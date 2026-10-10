@@ -1,0 +1,17 @@
+name: UK Stage1 Foundation Audit
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "scripts/uk-stage1-foundation-audit.sh"
+      - ".github/workflows/uk-stage1-foundation-audit.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/uk-stage1-foundation-audit.sh
