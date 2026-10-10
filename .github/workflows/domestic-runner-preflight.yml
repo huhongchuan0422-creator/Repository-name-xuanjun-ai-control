@@ -1,0 +1,13 @@
+name: Domestic Runner Read-Only Preflight
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  domestic-preflight:
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read-only preflight
+        run: bash scripts/domestic-runner-preflight.sh
