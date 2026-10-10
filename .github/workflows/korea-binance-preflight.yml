@@ -1,0 +1,17 @@
+name: Korea Binance Target Preflight
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "scripts/korea-binance-preflight.sh"
+      - ".github/workflows/korea-binance-preflight.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  korea-preflight:
+    runs-on: [self-hosted, linux, x64, xuanjun-korea-binance]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/korea-binance-preflight.sh

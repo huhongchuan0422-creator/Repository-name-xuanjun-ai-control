@@ -1,0 +1,17 @@
+name: Tokyo Read-Only Discovery
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "scripts/tokyo-readonly-discovery.sh"
+      - ".github/workflows/tokyo-readonly-discovery.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tokyo-discovery:
+    runs-on: [self-hosted, linux, x64, xuanjun-tokyo-readonly]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/tokyo-readonly-discovery.sh
