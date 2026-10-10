@@ -1,0 +1,26 @@
+name: Control Plane Validation
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate canonical files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f canonical/PROJECT_STATE.md
+          test -f inventory/XUANJUN_EXISTING_ASSET_MAP_V1.md
+          test -f plans/MIGRATION_SEQUENCE_V1.md
+          test -f runner/README.md
+          test -f scripts/runner-preflight.sh
+          ! grep -RInE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api[_-]?secret[[:space:]]*[:=][[:space:]]*[^<])' . --exclude-dir=.git
+          echo CONTROL_PLANE_VALIDATION=PASS
