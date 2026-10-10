@@ -47,9 +47,9 @@ class Queue:
         now = time.time() if now is None else now
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            # Expired workers may have performed external work. Recover to PENDING;
-            # fencing tokens prevent their stale acknowledgements.
-            self.db.execute("UPDATE tasks SET state='PENDING', lease_owner=NULL, lease_until=NULL,updated=? WHERE state='RUNNING' AND lease_until<=?", (now,now))
+            # Quarantine uncertain external effects: never silently retry expired work.
+            # A reconciliation/Owner gate is required before resume.
+            self.db.execute("UPDATE tasks SET state='WAITING_HUMAN', lease_owner=NULL, lease_until=NULL,fence=fence+1,updated=? WHERE state='RUNNING' AND lease_until<=?", (now,now))
             active = self.db.execute("SELECT COUNT(*) FROM tasks WHERE state='RUNNING' AND heavy=1").fetchone()[0]
             done = {r[0] for r in self.db.execute("SELECT id FROM tasks WHERE state='DONE'")}
             all_ids = {r[0] for r in self.db.execute("SELECT id FROM tasks")}
