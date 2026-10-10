@@ -1,0 +1,17 @@
+name: UK Control Plane Preflight
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "scripts/uk-dev-preflight.sh"
+      - ".github/workflows/uk-preflight.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  uk-preflight:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/uk-dev-preflight.sh
