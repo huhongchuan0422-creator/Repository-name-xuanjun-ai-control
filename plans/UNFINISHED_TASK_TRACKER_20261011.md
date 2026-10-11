@@ -285,3 +285,46 @@ Owner给出的冻结哈希；目录不可见或无读取权限只返回明确状
 本地候选的结论直接推广到A+B合并结果。正式切换仍须备份恢复、资源边界和
 唯一执行者现场证据；Owner人工节点集中登记，不能以聊天回执代替运行权威台账。
 
+
+## A+B第二版冻结与回收边界 — 2026-10-11 17:43 Asia/Shanghai
+
+Owner转交的首次组合候选09325583b59ed29e177682d4adccba7975730f0a独立QA /
+安全复验FAIL/HOLD，已撤销发布候选资格并退回修复；227项为开发自测，不能
+覆盖复验失败。失败包括缺codex_worker运行依赖、helper不可执行/组可写、
+workdir进入ledger子树、systemd239参数不兼容、sudo解释器PATH提权、停止
+/inactive未闭环、身份/路径过宽、非root-owned immutable安装、manifest无
+外部摘要锚/TOCTOU、callback/dispatcher DB不一致及epoch/恢复激活未程序化。
+原A/B单独候选也不具发布资格，不回收它们作为安装源。
+
+第二版执行方冻结报告（尚待Work回收实际内容）：
+- SOURCE_COMMIT仍为85ad1d7224485f3c57298e71a429eb576b8d943d。
+- 组合commit：93d5b04ed1ced8042e3982125a486e0bd1d43ec8。
+- 源补丁：/home/xuanjun_dev/xuanjun-uk-dev-20261011/integration-ab.patch。
+- patch SHA256：efe8607e8d54bf083ae8e696b953ee18aeb4c390ab7bc746cd2d1d09ddc2e1a6。
+- Owner提供的manifest SHA256：244a848aa322310a85a2bd0248908c079130cfa494a9dd3c17416eca768a41eb。
+- 229 tests、非root安装烟测、helper0755为执行方开发自测报告；未回收独立制品。
+- 对同一第二版候选的独立QA和安全复审已重新STARTED（Owner转交），结果未出。
+  发布/部署HOLD；C NOT_STARTED；无新的生产变更证据。
+
+英国Runner在c001d176c3eb7108d68492a10bd356175d708f09的真实job114438142799
+完成213项Work交接测试，但读取开发HOME为READ_ACCESS_NOT_VERIFIED，实际
+补丁尚未回收。新增一次性scripts/uk-work-handoff-bootstrap.py只能由英国
+Owner root在核对脚本摘要后执行：固定源文件、固定第二版哈希、256KiB上限、
+无symlink/祖先替换，先核对补丁再建立root-owned数据回收目录：
+/var/lib/xuanjun-work-handoff/returns/93d5b04ed1ced8042e3982125a486e0bd1d43ec8/。
+目录root:githubrunner组0750、candidate.patch root:githubrunner组0640；只复制
+数据，原文件和HOME权限不改，无通用sudo、服务重启、模型、数据库或部署。
+同内容重跑不覆盖，不同内容拒绝；原子发布及文件/目录fsync。root初始化结果
+尚NOT_VERIFIED，只影响结果回收，不阻止开发/独立复审在自己的工作目录继续。
+
+Runner只读collector只接收这份精确外部哈希的组合文本补丁，拒绝潜在密钥、
+symlink/git元数据/二进制/重命名/歧义路径；可接收脚本0755作为待审数据，
+不执行、不应用、不安装、不准入任何路径。manifest摘要当前仅Owner报告，
+不是已验证内容；Work必须重建SOURCE基线、核对补丁和manifest文件实际字节，
+逐文件审查并在最新PR HEAD上并发保护集成。独立QA/安全复审必须绑定最终拟
+发布commit和artifact，不能沿用旧失败版本或将Work交接测试计数当229项。
+
+现场仍需验证：窄helper实际安装/权限及systemd239运行；无UID0 Worker和生产
+路径读取；SQLite备份恢复含PRAGMA、fsync、WAL/SHM及失败回滚；旧Coordinator
+inactive、epoch唯一派发与lease丢失实际停止；两真实任务CI/QA/安全/批准拒绝/
+断点续跑；新看板外部HTTPS与真实心跳/全量人工队列。代码自测不替代这些门禁。

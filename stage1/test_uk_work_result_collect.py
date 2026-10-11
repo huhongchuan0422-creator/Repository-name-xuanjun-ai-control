@@ -70,3 +70,19 @@ class WorkCollectTest(unittest.TestCase):
                 stream.write(PATCH)
             with self.assertRaises(ValueError):
                 c.collect(directory, 'B', {0, os.getuid()}, 'a' * 40, '0' * 64)
+
+    def test_combined_receipt_requires_exact_external_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with open(os.path.join(directory, 'candidate.patch'), 'wb') as stream:
+                stream.write(PATCH)
+            for expected in [None, '0' * 64, c.INTEGRATED_PATCH_HASH]:
+                with self.assertRaises(ValueError):
+                    c.collect(directory, 'INTEGRATED', {0, os.getuid()}, 'a' * 40, expected)
+
+    def test_executable_script_transport_does_not_admit_symlink_or_git_metadata(self):
+        raw = PATCH.replace(b'--- a/', b'new mode 100755\n--- a/')
+        self.assertEqual(c.validate_patch(raw, 'INTEGRATED'), ['stage1/owner_dashboard.py'])
+        for invalid in [raw.replace(b'100755', b'120000'),
+                        raw.replace(b'stage1/owner_dashboard.py', b'.git/hooks/post-checkout')]:
+            with self.assertRaises(ValueError):
+                c.validate_patch(invalid, 'INTEGRATED')

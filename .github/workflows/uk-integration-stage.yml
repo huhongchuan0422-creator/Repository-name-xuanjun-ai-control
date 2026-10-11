@@ -19,7 +19,7 @@ jobs:
           set -euo pipefail
           test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
           python3 -m compileall -q stage1
-          python3 -m py_compile scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py
+          python3 -m py_compile scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-work-handoff-bootstrap.py scripts/uk-work-result-collect.py
           python3 -m unittest discover -s stage1 -q
           STAGE="/tmp/xuanjun-uk-integration-${GITHUB_SHA}"
           mkdir -p "$STAGE/stage1" "$STAGE/scripts" "$STAGE/canonical" "$STAGE/plans"
@@ -43,6 +43,11 @@ jobs:
           echo "UK_TASK_SOURCE_SHA=$GITHUB_SHA"
           echo "WORKER_TASK_DISPATCH=NOT_EXECUTED"
           echo "PRODUCTION_DEPLOYMENT=NOT_EXECUTED"
+      - name: Print reviewed handoff helper digest without executing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum scripts/uk-work-handoff-bootstrap.py scripts/uk-work-result-collect.py
       - name: Collect bounded development results without applying or deploying
         shell: bash
         run: |

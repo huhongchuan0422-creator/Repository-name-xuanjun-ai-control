@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read bounded A/B patches; never execute/apply them or claim acceptance."""
+"""Receive a hash-bound maintenance patch as data; never execute or admit it."""
 import base64
 import hashlib
 import json
@@ -12,8 +12,11 @@ import sys
 
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
 BASE_COMMIT = '85ad1d7224485f3c57298e71a429eb576b8d943d'
-ROOT = '/home/xuanjun_dev/xuanjun-uk-dev-20261011'
-MAX_PATCH = 131072
+ROOT = '/var/lib/xuanjun-work-handoff/returns'
+MAX_PATCH = 262144
+INTEGRATED_FROZEN_COMMIT = '93d5b04ed1ced8042e3982125a486e0bd1d43ec8'
+INTEGRATED_PATCH_HASH = 'efe8607e8d54bf083ae8e696b953ee18aeb4c390ab7bc746cd2d1d09ddc2e1a6'
+OWNER_REPORTED_MANIFEST_HASH = '244a848aa322310a85a2bd0248908c079130cfa494a9dd3c17416eca768a41eb'
 B_FROZEN_COMMIT = 'c49238abb9fa8a7fc90206d9d8308ac446f0988c'
 B_APPROVED_PATCH_HASH = 'ab58ff792f18b2c8daff53699ab43dd3241a5ae53575c98aaa399cdb1231236b'
 A_FROZEN_COMMIT = '85dd740d94f6c8d24979764dcbd40f3c48faabad'
@@ -77,6 +80,10 @@ def read_patch(path, owners):
 
 
 def allowed(node, path):
+    if node == 'INTEGRATED':
+        # Receipt of the exact Owner-pinned patch is not code-path admission.
+        # Every returned path must be reviewed before applying or publishing.
+        return bool(re.fullmatch(r'[A-Za-z0-9_./-]+', path))
     if path in EXACT[node]:
         return True
     if node == 'A':
@@ -87,7 +94,7 @@ def allowed(node, path):
 
 
 def validate_patch(raw, node):
-    if node not in EXACT:
+    if node not in EXACT and node != 'INTEGRATED':
         raise ValueError('UNKNOWN_NODE')
     if len(raw) > MAX_PATCH or b'\x00' in raw:
         raise ValueError('INVALID_PATCH_BYTES')
@@ -102,7 +109,7 @@ def validate_patch(raw, node):
                     or not allowed(node, match.group(1))):
                 raise ValueError('PATCH_SCOPE_NOT_APPROVED')
             path = match.group(1)
-            if any(part in ('', '.', '..') for part in path.split('/')) or path in paths:
+            if any(part in ('', '.', '..', '.git') for part in path.split('/')) or path in paths:
                 raise ValueError('AMBIGUOUS_PATCH_PATH')
             paths.append(path)
         elif line.startswith(('--- ', '+++ ')):
@@ -110,7 +117,10 @@ def validate_patch(raw, node):
             if (not paths or value not in ('/dev/null', 'a/' + paths[-1], 'b/' + paths[-1])):
                 raise ValueError('PATCH_HEADER_MISMATCH')
         elif line.startswith(('new file mode ', 'old mode ', 'new mode ', 'deleted file mode ')):
-            if line.split()[-1] != '100644':
+            mode = line.split()[-1]
+            executable_data = (node == 'INTEGRATED' and mode == '100755'
+                               and paths and paths[-1].endswith(('.py', '.sh')))
+            if mode != '100644' and not executable_data:
                 raise ValueError('PATCH_FILE_MODE_BLOCKED')
         elif line.startswith(('GIT binary patch', 'Binary files ', 'rename from ', 'rename to ',
                               'copy from ', 'copy to ')):
@@ -121,6 +131,8 @@ def validate_patch(raw, node):
 
 
 def collect(directory, node, owners, control_commit, expected_hash=None):
+    if node == 'INTEGRATED' and expected_hash != INTEGRATED_PATCH_HASH:
+        raise ValueError('INTEGRATED_FROZEN_HASH_REQUIRED')
     # Exactly one root-level .patch/.diff; never choose an arbitrary latest file.
     info = safe_path(directory, owners)
     if not stat.S_ISDIR(info.st_mode):
@@ -158,17 +170,25 @@ def main():
     if not re.fullmatch(r'[0-9a-f]{40}', commit):
         raise SystemExit('STOP_CONTROL_COMMIT_REQUIRED')
     owners = {0, os.getuid(), pwd.getpwnam('xuanjun_dev').pw_uid}
-    for node, folder in [('A', 'a-work'), ('B', 'b-work')]:
+    for node, folder in [('INTEGRATED', INTEGRATED_FROZEN_COMMIT)]:
         try:
             result = collect(ROOT + '/' + folder, node, owners, commit,
-                             B_APPROVED_PATCH_HASH if node == 'B' else A_APPROVED_PATCH_HASH)
+                             INTEGRATED_PATCH_HASH)
             if result['status'] == 'CANDIDATE_PATCH_COLLECTED':
-                result['owner_reported_frozen_commit'] = B_FROZEN_COMMIT if node == 'B' else A_FROZEN_COMMIT
+                result['owner_reported_frozen_commit'] = INTEGRATED_FROZEN_COMMIT
+                result['owner_reported_manifest_sha256'] = OWNER_REPORTED_MANIFEST_HASH
+                result['manifest_verified'] = False
+                result['maintenance_path_admission'] = 'NOT_VERIFIED'
         except PermissionError:
             result = {'node': node, 'status': 'READ_ACCESS_NOT_VERIFIED'}
         except FileNotFoundError:
             result = {'node': node, 'status': 'WORKDIR_OR_PATCH_NOT_VISIBLE'}
-        except (ValueError, UnicodeError, OSError):
+        except ValueError as error:
+            # Only our bounded machine codes, never arbitrary filesystem text.
+            code = str(error)
+            result = {'node': node, 'status': 'PATCH_REJECTED',
+                      'reason': code if re.fullmatch(r'[A-Z_]{1,64}', code) else 'INVALID_PATCH'}
+        except (UnicodeError, OSError):
             result = {'node': node, 'status': 'PATCH_REJECTED_NO_RAW_DIAGNOSTIC'}
         print('WORK_RESULT_' + node + '=' + json.dumps(result, sort_keys=True))
 
