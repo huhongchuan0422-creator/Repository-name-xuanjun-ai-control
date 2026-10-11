@@ -29,7 +29,7 @@ def main():
     try:
         os.fchmod(fd, 0o600)
         with os.fdopen(fd, 'w') as f:
-            f.write('OWNER_USER_ID=' + owner + '\\nOWNER_CHAT_ID=' + chat + '\\n')
+            f.write('OWNER_USER_ID=' + owner + '\nOWNER_CHAT_ID=' + chat + '\n')
         os.rename(tmp, destination)
     finally:
         if os.path.exists(tmp):
