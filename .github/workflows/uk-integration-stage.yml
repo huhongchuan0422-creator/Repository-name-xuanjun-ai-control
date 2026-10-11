@@ -48,6 +48,27 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum scripts/uk-work-handoff-bootstrap.py scripts/uk-work-result-collect.py
+      - name: Deliver Work-approved bounded repair source without starting agents
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          path=Path('plans/WORK_APPROVED_AB_REPAIR_SPEC_20261011.json')
+          raw=path.read_bytes()
+          spec=json.loads(raw.decode('utf-8'))
+          assert spec['permissions']['production_deploy'] is False
+          assert spec['permissions']['old_coordinator_codex_exec'] is False
+          patch=Path(spec['evidence_root']+'/integration-ab.patch').read_bytes()
+          assert hashlib.sha256(patch).hexdigest()==spec['repair_baseline']['patch_sha256']
+          print('WORK_REPAIR_CONTROL_SHA='+os.environ['GITHUB_SHA'])
+          print('WORK_REPAIR_SPEC_SHA256='+hashlib.sha256(raw).hexdigest())
+          print('WORK_REPAIR_SOURCE='+str(Path(os.environ['GITHUB_WORKSPACE'])/path))
+          print('WORK_REPAIR_EXECUTOR_RECEIPT=NOT_VERIFIED')
+          print('WORK_REPAIR_AGENT_START=NOT_EXECUTED')
+          print('FAILED_PATCH_APPLICATION=NOT_EXECUTED')
+          PYCODE
       - name: Collect bounded development results without applying or deploying
         shell: bash
         run: |

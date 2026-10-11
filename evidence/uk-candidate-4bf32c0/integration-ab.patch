@@ -1,0 +1,2120 @@
+diff --git a/.github/workflows/stage1-owner-workbench-checks.yml b/.github/workflows/stage1-owner-workbench-checks.yml
+new file mode 100644
+index 0000000..666673b
+--- /dev/null
++++ b/.github/workflows/stage1-owner-workbench-checks.yml
+@@ -0,0 +1,33 @@
++name: Stage1 Owner Workbench Candidate Checks
++on:
++  pull_request:
++    paths:
++      - 'stage1/owner_dashboard.py'
++      - 'stage1/owner_dashboard.html'
++      - 'stage1/test_owner_dashboard.py'
++      - 'stage1/owner_callback_server.py'
++      - 'stage1/test_owner_callback_server.py'
++      - 'stage1/uk_owner_callback_core.py'
++      - 'scripts/uk-owner-workbench-config.py'
++      - 'stage1/test_owner_workbench_config.py'
++      - 'deploy/uk-owner-workbench/**'
++      - '.github/workflows/stage1-owner-workbench-checks.yml'
++permissions:
++  contents: read
++jobs:
++  owner-workbench-unit:
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    steps:
++      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
++        with:
++          persist-credentials: false
++      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
++        with:
++          python-version: '3.12'
++      - name: Compile and test without deployment
++        run: |
++          set -euo pipefail
++          python -m py_compile stage1/owner_dashboard.py stage1/owner_callback_server.py stage1/uk_owner_callback_core.py scripts/uk-owner-workbench-config.py
++          cd stage1
++          python -m unittest -v test_owner_dashboard test_owner_callback_server test_uk_owner_callback_core test_owner_workbench_config
+diff --git a/.github/workflows/stage1-telegram-owner-checks.yml b/.github/workflows/stage1-telegram-owner-checks.yml
+index 83df9be..a84a099 100644
+--- a/.github/workflows/stage1-telegram-owner-checks.yml
++++ b/.github/workflows/stage1-telegram-owner-checks.yml
+@@ -6,6 +6,8 @@ on:
+       - 'stage1/test_telegram_owner_transport.py'
+       - 'stage1/uk_owner_callback_core.py'
+       - 'stage1/test_uk_owner_callback_core.py'
++      - 'stage1/owner_callback_server.py'
++      - 'stage1/test_owner_callback_server.py'
+       - 'stage1/telegram_owner_request_registry.py'
+       - 'stage1/test_telegram_owner_request_registry.py'
+       - '.github/workflows/stage1-telegram-owner-checks.yml'
+@@ -14,13 +16,16 @@ permissions:
+ jobs:
+   owner-transport-unit:
+     runs-on: ubuntu-latest
++    timeout-minutes: 5
+     steps:
+-      - uses: actions/checkout@v4
+-      - uses: actions/setup-python@v5
++      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
++        with:
++          persist-credentials: false
++      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
+         with:
+           python-version: '3.12'
+       - run: |
+           set -euo pipefail
+-          python -m py_compile stage1/telegram_owner_transport.py stage1/test_telegram_owner_transport.py stage1/uk_owner_callback_core.py stage1/test_uk_owner_callback_core.py
++          python -m py_compile stage1/telegram_owner_transport.py stage1/test_telegram_owner_transport.py stage1/uk_owner_callback_core.py stage1/test_uk_owner_callback_core.py stage1/owner_callback_server.py stage1/test_owner_callback_server.py
+           cd stage1
+-          python -m unittest -v test_telegram_owner_transport test_uk_owner_callback_core test_telegram_owner_request_registry
++          python -m unittest -v test_telegram_owner_transport test_uk_owner_callback_core test_owner_callback_server test_telegram_owner_request_registry
+diff --git a/deploy/INTEGRATION_BINDING.md b/deploy/INTEGRATION_BINDING.md
+new file mode 100644
+index 0000000..bb07b41
+--- /dev/null
++++ b/deploy/INTEGRATION_BINDING.md
+@@ -0,0 +1,17 @@
++# Integration artifact binding
++
++The checked-in manifest binds every A+B candidate file to `SOURCE_COMMIT`
++`85ad1d7224485f3c57298e71a429eb576b8d943d` and a SHA-256. The verifier fails
++closed on missing, extra-path, symlink, source or digest mismatches. The atomic
++installer copies only manifested bytes into a new immutable version directory
++using an atomic directory rename. Units bind the exact hash directory; no
++mutable `current` symlink is used at runtime.
++
++The final Git commit cannot contain its own commit hash, and a patch cannot
++contain its own SHA-256 without changing that SHA-256. Therefore the frozen
++`integration-ab.patch` digest is written beside the patch as
++`integration-ab.patch.sha256` after commit. It is an external freeze receipt;
++the checked-in trust root is SOURCE_COMMIT plus the per-file manifest.
++
++Schema migration is a separate backup-first staging gate. Neither manifest
++verification nor installation activates systemd, nginx, a webhook, or a DB.
+diff --git a/deploy/UK_DISPATCHER_ROLLOUT.md b/deploy/UK_DISPATCHER_ROLLOUT.md
+new file mode 100644
+index 0000000..4dc5d16
+--- /dev/null
++++ b/deploy/UK_DISPATCHER_ROLLOUT.md
+@@ -0,0 +1,46 @@
++# UK dispatcher controlled rollout (candidate only)
++
++This repository does not activate production. The old Coordinator, trading
++permissions, production webhook and production database remain unchanged.
++
++## Admission and backup
++
++1. Freeze the reviewed commit and independently verify the service, config and
++   exact artifact hashes. Create the dedicated `xuanjun-dispatcher` and
++   `xj_codex_worker` identities; the worker must not belong to production,
++   Docker or trading groups. Keep the ledger `0600` and unreadable to the worker.
++2. Stop before mutation if the configured repository `HEAD` is not the approved
++   `source_commit`, config validation fails, `gh`/Codex managed authentication is
++   absent, or an old/new dispatcher ownership decision is unresolved.
++3. While holding the existing database writer's maintenance gate, make a
++   consistent backup:
++
++       python3 stage1/ledger_backup.py --backup LIVE.sqlite BACKUP.sqlite
++
++   Save the returned SHA-256 outside Git. Verify and perform a restore rehearsal
++   into a new path using `--stage-restore ... --expected-sha256 ...`. Never copy
++   an active SQLite file directly.
++
++## Canary and switch
++
++1. Install into the root-owned manifest-hash directory under
++   `/opt/xuanjun-control-releases`; render the unit with that exact immutable
++   hash path. Runtime units must not follow a mutable release symlink.
++2. Run `development_service.py --check-config`; start the unit with no ready
++   CODEX_EXEC rows and confirm a second instance fails its dispatcher lock.
++3. Verify a disposable approved task: unique worktree, transient
++   `xj-codex-*` systemd unit, bounded CPU/memory/tasks, worker UID unable to read
++   the ledger or any production DB/credential path, exact-source branch push,
++   frozen CI and independent QA evidence. This is not production acceptance.
++4. Only after Release Gate approval, quiesce the old development dispatcher,
++   reconcile all leases/checkpoints, then enable the new unit. Do not insert
++   CODEX_EXEC into the old Coordinator.
++
++## Rollback
++
++Stop the new unit, retain its ledger/worktrees/evidence, restore the previous
++version symlink, and reactivate the prior dispatcher only after proving it owns
++no overlapping live lease. If database restoration is required, stage and
++verify the saved backup first, then atomically replace the stopped database
++under the single-writer maintenance gate. Unknown effects go to WAITING_HUMAN;
++never replay a model turn, commit, push or PR creation.
+diff --git a/deploy/dispatcher.example.json b/deploy/dispatcher.example.json
+new file mode 100644
+index 0000000..a571d68
+--- /dev/null
++++ b/deploy/dispatcher.example.json
+@@ -0,0 +1,20 @@
++{
++  "config_version": 1,
++  "control_repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control",
++  "source_commit": "85ad1d7224485f3c57298e71a429eb576b8d943d",
++  "repositories": {"huhongchuan0422-creator/Repository-name-xuanjun-ai-control": "/var/lib/xuanjun-development/control.git"},
++  "db_path": "/var/lib/xuanjun-development/ledger/state.sqlite",
++  "dispatcher_lock": "/run/xuanjun-development/dispatcher.lock",
++  "github_writer_lock": "/run/xuanjun-development/github-writer.lock",
++  "workspace_root": "/var/lib/xuanjun-development/worktrees",
++  "service_home": "/var/lib/xuanjun-development/service-home",
++  "worker_home": "/var/lib/xuanjun-development/worker-home",
++  "codex_home": "/var/lib/xuanjun-development/codex-home",
++  "worker_user": "xj_codex_worker",
++  "codex_bin": "/usr/bin/codex",
++  "gh_bin": "/usr/bin/gh",
++  "path": "/usr/local/bin:/usr/bin:/bin",
++  "required_checks": ["stage1-tests"],
++  "model": "gpt-5.6-sol",
++  "max_workers": 2
++}
+diff --git a/deploy/integration-manifest.json b/deploy/integration-manifest.json
+new file mode 100644
+index 0000000..a015074
+--- /dev/null
++++ b/deploy/integration-manifest.json
+@@ -0,0 +1,40 @@
++{
++  "schema": 1,
++  "source_commit": "85ad1d7224485f3c57298e71a429eb576b8d943d",
++  "binding": "SOURCE_COMMIT_AND_FILE_SHA256",
++  "files": {
++    ".github/workflows/stage1-owner-workbench-checks.yml": "eb911ef7fb95d6eb18d932f216e3ba1877e1859de72a83e5236f893c1b7690c7",
++    ".github/workflows/stage1-telegram-owner-checks.yml": "364426597cbaa73da6317dd2b8ce296fbe39d63e33646de9e8601499b44584a9",
++    "deploy/INTEGRATION_BINDING.md": "7f99deeab5ef783f898bcd45909c05a84a1bd2a2feb61a0a4aa923a5b00b05dc",
++    "deploy/UK_DISPATCHER_ROLLOUT.md": "5ce16dcedd359f8b6ec6cb592464d7a1f9f0590b2c763b11a8515076a24a507a",
++    "deploy/dispatcher.example.json": "afce9ad9bf7ea8b3e38898aee70b7b61bba315ce551b7fa08fe3a0bf379ce1ef",
++    "deploy/uk-owner-workbench/README.md": "b6e227e88e1bbcf7cce0532f16689e6ff249b28395f9a83bf36041a5b73a5d81",
++    "deploy/uk-owner-workbench/nginx.conf.template": "f72349f30c7c6beb950522967a3ce6a274285d48a12fcb531615ac0f84c410ef",
++    "deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service": "3073ad4a51087b279040b22bb32a98ba862fca08f1cdeac25342ec825cc32d39",
++    "deploy/xj-codex-isolation-helper.sudoers": "9ee36dc06dbf7f12003e6972e523d0aaf96f93525dd3e623118837d6c0b0d5c9",
++    "deploy/xuanjun-development-dispatcher.service": "68c6de2f6d52a73372897e17ab4a6bb398d2f001d63796572abf3e2633a0eb65",
++    "scripts/uk-integration-install.py": "b82d450b421d43f62c15d178736ced067be33d96d77f980ece06eab73e6fca25",
++    "scripts/uk-owner-workbench-config.py": "af0c64c5c5cf3a12167b8c6a25ef805c57f7a5296bc09c11c3eebf7ea27285ec",
++    "scripts/xj-codex-isolation-helper": "aa23517dae324c327dfc03a2cc3d05daec55274b6b40fa9682a89069420e5496",
++    "stage1/callback_schema_gate.py": "a7e83427ac9fedb7e86c28f9298122e134215317bb996eae8753cfcb3d455271",
++    "stage1/codex_app_server_worker.py": "518e5b7a2ca506d0917c0fe7270e29a15dc4e7ac0360fcb4d94e8274a6d42395",
++    "stage1/codex_worker.py": "f138a621a34e8e57736e9273afc6dd23c805bd3c2dbe3806f0cb2d6a8df70d78",
++    "stage1/development_loop.py": "ef92d0a3ba8ce7cbe0236c6a6a8f0b79c610b02a577521982955905f59b61bfb",
++    "stage1/development_pipeline.py": "3e3a22e1b62434379f70dc93b3ba6d5c41292c448275e78fc4cbc6ce9f3ea363",
++    "stage1/development_service.py": "9531709f5f0e5553f19f57174e4cd4e2400e42583f9770ee5de49c0e08900845",
++    "stage1/execution_ledger.py": "0653c04288d5c948233d50bd3e18090664dce194158a9e75f7754f925d6eb9f4",
++    "stage1/ledger_backup.py": "370af4f0c94bd75eda6d3e721d1a941dc2b3ca7a200c62b3279f26afc8599d3c",
++    "stage1/owner_callback_server.py": "aabc595ce808b016dc3f361354080df2fa7a782eb5591fd00177053c648e9832",
++    "stage1/owner_dashboard.html": "70f285c1335016f11ba17a51ab33d04d1a74380caaee3abb64fc74923f73584f",
++    "stage1/owner_dashboard.py": "b94bb793d554811b3f2147b2d91f3beb6c273ef46fcbdd2cc50d471432c146d6",
++    "stage1/telegram_owner_transport.py": "fd161575bfb6db99b367e712f8ad82c7941255e61364e347e5567ab56272beda",
++    "stage1/test_callback_schema_gate.py": "f3f713e9a79474a35906bdef3d0406983a36d0702156a9fc5f55ce40a274ab3c",
++    "stage1/test_development_service.py": "2408b5b745c909873de92c687932b6ec46b1cf745b3106305e55c58c3272fe6a",
++    "stage1/test_integration_installer.py": "286a4edbac0a18eebd2d67b5fbb69b032d458d16f79494829483155d140c14a7",
++    "stage1/test_isolation_helper.py": "d05f18e5fb07f4ccc804e1444f1dbc33261e1845a3151e0afd95b248c2bac781",
++    "stage1/test_owner_callback_server.py": "1627d88564b391254048be061fcc0825db6469a255033f52107a2b56f0f13a01",
++    "stage1/test_owner_workbench_config.py": "93134152b57e359e80d2c4259edc89e07fd67ff5daeaac728e64ce5025e1745b",
++    "stage1/test_uk_owner_callback_core.py": "71839253b212157c9f6d13daeaba4436f94e55d72c01e80d01af4c0972bd1f30",
++    "stage1/uk_owner_callback_core.py": "461d8139c4e3b8d8d442b278eb01d7fc9de82903fab9a6ef44717137788af9eb"
++  }
++}
+diff --git a/deploy/uk-owner-workbench/README.md b/deploy/uk-owner-workbench/README.md
+new file mode 100644
+index 0000000..93b25f6
+--- /dev/null
++++ b/deploy/uk-owner-workbench/README.md
+@@ -0,0 +1,34 @@
++# UK Owner workbench deployment candidate
++
++This directory is a candidate only. It does not authorize deployment or a
++formal Telegram webhook change.
++
++1. Freeze one reviewed commit and stage its exact files outside the repository.
++2. Create the dedicated `xuanjun-callback` identity and shared DB-only group;
++   it must not belong to `xuanjun_dev`, Docker, sudo or trading groups. Provision
++   the dashboard bearer token, callback bearer token, callback HMAC
++   key, Owner user ID and Owner private-chat ID as separate mode `0600` files.
++   Never put their values in Git, systemd environment lines or logs. Callback
++   secrets live only below `/etc/xuanjun-owner-callback`; its sole writable path
++   is `/var/lib/xuanjun-owner-callback/state`.
++3. Render `nginx.conf.template` with
++   `scripts/uk-owner-workbench-config.py --verify-files`. Install the rendered
++   file through the existing platform release gate, then run `nginx -t` before
++   reloading nginx. Existing unrelated server blocks must be preserved.
++4. Install the callback unit and the existing dashboard unit only after their
++   source manifests match the frozen commit. Both application listeners remain
++   loopback-only; only nginx listens on HTTPS.
++5. Before activation run `callback_schema_gate.py` against the stopped or
++   single-writer-gated database. It creates a consistent backup, migrates only a
++   staged restore, validates the schema, and reports `live_switched=false`.
++   Failure means zero switch. Activation of the staged DB is a later Release
++   Gate action and is not performed by this candidate.
++6. Acceptance requires external HTTPS checks for authorized and unauthorized
++   dashboard reads, the complete `WAITING_HUMAN` count/queue, and real fenced
++   APPROVE and REJECT requests. Repeat update IDs, request IDs, expired requests,
++   stale fences, wrong Owner user/chat bindings and bad signatures must fail.
++
++Rollback: restore the previous nginx configuration and reload it, then stop and
++disable only `xuanjun-uk-owner-callback.service`. Do not remove callback tables
++or modify task/approval rows during rollback. Retain the database backup and
++evidence. The existing customer webhook and old Coordinator remain unchanged.
+diff --git a/deploy/uk-owner-workbench/nginx.conf.template b/deploy/uk-owner-workbench/nginx.conf.template
+new file mode 100644
+index 0000000..6d80c26
+--- /dev/null
++++ b/deploy/uk-owner-workbench/nginx.conf.template
+@@ -0,0 +1,53 @@
++# Render @@OWNER_HOST@@, @@TLS_CERT@@ and @@TLS_KEY@@ through the controlled
++# release entry. Do not expose either Python service directly.
++limit_req_zone $binary_remote_addr zone=owner_callback_rate:10m rate=5r/s;
++limit_conn_zone $binary_remote_addr zone=owner_callback_conn:10m;
++server {
++    listen 443 ssl http2;
++    server_name @@OWNER_HOST@@;
++
++    ssl_certificate @@TLS_CERT@@;
++    ssl_certificate_key @@TLS_KEY@@;
++    ssl_protocols TLSv1.2 TLSv1.3;
++    add_header Strict-Transport-Security "max-age=31536000" always;
++    server_tokens off;
++
++    client_max_body_size 16k;
++    proxy_http_version 1.1;
++    proxy_set_header Host $host;
++    proxy_set_header X-Forwarded-Proto https;
++    proxy_set_header X-Forwarded-For $remote_addr;
++
++    location = /owner-callback {
++        limit_except POST { deny all; }
++        limit_req zone=owner_callback_rate burst=10 nodelay;
++        limit_conn owner_callback_conn 4;
++        proxy_pass http://127.0.0.1:18557/owner-callback;
++        proxy_set_header Authorization $http_authorization;
++        proxy_set_header X-Xuanjun-Signature $http_x_xuanjun_signature;
++        proxy_request_buffering on;
++        proxy_buffering off;
++        proxy_connect_timeout 2s;
++        proxy_send_timeout 5s;
++        proxy_read_timeout 12s;
++    }
++
++    location = /owner/ {
++        limit_conn owner_callback_conn 4;
++        proxy_pass http://127.0.0.1:18556/;
++        proxy_connect_timeout 2s;
++        proxy_send_timeout 5s;
++        proxy_read_timeout 12s;
++    }
++    location = /owner/api/state {
++        limit_req zone=owner_callback_rate burst=10 nodelay;
++        limit_conn owner_callback_conn 4;
++        proxy_pass http://127.0.0.1:18556/api/state;
++        proxy_set_header Authorization $http_authorization;
++        proxy_buffering off;
++        proxy_connect_timeout 2s;
++        proxy_send_timeout 5s;
++        proxy_read_timeout 12s;
++    }
++    location / { return 404; }
++}
+diff --git a/deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service b/deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service
+new file mode 100644
+index 0000000..e2eb45e
+--- /dev/null
++++ b/deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service
+@@ -0,0 +1,35 @@
++[Unit]
++Description=Xuanjun UK fenced Owner approval callback
++After=network.target
++
++[Service]
++Type=simple
++User=xuanjun-callback
++Group=xuanjun-control-db
++WorkingDirectory=/opt/xuanjun-control-releases/@@ARTIFACT_SHA256@@/stage1
++ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@ARTIFACT_SHA256@@/stage1/owner_callback_server.py --db /var/lib/xuanjun-owner-callback/state/state.sqlite --auth-file /etc/xuanjun-owner-callback/owner-callback-auth --hmac-key-file /etc/xuanjun-owner-callback/owner-callback-hmac --owner-id-file /etc/xuanjun-owner-callback/owner-user-id --owner-chat-id-file /etc/xuanjun-owner-callback/owner-chat-id --port 18557 --socket-timeout 5 --max-workers 8
++Restart=on-failure
++RestartSec=5
++NoNewPrivileges=true
++PrivateTmp=true
++PrivateDevices=true
++ProtectSystem=strict
++ProtectHome=true
++ProtectKernelTunables=true
++ProtectKernelModules=true
++ProtectControlGroups=true
++RestrictNamespaces=true
++LockPersonality=true
++RestrictSUIDSGID=true
++CapabilityBoundingSet=
++AmbientCapabilities=
++ReadOnlyPaths=/opt/xuanjun-control-releases/@@ARTIFACT_SHA256@@ /etc/xuanjun-owner-callback
++ReadWritePaths=/var/lib/xuanjun-owner-callback/state
++RestrictAddressFamilies=AF_INET AF_UNIX
++SystemCallArchitectures=native
++MemoryMax=256M
++TasksMax=32
++UMask=0077
++
++[Install]
++WantedBy=multi-user.target
+diff --git a/deploy/xj-codex-isolation-helper.sudoers b/deploy/xj-codex-isolation-helper.sudoers
+new file mode 100644
+index 0000000..0a543ec
+--- /dev/null
++++ b/deploy/xj-codex-isolation-helper.sudoers
+@@ -0,0 +1,2 @@
++# Install mode 0440, owner root:root only after helper hash/ownership verification.
++xuanjun-dispatcher ALL=(root) NOPASSWD: /usr/bin/python3 /usr/local/libexec/xj-codex-isolation-helper *
+diff --git a/deploy/xuanjun-development-dispatcher.service b/deploy/xuanjun-development-dispatcher.service
+new file mode 100644
+index 0000000..d3495b7
+--- /dev/null
++++ b/deploy/xuanjun-development-dispatcher.service
+@@ -0,0 +1,33 @@
++[Unit]
++Description=Xuanjun fenced development dispatcher
++After=network-online.target
++Wants=network-online.target
++ConditionPathExists=/etc/xuanjun-development/dispatcher.json
++
++[Service]
++Type=simple
++User=xuanjun-dispatcher
++Group=xuanjun-dispatcher
++ExecStartPre=/usr/bin/python3 /opt/xuanjun-control-releases/@@ARTIFACT_SHA256@@/stage1/development_service.py --config /etc/xuanjun-development/dispatcher.json --check-config
++ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@ARTIFACT_SHA256@@/stage1/development_service.py --config /etc/xuanjun-development/dispatcher.json
++Restart=on-failure
++RestartSec=10
++TimeoutStopSec=30
++NoNewPrivileges=yes
++PrivateTmp=yes
++PrivateDevices=yes
++ProtectSystem=strict
++ProtectHome=yes
++ProtectKernelTunables=yes
++ProtectKernelModules=yes
++ProtectControlGroups=yes
++RestrictSUIDSGID=yes
++LockPersonality=yes
++MemoryMax=3G
++CPUQuota=200%
++TasksMax=512
++ReadOnlyPaths=/opt/xuanjun-control-releases/@@ARTIFACT_SHA256@@ /etc/xuanjun-development
++ReadWritePaths=/var/lib/xuanjun-development /run/xuanjun-development
++
++[Install]
++WantedBy=multi-user.target
+diff --git a/scripts/uk-integration-install.py b/scripts/uk-integration-install.py
+new file mode 100755
+index 0000000..ff05f7a
+--- /dev/null
++++ b/scripts/uk-integration-install.py
+@@ -0,0 +1,146 @@
++#!/usr/bin/env python3
++"""Verify a frozen SOURCE_COMMIT/file manifest and atomically stage a release."""
++import argparse
++import hashlib
++import json
++import os
++import re
++import shutil
++import stat
++import subprocess
++import sys
++import tempfile
++
++
++SHA = re.compile(r'^[0-9a-f]{64}$')
++
++
++def digest(path):
++    value=hashlib.sha256()
++    fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
++    info=os.fstat(fd)
++    if not stat.S_ISREG(info.st_mode): os.close(fd); raise ValueError('NOT_REGULAR_FILE')
++    with os.fdopen(fd,'rb') as stream:
++        for chunk in iter(lambda:stream.read(1024*1024),b''): value.update(chunk)
++    return value.hexdigest()
++
++
++def read_manifest(path, expected_sha):
++    fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
++    try:
++        info=os.fstat(fd)
++        if not stat.S_ISREG(info.st_mode) or info.st_size>1024*1024:
++            raise ValueError('INVALID_MANIFEST_FILE')
++        chunks=[]; value=hashlib.sha256()
++        while True:
++            chunk=os.read(fd,65536)
++            if not chunk: break
++            chunks.append(chunk); value.update(chunk)
++        data=b''.join(chunks)
++        if not SHA.fullmatch(expected_sha) or value.hexdigest()!=expected_sha:
++            raise ValueError('MANIFEST_SHA256_MISMATCH')
++        return json.loads(data.decode('utf-8')),data
++    finally:
++        os.close(fd)
++
++
++def verify(root, manifest_path, expected_source, expected_manifest_sha):
++    if any(os.path.realpath(value)!=value for value in (root,manifest_path)):
++        raise ValueError('CANONICAL_PATH_REQUIRED')
++    # Hash and parse exactly the same bytes from one O_NOFOLLOW descriptor.
++    manifest,manifest_bytes=read_manifest(manifest_path,expected_manifest_sha)
++    if (manifest.get('schema')!=1 or manifest.get('source_commit')!=expected_source
++            or not re.fullmatch(r'[0-9a-f]{40}',expected_source)):
++        raise ValueError('SOURCE_COMMIT_MISMATCH')
++    files=manifest.get('files')
++    if not isinstance(files,dict) or not files: raise ValueError('EMPTY_MANIFEST')
++    for name,expected in files.items():
++        if (not isinstance(name,str) or name.startswith('/') or '..' in name.split('/')
++                or not SHA.fullmatch(expected)):
++            raise ValueError('INVALID_MANIFEST_ENTRY')
++        path=os.path.join(root,name)
++        if os.path.islink(path) or not os.path.isfile(path) or digest(path)!=expected:
++            raise ValueError('ARTIFACT_MISMATCH:'+name)
++    return manifest,manifest_bytes
++
++
++def smoke(root):
++    for relative in ('stage1/development_service.py','stage1/owner_callback_server.py',
++                     'stage1/owner_dashboard.py'):
++        result=subprocess.run([sys.executable,os.path.join(root,relative),'--help'],
++                              cwd=os.path.join(root,'stage1'),stdout=subprocess.DEVNULL,
++                              stderr=subprocess.PIPE,timeout=10,check=False)
++        if result.returncode: raise ValueError('RUNTIME_CLOSURE_SMOKE_FAILED:'+relative)
++
++
++def copy_verified(source,destination,expected):
++    source_fd=os.open(source,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
++    source_info=os.fstat(source_fd)
++    if not stat.S_ISREG(source_info.st_mode):
++        os.close(source_fd); raise ValueError('NOT_REGULAR_FILE')
++    destination_fd=os.open(destination,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o444)
++    observed=hashlib.sha256()
++    with os.fdopen(source_fd,'rb') as src,os.fdopen(destination_fd,'wb') as dst:
++        while True:
++            chunk=src.read(65536)
++            if not chunk: break
++            observed.update(chunk); dst.write(chunk)
++        dst.flush(); os.fsync(dst.fileno())
++    if observed.hexdigest()!=expected:
++        raise ValueError('ARTIFACT_CHANGED_DURING_COPY')
++
++
++def install(root,manifest_path,expected_source,expected_manifest_sha,releases,enforce_root=True):
++    if enforce_root and os.geteuid()!=0: raise PermissionError('ROOT_INSTALL_REQUIRED')
++    manifest,manifest_bytes=verify(root,manifest_path,expected_source,expected_manifest_sha)
++    if not os.path.isabs(releases) or os.path.realpath(os.path.dirname(releases))!=os.path.dirname(releases):
++        raise ValueError('INVALID_INSTALL_PATH')
++    manifest_hash=digest(manifest_path)
++    target=os.path.join(releases,'integration-'+manifest_hash[:16])
++    os.makedirs(releases,mode=0o750,exist_ok=True)
++    if os.path.exists(target): raise ValueError('RELEASE_ALREADY_EXISTS')
++    staging=tempfile.mkdtemp(prefix='.integration-',dir=releases)
++    try:
++        for name in sorted(manifest['files']):
++            destination=os.path.join(staging,name)
++            os.makedirs(os.path.dirname(destination),mode=0o750,exist_ok=True)
++            source=os.path.join(root,name)
++            try: copy_verified(source,destination,manifest['files'][name])
++            except ValueError as error: raise ValueError(str(error)+':'+name)
++        manifest_destination=os.path.join(staging,'INTEGRATION_MANIFEST.json')
++        manifest_fd=os.open(manifest_destination,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o444)
++        with os.fdopen(manifest_fd,'wb') as output:
++            output.write(manifest_bytes); output.flush(); os.fsync(output.fileno())
++        helper=os.path.join(staging,'scripts','xj-codex-isolation-helper')
++        os.chmod(helper,0o755)
++        if os.stat(helper).st_mode & 0o022: raise ValueError('UNSAFE_HELPER_MODE')
++        smoke(staging)
++        if enforce_root:
++            for directory,dirs,files in os.walk(staging):
++                os.chown(directory,0,0); os.chmod(directory,0o555)
++                for name in files:
++                    path=os.path.join(directory,name); os.chown(path,0,0)
++                    os.chmod(path,0o755 if path==helper else 0o444)
++        os.rename(staging,target)
++        directory_fd=os.open(releases,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
++        try: os.fsync(directory_fd)
++        finally: os.close(directory_fd)
++    finally:
++        if os.path.isdir(staging): shutil.rmtree(staging)
++    return target
++
++
++def main(argv=None):
++    parser=argparse.ArgumentParser()
++    parser.add_argument('--root',required=True); parser.add_argument('--manifest',required=True)
++    parser.add_argument('--source-commit',required=True); parser.add_argument('--manifest-sha256',required=True)
++    parser.add_argument('--verify-only',action='store_true')
++    parser.add_argument('--releases')
++    args=parser.parse_args(argv)
++    if args.verify_only:
++        verify(args.root,args.manifest,args.source_commit,args.manifest_sha256); print('MANIFEST_OK'); return 0
++    if not args.releases: parser.error('install requires --releases')
++    print(install(args.root,args.manifest,args.source_commit,args.manifest_sha256,args.releases)); return 0
++
++
++if __name__=='__main__': sys.exit(main())
+diff --git a/scripts/uk-owner-workbench-config.py b/scripts/uk-owner-workbench-config.py
+new file mode 100644
+index 0000000..ab0896a
+--- /dev/null
++++ b/scripts/uk-owner-workbench-config.py
+@@ -0,0 +1,56 @@
++#!/usr/bin/env python3
++"""Render and validate the HTTPS Owner workbench proxy configuration.
++
++This is a no-deploy release entry: it emits reviewed bytes for the existing
++platform installer. It never changes nginx, systemd, the webhook or the DB.
++"""
++import argparse
++import os
++import re
++import stat
++import sys
++
++
++ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++TEMPLATE = os.path.join(ROOT, 'deploy', 'uk-owner-workbench', 'nginx.conf.template')
++
++
++def safe_regular(path, secret=False):
++    if not os.path.isabs(path):
++        raise ValueError('ABSOLUTE_PATH_REQUIRED')
++    info = os.lstat(path)
++    if not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode):
++        raise ValueError('UNSAFE_TLS_FILE')
++    if secret and info.st_mode & 0o077:
++        raise ValueError('TLS_KEY_PERMISSIONS')
++    return path
++
++
++def render(owner_host, certificate, certificate_key):
++    if not re.fullmatch(r'(?=.{1,253}\Z)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}', owner_host):
++        raise ValueError('INVALID_OWNER_HOST')
++    for value in (certificate, certificate_key):
++        if not re.fullmatch(r'/[A-Za-z0-9_./-]{1,500}', value) or '..' in value.split('/'):
++            raise ValueError('INVALID_TLS_PATH')
++    with open(TEMPLATE) as stream:
++        template = stream.read()
++    return (template.replace('@@OWNER_HOST@@', owner_host)
++            .replace('@@TLS_CERT@@', certificate)
++            .replace('@@TLS_KEY@@', certificate_key))
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--owner-host', required=True)
++    parser.add_argument('--tls-cert', required=True)
++    parser.add_argument('--tls-key', required=True)
++    parser.add_argument('--verify-files', action='store_true')
++    args = parser.parse_args()
++    if args.verify_files:
++        safe_regular(args.tls_cert)
++        safe_regular(args.tls_key, secret=True)
++    sys.stdout.write(render(args.owner_host, args.tls_cert, args.tls_key))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/scripts/xj-codex-isolation-helper b/scripts/xj-codex-isolation-helper
+new file mode 100755
+index 0000000..fda7853
+--- /dev/null
++++ b/scripts/xj-codex-isolation-helper
+@@ -0,0 +1,135 @@
++#!/usr/bin/python3
++"""Root-owned narrow broker for one allowlisted transient Codex app-server."""
++import os
++import pwd
++import re
++import signal
++import stat
++import subprocess
++import sys
++import time
++
++
++def fail(message):
++    raise SystemExit(message)
++
++
++def parse(argv):
++    if '--' not in argv: fail('MISSING_COMMAND_SEPARATOR')
++    split=argv.index('--'); options=argv[:split]; command=argv[split+1:]
++    if len(options)!=5: fail('INVALID_OPTIONS')
++    values={}
++    for option in options:
++        if '=' not in option or not option.startswith('--'): fail('INVALID_OPTION')
++        key,value=option[2:].split('=',1)
++        if key in values: fail('DUPLICATE_OPTION')
++        values[key]=value
++    if set(values)!=set(('unit','uid','workdir','home','codex-home')): fail('INVALID_OPTIONS')
++    return values,command
++
++
++def _safe_tree(path, owner_uid):
++    root_device=os.stat(path,follow_symlinks=False).st_dev
++    for directory,dirs,files,descriptor in os.fwalk(path,topdown=True,follow_symlinks=False):
++        for name in dirs+files:
++            info=os.stat(name,dir_fd=descriptor,follow_symlinks=False)
++            if (info.st_dev!=root_device or info.st_uid!=owner_uid
++                    or stat.S_ISLNK(info.st_mode)
++                    or (not stat.S_ISDIR(info.st_mode) and not stat.S_ISREG(info.st_mode))
++                    or (stat.S_ISREG(info.st_mode) and info.st_nlink!=1)
++                    or info.st_mode & 0o077):
++                fail('UNSAFE_WORKTREE_ENTRY')
++    return True
++
++
++def _handoff_tree(path, from_uid, to_uid, to_gid):
++    _safe_tree(path,from_uid)
++    for directory,dirs,files,descriptor in os.fwalk(path,topdown=False,follow_symlinks=False):
++        for name in files:
++            info=os.stat(name,dir_fd=descriptor,follow_symlinks=False)
++            mode=(stat.S_IMODE(info.st_mode)&0o700)|0o600
++            os.chmod(name,mode,dir_fd=descriptor,follow_symlinks=False)
++            os.chown(name,to_uid,to_gid,dir_fd=descriptor,follow_symlinks=False)
++        for name in dirs:
++            os.chmod(name,0o700,dir_fd=descriptor,follow_symlinks=False)
++            os.chown(name,to_uid,to_gid,dir_fd=descriptor,follow_symlinks=False)
++    os.chmod(path,0o700,follow_symlinks=False)
++    os.chown(path,to_uid,to_gid,follow_symlinks=False)
++
++
++def validate(values,command):
++    if os.geteuid()!=0: fail('ROOT_BROKER_REQUIRED')
++    if not re.fullmatch(r'xj-codex-[a-f0-9]{24}',values['unit']): fail('INVALID_UNIT')
++    if values['uid']!='xj_codex_worker': fail('INVALID_UID')
++    try: account=pwd.getpwnam(values['uid'])
++    except KeyError: fail('UNKNOWN_UID')
++    if account.pw_uid==0: fail('PRIVILEGED_UID_REJECTED')
++    try: dispatcher=pwd.getpwnam('xuanjun-dispatcher')
++    except KeyError: fail('UNKNOWN_DISPATCHER_UID')
++    if dispatcher.pw_uid==0 or dispatcher.pw_uid==account.pw_uid: fail('INVALID_DISPATCHER_UID')
++    expected={'home':'/var/lib/xuanjun-development/worker-home',
++              'codex-home':'/var/lib/xuanjun-development/codex-home'}
++    if values['home']!=expected['home'] or values['codex-home']!=expected['codex-home']:
++        fail('INVALID_FIXED_HOME')
++    workroot='/var/lib/xuanjun-development/worktrees'
++    path=values['workdir']
++    if (not re.fullmatch(r'/[A-Za-z0-9_./-]+',path) or os.path.realpath(path)!=path
++            or os.path.commonpath([workroot,path])!=workroot or path==workroot):
++        fail('INVALID_WORKDIR')
++    for key in ('home','codex-home'):
++        path=values[key]
++        if not os.path.isdir(path): fail('INVALID_ISOLATION_PATH')
++        info=os.stat(path,follow_symlinks=False)
++        if (not stat.S_ISDIR(info.st_mode) or info.st_uid!=account.pw_uid
++                or info.st_mode & 0o077): fail('UNSAFE_ISOLATION_DIRECTORY')
++    winfo=os.stat(values['workdir'],follow_symlinks=False)
++    if (not stat.S_ISDIR(winfo.st_mode) or winfo.st_uid!=dispatcher.pw_uid
++            or winfo.st_mode & 0o077): fail('UNSAFE_DISPATCHER_WORKTREE')
++    _safe_tree(values['workdir'],dispatcher.pw_uid)
++    if len(set(values[key] for key in ('workdir','home','codex-home')))!=3:
++        fail('ISOLATION_PATH_OVERLAP')
++    expected=['/usr/bin/codex','-c','model_provider="openai"','-c','approval_policy="never"',
++              '-c','features.multi_agent=false','app-server','--listen','stdio://']
++    if command!=expected: fail('COMMAND_NOT_ALLOWLISTED')
++    info=os.stat(command[0],follow_symlinks=False)
++    if info.st_uid!=0 or info.st_mode & 0o022: fail('UNTRUSTED_CODEX_BINARY')
++    return account,dispatcher
++
++
++def main(argv=None):
++    values,command=parse(list(sys.argv[1:] if argv is None else argv)); worker,dispatcher=validate(values,command)
++    unit=values['unit']
++    run=['/usr/bin/systemd-run','--quiet','--wait','--collect','--pipe','--unit='+unit,
++         '--uid='+values['uid'],'--property=WorkingDirectory='+values['workdir'],
++         '--setenv=HOME='+values['home'],'--setenv=CODEX_HOME='+values['codex-home'],
++         '--property=NoNewPrivileges=yes','--property=PrivateTmp=yes',
++         '--property=PrivateDevices=yes','--property=ProtectSystem=strict',
++         '--property=ProtectHome=yes','--property=RestrictSUIDSGID=yes',
++         '--property=CPUQuota=100%','--property=MemoryMax=2G','--property=TasksMax=256',
++         '--property=InaccessiblePaths=/root /etc/xuanjun-owner-callback /var/lib/xuanjun-development/ledger',
++         '--property=ReadWritePaths='+values['workdir']+' '+values['home']+' '+values['codex-home'],'--']+command
++    _handoff_tree(values['workdir'],dispatcher.pw_uid,worker.pw_uid,worker.pw_gid)
++    child=None
++    stopping=[False]
++    def stop(*unused):
++        if stopping[0]: return
++        stopping[0]=True
++        subprocess.call(['/usr/bin/systemctl','stop',unit],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
++    signal.signal(signal.SIGTERM,stop); signal.signal(signal.SIGINT,stop)
++    try:
++        child=subprocess.Popen(run)
++        code=child.wait()
++        if stopping[0]:
++            deadline=time.monotonic()+10
++            while time.monotonic()<deadline:
++                state=subprocess.call(['/usr/bin/systemctl','is-active','--quiet',unit])
++                if state!=0: break
++                time.sleep(0.1)
++            else: fail('UNIT_STOP_UNCONFIRMED')
++        return code
++    finally:
++        if child is not None and child.poll() is None: stop(); child.wait()
++        _handoff_tree(values['workdir'],worker.pw_uid,dispatcher.pw_uid,dispatcher.pw_gid)
++
++
++if __name__=='__main__': sys.exit(main())
+diff --git a/stage1/callback_schema_gate.py b/stage1/callback_schema_gate.py
+new file mode 100644
+index 0000000..35a1cca
+--- /dev/null
++++ b/stage1/callback_schema_gate.py
+@@ -0,0 +1,35 @@
++"""Backup-first callback schema migration rehearsal; never switches live DB."""
++import argparse
++import json
++import os
++import sys
++
++from ledger_backup import backup, stage_restore
++from uk_owner_callback_core import install_schema, validate_schema
++
++
++def prepare(live, backup_path, staged):
++    if any(os.path.exists(path) for path in (backup_path, staged)):
++        raise ValueError('BACKUP_OR_STAGE_ALREADY_EXISTS')
++    original = backup(live, backup_path)
++    restored = stage_restore(backup_path, staged, original['sha256'])
++    install_schema(staged)
++    validate_schema(staged)
++    # The live DB is never opened writable by this gate. Activation is a later,
++    # separately approved single-writer atomic switch.
++    return {'backup_sha256': original['sha256'], 'staged_pre_migration_sha256': restored['sha256'],
++            'migration': 'STAGED_ONLY', 'live_switched': False}
++
++
++def main(argv=None):
++    parser=argparse.ArgumentParser()
++    parser.add_argument('--live',required=True)
++    parser.add_argument('--backup',required=True)
++    parser.add_argument('--staged',required=True)
++    args=parser.parse_args(argv)
++    print(json.dumps(prepare(args.live,args.backup,args.staged),sort_keys=True))
++    return 0
++
++
++if __name__ == '__main__':
++    sys.exit(main())
+diff --git a/stage1/codex_app_server_worker.py b/stage1/codex_app_server_worker.py
+index b99ddf5..b214ac7 100644
+--- a/stage1/codex_app_server_worker.py
++++ b/stage1/codex_app_server_worker.py
+@@ -9,7 +9,9 @@ Protocol: https://learn.chatgpt.com/docs/app-server
+ import json
+ import math
+ import os
++import re
+ import selectors
++import signal
+ import subprocess
+ import threading
+ import time
+@@ -24,6 +26,7 @@ class ProtocolFailure(Exception):
+ 
+ class CodexAppServerWorker(CodexWorker):
+     def __init__(self, *args, **kwargs):
++        self.isolation_prefix = kwargs.pop('isolation_prefix', ())
+         super(CodexAppServerWorker, self).__init__(*args, **kwargs)
+         if any(os.path.realpath(path) != path for path in
+                (self.home, self.codex_home, self.workdir)):
+@@ -34,9 +37,44 @@ class CodexAppServerWorker(CodexWorker):
+                 raise ValueError('authentication home and worktree must be disjoint')
+         self._proc = self._selector = None
+         self._run_lock = threading.Lock()
++        if self.isolation_prefix and not self._valid_isolation_prefix(self.isolation_prefix):
++            raise ValueError('unapproved per-task isolation wrapper')
++
++    def _valid_isolation_prefix(self, prefix):
++        fixed = ['/usr/bin/sudo', '-n', '/usr/bin/python3',
++                 '/usr/local/libexec/xj-codex-isolation-helper']
++        values = list(prefix)
++        if values[:len(fixed)] != fixed or values[-1:] != ['--']:
++            return False
++        extra = values[len(fixed):-1]
++        if (len(extra) != 5 or not extra[0].startswith('--unit=')
++                or not extra[1].startswith('--uid=')):
++            return False
++        unit, user = extra[0][7:], extra[1][6:]
++        if (not re.fullmatch(r'xj_[a-z0-9_-]{1,27}', user)
++                or user in ('root', 'toor') or user.isdigit()):
++            return False
++        if not re.fullmatch(r'xj-codex-[a-f0-9]{24}', unit):
++            return False
++        expected = ['--workdir=' + self.workdir, '--home=' + self.home,
++                    '--codex-home=' + self.codex_home]
++        return extra[2:] == expected
++
++    @staticmethod
++    def _stop(proc):
++        # Give the privileged helper enough time to stop the transient unit and
++        # prove it inactive before a final kill. Failure remains an unknown
++        # effect and the pipeline quarantines the task.
++        try: os.killpg(proc.pid,signal.SIGTERM)
++        except ProcessLookupError: pass
++        try: proc.wait(timeout=12)
++        except subprocess.TimeoutExpired:
++            try: os.killpg(proc.pid,signal.SIGKILL)
++            except ProcessLookupError: pass
++            proc.wait()
+ 
+     def build_argv(self):
+-        return [self.codex_bin, '-c', 'model_provider="openai"',
++        return list(self.isolation_prefix) + [self.codex_bin, '-c', 'model_provider="openai"',
+                 '-c', 'approval_policy="never"', '-c', 'features.multi_agent=false',
+                 'app-server', '--listen', 'stdio://']
+ 
+diff --git a/stage1/development_pipeline.py b/stage1/development_pipeline.py
+index 6892b60..7b0176a 100644
+--- a/stage1/development_pipeline.py
++++ b/stage1/development_pipeline.py
+@@ -16,10 +16,13 @@ Backend methods receive a fence callback and must call it before EVERY external
+ operation (including reads). Interrupted in-flight effects require human review.
+ """
+ import hashlib
++import contextlib
++import fcntl
+ import json
+ import os
+ import re
+ import subprocess
++import stat
+ 
+ from codex_worker import ALLOWED_MODELS, redact
+ from execution_ledger import LeaseLost
+@@ -100,7 +103,8 @@ class CliBackend(object):
+     No user-supplied shell/test command is ever accepted here.
+     """
+     def __init__(self, repositories, workspace_root, home, path,
+-                 required_checks, runner=None, gh_bin='/usr/bin/gh', use_gh_credentials=False):
++                 required_checks, runner=None, gh_bin='/usr/bin/gh', use_gh_credentials=False,
++                 github_lock_path=None):
+         if not repositories or not required_checks:
+             raise ValueError('repository map and explicit required CI checks required')
+         for value in (workspace_root, home):
+@@ -123,6 +127,34 @@ class CliBackend(object):
+         self.required_checks = tuple(required_checks)
+         self.runner = runner or subprocess.run
+         self.simulated = runner is not None
++        if github_lock_path is None:
++            github_lock_path = os.path.join(workspace_root, '.github-writer.lock')
++        if (not isinstance(github_lock_path, str) or not os.path.isabs(github_lock_path)
++                or os.path.realpath(github_lock_path) != github_lock_path):
++            raise ValueError('canonical GitHub writer lock required')
++        self.github_lock_path = github_lock_path
++
++    @contextlib.contextmanager
++    def _github_writer(self):
++        parent=os.path.dirname(self.github_lock_path)
++        os.makedirs(parent, mode=0o700, exist_ok=True)
++        pinfo=os.stat(parent,follow_symlinks=False)
++        if not stat.S_ISDIR(pinfo.st_mode) or pinfo.st_uid!=os.geteuid() or pinfo.st_mode & 0o077:
++            raise UnknownEffect('unsafe GitHub lock directory')
++        fd=os.open(self.github_lock_path,os.O_RDWR|os.O_CREAT|getattr(os,'O_NOFOLLOW',0),0o600)
++        os.fchmod(fd,0o600)
++        info=os.fstat(fd)
++        if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid():
++            os.close(fd); raise UnknownEffect('unsafe GitHub writer lock')
++        with os.fdopen(fd, 'a+') as handle:
++            try:
++                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
++            except BlockingIOError:
++                raise UnknownEffect('GitHub writer already active')
++            try:
++                yield
++            finally:
++                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+ 
+     def _cmd(self, argv, cwd, fence):
+         fence()
+@@ -241,17 +273,21 @@ class CliBackend(object):
+         # origin URL. Exact SHA refspec prevents a changed local branch push.
+         auth = (['-c', 'credential.helper=' + self.gh_bin + ' auth git-credential']
+                 if self.use_gh_credentials else [])
+-        self._git(auth + ['push', 'https://github.com/' + repo + '.git',
+-                         sha + ':refs/heads/' + branch], workdir, fence)
+-        raw = self._cmd([self.gh_bin, 'pr', 'list', '--repo', repo, '--head', branch,
+-                         '--state', 'open', '--json', 'number,headRefOid,headRefName'], workdir, fence)
+-        prs = json.loads(raw)
+-        if not prs:
+-            self._cmd([self.gh_bin, 'pr', 'create', '--repo', repo, '--head', branch,
+-                       '--title', 'Code task ' + branch,
+-                       '--body', 'Automated code acceptance. No production deployment or automatic merge.'], workdir, fence)
+-            prs = json.loads(self._cmd([self.gh_bin, 'pr', 'list', '--repo', repo, '--head', branch,
+-                                       '--state', 'open', '--json', 'number,headRefOid,headRefName'], workdir, fence))
++        with self._github_writer():
++            # The empty expected value makes creation fail if another writer
++            # already created this deterministic branch.
++            self._git(auth + ['push', '--force-with-lease=refs/heads/' + branch + ':',
++                             'https://github.com/' + repo + '.git',
++                             sha + ':refs/heads/' + branch], workdir, fence)
++            raw = self._cmd([self.gh_bin, 'pr', 'list', '--repo', repo, '--head', branch,
++                             '--state', 'open', '--json', 'number,headRefOid,headRefName'], workdir, fence)
++            prs = json.loads(raw)
++            if not prs:
++                self._cmd([self.gh_bin, 'pr', 'create', '--repo', repo, '--head', branch,
++                           '--title', 'Code task ' + branch,
++                           '--body', 'Automated code acceptance. No production deployment or automatic merge.'], workdir, fence)
++                prs = json.loads(self._cmd([self.gh_bin, 'pr', 'list', '--repo', repo, '--head', branch,
++                                           '--state', 'open', '--json', 'number,headRefOid,headRefName'], workdir, fence))
+         if len(prs) != 1 or prs[0]['headRefOid'] != sha or prs[0]['headRefName'] != branch:
+             raise UnknownEffect('PR identity mismatch')
+         return prs[0]['number']
+diff --git a/stage1/development_service.py b/stage1/development_service.py
+new file mode 100644
+index 0000000..2e47744
+--- /dev/null
++++ b/stage1/development_service.py
+@@ -0,0 +1,178 @@
++"""Executable, fail-closed UK development dispatcher entry point.
++
++This starts only the new DevelopmentLoop.  It neither creates tasks nor edits
++the old Coordinator.  Deployment must run it under the reviewed service unit.
++"""
++import argparse
++import fcntl
++import hashlib
++import json
++import os
++import pwd
++import re
++import signal
++import stat
++import subprocess
++import sys
++
++from codex_app_server_worker import CodexAppServerWorker
++from development_loop import DevelopmentLoop
++from development_pipeline import CliBackend, DevelopmentPipeline
++from execution_ledger import ExecutionLedger
++
++
++SHA = re.compile(r'^[0-9a-f]{40}$')
++SAFE_USER = re.compile(r'^[a-z_][a-z0-9_-]{0,30}$')
++REQUIRED = frozenset([
++    'config_version', 'control_repository', 'source_commit', 'repositories',
++    'db_path', 'dispatcher_lock', 'github_writer_lock', 'workspace_root',
++    'service_home', 'worker_home', 'codex_home', 'worker_user', 'codex_bin',
++    'gh_bin', 'path', 'required_checks', 'model', 'max_workers',
++])
++
++
++def _canonical(value, name, forbidden=('/', '/home', '/tmp', '/opt', '/var')):
++    if (not isinstance(value, str) or not os.path.isabs(value)
++            or os.path.realpath(value) != value or value in forbidden):
++        raise ValueError(name + ' must be a dedicated canonical absolute path')
++    return value
++
++
++def load_config(path, run=None):
++    if (not isinstance(path, str) or not os.path.isabs(path)
++            or os.path.realpath(path) != path or os.path.islink(path)):
++        raise ValueError('config path must be canonical, absolute and not a symlink')
++    fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
++    info=os.fstat(fd)
++    if (not stat.S_ISREG(info.st_mode) or info.st_uid not in (0,os.geteuid())
++            or info.st_mode & 0o022 or info.st_size>65536):
++        os.close(fd); raise ValueError('unsafe configuration file')
++    with os.fdopen(fd,'r') as handle: config=json.load(handle)
++    if not isinstance(config, dict) or set(config) != REQUIRED:
++        raise ValueError('configuration keys mismatch')
++    if config['config_version'] != 1 or config['model'] not in ('gpt-6.1-sol', 'gpt-5.6-sol'):
++        raise ValueError('unsupported config/model')
++    if not SHA.fullmatch(config['source_commit']):
++        raise ValueError('full lowercase source commit required')
++    if (not SAFE_USER.fullmatch(config['worker_user'])
++            or not config['worker_user'].startswith('xj_')
++            or config['worker_user'] in ('root', 'toor')):
++        raise ValueError('invalid isolated worker user')
++    try:
++        account = pwd.getpwnam(config['worker_user'])
++    except KeyError:
++        account = None  # --check-config before identity provisioning is allowed.
++    if account is not None and account.pw_uid in (0,os.geteuid()):
++        raise ValueError('privileged/shared worker identity rejected')
++    if config['max_workers'] not in (1, 2):
++        raise ValueError('max_workers must be 1 or 2')
++    if (not isinstance(config['required_checks'], list) or not config['required_checks']
++            or len(set(config['required_checks'])) != len(config['required_checks'])
++            or any(not isinstance(v, str) or not v.strip() for v in config['required_checks'])):
++        raise ValueError('explicit unique CI checks required')
++    if (not isinstance(config['repositories'], dict) or
++            set(config['repositories']) != {config['control_repository']}):
++        raise ValueError('only the configured control repository is allowed')
++    for key in ('db_path', 'dispatcher_lock', 'github_writer_lock', 'workspace_root',
++                'service_home', 'worker_home', 'codex_home', 'codex_bin', 'gh_bin'):
++        _canonical(config[key], key, forbidden=('/', '/home', '/tmp', '/opt', '/var'))
++    source = _canonical(config['repositories'][config['control_repository']], 'repository source')
++    for key in ('codex_bin','gh_bin'):
++        info=os.stat(config[key],follow_symlinks=False)
++        if (not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode & 0o022
++                or not info.st_mode & 0o111):
++            raise ValueError('untrusted executable: '+key)
++    if any(os.path.commonpath([root, config['db_path']]) == root for root in
++           (config['workspace_root'], config['worker_home'], config['codex_home'])):
++        raise ValueError('authoritative DB must be outside worker-accessible roots')
++    roots=[config['service_home'],config['worker_home'],config['codex_home'],config['workspace_root']]
++    if len(set(roots)) != 4 or any(os.path.commonpath([left,right]) in (left,right)
++            for index,left in enumerate(roots) for right in roots[index+1:]):
++        raise ValueError('service, auth and workspace roots must be distinct')
++    if (not isinstance(config['path'], str) or not config['path'] or
++            any(not os.path.isabs(v) for v in config['path'].split(os.pathsep))):
++        raise ValueError('explicit absolute PATH required')
++    runner = run or subprocess.run
++    result = runner(['git', '-c', 'core.hooksPath=/dev/null', 'rev-parse', 'HEAD'],
++                    cwd=source, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
++                    timeout=10, check=False)
++    observed = result.stdout.decode('ascii', 'replace').strip() if result.returncode == 0 else ''
++    if observed != config['source_commit']:
++        raise ValueError('control source HEAD does not match approved commit')
++    return config
++
++
++def isolation_prefix(config, workdir):
++    task_hash = hashlib.sha256(workdir.encode('utf-8')).hexdigest()[:24]
++    return ['/usr/bin/sudo', '-n', '/usr/bin/python3',
++            '/usr/local/libexec/xj-codex-isolation-helper',
++            '--unit=xj-codex-' + task_hash, '--uid=' + config['worker_user'],
++            '--workdir=' + workdir, '--home=' + config['worker_home'],
++            '--codex-home=' + config['codex_home'], '--']
++
++
++def build_loop(config):
++    repo = config['control_repository']
++    ledger = ExecutionLedger(config['db_path'], [repo], max_heavy=config['max_workers'],
++                             approved_base_shas=[config['source_commit']])
++    backend = CliBackend(config['repositories'], config['workspace_root'],
++                         config['service_home'], config['path'], config['required_checks'],
++                         gh_bin=config['gh_bin'], use_gh_credentials=True,
++                         github_lock_path=config['github_writer_lock'])
++    def workers(workdir, sandbox):
++        return CodexAppServerWorker(
++            config['codex_bin'], workdir, config['worker_home'], config['codex_home'],
++            config['path'], sandbox=sandbox, model=config['model'],
++            isolation_prefix=isolation_prefix(config, workdir))
++    def pipelines(_claim):
++        return DevelopmentPipeline(ledger, backend, workers, [repo])
++    return DevelopmentLoop(ledger, pipelines, 'uk-codex', max_workers=config['max_workers'])
++
++
++def acquire_dispatcher_lock(path):
++    parent=os.path.dirname(path)
++    os.makedirs(parent, mode=0o700, exist_ok=True)
++    pinfo=os.stat(parent,follow_symlinks=False)
++    if not stat.S_ISDIR(pinfo.st_mode) or pinfo.st_uid!=os.geteuid() or pinfo.st_mode & 0o077:
++        raise ValueError('unsafe lock directory')
++    fd=os.open(path,os.O_RDWR|os.O_CREAT|getattr(os,'O_NOFOLLOW',0),0o600)
++    os.fchmod(fd,0o600)
++    info=os.fstat(fd)
++    if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid():
++        os.close(fd); raise ValueError('unsafe lock file')
++    handle = os.fdopen(fd,'a+')
++    try:
++        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
++    except BlockingIOError:
++        handle.close()
++        raise RuntimeError('another new dispatcher holds the exclusive lock')
++    handle.seek(0)
++    handle.truncate()
++    handle.write(str(os.getpid()) + '\n')
++    handle.flush()
++    return handle
++
++
++def main(argv=None):
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--config', required=True)
++    parser.add_argument('--check-config', action='store_true')
++    args = parser.parse_args(argv)
++    config = load_config(args.config)
++    if args.check_config:
++        print('CONFIG_OK source_commit=' + config['source_commit'])
++        return 0
++    lock = acquire_dispatcher_lock(config['dispatcher_lock'])
++    loop = build_loop(config)
++    signal.signal(signal.SIGTERM, lambda *_: loop.stop())
++    signal.signal(signal.SIGINT, lambda *_: loop.stop())
++    try:
++        loop.serve()
++    finally:
++        loop.close()
++        lock.close()
++    return 0
++
++
++if __name__ == '__main__':
++    sys.exit(main())
+diff --git a/stage1/execution_ledger.py b/stage1/execution_ledger.py
+index 5e5d06f..6310028 100644
+--- a/stage1/execution_ledger.py
++++ b/stage1/execution_ledger.py
+@@ -43,7 +43,8 @@ class ExecutionLedger(object):
+                    ('details', 'TEXT', 0)],
+     }
+ 
+-    def __init__(self, db_path, allowed_repositories, clock=None, max_heavy=2):
++    def __init__(self, db_path, allowed_repositories, clock=None, max_heavy=2,
++                 approved_base_shas=None):
+         if not allowed_repositories or isinstance(allowed_repositories, str):
+             raise ValueError('explicit repository whitelist required')
+         if any(not isinstance(repo, str) or not repo.strip()
+@@ -55,6 +56,14 @@ class ExecutionLedger(object):
+         self.repositories = frozenset(allowed_repositories)
+         self.clock = clock or time.time
+         self.max_heavy = max_heavy
++        if approved_base_shas is not None:
++            if (not approved_base_shas or any(not isinstance(value, str)
++                    or re.fullmatch(r'[0-9a-f]{40}', value) is None
++                    for value in approved_base_shas)):
++                raise ValueError('approved base SHAs must be full lowercase commits')
++            self.approved_base_shas = frozenset(approved_base_shas)
++        else:
++            self.approved_base_shas = None
+         # Opening a missing DB does not silently bootstrap a competing registry.
+         with self._transaction() as conn:
+             self._validate_schema(conn)
+@@ -205,6 +214,8 @@ class ExecutionLedger(object):
+             raise ValueError('repository/type not whitelisted')
+         if not isinstance(spec['base_sha'], str) or re.fullmatch(r'[0-9a-fA-F]{40}', spec['base_sha']) is None:
+             raise ValueError('full 40-hex base commit required')
++        if self.approved_base_shas is not None and spec['base_sha'] not in self.approved_base_shas:
++            raise ValueError('base commit is not an approved control source')
+         if not isinstance(spec['prompt'], str) or not spec['prompt'].strip():
+             raise ValueError('trusted prompt required')
+         if len(spec['prompt'].encode('utf-8')) > 256 * 1024:
+diff --git a/stage1/ledger_backup.py b/stage1/ledger_backup.py
+new file mode 100644
+index 0000000..8acb0fc
+--- /dev/null
++++ b/stage1/ledger_backup.py
+@@ -0,0 +1,109 @@
++"""Consistent SQLite backup/verification and restore staging.
++
++Never replaces the live database.  A reviewed operator must stop the dispatcher,
++hold its exclusive lock and atomically activate a verified staged copy.
++"""
++import argparse
++import hashlib
++import json
++import os
++import sqlite3
++import sys
++import tempfile
++
++from execution_ledger import ExecutionLedger
++
++
++def database_manifest(path):
++    with sqlite3.connect('file:' + path + '?mode=ro', uri=True) as db:
++        check = db.execute('PRAGMA quick_check').fetchone()[0]
++        if check != 'ok':
++            raise ValueError('SQLite quick_check failed')
++        tables = [row[0] for row in db.execute(
++            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
++        counts = {name: db.execute('SELECT count(*) FROM "' + name.replace('"', '""') + '"').fetchone()[0]
++                  for name in tables}
++    digest = hashlib.sha256()
++    with open(path, 'rb') as handle:
++        for chunk in iter(lambda: handle.read(1024 * 1024), b''):
++            digest.update(chunk)
++    return {'sha256': digest.hexdigest(), 'size': os.path.getsize(path), 'counts': counts,
++            'quick_check': 'ok'}
++
++
++def backup(source, target):
++    if os.path.exists(target):
++        raise ValueError('backup target already exists')
++    directory = os.path.dirname(target) or '.'
++    os.makedirs(directory, mode=0o700, exist_ok=True)
++    fd, temporary = tempfile.mkstemp(prefix='.ledger-backup-', dir=directory)
++    os.close(fd)
++    try:
++        # Python 3.6 deployments may not expose Connection.backup().  Hold a
++        # consistent read transaction and replay SQLite's quoted logical dump
++        # into a new file; this also avoids copying a live WAL database file.
++        with sqlite3.connect('file:' + source + '?mode=ro', uri=True) as src:
++            src.execute('BEGIN')
++            user_version=src.execute('PRAGMA user_version').fetchone()[0]
++            application_id=src.execute('PRAGMA application_id').fetchone()[0]
++            statements = list(src.iterdump())
++            with sqlite3.connect(temporary) as dst:
++                dst.executescript('\n'.join(statements))
++                dst.execute('PRAGMA user_version=%d' % user_version)
++                dst.execute('PRAGMA application_id=%d' % application_id)
++            src.commit()
++        manifest = database_manifest(temporary)
++        os.chmod(temporary, 0o600)
++        with open(temporary,'rb') as durable:
++            os.fsync(durable.fileno())
++        os.replace(temporary, target)
++        directory_fd=os.open(directory,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
++        try: os.fsync(directory_fd)
++        finally: os.close(directory_fd)
++        return manifest
++    finally:
++        if os.path.exists(temporary):
++            os.unlink(temporary)
++
++
++def verify(path, expected_sha=None):
++    manifest = database_manifest(path)
++    if expected_sha is not None and manifest['sha256'] != expected_sha:
++        raise ValueError('backup digest mismatch')
++    # Validate read-only: verification must not create tables or alter WAL state.
++    with sqlite3.connect('file:' + path + '?mode=ro', uri=True) as db:
++        db.row_factory = sqlite3.Row
++        ExecutionLedger._validate_schema(db)
++        ExecutionLedger._validate_side_schema(db)
++    return manifest
++
++
++def stage_restore(source, target, expected_sha):
++    verify(source, expected_sha)
++    result = backup(source, target)
++    verify(target, result['sha256'])
++    return result
++
++
++def main(argv=None):
++    parser = argparse.ArgumentParser()
++    actions = parser.add_mutually_exclusive_group(required=True)
++    actions.add_argument('--backup', nargs=2, metavar=('SOURCE', 'TARGET'))
++    actions.add_argument('--verify', metavar='DATABASE')
++    actions.add_argument('--stage-restore', nargs=2, metavar=('BACKUP', 'STAGED_TARGET'))
++    parser.add_argument('--expected-sha256')
++    args = parser.parse_args(argv)
++    if args.backup:
++        result = backup(*args.backup)
++    elif args.verify:
++        result = verify(args.verify, args.expected_sha256)
++    else:
++        if not args.expected_sha256:
++            parser.error('--stage-restore requires --expected-sha256')
++        result = stage_restore(args.stage_restore[0], args.stage_restore[1], args.expected_sha256)
++    print(json.dumps(result, sort_keys=True))
++    return 0
++
++
++if __name__ == '__main__':
++    sys.exit(main())
+diff --git a/stage1/owner_callback_server.py b/stage1/owner_callback_server.py
+new file mode 100644
+index 0000000..b8242a0
+--- /dev/null
++++ b/stage1/owner_callback_server.py
+@@ -0,0 +1,159 @@
++"""Loopback-only HTTP adapter for the fenced Owner callback core.
++
++TLS is terminated by the reviewed reverse proxy. This process never accepts a
++public bind address and never registers approval requests.
++"""
++import argparse
++import json
++import os
++import re
++import stat
++import socket
++import threading
++from http.server import BaseHTTPRequestHandler, HTTPServer
++from socketserver import ThreadingMixIn
++
++from uk_owner_callback_core import apply
++
++
++def read_secret(path, pattern, binary=False):
++    info = os.lstat(path)
++    if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077:
++        raise ValueError('UNSAFE_SECRET_FILE')
++    flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)
++    fd = os.open(path, flags)
++    with os.fdopen(fd, 'rb' if binary else 'r') as stream:
++        value = stream.read(513)
++    if len(value) > 512:
++        raise ValueError('SECRET_TOO_LONG')
++    value = value.rstrip(b'\r\n') if binary else value.strip()
++    if not re.fullmatch(pattern, value):
++        raise ValueError('INVALID_SECRET')
++    return value
++
++
++def handler(config):
++    class Handler(BaseHTTPRequestHandler):
++        protocol_version = 'HTTP/1.1'
++
++        def setup(self):
++            BaseHTTPRequestHandler.setup(self)
++            self.connection.settimeout(config.get('socket_timeout', 5))
++
++        def log_message(self, *_):
++            pass
++
++        def send_response(self, code, message=None):
++            # BaseHTTPRequestHandler otherwise discloses Python/server versions.
++            self.log_request(code)
++            self.send_response_only(code, message)
++
++        def respond(self, status, body):
++            data = json.dumps(body, sort_keys=True, separators=(',', ':')).encode('ascii')
++            self.send_response(status)
++            self.send_header('Content-Type', 'application/json')
++            self.send_header('Cache-Control', 'no-store')
++            self.send_header('X-Content-Type-Options', 'nosniff')
++            self.send_header('Content-Length', str(len(data)))
++            self.end_headers()
++            self.wfile.write(data)
++
++        def do_POST(self):
++            if self.path != '/owner-callback':
++                self.respond(404, {'accepted': False})
++                return
++            if self.headers.get('Content-Type', '').split(';', 1)[0].strip().lower() != 'application/json':
++                self.respond(415, {'accepted': False})
++                return
++            try:
++                length = int(self.headers.get('Content-Length', ''))
++            except ValueError:
++                length = -1
++            if not 2 <= length <= 8192:
++                self.respond(413, {'accepted': False})
++                return
++            try:
++                body = self.rfile.read(length)
++            except socket.timeout:
++                self.close_connection = True
++                self.respond(408, {'accepted': False})
++                return
++            if len(body) != length:
++                self.close_connection = True
++                self.respond(400, {'accepted': False})
++                return
++            try:
++                result = apply(config['db'], body,
++                               self.headers.get('Authorization', ''),
++                               self.headers.get('X-Xuanjun-Signature', ''),
++                               config['token'], config['hmac_key'],
++                               config['owner_id'], config['owner_chat_id'])
++            except (ValueError, KeyError, TypeError):
++                self.respond(403, {'accepted': False})
++                return
++            except Exception:
++                self.respond(503, {'accepted': False})
++                return
++            self.respond(200, result)
++
++        def do_GET(self):
++            self.respond(405, {'accepted': False})
++    return Handler
++
++
++class BoundedThreadingHTTPServer(ThreadingMixIn, HTTPServer):
++    daemon_threads = True
++    request_queue_size = 16
++
++    def __init__(self, address, request_handler, max_workers=8):
++        if not isinstance(max_workers, int) or isinstance(max_workers, bool) or not 1 <= max_workers <= 32:
++            raise ValueError('INVALID_MAX_WORKERS')
++        self._slots = threading.BoundedSemaphore(max_workers)
++        HTTPServer.__init__(self, address, request_handler)
++
++    def process_request(self, request, client_address):
++        if not self._slots.acquire(False):
++            self.shutdown_request(request)
++            return
++        try:
++            ThreadingMixIn.process_request(self, request, client_address)
++        except BaseException:
++            self._slots.release()
++            raise
++
++    def process_request_thread(self, request, client_address):
++        try:
++            ThreadingMixIn.process_request_thread(self, request, client_address)
++        finally:
++            self._slots.release()
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--db', required=True)
++    parser.add_argument('--auth-file', required=True)
++    parser.add_argument('--hmac-key-file', required=True)
++    parser.add_argument('--owner-id-file', required=True)
++    parser.add_argument('--owner-chat-id-file', required=True)
++    parser.add_argument('--port', type=int, default=18557)
++    parser.add_argument('--socket-timeout', type=float, default=5)
++    parser.add_argument('--max-workers', type=int, default=8)
++    args = parser.parse_args()
++    if not 1024 <= args.port <= 65535:
++        raise SystemExit('INVALID_PORT')
++    config = {
++        'db': args.db,
++        'token': read_secret(args.auth_file, r'[A-Za-z0-9_-]{32,256}'),
++        'hmac_key': read_secret(args.hmac_key_file, rb'[ -~]{32,512}', binary=True),
++        'owner_id': read_secret(args.owner_id_file, r'[0-9]{1,32}'),
++        'owner_chat_id': read_secret(args.owner_chat_id_file, r'-?[0-9]{1,32}'),
++        'socket_timeout': args.socket_timeout,
++    }
++    if not 0.1 <= args.socket_timeout <= 30:
++        raise SystemExit('INVALID_SOCKET_TIMEOUT')
++    BoundedThreadingHTTPServer(('127.0.0.1', args.port), handler(config),
++                               max_workers=args.max_workers).serve_forever()
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/stage1/telegram_owner_transport.py b/stage1/telegram_owner_transport.py
+index e96d172..f7e4f65 100644
+--- a/stage1/telegram_owner_transport.py
++++ b/stage1/telegram_owner_transport.py
+@@ -44,7 +44,8 @@ class OwnerTelegramTransport:
+         if not ref or ref["state"]!="WAITING_HUMAN" or ref["expires_at"] <= time.time():
+             return "IGNORED"
+         payload=json.dumps({"request_id":args[1],"task_id":ref["task_id"],"fence":ref["fence"],
+-                            "owner_user_id":self.user_id,"update_id":update["update_id"],
++                            "owner_user_id":self.user_id,"owner_chat_id":self.chat_id,
++                            "update_id":update["update_id"],
+                             "decision":"APPROVE" if args[0]=="/approve" else "REJECT"},
+                             sort_keys=True,separators=(",",":")).encode()
+         signature=hmac.new(self.key,payload,hashlib.sha256).hexdigest()
+diff --git a/stage1/test_callback_schema_gate.py b/stage1/test_callback_schema_gate.py
+new file mode 100644
+index 0000000..9c8eec1
+--- /dev/null
++++ b/stage1/test_callback_schema_gate.py
+@@ -0,0 +1,42 @@
++import os
++import sqlite3
++import tempfile
++import unittest
++
++from callback_schema_gate import prepare
++from uk_owner_callback_core import install_schema, validate_schema
++
++
++BASE = '''CREATE TABLE tasks(id TEXT PRIMARY KEY,kind TEXT,state TEXT,depends TEXT,lease_owner TEXT,lease_until REAL,fence INTEGER,checkpoint TEXT,updated REAL);
++CREATE TABLE approvals(task_id TEXT PRIMARY KEY,decision TEXT,requested_at REAL,decided_at REAL);
++CREATE TABLE events(id INTEGER PRIMARY KEY,task_id TEXT,event TEXT,created REAL,details TEXT);
++CREATE TABLE execution_specs(task_id TEXT PRIMARY KEY REFERENCES tasks(id),spec TEXT NOT NULL,revision INTEGER NOT NULL,hash TEXT NOT NULL);
++CREATE TABLE worker_heartbeats(worker_id TEXT NOT NULL,task_id TEXT PRIMARY KEY REFERENCES tasks(id),fence INTEGER NOT NULL,seen_at REAL NOT NULL,phase TEXT NOT NULL);'''
++
++
++class SchemaGateTests(unittest.TestCase):
++    def setUp(self):
++        self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
++        self.live=os.path.join(self.temp.name,'live.sqlite')
++        with sqlite3.connect(self.live) as db: db.executescript(BASE)
++
++    def test_backup_first_staged_idempotent_migration_never_switches_live(self):
++        backup=os.path.join(self.temp.name,'backup.sqlite')
++        staged=os.path.join(self.temp.name,'staged.sqlite')
++        result=prepare(self.live,backup,staged)
++        self.assertFalse(result['live_switched'])
++        validate_schema(staged)
++        install_schema(staged); validate_schema(staged)
++        with sqlite3.connect(self.live) as db:
++            self.assertEqual(db.execute("SELECT count(*) FROM sqlite_master WHERE name LIKE 'owner_callback_%'").fetchone()[0],0)
++
++    def test_schema_mismatch_rolls_back(self):
++        broken=os.path.join(self.temp.name,'broken.sqlite')
++        with sqlite3.connect(broken) as db:
++            db.executescript(BASE + ';CREATE TABLE owner_callback_requests(request_id TEXT PRIMARY KEY);')
++        with self.assertRaises(ValueError): install_schema(broken)
++        with sqlite3.connect(broken) as db:
++            self.assertEqual([r[1] for r in db.execute('PRAGMA table_info(owner_callback_requests)')],['request_id'])
++
++
++if __name__ == '__main__': unittest.main()
+diff --git a/stage1/test_development_service.py b/stage1/test_development_service.py
+new file mode 100644
+index 0000000..4dab26e
+--- /dev/null
++++ b/stage1/test_development_service.py
+@@ -0,0 +1,155 @@
++import json
++import os
++import sqlite3
++import tempfile
++import unittest
++from unittest.mock import patch
++
++from development_service import acquire_dispatcher_lock, isolation_prefix, load_config
++from codex_app_server_worker import CodexAppServerWorker
++from development_pipeline import CliBackend, UnknownEffect
++from execution_ledger import ExecutionLedger
++from ledger_backup import backup, stage_restore, verify
++
++
++SCHEMA = '''CREATE TABLE tasks(id TEXT PRIMARY KEY,kind TEXT,state TEXT,depends TEXT,lease_owner TEXT,lease_until REAL,fence INTEGER,checkpoint TEXT,updated REAL);
++CREATE TABLE approvals(task_id TEXT PRIMARY KEY,decision TEXT,requested_at REAL,decided_at REAL);
++CREATE TABLE events(id INTEGER PRIMARY KEY,task_id TEXT,event TEXT,created REAL,details TEXT);
++CREATE TABLE execution_specs(task_id TEXT PRIMARY KEY REFERENCES tasks(id),spec TEXT NOT NULL,revision INTEGER NOT NULL,hash TEXT NOT NULL);
++CREATE TABLE worker_heartbeats(worker_id TEXT NOT NULL,task_id TEXT PRIMARY KEY REFERENCES tasks(id),fence INTEGER NOT NULL,seen_at REAL NOT NULL,phase TEXT NOT NULL);'''
++
++
++class Result:
++    returncode = 0
++    def __init__(self, sha):
++        self.stdout = (sha + '\n').encode('ascii')
++
++
++class ServiceTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory()
++        self.addCleanup(self.temp.cleanup)
++        self.root = os.path.realpath(self.temp.name)
++        for name in ('repo', 'work', 'service-home', 'worker-home', 'codex-home', 'run'):
++            os.mkdir(os.path.join(self.root, name))
++        os.chmod(os.path.join(self.root,'run'),0o700)
++        self.sha = '8' * 40
++        self.config = {
++            'config_version': 1, 'control_repository': 'owner/repo',
++            'source_commit': self.sha,
++            'repositories': {'owner/repo': os.path.join(self.root, 'repo')},
++            'db_path': os.path.join(self.root, 'state.sqlite'),
++            'dispatcher_lock': os.path.join(self.root, 'run', 'dispatcher.lock'),
++            'github_writer_lock': os.path.join(self.root, 'run', 'github.lock'),
++            'workspace_root': os.path.join(self.root, 'work'),
++            'service_home': os.path.join(self.root, 'service-home'),
++            'worker_home': os.path.join(self.root, 'worker-home'),
++            'codex_home': os.path.join(self.root, 'codex-home'),
++            'worker_user': 'xj_codex_worker', 'codex_bin': '/usr/libexec/platform-python3.6',
++            'gh_bin': '/usr/bin/git', 'path': '/usr/bin:/bin',
++            'required_checks': ['stage1-tests'], 'model': 'gpt-5.6-sol', 'max_workers': 2}
++        with sqlite3.connect(self.config['db_path']) as db:
++            db.executescript(SCHEMA)
++        self.path = os.path.join(self.root, 'config.json')
++        with open(self.path, 'w') as handle:
++            json.dump(self.config, handle)
++        os.chmod(self.path,0o600)
++
++    def test_config_binds_exact_control_head_and_rejects_extra_keys(self):
++        run = lambda *a, **k: Result(self.sha)
++        self.assertEqual(load_config(self.path, run=run)['source_commit'], self.sha)
++        with self.assertRaises(ValueError):
++            load_config(self.path, run=lambda *a, **k: Result('7' * 40))
++        value = dict(self.config, surprise=True)
++        with open(self.path, 'w') as handle:
++            json.dump(value, handle)
++        os.chmod(self.path,0o600)
++        with self.assertRaises(ValueError):
++            load_config(self.path, run=run)
++
++    def test_privileged_worker_identity_is_rejected(self):
++        run = lambda *a, **k: Result(self.sha)
++        value = dict(self.config, worker_user='root')
++        with open(self.path, 'w') as handle:
++            json.dump(value, handle)
++        os.chmod(self.path,0o600)
++        with self.assertRaises(ValueError):
++            load_config(self.path, run=run)
++        value['worker_user'] = 'xj_alias'
++        with open(self.path, 'w') as handle:
++            json.dump(value, handle)
++        os.chmod(self.path,0o600)
++        account = type('Account', (), {'pw_uid': 0})()
++        with patch('development_service.pwd.getpwnam', return_value=account):
++            with self.assertRaises(ValueError):
++                load_config(self.path, run=run)
++
++    def test_worker_wrapper_rejects_root_uid(self):
++        prefix = isolation_prefix(self.config, self.config['workspace_root'])
++        root_prefix = [('--uid=root' if value.startswith('--uid=') else value)
++                       for value in prefix]
++        with self.assertRaises(ValueError):
++            CodexAppServerWorker('/usr/bin/codex', self.config['workspace_root'],
++                self.config['worker_home'], self.config['codex_home'], '/usr/bin:/bin',
++                model='gpt-5.6-sol', isolation_prefix=root_prefix)
++
++    def test_exclusive_dispatcher_lock(self):
++        first = acquire_dispatcher_lock(self.config['dispatcher_lock'])
++        self.addCleanup(first.close)
++        with self.assertRaises(RuntimeError):
++            acquire_dispatcher_lock(self.config['dispatcher_lock'])
++
++    def test_isolation_prefix_is_task_specific_and_bounded(self):
++        prefix = isolation_prefix(self.config, self.config['workspace_root'])
++        self.assertIn('--uid=xj_codex_worker', prefix)
++        self.assertIn('/usr/local/libexec/xj-codex-isolation-helper', prefix)
++        self.assertIn('--workdir=' + self.config['workspace_root'], prefix)
++        self.assertEqual(prefix[-1], '--')
++        worker = CodexAppServerWorker('/usr/bin/codex', self.config['workspace_root'],
++            self.config['worker_home'], self.config['codex_home'], '/usr/bin:/bin',
++            model='gpt-5.6-sol', isolation_prefix=prefix)
++        self.assertEqual(worker.build_argv()[:len(prefix)], prefix)
++        with self.assertRaises(ValueError):
++            CodexAppServerWorker('/usr/bin/codex', self.config['workspace_root'],
++                self.config['worker_home'], self.config['codex_home'], '/usr/bin:/bin',
++                model='gpt-5.6-sol', isolation_prefix=prefix[:-1] + ['--property=MemoryMax=infinity', '--'])
++
++    def test_github_writer_lock_and_approved_source_are_exclusive(self):
++        kwargs = dict(repositories={'owner/repo': self.config['repositories']['owner/repo']},
++                      workspace_root=self.config['workspace_root'],
++                      home=self.config['service_home'], path='/usr/bin:/bin',
++                      required_checks=['stage1-tests'], runner=lambda *a, **k: Result(self.sha),
++                      github_lock_path=self.config['github_writer_lock'])
++        first, second = CliBackend(**kwargs), CliBackend(**kwargs)
++        with first._github_writer():
++            with self.assertRaises(UnknownEffect):
++                with second._github_writer():
++                    pass
++        ledger = ExecutionLedger(self.config['db_path'], ['owner/repo'],
++                                 approved_base_shas=[self.sha])
++        with sqlite3.connect(self.config['db_path']) as db:
++            db.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)',
++                       ('task', 'CODEX_EXEC', 'PENDING', '[]', None, None, 0, '{}', 0))
++        spec = {'repo': 'owner/repo', 'type': 'CODEX_EXEC', 'prompt': 'approved',
++                'heavy': True, 'timeout_seconds': 60, 'base_sha': '7' * 40}
++        with self.assertRaises(ValueError):
++            ledger.register_spec('task', spec, 'work', True)
++
++    def test_consistent_backup_verify_and_restore_stage(self):
++        with sqlite3.connect(self.config['db_path']) as db:
++            db.execute('PRAGMA user_version=17'); db.execute('PRAGMA application_id=4242')
++        backup_path = os.path.join(self.root, 'backup', 'ledger.sqlite')
++        manifest = backup(self.config['db_path'], backup_path)
++        self.assertEqual(verify(backup_path, manifest['sha256'])['quick_check'], 'ok')
++        staged = os.path.join(self.root, 'restore', 'ledger.sqlite')
++        restored = stage_restore(backup_path, staged, manifest['sha256'])
++        self.assertEqual(verify(staged, restored['sha256'])['counts'], manifest['counts'])
++        with sqlite3.connect(staged) as db:
++            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],17)
++            self.assertEqual(db.execute('PRAGMA application_id').fetchone()[0],4242)
++        with self.assertRaises(ValueError):
++            verify(staged, '0' * 64)
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/stage1/test_integration_installer.py b/stage1/test_integration_installer.py
+new file mode 100644
+index 0000000..6eeeb01
+--- /dev/null
++++ b/stage1/test_integration_installer.py
+@@ -0,0 +1,56 @@
++import hashlib
++import importlib.util
++import json
++import os
++import tempfile
++import unittest
++from unittest.mock import patch
++
++
++PATH=os.path.abspath(os.path.join(os.path.dirname(__file__),'..','scripts','uk-integration-install.py'))
++spec=importlib.util.spec_from_file_location('integration_installer',PATH)
++module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
++
++
++class InstallerRaceTests(unittest.TestCase):
++    def setUp(self):
++        self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
++
++    @staticmethod
++    def write(path,data):
++        with open(path,'wb') as stream: stream.write(data)
++
++    def test_manifest_hash_and_parse_use_same_open_descriptor(self):
++        root=os.path.realpath(os.path.join(self.temp.name,'root')); os.mkdir(root)
++        artifact=os.path.join(root,'artifact'); self.write(artifact,b'approved')
++        value={'schema':1,'source_commit':'8'*40,'files':{
++            'artifact':hashlib.sha256(b'approved').hexdigest()}}
++        manifest=os.path.realpath(os.path.join(self.temp.name,'manifest.json'))
++        data=json.dumps(value).encode(); self.write(manifest,data)
++        replacement=os.path.join(self.temp.name,'replacement'); self.write(replacement,b'{"schema":999}')
++        original=module.os.open; replaced=[False]
++        def racing_open(path,flags,*args):
++            fd=original(path,flags,*args)
++            if path==manifest and not replaced[0]:
++                replaced[0]=True; os.replace(replacement,manifest)
++            return fd
++        with patch.object(module.os,'open',side_effect=racing_open):
++            observed,_=module.verify(root,manifest,'8'*40,hashlib.sha256(data).hexdigest())
++        self.assertEqual(observed['schema'],1)
++
++    def test_source_copy_uses_verified_open_descriptor(self):
++        source=os.path.join(self.temp.name,'source'); destination=os.path.join(self.temp.name,'dest')
++        approved=b'approved bytes'; self.write(source,approved)
++        replacement=os.path.join(self.temp.name,'replacement'); self.write(replacement,b'tampered')
++        original=module.os.open; replaced=[False]
++        def racing_open(path,flags,*args):
++            fd=original(path,flags,*args)
++            if path==source and not replaced[0]:
++                replaced[0]=True; os.replace(replacement,source)
++            return fd
++        with patch.object(module.os,'open',side_effect=racing_open):
++            module.copy_verified(source,destination,hashlib.sha256(approved).hexdigest())
++        with open(destination,'rb') as stream: self.assertEqual(stream.read(),approved)
++
++
++if __name__=='__main__': unittest.main()
+diff --git a/stage1/test_isolation_helper.py b/stage1/test_isolation_helper.py
+new file mode 100644
+index 0000000..f9f2f00
+--- /dev/null
++++ b/stage1/test_isolation_helper.py
+@@ -0,0 +1,75 @@
++import importlib.machinery
++import os
++import subprocess
++import tempfile
++import unittest
++from unittest.mock import patch
++
++
++PATH=os.path.join(os.path.dirname(__file__),'..','scripts','xj-codex-isolation-helper')
++module=importlib.machinery.SourceFileLoader('isolation_helper',PATH).load_module()
++
++
++class IsolationHelperTests(unittest.TestCase):
++    def test_parser_and_command_allowlist_fail_closed(self):
++        values,command=module.parse([
++            '--unit=xj-codex-'+'a'*24,'--uid=xj_worker',
++            '--workdir=/var/lib/xuanjun-development/worktrees/task',
++            '--home=/var/lib/xuanjun-development/worker-home',
++            '--codex-home=/var/lib/xuanjun-development/codex-home','--','/bin/sh'])
++        account=type('Account',(),{'pw_uid':1001})()
++        with patch.object(module.os,'geteuid',return_value=0), \
++             patch.object(module.pwd,'getpwnam',return_value=account), \
++             patch.object(module.os.path,'isdir',return_value=True):
++            with self.assertRaises(SystemExit): module.validate(values,command)
++
++    def test_uid_zero_alias_rejected(self):
++        values={'unit':'xj-codex-'+'b'*24,'uid':'xj_alias',
++                'workdir':'/var/lib/xuanjun-development/worktrees/task',
++                'home':'/var/lib/xuanjun-development/worker-home',
++                'codex-home':'/var/lib/xuanjun-development/codex-home'}
++        account=type('Account',(),{'pw_uid':0})()
++        with patch.object(module.os,'geteuid',return_value=0), \
++             patch.object(module.pwd,'getpwnam',return_value=account):
++            with self.assertRaises(SystemExit): module.validate(values,[])
++
++    def test_ledger_or_control_workdir_is_rejected_before_launch(self):
++        command=['/usr/bin/codex','-c','model_provider="openai"','-c',
++                 'approval_policy="never"','-c','features.multi_agent=false',
++                 'app-server','--listen','stdio://']
++        account=type('Account',(),{'pw_uid':1001})()
++        for path in ('/var/lib/xuanjun-development/ledger/task-work',
++                     '/var/lib/xuanjun-development/control/task-work',
++                     '/var/lib/xuanjun-development/worktrees/../ledger/task-work'):
++            values={'unit':'xj-codex-'+'c'*24,'uid':'xj_codex_worker','workdir':path,
++                    'home':'/var/lib/xuanjun-development/worker-home',
++                    'codex-home':'/var/lib/xuanjun-development/codex-home'}
++            with patch.object(module.os,'geteuid',return_value=0), \
++                 patch.object(module.pwd,'getpwnam',return_value=account):
++                with self.assertRaises(SystemExit): module.validate(values,command)
++
++    def test_systemd239_uses_working_directory_property(self):
++        with open(PATH) as stream: source=stream.read()
++        self.assertIn("'--property=WorkingDirectory='+values['workdir']",source)
++        self.assertNotIn("'--working-directory='",source)
++
++    def test_real_git_worktree_passes_narrow_tree_validation_and_handoff(self):
++        with tempfile.TemporaryDirectory() as temp:
++            repo=os.path.join(temp,'repo'); work=os.path.join(temp,'worktree')
++            subprocess.check_call(['git','init','-q',repo])
++            subprocess.check_call(['git','-C',repo,'config','user.name','test'])
++            subprocess.check_call(['git','-C',repo,'config','user.email','test@localhost'])
++            with open(os.path.join(repo,'file.txt'),'w') as stream: stream.write('content')
++            subprocess.check_call(['git','-C',repo,'add','.'])
++            subprocess.check_call(['git','-C',repo,'commit','-qm','base'])
++            subprocess.check_call(['git','-C',repo,'worktree','add','-q',work,'-b','task'])
++            for directory,dirs,files in os.walk(work):
++                os.chmod(directory,0o700)
++                for name in files: os.chmod(os.path.join(directory,name),0o600)
++            uid,gid=os.geteuid(),os.getegid()
++            self.assertTrue(module._safe_tree(work,uid))
++            module._handoff_tree(work,uid,uid,gid)
++            self.assertTrue(module._safe_tree(work,uid))
++
++
++if __name__=='__main__': unittest.main()
+diff --git a/stage1/test_owner_callback_server.py b/stage1/test_owner_callback_server.py
+new file mode 100644
+index 0000000..c0ddaa0
+--- /dev/null
++++ b/stage1/test_owner_callback_server.py
+@@ -0,0 +1,94 @@
++import hashlib
++import hmac
++import io
++import json
++import os
++import sqlite3
++import tempfile
++import threading
++import unittest
++from unittest.mock import patch
++
++from owner_callback_server import BoundedThreadingHTTPServer, handler, read_secret
++
++
++class CallbackServerTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory()
++        self.db = os.path.join(self.temp.name, 'state.sqlite')
++        with sqlite3.connect(self.db) as db:
++            db.executescript('CREATE TABLE tasks(id TEXT PRIMARY KEY,state TEXT,fence INTEGER,updated REAL);CREATE TABLE approvals(task_id TEXT PRIMARY KEY,decision TEXT,decided_at REAL);CREATE TABLE events(task_id TEXT,event TEXT,created REAL,details TEXT);CREATE TABLE owner_callback_requests(request_id TEXT PRIMARY KEY,task_id TEXT,fence INTEGER,owner_id TEXT,owner_chat TEXT,expires_at REAL,consumed INTEGER);CREATE TABLE owner_callback_replays(update_id INTEGER PRIMARY KEY,request_id TEXT UNIQUE);')
++            db.execute("INSERT INTO tasks VALUES('t','WAITING_HUMAN',7,0)")
++            db.execute("INSERT INTO approvals VALUES('t','PENDING',NULL)")
++            db.execute("INSERT INTO owner_callback_requests VALUES('r','t',7,'123','456',9999999999,0)")
++        self.config = {'db': self.db, 'token': 'a' * 32, 'hmac_key': b'k' * 32,
++                       'owner_id': '123', 'owner_chat_id': '456'}
++
++    def tearDown(self):
++        self.temp.cleanup()
++
++    def request(self, obj, auth=None, signature=None, path='/owner-callback', content_type='application/json'):
++        body = json.dumps(obj).encode('utf-8')
++        instance = object.__new__(handler(self.config))
++        instance.path = path
++        instance.headers = {'Content-Type': content_type, 'Content-Length': str(len(body)),
++                            'Authorization': auth or 'Bearer ' + self.config['token'],
++                            'X-Xuanjun-Signature': signature or hmac.new(self.config['hmac_key'], body, hashlib.sha256).hexdigest()}
++        instance.rfile = io.BytesIO(body)
++        result = {}
++        instance.respond = lambda status, data: result.update(status=status, data=data)
++        instance.do_POST()
++        return result
++
++    def test_approve_and_replay_rejected(self):
++        obj = {'request_id':'r','task_id':'t','fence':7,'owner_user_id':'123',
++               'owner_chat_id':'456','update_id':99,'decision':'APPROVE'}
++        self.assertEqual(self.request(obj), {'status': 200, 'data': {'accepted': True}})
++        self.assertEqual(self.request(obj)['status'], 403)
++
++    def test_wrong_chat_signature_path_and_type_fail_closed(self):
++        obj = {'request_id':'r','task_id':'t','fence':7,'owner_user_id':'123',
++               'owner_chat_id':'999','update_id':100,'decision':'REJECT'}
++        self.assertEqual(self.request(obj)['status'], 403)
++        self.assertEqual(self.request(obj, signature='bad')['status'], 403)
++        self.assertEqual(self.request(obj, path='/')['status'], 404)
++        self.assertEqual(self.request(obj, content_type='text/plain')['status'], 415)
++
++    def test_secret_file_mode_and_symlink(self):
++        path = os.path.join(self.temp.name, 'secret')
++        with open(path, 'w') as stream:
++            stream.write('z' * 32)
++        os.chmod(path, 0o600)
++        self.assertEqual(read_secret(path, r'[a-z]{32}'), 'z' * 32)
++        os.chmod(path, 0o644)
++        with self.assertRaises(ValueError):
++            read_secret(path, r'[a-z]{32}')
++
++    def test_server_header_hidden_and_worker_bound_validated(self):
++        instance = object.__new__(handler(self.config))
++        instance.request_version = 'HTTP/1.1'
++        instance.requestline = 'POST /owner-callback HTTP/1.1'
++        instance.command = 'POST'
++        instance.path = '/owner-callback'
++        instance.wfile = io.BytesIO()
++        instance.send_response(200)
++        self.assertNotIn(b'Server:', instance.wfile.getvalue())
++        with self.assertRaises(ValueError):
++            BoundedThreadingHTTPServer(('127.0.0.1', 0), handler(self.config), max_workers=0)
++
++    def test_concurrent_replay_only_one_is_accepted(self):
++        obj = {'request_id':'r','task_id':'t','fence':7,'owner_user_id':'123',
++               'owner_chat_id':'456','update_id':101,'decision':'APPROVE'}
++        barrier = threading.Barrier(2)
++        results = []
++        def invoke():
++            barrier.wait(timeout=2)
++            results.append(self.request(obj)['status'])
++        threads = [threading.Thread(target=invoke) for unused in range(2)]
++        for thread in threads: thread.start()
++        for thread in threads: thread.join(timeout=5)
++        self.assertEqual(sorted(results), [200, 403])
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/stage1/test_owner_workbench_config.py b/stage1/test_owner_workbench_config.py
+new file mode 100644
+index 0000000..46637cc
+--- /dev/null
++++ b/stage1/test_owner_workbench_config.py
+@@ -0,0 +1,44 @@
++import importlib.util
++import os
++import unittest
++
++SPEC = importlib.util.spec_from_file_location('workbench_config', os.path.join(os.path.dirname(__file__), '..', 'scripts', 'uk-owner-workbench-config.py'))
++module = importlib.util.module_from_spec(SPEC)
++SPEC.loader.exec_module(module)
++
++
++class WorkbenchConfigTests(unittest.TestCase):
++    def test_https_routes_are_exact_and_loopback_only(self):
++        value = module.render('owner.example.com', '/etc/xj/fullchain.pem', '/etc/xj/key.pem')
++        self.assertIn('listen 443 ssl http2;', value)
++        self.assertIn('proxy_pass http://127.0.0.1:18556/api/state;', value)
++        self.assertIn('proxy_pass http://127.0.0.1:18557/owner-callback;', value)
++        self.assertIn('limit_except POST { deny all; }', value)
++        self.assertIn('proxy_set_header Authorization $http_authorization;', value)
++        self.assertIn('proxy_set_header X-Xuanjun-Signature $http_x_xuanjun_signature;', value)
++        self.assertIn('server_tokens off;', value)
++        self.assertIn('limit_req zone=owner_callback_rate burst=10 nodelay;', value)
++        self.assertIn('proxy_read_timeout 12s;', value)
++        self.assertNotIn('@@', value)
++
++    def test_service_is_dedicated_and_hardened(self):
++        path=os.path.join(os.path.dirname(__file__),'..','deploy','uk-owner-workbench',
++                          'xuanjun-uk-owner-callback.service')
++        with open(path) as stream: value=stream.read()
++        for required in ('User=xuanjun-callback','ProtectHome=true','ProtectSystem=strict',
++                         'CapabilityBoundingSet=','PrivateDevices=true','RestrictNamespaces=true',
++                         'ProtectKernelModules=true','LockPersonality=true'):
++            self.assertIn(required,value)
++        self.assertNotIn('User=xuanjun_dev',value)
++        self.assertNotIn('/home/xuanjun_dev',value)
++
++    def test_injection_and_relative_paths_rejected(self):
++        for host in ('localhost', 'owner.example.com;return 200', '../example.com'):
++            with self.assertRaises(ValueError):
++                module.render(host, '/a/cert', '/a/key')
++        with self.assertRaises(ValueError):
++            module.render('owner.example.com', 'relative', '/a/key')
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/stage1/test_uk_owner_callback_core.py b/stage1/test_uk_owner_callback_core.py
+index 23bff97..afbc4d7 100644
+--- a/stage1/test_uk_owner_callback_core.py
++++ b/stage1/test_uk_owner_callback_core.py
+@@ -11,16 +11,24 @@ class CallbackTests(unittest.TestCase):
+   db.commit();db.close()
+   install_schema(self.path)
+   db=sqlite3.connect(self.path)
+-  db.execute("INSERT INTO owner_callback_requests VALUES('r','t',2,'123',5000,0)")
++  db.execute("INSERT INTO owner_callback_requests VALUES('r','t',2,'123','456',5000,0)")
+   db.commit();db.close()
+-  self.obj=dict(request_id='r',task_id='t',fence=2,owner_user_id='123',update_id=17,decision='APPROVE')
++  self.obj=dict(request_id='r',task_id='t',fence=2,owner_user_id='123',owner_chat_id='456',update_id=17,decision='APPROVE')
+  def tearDown(self):self.tmp.cleanup()
+  def call(self,auth='Bearer auth',signature=None,now=1000):
+   raw=json.dumps(self.obj).encode();sig=hmac.new(b'key',raw,hashlib.sha256).hexdigest() if signature is None else signature
+-  return apply(self.path,raw,auth,sig,'auth',b'key','123',now=now)
++  return apply(self.path,raw,auth,sig,'auth',b'key','123','456',now=now)
+  def test_approve_and_replay(self):
+   self.assertTrue(self.call()['accepted'])
+   with self.assertRaises((ValueError,sqlite3.IntegrityError)):self.call()
++ def test_reject_is_fenced_and_terminal(self):
++  self.obj['decision']='REJECT'
++  self.assertTrue(self.call()['accepted'])
++  db=sqlite3.connect(self.path)
++  try:
++   self.assertEqual(db.execute("SELECT state FROM tasks WHERE id='t'").fetchone()[0],'FAILED')
++   self.assertEqual(db.execute("SELECT decision FROM approvals WHERE task_id='t'").fetchone()[0],'REJECT')
++  finally:db.close()
+  def test_wrong_auth(self):
+   with self.assertRaises(ValueError):self.call(auth='bad')
+  def test_wrong_sig(self):
+@@ -30,6 +38,9 @@ class CallbackTests(unittest.TestCase):
+  def test_bad_owner(self):
+   self.obj['owner_user_id']='999'
+   with self.assertRaises(ValueError):self.call()
++ def test_bad_owner_chat(self):
++  self.obj['owner_chat_id']='999'
++  with self.assertRaises(ValueError):self.call()
+  def test_stale_fence(self):
+   self.obj['fence']=1
+   with self.assertRaises(ValueError):self.call()
+diff --git a/stage1/uk_owner_callback_core.py b/stage1/uk_owner_callback_core.py
+index 6e2cd2e..d698435 100644
+--- a/stage1/uk_owner_callback_core.py
++++ b/stage1/uk_owner_callback_core.py
+@@ -5,7 +5,32 @@ import json
+ import sqlite3
+ import time
+ 
+-def apply(dbpath, body, auth, signature, expected_token, secret, owner_id, now=None):
++CALLBACK_SCHEMAS = {
++    'owner_callback_requests': {'request_id','task_id','fence','owner_id','owner_chat','expires_at','consumed'},
++    'owner_callback_replays': {'update_id','request_id'},
++}
++
++def validate_schema_connection(db):
++    core = {
++        'tasks': {'id','state','fence'},
++        'approvals': {'task_id','decision'},
++        'events': {'task_id','event','created','details'},
++    }
++    for table, required in dict(core, **CALLBACK_SCHEMAS).items():
++        columns={r[1] for r in db.execute('PRAGMA table_info(%s)' % table)}
++        if not required.issubset(columns):
++            raise ValueError('SCHEMA_MISMATCH_' + table.upper())
++    return True
++
++def validate_schema(dbpath):
++    db=sqlite3.connect('file:'+dbpath+'?mode=ro',uri=True)
++    try:
++        return validate_schema_connection(db)
++    finally:
++        db.close()
++
++def apply(dbpath, body, auth, signature, expected_token, secret, owner_id,
++          owner_chat_id, now=None):
+     if not hmac.compare_digest(auth or '', 'Bearer '+expected_token):
+         raise ValueError('bad service auth')
+     if not hmac.compare_digest(signature or '', hmac.new(secret, body, hashlib.sha256).hexdigest()):
+@@ -15,6 +40,8 @@ def apply(dbpath, body, auth, signature, expected_token, secret, owner_id, now=N
+         raise ValueError('bad decision')
+     if str(event.get('owner_user_id')) != str(owner_id):
+         raise ValueError('bad owner')
++    if str(event.get('owner_chat_id')) != str(owner_chat_id):
++        raise ValueError('bad owner chat')
+     if type(event.get('fence')) is not int or type(event.get('update_id')) is not int:
+         raise ValueError('bad fence/update')
+     if not isinstance(event.get('request_id'),str) or not isinstance(event.get('task_id'),str):
+@@ -24,8 +51,10 @@ def apply(dbpath, body, auth, signature, expected_token, secret, owner_id, now=N
+     try:
+         db.execute('BEGIN IMMEDIATE')
+         # Registrations are created only by trusted UK Coordinator, NOT Telegram.
+-        row=db.execute('SELECT task_id,fence,owner_id,expires_at,consumed FROM owner_callback_requests WHERE request_id=?',(event['request_id'],)).fetchone()
+-        if row is None or row[0]!=event['task_id'] or row[1]!=event['fence'] or row[2]!=str(owner_id) or row[3]<=now or row[4]:
++        row=db.execute('SELECT task_id,fence,owner_id,owner_chat,expires_at,consumed FROM owner_callback_requests WHERE request_id=?',(event['request_id'],)).fetchone()
++        if (row is None or row[0]!=event['task_id'] or row[1]!=event['fence']
++                or row[2]!=str(owner_id) or row[3]!=str(owner_chat_id)
++                or row[4]<=now or row[5]):
+             raise ValueError('missing/expired/used request')
+         state=db.execute('SELECT t.state,t.fence,a.decision FROM tasks t JOIN approvals a ON t.id=a.task_id WHERE t.id=?',(event['task_id'],)).fetchone()
+         if state!=('WAITING_HUMAN',event['fence'],'PENDING'):
+@@ -45,15 +74,24 @@ def apply(dbpath, body, auth, signature, expected_token, secret, owner_id, now=N
+         db.close()
+ 
+ def install_schema(dbpath):
+-    db=sqlite3.connect(dbpath)
++    db=sqlite3.connect(dbpath,isolation_level=None)
+     try:
+-        db.executescript("""
+-        CREATE TABLE IF NOT EXISTS owner_callback_requests(
++        db.execute('BEGIN IMMEDIATE')
++        db.execute("""CREATE TABLE IF NOT EXISTS owner_callback_requests(
+           request_id TEXT PRIMARY KEY,task_id TEXT NOT NULL,fence INTEGER NOT NULL,
+-          owner_id TEXT NOT NULL,expires_at REAL NOT NULL,consumed INTEGER NOT NULL DEFAULT 0);
+-        CREATE TABLE IF NOT EXISTS owner_callback_replays(
+-          update_id INTEGER PRIMARY KEY,request_id TEXT NOT NULL UNIQUE);
+-        """)
+-        db.commit()
++          owner_id TEXT NOT NULL,owner_chat TEXT NOT NULL,expires_at REAL NOT NULL,
++          consumed INTEGER NOT NULL DEFAULT 0)""")
++        db.execute("""CREATE TABLE IF NOT EXISTS owner_callback_replays(
++          update_id INTEGER PRIMARY KEY,request_id TEXT NOT NULL UNIQUE)""")
++        columns={r[1] for r in db.execute('PRAGMA table_info(owner_callback_requests)')}
++        if 'owner_chat' not in columns:
++            # Existing installations are deliberately not made permissive. The
++            # trusted request issuer must bind a chat before callbacks resume.
++            db.execute('ALTER TABLE owner_callback_requests ADD COLUMN owner_chat TEXT')
++        validate_schema_connection(db)
++        db.execute('COMMIT')
++    except BaseException:
++        db.execute('ROLLBACK')
++        raise
+     finally:
+         db.close()

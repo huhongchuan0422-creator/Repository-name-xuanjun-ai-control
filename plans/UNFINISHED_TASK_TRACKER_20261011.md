@@ -349,3 +349,36 @@ Work回收入口只绑定上述第三版，不执行任何旧候选。根源补�
 manifest摘要仍只Owner报告，回收补丁不等于该manifest文件/独立制品已验真。
 第二版回收代码7434ea01de0d5143915c1ae6946af3c24e1f7ad2的英国job114441178840
 实际成功；对应222项Work交接测试与第三版232项开发自测分开记录。
+
+## 最终失败回执、产物已回收与新设计准入 — 2026-10-11 18:04 Asia/Shanghai
+
+第三版4bf32c009c433416ac1ef7ff7038fd4dcd29d7d2最终代码QA=FAIL，安全=FAIL
+（Owner报告安全结论；完整安全报告未随包交付）。独立QA的232回归PASS不覆盖
+额外负例4PASS/2FAIL；普通worktree首次进入与Worker新文件回交失败。Worker
+可替换.git元数据并借Git clean filter在Dispatcher身份执行命令，为CRITICAL。
+执行方本轮重复重试已按规则checkpoint并HOLD，不再称开发/独立复验运行中；
+旧候选作为修复基线保留，不能安装；C NOT_STARTED，生产零变更为Owner回报。
+
+Owner上传交付包，Work已独立核对压缩包/补丁/manifest摘要，取GitHub真实85ad
+上游对象和91个文件blob重建源树，应用补丁得到fb8ee3bd3e2f175bcabc3eefe95aa182f3529b49，
+与独立QA树完全一致；manifest的33个文件哈希通过。当前候选Git commit对象
+未交付，4bf32c00身份由Owner/QA报告；准确验真范围是源tree、补丁和重建tree。
+原root数据回收命令已由上传替代，Owner目前不需到英国执行命令。
+产物和完整QA报告按数据保留在evidence/uk-candidate-4bf32c0/；没有把失败补丁
+应用到PR运行代码。Work本地复跑232测试有1个环境错误：测试硬编码缺失的
+/usr/libexec/platform-python3.6；不造假补二进制/改测试来报告PASS。两项独立
+本地行为探针复现worktree拒绝和.git clean-filter执行；不是英国跨UID证明。
+
+新的有界维护设计已由Work审查准入，见GIT_FREE_IMPORT_ACTIVATION_REPAIR_20261011.md
+与WORK_APPROVED_AB_REPAIR_SPEC_20261011.json：A1采用无.git快照及无过滤纯数据
+导入，替换整条shared worktree交接；A2采用持久epoch、统一activation descriptor
+及restore activator，并解决NNP/sudo链冲突；B通过有限ledger socket批准/拒绝，
+不维护另一任务DB。新预算单次模型<=20min、总补丁<=3轮，同指纹再现停止；
+保留旧预算和断点，不自动重置旧任务。唯一模型6.1主/5.6备用，不启用其他模型/API。
+
+Work任务源提交/Runner交付与英国执行方实际接收/启动分开登记：当前仅新设计
+准入和控制源发布，EXECUTOR_RECEIPT=NOT_VERIFIED / NEW_REPAIR_STARTED=NOT_VERIFIED。
+不以GitHub CI成功称英国Agent复工；新修复不能向旧Coordinator投递CODEX_EXEC。
+独立QA/安全须针对新冻结组合候选复审；现场二进制/身份/broker/unit停止/epoch/
+canonical DB/WAL恢复及HTTPS仍HOLD，修复阶段无生产切换授权。完整安全报告
+缺失仅阻塞该证据项；可独立实现/审查的新设计继续，人工平台节点集中处理。

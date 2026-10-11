@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "spec_revision": "20261011_ab_git_free_activation_v1",
+  "kind": "TRUSTED_CONTROL_PLANE_MAINTENANCE",
+  "authority": "CHATGPT_WORK_OWNER_DELEGATED",
+  "approval": "DESIGN_APPROVED_FOR_BOUNDED_IMPLEMENTATION",
+  "control_repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control",
+  "source_binding": "EXACT_RUNNER_GITHUB_SHA_AND_SPEC_DIGEST_REQUIRED",
+  "repair_baseline": {
+    "source_commit": "85ad1d7224485f3c57298e71a429eb576b8d943d",
+    "owner_reported_commit": "4bf32c009c433416ac1ef7ff7038fd4dcd29d7d2",
+    "verified_tree": "fb8ee3bd3e2f175bcabc3eefe95aa182f3529b49",
+    "patch_sha256": "82e81c2bbca62ff28dddab409f66ee53106283a1ebb3a9271c5c89b38e11aac0",
+    "manifest_sha256": "7a721baadf570decf6fae72747394e84fdac29fe1432fcef4f44a4bd85bf9eaf",
+    "release_admission": "FAIL_HOLD"
+  },
+  "design": "plans/GIT_FREE_IMPORT_ACTIVATION_REPAIR_20261011.md",
+  "source_root": "EXISTING_RUNNER_CHECKOUT_NOT_PRIVATE_TMP",
+  "evidence_root": "evidence/uk-candidate-4bf32c0",
+  "roles": [
+    {
+      "role": "A1",
+      "existing_nodes": [
+        "1.8",
+        "1.9",
+        "1.11",
+        "1.13"
+      ],
+      "scope": "Git-free snapshot, bounded file delta, private importer; pipeline/worker integration; no shared worktree handoff",
+      "exclusive_files": [
+        "stage1/development_pipeline.py",
+        "stage1/codex_app_server_worker.py",
+        "stage1/codex_worker.py"
+      ],
+      "depends_on": []
+    },
+    {
+      "role": "A2",
+      "existing_nodes": [
+        "1.8",
+        "1.9",
+        "1.11",
+        "1.13"
+      ],
+      "scope": "Durable epoch/activation descriptor, root broker socket and restore activator; no sudo under dispatcher NNP",
+      "exclusive_files": [
+        "stage1/execution_ledger.py",
+        "stage1/development_service.py",
+        "stage1/ledger_backup.py"
+      ],
+      "depends_on": []
+    },
+    {
+      "role": "B",
+      "existing_nodes": [
+        "1.10",
+        "1.12"
+      ],
+      "scope": "Owner routing/dashboard through one canonical generation/ledger socket; no second task DB",
+      "exclusive_files": [
+        "stage1/owner_callback_server.py",
+        "stage1/uk_owner_callback_core.py",
+        "stage1/owner_dashboard.py",
+        "stage1/owner_dashboard.html"
+      ],
+      "depends_on": [
+        "A2_CONTRACT_FREEZE"
+      ]
+    },
+    {
+      "role": "INDEPENDENT_QA",
+      "scope": "New frozen integrated artifact rebuild, portable regression and all specified negative cases",
+      "depends_on": [
+        "A1_A2_B_COMBINED_FREEZE"
+      ]
+    },
+    {
+      "role": "SECURITY",
+      "scope": "Independent privilege/Git data/TOCTOU/epoch/restore/publication audit on same exact artifact",
+      "depends_on": [
+        "A1_A2_B_COMBINED_FREEZE"
+      ]
+    }
+  ],
+  "budget": {
+    "seconds_per_model_attempt": 1200,
+    "patch_rounds_total": 3,
+    "repeated_same_failure": "HOLD_CHECKPOINT",
+    "old_failed_budget": "PRESERVE"
+  },
+  "models": {
+    "primary": "openai/gpt-6.1-sol",
+    "sole_fallback": "openai/gpt-5.6-sol",
+    "route": "EXISTING_CHATGPT_OAUTH_CODEX",
+    "paid_api": "DENY",
+    "other_models": "DENY"
+  },
+  "permissions": {
+    "production_db_write": false,
+    "old_coordinator_switch": false,
+    "trading_permission_change": false,
+    "formal_webhook_change": false,
+    "production_deploy": false,
+    "old_coordinator_codex_exec": false,
+    "generic_root_or_systemd_grant": false
+  },
+  "required_receipt": [
+    "server",
+    "control_source_sha",
+    "spec_sha256",
+    "role",
+    "workdir",
+    "actual_model",
+    "started",
+    "blocker",
+    "checkpoint"
+  ],
+  "delivery": "CONTROL_SOURCE_ONLY_EXECUTOR_RECEIPT_NOT_VERIFIED",
+  "c_status": "NOT_STARTED_UNTIL_REAL_RELEASE_ADMISSION"
+}
