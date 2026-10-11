@@ -1,0 +1,29 @@
+name: UK external Runner timeout observer (mechanical only)
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+concurrency:
+  group: xuanjun-external-runner-watchdog
+  cancel-in-progress: false
+jobs:
+  inspect:
+    # GitHub-hosted, never self-hosted UK runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parse receipts and create idempotent timeout evidence
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -B scripts/uk-external-runner-watchdog.py
