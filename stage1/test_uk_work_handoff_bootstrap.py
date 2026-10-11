@@ -16,7 +16,7 @@ SPEC_C.loader.exec_module(c)
 
 
 class HandoffBootstrapTest(unittest.TestCase):
-    def test_collector_and_copy_bind_same_second_candidate(self):
+    def test_collector_and_copy_bind_same_frozen_candidate(self):
         self.assertEqual(b.FROZEN_COMMIT, c.INTEGRATED_FROZEN_COMMIT)
         self.assertEqual(b.PATCH_HASH, c.INTEGRATED_PATCH_HASH)
         self.assertEqual(b.OWNER_REPORTED_MANIFEST_HASH, c.OWNER_REPORTED_MANIFEST_HASH)

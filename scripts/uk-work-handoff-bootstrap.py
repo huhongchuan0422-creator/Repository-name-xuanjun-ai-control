@@ -14,9 +14,9 @@ import sys
 import uuid
 
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
-FROZEN_COMMIT = '93d5b04ed1ced8042e3982125a486e0bd1d43ec8'
-PATCH_HASH = 'efe8607e8d54bf083ae8e696b953ee18aeb4c390ab7bc746cd2d1d09ddc2e1a6'
-OWNER_REPORTED_MANIFEST_HASH = '244a848aa322310a85a2bd0248908c079130cfa494a9dd3c17416eca768a41eb'
+FROZEN_COMMIT = '4bf32c009c433416ac1ef7ff7038fd4dcd29d7d2'
+PATCH_HASH = '82e81c2bbca62ff28dddab409f66ee53106283a1ebb3a9271c5c89b38e11aac0'
+OWNER_REPORTED_MANIFEST_HASH = '7a721baadf570decf6fae72747394e84fdac29fe1432fcef4f44a4bd85bf9eaf'
 SOURCE = '/home/xuanjun_dev/xuanjun-uk-dev-20261011/integration-ab.patch'
 BRIDGE = '/var/lib/xuanjun-work-handoff'
 MAX_PATCH = 262144

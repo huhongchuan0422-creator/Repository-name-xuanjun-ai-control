@@ -328,3 +328,24 @@ symlink/git元数据/二进制/重命名/歧义路径；可接收脚本0755作�
 路径读取；SQLite备份恢复含PRAGMA、fsync、WAL/SHM及失败回滚；旧Coordinator
 inactive、epoch唯一派发与lease丢失实际停止；两真实任务CI/QA/安全/批准拒绝/
 断点续跑；新看板外部HTTPS与真实心跳/全量人工队列。代码自测不替代这些门禁。
+
+## 第三版覆盖第二版发布候选 — 2026-10-11 17:48 Asia/Shanghai
+
+Owner转交第三版冻结，前两版均作废为发布候选（保留失败历史，不删除成果）：
+- commit：4bf32c009c433416ac1ef7ff7038fd4dcd29d7d2。
+- patch SHA256：82e81c2bbca62ff28dddab409f66ee53106283a1ebb3a9271c5c89b38e11aac0。
+- manifest SHA256：7a721baadf570decf6fae72747394e84fdac29fe1432fcef4f44a4bd85bf9eaf。
+- 执行方开发自测232项PASS、安装/三个入口--help烟测PASS；报告修复同fd
+  manifest/source校验竞态和dispatcher/worker受控worktree所有权交接。
+- 独立QA/安全定向复验进行中，结果未出。平台级dispatcher epoch、canonical
+  callback DB、restore activator、真实用户/二进制/root helper安装和unit inactive
+  仍HOLD；C NOT_STARTED，生产PASS尚无证据。
+
+Work回收入口只绑定上述第三版，不执行任何旧候选。根源补丁路径维持
+/home/xuanjun_dev/xuanjun-uk-dev-20261011/integration-ab.patch（路径沿用Owner
+上一版说明，当前字节待核）；root数据回收目录按第三版commit隔离：
+/var/lib/xuanjun-work-handoff/returns/4bf32c009c433416ac1ef7ff7038fd4dcd29d7d2/。
+若源文件已变为另一版本，则哈希失败即停止，不选择最新文件或安装旧版本。
+manifest摘要仍只Owner报告，回收补丁不等于该manifest文件/独立制品已验真。
+第二版回收代码7434ea01de0d5143915c1ae6946af3c24e1f7ad2的英国job114441178840
+实际成功；对应222项Work交接测试与第三版232项开发自测分开记录。
