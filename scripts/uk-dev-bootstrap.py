@@ -53,7 +53,7 @@ WantedBy=multi-user.target
 
 AUDIT_PROGRAM = r'''#!/usr/bin/python3
 """Fixed no-argument privileged read-only summaries; never emit credentials."""
-import json,os,re,socket,stat,subprocess,sys,urllib.request,urllib.error
+import json,os,pwd,re,socket,stat,subprocess,sys,urllib.request,urllib.error
 HOME='/home/xuanjun_dev'
 TOKEN=HOME+'/.config/xuanjun/owner-dashboard-token'
 ENV={'PATH':HOME+'/.openclaw/tools/node-v24.21.0/bin:/usr/local/bin:/usr/bin:/bin','HOME':HOME,'LANG':'C.UTF-8'}
@@ -126,9 +126,11 @@ for path in ['/','/api/state']:
  try:
   request=urllib.request.Request('http://127.0.0.1:18556'+path)
   if path=='/api/state':
-   s=os.lstat(TOKEN)
-   if not stat.S_ISREG(s.st_mode) or s.st_mode & 0o077:raise ValueError('unsafe')
-   with open(TOKEN) as stream:token=stream.read(257).strip()
+   fd=os.open(TOKEN,os.O_RDONLY|os.O_NOFOLLOW)
+   with os.fdopen(fd) as stream:
+    s=os.fstat(stream.fileno())
+    if not stat.S_ISREG(s.st_mode) or stat.S_IMODE(s.st_mode)!=0o600 or s.st_uid!=pwd.getpwnam('xuanjun_dev').pw_uid:raise ValueError('unsafe')
+    token=stream.read(257).strip()
    if re.fullmatch(r'[A-Za-z0-9_-]{32,256}',token) is None:raise ValueError('unsafe')
    request.add_header('Authorization','Bearer '+token)
   with urllib.request.urlopen(request,timeout=5) as response:
