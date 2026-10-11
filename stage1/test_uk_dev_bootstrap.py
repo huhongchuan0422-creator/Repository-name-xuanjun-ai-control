@@ -27,7 +27,7 @@ class BootstrapTest(unittest.TestCase):
         self.assertNotIn(b'ALL\n', plan['sudoers'])
         self.assertIn(b'User=xuanjun_dev', plan['unit'])
         self.assertIn(b'--port 18556', plan['unit'])
-        self.assertIn(b'ProtectSystem=strict', plan['unit'])
+        self.assertIn(b'ProtectSystem=full', plan['unit'])
         self.assertNotIn(b'ExecStartPre=', plan['unit'])
     def test_symlink_and_wrong_hash_sources_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
