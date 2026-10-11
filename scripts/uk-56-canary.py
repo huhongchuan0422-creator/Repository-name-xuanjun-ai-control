@@ -37,6 +37,34 @@ def objects(value):
                 yield obj
 
 
+def auth_types_for_provider(value, provider='openai'):
+    """Read the provider-filtered auth response, including nested credentials.
+
+    Provider envelope rows need not carry a credential type themselves.
+    Explicit nested provider declarations override the inherited scope.
+    Empty/unknown/mixed API auth still prevents inference.
+    """
+    found = []
+    def visit(obj, scope, depth=0):
+        if depth > 12:
+            found.append('UNKNOWN')
+            return
+        if isinstance(obj, dict):
+            scope = obj.get('provider', scope)
+            if scope == 'openai':
+                for key in ('type', 'mode'):
+                    if key in obj:
+                        found.append(obj[key])
+            for item in obj.values():
+                if isinstance(item, (dict, list)):
+                    visit(item, scope, depth + 1)
+        elif isinstance(obj, list):
+            for item in obj:
+                visit(item, scope, depth + 1)
+    visit(value, provider)
+    return found
+
+
 def catalog_summary(data):
     rows = []
     for obj in objects(data):
@@ -126,8 +154,12 @@ def main():
     result = {'target': TARGET, 'fallbacks': 0, 'channel_delivery': False,
               'production_cutover': False, 'catalog_refresh': 'NOT_EXECUTED'}
     code, data, error = command(['models', 'auth', 'list', '--provider', 'openai', '--json'])
-    auth_types = [obj.get('type', obj.get('mode')) for obj in objects(data)
-                  if obj.get('provider') == 'openai']
+    auth_types = auth_types_for_provider(data)
+    result['auth'] = {'exit_code': code, 'parsed': data is not None,
+                      'types': [t if isinstance(t, str) and t in
+                                ('oauth', 'api_key', 'api-key', 'token') else 'UNKNOWN'
+                                for t in auth_types[:10]],
+                      'error_code': error, 'diagnostic': command.last_error}
     if code != 0 or not auth_types or any(t != 'oauth' for t in auth_types):
         result['inference'] = {'status': 'NOT_STARTED_OAUTH_ROUTE_UNCONFIRMED'}
         print(json.dumps(result, sort_keys=True))

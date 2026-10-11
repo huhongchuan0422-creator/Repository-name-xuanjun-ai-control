@@ -83,3 +83,15 @@ At 2026-10-11 13:49 Asia/Shanghai, Owner explicitly authorized 6.1 Sol primary
 and 5.6 Sol as the sole fallback, with automatic safe recovery to 6.1 Sol.
 This supersedes earlier no-fallback instructions. No live model configuration
 has been changed by this documentation update. See plans/MODEL_POLICY_20261011.md.
+
+## Owner-assisted 5.6 preflight at 06:48Z
+
+Owner executed the hash-pinned 5.6 probe staged at commit 87655e84. It stopped
+with NOT_STARTED_OAUTH_ROUTE_UNCONFIRMED before catalog refresh or inference.
+This is not evidence that 5.6 is unavailable or that OAuth credentials expired.
+The preflight incorrectly required provider and credential type on the same
+JSON object; nested provider envelopes could therefore reject valid auth.
+The corrected candidate inherits provider scope in the provider-filtered auth
+response and emits only enum auth evidence plus masked diagnostics. Unknown,
+foreign-only or mixed API-key auth remains blocked. Production model config,
+login and channels have not been changed. Corrected live probe is pending.

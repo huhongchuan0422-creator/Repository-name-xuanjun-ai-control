@@ -39,6 +39,26 @@ class CanaryTests(unittest.TestCase):
         self.assertNotIn('--local', agent)
         self.assertIn('"production_configuration_mutation": false', output)
 
+    def test_nested_oauth_without_repeated_provider_is_recognized(self):
+        for auth in ({'provider': 'openai', 'profiles': [{'credentials': {'type': 'oauth'}}]},
+                     {'profiles': [{'type': 'oauth'}]}):
+            calls, output = self.main_with(auth)
+            self.assertEqual(calls[-1][0], 'agent')
+            self.assertIn('"types": ["oauth"]', output)
+
+    def test_nested_api_backup_blocks_probe(self):
+        calls, output = self.main_with({'provider': 'openai', 'profiles': [
+            {'type': 'oauth'}, {'credentials': {'type': 'api_key'}}]})
+        self.assertEqual(len(calls), 1)
+        self.assertIn('NOT_STARTED_OAUTH_ROUTE_UNCONFIRMED', output)
+
+    def test_foreign_auth_and_unknown_values_do_not_leak(self):
+        for auth in ({'profiles': [{'provider': 'other', 'type': 'oauth'}]},
+                     {'profiles': [{'type': 'private-type-value', 'secret': 'private-secret'}]}):
+            calls, output = self.main_with(auth)
+            self.assertEqual(len(calls), 1)
+            self.assertNotIn('private', output)
+
     def test_empty_catalog_is_not_model_unavailability(self):
         self.assertEqual(c.catalog_summary({}), {'target_rows': [], 'provider_outcomes': []})
 
