@@ -22,13 +22,21 @@ jobs:
           python3 -m py_compile scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py
           python3 -m unittest discover -s stage1 -q
           STAGE="/tmp/xuanjun-uk-integration-${GITHUB_SHA}"
-          mkdir -p "$STAGE/stage1" "$STAGE/scripts"
+          mkdir -p "$STAGE/stage1" "$STAGE/scripts" "$STAGE/canonical" "$STAGE/plans"
           cp stage1/*.py stage1/*.html "$STAGE/stage1/"
+          # Reuse the Runner's authenticated checkout for the Work-approved
+          # task source. The conversational agent needs no new GitHub token.
+          # These are immutable-SHA source documents, not a runtime queue.
+          cp canonical/PROJECT_STATE.md "$STAGE/canonical/"
+          cp plans/UNFINISHED_TASK_TRACKER_20261011.md plans/MODEL_POLICY_20261011.md plans/TOKYO_MIGRATION_DEADLINE_20261020.md plans/COMMUNITY_POINTS_REQUIREMENTS_20261011.md "$STAGE/plans/"
           cp scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-sol-diagnostic.py scripts/uk-sol-canary.py scripts/uk-sol-check-bootstrap.py scripts/uk-takeover-observation.py scripts/uk-56-canary.py scripts/uk-codex-runtime-align.py scripts/uk-codex-post-align.py "$STAGE/scripts/"
           printf '%s\n' "$GITHUB_SHA" > "$STAGE/SOURCE_COMMIT"
           chmod -R a+rX "$STAGE"
           sha256sum "$STAGE/scripts/uk-contract-export.py"
           echo "UK_INTEGRATION_STAGE=$STAGE"
+          echo "UK_CONTROL_SOURCE=$STAGE/canonical/PROJECT_STATE.md"
+          echo "UK_TASK_SOURCE_SHA=$GITHUB_SHA"
+          echo "WORKER_TASK_DISPATCH=NOT_EXECUTED"
           echo "PRODUCTION_DEPLOYMENT=NOT_EXECUTED"
       - name: Read actual contracts only through authorized fixed gateway
         shell: bash

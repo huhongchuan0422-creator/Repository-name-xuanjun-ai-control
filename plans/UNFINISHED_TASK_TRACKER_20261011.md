@@ -191,3 +191,24 @@ Work负责形成有范围、依赖、预算、验收与冻结代码来源的任�
 阶段仍WAITING_HUMAN。两个新增真实SQLite重启/反例测试加入后，本地206项
 通过；本次候选的英国Runner/CI结果须另核，不把模拟测试当生产续跑PASS。
 
+
+## 最新执行核对：2026-10-11 16:34
+
+153a82f9的7条CI均成功；英国run 38125077152/job 114427643391实际206项测试
+通过并stage，部署未执行。四主机run 38125077144完成：英国仍旧Coordinator、
+无execution_specs/worker_heartbeats，新派发没有启动；英国四个控制服务资源
+上限仍infinity、nginx not-found且观测监听无443；韩国小说/yibi-api/scheduler
+active且无限CPU/内存，Docker/containerd单位not-found。以上已记录实测，
+不把旧“服务名可能active”当当前结果。国内bridge已有明确256MiB/CPU上限。
+
+新增待核实：旧固定模型摘要报primary=OTHER_OR_UNKNOWN、fallback_count=0，
+其只识别6.1主模型，不能判定实际是5.6或非法模型；当前实际两模型策略需
+受控核对。此前5.6最小推理和Owner飞书回执仍分别有效，不能据此假定当前
+配置、连续开发或自动恢复已验收。无需重复成功安装或canary。
+
+下一控制源桥接使用现有Runner私有仓库checkout，在每个精确SHA的临时stage
+提供canonical与上述plans。Work统一批准spec；UK读取受保护控制源并按已
+批准的既有任务准入、取lease和执行；不靠Owner逐项向飞书发送任务。
+目前仍NOT_DISPATCHED，新派发器/隔离/独立审查为实际启动依赖。
+社区新规则及付款后播报官方调研见COMMUNITY_POINTS_REQUIREMENTS_20261011.md；
+该项目原映射为Stage 5，需求记录不代表业务开发或语音设备E2E已开始。

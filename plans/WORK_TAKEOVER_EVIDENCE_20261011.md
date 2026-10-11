@@ -258,3 +258,49 @@ containment, obtain controlled dispatcher activation and independent review,
 then accept two real development tasks with exact-commit CI/QA/checkpoint
 continuation. Do not submit CODEX_EXEC to the old Coordinator.
 Official protocol reference: https://learn.chatgpt.com/docs/app-server.
+
+## 2026-10-11 16:31–16:34 Asia/Shanghai execution evidence
+
+PR #17 candidate 153a82f975fcda7d700db7c3812021dcdaa6e689 used a latest-HEAD
+compare-and-set update. All seven associated workflows completed success.
+UK integration run 38125077152/job 114427643391 executed 206 tests successfully
+on the actual UK Python 3.6 Runner. Source stage:
+/tmp/xuanjun-uk-integration-153a82f975fcda7d700db7c3812021dcdaa6e689.
+PRODUCTION_DEPLOYMENT=NOT_EXECUTED. Checkpoint tests are regression evidence,
+not two real autonomous tasks or production restart acceptance.
+
+Four-server run 38125077144 completed all four jobs successfully with fixed
+host/user/role guards and PRODUCTION_MUTATION=NO. Korean novel factory,
+yibi-api and yibi-scheduler are active/running with unlimited CPU/memory;
+docker/containerd/nginx systemd units are not-found. There is a non-loopback
+443 listener; its process, TLS identity and intended service were not inspected,
+so it is not proof of a usable Binance/Owner HTTPS endpoint.
+UK OpenClaw, old Coordinator, dashboard and callback are active/running with
+CPUQuotaPerSecUSec/MemoryMax=infinity; Docker/containerd active. nginx is
+not-found; the observed listener list has no 443 and the dashboard is loopback
+18556. No public UK HTTPS acceptance is established.
+Domestic bridge is active/running with 500ms CPUQuotaPerSecUSec, 268435456-byte
+MemoryMax, TasksMax=64, NoNewPrivileges=yes and ProtectSystem=strict.
+Tokyo restricted model executor and tunnel are active/running with explicit
+CPU/memory limits. These service settings do not establish complete project
+or per-task isolation.
+
+The UK fixed contract export still hashes the old Coordinator as
+70e0d03412f7729f396652df041930f689a6ea674e4e33bf370da1e40a90f9c7
+and reports no execution_specs/worker_heartbeats tables. Actual new runtime
+dispatch remains NOT_VERIFIED; no CODEX_EXEC was inserted into the old runtime.
+Its model summary reports primary=OTHER_OR_UNKNOWN, fallback_count=0. The old
+sanitizer recognizes only a 6.1 primary, so this cannot identify an unauthorized
+model or attribute a config change. It does not attest the current desired
+6.1-primary/5.6-only-fallback policy. Reconcile actual policy through a bounded
+trusted summary before Worker activation; preserve the already-proven 5.6
+minimal inference and Owner Feishu receipt as scoped historical/live evidence.
+No new inference, credential replacement or model configuration write occurred.
+
+Owner delegated architecture/task assignment to ChatGPT Work, UK OpenClaw/Codex
+as executor. Canonical/README and the existing unfinished-task index now record
+this authority and ordered nodes. The next staging increment exports these
+existing control documents with SOURCE_COMMIT from the Runner-authenticated
+checkout, so the conversational agent need not obtain a new GitHub token.
+Document staging is source acquisition, not admission, lease or actual dispatch.
+No competing task registry, daemon, credentials or outbound message was created.
