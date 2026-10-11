@@ -8,6 +8,40 @@ import socket
 import stat
 import subprocess
 import shutil
+import glob
+import re
+
+
+def package_version(path):
+    """Read static package metadata only; never credentials or runtime config."""
+    try:
+        with open(path, 'rb') as stream:
+            raw = stream.read(524289)
+        if len(raw) > 524288:
+            return {'status': 'OVERSIZE'}
+        data = json.loads(raw.decode('utf-8'))
+        if data.get('name') not in ('@openclaw/codex', '@openai/codex'):
+            return {'status': 'UNEXPECTED_PACKAGE'}
+        version = data.get('version')
+        dependency = data.get('dependencies', {}).get('@openai/codex')
+        valid = lambda v: isinstance(v, str) and re.fullmatch(
+            r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?', v) is not None
+        return {'status': 'READ', 'name': data['name'],
+                'version': version if valid(version) else 'UNKNOWN',
+                'codex_dependency': dependency if valid(dependency) else 'UNKNOWN',
+                'sha256': hashlib.sha256(raw).hexdigest()}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {'status': 'NOT_READABLE_OR_INVALID'}
+
+
+def observe_managed_packages():
+    root = '/home/xuanjun_dev/.openclaw'
+    paths = [root + '/extensions/codex/package.json']
+    for name in ('@openclaw/codex', '@openai/codex'):
+        paths.extend(glob.glob(root + '/npm/projects/*/node_modules/' + name + '/package.json')[:20])
+    return {'installed_plugin_identity': 'NOT_VERIFIED',
+            'packages': [{'path': p, 'metadata': package_version(p)}
+                         for p in sorted(set(paths))]}
 
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
 PATHS = [
@@ -92,6 +126,7 @@ def main():
             pass
     result['candidate_processes'] = result['candidate_processes'][:100]
     result['isolation_observation'] = observe_isolation()
+    result['managed_package_observation'] = observe_managed_packages()
     print(json.dumps(result, sort_keys=True))
     if os.path.isfile('/usr/local/sbin/xuanjun-uk-owner-audit'):
         subprocess.run(['sudo', '-n', '/usr/local/sbin/xuanjun-uk-owner-audit'],
