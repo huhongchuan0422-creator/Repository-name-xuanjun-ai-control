@@ -452,3 +452,12 @@ guard阻止B。Work发布V3，采用Owner已确认的临时5.6-only/fallbacks=[]
 预算重置、生产权限扩充。冻结245/248仍是现行测试证据。
 下一步V3接收与实际RESUMED回执→提交修复→clean checkout全量→同制品
 独立QA/安全。发布指令不算启动；V3接收/续跑NOT_VERIFIED。
+
+### 20:53 CST：7ed631a冻结完成，安全失败纠正优先
+
+- V3已真实接收续跑；原B断点提交7ed631a.../treeaee5715...；clean248/248、QA PASS为执行者回执，报告字节尚未返回Work。
+- PR6109228044明确纠正6109204309的安全PASS：HIGH1入口仍允许6.1（可复现）；HIGH2 broker代码/平台边界未完整验收。因此当前QA_PASS_SECURITY_FAIL_HOLD，不采用较晚到达的绿色汇总作为覆盖证据。
+- Work扩围精确模型源码/相关测试，保持同任务/断点/原预算，单一集成writer；固定5.6默认与allowlist，显式6.1须在派发前拒绝。不改生产配置，不删负例，不重派A1A2。
+- broker归Work的A2 PLATFORM/Release Gate。先提供实际源码路径与可执行入口/边界测试矩阵，区分缺实现与缺现场安装；缺实现不能通过平台HOLD掩盖。现场root/身份/binary/epoch/fence/停止和恢复仍需受控准入。
+- 请求patch b26...、install manifest c157...、外部evidence manifest9b53...与QA/纠正security报告，区分不同摘要。现GitHub找不到7ed对象不否定本地工作，但Work未复现/收件不能判发布。
+- 模型修复、制品回传、broker边界盘点可独立继续；新源码冻结后全量+同制品双审，C/生产/HTTPS未验收。不需要Owner再授权上述代码工作。

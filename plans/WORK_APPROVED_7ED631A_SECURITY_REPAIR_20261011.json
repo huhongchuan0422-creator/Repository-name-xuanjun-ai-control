@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "authority": "CHATGPT_WORK_OWNER_DELEGATED",
+  "approval": "APPROVED_BOUNDED_POST_REVIEW_MODEL_SOURCE_REPAIR_AND_EVIDENCE_RETURN",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "bind_v3": {
+    "path": "plans/WORK_APPROVED_B_SCOPE_EXTENSION_V3_20261011.json",
+    "sha256": "75e7105067fb44fef96cd76197727f5e3ebc0b85d7483b25c98a2773aa6d039b"
+  },
+  "governing_security_receipt": {
+    "comment_id": 6109228044,
+    "supersedes_pass_claim_comment_id": 6109204309,
+    "state": "QA_PASS_SECURITY_FAIL_HOLD"
+  },
+  "frozen_checkpoint": {
+    "commit": "7ed631aabe240321656287bbd0c8ca546814c37c",
+    "tree": "aee5715e2a9bcba4fa90b40cfa4c0b3f5be40e87",
+    "parent": "925cfba3171ebb43a872ef2a0ab7ffc390a5a516",
+    "regression": {
+      "total": 248,
+      "passed": 248
+    },
+    "qa": "PASS_REPORTED_REPORT_NOT_RECEIVED",
+    "security": "FAIL_CORRECTED",
+    "release": "HOLD"
+  },
+  "model_policy": {
+    "primary": "openai/gpt-5.6-sol",
+    "fallbacks": [],
+    "allowed_models": [
+      "openai/gpt-5.6-sol"
+    ],
+    "route": "EXISTING_CHATGPT_OAUTH_CODEX",
+    "other_models": "DENY",
+    "paid_api": "DENY",
+    "automatic_61_probe_or_restore": false
+  },
+  "source_repair": {
+    "executor": "EXISTING_B_INTEGRATION_COORDINATOR_SINGLE_WRITER",
+    "duplicate_A1_A2_redispatch": false,
+    "additional_allowed_edit_paths": [
+      "stage1/codex_worker.py",
+      "stage1/codex_app_server_worker.py",
+      "stage1/development_service.py",
+      "stage1/test_codex_worker.py",
+      "stage1/test_codex_app_server_worker.py",
+      "stage1/test_development_service.py",
+      "stage1/test_development_pipeline.py"
+    ],
+    "scope": "ONLY execution-entry 5.6-only default/allowlist/validation and affected model-policy fixtures; preserve all existing auth/sandbox/isolation/epoch/fence/output controls",
+    "required_negative_tests": [
+      "omitted model resolves to5.6",
+      "explicit6.1 rejected before process/model dispatch",
+      "Astra/other model/wildcard/provider override rejected",
+      "configuration6.1 rejected before binary invocation",
+      "requested and observed model mismatch fail closed; actual UNKNOWN is not PASS",
+      "actual native model evidence remains required; no fallback"
+    ],
+    "historical_negative_fixture_text_61_may_remain": true,
+    "new_frozen_artifact_required_after_any_source_edit": true,
+    "old_security_PASS_must_not_be_reused": true,
+    "install_manifest_update": "Recompute existing already-tracked manifest/hash metadata for changed runtime files as data only; no installer execution or new install path authority"
+  },
+  "broker_gate_ownership": {
+    "owner": "A2_PLATFORM_RELEASE_GATE_UNDER_WORK",
+    "code_gate": "Executable broker client/server/service entrypoints and peer/epoch/fence/artifact/binary/path/argv/stop boundaries must be identified and pass independent code tests; missing executable implementation is not deferred as installation-only",
+    "platform_gate": "Actual root-owned installation, registered identities, SO_PEERCRED, binary/artifact hashes, activation epoch/fence, old Coordinator exclusivity, whole-unit/descendant stop and canonical-ledger restore require现场 evidence before C/deployment",
+    "accepted": false,
+    "code_evidence": "NOT_VERIFIED",
+    "platform_evidence": "NOT_VERIFIED",
+    "current_approval": "READ_SOURCE_AND_PREPARE_BOUNDARY_MATRIX_ONLY_NO_ROOT_INSTALL_OR_PRODUCTION_CHANGE",
+    "report_required": [
+      "exact existing broker source/service/helper/config paths from frozen manifest",
+      "executable entrypoints vs policy classes",
+      "each required boundary mapped to test/evidence/failure",
+      "missing implementation vs missing platform acceptance",
+      "minimum exact file paths needed for remaining code changes"
+    ],
+    "missing_broker_code_requires_new_exact_path_admission": true,
+    "does_not_block_independent_model_source_repair_or_artifact_return": true
+  },
+  "artifact_return": {
+    "required": [
+      "7ed full base identity and pinned patch b26d69593122750239038e0eddf6ffbd34ab86295f5d0c35ba4517f44a51478a",
+      "install manifest c157eb4ca957e516681b83714fefdfccb485a3c306772f0cb40c3e39e340bd29",
+      "separate external evidence manifest9b530d8dbb52d8647b924c39bb4dac5ce99b227ff24a9b34bf56177360b84a8e if present",
+      "full QA and corrected security reports bound to same artifact",
+      "post-repair new full commit/tree/patch/manifest/report identities"
+    ],
+    "candidate_not_resolvable_on_github": "LOCAL_OBJECT_NOT_ARTIFACT_FAILURE",
+    "transport": "Existing private PR comments/controlled artifact-return channel; no Agent branch push/new task system/credential copying",
+    "if_no_file_attachment": "Return safe UTF8 patch/manifest/reports as BASE64_DATA_ONLY chunks in this existing PR, each <=12000 chars with task/artifact/file/part/total/file_sha256; never credentials/.git/HOME/raw prompts",
+    "full_reconstruction": "If existing patch only targets local925 parent, also export full text delta from known source85ad1d7224485f3c57298e71a429eb576b8d943d to final tree; record new SHA256 and base tree. Do not claim old pinned patch hash describes that new delta.",
+    "chunk_data_is_evidence_only": true,
+    "no_execution_or_release_by_data_receipt": true
+  },
+  "status_reconciliation": {
+    "key": [
+      "task",
+      "artifact_commit",
+      "artifact_tree",
+      "review_type",
+      "revision",
+      "supersedes_comment_id"
+    ],
+    "last_arrival_timestamp_or_scratch_revision_not_authority": true,
+    "code_tests_PASS_not_security_verdict": true,
+    "same_artifact_FAIL_remains_until_explicit_report_with_reproductions_resolved": true
+  },
+  "budget": {
+    "preserve_original": true,
+    "reset": false,
+    "remaining": "UNKNOWN_PRESERVED_NOT_RESET",
+    "report_actual_remaining_before_attempt": true,
+    "exhausted": "HOLD_WITH_CHECKPOINT_NO_BLIND_RETRY"
+  },
+  "permissions": {
+    "production_deploy": false,
+    "production_db_write": false,
+    "production_config_write": false,
+    "old_coordinator_switch": false,
+    "formal_webhook_change": false,
+    "trading_permission_change": false,
+    "root_helper_install": false,
+    "generic_root_or_systemd_grant": false
+  },
+  "required_receipt": [
+    "parent_task",
+    "this_spec_sha256",
+    "v3_sha256",
+    "original_checkpoint_commit",
+    "actual_workdir",
+    "remaining_budget",
+    "actual_state",
+    "source_repair_paths",
+    "artifact_return_state",
+    "broker_boundary_state",
+    "blocker"
+  ],
+  "release_admission": "HOLD",
+  "c_status": "NOT_STARTED_UNTIL_REAL_RELEASE_ADMISSION"
+}

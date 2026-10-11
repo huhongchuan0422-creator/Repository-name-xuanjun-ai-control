@@ -23,7 +23,8 @@ OPENCLAW_REPAIR_TRIGGER=OWNER_FEISHU_MANUAL
 RUNNER_TO_OPENCLAW_AUTOMATIC_INTAKE=NOT_DEPLOYED_NOT_ACCEPTED
 WORK_INTAKE_CANDIDATE_CODE=CANDIDATE_QA_SECURITY_REVIEW_PASS
 WORK_INTAKE_PLATFORM_ADMISSION=HOLD
-OPENCLAW_REPAIR_B=V3_MODEL_SCOPE_AMENDMENT_APPROVED_RESUME_NOT_VERIFIED
+OPENCLAW_REPAIR_B=7ED631A_FROZEN_248_PASS_QA_PASS_SECURITY_FAIL_CORRECTED
+CURRENT_SECURITY_REPAIR_SPEC=plans/WORK_APPROVED_7ED631A_SECURITY_REPAIR_20261011.json
 CURRENT_B_CONTRACT=plans/WORK_APPROVED_B_SCOPE_EXTENSION_V3_20261011.json
 CURRENT_UK_DEVELOPMENT_MODEL=openai/gpt-5.6-sol
 CURRENT_UK_DEVELOPMENT_FALLBACKS=[]
@@ -145,3 +146,30 @@ Work scope/model blocker is addressed by this amendment; V3 receipt/actual B
 resume remain NOT_VERIFIED until returned. Automatic wake NOT_EXECUTED.
 All production DB/config/Webhook/trading/deployment permissions remain denied.
 C and release HOLD. Older contrary narrative above is historical.
+
+## 7ed631a review reconciliation and repair dispatch — 2026-10-11 20:53 CST
+
+V3 executor resumed and committed7ed631aabe240321656287bbd0c8ca546814c37c/
+treeaee5715e2a9bcba4fa90b40cfa4c0b3f5be40e87. Clean248/248 and QA PASS are
+reported in PR comments6109204309/6109208050. Security comment6109228044
+explicitly corrects the earlier PASS to FAIL: runtime6.1 acceptance is reproducible,
+and broker implementation/platform release boundaries remain unaccepted.
+This corrected same-artifact finding governs; comment order/scratch revisions/
+passing focused tests cannot erase it. Work has not received full artifact/report
+bytes; local commit is not resolvable through GitHub (404), not evidence of no work.
+
+Work authorizes bounded model-source/test repair under the existing task and
+checkpoint in WORK_APPROVED_7ED631A_SECURITY_REPAIR_20261011.json, with one B
+integration writer and no duplicate A1A2 task restart/budget reset. Runtime default,
+allowlist and config admission must enforce5.6-only before dispatch, preserving all
+negative guards. Changed source requires a new frozen artifact and fresh independent
+QA/security; old7ed PASS cannot be reused.
+
+Broker is Work-owned A2 PLATFORM/Release Gate: code entrypoints/test completeness
+and actual installation/peer/epoch/fence/artifact/binary/stop evidence are distinct.
+Missing executable broker implementation is not waived as mere installation.
+Current approval is source boundary inventory/plan only, no root install/production
+write. Artifact return and model fix can proceed independently. Request full pinned
+patch/manifest/QA/corrected-security bytes through existing private return channel.
+No Owner re-approval needed for the explicitly admitted deterministic code work.
+Release/C remain HOLD/NOT_STARTED; two real tasks/HTTPS/recovery still unaccepted.
