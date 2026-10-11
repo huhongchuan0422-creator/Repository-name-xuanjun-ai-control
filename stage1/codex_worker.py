@@ -14,9 +14,9 @@ import subprocess
 import tempfile
 import time
 
-MODEL = 'gpt-6.1-sol'
-OPENCLAW_MODEL = 'openai/gpt-6.1-sol'
-ALLOWED_MODELS = ('gpt-6.1-sol', 'gpt-5.6-sol')
+MODEL = 'gpt-5.6-sol'
+OPENCLAW_MODEL = 'openai/gpt-5.6-sol'
+ALLOWED_MODELS = ('gpt-5.6-sol',)
 MAX_STREAM_BYTES = 2 * 1024 * 1024
 MAX_PROMPT_BYTES = 256 * 1024
 

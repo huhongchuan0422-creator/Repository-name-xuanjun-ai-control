@@ -74,7 +74,7 @@ class AppServerTests(unittest.TestCase):
             '/usr/bin:/bin', sandbox=sandbox, runner=runner, model=model)
 
     def test_native_response_evidence_and_fixture_never_live_pass(self):
-        for model in ('gpt-6.1-sol', 'gpt-5.6-sol'):
+        for model in ('gpt-5.6-sol',):
             result = self.worker(model=model).run('implement approved function')
             self.assertEqual(result['status'], 'COMPLETED')
             self.assertTrue(result['model_verified'])
@@ -85,6 +85,11 @@ class AppServerTests(unittest.TestCase):
             self.assertFalse(result['production_pass'])
             self.assertNotIn('private@example.com', str(result))
 
+    def test_disallowed_model_is_rejected_before_transport_start(self):
+        with self.assertRaises(ValueError):
+            self.worker(model='gpt-6.1-sol')
+        self.assertEqual(self.calls, [])
+
     def test_account_rejects_api_key_unknown_and_no_login(self):
         for auth in ('apiKey', 'amazonBedrock', 'UNKNOWN', None):
             result = self.worker({'auth': auth}).run('test')
@@ -94,7 +99,8 @@ class AppServerTests(unittest.TestCase):
 
     def test_requested_or_agent_claim_cannot_fabricate_model_evidence(self):
         for case in ({'missing_model': True, 'text': 'I used openai gpt-5.6-sol'},
-                     {'model': 'gpt-6-astra'}, {'provider': 'other'}):
+                     {'model': 'gpt-6.1-sol'}, {'model': 'gpt-6-astra'},
+                     {'provider': 'other'}):
             result = self.worker(case).run('test')
             self.assertEqual(result['status'], 'MODEL_EVIDENCE_NOT_VERIFIED')
             self.assertFalse(result['model_verified'])

@@ -32,23 +32,34 @@ class WorkerTests(unittest.TestCase):
     def test_model_sandbox_and_no_bypass(self):
         args = self.worker().build_argv()
         self.assertEqual(args[args.index('--model') + 1], MODEL)
+        self.assertEqual(args[args.index('--model') + 1], 'gpt-5.6-sol')
         self.assertEqual(args[args.index('--sandbox') + 1], 'read-only')
         self.assertNotIn('--full-auto', args)
         self.assertNotIn('--dangerously-bypass-approvals-and-sandbox', args)
         self.assertNotIn('--skip-git-repo-check', args)
         self.assertEqual(args[-1], '-')
         self.assertIn('model_provider="openai"', args)
-    def test_only_explicit_owner_fallback_is_selectable(self):
+    def test_only_current_owner_model_is_selectable(self):
         worker = CodexWorker('/usr/bin/codex', self.root.name,
                              self.root.name, self.root.name + '/codex',
                              '/usr/bin:/bin', model='gpt-5.6-sol')
         args = worker.build_argv()
         self.assertEqual(args[args.index('--model') + 1], 'gpt-5.6-sol')
-        for model in ('gpt-6-astra', 'gpt-6.1', 'openai/*', ''):
+        for model in ('gpt-6.1-sol', 'gpt-6-astra', 'gpt-6.1', 'openai/*', ''):
             with self.assertRaises(ValueError):
                 CodexWorker('/usr/bin/codex', self.root.name,
                             self.root.name, self.root.name + '/codex',
                             '/usr/bin:/bin', model=model)
+    def test_disallowed_model_is_rejected_before_process_start(self):
+        calls = []
+        def runner(argv, **kwargs):
+            calls.append(argv)
+            raise AssertionError('disallowed model must not start a process')
+        with self.assertRaises(ValueError):
+            CodexWorker('/usr/bin/codex', self.root.name,
+                        self.root.name, self.root.name + '/codex',
+                        '/usr/bin:/bin', model='gpt-6.1-sol', runner=runner)
+        self.assertEqual(calls, [])
     def test_requested_model_is_not_returned_model_evidence(self):
         result = self.worker(self.script(self.success_events(
             'I used gpt-6.1-sol from openai'))).run('test')
