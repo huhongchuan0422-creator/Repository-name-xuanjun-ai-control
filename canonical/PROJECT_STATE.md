@@ -16,14 +16,14 @@ OPENCLAW_CANDIDATE_ARTIFACT_RECEIPT=PATCH_TREE_MANIFEST_VERIFIED
 OPENCLAW_CODE_QA=FAIL
 OPENCLAW_SECURITY=FAIL_OWNER_REPORTED
 OPENCLAW_OLD_RETRY_PATH=HOLD_CHECKPOINT_OWNER_REPORTED
-OPENCLAW_NEW_REPAIR_STARTED=A1_A2_STARTED_OWNER_RELAYED
+OPENCLAW_NEW_REPAIR_STARTED=A1_A2_DONE_B_REPAIRING_OWNER_RELAYED
 OPENCLAW_REPAIR_CONTROL_SHA=76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b
 OPENCLAW_REPAIR_SPEC_SHA256=deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a
 OPENCLAW_REPAIR_TRIGGER=OWNER_FEISHU_MANUAL
 RUNNER_TO_OPENCLAW_AUTOMATIC_INTAKE=NOT_DEPLOYED_NOT_ACCEPTED
 WORK_INTAKE_CANDIDATE_CODE=CANDIDATE_QA_SECURITY_REVIEW_PASS
 WORK_INTAKE_PLATFORM_ADMISSION=HOLD
-OPENCLAW_REPAIR_B=WAITING_A2_CONTRACT_FREEZE
+OPENCLAW_REPAIR_B=IMPLEMENTATION_REPORTED_TEST_SCOPE_HOLD_EXTENSION_APPROVED
 OPENCLAW_REPAIR_C=NOT_STARTED_UNTIL_RELEASE_ADMISSION
 STAGE1_RELEASE_ADMISSION=HOLD
 STAGE0_FULL_INVENTORY=NOT_VERIFIED
@@ -100,3 +100,15 @@ actual start and E2E completion must be reported as distinct states.
 Owner relayed the UK OpenClaw receipt binding control SHA 76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b and spec SHA256 deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a. A1 /root/repair_a1 and A2 /root/repair_a2 report STARTED in independent directories with openai/gpt-5.6-sol via existing OAuth/Codex. Agent names are session identifiers, not evidence of OS root execution. This is an Owner-relayed execution receipt, not an independent host probe. B waits for A2 contract freeze; C remains NOT_STARTED. Preserve this exact active source/spec and old failure budget/checkpoint; subsequent documentation commits do not restart this execution.
 
 The automatic chain is separate: Runner source pickup is verified, but automatic intake/wakeup/persistent receipt is not deployed or accepted. Work's intake increment must deduplicate identical parent task/spec bytes across later control commits, retaining each control SHA as a receipt binding; it must import this manual start as an already-accepted receipt without another wakeup. No old Coordinator CODEX_EXEC or production write is authorized by intake.
+
+## Latest Owner-relayed repair inspection — 2026-10-11 19:29 CST
+
+A1 reported completed at ae72ec7405540a59e63273a5711ed8f38e66b20e; A2 reported completed/frozen at abbreviated local commit 9df09fa. B is repairing from fb2cc90 with two uncommitted test files. Owner relayed 248 tests: 241 PASS / 3 FAIL / 4 ERROR, activation-store contract compatibility, Owner callback 403 and dashboard manifest hash synchronization. Independent QA/security NOT_STARTED; no deployment or production mutation reported. These are relayed observations, not Work-reproduced tests or independently acquired new artifacts. GitHub could not resolve A1/A2 commit references at this check; this does not invalidate a local commit. Full A2 SHA, final clean combined B SHA, patch/manifest bytes and clean final combined tree remain NOT_RECEIVED.
+
+Current source/spec remain 76c0cfe7/deb33417; preserve original task identity, failure budget and checkpoints. Do not restart A1/A2 on later control metadata updates. Current scope is B integration repair, then same-frozen-artifact independent QA/security; release remains HOLD and C NOT_STARTED. End-to-end delivery/restart acceptance is indexed in plans/TASK_INTAKE_POWER_RECOVERY_ACCEPTANCE_20261011.md. It refines existing gates, grants no new production permission, and creates no new task registry.
+
+## B scope admission — 2026-10-11 19:32 CST
+
+Owner reports B implementation at fb2cc9081fa8d215bf186046b53bae9b9334ad7b, subset 228 tests and compile/diff checks PASS; full 248 remains 241 PASS/3 FAIL/4 ERROR. Two diagnostic test files and cache leave working tree unclean. B stopped for the concrete test/bootstrap scope boundary. Work approves plans/WORK_APPROVED_B_SCOPE_EXTENSION_20261011.json under the same parent/spec/B attempt, without a new task, budget reset, A1/A2 restart or production change. The permitted continuation updates exactly three obsolete test modules and scripts/uk-dev-bootstrap.py to the canonical activation/socket contract; never restores DB-string fallback, weakens auth, drops negative assertions or executes the installer. EXTENSION_EXECUTOR_RECEIPT=NOT_VERIFIED; source publication is not proof B resumed. The current old-spec intake dedupe remains unchanged.
+
+B scope continuation must acknowledge original spec deb33417 plus the exact new extension file SHA256. This revision is an additive contract for the same B attempt, not a new intake task; the original task/spec bytes and dedupe key remain fixed. No Work session-directory permission, new gh credential or Feishu routing grant is required to read the controlled Runner checkout. Automatic delivery of this addendum is not installed or verified; request a real bound receipt before reporting RESUMED.

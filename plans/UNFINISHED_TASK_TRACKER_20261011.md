@@ -418,3 +418,15 @@ Existing code can automatically recover verified CI_WAIT only; general expired
 model/tool phases remain WAITING_HUMAN. An active Work chat and read-only hourly
 tracking are not continuous execution. Display awaiting Work/paused/stale with
 cause and next action, and keep independent ready tasks moving.
+
+## Latest integration and power-recovery acceptance — 2026-10-11 19:29 CST
+
+Owner现场回执：A1完成ae72ec7405540a59e63273a5711ed8f38e66b20e；A2本地冻结9df09fa；B从fb2cc90续修，2个未提交测试文件。248项为241通过/3失败/4错误（activation-store兼容、callback403、manifest同步），未达到全量PASS。独立QA/安全NOT_STARTED，未部署，生产无变更为Owner回报。新补丁/manifest和A2/B完整SHA未回收，不以Work入口242项CI替代这些失败。回执见evidence/uk-intake/OWNER_RELAYED_INTEGRATION_PROGRESS_20261011.json。
+
+当前B已在修复，不重派A1/A2或B；完成合同冻结即可并行B，无需再串行等A1。保留未提交测试与旧断点/预算，callback保持非法请求拒绝，manifest绑定实际最终字节。通过后冻结同一组合制品，独立QA/安全并行复验；C仍等真实发布准入。
+
+Owner要求把任务领取、触发、中断和重启完整落实，验收矩阵见plans/TASK_INTAKE_POWER_RECOVERY_ACCEPTANCE_20261011.md。复用GitHub批准源、A2唯一ledger、既有intake journal及窄broker；事件接件和执行监督分层，未知副作用不盲重跑。自动投递和新制品自动回传尚未现场验收；本契约不修改当前spec、不产生新任务或生产授权。
+
+### 19:32 scope HOLD resolved by Work authorization; receipt still needed
+
+Owner最新回报B实现fb2cc9081fa8d215bf186046b53bae9b9334ad7b，228非过期测试/compile/diff通过；248仍241/3失败/4错误，工作树不干净，正在等测试/bootstrap范围批准。Work已批准plans/WORK_APPROVED_B_SCOPE_EXTENSION_20261011.json，仅续接原B，允许三个明确旧测试模块及uk-dev-bootstrap契约对齐；不改DB-string兼容、不削弱鉴权/负例、不执行部署，不重置预算。扩展接收/复工回执NOT_VERIFIED。先修本地测试与清洁冻结，再同制品独立QA/安全；旧242项Work入口CI不能覆盖本次248项。
