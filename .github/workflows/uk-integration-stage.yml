@@ -2,7 +2,7 @@ name: UK Integration Stage and Contracts
 on:
   push:
     branches: [feature/uk-autonomous-loop-20261011]
-    paths: ['stage1/**', 'scripts/**', 'canonical/PROJECT_STATE.md', 'plans/UNFINISHED_TASK_TRACKER_20261011.md', 'plans/MODEL_POLICY_20261011.md', 'plans/TOKYO_MIGRATION_DEADLINE_20261020.md', 'plans/COMMUNITY_POINTS_REQUIREMENTS_20261011.md', '.github/workflows/uk-integration-stage.yml']
+    paths: ['stage1/**', 'scripts/**', 'deploy/uk-work-intake/**', 'plans/WORK_INTAKE_ACTIVATION_CONTRACT_20261011.md', 'canonical/PROJECT_STATE.md', 'plans/UNFINISHED_TASK_TRACKER_20261011.md', 'plans/MODEL_POLICY_20261011.md', 'plans/TOKYO_MIGRATION_DEADLINE_20261020.md', 'plans/COMMUNITY_POINTS_REQUIREMENTS_20261011.md', '.github/workflows/uk-integration-stage.yml']
 permissions:
   contents: read
 jobs:
@@ -19,7 +19,7 @@ jobs:
           set -euo pipefail
           test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
           python3 -m compileall -q stage1
-          python3 -m py_compile scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-work-handoff-bootstrap.py scripts/uk-work-result-collect.py
+          python3 -m py_compile scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-work-handoff-bootstrap.py scripts/uk-work-result-collect.py scripts/uk-work-intake.py
           python3 -m unittest discover -s stage1 -q
           STAGE="/tmp/xuanjun-uk-integration-${GITHUB_SHA}"
           mkdir -p "$STAGE/stage1" "$STAGE/scripts" "$STAGE/canonical" "$STAGE/plans"
@@ -69,6 +69,29 @@ jobs:
           print('WORK_REPAIR_AGENT_START=NOT_EXECUTED')
           print('FAILED_PATCH_APPLICATION=NOT_EXECUTED')
           PYCODE
+      - name: Publish intake data only when the reviewed platform transport is installed
+        shell: bash
+        run: |
+          set -euo pipefail
+          INSTALLED=/opt/xuanjun-work-intake/uk-work-intake.py
+          if test -f /etc/xuanjun-work-intake.json && test -f "$INSTALLED"; then
+            python3 - <<'PYCODE'
+          import hashlib, os, stat
+          from pathlib import Path
+          installed=Path('/opt/xuanjun-work-intake/uk-work-intake.py')
+          info=installed.lstat()
+          if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode & 0o022:
+              raise SystemExit('STOP_UNTRUSTED_INSTALLED_INTAKE')
+          if hashlib.sha256(installed.read_bytes()).digest()!=hashlib.sha256(Path('scripts/uk-work-intake.py').read_bytes()).digest():
+              raise SystemExit('STOP_INSTALLED_INTAKE_UPGRADE_REVIEW_REQUIRED')
+          PYCODE
+            /usr/bin/python3 -I "$INSTALLED" --publish
+            /usr/bin/python3 -I "$INSTALLED" --report
+          else
+            echo "WORK_AUTOMATIC_INTAKE=WAITING_REVIEWED_PLATFORM_INSTALL"
+            echo "WORK_AUTOMATIC_WAKE=NOT_EXECUTED"
+          fi
+
       - name: Collect bounded development results without applying or deploying
         shell: bash
         run: |

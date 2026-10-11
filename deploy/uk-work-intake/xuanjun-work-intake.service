@@ -1,0 +1,25 @@
+[Unit]
+Description=Xuanjun approved maintenance intake (receipt only, no release authority)
+After=xuanjun-uk-openclaw.service
+ConditionPathExists=/etc/xuanjun-work-intake.json
+
+[Service]
+Type=oneshot
+User=xuanjun_dev
+Group=xuanjun_dev
+WorkingDirectory=/opt/xuanjun-work-intake
+ExecStart=/usr/bin/python3 -I /opt/xuanjun-work-intake/uk-work-intake.py
+TimeoutStartSec=120
+TimeoutStopSec=10
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/xuanjun-work-intake/receipts /home/xuanjun_dev/.openclaw -/home/xuanjun_dev/.codex
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+TasksMax=64
+MemoryMax=512M
+CPUQuota=50%
+
