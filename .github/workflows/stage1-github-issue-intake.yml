@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.6'
-      - name: Compile and test
+          python-version: '3.12'
+      - name: Compile and test (Python 3.12 CI; UK Python 3.6 acceptance still required)
         run: |
           python -m py_compile stage1/github_issue_consumer.py stage1/test_github_issue_consumer.py
           cd stage1
