@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 REQUIRED = {'id', 'state', 'fence', 'updated'}
-OPTIONAL = ('lease_owner', 'lease_until', 'checkpoint', 'deps')
+OPTIONAL = ('lease_owner', 'lease_until', 'checkpoint', 'depends')
 
 
 def snapshot(path, now=None, limit=200):
@@ -35,7 +35,7 @@ def snapshot(path, now=None, limit=200):
         tasks = []
         for row in rows:
             task = dict(zip(selected, row))
-            for key in ('checkpoint', 'deps'):
+            for key in ('checkpoint', 'depends'):
                 if key in task:
                     try:
                         task[key] = json.loads(task[key])
