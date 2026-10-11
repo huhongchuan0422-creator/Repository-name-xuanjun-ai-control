@@ -29,7 +29,7 @@ Observed source HEAD: cc3dcaa8b48e86bbb1880eb4180a83d344f47b56.
   This does not rule out another configured authentication location.
 - Owner reports Feishu error: selected model unavailable from the provider.
   This establishes a failed channel inference, not quota exhaustion.
-  Preserve Sol-only and zero fallback; inspect actual provider/account/model
+  Historical policy was Sol-only and zero fallback; inspect actual provider/account/model
   catalog before changing authentication or provider configuration.
 - Owner APPROVE/REJECT production route, per-job containment, controlled
   dispatcher activation, two real AI tasks, exact-commit CI/QA and checkpoint
@@ -78,3 +78,8 @@ development to UK, Binance production and Telegram forwarding to Korea,
 operations on domestic. UK may also temporarily host community split and
 public-welfare video projects with independently verified project/environment
 isolation. See plans/TOKYO_MIGRATION_DEADLINE_20261020.md.
+
+At 2026-10-11 13:49 Asia/Shanghai, Owner explicitly authorized 6.1 Sol primary
+and 5.6 Sol as the sole fallback, with automatic safe recovery to 6.1 Sol.
+This supersedes earlier no-fallback instructions. No live model configuration
+has been changed by this documentation update. See plans/MODEL_POLICY_20261011.md.

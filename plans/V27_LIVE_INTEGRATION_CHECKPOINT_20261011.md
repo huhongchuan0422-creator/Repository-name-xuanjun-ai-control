@@ -43,7 +43,10 @@ nonblocking dispatch. The resulting local suite passes 142 tests.
 
 1. Verify the existing OpenClaw authentication source and an actual authorized
    Sol model response. Subscription quota and API usage remain distinct;
-   unsupported quota telemetry stays UNKNOWN. Never switch models on failure.
+   unsupported quota telemetry stays UNKNOWN. The Owner's 2026-10-11 13:49
+   instruction supersedes the earlier no-fallback rule: primary 6.1 Sol and sole
+   fallback 5.6 Sol, with bounded failover and safe recovery. See
+   plans/MODEL_POLICY_20261011.md; live activation is NOT_VERIFIED.
 2. Install the read-only Owner workbench as a persistent service and verify
    authenticated access. Public TLS routing remains a separate verified step.
 3. Provide per-job cgroup/process containment and isolated development credentials.
