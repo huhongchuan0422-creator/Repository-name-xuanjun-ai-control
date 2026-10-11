@@ -2,7 +2,7 @@ name: UK Integration Stage and Contracts
 on:
   push:
     branches: [feature/uk-autonomous-loop-20261011]
-    paths: ['stage1/**', 'scripts/**', '.github/workflows/uk-integration-stage.yml']
+    paths: ['stage1/**', 'scripts/**', 'canonical/PROJECT_STATE.md', 'plans/UNFINISHED_TASK_TRACKER_20261011.md', 'plans/MODEL_POLICY_20261011.md', 'plans/TOKYO_MIGRATION_DEADLINE_20261020.md', 'plans/COMMUNITY_POINTS_REQUIREMENTS_20261011.md', '.github/workflows/uk-integration-stage.yml']
 permissions:
   contents: read
 jobs:

@@ -212,3 +212,35 @@ active且无限CPU/内存，Docker/containerd单位not-found。以上已记录�
 目前仍NOT_DISPATCHED，新派发器/隔离/独立审查为实际启动依赖。
 社区新规则及付款后播报官方调研见COMMUNITY_POINTS_REQUIREMENTS_20261011.md；
 该项目原映射为Stage 5，需求记录不代表业务开发或语音设备E2E已开始。
+
+## Work向英国OpenClaw/Codex开发分工 — 2026-10-11
+
+Owner再次授权将开发交给英国OpenClaw、使用已有Codex额度；Work继续负责
+架构、任务准入、独立验收和发布决策。本段为既有节点的有界开发任务说明，
+不是新任务系统、生产ledger记录、Worker接收回执或运行证明。
+当前状态：WORK_APPROVED_SCOPE_PENDING_EXECUTOR_RECEIPT / NOT_DISPATCHED。
+启动入口尚未交付；不能向旧Coordinator投递CODEX_EXEC来绕开这个缺口。
+
+| 批次/既有节点 | 英国OpenClaw开发交付 | 完成证据和依赖 |
+| --- | --- | --- |
+| A：Stage 1 1.8–1.9、1.11、1.13，最高优先级 | 为现有DevelopmentLoop、ExecutionLedger、DevelopmentPipeline、CodexAppServerWorker补可执行服务入口及配置校验；绑定控制仓库最新HEAD、可信spec准入和GitHub写入并发保护；准备有回滚的英国安装/切换命令；实现唯一派发者和每任务资源隔离 | 真实子进程集成验证、入口启动/退出/故障和双派发者负例；数据库一致性备份及恢复校验必须先于生产迁移；隔离须证明Worker不能访问生产DB/交易密钥；冻结commit独立QA、安全审计后再发布。开发阶段只写隔离worktree，不执行生产切换 |
+| B：Stage 1 1.10、1.12，可与A并行开发 | 复用现有Owner看板及回调，补部署入口、鉴权HTTPS代理配置和全量人工队列；接通既有APPROVE/REJECT、防重放及任务fence | 同commit测试/制品、鉴权和拒绝重放负例；上线后外部HTTPS实际进度/心跳/人工队列验收；真实Owner审批/拒绝另行记录。不提前切正式Telegram Webhook |
+| C：Stage 1 1.14–1.15，依赖A的生产准入，相关发布验收依赖B | 从既有权威台账登记两个Work批准的真实开发任务，逐个贯穿开发、CI、独立QA、安全审计和发布准入；在明确checkpoint实际重启并自动继续 | 每任务task_id/spec_hash/worker_id/fence/开始时间/实际模型、冻结SHA、PR、CI和独立审查制品可对应；第二任务无需Owner逐项催促；恢复保留补丁预算，禁止重放模型/提交/PR副作用；代码DONE和生产E2E分开 |
+
+执行合同：候选基线为本段提交的父HEAD f07c808938b308ee294d82646aa167942a975036；
+接收时必须核对PR #17实时head_sha及本段来源commit，陈旧基线不得写入。
+A、B为控制平面维护开发，仅限上述目标文件及必要测试/安装配置，需专门可信
+维护准入和独立审查；不得放宽普通CODEX_EXEC的控制路径保护或自批发布。
+各任务单次模型执行最多20分钟、补丁最多3轮；重复失败按现有指纹规则暂停；
+并行仅限独立worktree和已验证资源容量。超时/未知副作用保留checkpoint和原因，
+进入WAITING_HUMAN；其他独立任务继续。预算调整只能由Work重新准入。
+
+只允许openai/gpt-6.1-sol主、openai/gpt-5.6-sol唯一备用；复用已有ChatGPT管理
+认证及Codex额度。已知6.1账户路径拒绝时有界选择已验证5.6，禁止其他模型、
+Astra、未经授权付费API；6.1真实最小探测恢复后仅在任务边界切回。
+不能因飞书聊天成功推定新Worker的独立认证/隔离已通过，不能复制OAuth到Git。
+
+本次Runner交付只暂存以上说明并测试候选源码；工作流不会调用模型、写生产DB、
+部署、迁移或发飞书/Telegram消息。只有受控入口返回真实lease/启动回执，
+才把状态改为RUNNING。缺少入口的阻塞必须明确报告，不能称后台持续开发。
+
