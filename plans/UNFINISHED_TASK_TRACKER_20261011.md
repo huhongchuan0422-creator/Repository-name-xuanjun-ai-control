@@ -4,6 +4,10 @@
 这是既有任务与验收证据的索引，不建立第二个执行队列，也不向旧 Coordinator
 投递 CODEX_EXEC。生产状态仍为 PARTIAL；代码测试通过不等于上线。
 
+## 最新英国开发政策与B准入（覆盖历史模型条目）
+
+当前任务临时仅允许openai/gpt-5.6-sol、fallbacks=[]。V3为当前B契约，覆盖V2模型guard和原spec旧模型语义；保留原spec字节/hash。两新增测试允许按新语义修改生成新diff，不必原样提交a1fa旧diff。当前策略不授权生产配置变更、6.1探测或自动恢复。原预算/断点和所有负例保留。
+
 ## 当前处理与下一动作
 
 | 范围 | 当前状态及证据 | 下一动作及依赖 |
@@ -436,3 +440,15 @@ Owner最新回报B实现fb2cc9081fa8d215bf186046b53bae9b9334ad7b，228非过期�
 Owner已核验上次扩展89d22f并对齐4个文件；早前本地248全绿由两个未提交测试diff支撑，不能作为冻结验收。新冻结925cfba3171ebb43a872ef2a0ab7ffc390a5a516隔离复跑为245/248，1失败/2错误，独立QA/安全尚未开始、未部署。最小diff a1fa635117286a0ccdf4c83060d9e8042719c07401b3fa13226ca176cc168861仍仅Owner摘要回执，未取得实际字节。
 
 Work批准WORK_APPROVED_B_SCOPE_EXTENSION_V2_20261011.json，仅新增test_development_service.py及test_owner_dashboard.py，原任务/断点/预算不变。broker v2测试不得删UID0/peer/epoch/fence/资源边界负例。模型测试须分开：单次已准入Worker可固定5.6零内部fallback；Owner全局仍6.1主/5.6唯一备用。把全局策略改为仅5.6零备用未批准；如实现误标全局字段，应在原B已授权dashboard源码范围修正，不能改断言掩盖。V2接收/续跑尚NOT_VERIFIED。隔离最终干净提交248全绿后，再同制品并行独立QA/安全审查。
+
+### 20:41 CST：Work修正持续HOLD的契约冲突
+
+Owner/executor反馈已超过10分钟，无真实任务进程；V2已领取、但旧6.1模型
+guard阻止B。Work发布V3，采用Owner已确认的临时5.6-only/fallbacks=[]；
+不需要Owner再授权。两获批测试与原B dashboard源范围均保留，NOT_VERIFIED
+旧diff内容不是编辑禁止，允许语义修复及新hash。禁止负例削弱或测试跳过。
+
+原任务/925cfba断点/tree5f02ee1/剩余预算不变；无重建任务、A1A2重启、
+预算重置、生产权限扩充。冻结245/248仍是现行测试证据。
+下一步V3接收与实际RESUMED回执→提交修复→clean checkout全量→同制品
+独立QA/安全。发布指令不算启动；V3接收/续跑NOT_VERIFIED。

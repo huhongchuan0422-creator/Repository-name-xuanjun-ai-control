@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "source": "OWNER_RELAYED_AND_GITHUB_EXECUTOR_COMMENT",
+  "recorded_at": "2026-10-11T20:41:24+08:00",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "control_sha": "82b1c6ffe1759ffcba01e0fcad17b1a5618513a6",
+  "comment_id": 6108962828,
+  "candidate_commit": "925cfba3171ebb43a872ef2a0ab7ffc390a5a516",
+  "candidate_tree": "5f02ee1e38b398d4aedb140baf6fa9b2b6103540",
+  "frozen_tests": {
+    "total": 248,
+    "passed": 245,
+    "failures": 1,
+    "errors": 2
+  },
+  "state": "HOLD_CONTRACT_CONFLICT",
+  "real_task_process": "ABSENT_OWNER_REPORTED",
+  "dirty_paths": [
+    "stage1/test_development_service.py",
+    "stage1/test_owner_dashboard.py"
+  ],
+  "dirty_diff_sha256": "a1fa635117286a0ccdf4c83060d9e8042719c07401b3fa13226ca176cc168861",
+  "new_commit": false,
+  "qa": "NOT_STARTED",
+  "security": "NOT_STARTED",
+  "deployed": false,
+  "accepted": false,
+  "cost": "UNKNOWN",
+  "resolution": "V3 temporarily5.6-only/zero fallback, semantic test edits allowed, no new task/budget/production authority",
+  "v3_executor_receipt": "NOT_VERIFIED"
+}

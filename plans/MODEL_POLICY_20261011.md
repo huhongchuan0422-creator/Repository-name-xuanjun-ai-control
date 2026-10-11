@@ -1,3 +1,34 @@
+# Current temporary UK development model policy — 2026-10-11 20:22 CST
+
+CURRENT_PRIMARY=openai/gpt-5.6-sol
+CURRENT_FALLBACKS=[]
+CURRENT_ALLOWED_MODELS=openai/gpt-5.6-sol
+CURRENT_SCOPE=UK_DEVELOPMENT_TASK_AND_COORDINATING_REPLIES_TEMPORARY
+AUTOMATIC_6_1_PROBE_OR_RESTORE=DENY_UNTIL_EXPLICIT_OWNER_AUTHORITY
+PAID_API=DENY
+PRODUCTION_CONFIGURATION_MUTATION=NOT_AUTHORIZED
+
+Owner confirms the temporary policy is only verified5.6, zero fallback. Work
+read PR comment6108962828 and received the Owner confirmation at20:22:22 CST.
+The comment attributes an earlier instruction to16:06:45 CST; that earlier
+timestamp is executor-reported. Current confirmation is the authority adopted.
+
+V3 governs current task model semantics and overrides the old6.1-primary rule
+in original spec.models and V2.model_policy_guard. Original bytes/digests are
+retained as history. Desired dashboard policy tests may assert primary5.6,
+fallbacks=[] globally for this current task, not merely for one Worker attempt.
+Actual model/provider remains UNKNOWN unless observed. No fresh model canary,
+provider/account switch, production config change or automatic6.1 restoration.
+
+The old a1fa6351 diff digest is provenance. NOT_VERIFIED old raw bytes does
+not block authorized semantic repair; B may generate a corrected diff/new hash.
+Continue original task/checkpoint/remaining budget and all quality gates.
+If verified5.6 is unavailable, checkpoint model work; no fallback is permitted.
+
+## Historical policy and model acceptance evidence
+The following older6.1-primary/5.6-fallback policy is superseded for the current
+UK development task wherever it conflicts with the operative section above.
+
 # Owner model policy — 2026-10-11 13:49 Asia/Shanghai
 
 This explicit Owner instruction supersedes earlier Sol-only / zero-fallback

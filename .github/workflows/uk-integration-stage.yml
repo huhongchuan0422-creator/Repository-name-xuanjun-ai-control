@@ -119,12 +119,50 @@ jobs:
           assert guard['owner_policy_change'] is False and guard['dashboard_global_policy_must_preserve_owner_policy'] is True
           assert extension['dispatch']['same_task_continuation'] is True
           assert all(extension['dispatch'][k] is False for k in ['new_task','restart_A1_A2','reset_budget','modify_original_spec_bytes'])
-          print('WORK_B_SCOPE_V2=APPROVED_CONTINUATION_ONLY_MODEL_POLICY_GUARDED')
+          print('WORK_B_SCOPE_V2=HISTORICAL_MODEL_GUARD_SUPERSEDED_BY_V3')
           print('WORK_B_SCOPE_V2_CONTROL_SHA='+os.environ['GITHUB_SHA'])
           print('WORK_B_SCOPE_V2_SHA256='+hashlib.sha256(raw).hexdigest())
           print('WORK_B_SCOPE_V2_SOURCE='+str(Path(os.environ['GITHUB_WORKSPACE'])/path))
           print('WORK_B_SCOPE_V2_EXECUTOR_RECEIPT=NOT_VERIFIED')
           print('WORK_B_SCOPE_V2_RESUME=NOT_EXECUTED')
+          PYCODE
+      - name: Verify current B amendment and 5.6-only policy without resuming a role
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          path=Path('plans/WORK_APPROVED_B_SCOPE_EXTENSION_V3_20261011.json')
+          raw=path.read_bytes()
+          obj=json.loads(raw.decode('utf-8'))
+          spec_raw=Path('plans/WORK_APPROVED_AB_REPAIR_SPEC_20261011.json').read_bytes()
+          prior=Path(obj['precedence']['supersedes_v2_path']).read_bytes()
+          assert obj['authority']=='CHATGPT_WORK_OWNER_DELEGATED'
+          assert obj['approval']=='APPROVED_BOUNDED_CONTINUATION_AND_MODEL_AMENDMENT'
+          assert obj['parent_task']==json.loads(spec_raw.decode('utf-8'))['parent_task'] and obj['role']=='B'
+          assert hashlib.sha256(spec_raw).hexdigest()==obj['bind_active_spec_sha256']
+          assert hashlib.sha256(prior).hexdigest()==obj['precedence']['supersedes_v2_sha256']
+          assert obj['additional_allowed_edit_paths']==['stage1/test_development_service.py','stage1/test_owner_dashboard.py']
+          model=obj['model_policy']
+          assert model['primary']=='openai/gpt-5.6-sol' and model['fallbacks']==[]
+          assert model['allowed_models']==['openai/gpt-5.6-sol']
+          assert model['route']=='EXISTING_CHATGPT_OAUTH_CODEX' and model['paid_api']=='DENY' and model['other_models']=='DENY'
+          assert model['automatic_61_probe'] is False and model['automatic_61_restore'] is False
+          assert model['production_config_write_authorized'] is False
+          assert obj['permissions'] and all(type(v) is bool and v is False for v in obj['permissions'].values())
+          edit=obj['diff_authorization']
+          assert edit['old_diff_NOT_VERIFIED_does_not_block_development'] is True
+          assert edit['old_diff_must_be_committed_unchanged'] is False and edit['corrected_diff_may_have_new_sha256'] is True
+          assert obj['execution_directive']['no_budget_reset'] is True
+          assert obj['execution_directive']['no_new_task_or_A1_A2_restart'] is True
+          assert obj['release_admission']=='HOLD'
+          print('WORK_B_SCOPE_V3=APPROVED_56_ONLY_SEMANTIC_CONTINUATION')
+          print('WORK_B_SCOPE_V3_CONTROL_SHA='+os.environ['GITHUB_SHA'])
+          print('WORK_B_SCOPE_V3_SHA256='+hashlib.sha256(raw).hexdigest())
+          print('WORK_B_SCOPE_V3_SOURCE='+str(Path(os.environ['GITHUB_WORKSPACE'])/path))
+          print('WORK_B_SCOPE_V3_EXECUTOR_RECEIPT=NOT_VERIFIED')
+          print('WORK_B_SCOPE_V3_RESUME=NOT_EXECUTED')
           PYCODE
       - name: Publish intake data only when the reviewed platform transport is installed
         shell: bash

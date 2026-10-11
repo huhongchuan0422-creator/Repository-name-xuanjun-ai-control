@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "revision": 3,
+  "extension_id": "B_SCOPE_AND_TEMPORARY_56_ONLY_MODEL_AMENDMENT_20261011",
+  "authority": "CHATGPT_WORK_OWNER_DELEGATED",
+  "approval": "APPROVED_BOUNDED_CONTINUATION_AND_MODEL_AMENDMENT",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "role": "B",
+  "bind_active_control_sha": "76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b",
+  "bind_active_spec_sha256": "deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a",
+  "precedence": {
+    "governing_contract": "THIS_V3",
+    "supersedes_v2_path": "plans/WORK_APPROVED_B_SCOPE_EXTENSION_V2_20261011.json",
+    "supersedes_v2_sha256": "a54f6e113e7d0a60fb5fe2fb3c471a2af856717ededd0801d649d94c470c525b",
+    "override_fields": [
+      "V2.model_policy_guard",
+      "V2 forbidden global 5.6-only assertions",
+      "original repair spec.models for current UK task"
+    ],
+    "original_spec_bytes_and_digest_preserved": true,
+    "prior_four_file_scope_retained": true
+  },
+  "owner_authority": {
+    "latest_confirmation": "2026-10-11T20:22:22+08:00",
+    "instruction": "TEMPORARILY_ONLY_56_ZERO_FALLBACK",
+    "github_receipt_comment_id": 6108962828,
+    "github_receipt_url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6108962828",
+    "earlier_instruction_time": "2026-10-11T16:06:45+08:00_EXECUTOR_REPORTED"
+  },
+  "model_policy": {
+    "scope": "CURRENT_UK_DEVELOPMENT_TASK_AND_COORDINATING_REPLIES_TEMPORARY",
+    "primary": "openai/gpt-5.6-sol",
+    "fallbacks": [],
+    "allowed_models": [
+      "openai/gpt-5.6-sol"
+    ],
+    "route": "EXISTING_CHATGPT_OAUTH_CODEX",
+    "other_models": "DENY",
+    "paid_api": "DENY",
+    "automatic_61_probe": false,
+    "automatic_61_restore": false,
+    "model_provider_or_budget_change_requires": "EXPLICIT_OWNER_AUTHORITY",
+    "actual_model_provider": "UNKNOWN_UNLESS_OBSERVED",
+    "production_config_write_authorized": false
+  },
+  "continuation_checkpoint": {
+    "commit": "925cfba3171ebb43a872ef2a0ab7ffc390a5a516",
+    "tree": "5f02ee1e38b398d4aedb140baf6fa9b2b6103540",
+    "workdir": "EXISTING_B_INTEGRATION_WORKDIR",
+    "frozen_tests": {
+      "total": 248,
+      "passed": 245,
+      "failures": 1,
+      "errors": 2
+    },
+    "old_dirty_diff_sha256": "a1fa635117286a0ccdf4c83060d9e8042719c07401b3fa13226ca176cc168861",
+    "old_dirty_diff_bytes_received": false,
+    "old_diff_preserve_as_evidence": true
+  },
+  "additional_allowed_edit_paths": [
+    "stage1/test_development_service.py",
+    "stage1/test_owner_dashboard.py"
+  ],
+  "existing_B_source_scope_retained": [
+    "stage1/owner_callback_server.py",
+    "stage1/uk_owner_callback_core.py",
+    "stage1/owner_dashboard.py",
+    "stage1/owner_dashboard.html"
+  ],
+  "diff_authorization": {
+    "type": "SEMANTIC_EDIT_SCOPE_NOT_OLD_DIFF_BYTE_ACCEPTANCE",
+    "old_diff_NOT_VERIFIED_does_not_block_development": true,
+    "old_diff_must_be_committed_unchanged": false,
+    "corrected_diff_may_have_new_sha256": true,
+    "record_before_and_after_sha256": true,
+    "additional_owner_confirmation_needed_for_approved_paths": false,
+    "work_review_of_old_bytes_required_before_repair": false
+  },
+  "allowed_changes": [
+    "Align old v1 isolation fixtures to frozen broker v2 while retaining UID0/peer/path/epoch/fence/resource/stop negative checks",
+    "Dashboard desired model-policy tests may assert global current-task primary5.6/fallbacks=[]; V2 prohibition is superseded",
+    "If candidate dashboard desired policy requires alignment, use its already approved B source scope; actual model/provider UNKNOWN absent native evidence",
+    "Commit corrected tests/source and freeze a new combined artifact; old diff digest is provenance, not an unchanged-byte acceptance requirement"
+  ],
+  "forbidden_changes": [
+    "No 6.1 probe/primary/fallback/automatic restoration for this current task; no other models/provider/account substitution/unauthorized API",
+    "No authentication/replay/epoch/fence/isolation weakening, dropped/skipped negative cases or swallowed failures",
+    "No legacy DB-string compatibility or second canonical task DB",
+    "No new tracked path beyond retained original scopes and two added tests",
+    "No production DB/config/deployment/Coordinator/Webhook/trading write, root helper install or generic root/systemd privilege"
+  ],
+  "budget": {
+    "rule": "CONTINUE_EXISTING_B_BUDGET_NO_RESET",
+    "patch_rounds_total_cap": 3,
+    "seconds_per_model_attempt_cap": 1200,
+    "remaining": "UNKNOWN_PRESERVE_AND_REPORT",
+    "repeated_same_failure": "HOLD_CHECKPOINT"
+  },
+  "permissions": {
+    "production_deploy": false,
+    "production_db_write": false,
+    "production_config_write": false,
+    "old_coordinator_switch": false,
+    "formal_webhook_change": false,
+    "trading_permission_change": false,
+    "generic_root_or_systemd_grant": false
+  },
+  "execution_directive": {
+    "decision": "CONTINUE_EXISTING_B_FROM_CHECKPOINT_WITH_REMAINING_ORIGINAL_BUDGET",
+    "contract_model_conflict_resolved": true,
+    "diff_content_UNKNOWN_is_not_editing_block": true,
+    "steps": [
+      "Read this V3 and MODEL_POLICY current section, verify source/digest, acknowledge RECEIVED/RESUMED/HOLD with actual remaining budget",
+      "Preserve old dirty diff evidence, correct two tests and any necessary already-approved B dashboard source to broker v2 and current5.6-only/zero-fallback intent",
+      "Commit all accepted changes; report full final commit/tree and replacement diff, patch and manifest digests",
+      "Run all 248 existing tests from separate clean checkout of that exact commit, with zero failures/errors/skips; count additions separately",
+      "After clean freeze and full regression, independently QA and security-review the same final artifact in separate sessions/directories"
+    ],
+    "no_new_task_or_A1_A2_restart": true,
+    "no_budget_reset": true,
+    "exhausted_budget": "HOLD_WITH_CONCRETE_REMAINING_BUDGET_EVIDENCE_NOT_RESET",
+    "actual_resume": "NOT_VERIFIED",
+    "automatic_wake": "NOT_EXECUTED"
+  },
+  "required_receipt": [
+    "parent_task",
+    "base_spec_sha256",
+    "extension_v3_sha256",
+    "original_checkpoint_commit",
+    "actual_workdir",
+    "state",
+    "remaining_original_budget",
+    "before_diff_sha256",
+    "corrected_diff_sha256",
+    "requested_model",
+    "observed_model_provider",
+    "blocker"
+  ],
+  "release_admission": "HOLD",
+  "c_status": "NOT_STARTED_UNTIL_REAL_RELEASE_ADMISSION"
+}
