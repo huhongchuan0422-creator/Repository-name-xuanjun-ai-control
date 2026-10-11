@@ -27,7 +27,26 @@ def _parse_instant(value):
     if not isinstance(value, str) or not re.fullmatch(
             r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)', value):
         raise ValueError('INVALID_TIMESTAMP')
-    return datetime.datetime.fromisoformat(value[:-1] + '+00:00' if value.endswith('Z') else value)
+    match = re.fullmatch(
+        r'(\\d{4}-\\d{2}-\\d{2})T(\\d{2}:\\d{2}:\\d{2})(?:\\.(\\d{1,6}))?(Z|[+-]\\d{2}:\\d{2})',
+        value)
+    if not match:
+        raise ValueError('INVALID_TIMESTAMP')
+    stamp = datetime.datetime.strptime(match.group(1) + 'T' + match.group(2),
+                                       '%Y-%m-%dT%H:%M:%S')
+    if match.group(3):
+        stamp = stamp.replace(microsecond=int(match.group(3).ljust(6, '0')))
+    suffix = match.group(4)
+    if suffix == 'Z':
+        offset = datetime.timedelta(0)
+    else:
+        hours, minutes = int(suffix[1:3]), int(suffix[4:6])
+        if hours > 23 or minutes > 59:
+            raise ValueError('INVALID_UTC_OFFSET')
+        offset = datetime.timedelta(hours=hours, minutes=minutes)
+        if suffix[0] == '-':
+            offset = -offset
+    return stamp.replace(tzinfo=datetime.timezone(offset))
 
 
 def _pct(value):
