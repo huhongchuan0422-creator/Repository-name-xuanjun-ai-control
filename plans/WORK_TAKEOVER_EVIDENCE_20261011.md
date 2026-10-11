@@ -42,3 +42,16 @@ New PR CI runs the entire regression suite, including autonomous loop and QA
 tests. Read-only takeover workflow exports source fingerprints and modification
 times without process arguments, environment variables or credentials. It does
 not claim to acquire an exclusive production writer lock.
+
+## Owner-assisted actual model check at 05:21Z
+
+Owner executed the hash-pinned Sol canary from commit 734bf7fa620989300575cb0e1d1e6e200f39edf0.
+The OpenAI catalog before and after refresh both contain gpt-6.1-sol with
+available=true. Actual Gateway agent request exits 1; no exact reply or returned
+model/provider metadata is present. Inference is FAILED, cause UNKNOWN; do not
+infer quota exhaustion or substitute another model.
+
+The previous diagnostic discarded unclassified CLI stderr. A corrected bounded
+diagnostic preserves credential-redacted error lines and recognizes Gateway
+permission/transport and Codex runtime failure classes. The fixed no-argument
+Runner capability is for this diagnostic only, never a shell or deploy command.

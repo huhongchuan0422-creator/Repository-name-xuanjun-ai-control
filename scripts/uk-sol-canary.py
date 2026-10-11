@@ -1,14 +1,28 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """One authorized Sol-only Gateway canary; no delivery or production cutover."""
 import json
 import os
+import re
 import socket
 import subprocess
+import sys
 import uuid
 
 ROOT = '/home/xuanjun_dev'
 CLI = ROOT + '/.openclaw/bin/openclaw'
 TARGET = 'openai/gpt-6.1-sol'
+
+
+def safe_diagnostic(raw):
+    """Bounded operational error evidence; mask credentials before truncation."""
+    raw = re.sub(r'(?i)bearer\s+\S+', 'Bearer [REDACTED]', raw)
+    raw = re.sub(r'\b(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]+', '[REDACTED]', raw)
+    raw = re.sub(r'\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', '[REDACTED]', raw)
+    raw = re.sub(r'\d{5,15}:[A-Za-z0-9_-]{20,}', '[REDACTED]', raw)
+    raw = re.sub(r'(?i)((?:[\"\'])?(?:[a-z_-]*token|[a-z_-]*secret|password|api[_ -]?key)(?:[\"\'])?\s*[=:]\s*)(\"(?:\\.|[^\"\\])*\"|\'(?:\\.|[^\'\\])*\'|[^\s,;}]+)', r'\1[REDACTED]', raw)
+    raw = re.sub(r'https?://[^\s\"\']+', '[URL_REDACTED]', raw)
+    lines = [l for l in raw.splitlines() if re.search(r'(?i)error|failed|exception|unavailable|denied|invalid|unknown|missing|scope|closed|timeout|refused', l)]
+    return '\n'.join(lines[-8:])[:2400]
 
 
 def objects(value):
@@ -65,7 +79,10 @@ def classify_error(raw):
               ('QUOTA_OR_USAGE_LIMIT', ('usage_limit', 'quota exceeded')),
               ('AUTH_REJECTED', ('unauthorized', 'invalid_api_key', 'authentication failed')),
               ('STATE_LOCKED', ('state lock', 'exclusive ownership')),
-              ('UNSUPPORTED_COMMAND', ('unknown option', 'unknown command'))]
+              ('UNSUPPORTED_COMMAND', ('unknown option', 'unknown command')),
+              ('GATEWAY_PERMISSION', ('missing scope', 'operator.', 'permission denied', 'forbidden')),
+              ('GATEWAY_TRANSPORT', ('gateway closed', 'connection refused', 'handshake', 'econnrefused')),
+              ('RUNTIME_FAILURE', ('app-server', 'app server', 'codex exited', 'runtime unavailable'))]
     for label, needles in checks:
         if any(n in lower for n in needles):
             return label
@@ -85,16 +102,19 @@ def command(args, timeout=40):
         except ValueError:
             data = None
         diagnostic = raw + p.stderr.decode('utf-8', 'replace')
+        command.last_error = safe_diagnostic(diagnostic) if p.returncode else ''
         return p.returncode, data, classify_error(diagnostic)
     except subprocess.TimeoutExpired:
         # Gateway acceptance is ambiguous; never retry this canary automatically.
+        command.last_error = 'CLI timeout; Gateway effect unknown; no automatic retry'
         return None, None, 'TIMEOUT_EFFECT_UNKNOWN_NO_RETRY'
     except OSError:
+        command.last_error = 'CLI unavailable'
         return None, None, 'CLI_UNAVAILABLE'
 
 
 def main():
-    if os.geteuid() != 0 or socket.gethostname().split('.')[0] != 'iZd7oeikknn1z21sq6ji6zZ':
+    if len(sys.argv) != 1 or os.geteuid() != 0 or socket.gethostname().split('.')[0] != 'iZd7oeikknn1z21sq6ji6zZ':
         raise SystemExit('STOP_FIXED_UK_ROOT_SCOPE')
     with open(ROOT + '/.openclaw/openclaw.json') as stream:
         cfg = json.load(stream)
@@ -110,6 +130,7 @@ def main():
     # Refresh provider inventory through the live Gateway; never offline models refresh.
     code, data, error = command(['models', 'list', '--agent', 'main', '--provider', 'openai', '--refresh', '--json'])
     result['catalog_after'] = dict(catalog_summary(data), exit_code=code, error_code=error)
+    result['catalog_after']['diagnostic'] = command.last_error
     result['catalog_refresh'] = 'REQUESTED'
     if code != 0 or data is None:
         result['inference'] = {'status': 'NOT_STARTED_CATALOG_UNCONFIRMED'}
@@ -125,6 +146,7 @@ def main():
     code, data, error = command(args, timeout=55)
     result['inference'] = evaluate(data, code, marker)
     result['inference']['error_code'] = 'NONE' if result['inference']['inference_verified'] else error
+    result['inference']['diagnostic'] = command.last_error
     print(json.dumps(result, sort_keys=True))
 
 

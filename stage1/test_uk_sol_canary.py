@@ -36,3 +36,15 @@ class CanaryTests(unittest.TestCase):
 
     def test_error_output_is_categorized_without_raw_text(self):
         self.assertEqual(c.classify_error('private token: selected model is unavailable'), 'MODEL_UNAVAILABLE')
+
+    def test_safe_diagnostic_retains_scope_error_and_masks_credentials(self):
+        raw = 'Error: missing scope operator.write token=private-value Bearer private-bearer https://example.test/?token=private-url'
+        text = c.safe_diagnostic(raw)
+        self.assertIn('missing scope operator.write', text)
+        self.assertNotIn('private-', text)
+        self.assertEqual(c.classify_error(raw), 'GATEWAY_PERMISSION')
+
+    def test_json_secrets_and_jwt_redacted_before_truncation(self):
+        raw = 'Error: {"access_token":"private-value"} eyJabc.defgh.ijklmn'
+        self.assertNotIn('private-value', c.safe_diagnostic(raw))
+        self.assertNotIn('eyJabc', c.safe_diagnostic(raw))

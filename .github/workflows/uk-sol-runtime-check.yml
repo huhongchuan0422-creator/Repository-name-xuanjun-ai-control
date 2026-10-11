@@ -1,0 +1,25 @@
+name: UK Sol Runtime Check
+on:
+  push:
+    branches: [feature/uk-autonomous-loop-20261011]
+    paths: ['.github/workflows/uk-sol-runtime-check.yml']
+permissions:
+  contents: read
+concurrency:
+  group: uk-sol-runtime-check
+  cancel-in-progress: false
+jobs:
+  sol-check:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - name: Fixed bounded diagnostic only; no deployment authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
+          if test -x /usr/local/sbin/xuanjun-uk-sol-check; then
+            sudo -n /usr/local/sbin/xuanjun-uk-sol-check
+          else
+            echo 'SOL_RUNTIME=WAITING_HUMAN_FIXED_DIAGNOSTIC_INSTALL'
+          fi
