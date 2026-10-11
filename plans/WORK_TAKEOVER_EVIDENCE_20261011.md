@@ -163,3 +163,25 @@ Official references: https://docs.openclaw.ai/cli/plugins/install and
 https://docs.openclaw.ai/cli/backup. Rollback uses the retained native verified
 state backup and the exact old plugin package; no live database restore is
 attempted automatically because it would discard new state without review.
+
+## Owner runtime alignment attempt, 15:32 Asia/Shanghai
+
+The first native backup failed reading our root-owned 0600 configuration backup
+inside .openclaw. No installation or inference occurred in that first attempt.
+Owner moved that exact backup to /home/.xuanjun-root-private-backups, preserving
+root ownership and 0600 mode; the parent is root-only 0700.
+The next attempt returned UK_VERIFIED_STATE_BACKUP at
+/home/xuanjun_dev/.xj-runtime-backup-e69ee31a90ad43d1bf8f5b4c60576c9c.
+The native pinned installation command returned exit 0, then the script stopped
+at STOP_INSTALLED_VERSION_OR_POLICY_NOT_VERIFIED_NO_INFERENCE. This means no
+model request or fallback activation ran. It does not establish active-version
+success. Our versions() reads the old fixed npm project, which may be stale
+after native generation replacement; policy rejection is also possible.
+
+uk-codex-post-align.py inspects selected plugin metadata and resolves the actual
+selected package/dependency location instead of reinstalling. Only the exact
+2026.9.9/0.160.0 pair, preserved two-model policy and existing OAuth permit a
+single new 5.6 request. An exclusive attempt marker prevents unchanged repeated
+probes. Verified model/provider and exact reply are required before existing
+validated CAS fallback activation. No repeated install, restart or DB restore.
+This continuation remains NOT_EXECUTED until the Owner runs its staged hash.
