@@ -24,7 +24,7 @@ jobs:
           STAGE="/tmp/xuanjun-uk-integration-${GITHUB_SHA}"
           mkdir -p "$STAGE/stage1" "$STAGE/scripts"
           cp stage1/*.py stage1/*.html "$STAGE/stage1/"
-          cp scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-sol-diagnostic.py scripts/uk-sol-canary.py scripts/uk-sol-check-bootstrap.py scripts/uk-takeover-observation.py scripts/uk-56-canary.py "$STAGE/scripts/"
+          cp scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-sol-diagnostic.py scripts/uk-sol-canary.py scripts/uk-sol-check-bootstrap.py scripts/uk-takeover-observation.py scripts/uk-56-canary.py scripts/uk-codex-runtime-align.py "$STAGE/scripts/"
           printf '%s\n' "$GITHUB_SHA" > "$STAGE/SOURCE_COMMIT"
           chmod -R a+rX "$STAGE"
           sha256sum "$STAGE/scripts/uk-contract-export.py"

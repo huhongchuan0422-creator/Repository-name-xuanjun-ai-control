@@ -130,3 +130,36 @@ Next: identify the actual installed plugin and redacted admission/causal metadat
 before choosing a narrowly scoped repair. Preserve ownership enforcement; no
 wildcard policy, speculative credential replacement, paid API substitution,
 repeated unchanged inference, or blind runtime upgrade.
+
+## Installed UK plugin identity, Owner output at 15:21 Asia/Shanghai
+
+Owner's root read reports managed @openclaw/codex 2026.9.8, declared dependency
+@openai/codex 0.158.0, and actual @openai/codex 0.158.0. The plugin and its
+binary match each other; core remains 2026.9.9. The extensions/codex path was
+NOT_READABLE_OR_INVALID and does not establish a broken managed install.
+The official v2026.9.9 plugin requires Codex 0.160.0. Comparing official plugin
+manifests at v2026.9.8 and v2026.9.9 found identical declared capabilities and
+Doctor contracts. The cohort difference is a repair candidate, not a proven
+cause of HTTP 403 or evidence that an update fixes inference.
+
+scripts/uk-codex-runtime-align.py prepares one root/host-guarded native repair:
+exact baseline check; existing OAuth only; native verified state backup;
+config concurrent-change guard; one pinned official plugin replacement through
+the running Gateway's drain/publication route with activation policy preserved;
+post-install dependency and OAuth checks; one fresh, non-delivering 5.6 probe.
+Only verified exact reply plus model/provider evidence permits native-validated
+CAS activation of 5.6 as the sole fallback. Timeout/uncertain install is never
+retried automatically. No service restart, doctor --fix, login, paid API,
+trading change, database restore or formal webhook cutover is performed.
+Native installation may perform the declared plugin config/state repairs after
+backup, through the native owner. Feishu, primary recovery and full failover E2E
+remain NOT_VERIFIED even when the individual inference succeeds.
+
+Local validation: 192 tests pass including policy rejection, wrong-host guard,
+validation failure, concurrent config preservation and exact fallback config.
+Root runtime repair has NOT_EXECUTED until Owner runs the staged hash-pinned
+program; its CI staging is not deployment or production inference evidence.
+Official references: https://docs.openclaw.ai/cli/plugins/install and
+https://docs.openclaw.ai/cli/backup. Rollback uses the retained native verified
+state backup and the exact old plugin package; no live database restore is
+attempted automatically because it would discard new state without review.
