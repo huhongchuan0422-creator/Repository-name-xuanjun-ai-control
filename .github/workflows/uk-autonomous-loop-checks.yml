@@ -1,0 +1,22 @@
+name: UK Autonomous Loop Checks
+on:
+  pull_request:
+    paths: ['stage1/**', 'scripts/uk-*.py', '.github/workflows/uk-autonomous-loop-checks.yml']
+permissions:
+  contents: read
+jobs:
+  autonomous-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and run complete acceptance regression suite
+        run: |
+          python -m compileall -q stage1
+          python -m py_compile scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py
+          python -m unittest discover -s stage1 -q
