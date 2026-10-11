@@ -1,0 +1,32 @@
+--- a/stage1/development_service.py
++++ b/stage1/development_service.py
+@@ -46,6 +46,11 @@
+     return value
+ 
+ 
++def _validate_model(model):
++    if not isinstance(model, str) or model != 'gpt-5.6-sol':
++        raise ValueError('unsupported config/model')
++
++
+ def load_config(path, run=None):
+     if (not isinstance(path, str) or not os.path.isabs(path)
+             or os.path.realpath(path) != path or os.path.islink(path)):
+@@ -61,8 +66,7 @@
+     if (not isinstance(config, dict) or config.get('config_version') not in (1, 2)
+             or set(config) != (REQUIRED_V2 if config.get('config_version') == 2 else REQUIRED)):
+         raise ValueError('configuration keys mismatch')
+-    if config['model'] not in ('gpt-6.1-sol', 'gpt-5.6-sol'):
+-        raise ValueError('unsupported config/model')
++    _validate_model(config['model'])
+     if not SHA.fullmatch(config['source_commit']):
+         raise ValueError('full lowercase source commit required')
+     if (not SAFE_USER.fullmatch(config['worker_user'])
+@@ -307,6 +311,7 @@
+ def build_loop(config):
+     if config.get('config_version') != 2:
+         raise ValueError('runtime requires broker-backed configuration version 2')
++    _validate_model(config.get('model'))
+     activation = ActivationStore(config['activation_descriptor'],
+                                  config['activation_epoch_journal'],
+                                  config['activation_lock'])
