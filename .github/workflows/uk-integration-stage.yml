@@ -31,6 +31,11 @@ jobs:
           cp plans/UNFINISHED_TASK_TRACKER_20261011.md plans/MODEL_POLICY_20261011.md plans/TOKYO_MIGRATION_DEADLINE_20261020.md plans/COMMUNITY_POINTS_REQUIREMENTS_20261011.md "$STAGE/plans/"
           cp scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-sol-diagnostic.py scripts/uk-sol-canary.py scripts/uk-sol-check-bootstrap.py scripts/uk-takeover-observation.py scripts/uk-56-canary.py scripts/uk-codex-runtime-align.py scripts/uk-codex-post-align.py "$STAGE/scripts/"
           printf '%s\n' "$GITHUB_SHA" > "$STAGE/SOURCE_COMMIT"
+          # /tmp is retained for existing Owner-assisted scripts only.
+          # OpenClaw has PrivateTmp=yes; its source is the verified checkout.
+          echo "OPENCLAW_CONTROL_CHECKOUT=$GITHUB_WORKSPACE"
+          echo "OPENCLAW_CONTROL_SHA=$GITHUB_SHA"
+          echo "OPENCLAW_TMP_HANDOFF=DO_NOT_USE"
           chmod -R a+rX "$STAGE"
           sha256sum "$STAGE/scripts/uk-contract-export.py"
           echo "UK_INTEGRATION_STAGE=$STAGE"
@@ -38,6 +43,11 @@ jobs:
           echo "UK_TASK_SOURCE_SHA=$GITHUB_SHA"
           echo "WORKER_TASK_DISPATCH=NOT_EXECUTED"
           echo "PRODUCTION_DEPLOYMENT=NOT_EXECUTED"
+      - name: Collect bounded development results without applying or deploying
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/uk-work-result-collect.py
       - name: Read actual contracts only through authorized fixed gateway
         shell: bash
         run: |

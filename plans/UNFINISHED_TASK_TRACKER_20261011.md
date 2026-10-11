@@ -218,7 +218,8 @@ active且无限CPU/内存，Docker/containerd单位not-found。以上已记录�
 Owner再次授权将开发交给英国OpenClaw、使用已有Codex额度；Work继续负责
 架构、任务准入、独立验收和发布决策。本段为既有节点的有界开发任务说明，
 不是新任务系统、生产ledger记录、Worker接收回执或运行证明。
-当前状态：WORK_APPROVED_SCOPE_PENDING_EXECUTOR_RECEIPT / NOT_DISPATCHED。
+历史任务登记状态：WORK_APPROVED_SCOPE_PENDING_EXECUTOR_RECEIPT / NOT_DISPATCHED；
+最新Owner转交的实际启动和候选回执见下节，尚非生产ledger/lease独立验证。
 启动入口尚未交付；不能向旧Coordinator投递CODEX_EXEC来绕开这个缺口。
 
 | 批次/既有节点 | 英国OpenClaw开发交付 | 完成证据和依赖 |
@@ -243,4 +244,44 @@ Astra、未经授权付费API；6.1真实最小探测恢复后仅在任务边界
 本次Runner交付只暂存以上说明并测试候选源码；工作流不会调用模型、写生产DB、
 部署、迁移或发飞书/Telegram消息。只有受控入口返回真实lease/启动回执，
 才把状态改为RUNNING。缺少入口的阻塞必须明确报告，不能称后台持续开发。
+
+## 交接调整及多Agent启动回执 — 2026-10-11 17:27
+
+Owner转交：英国OpenClaw已从Runner checkout核对85ad1d72，A/B独立开发目录
+已启动。现场16:33记录OpenClaw PrivateTmp=yes，与Runner的/tmp视图不同；
+撤销/tmp作为聊天Agent输入的要求，不关闭隔离、不要求Owner重连GitHub。
+使用已核验checkout，复制源码至独立工作目录；控制源SHA与开发基线分别记录。
+Work是GitHub集成/发布的唯一写入协调者；A/B可返回补丁，不必自行获取令牌。
+
+- main：协调/快速响应；A=/root/lane_a，入口/隔离/SQLite备份恢复开发中。
+- B=/root/lane_b：Owner报告冻结commit c49238abb9fa8a7fc90206d9d8308ac446f0988c，
+  patch SHA256 ab58ff792f18b2c8daff53699ab43dd3241a5ae53575c98aaa399cdb1231236b；
+  开发者报告213 tests/nginx渲染PASS，未推送、未部署，尚不采信为独立验收。
+- /root/independent_qa：独立qa-b重建并验证候选等价性和负例，STARTED自报。
+- /root/security_audit：权限/凭证/鉴权/fence/TLS/systemd/事务只读审计，STARTED自报。
+- B退出运行槽，当前main+A+QA+安全审计；子Agent禁止递归招募。
+  以上模型5.6继承是执行方报告，需会话/原生元数据另核；不代表生产派发已部署。
+- C仍NOT_STARTED，等待A生产准入。没有新的生产数据库或旧Coordinator变更证据。
+
+17:29 Owner追加执行方证据：A冻结85dd740d94f6c8d24979764dcbd40f3c48faabad，
+patch SHA256 117fbab62fca0ed459e4c45c1b8174f9819b511fbef059ec327f1ab4fc458b03，
+开发者报告211测试PASS、部署准入NO。B独立QA报告树等价、213全量和6额外负例
+PASS、配置/systemd静态验证PASS；部署HOLD。QA继续A，安全审计继续A/B，另有
+独立目录组合候选集成，未推送或部署。这些尚待回收实际补丁及QA/审计制品，
+不能与Work自身新增交接测试的计数混为同一候选；组合commit需重新冻结并审查。
+
+源码交接：Work批准范围→现有GitHub/Runner checkout→A/B独立目录。
+结果交接：各工作目录根部保留唯一UTF-8 .patch/.diff→Runner只读回收→Work核对
+补丁哈希/基线并在最新HEAD上集成→冻结合并候选CI→独立QA/安全审计→发布准入。
+不得在Runner正在checkout的目录开发或长期存放唯一结果，避免清理覆盖。
+现有scripts/uk-work-result-collect.py不执行补丁、模型或部署；只读取两个固定
+目录根部、拒绝symlink/未知路径/超限/潜在密钥/多候选歧义。A/B补丁绑定上述
+Owner给出的冻结哈希；目录不可见或无读取权限只返回明确状态，不放宽HOME权限。
+基线上下文、真实模型、QA、安全及生产状态始终NOT_VERIFIED，直到独立证据齐全。
+
+已启动A/B保留85ad1d72基线，不因Work更新交接说明丢弃开发成果；Work回收时
+核对相对该基线的差异，再按最新HEAD并发保护集成。冲突由Work处理，不强推。
+独立QA和安全审计须针对最后实际拟发布的冻结commit重新确认，不能把仅针对B
+本地候选的结论直接推广到A+B合并结果。正式切换仍须备份恢复、资源边界和
+唯一执行者现场证据；Owner人工节点集中登记，不能以聊天回执代替运行权威台账。
 
