@@ -17,7 +17,7 @@ jobs:
           test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
           id
           python3 - <<'PY'
-          import os, json, sqlite3, re, subprocess
+          import os, json, sqlite3, re, subprocess, tarfile
           base='/home/xuanjun_dev/uk-stage1-minimal'
           paths=[base+'/coordinator.py']
           for root,dirs,files in os.walk(base+'/owner-callback'):
@@ -43,9 +43,23 @@ jobs:
           except sqlite3.Error:
               print('DB_SCHEMA=WAITING_HUMAN_READ_ONLY_EXPORT')
           print('STAGED_SOURCE_FILES='+json.dumps([n for n in os.listdir('/tmp') if n.startswith(('uk_','xuanjun-uk','xj_uk'))]))
+          for archive in ['/tmp/uk_stage1_minimal_canary.tar.gz','/tmp/uk_owner_callback_loopback_canary_20261011.tar.gz','/tmp/xj_uk_owner_notify_deploy_20261011.tar.gz']:
+              try:
+                  with tarfile.open(archive) as tar:
+                      names=[m for m in tar.getmembers() if m.isfile() and m.name.endswith('.py') and m.size<100000]
+                      print('ARCHIVE_CODE_FILES='+json.dumps({'archive':archive,'files':[m.name for m in names]}))
+                      for member in names:
+                          if member.name.endswith(('coordinator.py','serve_uk_callback.py','uk_owner_callback_core.py')):
+                              source=tar.extractfile(member).read().decode('utf-8')
+                              if re.search(r'-----BEGIN .*PRIVATE KEY|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{30,}|[0-9]{6,}:[A-Za-z0-9_-]{25,}|sk-[A-Za-z0-9]{32,}',source):
+                                  print('ARCHIVE_SECRET_PATTERN_BLOCKED')
+                              else:
+                                  print('ARCHIVE_CONTRACT='+json.dumps({'archive':archive,'file':member.name,'source':source,'production_match':'NOT_VERIFIED'}))
+              except (OSError,tarfile.TarError):
+                  print('ARCHIVE_UNREADABLE='+archive)
           for unit in ['xuanjun-uk-openclaw.service','xuanjun-uk-stage1-minimal.service','xuanjun-uk-owner-callback.service']:
-              out=subprocess.check_output(['systemctl','show',unit,'--property=FragmentPath,User,ExecStart'],universal_newlines=True)
+              out=subprocess.check_output(['systemctl','show',unit,'--property=FragmentPath,User,ActiveState,SubState,ExecStart'],universal_newlines=True)
               print('UNIT_CONTRACT='+json.dumps(out))
           for p in ['/home/xuanjun_dev/.codex/auth.json','/home/xuanjun_dev/.openclaw/bin/codex']:
-              print('FILE_PRESENT='+json.dumps({'path':p,'present':os.path.isfile(p)}))
+              print('FILE_PRESENT='+json.dumps({'path':p,'present':'UNKNOWN_WHEN_PARENT_UNREADABLE'}))
           PY
