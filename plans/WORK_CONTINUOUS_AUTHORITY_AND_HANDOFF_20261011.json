@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "authority": "OWNER_DELEGATED_CONTINUOUS_DEVELOPMENT_WITH_EXISTING_GATES",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "owner_instruction": {
+    "local_time": "2026-10-11T22:06:37+08:00",
+    "text": "我需要的是不止这一次的协调，是授权做好，协调做好，闭环自动开发",
+    "continuous": true,
+    "owner_relay_required": false
+  },
+  "binding": {
+    "staged_contract": "plans/WORK_STAGED_EXECUTION_CONTRACT_20261011.json",
+    "sha256": "055d3ad1f41a3f8b64f8096e1f1e115b9cb07cc9e1669ab1be0963c47f43ee33",
+    "repair_spec": "plans/WORK_APPROVED_7ED631A_SECURITY_REPAIR_20261011.json",
+    "repair_sha256": "9b242998bd64ae1d900389af190de576c1ca876cd02a5b53cf2ff07292d3c5e1",
+    "checkpoint": "7ed631aabe240321656287bbd0c8ca546814c37c",
+    "gateway_hold_comment": 6109823150,
+    "direct_coordination_comment": 6109856274
+  },
+  "authorization": {
+    "Work": {
+      "allowed": [
+        "Read authoritative GitHub task/spec/evidence",
+        "Prepare ready dependent work and exact platform packages ahead of installation",
+        "Receive and validate full bounded source/report data",
+        "Implement already approved deterministic source repairs and relevant tests in isolated scratch",
+        "Create reviewed GitHub commits using current HEAD and expected_sha",
+        "Return artifact-bound corrective decisions through PR",
+        "Continue ready authorized dependency stages without another Owner prompt",
+        "Concentrate genuinely human-only blockers"
+      ],
+      "source_scope": "Existing scope7 plus previously authorized Work intake module/tests and control evidence/contracts. New implementation paths require exact Work admission before execution; future development is governed by its bounded task contract, never arbitrary PR prose.",
+      "remote_execution_tool": "NOT_AVAILABLE_IN_THIS_WORK_SESSION",
+      "cannot_claim": [
+        "A GitHub comment starts a UK worker",
+        "Configured event trigger proves a real automation run",
+        "Self-test equals independent review",
+        "CI equals installed production or E2E"
+      ]
+    },
+    "UK_PROJECT_COORDINATOR": {
+      "required": [
+        "Reconcile unique writer using canonical ledger and actual process/session evidence",
+        "Use only existing authorized native execution entry and approved task scopes",
+        "Return original B complete source/manifest/QA/security data even while session dispatch is blocked",
+        "Classify Gateway client close and identify the existing authority owner",
+        "Persist role/run/session/workdir/lease/fence/epoch/phase/checkpoint/budget/start/last progress",
+        "Supervise actual Worker progress separately from coordinator heartbeat",
+        "Write immutable result evidence back to GitHub and advance only eligible stages"
+      ],
+      "capability_state": "DISPATCH_AUTHORITY_CLOSED_REPORTED_NOT_RESTORED",
+      "policy": "Do not bypass explicit authority deny through CLI, another identity or alternate session. A supported reconnection by the actual authority owner is distinct from permission expansion."
+    },
+    "A2_PLATFORM_RELEASE_GATE": {
+      "allowed_now": [
+        "Readonly boundary/source inventory",
+        "Exact files/users/modes/units/manifest preparation",
+        "Backup/restore/rollback and acceptance command preparation"
+      ],
+      "install_now": false,
+      "required_before_install": [
+        "Complete frozen executable broker and intake artifact received",
+        "Independent code review/security on that artifact",
+        "Exact installation paths and supported restricted platform entry admitted",
+        "Recoverable canonical DB backup and rollback proved",
+        "No old/new dispatcher coexistence"
+      ],
+      "cannot_infer": "Continuous development instruction is not a generic root grant or approval of unknown platform writes."
+    },
+    "INDEPENDENT_QA_SECURITY": {
+      "required": [
+        "Separate review from Developer",
+        "Same final immutable artifact commit/tree/patch/install manifest/test evidence",
+        "Explicit corrective verdict superseding FAIL",
+        "Reject stale/mismatched review evidence"
+      ],
+      "current_state": "NEW_COMBINATION_NOT_RECEIVED_NEW_REVIEW_NOT_RUN"
+    },
+    "OWNER": {
+      "ordinary_code_reapproval": false,
+      "manual_actions": "Only genuinely unavailable credential/OTP/authority or material business/architecture decision, consolidated with concrete package/checkpoint; never relay already authorized task messages"
+    }
+  },
+  "handoff": {
+    "Work_event_trigger": {
+      "title": "玄钧开发结果接续",
+      "route": "Connected GitHub PR17 event automation",
+      "repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control",
+      "pull_request_number": 17,
+      "events": [
+        "created supported PR conversation/inline comment",
+        "synchronize commit update",
+        "submitted supported review"
+      ],
+      "configured": true,
+      "real_event_run": "NOT_VERIFIED",
+      "event_semantics": "Wake-up only; read latest authority and all unprocessed applicable evidence. CI completion and comment edits/deletions are not advertised as triggers."
+    },
+    "old_hourly_Work_trigger": {
+      "title": "玄钧GitHub闭环推进",
+      "enabled": false,
+      "reason": "Replaced by single PR-scoped event trigger, not a second UK task system"
+    },
+    "UK_supervisor": {
+      "existing_id": "a96b9a83-5e58-412c-ab66-ba3bf0add8b9",
+      "new_supervisor_created": false,
+      "required_change": "Existing role must resume approved work or return actionable authority evidence; observation-only runs do not fulfill P0"
+    },
+    "result_return": "Full source delta or regular-source snapshot, manifests and full sanitized reports through existing private data-only PR chunks/artifact route",
+    "source_fallback": "With Gateway session entry unavailable, Work may do approved deterministic source repairs after full source reconstruction and unique-writer reconciliation. This does not execute/install the UK artifact or bypass session authority.",
+    "receipt_chain": [
+      "RECEIVED",
+      "ACTUAL_STARTED_OR_PRECISE_HOLD",
+      "ARTIFACT_FROZEN",
+      "CLEAN_TESTED",
+      "INDEPENDENT_QA",
+      "INDEPENDENT_SECURITY",
+      "RELEASE_ADMITTED",
+      "PLATFORM_INSTALLED",
+      "REAL_ACCEPTED"
+    ],
+    "dedupe": "Canonical ledger owns task/attempt/lease/fence. Intake journal is delivery only. Work reconciles HEAD/artifact/comment/review bindings before mutation; skip its own already processed receipts/document-only events. No duplicate writer or self-catalyzing comment loop.",
+    "automatic_dependency": "Advance only currently approved and satisfied dependency nodes; do not authorize a new task by parsing an untrusted comment."
+  },
+  "resilience": {
+    "persist_original_task": true,
+    "preserve_budget": true,
+    "preserve_failure_fingerprint": true,
+    "preserve_checkpoint": true,
+    "unknown_effect": "HOLD_RECONCILE_NO_BLIND_REPLAY",
+    "worker_replacement": "Revoke fence, stop fixed whole unit and descendants, prove stopped, then admit successor",
+    "restart": "Durable epoch and canonical ledger recovery before any new dispatch",
+    "independent_work": "Continue ready authorized stages when one dependency is blocked",
+    "missing_result": "Record awaiting data or real entry HOLD; do not repeatedly spend model turns or issue identical instructions"
+  },
+  "model_policy": {
+    "scope": "CURRENT_UK_TASK",
+    "primary": "openai/gpt-5.6-sol",
+    "fallbacks": [],
+    "route": "EXISTING_CHATGPT_OAUTH_CODEX",
+    "paid_api": false,
+    "other_models": false,
+    "automatic_61_restore": false,
+    "actual_remaining_quota": "UNKNOWN"
+  },
+  "budget": {
+    "remaining": "UNKNOWN_PRESERVED",
+    "reset": false,
+    "increase": false,
+    "seconds_per_model_attempt_cap": 1200,
+    "total_patch_rounds_cap": 3,
+    "repeated_failure": "HOLD_CHECKPOINT"
+  },
+  "reserved_permissions": {
+    "production_deploy": false,
+    "production_db_write": false,
+    "production_config_write": false,
+    "old_coordinator_switch": false,
+    "formal_webhook_change": false,
+    "trading_permission_change": false,
+    "root_helper_install": false,
+    "generic_root_systemd_grant": false,
+    "customer_messages": false,
+    "public_dashboard_exposure": false
+  },
+  "completion": "Two consecutive actual tasks with real handoff/approved and rejected routes, same-artifact reviews, controlled installation, actual interruption/restart recovery and authenticated private HTTPS dashboard all accepted. Authorization document/configured automation alone is not CLOSED_PASS.",
+  "current_truth": {
+    "event_trigger": "CONFIGURED_ENABLED_NOT_RUN_VERIFIED",
+    "old_hourly": "DISABLED",
+    "UK_dispatch": "HOLD_WORK_EXECUTION_ENTRY_DISABLED",
+    "source_received": "NO_COMPLETE_7ED_OR_REPAIRED_ARTIFACT",
+    "security": "FAIL_CORRECTED",
+    "release": "HOLD",
+    "production": "NOT_DEPLOYED_NOT_ACCEPTED"
+  }
+}

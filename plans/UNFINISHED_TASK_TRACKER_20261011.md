@@ -489,3 +489,28 @@ delivery reconciliation, actual Work result wake, platform/recovery and private
 HTTPS are still unaccepted. Existing coordinator can resume approved B directly
 while platform preparation continues. Security FAIL, Release/C HOLD preserved.
 Owner does not relay. No production DB/config/trade/formal Webhook/root change.
+
+## Continuous authority and event-driven Work continuation
+
+Owner2026-10-11 22:06:37 Asia/Shanghai explicitly requests ongoing authorization,
+coordination and automatic development, not a one-off exchange. Contract:
+plans/WORK_CONTINUOUS_AUTHORITY_AND_HANDOFF_20261011.json.
+Ordinary already-approved code/receipt/review work requires no repeat Owner
+prompt. Preparation proceeds ahead; actual platform/root/production actions
+remain within existing exact release gates. Claimed capability and actual granted
+tools are separate; Work has no direct UK SSH/session/root interface.
+
+GitHub PR17 comment/commit/review event automation "玄钧开发结果接续" successfully
+created and enabled, replacing the old enabled hourly "玄钧GitHub闭环推进", which
+is now disabled. This resolves configuration failure by a dedicated supported
+event-trigger object; no new UK task/supervisor/ledger/budget is created.
+Actual first event-driven run remains NOT_VERIFIED until a recorded run.
+Unsupported CI-completion or edited/deleted-comment triggers are not promised.
+
+P0 live receipt6109823150 is HOLD_WORK_EXECUTION_ENTRY_DISABLED:
+sessions.list before dispatch returned Gateway client authority closed.
+UK local7ed is unchanged/no writer; full source and reports remain unreturned.
+Work reply6109856274 assigns two independent paths: immediate full data return
+for Work-side scope7 repair; classify client lifecycle/transport/policy deny
+and use supported authorized recovery only. No CLI/identity workaround of deny.
+Security FAIL, Release/C HOLD remain; configured events do not prove UK execution.
