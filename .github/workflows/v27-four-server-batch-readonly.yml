@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [feature/uk-autonomous-loop-20261011]
-    paths: ['.github/workflows/v27-four-server-batch-readonly.yml']
+    paths: ['.github/workflows/v27-four-server-batch-readonly.yml', 'scripts/v27-batch-readonly.sh']
 permissions:
   contents: read
 concurrency:
@@ -42,3 +42,4 @@ jobs:
         with:
           persist-credentials: false
       - run: bash scripts/v27-batch-readonly.sh domestic
+

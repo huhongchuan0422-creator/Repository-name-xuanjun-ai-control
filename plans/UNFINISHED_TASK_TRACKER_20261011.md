@@ -18,7 +18,7 @@
 | 连续真实开发/恢复 | 两个真实任务、独立QA、安全审计、发布证据及checkpoint续跑未验收 | 模型及新派发器就绪后贯穿两个任务；中断恢复与下一节点自动推进 |
 | HTTPS实时看板 | 既有loopback页面及鉴权接口200；公网TLS未验证 | 核查现有TLS入口与域名，增量路由；外部鉴权/心跳/失败/人工队列验收 |
 | 东京开发迁英国 | 已通过既有入口读取东京两个文件指纹；不等于全量资产盘点 | 完整开发资产与未提交工作盘点、备份、目标版本验证与恢复 |
-| 东京生产迁韩国 | 韩国身份/访问/容量/现有小说负载未现场核实；无迁移验收证据 | 目标只读盘点、独立隔离、生产备份恢复、shadow预验收、单交易执行者受控切换 |
+| 东京生产迁韩国 | 四服务器Runner身份/访问已核实；韩国2CPU/约2GiB，已见小说/yibi服务名；资源适配和迁移未验收 | 目标只读盘点、独立隔离、生产备份恢复、shadow预验收、单交易执行者受控切换 |
 | 国内运营/Telegram | 既有英国至国内隧道active；完整切换链未验收 | 依赖盘点与转发/客户/账务验收；保留回退，无实盘权限扩充 |
 | 四层门禁 | CI已执行；任务准入、独立QA/安全审计和ReleaseGate仍缺完整落实证据 | 受保护门禁分别验收，证据绑定同commit/制品；开发者不能自批发布 |
 
@@ -33,8 +33,9 @@
 - UK_WORKER_ACTIVATION：Owner已完成英国模型修复和飞书收发验收，不再要求重复。
   新App Server Worker候选已通过本地测试；隔离身份的现有ChatGPT认证、原生协议
   现场返回证据及每任务OS/cgroup边界仍须核实。该依赖不能阻塞独立盘点/确定性代码任务。
-- TARGET_ACCESS：现场核对韩国目标身份/入口及已有负载；不能把缺少访问证据
-  当作缺少Owner授权，也不能宣称已连通。
+- KOREA_CAPACITY_AND_CONTROLLED_BOOTSTRAP：韩国Runner访问已核实，取消旧TARGET_ACCESS阻塞。
+  2CPU/约2GiB目标仍需实际内存/CPU预算和受控部署入口；不得自动采购或停止已有项目。
+- DOMESTIC_PROTECTED_INVENTORY：国内Runner不能读取/home/openclaw_ops；完整运营依赖需受控脱敏导出，不能放宽整个HOME权限。
 - PLATFORM_CONFIRMATION：需要时集中处理交易API新出口IP白名单与平台确认；
   不自动扩充实盘权限，不提前切正式Telegram Webhook。
 
@@ -153,3 +154,40 @@ containment, obtain controlled dispatcher activation and independent review,
 then accept two real development tasks with exact-commit CI/QA/checkpoint
 continuation. Do not submit CODEX_EXEC to the old Coordinator.
 Official protocol reference: https://learn.chatgpt.com/docs/app-server.
+
+## 统一派发职责及当前节点顺序 — 2026-10-11
+
+Owner明确授权ChatGPT Work统一分发架构任务；英国OpenClaw通过已验收的
+ChatGPT管理认证/Codex额度路径执行。无须Owner逐项在飞书下任务，也不要求
+Owner为当前英国聊天Agent另连GitHub。候选来源是PR #17实时head_sha，不能
+用旧缓存f837b29f或merge_commit_sha作为最新候选HEAD。Canonical已同步职责。
+现有GitHub控制仓库是临时任务来源，既有数据库是运行权威；下表是原节点
+的执行索引，不建立第二个队列。生产仍是旧派发器，以下均不伪称已派给Worker。
+
+| 顺序/原节点 | Work负责的具体交付 | 英国执行与准入依赖 | 当前执行证据 |
+| --- | --- | --- | --- |
+| 并行：Stage 0、Stage 1 1.1–1.7 | 四服务器资产/容量/现有服务边界；英国隔离与既有认证复用 | 固定只读Runner；生产变更另经发布门禁 | Run 38124100959四主机实际成功，完整资产及隔离未验收 |
+| 首要：Stage 1 1.8–1.9、1.11、1.13 | 最新HEAD准入、唯一派发者、lease/fencing、失败指纹/预算、新dispatcher受控激活 | 完整DB备份恢复、每任务隔离、冻结版本独立审查 | 新Worker/控制路径保护代码及UK 204项测试通过；新dispatcher未激活 |
+| 同时：Stage 1 1.10、1.12 | HTTPS看板、全人工队列、APPROVE/REJECT及防重放 | 既有鉴权/TLS/回调复用；正式Webhook不得提前切 | 既有loopback200；新版本、公网TLS和真实批准拒绝未验收 |
+| 随后：Stage 1 1.14–1.15 | 两个有界真实开发任务，各贯穿CI、独立QA/安全审计、发布准入；实际重启续跑 | 仅在上项准入通过后向既有ledger登记spec并取lease | 未开始真实Worker任务，不把代码/测试任务记成它的开发 |
+| 并行迁移通道 | 东京全量盘点/一致性备份/恢复；英国开发、韩国生产与Telegram、国内运营依赖 | 10月19日23:59前验收；韩国容量/隔离、唯一交易执行者、必要白名单 | 四服务器访问已核实；复制/恢复/shadow/切换均未验收 |
+| Stage 2以后原顺序 | 社区分账小程序及新商家积分规则，再公益视频；后续金融/GEO沿既定顺序 | Stage 1闭环门禁及该业务既有节点条件 | 新需求已登记；不越过阶段启动资金操作 |
+
+Work负责形成有范围、依赖、预算、验收与冻结代码来源的任务spec；英国Worker
+负责开发/测试分支，不能自增任务范围或自批发布。开发、独立QA、安全审计和
+发布各自绑定同一commit/制品，禁止把一个模型verdict当作四层全部PASS。
+真实派发回执须包含task_id、spec_hash、worker_id、fence、开始时间和checkpoint；
+缺少这些证据则为NOT_DISPATCHED/NOT_VERIFIED，不称“后台持续开发”。
+
+## 已执行增量及恢复边界
+
+7ee62840ef0f18e863cfd6b0b67f4d3cd320f4fa的7条工作流均成功；英国Runner实际
+204项测试通过，临时stage完成，PRODUCTION_DEPLOYMENT=NOT_EXECUTED。
+完整新Worker模型路径仍待真实开发验收；Feishu成功回复不等于已执行开发spec。
+
+新增CI_WAIT过期租约恢复候选：只有完整保存的spec/hash、任务确定性branch、
+冻结40位SHA、有效PR编号和0–3补丁预算相符，才允许重新排队继续检查既有CI；
+旧fence失效、预算保留、模型/提交/PR创建不重放。模型执行或PR副作用不明的
+阶段仍WAITING_HUMAN。两个新增真实SQLite重启/反例测试加入后，本地206项
+通过；本次候选的英国Runner/CI结果须另核，不把模拟测试当生产续跑PASS。
+

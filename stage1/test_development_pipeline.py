@@ -256,6 +256,75 @@ class PipelineTest(unittest.TestCase):
             self.assertEqual(snapshot['state'], 'WAITING_HUMAN')
             self.assertEqual(snapshot['checkpoint']['patch_attempts'], 1)
             self.assertEqual(snapshot['checkpoint']['failure_fingerprint_count'], 2)
+
+    def test_restarted_dispatcher_resumes_ci_without_replaying_developer(self):
+        from test_execution_ledger import SCHEMA
+        with tempfile.TemporaryDirectory() as temp:
+            path = os.path.join(temp, 'tasks.db')
+            with sqlite3.connect(path) as conn:
+                conn.executescript(SCHEMA)
+                conn.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)',
+                             ('T-1', 'CODEX_EXEC', 'PENDING', '[]', None, None, 0, '{}', 0))
+            now = [1000]
+            ledger = ExecutionLedger(path, ['owner/repo'], clock=lambda: now[0])
+            ledger.register_spec('T-1', self.claim['spec'], 'owner', True)
+            factory = Factory(ledger)
+            pipeline = DevelopmentPipeline(ledger, self.backend, factory, ['owner/repo'])
+            original = ledger.claim('old-worker', ttl=180)
+            self.backend.status = 'PENDING'
+            waiting = pipeline.run(original)
+            self.assertEqual(waiting['reason'], 'CI_PENDING')
+            self.assertEqual(len(factory.prompts), 1)
+            # A fresh process and expired old lease: retain the exact checkpoint,
+            # invalidate the old worker, and reconcile before polling again.
+            now[0] += 181
+            restarted = ExecutionLedger(path, ['owner/repo'], clock=lambda: now[0])
+            self.assertEqual(restarted.recover_expired(), ['T-1'])
+            self.assertEqual(restarted.observation('T-1')['state'], 'PENDING')
+            recovered = restarted.claim('new-worker', ttl=180)
+            self.assertEqual(recovered['checkpoint'], waiting['checkpoint'])
+            self.assertGreater(recovered['fence'], original['fence'])
+            with self.assertRaises(LeaseLost):
+                ledger.assert_live(*self.token_from(original))
+            self.backend.status = 'PASS'
+            factory.ledger = restarted
+            result = DevelopmentPipeline(restarted, self.backend, factory, ['owner/repo']).run(recovered)
+            self.assertEqual(result['state'], 'DONE')
+            self.assertEqual([p[0] for p in factory.prompts], ['workspace-write', 'read-only'])
+            self.assertEqual(self.backend.calls.count('prepare'), 1)
+            self.assertEqual(self.backend.calls.count('commit'), 1)
+
+    @staticmethod
+    def token_from(claim):
+        return claim['task_id'], claim['worker_id'], claim['fence']
+
+    def test_expired_checkpoint_with_inflight_or_tampered_binding_never_auto_requeues(self):
+        from test_execution_ledger import SCHEMA
+        variants = ({'phase': 'IN_FLIGHT_CODEX'}, {'phase': 'IN_FLIGHT_PR'},
+                    {'spec_hash': '0' * 64}, {'spec_digest': '0' * 64},
+                    {'sha': 'main'}, {'pr': True}, {'patch_attempts': 4},
+                    {'patch_attempts': True}, {'branch': 'codex/task-foreign'})
+        for changes in variants:
+            with tempfile.TemporaryDirectory() as temp:
+                path = os.path.join(temp, 'tasks.db')
+                with sqlite3.connect(path) as conn:
+                    conn.executescript(SCHEMA)
+                    conn.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)',
+                                 ('T-1', 'CODEX_EXEC', 'PENDING', '[]', None, None, 0, '{}', 0))
+                now = [1000]
+                ledger = ExecutionLedger(path, ['owner/repo'], clock=lambda: now[0])
+                ledger.register_spec('T-1', self.claim['spec'], 'owner', True)
+                factory = Factory(ledger)
+                self.backend.status = 'PENDING'
+                claim = ledger.claim('old', ttl=180)
+                result = DevelopmentPipeline(ledger, self.backend, factory, ['owner/repo']).run(claim)
+                checkpoint = dict(result['checkpoint'], **changes)
+                ledger.checkpoint(*self.token_from(claim), value=checkpoint)
+                now[0] += 181
+                ledger.recover_expired()
+                self.assertEqual(ledger.observation('T-1')['state'], 'WAITING_HUMAN')
+                self.assertIsNone(ledger.claim('new'))
+                self.assertEqual(len(factory.prompts), 1)
     def test_checkpoint_reconciles_pr_before_resuming(self):
         self.backend.status = 'PENDING'
         self.pipeline.run(self.claim)

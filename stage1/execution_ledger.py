@@ -2,8 +2,9 @@
 
 Callers provision CODEX_EXEC rows through the authoritative task API and call
 assert_live immediately before each external operation. No lease scheme can
-roll back a side effect that completed before a process crashed: expired leases
-therefore require human review, never an automatic retry.
+roll back a side effect that completed before a process crashed. Expired leases
+with uncertain effects require human review. Only a fully bound read-only
+CI_WAIT checkpoint can be requeued automatically, followed by reconciliation.
 """
 import contextlib
 import hashlib
@@ -248,11 +249,55 @@ class ExecutionLedger(object):
         conn.execute('INSERT OR REPLACE INTO approvals VALUES(?,?,?,?)',
                      (task_id, 'PENDING', now, None))
 
+    def _safe_ci_wait(self, conn, row):
+        """An expired read-only poll can continue; a model/tool turn cannot.
+
+        Validate the persisted authority and immutable task/branch identities,
+        not just a caller-supplied phase label. Pipeline reconciliation rechecks
+        local and remote HEAD before any continuation work is performed.
+        """
+        try:
+            cp = json.loads(row['checkpoint'])
+            if not isinstance(cp, dict) or cp.get('phase') != 'CI_WAIT':
+                return False
+            stored = conn.execute('SELECT * FROM execution_specs WHERE task_id=?',
+                                  (row['id'],)).fetchone()
+            if stored is None or not isinstance(stored['revision'], int) or stored['revision'] < 1:
+                return False
+            spec = json.loads(stored['spec'])
+            packed = self._validate_spec(spec)
+            digest = hashlib.sha256(packed.encode('utf-8')).hexdigest()
+            approved = {'repo': spec['repo'], 'instructions': spec['prompt'],
+                        'base_sha': spec['base_sha']}
+            identity = hashlib.sha256(self._dump(approved).encode('utf-8')).hexdigest()
+            branch = 'codex/task-' + hashlib.sha256(row['id'].encode('utf-8')).hexdigest()[:24]
+            budget = cp.get('patch_attempts')
+            return (stored['hash'] == digest == cp.get('spec_hash')
+                    and cp.get('spec_digest') == identity
+                    and cp.get('branch') == branch
+                    and isinstance(cp.get('sha'), str)
+                    and re.fullmatch(r'[0-9a-f]{40}', cp['sha']) is not None
+                    and type(cp.get('pr')) is int and cp['pr'] > 0
+                    and isinstance(cp.get('workdir'), str)
+                    and Path(cp['workdir']).is_absolute()
+                    and type(budget) is int and 0 <= budget <= 3
+                    and cp.get('production_pass') is False)
+        except (ValueError, TypeError, KeyError):
+            return False
+
     def _recover(self, conn, now):
-        rows = conn.execute("SELECT id,fence FROM tasks WHERE kind='CODEX_EXEC' "
+        rows = conn.execute("SELECT * FROM tasks WHERE kind='CODEX_EXEC' "
                             "AND state='RUNNING' AND (lease_until IS NULL OR lease_until<=?)",
                             (now,)).fetchall()
         for row in rows:
+            if self._safe_ci_wait(conn, row):
+                conn.execute("UPDATE tasks SET state='PENDING',lease_owner=NULL,"
+                             'lease_until=NULL,fence=fence+1,updated=? WHERE id=?',
+                             (now, row['id']))
+                self._event(conn, row['id'], 'CI_WAIT_RECOVERED', now,
+                            {'previous_fence': row['fence'], 'automatic_retry': True,
+                             'model_turn_replayed': False})
+                continue
             conn.execute("UPDATE tasks SET state='WAITING_HUMAN',lease_owner=NULL,"
                          'lease_until=NULL,fence=fence+1,updated=? WHERE id=?',
                          (now, row['id']))

@@ -23,7 +23,7 @@ Owner 随后提供完整《玄钧云汇开发架构与开发顺序_统一整合�
 
 ## 当前英国开发的约束及证据
 
-Owner 最新指令在当前英国开发范围内优先：仅允许 `openai/gpt-6.1-sol`，禁止 Astra 和自动 Fallback。模型选择应由受保护政策配置执行，不能因文档的通用 Router 或低成本摘要示例引入其他模型。失败暂停对应模型步骤，确定性程序和独立任务按授权继续。
+Owner最新授权取代最初Sol-only规则：`openai/gpt-6.1-sol`为主、`openai/gpt-5.6-sol`为唯一备用；有界切换，主模型真实最小探测恢复后在任务边界切回。禁止Astra/其他模型和未经授权付费API。选择由受保护配置执行。英国5.6真实调用及Owner飞书收发已取得证据，自动切换/恢复及独立Worker开发仍未验收。以下a0ae8ac5测试/失败记录是历史审查基线，不能覆盖最新MODEL_POLICY或派发状态。
 
 代码审查基于 PR #17 的 `a0ae8ac5b6f6c8d48ca0cf60b3df7abbb36e712d`，PR仍 OPEN / Draft。完整 PR CI 与本地161项测试通过；这些是代码证据，不是生产或独立 QA 验收。
 Owner真实 canary 显示目录 available=true，但 agent 请求 exit_code=1，未取得精确回复或实际返回模型；推理 FAILED，失败原因 UNKNOWN，不能推断额度耗尽。
@@ -53,7 +53,17 @@ Owner真实 canary 显示目录 available=true，但 agent 请求 exit_code=1，
 
 ## 当前推进边界
 
-优先取得Sol调用的脱敏真实错误，修复并验证；同时可以补候选代码的上述契约和策略缺口，复用已完成工作。不可用追加测试数量或已有服务active替代E2E。
-固定Runner Sol诊断bootstrap已提交并在英国临时集成目录stage，仍需要Owner执行一次root安装；它只赋予固定无参数诊断入口，不赋予任意Shell或部署权限。后续同类诊断可由Runner执行。
+最新优先项是唯一派发者、隔离Worker认证/协议、四层门禁及受控dispatcher激活；5.6最小调用和飞书验收不重复。复用已提交的失败指纹/预算及看板契约增量，UK Runner在7ee62840实际204项测试通过；下一候选CI_WAIT重启恢复本地206项通过。不可用测试数量或服务active替代真实开发E2E。
+历史固定Sol-only诊断已经不适用于当前非空备用配置，不再要求Owner重复安装或执行；现有Runner固定只读审计不授予任意Shell或部署权限。
 模型成功后仍须独占派发、隔离身份/运行环境、备份后迁移、真实批准拒绝路由、独立QA与审计、两个真实任务及断点续跑、HTTPS看板和发布恢复证据。
 整体状态继续为PARTIAL；阶段1未PASS，不正式大规模启动阶段2，也不提前建设GEO。
+
+## 2026-10-11新增Owner要求
+
+任务由ChatGPT Work按既有架构节点和顺序统一派发，英国OpenClaw/Codex执行，
+不要求Owner逐项飞书派发。Canonical与未完成索引同步当前职责；生产派发
+回执未取得时仍NOT_VERIFIED。新商家积分/小程序规则见
+COMMUNITY_POINTS_REQUIREMENTS_20261011.md，与CP及推荐规则分账。
+东京/英国/韩国/国内Runner已实际执行只读批次38124100959；韩国2CPU/约2GiB
+以及既有项目需要目标资源预算，完整迁移和隔离仍未验收。
+
