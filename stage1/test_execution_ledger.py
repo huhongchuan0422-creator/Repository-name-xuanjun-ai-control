@@ -236,6 +236,56 @@ class LedgerTests(unittest.TestCase):
         with self.assertRaises(LeaseLost):
             self.ledger.finish(*token, state='FAILED')
 
+    def test_terminal_observation_matches_persisted_fence_and_checkpoint(self):
+        self.add('a')
+        self.register('a')
+        claim = self.ledger.claim('worker')
+        checkpoint = {'phase': 'ACCEPTED', 'spec_hash': claim['spec_hash']}
+        self.ledger.checkpoint(*self.token(claim), value=checkpoint)
+        self.ledger.finish(*self.token(claim), state='DONE')
+        with sqlite3.connect(self.path) as conn:
+            before = conn.execute('SELECT count(*) FROM events').fetchone()[0]
+        result = self.ledger.observation('a')
+        self.assertEqual(result, {'task_id': 'a', 'state': 'DONE',
+                                 'fence': claim['fence'], 'lease_owner': None,
+                                 'lease_until': None, 'checkpoint': checkpoint})
+        with sqlite3.connect(self.path) as conn:
+            self.assertEqual(conn.execute('SELECT count(*) FROM events').fetchone()[0], before)
+
+    def test_running_observation_matches_live_triple(self):
+        self.add('a')
+        self.register('a')
+        claim = self.ledger.claim('worker')
+        self.ledger.checkpoint(*self.token(claim), value={'phase': 'CI_WAIT'})
+        result = self.ledger.observation('a')
+        self.assertEqual(result['state'], 'RUNNING')
+        self.assertEqual(result['lease_owner'], claim['worker_id'])
+        self.assertEqual(result['fence'], claim['fence'])
+        self.assertEqual(result['checkpoint'], {'phase': 'CI_WAIT'})
+        self.assertTrue(self.ledger.assert_live(*self.token(claim)))
+
+    def test_observation_missing_database_does_not_recreate_it(self):
+        os.unlink(self.path)
+        with self.assertRaises(SchemaMismatch):
+            self.ledger.observation('a')
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_observation_fails_closed_on_schema_change(self):
+        self.add('a')
+        with sqlite3.connect(self.path) as conn:
+            conn.execute('ALTER TABLE tasks ADD COLUMN incompatible TEXT')
+        with self.assertRaises(SchemaMismatch):
+            self.ledger.observation('a')
+
+    def test_observation_never_returns_protected_checkpoint(self):
+        self.add('a')
+        self.register('a')
+        claim = self.ledger.claim('worker')
+        self.ledger.checkpoint(*self.token(claim), value={'access_token': 'private-value'})
+        with self.assertRaises(ValueError) as caught:
+            self.ledger.observation('a')
+        self.assertNotIn('private-value', str(caught.exception))
+
     def test_wrong_owner_or_fence_cannot_mutate(self):
         self.add('a')
         self.register('a')

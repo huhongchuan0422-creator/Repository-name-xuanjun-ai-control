@@ -338,6 +338,50 @@ class ExecutionLedger(object):
             raise LeaseLost('execution lease is no longer live')
         return row
 
+    def observation(self, task_id):
+        """Read one consistent authoritative snapshot without mutations.
+
+        This returns metadata and the persisted checkpoint only, never the
+        trusted prompt, spec, raw events, credential files or diagnostic output.
+        A credential-bearing checkpoint fails closed instead of being exposed.
+        """
+        try:
+            uri = Path(self.db_path).resolve().as_uri() + '?mode=ro'
+            conn = sqlite3.connect(uri, uri=True, timeout=10, isolation_level=None)
+        except sqlite3.OperationalError:
+            raise SchemaMismatch('existing authoritative database unavailable')
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute('BEGIN')
+            self._validate_schema(conn)
+            self._validate_side_schema(conn)
+            row = self._task(conn, task_id)
+            try:
+                checkpoint = json.loads(row['checkpoint'])
+                if not isinstance(checkpoint, dict):
+                    raise ValueError('invalid checkpoint')
+            except (TypeError, ValueError):
+                raise ValueError('persisted checkpoint must be a JSON object')
+            packed = self._dump(checkpoint)
+            protected = re.compile(
+                r'(?i)(?:"(?:api[ _-]?key|access[ _-]?token|refresh[ _-]?token|'
+                r'password|secret|authorization|private[ _-]?key|bot[ _-]?token)"\s*:|'
+                r'\b(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]{8,}|'
+                r'(?<!\d)\d{5,15}:[A-Za-z0-9_-]{20,}|bearer\s+[^\s"\\]+|'
+                r'-----BEGIN [A-Z ]*PRIVATE KEY-----)')
+            if protected.search(packed) or (row['lease_owner'] and protected.search(row['lease_owner'])):
+                raise ValueError('checkpoint contains protected credentials')
+            result = {'task_id': row['id'], 'state': row['state'],
+                      'fence': row['fence'], 'lease_owner': row['lease_owner'],
+                      'lease_until': row['lease_until'], 'checkpoint': checkpoint}
+            conn.commit()
+            return result
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def assert_live(self, task_id, worker_id, fence):
         with self._transaction() as conn:
             self._live(conn, task_id, worker_id, fence, self._now())
