@@ -2,7 +2,7 @@ name: UK Integration Stage and Contracts
 on:
   push:
     branches: [feature/uk-autonomous-loop-20261011]
-    paths: ['stage1/**', 'scripts/uk-contract-export.py', '.github/workflows/uk-integration-stage.yml']
+    paths: ['stage1/**', 'scripts/**', '.github/workflows/uk-integration-stage.yml']
 permissions:
   contents: read
 jobs:
@@ -19,12 +19,12 @@ jobs:
           set -euo pipefail
           test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
           python3 -m compileall -q stage1
-          python3 -m py_compile scripts/uk-contract-export.py
+          python3 -m py_compile scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py
           python3 -m unittest discover -s stage1 -q
           STAGE="/tmp/xuanjun-uk-integration-${GITHUB_SHA}"
           mkdir -p "$STAGE/stage1" "$STAGE/scripts"
           cp stage1/*.py stage1/*.html "$STAGE/stage1/"
-          cp scripts/uk-contract-export.py "$STAGE/scripts/"
+          cp scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py "$STAGE/scripts/"
           printf '%s\n' "$GITHUB_SHA" > "$STAGE/SOURCE_COMMIT"
           chmod -R a+rX "$STAGE"
           sha256sum "$STAGE/scripts/uk-contract-export.py"
@@ -46,3 +46,14 @@ jobs:
           else
             echo "LIVE_CONTRACT=WAITING_HUMAN_FIXED_GATEWAY_INSTALL"
           fi
+
+      - name: Read authenticated dashboard and model capability audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -x /usr/local/sbin/xuanjun-uk-owner-audit; then
+            sudo -n /usr/local/sbin/xuanjun-uk-owner-audit
+          else
+            echo "OWNER_DASHBOARD_AUDIT=WAITING_FIXED_BOOTSTRAP_INSTALL"
+          fi
+
