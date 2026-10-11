@@ -95,6 +95,37 @@ jobs:
           print('WORK_B_SCOPE_EXECUTOR_RECEIPT=NOT_VERIFIED')
           print('WORK_B_SCOPE_RESUME=NOT_EXECUTED')
           PYCODE
+      - name: Verify second B test-scope extension without starting agents
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          path=Path('plans/WORK_APPROVED_B_SCOPE_EXTENSION_V2_20261011.json')
+          raw=path.read_bytes()
+          extension=json.loads(raw.decode('utf-8'))
+          spec_raw=Path('plans/WORK_APPROVED_AB_REPAIR_SPEC_20261011.json').read_bytes()
+          assert extension['authority']=='CHATGPT_WORK_OWNER_DELEGATED'
+          assert extension['approval']=='APPROVED_BOUNDED_SCOPE_EXTENSION_CONTINUATION_ONLY'
+          assert extension['role']=='B'
+          assert extension['parent_task']==json.loads(spec_raw.decode('utf-8'))['parent_task']
+          assert extension['bind_active_spec_sha256']==hashlib.sha256(spec_raw).hexdigest()
+          assert hashlib.sha256(Path(extension['extends_contract']['path']).read_bytes()).hexdigest()==extension['extends_contract']['sha256']
+          assert extension['additional_allowed_edit_paths']==['stage1/test_development_service.py','stage1/test_owner_dashboard.py']
+          assert extension['permissions'] and all(type(v) is bool and v is False for v in extension['permissions'].values())
+          guard=extension['model_policy_guard']
+          assert guard['owner_primary']=='openai/gpt-6.1-sol' and guard['owner_sole_fallback']=='openai/gpt-5.6-sol'
+          assert guard['owner_policy_change'] is False and guard['dashboard_global_policy_must_preserve_owner_policy'] is True
+          assert extension['dispatch']['same_task_continuation'] is True
+          assert all(extension['dispatch'][k] is False for k in ['new_task','restart_A1_A2','reset_budget','modify_original_spec_bytes'])
+          print('WORK_B_SCOPE_V2=APPROVED_CONTINUATION_ONLY_MODEL_POLICY_GUARDED')
+          print('WORK_B_SCOPE_V2_CONTROL_SHA='+os.environ['GITHUB_SHA'])
+          print('WORK_B_SCOPE_V2_SHA256='+hashlib.sha256(raw).hexdigest())
+          print('WORK_B_SCOPE_V2_SOURCE='+str(Path(os.environ['GITHUB_WORKSPACE'])/path))
+          print('WORK_B_SCOPE_V2_EXECUTOR_RECEIPT=NOT_VERIFIED')
+          print('WORK_B_SCOPE_V2_RESUME=NOT_EXECUTED')
+          PYCODE
       - name: Publish intake data only when the reviewed platform transport is installed
         shell: bash
         run: |

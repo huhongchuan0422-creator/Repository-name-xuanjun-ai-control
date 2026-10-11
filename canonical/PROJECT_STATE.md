@@ -23,7 +23,7 @@ OPENCLAW_REPAIR_TRIGGER=OWNER_FEISHU_MANUAL
 RUNNER_TO_OPENCLAW_AUTOMATIC_INTAKE=NOT_DEPLOYED_NOT_ACCEPTED
 WORK_INTAKE_CANDIDATE_CODE=CANDIDATE_QA_SECURITY_REVIEW_PASS
 WORK_INTAKE_PLATFORM_ADMISSION=HOLD
-OPENCLAW_REPAIR_B=IMPLEMENTATION_REPORTED_TEST_SCOPE_HOLD_EXTENSION_APPROVED
+OPENCLAW_REPAIR_B=ISOLATED_245_OF_248_HOLD_SECOND_EXTENSION_APPROVED
 OPENCLAW_REPAIR_C=NOT_STARTED_UNTIL_RELEASE_ADMISSION
 STAGE1_RELEASE_ADMISSION=HOLD
 STAGE0_FULL_INVENTORY=NOT_VERIFIED
@@ -112,3 +112,9 @@ Current source/spec remain 76c0cfe7/deb33417; preserve original task identity, f
 Owner reports B implementation at fb2cc9081fa8d215bf186046b53bae9b9334ad7b, subset 228 tests and compile/diff checks PASS; full 248 remains 241 PASS/3 FAIL/4 ERROR. Two diagnostic test files and cache leave working tree unclean. B stopped for the concrete test/bootstrap scope boundary. Work approves plans/WORK_APPROVED_B_SCOPE_EXTENSION_20261011.json under the same parent/spec/B attempt, without a new task, budget reset, A1/A2 restart or production change. The permitted continuation updates exactly three obsolete test modules and scripts/uk-dev-bootstrap.py to the canonical activation/socket contract; never restores DB-string fallback, weakens auth, drops negative assertions or executes the installer. EXTENSION_EXECUTOR_RECEIPT=NOT_VERIFIED; source publication is not proof B resumed. The current old-spec intake dedupe remains unchanged.
 
 B scope continuation must acknowledge original spec deb33417 plus the exact new extension file SHA256. This revision is an additive contract for the same B attempt, not a new intake task; the original task/spec bytes and dedupe key remain fixed. No Work session-directory permission, new gh credential or Feishu routing grant is required to read the controlled Runner checkout. Automatic delivery of this addendum is not installed or verified; request a real bound receipt before reporting RESUMED.
+
+## Isolated candidate result and second B scope extension — 2026-10-11 20:05 CST
+
+Owner reports prior extension89d22f verified and its four files aligned. The earlier local248/248 relied on two uncommitted test diffs and is superseded: isolated checkout925cfba3171ebb43a872ef2a0ab7ffc390a5a516 returned245 PASS/1 FAIL/2 ERROR of248. IndependentQA/security NOT_STARTED; no deployment. Owner pins minimal delta a1fa635117286a0ccdf4c83060d9e8042719c07401b3fa13226ca176cc168861; actual new bytes not received by Work, local commit object unresolved via GitHub.
+
+Work approves plans/WORK_APPROVED_B_SCOPE_EXTENSION_V2_20261011.json for exactly stage1/test_development_service.py and stage1/test_owner_dashboard.py under the same B checkpoint/budget. Old isolation fixtures may follow broker v2 while retaining privilege/fence/resource negative tests. A single admitted Worker may be pinned5.6 with zero internal fallback; dashboard must preserve Owner global6.1 primary/5.6 sole fallback and distinguish that policy from actual/Worker observations. Global5.6-only/zero-fallback policy assertions are NOT_APPROVED. No production change, new task, A1/A2 restart or original-spec mutation. ExtensionV2 receipt/resume NOT_VERIFIED. Freeze and isolate the final committed combination before QA/security; no local dirty-tree green substitution.

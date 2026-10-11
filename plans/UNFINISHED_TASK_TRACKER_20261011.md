@@ -430,3 +430,9 @@ Owner要求把任务领取、触发、中断和重启完整落实，验收矩阵
 ### 19:32 scope HOLD resolved by Work authorization; receipt still needed
 
 Owner最新回报B实现fb2cc9081fa8d215bf186046b53bae9b9334ad7b，228非过期测试/compile/diff通过；248仍241/3失败/4错误，工作树不干净，正在等测试/bootstrap范围批准。Work已批准plans/WORK_APPROVED_B_SCOPE_EXTENSION_20261011.json，仅续接原B，允许三个明确旧测试模块及uk-dev-bootstrap契约对齐；不改DB-string兼容、不削弱鉴权/负例、不执行部署，不重置预算。扩展接收/复工回执NOT_VERIFIED。先修本地测试与清洁冻结，再同制品独立QA/安全；旧242项Work入口CI不能覆盖本次248项。
+
+## 20:05 isolated checkout correction and bounded test extension V2
+
+Owner已核验上次扩展89d22f并对齐4个文件；早前本地248全绿由两个未提交测试diff支撑，不能作为冻结验收。新冻结925cfba3171ebb43a872ef2a0ab7ffc390a5a516隔离复跑为245/248，1失败/2错误，独立QA/安全尚未开始、未部署。最小diff a1fa635117286a0ccdf4c83060d9e8042719c07401b3fa13226ca176cc168861仍仅Owner摘要回执，未取得实际字节。
+
+Work批准WORK_APPROVED_B_SCOPE_EXTENSION_V2_20261011.json，仅新增test_development_service.py及test_owner_dashboard.py，原任务/断点/预算不变。broker v2测试不得删UID0/peer/epoch/fence/资源边界负例。模型测试须分开：单次已准入Worker可固定5.6零内部fallback；Owner全局仍6.1主/5.6唯一备用。把全局策略改为仅5.6零备用未批准；如实现误标全局字段，应在原B已授权dashboard源码范围修正，不能改断言掩盖。V2接收/续跑尚NOT_VERIFIED。隔离最终干净提交248全绿后，再同制品并行独立QA/安全审查。
