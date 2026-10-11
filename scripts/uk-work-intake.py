@@ -26,7 +26,9 @@ INBOX = '/var/lib/xuanjun-work-intake/requests'
 RECEIPTS = '/var/lib/xuanjun-work-intake/receipts'
 CHECKOUT = '/home/githubrunner/actions-runner/_work/Repository-name-xuanjun-ai-control/Repository-name-xuanjun-ai-control'
 SPEC_PATH = 'plans/WORK_APPROVED_AB_REPAIR_SPEC_20261011.json'
-MODELS = ('openai/gpt-6.1-sol', 'openai/gpt-5.6-sol')
+REPAIR_PATH = 'plans/WORK_APPROVED_7ED631A_SECURITY_REPAIR_20261011.json'
+REPAIR_DIGEST = '9b242998bd64ae1d900389af190de576c1ca876cd02a5b53cf2ff07292d3c5e1'
+MODEL = 'openai/gpt-5.6-sol'
 DENIED = ('production_db_write', 'old_coordinator_switch', 'trading_permission_change',
           'formal_webhook_change', 'production_deploy', 'old_coordinator_codex_exec',
           'generic_root_or_systemd_grant')
@@ -34,6 +36,34 @@ MANUAL_DIGEST = 'deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6
 MANUAL_SOURCE = '76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b'
 MANUAL_DESIGN = 'fbe72ffbcb1e277d808f26c61b178f247dab159ea8c97b1fde0808490d8078cf'
 MAX_ENVELOPE = 98304
+
+
+def active_digest(envelope):
+    return envelope.get('repair_sha256', envelope['spec_sha256'])
+
+
+def repair_revision(envelope, spec):
+    """Only this exact approved continuation, not an arbitrary scope amendment."""
+    fields = ('repair_sha256', 'repair_base64')
+    if not any(k in envelope for k in fields):
+        return None
+    if (any(not isinstance(envelope.get(k), str) for k in fields)
+            or envelope['spec_sha256'] != MANUAL_DIGEST
+            or envelope['design_sha256'] != MANUAL_DESIGN
+            or envelope['repair_sha256'] != REPAIR_DIGEST):
+        raise ValueError('UNAPPROVED_REPAIR_REVISION')
+    raw = base64.b64decode(envelope['repair_base64'], validate=True)
+    if not raw or len(raw) > 16384 or digest(raw) != REPAIR_DIGEST:
+        raise ValueError('REPAIR_DIGEST')
+    repair = parse(raw.decode('utf-8'))
+    if (not isinstance(repair, dict) or repair.get('parent_task') != spec['parent_task']
+            or repair.get('authority') != 'CHATGPT_WORK_OWNER_DELEGATED'
+            or repair.get('approval') != 'APPROVED_BOUNDED_POST_REVIEW_MODEL_SOURCE_REPAIR_AND_EVIDENCE_RETURN'
+            or any(v is not False for v in repair.get('permissions', {}).values())
+            or repair.get('model_policy', {}).get('primary') != MODEL
+            or repair.get('model_policy', {}).get('fallbacks') != []):
+        raise ValueError('REPAIR_AUTHORITY')
+    return repair
 
 
 def parse(raw):
@@ -151,8 +181,16 @@ def validate(envelope):
         raise ValueError('SPEC_OBJECT_TYPES')
     if any(spec.get('permissions', {}).get(k) is not False for k in DENIED):
         raise ValueError('PRODUCTION_PERMISSION_DENIED')
+    repair = repair_revision(envelope, spec)
     models = spec.get('models', {})
-    if (models.get('primary'), models.get('sole_fallback')) != MODELS or (
+    historical = envelope['spec_sha256'] == MANUAL_DIGEST
+    # Original exact bytes are imported without a wake; the pinned amendment
+    # overrides their old model text only for B. New tasks must use current policy.
+    policy_ok = ((models.get('primary'), models.get('sole_fallback')) ==
+                 ('openai/gpt-6.1-sol', MODEL)) if historical else (
+                 models.get('primary') == MODEL and models.get('fallbacks') == []
+                 and models.get('sole_fallback') is None)
+    if not policy_ok or (
             models.get('route') != 'EXISTING_CHATGPT_OAUTH_CODEX'
             or models.get('paid_api') != 'DENY' or models.get('other_models') != 'DENY'):
         raise ValueError('MODEL_POLICY')
@@ -182,7 +220,18 @@ def validate(envelope):
     if not isinstance(spec.get('design'), str) or re.fullmatch(r'plans/[A-Za-z0-9_-]+\.md', spec['design']) is None:
         raise ValueError('DESIGN_PATH')
     # Source SHA is a receipt binding, not a reason to repeat identical work.
-    key = digest((task + '\n' + envelope['spec_sha256']).encode('ascii'))
+    if repair is not None:
+        # Effective coordinator instructions have ONE role. No A1/A2 redispatch.
+        spec = dict(spec)
+        spec['roles'] = [{'role': 'B', 'scope': repair['source_repair']['scope'],
+                          'exclusive_files': repair['source_repair']['additional_allowed_edit_paths']}]
+        spec['models'] = dict(repair['model_policy'])
+        spec['approved_repair'] = repair
+        spec['continuation'] = {'same_task': True, 'role': 'B',
+                                'checkpoint': repair['frozen_checkpoint'],
+                                'remaining_budget': repair['budget']['remaining'],
+                                'budget_reset': False, 'restart_A1_A2': False}
+    key = digest((task + '\n' + active_digest(envelope)).encode('ascii'))
     return key, spec, raw, design
 
 
@@ -262,7 +311,7 @@ def current_source(envelope, publisher):
 def clean_agent(response, source, spec_digest, spec_roles=None):
     if (not isinstance(response, dict) or response.get('control_source_sha') != source
             or response.get('spec_sha256') != spec_digest or response.get('server') != HOST
-            or response.get('actual_model') != MODELS[1]
+            or response.get('actual_model') != MODEL
             or response.get('state') not in ('RECEIVED', 'STARTED', 'WAITING_HUMAN')
             or not isinstance(response.get('roles'), dict) or not response['roles']):
         raise ValueError('UNBOUND_AGENT_RECEIPT')
@@ -291,7 +340,11 @@ def clean_receipt(value, key):
                            ('design_sha256', r'[0-9a-f]{64}')):
         if not isinstance(value.get(field), str) or re.fullmatch(pattern, value[field]) is None:
             raise ValueError('RECEIPT_BINDING')
-    expected = digest((value['parent_task'] + '\n' + value['spec_sha256']).encode('ascii'))
+    if 'repair_sha256' in value and (value['repair_sha256'] != REPAIR_DIGEST
+                                    or value['spec_sha256'] != MANUAL_DIGEST
+                                    or value['design_sha256'] != MANUAL_DESIGN):
+        raise ValueError('RECEIPT_REPAIR_BINDING')
+    expected = digest((value['parent_task'] + '\n' + active_digest(value)).encode('ascii'))
     if value['receipt_key'] != key or key != expected:
         raise ValueError('RECEIPT_KEY_MISMATCH')
     states = ('STARTED_OWNER_RELAYED', 'DISPATCHING_EFFECT_UNKNOWN_NO_AUTORETRY',
@@ -300,11 +353,14 @@ def clean_receipt(value, key):
         raise ValueError('RECEIPT_STATE')
     clean = {k: value[k] for k in ('schema', 'receipt_key', 'parent_task',
              'control_source_sha', 'spec_sha256', 'design_sha256', 'received_at', 'state')}
+    if 'repair_sha256' in value:
+        clean['repair_sha256'] = value['repair_sha256']
     clean.update(production_pass=False, independent_role_start_probe=False,
                  idempotent=value.get('idempotent') is True,
                  wake_executed=value.get('wake_executed') is True)
     if value['state'] == 'STARTED_OWNER_RELAYED':
-        if value['spec_sha256'] != MANUAL_DIGEST or value['design_sha256'] != MANUAL_DESIGN:
+        if (value['spec_sha256'] != MANUAL_DIGEST or value['design_sha256'] != MANUAL_DESIGN
+                or 'repair_sha256' in value):
             raise ValueError('MANUAL_RECEIPT_BINDING')
         clean.update(manual_control_source_sha=MANUAL_SOURCE,
                      roles={'A1': 'STARTED', 'A2': 'STARTED',
@@ -312,7 +368,8 @@ def clean_receipt(value, key):
                      evidence='evidence/uk-intake/OWNER_RELAYED_REPAIR_START_20261011.json')
     elif value['state'] == 'AGENT_RECEIPT_REPORTED':
         clean['agent_receipt'] = clean_agent(value.get('agent_receipt'),
-                                            value['control_source_sha'], value['spec_sha256'])
+                                            value['control_source_sha'], active_digest(value),
+                                            {'B'} if 'repair_sha256' in value else None)
     return clean
 
 
@@ -374,7 +431,7 @@ def transport_receipt(data):
         raise ValueError('GATEWAY_SCHEMA_NOT_VERIFIED')
     model = meta['agentMeta'].get('model')
     provider = meta['agentMeta'].get('provider')
-    if (model not in (MODELS[1], 'gpt-5.6-sol') or provider != 'openai'
+    if (model not in (MODEL, 'gpt-5.6-sol') or provider != 'openai'
             or data.get('error') or result.get('error') or meta.get('aborted') is True):
         raise ValueError('RETURNED_MODEL_NOT_VERIFIED')
     payloads = result.get('payloads')
@@ -382,9 +439,9 @@ def transport_receipt(data):
             or not isinstance(payloads[0], dict) or not isinstance(payloads[0].get('text'), str)):
         raise ValueError('EXACT_JSON_RECEIPT_REQUIRED')
     receipt = parse(payloads[0]['text'])
-    if not isinstance(receipt, dict) or receipt.get('actual_model') != MODELS[1]:
+    if not isinstance(receipt, dict) or receipt.get('actual_model') != MODEL:
         raise ValueError('MODEL_RECEIPT_MISMATCH')
-    receipt['actual_model'] = MODELS[1]  # mechanically verified transport value
+    receipt['actual_model'] = MODEL  # mechanically verified transport value
     return receipt
 
 
@@ -406,7 +463,9 @@ def accept(envelope, store, wake):
                   'spec_sha256': envelope['spec_sha256'],
                   'design_sha256': envelope['design_sha256'], 'received_at': int(time.time()),
                   'idempotent': False, 'production_pass': False}
-        if envelope['spec_sha256'] == MANUAL_DIGEST:
+        if 'repair_sha256' in envelope:
+            result['repair_sha256'] = envelope['repair_sha256']
+        if envelope['spec_sha256'] == MANUAL_DIGEST and 'repair_sha256' not in envelope:
             result.update(state='STARTED_OWNER_RELAYED', wake_executed=False,
                           manual_control_source_sha=MANUAL_SOURCE,
                           roles={'A1': 'STARTED', 'A2': 'STARTED',
@@ -421,7 +480,7 @@ def accept(envelope, store, wake):
             response = wake(envelope, spec, raw, design, key)
             allowed_roles = {role['role'] for role in spec.get('roles', [])}
             clean = clean_agent(response, envelope['control_source_sha'],
-                                envelope['spec_sha256'], allowed_roles)
+                                active_digest(envelope), allowed_roles)
             result.update(state='AGENT_RECEIPT_REPORTED', agent_receipt=clean,
                           wake_executed=True, independent_role_start_probe=False)
         except Exception:
@@ -458,21 +517,28 @@ def gateway_wake(config, envelope, spec, raw, design, key):
     visit(parse(auth.decode('utf-8')))
     if code or not types or any(t != 'oauth' for t in types):
         raise ValueError('OAUTH_ROUTE_NOT_CONFIRMED')
-    # Current verified fallback; this intake never probes an unavailable primary.
+    # Current sole allowed model; this intake never probes an unavailable model.
     message = ('Work approved bounded maintenance handoff. Receipt key: ' + key +
                '. Control SHA: ' + envelope['control_source_sha'] +
-               '. Spec SHA256: ' + envelope['spec_sha256'] +
+               '. Active spec SHA256: ' + active_digest(envelope) +
                '. Preserve existing tasks/checkpoints/budgets; do not restart an already running spec. '
                'Only coordinate approved roles. No production DB/deploy/old Coordinator CODEX_EXEC/'
                'formal Webhook/trade permissions/customer messages. Return exactly one JSON object '
                'with server, control_source_sha, spec_sha256, actual_model, state '
                '(RECEIVED/STARTED/WAITING_HUMAN), roles, blocker. Report STARTED only after role start. '
                'Do not recursively delegate beyond the supplied role contract.\nSPEC:\n' +
-               raw.decode('utf-8') + '\nAPPROVED DESIGN:\n' + design.decode('utf-8'))
+               encoded(spec).decode('utf-8') + '\nAPPROVED DESIGN:\n' + design.decode('utf-8'))
+    if 'repair_sha256' in envelope:
+        message += ('\nCONTINUATION ONLY: reuse the original B task/checkpoint/budget. '
+                    'Reconcile actual unique writer/session/lease before resume; never restart A1/A2. '
+                    'The ledger owns execution admission. Receipt is not proof of a live writer. '
+                    'Current approved repair overrides old6.1 design text. Only5.6, fallbacks=[]. '
+                    'Do not install platform/root helpers or alter production. Return HOLD if native '
+                    'resume is unavailable; do not merely update monitor scratch.')
     if not current_source(envelope, pwd.getpwnam('githubrunner').pw_uid):
         raise ValueError('SOURCE_CHANGED_BEFORE_MODEL_REQUEST')
     code, response = run_bounded([cli, 'agent', '--agent', 'main', '--session-key',
-                               'agent:main:work-intake-' + key, '--model', MODELS[1],
+                               'agent:main:work-intake-' + key, '--model', MODEL,
                                '--message', message, '--thinking', 'low', '--timeout', '60', '--json'],
                               env, 75, 65536)
     if code:
@@ -533,8 +599,11 @@ def main():
                         'spec_base64': base64.b64encode(raw).decode('ascii'),
                         'design_sha256': digest(design),
                         'design_base64': base64.b64encode(design).decode('ascii')}
+            repair_raw = source_blob(workspace, sha, REPAIR_PATH, 16384)
+            envelope.update(repair_sha256=digest(repair_raw),
+                            repair_base64=base64.b64encode(repair_raw).decode('ascii'))
             key, _, _, _ = validate(envelope)
-            publication_key = digest((sha + '\n' + envelope['spec_sha256']).encode('ascii'))
+            publication_key = digest((sha + '\n' + active_digest(envelope)).encode('ascii'))
             lock = store.lock()
             try:
                 if not current_source(envelope, publisher):
@@ -547,7 +616,8 @@ def main():
             finally:
                 os.close(lock)
             print(json.dumps({'state': 'PUBLISHED', 'receipt_key': key,
-                              'control_source_sha': sha, 'spec_sha256': digest(raw)}))
+                              'control_source_sha': sha, 'spec_sha256': digest(raw),
+                              'repair_sha256': envelope['repair_sha256']}))
         else:
             # Parent/file checks bind this readonly inbox to the publisher UID.
             names = [name for name in os.listdir(inbox)
@@ -560,7 +630,7 @@ def main():
                 try:
                     envelope = parse(read_file(os.path.join(inbox, name), {0, publisher}, MAX_ENVELOPE).decode('utf-8'))
                     validate(envelope)
-                    publication_key = digest((envelope['control_source_sha'] + '\n' + envelope['spec_sha256']).encode('ascii'))
+                    publication_key = digest((envelope['control_source_sha'] + '\n' + active_digest(envelope)).encode('ascii'))
                     if publication_key != name[:-5]:
                         raise ValueError('ENVELOPE_KEY_MISMATCH')
                     if not current_source(envelope, publisher):

@@ -461,3 +461,31 @@ guard阻止B。Work发布V3，采用Owner已确认的临时5.6-only/fallbacks=[]
 - broker归Work的A2 PLATFORM/Release Gate。先提供实际源码路径与可执行入口/边界测试矩阵，区分缺实现与缺现场安装；缺实现不能通过平台HOLD掩盖。现场root/身份/binary/epoch/fence/停止和恢复仍需受控准入。
 - 请求patch b26...、install manifest c157...、外部evidence manifest9b53...与QA/纠正security报告，区分不同摘要。现GitHub找不到7ed对象不否定本地工作，但Work未复现/收件不能判发布。
 - 模型修复、制品回传、broker边界盘点可独立继续；新源码冻结后全量+同制品双审，C/生产/HTTPS未验收。不需要Owner再授权上述代码工作。
+
+## Work direct GitHub takeover: staged contract and B-revision intake
+
+Authoritative staged contract plans/WORK_STAGED_EXECUTION_CONTRACT_20261011.json
+published at8ccd4d08a1fae7afdf65d5a376a6c3960ba0c8a7, SHA256
+055d3ad1f41a3f8b64f8096e1f1e115b9cb07cc9e1669ab1be0963c47f43ee33;
+direct coordinator delivery comment6109578270. P0–P3 owners, dependency gates,
+budget preservation, raw receipt fields, source scope and acceptance inputs are
+bound to the original task; no new platform installation authority. Work has no
+direct UK SSH/OpenClaw execution connector. Actual B start remains NOT_VERIFIED.
+
+Work fixes the existing intake to transport the exact9b242998 security amendment
+alongside the original pinned spec/design, use parent+active-revision dedupe,
+dispatch only B with7ed checkpoint/current5.6-only/original budget, and keep the
+manual A1/A2 import intact. Forged revisions and6.1 revival fail closed;
+effect-unknown markers still prevent retries. Module candidate SHA256
+3c1957c0dc247d18b5f67195509144f7e82f293c718fa39832d179e7cb9e59c9.
+Local control252/252 tests PASS;28 intake tests and Python3.6 syntax PASS.
+Independent review of this increment NOT_EXECUTED; installed code NOT_CHANGED;
+Gateway/model calls NOT_EXECUTED by Work. Old module only imported manual start
+and could not resume current B; installing it alone would not resolve dispatch.
+
+Prepared installation file/owner/mode matrix is appended to the intake contract.
+Frozen UK source/broker paths/full reports remain NOT_RECEIVED; pending old-source
+delivery reconciliation, actual Work result wake, platform/recovery and private
+HTTPS are still unaccepted. Existing coordinator can resume approved B directly
+while platform preparation continues. Security FAIL, Release/C HOLD preserved.
+Owner does not relay. No production DB/config/trade/formal Webhook/root change.

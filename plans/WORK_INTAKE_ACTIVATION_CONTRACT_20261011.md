@@ -168,3 +168,75 @@ check invokes Work to integrate a patch or approve a release.
 No platform installation, model call, production change or repeated A1/A2 wake
 was performed for this increment. Package the path/timer with the same frozen
 A2 reviewed installation manifest; do not add a competing root installer.
+
+## Current B security continuation delivery candidate
+
+Work implements the approved continuation in the existing intake module, not a
+second registry or dispatcher. Current source candidate SHA256:
+3c1957c0dc247d18b5f67195509144f7e82f293c718fa39832d179e7cb9e59c9.
+This supersedes the historical module digest for a future reviewed installation.
+No installed module was replaced and no Gateway call was made by Work.
+
+Publisher now exports the original pinned spec/design plus the exact existing
+security-repair amendment from the same verified raw Git commit/tree/blob chain.
+Only repair digest9b242998bd64ae1d900389af190de576c1ca876cd02a5b53cf2ff07292d3c5e1
+is admitted, against original specdeb33417 and designfbe72ffb. Changing amendment
+bytes, baseline, design or digest is rejected before wake. The effective contract
+contains only role B, checkpoint7ed631a, current5.6-only policy and original
+bounded budget; original spec bytes and manual A1/A2 receipt remain untouched.
+
+Publication dedupe is control SHA plus active amendment digest. Delivery receipt
+dedupe is original parent task plus active amendment digest. Thus an already
+imported original manual start cannot suppress this approved B continuation,
+while a documentation-only commit or repeated event cannot repeat its wake.
+The native coordinator must still reconcile actual original B session/lease
+and resume it rather than create a new task. Journal dedupe is not a distributed
+lease or proof of a live Developer.
+
+The historical base model pair is accepted only for the original exact pinned
+spec. That base alone is imported without inference. Synthetic/new maintenance
+specs must use current5.6-only/fallbacks=[]; the effective approved B continuation
+and actual Gateway argv select5.6. Returned6.1/metadata mismatch remains rejected.
+
+Local control regression252/252 PASS, including28 intake tests; Python3.6 syntax
+PASS. New negative cases cover pinned revision forgery/changed baseline, B-only
+role response, doc-SHA replay, old manual receipt separation, persistent crash
+marker,6.1 policy revival, and actual effective Gateway instructions with no
+--deliver. These are candidate code tests, not independent security approval,
+installed cross-UID evidence or UK combination acceptance.
+
+### Prepared package and acceptance inputs
+
+Package these existing exact paths with the final A2 reviewed installation;
+do not add a competing installer:
+
+| Repository file | Installed target | Owner/mode | Required evidence |
+| --- | --- | --- | --- |
+| scripts/uk-work-intake.py | /opt/xuanjun-work-intake/uk-work-intake.py | root/root0644; parent0755 | final byte hash and immutable owner/mode |
+| deploy/uk-work-intake/config.json | /etc/xuanjun-work-intake.json | root/root0644 | exact fixed inbox/receipts values |
+| deploy/uk-work-intake/xuanjun-work-intake.service | /etc/systemd/system/xuanjun-work-intake.service | root/root0644 | oneshot nonroot identity, control-group stop, actual restrictions |
+| deploy/uk-work-intake/xuanjun-work-intake.path | /etc/systemd/system/xuanjun-work-intake.path | root/root0644 | actual atomic-publication wake |
+| deploy/uk-work-intake/xuanjun-work-intake.timer | /etc/systemd/system/xuanjun-work-intake.timer | root/root0644 | boot and inactive reconciliation |
+| requests and receipts directories | /var/lib/xuanjun-work-intake/{requests,receipts} | distinct existing UID/groups02750 | cross-UID read/write denial and fsync receipt |
+
+The existing UK workflow compares installed module bytes against control source
+and refuses mismatched upgrades. Do not bypass that guard to get a wake. The
+approved staged contract055d3ad1... is an execution/acceptance amendment, not a
+new spec accepted by the old publisher schema.
+
+Still unresolved before platform admission:
+- full final A2/B frozen source, executable broker paths, units, manifest and
+  corrected security report have not been received;
+- review/installation of this new module with final A2 manifest and actual
+  transport profile is not performed;
+- pending older approved deliveries outside current detached checkout need
+  provenance-preserving reconciliation; this increment does not relax freshness;
+- result events triggering an actual Work execution run are not verified;
+- canonical ledger unique writer, stop/recovery, database restore and private
+  authenticated HTTPS remain live gates.
+
+Freeze exact package before independent QA/security. Platform role must return
+commands derived from actual final broker/unit/DB paths, previous protected
+configuration and verified restore backup. Work will not invent those unavailable
+paths or replace a failed release with a rollback target. No root/production
+installation authority is added by this candidate.

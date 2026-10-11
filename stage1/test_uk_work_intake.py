@@ -25,6 +25,7 @@ def envelope(manual=False):
     if not manual:
         spec = json.loads(raw.decode('utf-8'))
         spec['spec_revision'] = 'future_bounded_revision'
+        spec['models'].update(primary=i.MODEL, sole_fallback=None, fallbacks=[])
         raw = i.encoded(spec)
     return {'schema': 1, 'repository': i.REPO, 'branch': i.BRANCH,
             'control_source_sha': i.MANUAL_SOURCE, 'spec_sha256': i.digest(raw),
@@ -33,10 +34,17 @@ def envelope(manual=False):
             'design_base64': base64.b64encode(DESIGN).decode('ascii')}
 
 
+def repair_envelope():
+    e = envelope(True)
+    raw = (ROOT / i.REPAIR_PATH).read_bytes()
+    e.update(repair_sha256=i.digest(raw), repair_base64=base64.b64encode(raw).decode('ascii'))
+    return e
+
+
 def reported(e):
     return {'server': i.HOST, 'control_source_sha': e['control_source_sha'],
-            'spec_sha256': e['spec_sha256'], 'actual_model': i.MODELS[1],
-            'state': 'STARTED', 'roles': {'A1': 'STARTED'}, 'blocker': None}
+            'spec_sha256': i.active_digest(e), 'actual_model': i.MODEL,
+            'state': 'STARTED', 'roles': {'B' if 'repair_sha256' in e else 'A1': 'STARTED'}, 'blocker': None}
 
 
 def concurrent_accept(directory, e, log):
@@ -217,8 +225,8 @@ class IntakeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             i.transport_receipt(data)
         data['result']['meta'] = {'agentMeta': {'model': 'gpt-5.6-sol', 'provider': 'openai'}}
-        self.assertEqual(i.transport_receipt(data)['actual_model'], i.MODELS[1])
-        response['actual_model'] = i.MODELS[0]
+        self.assertEqual(i.transport_receipt(data)['actual_model'], i.MODEL)
+        response['actual_model'] = 'openai/gpt-6.1-sol'
         data['result']['payloads'][0]['text'] = json.dumps(response)
         with self.assertRaises(ValueError):
             i.transport_receipt(data)
@@ -308,3 +316,107 @@ class IntakeTest(unittest.TestCase):
         self.assertGreater(len(i.encoded(e)), 65536)
         self.store.save('a' * 64, e)
         self.assertEqual(self.store.load('a' * 64, i.MAX_ENVELOPE), e)
+
+    def test_approved_B_revision_resumes_once_without_importing_old_start(self):
+        old = i.accept(envelope(True), self.store, lambda *a: self.fail('old wake'))
+        e = repair_envelope()
+        with patch.object(i, 'gateway_wake', return_value=reported(e)) as wake:
+            new = i.accept(e, self.store, wake)
+            second = i.accept(e, self.store, wake)
+        self.assertNotEqual(old['receipt_key'], new['receipt_key'])
+        self.assertEqual(new['state'], 'AGENT_RECEIPT_REPORTED')
+        self.assertEqual(new['repair_sha256'], i.REPAIR_DIGEST)
+        self.assertEqual(new['agent_receipt']['roles'], {'B': 'STARTED'})
+        self.assertFalse(new['independent_role_start_probe'])
+        self.assertTrue(second['idempotent'])
+        wake.assert_called_once()
+
+    def test_repair_document_sha_replay_preserves_original_dedupe(self):
+        e = repair_envelope()
+        with patch.object(i, 'gateway_wake', return_value=reported(e)) as wake:
+            first = i.accept(e, self.store, wake)
+            e['control_source_sha'] = 'b' * 40
+            again = i.accept(e, self.store, wake)
+        wake.assert_called_once()
+        self.assertEqual(first['receipt_key'], again['receipt_key'])
+        self.assertFalse(again['wake_executed'])
+
+    def test_repair_effective_contract_only_B_and_current_models(self):
+        e = repair_envelope()
+        key, spec, raw, design = i.validate(e)
+        self.assertEqual([r['role'] for r in spec['roles']], ['B'])
+        self.assertEqual(spec['models']['primary'], i.MODEL)
+        self.assertEqual(spec['models']['fallbacks'], [])
+        self.assertEqual(spec['budget'], json.loads(RAW.decode('utf-8'))['budget'])
+        self.assertEqual(i.digest(raw), i.MANUAL_DIGEST)
+        self.assertEqual(i.digest(design), i.MANUAL_DESIGN)
+        response = reported(e)
+        response['roles'] = {'A1': 'STARTED'}
+        result = i.accept(e, self.store, lambda *a: response)
+        self.assertEqual(result['state'], 'WAITING_RECONCILIATION_EFFECT_UNKNOWN')
+
+    def test_forged_revision_or_changed_baseline_refused_before_wake(self):
+        for change in ('digest', 'bytes', 'missing', 'baseline', 'design'):
+            e = repair_envelope()
+            if change == 'digest':
+                e['repair_sha256'] = 'a' * 64
+            elif change == 'bytes':
+                raw = base64.b64decode(e['repair_base64']) + b'\n'
+                e['repair_base64'] = base64.b64encode(raw).decode('ascii')
+            elif change == 'missing':
+                del e['repair_base64']
+            elif change == 'baseline':
+                e['spec_sha256'] = envelope()['spec_sha256']
+                e['spec_base64'] = envelope()['spec_base64']
+            else:
+                e['design_sha256'] = 'b' * 64
+            with patch.object(i, 'gateway_wake') as wake, self.assertRaises(ValueError):
+                i.accept(e, self.store, wake)
+            wake.assert_not_called()
+
+    def test_new_legacy_model_spec_does_not_revive_61(self):
+        e = envelope()
+        spec = json.loads(base64.b64decode(e['spec_base64']).decode('utf-8'))
+        spec['models'].update(primary='openai/gpt-6.1-sol', sole_fallback=i.MODEL)
+        raw = i.encoded(spec)
+        e.update(spec_sha256=i.digest(raw), spec_base64=base64.b64encode(raw).decode('ascii'))
+        with self.assertRaises(ValueError):
+            i.validate(e)
+
+    def test_B_revision_crash_marker_prevents_retry_after_restart(self):
+        e = repair_envelope()
+        with self.assertRaises(SystemExit):
+            i.accept(e, self.store, lambda *a: (_ for _ in ()).throw(SystemExit()))
+        with patch.object(i, 'gateway_wake') as wake:
+            result = i.accept(e, self.store, wake)
+        self.assertEqual(result['state'], 'DISPATCHING_EFFECT_UNKNOWN_NO_AUTORETRY')
+        self.assertEqual(result['repair_sha256'], i.REPAIR_DIGEST)
+        wake.assert_not_called()
+
+    def test_revision_receipt_cannot_claim_old_manual_import(self):
+        e = repair_envelope()
+        r = i.accept(e, self.store, lambda *a: reported(e))
+        r['state'] = 'STARTED_OWNER_RELAYED'
+        with self.assertRaises(ValueError):
+            i.clean_receipt(r, r['receipt_key'])
+
+    def test_gateway_sends_effective_B_revision_and_checks_native_model(self):
+        e = repair_envelope()
+        key, spec, raw, design = i.validate(e)
+        auth = i.encoded({'provider': 'openai', 'profiles': [{'type': 'oauth'}]})
+        response = {'status': 'ok', 'result': {
+            'meta': {'agentMeta': {'model': 'gpt-5.6-sol', 'provider': 'openai'}},
+            'payloads': [{'text': json.dumps(reported(e))}]}}
+        with patch.object(i, 'run_bounded', side_effect=[(0, auth), (0, i.encoded(response))]) as run, \
+                patch.object(i, 'current_source', return_value=True), patch.object(i.pwd, 'getpwnam'):
+            result = i.gateway_wake({}, e, spec, raw, design, key)
+        argv = run.call_args[0][0]
+        self.assertEqual(argv[argv.index('--model') + 1], i.MODEL)
+        message = argv[argv.index('--message') + 1]
+        effective = json.loads(message.split('SPEC:\n', 1)[1].split('\nAPPROVED DESIGN:', 1)[0])
+        self.assertEqual([r['role'] for r in effective['roles']], ['B'])
+        self.assertEqual(effective['continuation']['checkpoint']['commit'],
+                         '7ed631aabe240321656287bbd0c8ca546814c37c')
+        self.assertFalse(effective['continuation']['budget_reset'])
+        self.assertEqual(result['spec_sha256'], i.REPAIR_DIGEST)
+        self.assertNotIn('--deliver', argv)
