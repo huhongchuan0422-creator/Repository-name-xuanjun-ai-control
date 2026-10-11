@@ -16,6 +16,7 @@ import time
 
 MODEL = 'gpt-6.1-sol'
 OPENCLAW_MODEL = 'openai/gpt-6.1-sol'
+ALLOWED_MODELS = ('gpt-6.1-sol', 'gpt-5.6-sol')
 MAX_STREAM_BYTES = 2 * 1024 * 1024
 MAX_PROMPT_BYTES = 256 * 1024
 
@@ -47,7 +48,7 @@ def redact(text):
 
 class CodexWorker(object):
     def __init__(self, codex_bin, workdir, home, codex_home, path,
-                 sandbox='read-only', runner=None):
+                 sandbox='read-only', runner=None, model=MODEL):
         for value in (codex_bin, workdir, home, codex_home):
             if not isinstance(value, str) or not os.path.isabs(value):
                 raise ValueError('explicit absolute paths required')
@@ -56,14 +57,17 @@ class CodexWorker(object):
             raise ValueError('explicit absolute PATH entries required')
         if sandbox not in ('read-only', 'workspace-write'):
             raise ValueError('unsupported sandbox')
+        if model not in ALLOWED_MODELS:
+            raise ValueError('model outside Owner allowlist')
         self.codex_bin, self.workdir = codex_bin, workdir
         self.home, self.codex_home, self.path = home, codex_home, path
         self.sandbox, self.runner = sandbox, runner
+        self.model = model
 
     def build_argv(self):
         return [self.codex_bin, '-c', 'model_provider="openai"',
                 '-c', 'approval_policy="never"', 'exec', '--json',
-                '--model', MODEL, '--sandbox', self.sandbox,
+                '--model', self.model, '--sandbox', self.sandbox,
                 '--cd', self.workdir, '-']
 
     def build_env(self):
@@ -76,7 +80,12 @@ class CodexWorker(object):
         simulated = self.runner is not None
         return {'status': status, 'output': redact(output),
                 'turn_completed': completed, 'exit_code': exit_code,
-                'model': MODEL, 'openclaw_model': OPENCLAW_MODEL,
+                'requested_model': self.model,
+                'requested_openclaw_model': 'openai/' + self.model,
+                # CLI selection is not authoritative returned-model evidence.
+                # Agent text must never be parsed as provider attestation.
+                'model': 'UNKNOWN', 'provider': 'UNKNOWN',
+                'model_verified': False, 'openclaw_model': 'UNKNOWN',
                 'simulated': simulated,
                 'real_execution': not simulated and status == 'COMPLETED',
                 'production_pass': False}

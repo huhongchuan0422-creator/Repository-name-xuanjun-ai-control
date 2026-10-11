@@ -38,6 +38,24 @@ class WorkerTests(unittest.TestCase):
         self.assertNotIn('--skip-git-repo-check', args)
         self.assertEqual(args[-1], '-')
         self.assertIn('model_provider="openai"', args)
+    def test_only_explicit_owner_fallback_is_selectable(self):
+        worker = CodexWorker('/usr/bin/codex', self.root.name,
+                             self.root.name, self.root.name + '/codex',
+                             '/usr/bin:/bin', model='gpt-5.6-sol')
+        args = worker.build_argv()
+        self.assertEqual(args[args.index('--model') + 1], 'gpt-5.6-sol')
+        for model in ('gpt-6-astra', 'gpt-6.1', 'openai/*', ''):
+            with self.assertRaises(ValueError):
+                CodexWorker('/usr/bin/codex', self.root.name,
+                            self.root.name, self.root.name + '/codex',
+                            '/usr/bin:/bin', model=model)
+    def test_requested_model_is_not_returned_model_evidence(self):
+        result = self.worker(self.script(self.success_events(
+            'I used gpt-6.1-sol from openai'))).run('test')
+        self.assertEqual(result['requested_model'], MODEL)
+        self.assertEqual(result['model'], 'UNKNOWN')
+        self.assertEqual(result['provider'], 'UNKNOWN')
+        self.assertFalse(result['model_verified'])
 
     def test_environment_does_not_inherit_secrets(self):
         os.environ['TEST_PRODUCTION_SECRET'] = 'never inherit'

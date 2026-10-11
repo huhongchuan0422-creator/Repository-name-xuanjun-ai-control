@@ -9,7 +9,9 @@ CI acceptance is for code only, and requires independent frozen-commit QA.
 
 Integration: claim = ledger.claim(worker_id); pipeline.run(claim, trusted_spec).
 worker_factory(workdir, sandbox) must construct CodexWorker with dedicated HOME,
-CODEX_HOME and model gpt-6.1-sol. Required CI names are configured out of band.
+CODEX_HOME and an Owner-allowed model. Required CI names are configured out of band.
+Actual model/provider require transport evidence; requested CLI selection is
+insufficient. This pipeline never replays a possibly mutating task on fallback.
 Backend methods receive a fence callback and must call it before EVERY external
 operation (including reads). Interrupted in-flight effects require human review.
 """
@@ -19,13 +21,33 @@ import os
 import re
 import subprocess
 
-from codex_worker import MODEL, redact
+from codex_worker import ALLOWED_MODELS, redact
 from execution_ledger import LeaseLost
 
 SHA = re.compile(r'^[0-9a-f]{40}$')
 REPO = re.compile(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
 BLOCKED = re.compile(r'(^|/)(\.env(?:\..*)?|\.ssh|\.aws|\.codex|credentials(?:\..*)?|secrets?(?:\..*)?|id_rsa|id_ed25519)(/|$)|\.(pem|key|p12|pfx)$', re.I)
 MAX_LOG = 16000
+
+
+def model_evidence_reason(result):
+    """Fail closed: selecting --model does not attest actual provider/model.
+
+    Trusted transport adapters may supply verified metadata; model-generated
+    prose or a requested-model label is insufficient. No automatic task replay
+    or fallback is performed here after possible worktree effects.
+    """
+    requested = result.get('requested_model', result.get('model'))
+    if requested not in ALLOWED_MODELS:
+        return 'MODEL_POLICY_MISMATCH'
+    if result.get('status') != 'COMPLETED':
+        return None
+    if (result.get('model_verified') is not True
+            or result.get('provider') != 'openai'
+            or result.get('model') not in ALLOWED_MODELS
+            or result.get('model') != requested):
+        return 'MODEL_EVIDENCE_NOT_VERIFIED'
+    return None
 
 
 class UnknownEffect(RuntimeError):
@@ -373,8 +395,9 @@ class DevelopmentPipeline(object):
                 if worker.sandbox != 'workspace-write' or worker.workdir != checkpoint['workdir']:
                     return end('WAITING_HUMAN', 'WORKER_BOUNDARY_MISMATCH')
                 result = worker.run(prompt, timeout_seconds=spec['timeout_seconds'], heartbeat=heartbeat, lease_check=live)
-                if result.get('model') != MODEL:
-                    return end('WAITING_HUMAN', 'MODEL_POLICY_MISMATCH')
+                reason = model_evidence_reason(result)
+                if reason:
+                    return end('WAITING_HUMAN', reason, 'unknown')
                 checkpoint['simulated'] = checkpoint['simulated'] or bool(result.get('simulated'))
                 checkpoint['real_execution'] = bool(result.get('real_execution')) and not checkpoint['simulated']
                 if result.get('status') != 'COMPLETED' or not result.get('turn_completed'):
@@ -464,7 +487,10 @@ class DevelopmentPipeline(object):
                 checkpoint['real_execution'] = (checkpoint['real_execution']
                                                 and result.get('real_execution') is True
                                                 and not checkpoint['simulated'])
-                if result.get('model') != MODEL or result.get('status') != 'COMPLETED' or not result.get('turn_completed'):
+                reason = model_evidence_reason(result)
+                if reason:
+                    return end('WAITING_HUMAN', 'QA_' + reason, 'unknown')
+                if result.get('status') != 'COMPLETED' or not result.get('turn_completed'):
                     return end('WAITING_HUMAN', 'QA_INCOMPLETE')
                 try:
                     verdict = json.loads(result.get('output', ''))

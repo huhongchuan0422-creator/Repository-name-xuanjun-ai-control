@@ -82,6 +82,8 @@ class Worker(object):
         if self.owner.failure:
             return {'status': 'FAILED', 'model': MODEL}
         return {'status': 'COMPLETED', 'turn_completed': True, 'model': self.owner.model,
+                'requested_model': self.owner.model, 'provider': 'openai',
+                'model_verified': self.owner.model_verified,
                 'simulated': self.owner.simulated, 'real_execution': not self.owner.simulated,
                 'output': json.dumps({'verdict': self.owner.verdict, 'commit': self.owner.qa_sha})}
 
@@ -91,6 +93,7 @@ class Factory(object):
         self.ledger, self.prompts = ledger, []
         self.simulated, self.failure, self.lose_lease = False, False, False
         self.model, self.verdict, self.qa_sha = MODEL, 'PASS', HEAD
+        self.model_verified = True
     def __call__(self, workdir, sandbox):
         return Worker(self, workdir, sandbox)
 
@@ -120,6 +123,33 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(result['state'], 'WAITING_HUMAN')
         self.assertEqual(result['reason'], 'SIMULATED_ACCEPTANCE_ONLY')
         self.assertFalse(result['real_execution'])
+    def test_unverified_model_pauses_before_commit_and_never_replays(self):
+        self.factory.model_verified = False
+        result = self.pipeline.run(self.claim)
+        self.assertEqual(result['state'], 'WAITING_HUMAN')
+        self.assertEqual(result['reason'], 'MODEL_EVIDENCE_NOT_VERIFIED')
+        self.assertNotIn('commit', self.backend.calls)
+        self.assertEqual(self.ledger.cp['phase'], 'IN_FLIGHT_CODEX')
+        self.resume()
+        self.assertEqual(len(self.factory.prompts), 1)
+    def test_verified_sole_fallback_obeys_same_ci_and_qa_gates(self):
+        self.factory.model = 'gpt-5.6-sol'
+        result = self.pipeline.run(self.claim)
+        self.assertEqual(result['state'], 'DONE')
+        self.assertEqual(result['checkpoint']['qa_commit'], HEAD)
+        self.assertFalse(result['production_pass'])
+    def test_unverified_qa_cannot_accept_frozen_commit(self):
+        original = self.factory.__class__.__call__
+        factory = self.factory
+        def worker(workdir, sandbox):
+            if sandbox == 'read-only':
+                factory.model_verified = False
+            return original(factory, workdir, sandbox)
+        self.pipeline.worker_factory = worker
+        result = self.pipeline.run(self.claim)
+        self.assertEqual(result['state'], 'WAITING_HUMAN')
+        self.assertEqual(result['reason'], 'QA_MODEL_EVIDENCE_NOT_VERIFIED')
+        self.assertNotIn('qa_commit', result['checkpoint'])
     def test_backend_simulation_also_blocks_done(self):
         self.backend.simulated = True
         self.assertEqual(self.pipeline.run(self.claim)['state'], 'WAITING_HUMAN')
