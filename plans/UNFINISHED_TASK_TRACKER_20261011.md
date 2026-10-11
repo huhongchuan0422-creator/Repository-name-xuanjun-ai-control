@@ -8,7 +8,7 @@
 
 | 范围 | 当前状态及证据 | 下一动作及依赖 |
 | --- | --- | --- |
-| 英国模型/飞书 | 5.6真实最小推理PASS：精确回复及openai/gpt-5.6-sol返回证据已核实；插件2026.9.9/Codex0.160.0；5.6唯一备用已配置、6.1仍为主 | 验收真实飞书回复及实际模型证据；有界切换、主模型恢复和开发Worker路径仍未完整验收；不重复安装或已成功canary |
+| 英国模型/飞书 | 英国5.6真实最小推理PASS，唯一备用已配置；Owner收到飞书精确验收回复，收发PASS；该飞书消息模型元数据未核实 | 关联该消息运行日志；验收有界切换/主模型恢复及隔离Worker路径，不重复已成功安装或canary |
 | 唯一执行者 | 13:38审计见3个Codex进程；不能据此判断原Work仍在写入 | 核对执行归属/活动与租约，取得唯一生产派发者证据后切换 |
 | 英国隔离 | Docker/containerd active；项目隔离未验证；服务CPU/内存上限infinity | 只读盘点容器、网络、卷、身份和SecretRef；按项目环境增量隔离及资源限制 |
 | CI失败暂停 | 本次候选补齐脱敏失败指纹、同指纹再失败暂停、重复SHA不刷新修复、断点保留3次预算 | 完整CI及冻结提交独立审查；跨子任务共享预算、全生命周期资源预算仍待补齐 |
@@ -30,9 +30,9 @@
 仅受影响路径登记 WAITING_HUMAN；下列是待落实到权威台账的索引，
 不声称这些记录已写入生产数据库。
 
-- UK_FEISHU_REPLY_ACCEPTANCE：英国5.6最小推理已PASS，原403不再作为当前阻塞。
-  Owner已完成受控修复，不需重复安装、白名单修复或5.6 canary。下一人工入口为
-  真实飞书发起验收消息；需要回复及实际模型证据，不能据此宣称闭环PASS。
+- UK_WORKER_ACTIVATION：Owner已完成英国模型修复和飞书收发验收，不再要求重复。
+  新App Server Worker候选已通过本地测试；隔离身份的现有ChatGPT认证、原生协议
+  现场返回证据及每任务OS/cgroup边界仍须核实。该依赖不能阻塞独立盘点/确定性代码任务。
 - TARGET_ACCESS：现场核对韩国目标身份/入口及已有负载；不能把缺少访问证据
   当作缺少Owner授权，也不能宣称已连通。
 - PLATFORM_CONFIRMATION：需要时集中处理交易API新出口IP白名单与平台确认；
@@ -112,3 +112,44 @@ fallback list. Do not repeat the successful installation or minimal 5.6 probe.
 Next model-path acceptance is an Owner-initiated Feishu reply through its actual
 route, with observed model/provider evidence; an echo alone is not a complete
 failover/recovery or autonomous-development E2E acceptance.
+
+## Feishu receipt and worker/control-gate increment — 2026-10-11
+
+Owner posted the actual Feishu reply to the requested marker:
+XJ_FEISHU_56_OK. Owner-observed channel receipt is PASS; the pasted reply has
+no provider/model metadata, so the model used for this Feishu turn remains
+NOT_VERIFIED. This does not establish bounded failover or 6.1 recovery.
+
+Candidate code adds CodexAppServerWorker using the official stdio protocol:
+initialize, account/read (existing managed ChatGPT only), thread/start with
+native resolved model/provider, correlated turn/start and turn/completed.
+It rejects API-key/unknown auth before starting a thread, mismatched/absent
+native model evidence, model reroute, cross-thread/turn events, unapproved
+server requests, delegation/MCP/dynamic tools, duplicate message identities,
+lease loss, timeout and output overflow. It does not copy credentials, log in,
+send channel messages, retry a possibly mutating task or deploy.
+HOME and CODEX_HOME must be canonical and disjoint from the worktree; tool
+read access is restricted and workspace tool networking disabled. External
+per-job OS/cgroup containment and dedicated authentication remain separate
+activation requirements; these must be verified before real code dispatch.
+
+Ordinary CLI-backend tasks now cannot modify their own worker/dispatcher,
+ledger, approval routing, AGENTS/config enforcement, workflow or installer/
+systemd control paths. Both pre-commit index and full pre-push history are
+checked. Reviewed base code remains readable; trusted maintenance remains
+separate from generated code acceptance. Independent security/release review
+is still required; this path check is not a complete four-layer acceptance.
+
+Local regression: 204 tests PASS, including real OS-pipe protocol fixtures.
+Fixtures are explicitly simulated and do not attest a UK Worker inference.
+UK integration/CI for this increment must be checked separately.
+An additive push trigger invokes the existing four-server read-only inventory
+when its workflow changes on this feature branch; production writes are not
+part of that inventory. Runner access, capacity and migration results remain
+unverified until actual job evidence is collected.
+
+Next: verify this candidate on the UK Runner, resolve isolated Worker auth and
+containment, obtain controlled dispatcher activation and independent review,
+then accept two real development tasks with exact-commit CI/QA/checkpoint
+continuation. Do not submit CODEX_EXEC to the old Coordinator.
+Official protocol reference: https://learn.chatgpt.com/docs/app-server.

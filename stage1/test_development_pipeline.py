@@ -324,6 +324,21 @@ class PipelineTest(unittest.TestCase):
 
 
 class CliBackendTest(unittest.TestCase):
+    def test_code_task_cannot_modify_its_own_gates_or_deployment_authority(self):
+        with tempfile.TemporaryDirectory() as temp:
+            backend = CliBackend({'owner/repo': temp}, os.path.join(temp, 'work'),
+                                 os.path.join(temp, 'home'), '/usr/bin', ['unit'])
+            for name in ('stage1/development_pipeline.py', 'stage1/execution_ledger.py',
+                         'stage1/codex_app_server_worker.py', 'stage1/owner_update_router.py',
+                         '.github/workflows/ci.yml', 'scripts/deploy.py', 'nested/AGENTS.md',
+                         'worker.service', '.codex/config.toml'):
+                with self.assertRaises(UnknownEffect):
+                    backend._validate_paths([name], temp, changed=True)
+            # A base repository may contain reviewed enforcement code; only its
+            # mutation is denied. Normal modules remain editable.
+            backend._validate_paths(['stage1/development_pipeline.py'], temp)
+            backend._validate_paths(['module/feature.py'], temp, changed=True)
+
     def test_git_is_argv_only_and_dedicated_environment(self):
         calls = []
         def runner(argv, **kwargs):

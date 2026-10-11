@@ -118,3 +118,44 @@ fallback list. Do not repeat the successful installation or minimal 5.6 probe.
 Next model-path acceptance is an Owner-initiated Feishu reply through its actual
 route, with observed model/provider evidence; an echo alone is not a complete
 failover/recovery or autonomous-development E2E acceptance.
+
+## Feishu receipt and worker/control-gate increment — 2026-10-11
+
+Owner posted the actual Feishu reply to the requested marker:
+XJ_FEISHU_56_OK. Owner-observed channel receipt is PASS; the pasted reply has
+no provider/model metadata, so the model used for this Feishu turn remains
+NOT_VERIFIED. This does not establish bounded failover or 6.1 recovery.
+
+Candidate code adds CodexAppServerWorker using the official stdio protocol:
+initialize, account/read (existing managed ChatGPT only), thread/start with
+native resolved model/provider, correlated turn/start and turn/completed.
+It rejects API-key/unknown auth before starting a thread, mismatched/absent
+native model evidence, model reroute, cross-thread/turn events, unapproved
+server requests, delegation/MCP/dynamic tools, duplicate message identities,
+lease loss, timeout and output overflow. It does not copy credentials, log in,
+send channel messages, retry a possibly mutating task or deploy.
+HOME and CODEX_HOME must be canonical and disjoint from the worktree; tool
+read access is restricted and workspace tool networking disabled. External
+per-job OS/cgroup containment and dedicated authentication remain separate
+activation requirements; these must be verified before real code dispatch.
+
+Ordinary CLI-backend tasks now cannot modify their own worker/dispatcher,
+ledger, approval routing, AGENTS/config enforcement, workflow or installer/
+systemd control paths. Both pre-commit index and full pre-push history are
+checked. Reviewed base code remains readable; trusted maintenance remains
+separate from generated code acceptance. Independent security/release review
+is still required; this path check is not a complete four-layer acceptance.
+
+Local regression: 204 tests PASS, including real OS-pipe protocol fixtures.
+Fixtures are explicitly simulated and do not attest a UK Worker inference.
+UK integration/CI for this increment must be checked separately.
+An additive push trigger invokes the existing four-server read-only inventory
+when its workflow changes on this feature branch; production writes are not
+part of that inventory. Runner access, capacity and migration results remain
+unverified until actual job evidence is collected.
+
+Next: verify this candidate on the UK Runner, resolve isolated Worker auth and
+containment, obtain controlled dispatcher activation and independent review,
+then accept two real development tasks with exact-commit CI/QA/checkpoint
+continuation. Do not submit CODEX_EXEC to the old Coordinator.
+Official protocol reference: https://learn.chatgpt.com/docs/app-server.

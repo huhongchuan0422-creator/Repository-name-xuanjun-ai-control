@@ -28,6 +28,14 @@ SHA = re.compile(r'^[0-9a-f]{40}$')
 REPO = re.compile(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
 BLOCKED = re.compile(r'(^|/)(\.env(?:\..*)?|\.ssh|\.aws|\.codex|credentials(?:\..*)?|secrets?(?:\..*)?|id_rsa|id_ed25519)(/|$)|\.(pem|key|p12|pfx)$', re.I)
 MAX_LOG = 16000
+# Ordinary code tasks cannot rewrite their own dispatch, approval, worker or CI
+# enforcement. Changes here require the separate trusted maintenance/review path.
+PROTECTED_PATHS = frozenset([
+    'stage1/codex_worker.py', 'stage1/codex_app_server_worker.py',
+    'stage1/development_pipeline.py', 'stage1/development_loop.py',
+    'stage1/execution_ledger.py', 'stage1/owner_approval_dispatch.py',
+    'stage1/owner_update_router.py', 'stage1/uk_owner_callback_core.py',
+    'stage1/telegram_owner_request_registry.py'])
 
 
 def model_evidence_reason(result):
@@ -154,10 +162,14 @@ class CliBackend(object):
             raise ValueError('repo not allowed')
         return self.repositories[repo]
 
-    def _validate_paths(self, paths, workdir):
+    def _validate_paths(self, paths, workdir, changed=False):
         for name in paths:
             if not name or name.startswith('/') or '..' in name.split('/') or BLOCKED.search(name):
                 raise UnknownEffect('restricted file path')
+            if changed and (name in PROTECTED_PATHS or name.startswith(('.github/', 'scripts/'))
+                            or os.path.basename(name) in ('AGENTS.md', 'requirements.toml', 'config.toml')
+                            or name.endswith(('.service', '.socket', '.timer', '.sudoers'))):
+                raise UnknownEffect('protected control path requires independent maintenance')
             full = os.path.join(workdir, name)
             if os.path.lexists(full) and (os.path.islink(full) or
                     os.path.commonpath([os.path.realpath(full), workdir]) != workdir):
@@ -189,11 +201,11 @@ class CliBackend(object):
             raise UnknownEffect('worker changed commit history')
         expected_sha = expected_sha or current_head
         changed = self._git(['ls-files', '--modified', '--others', '--exclude-standard', '-z'], workdir, fence).split('\0')
-        self._validate_paths([p for p in changed if p], workdir)
+        self._validate_paths([p for p in changed if p], workdir, changed=True)
         self._git(['add', '--all', '--', '.'], workdir, fence)
         # Verify index as well: Codex may have staged restricted files itself.
         indexed = self._git(['diff', '--cached', '--name-only', '-z'], workdir, fence).split('\0')
-        self._validate_paths([p for p in indexed if p], workdir)
+        self._validate_paths([p for p in indexed if p], workdir, changed=True)
         if not any(indexed):
             raise UnknownEffect('no code change to accept')
         self._git(['-c', 'user.name=Codex Worker', '-c', 'user.email=codex-worker@localhost',
@@ -215,7 +227,7 @@ class CliBackend(object):
         for commit in commits:
             names = self._git(['diff-tree', '--root', '--no-commit-id', '-r',
                                '--name-only', '-z', commit], workdir, fence).split('\0')
-            self._validate_paths([p for p in names if p], workdir)
+            self._validate_paths([p for p in names if p], workdir, changed=True)
             diff = self._git(['show', '--format=', '--no-ext-diff', '--no-textconv',
                               '--unified=0', commit], workdir, fence)
             for line in diff.splitlines():
