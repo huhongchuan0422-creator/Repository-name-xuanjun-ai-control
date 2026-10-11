@@ -14,6 +14,35 @@ REQUIRED = {'id', 'state', 'fence', 'updated'}
 OPTIONAL = ('lease_owner', 'lease_until', 'checkpoint', 'depends')
 
 
+def _task(row, selected, now):
+    task = dict(zip(selected, row))
+    for key in ('checkpoint', 'depends'):
+        if key in task:
+            try:
+                task[key] = json.loads(task[key])
+            except (ValueError, TypeError):
+                task[key] = None
+    # Expose only bounded checkpoint metadata, never prompts or free-form logs.
+    cp = task.get('checkpoint')
+    patterns = {'phase': r'[A-Z_]{1,40}', 'commit': r'[a-f0-9]{40}',
+                'sha': r'[a-f0-9]{40}', 'qa_commit': r'[a-f0-9]{40}',
+                'ci': r'(PASS|FAIL|PENDING|UNKNOWN|passed|failed)',
+                'qa': r'(PASS|FAIL|PENDING|UNKNOWN|passed|failed)',
+                'reason': r'[A-Z_]{1,80}', 'error_code': r'[A-Z_]{1,80}'}
+    task['checkpoint'] = {k: cp[k] for k, pattern in patterns.items()
+                          if isinstance(cp.get(k), str) and re.fullmatch(pattern, cp[k])} if isinstance(cp, dict) else {}
+    # Keep the original pipeline evidence and support existing dashboard clients.
+    for source, alias in (('sha', 'commit'), ('reason', 'error_code')):
+        if source in task['checkpoint'] and alias not in task['checkpoint']:
+            task['checkpoint'][alias] = task['checkpoint'][source]
+    # Database RUNNING is a lease claim, not evidence of continued execution.
+    task['execution_evidence'] = 'UNKNOWN'
+    if task['state'] == 'RUNNING':
+        lease = task.get('lease_until')
+        task['lease_status'] = 'VALID' if isinstance(lease, (int, float)) and lease > now else 'STALE_OR_UNKNOWN'
+    return task
+
+
 def snapshot(path, now=None, limit=200):
     if type(limit) is not int or not 1 <= limit <= 500:
         raise ValueError('invalid limit')
@@ -32,32 +61,12 @@ def snapshot(path, now=None, limit=200):
         rows = db.execute('SELECT ' + ','.join(selected) +
                           ' FROM tasks ORDER BY updated DESC,id LIMIT ?', (limit,)).fetchall()
         counts = dict(db.execute('SELECT state,COUNT(*) FROM tasks GROUP BY state'))
-        tasks = []
-        for row in rows:
-            task = dict(zip(selected, row))
-            for key in ('checkpoint', 'depends'):
-                if key in task:
-                    try:
-                        task[key] = json.loads(task[key])
-                    except (ValueError, TypeError):
-                        task[key] = None
-            if isinstance(task.get('checkpoint'), dict):
-                # Do not publish arbitrary prompts, logs, credentials or customer data.
-                cp = task['checkpoint']
-                patterns = {'phase': r'[A-Z_]{1,40}', 'commit': r'[a-f0-9]{40}',
-                            'ci': r'(PASS|FAIL|PENDING|UNKNOWN|passed|failed)',
-                            'qa': r'(PASS|FAIL|PENDING|UNKNOWN|passed|failed)',
-                            'error_code': r'[A-Z_]{1,80}'}
-                task['checkpoint'] = {k: cp[k] for k, pattern in patterns.items()
-                                      if isinstance(cp.get(k), str) and re.fullmatch(pattern, cp[k])}
-            else:
-                task['checkpoint'] = {}
-            # Database RUNNING is a lease claim, not evidence of continued execution.
-            task['execution_evidence'] = 'UNKNOWN'
-            if task['state'] == 'RUNNING':
-                lease = task.get('lease_until')
-                task['lease_status'] = 'VALID' if isinstance(lease, (int, float)) and lease > now else 'STALE_OR_UNKNOWN'
-            tasks.append(task)
+        tasks = [_task(row, selected, now) for row in rows]
+        # Human work must not disappear when newer automated tasks fill the
+        # recent-task window. Read the entire queue in the same transaction.
+        human_rows = db.execute('SELECT ' + ','.join(selected) +
+                                " FROM tasks WHERE state='WAITING_HUMAN' ORDER BY updated DESC,id").fetchall()
+        human_queue = [_task(row, selected, now) for row in human_rows]
         tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         heartbeats = []
         if 'worker_heartbeats' in tables:
@@ -76,8 +85,11 @@ def snapshot(path, now=None, limit=200):
                 'heartbeats': heartbeats, 'last_completed_at': done,
                 'services': {'openclaw': 'UNKNOWN', 'codex_model_access': 'UNKNOWN',
                              'github_runner': 'UNKNOWN', 'telegram': 'UNKNOWN'},
-                'model': 'openai/gpt-6.1-sol', 'fallbacks': 0,
-                'human_queue': [t for t in tasks if t['state'] == 'WAITING_HUMAN']}
+                'model_policy': {'primary': 'openai/gpt-6.1-sol',
+                                 'fallbacks': ['openai/gpt-5.6-sol'],
+                                 'source': 'OWNER_CONFIGURATION_INTENT'},
+                'model': 'UNKNOWN', 'fallbacks': None,
+                'human_queue': human_queue}
     finally:
         db.close()
 

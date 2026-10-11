@@ -2,14 +2,15 @@
 import copy
 import json
 import os
+import sqlite3
 import subprocess
 import tempfile
 import unittest
 
 from codex_worker import MODEL
 from development_pipeline import (DevelopmentPipeline, CliBackend, UnknownEffect,
-                                  digest_spec, safe_text)
-from execution_ledger import LeaseLost
+                                  digest_spec, safe_text, failure_fingerprint)
+from execution_ledger import ExecutionLedger, LeaseLost
 
 BASE = 'a' * 40
 HEAD = 'b' * 40
@@ -133,6 +134,14 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(self.backend.calls.count('prepare'), 1)
     def test_three_patch_attempts_are_bounded_and_logs_redacted(self):
         self.backend.status = 'FAIL'
+        # Different failing commits and diagnostics permit bounded progress.
+        def commit(repo, workdir, branch, fence, expected_sha=None):
+            self.backend.hit('commit', fence)
+            return '%040x' % self.backend.calls.count('commit')
+        def logs(repo, workdir, sha, fence):
+            self.backend.hit('logs', fence)
+            return 'password=do-not-leak\nassert failed at case ' + sha[-1]
+        self.backend.commit, self.backend.failure_logs = commit, logs
         result = self.pipeline.run(self.claim)
         for _ in range(3):
             self.assertEqual(result['reason'], 'PATCH_READY')
@@ -141,6 +150,82 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(result['reason'], 'PATCH_LIMIT_REACHED')
         self.assertEqual(len(self.factory.prompts), 4)
         self.assertNotIn('read-only', [p[0] for p in self.factory.prompts])
+        self.assertEqual(self.ledger.cp['patch_attempts'], 3)
+        self.assertEqual(len(self.ledger.cp['ci_failures']), 4)
+
+    def test_same_failure_after_one_patch_pauses_without_more_model_turns(self):
+        self.backend.status = 'FAIL'
+        def commit(repo, workdir, branch, fence, expected_sha=None):
+            self.backend.hit('commit', fence)
+            return '%040x' % self.backend.calls.count('commit')
+        self.backend.commit = commit
+        first = self.pipeline.run(self.claim)
+        self.assertEqual(first['reason'], 'PATCH_READY')
+        second = self.resume()
+        self.assertEqual(second['state'], 'WAITING_HUMAN')
+        self.assertEqual(second['reason'], 'REPEATED_CI_FAILURE')
+        self.assertEqual(second['checkpoint']['failure_fingerprint_count'], 2)
+        self.assertEqual(second['checkpoint']['patch_attempts'], 1)
+        self.assertEqual(len(self.factory.prompts), 2)
+        self.assertFalse(second['production_pass'])
+        # Manual resume must not reinterpret the same failing SHA as new work.
+        self.assertEqual(self.resume()['reason'], 'REPEATED_CI_FAILURE')
+        self.assertEqual(len(self.factory.prompts), 2)
+        self.assertEqual(self.ledger.cp['failure_fingerprint_count'], 2)
+
+    def test_empty_failure_evidence_does_not_trigger_blind_patch_or_model_fallback(self):
+        for log in ('', ' \n ', None, '2026-10-11T06:20:21.000Z ' + HEAD):
+            self.setUp()
+            self.backend.status = 'FAIL'
+            self.backend.failure_logs = lambda *args: log
+            result = self.pipeline.run(self.claim)
+            self.assertEqual(result['state'], 'WAITING_HUMAN')
+            self.assertEqual(result['reason'], 'CI_FAILURE_EVIDENCE_MISSING')
+            self.assertIsNone(result['checkpoint']['failure_fingerprint'])
+            self.assertEqual(result['checkpoint']['patch_attempts'], 0)
+            self.assertEqual(len(self.factory.prompts), 1)
+
+    def test_invalid_patch_budget_cannot_be_reset_by_checkpoint(self):
+        for attempts in (-1, 4, True, '0'):
+            self.claim['checkpoint'] = {'phase': 'NEW', 'patch_attempts': attempts}
+            self.assertEqual(self.pipeline.run(self.claim)['reason'], 'PATCH_BUDGET_INVALID')
+        self.assertFalse(self.backend.calls)
+
+    def test_failure_fingerprint_normalizes_only_timestamp_and_current_commit(self):
+        a = failure_fingerprint('2026-10-11T06:20:21.100Z error case 17 ' + HEAD, HEAD)
+        b = failure_fingerprint('2026-10-12T08:21:22.100Z error case 17 ' + BASE, BASE)
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, failure_fingerprint('error case 18 ' + BASE, BASE))
+        self.assertEqual(failure_fingerprint('password=one\nassert failed', HEAD),
+                         failure_fingerprint('password=two\nassert failed', HEAD))
+
+    def test_real_ledger_roundtrip_preserves_failure_and_patch_budget(self):
+        from test_execution_ledger import SCHEMA
+        with tempfile.TemporaryDirectory() as temp:
+            path = os.path.join(temp, 'tasks.db')
+            with sqlite3.connect(path) as conn:
+                conn.executescript(SCHEMA)
+                conn.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)',
+                             ('T-1', 'CODEX_EXEC', 'PENDING', '[]', None, None, 0, '{}', 0))
+            ledger = ExecutionLedger(path, ['owner/repo'])
+            ledger.register_spec('T-1', self.claim['spec'], 'owner', True)
+            factory = Factory(ledger)
+            pipeline = DevelopmentPipeline(ledger, self.backend, factory, ['owner/repo'])
+            claim = ledger.claim('worker', ttl=180)
+            self.backend.status = 'FAIL'
+            first = pipeline.run(claim)
+            persisted = ledger.observation('T-1')['checkpoint']
+            self.assertEqual(persisted, first['checkpoint'])
+            self.assertEqual(persisted['patch_attempts'], 1)
+            # A fresh pipeline process continues the persisted repair budget.
+            claim['checkpoint'] = persisted
+            self.backend.commit = lambda *args, **kwargs: 'c' * 40
+            second = DevelopmentPipeline(ledger, self.backend, factory, ['owner/repo']).run(claim)
+            self.assertEqual(second['reason'], 'REPEATED_CI_FAILURE')
+            snapshot = ledger.observation('T-1')
+            self.assertEqual(snapshot['state'], 'WAITING_HUMAN')
+            self.assertEqual(snapshot['checkpoint']['patch_attempts'], 1)
+            self.assertEqual(snapshot['checkpoint']['failure_fingerprint_count'], 2)
     def test_checkpoint_reconciles_pr_before_resuming(self):
         self.backend.status = 'PENDING'
         self.pipeline.run(self.claim)

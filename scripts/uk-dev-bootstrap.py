@@ -18,8 +18,8 @@ import subprocess
 import tempfile
 
 SOURCE_COMMIT = '8b4a67d9a75a63a880172becefd6d22851edd4c3'
-MANIFEST = {'owner_dashboard.py': '4c61b2fe8ccbdbdbeba70976580526f20d9dff8eb63d3f6d5739b499715b5faf',
-            'owner_dashboard.html': '0020c15849acbde3fd215e85a1940114a8740a9ed587fac4a54737b805d467d1'}
+MANIFEST = {'owner_dashboard.py': 'b94bb793d554811b3f2147b2d91f3beb6c273ef46fcbdd2cc50d471432c146d6',
+            'owner_dashboard.html': '70f285c1335016f11ba17a51ab33d04d1a74380caaee3abb64fc74923f73584f'}
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
 RELEASE = '/opt/xuanjun-uk-control/release'
 TOKEN = '/home/xuanjun_dev/.config/xuanjun/owner-dashboard-token'

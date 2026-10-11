@@ -36,6 +36,27 @@ def safe_text(value):
     return redact(str(value))[:MAX_LOG]
 
 
+def failure_fingerprint(log, sha):
+    """Compare bounded, redacted diagnostics, not run timestamps/commit IDs.
+
+    Missing diagnostics do not become a shared UNKNOWN failure fingerprint.
+    Other numbers, paths and assertion messages remain significant to avoid
+    conflating distinct failures. Only the current frozen SHA is normalized.
+    """
+    if not isinstance(log, str):
+        return None
+    text = safe_text(log)
+    text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
+    text = re.sub(r'\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})\b',
+                  '<timestamp>', text)
+    text = text.replace(sha, '<commit>')
+    text = '\n'.join(line.strip() for line in text.splitlines() if line.strip())
+    if not text or not re.search(r'[A-Za-z0-9]', text.replace('<timestamp>', '').replace('<commit>', '')
+                                 .replace('[REDACTED]', '')):
+        return None
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
 def digest_spec(spec):
     return hashlib.sha256(json.dumps(spec, sort_keys=True, separators=(',', ':'),
                                      ensure_ascii=False).encode('utf-8')).hexdigest()
@@ -311,6 +332,11 @@ class DevelopmentPipeline(object):
                     'simulated': bool(checkpoint.get('simulated'))}
         try:
             fence()
+            attempts = checkpoint.get('patch_attempts', 0)
+            if isinstance(attempts, bool) or not isinstance(attempts, int) or not 0 <= attempts <= 3:
+                return end('WAITING_HUMAN', 'PATCH_BUDGET_INVALID', 'unknown')
+            if checkpoint.get('phase') == 'NEW' and any(key in checkpoint for key in ('workdir', 'sha', 'pr')):
+                return end('WAITING_HUMAN', 'CHECKPOINT_IDENTITY_MISMATCH', 'unknown')
             if checkpoint and checkpoint.get('phase') != 'NEW':
                 if (checkpoint.get('spec_digest') != identity or checkpoint.get('branch') != branch
                         or checkpoint.get('spec_hash') != claim['spec_hash']):
@@ -328,11 +354,13 @@ class DevelopmentPipeline(object):
                         return end('PAUSED_RESOURCE', 'RESOURCE_NOT_READY', 'none')
                 save('IN_FLIGHT_PREPARE')
                 checkpoint['workdir'] = self.backend.prepare(repo, trusted_spec['base_sha'], branch, fence)
-                checkpoint.update({'patch_attempts': 0, 'simulated': bool(getattr(self.backend, 'simulated', False)),
+                checkpoint.update({'patch_attempts': attempts, 'simulated': bool(getattr(self.backend, 'simulated', False)),
                                    'real_execution': False})
                 save('PREPARED')
             phase = checkpoint['phase']
             if phase in ('PREPARED', 'PATCH_READY'):
+                if phase == 'PATCH_READY' and not 1 <= checkpoint['patch_attempts'] <= 3:
+                    return end('WAITING_HUMAN', 'PATCH_BUDGET_INVALID')
                 prompt = ('Implement the approved task below. Do not merge, deploy, read secrets, change git remotes, '
                           'or alter infrastructure/production. Only edit this isolated worktree. '\
                           'Commit is performed by the control plane.\n\n' + trusted_spec['instructions'])
@@ -387,9 +415,30 @@ class DevelopmentPipeline(object):
                 if checks.get('sha') != checkpoint['sha'] or status not in ('PASS', 'FAIL'):
                     return end('WAITING_HUMAN', 'CI_UNKNOWN', 'unknown')
                 if status == 'FAIL':
-                    if checkpoint['patch_attempts'] >= 3:
-                        return end('WAITING_HUMAN', 'PATCH_LIMIT_REACHED')
-                    checkpoint['failure_log'] = safe_text(self.backend.failure_logs(repo, checkpoint['workdir'], checkpoint['sha'], fence))
+                    # A resumed/repolled failing commit is the same observation,
+                    # not another failure or a fresh repair allowance.
+                    if checkpoint.get('last_failed_sha') == checkpoint['sha']:
+                        return end('WAITING_HUMAN', checkpoint.get('failure_stop_reason')
+                                   or 'CI_FAILURE_ALREADY_OBSERVED')
+                    log = self.backend.failure_logs(repo, checkpoint['workdir'], checkpoint['sha'], fence)
+                    checkpoint['failure_log'] = safe_text(log) if isinstance(log, str) else ''
+                    fingerprint = failure_fingerprint(checkpoint['failure_log'], checkpoint['sha'])
+                    count = (checkpoint.get('failure_fingerprint_count', 0) + 1
+                             if fingerprint and fingerprint == checkpoint.get('failure_fingerprint') else 1)
+                    checkpoint.update({'last_failed_sha': checkpoint['sha'],
+                                       'failure_fingerprint': fingerprint,
+                                       'failure_fingerprint_count': count if fingerprint else 0})
+                    history = list(checkpoint.get('ci_failures', []))[-3:]
+                    history.append({'sha': checkpoint['sha'], 'fingerprint': fingerprint,
+                                    'patch_attempts': checkpoint['patch_attempts']})
+                    checkpoint['ci_failures'] = history
+                    stop = ('CI_FAILURE_EVIDENCE_MISSING' if fingerprint is None else
+                            'REPEATED_CI_FAILURE' if count >= 2 else
+                            'PATCH_LIMIT_REACHED' if checkpoint['patch_attempts'] >= 3 else None)
+                    if stop:
+                        checkpoint['failure_stop_reason'] = stop
+                        return end('WAITING_HUMAN', stop)
+                    checkpoint.pop('failure_stop_reason', None)
                     checkpoint['patch_attempts'] += 1
                     save('PATCH_READY')
                     # Run returns after one attempt; scheduler resumes the same
