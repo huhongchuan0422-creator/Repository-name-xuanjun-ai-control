@@ -16,7 +16,7 @@ Owner explicitly requires GitHub to be the *sole relay* between the ordinary Cha
 
 ## Quota and failure gates
 
-See `plans/UK_SCRIPT_FIRST_QUOTA_POLICY_20261012.md` and `plans/UK_REPEATED_ERROR_30_60_MIN_STOP_POLICY_20261012.md`. All mechanical event processing must use scripts at zero inference. At 30% of verified Codex period usage prefer independently verified non-Codex ordinary ChatGPT chat; if its quota is verified exhausted and the comparable daily total <50%, Codex OAuth may resume. At 50% verified daily total, stop development inference through the next Asia/Shanghai day pending fresh meter. Non-comparable, unknown meters or chat eligibility => HOLD. Same error 30 minutes => Owner report + evaluate alternative; 60 minutes => stop original strategy, require changed method and review.
+See `plans/UK_SCRIPT_FIRST_QUOTA_POLICY_20261012.md` and `plans/UK_REPEATED_ERROR_30M_60M_POLICY_20261012.md`. All mechanical event processing must use scripts at zero inference. At 30% of verified Codex period usage prefer independently verified non-Codex ordinary ChatGPT chat; if its quota is verified exhausted and the comparable daily total <50%, Codex OAuth may resume. At 50% verified daily total, stop development inference through the next Asia/Shanghai day pending fresh meter. Non-comparable, unknown meters or chat eligibility => HOLD. Same error 30 minutes => Owner report + evaluate alternative; 60 minutes => stop original strategy, require changed method and review.
 
 ## Existing project truth
 
