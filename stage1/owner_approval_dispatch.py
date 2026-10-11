@@ -56,10 +56,16 @@ def prepare(dbpath, owner_id, owner_chat, now=None, ttl=900):
                   (task_id,fence,channel,created_at,request_id)
                   VALUES(?,?,'TELEGRAM',?,?)""",(task_id,fence,now,request_id))
                 created+=1
-            elif current[0]=='PENDING' and current[1]!=request_id:
-                db.execute("""UPDATE owner_notification_outbox SET request_id=?
+            elif current[1]!=request_id:
+                # A delivered request can expire while its task remains pending.
+                # Reopen outbox ONLY for a new registered request; never resend
+                # an already ACKED, still-valid request on each scheduler tick.
+                db.execute("""UPDATE owner_notification_outbox
+                   SET request_id=?,state='PENDING',ack_message_id=NULL,last_error=NULL,
+                       created_at=?
                    WHERE task_id=? AND fence=? AND channel='TELEGRAM'""",
-                   (request_id,task_id,fence))
+                   (request_id,now,task_id,fence))
+                created+=1
         db.execute('COMMIT')
         return created
     except BaseException:
