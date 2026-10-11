@@ -1,0 +1,22 @@
+name: Stage1 Owner Notification Outbox Checks
+on:
+  pull_request:
+    paths:
+      - 'stage1/owner_notification_outbox.py'
+      - 'stage1/test_owner_notification_outbox.py'
+      - '.github/workflows/stage1-owner-outbox-checks.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests
+        run: |
+          python -m py_compile stage1/owner_notification_outbox.py stage1/test_owner_notification_outbox.py
+          cd stage1
+          python -m unittest -v test_owner_notification_outbox
