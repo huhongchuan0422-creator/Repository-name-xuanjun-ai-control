@@ -14,7 +14,7 @@ import tempfile
 
 ROOT = '/home/xuanjun_dev'
 BASE = ROOT + '/uk-stage1-minimal'
-DEST = '/var/lib/xuanjun/contract-export'
+DEST = '/var/lib/xuanjun-contract-export'
 SAFE_STRINGS = {'request_id','task_id','fence','update_id','decision','owner_user_id','owner_chat_id',
                 'owner_id','owner_chat','APPROVE','REJECT','PENDING','RUNNING','WAITING_HUMAN',
                 'DONE','FAILED','PAUSED_RESOURCE','accepted','Authorization','X-Xuanjun-Signature',
@@ -150,4 +150,6 @@ def main():
     print('UK_CONTRACT_EXPORT=PASS')
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try:main()
+    except Exception:raise SystemExit('CONTRACT_EXPORT_FAILED_NO_RAW_DIAGNOSTICS')

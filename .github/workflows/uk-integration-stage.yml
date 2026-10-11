@@ -39,7 +39,7 @@ jobs:
             python3 - <<'PY'
           import json
           for name in ['uk','tokyo']:
-              path='/var/lib/xuanjun/contract-export/'+name+'.json'
+              path='/var/lib/xuanjun-contract-export/'+name+'.json'
               with open(path) as stream: obj=json.load(stream)
               print('LIVE_CONTRACT_'+name.upper()+'='+json.dumps(obj))
           PY
