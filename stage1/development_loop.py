@@ -6,9 +6,10 @@ that unit tests are production work. A verified pipeline_factory is mandatory.
 """
 import threading
 import time
+import re
 from concurrent.futures import ThreadPoolExecutor
 
-from execution_ledger import LeaseLost
+from execution_ledger import LeaseLost, SchemaMismatch
 
 
 class DevelopmentLoop(object):
@@ -27,10 +28,16 @@ class DevelopmentLoop(object):
     def _blocked(self, claim, reason):
         ids = (claim['task_id'], claim['worker_id'], claim['fence'])
         try:
-            observed = self.ledger.observation(claim['task_id'])
-            cp = dict(observed['checkpoint'])
-            cp['error_code'] = reason
-            self.ledger.checkpoint(*(ids + (cp,)))
+            try:
+                observed = self.ledger.observation(claim['task_id'])
+            except SchemaMismatch:
+                raise
+            except ValueError:
+                observed = None
+            if observed is not None:
+                cp = dict(observed['checkpoint'])
+                cp['error_code'] = reason
+                self.ledger.checkpoint(*(ids + (cp,)))
             self.ledger.finish(*(ids + ('WAITING_HUMAN',)), effects='unknown')
         except LeaseLost:
             pass
@@ -72,7 +79,7 @@ class DevelopmentLoop(object):
                     continue
             try:
                 phase = claim.get('checkpoint', {}).get('phase', 'EXECUTING')
-                if not isinstance(phase, str) or not phase.isupper() or len(phase) > 32:
+                if not isinstance(phase, str) or not re.fullmatch(r'[A-Z][A-Z0-9_]{0,31}', phase):
                     phase = 'EXECUTING'
                 self.ledger.heartbeat(*ids, ttl=180, phase=phase)
             except LeaseLost:
