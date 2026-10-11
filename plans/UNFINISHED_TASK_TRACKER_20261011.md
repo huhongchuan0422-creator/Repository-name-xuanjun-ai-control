@@ -382,3 +382,14 @@ Work任务源提交/Runner交付与英国执行方实际接收/启动分开登�
 独立QA/安全须针对新冻结组合候选复审；现场二进制/身份/broker/unit停止/epoch/
 canonical DB/WAL恢复及HTTPS仍HOLD，修复阶段无生产切换授权。完整安全报告
 缺失仅阻塞该证据项；可独立实现/审查的新设计继续，人工平台节点集中处理。
+
+
+## 18:16 receipt update: A1/A2 running after manual activation
+
+This supersedes the earlier NOT_VERIFIED start status for this bounded repair only. Exact receipt: evidence/uk-intake/OWNER_RELAYED_REPAIR_START_20261011.json.
+
+- Source/spec remain 76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b / deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a.
+- UK main reports A1 and A2 STARTED, openai/gpt-5.6-sol OAuth/Codex, independent a1/a2 directories, no current development blocker. Evidence is Owner-relayed, not independently inspected process state.
+- B waits for A2_CONTRACT_FREEZE; C still NOT_STARTED. Failed release candidate and failure budget/checkpoints are preserved. No duplicate task creation or redispatch is permitted.
+- Automatic Runner→OpenClaw intake remains NOT_DEPLOYED / NOT_ACCEPTED. Work will develop the bounded intake increment separately from A1/A2 files: detect approved source, validate spec digest, wake main coordinator only, and record durable idempotent receipt/start. Import the current manual receipt first. A changed documentation SHA with identical task/spec must never restart it.
+- Production admission remains HOLD; no DB, old Coordinator, trading permission or formal Webhook mutation was reported. No new Owner server command is requested at this code-development stage.

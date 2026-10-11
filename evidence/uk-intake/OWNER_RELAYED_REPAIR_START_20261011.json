@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-11T18:16:06+08:00",
+  "evidence_source": "OWNER_RELAYED_OPENCLAW_RECEIPT",
+  "independent_host_probe": false,
+  "server": "iZd7oeikknn1z21sq6ji6zZ",
+  "control_source_sha": "76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b",
+  "spec_sha256": "deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "actual_model": "openai/gpt-5.6-sol",
+  "auth_route": "EXISTING_OAUTH_CODEX_OWNER_REPORTED",
+  "trigger": "OWNER_FEISHU_MANUAL",
+  "roles": [
+    {
+      "role": "A1",
+      "agent": "/root/repair_a1",
+      "workdir": "/home/xuanjun_dev/xuanjun-uk-repair-20261011/a1",
+      "state": "STARTED",
+      "blocker": null
+    },
+    {
+      "role": "A2",
+      "agent": "/root/repair_a2",
+      "workdir": "/home/xuanjun_dev/xuanjun-uk-repair-20261011/a2",
+      "state": "STARTED",
+      "blocker": null
+    },
+    {
+      "role": "B",
+      "state": "NOT_STARTED",
+      "dependency": "A2_CONTRACT_FREEZE"
+    },
+    {
+      "role": "C",
+      "state": "NOT_STARTED",
+      "dependency": "REAL_RELEASE_ADMISSION"
+    }
+  ],
+  "checkpoint": "SOURCE_AND_FAILED_CANDIDATE_BASELINE_PRESERVED_OLD_RETRY_NOT_RESUMED",
+  "production_mutation": "NONE_OWNER_REPORTED",
+  "automatic_intake": "NOT_DEPLOYED_NOT_ACCEPTED",
+  "redispatch_same_spec": false
+}

@@ -16,7 +16,13 @@ OPENCLAW_CANDIDATE_ARTIFACT_RECEIPT=PATCH_TREE_MANIFEST_VERIFIED
 OPENCLAW_CODE_QA=FAIL
 OPENCLAW_SECURITY=FAIL_OWNER_REPORTED
 OPENCLAW_OLD_RETRY_PATH=HOLD_CHECKPOINT_OWNER_REPORTED
-OPENCLAW_NEW_REPAIR_STARTED=NOT_VERIFIED
+OPENCLAW_NEW_REPAIR_STARTED=A1_A2_STARTED_OWNER_RELAYED
+OPENCLAW_REPAIR_CONTROL_SHA=76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b
+OPENCLAW_REPAIR_SPEC_SHA256=deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a
+OPENCLAW_REPAIR_TRIGGER=OWNER_FEISHU_MANUAL
+RUNNER_TO_OPENCLAW_AUTOMATIC_INTAKE=NOT_DEPLOYED_NOT_ACCEPTED
+OPENCLAW_REPAIR_B=WAITING_A2_CONTRACT_FREEZE
+OPENCLAW_REPAIR_C=NOT_STARTED_UNTIL_RELEASE_ADMISSION
 STAGE1_RELEASE_ADMISSION=HOLD
 STAGE0_FULL_INVENTORY=NOT_VERIFIED
 STAGE1_PRODUCTION_E2E=PARTIAL
@@ -86,3 +92,9 @@ Independent ready tasks continue; an affected human dependency is recorded with
 reason, checkpoint and next action. Assignment, admission, lease acquisition,
 actual start and E2E completion must be reported as distinct states.
 
+
+## Bounded repair receipt — 2026-10-11 18:16 Asia/Shanghai
+
+Owner relayed the UK OpenClaw receipt binding control SHA 76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b and spec SHA256 deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a. A1 /root/repair_a1 and A2 /root/repair_a2 report STARTED in independent directories with openai/gpt-5.6-sol via existing OAuth/Codex. Agent names are session identifiers, not evidence of OS root execution. This is an Owner-relayed execution receipt, not an independent host probe. B waits for A2 contract freeze; C remains NOT_STARTED. Preserve this exact active source/spec and old failure budget/checkpoint; subsequent documentation commits do not restart this execution.
+
+The automatic chain is separate: Runner source pickup is verified, but automatic intake/wakeup/persistent receipt is not deployed or accepted. Work's intake increment must deduplicate identical parent task/spec bytes across later control commits, retaining each control SHA as a receipt binding; it must import this manual start as an already-accepted receipt without another wakeup. No old Coordinator CODEX_EXEC or production write is authorized by intake.
