@@ -26,7 +26,7 @@ jobs:
           python -m unittest -v test_owner_notification_outbox test_owner_approval_dispatch test_uk_owner_notify_worker
 
   uk-stage-for-manual-install:
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
