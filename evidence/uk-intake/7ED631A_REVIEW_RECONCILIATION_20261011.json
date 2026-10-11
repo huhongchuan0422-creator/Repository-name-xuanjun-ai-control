@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "source": "GITHUB_EXECUTOR_COMMENTS_AND_OWNER_RELAYS",
+  "recorded_at": "2026-10-11T20:53:38+08:00",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "control_sha": "cf69512bcc4f35b2897456124b9fd0dd8c16e794",
+  "resumed_receipt": 6109208050,
+  "frozen_receipt": 6109204309,
+  "security_correction_receipt": 6109228044,
+  "commit": "7ed631aabe240321656287bbd0c8ca546814c37c",
+  "tree": "aee5715e2a9bcba4fa90b40cfa4c0b3f5be40e87",
+  "isolated_regression": "248_OF_248_PASS_REPORTED",
+  "qa": "PASS_REPORTED",
+  "security": "FAIL_CORRECTED",
+  "source_repair_needed": true,
+  "broker_gate": "NOT_ACCEPTED",
+  "artifact_bytes_received": false,
+  "github_commit_resolution": "404_LOCAL_ONLY",
+  "deployment": false,
+  "accepted": false,
+  "actual_native_artifact_model": "NOT_VERIFIED",
+  "cost": "UNKNOWN",
+  "retained_reports": {
+    "6109204309": "SUPERSEDED_SECURITY_PASS",
+    "6109208050": "EARLIER_PHASE_RECEIPT",
+    "6109228044": "GOVERNING_CORRECTED_SECURITY_FAIL"
+  }
+}

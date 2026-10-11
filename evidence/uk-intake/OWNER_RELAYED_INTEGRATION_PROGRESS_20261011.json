@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-11T19:31:59+08:00",
+  "evidence_source": "OWNER_RELAYED_OPENCLAW_HOST_INSPECTION",
+  "independent_host_probe": false,
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "server": "iZd7oeikknn1z21sq6ji6zZ",
+  "active_control_source_sha": "76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b",
+  "active_spec_sha256": "deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a",
+  "roles": {
+    "A1": {
+      "state": "DONE_OWNER_REPORTED",
+      "reported_commit": "ae72ec7405540a59e63273a5711ed8f38e66b20e",
+      "artifact_received": false
+    },
+    "A2": {
+      "state": "DONE_FROZEN_OWNER_REPORTED",
+      "reported_abbreviated_commit": "9df09fa",
+      "full_commit": "NOT_RECEIVED",
+      "artifact_received": false
+    },
+    "B": {
+      "state": "IMPLEMENTATION_REPORTED_TEST_SCOPE_HOLD",
+      "reported_commit": "fb2cc9081fa8d215bf186046b53bae9b9334ad7b",
+      "working_tree": "DIRTY",
+      "uncommitted_test_files": 2,
+      "untracked_cache_reported": true,
+      "final_frozen_artifact": false,
+      "executor_receipt_after_scope_extension": "NOT_VERIFIED"
+    },
+    "INDEPENDENT_QA": {
+      "state": "NOT_STARTED_OWNER_REPORTED"
+    },
+    "SECURITY": {
+      "state": "NOT_STARTED_OWNER_REPORTED"
+    },
+    "C": {
+      "state": "NOT_STARTED_UNTIL_REAL_RELEASE_ADMISSION"
+    }
+  },
+  "reported_regression": {
+    "total": 248,
+    "passed": 241,
+    "failed": 3,
+    "errors": 4,
+    "work_reproduced": false
+  },
+  "reported_failure_groups": [
+    "OBSOLETE_CALLBACK_TEST_DB_STRING",
+    "OBSOLETE_SERVER_TEST_MISSING_ACTIVATION",
+    "BOOTSTRAP_MANIFEST_HASH_AND_ACTIVATION_ARGS"
+  ],
+  "github_object_lookup": {
+    "A1": "NOT_RESOLVED_AT_CHECK",
+    "A2": "NOT_RESOLVED_AT_CHECK",
+    "local_commit_invalidated": false
+  },
+  "remaining_patch_budget": "UNKNOWN_PRESERVE_EXISTING",
+  "actual_model_this_inspection": "NOT_VERIFIED",
+  "production_mutation": "NONE_OWNER_REPORTED",
+  "release_admission": "HOLD",
+  "automatic_intake": "NOT_DEPLOYED_NOT_ACCEPTED",
+  "cost": "UNKNOWN",
+  "redispatch_same_spec": false,
+  "reported_subset_checks": {
+    "nonobsolete_tests_passed": 228,
+    "canonical_activation_ledger_callback_dashboard": "PASS_OWNER_REPORTED",
+    "py_compile": "PASS_OWNER_REPORTED",
+    "git_diff_check": "PASS_OWNER_REPORTED",
+    "full_regression_pass": false
+  },
+  "scope_extension": {
+    "authority": "CHATGPT_WORK_OWNER_DELEGATED",
+    "status": "APPROVED_CONTINUATION_ONLY",
+    "contract": "plans/WORK_APPROVED_B_SCOPE_EXTENSION_20261011.json",
+    "executor_receipt": "NOT_VERIFIED"
+  }
+}

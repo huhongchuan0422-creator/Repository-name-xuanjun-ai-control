@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-11T20:05:53+08:00",
+  "evidence_source": "OWNER_RELAYED_OPENCLAW_ISOLATED_CHECKOUT_RESULT",
+  "independent_host_probe": false,
+  "work_reproduced": false,
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "server": "iZd7oeikknn1z21sq6ji6zZ",
+  "base_spec_sha256": "deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a",
+  "prior_extension_sha256": "89d22f111c82c123822d8764f86069781627df728b4bb06301dbe230c95cd0c0",
+  "prior_extension_receipt": "VERIFIED_BY_EXECUTOR_OWNER_REPORTED",
+  "prior_four_files_aligned": "OWNER_REPORTED",
+  "earlier_tests": {
+    "targeted_passed": 20,
+    "full_reported_passed": 248,
+    "superseded_by_isolated_checkout": true,
+    "reason": "DEPENDED_ON_TWO_UNCOMMITTED_TEST_DIFFS"
+  },
+  "current_candidate_commit": "925cfba3171ebb43a872ef2a0ab7ffc390a5a516",
+  "isolated_regression": {
+    "total": 248,
+    "passed": 245,
+    "failures": 1,
+    "errors": 2,
+    "actual_skip_count": "NOT_REPORTED",
+    "scope": "OWNER_REPORTED_FROZEN_CHECKOUT"
+  },
+  "remaining_test_paths": [
+    "stage1/test_development_service.py",
+    "stage1/test_owner_dashboard.py"
+  ],
+  "owner_reported_minimal_delta_sha256": "a1fa635117286a0ccdf4c83060d9e8042719c07401b3fa13226ca176cc168861",
+  "minimal_delta_bytes_received": false,
+  "state": "HOLD_TEST_SCOPE_EXTENSION",
+  "independent_qa": "NOT_STARTED_OWNER_REPORTED",
+  "security_review": "NOT_STARTED_OWNER_REPORTED",
+  "new_extension_authority": "APPROVED_CONTINUATION_ONLY_MODEL_POLICY_GUARDED",
+  "new_extension_receipt": "NOT_VERIFIED",
+  "production_mutation": "NONE_OWNER_REPORTED",
+  "cost": "UNKNOWN"
+}

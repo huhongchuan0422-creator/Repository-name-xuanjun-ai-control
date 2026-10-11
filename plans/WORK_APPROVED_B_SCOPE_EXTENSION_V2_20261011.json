@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "extension_id": "B_BROKER_V2_DASHBOARD_TEST_ALIGNMENT_20261011",
+  "authority": "CHATGPT_WORK_OWNER_DELEGATED",
+  "approval": "APPROVED_BOUNDED_SCOPE_EXTENSION_CONTINUATION_ONLY",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "bind_active_control_sha": "76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b",
+  "bind_active_spec_sha256": "deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a",
+  "extends_contract": {
+    "path": "plans/WORK_APPROVED_B_SCOPE_EXTENSION_20261011.json",
+    "sha256": "89d22f111c82c123822d8764f86069781627df728b4bb06301dbe230c95cd0c0",
+    "prior_scope_retained": true
+  },
+  "role": "B",
+  "continuation_checkpoint": {
+    "owner_reported_commit": "925cfba3171ebb43a872ef2a0ab7ffc390a5a516",
+    "workdir": "EXISTING_B_INTEGRATION_WORKDIR",
+    "retain_original_baseline_and_budget": true,
+    "retain_two_uncommitted_test_diffs": true
+  },
+  "owner_reported_minimal_delta_sha256": "a1fa635117286a0ccdf4c83060d9e8042719c07401b3fa13226ca176cc168861",
+  "minimal_delta_bytes_received": false,
+  "minimal_delta_content_admission": "NOT_VERIFIED_SCOPE_APPROVAL_IS_NOT_BYTE_APPROVAL",
+  "additional_allowed_edit_paths": [
+    "stage1/test_development_service.py",
+    "stage1/test_owner_dashboard.py"
+  ],
+  "allowed_changes": [
+    "Align old v1 isolation test fixtures and calls with frozen broker v2; retain rejected UID0/peer/path/epoch/fence and bounded resource/stop boundary checks",
+    "Commit meaningful test changes into the final candidate so isolated clean checkout reproduces them without local uncommitted state",
+    "For dashboard distinguish Owner global model policy from a single already-admitted Worker attempt pinned to verified 5.6 with no internal fallback",
+    "Preserve actual model/provider evidence as UNKNOWN where unobserved; do not treat configured policy as actual inference",
+    "If implementation mislabels Worker policy as Owner global policy, repair owner_dashboard.py only under its already existing B source scope; do not change global model configuration or weaken assertions"
+  ],
+  "model_policy_guard": {
+    "owner_primary": "openai/gpt-6.1-sol",
+    "owner_sole_fallback": "openai/gpt-5.6-sol",
+    "owner_policy_change": false,
+    "admitted_worker_model": "openai/gpt-5.6-sol",
+    "zero_fallback_allowed_scope": "ONE_ALREADY_ADMITTED_WORKER_ATTEMPT_ONLY",
+    "dashboard_global_policy_must_preserve_owner_policy": true,
+    "other_models": "DENY",
+    "paid_api": "DENY",
+    "route": "EXISTING_CHATGPT_OAUTH_CODEX",
+    "primary_recovery": "SEPARATE_BOUNDED_TASK_BOUNDARY_GATE_NOT_INFERRED_FROM_TESTS"
+  },
+  "forbidden_changes": [
+    "No policy assertion that Owner global policy is 5.6 only with zero fallback",
+    "No production database/config/migration/Coordinator/Webhook/trading change or broker installation",
+    "No DB-string fallback, second canonical ledger, authentication/replay/epoch/fence weakening",
+    "No dropped/skipped/weakened security negative cases or swallowed errors to report green",
+    "No changes to other new tracked paths without exact Work admission",
+    "No generic root/systemd authority, new credentials or unauthorized paid API"
+  ],
+  "budget": {
+    "rule": "CONTINUE_EXISTING_B_BUDGET_NO_RESET",
+    "patch_rounds_total_cap": 3,
+    "seconds_per_model_attempt_cap": 1200,
+    "remaining": "UNKNOWN_PRESERVE_AND_REPORT",
+    "repeated_same_failure": "HOLD_CHECKPOINT"
+  },
+  "permissions": {
+    "production_deploy": false,
+    "production_db_write": false,
+    "production_config_write": false,
+    "old_coordinator_switch": false,
+    "formal_webhook_change": false,
+    "trading_permission_change": false,
+    "generic_root_or_systemd_grant": false
+  },
+  "digest_binding": "SHA256_EXACT_EXTENSION_V2_FILE_BYTES",
+  "required_continuation_receipt": [
+    "parent_task",
+    "base_spec_sha256",
+    "prior_extension_sha256",
+    "extension_v2_sha256",
+    "original_checkpoint_commit",
+    "actual_workdir",
+    "state_RECEIVED_RESUMED_OR_HOLD",
+    "remaining_original_patch_budget",
+    "blocker"
+  ],
+  "completion_evidence": [
+    "Clean final combined SHA/tree and base identity; both test changes committed, caches handled explicitly",
+    "Isolated checkout from exact final commit without uncommitted diffs; all 248 existing tests run, zero fail/error/skip, added tests counted separately",
+    "Targeted broker v2 and dashboard model-policy separation tests",
+    "Immutable patch/manifest/report bytes and external digest bindings",
+    "Same-final-artifact independent QA and security both pass before any release admission"
+  ],
+  "dispatch": {
+    "same_task_continuation": true,
+    "new_task": false,
+    "restart_A1_A2": false,
+    "reset_budget": false,
+    "modify_original_spec_bytes": false,
+    "executor_receipt": "NOT_VERIFIED",
+    "automatic_wake": "NOT_EXECUTED"
+  },
+  "release_admission": "HOLD"
+}

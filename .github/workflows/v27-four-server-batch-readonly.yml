@@ -1,6 +1,9 @@
 name: V2.7 Four Server Read-Only Batch
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/uk-autonomous-loop-20261011]
+    paths: ['.github/workflows/v27-four-server-batch-readonly.yml', 'scripts/v27-batch-readonly.sh']
 permissions:
   contents: read
 concurrency:
@@ -12,22 +15,31 @@ jobs:
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - run: bash scripts/v27-batch-readonly.sh uk
   tokyo:
     runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - run: bash scripts/v27-batch-readonly.sh tokyo
   korea:
     runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - run: bash scripts/v27-batch-readonly.sh korea
   domestic:
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - run: bash scripts/v27-batch-readonly.sh domestic
+

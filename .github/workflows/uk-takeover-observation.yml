@@ -1,0 +1,20 @@
+name: UK Takeover Read-only Observation
+on:
+  push:
+    branches: [feature/uk-autonomous-loop-20261011]
+    paths: ['scripts/uk-takeover-observation.py', '.github/workflows/uk-takeover-observation.yml']
+permissions:
+  contents: read
+concurrency:
+  group: uk-takeover-observation
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Observe activity without deployment or credential disclosure
+        run: python3 scripts/uk-takeover-observation.py

@@ -1,0 +1,221 @@
+name: UK Integration Stage and Contracts
+on:
+  push:
+    branches: [feature/uk-autonomous-loop-20261011]
+    paths: ['stage1/**', 'scripts/**', 'deploy/uk-work-intake/**', 'plans/WORK_INTAKE_ACTIVATION_CONTRACT_20261011.md', 'canonical/PROJECT_STATE.md', 'plans/UNFINISHED_TASK_TRACKER_20261011.md', 'plans/MODEL_POLICY_20261011.md', 'plans/TOKYO_MIGRATION_DEADLINE_20261020.md', 'plans/COMMUNITY_POINTS_REQUIREMENTS_20261011.md', '.github/workflows/uk-integration-stage.yml']
+permissions:
+  contents: read
+jobs:
+  stage:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify Python 3.6 and stage reviewed integration source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
+          python3 -m compileall -q stage1
+          python3 -m py_compile scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-work-handoff-bootstrap.py scripts/uk-work-result-collect.py scripts/uk-work-intake.py
+          python3 -m unittest discover -s stage1 -q
+          STAGE="/tmp/xuanjun-uk-integration-${GITHUB_SHA}"
+          mkdir -p "$STAGE/stage1" "$STAGE/scripts" "$STAGE/canonical" "$STAGE/plans"
+          cp stage1/*.py stage1/*.html "$STAGE/stage1/"
+          # Reuse the Runner's authenticated checkout for the Work-approved
+          # task source. The conversational agent needs no new GitHub token.
+          # These are immutable-SHA source documents, not a runtime queue.
+          cp canonical/PROJECT_STATE.md "$STAGE/canonical/"
+          cp plans/UNFINISHED_TASK_TRACKER_20261011.md plans/MODEL_POLICY_20261011.md plans/TOKYO_MIGRATION_DEADLINE_20261020.md plans/COMMUNITY_POINTS_REQUIREMENTS_20261011.md "$STAGE/plans/"
+          cp scripts/uk-contract-export.py scripts/uk-dev-bootstrap.py scripts/uk-sol-diagnostic.py scripts/uk-sol-canary.py scripts/uk-sol-check-bootstrap.py scripts/uk-takeover-observation.py scripts/uk-56-canary.py scripts/uk-codex-runtime-align.py scripts/uk-codex-post-align.py "$STAGE/scripts/"
+          printf '%s\n' "$GITHUB_SHA" > "$STAGE/SOURCE_COMMIT"
+          # /tmp is retained for existing Owner-assisted scripts only.
+          # OpenClaw has PrivateTmp=yes; its source is the verified checkout.
+          echo "OPENCLAW_CONTROL_CHECKOUT=$GITHUB_WORKSPACE"
+          echo "OPENCLAW_CONTROL_SHA=$GITHUB_SHA"
+          echo "OPENCLAW_TMP_HANDOFF=DO_NOT_USE"
+          chmod -R a+rX "$STAGE"
+          sha256sum "$STAGE/scripts/uk-contract-export.py"
+          echo "UK_INTEGRATION_STAGE=$STAGE"
+          echo "UK_CONTROL_SOURCE=$STAGE/canonical/PROJECT_STATE.md"
+          echo "UK_TASK_SOURCE_SHA=$GITHUB_SHA"
+          echo "WORKER_TASK_DISPATCH=NOT_EXECUTED"
+          echo "PRODUCTION_DEPLOYMENT=NOT_EXECUTED"
+      - name: Print reviewed handoff helper digest without executing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum scripts/uk-work-handoff-bootstrap.py scripts/uk-work-result-collect.py
+      - name: Deliver Work-approved bounded repair source without starting agents
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          path=Path('plans/WORK_APPROVED_AB_REPAIR_SPEC_20261011.json')
+          raw=path.read_bytes()
+          spec=json.loads(raw.decode('utf-8'))
+          assert spec['permissions']['production_deploy'] is False
+          assert spec['permissions']['old_coordinator_codex_exec'] is False
+          patch=Path(spec['evidence_root']+'/integration-ab.patch').read_bytes()
+          assert hashlib.sha256(patch).hexdigest()==spec['repair_baseline']['patch_sha256']
+          print('WORK_REPAIR_CONTROL_SHA='+os.environ['GITHUB_SHA'])
+          print('WORK_REPAIR_SPEC_SHA256='+hashlib.sha256(raw).hexdigest())
+          print('WORK_REPAIR_SOURCE='+str(Path(os.environ['GITHUB_WORKSPACE'])/path))
+          print('WORK_REPAIR_EXECUTOR_RECEIPT=NOT_VERIFIED')
+          print('WORK_REPAIR_AGENT_START=NOT_EXECUTED')
+          print('FAILED_PATCH_APPLICATION=NOT_EXECUTED')
+          PYCODE
+      - name: Verify approved B scope extension as data without resuming a role
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          raw=Path('plans/WORK_APPROVED_B_SCOPE_EXTENSION_20261011.json').read_bytes()
+          extension=json.loads(raw.decode('utf-8'))
+          spec_raw=Path('plans/WORK_APPROVED_AB_REPAIR_SPEC_20261011.json').read_bytes()
+          assert extension['authority']=='CHATGPT_WORK_OWNER_DELEGATED'
+          assert extension['approval']=='APPROVED_BOUNDED_SCOPE_EXTENSION_CONTINUATION_ONLY'
+          assert extension['role']=='B'
+          assert extension['parent_task']==json.loads(spec_raw.decode('utf-8'))['parent_task']
+          assert extension['bind_active_spec_sha256']==hashlib.sha256(spec_raw).hexdigest()
+          assert extension['allowed_edit_paths']==['stage1/test_uk_owner_callback_core.py','stage1/test_owner_callback_server.py','stage1/test_uk_dev_bootstrap.py','scripts/uk-dev-bootstrap.py']
+          assert extension['permissions'] and all(type(v) is bool and v is False for v in extension['permissions'].values())
+          assert extension['dispatch']['same_task_continuation'] is True
+          assert all(extension['dispatch'][k] is False for k in ['new_task','restart_A1_A2','reset_budget','modify_original_spec_bytes'])
+          print('WORK_B_SCOPE_EXTENSION=APPROVED_CONTINUATION_ONLY')
+          print('WORK_B_SCOPE_CONTROL_SHA='+os.environ['GITHUB_SHA'])
+          print('WORK_B_SCOPE_SHA256='+hashlib.sha256(raw).hexdigest())
+          print('WORK_B_SCOPE_SOURCE='+str(Path(os.environ['GITHUB_WORKSPACE'])/'plans/WORK_APPROVED_B_SCOPE_EXTENSION_20261011.json'))
+          print('WORK_B_SCOPE_EXECUTOR_RECEIPT=NOT_VERIFIED')
+          print('WORK_B_SCOPE_RESUME=NOT_EXECUTED')
+          PYCODE
+      - name: Verify second B test-scope extension without starting agents
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          path=Path('plans/WORK_APPROVED_B_SCOPE_EXTENSION_V2_20261011.json')
+          raw=path.read_bytes()
+          extension=json.loads(raw.decode('utf-8'))
+          spec_raw=Path('plans/WORK_APPROVED_AB_REPAIR_SPEC_20261011.json').read_bytes()
+          assert extension['authority']=='CHATGPT_WORK_OWNER_DELEGATED'
+          assert extension['approval']=='APPROVED_BOUNDED_SCOPE_EXTENSION_CONTINUATION_ONLY'
+          assert extension['role']=='B'
+          assert extension['parent_task']==json.loads(spec_raw.decode('utf-8'))['parent_task']
+          assert extension['bind_active_spec_sha256']==hashlib.sha256(spec_raw).hexdigest()
+          assert hashlib.sha256(Path(extension['extends_contract']['path']).read_bytes()).hexdigest()==extension['extends_contract']['sha256']
+          assert extension['additional_allowed_edit_paths']==['stage1/test_development_service.py','stage1/test_owner_dashboard.py']
+          assert extension['permissions'] and all(type(v) is bool and v is False for v in extension['permissions'].values())
+          guard=extension['model_policy_guard']
+          assert guard['owner_primary']=='openai/gpt-6.1-sol' and guard['owner_sole_fallback']=='openai/gpt-5.6-sol'
+          assert guard['owner_policy_change'] is False and guard['dashboard_global_policy_must_preserve_owner_policy'] is True
+          assert extension['dispatch']['same_task_continuation'] is True
+          assert all(extension['dispatch'][k] is False for k in ['new_task','restart_A1_A2','reset_budget','modify_original_spec_bytes'])
+          print('WORK_B_SCOPE_V2=HISTORICAL_MODEL_GUARD_SUPERSEDED_BY_V3')
+          print('WORK_B_SCOPE_V2_CONTROL_SHA='+os.environ['GITHUB_SHA'])
+          print('WORK_B_SCOPE_V2_SHA256='+hashlib.sha256(raw).hexdigest())
+          print('WORK_B_SCOPE_V2_SOURCE='+str(Path(os.environ['GITHUB_WORKSPACE'])/path))
+          print('WORK_B_SCOPE_V2_EXECUTOR_RECEIPT=NOT_VERIFIED')
+          print('WORK_B_SCOPE_V2_RESUME=NOT_EXECUTED')
+          PYCODE
+      - name: Verify current B amendment and 5.6-only policy without resuming a role
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          path=Path('plans/WORK_APPROVED_B_SCOPE_EXTENSION_V3_20261011.json')
+          raw=path.read_bytes()
+          obj=json.loads(raw.decode('utf-8'))
+          spec_raw=Path('plans/WORK_APPROVED_AB_REPAIR_SPEC_20261011.json').read_bytes()
+          prior=Path(obj['precedence']['supersedes_v2_path']).read_bytes()
+          assert obj['authority']=='CHATGPT_WORK_OWNER_DELEGATED'
+          assert obj['approval']=='APPROVED_BOUNDED_CONTINUATION_AND_MODEL_AMENDMENT'
+          assert obj['parent_task']==json.loads(spec_raw.decode('utf-8'))['parent_task'] and obj['role']=='B'
+          assert hashlib.sha256(spec_raw).hexdigest()==obj['bind_active_spec_sha256']
+          assert hashlib.sha256(prior).hexdigest()==obj['precedence']['supersedes_v2_sha256']
+          assert obj['additional_allowed_edit_paths']==['stage1/test_development_service.py','stage1/test_owner_dashboard.py']
+          model=obj['model_policy']
+          assert model['primary']=='openai/gpt-5.6-sol' and model['fallbacks']==[]
+          assert model['allowed_models']==['openai/gpt-5.6-sol']
+          assert model['route']=='EXISTING_CHATGPT_OAUTH_CODEX' and model['paid_api']=='DENY' and model['other_models']=='DENY'
+          assert model['automatic_61_probe'] is False and model['automatic_61_restore'] is False
+          assert model['production_config_write_authorized'] is False
+          assert obj['permissions'] and all(type(v) is bool and v is False for v in obj['permissions'].values())
+          edit=obj['diff_authorization']
+          assert edit['old_diff_NOT_VERIFIED_does_not_block_development'] is True
+          assert edit['old_diff_must_be_committed_unchanged'] is False and edit['corrected_diff_may_have_new_sha256'] is True
+          assert obj['execution_directive']['no_budget_reset'] is True
+          assert obj['execution_directive']['no_new_task_or_A1_A2_restart'] is True
+          assert obj['release_admission']=='HOLD'
+          print('WORK_B_SCOPE_V3=APPROVED_56_ONLY_SEMANTIC_CONTINUATION')
+          print('WORK_B_SCOPE_V3_CONTROL_SHA='+os.environ['GITHUB_SHA'])
+          print('WORK_B_SCOPE_V3_SHA256='+hashlib.sha256(raw).hexdigest())
+          print('WORK_B_SCOPE_V3_SOURCE='+str(Path(os.environ['GITHUB_WORKSPACE'])/path))
+          print('WORK_B_SCOPE_V3_EXECUTOR_RECEIPT=NOT_VERIFIED')
+          print('WORK_B_SCOPE_V3_RESUME=NOT_EXECUTED')
+          PYCODE
+      - name: Publish intake data only when the reviewed platform transport is installed
+        shell: bash
+        run: |
+          set -euo pipefail
+          INSTALLED=/opt/xuanjun-work-intake/uk-work-intake.py
+          if test -f /etc/xuanjun-work-intake.json && test -f "$INSTALLED"; then
+            python3 - <<'PYCODE'
+          import hashlib, os, stat
+          from pathlib import Path
+          installed=Path('/opt/xuanjun-work-intake/uk-work-intake.py')
+          info=installed.lstat()
+          if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode & 0o022:
+              raise SystemExit('STOP_UNTRUSTED_INSTALLED_INTAKE')
+          if hashlib.sha256(installed.read_bytes()).digest()!=hashlib.sha256(Path('scripts/uk-work-intake.py').read_bytes()).digest():
+              raise SystemExit('STOP_INSTALLED_INTAKE_UPGRADE_REVIEW_REQUIRED')
+          PYCODE
+            /usr/bin/python3 -I "$INSTALLED" --publish
+            /usr/bin/python3 -I "$INSTALLED" --report
+          else
+            echo "WORK_AUTOMATIC_INTAKE=WAITING_REVIEWED_PLATFORM_INSTALL"
+            echo "WORK_AUTOMATIC_WAKE=NOT_EXECUTED"
+          fi
+
+      - name: Collect bounded development results without applying or deploying
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/uk-work-result-collect.py
+      - name: Read actual contracts only through authorized fixed gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -x /usr/local/sbin/xj-uk-contract-export; then
+            sudo -n /usr/local/sbin/xj-uk-contract-export
+            python3 - <<'PY'
+          import json
+          for name in ['uk','tokyo']:
+              path='/var/lib/xuanjun-contract-export/'+name+'.json'
+              with open(path) as stream: obj=json.load(stream)
+              print('LIVE_CONTRACT_'+name.upper()+'='+json.dumps(obj))
+          PY
+          else
+            echo "LIVE_CONTRACT=WAITING_HUMAN_FIXED_GATEWAY_INSTALL"
+          fi
+
+      - name: Read authenticated dashboard and model capability audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -x /usr/local/sbin/xuanjun-uk-owner-audit; then
+            sudo -n /usr/local/sbin/xuanjun-uk-owner-audit
+          else
+            echo "OWNER_DASHBOARD_AUDIT=WAITING_FIXED_BOOTSTRAP_INSTALL"
+          fi
+

@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "extension_id": "B_OBSOLETE_TEST_BOOTSTRAP_ALIGNMENT_20261011",
+  "authority": "CHATGPT_WORK_OWNER_DELEGATED",
+  "approval": "APPROVED_BOUNDED_SCOPE_EXTENSION_CONTINUATION_ONLY",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "bind_active_control_sha": "76c0cfe7f7a4dd9ed52a9dc719897c95c437ba8b",
+  "bind_active_spec_sha256": "deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a",
+  "role": "B",
+  "continuation_checkpoint": {
+    "reported_local_commit": "fb2cc9081fa8d215bf186046b53bae9b9334ad7b",
+    "workdir": "EXISTING_B_INTEGRATION_WORKDIR",
+    "retain_uncommitted_diagnostics": true,
+    "retain_original_baseline_and_budget": true
+  },
+  "allowed_edit_paths": [
+    "stage1/test_uk_owner_callback_core.py",
+    "stage1/test_owner_callback_server.py",
+    "stage1/test_uk_dev_bootstrap.py",
+    "scripts/uk-dev-bootstrap.py"
+  ],
+  "allowed_changes": [
+    "Align obsolete callback tests with frozen canonical activation and ledger socket; no DB-string fallback",
+    "Build isolated activation/socket fixtures for server tests without production state",
+    "Update bootstrap canonical activation/socket arguments and only scripts/uk-dev-bootstrap.py embedded install file list/digests from actual final candidate bytes; any other tracked manifest path requires an exact Work scope extension",
+    "Review the two existing diagnostic test diffs, retain meaningful negative assertions, then commit within this exact scope",
+    "Remove only generated __pycache__ files in the owned isolated candidate workdir; do not delete diagnostics or assets"
+  ],
+  "forbidden_changes": [
+    "No production database/configuration/migration/Coordinator/Webhook/trading change",
+    "No second task database or compatibility fallback to arbitrary DB strings",
+    "No weakening authentication, replay, epoch/fence, negative tests or failure handling",
+    "No ignored/skipped/deleted failures or broad test-assertion relaxation to obtain green results",
+    "No root installer execution, service change, generic sudo/systemd grant or credential copying",
+    "No edits outside listed paths; new exact path scope must be reported to Work, independent work continues"
+  ],
+  "budget": {
+    "rule": "CONTINUE_EXISTING_B_BUDGET_NO_RESET",
+    "patch_rounds_total_cap": 3,
+    "seconds_per_model_attempt_cap": 1200,
+    "repeated_same_failure": "HOLD_CHECKPOINT",
+    "remaining": "UNKNOWN_PRESERVE_AND_REPORT"
+  },
+  "models": {
+    "primary": "openai/gpt-6.1-sol",
+    "sole_fallback": "openai/gpt-5.6-sol",
+    "route": "EXISTING_CHATGPT_OAUTH_CODEX",
+    "other_models": "DENY",
+    "paid_api": "DENY"
+  },
+  "permissions": {
+    "production_deploy": false,
+    "production_db_write": false,
+    "production_config_write": false,
+    "old_coordinator_switch": false,
+    "formal_webhook_change": false,
+    "trading_permission_change": false,
+    "generic_root_or_systemd_grant": false
+  },
+  "completion_evidence": [
+    "Full final frozen commit and tree, base/source identity, clean tracked/untracked status with runtime caches excluded explicitly",
+    "Patch and externally bound manifest hashes plus actual immutable bytes",
+    "Full suite: all 248 existing tests collected, zero failures/errors/skips; any added tests counted explicitly",
+    "Canonical positive activation/socket callback tests and unauthorized/replay/stale-generation rejection",
+    "Dry-run bootstrap/hash/owner/mode/path negative tests, no installation",
+    "Same final combined artifact independently QA and security reviewed; release still HOLD until live admission",
+    "Final evidence binds both original approved spec digest and this exact extension file SHA256; source publication alone is not executor receipt"
+  ],
+  "dispatch": {
+    "same_task_continuation": true,
+    "new_task": false,
+    "restart_A1_A2": false,
+    "reset_budget": false,
+    "modify_original_spec_bytes": false,
+    "automatic_intake_receipt": "NOT_VERIFIED",
+    "executor_receipt": "NOT_VERIFIED"
+  },
+  "allowed_generated_artifacts": {
+    "scope": "Immutable patch/manifest/test evidence inside the existing owned B candidate output directory only",
+    "source_edit_scope_expanded": false,
+    "forbidden": "No production paths or unrelated tracked source edits"
+  },
+  "digest_binding": "SHA256_EXACT_EXTENSION_FILE_BYTES_EXTERNAL_TO_THIS_FILE",
+  "required_continuation_receipt": [
+    "parent_task",
+    "base_spec_sha256",
+    "extension_id",
+    "extension_sha256",
+    "actual_workdir",
+    "original_checkpoint_commit",
+    "state_RECEIVED_RESUMED_OR_HOLD",
+    "remaining_original_patch_budget",
+    "blocker"
+  ]
+}

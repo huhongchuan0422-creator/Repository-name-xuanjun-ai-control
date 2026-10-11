@@ -1,0 +1,240 @@
+{
+  "schema": 1,
+  "kind": "STAGED_EXECUTION_ACCEPTANCE_AMENDMENT",
+  "authority": "CHATGPT_WORK_OWNER_DELEGATED",
+  "approval": "APPROVED_EXISTING_B_SOURCE_REPAIR_AND_READONLY_PLATFORM_PREPARATION",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "revision": "20261011_p0_p3_v1",
+  "control_repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control",
+  "branch": "feature/uk-autonomous-loop-20261011",
+  "authority_comments": [
+    6109512503,
+    6109556304
+  ],
+  "bindings": {
+    "core_delta_commit": "e21938a844ba6292b69099effbbe3918f89614ad",
+    "core_delta_tree": "1add3b91e8a88a1823f7c457c4c9192e3128e43e",
+    "repair_spec_path": "plans/WORK_APPROVED_7ED631A_SECURITY_REPAIR_20261011.json",
+    "repair_spec_sha256": "9b242998bd64ae1d900389af190de576c1ca876cd02a5b53cf2ff07292d3c5e1",
+    "base_spec_sha256": "deb334171fdbc10d9ab8abff046493526ca5c992428d514629a86cf32859fc6a",
+    "checkpoint_commit": "7ed631aabe240321656287bbd0c8ca546814c37c",
+    "checkpoint_tree": "aee5715e2a9bcba4fa90b40cfa4c0b3f5be40e87",
+    "security_fail_comment": 6109228044
+  },
+  "precedence": "Current 5.6-only policy overrides historical model text. This staged contract preserves existing repair scope, task, checkpoint and budgets. It grants no platform installation or production authority and is not a new dispatch spec for the old intake validator.",
+  "models": {
+    "primary": "openai/gpt-5.6-sol",
+    "fallbacks": [],
+    "route": "EXISTING_CHATGPT_OAUTH_CODEX",
+    "paid_api": "DENY",
+    "other_models": "DENY",
+    "automatic_61_probe_or_restore": false,
+    "observed": "UNKNOWN_UNTIL_NATIVE_EVIDENCE"
+  },
+  "execution": {
+    "host": "iZd7oeikknn1z21sq6ji6zZ",
+    "coordinator": "EXISTING_OPENCLAW_MAIN",
+    "supervisor_id": "a96b9a83-5e58-412c-ab66-ba3bf0add8b9",
+    "developer_role": "EXISTING_B_INTEGRATION_SINGLE_WRITER",
+    "workdir": "/home/xuanjun_dev/xuanjun-uk-repair-20261011/b",
+    "route_now": "Existing coordinator native child-session resume for original B, after unique writer reconciliation",
+    "exact_native_resume_tool": "NOT_VERIFIED_COORDINATOR_MUST_RETURN_TOOL_AND_BOUND_SESSION_BEFORE_STARTED_CLAIM",
+    "work_direct_remote_execution": "UNAVAILABLE_NO_UK_SSH_OR_OPENCLAW_EXEC_CONNECTOR",
+    "no_alternate_coordinator": true,
+    "no_duplicate_A1_A2": true,
+    "no_owner_relay": true
+  },
+  "source_scope": [
+    "stage1/codex_worker.py",
+    "stage1/codex_app_server_worker.py",
+    "stage1/development_service.py",
+    "stage1/test_codex_worker.py",
+    "stage1/test_codex_app_server_worker.py",
+    "stage1/test_development_service.py",
+    "stage1/test_development_pipeline.py"
+  ],
+  "source_scope_purpose": "Only current 5.6 default/allowlist/config admission and affected fixtures; preserve auth/sandbox/lease/epoch/fence/stop guards. Integrate three-file core delta semantically against actual UK base, never overwrite full local files or cherry-pick whole control branch.",
+  "manifest_scope": "Recompute existing tracked install hash metadata as data only after runtime changes, no new install paths or installer execution.",
+  "budget": {
+    "preserve_original": true,
+    "reset": false,
+    "remaining": "UNKNOWN_PRESERVED_NOT_RESET",
+    "patch_rounds_total_cap": 3,
+    "seconds_per_model_attempt_cap": 1200,
+    "repeated_same_failure": "HOLD_CHECKPOINT",
+    "unknown_is_not_exhausted": true,
+    "timeboxes": "Planning targets from observed P0 start; do not expand original resource budget"
+  },
+  "stages": [
+    {
+      "id": "P0",
+      "owner": "PROJECT_COORDINATOR_EXISTING_MAIN",
+      "status": "START_NOT_VERIFIED",
+      "depends_on": [],
+      "actions": [
+        "Read exact control source and bound existing authorizations",
+        "Reconcile actual B run/session/lease/fence/epoch and preserved counters",
+        "Resume original B if proven no live writer and native execution entry allows it; existing writer is reused",
+        "Persist and return bound actual RESUMED or precise HOLD in same run"
+      ],
+      "receipt_fields": [
+        "parent_task",
+        "staged_contract_sha256",
+        "repair_spec_sha256",
+        "control_source_sha",
+        "execution_id",
+        "idempotency_key",
+        "role",
+        "native_tool",
+        "run_or_session",
+        "pid_or_unit_if_available",
+        "workdir",
+        "lease",
+        "fence",
+        "epoch",
+        "start_time",
+        "phase",
+        "checkpoint",
+        "requested_model",
+        "observed_model",
+        "remaining_budget",
+        "blocker"
+      ],
+      "acceptance": "Bound receipt plus actual role/session start evidence; PR comment/scratch/RECEIVED alone is insufficient",
+      "target_minutes": 30,
+      "if_blocked": "HOLD_WORK_EXECUTION_ENTRY_DISABLED with exact unavailable tool/policy/permission evidence; keep independent read-only preparation open"
+    },
+    {
+      "id": "P1",
+      "owner": "B_SINGLE_INTEGRATION_WRITER; INDEPENDENT_QA; SECURITY; WORK_REVIEW",
+      "status": "WAITING_P0",
+      "depends_on": [
+        "P0"
+      ],
+      "actions": [
+        "Integrate e219 core delta and local service admission under scope7",
+        "Freeze new commit/tree/patch/install manifest/test manifest",
+        "Rebuild full source from known base and bounded data patch in clean isolated checkout",
+        "Run entire discovered suite without skipped/removed guard tests",
+        "Independent QA and independent security bind exact same final artifact; any byte change invalidates old reports"
+      ],
+      "required_negatives": [
+        "omitted model selects5.6",
+        "explicit6.1 rejected before process/transport/model invocation",
+        "Astra/other/wildcard/provider override rejected",
+        "native requested/returned model mismatch rejected",
+        "auth/sandbox/lease/epoch/fence/stop negatives preserved"
+      ],
+      "evidence_return": "Existing private PR/artifact-return route; full source delta from85ad1d7224485f3c57298e71a429eb576b8d943d if local925 parent not remotely available; bounded BASE64_DATA_ONLY chunks <=12000 chars with filename/part/total/SHA256; no .git/credentials/HOME/raw prompts",
+      "acceptance": "Full reconstructed source and raw reports received, hashes verified, clean full regression plus independent QA/security; code-only PASS does not satisfy broker platform gate",
+      "target_hours": [
+        2,
+        4
+      ]
+    },
+    {
+      "id": "P2",
+      "owner": "WORK_AND_EXISTING_A2_PLATFORM_RELEASE_GATE",
+      "status": "PREPARATION_ALLOWED_INSTALL_HOLD",
+      "depends_on": [
+        "P1_SAME_ARTIFACT_CODE_REVIEW",
+        "EXACT_INSTALL_PACKAGE_AND_PATH_ADMISSION",
+        "EXISTING_CONTROLLED_PLATFORM_AUTHORITY"
+      ],
+      "parallel_preparation": [
+        "Inventory actual frozen broker client/server/service paths and executable entrypoints",
+        "Map peer UID/epoch/fence/artifact/binary/path/argv/whole-cgroup-stop boundaries to tests",
+        "Prepare precise installed files/units/users/owners/modes/hash binding/rollback and backup restore commands",
+        "Design approved repair revision intake without restarting A1/A2 or resetting existing B counters"
+      ],
+      "identified_intake_gaps": [
+        "Legacy SPEC_PATH pins base spec and imports it as STARTED_OWNER_RELAYED without wake",
+        "Legacy validator still requires6.1-primary/5.6-fallback historical pair",
+        "Changing control SHA alone does not resume current B",
+        "Consumer only accepts current detached checkout source; pending older approved deliveries need provenance-preserving reconciliation",
+        "No root-owned module/config/inbox/service/path/timer installed evidence"
+      ],
+      "install_authorized": false,
+      "minimum_package": "Exact frozen A2 manifest plus reviewed intake; no competing generic root installer",
+      "platform_evidence": [
+        "protected distinct-UID filesystem denial",
+        "SO_PEERCRED actual UID",
+        "root-owned verified broker binary and artifact hashes",
+        "persistent activation epoch/fence plus old Coordinator exclusivity",
+        "fixed argv/path rejection",
+        "whole-unit and descendants stopped before replacement",
+        "canonical DB backup checksum and successful restore including WAL/SHM/PRAGMA/fsync",
+        "actual systemd path/timer/restart behavior",
+        "authenticated private/internal HTTPS dashboard"
+      ],
+      "rollback": "Prepare hash-bound previous units/config/artifact and verified DB restore; preserve epoch monotonicity, stop and prove old cgroups empty, reconcile effects before reopening dispatcher. Never activate a historically failed release as rollback.",
+      "acceptance": "Actual controlled platform installation and host-bound boundary evidence; templates/unit tests are not acceptance",
+      "target_engineering_hours": [
+        6,
+        12
+      ]
+    },
+    {
+      "id": "P3",
+      "owner": "EXISTING_C_ACCEPTANCE_EXECUTOR; WORK_RELEASE_GATE; OWNER_DECISION",
+      "status": "NOT_STARTED_RELEASE_HOLD",
+      "depends_on": [
+        "P1_FULL_ARTIFACT_REVIEW",
+        "P2_PLATFORM_ACCEPTED",
+        "EXPLICIT_RELEASE_ADMISSION"
+      ],
+      "cases": [
+        "two consecutive real development tasks with automatic dependency progression",
+        "one bound APPROVE and one bound REJECT with identity/artifact/nonce/replay guards",
+        "new approved revision and duplicate delivery/document-only SHA/event storm/event while consumer active",
+        "durable-marker crash/worker exit/stale child progress/uncertain external-effect HOLD",
+        "isolated host reboot recovery with persistent epoch/checkpoint and no duplicate external effects",
+        "private HTTPS Owner dashboard with source/artifact/roles/lease/fence/epoch/tests/reviews/deploy/acceptance/blocker/next-action and stale observation status"
+      ],
+      "power_cycle_scope": "ISOLATED_ENVIRONMENT_ONLY_NO_UNCONTROLLED_PRODUCTION_POWER_OFF",
+      "acceptance": "Raw event and host evidence for all cases, frozen release manifest and external authenticated HTTPS probe; all gates PASS before CLOSED_PASS",
+      "target_working_days": [
+        1,
+        2
+      ]
+    }
+  ],
+  "acceptance_commands": {
+    "p1_regression": "python3 -m unittest discover -s stage1 -p 'test_*.py' -v",
+    "p1_clean": "git status --porcelain=v1",
+    "p1_identity": [
+      "git rev-parse HEAD",
+      "git rev-parse HEAD^{tree}"
+    ],
+    "p1_compile": "python3 -m compileall -q stage1",
+    "notes": "Execute only in trusted clean isolated candidate; verify interpreter against artifact contract, capture exit code/discovered test count/skips and full report. Do not force old248 count when new tests are added. Platform acceptance commands must be derived from actual frozen paths, binaries and units and independently reviewed before execution; exact host details currently NOT_RECEIVED."
+  },
+  "result_transition": {
+    "route": "THIS_PRIVATE_PR17_AND_CANONICAL_LEDGER",
+    "coordinator": "Persist phase and immutable result before triggering next approved dependency; notification failure cannot erase completion",
+    "work": "Work can review while this run or an explicitly configured execution automation is active; PR comment alone does not prove a new Work run",
+    "automatic_work_wake": "NOT_VERIFIED_MUST_RETURN_ACTUAL_EVENT_OR_AUTOMATION_RUN_EVIDENCE",
+    "release_gate": "FAIL remains until explicit artifact-bound corrective report; no timestamp/scratch override"
+  },
+  "permissions": {
+    "production_deploy": false,
+    "production_db_write": false,
+    "production_config_write": false,
+    "old_coordinator_switch": false,
+    "formal_webhook_change": false,
+    "trading_permission_change": false,
+    "root_helper_install": false,
+    "generic_root_or_systemd_grant": false,
+    "customer_messages": false,
+    "public_dashboard_exposure": false
+  },
+  "current_status": {
+    "P0": "NOT_VERIFIED",
+    "P1": "CORE_DELTA_TESTED_COMBINATION_NOT_RECEIVED",
+    "P2": "NOT_INSTALLED_NOT_ACCEPTED",
+    "P3": "NOT_STARTED",
+    "security": "FAIL_CORRECTED",
+    "release": "HOLD",
+    "owner_action": "NONE_FOR_AUTHORIZED_CODE_WORK"
+  }
+}

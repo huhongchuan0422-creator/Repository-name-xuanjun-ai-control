@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "state": "SINGLE_FILE_SOURCE_VERIFIED_NARROW_PATCH_PREPARED",
+  "source_control_head": "c95a85df8560cb3c0465f30a12d3ca3f59ad1500",
+  "repair_spec_sha256": "9b242998bd64ae1d900389af190de576c1ca876cd02a5b53cf2ff07292d3c5e1",
+  "artifact_commit": "7ed631aabe240321656287bbd0c8ca546814c37c",
+  "artifact_tree": "aee5715e2a9bcba4fa90b40cfa4c0b3f5be40e87",
+  "source_comment_ids": [
+    6110143068,
+    6110143208,
+    6110143381
+  ],
+  "manifest_index_comment_id": 6110143508,
+  "file": "stage1/development_service.py",
+  "mode": "100644",
+  "before_sha256": "2ca26b352ab2fac561f2e43efdcba4b4b377c4f75a37ce6a83dd56b01a634957",
+  "before_git_blob": "9d6e448ceb8d99b29d39c9ba170f0c369b02976f",
+  "after_sha256": "ea75b210d4d3813f9a77abc3cf40d30b5c1c2445cdf861483febf4077696855d",
+  "patch_sha256": "02a69246bcd218c394c11101696aa3e53c6743cf345d2bcbcfc689c554facca4",
+  "chunk_tail_handling": "Part3 includes a separate exact git-index record after final padded base64; excluded only that record. Entire decoded file SHA256 and Git blob matched. Unknown tails are rejected.",
+  "repair": "Shared gpt-5.6-sol string-only validator at load_config and direct build_loop entry before activation/binary/DB. Existing required-model schema preserved; broker and other definitions unchanged by AST comparison.",
+  "validation": {
+    "focused_tests": 14,
+    "passed": 14,
+    "failed": 0,
+    "python36_syntax": "PASS",
+    "original_61_admission_reproduced": "YES_WITH_MOCK_GIT_NO_BINARY_EXECUTION",
+    "full_uk_regression": "NOT_RUN_FULL_SOURCE_MISSING",
+    "independent_qa": "AWAITING_REVIEW",
+    "independent_security": "AWAITING_REVIEW",
+    "native_model_inference": "NOT_RUN"
+  },
+  "apply_gate": [
+    "Verify no concurrent writer and current service before hash exactly matches. If changed, reconcile rather than overwrite.",
+    "Apply only the unified diff to the original B checkpoint under existing scope7; no new attempt, budget reset or A1/A2 restart.",
+    "Integrate earlier approved worker delta against actual source; preserve all original tests and add admission negatives to existing authorized tests.",
+    "Recompute existing manifest and freeze new commit/tree; clean full regression then independent same-artifact QA/security."
+  ],
+  "next_missing": [
+    "Complete frozen regular-source/85ad delta",
+    "Full install manifest bytes; index hash7a721b... is not pinned install manifest c157eb4c...",
+    "Original service tests and other scope7 source/tests",
+    "Full QA and corrected-security reports",
+    "Gateway close-layer diagnosis",
+    "Real run/session/lease/fence/epoch and executable broker/platform boundaries"
+  ],
+  "supersedes_security_receipt": null,
+  "security": "FAIL_ON_7ED_REMAINS",
+  "release": "HOLD",
+  "uk_integration": "NOT_EXECUTED_BY_WORK",
+  "uk_developer_start": "NOT_PROVEN",
+  "production_mutation": false,
+  "budget": "UNKNOWN_PRESERVED_NOT_RESET",
+  "webhook_work_invocation": "OBSERVED_ACTUAL_RUN_SOURCE_RECEIVED_AND_VALIDATED_NOT_UK_EXECUTION"
+}
