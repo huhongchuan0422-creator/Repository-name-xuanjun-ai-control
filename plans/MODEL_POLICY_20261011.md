@@ -32,11 +32,13 @@ The UK host `iZd7oeikknn1z21sq6ji6zZ` returned HTTP 400 for the existing
 ChatGPT/Codex route: gpt-6.1-sol is not supported on that route. This is not proof
 of quota exhaustion or a general prohibition on all ChatGPT accounts.
 
-5.6 inference, Feishu real reply, two-model failover and primary recovery are
-NOT_VERIFIED. Existing worker code and the root-pinned Sol-only diagnostic still
-enforce the previous model. The policy document itself does not alter those programs or configuration.
-The later Owner-assisted allowlist change below is a separate observed change,
-and still must not be reported as an inference or channel repair.
+Latest Owner-assisted evidence verifies real 5.6 minimal inference and activates
+5.6 as the sole fallback; primary and exact two-model allowlist are preserved.
+Feishu real reply, bounded failover and primary recovery remain NOT_VERIFIED.
+Worker candidates permit both models but require observed model/provider evidence;
+their automatic failover/recovery transport integration remains pending. The
+root-pinned Sol-only diagnostic is historical and must not be rerun now.
+See the latest acceptance section below; earlier failures are retained as history.
 
 Activation requires checking the installed OpenClaw/Codex version and actual
 allowlist, agent/session overrides and authentication route; minimally verifying
@@ -84,3 +86,35 @@ Next: identify the actual installed plugin and redacted admission/causal metadat
 before choosing a narrowly scoped repair. Preserve ownership enforcement; no
 wildcard policy, speculative credential replacement, paid API substitution,
 repeated unchanged inference, or blind runtime upgrade.
+
+## Latest UK real inference acceptance — 2026-10-11
+
+Source: Owner-posted output of the root/UK-host/hash-guarded
+scripts/uk-codex-post-align.py staged from commit
+2a44143da7cbb3a0794bf3a08d73ea4ce701ca83; source SHA256
+046f49f137117d288f7bd0ef98604bdb2e344a242413d33f443046eedb96b97d.
+This is Owner-assisted live evidence, not an independent Runner reproduction.
+
+- Selected plugin inspection exits 0; selected @openclaw/codex is 2026.9.9,
+  declared and installed Codex versions are both 0.160.0; policy_ok=true.
+- install_repeated=false: the successful continuation did not repeat installation.
+- Actual fresh 5.6 request exits 0, exact_reply=true,
+  returned_model=openai/gpt-5.6-sol, returned_provider=openai,
+  inference_verified=true, error_code=NONE.
+- sole_fallback_configured=true: the validated CAS configuration activation
+  completed. Primary remains openai/gpt-6.1-sol, sole fallback is
+  openai/gpt-5.6-sol, allowlist remains exactly these two models.
+- subscription_quota_pool=UNKNOWN. No unauthorized API billing was enabled.
+- channel_delivery=false, feishu_e2e=NOT_VERIFIED, production_pass=false.
+  Bounded primary-to-fallback routing and primary recovery remain NOT_VERIFIED.
+  The prior 5.6 403 is historical: this new minimal inference passed. The exact
+  cause of the earlier rejection is not proven solely by this success.
+- No new dispatcher/dashboard deployment, container isolation acceptance,
+  database migration, trading permission change or formal webhook cutover is
+  established by this result.
+
+The original Sol-only fixed diagnostic must not be reused with a nonempty
+fallback list. Do not repeat the successful installation or minimal 5.6 probe.
+Next model-path acceptance is an Owner-initiated Feishu reply through its actual
+route, with observed model/provider evidence; an echo alone is not a complete
+failover/recovery or autonomous-development E2E acceptance.

@@ -1,6 +1,6 @@
 # 未完成任务跟进索引
 
-更新：2026-10-11，Asia/Shanghai；核查基线 PR #17 `0c7919a1`；现场证据截至15:00。
+更新：2026-10-11，Asia/Shanghai；模型现场验收源 PR #17 `2a44143d`；以下当前状态取代历史失败记录。
 这是既有任务与验收证据的索引，不建立第二个执行队列，也不向旧 Coordinator
 投递 CODEX_EXEC。生产状态仍为 PARTIAL；代码测试通过不等于上线。
 
@@ -8,7 +8,7 @@
 
 | 范围 | 当前状态及证据 | 下一动作及依赖 |
 | --- | --- | --- |
-| 英国模型/飞书 | Owner已备份并验证两模型精确allowlist；6.1主配置、fallbacks=[]；5.6新隔离请求403 Owner归属拒绝；OpenClaw2026.9.9/Codex0.158.0 | 对照实际插件版本及脱敏请求归属/准入证据定位403；未定位前不重复canary、不盲目重登；5.6、飞书、切换及主模型恢复均未验收 |
+| 英国模型/飞书 | 5.6真实最小推理PASS：精确回复及openai/gpt-5.6-sol返回证据已核实；插件2026.9.9/Codex0.160.0；5.6唯一备用已配置、6.1仍为主 | 验收真实飞书回复及实际模型证据；有界切换、主模型恢复和开发Worker路径仍未完整验收；不重复安装或已成功canary |
 | 唯一执行者 | 13:38审计见3个Codex进程；不能据此判断原Work仍在写入 | 核对执行归属/活动与租约，取得唯一生产派发者证据后切换 |
 | 英国隔离 | Docker/containerd active；项目隔离未验证；服务CPU/内存上限infinity | 只读盘点容器、网络、卷、身份和SecretRef；按项目环境增量隔离及资源限制 |
 | CI失败暂停 | 本次候选补齐脱敏失败指纹、同指纹再失败暂停、重复SHA不刷新修复、断点保留3次预算 | 完整CI及冻结提交独立审查；跨子任务共享预算、全生命周期资源预算仍待补齐 |
@@ -30,10 +30,9 @@
 仅受影响路径登记 WAITING_HUMAN；下列是待落实到权威台账的索引，
 不声称这些记录已写入生产数据库。
 
-- UK_MODEL_REQUEST_OWNERSHIP：Owner已完成英国白名单备份修复及版本检查，
-  不再要求重复该人工步骤。新的5.6请求失败于403请求Owner归属校验；需要
-  现场实际插件版本及脱敏准入证据，不能据此要求重登或购买API。英国Runner
-  固定入口仍为旧Sol-only诊断，不得复用它反复探测已知不支持的6.1路径。
+- UK_FEISHU_REPLY_ACCEPTANCE：英国5.6最小推理已PASS，原403不再作为当前阻塞。
+  Owner已完成受控修复，不需重复安装、白名单修复或5.6 canary。下一人工入口为
+  真实飞书发起验收消息；需要回复及实际模型证据，不能据此宣称闭环PASS。
 - TARGET_ACCESS：现场核对韩国目标身份/入口及已有负载；不能把缺少访问证据
   当作缺少Owner授权，也不能宣称已连通。
 - PLATFORM_CONFIRMATION：需要时集中处理交易API新出口IP白名单与平台确认；
@@ -81,3 +80,35 @@ Next: identify the actual installed plugin and redacted admission/causal metadat
 before choosing a narrowly scoped repair. Preserve ownership enforcement; no
 wildcard policy, speculative credential replacement, paid API substitution,
 repeated unchanged inference, or blind runtime upgrade.
+
+## Latest UK real inference acceptance — 2026-10-11
+
+Source: Owner-posted output of the root/UK-host/hash-guarded
+scripts/uk-codex-post-align.py staged from commit
+2a44143da7cbb3a0794bf3a08d73ea4ce701ca83; source SHA256
+046f49f137117d288f7bd0ef98604bdb2e344a242413d33f443046eedb96b97d.
+This is Owner-assisted live evidence, not an independent Runner reproduction.
+
+- Selected plugin inspection exits 0; selected @openclaw/codex is 2026.9.9,
+  declared and installed Codex versions are both 0.160.0; policy_ok=true.
+- install_repeated=false: the successful continuation did not repeat installation.
+- Actual fresh 5.6 request exits 0, exact_reply=true,
+  returned_model=openai/gpt-5.6-sol, returned_provider=openai,
+  inference_verified=true, error_code=NONE.
+- sole_fallback_configured=true: the validated CAS configuration activation
+  completed. Primary remains openai/gpt-6.1-sol, sole fallback is
+  openai/gpt-5.6-sol, allowlist remains exactly these two models.
+- subscription_quota_pool=UNKNOWN. No unauthorized API billing was enabled.
+- channel_delivery=false, feishu_e2e=NOT_VERIFIED, production_pass=false.
+  Bounded primary-to-fallback routing and primary recovery remain NOT_VERIFIED.
+  The prior 5.6 403 is historical: this new minimal inference passed. The exact
+  cause of the earlier rejection is not proven solely by this success.
+- No new dispatcher/dashboard deployment, container isolation acceptance,
+  database migration, trading permission change or formal webhook cutover is
+  established by this result.
+
+The original Sol-only fixed diagnostic must not be reused with a nonempty
+fallback list. Do not repeat the successful installation or minimal 5.6 probe.
+Next model-path acceptance is an Owner-initiated Feishu reply through its actual
+route, with observed model/provider evidence; an echo alone is not a complete
+failover/recovery or autonomous-development E2E acceptance.

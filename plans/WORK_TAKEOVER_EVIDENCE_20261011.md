@@ -23,7 +23,7 @@ Observed source HEAD: cc3dcaa8b48e86bbb1880eb4180a83d344f47b56.
   of activity or inactivity. Read-only observation must precede any cutover.
 - HTTPS dashboard URL: NOT_VERIFIED. nginx is inactive; another TLS server
   or upstream has not been inspected. Do not reinstall an active dashboard.
-- Actual Sol inference and subscription entitlement: NOT_VERIFIED. Conventional
+- Initial actual Sol inference and subscription entitlement: NOT_VERIFIED (historical baseline; see latest 5.6 acceptance below). Conventional
   Codex binaries and `/home/xuanjun_dev/.codex/auth.json` remain absent.
   OpenClaw main auth-profile files also absent at the two inspected paths.
   This does not rule out another configured authentication location.
@@ -185,3 +185,35 @@ single new 5.6 request. An exclusive attempt marker prevents unchanged repeated
 probes. Verified model/provider and exact reply are required before existing
 validated CAS fallback activation. No repeated install, restart or DB restore.
 This continuation remains NOT_EXECUTED until the Owner runs its staged hash.
+
+## Latest UK real inference acceptance — 2026-10-11
+
+Source: Owner-posted output of the root/UK-host/hash-guarded
+scripts/uk-codex-post-align.py staged from commit
+2a44143da7cbb3a0794bf3a08d73ea4ce701ca83; source SHA256
+046f49f137117d288f7bd0ef98604bdb2e344a242413d33f443046eedb96b97d.
+This is Owner-assisted live evidence, not an independent Runner reproduction.
+
+- Selected plugin inspection exits 0; selected @openclaw/codex is 2026.9.9,
+  declared and installed Codex versions are both 0.160.0; policy_ok=true.
+- install_repeated=false: the successful continuation did not repeat installation.
+- Actual fresh 5.6 request exits 0, exact_reply=true,
+  returned_model=openai/gpt-5.6-sol, returned_provider=openai,
+  inference_verified=true, error_code=NONE.
+- sole_fallback_configured=true: the validated CAS configuration activation
+  completed. Primary remains openai/gpt-6.1-sol, sole fallback is
+  openai/gpt-5.6-sol, allowlist remains exactly these two models.
+- subscription_quota_pool=UNKNOWN. No unauthorized API billing was enabled.
+- channel_delivery=false, feishu_e2e=NOT_VERIFIED, production_pass=false.
+  Bounded primary-to-fallback routing and primary recovery remain NOT_VERIFIED.
+  The prior 5.6 403 is historical: this new minimal inference passed. The exact
+  cause of the earlier rejection is not proven solely by this success.
+- No new dispatcher/dashboard deployment, container isolation acceptance,
+  database migration, trading permission change or formal webhook cutover is
+  established by this result.
+
+The original Sol-only fixed diagnostic must not be reused with a nonempty
+fallback list. Do not repeat the successful installation or minimal 5.6 probe.
+Next model-path acceptance is an Owner-initiated Feishu reply through its actual
+route, with observed model/provider evidence; an echo alone is not a complete
+failover/recovery or autonomous-development E2E acceptance.
