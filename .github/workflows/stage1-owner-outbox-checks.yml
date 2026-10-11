@@ -24,3 +24,25 @@ jobs:
           python -m py_compile stage1/owner_notification_outbox.py stage1/test_owner_notification_outbox.py stage1/owner_approval_dispatch.py stage1/test_owner_approval_dispatch.py stage1/uk_owner_notify_worker.py stage1/test_uk_owner_notify_worker.py
           cd stage1
           python -m unittest -v test_owner_notification_outbox test_owner_approval_dispatch test_uk_owner_notify_worker
+
+  uk-stage-for-manual-install:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Stage UK Owner Batch1 sources (no production mutation)
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
+          DEST="/tmp/xj-uk-batch1-${GITHUB_SHA}"
+          umask 022
+          mkdir -p "$DEST"
+          cp stage1/{owner_approval_dispatch,owner_notification_outbox,uk_owner_notify_worker,telegram_owner_transport,telegram_owner_request_registry,uk_owner_callback_core}.py "$DEST/"
+          cp stage1/{test_owner_approval_dispatch,test_owner_notification_outbox,test_uk_owner_notify_worker,test_telegram_owner_transport,test_telegram_owner_request_registry,test_uk_owner_callback_core}.py "$DEST/"
+          printf '%s\\n' "$GITHUB_SHA" > "$DEST/SOURCE_COMMIT"
+          (cd "$DEST" && python3 -m unittest -q test_owner_approval_dispatch test_owner_notification_outbox test_uk_owner_notify_worker test_telegram_owner_transport test_telegram_owner_request_registry test_uk_owner_callback_core)
+          chmod -R a+rX "$DEST"
+          echo "UK_STAGE_PASS=$DEST"
