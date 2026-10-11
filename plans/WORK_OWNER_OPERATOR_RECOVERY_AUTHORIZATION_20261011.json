@@ -1,0 +1,148 @@
+{
+  "schema": 1,
+  "kind": "OWNER_APPROVED_UK_OPERATOR_RECOVERY_AND_DISPATCH",
+  "authority": "EXPLICIT_OWNER_INSTRUCTION",
+  "approval": "APPROVED_FOR_EXISTING_PLATFORM_AUTHORITY_OWNER_TO_APPLY",
+  "revision": "20261011_operator_recovery_v1",
+  "parent_task": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "owner_instruction": {
+    "local_time": "2026-10-11T23:02:14+08:00",
+    "text": "把权限给老子放大，不要这么小气",
+    "interpretation": "Authorize operator permissions and supported grant recovery needed to execute the existing UK development and independent review loop; ordinary authorized steps require no renewed Owner confirmation."
+  },
+  "binding": {
+    "repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control",
+    "pull_request": 17,
+    "control_head_before": "63578834cc5d721ab561c5da61f90e5a82d0c982",
+    "staged_contract_path": "plans/WORK_STAGED_EXECUTION_CONTRACT_20261011.json",
+    "staged_contract_sha256": "055d3ad1f41a3f8b64f8096e1f1e115b9cb07cc9e1669ab1be0963c47f43ee33",
+    "repair_spec_path": "plans/WORK_APPROVED_7ED631A_SECURITY_REPAIR_20261011.json",
+    "repair_spec_sha256": "9b242998bd64ae1d900389af190de576c1ca876cd02a5b53cf2ff07292d3c5e1",
+    "candidate_commit": "51f5d90554d236e9aad6eb49a4b0a7421ecc2777",
+    "candidate_tree": "c57a98eee172211c2113f108681d27a01586ea6a",
+    "candidate_receipt": 6110323604,
+    "diagnosis_receipt": 6110336815,
+    "work_diagnosis": 6110338326
+  },
+  "target": {
+    "host": "iZd7oeikknn1z21sq6ji6zZ",
+    "gateway": "EXISTING_UK_OPENCLAW_GATEWAY",
+    "coordinator": "EXISTING_PROJECT_COORDINATOR_MAIN",
+    "device_id": "MUST_RESOLVE_FROM_CURRENT_SIGNED_CLIENT_NO_GUESS",
+    "profile_id": "MUST_RESOLVE_FROM_EXISTING_ATTESTED_COORDINATOR_IDENTITY",
+    "connection_id": "MUST_CORRELATE_FAILING_TOOL_REQUEST_NOT_STATUS_PROBE",
+    "current_session": "PRESERVE_ORIGINAL_TASK_CHECKPOINT_DO_NOT_RESET",
+    "authority_owner": "EXISTING_AUTHORIZED_PLATFORM_OPERATOR_NO_NEW_IDENTITY"
+  },
+  "operator_scope_grants": {
+    "PROJECT_COORDINATOR": {
+      "scopes": [
+        "operator.read",
+        "operator.write",
+        "operator.questions"
+      ],
+      "purpose": [
+        "Read sessions and diagnostics",
+        "Start/resume the original B within approved workspace and preserved budget",
+        "Dispatch independent QA/security and platform preparation within current task",
+        "Receive evidence and advance approved eligible dependencies"
+      ]
+    },
+    "INDEPENDENT_QA_SECURITY": {
+      "scopes": [
+        "operator.read",
+        "operator.write",
+        "operator.questions"
+      ],
+      "purpose": [
+        "Create or continue separate existing-review workspaces and execute approved review methods on the same frozen artifact",
+        "Return independent artifact-bound decisions without developer self-approval"
+      ]
+    },
+    "EXISTING_PLATFORM_AUTHORITY": {
+      "scopes": [
+        "operator.read",
+        "operator.write",
+        "operator.pairing",
+        "operator.approvals",
+        "operator.questions"
+      ],
+      "purpose": [
+        "Apply this exact coordinator/reviewer operator grant via supported existing authority endpoint",
+        "Approve exact current signed operator-device pairing request within caller's own authority",
+        "Resolve bounded execution approvals for this approved task and prepare platform files"
+      ]
+    }
+  },
+  "authorized_runtime_changes": {
+    "operator_device_scope_approval": true,
+    "coordinator_named_role_scope_adjustment": true,
+    "scope": "Only existing UK coordinator/reviewer signed identity and exact operator scopes above; an existing administrator may adjust its attested role ceiling or supported channel operator grant only if necessary for this specific recovery.",
+    "supported_reconnect": true,
+    "persist_supported_device_token": true,
+    "credential_return_to_work": false,
+    "application_production_configuration_change": false,
+    "gateway_auth_disable": false,
+    "gateway_core_guard_removal": false,
+    "unapproved_runtime_upgrade": false
+  },
+  "apply_sequence": [
+    "Read current actual failed caller client/conn/role/profile/device and scopes; status probe capability alone does not identify this caller.",
+    "Existing authorized platform/operator owner reconciles approved device contract and current role ceiling. If already approved, repair only supported binding/reconnect, not permission expansion.",
+    "If required, existing administrator adjusts this exact coordinator/reviewer role ceiling for the listed scopes; no blanket profile or global role change.",
+    "Original same signed client uses supported scope-upgrade request. The existing authorized approver verifies exact current requestId/device/profile/requested-vs-approved and approves within its own grant. No --latest blind approval, local DB edits, hand-minted token, alternative identity or explicit-denial bypass.",
+    "Persist any new token only inside the supported original client credential store; reconnect normally and record negotiated hello.auth scopes without returning secrets.",
+    "Read sessions.list through that actual coordinator authority and reconcile original B live writer/lease/fence/epoch before one controlled dispatch or resume.",
+    "Dispatch independent QA/security on candidate51f5d90 only with matching source/manifest bytes and separate reviewer identity/workspace; return actual invocation/session/lease evidence and immutable artifact-bound results.",
+    "Retain existing GitHub evidence return and automatic eligible dependency progression; no renewed Owner prompt for these authorized operator steps."
+  ],
+  "failure_handling": {
+    "missing_authorized_approver": "HOLD_NO_AUTHORIZED_OPERATOR_RECOVERY_ENDPOINT with exact existing actor/endpoint missing; do not repeat closed-client calls",
+    "explicit_policy_deny": "Return structured denial and role/device ceiling; no alternate identity/CLI bypass",
+    "unknown_dispatch_effect": "Reconcile existing run and external effects before replay",
+    "no_scope_self_grant": true
+  },
+  "acceptance_fields": [
+    "parent_task",
+    "authorization_commit",
+    "authorization_sha256",
+    "existing_approver_identity_redacted",
+    "device_profile_binding_redacted",
+    "current_request_id_if_used",
+    "before_requested_approved_role_scope_summary",
+    "after_hello_role_scopes",
+    "coordinator_client_connection_correlation",
+    "sessions_list_read_result",
+    "original_B_run_session_workdir",
+    "lease_fence_epoch_or_precise_unavailable_reason",
+    "candidate_commit_tree",
+    "independent_QA_security_workspace_and_artifact_binding",
+    "budget_preserved"
+  ],
+  "boundaries": {
+    "operator_admin_to_coordinator": false,
+    "root_or_generic_systemd": false,
+    "production_install": false,
+    "production_DB_write": false,
+    "trading_or_formal_webhook_change": false,
+    "old_coordinator_switch": false,
+    "model": "openai/gpt-5.6-sol",
+    "fallbacks": [],
+    "auth_route": "EXISTING_OAUTH_CODEX",
+    "paid_api": false,
+    "new_UK_Developer_task": false,
+    "A1_A2_restart": false,
+    "budget_increase": false,
+    "developer_self_review": false
+  },
+  "precedence": "This explicit Owner authorization adds narrowly identified UK operator grant/role recovery to the prior contract. It supersedes statements that all operator scope expansion is unauthorized; original repair paths, budgets, review and release/platform gates remain. Permission changes must use an actually authorized existing approver; a GitHub artifact cannot create Gateway privileges.",
+  "current_truth": {
+    "owner_authorization": "APPROVED",
+    "work_has_UK_gateway_operator_tool": false,
+    "grant_applied": "NOT_VERIFIED",
+    "sessions_dispatch": "HOLD_PENDING_ACTUAL_OPERATOR_RECOVERY",
+    "candidate": "EXECUTOR_REPORTED_FROZEN_249_PASS",
+    "independent_QA_security": "NOT_RECEIVED",
+    "release": "HOLD"
+  }
+}

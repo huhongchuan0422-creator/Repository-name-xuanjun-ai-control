@@ -49,13 +49,15 @@
         "Write immutable result evidence back to GitHub and advance only eligible stages"
       ],
       "capability_state": "DISPATCH_AUTHORITY_CLOSED_REPORTED_NOT_RESTORED",
-      "policy": "Do not bypass explicit authority deny through CLI, another identity or alternate session. A supported reconnection by the actual authority owner is distinct from permission expansion."
+      "policy": "Owner explicitly authorized listed operator scope and identity-bound role recovery at23:02:14. Existing authorized platform approver must apply the referenced addendum through supported grant/reconnect. Closed clients cannot self-grant or bypass explicit denial via alternate identity/CLI; no renewed Owner permission for this approved recovery.",
+      "operator_recovery_authorization": "plans/WORK_OWNER_OPERATOR_RECOVERY_AUTHORIZATION_20261011.json"
     },
     "A2_PLATFORM_RELEASE_GATE": {
       "allowed_now": [
         "Readonly boundary/source inventory",
         "Exact files/users/modes/units/manifest preparation",
-        "Backup/restore/rollback and acceptance command preparation"
+        "Backup/restore/rollback and acceptance command preparation",
+        "Apply the exact Owner-approved UK operator recovery addendum through existing authorized platform/operator grant endpoint; production installation remains a separate gate."
       ],
       "install_now": false,
       "required_before_install": [
@@ -74,7 +76,7 @@
         "Explicit corrective verdict superseding FAIL",
         "Reject stale/mismatched review evidence"
       ],
-      "current_state": "NEW_COMBINATION_NOT_RECEIVED_NEW_REVIEW_NOT_RUN"
+      "current_state": "NEW_CANDIDATE_REPORTED_NOT_RECONSTRUCTED_NEW_INDEPENDENT_REVIEW_PENDING"
     },
     "OWNER": {
       "ordinary_code_reapproval": false,
@@ -93,7 +95,7 @@
         "submitted supported review"
       ],
       "configured": true,
-      "real_event_run": "NOT_VERIFIED",
+      "real_event_run": "VERIFIED_RESULT_HANDOFF_6110143068_6110143508_TO_WORK_DECISION_6110190442",
       "event_semantics": "Wake-up only; read latest authority and all unprocessed applicable evidence. CI completion and comment edits/deletions are not advertised as triggers."
     },
     "old_hourly_Work_trigger": {
@@ -165,12 +167,13 @@
   },
   "completion": "Two consecutive actual tasks with real handoff/approved and rejected routes, same-artifact reviews, controlled installation, actual interruption/restart recovery and authenticated private HTTPS dashboard all accepted. Authorization document/configured automation alone is not CLOSED_PASS.",
   "current_truth": {
-    "event_trigger": "CONFIGURED_ENABLED_NOT_RUN_VERIFIED",
+    "event_trigger": "ACTUAL_GITHUB_RESULT_EVENT_RUN_OBSERVED_SOURCE_RECEIVED_REPAIR_DELIVERED",
     "old_hourly": "DISABLED",
-    "UK_dispatch": "HOLD_WORK_EXECUTION_ENTRY_DISABLED",
-    "source_received": "NO_COMPLETE_7ED_OR_REPAIRED_ARTIFACT",
+    "UK_dispatch": "HOLD_OPERATOR_RECOVERY_AUTHORIZED_NOT_APPLIED_VERIFIED",
+    "source_received": "VERIFIED_7ED_SERVICE_FILE_ONLY_NEW_51F5D90_FULL_ARTIFACT_PENDING",
     "security": "FAIL_CORRECTED",
     "release": "HOLD",
-    "production": "NOT_DEPLOYED_NOT_ACCEPTED"
+    "production": "NOT_DEPLOYED_NOT_ACCEPTED",
+    "candidate": "EXECUTOR_REPORTED_51F5D90_CLEAN_249_PASS_6110323604"
   }
 }
