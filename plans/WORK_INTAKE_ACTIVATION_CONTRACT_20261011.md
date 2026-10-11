@@ -80,7 +80,9 @@ Required dedicated boundaries (actual users/groups must be inspected):
 | Intake lock | respective writer | 0600 | Advisory local serialization |
 
 Templates: deploy/uk-work-intake/{config.json,xuanjun-work-intake.service,
-xuanjun-work-intake.timer}. Timer is proposed at 30 seconds; unit is oneshot,
+xuanjun-work-intake.path,xuanjun-work-intake.timer}. Directory change events
+propose immediate activation; the timer reconciles at boot (30 seconds) and
+120 seconds after the consumer becomes inactive. The unit is oneshot,
 unprivileged, NNP, PrivateTmp, with bounded CPU/memory/tasks. Template validation
 is not evidence of systemd239 installation or runtime viability.
 
@@ -102,3 +104,67 @@ read/write denial; real systemd239 timer/reboot; actual Gateway profile and OAut
 route; one approved new-source automatic receipt; replay/new-document-SHA no wake;
 crash effect-unknown reconciliation and no customer/channel delivery. Production
 loop, HTTPS dashboard, two tasks and migration retain their separate gates.
+
+## Event delivery and task supervision are separate — 2026-10-11 19:00 CST
+
+Owner relayed a live UK inspection: the installed module/config/inbox/receipt
+directories and intake timer were absent. This confirms the missing installation
+from a relayed inspection; Work has not independently probed those paths. An
+approved source fetched by Runner cannot wake OpenClaw by itself.
+
+The proposed delivery chain is GitHub push -> existing Actions/UK Runner ->
+atomic immutable local envelope -> systemd.path -> the same non-root consumer.
+The timer uses that same consumer for boot/missed-event reconciliation. Neither
+unit polls GitHub or receives a public webhook. Both retain the identical
+parent-task/spec deduplication journal, including the manually started A1/A2.
+Events are hints, not durable acknowledgements; overlapping triggers are
+serialized by the service/journal and the timer revisits durable requests.
+
+Use PathChanged on the request directory, not DirectoryNotEmpty: immutable
+envelopes remain after consumption and a permanently nonempty directory would
+continuously reactivate the service. Receipts are written to a separate path;
+consumer reads do not write the inbox. Lock/temp-file directory events can cause
+a harmless pre-publication scan; atomic complete publication plus the timer
+provides another opportunity. Existing contents at watcher startup are handled
+by OnBootSec. No assumption of exactly-once events is made. Admission must test
+event storms/start limiting, an event during a running consumer, watcher restart,
+missed events and boot with an existing envelope. 120 seconds is a scheduling
+interval, not a guaranteed end-to-end response SLA.
+
+This transport is not a heartbeat watchdog and must not restart a task merely
+because a model response or Agent session stopped. No separate task DB or lease
+authority is introduced. The forthcoming A2 canonical ledger/broker must own
+task leases, fences, process identities, persistent checkpoints and recovery.
+Current source already has heartbeat/checkpoint/lease-expiry mechanisms, but
+only a validated read-only CI_WAIT checkpoint is automatically requeued.
+Other expired model/tool phases become WAITING_HUMAN for uncertain effects.
+Do not advertise general automatic model-task recovery from these unit tests.
+
+Lifecycle release requirements:
+- Persist source/spec, phase, lease/fence/epoch, role identity, checkpoint,
+  failure fingerprint, preserved remaining budget, next action and blocker.
+- Observe actual Worker/session or cgroup progress separately from dispatcher
+  liveness. Dispatcher heartbeats alone must not make a stuck child look active.
+- A supervisor independent of the blocked model turn must detect process exit,
+  stale progress and bounded runtime. Revoke the fence and stop/wait the actual
+  unit/cgroup before a successor is admitted. Prove crash/reboot cases live.
+- Reconcile a completed external action by its immutable idempotency identity;
+  resume only mechanically proven safe steps. An unknown GitHub/model/publish
+  effect stays HOLD/WAITING_HUMAN with cause, checkpoint and required action.
+  No blind turn replay, budget reset or indefinite repair loop.
+- Unlock B only on a validated A2 contract freeze and C only on actual release
+  admission. QA/security must bind the final artifact. Continue independent
+  ready tasks while an affected task waits for a human or Work review.
+- Dashboard distinguishes last heartbeat, last progress, stale/paused/error,
+  awaiting Work, WAITING_HUMAN and completion; never retain an unqualified
+  STARTED badge after an unverified or expired heartbeat.
+
+Work executes while its conversation or an explicitly configured run is active.
+A chat response ending does not create a continuously running Work agent. The
+UK supervised runtime must persist execution and surface any Work review
+dependency explicitly. Neither this path unit nor the existing read-only hourly
+check invokes Work to integrate a patch or approve a release.
+
+No platform installation, model call, production change or repeated A1/A2 wake
+was performed for this increment. Package the path/timer with the same frozen
+A2 reviewed installation manifest; do not add a competing root installer.

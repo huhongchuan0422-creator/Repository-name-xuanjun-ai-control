@@ -402,3 +402,19 @@ Work implemented scripts/uk-work-intake.py outside A1/A2's exclusive files. It p
 Local full regression 242 PASS / intake 20 PASS; Python3.6 AST and local systemd template verification PASS. Independent Work code and security reviewers first returned FAIL; metadata spoofing, receipt secrets/false PASS, Git replace, auth-to-send freshness gap, late publisher overwrite, malformed JSON/output limit and FIFO blocking were fixed and negative-tested. Final reviews PASS for this intake candidate scope. Script SHA256 40d87f1deee7cd0a2183744ce385b80d278a34eeed136feb83683810a2b675e8. This does not qualify UK A1/A2's forthcoming artifact or production release.
 
 Workflow calls only a separately installed root-owned, hash-matching module. With no installation it reports WAITING_REVIEWED_PLATFORM_INSTALL and NOT_EXECUTED; no model/Agent start is added to the ordinary source staging path. Platform gate: controlled installation integrated with the frozen A2 platform contract, actual publisher/consumer UID+group-read boundaries, systemd239 timer/reboot, fixed Gateway profile and OAuth route, automatic new-spec receipt and replay/crash tests. Details: plans/WORK_INTAKE_ACTIVATION_CONTRACT_20261011.md. No timer/root installation or production change has occurred. Current A1/A2 source/spec stay pinned to 76c0cfe7/deb33417; preserve checkpoints and budget; B/C dependencies unchanged.
+
+## Event intake and interrupted-task follow-up — 2026-10-11 19:00 CST
+
+Owner relayed UK verification that intake module/config/directories/timer are
+not installed. Work adds a candidate systemd.path for atomic inbox publication
+and changes the shared consumer timer to boot reconciliation plus 120 seconds
+after inactivity. No GitHub polling token, public webhook, alternate task queue
+or repeated A1/A2 assignment is added. Event delivery remains NOT_DEPLOYED.
+
+Intake receipts do not monitor child tasks. Persistent progress/lease expiry,
+actual cgroup stop, side-effect reconciliation and safe checkpoint recovery
+belong to A2's canonical runtime and must be live-tested before unattended PASS.
+Existing code can automatically recover verified CI_WAIT only; general expired
+model/tool phases remain WAITING_HUMAN. An active Work chat and read-only hourly
+tracking are not continuous execution. Display awaiting Work/paused/stale with
+cause and next action, and keep independent ready tasks moving.

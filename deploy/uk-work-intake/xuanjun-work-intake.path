@@ -1,0 +1,14 @@
+[Unit]
+Description=Watch the reviewed Work inbox for immutable publication
+ConditionPathExists=/etc/xuanjun-work-intake.json
+ConditionPathIsDirectory=/var/lib/xuanjun-work-intake/requests
+
+[Path]
+# Publisher atomically renames a complete envelope into this directory.
+# Receipts belong elsewhere; consumed immutable envelopes remain in the inbox.
+# DirectoryNotEmpty would continually reactivate this service.
+PathChanged=/var/lib/xuanjun-work-intake/requests
+Unit=xuanjun-work-intake.service
+
+[Install]
+WantedBy=multi-user.target

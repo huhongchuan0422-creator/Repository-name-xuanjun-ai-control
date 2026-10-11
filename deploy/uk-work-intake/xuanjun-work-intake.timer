@@ -1,9 +1,9 @@
 [Unit]
-Description=Check approved Work intake every 30 seconds
+Description=Reconcile approved Work intake after boot and missed inbox events
 
 [Timer]
 OnBootSec=30
-OnUnitInactiveSec=30
+OnUnitInactiveSec=120
 AccuracySec=5
 Unit=xuanjun-work-intake.service
 
