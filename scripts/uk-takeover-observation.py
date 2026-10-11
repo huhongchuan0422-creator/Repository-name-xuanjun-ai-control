@@ -7,6 +7,7 @@ import os
 import socket
 import stat
 import subprocess
+import shutil
 
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
 PATHS = [
@@ -16,6 +17,39 @@ PATHS = [
     '/etc/systemd/system/xuanjun-uk-owner-dashboard.service',
     '/usr/local/sbin/xuanjun-uk-owner-audit',
 ]
+
+
+def observe_isolation():
+    """Report only allowlisted unit properties; never env, args or secrets.
+
+    Runtime installation and systemd hardening alone do not prove project
+    container boundaries. No Docker socket access is granted to this observer.
+    """
+    result = {'project_container_isolation': 'NOT_VERIFIED',
+              'runtime_binaries': {name: bool(shutil.which(name))
+                                   for name in ('docker', 'podman', 'containerd')},
+              'units': {}}
+    properties = ('ActiveState', 'NoNewPrivileges', 'PrivateTmp',
+                  'ProtectSystem', 'ProtectHome', 'MemoryMax', 'CPUQuotaPerSecUSec')
+    units = ('docker.service', 'containerd.service', 'podman.service',
+             'xuanjun-uk-openclaw.service', 'xuanjun-uk-stage1-minimal.service',
+             'xuanjun-uk-owner-dashboard.service')
+    for unit in units:
+        try:
+            proc = subprocess.run(['/usr/bin/systemctl', 'show', unit,
+                                   '--property=' + ','.join(properties)],
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                  timeout=5, check=False)
+            values = {}
+            if proc.returncode == 0:
+                for line in proc.stdout[:4096].decode('utf-8', 'replace').splitlines():
+                    key, separator, value = line.partition('=')
+                    if separator and key in properties and len(value) <= 64:
+                        values[key] = value
+            result['units'][unit] = values or {'status': 'UNKNOWN'}
+        except (OSError, subprocess.SubprocessError):
+            result['units'][unit] = {'status': 'UNKNOWN'}
+    return result
 
 
 def observe_file(path):
@@ -57,6 +91,7 @@ def main():
         except OSError:
             pass
     result['candidate_processes'] = result['candidate_processes'][:100]
+    result['isolation_observation'] = observe_isolation()
     print(json.dumps(result, sort_keys=True))
     if os.path.isfile('/usr/local/sbin/xuanjun-uk-owner-audit'):
         subprocess.run(['sudo', '-n', '/usr/local/sbin/xuanjun-uk-owner-audit'],

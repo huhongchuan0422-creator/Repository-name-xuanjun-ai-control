@@ -55,3 +55,26 @@ The previous diagnostic discarded unclassified CLI stderr. A corrected bounded
 diagnostic preserves credential-redacted error lines and recognizes Gateway
 permission/transport and Codex runtime failure classes. The fixed no-argument
 Runner capability is for this diagnostic only, never a shell or deploy command.
+
+## Actual account-path rejection at 05:34Z
+
+Owner installed the hash-pinned fixed no-argument diagnostic successfully on
+the UK host. The real canary returned HTTP400 invalid_request_error:
+`The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.`
+This is an account/client/runtime-path rejection, not evidence of quota
+exhaustion. Which account eligibility, client version or runtime routing causes
+it is still NOT_VERIFIED. Official model documentation says availability varies
+by account and client; do not generalize this result to all ChatGPT sign-ins.
+Feishu real reply remains unverified. No fallback or API purchase was enabled.
+Do not rerun identical inference without new evidence or a targeted correction.
+
+The exact rejection is already preserved in the bounded masked diagnostic even
+though its narrow error classifier currently labels it UNKNOWN. Classification
+alone does not change the live error. Preserve the installed helper's pinned
+bytes pending an actual runtime/authorization correction.
+
+Owner now requires all Tokyo assets migrated before 2026-10-20 (Asia/Shanghai):
+development to UK, Binance production and Telegram forwarding to Korea,
+operations on domestic. UK may also temporarily host community split and
+public-welfare video projects with independently verified project/environment
+isolation. See plans/TOKYO_MIGRATION_DEADLINE_20261020.md.
