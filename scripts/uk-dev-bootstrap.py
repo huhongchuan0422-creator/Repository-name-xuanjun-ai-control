@@ -72,7 +72,7 @@ def mode(path):
 result={'runtime_acceptance':'UNKNOWN','auth_files':{p:mode(p) for p in [HOME+'/.codex/auth.json',HOME+'/.openclaw/agents/main/agent/auth-profiles.json',TOKEN]},'binaries':[],'units':{}}
 for p in [HOME+'/.openclaw/bin/codex',HOME+'/.local/bin/codex','/usr/local/bin/codex','/usr/bin/codex',HOME+'/.openclaw/bin/openclaw']:
  if os.path.isfile(p):result['binaries'].append(p)
-for unit in ['xuanjun-uk-openclaw.service','xuanjun-uk-stage1-minimal.service','xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.service','xj-uk-domestic-customer-tunnel.service','xj-uk-owner-notify.timer']:
+for unit in ['xuanjun-uk-openclaw.service','xuanjun-uk-stage1-minimal.service','xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.service','xj-uk-domestic-customer-tunnel.service','xj-uk-owner-notify.timer','nginx.service']:
  code,out=run(['/usr/bin/systemctl','is-active',unit])
  value=out.strip()
  result['units'][unit]=value if value in ('active','inactive','failed','activating','deactivating','unknown') else 'UNKNOWN'
@@ -117,7 +117,7 @@ except Exception:result['ssh_config_status']='UNKNOWN'
 cli=HOME+'/.openclaw/bin/openclaw'
 result['openclaw_help']={}
 if os.path.isfile(cli):
- for name,args in [('root',['--help']),('models',['models','--help'])]:
+ for name,args in [('root',['--help']),('models',['models','--help']),('agent',['agent','--help']),('auth',['models','auth','--help'])]:
   code,out=run(['/usr/sbin/runuser','-u','xuanjun_dev','--',cli]+args)
   # Only syntactic option flags survive; never emit raw help/diagnostics.
   result['openclaw_help'][name]={'exit_code':code,'flags':sorted(set(re.findall(r'(?<![A-Za-z0-9_])--[a-z][a-z0-9-]{0,63}',out)))[:120]}
