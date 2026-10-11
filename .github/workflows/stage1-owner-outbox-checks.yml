@@ -4,6 +4,8 @@ on:
     paths:
       - 'stage1/owner_notification_outbox.py'
       - 'stage1/test_owner_notification_outbox.py'
+      - 'stage1/owner_approval_dispatch.py'
+      - 'stage1/test_owner_approval_dispatch.py'
       - '.github/workflows/stage1-owner-outbox-checks.yml'
 permissions:
   contents: read
@@ -17,6 +19,6 @@ jobs:
           python-version: '3.12'
       - name: Unit tests
         run: |
-          python -m py_compile stage1/owner_notification_outbox.py stage1/test_owner_notification_outbox.py
+          python -m py_compile stage1/owner_notification_outbox.py stage1/test_owner_notification_outbox.py stage1/owner_approval_dispatch.py stage1/test_owner_approval_dispatch.py
           cd stage1
-          python -m unittest -v test_owner_notification_outbox
+          python -m unittest -v test_owner_notification_outbox test_owner_approval_dispatch
