@@ -95,3 +95,38 @@ The corrected candidate inherits provider scope in the provider-filtered auth
 response and emits only enum auth evidence plus masked diagnostics. Unknown,
 foreign-only or mixed API-key auth remains blocked. Production model config,
 login and channels have not been changed. Corrected live probe is pending.
+
+## UK Owner evidence at 2026-10-11 15:00 Asia/Shanghai
+
+Source: Owner-posted host-guarded command outputs; not an independent Runner
+reproduction. Host: iZd7oeikknn1z21sq6ji6zZ (UK).
+
+- Owner applied a native-validated, backed-up atomic configuration update. The
+  defaults allowlist is exactly openai/gpt-6.1-sol and openai/gpt-5.6-sol. A main
+  agent explicit model policy, if present, was updated to the same allowlist.
+- Backup: /home/xuanjun_dev/.openclaw/openclaw.json.xj-model-backup-fac5565d095b47f3b7ee169c403a3640.
+- A fresh isolated main-agent 5.6 request then failed with HTTP 403:
+  "Codex cannot verify the owner of this model request. Start a fresh request before retrying."
+  No exact nonce reply or returned model/provider was verified. The earlier
+  model-allowlist denial is no longer the observed failure. This new error does
+  not establish expired OAuth, quota exhaustion, or 5.6 account incompatibility.
+- The follow-up read-only version/config check reports OpenClaw 2026.9.9,
+  managed Codex 0.158.0, primary openai/gpt-6.1-sol, fallbacks=[], and the exact
+  two-model allowlist. No app-server command override was configured;
+  homeScope/transport were DEFAULT_OR_UNKNOWN, not a verified explicit value.
+- Production configuration mutation occurred for the allowlist only. Sole
+  fallback activation did not occur because actual 5.6 inference failed.
+  Feishu E2E, bounded failover, primary recovery and production loop remain
+  NOT_VERIFIED. No channel delivery or production cutover was performed.
+
+Upstream OpenClaw source at 11d3d04a1279781a770f6a6aa09e6322b064b80a,
+extensions/codex/src/app-server/inference-dispatch.ts, emits the exact Owner
+error at multiple request-metadata/custody authorization failures. Issue
+https://github.com/openclaw/openclaw/issues/165739 describes the same message
+for re-tasked native children, but our fresh main-agent CLI request is a different
+scenario. Installed source equivalence and the rejected custody step are
+NOT_VERIFIED. This is a diagnostic lead, not a confirmed cause or fixed release.
+Next: identify the actual installed plugin and redacted admission/causal metadata
+before choosing a narrowly scoped repair. Preserve ownership enforcement; no
+wildcard policy, speculative credential replacement, paid API substitution,
+repeated unchanged inference, or blind runtime upgrade.
