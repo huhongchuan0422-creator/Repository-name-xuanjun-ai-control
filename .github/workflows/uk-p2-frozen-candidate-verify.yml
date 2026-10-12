@@ -18,9 +18,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with: {persist-credentials: false}
+        with:\n          persist-credentials: false
       - name: Download exact package using Python 3.6 stdlib only
-        env: {GH_TOKEN: ${{ github.token }}}
+        env:\n          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
