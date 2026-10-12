@@ -5,11 +5,14 @@ on:
     paths:
       - scripts/uk-supervisor-binding-audit.py
       - .github/workflows/uk-supervisor-binding-audit.yml
+concurrency:
+  group: xuanjun-readonly-supervisor-binding-audit
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
   audit:
-    runs-on: [self-hosted, Linux, X64, uk]
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
