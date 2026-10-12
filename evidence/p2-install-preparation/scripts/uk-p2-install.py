@@ -4,6 +4,10 @@ import argparse
 import importlib.util
 import json
 import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, 'stage1'))
 
 from activation_control import ActivationStore
 from ledger_cutover_transaction import LedgerCutoverTransaction
