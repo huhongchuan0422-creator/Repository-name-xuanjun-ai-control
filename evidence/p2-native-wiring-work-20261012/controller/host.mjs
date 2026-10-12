@@ -120,7 +120,8 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
       const expected=preparedSandboxes.get(sessionKey);
       if(!expected||expected.runtimeId!==unit.name||expected.backendId!==unit.backend
         ||expected.workspaceDir!==request.workdir||!store.guard(request))return null;
-      const cfg=config();
+      const cfg=config(),agentId=selectAgent(request);
+      if(!agentId)return null;
       const current=await resolveSandboxContext({config:cfg,agentId,sessionKey,
         workspaceDir:request.workdir,requireCurrentConfig:true,
         assertCurrent:()=>{if(!store.guard(request))hold('PLACEMENT_LEASE');}});
