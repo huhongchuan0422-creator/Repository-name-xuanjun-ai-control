@@ -1,0 +1,20 @@
+name: UK P2 authoritative prerequisite audit
+on:
+  push:
+    branches: [build/p2-manual-package-20261012]
+    paths: ['.github/workflows/uk-p2-package-audit.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - name: Existing installed fixed root reader
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          test "$(sha256sum /usr/local/sbin/xuanjun-uk-install-audit | cut -d' ' -f1)" = 1fa4bf89868de245a82e1a7a22ae6035acd1975b42de3252197b68d08fa676c8
+          sudo -n /usr/local/sbin/xuanjun-uk-install-audit
