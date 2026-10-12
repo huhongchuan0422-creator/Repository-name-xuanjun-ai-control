@@ -162,17 +162,54 @@ class FixedRuntimeTests(unittest.TestCase):
     def test_database_proof_is_read_only_and_precedes_service_start(self):
         descriptor={'state': 'QUIESCED',
                     'db_path': '/var/lib/xuanjun-development/generations/1/state.sqlite'}
-        with patch.object(self.runtime, '_authority'):
+        with patch.object(self.runtime, '_authority'),patch.object(self.runtime,'_prepare_database_access'):
             self.assertEqual(self.runtime.reopen_database(descriptor),
                              {'database_reopened': True})
-        self.assertEqual(self.commands[0][0], '/usr/bin/python3')
-        self.assertIn('mode=ro', self.commands[0][4])
+        self.assertEqual(self.commands[0][:5], ['/usr/sbin/runuser','--user','xuanjun-dispatcher','--','/usr/bin/python3'])
+        self.assertIn('mode=ro', self.commands[0][8])
         self.assertFalse(any('systemctl' in item for command in self.commands for item in command))
 
     def test_stop_inhibits_triggers_and_includes_socket_activated_services(self):
         self.assertEqual(module.STOP_SERVICES[:3], (
             'xuanjun-github-intake.timer','xuanjun-ledger.socket','xj-root-broker.socket'))
         self.assertIn('xuanjun-ledger.service',module.STOP_SERVICES)
+
+    def test_ledger_access_rejects_unreviewed_generation_owner(self):
+        from types import SimpleNamespace
+        from test_p2_prerequisites import plan
+        p=plan();uid=p['users']['xuanjun-dispatcher']['uid']
+        gid=p['groups']['xuanjun-control-db']
+        raw=json.dumps({'prerequisites':p}).encode()
+        with patch.object(module,'_read_regular',return_value=(raw,SimpleNamespace(st_uid=0,st_mode=0o100600))), \
+             patch.object(module.pwd,'getpwnam',return_value=SimpleNamespace(pw_uid=uid)), \
+             patch.object(module.grp,'getgrnam',return_value=SimpleNamespace(gr_gid=gid)), \
+             patch.object(module.os,'fchown') as change:
+            with self.assertRaisesRegex(ValueError,'PRIVATE_DECLARED_GENERATION'):
+                self.runtime._prepare_database_access('/var/lib/xuanjun-development/generations/1/state.sqlite')
+            change.assert_not_called()
+
+    def test_ledger_access_durable_intent_precedes_ownership_effect(self):
+        from types import SimpleNamespace
+        from test_p2_prerequisites import plan
+        p=plan();uid=p['users']['xuanjun-dispatcher']['uid'];gid=p['groups']['xuanjun-control-db']
+        parent='/var/lib/xuanjun-development/generations/1'
+        p['directories'].append(dict(path=parent,uid=uid,gid=gid,mode=0o700))
+        raw=json.dumps({'prerequisites':p}).encode();events=[]
+        before=SimpleNamespace(st_mode=0o100600,st_nlink=1,st_uid=0,st_gid=0,st_dev=1,st_ino=2)
+        after=SimpleNamespace(st_mode=0o100600,st_uid=uid,st_gid=gid)
+        with patch.object(module,'_read_regular',return_value=(raw,SimpleNamespace(st_uid=0,st_mode=0o100600))), \
+             patch.object(module.pwd,'getpwnam',return_value=SimpleNamespace(pw_uid=uid)), \
+             patch.object(module.grp,'getgrnam',return_value=SimpleNamespace(gr_gid=gid)), \
+             patch.object(self.runtime.prerequisites,'directory_matches'), \
+             patch.object(module.os.path,'lexists',return_value=False), \
+             patch.object(module.os,'open',return_value=17), \
+             patch.object(module.os,'fstat',side_effect=[before,after]), \
+             patch.object(module.os,'lstat',return_value=before), \
+             patch.object(module.os,'fchown',side_effect=lambda *a:events.append('CHOWN')), \
+             patch.object(module.os,'fsync'),patch.object(module.os,'close'), \
+             patch.object(module,'_atomic_receipt',side_effect=lambda path,r:events.append(r['state'])):
+            self.runtime._prepare_database_access(parent+'/state.sqlite')
+        self.assertEqual(events,['INTENT','CHOWN','DONE'])
         self.assertIn('xj-root-broker.service',module.STOP_SERVICES)
         self.assertIn('xuanjun-github-intake.service',module.STOP_SERVICES)
 
