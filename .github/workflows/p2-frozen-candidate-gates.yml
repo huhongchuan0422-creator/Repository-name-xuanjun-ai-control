@@ -1,71 +1,30 @@
-name: P2 frozen candidate mechanical QA Security
+name: P2 authoritative package mechanical QA Security
 on:
   push:
-    branches: [repair/p2-chatgpt-clean-review-20261013]
+    branches:
+      - repair/p2-chatgpt-clean-review-20261013
     paths:
       - .github/workflows/p2-frozen-candidate-gates.yml
 permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: '11778873716'
-  P2_TAR_SHA256: 'b279c3a88aed317a5fcd34af7c165d68ab3870773d3f21dcfe89d4fc09a584a9'
-  P2_SOURCE_COMMIT: '7c28108cfe089e150bdcd103058d79c6377956f0'
-  P2_SOURCE_TREE: 'af25a905eae7297d1d9884146a0e761f67de2c43'
-  P2_MANIFEST_SHA256: '6319f90b32aa25955dcf5352184411bfab080e0c730ec7079ad78f9bfeda6e0e'
+  P2_ARTIFACT_ID: "11778873716"
+  P2_TAR_SHA256: "b279c3a88aed317a5fcd34af7c165d68ab3870773d3f21dcfe89d4fc09a584a9"
+  P2_SOURCE_COMMIT: "7c28108cfe089e150bdcd103058d79c6377956f0"
+  P2_SOURCE_TREE: "af25a905eae7297d1d9884146a0e761f67de2c43"
+  P2_MANIFEST_SHA256: "6319f90b32aa25955dcf5352184411bfab080e0c730ec7079ad78f9bfeda6e0e"
 jobs:
   qa:
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:\n          persist-credentials: false
-      - name: Download and safely extract exact authoritative package
-        env:\n          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
-          python3 -I -B - <<'PY'
-          import hashlib,io,os,tarfile,zipfile
-          z=zipfile.ZipFile('/tmp/p2.zip')
-          raw=z.read('p2-candidate.tar.gz')
-          assert hashlib.sha256(raw).hexdigest()==os.environ['P2_TAR_SHA256']
-          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
-              seen=set()
-              for m in t.getmembers():
-                  parts=m.name.split('/')
-                  assert parts and parts[0]=='xuanjun-p2-package' and not m.name.startswith('/')
-                  assert all(p not in ('','.', '..') for p in parts)
-                  assert m.name not in seen and m.isfile()
-                  seen.add(m.name)
-              t.extractall('/tmp/p2pkg')
-          open('/tmp/p2-candidate.tar.gz','wb').write(raw)
-          PY
-      - name: Authoritative freezer and real release-installer identity verify
-        run: |
-          set -euo pipefail
-          ROOT=/tmp/p2pkg/xuanjun-p2-package
-          python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz \
-            --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
-          python3 -I -B - <<'PY'
-          import importlib.util,os
-          root='/tmp/p2pkg/xuanjun-p2-package'
-          p=root+'/scripts/uk-integration-install.py'
-          spec=importlib.util.spec_from_file_location('installer',p)
-          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-          m.verify(root,root+'/deploy/integration-manifest.json',
-                   os.environ['P2_SOURCE_COMMIT'],os.environ['P2_MANIFEST_SHA256'],
-                   os.environ['P2_SOURCE_TREE'])
-          print('P2_REAL_RELEASE_INSTALLER_VERIFY=PASS')
-          PY
-          echo P2_FROZEN_QA_MECHANICAL=PASS
-          echo RELEASE_GATE=NOT_GRANTED
-  security:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 4
-    steps:
-      - name: Download and verify exact authoritative package
-        env: {GH_TOKEN: ${{ github.token }}}
+        with:
+          persist-credentials: false
+      - name: Download exact artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
@@ -74,21 +33,60 @@ jobs:
           raw=zipfile.ZipFile('/tmp/p2.zip').read('p2-candidate.tar.gz')
           assert hashlib.sha256(raw).hexdigest()==os.environ['P2_TAR_SHA256']
           with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
-              names=set()
+              seen=set()
               for m in t.getmembers():
                   parts=m.name.split('/')
                   assert m.isfile() and parts[0]=='xuanjun-p2-package'
-                  assert all(p not in ('','.', '..') for p in parts) and m.name not in names
-                  names.add(m.name)
+                  assert all(p not in ('','.', '..') for p in parts) and m.name not in seen
+                  seen.add(m.name)
+              t.extractall('/tmp/p2pkg')
+          open('/tmp/p2-candidate.tar.gz','wb').write(raw)
+          PY
+      - name: Verify freezer and real release installer
+        run: |
+          set -euo pipefail
+          ROOT=/tmp/p2pkg/xuanjun-p2-package
+          python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          python3 -I -B - <<'PY'
+          import importlib.util,os
+          root='/tmp/p2pkg/xuanjun-p2-package'
+          spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          m.verify(root,root+'/deploy/integration-manifest.json',os.environ['P2_SOURCE_COMMIT'],os.environ['P2_MANIFEST_SHA256'],os.environ['P2_SOURCE_TREE'])
+          print('P2_REAL_RELEASE_INSTALLER_VERIFY=PASS')
+          PY
+          echo P2_AUTHORITATIVE_QA_MECHANICAL=PASS
+          echo RELEASE_GATE=NOT_GRANTED
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Download and inspect exact artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
+          python3 -I -B - <<'PY'
+          import hashlib,io,os,tarfile,zipfile
+          raw=zipfile.ZipFile('/tmp/p2.zip').read('p2-candidate.tar.gz')
+          assert hashlib.sha256(raw).hexdigest()==os.environ['P2_TAR_SHA256']
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
+              seen=set()
+              for m in t.getmembers():
+                  parts=m.name.split('/')
+                  assert m.isfile() and parts[0]=='xuanjun-p2-package'
+                  assert all(p not in ('','.', '..') for p in parts) and m.name not in seen
+                  seen.add(m.name)
               t.extractall('/tmp/p2pkg')
           open('/tmp/p2-candidate.tar.gz','wb').write(raw)
           PY
           ROOT=/tmp/p2pkg/xuanjun-p2-package
-          python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz \
-            --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
           test "$(find "$ROOT" -type l | wc -l)" -eq 0
           test "$(find "$ROOT" -type f -perm -0002 | wc -l)" -eq 0
           ! grep -RInE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api[_-]?secret[[:space:]]*[:=][[:space:]]*[^<])' "$ROOT"
-          echo P2_FROZEN_SECURITY_MECHANICAL=PASS
+          echo P2_AUTHORITATIVE_SECURITY_MECHANICAL=PASS
           echo MODEL_CALLS=0
           echo RELEASE_GATE=NOT_GRANTED

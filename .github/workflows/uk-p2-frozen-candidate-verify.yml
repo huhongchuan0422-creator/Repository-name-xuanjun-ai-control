@@ -1,35 +1,43 @@
-name: P2 UK frozen candidate verify-only
+name: P2 UK authoritative package verify-only
 on:
   push:
-    branches: [repair/p2-chatgpt-clean-review-20261013]
-    paths: [.github/workflows/uk-p2-frozen-candidate-verify.yml]
+    branches:
+      - repair/p2-chatgpt-clean-review-20261013
+    paths:
+      - .github/workflows/uk-p2-frozen-candidate-verify.yml
 permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: '11778873716'
-  P2_TAR_SHA256: 'b279c3a88aed317a5fcd34af7c165d68ab3870773d3f21dcfe89d4fc09a584a9'
-  P2_SOURCE_COMMIT: '7c28108cfe089e150bdcd103058d79c6377956f0'
-  P2_SOURCE_TREE: 'af25a905eae7297d1d9884146a0e761f67de2c43'
-  P2_MANIFEST_SHA256: '6319f90b32aa25955dcf5352184411bfab080e0c730ec7079ad78f9bfeda6e0e'
+  P2_ARTIFACT_ID: "11778873716"
+  P2_TAR_SHA256: "b279c3a88aed317a5fcd34af7c165d68ab3870773d3f21dcfe89d4fc09a584a9"
+  P2_SOURCE_COMMIT: "7c28108cfe089e150bdcd103058d79c6377956f0"
+  P2_SOURCE_TREE: "af25a905eae7297d1d9884146a0e761f67de2c43"
+  P2_MANIFEST_SHA256: "6319f90b32aa25955dcf5352184411bfab080e0c730ec7079ad78f9bfeda6e0e"
 jobs:
   verify:
-    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - xuanjun-uk-dev
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:\n          persist-credentials: false
-      - name: Download exact package using Python 3.6 stdlib only
-        env:\n          GH_TOKEN: ${{ github.token }}
+        with:
+          persist-credentials: false
+      - name: Download exact artifact with Python 3.6 stdlib
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
           rm -rf /tmp/p2pkg /tmp/p2-candidate.tar.gz
           /usr/bin/python3 -I -B - <<'PY'
-          import hashlib,io,os,tarfile,urllib.parse,urllib.request,zipfile
-          assert tuple(__import__('sys').version_info[:3])==(3,6,8)
-          class R(urllib.request.HTTPRedirectHandler):
+          import hashlib,io,os,tarfile,urllib.parse,urllib.request,zipfile,sys
+          assert sys.version_info[:3]==(3,6,8)
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,req,fp,code,msg,headers,newurl):
                   x=urllib.request.HTTPRedirectHandler.redirect_request(self,req,fp,code,msg,headers,newurl)
                   if x is not None and urllib.parse.urlparse(req.full_url).netloc!=urllib.parse.urlparse(newurl).netloc:
@@ -37,8 +45,8 @@ jobs:
                   return x
           url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/%s/zip'%os.environ['P2_ARTIFACT_ID']
           req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'p2-uk'})
-          raw=urllib.request.build_opener(R()).open(req,timeout=30).read(8*1024*1024+1)
-          z=zipfile.ZipFile(io.BytesIO(raw));tarbytes=z.read('p2-candidate.tar.gz')
+          raw=urllib.request.build_opener(SafeRedirect()).open(req,timeout=30).read(8*1024*1024+1)
+          tarbytes=zipfile.ZipFile(io.BytesIO(raw)).read('p2-candidate.tar.gz')
           assert hashlib.sha256(tarbytes).hexdigest()==os.environ['P2_TAR_SHA256']
           with tarfile.open(fileobj=io.BytesIO(tarbytes),mode='r:gz') as t:
               seen=set()
@@ -51,29 +59,24 @@ jobs:
           open('/tmp/p2-candidate.tar.gz','wb').write(tarbytes)
           print('P2_UK_ARTIFACT_EXTRACT=PASS')
           PY
-      - name: Verify authoritative package and UK host facts
+      - name: Verify exact package through real installer on UK
         shell: bash
         run: |
           set -euo pipefail
           ROOT=/tmp/p2pkg/xuanjun-p2-package
-          /usr/bin/python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz \
-            --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          /usr/bin/python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
           sudo -n /usr/bin/python3 -I -B - <<'PY'
-          import hashlib,importlib.util,os,pwd,stat,subprocess,sys
+          import hashlib,importlib.util,os,stat,subprocess,sys,grp
           assert sys.version_info[:3]==(3,6,8)
           root='/tmp/p2pkg/xuanjun-p2-package'
           spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
-          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-          m.verify(root,root+'/deploy/integration-manifest.json',
-                   os.environ['P2_SOURCE_COMMIT'],os.environ['P2_MANIFEST_SHA256'],
-                   os.environ['P2_SOURCE_TREE'])
-          py='/usr/libexec/platform-python3.6'
-          h=hashlib.sha256(open(py,'rb').read()).hexdigest()
-          assert h=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          m.verify(root,root+'/deploy/integration-manifest.json',os.environ['P2_SOURCE_COMMIT'],os.environ['P2_MANIFEST_SHA256'],os.environ['P2_SOURCE_TREE'])
+          assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           def show(k):
               return subprocess.check_output(['/usr/bin/systemctl','show','xuanjun-uk-openclaw.service','--property='+k,'--value'],universal_newlines=True).strip()
           assert show('User')=='xuanjun_dev' and show('ActiveState')=='active' and show('SubState')=='running'
-          import grp
           st=os.stat('/var/run/docker.sock')
           assert st.st_gid==grp.getgrnam('docker').gr_gid and stat.S_IMODE(st.st_mode)==0o660
           print('P2_UK_REAL_RELEASE_INSTALLER_VERIFY=PASS')
