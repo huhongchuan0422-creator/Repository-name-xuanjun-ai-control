@@ -20,7 +20,7 @@ import sys
 HOST='iZd7oeikknn1z21sq6ji6zZ'
 LEGACY_DB='/home/xuanjun_dev/uk-stage1-minimal/state.sqlite'
 ACTIVATION='/var/lib/xuanjun-development/activation/active.json'
-NGINX_CONF='/etc/nginx/conf.d/xuanjun-owner-workbench.conf'
+NGINX_CONF='/etc/nginx/nginx.conf'
 AUTH_DB='/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite'
 UNITS=('xuanjun-uk-stage1-minimal.service','xuanjun-uk-openclaw.service')
 IDENTITIES=('xuanjun-dispatcher','xuanjun-callback','xj_codex_worker')
@@ -49,6 +49,16 @@ def file_identity(path,limit=536870912):
                 'size':info.st_size}
     finally:
         os.close(fd)
+
+def socket_identity(path):
+    real=os.path.realpath(path)
+    if real!=path:
+        raise ValueError('NON_CANONICAL_SOCKET:'+path)
+    info=os.stat(path)
+    if not stat.S_ISSOCK(info.st_mode):
+        raise ValueError('NOT_SOCKET:'+path)
+    return {'path':path,'kind':'socket','owner_uid':info.st_uid,
+            'owner_gid':info.st_gid,'mode':stat.S_IMODE(info.st_mode)}
 
 def maybe_identity(path):
     try:return file_identity(path)
@@ -87,17 +97,30 @@ def group_fact(name):
         return {'status':'ABSENT'}
 
 def tls_refs():
-    if not os.path.exists(NGINX_CONF):
-        return {'status':'UNAVAILABLE','config':NGINX_CONF}
-    refs=[]
-    raw=open(NGINX_CONF,'r').read().splitlines()
-    for line in raw:
+    try:
+        rendered=subprocess.check_output(
+            ['/usr/sbin/nginx','-T'],stderr=subprocess.STDOUT,
+            universal_newlines=True,timeout=15)
+    except (OSError,subprocess.CalledProcessError):
+        return {'status':'UNAVAILABLE','config':NGINX_CONF,'reason':'NGINX_T_FAILED'}
+    paths=[]
+    for line in rendered.splitlines():
         m=TLS_RE.match(line)
-        if m:
-            path=m.group(2).strip()
+        if not m:
+            continue
+        path=m.group(2).strip()
+        if path and path not in paths:
+            paths.append(path)
+    refs=[]
+    for path in paths:
+        try:
             refs.append(file_identity(path,16*1024*1024))
-    if len(refs)!=2 or len(set(x['path'] for x in refs))!=2:
-        return {'status':'UNAVAILABLE','config':NGINX_CONF,'reference_count':len(refs)}
+        except (OSError,ValueError) as error:
+            return {'status':'UNAVAILABLE','config':NGINX_CONF,
+                    'reason':'TLS_REFERENCE_'+type(error).__name__,
+                    'path':path}
+    if not refs:
+        return {'status':'UNAVAILABLE','config':NGINX_CONF,'reference_count':0}
     return {'status':'PRESENT','config':file_identity(NGINX_CONF,1048576),
             'references':refs}
 
@@ -129,7 +152,7 @@ def main():
       'groups':dict((x,group_fact(x)) for x in GROUPS),
       'oauth_reference':maybe_identity(AUTH_DB),
       'tls':tls_refs(),
-      'docker_socket':maybe_identity('/var/run/docker.sock'),
+      'docker_socket':socket_identity('/var/run/docker.sock'),
       'python':file_identity('/usr/libexec/platform-python3.6',64*1024*1024),
       'openclaw':file_identity('/home/xuanjun_dev/.openclaw/bin/openclaw',16*1024*1024),
     }
