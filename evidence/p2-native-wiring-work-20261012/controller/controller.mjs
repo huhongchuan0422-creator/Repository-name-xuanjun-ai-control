@@ -58,7 +58,8 @@ export class NativeController {
     const binding=receipt.binding||receipt.request;
     const observed=await (cleanup?this.store.receipt(binding):this.store.read(binding)),record=observed.task.native_execution;
     if(!record||record.idempotency_key!==receipt.idempotency_key)hold('RECEIPT_UNKNOWN');
-    if(record.receipt && canonical(record.receipt)!==canonical(receipt))hold('RECEIPT_MISMATCH');
+    const isAdmission=receipt?.request&&canonical(record.admission)===canonical(receipt);
+    if(record.receipt&&!isAdmission&&canonical(record.receipt)!==canonical(receipt))hold('RECEIPT_MISMATCH');
     return {observed,record};
   }
   async launch(admission,runtime) {

@@ -81,6 +81,7 @@ try {
   assert.equal(launched.run_id,'run-real-files');assert.equal(launchCalls,1);
   const duplicate=await concrete.launch(admission,runtime);
   assert.equal(duplicate.run_id,launched.run_id);assert.equal(launchCalls,1);
+  assert.equal(duplicate.placement_digest,launched.placement_digest);
   // Simulate a controller/client crash after durable LAUNCH_INTENT but before receipt persistence.
   const savedReceipt=current.native_execution.receipt;
   current={...current,native_execution:{...current.native_execution,phase:'LAUNCH_INTENT',receipt:undefined}};
