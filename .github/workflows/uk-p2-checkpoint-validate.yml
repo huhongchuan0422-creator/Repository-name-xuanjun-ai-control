@@ -13,6 +13,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Fixed installed read-only audit
         shell: bash
         run: |
@@ -32,6 +35,7 @@ jobs:
           mkdir -m 700 "$WORK/temp"
           export TMPDIR="$WORK/temp"
           export PYTHONDONTWRITEBYTECODE=1
+          export P2_REVIEW_INPUT="$GITHUB_WORKSPACE/evidence/p2-install-preparation"
           cd "$WORK"
           /usr/bin/python3 -B - <<'PY'
           import io,tarfile,os,hashlib,subprocess,json
@@ -58,7 +62,13 @@ jobs:
           assert s.count(a)==1 and s.count(c)==1
           s=s.replace(a,'        pristine=json.loads(json.dumps(value))\n'+a).replace(c,'module.restore_rollback_files(pristine,7,None)')
           with open(p,'w') as f:f.write(s)
-          print('EXACT_ISOLATED_TEST_FIX_APPLIED')
+          import shutil
+          for relative in ['stage1/activation_control.py','stage1/test_activation_lock_permissions.py','scripts/uk-integration-install.py','stage1/test_integration_installer.py','deploy/integration-manifest.json']:
+              shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),os.path.join('repo',relative))
+          with open('repo/deploy/integration-manifest.json') as f:m=json.load(f)
+          for relative,digest in m['files'].items():
+              with open(os.path.join('repo',relative),'rb') as f:assert hashlib.sha256(f.read()).hexdigest()==digest,relative
+          print('ISOLATED_PREPARATION_DELTA_AND_40_FILE_MANIFEST_VERIFIED')
           PY
           cd repo
           /usr/bin/python3 -B -m unittest discover -s stage1 -p 'test_*.py'
