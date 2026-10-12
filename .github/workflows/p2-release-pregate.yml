@@ -9,8 +9,8 @@ permissions:
   actions: read
 env:
   P2_ARTIFACT_ID: '11778800853'
-  P2_TAR_SHA256: '17127b5ca03e3784043e13c60ab11a9e8a65a0230a57efa13950e440d6095a0f'
-  P2_SOURCE_COMMIT: '04c930b220f677d557d96b053d9b09c72007af51'
+  P2_TAR_SHA256: 'dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317'
+  P2_SOURCE_COMMIT: '9d8be9805baa7bf4b690bfa74fcf78a0ff340dca'
   QA_SECURITY_RUN: '38319971165'
   UK_VERIFY_RUN: '38319971234'
 jobs:
@@ -54,7 +54,7 @@ jobs:
           import json,pathlib
           root=pathlib.Path('.')
           p=json.loads((root/'P2_CANDIDATE_PROVENANCE.json').read_text())
-          assert p['source_commit']=='04c930b220f677d557d96b053d9b09c72007af51'
+          assert p['source_commit']=='9d8be9805baa7bf4b690bfa74fcf78a0ff340dca'
           assert p['model_calls']==0
           assert p['release_gate']=='NOT_GRANTED'
           required={
