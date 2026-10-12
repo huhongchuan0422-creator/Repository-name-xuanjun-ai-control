@@ -30,12 +30,12 @@ def main():
         folders[:]=[f for f in sorted(folders) if depth<5 and f not in ('node_modules','__pycache__')]
         for name in sorted(files):
             path=os.path.join(directory,name)
-            if name.endswith('.js') and any(w in path[len(root):] for w in ('gateway','agent','automation','schema','protocol')):code_paths.append(path)
-        if len(code_paths)>1000:break
+            if name.endswith(('.js','.mjs')) and any(w in path[len(root):] for w in ('gateway','agent','automation','schema','protocol')):code_paths.append(path)
+        if len(code_paths)>3000:break
     for path in code_paths:
         info=os.lstat(path)
         if not stat.S_ISREG(info.st_mode) or info.st_size>4000000:continue
-        if scanned+info.st_size>32000000:break
+        if scanned+info.st_size>48000000:break
         scanned+=info.st_size
         with open(path,'r',encoding='utf-8') as f:body=f.read()
         if re.search(r'-----BEGIN .*PRIVATE KEY|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{30,}|[0-9]{6,}:[A-Za-z0-9_-]{25,}|sk-[A-Za-z0-9]{32,}',body):continue
