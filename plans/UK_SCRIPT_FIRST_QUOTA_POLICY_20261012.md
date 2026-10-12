@@ -40,3 +40,12 @@ Owner rule supersedes any prior plan that spends model quota on mechanical super
 As of PR #17 receipt `6115075801`, a previous 120-second inference-consuming supervisor was disabled after about 17% weekly quota remaining was observed. No replacement polling is allowed. There is no admitted durable UK Developer, P2 not installed, P3 not started; Issue #19 non-Codex entrypoint not verified, so it is not usable by assumption. UK root/systemd/cgroup/OAuth changes still need one independently reviewed, exact scoped approval package. Do not activate this gate by overwriting production files from a PR comment.
 
 **Acceptance**: deterministic tests; verified authoritative dual-route metering and day aggregation; admission traces at 29.99/30/49.99/50; ChatGPT exhausted vs technical error; unavailable model and unknown evidence HOLD; measured script overhead no model inference; independent reviews; then authorized real-host admission. Only P2/P3 and #19 E2E may claim completed after their own separate real end-to-end gates.
+
+## Mandatory UK Python compatibility gate (Owner correction, 2026-10-12)
+
+**UK target host: Python 3.6.x, not a presumed 3.7+ runtime.** The detailed mandatory compatibility and safe-upgrade contract is [`plans/UK_PYTHON36_COMPATIBILITY_CONTRACT_20261012.md`](UK_PYTHON36_COMPATIBILITY_CONTRACT_20261012.md). It is binding for any UK P2/P3/#19 code written, packaged, reviewed or started by Runner/systemd.
+
+- Keep system `/usr/bin/python3` unchanged; no generic Python 3.7 upgrade (3.7 is EOL). A later supported runtime, if required, must be installed in isolation and separately reviewed.
+- All UK-bound Python scripts must pass the **real pinned UK Python 3.6 interpreter**, same interpreter used by systemd, plus pinned dependency/import tests and independent same-hash QA before installing; grammar-only CI checks are insufficient.
+- GitHub-hosted-only scripts may use newer Python but must not be executed under UK 3.6 without conversion/verification. Unknown => `HOLD_PY36_COMPATIBILITY_NOT_VERIFIED`.
+- This policy is a documentation source only until reviewed and installed; it authorizes no privileged runtime or unit mutation.
