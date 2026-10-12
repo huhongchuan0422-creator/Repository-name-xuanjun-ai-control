@@ -4,8 +4,9 @@ import importlib.util
 from pathlib import Path
 import unittest
 
-ROOT = Path(__file__).resolve().parent
-SPEC = importlib.util.spec_from_file_location("watchdog", str(ROOT / "uk-external-runner-watchdog.py"))
+ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location(
+    "watchdog", str(ROOT / "scripts" / "uk-external-runner-watchdog.py"))
 MOD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MOD)
 T = datetime.datetime(2026, 10, 12, 0, 0, tzinfo=datetime.timezone.utc)
