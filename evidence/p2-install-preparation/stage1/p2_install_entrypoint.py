@@ -164,6 +164,7 @@ class P2InstallEntrypoint(object):
         release = None
         provision = None
         legacy_effect = False
+        runtime_activation_requested = False
         prepared = None
         try:
             # Read-only references are verified before the first install effect.
@@ -209,6 +210,9 @@ class P2InstallEntrypoint(object):
             self._write(receipt, 'LEGACY_QUIESCED', epoch=quiesced['epoch'],
                         cutover_receipt_sha256=_digest(cutover))
 
+            # Set before the call because a failed start may have activated a
+            # strict prefix of the declared service order.
+            runtime_activation_requested = True
             runtime_proof = self.runtime.activate(plan['runtime'], quiesced)
             if (not isinstance(runtime_proof, dict)
                     or set(runtime_proof) != {'database_reopened',
@@ -231,8 +235,9 @@ class P2InstallEntrypoint(object):
                         error_type=type(error).__name__)
             rollback = []
             try:
-                self.runtime.stop_new(plan['runtime'])
-                rollback.append('NEW_RUNTIME_STOPPED')
+                if runtime_activation_requested:
+                    self.runtime.stop_new(plan['runtime'])
+                    rollback.append('NEW_RUNTIME_STOPPED')
                 if provision is not None:
                     self.runtime.restore(provision)
                     rollback.append('PROVISIONING_RESTORED')

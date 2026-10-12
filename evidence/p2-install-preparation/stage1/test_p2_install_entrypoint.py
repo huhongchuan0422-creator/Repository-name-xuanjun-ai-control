@@ -128,7 +128,7 @@ class P2InstallEntrypointTests(unittest.TestCase):
             value.execute(self.plan)
         self.assertEqual(cutover.calls,[])
         self.assertFalse(cutover.adapter.restored)
-        self.assertEqual(runtime.calls,['preflight','stop_new'])
+        self.assertEqual(runtime.calls,['preflight'])
 
     def test_cutover_stop_failure_uses_durable_boundary_for_exact_restore(self):
         value,runtime,activation,cutover,receipt=self.make()
