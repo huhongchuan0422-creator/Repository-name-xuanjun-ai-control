@@ -59,28 +59,32 @@ def main():
     if sys.version_info[:3]!=(3,6,8):
         raise SystemExit('HOLD_PYTHON_VERSION_'+'.'.join(str(v) for v in sys.version_info[:3]))
 
-    candidates=[]
-    for name in os.listdir('/proc'):
-        if not name.isdigit():continue
-        pid=int(name)
-        try:
-            st=proc_status(pid)
-            uids=st.get('Uid','').split()
-            if len(uids)!=4 or any(int(v)!=uid for v in uids):continue
-            raw,_=read('/proc/%d/cmdline'%pid,maximum=131072)
-            args=[v.decode('utf-8','replace') for v in raw.rstrip(b'\0').split(b'\0') if v]
-            joined=' '.join(args)
-            if 'openclaw' in joined.lower() and 'gateway' in joined.lower():
-                exe=os.path.realpath('/proc/%d/exe'%pid)
-                cgroup,_=read('/proc/%d/cgroup'%pid,maximum=131072)
-                candidates.append({'pid':pid,'ppid':int(st.get('PPid','0')),
-                    'exe':exe,'exe_sha256':digest(exe)['sha256'],
-                    'cgroup':cgroup.decode('utf-8','strict').splitlines(),
-                    'cmdline_sha256':hashlib.sha256(raw).hexdigest()})
-        except (IOError,OSError,ValueError,UnicodeError):
-            continue
-    if len(candidates)!=1:
-        raise SystemExit('HOLD_GATEWAY_PROCESS_COUNT_%d'%len(candidates))
+    unit='xuanjun-uk-openclaw.service'
+    values={}
+    for name in ('User','ActiveState','SubState','ControlGroup','MainPID'):
+        values[name]=subprocess.check_output(
+            ['/usr/bin/systemctl','show',unit,'--property='+name,'--value'],
+            universal_newlines=True,timeout=10).strip()
+    if values['User']!=USER or values['ActiveState']!='active' or values['SubState']!='running':
+        raise SystemExit('HOLD_GATEWAY_UNIT_NOT_ACTIVE')
+    pid=int(values['MainPID'])
+    if pid<2:
+        raise SystemExit('HOLD_GATEWAY_PID')
+    st=proc_status(pid)
+    uids=st.get('Uid','').split()
+    if len(uids)!=4 or any(int(v)!=uid for v in uids):
+        raise SystemExit('HOLD_GATEWAY_UID')
+    raw,_=read('/proc/%d/cmdline'%pid,maximum=131072)
+    exe=os.path.realpath('/proc/%d/exe'%pid)
+    cgroup,_=read('/proc/%d/cgroup'%pid,maximum=131072)
+    cgroup_lines=cgroup.decode('utf-8','strict').splitlines()
+    cgroup_paths=[line.split(':',2)[-1] for line in cgroup_lines if line.count(':')>=2]
+    if values['ControlGroup'] not in cgroup_paths:
+        raise SystemExit('HOLD_GATEWAY_CGROUP')
+    gateway={'pid':pid,'ppid':int(st.get('PPid','0')),
+             'exe':exe,'exe_sha256':digest(exe)['sha256'],
+             'cgroup':cgroup_lines,
+             'cmdline_sha256':hashlib.sha256(raw).hexdigest()}
 
     sources=[]
     for path in [
@@ -117,7 +121,7 @@ def main():
         'state':'P2_UK_VERIFY_ONLY_HOST_FACTS',
         'model_calls':0,'authority_mutation':'NONE','container_mutation':'NONE',
         'python_version':list(sys.version_info[:3]),
-        'gateway':candidates[0],
+        'gateway':gateway,
         'sources':sources,
         'plugin_runtime_files':plugin_runtime,
         'docker_server_version':docker,
