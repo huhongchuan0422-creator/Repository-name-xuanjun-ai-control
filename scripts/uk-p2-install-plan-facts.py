@@ -52,12 +52,12 @@ def file_identity(path,limit=536870912):
 
 def socket_identity(path):
     real=os.path.realpath(path)
-    if real!=path:
-        raise ValueError('NON_CANONICAL_SOCKET:'+path)
-    info=os.stat(path)
+    if path!='/var/run/docker.sock' or real!='/run/docker.sock':
+        raise ValueError('UNEXPECTED_DOCKER_SOCKET_PATH:'+path+'->'+real)
+    info=os.stat(real)
     if not stat.S_ISSOCK(info.st_mode):
-        raise ValueError('NOT_SOCKET:'+path)
-    return {'path':path,'kind':'socket','owner_uid':info.st_uid,
+        raise ValueError('NOT_SOCKET:'+real)
+    return {'path':path,'realpath':real,'kind':'socket','owner_uid':info.st_uid,
             'owner_gid':info.st_gid,'mode':stat.S_IMODE(info.st_mode)}
 
 def maybe_identity(path):
