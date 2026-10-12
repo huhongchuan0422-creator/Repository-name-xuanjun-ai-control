@@ -7,6 +7,8 @@ the reviewed plan and checked before the first target mutation.
 import hashlib
 import json
 import os
+import pwd
+import grp
 import re
 import socket
 import stat
@@ -236,10 +238,56 @@ class FixedHostRuntime(object):
                 or not path.startswith('/var/lib/xuanjun-development/generations/')
                 or os.path.realpath(path) != path):
             raise ValueError('QUIESCED_CANONICAL_DATABASE_REQUIRED')
-        self._command(['/usr/bin/python3', '-I', '-B', '-c',
+        self._prepare_database_access(path)
+        self._command(['/usr/sbin/runuser','--user','xuanjun-dispatcher','--',
+                       '/usr/bin/python3', '-I', '-B', '-c',
                        'import sqlite3,sys,pathlib;d=sqlite3.connect(pathlib.Path(sys.argv[1]).as_uri()+"?mode=ro",uri=True);assert d.execute("PRAGMA quick_check").fetchone()[0]=="ok";d.close()',
                        path])
         return {'database_reopened': True}
+
+    def _prepare_database_access(self,path):
+        raw,info=_read_regular(self.receipt_path)
+        if info.st_uid!=0 or stat.S_IMODE(info.st_mode)!=0o600:
+            raise ValueError('PROTECTED_RUNTIME_RECEIPT_REQUIRED')
+        plan=json.loads(raw.decode('utf-8'))['prerequisites']
+        from p2_prerequisites import validate
+        validate(plan)
+        uid=plan['users']['xuanjun-dispatcher']['uid']
+        gid=plan['groups']['xuanjun-control-db']
+        if (pwd.getpwnam('xuanjun-dispatcher').pw_uid!=uid
+                or grp.getgrnam('xuanjun-control-db').gr_gid!=gid):
+            raise ValueError('LEDGER_CONSUMER_IDENTITY_MISMATCH')
+        parent=os.path.dirname(path)
+        declared=[x for x in plan['directories'] if x['path']==parent]
+        if (len(declared)!=1 or declared[0]['uid']!=uid
+                or declared[0]['gid']!=gid or declared[0]['mode']!=0o700):
+            raise ValueError('PRIVATE_DECLARED_GENERATION_DIRECTORY_REQUIRED')
+        self.prerequisites.directory_matches(declared[0])
+        if any(os.path.lexists(path+suffix) for suffix in ('-wal','-shm')):
+            raise ValueError('STAGED_LEDGER_SIDECAR_HOLD')
+        journal=os.path.join(self.directory,'ledger-access.json')
+        if os.path.lexists(journal):
+            raise ValueError('HOLD_EXISTING_LEDGER_ACCESS_JOURNAL')
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        try:
+            info=os.fstat(fd)
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink!=1
+                    or info.st_uid!=0 or stat.S_IMODE(info.st_mode)!=0o600):
+                raise ValueError('FRESH_ROOT_STAGED_LEDGER_REQUIRED')
+            receipt={'schema':1,'path':path,'device':info.st_dev,'inode':info.st_ino,
+                     'previous_uid':info.st_uid,'previous_gid':info.st_gid,
+                     'uid':uid,'gid':gid,'mode':0o600,'state':'INTENT'}
+            _atomic_receipt(journal,receipt)
+            os.fchown(fd,uid,gid)
+            os.fsync(fd)
+            after=os.fstat(fd)
+            current=os.lstat(path)
+            if ((after.st_uid,after.st_gid,stat.S_IMODE(after.st_mode))!=(uid,gid,0o600)
+                    or (current.st_dev,current.st_ino)!=(info.st_dev,info.st_ino)):
+                raise ValueError('HOLD_LEDGER_ACCESS_IDENTITY_CHANGED')
+            receipt['state']='DONE';_atomic_receipt(journal,receipt)
+        finally:
+            os.close(fd)
 
     def activate(self, runtime, descriptor):
         self._authority()
