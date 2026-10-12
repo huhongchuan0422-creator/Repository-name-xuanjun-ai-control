@@ -240,21 +240,55 @@ class FixedHostRuntime(object):
                             separators=(',', ':')).encode('utf-8')
         if _digest_bytes(packed) != provision['receipt_sha256']:
             raise ValueError('RUNTIME_ROLLBACK_RECEIPT_MISMATCH')
+        # Validate every backup and current target before any rollback effect.
+        # A failed provision may leave either old or installed bytes in place.
+        prepared = []
+        seen = set()
         for item in reversed(receipt['targets']):
+            target = item['target']
+            if (not isinstance(target, str) or not os.path.isabs(target)
+                    or os.path.realpath(target) != target or target in seen
+                    or not any(target.startswith(p) for p in ALLOWED_TARGET_PREFIXES)):
+                raise ValueError('UNSAFE_RUNTIME_ROLLBACK_TARGET')
+            seen.add(target)
+            parent = os.lstat(os.path.dirname(target))
+            if (not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o022):
+                raise ValueError('UNSAFE_RUNTIME_TARGET_PARENT')
+            previous = item['previous']
+            old = None
+            if previous is not None:
+                backup = previous['backup']
+                if (os.path.dirname(backup) != self.directory
+                        or os.path.realpath(backup) != backup):
+                    raise ValueError('UNSAFE_RUNTIME_ROLLBACK_BACKUP')
+                old, info = _read_regular(backup)
+                if _digest_bytes(old) != previous['sha256']:
+                    raise ValueError('RUNTIME_ROLLBACK_BACKUP_CHANGED')
+            if os.path.lexists(target):
+                current, info = _read_regular(target)
+                observed = (_digest_bytes(current), stat.S_IMODE(info.st_mode),
+                            info.st_uid, info.st_gid)
+                allowed = [(item['rendered_sha256'], item['mode'], item['uid'], item['gid'])]
+                if previous is not None:
+                    allowed.append((previous['sha256'], previous['mode'],
+                                    previous['uid'], previous['gid']))
+                if observed not in allowed:
+                    raise ValueError('RUNTIME_ROLLBACK_TARGET_CHANGED')
+            elif previous is not None:
+                raise ValueError('RUNTIME_ROLLBACK_TARGET_MISSING')
+            prepared.append((item, old))
+        for item, old in prepared:
             previous = item['previous']
             if previous is None:
                 if os.path.lexists(item['target']):
                     os.unlink(item['target'])
-                    directory=os.open(os.path.dirname(item['target']),
-                                      os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+                    directory = os.open(os.path.dirname(item['target']),
+                                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
                     try: os.fsync(directory)
                     finally: os.close(directory)
-                continue
-            old, info = _read_regular(previous['backup'])
-            if _digest_bytes(old) != previous['sha256']:
-                raise ValueError('RUNTIME_ROLLBACK_BACKUP_CHANGED')
-            self._atomic_target(item['target'], old, previous['mode'],
-                                previous['uid'], previous['gid'])
+            else:
+                self._atomic_target(item['target'], old, previous['mode'],
+                                    previous['uid'], previous['gid'])
         self._command(['/usr/bin/systemctl', 'daemon-reload'])
         if any(item['target'].startswith('/etc/nginx/')
                for item in receipt['targets']):
