@@ -277,10 +277,8 @@ class Supervisor(object):
             task = self._task(task_id)
             if task['attempt_id'] != attempt_id:
                 raise ValueError('ATTEMPT_BINDING_MISMATCH')
-            accepted_at = self.clock()
-            if (not finite(accepted_at) or observed_at < task['last_event_at']
-                    or observed_at > accepted_at + 300):
-                raise ValueError('EVENT_TIME_RECONCILIATION_REQUIRED')
+            # Exact replays are idempotent even when a newer event has since
+            # advanced last_event_at.  Conflicting reuse still fails closed.
             encoded = canonical(payload)
             prior = self.db.execute('''SELECT kind,observed_at,evidence_kind,
               evidence_ref,payload_json FROM events
@@ -295,6 +293,10 @@ class Supervisor(object):
                 if not exact:
                     raise ValueError('EVENT_ID_REUSE_CONFLICT')
                 return {'duplicate': True, 'state': task['state']}
+            accepted_at = self.clock()
+            if (not finite(accepted_at) or observed_at < task['last_event_at']
+                    or observed_at > accepted_at + 300):
+                raise ValueError('EVENT_TIME_RECONCILIATION_REQUIRED')
             self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
                 (task_id, attempt_id, event_id, kind, observed_at,
                  evidence_kind, evidence_ref, encoded))
