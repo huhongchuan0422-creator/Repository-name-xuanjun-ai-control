@@ -1,0 +1,27 @@
+name: P2 UK Docker permission facts
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/uk-p2-docker-permission-facts.yml
+permissions:
+  contents: read
+jobs:
+  facts:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - name: Read Docker socket and service-user permission facts only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          /usr/bin/python3 -c 'import sys; assert sys.version_info[:3] == (3,6,8); print("PYTHON_3_6_8=PASS")'
+          stat -Lc 'DOCKER_SOCKET_UID=%u GID=%g MODE=%a TYPE=%F' /var/run/docker.sock
+          id xuanjun_dev
+          getent group docker || true
+          if command -v getfacl >/dev/null 2>&1; then getfacl -cp /var/run/docker.sock || true; fi
+          systemctl show xuanjun-uk-openclaw.service --property=User,Group,SupplementaryGroups,MainPID,ActiveState,SubState
+          sudo -n -l 2>/dev/null | sed -n '1,120p' || true
+          echo MODEL_CALLS=0
+          echo AUTHORITY_MUTATION=NONE
