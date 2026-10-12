@@ -26,6 +26,7 @@ source=DEST/'xuanjun-p2-package'
 for item in source.rglob('*'):
     if item.is_file():item.chmod(item.stat().st_mode|0o200)
 subprocess.run(['patch','--batch','--fuzz=0','-p1','-i',str(ROOT/'native-wiring.patch')],cwd=source,check=True)
+shutil.copy2(ROOT/'native_peer_identity.py',source/'stage1'/'native_peer_identity.py')
 subprocess.run(['python',str(ROOT/'followup_overlay.py'),str(source)],check=True)
 plugin=source/'plugins/p2-native-controller'
 shutil.copytree(ROOT/'controller',plugin)

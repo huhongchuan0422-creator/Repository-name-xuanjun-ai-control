@@ -1,4 +1,5 @@
 import os,sys,json,socket,struct,unittest
+from unittest.mock import patch
 sys.path.insert(0,os.path.join(os.environ['P2_SOURCE_ROOT'],'stage1'))
 from uk_owner_callback_core import LedgerOwnerDecisionServer,_strict_json
 class Connection:
@@ -9,10 +10,14 @@ class Connection:
 class Ledger:
     def native_observation(self,request):return {'task':{'fence':request['fence']}}
 class Tests(unittest.TestCase):
-    def setUp(self):self.server=LedgerOwnerDecisionServer(None,Ledger(),1003,native_uid=1002)
+    def setUp(self):
+        self.identity={'uid':1002}
+        self.server=LedgerOwnerDecisionServer(None,Ledger(),1003,native_identity=self.identity)
     def test_native_role_existing_socket(self):
         c=Connection(1002,{'operation':'NATIVE_GATEWAY','payload':{'operation':'read','request':{'fence':1}}})
-        self.server.serve_connection(c)
+        with patch('uk_owner_callback_core.verify_native_gateway_peer',return_value=True) as verify:
+            self.server.serve_connection(c)
+        verify.assert_called_once_with(123,1002,self.identity)
         self.assertEqual(json.loads(c.sent),{'accepted':True,'result':{'task':{'fence':1}}})
     def test_unknown_peer_rejected_before_read(self):
         c=Connection(1004,{})
@@ -23,10 +28,17 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError):self.server.serve_connection(c)
     def test_native_cannot_use_owner_decision(self):
         c=Connection(1002,{'operation':'OWNER_DECISION','event':{}})
-        with self.assertRaises(PermissionError):self.server.serve_connection(c)
+        with patch('uk_owner_callback_core.verify_native_gateway_peer',return_value=True):
+            with self.assertRaises(PermissionError):self.server.serve_connection(c)
     def test_arbitrary_sql_operation_rejected(self):
         c=Connection(1002,{'operation':'NATIVE_GATEWAY','payload':{'operation':'sql','query':'DELETE FROM tasks'}})
-        with self.assertRaises(ValueError):self.server.serve_connection(c)
+        with patch('uk_owner_callback_core.verify_native_gateway_peer',return_value=True):
+            with self.assertRaises(ValueError):self.server.serve_connection(c)
+    def test_shared_uid_without_gateway_process_identity_rejected(self):
+        c=Connection(1002,{'operation':'NATIVE_GATEWAY','payload':{'operation':'read','request':{'fence':1}}})
+        with patch('uk_owner_callback_core.verify_native_gateway_peer',return_value=False):
+            with self.assertRaises(PermissionError):self.server.serve_connection(c)
+        self.assertIsNone(c.sent)
     def test_duplicate_nested_key_rejected(self):
         with self.assertRaises(ValueError):_strict_json('{"a":{"fence":1,"fence":2}}')
     def test_normal_numbers_preserve_types_and_overflow_rejected(self):

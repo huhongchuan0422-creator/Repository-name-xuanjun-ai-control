@@ -38,6 +38,66 @@ def main():
                          'request_contract': checkpoint.get('native_request_contract'),
                          'native_execution': checkpoint.get('native_execution')})""")
 
+    replace_once(
+        stage1 / 'uk_owner_callback_core.py',
+        """import socket
+import sqlite3""",
+        """import socket
+import sqlite3
+from native_peer_identity import verify_native_gateway_peer""")
+
+    replace_once(
+        stage1 / 'uk_owner_callback_core.py',
+        """    def __init__(self, activation_store, ledger, callback_uid, native_uid=None):
+        if type(callback_uid) is not int or callback_uid < 1:
+            raise ValueError('callback UID must be unprivileged')
+        self.activation_store = activation_store
+        self.ledger = ledger
+        self.callback_uid = callback_uid
+        if native_uid is not None and (type(native_uid) is not int or native_uid < 1 or native_uid == callback_uid):
+            raise ValueError('native Gateway UID must be distinct and unprivileged')
+        self.native_uid = native_uid""",
+        """    def __init__(self, activation_store, ledger, callback_uid, native_identity=None):
+        if type(callback_uid) is not int or callback_uid < 1:
+            raise ValueError('callback UID must be unprivileged')
+        self.activation_store = activation_store
+        self.ledger = ledger
+        self.callback_uid = callback_uid
+        if native_identity is not None and (
+                not isinstance(native_identity, dict)
+                or type(native_identity.get('uid')) is not int
+                or native_identity['uid'] < 1
+                or native_identity['uid'] == callback_uid):
+            raise ValueError('narrow native Gateway identity required')
+        self.native_identity = native_identity""")
+
+    replace_once(
+        stage1 / 'uk_owner_callback_core.py',
+        """        unused_pid, peer_uid, unused_gid = struct.unpack('3i', credentials)
+        if peer_uid == self.native_uid:
+            request = _read_line(connection, maximum=1048576)""",
+        """        peer_pid, peer_uid, unused_gid = struct.unpack('3i', credentials)
+        if self.native_identity is not None and peer_uid == self.native_identity['uid']:
+            if not verify_native_gateway_peer(peer_pid, peer_uid, self.native_identity):
+                raise PermissionError('native Gateway process identity rejected')
+            request = _read_line(connection, maximum=1048576)""")
+
+    replace_once(
+        stage1 / 'ledger_service.py',
+        """from uk_owner_callback_core import LedgerOwnerDecisionServer""",
+        """from uk_owner_callback_core import LedgerOwnerDecisionServer
+from native_peer_identity import load_native_peer_identity""")
+
+    replace_once(
+        stage1 / 'ledger_service.py',
+        """    callback_uid=pwd.getpwnam(config['callback_user']).pw_uid
+    native_uid=pwd.getpwnam('xuanjun_dev').pw_uid
+    return LedgerOwnerDecisionServer(activation,ledger,callback_uid,native_uid=native_uid)""",
+        """    callback_uid=pwd.getpwnam(config['callback_user']).pw_uid
+    native_identity=load_native_peer_identity()
+    return LedgerOwnerDecisionServer(activation,ledger,callback_uid,
+                                     native_identity=native_identity)""")
+
     pipeline = stage1 / 'development_pipeline.py'
 
     replace_once(
