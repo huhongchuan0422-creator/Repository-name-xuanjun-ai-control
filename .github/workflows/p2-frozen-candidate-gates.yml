@@ -8,9 +8,9 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: '11778665054'
-  P2_TAR_SHA256: 'd9c2f4f4f35cbee094ad9d9a5a6c38549b67168e6d5beed9a1871db3c3a40529'
-  P2_SOURCE_COMMIT: '0b1e6dcaaea5f399a88ad5f70a06d0e6a5577ee0'
+  P2_ARTIFACT_ID: '11778800853'
+  P2_TAR_SHA256: '17127b5ca03e3784043e13c60ab11a9e8a65a0230a57efa13950e440d6095a0f'
+  P2_SOURCE_COMMIT: '04c930b220f677d557d96b053d9b09c72007af51'
 jobs:
   qa:
     runs-on: ubuntu-24.04
@@ -39,7 +39,7 @@ jobs:
           root=pathlib.Path('/tmp/pkg/xuanjun-p2-package')
           p=json.loads((root/'P2_CANDIDATE_PROVENANCE.json').read_text())
           assert p['state']=='FROZEN_CANDIDATE_NOT_RELEASED'
-          assert p['source_commit']=='0b1e6dcaaea5f399a88ad5f70a06d0e6a5577ee0'
+          assert p['source_commit']=='04c930b220f677d557d96b053d9b09c72007af51'
           assert p['old_frozen_archive_sha256']=='456ae23aa52e300021c9fb889df84d8eba34965769ce868e5ee6e43c29911a13'
           assert p['model_calls']==0 and p['release_gate']=='NOT_GRANTED'
           print('P2_FROZEN_PROVENANCE=PASS')

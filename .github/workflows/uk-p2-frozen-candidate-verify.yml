@@ -1,0 +1,108 @@
+name: P2 UK frozen candidate verify-only
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/uk-p2-frozen-candidate-verify.yml
+permissions:
+  contents: read
+  actions: read
+env:
+  P2_ARTIFACT_ID: '11778800853'
+  P2_TAR_SHA256: '17127b5ca03e3784043e13c60ab11a9e8a65a0230a57efa13950e440d6095a0f'
+  P2_SOURCE_COMMIT: '04c930b220f677d557d96b053d9b09c72007af51'
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 5
+    steps:
+      - name: Download exact P2 candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          rm -rf /tmp/p2-verify-only-artifact /tmp/p2-verify-only-pkg
+          mkdir /tmp/p2-verify-only-artifact /tmp/p2-verify-only-pkg
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2-verify-only.zip
+          cd /tmp/p2-verify-only-artifact
+          unzip -q /tmp/p2-verify-only.zip
+          printf '%s  %s\n' "$P2_TAR_SHA256" p2-candidate.tar.gz | sha256sum -c -
+          tar -xzf p2-candidate.tar.gz -C /tmp/p2-verify-only-pkg
+      - name: Verify exact package on UK Python 3.6.8 and host facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - <<'PY'
+          from __future__ import print_function
+          import hashlib,json,os,pwd,stat,subprocess,sys
+          ROOT='/tmp/p2-verify-only-pkg/xuanjun-p2-package'
+          if sys.version_info[:3]!=(3,6,8): raise SystemExit('HOLD_PYTHON_368')
+          def h(path):
+              x=hashlib.sha256()
+              with open(path,'rb') as f:
+                  while True:
+                      b=f.read(65536)
+                      if not b:break
+                      x.update(b)
+              return x.hexdigest()
+          p=json.load(open(ROOT+'/P2_CANDIDATE_PROVENANCE.json'))
+          if p.get('source_commit')!='04c930b220f677d557d96b053d9b09c72007af51': raise SystemExit('HOLD_SOURCE_COMMIT')
+          required=[
+            'plugins/p2-native-controller/openclaw.plugin.json',
+            'plugins/p2-native-controller/plugin.mjs',
+            'deploy/p2-native-controller.binding.json.template',
+            'deploy/p2-native-ledger-client.json.template',
+            'deploy/xuanjun-uk-openclaw-p2-docker.conf',
+            'stage1/p2_fixed_host_runtime.py',
+            'stage1/p2_install_entrypoint.py',
+            'scripts/uk-p2-install.py']
+          sums={}
+          for line in open(ROOT+'/SHA256SUMS'):
+              digest,path=line.rstrip('\n').split('  ',1);sums[path]=digest
+          for rel in required:
+              path=ROOT+'/'+rel
+              if not os.path.isfile(path) or os.path.islink(path) or sums.get(rel)!=h(path):
+                  raise SystemExit('HOLD_PACKAGE_FILE_'+rel)
+          manifest=json.load(open(ROOT+'/deploy/integration-manifest.json'))
+          for rel in required:
+              if rel not in manifest.get('files',{}): raise SystemExit('HOLD_MANIFEST_'+rel)
+          for base,dirs,files in os.walk(ROOT):
+              for name in files:
+                  path=os.path.join(base,name)
+                  if os.path.islink(path): raise SystemExit('HOLD_SYMLINK')
+                  if name.endswith('.py'):
+                      compile(open(path,'rb').read(),path,'exec')
+          py='/usr/libexec/platform-python3.6'
+          if os.path.realpath('/usr/bin/python3')!=py: raise SystemExit('HOLD_CANONICAL_PYTHON')
+          if h(py)!='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6':
+              raise SystemExit('HOLD_PYTHON_HASH')
+          unit='xuanjun-uk-openclaw.service'
+          def show(prop):
+              return subprocess.check_output(['/usr/bin/systemctl','show',unit,'--property='+prop,'--value'],
+                                             universal_newlines=True,timeout=10).strip()
+          if show('User')!='xuanjun_dev' or show('ActiveState')!='active' or show('SubState')!='running':
+              raise SystemExit('HOLD_GATEWAY_UNIT')
+          if show('ControlGroup')!='/system.slice/xuanjun-uk-openclaw.service':
+              raise SystemExit('HOLD_GATEWAY_CGROUP')
+          docker_gid=None
+          import grp
+          docker_gid=grp.getgrnam('docker').gr_gid
+          sock=os.stat('/var/run/docker.sock')
+          if sock.st_gid!=docker_gid or stat.S_IMODE(sock.st_mode)!=0o660:
+              raise SystemExit('HOLD_DOCKER_SOCKET')
+          deps={
+            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs':'db7fc7539455da0c564d4ded0d04da1c764a46903d1632489b8bd04641098320',
+            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/runtime-BgTk9ZFM.mjs':'18d2498124bb5437ce53b8b5fa90e71ca8e99f09c34118d2931a951dd9dadf22',
+            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/server-plugins-CzOpf53P.mjs':'e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9',
+            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/agent-tools.before-tool-call-Cg8vCu9u.mjs':'69abb7861a76913024828b0a7fd1948fc72081f9a8c91b629d0bc06e966f49c5',
+            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/error-runtime-B-G5NrRT.mjs':'d43944505d8b3d98be863da5b9495c336af88c745d4eb00c78218eacb6c0eb22'}
+          for path,digest in deps.items():
+              if os.path.realpath(path)!=path or h(path)!=digest:
+                  raise SystemExit('HOLD_OPENCLAW_DEP_'+os.path.basename(path))
+          print(json.dumps({'state':'P2_UK_SAME_ARTIFACT_VERIFY_ONLY_PASS',
+            'artifact_id':11778800853,'tar_sha256':'17127b5ca03e3784043e13c60ab11a9e8a65a0230a57efa13950e440d6095a0f',
+            'python_version':list(sys.version_info[:3]),'gateway_uid':pwd.getpwnam('xuanjun_dev').pw_uid,
+            'model_calls':0,'install_effects':0,'release_gate':'NOT_GRANTED'},sort_keys=True))
+          PY
