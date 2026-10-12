@@ -254,6 +254,7 @@ class SupervisorTests(unittest.TestCase):
         self.s.record('t1','a1','start','STARTED',1001)
         self.s.scan(1302)
         self.assertEqual(self.s._task('t1')['recovery_level'],1)
+        self.now=1303
         self.s.record('t1','a1','p','PROGRESS',1303,
                       'SOURCE_COMMIT','commit:abc',
                       {'next_progress_deadline':2000})
