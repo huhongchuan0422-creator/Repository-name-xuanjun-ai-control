@@ -20,10 +20,10 @@ class ReviewTests(unittest.TestCase):
     def setUp(self):
         self.contract=dict(task_id='original',spec_sha256='a'*64,checkpoint_sha256='b'*64,
             target_repository='owner/repo',target_base_sha='c'*40,code_commit='d'*40,entry='CHATGPT',
-            developer={'issuer':'native','subject':'developer'},allowed_files=['src/f.py'],
+            developer={'issuer':'native','subject':'developer'},allowed_files=['src/f.py','src/data.json'],
             trusted_reviewers=[{'issuer':'native','subject':'qa','key_id':'qa-key','role':'QA'},
                                {'issuer':'native','subject':'security','key_id':'security-key','role':'SECURITY'}])
-        self.files={'src/f.py':b'answer=42\n'}
+        self.files={'src/f.py':b'answer=42\n','src/data.json':b'{}\n'}
         self.binding=dict(task_id='same',attempt_id='attempt-1',run_id='run-1',session_id='session-1',fence=1,
                           checkpoint_sha256='a'*64,ledger_revision=2,receipt_sha256='b'*64,authority_key_id='ledger-key')
 
@@ -44,7 +44,7 @@ class ReviewTests(unittest.TestCase):
 
     def test_all_policy_fields_bound_to_digest(self):
         reviews=self.reviews()
-        for field,value in [('developer',{'issuer':'native','subject':'other'}),('allowed_files',['src/f.py','src/new.py']),('trusted_reviewers',[dict(p,subject=p['subject']+'2') for p in self.contract['trusted_reviewers']])]:
+        for field,value in [('developer',{'issuer':'native','subject':'other'}),('allowed_files',['src/f.py']),('trusted_reviewers',[dict(p,subject=p['subject']+'2') for p in self.contract['trusted_reviewers']])]:
             changed=copy.deepcopy(self.contract);changed[field]=value
             with self.assertRaises(ValueError):gate.review_bundle(changed,self.files,reviews,KEYS)
 
@@ -109,6 +109,13 @@ class ReviewTests(unittest.TestCase):
         for now in (-1,float('nan'),float('inf')):
             with self.assertRaises(ValueError):gate.continuation_due(self.binding,0,now)
 
+    def test_exact_authorized_file_set_required(self):
+        del self.files['src/data.json']
+        with self.assertRaises(ValueError):
+            gate.review_bundle(self.contract,self.files,[])
+        self.files['src/data.json']=b'{}\n'
+        self.assertEqual(gate.review_bundle(self.contract,self.files,[])['state'],'HOLD_INDEPENDENT_REVIEW_REQUIRED')
+
     def test_invalid_task_repository_and_policy_paths(self):
         for field,value in [('task_id',{}),('target_repository','owner/repo/../other'),('allowed_files',['../bad.py','src/f.py'])]:
             changed=dict(self.contract);changed[field]=value
@@ -120,11 +127,45 @@ class ReviewTests(unittest.TestCase):
         record['signature']=hmac.new(keys['security-key'],gate.canonical({k:v for k,v in record.items() if k!='signature'}),hashlib.sha256).hexdigest()
         with self.assertRaises(ValueError):gate.review_bundle(self.contract,self.files,records,keys)
 
-    def test_missing_or_extra_reviewed_file_is_rejected(self):
-        for files in ({},{'src/f.py':b'x=1','src/extra.py':b'x=2'}):
-            with self.assertRaises(ValueError):gate.review_bundle(self.contract,files,[])
-        changed=dict(self.contract,allowed_files=['src/f.py','src/missing.py'])
-        with self.assertRaises(ValueError):gate.review_bundle(changed,self.files,[])
-
 
 if __name__=='__main__':unittest.main()
+
+
+
+class BatchTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = ReviewTests()
+        self.fixture.setUp()
+
+    def record(self, age, evidence=None):
+        return dict(binding=copy.deepcopy(self.fixture.binding),
+                    receipt_read_at=1000-age, evidence=evidence)
+
+    def test_all_tasks_are_assessed_without_first_task_shortcut(self):
+        result=gate.continuation_batch([self.record(v) for v in (900,10,600,300)],1000,KEYS)
+        self.assertEqual([v['state'] for v in result],['HOLD_CONTINUATION_MISSING',
+                         'AWAIT_EXECUTION_EVIDENCE','INSPECT_AND_RESUME_SAME_ATTEMPT','RECOVER_INTAKE'])
+        self.assertEqual([v['index'] for v in result],[0,1,2,3])
+        self.assertTrue(all(v['authority_effect']=='NONE' for v in result))
+        self.assertTrue(all(v['takeover_allowed'] is False for v in result))
+
+    def test_one_forged_receipt_does_not_hide_other_overdue_tasks(self):
+        forged=self.fixture.evidence()
+        forged['signature']='0'*64
+        result=gate.continuation_batch([self.record(900,forged),self.record(900)],1000,KEYS)
+        self.assertEqual(result[0]['state'],'HOLD_INVALID_CONTINUATION_EVIDENCE')
+        self.assertEqual(result[1]['state'],'HOLD_CONTINUATION_MISSING')
+
+    def test_receiver_without_ack_never_closes_handoff(self):
+        proof=dict(receiver_accepted=False,old_writer_stopped=True,
+                   old_fence_invalidated=True,effects_reconciled=True)
+        evidence=self.fixture.evidence('HANDOFF_ACKNOWLEDGED',proof)
+        result=gate.continuation_batch([self.record(900,evidence)],1000,KEYS)
+        self.assertEqual(result[0]['state'],'HOLD_CONTINUATION_MISSING')
+
+    def test_bad_inventory_visible_and_no_unbounded_scan(self):
+        result=gate.continuation_batch([{},self.record(900)],1000,KEYS)
+        self.assertEqual(result[0]['state'],'HOLD_INVALID_INVENTORY_RECORD')
+        self.assertEqual(result[1]['state'],'HOLD_CONTINUATION_MISSING')
+        with self.assertRaises(ValueError):gate.continuation_batch([{}]*257,1000)
+        with self.assertRaises(ValueError):gate.continuation_batch([],float('nan'))

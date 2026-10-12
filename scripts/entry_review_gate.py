@@ -85,7 +85,7 @@ def review_bundle(contract,files,reviews,review_keys=None):
     if not isinstance(files,dict) or not files or len(files)>32:
         raise ValueError('BOUNDED_FILES_REQUIRED')
     if set(files)!=set(contract['allowed_files']):
-        raise ValueError('EXACT_REVIEWED_FILE_SET_REQUIRED')
+        raise ValueError('EXACT_AUTHORIZED_FILE_SET_REQUIRED')
     manifest={};total=0
     for path,raw in files.items():
         if (not isinstance(path,str) or not re.fullmatch(r'[A-Za-z0-9_./-]+',path)
@@ -154,3 +154,30 @@ def continuation_due(binding,receipt_read_at,now,evidence=None,ledger_keys=None)
     age=now-receipt_read_at
     action='HOLD_CONTINUATION_MISSING' if age>=900 else 'INSPECT_AND_RESUME_SAME_ATTEMPT' if age>=600 else 'RECOVER_INTAKE' if age>=300 else 'AWAIT_EXECUTION_EVIDENCE'
     return {'state':action,'authority_effect':'NONE','takeover_allowed':False,'read_or_heartbeat_is_progress':False}
+
+
+
+def continuation_batch(records, now, ledger_keys=None):
+    """Assess every supplied canonical receipt; never dispatch or mutate authority.
+
+    The caller must supply the complete task inventory from the existing ledger.
+    One invalid receipt becomes a visible HOLD without hiding other tasks.
+    """
+    if not isinstance(records, list) or len(records) > 256:
+        raise ValueError('BOUNDED_CANONICAL_INVENTORY_REQUIRED')
+    if type(now) not in (int, float) or not math.isfinite(now):
+        raise ValueError('FINITE_TIME_REQUIRED')
+    results = []
+    for index, record in enumerate(records):
+        if not isinstance(record, dict) or set(record) != {'binding', 'receipt_read_at', 'evidence'}:
+            results.append({'index': index, 'state': 'HOLD_INVALID_INVENTORY_RECORD',
+                            'authority_effect': 'NONE', 'takeover_allowed': False})
+            continue
+        try:
+            decision = continuation_due(record['binding'], record['receipt_read_at'],
+                                        now, record['evidence'], ledger_keys)
+            results.append(dict(decision, index=index))
+        except (ValueError, TypeError, OverflowError):
+            results.append({'index': index, 'state': 'HOLD_INVALID_CONTINUATION_EVIDENCE',
+                            'authority_effect': 'NONE', 'takeover_allowed': False})
+    return results
