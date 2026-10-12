@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import os
+import sqlite3
 import tempfile
 import unittest
 
@@ -123,6 +124,41 @@ class SupervisorTests(unittest.TestCase):
         self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
         self.s.claim('t1','a2','qa','WORK','run2','session2','lease2',2,2,1004)
         self.assertEqual(self.s._task('t1')['attempt_id'],'a2')
+
+    def test_handoff_ack_exact_replay_survives_attempt_clear(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        first=self.s.record('t1','a1','ack-replay','HANDOFF_ACKNOWLEDGED',
+                            1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        replay=self.s.record('t1','a1','ack-replay','HANDOFF_ACKNOWLEDGED',
+                             1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        self.assertFalse(first['duplicate'])
+        self.assertTrue(replay['duplicate'])
+        self.assertEqual(self.s._task('t1')['state'],'READY')
+
+    def test_version_one_database_migrates_and_preserves_task(self):
+        self.registration()
+        self.s.close()
+        db=sqlite3.connect(self.path)
+        try:
+            db.execute('ALTER TABLE tasks DROP COLUMN recovery_generation')
+            db.execute('PRAGMA user_version=1')
+            db.commit()
+        finally:
+            db.close()
+        self.s=Supervisor(self.path,lambda:self.now)
+        columns=[row['name'] for row in
+                 self.s.db.execute('PRAGMA table_info(tasks)')]
+        self.assertIn('recovery_generation',columns)
+        self.assertEqual(self.s._task('t1')['recovery_generation'],0)
+        self.assertEqual([row['task_id'] for row in self.s.ready()],['t1'])
+        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s._task('t1')['state'],'READY')
 
     def test_unknown_side_effects_preserved_in_visible_hold(self):
         self.registration(); self.claim()
