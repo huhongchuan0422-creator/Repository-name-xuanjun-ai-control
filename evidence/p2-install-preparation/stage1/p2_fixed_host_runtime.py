@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 
 from ledger_cutover_transaction import _atomic_receipt
+from p2_prerequisites import Prerequisites
 
 
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
@@ -76,6 +77,7 @@ class FixedHostRuntime(object):
         self.directory = transaction_directory
         self.run = run
         self.receipt_path = os.path.join(transaction_directory, 'runtime-provisioning.json')
+        self.prerequisites = Prerequisites(transaction_directory, run)
 
     def _authority(self):
         if os.geteuid() != 0 or socket.gethostname().split('.')[0] != HOST:
@@ -131,6 +133,7 @@ class FixedHostRuntime(object):
             raise ValueError('EXACT_RUNTIME_SERVICE_ORDER_REQUIRED')
         if os.path.lexists(self.receipt_path):
             raise ValueError('HOLD_EXISTING_RUNTIME_RECEIPT')
+        self.prerequisites.preflight(runtime['prerequisites'])
         for reference in auth['references'] + tls['references']:
             self._reference(reference)
         release = '/opt/xuanjun-control-releases/' + runtime['release_directory']
@@ -202,13 +205,15 @@ class FixedHostRuntime(object):
                              'mode': binding['mode'], 'uid': binding['owner_uid'],
                              'gid': binding['group_gid'], 'data': rendered})
         receipt = {'schema': 1, 'targets': [dict(item, data=None) for item in prepared],
-                   'services': list(ALLOWED_SERVICES), 'rollback_complete': True}
+                   'services': list(ALLOWED_SERVICES), 'rollback_complete': True,
+                   'prerequisites': runtime['prerequisites']}
         packed = json.dumps(receipt, sort_keys=True,
                             separators=(',', ':')).encode('utf-8')
         reference = {'schema': 1, 'receipt_sha256': _digest_bytes(packed),
                      'rollback_complete': True}
         _atomic_receipt(self.receipt_path, receipt)
         try:
+            self.prerequisites.apply(runtime['prerequisites'])
             for item in prepared:
                 self._atomic_target(item['target'], item['data'], item['mode'],
                                     item['uid'], item['gid'])
@@ -276,6 +281,10 @@ class FixedHostRuntime(object):
                     or not any(target.startswith(p) for p in ALLOWED_TARGET_PREFIXES)):
                 raise ValueError('UNSAFE_RUNTIME_ROLLBACK_TARGET')
             seen.add(target)
+            previous = item['previous']
+            if not os.path.exists(os.path.dirname(target)) and previous is None and not os.path.lexists(target):
+                prepared.append((item, None))
+                continue
             parent = os.lstat(os.path.dirname(target))
             if (not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o022):
                 raise ValueError('UNSAFE_RUNTIME_TARGET_PARENT')
@@ -314,6 +323,7 @@ class FixedHostRuntime(object):
             else:
                 self._atomic_target(item['target'], old, previous['mode'],
                                     previous['uid'], previous['gid'])
+        self.prerequisites.rollback(receipt['prerequisites'])
         self._command(['/usr/bin/systemctl', 'daemon-reload'])
         if any(item['target'].startswith('/etc/nginx/')
                for item in receipt['targets']):
