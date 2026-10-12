@@ -112,4 +112,50 @@ class WiringTests(unittest.TestCase):
             raw=(SOURCE / name).read_text()
             ast.parse(raw,feature_version=(3,6));compile(raw,name,'exec')
 
+from native_github_notifier import FixedPr17GithubNotifier
+from types import SimpleNamespace
+
+class GhTests(unittest.TestCase):
+    def make(self, mode='ok'):
+        calls=[]
+        def run(argv,**kw):
+            calls.append((argv,kw))
+            if argv[-1]=='user':value={'login':'other' if mode=='wrong_owner' else FixedPr17GithubNotifier.OWNER}
+            elif '--method' in argv:
+                if mode=='unknown_send':raise TimeoutError('write result unknown')
+                body=json.loads(kw['input'])['body']
+                value={'id':321,'body':body,'user':{'login':FixedPr17GithubNotifier.OWNER}}
+            else:
+                marker='<!-- XJ_P2_RESULT '+self.key+' -->'
+                row={'id':99,'body':marker+'\nexisting','user':{'login':FixedPr17GithubNotifier.OWNER}}
+                value=[[row,row]] if mode=='duplicate' else [[row]] if mode=='existing' else [[]]
+            return SimpleNamespace(returncode=0,stdout=json.dumps(value).encode())
+        n=FixedPr17GithubNotifier('/usr/bin/true','/root','/usr/bin:/bin',runner=run)
+        self.report={'task_id':'t','spec_hash':'s','fence':1,'epoch':2,'commit':'a'*40,'pr':17,'qa_commit':'a'*40,'state':'CODE_ACCEPTED_PENDING_LEDGER_FINISH','production_pass':False}
+        self.key=hashlib.sha256(json.dumps(self.report,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        return n,calls
+    def test_real_transport_fixed_endpoint_structured_input(self):
+        n,calls=self.make();r=n.send(self.report,self.key)
+        self.assertEqual(r['message_id'],'321');self.assertIn('repos/'+REPO+'/issues/17/comments',calls[-1][0])
+        self.assertIsInstance(calls[-1][1]['input'],bytes);self.assertNotIn('shell',calls[-1][1])
+    def test_existing_external_receipt_no_second_post(self):
+        n,calls=self.make('existing');self.assertEqual(n.send(self.report,self.key)['message_id'],'99')
+        self.assertFalse(any('--method' in a for a,k in calls))
+    def test_wrong_account_no_send(self):
+        n,calls=self.make('wrong_owner')
+        with self.assertRaises(NativeContractError):n.send(self.report,self.key)
+        self.assertEqual(len(calls),1)
+    def test_unknown_send_not_retried(self):
+        n,calls=self.make('unknown_send')
+        with self.assertRaises(TimeoutError):n.send(self.report,self.key)
+        self.assertEqual(sum('--method' in a for a,k in calls),1)
+    def test_duplicate_external_receipts_hold(self):
+        n,calls=self.make('duplicate')
+        with self.assertRaises(NativeContractError):n.send(self.report,self.key)
+        self.assertFalse(any('--method' in a for a,k in calls))
+    def test_report_hash_mismatch_no_command(self):
+        n,calls=self.make()
+        with self.assertRaises(NativeContractError):n.send(self.report,'0'*64)
+        self.assertEqual(calls,[])
+
 if __name__=='__main__':unittest.main(verbosity=2)

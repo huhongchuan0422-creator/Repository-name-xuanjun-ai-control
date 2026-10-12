@@ -1,0 +1,29 @@
+{
+  "status": "CONTROLLER_BACKEND_NOT_IMPLEMENTED_INSTALL_HOLD",
+  "owner": "WORK_CURRENT_SESSION",
+  "model_calls": 0,
+  "source_read_head": "80c8ecab1a3a827596af9d128169dc61cc385b0d",
+  "findings": [
+    {
+      "path": "agent-request-preflight-RvlrwpA6.mjs",
+      "sha256": "025f3224c894c76f80823bdb316efb93d1210657c76711a946e7845afe655d29",
+      "observation": "agent cwd requires client.internal.pluginRuntimeOwnerId; ordinary Gateway CLI is refused before admission"
+    },
+    {
+      "path": "worker-admission-GvAR4z9-.mjs",
+      "sha256": "4ffce51750a296d9b82adfc2eb9dcd648dcbb2e13b01e977ddcd74dd5d82468d",
+      "observation": "worker.sessions.spawn exists on dedicated worker protocol, requiring WorkerConnectAdmission; not an ordinary CLI dispatch endpoint"
+    },
+    {
+      "path": "worker-session-tool-executor-DK6wSr9D.mjs",
+      "sha256": "8b4588002df90d41b68435d63b603031b5daaad9c02c3a1eda1c7840b0f204e7",
+      "observation": "source requires active worker turn and current placement identity"
+    }
+  ],
+  "actual_code": "5-path repair patch with concrete fixed PR17 gh transport",
+  "local_tests": "21/21 PASS; fake-controller and fake-GitHub runner; Python3.6 grammar PASS",
+  "patch_sha256": "a10b01ad1d00fb661151b05473c9d3b5ea383d2ad81dd40e0e022f959793e6b8",
+  "remaining": "trusted plugin-owned controller implementation, real canonical mapping and isolation/stop/result proof; units/manifest/freeze; independent gates; UK install/rollback/E2E",
+  "uk_inference": "NOT_RUN",
+  "uk_install": "NOT_RUN"
+}
