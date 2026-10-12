@@ -1,0 +1,23 @@
+name: P2 installed native controller source read
+on:
+  push:
+    branches: [repair/p2-native-wiring-work-20261012-2119]
+    paths: [scripts/uk-native-controller-source-read.py, .github/workflows/uk-native-controller-source-read.yml]
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-native-controller-source-read
+  cancel-in-progress: false
+jobs:
+  code-read:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read fixed code bytes as nonroot without model or runtime mutation
+        run: |
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-native-controller-source-read.py
