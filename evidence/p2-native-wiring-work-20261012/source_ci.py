@@ -37,10 +37,24 @@ for name in ('test_native_wiring.py','test_native_ledger.py','test_native_socket
 for name in ('test_controller.mjs','test_host.mjs'):
     subprocess.run(['node',str(ROOT/name)],env=env,check=True)
 for item in plugin.glob('*.mjs'):subprocess.run(['node','--check',str(item)],check=True)
+build_commit=os.environ.get('P2_BUILD_COMMIT')
+build_tree=os.environ.get('P2_BUILD_TREE')
+if build_commit or build_tree:
+    if not build_commit or not build_tree:
+        raise ValueError('P2_BUILD_IDENTITY_INCOMPLETE')
+    package_archive=DEST/'authoritative-p2-package.tar.gz'
+    subprocess.run(['python',str(source/'tools/p2-package-freeze.py'),'build',
+        '--source-root',str(source),'--output',str(package_archive),
+        '--source-commit',build_commit,'--source-tree',build_tree],check=True)
+    subprocess.run(['python',str(source/'tools/p2-package-freeze.py'),'verify',
+        '--archive',str(package_archive),'--source-commit',build_commit,
+        '--source-tree',build_tree],check=True)
+    env['P2_AUTHORITATIVE_PACKAGE']=str(package_archive)
+
 for name in ('p2_install_entrypoint.py','p2_fixed_host_runtime.py'):
     raw=(source/'stage1'/name).read_text();compile(raw,name,'exec')
 print(json.dumps({'state':'SOURCE_REGRESSION_PASS','frozen_archive_sha256':SHA,
  'patch_sha256':hashlib.sha256((ROOT/'native-wiring.patch').read_bytes()).hexdigest(),
  'followup_sha256':hashlib.sha256((ROOT/'followup_overlay.py').read_bytes()).hexdigest(),
  'c2_install_overlay_sha256':hashlib.sha256((ROOT/'c2_install_overlay.py').read_bytes()).hexdigest(),
- 'model_calls':0,'UK_runtime':'NOT_RUN','install':'NOT_RUN','release_gate':'NOT_GRANTED'}))
+ 'authoritative_freeze':bool(build_commit),'model_calls':0,'UK_runtime':'NOT_RUN','install':'NOT_RUN','release_gate':'NOT_GRANTED'}))

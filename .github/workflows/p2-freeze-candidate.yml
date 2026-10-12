@@ -20,21 +20,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11747942678/zip > /tmp/p2-frozen.zip
-      - name: Reconstruct and regression-test exact source
+      - name: Reconstruct, regress and authoritative-freeze exact source
         env:
           P2_FROZEN_ZIP: /tmp/p2-frozen.zip
-        run: python evidence/p2-native-wiring-work-20261012/source_ci.py
-      - name: Freeze provenance and SHA256SUMS
+          P2_BUILD_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
-          rm -rf /tmp/p2-release
-          python evidence/p2-native-wiring-work-20261012/freeze_candidate.py \
-            /tmp/xuanjun-p2-native-ci/xuanjun-p2-package /tmp/p2-release
-          cd /tmp/p2-release
-          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
-            -cf /tmp/p2-candidate.tar xuanjun-p2-package
-          gzip -n -9 /tmp/p2-candidate.tar
+          export P2_BUILD_TREE="$(git rev-parse 'HEAD^{tree}')"
+          python evidence/p2-native-wiring-work-20261012/source_ci.py
+          cp /tmp/xuanjun-p2-native-ci/authoritative-p2-package.tar.gz /tmp/p2-candidate.tar.gz
+          python /tmp/xuanjun-p2-native-ci/xuanjun-p2-package/tools/p2-package-freeze.py verify \
+            --archive /tmp/p2-candidate.tar.gz \
+            --source-commit "$P2_BUILD_COMMIT" --source-tree "$P2_BUILD_TREE"
           sha256sum /tmp/p2-candidate.tar.gz | tee /tmp/p2-candidate.tar.gz.sha256
+          printf '%s\n' "$P2_BUILD_TREE" > /tmp/p2-source-tree.txt
           echo MODEL_CALLS=0
           echo UK_RUNTIME=NOT_RUN
           echo RELEASE_GATE=NOT_GRANTED
@@ -44,6 +43,7 @@ jobs:
           path: |
             /tmp/p2-candidate.tar.gz
             /tmp/p2-candidate.tar.gz.sha256
+            /tmp/p2-source-tree.txt
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

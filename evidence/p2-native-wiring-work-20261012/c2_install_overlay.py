@@ -375,6 +375,44 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
         self.prerequisites.rollback(receipt['prerequisites'])
         self._command(['/usr/bin/systemctl', 'daemon-reload'])
 """)
+    installer=source/'scripts'/'uk-integration-install.py'
+    replace_once(installer,
+"""    required={'schema','source_repository','source_commit','source_tree',
+              'runtime_manifest_path','runtime_manifest_sha256','runtime_files',
+              'verifier_path','verifier_sha256','oauth_content_included',
+              'tls_private_key_included','new_paid_api_usage'}
+""",
+"""    required={'schema','source_repository','source_commit','source_tree',
+              'runtime_manifest_path','runtime_manifest_sha256','runtime_files',
+              'verifier_path','verifier_sha256','oauth_content_included',
+              'tls_private_key_included','new_paid_api_usage','operations','rollback_map'}
+""")
+    replace_once(installer,
+"""    if (not isinstance(value,dict) or set(value)!=required
+            or value.get('schema')!=1
+            or value.get('source_repository')!='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+""",
+"""    expected_operations={
+        'verify_only':['scripts/uk-p2-install.py','--operation','verify-only'],
+        'install':['scripts/uk-p2-install.py','--operation','install'],
+        'rollback':['scripts/uk-p2-install.py','--operation','rollback']}
+    expected_rollback=[
+        'ACTIVATION_FENCED_EPOCH','NEW_RUNTIME_STOPPED','PROVISIONING_RESTORED',
+        'LEGACY_FILES_RESTORED_NOT_RESTARTED',
+        'RECONCILE_DATABASE_AND_EPOCH_BEFORE_ANY_RESTART']
+    if (not isinstance(value,dict) or set(value)!=required
+            or value.get('schema')!=2
+            or value.get('source_repository')!='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+""")
+    replace_once(installer,
+"""            or value.get('new_paid_api_usage')!='NONE'
+            or not isinstance(verifier,str) or verifier.startswith('/')
+""",
+"""            or value.get('new_paid_api_usage')!='NONE'
+            or value.get('operations')!=expected_operations
+            or value.get('rollback_map')!=expected_rollback
+            or not isinstance(verifier,str) or verifier.startswith('/')
+""")
     manifest=deploy/'integration-manifest.json';value=json.loads(manifest.read_text());files=value['files']
     for path in [entry,runtime,binding,ledger_client,dropin]:
         files[path.relative_to(source).as_posix()]=sha(path)
