@@ -22,7 +22,7 @@ class SupervisorTests(unittest.TestCase):
 
     def registration(self, task='t1', deps=None):
         self.s.register(dict(task_id=task, parent_task_id='parent', stage='dev',
-            writer_scope=task + ':dev', owner='developer', entry='WORK', checkpoint_sha256='a'*64,
+            owner='developer', entry='WORK', checkpoint_sha256='a'*64,
             spec_sha256='b'*64, next_action='implement',
             dependencies=deps or [], completion_conditions=['tests'],
             progress_deadline=1900, receipt_deadline=1100,
@@ -196,6 +196,43 @@ class SupervisorTests(unittest.TestCase):
         self.claim('parent')
         with self.assertRaises(ValueError):
             self.s.record('parent','a1','unsafe','TERMINAL',1002,payload=unsafe)
+
+    def test_delayed_exact_replay_remains_idempotent(self):
+        self.registration(); self.claim()
+        first=self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','hb','HEARTBEAT',1002)
+        replay=self.s.record('t1','a1','start','STARTED',1001)
+        self.assertFalse(first['duplicate'])
+        self.assertTrue(replay['duplicate'])
+
+    def test_recovery_generation_prevents_outbox_collision_after_progress(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        first=self.s.scan(1302)[0]
+        self.now=1303
+        self.s.record('t1','a1','progress','PROGRESS',1303,
+                      'SOURCE_COMMIT','commit:abc',
+                      {'next_progress_deadline':2000})
+        second=self.s.scan(1604)[0]
+        self.assertNotEqual(first['outbox_event_id'],
+                            second['outbox_event_id'])
+        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        ids=[row['event_id'] for row in self.s.due_outbox(1604)]
+        self.assertIn(first['outbox_event_id'],ids)
+        self.assertIn(second['outbox_event_id'],ids)
+
+    def test_handoff_rejects_empty_new_identity(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        bad=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','ack-empty','HANDOFF_ACKNOWLEDGED',
+                          1003,'PHASE_EXECUTION','proof:'+('a'*64),bad)
+        self.assertEqual(self.s._task('t1')['state'],'HANDOFF_PENDING')
 
     def test_future_or_reordered_event_is_rejected(self):
         self.registration(); self.claim()
