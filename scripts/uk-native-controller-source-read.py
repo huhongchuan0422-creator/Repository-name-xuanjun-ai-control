@@ -24,9 +24,15 @@ def main():
         records.append({'path':requested,'resolved':path,'sha256':hashlib.sha256(raw).hexdigest(),'uid':info.st_uid,'mode':oct(stat.S_IMODE(info.st_mode)),'source':source})
     root='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
     selected=[];scanned=0
-    for name in sorted(os.listdir(root)):
-        if not name.endswith('.js') or not any(w in name for w in ('gateway','agent','automation','schema','protocol')):continue
-        path=root+'/'+name
+    code_paths=[]
+    for directory,folders,files in os.walk(root,followlinks=False):
+        depth=os.path.relpath(directory,root).count(os.sep)
+        folders[:]=[f for f in sorted(folders) if depth<5 and f not in ('node_modules','__pycache__')]
+        for name in sorted(files):
+            path=os.path.join(directory,name)
+            if name.endswith('.js') and any(w in path[len(root):] for w in ('gateway','agent','automation','schema','protocol')):code_paths.append(path)
+        if len(code_paths)>1000:break
+    for path in code_paths:
         info=os.lstat(path)
         if not stat.S_ISREG(info.st_mode) or info.st_size>4000000:continue
         if scanned+info.st_size>32000000:break
@@ -39,6 +45,6 @@ def main():
             if start>=0:snippets.append({'symbol':word,'source':body[max(0,start-1000):start+5000]})
         if snippets:selected.append({'path':path,'sha256':hashlib.sha256(body.encode()).hexdigest(),'snippets':snippets})
         if len(selected)>=14:break
-    records.append({'gateway_code_snippets':selected,'bytes_scanned':scanned})
+    records.append({'gateway_code_snippets':selected,'bytes_scanned':scanned,'code_candidates':len(code_paths),'directory_names':sorted(os.listdir(root))[:30]})
     print(json.dumps({'state':'READONLY_CODE_EXPORT','model_calls':0,'authority_mutation':'NONE','sources':records},sort_keys=True))
 if __name__=='__main__':main()
