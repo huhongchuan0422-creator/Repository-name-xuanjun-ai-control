@@ -56,3 +56,35 @@ This interface delta is proposed on PR17 comment6134594691 for the shared owner;
 Dots does not modify execution_ledger.py, P2 controller or install manifests.
 
 Source/CI checks are separate from UK activation and 5/10/15 fault acceptance.
+
+## Amendments 6134634728 and 6134670620: bounded lineage and policy
+
+The adapter now accepts optional activation_binding, ledger_identity and exact
+task_id parameters. Pagination and exact-task lookup are mutually exclusive.
+Activation includes ledger UUID, generation, epoch, instance and canonical path;
+file identity must come from the admitted caller, not submitted task metadata.
+Checkpoint content stays private; only its normalized hash and strictly formatted
+native attempt/lease identifiers are exposed. Unknown identifiers stay UNKNOWN.
+Stopped native runs and terminal tasks without continuation/ACK evidence remain
+visible; an observed terminal result never proves successor admission.
+
+assert_inventory_lineage compares an observation only. It grants no authority.
+The proposed shared-owner patch and hash-bound test excerpts are in
+evidence/dots-task23-canonical-20261013/. P2 owns integration into its existing
+execution_supervision.py, transaction pinning, imports and package manifest.
+No shared production source is modified here. Its proposed notice operation
+re-reads exact lineage in the admitted transaction and uses existing events and
+delivery rows; duplicate notices preserve dead-letter state. No resume or
+external delivery is implemented by this notice proposal.
+
+receiver_continuation_policy defaults to CAPABILITY_UNAVAILABLE with no fallback
+for every callable model route, including Work, Codex, agents, CLI/app-server and
+paid APIs. It never dispatches. Listed mechanical routes still require the
+existing reviewed mechanical executor. WORK/CHATGPT/DOTS are entry labels, not
+permission to invoke those models. Native-chat quota attribution is UNKNOWN.
+Policy fixtures do not establish integrated runtime enforcement:
+POLICY_RECORDED / ENFORCEMENT_NOT_VERIFIED.
+
+The CI evidence suite uses disposable SQLite fixtures, not the UK ledger.
+Real activation, receiver ACK, 5/10/15 fault acceptance and independent review
+remain required separately.

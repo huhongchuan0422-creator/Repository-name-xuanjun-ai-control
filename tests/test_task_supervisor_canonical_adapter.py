@@ -109,6 +109,44 @@ class InventoryTests(unittest.TestCase):
                 self.assertIn('UNKNOWN_EFFECT_NO_REPLAY',row['attention'])
                 self.db.rollback()
 
+    def test_activation_and_exact_task_are_bound(self):
+        self.task('a');self.task('b');self.begin()
+        activation={'ledger_uuid':'00000000-0000-0000-0000-000000000001',
+                    'instance':'00000000-0000-0000-0000-000000000002',
+                    'generation':1,'epoch':2,'db_path':'/fixture/canonical.db'}
+        result=inventory_page(self.db,100,activation_binding=activation,ledger_identity='1:2',task_id='b')
+        self.assertEqual([x['id'] for x in result['tasks']],['b'])
+        self.assertEqual(result['tasks'][0]['binding']['activation'],activation)
+        self.assertEqual(result['tasks'][0]['binding']['ledger_identity'],'1:2')
+
+    def test_all_entries_deny_delegated_routes_without_fallback(self):
+        from task_supervisor_runtime import receiver_continuation_policy
+        for entry in ('WORK','CHATGPT','DOTS'):
+            for route in ('WORK','CODEX','CODEX_CLI','APP_SERVER','PAID_API','OPENCLAW_AGENT','CHILD_SPAWN','FALLBACK','NATIVE_CHAT_CALL'):
+                value=receiver_continuation_policy(entry,route)
+                self.assertEqual(value['state'],'CAPABILITY_UNAVAILABLE')
+                self.assertFalse(value['dispatch']);self.assertIsNone(value['fallback'])
+            value=receiver_continuation_policy(entry,'HASH_SYNTAX_TEST')
+            self.assertEqual(value['state'],'MECHANICAL_REVIEW_REQUIRED')
+            self.assertFalse(value['dispatch'])
+
+    def test_lineage_rejects_replacement_and_missing_authority(self):
+        import copy
+        from task_supervisor_runtime import assert_inventory_lineage
+        expected={'task_id':'a','fence':4,'spec_sha256':'a'*64,'checkpoint_sha256':'b'*64,
+                  'run_id':'r1','session_id':'s1','epoch':2,'attempt_id':'c'*64,
+                  'ledger_identity':'1:2','entry':'DOTS','lease_id':'lease1',
+                  'activation':{'ledger_uuid':'u1','generation':1,'epoch':2,'instance':'i1','db_path':'/fixture'}}
+        for key,value in (('run_id','r2'),('session_id','s2'),('fence',5),('epoch',3),('checkpoint_sha256','d'*64)):
+            current=copy.deepcopy(expected);current[key]=value
+            with self.assertRaises(ValueError):assert_inventory_lineage(expected,current)
+        for key in ('generation','epoch','instance'):
+            current=copy.deepcopy(expected);current['activation'][key]='changed'
+            with self.assertRaises(ValueError):assert_inventory_lineage(expected,current)
+        current=copy.deepcopy(expected);current['attempt_id']='UNKNOWN'
+        with self.assertRaises(ValueError):assert_inventory_lineage(expected,current)
+        self.assertEqual(assert_inventory_lineage(expected,expected),'MATCHED_OBSERVATION_NOT_AUTHORITY')
+
     def test_invalid_limits_and_clock(self):
         self.begin()
         for clock,limit in ((float('nan'),1),(100,True),(100,0),(100,101)):

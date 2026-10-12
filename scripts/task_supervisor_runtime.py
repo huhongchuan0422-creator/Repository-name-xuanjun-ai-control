@@ -10,6 +10,7 @@ import fcntl
 import hashlib
 import json
 import math
+import re
 import os
 import sqlite3
 import stat
@@ -210,7 +211,7 @@ CANONICAL_READ_COLUMNS = ('id', 'kind', 'state', 'depends', 'lease_owner', 'leas
 CANONICAL_RUN_COLUMNS = ('task_id', 'executor', 'run_id', 'session_id', 'spec_hash',
                'checkpoint_hash', 'writer_fence', 'writer_epoch', 'status',
                'last_progress', 'start_deadline', 'progress_deadline',
-               'result_deadline', 'started_at', 'effects')
+               'result_deadline', 'started_at', 'effects', 'native_state')
 
 
 def _finite(value):
@@ -222,7 +223,8 @@ def _columns(db, table):
     return tuple(row[1] for row in db.execute('PRAGMA table_info(' + table + ')'))
 
 
-def canonical_inventory_page(db, now, after_id=None, limit=100):
+def canonical_inventory_page(db, now, after_id=None, limit=100,
+                             activation_binding=None, ledger_identity=None, task_id=None):
     if not db.in_transaction:
         raise ValueError('CANONICAL_READ_TRANSACTION_REQUIRED')
     if not _finite(now) or type(limit) is not int or not 1 <= limit <= 100:
@@ -234,9 +236,34 @@ def canonical_inventory_page(db, now, after_id=None, limit=100):
     run_columns = _columns(db, 'supervised_runs')
     if run_columns and not set(CANONICAL_RUN_COLUMNS).issubset(run_columns):
         raise ValueError('SUPERVISION_SCHEMA_UNRECOGNIZED')
+    activation = {key: 'UNKNOWN' for key in
+                  ('ledger_uuid', 'generation', 'epoch', 'instance', 'db_path')}
+    if activation_binding is not None:
+        if not isinstance(activation_binding, dict) or set(activation_binding) != set(activation):
+            raise ValueError('ACTIVATION_BINDING_SHAPE')
+        for key in ('ledger_uuid', 'instance'):
+            value = activation_binding[key]
+            if not isinstance(value, str) or re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', value) is None:
+                raise ValueError('ACTIVATION_IDENTITY')
+        for key in ('generation', 'epoch'):
+            if type(activation_binding[key]) is not int or activation_binding[key] < 1:
+                raise ValueError('ACTIVATION_GENERATION')
+        path = activation_binding['db_path']
+        if not isinstance(path, str) or not os.path.isabs(path) or os.path.normpath(path) != path:
+            raise ValueError('ACTIVATION_PATH')
+        activation = dict(activation_binding)
+    if ledger_identity is not None:
+        parts = ledger_identity.split(':') if isinstance(ledger_identity, str) else []
+        if len(parts) != 2 or any(not x.isdigit() for x in parts):
+            raise ValueError('LEDGER_FILE_IDENTITY')
+    if task_id is not None and (after_id is not None or not isinstance(task_id, str) or not task_id):
+        raise ValueError('EXACT_TASK_SELECTOR')
     query = 'SELECT ' + ','.join(CANONICAL_READ_COLUMNS) + ' FROM tasks'
     args = []
-    if after_id is not None:
+    if task_id is not None:
+        query += ' WHERE id = ?'
+        args.append(task_id)
+    elif after_id is not None:
         query += ' WHERE id > ?'
         args.append(after_id)
     query += ' ORDER BY id LIMIT ?'
@@ -289,6 +316,11 @@ def canonical_inventory_page(db, now, after_id=None, limit=100):
         else:
             if run['effects'] == 'UNKNOWN':
                 flags.append('UNKNOWN_EFFECT_NO_REPLAY')
+            if (run['native_state'] in ('EXITED', 'FAILED', 'CANCELLED', 'NOT_FOUND')
+                    and task['state'] in ('PENDING', 'RUNNING') and run['status'] != 'COMPLETED'):
+                flags.append('TERMINAL_WITHOUT_RESULT')
+            if run['status'] == 'COMPLETED':
+                flags.append('TERMINAL_CONTINUATION_UNVERIFIED')
             if task['state'] == 'RUNNING':
                 for field, label in (('progress_deadline', 'PROGRESS'),
                                      ('result_deadline', 'RESULT')):
@@ -301,6 +333,8 @@ def canonical_inventory_page(db, now, after_id=None, limit=100):
                     flags.append('START_DEADLINE_UNVERIFIED')
                 elif run['start_deadline'] < now:
                     flags.append('START_DEADLINE_EXCEEDED')
+        if task['state'] in ('DONE', 'FAILED') and 'TERMINAL_CONTINUATION_UNVERIFIED' not in flags:
+            flags.append('TERMINAL_CONTINUATION_UNVERIFIED')
         row = {key: task[key] for key in ('id', 'kind', 'state', 'lease_owner',
                                           'lease_until', 'fence')}
         spec_hash = None
@@ -319,12 +353,16 @@ def canonical_inventory_page(db, now, after_id=None, limit=100):
             if any(x['authority_fence'] != task['fence'] for x in delivery_rows):
                 flags.append('STALE_DELIVERY_RECONCILE_ONLY')
         checkpoint_hash = 'UNKNOWN'
+        native = {}
         raw_checkpoint = db.execute('SELECT CASE WHEN length(checkpoint)<=65536'
             ' THEN checkpoint ELSE NULL END FROM tasks WHERE id=?', (task['id'],)).fetchone()[0]
         try:
             value = json.loads(raw_checkpoint)
             if not isinstance(value, dict):
                 raise ValueError('checkpoint object required')
+            native = value.get('native_execution', {})
+            if not isinstance(native, dict):
+                native = {}
             checkpoint_hash = hashlib.sha256(json.dumps(value, sort_keys=True,
                 separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
         except (TypeError, ValueError):
@@ -334,6 +372,17 @@ def canonical_inventory_page(db, now, after_id=None, limit=100):
         if not _finite(task['lease_until']) and task['lease_until'] is not None:
             task['lease_until'] = 'UNKNOWN'
             row['lease_until'] = 'UNKNOWN'
+        attempt = native.get('idempotency_key')
+        if not isinstance(attempt, str) or len(attempt) != 64 or any(c not in '0123456789abcdef' for c in attempt):
+            attempt = 'UNKNOWN'
+        lease_id = 'UNKNOWN'
+        request = native.get('request')
+        if isinstance(request, dict) and isinstance(request.get('lease'), str):
+            try:
+                if re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', request['lease']):
+                    lease_id = request['lease']
+            except ValueError:
+                pass
         binding = {'task_id': task['id'], 'fence': task['fence'],
                    'lease_owner': task['lease_owner'], 'lease_until': task['lease_until'],
                    'spec_sha256': spec_hash or ((run['spec_hash'] or 'UNKNOWN') if run else 'UNKNOWN'),
@@ -342,8 +391,16 @@ def canonical_inventory_page(db, now, after_id=None, limit=100):
                    'session_id': (run['session_id'] or 'UNKNOWN') if run else 'UNKNOWN',
                    'epoch': run['writer_epoch'] if run and run['writer_epoch'] is not None else 'UNKNOWN',
                    'entry': (run['executor'] or 'UNKNOWN') if run else 'UNKNOWN',
-                   'entry_authenticated': False, 'attempt_id': 'UNKNOWN',
-                   'lease_id': 'UNKNOWN'}
+                   'entry_authenticated': False,
+                   'attempt_id': attempt,
+                   'lease_id': lease_id, 'task_state': task['state'],
+                   'supervision_status': run['status'] if run else 'UNKNOWN',
+                   'effects': run['effects'] if run else 'UNKNOWN',
+                   'activation': activation, 'ledger_identity': ledger_identity or 'UNKNOWN'}
+        if activation_binding is None or ledger_identity is None:
+            flags.append('ACTIVATION_IDENTITY_UNVERIFIED')
+        elif run and run['writer_epoch'] != activation['epoch']:
+            flags.append('ACTIVATION_EPOCH_MISMATCH')
         if run and spec_hash and run['spec_hash'] != spec_hash:
             flags.append('SPEC_LINEAGE_MISMATCH')
         decision = 'INSPECT_ONLY'
@@ -357,6 +414,7 @@ def canonical_inventory_page(db, now, after_id=None, limit=100):
         row.update({'supervision': run, 'attention': flags, 'binding': binding,
                     'deliveries': delivery_rows, 'decision': decision,
                     'decision_key': key, 'provider': 'CAPABILITY_UNAVAILABLE',
+                    'next_action': 'UNKNOWN', 'receiver_ack': 'UNKNOWN',
                     'execution_authority': 'NOT_GRANTED'})
         # Deliberately omit raw checkpoint/prompt content and task.updated: a
         # heartbeat or dashboard update is not evidence of real progress.
@@ -365,6 +423,55 @@ def canonical_inventory_page(db, now, after_id=None, limit=100):
             'next_cursor': rows[-1]['id'] if len(source_rows) > limit else None,
             'complete': len(source_rows) <= limit, 'dispatch_performed': False,
             'canonical_mutation': False, 'authority': 'READ_ONLY_OBSERVATION'}
+
+
+
+def receiver_continuation_policy(entry, route):
+    """Data-only selection under policy6134670620; no provider is invoked.
+
+    A model-backed native entry is never callable through this adapter. Actual
+    current native chats continue themselves; mechanical work needs its own
+    reviewed executor. Unknown routes deny, with no fallback.
+    """
+    if entry not in ('WORK', 'CHATGPT', 'DOTS'):
+        return {'state': 'CAPABILITY_UNAVAILABLE', 'reason': 'UNKNOWN_ENTRY',
+                'dispatch': False, 'fallback': None}
+    mechanical = ('READ_ONLY_COLLECTION', 'HASH_SYNTAX_TEST', 'PACKAGE',
+                  'RECEIPT_COLLECTION', 'DEADLINE_SCAN')
+    if route in mechanical:
+        return {'state': 'MECHANICAL_REVIEW_REQUIRED', 'reason': 'NO_INFERENCE_ROUTE',
+                'dispatch': False, 'fallback': None}
+    return {'state': 'CAPABILITY_UNAVAILABLE', 'reason': 'DELEGATED_MODEL_ROUTE_DENIED',
+            'dispatch': False, 'fallback': None}
+
+
+def assert_inventory_lineage(expected, current, notice_only=False):
+    """Comparison primitive for an EXISTING admitted mutation transaction.
+
+    This function neither opens a transaction nor grants permission. Integrator
+    must re-read current inside its transaction and apply existing operation
+    authorization/effect/stop guards; never call an external callback from here.
+    """
+    required = ('task_id', 'fence', 'spec_sha256', 'checkpoint_sha256',
+                'run_id', 'session_id', 'epoch', 'attempt_id', 'ledger_identity',
+                'entry', 'lease_id')
+    if type(notice_only) is not bool:
+        raise ValueError('INVALID_NOTICE_MODE')
+    if notice_only:
+        required = ('task_id', 'fence', 'checkpoint_sha256', 'ledger_identity')
+    for value in (expected, current):
+        if not isinstance(value, dict):
+            raise ValueError('CANONICAL_LINEAGE_REQUIRED')
+        if any(value.get(key) in (None, '', 'UNKNOWN') for key in required):
+            raise ValueError('CAPABILITY_UNAVAILABLE_MISSING_LINEAGE')
+        activation = value.get('activation')
+        if not isinstance(activation, dict) or any(activation.get(key) in (None, '', 'UNKNOWN')
+                for key in ('ledger_uuid', 'generation', 'epoch', 'instance', 'db_path')):
+            raise ValueError('CAPABILITY_UNAVAILABLE_MISSING_ACTIVATION')
+    # Matching observations still do not authorize a state transition.
+    if canonical(expected) != canonical(current):
+        raise ValueError('STALE_CANONICAL_INVENTORY')
+    return 'MATCHED_OBSERVATION_NOT_AUTHORITY'
 
 
 def main():

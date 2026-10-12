@@ -8,6 +8,7 @@ on:
       - tests/test_task_supervisor_runtime.py
       - tests/test_task_supervisor_outbox_attempt.py
       - tests/test_task_supervisor_canonical_adapter.py
+      - evidence/dots-task23-canonical-20261013/**
       - deploy/xuanjun-task-supervisor.service.in
       - deploy/xuanjun-task-supervisor.timer.in
       - .github/workflows/task-supervisor-runtime-gates.yml
@@ -25,3 +26,6 @@ jobs:
         run: |
           python3 -m py_compile scripts/task_supervisor.py scripts/task_supervisor_runtime.py scripts/task_supervisor_runtime_entry.py
           python3 -B -m unittest discover -s tests -p 'test_task_supervisor*.py' -v
+
+      - name: Validate proposed canonical notice delta (fixtures only)
+        run: python3 -B -m unittest discover -s evidence/dots-task23-canonical-20261013 -p 'test_*.py' -v
