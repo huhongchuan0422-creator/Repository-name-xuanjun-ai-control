@@ -1,0 +1,79 @@
+name: UK P2 deterministic manual package freeze
+
+on:
+  push:
+    branches: [build/p2-manual-package-20261012]
+    paths:
+      - 'evidence/p2-install-preparation/**'
+      - '.github/workflows/uk-p2-package-freeze.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Unit test deterministic package boundary
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest -v \
+            evidence/p2-install-preparation/tools/test_p2_package_freeze.py
+
+      - name: Build twice, compare bytes, and verify provenance
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          source_root="$GITHUB_WORKSPACE/evidence/p2-install-preparation"
+          source_tree="$(git show -s --format=%T "$GITHUB_SHA")"
+          package="xuanjun-p2-manual-${GITHUB_SHA}.tar.gz"
+          mkdir -p frozen second
+          python3 -I -B "$source_root/tools/p2-package-freeze.py" build \
+            --source-root "$source_root" \
+            --source-commit "$GITHUB_SHA" \
+            --source-tree "$source_tree" \
+            --output "$GITHUB_WORKSPACE/frozen/$package"
+          python3 -I -B "$source_root/tools/p2-package-freeze.py" build \
+            --source-root "$source_root" \
+            --source-commit "$GITHUB_SHA" \
+            --source-tree "$source_tree" \
+            --output "$GITHUB_WORKSPACE/second/$package"
+          cmp "$GITHUB_WORKSPACE/frozen/$package" "$GITHUB_WORKSPACE/second/$package"
+          archive_sha256="$(sha256sum "$GITHUB_WORKSPACE/frozen/$package" | cut -d' ' -f1)"
+          python3 -I -B "$source_root/tools/p2-package-freeze.py" verify \
+            --archive "$GITHUB_WORKSPACE/frozen/$package" \
+            --sha256 "$archive_sha256" \
+            --source-commit "$GITHUB_SHA" \
+            --source-tree "$source_tree"
+          printf '%s  %s\n' "$archive_sha256" "$package" > frozen/SHA256SUMS
+          printf 'SOURCE_COMMIT=%s\nSOURCE_TREE=%s\nARCHIVE_SHA256=%s\n' \
+            "$GITHUB_SHA" "$source_tree" "$archive_sha256" > frozen/SOURCE.txt
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
+          echo "source_tree=$source_tree" >> "$GITHUB_OUTPUT"
+          {
+            echo 'P2_PACKAGE_FREEZE=PASS'
+            echo "SOURCE_COMMIT=$GITHUB_SHA"
+            echo "SOURCE_TREE=$source_tree"
+            echo "ARCHIVE_SHA256=$archive_sha256"
+            echo 'RUNTIME_FILES=48'
+            echo 'CODEX_INFERENCE_CALLS_BY_WORKFLOW=0'
+            echo 'NEW_PAID_API_USAGE=NONE'
+            echo 'INSTALL=NO'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable private package candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: xuanjun-p2-manual-${{ github.sha }}
+          path: frozen/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
