@@ -21,6 +21,20 @@ export default {
       if(typeof sdk.resolveSandboxContext!=='function')throw new Error('HOLD_CONTEXT_EXPORT');
       return sdk.resolveSandboxContext(params);
     };
-    registerController(api,createHostBindings(api,settings,resolveContext));
+    if(!Object.hasOwn(settings.contextFiles||{},settings.admissionPath))throw new Error('HOLD_ADMISSION_MANIFEST');
+    const admissionSdkPromise=import(pathToFileURL(settings.admissionPath).href);
+    const prepareRunAdmission=(...args)=>admissionSdkPromise.then(sdk=>{
+      if(typeof sdk.prepareSystemAgentRunAdmission!=='function')throw new Error('HOLD_RUN_ADMISSION_EXPORT');
+      return sdk.prepareSystemAgentRunAdmission(...args);
+    });
+    const host=createHostBindings(api,settings,resolveContext,(...args)=>{
+      const deferred={admit:async owner=>{
+        const prepared=await prepareRunAdmission(...args);
+        deferred._prepared=prepared;
+        return prepared.admit(owner);
+      },close:()=>deferred._prepared?.close()};
+      return deferred;
+    });
+    registerController(api,host);
   }
 };

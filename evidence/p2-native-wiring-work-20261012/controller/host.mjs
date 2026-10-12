@@ -3,8 +3,10 @@ import {ContainerObserver} from './workspace.mjs';
 
 const hold=reason=>{throw new Error('HOLD_'+reason);};
 /** Concrete adapters using Gateway's injected SDK and pinned context resolver. */
-export function createHostBindings(api,settings,resolveSandboxContext) {
+export function createHostBindings(api,settings,resolveSandboxContext,prepareSystemAgentRunAdmission) {
   if(typeof resolveSandboxContext!=='function')hold('SANDBOX_CONTEXT_EXPORT');
+  if(typeof prepareSystemAgentRunAdmission!=='function')hold('RUN_ADMISSION_EXPORT');
+  const admissions=new Map();
   const store=new CanonicalLedgerStore(settings.ledger);
   const boundary=new ContainerObserver(settings.engine);
   const agentId=settings.agentId;
@@ -17,18 +19,31 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
       agentDir:runtime.agent.resolveAgentDir(cfg,agentId),workspaceDir:request.workdir,
       provider:request.provider,model:request.model});
   };
-  const prepare=async(runtime,{request,sessionKey})=>{
+  const prepare=async(runtime,{request,sessionKey,idempotencyKey})=>{
     const cfg=config();
     const authority=runtime.sandbox.resolveWorkspaceAuthority({config:cfg,agentId,sessionKey,
       workspaceDir:request.workdir,modelProvider:request.provider,modelId:request.model});
     if(authority?.sandboxed!==true||authority.confinementError)hold('SANDBOX_AUTHORITY');
-    const context=await resolveSandboxContext({config:cfg,agentId,sessionKey,
-      workspaceDir:request.workdir,requireCurrentConfig:true,
-      assertCurrent:()=>{if(!store.guard(request))hold('PREPARE_LEASE');}});
-    if(context?.enabled!==true||context.sessionKey!==sessionKey||context.workspaceDir!==request.workdir
-      ||context.backendId!==settings.engine.backend||typeof context.runtimeId!=='string'
-      ||context.workspaceAccess!==(request.sandbox==='read-only'?'ro':'rw'))hold('SANDBOX_CONTEXT_BINDING');
-    return {backend:context.backendId,name:context.runtimeId};
+    if(!/^[0-9a-f]{64}$/.test(idempotencyKey??''))hold('RUN_ADMISSION_ID');
+    const authorityRunId='xuanjun-p2:'+idempotencyKey;
+    if(admissions.has(sessionKey))hold('RUN_ADMISSION_DUPLICATE');
+    const prepared=prepareSystemAgentRunAdmission(cfg,authorityRunId,agentId,'xuanjun.p2.native');
+    if(!prepared||typeof prepared.admit!=='function'||typeof prepared.close!=='function')hold('RUN_ADMISSION_CONTRACT');
+    let admittedRunContext;
+    try {
+      admittedRunContext=await prepared.admit('plugin-harness');
+      const context=await resolveSandboxContext({config:cfg,agentId,sessionKey,
+        workspaceDir:request.workdir,requireCurrentConfig:true,admittedRunContext,
+        assertCurrent:()=>{if(!store.guard(request))hold('PREPARE_LEASE');}});
+      if(context?.enabled!==true||context.sessionKey!==sessionKey||context.workspaceDir!==request.workdir
+        ||context.backendId!==settings.engine.backend||typeof context.runtimeId!=='string'
+        ||context.workspaceAccess!==(request.sandbox==='read-only'?'ro':'rw'))hold('SANDBOX_CONTEXT_BINDING');
+      admissions.set(sessionKey,{prepared,authorityRunId,runtimeId:context.runtimeId,backendId:context.backendId});
+      return {backend:context.backendId,name:context.runtimeId,authority_run_id:authorityRunId};
+    } catch(error) {
+      try {prepared.close();} catch {}
+      throw error;
+    }
   };
   const collectResult=async(runtime,record)=>{
     if(record.phase!=='TERMINAL'||record.observation?.state!=='completed')hold('RUN_NOT_COMPLETED');
@@ -89,9 +104,22 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
     } catch {return {block:true,blockReason:'P2 canonical lease/run/unit admission unavailable'};}
   };
   return {store,boundary,eligibility,prepare,collectResult,preflight,beforeToolCall,
-    // No installed SDK placement attestation has been demonstrated. Fail closed rather than
-    // inventing an API, synthesizing a cgroup ID, or launching outside the admitted unit.
-    verifyWorkerPlacement:async()=>null,
+    verifyWorkerPlacement:async(_runtime,{request,unit,sessionKey,source})=>{
+      const active=admissions.get(sessionKey);
+      if(!active||active.runtimeId!==unit.id||active.backendId!==unit.backend
+        ||active.authorityRunId!==unit.authority_run_id||!store.guard(request))return null;
+      return {verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
+        source_manifest_sha256:source.manifest_sha256,
+        request_sha256:(await import('./canonical.mjs')).digest(request),
+        authority_run_id:active.authorityRunId};
+    },
+    releaseWorkerPlacement:sessionKey=>{
+      const active=admissions.get(sessionKey);
+      if(!active)return false;
+      admissions.delete(sessionKey);
+      active.prepared.close();
+      return true;
+    },
     verifyLease:(task,request,now)=>task.state==='RUNNING'&&Number.isFinite(task.lease_until)&&task.lease_until*1000>now,
     commitGuard:request=>store.guard(request)};
 }

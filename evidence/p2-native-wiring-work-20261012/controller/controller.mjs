@@ -45,7 +45,7 @@ export class NativeController {
     // Persist intent before provisioning any physical execution boundary.
     observed=await this.store.replace(observed,{...observed.task,native_execution:{
       phase:'PROVISIONING',request,idempotency_key:key,session_key:sessionKey,source,previous_receipts:previous}});
-    const unit=await this.prepare(runtime,{request,sessionKey,source});
+    const unit=await this.prepare(runtime,{request,sessionKey,source,idempotencyKey:key});
     const bound=await this.boundary.bind(unit,request.workdir,[],request.sandbox);
     const admission={request,idempotency_key:key,isolation_enforced:true};
     const latest=await this.current(request);
