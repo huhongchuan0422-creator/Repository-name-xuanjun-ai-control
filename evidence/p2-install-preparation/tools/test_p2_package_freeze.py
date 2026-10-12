@@ -10,7 +10,7 @@ import unittest
 
 HERE = os.path.dirname(__file__)
 spec = importlib.util.spec_from_file_location('package_freeze',
-    os.path.join(HERE, 'p2_package_freeze.py'))
+    os.path.join(HERE, 'p2-package-freeze.py'))
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
