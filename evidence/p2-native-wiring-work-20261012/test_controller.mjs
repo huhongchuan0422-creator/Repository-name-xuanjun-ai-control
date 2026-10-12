@@ -7,7 +7,7 @@ import {canonical} from './controller/canonical.mjs';
 for(const raw of ['{"a":1,"a":2}','{"__proto__":{}}','1e999','9007199254740993','[1,]','{"a":1}x'])assert.throws(()=>strictJson(raw));
 assert.equal(strictJson('{"a":[true,null,"中文"]}').a[2],'中文');
 let calls=0;
-const bindings={store:{read:async()=>({task:{}})},boundary:{},prepare:async()=>{},eligibility:async()=>false,collectResult:async()=>{},verifyLease:async()=>false,commitGuard:()=>false,verifyWorkerPlacement:async()=>null};
+const bindings={store:{read:async()=>({task:{}})},boundary:{},prepare:async()=>{},eligibility:async()=>false,collectResult:async()=>{},verifyLease:async()=>false,commitGuard:()=>false,verifyWorkerPlacement:async()=>null,releaseWorkerPlacement:()=>true};
 assert.throws(()=>new NativeController({...bindings,commitGuard:undefined}),/HOST_BINDING/);
 const controller=new NativeController(bindings);
 await assert.rejects(()=>controller.admit('{}','0'.repeat(64),{}),/REQUEST_HASH/);

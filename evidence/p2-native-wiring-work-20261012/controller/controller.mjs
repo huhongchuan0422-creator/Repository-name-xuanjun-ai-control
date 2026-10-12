@@ -7,11 +7,11 @@ const fields=['task_id','spec_hash','lease','fence','epoch','generation','instan
 const hold=reason=>{throw new Error('HOLD_'+reason);};
 /** Gateway-owned handler. Bindings must be installed host adapters, never RPC params. */
 export class NativeController {
-  constructor({store,boundary,prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement,clock=Date.now}) {
-    for(const fn of [prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement]) if(typeof fn!=='function')hold('HOST_BINDING_MISSING');
+  constructor({store,boundary,prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement,releaseWorkerPlacement,clock=Date.now}) {
+    for(const fn of [prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement,releaseWorkerPlacement]) if(typeof fn!=='function')hold('HOST_BINDING_MISSING');
     this.store=store;this.boundary=boundary;this.prepare=prepare;
     this.eligibility=eligibility;this.collectResult=collectResult;
-    this.verifyLease=verifyLease;this.commitGuard=commitGuard;this.verifyWorkerPlacement=verifyWorkerPlacement;this.clock=clock;
+    this.verifyLease=verifyLease;this.commitGuard=commitGuard;this.verifyWorkerPlacement=verifyWorkerPlacement;this.releaseWorkerPlacement=releaseWorkerPlacement;this.clock=clock;
   }
   async current(request) {
     const observed=await this.store.read(request);
@@ -85,8 +85,9 @@ export class NativeController {
     const latest=await this.current(record.request);
     if(latest.task.native_execution?.phase!=='ADMITTED'
       ||canonical(latest.task.native_execution.admission)!==canonical(admission))hold('LAUNCH_STALE_ADMISSION');
-    await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'LAUNCH_INTENT',placement}});
-    const request=record.request;
+    const intentObserved=await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'LAUNCH_INTENT',placement}});
+    const intentRecord=intentObserved.task.native_execution;
+    const request=intentRecord.request;
     // Only the Gateway-injected request-scoped SDK may dispatch this run.
     const result=await runtime.subagent.run({sessionKey:record.session_key,message:request.prompt,
       provider:request.provider,model:request.model,cwd:request.workdir,
@@ -94,7 +95,7 @@ export class NativeController {
       assertCurrent:()=>{const proof=this.commitGuard(request); if(proof!==true)hold('COMMIT_LEASE_OR_FENCE');}});
     // A synchronous lease guard must be bound by the installed host adapter;
     // fail closed rather than making an asynchronous CAS check look synchronous.
-    return this.persistLaunch(record,result,runtime);
+    return this.persistLaunch(intentRecord,result,runtime);
   }
   async persistLaunch(record,result,runtime) {
     if(!result?.runId||result.sessionKey!==record.session_key)hold('LAUNCH_UNKNOWN');
@@ -120,6 +121,7 @@ export class NativeController {
       const latest=await this.store.read(record.request);
       if(canonical(latest.task.native_execution?.receipt)!==canonical(receipt))hold('TERMINAL_CAS');
       await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'TERMINAL',observation:result}});
+      if(this.releaseWorkerPlacement(record.session_key)!==true)hold('RUN_ADMISSION_RELEASE');
     }
     return result;
   }
@@ -146,6 +148,8 @@ export class NativeController {
       await this.boundary.stop(record.unit);
     }
     if(!cancelled)hold('SESSION_CANCELLATION_UNKNOWN');
-    return this.boundary.inspect(record.unit);
+    const stopped=await this.boundary.inspect(record.unit);
+    if(this.releaseWorkerPlacement(record.session_key)!==true)hold('RUN_ADMISSION_RELEASE');
+    return stopped;
   }
 }
