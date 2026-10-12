@@ -147,6 +147,24 @@ class InventoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):assert_inventory_lineage(expected,current)
         self.assertEqual(assert_inventory_lineage(expected,expected),'MATCHED_OBSERVATION_NOT_AUTHORITY')
 
+    def test_deep_checkpoint_does_not_hide_other_tasks(self):
+        self.task('a');self.task('b')
+        deep = '{"x":' + '[' * 1500 + '0' + ']' * 1500 + '}'
+        self.db.execute('UPDATE tasks SET checkpoint=? WHERE id=?', (deep, 'a'))
+        self.begin()
+        rows = inventory_page(self.db, 100)['tasks']
+        self.assertEqual([row['id'] for row in rows], ['a', 'b'])
+        self.assertIn('CHECKPOINT_UNVERIFIED', rows[0]['attention'])
+        self.assertEqual(rows[0]['binding']['checkpoint_sha256'], 'UNKNOWN')
+        self.assertFalse(inventory_page(self.db, 100)['dispatch_performed'])
+
+    def test_deep_dependencies_do_not_hide_other_tasks(self):
+        self.task('a', depends='[' * 1500 + '0' + ']' * 1500)
+        self.task('b');self.begin()
+        rows = inventory_page(self.db, 100)['tasks']
+        self.assertEqual([row['id'] for row in rows], ['a', 'b'])
+        self.assertIn('DEPENDENCIES_UNVERIFIED', rows[0]['attention'])
+
     def test_invalid_limits_and_clock(self):
         self.begin()
         for clock,limit in ((float('nan'),1),(100,True),(100,0),(100,101)):

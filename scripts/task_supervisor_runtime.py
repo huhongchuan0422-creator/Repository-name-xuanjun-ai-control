@@ -291,7 +291,7 @@ def canonical_inventory_page(db, now, after_id=None, limit=100,
                     or any(not isinstance(x, str) or not x for x in dependencies)
                     or len(set(dependencies)) != len(dependencies)):
                 raise ValueError('bad dependencies')
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, RecursionError):
             dependencies = None
             flags.append('DEPENDENCIES_UNVERIFIED')
         if dependencies:
@@ -365,7 +365,7 @@ def canonical_inventory_page(db, now, after_id=None, limit=100,
                 native = {}
             checkpoint_hash = hashlib.sha256(json.dumps(value, sort_keys=True,
                 separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, RecursionError):
             flags.append('CHECKPOINT_UNVERIFIED')
         if run and run['checkpoint_hash'] and run['checkpoint_hash'] != checkpoint_hash:
             flags.append('CHECKPOINT_LINEAGE_MISMATCH')
