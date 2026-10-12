@@ -121,7 +121,7 @@ def audit():
                                          'api-key', 'token', 'ok', 'missing', 'expired',
                                          'none', 'profile', 'env', 'runtime'):
                                     summary['safe_fields'].append({'route': route + '/' + k, 'value': v})
-                            if k in ('authPath', 'authStorePath', 'profilePath', 'agentDir', 'configPath'):
+                            if k in ('authPath', 'authStorePath', 'profilePath', 'agentDir', 'configPath', 'storePath'):
                                 path = safe_path(v)
                                 if path:
                                     summary['safe_fields'].append({'route': route + '/' + k,
