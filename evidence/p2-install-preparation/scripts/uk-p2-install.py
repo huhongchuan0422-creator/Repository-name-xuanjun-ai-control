@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Concrete fixed-host CLI for one admitted P2 install transaction."""
 import argparse
+import fcntl
+import hashlib
 import importlib.util
 import json
 import os
+import stat
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,6 +20,9 @@ from p2_install_entrypoint import P2InstallEntrypoint
 
 
 def _installer(path):
+    expected=os.path.join(ROOT,'scripts','uk-integration-install.py')
+    if path!=expected or os.path.realpath(path)!=path:
+        raise ValueError('FIXED_RELEASE_INSTALLER_REQUIRED')
     spec=importlib.util.spec_from_file_location('uk_integration_install',path)
     module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
     def install(artifact):
@@ -26,14 +32,47 @@ def _installer(path):
     return install
 
 
+def read_plan(path, expected_digest):
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(fd,'rb') as stream:
+        info=os.fstat(stream.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid!=0
+                or stat.S_IMODE(info.st_mode)&0o022 or info.st_size>1048576):
+            raise ValueError('ROOT_PROTECTED_BOUNDED_PLAN_REQUIRED')
+        raw=stream.read(1048577)
+    if hashlib.sha256(raw).hexdigest()!=expected_digest:
+        raise ValueError('REVIEWED_PLAN_SHA256_MISMATCH')
+    return json.loads(raw.decode('utf-8'))
+
+
+def installation_lock():
+    fd=os.open('/run/xuanjun-p2-install.lock',
+               os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW|os.O_NONBLOCK,0o600)
+    try:
+        info=os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid!=0
+                or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1):
+            raise ValueError('UNSAFE_INSTALL_LOCK')
+        fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser()
     parser.add_argument('--plan',required=True)
+    parser.add_argument('--plan-sha256',required=True)
     parser.add_argument('--receipt',required=True)
     parser.add_argument('--transaction-directory',required=True)
     parser.add_argument('--release-installer',required=True)
     args=parser.parse_args(argv)
-    with open(args.plan) as stream: plan=json.load(stream)
+    if os.geteuid()!=0:
+        raise ValueError('ROOT_REQUIRED')
+    plan=read_plan(args.plan,args.plan_sha256)
+    release_install=_installer(args.release_installer)
+    lock_fd=installation_lock()
     activation=ActivationStore(
       '/var/lib/xuanjun-development/activation/active.json',
       '/var/lib/xuanjun-development/activation/epochs.jsonl',
@@ -42,8 +81,11 @@ def main(argv=None):
     cutover=LedgerCutoverTransaction(
       os.path.join(args.transaction_directory,'ledger-cutover.json'),legacy)
     runtime=FixedHostRuntime(args.transaction_directory)
-    result=P2InstallEntrypoint(args.receipt,_installer(args.release_installer),
-                               cutover,activation,runtime).execute(plan)
+    try:
+        result=P2InstallEntrypoint(args.receipt,release_install,
+                                   cutover,activation,runtime).execute(plan)
+    finally:
+        os.close(lock_fd)
     print(json.dumps(result,sort_keys=True,separators=(',',':')))
     return 0
 
