@@ -1,0 +1,24 @@
+name: P2 native platform coordination delivery
+on:
+  push:
+    branches: [dispatch/p2-platform-engineer-20261012]
+    paths: ['scripts/p2-platform-native-delivery.py', '.github/workflows/p2-platform-native-delivery.yml']
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-original-p2-platform-delivery
+  cancel-in-progress: false
+jobs:
+  deliver:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Deliver owner-authorized coordination as existing nonroot native user
+        run: |
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          /usr/bin/python3 -B -m py_compile scripts/p2-platform-native-delivery.py
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/p2-platform-native-delivery.py
