@@ -12,7 +12,8 @@ def policy_shape(value):
                        'attempt_id run_id session_id checkpoint_commit checkpoint_tree '
                        'source_commit authority_comment comment_id effective_at '
                        'previous_writer new_writer handoff_state stop_state '
-                       'effects_state fence_state scope policy mode').split())
+                       'effects_state fence_state scope policy mode task_state observed_at '
+                       'codex_quota_usage human_gate_policy new_paid_api_usage primary_developers').split())
     blocked = ('secret', 'credential', 'token', 'password', 'prompt', 'message',
                'history', 'oauth', 'authorization', 'cookie')
     def walk(obj, path, depth):
@@ -38,6 +39,10 @@ def policy_shape(value):
                 if isinstance(item, (dict, list)):
                     walk(item, row['path'], depth + 1)
         elif isinstance(obj, list):
+            if path.endswith('.primary_developers'):
+                for label in obj[:10]:
+                    if label in ('DOTS', 'CHATGPT', 'WORK', 'Dots', 'ChatGPT', 'Work'):
+                        rows.append({'path': path, 'type': 'entry_label', 'value': label})
             for index, item in enumerate(obj[:20]):
                 if isinstance(item, (dict, list)):
                     walk(item, path + '[%d]' % index, depth + 1)
