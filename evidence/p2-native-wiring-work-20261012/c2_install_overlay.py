@@ -265,6 +265,116 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
         self._stop_gateway()
         return True
 """)
+    replace_once(runtime,
+"""GATEWAY_SERVICE='xuanjun-uk-openclaw.service'
+P2_PLUGIN_ID='xuanjun-p2-native-controller'
+P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
+""",
+"""GATEWAY_SERVICE='xuanjun-uk-openclaw.service'
+GATEWAY_DROPIN_DIR='/etc/systemd/system/xuanjun-uk-openclaw.service.d'
+P2_PLUGIN_ID='xuanjun-p2-native-controller'
+P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
+""")
+    replace_once(runtime,
+"""    def _start_gateway(self):
+        self._command(['/usr/bin/systemctl','start',GATEWAY_SERVICE])
+        self._command(['/usr/bin/systemctl','is-active','--quiet',GATEWAY_SERVICE])
+
+    def _install_plugin(self,release,runtime):
+""",
+"""    def _start_gateway(self):
+        self._command(['/usr/bin/systemctl','start',GATEWAY_SERVICE])
+        self._command(['/usr/bin/systemctl','is-active','--quiet',GATEWAY_SERVICE])
+
+    @staticmethod
+    def _dropin_parent_state():
+        if os.path.lexists(GATEWAY_DROPIN_DIR):
+            info=os.lstat(GATEWAY_DROPIN_DIR)
+            if (not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_gid!=0
+                    or stat.S_IMODE(info.st_mode)!=0o755):
+                raise ValueError('UNSAFE_GATEWAY_DROPIN_DIRECTORY')
+            return False
+        return True
+
+    @staticmethod
+    def _create_dropin_parent():
+        parent=os.path.dirname(GATEWAY_DROPIN_DIR)
+        info=os.lstat(parent)
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_gid!=0
+                or info.st_mode&0o022):
+            raise ValueError('UNSAFE_SYSTEMD_DIRECTORY')
+        os.mkdir(GATEWAY_DROPIN_DIR,0o755)
+        os.chown(GATEWAY_DROPIN_DIR,0,0)
+        os.chmod(GATEWAY_DROPIN_DIR,0o755)
+        fd=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+        try:os.fsync(fd)
+        finally:os.close(fd)
+
+    @staticmethod
+    def _remove_created_dropin_parent():
+        if not os.path.lexists(GATEWAY_DROPIN_DIR):return
+        info=os.lstat(GATEWAY_DROPIN_DIR)
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_gid!=0
+                or stat.S_IMODE(info.st_mode)!=0o755 or os.listdir(GATEWAY_DROPIN_DIR)):
+            raise ValueError('HOLD_GATEWAY_DROPIN_DIRECTORY_CHANGED')
+        os.rmdir(GATEWAY_DROPIN_DIR)
+        parent=os.path.dirname(GATEWAY_DROPIN_DIR)
+        fd=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+        try:os.fsync(fd)
+        finally:os.close(fd)
+
+    def _install_plugin(self,release,runtime):
+""")
+    replace_once(runtime,
+"""        receipt = {'schema': 1, 'targets': [dict(item, data=None) for item in prepared],
+                   'services': list(ALLOWED_SERVICES), 'rollback_complete': True,
+                   'prerequisites': runtime['prerequisites'],
+                   'plugin': {'id': P2_PLUGIN_ID, 'previous': 'ABSENT',
+                              'gateway_service': GATEWAY_SERVICE}}
+""",
+"""        create_dropin_parent=self._dropin_parent_state()
+        receipt = {'schema': 1, 'targets': [dict(item, data=None) for item in prepared],
+                   'services': list(ALLOWED_SERVICES), 'rollback_complete': True,
+                   'prerequisites': runtime['prerequisites'],
+                   'plugin': {'id': P2_PLUGIN_ID, 'previous': 'ABSENT',
+                              'gateway_service': GATEWAY_SERVICE,
+                              'dropin_parent_created': create_dropin_parent}}
+""")
+    replace_once(runtime,
+"""            self.prerequisites.apply(runtime['prerequisites'])
+            for item in prepared:
+                self._atomic_target(item['target'], item['data'], item['mode'],
+                                    item['uid'], item['gid'])
+""",
+"""            self.prerequisites.apply(runtime['prerequisites'])
+            if create_dropin_parent:self._create_dropin_parent()
+            for item in prepared:
+                self._atomic_target(item['target'], item['data'], item['mode'],
+                                    item['uid'], item['gid'])
+""")
+    replace_once(runtime,
+"""        if receipt.get('plugin')!={'id':P2_PLUGIN_ID,'previous':'ABSENT',
+                                   'gateway_service':GATEWAY_SERVICE}:
+            raise ValueError('P2_PLUGIN_ROLLBACK_RECEIPT_MISMATCH')
+""",
+"""        plugin_receipt=receipt.get('plugin')
+        if (not isinstance(plugin_receipt,dict)
+                or set(plugin_receipt)!={'id','previous','gateway_service','dropin_parent_created'}
+                or plugin_receipt.get('id')!=P2_PLUGIN_ID
+                or plugin_receipt.get('previous')!='ABSENT'
+                or plugin_receipt.get('gateway_service')!=GATEWAY_SERVICE
+                or type(plugin_receipt.get('dropin_parent_created')) is not bool):
+            raise ValueError('P2_PLUGIN_ROLLBACK_RECEIPT_MISMATCH')
+""")
+    replace_once(runtime,
+"""        self.prerequisites.rollback(receipt['prerequisites'])
+        self._command(['/usr/bin/systemctl', 'daemon-reload'])
+""",
+"""        if plugin_receipt['dropin_parent_created']:
+            self._remove_created_dropin_parent()
+        self.prerequisites.rollback(receipt['prerequisites'])
+        self._command(['/usr/bin/systemctl', 'daemon-reload'])
+""")
     manifest=deploy/'integration-manifest.json';value=json.loads(manifest.read_text());files=value['files']
     for path in [entry,runtime,binding,ledger_client,dropin]:
         files[path.relative_to(source).as_posix()]=sha(path)
