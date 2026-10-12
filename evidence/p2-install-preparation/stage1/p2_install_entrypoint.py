@@ -165,6 +165,7 @@ class P2InstallEntrypoint(object):
         provision = None
         legacy_effect = False
         runtime_activation_requested = False
+        runtime_stop_requested = False
         prepared = None
         try:
             # Read-only references are verified before the first install effect.
@@ -210,20 +211,18 @@ class P2InstallEntrypoint(object):
             self._write(receipt, 'LEGACY_QUIESCED', epoch=quiesced['epoch'],
                         cutover_receipt_sha256=_digest(cutover))
 
-            # Set before the call because a failed start may have activated a
-            # strict prefix of the declared service order.
-            runtime_activation_requested = True
-            runtime_proof = self.runtime.activate(plan['runtime'], quiesced)
-            if (not isinstance(runtime_proof, dict)
-                    or set(runtime_proof) != {'database_reopened',
-                                              'services_active'}
-                    or runtime_proof['database_reopened'] is not True
-                    or runtime_proof['services_active'] is not True):
-                raise ValueError('RUNTIME_ACTIVATION_PROOF_INCOMPLETE')
+            # Services require ACTIVE; prove the staged DB is readable first.
+            reopen = self.runtime.reopen_database(quiesced)
+            if reopen != {'database_reopened': True}:
+                raise ValueError('DATABASE_REOPEN_PROOF_INCOMPLETE')
             active = self.activation.transition('QUIESCED', 'ACTIVE',
                                                  quiesced['epoch'],
-                                                 quiesced['instance'],
-                                                 {'database_reopened': True})
+                                                 quiesced['instance'], reopen)
+            # Mark before starting: a failed start may leave a live prefix.
+            runtime_activation_requested = True
+            runtime_proof = self.runtime.activate(plan['runtime'], active)
+            if runtime_proof != {'services_active': True}:
+                raise ValueError('RUNTIME_ACTIVATION_PROOF_INCOMPLETE')
             self._write(receipt, 'RUNTIME_ACTIVE', epoch=active['epoch'])
             self._write(receipt, 'COMPLETE', status='P2_INSTALL_TRANSACTION_COMPLETE')
             return dict(receipt)
@@ -235,7 +234,11 @@ class P2InstallEntrypoint(object):
                         error_type=type(error).__name__)
             rollback = []
             try:
+                if prepared is not None:
+                    fenced = self.activation.fence(prepared['epoch'], prepared['instance'])
+                    rollback.append('ACTIVATION_FENCED_EPOCH_' + str(fenced['epoch']))
                 if runtime_activation_requested:
+                    runtime_stop_requested = True
                     self.runtime.stop_new(plan['runtime'])
                     rollback.append('NEW_RUNTIME_STOPPED')
                 if provision is not None:
@@ -247,6 +250,15 @@ class P2InstallEntrypoint(object):
                 self._write(receipt, 'ROLLED_BACK', rollback=rollback,
                             recovery='RECONCILE_DATABASE_AND_EPOCH_BEFORE_ANY_RESTART')
             except Exception as rollback_error:
+                # Fencing failure forbids restoration, but still contain any
+                # service prefix already started. Never blindly retry a stop.
+                if runtime_activation_requested and not runtime_stop_requested:
+                    runtime_stop_requested = True
+                    try:
+                        self.runtime.stop_new(plan['runtime'])
+                        rollback.append('NEW_RUNTIME_STOPPED_WITH_FENCE_HOLD')
+                    except Exception:
+                        rollback.append('NEW_RUNTIME_STOP_FAILED_HOLD')
                 self._write(receipt, 'HOLD', rollback=rollback,
                             rollback_error_type=type(rollback_error).__name__,
                             recovery='MANUAL_RECONCILIATION_REQUIRED_NO_RESTART')

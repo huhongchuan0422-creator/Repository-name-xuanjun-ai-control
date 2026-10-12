@@ -12,6 +12,9 @@ class FakeActivation(object):
     def prepare(self,*args,**kwargs):
         self.calls.append(('prepare',args,kwargs))
         return {'epoch':1,'instance':args[5]}
+    def fence(self,epoch,instance):
+        self.calls.append(("fence",epoch,instance))
+        return {"epoch":epoch+1,"state":"PREPARED"}
     def transition(self,old,new,epoch,instance,proof):
         self.calls.append((old,new,proof))
         return {'epoch':epoch,'instance':instance,'state':new}
@@ -23,10 +26,14 @@ class FakeRuntime(object):
     def provision(self,*args):
         self.calls.append('provision')
         return {'schema':1,'receipt_sha256':'a'*64,'rollback_complete':True}
+    def reopen_database(self,*args):
+        self.calls.append("reopen_database")
+        return {"database_reopened":True}
     def activate(self,*args):
         self.calls.append('activate')
+        if args[1].get('state') != 'ACTIVE': raise RuntimeError('not active')
         if self.fail: raise RuntimeError('planned')
-        return {'database_reopened':True,'services_active':True}
+        return {'services_active':True}
     def stop_new(self,*args): self.calls.append('stop_new')
     def restore(self,*args): self.calls.append('restore')
 
@@ -87,7 +94,7 @@ class P2InstallEntrypointTests(unittest.TestCase):
         self.assertEqual(result['stage'],'COMPLETE')
         self.assertFalse(result['oauth_copied'])
         self.assertEqual(result['new_paid_api_usage'],'NONE')
-        self.assertEqual(runtime.calls,['preflight','provision','activate'])
+        self.assertEqual(runtime.calls,['preflight','provision','reopen_database','activate'])
         self.assertEqual([c[0] for c in activation.calls],
                          ['prepare','PREPARED','QUIESCED'])
         with open(receipt) as stream: self.assertEqual(json.load(stream)['stage'],'COMPLETE')
@@ -96,11 +103,12 @@ class P2InstallEntrypointTests(unittest.TestCase):
         value,runtime,activation,cutover,receipt=self.make(FakeRuntime(fail=True))
         with self.assertRaisesRegex(RuntimeError,'planned'): value.execute(self.plan)
         self.assertEqual(runtime.calls,
-                         ['preflight','provision','activate','stop_new','restore'])
+                         ['preflight','provision','reopen_database','activate','stop_new','restore'])
         self.assertTrue(cutover.adapter.restored)
         with open(receipt) as stream: result=json.load(stream)
         self.assertEqual(result['stage'],'ROLLED_BACK')
         self.assertFalse(result['legacy_writer_restarted'])
+        self.assertEqual(activation.calls[-1][0], 'fence')
         self.assertIn('BEFORE_ANY_RESTART',result['recovery'])
 
     def test_existing_receipt_blocks_replay_before_any_effect(self):
@@ -145,6 +153,30 @@ class P2InstallEntrypointTests(unittest.TestCase):
         with open(receipt) as stream: result=json.load(stream)
         self.assertEqual(result['stage'],'ROLLED_BACK')
         self.assertIn('LEGACY_FILES_RESTORED_NOT_RESTARTED',result['rollback'])
+
+    def test_failed_database_reopen_never_starts_services_and_fences_epoch(self):
+        value,runtime,activation,cutover,receipt=self.make()
+        def broken(descriptor):
+            runtime.calls.append('reopen_database')
+            raise RuntimeError('database corrupt')
+        runtime.reopen_database=broken
+        with self.assertRaisesRegex(RuntimeError,'database corrupt'):
+            value.execute(self.plan)
+        self.assertNotIn('activate',runtime.calls)
+        self.assertEqual(activation.calls[-1][0],'fence')
+        with open(receipt) as stream:
+            result=json.load(stream)
+        self.assertTrue(result['rollback'][0].startswith('ACTIVATION_FENCED'))
+
+    def test_failed_fence_holds_without_restoring_or_starting_anything(self):
+        value,runtime,activation,cutover,receipt=self.make(FakeRuntime(fail=True))
+        def broken(*args): raise RuntimeError('fence CAS changed')
+        activation.fence=broken
+        with self.assertRaisesRegex(RuntimeError,'planned'):
+            value.execute(self.plan)
+        self.assertNotIn('restore',runtime.calls)
+        with open(receipt) as stream:
+            self.assertEqual(json.load(stream)['stage'],'HOLD')
 
 
 if __name__=='__main__': unittest.main()

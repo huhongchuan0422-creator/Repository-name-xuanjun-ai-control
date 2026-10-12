@@ -1,7 +1,7 @@
 name: UK P2 checkpoint Python36 validation and fixed existing audit
 on:
   push:
-    branches: [proposal/uk-mechanical-bootstrap-20261012, fix/p2-dispatcher-runtime-20261012, fix/p2-measured-legacy-exclusion-20261012, fix/p2-ledger-cutover-transaction-20261012, fix/p2-unified-install-transaction-20261012, fix/p2-fixed-runtime-entrypoint-20261012, fix/p2-first-install-entry-20261012, fix/p2-rollback-prevalidation-20261012]
+    branches: [proposal/uk-mechanical-bootstrap-20261012, fix/p2-dispatcher-runtime-20261012, fix/p2-measured-legacy-exclusion-20261012, fix/p2-ledger-cutover-transaction-20261012, fix/p2-unified-install-transaction-20261012, fix/p2-fixed-runtime-entrypoint-20261012, fix/p2-first-install-entry-20261012, fix/p2-rollback-prevalidation-20261012, fix/p2-active-before-service-20261012]
     paths: ['.github/workflows/uk-p2-checkpoint-validate.yml']
 permissions:
   contents: read
@@ -68,9 +68,41 @@ jobs:
           with open('repo/deploy/integration-manifest.json') as f:m=json.load(f)
           for relative,digest in m['files'].items():
               with open(os.path.join('repo',relative),'rb') as f:assert hashlib.sha256(f.read()).hexdigest()==digest,relative
-          print('ISOLATED_PREPARATION_DELTA_AND_47_FILE_MANIFEST_VERIFIED')
+          print('ISOLATED_PREPARATION_DELTA_AND_47_FILE_MANIFEST_VERIFIED_WITH_DASHBOARD_BINDING')
           PY
           cd repo
           /usr/bin/python3 -B -m unittest discover -s stage1 -p 'test_*.py'
           echo "PYTHON36_CHECKPOINT_REGRESSION_PASS" >> "$GITHUB_STEP_SUMMARY"
           echo "INSTALL=NO; P2_PASS=NO; MODEL_CALLS_BY_WORKFLOW=0" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Read-only process ownership metadata (no models or stop)
+        if: always()
+        shell: bash
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import os,json,socket,subprocess
+          assert socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          out={'authority_effect':'NONE','models_called':0,'processes':[]}
+          for pid in os.listdir('/proc'):
+              if not pid.isdigit():continue
+              root='/proc/'+pid
+              try:
+                  with open(root+'/comm') as f:name=f.read(64).strip()
+                  if name not in ('codex','openclaw','node','git'):continue
+                  row={'pid':int(pid),'name':name}
+                  with open(root+'/status') as f:
+                      for line in f:
+                          key,sep,value=line.partition(':')
+                          if key in ('Uid','PPid'):row[key]=value.strip().split()
+                  with open(root+'/cgroup') as f:row['cgroup']=f.read(4096).strip()
+                  try:row['cwd']=os.readlink(root+'/cwd')
+                  except OSError:row['cwd']='NOT_READABLE'
+                  try:
+                      with open(root+'/cmdline','rb') as f:args=f.read(65536).split(b'\0')
+                      row['cli_mode']=next((a.decode('ascii') for a in args[1:3] if a in (b'app-server',b'exec',b'resume',b'gateway')),'UNKNOWN')
+                      row['old_attempt_mentioned']=any(b'p2-final-transaction-freeze-20261012-1054' in a for a in args)
+                  except OSError:row['cli_mode']='NOT_READABLE'
+                  out['processes'].append(row)
+              except OSError:continue
+          print(json.dumps(out,sort_keys=True))
+          PY
