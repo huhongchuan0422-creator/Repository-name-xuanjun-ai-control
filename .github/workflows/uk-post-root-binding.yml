@@ -33,3 +33,26 @@ jobs:
           /usr/bin/python3 -B -m py_compile scripts/post-root-native-binding-audit.py
           sudo -n /usr/bin/python3 -I -B scripts/post-root-native-binding-audit.py
           echo 'INSTALL=NO; MODEL_CALLS=0; LEASE_SERVICE_MUTATIONS=NONE' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve exact committed code for reconciliation only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          destination="$RUNNER_TEMP/p2-retained-$GITHUB_RUN_ID"
+          mkdir -m 700 "$destination"
+          repository=/home/xuanjun_dev/xuanjun-p2-native-adapter-6121230482
+          for revision in d99b04060b703f68cc784ba55911009094492104 70309e7634d7fba3d6f16e0af4fa093fc159e2e7; do
+            sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git --no-optional-locks -C "$repository" archive --format=tar "$revision" > "$destination/$revision.tar"
+            test -s "$destination/$revision.tar"
+            sha256sum "$destination/$revision.tar" >> "$destination/SHA256SUMS"
+          done
+          echo 'RETAINED_SOURCE_ONLY_NOT_INSTALLER; TASK=XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1; FREEZE=NOT_ADMITTED' > "$destination/STATUS.txt"
+          echo "P2_RETENTION_PATH=$destination" >> "$GITHUB_ENV"
+      - name: Retain both source trees without installation admission
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p2-unadmitted-retained-source-${{ github.run_id }}
+          path: ${{ env.P2_RETENTION_PATH }}
+          retention-days: 30
+          if-no-files-found: error
