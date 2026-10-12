@@ -9,6 +9,7 @@ from __future__ import print_function
 import hashlib
 import json
 import math
+import re
 import sqlite3
 import time
 
@@ -53,6 +54,7 @@ class Supervisor(object):
           task_id TEXT PRIMARY KEY,
           parent_task_id TEXT NOT NULL,
           stage TEXT NOT NULL,
+          writer_scope TEXT NOT NULL UNIQUE,
           state TEXT NOT NULL,
           owner TEXT NOT NULL,
           entry TEXT NOT NULL,
@@ -68,6 +70,12 @@ class Supervisor(object):
           dependencies_json TEXT NOT NULL,
           completion_json TEXT NOT NULL,
           last_real_progress_at REAL,
+          received_at REAL,
+          started_at REAL,
+          handoff_requested_at REAL,
+          last_event_at REAL NOT NULL,
+          max_fence INTEGER NOT NULL DEFAULT 0,
+          max_epoch INTEGER NOT NULL DEFAULT 0,
           progress_deadline REAL NOT NULL,
           receipt_deadline REAL NOT NULL,
           started_deadline REAL NOT NULL,
@@ -111,6 +119,7 @@ class Supervisor(object):
           instance_id TEXT PRIMARY KEY,
           observed_at REAL NOT NULL,
           process_ref TEXT NOT NULL,
+          evidence_ref TEXT NOT NULL,
           updated_at REAL NOT NULL
         );
         CREATE INDEX IF NOT EXISTS task_ready_idx
@@ -123,7 +132,7 @@ class Supervisor(object):
         return self.db
 
     def register(self, value, now=None):
-        required = {'task_id', 'parent_task_id', 'stage', 'owner', 'entry',
+        required = {'task_id', 'parent_task_id', 'stage', 'writer_scope', 'owner', 'entry',
                     'checkpoint_sha256', 'spec_sha256', 'next_action',
                     'dependencies', 'completion_conditions',
                     'progress_deadline', 'receipt_deadline',
@@ -134,8 +143,8 @@ class Supervisor(object):
         now = self.clock() if now is None else now
         if not finite(now):
             raise ValueError('FINITE_TIME_REQUIRED')
-        for name in ('task_id', 'parent_task_id', 'stage', 'owner', 'entry',
-                     'next_action'):
+        for name in ('task_id', 'parent_task_id', 'stage', 'writer_scope',
+                     'owner', 'entry', 'next_action'):
             if not isinstance(value[name], str) or not value[name].strip():
                 raise ValueError('NONEMPTY_TASK_IDENTITY_REQUIRED')
         for name in ('checkpoint_sha256', 'spec_sha256'):
@@ -151,25 +160,28 @@ class Supervisor(object):
         if any(not finite(v) or v < now for v in deadlines):
             raise ValueError('FUTURE_DEADLINES_REQUIRED')
         args = (value['task_id'], value['parent_task_id'], value['stage'],
-                'READY', value['owner'], value['entry'], UNKNOWN, UNKNOWN,
-                UNKNOWN, value['checkpoint_sha256'], value['spec_sha256'],
-                UNKNOWN, None, None, value['next_action'],
-                canonical(value['dependencies']),
+                value['writer_scope'], 'READY', value['owner'], value['entry'],
+                UNKNOWN, UNKNOWN, UNKNOWN, value['checkpoint_sha256'],
+                value['spec_sha256'], UNKNOWN, None, None,
+                value['next_action'], canonical(value['dependencies']),
                 canonical(value['completion_conditions']), None,
+                None, None, None, now, 0, 0,
                 value['progress_deadline'], value['receipt_deadline'],
                 value['started_deadline'], value['terminal_deadline'],
                 value['handoff_deadline'], UNKNOWN, UNKNOWN, UNKNOWN,
                 UNKNOWN, 0, now, now)
         with self.db:
             self.db.execute('''INSERT INTO tasks(
-              task_id,parent_task_id,stage,state,owner,entry,run_id,session_id,
-              attempt_id,checkpoint_sha256,spec_sha256,lease_id,fence,epoch,
-              next_action,dependencies_json,completion_json,
-              last_real_progress_at,progress_deadline,receipt_deadline,
-              started_deadline,terminal_deadline,handoff_deadline,
-              writer_stopped,effects_reconciled,receiver_accepted,
-              old_fence_invalidated,recovery_level,created_at,updated_at)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+              task_id,parent_task_id,stage,writer_scope,state,owner,entry,
+              run_id,session_id,attempt_id,checkpoint_sha256,spec_sha256,
+              lease_id,fence,epoch,next_action,dependencies_json,completion_json,
+              last_real_progress_at,received_at,started_at,handoff_requested_at,
+              last_event_at,max_fence,max_epoch,progress_deadline,
+              receipt_deadline,started_deadline,terminal_deadline,
+              handoff_deadline,writer_stopped,effects_reconciled,
+              receiver_accepted,old_fence_invalidated,recovery_level,
+              created_at,updated_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                             args)
 
     def _task(self, task_id):
@@ -189,10 +201,10 @@ class Supervisor(object):
 
     def ready(self, limit=100):
         rows = self.db.execute('''SELECT * FROM tasks WHERE state='READY'
-                                  ORDER BY updated_at, task_id LIMIT ?''',
-                               (limit,)).fetchall()
-        return [dict(row) for row in rows
-                if self._dependencies_done(dict(row))]
+                                  ORDER BY updated_at, task_id''').fetchall()
+        eligible = [dict(row) for row in rows
+                    if self._dependencies_done(dict(row))]
+        return eligible[:limit]
 
     def claim(self, task_id, attempt_id, owner, entry, run_id, session_id,
               lease_id, fence, epoch, now=None, deadlines=None):
@@ -219,6 +231,8 @@ class Supervisor(object):
                     raise ValueError('FRESH_ATTEMPT_DEADLINES_REQUIRED')
             elif any(task[n] <= now for n in deadline_names):
                 raise ValueError('FRESH_ATTEMPT_DEADLINES_REQUIRED')
+            if fence <= task['max_fence'] or epoch <= task['max_epoch']:
+                raise ValueError('MONOTONIC_FENCE_EPOCH_REQUIRED')
             values = deadlines or {n: task[n] for n in deadline_names}
             # Same task+stage is represented by one primary row, so a second
             # writer cannot be claimed concurrently.
@@ -227,13 +241,15 @@ class Supervisor(object):
               progress_deadline=?,receipt_deadline=?,started_deadline=?,
               terminal_deadline=?,handoff_deadline=?,last_real_progress_at=NULL,
               writer_stopped=?,effects_reconciled=?,receiver_accepted=?,
-              old_fence_invalidated=?,recovery_level=0,updated_at=?
+              old_fence_invalidated=?,recovery_level=0,received_at=?,
+              started_at=NULL,handoff_requested_at=NULL,last_event_at=?,
+              max_fence=?,max_epoch=?,updated_at=?
               WHERE task_id=? AND state='READY' ''',
               (attempt_id, owner, entry, run_id, session_id, lease_id, fence,
                epoch, values['progress_deadline'], values['receipt_deadline'],
                values['started_deadline'], values['terminal_deadline'],
                values['handoff_deadline'], UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
-               now, task_id))
+               now, now, fence, epoch, now, task_id))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
 
@@ -254,6 +270,10 @@ class Supervisor(object):
             task = self._task(task_id)
             if task['attempt_id'] != attempt_id:
                 raise ValueError('ATTEMPT_BINDING_MISMATCH')
+            accepted_at = self.clock()
+            if (not finite(accepted_at) or observed_at < task['last_event_at']
+                    or observed_at > accepted_at + 300):
+                raise ValueError('EVENT_TIME_RECONCILIATION_REQUIRED')
             encoded = canonical(payload)
             prior = self.db.execute('''SELECT kind,observed_at,evidence_kind,
               evidence_ref,payload_json FROM events
@@ -277,6 +297,8 @@ class Supervisor(object):
                 if state != 'RECEIVED':
                     raise ValueError('START_REQUIRES_RECEIPT')
                 state = 'STARTED'
+                self.db.execute('UPDATE tasks SET started_at=? WHERE task_id=?',
+                                (observed_at, task_id))
             elif kind == 'PROGRESS':
                 if (state not in ('STARTED', 'RUNNING')
                         or evidence_kind not in REAL_PROGRESS
@@ -298,13 +320,19 @@ class Supervisor(object):
                 if state not in ACTIVE:
                     raise ValueError('ACTIVE_ATTEMPT_REQUIRED')
                 state = 'HANDOFF_PENDING'
+                self.db.execute('UPDATE tasks SET handoff_requested_at=? WHERE task_id=?',
+                                (observed_at, task_id))
             elif kind == 'HANDOFF_ACKNOWLEDGED':
                 exact = {'receiver_accepted': True, 'old_writer_stopped': True,
                          'old_fence_invalidated': True,
                          'effects_reconciled': True,
                          'new_owner': payload.get('new_owner'),
-                         'new_entry': payload.get('new_entry')}
-                if state != 'HANDOFF_PENDING' or payload != exact:
+                         'new_entry': payload.get('new_entry'),
+                         'lease_id': task['lease_id'], 'fence': task['fence'],
+                         'epoch': task['epoch']}
+                if (state != 'HANDOFF_PENDING' or payload != exact
+                        or evidence_kind != 'PHASE_EXECUTION'
+                        or evidence_ref in ('', UNKNOWN)):
                     raise ValueError('EXACT_HANDOFF_PROOF_REQUIRED')
                 state = 'READY'
                 self.db.execute('''UPDATE tasks SET receiver_accepted='TRUE',
@@ -317,18 +345,29 @@ class Supervisor(object):
             elif kind == 'TERMINAL':
                 terminal = payload.get('state')
                 required = {'state', 'artifact_sha256', 'writer_stopped',
-                            'effects_reconciled', 'next_action'}
+                            'effects_reconciled', 'next_action',
+                            'completion_evidence'}
                 artifact = payload.get('artifact_sha256')
                 artifact_ok = (artifact == UNKNOWN or
                     (isinstance(artifact, str) and len(artifact) == 64 and
                      all(c in '0123456789abcdef' for c in artifact)))
+                completion = json.loads(task['completion_json'])
                 if (set(payload) != required or terminal not in TERMINAL
                         or not artifact_ok
+                        or not isinstance(payload['completion_evidence'], list)
                         or payload['writer_stopped'] not in
                            (True, False, UNKNOWN)
                         or payload['effects_reconciled'] not in
                            (True, False, UNKNOWN)):
                     raise ValueError('EXACT_TERMINAL_EVIDENCE_REQUIRED')
+                if state not in ACTIVE or attempt_id == UNKNOWN:
+                    raise ValueError('ACTIVE_ATTEMPT_TERMINAL_REQUIRED')
+                if terminal == 'SUCCESS' and (
+                        artifact == UNKNOWN
+                        or payload['writer_stopped'] is not True
+                        or payload['effects_reconciled'] is not True
+                        or payload['completion_evidence'] != completion):
+                    raise ValueError('SAFE_COMPLETION_EVIDENCE_REQUIRED')
                 state = terminal
                 self._enqueue(task_id, attempt_id, event_id, payload,
                               observed_at)
@@ -338,8 +377,9 @@ class Supervisor(object):
                    str(payload['effects_reconciled']).upper(),
                    payload['next_action'], task_id))
             self.db.execute('''UPDATE tasks SET state=?,
-              last_real_progress_at=?,updated_at=? WHERE task_id=?''',
-              (state, progress, observed_at, task_id))
+              last_real_progress_at=?,last_event_at=?,updated_at=?
+              WHERE task_id=?''',
+              (state, progress, observed_at, observed_at, task_id))
             return {'duplicate': False, 'state': state}
 
     def _enqueue(self, task_id, attempt_id, event_id, payload, now):
@@ -360,9 +400,18 @@ class Supervisor(object):
             rows = [dict(r) for r in self.db.execute(
                 "SELECT * FROM tasks WHERE state IN ('READY','RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')")]
             for task in rows:
-                base = task['last_real_progress_at']
+                if task['state'] == 'READY':
+                    base = task['created_at']
+                elif task['state'] == 'RECEIVED':
+                    base = task['received_at']
+                elif task['state'] in ('STARTED','RUNNING'):
+                    base = task['last_real_progress_at']
+                    if base is None:
+                        base = task['started_at']
+                else:
+                    base = task['handoff_requested_at']
                 if base is None:
-                    base = task['updated_at']
+                    base = task['created_at']
                 age = now - base
                 deadline_name = {
                     'READY': 'receipt_deadline',
@@ -413,16 +462,25 @@ class Supervisor(object):
                         'outbox_event_id': event_id})
         return sorted(actions, key=lambda x: x['task_id'])
 
-    def supervisor_heartbeat(self, instance_id, process_ref, now=None):
+    def supervisor_heartbeat(self, instance_id, process_ref, evidence_ref,
+                             now=None):
         now = self.clock() if now is None else now
-        if (not finite(now) or not isinstance(instance_id, str)
-                or not instance_id.strip() or not isinstance(process_ref, str)
-                or not process_ref.strip()):
+        accepted_at = self.clock()
+        if (not finite(now) or not finite(accepted_at)
+                or now > accepted_at + 5 or now < accepted_at - 300
+                or not isinstance(instance_id, str)
+                or not instance_id.strip()
+                or not isinstance(process_ref, str)
+                or not re.fullmatch(r'(pid:[1-9][0-9]*|unit:[A-Za-z0-9_.@-]+)',
+                                    process_ref)
+                or not isinstance(evidence_ref, str)
+                or not re.fullmatch(r'[0-9a-f]{64}', evidence_ref)):
             raise ValueError('EXACT_SUPERVISOR_LIVENESS_REQUIRED')
         with self.db:
             self.db.execute('''INSERT OR REPLACE INTO supervisor_heartbeats
-              (instance_id,observed_at,process_ref,updated_at) VALUES (?,?,?,?)''',
-              (instance_id, now, process_ref, now))
+              (instance_id,observed_at,process_ref,evidence_ref,updated_at)
+              VALUES (?,?,?,?,?)''',
+              (instance_id, now, process_ref, evidence_ref, accepted_at))
 
     def supervisor_health(self, now=None, max_age=300):
         now = self.clock() if now is None else now
@@ -433,8 +491,10 @@ class Supervisor(object):
         return [{'instance_id': row['instance_id'],
                  'process_ref': row['process_ref'],
                  'observed_at': row['observed_at'],
-                 'state': 'HEALTHY' if now - row['observed_at'] <= max_age
-                          else 'SUPERVISOR_UNAVAILABLE'}
+                 'evidence_ref': row['evidence_ref'],
+                 'state': ('FRESH_RECORD_NOT_PROCESS_VERIFIED'
+                           if 0 <= now - row['observed_at'] <= max_age
+                           else 'SUPERVISOR_UNAVAILABLE')}
                 for row in rows]
 
     def due_outbox(self, now=None, limit=100):
