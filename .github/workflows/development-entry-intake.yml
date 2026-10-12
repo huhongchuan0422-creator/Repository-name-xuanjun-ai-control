@@ -1,0 +1,35 @@
+name: Three native development entry receipt
+on:
+  issue_comment:
+    types: [created]
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    if: github.event_name != 'issue_comment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests -p 'test_development_entry_intake.py'
+  receipt:
+    if: github.event_name == 'issue_comment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Validate metadata and return receipt without executing code
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -B scripts/development_entry_intake.py
