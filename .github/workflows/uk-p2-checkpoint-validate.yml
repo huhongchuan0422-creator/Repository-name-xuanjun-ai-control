@@ -1,7 +1,7 @@
 name: UK P2 checkpoint Python36 validation and fixed existing audit
 on:
   push:
-    branches: [proposal/uk-mechanical-bootstrap-20261012, fix/p2-dispatcher-runtime-20261012, fix/p2-measured-legacy-exclusion-20261012]
+    branches: [proposal/uk-mechanical-bootstrap-20261012, fix/p2-dispatcher-runtime-20261012, fix/p2-measured-legacy-exclusion-20261012, fix/p2-ledger-cutover-transaction-20261012]
     paths: ['.github/workflows/uk-p2-checkpoint-validate.yml']
 permissions:
   contents: read
@@ -63,7 +63,7 @@ jobs:
           s=s.replace(a,'        pristine=json.loads(json.dumps(value))\n'+a).replace(c,'module.restore_rollback_files(pristine,7,None)')
           with open(p,'w') as f:f.write(s)
           import shutil
-          for relative in ['stage1/activation_control.py','stage1/test_activation_lock_permissions.py','scripts/uk-integration-install.py','stage1/test_integration_installer.py','deploy/integration-manifest.json','scripts/uk-dev-bootstrap.py','stage1/ledger_backup.py','stage1/ledger_install_stage.py','stage1/test_ledger_install_stage.py','deploy/dispatcher.example.json','deploy/xuanjun-development-dispatcher.service','stage1/legacy_quiescence.py','stage1/test_legacy_quiescence.py']:
+          for relative in ['stage1/activation_control.py','stage1/test_activation_lock_permissions.py','scripts/uk-integration-install.py','stage1/test_integration_installer.py','deploy/integration-manifest.json','scripts/uk-dev-bootstrap.py','stage1/ledger_backup.py','stage1/ledger_install_stage.py','stage1/test_ledger_install_stage.py','deploy/dispatcher.example.json','deploy/xuanjun-development-dispatcher.service','stage1/legacy_quiescence.py','stage1/test_legacy_quiescence.py','stage1/ledger_cutover_transaction.py','stage1/test_ledger_cutover_transaction.py']:
               shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),os.path.join('repo',relative))
           with open('repo/deploy/integration-manifest.json') as f:m=json.load(f)
           for relative,digest in m['files'].items():
