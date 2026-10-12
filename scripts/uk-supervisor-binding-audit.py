@@ -188,5 +188,42 @@ def main():
         p=subprocess.run([cli]+args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10,env=env)
         helptext=p.stdout.decode('utf-8','replace')
         result['scratch_help'][' '.join(args)]={'exit_code':p.returncode,'options':sorted(set(re.findall(r'--[a-z][a-z-]+',helptext)))}
+    job='a96b9a83-5e58-412c-ab66-ba3bf0add8b9'
+    if job not in result.get('supervisor_job_constants',[]):
+        result['canonical_scratch']={'state':'HOLD_JOB_BINDING_CHANGED'}
+    else:
+        p=subprocess.run([cli,'automations','scratch',job,'--json'],env=env,
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
+        if p.returncode!=0 or len(p.stdout)>1048576:
+            result['canonical_scratch']={'state':'HOLD_SCRATCH_READ_UNAVAILABLE','exit_code':p.returncode}
+        else:
+            wrapper=json.loads(p.stdout.decode('utf-8'))
+            value=wrapper.get('content')
+            if isinstance(value,str):value=json.loads(value)
+            if not isinstance(value,dict):
+                result['canonical_scratch']={'state':'HOLD_SCRATCH_FORMAT_UNCONFIRMED','wrapper_keys':sorted(wrapper)[:40]}
+            else:
+                selected=[]
+                keys={'task_id','taskId','parent_task_id','state','status','owner','role','entry','attempt_id','run_id','session_id','lease_id','fence','epoch','revision','checkpoint_sha256','spec_sha256','last_real_progress_at','progress_deadline','next_owner','child_started','live_execution_units','canonical_ledger_path'}
+                def inspect(v,path,depth=0):
+                    if depth>5 or len(selected)>=80:return
+                    if isinstance(v,dict):
+                        for key,item in sorted(v.items()):
+                            if any(w in key.lower() for w in ('prompt','message','history','secret','credential','token','auth')):continue
+                            here=path+'.'+key
+                            if key in keys:
+                                if isinstance(item,str) and len(item)<=180 and re.fullmatch(r'[A-Za-z0-9_./:-]+',item):
+                                    selected.append({'path':here,'value':item})
+                                elif type(item) in (bool,int,float) or item is None:
+                                    selected.append({'path':here,'value':item})
+                            elif isinstance(item,(list,dict)):inspect(item,here,depth+1)
+                    elif isinstance(v,list):
+                        for i,item in enumerate(v[:20]):inspect(item,path+'[%d]'%i,depth+1)
+                inspect(value,'content')
+                result['canonical_scratch']={'state':'READ_ONLY_VERIFIED_JOB','job_id':job,
+                    'revision':wrapper.get('currentRevision',wrapper.get('revision')),
+                    'wrapper_keys':sorted(wrapper)[:40],'content_keys':sorted(value)[:60],
+                    'content_sha256':hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest(),
+                    'selected_fields':selected,'write_performed':False}
     print(json.dumps(result,sort_keys=True))
 if __name__=='__main__':main()
