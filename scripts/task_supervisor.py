@@ -78,9 +78,13 @@ class Supervisor(object):
                             self.db.execute('PRAGMA table_info(tasks)'))
             previous = tuple(name for name in TASK_COLUMNS
                              if name != 'recovery_generation')
-            if columns not in (previous, TASK_COLUMNS):
+            current_ok = (len(columns) == len(TASK_COLUMNS)
+                          and set(columns) == set(TASK_COLUMNS))
+            previous_ok = (len(columns) == len(previous)
+                           and set(columns) == set(previous))
+            if not (current_ok or previous_ok):
                 raise ValueError('SUPERVISOR_TASK_SCHEMA_MISMATCH')
-            if columns == previous and user_version not in (0, 1):
+            if previous_ok and user_version not in (0, 1):
                 raise ValueError('SUPERVISOR_MIGRATION_VERSION_MISMATCH')
         self.db.executescript('''
         CREATE TABLE IF NOT EXISTS tasks(
@@ -166,12 +170,15 @@ class Supervisor(object):
                             self.db.execute('PRAGMA table_info(tasks)'))
             previous = tuple(name for name in TASK_COLUMNS
                              if name != 'recovery_generation')
-            if columns == previous:
+            previous_ok = (len(columns) == len(previous)
+                           and set(columns) == set(previous))
+            if previous_ok:
                 self.db.execute('''ALTER TABLE tasks ADD COLUMN
                   recovery_generation INTEGER NOT NULL DEFAULT 0''')
                 columns = tuple(row['name'] for row in
                                 self.db.execute('PRAGMA table_info(tasks)'))
-            if columns != TASK_COLUMNS:
+            if (len(columns) != len(TASK_COLUMNS)
+                    or set(columns) != set(TASK_COLUMNS)):
                 raise ValueError('SUPERVISOR_TASK_SCHEMA_MISMATCH')
             self.db.execute('PRAGMA application_id=%d' %
                             SUPERVISOR_APPLICATION_ID)
