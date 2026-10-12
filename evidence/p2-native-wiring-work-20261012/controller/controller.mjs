@@ -52,10 +52,15 @@ export class NativeController {
       phase:'PROVISIONING',request,idempotency_key:key,session_key:sessionKey,source,previous_receipts:previous}});
     const unit=await this.prepare(runtime,{request,sessionKey,source,idempotencyKey:key});
     const bound=await this.boundary.bind(unit,request.workdir,[],request.sandbox);
+    if(typeof this.boundary.attestSnapshot!=='function')hold('NAMESPACE_ATTESTATION_UNAVAILABLE');
+    const namespace_attestation=await this.boundary.attestSnapshot(bound,source);
+    if(!namespace_attestation||!/^[0-9a-f]{64}$/.test(namespace_attestation.namespace_sha256??''))
+      hold('NAMESPACE_ATTESTATION');
     const admission={request,idempotency_key:key,isolation_enforced:true};
     const latest=await this.current(request);
     if(latest.task.native_execution?.phase!=='PROVISIONING'||latest.task.native_execution.idempotency_key!==key)hold('PROVISIONING_CAS');
-    await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'ADMITTED',unit:bound,admission}});
+    await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,
+      phase:'ADMITTED',unit:bound,namespace_attestation,admission}});
     return admission;
   }
   async record(receipt,cleanup=false) {
@@ -85,7 +90,9 @@ export class NativeController {
       ||placement.cgroup!==record.unit.cgroup
       ||placement.source_manifest_sha256!==record.source.manifest_sha256
       ||placement.request_sha256!==requestDigest
-      ||placement.sandbox_runtime_id!==record.unit.name)hold('WORKER_PLACEMENT_UNVERIFIED');
+      ||placement.sandbox_runtime_id!==record.unit.name
+      ||placement.namespace_sha256!==record.namespace_attestation?.namespace_sha256)
+      hold('WORKER_PLACEMENT_UNVERIFIED');
     let intentRecord=record;
     if(record.phase==='ADMITTED') {
       const latest=await this.current(record.request);

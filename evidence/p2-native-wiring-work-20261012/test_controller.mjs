@@ -62,13 +62,13 @@ try {
   const runtime={subagent:{run:async params=>{assert.equal(current.native_execution.phase,'LAUNCH_INTENT');params.assertCurrent();launchCalls++;return {runId:'run-real-files',sessionKey:params.sessionKey,runtime:{provider:'openai',model:'gpt-5.6-sol',harness:'embedded'}};}},agent:{session:{getSessionEntry:async()=>({sessionId:'session-real-files'})}}};
   const concrete=new NativeController({...bindings,store,
     prepare:async()=>{assert.equal(current.native_execution.phase,'PROVISIONING');prepareCalls++;return {backend:'docker',name:'unit'};},
-    boundary:{bind:async unit=>({...unit,id:'d'.repeat(64),cgroup:'/sys/fs/cgroup/xuanjun-p2-test'}),inspect:async()=>({active:!unitStopped,process_alive:!unitStopped,descendants_exited:unitStopped}),stop:async()=>{unitStopped=true;return {active:false,process_alive:false,descendants_exited:true};}},
+    boundary:{bind:async unit=>({...unit,id:'d'.repeat(64),cgroup:'/sys/fs/cgroup/xuanjun-p2-test',container_pid:42,workspace_source:dir,workspace_destination:'/workspace'}),attestSnapshot:async()=>({namespace_sha256:'e'.repeat(64)}),inspect:async()=>({active:!unitStopped,process_alive:!unitStopped,descendants_exited:unitStopped}),stop:async()=>{unitStopped=true;return {active:false,process_alive:false,descendants_exited:true};}},
     verifyLease:async()=>leaseValid,commitGuard:()=>leaseValid,
     verifyWorkerPlacement:async(_runtime,{request,unit,sessionKey,source})=>placementValid?{
       verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
       source_manifest_sha256:source.manifest_sha256,
       request_sha256:createHash('sha256').update(canonical(request)).digest('hex'),
-      sandbox_runtime_id:unit.name
+      sandbox_runtime_id:unit.name,namespace_sha256:'e'.repeat(64)
     }:null});
   const changed={...request,prompt:'mutated'};
   const changedRaw=JSON.stringify(changed),changedKey=createHash('sha256').update(changedRaw).digest('hex');

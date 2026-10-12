@@ -88,7 +88,11 @@ export class ContainerObserver {
         || !Array.isArray(policy.securityOpt) || !policy.securityOpt.some(x=>x.startsWith('no-new-privileges'))
         || !/^[1-9][0-9]*(?::[0-9]+)?$/.test(policy.user??'')) throw new Error('HOLD_UNIT_CONFINEMENT');
     const mounts=JSON.parse(await this.command(['inspect','--format','{{json .Mounts}}',id]));
-    if (!Array.isArray(mounts) || !mounts.some(m=>m.Type==='bind' && m.Source===workdir && m.RW===(sandbox==='workspace-write'))
+    const workspaceMount=Array.isArray(mounts)?mounts.find(m=>m.Type==='bind' && m.Source===workdir
+      && m.RW===(sandbox==='workspace-write')):undefined;
+    if (!workspaceMount || typeof workspaceMount.Destination!=='string'
+        || !workspaceMount.Destination.startsWith('/')
+        || workspaceMount.Destination.split('/').includes('..')
         || mounts.some(m=>m.Type!=='bind' || (m.Source!==workdir && (m.RW!==false
           || !readOnlyRoots.some(r=>m.Source===r || m.Source.startsWith(r+'/'))))))
       throw new Error('HOLD_UNIT_MOUNTS');
@@ -99,7 +103,35 @@ export class ContainerObserver {
     if (!row || !row[2].startsWith('/') || row[2]==='/' || row[2].split('/').includes('..')) throw new Error('HOLD_UNIT_CGROUP');
     const cgroup=(row[0]==='0'?'/sys/fs/cgroup':'/sys/fs/cgroup/pids')+row[2];
     if (await realpath(cgroup)!==cgroup) throw new Error('HOLD_UNIT_CGROUP');
-    return {...unit,id,cgroup};
+    return {...unit,id,cgroup,container_pid:data.Pid,workspace_source:workdir,
+      workspace_destination:workspaceMount.Destination};
+  }
+  async attestSnapshot(unit,source) {
+    if(!unit||!Number.isSafeInteger(unit.container_pid)||unit.container_pid<=0
+      ||unit.workspace_source!==source?.workdir
+      ||typeof unit.workspace_destination!=='string'||!unit.workspace_destination.startsWith('/')
+      ||!Array.isArray(source?.files))throw new Error('HOLD_NAMESPACE_ATTESTATION');
+    const namespaceRoot=path.join('/proc',String(unit.container_pid),'root');
+    const chunks=[];let total=0;
+    for(const entry of source.files) {
+      if(!entry||typeof entry.path!=='string'||entry.path.startsWith('/')
+        ||entry.path.split('/').some(p=>!p||p==='.'||p==='..'))throw new Error('HOLD_NAMESPACE_PATH');
+      const absolute=path.join(namespaceRoot,unit.workspace_destination,entry.path);
+      const fd=await open(absolute,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+      try {
+        const info=await fd.stat();
+        if(!info.isFile()||info.size>4*1024*1024)throw new Error('HOLD_NAMESPACE_FILE');
+        const raw=await fd.readFile();
+        total+=raw.length;
+        if(total>32*1024*1024||raw.length!==info.size
+          ||createHash('sha256').update(raw).digest('hex')!==entry.sha256
+          ||(((info.mode&0o111)!==0)!==(entry.mode==='100755')))throw new Error('HOLD_NAMESPACE_BYTES');
+        chunks.push(Buffer.from(entry.mode+' '+entry.path+' '+entry.sha256+'\n'));
+      } finally {await fd.close();}
+    }
+    return {container_pid:unit.container_pid,workspace_destination:unit.workspace_destination,
+      file_count:source.files.length,total_bytes:total,
+      namespace_sha256:createHash('sha256').update(Buffer.concat(chunks)).digest('hex')};
   }
   async emptyCgroup(unit) {
     const root=unit.cgroup;

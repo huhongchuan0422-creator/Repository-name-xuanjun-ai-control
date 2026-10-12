@@ -121,10 +121,10 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
         ||current.workspaceAccess!==(request.sandbox==='read-only'?'ro':'rw'))return null;
       const observed=await boundary.inspect(unit);
       if(!observed.active||!observed.process_alive)return null;
+      const namespace=await boundary.attestSnapshot(unit,source);
       return {verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
-        source_manifest_sha256:source.manifest_sha256,
-        request_sha256:digest(request),
-        sandbox_runtime_id:current.runtimeId};
+        source_manifest_sha256:source.manifest_sha256,namespace_sha256:namespace.namespace_sha256,
+        request_sha256:digest(request),sandbox_runtime_id:current.runtimeId};
     },
     releaseWorkerPlacement:sessionKey=>{preparedSandboxes.delete(sessionKey);return true;},
     verifyLease:(task,request,now)=>task.state==='RUNNING'&&Number.isFinite(task.lease_until)&&task.lease_until*1000>now,
