@@ -274,8 +274,22 @@ def audit():
                             if type(value) in (int, float):
                                 clean[field] = value
                         probe['matching_sessions'].append(clean)
-                store = listing.get('path') if isinstance(listing, dict) else None
-                store = safe_path(store)
+                probe['registry_schema_keys'] = sorted(k for k in listing if isinstance(k, str) and re.fullmatch(r'[A-Za-z_]{1,40}', k))[:30] if isinstance(listing, dict) else []
+                stores = []
+                if isinstance(listing, dict):
+                    for field in ('path', 'storePath'):
+                        candidate = safe_path(listing.get(field))
+                        if candidate and candidate.endswith('/sessions.json'):
+                            stores.append(candidate)
+                    for item in listing.get('stores', [])[:20]:
+                        if isinstance(item, dict):
+                            for field in ('path', 'storePath'):
+                                candidate = safe_path(item.get(field))
+                                if candidate and candidate.endswith('/sessions.json'):
+                                    stores.append(candidate)
+                probe['registry_store_paths'] = sorted(set(stores))
+                store = stores[0] if len(set(stores)) == 1 else None
+                probe['session_log_probe_state'] = 'STORE_PATH_UNAVAILABLE' if store is None else 'STORE_PATH_OBSERVED'
                 if store and store.endswith('/sessions.json'):
                     log_path = os.path.dirname(store) + '/' + probe['main_session_id'] + '.jsonl'
                     info = os.lstat(log_path)
