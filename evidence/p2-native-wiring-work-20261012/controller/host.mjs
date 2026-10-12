@@ -1,5 +1,6 @@
 import {CanonicalLedgerStore} from './ledger.mjs';
 import {ContainerObserver} from './workspace.mjs';
+import {digest} from './canonical.mjs';
 
 const hold=reason=>{throw new Error('HOLD_'+reason);};
 /** Concrete adapters using Gateway's injected SDK and pinned context resolver. */
@@ -60,6 +61,7 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
     // Physical provision and active canonical claim are checked at admission.
     // Preflight cannot manufacture an active task to obtain a green flag.
     if(!runtime.subagent?.run||!runtime.subagent.waitForRun||!runtime.sandbox?.resolveWorkspaceAuthority
+      ||typeof runtime.sandbox.prepareWorkspaceAuthority!=='function'
       ||!runtime.agent?.session?.getSessionEntry)hold('GATEWAY_SDK');
     const observed=store.call('preflight',null);
     const cfg=config(),selected=cfg?.agents?.defaults?.model;
@@ -88,9 +90,18 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
     try {
       const saved=store.call('tool_guard',{session_key:ctx.sessionKey}).native_execution;
       if(!saved?.receipt||event.runId!==saved.receipt.run_id||(ctx.runId!==undefined&&ctx.runId!==event.runId))hold('TOOL_RUN_BINDING');
+      if(!saved.placement||saved.receipt.placement_digest!==digest(saved.placement)
+        ||saved.placement.sandbox_runtime_id!==saved.unit?.name)hold('TOOL_PLACEMENT_RECEIPT');
       const allowed=saved.request?.sandbox==='read-only'?['read']:['read','write','edit','apply_patch','exec'];
       if(!allowed.includes(event.toolName)
         ||event.params?.elevated===true||['gateway','node'].includes(event.params?.host))hold('TOOL_POLICY');
+      const cfg=config();
+      const sandbox=await resolveSandboxContext({config:cfg,agentId,sessionKey:ctx.sessionKey,
+        workspaceDir:saved.request.workdir,requireCurrentConfig:true,
+        assertCurrent:()=>{if(!store.guard(saved.request))hold('TOOL_LEASE');}});
+      if(sandbox?.enabled!==true||sandbox.runtimeId!==saved.unit.name
+        ||sandbox.backendId!==saved.unit.backend||sandbox.workspaceDir!==saved.request.workdir
+        ||sandbox.workspaceAccess!==(saved.request.sandbox==='read-only'?'ro':'rw'))hold('TOOL_SANDBOX_BINDING');
       const unit=await boundary.inspect(saved.unit);
       if(!unit.active||!unit.process_alive)hold('TOOL_UNIT_INACTIVE');
       return;
@@ -112,10 +123,10 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
       if(!observed.active||!observed.process_alive)return null;
       return {verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
         source_manifest_sha256:source.manifest_sha256,
-        request_sha256:(await import('./canonical.mjs')).digest(request),
+        request_sha256:digest(request),
         sandbox_runtime_id:current.runtimeId};
     },
-    releaseWorkerPlacement:sessionKey=>preparedSandboxes.delete(sessionKey),
+    releaseWorkerPlacement:sessionKey=>{preparedSandboxes.delete(sessionKey);return true;},
     verifyLease:(task,request,now)=>task.state==='RUNNING'&&Number.isFinite(task.lease_until)&&task.lease_until*1000>now,
     commitGuard:request=>store.guard(request)};
 }
