@@ -105,5 +105,59 @@ def main():
             'imports':[n.module for n in ast.walk(tree) if isinstance(n,ast.ImportFrom)]+[a.name for n in ast.walk(tree) if isinstance(n,ast.Import) for a in n.names],
             'state_path_literals':sorted(set(literals)),
             'calls':sorted(set(n.func.attr if isinstance(n.func,ast.Attribute) else n.func.id for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,(ast.Attribute,ast.Name))))}
+    if 'installed_supervisor_source' in result:
+        functions={}
+        for node in tree.body:
+            if isinstance(node,ast.FunctionDef) and node.name in ('load_state','save_state'):
+                # These helpers only expose source structure; no values from state.
+                keys=[]
+                for child in ast.walk(node):
+                    if isinstance(child,ast.Str) and len(child.s)<100 and re.fullmatch(r'[A-Za-z0-9_./-]+',child.s):
+                        if not any(w in child.s.lower() for w in ('secret','token','password','credential')):
+                            keys.append(child.s)
+                functions[node.name]={'parameters':[a.arg for a in node.args.args],'constant_names':sorted(set(keys))}
+        result['installed_state_helpers']=functions
+        paths=[]
+        for node in tree.body:
+            if isinstance(node,ast.Assign) and isinstance(node.value,ast.Str):
+                val=node.value.s
+                if val.startswith(('/home/xuanjun_dev/','/var/lib/xuanjun','/tmp/xuanjun')) and re.fullmatch(r'[A-Za-z0-9_./-]+',val) and not any(w in val.lower() for w in ('credential','secret','token','auth')):
+                    paths.append({'names':[n.id for n in node.targets if isinstance(n,ast.Name)],'path':val})
+        result['installed_top_level_paths']=paths
+    # Read existing unit metadata; never print ExecStart or raw command lines.
+    unit_names=('xuanjun-ledger.service','xuanjun-p2-supervisor.service','xuanjun-p2-supervisor.timer')
+    result['existing_units']={}
+    for unit in unit_names:
+        p=subprocess.run(['/usr/bin/systemctl','show',unit,
+            '--property=LoadState,ActiveState,SubState,MainPID,FragmentPath'],
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=5,
+            env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'})
+        result['existing_units'][unit]={a:b[:256] for a,sep,b in (line.partition('=') for line in p.stdout.decode('utf-8','replace').splitlines()) if sep and a in ('LoadState','ActiveState','SubState','MainPID','FragmentPath')}
+    result['existing_controller_paths']=[]
+    for root in ('/var/lib/xuanjun-development','/var/lib/xuanjun-p2-mechanical'):
+        if not os.path.lexists(root):
+            result['existing_controller_paths'].append({'path':root,'exists':False});continue
+        meta=os.lstat(root)
+        result['existing_controller_paths'].append({'path':root,'exists':True,'uid':meta.st_uid,'mode':oct(stat.S_IMODE(meta.st_mode))})
+        try:
+            names=sorted(os.listdir(root))[:50]
+        except OSError:
+            result['existing_controller_paths'][-1]['read']='PERMISSION_UNAVAILABLE';continue
+        for name in names:
+            if not any(word in name.lower() for word in ('ledger','state','supervis')) or any(word in name.lower() for word in ('auth','secret','token','credential')):
+                continue
+            path=root+'/'+name;meta=os.lstat(path)
+            row={'path':path,'uid':meta.st_uid,'mode':oct(stat.S_IMODE(meta.st_mode)),'size':meta.st_size,'canonical_authority':'NOT_PROVEN'}
+            if stat.S_ISREG(meta.st_mode) and name.endswith(('.db','.sqlite','.sqlite3')) and meta.st_size<16777216:
+                from urllib.parse import quote
+                try:
+                    db=sqlite3.connect('file:'+quote(path,safe='/')+'?mode=ro',uri=True,timeout=3)
+                    try:
+                        row['application_id']=db.execute('PRAGMA application_id').fetchone()[0]
+                        row['user_version']=db.execute('PRAGMA user_version').fetchone()[0]
+                        row['table_names']=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' LIMIT 20")]
+                    finally:db.close()
+                except Exception:row['read']='SCHEMA_UNAVAILABLE_NO_RAW_OUTPUT'
+            result['existing_controller_paths'].append(row)
     print(json.dumps(result,sort_keys=True))
 if __name__=='__main__':main()
