@@ -1,0 +1,35 @@
+name: UK post-root native consumer metadata
+on:
+  push:
+    branches: [audit/uk-post-root-binding-20261012]
+    paths: ['scripts/post-root-native-binding-audit.py', '.github/workflows/uk-post-root-binding.yml']
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-uk-post-root-readonly
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify actual privilege without changing host state
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          test "$(sudo -n /usr/bin/id -u)" = 0
+          test "$(sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/sudo -n /usr/bin/id -u)" = 0
+          echo '0b6c6a699b790e25e3631d96448f899382d35702cf79440ae9f92b5fd6b9091e  /etc/sudoers.d/xuanjun-uk-longterm-development' | sudo -n /usr/bin/sha256sum -c -
+          echo ROOT_TRANSPORT_ACTUALLY_VERIFIED
+      - name: Read sanitized actual native consumer metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -B -m py_compile scripts/post-root-native-binding-audit.py
+          sudo -n /usr/bin/python3 -I -B scripts/post-root-native-binding-audit.py
+          echo 'INSTALL=NO; MODEL_CALLS=0; LEASE_SERVICE_MUTATIONS=NONE' >> "$GITHUB_STEP_SUMMARY"
