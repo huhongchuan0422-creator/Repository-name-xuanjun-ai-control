@@ -36,6 +36,16 @@ def main():
           'sandbox_main':{k:safe(main_agent.get('sandbox',{}).get(k)) for k in ('mode','backend','scope','workspaceAccess')},
           'cli_backend_keys':[safe(k) for k in defaults.get('cliBackends',{})][:16]}
     except FileNotFoundError:output['policy']={'state':'CONFIG_PATH_MISSING'}
+    output['oauth_metadata']=[]
+    auth='/home/xuanjun_dev/.openclaw/agents/main/agent/auth-profiles.json'
+    try:
+        raw,info=read(auth)
+        data=json.loads(raw.decode('utf-8'))
+        output['oauth_metadata']=[{'type':safe(v.get('type')),'provider':safe(v.get('provider'))} for v in list(data.get('profiles',{}).values())[:32] if isinstance(v,dict)]
+    except FileNotFoundError:output['oauth_metadata']=[{'state':'PROFILE_PATH_MISSING'}]
+    extra='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/loader-runtime-load-DpgEqnzx.mjs'
+    raw,info=read(extra)
+    output['sources'].append({'path':extra,'sha256':hashlib.sha256(raw).hexdigest(),'uid':info.st_uid,'source':raw.decode('utf-8')})
     output['engines']=[]
     for binary in ('/usr/bin/docker','/usr/bin/podman'):
         try:
