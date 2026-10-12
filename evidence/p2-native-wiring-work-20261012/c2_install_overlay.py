@@ -17,7 +17,7 @@ def main():
     binding.write_text("""{
   "agentIds":{"workspace-write":"developer","read-only":"platform-engineer"},
   "engine":{"backend":"docker","binary":"/usr/bin/docker"},
-  "ledger":{"python":"/usr/bin/python3","pythonSha256":"@@PYTHON_SHA256@@","bridge":"@@LEDGER_BRIDGE_PATH@@","config":"@@LEDGER_BRIDGE_CONFIG_PATH@@","files":{"@@LEDGER_BRIDGE_PATH@@":"@@LEDGER_BRIDGE_SHA256@@","@@LEDGER_BRIDGE_CONFIG_PATH@@":"@@LEDGER_BRIDGE_CONFIG_SHA256@@"}},
+  "ledger":{"python":"/usr/libexec/platform-python3.6","pythonSha256":"@@PYTHON_SHA256@@","bridge":"@@LEDGER_BRIDGE_PATH@@","config":"@@LEDGER_BRIDGE_CONFIG_PATH@@","files":{"@@LEDGER_BRIDGE_PATH@@":"@@LEDGER_BRIDGE_SHA256@@","@@LEDGER_BRIDGE_CONFIG_PATH@@":"@@LEDGER_BRIDGE_CONFIG_SHA256@@"}},
   "workspaceRoot":"@@WORKSPACE_ROOT@@",
   "contextPath":"@@SANDBOX_CONTEXT_PATH@@",
   "contextFiles":{
