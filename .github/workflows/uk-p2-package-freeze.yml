@@ -124,7 +124,7 @@ jobs:
             --sha256 "$archive_sha256" \
             --source-commit "$GITHUB_SHA" \
             --source-tree "$source_tree"
-          bridge_root="$(mktemp -d "$P2_PACKAGE_WORK/install-bridge-XXXXXX")"
+          bridge_root="$(mktemp -d "$(dirname "$P2_PACKAGE_SOURCE")/install-bridge-XXXXXX")"
           tar -xzf "$GITHUB_WORKSPACE/frozen/$package" -C "$bridge_root"
           BRIDGE_ROOT="$bridge_root/xuanjun-p2-package" SOURCE_TREE="$source_tree" /usr/bin/python3 -I -B - <<'PY'
           import hashlib,importlib.util,json,os
