@@ -1,0 +1,16 @@
+name: Entry review and continuation gates
+on:
+  pull_request:
+    paths: ['scripts/entry_review_gate.py', 'tests/test_entry_review_gate.py', '.github/workflows/entry-review-gates.yml']
+permissions:
+  contents: read
+jobs:
+  data-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exercise exact-version and continuation negatives
+        run: python3 -B -m unittest discover -s tests -p 'test_entry_review_gate.py' -v
