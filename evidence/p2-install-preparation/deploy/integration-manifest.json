@@ -61,7 +61,7 @@
     "deploy/xj-root-broker.service": "50d7781cb9c385f154fe80d9d9310411576f8ed98d4f5c84cdc1c5a0bd6de7ba",
     "deploy/xj-root-broker.socket": "a01777a36599bdc253357a100ed9eb089507b6bc9cae739cb3647b8e35d49562",
     "deploy/xuanjun-development-dispatcher.service": "92c3d59805ed104eb5b79843f9941cb93e8d230377e24ee50bbb6e6b3027d72d",
-    "deploy/xuanjun-github-intake.service": "dc8e803ba0b2a08bafe0834a16e076b2b8c12f619f2733d9f738597d52a1f8c4",
+    "deploy/xuanjun-github-intake.service": "7b9ef4ecdcee076c24aaaa73fd546ff2287b93fe2959b3749b4afdfbca4d68b3",
     "deploy/xuanjun-github-intake.timer": "0b82e326abad52faf02efefd1d82fdbe848dca0234d27d3fdad8f07ac3dd0f97",
     "deploy/xuanjun-ledger.service": "06322ea8c0d0b2d615c0905f4ce8b231ae03693d355d403338bf16c96096247a",
     "deploy/xuanjun-ledger.socket": "3a1e7c9d12ba01c99c76a3ab4a75efa9b4756130387fecbe4e02a5967729ff72",
@@ -99,6 +99,6 @@
     "scripts/uk-p2-install.py": "a667b085df2c225dd5acaa869ff305e1a31f3a570f9cda287aee31c3d1b7b034",
     "stage1/p2_prerequisites.py": "b39355a8378e81ab4e045fd8fdac73f12dbed2ca7c4c6bd79120015a18ea30f1",
     "stage1/mechanical_wake.py": "944bbd15249a02d299997a92468f4649e87a13dbdf9492339fc21389ca68379c",
-    "stage1/mechanical_wake_service.py": "bb05684f66d88d7571e08e297200d61b0cfcadb3cbb8c65b06dfb109a1eb9736"
+    "stage1/mechanical_wake_service.py": "26e3d914780c98cba28ad4c9992afc76dd423aef5130c0023012a3b623b4abe2"
   }
 }

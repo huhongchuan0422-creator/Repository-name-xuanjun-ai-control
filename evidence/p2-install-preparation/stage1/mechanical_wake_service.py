@@ -1,4 +1,4 @@
-#!/usr/bin/python3 -I
+#!/usr/bin/python3 -Es
 """Run one inference-free recovery pass after the fixed GitHub intake scan."""
 import json
 import os
