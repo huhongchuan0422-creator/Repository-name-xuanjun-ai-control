@@ -1,0 +1,54 @@
+name: UK P2 mechanical canary via existing Runner
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths:
+      - '.github/workflows/uk-p2-mechanical-smoke.yml'
+      - 'plans/UK_P2_MECHANICAL_CANARY_TRIGGER_*.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: xuanjun-p2-mechanical-canary
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - name: Validate UK host and installed pinned mechanical bridge
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
+          test "$(id -un)" = "githubrunner"
+          test "$GITHUB_REPOSITORY" = "huhongchuan0422-creator/Repository-name-xuanjun-ai-control"
+          test -f /opt/xuanjun-p2-mechanical/p2_mechanical_bridge.py
+          printf '%s  %s\n' '9a6f33c332284412f98ef9f82c94363b4c5caa4ceb5d8cea835bd94de14e99b9' /opt/xuanjun-p2-mechanical/p2_mechanical_bridge.py | sha256sum -c -
+      - name: Publish inert event and wait for independent service receipt
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          P=/opt/xuanjun-p2-mechanical/p2_mechanical_bridge.py
+          /usr/bin/python3 -I "$P" publish --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT"
+          /usr/bin/python3 -I "$P" wait --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --timeout 90
+          echo 'MECHANICAL_CANARY_ONLY_NOT_P2_PASS'
+      - name: Emit deterministic GitHub Actions receipt without PR write
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '## UK P2 mechanical bridge canary'
+            echo ''
+            echo 'Source SHA: ${GITHUB_SHA}'
+            echo 'Run ID: ${GITHUB_RUN_ID}'
+            echo 'Runner identity: self-hosted UK'
+            echo 'Hash-bound mechanical publish/wait steps are authoritative.'
+            echo 'P2 full broker/ledger/dispatcher: NOT_INSTALLED.'
+            echo 'P3: NOT_STARTED. Model inference by this workflow: NONE.'
+          } >> "${GITHUB_STEP_SUMMARY}"
+          echo 'CANARY_EVIDENCE_IN_GITHUB_JOB_LOGS_AND_STEP_SUMMARY'

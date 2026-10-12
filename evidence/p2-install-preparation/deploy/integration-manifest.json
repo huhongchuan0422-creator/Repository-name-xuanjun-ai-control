@@ -1,0 +1,101 @@
+{
+  "schema": 2,
+  "source_commit_policy": "EXTERNAL_FROZEN_COMMIT",
+  "source_parent": "718911cc48997dedb298d57e6a3c3744c3c93504",
+  "contract_sha256": "055d3ad1f41a3f8b64f8096e1f1e115b9cb07cc9e1669ab1be0963c47f43ee33",
+  "binding": "EXTERNAL_COMMIT_TREE_PLUS_MANIFEST_AND_FILE_SHA256",
+  "rendering": {
+    "identity_files": [
+      "deploy/dispatcher.example.json",
+      "deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service",
+      "deploy/uk-owner-workbench/xuanjun-uk-owner-dashboard.service",
+      "deploy/xj-root-broker.service",
+      "deploy/xuanjun-development-dispatcher.service",
+      "deploy/xuanjun-github-intake.service",
+      "deploy/xuanjun-ledger.service"
+    ],
+    "allowed_remaining_placeholders": {
+      "deploy/dispatcher.example.json": [
+        "@@GENERATION@@",
+        "@@INSTANCE_UUID@@",
+        "@@LEDGER_UUID@@",
+        "@@SOURCE_COMMIT@@"
+      ],
+      "deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service": [],
+      "deploy/uk-owner-workbench/xuanjun-uk-owner-dashboard.service": [],
+      "deploy/xj-root-broker.service": [],
+      "deploy/xuanjun-development-dispatcher.service": [],
+      "deploy/xuanjun-github-intake.service": [],
+      "deploy/xuanjun-ledger.service": []
+    }
+  },
+  "required_renderers": [
+    {
+      "path": "scripts/uk-owner-workbench-config.py",
+      "sha256": "af0c64c5c5cf3a12167b8c6a25ef805c57f7a5296bc09c11c3eebf7ea27285ec",
+      "target": "/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/scripts/uk-owner-workbench-config.py",
+      "owner": "root",
+      "group": "root",
+      "mode": "0555",
+      "invocation": [
+        "/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/scripts/uk-owner-workbench-config.py",
+        "--owner-host",
+        "<fqdn>",
+        "--tls-cert",
+        "<absolute-path>",
+        "--tls-key",
+        "<absolute-path>",
+        "--verify-files"
+      ]
+    }
+  ],
+  "files": {
+    "deploy/INTEGRATION_BINDING.md": "fa8518ad5eab07520a92ca1d87ccf788c56ab6550e48112bc1d505e2fa73337a",
+    "deploy/UK_DISPATCHER_ROLLOUT.md": "7f8929cf16b4739ac6fbf10b4bedbc1ab406ae04ccdc6d2613747c22bdb1538a",
+    "deploy/dispatcher.example.json": "cc449a9fd1dfa47608f32eb4d119b4b384e52ab149919fe7b101ae9291d66bff",
+    "deploy/root-broker.example.json": "9cc7251fece619ce8a9d1fa99d6f4b22db489e612c3305d5c24a208237530b73",
+    "deploy/uk-owner-workbench/README.md": "a22d154a81aa293fff778b456dc4e33c3043ba06a371bd0efe0b812c84da50b2",
+    "deploy/uk-owner-workbench/nginx.conf.template": "f72349f30c7c6beb950522967a3ce6a274285d48a12fcb531615ac0f84c410ef",
+    "deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service": "b71ac796718c44933c182e84fbd7630df315876dddb8e1d65ebd6d9e93a4c68a",
+    "deploy/uk-owner-workbench/xuanjun-uk-owner-dashboard.service": "3e03f165fad1892465f28324f8dea2fba8ff620b759fa2c265a625dc03cd431f",
+    "deploy/xj-root-broker.service": "50d7781cb9c385f154fe80d9d9310411576f8ed98d4f5c84cdc1c5a0bd6de7ba",
+    "deploy/xj-root-broker.socket": "a01777a36599bdc253357a100ed9eb089507b6bc9cae739cb3647b8e35d49562",
+    "deploy/xuanjun-development-dispatcher.service": "92c3d59805ed104eb5b79843f9941cb93e8d230377e24ee50bbb6e6b3027d72d",
+    "deploy/xuanjun-github-intake.service": "1f04f0963b44ef3efd99c8ffce7dc2be4e0503516aa0f1ee0757abedf8699fc4",
+    "deploy/xuanjun-github-intake.timer": "9e0cfad3d302dec3514a6fd9248c5c3252579c5a9f91070e978837e617c05e8e",
+    "deploy/xuanjun-ledger.service": "06322ea8c0d0b2d615c0905f4ce8b231ae03693d355d403338bf16c96096247a",
+    "deploy/xuanjun-ledger.socket": "3a1e7c9d12ba01c99c76a3ab4a75efa9b4756130387fecbe4e02a5967729ff72",
+    "scripts/uk-integration-install.py": "ee67c1fb9f849c3c7aca24e78b6b76ef9d957af6668d217858f8737758500643",
+    "scripts/uk-owner-workbench-config.py": "af0c64c5c5cf3a12167b8c6a25ef805c57f7a5296bc09c11c3eebf7ea27285ec",
+    "scripts/xj-root-broker-client": "7d7e71185b072a1beaf598fd0f3cec91989e4e6766c93d81db567771d138c8e2",
+    "stage1/activation_control.py": "169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4",
+    "stage1/callback_schema_gate.py": "a7e83427ac9fedb7e86c28f9298122e134215317bb996eae8753cfcb3d455271",
+    "stage1/codex_app_server_worker.py": "1e360903d3442ad17950f3f4f5084a775e55e8ede0debb7e06415a296bbe2dea",
+    "stage1/codex_worker.py": "2aed0a0f37972874c4f8275a8a1bae1d671348e0a9e4fb887d6e185411b969c3",
+    "stage1/development_loop.py": "ef92d0a3ba8ce7cbe0236c6a6a8f0b79c610b02a577521982955905f59b61bfb",
+    "stage1/development_pipeline.py": "0b43e62ca97cc21946732c2ab25ef19a10efd425072ce022de46d65b9235ba21",
+    "stage1/development_service.py": "427a94f0e0dd2c737e1b441bdbfd094ce63991d385b9952c51cda4c12ce2835a",
+    "stage1/execution_ledger.py": "8e4f619271505b5ea930a30156b2526bfcc8a6b423ad6ea7e66f27917ebbaa49",
+    "stage1/execution_supervision.py": "4de3ad4210912ef79935aadb0d4b2de06159a38546a6aec3830d9b46dbef1d53",
+    "stage1/github_issue_consumer.py": "9e05f2b941381f31fd6f194e4845afc3d262cfaa69482a708df7c45c13b951c9",
+    "stage1/ledger_backup.py": "e30fa6901b6b951419abcbcae4ce957b88a2ebd29bc5d6de49cd546be542cc84",
+    "stage1/ledger_service.py": "07139b397bdfd67957fa7bfca675a604fc2fa805a268f33072f153edc1067713",
+    "stage1/owner_approval_dispatch.py": "de72d6a4cf1eeabf765d9a7b537c8ec94ff83a5eda049e58695c50a2a59f88e3",
+    "stage1/owner_callback_server.py": "1f254a73d2d551d6d6d7045d0658d7b69b830b0b3493fe04ab8d51b715fdfd79",
+    "stage1/owner_dashboard.html": "79cd5f314230e0e2862f26e73b48ef617090feba641b9dd8952eb224db2e368a",
+    "stage1/owner_dashboard.py": "138af6496f491ab4bf15c24020a6f66bb0899dadeae8eb66c6b583031c7f5f09",
+    "stage1/owner_notification_outbox.py": "6d06324e7f6c974bc38c247c5792254a93e394ee9d2e0e1558dd4c034537fdf0",
+    "stage1/owner_update_router.py": "002d1c2cf415df99e64bdcb0f9f3e9b879a8cfbff57d6ad52793642fa23c21c8",
+    "stage1/root_broker.py": "6177305043d075c5e4ee697b6a3bc0a86784dac44d2368c658ac64af64fc7f4b",
+    "stage1/telegram_owner_transport.py": "fd161575bfb6db99b367e712f8ad82c7941255e61364e347e5567ab56272beda",
+    "stage1/uk_owner_callback_core.py": "a00e5b28468bdb335f891026039655167cb7df6ab207702375518c6f11471884",
+    "stage1/uk_owner_notify_worker.py": "90dee461e16d90994dfda3942c0e8312ff5b3703fbc4340f74453f690506b10d",
+    "stage1/ledger_install_stage.py": "0775b91a51bf46097e6fd3b33e19745fe4fa0fd324bde69b3d3bf61bc618c2db",
+    "stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e",
+    "stage1/ledger_cutover_transaction.py": "781704b76dc53981d2f3c957435755ec763ed8ac4440dcdfa2da2ab176c8413a",
+    "stage1/legacy_host_adapter.py": "22807a24dda907fcbd025e1217e197b23da0d5281f8256a84c256274b70069cf",
+    "stage1/p2_install_entrypoint.py": "ef22be1f4c50d9ca6ceb39f146c610ba9b57e81adaa0d903382a8cdcd4218577",
+    "stage1/p2_fixed_host_runtime.py": "7a20a63480ca923cafb5d50dc1857d4b12e0adf8407e78132f975b7f886c9200",
+    "scripts/uk-p2-install.py": "2f27163880c6c47e64a0724e7c609f30e9e846980c180017992c477e47c68c4f"
+  }
+}

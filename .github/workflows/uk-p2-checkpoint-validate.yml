@@ -1,0 +1,108 @@
+name: UK P2 checkpoint Python36 validation and fixed existing audit
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012, fix/p2-dispatcher-runtime-20261012, fix/p2-measured-legacy-exclusion-20261012, fix/p2-ledger-cutover-transaction-20261012, fix/p2-unified-install-transaction-20261012, fix/p2-fixed-runtime-entrypoint-20261012, fix/p2-first-install-entry-20261012, fix/p2-rollback-prevalidation-20261012, fix/p2-active-before-service-20261012]
+    paths: ['.github/workflows/uk-p2-checkpoint-validate.yml']
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-p2-once-checkpoint-validation
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fixed installed read-only audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          sudo -n /usr/local/sbin/xuanjun-uk-owner-audit
+      - name: Isolated checkpoint regression, never original worktree
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          WORK=$(mktemp -d /var/lib/xuanjun-p2-source-handoff/p2-checkpoint-check-XXXXXX)
+          chmod 700 "$WORK"
+          mkdir -m 700 "$WORK/temp"
+          export TMPDIR="$WORK/temp"
+          export PYTHONDONTWRITEBYTECODE=1
+          export P2_REVIEW_INPUT="$GITHUB_WORKSPACE/evidence/p2-install-preparation"
+          cd "$WORK"
+          /usr/bin/python3 -B - <<'PY'
+          import io,tarfile,os,hashlib,subprocess,json
+          p='/var/lib/xuanjun-p2-source-handoff/authoritative-source.tar.gz'
+          fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:b=f.read(5242881)
+          assert hashlib.sha256(b).hexdigest()=='4145afe30eac74024ce46772508d560ec2790a12b06fdec3368e45df58b87ff0'
+          with tarfile.open(fileobj=io.BytesIO(b),mode='r:gz') as t:
+              data={m.name:t.extractfile(m).read() for m in t.getmembers() if m.isfile()}
+          assert set(data)=={'CHECKSUMS.sha256','manifest.txt','tracked-source.tar','worktree-diff.patch'}
+          for line in data['CHECKSUMS.sha256'].decode().splitlines():
+              h,n=line.split(None,1);assert hashlib.sha256(data[n.lstrip('*')]).hexdigest()==h
+          os.mkdir('repo',0o700)
+          with tarfile.open(fileobj=io.BytesIO(data['tracked-source.tar'])) as t:
+              for m in t.getmembers():
+                  assert not m.issym() and not m.islnk() and not m.name.startswith('/') and '..' not in m.name.split('/')
+              t.extractall('repo')
+          subprocess.run(['/usr/bin/git','apply','--check','-'],input=data['worktree-diff.patch'],cwd='repo',check=True)
+          subprocess.run(['/usr/bin/git','apply','-'],input=data['worktree-diff.patch'],cwd='repo',check=True)
+          p='repo/stage1/test_integration_installer.py'
+          with open(p) as f:s=f.read()
+          a='        observed=[]\n        def restore(target,backup,digest):'
+          c='module.restore_rollback_files(json.loads(json.dumps(value)),7,None)'
+          assert s.count(a)==1 and s.count(c)==1
+          s=s.replace(a,'        pristine=json.loads(json.dumps(value))\n'+a).replace(c,'module.restore_rollback_files(pristine,7,None)')
+          with open(p,'w') as f:f.write(s)
+          import shutil
+          for relative in ['stage1/activation_control.py','stage1/test_activation_lock_permissions.py','scripts/uk-integration-install.py','stage1/test_integration_installer.py','deploy/integration-manifest.json','scripts/uk-dev-bootstrap.py','stage1/ledger_backup.py','stage1/ledger_install_stage.py','stage1/test_ledger_install_stage.py','deploy/dispatcher.example.json','deploy/xuanjun-development-dispatcher.service','stage1/legacy_quiescence.py','stage1/test_legacy_quiescence.py','stage1/ledger_cutover_transaction.py','stage1/test_ledger_cutover_transaction.py','stage1/legacy_host_adapter.py','stage1/test_legacy_host_adapter.py','stage1/p2_install_entrypoint.py','stage1/test_p2_install_entrypoint.py','stage1/p2_fixed_host_runtime.py','stage1/test_p2_fixed_host_runtime.py','scripts/uk-p2-install.py']:
+              shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),os.path.join('repo',relative))
+          with open('repo/deploy/integration-manifest.json') as f:m=json.load(f)
+          for relative,digest in m['files'].items():
+              with open(os.path.join('repo',relative),'rb') as f:assert hashlib.sha256(f.read()).hexdigest()==digest,relative
+          print('ISOLATED_PREPARATION_DELTA_AND_47_FILE_MANIFEST_VERIFIED_WITH_DASHBOARD_BINDING')
+          PY
+          cd repo
+          /usr/bin/python3 -B -m unittest discover -s stage1 -p 'test_*.py'
+          echo "PYTHON36_CHECKPOINT_REGRESSION_PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "INSTALL=NO; P2_PASS=NO; MODEL_CALLS_BY_WORKFLOW=0" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Read-only process ownership metadata (no models or stop)
+        if: always()
+        shell: bash
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import os,json,socket,subprocess
+          assert socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          out={'authority_effect':'NONE','models_called':0,'processes':[]}
+          for pid in os.listdir('/proc'):
+              if not pid.isdigit():continue
+              root='/proc/'+pid
+              try:
+                  with open(root+'/comm') as f:name=f.read(64).strip()
+                  if name not in ('codex','openclaw','node','git'):continue
+                  row={'pid':int(pid),'name':name}
+                  with open(root+'/status') as f:
+                      for line in f:
+                          key,sep,value=line.partition(':')
+                          if key in ('Uid','PPid'):row[key]=value.strip().split()
+                  with open(root+'/cgroup') as f:row['cgroup']=f.read(4096).strip()
+                  try:row['cwd']=os.readlink(root+'/cwd')
+                  except OSError:row['cwd']='NOT_READABLE'
+                  try:
+                      with open(root+'/cmdline','rb') as f:args=f.read(65536).split(b'\0')
+                      row['cli_mode']=next((a.decode('ascii') for a in args[1:3] if a in (b'app-server',b'exec',b'resume',b'gateway')),'UNKNOWN')
+                      row['old_attempt_mentioned']=any(b'p2-final-transaction-freeze-20261012-1054' in a for a in args)
+                  except OSError:row['cli_mode']='NOT_READABLE'
+                  out['processes'].append(row)
+              except OSError:continue
+          print(json.dumps(out,sort_keys=True))
+          PY

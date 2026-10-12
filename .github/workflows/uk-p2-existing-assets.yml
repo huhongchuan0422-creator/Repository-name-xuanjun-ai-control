@@ -1,0 +1,48 @@
+name: UK P2 existing asset and permission discovery
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths: ['.github/workflows/uk-p2-existing-assets.yml']
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-p2-once-existing-assets
+  cancel-in-progress: false
+jobs:
+  discover:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - name: Read-only allowlisted asset metadata, no secrets or model
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          /usr/bin/python3 -B - <<'PY'
+          import os,stat,json,subprocess,re,hashlib,ast
+          out={'scope':'READ_ONLY_NO_MODEL_NO_INSTALL','helpers':[],'units':{},'sudo_helper_paths':[]}
+          for name in sorted(os.listdir('/usr/local/sbin')):
+              if not re.fullmatch(r'(?:xuanjun|xj)-[A-Za-z0-9_.-]+',name):continue
+              path='/usr/local/sbin/'+name
+              try:
+                  info=os.lstat(path)
+                  item={'path':path,'owner':info.st_uid,'mode':oct(stat.S_IMODE(info.st_mode))}
+                  if stat.S_ISREG(info.st_mode) and info.st_size<262144:
+                      with open(path,'rb') as f:raw=f.read()
+                      item['sha256']=hashlib.sha256(raw).hexdigest()
+                      try:
+                          tree=ast.parse(raw.decode())
+                          literals=[n.s for n in ast.walk(tree) if isinstance(n,ast.Str)]
+                          item['path_bindings']=sorted(set(x for x in literals if re.fullmatch(r'/[A-Za-z0-9_./-]{1,300}',x) and (x.endswith(('.sqlite','.db','auth.json','auth-profiles.json','.service','.pem','.crt','.key')) or '/codex' in x or '/gh' in x)))
+                      except Exception: item['python_path_bindings']='UNAVAILABLE'
+                  out['helpers'].append(item)
+              except OSError:pass
+          p=subprocess.run(['/usr/bin/sudo','-n','-l'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+          out['sudo_inventory_exit']=p.returncode
+          out['sudo_helper_paths']=sorted(set(re.findall(r'/usr/local/sbin/(?:xuanjun|xj)-[A-Za-z0-9_.-]+',p.stdout.decode('utf-8','replace'))))
+          for unit in ['xuanjun-uk-openclaw.service','xuanjun-uk-stage1-minimal.service','xuanjun-uk-owner-dashboard.service','xuanjun-uk-owner-callback.service','xj-uk-domestic-customer-tunnel.service']:
+              p=subprocess.run(['/usr/bin/systemctl','show',unit,'--property=User,Group,WorkingDirectory,FragmentPath,MainPID,ActiveState'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+              out['units'][unit]=p.stdout.decode('utf-8','replace').strip()
+          print(json.dumps(out,sort_keys=True))
+          PY

@@ -1,0 +1,35 @@
+{
+  "config_version": 2,
+  "control_repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control",
+  "source_commit": "@@SOURCE_COMMIT@@",
+  "repositories": {
+    "huhongchuan0422-creator/Repository-name-xuanjun-ai-control": "/var/lib/xuanjun-development/control.git"
+  },
+  "db_path": "/var/lib/xuanjun-development/generations/@@GENERATION@@/state.sqlite",
+  "dispatcher_lock": "/run/xuanjun-dispatcher/dispatcher.lock",
+  "github_writer_lock": "/run/xuanjun-dispatcher/github-writer.lock",
+  "workspace_root": "/var/lib/xuanjun-development/worktrees",
+  "service_home": "/var/lib/xuanjun-development/service-home",
+  "worker_home": "/var/lib/xuanjun-development/worker-home",
+  "codex_home": "/var/lib/xuanjun-development/codex-home",
+  "worker_user": "xj_codex_worker",
+  "callback_user": "xuanjun-callback",
+  "codex_bin": "/opt/xuanjun-runtime/codex-0.160.0/codex",
+  "gh_bin": "/opt/xuanjun-runtime/gh/gh",
+  "path": "/usr/local/bin:/usr/bin:/bin",
+  "required_checks": [
+    "stage1-tests"
+  ],
+  "model": "gpt-5.6-sol",
+  "max_workers": 1,
+  "activation_descriptor": "/var/lib/xuanjun-development/activation/active.json",
+  "activation_epoch_journal": "/var/lib/xuanjun-development/activation/epochs.jsonl",
+  "activation_lock": "/var/lib/xuanjun-development/activation/activation.lock",
+  "broker_socket": "/run/xuanjun-development/broker.sock",
+  "broker_client": "/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/scripts/xj-root-broker-client",
+  "release_sha256": "@@ARTIFACT_SHA256@@",
+  "ledger_uuid": "@@LEDGER_UUID@@",
+  "generation": 1,
+  "instance": "@@INSTANCE_UUID@@",
+  "ledger_socket": "/run/xuanjun-development/ledger.sock"
+}
