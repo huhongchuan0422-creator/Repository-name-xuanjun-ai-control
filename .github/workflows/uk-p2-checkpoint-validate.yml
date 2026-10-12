@@ -1,0 +1,66 @@
+name: UK P2 checkpoint Python36 validation and fixed existing audit
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths: ['.github/workflows/uk-p2-checkpoint-validate.yml']
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-p2-once-checkpoint-validation
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 5
+    steps:
+      - name: Fixed installed read-only audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          sudo -n /usr/local/sbin/xuanjun-uk-owner-audit
+      - name: Isolated checkpoint regression, never original worktree
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          WORK=$(mktemp -d /home/githubrunner/p2-checkpoint-check-XXXXXX)
+          chmod 700 "$WORK"
+          mkdir -m 700 "$WORK/temp"
+          export TMPDIR="$WORK/temp"
+          export PYTHONDONTWRITEBYTECODE=1
+          cd "$WORK"
+          /usr/bin/python3 -B - <<'PY'
+          import io,tarfile,os,hashlib,subprocess,json
+          p='/var/lib/xuanjun-p2-source-handoff/authoritative-source.tar.gz'
+          fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:b=f.read(5242881)
+          assert hashlib.sha256(b).hexdigest()=='4145afe30eac74024ce46772508d560ec2790a12b06fdec3368e45df58b87ff0'
+          with tarfile.open(fileobj=io.BytesIO(b),mode='r:gz') as t:
+              data={m.name:t.extractfile(m).read() for m in t.getmembers() if m.isfile()}
+          assert set(data)=={'CHECKSUMS.sha256','manifest.txt','tracked-source.tar','worktree-diff.patch'}
+          for line in data['CHECKSUMS.sha256'].decode().splitlines():
+              h,n=line.split(None,1);assert hashlib.sha256(data[n.lstrip('*')]).hexdigest()==h
+          os.mkdir('repo',0o700)
+          with tarfile.open(fileobj=io.BytesIO(data['tracked-source.tar'])) as t:
+              for m in t.getmembers():
+                  assert not m.issym() and not m.islnk() and not m.name.startswith('/') and '..' not in m.name.split('/')
+              t.extractall('repo')
+          subprocess.run(['/usr/bin/git','apply','--check','-'],input=data['worktree-diff.patch'],cwd='repo',check=True)
+          subprocess.run(['/usr/bin/git','apply','-'],input=data['worktree-diff.patch'],cwd='repo',check=True)
+          p='repo/stage1/test_integration_installer.py'
+          with open(p) as f:s=f.read()
+          a='        observed=[]\n        def restore(target,backup,digest):'
+          c='module.restore_rollback_files(json.loads(json.dumps(value)),7,None)'
+          assert s.count(a)==1 and s.count(c)==1
+          s=s.replace(a,'        pristine=json.loads(json.dumps(value))\n'+a).replace(c,'module.restore_rollback_files(pristine,7,None)')
+          with open(p,'w') as f:f.write(s)
+          print('EXACT_ISOLATED_TEST_FIX_APPLIED')
+          PY
+          cd repo
+          /usr/bin/python3 -B -m unittest discover -s stage1 -p 'test_*.py'
+          echo "PYTHON36_CHECKPOINT_REGRESSION_PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "INSTALL=NO; P2_PASS=NO; MODEL_CALLS_BY_WORKFLOW=0" >> "$GITHUB_STEP_SUMMARY"
