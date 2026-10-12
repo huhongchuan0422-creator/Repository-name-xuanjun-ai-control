@@ -1,0 +1,26 @@
+name: P2 UK install plan facts read-only
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - scripts/uk-p2-install-plan-facts.py
+      - .github/workflows/uk-p2-install-plan-facts.yml
+permissions:
+  contents: read
+jobs:
+  facts:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Collect fixed UK P2 install-plan facts only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          sudo -n /usr/bin/python3 -I -B scripts/uk-p2-install-plan-facts.py
+          echo P2_INSTALL_PLAN_FACTS=READ_ONLY
+          echo MODEL_CALLS=0
+          echo INSTALL_EFFECTS=0
