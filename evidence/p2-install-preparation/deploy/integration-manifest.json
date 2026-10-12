@@ -78,7 +78,7 @@
     "stage1/execution_ledger.py": "8e4f619271505b5ea930a30156b2526bfcc8a6b423ad6ea7e66f27917ebbaa49",
     "stage1/execution_supervision.py": "4de3ad4210912ef79935aadb0d4b2de06159a38546a6aec3830d9b46dbef1d53",
     "stage1/github_issue_consumer.py": "9e05f2b941381f31fd6f194e4845afc3d262cfaa69482a708df7c45c13b951c9",
-    "stage1/ledger_backup.py": "0d2df09e285bdbd61086114f4724389b6249ac297f86e3722f19e2d302a31a0e",
+    "stage1/ledger_backup.py": "e30fa6901b6b951419abcbcae4ce957b88a2ebd29bc5d6de49cd546be542cc84",
     "stage1/ledger_service.py": "07139b397bdfd67957fa7bfca675a604fc2fa805a268f33072f153edc1067713",
     "stage1/owner_approval_dispatch.py": "de72d6a4cf1eeabf765d9a7b537c8ec94ff83a5eda049e58695c50a2a59f88e3",
     "stage1/owner_callback_server.py": "1f254a73d2d551d6d6d7045d0658d7b69b830b0b3493fe04ab8d51b715fdfd79",
@@ -89,6 +89,7 @@
     "stage1/root_broker.py": "6177305043d075c5e4ee697b6a3bc0a86784dac44d2368c658ac64af64fc7f4b",
     "stage1/telegram_owner_transport.py": "fd161575bfb6db99b367e712f8ad82c7941255e61364e347e5567ab56272beda",
     "stage1/uk_owner_callback_core.py": "a00e5b28468bdb335f891026039655167cb7df6ab207702375518c6f11471884",
-    "stage1/uk_owner_notify_worker.py": "90dee461e16d90994dfda3942c0e8312ff5b3703fbc4340f74453f690506b10d"
+    "stage1/uk_owner_notify_worker.py": "90dee461e16d90994dfda3942c0e8312ff5b3703fbc4340f74453f690506b10d",
+    "stage1/ledger_install_stage.py": "0775b91a51bf46097e6fd3b33e19745fe4fa0fd324bde69b3d3bf61bc618c2db"
   }
 }
