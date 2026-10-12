@@ -1,0 +1,55 @@
+name: UK P2 mechanical canary via existing Runner
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths:
+      - '.github/workflows/uk-p2-mechanical-smoke.yml'
+      - 'plans/UK_P2_MECHANICAL_CANARY_TRIGGER_*.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: xuanjun-p2-mechanical-canary
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - name: Validate UK host and installed pinned mechanical bridge
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
+          test "$(id -un)" = "githubrunner"
+          test "$GITHUB_REPOSITORY" = "huhongchuan0422-creator/Repository-name-xuanjun-ai-control"
+          test -f /opt/xuanjun-p2-mechanical/p2_mechanical_bridge.py
+          printf '%s  %s\n' '9a6f33c332284412f98ef9f82c94363b4c5caa4ceb5d8cea835bd94de14e99b9' /opt/xuanjun-p2-mechanical/p2_mechanical_bridge.py | sha256sum -c -
+      - name: Publish inert event and wait for independent service receipt
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          P=/opt/xuanjun-p2-mechanical/p2_mechanical_bridge.py
+          /usr/bin/python3 -I "$P" publish --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT"
+          /usr/bin/python3 -I "$P" wait --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --timeout 90
+          echo 'MECHANICAL_CANARY_ONLY_NOT_P2_PASS'
+      - name: Return bounded GitHub evidence (no AI/model invocation)
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const passed = "${{ steps.pin.outcome }}" === "success" && "${{ steps.probe.outcome }}" === "success";
+            const body = [
+              "::SKIP_COMPLETION::",
+              "## P2 UK existing Runner → independent systemd bridge canary",
+              passed ? "MECHANICAL_CANARY_PASS_ONLY" : "HOLD_MECHANICAL_BRIDGE_NOT_PROVEN",
+              "GitHub run: https://github.com/" + context.repo.owner + "/" + context.repo.repo + "/actions/runs/" + context.runId,
+              "Source SHA: " + context.sha,
+              "No model inference made by this canary script. Entire OpenClaw/Codex runtime usage remains UNVERIFIED.",
+              "P2 final dispatcher/ledger/broker NOT_INSTALLED; P3 NOT_STARTED; #19 HOLD.",
+              "No AI worker, duplicate writer, production or OAuth modification by this workflow."
+            ].join("\n");
+            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:17,body});
