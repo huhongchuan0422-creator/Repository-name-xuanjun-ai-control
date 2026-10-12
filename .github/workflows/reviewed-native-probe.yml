@@ -1,0 +1,34 @@
+name: Reviewed native probe execution
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+permissions:
+  contents: read
+jobs:
+  reviewed-probe:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'probe/chatgpt-native-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Execute only reviewed probe bytes
+        run: |
+          python3 -I -B - <<'PY'
+          import hashlib, pathlib, subprocess, sys
+          path=pathlib.Path('evidence/entry-probes/chatgpt/native_probe.py')
+          assert path.is_file() and not path.is_symlink()
+          raw=path.read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='aa7c816200c0826900cca20e898e25cdd64a5b383218e0760a401b0ad114ade9', 'UNREVIEWED_PROBE_BYTES'
+          result=subprocess.run([sys.executable,'-I','-B',str(path)],
+              env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},
+              stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=5)
+          assert result.returncode==0, 'PROBE_PROCESS_FAILED'
+          assert result.stdout==b'CHATGPT_NATIVE_ENTRY_PROBE_PASS\n', 'UNEXPECTED_PROBE_OUTPUT'
+          print('REVIEWED_PROBE_CODE_EXECUTED_PASS')
+          print('UK_HOST_TEST=NOT_RUN; QUOTA_ATTRIBUTION=UNKNOWN')
+          PY
