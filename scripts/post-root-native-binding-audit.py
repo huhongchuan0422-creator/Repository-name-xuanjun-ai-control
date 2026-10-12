@@ -428,6 +428,13 @@ def audit():
                  '/home/xuanjun_dev/p2-platform-delivery-receipts')]
 
 
+
+        if row['target_present']:
+            for fixed_commit in ('3888f859eeb440a63602b2e9822823447ea8294c', '34bd8d8b0306127f84e0274fe44c012f1244f420'):
+                ec, value = git_read(['cat-file', '-t', fixed_commit])
+                row['object_' + fixed_commit] = {'exit_code': ec, 'type': value.decode('ascii', 'replace').strip() if ec == 0 else 'MISSING'}
+            ec, missing = git_read(['fsck', '--full', '--no-reflogs'])
+            row['fsck_exit_code'] = ec
         reconciliation['repositories'].append(row)
     result['p2_unfrozen_code_reconciliation'] = reconciliation
 
