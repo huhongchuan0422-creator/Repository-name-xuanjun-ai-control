@@ -1,13 +1,20 @@
-# Concrete deployment dependencies — installation HOLD
+# P2 remaining measured deployment gates
 
-The proposed controller uses the existing Gateway process and existing canonical ledger socket. It does not create a task database, queue, scheduler daemon or new model route.
+Already evidenced:
+- Existing canonical ledger/CAS is reused; no second task DB/queue.
+- Exact OpenClaw sandbox runtime is bound to canonical run/session/unit/cgroup and rechecked before every tool call.
+- Container-side source namespace attestation is bound into admission and rechecked before dispatch.
+- Receipt-less `LAUNCH_INTENT` is UNKNOWN/HOLD and never physically replayed.
+- Gateway native socket role has process-chain identity checks rather than shared-UID-only trust.
+- UK Gateway process identity and Python 3.6.8 are verified by zero-model self-hosted evidence.
 
-The socket server authenticates the native Gateway UID separately from the Owner callback UID. Gateway requires access to the exact existing Unix socket, without joining the DB group or gaining database-file permissions. Release must bind the socket's ACL across recreation and verify the actual peer UID.
+Still required before installation:
+1. Complete the currently queued UK dependency/unit/host-facts verify-only runs on the latest immutable source.
+2. Freeze one candidate artifact with provenance and SHA256SUMS and record its artifact ID + archive hash.
+3. Run independent QA and Security against that exact artifact; author self-test is not approval.
+4. Run Release gate against the same artifact and reject any byte drift.
+5. Produce reviewed verify-only, install and rollback commands from the frozen package; no guessed root command.
+6. Owner executes the reviewed installation once on UK; then run E2E and fault injection.
+7. Update the existing dashboard in its current layout with exact source/artifact/runtime/gate status.
 
-The active descriptor binary_sha256 must equal the reviewed native transport bytes. Existing Codex binary identity cannot attest a native controller. Switching that binding requires the existing activation cutover, stop proof and same-release freeze; current UK activation was not changed.
-
-Observed installed SDK has runtime.config.current(), request-scoped subagent.run(), sandbox.resolveWorkspaceAuthority(), agent session metadata and before_tool_call. The tool run ID is carried on the hook event. Plugin controller source now checks it there and validates current canonical lease/unit before allowing tool use.
-
-Remaining measured gaps: no explicit current UK worker sandbox configuration; exact effective OAuth store/route not attested by the assumed main auth-profiles path (it was missing); no installed immutable context dependency manifest, native plugin binding file, socket client config or updated dispatcher unit. Docker binary alone is not Docker access/image/read-only/isolation proof. SDK read-only QA workspace mapping still requires an actual verify-only test. These dependencies must be made concrete and reviewed before giving an install command.
-
-Source regression is not installation, OAuth consumption, rollback, unknown-effect reconciliation or real E2E proof. Old unknown execution f998 is never replayed. No UK writer/lease/epoch/model/config/install mutation was performed.
+P2_INSTALL remains HOLD until all seven are satisfied. Old `f998...` remains effect-unknown and must not be replayed.
