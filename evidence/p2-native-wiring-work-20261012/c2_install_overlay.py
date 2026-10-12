@@ -40,6 +40,53 @@ SupplementaryGroups=docker
 """)
     entry=stage1/'p2_install_entrypoint.py'
     replace_once(entry,
+"""    for name, expected_mode in (('auth', 'EXISTING_OAUTH_REFERENCE'),
+                                ('tls', 'EXISTING_TLS_REFERENCE')):
+        value = plan[name]
+        if (not isinstance(value, dict)
+                or set(value) != {'mode', 'references'}
+                or value.get('mode') != expected_mode
+                or not isinstance(value.get('references'), list)
+                or not value['references']):
+            raise ValueError('INVALID_' + name.upper() + '_REFERENCE_BINDING')
+        seen = set()
+        for reference in value['references']:
+            if (not isinstance(reference, dict)
+                    or set(reference) != {'path', 'sha256', 'owner_uid', 'mode'}
+                    or not _canonical(reference.get('path'))
+                    or reference['path'] in seen
+                    or not SHA256.fullmatch(reference.get('sha256', ''))
+                    or type(reference.get('owner_uid')) is not int
+                    or type(reference.get('mode')) is not int
+                    or reference['mode'] & 0o077):
+                raise ValueError('INVALID_' + name.upper() + '_REFERENCE')
+            seen.add(reference['path'])
+
+    runtime = plan['runtime']
+""",
+"""    auth = plan['auth']
+    if (not isinstance(auth, dict)
+            or set(auth) != {'mode', 'references'}
+            or auth.get('mode') != 'EXISTING_OAUTH_REFERENCE'
+            or not isinstance(auth.get('references'), list)
+            or not auth['references']):
+        raise ValueError('INVALID_AUTH_REFERENCE_BINDING')
+    seen = set()
+    for reference in auth['references']:
+        if (not isinstance(reference, dict)
+                or set(reference) != {'path', 'sha256', 'owner_uid', 'mode'}
+                or not _canonical(reference.get('path'))
+                or reference['path'] in seen
+                or not SHA256.fullmatch(reference.get('sha256', ''))
+                or type(reference.get('owner_uid')) is not int
+                or type(reference.get('mode')) is not int
+                or reference['mode'] & 0o077):
+            raise ValueError('INVALID_AUTH_REFERENCE')
+        seen.add(reference['path'])
+
+    runtime = plan['runtime']
+""")
+    replace_once(entry,
 """    if (not isinstance(runtime, dict)
             or set(runtime) != {'release_directory', 'provisioning', 'services', 'prerequisites'}
             or not isinstance(runtime.get('prerequisites'), dict)""",
@@ -70,6 +117,30 @@ SupplementaryGroups=docker
             or plugin.get('service_user')!='xuanjun_dev'
             or plugin.get('docker_dropin')!='/etc/systemd/system/xuanjun-uk-openclaw.service.d/20-p2-docker.conf'):
         raise ValueError('INVALID_P2_PLUGIN_BINDING')
+    tls=plan['tls']
+    nginx_required=any(isinstance(x,dict)
+                       and isinstance(x.get('target'),str)
+                       and x['target'].startswith('/etc/nginx/')
+                       for x in runtime['provisioning'])
+    expected_tls_mode='EXISTING_TLS_REFERENCE' if nginx_required else 'NOT_APPLICABLE_NO_NGINX'
+    if (not isinstance(tls,dict) or set(tls)!={'mode','references'}
+            or tls.get('mode')!=expected_tls_mode
+            or not isinstance(tls.get('references'),list)
+            or (nginx_required and not tls['references'])
+            or (not nginx_required and tls['references'])):
+        raise ValueError('INVALID_TLS_REFERENCE_BINDING')
+    seen=set()
+    for reference in tls['references']:
+        if (not isinstance(reference,dict)
+                or set(reference)!={'path','sha256','owner_uid','mode'}
+                or not _canonical(reference.get('path'))
+                or reference['path'] in seen
+                or not SHA256.fullmatch(reference.get('sha256',''))
+                or type(reference.get('owner_uid')) is not int
+                or type(reference.get('mode')) is not int
+                or reference['mode'] & 0o077):
+            raise ValueError('INVALID_TLS_REFERENCE')
+        seen.add(reference['path'])
     return True""")
     runtime=stage1/'p2_fixed_host_runtime.py'
     replace_once(runtime,

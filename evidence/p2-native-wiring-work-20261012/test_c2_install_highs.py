@@ -40,6 +40,55 @@ def write_receipt(root,target,current,installed=b'installed',old=b'old'):
     pathlib.Path(os.path.join(root,'provision.json')).write_bytes(raw)
     return {'schema':1,'receipt_sha256':hashlib.sha256(raw).hexdigest(),'rollback_complete':True}
 
+class PlanTlsBindingTests(unittest.TestCase):
+    def _plan(self):
+        import p2_install_entrypoint as entry
+        h='a'*64;u='12345678-1234-4234-8234-123456789abc'
+        return {'schema':1,'transaction_id':u,
+            'artifact':{'root':'/opt/p2','manifest':'/opt/p2/manifest.json',
+                'source_commit':'b'*40,'source_tree':'c'*40,'manifest_sha256':h,
+                'releases':'/opt/xuanjun-control-releases'},
+            'cutover':{},
+            'activation':{'release_sha256':h,'config_sha256':h,'binary_sha256':h,
+                'ledger_uuid':u,'generation':1,'instance':u,
+                'db_path':'/var/lib/xuanjun-development/db.sqlite',
+                'ledger_socket':'/run/xuanjun-development/ledger.sock','expected_epoch':0},
+            'runtime':{'release_directory':'integration-'+'d'*16,
+                'provisioning':[
+                    {'target':'/etc/xuanjun-development/p2-native-controller.binding.json'},
+                    {'target':'/etc/xuanjun-development/p2-native-ledger-client.json'},
+                    {'target':'/etc/systemd/system/xuanjun-uk-openclaw.service.d/20-p2-docker.conf'}],
+                'services':['xuanjun-ledger.socket','xuanjun-ledger.service',
+                    'xuanjun-github-intake.service','xuanjun-github-intake.timer',
+                    'xj-root-broker.socket','xj-root-broker.service',
+                    'xuanjun-development-dispatcher.service'],
+                'prerequisites':{},
+                'plugin':{'id':'xuanjun-p2-native-controller','source':'plugins/p2-native-controller',
+                    'binding_file':'/etc/xuanjun-development/p2-native-controller.binding.json',
+                    'binding_sha256':h,
+                    'ledger_client_config':'/etc/xuanjun-development/p2-native-ledger-client.json',
+                    'ledger_client_sha256':h,'gateway_service':'xuanjun-uk-openclaw.service',
+                    'openclaw_bin':'/home/xuanjun_dev/.openclaw/bin/openclaw',
+                    'service_user':'xuanjun_dev',
+                    'docker_dropin':'/etc/systemd/system/xuanjun-uk-openclaw.service.d/20-p2-docker.conf'}},
+            'auth':{'mode':'EXISTING_OAUTH_REFERENCE','references':[{
+                'path':'/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite',
+                'sha256':h,'owner_uid':1002,'mode':0o600}]},
+            'tls':{'mode':'NOT_APPLICABLE_NO_NGINX','references':[]}}
+
+    def test_no_nginx_requires_explicit_no_tls_mode(self):
+        import p2_install_entrypoint as entry
+        plan=self._plan()
+        self.assertTrue(entry.validate_plan(plan))
+        plan['tls']={'mode':'EXISTING_TLS_REFERENCE','references':[]}
+        with self.assertRaises(ValueError):entry.validate_plan(plan)
+
+    def test_nginx_target_requires_real_tls_reference(self):
+        import p2_install_entrypoint as entry
+        plan=self._plan()
+        plan['runtime']['provisioning'].append({'target':'/etc/nginx/conf.d/p2.conf'})
+        with self.assertRaises(ValueError):entry.validate_plan(plan)
+
 class RollbackValidationTests(unittest.TestCase):
     def test_target_drift_has_zero_external_effects(self):
         with tempfile.TemporaryDirectory() as root:
