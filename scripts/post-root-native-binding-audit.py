@@ -96,6 +96,46 @@ def audit():
         except (OSError, ValueError):
             continue
     result['consumer_auth_acceptance'] = 'NOT_PROVEN_BY_FILE_METADATA'
+    cli = BASE + '/.openclaw/bin/openclaw'
+    node_dir = BASE + '/.openclaw/tools/node-v24.21.0/bin'
+    result['openclaw_auth_status'] = {'status': 'CLI_OR_NODE_UNAVAILABLE'}
+    if os.path.isfile(cli) and os.path.isfile(node_dir + '/node'):
+        env = {'HOME': BASE, 'PATH': node_dir + ':/usr/local/bin:/usr/bin:/bin',
+               'LANG': 'C.UTF-8'}
+        p = subprocess.run(['/usr/sbin/runuser', '-u', 'xuanjun_dev', '--',
+                            cli, 'models', '--status-json'],
+                           env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                           timeout=30, check=False)
+        summary = {'exit_code': p.returncode, 'status': 'UNPARSED_NO_RAW_OUTPUT',
+                   'safe_fields': [], 'model_inference_requested': False}
+        if p.returncode == 0 and len(p.stdout) <= 1048576:
+            try:
+                data = json.loads(p.stdout.decode('utf-8'))
+                def walk(value, route, depth):
+                    if depth > 8:
+                        return
+                    if isinstance(value, dict):
+                        for k, v in value.items():
+                            if k in ('provider', 'type', 'mode', 'status', 'authMode'):
+                                if v in ('openai', 'openai-codex', 'oauth', 'api_key',
+                                         'api-key', 'token', 'ok', 'missing', 'expired',
+                                         'none', 'profile', 'env', 'runtime'):
+                                    summary['safe_fields'].append({'route': route + '/' + k, 'value': v})
+                            if k in ('authPath', 'authStorePath', 'profilePath', 'agentDir', 'configPath'):
+                                path = safe_path(v)
+                                if path:
+                                    summary['safe_fields'].append({'route': route + '/' + k,
+                                                                  'metadata': metadata(path)})
+                            if isinstance(v, (dict, list)) and k not in ('tokens', 'credentials', 'secrets'):
+                                walk(v, route + '/object', depth + 1)
+                    elif isinstance(value, list):
+                        for v in value[:100]:
+                            walk(v, route + '/item', depth + 1)
+                walk(data, 'models-status', 0)
+                summary['status'] = 'PARSED_STRICT_ALLOWLIST'
+            except (ValueError, UnicodeError, TypeError):
+                pass
+        result['openclaw_auth_status'] = summary
     print(json.dumps(result, sort_keys=True))
 
 
