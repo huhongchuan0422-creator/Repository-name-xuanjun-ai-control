@@ -399,6 +399,34 @@ def audit():
                     continue
             row['cwd_scan_proves_no_writer'] = False
             row['lease_fence_evidence'] = 'CANONICAL_RECORD_NOT_BOUND'
+            row['comparison_exit_codes'] = {}
+            for label, left, right in (('d99_to_head', row['target_commit'], 'HEAD'),
+                                       ('d99_parent_to_d99', row['target_commit'] + '^', row['target_commit'])):
+                ec, changes = git_read(['diff', '--name-status', '--no-renames', left, right, '--'])
+                row['comparison_exit_codes'][label] = ec
+                row[label + '_paths'] = changes.decode('utf-8', 'replace').splitlines()[:100] if ec == 0 else []
+            row['associated_processes_by_cwd'] = []
+            for proc_id in os.listdir('/proc'):
+                if not proc_id.isdigit():
+                    continue
+                try:
+                    pp = '/proc/' + proc_id
+                    cwd = os.readlink(pp + '/cwd')
+                    with open(pp + '/comm') as stream:
+                        comm = stream.read(80).strip()
+                    uid = os.stat(pp).st_uid
+                    if uid != pwd.getpwnam('xuanjun_dev').pw_uid or comm not in ('codex', 'node', 'openclaw', 'python3', 'bash'):
+                        continue
+                    with open(pp + '/stat') as stream:
+                        fields = stream.read(4096).rsplit(')', 1)[1].split()
+                    row['associated_processes_by_cwd'].append({'pid': int(proc_id), 'ppid': int(fields[1]),
+                        'start_ticks': fields[19], 'comm': comm, 'cwd': safe_path(cwd) or 'OUTSIDE_ALLOWED_ROOTS'})
+                except (OSError, ValueError, IndexError):
+                    continue
+            row['canonical_state_metadata'] = [metadata(p) for p in
+                ('/var/lib/xuanjun-development', '/etc/xuanjun-development',
+                 '/home/xuanjun_dev/p2-platform-delivery-receipts')]
+
 
         reconciliation['repositories'].append(row)
     result['p2_unfrozen_code_reconciliation'] = reconciliation
