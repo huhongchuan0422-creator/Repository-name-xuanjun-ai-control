@@ -85,5 +85,25 @@ def main():
             result['requested_main_session_records']=selected
     except Exception:
         result['native_registry']='HOLD_REGISTRY_READ_FAILED_NO_RAW_OUTPUT'
+    # Inspect installed supervisor code as data, never import or execute it.
+    import ast, hashlib, re
+    installed=HOME_PATH+'/.openclaw/workspace/scripts/p2_supervisor.py'
+    info=os.lstat(installed)
+    if stat.S_ISREG(info.st_mode) and info.st_uid==os.geteuid() and info.st_size<131072:
+        with open(installed,'rb') as stream:raw=stream.read(131073)
+        tree=ast.parse(raw.decode('utf-8'))
+        literals=[]
+        for node in ast.walk(tree):
+            if not isinstance(node,ast.Str):continue
+            value=node.s
+            if len(value)>160 or any(word in value.lower() for word in ('secret','credential','token','password','oauth','auth.json')):continue
+            if (value.startswith(('/home/xuanjun_dev/','/tmp/xuanjun','/var/lib/xuanjun')) and re.fullmatch(r'[A-Za-z0-9_./-]+',value)) or (re.fullmatch(r'[A-Za-z0-9_./-]+',value) and any(word in value.lower() for word in ('ledger','supervis','scratch','checkpoint'))):
+                literals.append(value)
+        result['installed_supervisor_source']={
+            'path':installed,'sha256':hashlib.sha256(raw).hexdigest(),
+            'functions':[n.name for n in ast.walk(tree) if isinstance(n,ast.FunctionDef)],
+            'imports':[n.module for n in ast.walk(tree) if isinstance(n,ast.ImportFrom)]+[a.name for n in ast.walk(tree) if isinstance(n,ast.Import) for a in n.names],
+            'state_path_literals':sorted(set(literals)),
+            'calls':sorted(set(n.func.attr if isinstance(n.func,ast.Attribute) else n.func.id for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,(ast.Attribute,ast.Name))))}
     print(json.dumps(result,sort_keys=True))
 if __name__=='__main__':main()
