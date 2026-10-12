@@ -1,7 +1,7 @@
 name: Entry review and continuation gates
 on:
   pull_request:
-    paths: ['scripts/entry_review_gate.py', 'scripts/native_syntax_*.py', 'scripts/development_entry_intake.py', 'tests/test_*gate.py', 'tests/test_native_syntax_intake.py', 'ci/native-syntax/**', '.github/workflows/entry-review-gates.yml', '.github/workflows/development-entry-intake.yml']
+    paths: ['scripts/entry_review_gate.py', 'scripts/native_syntax_*.py', 'scripts/development_entry_intake.py', 'tests/test_*gate.py', 'tests/test_native_syntax_intake.py', '.github/workflows/entry-review-gates.yml', '.github/workflows/development-entry-intake.yml', '.syntax/**']
 permissions:
   contents: read
 jobs:
@@ -14,10 +14,14 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '22.23.3'
-      - name: Install integrity-locked syntax checker without package scripts
-        run: npm ci --prefix ci/native-syntax --ignore-scripts --no-audit --no-fund
+          node-version: '22.14.0'
+      - name: Install fixed syntax checker without package scripts
+        run: |
+          install -d -m 700 "$RUNNER_TEMP/xj-syntax"
+          cp .syntax/package.json .syntax/package-lock.json "$RUNNER_TEMP/xj-syntax/"
+          npm ci --prefix "$RUNNER_TEMP/xj-syntax" --ignore-scripts --no-audit --no-fund
       - name: Exercise mechanical syntax and continuation gates
         env:
-          XJ_TYPESCRIPT_MODULE: ${{ github.workspace }}/ci/native-syntax/node_modules/typescript
+          XJ_SYNTAX_ROOT: ${{ runner.temp }}/xj-syntax
+          XJ_TYPESCRIPT_MODULE: ${{ runner.temp }}/xj-syntax/node_modules/typescript/lib/typescript.js
         run: python3 -B -m unittest discover -s tests -v

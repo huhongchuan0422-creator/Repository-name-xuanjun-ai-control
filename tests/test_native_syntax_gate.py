@@ -52,6 +52,12 @@ class SyntaxTests(unittest.TestCase):
         self.assertEqual(gate.check_bytes('a.ts',b'const a: number = 1;',module)['state'],'PASS_SYNTAX')
         self.assertEqual(gate.check_bytes('a.ts',b'const a: number = ;',module)['state'],'REJECT_SYNTAX')
 
+    def test_typescript_arbitrary_module_is_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            module=pathlib.Path(root)/'evil.js'
+            module.write_text('throw new Error("must not load")')
+            self.assertEqual(gate.check_bytes('a.ts',b'const x=1;',str(module))['state'],'HOLD_TYPESCRIPT_CHECKER_UNAVAILABLE')
+
     def test_hash_changes_when_code_changes(self):
         self.assertNotEqual(gate.check_bytes('a.py',b'x=1')['sha256'],gate.check_bytes('a.py',b'x=2')['sha256'])
 

@@ -6,6 +6,34 @@ import re
 import shutil
 import subprocess
 import sys
+import stat
+
+TYPESCRIPT_SHA256='0fba5508ecbe50cd00a45f132a76582fb22a4ec55769fd3d794fd0e026f9fb67'
+
+
+def trusted_typescript(module):
+    root=os.environ.get('XJ_SYNTAX_ROOT')
+    if not root or not os.path.isabs(root) or os.path.realpath(root)!=root:
+        return False
+    if module!=root+'/node_modules/typescript/lib/typescript.js':
+        return False
+    try:
+        info=os.lstat(root)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.geteuid() or stat.S_IMODE(info.st_mode)!=0o700:
+            return False
+        for relative in ('node_modules','node_modules/typescript','node_modules/typescript/lib','node_modules/typescript/lib/typescript.js'):
+            info=os.lstat(root+'/'+relative)
+            if stat.S_ISLNK(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode & 0o022:
+                return False
+            if relative.endswith('.js'):
+                if not stat.S_ISREG(info.st_mode):return False
+            elif not stat.S_ISDIR(info.st_mode):return False
+        fd=os.open(module,os.O_RDONLY|os.O_NOFOLLOW)
+        with os.fdopen(fd,'rb') as stream:
+            raw=stream.read(16777217)
+        return len(raw)<=16777216 and hashlib.sha256(raw).hexdigest()==TYPESCRIPT_SHA256
+    except OSError:
+        return False
 
 PY_CHECK = """import json,sys
 raw=sys.stdin.buffer.read(131073)
@@ -51,7 +79,7 @@ def check_bytes(path, raw, typescript_module=None):
     elif path.endswith(('.ts','.tsx')):
         node=shutil.which('node')
         # Module path is an operator-owned checker dependency, never bundle data.
-        if not node or not typescript_module or not os.path.isabs(typescript_module):
+        if not node or not typescript_module or not trusted_typescript(typescript_module):
             return dict(receipt,state='HOLD_TYPESCRIPT_CHECKER_UNAVAILABLE')
         script=TS_CHECK.replace("fileName:'submitted.ts'", "fileName:'submitted.tsx'") if path.endswith('.tsx') else TS_CHECK
         argv=[node,'-e',script,typescript_module]
