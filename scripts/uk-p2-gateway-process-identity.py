@@ -18,7 +18,7 @@ USER='xuanjun_dev'
 UNIT='xuanjun-uk-openclaw.service'
 
 
-def file_digest(path, maximum=64*1024*1024):
+def file_digest(path, maximum=256*1024*1024):
     real=os.path.realpath(path)
     fd=os.open(real,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_NONBLOCK',0))
     try:
