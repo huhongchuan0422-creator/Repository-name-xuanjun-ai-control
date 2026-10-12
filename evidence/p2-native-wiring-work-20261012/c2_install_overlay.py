@@ -29,6 +29,9 @@ def main():
   }
 }
 """)
+    ledger_client=deploy/'p2-native-ledger-client.json.template'
+    ledger_client.write_text("""{"socket_path":"/run/xuanjun-development/ledger.sock","server_uid":@@LEDGER_SERVER_UID@@}
+""")
     dropin=deploy/'xuanjun-uk-openclaw-p2-docker.conf'
     dropin.write_text("""[Service]
 # P2 grants Docker socket group access only to the Gateway service.
@@ -52,13 +55,16 @@ SupplementaryGroups=docker
             or not runtime['services']):
         raise ValueError('INVALID_RUNTIME_BINDING')
     plugin=runtime['plugin']
-    plugin_keys={'id','source','binding_file','binding_sha256','gateway_service',
-                 'openclaw_bin','service_user','docker_dropin'}
+    plugin_keys={'id','source','binding_file','binding_sha256','ledger_client_config',
+                 'ledger_client_sha256','gateway_service','openclaw_bin','service_user',
+                 'docker_dropin'}
     if (not isinstance(plugin,dict) or set(plugin)!=plugin_keys
             or plugin.get('id')!='xuanjun-p2-native-controller'
             or plugin.get('source')!='plugins/p2-native-controller'
             or plugin.get('binding_file')!='/etc/xuanjun-development/p2-native-controller.binding.json'
             or not SHA256.fullmatch(plugin.get('binding_sha256',''))
+            or plugin.get('ledger_client_config')!='/etc/xuanjun-development/p2-native-ledger-client.json'
+            or not SHA256.fullmatch(plugin.get('ledger_client_sha256',''))
             or plugin.get('gateway_service')!='xuanjun-uk-openclaw.service'
             or plugin.get('openclaw_bin')!='/home/xuanjun_dev/.openclaw/bin/openclaw'
             or plugin.get('service_user')!='xuanjun_dev'
@@ -179,8 +185,10 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
         if plugin['gateway_service']!=GATEWAY_SERVICE or plugin['id']!=P2_PLUGIN_ID:
             raise ValueError('P2_PLUGIN_POLICY')
         matches=[binding for binding in runtime['provisioning'] if binding.get('target')==plugin['binding_file']]
+        clients=[binding for binding in runtime['provisioning'] if binding.get('target')==plugin['ledger_client_config']]
         dropins=[binding for binding in runtime['provisioning'] if binding.get('target')==plugin['docker_dropin']]
         if (len(matches)!=1 or matches[0].get('rendered_sha256')!=plugin['binding_sha256']
+                or len(clients)!=1 or clients[0].get('rendered_sha256')!=plugin['ledger_client_sha256']
                 or len(dropins)!=1):
             raise ValueError('P2_PLUGIN_PROVISIONING_BINDING')
         result=self.run(['/usr/bin/systemctl','is-active','--quiet',GATEWAY_SERVICE],
@@ -258,7 +266,7 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
         return True
 """)
     manifest=deploy/'integration-manifest.json';value=json.loads(manifest.read_text());files=value['files']
-    for path in [entry,runtime,binding,dropin]:
+    for path in [entry,runtime,binding,ledger_client,dropin]:
         files[path.relative_to(source).as_posix()]=sha(path)
     plugin=source/'plugins'/'p2-native-controller'
     for path in sorted(plugin.iterdir()):
