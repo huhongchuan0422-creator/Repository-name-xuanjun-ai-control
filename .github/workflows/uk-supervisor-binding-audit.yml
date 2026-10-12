@@ -24,3 +24,16 @@ jobs:
           test "$(id -un)" = githubrunner
           /usr/bin/python3 -B -m py_compile scripts/uk-supervisor-binding-audit.py
           sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-supervisor-binding-audit.py
+
+      - name: Preserve exact existing Stage B package, no rebuild or installation
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/p2-stage-b-retained"
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-stage-b-package-export.py > "$RUNNER_TEMP/p2-stage-b-retained/PROVENANCE.json"
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - --bytes < scripts/uk-stage-b-package-export.py > "$RUNNER_TEMP/p2-stage-b-retained/candidate.tar.gz"
+          test -s "$RUNNER_TEMP/p2-stage-b-retained/candidate.tar.gz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p2-stage-b-exact-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/p2-stage-b-retained
+          retention-days: 30
+          if-no-files-found: error
