@@ -1,0 +1,75 @@
+name: P2 release pre-gate exact artifact
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/p2-release-pregate.yml
+permissions:
+  contents: read
+  actions: read
+env:
+  P2_ARTIFACT_ID: '11778800853'
+  P2_TAR_SHA256: '17127b5ca03e3784043e13c60ab11a9e8a65a0230a57efa13950e440d6095a0f'
+  P2_SOURCE_COMMIT: '04c930b220f677d557d96b053d9b09c72007af51'
+  QA_SECURITY_RUN: '38319971165'
+  UK_VERIFY_RUN: '38319971234'
+jobs:
+  release-pregate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require exact prerequisite runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in "$QA_SECURITY_RUN" "$UK_VERIFY_RUN"; do
+            ok=0
+            for i in $(seq 1 18); do
+              status=$(gh api "repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/$run" --jq '.status+":"+(.conclusion//"")')
+              case "$status" in
+                completed:success) ok=1; break ;;
+                completed:*) echo "PREREQUISITE_FAILED=$run:$status"; exit 41 ;;
+              esac
+              sleep 10
+            done
+            test "$ok" -eq 1 || { echo "PREREQUISITE_NOT_TERMINAL=$run"; exit 42; }
+          done
+      - name: Verify exact frozen artifact again
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/p2-release-gate
+          mkdir /tmp/p2-release-gate
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2-release-gate.zip
+          cd /tmp/p2-release-gate
+          unzip -q /tmp/p2-release-gate.zip
+          printf '%s  %s\n' "$P2_TAR_SHA256" p2-candidate.tar.gz | sha256sum -c -
+          mkdir pkg
+          tar -xzf p2-candidate.tar.gz -C pkg
+          cd pkg/xuanjun-p2-package
+          sha256sum -c SHA256SUMS
+          python3 -I -B - <<'PY'
+          import json,pathlib
+          root=pathlib.Path('.')
+          p=json.loads((root/'P2_CANDIDATE_PROVENANCE.json').read_text())
+          assert p['source_commit']=='04c930b220f677d557d96b053d9b09c72007af51'
+          assert p['model_calls']==0
+          assert p['release_gate']=='NOT_GRANTED'
+          required={
+            'deploy/p2-native-controller.binding.json.template',
+            'deploy/p2-native-ledger-client.json.template',
+            'deploy/xuanjun-uk-openclaw-p2-docker.conf',
+            'plugins/p2-native-controller/plugin.mjs',
+            'stage1/p2_fixed_host_runtime.py',
+            'stage1/p2_install_entrypoint.py',
+            'scripts/uk-p2-install.py'}
+          manifest=json.loads((root/'deploy/integration-manifest.json').read_text())
+          assert required <= set(manifest['files'])
+          print('P2_RELEASE_PREGATE_ARTIFACT_IDENTITY=PASS')
+          PY
+          echo P2_RELEASE_READY_FOR_INDEPENDENT_APPROVAL=YES
+          echo P2_RELEASE_GRANTED=NO
+          echo INSTALL_EXECUTED=NO
+          echo MODEL_CALLS=0
