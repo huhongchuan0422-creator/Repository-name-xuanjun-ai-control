@@ -42,11 +42,14 @@ jobs:
           destination="$RUNNER_TEMP/p2-retained-$GITHUB_RUN_ID"
           mkdir -m 700 "$destination"
           repository=/home/xuanjun_dev/xuanjun-p2-native-adapter-6121230482
-          for revision in d99b04060b703f68cc784ba55911009094492104 70309e7634d7fba3d6f16e0af4fa093fc159e2e7 c0a25ccacb0d33a73498126eee9f159aedde8c68; do
+          for revision in d99b04060b703f68cc784ba55911009094492104 70309e7634d7fba3d6f16e0af4fa093fc159e2e7 c0a25ccacb0d33a73498126eee9f159aedde8c68 3888f859eeb440a63602b2e9822823447ea8294c; do
             sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git --no-optional-locks -C "$repository" archive --format=tar "$revision" > "$destination/$revision.tar"
             test -s "$destination/$revision.tar"
-            sha256sum "$destination/$revision.tar" >> "$destination/SHA256SUMS"
+            (cd "$destination" && sha256sum "$revision.tar") >> "$destination/SHA256SUMS"
           done
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git --no-optional-locks -C "$repository" fsck --full --no-reflogs > "$destination/GIT_FSCK.txt" 2>&1 || echo GIT_INTEGRITY_HOLD >> "$destination/STATUS.txt"
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git --no-optional-locks -C "$repository" log --max-count=12 --format='%H %T %P' > "$destination/COMMIT_GRAPH.txt"
+          (cd "$destination" && sha256sum -c SHA256SUMS)
           echo 'RETAINED_SOURCE_ONLY_NOT_INSTALLER; TASK=XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1; FREEZE=NOT_ADMITTED' > "$destination/STATUS.txt"
           echo "P2_RETENTION_PATH=$destination" >> "$GITHUB_ENV"
       - name: Retain both source trees without installation admission
