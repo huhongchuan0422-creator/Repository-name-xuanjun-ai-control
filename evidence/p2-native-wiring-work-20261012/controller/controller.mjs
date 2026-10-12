@@ -72,8 +72,12 @@ export class NativeController {
     // A container's existence and an SDK sessionKey are NOT proof of run confinement.
     const placement=await this.verifyWorkerPlacement(runtime,{request:record.request,unit:record.unit,sessionKey:record.session_key,source:record.source});
     if(placement!==true)hold('WORKER_PLACEMENT_UNVERIFIED');
-    await this.current(record.request);
-    await this.store.replace(observed,{...observed.task,native_execution:{...record,phase:'LAUNCH_INTENT'}});
+    // Re-read the canonical revision after the potentially slow placement check.
+    // Never CAS using a pre-check snapshot: lease/fence or execution state may have changed.
+    const latest=await this.current(record.request);
+    if(latest.task.native_execution?.phase!=='ADMITTED'
+      ||canonical(latest.task.native_execution.admission)!==canonical(admission))hold('LAUNCH_STALE_ADMISSION');
+    await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'LAUNCH_INTENT'}});
     const request=record.request;
     // Only the Gateway-injected request-scoped SDK may dispatch this run.
     const result=await runtime.subagent.run({sessionKey:record.session_key,message:request.prompt,
