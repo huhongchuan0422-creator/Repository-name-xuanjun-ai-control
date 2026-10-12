@@ -106,7 +106,7 @@ export function createHostBindings(api,settings,resolveSandboxContext,prepareSys
   return {store,boundary,eligibility,prepare,collectResult,preflight,beforeToolCall,
     verifyWorkerPlacement:async(_runtime,{request,unit,sessionKey,source})=>{
       const active=admissions.get(sessionKey);
-      if(!active||active.runtimeId!==unit.id||active.backendId!==unit.backend
+      if(!active||active.runtimeId!==unit.name||active.backendId!==unit.backend
         ||active.authorityRunId!==unit.authority_run_id||!store.guard(request))return null;
       return {verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
         source_manifest_sha256:source.manifest_sha256,
