@@ -205,7 +205,7 @@ def main():
                 result['canonical_scratch']={'state':'HOLD_SCRATCH_FORMAT_UNCONFIRMED','wrapper_keys':sorted(wrapper)[:40]}
             else:
                 selected=[]
-                keys={'task_id','taskId','parent_task_id','state','status','owner','role','entry','attempt_id','run_id','session_id','lease_id','fence','epoch','revision','checkpoint_sha256','spec_sha256','last_real_progress_at','progress_deadline','next_owner','child_started','live_execution_units','canonical_ledger_path'}
+                keys={'task_id','taskId','parent_task_id','state','status','owner','role','entry','attempt_id','run_id','session_id','lease_id','fence','epoch','revision','checkpoint_sha256','spec_sha256','last_real_progress_at','progress_deadline','next_owner','child_started','live_execution_units','canonical_ledger_path','candidate_commit','candidate_tree','task_state','task','schema','session_key','workdir','execution_unit','started_at','completed_at','artifact_sha256','manifest_sha256','source_commit','tree','commit','result','blocker','next_action','source_path','report_path'}
                 def inspect(v,path,depth=0):
                     if depth>5 or len(selected)>=80:return
                     if isinstance(v,dict):
@@ -225,6 +225,8 @@ def main():
                     'revision':wrapper.get('currentRevision',wrapper.get('revision')),
                     'wrapper_keys':sorted(wrapper)[:40],'content_keys':sorted(value)[:60],
                     'content_sha256':hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest(),
-                    'selected_fields':selected,'write_performed':False}
+                    'selected_fields':selected,'write_performed':False,
+                    'stage_b_active_keys':sorted(value.get('stage_b_active',{})) if isinstance(value.get('stage_b_active'),dict) else [],
+                    'completion_delivery_keys':sorted(value.get('stage_b_completion_delivery',{})) if isinstance(value.get('stage_b_completion_delivery'),dict) else []}
     print(json.dumps(result,sort_keys=True))
 if __name__=='__main__':main()
