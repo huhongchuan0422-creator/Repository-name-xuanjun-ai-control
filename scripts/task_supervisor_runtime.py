@@ -223,6 +223,33 @@ def _columns(db, table):
     return tuple(row[1] for row in db.execute('PRAGMA table_info(' + table + ')'))
 
 
+def _bounded_inventory_json(raw):
+    # Stable cross-version bound before recursive decoder/encoder work. Brackets
+    # inside JSON strings (including escaped quotes) are data, not nesting.
+    if not isinstance(raw, str):
+        raise ValueError('INVENTORY_JSON_REQUIRED')
+    depth = 0
+    quoted = False
+    escaped = False
+    for char in raw:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char in '[{':
+            depth += 1
+            if depth > 64:
+                raise ValueError('INVENTORY_JSON_DEPTH_EXCEEDED')
+        elif char in ']}':
+            depth -= 1
+    return json.loads(raw)
+
+
 def canonical_inventory_page(db, now, after_id=None, limit=100,
                              activation_binding=None, ledger_identity=None, task_id=None):
     if not db.in_transaction:
@@ -286,7 +313,7 @@ def canonical_inventory_page(db, now, after_id=None, limit=100,
         try:
             if not isinstance(task['depends'], str) or len(task['depends']) > 8192:
                 raise ValueError('dependency data limit')
-            dependencies = json.loads(task['depends'])
+            dependencies = _bounded_inventory_json(task['depends'])
             if (not isinstance(dependencies, list) or len(dependencies) > 32
                     or any(not isinstance(x, str) or not x for x in dependencies)
                     or len(set(dependencies)) != len(dependencies)):
@@ -357,7 +384,7 @@ def canonical_inventory_page(db, now, after_id=None, limit=100,
         raw_checkpoint = db.execute('SELECT CASE WHEN length(checkpoint)<=65536'
             ' THEN checkpoint ELSE NULL END FROM tasks WHERE id=?', (task['id'],)).fetchone()[0]
         try:
-            value = json.loads(raw_checkpoint)
+            value = _bounded_inventory_json(raw_checkpoint)
             if not isinstance(value, dict):
                 raise ValueError('checkpoint object required')
             native = value.get('native_execution', {})

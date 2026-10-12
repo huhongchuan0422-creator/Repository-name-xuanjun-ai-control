@@ -165,6 +165,15 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual([row['id'] for row in rows], ['a', 'b'])
         self.assertIn('DEPENDENCIES_UNVERIFIED', rows[0]['attention'])
 
+    def test_json_depth_bound_is_portable_and_strings_are_not_nesting(self):
+        from task_supervisor_runtime import _bounded_inventory_json
+        import json
+        _bounded_inventory_json('[' * 64 + '0' + ']' * 64)
+        with self.assertRaises(ValueError):
+            _bounded_inventory_json('[' * 65 + '0' + ']' * 65)
+        text = '[{' * 100 + '\\"' + '}]' * 100
+        self.assertEqual(_bounded_inventory_json(json.dumps({'text': text})), {'text': text})
+
     def test_invalid_limits_and_clock(self):
         self.begin()
         for clock,limit in ((float('nan'),1),(100,True),(100,0),(100,101)):
