@@ -1,0 +1,24 @@
+[Unit]
+Description=Xuanjun bounded GitHub issue intake into canonical ledger
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=xuanjun-dispatcher
+Group=xuanjun-control-db
+WorkingDirectory=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1
+ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/github_issue_consumer.py --activation-descriptor /var/lib/xuanjun-development/activation/active.json --activation-epoch-journal /var/lib/xuanjun-development/activation/epochs.jsonl --activation-lock /var/lib/xuanjun-development/activation/activation.lock --repo huhongchuan0422-creator/Repository-name-xuanjun-ai-control --token-file /etc/xuanjun-development/github-intake-token
+ExecStart=/usr/bin/python3 -I -B /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/mechanical_wake_service.py
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+ReadOnlyPaths=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@ /etc/xuanjun-development /var/lib/xuanjun-development/activation
+ReadWritePaths=/var/lib/xuanjun-development/generations
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077

@@ -80,7 +80,7 @@ jobs:
             'stage1/test_p2_install_entrypoint.py','stage1/p2_fixed_host_runtime.py',
             'stage1/test_p2_fixed_host_runtime.py','scripts/uk-p2-install.py',
             'stage1/p2_prerequisites.py','stage1/test_p2_prerequisites.py',
-            'stage1/test_p2_install_cli.py']
+            'stage1/test_p2_install_cli.py','stage1/mechanical_wake.py','stage1/mechanical_wake_service.py','stage1/test_mechanical_wake.py','stage1/owner_dashboard.py','deploy/xuanjun-github-intake.service','deploy/xuanjun-github-intake.timer']
           for relative in delta:
               shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),
                               os.path.join(root,relative))
@@ -135,7 +135,7 @@ jobs:
             echo "SOURCE_COMMIT=$GITHUB_SHA"
             echo "SOURCE_TREE=$source_tree"
             echo "ARCHIVE_SHA256=$archive_sha256"
-            echo 'RUNTIME_FILES=48'
+            echo 'RUNTIME_FILES=50'
             echo 'CODEX_INFERENCE_CALLS_BY_WORKFLOW=0'
             echo 'NEW_PAID_API_USAGE=NONE'
             echo 'INSTALL=NO'

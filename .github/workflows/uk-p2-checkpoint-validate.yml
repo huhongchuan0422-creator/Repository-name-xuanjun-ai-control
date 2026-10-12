@@ -63,12 +63,12 @@ jobs:
           s=s.replace(a,'        pristine=json.loads(json.dumps(value))\n'+a).replace(c,'module.restore_rollback_files(pristine,7,None)')
           with open(p,'w') as f:f.write(s)
           import shutil
-          for relative in ['stage1/activation_control.py','stage1/test_activation_lock_permissions.py','scripts/uk-integration-install.py','stage1/test_integration_installer.py','deploy/integration-manifest.json','scripts/uk-dev-bootstrap.py','stage1/ledger_backup.py','stage1/ledger_install_stage.py','stage1/test_ledger_install_stage.py','deploy/dispatcher.example.json','deploy/xuanjun-development-dispatcher.service','stage1/legacy_quiescence.py','stage1/test_legacy_quiescence.py','stage1/ledger_cutover_transaction.py','stage1/test_ledger_cutover_transaction.py','stage1/legacy_host_adapter.py','stage1/test_legacy_host_adapter.py','stage1/p2_install_entrypoint.py','stage1/test_p2_install_entrypoint.py','stage1/p2_fixed_host_runtime.py','stage1/test_p2_fixed_host_runtime.py','scripts/uk-p2-install.py','stage1/p2_prerequisites.py','stage1/test_p2_prerequisites.py','stage1/test_p2_install_cli.py']:
+          for relative in ['stage1/activation_control.py','stage1/test_activation_lock_permissions.py','scripts/uk-integration-install.py','stage1/test_integration_installer.py','deploy/integration-manifest.json','scripts/uk-dev-bootstrap.py','stage1/ledger_backup.py','stage1/ledger_install_stage.py','stage1/test_ledger_install_stage.py','deploy/dispatcher.example.json','deploy/xuanjun-development-dispatcher.service','stage1/legacy_quiescence.py','stage1/test_legacy_quiescence.py','stage1/ledger_cutover_transaction.py','stage1/test_ledger_cutover_transaction.py','stage1/legacy_host_adapter.py','stage1/test_legacy_host_adapter.py','stage1/p2_install_entrypoint.py','stage1/test_p2_install_entrypoint.py','stage1/p2_fixed_host_runtime.py','stage1/test_p2_fixed_host_runtime.py','scripts/uk-p2-install.py','stage1/p2_prerequisites.py','stage1/test_p2_prerequisites.py','stage1/test_p2_install_cli.py','stage1/mechanical_wake.py','stage1/mechanical_wake_service.py','stage1/test_mechanical_wake.py','stage1/owner_dashboard.py','deploy/xuanjun-github-intake.service','deploy/xuanjun-github-intake.timer']:
               shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),os.path.join('repo',relative))
           with open('repo/deploy/integration-manifest.json') as f:m=json.load(f)
           for relative,digest in m['files'].items():
               with open(os.path.join('repo',relative),'rb') as f:assert hashlib.sha256(f.read()).hexdigest()==digest,relative
-          print('ISOLATED_PREPARATION_DELTA_AND_48_FILE_MANIFEST_VERIFIED_WITH_DASHBOARD_BINDING')
+          print('ISOLATED_PREPARATION_DELTA_AND_50_FILE_MANIFEST_VERIFIED_WITH_DASHBOARD_BINDING')
           PY
           cd repo
           /usr/bin/python3 -B -m unittest discover -s stage1 -p 'test_*.py'

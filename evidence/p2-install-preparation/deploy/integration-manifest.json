@@ -61,8 +61,8 @@
     "deploy/xj-root-broker.service": "50d7781cb9c385f154fe80d9d9310411576f8ed98d4f5c84cdc1c5a0bd6de7ba",
     "deploy/xj-root-broker.socket": "a01777a36599bdc253357a100ed9eb089507b6bc9cae739cb3647b8e35d49562",
     "deploy/xuanjun-development-dispatcher.service": "92c3d59805ed104eb5b79843f9941cb93e8d230377e24ee50bbb6e6b3027d72d",
-    "deploy/xuanjun-github-intake.service": "1f04f0963b44ef3efd99c8ffce7dc2be4e0503516aa0f1ee0757abedf8699fc4",
-    "deploy/xuanjun-github-intake.timer": "9e0cfad3d302dec3514a6fd9248c5c3252579c5a9f91070e978837e617c05e8e",
+    "deploy/xuanjun-github-intake.service": "dc8e803ba0b2a08bafe0834a16e076b2b8c12f619f2733d9f738597d52a1f8c4",
+    "deploy/xuanjun-github-intake.timer": "0b82e326abad52faf02efefd1d82fdbe848dca0234d27d3fdad8f07ac3dd0f97",
     "deploy/xuanjun-ledger.service": "06322ea8c0d0b2d615c0905f4ce8b231ae03693d355d403338bf16c96096247a",
     "deploy/xuanjun-ledger.socket": "3a1e7c9d12ba01c99c76a3ab4a75efa9b4756130387fecbe4e02a5967729ff72",
     "scripts/uk-integration-install.py": "ee67c1fb9f849c3c7aca24e78b6b76ef9d957af6668d217858f8737758500643",
@@ -83,7 +83,7 @@
     "stage1/owner_approval_dispatch.py": "de72d6a4cf1eeabf765d9a7b537c8ec94ff83a5eda049e58695c50a2a59f88e3",
     "stage1/owner_callback_server.py": "1f254a73d2d551d6d6d7045d0658d7b69b830b0b3493fe04ab8d51b715fdfd79",
     "stage1/owner_dashboard.html": "79cd5f314230e0e2862f26e73b48ef617090feba641b9dd8952eb224db2e368a",
-    "stage1/owner_dashboard.py": "138af6496f491ab4bf15c24020a6f66bb0899dadeae8eb66c6b583031c7f5f09",
+    "stage1/owner_dashboard.py": "7e492f9dd3b17f3e4e93520012f742db335bdea606c4e7a037f428a2d817d1fc",
     "stage1/owner_notification_outbox.py": "6d06324e7f6c974bc38c247c5792254a93e394ee9d2e0e1558dd4c034537fdf0",
     "stage1/owner_update_router.py": "002d1c2cf415df99e64bdcb0f9f3e9b879a8cfbff57d6ad52793642fa23c21c8",
     "stage1/root_broker.py": "6177305043d075c5e4ee697b6a3bc0a86784dac44d2368c658ac64af64fc7f4b",
@@ -97,6 +97,8 @@
     "stage1/p2_install_entrypoint.py": "15fa9a407010349d9a5fc3147f2d1489dfd37066f9f7b8c3721ac659a9c9025e",
     "stage1/p2_fixed_host_runtime.py": "66513e5ba1624e681772faf334ee1eba0245f6a36c7c3d7fb4949a1db2a1e35e",
     "scripts/uk-p2-install.py": "a667b085df2c225dd5acaa869ff305e1a31f3a570f9cda287aee31c3d1b7b034",
-    "stage1/p2_prerequisites.py": "b39355a8378e81ab4e045fd8fdac73f12dbed2ca7c4c6bd79120015a18ea30f1"
+    "stage1/p2_prerequisites.py": "b39355a8378e81ab4e045fd8fdac73f12dbed2ca7c4c6bd79120015a18ea30f1",
+    "stage1/mechanical_wake.py": "5a2571f8d982d4608edb22af646e2161e02d85c93c0456f8aae7d3534d4caffc",
+    "stage1/mechanical_wake_service.py": "78e3157dd2010fbbde7a6b31f1942d06f3cd2aca77d4370093361d725de7c356"
   }
 }
