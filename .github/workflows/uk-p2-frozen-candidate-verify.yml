@@ -9,11 +9,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11780285684"
-  P2_TAR_SHA256: "c630dcf965cdffff0e583db583eb787c5a67ec0a5da37b9111518f6b91901efe"
-  P2_SOURCE_COMMIT: "ce0e02fffbaac6bd2264c91388034b28509e02f8"
-  P2_SOURCE_TREE: "cf563fb7d043f6a94ccf7c3fbe7568ec76997a07"
-  P2_MANIFEST_SHA256: "267626f41f27ed5650af961b449b8a96baf053242a1b235c51591ec8beae7e9c"
+  P2_ARTIFACT_ID: "11780595272"
+  P2_TAR_SHA256: "9052864b9bae3f32a30c79d25456bcca4355bf348543c68cd13a38b17b3ff8b0"
+  P2_SOURCE_COMMIT: "5e7fc1372a0bdc231da0461c2c97b93cb79f750a"
+  P2_SOURCE_TREE: "8f1350c6521552c2c664b774acf69be82273d69b"
+  P2_MANIFEST_SHA256: "81906e9734665cf43516002a6939718a93a3b831fba355cf49518c9edc3cf49b"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -79,9 +79,9 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   'ce0e02fffbaac6bd2264c91388034b28509e02f8',
-                   '267626f41f27ed5650af961b449b8a96baf053242a1b235c51591ec8beae7e9c',
-                   'cf563fb7d043f6a94ccf7c3fbe7568ec76997a07')
+                   '5e7fc1372a0bdc231da0461c2c97b93cb79f750a',
+                   '81906e9734665cf43516002a6939718a93a3b831fba355cf49518c9edc3cf49b',
+                   '8f1350c6521552c2c664b774acf69be82273d69b')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           def show(k):
               return subprocess.check_output(['/usr/bin/systemctl','show','xuanjun-uk-openclaw.service','--property='+k,'--value'],universal_newlines=True).strip()
