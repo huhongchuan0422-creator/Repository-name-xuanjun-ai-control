@@ -136,6 +136,31 @@ def audit():
             except (ValueError, UnicodeError, TypeError):
                 pass
         result['openclaw_auth_status'] = summary
+    if os.path.isfile(cli) and os.path.isfile(node_dir + '/node'):
+        # Discover supported commands from bounded help output, not guessed resume APIs.
+        # Output only fixed option presence; never session content or raw CLI output.
+        capabilities = {}
+        for command in ('agent', 'agents', 'sessions', 'gateway'):
+            try:
+                p = subprocess.run(['/usr/sbin/runuser', '-u', 'xuanjun_dev', '--',
+                                    cli, command, '--help'], env=env,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   timeout=20, check=False)
+                if len(p.stdout) > 262144:
+                    capabilities[command] = {'state': 'HOLD_OVERSIZE_HELP'}
+                    continue
+                help_text = p.stdout.decode('utf-8', 'replace')
+                options = ('--session-id', '--agent', '--message', '--local',
+                           '--json', '--timeout', '--deliver', '--thinking')
+                capabilities[command] = {
+                    'exit_code': p.returncode,
+                    'supported_options': [o for o in options if o in help_text],
+                    'documented_resume_word': 'resume' in help_text.lower(),
+                    'documented_stop_word': 'stop' in help_text.lower(),
+                    'raw_output_emitted': False, 'inference_requested': False}
+            except (OSError, subprocess.TimeoutExpired):
+                capabilities[command] = {'state': 'HOLD_HELP_UNAVAILABLE'}
+        result['native_command_capabilities'] = capabilities
     print(json.dumps(result, sort_keys=True))
 
 
