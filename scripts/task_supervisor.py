@@ -86,6 +86,7 @@ class Supervisor(object):
           receiver_accepted TEXT NOT NULL,
           old_fence_invalidated TEXT NOT NULL,
           recovery_level INTEGER NOT NULL DEFAULT 0,
+          recovery_generation INTEGER NOT NULL DEFAULT 0,
           created_at REAL NOT NULL,
           updated_at REAL NOT NULL
         );
@@ -132,7 +133,7 @@ class Supervisor(object):
         return self.db
 
     def register(self, value, now=None):
-        required = {'task_id', 'parent_task_id', 'stage', 'writer_scope', 'owner', 'entry',
+        required = {'task_id', 'parent_task_id', 'stage', 'owner', 'entry',
                     'checkpoint_sha256', 'spec_sha256', 'next_action',
                     'dependencies', 'completion_conditions',
                     'progress_deadline', 'receipt_deadline',
@@ -143,7 +144,7 @@ class Supervisor(object):
         now = self.clock() if now is None else now
         if not finite(now):
             raise ValueError('FINITE_TIME_REQUIRED')
-        for name in ('task_id', 'parent_task_id', 'stage', 'writer_scope',
+        for name in ('task_id', 'parent_task_id', 'stage',
                      'owner', 'entry', 'next_action'):
             if not isinstance(value[name], str) or not value[name].strip():
                 raise ValueError('NONEMPTY_TASK_IDENTITY_REQUIRED')
@@ -160,7 +161,9 @@ class Supervisor(object):
         if any(not finite(v) or v < now for v in deadlines):
             raise ValueError('FUTURE_DEADLINES_REQUIRED')
         args = (value['task_id'], value['parent_task_id'], value['stage'],
-                value['writer_scope'], 'READY', value['owner'], value['entry'],
+                '%s:%s:%s' % (value['parent_task_id'], value['task_id'],
+                                value['stage']), 'READY',
+                value['owner'], value['entry'],
                 UNKNOWN, UNKNOWN, UNKNOWN, value['checkpoint_sha256'],
                 value['spec_sha256'], UNKNOWN, None, None,
                 value['next_action'], canonical(value['dependencies']),
@@ -169,7 +172,7 @@ class Supervisor(object):
                 value['progress_deadline'], value['receipt_deadline'],
                 value['started_deadline'], value['terminal_deadline'],
                 value['handoff_deadline'], UNKNOWN, UNKNOWN, UNKNOWN,
-                UNKNOWN, 0, now, now)
+                UNKNOWN, 0, 0, now, now)
         with self.db:
             self.db.execute('''INSERT INTO tasks(
               task_id,parent_task_id,stage,writer_scope,state,owner,entry,
@@ -180,8 +183,8 @@ class Supervisor(object):
               receipt_deadline,started_deadline,terminal_deadline,
               handoff_deadline,writer_stopped,effects_reconciled,
               receiver_accepted,old_fence_invalidated,recovery_level,
-              created_at,updated_at)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+              recovery_generation,created_at,updated_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                             args)
 
     def _task(self, task_id):
@@ -266,6 +269,10 @@ class Supervisor(object):
         payload = {} if payload is None else payload
         if not isinstance(payload, dict):
             raise ValueError('EVENT_PAYLOAD_REQUIRED')
+        if (len(event_id) > 200 or not isinstance(evidence_ref, str)
+                or len(evidence_ref) > 1024
+                or len(canonical(payload).encode('utf-8')) > 65536):
+            raise ValueError('BOUNDED_EVENT_REQUIRED')
         with self.db:
             task = self._task(task_id)
             if task['attempt_id'] != attempt_id:
@@ -306,8 +313,9 @@ class Supervisor(object):
                         or evidence_ref in ('', UNKNOWN)):
                     raise ValueError('REAL_PROGRESS_EVIDENCE_REQUIRED')
                 state = 'RUNNING'; progress = observed_at
-                self.db.execute('UPDATE tasks SET recovery_level=0 WHERE task_id=?',
-                                (task_id,))
+                self.db.execute('''UPDATE tasks SET recovery_level=0,
+                  recovery_generation=recovery_generation+1 WHERE task_id=?''',
+                  (task_id,))
                 next_deadline = payload.get('next_progress_deadline')
                 if next_deadline is not None:
                     if not finite(next_deadline) or next_deadline <= observed_at:
@@ -331,6 +339,10 @@ class Supervisor(object):
                          'lease_id': task['lease_id'], 'fence': task['fence'],
                          'epoch': task['epoch']}
                 if (state != 'HANDOFF_PENDING' or payload != exact
+                        or not isinstance(payload.get('new_owner'), str)
+                        or not payload['new_owner'].strip()
+                        or not isinstance(payload.get('new_entry'), str)
+                        or not payload['new_entry'].strip()
                         or evidence_kind != 'PHASE_EXECUTION'
                         or evidence_ref in ('', UNKNOWN)):
                     raise ValueError('EXACT_HANDOFF_PROOF_REQUIRED')
@@ -429,14 +441,16 @@ class Supervisor(object):
                 elif age >= 300 or overdue:
                     action = 'CHECK_RECEIPT_AND_PROGRESS'; level = 1
                 if action and level > task['recovery_level']:
-                    event_id = 'supervision-L%d-%s-%s' % (
-                        level, task['task_id'], task['attempt_id'])
+                    event_id = 'supervision-G%d-L%d-%s-%s' % (
+                        task['recovery_generation'], level,
+                        task['task_id'], task['attempt_id'])
                     payload = {
                         'state': 'HOLD' if level == 3 else task['state'],
                         'action': action, 'deadline_kind': deadline_name,
                         'deadline': task[deadline_name],
                         'last_real_progress_at': task['last_real_progress_at'],
                         'checkpoint_sha256': task['checkpoint_sha256'],
+                        'recovery_generation': task['recovery_generation'],
                         'takeover_allowed': False,
                         'requires_effect_reconciliation': True,
                     }
@@ -449,12 +463,16 @@ class Supervisor(object):
                                   event_id, payload, now)
                     if level == 3:
                         self.db.execute('''UPDATE tasks SET state='HOLD',
-                          next_action=?,recovery_level=? WHERE task_id=?''',
+                          next_action=?,recovery_level=? WHERE task_id=?
+                          AND state=? AND recovery_level<?''',
                           ('RECONCILE_BEFORE_CONTROLLED_REASSIGN', level,
-                           task['task_id']))
+                           task['task_id'], task['state'], level))
                     else:
                         self.db.execute('''UPDATE tasks SET recovery_level=?
-                          WHERE task_id=?''', (level, task['task_id']))
+                          WHERE task_id=? AND state=? AND recovery_level<?''',
+                          (level, task['task_id'], task['state'], level))
+                    if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                        continue
                     actions.append({'task_id': task['task_id'],
                         'attempt_id': task['attempt_id'], 'action': action,
                         'takeover_allowed': False,
