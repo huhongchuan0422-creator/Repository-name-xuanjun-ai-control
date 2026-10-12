@@ -1,0 +1,107 @@
+name: P2 frozen candidate mechanical QA Security
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/p2-frozen-candidate-gates.yml
+permissions:
+  contents: read
+  actions: read
+env:
+  P2_ARTIFACT_ID: '11762653472'
+  P2_TAR_SHA256: '6a1b52b248f80c532644e48d18be94e616536d01048bfc2fb271f96e05ce6b80'
+  P2_SOURCE_COMMIT: '531f87ef8bcfb5453e43288f9eae1c64dd1d57ee'
+jobs:
+  qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Download exact frozen artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
+          mkdir /tmp/artifact
+          cd /tmp/artifact
+          unzip -q /tmp/p2.zip
+          test -f p2-candidate.tar.gz
+          printf '%s  %s\n' "$P2_TAR_SHA256" p2-candidate.tar.gz | sha256sum -c -
+          mkdir /tmp/pkg
+          tar -xzf p2-candidate.tar.gz -C /tmp/pkg
+      - name: Verify provenance and all packaged file hashes
+        run: |
+          set -euo pipefail
+          cd /tmp/pkg/xuanjun-p2-package
+          sha256sum -c SHA256SUMS
+          python3 -I -B - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('/tmp/pkg/xuanjun-p2-package')
+          p=json.loads((root/'P2_CANDIDATE_PROVENANCE.json').read_text())
+          assert p['state']=='FROZEN_CANDIDATE_NOT_RELEASED'
+          assert p['source_commit']=='531f87ef8bcfb5453e43288f9eae1c64dd1d57ee'
+          assert p['old_frozen_archive_sha256']=='456ae23aa52e300021c9fb889df84d8eba34965769ce868e5ee6e43c29911a13'
+          assert p['model_calls']==0 and p['release_gate']=='NOT_GRANTED'
+          print('P2_FROZEN_PROVENANCE=PASS')
+          PY
+      - name: Syntax and package shape
+        run: |
+          set -euo pipefail
+          ROOT=/tmp/pkg/xuanjun-p2-package
+          test ! -L "$ROOT"
+          test -d "$ROOT/plugins/p2-native-controller"
+          find "$ROOT" -type l -print -quit | grep -q . && exit 41 || true
+          python3 -I -B - <<'PY'
+          import ast, pathlib
+          root=pathlib.Path('/tmp/pkg/xuanjun-p2-package')
+          for path in root.rglob('*.py'):
+              raw=path.read_text(encoding='utf-8')
+              try:
+                  ast.parse(raw, filename=str(path), feature_version=(3,6))
+              except TypeError:
+                  ast.parse(raw, filename=str(path))
+          print('PYTHON_3_6_GRAMMAR=PASS')
+          PY
+          for f in "$ROOT"/plugins/p2-native-controller/*.mjs; do node --check "$f"; done
+          echo P2_FROZEN_QA_MECHANICAL=PASS
+          echo UK_RUNTIME=NOT_RUN
+          echo RELEASE_GATE=NOT_GRANTED
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Download exact frozen artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
+          mkdir /tmp/artifact
+          cd /tmp/artifact
+          unzip -q /tmp/p2.zip
+          printf '%s  %s\n' "$P2_TAR_SHA256" p2-candidate.tar.gz | sha256sum -c -
+          mkdir /tmp/pkg
+          tar -xzf p2-candidate.tar.gz -C /tmp/pkg
+      - name: Fail closed on unsafe packaged bytes
+        run: |
+          set -euo pipefail
+          ROOT=/tmp/pkg/xuanjun-p2-package
+          cd "$ROOT"
+          sha256sum -c SHA256SUMS
+          test "$(find . -type l | wc -l)" -eq 0
+          test "$(find . -type f -perm -0002 | wc -l)" -eq 0
+          test "$(find . -type d -perm -0002 | wc -l)" -eq 0
+          ! grep -RInE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api[_-]?secret[[:space:]]*[:=][[:space:]]*[^<])' . --exclude=SHA256SUMS
+          python3 -I -B - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('/tmp/pkg/xuanjun-p2-package')
+          cfg=json.loads((root/'plugins/p2-native-controller/openclaw.plugin.json').read_text())
+          assert cfg.get('id')=='xuanjun-p2-native-controller'
+          assert (root/'stage1/native_peer_identity.py').is_file()
+          assert (root/'stage1/native_ledger_bridge.py').is_file()
+          assert (root/'stage1/native_ledger_operations.py').is_file()
+          print('P2_FROZEN_SECURITY_SHAPE=PASS')
+          PY
+          echo P2_FROZEN_SECURITY_MECHANICAL=PASS
+          echo MODEL_CALLS=0
+          echo RELEASE_GATE=NOT_GRANTED
