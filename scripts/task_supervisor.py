@@ -34,6 +34,16 @@ TASK_COLUMNS = (
     'old_fence_invalidated', 'recovery_level', 'recovery_generation',
     'created_at', 'updated_at',
 )
+PERSISTENT_COLUMNS = {
+    'events': ('task_id', 'attempt_id', 'event_id', 'kind',
+               'observed_at', 'evidence_kind', 'evidence_ref',
+               'payload_json'),
+    'outbox': ('outbox_id', 'task_id', 'attempt_id', 'event_id',
+               'payload_json', 'attempts', 'next_attempt_at',
+               'delivered_at', 'dead_lettered_at', 'last_error'),
+    'supervisor_heartbeats': ('instance_id', 'observed_at', 'process_ref',
+                              'evidence_ref', 'updated_at'),
+}
 
 
 def canonical(value):
@@ -56,11 +66,81 @@ class Supervisor(object):
         self.db = sqlite3.connect(path, timeout=10, isolation_level='IMMEDIATE')
         self.db.row_factory = sqlite3.Row
         self.db.execute('PRAGMA foreign_keys=ON')
-        self.db.execute('PRAGMA journal_mode=WAL')
+        # Identity and complete schema are validated before any persistent
+        # journal-mode mutation of an existing file.
         self._schema()
+        self.db.execute('PRAGMA journal_mode=WAL')
 
     def close(self):
         self.db.close()
+
+    def _migration_failpoint(self, name):
+        """No-op production hook overridden only by fault-injection tests."""
+        return None
+
+    def _index_columns(self, name):
+        return tuple(row['name'] for row in
+                     self.db.execute('PRAGMA index_info("%s")' %
+                                     name.replace('"', '""')))
+
+    def _validate_schema(self, allow_previous):
+        previous = tuple(name for name in TASK_COLUMNS
+                         if name != 'recovery_generation')
+        task_columns = tuple(row['name'] for row in
+                             self.db.execute('PRAGMA table_info(tasks)'))
+        current_ok = (len(task_columns) == len(TASK_COLUMNS)
+                      and set(task_columns) == set(TASK_COLUMNS))
+        previous_ok = (allow_previous and len(task_columns) == len(previous)
+                       and set(task_columns) == set(previous))
+        if not (current_ok or previous_ok):
+            raise ValueError('SUPERVISOR_TASK_SCHEMA_MISMATCH')
+        for table, expected in PERSISTENT_COLUMNS.items():
+            actual = tuple(row['name'] for row in self.db.execute(
+                'PRAGMA table_info("%s")' % table))
+            if actual != expected:
+                raise ValueError('SUPERVISOR_AUX_SCHEMA_MISMATCH')
+
+        def primary_key(table):
+            rows = self.db.execute(
+                'PRAGMA table_info("%s")' % table).fetchall()
+            return tuple(row['name'] for row in
+                         sorted((r for r in rows if r['pk']),
+                                key=lambda r: r['pk']))
+
+        if (primary_key('tasks') != ('task_id',)
+                or primary_key('events') !=
+                   ('task_id', 'attempt_id', 'event_id')
+                or primary_key('outbox') != ('outbox_id',)
+                or primary_key('supervisor_heartbeats') != ('instance_id',)):
+            raise ValueError('SUPERVISOR_PRIMARY_KEY_MISMATCH')
+
+        def unique_sets(table):
+            values = []
+            for row in self.db.execute('PRAGMA index_list("%s")' % table):
+                if row['unique']:
+                    values.append(self._index_columns(row['name']))
+            return values
+
+        if (('writer_scope',) not in unique_sets('tasks')
+                or ('task_id', 'attempt_id', 'event_id')
+                   not in unique_sets('outbox')):
+            raise ValueError('SUPERVISOR_UNIQUE_KEY_MISMATCH')
+        for table in ('events', 'outbox'):
+            foreign = [row for row in
+                       self.db.execute('PRAGMA foreign_key_list("%s")' %
+                                       table)]
+            if (len(foreign) != 1 or foreign[0]['table'] != 'tasks'
+                    or foreign[0]['from'] != 'task_id'
+                    or foreign[0]['to'] != 'task_id'):
+                raise ValueError('SUPERVISOR_FOREIGN_KEY_MISMATCH')
+        required_indexes = {
+            'task_ready_idx': ('state', 'updated_at', 'task_id'),
+            'outbox_due_idx': ('delivered_at', 'next_attempt_at', 'outbox_id'),
+        }
+        for name, expected in required_indexes.items():
+            if self._index_columns(name) != expected:
+                raise ValueError('SUPERVISOR_INDEX_MISMATCH')
+        return previous_ok
 
     def _schema(self):
         application_id = self.db.execute(
@@ -73,19 +153,16 @@ class Supervisor(object):
         existing = self.db.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'"
         ).fetchone()
+        previous_ok = False
         if existing is not None:
-            columns = tuple(row['name'] for row in
-                            self.db.execute('PRAGMA table_info(tasks)'))
-            previous = tuple(name for name in TASK_COLUMNS
-                             if name != 'recovery_generation')
-            current_ok = (len(columns) == len(TASK_COLUMNS)
-                          and set(columns) == set(TASK_COLUMNS))
-            previous_ok = (len(columns) == len(previous)
-                           and set(columns) == set(previous))
-            if not (current_ok or previous_ok):
-                raise ValueError('SUPERVISOR_TASK_SCHEMA_MISMATCH')
+            previous_ok = self._validate_schema(allow_previous=True)
             if previous_ok and user_version not in (0, 1):
                 raise ValueError('SUPERVISOR_MIGRATION_VERSION_MISMATCH')
+        else:
+            unexpected = self.db.execute("""SELECT name FROM sqlite_master
+              WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1""").fetchone()
+            if unexpected is not None:
+                raise ValueError('SUPERVISOR_DATABASE_ID_MISMATCH')
         self.db.executescript('''
         CREATE TABLE IF NOT EXISTS tasks(
           task_id TEXT PRIMARY KEY,
@@ -165,25 +242,23 @@ class Supervisor(object):
         CREATE INDEX IF NOT EXISTS outbox_due_idx
           ON outbox(delivered_at, next_attempt_at, outbox_id);
         ''')
-        with self.db:
-            columns = tuple(row['name'] for row in
-                            self.db.execute('PRAGMA table_info(tasks)'))
-            previous = tuple(name for name in TASK_COLUMNS
-                             if name != 'recovery_generation')
-            previous_ok = (len(columns) == len(previous)
-                           and set(columns) == set(previous))
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
             if previous_ok:
                 self.db.execute('''ALTER TABLE tasks ADD COLUMN
                   recovery_generation INTEGER NOT NULL DEFAULT 0''')
-                columns = tuple(row['name'] for row in
-                                self.db.execute('PRAGMA table_info(tasks)'))
-            if (len(columns) != len(TASK_COLUMNS)
-                    or set(columns) != set(TASK_COLUMNS)):
-                raise ValueError('SUPERVISOR_TASK_SCHEMA_MISMATCH')
+                self._migration_failpoint('after_alter')
+            self._validate_schema(allow_previous=False)
             self.db.execute('PRAGMA application_id=%d' %
                             SUPERVISOR_APPLICATION_ID)
+            self._migration_failpoint('after_application_id')
             self.db.execute('PRAGMA user_version=%d' %
                             SUPERVISOR_SCHEMA_VERSION)
+            self._migration_failpoint('after_user_version')
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
 
     def _tx(self):
         return self.db
