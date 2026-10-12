@@ -376,6 +376,30 @@ def audit():
             row['status_entries'] = status.count(b'\\x00')
             row['diff_preserved_in_place'] = True
             row['authors_are_execution_identity'] = False
+            _, history = git_read(['log', '--max-count=8', '--format=%H %T %P', row['target_commit'] + '..HEAD'])
+            row['subsequent_commit_graph'] = history.decode('ascii', 'replace').splitlines()
+            _, names = git_read(['diff', '--name-status', '--no-renames', row['target_commit'] + '^', 'HEAD', '--'])
+            row['changed_paths'] = [line for line in names.decode('utf-8', 'replace').splitlines()[:100] if not any(ord(x) < 32 and x != '\\t' for x in line)]
+            row['matching_processes'] = []
+            for proc_id in os.listdir('/proc'):
+                if not proc_id.isdigit():
+                    continue
+                try:
+                    proc_path = '/proc/' + proc_id
+                    cwd = os.readlink(proc_path + '/cwd')
+                    if not (cwd == directory or cwd.startswith(directory + '/')):
+                        continue
+                    with open(proc_path + '/comm') as stream:
+                        name = stream.read(80).strip()
+                    with open(proc_path + '/stat') as stream:
+                        fields = stream.read(4096).rsplit(')', 1)[1].split()
+                    row['matching_processes'].append({'pid': int(proc_id), 'uid': os.stat(proc_path).st_uid,
+                        'cwd': cwd, 'comm': name, 'ppid': int(fields[1]), 'start_ticks': fields[19]})
+                except (OSError, ValueError, IndexError):
+                    continue
+            row['cwd_scan_proves_no_writer'] = False
+            row['lease_fence_evidence'] = 'CANONICAL_RECORD_NOT_BOUND'
+
         reconciliation['repositories'].append(row)
     result['p2_unfrozen_code_reconciliation'] = reconciliation
 
