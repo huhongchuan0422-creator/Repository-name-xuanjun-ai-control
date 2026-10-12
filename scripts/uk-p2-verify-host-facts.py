@@ -86,30 +86,6 @@ def main():
              'cgroup':cgroup_lines,
              'cmdline_sha256':hashlib.sha256(raw).hexdigest()}
 
-    sources=[]
-    for path in [
-        NODE,
-        OPENCLAW_ROOT+'/bin/openclaw',
-        OPENCLAW_ROOT+'/tools/node-v24.21.0/lib/node_modules/openclaw/package.json',
-        DIST+'/context-DyPstb2Q.mjs',
-        DIST+'/loader-runtime-load-DpgEqnzx.mjs',
-        DIST+'/store-BVWJOVBa.mjs',
-        '/usr/bin/python3',
-        '/usr/bin/docker',
-    ]:
-        sources.append(digest(path))
-
-    plugin_runtime=[]
-    for name in sorted(os.listdir(DIST)):
-        if ('plugin' in name.lower() or 'sandbox' in name.lower()) and name.endswith('.mjs'):
-            path=os.path.join(DIST,name)
-            try:
-                item=digest(path)
-            except (IOError,OSError,ValueError):
-                continue
-            plugin_runtime.append(item)
-            if len(plugin_runtime)>=64:break
-
     docker=subprocess.check_output(
         ['/usr/bin/docker','--host=unix:///var/run/docker.sock','version','--format','{{.Server.Version}}'],
         env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},
@@ -118,12 +94,10 @@ def main():
         raise SystemExit('HOLD_DOCKER_VERSION')
 
     print(json.dumps({
-        'state':'P2_UK_VERIFY_ONLY_HOST_FACTS',
+        'state':'P2_UK_GATEWAY_DOCKER_VERIFY_ONLY',
         'model_calls':0,'authority_mutation':'NONE','container_mutation':'NONE',
         'python_version':list(sys.version_info[:3]),
         'gateway':gateway,
-        'sources':sources,
-        'plugin_runtime_files':plugin_runtime,
         'docker_server_version':docker,
     },sort_keys=True))
 
