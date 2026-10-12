@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import os
+import shutil
 import sqlite3
 import tempfile
 import unittest
@@ -159,6 +160,109 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual([row['task_id'] for row in self.s.ready()],['t1'])
         self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
         self.assertEqual(self.s._task('t1')['state'],'READY')
+
+    def test_migration_interruptions_roll_back_all_schema_and_headers(self):
+        self.registration()
+        self.s.close()
+        db=sqlite3.connect(self.path)
+        try:
+            db.execute('PRAGMA journal_mode=DELETE')
+            db.execute('ALTER TABLE tasks DROP COLUMN recovery_generation')
+            db.execute('PRAGMA application_id=0')
+            db.execute('PRAGMA user_version=1')
+            db.commit()
+        finally:
+            db.close()
+
+        class FailingSupervisor(Supervisor):
+            fail_at = None
+            def _migration_failpoint(self, name):
+                if name == self.fail_at:
+                    raise RuntimeError('injected migration interruption')
+
+        for point in ('after_alter','after_application_id',
+                      'after_user_version'):
+            handle,path=tempfile.mkstemp(); os.close(handle)
+            try:
+                shutil.copyfile(self.path,path)
+                FailingSupervisor.fail_at=point
+                with self.assertRaises(RuntimeError):
+                    FailingSupervisor(path,lambda:self.now)
+                check=sqlite3.connect(path)
+                try:
+                    columns=[row[1] for row in
+                             check.execute('PRAGMA table_info(tasks)')]
+                    self.assertNotIn('recovery_generation',columns)
+                    self.assertEqual(check.execute(
+                        'PRAGMA application_id').fetchone()[0],0)
+                    self.assertEqual(check.execute(
+                        'PRAGMA user_version').fetchone()[0],1)
+                    self.assertEqual(check.execute(
+                        'SELECT task_id FROM tasks').fetchone()[0],'t1')
+                finally:
+                    check.close()
+            finally:
+                os.unlink(path)
+        self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s._task('t1')['recovery_generation'],0)
+
+    def test_unknown_database_rejected_without_journal_mutation(self):
+        handle,path=tempfile.mkstemp(); os.close(handle)
+        try:
+            db=sqlite3.connect(path)
+            db.execute('CREATE TABLE foreign_data(value TEXT)')
+            db.execute('PRAGMA application_id=1234')
+            db.execute('PRAGMA journal_mode=DELETE')
+            db.commit(); db.close()
+            with self.assertRaises(ValueError):
+                Supervisor(path,lambda:self.now)
+            check=sqlite3.connect(path)
+            try:
+                self.assertEqual(check.execute(
+                    'PRAGMA journal_mode').fetchone()[0].lower(),'delete')
+                self.assertIsNone(check.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='tasks'"
+                ).fetchone())
+            finally:
+                check.close()
+        finally:
+            os.unlink(path)
+
+    def test_malformed_auxiliary_schema_fails_at_initialization(self):
+        handle,path=tempfile.mkstemp(); os.close(handle)
+        try:
+            good=Supervisor(path,lambda:self.now); good.close()
+            db=sqlite3.connect(path)
+            db.execute('PRAGMA foreign_keys=OFF')
+            db.execute('DROP TABLE events')
+            db.execute('CREATE TABLE events(x TEXT)')
+            db.execute('PRAGMA journal_mode=DELETE')
+            db.commit(); db.close()
+            with self.assertRaises(ValueError):
+                Supervisor(path,lambda:self.now)
+        finally:
+            os.unlink(path)
+
+    def test_future_schema_version_fails_closed(self):
+        handle,path=tempfile.mkstemp(); os.close(handle)
+        try:
+            good=Supervisor(path,lambda:self.now); good.close()
+            db=sqlite3.connect(path)
+            db.execute('PRAGMA journal_mode=DELETE')
+            db.execute('PRAGMA user_version=999')
+            db.commit(); db.close()
+            with self.assertRaises(ValueError):
+                Supervisor(path,lambda:self.now)
+            check=sqlite3.connect(path)
+            try:
+                self.assertEqual(check.execute(
+                    'PRAGMA user_version').fetchone()[0],999)
+                self.assertEqual(check.execute(
+                    'PRAGMA journal_mode').fetchone()[0].lower(),'delete')
+            finally:
+                check.close()
+        finally:
+            os.unlink(path)
 
     def test_unknown_side_effects_preserved_in_visible_hold(self):
         self.registration(); self.claim()
