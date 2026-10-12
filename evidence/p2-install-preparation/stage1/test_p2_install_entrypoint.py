@@ -71,7 +71,7 @@ class P2InstallEntrypointTests(unittest.TestCase):
             'ledger_socket':'/run/xuanjun-development/ledger.sock',
             'expected_epoch':0},
           'runtime':{'release_directory':'integration-'+'1'*16,
-            'provisioning':[{'binding':'opaque'}],
+            'provisioning':[{'binding':'opaque'}], 'prerequisites':{},
             'services':['xuanjun-ledger.socket']},
           'auth':{'mode':'EXISTING_OAUTH_REFERENCE','references':[
             {'path':'/var/lib/xuanjun-development/codex-home/auth.json',
