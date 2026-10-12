@@ -39,3 +39,42 @@ They cover stale run/fence/epoch/checkpoint, all nine entry pairs, stopped reade
 terminal without next-action evidence, duplicate/restart/dead-letter retention,
 unsupervised-task inclusion and zero dispatch. They do not substitute for the UK
 3.6.8 runtime, real receipt delivery/ACK, 5/10/15 faults or independent review.
+
+## Version-bound UK mechanical acceptance input contract (not dispatched)
+
+P2 shared owner supplies integrated commit/tree, frozen archive and manifest
+SHA256, included adapter/shared-source hashes, approved activation binding and
+existing ledger device/inode, review receipt, and its existing Runner job path.
+Missing any prerequisite is BLOCKED_INPUT, not a Runner failure. Do not open a
+new DB, change lease/fence, install, enable timers or call models from this fixture
+suite. Host activation/mutation needs the existing separately admitted mechanism.
+
+After that admission, the existing mechanical executor must report each case
+separately with exact artifact, task/attempt/run/session, lease/fence/epoch,
+generation/instance/checkpoint and event/delivery identities:
+
+1. Complete inventory includes canonical tasks with no supervised run; bad bounded
+   metadata in one task does not omit later tasks. No registry/table replacement.
+2. Existing 5/10/15-minute start/progress/result cases use real elapsed canonical
+   deadlines. Heartbeat alone cannot count as progress or reset a due deadline.
+3. Stale run/fence/epoch/checkpoint/activation changes between observation and the
+   notice transaction fail before event/task mutation. UNKNOWN effects never replay.
+4. Restart/repeated scan retains one decision event and existing delivery attempt,
+   ACK and dead-letter state. Report delivered/failed/pending separately; queueing
+   a notice is not successful delivery or successor ACK.
+5. All nine WORK/CHATGPT/DOTS origin-successor pairs retain task identity and
+   checkpoint. Native model invocation is prohibited; unavailable transport is
+   CAPABILITY_UNAVAILABLE. Readable/stopped readers never establish a writable
+   active receiver. Actual native reception and ACK require real evidence.
+6. Terminal-without-next-action remains visible. Verify exact next responsibility
+   and receipted continuation or an explicit capability/human gate; no synthetic
+   PASS, model fallback or new queue. Mechanical-only continuation is distinct
+   from native coding and must not impersonate it.
+
+Receipt fields: integrated_commit, tree, artifact_id, archive_sha256,
+manifest_sha256, python_version, sqlite_version, runner_job, case_id,
+observed_lineage, pre/post canonical hashes, event/delivery ids, actual result,
+model_dispatch_count, mutation_scope, next_owner and receiver_ack. Keep secret
+values/raw checkpoints out of GitHub. NOT_RUN, BLOCKED_INPUT and
+CAPABILITY_UNAVAILABLE are valid non-PASS outcomes. Local/hosted fixtures cannot
+populate UK acceptance fields.

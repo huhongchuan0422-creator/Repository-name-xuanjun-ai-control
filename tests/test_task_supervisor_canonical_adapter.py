@@ -174,6 +174,24 @@ class InventoryTests(unittest.TestCase):
         text = '[{' * 100 + '\\"' + '}]' * 100
         self.assertEqual(_bounded_inventory_json(json.dumps({'text': text})), {'text': text})
 
+    def test_stale_run_fence_is_visible_and_part_of_decision_identity(self):
+        self.task('a', 'RUNNING')
+        values = dict.fromkeys(RUN_COLUMNS)
+        values.update(task_id='a', executor='DOTS', run_id='old', writer_fence=3,
+                      writer_epoch=2, effects='NONE', status='STARTED')
+        self.db.execute('INSERT INTO supervised_runs VALUES(' + ','.join('?' for x in RUN_COLUMNS) + ')',
+                        [values[x] for x in RUN_COLUMNS])
+        self.begin()
+        stale = inventory_page(self.db,100)['tasks'][0]
+        self.assertIn('RUN_FENCE_MISMATCH', stale['attention'])
+        self.assertEqual(stale['binding']['writer_fence'], 3)
+        self.db.rollback()
+        self.db.execute('UPDATE supervised_runs SET writer_fence=4')
+        self.begin()
+        current = inventory_page(self.db,100)['tasks'][0]
+        self.assertNotIn('RUN_FENCE_MISMATCH', current['attention'])
+        self.assertNotEqual(stale['decision_key'], current['decision_key'])
+
     def test_invalid_limits_and_clock(self):
         self.begin()
         for clock,limit in ((float('nan'),1),(100,True),(100,0),(100,101)):

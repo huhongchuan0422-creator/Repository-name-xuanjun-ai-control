@@ -341,6 +341,8 @@ def canonical_inventory_page(db, now, after_id=None, limit=100,
         if run is None:
             flags.append('SUPERVISION_RECORD_MISSING')
         else:
+            if run['writer_fence'] != task['fence']:
+                flags.append('RUN_FENCE_MISMATCH')
             if run['effects'] == 'UNKNOWN':
                 flags.append('UNKNOWN_EFFECT_NO_REPLAY')
             if (run['native_state'] in ('EXITED', 'FAILED', 'CANCELLED', 'NOT_FOUND')
@@ -419,6 +421,7 @@ def canonical_inventory_page(db, now, after_id=None, limit=100,
                    'epoch': run['writer_epoch'] if run and run['writer_epoch'] is not None else 'UNKNOWN',
                    'entry': (run['executor'] or 'UNKNOWN') if run else 'UNKNOWN',
                    'entry_authenticated': False,
+                   'writer_fence': run['writer_fence'] if run else 'UNKNOWN',
                    'attempt_id': attempt,
                    'lease_id': lease_id, 'task_state': task['state'],
                    'supervision_status': run['status'] if run else 'UNKNOWN',
