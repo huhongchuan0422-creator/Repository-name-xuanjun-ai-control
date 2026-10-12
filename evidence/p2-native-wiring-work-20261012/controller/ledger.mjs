@@ -5,12 +5,12 @@ import path from 'node:path';
 import {canonical} from './canonical.mjs';
 import {strictJson} from './strict-json.mjs';
 
-export function protectedFile(file,sha256,executable=false) {
+export function protectedFile(file,sha256,executable=false,expectedUid=0) {
   if(!path.isAbsolute(file)||realpathSync(file)!==file)throw new Error('HOLD_HOST_PATH');
   let parent=path.dirname(file);
   for(;;){const info=lstatSync(parent);if(!info.isDirectory()||info.uid!==0||(info.mode&0o022))throw new Error('HOLD_HOST_PARENT');if(parent==='/')break;parent=path.dirname(parent);}
   const info=lstatSync(file);
-  if(!info.isFile()||info.uid!==0||(info.mode&0o022)||(executable&&!(info.mode&0o111)))throw new Error('HOLD_HOST_FILE');
+  if(!Number.isSafeInteger(expectedUid)||expectedUid<0||!info.isFile()||info.uid!==expectedUid||(info.mode&0o022)||(executable&&!(info.mode&0o111)))throw new Error('HOLD_HOST_FILE');
   const raw=readFileSync(file);
   if(!/^[0-9a-f]{64}$/.test(sha256??'')||createHash('sha256').update(raw).digest('hex')!==sha256)throw new Error('HOLD_HOST_HASH');
 }
