@@ -23,7 +23,7 @@ class ReviewTests(unittest.TestCase):
             developer={'issuer':'native','subject':'developer'},allowed_files=['src/f.py','src/data.json'],
             trusted_reviewers=[{'issuer':'native','subject':'qa','key_id':'qa-key','role':'QA'},
                                {'issuer':'native','subject':'security','key_id':'security-key','role':'SECURITY'}])
-        self.files={'src/f.py':b'answer=42\n'}
+        self.files={'src/f.py':b'answer=42\n','src/data.json':b'{}\n'}
         self.binding=dict(task_id='same',attempt_id='attempt-1',run_id='run-1',session_id='session-1',fence=1,
                           checkpoint_sha256='a'*64,ledger_revision=2,receipt_sha256='b'*64,authority_key_id='ledger-key')
 
@@ -109,6 +109,13 @@ class ReviewTests(unittest.TestCase):
         for now in (-1,float('nan'),float('inf')):
             with self.assertRaises(ValueError):gate.continuation_due(self.binding,0,now)
 
+    def test_exact_authorized_file_set_required(self):
+        del self.files['src/data.json']
+        with self.assertRaises(ValueError):
+            gate.review_bundle(self.contract,self.files,[])
+        self.files['src/data.json']=b'{}\n'
+        self.assertEqual(gate.review_bundle(self.contract,self.files,[])['state'],'HOLD_INDEPENDENT_REVIEW_REQUIRED')
+
     def test_invalid_task_repository_and_policy_paths(self):
         for field,value in [('task_id',{}),('target_repository','owner/repo/../other'),('allowed_files',['../bad.py','src/f.py'])]:
             changed=dict(self.contract);changed[field]=value
@@ -122,3 +129,4 @@ class ReviewTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+

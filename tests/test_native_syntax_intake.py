@@ -42,15 +42,24 @@ class IntakeTests(unittest.TestCase):
         self.raw=b'x=2\n'
         self.assertNotEqual(first,syntax_receipt(self.value,'owner/control','token',self.read)['receipt_sha256'])
 
-    def test_wrong_head_and_protected_rename(self):
-        for mode in ('head','rename'):
+    def test_wrong_head_and_protected_or_missing_rename(self):
+        for mode in ('head','rename','missing-rename'):
             def read(url,token):
                 value=self.read(url,token)
                 if '/compare/' in url:
                     if mode=='head':value['commits'][-1]['sha']='f'*40
-                    else:value['files'][0].update(status='renamed',previous_filename='secrets.json')
+                    elif mode=='rename':value['files'][0].update(status='renamed',previous_filename='secrets.json')
+                    else:value['files'][0].update(status='renamed')
                 return value
             with self.assertRaises(ValueError):syntax_receipt(self.value,'owner/control','token',read)
 
+    def test_receipt_binds_actual_runtime_provenance(self):
+        checker=self.receipt()['binding']['checker'] if hasattr(self,'receipt') else syntax_receipt(self.value,'owner/control','token',self.read)['binding']['checker']
+        for name in ('python','bash','node'):
+            self.assertEqual(set(checker[name]),{'path','version','sha256'})
+            self.assertTrue(checker[name]['path'].startswith('/'))
+            self.assertEqual(len(checker[name]['sha256']),64)
+
 
 if __name__=='__main__':unittest.main()
+

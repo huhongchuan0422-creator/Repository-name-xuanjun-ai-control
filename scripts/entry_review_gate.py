@@ -84,6 +84,8 @@ def review_bundle(contract,files,reviews,review_keys=None):
             raise ValueError('HASH_BINDING_REQUIRED')
     if not isinstance(files,dict) or not files or len(files)>32:
         raise ValueError('BOUNDED_FILES_REQUIRED')
+    if set(files)!=set(contract['allowed_files']):
+        raise ValueError('EXACT_AUTHORIZED_FILE_SET_REQUIRED')
     manifest={};total=0
     for path,raw in files.items():
         if (not isinstance(path,str) or not re.fullmatch(r'[A-Za-z0-9_./-]+',path)
@@ -152,3 +154,4 @@ def continuation_due(binding,receipt_read_at,now,evidence=None,ledger_keys=None)
     age=now-receipt_read_at
     action='HOLD_CONTINUATION_MISSING' if age>=900 else 'INSPECT_AND_RESUME_SAME_ATTEMPT' if age>=600 else 'RECOVER_INTAKE' if age>=300 else 'AWAIT_EXECUTION_EVIDENCE'
     return {'state':action,'authority_effect':'NONE','takeover_allowed':False,'read_or_heartbeat_is_progress':False}
+
