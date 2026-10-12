@@ -84,6 +84,8 @@ def review_bundle(contract,files,reviews,review_keys=None):
             raise ValueError('HASH_BINDING_REQUIRED')
     if not isinstance(files,dict) or not files or len(files)>32:
         raise ValueError('BOUNDED_FILES_REQUIRED')
+    if set(files)!=set(contract['allowed_files']):
+        raise ValueError('EXACT_REVIEWED_FILE_SET_REQUIRED')
     manifest={};total=0
     for path,raw in files.items():
         if (not isinstance(path,str) or not re.fullmatch(r'[A-Za-z0-9_./-]+',path)

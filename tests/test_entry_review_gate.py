@@ -20,7 +20,7 @@ class ReviewTests(unittest.TestCase):
     def setUp(self):
         self.contract=dict(task_id='original',spec_sha256='a'*64,checkpoint_sha256='b'*64,
             target_repository='owner/repo',target_base_sha='c'*40,code_commit='d'*40,entry='CHATGPT',
-            developer={'issuer':'native','subject':'developer'},allowed_files=['src/f.py','src/data.json'],
+            developer={'issuer':'native','subject':'developer'},allowed_files=['src/f.py'],
             trusted_reviewers=[{'issuer':'native','subject':'qa','key_id':'qa-key','role':'QA'},
                                {'issuer':'native','subject':'security','key_id':'security-key','role':'SECURITY'}])
         self.files={'src/f.py':b'answer=42\n'}
@@ -44,7 +44,7 @@ class ReviewTests(unittest.TestCase):
 
     def test_all_policy_fields_bound_to_digest(self):
         reviews=self.reviews()
-        for field,value in [('developer',{'issuer':'native','subject':'other'}),('allowed_files',['src/f.py']),('trusted_reviewers',[dict(p,subject=p['subject']+'2') for p in self.contract['trusted_reviewers']])]:
+        for field,value in [('developer',{'issuer':'native','subject':'other'}),('allowed_files',['src/f.py','src/new.py']),('trusted_reviewers',[dict(p,subject=p['subject']+'2') for p in self.contract['trusted_reviewers']])]:
             changed=copy.deepcopy(self.contract);changed[field]=value
             with self.assertRaises(ValueError):gate.review_bundle(changed,self.files,reviews,KEYS)
 
@@ -119,6 +119,12 @@ class ReviewTests(unittest.TestCase):
         record=records[1]
         record['signature']=hmac.new(keys['security-key'],gate.canonical({k:v for k,v in record.items() if k!='signature'}),hashlib.sha256).hexdigest()
         with self.assertRaises(ValueError):gate.review_bundle(self.contract,self.files,records,keys)
+
+    def test_missing_or_extra_reviewed_file_is_rejected(self):
+        for files in ({},{'src/f.py':b'x=1','src/extra.py':b'x=2'}):
+            with self.assertRaises(ValueError):gate.review_bundle(self.contract,files,[])
+        changed=dict(self.contract,allowed_files=['src/f.py','src/missing.py'])
+        with self.assertRaises(ValueError):gate.review_bundle(changed,self.files,[])
 
 
 if __name__=='__main__':unittest.main()

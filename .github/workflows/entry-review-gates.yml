@@ -25,3 +25,31 @@ jobs:
           XJ_SYNTAX_ROOT: ${{ runner.temp }}/xj-syntax
           XJ_TYPESCRIPT_MODULE: ${{ runner.temp }}/xj-syntax/node_modules/typescript/lib/typescript.js
         run: python3 -B -m unittest discover -s tests -v
+  python36-gates:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.14.0'
+      - name: Fixed nonroot UK test boundary
+        run: |
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          test "$(id -u)" != 0
+          /usr/bin/python3 -c 'import sys; assert sys.version_info[:2] == (3,6)'
+      - name: Install integrity-bound compiler in private test directory
+        run: |
+          install -d -m 700 "$RUNNER_TEMP/xj-syntax"
+          cp .syntax/package.json .syntax/package-lock.json "$RUNNER_TEMP/xj-syntax/"
+          npm ci --prefix "$RUNNER_TEMP/xj-syntax" --ignore-scripts --no-audit --no-fund
+      - name: UK Python36 exact-source gates
+        env:
+          XJ_SYNTAX_ROOT: ${{ runner.temp }}/xj-syntax
+          XJ_TYPESCRIPT_MODULE: ${{ runner.temp }}/xj-syntax/node_modules/typescript/lib/typescript.js
+        run: /usr/bin/python3 -B -m unittest discover -s tests -v

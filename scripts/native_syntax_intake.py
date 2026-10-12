@@ -9,8 +9,71 @@ import json
 import os
 import re
 import urllib.request
+import shutil
+import subprocess
+import sys
+
+import native_syntax_gate
 
 from native_syntax_gate import check_bytes
+
+
+def _sha256_file(path):
+    value=hashlib.sha256()
+    with open(path,'rb') as stream:
+        while True:
+            chunk=stream.read(524288)
+            if not chunk:break
+            value.update(chunk)
+    return value.hexdigest()
+
+
+def _runtime(executable,args):
+    path=os.path.realpath(executable)
+    if not os.path.isabs(path) or not os.path.isfile(path):
+        raise ValueError('CHECKER_EXECUTABLE_REQUIRED')
+    proc=subprocess.run([path]+args,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+        env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},timeout=5,check=False)
+    lines=proc.stdout.decode('utf-8','replace').splitlines()
+    if proc.returncode or not lines or len(lines[0])>160:
+        raise ValueError('CHECKER_VERSION_REQUIRED')
+    return {'path':path,'version':lines[0],'sha256':_sha256_file(path)}
+
+
+def build_checker_identity():
+    workspace=os.environ.get('GITHUB_WORKSPACE')
+    module=os.environ.get('XJ_TYPESCRIPT_MODULE')
+    if not workspace or os.path.realpath(workspace)!=workspace or not native_syntax_gate.trusted_typescript(module):
+        raise ValueError('TRUSTED_CHECKER_CONTEXT_REQUIRED')
+    proc=subprocess.run(['/usr/bin/git','-C',workspace,'rev-parse','HEAD'],
+        stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=5,check=False)
+    commit=proc.stdout.decode('ascii','strict').strip()
+    if proc.returncode or not re.fullmatch('[0-9a-f]{40}',commit):
+        raise ValueError('EXACT_CHECKOUT_COMMIT_REQUIRED')
+    node=shutil.which('node')
+    if not node:raise ValueError('NODE_CHECKER_REQUIRED')
+    return {'gate_commit':commit,'python':_runtime(sys.executable,['--version']),
+        'bash':_runtime('/usr/bin/bash',['--version']),'node':_runtime(node,['--version']),
+        'intake_sha256':_sha256_file(__file__),'gate_sha256':_sha256_file(native_syntax_gate.__file__),
+        'typescript_version':'5.7.3','typescript_sha256':_sha256_file(module)}
+
+
+def validate_checker_identity(value):
+    fields={'gate_commit','python','bash','node','intake_sha256','gate_sha256','typescript_version','typescript_sha256'}
+    if (not isinstance(value,dict) or set(value)!=fields or value['typescript_version']!='5.7.3'
+            or not isinstance(value['gate_commit'],str) or not re.fullmatch('[0-9a-f]{40}',value['gate_commit'])):
+        raise ValueError('EXACT_CHECKER_IDENTITY_REQUIRED')
+    for field in ('intake_sha256','gate_sha256','typescript_sha256'):
+        if not isinstance(value[field],str) or not re.fullmatch('[0-9a-f]{64}',value[field]):
+            raise ValueError('EXACT_CHECKER_DIGEST_REQUIRED')
+    for field in ('python','bash','node'):
+        runtime=value[field]
+        if (not isinstance(runtime,dict) or set(runtime)!= {'path','version','sha256'}
+                or not isinstance(runtime['path'],str) or not os.path.isabs(runtime['path'])
+                or os.path.normpath(runtime['path'])!=runtime['path']
+                or not isinstance(runtime['version'],str) or not runtime['version']
+                or not isinstance(runtime['sha256'],str) or not re.fullmatch('[0-9a-f]{64}',runtime['sha256'])):
+            raise ValueError('EXACT_RUNTIME_IDENTITY_REQUIRED')
 
 
 def github_json(url, token):
@@ -32,12 +95,14 @@ def github_json(url, token):
     return value
 
 
-def syntax_receipt(value, control_repository, token, read=github_json, typescript_module=None):
+def syntax_receipt(value, control_repository, token, read=github_json, typescript_module=None,checker_identity=None):
     if value.get('event')!='CODE_READY':return None
     repo=value.get('target_repository')
     # Metadata receipt intake does not authorize other repositories.
     if repo!=control_repository or not re.fullmatch(r'[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+',repo):
         return {'state':'HOLD_TARGET_REPOSITORY_ADMISSION_REQUIRED','authority_effect':'NONE'}
+    if checker_identity is None:checker_identity=build_checker_identity()
+    validate_checker_identity(checker_identity)
     base,head=value.get('target_base_sha'),value.get('code_commit')
     if any(not isinstance(v,str) or not re.fullmatch('[0-9a-f]{40}',v) for v in (base,head)):
         raise ValueError('EXACT_COMMIT_BINDING_REQUIRED')
@@ -63,6 +128,8 @@ def syntax_receipt(value, control_repository, token, read=github_json, typescrip
             raise ValueError('SAFE_UNIQUE_PATH_REQUIRED')
         seen.add(path)
         previous=file.get('previous_filename')
+        if file.get('status')=='renamed' and previous is None:
+            raise ValueError('RENAME_SOURCE_REQUIRED')
         if previous is not None and (not isinstance(previous,str) or not re.fullmatch(r'[A-Za-z0-9_./-]+',previous) or any(p in ('','.','..') or p.startswith('.') for p in previous.split('/')) or re.search(r'(^|/)(auth|secret|credential|token)[^/]*$',previous,re.I)):
             raise ValueError('PROTECTED_RENAME_SOURCE')
         if any(p.startswith('.') for p in path.split('/')) or re.search(r'(^|/)(auth|secret|credential|token)[^/]*$',path,re.I):
@@ -89,12 +156,7 @@ def syntax_receipt(value, control_repository, token, read=github_json, typescrip
     binding={key:value[key] for key in ('task_id','spec_sha256','checkpoint_sha256',
              'entry','target_repository','target_base_sha','code_commit')}
     binding['files']=sorted(checks,key=lambda c:c['path'])
-    from native_syntax_gate import TYPESCRIPT_SHA256
-    checker_path=os.path.join(os.path.dirname(__file__),'native_syntax_gate.py')
-    with open(checker_path,'rb') as stream:
-        checker_sha=hashlib.sha256(stream.read()).hexdigest()
-    binding['checker']={'source_sha256':checker_sha,
-        'typescript_sha256':TYPESCRIPT_SHA256,'mode':'SYNTAX_ONLY_NO_EXECUTION'}
+    binding['checker']=checker_identity
     digest=hashlib.sha256(json.dumps(binding,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest()
     passed=all(c['state'] in ('PASS_SYNTAX','REMOVED_DATA_ONLY') for c in checks)
     return {'state':'PASS_SYNTAX_NOT_ADMITTED' if passed else 'HOLD_SYNTAX_GATE',
