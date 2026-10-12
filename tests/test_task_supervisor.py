@@ -4,6 +4,7 @@ import os
 import shutil
 import sqlite3
 import tempfile
+import threading
 import unittest
 
 import sys
@@ -263,6 +264,117 @@ class SupervisorTests(unittest.TestCase):
                 check.close()
         finally:
             os.unlink(path)
+
+    def test_two_connections_serialize_ack_and_old_terminal(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','handoff','HANDOFF_REQUESTED',1002)
+        barrier=threading.Barrier(2); results=[]
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        terminal=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
+
+        def acknowledge():
+            worker=Supervisor(self.path,lambda:self.now)
+            try:
+                barrier.wait()
+                worker.record('t1','a1','ack-race',
+                    'HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION',
+                    'proof:'+('a'*64),good)
+                results.append('ack')
+            except ValueError:
+                results.append('ack-rejected')
+            finally:
+                worker.close()
+
+        def finish_old_attempt():
+            worker=Supervisor(self.path,lambda:self.now)
+            try:
+                barrier.wait()
+                worker.record('t1','a1','terminal-race','TERMINAL',
+                              1003,payload=terminal)
+                results.append('terminal')
+            except ValueError:
+                results.append('terminal-rejected')
+            finally:
+                worker.close()
+
+        one=threading.Thread(target=acknowledge)
+        two=threading.Thread(target=finish_old_attempt)
+        one.start(); two.start(); one.join(5); two.join(5)
+        self.assertFalse(one.is_alive()); self.assertFalse(two.is_alive())
+        self.assertEqual(len([r for r in results
+                             if not r.endswith('rejected')]),1)
+        row=self.s._task('t1')
+        self.assertIn(row['state'],('READY','SUCCESS'))
+        committed=self.s.db.execute("""SELECT event_id FROM events
+          WHERE event_id IN ('ack-race','terminal-race')""").fetchall()
+        self.assertEqual(len(committed),1)
+
+    def test_two_connections_serialize_terminal_and_l3_scan(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        barrier=threading.Barrier(2); results=[]
+        terminal=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
+
+        def finish():
+            worker=Supervisor(self.path,lambda:self.now)
+            try:
+                barrier.wait()
+                worker.record('t1','a1','terminal-vs-scan','TERMINAL',
+                              1002,payload=terminal)
+                results.append('terminal')
+            except ValueError:
+                results.append('terminal-rejected')
+            finally:
+                worker.close()
+
+        def escalate():
+            worker=Supervisor(self.path,lambda:self.now)
+            try:
+                barrier.wait()
+                actions=worker.scan(1902)
+                results.append('scan' if actions else 'scan-empty')
+            finally:
+                worker.close()
+
+        one=threading.Thread(target=finish)
+        two=threading.Thread(target=escalate)
+        one.start(); two.start(); one.join(5); two.join(5)
+        self.assertFalse(one.is_alive()); self.assertFalse(two.is_alive())
+        self.assertIn(self.s._task('t1')['state'],('SUCCESS','HOLD'))
+        self.assertTrue(
+            ('terminal' in results and 'scan-empty' in results)
+            or ('terminal-rejected' in results and 'scan' in results))
+
+    def test_ack_commit_blocks_old_attempt_before_new_claim(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','handoff','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack-first','HANDOFF_ACKNOWLEDGED',
+                      1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        other=Supervisor(self.path,lambda:self.now)
+        terminal=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
+        try:
+            with self.assertRaises(ValueError):
+                other.record('t1','a1','late-terminal','TERMINAL',
+                             1004,payload=terminal)
+        finally:
+            other.close()
+        self.assertIsNone(self.s.db.execute(
+            "SELECT 1 FROM events WHERE event_id='late-terminal'").fetchone())
 
     def test_unknown_side_effects_preserved_in_visible_hold(self):
         self.registration(); self.claim()
