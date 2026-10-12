@@ -38,9 +38,10 @@ assert.equal(task.native_execution.report,report);
 const writesBefore=writes;
 assert.equal(await lifecycle.report(receipt,{}),report);assert.equal(writes,writesBefore);
 await assert.rejects(()=>lifecycle.inspect({...receipt,run_id:'wrong'},{}),/RECEIPT_MISMATCH/);
-// A timed-out wait must never become a successful terminal execution.
+// Once a terminal observation is durably persisted, later observation calls return it
+// without consulting a stale/nonterminal wait response.
 const pending=await lifecycle.inspect(receipt,{subagent:{waitForRun:async()=>({status:'timeout'})}});
-assert.equal(pending.state,'running');
+assert.equal(pending.state,'completed');
 console.log('controller lifecycle: terminal stop, durable CAS, duplicate read, wrong identity, pending wait PASS (mock host)');
 // Real file hashing + Git tree admission, with mock Gateway/OS boundary.
 const {mkdtemp,writeFile,rm}=await import('node:fs/promises');
