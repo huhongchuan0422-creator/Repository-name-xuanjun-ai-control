@@ -1,0 +1,43 @@
+name: Exact native JSON probe tests
+on:
+  pull_request:
+    paths:
+      - evidence/entry-probes/chatgpt/json_input_validator_probe.py
+      - evidence/entry-probes/chatgpt/test_json_input_validator_probe.py
+      - .github/workflows/native-json-probe-tests.yml
+permissions:
+  contents: read
+jobs:
+  reviewed-probe-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Bind authored bytes before disposable hosted tests
+        run: |
+          python3 -I -B - <<'PY'
+          import hashlib, pathlib, subprocess, sys, os
+          root = pathlib.Path('evidence/entry-probes/chatgpt')
+          approved = {
+              'json_input_validator_probe.py': 'c97a57ea6f4248008af10a6358c9c3a9325ff7a4709ec54098227bd3e7e4ee25',
+              'test_json_input_validator_probe.py': '9af6f29ae8ac0d4c606013750eedcb2f78abbc5473018a476c6bd5ae73d29d7d',
+          }
+          for parent in (root, root.parent, root.parent.parent, root.parent.parent.parent):
+              assert parent.is_dir() and not parent.is_symlink(), 'NONREGULAR_PARENT'
+          for name, digest in approved.items():
+              path = root / name
+              assert path.is_file() and not path.is_symlink(), 'NONREGULAR_FILE'
+              raw = path.read_bytes()
+              assert len(raw) <= 131072 and hashlib.sha256(raw).hexdigest() == digest, 'CHANGED_REVIEWED_BYTES'
+              compile(raw.decode('utf-8'), name, 'exec')
+          result = subprocess.run([sys.executable, '-I', '-B', '-c',
+              "import sys,unittest; sys.path.insert(0," + repr(str(root.resolve())) + "); r=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover(" + repr(str(root.resolve())) + ")); sys.exit(not r.wasSuccessful())"],
+              env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'},
+              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+          print(result.stdout.decode('utf-8', 'replace'))
+          print(result.stderr.decode('utf-8', 'replace'))
+          assert result.returncode == 0 and b'Ran 10 tests' in result.stderr, 'PROBE_TEST_FAILURE'
+          print('EXACT_NATIVE_SOURCE_HOSTED_TEST_PASS; UK=NOT_RUN; RELEASE=NOT_GRANTED')
+          PY
