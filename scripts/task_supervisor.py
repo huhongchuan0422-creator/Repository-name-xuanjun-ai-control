@@ -20,6 +20,20 @@ TERMINAL = frozenset(('SUCCESS', 'FAILURE', 'CANCELLED', 'HOLD',
 REAL_PROGRESS = frozenset(('SOURCE_COMMIT', 'TEST_RUN', 'ARTIFACT',
                            'PHASE_EXECUTION'))
 ACTIVE = frozenset(('RECEIVED', 'STARTED', 'RUNNING', 'HANDOFF_PENDING'))
+SUPERVISOR_APPLICATION_ID = 0x58534A31
+SUPERVISOR_SCHEMA_VERSION = 2
+TASK_COLUMNS = (
+    'task_id', 'parent_task_id', 'stage', 'writer_scope', 'state', 'owner',
+    'entry', 'run_id', 'session_id', 'attempt_id', 'checkpoint_sha256',
+    'spec_sha256', 'lease_id', 'fence', 'epoch', 'next_action',
+    'dependencies_json', 'completion_json', 'last_real_progress_at',
+    'received_at', 'started_at', 'handoff_requested_at', 'last_event_at',
+    'max_fence', 'max_epoch', 'progress_deadline', 'receipt_deadline',
+    'started_deadline', 'terminal_deadline', 'handoff_deadline',
+    'writer_stopped', 'effects_reconciled', 'receiver_accepted',
+    'old_fence_invalidated', 'recovery_level', 'recovery_generation',
+    'created_at', 'updated_at',
+)
 
 
 def canonical(value):
@@ -49,6 +63,25 @@ class Supervisor(object):
         self.db.close()
 
     def _schema(self):
+        application_id = self.db.execute(
+            'PRAGMA application_id').fetchone()[0]
+        user_version = self.db.execute('PRAGMA user_version').fetchone()[0]
+        if application_id not in (0, SUPERVISOR_APPLICATION_ID):
+            raise ValueError('SUPERVISOR_DATABASE_ID_MISMATCH')
+        if user_version not in (0, 1, SUPERVISOR_SCHEMA_VERSION):
+            raise ValueError('UNSUPPORTED_SUPERVISOR_SCHEMA')
+        existing = self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'"
+        ).fetchone()
+        if existing is not None:
+            columns = tuple(row['name'] for row in
+                            self.db.execute('PRAGMA table_info(tasks)'))
+            previous = tuple(name for name in TASK_COLUMNS
+                             if name != 'recovery_generation')
+            if columns not in (previous, TASK_COLUMNS):
+                raise ValueError('SUPERVISOR_TASK_SCHEMA_MISMATCH')
+            if columns == previous and user_version not in (0, 1):
+                raise ValueError('SUPERVISOR_MIGRATION_VERSION_MISMATCH')
         self.db.executescript('''
         CREATE TABLE IF NOT EXISTS tasks(
           task_id TEXT PRIMARY KEY,
@@ -128,6 +161,22 @@ class Supervisor(object):
         CREATE INDEX IF NOT EXISTS outbox_due_idx
           ON outbox(delivered_at, next_attempt_at, outbox_id);
         ''')
+        with self.db:
+            columns = tuple(row['name'] for row in
+                            self.db.execute('PRAGMA table_info(tasks)'))
+            previous = tuple(name for name in TASK_COLUMNS
+                             if name != 'recovery_generation')
+            if columns == previous:
+                self.db.execute('''ALTER TABLE tasks ADD COLUMN
+                  recovery_generation INTEGER NOT NULL DEFAULT 0''')
+                columns = tuple(row['name'] for row in
+                                self.db.execute('PRAGMA table_info(tasks)'))
+            if columns != TASK_COLUMNS:
+                raise ValueError('SUPERVISOR_TASK_SCHEMA_MISMATCH')
+            self.db.execute('PRAGMA application_id=%d' %
+                            SUPERVISOR_APPLICATION_ID)
+            self.db.execute('PRAGMA user_version=%d' %
+                            SUPERVISOR_SCHEMA_VERSION)
 
     def _tx(self):
         return self.db
@@ -275,8 +324,6 @@ class Supervisor(object):
             raise ValueError('BOUNDED_EVENT_REQUIRED')
         with self.db:
             task = self._task(task_id)
-            if task['attempt_id'] != attempt_id:
-                raise ValueError('ATTEMPT_BINDING_MISMATCH')
             # Exact replays are idempotent even when a newer event has since
             # advanced last_event_at.  Conflicting reuse still fails closed.
             encoded = canonical(payload)
@@ -293,6 +340,8 @@ class Supervisor(object):
                 if not exact:
                     raise ValueError('EVENT_ID_REUSE_CONFLICT')
                 return {'duplicate': True, 'state': task['state']}
+            if task['attempt_id'] != attempt_id:
+                raise ValueError('ATTEMPT_BINDING_MISMATCH')
             accepted_at = self.clock()
             if (not finite(accepted_at) or observed_at < task['last_event_at']
                     or observed_at > accepted_at + 300):
