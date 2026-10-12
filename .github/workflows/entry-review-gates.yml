@@ -29,6 +29,8 @@ jobs:
           XJ_TYPESCRIPT_MODULE: ${{ runner.temp }}/xj-syntax/node_modules/typescript/lib/typescript.js
         run: python3 -B -m unittest discover -s tests -v
   python36-gates:
+    # Persistent host execution is disabled until trusted admission and isolation exist.
+    if: ${{ false }}
     runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
     timeout-minutes: 5
     permissions:
