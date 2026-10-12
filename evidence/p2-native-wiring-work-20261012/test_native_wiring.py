@@ -50,32 +50,38 @@ class Backend:
 class WiringTests(unittest.TestCase):
     def worker(self,c):return NativePipelineWorker(c,CLAIM,'/isolated/snapshot','workspace-write',clock=lambda:0,wait=lambda x:None)
     def run_worker(self,c,live=lambda:True):return self.worker(c).run('approved',30,lambda:None,live)
-    def test_trusted_terminal_result_and_stop(self):
-        c=Controller();r=self.run_worker(c);self.assertTrue(r['worker_boundary_stopped']);self.assertEqual(c.launches,1)
-        self.assertNotIn('checkpoint',c.request)
-    def test_no_launch_without_isolation_admission(self):
-        c=Controller();c.admit=lambda request,key:{'request':request,'idempotency_key':key,'isolation_enforced':False}
-        with self.assertRaises(NativeContractError):self.run_worker(c)
-        self.assertEqual(c.launches,0)
-    def test_expired_lease_no_admission_or_launch(self):
+    def test_delegated_pipeline_model_dispatch_denied_before_controller_effect(self):
         c=Controller()
-        with self.assertRaises(NativeContractError):self.run_worker(c,lambda:False)
-        self.assertEqual(c.launches,0);self.assertIsNone(c.request)
-    def test_terminal_session_without_empty_cgroup_rejected(self):
-        c=Controller();c.observed['descendants_exited']=False
-        with self.assertRaises(NativeContractError):self.run_worker(c)
-    def test_missing_process_observation_rejected(self):
-        c=Controller();c.observed['process_alive']=None
-        with self.assertRaises(NativeContractError):self.run_worker(c)
-    def test_assistant_shaped_report_not_durable(self):
-        c=Controller();c.report=lambda r:{'outcome':'done'}
-        with self.assertRaises(NativeContractError):self.run_worker(c)
-    def test_actual_model_mismatch_rejected(self):
-        c=Controller();c.result['model']='gpt-6.1-sol'
-        with self.assertRaises(NativeContractError):self.run_worker(c)
-    def test_wrong_run_observation_rejected(self):
-        c=Controller();c.inspect=lambda r:dict(c.observed,**dict(r,run_id='another'))
-        with self.assertRaises(NativeContractError):self.run_worker(c)
+        with self.assertRaisesRegex(NativeContractError,'delegated model dispatch prohibited'):
+            self.run_worker(c)
+        self.assertEqual(c.launches,0)
+        self.assertEqual(c.stops,0)
+        self.assertIsNone(c.request)
+
+    def test_denial_has_no_fallback_when_lease_is_false(self):
+        c=Controller()
+        with self.assertRaisesRegex(NativeContractError,'delegated model dispatch prohibited'):
+            self.run_worker(c,lambda:False)
+        self.assertEqual(c.launches,0)
+        self.assertIsNone(c.request)
+
+    def test_direct_gateway_agent_spawn_denied_without_rpc_or_authorize(self):
+        from native_child_adapter import OpenClawGatewayNativeProvider
+        calls=[];authorized=[]
+        class Authority(object):
+            def authorize(self,*args):authorized.append(args)
+        provider=OpenClawGatewayNativeProvider('task',controller=Authority(),
+            runner=lambda *args,**kwargs:calls.append((args,kwargs)))
+        with self.assertRaisesRegex(NativeContractError,'delegated model dispatch prohibited'):
+            provider.spawn({},'a'*64)
+        self.assertEqual(calls,[])
+        self.assertEqual(authorized,[])
+
+    def test_development_service_has_no_codex_fallback(self):
+        raw=(SOURCE/'development_service.py').read_text()
+        self.assertNotIn('CodexAppServerWorker',raw)
+        self.assertIn('reviewed installed native controller required',raw)
+
     def test_notification_fixed_recipient_ack_and_lookup(self):
         n=ExistingOutboxNotifier(Controller());self.assertEqual(n.send({},'k'),n.reconcile('k'))
     def test_wrong_recipient_ack_rejected(self):

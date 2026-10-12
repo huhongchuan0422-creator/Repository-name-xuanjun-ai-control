@@ -503,6 +503,13 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
     manifest=deploy/'integration-manifest.json';value=json.loads(manifest.read_text());files=value['files']
     authorized=set(files)
     c2_paths=[entry,runtime,installer,binding,ledger_client,dropin]
+    for name in ('native_pipeline_runtime.py','native_gateway_controller.py',
+                 'native_github_notifier.py','native_ledger_bridge.py',
+                 'native_ledger_operations.py','native_peer_identity.py'):
+        path=stage1/name
+        if not path.is_file():
+            raise ValueError('P2_NATIVE_RUNTIME_FILE_MISSING:'+name)
+        c2_paths.append(path)
     plugin=source/'plugins'/'p2-native-controller'
     c2_paths.extend(path for path in sorted(plugin.iterdir()) if path.is_file())
     for item in c2_paths:

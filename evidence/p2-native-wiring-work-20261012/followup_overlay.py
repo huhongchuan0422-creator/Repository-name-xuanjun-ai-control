@@ -29,6 +29,28 @@ def main():
             'prompt': prompt, 'timeout_seconds': timeout_seconds}""")
 
     replace_once(
+        stage1 / 'native_pipeline_runtime.py',
+        """    def run(self, prompt, timeout_seconds, heartbeat, lease_check):
+        if not lease_check():
+            raise NativeContractError('native lease expired before admission')""",
+        """    def run(self, prompt, timeout_seconds, heartbeat, lease_check):
+        raise NativeContractError('delegated model dispatch prohibited by owner policy')
+        if not lease_check():
+            raise NativeContractError('native lease expired before admission')""")
+
+    replace_once(
+        stage1 / 'native_child_adapter.py',
+        """    def spawn(self, binding, idempotency_key):
+        if self.controller is None:
+            raise NativeContractError('trusted native controller unavailable; dispatch denied')
+        self.controller.authorize(binding, idempotency_key)""",
+        """    def spawn(self, binding, idempotency_key):
+        raise NativeContractError('delegated model dispatch prohibited by owner policy')
+        if self.controller is None:
+            raise NativeContractError('trusted native controller unavailable; dispatch denied')
+        self.controller.authorize(binding, idempotency_key)""")
+
+    replace_once(
         stage1 / 'execution_ledger.py',
         """            task.update({'state': row['state'], 'lease_until': row['lease_until'],
                          'source_manifest': checkpoint.get('native_source_manifest'),

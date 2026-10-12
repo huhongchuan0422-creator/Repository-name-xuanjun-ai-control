@@ -40,6 +40,16 @@ def write_receipt(root,target,current,installed=b'installed',old=b'old'):
     pathlib.Path(os.path.join(root,'provision.json')).write_bytes(raw)
     return {'schema':1,'receipt_sha256':hashlib.sha256(raw).hexdigest(),'rollback_complete':True}
 
+class NativeRuntimeManifestTests(unittest.TestCase):
+    def test_all_native_runtime_dependencies_are_manifested(self):
+        root=pathlib.Path(os.environ['P2_SOURCE_ROOT'])
+        manifest=json.loads((root/'deploy'/'integration-manifest.json').read_text())
+        required=set('stage1/'+name for name in (
+            'native_pipeline_runtime.py','native_gateway_controller.py',
+            'native_github_notifier.py','native_ledger_bridge.py',
+            'native_ledger_operations.py','native_peer_identity.py'))
+        self.assertTrue(required.issubset(set(manifest['files'])))
+
 class PlanTlsBindingTests(unittest.TestCase):
     def _plan(self):
         import p2_install_entrypoint as entry

@@ -77,6 +77,7 @@ export class NativeController {
     const {observed,record}=await this.record(admission);
     await this.current(record.request);
     if(canonical(record.admission)!==canonical(admission))hold('LAUNCH_REPLAY_FORBIDDEN');
+    hold('MODEL_DISPATCH_PROHIBITED');
     if(record.receipt && ['RUNNING','TERMINAL'].includes(record.phase))return record.receipt;
     if(record.phase==='LAUNCH_INTENT')hold('LAUNCH_EFFECT_UNKNOWN');
     if(record.phase!=='ADMITTED')hold('LAUNCH_REPLAY_FORBIDDEN');
