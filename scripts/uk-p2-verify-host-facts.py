@@ -82,7 +82,7 @@ def main():
     if values['ControlGroup'] not in cgroup_paths:
         raise SystemExit('HOLD_GATEWAY_CGROUP')
     gateway={'pid':pid,'ppid':int(st.get('PPid','0')),
-             'exe':exe,'exe_sha256':digest(exe)['sha256'],
+             'exe':exe,
              'cgroup':cgroup_lines,
              'cmdline_sha256':hashlib.sha256(raw).hexdigest()}
 
