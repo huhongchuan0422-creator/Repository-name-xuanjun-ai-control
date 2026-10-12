@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import tempfile
 import unittest
@@ -95,6 +96,59 @@ class FixedRuntimeTests(unittest.TestCase):
             os.path.join(root,'scripts','uk-p2-install.py'),'--help'],
             env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         self.assertEqual(result.returncode,0,result.stderr.decode())
+
+    def _rollback_fixture(self, originals):
+        targets = []
+        for number, original in enumerate(originals):
+            target = os.path.join(self.temp.name, 'target-%d' % number)
+            with open(target, 'wb') as stream: stream.write(b'installed')
+            os.chmod(target, 0o600)
+            info = os.stat(target)
+            previous = None
+            if original is not None:
+                backup = os.path.join(self.transaction, 'target-%d.backup' % number)
+                with open(backup, 'wb') as stream: stream.write(original)
+                previous = dict(backup=backup, sha256=module._digest_bytes(original),
+                                mode=0o600, uid=info.st_uid, gid=info.st_gid)
+            targets.append(dict(target=target, previous=previous,
+                                rendered_sha256=module._digest_bytes(b'installed'),
+                                mode=0o600, uid=info.st_uid, gid=info.st_gid))
+        receipt = dict(schema=1, targets=targets, services=[], rollback_complete=True)
+        raw = json.dumps(receipt, sort_keys=True, separators=(',', ':')).encode('utf-8')
+        with open(self.runtime.receipt_path, 'wb') as stream: stream.write(raw)
+        return targets, dict(receipt_sha256=module._digest_bytes(raw))
+
+    def test_changed_new_target_is_not_deleted_during_rollback(self):
+        targets, proof = self._rollback_fixture([None])
+        with open(targets[0]['target'], 'wb') as stream: stream.write(b'other-owner-change')
+        with patch.object(self.runtime, '_authority'), \
+             patch.object(module, 'ALLOWED_TARGET_PREFIXES', (self.temp.name + '/',)):
+            with self.assertRaisesRegex(ValueError, 'TARGET_CHANGED'):
+                self.runtime.restore(proof)
+        with open(targets[0]['target'], 'rb') as stream:
+            self.assertEqual(stream.read(), b'other-owner-change')
+        self.assertEqual(self.commands, [])
+
+    def test_late_corrupt_backup_blocks_all_rollback_writes(self):
+        targets, proof = self._rollback_fixture([b'old-first', b'old-second'])
+        with open(targets[0]['previous']['backup'], 'wb') as stream: stream.write(b'corrupt')
+        with patch.object(self.runtime, '_authority'), \
+             patch.object(module, 'ALLOWED_TARGET_PREFIXES', (self.temp.name + '/',)), \
+             patch.object(self.runtime, '_atomic_target') as write:
+            with self.assertRaisesRegex(ValueError, 'BACKUP_CHANGED'):
+                self.runtime.restore(proof)
+            write.assert_not_called()
+        self.assertEqual(self.commands, [])
+
+    def test_exact_rollback_restores_old_and_removes_only_unchanged_new(self):
+        targets, proof = self._rollback_fixture([b'original', None])
+        with patch.object(self.runtime, '_authority'), \
+             patch.object(module, 'ALLOWED_TARGET_PREFIXES', (self.temp.name + '/',)):
+            self.assertEqual(self.runtime.restore(proof)['services_restarted'], False)
+        with open(targets[0]['target'], 'rb') as stream:
+            self.assertEqual(stream.read(), b'original')
+        self.assertFalse(os.path.lexists(targets[1]['target']))
+        self.assertEqual(self.commands, [['/usr/bin/systemctl', 'daemon-reload']])
 
 
 if __name__=='__main__': unittest.main()
