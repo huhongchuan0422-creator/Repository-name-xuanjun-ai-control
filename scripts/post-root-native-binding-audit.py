@@ -205,9 +205,9 @@ def audit():
                             break
                         source = raw.decode('utf-8', 'replace')
                         symbols = sorted(set(re.findall(
-                            r'function\\s+([A-Za-z_$][A-Za-z0-9_$]{0,100})', source)))
+                            r'function\s+([A-Za-z_$][A-Za-z0-9_$]{0,100})', source)))
                         methods = sorted(set(re.findall(
-                            r'[\\\"\\\']((?:sessions|agents|agent|chat|models)\\.[A-Za-z0-9_.]{1,80})[\\\"\\\']',
+                            r'[\\\"\\\']((?:sessions|agents|agent|chat|models)\.[A-Za-z0-9_.]{1,80})[\\\"\\\']',
                             source)))
                         modules.append({'path': path, 'sha256': hashlib.sha256(raw).hexdigest(),
                             'uid': info.st_uid, 'mode': oct(stat.S_IMODE(info.st_mode)),
@@ -220,6 +220,28 @@ def audit():
             result['installed_native_code'] = {'state': 'CODE_METADATA_ONLY',
                 'entry_path': entry, 'package_root': package_root, 'modules': modules,
                 'credential_content_read': False, 'inference_requested': False}
+
+
+    result['configured_native_roles'] = {'state': 'CLI_UNAVAILABLE', 'agent_ids': []}
+    if os.path.isfile(cli) and os.path.isfile(node_dir + '/node'):
+        p = subprocess.run(['/usr/sbin/runuser', '-u', 'xuanjun_dev', '--',
+                            cli, 'agents', 'list', '--json'], env=env,
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                           timeout=20, check=False)
+        registry = {'state': 'UNPARSED_NO_RAW_OUTPUT', 'exit_code': p.returncode, 'agent_ids': []}
+        if p.returncode == 0 and len(p.stdout) <= 262144:
+            try:
+                value = json.loads(p.stdout.decode('utf-8'))
+                items = value if isinstance(value, list) else value.get('agents', [])
+                for item in items[:100]:
+                    if isinstance(item, dict):
+                        agent_id = item.get('id') or item.get('agentId')
+                        if isinstance(agent_id, str) and re.fullmatch(r'[A-Za-z0-9_.-]{1,100}', agent_id):
+                            registry['agent_ids'].append(agent_id)
+                registry['state'] = 'CONFIGURED_ROLE_METADATA_ONLY'
+            except (ValueError, TypeError, AttributeError):
+                pass
+        result['configured_native_roles'] = registry
 
     print(json.dumps(result, sort_keys=True))
 
