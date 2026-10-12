@@ -17,7 +17,7 @@ CLI=HOME_PATH+'/.openclaw/bin/openclaw'
 ENV={'HOME':HOME_PATH,'PATH':HOME_PATH+'/.openclaw/tools/node-v24.21.0/bin:/usr/local/bin:/usr/bin:/bin','LANG':'C.UTF-8'}
 TASK='XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1'
 MODEL='openai/gpt-5.6-sol'
-KEY=hashlib.sha256((TASK+'\nP2_PLATFORM_ENGINEER\n6121230482').encode()).hexdigest()
+KEY=hashlib.sha256((TASK+'\nP2_WORK_DECISION_PLAN\n6122784575').encode()).hexdigest()
 
 
 def capture(argv,seconds=20,limit=131072):
@@ -60,8 +60,8 @@ def parse(raw):
 def main():
     if os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid or os.geteuid()==0 or socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ':
         raise SystemExit('STOP_FIXED_NONROOT_UK_DELIVERY')
-    receipt={'task_id':TASK,'role_requested':'PLATFORM_ENGINEER','receiver':'EXISTING_OPENCLAW_MAIN',
-             'authority_comment':6121230482,'dispatch_key':KEY,'model_calls_requested':0,
+    receipt={'task_id':TASK,'role_requested':'COORDINATOR_READONLY_PLAN','receiver':'EXISTING_OPENCLAW_MAIN',
+             'authority_comment':6122784575,'dispatch_key':KEY,'model_calls_requested':0,
              'child_started':'NOT_PROVEN','lease_fence_epoch_mutation':'NONE','install':'NO'}
     try:
         code,raw=capture([CLI,'agent','--help'])
@@ -110,9 +110,10 @@ def main():
             stream.flush();os.fsync(stream.fileno())
         parent_fd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
         os.fsync(parent_fd);os.close(parent_fd)
-        message='''Owner explicitly authorized P2 PLATFORM_ENGINEER stage via PR17 comment6121230482. Same task XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1, original spec/checkpoint/budget, candidate502ec666/artifact11734982903. Do not create a second queue, reset budget or start a competing writer.
-As the existing main coordinator, first reconcile actual original P2 writer/session/descendants/lease/fence/epoch and unknown effects. Use your supported native child-session mechanism to dispatch PLATFORM_ENGINEER for bounded READONLY platform preparation: actual native OAuth/gh consumer identity, exact verify-only/install/rollback plan and real adapter capability diagnosis. Do not install, switch old Coordinator, modify production/config/DB/Webhook/trading/customer channels, copy tokens/auth.json, change account/models or invoke paid API. Keep openai/gpt-5.6-sol with fallbacks=[] and existing OAuth. If original execution authority or native child entry is not available, return exact HOLD; do not claim STARTED from a comment or audit job.
-Only if PLATFORM_ENGINEER actually diagnoses a native adapter gap and finishes/stops with reconciled authority, serially dispatch Developer on the same task to implement it; do not start both as writers. Return one bounded JSON object: role_requested, state, native_tool, run_id, session_key, process_or_unit, checkpoint, lease, fence, epoch, blocker. STARTED requires a real native child plus independent session/process evidence. Do the authorized stage now, not a status-only acknowledgement.'''
+        message='''Work has formally RECEIVED your P2 handoff via PR17 comment6122492558, and permission direction6122784575. Owner18:47 orders Work to execute and find remaining blockers. SAME original task/spec/checkpoint/budget. This is ONE new bounded READONLY architecture/authority evidence request, NOT replay of original Platform dispatch, NOT authorization to start any writer or install.
+Existing source3888f859/tree686786e69e4397b5834bac631a57545fa954a829 is recovered in object-complete isolated snapshot /home/xuanjun_dev/p2-source-snapshot-38238238382; archive11740719445. Original ancestry issue is audit-only for source preparation perOwner18:46. Native CLI independently confirms original main sessione2474bef and developer session5abbaed8/keya7a28c3a statusdone. No configured platform_engineer CLI entry.
+NOW inspect actual supported installed Gateway/native API method names and request/response schema for spawn/status/reconcile/report recovery, existing notifier send/reconcile plus fixed PR17 recipient binding, and canonical originalattempt fence/epoch/solewriter STOP/descendants/effects (scratch revision197 previously reported). Return exact runtime source paths/hashes and canonical scratch/lease/fence record location; do not copy secrets/authJSON or read credential DB. Explain original secondwriter identity/effects or preserveUNKNOWN. Persist a bounded sanitized concrete plan at /home/xuanjun_dev/p2-native-plan-6122784575.json with no credentials/prompt history: task_id,state,canonical_state_path,original_attempt,writer_status,fence_status,effects_status,native_methods,provider_source_paths,notifier_source_paths,recipient_binding,epoch_cas_location,minimal_files,blocker. Print that same JSON only.
+Keep existing OAuth/openai/gpt-5.6-sol/fallbacks=[]/no paidAPI. No new queue, secondwriter, production/hostconfig/service/lease/fence change, native child spawn, install or model delegation. This bounded call is allowed coordination, not permission to execute submittedcode. Work will review actual plan and apply minimum safe code repair separately. Do the readonly inspection now.'''
         argv=[CLI,'agent','--agent','main']+session_args
         if has_model:argv+=['--model',MODEL]
         argv+=['--message',message,'--thinking','low','--timeout','90','--json']
