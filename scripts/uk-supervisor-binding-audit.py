@@ -2,6 +2,48 @@
 import json, os, pwd, socket, sqlite3, stat, subprocess, time
 HOME_PATH='/home/xuanjun_dev'
 KEY='f99816db392e0f8e50af028cdd2f2782f0bdeb8e8f2a0e23713a2b1f38350c0a'
+
+def policy_shape(value):
+    """Only bounded schema names and allowlisted state/identity labels."""
+    import re
+    rows = []
+    scalar_keys = set(('state status owner role entry task task_id next_actor next_owner '
+                       'checkpoint_sha256 spec_sha256 lease lease_id fence epoch '
+                       'attempt_id run_id session_id checkpoint_commit checkpoint_tree '
+                       'source_commit authority_comment comment_id effective_at '
+                       'previous_writer new_writer handoff_state stop_state '
+                       'effects_state fence_state scope policy mode').split())
+    blocked = ('secret', 'credential', 'token', 'password', 'prompt', 'message',
+               'history', 'oauth', 'authorization', 'cookie')
+    def walk(obj, path, depth):
+        if depth > 6 or len(rows) >= 160:
+            return
+        if isinstance(obj, dict):
+            for key in sorted(obj)[:80]:
+                if len(rows) >= 160:
+                    break
+                if not isinstance(key, str) or not re.fullmatch(r'[A-Za-z0-9_]{1,80}', key):
+                    continue
+                if any(part in key.lower() for part in blocked):
+                    continue
+                item = obj[key]
+                row = {'path': path + '.' + key, 'type': type(item).__name__}
+                if type(item) is bool or item is None:
+                    row['value'] = item
+                elif key in scalar_keys and type(item) is int:
+                    row['value'] = item
+                elif key in scalar_keys and isinstance(item, str) and len(item) <= 180 and re.fullmatch(r'[A-Za-z0-9_./:-]+', item):
+                    row['value'] = item
+                rows.append(row)
+                if isinstance(item, (dict, list)):
+                    walk(item, row['path'], depth + 1)
+        elif isinstance(obj, list):
+            for index, item in enumerate(obj[:20]):
+                if isinstance(item, (dict, list)):
+                    walk(item, path + '[%d]' % index, depth + 1)
+    walk(value, 'policy', 0)
+    return rows
+
 def main():
     if os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid or os.geteuid()==0 or socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ':
         raise SystemExit('HOLD_FIXED_NONROOT_UK_AUDIT')
@@ -221,6 +263,7 @@ def main():
                     elif isinstance(v,list):
                         for i,item in enumerate(v[:20]):inspect(item,path+'[%d]'%i,depth+1)
                 inspect(value,'content')
+                result['canonical_policy_shape'] = policy_shape({name: value[name] for name in ('owner_authority_amendment', 'next_actor', 'task_state', 'task') if name in value})
                 result['canonical_scratch']={'state':'READ_ONLY_VERIFIED_JOB','job_id':job,
                     'revision':wrapper.get('currentRevision',wrapper.get('revision')),
                     'wrapper_keys':sorted(wrapper)[:40],'content_keys':sorted(value)[:60],
