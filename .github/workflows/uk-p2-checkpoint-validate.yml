@@ -63,7 +63,7 @@ jobs:
           s=s.replace(a,'        pristine=json.loads(json.dumps(value))\n'+a).replace(c,'module.restore_rollback_files(pristine,7,None)')
           with open(p,'w') as f:f.write(s)
           import shutil
-          for relative in ['stage1/activation_control.py','stage1/test_activation_lock_permissions.py','scripts/uk-integration-install.py','stage1/test_integration_installer.py','deploy/integration-manifest.json']:
+          for relative in ['stage1/activation_control.py','stage1/test_activation_lock_permissions.py','scripts/uk-integration-install.py','stage1/test_integration_installer.py','deploy/integration-manifest.json','scripts/uk-dev-bootstrap.py']:
               shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),os.path.join('repo',relative))
           with open('repo/deploy/integration-manifest.json') as f:m=json.load(f)
           for relative,digest in m['files'].items():
