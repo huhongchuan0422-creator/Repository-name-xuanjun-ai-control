@@ -161,6 +161,66 @@ def audit():
             except (OSError, subprocess.TimeoutExpired):
                 capabilities[command] = {'state': 'HOLD_HELP_UNAVAILABLE'}
         result['native_command_capabilities'] = capabilities
+
+    # Inspect installed CODE module metadata, never state/config/credential bytes.
+    import hashlib
+    import re
+    entry = os.path.realpath(cli)
+    code_prefix = BASE + '/.openclaw/npm/projects/'
+    result['installed_native_code'] = {'state': 'CODE_ROOT_NOT_BOUND'}
+    if entry.startswith(code_prefix) and entry.endswith(('.js', '.mjs', '.cjs')):
+        parent = os.path.dirname(entry)
+        package_root = None
+        for unused in range(5):
+            package_json = os.path.join(parent, 'package.json')
+            if os.path.isfile(package_json):
+                package_root = parent
+                break
+            parent = os.path.dirname(parent)
+        if package_root and package_root.startswith(code_prefix):
+            modules = []
+            examined = 0
+            for directory, dirs, names in os.walk(package_root, followlinks=False):
+                dirs[:] = [d for d in dirs if d not in ('node_modules', '.git', 'test', 'tests')
+                           and not os.path.islink(os.path.join(directory, d))]
+                if directory.count('/') - package_root.count('/') > 3:
+                    dirs[:] = []
+                    continue
+                for name in sorted(names):
+                    if (not name.endswith(('.js', '.mjs', '.cjs'))
+                            or not re.search(r'(auth|oauth|codex|gateway|session)', name, re.I)):
+                        continue
+                    path = os.path.join(directory, name)
+                    if os.path.islink(path) or len(modules) >= 40:
+                        continue
+                    try:
+                        info = os.stat(path)
+                        if not stat.S_ISREG(info.st_mode) or info.st_size > 16777216:
+                            continue
+                        with open(path, 'rb') as stream:
+                            raw = stream.read(16777217)
+                        examined += len(raw)
+                        if examined > 67108864:
+                            dirs[:] = []
+                            break
+                        source = raw.decode('utf-8', 'replace')
+                        symbols = sorted(set(re.findall(
+                            r'function\\s+([A-Za-z_$][A-Za-z0-9_$]{0,100})', source)))
+                        methods = sorted(set(re.findall(
+                            r'[\\\"\\\']((?:sessions|agents|agent|chat|models)\\.[A-Za-z0-9_.]{1,80})[\\\"\\\']',
+                            source)))
+                        modules.append({'path': path, 'sha256': hashlib.sha256(raw).hexdigest(),
+                            'uid': info.st_uid, 'mode': oct(stat.S_IMODE(info.st_mode)),
+                            'symbols': [v for v in symbols if re.search(r'(auth|oauth|profile|session|resume|abort|stop|credential)', v, re.I)][:40],
+                            'rpc_method_names': methods[:40]})
+                    except (OSError, UnicodeError):
+                        continue
+                if examined > 67108864 or len(modules) >= 40:
+                    break
+            result['installed_native_code'] = {'state': 'CODE_METADATA_ONLY',
+                'entry_path': entry, 'package_root': package_root, 'modules': modules,
+                'credential_content_read': False, 'inference_requested': False}
+
     print(json.dumps(result, sort_keys=True))
 
 
