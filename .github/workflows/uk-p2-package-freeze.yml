@@ -2,7 +2,7 @@ name: UK P2 deterministic manual package freeze
 
 on:
   push:
-    branches: [build/p2-manual-package-20261012]
+    branches: [build/p2-manual-package-20261012, fix/p2-wake-5-10-15-20261012]
     paths:
       - 'evidence/p2-install-preparation/**'
       - '.github/workflows/uk-p2-package-freeze.yml'
