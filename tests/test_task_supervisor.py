@@ -22,7 +22,7 @@ class SupervisorTests(unittest.TestCase):
 
     def registration(self, task='t1', deps=None):
         self.s.register(dict(task_id=task, parent_task_id='parent', stage='dev',
-            owner='coordinator', entry='WORK', checkpoint_sha256='a'*64,
+            owner='developer', entry='WORK', checkpoint_sha256='a'*64,
             spec_sha256='b'*64, next_action='implement',
             dependencies=deps or [], completion_conditions=['tests'],
             progress_deadline=1900, receipt_deadline=1100,
@@ -134,7 +134,7 @@ class SupervisorTests(unittest.TestCase):
         action=self.s.scan(1902)[0]
         self.assertEqual(action['action'],'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
         self.assertTrue(action['requires_effect_reconciliation'])
-        self.assertEqual(self.s._task('t1')['state'],'STARTED')
+        self.assertEqual(self.s._task('t1')['state'],'HOLD')
 
     def test_old_writer_cannot_resume_after_ack_and_new_attempt(self):
         self.registration(); self.claim()
@@ -148,6 +148,49 @@ class SupervisorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.s.record('t1','a1','zombie','PROGRESS',1005,
                           'SOURCE_COMMIT','deadbeef')
+
+    def test_event_id_reuse_with_different_bytes_is_rejected(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','start','HEARTBEAT',1001)
+
+    def test_assigned_responsibility_is_bound_to_claim(self):
+        self.registration()
+        with self.assertRaises(ValueError):
+            self.s.claim('t1','a1','other','WORK','run1','session1',
+                         'lease1',1,1,now=self.now)
+
+    def test_deadlines_trigger_even_before_generic_age(self):
+        self.registration()
+        action = self.s.scan(1100)[0]
+        self.assertEqual(action['action'],'CHECK_RECEIPT_AND_PROGRESS')
+        self.assertEqual(action['attempt_id'],UNKNOWN)
+
+    def test_supervision_action_and_hold_survive_restart(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.scan(1302); self.s.scan(1602); self.s.scan(1902)
+        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s._task('t1')['state'],'HOLD')
+        events=[r['event_id'] for r in self.s.db.execute(
+            "SELECT event_id FROM events WHERE kind='SUPERVISION_ACTION'")]
+        self.assertEqual(len(events),3)
+        self.assertEqual(len(self.s.due_outbox(1902)),3)
+
+    def test_supervisor_liveness_survives_restart(self):
+        self.s.supervisor_heartbeat('uk-supervisor','pid:42',1000)
+        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s.supervisor_health(1200)[0]['state'],'HEALTHY')
+        self.assertEqual(self.s.supervisor_health(1400)[0]['state'],
+                         'SUPERVISOR_UNAVAILABLE')
+
+    def test_terminal_artifact_hash_is_strict(self):
+        self.registration(); self.claim()
+        bad=dict(state='SUCCESS',artifact_sha256='not-a-hash',
+            writer_stopped=True,effects_reconciled=True,next_action='handoff')
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','bad','TERMINAL',1002,payload=bad)
 
     def test_quota_unavailable_is_terminal_durable_and_not_fake_running(self):
         self.registration(); self.claim()
