@@ -1,4 +1,4 @@
-"""Durable 5/15/30 minute recovery actions over the canonical ledger.
+"""Durable 5/10/15 minute recovery actions over the canonical ledger.
 
 This module never creates a second task queue.  Every action is durably
 claimed before an external adapter is invoked so a crash becomes visible
@@ -26,7 +26,7 @@ def _dump(value):
 
 
 class MechanicalWakeController(object):
-    THRESHOLDS = (300, 900, 1800)
+    THRESHOLDS = (300, 600, 900)
 
     def __init__(self, db_path, clock, adapter):
         self.db_path, self.clock, self.adapter = db_path, clock, adapter
@@ -62,15 +62,15 @@ class MechanicalWakeController(object):
         age = now - row['dispatched_at']
         if 300 not in fired and row['accepted_at'] is None and age >= 300:
             return 300
+        if (600 not in fired
+                and ((row['started_at'] is None and age >= 600)
+                or (row['started_at'] is not None and self._stale(now, row, 600)))):
+            if age < 900 or not self._stale(now, row, 900):
+                return 600
         if (900 not in fired
                 and ((row['started_at'] is None and age >= 900)
                 or (row['started_at'] is not None and self._stale(now, row, 900)))):
-            if age < 1800 or not self._stale(now, row, 1800):
-                return 900
-        if (1800 not in fired
-                and ((row['started_at'] is None and age >= 1800)
-                or (row['started_at'] is not None and self._stale(now, row, 1800)))):
-            return 1800
+            return 900
         return None
 
     def evaluate(self, task_id):
@@ -101,8 +101,8 @@ class MechanicalWakeController(object):
                 return {'state': 'IDEMPOTENT', 'task_id': task_id,
                         'attempt': attempt, 'threshold_seconds': threshold,
                         'status': previous['status']}
-            action = {300: 'RECOVER_INTAKE', 900: 'RESUME_ORIGINAL',
-                      1800: 'CONTROLLED_RECOVERY_OR_HOLD'}[threshold]
+            action = {300: 'RECOVER_INTAKE', 600: 'RESUME_ORIGINAL',
+                      900: 'CONTROLLED_RECOVERY_OR_HOLD'}[threshold]
             checkpoint = row['checkpoint']
             db.execute("""INSERT INTO mechanical_wake_events
               (task_id,attempt,threshold_seconds,triggered_at,action,run_id,
@@ -110,7 +110,7 @@ class MechanicalWakeController(object):
               VALUES(?,?,?,?,?,?,?,?,?,'ACTION_REQUESTED_EFFECT_UNKNOWN',NULL,NULL,?)""",
               (task_id, attempt, threshold, now, action, row['run_id'],
                row['session_id'], row['last_progress'], checkpoint,
-               now + (600 if threshold < 1800 else 1800)))
+               now + (300 if threshold < 900 else 900)))
             db.execute('COMMIT')
         except BaseException:
             if db.in_transaction:
@@ -133,7 +133,7 @@ class MechanicalWakeController(object):
                 if (not isinstance(observed, dict)
                         or set(observed) != {'state', 'same_attempt', 'fence_stale'}):
                     raise ValueError('INVALID_WRITER_OBSERVATION')
-                if threshold == 900:
+                if threshold == 600:
                     if observed != {'state': 'RUNNING', 'same_attempt': True,
                                     'fence_stale': False}:
                         result = {'state': 'HOLD_ORIGINAL_WRITER_NOT_RESUMABLE'}

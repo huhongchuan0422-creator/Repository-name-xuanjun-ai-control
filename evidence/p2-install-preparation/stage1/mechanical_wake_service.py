@@ -20,7 +20,7 @@ class InstalledAdapter(object):
     """Only attests capabilities available to the installed non-root unit.
 
     The preceding ExecStart performed the real intake scan.  There is not yet
-    a reviewed native-session resume API, so 15/30 minute actions remain a
+    a reviewed native-session resume API, so 10/15 minute actions remain a
     visible HOLD rather than using comments or spawning a second writer.
     """
     def recover_intake(self, context):

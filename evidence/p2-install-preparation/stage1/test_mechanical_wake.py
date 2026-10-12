@@ -44,7 +44,7 @@ class WakeTests(unittest.TestCase):
         db.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?)",
                    ('T','RUNNING',3,'worker',9999,json.dumps({'phase':'P'}),0))
         db.execute("INSERT INTO supervised_runs VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-          ('T','s','e','attempt-1','session-1','w','a',0,300,900,1800,
+          ('T','s','e','attempt-1','session-1','w','a',0,300,600,900,
            'DISPATCHED',None,None,None,None,'NONE','b',0,None,None,None,0,None,
            'DISPATCHED',json.dumps({'phase':'P'}),0,'h'))
         db.commit(); db.close()
@@ -60,26 +60,26 @@ class WakeTests(unittest.TestCase):
         self.assertEqual(state['wake_timeline'][0]['threshold_seconds'], 300)
         self.assertEqual(state['wake_timeline'][0]['result'], {'state':'RECEIVED'})
 
-    def test_fifteen_minute_resumes_only_same_live_writer(self):
+    def test_ten_minute_resumes_only_same_live_writer(self):
         db=sqlite3.connect(self.path);db.execute(
           "UPDATE supervised_runs SET accepted_at=10,started_at=10,last_progress=10")
-        db.commit();db.close();self.now[0]=910
+        db.commit();db.close();self.now[0]=610
         result=self.value.evaluate('T')
         self.assertEqual(result['state'],'RESUME_REQUESTED')
         self.assertEqual([c[0] for c in self.adapter.calls],['inspect','resume'])
 
-    def test_thirty_minute_takeover_requires_stopped_and_stale_fence(self):
+    def test_fifteen_minute_takeover_requires_stopped_and_stale_fence(self):
         db=sqlite3.connect(self.path);db.execute(
           "UPDATE supervised_runs SET accepted_at=10,started_at=10,last_progress=10")
-        db.commit();db.close();self.now[0]=1810
+        db.commit();db.close();self.now[0]=910
         self.adapter.writer={'state':'STOPPED','same_attempt':True,'fence_stale':True}
         self.assertEqual(self.value.evaluate('T')['state'],'RECOVERY_STARTED')
         self.assertEqual([c[0] for c in self.adapter.calls],['inspect','recover'])
 
-    def test_thirty_minute_live_writer_holds_without_takeover(self):
+    def test_fifteen_minute_live_writer_holds_without_takeover(self):
         db=sqlite3.connect(self.path);db.execute(
           "UPDATE supervised_runs SET accepted_at=10,started_at=10,last_progress=10")
-        db.commit();db.close();self.now[0]=1810
+        db.commit();db.close();self.now[0]=910
         result=self.value.evaluate('T')
         self.assertEqual(result['state'],'HOLD_WRITER_OR_FENCE_NOT_PROVEN')
         self.assertEqual([c[0] for c in self.adapter.calls],['inspect'])

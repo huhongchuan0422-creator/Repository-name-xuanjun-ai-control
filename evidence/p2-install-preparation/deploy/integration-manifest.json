@@ -98,7 +98,7 @@
     "stage1/p2_fixed_host_runtime.py": "66513e5ba1624e681772faf334ee1eba0245f6a36c7c3d7fb4949a1db2a1e35e",
     "scripts/uk-p2-install.py": "a667b085df2c225dd5acaa869ff305e1a31f3a570f9cda287aee31c3d1b7b034",
     "stage1/p2_prerequisites.py": "b39355a8378e81ab4e045fd8fdac73f12dbed2ca7c4c6bd79120015a18ea30f1",
-    "stage1/mechanical_wake.py": "5a2571f8d982d4608edb22af646e2161e02d85c93c0456f8aae7d3534d4caffc",
-    "stage1/mechanical_wake_service.py": "78e3157dd2010fbbde7a6b31f1942d06f3cd2aca77d4370093361d725de7c356"
+    "stage1/mechanical_wake.py": "944bbd15249a02d299997a92468f4649e87a13dbdf9492339fc21389ca68379c",
+    "stage1/mechanical_wake_service.py": "bb05684f66d88d7571e08e297200d61b0cfcadb3cbb8c65b06dfb109a1eb9736"
   }
 }
