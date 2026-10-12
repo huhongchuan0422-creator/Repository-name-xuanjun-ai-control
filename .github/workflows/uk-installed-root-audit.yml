@@ -1,0 +1,22 @@
+name: UK installed root audit capability real receipt
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths: ['.github/workflows/uk-installed-root-audit.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - name: Verify installed helper and execute exact no-argument root audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          echo "1fa4bf89868de245a82e1a7a22ae6035acd1975b42de3252197b68d08fa676c8  /usr/local/sbin/xuanjun-uk-install-audit" | sha256sum -c -
+          test "$(stat -c '%U:%a' /usr/local/sbin/xuanjun-uk-install-audit)" = root:555
+          sudo -n /usr/local/sbin/xuanjun-uk-install-audit
+          echo 'RUNNER_REAL_ROOT_AUDIT_PASS_ONLY; P2_NOT_INSTALLED' >> "$GITHUB_STEP_SUMMARY"
