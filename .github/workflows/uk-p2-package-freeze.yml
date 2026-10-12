@@ -80,7 +80,8 @@ jobs:
             'stage1/test_p2_install_entrypoint.py','stage1/p2_fixed_host_runtime.py',
             'stage1/test_p2_fixed_host_runtime.py','scripts/uk-p2-install.py',
             'stage1/p2_prerequisites.py','stage1/test_p2_prerequisites.py',
-            'stage1/test_p2_install_cli.py','stage1/mechanical_wake.py','stage1/mechanical_wake_service.py','stage1/test_mechanical_wake.py','stage1/owner_dashboard.py','stage1/owner_dashboard.html','stage1/test_p2_package_install_bridge.py','deploy/xuanjun-github-intake.service','deploy/xuanjun-github-intake.timer']
+            'stage1/test_p2_install_cli.py','stage1/codex_worker.py',
+            'stage1/test_p2_model_policy_overlay.py','stage1/mechanical_wake.py','stage1/mechanical_wake_service.py','stage1/test_mechanical_wake.py','stage1/owner_dashboard.py','stage1/owner_dashboard.html','stage1/test_p2_package_install_bridge.py','deploy/xuanjun-github-intake.service','deploy/xuanjun-github-intake.timer']
           for relative in delta:
               shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),
                               os.path.join(root,relative))
@@ -138,7 +139,7 @@ jobs:
           print('DATA_ONLY_PACKAGE_INSTALL_IDENTITY_BRIDGE_PASS')
           PY
           printf '%s  %s\n' "$archive_sha256" "$package" > frozen/SHA256SUMS
-          printf 'SOURCE_COMMIT=%s\nSOURCE_TREE=%s\nARCHIVE_SHA256=%s\n' \
+          printf 'SOURCE_COMMIT=%s\nSOURCE_TREE=%s\nBASE_EXPORT_SHA256=4145afe30eac74024ce46772508d560ec2790a12b06fdec3368e45df58b87ff0\nARCHIVE_SHA256=%s\n' \
             "$GITHUB_SHA" "$source_tree" "$archive_sha256" > frozen/SOURCE.txt
           echo "package=$package" >> "$GITHUB_OUTPUT"
           echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
@@ -147,6 +148,7 @@ jobs:
             echo 'P2_PACKAGE_FREEZE=PASS'
             echo "SOURCE_COMMIT=$GITHUB_SHA"
             echo "SOURCE_TREE=$source_tree"
+            echo "BASE_EXPORT_SHA256=4145afe30eac74024ce46772508d560ec2790a12b06fdec3368e45df58b87ff0"
             echo "ARCHIVE_SHA256=$archive_sha256"
             echo 'RUNTIME_FILES=50'
             echo 'CODEX_INFERENCE_CALLS_BY_WORKFLOW=0'
