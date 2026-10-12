@@ -497,6 +497,20 @@ def audit():
         except (OSError, subprocess.TimeoutExpired):
             provider_probe[' '.join(command)] = {'state': 'UNAVAILABLE'}
     result['p2_supported_provider_probe'] = provider_probe
+    try:
+        with open(cli_path, 'r', encoding='utf-8') as stream:
+            wrapper = stream.read(262144)
+        provider_probe['wrapper_shebang'] = wrapper.splitlines()[0][:160] if wrapper.startswith('#!') else 'NONE'
+        provider_probe['wrapper_method_symbols'] = sorted(set(re.findall(
+            r'(?:sessions|subagents|agent|tools|runs)\\.[A-Za-z_][A-Za-z0-9_.]{0,80}', wrapper)))[:80]
+        provider_probe['wrapper_runtime_paths'] = sorted(set(p for p in re.findall(
+            r'/home/xuanjun_dev/[A-Za-z0-9_./-]{1,250}', wrapper)
+            if not re.search(r'(auth|token|secret|credential)', p, re.I)))[:30]
+        provider_probe['wrapper_state_path_symbols'] = sorted(set(re.findall(
+            r'[A-Za-z_]*(?:SCRATCH|LEDGER|STATE|GATEWAY)[A-Za-z_]*', wrapper)))[:30]
+    except (OSError, UnicodeError):
+        provider_probe['wrapper_source'] = 'UNAVAILABLE'
+
 
     print(json.dumps(result, sort_keys=True))
 
