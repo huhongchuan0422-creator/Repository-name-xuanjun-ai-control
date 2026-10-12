@@ -3,7 +3,7 @@ import os,pwd,socket,stat,json,hashlib,re
 def main():
     if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:
         raise SystemExit('HOLD_FIXED_UK_NONROOT')
-    paths=['/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-Dt2Gy7El.mjs']
+    paths=['/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/cli-backend-dispatch-eligibility-BZXmQ5Ky.mjs']
     records=[]
     for requested in paths:
         path=os.path.realpath(requested)
