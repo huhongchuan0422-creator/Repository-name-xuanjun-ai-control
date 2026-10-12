@@ -7,7 +7,7 @@ import {canonical} from './controller/canonical.mjs';
 for(const raw of ['{"a":1,"a":2}','{"__proto__":{}}','1e999','9007199254740993','[1,]','{"a":1}x'])assert.throws(()=>strictJson(raw));
 assert.equal(strictJson('{"a":[true,null,"中文"]}').a[2],'中文');
 let calls=0;
-const bindings={store:{read:async()=>({task:{}})},boundary:{},prepare:async()=>{},eligibility:async()=>false,collectResult:async()=>{},verifyLease:async()=>false,commitGuard:()=>false,verifyWorkerPlacement:async()=>null,releaseWorkerPlacement:()=>true};
+const bindings={store:{read:async()=>({task:{}})},boundary:{},prepare:async()=>{},eligibility:async()=>false,collectResult:async()=>{},verifyLease:async()=>false,commitGuard:()=>false,verifyWorkerPlacement:async()=>null,releaseWorkerPlacement:()=>true,selectAgent:r=>r.sandbox==='read-only'?'platform-engineer':'developer'};
 assert.throws(()=>new NativeController({...bindings,commitGuard:undefined}),/HOST_BINDING/);
 const controller=new NativeController(bindings);
 await assert.rejects(()=>controller.admit('{}','0'.repeat(64),{}),/REQUEST_HASH/);
@@ -59,7 +59,7 @@ try {
   let current={...request,state:'RUNNING',lease_until:Date.now()/1000+60,source_manifest:source,request_contract:requestContract};
   let launchCalls=0,prepareCalls=0,leaseValid=true,unitStopped=false,placementValid=false;
   const store={read:async()=>({task:current}),receipt:async()=>({task:current}),replace:async(o,next)=>{assert.equal(o.task,current);current=next;return {task:current};}};
-  const runtime={subagent:{run:async params=>{assert.equal(current.native_execution.phase,'LAUNCH_INTENT');params.assertCurrent();launchCalls++;return {runId:'run-real-files',sessionKey:params.sessionKey,runtime:{provider:'openai',model:'gpt-5.6-sol',harness:'embedded'}};}},agent:{session:{getSessionEntry:async()=>({sessionId:'session-real-files'})}}};
+  const runtime={subagent:{run:async params=>{assert.equal(current.native_execution.phase,'LAUNCH_INTENT');assert.equal(params.sessionKey.startsWith('agent:developer:xuanjun-p2:'),true);params.assertCurrent();launchCalls++;return {runId:'run-real-files',sessionKey:params.sessionKey,runtime:{provider:'openai',model:'gpt-5.6-sol',harness:'embedded'}};}},agent:{session:{getSessionEntry:async params=>{assert.equal(params.agentId,'developer');return {sessionId:'session-real-files'};}}}};
   const concrete=new NativeController({...bindings,store,
     prepare:async()=>{assert.equal(current.native_execution.phase,'PROVISIONING');prepareCalls++;return {backend:'docker',name:'unit'};},
     boundary:{bind:async unit=>({...unit,id:'d'.repeat(64),cgroup:'/sys/fs/cgroup/xuanjun-p2-test',container_pid:42,workspace_source:dir,workspace_destination:'/workspace'}),attestSnapshot:async()=>({namespace_sha256:'e'.repeat(64)}),inspect:async()=>({active:!unitStopped,process_alive:!unitStopped,descendants_exited:unitStopped}),stop:async()=>{unitStopped=true;return {active:false,process_alive:false,descendants_exited:true};}},
@@ -85,7 +85,7 @@ try {
   const stable=current.native_execution;
   const originalPlacement=concrete.verifyWorkerPlacement;
   concrete.verifyWorkerPlacement=async(runtimeArg,args)=>{
-    current={...current,native_execution:{...current.native_execution,session_key:'agent:main:xuanjun-p2:'+'f'.repeat(64)}};
+    current={...current,native_execution:{...current.native_execution,session_key:'agent:developer:xuanjun-p2:'+'f'.repeat(64)}};
     return originalPlacement(runtimeArg,args);
   };
   await assert.rejects(()=>concrete.launch(admission,runtime),/LAUNCH_EXECUTION_BINDING_CHANGED/);

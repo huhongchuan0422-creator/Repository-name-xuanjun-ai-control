@@ -98,6 +98,14 @@ from native_peer_identity import load_native_peer_identity""")
     return LedgerOwnerDecisionServer(activation,ledger,callback_uid,
                                      native_identity=native_identity)""")
 
+    replace_once(
+        stage1 / 'execution_ledger.py',
+        """        if not isinstance(session_key, str) or not re.fullmatch(r'agent:main:xuanjun-p2:[0-9a-f]{64}', session_key):
+            raise ValueError('native tool session rejected')""",
+        """        if (not isinstance(session_key, str)
+                or not re.fullmatch(r'agent:(?:developer|platform-engineer):xuanjun-p2:[0-9a-f]{64}', session_key)):
+            raise ValueError('native tool session rejected')""")
+
     pipeline = stage1 / 'development_pipeline.py'
 
     replace_once(

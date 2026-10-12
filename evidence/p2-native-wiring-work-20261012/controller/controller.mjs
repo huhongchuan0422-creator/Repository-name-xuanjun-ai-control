@@ -7,11 +7,11 @@ const fields=['task_id','spec_hash','lease','fence','epoch','generation','instan
 const hold=reason=>{throw new Error('HOLD_'+reason);};
 /** Gateway-owned handler. Bindings must be installed host adapters, never RPC params. */
 export class NativeController {
-  constructor({store,boundary,prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement,releaseWorkerPlacement,clock=Date.now}) {
-    for(const fn of [prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement,releaseWorkerPlacement]) if(typeof fn!=='function')hold('HOST_BINDING_MISSING');
+  constructor({store,boundary,prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement,releaseWorkerPlacement,selectAgent,clock=Date.now}) {
+    for(const fn of [prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement,releaseWorkerPlacement,selectAgent]) if(typeof fn!=='function')hold('HOST_BINDING_MISSING');
     this.store=store;this.boundary=boundary;this.prepare=prepare;
     this.eligibility=eligibility;this.collectResult=collectResult;
-    this.verifyLease=verifyLease;this.commitGuard=commitGuard;this.verifyWorkerPlacement=verifyWorkerPlacement;this.releaseWorkerPlacement=releaseWorkerPlacement;this.clock=clock;
+    this.verifyLease=verifyLease;this.commitGuard=commitGuard;this.verifyWorkerPlacement=verifyWorkerPlacement;this.releaseWorkerPlacement=releaseWorkerPlacement;this.selectAgent=selectAgent;this.clock=clock;
   }
   async current(request) {
     const observed=await this.store.read(request);
@@ -46,10 +46,12 @@ export class NativeController {
     }
     if(await this.eligibility(runtime,request))hold('CLI_DISPATCH_BYPASS');
     const source=await verifySnapshot(observed.task.source_manifest,request.workdir);
-    const sessionKey='agent:main:xuanjun-p2:'+key;
+    const agentId=this.selectAgent(request);
+    if(!['developer','platform-engineer'].includes(agentId))hold('AGENT_POLICY');
+    const sessionKey='agent:'+agentId+':xuanjun-p2:'+key;
     // Persist intent before provisioning any physical execution boundary.
     observed=await this.store.replace(observed,{...observed.task,native_execution:{
-      phase:'PROVISIONING',request,idempotency_key:key,session_key:sessionKey,source,previous_receipts:previous}});
+      phase:'PROVISIONING',request,idempotency_key:key,session_key:sessionKey,agent_id:agentId,source,previous_receipts:previous}});
     const unit=await this.prepare(runtime,{request,sessionKey,source,idempotencyKey:key});
     const bound=await this.boundary.bind(unit,request.workdir,[],request.sandbox);
     if(typeof this.boundary.attestSnapshot!=='function')hold('NAMESPACE_ATTESTATION_UNAVAILABLE');
@@ -126,7 +128,7 @@ export class NativeController {
   }
   async persistLaunch(record,result,runtime) {
     if(!result?.runId||result.sessionKey!==record.session_key)hold('LAUNCH_UNKNOWN');
-    const entry=await runtime.agent.session.getSessionEntry({sessionKey:record.session_key,agentId:'main',readConsistency:'latest'});
+    const entry=await runtime.agent.session.getSessionEntry({sessionKey:record.session_key,agentId:record.agent_id,readConsistency:'latest'});
     if(!entry?.sessionId)hold('SESSION_ID_UNKNOWN');
     const receipt={binding:Object.fromEntries(fields.map(k=>[k,record.request[k]])),idempotency_key:record.idempotency_key,run_id:result.runId,session_id:entry.sessionId,execution_unit_id:record.unit.backend+':'+record.unit.id,placement_digest:createHash('sha256').update(canonical(record.placement)).digest('hex')};
     const latest=await this.current(record.request);
