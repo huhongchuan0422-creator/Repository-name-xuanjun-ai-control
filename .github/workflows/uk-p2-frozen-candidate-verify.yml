@@ -14,6 +14,8 @@ env:
   P2_SOURCE_COMMIT: "d05d0978fd0f60a7df258c752990995f896c1965"
   P2_SOURCE_TREE: "c36fb7806cf75a83a4fa34608be7f650523fffd1"
   P2_MANIFEST_SHA256: "73c0c49b694f7ee531306490ad5c1e4e9c74c5321dba0ef1d75734ba56e4b6e0"
+  P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
+  P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
   verify:
     runs-on:
@@ -33,7 +35,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
-          rm -rf /tmp/p2pkg /tmp/p2-candidate.tar.gz
+          test ! -e "$P2_WORK_DIR"
+          test ! -e "$P2_TAR_PATH"
           /usr/bin/python3 -I -B - <<'PY'
           import hashlib,io,os,tarfile,urllib.parse,urllib.request,zipfile,sys
           assert sys.version_info[:3]==(3,6,8)
@@ -55,23 +58,23 @@ jobs:
                   assert m.isfile() and parts[0]=='xuanjun-p2-package'
                   assert all(p not in ('','.', '..') for p in parts) and m.name not in seen
                   seen.add(m.name)
-              t.extractall('/tmp/p2pkg')
-          open('/tmp/p2-candidate.tar.gz','wb').write(tarbytes)
+              t.extractall(os.environ['P2_WORK_DIR'])
+          open(os.environ['P2_TAR_PATH'],'wb').write(tarbytes)
           print('P2_UK_ARTIFACT_EXTRACT=PASS')
           PY
       - name: Verify exact package through real installer on UK
         shell: bash
         run: |
           set -euo pipefail
-          ROOT=/tmp/p2pkg/xuanjun-p2-package
-          /usr/bin/python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          ROOT="$P2_WORK_DIR/xuanjun-p2-package"
+          /usr/bin/python3 "$ROOT/tools/p2-package-freeze.py" verify --archive "$P2_TAR_PATH" --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
           # Real install staging is root-owned. Reproduce only that ownership in /tmp
           # before invoking the root-only release installer verifier.
-          sudo -n /usr/bin/chown -R 0:0 /tmp/p2pkg
-          sudo -n /usr/bin/python3 -I -B - <<'PY'
+          sudo -n /usr/bin/chown -R 0:0 "$P2_WORK_DIR"
+          sudo -n /usr/bin/python3 -I -B - "$ROOT" <<'PY'
           import hashlib,importlib.util,os,stat,subprocess,sys,grp
           assert sys.version_info[:3]==(3,6,8)
-          root='/tmp/p2pkg/xuanjun-p2-package'
+          root=sys.argv[1]
           spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
