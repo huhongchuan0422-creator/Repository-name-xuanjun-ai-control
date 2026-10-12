@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "task_id": "XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1",
+  "source_commit": "f840b2e98724a9e5b940f73606ee0687b6ba98c8",
+  "source_tree": "2810ad1e2c596796469c75999f8d1d62ecb74d2d",
+  "archive_sha256": "456ae23aa52e300021c9fb889df84d8eba34965769ce868e5ee6e43c29911a13",
+  "manifest_sha256": "4f77c7f11be7a3c96ecbd8c30c239189876a42a47e9d16cec0f875b8df3b16aa",
+  "export_run": 38250045267,
+  "export_artifact": 11747942678,
+  "qa": "FAIL",
+  "security": "FAIL",
+  "release": "HOLD",
+  "install": "DENIED",
+  "review_environment": "WORK_NATIVE_ISOLATED_STATIC_AND_FAKE_TESTS_NO_UK_INSTALL",
+  "reviewers": {
+    "qa": "/root/p2_qa",
+    "security": "/root/p2_security",
+    "release": "/root/p2_release"
+  },
+  "reports": {
+    "QA_REVIEW.md": "12d7bac3a75a8e858b14718b3d2108862825f1fd4e07272fe78d3a990002691f",
+    "SECURITY_REVIEW.md": "c1b66b047d1c8b4c1d73db91ffe51633f7b8c31d5588da35c4105e4147317dc2",
+    "RELEASE_REVIEW.md": "8ac953db16399b458c6e796362429cd432ca5af0e7d2632eaf53ca955a6c8007"
+  },
+  "repair_actor": "/root/p2_minimal_repair",
+  "repair_scope": "ISOLATED_SOURCE_PROPOSAL_NO_UK_EXECUTION_AUTHORITY"
+}
