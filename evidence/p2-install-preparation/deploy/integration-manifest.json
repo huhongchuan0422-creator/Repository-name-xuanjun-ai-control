@@ -52,7 +52,7 @@
   "files": {
     "deploy/INTEGRATION_BINDING.md": "fa8518ad5eab07520a92ca1d87ccf788c56ab6550e48112bc1d505e2fa73337a",
     "deploy/UK_DISPATCHER_ROLLOUT.md": "7f8929cf16b4739ac6fbf10b4bedbc1ab406ae04ccdc6d2613747c22bdb1538a",
-    "deploy/dispatcher.example.json": "0f800866484bda5b1bc8b34ee8938b872540581927615325337dc49cac90ab8f",
+    "deploy/dispatcher.example.json": "cc449a9fd1dfa47608f32eb4d119b4b384e52ab149919fe7b101ae9291d66bff",
     "deploy/root-broker.example.json": "9cc7251fece619ce8a9d1fa99d6f4b22db489e612c3305d5c24a208237530b73",
     "deploy/uk-owner-workbench/README.md": "a22d154a81aa293fff778b456dc4e33c3043ba06a371bd0efe0b812c84da50b2",
     "deploy/uk-owner-workbench/nginx.conf.template": "f72349f30c7c6beb950522967a3ce6a274285d48a12fcb531615ac0f84c410ef",
@@ -60,7 +60,7 @@
     "deploy/uk-owner-workbench/xuanjun-uk-owner-dashboard.service": "3e03f165fad1892465f28324f8dea2fba8ff620b759fa2c265a625dc03cd431f",
     "deploy/xj-root-broker.service": "50d7781cb9c385f154fe80d9d9310411576f8ed98d4f5c84cdc1c5a0bd6de7ba",
     "deploy/xj-root-broker.socket": "a01777a36599bdc253357a100ed9eb089507b6bc9cae739cb3647b8e35d49562",
-    "deploy/xuanjun-development-dispatcher.service": "bcd5ebe28f9c568aa516c1511d2c97cfff7ea4b674ebdfdd5f83384b5fa29f3f",
+    "deploy/xuanjun-development-dispatcher.service": "92c3d59805ed104eb5b79843f9941cb93e8d230377e24ee50bbb6e6b3027d72d",
     "deploy/xuanjun-github-intake.service": "1f04f0963b44ef3efd99c8ffce7dc2be4e0503516aa0f1ee0757abedf8699fc4",
     "deploy/xuanjun-github-intake.timer": "9e0cfad3d302dec3514a6fd9248c5c3252579c5a9f91070e978837e617c05e8e",
     "deploy/xuanjun-ledger.service": "06322ea8c0d0b2d615c0905f4ce8b231ae03693d355d403338bf16c96096247a",
