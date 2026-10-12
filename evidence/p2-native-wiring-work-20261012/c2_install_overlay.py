@@ -414,11 +414,23 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
             or not isinstance(verifier,str) or verifier.startswith('/')
 """)
     manifest=deploy/'integration-manifest.json';value=json.loads(manifest.read_text());files=value['files']
-    for path in [entry,runtime,installer,binding,ledger_client,dropin]:
-        files[path.relative_to(source).as_posix()]=sha(path)
+    authorized=set(files)
+    c2_paths=[entry,runtime,installer,binding,ledger_client,dropin]
     plugin=source/'plugins'/'p2-native-controller'
-    for path in sorted(plugin.iterdir()):
-        if path.is_file():files[path.relative_to(source).as_posix()]=sha(path)
+    c2_paths.extend(path for path in sorted(plugin.iterdir()) if path.is_file())
+    for item in c2_paths:
+        relative=item.relative_to(source).as_posix()
+        if relative not in files:
+            files[relative]=sha(item)
+            authorized.add(relative)
+    # All prior changes came from the pinned old artifact + fuzz=0 native patch +
+    # exact follow-up/C2 replacements. Rebind every already-authorized runtime
+    # path to its final bytes; never discover or admit unrelated files here.
+    for relative in sorted(authorized):
+        item=source/relative
+        if not item.is_file() or item.is_symlink():
+            raise ValueError('C2_MANIFEST_FILE_MISSING_OR_UNSAFE:'+relative)
+        files[relative]=sha(item)
     manifest.write_text(json.dumps(value,sort_keys=True,indent=2,separators=(',', ': '))+'\n')
     print('P2_C2_INSTALL_OVERLAY_APPLIED')
 
