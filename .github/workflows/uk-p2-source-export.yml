@@ -1,0 +1,46 @@
+name: UK P2 export authoritative source (mechanical only)
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths: ['plans/UK_P2_SOURCE_EXPORT_TRIGGER_20261012.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-p2-once-source-export
+  cancel-in-progress: false
+jobs:
+  export:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 6
+    steps:
+      - name: Read-only exact host, account and source-handoff admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
+          test "$(id -un)" = "githubrunner"
+          test "$GITHUB_REPOSITORY" = "huhongchuan0422-creator/Repository-name-xuanjun-ai-control"
+          DIR=/var/lib/xuanjun-p2-source-handoff
+          FILE="$DIR/authoritative-source.tar.gz"
+          test ! -L "$DIR" && test ! -L "$FILE"
+          test "$(stat -c '%a:%U' "$DIR")" = "700:githubrunner"
+          test "$(stat -c '%a:%U' "$FILE")" = "600:githubrunner"
+          test "$(stat -c %s "$FILE")" -le 5242880
+          tar -tzf "$FILE" | LC_ALL=C sort | diff -u - <(printf '%s\n' 'CHECKSUMS.sha256' 'manifest.txt' 'tracked-source.tar' 'worktree-diff.patch' | LC_ALL=C sort)
+          echo "P2_SOURCE_HANDOFF_SHA256=$(sha256sum "$FILE" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
+          echo "SOURCE_EXPORT_ONLY_NO_MODEL_NO_INSTALL"
+      - name: Upload private code-only source archive for GitHub-connected Work review
+        uses: actions/upload-artifact@v4
+        with:
+          name: xuanjun-p2-authoritative-source-${{ github.run_id }}
+          path: /var/lib/xuanjun-p2-source-handoff/authoritative-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Record non-release acceptance boundary
+        shell: bash
+        run: |
+          echo "P2_SOURCE_EXPORTED_ONLY_NOT_INSTALLED" >> "$GITHUB_STEP_SUMMARY"
+          echo "P3_NOT_STARTED" >> "$GITHUB_STEP_SUMMARY"
+          echo "MODEL_INFERENCE_BY_THIS_JOB=0" >> "$GITHUB_STEP_SUMMARY"
