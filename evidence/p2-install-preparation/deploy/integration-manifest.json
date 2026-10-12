@@ -90,6 +90,7 @@
     "stage1/telegram_owner_transport.py": "fd161575bfb6db99b367e712f8ad82c7941255e61364e347e5567ab56272beda",
     "stage1/uk_owner_callback_core.py": "a00e5b28468bdb335f891026039655167cb7df6ab207702375518c6f11471884",
     "stage1/uk_owner_notify_worker.py": "90dee461e16d90994dfda3942c0e8312ff5b3703fbc4340f74453f690506b10d",
-    "stage1/ledger_install_stage.py": "0775b91a51bf46097e6fd3b33e19745fe4fa0fd324bde69b3d3bf61bc618c2db"
+    "stage1/ledger_install_stage.py": "0775b91a51bf46097e6fd3b33e19745fe4fa0fd324bde69b3d3bf61bc618c2db",
+    "stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e"
   }
 }
