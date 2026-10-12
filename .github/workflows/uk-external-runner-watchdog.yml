@@ -1,0 +1,31 @@
+name: UK external Runner receipt SLA (mechanical only)
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+concurrency:
+  group: xuanjun-runner-receipt-${{ github.event.comment.id }}
+  cancel-in-progress: false
+jobs:
+  monitor:
+    if: >-
+      github.event.issue.number == 17 &&
+      github.event.sender.login == 'huhongchuan0422-creator' &&
+      contains(github.event.comment.body, '<!-- XJ_GH_TASK_EVENT') &&
+      contains(github.event.comment.body, '"state":"SUBMITTED"')
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Monitor one submitted attempt until terminal receipt or deadline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 -B scripts/uk-external-runner-watchdog.py --event-path "$GITHUB_EVENT_PATH"
