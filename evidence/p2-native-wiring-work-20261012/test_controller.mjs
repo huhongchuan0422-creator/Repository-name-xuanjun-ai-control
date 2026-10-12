@@ -78,7 +78,14 @@ try {
   placementValid=true;
   const launched=await concrete.launch(admission,runtime);
   assert.equal(launched.run_id,'run-real-files');assert.equal(launchCalls,1);
-  await assert.rejects(()=>concrete.launch(admission,runtime),/RECEIPT_MISMATCH|LAUNCH_REPLAY/);
+  const duplicate=await concrete.launch(admission,runtime);
+  assert.equal(duplicate.run_id,launched.run_id);assert.equal(launchCalls,1);
+  // Simulate a controller/client crash after durable LAUNCH_INTENT but before receipt persistence.
+  const savedReceipt=current.native_execution.receipt;
+  current={...current,native_execution:{...current.native_execution,phase:'LAUNCH_INTENT',receipt:undefined}};
+  const recovered=await concrete.launch(admission,runtime);
+  assert.equal(recovered.run_id,savedReceipt.run_id);assert.equal(launchCalls,2);
+  // The Gateway idempotency key is the same; a real host must replay the accepted run.
   leaseValid=false;
   // Stop uses persisted receipt even after the live claim is lost.
   assert.equal((await concrete.stop(launched,{subagent:{deleteSession:async()=>{}}})).descendants_exited,true);

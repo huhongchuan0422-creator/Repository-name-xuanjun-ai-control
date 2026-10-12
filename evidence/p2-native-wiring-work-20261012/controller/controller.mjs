@@ -31,7 +31,8 @@ export class NativeController {
     if(observed.task.native_execution) {
       const saved=observed.task.native_execution;
       if(saved.idempotency_key===key && canonical(saved.request)===canonical(request)) {
-        if(saved.phase!=='ADMITTED')hold('EFFECT_RECONCILIATION_REQUIRED');
+        if(!saved.admission||!['ADMITTED','LAUNCH_INTENT','RUNNING','TERMINAL'].includes(saved.phase))
+          hold('EFFECT_RECONCILIATION_REQUIRED');
         return saved.admission;
       }
       if(saved.phase!=='TERMINAL'||!saved.report||saved.observation?.descendants_exited!==true
@@ -63,13 +64,13 @@ export class NativeController {
   async launch(admission,runtime) {
     const {observed,record}=await this.record(admission);
     await this.current(record.request);
-    if(record.phase!=='ADMITTED'||canonical(record.admission)!==canonical(admission))hold('LAUNCH_REPLAY_FORBIDDEN');
+    if(canonical(record.admission)!==canonical(admission))hold('LAUNCH_REPLAY_FORBIDDEN');
+    if(record.receipt && ['RUNNING','TERMINAL'].includes(record.phase))return record.receipt;
+    if(!['ADMITTED','LAUNCH_INTENT'].includes(record.phase))hold('LAUNCH_REPLAY_FORBIDDEN');
     await verifySnapshot(observed.task.source_manifest,record.request.workdir);
     const boundary=await this.boundary.inspect(record.unit);
     if(!boundary.active||!boundary.process_alive)hold('BOUNDARY_NOT_ACTIVE');
     if(await this.eligibility(runtime,record.request))hold('CLI_DISPATCH_BYPASS');
-    // Require an independent host-provided placement attestation before any irreversible dispatch.
-    // A container's existence and an SDK sessionKey are NOT proof of run confinement.
     const placement=await this.verifyWorkerPlacement(runtime,{request:record.request,unit:record.unit,sessionKey:record.session_key,source:record.source});
     const requestDigest=createHash('sha256').update(canonical(record.request)).digest('hex');
     if(!placement || placement.verified!==true
@@ -80,22 +81,25 @@ export class NativeController {
       ||placement.source_manifest_sha256!==record.source.manifest_sha256
       ||placement.request_sha256!==requestDigest
       ||placement.sandbox_runtime_id!==record.unit.name)hold('WORKER_PLACEMENT_UNVERIFIED');
-    // Re-read the canonical revision after the potentially slow placement check.
-    // Never CAS using a pre-check snapshot: lease/fence or execution state may have changed.
-    const latest=await this.current(record.request);
-    if(latest.task.native_execution?.phase!=='ADMITTED'
-      ||canonical(latest.task.native_execution.admission)!==canonical(admission))hold('LAUNCH_STALE_ADMISSION');
-    const intentObserved=await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'LAUNCH_INTENT',placement}});
-    const intentRecord=intentObserved.task.native_execution;
-    const request=intentRecord.request;
-    // Only the Gateway-injected request-scoped SDK may dispatch this run.
+    let intentRecord=record;
+    if(record.phase==='ADMITTED') {
+      const latest=await this.current(record.request);
+      if(latest.task.native_execution?.phase!=='ADMITTED'
+        ||canonical(latest.task.native_execution.admission)!==canonical(admission))hold('LAUNCH_STALE_ADMISSION');
+      const intentObserved=await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'LAUNCH_INTENT',placement}});
+      intentRecord=intentObserved.task.native_execution;
+    } else if(canonical(record.placement)!==canonical(placement)) {
+      hold('LAUNCH_PLACEMENT_CHANGED');
+    }
+    return this.dispatchLaunch(intentRecord,runtime);
+  }
+  async dispatchLaunch(record,runtime) {
+    const request=record.request;
     const result=await runtime.subagent.run({sessionKey:record.session_key,message:request.prompt,
       provider:request.provider,model:request.model,cwd:request.workdir,
       idempotencyKey:record.idempotency_key,deliver:false,
       assertCurrent:()=>{const proof=this.commitGuard(request); if(proof!==true)hold('COMMIT_LEASE_OR_FENCE');}});
-    // A synchronous lease guard must be bound by the installed host adapter;
-    // fail closed rather than making an asynchronous CAS check look synchronous.
-    return this.persistLaunch(intentRecord,result,runtime);
+    return this.persistLaunch(record,result,runtime);
   }
   async persistLaunch(record,result,runtime) {
     if(!result?.runId||result.sessionKey!==record.session_key)hold('LAUNCH_UNKNOWN');
@@ -103,13 +107,19 @@ export class NativeController {
     if(!entry?.sessionId)hold('SESSION_ID_UNKNOWN');
     const receipt={binding:Object.fromEntries(fields.map(k=>[k,record.request[k]])),idempotency_key:record.idempotency_key,run_id:result.runId,session_id:entry.sessionId,execution_unit_id:record.unit.backend+':'+record.unit.id,placement_digest:createHash('sha256').update(canonical(record.placement)).digest('hex')};
     const latest=await this.current(record.request);
-    if(latest.task.native_execution?.phase!=='LAUNCH_INTENT')hold('LAUNCH_CAS');
-    await this.store.replace(latest,{...latest.task,native_execution:{...record,phase:'RUNNING',receipt,runtime:result.runtime}});
+    const current=latest.task.native_execution;
+    if(current?.receipt) {
+      if(canonical(current.receipt)!==canonical(receipt)||!['RUNNING','TERMINAL'].includes(current.phase))hold('LAUNCH_CAS');
+      return current.receipt;
+    }
+    if(current?.phase!=='LAUNCH_INTENT'||current.idempotency_key!==record.idempotency_key)hold('LAUNCH_CAS');
+    await this.store.replace(latest,{...latest.task,native_execution:{...current,phase:'RUNNING',receipt,runtime:result.runtime}});
     return receipt;
   }
   async inspect(receipt,runtime) {
     const {observed,record}=await this.record(receipt);
     if(!record.receipt)hold('LAUNCH_EFFECT_UNKNOWN');
+    if(record.phase==='TERMINAL'&&record.observation)return record.observation;
     const status=await runtime.subagent.waitForRun({runId:receipt.run_id,timeoutMs:1});
     if(!['ok','error','pending','timeout'].includes(status?.status))hold('RUN_STATE_UNKNOWN');
     let unit=await this.boundary.inspect(record.unit);
@@ -138,6 +148,11 @@ export class NativeController {
   }
   async stop(receipt,runtime) {
     const {record}=await this.record(receipt,true);
+    if(record.phase==='TERMINAL'&&record.observation?.unit_active===false
+      &&record.observation?.process_alive===false&&record.observation?.descendants_exited===true) {
+      this.releaseWorkerPlacement(record.session_key);
+      return record.observation;
+    }
     // Session cancellation and physical stop are separate observations.
     // Always attempt the physical stop even if cancellation response is lost.
     let cancelled=false;
