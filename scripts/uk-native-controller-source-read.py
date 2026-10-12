@@ -30,9 +30,9 @@ def main():
         folders[:]=[f for f in sorted(folders) if depth<5 and f not in ('node_modules','__pycache__')]
         for name in sorted(files):
             path=os.path.join(directory,name)
-            if name.endswith(('.js','.mjs')) and any(w in path[len(root):] for w in ('gateway','agent','automation','schema','protocol','worker')):code_paths.append(path)
+            if name.endswith(('.js','.mjs','.d.ts')) and any(w in path[len(root):] for w in ('plugin-runtime','runtime-subagent','plugin-sdk','plugins.types')):code_paths.append(path)
         if len(code_paths)>3000:break
-    code_paths.insert(0,root+'/src-D2gvuSyP.mjs')
+    code_paths=[p for p in code_paths if any(w in p for w in ('runtime','types','index'))]
     for path in code_paths:
         info=os.lstat(path)
         if not stat.S_ISREG(info.st_mode) or info.st_size>4000000:continue
@@ -41,7 +41,7 @@ def main():
         with open(path,'r',encoding='utf-8') as f:body=f.read()
         if re.search(r'-----BEGIN .*PRIVATE KEY|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{30,}|[0-9]{6,}:[A-Za-z0-9_-]{25,}|sk-[A-Za-z0-9]{32,}',body):continue
         snippets=[]
-        for word in ('const AgentParamsSchema','const AgentWaitParamsSchema','runEmbeddedPiAgent','expectedRevision','automations.scratch','agentHandlers','registerGatewayMethod','WorkerSessionsSpawnParamsSchema','worker.sessions.spawn'):
+        for word in ('registerGatewayMethod','subagent:','subagent =','runSubagent','PluginRuntimeSubagent','pluginRuntimeOwnerId'):
             start=body.find(word)
             if start>=0:snippets.append({'symbol':word,'source':body[max(0,start-1000):start+5000]})
         if snippets:selected.append({'path':path,'sha256':hashlib.sha256(body.encode()).hexdigest(),'snippets':snippets})
