@@ -142,7 +142,7 @@
      def _deliver(self, claim, cp):
 --- /dev/null
 +++ b/stage1/native_pipeline_runtime.py
-@@ -0,0 +1,189 @@
+@@ -0,0 +1,191 @@
 +"""Connect the existing pipeline to an explicitly reviewed native controller.
 +
 +No Gateway RPCs are invented here. The controller must supply the installed
@@ -331,10 +331,12 @@
 +        raise NativeContractError('installed controller factory missing')
 +    from native_github_notifier import FixedPr17GithubNotifier
 +    notifier = FixedPr17GithubNotifier(config['gh_bin'], config['service_home'], config['path'])
-+    return NativePipelineRuntime(factory(config), notifier=notifier)
++    runtime = NativePipelineRuntime(factory(config), notifier=notifier)
++    runtime.binary_sha256 = digest
++    return runtime
 --- /dev/null
 +++ b/stage1/native_gateway_controller.py
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,114 @@
 +"""Transport to installed plugin-owned endpoints; never dispatch generic agent RPC."""
 +import hashlib
 +import json
@@ -343,6 +345,25 @@
 +import subprocess
 +
 +from native_child_adapter import NativeContractError
++
++
++def strict_json(raw):
++    import math
++    def pairs(values):
++        result = {}
++        for key, value in values:
++            if key in result or key in ('__proto__', 'constructor', 'prototype'):
++                raise NativeContractError('duplicate or unsafe Gateway JSON key')
++            result[key] = value
++        return result
++    def finite(token):
++        value = float(token)
++        if not math.isfinite(value):
++            raise NativeContractError('nonfinite Gateway JSON')
++        return value
++    def constant(unused):
++        raise NativeContractError('nonfinite Gateway JSON')
++    return json.loads(raw, object_pairs_hook=pairs, parse_float=finite, parse_constant=constant)
 +
 +
 +class GatewayController(object):
@@ -372,7 +393,7 @@
 +            raise NativeContractError('Gateway effect unknown; no retry')
 +        if process.returncode or len(output) > 1048576:
 +            raise NativeContractError('Gateway response unconfirmed; no retry')
-+        return json.loads(output.decode('utf-8'))
++        return strict_json(output.decode('utf-8'))
 +
 +    def _call(self, operation, value=None, **params):
 +        method = ('xuanjun.execution.start' if operation in ('admit', 'launch')
@@ -424,7 +445,7 @@
 +            raise NativeContractError('transport config limit')
 +    finally:
 +        os.close(fd)
-+    transport = json.loads(raw.decode('utf-8'))
++    transport = strict_json(raw.decode('utf-8'))
 +    required = {'openclaw_bin', 'openclaw_sha256', 'openclaw_owner_uid',
 +                'gateway_home', 'gateway_path'}
 +    if not isinstance(transport, dict) or set(transport) != required:
@@ -526,42 +547,76 @@
 +        return {'idempotency_key':idempotency_key,'message_id':str(result['id'])}
 --- /dev/null
 +++ b/stage1/native_ledger_bridge.py
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,65 @@
 +#!/usr/bin/env python3
-+"""Bound host adapter for existing ledger only; never creates a database/table."""
++"""Synchronous client of the EXISTING ledger socket; no direct DB access."""
 +import argparse
 +import json
 +import os
++import socket
++import stat
++import struct
 +import sys
-+from activation_control import ActivationStore
-+from development_service import load_config
-+from execution_ledger import ExecutionLedger
++from native_ledger_operations import execute
 +
 +
-+def existing_ledger(config, cleanup=False):
-+    activation = ActivationStore(config['activation_descriptor'],
-+        config['activation_epoch_journal'], config['activation_lock'])
-+    active = ({key: config[key] for key in ('db_path', 'ledger_uuid', 'generation', 'instance')}
-+              if cleanup else activation.read(require_active=True))
-+    if active['db_path'] != config['db_path']:
-+        raise ValueError('active canonical path mismatch')
-+    ledger = object.__new__(ExecutionLedger)
-+    ledger.db_path = active['db_path']
-+    ledger.repositories = frozenset([config['control_repository']])
-+    ledger.approved_base_shas = frozenset([config['source_commit']])
-+    ledger.max_heavy = config['max_workers']
-+    import time
-+    ledger.clock = time.time
-+    ledger.activation_store = None if cleanup else activation
-+    ledger.activation_binding = None if cleanup else {key: active[key] for key in
-+        ('ledger_uuid', 'generation', 'epoch', 'instance', 'db_path')}
-+    if not cleanup:
-+        with ledger._transaction() as conn:
-+            ledger._validate_schema(conn)
-+            ledger._validate_side_schema(conn)
-+    return ledger
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--config', required=True)
++    args = parser.parse_args()
++    fd = os.open(args.config, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
++    try:
++        info = os.fstat(fd)
++        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or info.st_size > 65536:
++            raise ValueError('protected socket client config required')
++        config = json.loads(os.read(fd, 65537).decode('utf-8'))
++    finally:
++        os.close(fd)
++    if set(config) != {'socket_path', 'server_uid'} or type(config['server_uid']) is not int or config['server_uid'] < 1:
++        raise ValueError('socket client config mismatch')
++    path = config['socket_path']
++    if not os.path.isabs(path) or os.path.realpath(path) != path:
++        raise ValueError('canonical ledger socket required')
++    raw = sys.stdin.buffer.read(1048577)
++    if len(raw) > 1048576:
++        raise ValueError('native request limit')
++    payload = json.loads(raw.decode('utf-8'))
++    packed = (json.dumps({'operation':'NATIVE_GATEWAY', 'payload':payload},
++                        sort_keys=True,separators=(',', ':'),allow_nan=False)+'\n').encode('utf-8')
++    if len(packed) >= 1048576:
++        raise ValueError('native wire limit')
++    connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
++    try:
++        connection.settimeout(10)
++        connection.connect(path)
++        credentials = connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,struct.calcsize('3i'))
++        if struct.unpack('3i',credentials)[1] != config['server_uid']:
++            raise ValueError('ledger socket server UID mismatch')
++        connection.sendall(packed)
++        response=bytearray()
++        while b'\n' not in response:
++            chunk=connection.recv(1048576-len(response))
++            if not chunk or len(response)+len(chunk)>=1048576:raise ValueError('native response unconfirmed')
++            response.extend(chunk)
++        line,remainder=bytes(response).split(b'\n',1)
++        if remainder:raise ValueError('multiple native responses')
++        value=json.loads(line.decode('utf-8'))
++        if set(value)!={'accepted','result'} or value['accepted'] is not True:
++            raise ValueError('native operation unconfirmed')
++        sys.stdout.write(json.dumps(value['result'],sort_keys=True,separators=(',', ':'),allow_nan=False))
++    finally:
++        connection.close()
 +
 +
++if __name__ == '__main__':
++    try:main()
++    except Exception:
++        sys.stderr.write('HOLD_CANONICAL_SOCKET\n')
++        sys.exit(2)
+--- /dev/null
++++ b/stage1/native_ledger_operations.py
+@@ -0,0 +1,19 @@
++"""Typed native operations over the existing ledger, without dispatch authority."""
 +def execute(ledger, value):
 +    if not isinstance(value, dict) or value.get('operation') not in ('preflight', 'read', 'cas', 'guard', 'receipt', 'tool_guard'):
 +        raise ValueError('native bridge operation rejected')
@@ -580,34 +635,21 @@
 +    observed = ledger.native_observation(request)
 +    return True if value['operation'] == 'guard' else observed
 +
-+
-+def main():
-+    parser = argparse.ArgumentParser()
-+    parser.add_argument('--config', required=True)
-+    args = parser.parse_args()
-+    if os.stat(args.config, follow_symlinks=False).st_uid != 0:
-+        raise ValueError('root-owned config required')
-+    raw = sys.stdin.buffer.read(1048577)
-+    if len(raw) > 1048576:
-+        raise ValueError('native request limit')
-+    value = json.loads(raw.decode('utf-8'))
-+    result = execute(existing_ledger(load_config(args.config), cleanup=value.get('operation') == 'receipt'), value)
-+    sys.stdout.write(json.dumps(result, sort_keys=True, separators=(',', ':'), allow_nan=False))
-+
-+
-+if __name__ == '__main__':
-+    try:
-+        main()
-+    except Exception:
-+        sys.stderr.write('HOLD_CANONICAL_BRIDGE\n')
-+        sys.exit(2)
 --- a/stage1/execution_ledger.py
 +++ b/stage1/execution_ledger.py
-@@ -481,6 +481,98 @@
+@@ -481,6 +481,106 @@
              self._live(conn, task_id, worker_id, fence, self._now())
          return True
  
 +    def _native_bound(self, conn, request):
++        if (not isinstance(request, dict)
++                or any(type(request.get(k)) is not int or request[k] < 1
++                       for k in ('fence', 'epoch', 'generation'))
++                or any(not isinstance(request.get(k), str) or not request[k]
++                       for k in ('task_id', 'lease', 'instance'))
++                or not isinstance(request.get('spec_hash'), str)
++                or not re.fullmatch(r'[0-9a-f]{64}', request['spec_hash'])):
++            raise LeaseLost('native claim types rejected')
 +        row = self._live(conn, request['task_id'], request['lease'], request['fence'], self._now())
 +        stored = conn.execute('SELECT * FROM execution_specs WHERE task_id=?',
 +                              (request['task_id'],)).fetchone()
@@ -702,7 +744,7 @@
      def heartbeat(self, task_id, worker_id, fence, ttl=60, phase='EXECUTING'):
          self._ttl(ttl)
          if not isinstance(phase, str) or re.fullmatch(r'[A-Z][A-Z0-9_]{0,31}', phase) is None:
-@@ -500,7 +592,14 @@
+@@ -500,7 +600,14 @@
          packed = self._dump(value)
          with self._transaction() as conn:
              now = self._now()
@@ -732,7 +774,7 @@
  
  
  SHA = re.compile(r'^[0-9a-f]{40}$')
-@@ -329,10 +329,13 @@
+@@ -329,22 +329,24 @@
                                         separators=(',', ':')) + '\n').encode('utf-8'))
  
  
@@ -747,7 +789,23 @@
      activation = ActivationStore(config['activation_descriptor'],
                                   config['activation_epoch_journal'],
                                   config['activation_lock'])
-@@ -359,12 +362,10 @@
+     active = activation.read(require_active=True)
+-    binary_digest = hashlib.sha256()
+-    with open(config['codex_bin'], 'rb') as binary:
+-        for chunk in iter(lambda: binary.read(1024 * 1024), b''):
+-            binary_digest.update(chunk)
++    native_digest = getattr(native_runtime, 'binary_sha256', None)
++    if not isinstance(native_digest, str) or not re.fullmatch(r'[0-9a-f]{64}', native_digest):
++        raise ValueError('native transport bytes are not pinned to activation')
+     expected = {'db_path': config['db_path'], 'ledger_socket': config['ledger_socket'],
+                 'release_sha256': config['release_sha256'],
+                 'config_sha256': config.get('_loaded_sha256'),
+-                'binary_sha256': binary_digest.hexdigest(),
++                'binary_sha256': native_digest,
+                 'ledger_uuid': config['ledger_uuid'], 'generation': config['generation'],
+                 'instance': config['instance']}
+     if any(active[key] != value for key, value in expected.items()):
+@@ -359,12 +361,10 @@
                           github_lock_path=config['github_writer_lock'])
      def pipelines(claim):
          def workers(workdir, sandbox):
@@ -764,7 +822,7 @@
  
  
  def acquire_dispatcher_lock(path):
-@@ -395,13 +396,17 @@
+@@ -395,13 +395,17 @@
      parser = argparse.ArgumentParser()
      parser.add_argument('--config', required=True)
      parser.add_argument('--check-config', action='store_true')
@@ -867,3 +925,93 @@
                  return end('DONE', 'CODE_ACCEPTED_CI_AND_INDEPENDENT_QA')
              return end('WAITING_HUMAN', 'UNRECOGNIZED_PHASE', 'unknown')
          except PublisherNotReady:
+--- a/stage1/uk_owner_callback_core.py
++++ b/stage1/uk_owner_callback_core.py
+@@ -2,6 +2,7 @@
+ import hashlib
+ import hmac
+ import json
++import math
+ import os
+ import socket
+ import sqlite3
+@@ -72,6 +73,24 @@
+     return event
+ 
+ 
++def _strict_json(raw):
++    def pairs(values):
++        result = {}
++        for key, value in values:
++            if key in result or key in ('__proto__', 'constructor', 'prototype'):
++                raise ValueError('duplicate or unsafe JSON key')
++            result[key] = value
++        return result
++    def finite(token):
++        value = float(token)
++        if not math.isfinite(value):
++            raise ValueError('nonfinite JSON number')
++        return value
++    def constant(unused):
++        raise ValueError('nonfinite JSON constant')
++    return json.loads(raw, object_pairs_hook=pairs, parse_float=finite, parse_constant=constant)
++
++
+ def _read_line(connection, maximum=8192):
+     payload = bytearray()
+     while b'\n' not in payload:
+@@ -84,7 +103,7 @@
+     line, remainder = bytes(payload).split(b'\n', 1)
+     if remainder:
+         raise ValueError('multiple ledger messages rejected')
+-    return json.loads(line.decode('utf-8'))
++    return _strict_json(line.decode('utf-8'))
+ 
+ 
+ def send_ledger_request(socket_path, request, timeout=5):
+@@ -132,17 +151,32 @@
+ class LedgerOwnerDecisionServer(object):
+     """Bounded ledger-service adapter; exposes no SQL or arbitrary operation."""
+ 
+-    def __init__(self, activation_store, ledger, callback_uid):
++    def __init__(self, activation_store, ledger, callback_uid, native_uid=None):
+         if type(callback_uid) is not int or callback_uid < 1:
+             raise ValueError('callback UID must be unprivileged')
+         self.activation_store = activation_store
+         self.ledger = ledger
+         self.callback_uid = callback_uid
++        if native_uid is not None and (type(native_uid) is not int or native_uid < 1 or native_uid == callback_uid):
++            raise ValueError('native Gateway UID must be distinct and unprivileged')
++        self.native_uid = native_uid
+ 
+     def serve_connection(self, connection):
+         credentials = connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
+                                              struct.calcsize('3i'))
+         unused_pid, peer_uid, unused_gid = struct.unpack('3i', credentials)
++        if peer_uid == self.native_uid:
++            request = _read_line(connection, maximum=1048576)
++            if not isinstance(request, dict) or set(request) != {'operation', 'payload'} or request['operation'] != 'NATIVE_GATEWAY':
++                raise PermissionError('native socket role rejected')
++            from native_ledger_operations import execute
++            result = execute(self.ledger, request['payload'])
++            packed = (json.dumps({'accepted':True, 'result':result}, sort_keys=True,
++                                 separators=(',', ':'), allow_nan=False)+'\n').encode('utf-8')
++            if len(packed) >= 1048576:
++                raise ValueError('native response limit')
++            connection.sendall(packed)
++            return
+         if peer_uid != self.callback_uid:
+             raise PermissionError('ledger socket peer rejected')
+         request = _read_line(connection)
+--- a/stage1/ledger_service.py
++++ b/stage1/ledger_service.py
+@@ -23,7 +23,8 @@
+                            approved_base_shas=[config['source_commit']],
+                            activation_store=activation)
+     callback_uid=pwd.getpwnam(config['callback_user']).pw_uid
+-    return LedgerOwnerDecisionServer(activation,ledger,callback_uid)
++    native_uid=pwd.getpwnam('xuanjun_dev').pw_uid
++    return LedgerOwnerDecisionServer(activation,ledger,callback_uid,native_uid=native_uid)
+ 
+ 
+ def listener():

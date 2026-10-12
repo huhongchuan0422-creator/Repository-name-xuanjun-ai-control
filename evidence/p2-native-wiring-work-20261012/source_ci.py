@@ -29,9 +29,10 @@ subprocess.run(['patch','--batch','--fuzz=0','-p1','-i',str(ROOT/'native-wiring.
 plugin=source/'plugins/p2-native-controller'
 shutil.copytree(ROOT/'controller',plugin)
 env=dict(os.environ,P2_SOURCE_ROOT=str(source))
-for name in ('test_native_wiring.py','test_native_ledger.py'):
+for name in ('test_native_wiring.py','test_native_ledger.py','test_native_socket.py'):
     subprocess.run(['python',str(ROOT/name)],env=env,check=True)
-subprocess.run(['node',str(ROOT/'test_controller.mjs')],env=env,check=True)
+for name in ('test_controller.mjs','test_host.mjs'):
+    subprocess.run(['node',str(ROOT/name)],env=env,check=True)
 for item in plugin.glob('*.mjs'):subprocess.run(['node','--check',str(item)],check=True)
 print(json.dumps({'state':'SOURCE_REGRESSION_PASS','frozen_archive_sha256':SHA,
  'patch_sha256':hashlib.sha256((ROOT/'native-wiring.patch').read_bytes()).hexdigest(),

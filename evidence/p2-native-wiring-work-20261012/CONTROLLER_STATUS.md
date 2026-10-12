@@ -1,9 +1,11 @@
 # Native controller source candidate — NOT INSTALLABLE
 
-Implemented request-scoped Gateway handler, existing SQLite ledger CAS/guard/expired-lease stop lookup, private importer snapshot manifest, session/unit receipt binding, SDK host adapters, model transcript metadata checks, fixed PR17 notification, plugin entrypoint and transport. No new task registry or queue.
+Implemented Gateway plugin-owned handler and host adapters, existing ledger socket/CAS/synchronous guard, expired-lease stop lookup, source tree verification, model transcript metadata checks, native transport hash activation binding, tool run/lease/unit hook, read-only QA tool deny, and fixed PR17 notification. No new task registry, database, queue or scheduler daemon.
 
-Local tests: 21 Python wiring + 11 real SQLite tests PASS; JavaScript parser/authorization/lifecycle plus real snapshot admission PASS. Gateway/OS calls in local tests are mocks.
+Local tests: 21 wiring +11 actual SQLite +7 socket-role/parser tests PASS; JavaScript controller lifecycle/real snapshot tests and9 host policy assertions PASS. Gateway/OS operations are mocks in these tests.
 
-UK zero-model readiness run38264025471/job114861499196: Docker binary exists, current config primary openai/gpt-5.6-sol and fallbacks=[], no explicit worker sandbox configuration. Follow-up38264369797/job114862678165: assumed main auth-profiles path absent; this does NOT prove OAuth is absent. Installed API runtime.config.current() and modelAuth.ensureAuthProfileStore/order verified from source. No OAuth values logged.
+Hosted CI38265743841/job114867330810 on288ba340 passed the earlier frozen-source replay (21+11 Python and controller JavaScript). Later socket/host changes require their own commit-bound CI.
 
-Remaining: exact immutable host SDK dependency manifest and installation permissions; verified effective OAuth metadata/dispatch path; sandbox config/image/worker UID; tool-hook context run/session fields verification; packaging/deployment manifest and units; same-artifact QA/Security/Release; installation/rollback/real E2E. No source CI or local test grants installation permission.
+UK readiness38264025471 and38264369797: existing Docker binary, primary openai/gpt-5.6-sol, fallbacks=[], no explicit worker sandbox configuration. Assumed main auth-profiles path absent is NOT evidence OAuth is absent. Installed SDK contracts38266313384/job114869259709 verify runtime.config.current(), native modelAuth metadata APIs and hook event.runId. All reads zero-model, no production/lease changes.
+
+Installation HOLD: actual OAuth/runtime dispatch, sandbox config/image/UID and read-only QA workspace mapping, immutable context module trust, plugin binding/transport config, socket ACL persistence, updated unit/manifest/activation cutover, same artifact QA/Security/Release, install/rollback/E2E have not passed. See HOST_BINDING_GAPS.md. Unknown f998 never replayed.

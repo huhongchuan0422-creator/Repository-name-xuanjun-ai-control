@@ -79,8 +79,9 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
     if(typeof ctx?.sessionKey!=='string'||!ctx.sessionKey.startsWith('agent:main:xuanjun-p2:'))return;
     try {
       const saved=store.call('tool_guard',{session_key:ctx.sessionKey}).native_execution;
-      if(!saved?.receipt||ctx.runId!==saved.receipt.run_id)hold('TOOL_RUN_BINDING');
-      if(!['read','write','edit','apply_patch','exec'].includes(event.toolName)
+      if(!saved?.receipt||event.runId!==saved.receipt.run_id||(ctx.runId!==undefined&&ctx.runId!==event.runId))hold('TOOL_RUN_BINDING');
+      const allowed=saved.request?.sandbox==='read-only'?['read']:['read','write','edit','apply_patch','exec'];
+      if(!allowed.includes(event.toolName)
         ||event.params?.elevated===true||['gateway','node'].includes(event.params?.host))hold('TOOL_POLICY');
       const unit=await boundary.inspect(saved.unit);
       if(!unit.active||!unit.process_alive)hold('TOOL_UNIT_INACTIVE');
