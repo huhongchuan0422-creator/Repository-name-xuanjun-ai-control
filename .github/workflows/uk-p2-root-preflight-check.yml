@@ -1,0 +1,27 @@
+name: UK P2 privileged preflight Python36 static validation
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths: ['.github/workflows/uk-p2-root-preflight-check.yml', 'scripts/uk-host-install-preflight.py']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact target Python, non-root self-test only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          /usr/bin/python3 -I -B scripts/uk-host-install-preflight.py --self-test
+          /usr/bin/python3 -B - <<'PY'
+          import ast
+          with open('scripts/uk-host-install-preflight.py') as f:ast.parse(f.read())
+          print('ROOT_SCOPE_NOT_EXECUTED')
+          PY
