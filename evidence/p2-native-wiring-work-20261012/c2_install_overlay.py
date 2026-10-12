@@ -414,7 +414,7 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
             or not isinstance(verifier,str) or verifier.startswith('/')
 """)
     manifest=deploy/'integration-manifest.json';value=json.loads(manifest.read_text());files=value['files']
-    for path in [entry,runtime,binding,ledger_client,dropin]:
+    for path in [entry,runtime,installer,binding,ledger_client,dropin]:
         files[path.relative_to(source).as_posix()]=sha(path)
     plugin=source/'plugins'/'p2-native-controller'
     for path in sorted(plugin.iterdir()):
