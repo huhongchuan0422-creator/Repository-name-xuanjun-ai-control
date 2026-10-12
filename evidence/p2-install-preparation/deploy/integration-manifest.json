@@ -68,7 +68,7 @@
     "scripts/uk-integration-install.py": "ee67c1fb9f849c3c7aca24e78b6b76ef9d957af6668d217858f8737758500643",
     "scripts/uk-owner-workbench-config.py": "af0c64c5c5cf3a12167b8c6a25ef805c57f7a5296bc09c11c3eebf7ea27285ec",
     "scripts/xj-root-broker-client": "7d7e71185b072a1beaf598fd0f3cec91989e4e6766c93d81db567771d138c8e2",
-    "stage1/activation_control.py": "c03e6b7516cbc8aa14b52d018dbfa8d06d0740154bf7110c94941b9d6e550bd8",
+    "stage1/activation_control.py": "169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4",
     "stage1/callback_schema_gate.py": "a7e83427ac9fedb7e86c28f9298122e134215317bb996eae8753cfcb3d455271",
     "stage1/codex_app_server_worker.py": "1e360903d3442ad17950f3f4f5084a775e55e8ede0debb7e06415a296bbe2dea",
     "stage1/codex_worker.py": "2aed0a0f37972874c4f8275a8a1bae1d671348e0a9e4fb887d6e185411b969c3",
@@ -94,8 +94,8 @@
     "stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e",
     "stage1/ledger_cutover_transaction.py": "781704b76dc53981d2f3c957435755ec763ed8ac4440dcdfa2da2ab176c8413a",
     "stage1/legacy_host_adapter.py": "22807a24dda907fcbd025e1217e197b23da0d5281f8256a84c256274b70069cf",
-    "stage1/p2_install_entrypoint.py": "9d1f36bc31cb9b4808b4da671435159469d394e6d4ed9799756a6aac7c685c28",
-    "stage1/p2_fixed_host_runtime.py": "ff410cb2d358532a71b124c4d7a19cef4fd182a3cd56ba57d022b0c6cd69266f",
+    "stage1/p2_install_entrypoint.py": "ef22be1f4c50d9ca6ceb39f146c610ba9b57e81adaa0d903382a8cdcd4218577",
+    "stage1/p2_fixed_host_runtime.py": "7a20a63480ca923cafb5d50dc1857d4b12e0adf8407e78132f975b7f886c9200",
     "scripts/uk-p2-install.py": "2f27163880c6c47e64a0724e7c609f30e9e846980c180017992c477e47c68c4f"
   }
 }
