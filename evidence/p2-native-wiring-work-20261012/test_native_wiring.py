@@ -82,6 +82,30 @@ class WiringTests(unittest.TestCase):
         self.assertNotIn('CodexAppServerWorker',raw)
         self.assertIn('reviewed installed native controller required',raw)
 
+    def test_root_broker_handler_launch_denied_before_systemd_run(self):
+        import root_broker
+        calls=[]
+        handler=root_broker.Systemd239Handler('/tmp/worker','/tmp/codex',
+            run=lambda *args,**kwargs:calls.append((args,kwargs)))
+        with self.assertRaisesRegex(RuntimeError,'delegated model dispatch prohibited'):
+            handler({'operation':'launch','unit':'forbidden'})
+        self.assertEqual(calls,[])
+
+    def test_root_broker_stdio_launch_denied_before_popen(self):
+        import root_broker
+        handler=root_broker.Systemd239Handler('/tmp/worker','/tmp/codex',
+            run=lambda *args,**kwargs:None)
+        with patch.object(root_broker.subprocess,'Popen') as popen:
+            with self.assertRaisesRegex(RuntimeError,'delegated model dispatch prohibited'):
+                handler.serve_launch({},None)
+            popen.assert_not_called()
+
+    def test_broker_policy_source_denies_launch_before_activation_read(self):
+        raw=(SOURCE/'development_service.py').read_text()
+        deny=raw.index("if operation == 'launch':\n            raise PermissionError('delegated model dispatch prohibited by owner policy')")
+        activation=raw.index("active = self.activation.read(require_active=True)",deny)
+        self.assertLess(deny,activation)
+
     def test_notification_fixed_recipient_ack_and_lookup(self):
         n=ExistingOutboxNotifier(Controller());self.assertEqual(n.send({},'k'),n.reconcile('k'))
     def test_wrong_recipient_ack_rejected(self):

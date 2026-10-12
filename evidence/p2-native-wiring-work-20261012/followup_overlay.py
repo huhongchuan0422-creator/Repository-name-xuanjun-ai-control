@@ -128,6 +128,38 @@ from native_peer_identity import load_native_peer_identity""")
                 or not re.fullmatch(r'agent:(?:developer|platform-engineer):xuanjun-p2:[0-9a-f]{64}', session_key)):
             raise ValueError('native tool session rejected')""")
 
+    replace_once(
+        stage1 / 'development_service.py',
+        """        operation = request['operation']
+        if operation not in ('launch', 'stop', 'status'):
+            raise ValueError('unsupported broker operation')""",
+        """        operation = request['operation']
+        if operation not in ('launch', 'stop', 'status'):
+            raise ValueError('unsupported broker operation')
+        if operation == 'launch':
+            raise PermissionError('delegated model dispatch prohibited by owner policy')""")
+
+    replace_once(
+        stage1 / 'root_broker.py',
+        """    def __call__(self, authorized):
+        operation, unit = authorized['operation'], authorized['unit']
+        if operation == 'launch':""",
+        """    def __call__(self, authorized):
+        operation, unit = authorized['operation'], authorized['unit']
+        if operation == 'launch':
+            raise RuntimeError('delegated model dispatch prohibited by owner policy')
+        if operation == 'launch':""")
+
+    replace_once(
+        stage1 / 'root_broker.py',
+        """    def serve_launch(self, authorized, connection):
+        """Relay one fixed transient app-server without granting manager APIs."""
+        process = subprocess.Popen(self._launch_argv(authorized), stdin=subprocess.PIPE,""",
+        """    def serve_launch(self, authorized, connection):
+        """Relay one fixed transient app-server without granting manager APIs."""
+        raise RuntimeError('delegated model dispatch prohibited by owner policy')
+        process = subprocess.Popen(self._launch_argv(authorized), stdin=subprocess.PIPE,""")
+
     pipeline = stage1 / 'development_pipeline.py'
 
     replace_once(
