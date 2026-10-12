@@ -107,4 +107,4 @@ jobs:
           print(json.dumps(out,sort_keys=True))
           PY
 
-# Regression includes isolated ledger identity and durable access handoff.
+# Regression includes isolated ledger identity, durable access handoff, and explicit successful-install rollback.

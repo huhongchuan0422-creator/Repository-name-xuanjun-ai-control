@@ -149,3 +149,5 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+# Freeze is rerun whenever rollback semantics advance so package and UK regression share one HEAD.
