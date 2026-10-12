@@ -7,11 +7,11 @@ const fields=['task_id','spec_hash','lease','fence','epoch','generation','instan
 const hold=reason=>{throw new Error('HOLD_'+reason);};
 /** Gateway-owned handler. Bindings must be installed host adapters, never RPC params. */
 export class NativeController {
-  constructor({store,boundary,prepare,eligibility,collectResult,verifyLease,commitGuard,clock=Date.now}) {
-    for(const fn of [prepare,eligibility,collectResult,verifyLease,commitGuard]) if(typeof fn!=='function')hold('HOST_BINDING_MISSING');
+  constructor({store,boundary,prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement,clock=Date.now}) {
+    for(const fn of [prepare,eligibility,collectResult,verifyLease,commitGuard,verifyWorkerPlacement]) if(typeof fn!=='function')hold('HOST_BINDING_MISSING');
     this.store=store;this.boundary=boundary;this.prepare=prepare;
     this.eligibility=eligibility;this.collectResult=collectResult;
-    this.verifyLease=verifyLease;this.commitGuard=commitGuard;this.clock=clock;
+    this.verifyLease=verifyLease;this.commitGuard=commitGuard;this.verifyWorkerPlacement=verifyWorkerPlacement;this.clock=clock;
   }
   async current(request) {
     const observed=await this.store.read(request);
@@ -68,6 +68,11 @@ export class NativeController {
     const boundary=await this.boundary.inspect(record.unit);
     if(!boundary.active||!boundary.process_alive)hold('BOUNDARY_NOT_ACTIVE');
     if(await this.eligibility(runtime,record.request))hold('CLI_DISPATCH_BYPASS');
+    // Require an independent host-provided placement attestation before any irreversible dispatch.
+    // A container's existence and an SDK sessionKey are NOT proof of run confinement.
+    const placement=await this.verifyWorkerPlacement(runtime,{request:record.request,unit:record.unit,sessionKey:record.session_key,source:record.source});
+    if(placement!==true)hold('WORKER_PLACEMENT_UNVERIFIED');
+    await this.current(record.request);
     await this.store.replace(observed,{...observed.task,native_execution:{...record,phase:'LAUNCH_INTENT'}});
     const request=record.request;
     // Only the Gateway-injected request-scoped SDK may dispatch this run.

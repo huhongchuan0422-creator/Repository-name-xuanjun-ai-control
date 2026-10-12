@@ -89,6 +89,9 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
     } catch {return {block:true,blockReason:'P2 canonical lease/run/unit admission unavailable'};}
   };
   return {store,boundary,eligibility,prepare,collectResult,preflight,beforeToolCall,
+    // No installed SDK placement attestation has been demonstrated. Fail closed rather than
+    // inventing an API, synthesizing a cgroup ID, or launching outside the admitted unit.
+    verifyWorkerPlacement:async()=>false,
     verifyLease:(task,request,now)=>task.state==='RUNNING'&&Number.isFinite(task.lease_until)&&task.lease_until*1000>now,
     commitGuard:request=>store.guard(request)};
 }
