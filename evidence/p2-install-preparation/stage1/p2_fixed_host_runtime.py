@@ -21,11 +21,24 @@ SHA256 = re.compile(r'^[0-9a-f]{64}$')
 TOKEN = re.compile(br'@@[A-Z0-9_]+@@')
 ALLOWED_SERVICES = (
     'xj-root-broker.socket',
+    'xj-root-broker.service',
     'xuanjun-ledger.socket',
+    'xuanjun-ledger.service',
     'xuanjun-uk-owner-callback.service',
     'xuanjun-uk-owner-dashboard.service',
     'xuanjun-development-dispatcher.service',
     'xuanjun-github-intake.timer',
+)
+STOP_SERVICES = (
+    'xuanjun-github-intake.timer',
+    'xuanjun-ledger.socket',
+    'xj-root-broker.socket',
+    'xuanjun-github-intake.service',
+    'xuanjun-development-dispatcher.service',
+    'xuanjun-uk-owner-callback.service',
+    'xuanjun-uk-owner-dashboard.service',
+    'xuanjun-ledger.service',
+    'xj-root-broker.service',
 )
 ALLOWED_TARGET_PREFIXES = (
     '/etc/xuanjun-development/',
@@ -210,8 +223,23 @@ class FixedHostRuntime(object):
             self.restore(reference)
             raise
 
+    def reopen_database(self, descriptor):
+        self._authority()
+        path = descriptor.get('db_path')
+        if (descriptor.get('state') != 'QUIESCED'
+                or not isinstance(path, str)
+                or not path.startswith('/var/lib/xuanjun-development/generations/')
+                or os.path.realpath(path) != path):
+            raise ValueError('QUIESCED_CANONICAL_DATABASE_REQUIRED')
+        self._command(['/usr/bin/python3', '-I', '-B', '-c',
+                       'import sqlite3,sys,pathlib;d=sqlite3.connect(pathlib.Path(sys.argv[1]).as_uri()+"?mode=ro",uri=True);assert d.execute("PRAGMA quick_check").fetchone()[0]=="ok";d.close()',
+                       path])
+        return {'database_reopened': True}
+
     def activate(self, runtime, descriptor):
         self._authority()
+        if descriptor.get('state') != 'ACTIVE':
+            raise ValueError('ACTIVE_DESCRIPTOR_REQUIRED_BEFORE_SERVICES')
         for service in ALLOWED_SERVICES:
             self._command(['/usr/bin/systemctl', 'start', service])
             self._command(['/usr/bin/systemctl', 'is-active', '--quiet', service])
@@ -221,14 +249,11 @@ class FixedHostRuntime(object):
             self._command(['/usr/bin/systemctl', 'reload', 'nginx.service'])
             self._command(['/usr/bin/systemctl', 'is-active', '--quiet',
                            'nginx.service'])
-        self._command(['/usr/bin/python3', '-c',
-                       'import sqlite3,sys;d=sqlite3.connect("file:"+sys.argv[1]+"?mode=ro",uri=True);assert d.execute("PRAGMA quick_check").fetchone()[0]=="ok"',
-                       descriptor['db_path']])
-        return {'database_reopened': True, 'services_active': True}
+        return {'services_active': True}
 
     def stop_new(self, runtime):
         self._authority()
-        for service in reversed(ALLOWED_SERVICES):
+        for service in STOP_SERVICES:
             self._command(['/usr/bin/systemctl', 'stop', service])
         return True
 
