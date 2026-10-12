@@ -3,10 +3,11 @@ import {createHash} from 'node:crypto';
 import {strictJson} from './controller/strict-json.mjs';
 import {NativeController} from './controller/controller.mjs';
 import {registerController} from './controller/index.mjs';
+import {canonical} from './controller/canonical.mjs';
 for(const raw of ['{"a":1,"a":2}','{"__proto__":{}}','1e999','9007199254740993','[1,]','{"a":1}x'])assert.throws(()=>strictJson(raw));
 assert.equal(strictJson('{"a":[true,null,"中文"]}').a[2],'中文');
 let calls=0;
-const bindings={store:{read:async()=>({task:{}})},boundary:{},prepare:async()=>{},eligibility:async()=>false,collectResult:async()=>{},verifyLease:async()=>false,commitGuard:()=>false,verifyWorkerPlacement:async()=>false};
+const bindings={store:{read:async()=>({task:{}})},boundary:{},prepare:async()=>{},eligibility:async()=>false,collectResult:async()=>{},verifyLease:async()=>false,commitGuard:()=>false,verifyWorkerPlacement:async()=>null};
 assert.throws(()=>new NativeController({...bindings,commitGuard:undefined}),/HOST_BINDING/);
 const controller=new NativeController(bindings);
 await assert.rejects(()=>controller.admit('{}','0'.repeat(64),{}),/REQUEST_HASH/);
@@ -59,9 +60,13 @@ try {
   const runtime={subagent:{run:async params=>{assert.equal(current.native_execution.phase,'LAUNCH_INTENT');params.assertCurrent();launchCalls++;return {runId:'run-real-files',sessionKey:params.sessionKey,runtime:{provider:'openai',model:'gpt-5.6-sol',harness:'embedded'}};}},agent:{session:{getSessionEntry:async()=>({sessionId:'session-real-files'})}}};
   const concrete=new NativeController({...bindings,store,
     prepare:async()=>{assert.equal(current.native_execution.phase,'PROVISIONING');prepareCalls++;return {backend:'docker',name:'unit'};},
-    boundary:{bind:async unit=>({...unit,id:'d'.repeat(64)}),inspect:async()=>({active:!unitStopped,process_alive:!unitStopped,descendants_exited:unitStopped}),stop:async()=>{unitStopped=true;return {active:false,process_alive:false,descendants_exited:true};}},
+    boundary:{bind:async unit=>({...unit,id:'d'.repeat(64),cgroup:'/sys/fs/cgroup/xuanjun-p2-test'}),inspect:async()=>({active:!unitStopped,process_alive:!unitStopped,descendants_exited:unitStopped}),stop:async()=>{unitStopped=true;return {active:false,process_alive:false,descendants_exited:true};}},
     verifyLease:async()=>leaseValid,commitGuard:()=>leaseValid,
-    verifyWorkerPlacement:async()=>placementValid});
+    verifyWorkerPlacement:async(_runtime,{request,unit,sessionKey,source})=>placementValid?{
+      verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
+      source_manifest_sha256:source.manifest_sha256,
+      request_sha256:createHash('sha256').update(canonical(request)).digest('hex')
+    }:null});
   const raw=JSON.stringify(request),key=createHash('sha256').update(raw).digest('hex');
   const admission=await concrete.admit(raw,key,runtime);
   assert.equal(admission.isolation_enforced,true);assert.equal(prepareCalls,1);

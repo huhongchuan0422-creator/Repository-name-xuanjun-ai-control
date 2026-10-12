@@ -71,13 +71,20 @@ export class NativeController {
     // Require an independent host-provided placement attestation before any irreversible dispatch.
     // A container's existence and an SDK sessionKey are NOT proof of run confinement.
     const placement=await this.verifyWorkerPlacement(runtime,{request:record.request,unit:record.unit,sessionKey:record.session_key,source:record.source});
-    if(placement!==true)hold('WORKER_PLACEMENT_UNVERIFIED');
+    const requestDigest=createHash('sha256').update(canonical(record.request)).digest('hex');
+    if(!placement || placement.verified!==true
+      ||placement.session_key!==record.session_key
+      ||placement.unit_backend!==record.unit.backend
+      ||placement.unit_id!==record.unit.id
+      ||placement.cgroup!==record.unit.cgroup
+      ||placement.source_manifest_sha256!==record.source.manifest_sha256
+      ||placement.request_sha256!==requestDigest)hold('WORKER_PLACEMENT_UNVERIFIED');
     // Re-read the canonical revision after the potentially slow placement check.
     // Never CAS using a pre-check snapshot: lease/fence or execution state may have changed.
     const latest=await this.current(record.request);
     if(latest.task.native_execution?.phase!=='ADMITTED'
       ||canonical(latest.task.native_execution.admission)!==canonical(admission))hold('LAUNCH_STALE_ADMISSION');
-    await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'LAUNCH_INTENT'}});
+    await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'LAUNCH_INTENT',placement}});
     const request=record.request;
     // Only the Gateway-injected request-scoped SDK may dispatch this run.
     const result=await runtime.subagent.run({sessionKey:record.session_key,message:request.prompt,
@@ -92,7 +99,7 @@ export class NativeController {
     if(!result?.runId||result.sessionKey!==record.session_key)hold('LAUNCH_UNKNOWN');
     const entry=await runtime.agent.session.getSessionEntry({sessionKey:record.session_key,agentId:'main',readConsistency:'latest'});
     if(!entry?.sessionId)hold('SESSION_ID_UNKNOWN');
-    const receipt={binding:Object.fromEntries(fields.map(k=>[k,record.request[k]])),idempotency_key:record.idempotency_key,run_id:result.runId,session_id:entry.sessionId,execution_unit_id:record.unit.backend+':'+record.unit.id};
+    const receipt={binding:Object.fromEntries(fields.map(k=>[k,record.request[k]])),idempotency_key:record.idempotency_key,run_id:result.runId,session_id:entry.sessionId,execution_unit_id:record.unit.backend+':'+record.unit.id,placement_digest:createHash('sha256').update(canonical(record.placement)).digest('hex')};
     const latest=await this.current(record.request);
     if(latest.task.native_execution?.phase!=='LAUNCH_INTENT')hold('LAUNCH_CAS');
     await this.store.replace(latest,{...latest.task,native_execution:{...record,phase:'RUNNING',receipt,runtime:result.runtime}});

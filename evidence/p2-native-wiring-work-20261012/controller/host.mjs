@@ -91,7 +91,7 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
   return {store,boundary,eligibility,prepare,collectResult,preflight,beforeToolCall,
     // No installed SDK placement attestation has been demonstrated. Fail closed rather than
     // inventing an API, synthesizing a cgroup ID, or launching outside the admitted unit.
-    verifyWorkerPlacement:async()=>false,
+    verifyWorkerPlacement:async()=>null,
     verifyLease:(task,request,now)=>task.state==='RUNNING'&&Number.isFinite(task.lease_until)&&task.lease_until*1000>now,
     commitGuard:request=>store.guard(request)};
 }
