@@ -1,0 +1,23 @@
+name: UK supervision binding read-only audit
+on:
+  push:
+    branches: [audit/uk-supervisor-binding-20261012]
+    paths:
+      - scripts/uk-supervisor-binding-audit.py
+      - .github/workflows/uk-supervisor-binding-audit.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: [self-hosted, Linux, X64, uk]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Fixed nonroot read-only audit without model calls
+        run: |
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          /usr/bin/python3 -B -m py_compile scripts/uk-supervisor-binding-audit.py
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-supervisor-binding-audit.py
