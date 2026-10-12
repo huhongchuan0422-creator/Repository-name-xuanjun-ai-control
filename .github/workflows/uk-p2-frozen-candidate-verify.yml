@@ -25,7 +25,16 @@ jobs:
           test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
           rm -rf /tmp/p2-verify-only-artifact /tmp/p2-verify-only-pkg
           mkdir /tmp/p2-verify-only-artifact /tmp/p2-verify-only-pkg
-          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2-verify-only.zip
+          /usr/bin/python3 -I -B - <<'PY'
+          import os,urllib.request
+          url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/%s/zip'%os.environ['P2_ARTIFACT_ID']
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+              'Accept':'application/vnd.github+json','User-Agent':'xuanjun-p2-verify'})
+          with urllib.request.urlopen(req,timeout=30) as response:
+              raw=response.read(8*1024*1024+1)
+          if len(raw)>8*1024*1024: raise SystemExit('HOLD_ARTIFACT_SIZE')
+          open('/tmp/p2-verify-only.zip','wb').write(raw)
+          PY
           cd /tmp/p2-verify-only-artifact
           unzip -q /tmp/p2-verify-only.zip
           printf '%s  %s\n' "$P2_TAR_SHA256" p2-candidate.tar.gz | sha256sum -c -
