@@ -2,6 +2,7 @@ import os
 import stat
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 from activation_control import ActivationStore, ActivationError
@@ -53,6 +54,28 @@ class ActivationLockPermissionsTests(unittest.TestCase):
         os.symlink(target, self.store.lock_path)
         with self.assertRaises(OSError):
             self.store._locked()
+
+    def _prepared(self):
+        return self.store.prepare('a'*64,'b'*64,'c'*64,str(uuid.uuid4()),
+            1,str(uuid.uuid4()),self.temp.name+'/db.sqlite',self.temp.name+'/ledger.sock',
+            expected_epoch=0)
+
+    def test_fence_persists_next_inactive_epoch_and_blocks_stale_cas(self):
+        original=self._prepared()
+        stopped=self.store.fence(original['epoch'],original['instance'])
+        self.assertEqual(stopped['epoch'],2)
+        self.assertEqual(stopped['state'],'PREPARED')
+        self.assertEqual(self.store.reconcile(),stopped)
+        with self.assertRaises(ActivationError): self.store.read(require_active=True)
+        with self.assertRaisesRegex(ActivationError,'CAS'):
+            self.store.fence(original['epoch'],original['instance'])
+
+    def test_reader_cannot_fence_even_with_valid_identity(self):
+        original=self._prepared()
+        with patch('activation_control.os.geteuid',return_value=self.store.owner_uid+1):
+            with self.assertRaisesRegex(ActivationError,'authority owner'):
+                self.store.fence(original['epoch'],original['instance'])
+        self.assertEqual(self.store.read(),original)
 
 
 if __name__ == '__main__':
