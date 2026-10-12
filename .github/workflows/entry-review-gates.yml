@@ -22,7 +22,7 @@ jobs:
         run: |
           install -d -m 700 "$RUNNER_TEMP/xj-syntax"
           cp .syntax/package.json .syntax/package-lock.json "$RUNNER_TEMP/xj-syntax/"
-          npm ci --prefix "$RUNNER_TEMP/xj-syntax" --ignore-scripts --no-audit --no-fund
+          npm ci --prefix "$RUNNER_TEMP/xj-syntax" --cache "$RUNNER_TEMP/xj-syntax/npm-cache" --ignore-scripts --no-audit --no-fund
       - name: Exercise mechanical syntax and continuation gates
         env:
           XJ_SYNTAX_ROOT: ${{ runner.temp }}/xj-syntax
@@ -50,7 +50,7 @@ jobs:
         run: |
           install -d -m 700 "$RUNNER_TEMP/xj-syntax"
           cp .syntax/package.json .syntax/package-lock.json "$RUNNER_TEMP/xj-syntax/"
-          npm ci --prefix "$RUNNER_TEMP/xj-syntax" --ignore-scripts --no-audit --no-fund
+          npm ci --prefix "$RUNNER_TEMP/xj-syntax" --cache "$RUNNER_TEMP/xj-syntax/npm-cache" --ignore-scripts --no-audit --no-fund
       - name: UK Python36 exact-source gates
         env:
           XJ_SYNTAX_ROOT: ${{ runner.temp }}/xj-syntax
