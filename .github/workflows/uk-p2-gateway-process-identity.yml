@@ -19,16 +19,19 @@ jobs:
           set -euo pipefail
           test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
           /usr/bin/python3 -c 'import sys; assert sys.version_info[:3] == (3,6,8)'
-          PID="$(systemctl show xuanjun-uk-openclaw.service --property=MainPID --value)"
-          test "$PID" -gt 1
-          EXE="$(readlink -f "/proc/$PID/exe")"
-          test -n "$EXE"
-          echo "GATEWAY_EXE=$EXE"
-          echo "GATEWAY_EXE_SHA256=$(sha256sum "$EXE" | awk '{print $1}')"
-          echo "GATEWAY_CGROUP=$(awk -F: '$1=="0" && $2=="" {print $3}' "/proc/$PID/cgroup")"
-          echo "GATEWAY_UID=$(awk '/^Uid:/ {print $2}' "/proc/$PID/status")"
-          echo "GATEWAY_CMDLINE_SHA256=$(sha256sum "/proc/$PID/cmdline" | awk '{print $1}')"
-          echo "PYTHON_EXE=$(readlink -f /usr/bin/python3)"
-          echo "PYTHON_EXE_SHA256=$(sha256sum "$(readlink -f /usr/bin/python3)" | awk '{print $1}')"
-          echo MODEL_CALLS=0
-          echo AUTHORITY_MUTATION=NONE
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /bin/bash -c '
+            set -euo pipefail
+            PID="$(systemctl show xuanjun-uk-openclaw.service --property=MainPID --value)"
+            test "$PID" -gt 1
+            EXE="$(readlink -f "/proc/$PID/exe")"
+            test -n "$EXE"
+            echo "GATEWAY_EXE=$EXE"
+            echo "GATEWAY_EXE_SHA256=$(sha256sum "$EXE" | awk "{print \\$1}")"
+            echo "GATEWAY_CGROUP=$(awk -F: "\\$1==\\\"0\\\" && \\$2==\\\"\\\" {print \\$3}" "/proc/$PID/cgroup")"
+            echo "GATEWAY_UID=$(awk "/^Uid:/ {print \\$2}" "/proc/$PID/status")"
+            echo "GATEWAY_CMDLINE_SHA256=$(sha256sum "/proc/$PID/cmdline" | awk "{print \\$1}")"
+            echo "PYTHON_EXE=$(readlink -f /usr/bin/python3)"
+            echo "PYTHON_EXE_SHA256=$(sha256sum "$(readlink -f /usr/bin/python3)" | awk "{print \\$1}")"
+            echo MODEL_CALLS=0
+            echo AUTHORITY_MUTATION=NONE
+          '
