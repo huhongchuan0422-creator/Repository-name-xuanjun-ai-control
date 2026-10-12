@@ -1,0 +1,25 @@
+name: P2 UK OpenClaw dependency hashes
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - scripts/uk-p2-openclaw-dependencies.py
+      - .github/workflows/uk-p2-openclaw-dependencies.yml
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-openclaw-dependencies
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Hash installed dependency files without model execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-p2-openclaw-dependencies.py
