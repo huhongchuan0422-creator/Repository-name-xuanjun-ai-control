@@ -6,7 +6,7 @@ import {registerController} from './controller/index.mjs';
 for(const raw of ['{"a":1,"a":2}','{"__proto__":{}}','1e999','9007199254740993','[1,]','{"a":1}x'])assert.throws(()=>strictJson(raw));
 assert.equal(strictJson('{"a":[true,null,"中文"]}').a[2],'中文');
 let calls=0;
-const bindings={store:{read:async()=>({task:{}})},boundary:{},prepare:async()=>{},eligibility:async()=>false,collectResult:async()=>{},verifyLease:async()=>false,commitGuard:()=>false};
+const bindings={store:{read:async()=>({task:{}})},boundary:{},prepare:async()=>{},eligibility:async()=>false,collectResult:async()=>{},verifyLease:async()=>false,commitGuard:()=>false,verifyWorkerPlacement:async()=>false};
 assert.throws(()=>new NativeController({...bindings,commitGuard:undefined}),/HOST_BINDING/);
 const controller=new NativeController(bindings);
 await assert.rejects(()=>controller.admit('{}','0'.repeat(64),{}),/REQUEST_HASH/);
@@ -60,7 +60,8 @@ try {
   const concrete=new NativeController({...bindings,store,
     prepare:async()=>{assert.equal(current.native_execution.phase,'PROVISIONING');prepareCalls++;return {backend:'docker',name:'unit'};},
     boundary:{bind:async unit=>({...unit,id:'d'.repeat(64)}),inspect:async()=>({active:!unitStopped,process_alive:!unitStopped,descendants_exited:unitStopped}),stop:async()=>{unitStopped=true;return {active:false,process_alive:false,descendants_exited:true};}},
-    verifyLease:async()=>leaseValid,commitGuard:()=>leaseValid});
+    verifyLease:async()=>leaseValid,commitGuard:()=>leaseValid,
+    verifyWorkerPlacement:async()=>true});
   const raw=JSON.stringify(request),key=createHash('sha256').update(raw).digest('hex');
   const admission=await concrete.admit(raw,key,runtime);
   assert.equal(admission.isolation_enforced,true);assert.equal(prepareCalls,1);
@@ -74,3 +75,22 @@ try {
   assert.equal(launchCalls,1);
   console.log('real snapshot admission / intent-before-effects / no duplicate launch / expired-lease stop PASS');
 } finally {await rm(dir,{recursive:true,force:true});}
+
+// Placement rejection is before durable LAUNCH_INTENT and before SDK dispatch.
+const rejected=new NativeController({...bindings,store,
+  prepare:async()=>({backend:'docker',name:'unit'}),
+  boundary:{bind:async unit=>({...unit,id:'d'.repeat(64)}),inspect:async()=>({active:true,process_alive:true,descendants_exited:false})},
+  eligibility:async()=>false,verifyLease:async()=>true,commitGuard:()=>true,
+  verifyWorkerPlacement:async()=>false});
+// Negative placement test uses a standalone minimal canonical row.
+let deniedRuns=0;
+const denialReceipt={idempotency_key:'d'.repeat(64),request:{task_id:'t',spec_hash:'a'.repeat(64),lease:'worker',fence:1,epoch:2,generation:1,instance:'i',workdir:'/tmp'},unit:{backend:'docker',id:'d'.repeat(64)},session_key:'agent:main:xuanjun-p2:denied',source:{},phase:'ADMITTED'};
+const denialTask={...denialReceipt.request,state:'RUNNING',lease_until:Date.now()/1000+60,native_execution:{...denialReceipt,admission:{idempotency_key:denialReceipt.idempotency_key,request:denialReceipt.request}}};
+const deniedStore={read:async()=>({task:denialTask}),replace:async()=>{throw Error('ILLEGAL_WRITE_BEFORE_PLACEMENT')}};
+const deniedController=new NativeController({...bindings,store:deniedStore,
+  boundary:{inspect:async()=>({active:true,process_alive:true})},
+  eligibility:async()=>false,verifyLease:async()=>true,commitGuard:()=>true,
+  verifyWorkerPlacement:async()=>false});
+await assert.rejects(()=>deniedController.launch(denialTask.native_execution.admission,{subagent:{run:async()=>{deniedRuns++}}}),/WORKER_PLACEMENT_UNVERIFIED/);
+assert.equal(deniedRuns,0);
+console.log('unverified placement denies dispatch before LAUNCH_INTENT PASS');
