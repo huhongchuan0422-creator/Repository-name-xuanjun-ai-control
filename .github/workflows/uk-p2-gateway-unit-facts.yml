@@ -1,0 +1,24 @@
+name: P2 UK gateway unit facts
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths: [.github/workflows/uk-p2-gateway-unit-facts.yml]
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-gateway-unit-facts
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - name: Read fixed Gateway unit metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          /usr/bin/python3 -c 'import sys; assert sys.version_info[:3] == (3,6,8); print("PYTHON_3_6_8=PASS")'
+          systemctl show xuanjun-uk-openclaw.service --property=Id,User,ActiveState,SubState,ControlGroup,MainPID,FragmentPath
+          echo MODEL_CALLS=0
+          echo AUTHORITY_MUTATION=NONE
