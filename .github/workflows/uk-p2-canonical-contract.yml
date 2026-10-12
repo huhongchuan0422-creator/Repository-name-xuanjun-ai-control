@@ -38,3 +38,46 @@ jobs:
               print('SOL_DIAGNOSTIC_STATIC_PATHS='+json.dumps(paths))
           except Exception:print('SOL_DIAGNOSTIC_STATIC_PATHS=UNAVAILABLE')
           PY
+
+      - name: Read exact observed native config metadata, never credential values
+        shell: bash
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import os,stat,json,hashlib
+          rows=[]
+          paths=['/home/xuanjun_dev/.openclaw/openclaw.json',
+                 '/home/xuanjun_dev/.codex/config.toml',
+                 '/home/xuanjun_dev/.codex/auth.json',
+                 '/home/xuanjun_dev/.config/gh/hosts.yml']
+          for path in paths:
+              row={'path':path,'content_exposed':False}
+              try:
+                  info=os.lstat(path)
+                  row.update(uid=info.st_uid,mode=oct(stat.S_IMODE(info.st_mode)),regular=stat.S_ISREG(info.st_mode))
+                  if path.endswith('openclaw.json') and stat.S_ISREG(info.st_mode):
+                      fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+                      with os.fdopen(fd,'rb') as stream:
+                          raw=stream.read(262145)
+                      if len(raw)>262144:raise ValueError('CONFIG_TOO_LARGE')
+                      obj=json.loads(raw.decode('utf-8'))
+                      row['config_sha256']=hashlib.sha256(raw).hexdigest()
+                      row['top_level_fields']=sorted(obj) if isinstance(obj,dict) else []
+                      row['binding_fields']=[]
+                      def walk(value,keys=(),depth=0):
+                          if depth>8:return
+                          if isinstance(value,dict):
+                              for key,item in value.items():
+                                  if not isinstance(key,str):continue
+                                  if key in ('auth','profiles','provider','authProfile','authProfileId','mode','cliBackends','command','args','codexHome','authPath','credentialStore','authStore','workspace'):
+                                      row['binding_fields'].append({'field':'.'.join(keys+(key,)),'type':type(item).__name__})
+                                  walk(item,keys+(key,),depth+1)
+                          elif isinstance(value,list):
+                              for item in value[:32]:walk(item,keys+('[]',),depth+1)
+                      walk(obj)
+                  row['status']='METADATA_OBSERVED_NOT_CONSUMER_BINDING'
+              except FileNotFoundError:row['status']='EXACT_PATH_ABSENT_NOT_GLOBAL_AUTH_ABSENCE'
+              except PermissionError:row['status']='READ_PERMISSION_UNAVAILABLE'
+              except (OSError,ValueError,UnicodeError):row['status']='METADATA_UNAVAILABLE'
+              rows.append(row)
+          print(json.dumps({'scope':'EXACT_PATH_READ_ONLY','models_called':0,'credential_values_exposed':False,'native_consumer_binding':'UNKNOWN','rows':rows},sort_keys=True))
+          PY
