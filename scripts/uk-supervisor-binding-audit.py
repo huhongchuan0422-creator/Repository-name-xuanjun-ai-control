@@ -159,5 +159,34 @@ def main():
                     finally:db.close()
                 except Exception:row['read']='SCHEMA_UNAVAILABLE_NO_RAW_OUTPUT'
             result['existing_controller_paths'].append(row)
+    # Resolve only argv structure and job identity from the existing helpers.
+    helper_commands={}
+    for node in tree.body:
+        if isinstance(node,ast.FunctionDef) and node.name in ('load_state','save_state'):
+            commands=[]
+            for child in ast.walk(node):
+                if isinstance(child,ast.Call) and isinstance(child.func,ast.Name) and child.func.id=='run' and child.args and isinstance(child.args[0],(ast.List,ast.Tuple)):
+                    values=[]
+                    for arg in child.args[0].elts:
+                        if isinstance(arg,ast.Str) and len(arg.s)<100 and re.fullmatch(r'[A-Za-z0-9_./:-]+',arg.s):
+                            values.append(arg.s)
+                        elif isinstance(arg,ast.Name):values.append('VARIABLE:'+arg.id)
+                        else:values.append('EXPRESSION_NOT_EVALUATED')
+                    commands.append(values)
+            helper_commands[node.name]=commands
+    result['existing_scratch_argv']=helper_commands
+    jobs=[]
+    for node in tree.body:
+        if isinstance(node,ast.Assign) and any(isinstance(n,ast.Name) and ('JOB' in n.id or 'SUPERVISOR' in n.id) for n in node.targets):
+            for child in ast.walk(node.value):
+                if isinstance(child,ast.Str) and re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',child.s):
+                    jobs.append(child.s)
+    result['supervisor_job_constants']=sorted(set(jobs))
+    result['scratch_help']={}
+    cli=HOME_PATH+'/.openclaw/bin/openclaw'
+    for args in (['automations','--help'],['automations','scratch','--help']):
+        p=subprocess.run([cli]+args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10,env=env)
+        helptext=p.stdout.decode('utf-8','replace')
+        result['scratch_help'][' '.join(args)]={'exit_code':p.returncode,'options':sorted(set(re.findall(r'--[a-z][a-z-]+',helptext)))}
     print(json.dumps(result,sort_keys=True))
 if __name__=='__main__':main()
