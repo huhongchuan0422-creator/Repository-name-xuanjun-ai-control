@@ -152,13 +152,13 @@ from native_peer_identity import load_native_peer_identity""")
 
     replace_once(
         stage1 / 'root_broker.py',
-        """    def serve_launch(self, authorized, connection):
-        """Relay one fixed transient app-server without granting manager APIs."""
-        process = subprocess.Popen(self._launch_argv(authorized), stdin=subprocess.PIPE,""",
-        """    def serve_launch(self, authorized, connection):
-        """Relay one fixed transient app-server without granting manager APIs."""
-        raise RuntimeError('delegated model dispatch prohibited by owner policy')
-        process = subprocess.Popen(self._launch_argv(authorized), stdin=subprocess.PIPE,""")
+        """        process = subprocess.Popen(self._launch_argv(authorized), stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   bufsize=0)""",
+        """        raise RuntimeError('delegated model dispatch prohibited by owner policy')
+        process = subprocess.Popen(self._launch_argv(authorized), stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   bufsize=0)""")
 
     pipeline = stage1 / 'development_pipeline.py'
 
