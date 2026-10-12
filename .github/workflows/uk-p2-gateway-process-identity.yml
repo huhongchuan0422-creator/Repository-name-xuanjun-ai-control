@@ -2,7 +2,9 @@ name: P2 UK gateway process identity
 on:
   push:
     branches: [repair/p2-chatgpt-clean-review-20261013]
-    paths: [.github/workflows/uk-p2-gateway-process-identity.yml]
+    paths:
+      - scripts/uk-p2-gateway-process-identity.py
+      - .github/workflows/uk-p2-gateway-process-identity.yml
 permissions:
   contents: read
 concurrency:
@@ -13,25 +15,12 @@ jobs:
     runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
     timeout-minutes: 2
     steps:
-      - name: Read active Gateway process identity only
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read active Gateway process identity as exact service user
         shell: bash
         run: |
           set -euo pipefail
           test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
-          /usr/bin/python3 -c 'import sys; assert sys.version_info[:3] == (3,6,8)'
-          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /bin/bash -c '
-            set -euo pipefail
-            PID="$(systemctl show xuanjun-uk-openclaw.service --property=MainPID --value)"
-            test "$PID" -gt 1
-            EXE="$(readlink -f "/proc/$PID/exe")"
-            test -n "$EXE"
-            echo "GATEWAY_EXE=$EXE"
-            echo "GATEWAY_EXE_SHA256=$(sha256sum "$EXE" | awk "{print \\$1}")"
-            echo "GATEWAY_CGROUP=$(awk -F: "\\$1==\\\"0\\\" && \\$2==\\\"\\\" {print \\$3}" "/proc/$PID/cgroup")"
-            echo "GATEWAY_UID=$(awk "/^Uid:/ {print \\$2}" "/proc/$PID/status")"
-            echo "GATEWAY_CMDLINE_SHA256=$(sha256sum "/proc/$PID/cmdline" | awk "{print \\$1}")"
-            echo "PYTHON_EXE=$(readlink -f /usr/bin/python3)"
-            echo "PYTHON_EXE_SHA256=$(sha256sum "$(readlink -f /usr/bin/python3)" | awk "{print \\$1}")"
-            echo MODEL_CALLS=0
-            echo AUTHORITY_MUTATION=NONE
-          '
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-p2-gateway-process-identity.py
