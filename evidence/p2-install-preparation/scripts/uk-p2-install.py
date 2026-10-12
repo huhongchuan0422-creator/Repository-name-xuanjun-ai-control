@@ -16,7 +16,7 @@ from activation_control import ActivationStore
 from ledger_cutover_transaction import LedgerCutoverTransaction
 from legacy_host_adapter import LegacyHostAdapter
 from p2_fixed_host_runtime import FixedHostRuntime
-from p2_install_entrypoint import P2InstallEntrypoint
+from p2_install_entrypoint import P2InstallEntrypoint, validate_plan
 
 
 def _installer(path):
@@ -62,6 +62,8 @@ def installation_lock():
 
 def main(argv=None):
     parser=argparse.ArgumentParser()
+    parser.add_argument('--operation',required=True,
+                        choices=('verify-only','install','rollback'))
     parser.add_argument('--plan',required=True)
     parser.add_argument('--plan-sha256',required=True)
     parser.add_argument('--receipt',required=True)
@@ -82,8 +84,22 @@ def main(argv=None):
       os.path.join(args.transaction_directory,'ledger-cutover.json'),legacy)
     runtime=FixedHostRuntime(args.transaction_directory)
     try:
-        result=P2InstallEntrypoint(args.receipt,release_install,
-                                   cutover,activation,runtime).execute(plan)
+        entrypoint=P2InstallEntrypoint(args.receipt,release_install,
+                                      cutover,activation,runtime)
+        if args.operation=='verify-only':
+            validate_plan(plan)
+            runtime.preflight(plan['runtime'],plan['auth'],plan['tls'])
+            result={'schema':1,'stage':'VERIFIED_ONLY',
+                    'transaction_id':plan['transaction_id'],
+                    'plan_sha256':hashlib.sha256(json.dumps(
+                        plan,sort_keys=True,separators=(',',':'),
+                        allow_nan=False).encode('utf-8')).hexdigest(),
+                    'effects':0,'oauth_copied':False,
+                    'new_paid_api_usage':'NONE'}
+        elif args.operation=='install':
+            result=entrypoint.execute(plan)
+        else:
+            result=entrypoint.rollback(plan)
     finally:
         os.close(lock_fd)
     print(json.dumps(result,sort_keys=True,separators=(',',':')))

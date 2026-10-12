@@ -94,9 +94,9 @@
     "stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e",
     "stage1/ledger_cutover_transaction.py": "781704b76dc53981d2f3c957435755ec763ed8ac4440dcdfa2da2ab176c8413a",
     "stage1/legacy_host_adapter.py": "22807a24dda907fcbd025e1217e197b23da0d5281f8256a84c256274b70069cf",
-    "stage1/p2_install_entrypoint.py": "a2a459c8d68a7f47fc0388e96ac78edc2a77dff315134d5136493a425698ed8d",
+    "stage1/p2_install_entrypoint.py": "15fa9a407010349d9a5fc3147f2d1489dfd37066f9f7b8c3721ac659a9c9025e",
     "stage1/p2_fixed_host_runtime.py": "66513e5ba1624e681772faf334ee1eba0245f6a36c7c3d7fb4949a1db2a1e35e",
-    "scripts/uk-p2-install.py": "2b77be30140eea605e3e97a6111e0e3cf8e63ad69f2002e353661b53604d853b",
+    "scripts/uk-p2-install.py": "a667b085df2c225dd5acaa869ff305e1a31f3a570f9cda287aee31c3d1b7b034",
     "stage1/p2_prerequisites.py": "b39355a8378e81ab4e045fd8fdac73f12dbed2ca7c4c6bd79120015a18ea30f1"
   }
 }
