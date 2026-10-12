@@ -1,9 +1,9 @@
-# Native controller source proposal
+# Native controller source candidate — NOT INSTALLABLE
 
-Gateway-owned handler source, existing scratch CAS, snapshot tree verification, physical unit observer, registration and local tests. No UK installation or model execution occurred.
+Implemented request-scoped Gateway handler, existing SQLite ledger CAS/guard/expired-lease stop lookup, private importer snapshot manifest, session/unit receipt binding, SDK host adapters, model transcript metadata checks, fixed PR17 notification, plugin entrypoint and transport. No new task registry or queue.
 
-Local validation: existing Python wiring 21 tests PASS; JavaScript parser/authorization/lifecycle tests PASS with mock host.
+Local tests: 21 Python wiring + 11 real SQLite tests PASS; JavaScript parser/authorization/lifecycle plus real snapshot admission PASS. Gateway/OS calls in local tests are mocks.
 
-Not installable yet: installed host adapters for synchronous commit guard, sandbox preparation, CLI-dispatch eligibility and artifact/model result collection remain required. Plugin SDK client authorization layout must be verified against installed Gateway types. Existing canonical task mapping must be reviewed; no new task may be created. Register only after those bindings and package QA/Security/Release checks.
+UK zero-model readiness run38264025471/job114861499196: Docker binary exists, current config primary openai/gpt-5.6-sol and fallbacks=[], no explicit worker sandbox configuration. Follow-up38264369797/job114862678165: assumed main auth-profiles path absent; this does NOT prove OAuth is absent. Installed API runtime.config.current() and modelAuth.ensureAuthProfileStore/order verified from source. No OAuth values logged.
 
-A pending/timeout wait is not terminal proof. Launch intent cannot be blindly replayed. Assistant message JSON is not a durable result. Current OAuth CLI dispatch eligibility may block container confinement and must be resolved without model/API changes.
+Remaining: exact immutable host SDK dependency manifest and installation permissions; verified effective OAuth metadata/dispatch path; sandbox config/image/worker UID; tool-hook context run/session fields verification; packaging/deployment manifest and units; same-artifact QA/Security/Release; installation/rollback/real E2E. No source CI or local test grants installation permission.

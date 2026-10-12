@@ -26,7 +26,11 @@ export function registerController(api,hostBindings) {
         const reason=/^HOLD_[A-Z_]+$/.test(error?.message??'')?error.message:'HOLD_EFFECT_UNCONFIRMED';
         respond(false,undefined,{code:'UNAVAILABLE',message:reason});
       }
-    });
+    },{scope:'operator.admin'});
+  }
+  if(typeof hostBindings.beforeToolCall==='function') {
+    if(typeof api.on!=='function')throw new Error('HOLD_TOOL_HOOK_API');
+    api.on('before_tool_call',hostBindings.beforeToolCall,{priority:1000});
   }
   return controller;
 }

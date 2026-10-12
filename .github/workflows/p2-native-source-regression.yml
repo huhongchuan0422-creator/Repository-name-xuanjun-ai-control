@@ -1,0 +1,26 @@
+name: P2 native source regression (zero model)
+on:
+  push:
+    branches: [repair/p2-native-wiring-work-20261012-2119]
+    paths:
+      - evidence/p2-native-wiring-work-20261012/**
+      - .github/workflows/p2-native-source-regression.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Fetch exact existing frozen artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11747942678/zip > /tmp/p2-frozen.zip
+      - name: Verify digest, replay source patch, run regressions (no UK access)
+        env:
+          P2_FROZEN_ZIP: /tmp/p2-frozen.zip
+        run: python evidence/p2-native-wiring-work-20261012/source_ci.py

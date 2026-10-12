@@ -76,7 +76,7 @@ export class ContainerObserver {
     if (unit.id!==undefined && !/^[0-9a-f]{64}$/.test(unit.id)) throw new Error('HOLD_UNIT_IMMUTABLE_ID');
     return unit.id || unit.name;
   }
-  async bind(unit,workdir,readOnlyRoots=[]) {
+  async bind(unit,workdir,readOnlyRoots=[],sandbox='workspace-write') {
     const name=this.name(unit);
     const id=(await this.command(['inspect','--format','{{.Id}}',name])).trim();
     if (!/^[0-9a-f]{64}$/.test(id)) throw new Error('HOLD_UNIT_IMMUTABLE_ID');
@@ -88,7 +88,7 @@ export class ContainerObserver {
         || !Array.isArray(policy.securityOpt) || !policy.securityOpt.some(x=>x.startsWith('no-new-privileges'))
         || !/^[1-9][0-9]*(?::[0-9]+)?$/.test(policy.user??'')) throw new Error('HOLD_UNIT_CONFINEMENT');
     const mounts=JSON.parse(await this.command(['inspect','--format','{{json .Mounts}}',id]));
-    if (!Array.isArray(mounts) || !mounts.some(m=>m.Type==='bind' && m.Source===workdir)
+    if (!Array.isArray(mounts) || !mounts.some(m=>m.Type==='bind' && m.Source===workdir && m.RW===(sandbox==='workspace-write'))
         || mounts.some(m=>m.Type!=='bind' || (m.Source!==workdir && (m.RW!==false
           || !readOnlyRoots.some(r=>m.Source===r || m.Source.startsWith(r+'/'))))))
       throw new Error('HOLD_UNIT_MOUNTS');

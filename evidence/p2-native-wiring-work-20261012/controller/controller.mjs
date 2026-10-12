@@ -46,7 +46,7 @@ export class NativeController {
     observed=await this.store.replace(observed,{...observed.task,native_execution:{
       phase:'PROVISIONING',request,idempotency_key:key,session_key:sessionKey,source,previous_receipts:previous}});
     const unit=await this.prepare(runtime,{request,sessionKey,source});
-    const bound=await this.boundary.bind(unit,request.workdir);
+    const bound=await this.boundary.bind(unit,request.workdir,[],request.sandbox);
     const admission={request,idempotency_key:key,isolation_enforced:true};
     const latest=await this.current(request);
     if(latest.task.native_execution?.phase!=='PROVISIONING'||latest.task.native_execution.idempotency_key!==key)hold('PROVISIONING_CAS');
@@ -117,8 +117,18 @@ export class NativeController {
     await this.store.replace(observed,{...observed.task,native_execution:{...record,report}});
     return report;
   }
-  async stop(receipt) {
+  async stop(receipt,runtime) {
     const {record}=await this.record(receipt,true);
-    return this.boundary.stop(record.unit);
+    // Session cancellation and physical stop are separate observations.
+    // Always attempt the physical stop even if cancellation response is lost.
+    let cancelled=false;
+    try {
+      await runtime.subagent.deleteSession({sessionKey:record.session_key,deleteTranscript:false});
+      cancelled=true;
+    } finally {
+      await this.boundary.stop(record.unit);
+    }
+    if(!cancelled)hold('SESSION_CANCELLATION_UNKNOWN');
+    return this.boundary.inspect(record.unit);
   }
 }

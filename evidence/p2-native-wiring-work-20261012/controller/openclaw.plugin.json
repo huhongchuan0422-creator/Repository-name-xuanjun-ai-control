@@ -1,0 +1,1 @@
+{"id":"xuanjun-p2-native-controller","name":"Xuanjun P2 native controller","configSchema":{"type":"object","additionalProperties":false,"required":["bindingFile","bindingSha256"],"properties":{"bindingFile":{"type":"string"},"bindingSha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}}}

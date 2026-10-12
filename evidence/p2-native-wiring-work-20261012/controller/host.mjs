@@ -9,7 +9,7 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
   const boundary=new ContainerObserver(settings.engine);
   const agentId=settings.agentId;
   if(agentId!=='main')hold('AGENT_POLICY');
-  const config=()=>api.config;
+  const config=()=>{if(typeof api.runtime.config?.current!=='function')hold('LIVE_CONFIG_API');return api.runtime.config.current();};
   const eligibility=(runtime,request)=>{
     const cfg=config();
     if(!cfg||typeof runtime.agent?.resolveCliBackendDispatchEligibility!=='function')hold('DISPATCH_ELIGIBILITY_UNAVAILABLE');
@@ -55,9 +55,15 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
       ||!runtime.agent?.session?.getSessionEntry)hold('GATEWAY_SDK');
     const observed=store.call('preflight',null);
     const cfg=config(),selected=cfg?.agents?.defaults?.model;
-    const profile=cfg?.auth?.profiles?.[settings.authProfileId];
     if(selected?.primary!=='openai/gpt-5.6-sol'||!Array.isArray(selected.fallbacks)
-      ||selected.fallbacks.length||profile?.provider!=='openai'||profile.mode!=='oauth')hold('OAUTH_MODEL_POLICY');
+      ||selected.fallbacks.length)hold('MODEL_POLICY');
+    const auth=runtime.modelAuth;
+    if(!auth?.ensureAuthProfileStore||!auth.resolveAuthProfileOrder)hold('AUTH_METADATA_API');
+    const agentDir=runtime.agent.resolveAgentDir(cfg,agentId);
+    const authStore=auth.ensureAuthProfileStore(agentDir,{config:cfg,allowKeychainPrompt:false});
+    const order=auth.resolveAuthProfileOrder({cfg,store:authStore,provider:'openai'});
+    const profile=authStore?.profiles?.[order?.[0]];
+    if(profile?.type!=='oauth'||profile.provider!=='openai')hold('EXISTING_OAUTH_PROFILE');
     const request={workdir:settings.workspaceRoot,provider:'openai',model:'gpt-5.6-sol'};
     if(eligibility(runtime,request))hold('OAUTH_CLI_DISPATCH_BYPASS');
     const authority=runtime.sandbox.resolveWorkspaceAuthority({config:cfg,agentId,
@@ -69,7 +75,19 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
     if(observed.canonical_existing!==true||observed.outbox_existing!==true)hold('CANONICAL_PREFLIGHT');
     return {ready:true,canonical_existing:true,outbox_existing:true,isolation_enforced:true};
   };
-  return {store,boundary,eligibility,prepare,collectResult,preflight,
+  const beforeToolCall=async(event,ctx)=>{
+    if(typeof ctx?.sessionKey!=='string'||!ctx.sessionKey.startsWith('agent:main:xuanjun-p2:'))return;
+    try {
+      const saved=store.call('tool_guard',{session_key:ctx.sessionKey}).native_execution;
+      if(!saved?.receipt||ctx.runId!==saved.receipt.run_id)hold('TOOL_RUN_BINDING');
+      if(!['read','write','edit','apply_patch','exec'].includes(event.toolName)
+        ||event.params?.elevated===true||['gateway','node'].includes(event.params?.host))hold('TOOL_POLICY');
+      const unit=await boundary.inspect(saved.unit);
+      if(!unit.active||!unit.process_alive)hold('TOOL_UNIT_INACTIVE');
+      return;
+    } catch {return {block:true,blockReason:'P2 canonical lease/run/unit admission unavailable'};}
+  };
+  return {store,boundary,eligibility,prepare,collectResult,preflight,beforeToolCall,
     verifyLease:(task,request,now)=>task.state==='RUNNING'&&Number.isFinite(task.lease_until)&&task.lease_until*1000>now,
     commitGuard:request=>store.guard(request)};
 }

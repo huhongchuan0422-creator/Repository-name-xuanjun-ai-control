@@ -334,7 +334,7 @@
 +    return NativePipelineRuntime(factory(config), notifier=notifier)
 --- /dev/null
 +++ b/stage1/native_gateway_controller.py
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,95 @@
 +"""Transport to installed plugin-owned endpoints; never dispatch generic agent RPC."""
 +import hashlib
 +import json
@@ -355,14 +355,15 @@
 +    def _run(self, argv):
 +        info = os.lstat(self.executable)
 +        if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o022
++                or info.st_uid != self.config['openclaw_owner_uid']
 +                or os.path.realpath(self.executable) != self.executable):
 +            raise NativeContractError('Gateway executable unsafe')
 +        with open(self.executable, 'rb') as source:
 +            if hashlib.sha256(source.read()).hexdigest() != self.sha256:
 +                raise NativeContractError('Gateway executable changed')
 +        process = subprocess.Popen(argv, stdout=subprocess.PIPE,
-+            stderr=subprocess.PIPE, env={'HOME': self.config['service_home'],
-+            'PATH': self.config['path'], 'LANG': 'C.UTF-8'})
++            stderr=subprocess.PIPE, env={'HOME': self.config['gateway_home'],
++            'PATH': self.config['gateway_path'], 'LANG': 'C.UTF-8'})
 +        try:
 +            output, _ = process.communicate(timeout=30)
 +        except subprocess.TimeoutExpired:
@@ -409,7 +410,26 @@
 +
 +
 +def create_controller(config):
-+    return GatewayController(config)
++    # The installed transport config is part of the same release manifest.
++    # Dispatcher config keeps its existing strict schema.
++    config_path = __file__ + '.json'
++    fd = os.open(config_path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
++    try:
++        info = os.fstat(fd)
++        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
++                or info.st_mode & 0o022 or info.st_size > 65536):
++            raise NativeContractError('unsafe transport config')
++        raw = os.read(fd, 65537)
++        if len(raw) > 65536:
++            raise NativeContractError('transport config limit')
++    finally:
++        os.close(fd)
++    transport = json.loads(raw.decode('utf-8'))
++    required = {'openclaw_bin', 'openclaw_sha256', 'openclaw_owner_uid',
++                'gateway_home', 'gateway_path'}
++    if not isinstance(transport, dict) or set(transport) != required:
++        raise NativeContractError('transport config keys mismatch')
++    return GatewayController(transport)
 --- /dev/null
 +++ b/stage1/native_github_notifier.py
 @@ -0,0 +1,91 @@
@@ -506,7 +526,7 @@
 +        return {'idempotency_key':idempotency_key,'message_id':str(result['id'])}
 --- /dev/null
 +++ b/stage1/native_ledger_bridge.py
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,74 @@
 +#!/usr/bin/env python3
 +"""Bound host adapter for existing ledger only; never creates a database/table."""
 +import argparse
@@ -543,13 +563,15 @@
 +
 +
 +def execute(ledger, value):
-+    if not isinstance(value, dict) or value.get('operation') not in ('preflight', 'read', 'cas', 'guard', 'receipt'):
++    if not isinstance(value, dict) or value.get('operation') not in ('preflight', 'read', 'cas', 'guard', 'receipt', 'tool_guard'):
 +        raise ValueError('native bridge operation rejected')
 +    if value['operation'] == 'preflight':
 +        with ledger._transaction() as conn:
 +            ledger._validate_schema(conn)
 +            ledger._validate_side_schema(conn)
 +        return {'canonical_existing': True, 'outbox_existing': True}
++    if value['operation'] == 'tool_guard':
++        return ledger.native_tool_observation(value['request']['session_key'])
 +    request = value['request']
 +    if value['operation'] == 'receipt':
 +        return ledger.native_receipt_observation(request)
@@ -581,7 +603,7 @@
 +        sys.exit(2)
 --- a/stage1/execution_ledger.py
 +++ b/stage1/execution_ledger.py
-@@ -481,6 +481,80 @@
+@@ -481,6 +481,98 @@
              self._live(conn, task_id, worker_id, fence, self._now())
          return True
  
@@ -612,6 +634,24 @@
 +                         'native_execution': checkpoint.get('native_execution')})
 +            return {'task': task, 'request': dict(request),
 +                    'native_expected': checkpoint.get('native_execution')}
++
++    def native_tool_observation(self, session_key):
++        if not isinstance(session_key, str) or not re.fullmatch(r'agent:main:xuanjun-p2:[0-9a-f]{64}', session_key):
++            raise ValueError('native tool session rejected')
++        with self._transaction() as conn:
++            rows = conn.execute('SELECT checkpoint FROM tasks LIMIT 1001').fetchall()
++            if len(rows) > 1000:
++                raise ValueError('native task lookup limit')
++            matches = []
++            for row in rows:
++                record = json.loads(row['checkpoint']).get('native_execution')
++                if isinstance(record, dict) and record.get('session_key') == session_key:
++                    matches.append(record)
++            if len(matches) != 1 or matches[0].get('phase') != 'RUNNING':
++                raise LeaseLost('native tool admission not bound to active run')
++            record = matches[0]
++            self._native_bound(conn, record['request'])
++            return {'native_execution': record}
 +
 +    def native_receipt_observation(self, request):
 +        """Read a persisted execution for stop/reconciliation after lease loss.
@@ -662,7 +702,7 @@
      def heartbeat(self, task_id, worker_id, fence, ttl=60, phase='EXECUTING'):
          self._ttl(ttl)
          if not isinstance(phase, str) or re.fullmatch(r'[A-Z][A-Z0-9_]{0,31}', phase) is None:
-@@ -500,7 +574,14 @@
+@@ -500,7 +592,14 @@
          packed = self._dump(value)
          with self._transaction() as conn:
              now = self._now()
