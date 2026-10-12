@@ -128,6 +128,36 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(row['state'],'CAPABILITY_UNAVAILABLE')
         self.assertEqual(row['effects_reconciled'],UNKNOWN)
 
+    def test_normal_exit_without_receipt_becomes_visible_hold_action(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        action=self.s.scan(1902)[0]
+        self.assertEqual(action['action'],'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
+        self.assertTrue(action['requires_effect_reconciliation'])
+        self.assertEqual(self.s._task('t1')['state'],'STARTED')
+
+    def test_old_writer_cannot_resume_after_ack_and_new_attempt(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK')
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,payload=good)
+        self.s.claim('t1','a2','qa','WORK','run2','session2','lease2',2,2,1004)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','zombie','PROGRESS',1005,
+                          'SOURCE_COMMIT','deadbeef')
+
+    def test_quota_unavailable_is_terminal_durable_and_not_fake_running(self):
+        self.registration(); self.claim()
+        payload=dict(state='CAPABILITY_UNAVAILABLE',artifact_sha256=UNKNOWN,
+            writer_stopped=True,effects_reconciled=True,
+            next_action='OWNER_VISIBLE_QUOTA_HOLD')
+        self.s.record('t1','a1','quota','TERMINAL',1002,payload=payload)
+        self.assertEqual(self.s._task('t1')['state'],'CAPABILITY_UNAVAILABLE')
+        self.assertEqual(len(self.s.due_outbox(1002)),1)
+
 
 if __name__ == '__main__':
     unittest.main()
