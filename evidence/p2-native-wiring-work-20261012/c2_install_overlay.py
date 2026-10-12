@@ -229,8 +229,6 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
 """        if receipt.get('plugin')!={'id':P2_PLUGIN_ID,'previous':'ABSENT',
                                    'gateway_service':GATEWAY_SERVICE}:
             raise ValueError('P2_PLUGIN_ROLLBACK_RECEIPT_MISMATCH')
-        self._rollback_plugin({'plugin': {'id':P2_PLUGIN_ID,'service_user':'xuanjun_dev',
-            'openclaw_bin':'/home/xuanjun_dev/.openclaw/bin/openclaw'}},restart=False)
         # Validate every backup and current target before any rollback effect.
         # A failed provision may leave either old or installed bytes in place.
         prepared = []
@@ -365,6 +363,24 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
                 or plugin_receipt.get('gateway_service')!=GATEWAY_SERVICE
                 or type(plugin_receipt.get('dropin_parent_created')) is not bool):
             raise ValueError('P2_PLUGIN_ROLLBACK_RECEIPT_MISMATCH')
+""")
+    replace_once(runtime,
+"""            prepared.append((item, old))
+        for item, old in prepared:
+""",
+"""            prepared.append((item, old))
+        if plugin_receipt['dropin_parent_created']:
+            if not os.path.lexists(GATEWAY_DROPIN_DIR):
+                raise ValueError('HOLD_GATEWAY_DROPIN_DIRECTORY_MISSING')
+            dropin_parent=os.lstat(GATEWAY_DROPIN_DIR)
+            if (not stat.S_ISDIR(dropin_parent.st_mode) or dropin_parent.st_uid!=0
+                    or dropin_parent.st_gid!=0 or stat.S_IMODE(dropin_parent.st_mode)!=0o755):
+                raise ValueError('HOLD_GATEWAY_DROPIN_DIRECTORY_CHANGED')
+        # All receipt, backup, target and service-drop-in evidence has passed.
+        # External rollback effects may start only after this point.
+        self._rollback_plugin({'plugin': {'id':P2_PLUGIN_ID,'service_user':'xuanjun_dev',
+            'openclaw_bin':'/home/xuanjun_dev/.openclaw/bin/openclaw'}},restart=False)
+        for item, old in prepared:
 """)
     replace_once(runtime,
 """        self.prerequisites.rollback(receipt['prerequisites'])

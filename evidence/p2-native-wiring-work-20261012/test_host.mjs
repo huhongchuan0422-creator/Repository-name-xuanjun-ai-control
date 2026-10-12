@@ -21,6 +21,12 @@ const receipt={run_id:'r',placement_digest:createHash('sha256').update(canonical
 const running={native_execution:{receipt,request,unit,placement,agent_id:'developer'}};
 bindings.store.call=(operation)=>operation==='tool_guard'?running:true;
 assert.equal(await bindings.beforeToolCall({toolName:'read',params:{},runId:'r'},ctx),undefined);
+let postInspect=running;
+bindings.boundary.inspect=async()=>{postInspect={native_execution:{...running.native_execution,session_key:'agent:developer:xuanjun-p2:'+'f'.repeat(64)}};return {active:true,process_alive:true};};
+bindings.store.call=(operation)=>operation==='tool_guard'?postInspect:true;
+assert.equal((await bindings.beforeToolCall({toolName:'read',params:{},runId:'r'},ctx)).block,true);
+bindings.boundary.inspect=async()=>({active:true,process_alive:true});
+bindings.store.call=(operation)=>operation==='tool_guard'?running:true;
 assert.equal((await bindings.beforeToolCall({toolName:'read',params:{}},ctx)).block,true);
 assert.equal((await bindings.beforeToolCall({toolName:'exec',params:{host:'node'},runId:'r'},ctx)).block,true);
 assert.equal((await bindings.beforeToolCall({toolName:'read',params:{},runId:'r'},{...ctx,runId:'wrong'})).block,true);

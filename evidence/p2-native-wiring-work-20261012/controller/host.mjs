@@ -110,8 +110,16 @@ export function createHostBindings(api,settings,resolveSandboxContext) {
       if(sandbox?.enabled!==true||sandbox.runtimeId!==saved.unit.name
         ||sandbox.backendId!==saved.unit.backend||sandbox.workspaceDir!==saved.request.workdir
         ||sandbox.workspaceAccess!==(saved.request.sandbox==='read-only'?'ro':'rw'))hold('TOOL_SANDBOX_BINDING');
+      const identity=digest({phase:saved.phase,idempotency_key:saved.idempotency_key,
+        session_key:saved.session_key,agent_id:saved.agent_id,request:saved.request,
+        unit:saved.unit,placement:saved.placement,receipt:saved.receipt});
       const unit=await boundary.inspect(saved.unit);
       if(!unit.active||!unit.process_alive)hold('TOOL_UNIT_INACTIVE');
+      const current=store.call('tool_guard',{session_key:ctx.sessionKey}).native_execution;
+      if(!current||digest({phase:current.phase,idempotency_key:current.idempotency_key,
+        session_key:current.session_key,agent_id:current.agent_id,request:current.request,
+        unit:current.unit,placement:current.placement,receipt:current.receipt})!==identity
+        ||store.guard(saved.request)!==true)hold('TOOL_CANONICAL_CHANGED_AFTER_INSPECT');
       return;
     } catch {return {block:true,blockReason:'P2 canonical lease/run/unit admission unavailable'};}
   };

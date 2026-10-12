@@ -32,7 +32,7 @@ plugin=source/'plugins/p2-native-controller'
 shutil.copytree(ROOT/'controller',plugin)
 subprocess.run(['python',str(ROOT/'c2_install_overlay.py'),str(source)],check=True)
 env=dict(os.environ,P2_SOURCE_ROOT=str(source))
-for name in ('test_native_wiring.py','test_native_ledger.py','test_native_socket.py'):
+for name in ('test_native_wiring.py','test_native_ledger.py','test_native_socket.py','test_c2_install_highs.py'):
     subprocess.run(['python',str(ROOT/name)],env=env,check=True)
 for name in ('test_controller.mjs','test_host.mjs'):
     subprocess.run(['node',str(ROOT/name)],env=env,check=True)
