@@ -65,7 +65,8 @@ try {
     verifyWorkerPlacement:async(_runtime,{request,unit,sessionKey,source})=>placementValid?{
       verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
       source_manifest_sha256:source.manifest_sha256,
-      request_sha256:createHash('sha256').update(canonical(request)).digest('hex')
+      request_sha256:createHash('sha256').update(canonical(request)).digest('hex'),
+      sandbox_runtime_id:unit.name
     }:null});
   const raw=JSON.stringify(request),key=createHash('sha256').update(raw).digest('hex');
   const admission=await concrete.admit(raw,key,runtime);
