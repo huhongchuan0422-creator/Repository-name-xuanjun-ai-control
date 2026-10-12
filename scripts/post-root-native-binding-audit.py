@@ -243,6 +243,77 @@ def audit():
                 pass
         result['configured_native_roles'] = registry
 
+    import pwd
+
+    result['p2_platform_child_probe'] = {'state': 'SESSION_QUERY_UNAVAILABLE', 'child_started': 'NOT_PROVEN'}
+    if os.path.isfile(cli) and os.path.isfile(node_dir + '/node'):
+        p = subprocess.run(['/usr/sbin/runuser', '-u', 'xuanjun_dev', '--',
+                            cli, 'sessions', '--json', '--agent', 'main'], env=env,
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=20, check=False)
+        probe = {'state': 'NO_RAW_SESSION_CONTENT', 'exit_code': p.returncode,
+                 'main_session_id': 'e2474bef-73d5-4c39-9428-4d610697db29',
+                 'matching_sessions': [], 'spawn_tool_calls': [], 'spawn_tool_results': [],
+                 'child_started': 'NOT_PROVEN'}
+        if p.returncode == 0 and len(p.stdout) <= 1048576:
+            try:
+                listing = json.loads(p.stdout.decode('utf-8'))
+                rows = listing if isinstance(listing, list) else listing.get('sessions', [])
+                for row in rows[:1000]:
+                    if not isinstance(row, dict):
+                        continue
+                    session_id = row.get('sessionId')
+                    key = row.get('key')
+                    if session_id == probe['main_session_id'] or (isinstance(key, str) and 'p2-platform-' in key):
+                        clean = {}
+                        for field in ('sessionId', 'key', 'model', 'modelProvider', 'kind'):
+                            value = row.get(field)
+                            if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:/-]{1,250}', value):
+                                clean[field] = value
+                        for field in ('updatedAt', 'createdAt'):
+                            value = row.get(field)
+                            if type(value) in (int, float):
+                                clean[field] = value
+                        probe['matching_sessions'].append(clean)
+                store = listing.get('path') if isinstance(listing, dict) else None
+                store = safe_path(store)
+                if store and store.endswith('/sessions.json'):
+                    log_path = os.path.dirname(store) + '/' + probe['main_session_id'] + '.jsonl'
+                    info = os.lstat(log_path)
+                    if stat.S_ISREG(info.st_mode) and info.st_uid == pwd.getpwnam('xuanjun_dev').pw_uid and info.st_size <= 2097152:
+                        with open(log_path, 'r', encoding='utf-8') as stream:
+                            for line in stream:
+                                record = json.loads(line)
+                                message = record.get('message', {})
+                                role = message.get('role')
+                                content = message.get('content', [])
+                                if not isinstance(content, list):
+                                    continue
+                                for part in content:
+                                    if not isinstance(part, dict):
+                                        continue
+                                    if role == 'assistant' and part.get('type') == 'toolCall' and part.get('name') in ('sessions_spawn', 'subagents'):
+                                        arguments = part.get('arguments', {})
+                                        label = arguments.get('label') if isinstance(arguments, dict) else None
+                                        probe['spawn_tool_calls'].append({'tool': part['name'],
+                                            'tool_call_id': part.get('id') if isinstance(part.get('id'), str) else None,
+                                            'platform_label_present': isinstance(label, str) and 'PLATFORM' in label.upper()})
+                                    if role == 'toolResult' and message.get('toolName') == 'sessions_spawn' and part.get('type') == 'text':
+                                        try:
+                                            observed = json.loads(part.get('text', ''))
+                                            clean = {}
+                                            for field in ('status', 'runId', 'childSessionKey'):
+                                                value = observed.get(field)
+                                                if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:/-]{1,250}', value):
+                                                    clean[field] = value
+                                            probe['spawn_tool_results'].append(clean)
+                                        except (ValueError, TypeError, AttributeError):
+                                            pass
+                        probe['session_log_metadata'] = metadata(log_path)
+                probe['state'] = 'NATIVE_SESSION_METADATA_PROBED_NO_CHILD_START_ATTESTATION'
+            except (ValueError, TypeError, AttributeError, OSError):
+                probe['state'] = 'HOLD_NATIVE_SESSION_PROBE_SCHEMA_OR_LOG_UNAVAILABLE'
+        result['p2_platform_child_probe'] = probe
+
     print(json.dumps(result, sort_keys=True))
 
 
