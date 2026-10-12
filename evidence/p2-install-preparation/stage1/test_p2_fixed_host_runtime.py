@@ -20,6 +20,9 @@ class FixedRuntimeTests(unittest.TestCase):
         self.transaction=os.path.join(self.temp.name,'transaction'); os.mkdir(self.transaction,0o700)
         self.commands=[]
         self.runtime=module.FixedHostRuntime(self.transaction,self._run)
+        self.runtime.prerequisites.preflight=lambda plan: True
+        self.runtime.prerequisites.apply=lambda plan: {'plan_sha256':'a'*64}
+        self.runtime.prerequisites.rollback=lambda plan: {'restored':True}
 
     def _run(self,command,**unused): self.commands.append(command); return Result()
 
@@ -65,7 +68,7 @@ class FixedRuntimeTests(unittest.TestCase):
 
     def test_first_install_preflight_does_not_require_uninstalled_release(self):
         release='integration-'+'a'*16
-        runtime={'release_directory':release,'services':list(module.ALLOWED_SERVICES),
+        runtime={'release_directory':release,'prerequisites':{},'services':list(module.ALLOWED_SERVICES),
                  'provisioning':[{'source':'deploy/unit',
                    'target':'/etc/systemd/system/unit.service','source_sha256':'b'*64,
                    'rendered_sha256':'c'*64,'mode':0o644,'owner_uid':0,
@@ -113,7 +116,7 @@ class FixedRuntimeTests(unittest.TestCase):
             targets.append(dict(target=target, previous=previous,
                                 rendered_sha256=module._digest_bytes(b'installed'),
                                 mode=0o600, uid=info.st_uid, gid=info.st_gid))
-        receipt = dict(schema=1, targets=targets, services=[], rollback_complete=True)
+        receipt = dict(schema=1, targets=targets, services=[], rollback_complete=True, prerequisites={})
         raw = json.dumps(receipt, sort_keys=True, separators=(',', ':')).encode('utf-8')
         with open(self.runtime.receipt_path, 'wb') as stream: stream.write(raw)
         return targets, dict(receipt_sha256=module._digest_bytes(raw))
