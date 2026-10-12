@@ -60,6 +60,18 @@ jobs:
             echo ISOLATED_OBJECT_COMPLETENESS_HOLD >> "$destination/RECOVERY_STATUS.txt"
           fi
           echo "$recovery" >> "$destination/RECOVERY_STATUS.txt"
+          snapshot=/home/xuanjun_dev/p2-source-snapshot-$GITHUB_RUN_ID
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /bin/mkdir -m 700 "$snapshot"
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$repository" archive 3888f859eeb440a63602b2e9822823447ea8294c | sudo -n /usr/sbin/runuser -u xuanjun_dev -- /bin/tar -x -C "$snapshot"
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$snapshot" init --quiet
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$snapshot" add -f .
+          tree=$(sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$snapshot" write-tree)
+          test "$tree" = 686786e69e4397b5834bac631a57545fa954a829
+          rootcommit=$(sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$snapshot" -c user.name=RecoverySnapshot -c user.email=recovery@invalid commit-tree "$tree" -m 'Retained exact 3888 source snapshot; original ancestry incomplete; NOT RELEASE')
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$snapshot" update-ref refs/heads/recovered-source "$rootcommit"
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$snapshot" fsck --full > "$destination/SNAPSHOT_FSCK.txt" 2>&1
+          printf 'ORIGINAL_COMMIT=3888f859eeb440a63602b2e9822823447ea8294c\\nEXACT_TREE=%s\\nRECOVERY_ROOT=%s\\nANCESTRY_REPAIRED=NO\\nSOURCE_OBJECT_COMPLETENESS=PASS\\nINSTALL=NO\\n' "$tree" "$rootcommit" > "$destination/SNAPSHOT_PROVENANCE.txt"
+
           (cd "$destination" && sha256sum -c SHA256SUMS)
           echo 'RETAINED_SOURCE_ONLY_NOT_INSTALLER; TASK=XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1; FREEZE=NOT_ADMITTED' > "$destination/STATUS.txt"
           echo "P2_RETENTION_PATH=$destination" >> "$GITHUB_ENV"
