@@ -27,7 +27,7 @@ jobs:
           set -euo pipefail
           test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
           test "$(id -un)" = githubrunner
-          WORK=$(mktemp -d /home/githubrunner/p2-checkpoint-check-XXXXXX)
+          WORK=$(mktemp -d /var/lib/xuanjun-p2-source-handoff/p2-checkpoint-check-XXXXXX)
           chmod 700 "$WORK"
           mkdir -m 700 "$WORK/temp"
           export TMPDIR="$WORK/temp"
