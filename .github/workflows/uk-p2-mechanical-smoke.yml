@@ -36,20 +36,19 @@ jobs:
           /usr/bin/python3 -I "$P" publish --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT"
           /usr/bin/python3 -I "$P" wait --commit "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --timeout 90
           echo 'MECHANICAL_CANARY_ONLY_NOT_P2_PASS'
-      - name: Return bounded GitHub evidence (no AI/model invocation)
+      - name: Emit deterministic GitHub Actions receipt without PR write
         if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const passed = "${{ steps.pin.outcome }}" === "success" && "${{ steps.probe.outcome }}" === "success";
-            const body = [
-              "::SKIP_COMPLETION::",
-              "## P2 UK existing Runner → independent systemd bridge canary",
-              passed ? "MECHANICAL_CANARY_PASS_ONLY" : "HOLD_MECHANICAL_BRIDGE_NOT_PROVEN",
-              "GitHub run: https://github.com/" + context.repo.owner + "/" + context.repo.repo + "/actions/runs/" + context.runId,
-              "Source SHA: " + context.sha,
-              "No model inference made by this canary script. Entire OpenClaw/Codex runtime usage remains UNVERIFIED.",
-              "P2 final dispatcher/ledger/broker NOT_INSTALLED; P3 NOT_STARTED; #19 HOLD.",
-              "No AI worker, duplicate writer, production or OAuth modification by this workflow."
-            ].join("\n");
-            await github.rest.issues.createComment({owner:context.repo.owner,repo:context.repo.repo,issue_number:17,body});
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '## UK P2 mechanical bridge canary'
+            echo ''
+            echo 'Source SHA: ${GITHUB_SHA}'
+            echo 'Run ID: ${GITHUB_RUN_ID}'
+            echo 'Runner identity: self-hosted UK'
+            echo 'Hash-bound mechanical publish/wait steps are authoritative.'
+            echo 'P2 full broker/ledger/dispatcher: NOT_INSTALLED.'
+            echo 'P3: NOT_STARTED. Model inference by this workflow: NONE.'
+          } >> "${GITHUB_STEP_SUMMARY}"
+          echo 'CANARY_EVIDENCE_IN_GITHUB_JOB_LOGS_AND_STEP_SUMMARY'
