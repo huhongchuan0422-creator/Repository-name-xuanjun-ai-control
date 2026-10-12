@@ -91,6 +91,8 @@
     "stage1/uk_owner_callback_core.py": "a00e5b28468bdb335f891026039655167cb7df6ab207702375518c6f11471884",
     "stage1/uk_owner_notify_worker.py": "90dee461e16d90994dfda3942c0e8312ff5b3703fbc4340f74453f690506b10d",
     "stage1/ledger_install_stage.py": "0775b91a51bf46097e6fd3b33e19745fe4fa0fd324bde69b3d3bf61bc618c2db",
-    "stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e"
+    "stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e",
+    "stage1/ledger_cutover_transaction.py": "781704b76dc53981d2f3c957435755ec763ed8ac4440dcdfa2da2ab176c8413a",
+    "stage1/legacy_host_adapter.py": "22807a24dda907fcbd025e1217e197b23da0d5281f8256a84c256274b70069cf"
   }
 }
