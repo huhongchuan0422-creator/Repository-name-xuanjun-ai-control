@@ -304,6 +304,10 @@ class Supervisor(object):
                 value['started_deadline'], value['terminal_deadline'],
                 value['handoff_deadline'], UNKNOWN, UNKNOWN, UNKNOWN,
                 UNKNOWN, 0, 0, now, now)
+        # sqlite3's context manager does not itself begin a transaction.
+        # Acquire the write lock before any state read so validation and
+        # event/task/outbox mutation share one serialization point.
+        self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             self.db.execute('''INSERT INTO tasks(
               task_id,parent_task_id,stage,writer_scope,state,owner,entry,
@@ -348,6 +352,10 @@ class Supervisor(object):
                 or type(fence) is not int or fence < 1
                 or type(epoch) is not int or epoch < 1):
             raise ValueError('EXACT_EXECUTION_AUTHORITY_REQUIRED')
+        # sqlite3's context manager does not itself begin a transaction.
+        # Acquire the write lock before any state read so validation and
+        # event/task/outbox mutation share one serialization point.
+        self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
             if task['state'] != 'READY' or not self._dependencies_done(task):
@@ -404,6 +412,10 @@ class Supervisor(object):
                 or len(evidence_ref) > 1024
                 or len(canonical(payload).encode('utf-8')) > 65536):
             raise ValueError('BOUNDED_EVENT_REQUIRED')
+        # sqlite3's context manager does not itself begin a transaction.
+        # Acquire the write lock before any state read so validation and
+        # event/task/outbox mutation share one serialization point.
+        self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
             # Exact replays are idempotent even when a newer event has since
@@ -541,6 +553,10 @@ class Supervisor(object):
         if not finite(now):
             raise ValueError('FINITE_TIME_REQUIRED')
         actions = []
+        # sqlite3's context manager does not itself begin a transaction.
+        # Acquire the write lock before any state read so validation and
+        # event/task/outbox mutation share one serialization point.
+        self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             rows = [dict(r) for r in self.db.execute(
                 "SELECT * FROM tasks WHERE state IN ('READY','RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')")]
@@ -627,6 +643,10 @@ class Supervisor(object):
                 or not isinstance(evidence_ref, str)
                 or not re.fullmatch(r'[0-9a-f]{64}', evidence_ref)):
             raise ValueError('EXACT_SUPERVISOR_LIVENESS_REQUIRED')
+        # sqlite3's context manager does not itself begin a transaction.
+        # Acquire the write lock before any state read so validation and
+        # event/task/outbox mutation share one serialization point.
+        self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             self.db.execute('''INSERT OR REPLACE INTO supervisor_heartbeats
               (instance_id,observed_at,process_ref,evidence_ref,updated_at)
@@ -657,6 +677,10 @@ class Supervisor(object):
 
     def outbox_result(self, outbox_id, delivered, now=None, error=''):
         now = self.clock() if now is None else now
+        # sqlite3's context manager does not itself begin a transaction.
+        # Acquire the write lock before any state read so validation and
+        # event/task/outbox mutation share one serialization point.
+        self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             row = self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',
                                   (outbox_id,)).fetchone()
