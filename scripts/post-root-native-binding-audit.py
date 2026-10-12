@@ -328,6 +328,57 @@ def audit():
                 probe['state'] = 'HOLD_NATIVE_SESSION_PROBE_SCHEMA_OR_LOG_UNAVAILABLE'
         result['p2_platform_child_probe'] = probe
 
+
+    # Read-only reconciliation: no reset/clean/stash/commit or host lease mutation.
+    reconciliation = {'target_prefix': 'd99b0406', 'repositories': [],
+                      'writer_stopped': 'NOT_PROVEN', 'lease_fence': 'NOT_RECONCILED',
+                      'side_effects': 'NOT_RECONCILED', 'freeze': 'DENIED_PENDING_RECONCILIATION'}
+    roots = ['/home/xuanjun_dev', '/home/githubrunner']
+    found = []
+    for root in roots:
+        for directory, dirs, files in os.walk(root, followlinks=False):
+            depth = directory[len(root):].count('/')
+            if '.git' in dirs or '.git' in files:
+                found.append(directory)
+                dirs[:] = []
+                continue
+            dirs[:] = [d for d in dirs if d not in ('node_modules', '.npm', '.cache', 'vendor', 'state', 'sessions') and not os.path.islink(os.path.join(directory, d))]
+            if depth >= 4 or len(found) >= 40:
+                dirs[:] = []
+    for directory in found[:40]:
+        owner = pwd.getpwuid(os.stat(directory).st_uid).pw_name
+        if owner not in ('xuanjun_dev', 'githubrunner'):
+            continue
+        def git_read(arguments):
+            command = ['/usr/sbin/runuser', '-u', owner, '--', '/usr/bin/git', '--no-optional-locks', '-C', directory] + arguments
+            environment = dict(os.environ, GIT_OPTIONAL_LOCKS='0', GIT_TERMINAL_PROMPT='0')
+            outcome = subprocess.run(command, env=environment, stdout=subprocess.PIPE,
+                                     stderr=subprocess.DEVNULL, timeout=10)
+            return outcome.returncode, outcome.stdout[:2097152]
+        code, head = git_read(['rev-parse', 'HEAD'])
+        if code:
+            continue
+        code, target = git_read(['rev-parse', '--verify', 'd99b0406^{commit}'])
+        row = {'path': directory, 'unix_owner': owner, 'head': head.decode('ascii', 'replace').strip(),
+               'target_present': code == 0}
+        if code == 0:
+            row['target_commit'] = target.decode('ascii', 'replace').strip()
+            _, authors = git_read(['show', '-s', '--format=%H%n%T%n%P%n%an%n%cn%n%aI%n%cI', row['target_commit']])
+            row['commit_author_metadata'] = authors.decode('utf-8', 'replace').splitlines()
+            _, status = git_read(['status', '--porcelain=v1', '-z', '--untracked-files=normal'])
+            _, diff = git_read(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--'])
+            _, index = git_read(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--binary', '--'])
+            import hashlib
+            row['status_sha256'] = hashlib.sha256(status).hexdigest()
+            row['diff_sha256'] = hashlib.sha256(diff).hexdigest()
+            row['index_diff_sha256'] = hashlib.sha256(index).hexdigest()
+            row['diff_bytes_bounded'] = len(diff)
+            row['status_entries'] = status.count(b'\\x00')
+            row['diff_preserved_in_place'] = True
+            row['authors_are_execution_identity'] = False
+        reconciliation['repositories'].append(row)
+    result['p2_unfrozen_code_reconciliation'] = reconciliation
+
     print(json.dumps(result, sort_keys=True))
 
 
