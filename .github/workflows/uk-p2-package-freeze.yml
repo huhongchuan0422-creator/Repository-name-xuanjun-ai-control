@@ -89,7 +89,7 @@ jobs:
           shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],'tools/p2-package-freeze.py'),
                           os.path.join(tools,'p2-package-freeze.py'))
           with open(os.path.join(root,'deploy/integration-manifest.json')) as stream:manifest=json.load(stream)
-          assert len(manifest['files'])==48
+          assert len(manifest['files'])==50
           for relative,expected in manifest['files'].items():
               with open(os.path.join(root,relative),'rb') as stream:
                   assert hashlib.sha256(stream.read()).hexdigest()==expected,relative
