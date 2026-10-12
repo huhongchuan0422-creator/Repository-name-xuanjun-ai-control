@@ -398,10 +398,8 @@ class Supervisor(object):
                 or not process_ref.strip()):
             raise ValueError('EXACT_SUPERVISOR_LIVENESS_REQUIRED')
         with self.db:
-            self.db.execute('''INSERT INTO supervisor_heartbeats
-              (instance_id,observed_at,process_ref,updated_at) VALUES (?,?,?,?)
-              ON CONFLICT(instance_id) DO UPDATE SET observed_at=excluded.observed_at,
-              process_ref=excluded.process_ref,updated_at=excluded.updated_at''',
+            self.db.execute('''INSERT OR REPLACE INTO supervisor_heartbeats
+              (instance_id,observed_at,process_ref,updated_at) VALUES (?,?,?,?)''',
               (instance_id, now, process_ref, now))
 
     def supervisor_health(self, now=None, max_age=300):
