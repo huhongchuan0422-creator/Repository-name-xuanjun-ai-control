@@ -1,7 +1,7 @@
 name: UK P2 checkpoint Python36 validation and fixed existing audit
 on:
   push:
-    branches: [proposal/uk-mechanical-bootstrap-20261012, fix/p2-dispatcher-runtime-20261012, fix/p2-measured-legacy-exclusion-20261012, fix/p2-ledger-cutover-transaction-20261012, fix/p2-unified-install-transaction-20261012, fix/p2-fixed-runtime-entrypoint-20261012]
+    branches: [proposal/uk-mechanical-bootstrap-20261012, fix/p2-dispatcher-runtime-20261012, fix/p2-measured-legacy-exclusion-20261012, fix/p2-ledger-cutover-transaction-20261012, fix/p2-unified-install-transaction-20261012, fix/p2-fixed-runtime-entrypoint-20261012, fix/p2-first-install-entry-20261012]
     paths: ['.github/workflows/uk-p2-checkpoint-validate.yml']
 permissions:
   contents: read
