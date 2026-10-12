@@ -48,7 +48,7 @@ class FixedRuntimeTests(unittest.TestCase):
         with patch.object(self.runtime,'_authority',return_value=None):
             self.runtime.stop_new({'services':list(module.ALLOWED_SERVICES)})
         stopped=[command[-1] for command in self.commands]
-        self.assertEqual(stopped,list(reversed(module.ALLOWED_SERVICES)))
+        self.assertEqual(stopped,list(module.STOP_SERVICES))
         self.assertTrue(all(command[1]=='stop' for command in self.commands))
 
     def test_binding_rejects_escape_duplicate_authority_and_writable_mode(self):
@@ -149,6 +149,29 @@ class FixedRuntimeTests(unittest.TestCase):
             self.assertEqual(stream.read(), b'original')
         self.assertFalse(os.path.lexists(targets[1]['target']))
         self.assertEqual(self.commands, [['/usr/bin/systemctl', 'daemon-reload']])
+
+    def test_quiesced_runtime_cannot_start_active_only_services(self):
+        with patch.object(self.runtime, '_authority'):
+            with self.assertRaisesRegex(ValueError, 'ACTIVE_DESCRIPTOR_REQUIRED'):
+                self.runtime.activate({'provisioning': []}, {'state': 'QUIESCED'})
+        self.assertEqual(self.commands, [])
+
+    def test_database_proof_is_read_only_and_precedes_service_start(self):
+        descriptor={'state': 'QUIESCED',
+                    'db_path': '/var/lib/xuanjun-development/generations/1/state.sqlite'}
+        with patch.object(self.runtime, '_authority'):
+            self.assertEqual(self.runtime.reopen_database(descriptor),
+                             {'database_reopened': True})
+        self.assertEqual(self.commands[0][0], '/usr/bin/python3')
+        self.assertIn('mode=ro', self.commands[0][4])
+        self.assertFalse(any('systemctl' in item for command in self.commands for item in command))
+
+    def test_stop_inhibits_triggers_and_includes_socket_activated_services(self):
+        self.assertEqual(module.STOP_SERVICES[:3], (
+            'xuanjun-github-intake.timer','xuanjun-ledger.socket','xj-root-broker.socket'))
+        self.assertIn('xuanjun-ledger.service',module.STOP_SERVICES)
+        self.assertIn('xj-root-broker.service',module.STOP_SERVICES)
+        self.assertIn('xuanjun-github-intake.service',module.STOP_SERVICES)
 
 
 if __name__=='__main__': unittest.main()
