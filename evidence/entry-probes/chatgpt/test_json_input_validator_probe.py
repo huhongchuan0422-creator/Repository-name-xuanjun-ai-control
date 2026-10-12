@@ -10,6 +10,12 @@ class JsonProbeTests(unittest.TestCase):
     def test_valid_utf8_json(self):
         self.assertEqual(validate_json_bytes(b'{"a":1}'), {"a": 1})
 
+    def test_integer_type_preserved(self):
+        self.assertIs(type(validate_json_bytes(b'123')), int)
+
+    def test_float_type_preserved(self):
+        self.assertIs(type(validate_json_bytes(b'1.5')), float)
+
     def test_duplicate_key_rejected(self):
         with self.assertRaises(ValueError):
             validate_json_bytes(b'{"a":1,"a":2}')
