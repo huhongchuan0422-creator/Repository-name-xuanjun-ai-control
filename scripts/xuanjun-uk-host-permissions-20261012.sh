@@ -194,7 +194,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 XJ_AUDIT_PYTHON
 echo "1fa4bf89868de245a82e1a7a22ae6035acd1975b42de3252197b68d08fa676c8  $STAGE/audit.py" | sha256sum -c -
 /usr/bin/python3 -I -B "$STAGE/audit.py" --self-test

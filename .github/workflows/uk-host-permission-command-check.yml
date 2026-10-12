@@ -23,7 +23,7 @@ jobs:
           /usr/bin/python3 -B - <<'PY'
           import ast,hashlib,os,tempfile,subprocess
           with open('scripts/xuanjun-uk-host-permissions-20261012.sh') as f:s=f.read()
-          assert hashlib.sha256(s.encode()).hexdigest()=='3690ad5c8d752f8ed9034a377c2093e5b44bd8c5fd6415ec4bdd08d571ee130f'
+          assert hashlib.sha256(s.encode()).hexdigest()=='0b08adbed54209b3eddf93ed05a7b87acac912fc612f650c1d44807f329574ba'
           code=s.split("<<'XJ_AUDIT_PYTHON'\n",1)[1].split('\nXJ_AUDIT_PYTHON',1)[0]+'\n'
           ast.parse(code)
           assert hashlib.sha256(code.encode()).hexdigest()=='1fa4bf89868de245a82e1a7a22ae6035acd1975b42de3252197b68d08fa676c8'
