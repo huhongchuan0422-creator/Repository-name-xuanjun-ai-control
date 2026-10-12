@@ -68,7 +68,7 @@ jobs:
           with open('repo/deploy/integration-manifest.json') as f:m=json.load(f)
           for relative,digest in m['files'].items():
               with open(os.path.join('repo',relative),'rb') as f:assert hashlib.sha256(f.read()).hexdigest()==digest,relative
-          print('ISOLATED_PREPARATION_DELTA_AND_41_FILE_MANIFEST_VERIFIED')
+          print('ISOLATED_PREPARATION_DELTA_AND_42_FILE_MANIFEST_VERIFIED')
           PY
           cd repo
           /usr/bin/python3 -B -m unittest discover -s stage1 -p 'test_*.py'
