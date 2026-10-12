@@ -1,73 +1,76 @@
-name: P2 release pre-gate exact artifact
+name: P2 release pre-gate exact authoritative artifact
 on:
   push:
-    branches: [repair/p2-chatgpt-clean-review-20261013]
+    branches:
+      - repair/p2-chatgpt-clean-review-20261013
     paths:
       - .github/workflows/p2-release-pregate.yml
 permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: '11778162510'
-  P2_TAR_SHA256: 'dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317'
-  P2_SOURCE_COMMIT: '9d8be9805baa7bf4b690bfa74fcf78a0ff340dca'
-  QA_SECURITY_RUN: '38320576089'
-  UK_VERIFY_RUN: '38320575916'
+  P2_ARTIFACT_ID: "11778873716"
+  P2_TAR_SHA256: "b279c3a88aed317a5fcd34af7c165d68ab3870773d3f21dcfe89d4fc09a584a9"
+  P2_SOURCE_COMMIT: "7c28108cfe089e150bdcd103058d79c6377956f0"
+  P2_SOURCE_TREE: "af25a905eae7297d1d9884146a0e761f67de2c43"
+  P2_MANIFEST_SHA256: "6319f90b32aa25955dcf5352184411bfab080e0c730ec7079ad78f9bfeda6e0e"
+  QA_SECURITY_RUN: "38321677940"
+  UK_VERIFY_RUN: "38321954736"
 jobs:
   release-pregate:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require exact prerequisite runs
+      - name: Require exact successful prerequisite runs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           for run in "$QA_SECURITY_RUN" "$UK_VERIFY_RUN"; do
-            ok=0
-            for i in $(seq 1 18); do
-              status=$(gh api "repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/$run" --jq '.status+":"+(.conclusion//"")')
-              case "$status" in
-                completed:success) ok=1; break ;;
-                completed:*) echo "PREREQUISITE_FAILED=$run:$status"; exit 41 ;;
-              esac
-              sleep 10
-            done
-            test "$ok" -eq 1 || { echo "PREREQUISITE_NOT_TERMINAL=$run"; exit 42; }
+            status="$(gh api "repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/$run" --jq '.status+":"+(.conclusion//"")')"
+            test "$status" = "completed:success" || {
+              echo "P2_PREREQUISITE_NOT_SUCCESS=$run:$status"
+              exit 41
+            }
           done
-      - name: Verify exact frozen artifact again
+      - name: Download exact authoritative P2 artifact
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          rm -rf /tmp/p2-release-gate
-          mkdir /tmp/p2-release-gate
+          rm -rf /tmp/p2-release-gate /tmp/p2-release-pkg
+          mkdir /tmp/p2-release-gate /tmp/p2-release-pkg
           gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2-release-gate.zip
-          cd /tmp/p2-release-gate
-          unzip -q /tmp/p2-release-gate.zip
-          printf '%s  %s\n' "$P2_TAR_SHA256" p2-candidate.tar.gz | sha256sum -c -
-          mkdir pkg
-          tar -xzf p2-candidate.tar.gz -C pkg
-          cd pkg/xuanjun-p2-package
-          sha256sum -c SHA256SUMS
           python3 -I -B - <<'PY'
-          import json,pathlib
-          root=pathlib.Path('.')
-          p=json.loads((root/'P2_CANDIDATE_PROVENANCE.json').read_text())
-          assert p['source_commit']=='9d8be9805baa7bf4b690bfa74fcf78a0ff340dca'
-          assert p['model_calls']==0
-          assert p['release_gate']=='NOT_GRANTED'
-          required={
-            'deploy/p2-native-controller.binding.json.template',
-            'deploy/p2-native-ledger-client.json.template',
-            'deploy/xuanjun-uk-openclaw-p2-docker.conf',
-            'plugins/p2-native-controller/plugin.mjs',
-            'stage1/p2_fixed_host_runtime.py',
-            'stage1/p2_install_entrypoint.py',
-            'scripts/uk-p2-install.py'}
-          manifest=json.loads((root/'deploy/integration-manifest.json').read_text())
-          assert required <= set(manifest['files'])
-          print('P2_RELEASE_PREGATE_ARTIFACT_IDENTITY=PASS')
+          import hashlib,io,os,tarfile,zipfile
+          raw=zipfile.ZipFile('/tmp/p2-release-gate.zip').read('p2-candidate.tar.gz')
+          assert hashlib.sha256(raw).hexdigest()==os.environ['P2_TAR_SHA256']
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as tf:
+              seen=set()
+              for item in tf.getmembers():
+                  parts=item.name.split('/')
+                  assert item.isfile() and parts[0]=='xuanjun-p2-package'
+                  assert all(p not in ('','.', '..') for p in parts)
+                  assert item.name not in seen
+                  seen.add(item.name)
+              tf.extractall('/tmp/p2-release-pkg')
+          open('/tmp/p2-release-gate/p2-candidate.tar.gz','wb').write(raw)
+          PY
+      - name: Verify with authoritative freezer and real release installer
+        run: |
+          set -euo pipefail
+          ROOT=/tmp/p2-release-pkg/xuanjun-p2-package
+          python3 "$ROOT/tools/p2-package-freeze.py" verify             --archive /tmp/p2-release-gate/p2-candidate.tar.gz             --sha256 "$P2_TAR_SHA256"             --source-commit "$P2_SOURCE_COMMIT"             --source-tree "$P2_SOURCE_TREE"
+          python3 -I -B - <<'PY'
+          import importlib.util,os
+          root='/tmp/p2-release-pkg/xuanjun-p2-package'
+          spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
+          installer=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(installer)
+          installer.verify(root,root+'/deploy/integration-manifest.json',
+              os.environ['P2_SOURCE_COMMIT'],os.environ['P2_MANIFEST_SHA256'],
+              os.environ['P2_SOURCE_TREE'])
+          print('P2_RELEASE_PREGATE_REAL_INSTALLER_VERIFY=PASS')
           PY
           echo P2_RELEASE_READY_FOR_INDEPENDENT_APPROVAL=YES
           echo P2_RELEASE_GRANTED=NO
