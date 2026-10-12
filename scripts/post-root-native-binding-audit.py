@@ -438,6 +438,48 @@ def audit():
         reconciliation['repositories'].append(row)
     result['p2_unfrozen_code_reconciliation'] = reconciliation
 
+
+    authority_probe = {'scope': 'READ_ONLY_NO_MODEL_NO_LEASE_MUTATION',
+                       'writer_stop': 'NOT_PROVEN', 'sessions': [], 'state_files': []}
+    for agent in ('main', 'developer', 'platform_engineer'):
+        try:
+            outcome = subprocess.run(['/usr/sbin/runuser', '-u', 'xuanjun_dev', '--',
+                '/home/xuanjun_dev/.openclaw/bin/openclaw', 'sessions', '--json', '--agent', agent],
+                env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=20)
+            if outcome.returncode or len(outcome.stdout) > 1048576:
+                authority_probe['sessions'].append({'agent': agent, 'exit_code': outcome.returncode})
+                continue
+            listing = json.loads(outcome.stdout.decode('utf-8'))
+            for item in listing.get('sessions', [])[:1000]:
+                key = item.get('key', '')
+                if not isinstance(key, str) or not any(v in key for v in
+                    ('a7a28c3a-f304-4412-a9ae-d167b1c522a3', 'p2-platform', 'developer', 'platform')):
+                    continue
+                clean = {'agent': agent}
+                for field in ('sessionId', 'key', 'kind', 'model', 'modelProvider', 'status'):
+                    value = item.get(field)
+                    if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:/-]{1,250}', value):
+                        clean[field] = value
+                if type(item.get('updatedAt')) in (int, float):
+                    clean['updatedAt'] = item['updatedAt']
+                authority_probe['sessions'].append(clean)
+        except (OSError, ValueError, subprocess.TimeoutExpired, AttributeError):
+            authority_probe['sessions'].append({'agent': agent, 'state': 'UNAVAILABLE'})
+    for base in ('/home/xuanjun_dev/uk-stage1-minimal', '/home/xuanjun_dev/.openclaw/workspace',
+                 '/home/xuanjun_dev/.openclaw/workspace-main'):
+        if not os.path.isdir(base):
+            continue
+        for directory, dirs, files in os.walk(base, followlinks=False):
+            depth = directory[len(base):].count('/')
+            dirs[:] = [name for name in dirs if name not in ('.git', 'node_modules', 'auth', 'sessions') and not os.path.islink(os.path.join(directory, name))]
+            if depth >= 3:
+                dirs[:] = []
+            for name in files:
+                if re.fullmatch(r'[A-Za-z0-9_.-]{1,120}', name) and re.search(r'(scratch|ledger|lease|fence|task|execution)', name, re.I) and not re.search(r'(auth|secret|token|credential)', name, re.I):
+                    authority_probe['state_files'].append(metadata(os.path.join(directory, name)))
+                    if len(authority_probe['state_files']) >= 60:
+                        break
+    result['p2_authority_registry_probe'] = authority_probe
     print(json.dumps(result, sort_keys=True))
 
 
