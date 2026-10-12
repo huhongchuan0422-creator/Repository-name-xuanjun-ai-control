@@ -8,6 +8,9 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
+import sys
 import urllib.request
 
 from native_syntax_gate import check_bytes
@@ -30,6 +33,36 @@ def github_json(url, token):
         parse_constant=lambda _: (_ for _ in ()).throw(ValueError('NONFINITE_API_JSON')))
     if not isinstance(value,dict):raise ValueError('API_OBJECT_REQUIRED')
     return value
+
+
+def _sha256_file(path):
+    with open(path,'rb') as stream:
+        return hashlib.sha256(stream.read()).hexdigest()
+
+
+def _runtime_identity(executable,version_args):
+    resolved=os.path.realpath(executable)
+    if not os.path.isabs(resolved) or not os.path.isfile(resolved):
+        raise ValueError('CHECKER_EXECUTABLE_REQUIRED')
+    result=subprocess.run([resolved]+version_args,stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},
+        timeout=5,check=False)
+    lines=result.stdout.decode('utf-8','replace').splitlines()
+    if result.returncode!=0 or not lines:
+        raise ValueError('CHECKER_VERSION_REQUIRED')
+    return {'path':resolved,'version':lines[0][:160],
+            'sha256':_sha256_file(resolved)}
+
+
+def checker_identity(checker_sha,typescript_sha):
+    node=shutil.which('node')
+    if not node:
+        raise ValueError('NODE_CHECKER_REQUIRED')
+    return {'source_sha256':checker_sha,'typescript_sha256':typescript_sha,
+        'python':_runtime_identity(sys.executable,['--version']),
+        'bash':_runtime_identity('/usr/bin/bash',['--version']),
+        'node':_runtime_identity(node,['--version']),
+        'mode':'SYNTAX_ONLY_NO_EXECUTION'}
 
 
 def syntax_receipt(value, control_repository, token, read=github_json, typescript_module=None):
@@ -63,6 +96,8 @@ def syntax_receipt(value, control_repository, token, read=github_json, typescrip
             raise ValueError('SAFE_UNIQUE_PATH_REQUIRED')
         seen.add(path)
         previous=file.get('previous_filename')
+        if file.get('status')=='renamed' and previous is None:
+            raise ValueError('RENAMED_SOURCE_REQUIRED')
         if previous is not None and (not isinstance(previous,str) or not re.fullmatch(r'[A-Za-z0-9_./-]+',previous) or any(p in ('','.','..') or p.startswith('.') for p in previous.split('/')) or re.search(r'(^|/)(auth|secret|credential|token)[^/]*$',previous,re.I)):
             raise ValueError('PROTECTED_RENAME_SOURCE')
         if any(p.startswith('.') for p in path.split('/')) or re.search(r'(^|/)(auth|secret|credential|token)[^/]*$',path,re.I):
@@ -93,11 +128,11 @@ def syntax_receipt(value, control_repository, token, read=github_json, typescrip
     checker_path=os.path.join(os.path.dirname(__file__),'native_syntax_gate.py')
     with open(checker_path,'rb') as stream:
         checker_sha=hashlib.sha256(stream.read()).hexdigest()
-    binding['checker']={'source_sha256':checker_sha,
-        'typescript_sha256':TYPESCRIPT_SHA256,'mode':'SYNTAX_ONLY_NO_EXECUTION'}
+    binding['checker']=checker_identity(checker_sha,TYPESCRIPT_SHA256)
     digest=hashlib.sha256(json.dumps(binding,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest()
     passed=all(c['state'] in ('PASS_SYNTAX','REMOVED_DATA_ONLY') for c in checks)
     return {'state':'PASS_SYNTAX_NOT_ADMITTED' if passed else 'HOLD_SYNTAX_GATE',
             'binding':binding,'receipt_sha256':digest,'authority_effect':'NONE',
             'code_executed':False,'independent_review':'NOT_PERFORMED',
             'security_approved':False,'quota_attribution':'UNKNOWN'}
+
