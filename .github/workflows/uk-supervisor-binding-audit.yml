@@ -1,13 +1,13 @@
 name: UK supervision binding read-only audit
 on:
   push:
-    branches: [audit/uk-supervisor-binding-20261012]
+    branches: [audit/dots-canonical-scope-20261013]
     paths:
       - scripts/uk-supervisor-binding-audit.py
       - .github/workflows/uk-supervisor-binding-audit.yml
 concurrency:
-  group: xuanjun-readonly-supervisor-binding-audit
-  cancel-in-progress: true
+  group: xuanjun-readonly-dots-canonical-scope
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
