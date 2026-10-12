@@ -102,6 +102,7 @@ class Supervisor(object):
           attempts INTEGER NOT NULL DEFAULT 0,
           next_attempt_at REAL NOT NULL,
           delivered_at REAL,
+          dead_lettered_at REAL,
           last_error TEXT NOT NULL DEFAULT '',
           UNIQUE(task_id, attempt_id, event_id),
           FOREIGN KEY(task_id) REFERENCES tasks(task_id)
@@ -194,7 +195,7 @@ class Supervisor(object):
                 if self._dependencies_done(dict(row))]
 
     def claim(self, task_id, attempt_id, owner, entry, run_id, session_id,
-              lease_id, fence, epoch, now=None):
+              lease_id, fence, epoch, now=None, deadlines=None):
         now = self.clock() if now is None else now
         if (any(not isinstance(v, str) or not v for v in
                 (attempt_id, owner, entry, run_id, session_id, lease_id))
@@ -207,13 +208,32 @@ class Supervisor(object):
                 raise ValueError('TASK_NOT_READY')
             if task['owner'] != owner or task['entry'] != entry:
                 raise ValueError('ASSIGNED_RESPONSIBILITY_MISMATCH')
+            deadline_names = ('progress_deadline','receipt_deadline',
+                              'started_deadline','terminal_deadline',
+                              'handoff_deadline')
+            if deadlines is not None:
+                if (not isinstance(deadlines, dict)
+                        or set(deadlines) != set(deadline_names)
+                        or any(not finite(deadlines[n]) or deadlines[n] <= now
+                               for n in deadline_names)):
+                    raise ValueError('FRESH_ATTEMPT_DEADLINES_REQUIRED')
+            elif any(task[n] <= now for n in deadline_names):
+                raise ValueError('FRESH_ATTEMPT_DEADLINES_REQUIRED')
+            values = deadlines or {n: task[n] for n in deadline_names}
             # Same task+stage is represented by one primary row, so a second
             # writer cannot be claimed concurrently.
             self.db.execute('''UPDATE tasks SET state='RECEIVED',attempt_id=?,
               owner=?,entry=?,run_id=?,session_id=?,lease_id=?,fence=?,epoch=?,
-              updated_at=? WHERE task_id=? AND state='READY' ''',
+              progress_deadline=?,receipt_deadline=?,started_deadline=?,
+              terminal_deadline=?,handoff_deadline=?,last_real_progress_at=NULL,
+              writer_stopped=?,effects_reconciled=?,receiver_accepted=?,
+              old_fence_invalidated=?,recovery_level=0,updated_at=?
+              WHERE task_id=? AND state='READY' ''',
               (attempt_id, owner, entry, run_id, session_id, lease_id, fence,
-               epoch, now, task_id))
+               epoch, values['progress_deadline'], values['receipt_deadline'],
+               values['started_deadline'], values['terminal_deadline'],
+               values['handoff_deadline'], UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
+               now, task_id))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
 
@@ -264,6 +284,8 @@ class Supervisor(object):
                         or evidence_ref in ('', UNKNOWN)):
                     raise ValueError('REAL_PROGRESS_EVIDENCE_REQUIRED')
                 state = 'RUNNING'; progress = observed_at
+                self.db.execute('UPDATE tasks SET recovery_level=0 WHERE task_id=?',
+                                (task_id,))
                 next_deadline = payload.get('next_progress_deadline')
                 if next_deadline is not None:
                     if not finite(next_deadline) or next_deadline <= observed_at:
@@ -418,7 +440,8 @@ class Supervisor(object):
     def due_outbox(self, now=None, limit=100):
         now = self.clock() if now is None else now
         return [dict(r) for r in self.db.execute('''SELECT * FROM outbox
-          WHERE delivered_at IS NULL AND next_attempt_at<=?
+          WHERE delivered_at IS NULL AND dead_lettered_at IS NULL
+            AND next_attempt_at<=?
           ORDER BY next_attempt_at,outbox_id LIMIT ?''', (now, limit))]
 
     def outbox_result(self, outbox_id, delivered, now=None, error=''):
@@ -436,9 +459,14 @@ class Supervisor(object):
                 return {'delivered': True}
             attempts = row['attempts'] + 1
             if attempts >= 5:
-                next_at = now + 86400
+                next_at = now
                 self.db.execute("UPDATE tasks SET state='HOLD',next_action=? WHERE task_id=?",
                                 ('OWNER_VISIBLE_OUTBOX_FAILURE', row['task_id']))
+                self.db.execute('''UPDATE outbox SET attempts=?,dead_lettered_at=?,
+                  last_error=? WHERE outbox_id=?''',
+                  (attempts, now, error[:256], outbox_id))
+                return {'delivered': False, 'attempts': attempts,
+                        'dead_lettered': True}
             else:
                 next_at = now + min(300, 30 * (2 ** (attempts - 1)))
             self.db.execute('''UPDATE outbox SET attempts=?,next_attempt_at=?,
