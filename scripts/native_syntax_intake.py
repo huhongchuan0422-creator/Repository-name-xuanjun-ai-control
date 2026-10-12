@@ -4,6 +4,8 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import urllib.request
 
@@ -28,6 +30,18 @@ def _sha256_file(path):
     with open(path,'rb') as stream:return hashlib.sha256(stream.read()).hexdigest()
 
 
+def _runtime(executable, version_args):
+    resolved=os.path.realpath(executable)
+    if not os.path.isabs(resolved) or not os.path.isfile(resolved):
+        raise ValueError('CHECKER_EXECUTABLE_REQUIRED')
+    result=subprocess.run([resolved]+version_args,stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'},
+        timeout=5,check=False)
+    version=result.stdout.decode('utf-8','replace').splitlines()[0][:160]
+    if result.returncode!=0 or not version:raise ValueError('CHECKER_VERSION_REQUIRED')
+    return {'path':resolved,'version':version,'sha256':_sha256_file(resolved)}
+
+
 def build_checker_identity(gate_commit, typescript_module, trusted_root):
     if not isinstance(gate_commit,str) or not re.fullmatch(r'[0-9a-f]{40}',gate_commit):
         raise ValueError('EXACT_GATE_COMMIT_REQUIRED')
@@ -40,7 +54,12 @@ def build_checker_identity(gate_commit, typescript_module, trusted_root):
     with open(package,encoding='utf-8') as stream:metadata=json.load(stream)
     if metadata.get('name')!='typescript' or metadata.get('version')!='5.7.3':
         raise ValueError('FIXED_TYPESCRIPT_REQUIRED')
-    return {'gate_commit':gate_commit,'python_version':sys.version.split()[0],
+    node=shutil.which('node');bash='/usr/bin/bash'
+    if not node:raise ValueError('NODE_CHECKER_REQUIRED')
+    return {'gate_commit':gate_commit,
+        'python':_runtime(sys.executable,['--version']),
+        'bash':_runtime(bash,['--version']),
+        'node':_runtime(node,['--version']),
         'intake_sha256':_sha256_file(__file__),
         'gate_sha256':_sha256_file(native_syntax_gate.__file__),
         'typescript_version':'5.7.3','typescript_sha256':_sha256_file(library)}
@@ -55,11 +74,21 @@ def syntax_receipt(value, control_repository, token, read=github_json,
     if checker_identity is None:
         checker_identity=build_checker_identity(os.environ.get('GITHUB_SHA'),
             typescript_module,os.environ.get('GITHUB_WORKSPACE'))
-    required_checker={'gate_commit','python_version','intake_sha256','gate_sha256',
+    required_checker={'gate_commit','python','bash','node','intake_sha256','gate_sha256',
                       'typescript_version','typescript_sha256'}
     if (not isinstance(checker_identity,dict) or set(checker_identity)!=required_checker
-            or any(not isinstance(v,str) or not v for v in checker_identity.values())):
+            or not re.fullmatch(r'[0-9a-f]{40}',checker_identity.get('gate_commit',''))
+            or checker_identity.get('typescript_version')!='5.7.3'
+            or any(not re.fullmatch(r'[0-9a-f]{64}',checker_identity.get(k,''))
+                   for k in ('intake_sha256','gate_sha256','typescript_sha256'))):
         raise ValueError('EXACT_CHECKER_IDENTITY_REQUIRED')
+    for name in ('python','bash','node'):
+        runtime=checker_identity.get(name)
+        if (not isinstance(runtime,dict) or set(runtime)!= {'path','version','sha256'}
+                or not isinstance(runtime['path'],str) or not os.path.isabs(runtime['path'])
+                or not isinstance(runtime['version'],str) or not runtime['version']
+                or not re.fullmatch(r'[0-9a-f]{64}',runtime['sha256'])):
+            raise ValueError('EXACT_RUNTIME_IDENTITY_REQUIRED')
     base,head=value.get('target_base_sha'),value.get('code_commit')
     if any(not isinstance(v,str) or not re.fullmatch('[0-9a-f]{40}',v) for v in (base,head)):
         raise ValueError('EXACT_COMMIT_BINDING_REQUIRED')

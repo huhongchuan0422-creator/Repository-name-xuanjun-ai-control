@@ -15,7 +15,11 @@ class IntakeTests(unittest.TestCase):
             spec_sha256='c'*64,checkpoint_sha256='d'*64,entry='DOTS')
         self.raw=b'x=1\n';self.mode='100644';self.truncated=False
         self.status='added';self.previous=None;self.reported_head='b'*40
-        self.checker=dict(gate_commit='e'*40,python_version='3.11.0',
+        runtime=lambda path,version,sha:dict(path=path,version=version,sha256=sha*64)
+        self.checker=dict(gate_commit='e'*40,
+            python=runtime('/usr/bin/python3','Python 3.11.0','4'),
+            bash=runtime('/usr/bin/bash','GNU bash 5.2','5'),
+            node=runtime('/usr/bin/node','v22.23.3','6'),
             intake_sha256='f'*64,gate_sha256='1'*64,typescript_version='5.7.3',
             typescript_sha256='2'*64)
 
@@ -62,6 +66,13 @@ class IntakeTests(unittest.TestCase):
         second=self.receipt()['receipt_sha256'];self.assertNotEqual(first,second)
         self.raw=b'x=1\n';self.checker['gate_commit']='3'*40
         self.assertNotEqual(first,self.receipt()['receipt_sha256'])
+
+    def test_runtime_identity_is_strict_and_bound(self):
+        first=self.receipt()['receipt_sha256']
+        self.checker['node']=dict(self.checker['node'],version='v22.24.0')
+        self.assertNotEqual(first,self.receipt()['receipt_sha256'])
+        self.checker['node']=dict(self.checker['node'],sha256='not-a-hash')
+        with self.assertRaises(ValueError):self.receipt()
 
 
 if __name__=='__main__':unittest.main()
