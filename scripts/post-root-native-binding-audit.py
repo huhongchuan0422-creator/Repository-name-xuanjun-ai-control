@@ -480,6 +480,24 @@ def audit():
                     if len(authority_probe['state_files']) >= 60:
                         break
     result['p2_authority_registry_probe'] = authority_probe
+    provider_probe = {'scope': 'READ_ONLY_INSTALLED_INTERFACE_METADATA', 'model_calls': 0}
+    cli_path = '/home/xuanjun_dev/.openclaw/bin/openclaw'
+    provider_probe['cli_realpath'] = safe_path(os.path.realpath(cli_path))
+    for command in (['gateway', 'call', '--help'], ['subagents', '--help']):
+        try:
+            outcome = subprocess.run(['/usr/sbin/runuser', '-u', 'xuanjun_dev', '--',
+                cli_path] + command, env=env, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, timeout=15)
+            raw = outcome.stdout.decode('utf-8', 'replace')[:131072]
+            provider_probe[' '.join(command)] = {'exit_code': outcome.returncode,
+                'options': sorted(set(re.findall(r'--[a-z][a-z-]{1,40}', raw)))[:40],
+                'mentions': [word for word in ('status', 'sessions', 'spawn', 'stop', 'reconcile', 'params', 'token')
+                             if re.search(r'\\b' + word + r'\\b', raw)],
+                'help_not_runtime_support': True}
+        except (OSError, subprocess.TimeoutExpired):
+            provider_probe[' '.join(command)] = {'state': 'UNAVAILABLE'}
+    result['p2_supported_provider_probe'] = provider_probe
+
     print(json.dumps(result, sort_keys=True))
 
 
