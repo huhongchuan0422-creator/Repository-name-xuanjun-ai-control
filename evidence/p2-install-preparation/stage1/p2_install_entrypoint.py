@@ -93,7 +93,8 @@ def validate_plan(plan):
 
     runtime = plan['runtime']
     if (not isinstance(runtime, dict)
-            or set(runtime) != {'release_directory', 'provisioning', 'services'}
+            or set(runtime) != {'release_directory', 'provisioning', 'services', 'prerequisites'}
+            or not isinstance(runtime.get('prerequisites'), dict)
             or not re.fullmatch(r'integration-[0-9a-f]{16}',
                                 runtime.get('release_directory', ''))
             or not isinstance(runtime.get('provisioning'), list)
