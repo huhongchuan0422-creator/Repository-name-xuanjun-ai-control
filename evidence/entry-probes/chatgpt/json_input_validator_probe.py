@@ -23,10 +23,11 @@ def _reject_constant(value):
     raise ValueError("non-finite JSON number: %s" % value)
 
 
-def _reject_overflow(value):
-    if isinstance(value, float) and not math.isfinite(value):
-        raise ValueError("non-finite parsed JSON number")
-    return value
+def _parse_float(value):
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("non-finite parsed JSON float")
+    return number
 
 
 def validate_json_bytes(raw_bytes):
@@ -35,8 +36,7 @@ def validate_json_bytes(raw_bytes):
         text,
         object_pairs_hook=_reject_duplicates,
         parse_constant=_reject_constant,
-        parse_float=_reject_overflow,
-        parse_int=_reject_overflow,
+        parse_float=_parse_float,
     )
 
 
