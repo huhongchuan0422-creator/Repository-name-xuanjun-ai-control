@@ -59,13 +59,14 @@ try {
   const store={read:async()=>({task:current}),receipt:async()=>({task:current}),replace:async(o,next)=>{assert.equal(o.task,current);current=next;return {task:current};}};
   const runtime={subagent:{run:async params=>{assert.equal(current.native_execution.phase,'LAUNCH_INTENT');params.assertCurrent();launchCalls++;return {runId:'run-real-files',sessionKey:params.sessionKey,runtime:{provider:'openai',model:'gpt-5.6-sol',harness:'embedded'}};}},agent:{session:{getSessionEntry:async()=>({sessionId:'session-real-files'})}}};
   const concrete=new NativeController({...bindings,store,
-    prepare:async()=>{assert.equal(current.native_execution.phase,'PROVISIONING');prepareCalls++;return {backend:'docker',name:'unit'};},
+    prepare:async()=>{assert.equal(current.native_execution.phase,'PROVISIONING');prepareCalls++;return {backend:'docker',name:'unit',authority_run_id:'xuanjun-p2:'+key};},
     boundary:{bind:async unit=>({...unit,id:'d'.repeat(64),cgroup:'/sys/fs/cgroup/xuanjun-p2-test'}),inspect:async()=>({active:!unitStopped,process_alive:!unitStopped,descendants_exited:unitStopped}),stop:async()=>{unitStopped=true;return {active:false,process_alive:false,descendants_exited:true};}},
     verifyLease:async()=>leaseValid,commitGuard:()=>leaseValid,
     verifyWorkerPlacement:async(_runtime,{request,unit,sessionKey,source})=>placementValid?{
       verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
       source_manifest_sha256:source.manifest_sha256,
-      request_sha256:createHash('sha256').update(canonical(request)).digest('hex')
+      request_sha256:createHash('sha256').update(canonical(request)).digest('hex'),
+      authority_run_id:unit.authority_run_id
     }:null});
   const raw=JSON.stringify(request),key=createHash('sha256').update(raw).digest('hex');
   const admission=await concrete.admit(raw,key,runtime);
