@@ -505,7 +505,8 @@ P2_PLUGIN_CONFIG_PATH='plugins.entries.xuanjun-p2-native-controller.config'
     c2_paths=[entry,runtime,installer,binding,ledger_client,dropin]
     for name in ('native_pipeline_runtime.py','native_gateway_controller.py',
                  'native_github_notifier.py','native_ledger_bridge.py',
-                 'native_ledger_operations.py','native_peer_identity.py'):
+                 'native_ledger_operations.py','native_peer_identity.py',
+                 'task_supervisor_inventory_adapter.py'):
         path=stage1/name
         if not path.is_file():
             raise ValueError('P2_NATIVE_RUNTIME_FILE_MISSING:'+name)
