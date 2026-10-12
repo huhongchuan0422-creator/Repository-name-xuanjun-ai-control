@@ -5,7 +5,7 @@ export function registerController(api,hostBindings) {
   const controller=new NativeController(hostBindings);
   const methods={
     'xuanjun.execution.start':new Set(['admit','launch']),
-    'xuanjun.execution.inspect':new Set(['inspect','report','stop'])
+    'xuanjun.execution.inspect':new Set(['preflight','inspect','report','stop'])
   };
   for(const [method,allowed] of Object.entries(methods)) {
     api.registerGatewayMethod(method,async ({params,respond,client})=>{
@@ -16,7 +16,10 @@ export function registerController(api,hostBindings) {
         const runtime=api.runtime;
         if(!runtime?.subagent?.run||!runtime.subagent.waitForRun)throw new Error('HOLD_REQUEST_SCOPED_SDK');
         let result;
-        if(params.operation==='admit') result=await controller.admit(params.request_json,params.idempotency_key,runtime);
+        if(params.operation==='preflight') {
+          if(typeof hostBindings.preflight!=='function')throw new Error('HOLD_HOST_PREFLIGHT_MISSING');
+          result=await hostBindings.preflight(runtime);
+        } else if(params.operation==='admit') result=await controller.admit(params.request_json,params.idempotency_key,runtime);
         else result=await controller[params.operation](params.value,runtime);
         respond(true,result);
       } catch(error) {
