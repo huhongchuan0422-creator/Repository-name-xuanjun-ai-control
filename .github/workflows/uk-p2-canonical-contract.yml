@@ -1,0 +1,40 @@
+name: UK P2 reuse existing fixed contract exporter
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths: ['.github/workflows/uk-p2-canonical-contract.yml']
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-p2-once-canonical-contract
+  cancel-in-progress: false
+jobs:
+  export:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - name: Verify and run existing no-argument sanitized contract export
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          echo "9f9e893b9dacf26ab9c03f11fc11d0ab54c912b8441da1863b3d03ebe9d1a051  /usr/local/sbin/xj-uk-contract-export" | sha256sum -c -
+          sudo -n /usr/local/sbin/xj-uk-contract-export
+          /usr/bin/python3 -B - <<'PY'
+          import json,os,stat,re,ast
+          p='/var/lib/xuanjun-contract-export/uk.json'
+          fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd) as f:
+              s=os.fstat(f.fileno());assert s.st_uid==0 and stat.S_ISREG(s.st_mode)
+              d=json.load(f)
+          print(json.dumps({'schema':d.get('schema'),'units':d.get('units'),'codex_bins':d.get('codex_bins'),'codex_auth_present':d.get('codex_auth_present'),'files':[{'path':x['path'],'sha256':x['sha256'],'contract_ast':x['contract_ast']} for x in d.get('files',[])]},sort_keys=True))
+          p='/usr/local/sbin/xuanjun-uk-sol-check'
+          with open(p) as f:s=f.read(262145)
+          try:
+              t=ast.parse(s)
+              strings=[n.s for n in ast.walk(t) if isinstance(n,ast.Str)]
+              paths=sorted(set(x for x in strings if re.fullmatch(r'/[A-Za-z0-9_./-]{1,300}',x)))
+              print('SOL_DIAGNOSTIC_STATIC_PATHS='+json.dumps(paths))
+          except Exception:print('SOL_DIAGNOSTIC_STATIC_PATHS=UNAVAILABLE')
+          PY
