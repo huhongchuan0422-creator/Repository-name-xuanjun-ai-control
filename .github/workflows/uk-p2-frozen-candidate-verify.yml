@@ -8,7 +8,7 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: '11778800853'
+  P2_ARTIFACT_ID: '11778162510'
   P2_TAR_SHA256: 'dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317'
   P2_SOURCE_COMMIT: '9d8be9805baa7bf4b690bfa74fcf78a0ff340dca'
 jobs:
@@ -131,7 +131,7 @@ jobs:
               if os.path.realpath(path)!=path or h(path)!=digest:
                   raise SystemExit('HOLD_OPENCLAW_DEP_'+os.path.basename(path))
           print(json.dumps({'state':'P2_UK_SAME_ARTIFACT_VERIFY_ONLY_PASS',
-            'artifact_id':11778800853,'tar_sha256':'dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317',
+            'artifact_id':11778162510,'tar_sha256':'dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317',
             'python_version':list(sys.version_info[:3]),'gateway_uid':pwd.getpwnam('xuanjun_dev').pw_uid,
             'model_calls':0,'install_effects':0,'release_gate':'NOT_GRANTED'},sort_keys=True))
           PY
