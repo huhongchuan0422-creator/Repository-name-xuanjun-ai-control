@@ -80,22 +80,47 @@ try {
   await assert.rejects(()=>concrete.launch(admission,runtime),/WORKER_PLACEMENT_UNVERIFIED/);
   assert.equal(launchCalls,0);
   assert.equal(current.native_execution.phase,'ADMITTED');
+  // Placement callback may not swap canonical execution identity under the same admission.
   placementValid=true;
+  const stable=current.native_execution;
+  const originalPlacement=concrete.verifyWorkerPlacement;
+  concrete.verifyWorkerPlacement=async(runtimeArg,args)=>{
+    current={...current,native_execution:{...current.native_execution,session_key:'agent:main:xuanjun-p2:'+'f'.repeat(64)}};
+    return originalPlacement(runtimeArg,args);
+  };
+  await assert.rejects(()=>concrete.launch(admission,runtime),/LAUNCH_EXECUTION_BINDING_CHANGED/);
+  assert.equal(launchCalls,0);
+  current={...current,native_execution:stable};
+  concrete.verifyWorkerPlacement=originalPlacement;
+
+  // Workspace bytes changed during placement must be caught by the post-placement snapshot check.
+  concrete.verifyWorkerPlacement=async(runtimeArg,args)=>{
+    const proof=await originalPlacement(runtimeArg,args);
+    await writeFile(path.join(dir,'main.py'),Buffer.from('tampered source\n'),{mode:0o600});
+    return proof;
+  };
+  await assert.rejects(()=>concrete.launch(admission,runtime),/SOURCE_BYTES|SOURCE_TREE_MISMATCH|LAUNCH_SOURCE_CHANGED/);
+  assert.equal(launchCalls,0);
+  await writeFile(path.join(dir,'main.py'),bytes,{mode:0o600});
+  concrete.verifyWorkerPlacement=originalPlacement;
+
   const launched=await concrete.launch(admission,runtime);
   assert.equal(launched.run_id,'run-real-files');assert.equal(launchCalls,1);
   const duplicate=await concrete.launch(admission,runtime);
   assert.equal(duplicate.run_id,launched.run_id);assert.equal(launchCalls,1);
   assert.equal(duplicate.placement_digest,launched.placement_digest);
   // Simulate a controller/client crash after durable LAUNCH_INTENT but before receipt persistence.
-  const savedReceipt=current.native_execution.receipt;
-  current={...current,native_execution:{...current.native_execution,phase:'LAUNCH_INTENT',receipt:undefined}};
-  const recovered=await concrete.launch(admission,runtime);
-  assert.equal(recovered.run_id,savedReceipt.run_id);assert.equal(launchCalls,2);
-  // The Gateway idempotency key is the same; a real host must replay the accepted run.
+  // Unknown launch effect must HOLD; never call the SDK a second time.
+  const savedExecution=current.native_execution;
+  current={...current,native_execution:{...savedExecution,phase:'LAUNCH_INTENT',receipt:undefined}};
+  await assert.rejects(()=>concrete.launch(admission,runtime),/LAUNCH_EFFECT_UNKNOWN/);
+  assert.equal(launchCalls,1);
+  // Restore the known receipt only to exercise post-lease stop reconciliation.
+  current={...current,native_execution:savedExecution};
   leaseValid=false;
   // Stop uses persisted receipt even after the live claim is lost.
   assert.equal((await concrete.stop(launched,{subagent:{deleteSession:async()=>{}}})).descendants_exited,true);
-  assert.equal(launchCalls,2);
+  assert.equal(launchCalls,1);
   console.log('real snapshot admission / intent-before-effects / no duplicate launch / expired-lease stop PASS');
 } finally {await rm(dir,{recursive:true,force:true});}
 

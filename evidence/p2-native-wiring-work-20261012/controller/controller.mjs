@@ -76,11 +76,16 @@ export class NativeController {
     await this.current(record.request);
     if(canonical(record.admission)!==canonical(admission))hold('LAUNCH_REPLAY_FORBIDDEN');
     if(record.receipt && ['RUNNING','TERMINAL'].includes(record.phase))return record.receipt;
-    if(!['ADMITTED','LAUNCH_INTENT'].includes(record.phase))hold('LAUNCH_REPLAY_FORBIDDEN');
+    if(record.phase==='LAUNCH_INTENT')hold('LAUNCH_EFFECT_UNKNOWN');
+    if(record.phase!=='ADMITTED')hold('LAUNCH_REPLAY_FORBIDDEN');
     await verifySnapshot(observed.task.source_manifest,record.request.workdir);
     const boundary=await this.boundary.inspect(record.unit);
     if(!boundary.active||!boundary.process_alive)hold('BOUNDARY_NOT_ACTIVE');
     if(await this.eligibility(runtime,record.request))hold('CLI_DISPATCH_BYPASS');
+    const executionBinding={admission:record.admission,idempotency_key:record.idempotency_key,
+      session_key:record.session_key,unit:record.unit,source:record.source,request:record.request,
+      namespace_attestation:record.namespace_attestation};
+    const executionBindingDigest=createHash('sha256').update(canonical(executionBinding)).digest('hex');
     const placement=await this.verifyWorkerPlacement(runtime,{request:record.request,unit:record.unit,sessionKey:record.session_key,source:record.source});
     const requestDigest=createHash('sha256').update(canonical(record.request)).digest('hex');
     if(!placement || placement.verified!==true
@@ -93,17 +98,23 @@ export class NativeController {
       ||placement.sandbox_runtime_id!==record.unit.name
       ||placement.namespace_sha256!==record.namespace_attestation?.namespace_sha256)
       hold('WORKER_PLACEMENT_UNVERIFIED');
-    let intentRecord=record;
-    if(record.phase==='ADMITTED') {
-      const latest=await this.current(record.request);
-      if(latest.task.native_execution?.phase!=='ADMITTED'
-        ||canonical(latest.task.native_execution.admission)!==canonical(admission))hold('LAUNCH_STALE_ADMISSION');
-      const intentObserved=await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'LAUNCH_INTENT',placement}});
-      intentRecord=intentObserved.task.native_execution;
-    } else if(canonical(record.placement)!==canonical(placement)) {
-      hold('LAUNCH_PLACEMENT_CHANGED');
-    }
-    return this.dispatchLaunch(intentRecord,runtime);
+    const latest=await this.current(record.request);
+    const latestRecord=latest.task.native_execution;
+    if(latestRecord?.phase!=='ADMITTED')hold('LAUNCH_STALE_ADMISSION');
+    const latestBinding={admission:latestRecord.admission,idempotency_key:latestRecord.idempotency_key,
+      session_key:latestRecord.session_key,unit:latestRecord.unit,source:latestRecord.source,
+      request:latestRecord.request,namespace_attestation:latestRecord.namespace_attestation};
+    if(createHash('sha256').update(canonical(latestBinding)).digest('hex')!==executionBindingDigest)
+      hold('LAUNCH_EXECUTION_BINDING_CHANGED');
+    const postSource=await verifySnapshot(latest.task.source_manifest,latestRecord.request.workdir);
+    if(canonical(postSource)!==canonical(latestRecord.source))hold('LAUNCH_SOURCE_CHANGED');
+    const postNamespace=await this.boundary.attestSnapshot(latestRecord.unit,postSource);
+    if(!postNamespace
+      ||postNamespace.namespace_sha256!==latestRecord.namespace_attestation?.namespace_sha256)
+      hold('LAUNCH_NAMESPACE_CHANGED');
+    const intentObserved=await this.store.replace(latest,{...latest.task,native_execution:{
+      ...latestRecord,phase:'LAUNCH_INTENT',placement,execution_binding_sha256:executionBindingDigest}});
+    return this.dispatchLaunch(intentObserved.task.native_execution,runtime);
   }
   async dispatchLaunch(record,runtime) {
     const request=record.request;
