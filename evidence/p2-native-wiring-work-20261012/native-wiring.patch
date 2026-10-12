@@ -822,7 +822,7 @@
  
  
  def acquire_dispatcher_lock(path):
-@@ -395,13 +395,17 @@
+@@ -395,20 +395,28 @@
      parser = argparse.ArgumentParser()
      parser.add_argument('--config', required=True)
      parser.add_argument('--check-config', action='store_true')
@@ -833,14 +833,29 @@
      if args.check_config:
          print('CONFIG_OK source_commit=' + config['source_commit'])
          return 0
-+    native_runtime = load_reviewed_controller(args.native_controller,
-+                                             args.native_controller_sha256, config)
-+    loop = build_loop(config, native_runtime=native_runtime)
      lock = acquire_dispatcher_lock(config['dispatcher_lock'])
 -    loop = build_loop(config)
-     signal.signal(signal.SIGTERM, lambda *_: loop.stop())
-     signal.signal(signal.SIGINT, lambda *_: loop.stop())
+-    signal.signal(signal.SIGTERM, lambda *_: loop.stop())
+-    signal.signal(signal.SIGINT, lambda *_: loop.stop())
++    loop = None
      try:
++        native_runtime = load_reviewed_controller(args.native_controller,
++                                                 args.native_controller_sha256, config)
++        loop = build_loop(config, native_runtime=native_runtime)
++        signal.signal(signal.SIGTERM, lambda *_: loop.stop())
++        signal.signal(signal.SIGINT, lambda *_: loop.stop())
+         loop.serve()
+     finally:
+-        loop.close()
+-        lock.close()
++        try:
++            if loop is not None:
++                loop.close()
++        finally:
++            lock.close()
+     return 0
+ 
+ 
 --- a/stage1/development_pipeline.py
 +++ b/stage1/development_pipeline.py
 @@ -1078,6 +1078,22 @@
