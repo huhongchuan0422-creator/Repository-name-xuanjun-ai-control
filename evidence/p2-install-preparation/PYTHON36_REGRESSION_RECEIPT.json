@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "source_delta_head": "0c5d2042474d452b4fcdd87ded1c155dc71bf093",
+  "run_id": 38191967590,
+  "job_id": 114626458683,
+  "python": "3.6.8",
+  "tests": 301,
+  "result": "PASS",
+  "manifest_files": 40,
+  "independent_qa": "PENDING",
+  "security": "PENDING",
+  "installation": "NOT_EXECUTED",
+  "P2": "NOT_INSTALLED",
+  "P3": "NOT_STARTED",
+  "old_checkpoint": "PRESERVED",
+  "scope": "ISOLATED_SOURCE_PREPARATION_ONLY"
+}
