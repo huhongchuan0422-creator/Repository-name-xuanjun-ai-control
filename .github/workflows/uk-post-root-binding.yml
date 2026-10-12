@@ -49,6 +49,17 @@ jobs:
           done
           sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git --no-optional-locks -C "$repository" fsck --full --no-reflogs > "$destination/GIT_FSCK.txt" 2>&1 || echo GIT_INTEGRITY_HOLD >> "$destination/STATUS.txt"
           sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git --no-optional-locks -C "$repository" log --max-count=12 --format='%H %T %P' > "$destination/COMMIT_GRAPH.txt"
+          recovery=/home/xuanjun_dev/p2-object-recovery-$GITHUB_RUN_ID
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git clone --no-checkout --no-hardlinks "$repository" "$recovery"
+          echo 'dHJlZSA5NzcwY2ZmYzZlNzRlZDUxMzVhMGI3NjliNzhjMWFmMmMzZTQzOTA4CnBhcmVudCA3ZDFhMDU4NzJjN2FkYjU5ZWJmZTM0NDUxOWFiMzY2MjkxOGJmYjZmCmF1dGhvciBodWhvbmdjaHVhbjA0MjItY3JlYXRvciA8aHVob25nY2h1YW4wNDIyQGdtYWlsLmNvbT4gMTc5MTc4NDkyMCArMDgwMApjb21taXR0ZXIgaHVob25nY2h1YW4wNDIyLWNyZWF0b3IgPGh1aG9uZ2NodWFuMDQyMkBnbWFpbC5jb20+IDE3OTE3ODQ5MjAgKzA4MDAKCkZpeCBwYWNrYWdlIHZlcmlmaWVyIHRlc3QgbW9kdWxlIHBhdGg=' | base64 -d > "$destination/missing-commit.raw"
+          restored=$(sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$recovery" hash-object -t commit -w --stdin < "$destination/missing-commit.raw")
+          test "$restored" = 34bd8d8b0306127f84e0274fe44c012f1244f420
+          if sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/git -C "$recovery" fsck --full --no-reflogs > "$destination/ISOLATED_FSCK.txt" 2>&1; then
+            echo ISOLATED_OBJECT_COMPLETENESS_PASS >> "$destination/RECOVERY_STATUS.txt"
+          else
+            echo ISOLATED_OBJECT_COMPLETENESS_HOLD >> "$destination/RECOVERY_STATUS.txt"
+          fi
+          echo "$recovery" >> "$destination/RECOVERY_STATUS.txt"
           (cd "$destination" && sha256sum -c SHA256SUMS)
           echo 'RETAINED_SOURCE_ONLY_NOT_INSTALLER; TASK=XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1; FREEZE=NOT_ADMITTED' > "$destination/STATUS.txt"
           echo "P2_RETENTION_PATH=$destination" >> "$GITHUB_ENV"
