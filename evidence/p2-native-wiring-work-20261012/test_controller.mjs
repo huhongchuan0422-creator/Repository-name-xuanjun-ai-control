@@ -54,18 +54,22 @@ try {
   const source={workdir:dir,commit:'c'.repeat(40),tree,files:[{path:'main.py',mode:'100644',sha256:createHash('sha256').update(bytes).digest('hex')}]};
   const request={task_id:'t',spec_hash:'a'.repeat(64),lease:'worker',fence:1,epoch:2,generation:1,instance:'instance',workdir:dir,sandbox:'workspace-write',provider:'openai',model:'gpt-5.6-sol',prompt:'approved',timeout_seconds:30};
   let current={...request,state:'RUNNING',lease_until:Date.now()/1000+60,source_manifest:source};
-  let launchCalls=0,prepareCalls=0,leaseValid=true,unitStopped=false;
+  let launchCalls=0,prepareCalls=0,leaseValid=true,unitStopped=false,placementValid=false;
   const store={read:async()=>({task:current}),receipt:async()=>({task:current}),replace:async(o,next)=>{assert.equal(o.task,current);current=next;return {task:current};}};
   const runtime={subagent:{run:async params=>{assert.equal(current.native_execution.phase,'LAUNCH_INTENT');params.assertCurrent();launchCalls++;return {runId:'run-real-files',sessionKey:params.sessionKey,runtime:{provider:'openai',model:'gpt-5.6-sol',harness:'embedded'}};}},agent:{session:{getSessionEntry:async()=>({sessionId:'session-real-files'})}}};
   const concrete=new NativeController({...bindings,store,
     prepare:async()=>{assert.equal(current.native_execution.phase,'PROVISIONING');prepareCalls++;return {backend:'docker',name:'unit'};},
     boundary:{bind:async unit=>({...unit,id:'d'.repeat(64)}),inspect:async()=>({active:!unitStopped,process_alive:!unitStopped,descendants_exited:unitStopped}),stop:async()=>{unitStopped=true;return {active:false,process_alive:false,descendants_exited:true};}},
     verifyLease:async()=>leaseValid,commitGuard:()=>leaseValid,
-    verifyWorkerPlacement:async()=>true});
+    verifyWorkerPlacement:async()=>placementValid});
   const raw=JSON.stringify(request),key=createHash('sha256').update(raw).digest('hex');
   const admission=await concrete.admit(raw,key,runtime);
   assert.equal(admission.isolation_enforced,true);assert.equal(prepareCalls,1);
   await concrete.admit(raw,key,runtime);assert.equal(prepareCalls,1);
+  await assert.rejects(()=>concrete.launch(admission,runtime),/WORKER_PLACEMENT_UNVERIFIED/);
+  assert.equal(launchCalls,0);
+  assert.equal(current.native_execution.phase,'ADMITTED');
+  placementValid=true;
   const launched=await concrete.launch(admission,runtime);
   assert.equal(launched.run_id,'run-real-files');assert.equal(launchCalls,1);
   await assert.rejects(()=>concrete.launch(admission,runtime),/RECEIPT_MISMATCH|LAUNCH_REPLAY/);
@@ -76,21 +80,3 @@ try {
   console.log('real snapshot admission / intent-before-effects / no duplicate launch / expired-lease stop PASS');
 } finally {await rm(dir,{recursive:true,force:true});}
 
-// Placement rejection is before durable LAUNCH_INTENT and before SDK dispatch.
-const rejected=new NativeController({...bindings,store,
-  prepare:async()=>({backend:'docker',name:'unit'}),
-  boundary:{bind:async unit=>({...unit,id:'d'.repeat(64)}),inspect:async()=>({active:true,process_alive:true,descendants_exited:false})},
-  eligibility:async()=>false,verifyLease:async()=>true,commitGuard:()=>true,
-  verifyWorkerPlacement:async()=>false});
-// Negative placement test uses a standalone minimal canonical row.
-let deniedRuns=0;
-const denialReceipt={idempotency_key:'d'.repeat(64),request:{task_id:'t',spec_hash:'a'.repeat(64),lease:'worker',fence:1,epoch:2,generation:1,instance:'i',workdir:'/tmp'},unit:{backend:'docker',id:'d'.repeat(64)},session_key:'agent:main:xuanjun-p2:denied',source:{},phase:'ADMITTED'};
-const denialTask={...denialReceipt.request,state:'RUNNING',lease_until:Date.now()/1000+60,native_execution:{...denialReceipt,admission:{idempotency_key:denialReceipt.idempotency_key,request:denialReceipt.request}}};
-const deniedStore={read:async()=>({task:denialTask}),replace:async()=>{throw Error('ILLEGAL_WRITE_BEFORE_PLACEMENT')}};
-const deniedController=new NativeController({...bindings,store:deniedStore,
-  boundary:{inspect:async()=>({active:true,process_alive:true})},
-  eligibility:async()=>false,verifyLease:async()=>true,commitGuard:()=>true,
-  verifyWorkerPlacement:async()=>false});
-await assert.rejects(()=>deniedController.launch(denialTask.native_execution.admission,{subagent:{run:async()=>{deniedRuns++}}}),/WORKER_PLACEMENT_UNVERIFIED/);
-assert.equal(deniedRuns,0);
-console.log('unverified placement denies dispatch before LAUNCH_INTENT PASS');
