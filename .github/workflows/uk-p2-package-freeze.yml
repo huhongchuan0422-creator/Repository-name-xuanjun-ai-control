@@ -1,0 +1,168 @@
+name: UK P2 deterministic manual package freeze
+
+on:
+  push:
+    branches: [build/p2-manual-package-20261012]
+    paths:
+      - 'evidence/p2-install-preparation/**'
+      - '.github/workflows/uk-p2-package-freeze.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xuanjun-p2-manual-package-freeze
+  cancel-in-progress: false
+
+jobs:
+  freeze:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Unit test deterministic package boundary
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest -v \
+            evidence/p2-install-preparation/tools/test_p2_package_freeze.py
+
+      - name: Reconstruct reviewed source without touching original worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          work="$(mktemp -d /var/lib/xuanjun-p2-source-handoff/p2-package-freeze-XXXXXX)"
+          chmod 700 "$work"
+          export P2_REVIEW_INPUT="$GITHUB_WORKSPACE/evidence/p2-install-preparation"
+          export P2_PACKAGE_WORK="$work"
+          /usr/bin/python3 -I -B - <<'PY'
+          import hashlib,io,json,os,shutil,subprocess,tarfile
+          source='/var/lib/xuanjun-p2-source-handoff/authoritative-source.tar.gz'
+          fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as stream:data=stream.read(5242881)
+          assert hashlib.sha256(data).hexdigest()=='4145afe30eac74024ce46772508d560ec2790a12b06fdec3368e45df58b87ff0'
+          with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
+              outer={m.name:archive.extractfile(m).read() for m in archive.getmembers() if m.isfile()}
+          assert set(outer)=={'CHECKSUMS.sha256','manifest.txt','tracked-source.tar','worktree-diff.patch'}
+          for line in outer['CHECKSUMS.sha256'].decode().splitlines():
+              expected,name=line.split(None,1)
+              assert hashlib.sha256(outer[name.lstrip('*')]).hexdigest()==expected
+          root=os.path.join(os.environ['P2_PACKAGE_WORK'],'repo')
+          os.mkdir(root,0o700)
+          with tarfile.open(fileobj=io.BytesIO(outer['tracked-source.tar'])) as archive:
+              for member in archive.getmembers():
+                  assert not member.issym() and not member.islnk()
+                  assert not member.name.startswith('/') and '..' not in member.name.split('/')
+              archive.extractall(root)
+          subprocess.run(['/usr/bin/git','apply','--check','-'],input=outer['worktree-diff.patch'],cwd=root,check=True)
+          subprocess.run(['/usr/bin/git','apply','-'],input=outer['worktree-diff.patch'],cwd=root,check=True)
+          test_path=os.path.join(root,'stage1/test_integration_installer.py')
+          with open(test_path) as stream:value=stream.read()
+          anchor='        observed=[]\n        def restore(target,backup,digest):'
+          call='module.restore_rollback_files(json.loads(json.dumps(value)),7,None)'
+          assert value.count(anchor)==1 and value.count(call)==1
+          value=value.replace(anchor,'        pristine=json.loads(json.dumps(value))\n'+anchor)
+          value=value.replace(call,'module.restore_rollback_files(pristine,7,None)')
+          with open(test_path,'w') as stream:stream.write(value)
+          delta=['stage1/activation_control.py','stage1/test_activation_lock_permissions.py',
+            'scripts/uk-integration-install.py','stage1/test_integration_installer.py',
+            'deploy/integration-manifest.json','scripts/uk-dev-bootstrap.py',
+            'stage1/ledger_backup.py','stage1/ledger_install_stage.py',
+            'stage1/test_ledger_install_stage.py','deploy/dispatcher.example.json',
+            'deploy/xuanjun-development-dispatcher.service','stage1/legacy_quiescence.py',
+            'stage1/test_legacy_quiescence.py','stage1/ledger_cutover_transaction.py',
+            'stage1/test_ledger_cutover_transaction.py','stage1/legacy_host_adapter.py',
+            'stage1/test_legacy_host_adapter.py','stage1/p2_install_entrypoint.py',
+            'stage1/test_p2_install_entrypoint.py','stage1/p2_fixed_host_runtime.py',
+            'stage1/test_p2_fixed_host_runtime.py','scripts/uk-p2-install.py',
+            'stage1/p2_prerequisites.py','stage1/test_p2_prerequisites.py',
+            'stage1/test_p2_install_cli.py','stage1/codex_worker.py','stage1/test_codex_worker.py',
+            'stage1/test_codex_app_server_worker.py','stage1/test_p2_model_policy_overlay.py','stage1/mechanical_wake.py','stage1/mechanical_wake_service.py','stage1/test_mechanical_wake.py','stage1/owner_dashboard.py','stage1/owner_dashboard.html','stage1/test_p2_package_install_bridge.py','deploy/xuanjun-github-intake.service','deploy/xuanjun-github-intake.timer']
+          for relative in delta:
+              shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),
+                              os.path.join(root,relative))
+          tools=os.path.join(root,'tools')
+          if not os.path.exists(tools):os.mkdir(tools,0o700)
+          shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],'tools/p2-package-freeze.py'),
+                          os.path.join(tools,'p2-package-freeze.py'))
+          with open(os.path.join(root,'deploy/integration-manifest.json')) as stream:manifest=json.load(stream)
+          assert len(manifest['files'])==50
+          for relative,expected in manifest['files'].items():
+              with open(os.path.join(root,relative),'rb') as stream:
+                  assert hashlib.sha256(stream.read()).hexdigest()==expected,relative
+          PY
+          echo "P2_PACKAGE_SOURCE=$work/repo" >> "$GITHUB_ENV"
+
+      - name: Build twice, compare bytes, and verify provenance
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          source_root="$P2_PACKAGE_SOURCE"
+          verifier="$GITHUB_WORKSPACE/evidence/p2-install-preparation/tools/p2-package-freeze.py"
+          source_tree="$(git show -s --format=%T "$GITHUB_SHA")"
+          package="xuanjun-p2-manual-${GITHUB_SHA}.tar.gz"
+          mkdir -p frozen second
+          python3 -I -B "$verifier" build \
+            --source-root "$source_root" \
+            --source-commit "$GITHUB_SHA" \
+            --source-tree "$source_tree" \
+            --output "$GITHUB_WORKSPACE/frozen/$package"
+          python3 -I -B "$verifier" build \
+            --source-root "$source_root" \
+            --source-commit "$GITHUB_SHA" \
+            --source-tree "$source_tree" \
+            --output "$GITHUB_WORKSPACE/second/$package"
+          cmp "$GITHUB_WORKSPACE/frozen/$package" "$GITHUB_WORKSPACE/second/$package"
+          archive_sha256="$(sha256sum "$GITHUB_WORKSPACE/frozen/$package" | cut -d' ' -f1)"
+          python3 -I -B "$verifier" verify \
+            --archive "$GITHUB_WORKSPACE/frozen/$package" \
+            --sha256 "$archive_sha256" \
+            --source-commit "$GITHUB_SHA" \
+            --source-tree "$source_tree"
+          bridge_root="$(mktemp -d "$(dirname "$P2_PACKAGE_SOURCE")/install-bridge-XXXXXX")"
+          tar -xzf "$GITHUB_WORKSPACE/frozen/$package" -C "$bridge_root"
+          BRIDGE_ROOT="$bridge_root/xuanjun-p2-package" SOURCE_TREE="$source_tree" /usr/bin/python3 -I -B - <<'PY'
+          import hashlib,importlib.util,json,os
+          root=os.environ['BRIDGE_ROOT']
+          with open(os.path.join(root,'P2_PACKAGE_PROVENANCE.json')) as stream:p=json.load(stream)
+          installer=os.path.join(root,'scripts','uk-integration-install.py')
+          spec=importlib.util.spec_from_file_location('p2_package_installer',installer)
+          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+          manifest=os.path.join(root,p['runtime_manifest_path'])
+          module.verify(root,manifest,p['source_commit'],p['runtime_manifest_sha256'],os.environ['SOURCE_TREE'])
+          print('DATA_ONLY_PACKAGE_INSTALL_IDENTITY_BRIDGE_PASS')
+          PY
+          printf '%s  %s\n' "$archive_sha256" "$package" > frozen/SHA256SUMS
+          printf 'SOURCE_COMMIT=%s\nSOURCE_TREE=%s\nBASE_EXPORT_SHA256=4145afe30eac74024ce46772508d560ec2790a12b06fdec3368e45df58b87ff0\nARCHIVE_SHA256=%s\n' \
+            "$GITHUB_SHA" "$source_tree" "$archive_sha256" > frozen/SOURCE.txt
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
+          echo "source_tree=$source_tree" >> "$GITHUB_OUTPUT"
+          {
+            echo 'P2_PACKAGE_FREEZE=PASS'
+            echo "SOURCE_COMMIT=$GITHUB_SHA"
+            echo "SOURCE_TREE=$source_tree"
+            echo "BASE_EXPORT_SHA256=4145afe30eac74024ce46772508d560ec2790a12b06fdec3368e45df58b87ff0"
+            echo "ARCHIVE_SHA256=$archive_sha256"
+            echo 'RUNTIME_FILES=50'
+            echo 'CODEX_INFERENCE_CALLS_BY_WORKFLOW=0'
+            echo 'NEW_PAID_API_USAGE=NONE'
+            echo 'INSTALL=NO'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable private package candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: xuanjun-p2-manual-${{ github.sha }}
+          path: frozen/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+# Freeze is rerun whenever rollback semantics advance so package and UK regression share one HEAD.

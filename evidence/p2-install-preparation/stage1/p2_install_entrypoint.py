@@ -93,7 +93,8 @@ def validate_plan(plan):
 
     runtime = plan['runtime']
     if (not isinstance(runtime, dict)
-            or set(runtime) != {'release_directory', 'provisioning', 'services'}
+            or set(runtime) != {'release_directory', 'provisioning', 'services', 'prerequisites'}
+            or not isinstance(runtime.get('prerequisites'), dict)
             or not re.fullmatch(r'integration-[0-9a-f]{16}',
                                 runtime.get('release_directory', ''))
             or not isinstance(runtime.get('provisioning'), list)
@@ -150,6 +151,103 @@ class P2InstallEntrypoint(object):
             raise ValueError('CUTOVER_RECEIPT_IDENTITY_MISMATCH')
         stage = value.get('failed_stage') if value.get('stage') == 'HOLD' else value.get('stage')
         return stage in ('STOP_REQUESTED', 'QUIESCED', 'STAGE_REQUESTED', 'STAGED')
+
+    def _complete_receipt(self, plan):
+        if not os.path.lexists(self.receipt_path):
+            raise ValueError('COMPLETE_INSTALL_RECEIPT_REQUIRED')
+        fd = os.open(self.receipt_path, os.O_RDONLY |
+                     getattr(os, 'O_NOFOLLOW', 0))
+        try:
+            info = os.fstat(fd)
+            if (not os.path.isfile(self.receipt_path)
+                    or info.st_uid != os.geteuid()
+                    or info.st_mode & 0o077 or info.st_size > 1024 * 1024):
+                raise ValueError('PROTECTED_COMPLETE_INSTALL_RECEIPT_REQUIRED')
+            with os.fdopen(fd) as stream:
+                receipt = json.load(stream)
+                fd = -1
+        finally:
+            if fd >= 0:
+                os.close(fd)
+        required = {'schema', 'transaction_id', 'plan_sha256', 'stage',
+                    'legacy_writer_restarted', 'oauth_copied',
+                    'new_paid_api_usage', 'release',
+                    'provisioning_receipt_sha256', 'epoch',
+                    'cutover_receipt_sha256', 'status'}
+        if (not isinstance(receipt, dict) or set(receipt) != required
+                or receipt.get('schema') != 1
+                or receipt.get('transaction_id') != plan['transaction_id']
+                or receipt.get('plan_sha256') != _digest(plan)
+                or receipt.get('stage') != 'COMPLETE'
+                or receipt.get('status') != 'P2_INSTALL_TRANSACTION_COMPLETE'
+                or receipt.get('legacy_writer_restarted') is not False
+                or receipt.get('oauth_copied') is not False
+                or receipt.get('new_paid_api_usage') != 'NONE'
+                or not SHA256.fullmatch(
+                    receipt.get('provisioning_receipt_sha256', ''))):
+            raise ValueError('EXACT_COMPLETE_INSTALL_RECEIPT_REQUIRED')
+        return receipt
+
+    def rollback(self, plan):
+        """Rollback one exact COMPLETE install without restarting any writer."""
+        validate_plan(plan)
+        receipt = self._complete_receipt(plan)
+        current = self.activation.read(require_active=True)
+        activation = plan['activation']
+        expected = {
+            'state': 'ACTIVE',
+            'release_sha256': activation['release_sha256'],
+            'config_sha256': activation['config_sha256'],
+            'binary_sha256': activation['binary_sha256'],
+            'ledger_uuid': activation['ledger_uuid'],
+            'generation': activation['generation'],
+            'epoch': receipt['epoch'],
+            'instance': activation['instance'],
+            'db_path': activation['db_path'],
+            'ledger_socket': activation['ledger_socket'],
+        }
+        if any(current.get(key) != value for key, value in expected.items()):
+            raise ValueError('ACTIVE_INSTALL_IDENTITY_MISMATCH')
+        provision = {'schema': 1,
+                     'receipt_sha256':
+                         receipt['provisioning_receipt_sha256'],
+                     'rollback_complete': True}
+        rollback = []
+        self._write(receipt, 'ROLLBACK_REQUESTED',
+                    rollback_from='COMPLETE',
+                    rollback_step='FENCE_PENDING')
+        try:
+            fenced = self.activation.fence(current['epoch'],
+                                           current['instance'])
+            rollback.append('ACTIVATION_FENCED_EPOCH_' +
+                            str(fenced['epoch']))
+            self._write(receipt, 'ROLLBACK_REQUESTED',
+                        rollback=rollback,
+                        rollback_step='STOP_NEW_PENDING')
+            self.runtime.stop_new(plan['runtime'])
+            rollback.append('NEW_RUNTIME_STOPPED')
+            self._write(receipt, 'ROLLBACK_REQUESTED',
+                        rollback=rollback,
+                        rollback_step='PROVISIONING_RESTORE_PENDING')
+            self.runtime.restore(provision)
+            rollback.append('PROVISIONING_RESTORED')
+            self._write(receipt, 'ROLLBACK_REQUESTED',
+                        rollback=rollback,
+                        rollback_step='LEGACY_FILE_RESTORE_PENDING')
+            self.cutover.adapter.restore_legacy_files()
+            rollback.append('LEGACY_FILES_RESTORED_NOT_RESTARTED')
+            self._write(
+                receipt, 'ROLLED_BACK', rollback=rollback,
+                rollback_step='COMPLETE',
+                recovery='RECONCILE_DATABASE_AND_EPOCH_BEFORE_ANY_RESTART')
+            return dict(receipt)
+        except Exception as error:
+            self._write(
+                receipt, 'HOLD', rollback=rollback,
+                rollback_step=receipt.get('rollback_step', 'UNKNOWN'),
+                rollback_error_type=type(error).__name__,
+                recovery='MANUAL_RECONCILIATION_REQUIRED_NO_RESTART')
+            raise
 
     def execute(self, plan):
         validate_plan(plan)

@@ -8,16 +8,28 @@ import p2_install_entrypoint as module
 
 
 class FakeActivation(object):
-    def __init__(self): self.calls=[]
+    def __init__(self): self.calls=[]; self.current=None
     def prepare(self,*args,**kwargs):
         self.calls.append(('prepare',args,kwargs))
-        return {'epoch':1,'instance':args[5]}
+        self.current={'schema':1,'state':'PREPARED',
+          'release_sha256':args[0],'config_sha256':args[1],
+          'binary_sha256':args[2],'ledger_uuid':args[3],
+          'generation':args[4],'epoch':1,'instance':args[5],
+          'db_path':args[6],'ledger_socket':args[7]}
+        return dict(self.current)
     def fence(self,epoch,instance):
         self.calls.append(("fence",epoch,instance))
-        return {"epoch":epoch+1,"state":"PREPARED"}
+        self.current=dict(self.current,state='PREPARED',epoch=epoch+1)
+        return dict(self.current)
+    def read(self,require_active=False):
+        self.calls.append(('read',require_active))
+        if require_active and self.current.get('state')!='ACTIVE':
+            raise RuntimeError('not active')
+        return dict(self.current)
     def transition(self,old,new,epoch,instance,proof):
         self.calls.append((old,new,proof))
-        return {'epoch':epoch,'instance':instance,'state':new}
+        self.current=dict(self.current,state=new)
+        return dict(self.current)
 
 
 class FakeRuntime(object):
@@ -71,7 +83,7 @@ class P2InstallEntrypointTests(unittest.TestCase):
             'ledger_socket':'/run/xuanjun-development/ledger.sock',
             'expected_epoch':0},
           'runtime':{'release_directory':'integration-'+'1'*16,
-            'provisioning':[{'binding':'opaque'}],
+            'provisioning':[{'binding':'opaque'}], 'prerequisites':{},
             'services':['xuanjun-ledger.socket']},
           'auth':{'mode':'EXISTING_OAUTH_REFERENCE','references':[
             {'path':'/var/lib/xuanjun-development/codex-home/auth.json',
@@ -110,6 +122,39 @@ class P2InstallEntrypointTests(unittest.TestCase):
         self.assertFalse(result['legacy_writer_restarted'])
         self.assertEqual(activation.calls[-1][0], 'fence')
         self.assertIn('BEFORE_ANY_RESTART',result['recovery'])
+
+
+    def test_completed_install_has_explicit_fail_closed_rollback(self):
+        value,runtime,activation,cutover,receipt=self.make()
+        self.assertEqual(value.execute(self.plan)['stage'],'COMPLETE')
+        result=value.rollback(self.plan)
+        self.assertEqual(result['stage'],'ROLLED_BACK')
+        self.assertEqual(result['rollback'],
+          ['ACTIVATION_FENCED_EPOCH_2','NEW_RUNTIME_STOPPED',
+           'PROVISIONING_RESTORED','LEGACY_FILES_RESTORED_NOT_RESTARTED'])
+        self.assertEqual(runtime.calls,
+          ['preflight','provision','reopen_database','activate',
+           'stop_new','restore'])
+        self.assertTrue(cutover.adapter.restored)
+        self.assertFalse(result['legacy_writer_restarted'])
+        self.assertEqual(
+          result['recovery'],
+          'RECONCILE_DATABASE_AND_EPOCH_BEFORE_ANY_RESTART')
+        with self.assertRaisesRegex(ValueError,
+                                    'EXACT_COMPLETE_INSTALL_RECEIPT'):
+            value.rollback(self.plan)
+
+    def test_rollback_rejects_changed_active_identity_before_effect(self):
+        value,runtime,activation,cutover,receipt=self.make()
+        value.execute(self.plan)
+        activation.current['release_sha256']='0'*64
+        before=list(runtime.calls)
+        with self.assertRaisesRegex(ValueError,
+                                    'ACTIVE_INSTALL_IDENTITY_MISMATCH'):
+            value.rollback(self.plan)
+        self.assertEqual(runtime.calls,before)
+        self.assertFalse(cutover.adapter.restored)
+
 
     def test_existing_receipt_blocks_replay_before_any_effect(self):
         value,runtime,activation,cutover,receipt=self.make()
