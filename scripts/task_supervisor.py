@@ -106,6 +106,12 @@ class Supervisor(object):
           UNIQUE(task_id, attempt_id, event_id),
           FOREIGN KEY(task_id) REFERENCES tasks(task_id)
         );
+        CREATE TABLE IF NOT EXISTS supervisor_heartbeats(
+          instance_id TEXT PRIMARY KEY,
+          observed_at REAL NOT NULL,
+          process_ref TEXT NOT NULL,
+          updated_at REAL NOT NULL
+        );
         CREATE INDEX IF NOT EXISTS task_ready_idx
           ON tasks(state, updated_at, task_id);
         CREATE INDEX IF NOT EXISTS outbox_due_idx
@@ -199,6 +205,8 @@ class Supervisor(object):
             task = self._task(task_id)
             if task['state'] != 'READY' or not self._dependencies_done(task):
                 raise ValueError('TASK_NOT_READY')
+            if task['owner'] != owner or task['entry'] != entry:
+                raise ValueError('ASSIGNED_RESPONSIBILITY_MISMATCH')
             # Same task+stage is represented by one primary row, so a second
             # writer cannot be claimed concurrently.
             self.db.execute('''UPDATE tasks SET state='RECEIVED',attempt_id=?,
@@ -217,6 +225,8 @@ class Supervisor(object):
             raise ValueError('UNKNOWN_EVENT_KIND')
         if not finite(observed_at):
             raise ValueError('FINITE_TIME_REQUIRED')
+        if not isinstance(event_id, str) or not event_id.strip():
+            raise ValueError('EVENT_ID_REQUIRED')
         payload = {} if payload is None else payload
         if not isinstance(payload, dict):
             raise ValueError('EVENT_PAYLOAD_REQUIRED')
@@ -224,12 +234,23 @@ class Supervisor(object):
             task = self._task(task_id)
             if task['attempt_id'] != attempt_id:
                 raise ValueError('ATTEMPT_BINDING_MISMATCH')
-            try:
-                self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
-                    (task_id, attempt_id, event_id, kind, observed_at,
-                     evidence_kind, evidence_ref, canonical(payload)))
-            except sqlite3.IntegrityError:
+            encoded = canonical(payload)
+            prior = self.db.execute('''SELECT kind,observed_at,evidence_kind,
+              evidence_ref,payload_json FROM events
+              WHERE task_id=? AND attempt_id=? AND event_id=?''',
+              (task_id, attempt_id, event_id)).fetchone()
+            if prior is not None:
+                exact = (prior['kind'] == kind
+                         and prior['observed_at'] == observed_at
+                         and prior['evidence_kind'] == evidence_kind
+                         and prior['evidence_ref'] == evidence_ref
+                         and prior['payload_json'] == encoded)
+                if not exact:
+                    raise ValueError('EVENT_ID_REUSE_CONFLICT')
                 return {'duplicate': True, 'state': task['state']}
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                (task_id, attempt_id, event_id, kind, observed_at,
+                 evidence_kind, evidence_ref, encoded))
             state = task['state']
             progress = task['last_real_progress_at']
             if kind == 'STARTED':
@@ -243,6 +264,12 @@ class Supervisor(object):
                         or evidence_ref in ('', UNKNOWN)):
                     raise ValueError('REAL_PROGRESS_EVIDENCE_REQUIRED')
                 state = 'RUNNING'; progress = observed_at
+                next_deadline = payload.get('next_progress_deadline')
+                if next_deadline is not None:
+                    if not finite(next_deadline) or next_deadline <= observed_at:
+                        raise ValueError('FUTURE_PROGRESS_DEADLINE_REQUIRED')
+                    self.db.execute('UPDATE tasks SET progress_deadline=? WHERE task_id=?',
+                                    (next_deadline, task_id))
             elif kind == 'HEARTBEAT':
                 pass  # intentionally does not refresh progress
             elif kind == 'HANDOFF_REQUESTED':
@@ -269,7 +296,12 @@ class Supervisor(object):
                 terminal = payload.get('state')
                 required = {'state', 'artifact_sha256', 'writer_stopped',
                             'effects_reconciled', 'next_action'}
+                artifact = payload.get('artifact_sha256')
+                artifact_ok = (artifact == UNKNOWN or
+                    (isinstance(artifact, str) and len(artifact) == 64 and
+                     all(c in '0123456789abcdef' for c in artifact)))
                 if (set(payload) != required or terminal not in TERMINAL
+                        or not artifact_ok
                         or payload['writer_stopped'] not in
                            (True, False, UNKNOWN)
                         or payload['effects_reconciled'] not in
@@ -299,29 +331,91 @@ class Supervisor(object):
 
     def scan(self, now=None):
         now = self.clock() if now is None else now
+        if not finite(now):
+            raise ValueError('FINITE_TIME_REQUIRED')
         actions = []
-        for task in [dict(r) for r in self.db.execute(
-                "SELECT * FROM tasks WHERE state IN ('READY','RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')")]:
-            base = task['last_real_progress_at']
-            if base is None:
-                base = task['updated_at']
-            age = now - base
-            action = None; level = 0
-            if age >= 900:
-                action = 'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN'; level = 3
-            elif age >= 600:
-                action = 'RECONCILE_AND_RESUME_SAME_ATTEMPT'; level = 2
-            elif age >= 300:
-                action = 'CHECK_RECEIPT_AND_PROGRESS'; level = 1
-            if action and level > task['recovery_level']:
-                # A supervision action is not worker progress and must not move
-                # the stall clock forward.
-                self.db.execute('UPDATE tasks SET recovery_level=? WHERE task_id=?',
-                                (level, task['task_id']))
-                actions.append({'task_id': task['task_id'], 'attempt_id': task['attempt_id'],
-                    'action': action, 'takeover_allowed': False,
-                    'requires_effect_reconciliation': True})
+        with self.db:
+            rows = [dict(r) for r in self.db.execute(
+                "SELECT * FROM tasks WHERE state IN ('READY','RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')")]
+            for task in rows:
+                base = task['last_real_progress_at']
+                if base is None:
+                    base = task['updated_at']
+                age = now - base
+                deadline_name = {
+                    'READY': 'receipt_deadline',
+                    'RECEIVED': 'started_deadline',
+                    'STARTED': 'progress_deadline',
+                    'RUNNING': 'progress_deadline',
+                    'HANDOFF_PENDING': 'handoff_deadline',
+                }[task['state']]
+                overdue = now >= task[deadline_name]
+                action = None; level = 0
+                if age >= 900:
+                    action = 'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN'; level = 3
+                elif age >= 600:
+                    action = 'RECONCILE_AND_RESUME_SAME_ATTEMPT'; level = 2
+                elif age >= 300 or overdue:
+                    action = 'CHECK_RECEIPT_AND_PROGRESS'; level = 1
+                if action and level > task['recovery_level']:
+                    event_id = 'supervision-L%d-%s-%s' % (
+                        level, task['task_id'], task['attempt_id'])
+                    payload = {
+                        'state': 'HOLD' if level == 3 else task['state'],
+                        'action': action, 'deadline_kind': deadline_name,
+                        'deadline': task[deadline_name],
+                        'last_real_progress_at': task['last_real_progress_at'],
+                        'checkpoint_sha256': task['checkpoint_sha256'],
+                        'takeover_allowed': False,
+                        'requires_effect_reconciliation': True,
+                    }
+                    self.db.execute('''INSERT OR IGNORE INTO events
+                      VALUES (?,?,?,?,?,?,?,?)''',
+                      (task['task_id'], task['attempt_id'], event_id,
+                       'SUPERVISION_ACTION', now, 'PHASE_EXECUTION',
+                       action, canonical(payload)))
+                    self._enqueue(task['task_id'], task['attempt_id'],
+                                  event_id, payload, now)
+                    if level == 3:
+                        self.db.execute('''UPDATE tasks SET state='HOLD',
+                          next_action=?,recovery_level=? WHERE task_id=?''',
+                          ('RECONCILE_BEFORE_CONTROLLED_REASSIGN', level,
+                           task['task_id']))
+                    else:
+                        self.db.execute('''UPDATE tasks SET recovery_level=?
+                          WHERE task_id=?''', (level, task['task_id']))
+                    actions.append({'task_id': task['task_id'],
+                        'attempt_id': task['attempt_id'], 'action': action,
+                        'takeover_allowed': False,
+                        'requires_effect_reconciliation': True,
+                        'outbox_event_id': event_id})
         return sorted(actions, key=lambda x: x['task_id'])
+
+    def supervisor_heartbeat(self, instance_id, process_ref, now=None):
+        now = self.clock() if now is None else now
+        if (not finite(now) or not isinstance(instance_id, str)
+                or not instance_id.strip() or not isinstance(process_ref, str)
+                or not process_ref.strip()):
+            raise ValueError('EXACT_SUPERVISOR_LIVENESS_REQUIRED')
+        with self.db:
+            self.db.execute('''INSERT INTO supervisor_heartbeats
+              (instance_id,observed_at,process_ref,updated_at) VALUES (?,?,?,?)
+              ON CONFLICT(instance_id) DO UPDATE SET observed_at=excluded.observed_at,
+              process_ref=excluded.process_ref,updated_at=excluded.updated_at''',
+              (instance_id, now, process_ref, now))
+
+    def supervisor_health(self, now=None, max_age=300):
+        now = self.clock() if now is None else now
+        if not finite(now) or not finite(max_age) or max_age <= 0:
+            raise ValueError('FINITE_LIVENESS_WINDOW_REQUIRED')
+        rows = [dict(r) for r in self.db.execute(
+            'SELECT * FROM supervisor_heartbeats ORDER BY instance_id')]
+        return [{'instance_id': row['instance_id'],
+                 'process_ref': row['process_ref'],
+                 'observed_at': row['observed_at'],
+                 'state': 'HEALTHY' if now - row['observed_at'] <= max_age
+                          else 'SUPERVISOR_UNAVAILABLE'}
+                for row in rows]
 
     def due_outbox(self, now=None, limit=100):
         now = self.clock() if now is None else now
