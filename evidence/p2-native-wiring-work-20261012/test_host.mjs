@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {createHostBindings} from './controller/host.mjs';
 const cfg={agents:{defaults:{model:{primary:'openai/gpt-5.6-sol',fallbacks:[]}}}};
-const runtime={config:{current:()=>cfg},agent:{resolveAgentDir:()=>'/trusted/agent',resolveCliBackendDispatchEligibility:()=>undefined,session:{getSessionEntry:()=>{}}},subagent:{run:()=>{},waitForRun:()=>{}},sandbox:{resolveWorkspaceAuthority:()=>({sandboxed:true})},modelAuth:{ensureAuthProfileStore:()=>({profiles:{p:{type:'oauth',provider:'openai'}}}),resolveAuthProfileOrder:()=>['p']}};
-const bindings=createHostBindings({runtime},{agentId:'main',engine:{backend:'docker',binary:'/usr/bin/docker'},ledger:{python:'/usr/bin/python3',bridge:'/bridge',config:'/config',files:{'/bridge':'a','/config':'b'}},workspaceRoot:'/workspace'},async()=>{},()=>({admit:async()=>({operator:true}),close:()=>{}}));
+const runtime={config:{current:()=>cfg},agent:{resolveAgentDir:()=>'/trusted/agent',resolveCliBackendDispatchEligibility:()=>undefined,session:{getSessionEntry:()=>{}}},subagent:{run:()=>{},waitForRun:()=>{}},sandbox:{resolveWorkspaceAuthority:()=>({sandboxed:true}),prepareWorkspaceAuthority:async()=>({sandboxed:true,workspaceAccess:'rw'})},modelAuth:{ensureAuthProfileStore:()=>({profiles:{p:{type:'oauth',provider:'openai'}}}),resolveAuthProfileOrder:()=>['p']}};
+const bindings=createHostBindings({runtime},{agentId:'main',engine:{backend:'docker',binary:'/usr/bin/docker'},ledger:{python:'/usr/bin/python3',bridge:'/bridge',config:'/config',files:{'/bridge':'a','/config':'b'}},workspaceRoot:'/workspace'},async()=>({enabled:true,sessionKey:'s',workspaceDir:'/workspace',backendId:'docker',runtimeId:'unit',workspaceAccess:'rw'}));
 bindings.store.call=(operation)=>operation==='preflight'?{canonical_existing:true,outbox_existing:true}:{native_execution:{receipt:{run_id:'r'},request:{sandbox:'workspace-write'},unit:{}}};
 bindings.boundary.command=async()=> '28.0.0';
 bindings.boundary.inspect=async()=>({active:true,process_alive:true});

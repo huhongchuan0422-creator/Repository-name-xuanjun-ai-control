@@ -3,10 +3,9 @@ import {ContainerObserver} from './workspace.mjs';
 
 const hold=reason=>{throw new Error('HOLD_'+reason);};
 /** Concrete adapters using Gateway's injected SDK and pinned context resolver. */
-export function createHostBindings(api,settings,resolveSandboxContext,prepareSystemAgentRunAdmission) {
+export function createHostBindings(api,settings,resolveSandboxContext) {
   if(typeof resolveSandboxContext!=='function')hold('SANDBOX_CONTEXT_EXPORT');
-  if(typeof prepareSystemAgentRunAdmission!=='function')hold('RUN_ADMISSION_EXPORT');
-  const admissions=new Map();
+  const preparedSandboxes=new Map();
   const store=new CanonicalLedgerStore(settings.ledger);
   const boundary=new ContainerObserver(settings.engine);
   const agentId=settings.agentId;
@@ -19,31 +18,25 @@ export function createHostBindings(api,settings,resolveSandboxContext,prepareSys
       agentDir:runtime.agent.resolveAgentDir(cfg,agentId),workspaceDir:request.workdir,
       provider:request.provider,model:request.model});
   };
-  const prepare=async(runtime,{request,sessionKey,idempotencyKey})=>{
+  const prepare=async(runtime,{request,sessionKey})=>{
     const cfg=config();
     const authority=runtime.sandbox.resolveWorkspaceAuthority({config:cfg,agentId,sessionKey,
       workspaceDir:request.workdir,modelProvider:request.provider,modelId:request.model});
     if(authority?.sandboxed!==true||authority.confinementError)hold('SANDBOX_AUTHORITY');
-    if(!/^[0-9a-f]{64}$/.test(idempotencyKey??''))hold('RUN_ADMISSION_ID');
-    const authorityRunId='xuanjun-p2:'+idempotencyKey;
-    if(admissions.has(sessionKey))hold('RUN_ADMISSION_DUPLICATE');
-    const prepared=prepareSystemAgentRunAdmission(cfg,authorityRunId,agentId,'xuanjun.p2.native');
-    if(!prepared||typeof prepared.admit!=='function'||typeof prepared.close!=='function')hold('RUN_ADMISSION_CONTRACT');
-    let admittedRunContext;
-    try {
-      admittedRunContext=await prepared.admit('plugin-harness');
-      const context=await resolveSandboxContext({config:cfg,agentId,sessionKey,
-        workspaceDir:request.workdir,requireCurrentConfig:true,admittedRunContext,
-        assertCurrent:()=>{if(!store.guard(request))hold('PREPARE_LEASE');}});
-      if(context?.enabled!==true||context.sessionKey!==sessionKey||context.workspaceDir!==request.workdir
-        ||context.backendId!==settings.engine.backend||typeof context.runtimeId!=='string'
-        ||context.workspaceAccess!==(request.sandbox==='read-only'?'ro':'rw'))hold('SANDBOX_CONTEXT_BINDING');
-      admissions.set(sessionKey,{prepared,authorityRunId,runtimeId:context.runtimeId,backendId:context.backendId});
-      return {backend:context.backendId,name:context.runtimeId,authority_run_id:authorityRunId};
-    } catch(error) {
-      try {prepared.close();} catch {}
-      throw error;
-    }
+    if(typeof runtime.sandbox?.prepareWorkspaceAuthority!=='function')hold('SANDBOX_PREPARE_API');
+    const preparedAuthority=await runtime.sandbox.prepareWorkspaceAuthority({config:cfg,agentId,sessionKey,
+      workspaceDir:request.workdir,modelProvider:request.provider,modelId:request.model});
+    if(preparedAuthority?.sandboxed!==true||preparedAuthority.confinementError
+      ||preparedAuthority.workspaceAccess!==(request.sandbox==='read-only'?'ro':'rw'))hold('SANDBOX_AUTHORITY');
+    const context=await resolveSandboxContext({config:cfg,agentId,sessionKey,
+      workspaceDir:request.workdir,requireCurrentConfig:true,
+      assertCurrent:()=>{if(!store.guard(request))hold('PREPARE_LEASE');}});
+    if(context?.enabled!==true||context.sessionKey!==sessionKey||context.workspaceDir!==request.workdir
+      ||context.backendId!==settings.engine.backend||typeof context.runtimeId!=='string'
+      ||context.workspaceAccess!==(request.sandbox==='read-only'?'ro':'rw'))hold('SANDBOX_CONTEXT_BINDING');
+    preparedSandboxes.set(sessionKey,{runtimeId:context.runtimeId,backendId:context.backendId,
+      workspaceDir:context.workspaceDir,workspaceAccess:context.workspaceAccess});
+    return {backend:context.backendId,name:context.runtimeId};
   };
   const collectResult=async(runtime,record)=>{
     if(record.phase!=='TERMINAL'||record.observation?.state!=='completed')hold('RUN_NOT_COMPLETED');
@@ -104,22 +97,25 @@ export function createHostBindings(api,settings,resolveSandboxContext,prepareSys
     } catch {return {block:true,blockReason:'P2 canonical lease/run/unit admission unavailable'};}
   };
   return {store,boundary,eligibility,prepare,collectResult,preflight,beforeToolCall,
-    verifyWorkerPlacement:async(_runtime,{request,unit,sessionKey,source})=>{
-      const active=admissions.get(sessionKey);
-      if(!active||active.runtimeId!==unit.name||active.backendId!==unit.backend
-        ||active.authorityRunId!==unit.authority_run_id||!store.guard(request))return null;
+    verifyWorkerPlacement:async(runtime,{request,unit,sessionKey,source})=>{
+      const expected=preparedSandboxes.get(sessionKey);
+      if(!expected||expected.runtimeId!==unit.name||expected.backendId!==unit.backend
+        ||expected.workspaceDir!==request.workdir||!store.guard(request))return null;
+      const cfg=config();
+      const current=await resolveSandboxContext({config:cfg,agentId,sessionKey,
+        workspaceDir:request.workdir,requireCurrentConfig:true,
+        assertCurrent:()=>{if(!store.guard(request))hold('PLACEMENT_LEASE');}});
+      if(current?.enabled!==true||current.runtimeId!==unit.name||current.backendId!==unit.backend
+        ||current.workspaceDir!==request.workdir
+        ||current.workspaceAccess!==(request.sandbox==='read-only'?'ro':'rw'))return null;
+      const observed=await boundary.inspect(unit);
+      if(!observed.active||!observed.process_alive)return null;
       return {verified:true,session_key:sessionKey,unit_backend:unit.backend,unit_id:unit.id,cgroup:unit.cgroup,
         source_manifest_sha256:source.manifest_sha256,
         request_sha256:(await import('./canonical.mjs')).digest(request),
-        authority_run_id:active.authorityRunId};
+        sandbox_runtime_id:current.runtimeId};
     },
-    releaseWorkerPlacement:sessionKey=>{
-      const active=admissions.get(sessionKey);
-      if(!active)return false;
-      admissions.delete(sessionKey);
-      active.prepared.close();
-      return true;
-    },
+    releaseWorkerPlacement:sessionKey=>preparedSandboxes.delete(sessionKey),
     verifyLease:(task,request,now)=>task.state==='RUNNING'&&Number.isFinite(task.lease_until)&&task.lease_until*1000>now,
     commitGuard:request=>store.guard(request)};
 }

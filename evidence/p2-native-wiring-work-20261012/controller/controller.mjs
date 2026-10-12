@@ -79,7 +79,7 @@ export class NativeController {
       ||placement.cgroup!==record.unit.cgroup
       ||placement.source_manifest_sha256!==record.source.manifest_sha256
       ||placement.request_sha256!==requestDigest
-      ||placement.authority_run_id!==record.unit.authority_run_id)hold('WORKER_PLACEMENT_UNVERIFIED');
+      ||placement.sandbox_runtime_id!==record.unit.name)hold('WORKER_PLACEMENT_UNVERIFIED');
     // Re-read the canonical revision after the potentially slow placement check.
     // Never CAS using a pre-check snapshot: lease/fence or execution state may have changed.
     const latest=await this.current(record.request);
