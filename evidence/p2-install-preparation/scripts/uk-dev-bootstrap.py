@@ -21,7 +21,7 @@ SOURCE_COMMIT = '8b4a67d9a75a63a880172becefd6d22851edd4c3'
 MANIFEST = {
     'activation_control.py': '169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4',
     'owner_dashboard.py': '7e492f9dd3b17f3e4e93520012f742db335bdea606c4e7a037f428a2d817d1fc',
-    'owner_dashboard.html': '79cd5f314230e0e2862f26e73b48ef617090feba641b9dd8952eb224db2e368a',
+    'owner_dashboard.html': '3b9f31303814bd2462e66f7f2762b0f50ed9a4294dc7fcce4a357f3a194e2306',
 }
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
 RELEASE = '/opt/xuanjun-uk-control/release'

@@ -80,7 +80,7 @@ jobs:
             'stage1/test_p2_install_entrypoint.py','stage1/p2_fixed_host_runtime.py',
             'stage1/test_p2_fixed_host_runtime.py','scripts/uk-p2-install.py',
             'stage1/p2_prerequisites.py','stage1/test_p2_prerequisites.py',
-            'stage1/test_p2_install_cli.py','stage1/mechanical_wake.py','stage1/mechanical_wake_service.py','stage1/test_mechanical_wake.py','stage1/owner_dashboard.py','deploy/xuanjun-github-intake.service','deploy/xuanjun-github-intake.timer']
+            'stage1/test_p2_install_cli.py','stage1/mechanical_wake.py','stage1/mechanical_wake_service.py','stage1/test_mechanical_wake.py','stage1/owner_dashboard.py','stage1/owner_dashboard.html','stage1/test_p2_package_install_bridge.py','deploy/xuanjun-github-intake.service','deploy/xuanjun-github-intake.timer']
           for relative in delta:
               shutil.copyfile(os.path.join(os.environ['P2_REVIEW_INPUT'],relative),
                               os.path.join(root,relative))
@@ -124,6 +124,19 @@ jobs:
             --sha256 "$archive_sha256" \
             --source-commit "$GITHUB_SHA" \
             --source-tree "$source_tree"
+          bridge_root="$(mktemp -d "$P2_PACKAGE_WORK/install-bridge-XXXXXX")"
+          tar -xzf "$GITHUB_WORKSPACE/frozen/$package" -C "$bridge_root"
+          BRIDGE_ROOT="$bridge_root/xuanjun-p2-package" SOURCE_TREE="$source_tree" /usr/bin/python3 -I -B - <<'PY'
+          import hashlib,importlib.util,json,os
+          root=os.environ['BRIDGE_ROOT']
+          with open(os.path.join(root,'P2_PACKAGE_PROVENANCE.json')) as stream:p=json.load(stream)
+          installer=os.path.join(root,'scripts','uk-integration-install.py')
+          spec=importlib.util.spec_from_file_location('p2_package_installer',installer)
+          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+          manifest=os.path.join(root,p['runtime_manifest_path'])
+          module.verify(root,manifest,p['source_commit'],p['runtime_manifest_sha256'],os.environ['SOURCE_TREE'])
+          print('DATA_ONLY_PACKAGE_INSTALL_IDENTITY_BRIDGE_PASS')
+          PY
           printf '%s  %s\n' "$archive_sha256" "$package" > frozen/SHA256SUMS
           printf 'SOURCE_COMMIT=%s\nSOURCE_TREE=%s\nARCHIVE_SHA256=%s\n' \
             "$GITHUB_SHA" "$source_tree" "$archive_sha256" > frozen/SOURCE.txt

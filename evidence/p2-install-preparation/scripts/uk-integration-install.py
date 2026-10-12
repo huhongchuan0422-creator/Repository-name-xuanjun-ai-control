@@ -17,6 +17,7 @@ RELEASE_DIRECTORY = re.compile(r'^integration-[0-9a-f]{16}$')
 PLACEHOLDER = re.compile(r'@@[A-Z0-9_]+@@')
 IDENTITY_TOKENS = ('@@RELEASE_DIRECTORY@@', '@@ARTIFACT_SHA256@@')
 REQUIRED_RENDERER = 'scripts/uk-owner-workbench-config.py'
+PACKAGE_PROVENANCE = 'P2_PACKAGE_PROVENANCE.json'
 IDENTITY_RENDERED_FILES = (
     'deploy/dispatcher.example.json',
     'deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service',
@@ -263,6 +264,61 @@ def _git_identity(root):
     return tuple(values)
 
 
+def _package_identity(root, manifest_path, manifest_bytes, manifest):
+    """Read the freeze tool's immutable identity from a data-only package.
+
+    Manual packages intentionally contain no ``.git`` directory.  Their
+    provenance is generated inside the deterministic archive and is itself
+    bound to the exact manifest bytes and every runtime-file hash.
+    """
+    path=os.path.join(root,PACKAGE_PROVENANCE)
+    fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
+    try:
+        info=os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_size>1024*1024
+                or info.st_uid!=os.geteuid() or info.st_mode&0o022):
+            raise ValueError('UNSAFE_PACKAGE_PROVENANCE')
+        with os.fdopen(fd,'rb',closefd=False) as stream:
+            raw=stream.read(1024*1024+1)
+    finally:
+        os.close(fd)
+    try:
+        value=json.loads(raw.decode('utf-8'))
+    except (UnicodeDecodeError,ValueError):
+        raise ValueError('INVALID_PACKAGE_PROVENANCE')
+    required={'schema','source_repository','source_commit','source_tree',
+              'runtime_manifest_path','runtime_manifest_sha256','runtime_files',
+              'verifier_path','verifier_sha256','oauth_content_included',
+              'tls_private_key_included','new_paid_api_usage'}
+    relative=os.path.relpath(manifest_path,root)
+    verifier=value.get('verifier_path') if isinstance(value,dict) else None
+    verifier_path=os.path.join(root,verifier) if isinstance(verifier,str) else ''
+    if (not isinstance(value,dict) or set(value)!=required
+            or value.get('schema')!=1
+            or value.get('source_repository')!='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+            or not re.fullmatch(r'[0-9a-f]{40}',value.get('source_commit',''))
+            or not re.fullmatch(r'[0-9a-f]{40}',value.get('source_tree',''))
+            or value.get('runtime_manifest_path')!=relative
+            or value.get('runtime_manifest_sha256')!=hashlib.sha256(manifest_bytes).hexdigest()
+            or value.get('runtime_files')!=manifest.get('files')
+            or value.get('oauth_content_included') is not False
+            or value.get('tls_private_key_included') is not False
+            or value.get('new_paid_api_usage')!='NONE'
+            or not isinstance(verifier,str) or verifier.startswith('/')
+            or '..' in verifier.split('/') or os.path.realpath(verifier_path)!=verifier_path
+            or not SHA.fullmatch(value.get('verifier_sha256',''))
+            or digest(verifier_path)!=value['verifier_sha256']):
+        raise ValueError('PACKAGE_PROVENANCE_BINDING_MISMATCH')
+    return (value['source_commit'],value['source_tree'],manifest['source_parent'])
+
+
+def _artifact_identity(root,manifest_path,manifest_bytes,manifest):
+    provenance=os.path.join(root,PACKAGE_PROVENANCE)
+    if os.path.lexists(provenance):
+        return _package_identity(root,manifest_path,manifest_bytes,manifest)
+    return _git_identity(root)
+
+
 def verify(root, manifest_path, expected_source, expected_manifest_sha,
            expected_tree=None):
     if any(os.path.realpath(value)!=value for value in (root,manifest_path)):
@@ -280,7 +336,8 @@ def verify(root, manifest_path, expected_source, expected_manifest_sha,
                 or not re.fullmatch(r'[0-9a-f]{64}',manifest.get('contract_sha256',''))
                 or not re.fullmatch(r'[0-9a-f]{40}',expected_tree or '')):
             raise ValueError('INVALID_EXTERNAL_COMMIT_BINDING')
-        commit,tree,parent=_git_identity(root)
+        commit,tree,parent=_artifact_identity(root,manifest_path,
+                                              manifest_bytes,manifest)
         if (commit!=expected_source or tree!=expected_tree
                 or parent!=manifest['source_parent']):
             raise ValueError('FROZEN_GIT_IDENTITY_MISMATCH')
