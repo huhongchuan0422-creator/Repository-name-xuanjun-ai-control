@@ -18,7 +18,7 @@ const request={sandbox:'workspace-write',workdir:'/workspace'};
 const unit={backend:'docker',name:'unit',id:'d'.repeat(64),cgroup:'/sys/fs/cgroup/xuanjun-p2-test'};
 const placement={verified:true,session_key:ctx.sessionKey,unit_backend:'docker',unit_id:unit.id,cgroup:unit.cgroup,source_manifest_sha256:'b'.repeat(64),request_sha256:'c'.repeat(64),sandbox_runtime_id:'unit'};
 const receipt={run_id:'r',placement_digest:createHash('sha256').update(canonical(placement)).digest('hex')};
-const running={native_execution:{receipt,request,unit,placement,agent_id:'developer'}};
+const running={native_execution:{phase:'RUNNING',idempotency_key:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',session_key:ctx.sessionKey,receipt,request,unit,placement,agent_id:'developer'}};
 bindings.store.call=(operation)=>operation==='tool_guard'?running:true;
 assert.equal(await bindings.beforeToolCall({toolName:'read',params:{},runId:'r'},ctx),undefined);
 let postInspect=running;
