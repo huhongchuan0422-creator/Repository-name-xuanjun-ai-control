@@ -19,7 +19,7 @@ import tempfile
 
 SOURCE_COMMIT = '8b4a67d9a75a63a880172becefd6d22851edd4c3'
 MANIFEST = {
-    'activation_control.py': 'c03e6b7516cbc8aa14b52d018dbfa8d06d0740154bf7110c94941b9d6e550bd8',
+    'activation_control.py': '169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4',
     'owner_dashboard.py': '138af6496f491ab4bf15c24020a6f66bb0899dadeae8eb66c6b583031c7f5f09',
     'owner_dashboard.html': '79cd5f314230e0e2862f26e73b48ef617090feba641b9dd8952eb224db2e368a',
 }
