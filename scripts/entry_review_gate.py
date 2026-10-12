@@ -60,12 +60,19 @@ def review_bundle(contract,files,reviews,review_keys=None):
         raise ValueError('EXACT_TRUSTED_CONTRACT_REQUIRED')
     if contract['entry'] not in ENTRIES:
         raise ValueError('UNKNOWN_ENTRY')
+    if (not isinstance(contract['task_id'],str) or not re.fullmatch(r'[A-Za-z0-9_.:/-]{1,160}',contract['task_id'])
+            or not isinstance(contract['target_repository'],str)
+            or not re.fullmatch(r'[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+',contract['target_repository'])):
+        raise ValueError('EXACT_TASK_REPOSITORY_REQUIRED')
     developer=identity(contract['developer'])
     if (not isinstance(contract['trusted_reviewers'],list) or len(contract['trusted_reviewers'])!=2
             or not isinstance(contract['allowed_files'],list) or not contract['allowed_files']
             or any(not isinstance(p,str) for p in contract['allowed_files'])
             or len(set(contract['allowed_files']))!=len(contract['allowed_files'])):
         raise ValueError('STRICT_POLICY_ARRAYS_REQUIRED')
+    for path in contract['allowed_files']:
+        if not re.fullmatch(r'[A-Za-z0-9_./-]+',path) or any(p in ('','.','..') for p in path.split('/')):
+            raise ValueError('CANONICAL_POLICY_PATH_REQUIRED')
     policies={}
     for policy in contract['trusted_reviewers']:
         who=identity(policy,True)
@@ -104,6 +111,10 @@ def review_bundle(contract,files,reviews,review_keys=None):
                 or value['bundle_sha256']!=bundle_sha or value['decision']!='PASS'):
             raise ValueError('INDEPENDENT_EXACT_VERSION_REVIEW_REQUIRED')
         roles.add(value['role']);record_ids.add(record['record_id'])
+    if roles=={'QA','SECURITY'}:
+        values=[review_keys[p['key_id']] for p in policies.values()]
+        if hmac.compare_digest(values[0],values[1]):
+            raise ValueError('DISTINCT_REVIEW_AUTHORITY_KEYS_REQUIRED')
     return {'state':'ISOLATED_TEST_ELIGIBLE' if roles=={'QA','SECURITY'} else 'HOLD_INDEPENDENT_REVIEW_REQUIRED',
             'bundle_sha256':bundle_sha,'binding':binding,'authority_effect':'NONE','release_approved':False}
 

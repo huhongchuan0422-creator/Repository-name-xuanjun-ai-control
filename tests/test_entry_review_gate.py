@@ -109,5 +109,16 @@ class ReviewTests(unittest.TestCase):
         for now in (-1,float('nan'),float('inf')):
             with self.assertRaises(ValueError):gate.continuation_due(self.binding,0,now)
 
+    def test_invalid_task_repository_and_policy_paths(self):
+        for field,value in [('task_id',{}),('target_repository','owner/repo/../other'),('allowed_files',['../bad.py','src/f.py'])]:
+            changed=dict(self.contract);changed[field]=value
+            with self.assertRaises(ValueError):gate.review_bundle(changed,self.files,[])
+
+    def test_same_key_cannot_claim_two_independent_reviewers(self):
+        records=self.reviews();keys=dict(KEYS);keys['security-key']=keys['qa-key']
+        record=records[1]
+        record['signature']=hmac.new(keys['security-key'],gate.canonical({k:v for k,v in record.items() if k!='signature'}),hashlib.sha256).hexdigest()
+        with self.assertRaises(ValueError):gate.review_bundle(self.contract,self.files,records,keys)
+
 
 if __name__=='__main__':unittest.main()
