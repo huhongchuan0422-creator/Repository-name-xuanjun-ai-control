@@ -1,0 +1,437 @@
+--- a/stage1/native_child_adapter.py
++++ b/stage1/native_child_adapter.py
+@@ -24,11 +24,12 @@
+     TERMINAL = frozenset(['done', 'failed', 'interrupted', 'killed', 'timeout'])
+ 
+     def __init__(self, task_message, executable=None, runner=None,
+-                 model='openai/gpt-5.6-sol', timeout_seconds=30):
++                 model='openai/gpt-5.6-sol', timeout_seconds=30, controller=None):
+         if not isinstance(task_message, str) or not task_message.strip():
+             raise NativeContractError('nonempty native task message required')
+         if model != 'openai/gpt-5.6-sol':
+             raise NativeContractError('fixed OAuth model required')
++        self.controller = controller
+         self.task_message = task_message
+         self.executable = executable or '/home/xuanjun_dev/.openclaw/bin/openclaw'
+         if not os.path.isabs(self.executable):
+@@ -93,6 +94,9 @@
+                 self._dump(identity))
+ 
+     def spawn(self, binding, idempotency_key):
++        if self.controller is None:
++            raise NativeContractError('trusted native controller unavailable; dispatch denied')
++        self.controller.authorize(binding, idempotency_key)
+         session_key = self._session_key(idempotency_key, binding['executor_id'])
+         response = self._call('agent', {
+             'message': self._instruction(binding),
+@@ -129,62 +133,28 @@
+         if not row or not row.get('sessionId'):
+             return {'accepted': False, 'run_id': run_id,
+                     'reason': 'accepted run session identity unavailable'}
+-        session_id = row['sessionId']
+-        return {
+-            'accepted': True, 'run_id': run_id, 'session_id': session_id,
+-            'started_at': started_at, 'binding': dict(binding),
+-            'execution_identity': {
+-                'executor_id': binding['executor_id'], 'session_id': session_id,
+-                'epoch': binding['epoch'],
+-                'git_commit': binding['artifact_commit'],
+-                'git_tree': binding['artifact_tree']},
+-            'execution_unit': {
+-                'id': 'gateway-session:' + session_id,
+-                'run_id': run_id, 'session_id': session_id, 'active': True}}
++        if self.controller is None:
++            return {'accepted': False, 'run_id': run_id,
++                    'reason': 'trusted execution observation unavailable'}
++        return self.controller.receipt(run_id, row['sessionId'], idempotency_key)
+ 
+     def status(self, run_id, session_id):
++        unknown = {'run_id': run_id, 'session_id': session_id,
++                   'state': 'unknown', 'process_alive': None,
++                   'unit_active': None, 'effects': 'unknown'}
++        if self.controller is None:
++            return unknown
+         try:
+-            wait = self._call('agent.wait', {'runId': run_id, 'timeoutMs': 1})
+-        except Exception as exc:
+-            wait = {'status': 'unavailable', 'error': str(exc)[:500]}
+-        row = self._session(run_id=run_id, session_id=session_id)
+-        if not row:
+-            return {'run_id': run_id, 'session_id': session_id,
+-                    'state': 'lost', 'process_alive': False,
+-                    'unit_active': False}
+-        raw = row.get('status')
+-        state = ('running' if raw in self.ACTIVE else
+-                 'completed' if raw == 'done' else
+-                 'failed' if raw in self.TERMINAL else 'lost')
+-        result = {'run_id': run_id, 'session_id': session_id, 'state': state,
+-                  'process_alive': raw in self.ACTIVE,
+-                  'unit_active': raw in self.ACTIVE,
+-                  'last_progress_at': (row.get('lastActivityAt') or
+-                                       row.get('updatedAt') or 0) / 1000.0,
+-                  'provider_wait': wait}
+-        if state == 'completed':
+-            result['report'] = self.recover_report(run_id, session_id)
+-        return result
++            observed = self.controller.status(run_id, session_id)
++        except Exception:
++            return unknown
++        return observed if isinstance(observed, dict) else unknown
+ 
+     def recover_report(self, run_id, session_id):
+-        row = self._session(run_id=run_id, session_id=session_id)
+-        if not row:
++        # Conversation text is not an authoritative durable execution report.
++        if self.controller is None:
+             return None
+-        response = self._call('sessions.get', {
+-            'key': row['key'], 'agentId': row.get('agentId'), 'limit': 20})
+-        messages = response.get('messages', []) if isinstance(response, dict) else []
+-        for message in reversed(messages):
+-            if not isinstance(message, dict) or message.get('role') != 'assistant':
+-                continue
+-            for item in reversed(message.get('content', [])):
+-                if isinstance(item, dict) and item.get('type') == 'text':
+-                    try:
+-                        report = json.loads(item.get('text', ''))
+-                    except (TypeError, ValueError):
+-                        continue
+-                    if isinstance(report, dict):
+-                        return report
+-        return None
++        return self.controller.recover_report(run_id, session_id)
+ 
+ 
+ class NativeChildAdapter(object):
+@@ -348,10 +318,16 @@
+         if (not isinstance(status, dict) or status.get('run_id') != cp['run_id']
+                 or status.get('session_id') != cp['session_id']):
+             return self._hold(claim, cp, 'NATIVE_STATE_UNCONFIRMED', 'unknown')
++        if status.get('state') == 'unknown':
++            return self._hold(claim, cp, 'NATIVE_STATE_UNCONFIRMED', 'unknown')
+         report = status.get('report')
+         if status.get('state') == 'completed' and not report:
+             report = self.native.recover_report(cp['run_id'], cp['session_id'])
+         if report:
++            if (status.get('state') not in self.TERMINAL
++                    or status.get('process_alive') is not False
++                    or status.get('unit_active') is not False):
++                return self._hold(claim, cp, 'RESULT_STOP_UNCONFIRMED', 'unknown')
+             identity = self._result_identity(cp)
+             if not isinstance(report, dict) or any(report.get(k) != v for k, v in identity.items()):
+                 return self._hold(claim, cp, 'ARTIFACT_REPORT_MISMATCH', 'unknown')
+@@ -359,15 +335,15 @@
+             self.ledger.checkpoint(*self._token(claim), value=cp)
+             return self._deliver(claim, cp)
+         if (status.get('state') in self.TERMINAL
+-                and status.get('process_alive') is not True
+-                and status.get('unit_active') is not True):
+-            return self._hold(claim, cp, 'RESULT_MISSING', 'none')
++                and status.get('process_alive') is False
++                and status.get('unit_active') is False):
++            return self._hold(claim, cp, 'RESULT_MISSING', 'unknown')
+         if self.clock() > cp['native_binding']['result_deadline']:
+             return self._hold(claim, cp, 'RESULT_DEADLINE_EXCEEDED', 'unknown')
+         deadline = cp['native_binding']['progress_deadline']
+         progress = status.get('last_progress_at')
+         if self.clock() > deadline and (not isinstance(progress, (int, float)) or progress < deadline):
+-            return self._hold(claim, cp, 'STALLED', 'none')
++            return self._hold(claim, cp, 'STALLED', 'unknown')
+         return cp
+ 
+     def _deliver(self, claim, cp):
+--- a/stage1/development_service.py
++++ b/stage1/development_service.py
+@@ -18,10 +18,10 @@
+ import sys
+ 
+ from activation_control import ActivationStore
+-from codex_app_server_worker import CodexAppServerWorker
+ from development_loop import DevelopmentLoop
+ from development_pipeline import CliBackend, DevelopmentPipeline
+ from execution_ledger import ExecutionLedger
++from native_pipeline_runtime import load_reviewed_controller
+ 
+ 
+ SHA = re.compile(r'^[0-9a-f]{40}$')
+@@ -329,10 +329,13 @@
+                                        separators=(',', ':')) + '\n').encode('utf-8'))
+ 
+ 
+-def build_loop(config):
++def build_loop(config, native_runtime=None):
+     if config.get('config_version') != 2:
+         raise ValueError('runtime requires broker-backed configuration version 2')
+     _validate_model(config.get('model'))
++    if native_runtime is None:
++        raise ValueError('reviewed installed native controller required; no Codex fallback')
++    native_runtime.preflight(config)
+     activation = ActivationStore(config['activation_descriptor'],
+                                  config['activation_epoch_journal'],
+                                  config['activation_lock'])
+@@ -359,12 +362,10 @@
+                          github_lock_path=config['github_writer_lock'])
+     def pipelines(claim):
+         def workers(workdir, sandbox):
+-            return CodexAppServerWorker(
+-                config['codex_bin'], workdir, config['worker_home'], config['codex_home'],
+-                config['path'], sandbox=sandbox, model=config['model'],
+-                isolation_prefix=isolation_prefix(config, workdir, claim))
+-        return DevelopmentPipeline(ledger, backend, workers, [repo])
+-    return DevelopmentLoop(ledger, pipelines, 'uk-codex', max_workers=config['max_workers'])
++            return native_runtime.worker(claim, workdir, sandbox)
++        return DevelopmentPipeline(ledger, backend, workers, [repo],
++                                   result_notifier=native_runtime.notifier)
++    return DevelopmentLoop(ledger, pipelines, 'uk-native', max_workers=config['max_workers'])
+ 
+ 
+ def acquire_dispatcher_lock(path):
+@@ -395,13 +396,17 @@
+     parser = argparse.ArgumentParser()
+     parser.add_argument('--config', required=True)
+     parser.add_argument('--check-config', action='store_true')
++    parser.add_argument('--native-controller')
++    parser.add_argument('--native-controller-sha256')
+     args = parser.parse_args(argv)
+     config = load_config(args.config)
+     if args.check_config:
+         print('CONFIG_OK source_commit=' + config['source_commit'])
+         return 0
++    native_runtime = load_reviewed_controller(args.native_controller,
++                                             args.native_controller_sha256, config)
++    loop = build_loop(config, native_runtime=native_runtime)
+     lock = acquire_dispatcher_lock(config['dispatcher_lock'])
+-    loop = build_loop(config)
+     signal.signal(signal.SIGTERM, lambda *_: loop.stop())
+     signal.signal(signal.SIGINT, lambda *_: loop.stop())
+     try:
+--- a/stage1/development_pipeline.py
++++ b/stage1/development_pipeline.py
+@@ -1112,10 +1112,12 @@
+     trusted_spec is tied to it and carries the pinned base SHA. Independently
+     approved base_sha must be persisted by the control plane before first run.
+     """
+-    def __init__(self, ledger, backend, worker_factory, allowed_repositories, resource_check=None):
++    def __init__(self, ledger, backend, worker_factory, allowed_repositories, resource_check=None,
++                 result_notifier=None):
+         self.ledger, self.backend, self.worker_factory = ledger, backend, worker_factory
+         self.allowed_repositories = frozenset(allowed_repositories)
+         self.resource_check = resource_check
++        self.result_notifier = result_notifier
+ 
+     def run(self, claim, trusted_spec=None):
+         if trusted_spec is None:
+@@ -1379,6 +1381,24 @@
+             if phase == 'ACCEPTED':
+                 if checkpoint.get('simulated') or not checkpoint.get('real_execution'):
+                     return end('WAITING_HUMAN', 'SIMULATED_ACCEPTANCE_ONLY')
++                if self.result_notifier is not None:
++                    report = {'task_id': claim['task_id'], 'spec_hash': claim['spec_hash'],
++                              'fence': claim['fence'], 'epoch': claim.get('epoch'),
++                              'commit': checkpoint['sha'], 'pr': checkpoint.get('pr'),
++                              'qa_commit': checkpoint.get('qa_commit'),
++                              'state': 'CODE_ACCEPTED_PENDING_LEDGER_FINISH',
++                              'production_pass': False}
++                    key = digest_spec(report)
++                    save('IN_FLIGHT_NOTIFY')
++                    fence()
++                    receipt = self.result_notifier.send(report, idempotency_key=key)
++                    if (not isinstance(receipt, dict)
++                            or receipt.get('idempotency_key') != key
++                            or not isinstance(receipt.get('message_id'), str)
++                            or not receipt['message_id']):
++                        return end('WAITING_HUMAN', 'NOTIFICATION_ACK_UNCONFIRMED', 'unknown')
++                    checkpoint['notification_receipt'] = receipt
++                    save('ACCEPTED')
+                 return end('DONE', 'CODE_ACCEPTED_CI_AND_INDEPENDENT_QA')
+             return end('WAITING_HUMAN', 'UNRECOGNIZED_PHASE', 'unknown')
+         except PublisherNotReady:
+--- /dev/null
++++ b/stage1/native_pipeline_runtime.py
+@@ -0,0 +1,186 @@
++"""Connect the existing pipeline to an explicitly reviewed native controller.
++
++No Gateway RPCs are invented here. The controller must supply the installed
++launch/inspect/report implementation and enforce isolation before launch.
++"""
++import hashlib
++import json
++import time
++
++from native_child_adapter import NativeContractError
++
++
++class NativePipelineWorker(object):
++    requires_boundary_proof = True
++
++    def __init__(self, controller, claim, workdir, sandbox, clock=None, wait=None):
++        if sandbox not in ('workspace-write', 'read-only'):
++            raise NativeContractError('native sandbox rejected')
++        self.controller, self.claim = controller, dict(claim)
++        self.workdir, self.sandbox = workdir, sandbox
++        self.clock, self.wait = clock or time.monotonic, wait or time.sleep
++
++    def run(self, prompt, timeout_seconds, heartbeat, lease_check):
++        if not lease_check():
++            raise NativeContractError('native lease expired before admission')
++        request = {
++            'task_id': self.claim['task_id'], 'spec_hash': self.claim['spec_hash'],
++            'lease': self.claim['worker_id'], 'fence': self.claim['fence'],
++            'epoch': self.claim['epoch'], 'generation': self.claim['generation'],
++            'instance': self.claim['instance'], 'workdir': self.workdir,
++            'sandbox': self.sandbox, 'provider': 'openai', 'model': 'gpt-5.6-sol',
++            'prompt': prompt, 'timeout_seconds': timeout_seconds,
++            'checkpoint': self.claim.get('checkpoint', {})}
++        key = hashlib.sha256(json.dumps(request, sort_keys=True,
++            separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
++        # This call must persist the idempotent launch intent in the EXISTING
++        # canonical controller. Missing proof must fail before model dispatch.
++        admission = self.controller.admit(request, key)
++        if (not isinstance(admission, dict) or admission.get('request') != request
++                or admission.get('idempotency_key') != key
++                or admission.get('isolation_enforced') is not True):
++            raise NativeContractError('native isolation admission unconfirmed')
++        if not lease_check():
++            raise NativeContractError('native lease expired before launch')
++        receipt = self.controller.launch(admission)
++        if (not isinstance(receipt, dict) or not receipt.get('run_id')
++                or not receipt.get('session_id') or not receipt.get('execution_unit_id')
++                or receipt.get('idempotency_key') != key):
++            raise NativeContractError('native launch effect unknown; do not replay')
++        deadline = self.clock() + timeout_seconds
++        while True:
++            if not lease_check():
++                # A stop request is not a proof that descendants stopped.
++                self.controller.stop(receipt)
++                raise NativeContractError('native lease lost; stop reconciliation required')
++            heartbeat()
++            observed = self.controller.inspect(receipt)
++            if (not isinstance(observed, dict) or any(observed.get(k) != receipt[k]
++                    for k in ('run_id', 'session_id', 'execution_unit_id'))):
++                raise NativeContractError('native observation identity unconfirmed')
++            if observed.get('state') in ('completed', 'failed', 'cancelled'):
++                if (observed.get('process_alive') is not False
++                        or observed.get('unit_active') is not False
++                        or observed.get('descendants_exited') is not True):
++                    raise NativeContractError('native execution stop unconfirmed')
++                report = self.controller.report(receipt)
++                if (not isinstance(report, dict) or report.get('request') != request
++                        or any(report.get(k) != receipt[k] for k in
++                               ('run_id', 'session_id', 'execution_unit_id'))
++                        or report.get('idempotency_key') != key
++                        or not isinstance(report.get('durable_receipt_id'), str)
++                        or not report['durable_receipt_id']
++                        or not isinstance(report.get('result'), dict)):
++                    raise NativeContractError('native durable result unconfirmed')
++                result = dict(report['result'])
++                if (result.get('provider') != 'openai' or result.get('model') != 'gpt-5.6-sol'
++                        or result.get('model_verified') is not True):
++                    raise NativeContractError('native observed model unconfirmed')
++                result['worker_boundary_stopped'] = True
++                return result
++            if observed.get('state') not in ('queued', 'running'):
++                raise NativeContractError('native process/effects unknown; do not replay')
++            if self.clock() >= deadline:
++                self.controller.stop(receipt)
++                raise NativeContractError('native deadline; stop reconciliation required')
++            self.wait(min(1, max(0, deadline - self.clock())))
++
++
++class ExistingOutboxNotifier(object):
++    """Use the existing controller outbox; never create a delivery database."""
++    REPOSITORY = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
++    PR = 17
++
++    def __init__(self, controller):
++        self.controller = controller
++
++    def send(self, report, idempotency_key):
++        receipt = self.controller.notify(self.REPOSITORY, self.PR, report,
++                                         idempotency_key)
++        return self._check(receipt, idempotency_key)
++
++    def reconcile(self, idempotency_key):
++        receipt = self.controller.notification_receipt(self.REPOSITORY, self.PR,
++                                                       idempotency_key)
++        if receipt is None:
++            return None
++        return self._check(receipt, idempotency_key)
++
++    @staticmethod
++    def _check(receipt, key):
++        if (not isinstance(receipt, dict) or receipt.get('idempotency_key') != key
++                or receipt.get('repository') != ExistingOutboxNotifier.REPOSITORY
++                or receipt.get('pr_number') != ExistingOutboxNotifier.PR
++                or not isinstance(receipt.get('message_id'), str)
++                or not receipt['message_id']):
++            raise NativeContractError('fixed PR17 notification ACK unconfirmed')
++        return {'idempotency_key': key, 'message_id': receipt['message_id']}
++
++
++class NativePipelineRuntime(object):
++    def __init__(self, controller):
++        methods = ('admit', 'launch', 'inspect', 'report', 'stop',
++                   'notify', 'notification_receipt', 'preflight')
++        if any(not callable(getattr(controller, name, None)) for name in methods):
++            raise NativeContractError('complete installed controller/outbox required')
++        self.controller = controller
++        self.notifier = ExistingOutboxNotifier(controller)
++
++    def preflight(self, config):
++        # Require actual installed-controller acknowledgement BEFORE claiming
++        # work or opening a new ledger. No returned model text is consulted.
++        result = self.controller.preflight(config)
++        if (not isinstance(result, dict) or result.get('ready') is not True
++                or result.get('canonical_existing') is not True
++                or result.get('isolation_enforced') is not True
++                or result.get('outbox_existing') is not True):
++            raise NativeContractError('installed native runtime is not ready')
++
++    def worker(self, claim, workdir, sandbox):
++        return NativePipelineWorker(self.controller, claim, workdir, sandbox)
++
++
++def load_reviewed_controller(path, digest, config):
++    """Execute exactly hash-verified root-owned installed controller bytes.
++
++    This is an explicit deployment dependency, not a claim that a controller
++    endpoint has already been installed. No dynamic import of worker bytes.
++    """
++    import os
++    import stat
++    import re
++    if (not isinstance(path, str) or not os.path.isabs(path)
++            or os.path.realpath(path) != path
++            or not re.fullmatch(r'[0-9a-f]{64}', digest or '')):
++        raise NativeContractError('pinned canonical controller required')
++    parent = os.path.dirname(path)
++    while True:
++        info = os.lstat(parent)
++        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
++            raise NativeContractError('controller parent is not root-protected')
++        if parent == '/':
++            break
++        parent = os.path.dirname(parent)
++    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)
++                 | getattr(os, 'O_NONBLOCK', 0))
++    try:
++        info = os.fstat(fd)
++        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
++                or info.st_mode & 0o022 or info.st_size > 262144):
++            raise NativeContractError('unsafe installed controller')
++        raw = b''
++        while len(raw) <= 262144:
++            part = os.read(fd, 65536)
++            if not part:
++                break
++            raw += part
++        if len(raw) > 262144 or hashlib.sha256(raw).hexdigest() != digest:
++            raise NativeContractError('installed controller hash mismatch')
++    finally:
++        os.close(fd)
++    namespace = {'__name__': 'xuanjun_reviewed_native_controller', '__file__': path}
++    exec(compile(raw, path, 'exec'), namespace)
++    factory = namespace.get('create_controller')
++    if not callable(factory):
++        raise NativeContractError('installed controller factory missing')
++    return NativePipelineRuntime(factory(config))
