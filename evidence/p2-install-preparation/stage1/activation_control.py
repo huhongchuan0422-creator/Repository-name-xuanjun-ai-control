@@ -336,3 +336,29 @@ class ActivationStore(object):
             return updated
         finally:
             os.close(lock)
+
+
+    def fence(self, expected_epoch, expected_instance):
+        """Revoke an uncertain installation before stopping/restoring services.
+
+        A durable next PREPARED epoch denies active readers. It never grants a
+        new writer or restarts anything; recovery requires explicit reconciliation.
+        """
+        if os.geteuid() != self.owner_uid:
+            raise ActivationError('activation fencing requires authority owner')
+        lock = self._locked()
+        try:
+            records = self._journal()
+            if not records:
+                raise ActivationError('activation journal is empty')
+            current = records[-1][0]['descriptor']
+            if (self._read_descriptor_unlocked() != current
+                    or current['epoch'] != expected_epoch
+                    or current['instance'] != expected_instance):
+                raise ActivationError('activation fence CAS failed')
+            updated = dict(current, state='PREPARED', epoch=current['epoch'] + 1)
+            self._append(updated, records, {'fenced_epoch': current['epoch']})
+            self._write_descriptor(updated)
+            return updated
+        finally:
+            os.close(lock)
