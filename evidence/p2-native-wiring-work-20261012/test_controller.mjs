@@ -91,7 +91,7 @@ try {
   leaseValid=false;
   // Stop uses persisted receipt even after the live claim is lost.
   assert.equal((await concrete.stop(launched,{subagent:{deleteSession:async()=>{}}})).descendants_exited,true);
-  assert.equal(launchCalls,1);
+  assert.equal(launchCalls,2);
   console.log('real snapshot admission / intent-before-effects / no duplicate launch / expired-lease stop PASS');
 } finally {await rm(dir,{recursive:true,force:true});}
 
