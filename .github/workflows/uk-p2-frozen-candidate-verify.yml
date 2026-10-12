@@ -65,6 +65,9 @@ jobs:
           set -euo pipefail
           ROOT=/tmp/p2pkg/xuanjun-p2-package
           /usr/bin/python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          # Real install staging is root-owned. Reproduce only that ownership in /tmp
+          # before invoking the root-only release installer verifier.
+          sudo -n /usr/bin/chown -R 0:0 /tmp/p2pkg
           sudo -n /usr/bin/python3 -I -B - <<'PY'
           import hashlib,importlib.util,os,stat,subprocess,sys,grp
           assert sys.version_info[:3]==(3,6,8)
