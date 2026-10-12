@@ -1,26 +1,46 @@
-"""Read fixed installed controller code as data; no inference or mutation."""
+"""Fixed UK readiness/source read: zero inference, no execution or mutation."""
 import os,pwd,socket,stat,json,hashlib,re
+def read(path,maximum=1048576):
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    try:
+        info=os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size>maximum:raise ValueError("SHAPE")
+        raw=os.read(fd,maximum+1)
+        if len(raw)>maximum:raise ValueError("LIMIT")
+        return raw,info
+    finally:os.close(fd)
+def safe(value):
+    if value is None or type(value) in (bool,int):return value
+    if isinstance(value,str) and len(value)<150 and re.fullmatch(r"[A-Za-z0-9_./:@+-]*",value):return value
+    return "REDACTED_UNEXPECTED_VALUE"
 def main():
-    if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:
-        raise SystemExit('HOLD_FIXED_UK_NONROOT')
-    paths=['/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/cli-backend-dispatch-eligibility-BZXmQ5Ky.mjs']
-    records=[]
-    for requested in paths:
-        path=os.path.realpath(requested)
-        if not path.startswith('/home/xuanjun_dev/.openclaw/'):
-            records.append({'path':requested,'state':'OUTSIDE_CODE_ROOT'});continue
-        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:raise SystemExit('HOLD_FIXED_UK_NONROOT')
+    output={'state':'READONLY_NATIVE_READINESS','model_calls':0,'authority_mutation':'NONE','sources':[]}
+    code='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs'
+    raw,info=read(code)
+    output['sources'].append({'path':code,'sha256':hashlib.sha256(raw).hexdigest(),'uid':info.st_uid,'source':raw.decode('utf-8')})
+    config='/home/xuanjun_dev/.openclaw/openclaw.json'
+    try:
+        raw,info=read(config)
+        cfg=json.loads(raw.decode('utf-8'))
+        agents=cfg.get('agents',{})
+        defaults=agents.get('defaults',{})
+        main_agent=next((a for a in agents.get('list',[]) if a.get('id')=='main'),{})
+        profiles=cfg.get('auth',{}).get('profiles',{})
+        model=defaults.get('model',{})
+        output['policy']={'config_uid':info.st_uid,'config_mode':oct(stat.S_IMODE(info.st_mode)),
+          'primary':safe(model.get('primary') if isinstance(model,dict) else model),
+          'fallbacks':[safe(v) for v in model.get('fallbacks',[])][:16] if isinstance(model,dict) else None,
+          'auth_modes':[{'provider':safe(v.get('provider')),'mode':safe(v.get('mode'))} for v in list(profiles.values())[:32] if isinstance(v,dict)],
+          'sandbox_defaults':{k:safe(defaults.get('sandbox',{}).get(k)) for k in ('mode','backend','scope','workspaceAccess')},
+          'sandbox_main':{k:safe(main_agent.get('sandbox',{}).get(k)) for k in ('mode','backend','scope','workspaceAccess')},
+          'cli_backend_keys':[safe(k) for k in defaults.get('cliBackends',{})][:16]}
+    except FileNotFoundError:output['policy']={'state':'CONFIG_PATH_MISSING'}
+    output['engines']=[]
+    for binary in ('/usr/bin/docker','/usr/bin/podman'):
         try:
-            info=os.fstat(fd)
-            if not stat.S_ISREG(info.st_mode) or info.st_size>1048576:
-                records.append({'path':requested,'state':'NONREGULAR_OR_OVERSIZE'});continue
-            raw=os.read(fd,1048577)
-        finally:os.close(fd)
-        try:source=raw.decode('utf-8')
-        except UnicodeDecodeError:
-            records.append({'path':requested,'state':'BINARY_METADATA_ONLY','resolved':path});continue
-        if re.search(r'-----BEGIN .*PRIVATE KEY|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{30,}|[0-9]{6,}:[A-Za-z0-9_-]{25,}|sk-[A-Za-z0-9]{32,}',source):
-            records.append({'path':requested,'state':'SECRET_PATTERN_BLOCKED'});continue
-        records.append({'path':requested,'resolved':path,'sha256':hashlib.sha256(raw).hexdigest(),'uid':info.st_uid,'mode':oct(stat.S_IMODE(info.st_mode)),'source':source})
-    print(json.dumps({'state':'READONLY_CODE_EXPORT','model_calls':0,'authority_mutation':'NONE','sources':records},sort_keys=True))
+            i=os.lstat(binary)
+            output['engines'].append({'path':binary,'regular':stat.S_ISREG(i.st_mode),'uid':i.st_uid,'mode':oct(stat.S_IMODE(i.st_mode))})
+        except FileNotFoundError:output['engines'].append({'path':binary,'state':'MISSING'})
+    print(json.dumps(output,sort_keys=True))
 if __name__=='__main__':main()

@@ -14,7 +14,7 @@ export class NativeController {
     this.verifyLease=verifyLease;this.commitGuard=commitGuard;this.clock=clock;
   }
   async current(request) {
-    const observed=await this.store.read();
+    const observed=await this.store.read(request);
     if(fields.some(k=>observed.task[k]!==request[k]) || !await this.verifyLease(observed.task,request,this.clock()))hold('LEASE_OR_FENCE');
     return observed;
   }
@@ -27,18 +27,24 @@ export class NativeController {
       || typeof request.prompt!=='string'||!Number.isSafeInteger(request.timeout_seconds)
       || request.timeout_seconds<1||request.timeout_seconds>3600)hold('REQUEST_POLICY');
     let observed=await this.current(request);
+    let previous=[];
     if(observed.task.native_execution) {
       const saved=observed.task.native_execution;
-      if(saved.idempotency_key!==key || canonical(saved.request)!==canonical(request))hold('EXISTING_EXECUTION');
-      if(saved.phase!=='ADMITTED')hold('EFFECT_RECONCILIATION_REQUIRED');
-      return saved.admission;
+      if(saved.idempotency_key===key && canonical(saved.request)===canonical(request)) {
+        if(saved.phase!=='ADMITTED')hold('EFFECT_RECONCILIATION_REQUIRED');
+        return saved.admission;
+      }
+      if(saved.phase!=='TERMINAL'||!saved.report||saved.observation?.descendants_exited!==true
+        ||saved.observation?.unit_active!==false||saved.observation?.process_alive!==false)hold('EXISTING_EXECUTION_REQUIRES_RECONCILIATION');
+      previous=[...(saved.previous_receipts||[]),saved.report];
+      if(previous.length>8)hold('EXECUTION_HISTORY_LIMIT');
     }
     if(await this.eligibility(runtime,request))hold('CLI_DISPATCH_BYPASS');
     const source=await verifySnapshot(observed.task.source_manifest,request.workdir);
     const sessionKey='agent:main:xuanjun-p2:'+key;
     // Persist intent before provisioning any physical execution boundary.
     observed=await this.store.replace(observed,{...observed.task,native_execution:{
-      phase:'PROVISIONING',request,idempotency_key:key,session_key:sessionKey,source}});
+      phase:'PROVISIONING',request,idempotency_key:key,session_key:sessionKey,source,previous_receipts:previous}});
     const unit=await this.prepare(runtime,{request,sessionKey,source});
     const bound=await this.boundary.bind(unit,request.workdir);
     const admission={request,idempotency_key:key,isolation_enforced:true};
@@ -47,8 +53,9 @@ export class NativeController {
     await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'ADMITTED',unit:bound,admission}});
     return admission;
   }
-  async record(receipt) {
-    const observed=await this.store.read(),record=observed.task.native_execution;
+  async record(receipt,cleanup=false) {
+    const binding=receipt.binding||receipt.request;
+    const observed=await (cleanup?this.store.receipt(binding):this.store.read(binding)),record=observed.task.native_execution;
     if(!record||record.idempotency_key!==receipt.idempotency_key)hold('RECEIPT_UNKNOWN');
     if(record.receipt && canonical(record.receipt)!==canonical(receipt))hold('RECEIPT_MISMATCH');
     return {observed,record};
@@ -76,10 +83,10 @@ export class NativeController {
     if(!result?.runId||result.sessionKey!==record.session_key)hold('LAUNCH_UNKNOWN');
     const entry=await runtime.agent.session.getSessionEntry({sessionKey:record.session_key,agentId:'main',readConsistency:'latest'});
     if(!entry?.sessionId)hold('SESSION_ID_UNKNOWN');
-    const receipt={idempotency_key:record.idempotency_key,run_id:result.runId,session_id:entry.sessionId,execution_unit_id:record.unit.backend+':'+record.unit.id};
+    const receipt={binding:Object.fromEntries(fields.map(k=>[k,record.request[k]])),idempotency_key:record.idempotency_key,run_id:result.runId,session_id:entry.sessionId,execution_unit_id:record.unit.backend+':'+record.unit.id};
     const latest=await this.current(record.request);
     if(latest.task.native_execution?.phase!=='LAUNCH_INTENT')hold('LAUNCH_CAS');
-    await this.store.replace(latest,{...latest.task,native_execution:{...record,phase:'RUNNING',receipt}});
+    await this.store.replace(latest,{...latest.task,native_execution:{...record,phase:'RUNNING',receipt,runtime:result.runtime}});
     return receipt;
   }
   async inspect(receipt,runtime) {
@@ -93,7 +100,7 @@ export class NativeController {
     const state=terminal?(status.status==='ok'?'completed':'failed'):'running';
     const result={...receipt,state,process_alive:unit.process_alive,unit_active:unit.active,descendants_exited:unit.descendants_exited};
     if(terminal&&!unit.active&&!unit.process_alive&&unit.descendants_exited) {
-      const latest=await this.store.read();
+      const latest=await this.store.read(record.request);
       if(canonical(latest.task.native_execution?.receipt)!==canonical(receipt))hold('TERMINAL_CAS');
       await this.store.replace(latest,{...latest.task,native_execution:{...latest.task.native_execution,phase:'TERMINAL',observation:result}});
     }
@@ -111,7 +118,7 @@ export class NativeController {
     return report;
   }
   async stop(receipt) {
-    const {record}=await this.record(receipt);
+    const {record}=await this.record(receipt,true);
     return this.boundary.stop(record.unit);
   }
 }
