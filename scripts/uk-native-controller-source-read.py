@@ -3,7 +3,7 @@ import os,pwd,socket,stat,json,hashlib,re
 def main():
     if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:
         raise SystemExit('HOLD_FIXED_UK_NONROOT')
-    paths=['/home/xuanjun_dev/.openclaw/workspace/scripts/p2_supervisor.py','/home/xuanjun_dev/.openclaw/bin/openclaw']
+    paths=['/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/agent-XuZuntjH.mjs','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/gateway/protocol/index.js']
     records=[]
     for requested in paths:
         path=os.path.realpath(requested)
@@ -30,7 +30,7 @@ def main():
         folders[:]=[f for f in sorted(folders) if depth<5 and f not in ('node_modules','__pycache__')]
         for name in sorted(files):
             path=os.path.join(directory,name)
-            if name.endswith(('.js','.mjs')) and any(w in path[len(root):] for w in ('gateway','agent','automation','schema','protocol')):code_paths.append(path)
+            if name.endswith(('.js','.mjs')) and any(w in path[len(root):] for w in ('gateway','agent','automation','schema','protocol','worker')):code_paths.append(path)
         if len(code_paths)>3000:break
     for path in code_paths:
         info=os.lstat(path)
@@ -40,7 +40,7 @@ def main():
         with open(path,'r',encoding='utf-8') as f:body=f.read()
         if re.search(r'-----BEGIN .*PRIVATE KEY|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{30,}|[0-9]{6,}:[A-Za-z0-9_-]{25,}|sk-[A-Za-z0-9]{32,}',body):continue
         snippets=[]
-        for word in ('AgentParamsSchema','AgentWaitParamsSchema','runEmbeddedPiAgent','expectedRevision','automations.scratch','agentHandlers','registerGatewayMethod'):
+        for word in ('AgentParamsSchema','AgentWaitParamsSchema','runEmbeddedPiAgent','expectedRevision','automations.scratch','agentHandlers','registerGatewayMethod','WorkerSessionsSpawnParamsSchema','worker.sessions.spawn'):
             start=body.find(word)
             if start>=0:snippets.append({'symbol':word,'source':body[max(0,start-1000):start+5000]})
         if snippets:selected.append({'path':path,'sha256':hashlib.sha256(body.encode()).hexdigest(),'snippets':snippets})
