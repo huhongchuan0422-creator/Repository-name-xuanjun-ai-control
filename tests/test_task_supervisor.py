@@ -22,7 +22,7 @@ class SupervisorTests(unittest.TestCase):
 
     def registration(self, task='t1', deps=None):
         self.s.register(dict(task_id=task, parent_task_id='parent', stage='dev',
-            owner='developer', entry='WORK', checkpoint_sha256='a'*64,
+            writer_scope=task + ':dev', owner='developer', entry='WORK', checkpoint_sha256='a'*64,
             spec_sha256='b'*64, next_action='implement',
             dependencies=deps or [], completion_conditions=['tests'],
             progress_deadline=1900, receipt_deadline=1100,
@@ -72,7 +72,8 @@ class SupervisorTests(unittest.TestCase):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
         payload=dict(state='SUCCESS',artifact_sha256='c'*64,
-            writer_stopped=True,effects_reconciled=True,next_action='handoff')
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
         self.s.record('t1','a1','done','TERMINAL',1002,payload=payload)
         self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
         due=self.s.due_outbox(1002)
@@ -83,7 +84,8 @@ class SupervisorTests(unittest.TestCase):
     def test_lost_completion_notification_retries_bounded(self):
         self.registration(); self.claim()
         payload=dict(state='FAILURE',artifact_sha256=UNKNOWN,
-            writer_stopped=UNKNOWN,effects_reconciled=UNKNOWN,next_action='inspect')
+            writer_stopped=UNKNOWN,effects_reconciled=UNKNOWN,next_action='inspect',
+            completion_evidence=[])
         self.s.record('t1','a1','done','TERMINAL',1002,payload=payload)
         item=self.s.due_outbox(1002)[0]
         expected=[1032,1092,1212,1452]
@@ -104,9 +106,10 @@ class SupervisorTests(unittest.TestCase):
         self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
         bad=dict(receiver_accepted=True,old_writer_stopped=False,
             old_fence_invalidated=True,effects_reconciled=True,
-            new_owner='qa',new_entry='WORK')
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
         with self.assertRaises(ValueError):
-            self.s.record('t1','a1','ackbad','HANDOFF_ACKNOWLEDGED',1003,payload=bad)
+            self.s.record('t1','a1','ackbad','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),bad)
         self.assertEqual(self.s._task('t1')['state'],'HANDOFF_PENDING')
 
     def test_exact_handoff_allows_new_claim_only_after_reconciliation(self):
@@ -115,8 +118,9 @@ class SupervisorTests(unittest.TestCase):
         self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
-            new_owner='qa',new_entry='WORK')
-        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,payload=good)
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
         self.s.claim('t1','a2','qa','WORK','run2','session2','lease2',2,2,1004)
         self.assertEqual(self.s._task('t1')['attempt_id'],'a2')
 
@@ -124,7 +128,7 @@ class SupervisorTests(unittest.TestCase):
         self.registration(); self.claim()
         payload=dict(state='CAPABILITY_UNAVAILABLE',artifact_sha256=UNKNOWN,
             writer_stopped=UNKNOWN,effects_reconciled=UNKNOWN,
-            next_action='owner-visible hold')
+            next_action='owner-visible hold',completion_evidence=[])
         self.s.record('t1','a1','u','TERMINAL',1002,payload=payload)
         row=self.s._task('t1')
         self.assertEqual(row['state'],'CAPABILITY_UNAVAILABLE')
@@ -144,12 +148,69 @@ class SupervisorTests(unittest.TestCase):
         self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
-            new_owner='qa',new_entry='WORK')
-        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,payload=good)
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
         self.s.claim('t1','a2','qa','WORK','run2','session2','lease2',2,2,1004)
         with self.assertRaises(ValueError):
             self.s.record('t1','a1','zombie','PROGRESS',1005,
                           'SOURCE_COMMIT','deadbeef')
+
+    def test_heartbeat_cannot_delay_ten_or_fifteen_minute_actions(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','hb','HEARTBEAT',1290)
+        self.assertEqual(self.s.scan(1602)[0]['action'],
+                         'RECONCILE_AND_RESUME_SAME_ATTEMPT')
+        self.s.record('t1','a1','hb2','HEARTBEAT',1295)
+        self.assertEqual(self.s.scan(1902)[0]['action'],
+                         'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
+
+    def test_ready_scan_does_not_starve_later_eligible_task(self):
+        for index in range(101):
+            self.registration('blocked-%03d' % index, ['missing'])
+        self.registration('eligible')
+        self.assertEqual([row['task_id'] for row in self.s.ready(1)],
+                         ['eligible'])
+
+    def test_fence_and_epoch_must_increase_after_handoff(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,
+                      'PHASE_EXECUTION','proof:'+('a'*64),good)
+        with self.assertRaises(ValueError):
+            self.s.claim('t1','a2','qa','WORK','run2','session2',
+                         'lease2',1,1,1004)
+
+    def test_unclaimed_or_unsafe_success_cannot_unlock_dependency(self):
+        self.registration('parent')
+        unsafe=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=False,effects_reconciled=False,next_action='handoff',
+            completion_evidence=['tests'])
+        with self.assertRaises(ValueError):
+            self.s.record('parent',UNKNOWN,'fake','TERMINAL',1001,payload=unsafe)
+        self.claim('parent')
+        with self.assertRaises(ValueError):
+            self.s.record('parent','a1','unsafe','TERMINAL',1002,payload=unsafe)
+
+    def test_future_or_reordered_event_is_rejected(self):
+        self.registration(); self.claim()
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','future','STARTED',2000)
+        self.s.record('t1','a1','start','STARTED',1001)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','old','HEARTBEAT',1000)
+
+    def test_supervisor_liveness_never_claims_process_verified(self):
+        with self.assertRaises(ValueError):
+            self.s.supervisor_heartbeat('uk-supervisor','pid:42','d'*64,2000)
+        self.s.supervisor_heartbeat('uk-supervisor','pid:42','d'*64,1000)
+        self.assertEqual(self.s.supervisor_health(1001)[0]['state'],
+                         'FRESH_RECORD_NOT_PROCESS_VERIFIED')
 
     def test_event_id_reuse_with_different_bytes_is_rejected(self):
         self.registration(); self.claim()
@@ -181,9 +242,10 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(len(self.s.due_outbox(1902)),3)
 
     def test_supervisor_liveness_survives_restart(self):
-        self.s.supervisor_heartbeat('uk-supervisor','pid:42',1000)
+        self.s.supervisor_heartbeat('uk-supervisor','pid:42','d'*64,1000)
         self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
-        self.assertEqual(self.s.supervisor_health(1200)[0]['state'],'HEALTHY')
+        self.assertEqual(self.s.supervisor_health(1200)[0]['state'],
+                         'FRESH_RECORD_NOT_PROCESS_VERIFIED')
         self.assertEqual(self.s.supervisor_health(1400)[0]['state'],
                          'SUPERVISOR_UNAVAILABLE')
 
@@ -204,8 +266,9 @@ class SupervisorTests(unittest.TestCase):
         self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
-            new_owner='qa',new_entry='WORK')
-        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,payload=good)
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
         with self.assertRaises(ValueError):
             self.s.claim('t1','a2','qa','WORK','run2','session2',
                          'lease2',2,2,now=4000)
@@ -220,7 +283,8 @@ class SupervisorTests(unittest.TestCase):
     def test_terminal_artifact_hash_is_strict(self):
         self.registration(); self.claim()
         bad=dict(state='SUCCESS',artifact_sha256='not-a-hash',
-            writer_stopped=True,effects_reconciled=True,next_action='handoff')
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
         with self.assertRaises(ValueError):
             self.s.record('t1','a1','bad','TERMINAL',1002,payload=bad)
 
@@ -228,7 +292,7 @@ class SupervisorTests(unittest.TestCase):
         self.registration(); self.claim()
         payload=dict(state='CAPABILITY_UNAVAILABLE',artifact_sha256=UNKNOWN,
             writer_stopped=True,effects_reconciled=True,
-            next_action='OWNER_VISIBLE_QUOTA_HOLD')
+            next_action='OWNER_VISIBLE_QUOTA_HOLD',completion_evidence=[])
         self.s.record('t1','a1','quota','TERMINAL',1002,payload=payload)
         self.assertEqual(self.s._task('t1')['state'],'CAPABILITY_UNAVAILABLE')
         self.assertEqual(len(self.s.due_outbox(1002)),1)
