@@ -1,7 +1,7 @@
 name: UK P2 reuse existing fixed contract exporter
 on:
   push:
-    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    branches: [audit/p2-native-consumer-20261012]
     paths: ['.github/workflows/uk-p2-canonical-contract.yml']
 permissions:
   contents: read
