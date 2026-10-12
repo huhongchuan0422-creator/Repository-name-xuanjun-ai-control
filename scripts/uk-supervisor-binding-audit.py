@@ -198,7 +198,8 @@ def main():
             result['canonical_scratch']={'state':'HOLD_SCRATCH_READ_UNAVAILABLE','exit_code':p.returncode}
         else:
             wrapper=json.loads(p.stdout.decode('utf-8'))
-            value=wrapper.get('content')
+            value=wrapper.get('scratch',wrapper.get('content'))
+            if isinstance(value,dict) and 'content' in value:value=value['content']
             if isinstance(value,str):value=json.loads(value)
             if not isinstance(value,dict):
                 result['canonical_scratch']={'state':'HOLD_SCRATCH_FORMAT_UNCONFIRMED','wrapper_keys':sorted(wrapper)[:40]}
