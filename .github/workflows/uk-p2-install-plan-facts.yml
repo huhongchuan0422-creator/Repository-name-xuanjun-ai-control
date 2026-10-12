@@ -24,3 +24,4 @@ jobs:
           echo P2_INSTALL_PLAN_FACTS=READ_ONLY
           echo MODEL_CALLS=0
           echo INSTALL_EFFECTS=0
+# refresh trigger for current P2 HIGH-fix artifact plan facts
