@@ -1,0 +1,98 @@
+{
+  "state": "READONLY_METADATA_NOT_RUNTIME_ACCEPTANCE",
+  "run_id": 38266998881,
+  "job_id": 114871560749,
+  "model_calls": 0,
+  "authority_mutation": "NONE",
+  "agent_metadata": [
+    {
+      "agentDir": null,
+      "id": "main",
+      "model_primary": null,
+      "sandbox": {
+        "backend": null,
+        "mode": null,
+        "scope": null,
+        "workspaceAccess": null
+      }
+    },
+    {
+      "agentDir": "/home/xuanjun_dev/.openclaw/agents/platform-engineer/agent",
+      "id": "platform-engineer",
+      "model_primary": "openai/gpt-5.6-sol",
+      "sandbox": {
+        "backend": null,
+        "mode": null,
+        "scope": null,
+        "workspaceAccess": null
+      }
+    },
+    {
+      "agentDir": "/home/xuanjun_dev/.openclaw/agents/developer/agent",
+      "id": "developer",
+      "model_primary": "openai/gpt-5.6-sol",
+      "sandbox": {
+        "backend": null,
+        "mode": null,
+        "scope": null,
+        "workspaceAccess": null
+      }
+    }
+  ],
+  "provider_metadata": {
+    "api": null,
+    "api_key_value_type": "NoneType",
+    "auth": null
+  },
+  "policy": {
+    "auth_modes": [],
+    "cli_backend_keys": [],
+    "config_mode": "0o600",
+    "config_uid": 1002,
+    "fallbacks": [],
+    "primary": "openai/gpt-5.6-sol",
+    "sandbox_defaults": {
+      "backend": null,
+      "mode": null,
+      "scope": null,
+      "workspaceAccess": null
+    },
+    "sandbox_main": {
+      "backend": null,
+      "mode": null,
+      "scope": null,
+      "workspaceAccess": null
+    }
+  },
+  "oauth_metadata": [
+    {
+      "state": "PROFILE_PATH_MISSING"
+    }
+  ],
+  "engines": [
+    {
+      "mode": "0o755",
+      "path": "/usr/bin/docker",
+      "regular": true,
+      "uid": 0
+    },
+    {
+      "path": "/usr/bin/podman",
+      "state": "MISSING"
+    }
+  ],
+  "sources": [
+    {
+      "path": "/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs",
+      "sha256": "db7fc7539455da0c564d4ded0d04da1c764a46903d1632489b8bd04641098320"
+    },
+    {
+      "path": "/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/loader-runtime-load-DpgEqnzx.mjs",
+      "sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787"
+    },
+    {
+      "path": "/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/store-BVWJOVBa.mjs",
+      "sha256": "dac59db7e54c22364d038460bce45057dcccc0a93afde7d22d1a7babc782b765"
+    }
+  ]
+}
