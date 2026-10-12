@@ -97,32 +97,47 @@ def group_fact(name):
         return {'status':'ABSENT'}
 
 def tls_refs():
-    try:
-        rendered=subprocess.check_output(
-            ['/usr/sbin/nginx','-T'],stderr=subprocess.STDOUT,
-            universal_newlines=True,timeout=15)
-    except (OSError,subprocess.CalledProcessError):
-        return {'status':'UNAVAILABLE','config':NGINX_CONF,'reason':'NGINX_T_FAILED'}
+    root='/etc/nginx'
     paths=[]
-    for line in rendered.splitlines():
-        m=TLS_RE.match(line)
-        if not m:
-            continue
-        path=m.group(2).strip()
-        if path and path not in paths:
-            paths.append(path)
+    scanned=0
+    for base,dirs,files in os.walk(root,followlinks=False):
+        dirs[:]=[d for d in dirs if not os.path.islink(os.path.join(base,d))]
+        for name in sorted(files):
+            if scanned>=256:
+                raise ValueError('NGINX_CONFIG_SCAN_LIMIT')
+            candidate=os.path.join(base,name)
+            real=os.path.realpath(candidate)
+            if not real.startswith(root+'/') and real!=NGINX_CONF:
+                continue
+            try:
+                raw,info=file_identity(real,1048576),os.stat(real)
+                text=open(real,'r').read().splitlines()
+            except (OSError,ValueError,UnicodeError):
+                continue
+            scanned+=1
+            for line in text:
+                m=TLS_RE.match(line)
+                if not m:
+                    continue
+                ref=m.group(2).strip()
+                if not os.path.isabs(ref):
+                    return {'status':'UNAVAILABLE','config':NGINX_CONF,
+                            'reason':'RELATIVE_TLS_REFERENCE','path':ref}
+                ref=os.path.realpath(ref)
+                if ref not in paths:
+                    paths.append(ref)
     refs=[]
-    for path in paths:
+    for ref in paths:
         try:
-            refs.append(file_identity(path,16*1024*1024))
+            refs.append(file_identity(ref,16*1024*1024))
         except (OSError,ValueError) as error:
             return {'status':'UNAVAILABLE','config':NGINX_CONF,
-                    'reason':'TLS_REFERENCE_'+type(error).__name__,
-                    'path':path}
+                    'reason':'TLS_REFERENCE_'+type(error).__name__,'path':ref}
     if not refs:
-        return {'status':'UNAVAILABLE','config':NGINX_CONF,'reference_count':0}
-    return {'status':'PRESENT','config':file_identity(NGINX_CONF,1048576),
-            'references':refs}
+        return {'status':'UNAVAILABLE','config':NGINX_CONF,
+                'reason':'NO_TLS_REFERENCE_FOUND','scanned_files':scanned}
+    config=file_identity(NGINX_CONF,1048576) if os.path.exists(NGINX_CONF) else {'path':NGINX_CONF,'status':'UNAVAILABLE'}
+    return {'status':'PRESENT','config':config,'references':refs,'scanned_files':scanned}
 
 def activation_fact():
     if not os.path.exists(ACTIVATION):
