@@ -14,3 +14,7 @@ Private control-plane repository for XuanJun AI / XuanJun Yunhui engineering orc
 - main is release/control-state only.
 - Work occurs on task branches and PRs.
 - Agents must not push production changes directly to main.
+
+## Mandatory development execution rules
+
+Work and OpenClaw must read and follow [开发执行与反馈强制规则](docs/DEVELOPMENT_EXECUTION_AND_FEEDBACK_RULES_20261012.md) before dispatch or continuation. Deliver results, actively advance ready nodes, track missing receipts, preserve interrupted tasks and unblock independent work. Documentation and alerts are not proof of deployed execution capabilities.
