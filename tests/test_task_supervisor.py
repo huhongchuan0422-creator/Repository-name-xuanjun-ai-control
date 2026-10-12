@@ -93,8 +93,10 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(result['attempts'],index)
             self.assertEqual(result['next_attempt_at'],next_at)
             now=next_at
-        self.s.outbox_result(item['outbox_id'],False,now,'offline')
+        last=self.s.outbox_result(item['outbox_id'],False,now,'offline')
+        self.assertTrue(last['dead_lettered'])
         self.assertEqual(self.s._task('t1')['state'],'HOLD')
+        self.assertEqual(self.s.due_outbox(now + 999999),[])
 
     def test_receiver_without_ack_cannot_release_responsibility(self):
         self.registration(); self.claim()
@@ -184,6 +186,36 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(self.s.supervisor_health(1200)[0]['state'],'HEALTHY')
         self.assertEqual(self.s.supervisor_health(1400)[0]['state'],
                          'SUPERVISOR_UNAVAILABLE')
+
+    def test_real_progress_resets_recovery_budget(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.scan(1302)
+        self.assertEqual(self.s._task('t1')['recovery_level'],1)
+        self.s.record('t1','a1','p','PROGRESS',1303,
+                      'SOURCE_COMMIT','commit:abc',
+                      {'next_progress_deadline':2000})
+        self.assertEqual(self.s._task('t1')['recovery_level'],0)
+        self.assertEqual(self.s._task('t1')['progress_deadline'],2000)
+
+    def test_late_handoff_requires_fresh_attempt_deadlines(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK')
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,payload=good)
+        with self.assertRaises(ValueError):
+            self.s.claim('t1','a2','qa','WORK','run2','session2',
+                         'lease2',2,2,now=4000)
+        deadlines=dict(progress_deadline=5000,receipt_deadline=4100,
+            started_deadline=4200,terminal_deadline=6000,handoff_deadline=5500)
+        self.s.claim('t1','a2','qa','WORK','run2','session2',
+                     'lease2',2,2,now=4000,deadlines=deadlines)
+        task=self.s._task('t1')
+        self.assertEqual(task['recovery_level'],0)
+        self.assertEqual(task['writer_stopped'],UNKNOWN)
 
     def test_terminal_artifact_hash_is_strict(self):
         self.registration(); self.claim()
