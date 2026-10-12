@@ -22,3 +22,5 @@ jobs:
           systemctl show xuanjun-uk-openclaw.service --property=Id,User,ActiveState,SubState,ControlGroup,MainPID,FragmentPath
           echo MODEL_CALLS=0
           echo AUTHORITY_MUTATION=NONE
+
+# verify-only trigger: controller high-finding repair 3d7928b

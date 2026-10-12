@@ -56,3 +56,5 @@ def main():
       'package_json_sha256':hashlib.sha256(package).hexdigest(),
       'symbols':found,'model_calls':0,'authority_mutation':'NONE'},sort_keys=True))
 if __name__=='__main__':main()
+
+# verify-only trigger: controller high-finding repair 3d7928b
