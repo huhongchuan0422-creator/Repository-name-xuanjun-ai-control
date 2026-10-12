@@ -55,7 +55,8 @@ try {
   const tree=createHash('sha1').update(Buffer.from('tree '+treeBytes.length+'\0')).update(treeBytes).digest('hex');
   const source={workdir:dir,commit:'c'.repeat(40),tree,files:[{path:'main.py',mode:'100644',sha256:createHash('sha256').update(bytes).digest('hex')}]};
   const request={task_id:'t',spec_hash:'a'.repeat(64),lease:'worker',fence:1,epoch:2,generation:1,instance:'instance',workdir:dir,sandbox:'workspace-write',provider:'openai',model:'gpt-5.6-sol',prompt:'approved',timeout_seconds:30};
-  let current={...request,state:'RUNNING',lease_until:Date.now()/1000+60,source_manifest:source};
+  const requestContract={spec_hash:request.spec_hash,workdir:request.workdir,sandbox:request.sandbox,provider:request.provider,model:request.model,prompt:request.prompt,timeout_seconds:request.timeout_seconds};
+  let current={...request,state:'RUNNING',lease_until:Date.now()/1000+60,source_manifest:source,request_contract:requestContract};
   let launchCalls=0,prepareCalls=0,leaseValid=true,unitStopped=false,placementValid=false;
   const store={read:async()=>({task:current}),receipt:async()=>({task:current}),replace:async(o,next)=>{assert.equal(o.task,current);current=next;return {task:current};}};
   const runtime={subagent:{run:async params=>{assert.equal(current.native_execution.phase,'LAUNCH_INTENT');params.assertCurrent();launchCalls++;return {runId:'run-real-files',sessionKey:params.sessionKey,runtime:{provider:'openai',model:'gpt-5.6-sol',harness:'embedded'}};}},agent:{session:{getSessionEntry:async()=>({sessionId:'session-real-files'})}}};
@@ -69,6 +70,9 @@ try {
       request_sha256:createHash('sha256').update(canonical(request)).digest('hex'),
       sandbox_runtime_id:unit.name
     }:null});
+  const changed={...request,prompt:'mutated'};
+  const changedRaw=JSON.stringify(changed),changedKey=createHash('sha256').update(changedRaw).digest('hex');
+  await assert.rejects(()=>concrete.admit(changedRaw,changedKey,runtime),/REQUEST_CONTRACT/);
   const raw=JSON.stringify(request),key=createHash('sha256').update(raw).digest('hex');
   const admission=await concrete.admit(raw,key,runtime);
   assert.equal(admission.isolation_enforced,true);assert.equal(prepareCalls,1);

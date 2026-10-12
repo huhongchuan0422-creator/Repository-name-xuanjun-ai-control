@@ -27,6 +27,10 @@ export class NativeController {
       || typeof request.prompt!=='string'||!Number.isSafeInteger(request.timeout_seconds)
       || request.timeout_seconds<1||request.timeout_seconds>3600)hold('REQUEST_POLICY');
     let observed=await this.current(request);
+    const requestContract={spec_hash:request.spec_hash,workdir:request.workdir,sandbox:request.sandbox,
+      provider:request.provider,model:request.model,prompt:request.prompt,timeout_seconds:request.timeout_seconds};
+    if(!observed.task.request_contract
+      ||canonical(observed.task.request_contract)!==canonical(requestContract))hold('REQUEST_CONTRACT');
     let previous=[];
     if(observed.task.native_execution) {
       const saved=observed.task.native_execution;
