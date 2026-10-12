@@ -1,7 +1,7 @@
 name: Entry review and continuation gates
 on:
   pull_request:
-    paths: ['scripts/entry_review_gate.py', 'tests/test_entry_review_gate.py', '.github/workflows/entry-review-gates.yml']
+    paths: ['scripts/entry_review_gate.py', 'scripts/native_syntax_*.py', 'scripts/development_entry_intake.py', 'tests/test_*gate.py', 'tests/test_native_syntax_intake.py', '.github/workflows/entry-review-gates.yml', '.github/workflows/development-entry-intake.yml']
 permissions:
   contents: read
 jobs:
@@ -12,5 +12,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Exercise exact-version and continuation negatives
-        run: python3 -B -m unittest discover -s tests -p 'test_entry_review_gate.py' -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install fixed syntax checker without package scripts
+        run: npm install --prefix "$RUNNER_TEMP/xj-syntax" typescript@5.7.3 --ignore-scripts --no-audit --no-fund
+      - name: Exercise mechanical syntax and continuation gates
+        env:
+          XJ_TYPESCRIPT_MODULE: ${{ runner.temp }}/xj-syntax/node_modules/typescript
+        run: python3 -B -m unittest discover -s tests -v

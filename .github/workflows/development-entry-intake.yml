@@ -34,7 +34,14 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install fixed syntax checker without package scripts
+        run: npm install --prefix "$RUNNER_TEMP/xj-syntax" typescript@5.7.3 --ignore-scripts --no-audit --no-fund
       - name: Validate metadata and return receipt without executing code
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          XJ_TYPESCRIPT_MODULE: ${{ runner.temp }}/xj-syntax/node_modules/typescript
         run: python3 -B scripts/development_entry_intake.py
+

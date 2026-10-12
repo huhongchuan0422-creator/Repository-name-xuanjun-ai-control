@@ -4,6 +4,8 @@ import os
 import re
 import urllib.request
 
+from native_syntax_intake import syntax_receipt
+
 MARKER = re.compile(r'<!-- XJ_DEV_ENTRY (\{[^\n]*\}) -->')
 ENTRIES = {'WORK': 'WORK_NATIVE', 'CHATGPT': 'CHATGPT_NATIVE', 'DOTS': 'DOTS_NATIVE'}
 FIELDS = {'schema', 'entry', 'execution_path', 'task_id', 'spec_sha256',
@@ -78,6 +80,15 @@ def main():
         return
     try:
         receipt = validate_event(event, repo, owner)
+        if receipt['event'] == 'CODE_READY':
+            try:
+                receipt['syntax_gate'] = syntax_receipt(receipt, repo,
+                    os.environ['GITHUB_TOKEN'],
+                    typescript_module=os.environ.get('XJ_TYPESCRIPT_MODULE'))
+            except Exception:
+                # Do not emit server errors, credential values or source snippets.
+                receipt['syntax_gate'] = {'state': 'HOLD_SYNTAX_INTAKE_ERROR',
+                    'authority_effect': 'NONE', 'code_executed': False}
     except (ValueError, TypeError, KeyError):
         receipt = dict(status='REJECTED_INVALID_ENTRY_ENVELOPE',
                        source_comment_id=event['comment']['id'], authority_effect='NONE')
@@ -98,3 +109,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
