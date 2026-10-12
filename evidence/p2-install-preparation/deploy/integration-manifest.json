@@ -93,6 +93,7 @@
     "stage1/ledger_install_stage.py": "0775b91a51bf46097e6fd3b33e19745fe4fa0fd324bde69b3d3bf61bc618c2db",
     "stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e",
     "stage1/ledger_cutover_transaction.py": "781704b76dc53981d2f3c957435755ec763ed8ac4440dcdfa2da2ab176c8413a",
-    "stage1/legacy_host_adapter.py": "22807a24dda907fcbd025e1217e197b23da0d5281f8256a84c256274b70069cf"
+    "stage1/legacy_host_adapter.py": "22807a24dda907fcbd025e1217e197b23da0d5281f8256a84c256274b70069cf",
+    "stage1/p2_install_entrypoint.py": "8c4ed80ae61ac7eeb00c6ddd4485a13896a016cf8c9bea8d8947d51e5f021f57"
   }
 }
