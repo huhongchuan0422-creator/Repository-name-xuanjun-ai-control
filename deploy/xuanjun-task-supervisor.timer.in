@@ -1,0 +1,11 @@
+[Unit]
+Description=Repeat mechanical task supervision independently of model windows
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=1s
+Unit=xuanjun-task-supervisor.service
+
+[Install]
+WantedBy=timers.target

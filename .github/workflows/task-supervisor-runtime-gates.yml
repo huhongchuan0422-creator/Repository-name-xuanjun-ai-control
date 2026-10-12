@@ -1,0 +1,25 @@
+name: Mechanical supervisor runtime gates
+on:
+  pull_request:
+    paths:
+      - scripts/task_supervisor.py
+      - scripts/task_supervisor_runtime.py
+      - scripts/task_supervisor_runtime_entry.py
+      - tests/test_task_supervisor_runtime.py
+      - deploy/xuanjun-task-supervisor.service.in
+      - deploy/xuanjun-task-supervisor.timer.in
+      - .github/workflows/task-supervisor-runtime-gates.yml
+permissions:
+  contents: read
+jobs:
+  runtime-faults:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate exact runtime and restart faults
+        run: |
+          python3 -m py_compile scripts/task_supervisor.py scripts/task_supervisor_runtime.py scripts/task_supervisor_runtime_entry.py
+          python3 -B -m unittest discover -s tests -p 'test_task_supervisor*.py' -v

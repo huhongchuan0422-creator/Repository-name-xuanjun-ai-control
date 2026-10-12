@@ -581,6 +581,11 @@ class Supervisor(object):
                     'RUNNING': 'progress_deadline',
                     'HANDOFF_PENDING': 'handoff_deadline',
                 }[task['state']]
+                # A live heartbeat or later phase deadline cannot hide a
+                # separately registered terminal deadline.
+                if (task['state'] in ACTIVE and
+                        task['terminal_deadline'] < task[deadline_name]):
+                    deadline_name = 'terminal_deadline'
                 overdue = now >= task[deadline_name]
                 action = None; level = 0
                 if age >= 900:
@@ -709,4 +714,5 @@ class Supervisor(object):
               (attempts, next_at, error[:256], outbox_id))
             return {'delivered': False, 'attempts': attempts,
                     'next_attempt_at': next_at}
+
 
