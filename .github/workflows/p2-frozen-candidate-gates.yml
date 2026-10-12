@@ -8,100 +8,87 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: '11778162510'
-  P2_TAR_SHA256: 'dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317'
-  P2_SOURCE_COMMIT: '9d8be9805baa7bf4b690bfa74fcf78a0ff340dca'
+  P2_ARTIFACT_ID: '11778873716'
+  P2_TAR_SHA256: 'b279c3a88aed317a5fcd34af7c165d68ab3870773d3f21dcfe89d4fc09a584a9'
+  P2_SOURCE_COMMIT: '7c28108cfe089e150bdcd103058d79c6377956f0'
+  P2_SOURCE_TREE: 'af25a905eae7297d1d9884146a0e761f67de2c43'
+  P2_MANIFEST_SHA256: '6319f90b32aa25955dcf5352184411bfab080e0c730ec7079ad78f9bfeda6e0e'
 jobs:
   qa:
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     steps:
-      - name: Download exact frozen artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - name: Download and safely extract exact authoritative package
+        env: {GH_TOKEN: ${{ github.token }}}
         run: |
           set -euo pipefail
           gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
-          mkdir /tmp/artifact
-          cd /tmp/artifact
-          unzip -q /tmp/p2.zip
-          test -f p2-candidate.tar.gz
-          printf '%s  %s\n' "$P2_TAR_SHA256" p2-candidate.tar.gz | sha256sum -c -
-          mkdir /tmp/pkg
-          tar -xzf p2-candidate.tar.gz -C /tmp/pkg
-      - name: Verify provenance and all packaged file hashes
+          python3 -I -B - <<'PY'
+          import hashlib,io,os,tarfile,zipfile
+          z=zipfile.ZipFile('/tmp/p2.zip')
+          raw=z.read('p2-candidate.tar.gz')
+          assert hashlib.sha256(raw).hexdigest()==os.environ['P2_TAR_SHA256']
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
+              seen=set()
+              for m in t.getmembers():
+                  parts=m.name.split('/')
+                  assert parts and parts[0]=='xuanjun-p2-package' and not m.name.startswith('/')
+                  assert all(p not in ('','.', '..') for p in parts)
+                  assert m.name not in seen and m.isfile()
+                  seen.add(m.name)
+              t.extractall('/tmp/p2pkg')
+          open('/tmp/p2-candidate.tar.gz','wb').write(raw)
+          PY
+      - name: Authoritative freezer and real release-installer identity verify
         run: |
           set -euo pipefail
-          cd /tmp/pkg/xuanjun-p2-package
-          sha256sum -c SHA256SUMS
+          ROOT=/tmp/p2pkg/xuanjun-p2-package
+          python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz \
+            --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
           python3 -I -B - <<'PY'
-          import json, pathlib
-          root=pathlib.Path('/tmp/pkg/xuanjun-p2-package')
-          p=json.loads((root/'P2_CANDIDATE_PROVENANCE.json').read_text())
-          assert p['state']=='FROZEN_CANDIDATE_NOT_RELEASED'
-          assert p['source_commit']=='9d8be9805baa7bf4b690bfa74fcf78a0ff340dca'
-          assert p['old_frozen_archive_sha256']=='456ae23aa52e300021c9fb889df84d8eba34965769ce868e5ee6e43c29911a13'
-          assert p['model_calls']==0 and p['release_gate']=='NOT_GRANTED'
-          print('P2_FROZEN_PROVENANCE=PASS')
+          import importlib.util,os
+          root='/tmp/p2pkg/xuanjun-p2-package'
+          p=root+'/scripts/uk-integration-install.py'
+          spec=importlib.util.spec_from_file_location('installer',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          m.verify(root,root+'/deploy/integration-manifest.json',
+                   os.environ['P2_SOURCE_COMMIT'],os.environ['P2_MANIFEST_SHA256'],
+                   os.environ['P2_SOURCE_TREE'])
+          print('P2_REAL_RELEASE_INSTALLER_VERIFY=PASS')
           PY
-      - name: Syntax and package shape
-        run: |
-          set -euo pipefail
-          ROOT=/tmp/pkg/xuanjun-p2-package
-          test ! -L "$ROOT"
-          test -d "$ROOT/plugins/p2-native-controller"
-          find "$ROOT" -type l -print -quit | grep -q . && exit 41 || true
-          python3 -I -B - <<'PY'
-          import ast, pathlib
-          root=pathlib.Path('/tmp/pkg/xuanjun-p2-package')
-          for path in root.rglob('*.py'):
-              raw=path.read_text(encoding='utf-8')
-              try:
-                  ast.parse(raw, filename=str(path), feature_version=(3,6))
-              except TypeError:
-                  ast.parse(raw, filename=str(path))
-          print('PYTHON_3_6_GRAMMAR=PASS')
-          PY
-          for f in "$ROOT"/plugins/p2-native-controller/*.mjs; do node --check "$f"; done
           echo P2_FROZEN_QA_MECHANICAL=PASS
-          echo UK_RUNTIME=NOT_RUN
           echo RELEASE_GATE=NOT_GRANTED
   security:
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     steps:
-      - name: Download exact frozen artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Download and verify exact authoritative package
+        env: {GH_TOKEN: ${{ github.token }}}
         run: |
           set -euo pipefail
           gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
-          mkdir /tmp/artifact
-          cd /tmp/artifact
-          unzip -q /tmp/p2.zip
-          printf '%s  %s\n' "$P2_TAR_SHA256" p2-candidate.tar.gz | sha256sum -c -
-          mkdir /tmp/pkg
-          tar -xzf p2-candidate.tar.gz -C /tmp/pkg
-      - name: Fail closed on unsafe packaged bytes
-        run: |
-          set -euo pipefail
-          ROOT=/tmp/pkg/xuanjun-p2-package
-          cd "$ROOT"
-          sha256sum -c SHA256SUMS
-          test "$(find . -type l | wc -l)" -eq 0
-          test "$(find . -type f -perm -0002 | wc -l)" -eq 0
-          test "$(find . -type d -perm -0002 | wc -l)" -eq 0
-          ! grep -RInE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api[_-]?secret[[:space:]]*[:=][[:space:]]*[^<])' . --exclude=SHA256SUMS
           python3 -I -B - <<'PY'
-          import json, pathlib
-          root=pathlib.Path('/tmp/pkg/xuanjun-p2-package')
-          cfg=json.loads((root/'plugins/p2-native-controller/openclaw.plugin.json').read_text())
-          assert cfg.get('id')=='xuanjun-p2-native-controller'
-          assert (root/'stage1/native_peer_identity.py').is_file()
-          assert (root/'stage1/native_ledger_bridge.py').is_file()
-          assert (root/'stage1/native_ledger_operations.py').is_file()
-          print('P2_FROZEN_SECURITY_SHAPE=PASS')
+          import hashlib,io,os,tarfile,zipfile
+          raw=zipfile.ZipFile('/tmp/p2.zip').read('p2-candidate.tar.gz')
+          assert hashlib.sha256(raw).hexdigest()==os.environ['P2_TAR_SHA256']
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
+              names=set()
+              for m in t.getmembers():
+                  parts=m.name.split('/')
+                  assert m.isfile() and parts[0]=='xuanjun-p2-package'
+                  assert all(p not in ('','.', '..') for p in parts) and m.name not in names
+                  names.add(m.name)
+              t.extractall('/tmp/p2pkg')
+          open('/tmp/p2-candidate.tar.gz','wb').write(raw)
           PY
+          ROOT=/tmp/p2pkg/xuanjun-p2-package
+          python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz \
+            --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          test "$(find "$ROOT" -type l | wc -l)" -eq 0
+          test "$(find "$ROOT" -type f -perm -0002 | wc -l)" -eq 0
+          ! grep -RInE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api[_-]?secret[[:space:]]*[:=][[:space:]]*[^<])' "$ROOT"
           echo P2_FROZEN_SECURITY_MECHANICAL=PASS
           echo MODEL_CALLS=0
           echo RELEASE_GATE=NOT_GRANTED

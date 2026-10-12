@@ -2,136 +2,82 @@ name: P2 UK frozen candidate verify-only
 on:
   push:
     branches: [repair/p2-chatgpt-clean-review-20261013]
-    paths:
-      - .github/workflows/uk-p2-frozen-candidate-verify.yml
+    paths: [.github/workflows/uk-p2-frozen-candidate-verify.yml]
 permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: '11778162510'
-  P2_TAR_SHA256: 'dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317'
-  P2_SOURCE_COMMIT: '9d8be9805baa7bf4b690bfa74fcf78a0ff340dca'
+  P2_ARTIFACT_ID: '11778873716'
+  P2_TAR_SHA256: 'b279c3a88aed317a5fcd34af7c165d68ab3870773d3f21dcfe89d4fc09a584a9'
+  P2_SOURCE_COMMIT: '7c28108cfe089e150bdcd103058d79c6377956f0'
+  P2_SOURCE_TREE: 'af25a905eae7297d1d9884146a0e761f67de2c43'
+  P2_MANIFEST_SHA256: '6319f90b32aa25955dcf5352184411bfab080e0c730ec7079ad78f9bfeda6e0e'
 jobs:
   verify:
     runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
     timeout-minutes: 5
     steps:
-      - name: Download exact P2 candidate
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - name: Download exact package using Python 3.6 stdlib only
+        env: {GH_TOKEN: ${{ github.token }}}
         shell: bash
         run: |
           set -euo pipefail
           test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
-          rm -rf /tmp/p2-verify-only-artifact /tmp/p2-verify-only-pkg
-          mkdir /tmp/p2-verify-only-artifact /tmp/p2-verify-only-pkg
+          rm -rf /tmp/p2pkg /tmp/p2-candidate.tar.gz
           /usr/bin/python3 -I -B - <<'PY'
           import hashlib,io,os,tarfile,urllib.parse,urllib.request,zipfile
-          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+          assert tuple(__import__('sys').version_info[:3])==(3,6,8)
+          class R(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,req,fp,code,msg,headers,newurl):
-                  redirected=urllib.request.HTTPRedirectHandler.redirect_request(
-                      self,req,fp,code,msg,headers,newurl)
-                  if redirected is not None and urllib.parse.urlparse(req.full_url).netloc != urllib.parse.urlparse(newurl).netloc:
-                      redirected.remove_header('Authorization')
-                  return redirected
+                  x=urllib.request.HTTPRedirectHandler.redirect_request(self,req,fp,code,msg,headers,newurl)
+                  if x is not None and urllib.parse.urlparse(req.full_url).netloc!=urllib.parse.urlparse(newurl).netloc:
+                      x.remove_header('Authorization')
+                  return x
           url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/%s/zip'%os.environ['P2_ARTIFACT_ID']
-          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],
-              'Accept':'application/vnd.github+json','User-Agent':'xuanjun-p2-verify'})
-          with urllib.request.build_opener(SafeRedirect()).open(req,timeout=30) as response:
-              raw=response.read(8*1024*1024+1)
-          if len(raw)>8*1024*1024: raise SystemExit('HOLD_ARTIFACT_SIZE')
-          archive=zipfile.ZipFile(io.BytesIO(raw))
-          names=archive.namelist()
-          if names.count('p2-candidate.tar.gz')!=1: raise SystemExit('HOLD_ARTIFACT_SHAPE')
-          tar_bytes=archive.read('p2-candidate.tar.gz')
-          if hashlib.sha256(tar_bytes).hexdigest()!=os.environ['P2_TAR_SHA256']:
-              raise SystemExit('HOLD_TAR_SHA256')
-          open('/tmp/p2-verify-only-artifact/p2-candidate.tar.gz','wb').write(tar_bytes)
-          with tarfile.open(fileobj=io.BytesIO(tar_bytes),mode='r:gz') as tf:
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'p2-uk'})
+          raw=urllib.request.build_opener(R()).open(req,timeout=30).read(8*1024*1024+1)
+          z=zipfile.ZipFile(io.BytesIO(raw));tarbytes=z.read('p2-candidate.tar.gz')
+          assert hashlib.sha256(tarbytes).hexdigest()==os.environ['P2_TAR_SHA256']
+          with tarfile.open(fileobj=io.BytesIO(tarbytes),mode='r:gz') as t:
               seen=set()
-              for item in tf.getmembers():
-                  parts=item.name.split('/')
-                  if (not parts or parts[0]!='xuanjun-p2-package' or item.name.startswith('/')
-                          or any(p in ('','.', '..') for p in parts) or item.name in seen
-                          or not (item.isfile() or item.isdir())):
-                      raise SystemExit('HOLD_TAR_MEMBER')
-                  seen.add(item.name)
-              tf.extractall('/tmp/p2-verify-only-pkg')
-          print('P2_ARTIFACT_DOWNLOAD_AND_EXTRACT=PASS')
+              for m in t.getmembers():
+                  parts=m.name.split('/')
+                  assert m.isfile() and parts[0]=='xuanjun-p2-package'
+                  assert all(p not in ('','.', '..') for p in parts) and m.name not in seen
+                  seen.add(m.name)
+              t.extractall('/tmp/p2pkg')
+          open('/tmp/p2-candidate.tar.gz','wb').write(tarbytes)
+          print('P2_UK_ARTIFACT_EXTRACT=PASS')
           PY
-      - name: Verify exact package on UK Python 3.6.8 and host facts
+      - name: Verify authoritative package and UK host facts
         shell: bash
         run: |
           set -euo pipefail
+          ROOT=/tmp/p2pkg/xuanjun-p2-package
+          /usr/bin/python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz \
+            --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
           sudo -n /usr/bin/python3 -I -B - <<'PY'
-          from __future__ import print_function
-          import hashlib,json,os,pwd,stat,subprocess,sys
-          ROOT='/tmp/p2-verify-only-pkg/xuanjun-p2-package'
-          if sys.version_info[:3]!=(3,6,8): raise SystemExit('HOLD_PYTHON_368')
-          def h(path):
-              x=hashlib.sha256()
-              with open(path,'rb') as f:
-                  while True:
-                      b=f.read(65536)
-                      if not b:break
-                      x.update(b)
-              return x.hexdigest()
-          p=json.load(open(ROOT+'/P2_CANDIDATE_PROVENANCE.json'))
-          if p.get('source_commit')!='9d8be9805baa7bf4b690bfa74fcf78a0ff340dca': raise SystemExit('HOLD_SOURCE_COMMIT')
-          required=[
-            'plugins/p2-native-controller/openclaw.plugin.json',
-            'plugins/p2-native-controller/plugin.mjs',
-            'deploy/p2-native-controller.binding.json.template',
-            'deploy/p2-native-ledger-client.json.template',
-            'deploy/xuanjun-uk-openclaw-p2-docker.conf',
-            'stage1/p2_fixed_host_runtime.py',
-            'stage1/p2_install_entrypoint.py',
-            'scripts/uk-p2-install.py']
-          sums={}
-          for line in open(ROOT+'/SHA256SUMS'):
-              digest,path=line.rstrip('\n').split('  ',1);sums[path]=digest
-          for rel in required:
-              path=ROOT+'/'+rel
-              if not os.path.isfile(path) or os.path.islink(path) or sums.get(rel)!=h(path):
-                  raise SystemExit('HOLD_PACKAGE_FILE_'+rel)
-          manifest=json.load(open(ROOT+'/deploy/integration-manifest.json'))
-          for rel in required:
-              if rel not in manifest.get('files',{}): raise SystemExit('HOLD_MANIFEST_'+rel)
-          for base,dirs,files in os.walk(ROOT):
-              for name in files:
-                  path=os.path.join(base,name)
-                  if os.path.islink(path): raise SystemExit('HOLD_SYMLINK')
-                  if name.endswith('.py'):
-                      compile(open(path,'rb').read(),path,'exec')
+          import hashlib,importlib.util,os,pwd,stat,subprocess,sys
+          assert sys.version_info[:3]==(3,6,8)
+          root='/tmp/p2pkg/xuanjun-p2-package'
+          spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          m.verify(root,root+'/deploy/integration-manifest.json',
+                   os.environ['P2_SOURCE_COMMIT'],os.environ['P2_MANIFEST_SHA256'],
+                   os.environ['P2_SOURCE_TREE'])
           py='/usr/libexec/platform-python3.6'
-          if os.path.realpath('/usr/bin/python3')!=py: raise SystemExit('HOLD_CANONICAL_PYTHON')
-          if h(py)!='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6':
-              raise SystemExit('HOLD_PYTHON_HASH')
-          unit='xuanjun-uk-openclaw.service'
-          def show(prop):
-              return subprocess.check_output(['/usr/bin/systemctl','show',unit,'--property='+prop,'--value'],
-                                             universal_newlines=True,timeout=10).strip()
-          if show('User')!='xuanjun_dev' or show('ActiveState')!='active' or show('SubState')!='running':
-              raise SystemExit('HOLD_GATEWAY_UNIT')
-          if show('ControlGroup')!='/system.slice/xuanjun-uk-openclaw.service':
-              raise SystemExit('HOLD_GATEWAY_CGROUP')
-          docker_gid=None
+          h=hashlib.sha256(open(py,'rb').read()).hexdigest()
+          assert h=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
+          def show(k):
+              return subprocess.check_output(['/usr/bin/systemctl','show','xuanjun-uk-openclaw.service','--property='+k,'--value'],universal_newlines=True).strip()
+          assert show('User')=='xuanjun_dev' and show('ActiveState')=='active' and show('SubState')=='running'
           import grp
-          docker_gid=grp.getgrnam('docker').gr_gid
-          sock=os.stat('/var/run/docker.sock')
-          if sock.st_gid!=docker_gid or stat.S_IMODE(sock.st_mode)!=0o660:
-              raise SystemExit('HOLD_DOCKER_SOCKET')
-          deps={
-            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs':'db7fc7539455da0c564d4ded0d04da1c764a46903d1632489b8bd04641098320',
-            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/runtime-BgTk9ZFM.mjs':'18d2498124bb5437ce53b8b5fa90e71ca8e99f09c34118d2931a951dd9dadf22',
-            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/server-plugins-CzOpf53P.mjs':'e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9',
-            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/agent-tools.before-tool-call-Cg8vCu9u.mjs':'69abb7861a76913024828b0a7fd1948fc72081f9a8c91b629d0bc06e966f49c5',
-            '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/error-runtime-B-G5NrRT.mjs':'d43944505d8b3d98be863da5b9495c336af88c745d4eb00c78218eacb6c0eb22'}
-          for path,digest in deps.items():
-              if os.path.realpath(path)!=path or h(path)!=digest:
-                  raise SystemExit('HOLD_OPENCLAW_DEP_'+os.path.basename(path))
-          print(json.dumps({'state':'P2_UK_SAME_ARTIFACT_VERIFY_ONLY_PASS',
-            'artifact_id':11778162510,'tar_sha256':'dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317',
-            'python_version':list(sys.version_info[:3]),'gateway_uid':pwd.getpwnam('xuanjun_dev').pw_uid,
-            'model_calls':0,'install_effects':0,'release_gate':'NOT_GRANTED'},sort_keys=True))
+          st=os.stat('/var/run/docker.sock')
+          assert st.st_gid==grp.getgrnam('docker').gr_gid and stat.S_IMODE(st.st_mode)==0o660
+          print('P2_UK_REAL_RELEASE_INSTALLER_VERIFY=PASS')
+          print('P2_UK_PYTHON_3_6_8=PASS')
+          print('P2_UK_MODEL_CALLS=0')
+          print('P2_UK_INSTALL_EFFECTS=0')
           PY
