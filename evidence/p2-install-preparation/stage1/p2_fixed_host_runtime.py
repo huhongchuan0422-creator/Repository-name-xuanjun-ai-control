@@ -128,9 +128,9 @@ class FixedHostRuntime(object):
             source, target = self._binding(binding, release)
             if target in seen: raise ValueError('DUPLICATE_RUNTIME_TARGET')
             seen.add(target)
-            data, unused = _read_regular(source)
-            if _digest_bytes(data) != binding['source_sha256']:
-                raise ValueError('RUNTIME_SOURCE_HASH_MISMATCH')
+            # The immutable release does not exist on a first installation.
+            # Its installer verifies every source hash before staging; verify
+            # the installed bytes again in provision before target effects.
         return True
 
     @staticmethod
@@ -170,6 +170,8 @@ class FixedHostRuntime(object):
         for number, binding in enumerate(runtime['provisioning']):
             source, target = self._binding(binding, release)
             data, unused = _read_regular(source)
+            if _digest_bytes(data) != binding['source_sha256']:
+                raise ValueError('RUNTIME_SOURCE_HASH_MISMATCH')
             rendered = self._render(data, binding)
             previous = None
             if os.path.lexists(target):
