@@ -30,7 +30,7 @@ def main():
         folders[:]=[f for f in sorted(folders) if depth<5 and f not in ('node_modules','__pycache__')]
         for name in sorted(files):
             path=os.path.join(directory,name)
-            if name.endswith(('.js','.mjs','.d.ts')) and any(w in path[len(root):] for w in ('plugin-runtime','runtime-subagent','plugin-sdk','plugins.types')):code_paths.append(path)
+            if name.endswith(('.js','.mjs','.d.ts')) and any(w in path[len(root):] for w in ('subagent','runtime-agent','agent-runtime','plugins','runtime.types','runtime-types')):code_paths.append(path)
         if len(code_paths)>3000:break
     code_paths=[p for p in code_paths if any(w in p for w in ('runtime','types','index'))]
     for path in code_paths:
@@ -41,11 +41,11 @@ def main():
         with open(path,'r',encoding='utf-8') as f:body=f.read()
         if re.search(r'-----BEGIN .*PRIVATE KEY|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{30,}|[0-9]{6,}:[A-Za-z0-9_-]{25,}|sk-[A-Za-z0-9]{32,}',body):continue
         snippets=[]
-        for word in ('registerGatewayMethod','subagent:','subagent =','runSubagent','PluginRuntimeSubagent','pluginRuntimeOwnerId'):
+        for word in ('PluginRuntimeAgent','PluginRuntimeSubagent','createPluginRuntimeAgent','createPluginSubagentRuntime','pluginRuntimeOwnerId','agent:','subagent:'):
             start=body.find(word)
             if start>=0:snippets.append({'symbol':word,'source':body[max(0,start-1000):start+5000]})
         if snippets:selected.append({'path':path,'sha256':hashlib.sha256(body.encode()).hexdigest(),'snippets':snippets})
         if len(selected)>=14:break
-    records.append({'gateway_code_snippets':selected,'bytes_scanned':scanned,'code_candidates':len(code_paths),'directory_names':sorted(os.listdir(root))[:30]})
+    records.append({'gateway_code_snippets':selected,'bytes_scanned':scanned,'code_candidates':len(code_paths),'directory_names':sorted(os.listdir(root))[:30],'candidate_paths':code_paths[:180]})
     print(json.dumps({'state':'READONLY_CODE_EXPORT','model_calls':0,'authority_mutation':'NONE','sources':records},sort_keys=True))
 if __name__=='__main__':main()
