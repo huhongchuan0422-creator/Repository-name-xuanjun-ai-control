@@ -2,6 +2,8 @@ import hashlib
 import os
 import tempfile
 import unittest
+import subprocess
+import sys
 from unittest.mock import patch
 
 import p2_fixed_host_runtime as module
@@ -59,6 +61,40 @@ class FixedRuntimeTests(unittest.TestCase):
             broken=dict(base); broken[key]=replacement
             with self.assertRaisesRegex(ValueError,'INVALID_PROVISIONING_BINDING'):
                 self.runtime._binding(broken,release)
+
+    def test_first_install_preflight_does_not_require_uninstalled_release(self):
+        release='integration-'+'a'*16
+        runtime={'release_directory':release,'services':list(module.ALLOWED_SERVICES),
+                 'provisioning':[{'source':'deploy/unit',
+                   'target':'/etc/systemd/system/unit.service','source_sha256':'b'*64,
+                   'rendered_sha256':'c'*64,'mode':0o644,'owner_uid':0,
+                   'group_gid':0,'replacements':{}}]}
+        with patch.object(self.runtime,'_authority',return_value=None), \
+             patch.object(self.runtime,'_reference',return_value=None), \
+             patch.object(module,'_read_regular',side_effect=AssertionError('uninstalled release read')):
+            self.assertTrue(self.runtime.preflight(runtime,{'references':[]},{'references':[]}))
+
+    def test_installed_source_hash_mismatch_blocks_all_target_writes(self):
+        release='/opt/xuanjun-control-releases/integration-'+'a'*16
+        runtime={'release_directory':'integration-'+'a'*16,
+                 'provisioning':[{'source':'deploy/unit',
+                   'target':'/etc/systemd/system/unit.service','source_sha256':'b'*64,
+                   'rendered_sha256':'c'*64,'mode':0o644,'owner_uid':0,
+                   'group_gid':0,'replacements':{}}]}
+        with patch.object(self.runtime,'_authority',return_value=None), \
+             patch.object(module,'_read_regular',return_value=(b'changed',None)), \
+             patch.object(self.runtime,'_atomic_target') as write:
+            with self.assertRaisesRegex(ValueError,'SOURCE_HASH_MISMATCH'):
+                self.runtime.provision(release,runtime)
+            write.assert_not_called()
+
+    def test_actual_cli_imports_from_stage1_without_pythonpath(self):
+        root=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env=dict(os.environ); env.pop('PYTHONPATH',None)
+        result=subprocess.run([sys.executable,'-I','-B',
+            os.path.join(root,'scripts','uk-p2-install.py'),'--help'],
+            env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        self.assertEqual(result.returncode,0,result.stderr.decode())
 
 
 if __name__=='__main__': unittest.main()
