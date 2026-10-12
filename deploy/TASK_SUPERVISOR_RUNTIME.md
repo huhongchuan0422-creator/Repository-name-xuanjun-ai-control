@@ -32,3 +32,27 @@ provider and recipient binding; exact artifact QA/Security/Release; timer
 activation and independent timer/process liveness; live 5/10/15 faults;
 outbox delivery/unknown effects; reboot/power-loss and dashboard live bridge.
 Local and hosted fake-ledger tests are source evidence only.
+
+## Contract 6134558596: existing ExecutionLedger adapter
+
+`canonical_inventory_page(db, now, after_id=None, limit=100)` reads the existing
+`tasks(id,kind,state,depends,lease_owner,lease_until,fence,checkpoint,updated)`
+schema in a caller-owned consistent read transaction. It never opens/creates a
+database or modifies tables. The existing canonical owner must validate the
+activation binding before and after this observation and retain the transaction
+across pagination. The standalone schema-v2 tick above is NOT a valid substitute.
+
+It includes tasks without supervised_runs, reads bounded existing delivery
+metadata without draining it, preserves dead letters and identifies stale-fence
+notifications. It uses persisted progress/result deadlines, not task.updated.
+Raw checkpoints/spec prompts are never exported. Missing attempt/lease IDs and
+entry authentication remain UNKNOWN/unproven, rather than invented labels.
+
+Decisions are proposals only. `CAPABILITY_UNAVAILABLE` remains until the existing
+ExecutionSupervisor operations bind expected spec/run/session/fence/epoch and
+checkpoint inside the same canonical transaction. A read-then-boolean callback
+cannot authorize resume or notify: stale observations must not affect a new run.
+This interface delta is proposed on PR17 comment6134594691 for the shared owner;
+Dots does not modify execution_ledger.py, P2 controller or install manifests.
+
+Source/CI checks are separate from UK activation and 5/10/15 fault acceptance.

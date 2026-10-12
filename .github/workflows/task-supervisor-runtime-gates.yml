@@ -6,6 +6,8 @@ on:
       - scripts/task_supervisor_runtime.py
       - scripts/task_supervisor_runtime_entry.py
       - tests/test_task_supervisor_runtime.py
+      - tests/test_task_supervisor_outbox_attempt.py
+      - tests/test_task_supervisor_canonical_adapter.py
       - deploy/xuanjun-task-supervisor.service.in
       - deploy/xuanjun-task-supervisor.timer.in
       - .github/workflows/task-supervisor-runtime-gates.yml
