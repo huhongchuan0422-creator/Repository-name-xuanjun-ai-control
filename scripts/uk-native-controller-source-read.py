@@ -1,56 +1,27 @@
-"""Fixed UK readiness/source read: zero inference, no execution or mutation."""
-import os,pwd,socket,stat,json,hashlib,re
-def read(path,maximum=1048576):
-    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
-    try:
-        info=os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_size>maximum:raise ValueError("SHAPE")
-        raw=os.read(fd,maximum+1)
-        if len(raw)>maximum:raise ValueError("LIMIT")
-        return raw,info
-    finally:os.close(fd)
-def safe(value):
-    if value is None or type(value) in (bool,int):return value
-    if isinstance(value,str) and len(value)<150 and re.fullmatch(r"[A-Za-z0-9_./:@+-]*",value):return value
-    return "REDACTED_UNEXPECTED_VALUE"
+"""Read installed SDK sandbox identity and hook contracts; no execution."""
+import os,pwd,socket,stat,json,hashlib
 def main():
     if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:raise SystemExit('HOLD_FIXED_UK_NONROOT')
-    output={'state':'READONLY_NATIVE_READINESS','model_calls':0,'authority_mutation':'NONE','sources':[]}
-    code='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs'
-    raw,info=read(code)
-    output['sources'].append({'path':code,'sha256':hashlib.sha256(raw).hexdigest(),'uid':info.st_uid,'source':raw.decode('utf-8')})
-    config='/home/xuanjun_dev/.openclaw/openclaw.json'
-    try:
-        raw,info=read(config)
-        cfg=json.loads(raw.decode('utf-8'))
-        agents=cfg.get('agents',{})
-        defaults=agents.get('defaults',{})
-        main_agent=next((a for a in agents.get('list',[]) if a.get('id')=='main'),{})
-        profiles=cfg.get('auth',{}).get('profiles',{})
-        model=defaults.get('model',{})
-        output['policy']={'config_uid':info.st_uid,'config_mode':oct(stat.S_IMODE(info.st_mode)),
-          'primary':safe(model.get('primary') if isinstance(model,dict) else model),
-          'fallbacks':[safe(v) for v in model.get('fallbacks',[])][:16] if isinstance(model,dict) else None,
-          'auth_modes':[{'provider':safe(v.get('provider')),'mode':safe(v.get('mode'))} for v in list(profiles.values())[:32] if isinstance(v,dict)],
-          'sandbox_defaults':{k:safe(defaults.get('sandbox',{}).get(k)) for k in ('mode','backend','scope','workspaceAccess')},
-          'sandbox_main':{k:safe(main_agent.get('sandbox',{}).get(k)) for k in ('mode','backend','scope','workspaceAccess')},
-          'cli_backend_keys':[safe(k) for k in defaults.get('cliBackends',{})][:16]}
-    except FileNotFoundError:output['policy']={'state':'CONFIG_PATH_MISSING'}
-    output['oauth_metadata']=[]
-    auth='/home/xuanjun_dev/.openclaw/agents/main/agent/auth-profiles.json'
-    try:
-        raw,info=read(auth)
-        data=json.loads(raw.decode('utf-8'))
-        output['oauth_metadata']=[{'type':safe(v.get('type')),'provider':safe(v.get('provider'))} for v in list(data.get('profiles',{}).values())[:32] if isinstance(v,dict)]
-    except FileNotFoundError:output['oauth_metadata']=[{'state':'PROFILE_PATH_MISSING'}]
-    extra='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/loader-runtime-load-DpgEqnzx.mjs'
-    raw,info=read(extra)
-    output['sources'].append({'path':extra,'sha256':hashlib.sha256(raw).hexdigest(),'uid':info.st_uid,'source':raw.decode('utf-8')})
-    output['engines']=[]
-    for binary in ('/usr/bin/docker','/usr/bin/podman'):
+    root='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/'
+    sources=[]
+    for name in ('registry-xPfhu4Rv.mjs','shared-BLNeHhmu.mjs','hooks-3uEO1KNL.mjs','agent-scope-config-Dm6T00l4.mjs','setup-registry-2Voi6xC9.mjs'):
+        fd=os.open(root+name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
         try:
-            i=os.lstat(binary)
-            output['engines'].append({'path':binary,'regular':stat.S_ISREG(i.st_mode),'uid':i.st_uid,'mode':oct(stat.S_IMODE(i.st_mode))})
-        except FileNotFoundError:output['engines'].append({'path':binary,'state':'MISSING'})
-    print(json.dumps(output,sort_keys=True))
+            i=os.fstat(fd)
+            if not stat.S_ISREG(i.st_mode) or i.st_size>1048576:raise ValueError('HOLD_CODE_BOUND')
+            raw=os.read(fd,1048577)
+        finally:os.close(fd)
+        sources.append({'path':root+name,'sha256':hashlib.sha256(raw).hexdigest(),'source':raw.decode('utf-8')})
+    hits=[]
+    for name in sorted(os.listdir(root)):
+        if not name.endswith('.mjs'):continue
+        info=os.lstat(root+name)
+        if not stat.S_ISREG(info.st_mode) or info.st_size>1048576:continue
+        with open(root+name,'r',encoding='utf-8') as f:source=f.read()
+        offset=source.find('runBeforeToolCall(')
+        if offset<0:offset=source.find('before_tool_call',source.find('//#region'))
+        if offset>=0 and ('runBeforeToolCall(' in source or 'toolCallId' in source):
+            hits.append({'path':root+name,'sha256':hashlib.sha256(source.encode()).hexdigest(),'excerpt':source[max(0,offset-500):offset+3500]})
+            if len(hits)>=8:break
+    print(json.dumps({'state':'READONLY_SDK_CONTRACTS','model_calls':0,'authority_mutation':'NONE','sources':sources,'hook_hits':hits},sort_keys=True))
 if __name__=='__main__':main()
