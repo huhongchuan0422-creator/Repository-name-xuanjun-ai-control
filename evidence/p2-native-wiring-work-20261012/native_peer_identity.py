@@ -40,8 +40,34 @@ def _protected_bytes(path, maximum=262144):
         os.close(fd)
 
 
+def _owned_sha256(path, expected_uid, maximum=256 * 1024 * 1024):
+    if (type(expected_uid) is not int or expected_uid < 0
+            or not isinstance(path, str) or not os.path.isabs(path)
+            or os.path.realpath(path) != path):
+        raise ValueError('canonical owned path required')
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != expected_uid
+                or info.st_mode & 0o022 or info.st_size > maximum):
+            raise ValueError('owned immutable file required')
+        digest = hashlib.sha256()
+        total = 0
+        while True:
+            raw = os.read(fd, 65536)
+            if not raw:
+                break
+            total += len(raw)
+            if total > maximum:
+                raise ValueError('owned file size limit')
+            digest.update(raw)
+        return digest.hexdigest()
+    finally:
+        os.close(fd)
+
+
 def _protected_sha256(path):
-    return hashlib.sha256(_protected_bytes(path, maximum=64 * 1024 * 1024)).hexdigest()
+    return _owned_sha256(path, 0)
 
 
 def load_native_peer_identity(binding_path=BINDING_FILE):
@@ -87,8 +113,9 @@ def load_native_peer_identity(binding_path=BINDING_FILE):
     if (not isinstance(cgroup, str) or not cgroup.startswith('/')
             or '..' in cgroup.split('/') or len(cgroup) > 4096):
         raise ValueError('native Gateway cgroup invalid')
+    if _owned_sha256(fields['gateway_exe'], uid) != fields['gateway_exe_sha256']:
+        raise ValueError('native Gateway bytes changed')
     for path, digest in (
-            (fields['gateway_exe'], fields['gateway_exe_sha256']),
             (fields['bridge_python'], fields['bridge_python_sha256']),
             (fields['bridge_path'], fields['bridge_sha256']),
             (fields['bridge_config'], fields['bridge_config_sha256'])):
@@ -153,7 +180,7 @@ def verify_native_gateway_peer(peer_pid, peer_uid, identity, proc_root='/proc'):
         parent_exe = os.path.realpath(os.path.join(proc_root, str(parent_pid), 'exe'))
         if parent_exe != identity['gateway_exe']:
             return False
-        if _protected_sha256(parent_exe) != identity['gateway_exe_sha256']:
+        if _owned_sha256(parent_exe, peer_uid) != identity['gateway_exe_sha256']:
             return False
         cgroups = _proc_bytes(proc_root, parent_pid, 'cgroup', maximum=131072).decode(
             'utf-8', 'strict').splitlines()
