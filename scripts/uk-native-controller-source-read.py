@@ -3,7 +3,7 @@ import os,pwd,socket,stat,json,hashlib,re
 def main():
     if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:
         raise SystemExit('HOLD_FIXED_UK_NONROOT')
-    paths=['/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/runtime-BgTk9ZFM.mjs']
+    paths=['/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/server-plugins-GGzIhVdM.mjs']
     records=[]
     for requested in paths:
         path=os.path.realpath(requested)
@@ -12,9 +12,9 @@ def main():
         fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
         try:
             info=os.fstat(fd)
-            if not stat.S_ISREG(info.st_mode) or info.st_size>131072:
+            if not stat.S_ISREG(info.st_mode) or info.st_size>1048576:
                 records.append({'path':requested,'state':'NONREGULAR_OR_OVERSIZE'});continue
-            raw=os.read(fd,131073)
+            raw=os.read(fd,1048577)
         finally:os.close(fd)
         try:source=raw.decode('utf-8')
         except UnicodeDecodeError:
