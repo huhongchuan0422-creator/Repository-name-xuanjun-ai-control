@@ -1,0 +1,48 @@
+name: UK P2 read-only final package prerequisites
+on:
+  push:
+    branches: [proposal/uk-mechanical-bootstrap-20261012]
+    paths: ['.github/workflows/uk-p2-package-preflight.yml']
+permissions:
+  contents: read
+concurrency:
+  group: xuanjun-p2-package-prerequisites
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - name: Fixed host read-only prerequisite inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test "$(id -un)" = githubrunner
+          /usr/bin/python3 -B - <<'PY'
+          import os,stat,json,subprocess,hashlib
+          def meta(p):
+              try:
+                  s=os.lstat(p)
+                  v={'path':p,'uid':s.st_uid,'gid':s.st_gid,'mode':oct(stat.S_IMODE(s.st_mode)),'regular':stat.S_ISREG(s.st_mode),'symlink':stat.S_ISLNK(s.st_mode)}
+                  if v['regular'] and p.startswith('/opt/xuanjun-runtime/') and s.st_size<100000000:
+                      with open(p,'rb') as f:v['sha256']=hashlib.sha256(f.read()).hexdigest()
+                  return v
+              except OSError as e:return {'path':p,'status':'UNAVAILABLE','errno':e.errno}
+          paths=['/usr/bin/python3','/opt/xuanjun-runtime/codex-0.160.0/codex','/opt/xuanjun-runtime/gh/gh','/etc/xuanjun-development/dispatcher.json','/etc/xuanjun-development/root-broker.json','/var/lib/xuanjun-development/activation/active.json','/var/lib/xuanjun-development/activation/epochs.jsonl','/var/lib/xuanjun-development/activation/activation.lock','/etc/xuanjun-owner-callback/owner-dashboard-token','/etc/xuanjun-owner-callback/owner-callback-auth','/etc/xuanjun-development/github-intake-token','/usr/local/sbin/xuanjun-uk-owner-audit']
+          out={'scope':'READ_ONLY_NO_MODEL_NO_INSTALL','python':subprocess.check_output(['/usr/bin/python3','--version'],stderr=subprocess.STDOUT).decode().strip(),'paths':[meta(p) for p in paths],'units':{}}
+          for unit in ['xuanjun-uk-openclaw.service','xuanjun-uk-stage1-minimal.service','xuanjun-development-dispatcher.service','xuanjun-ledger.service','xj-root-broker.service','xuanjun-github-intake.service','xuanjun-uk-owner-dashboard.service','nginx.service']:
+              r=subprocess.run(['/usr/bin/systemctl','show',unit,'--property=ActiveState,SubState,MainPID,FragmentPath,UnitFileState'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+              out['units'][unit]=r.stdout.decode().strip()
+          try:
+              p=paths[5]
+              fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+              with os.fdopen(fd) as f:
+                  raw=f.read(65537)
+              if len(raw)>65536:raise ValueError()
+              d=json.loads(raw)
+              out['activation']={k:d.get(k) for k in ['schema','state','db_path','generation','epoch','ledger_uuid','instance','release_sha256','config_sha256','binary_sha256','ledger_socket']}
+              out['ledger_metadata']=meta(d['db_path'])
+          except Exception:out['activation']='UNAVAILABLE'
+          print(json.dumps(out,sort_keys=True))
+          PY
