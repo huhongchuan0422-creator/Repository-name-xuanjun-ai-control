@@ -512,6 +512,56 @@ def audit():
         provider_probe['wrapper_source'] = 'UNAVAILABLE'
 
 
+
+    plan_path = '/home/xuanjun_dev/p2-native-plan-6122784575.json'
+    plan_probe = {'metadata': metadata(plan_path), 'claims_are_not_runtime_proof': True}
+    try:
+        info = os.lstat(plan_path)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != pwd.getpwnam('xuanjun_dev').pw_uid or info.st_size > 65536:
+            raise ValueError('PLAN_METADATA_REJECTED')
+        with open(plan_path, 'r', encoding='utf-8') as stream:
+            plan = json.load(stream)
+        plan_probe['schema_fields'] = sorted(k for k in plan if isinstance(k, str) and re.fullmatch(r'[A-Za-z_]{1,50}', k))
+        for field in ('task_id', 'state', 'original_attempt', 'writer_status', 'fence_status', 'effects_status'):
+            value = plan.get(field)
+            if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:/ -]{1,300}', value):
+                plan_probe[field] = value
+        for field in ('canonical_state_path', 'epoch_cas_location'):
+            value = safe_path(plan.get(field))
+            if value:
+                plan_probe[field] = value
+        for field in ('provider_source_paths', 'notifier_source_paths', 'minimal_files'):
+            values = plan.get(field)
+            if isinstance(values, list):
+                plan_probe[field] = [v for v in values[:30] if isinstance(v, str) and re.fullmatch(r'[A-Za-z0-9_./-]{1,500}', v)]
+        values = plan.get('native_methods')
+        if isinstance(values, list):
+            plan_probe['native_methods'] = [v for v in values[:40] if isinstance(v, str) and re.fullmatch(r'[A-Za-z0-9_.-]{1,120}', v)]
+        plan_probe['state_of_read'] = 'BOUNDED_PLAN_READ'
+    except (OSError, ValueError, TypeError, AttributeError):
+        plan_probe['state_of_read'] = 'PLAN_NOT_AVAILABLE_OR_REJECTED'
+    result['p2_concrete_plan_readback'] = plan_probe
+    code_root = '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
+    installed = []
+    if os.path.isdir(code_root):
+        for name in sorted(os.listdir(code_root)):
+            if not name.endswith('.js') or not re.search(r'(gateway|session|subagent|server-method|agent)', name, re.I):
+                continue
+            path = os.path.join(code_root, name)
+            try:
+                info = os.lstat(path)
+                if not stat.S_ISREG(info.st_mode) or info.st_size > 2097152:
+                    continue
+                with open(path, 'r', encoding='utf-8') as stream:
+                    text = stream.read()
+                symbols = sorted(set(re.findall(r'[\\"\\\']((?:sessions|subagents|agent|chat|tools|runs)\\.[A-Za-z0-9_.]{1,80})[\\"\\\']', text)))
+                if symbols:
+                    installed.append({'path': path, 'sha256': hashlib.sha256(text.encode('utf-8')).hexdigest(), 'method_literals_not_runtime_proof': symbols[:40]})
+            except (OSError, UnicodeError):
+                continue
+            if len(installed) >= 20:
+                break
+    result['p2_installed_gateway_source_metadata'] = installed
     print(json.dumps(result, sort_keys=True))
 
 
