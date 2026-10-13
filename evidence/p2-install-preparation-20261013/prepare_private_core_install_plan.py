@@ -48,6 +48,17 @@ def main(package,output):
     existing={x['path']:x for x in prerequisites['directories']}
     for p,u,g,m in dirs:existing[p]={'path':p,'uid':u,'gid':g,'mode':m}
     prerequisites['directories']=sorted(existing.values(),key=lambda x:(x['path'].count('/'),x['path']))
+    tls_paths={}
+    wanted_tls={'cert':'c4bfb6265349780c22c346657096291a96db804c2a3eac9b3ee0b62a2492a71d','key':'0910affcb259decf8bf5ae8d9079bcc95831fadb24de422fcbbb5ab1330615ea'}
+    names=os.listdir(DURABLE);assert len(names)<128
+    for name in names:
+        path=DURABLE+'/'+name;info=os.lstat(path)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or stat.S_IMODE(info.st_mode)!=0o600 or info.st_size>16384:continue
+        ref=reference(path,0,0o600)
+        for role,digest in wanted_tls.items():
+            if ref['sha256']==digest:
+                assert role not in tls_paths;tls_paths[role]=path
+    assert set(tls_paths)=={'cert','key'}
     tokens={'@@SOURCE_COMMIT@@':SOURCE,'@@GENERATION@@':'1','@@RELEASE_DIRECTORY@@':RELNAME,
             '@@ARTIFACT_SHA256@@':MANIFEST,'@@LEDGER_UUID@@':ledger,'@@INSTANCE_UUID@@':instance,
             '@@CODEX_SHA256@@':'12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad',
@@ -55,7 +66,7 @@ def main(package,output):
             '@@LEDGER_BRIDGE_PATH@@':RELEASE+'/stage1/native_ledger_bridge.py',
             '@@LEDGER_BRIDGE_CONFIG_PATH@@':DEV+'p2-native-ledger-client.json',
             '@@WORKSPACE_ROOT@@':VAR+'/worktrees','@@OWNER_HOST@@':'uk.wenwenwenyiyiyi.work',
-            '@@TLS_CERT@@':DURABLE+'/fullchain.pem','@@TLS_KEY@@':DURABLE+'/privatekey.pem'}
+            '@@TLS_CERT@@':tls_paths['cert'],'@@TLS_KEY@@':tls_paths['key']}
     roles=[('SANDBOX_CONTEXT','context-DyPstb2Q.mjs'),('SANDBOX_PREPARE','context-Dt2Gy7El.mjs'),
            ('SUBAGENT_RUNTIME','runtime-BgTk9ZFM.mjs'),('BEFORE_TOOL_HOOK','agent-tools.before-tool-call.runtime-DrbwqsOU.mjs'),
            ('REQUEST_SCOPED_ERROR','error-runtime-B-G5NrRT.mjs')]
@@ -119,7 +130,7 @@ def main(package,output):
           'runtime':{'release_directory':RELNAME,'provisioning':bindings,'services':list(ALLOWED_SERVICES),
                      'prerequisites':prerequisites,'plugin':plugin},
           'auth':{'mode':'EXISTING_OAUTH_REFERENCE','references':auth},
-          'tls':{'mode':'EXISTING_TLS_REFERENCE','references':[reference(DURABLE+'/fullchain.pem',0,0o600),reference(DURABLE+'/privatekey.pem',0,0o600)]}}
+          'tls':{'mode':'EXISTING_TLS_REFERENCE','references':[reference(tls_paths['cert'],0,0o600),reference(tls_paths['key'],0,0o600)]}}
     from p2_install_entrypoint import validate_plan
     from p2_prerequisites import validate as validate_prerequisites
     validate_plan(plan);validate_prerequisites(prerequisites)
