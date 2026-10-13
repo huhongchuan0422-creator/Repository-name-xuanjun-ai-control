@@ -4,7 +4,7 @@ assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21s
 B='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
 ROOT=os.environ['P2_REVIEW_ROOT']+'/xuanjun-p2-package'
 RUN=sys.argv[1]
-SOURCE='c41faa99a55a602157e246a214b63b9fb7c1524d';TREE='858642b69542aad935eee2f6ec61bdf0ecd52a96';MANIFEST='508fcce851c7ea6e78efe28044871f44fff3e3dbfa8bffd94dffae2a2f89d3fd'
+SOURCE='8743a953a2f92ecbf515ecaa6609c50993f4ac74';TREE='7c41607186e5ebc66003344a245742c0ba8d0315';MANIFEST='44ede26d72bbb776dc813d6eb4d057581e11440d17082a6f1a207fc377689b0a'
 OLD='2b49066f37742dedd41657fb445c91f4204fd4a2a257f921dd9fd514e5b25f0e'
 def read(p,expected=None):
  assert os.path.realpath(p)==p
@@ -55,7 +55,7 @@ for i,row in enumerate(boot['files']):
  if row['target']=='/etc/xuanjun-development/p2-native-binding.json':
   data=replace(data.decode()).encode()
  target=d+'/private-bootstrap/bootstrap-'+str(i);write(target,data);row['source']=target;row['sha256']=h(data)
-boot['artifact_id']=11831931331
+boot['artifact_id']=11833798542
 bootpath=d+'/protected-bootstrap-candidate-receipt.json';bootraw=pack(boot);write(bootpath,bootraw)
 p['runtime']['bootstrap']={'path':bootpath,'sha256':h(bootraw)}
 pubpath=B+'/publisher-realm-'+RUN+'/protected-publisher-inputs.json'
@@ -64,6 +64,7 @@ p['runtime']['publisher']={'path':pubpath,'sha256':h(pubraw),'source_commit':SOU
 D=B+'/legacy-isolation-'+p['transaction_id']
 p['cutover']['legacy_isolation']={'directory':D,'receipt_sha256':'70d8e244f7f72c15a16299b9eef19670cd7cdee452b1913d864af93c2f4824bc','original_plan_path':original,'original_plan_sha256':'6a7789a023d0cbb265663275ee7442fdd026eaaee0fc4ee4a0f237ec5a62e970','legacy_state_sha256':'fe57912b31e42665a895a1e0d7c64fde5cebaff6a99394d0183a3fe3d95ab7c1','database_sha256':'a6b3847009ca7ee394772b7cf0144b90f82d1c68a3e9b4d3e9c4656f50c28d60'}
 p['runtime']['legacy_cutover']=copy.deepcopy(p['cutover'])
+p['runtime']['auxiliary_isolation']={'path':D+'/auxiliary-owner/auxiliary-isolation-receipt.json','sha256':'d754368b2f7357de6a38015c0be119ba9fbf16e3847ec174451273820a2ec32b','transaction_id':p['transaction_id']}
 sys.path.insert(0,ROOT+'/stage1')
 from p2_install_entrypoint import validate_plan
 assert validate_plan(p)
