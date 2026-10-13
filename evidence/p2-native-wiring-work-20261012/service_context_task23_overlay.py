@@ -321,7 +321,11 @@ Requires=xuanjun-p2-gateway-relay.socket
         return '%d:%d' % (info.st_dev,info.st_ino)
 
     def _assert_db_identity(self,fd,identity):
-        if self._db_identity(fd)!=identity:
+        try:
+            current_identity=self._db_identity(fd)
+        except SchemaMismatch:
+            raise LeaseLost('canonical database fd changed')
+        if current_identity!=identity:
             raise LeaseLost('canonical database fd changed')
         current=os.lstat(self.db_path)
         observed='%d:%d' % (current.st_dev,current.st_ino)
