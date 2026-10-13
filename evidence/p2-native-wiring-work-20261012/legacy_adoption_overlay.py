@@ -27,6 +27,8 @@ if u.count(old)!=1:raise ValueError('ADOPTED_GATEWAY_GUARD_ANCHOR')
 u=u.replace(old,"        self._verify_gateway_preflight(runtime)")
 helper="""    def _verify_gateway_preflight(self,runtime):
         if 'legacy_cutover' in runtime:
+            if not isinstance(runtime['legacy_cutover'],dict) or 'legacy_isolation' not in runtime['legacy_cutover']:
+                raise ValueError('ADOPTED_GATEWAY_REFERENCE_REQUIRED')
             from legacy_host_adapter import LegacyHostAdapter
             if LegacyHostAdapter(self.directory).preflight(runtime['legacy_cutover']) is not True:
                 raise ValueError('ADOPTED_GATEWAY_PREFLIGHT_FAILED')

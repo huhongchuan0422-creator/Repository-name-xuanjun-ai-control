@@ -72,11 +72,14 @@ class GatewayPreflightTests(unittest.TestCase):
   with patch('legacy_host_adapter.LegacyHostAdapter') as cls:
    cls.return_value.preflight.return_value=True;r._verify_gateway_preflight({'legacy_cutover':p})
    cls.assert_called_once_with('/synthetic');cls.return_value.preflight.assert_called_once_with(p)
+ def test_missing_explicit_reference_holds(self):
+  r=self.runtime()
+  with self.assertRaisesRegex(ValueError,'REFERENCE_REQUIRED'):r._verify_gateway_preflight({'legacy_cutover':{}})
  def test_failed_adoption_never_falls_back(self):
   from unittest.mock import patch
   r=self.runtime();r.run=lambda *a,**kw:(_ for _ in ()).throw(AssertionError('fallback'))
   with patch('legacy_host_adapter.LegacyHostAdapter') as cls:
    cls.return_value.preflight.side_effect=ValueError('ADOPTION_CHANGED')
-   with self.assertRaisesRegex(ValueError,'ADOPTION_CHANGED'):r._verify_gateway_preflight({'legacy_cutover':{}})
+   with self.assertRaisesRegex(ValueError,'ADOPTION_CHANGED'):r._verify_gateway_preflight({'legacy_cutover':{'legacy_isolation':{}}})
 if __name__=='__main__':unittest.main()
 
