@@ -38,9 +38,12 @@ def main(run):
  mirror=BASE+'/control-mirror.git';assert os.path.realpath(mirror)==mirror
  s=os.lstat(mirror);assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700
  assert cmd(git(mirror,'config','--get','remote.origin.url')).decode().strip()==REMOTE
- assert cmd(git(mirror,'rev-parse',SOURCE+'^{tree}')).decode().strip()==TREE
  ref='refs/xuanjun-preparation/'+SOURCE
- cmd(git(mirror,'update-ref',ref,SOURCE)) # Preparation mirror only, never canonical mirror.
+ helper=BASE+'/git-preparation-askpass.py';read(helper,0o500)
+ fetch_env=dict(ENV,GIT_ASKPASS=helper)
+ # Standalone preparation must not depend on a separate queued verifier fetching first.
+ cmd(git(mirror,'fetch','--quiet','--no-tags',REMOTE,SOURCE+':'+ref),fetch_env,timeout=60)
+ assert cmd(git(mirror,'rev-parse',ref+'^{tree}')).decode().strip()==TREE
  bundle=output+'/control.bundle';cmd(git(mirror,'bundle','create',bundle,ref),timeout=60);os.chmod(bundle,0o600)
  size=os.stat(bundle).st_size;assert size<134217728
  gh=[];count=0
