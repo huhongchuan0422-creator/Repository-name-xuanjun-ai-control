@@ -61,7 +61,7 @@ class FixedPr17Transport(object):
                     try:
                         envelope=json.loads(body[len(marker)+1:])
                     except (ValueError,TypeError):
-                        continue
+                        return
                     if (isinstance(envelope,dict)
                             and envelope.get('schema')==1
                             and envelope.get('kind')=='TASK45_OUTBOX_DELIVERY'
