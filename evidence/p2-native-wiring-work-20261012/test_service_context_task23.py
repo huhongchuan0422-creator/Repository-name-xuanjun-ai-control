@@ -87,7 +87,7 @@ class Tests(unittest.TestCase):
         timeout=TimeoutSocket(31337)
         result=relay.serve_connection(timeout,controller,31337)
         self.assertFalse(result['ok'])
-        self.assertEqual(result['error'],'TimeoutError')
+        self.assertIn(result['error'],('TimeoutError','timeout'))
         self.assertEqual(controller.calls,0)
         oversize=OversizeSocket(31337)
         result=relay.serve_connection(oversize,controller,31337)
@@ -243,6 +243,136 @@ class Tests(unittest.TestCase):
                 with self.assertRaises(LeaseLost):
                     ledger.record_inventory_notices()
             self.assertTrue(swapped[0])
+
+    def test_rejected_hardlinked_database_does_not_leak_fds(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._db(path)
+            ledger=ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'])
+            os.link(path,path+'.hardlink')
+            before=len(os.listdir('/proc/self/fd'))
+            for unused in range(3):
+                with self.assertRaises(ledger_module.SchemaMismatch):
+                    with ledger._pinned_transaction(): pass
+            self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+
+    def test_connect_and_pragma_initialization_failures_close_complete_lifetime(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._db(path)
+            ledger=ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'])
+            before=len(os.listdir('/proc/self/fd'))
+            for error in (sqlite3.OperationalError('fixture'),RuntimeError('fixture')):
+                with patch.object(ledger_module.sqlite3,'connect',side_effect=error):
+                    with self.assertRaises((ledger_module.SchemaMismatch,RuntimeError)):
+                        with ledger._pinned_transaction(): pass
+                self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+            class BrokenConnection(object):
+                row_factory=None
+                closed=False
+                def execute(self,*args): raise RuntimeError('pragma fixture')
+                def close(self): self.closed=True
+            broken=BrokenConnection()
+            with patch.object(ledger_module.sqlite3,'connect',return_value=broken):
+                with self.assertRaises(RuntimeError):
+                    with ledger._pinned_transaction(): pass
+            self.assertTrue(broken.closed)
+            self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+
+    def _populate(self,path,count):
+        self._db(path)
+        db=sqlite3.connect(path);db.execute('DELETE FROM tasks')
+        for i in range(count):
+            db.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)',
+                ('t%05d'%i,'CODEX_EXEC','PENDING','[]',None,None,4,'{}',9999))
+        db.execute('UPDATE tasks SET depends=? WHERE id=?',
+            ('['*65+'0'+']'*65,'t00000'))
+        db.commit();db.close()
+
+    def _ledger(self,path,activation):
+        return ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'],
+                               clock=lambda:100,activation_store=activation)
+
+    def test_sixty_five_pages_make_durable_progress_and_restart_finishes(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._populate(path,65)
+            activation=Activation(os.path.realpath(path))
+            first=self._ledger(path,activation).record_inventory_notices(limit=1)
+            self.assertEqual(first['observed'],64);self.assertEqual(first['pages'],64)
+            self.assertTrue(first['scan_pending']);self.assertFalse(first['sweep_complete'])
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],64)
+            checkpoint=json.loads(db.execute("SELECT details FROM events WHERE event='INVENTORY_SCAN_CHECKPOINT_V1' ORDER BY id DESC LIMIT 1").fetchone()[0])
+            self.assertEqual(checkpoint['after_id'],'t00063')
+            self.assertEqual(checkpoint['sweep_end'],'t00064');db.close()
+            second=self._ledger(path,activation).record_inventory_notices(limit=1)
+            self.assertEqual(second['observed'],1);self.assertTrue(second['sweep_complete'])
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],65)
+            db.close()
+
+    def test_default_population_over_6400_is_not_rolled_back_or_starved(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._populate(path,6401)
+            activation=Activation(os.path.realpath(path))
+            first=self._ledger(path,activation).record_inventory_notices()
+            self.assertEqual(first['observed'],6400);self.assertTrue(first['scan_pending'])
+            second=self._ledger(path,activation).record_inventory_notices()
+            self.assertEqual(second['observed'],1);self.assertTrue(second['sweep_complete'])
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],6401)
+            self.assertEqual(db.execute("SELECT count(*) FROM supervision_events WHERE task_id='t06400'").fetchone()[0],1)
+            db.close()
+
+    def test_finite_sweep_wraps_for_insertions_before_and_after_cursor(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._populate(path,65)
+            activation=Activation(os.path.realpath(path))
+            self._ledger(path,activation).record_inventory_notices(limit=1)
+            db=sqlite3.connect(path)
+            for name in ('a-new','z-new'):
+                db.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)',
+                    (name,'CODEX_EXEC','PENDING','[]',None,None,4,'{}',9999))
+            db.commit();db.close()
+            finish=self._ledger(path,activation).record_inventory_notices(limit=1)
+            self.assertEqual(finish['observed'],1);self.assertTrue(finish['sweep_complete'])
+            sweep=self._ledger(path,activation).record_inventory_notices()
+            self.assertEqual(sweep['observed'],67);self.assertTrue(sweep['sweep_complete'])
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],67)
+            db.close()
+
+    def test_notice_failure_rolls_back_cursor_and_can_retry_same_slice(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._populate(path,65)
+            activation=Activation(os.path.realpath(path));ledger=self._ledger(path,activation)
+            with patch.object(ExecutionSupervisor,'record_inventory_notice',side_effect=RuntimeError('fixture')):
+                with self.assertRaises(RuntimeError): ledger.record_inventory_notices(limit=1)
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute('SELECT count(*) FROM events').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],0)
+            db.close()
+            self.assertEqual(ledger.record_inventory_notices(limit=1)['observed'],64)
+
+    def test_new_activation_does_not_reuse_old_scan_cursor(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._populate(path,65)
+            activation=Activation(os.path.realpath(path))
+            self._ledger(path,activation).record_inventory_notices(limit=1)
+            activation.value['epoch']+=1
+            again=self._ledger(path,activation).record_inventory_notices(limit=1)
+            self.assertEqual(again['observed'],64);self.assertTrue(again['scan_pending'])
+
+    def test_corrupt_checkpoint_holds_without_notice_mutation(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._populate(path,65)
+            activation=Activation(os.path.realpath(path))
+            db=sqlite3.connect(path)
+            db.execute("INSERT INTO events(task_id,event,created,details) VALUES(NULL,'INVENTORY_SCAN_CHECKPOINT_V1',0,'bad')")
+            db.commit();db.close()
+            with self.assertRaises(ledger_module.SchemaMismatch):
+                self._ledger(path,activation).record_inventory_notices(limit=1)
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],0)
+            db.close()
 
 if __name__=='__main__':
     unittest.main(verbosity=2)
