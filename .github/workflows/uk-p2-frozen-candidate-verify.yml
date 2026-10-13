@@ -226,4 +226,4 @@ jobs:
           print(json.dumps(value,sort_keys=True))
           print('PROTECTED_PREPARATION_PATH='+path)
           print('PROTECTED_PREPARATION_SHA256='+hashlib.sha256(raw).hexdigest())
-                    PY
+          PY
