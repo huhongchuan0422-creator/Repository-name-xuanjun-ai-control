@@ -1,7 +1,7 @@
 """Read-only bounded UK P2 authority snapshot; never grants admission."""
 import collections, datetime, hashlib, json, os, socket, sqlite3, stat, subprocess
 DB='/home/xuanjun_dev/uk-stage1-minimal/state.sqlite'
-UNITS=['xuanjun-uk-stage1-minimal.service','xuanjun-uk-openclaw.service','xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.service','xuanjun-p2-mechanical.timer','xuanjun-p2-mechanical.path','xuanjun-p2-mechanical.service']
+UNITS=['xuanjun-uk-stage1-minimal.service','xuanjun-uk-openclaw.service','xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.service','xuanjun-p2-mechanical.timer','xuanjun-p2-mechanical.path','xuanjun-p2-mechanical.service','xj-uk-owner-notify.service','xj-uk-owner-notify.timer']
 def command(args):
     r=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=20)
     if r.returncode: raise ValueError('READONLY_COMMAND_FAILED')
@@ -27,6 +27,33 @@ def main():
     inventory=command(['/usr/bin/systemctl','list-units','--all','--no-legend','--no-pager','--plain']).splitlines()
     out['loaded_xuanjun_units']=[r for r in inventory if 'xuanjun' in r or 'xj-' in r][:2048]
     out['unit_inventory_truncated']=len(inventory)>2048
+    # Inspect fixed notifier files without exposing arguments, environment or file content.
+    import shlex
+    notifier={}
+    for unit in ['xj-uk-owner-notify.service','xj-uk-owner-notify.timer']:
+        path='/etc/systemd/system/'+unit
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        with os.fdopen(fd,'rb') as f:
+            st=os.fstat(f.fileno())
+            if not stat.S_ISREG(st.st_mode) or st.st_size>262144:raise ValueError('NOTIFIER_UNIT_BOUND_REQUIRED')
+            raw=f.read(262145)
+        value={'unit_sha256':hashlib.sha256(raw).hexdigest(),'script_capabilities':[]}
+        if unit.endswith('.service'):
+            for line in raw.decode('utf-8').splitlines():
+                if not line.startswith('ExecStart='):continue
+                tokens=shlex.split(line[len('ExecStart='):])
+                for token in tokens:
+                    if not token.startswith(('/home/xuanjun_dev/','/opt/xuanjun-uk-control/')) or not token.endswith(('.py','.sh')):continue
+                    if os.path.realpath(token)!=token:raise ValueError('NOTIFIER_SCRIPT_SYMLINK_HOLD')
+                    fd=os.open(token,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+                    with os.fdopen(fd,'rb') as f:
+                        st=os.fstat(f.fileno())
+                        if not stat.S_ISREG(st.st_mode) or st.st_size>1048576:raise ValueError('NOTIFIER_SCRIPT_BOUND_REQUIRED')
+                        b=f.read(1048577)
+                    text=b.decode('utf-8')
+                    value['script_capabilities'].append({'path':token,'sha256':hashlib.sha256(b).hexdigest(),'sqlite_reference':'sqlite' in text.lower(),'sql_mutation_tokens':any(x in text.upper() for x in ['INSERT INTO','UPDATE ','DELETE FROM','CREATE TABLE']),'telegram_send_reference':'sendMessage' in text,'readonly_immutable_reference':'immutable=1' in text,'expiry_guard_reference':'expires_at' in text})
+        notifier[unit]=value
+    out['notifier_static_metadata']=notifier
     con=sqlite3.connect('file:'+DB+'?mode=ro&immutable=1',uri=True)
     try:
         con.execute('PRAGMA query_only=ON')
@@ -38,7 +65,8 @@ def main():
         if 'tasks' in tables:
             cols={r[1] for r in con.execute('PRAGMA table_info(tasks)')}
             out['task_columns']=sorted(cols)
-            if 'status' in cols:out['task_status_counts']=list(con.execute('SELECT status,count(*) FROM tasks GROUP BY status'))
+            for c in ['status','state']:
+                if c in cols:out['task_'+c+'_counts']=list(con.execute('SELECT "'+c+'",count(*) FROM tasks GROUP BY "'+c+'"'))
             for c in ['lease_owner','lease_until']:
                 if c in cols:out[c+'_nonempty']=con.execute('SELECT count(*) FROM tasks WHERE "'+c+'" IS NOT NULL AND CAST("'+c+'" AS TEXT)<>\'\'').fetchone()[0]
             if 'fence' in cols:out['fence_counts']=list(con.execute('SELECT fence,count(*) FROM tasks GROUP BY fence'))
