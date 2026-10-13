@@ -35,6 +35,27 @@ class HistoryTests(unittest.TestCase):
         self.assertIn('page_token=next', self.calls[1])
         self.assertEqual(self.calls[-1], 'im/v1/messages/om_fixture')
 
+    def equivalent_variants(self):
+        value = json.loads(self.content)
+        return [json.dumps(value, ensure_ascii=False, indent=2),
+                json.dumps(value, ensure_ascii=True),
+                self.content + ' ',
+                '{"text":"ignored","text":' + json.dumps(value['text'], ensure_ascii=False) + '}']
+
+    def test_equivalent_json_listing_different_bytes_unknown(self):
+        for content in self.equivalent_variants():
+            self.assertEqual(json.loads(content), json.loads(self.content))
+            self.assertNotEqual(content, self.content)
+            item = copy.deepcopy(self.item); item['body']['content'] = content
+            self.responses = [self.page([item])]
+            self.assertEqual(self.lookup(), 'UNKNOWN')
+
+    def test_equivalent_json_readback_different_bytes_unknown(self):
+        for content in self.equivalent_variants():
+            item = copy.deepcopy(self.item); item['body']['content'] = content
+            self.responses = [self.page([self.item]), {'code': 0, 'data': {'items': [item]}}]
+            self.assertEqual(self.lookup(), 'UNKNOWN')
+
     def test_complete_absence_unknown_never_not_sent(self):
         self.responses = [self.page([])]
         self.assertEqual(self.lookup(), 'UNKNOWN')
@@ -80,6 +101,14 @@ class HistoryTests(unittest.TestCase):
     def test_readback_changed_or_unavailable_unknown(self):
         for result in ({'code': 0, 'data': {'items': []}}, {'code': 999}):
             self.responses = [self.page([self.item]), result]
+            self.assertEqual(self.lookup(), 'UNKNOWN')
+
+    def test_readback_binding_fields_revalidated(self):
+        for field, value in [('chat_id', 'oc_other'), ('message_id', 'om_other'),
+                             ('msg_type', 'image'), ('msg_type', None), ('deleted', True),
+                             ('sender', {'sender_type': 'app', 'id': 'cli_other'})]:
+            item = copy.deepcopy(self.item); item[field] = value
+            self.responses = [self.page([self.item]), {'code': 0, 'data': {'items': [item]}}]
             self.assertEqual(self.lookup(), 'UNKNOWN')
 
     def test_identity_and_chat_binding_before_query(self):

@@ -27,7 +27,7 @@ class OwnerFeishuHistory:
             raise ValueError('HISTORY_UNCONFIRMED')
         return response['data']
 
-    def _match(self, item, expected):
+    def _match(self, item, content):
         if not isinstance(item, dict):
             return False
         sender = item.get('sender')
@@ -39,10 +39,7 @@ class OwnerFeishuHistory:
                 not isinstance(item.get('message_id'), str) or
                 re.fullmatch(r'om_[A-Za-z0-9_-]{1,128}', item['message_id']) is None):
             return False
-        try:
-            return json.loads(body['content']) == expected
-        except (ValueError, TypeError):
-            return False
+        return body['content'] == content
 
     def __call__(self, chat_id, identity, content):
         if chat_id != self.chat_id:
@@ -68,7 +65,7 @@ class OwnerFeishuHistory:
                         type(data.get('has_more')) is not bool):
                     return 'UNKNOWN'
                 for item in items:
-                    if self._match(item, expected):
+                    if self._match(item, content):
                         matches.add(item['message_id'])
                 if len(matches) > 1:
                     return 'UNKNOWN'
@@ -87,10 +84,10 @@ class OwnerFeishuHistory:
             items = self._data(self.get('im/v1/messages/' + receipt)).get('items')
             if (not isinstance(items, list) or len(items) != 1 or
                     items[0].get('message_id') != receipt or
-                    not self._match(items[0], expected)):
+                    not self._match(items[0], content)):
                 return 'UNKNOWN'
             return {'chat_id': self.chat_id, 'msg_type': 'text',
-                    'message_id': receipt, 'content': content}
+                    'message_id': receipt, 'content': items[0]['body']['content']}
         except Exception:
             # Never leak credential-bearing exception messages or authorize retry.
             return 'UNKNOWN'

@@ -50,12 +50,7 @@ class OwnerFeishuTransport:
             data.get('chat_id')!=self.chat_id or data.get('msg_type')!='text' or
             not isinstance(data.get('body'),dict)):
             raise RuntimeError('FEISHU_RECEIPT_UNCONFIRMED')
-        try:
-            expected=json.loads(content)
-            actual=json.loads(data['body'].get('content',''))
-        except (ValueError,TypeError):
-            raise RuntimeError('FEISHU_RECEIPT_CONTENT_UNCONFIRMED')
-        if actual!=expected:
+        if data['body'].get('content')!=content:
             raise RuntimeError('FEISHU_RECEIPT_CONTENT_MISMATCH')
         self._bound(destination,identity,kind,claim)
         return data['message_id']
@@ -81,3 +76,4 @@ class OwnerFeishuTransport:
             re.fullmatch(r'om_[A-Za-z0-9_-]{1,128}',result['message_id'])):
             return result['message_id']
         return 'UNKNOWN'
+

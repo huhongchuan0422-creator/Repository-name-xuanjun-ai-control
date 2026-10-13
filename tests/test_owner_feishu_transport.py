@@ -37,6 +37,8 @@ class Tests(unittest.TestCase):
         if self.mode=='wrong_chat':answer['data']['chat_id']='oc_other'
         if self.mode=='wrong_text':answer['data']['body']['content']='{"text":"wrong"}'
         if self.mode=='missing_receipt':answer['data'].pop('message_id')
+        if self.mode=='wrong_type':answer['data']['msg_type']='image'
+        if self.mode=='missing_type':answer['data'].pop('msg_type')
         if self.mode=='error':answer={'code':999}
         return answer
     def state(self):
@@ -46,6 +48,24 @@ class Tests(unittest.TestCase):
     def send(self):return self.supervisor.deliver_once('fixture-worker','OWNER',self.transport)
     def test_actual_existing_outbox_success(self):
         self.assertEqual(self.send(),'om_fixture');self.assertEqual(self.state(),('ACKED','om_fixture',1));self.assertNotIn('NEVER_EXPORT',json.dumps(self.calls))
+    def test_send_receipt_equivalent_json_different_bytes_rejected(self):
+        for variant in ('spaces', 'unicode', 'trailing', 'duplicate'):
+            def api(path, body):
+                answer = self.api(path, body)
+                value = json.loads(body['content'])
+                content = json.dumps(value, ensure_ascii=False, indent=2)
+                if variant == 'unicode': content = json.dumps(value, ensure_ascii=True)
+                if variant == 'trailing': content = body['content'] + ' '
+                if variant == 'duplicate': content = '{"text":"ignored","text":' + json.dumps(value['text'], ensure_ascii=False) + '}'
+                self.assertEqual(json.loads(content), value)
+                self.assertNotEqual(content, body['content'])
+                answer['data']['body']['content'] = content
+                return answer
+            transport, claim, unused = self.reconciliation_fixture()
+            transport.api = api
+            with self.assertRaises(RuntimeError):
+                transport('OWNER', self.key, 'COMPLETED', {}, claim)
+
     def test_ack_no_duplicate_on_restart(self):
         self.send();self.supervisor=ExecutionSupervisor(self.path,lambda:self.now)
         self.assertIsNone(self.send());self.assertEqual(len(self.calls),1)
@@ -56,7 +76,7 @@ class Tests(unittest.TestCase):
         self.mode='lost';self.send();self.now=200
         self.assertEqual(self.supervisor.reconcile_delivery(self.key,'OWNER','fixture-reconciler',lambda d,k:'UNKNOWN'),'HELD');self.assertIsNone(self.send())
     def test_bad_receipts_never_ack(self):
-        for mode in ('wrong_chat','wrong_text','missing_receipt','error'):
+        for mode in ('wrong_chat','wrong_text','missing_receipt','wrong_type','missing_type','error'):
             with self.subTest(mode=mode):
                 claim={'destination':'OWNER','event_key':'T1:COMPLETED:1','delivery_identity':'T1:COMPLETED:1','authority_fence':4,'authority_epoch':2,'claim_epoch':1,'claim_attempt':1}
                 transport=OwnerFeishuTransport('oc_fixture','a'*64,self.api,lambda c:True);self.mode=mode
@@ -99,3 +119,4 @@ class Tests(unittest.TestCase):
         self.assertEqual(self.calls,[])
 
 if __name__=='__main__':unittest.main()
+
