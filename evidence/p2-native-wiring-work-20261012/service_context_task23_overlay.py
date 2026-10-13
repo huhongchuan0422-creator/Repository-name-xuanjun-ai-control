@@ -560,9 +560,30 @@ REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
                 or len(dropins)!=1):
 """)
 
+
+    # Complete the reviewed Gateway reuse boundary and bounded reference reads.
+    replace_once(source/'stage1/p2_fixed_host_runtime.py',
+"        data, info = _read_regular(value['path'])\n",
+"        # Existing OAuth stores may be several MiB; still bounded and read-only.\n        data, info = _read_regular(value['path'], limit=16*1024*1024)\n")
+    replace_once(source/'stage1/legacy_host_adapter.py',
+'    def restore_legacy_files(self):\n        state = self._state()\n',
+"    def restore_legacy_files(self, gateway_only=False):\n        if type(gateway_only) is not bool:\n            raise ValueError('INVALID_LEGACY_RESTORE_SELECTION')\n        state = self._state()\n        gateway='xuanjun-uk-openclaw.service'\n        coordinator='/etc/systemd/system/xuanjun-uk-stage1-minimal.service'\n        if gateway_only and (not os.path.islink(coordinator) or os.readlink(coordinator)!='/dev/null'):\n            raise ValueError('OLD_COORDINATOR_MUST_REMAIN_MASKED')\n")
+    replace_once(source/'stage1/legacy_host_adapter.py',
+"        for unit, data in payloads.items():\n            value = state['units'][unit]\n            path = value['path']\n            if (not os.path.islink(path) or os.readlink(path) != '/dev/null'):\n                # Allow an interrupted restore only when exact original bytes\n",
+"        for unit, data in payloads.items():\n            if gateway_only and unit!=gateway:\n                continue\n            value = state['units'][unit]\n            path = value['path']\n            if (not os.path.islink(path) or os.readlink(path) != '/dev/null'):\n                # Allow an interrupted restore only when exact original bytes\n")
+    replace_once(source/'stage1/legacy_host_adapter.py',
+"        self._command('daemon-reload')\n        # Restoring files is not permission to restart old/new writers. Caller\n",
+"        if gateway_only and (not os.path.islink(coordinator) or os.readlink(coordinator)!='/dev/null'):\n            raise ValueError('OLD_COORDINATOR_MASK_CHANGED')\n        self._command('daemon-reload')\n        # Restoring files is not permission to restart old/new writers. Caller\n")
+    replace_once(source/'stage1/p2_install_entrypoint.py',
+"            runtime_activation_requested = True\n            runtime_proof = self.runtime.activate(plan['runtime'], active)\n",
+"            runtime_activation_requested = True\n            # Cutover masks the old parent as well as the coordinator. Reuse\n            # only its exact backed-up Gateway unit after the new epoch is ACTIVE;\n            # the old coordinator remains masked and no service starts here.\n            gateway_restore=self.cutover.adapter.restore_legacy_files(gateway_only=True)\n            if gateway_restore!={'unit_files_restored':True,'services_restarted':False}:\n                raise ValueError('GATEWAY_REUSE_RESTORE_UNPROVEN')\n            runtime_proof = self.runtime.activate(plan['runtime'], active)\n")
+    replace_once(source/'stage1/p2_fixed_host_runtime.py',
+"        for service in ALLOWED_SERVICES:\n            self._command(['/usr/bin/systemctl', 'start', service])\n",
+"        # The caller restored only the Gateway unit after cutover. Start that\n        # admitted parent before relay/dispatcher preflight, never the old coordinator.\n        self._start_gateway()\n        for service in ALLOWED_SERVICES:\n            self._command(['/usr/bin/systemctl', 'start', service])\n")
+
     manifest=deploy/'integration-manifest.json';value=json.loads(manifest.read_text());files=value['files']
     changed=[controller,stage1/'native_gateway_controller.py.json',relay,preflight,ledger,wake,fixed,entry,
-             dispatcher,relay_template,relay_socket,relay_service]
+             dispatcher,relay_template,relay_socket,relay_service,stage1/'legacy_host_adapter.py']
     for item in changed:
         files[item.relative_to(source).as_posix()]=sha(item)
     manifest.write_text(json.dumps(value,sort_keys=True,indent=2,separators=(',', ': '))+'\n')
