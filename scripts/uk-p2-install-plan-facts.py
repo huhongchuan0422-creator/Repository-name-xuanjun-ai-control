@@ -149,6 +149,16 @@ def tls_refs():
     config=file_identity(NGINX_CONF,1048576) if os.path.exists(NGINX_CONF) else {'path':NGINX_CONF,'status':'UNAVAILABLE'}
     return {'status':'PRESENT','config':config,'references':refs,'scanned_files':scanned}
 
+def gateway_auth_env_fact():
+    out=subprocess.check_output(['/usr/bin/systemctl','show','xuanjun-uk-openclaw.service',
+        '--property=MainPID','--value'],universal_newlines=True,timeout=10).strip()
+    pid=int(out)
+    raw=open('/proc/%d/environ'%pid,'rb').read(1024*1024)
+    names=set(item.split(b'=',1)[0].decode('ascii','ignore') for item in raw.split(b'\0') if b'=' in item)
+    return {'token_present':'OPENCLAW_GATEWAY_TOKEN' in names,
+            'password_present':'OPENCLAW_GATEWAY_PASSWORD' in names,
+            'url_present':'OPENCLAW_GATEWAY_URL' in names}
+
 def activation_fact():
     if not os.path.exists(ACTIVATION):
         return {'status':'ABSENT','path':ACTIVATION}
@@ -180,6 +190,7 @@ def main():
       'docker_socket':socket_identity('/var/run/docker.sock'),
       'python':file_identity('/usr/libexec/platform-python3.6',64*1024*1024),
       'openclaw':file_identity('/home/xuanjun_dev/.openclaw/bin/openclaw',16*1024*1024),
+      'gateway_auth_env':gateway_auth_env_fact(),
       'openclaw_paths':[path_fact(x) for x in (
           '/home/xuanjun_dev','/home/xuanjun_dev/.openclaw',
           '/home/xuanjun_dev/.openclaw/bin',
