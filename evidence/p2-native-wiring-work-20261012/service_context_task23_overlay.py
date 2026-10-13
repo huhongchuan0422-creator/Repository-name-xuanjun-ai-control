@@ -28,7 +28,8 @@ def main():
 import stat
 import subprocess
 """,
-"""import os
+"""import grp
+import os
 import pwd
 import socket
 import stat
@@ -45,9 +46,21 @@ import subprocess
     def __init__(self, config):
         self.socket_path=config['relay_socket']
         self.server_user=config['server_user']
+        self.client_group=config['client_group']
 
     def _call(self, operation, value=None, **params):
         server_uid=pwd.getpwnam(self.server_user).pw_uid
+        client_gid=grp.getgrnam(self.client_group).gr_gid
+        parent=os.path.dirname(self.socket_path)
+        parent_info=os.lstat(parent)
+        socket_info=os.lstat(self.socket_path)
+        if (os.path.realpath(self.socket_path)!=self.socket_path
+                or not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid!=0
+                or parent_info.st_mode&0o022
+                or not stat.S_ISSOCK(socket_info.st_mode)
+                or socket_info.st_uid!=server_uid or socket_info.st_gid!=client_gid
+                or stat.S_IMODE(socket_info.st_mode)!=0o660):
+            raise NativeContractError('Gateway relay socket identity rejected')
         request={'operation':operation}
         request.update(params)
         if value is not None: request['value']=value
@@ -57,9 +70,6 @@ import subprocess
         client.settimeout(30)
         try:
             client.connect(self.socket_path)
-            credentials=client.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,struct.calcsize('3i'))
-            unused_pid,uid,unused_gid=struct.unpack('3i',credentials)
-            if uid!=server_uid: raise NativeContractError('Gateway relay peer rejected')
             client.sendall(raw)
             response=bytearray()
             while b'\\n' not in response:
@@ -99,16 +109,18 @@ def create_controller(config):
         raise NativeContractError('transport config keys mismatch')
     return GatewayController(transport)
 """,
-"""    required={'relay_socket','server_user'}
+"""    required={'relay_socket','server_user','client_group'}
     if (not isinstance(transport,dict) or set(transport)!=required
             or transport.get('relay_socket')!='/run/xuanjun-development/p2-gateway.sock'
-            or transport.get('server_user')!='xuanjun_dev'):
+            or transport.get('server_user')!='xuanjun_dev'
+            or transport.get('client_group')!='xuanjun-dispatcher'):
         raise NativeContractError('transport config keys mismatch')
     return RelayController(transport)
 """)
     (stage1/'native_gateway_controller.py.json').write_text(
         json.dumps({'relay_socket':'/run/xuanjun-development/p2-gateway.sock',
-                    'server_user':'xuanjun_dev'},sort_keys=True,separators=(',',':'))+'\n')
+                    'server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'},
+                   sort_keys=True,separators=(',',':'))+'\n')
 
     relay=stage1/'p2_gateway_relay.py'
     relay.write_text(r'''#!/usr/bin/python3
@@ -158,15 +170,20 @@ def execute(controller,request):
     return getattr(controller,op)(request['value'])
 
 def serve_connection(connection,controller,dispatcher_uid):
-    credentials=connection.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,struct.calcsize('3i'))
-    unused_pid,uid,unused_gid=struct.unpack('3i',credentials)
-    if uid!=dispatcher_uid: raise PermissionError('relay caller rejected')
+    connection.settimeout(5)
     try:
+        credentials=connection.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,struct.calcsize('3i'))
+        unused_pid,uid,unused_gid=struct.unpack('3i',credentials)
+        if uid!=dispatcher_uid: raise PermissionError('relay caller rejected')
         result=execute(controller,read_request(connection))
         answer={'ok':True,'result':result,'error':None}
     except Exception as error:
         answer={'ok':False,'result':None,'error':type(error).__name__}
-    connection.sendall((json.dumps(answer,sort_keys=True,separators=(',',':'))+'\n').encode('utf-8'))
+    try:
+        connection.sendall((json.dumps(answer,sort_keys=True,separators=(',',':'))+'\n').encode('utf-8'))
+    except Exception:
+        pass
+    return answer
 
 def listener(path):
     if int(os.environ.get('LISTEN_FDS','0') or '0')==1 and int(os.environ.get('LISTEN_PID','0') or '0')==os.getpid():
@@ -379,19 +396,36 @@ Requires=xuanjun-p2-gateway-relay.socket
         "            raise LeaseLost('inventory notice requires active canonical generation')\n"
         "        if type(limit) is not int or not 1<=limit<=100:\n"
         "            raise ValueError('inventory notice limit')\n"
+        "        from execution_supervision import ExecutionSupervisor\n"
         "        from task_supervisor_inventory_adapter import canonical_inventory_page\n"
-        "        supervisor=self.supervisor(clock=self.clock)\n"
         "        with self._pinned_transaction() as value:\n"
         "            conn,identity=value\n"
-        "            page=canonical_inventory_page(conn,self._now(),limit=limit,\n"
-        "                activation_binding=self.activation_binding,ledger_identity=identity)\n"
-        "            receipts=[]\n"
-        "            for intent in page['tasks']:\n"
-        "                if intent['decision']=='HOLD_AND_NOTIFY_REQUIRES_ADMISSION':\n"
-        "                    receipts.append(supervisor.record_inventory_notice(\n"
-        "                        conn,intent,self.activation_binding,identity))\n"
+        "            required=('supervised_runs','supervision_events','supervision_delivery')\n"
+        "            if any(not conn.execute(\"SELECT 1 FROM sqlite_master WHERE type='table' AND name=?\",(name,)).fetchone() for name in required):\n"
+        "                raise SchemaMismatch('existing supervision schema required')\n"
+        "            supervisor=ExecutionSupervisor.__new__(ExecutionSupervisor)\n"
+        "            supervisor.db_path=self.db_path;supervisor.clock=self.clock\n"
+        "            supervisor.activation_store=self.activation_store\n"
+        "            supervisor.activation_binding=dict(self.activation_binding)\n"
+        "            supervisor.max_delivery_attempts=3;supervisor.claim_ttl=30\n"
+        "            receipts=[];observed=0;pages=0;after_id=None\n"
+        "            while True:\n"
+        "                pages+=1\n"
+        "                if pages>64: raise ValueError('inventory pagination bound exceeded')\n"
+        "                page=canonical_inventory_page(conn,self._now(),after_id=after_id,limit=limit,\n"
+        "                    activation_binding=self.activation_binding,ledger_identity=identity)\n"
+        "                observed+=len(page['tasks'])\n"
+        "                for intent in page['tasks']:\n"
+        "                    if intent['decision']=='HOLD_AND_NOTIFY_REQUIRES_ADMISSION':\n"
+        "                        receipts.append(supervisor.record_inventory_notice(\n"
+        "                            conn,intent,self.activation_binding,identity))\n"
+        "                if page['complete']: break\n"
+        "                cursor=page['next_cursor']\n"
+        "                if not isinstance(cursor,str) or not cursor or (after_id is not None and cursor<=after_id):\n"
+        "                    raise ValueError('inventory cursor did not advance')\n"
+        "                after_id=cursor\n"
         "            return {'state':'INVENTORY_NOTICE_PASS','ledger_identity':identity,\n"
-        "                    'observed':len(page['tasks']),'notices':receipts,\n"
+        "                    'observed':observed,'pages':pages,'notices':receipts,\n"
         "                    'dispatch_performed':False}\n"
     )
     replace_once(ledger,supervisor_tail,supervisor_tail+inventory_method)

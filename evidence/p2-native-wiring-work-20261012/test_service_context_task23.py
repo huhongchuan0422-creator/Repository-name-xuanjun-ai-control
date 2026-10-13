@@ -17,12 +17,16 @@ sys.path.insert(0,str(STAGE1))
 import execution_ledger as ledger_module
 import p2_gateway_relay as relay
 from execution_ledger import ExecutionLedger,LeaseLost
+from execution_supervision import SCHEMA as SUPERVISION_SCHEMA
 
 class FakeSocket(object):
     def __init__(self,uid):
         self.uid=uid
         self.sent=b''
         self.done=False
+        self.timeout=None
+    def settimeout(self,value):
+        self.timeout=value
     def getsockopt(self,*args):
         return struct.pack('3i',111,self.uid,222)
     def recv(self,n):
@@ -47,11 +51,17 @@ class Activation(object):
         return dict(self.value)
 
 class Tests(unittest.TestCase):
-    def test_relay_rejects_unauthorized_peer_before_gateway_call(self):
+    def test_relay_rejects_unauthorized_peer_and_keeps_serving(self):
+        controller=Controller()
         fake=FakeSocket(424242)
-        with self.assertRaises(PermissionError):
-            relay.serve_connection(fake,Controller(),31337)
-        self.assertEqual(fake.sent,b'')
+        result=relay.serve_connection(fake,controller,31337)
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['error'],'PermissionError')
+        self.assertEqual(fake.timeout,5)
+        valid=FakeSocket(31337)
+        result=relay.serve_connection(valid,controller,31337)
+        self.assertTrue(result['ok'])
+        self.assertTrue(result['result']['ready'])
 
     def test_relay_allows_only_fixed_preflight(self):
         fake=FakeSocket(31337)
@@ -67,7 +77,8 @@ class Tests(unittest.TestCase):
         self.assertIn('p2_service_context_preflight.py',service)
         config=json.loads((STAGE1/'native_gateway_controller.py.json').read_text())
         self.assertEqual(config,{'relay_socket':'/run/xuanjun-development/p2-gateway.sock',
-                                 'server_user':'xuanjun_dev'})
+                                 'server_user':'xuanjun_dev',
+                                 'client_group':'xuanjun-dispatcher'})
         relay_service=(ROOT/'deploy/xuanjun-p2-gateway-relay.service').read_text()
         self.assertIn('User=xuanjun_dev',relay_service)
         self.assertIn('ProtectHome=read-only',relay_service)
@@ -83,6 +94,8 @@ class Tests(unittest.TestCase):
         CREATE TABLE approvals(task_id TEXT PRIMARY KEY,decision TEXT,requested_at REAL,decided_at REAL);
         CREATE TABLE events(id INTEGER PRIMARY KEY,task_id TEXT,event TEXT,created REAL,details TEXT);
         """)
+        db.executescript(SUPERVISION_SCHEMA)
+        db.execute('PRAGMA journal_mode=WAL')
         db.execute("INSERT INTO tasks VALUES('t','CODEX_EXEC','PENDING','[]',NULL,NULL,4,'{}',9999)")
         db.commit()
         db.close()
@@ -146,6 +159,61 @@ class Tests(unittest.TestCase):
             self.assertFalse(db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='supervision_events'").fetchone())
             db.close()
+
+
+    def test_inventory_paginates_beyond_first_hundred_and_restart_dedupes(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite')
+            self._db(path)
+            db=sqlite3.connect(path)
+            for i in range(1,151):
+                db.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)",
+                    ('t%03d'%i,'CODEX_EXEC','PENDING','[]',None,None,4,'{}',9999))
+            db.execute("UPDATE tasks SET depends=? WHERE id='t001'",
+                       ('['*65+'0'+']'*65,))
+            db.commit();db.close()
+            activation=Activation(os.path.realpath(path))
+            ledger=ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'],
+                                   clock=lambda:100,activation_store=activation)
+            result=ledger.record_inventory_notices(limit=20)
+            self.assertEqual(result['observed'],151)
+            self.assertGreater(result['pages'],1)
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],151)
+            late=db.execute("SELECT event_key FROM supervision_events WHERE task_id='t150'").fetchone()[0]
+            db.execute("UPDATE supervision_delivery SET state='DEAD_LETTER',attempts=5 WHERE event_key=?",(late,))
+            db.commit();db.close()
+            restarted=ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'],
+                                      clock=lambda:101,activation_store=activation)
+            again=restarted.record_inventory_notices(limit=17)
+            self.assertEqual(again['observed'],151)
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],151)
+            self.assertTrue(all(tuple(x)==('DEAD_LETTER',5) for x in
+                db.execute("SELECT state,attempts FROM supervision_delivery WHERE event_key=?",(late,))))
+            self.assertEqual(db.execute('PRAGMA journal_mode').fetchone()[0].lower(),'wal')
+            db.close()
+
+    def test_path_replacement_before_sqlite_connect_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite')
+            self._db(path)
+            activation=Activation(os.path.realpath(path))
+            ledger=ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'],
+                                   clock=lambda:100,activation_store=activation)
+            original=ledger_module.sqlite3.connect
+            swapped=[False]
+            def connect(database,*args,**kwargs):
+                if isinstance(database,str) and database.startswith('file:/proc/self/fd/') and not swapped[0]:
+                    swapped[0]=True
+                    replacement=path+'.new'
+                    self._db(replacement)
+                    os.replace(replacement,path)
+                return original(database,*args,**kwargs)
+            with patch.object(ledger_module.sqlite3,'connect',side_effect=connect):
+                with self.assertRaises(LeaseLost):
+                    ledger.record_inventory_notices()
+            self.assertTrue(swapped[0])
 
 if __name__=='__main__':
     unittest.main(verbosity=2)
