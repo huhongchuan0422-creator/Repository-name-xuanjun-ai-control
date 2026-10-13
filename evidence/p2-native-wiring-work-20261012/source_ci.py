@@ -31,9 +31,10 @@ subprocess.run(['python',str(ROOT/'followup_overlay.py'),str(source)],check=True
 plugin=source/'plugins/p2-native-controller'
 shutil.copytree(ROOT/'controller',plugin)
 subprocess.run(['python',str(ROOT/'task23_shared_overlay.py'),str(source)],check=True)
+subprocess.run(['python',str(ROOT/'work_review_blockers_overlay.py'),str(source)],check=True)
 subprocess.run(['python',str(ROOT/'c2_install_overlay.py'),str(source)],check=True)
 env=dict(os.environ,P2_SOURCE_ROOT=str(source))
-for name in ('test_native_wiring.py','test_native_ledger.py','test_native_socket.py','test_c2_install_highs.py','test_task23_shared_integration.py'):
+for name in ('test_native_wiring.py','test_native_ledger.py','test_native_socket.py','test_c2_install_highs.py','test_task23_shared_integration.py','test_work_review_blockers.py'):
     subprocess.run(['python',str(ROOT/name)],env=env,check=True)
 for name in ('test_controller.mjs','test_host.mjs'):
     subprocess.run(['node',str(ROOT/name)],env=env,check=True)
@@ -60,4 +61,5 @@ print(json.dumps({'state':'SOURCE_REGRESSION_PASS','frozen_archive_sha256':SHA,
  'c2_install_overlay_sha256':hashlib.sha256((ROOT/'c2_install_overlay.py').read_bytes()).hexdigest(),
  'task23_shared_overlay_sha256':hashlib.sha256((ROOT/'task23_shared_overlay.py').read_bytes()).hexdigest(),
  'task23_adapter_sha256':hashlib.sha256((ROOT/'task_supervisor_inventory_adapter.py').read_bytes()).hexdigest(),
+ 'work_review_blockers_overlay_sha256':hashlib.sha256((ROOT/'work_review_blockers_overlay.py').read_bytes()).hexdigest(),
  'authoritative_freeze':bool(build_commit),'model_calls':0,'UK_runtime':'NOT_RUN','install':'NOT_RUN','release_gate':'NOT_GRANTED'}))
