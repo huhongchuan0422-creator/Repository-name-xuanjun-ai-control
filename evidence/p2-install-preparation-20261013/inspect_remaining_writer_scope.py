@@ -26,3 +26,42 @@ for rel in ('stage1/ledger_install_stage.py','stage1/ledger_backup.py'):
  assert len(r)<=131072 and hashlib.sha256(r).hexdigest()==manifest['files'][rel]
  print('MIGRATION_SOURCE='+json.dumps({'path':rel,'base64':base64.b64encode(r).decode()}))
 print('BOUNDED_WRITER_INVENTORY='+json.dumps({'development_uid_processes':processes,'units':units,'process_races':races,'scope':'UID1002_1003_1004_1005_1008_AND_RELATED_SYSTEMD_NAMES','other_writers_outside_scope':'UNKNOWN','canonical_ledger_opened':False,'fence_mutation':False,'services_changed':False,'install':False,'model_calls':0},sort_keys=True))
+
+import ast,re,shlex,stat
+aux={}
+for unit in ('xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.service','xuanjun-p2-mechanical.service','xuanjun-p2-mechanical.timer','xuanjun-p2-mechanical.path'):
+ r=subprocess.run(['/usr/bin/systemctl','show',unit,'--property=FragmentPath,ActiveState,SubState,MainPID,UnitFileState,ControlGroup'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+ assert r.returncode==0
+ info=dict(x.split('=',1) for x in r.stdout.decode().splitlines() if '=' in x)
+ path=info['FragmentPath'];assert path.startswith('/etc/systemd/system/') and os.path.realpath(path)==path
+ with open(path,'rb') as f:raw=f.read(65537)
+ assert len(raw)<=65536;info['fragment_sha256']=hashlib.sha256(raw).hexdigest()
+ commands=[x.split('=',1)[1] for x in raw.decode().splitlines() if x.startswith('ExecStart=')]
+ sourcepaths=set()
+ for command in commands:
+  for token in shlex.split(command):
+   if token.startswith('/') and token.endswith(('.py','.sh')) and os.path.isfile(token):sourcepaths.add(token)
+ findings=[]
+ for p in sorted(sourcepaths):
+  assert os.path.realpath(p)==p
+  with open(p,'rb') as f:code=f.read(262145)
+  assert len(code)<=262144
+  value={'path':p,'sha256':hashlib.sha256(code).hexdigest(),'size':len(code)}
+  text=code.decode()
+  value['legacy_database_path_literal']= '/home/xuanjun_dev/uk-stage1-minimal/state.sqlite' in text
+  value['contains_sqlite_connect']= 'sqlite3.connect' in text
+  value['contains_ledger_claim_or_finish']=any(x in text for x in ('.claim(','.finish(','.execute('))
+  value['contains_service_start_or_restart']=bool(re.search(r'(systemctl.*(?:start|restart)|openclaw.*gateway)',text))
+  if p.endswith('.py'):
+   tree=ast.parse(text)
+   value['imports']=sorted(set(x.module for x in ast.walk(tree) if isinstance(x,ast.ImportFrom) and x.module))
+   sql=[]
+   for node in ast.walk(tree):
+    if isinstance(node,ast.Str):
+     q=node.s.strip().split()
+     if q and q[0].upper() in ('UPDATE','INSERT','DELETE','REPLACE','SELECT','CREATE'):sql.append(q[0].upper())
+   value['sql_verbs']=sorted(set(sql))
+  findings.append(value)
+ info['entrypoint_sources']=findings;aux[unit]=info
+print('AUXILIARY_STATIC_EFFECT_SCOPE='+json.dumps(aux,sort_keys=True))
+print('AUXILIARY_STOP=NO; AUTHORIZATION_NOT_EXPANDED')
