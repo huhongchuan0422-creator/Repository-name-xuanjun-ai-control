@@ -551,7 +551,7 @@ jobs:
                   if name=='TRAILER!!!':break
                   if name.startswith('./'):name=name[2:]
                   parts=name.split('/');assert not name.startswith('/') and all(x not in ('','..','.') for x in parts)
-                  if not name.startswith('usr/lib/python3.6/site-packages/'):continue
+                  if not name.startswith(('usr/lib/python3.6/site-packages/','usr/lib64/python3.6/site-packages/')):continue
                   target=stage+'/'+name;assert os.path.realpath(target)==target
                   if stat.S_ISDIR(mode):os.makedirs(target,mode=0o700,exist_ok=True)
                   elif stat.S_ISREG(mode):
@@ -562,11 +562,12 @@ jobs:
                   else:raise ValueError('UNEXPECTED_LIBRARY_MEMBER_TYPE')
           libs=stage+'/usr/lib/python3.6/site-packages'
           launcher=stage+'/certbot-entry.py'
-          with open(launcher,'x') as f:f.write('import sys\nsys.path.insert(0,'+repr(libs)+')\nfrom certbot.main import main\nsys.exit(main())\n')
+          with open(launcher,'x') as f:f.write('import sys\nsys.path.insert(0,'+repr(libs)+')\nsys.path.insert(0,'+repr(stage+'/usr/lib64/python3.6/site-packages')+')\nfrom certbot.main import main\nsys.exit(main())\n')
           os.chmod(launcher,0o600)
           p=subprocess.run(['/usr/bin/python3','-I','-B',launcher,'--version'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
           text=(p.stdout+p.stderr).decode('utf-8','replace')
           result={'schema':1,'state':'ISOLATED_TLS_TOOL_READY' if p.returncode==0 and 'certbot 1.22.0' in text else 'HOLD_ISOLATED_TLS_TOOL','version_exit':p.returncode,'extracted_library_files':extracted,'packages_installed':False,'services_changed':False,'canonical_mutation':False,'certificate_requested':False}
+          if p.returncode:result['tool_error_tail']=text.splitlines()[-3:]
           if result['state']=='ISOLATED_TLS_TOOL_READY':
               host='uk.wenwenwenyiyiyi.work'
               assert sorted({x[4][0] for x in socket.getaddrinfo(host,443,socket.AF_INET,socket.SOCK_STREAM)})==['8.208.119.115']
