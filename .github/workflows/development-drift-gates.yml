@@ -1,0 +1,22 @@
+name: Development drift gates
+on:
+  pull_request:
+    paths:
+      - scripts/development_drift_guard.py
+      - tests/test_development_drift_guard.py
+      - docs/DEVELOPMENT_DRIFT_GUARD.md
+      - .github/workflows/development-drift-gates.yml
+permissions:
+  contents: read
+jobs:
+  offline-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate pure identity and resource budget checks
+        run: |
+          python3 -m py_compile scripts/development_drift_guard.py
+          python3 -B -m unittest discover -s tests -p 'test_development_drift_guard.py' -v
