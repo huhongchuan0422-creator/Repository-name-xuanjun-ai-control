@@ -71,6 +71,12 @@ the atomic transition. Digest format/booleans alone prove none of these.
    acceptance. Source tests never close these nodes or grant deployment.
 
 Current scope has no external writes, model calls, sender, persistence or process
-launch. UK Python3.6.8 and live producer mapping/integration/acceptance NOT_RUN.
+launch. UK Python3.6.8 isolated fixtures PASS; live producer mapping/integration/acceptance NOT_RUN.
 These functions raise fixed ValueError codes or return HOLD for malformed inputs;
 caller handles rejection visibly instead of dropping a task or substituting zero.
+
+## UK isolated platform receipt — 2026-10-13
+
+Exact workflow commit b0d183f758fec768341b8f3a035a332ec4aaa37e; source bytes unchanged from independently reviewed4bcfa593. Actual UK Python3.6.8 run38340631779/job115110583045 SUCCESS, logs read:11+8+7+10+7=43 tests PASS. Hosted same run/job115110583249 SUCCESS.
+
+Isolated fixtures only, model_calls=0. No operational DB, service activation, real notification, runtime admission, quota claim or release approval. Work retains outcome ownership. Next integration needs caller-authenticated current canonical producer snapshot and installed P2 authority; no omitted fields may be invented. These receipts supersede prior platform NOT_RUN only, not live integration NOT_RUN.
