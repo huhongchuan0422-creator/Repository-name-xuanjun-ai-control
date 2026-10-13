@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 ROOT=pathlib.Path(__file__).parents[1]
+sys.path.insert(0,str(ROOT/'scripts'))
 for name,path in (
     ('entry_review_gate',ROOT/'scripts/entry_review_gate.py'),
     ('task_supervisor',ROOT/'scripts/task_supervisor.py'),
