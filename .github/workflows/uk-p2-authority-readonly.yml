@@ -1,0 +1,19 @@
+name: P2 UK read-only authority snapshot
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-install-preparation-20261013/authority_readonly.py
+      - .github/workflows/uk-p2-authority-readonly.yml
+permissions:
+  contents: read
+jobs:
+  authority-snapshot:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read metadata only; no install, service or database mutation
+        run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/authority_readonly.py
