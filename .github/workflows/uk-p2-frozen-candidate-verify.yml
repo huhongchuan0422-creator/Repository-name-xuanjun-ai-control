@@ -1267,3 +1267,66 @@ jobs:
           print(json.dumps(result,sort_keys=True));print('FROZEN_SNAPSHOT_BACKEND_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
 
+      - name: Verify actual SDK source mounts and readonly write denial with exact container cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,subprocess,hashlib,stat
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];fixture=root+'/sdk-readonly-mount-fixture';os.mkdir(fixture,0o755);os.chmod(fixture,0o755)
+          home=fixture+'/home';os.mkdir(home,0o700);os.chown(home,1002,1002)
+          snapshot=root+'/frozen-snapshot-backend-fixture/worktrees/snapshot'
+          image='sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d'
+          roles={};gid=os.stat('/var/run/docker.sock').st_gid
+          for agent,access in [('developer','rw'),('platform-engineer','ro')]:
+              roles[agent]={'workspace':snapshot,'sandbox':{'mode':'all','scope':'agent','workspaceAccess':access,'workspaceRoot':home+'/sandbox-workspaces','backend':'docker','docker':{'image':image,'user':'1002:1002','network':'none','readOnlyRoot':True,'capDrop':['ALL'],'binds':[],'tmpfs':[],'containerPrefix':'xjfx-'+os.path.basename(root)+'-'+agent+'-'}}}
+          cfg={'agents':{'defaults':{'skipBootstrap':True},'entries':roles}}
+          module='file:///home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs'
+          js="const m=await import("+json.dumps(module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const agentId of ['developer','platform-engineer']){const sessionKey='agent:'+agentId+':p2-fixture:"+os.path.basename(root)+"';const c=await m.resolveSandboxContext({config:cfg,agentId,sessionKey,workspaceDir:"+json.dumps(snapshot)+",requireCurrentConfig:false,assertCurrent:()=>{}});const row={agentId};for(const key of ['enabled','sessionKey','workspaceDir','agentWorkspaceDir','skillsWorkspaceDir','containerWorkdir','containerName','containerId','workspaceAccess','backendId','runtimeId']){if(c?.[key]!==undefined&&['string','boolean','number'].includes(typeof c[key]))row[key]=c[key];}rows.push(row);}console.log('P2_SDK_MOUNTS='+JSON.stringify(rows));"
+          env={'PATH':'/usr/bin:/bin','LANG':'C','HOME':home,'OPENCLAW_STATE_DIR':home+'/state','OPENCLAW_HOME':home,'NO_COLOR':'1','DOCKER_HOST':'unix:///var/run/docker.sock'}
+          contexts=[];known=[];result={'schema':1,'state':'HOLD_SDK_SOURCE_MOUNTS','artifact_id':11806508375,'model_calls':0,'canonical_ledger_changed':False,'production_services_changed':False,'writer_admission':False,'contexts':contexts,'units':known}
+          def docker(*args):
+              return subprocess.run(['/usr/bin/docker','--host=unix:///var/run/docker.sock']+list(args),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
+          try:
+              p=subprocess.run(['/usr/bin/setpriv','--reuid=1002','--regid=1002','--groups='+str(gid),'/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],input=json.dumps(cfg).encode(),env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=90)
+              result['sdk_exit']=p.returncode
+              fd=os.open(fixture+'/protected-sdk.log',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+              with os.fdopen(fd,'wb') as f:f.write(p.stdout+p.stderr)
+              assert p.returncode==0
+              lines=[line[len('P2_SDK_MOUNTS='):] for line in p.stdout.decode().splitlines() if line.startswith('P2_SDK_MOUNTS=')]
+              assert len(lines)==1;contexts.extend(json.loads(lines[0]));assert len(contexts)==2
+              for context in contexts:
+                  q=docker('inspect',context['runtimeId']);assert q.returncode==0
+                  obj=json.loads(q.stdout.decode())[0]
+                  assert obj['Image']==image and obj['Config'].get('User')=='1002:1002'
+                  assert obj['HostConfig'].get('NetworkMode')=='none' and obj['HostConfig'].get('ReadonlyRootfs') is True
+                  mounts=[{'type':m.get('Type'),'source':m.get('Source'),'destination':m.get('Destination'),'rw':m.get('RW')} for m in obj.get('Mounts',[])]
+                  assert all(m['type']=='bind' and m['source'].startswith(root+'/') for m in mounts)
+                  repo=[m for m in mounts if m['source']==snapshot];assert repo
+                  expected_rw=context['agentId']=='developer';assert any(m['rw']==expected_rw for m in repo)
+                  destination=next(m['destination'] for m in repo if m['rw']==expected_rw)
+                  row={'id':obj['Id'],'runtime_id':context['runtimeId'],'agent_id':context['agentId'],'container_pid':obj['State'].get('Pid'),'mounts':mounts,'source_destination':destination}
+                  known.append(row)
+                  payload="import os,sys,json;path=sys.argv[1];out={};\nwith open(path,'rb') as f:out['read_size']=len(f.read())\ntry:\n fd=os.open(path,os.O_WRONLY);os.close(fd);out['source_write']='ALLOWED'\nexcept OSError as e:out['source_write']='DENIED';out['write_errno']=e.errno\nprint(json.dumps(out))"
+                  q=docker('exec','--user','1002:1002',obj['Id'],'/usr/bin/python3','-B','-c',payload,destination+'/fixture.py');assert q.returncode==0
+                  row['source_io_probe']=json.loads(q.stdout.decode());assert row['source_io_probe']['source_write']==('ALLOWED' if expected_rw else 'DENIED')
+              result['state']='SDK_RW_RO_SOURCE_MOUNT_AND_WRITE_DENIAL_PASS_PENDING_CONTROLLER_ADAPTATION'
+          except Exception as e:
+              result['error_type']=type(e).__name__;message=str(e)
+              result['hold_reason']=message if message and all(x in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_ ' for x in message) else 'DETAILS_RETAINED_PRIVATE'
+          finally:
+              cleanup=[]
+              for context in contexts:
+                  name=context['runtimeId'];q=docker('inspect',name)
+                  if q.returncode==0:
+                      obj=json.loads(q.stdout.decode())[0]
+                      assert obj['Image']==image and any(m.get('Source','').startswith(root+'/') for m in obj.get('Mounts',[]))
+                      q=docker('rm','--force',obj['Id']);assert q.returncode==0
+                  q=docker('inspect',name);cleanup.append({'runtime_id':name,'removed_or_absent':q.returncode!=0})
+              result['exact_container_cleanup']=cleanup;result['fixture_cleanup_confirmed']=len(cleanup)==2 and all(x['removed_or_absent'] for x in cleanup)
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-sdk-source-mount-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('SDK_SOURCE_MOUNT_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
