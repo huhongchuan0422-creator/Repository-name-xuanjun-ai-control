@@ -1,0 +1,25 @@
+name: Work cost and canary source gates
+on:
+  pull_request:
+    paths:
+      - scripts/task_cost_projection.py
+      - scripts/canary_evidence_coverage.py
+      - tests/test_task_cost_projection.py
+      - tests/test_canary_evidence_coverage.py
+      - docs/TASK_COST_PROJECTION.md
+      - docs/CANARY_EVIDENCE_COVERAGE.md
+      - .github/workflows/work-cost-canary-gates.yml
+permissions:
+  contents: read
+jobs:
+  offline-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate isolated source boundaries
+        run: |
+          python3 -B -m unittest discover -s tests -p 'test_task_cost_projection.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_canary_evidence_coverage.py' -v
