@@ -65,3 +65,21 @@ for unit in ('xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.ser
  info['entrypoint_sources']=findings;aux[unit]=info
 print('AUXILIARY_STATIC_EFFECT_SCOPE='+json.dumps(aux,sort_keys=True))
 print('AUXILIARY_STOP=NO; AUTHORIZATION_NOT_EXPANDED')
+
+import glob
+modules=[]
+for path in glob.glob('/home/xuanjun_dev/uk-stage1-minimal/**/uk_owner_callback.py',recursive=True):
+ assert os.path.realpath(path)==path
+ with open(path,'rb') as f:raw=f.read(262145)
+ assert len(raw)<=262144
+ text=raw.decode();tree=ast.parse(text);verbs=[];imports=[];calls=[]
+ for node in ast.walk(tree):
+  if isinstance(node,ast.ImportFrom):imports.append(node.module)
+  if isinstance(node,ast.Import):imports.extend(x.name for x in node.names)
+  if isinstance(node,ast.Str):
+   q=node.s.strip().split()
+   if q and q[0].upper() in ('INSERT','UPDATE','DELETE','REPLACE','SELECT','CREATE'):verbs.append(q[0].upper())
+  if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute):
+   if node.func.attr in ('claim','finish','approve','reject','execute','executemany','commit','connect'):calls.append(node.func.attr)
+ modules.append({'path':path,'sha256':hashlib.sha256(raw).hexdigest(),'imports':sorted(set(imports)),'sql_verbs':sorted(set(verbs)),'effect_call_names':sorted(set(calls)),'old_database_literal':'state.sqlite' in text})
+print('CALLBACK_DEPENDENCY_EFFECTS='+json.dumps(modules,sort_keys=True))
