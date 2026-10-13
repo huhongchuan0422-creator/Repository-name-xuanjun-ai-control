@@ -211,61 +211,7 @@ def codex_version_facts():
         after=file_identity(binding['path'])
         if before!=after:raise ValueError('CODEX_VERSION_SOURCE_CHANGED')
         text=process.stdout.decode('ascii').strip()
-        if process.returncode!=0 or not re.match(r'^codex-cli [0-9]+\.[0-9]+\.[0-9]+
-    if socket.gethostname().split('.')[0]!=HOST or os.geteuid()!=0:
-        raise SystemExit('HOLD_FIXED_UK_ROOT_IDENTITY')
-    if sys.version_info[:3]!=(3,6,8):
-        raise SystemExit('HOLD_PYTHON_VERSION')
-    result={
-      'schema':1,
-      'state':'P2_UK_INSTALL_PLAN_FACTS',
-      'python_version':list(sys.version_info[:3]),
-      'model_calls':0,
-      'effects':0,
-      'legacy_database':maybe_identity(LEGACY_DB),
-      'activation':activation_fact(),
-      'units':[unit_fact(x) for x in UNITS],
-      'users':dict((x,identity_fact(x)) for x in IDENTITIES),
-      'groups':dict((x,group_fact(x)) for x in GROUPS),
-      'oauth_reference':maybe_identity(AUTH_DB),
-      'tls':tls_refs(),
-      'docker_socket':socket_identity('/var/run/docker.sock'),
-      'python':file_identity('/usr/libexec/platform-python3.6',64*1024*1024),
-      'openclaw':file_identity('/home/xuanjun_dev/.openclaw/bin/openclaw',16*1024*1024),
-      'gateway_auth_env':gateway_auth_env_fact(),
-      'proposed_identity_ids':proposed_identity_ids(),
-      'gh_binary':maybe_identity('/usr/bin/gh'),
-      'gh_binary_candidates':[maybe_identity(os.path.realpath(p)) for p in (
-          '/usr/bin/gh','/usr/local/bin/gh','/opt/xuanjun-runtime/gh/gh',
-          '/home/xuanjun_dev/.local/bin/gh')],
-      # File metadata only: never print tokens, HMAC keys or identities.
-      'required_private_input_paths':[path_fact(p) for p in (
-          '/etc/xuanjun-development/github-intake-token',
-          '/etc/xuanjun-owner-callback/owner-dashboard-token',
-          '/etc/xuanjun-owner-callback/owner-callback-auth',
-          '/etc/xuanjun-owner-callback/owner-callback-hmac',
-          '/etc/xuanjun-owner-callback/owner-user-id',
-          '/etc/xuanjun-owner-callback/owner-chat-id')],
-      'https_runtime_paths':[path_fact(p) for p in (
-          '/usr/sbin/nginx','/etc/nginx','/usr/bin/caddy',
-          '/etc/caddy','/etc/letsencrypt','/etc/ssl/private')],
-      'codex_version_facts':codex_version_facts(),
-      'codex_binary_candidates':find_named_files('/home/xuanjun_dev/.openclaw','codex'),
-      'plan_parents':[path_fact(x) for x in (
-          '/etc','/opt','/var/lib','/var/lib/xuanjun-development',
-          '/opt/xuanjun-runtime','/home/xuanjun_dev/uk-stage1-minimal')],
-      'openclaw_paths':[path_fact(x) for x in (
-          '/home/xuanjun_dev','/home/xuanjun_dev/.openclaw',
-          '/home/xuanjun_dev/.openclaw/bin',
-          '/home/xuanjun_dev/.openclaw/tools',
-          '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0',
-          '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node',
-          '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw')],
-    }
-    print(json.dumps(result,sort_keys=True,separators=(',',':')))
-
-if __name__=='__main__':main()
-,text):
+        if process.returncode!=0 or re.fullmatch(r'codex-cli [0-9]+[.][0-9]+[.][0-9]+',text) is None:
             raise ValueError('CODEX_VERSION_INVALID')
         results.append({'identity':after,'version':text,'model_calls':0,'operation':'offline_version_only'})
     return results
@@ -308,6 +254,7 @@ def main():
       'https_runtime_paths':[path_fact(p) for p in (
           '/usr/sbin/nginx','/etc/nginx','/usr/bin/caddy',
           '/etc/caddy','/etc/letsencrypt','/etc/ssl/private')],
+      'codex_version_facts':codex_version_facts(),
       'codex_binary_candidates':find_named_files('/home/xuanjun_dev/.openclaw','codex'),
       'plan_parents':[path_fact(x) for x in (
           '/etc','/opt','/var/lib','/var/lib/xuanjun-development',
