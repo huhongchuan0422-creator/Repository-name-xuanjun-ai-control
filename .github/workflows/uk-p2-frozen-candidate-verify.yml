@@ -228,102 +228,82 @@ jobs:
           print('PROTECTED_PREPARATION_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
 
-      - name: Stage pinned official binaries and protected prerequisites subplan only
+      - name: Reuse protected preparation and inspect actual UK HTTPS inputs
         shell: bash
         run: |
           set -euo pipefail
           sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
-          import os,sys,socket,stat,json,hashlib,urllib.request,tarfile,subprocess
+          import os,sys,stat,hashlib,json,socket,subprocess,shutil
           assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
           root=sys.argv[1]
-          info=os.lstat(root)
-          assert stat.S_ISDIR(info.st_mode) and info.st_uid==0 and not info.st_mode&0o022
-          inventory=json.load(open(root+'/protected-prerequisite-inventory.json'))
-          assert inventory['artifact_id']==11796280855
-          assets=[
-           ('gh','https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_amd64.tar.gz',
-            'bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386',33554432,
-            'gh_2.102.0_linux_amd64/bin/gh','/opt/xuanjun-runtime/gh/gh','gh version 2.102.0'),
-           ('codex','https://github.com/openai/codex/releases/download/rust-v0.160.0/codex-x86_64-unknown-linux-musl.tar.gz',
-            '306865417d4ee7a927785852910a527f41e1e159add390ac5ae3accb67d44a13',109304578,
-            'codex-x86_64-unknown-linux-musl','/opt/xuanjun-runtime/codex-0.160.0/codex','codex-cli 0.160.0')]
-          stage=root+'/pinned-binaries';os.mkdir(stage,0o700)
-          home=stage+'/offline-home';os.mkdir(home,0o700)
-          bindings=[];receipts=[]
-          for name,url,digest,bound,member,target,version in assets:
-              archive=stage+'/'+name+'.tar.gz';h=hashlib.sha256();size=0
-              fd=os.open(archive,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-              with os.fdopen(fd,'wb') as output:
-                  with urllib.request.urlopen(url,timeout=45) as response:
-                      while True:
-                          chunk=response.read(1048576)
-                          if not chunk:break
-                          size+=len(chunk)
-                          if size>bound:raise ValueError('PINNED_ARCHIVE_BOUND')
-                          h.update(chunk);output.write(chunk)
-                  output.flush();os.fsync(output.fileno())
-              if h.hexdigest()!=digest:raise ValueError('PINNED_ARCHIVE_DIGEST')
-              path=stage+'/'+name;binary_hash=hashlib.sha256();total=0
-              with tarfile.open(archive,'r:gz') as tf:
-                  entries=[m for m in tf.getmembers() if m.name==member]
-                  if len(entries)!=1 or not entries[0].isfile() or not 0<entries[0].size<=536870912:
-                      raise ValueError('EXACT_OFFICIAL_BINARY_MEMBER_REQUIRED')
-                  fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o500)
-                  with os.fdopen(fd,'wb') as output:
-                      source=tf.extractfile(entries[0]);header=source.read(20)
-                      if header[:6]!=b'\x7fELF\x02\x01' or header[18:20]!=b'\x3e\x00':
-                          raise ValueError('PINNED_X86_64_ELF_REQUIRED')
-                      output.write(header);binary_hash.update(header);total=len(header)
-                      while True:
-                          chunk=source.read(1048576)
-                          if not chunk:break
-                          total+=len(chunk)
-                          if total>536870912:raise ValueError('PINNED_BINARY_BOUND')
-                          output.write(chunk);binary_hash.update(chunk)
-                      if total!=entries[0].size:raise ValueError('PINNED_BINARY_SIZE')
-                      output.flush();os.fsync(output.fileno())
-              actual=binary_hash.hexdigest()
-              if name=='gh' and actual!='7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b':
-                  raise ValueError('EXISTING_GH_RECEIPT_MISMATCH')
-              result=subprocess.check_output([path,'--version'],stderr=subprocess.DEVNULL,timeout=15,
-                env={'HOME':home,'PATH':'/usr/bin:/bin','LANG':'C','GH_NO_UPDATE_NOTIFIER':'1','GH_NO_EXTENSION_UPDATE_NOTIFIER':'1','GH_PROMPT_DISABLED':'1'})
-              if len(result)>4096 or not result.decode('utf-8').splitlines()[0].startswith(version):
-                  raise ValueError('PINNED_OFFLINE_VERSION_MISMATCH')
-              os.chmod(path,0o555)
-              bindings.append({'source':path,'target':target,'sha256':actual})
-              receipts.append({'name':name,'official_archive_sha256':digest,'binary_sha256':actual,'binary_size':total,'offline_version':version,'installed':False})
-          pairs=inventory['candidate_free_uid_gid_pairs_not_reserved']
-          assert len(pairs)==4
-          names=('xuanjun-dispatcher','xuanjun-callback','xj_codex_worker','xuanjun-control-db')
-          groups=dict(zip(names,pairs));users={};directories=[]
-          def directory(path,uid=0,gid=0,mode=0o755):
-              directories.append({'path':path,'uid':uid,'gid':gid,'mode':mode})
-          for path in ('/opt/xuanjun-runtime','/opt/xuanjun-runtime/gh','/opt/xuanjun-runtime/codex-0.160.0',
-           '/var/lib/xuanjun-development','/var/lib/xuanjun-development/users'):
-              directory(path)
-          directory('/etc/xuanjun-development',0,pairs[3],0o750)
-          directory('/etc/xuanjun-owner-callback',0,pairs[3],0o750)
-          for name in names[:3]:
-              uid=groups[name];home='/var/lib/xuanjun-development/users/'+name
-              users[name]={'uid':uid,'gid':uid,'home':home,
-                'groups':[] if name=='xj_codex_worker' else ['xuanjun-control-db']}
-              directory(home,uid,uid,0o700)
-          plan={'schema':1,'groups':groups,'users':users,'directories':directories,'binaries':bindings}
-          sys.path.insert(0,root+'/xuanjun-p2-package/stage1')
-          from p2_prerequisites import validate
-          validate(plan)
-          def protected_write(path,value):
-              raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
-              fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-              with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-              return hashlib.sha256(raw).hexdigest()
-          plan_path=root+'/protected-prerequisites-subplan.json'
-          plan_hash=protected_write(plan_path,plan)
-          record={'schema':1,'state':'PINNED_BINARIES_STAGED_SUBPLAN_VALIDATED_NOT_INSTALLED','artifact_id':11796280855,
-           'subplan_sha256':plan_hash,'subplan_path':plan_path,'binaries':receipts,
-           'scope':'BINARY_AND_ACCOUNT_PREREQUISITES_ONLY_NOT_COMPLETE_P2_PLAN',
-           'missing_full_plan_sections':['protected_receiver_auth','runtime_provisioning','TLS_callback','cutover_activation'],
-           'accounts_created':False,'services_changed':False,'canonical_ledger_changed':False,'model_calls':0}
-          protected_write(root+'/protected-binary-preparation-receipt.json',record)
-          print(json.dumps(record,sort_keys=True))
+          prior='/tmp/p2pkg-38365394514-1'
+          def protected(path,maximum=1048576):
+              if os.path.realpath(path)!=path:raise ValueError('PROTECTED_CANONICAL_PATH')
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno())
+                  if not stat.S_ISREG(s.st_mode) or s.st_uid!=0 or s.st_mode&0o077 or s.st_size>maximum:
+                      raise ValueError('PROTECTED_ROOT_FILE')
+                  return f.read(maximum+1)
+          raw=protected(prior+'/protected-prerequisites-subplan.json')
+          assert hashlib.sha256(raw).hexdigest()=='9fbe85c665824a2c7b362dfb010fa47d3f144b67cd8dffa5b153efc4f64334a4'
+          plan=json.loads(raw.decode())
+          for b in plan['binaries']:
+              p=b['source'];assert p.startswith(prior+'/pinned-binaries/') and os.path.realpath(p)==p
+              fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW);h=hashlib.sha256()
+              with os.fdopen(fd,'rb') as f:
+                  before=os.fstat(f.fileno());assert before.st_uid==0 and stat.S_IMODE(before.st_mode)==0o555
+                  while True:
+                      x=f.read(1048576)
+                      if not x:break
+                      h.update(x)
+                  after=os.fstat(f.fileno())
+                  assert (before.st_size,before.st_mtime_ns)==(after.st_size,after.st_mtime_ns)
+              assert h.hexdigest()==b['sha256']
+          print('EXISTING_PINNED_BINARIES_AND_PROTECTED_SUBPLAN_REUSED=PASS')
+          result={'schema':1,'state':'UK_HTTPS_AND_PLAN_INPUT_INVENTORY_NOT_INSTALLED',
+           'artifact_id':11796280855,'owner_hostname':'uk.wenwenwenyiyiyi.work','prior_subplan_path':prior+'/protected-prerequisites-subplan.json',
+           'prior_subplan_sha256':hashlib.sha256(raw).hexdigest(),'packages_installed':False,
+           'credentials_read':False,'services_changed':False,'canonical_ledger_changed':False}
+          try:
+              result['dns_a']=sorted({x[4][0] for x in socket.getaddrinfo(result['owner_hostname'],443,socket.AF_INET,socket.SOCK_STREAM)})
+          except Exception as e:result['dns_state']='UNKNOWN_'+type(e).__name__
+          result['required_dns_ip']='8.208.119.115';result['dns_matches_expected']=result.get('dns_a')==['8.208.119.115']
+          p=subprocess.run(['/usr/sbin/ss','-H','-ltn'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+          listeners=[]
+          for line in p.stdout.decode('utf-8','replace').splitlines():
+              parts=line.split()
+              if len(parts)>=4 and parts[3].rsplit(':',1)[-1] in ('80','443'):
+                  listeners.append(parts[3])
+          result['http_https_listeners']=listeners
+          result['available_tools']={name:shutil.which(name) for name in ('nginx','certbot','acme.sh','openssl','dnf','yum','rpm')}
+          os_data={}
+          with open('/etc/os-release') as f:
+              for line in f:
+                  key,sep,value=line.strip().partition('=')
+                  if key in ('ID','VERSION_ID','PRETTY_NAME'):os_data[key]=value.strip('"')
+          result['os']=os_data
+          paths=('/usr/sbin/nginx','/usr/bin/certbot','/root/.acme.sh/acme.sh',
+           '/etc/letsencrypt/live/uk.wenwenwenyiyiyi.work','/etc/nginx',
+           '/home/xuanjun_dev/uk-stage1-minimal','/tmp/p2pkg-38365394514-1')
+          result['paths']=[]
+          for path in paths:
+              try:
+                  s=os.lstat(path);result['paths'].append({'path':path,'exists':True,'uid':s.st_uid,'mode':oct(stat.S_IMODE(s.st_mode)),'symlink':stat.S_ISLNK(s.st_mode)})
+              except FileNotFoundError:result['paths'].append({'path':path,'exists':False})
+          result['callback_named_candidates']=[]
+          for base in ('/home/xuanjun_dev/uk-stage1-minimal','/home/xuanjun_dev'):
+              count=0
+              for name in sorted(os.listdir(base)):
+                  count+=1
+                  if count>500:break
+                  if any(word in name.lower() for word in ('callback','canary','owner')):
+                      result['callback_named_candidates'].append({'parent':base,'name':name})
+                      if len(result['callback_named_candidates'])>=30:break
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-https-plan-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('PROTECTED_HTTPS_PLAN_INPUTS_SHA256='+hashlib.sha256(packed).hexdigest())
           PY
