@@ -1032,3 +1032,48 @@ jobs:
           with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
           print(json.dumps(result,sort_keys=True));print('NATIVE_DOCKER_IMAGE_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
           PY
+
+      - name: Diagnose Docker daemon and reuse installed official sandbox build assets without execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,socket,json,hashlib,subprocess
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];package='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw'
+          with open(package+'/package.json','rb') as f:
+              s=os.fstat(f.fileno());raw=f.read(1048577);assert s.st_uid==1002 and not s.st_mode&0o022 and len(raw)<=1048576
+          meta=json.loads(raw.decode())
+          result={'schema':1,'installed_openclaw_version':meta.get('version'),'package_json_sha256':hashlib.sha256(raw).hexdigest(),'assets':[],'model_calls':0,'services_changed':False,'containers_created':False,'images_built':False,'images_pulled':False,'writer_admission':False}
+          p=subprocess.run(['/usr/bin/docker','version','--format','{{.Server.Version}}'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+          result['docker_server_exit']=p.returncode
+          if p.returncode==0:result['docker_server_version']=p.stdout.decode().strip()
+          p=subprocess.run(['systemctl','show','docker.service','--property=LoadState,ActiveState,SubState'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+          result['docker_service']=dict(line.split('=',1) for line in p.stdout.decode().splitlines() if '=' in line)
+          for image in ('openclaw-sandbox:bookworm-slim','debian:bookworm-slim'):
+              p=subprocess.run(['/usr/bin/docker','image','inspect','--format','{{.Id}}',image],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+              row={'image':image,'exit':p.returncode}
+              if p.returncode==0:row['image_id']=p.stdout.decode().strip()
+              else:
+                  error=p.stderr.decode('utf-8','replace').lower()
+                  row['failure_class']='IMAGE_NOT_FOUND' if 'no such image' in error or 'no such object' in error else 'DAEMON_OR_OTHER_ERROR'
+              result.setdefault('image_inventory',[]).append(row)
+          count=0
+          for parent,dirs,files in os.walk(package,followlinks=False):
+              dirs[:]=[x for x in dirs if x not in ('node_modules','.git')]
+              for name in files:
+                  count+=1;assert count<50000
+                  if name not in ('Dockerfile.sandbox','Dockerfile.sandbox-common','Dockerfile.sandbox-browser','sandbox-setup.sh','sandbox-common-setup.sh'):continue
+                  path=parent+'/'+name
+                  if os.path.realpath(path)!=path:continue
+                  with open(path,'rb') as f:
+                      s=os.fstat(f.fileno());data=f.read(1048577);assert s.st_uid==1002 and not s.st_mode&0o022 and len(data)<=1048576
+                  row={'path':path,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data),'uid':s.st_uid}
+                  if name.startswith('Dockerfile'):row['content']=data.decode()
+                  result['assets'].append(row)
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-docker-build-asset-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('DOCKER_BUILD_ASSET_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
