@@ -216,6 +216,24 @@ def codex_version_facts():
         results.append({'identity':after,'version':text,'model_calls':0,'operation':'offline_version_only'})
     return results
 
+def protected_input_fact(path):
+    # Fixed reviewed paths only; never expose contents or secret digests.
+    try:
+        info=os.lstat(path)
+    except OSError:
+        return {'path':path,'state':'HOLD_MISSING_PROTECTED_INPUT'}
+    if (not stat.S_ISREG(info.st_mode) or os.path.realpath(path)!=path
+            or info.st_uid!=0 or info.st_gid!=0
+            or stat.S_IMODE(info.st_mode)!=0o600
+            or not 0<info.st_size<=65536):
+        return {'path':path,'state':'HOLD_UNSAFE_PROTECTED_INPUT'}
+    parent=os.lstat(os.path.dirname(path))
+    if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid!=0
+            or parent.st_mode&0o022):
+        return {'path':path,'state':'HOLD_UNSAFE_INPUT_PARENT'}
+    return {'path':path,'state':'METADATA_READY_CONTENT_NOT_VERIFIED'}
+
+
 def main():
     if socket.gethostname().split('.')[0]!=HOST or os.geteuid()!=0:
         raise SystemExit('HOLD_FIXED_UK_ROOT_IDENTITY')
@@ -244,7 +262,7 @@ def main():
           '/usr/bin/gh','/usr/local/bin/gh','/opt/xuanjun-runtime/gh/gh',
           '/home/xuanjun_dev/.local/bin/gh')],
       # File metadata only: never print tokens, HMAC keys or identities.
-      'required_private_input_paths':[path_fact(p) for p in (
+      'required_private_input_paths':[protected_input_fact(p) for p in (
           '/etc/xuanjun-development/github-intake-token',
           '/etc/xuanjun-owner-callback/owner-dashboard-token',
           '/etc/xuanjun-owner-callback/owner-callback-auth',
