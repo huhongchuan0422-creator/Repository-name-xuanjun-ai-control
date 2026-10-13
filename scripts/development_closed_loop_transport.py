@@ -5,7 +5,6 @@ are reconciled by marker before any subsequent POST.
 """
 from __future__ import print_function
 
-import hashlib
 import json
 import re
 import subprocess
@@ -49,7 +48,7 @@ class FixedPr17Transport(object):
         marker=_marker(outbox_id)
         rows=self._run([self.gh_bin,'api',
             'repos/'+REPOSITORY+'/issues/'+str(PR_NUMBER)+'/comments',
-            '--paginate'])
+            '--paginate','--slurp'])
         matches=[]
         def walk(value):
             if isinstance(value,list):
@@ -57,8 +56,18 @@ class FixedPr17Transport(object):
             elif isinstance(value,dict):
                 body=value.get('body')
                 login=(value.get('user') or {}).get('login')
-                if isinstance(body,str) and marker in body and login==OWNER:
-                    matches.append(value)
+                if (isinstance(body,str) and body.startswith(marker+'\n')
+                        and login==OWNER and isinstance(value.get('id'),int)):
+                    try:
+                        envelope=json.loads(body[len(marker)+1:])
+                    except (ValueError,TypeError):
+                        continue
+                    if (isinstance(envelope,dict)
+                            and envelope.get('schema')==1
+                            and envelope.get('kind')=='TASK45_OUTBOX_DELIVERY'
+                            and envelope.get('outbox_id')==outbox_id
+                            and 'payload' in envelope):
+                        matches.append(value)
         walk(rows)
         if len(matches)>1:
             raise ValueError('DUPLICATE_EXTERNAL_RECEIPT')
@@ -68,7 +77,7 @@ class FixedPr17Transport(object):
                 'pr_number':PR_NUMBER}
 
     def send(self,row):
-        if not isinstance(row,dict) or set(row)<={'outbox_id','payload_json'}:
+        if not isinstance(row,dict) or not {'outbox_id','payload_json'} <= set(row):
             raise ValueError('EXACT_OUTBOX_ROW_REQUIRED')
         outbox_id=row['outbox_id'];marker=_marker(outbox_id)
         existing=self.reconcile(outbox_id)
@@ -87,7 +96,7 @@ class FixedPr17Transport(object):
             # External write may have succeeded. Caller must reconcile later.
             raise
         if ((value.get('user') or {}).get('login')!=OWNER
-                or marker not in value.get('body','')
+                or value.get('body')!=body
                 or not isinstance(value.get('id'),int)):
             raise ValueError('UNTRUSTED_EXTERNAL_RECEIPT')
         return {'message_id':str(value['id']),'outbox_id':outbox_id,
