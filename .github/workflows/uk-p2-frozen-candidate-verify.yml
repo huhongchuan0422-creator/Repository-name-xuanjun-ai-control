@@ -307,3 +307,66 @@ jobs:
           print(json.dumps(result,sort_keys=True))
           print('PROTECTED_HTTPS_PLAN_INPUTS_SHA256='+hashlib.sha256(packed).hexdigest())
           PY
+
+      - name: Inspect existing callback references and vendor package candidates only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,re,subprocess,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          result={'schema':1,'state':'EXISTING_CALLBACK_AND_TLS_PACKAGE_METADATA_ONLY','artifact_id':11796280855,
+           'service_changes':False,'canonical_mutation':False,'credential_values_exported':False}
+          entries=[]
+          bases=('/home/xuanjun_dev/uk-stage1-minimal/owner-callback',
+           '/home/xuanjun_dev/uk-stage1-minimal/owner-callback.env',
+           '/home/xuanjun_dev/uk-stage1-minimal/owner-telegram',
+           '/home/xuanjun_dev/uk-owner-candidate-20261011T003934Z',
+           '/home/xuanjun_dev/uk-owner-candidate-20261011T004631Z',
+           '/home/xuanjun_dev/uk-owner-notify')
+          paths=[]
+          for base in bases:
+              try:s=os.lstat(base)
+              except FileNotFoundError:continue
+              if stat.S_ISDIR(s.st_mode) and not stat.S_ISLNK(s.st_mode):
+                  paths.extend(base+'/'+x for x in sorted(os.listdir(base))[:50] if re.fullmatch(r'[A-Za-z0-9_.-]{1,100}',x))
+              elif stat.S_ISREG(s.st_mode):paths.append(base)
+          for path in paths[:200]:
+              if os.path.realpath(path)!=path:continue
+              s=os.lstat(path)
+              row={'path':path,'uid':s.st_uid,'gid':s.st_gid,'mode':oct(stat.S_IMODE(s.st_mode)),'size':s.st_size,'regular':stat.S_ISREG(s.st_mode)}
+              if row['regular'] and 0<s.st_size<=65536 and path.endswith(('.env','.json')):
+                  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+                  with os.fdopen(fd,'rb') as f:data=f.read(65537)
+                  if path.endswith('.env'):
+                      text=data.decode('utf-8','replace')
+                      row['env_field_names']=re.findall(r'(?m)^(?:export[ ]+)?([A-Z][A-Z0-9_]{0,79})[ ]*=',text)[:40]
+                  else:
+                      try:
+                          value=json.loads(data.decode('utf-8'))
+                          if isinstance(value,dict):row['json_field_names']=[k for k in value if isinstance(k,str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,79}',k)][:40]
+                      except Exception:row['json_parse']='UNKNOWN'
+              entries.append(row)
+          result['existing_candidate_file_metadata']=entries
+          cache=root+'/dnf-preparation';os.mkdir(cache,0o700)
+          argv=['/bin/dnf','-q','--setopt=cachedir='+cache+'/cache','--setopt=persistdir='+cache+'/persist',
+           '--setopt=logdir='+cache+'/log','--setopt=timeout=15','--setopt=retries=1','list','--showduplicates','nginx','certbot','python3-certbot']
+          try:
+              p=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=90)
+              text=p.stdout.decode('utf-8','replace');rows=[]
+              for line in text.splitlines():
+                  cols=line.split()
+                  if len(cols)==3 and re.fullmatch(r'(nginx|certbot|python3-certbot)\.(x86_64|noarch)',cols[0]) and all(re.fullmatch(r'[A-Za-z0-9_.:+@-]{1,150}',x) for x in cols[1:]):
+                      rows.append(cols)
+              result['official_package_candidates']=rows[-40:]
+              result['package_query_exit']=p.returncode
+          except subprocess.TimeoutExpired:
+              result['package_query']='HOLD_TIMEOUT'
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-callback-tls-metadata.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('PROTECTED_CALLBACK_TLS_METADATA_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
