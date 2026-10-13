@@ -417,7 +417,53 @@ jobs:
                   for key in records:
                       match=re.search(r':feishu:(?:group|direct):(oc_[A-Za-z0-9_-]+)$',key)
                       if match:routes.add(match.group(1))
-              public['existing_chat_candidate_count']=len(routes)
+                  if not routes:
+                  import subprocess
+                  cli='/home/xuanjun_dev/.openclaw/bin/openclaw'
+                  with open(cli,'rb') as f:assert hashlib.sha256(f.read()).hexdigest()=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
+                  p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--',cli,'sessions','--json','--all-agents'],env={'HOME':'/home/xuanjun_dev','PATH':'/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin:/usr/bin:/bin','LANG':'C','NO_COLOR':'1'},stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=30)
+                  public['native_session_query_exit']=p.returncode
+                  assert p.returncode==0 and len(p.stdout)<=2097152
+                  text=p.stdout.decode('utf-8')
+                  records=json.loads(text[text.index('{'):]).get('sessions',[])
+                  assert isinstance(records,list) and len(records)<=10000
+                  for record in records:
+                      match=re.search(r':feishu:(?:group|direct):(oc_[A-Za-z0-9_-]+)
+              assert len(routes)==1 and re.fullmatch(r'cli_[A-Za-z0-9_-]{1,128}',config.get('appId',''))
+              chat_id=next(iter(routes))
+              auth=api('auth/v3/tenant_access_token/internal',body={'app_id':config['appId'],'app_secret':config['appSecret']})
+              public['auth_code']=auth.get('code');assert auth.get('code')==0
+              token=auth['tenant_access_token']
+              bot=api('bot/v3/info',token)
+              public['expected_bot_name_match']=bot.get('bot',{}).get('app_name')=='玄钧云汇开发总管'
+              chat=api('im/v1/chats/'+chat_id,token)
+              public['chat_is_p2p']=chat.get('code')==0 and chat.get('data',{}).get('chat_mode')=='p2p'
+              history=api('im/v1/messages?container_id_type=chat&container_id='+chat_id+'&sort_type=ByCreateTimeDesc&page_size=50',token)
+              matches=[]
+              for item in history.get('data',{}).get('items',[]):
+                  try:
+                      value=json.loads(item.get('body',{}).get('content','')).get('text','')
+                      if 'XJ_P2_FEISHU_CANARY_11787198841_20261013' in value and item.get('chat_id')==chat_id:
+                          matches.append(item['message_id'])
+                  except (ValueError,TypeError,KeyError):pass
+              public['prior_canary_readback_match']=bool(matches)
+              assert public['expected_bot_name_match'] and public['chat_is_p2p'] and matches
+              private['feishu_binding']={'app_id':config['appId'],'chat_id':chat_id,'package_sha256':private['runtime_release_sha256']}
+              private['prior_canary_message_ids']=matches
+              public['state']='EXISTING_FEISHU_CHAT_BINDING_INPUTS_VERIFIED'
+          except Exception as e:public['hold_reason']=type(e).__name__
+          private['public_receipt']=public
+          raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-owner-binding-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(public,sort_keys=True))
+          print('OWNER_BINDING_INPUTS_PATH='+path)
+          print('OWNER_BINDING_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+,record.get('key',''))
+                      if match:routes.add(match.group(1))
+          public['existing_chat_candidate_count']=len(routes)
               assert len(routes)==1 and re.fullmatch(r'cli_[A-Za-z0-9_-]{1,128}',config.get('appId',''))
               chat_id=next(iter(routes))
               auth=api('auth/v3/tenant_access_token/internal',body={'app_id':config['appId'],'app_secret':config['appSecret']})
