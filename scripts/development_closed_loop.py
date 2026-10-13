@@ -168,3 +168,100 @@ def closed_loop_status(supervisor, task_id):
         return {'state': 'WAITING_HANDOFF_ACK',
                 'task_state': task['state']}
     return {'state': 'IN_PROGRESS', 'task_state': task['state']}
+
+def admitted_receipt_ack(supervisor, task_id, attempt_id, event_id,
+                         observed_at, evidence_ref, binding):
+    """Record RECEIVED only for an already claimed exact canonical attempt.
+
+    Neither this ACK nor its notice grants an execution lease. The caller must
+    authenticate binding with the existing canonical admission provider.
+    """
+    task = _task(supervisor, task_id)
+    required = ('lease_id', 'fence', 'epoch', 'checkpoint_sha256',
+                'spec_sha256', 'run_id', 'session_id')
+    if (not isinstance(binding, dict) or set(binding) != set(required)
+            or task['state'] != 'RECEIVED'
+            or task['attempt_id'] != attempt_id
+            or any(task[k] != binding[k] for k in required)):
+        raise ValueError('CANONICAL_ADMISSION_ACK_REQUIRED')
+    return supervisor.record(
+        task_id, attempt_id, event_id, 'RECEIVED', observed_at,
+        evidence_kind='PHASE_EXECUTION',
+        evidence_ref=_nonempty(evidence_ref, 'ADMISSION_EVIDENCE_REQUIRED'),
+        payload={'admission_verified': True,
+                 'run_id': binding['run_id'],
+                 'session_id': binding['session_id'],
+                 'checkpoint_sha256': binding['checkpoint_sha256'],
+                 'spec_sha256': binding['spec_sha256'],
+                 'lease_id': binding['lease_id'],
+                 'fence': binding['fence'], 'epoch': binding['epoch']})
+
+
+def enqueue_owner_notice(supervisor, task_id, event_id, observed_at,
+                         kind, exact_commit, github_url):
+    """Persist notice through existing events/outbox, not a new sender.
+
+    Only current canonical task information is used; actual delivery requires
+    separately enrolled Owner transport and outbox reconciliation.
+    """
+    import re
+    import hashlib
+    from task_supervisor import canonical, finite
+    if kind not in ('RECEIPT_TIMEOUT', 'PROGRESS_TIMEOUT',
+                    'FAILURE', 'COMPLETION'):
+        raise ValueError('NOTICE_KIND_REQUIRED')
+    if (not isinstance(event_id, str) or not event_id
+            or len(event_id) > 200 or not finite(observed_at)
+            or not isinstance(exact_commit, str)
+            or re.fullmatch(r'[0-9a-f]{40}', exact_commit) is None
+            or not isinstance(github_url, str)
+            or re.fullmatch(
+                r'https://github[.]com/huhongchuan0422-creator/'
+                r'Repository-name-xuanjun-ai-control/'
+                r'(?:pull|issues|actions/runs)/[0-9]+(?:#issuecomment-[0-9]+)?',
+                github_url) is None):
+        raise ValueError('BOUNDED_OWNER_NOTICE_REQUIRED')
+    supervisor.db.execute('BEGIN IMMEDIATE')
+    with supervisor.db:
+        task = supervisor._task(task_id)
+        valid = ((kind == 'RECEIPT_TIMEOUT'
+                  and task['state'] == 'READY'
+                  and observed_at >= task['receipt_deadline'])
+                 or (kind == 'PROGRESS_TIMEOUT'
+                     and task['state'] in ('RECEIVED', 'STARTED', 'RUNNING',
+                                           'HANDOFF_PENDING')
+                     and observed_at >= task['progress_deadline'])
+                 or (kind == 'FAILURE' and task['state'] in
+                     ('FAILURE', 'CANCELLED', 'HOLD', 'CAPABILITY_UNAVAILABLE'))
+                 or (kind == 'COMPLETION' and task['state'] == 'SUCCESS'))
+        if not valid:
+            raise ValueError('NOTICE_NOT_SUPPORTED_BY_CANONICAL_STATE')
+        attempt = task['attempt_id']
+        # No receipt deadline extension and no transition to RECEIVED.
+        payload = {
+            'kind': kind, 'task_id': task_id, 'attempt_id': attempt,
+            'state': task['state'], 'source_commit': exact_commit,
+            'github_url': github_url,
+            'checkpoint_sha256': task['checkpoint_sha256'],
+            'spec_sha256': task['spec_sha256'],
+            'lease_id': task['lease_id'], 'fence': task['fence'],
+            'epoch': task['epoch'], 'authority_effect': 'NONE'}
+        seed = canonical({'task_id': task_id, 'attempt_id': attempt,
+                          'event_id': event_id}).encode('utf-8')
+        digest = hashlib.sha256(seed).hexdigest()
+        previous = supervisor.db.execute(
+            'SELECT payload_json FROM events WHERE task_id=? '
+            'AND attempt_id=? AND event_id=?',
+            (task_id, attempt, event_id)).fetchone()
+        value = canonical(payload)
+        if previous is not None:
+            if previous['payload_json'] != value:
+                raise ValueError('NOTICE_EVENT_ID_CONFLICT')
+            return {'duplicate': True, 'outbox_id': digest}
+        supervisor.db.execute(
+            'INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+            (task_id, attempt, event_id, 'OWNER_NOTICE', observed_at,
+             'PHASE_EXECUTION', github_url, value))
+        supervisor._enqueue(task_id, attempt, event_id, payload, observed_at)
+        return {'duplicate': False, 'outbox_id': digest,
+                'state': 'PERSISTED_NOT_DELIVERED'}
