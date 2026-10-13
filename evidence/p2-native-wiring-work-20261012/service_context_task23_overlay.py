@@ -358,16 +358,13 @@ Requires=xuanjun-p2-gateway-relay.socket
         with self._pinned_transaction() as value:
             yield value[0]
 """)
-    old_supervisor = (
-        "    def supervisor(self, clock=None, max_delivery_attempts=3, claim_ttl=30):\n"
-        "        \\\"\\\"\\\"Return supervision adapters bound to this exact canonical generation.\\\"\\\"\\\"\n"
-        "        from execution_supervision import ExecutionSupervisor\n"
+    supervisor_tail = (
         "        return ExecutionSupervisor(self.db_path, clock or self.clock,\n"
         "                                   max_delivery_attempts=max_delivery_attempts,\n"
         "                                   claim_ttl=claim_ttl,\n"
         "                                   activation_store=self.activation_store)\n"
     )
-    new_supervisor = old_supervisor + (
+    inventory_method = (
         "\n"
         "    def record_inventory_notices(self,limit=100):\n"
         "        if self.activation_store is None or self.activation_binding is None:\n"
@@ -389,7 +386,7 @@ Requires=xuanjun-p2-gateway-relay.socket
         "                    'observed':len(page['tasks']),'notices':receipts,\n"
         "                    'dispatch_performed':False}\n"
     )
-    replace_once(ledger,old_supervisor,new_supervisor)
+    replace_once(ledger,supervisor_tail,supervisor_tail+inventory_method)
     # execution_ledger needs stat for inode checks.
     replace_once(ledger,"import sqlite3\nimport time","import sqlite3\nimport stat\nimport time")
 
