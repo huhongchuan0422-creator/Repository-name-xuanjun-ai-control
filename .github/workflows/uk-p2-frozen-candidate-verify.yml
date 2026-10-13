@@ -454,6 +454,20 @@ jobs:
               private['prior_canary_message_ids']=matches
               public['state']='EXISTING_FEISHU_CHAT_BINDING_INPUTS_VERIFIED'
           except Exception as e:public['hold_reason']=type(e).__name__
+          ghpath='/home/xuanjun_dev/.config/gh/hosts.yml'
+          try:
+              fd=os.open(ghpath,os.O_RDONLY|os.O_NOFOLLOW)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno())
+                  assert stat.S_ISREG(s.st_mode) and s.st_uid==1002 and not s.st_mode&0o077 and s.st_size<=65536
+                  raw=f.read()
+              import yaml
+              hosts=yaml.safe_load(raw.decode())
+              value=hosts.get('github.com',{}).get('oauth_token','')
+              if isinstance(value,str) and re.fullmatch(r'(ghp_[A-Za-z0-9]+|github_pat_[A-Za-z0-9_]+|gho_[A-Za-z0-9]+)',value):
+                  private['github_token_reference']={'path':ghpath,'field':'github.com.oauth_token'}
+                  public['github_auth_reference']='EXISTING_PROTECTED_GH_OAUTH_REFERENCE'
+          except (OSError,ValueError,TypeError,AssertionError,ImportError):pass
           private['public_receipt']=public
           raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
           path=root+'/protected-owner-binding-inputs.json'
@@ -532,7 +546,7 @@ jobs:
           assert hashlib.sha256(raw).hexdigest()=='28bd0dd3419b2822ec7b001596e1be1909c22f0ac1b0fa1d307db7a220aa385a'
           private={'schema':1,'state':'ADDITIONAL_EXISTING_INSTALL_INPUTS','durable_preparation_root':prior}
           public={'schema':1,'canonical_mutation':False,'secret_values_exported':False,'services_changed':False,'owner_callback_chat_evidence':'NOT_FOUND','github_auth_reference':'NOT_FOUND'}
-          envpaths={'/home/xuanjun_dev/uk-stage1-minimal/owner-callback.env'}
+          envpaths={'/home/xuanjun_dev/uk-stage1-minimal/owner-callback.env','/home/xuanjun_dev/uk-stage1-minimal/.env','/home/xuanjun_dev/.openclaw/.env'}
           for unit in ('xuanjun-uk-stage1-minimal.service','xuanjun-uk-openclaw.service'):
               with open('/etc/systemd/system/'+unit) as f:text=f.read()
               for path in re.findall(r'(?m)^EnvironmentFile=-?([^\n ]+)',text):
@@ -570,7 +584,7 @@ jobs:
                   cols=[x[1] for x in db.execute('PRAGMA table_info("'+table+'")')]
                   schema[table]=cols
                   users=[x for x in cols if x.lower() in ('user_id','owner_user_id','owner_id','sender_id')]
-                  chats=[x for x in cols if x.lower() in ('chat_id','owner_chat_id')]
+                  chats=[x for x in cols if x.lower() in ('chat_id','owner_chat_id','owner_chat')]
                   for user in users:
                       for chat in chats:
                           rows=db.execute('SELECT DISTINCT "'+chat+'" FROM "'+table+'" WHERE CAST("'+user+'" AS TEXT)=? LIMIT 3',(owner,)).fetchall()
