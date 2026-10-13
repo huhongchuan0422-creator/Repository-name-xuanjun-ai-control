@@ -44,9 +44,10 @@ import subprocess
 """class RelayController(object):
     def __init__(self, config):
         self.socket_path=config['relay_socket']
-        self.server_uid=pwd.getpwnam(config['server_user']).pw_uid
+        self.server_user=config['server_user']
 
     def _call(self, operation, value=None, **params):
+        server_uid=pwd.getpwnam(self.server_user).pw_uid
         request={'operation':operation}
         request.update(params)
         if value is not None: request['value']=value
@@ -58,7 +59,7 @@ import subprocess
             client.connect(self.socket_path)
             credentials=client.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,struct.calcsize('3i'))
             unused_pid,uid,unused_gid=struct.unpack('3i',credentials)
-            if uid!=self.server_uid: raise NativeContractError('Gateway relay peer rejected')
+            if uid!=server_uid: raise NativeContractError('Gateway relay peer rejected')
             client.sendall(raw)
             response=bytearray()
             while b'\\n' not in response:
@@ -106,7 +107,8 @@ def create_controller(config):
     return RelayController(transport)
 """)
     (stage1/'native_gateway_controller.py.json').write_text(
-        '{"relay_socket":"/run/xuanjun-development/p2-gateway.sock","server_user":"xuanjun_dev"}\\n')
+        json.dumps({'relay_socket':'/run/xuanjun-development/p2-gateway.sock',
+                    'server_user':'xuanjun_dev'},sort_keys=True,separators=(',',':'))+'\n')
 
     relay=stage1/'p2_gateway_relay.py'
     relay.write_text(r'''#!/usr/bin/python3

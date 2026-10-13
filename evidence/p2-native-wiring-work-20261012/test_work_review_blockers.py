@@ -48,8 +48,11 @@ class ReviewBlockerTests(unittest.TestCase):
                 self.assertIn('--native-controller '+expected,line)
                 self.assertIn('--native-controller-sha256 '+digest,line)
         transport=json.loads((STAGE1/'native_gateway_controller.py.json').read_text())
-        self.assertEqual(transport['openclaw_bin'],'/home/xuanjun_dev/.openclaw/bin/openclaw')
-        self.assertEqual(transport['openclaw_sha256'],
+        self.assertEqual(transport,{'relay_socket':'/run/xuanjun-development/p2-gateway.sock',
+                                    'server_user':'xuanjun_dev'})
+        relay=json.loads((SOURCE/'deploy/p2-gateway-relay.json.template').read_text())
+        self.assertEqual(relay['openclaw_bin'],'/home/xuanjun_dev/.openclaw/bin/openclaw')
+        self.assertEqual(relay['openclaw_sha256'],
                          'b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2')
 
     def test_real_controller_loader_accepts_exact_and_rejects_missing_wrong_digest(self):
