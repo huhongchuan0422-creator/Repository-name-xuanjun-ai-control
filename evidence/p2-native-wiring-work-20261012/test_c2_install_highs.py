@@ -124,4 +124,110 @@ class RollbackValidationTests(unittest.TestCase):
                 runtime.restore(reference)
             self.assertEqual(runtime.effects,[])
 
+class GatewayLifecycleTests(unittest.TestCase):
+    def test_active_gateway_precedes_relay_and_dispatcher(self):
+        with tempfile.TemporaryDirectory() as d:
+            runtime=ProbeRuntime(d)
+            result=runtime.activate({'provisioning':[]},{'state':'ACTIVE'})
+            self.assertEqual(result,{'services_active':True})
+            self.assertEqual(runtime.effects[0],('start',))
+            starts=[item[1][-1] for item in runtime.effects if item[0]=='command' and item[1][1]=='start']
+            self.assertNotIn('xuanjun-uk-stage1-minimal.service',starts)
+            self.assertLess(starts.index('xuanjun-p2-gateway-relay.service'),
+                            starts.index('xuanjun-development-dispatcher.service'))
+
+    def test_inactive_epoch_has_zero_gateway_or_service_starts(self):
+        with tempfile.TemporaryDirectory() as d:
+            runtime=ProbeRuntime(d)
+            with self.assertRaises(ValueError):runtime.activate({'provisioning':[]},{'state':'QUIESCED'})
+            self.assertEqual(runtime.effects,[])
+
+    def test_gateway_only_restore_keeps_coordinator_masked_and_never_starts(self):
+        import legacy_host_adapter as legacy
+        with tempfile.TemporaryDirectory() as d:
+            real_open=os.open;real_replace=os.replace;real_islink=os.path.islink
+            real_readlink=os.readlink;real_mkstemp=tempfile.mkstemp
+            prefix='/etc/systemd/system/'
+            def mapped(path):
+                return os.path.join(d,'unit-'+path[len(prefix):]) if isinstance(path,str) and path.startswith(prefix) else (d if path=='/etc/systemd/system' else path)
+            units={}
+            for unit in ('xuanjun-uk-openclaw.service','xuanjun-uk-stage1-minimal.service'):
+                data=('original '+unit).encode();backup=os.path.join(d,unit+'.backup')
+                pathlib.Path(backup).write_bytes(data);os.symlink('/dev/null',mapped(prefix+unit))
+                units[unit]={'path':prefix+unit,'backup':backup,'sha256':hashlib.sha256(data).hexdigest(),
+                             'mode':0o644,'uid':0,'gid':0,'was_active':True}
+            class Adapter(legacy.LegacyHostAdapter):
+                def _state(self): return {'schema':1,'units':units,'source_before':{}}
+                def _command(self,*args): self.commands.append(args)
+            adapter=Adapter(d);adapter.commands=[]
+            def digest(path): return hashlib.sha256(pathlib.Path(mapped(path)).read_bytes()).hexdigest()
+            with patch.object(legacy,'protected_hash',side_effect=digest), \
+                 patch.object(legacy.os,'open',side_effect=lambda path,*a,**kw:real_open(mapped(path),*a,**kw)), \
+                 patch.object(legacy.os,'replace',side_effect=lambda src,dst:real_replace(src,mapped(dst))), \
+                 patch.object(legacy.os,'fchown',return_value=None), \
+                 patch.object(legacy.os.path,'islink',side_effect=lambda path:real_islink(mapped(path))), \
+                 patch.object(legacy.os,'readlink',side_effect=lambda path:real_readlink(mapped(path))), \
+                 patch.object(legacy.tempfile,'mkstemp',side_effect=lambda **kw:real_mkstemp(prefix=kw['prefix'],dir=d)):
+                result=adapter.restore_legacy_files(gateway_only=True)
+            self.assertEqual(result,{'unit_files_restored':True,'services_restarted':False})
+            self.assertFalse(real_islink(mapped(prefix+'xuanjun-uk-openclaw.service')))
+            self.assertTrue(real_islink(mapped(prefix+'xuanjun-uk-stage1-minimal.service')))
+            self.assertEqual(adapter.commands,[('daemon-reload',)])
+
+    def test_unmasked_coordinator_refuses_gateway_restore_before_effects(self):
+        import legacy_host_adapter as legacy
+        class Adapter(legacy.LegacyHostAdapter):
+            def _state(self): return {'schema':1,'units':{},'source_before':{}}
+            def _command(self,*args): raise AssertionError('effect')
+        with tempfile.TemporaryDirectory() as d:
+            with patch.object(legacy.os.path,'islink',return_value=False):
+                with self.assertRaisesRegex(ValueError,'OLD_COORDINATOR_MUST_REMAIN_MASKED'):
+                    Adapter(d).restore_legacy_files(gateway_only=True)
+
+    def test_install_restores_only_gateway_after_active_before_runtime(self):
+        import p2_install_entrypoint as entry
+        order=[]
+        class Activation(object):
+            def prepare(self,*args,**kwargs): return {'epoch':1,'instance':'12345678-1234-4234-8234-123456789abc'}
+            def transition(self,before,after,*args):
+                order.append(after);return {'state':after,'epoch':1,'instance':'12345678-1234-4234-8234-123456789abc'}
+        class Adapter(object):
+            def restore_legacy_files(self,gateway_only=False):
+                order.append(('restore',gateway_only));return {'unit_files_restored':True,'services_restarted':False}
+        class Cutover(object):
+            adapter=Adapter()
+            def execute(self,plan): return {'stage':'STAGED','quiescence':{'proof':dict.fromkeys(entry.PROOF_KEYS,True)}}
+        class Runtime(object):
+            def preflight(self,*args): return True
+            def provision(self,*args): return {'schema':1,'receipt_sha256':'a'*64,'rollback_complete':True}
+            def reopen_database(self,*args): return {'database_reopened':True}
+            def activate(self,*args): order.append('runtime');return {'services_active':True}
+        with tempfile.TemporaryDirectory() as d:
+            plan=PlanTlsBindingTests()._plan()
+            expected='/opt/xuanjun-control-releases/'+plan['runtime']['release_directory']
+            result=entry.P2InstallEntrypoint(os.path.join(d,'receipt'),lambda x:expected,
+                                            Cutover(),Activation(),Runtime()).execute(plan)
+            self.assertEqual(result['stage'],'COMPLETE')
+            self.assertEqual(order[-3:],['ACTIVE',('restore',True),'runtime'])
+
+class BoundedReferenceTests(unittest.TestCase):
+    def test_existing_multi_megabyte_oauth_reference_is_read_only_and_bound(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'oauth.sqlite');data=b'x'*(5*1024*1024)
+            pathlib.Path(path).write_bytes(data);os.chmod(path,0o600)
+            ref={'path':path,'sha256':hashlib.sha256(data).hexdigest(),
+                 'owner_uid':os.getuid(),'mode':0o600}
+            before=os.stat(path)
+            mod.FixedHostRuntime._reference(ref)
+            self.assertEqual(os.stat(path).st_mtime_ns,before.st_mtime_ns)
+            ref['sha256']='0'*64
+            with self.assertRaises(ValueError):mod.FixedHostRuntime._reference(ref)
+
+    def test_oversize_reference_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'oauth.sqlite')
+            with open(path,'wb') as f:f.truncate(16*1024*1024+1)
+            with self.assertRaises(ValueError):
+                mod.FixedHostRuntime._reference({'path':path,'sha256':'a'*64,'owner_uid':os.getuid(),'mode':0o600})
+
 if __name__=='__main__':unittest.main(verbosity=2)
