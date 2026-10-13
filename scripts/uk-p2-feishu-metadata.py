@@ -154,6 +154,55 @@ def collect():
                     'chat_mode':mode if mode in ('p2p','group','topic') else 'UNKNOWN',
                     'history_code':history.get('code') if type(history.get('code')) is int else None,
                     'message_chat_types':kinds,'matches_owner_screenshot_notification':screenshot_match})
+            # Read-only integration facts: inspect ONLY the already delivered canary.
+            # Never send, print IDs/content/credentials, or use this as production ACK.
+            result['existing_canary_readonly']={'state':'NOT_FOUND_NOT_PROOF_OF_ABSENCE'}
+            if result.get('bot_matches_owner_screenshot') is True and len(routes)==1 and mode=='p2p':
+                import time, urllib.parse
+                event='XJ_P2_FEISHU_CANARY_11787198841_20261013'
+                expected_text='P2飞书机械核验：已确认本会话为「玄钧云汇开发总管」私聊。当前包11787198841，SHA256前缀3ff24ecc。零模型调用；此消息仅验证通知发送，不代表安装完成。核验标识：'+event
+                expected_original=json.dumps({'text':expected_text},ensure_ascii=False)
+                expected_compact=json.dumps({'text':expected_text},ensure_ascii=False,separators=(',',':'))
+                next_token=None; seen_tokens=set(); found={}; complete=False; started=time.monotonic()
+                for unused in range(10):
+                    if time.monotonic()-started>60:break
+                    params={'container_id_type':'chat','container_id':routes[0],'page_size':50,'sort_type':'ByCreateTimeDesc'}
+                    if next_token is not None:params['page_token']=next_token
+                    page=feishu_api('im/v1/messages?'+urllib.parse.urlencode(params),token)
+                    data=page.get('data')
+                    if type(page.get('code')) is not int or page['code']!=0 or not isinstance(data,dict):break
+                    batch=data.get('items')
+                    if not isinstance(batch,list) or len(batch)>50 or type(data.get('has_more')) is not bool:break
+                    for item in batch:
+                        if not isinstance(item,dict) or item.get('chat_id')!=routes[0] or item.get('msg_type')!='text':continue
+                        sender=item.get('sender');body=item.get('body')
+                        if not isinstance(sender,dict) or sender.get('sender_type')!='app' or not isinstance(body,dict):continue
+                        try:matched=json.loads(body.get('content',''))=={'text':expected_text}
+                        except (ValueError,TypeError):matched=False
+                        ident=item.get('message_id')
+                        if matched and isinstance(ident,str) and re.fullmatch(r'om_[A-Za-z0-9_-]+',ident):found[ident]=item
+                    if not data['has_more']:complete=True;break
+                    next_token=data.get('page_token')
+                    if not isinstance(next_token,str) or not next_token or next_token in seen_tokens:break
+                    seen_tokens.add(next_token)
+                observation={'state':'UNKNOWN','complete_scan':complete,'distinct_canary_receipts':len(found)}
+                if complete and len(found)==1:
+                    ident=next(iter(found));original=found[ident]
+                    response=feishu_api('im/v1/messages/'+ident,token)
+                    records=response.get('data',{}).get('items',[])
+                    if type(response.get('code')) is int and response['code']==0 and isinstance(records,list) and len(records)==1:
+                        reread=records[0]
+                        if (isinstance(reread,dict) and reread.get('message_id')==ident and reread.get('chat_id')==routes[0] and
+                            reread.get('msg_type')=='text' and reread.get('body')==original.get('body') and
+                            reread.get('sender')==original.get('sender') and reread.get('deleted') is not True):
+                            sender=reread['sender'];actual=reread['body']['content']
+                            observation.update({'state':'EXISTING_CANARY_READBACK_VERIFIED_NOT_RUNTIME_ACK',
+                              'exact_original_serialization':actual==expected_original,
+                              'exact_compact_serialization':actual==expected_compact,
+                              'sender_id_type':sender.get('id_type') if sender.get('id_type') in ('open_id','app_id','user_id','union_id') else 'UNKNOWN',
+                              'sender_matches_bot_open_id':isinstance(bot.get('bot',{}).get('open_id'),str) and sender.get('id')==bot['bot']['open_id'],
+                              'sender_matches_configured_app_id':sender.get('id')==config['appId']})
+                result['existing_canary_readonly']=observation
             if (CANARY_SEND_ENABLED and result.get('bot_matches_owner_screenshot') is True and len(routes)==1 and
                 len(result['api_chat_observations'])==1 and
                 result['api_chat_observations'][0]['chat_mode']=='p2p' and
