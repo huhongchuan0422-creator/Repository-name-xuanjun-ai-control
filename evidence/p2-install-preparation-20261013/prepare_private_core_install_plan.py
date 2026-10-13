@@ -79,7 +79,7 @@ def main(package,output):
     bind('deploy/p2-native-ledger-client.json.template',DEV+'p2-native-ledger-client.json',0o640,1002)
     tokens['@@LEDGER_BRIDGE_CONFIG_SHA256@@']=sha(rendered[DEV+'p2-native-ledger-client.json'])
     bind('deploy/p2-native-controller.binding.json.template',DEV+'p2-native-controller.binding.json',0o640,1002)
-    bind('deploy/p2-gateway-relay.json.template',DEV+'p2-gateway-relay.json',0o640,1003)
+    bind('deploy/p2-gateway-relay.json.template',DEV+'p2-gateway-relay.json',0o640,1002)
     bind('deploy/dispatcher.example.json',DEV+'dispatcher.json',0o640,1003)
     bind('deploy/root-broker.example.json',DEV+'root-broker.json',0o600)
     owner=bundle['owner_provisioning']
