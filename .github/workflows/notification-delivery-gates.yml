@@ -8,14 +8,23 @@ on:
       - .github/workflows/notification-delivery-gates.yml
 permissions:
   contents: read
+  actions: read
 jobs:
   offline-fixtures:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
+    env:
+      P2_INTEGRATION_ARCHIVE: ${{ runner.temp }}/p2-11786072168.zip
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - name: Fetch exact frozen producer artifact (no host execution)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11786072168/zip" > "$P2_INTEGRATION_ARCHIVE"
+          test -s "$P2_INTEGRATION_ARCHIVE"
       - name: Validate existing-schema read-only delivery pages
         run: |
           python3 -m py_compile scripts/notification_delivery_view.py

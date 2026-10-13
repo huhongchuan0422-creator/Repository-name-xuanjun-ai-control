@@ -262,4 +262,150 @@ class Tests(unittest.TestCase):
         self.assertIn('EVENT_KEY_BINDING_MISMATCH',self.view()['items'][0]['warnings'])
 
 
+
+class FrozenPackageIntegrationTests(unittest.TestCase):
+    """Real frozen producer and schema; temporary DB only, never a host ledger."""
+    @classmethod
+    def setUpClass(cls):
+        import os, tempfile, zipfile, tarfile, io, importlib.util
+        from pathlib import Path, PurePosixPath
+        archive = os.environ.get('P2_INTEGRATION_ARCHIVE')
+        if not archive:
+            raise unittest.SkipTest('P2_INTEGRATION_ARCHIVE absent: package integration NOT_RUN')
+        cls.package_tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.package_tmp.name)
+        try:
+            with zipfile.ZipFile(archive) as z:
+                infos = z.infolist()
+                if len(infos) > 10 or sum(i.file_size for i in infos) > 10000000:
+                    raise ValueError('PACKAGE_ZIP_BOUND')
+                names = [i.filename for i in infos]
+                if names.count('p2-candidate.tar.gz') != 1:
+                    raise ValueError('PACKAGE_ZIP_IDENTITY')
+                data = z.read('p2-candidate.tar.gz')
+            if hashlib.sha256(data).hexdigest() != '25999a0491a94ce8b9c1c24262ccba38bdfc737e32193ae2825c7de9202a205b':
+                raise ValueError('PACKAGE_TAR_HASH')
+            with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as tar:
+                members = tar.getmembers()
+                if len(members) > 300 or sum(x.size for x in members) > 20000000:
+                    raise ValueError('PACKAGE_TAR_BOUND')
+                seen = set()
+                for member in members:
+                    name = PurePosixPath(member.name)
+                    if (name.is_absolute() or '..' in name.parts or
+                            not (member.isfile() or member.isdir()) or member.name in seen):
+                        raise ValueError('PACKAGE_MEMBER_UNSAFE')
+                    seen.add(member.name)
+                # Write bytes only; never apply archive owners, modes or links.
+                for member in members:
+                    target = root.joinpath(*PurePosixPath(member.name).parts)
+                    if member.isdir():
+                        target.mkdir(parents=True, exist_ok=True)
+                    else:
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_bytes(tar.extractfile(member).read())
+            package = root / 'xuanjun-p2-package'
+            manifest = (package / 'deploy/integration-manifest.json').read_bytes()
+            if hashlib.sha256(manifest).hexdigest() != '9c8ded6c3c17c88e76361085b8ee752f997d947c51506656099b22e033777d4c':
+                raise ValueError('PACKAGE_MANIFEST_HASH')
+            files = json.loads(manifest.decode('utf-8'))['files']
+            if len(files) != 77:
+                raise ValueError('PACKAGE_MANIFEST_COUNT')
+            for name, digest in files.items():
+                path = PurePosixPath(name)
+                if path.is_absolute() or '..' in path.parts:
+                    raise ValueError('PACKAGE_MANIFEST_PATH')
+                if hashlib.sha256(package.joinpath(*path.parts).read_bytes()).hexdigest() != digest:
+                    raise ValueError('PACKAGE_FILE_HASH')
+            spec = importlib.util.spec_from_file_location('frozen_execution_supervision', str(package / 'stage1/execution_supervision.py'))
+            cls.producer = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(cls.producer)
+        except BaseException:
+            cls.package_tmp.cleanup()
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.package_tmp.cleanup()
+
+    def setUp(self):
+        import tempfile, os
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = os.path.join(self.tmp.name, 'fixture.sqlite')
+        self.db = sqlite3.connect(self.path, isolation_level=None)
+        self.db.row_factory = sqlite3.Row
+        self.addCleanup(self.db.close)
+        self.db.execute('CREATE TABLE tasks(id TEXT PRIMARY KEY, fence INTEGER)')
+        self.db.execute("INSERT INTO tasks VALUES('T1',4)")
+        self.binding = dict(AUTH, ledger_uuid='fixture-ledger', instance='fixture-instance', db_path=self.path)
+        owner = self
+        class ActivationFixture:
+            def read(self, require_active=False):
+                return dict(owner.binding)
+        self.activation = ActivationFixture()
+        self.supervisor = self.producer.ExecutionSupervisor(self.path, lambda: 100, activation_store=self.activation)
+
+    def seed(self):
+        self.db.execute('BEGIN IMMEDIATE')
+        for kind, options in [('INVENTORY', {'dedupe_key': 'b' * 64}),
+                              ('TERMINAL', {'canonical': True}), ('NOTICE', {})]:
+            self.supervisor._event(self.db, 'T1', kind, {'private': 'NOT_EXPORTED'}, **options)
+        self.db.commit()
+
+    def page(self, **kwargs):
+        return delivery_page(self.db, 100, AUTH, read_authority=lambda: {
+            k: self.activation.read(require_active=True)[k] for k in ('generation', 'epoch')}, **kwargs)
+
+    def test_complete_producer_schema_and_composite_pagination(self):
+        self.seed()
+        before = '\n'.join(self.db.iterdump())
+        self.db.execute('PRAGMA query_only=ON')
+        self.db.execute('BEGIN')
+        rows, cursor = [], None
+        while True:
+            page = self.page(limit=1, after=cursor)
+            rows.extend(page['items'])
+            if not page['has_more']:
+                break
+            cursor = page['next_cursor']
+        self.assertEqual(len(rows), 6)
+        self.assertEqual(len({(r['event_key'], r['destination']) for r in rows}), 6)
+        self.assertTrue(all(r['status'] == 'OBSERVED' for r in rows))
+        self.assertTrue(all(not r['external_delivery_verified'] for r in rows))
+        self.assertNotIn('NOT_EXPORTED', json.dumps(rows))
+        self.assertEqual(before, '\n'.join(self.db.iterdump()))
+
+    def test_real_constructor_restart_and_dedupe_keep_dead_letter(self):
+        self.seed()
+        self.db.execute("UPDATE supervision_delivery SET state='DEAD_LETTER',attempts=3")
+        self.supervisor = self.producer.ExecutionSupervisor(self.path, lambda: 100, activation_store=self.activation)
+        self.db.execute('BEGIN IMMEDIATE')
+        self.supervisor._event(self.db, 'T1', 'INVENTORY', {'private': 'NOT_EXPORTED'}, dedupe_key='b' * 64)
+        self.db.commit()
+        self.db.execute('BEGIN')
+        rows = self.page()['items']
+        self.assertEqual(len(rows), 6)
+        self.assertTrue(all(r['attempts'] == 3 and r['classification'] == 'MANUAL_REVIEW_REQUIRED' for r in rows))
+
+    def test_real_rows_stale_task_fence_hold(self):
+        self.seed()
+        self.db.execute('UPDATE tasks SET fence=5')
+        self.db.execute('BEGIN')
+        self.assertTrue(all(r['status'] == 'HOLD' for r in self.page()['items']))
+
+    def test_real_rows_stale_epoch_hold(self):
+        self.seed()
+        self.db.execute('UPDATE supervision_delivery SET authority_epoch=1')
+        self.db.execute('BEGIN')
+        self.assertTrue(all('STALE_OR_UNKNOWN_AUTHORITY' in r['warnings'] for r in self.page()['items']))
+
+    def test_real_activation_change_rejects_view(self):
+        self.seed()
+        self.binding['generation'] = 2
+        self.db.execute('BEGIN')
+        with self.assertRaisesRegex(ValueError, 'ACTIVATION_CHANGED'):
+            self.page()
+
+
 if __name__=='__main__':unittest.main()

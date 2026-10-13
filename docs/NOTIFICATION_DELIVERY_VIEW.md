@@ -50,3 +50,34 @@ view into the existing authenticated dashboard; no new HTTP service is provided.
 
 Python3.6+ standard library. Run python3 -B -m unittest discover -s tests -p
 test_notification_delivery_view.py -v (one shell command).
+
+## Exact frozen-package integration evidence
+
+PR17 registration6137242353 continues this same scope. Five additional tests load
+the complete ExecutionSupervisor module and initialize its actual supplemental
+schema in a temporary SQLite fixture with a minimal existing tasks(id,fence)
+table. No P2 source is changed, no operational database is opened, and no model,
+service, network sender or external ACK is invoked. ActivationStore is explicitly
+a test fixture; this does not verify the production pinned-transaction caller.
+
+Input is P2 artifact11786072168, source46a7c6796f61c6f196eb1d95497f2fb94e22fc00,
+tar SHA25625999a0491a94ce8b9c1c24262ccba38bdfc737e32193ae2825c7de9202a205b,
+manifest SHA2569c8ded6c3c17c88e76361085b8ee752f997d947c51506656099b22e033777d4c.
+All77 manifest file hashes are checked before importing the producer. Extraction
+is bounded and writes regular bytes only, never archive permissions or links.
+Changed, missing or expired artifact fails the CI job; no latest-artifact fallback.
+
+Set P2_INTEGRATION_ARCHIVE to the downloaded ZIP to run all35 tests. Without it,
+the five package tests are explicitly skipped/NOT_RUN; the original30 tests are
+not package-integration proof. CI fetches the fixed artifact with read-only Actions
+permission and requires a nonempty archive before running. Added checks cover
+actual constructor/schema and three event-key forms, readonly composite pagination,
+restart/dedupe preserving dead letters, stale task fence/epoch and activation change.
+
+Remaining real integration contract: Work, as sole P2 shared caller owner, must
+call delivery_page inside the existing authenticated, pinned canonical read
+transaction, supply current verified generation/epoch through the existing
+activation reader, retain UUID/instance/file identity checks and label partial
+pages. Bind that integrated package to its own artifact/manifest/CI and admitted
+UK acceptance task. This producer compatibility result is not that caller wiring,
+not OpenClaw pickup, not installed UK E2E and not release permission.
