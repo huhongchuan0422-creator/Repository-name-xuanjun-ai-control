@@ -1077,3 +1077,63 @@ jobs:
           with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
           print(json.dumps(result,sort_keys=True));print('DOCKER_BUILD_ASSET_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
           PY
+
+      - name: Reproduce frozen snapshot permissions with isolated numeric identities and no canonical ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,stat,subprocess,hashlib
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];sys.path.insert(0,root+'/xuanjun-p2-package/stage1')
+          from development_pipeline import CliBackend
+          fixture=root+'/snapshot-permission-fixture';os.mkdir(fixture,0o755);os.chmod(fixture,0o755)
+          snapshot=fixture+'/snapshot'
+          backend=CliBackend.__new__(CliBackend)
+          backend._write_snapshot(snapshot,{'fixture.py':{'mode':0o100644,'data':b'FIXTURE_ONLY=1\n'}})
+          for parent,dirs,files in os.walk(snapshot):
+              os.chown(parent,1003,1003)
+              for name in files:os.chown(parent+'/'+name,1003,1003)
+          script="import os,sys,json;uid=int(sys.argv[1]);os.setgroups([]);os.setgid(uid);os.setuid(uid);path=sys.argv[2];result={'uid':uid};\nfor operation in ('read','write'):\n try:\n  fd=os.open(path,os.O_RDONLY if operation=='read' else os.O_WRONLY);os.close(fd);result[operation]='ALLOWED'\n except PermissionError:result[operation]='DENIED'\nprint(json.dumps(result))"
+          rows=[]
+          for uid in (1002,1005):
+              p=subprocess.run(['/usr/bin/python3','-I','-B','-c',script,str(uid),snapshot+'/fixture.py'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+              assert p.returncode==0;rows.append(json.loads(p.stdout.decode()))
+          result={'schema':1,'state':'SNAPSHOT_CROSS_UID_ACCESS_BLOCKED' if all(x['read']=='DENIED' for x in rows) else 'SNAPSHOT_ACCESS_REQUIRES_REVIEW','fixture_directory_mode':oct(stat.S_IMODE(os.stat(snapshot).st_mode)),'fixture_file_mode':oct(stat.S_IMODE(os.stat(snapshot+'/fixture.py').st_mode)),'snapshot_owner_uid':1003,'identity_access':rows,'canonical_ledger_changed':False,'production_paths_changed':False,'model_calls':0,'services_changed':False,'writer_admission':False}
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-snapshot-permission-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('SNAPSHOT_PERMISSION_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Prepare isolated official sandbox image cache without runtime container or model execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,hashlib,subprocess,shutil
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];build=root+'/sandbox-image-build';os.mkdir(build,0o700)
+          dockerfile="FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251\n\nENV DEBIAN_FRONTEND=noninteractive\n\nRUN apt-get update \\\n  && apt-get install -y --no-install-recommends \\\n    bash \\\n    ca-certificates \\\n    curl \\\n    git \\\n    jq \\\n    python3 \\\n    ripgrep \\\n  && rm -rf /var/lib/apt/lists/*\n\nRUN useradd --create-home --shell /bin/bash sandbox\nUSER sandbox\nWORKDIR /home/sandbox\n\nCMD [\"sleep\", \"infinity\"]\n".encode()
+          fd=os.open(build+'/Dockerfile',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(dockerfile);f.flush();os.fsync(f.fileno())
+          os.mkdir(build+'/client-config',0o700)
+          image='xuanjun-p2-sandbox:prep-base-20261013'
+          result={'schema':1,'state':'HOLD_SANDBOX_IMAGE_BUILD','official_source_commit':'bcfc88812a35243893585dbeca87ca41b48272ca','official_source_path':'scripts/docker/sandbox/Dockerfile','dockerfile_sha256':hashlib.sha256(dockerfile).hexdigest(),'adaptation':'REMOVE_APT_CACHE_MOUNTS_FOR_CLASSIC_BUILDER_AND_CLEAR_APT_LISTS','image_tag':image,'runtime_containers_created':False,'build_intermediate_containers_possible':True,'services_changed':False,'model_calls':0,'writer_admission':False}
+          assert shutil.disk_usage('/var/lib/docker').free>2147483648
+          env={'PATH':'/usr/bin:/bin','LANG':'C','DOCKER_HOST':'unix:///var/run/docker.sock','DOCKER_BUILDKIT':'0','DOCKER_CONFIG':build+'/client-config'}
+          with open(build+'/protected-build.log','xb') as log:
+              os.chmod(build+'/protected-build.log',0o600)
+              try:
+                  p=subprocess.run(['/usr/bin/docker','build','--force-rm','--memory=768m','--cpu-quota=100000','--label','xuanjun.p2.preparation=11796280855','--label','xuanjun.p2.official_source=bcfc88812a35243893585dbeca87ca41b48272ca','-t',image,'-f',build+'/Dockerfile',build],env=env,stdout=log,stderr=subprocess.STDOUT,timeout=240)
+                  result['build_exit']=p.returncode
+                  if p.returncode==0:
+                      p=subprocess.run(['/usr/bin/docker','image','inspect',image],env=env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=15)
+                      assert p.returncode==0;data=json.loads(p.stdout.decode())[0]
+                      result.update(state='SANDBOX_IMAGE_CACHE_PREPARED_NO_RUNTIME_ACCEPTANCE',image_id=data['Id'],image_user=data.get('Config',{}).get('User'))
+              except subprocess.TimeoutExpired:result['build_state']='TIMEOUT_DAEMON_COMPLETION_UNKNOWN'
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-sandbox-image-build-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('SANDBOX_IMAGE_BUILD_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
