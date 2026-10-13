@@ -28,5 +28,5 @@ value={'schema':1,'baseline_path':PATH,'baseline_sha256':DIGEST,'packages':rows,
 raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode();path=out+'/protected-rpm-effects.json'
 fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
 with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-public={'state':'VENDOR_RPM_EFFECTS_READONLY_PREPARED','packages':[{'name':r['name'],'lifecycle_files':r['lifecycle_files'],'scripts_sha256':sha(r['scripts'].encode()),'triggers_sha256':sha(r['triggers'].encode())} for r in rows],'install':False,'services_changed':False,'model_calls':0,'writer_admission':False}
+public={'state':'VENDOR_RPM_EFFECTS_READONLY_PREPARED','packages':[{'name':r['name'],'lifecycle_files':r['lifecycle_files'],'scripts_sha256':sha(r['scripts'].encode()),'triggers_sha256':sha(r['triggers'].encode()),'vendor_scripts':r['scripts'],'vendor_triggers':r['triggers']} for r in rows],'install':False,'services_changed':False,'model_calls':0,'writer_admission':False}
 print(json.dumps(public,sort_keys=True));print('RPM_EFFECTS_PATH='+path);print('RPM_EFFECTS_SHA256='+sha(raw))
