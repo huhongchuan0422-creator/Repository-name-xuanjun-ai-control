@@ -39,6 +39,22 @@ jobs:
               try:prepare(root)
               except ValueError:pass
               else:raise AssertionError('hardlink accepted')
+          from unittest.mock import patch
+          with tempfile.TemporaryDirectory() as parent:
+              directory=pathlib.Path(parent,'stage');directory.mkdir(mode=0o700)
+              moved=pathlib.Path(parent,'old');actual=os.open;swapped=[]
+              def swap(path,*args,**kwargs):
+                  if path==names[0] and not swapped:
+                      directory.rename(moved);directory.mkdir(mode=0o700);swapped.append(True)
+                  return actual(path,*args,**kwargs)
+              with patch('os.open',swap):
+                  try:prepare(str(directory))
+                  except ValueError as error:
+                      assert str(error)=='HOLD_STAGING_DIRECTORY_IDENTITY_CHANGED'
+                  else:raise AssertionError('ancestor replacement accepted')
+              assert list(directory.iterdir())==[]
+              assert pathlib.Path(moved,names[0]).is_file()
+          print('P2_UK_DIRFD_ANCESTOR_SWAP_NO_REDIRECTED_WRITE=PASS')
           print('P2_UK_PRIVATE_STAGING_GENERATE_RETRY_MODE_HARDLINK=PASS')
           print('PRODUCTION_INPUTS_CREATED=NO')
           print('MODEL_CALLS=0')
