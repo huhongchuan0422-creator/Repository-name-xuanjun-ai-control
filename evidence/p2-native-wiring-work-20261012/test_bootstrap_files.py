@@ -47,4 +47,9 @@ class Bootstrap(unittest.TestCase):
   m.BootstrapFiles(str(self.tx)).rollback();self.assertEqual(list(self.parent.iterdir()),[])
  def test_missing_reference_is_rejected(self):
   with self.assertRaisesRegex(ValueError,'BOOTSTRAP_EXACT_REFERENCE'):self.original_prepare(None,'integration-'+'a'*16)
+ def test_runtime_missing_reference_is_rejected(self):
+  import p2_fixed_host_runtime as runtime
+  host=runtime.FixedHostRuntime(str(self.tx));host._authority=lambda:None;host.prerequisites.preflight=lambda plan:None
+  with self.assertRaisesRegex(ValueError,'BOOTSTRAP_EXACT_REFERENCE'):
+   host.preflight({'services':list(runtime.ALLOWED_SERVICES),'prerequisites':{},'release_directory':'integration-'+'a'*16},{},{})
 if __name__=='__main__':unittest.main(verbosity=2)

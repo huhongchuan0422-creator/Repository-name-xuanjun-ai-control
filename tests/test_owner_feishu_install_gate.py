@@ -42,6 +42,10 @@ class InstallGateTests(unittest.TestCase):
 
     def preflight(self):
         with patch.object(runtime_module.pwd,'getpwnam',return_value=types.SimpleNamespace(pw_uid=42,pw_gid=42)):
+            if hasattr(runtime_module,'BootstrapFiles'):
+                # This suite isolates the Feishu gate; real bootstrap effects have a separate root suite.
+                with patch.object(runtime_module.BootstrapFiles,'prepare',return_value=[]):
+                    return self.runtime.preflight(self.plan,self.auth,{'references':[]})
             return self.runtime.preflight(self.plan,self.auth,{'references':[]})
 
     def test_protected_receiver_and_existing_profile_required(self):
