@@ -74,7 +74,8 @@ class OwnerFeishuTransport:
             self._bound('OWNER',identity,kind,claim)
         except ValueError:
             return 'UNKNOWN'
-        if (isinstance(result,dict) and result.get('chat_id')==self.chat_id and
+        if (isinstance(result,dict) and result.get('msg_type')=='text' and
+            result.get('chat_id')==self.chat_id and
             result.get('content')==self._body(identity,kind) and
             isinstance(result.get('message_id'),str) and
             re.fullmatch(r'om_[A-Za-z0-9_-]{1,128}',result['message_id'])):
