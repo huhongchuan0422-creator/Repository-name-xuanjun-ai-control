@@ -27,12 +27,13 @@ def prepare(directory):
             try:
                 info=os.fstat(fd);value=os.read(fd,129)
                 if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid()
-                        or info.st_gid!=os.getegid() or stat.S_IMODE(info.st_mode)!=0o600
+                        or info.st_gid!=os.getegid() or info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o600
                         or re.fullmatch(br'[A-Za-z0-9_-]{43,86}\n',value) is None):
                     raise ValueError('HOLD_EXISTING_PRIVATE_INPUT_UNSAFE')
             finally:os.close(fd)
             status='EXISTING_VALIDATED_NOT_REPLACED'
         else:
+            os.fchmod(fd,0o600)
             with os.fdopen(fd,'wb') as stream:
                 stream.write(secrets.token_urlsafe(48).encode('ascii')+b'\n')
                 stream.flush();os.fsync(stream.fileno())
