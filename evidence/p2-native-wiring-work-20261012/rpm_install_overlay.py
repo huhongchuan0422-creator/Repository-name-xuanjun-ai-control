@@ -26,6 +26,14 @@ replace(a,"try:self._rollback_plugin(runtime,restart=True)","try:self._rollback_
 method="    def _verify_plugin_runtime(self,runtime):\n"+'\n'.join(line[4:] for line in inspect.rstrip().split('\n'))+'\n\n'
 replace(a,'    def _rollback_plugin(self,runtime,restart):',method+'    def _rollback_plugin(self,runtime,restart):')
 replace(a,"        self._start_gateway()\n        for service in ALLOWED_SERVICES:", "        self._start_gateway()\n        self._verify_plugin_runtime(runtime)\n        for service in ALLOWED_SERVICES:")
+replace(a,"            self._command(['/usr/bin/systemctl', 'reload', 'nginx.service'])\n            self._command(['/usr/bin/systemctl', 'is-active', '--quiet',", "            self._command(['/usr/bin/systemctl', 'start', 'nginx.service'])\n            self._command(['/usr/bin/systemctl', 'is-active', '--quiet',")
+replace(a,"        for service in STOP_SERVICES:","        if any(item['target'].startswith('/etc/nginx/') for item in runtime.get('provisioning',[])):\n            self._command(['/usr/bin/systemctl','stop','nginx.service'])\n        for service in STOP_SERVICES:")
+token='ALLOWED_SERVICES+(GATEWAY_SERVICE,)'
+if texts[a].count(token)!=5:raise ValueError('NGINX_BOOT_SCOPE_ANCHORS')
+texts[a]=texts[a].replace(token,'self._boot_units(binding)')
+replace(a,"        value=self._boot_read(self._boot_binding())", "        binding=self._boot_binding();value=self._boot_read(binding)")
+helper="    def _boot_units(self,binding):\n        raw,info=_read_regular(self.receipt_path)\n        if info.st_uid!=os.geteuid() or stat.S_IMODE(info.st_mode)!=0o600 or _digest_bytes(raw)!=binding:\n            raise ValueError('BOOT_PROVISION_CHANGED')\n        value=json.loads(raw.decode());targets=value.get('targets',[])\n        if not isinstance(targets,list) or any(not isinstance(t,dict) or not isinstance(t.get('target'),str) for t in targets):\n            raise ValueError('BOOT_TARGET_SCOPE')\n        extra=('nginx.service',) if any(t['target'].startswith('/etc/nginx/') for t in targets) else ()\n        return tuple(ALLOWED_SERVICES)+(GATEWAY_SERVICE,)+extra\n\n"
+replace(a,'    def _boot_read(self, binding):',helper+'    def _boot_read(self, binding):')
 replace(a,"        SandboxProfile(self.directory).rollback_check()\n        self._restore_boot()", "        SandboxProfile(self.directory).rollback_check()\n        RpmPrerequisites(self.directory).rollback_rows()\n        self._restore_boot()")
 replace(a,"        self.prerequisites.rollback(receipt['prerequisites'])", "        RpmPrerequisites(self.directory).rollback()\n        self.prerequisites.rollback(receipt['prerequisites'])")
 restore_start=texts[a].index('    def restore(')

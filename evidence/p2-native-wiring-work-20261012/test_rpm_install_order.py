@@ -50,4 +50,19 @@ class Order(unittest.TestCase):
   rt={'plugin':{'source':'plugins/p2-native-controller','binding_file':'/synthetic/binding','binding_sha256':'a'*64},'sandbox_policy':{}}
   with patch.object(runtime.os.path,'realpath',side_effect=lambda p:p),patch.object(runtime.os.path,'isdir',return_value=True),patch.object(runtime.SandboxProfile,'apply',return_value=None):r._install_plugin('/synthetic/release',rt)
   self.assertFalse(any('inspect' in c for c in calls));self.assertTrue(any(c[:2]==['plugins','install'] for c in calls))
+ def test_nginx_starts_after_backend_and_stops_during_rollback(self):
+  with tempfile.TemporaryDirectory() as d:
+   r=base.ProbeRuntime(d);rt={'provisioning':[{'target':'/etc/nginx/conf.d/p2.conf'}]}
+   with patch('owner_feishu_https.installed_binding',return_value={'package_sha256':'a'*64}):r.activate(rt,{'state':'ACTIVE','release_sha256':'a'*64})
+   commands=[e[1] for e in r.effects if e[0]=='command']
+   self.assertIn(('/usr/bin/systemctl','start','nginx.service'),commands);self.assertNotIn(('/usr/bin/systemctl','reload','nginx.service'),commands)
+   self.assertLess(commands.index(('/usr/bin/systemctl','start','xuanjun-uk-owner-callback.service')),commands.index(('/usr/bin/systemctl','start','nginx.service')))
+   with patch.object(r,'_stop_gateway',return_value=None):r.stop_new(rt)
+   self.assertIn(('command',('/usr/bin/systemctl','stop','nginx.service')),r.effects)
+ def test_nginx_boot_scope_is_bound_to_provision_receipt(self):
+  with tempfile.TemporaryDirectory() as d:
+   r=base.ProbeRuntime(d);p=pathlib.Path(r.receipt_path);p.write_text(json.dumps({'targets':[{'target':'/etc/nginx/conf.d/p2.conf'}]}));p.chmod(0o600)
+   binding=r._boot_binding();self.assertIn('nginx.service',r._boot_units(binding))
+   p.write_text(json.dumps({'targets':[]}))
+   with self.assertRaisesRegex(ValueError,'BOOT_PROVISION_CHANGED'):r._boot_units(binding)
 if __name__=='__main__':unittest.main()
