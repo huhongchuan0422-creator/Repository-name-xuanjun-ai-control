@@ -519,72 +519,78 @@ jobs:
           print('INSTALL_PREPARATION_BUNDLE_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
 
-      - name: Persist verified private inputs without repeating certificate issuance
+      - name: Reuse durable preparation and resolve remaining existing callback and GitHub inputs
         shell: bash
         run: |
           set -euo pipefail
           sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
-          import os,sys,stat,json,hashlib,shutil,socket,subprocess
+          import os,sys,stat,json,hashlib,sqlite3,socket,re,shlex
           assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
           root=sys.argv[1]
-          base='/var/lib/xuanjun-p2-preparation'
-          if not os.path.lexists(base):os.mkdir(base,0o700)
-          s=os.lstat(base);assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700 and os.path.realpath(base)==base
-          dest=base+'/artifact-11796280855-'+os.path.basename(root)
-          os.mkdir(dest,0o700)
-          def copy(source,target,expected,mode=0o600,require_root=True):
-              assert os.path.realpath(source)==source
-              fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
-              h=hashlib.sha256()
-              out=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
-              with os.fdopen(fd,'rb') as f,os.fdopen(out,'wb') as g:
-                  before=os.fstat(f.fileno());assert stat.S_ISREG(before.st_mode) and (before.st_uid==0 or not require_root) and not before.st_mode&0o022
-                  while True:
-                      chunk=f.read(1048576)
-                      if not chunk:break
-                      h.update(chunk);g.write(chunk)
-                  after=os.fstat(f.fileno());assert (before.st_size,before.st_mtime_ns)==(after.st_size,after.st_mtime_ns)
-                  assert h.hexdigest()==expected
-                  g.flush();os.fsync(g.fileno())
-              return {'path':target,'sha256':expected,'owner_uid':0,'mode':mode}
-          def receipt(path,sha):
-              with open(path,'rb') as f:raw=f.read()
-              assert hashlib.sha256(raw).hexdigest()==sha
-              return json.loads(raw.decode())
-          tlsroot='/tmp/p2pkg-38371615004-1/isolated-tls'
-          tls=receipt(tlsroot+'/protected-tls-preparation-receipt.json','46fb6cb6bfd9d562b97548b51bb76f93db5add3ee68f1287e80d8ef9415b7569')
-          assert tls['state']=='REAL_UK_TLS_CERTIFICATE_PREPARED'
-          tlsrefs=[]
-          for i,item in enumerate(tls['tls_references']):
-              name=('fullchain.pem','privkey.pem')[i]
-              tlsrefs.append(copy(item['path'],dest+'/'+name,item['sha256']))
-          p=subprocess.run(['/bin/openssl','x509','-in',dest+'/fullchain.pem','-noout','-checkend','604800'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10);assert p.returncode==0
-          q=subprocess.run(['/bin/openssl','x509','-in',dest+'/fullchain.pem','-pubkey','-noout'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
-          k=subprocess.run(['/bin/openssl','pkey','-in',dest+'/privkey.pem','-pubout'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
-          assert q.returncode==k.returncode==0 and q.stdout==k.stdout
-          files=[]
-          for source,name,sha in (
-          ('/tmp/p2pkg-38370684370-1/protected-owner-binding-inputs.json','protected-owner-binding-inputs.json','5ec6adc519f473f9f6854673a34e620f6a4b1ad5d4f4ff44c519196430f1d539'),
-          ('/tmp/p2pkg-38371013936-1/protected-install-preparation-bundle.json','protected-install-preparation-bundle.json','9bc378238ca9906420685c1940dd7c97511b0f022bcbd56c9471ef2cc7e09af7'),
-          ('/tmp/p2pkg-38365394514-1/protected-prerequisites-subplan.json','protected-prerequisites-subplan.json','9fbe85c665824a2c7b362dfb010fa47d3f144b67cd8dffa5b153efc4f64334a4')):
-              files.append(copy(source,dest+'/'+name,sha))
-          os.mkdir(dest+'/pinned-binaries',0o700)
-          for name,sha in (('gh','7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b'),('codex','12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad')):
-              files.append(copy('/tmp/p2pkg-38365394514-1/pinned-binaries/'+name,dest+'/pinned-binaries/'+name,sha,0o555))
-          rpmroot='/tmp/p2pkg-38369525772-1/tls-rpm-preparation'
-          rr=receipt(rpmroot+'/protected-tls-rpm-receipt.json','fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e')
-          os.mkdir(dest+'/rpms',0o700)
-          for item in rr['rpms']:
-              assert '/' not in item['file']
-              files.append(copy(rpmroot+'/'+item['file'],dest+'/rpms/'+item['file'],item['sha256'],0o400))
-          archive='/tmp/p2-candidate-'+os.path.basename(root)[6:]+'.tar.gz'
-          files.append(copy(archive,dest+'/p2-candidate.tar.gz','66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd',0o400,require_root=False))
-          value={'schema':1,'state':'DURABLE_PROTECTED_INSTALL_INPUTS_PREPARED_NOT_INSTALL_PLAN','artifact_id':11796280855,'preparation_root':dest,'tls_references':tlsrefs,'files':files,'packages_installed':False,'services_changed':False,'canonical_mutation':False,'credential_values_exported':False,'release_granted':False}
-          raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
-          path=dest+'/durable-preparation-receipt.json'
+          prior='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          with open(prior+'/durable-preparation-receipt.json','rb') as f:raw=f.read()
+          assert hashlib.sha256(raw).hexdigest()=='28bd0dd3419b2822ec7b001596e1be1909c22f0ac1b0fa1d307db7a220aa385a'
+          private={'schema':1,'state':'ADDITIONAL_EXISTING_INSTALL_INPUTS','durable_preparation_root':prior}
+          public={'schema':1,'canonical_mutation':False,'secret_values_exported':False,'services_changed':False,'owner_callback_chat_evidence':'NOT_FOUND','github_auth_reference':'NOT_FOUND'}
+          envpaths={'/home/xuanjun_dev/uk-stage1-minimal/owner-callback.env'}
+          for unit in ('xuanjun-uk-stage1-minimal.service','xuanjun-uk-openclaw.service'):
+              with open('/etc/systemd/system/'+unit) as f:text=f.read()
+              for path in re.findall(r'(?m)^EnvironmentFile=-?([^\n ]+)',text):
+                  if path.startswith('/home/xuanjun_dev/'):envpaths.add(path)
+          envs={}
+          for path in sorted(envpaths):
+              if os.path.realpath(path)!=path:continue
+              try:
+                  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+                  with os.fdopen(fd,'rb') as f:
+                      s=os.fstat(f.fileno())
+                      if not stat.S_ISREG(s.st_mode) or s.st_uid not in (0,1002) or s.st_mode&0o077 or s.st_size>65536:continue
+                      raw=f.read()
+                  fields={}
+                  for line in raw.decode().splitlines():
+                      match=re.fullmatch(r'(?:export )?([A-Z][A-Z0-9_]*)=(.*)',line)
+                      if match:
+                          values=shlex.split(match.group(2))
+                          if len(values)==1:fields[match.group(1)]=values[0]
+                  envs[path]=fields
+              except (OSError,ValueError,UnicodeError):continue
+          public['existing_env_field_names']={path:sorted(fields) for path,fields in envs.items()}
+          owner=None
+          for fields in envs.values():
+              value=fields.get('XJ_OWNER_USER_ID')
+              if value and re.fullmatch(r'[0-9]{1,20}',value):owner=value
+          if owner:
+              private['owner_callback_user_id']=owner
+              dbpath='/home/xuanjun_dev/uk-stage1-minimal/state.sqlite'
+              db=sqlite3.connect('file:'+dbpath+'?mode=ro',uri=True,timeout=3);db.execute('PRAGMA query_only=ON')
+              tables=db.execute('SELECT name FROM sqlite_master WHERE type="table" LIMIT 100').fetchall()
+              schema={};matches=set()
+              for (table,) in tables:
+                  if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,100}',table):continue
+                  cols=[x[1] for x in db.execute('PRAGMA table_info("'+table+'")')]
+                  schema[table]=cols
+                  users=[x for x in cols if x.lower() in ('user_id','owner_user_id','owner_id','sender_id')]
+                  chats=[x for x in cols if x.lower() in ('chat_id','owner_chat_id')]
+                  for user in users:
+                      for chat in chats:
+                          rows=db.execute('SELECT DISTINCT "'+chat+'" FROM "'+table+'" WHERE CAST("'+user+'" AS TEXT)=? LIMIT 3',(owner,)).fetchall()
+                          for (value,) in rows:
+                              if isinstance(value,(str,int)) and re.fullmatch(r'-?[0-9]{1,20}',str(value)):matches.add(str(value))
+              db.close();public['legacy_schema']=schema;public['owner_chat_candidate_count']=len(matches)
+              if len(matches)==1:
+                  private['owner_callback_chat_id']=next(iter(matches));public['owner_callback_chat_evidence']='EXISTING_LEGACY_OWNER_PAIR'
+          for path,fields in envs.items():
+              for key in ('GH_TOKEN','GITHUB_TOKEN','XJ_GITHUB_TOKEN'):
+                  value=fields.get(key)
+                  if value and re.fullmatch(r'(ghp_[A-Za-z0-9]+|github_pat_[A-Za-z0-9_]+)',value):
+                      private['github_token_reference']={'path':path,'field':key}
+                      public['github_auth_reference']='EXISTING_PROTECTED_ENV_REFERENCE'
+          private['public_receipt']=public
+          raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-additional-install-inputs.json'
           fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-          print(json.dumps({'state':value['state'],'preparation_root':dest,'protected_file_count':len(files)+2,'certificate_key_match':True,'services_changed':False,'packages_installed':False},sort_keys=True))
-          print('DURABLE_PREPARATION_RECEIPT_PATH='+path)
-          print('DURABLE_PREPARATION_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          print(json.dumps(public,sort_keys=True))
+          print('ADDITIONAL_INSTALL_INPUTS_PATH='+path)
+          print('ADDITIONAL_INSTALL_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
