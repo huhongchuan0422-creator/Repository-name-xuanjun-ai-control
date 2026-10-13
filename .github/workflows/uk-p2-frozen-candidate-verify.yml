@@ -633,3 +633,70 @@ jobs:
           print('OWNER_ACTION_REQUIRED=EXISTING_GITHUB_REFERENCE_OR_PROTECTED_AUTH_INPUT')
           print('GITHUB_AUTH_VALUES_READ_OR_WRITTEN_BY_THIS_STEP=NO; P2_INSTALL=NO')
           PY
+
+      - name: Verify Owner GitHub reference read-only and collect installed SDK hashes for complete plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,socket,re,glob,urllib.request
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];prior='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          def protected(path,uid=0,maximum=1048576):
+              assert os.path.realpath(path)==path
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_uid==uid and not s.st_mode&0o077 and s.st_size<=maximum
+                  raw=f.read(maximum+1);assert len(raw)<=maximum
+                  return raw,s
+          raw,s=protected(prior+'/github-input-receipt.json');receipt=json.loads(raw.decode())
+          raw,s=protected(prior+'/github-intake-token.input')
+          assert hashlib.sha256(raw).hexdigest()==receipt['sha256'] and receipt['repository']=='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+          token=raw.decode().strip();assert re.fullmatch(r'github_pat_[A-Za-z0-9_]{20,250}',token)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):return None
+          req=urllib.request.Request('https://api.github.com/repos/'+receipt['repository'],headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','User-Agent':'xuanjun-p2-readonly-preparation'})
+          with urllib.request.build_opener(NoRedirect()).open(req,timeout=15) as f:
+              response=f.read(1048577)
+          assert len(response)<=1048576 and json.loads(response.decode())['full_name']==receipt['repository']
+          del token
+          result={'schema':1,'artifact_id':11796280855,'github_protected_reference_verified':True,'github_read_access_verified':True,'github_write_access':'NOT_TESTED','credentials_exported':False,'services_changed':False,'canonical_mutation':False,'model_calls':0,'installed_sdk_files':[]}
+          cli='/home/xuanjun_dev/.openclaw/bin/openclaw'
+          with open(cli,'rb') as f:wrapper=f.read(65537)
+          assert hashlib.sha256(wrapper).hexdigest()=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
+          roots=set()
+          for path in re.findall(rb'/home/xuanjun_dev/[A-Za-z0-9_./-]+',wrapper):
+              text=path.decode()
+              if 'openclaw' in text and '/node_modules/' in text:
+                  roots.add(text.split('/node_modules/openclaw')[0]+'/node_modules/openclaw')
+          for pattern in ('/home/xuanjun_dev/.openclaw/tools/*/node_modules/openclaw','/home/xuanjun_dev/.openclaw/tools/*/lib/node_modules/openclaw','/home/xuanjun_dev/.openclaw/lib/node_modules/openclaw','/home/xuanjun_dev/.openclaw/node_modules/openclaw'):
+              roots.update(glob.glob(pattern))
+          result['sdk_roots']=[]
+          for base in sorted(roots):
+              base=os.path.realpath(base)
+              if not base.startswith('/home/xuanjun_dev/.openclaw/') or not os.path.isdir(base):continue
+              result['sdk_roots'].append(base)
+              count=0
+              for parent,dirs,names in os.walk(base+'/dist',followlinks=False):
+                  dirs[:]=[x for x in dirs if x not in ('node_modules','.git')]
+                  for name in sorted(names):
+                      count+=1
+                      if count>10000:break
+                      if not name.endswith(('.js','.mjs')) or not any(word in name.lower() for word in ('sandbox','subagent','before-tool','request-scoped')):continue
+                      path=parent+'/'+name
+                      if os.path.realpath(path)!=path:continue
+                      s=os.lstat(path)
+                      if not stat.S_ISREG(s.st_mode) or s.st_uid not in (0,1002) or s.st_mode&0o022 or s.st_size>4194304:continue
+                      with open(path,'rb') as f:data=f.read()
+                      markers=[word for word in ('resolveSandboxContext','prepareWorkspaceAuthority','before_tool_call','requestScoped','resolveCliBackendDispatchEligibility') if word.encode() in data]
+                      result['installed_sdk_files'].append({'path':path,'sha256':hashlib.sha256(data).hexdigest(),'uid':s.st_uid,'mode':stat.S_IMODE(s.st_mode),'markers':markers})
+                      if len(result['installed_sdk_files'])>=100:break
+                  if count>10000 or len(result['installed_sdk_files'])>=100:break
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-auth-sdk-plan-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('AUTH_SDK_PLAN_INPUTS_PATH='+path)
+          print('AUTH_SDK_PLAN_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
