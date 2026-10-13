@@ -156,8 +156,8 @@ class Tests(unittest.TestCase):
                     ledger.record_inventory_notices()
             self.assertTrue(swapped[0])
             db=sqlite3.connect(path)
-            self.assertFalse(db.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='supervision_events'").fetchone())
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM supervision_delivery').fetchone()[0],0)
             db.close()
 
 
