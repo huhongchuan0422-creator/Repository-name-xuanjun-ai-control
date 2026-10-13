@@ -53,3 +53,8 @@ class DependencyTests(unittest.TestCase):
     def test_malformed_dependency(self):
         n = nodes(); n['A']['dependencies'] = [None]
         self.assertEqual(dependency_view('T', n)['status'], 'HOLD')
+
+    def test_malformed_target_has_fixed_rejection(self):
+        for target in ([], {}, None, True, '', '../bad', 'x' * 161):
+            with self.assertRaisesRegex(ValueError, 'INVALID_DEPENDENCY_INPUT'):
+                dependency_view(target, nodes())
