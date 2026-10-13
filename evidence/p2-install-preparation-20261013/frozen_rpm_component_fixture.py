@@ -42,7 +42,7 @@ try:
    return types.SimpleNamespace(returncode=0,stdout=b'ActiveState=inactive\nMainPID=0\n',stderr=b'')
   if args[0]=='/bin/rpm' and any(x in args for x in ('-q','-U','-e','-V')):
    args=rpm+args[1:]
-   if '-U' in args or '-e' in args:args=args+['--nodeps'] # Fixture-only: no host dependency database.
+   if '-U' in args or '-e' in args or '-V' in args:args=args+['--nodeps'] # Fixture-only: no host dependency database.
   return real_command(args,check)
  def fixture_lexists(path):
   # Payload targets are queried only during prepare; journals and cached RPMs remain real.
