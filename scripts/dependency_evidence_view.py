@@ -3,7 +3,8 @@ import re
 
 
 def dependency_view(target, nodes):
-    if not isinstance(nodes, dict) or len(nodes) > 1000 or target not in nodes:
+    if (not isinstance(target, str) or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,160}', target)
+            or not isinstance(nodes, dict) or len(nodes) > 1000 or target not in nodes):
         raise ValueError('INVALID_DEPENDENCY_INPUT')
     reasons = set(); visited = set(); active = set(); stack = [(target, False)]
     while stack:
