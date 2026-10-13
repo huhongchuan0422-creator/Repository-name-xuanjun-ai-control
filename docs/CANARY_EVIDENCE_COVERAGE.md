@@ -24,3 +24,9 @@ signatures, inspect logs, prove execution or imply independent release approval.
 All output grants are false. Fixtures intentionally demonstrate shape acceptance,
 not UK PASS. Source development is independent; activation is blocked by P2 and
 Stage1 dependencies. Independent QA/Security/Release and UK acceptance NOT_RUN.
+
+## UK isolated platform receipt — 2026-10-13
+
+Exact workflow commit abcad3c1cc06d794a4646db36b76e38b4fb475a2; source bytes unchanged from independently reviewedab048245. Actual UK Python3.6.8 run38340629785/job115110577120 SUCCESS, logs read:15cost+11canary=26 tests PASS. Hosted same run/job115110577311 SUCCESS.
+
+Isolated fixtures only, model_calls=0. No operational DB, service activation, real notification, runtime admission, quota claim or release approval. Work retains outcome ownership. Next integration needs caller-authenticated current canonical producer snapshot and installed P2 authority; no omitted fields may be invented. These receipts supersede prior platform NOT_RUN only, not live integration NOT_RUN.
