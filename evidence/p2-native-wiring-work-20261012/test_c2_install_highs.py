@@ -22,6 +22,7 @@ class ProbeRuntime(mod.FixedHostRuntime):
     def _rollback_plugin(self,runtime,restart): self.effects.append(('plugin',restart))
     def _command(self,command): self.effects.append(('command',tuple(command)))
     def _start_gateway(self): self.effects.append(('start',))
+    def _enable_boot(self): self.effects.append(('enable-boot',))
     @staticmethod
     def _atomic_target(path,data,mode,uid,gid): raise AssertionError('target mutation before validation')
 
@@ -130,7 +131,7 @@ class GatewayLifecycleTests(unittest.TestCase):
             runtime=ProbeRuntime(d)
             result=runtime.activate({'provisioning':[]},{'state':'ACTIVE'})
             self.assertEqual(result,{'services_active':True})
-            self.assertEqual(runtime.effects[0],('start',))
+            self.assertEqual(runtime.effects[:2],[('enable-boot',),('start',)])
             starts=[item[1][-1] for item in runtime.effects if item[0]=='command' and item[1][1]=='start']
             self.assertNotIn('xuanjun-uk-stage1-minimal.service',starts)
             self.assertLess(starts.index('xuanjun-p2-gateway-relay.service'),
@@ -229,5 +230,71 @@ class BoundedReferenceTests(unittest.TestCase):
             with open(path,'wb') as f:f.truncate(16*1024*1024+1)
             with self.assertRaises(ValueError):
                 mod.FixedHostRuntime._reference({'path':path,'sha256':'a'*64,'owner_uid':os.getuid(),'mode':0o600})
+
+class BootJournalTests(unittest.TestCase):
+    def runtime(self, root):
+        from types import SimpleNamespace
+        states={u:'disabled' for u in mod.ALLOWED_SERVICES+(mod.GATEWAY_SERVICE,)}
+        states[mod.GATEWAY_SERVICE]='enabled'
+        calls=[]
+        def run(argv,**kwargs):
+            operation,unit=argv[1:]
+            if operation=='is-enabled':
+                state=states[unit]
+                return SimpleNamespace(returncode=0 if state=='enabled' else 1,
+                                       stdout=(state+'\n').encode())
+            # Intent must already exist before first enable/disable effect.
+            value=json.loads(pathlib.Path(root,'runtime-boot.json').read_text())
+            self.assertEqual(set(value['previous']),set(states))
+            calls.append((operation,unit))
+            states[unit]='enabled' if operation=='enable' else 'disabled'
+            return SimpleNamespace(returncode=0)
+        runtime=mod.FixedHostRuntime(root,run)
+        pathlib.Path(runtime.receipt_path).write_bytes(b'{}\n')
+        os.chmod(runtime.receipt_path,0o600)
+        return runtime,states,calls
+
+    def test_enable_restart_rollback_preserves_previous_enabled_gateway(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,states,calls=self.runtime(d);r._enable_boot()
+            self.assertTrue(all(v=='enabled' for v in states.values()))
+            # New object models process loss; original states remain durable.
+            restarted=mod.FixedHostRuntime(d,r.run);restarted._restore_boot()
+            self.assertEqual(states[mod.GATEWAY_SERVICE],'enabled')
+            self.assertTrue(all(states[u]=='disabled' for u in mod.ALLOWED_SERVICES))
+            restarted._restore_boot()
+            with self.assertRaises(ValueError):restarted._enable_boot()
+
+    def test_unknown_state_rejected_before_intent_or_effect(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,states,calls=self.runtime(d);states[mod.ALLOWED_SERVICES[-1]]='enabled-runtime'
+            with self.assertRaises(ValueError):r._enable_boot()
+            self.assertEqual(calls,[])
+            self.assertFalse(os.path.exists(os.path.join(d,'runtime-boot.json')))
+
+    def test_interrupted_enable_rollback_uses_original_states(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,states,calls=self.runtime(d);original=r.run
+            def fail(argv,**kwargs):
+                if argv[1]=='enable' and len(calls)==2:raise RuntimeError('injected')
+                return original(argv,**kwargs)
+            r.run=fail
+            with self.assertRaises(RuntimeError):r._enable_boot()
+            self.assertEqual(json.loads(pathlib.Path(d,'runtime-boot.json').read_text())['state'],'ENABLE_REQUESTED')
+            r.run=original;r._restore_boot()
+            self.assertTrue(all(states[u]=='disabled' for u in mod.ALLOWED_SERVICES))
+
+    def test_receipt_drift_and_injected_unit_rejected_before_rollback(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,states,calls=self.runtime(d);r._enable_boot();before=len(calls)
+            pathlib.Path(r.receipt_path).write_bytes(b'changed')
+            with self.assertRaises(ValueError):r._restore_boot()
+            self.assertEqual(len(calls),before)
+            pathlib.Path(r.receipt_path).write_bytes(b'{}\n')
+            path=pathlib.Path(d,'runtime-boot.json');value=json.loads(path.read_text())
+            value['previous']['evil.service']='disabled';path.write_text(json.dumps(value))
+            with self.assertRaises(ValueError):r._restore_boot()
+            self.assertEqual(len(calls),before)
+
 
 if __name__=='__main__':unittest.main(verbosity=2)
