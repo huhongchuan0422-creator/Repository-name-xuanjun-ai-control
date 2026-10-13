@@ -83,3 +83,8 @@ for path in glob.glob('/home/xuanjun_dev/uk-stage1-minimal/**/uk_owner_callback.
    if node.func.attr in ('claim','finish','approve','reject','execute','executemany','commit','connect'):calls.append(node.func.attr)
  modules.append({'path':path,'sha256':hashlib.sha256(raw).hexdigest(),'imports':sorted(set(imports)),'sql_verbs':sorted(set(verbs)),'effect_call_names':sorted(set(calls)),'old_database_literal':'state.sqlite' in text})
 print('CALLBACK_DEPENDENCY_EFFECTS='+json.dumps(modules,sort_keys=True))
+
+p='/tmp/p2-adopted-plan-38432771093/xuanjun-p2-package/stage1/p2_fixed_host_runtime.py'
+with open(p,'rb') as f:r=f.read(131073)
+assert len(r)<=131072
+print('AUXILIARY_RUNTIME_SOURCE_BASE64='+base64.b64encode(r).decode())
