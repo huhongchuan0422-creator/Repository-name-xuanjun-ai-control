@@ -68,3 +68,41 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+
+  uk-compatibility:
+    needs: prepare
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 5
+    steps:
+      - name: Verify pinned official binary offline in disposable UK directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          TASK_DIR="$(mktemp -d /tmp/p2-gh-compat.XXXXXXXX)"
+          trap 'rm -rf -- "$TASK_DIR"' EXIT
+          export TASK_DIR
+          /usr/bin/python3 -I -B - <<'PY'
+          import hashlib,io,os,struct,subprocess,tarfile,urllib.request
+          root=os.environ['TASK_DIR']
+          raw=urllib.request.urlopen('https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_amd64.tar.gz',timeout=45).read(32*1024*1024+1)
+          assert hashlib.sha256(raw).hexdigest()=='bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386'
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as tf:
+              members=[m for m in tf.getmembers() if m.name=='gh_2.102.0_linux_amd64/bin/gh']
+              assert len(members)==1 and members[0].isfile() and 0<members[0].size<128*1024*1024
+              binary=tf.extractfile(members[0]).read(128*1024*1024+1)
+          assert len(binary)==members[0].size
+          assert hashlib.sha256(binary).hexdigest()=='7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b'
+          assert binary[:6]==b'\x7fELF\x02\x01' and struct.unpack('<H',binary[18:20])[0]==62
+          path=root+'/gh'
+          with open(path,'xb') as fh: fh.write(binary)
+          os.chmod(path,0o500)
+          os.mkdir(root+'/home',0o700)
+          env={'HOME':root+'/home','PATH':'/usr/bin:/bin','GH_NO_UPDATE_NOTIFIER':'1','GH_NO_EXTENSION_UPDATE_NOTIFIER':'1','GH_PROMPT_DISABLED':'1','LANG':'C'}
+          result=subprocess.check_output([path,'--version'],env=env,timeout=10).decode('utf-8')
+          assert result.splitlines()[0].split()[:3]==['gh','version','2.102.0']
+          print('GH_UK_EXACT_BINARY_SHA256=7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b')
+          print('GH_UK_COMPATIBILITY=PASS')
+          print('INSTALL_PERFORMED=NO')
+          print('MODEL_CALLS=0')
+          PY
