@@ -186,7 +186,7 @@ def collect():
                     if not isinstance(next_token,str) or not next_token or next_token in seen_tokens:break
                     seen_tokens.add(next_token)
                 observation={'state':'UNKNOWN','complete_scan':complete,'distinct_canary_receipts':len(found)}
-                if complete and len(found)==1:
+                if len(found)==1:
                     ident=next(iter(found));original=found[ident]
                     response=feishu_api('im/v1/messages/'+ident,token)
                     records=response.get('data',{}).get('items',[])
@@ -196,7 +196,8 @@ def collect():
                             reread.get('msg_type')=='text' and reread.get('body')==original.get('body') and
                             reread.get('sender')==original.get('sender') and reread.get('deleted') is not True):
                             sender=reread['sender'];actual=reread['body']['content']
-                            observation.update({'state':'EXISTING_CANARY_READBACK_VERIFIED_NOT_RUNTIME_ACK',
+                            observation.update({'state':'EXISTING_CANARY_READBACK_VERIFIED_NOT_RUNTIME_ACK' if complete else 'READBACK_VERIFIED_HISTORY_INCOMPLETE_NOT_RUNTIME_ACK',
+                              'receipt_readback_verified':True,
                               'exact_original_serialization':actual==expected_original,
                               'exact_compact_serialization':actual==expected_compact,
                               'sender_id_type':sender.get('id_type') if sender.get('id_type') in ('open_id','app_id','user_id','union_id') else 'UNKNOWN',
