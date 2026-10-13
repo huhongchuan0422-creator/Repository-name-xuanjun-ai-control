@@ -700,3 +700,43 @@ jobs:
           print('AUTH_SDK_PLAN_INPUTS_PATH='+path)
           print('AUTH_SDK_PLAN_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
+
+      - name: Inspect immutable installed SDK component exports without task execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,subprocess,re,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];base='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
+          marks=('resolveSandboxContext','prepareWorkspaceAuthority','prepareSandboxWorkspace','createPluginRuntime','requestScoped','before_tool_call','RequestScoped')
+          p=subprocess.run(['/usr/bin/rg','-l','--glob','*.mjs','--glob','*.js']+sum((['-e',m] for m in marks),[])+[base],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=20)
+          assert p.returncode in (0,1) and len(p.stdout)<131072
+          rows=[]
+          for path in sorted(set(p.stdout.decode().splitlines()))[:150]:
+              if os.path.realpath(path)!=path or not path.startswith(base+'/'):continue
+              s=os.lstat(path)
+              if not stat.S_ISREG(s.st_mode) or s.st_uid!=1002 or s.st_mode&0o022 or s.st_size>8388608:continue
+              with open(path,'rb') as f:data=f.read()
+              text=data.decode('utf-8')
+              definitions=[m for m in marks if re.search(r'(?:async\\s+)?function\\s+'+m+r'\\b',text)]
+              exports=re.findall(r'(?m)^export[^\\n]{0,600}',text)[-3:]
+              rows.append({'path':path,'sha256':hashlib.sha256(data).hexdigest(),'uid':s.st_uid,'size':s.st_size,'markers':[m for m in marks if m in text],'function_definitions':definitions,'export_declarations':exports})
+          selected=base+'/workspace-sandbox-D4HRmyjR.mjs'
+          js="const m=await import("+json.dumps('file://'+selected)+");console.log(JSON.stringify({module_exports:Object.keys(m).sort(),named_resolveSandboxContext:typeof m.resolveSandboxContext==='function'}))"
+          p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C','NO_COLOR':'1'},stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30)
+          exports={'exit':p.returncode}
+          if p.returncode==0:
+              try:exports.update(json.loads(p.stdout.decode().strip().splitlines()[-1]))
+              except Exception:exports['state']='HOLD_UNPARSEABLE'
+          else:
+              exports['error_class']='OFFLINE_IMPORT_FAILED'
+          value={'schema':1,'state':'SDK_COMPONENT_EXPORT_INSPECTION','files':rows,'context_import':exports,'model_calls':0,'services_changed':False,'canonical_mutation':False}
+          raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-sdk-export-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(value,sort_keys=True))
+          print('SDK_EXPORT_INPUTS_PATH='+path)
+          print('SDK_EXPORT_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
