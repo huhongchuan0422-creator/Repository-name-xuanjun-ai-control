@@ -41,7 +41,7 @@ def build_digest(snapshot, now, limit=100, max_age=300):
     if snapshot.get('source') != 'CANONICAL_LEDGER_READ_ONLY':
         warnings.add('UNEXPECTED_SOURCE')
     counts = snapshot.get('counts')
-    expected = counts.get('WAITING_HUMAN', 0) if isinstance(counts, dict) else None
+    expected = counts.get('WAITING_HUMAN') if isinstance(counts, dict) else None
     if type(expected) is not int or expected < 0 or expected != len(queue):
         warnings.add('QUEUE_COUNT_MISMATCH')
     rows = {}
@@ -65,6 +65,8 @@ def build_digest(snapshot, now, limit=100, max_age=300):
         commit = commit if _text(commit, r'[a-f0-9]{40}') else None
         phase = cp.get('phase')
         phase = phase if _text(phase, r'[A-Z_]{1,40}') else 'UNKNOWN'
+        if phase == 'UNKNOWN' or commit is None:
+            warnings.add('UNKNOWN_CHECKPOINT_EVIDENCE')
         row = {'task_id': task_id, 'fence': fence, 'reason': reason,
                'phase': phase, 'commit': commit,
                'execution_evidence': 'UNKNOWN', 'approval_granted': False}

@@ -29,6 +29,18 @@ are explicit HOLD. Checkpoint output is limited to phase, commit and reason;
 raw prompts/logs/dependencies/credentials are never copied. The authenticated UI
 must render text as text and keep task identifiers within its authorized audience.
 
+Required evidence is conservative for every action category: an explicit integer
+WAITING_HUMAN count (including explicit zero for an empty queue), a recognized
+syntactic phase other than UNKNOWN, a lowercase 40-hex commit/sha, and a known
+syntactic reason. Missing/invalid phase or commit adds UNKNOWN_CHECKPOINT_EVIDENCE
+and HOLD; a reason alone is insufficient. Non-code action categories with no
+commit remain visible but HOLD until a separately reviewed category-specific
+evidence contract exists. Do not invent commits to satisfy this view. The current
+P2 producer may omit zero-count state keys, so the authenticated integration must
+explicitly provide the known zero from its consistent complete snapshot or accept
+HOLD; this module must not infer zero from absence. Producer integration remains
+NOT_RUN and must be tested before node acceptance.
+
 Run `python3 -B -m unittest discover -s tests -p test_owner_action_digest.py -v`.
 Python 3.6+ standard library only. Hosted CI and local compatibility are separate
 from UK installation, UI integration, actual notification and acceptance, all

@@ -69,6 +69,42 @@ class DigestTests(unittest.TestCase):
     def test_empty(self):
         self.assertEqual(build_digest(snapshot([]), 100)['status'], 'VIEW_READY')
 
+    def test_missing_count_not_zero(self):
+        source = snapshot([]); source['counts'] = {}
+        result = build_digest(source, 100)
+        self.assertEqual(result['status'], 'HOLD')
+        self.assertIn('QUEUE_COUNT_MISMATCH', result['warnings'])
+
+    def test_invalid_count_not_zero(self):
+        for value in (None, True, False, '0', 0.0, -1):
+            source = snapshot([]); source['counts']['WAITING_HUMAN'] = value
+            self.assertEqual(build_digest(source, 100)['status'], 'HOLD')
+
+    def test_reason_only_checkpoint_not_ready(self):
+        row = task(); row['checkpoint'] = {'error_code': 'OWNER_APPROVAL'}
+        result = build_digest(snapshot([row]), 100)
+        self.assertEqual(result['status'], 'HOLD')
+        self.assertIn('UNKNOWN_CHECKPOINT_EVIDENCE', result['warnings'])
+
+    def test_missing_or_invalid_phase_hold(self):
+        for value in (None, '', 'UNKNOWN', 'lowercase', '<script>', True):
+            row = task(); row['checkpoint']['phase'] = value
+            self.assertIn('UNKNOWN_CHECKPOINT_EVIDENCE',
+                          build_digest(snapshot([row]), 100)['warnings'])
+
+    def test_missing_or_invalid_commit_hold(self):
+        for value in (None, '', 'a' * 39, 'A' * 40, 'UNKNOWN', True):
+            row = task(); row['checkpoint']['commit'] = value
+            self.assertIn('UNKNOWN_CHECKPOINT_EVIDENCE',
+                          build_digest(snapshot([row]), 100)['warnings'])
+
+    def test_producer_checkpoint_aliases(self):
+        row = task(); row['checkpoint'] = {'phase': 'REVIEW', 'reason': 'OWNER_APPROVAL',
+                                         'sha': 'a' * 40}
+        result = build_digest(snapshot([row]), 100)
+        self.assertEqual(result['status'], 'VIEW_READY')
+        self.assertEqual(result['items'][0]['commit'], 'a' * 40)
+
     def test_unknown_checkpoint(self):
         row = task(); row['checkpoint'] = None
         result = build_digest(snapshot([row]), 100)
