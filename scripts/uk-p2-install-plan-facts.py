@@ -221,6 +221,20 @@ def main():
       'gateway_auth_env':gateway_auth_env_fact(),
       'proposed_identity_ids':proposed_identity_ids(),
       'gh_binary':maybe_identity('/usr/bin/gh'),
+      'gh_binary_candidates':[maybe_identity(os.path.realpath(p)) for p in (
+          '/usr/bin/gh','/usr/local/bin/gh','/opt/xuanjun-runtime/gh/gh',
+          '/home/xuanjun_dev/.local/bin/gh')],
+      # File metadata only: never print tokens, HMAC keys or identities.
+      'required_private_input_paths':[path_fact(p) for p in (
+          '/etc/xuanjun-development/github-intake-token',
+          '/etc/xuanjun-owner-callback/owner-dashboard-token',
+          '/etc/xuanjun-owner-callback/owner-callback-auth',
+          '/etc/xuanjun-owner-callback/owner-callback-hmac',
+          '/etc/xuanjun-owner-callback/owner-user-id',
+          '/etc/xuanjun-owner-callback/owner-chat-id')],
+      'https_runtime_paths':[path_fact(p) for p in (
+          '/usr/sbin/nginx','/etc/nginx','/usr/bin/caddy',
+          '/etc/caddy','/etc/letsencrypt','/etc/ssl/private')],
       'codex_binary_candidates':find_named_files('/home/xuanjun_dev/.openclaw','codex'),
       'plan_parents':[path_fact(x) for x in (
           '/etc','/opt','/var/lib','/var/lib/xuanjun-development',
