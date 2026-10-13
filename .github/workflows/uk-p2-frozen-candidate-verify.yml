@@ -751,3 +751,46 @@ jobs:
           print('SDK_EXPORT_INPUTS_PATH='+path)
           print('SDK_EXPORT_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
+
+      - name: Prepare private source mirror with Owner authentication without GitHub mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,subprocess,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];prior='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          tokenpath=prior+'/github-intake-token.input'
+          s=os.lstat(tokenpath);assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o600 and os.path.realpath(tokenpath)==tokenpath
+          helper=prior+'/git-preparation-askpass.py'
+          code=("#!/usr/bin/python3\nimport sys,os,stat\np="+repr(tokenpath)+"\nif 'Username' in sys.argv[1]: print('huhongchuan0422-creator')\nelse:\n fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)\n with os.fdopen(fd) as f:\n  s=os.fstat(f.fileno());assert s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o600\n  print(f.read().strip())\n").encode()
+          if os.path.lexists(helper):
+              with open(helper,'rb') as f:assert f.read()==code
+          else:
+              fd=os.open(helper,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o500)
+              with os.fdopen(fd,'wb') as f:f.write(code);f.flush();os.fsync(f.fileno())
+          remote='https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control.git'
+          mirror=prior+'/control-mirror.git'
+          env={'PATH':'/usr/bin:/bin','LANG':'C','GIT_TERMINAL_PROMPT':'0','GIT_ASKPASS':helper,'GIT_CONFIG_GLOBAL':'/dev/null','GIT_CONFIG_NOSYSTEM':'1'}
+          result={'schema':1,'artifact_id':11796280855,'state':'HOLD_SOURCE_MIRROR','github_mutation':False,'canonical_mutation':False,'services_changed':False,'credential_values_exported':False}
+          try:
+              if not os.path.lexists(mirror):
+                  p=subprocess.run(['/usr/bin/git','clone','--quiet','--mirror',remote,mirror],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120)
+                  result['clone_exit']=p.returncode;assert p.returncode==0
+              os.chmod(mirror,0o700)
+              def git(*args):return subprocess.check_output(['/usr/bin/git','--git-dir='+mirror]+list(args),env=env,stderr=subprocess.DEVNULL,timeout=15).decode().strip()
+              assert git('config','--get','remote.origin.url')==remote
+              assert git('rev-parse','--is-bare-repository')=='true'
+              source='f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06'
+              assert git('rev-parse',source+'^{commit}')==source
+              tree=git('rev-parse',source+'^{tree}');assert tree=='3fc23b2a01bd8f01ea0edcef9216ded7313409c2'
+              result.update(state='PROTECTED_SOURCE_MIRROR_READY_CONTENTS_READ_VERIFIED',mirror_path=mirror,source_commit=source,source_tree=tree)
+          except Exception as e:result['hold_reason']=type(e).__name__
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-source-mirror-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('SOURCE_MIRROR_RECEIPT_PATH='+path)
+          print('SOURCE_MIRROR_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
