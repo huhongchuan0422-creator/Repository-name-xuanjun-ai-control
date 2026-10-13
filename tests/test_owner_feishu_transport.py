@@ -77,4 +77,25 @@ class Tests(unittest.TestCase):
     def test_no_new_tables_in_delivery(self):
         db=sqlite3.connect(self.path);before=db.execute('SELECT name FROM sqlite_master ORDER BY name').fetchall();self.send();after=db.execute('SELECT name FROM sqlite_master ORDER BY name').fetchall();db.close();self.assertEqual(before,after)
 
+    def reconciliation_fixture(self, msg_type='text'):
+        claim={'destination':'OWNER','event_key':self.key,'delivery_identity':self.key,
+               'authority_fence':4,'authority_epoch':2,'claim_epoch':1,'claim_attempt':1}
+        transport=OwnerFeishuTransport('oc_fixture','a'*64,self.api,lambda c:True)
+        result={'chat_id':'oc_fixture','message_id':'om_fixture',
+                'content':transport._body(self.key,'COMPLETED')}
+        if msg_type is not None:result['msg_type']=msg_type
+        return transport,claim,result
+    def test_reconcile_matching_text_receipt(self):
+        transport,claim,result=self.reconciliation_fixture()
+        self.assertEqual(transport.reconcile(self.key,'COMPLETED',lambda *a:result,claim),'om_fixture')
+        self.assertEqual(self.calls,[])
+    def test_reconcile_wrong_message_type(self):
+        transport,claim,result=self.reconciliation_fixture('image')
+        self.assertEqual(transport.reconcile(self.key,'COMPLETED',lambda *a:result,claim),'UNKNOWN')
+        self.assertEqual(self.calls,[])
+    def test_reconcile_missing_message_type(self):
+        transport,claim,result=self.reconciliation_fixture(None)
+        self.assertEqual(transport.reconcile(self.key,'COMPLETED',lambda *a:result,claim),'UNKNOWN')
+        self.assertEqual(self.calls,[])
+
 if __name__=='__main__':unittest.main()
