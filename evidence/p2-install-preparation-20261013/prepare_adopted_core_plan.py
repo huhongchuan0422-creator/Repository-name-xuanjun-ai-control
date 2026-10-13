@@ -4,7 +4,7 @@ assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21s
 B='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
 ROOT=os.environ['P2_REVIEW_ROOT']+'/xuanjun-p2-package'
 RUN=sys.argv[1]
-SOURCE='8743a953a2f92ecbf515ecaa6609c50993f4ac74';TREE='7c41607186e5ebc66003344a245742c0ba8d0315';MANIFEST='44ede26d72bbb776dc813d6eb4d057581e11440d17082a6f1a207fc377689b0a'
+SOURCE='2516b8adf88a126b956c6b5ccf1a1dd186a328a6';TREE='e03b72b7b9578ef5087ca8c01c9276ab73825dcb';MANIFEST='44ede26d72bbb776dc813d6eb4d057581e11440d17082a6f1a207fc377689b0a'
 OLD='2b49066f37742dedd41657fb445c91f4204fd4a2a257f921dd9fd514e5b25f0e'
 def read(p,expected=None):
  assert os.path.realpath(p)==p
@@ -55,7 +55,7 @@ for i,row in enumerate(boot['files']):
  if row['target']=='/etc/xuanjun-development/p2-native-binding.json':
   data=replace(data.decode()).encode()
  target=d+'/private-bootstrap/bootstrap-'+str(i);write(target,data);row['source']=target;row['sha256']=h(data)
-boot['artifact_id']=11833798542
+boot['artifact_id']=11833404272
 bootpath=d+'/protected-bootstrap-candidate-receipt.json';bootraw=pack(boot);write(bootpath,bootraw)
 p['runtime']['bootstrap']={'path':bootpath,'sha256':h(bootraw)}
 pubpath=B+'/publisher-realm-'+RUN+'/protected-publisher-inputs.json'
