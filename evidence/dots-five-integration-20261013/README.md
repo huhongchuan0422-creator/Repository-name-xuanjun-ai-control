@@ -70,6 +70,6 @@ UK execution of these new checks: NOT_RUN. Installed/live acceptance: NOT_RUN.
 Run with PYTHONPATH containing this directory and repository root,
 DOTS_TEST_DEPENDENCIES pointing to hash-checked pinned sources and
 P2_TEST_PACKAGE to the complete validated historical package. CI bootstrap
-uses an ephemeral read-only Actions token for the fixed artifact endpoint,
+uses an ephemeral read-only Actions token for fixed repository contents/artifact endpoints,
 strips Authorization on cross-origin redirect and does not pass token into
 test step. No service/systemd/sudo/production credentials or model routing.

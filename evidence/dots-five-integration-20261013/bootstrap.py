@@ -24,7 +24,7 @@ class Redirect(urllib.request.HTTPRedirectHandler):
 
 
 def get(url, limit, token=None):
-    headers={'User-Agent':'xuanjun-pinned-fixture'}
+    headers={'User-Agent':'xuanjun-pinned-fixture', 'Accept':'application/vnd.github.raw+json'}
     if token:
         if urllib.parse.urlparse(url).netloc != 'api.github.com':raise ValueError('TOKEN_HOST')
         headers['Authorization']='Bearer '+token
@@ -39,8 +39,8 @@ def main(root):
     root=Path(root);root.mkdir(mode=0o700,parents=True,exist_ok=False)
     deps=root/'dependencies';deps.mkdir()
     for item in json.loads(Path(__file__).with_name('dependencies.json').read_text()):
-        url='https://raw.githubusercontent.com/{}/{}/{}'.format(REPOSITORY,item['commit'],item['path'])
-        data=get(url,262144)
+        url='https://api.github.com/repos/{}/contents/{}?ref={}'.format(REPOSITORY,item['path'],item['commit'])
+        data=get(url,262144,os.environ.get('GH_TOKEN'))
         if hashlib.sha256(data).hexdigest()!=item['sha256']:raise ValueError('DEPENDENCY_HASH')
         (deps/item['name']).write_bytes(data)
     archive=get('https://api.github.com/repos/'+REPOSITORY+'/actions/artifacts/11786072168/zip',8388608,os.environ.get('GH_TOKEN'))
