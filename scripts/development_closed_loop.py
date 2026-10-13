@@ -38,6 +38,13 @@ def apply_code_review(supervisor, task_id, attempt_id, event_prefix,
     """Persist exact-version review and request the next bounded handoff."""
     _nonempty(event_prefix, 'EVENT_PREFIX_REQUIRED')
     _nonempty(evidence_ref, 'REVIEW_EVIDENCE_REQUIRED')
+    task = _task(supervisor, task_id)
+    if (contract.get('task_id') != task_id
+            or contract.get('spec_sha256') != task['spec_sha256']
+            or contract.get('checkpoint_sha256') != task['checkpoint_sha256']
+            or task['attempt_id'] != attempt_id
+            or task['state'] not in ('STARTED', 'RUNNING')):
+        raise ValueError('REVIEW_CANONICAL_BINDING_MISMATCH')
     outcome = review_outcome(contract, files, reviews, review_keys)
     if outcome['state'] == 'HOLD_INDEPENDENT_REVIEW_REQUIRED':
         return dict(outcome, next_action='AWAIT_INDEPENDENT_REVIEW',
@@ -52,6 +59,9 @@ def apply_code_review(supervisor, task_id, attempt_id, event_prefix,
         phase = 'REVIEW_PASSED_TEST_REQUIRED'
     progress_payload = {
         'phase': phase,
+        'review_task_id': task_id,
+        'review_spec_sha256': task['spec_sha256'],
+        'review_checkpoint_sha256': task['checkpoint_sha256'],
         'bundle_sha256': outcome['bundle_sha256'],
         'review_roles': outcome['review_roles'],
         'failed_roles': outcome['failed_roles'],
