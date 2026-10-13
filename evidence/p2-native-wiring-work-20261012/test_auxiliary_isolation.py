@@ -62,4 +62,34 @@ class AuxiliaryTests(unittest.TestCase):
    original=a.verify
    with patch.object(a,'verify',side_effect=lambda ref:original(ref,run=self.run)):
     self.assertEqual(runtime.FixedHostRuntime._binding(b,'/tmp/release',self.ref)[1],self.target)
+ def restore_fixture(self,tamper=False):
+  import contextlib
+  directory=self.root/'runtime';directory.mkdir(mode=0o700)
+  p=pathlib.Path(self.target);p.unlink();p.write_bytes(b'new runtime unit');p.chmod(0o644)
+  backup=directory/'target-000.backup';previous=a.mask_previous
+  original_backup=self.parent/(sorted(a.UNITS)[0]+'.backup')
+  backup.write_bytes(original_backup.read_bytes());backup.chmod(0o600)
+  item={'target':self.target,'previous':{'backup':str(backup),'sha256':self.hashes[sorted(a.UNITS)[0]],'mode':0o644,'uid':0,'gid':0,'masked':True},'rendered_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'mode':0o644,'uid':0,'gid':0}
+  receipt={'schema':1,'targets':[item],'auxiliary_isolation':self.ref,'prerequisites':{},'plugin':{'id':runtime.P2_PLUGIN_ID,'previous':'ABSENT','gateway_service':runtime.GATEWAY_SERVICE,'dropin_parent_created':False}}
+  raw=json.dumps(receipt,sort_keys=True,separators=(',',':')).encode()
+  path=directory/'runtime.json';path.write_bytes(raw);path.chmod(0o600)
+  if tamper:p.write_bytes(b'unknown external drift')
+  r=runtime.FixedHostRuntime.__new__(runtime.FixedHostRuntime);r.directory=str(directory);r.receipt_path=str(path);r._authority=lambda:None
+  effects=[];r._restore_boot=lambda:effects.append('boot');r._rollback_plugin=lambda *x,**kw:effects.append(('plugin',kw));r._command=lambda x:effects.append(x)
+  r.prerequisites=types.SimpleNamespace(rollback=lambda x:effects.append('prerequisites'))
+  original_verify=a.verify
+  with contextlib.ExitStack() as stack:
+   stack.enter_context(patch.object(runtime,'ALLOWED_TARGET_PREFIXES',(a.UNIT_ROOT+'/',)))
+   stack.enter_context(patch.object(a,'verify',side_effect=lambda ref,masked=True:original_verify(ref,masked=masked,run=self.run)))
+   for cls,names in ((runtime.BootstrapFiles,('rollback_rows','rollback')),(runtime.PublisherBootstrap,('rollback_rows','rollback')),(runtime.SandboxProfile,('rollback_check',)),(runtime.RpmPrerequisites,('rollback_rows','rollback'))):
+    for name in names:stack.enter_context(patch.object(cls,name,return_value=None))
+   if tamper:
+    with self.assertRaisesRegex(ValueError,'TARGET_CHANGED'):r.restore({'receipt_sha256':hashlib.sha256(raw).hexdigest()})
+    self.assertEqual(effects,[]);self.assertFalse(a.is_mask(self.target))
+   else:
+    result=r.restore({'receipt_sha256':hashlib.sha256(raw).hexdigest()})
+    self.assertEqual(result,{'restored':True,'services_restarted':False});self.assertTrue(a.is_mask(self.target))
+    self.assertFalse(any(isinstance(x,list) and ('start' in x or 'restart' in x) for x in effects))
+ def test_full_runtime_restore_returns_to_mask_without_restart(self):self.restore_fixture()
+ def test_full_runtime_target_drift_has_zero_rollback_effects(self):self.restore_fixture(tamper=True)
 if __name__=='__main__':unittest.main()
