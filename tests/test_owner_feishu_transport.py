@@ -1,4 +1,6 @@
 import json, os, pathlib, sqlite3, sys, tempfile, unittest
+if 'P2_SOURCE_ROOT' not in os.environ:
+    raise unittest.SkipTest('Exact frozen producer fixture absent: integration NOT_RUN')
 ROOT=pathlib.Path(__file__).parent
 sys.path.insert(0,str(ROOT.parent/'scripts'))
 sys.path.insert(0,os.environ['P2_SOURCE_ROOT']+'/stage1')
