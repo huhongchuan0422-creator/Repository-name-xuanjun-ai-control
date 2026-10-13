@@ -9,11 +9,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11780439406"
-  P2_TAR_SHA256: "8e300d826dc5eb1b50b071bb55a5da95f721a890abff8d9552c3c7fd154f2c0a"
-  P2_SOURCE_COMMIT: "1fc2df4e105b470b0d3c618b10470480b659445b"
-  P2_SOURCE_TREE: "a4f65a5618f0963446d8bb3aa1380cf23e0226ef"
-  P2_MANIFEST_SHA256: "e9afeba84e08c1c6cbb816d4348da29ae7e7c1f948632a0f8ec76eaf15748625"
+  P2_ARTIFACT_ID: "11781889683"
+  P2_TAR_SHA256: "3998a2f6018fc615f344fb4bb5ea59b27454d939b40c61a12ff6d10b4de6d597"
+  P2_SOURCE_COMMIT: "936db20b180a052b556de9bfb85982e3cde261c7"
+  P2_SOURCE_TREE: "ebcf6f715cbcf729d005d8aff7efbcbd69aed41e"
+  P2_MANIFEST_SHA256: "d1c292ce5eecc9bffdfcee3c9637437c7075d94e4b250eaebcdafaeaac3c10e6"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -79,19 +79,31 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   '1fc2df4e105b470b0d3c618b10470480b659445b',
-                   'e9afeba84e08c1c6cbb816d4348da29ae7e7c1f948632a0f8ec76eaf15748625',
-                   'a4f65a5618f0963446d8bb3aa1380cf23e0226ef')
+                   '936db20b180a052b556de9bfb85982e3cde261c7',
+                   'd1c292ce5eecc9bffdfcee3c9637437c7075d94e4b250eaebcdafaeaac3c10e6',
+                   'ebcf6f715cbcf729d005d8aff7efbcbd69aed41e')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
-          assert transport['openclaw_bin']=='/home/xuanjun_dev/.openclaw/bin/openclaw'
-          assert transport['openclaw_owner_uid']==1002
-          actual=hashlib.sha256(open(transport['openclaw_bin'],'rb').read()).hexdigest()
-          assert actual==transport['openclaw_sha256']=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
+          assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev'}
+          relay=json.load(open(root+'/deploy/p2-gateway-relay.json.template','r'))
+          assert relay['openclaw_bin']=='/home/xuanjun_dev/.openclaw/bin/openclaw'
+          assert relay['openclaw_owner_uid']==1002
+          actual=hashlib.sha256(open(relay['openclaw_bin'],'rb').read()).hexdigest()
+          assert actual==relay['openclaw_sha256']=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
           service=open(root+'/deploy/xuanjun-development-dispatcher.service','r').read()
           controller_sha=hashlib.sha256(open(root+'/stage1/native_gateway_controller.py','rb').read()).hexdigest()
-          assert service.count('--native-controller ')==2
-          assert service.count('--native-controller-sha256 '+controller_sha)==2
+          assert 'ProtectHome=yes' in service
+          assert 'Requires=xuanjun-p2-gateway-relay.socket' in service
+          assert '/home/xuanjun_dev' not in service
+          assert service.count('--native-controller ')==3
+          assert service.count('--native-controller-sha256 '+controller_sha)==3
+          relay_service=open(root+'/deploy/xuanjun-p2-gateway-relay.service','r').read()
+          assert 'User=xuanjun_dev' in relay_service and 'ProtectHome=read-only' in relay_service
+          assert 'p2_service_context_preflight.py' in service
+          ledger=open(root+'/stage1/execution_ledger.py','r').read()
+          wake=open(root+'/stage1/mechanical_wake_service.py','r').read()
+          assert '_pinned_transaction' in ledger and 'record_inventory_notices' in ledger
+          assert 'record_inventory_notices()' in wake
           def show(k):
               return subprocess.check_output(['/usr/bin/systemctl','show','xuanjun-uk-openclaw.service','--property='+k,'--value'],universal_newlines=True).strip()
           assert show('User')=='xuanjun_dev' and show('ActiveState')=='active' and show('SubState')=='running'
