@@ -1,0 +1,23 @@
+name: Offline AI evaluation receipt gates
+on:
+  pull_request:
+    paths:
+      - scripts/ai_eval_receipt_gate.py
+      - tests/test_ai_eval_receipt_gate.py
+      - fixtures/ai_eval/**
+      - docs/AI_EVAL_BASELINE.md
+      - .github/workflows/ai-eval-baseline-gates.yml
+permissions:
+  contents: read
+jobs:
+  offline-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate offline exact-output checker (no model or UK acceptance)
+        run: |
+          python3 -m py_compile scripts/ai_eval_receipt_gate.py
+          python3 -B -m unittest discover -s tests -p 'test_ai_eval_receipt_gate.py' -v
