@@ -10,11 +10,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11806508375"
-  P2_TAR_SHA256: "58334c0ccc8e0291e7c549bac525875a645dc67265e09a83da95b599477dc74f"
-  P2_SOURCE_COMMIT: "a47612729dc18b03fe1f450a9c30c844d11cf724"
-  P2_SOURCE_TREE: "3172aef4711d219c0ea848059fa5305c7d43876f"
-  P2_MANIFEST_SHA256: "35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8"
+  P2_ARTIFACT_ID: "11809293413"
+  P2_TAR_SHA256: "654bd6146499dad7de8659710649e3f71757c2e962777d8bb5745303fd9d9cb5"
+  P2_SOURCE_COMMIT: "e023d9c1ddf4aa557c7bc95d4165ba23a4adbf40"
+  P2_SOURCE_TREE: "aa00a9cd4f2b6c8e41defe4d28eba75571e6d85c"
+  P2_MANIFEST_SHA256: "24dfdc4414d5fcff99ccfb89b694906a9c346fc57fbdb4715e9caea3fc25c240"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -164,9 +164,9 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   'a47612729dc18b03fe1f450a9c30c844d11cf724',
-                   '35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8',
-                   '3172aef4711d219c0ea848059fa5305c7d43876f')
+                   'e023d9c1ddf4aa557c7bc95d4165ba23a4adbf40',
+                   '24dfdc4414d5fcff99ccfb89b694906a9c346fc57fbdb4715e9caea3fc25c240',
+                   'aa00a9cd4f2b6c8e41defe4d28eba75571e6d85c')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
           assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
@@ -255,7 +255,7 @@ jobs:
            '/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite',
            '/home/xuanjun_dev/.openclaw/openclaw.json')
           value={'schema':1,'state':'PREREQUISITE_INVENTORY_NOT_INSTALL_PLAN','artifact_id':11796280855,
-           'archive_sha256':'58334c0ccc8e0291e7c549bac525875a645dc67265e09a83da95b599477dc74f',
+           'archive_sha256':'654bd6146499dad7de8659710649e3f71757c2e962777d8bb5745303fd9d9cb5',
            'candidate_free_uid_gid_pairs_not_reserved':free,'users':users,
            'binary_candidates':[metadata(p,True) for p in sources],'paths':[metadata(p) for p in paths],
            'source_binaries_executed':False,'credentials_read':False,'services_changed':False,
@@ -438,7 +438,7 @@ jobs:
                   assert len(raw)<=2097152
                   return json.loads(raw.decode())
               except urllib.error.HTTPError as e:return {'code':e.code}
-          private={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8','auth_references':[]}
+          private={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'24dfdc4414d5fcff99ccfb89b694906a9c346fc57fbdb4715e9caea3fc25c240','auth_references':[]}
           public={'schema':1,'state':'OWNER_BINDING_INPUTS_HOLD','credential_values_exported':False,'notification_sends':0,'model_calls':0,'services_changed':False,'canonical_mutation':False}
           try:
               profile='/home/xuanjun_dev/.openclaw/openclaw.json'
@@ -822,13 +822,13 @@ jobs:
               def git(*args):return subprocess.check_output(['/usr/bin/git','--git-dir='+mirror]+list(args),env=env,stderr=subprocess.DEVNULL,timeout=15).decode().strip()
               assert git('config','--get','remote.origin.url')==remote
               assert git('rev-parse','--is-bare-repository')=='true'
-              source='a47612729dc18b03fe1f450a9c30c844d11cf724'
+              source='e023d9c1ddf4aa557c7bc95d4165ba23a4adbf40'
               try:observed=git('rev-parse',source+'^{commit}')
               except subprocess.CalledProcessError:
                   p=subprocess.run(['/usr/bin/git','--git-dir='+mirror,'fetch','--quiet','--no-tags','origin',source+':refs/xuanjun-preparation/'+source],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120)
                   assert p.returncode==0;observed=git('rev-parse',source+'^{commit}')
               assert observed==source
-              tree=git('rev-parse',source+'^{tree}');assert tree=='3172aef4711d219c0ea848059fa5305c7d43876f'
+              tree=git('rev-parse',source+'^{tree}');assert tree=='aa00a9cd4f2b6c8e41defe4d28eba75571e6d85c'
               result.update(state='PROTECTED_SOURCE_MIRROR_READY_CONTENTS_READ_VERIFIED',mirror_path=mirror,source_commit=source,source_tree=tree)
           except Exception as e:result['hold_reason']=type(e).__name__
           raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
@@ -993,14 +993,14 @@ jobs:
           installer=package+'/scripts/uk-integration-install.py'
           spec=importlib.util.spec_from_file_location('p2_seal_verify',installer);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
           manifest=package+'/deploy/integration-manifest.json'
-          m.verify(package,manifest,'a47612729dc18b03fe1f450a9c30c844d11cf724','35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8',expected_tree='3172aef4711d219c0ea848059fa5305c7d43876f')
+          m.verify(package,manifest,'e023d9c1ddf4aa557c7bc95d4165ba23a4adbf40','24dfdc4414d5fcff99ccfb89b694906a9c346fc57fbdb4715e9caea3fc25c240',expected_tree='aa00a9cd4f2b6c8e41defe4d28eba75571e6d85c')
           sealed_package=output+'/xuanjun-p2-package';shutil.copytree(package,sealed_package,symlinks=False)
           for parent,dirs,files in os.walk(sealed_package):
               os.chown(parent,0,0);os.chmod(parent,0o755)
               for name in files:
                   path=parent+'/'+name;assert not os.path.islink(path)
                   os.chown(path,0,0);os.chmod(path,0o555 if os.stat(path).st_mode&0o111 else 0o444)
-          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','a47612729dc18b03fe1f450a9c30c844d11cf724','35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8',expected_tree='3172aef4711d219c0ea848059fa5305c7d43876f')
+          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','e023d9c1ddf4aa557c7bc95d4165ba23a4adbf40','24dfdc4414d5fcff99ccfb89b694906a9c346fc57fbdb4715e9caea3fc25c240',expected_tree='aa00a9cd4f2b6c8e41defe4d28eba75571e6d85c')
           plan=json.loads(read(work+'/protected-core-install-plan.json',0o600).decode())
           plan['artifact']['root']=sealed_package;plan['artifact']['manifest']=sealed_package+'/deploy/integration-manifest.json'
           for item in plan['runtime']['prerequisites']['binaries']:
@@ -1260,7 +1260,7 @@ jobs:
           scan="import os,sys;os.setgroups([]);os.setgid(1003);os.setuid(1003);sys.path.insert(0,sys.argv[1]+'/stage1');from development_pipeline import CliBackend;from native_snapshot_access import NativeSnapshotAccess;b=CliBackend({'owner/repo':sys.argv[2]+'/control.git'},sys.argv[2],sys.argv[2]+'/home','/usr/bin:/bin',['fixture'],snapshot_access=NativeSnapshotAccess(sys.argv[2],1003,1002));assert b._scan_snapshot(sys.argv[2]+'/snapshot')['newdir/new.py']['data']==b'FIXTURE_ONLY=2\\n';print('FROZEN_BACKEND_READS_GATEWAY_OUTPUT')"
           p=subprocess.run(['/usr/bin/python3','-I','-B','-c',scan,package,workspace],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)
           assert p.returncode==0,'FROZEN_BACKEND_GATEWAY_OUTPUT_SCAN_FAILED'
-          result={'schema':1,'state':'EXACT_ARTIFACT_NATIVE_SNAPSHOT_BACKEND_KERNEL_PASS','artifact_id':11806508375,'source_commit':'a47612729dc18b03fe1f450a9c30c844d11cf724','identity_access':rows,'gateway_output_import_scan':True,'model_calls':0,'services_changed':False,'canonical_ledger_changed':False,'writer_admission':False}
+          result={'schema':1,'state':'EXACT_ARTIFACT_NATIVE_SNAPSHOT_BACKEND_KERNEL_PASS','artifact_id':11809293413,'source_commit':'e023d9c1ddf4aa557c7bc95d4165ba23a4adbf40','identity_access':rows,'gateway_output_import_scan':True,'model_calls':0,'services_changed':False,'canonical_ledger_changed':False,'writer_admission':False}
           raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
           fd=os.open(root+'/protected-frozen-snapshot-backend-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
@@ -1285,7 +1285,7 @@ jobs:
           module='file:///home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs'
           js="const m=await import("+json.dumps(module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const agentId of ['developer','platform-engineer']){const sessionKey='agent:'+agentId+':p2-fixture:"+os.path.basename(root)+"';const c=await m.resolveSandboxContext({config:cfg,agentId,sessionKey,workspaceDir:"+json.dumps(snapshot)+",requireCurrentConfig:false,assertCurrent:()=>{}});const row={agentId};for(const key of ['enabled','sessionKey','workspaceDir','agentWorkspaceDir','skillsWorkspaceDir','containerWorkdir','containerName','containerId','workspaceAccess','backendId','runtimeId']){if(c?.[key]!==undefined&&['string','boolean','number'].includes(typeof c[key]))row[key]=c[key];}rows.push(row);}console.log('P2_SDK_MOUNTS='+JSON.stringify(rows));"
           env={'PATH':'/usr/bin:/bin','LANG':'C','HOME':home,'OPENCLAW_STATE_DIR':home+'/state','OPENCLAW_HOME':home,'NO_COLOR':'1','DOCKER_HOST':'unix:///var/run/docker.sock'}
-          contexts=[];known=[];result={'schema':1,'state':'HOLD_SDK_SOURCE_MOUNTS','artifact_id':11806508375,'model_calls':0,'canonical_ledger_changed':False,'production_services_changed':False,'writer_admission':False,'contexts':contexts,'units':known}
+          contexts=[];known=[];result={'schema':1,'state':'HOLD_SDK_SOURCE_MOUNTS','artifact_id':11809293413,'model_calls':0,'canonical_ledger_changed':False,'production_services_changed':False,'writer_admission':False,'contexts':contexts,'units':known}
           def docker(*args):
               return subprocess.run(['/usr/bin/docker','--host=unix:///var/run/docker.sock']+list(args),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
           try:
@@ -1311,7 +1311,24 @@ jobs:
                   payload="import os,sys,json;path=sys.argv[1];out={};\nwith open(path,'rb') as f:out['read_size']=len(f.read())\ntry:\n fd=os.open(path,os.O_WRONLY);os.close(fd);out['source_write']='ALLOWED'\nexcept OSError as e:out['source_write']='DENIED';out['write_errno']=e.errno\nprint(json.dumps(out))"
                   q=docker('exec','--user','1002:1002',obj['Id'],'/usr/bin/python3','-B','-c',payload,destination+'/fixture.py');assert q.returncode==0
                   row['source_io_probe']=json.loads(q.stdout.decode());assert row['source_io_probe']['source_write']==('ALLOWED' if expected_rw else 'DENIED')
-              result['state']='SDK_RW_RO_SOURCE_MOUNT_AND_WRITE_DENIAL_PASS_PENDING_CONTROLLER_ADAPTATION'
+              package=root+'/xuanjun-p2-package/plugins/p2-native-controller'
+              source={'workdir':snapshot,'files':[]}
+              for directory,dirs,files in os.walk(snapshot):
+                  for name in sorted(files):
+                      absolute=directory+'/'+name;s=os.lstat(absolute);assert stat.S_ISREG(s.st_mode)
+                      with open(absolute,'rb') as f:raw=f.read()
+                      source['files'].append({'path':os.path.relpath(absolute,snapshot),'mode':'100755' if s.st_mode&0o111 else '100644','sha256':hashlib.sha256(raw).hexdigest()})
+              module_url='file://'+package
+              verifyjs="const {sandboxLayout}=await import("+json.dumps(module_url+'/sdk-layout.mjs')+");const {ContainerObserver}=await import("+json.dumps(module_url+'/workspace.mjs')+");let b='';for await(const c of process.stdin)b+=c;const input=JSON.parse(b);const observer=new ContainerObserver({binary:'/usr/bin/docker',backend:'docker'});const out=[];for(const ctx of input.contexts){const request={workdir:input.source.workdir,sandbox:ctx.workspaceAccess==='ro'?'read-only':'workspace-write'};const layout=sandboxLayout(ctx,request,ctx.sessionKey,'docker');const unit=await observer.bind({backend:'docker',name:ctx.runtimeId,sdk_layout:layout},request.workdir,[],request.sandbox);const attestation=await observer.attestSnapshot(unit,input.source);out.push({agent_id:ctx.agentId,unit_id:unit.id,cgroup:unit.cgroup,workspace_destination:unit.workspace_destination,attestation});}console.log('P2_OBSERVER_NAMESPACE='+JSON.stringify(out));"
+              q=subprocess.run(['/usr/bin/setpriv','--reuid=1002','--regid=1002','--groups='+str(gid),'/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',verifyjs],input=json.dumps({'contexts':contexts,'source':source}).encode(),env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60)
+              fd=os.open(fixture+'/protected-observer.log',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+              with os.fdopen(fd,'wb') as f:f.write(q.stdout+q.stderr)
+              result['observer_exit']=q.returncode
+              assert q.returncode==0,'EXACT_CONTROLLER_OBSERVER_OR_NAMESPACE_FAILED'
+              observed=[line[len('P2_OBSERVER_NAMESPACE='):] for line in q.stdout.decode().splitlines() if line.startswith('P2_OBSERVER_NAMESPACE=')]
+              assert len(observed)==1;result['controller_observer_namespace']=json.loads(observed[0]);assert len(result['controller_observer_namespace'])==2
+              assert [r['workspace_destination'] for r in result['controller_observer_namespace']]==['/workspace','/agent']
+              result['state']='SDK_LAYOUT_ACTUAL_CONTROLLER_MOUNTS_NAMESPACE_AND_READONLY_DENIAL_PASS'
           except Exception as e:
               result['error_type']=type(e).__name__;message=str(e)
               result['hold_reason']=message if message and all(x in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_ ' for x in message) else 'DETAILS_RETAINED_PRIVATE'
@@ -1329,4 +1346,5 @@ jobs:
           fd=os.open(root+'/protected-sdk-source-mount-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
           print(json.dumps(result,sort_keys=True));print('SDK_SOURCE_MOUNT_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          assert result['state']=='SDK_LAYOUT_ACTUAL_CONTROLLER_MOUNTS_NAMESPACE_AND_READONLY_DENIAL_PASS' and result['fixture_cleanup_confirmed'],'SDK_CONTROLLER_FIXTURE_HOLD'
           PY
