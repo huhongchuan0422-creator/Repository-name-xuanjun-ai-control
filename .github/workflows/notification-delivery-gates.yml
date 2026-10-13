@@ -1,0 +1,22 @@
+name: Notification delivery diagnostics gates
+on:
+  pull_request:
+    paths:
+      - scripts/notification_delivery_view.py
+      - tests/test_notification_delivery_view.py
+      - docs/NOTIFICATION_DELIVERY_VIEW.md
+      - .github/workflows/notification-delivery-gates.yml
+permissions:
+  contents: read
+jobs:
+  offline-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate existing-schema read-only delivery pages
+        run: |
+          python3 -m py_compile scripts/notification_delivery_view.py
+          python3 -B -m unittest discover -s tests -p 'test_notification_delivery_view.py' -v
