@@ -91,7 +91,7 @@ class KernelSnapshots(unittest.TestCase):
         with self.assertRaises(ValueError):self.backend._scan_snapshot(snapshot)
     def test_symlink_rejected_before_acl(self):
         snapshot=self.root+'/snapshot';os.mkdir(snapshot);os.symlink('/etc/passwd',snapshot+'/link')
-        with self.assertRaises(OSError):self.policy.share(snapshot)
+        with self.assertRaisesRegex(ValueError,'SNAPSHOT_SPECIAL_ENTRY_REJECTED'):self.policy.share(snapshot)
     def test_fifo_rejected_without_blocking(self):
         snapshot=self.root+'/snapshot';os.mkdir(snapshot);os.mkfifo(snapshot+'/fifo')
         with self.assertRaises(ValueError):self.policy.share(snapshot)
