@@ -57,7 +57,7 @@ jobs:
               row['removed_or_absent']=p.returncode!=0;assert row['removed_or_absent'];rows.append(row)
           result={'schema':1,'state':'PREVIOUS_FIXTURE_EXACT_CONTAINER_CLEANUP_CONFIRMED','previous_name_filter_was_not_exact_container_cleanup_proof':True,'containers':rows,'production_services_changed':False,'canonical_ledger_changed':False,'model_calls':0}
           raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
-          fd=os.open(root+'/protected-sdk-fixture-cleanup-correction.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          fd=os.open('/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/sdk-cleanup-'+os.path.basename(root)+'.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
           print(json.dumps(result,sort_keys=True));print('SDK_FIXTURE_CLEANUP_CORRECTION_SHA256='+hashlib.sha256(raw).hexdigest())
           base='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
