@@ -43,7 +43,20 @@ try:
  for row in rows:
   fmt='%{NAME} %{EPOCHNUM} %{VERSION} %{RELEASE} %{ARCH}\n'
   p=command(rpm+['-q','--qf',fmt,row['name']]);assert p.stdout.decode().strip().split()==row['candidate']
- assert os.path.isfile(root+'/usr/sbin/nginx') and os.path.isfile(root+'/usr/bin/certbot')
+ def fixture_regular(relative):
+  current=root+relative
+  for _ in range(16):
+   if not os.path.lexists(current):return False
+   info=os.lstat(current)
+   if stat.S_ISREG(info.st_mode):return True
+   if not stat.S_ISLNK(info.st_mode):return False
+   target=os.readlink(current)
+   current=os.path.normpath(root+target if target.startswith('/') else os.path.dirname(current)+'/'+target)
+   if not current.startswith(root+'/'):raise ValueError('RPM_FIXTURE_LINK_ESCAPE')
+  raise ValueError('RPM_FIXTURE_LINK_DEPTH')
+ public['cli_payload_entries']=[{'path':p,'present':os.path.lexists(root+p),'symlink':os.readlink(root+p) if os.path.islink(root+p) else None} for p in ('/usr/sbin/nginx','/usr/bin/certbot')]
+ print(json.dumps({'isolated_cli_payload_entries':public['cli_payload_entries']},sort_keys=True))
+ assert fixture_regular('/usr/sbin/nginx') and fixture_regular('/usr/bin/certbot')
  public['isolated_payload_install']=True
  command(rpm+['-e','--nodeps','--noscripts','--notriggers']+names)
  assert not command(rpm+['-qa']).stdout.strip()
