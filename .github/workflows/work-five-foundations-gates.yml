@@ -1,0 +1,33 @@
+name: Work five foundation source gates
+on:
+  pull_request:
+    paths:
+      - scripts/dependency_evidence_view.py
+      - scripts/resume_prerequisite_view.py
+      - scripts/human_alert_payload.py
+      - scripts/run_usage_projection.py
+      - scripts/handoff_evidence_view.py
+      - tests/test_dependency_evidence_view.py
+      - tests/test_resume_prerequisite_view.py
+      - tests/test_human_alert_payload.py
+      - tests/test_run_usage_projection.py
+      - tests/test_handoff_evidence_view.py
+      - docs/WORK_FIVE_FOUNDATIONS.md
+      - .github/workflows/work-five-foundations-gates.yml
+permissions:
+  contents: read
+jobs:
+  offline-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate isolated source boundaries
+        run: |
+          python3 -B -m unittest discover -s tests -p 'test_dependency_evidence_view.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_resume_prerequisite_view.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_human_alert_payload.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_run_usage_projection.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_handoff_evidence_view.py' -v
