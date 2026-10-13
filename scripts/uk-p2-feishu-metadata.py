@@ -153,6 +153,46 @@ def collect():
                     'chat_mode':mode if mode in ('p2p','group','topic') else 'UNKNOWN',
                     'history_code':history.get('code') if type(history.get('code')) is int else None,
                     'message_chat_types':kinds,'matches_owner_screenshot_notification':screenshot_match})
+            if (result.get('bot_matches_owner_screenshot') is True and len(routes)==1 and
+                len(result['api_chat_observations'])==1 and
+                result['api_chat_observations'][0]['chat_mode']=='p2p' and
+                result['api_chat_observations'][0]['matches_owner_screenshot_notification'] is True):
+                import uuid
+                event='XJ_P2_FEISHU_CANARY_11787198841_20261013'
+                text='P2飞书机械核验：已确认本会话为「玄钧云汇开发总管」私聊。当前包11787198841，SHA256前缀3ff24ecc。零模型调用；此消息仅验证通知发送，不代表安装完成。核验标识：'+event
+                content=json.dumps({'text':text},ensure_ascii=False)
+                existing=None
+                for a in items:
+                    try:
+                        if json.loads(a.get('body',{}).get('content','')).get('text')==text:
+                            existing=a.get('message_id')
+                    except (ValueError,TypeError):pass
+                if existing:
+                    sent={'code':0,'data':{'message_id':existing}}
+                    result['canary_send_state']='EXISTING_MESSAGE_RECONCILED'
+                else:
+                    sent=feishu_api('im/v1/messages?receive_id_type=chat_id',token,body={
+                        'receive_id':routes[0],'msg_type':'text','content':content,
+                        'uuid':str(uuid.uuid5(uuid.NAMESPACE_URL,event))})
+                    result['live_send_performed']=True
+                    result['send_performed']=True
+                    result['canary_send_state']='POST_ATTEMPTED_NO_AUTOMATIC_RETRY'
+                result['canary_event']=event
+                result['canary_api_code']=sent.get('code') if type(sent.get('code')) is int else None
+                message_id=sent.get('data',{}).get('message_id')
+                result['canary_receipt_present']=isinstance(message_id,str) and bool(message_id)
+                if sent.get('code')==0 and isinstance(message_id,str) and re.fullmatch(r'om_[A-Za-z0-9_-]+',message_id):
+                    receipt=feishu_api('im/v1/messages/'+message_id,token)
+                    read_items=receipt.get('data',{}).get('items',[])
+                    matched=False
+                    for a in read_items:
+                        try:
+                            matched=matched or (a.get('message_id')==message_id and
+                                a.get('chat_id')==routes[0] and
+                                json.loads(a.get('body',{}).get('content','')).get('text')==text)
+                        except (ValueError,TypeError):pass
+                    result['canary_server_readback_match']=matched
+                    result['owner_read_ack']='NOT_VERIFIED'
     except (OSError,ValueError,TypeError,KeyError,UnicodeError):
         result['authoritative_chat_check']='HOLD_NO_SECRET_OUTPUT'
     return result
