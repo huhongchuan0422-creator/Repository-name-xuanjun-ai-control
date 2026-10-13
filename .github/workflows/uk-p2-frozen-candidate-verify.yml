@@ -463,3 +463,58 @@ jobs:
           print('OWNER_BINDING_INPUTS_PATH='+path)
           print('OWNER_BINDING_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
+
+      - name: Render protected Owner binding and test exact RPM transaction without installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,subprocess,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          def protected(path,sha):
+              assert os.path.realpath(path)==path
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and not s.st_mode&0o077 and s.st_size<2097152
+                  raw=f.read()
+              assert hashlib.sha256(raw).hexdigest()==sha
+              return json.loads(raw.decode())
+          owner=protected('/tmp/p2pkg-38370684370-1/protected-owner-binding-inputs.json','5ec6adc519f473f9f6854673a34e620f6a4b1ad5d4f4ff44c519196430f1d539')
+          assert owner['public_receipt']['state']=='EXISTING_FEISHU_CHAT_BINDING_INPUTS_VERIFIED'
+          rpmroot='/tmp/p2pkg-38369525772-1/tls-rpm-preparation'
+          rpmreceipt=protected(rpmroot+'/protected-tls-rpm-receipt.json','fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e')
+          assert rpmreceipt['state']=='DEPENDENCY_DOWNLOAD_PREPARED' and len(rpmreceipt['rpms'])==16
+          rpms=[]
+          for item in rpmreceipt['rpms']:
+              name=item['file'];assert '/' not in name and name.endswith('.rpm')
+              path=rpmroot+'/'+name;assert os.path.realpath(path)==path
+              with open(path,'rb') as f:
+                  s=os.fstat(f.fileno());assert s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o400
+                  assert hashlib.sha256(f.read()).hexdigest()==item['sha256']
+              p=subprocess.run(['/bin/rpm','--checksig',path],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+              text=(p.stdout+p.stderr).decode('utf-8','replace')
+              assert p.returncode==0 and 'OK' in text and 'NOKEY' not in text and 'NOT OK' not in text
+              rpms.append(path)
+          p=subprocess.run(['/bin/rpm','-U','--test']+rpms,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60)
+          public={'schema':1,'state':'OWNER_BINDING_RENDERED_AND_RPM_TRANSACTION_PRECHECK','rpm_transaction_test_exit':p.returncode,'rpm_count':len(rpms),'packages_installed':False,'services_changed':False,'canonical_mutation':False,'secret_values_exported':False,'release_granted':False}
+          if p.returncode:public['state']='HOLD_RPM_TRANSACTION_PRECHECK'
+          template=root+'/xuanjun-p2-package/deploy/p2-owner-feishu-binding.json.template'
+          with open(template,'rb') as f:source=f.read()
+          binding=owner['feishu_binding'];replacements={'@@APP_ID@@':binding['app_id'],'@@CHAT_ID@@':binding['chat_id'],'@@PACKAGE_SHA256@@':binding['package_sha256']}
+          rendered=source
+          for key in sorted(replacements):rendered=rendered.replace(key.encode(),replacements[key].encode())
+          assert json.loads(rendered.decode())==binding
+          path=root+'/prepared-owner-feishu-binding.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(rendered);f.flush();os.fsync(f.fileno())
+          public['rendered_binding_sha256']=hashlib.sha256(rendered).hexdigest()
+          private={'schema':1,'artifact_id':11796280855,'public_receipt':public,'owner_provisioning':{'source':'deploy/p2-owner-feishu-binding.json.template','target':'/etc/xuanjun-development/p2-owner-feishu-binding.json','source_sha256':hashlib.sha256(source).hexdigest(),'rendered_sha256':hashlib.sha256(rendered).hexdigest(),'mode':0o640,'owner_uid':0,'group_gid':1002,'replacements':replacements},'auth_references':owner['auth_references'],'rpm_receipt_path':rpmroot+'/protected-tls-rpm-receipt.json','rpm_receipt_sha256':'fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e','remaining_requirements':['REAL_TLS_CERTIFICATE_REFERENCE','COMPLETE_RUNTIME_PROVISIONING_AND_CUTOVER_PLAN','EXISTING_OWNER_CALLBACK_CHAT_ID_REFERENCE','GITHUB_INTAKE_AUTH_REFERENCE','INDEPENDENT_PLAN_RELEASE_REVIEW','OWNER_MANUAL_INSTALL_BOUNDARY']}
+          raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-install-preparation-bundle.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(public,sort_keys=True))
+          print('INSTALL_PREPARATION_BUNDLE_PATH='+path)
+          print('INSTALL_PREPARATION_BUNDLE_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
