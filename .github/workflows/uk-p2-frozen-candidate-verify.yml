@@ -371,41 +371,82 @@ jobs:
           print('PROTECTED_CALLBACK_TLS_METADATA_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
 
-      - name: Download TLS dependency transaction without installing packages
+      - name: Resolve existing Owner binding privately without notification sends
         shell: bash
         run: |
           set -euo pipefail
           sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
-          import os,sys,socket,subprocess,stat,hashlib,json
+          import os,sys,stat,json,hashlib,socket,re,urllib.request,urllib.error
           assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
-          root=sys.argv[1];stage=root+'/tls-rpm-preparation';os.mkdir(stage,0o700)
-          argv=['/bin/dnf','-q','-y','--setopt=cachedir='+stage+'/cache','--setopt=persistdir='+stage+'/persist','--setopt=logdir='+stage+'/log','--setopt=timeout=15','--setopt=retries=1','--setopt=gpgcheck=1','install','--downloadonly','--downloaddir='+stage,'nginx-1:1.24.0-3.0.1.2.al8.1','certbot-1.22.0-1.el8']
-          result={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601','archive_sha256':'66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd','packages_installed':False,'service_changes':False,'writer_admission':'NOT_GRANTED','rpms':[]}
+          root=sys.argv[1]
+          def read(path,uid,maximum=2097152):
+              assert os.path.realpath(path)==path
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno())
+                  assert stat.S_ISREG(s.st_mode) and s.st_uid==uid and not s.st_mode&0o077 and s.st_size<=maximum
+                  raw=f.read(maximum+1)
+                  assert len(raw)<=maximum
+                  return raw,s
+          def api(path,token=None,body=None):
+              headers={'Content-Type':'application/json'}
+              if token:headers['Authorization']='Bearer '+token
+              req=urllib.request.Request('https://open.feishu.cn/open-apis/'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
+              try:
+                  with urllib.request.urlopen(req,timeout=15) as f:raw=f.read(2097153)
+                  assert len(raw)<=2097152
+                  return json.loads(raw.decode())
+              except urllib.error.HTTPError as e:return {'code':e.code}
+          private={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601','auth_references':[]}
+          public={'schema':1,'state':'OWNER_BINDING_INPUTS_HOLD','credential_values_exported':False,'notification_sends':0,'model_calls':0,'services_changed':False,'canonical_mutation':False}
           try:
-              p=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=180)
-              result['download_exit']=p.returncode
-          except subprocess.TimeoutExpired:
-              result['download_exit']='TIMEOUT'
-          for name in sorted(os.listdir(stage)):
-              if not name.endswith('.rpm'):continue
-              path=stage+'/'+name;s=os.lstat(path)
-              assert stat.S_ISREG(s.st_mode) and not stat.S_ISLNK(s.st_mode) and s.st_uid==0
-              h=hashlib.sha256()
-              with open(path,'rb') as f:
-                  while True:
-                      x=f.read(1048576)
-                      if not x:break
-                      h.update(x)
-              os.chmod(path,0o400)
-              p=subprocess.run(['/bin/rpm','--checksig',path],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
-              text=(p.stdout+p.stderr).decode('utf-8','replace')
-              result['rpms'].append({'file':name,'sha256':h.hexdigest(),'size':s.st_size,'signature_check_exit':p.returncode,'signature_verified':p.returncode==0 and 'OK' in text and 'NOKEY' not in text and 'NOT OK' not in text})
-          result['state']='DEPENDENCY_DOWNLOAD_PREPARED' if result.get('download_exit')==0 and result['rpms'] and all(x['signature_verified'] for x in result['rpms']) else 'HOLD_DEPENDENCY_DOWNLOAD_OR_SIGNATURE'
-          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
-          path=stage+'/protected-tls-rpm-receipt.json'
+              profile='/home/xuanjun_dev/.openclaw/openclaw.json'
+              raw,s=read(profile,1002);config=json.loads(raw.decode())['channels']['feishu']
+              private['auth_references'].append({'path':profile,'sha256':hashlib.sha256(raw).hexdigest(),'owner_uid':1002,'mode':stat.S_IMODE(s.st_mode)})
+              authpath='/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite'
+              raw,s=read(authpath,1002,16777216)
+              private['auth_references'].append({'path':authpath,'sha256':hashlib.sha256(raw).hexdigest(),'owner_uid':1002,'mode':stat.S_IMODE(s.st_mode)})
+              routes=set()
+              agents='/home/xuanjun_dev/.openclaw/agents'
+              for agent in sorted(os.listdir(agents))[:32]:
+                  if not re.fullmatch(r'[A-Za-z0-9_.-]{1,80}',agent):continue
+                  path=agents+'/'+agent+'/sessions/sessions.json'
+                  try:raw,s=read(path,1002);records=json.loads(raw.decode())
+                  except (OSError,ValueError,AssertionError):continue
+                  if not isinstance(records,dict) or len(records)>10000:continue
+                  for key in records:
+                      match=re.search(r':feishu:(?:group|direct):(oc_[A-Za-z0-9_-]+)$',key)
+                      if match:routes.add(match.group(1))
+              public['existing_chat_candidate_count']=len(routes)
+              assert len(routes)==1 and re.fullmatch(r'cli_[A-Za-z0-9_-]{1,128}',config.get('appId',''))
+              chat_id=next(iter(routes))
+              auth=api('auth/v3/tenant_access_token/internal',body={'app_id':config['appId'],'app_secret':config['appSecret']})
+              public['auth_code']=auth.get('code');assert auth.get('code')==0
+              token=auth['tenant_access_token']
+              bot=api('bot/v3/info',token)
+              public['expected_bot_name_match']=bot.get('bot',{}).get('app_name')=='玄钧云汇开发总管'
+              chat=api('im/v1/chats/'+chat_id,token)
+              public['chat_is_p2p']=chat.get('code')==0 and chat.get('data',{}).get('chat_mode')=='p2p'
+              history=api('im/v1/messages?container_id_type=chat&container_id='+chat_id+'&sort_type=ByCreateTimeDesc&page_size=50',token)
+              matches=[]
+              for item in history.get('data',{}).get('items',[]):
+                  try:
+                      value=json.loads(item.get('body',{}).get('content','')).get('text','')
+                      if 'XJ_P2_FEISHU_CANARY_11787198841_20261013' in value and item.get('chat_id')==chat_id:
+                          matches.append(item['message_id'])
+                  except (ValueError,TypeError,KeyError):pass
+              public['prior_canary_readback_match']=bool(matches)
+              assert public['expected_bot_name_match'] and public['chat_is_p2p'] and matches
+              private['feishu_binding']={'app_id':config['appId'],'chat_id':chat_id,'package_sha256':private['runtime_release_sha256']}
+              private['prior_canary_message_ids']=matches
+              public['state']='EXISTING_FEISHU_CHAT_BINDING_INPUTS_VERIFIED'
+          except Exception as e:public['hold_reason']=type(e).__name__
+          private['public_receipt']=public
+          raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-owner-binding-inputs.json'
           fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-          print(json.dumps(result,sort_keys=True))
-          print('TLS_RPM_RECEIPT_PATH='+path)
-          print('TLS_RPM_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          print(json.dumps(public,sort_keys=True))
+          print('OWNER_BINDING_INPUTS_PATH='+path)
+          print('OWNER_BINDING_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
