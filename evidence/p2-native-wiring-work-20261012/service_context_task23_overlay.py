@@ -340,7 +340,9 @@ Requires=xuanjun-p2-gateway-relay.socket
         identity=self._db_identity(fd)
         self._assert_db_identity(fd,identity)
         try:
-            uri=Path(self.db_path).resolve().as_uri()+'?mode=rw'
+            # The SQLite connection is opened through the already pinned fd so
+            # it cannot race a pathname replacement between identity check and connect.
+            uri='file:/proc/self/fd/%d?mode=rw' % fd
             conn=sqlite3.connect(uri,uri=True,timeout=10,isolation_level=None)
         except sqlite3.OperationalError:
             os.close(fd)

@@ -7,6 +7,7 @@ STAGE1=ROOT/'stage1'
 sys.path.insert(0,str(STAGE1))
 import native_gateway_controller as ngc
 import p2_gateway_relay as relay
+import execution_ledger as ledger_module
 from execution_ledger import ExecutionLedger,LeaseLost
 
 class FakeSocket(object):
@@ -73,6 +74,48 @@ class Tests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT count(*) FROM supervision_events').fetchone()[0],1)
             self.assertEqual(db.execute('SELECT count(*) FROM supervision_delivery').fetchone()[0],2)
             db.close()
+
+    def test_sqlite_connection_uses_pinned_fd_uri(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._db(path)
+            activation=Activation(os.path.realpath(path))
+            ledger=ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'],
+                                   clock=lambda:100,activation_store=activation)
+            original=sqlite3.connect
+            seen=[]
+            def connect(database,*args,**kwargs):
+                seen.append(database)
+                return original(database,*args,**kwargs)
+            with patch.object(ledger_module.sqlite3,'connect',side_effect=connect):
+                with ledger._pinned_transaction() as value:
+                    db,identity=value
+                    self.assertTrue(identity)
+                    self.assertEqual(db.execute('SELECT count(*) FROM tasks').fetchone()[0],1)
+            self.assertTrue(seen)
+            self.assertRegex(seen[0],r'^file:/proc/self/fd/[0-9]+\?mode=rw        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'ledger.sqlite');self._db(path)
+            activation=Activation(os.path.realpath(path))
+            ledger=ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'],
+                                   clock=lambda:100,activation_store=activation)
+            real=ledger.supervisor()
+            original=real.record_inventory_notice
+            def swap(db,intent,binding,identity):
+                result=original(db,intent,binding,identity)
+                replacement=path+'.new'
+                self._db(replacement)
+                os.replace(replacement,path)
+                return result
+            class Wrapper(object):
+                def record_inventory_notice(self,*a):return swap(*a)
+            with patch.object(ledger,'supervisor',return_value=Wrapper()):
+                with self.assertRaises(LeaseLost):ledger.record_inventory_notices()
+            db=sqlite3.connect(path)
+            # Replacement DB is a fresh canonical fixture: transaction on old inode was rolled back.
+            self.assertFalse(db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='supervision_events'").fetchone())
+            db.close()
+
+if __name__=='__main__':unittest.main(verbosity=2)
+)
 
     def test_inode_swap_rolls_back_inventory_transaction(self):
         with tempfile.TemporaryDirectory() as d:
