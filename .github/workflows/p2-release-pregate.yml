@@ -14,8 +14,10 @@ env:
   P2_SOURCE_COMMIT: "566b2bccd70ad4c722526af7587344214a9cb235"
   P2_SOURCE_TREE: "d8fadff02fba7181b6c798f0ac35fe5a9480f342"
   P2_MANIFEST_SHA256: "fe73feb4435f8f32313a86e9d434a4a6a7b994492f731b1c62dd7de801e7a69c"
-  QA_SECURITY_RUN: "38336480483"
-  UK_VERIFY_RUN: "38336482564"
+  QA_SECURITY_RUN: "38343314104"
+  QA_SECURITY_HEAD: "731e2ab07b54cf89786defeb5543ff0f00ef4c45"
+  UK_VERIFY_RUN: "38343316028"
+  UK_VERIFY_HEAD: "9a60472a77b191381a9a71125a4ca58f12ff2ca9"
 jobs:
   release-pregate:
     runs-on: ubuntu-24.04
@@ -26,13 +28,101 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for run in "$QA_SECURITY_RUN" "$UK_VERIFY_RUN"; do
-            status="$(gh api "repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/$run" --jq '.status+":"+(.conclusion//"")')"
-            test "$status" = "completed:success" || {
-              echo "P2_PREREQUISITE_NOT_SUCCESS=$run:$status"
-              exit 41
-            }
-          done
+          python3 -I -B - <<'PY'
+          import base64, json, os, re, subprocess
+          
+          REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+          REPO_ID = 1413132159
+          BRANCH = 'repair/p2-chatgpt-clean-review-20261013'
+          KEYS = ('P2_ARTIFACT_ID', 'P2_TAR_SHA256', 'P2_SOURCE_COMMIT',
+                  'P2_SOURCE_TREE', 'P2_MANIFEST_SHA256')
+          
+          def require(ok, reason):
+              if not ok:
+                  raise ValueError('P2_PREREQUISITE_HOLD_' + reason)
+          
+          def api(endpoint):
+              raw = subprocess.check_output(['gh', 'api', endpoint], timeout=30)
+              require(len(raw) <= 2 * 1024 * 1024, 'RESPONSE_BOUND')
+              return json.loads(raw.decode('utf-8'))
+          
+          def frozen_env(source):
+              require(isinstance(source, str) and len(source) <= 128 * 1024, 'WORKFLOW_BOUND')
+              lines = source.splitlines()
+              require(lines.count('env:') == 1, 'ENV_BLOCK')
+              start = lines.index('env:') + 1
+              result = {}
+              for line in lines[start:]:
+                  if line and not line.startswith(' '):
+                      break
+                  match = re.fullmatch(r'  ([A-Z0-9_]+): "([^"\r\n]*)"', line)
+                  if match and match.group(1) in KEYS:
+                      key, value = match.groups()
+                      require(key not in result, 'DUPLICATE_BINDING')
+                      result[key] = value
+              require(set(result) == set(KEYS), 'MISSING_BINDING')
+              return result
+          
+          def validate(run, pages, source, run_id, head, path, jobs, runner):
+              require(type(run_id) is int and type(run.get('id')) is int
+                      and run['id'] == run_id, 'RUN_ID')
+              require(run.get('repository', {}).get('full_name') == REPO
+                      and run.get('repository', {}).get('id') == REPO_ID, 'REPOSITORY')
+              require(run.get('event') == 'push' and run.get('head_branch') == BRANCH, 'EVENT')
+              require(run.get('head_sha') == head and run.get('path') == path, 'WORKFLOW_HEAD')
+              require(run.get('run_attempt') == 1, 'ATTEMPT')
+              require(run.get('status') == 'completed'
+                      and run.get('conclusion') == 'success', 'RUN_STATUS')
+              require(frozen_env(source) == {key: os.environ[key] for key in KEYS}, 'ARTIFACT_BINDING')
+              require(isinstance(pages, list) and pages and len(pages) <= 10, 'JOB_PAGES')
+              total = pages[0].get('total_count')
+              rows = []
+              for page in pages:
+                  require(page.get('total_count') == total and isinstance(page.get('jobs'), list), 'JOB_PAGE')
+                  rows.extend(page['jobs'])
+              require(type(total) is int and total == len(rows) == len(jobs), 'JOB_COMPLETENESS')
+              require({row.get('name') for row in rows} == set(jobs), 'JOB_NAMES')
+              require(len({row.get('id') for row in rows}) == len(rows), 'DUPLICATE_JOB')
+              for row in rows:
+                  require(row.get('run_id') == run_id and row.get('run_attempt') == 1, 'JOB_RUN')
+                  require(row.get('head_sha') == head and row.get('status') == 'completed'
+                          and row.get('conclusion') == 'success', 'JOB_STATUS')
+                  steps = row.get('steps')
+                  require(isinstance(steps, list) and steps, 'STEPS_MISSING')
+                  require(all(step.get('status') == 'completed' and step.get('conclusion') == 'success'
+                              for step in steps), 'STEP_NOT_SUCCESS')
+                  require(set(jobs[row['name']]) <= {step.get('name') for step in steps}, 'REQUIRED_STEPS')
+                  if runner:
+                      require(row.get('runner_name') == runner, 'UK_RUNNER')
+          
+          def check(run_id, head, path, jobs, runner=None):
+              run = api('repos/' + REPO + '/actions/runs/' + str(run_id))
+              response = subprocess.check_output(
+                  ['gh', 'api', '--paginate', '--slurp',
+                   'repos/' + REPO + '/actions/runs/' + str(run_id) + '/attempts/1/jobs?per_page=100'],
+                  timeout=30)
+              require(len(response) <= 2 * 1024 * 1024, 'JOB_RESPONSE_BOUND')
+              pages = json.loads(response.decode('utf-8'))
+              contents = api('repos/' + REPO + '/contents/' + path + '?ref=' + head)
+              require(contents.get('encoding') == 'base64', 'WORKFLOW_ENCODING')
+              source = base64.b64decode(contents['content'], validate=False).decode('utf-8')
+              validate(run, pages, source, run_id, head, path, jobs, runner)
+              latest = api('repos/' + REPO + '/actions/runs/' + str(run_id))
+              require((latest.get('run_attempt'), latest.get('status'), latest.get('conclusion'))
+                      == (1, 'completed', 'success'), 'RUN_CHANGED')
+              print('P2_EXACT_PREREQUISITE_VERIFIED=' + str(run_id))
+          
+          check(int(os.environ['QA_SECURITY_RUN']), os.environ['QA_SECURITY_HEAD'],
+                '.github/workflows/p2-frozen-candidate-gates.yml',
+                {'qa': ('Verify freezer and real release installer',),
+                 'security': ('Download and inspect exact artifact',)})
+          check(int(os.environ['UK_VERIFY_RUN']), os.environ['UK_VERIFY_HEAD'],
+                '.github/workflows/uk-p2-frozen-candidate-verify.yml',
+                {'verify': ('Python 3.6.8 WAL pagination and relay boundedness regressions',
+                            'Verify exact package through real installer on UK')},
+                'iZd7oeikknn1z21sq6ji6zZ')
+          
+          PY
       - name: Download exact authoritative P2 artifact
         env:
           GH_TOKEN: ${{ github.token }}
