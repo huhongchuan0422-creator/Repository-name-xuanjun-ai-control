@@ -72,7 +72,7 @@ jobs:
           # before invoking the root-only release installer verifier.
           sudo -n /usr/bin/chown -R 0:0 "$P2_WORK_DIR"
           sudo -n /usr/bin/python3 -I -B - "$ROOT" <<'PY'
-          import hashlib,importlib.util,os,stat,subprocess,sys,grp
+          import hashlib,importlib.util,json,os,stat,subprocess,sys,grp
           assert sys.version_info[:3]==(3,6,8)
           root=sys.argv[1]
           spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
