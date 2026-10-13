@@ -49,6 +49,9 @@ class InstallGateTests(unittest.TestCase):
                         with patch.object(runtime_module.PublisherBootstrap,'prepare',return_value=(None,None)):
                             if hasattr(runtime_module,'SandboxProfile'):
                                 with patch.object(runtime_module.SandboxProfile,'prepare',return_value=(None,None)):
+                                    if hasattr(runtime_module,'RpmPrerequisites'):
+                                        with patch.object(runtime_module.RpmPrerequisites,'prepare',return_value=[]):
+                                            return self.runtime.preflight(self.plan,self.auth,{'references':[]})
                                     return self.runtime.preflight(self.plan,self.auth,{'references':[]})
                             return self.runtime.preflight(self.plan,self.auth,{'references':[]})
                     return self.runtime.preflight(self.plan,self.auth,{'references':[]})

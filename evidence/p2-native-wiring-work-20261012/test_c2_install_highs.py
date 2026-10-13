@@ -23,6 +23,7 @@ class ProbeRuntime(mod.FixedHostRuntime):
     def _command(self,command): self.effects.append(('command',tuple(command)))
     def _start_gateway(self): self.effects.append(('start',))
     def _enable_boot(self): self.effects.append(('enable-boot',))
+    def _verify_plugin_runtime(self,runtime): self.effects.append(('plugin-inspect',))
     @staticmethod
     def _atomic_target(path,data,mode,uid,gid): raise AssertionError('target mutation before validation')
 
@@ -206,6 +207,8 @@ class GatewayLifecycleTests(unittest.TestCase):
             def execute(self,plan): return {'stage':'STAGED','quiescence':{'proof':dict.fromkeys(entry.PROOF_KEYS,True)}}
         class Runtime(object):
             def preflight(self,*args): return True
+            def prepare_prerequisites(self,*args): order.append('prerequisites');return True
+            def restore_prerequisites(self,*args): return True
             def provision(self,*args): return {'schema':1,'receipt_sha256':'a'*64,'rollback_complete':True}
             def reopen_database(self,*args): return {'database_reopened':True}
             def activate(self,*args): order.append('runtime');return {'services_active':True}
