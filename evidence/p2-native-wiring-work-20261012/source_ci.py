@@ -40,6 +40,16 @@ for name in ('test_native_wiring.py','test_native_ledger.py','test_native_socket
 for name in ('test_controller.mjs','test_host.mjs'):
     subprocess.run(['node',str(ROOT/name)],env=env,check=True)
 for item in plugin.glob('*.mjs'):subprocess.run(['node','--check',str(item)],check=True)
+# Retain base regressions above, then integrate and test the complete caller package.
+repo=ROOT.parents[1]
+base_fixture=DEST/'feishu-base'/'xuanjun-p2-package'
+base_fixture.parent.mkdir(mode=0o700)
+shutil.copytree(str(source),str(base_fixture))
+subprocess.run(['python','-B',str(repo/'scripts/owner_feishu_runtime_overlay.py'),str(source)],check=True)
+env.update(P2_SOURCE_ROOT=str(base_fixture),P2_FEISHU_INTEGRATION_ROOT=str(source))
+subprocess.run(['python','-B','-m','unittest','discover','-s',str(repo/'tests'),'-p','test_owner_feishu_*.py','-v'],env=env,check=True)
+subprocess.run(['node',str(repo/'tests/test_owner_feishu_gateway.mjs')],env=env,check=True)
+for item in plugin.glob('*.mjs'):subprocess.run(['node','--check',str(item)],check=True)
 build_commit=os.environ.get('P2_BUILD_COMMIT')
 build_tree=os.environ.get('P2_BUILD_TREE')
 if build_commit or build_tree:

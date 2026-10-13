@@ -4,6 +4,8 @@ on:
     branches: [repair/p2-chatgpt-clean-review-20261013]
     paths:
       - evidence/p2-native-wiring-work-20261012/**
+      - scripts/owner_feishu_*.py
+      - tests/test_owner_feishu_*
       - .github/workflows/p2-freeze-candidate.yml
 permissions:
   contents: read

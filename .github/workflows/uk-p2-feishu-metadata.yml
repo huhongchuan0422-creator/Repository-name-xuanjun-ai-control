@@ -2,7 +2,7 @@ name: P2 UK existing Feishu metadata
 on:
   push:
     branches: [repair/p2-chatgpt-clean-review-20261013]
-    paths: [scripts/uk-p2-feishu-metadata.py, scripts/owner_feishu_transport.py, scripts/owner_feishu_history.py, scripts/owner_feishu_claim_guard.py, tests/test_owner_feishu_transport.py, tests/test_owner_feishu_history.py, tests/test_owner_feishu_claim_guard.py, .github/workflows/uk-p2-feishu-metadata.yml]
+    paths: [scripts/uk-p2-feishu-metadata.py, scripts/owner_feishu_transport.py, scripts/owner_feishu_history.py, scripts/owner_feishu_claim_guard.py, tests/test_owner_feishu_transport.py, tests/test_owner_feishu_history.py, tests/test_owner_feishu_claim_guard.py, scripts/owner_feishu_ledger_endpoint.py, scripts/owner_feishu_bridge_cycle.py, scripts/owner_feishu_https.py, scripts/owner_feishu_runtime_overlay.py, tests/test_owner_feishu_runtime.py, tests/test_owner_feishu_wire.py, tests/test_owner_feishu_https.py, tests/test_owner_feishu_install_gate.py, tests/test_owner_feishu_gateway.mjs, .github/workflows/uk-p2-feishu-metadata.yml]
 permissions:
   contents: read
   actions: read
@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 4
     env:
       P2_SOURCE_ROOT: /tmp/p2-feishu-${{ github.run_id }}-${{ github.run_attempt }}/xuanjun-p2-package
+      P2_FEISHU_INTEGRATION_ROOT: /tmp/p2-feishu-${{ github.run_id }}-${{ github.run_attempt }}/integration/xuanjun-p2-package
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -69,6 +70,16 @@ jobs:
           for name,digest in files.items():assert hashlib.sha256((package/name).read_bytes()).hexdigest()==digest
           print('EXACT_FROZEN_PRODUCER_80_HASHES=PASS')
           PY
+      - name: Apply exact-base complete caller integration in isolated fixture
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import os,pathlib,shutil
+          source=pathlib.Path(os.environ['P2_SOURCE_ROOT'])
+          dest=pathlib.Path(os.environ['P2_FEISHU_INTEGRATION_ROOT'])
+          dest.parent.mkdir(mode=0o700)
+          shutil.copytree(str(source),str(dest))
+          PY
+          /usr/bin/python3 -B scripts/owner_feishu_runtime_overlay.py "$P2_FEISHU_INTEGRATION_ROOT"
       - name: Existing outbox Feishu receipt and uncertainty regressions
         run: |
           /usr/bin/python3 -B -m unittest discover -s tests -p 'test_owner_feishu_*.py' -v
