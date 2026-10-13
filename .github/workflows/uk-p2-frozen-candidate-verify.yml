@@ -958,14 +958,19 @@ jobs:
           plan['artifact']['root']=sealed_package;plan['artifact']['manifest']=sealed_package+'/deploy/integration-manifest.json'
           for item in plan['runtime']['prerequisites']['binaries']:
               candidates=[]
-              for name in os.listdir(durable):
-                  path=durable+'/'+name;s=os.lstat(path)
-                  if name==os.path.basename(item['target']) and stat.S_ISREG(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o555:
-                      with open(path,'rb') as f:
-                          h=hashlib.sha256()
-                          for raw in iter(lambda:f.read(65536),b''):h.update(raw)
-                      if h.hexdigest()==item['sha256']:candidates.append(path)
-              assert len(candidates)==1;item['source']=candidates[0]
+              count=0
+              for parent,dirs,files in os.walk(durable,followlinks=False):
+                  dirs[:]=[name for name in dirs if not name.startswith('plan-')]
+                  ps=os.lstat(parent);assert ps.st_uid==0 and not ps.st_mode&0o022 and os.path.realpath(parent)==parent
+                  for name in files:
+                      count+=1;assert count<256
+                      path=parent+'/'+name;s=os.lstat(path)
+                      if name==os.path.basename(item['target']) and stat.S_ISREG(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o555 and os.path.realpath(path)==path:
+                          with open(path,'rb') as f:
+                              h=hashlib.sha256()
+                              for raw in iter(lambda:f.read(65536),b''):h.update(raw)
+                          if h.hexdigest()==item['sha256']:candidates.append(path)
+              assert len(candidates)==1,'PINNED_DURABLE_BINARY_NOT_UNIQUE';item['source']=candidates[0]
           raw=(json.dumps(plan,sort_keys=True,separators=(',',':'))+'\n').encode()
           write(output+'/protected-core-install-plan.json',raw)
           policy=read(work+'/protected-openclaw-sandbox-policy-candidate.json',0o600)
@@ -995,4 +1000,35 @@ jobs:
           print(json.dumps(result,sort_keys=True))
           print('SEALED_PREPARATION_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
           assert result['state']=='ACTUAL_RUNTIME_PREFLIGHT_PASS_NO_INSTALL_ADMISSION'
+          PY
+
+      - name: Verify required native Docker images from candidate policy without pull or container creation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,subprocess,hashlib,stat
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];path=root+'/protected-openclaw-sandbox-policy-candidate.json'
+          fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o600
+              raw=f.read(1048577);assert len(raw)<=1048576
+          module='file:///home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/config-CQ7BYVQS.mjs'
+          js="const m=await import("+json.dumps(module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);console.log(JSON.stringify(['developer','platform-engineer'].map(id=>{const r=m.i(cfg,id);return {agent_id:id,backend:r.backend,image:r.docker?.image,network:r.docker?.network,readOnlyRoot:r.docker?.readOnlyRoot};})));"
+          p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],input=raw,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C'},timeout=30)
+          assert p.returncode==0;rows=json.loads(p.stdout.decode().strip().splitlines()[-1])
+          result={'schema':1,'state':'HOLD_NATIVE_DOCKER_IMAGES','agent_docker':rows,'images':[],'images_pulled':False,'containers_created':False,'services_changed':False,'model_calls':0,'writer_admission':False}
+          for image in sorted({r.get('image','') for r in rows}):
+              assert isinstance(image,str) and image and not image.startswith('-') and len(image)<256
+              p=subprocess.run(['/usr/bin/docker','image','inspect','--format','{{.Id}}',image],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=15)
+              row={'image':image,'inspect_exit':p.returncode}
+              if p.returncode==0:row['image_id']=p.stdout.decode().strip()
+              result['images'].append(row)
+          if result['images'] and all(x['inspect_exit']==0 for x in result['images']):result['state']='NATIVE_DOCKER_IMAGES_PRESENT_NO_RUNTIME_ACCEPTANCE'
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-native-docker-image-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('NATIVE_DOCKER_IMAGE_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
           PY
