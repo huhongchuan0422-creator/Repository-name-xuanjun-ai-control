@@ -297,4 +297,24 @@ class BootJournalTests(unittest.TestCase):
             self.assertEqual(len(calls),before)
 
 
+class DashboardFoundationWiringTests(unittest.TestCase):
+    def test_real_snapshot_calls_cost_usage_views_without_inventing_evidence(self):
+        import sqlite3
+        import owner_dashboard
+        with tempfile.TemporaryDirectory() as root:
+            path=os.path.join(root,'ledger.sqlite')
+            db=sqlite3.connect(path)
+            db.execute('CREATE TABLE tasks(id TEXT PRIMARY KEY,state TEXT,fence INTEGER,updated REAL)')
+            db.execute("INSERT INTO tasks VALUES('task1','RUNNING',4,100)")
+            db.commit();before=db.total_changes
+            result=owner_dashboard.snapshot(path,now=101)
+            view=result['foundation_views']
+            self.assertEqual(view['evidence_status'],'HOLD_NO_CANONICAL_COST_USAGE_PRODUCER')
+            self.assertEqual(view['usage']['status'],'HOLD')
+            self.assertIsNone(view['usage']['totals']['model_calls'])
+            self.assertEqual(len(view['costs']),1)
+            self.assertFalse(view['costs'][0]['payment_granted'])
+            self.assertEqual(db.total_changes,before)
+            db.close()
+
 if __name__=='__main__':unittest.main(verbosity=2)
