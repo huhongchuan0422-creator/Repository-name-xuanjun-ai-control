@@ -37,6 +37,39 @@ def collect():
             item['status']='READ_METADATA_ONLY'
         except (OSError,ValueError,TypeError,UnicodeError): item['status']='UNAVAILABLE_OR_INVALID'
         result['configs'].append(item)
+    result['session_inventory']=[]
+    agents=HOME_ROOT+'/agents'
+    try: names=sorted(os.listdir(agents))
+    except OSError: names=[]
+    if len(names)>32: raise ValueError('AGENT_BOUND')
+    targets={}
+    for name in names:
+        if re.fullmatch(r'[A-Za-z0-9_.-]{1,80}',name) is None: continue
+        path=agents+'/'+name+'/sessions/sessions.json'
+        try: records=read_json(path)
+        except (OSError,ValueError,TypeError,UnicodeError): continue
+        if not isinstance(records,dict) or len(records)>10000: raise ValueError('SESSION_BOUND')
+        for record in records.values():
+            if not isinstance(record,dict): continue
+            context=record.get('deliveryContext',{})
+            origin=record.get('origin',{})
+            if not isinstance(context,dict): context={}
+            if not isinstance(origin,dict): origin={}
+            channel=context.get('channel') or record.get('lastChannel') or origin.get('provider')
+            if channel!='feishu': continue
+            target=context.get('to') or record.get('lastTo')
+            account=context.get('accountId') or record.get('lastAccountId')
+            shape='UNKNOWN'
+            if isinstance(target,str):
+                if re.fullmatch(r'(?:user:|feishu:)?ou_[A-Za-z0-9_-]+',target): shape='DIRECT_USER'
+                elif re.fullmatch(r'(?:chat:|feishu:)?oc_[A-Za-z0-9_-]+',target): shape='CHAT_ID'
+            result['session_inventory'].append({'channel':'feishu','target_shape':shape,
+                'chat_type':origin.get('chatType') if origin.get('chatType') in ('direct','group') else 'UNKNOWN',
+                'account_present':bool(account),'updated_at':record.get('updatedAt') if type(record.get('updatedAt')) in (int,float) else None})
+            if shape=='DIRECT_USER' and origin.get('chatType')=='direct':
+                targets[(target,account if isinstance(account,str) else None)]=True
+    result['distinct_direct_targets']=len(targets)
+    result['live_send_performed']=False
     cli=HOME_ROOT+'/bin/openclaw'
     for args in (['message','send','--help'],['channels','--help']):
         proc=subprocess.run([cli]+args,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=30,
