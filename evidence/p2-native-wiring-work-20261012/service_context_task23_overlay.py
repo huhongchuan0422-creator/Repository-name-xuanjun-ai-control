@@ -368,7 +368,7 @@ Requires=xuanjun-p2-gateway-relay.socket
                                    activation_store=self.activation_store)
 """,
 """    def supervisor(self, clock=None, max_delivery_attempts=3, claim_ttl=30):
-        """Return supervision adapters bound to this exact canonical generation."""
+        # Return supervision adapters bound to this exact canonical generation.
         from execution_supervision import ExecutionSupervisor
         return ExecutionSupervisor(self.db_path, clock or self.clock,
                                    max_delivery_attempts=max_delivery_attempts,
