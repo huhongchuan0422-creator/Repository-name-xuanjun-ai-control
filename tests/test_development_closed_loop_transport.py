@@ -56,16 +56,39 @@ class TransportTests(unittest.TestCase):
                 value={'id':321,'body':body,'user':{'login':development_closed_loop_transport.OWNER}}
             else:
                 marker=development_closed_loop_transport._marker(self.row['outbox_id'])
+                envelope=json.dumps({'schema':1,'kind':'TASK45_OUTBOX_DELIVERY',
+                    'outbox_id':self.row['outbox_id'],'payload':{'evidence':'ok'}})
                 if mode=='existing' or (mode=='unknown' and posted):
-                    value=[[{'id':99,'body':marker+'\nexisting',
+                    value=[[{'id':99,'body':marker+'\n'+envelope,
                              'user':{'login':development_closed_loop_transport.OWNER}}]]
                 elif mode=='duplicate':
-                    item={'id':99,'body':marker,'user':{'login':development_closed_loop_transport.OWNER}}
+                    item={'id':99,'body':marker+'\n'+envelope,'user':{'login':development_closed_loop_transport.OWNER}}
                     value=[[item,item]]
+                elif mode=='malformed':
+                    value=[[{'id':99,'body':marker+'\nnot-json',
+                             'user':{'login':development_closed_loop_transport.OWNER}}]]
                 else:value=[[]]
             return SimpleNamespace(returncode=0,stdout=json.dumps(value).encode(),stderr=b'')
         return development_closed_loop_transport.FixedPr17Transport(
             gh_bin='/usr/bin/gh',runner=run),calls
+
+    def test_malformed_marker_does_not_ack(self):
+        tr,calls=self.fake('malformed')
+        result=development_closed_loop_transport.deliver_one(self.sup,tr,103)
+        self.assertEqual(result['state'],'DELIVERED_ACKNOWLEDGED')
+        self.assertEqual(sum('--method' in a for a,k in calls),1)
+
+    def test_missing_required_payload_is_rejected(self):
+        tr,calls=self.fake('ok')
+        with self.assertRaises(ValueError):
+            tr.send({'outbox_id':self.row['outbox_id']})
+        self.assertFalse(any('--method' in a for a,k in calls))
+
+    def test_paginated_reconciliation_uses_slurp(self):
+        tr,calls=self.fake('existing')
+        receipt=tr.reconcile(self.row['outbox_id'])
+        self.assertEqual(receipt['message_id'],'99')
+        self.assertIn('--slurp',calls[0][0])
 
     def test_send_then_ack_closes_loop(self):
         tr,calls=self.fake('ok')
