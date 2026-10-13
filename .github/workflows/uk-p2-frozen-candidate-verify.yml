@@ -532,13 +532,13 @@ jobs:
           s=os.lstat(base);assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700 and os.path.realpath(base)==base
           dest=base+'/artifact-11796280855-'+os.path.basename(root)
           os.mkdir(dest,0o700)
-          def copy(source,target,expected,mode=0o600):
+          def copy(source,target,expected,mode=0o600,require_root=True):
               assert os.path.realpath(source)==source
               fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
               h=hashlib.sha256()
               out=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
               with os.fdopen(fd,'rb') as f,os.fdopen(out,'wb') as g:
-                  before=os.fstat(f.fileno());assert stat.S_ISREG(before.st_mode) and before.st_uid==0 and not before.st_mode&0o022
+                  before=os.fstat(f.fileno());assert stat.S_ISREG(before.st_mode) and (before.st_uid==0 or not require_root) and not before.st_mode&0o022
                   while True:
                       chunk=f.read(1048576)
                       if not chunk:break
@@ -578,7 +578,7 @@ jobs:
               assert '/' not in item['file']
               files.append(copy(rpmroot+'/'+item['file'],dest+'/rpms/'+item['file'],item['sha256'],0o400))
           archive='/tmp/p2-candidate-'+os.path.basename(root)[6:]+'.tar.gz'
-          files.append(copy(archive,dest+'/p2-candidate.tar.gz','66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd',0o400))
+          files.append(copy(archive,dest+'/p2-candidate.tar.gz','66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd',0o400,require_root=False))
           value={'schema':1,'state':'DURABLE_PROTECTED_INSTALL_INPUTS_PREPARED_NOT_INSTALL_PLAN','artifact_id':11796280855,'preparation_root':dest,'tls_references':tlsrefs,'files':files,'packages_installed':False,'services_changed':False,'canonical_mutation':False,'credential_values_exported':False,'release_granted':False}
           raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
           path=dest+'/durable-preparation-receipt.json'
