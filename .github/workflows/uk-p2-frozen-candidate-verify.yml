@@ -10,11 +10,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11792669456"
-  P2_TAR_SHA256: "af34a001a4adda11349ca1b795b21ace69bf2fad19dbca0abef6bc5edb082959"
-  P2_SOURCE_COMMIT: "ccf10f481740904d6b782bcb79a206d651a867a8"
-  P2_SOURCE_TREE: "de31e7f66fe1c132ae75b983d0a299fc7c7e2018"
-  P2_MANIFEST_SHA256: "55f053e23749f7050e5f06aaa6a92e80485464a56d90d16522ebb26d895e4191"
+  P2_ARTIFACT_ID: "11796280855"
+  P2_TAR_SHA256: "66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd"
+  P2_SOURCE_COMMIT: "f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06"
+  P2_SOURCE_TREE: "3fc23b2a01bd8f01ea0edcef9216ded7313409c2"
+  P2_MANIFEST_SHA256: "afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -123,9 +123,9 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   'ccf10f481740904d6b782bcb79a206d651a867a8',
-                   '55f053e23749f7050e5f06aaa6a92e80485464a56d90d16522ebb26d895e4191',
-                   'de31e7f66fe1c132ae75b983d0a299fc7c7e2018')
+                   'f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06',
+                   'afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601',
+                   '3fc23b2a01bd8f01ea0edcef9216ded7313409c2')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
           assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
