@@ -5,7 +5,7 @@ HOST = 'iZd7oeikknn1z21sq6ji6zZ'
 DURABLE = '/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
 EXTRA = '/tmp/p2pkg-38372850075-1/protected-additional-install-inputs.json'
 EXTRA_SHA = '88cde0b1be1b65679b6b7a45fba0ccd6e08b4a0ca6625d9c5b56a6c0f0ea9001'
-RELEASE = '/opt/xuanjun-control-releases/integration-2f859f4775535015'
+RELEASE = '/opt/xuanjun-control-releases/integration-27b8d6c61f5cf459'
 
 def read(path, uid=0, mode=0o600, limit=1048576):
     assert os.path.realpath(path) == path

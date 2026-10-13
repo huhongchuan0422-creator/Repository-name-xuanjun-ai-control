@@ -10,6 +10,7 @@ permissions:
   contents: read
   actions: read
 env:
+  # Native bootstrap release path is bound to this manifest prefix: integration-27b8d6c61f5cf459.
   P2_ARTIFACT_ID: "11819078922"
   P2_TAR_SHA256: "cdab0fdece9bf5da43b1c05658f1774332fd348678bd9facc6a5f9ce2dde7943"
   P2_SOURCE_COMMIT: "e993cc8dabdce048cf96f7ca5cf28d8801d59f5b"
