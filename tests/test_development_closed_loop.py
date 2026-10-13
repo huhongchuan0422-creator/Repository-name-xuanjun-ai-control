@@ -190,6 +190,73 @@ class ClosedLoopTests(unittest.TestCase):
                 'handoff-proof','tester','WORK',
                 dict(development_closed_loop.TRUE_PROOF))
 
+
+    def test_admission_ack_matches_claim_and_never_grants_authority(self):
+        row=development_closed_loop._task(self.sup,'task4')
+        binding={key:row[key] for key in (
+            'lease_id','fence','epoch','checkpoint_sha256',
+            'spec_sha256','run_id','session_id')}
+        with self.assertRaises(ValueError):
+            development_closed_loop.admitted_receipt_ack(
+                self.sup,'task4','attempt-1','wrong',103,'real-receipt',
+                dict(binding, fence=99))
+        self.assertEqual(self.sup.db.execute(
+            "SELECT count(*) FROM events WHERE event_id='wrong'").fetchone()[0],0)
+        # A STARTED attempt cannot be relabeled as a new RECEIVED event.
+        with self.assertRaises(ValueError):
+            development_closed_loop.admitted_receipt_ack(
+                self.sup,'task4','attempt-1','late',103,'real-receipt',binding)
+
+    def test_owner_notice_durable_dedupe_and_no_false_acceptance(self):
+        url=('https://github.com/huhongchuan0422-creator/'
+             'Repository-name-xuanjun-ai-control/pull/58')
+        # Existing STARTED task cannot be labeled unreceived.
+        with self.assertRaises(ValueError):
+            development_closed_loop.enqueue_owner_notice(
+                self.sup,'task4','bad',105,'RECEIPT_TIMEOUT','d'*40,url)
+        # Terminal failure notice uses the existing durable outbox.
+        self.sup.record('task4','attempt-1','failure','TERMINAL',103,
+            evidence_kind='PHASE_EXECUTION', evidence_ref='fail-proof',
+            payload={'state':'FAILURE','artifact_sha256':'UNKNOWN',
+                     'writer_stopped':False,'effects_reconciled':False,
+                     'next_action':'REPAIR',
+                     'completion_evidence':[]})
+        notice=development_closed_loop.enqueue_owner_notice(
+            self.sup,'task4','notice-failure',104,'FAILURE','d'*40,url)
+        self.assertEqual(notice['state'],'PERSISTED_NOT_DELIVERED')
+        replay=development_closed_loop.enqueue_owner_notice(
+            self.sup,'task4','notice-failure',104,'FAILURE','d'*40,url)
+        self.assertTrue(replay['duplicate'])
+        self.assertEqual(self.sup.db.execute(
+            "SELECT count(*) FROM outbox WHERE event_id='notice-failure'").fetchone()[0],1)
+        with self.assertRaises(ValueError):
+            development_closed_loop.enqueue_owner_notice(
+                self.sup,'task4','notice-failure',104,'FAILURE','e'*40,url)
+
+    def test_missing_ack_timeout_uses_ready_without_receiving(self):
+        sup=task_supervisor.Supervisor(
+            os.path.join(self.tmp.name,'second.sqlite'),clock=lambda:100)
+        try:
+            sup.register(dict(task_id='unreceived',parent_task_id='parent',
+                stage='DELIVERY',owner='owner',entry='CHATGPT',
+                checkpoint_sha256='a'*64,spec_sha256='b'*64,
+                next_action='AWAIT',dependencies=[],
+                completion_conditions=['done'],
+                progress_deadline=105,receipt_deadline=105,
+                started_deadline=105,terminal_deadline=105,
+                handoff_deadline=105),now=100)
+            url=('https://github.com/huhongchuan0422-creator/'
+                 'Repository-name-xuanjun-ai-control/issues/19')
+            result=development_closed_loop.enqueue_owner_notice(
+                sup,'unreceived','receipt-timeout',106,
+                'RECEIPT_TIMEOUT','c'*40,url)
+            self.assertEqual(result['state'],'PERSISTED_NOT_DELIVERED')
+            row=sup._task('unreceived')
+            self.assertEqual(row['state'],'READY')
+            self.assertEqual(row['attempt_id'],'UNKNOWN')
+        finally:
+            sup.close()
+
     def test_no_model_or_process_dispatch_surface(self):
         raw=(ROOT/'scripts/development_closed_loop.py').read_text()
         for token in ('subprocess','Popen','openai','codex','runtime.subagent'):
