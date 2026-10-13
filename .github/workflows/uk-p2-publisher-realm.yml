@@ -1,0 +1,26 @@
+name: P2 UK isolated publisher mirror and GH credential realm
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/uk-p2-publisher-realm.yml
+      - evidence/p2-install-preparation-20261013/prepare_publisher_realm.py
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-publisher-realm
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Prepare bundle and prove UID1003 GH auth and Git dry run in disposable namespace
+        env:
+          P2_PUBLISHER_RUN: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_publisher_realm.py "$P2_PUBLISHER_RUN"
