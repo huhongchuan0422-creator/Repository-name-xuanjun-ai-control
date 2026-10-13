@@ -101,12 +101,7 @@ def collect():
                 key=a.get('key','')
                 if isinstance(key,str) and ':feishu:' in key:
                     result['sessions_cli_feishu'].append({'kind':a.get('kind') if a.get('kind') in ('direct','group') else 'UNKNOWN',
-                      'key_direct_user_shape':bool(re.search(r':feishu:direct:ou_[A-Za-z0-9_-]+
-if __name__=='__main__':
-    if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:
-        raise SystemExit('HOLD_FIXED_UK_IDENTITY')
-    print(json.dumps(collect(),sort_keys=True))
-,key)),
+                      'key_direct_user_shape':bool(re.search(r':feishu:direct:ou_[A-Za-z0-9_-]+$',key)),
                       'updated_at':a.get('updatedAt') if type(a.get('updatedAt')) in (int,float) else None})
         except (ValueError,UnicodeError,TypeError):
             result['sessions_cli_status']='UNPARSEABLE_NOT_EXPORTED'
