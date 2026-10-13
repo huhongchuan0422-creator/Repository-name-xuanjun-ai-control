@@ -84,6 +84,8 @@ class NativeSnapshotAccess:
 
     def validate(self, fd, directory=False):
         info = os.fstat(fd)
+        if (type(directory) is not bool or not (stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode))):
+            raise ValueError('SNAPSHOT_FILE_TYPE_REJECTED')
         if info.st_uid not in self.uids or (not directory and info.st_nlink != 1):
             raise ValueError('SNAPSHOT_IDENTITY_REJECTED')
         mode = stat.S_IMODE(info.st_mode)

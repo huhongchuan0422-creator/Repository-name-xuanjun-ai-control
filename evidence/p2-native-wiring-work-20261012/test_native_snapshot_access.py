@@ -22,6 +22,10 @@ class ACLValidation(unittest.TestCase):
         for uid in (1003,1002):self.assertEqual(self.file(owner=uid),0o100644)
     def test_reject_foreign_file_owner(self):
         with self.assertRaises(ValueError):self.file(owner=1005)
+    def test_reject_device_file_type(self):
+        info=types.SimpleNamespace(st_uid=1003,st_mode=stat.S_IFCHR|0o660,st_nlink=1)
+        with mock.patch('native_snapshot_access.os.fstat',return_value=info):
+            with self.assertRaises(ValueError):self.policy.validate(7)
     def test_reject_hardlink(self):
         with self.assertRaises(ValueError):self.file(nlink=2)
     def test_reject_world_access(self):
