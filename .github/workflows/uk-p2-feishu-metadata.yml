@@ -2,7 +2,7 @@ name: P2 UK existing Feishu metadata
 on:
   push:
     branches: [repair/p2-chatgpt-clean-review-20261013]
-    paths: [scripts/uk-p2-feishu-metadata.py, scripts/owner_feishu_transport.py, scripts/owner_feishu_history.py, tests/test_owner_feishu_transport.py, tests/test_owner_feishu_history.py, .github/workflows/uk-p2-feishu-metadata.yml]
+    paths: [scripts/uk-p2-feishu-metadata.py, scripts/owner_feishu_transport.py, scripts/owner_feishu_history.py, scripts/owner_feishu_claim_guard.py, tests/test_owner_feishu_transport.py, tests/test_owner_feishu_history.py, tests/test_owner_feishu_claim_guard.py, .github/workflows/uk-p2-feishu-metadata.yml]
 permissions:
   contents: read
   actions: read
