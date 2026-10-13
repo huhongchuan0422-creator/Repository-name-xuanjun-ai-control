@@ -46,6 +46,13 @@ base_fixture=DEST/'feishu-base'/'xuanjun-p2-package'
 base_fixture.parent.mkdir(mode=0o700)
 shutil.copytree(str(source),str(base_fixture))
 subprocess.run(['python','-B',str(repo/'scripts/owner_feishu_runtime_overlay.py'),str(source)],check=True)
+controller_digest=hashlib.sha256((source/'stage1/native_gateway_controller.py').read_bytes()).hexdigest()
+service_text=(source/'deploy/xuanjun-development-dispatcher.service').read_text()
+if service_text.count('--native-controller-sha256 '+controller_digest)!=3:
+    raise ValueError('FINAL_PACKAGE_CONTROLLER_SERVICE_HASH_MISMATCH')
+final_env=dict(env,P2_SOURCE_ROOT=str(source))
+subprocess.run(['python','-B',str(ROOT/'test_c2_install_highs.py')],env=final_env,check=True)
+print('FINAL_PACKAGE_CONTROLLER_SERVICE_HASH_AND_INSTALL_LIFECYCLE=PASS')
 env.update(P2_SOURCE_ROOT=str(base_fixture),P2_FEISHU_INTEGRATION_ROOT=str(source))
 subprocess.run(['python','-B','-m','unittest','discover','-s',str(repo/'tests'),'-p','test_owner_feishu_*.py','-v'],env=env,check=True)
 subprocess.run(['node',str(repo/'tests/test_owner_feishu_gateway.mjs')],env=env,check=True)

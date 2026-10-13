@@ -22,6 +22,13 @@ def apply(root):
         for old,new in spec['edits']:
             if text.count(old)!=1:raise ValueError('FEISHU_RUNTIME_SNIPPET_DRIFT:'+path)
             text=text.replace(old,new)
+    service=root/'deploy/xuanjun-development-dispatcher.service'
+    old_controller=PATCHES['stage1/native_gateway_controller.py']['sha256']
+    old_flag='--native-controller-sha256 '+old_controller
+    if (service.is_symlink() or hashlib.sha256(service.read_bytes()).hexdigest()!=
+            '8dc58fb6423f1a6db61f5555e9005c9f9296576ce005bff503973ceff8d1ba44' or
+            service.read_text().count(old_flag)!=3):
+        raise ValueError('FEISHU_CONTROLLER_SERVICE_BINDING_DRIFT')
     template=root/'deploy/p2-owner-feishu-binding.json.template'
     if template.exists():raise ValueError('FEISHU_BINDING_TEMPLATE_EXISTS')
     for name in MODULES:
@@ -33,6 +40,9 @@ def apply(root):
         target=root/path;text=target.read_text()
         for old,new in spec['edits']:text=text.replace(old,new)
         target.write_text(text)
+    new_controller=hashlib.sha256((root/'stage1/native_gateway_controller.py').read_bytes()).hexdigest()
+    service.write_text(service.read_text().replace(old_flag,
+        '--native-controller-sha256 '+new_controller))
     for name in MODULES:
         shutil.copyfile(str(pathlib.Path(__file__).resolve().parent/name),str(root/'stage1'/name))
     template.write_text('{"app_id":"@@APP_ID@@","chat_id":"@@CHAT_ID@@","package_sha256":"@@PACKAGE_SHA256@@"}\n')
