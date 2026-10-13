@@ -1,0 +1,23 @@
+name: Source path ownership gates
+on:
+  pull_request:
+    paths:
+      - scripts/source_path_ownership.py
+      - tests/test_source_path_ownership.py
+      - docs/SOURCE_PATH_OWNERSHIP.md
+      - .github/workflows/source-path-ownership-gates.yml
+permissions:
+  contents: read
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Validate pure source checks
+        run: |
+          python3 -m py_compile scripts/source_path_ownership.py
+          python3 -B -m unittest discover -s tests -p 'test_source_path_ownership.py' -v
