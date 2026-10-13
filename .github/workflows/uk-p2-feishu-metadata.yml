@@ -27,7 +27,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
     timeout-minutes: 4
     env:
-      P2_SOURCE_ROOT: ${{ runner.temp }}/p2-feishu-${{ github.run_id }}-${{ github.run_attempt }}/xuanjun-p2-package
+      P2_SOURCE_ROOT: /tmp/p2-feishu-${{ github.run_id }}-${{ github.run_attempt }}/xuanjun-p2-package
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -81,6 +81,6 @@ jobs:
           /usr/bin/python3 -I -B - <<'PY'
           import os,pathlib,shutil
           root=pathlib.Path(os.environ['P2_SOURCE_ROOT']).parent
-          assert str(root).startswith(os.environ['RUNNER_TEMP']+'/p2-feishu-')
+          assert str(root).startswith('/tmp/p2-feishu-')
           if root.exists():shutil.rmtree(str(root))
           PY
