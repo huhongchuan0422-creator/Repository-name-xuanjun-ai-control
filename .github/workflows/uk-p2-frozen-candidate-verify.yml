@@ -1137,3 +1137,51 @@ jobs:
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
           print(json.dumps(result,sort_keys=True));print('SANDBOX_IMAGE_BUILD_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
+
+      - name: Verify narrow snapshot ACL prototype and importer denial with real isolated numeric identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,stat,json,hashlib,subprocess
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];fixture=root+'/narrow-acl-fixture';os.mkdir(fixture,0o755);os.chmod(fixture,0o755)
+          source='evidence/p2-install-preparation-20261013/native_snapshot_access_prototype.py'
+          with open(source,'rb') as f:code=f.read()
+          module=fixture+'/native_snapshot_access.py'
+          fd=os.open(module,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o444)
+          with os.fdopen(fd,'wb') as f:f.write(code)
+          work=fixture+'/worktrees';os.mkdir(work,0o755);os.chown(work,1003,1003)
+          snapshot=work+'/snapshot';os.mkdir(snapshot,0o700);os.chown(snapshot,1003,1003)
+          for name,mode in [('fixture.py',0o600),('fixture.sh',0o700)]:
+              fd=os.open(snapshot+'/'+name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,mode)
+              with os.fdopen(fd,'wb') as f:f.write(b'FIXTURE_ONLY=1\n')
+              os.chown(snapshot+'/'+name,1003,1003)
+          secret=fixture+'/service-home';os.mkdir(secret,0o700);os.chown(secret,1003,1003)
+          fd=os.open(secret+'/dummy-secret',os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(b'FIXTURE_SECRET_NOT_A_CREDENTIAL\n')
+          os.chown(secret+'/dummy-secret',1003,1003)
+          env={'PATH':'/usr/bin:/bin','LANG':'C','HOME':fixture}
+          js="import os,sys,importlib.util;os.setgroups([]);os.setgid(1003);os.setuid(1003);s=importlib.util.spec_from_file_location('acl',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);a=m.NativeSnapshotAccess(sys.argv[2],1003,1002);a.share(sys.argv[2]+'/snapshot');print('ACL_SHARED')"
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',js,module,work],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+          assert p.returncode==0,'NARROW_ACL_SHARE_FAILED'
+          probe="import os,sys,json;uid=int(sys.argv[1]);os.setgroups([]);os.setgid(uid);os.setuid(uid);result={'uid':uid};\nfor key,path,flags in [('snapshot_read',sys.argv[2],os.O_RDONLY),('snapshot_write',sys.argv[2],os.O_WRONLY),('importer_read',sys.argv[3],os.O_RDONLY)]:\n try:fd=os.open(path,flags);os.close(fd);result[key]='ALLOWED'\n except PermissionError:result[key]='DENIED'\nprint(json.dumps(result))"
+          rows=[]
+          for uid in (1002,1003,1005):
+              p=subprocess.run(['/usr/bin/python3','-I','-B','-c',probe,str(uid),snapshot+'/fixture.py',secret+'/dummy-secret'],env=env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+              assert p.returncode==0;rows.append(json.loads(p.stdout.decode()))
+          assert rows[0]['snapshot_read']==rows[0]['snapshot_write']=='ALLOWED' and rows[0]['importer_read']=='DENIED'
+          assert rows[1]['snapshot_read']==rows[1]['snapshot_write']==rows[1]['importer_read']=='ALLOWED'
+          assert all(rows[2][k]=='DENIED' for k in ('snapshot_read','snapshot_write','importer_read'))
+          create="import os,sys;os.setgroups([]);os.setgid(1002);os.setuid(1002);p=sys.argv[1];os.mkdir(p+'/created-dir');f=open(p+'/created-dir/new.py','w');f.write('FIXTURE_ONLY=2\\n');f.close()"
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',create,snapshot],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=8)
+          assert p.returncode==0,'NARROW_ACL_INHERITANCE_FAILED'
+          validate="import os,sys,importlib.util;os.setgroups([]);os.setgid(1003);os.setuid(1003);s=importlib.util.spec_from_file_location('acl',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);a=m.NativeSnapshotAccess(sys.argv[2],1003,1002);p=sys.argv[2]+'/snapshot';\nfor path,directory in [(p,True),(p+'/fixture.py',False),(p+'/fixture.sh',False),(p+'/created-dir',True),(p+'/created-dir/new.py',False)]:\n fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW);a.validate(fd,directory);os.close(fd)\nprint('ACL_INHERITANCE_VALIDATED')"
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',validate,module,work],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)
+          assert p.returncode==0,'NARROW_ACL_VALIDATION_FAILED'
+          result={'schema':1,'state':'REAL_NARROW_SNAPSHOT_ACL_FIXTURE_PASS_NO_RUNTIME_ACCEPTANCE','prototype_sha256':hashlib.sha256(code).hexdigest(),'identity_access':rows,'gateway_created_file_readable_by_dispatcher':True,'default_acl_validation':True,'canonical_ledger_changed':False,'production_paths_changed':False,'services_changed':False,'model_calls':0,'writer_admission':False}
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-narrow-acl-fixture-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('NARROW_ACL_FIXTURE_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
