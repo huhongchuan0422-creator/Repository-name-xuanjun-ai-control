@@ -26,7 +26,7 @@ Evidence: UK read-onlyfacts38336367068/job115097248332 at collector commit9f22c0
 
 | Prerequisite | Observed | Required next action |
 | --- | --- | --- |
-| gh binary | absent at /usr/bin/gh,/usr/local/bin/gh,/opt/xuanjun-runtime/gh/gh,/home/xuanjun_dev/.local/bin/gh | Select and verify a real source binary through existing prerequisite plan; no fabricated hash |
+| gh binary | Host fixed paths remain absent. Official v2.102.0 staged artifact11784779205; binary SHA256 7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b. Hosted and UK offline exact version PASS at run38337815855/job115101842365 | Preparation compatibility closed; independently review and bind staged source to existing prerequisite plan before Owner installation |
 | Existing OAuth reference | existing private5MiB-class store under xuanjun_dev | Re-read exact identity/hash just before preflight; no copy and no exposed value |
 | GitHub intake token | /etc/xuanjun-development/github-intake-token absent | Existing protected enrollment must supply scoped token; ephemeral CI token is not persistent service auth |
 | Owner dashboard token | /etc/xuanjun-owner-callback/owner-dashboard-token absent | Protected provisioning/enrollment; do not log secret |
@@ -45,3 +45,7 @@ Evidence: UK read-onlyfacts38336367068/job115097248332 at collector commit9f22c0
 5. Prove installed hashes, socket activation identity, dispatcher-UID preflight, canonical WAL/epoch/single-writer, outbox delivery ACK, restart and rollback. Then actual E2E under its separately admitted scope. Preserve f998 unknown-effects no-replay boundary.
 
 Current: SOURCE_TESTED_INSTALL_PREPARATION_HOLD. P2_RELEASE_GRANTED=NO; P2_INSTALL=NO; real installed socket/service/rollback/E2E=NOT_RUN. Work retains outcome responsibility and continues independently executable preparation; these gaps are not a request to rerun old package review.
+
+## Pinned gh preparation receipt
+
+Workflow source e4e7a5d7876be791377a4a332feb4fd093c222b0; run38337815855 both prepare and uk-compatibility SUCCESS. Actual UK job log confirms exact binary digest and gh version2.102.0. Downloaded only official archive with pinned SHA256 bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386; extracted only bounded regular bin/gh, checked ELF64 x86_64. UK probe used temporary directory, isolated HOME and minimal environment; cleanup completed, no root/service/credential/API/model action. MODEL_CALLS=0; INSTALL_PERFORMED=NO. Artifact11784779205 zip digest73299316ceda96c292bde0a7d1aa44f2b56de10ab6d17b3123dbc9785727af86. Its hosted receipt says UK NOT_RUN because uploaded before downstream UK job; this downstream exact-binary receipt supplies compatibility evidence without editing old artifact. Host target /opt/xuanjun-runtime/gh/gh remains absent. P2 package11784412668 unchanged, release/install remain NO.
