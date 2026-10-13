@@ -1015,7 +1015,7 @@ jobs:
               candidates=[]
               count=0
               for parent,dirs,files in os.walk(durable,followlinks=False):
-                  dirs[:]=[name for name in dirs if not name.startswith('plan-')]
+                  dirs[:]=[name for name in dirs if not name.startswith(('plan-','publisher-realm-')) and name!='control-mirror.git']
                   ps=os.lstat(parent);assert ps.st_uid==0 and not ps.st_mode&0o022 and os.path.realpath(parent)==parent
                   for name in files:
                       count+=1;assert count<256
