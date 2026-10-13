@@ -5,6 +5,7 @@ on:
       - repair/p2-chatgpt-clean-review-20261013
     paths:
       - .github/workflows/uk-p2-frozen-candidate-verify.yml
+      - evidence/p2-native-wiring-work-20261012/test_c2_install_highs.py
 permissions:
   contents: read
   actions: read
