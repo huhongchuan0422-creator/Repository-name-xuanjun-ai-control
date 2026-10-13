@@ -15,6 +15,34 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - name: UK isolated private-input preparation regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'PY'
+          import os,pathlib,runpy,tempfile,sys
+          assert sys.version_info[:3]==(3,6,8)
+          ns=runpy.run_path('scripts/p2-protected-input-prepare.py',run_name='isolated_fixture')
+          prepare=ns['prepare'];names=ns['NAMES']
+          with tempfile.TemporaryDirectory() as root:
+              prepare(root)
+              original={n:pathlib.Path(root,n).read_bytes() for n in names}
+              assert len(set(original.values()))==3
+              prepare(root)
+              assert all(pathlib.Path(root,n).read_bytes()==v for n,v in original.items())
+              first=pathlib.Path(root,names[0]);first.chmod(0o644)
+              try:prepare(root)
+              except ValueError:pass
+              else:raise AssertionError('unsafe mode accepted')
+              first.chmod(0o600)
+              os.link(str(first),str(pathlib.Path(root,'hardlink')))
+              try:prepare(root)
+              except ValueError:pass
+              else:raise AssertionError('hardlink accepted')
+          print('P2_UK_PRIVATE_STAGING_GENERATE_RETRY_MODE_HARDLINK=PASS')
+          print('PRODUCTION_INPUTS_CREATED=NO')
+          print('MODEL_CALLS=0')
+          PY
       - name: Collect fixed UK P2 install-plan facts only
         shell: bash
         run: |
