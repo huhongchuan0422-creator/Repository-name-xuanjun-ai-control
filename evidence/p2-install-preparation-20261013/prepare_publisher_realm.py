@@ -3,8 +3,8 @@ import hashlib,json,os,re,shutil,socket,stat,subprocess,sys,tempfile,signal
 BASE='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
 REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 REMOTE='https://github.com/'+REPO+'.git'
-SOURCE='305a4f35fa1018d6dba3007d59aa03c3a6258ead'
-TREE='a388ad2d28e0125c4790e409db146ec77410c081'
+SOURCE='62d2e64d34feea1f02bffa7e8b597484bb98307f'
+TREE='e75e549d87515aee1c022faa04e805f694088d6e'
 GH_SHA='7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b'
 ENV={'PATH':'/usr/bin:/bin','LANG':'C','GIT_TERMINAL_PROMPT':'0','GIT_CONFIG_GLOBAL':'/dev/null','GIT_CONFIG_NOSYSTEM':'1','GIT_NO_REPLACE_OBJECTS':'1'}
 def sha(data):return hashlib.sha256(data).hexdigest()
