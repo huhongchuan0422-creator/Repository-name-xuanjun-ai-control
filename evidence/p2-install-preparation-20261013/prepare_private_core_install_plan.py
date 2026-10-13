@@ -1,9 +1,9 @@
 """Render an exact private core install plan; this program never applies it."""
 import os, sys, stat, socket, json, hashlib, uuid, re
 DURABLE='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
-MANIFEST='435282fa6a00f0e715b5ee6828eee035ed92ebf9dee71a3997a47aa68d48c4c3'
-SOURCE='0f7e150688632b250da375f23a4475c696b1a541'
-TREE='375345b337b155014532832ff171eaa96e481f1b'
+MANIFEST='2f859f47755350150ff967822932fc84b4daa006f65c2ef77ff64e1185bf1e57'
+SOURCE='f9ab3eace4ffed0fc0376953ec88982136601846'
+TREE='bd103b7b2b042238b300fb7d0e9805c205fdb851'
 BASE='/tmp/p2pkg-38365394514-1'
 BUNDLE='/tmp/p2pkg-38371013936-1/protected-install-preparation-bundle.json'
 SDK='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/'
@@ -46,6 +46,7 @@ def main(package,output):
           (VAR,0,0,0o755),(VAR+'/activation',0,0,0o755),(VAR+'/generations',0,1006,0o750),
           (VAR+'/generations/1',1003,1006,0o750),(VAR+'/backups',0,0,0o700),
           (VAR+'/worktrees',1003,1003,0o755),(VAR+'/service-home',1003,1003,0o700),
+          (VAR+'/service-home/.config',1003,1003,0o700),
           (VAR+'/worker-home',1005,1005,0o700),(VAR+'/codex-home',1005,1005,0o700),
           (VAR+'/users',0,0,0o755)]
     existing={x['path']:x for x in prerequisites['directories']}

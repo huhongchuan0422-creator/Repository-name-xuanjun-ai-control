@@ -10,11 +10,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11813251608"
-  P2_TAR_SHA256: "03f0a380feac11d0b1ef5c221d1baeee03b2673368f84a8fea39b784e412c0eb"
-  P2_SOURCE_COMMIT: "0f7e150688632b250da375f23a4475c696b1a541"
-  P2_SOURCE_TREE: "375345b337b155014532832ff171eaa96e481f1b"
-  P2_MANIFEST_SHA256: "435282fa6a00f0e715b5ee6828eee035ed92ebf9dee71a3997a47aa68d48c4c3"
+  P2_ARTIFACT_ID: "11815238339"
+  P2_TAR_SHA256: "267c2fd8c8f93fc001ef0853d5eed19e0ab0d6a081024195c5b62c9b376f96b4"
+  P2_SOURCE_COMMIT: "f9ab3eace4ffed0fc0376953ec88982136601846"
+  P2_SOURCE_TREE: "bd103b7b2b042238b300fb7d0e9805c205fdb851"
+  P2_MANIFEST_SHA256: "2f859f47755350150ff967822932fc84b4daa006f65c2ef77ff64e1185bf1e57"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -164,9 +164,9 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   '0f7e150688632b250da375f23a4475c696b1a541',
-                   '435282fa6a00f0e715b5ee6828eee035ed92ebf9dee71a3997a47aa68d48c4c3',
-                   '375345b337b155014532832ff171eaa96e481f1b')
+                   'f9ab3eace4ffed0fc0376953ec88982136601846',
+                   '2f859f47755350150ff967822932fc84b4daa006f65c2ef77ff64e1185bf1e57',
+                   'bd103b7b2b042238b300fb7d0e9805c205fdb851')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
           assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
@@ -255,7 +255,7 @@ jobs:
            '/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite',
            '/home/xuanjun_dev/.openclaw/openclaw.json')
           value={'schema':1,'state':'PREREQUISITE_INVENTORY_NOT_INSTALL_PLAN','artifact_id':11796280855,
-           'archive_sha256':'03f0a380feac11d0b1ef5c221d1baeee03b2673368f84a8fea39b784e412c0eb',
+           'archive_sha256':'267c2fd8c8f93fc001ef0853d5eed19e0ab0d6a081024195c5b62c9b376f96b4',
            'candidate_free_uid_gid_pairs_not_reserved':free,'users':users,
            'binary_candidates':[metadata(p,True) for p in sources],'paths':[metadata(p) for p in paths],
            'source_binaries_executed':False,'credentials_read':False,'services_changed':False,
@@ -438,7 +438,7 @@ jobs:
                   assert len(raw)<=2097152
                   return json.loads(raw.decode())
               except urllib.error.HTTPError as e:return {'code':e.code}
-          private={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'435282fa6a00f0e715b5ee6828eee035ed92ebf9dee71a3997a47aa68d48c4c3','auth_references':[]}
+          private={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'2f859f47755350150ff967822932fc84b4daa006f65c2ef77ff64e1185bf1e57','auth_references':[]}
           public={'schema':1,'state':'OWNER_BINDING_INPUTS_HOLD','credential_values_exported':False,'notification_sends':0,'model_calls':0,'services_changed':False,'canonical_mutation':False}
           try:
               profile='/home/xuanjun_dev/.openclaw/openclaw.json'
@@ -822,13 +822,13 @@ jobs:
               def git(*args):return subprocess.check_output(['/usr/bin/git','--git-dir='+mirror]+list(args),env=env,stderr=subprocess.DEVNULL,timeout=15).decode().strip()
               assert git('config','--get','remote.origin.url')==remote
               assert git('rev-parse','--is-bare-repository')=='true'
-              source='0f7e150688632b250da375f23a4475c696b1a541'
+              source='f9ab3eace4ffed0fc0376953ec88982136601846'
               try:observed=git('rev-parse',source+'^{commit}')
               except subprocess.CalledProcessError:
                   p=subprocess.run(['/usr/bin/git','--git-dir='+mirror,'fetch','--quiet','--no-tags','origin',source+':refs/xuanjun-preparation/'+source],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120)
                   assert p.returncode==0;observed=git('rev-parse',source+'^{commit}')
               assert observed==source
-              tree=git('rev-parse',source+'^{tree}');assert tree=='375345b337b155014532832ff171eaa96e481f1b'
+              tree=git('rev-parse',source+'^{tree}');assert tree=='bd103b7b2b042238b300fb7d0e9805c205fdb851'
               result.update(state='PROTECTED_SOURCE_MIRROR_READY_CONTENTS_READ_VERIFIED',mirror_path=mirror,source_commit=source,source_tree=tree)
           except Exception as e:result['hold_reason']=type(e).__name__
           raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
@@ -959,6 +959,14 @@ jobs:
           assert p.returncode==0,'OFFLINE_POLICY_RESOLUTION_HOLD'
           PY
 
+      - name: Prepare exact-source publisher realm and verify isolated UID1003 credentials without canonical effects
+        shell: bash
+        env:
+          P2_PUBLISHER_RUN: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_publisher_realm.py "$P2_PUBLISHER_RUN"
+
       - name: Prepare private callback and native peer bootstrap candidates without applying
         shell: bash
         run: |
@@ -993,14 +1001,14 @@ jobs:
           installer=package+'/scripts/uk-integration-install.py'
           spec=importlib.util.spec_from_file_location('p2_seal_verify',installer);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
           manifest=package+'/deploy/integration-manifest.json'
-          m.verify(package,manifest,'0f7e150688632b250da375f23a4475c696b1a541','435282fa6a00f0e715b5ee6828eee035ed92ebf9dee71a3997a47aa68d48c4c3',expected_tree='375345b337b155014532832ff171eaa96e481f1b')
+          m.verify(package,manifest,'f9ab3eace4ffed0fc0376953ec88982136601846','2f859f47755350150ff967822932fc84b4daa006f65c2ef77ff64e1185bf1e57',expected_tree='bd103b7b2b042238b300fb7d0e9805c205fdb851')
           sealed_package=output+'/xuanjun-p2-package';shutil.copytree(package,sealed_package,symlinks=False)
           for parent,dirs,files in os.walk(sealed_package):
               os.chown(parent,0,0);os.chmod(parent,0o755)
               for name in files:
                   path=parent+'/'+name;assert not os.path.islink(path)
                   os.chown(path,0,0);os.chmod(path,0o555 if os.stat(path).st_mode&0o111 else 0o444)
-          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','0f7e150688632b250da375f23a4475c696b1a541','435282fa6a00f0e715b5ee6828eee035ed92ebf9dee71a3997a47aa68d48c4c3',expected_tree='375345b337b155014532832ff171eaa96e481f1b')
+          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','f9ab3eace4ffed0fc0376953ec88982136601846','2f859f47755350150ff967822932fc84b4daa006f65c2ef77ff64e1185bf1e57',expected_tree='bd103b7b2b042238b300fb7d0e9805c205fdb851')
           plan=json.loads(read(work+'/protected-core-install-plan.json',0o600).decode())
           plan['artifact']['root']=sealed_package;plan['artifact']['manifest']=sealed_package+'/deploy/integration-manifest.json'
           for item in plan['runtime']['prerequisites']['binaries']:
@@ -1030,6 +1038,10 @@ jobs:
           bootraw=(json.dumps(bootstrap,sort_keys=True,separators=(',',':'))+'\n').encode()
           write(output+'/protected-bootstrap-candidate-receipt.json',bootraw)
           plan['runtime']['bootstrap']={'path':output+'/protected-bootstrap-candidate-receipt.json','sha256':hashlib.sha256(bootraw).hexdigest()}
+          publisher_path=durable+'/publisher-realm-'+os.path.basename(work).split('-')[1]+'/protected-publisher-inputs.json'
+          publisher_raw=read(publisher_path,0o600);publisher=json.loads(publisher_raw.decode())
+          assert publisher['source_commit']=='f9ab3eace4ffed0fc0376953ec88982136601846' and publisher['source_tree']=='bd103b7b2b042238b300fb7d0e9805c205fdb851'
+          plan['runtime']['publisher']={'path':publisher_path,'sha256':hashlib.sha256(publisher_raw).hexdigest(),'source_commit':publisher['source_commit'],'source_tree':publisher['source_tree']}
           raw=(json.dumps(plan,sort_keys=True,separators=(',',':'))+'\n').encode()
           write(output+'/protected-core-install-plan.json',raw)
           sys.path.insert(0,sealed_package+'/stage1')
@@ -1263,7 +1275,7 @@ jobs:
           scan="import os,sys;os.setgroups([]);os.setgid(1003);os.setuid(1003);sys.path.insert(0,sys.argv[1]+'/stage1');from development_pipeline import CliBackend;from native_snapshot_access import NativeSnapshotAccess;b=CliBackend({'owner/repo':sys.argv[2]+'/control.git'},sys.argv[2],sys.argv[2]+'/home','/usr/bin:/bin',['fixture'],snapshot_access=NativeSnapshotAccess(sys.argv[2],1003,1002));assert b._scan_snapshot(sys.argv[2]+'/snapshot')['newdir/new.py']['data']==b'FIXTURE_ONLY=2\\n';print('FROZEN_BACKEND_READS_GATEWAY_OUTPUT')"
           p=subprocess.run(['/usr/bin/python3','-I','-B','-c',scan,package,workspace],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)
           assert p.returncode==0,'FROZEN_BACKEND_GATEWAY_OUTPUT_SCAN_FAILED'
-          result={'schema':1,'state':'EXACT_ARTIFACT_NATIVE_SNAPSHOT_BACKEND_KERNEL_PASS','artifact_id':11813251608,'source_commit':'0f7e150688632b250da375f23a4475c696b1a541','identity_access':rows,'gateway_output_import_scan':True,'model_calls':0,'services_changed':False,'canonical_ledger_changed':False,'writer_admission':False}
+          result={'schema':1,'state':'EXACT_ARTIFACT_NATIVE_SNAPSHOT_BACKEND_KERNEL_PASS','artifact_id':11815238339,'source_commit':'f9ab3eace4ffed0fc0376953ec88982136601846','identity_access':rows,'gateway_output_import_scan':True,'model_calls':0,'services_changed':False,'canonical_ledger_changed':False,'writer_admission':False}
           raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
           fd=os.open(root+'/protected-frozen-snapshot-backend-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
@@ -1288,7 +1300,7 @@ jobs:
           module='file:///home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs'
           js="const m=await import("+json.dumps(module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const agentId of ['developer','platform-engineer']){const sessionKey='agent:'+agentId+':p2-fixture:"+os.path.basename(root)+"';const c=await m.resolveSandboxContext({config:cfg,agentId,sessionKey,workspaceDir:"+json.dumps(snapshot)+",requireCurrentConfig:false,assertCurrent:()=>{}});const row={agentId};for(const key of ['enabled','sessionKey','workspaceDir','agentWorkspaceDir','skillsWorkspaceDir','containerWorkdir','containerName','containerId','workspaceAccess','backendId','runtimeId']){if(c?.[key]!==undefined&&['string','boolean','number'].includes(typeof c[key]))row[key]=c[key];}rows.push(row);}console.log('P2_SDK_MOUNTS='+JSON.stringify(rows));"
           env={'PATH':'/usr/bin:/bin','LANG':'C','HOME':home,'OPENCLAW_STATE_DIR':home+'/state','OPENCLAW_HOME':home,'NO_COLOR':'1','DOCKER_HOST':'unix:///var/run/docker.sock'}
-          contexts=[];known=[];result={'schema':1,'state':'HOLD_SDK_SOURCE_MOUNTS','artifact_id':11813251608,'model_calls':0,'canonical_ledger_changed':False,'production_services_changed':False,'writer_admission':False,'contexts':contexts,'units':known}
+          contexts=[];known=[];result={'schema':1,'state':'HOLD_SDK_SOURCE_MOUNTS','artifact_id':11815238339,'model_calls':0,'canonical_ledger_changed':False,'production_services_changed':False,'writer_admission':False,'contexts':contexts,'units':known}
           def docker(*args):
               return subprocess.run(['/usr/bin/docker','--host=unix:///var/run/docker.sock']+list(args),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
           try:
