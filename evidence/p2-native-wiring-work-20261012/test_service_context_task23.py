@@ -17,7 +17,7 @@ sys.path.insert(0,str(STAGE1))
 import execution_ledger as ledger_module
 import p2_gateway_relay as relay
 from execution_ledger import ExecutionLedger,LeaseLost
-from execution_supervision import SCHEMA as SUPERVISION_SCHEMA
+from execution_supervision import ExecutionSupervisor,SCHEMA as SUPERVISION_SCHEMA
 
 class FakeSocket(object):
     def __init__(self,uid):
@@ -141,20 +141,20 @@ class Tests(unittest.TestCase):
             activation=Activation(os.path.realpath(path))
             ledger=ExecutionLedger(path,['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'],
                                    clock=lambda:100,activation_store=activation)
-            real=ledger.supervisor()
-            original=real.record_inventory_notice
-            def swap(db,intent,binding,identity):
-                result=original(db,intent,binding,identity)
-                replacement=path+'.new'
-                self._db(replacement)
-                os.replace(replacement,path)
+            original=ExecutionSupervisor.record_inventory_notice
+            swapped=[False]
+            def swap(supervisor,db,intent,binding,identity):
+                result=original(supervisor,db,intent,binding,identity)
+                if not swapped[0]:
+                    swapped[0]=True
+                    replacement=path+'.new'
+                    self._db(replacement)
+                    os.replace(replacement,path)
                 return result
-            class Wrapper(object):
-                def record_inventory_notice(self,*args):
-                    return swap(*args)
-            with patch.object(ledger,'supervisor',return_value=Wrapper()):
+            with patch.object(ExecutionSupervisor,'record_inventory_notice',new=swap):
                 with self.assertRaises(LeaseLost):
                     ledger.record_inventory_notices()
+            self.assertTrue(swapped[0])
             db=sqlite3.connect(path)
             self.assertFalse(db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='supervision_events'").fetchone())

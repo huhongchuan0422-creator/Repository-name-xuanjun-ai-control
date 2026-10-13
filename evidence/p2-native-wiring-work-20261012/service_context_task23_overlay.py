@@ -357,11 +357,17 @@ Requires=xuanjun-p2-gateway-relay.socket
         identity=self._db_identity(fd)
         self._assert_db_identity(fd,identity)
         try:
-            # The SQLite connection is opened through the already pinned fd so
-            # it cannot race a pathname replacement between identity check and connect.
+            # The SQLite connection is opened through the already pinned fd.
+            # If pathname replacement makes that fd no longer reopenable for
+            # SQLite/WAL, classify the observed identity drift before returning.
             uri='file:/proc/self/fd/%d?mode=rw' % fd
             conn=sqlite3.connect(uri,uri=True,timeout=10,isolation_level=None)
         except sqlite3.OperationalError:
+            try:
+                self._assert_db_identity(fd,identity)
+            except LeaseLost:
+                os.close(fd)
+                raise
             os.close(fd)
             raise SchemaMismatch('existing authoritative database unavailable')
         conn.row_factory=sqlite3.Row
