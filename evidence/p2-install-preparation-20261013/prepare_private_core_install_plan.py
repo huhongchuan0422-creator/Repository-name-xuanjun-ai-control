@@ -1,9 +1,9 @@
 """Render an exact private core install plan; this program never applies it."""
 import os, sys, stat, socket, json, hashlib, uuid, re
 DURABLE='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
-MANIFEST='27b8d6c61f5cf4590cfbe87299c334c6231ad259b9088259470bafaecd0b2424'
-SOURCE='e993cc8dabdce048cf96f7ca5cf28d8801d59f5b'
-TREE='eb67c79012ebe3cea4addd25256c9bcce31282b6'
+MANIFEST='5b8439e1434eb5b9ccbc76b1d24b043f9c31fb3442cc5746ec52d04d69c9b58e'
+SOURCE='305a4f35fa1018d6dba3007d59aa03c3a6258ead'
+TREE='a388ad2d28e0125c4790e409db146ec77410c081'
 BASE='/tmp/p2pkg-38365394514-1'
 BUNDLE='/tmp/p2pkg-38371013936-1/protected-install-preparation-bundle.json'
 SDK='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/'
@@ -39,6 +39,8 @@ def main(package,output):
     prerequisites=protected(BASE+'/protected-prerequisites-subplan.json','9fbe85c665824a2c7b362dfb010fa47d3f144b67cd8dffa5b153efc4f64334a4')
     assert set(prerequisites['groups'])=={'xuanjun-dispatcher','xuanjun-callback','xj_codex_worker','xuanjun-control-db'}
     prerequisites['groups']['xuanjun-ledger-client']=1007  # Unreserved; real preflight checks NSS conflicts.
+    prerequisites['groups']['nginx']=1008
+    prerequisites['users']['nginx']={'uid':1008,'gid':1008,'home':VAR+'/nginx-home','groups':[]}
 
     bundle=protected(BUNDLE,'9bc378238ca9906420685c1940dd7c97511b0f022bcbd56c9471ef2cc7e09af7')
     transaction=str(uuid.uuid4());ledger=str(uuid.uuid4());instance=str(uuid.uuid4())
@@ -46,7 +48,7 @@ def main(package,output):
           (VAR,0,0,0o755),(VAR+'/activation',0,0,0o755),(VAR+'/generations',0,1006,0o750),
           (VAR+'/generations/1',1003,1006,0o750),(VAR+'/backups',0,0,0o700),
           (VAR+'/worktrees',1003,1003,0o755),(VAR+'/service-home',1003,1003,0o700),
-          (VAR+'/service-home/.config',1003,1003,0o700),
+          (VAR+'/service-home/.config',1003,1003,0o700),(VAR+'/nginx-home',1008,1008,0o700),
           (VAR+'/worker-home',1005,1005,0o700),(VAR+'/codex-home',1005,1005,0o700),
           (VAR+'/users',0,0,0o755)]
     existing={x['path']:x for x in prerequisites['directories']}

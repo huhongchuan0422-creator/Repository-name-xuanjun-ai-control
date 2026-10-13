@@ -5,17 +5,16 @@ on:
       - repair/p2-chatgpt-clean-review-20261013
     paths:
       - .github/workflows/uk-p2-frozen-candidate-verify.yml
-      - evidence/p2-native-wiring-work-20261012/test_c2_install_highs.py
 permissions:
   contents: read
   actions: read
 env:
-  # Native bootstrap release path is bound to this manifest prefix: integration-27b8d6c61f5cf459.
-  P2_ARTIFACT_ID: "11819078922"
-  P2_TAR_SHA256: "cdab0fdece9bf5da43b1c05658f1774332fd348678bd9facc6a5f9ce2dde7943"
-  P2_SOURCE_COMMIT: "e993cc8dabdce048cf96f7ca5cf28d8801d59f5b"
-  P2_SOURCE_TREE: "eb67c79012ebe3cea4addd25256c9bcce31282b6"
-  P2_MANIFEST_SHA256: "27b8d6c61f5cf4590cfbe87299c334c6231ad259b9088259470bafaecd0b2424"
+  # Native bootstrap release path is bound to this manifest prefix: integration-5b8439e1434eb5b9.
+  P2_ARTIFACT_ID: "11824656512"
+  P2_TAR_SHA256: "a5d1eacadb473a529caf25d9f1b24c3c5aa7e1f93aed5dd7f792fd116a2064e9"
+  P2_SOURCE_COMMIT: "305a4f35fa1018d6dba3007d59aa03c3a6258ead"
+  P2_SOURCE_TREE: "a388ad2d28e0125c4790e409db146ec77410c081"
+  P2_MANIFEST_SHA256: "5b8439e1434eb5b9ccbc76b1d24b043f9c31fb3442cc5746ec52d04d69c9b58e"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -165,9 +164,9 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   'e993cc8dabdce048cf96f7ca5cf28d8801d59f5b',
-                   '27b8d6c61f5cf4590cfbe87299c334c6231ad259b9088259470bafaecd0b2424',
-                   'eb67c79012ebe3cea4addd25256c9bcce31282b6')
+                   '305a4f35fa1018d6dba3007d59aa03c3a6258ead',
+                   '5b8439e1434eb5b9ccbc76b1d24b043f9c31fb3442cc5746ec52d04d69c9b58e',
+                   'a388ad2d28e0125c4790e409db146ec77410c081')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
           assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
@@ -255,8 +254,8 @@ jobs:
            '/etc/letsencrypt/live','/sys/fs/cgroup/systemd',
            '/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite',
            '/home/xuanjun_dev/.openclaw/openclaw.json')
-          value={'schema':1,'state':'PREREQUISITE_INVENTORY_NOT_INSTALL_PLAN','artifact_id':11796280855,
-           'archive_sha256':'cdab0fdece9bf5da43b1c05658f1774332fd348678bd9facc6a5f9ce2dde7943',
+          value={'schema':1,'state':'PREREQUISITE_INVENTORY_NOT_INSTALL_PLAN','artifact_id':11824656512,
+           'archive_sha256':'a5d1eacadb473a529caf25d9f1b24c3c5aa7e1f93aed5dd7f792fd116a2064e9',
            'candidate_free_uid_gid_pairs_not_reserved':free,'users':users,
            'binary_candidates':[metadata(p,True) for p in sources],'paths':[metadata(p) for p in paths],
            'source_binaries_executed':False,'credentials_read':False,'services_changed':False,
@@ -304,7 +303,7 @@ jobs:
               assert h.hexdigest()==b['sha256']
           print('EXISTING_PINNED_BINARIES_AND_PROTECTED_SUBPLAN_REUSED=PASS')
           result={'schema':1,'state':'UK_HTTPS_AND_PLAN_INPUT_INVENTORY_NOT_INSTALLED',
-           'artifact_id':11796280855,'owner_hostname':'uk.wenwenwenyiyiyi.work','prior_subplan_path':prior+'/protected-prerequisites-subplan.json',
+           'artifact_id':11824656512,'owner_hostname':'uk.wenwenwenyiyiyi.work','prior_subplan_path':prior+'/protected-prerequisites-subplan.json',
            'prior_subplan_sha256':hashlib.sha256(raw).hexdigest(),'packages_installed':False,
            'credentials_read':False,'services_changed':False,'canonical_ledger_changed':False}
           try:
@@ -358,7 +357,7 @@ jobs:
           import os,sys,stat,json,hashlib,re,subprocess,socket
           assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
           root=sys.argv[1]
-          result={'schema':1,'state':'EXISTING_CALLBACK_AND_TLS_PACKAGE_METADATA_ONLY','artifact_id':11796280855,
+          result={'schema':1,'state':'EXISTING_CALLBACK_AND_TLS_PACKAGE_METADATA_ONLY','artifact_id':11824656512,
            'service_changes':False,'canonical_mutation':False,'credential_values_exported':False}
           entries=[]
           bases=('/home/xuanjun_dev/uk-stage1-minimal/owner-callback',
@@ -439,7 +438,7 @@ jobs:
                   assert len(raw)<=2097152
                   return json.loads(raw.decode())
               except urllib.error.HTTPError as e:return {'code':e.code}
-          private={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'27b8d6c61f5cf4590cfbe87299c334c6231ad259b9088259470bafaecd0b2424','auth_references':[]}
+          private={'schema':1,'artifact_id':11824656512,'runtime_release_sha256':'5b8439e1434eb5b9ccbc76b1d24b043f9c31fb3442cc5746ec52d04d69c9b58e','auth_references':[]}
           public={'schema':1,'state':'OWNER_BINDING_INPUTS_HOLD','credential_values_exported':False,'notification_sends':0,'model_calls':0,'services_changed':False,'canonical_mutation':False}
           try:
               profile='/home/xuanjun_dev/.openclaw/openclaw.json'
@@ -482,14 +481,31 @@ jobs:
               public['expected_bot_name_match']=bot.get('bot',{}).get('app_name')=='玄钧云汇开发总管'
               chat=api('im/v1/chats/'+chat_id,token)
               public['chat_is_p2p']=chat.get('code')==0 and chat.get('data',{}).get('chat_mode')=='p2p'
-              history=api('im/v1/messages?container_id_type=chat&container_id='+chat_id+'&sort_type=ByCreateTimeDesc&page_size=50',token)
-              matches=[]
-              for item in history.get('data',{}).get('items',[]):
-                  try:
-                      value=json.loads(item.get('body',{}).get('content','')).get('text','')
-                      if 'XJ_P2_FEISHU_CANARY_11787198841_20261013' in value and item.get('chat_id')==chat_id:
-                          matches.append(item['message_id'])
-                  except (ValueError,TypeError,KeyError):pass
+              matches=[];seen=set();cursor=None
+              public.update(history_pages=0,history_items=0,history_exhausted=False)
+              for page in range(20):
+                  query={'container_id_type':'chat','container_id':chat_id,'sort_type':'ByCreateTimeDesc','page_size':'50'}
+                  if cursor:query['page_token']=cursor
+                  history=api('im/v1/messages?'+urllib.parse.urlencode(query),token)
+                  public['history_api_code']=history.get('code')
+                  if history.get('code')!=0:raise ValueError('HISTORY_API_REJECTED')
+                  data=history.get('data');assert isinstance(data,dict)
+                  items=data.get('items');assert isinstance(items,list) and len(items)<=50 and isinstance(data.get('has_more'),bool)
+                  public['history_pages']+=1;public['history_items']+=len(items)
+                  for item in items:
+                      try:
+                          value=json.loads(item.get('body',{}).get('content','')).get('text','')
+                          if isinstance(value,str) and 'XJ_P2_FEISHU_CANARY_11787198841_20261013' in value and item.get('chat_id')==chat_id:
+                              matches.append(item['message_id'])
+                      except (ValueError,TypeError,KeyError):pass
+                  if matches:
+                      public['canary_found_page']=page+1;break
+                  if not data['has_more']:
+                      public['history_exhausted']=True;break
+                  cursor=data.get('page_token')
+                  if not isinstance(cursor,str) or not cursor or len(cursor)>4096 or cursor in seen:raise ValueError('HISTORY_CURSOR_INVALID')
+                  seen.add(cursor)
+              if not matches:public['history_hold_reason']='HISTORY_EXHAUSTED_CANARY_NOT_FOUND' if public['history_exhausted'] else 'HISTORY_PAGE_LIMIT_CANARY_NOT_FOUND'
               public['prior_canary_readback_match']=bool(matches)
               assert public['expected_bot_name_match'] and public['chat_is_p2p'] and matches
               private['feishu_binding']={'app_id':config['appId'],'chat_id':chat_id,'package_sha256':private['runtime_release_sha256']}
@@ -565,7 +581,7 @@ jobs:
           fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(rendered);f.flush();os.fsync(f.fileno())
           public['rendered_binding_sha256']=hashlib.sha256(rendered).hexdigest()
-          private={'schema':1,'artifact_id':11796280855,'public_receipt':public,'owner_provisioning':{'source':'deploy/p2-owner-feishu-binding.json.template','target':'/etc/xuanjun-development/p2-owner-feishu-binding.json','source_sha256':hashlib.sha256(source).hexdigest(),'rendered_sha256':hashlib.sha256(rendered).hexdigest(),'mode':0o640,'owner_uid':0,'group_gid':1002,'replacements':replacements},'auth_references':owner['auth_references'],'rpm_receipt_path':rpmroot+'/protected-tls-rpm-receipt.json','rpm_receipt_sha256':'fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e','remaining_requirements':['REAL_TLS_CERTIFICATE_REFERENCE','COMPLETE_RUNTIME_PROVISIONING_AND_CUTOVER_PLAN','EXISTING_OWNER_CALLBACK_CHAT_ID_REFERENCE','GITHUB_INTAKE_AUTH_REFERENCE','INDEPENDENT_PLAN_RELEASE_REVIEW','OWNER_MANUAL_INSTALL_BOUNDARY']}
+          private={'schema':1,'artifact_id':11824656512,'public_receipt':public,'owner_provisioning':{'source':'deploy/p2-owner-feishu-binding.json.template','target':'/etc/xuanjun-development/p2-owner-feishu-binding.json','source_sha256':hashlib.sha256(source).hexdigest(),'rendered_sha256':hashlib.sha256(rendered).hexdigest(),'mode':0o640,'owner_uid':0,'group_gid':1002,'replacements':replacements},'auth_references':owner['auth_references'],'rpm_receipt_path':rpmroot+'/protected-tls-rpm-receipt.json','rpm_receipt_sha256':'fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e','remaining_requirements':['REAL_TLS_CERTIFICATE_REFERENCE','COMPLETE_RUNTIME_PROVISIONING_AND_CUTOVER_PLAN','EXISTING_OWNER_CALLBACK_CHAT_ID_REFERENCE','GITHUB_INTAKE_AUTH_REFERENCE','INDEPENDENT_PLAN_RELEASE_REVIEW','OWNER_MANUAL_INSTALL_BOUNDARY']}
           raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
           path=root+'/protected-install-preparation-bundle.json'
           fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
@@ -702,7 +718,7 @@ jobs:
               response=f.read(1048577)
           assert len(response)<=1048576 and json.loads(response.decode())['full_name']==receipt['repository']
           del token
-          result={'schema':1,'artifact_id':11796280855,'github_protected_reference_verified':True,'github_read_access_verified':True,'github_write_access':'NOT_TESTED','credentials_exported':False,'services_changed':False,'canonical_mutation':False,'model_calls':0,'installed_sdk_files':[]}
+          result={'schema':1,'artifact_id':11824656512,'github_protected_reference_verified':True,'github_read_access_verified':True,'github_write_access':'NOT_TESTED','credentials_exported':False,'services_changed':False,'canonical_mutation':False,'model_calls':0,'installed_sdk_files':[]}
           cli='/home/xuanjun_dev/.openclaw/bin/openclaw'
           with open(cli,'rb') as f:wrapper=f.read(65537)
           assert hashlib.sha256(wrapper).hexdigest()=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
@@ -814,7 +830,7 @@ jobs:
           remote='https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control.git'
           mirror=prior+'/control-mirror.git'
           env={'PATH':'/usr/bin:/bin','LANG':'C','GIT_TERMINAL_PROMPT':'0','GIT_ASKPASS':helper,'GIT_CONFIG_GLOBAL':'/dev/null','GIT_CONFIG_NOSYSTEM':'1'}
-          result={'schema':1,'artifact_id':11796280855,'state':'HOLD_SOURCE_MIRROR','github_mutation':False,'canonical_mutation':False,'services_changed':False,'credential_values_exported':False}
+          result={'schema':1,'artifact_id':11824656512,'state':'HOLD_SOURCE_MIRROR','github_mutation':False,'canonical_mutation':False,'services_changed':False,'credential_values_exported':False}
           try:
               if not os.path.lexists(mirror):
                   p=subprocess.run(['/usr/bin/git','clone','--quiet','--mirror',remote,mirror],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120)
@@ -823,13 +839,13 @@ jobs:
               def git(*args):return subprocess.check_output(['/usr/bin/git','--git-dir='+mirror]+list(args),env=env,stderr=subprocess.DEVNULL,timeout=15).decode().strip()
               assert git('config','--get','remote.origin.url')==remote
               assert git('rev-parse','--is-bare-repository')=='true'
-              source='e993cc8dabdce048cf96f7ca5cf28d8801d59f5b'
+              source='305a4f35fa1018d6dba3007d59aa03c3a6258ead'
               try:observed=git('rev-parse',source+'^{commit}')
               except subprocess.CalledProcessError:
                   p=subprocess.run(['/usr/bin/git','--git-dir='+mirror,'fetch','--quiet','--no-tags','origin',source+':refs/xuanjun-preparation/'+source],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120)
                   assert p.returncode==0;observed=git('rev-parse',source+'^{commit}')
               assert observed==source
-              tree=git('rev-parse',source+'^{tree}');assert tree=='eb67c79012ebe3cea4addd25256c9bcce31282b6'
+              tree=git('rev-parse',source+'^{tree}');assert tree=='a388ad2d28e0125c4790e409db146ec77410c081'
               result.update(state='PROTECTED_SOURCE_MIRROR_READY_CONTENTS_READ_VERIFIED',mirror_path=mirror,source_commit=source,source_tree=tree)
           except Exception as e:result['hold_reason']=type(e).__name__
           raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
@@ -1002,14 +1018,14 @@ jobs:
           installer=package+'/scripts/uk-integration-install.py'
           spec=importlib.util.spec_from_file_location('p2_seal_verify',installer);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
           manifest=package+'/deploy/integration-manifest.json'
-          m.verify(package,manifest,'e993cc8dabdce048cf96f7ca5cf28d8801d59f5b','27b8d6c61f5cf4590cfbe87299c334c6231ad259b9088259470bafaecd0b2424',expected_tree='eb67c79012ebe3cea4addd25256c9bcce31282b6')
+          m.verify(package,manifest,'305a4f35fa1018d6dba3007d59aa03c3a6258ead','5b8439e1434eb5b9ccbc76b1d24b043f9c31fb3442cc5746ec52d04d69c9b58e',expected_tree='a388ad2d28e0125c4790e409db146ec77410c081')
           sealed_package=output+'/xuanjun-p2-package';shutil.copytree(package,sealed_package,symlinks=False)
           for parent,dirs,files in os.walk(sealed_package):
               os.chown(parent,0,0);os.chmod(parent,0o755)
               for name in files:
                   path=parent+'/'+name;assert not os.path.islink(path)
                   os.chown(path,0,0);os.chmod(path,0o555 if os.stat(path).st_mode&0o111 else 0o444)
-          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','e993cc8dabdce048cf96f7ca5cf28d8801d59f5b','27b8d6c61f5cf4590cfbe87299c334c6231ad259b9088259470bafaecd0b2424',expected_tree='eb67c79012ebe3cea4addd25256c9bcce31282b6')
+          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','305a4f35fa1018d6dba3007d59aa03c3a6258ead','5b8439e1434eb5b9ccbc76b1d24b043f9c31fb3442cc5746ec52d04d69c9b58e',expected_tree='a388ad2d28e0125c4790e409db146ec77410c081')
           plan=json.loads(read(work+'/protected-core-install-plan.json',0o600).decode())
           plan['artifact']['root']=sealed_package;plan['artifact']['manifest']=sealed_package+'/deploy/integration-manifest.json'
           for item in plan['runtime']['prerequisites']['binaries']:
@@ -1040,9 +1056,10 @@ jobs:
           write(output+'/protected-bootstrap-candidate-receipt.json',bootraw)
           plan['runtime']['bootstrap']={'path':output+'/protected-bootstrap-candidate-receipt.json','sha256':hashlib.sha256(bootraw).hexdigest()}
           plan['runtime']['sandbox_policy']={'path':output+'/protected-openclaw-sandbox-policy-candidate.json','sha256':hashlib.sha256(policy).hexdigest(),'original_sha256':'569e7f4eb66860caf05e23fc1d00098d9f67c9204347b979ab39696f184fbba3'}
+          plan['runtime']['rpm']={'path':durable+'/rpm-tls-baseline-38410346819/protected-rpm-tls-baseline.json','sha256':'f784c4809b77df7f75ded97209efc32ff8c69944be33028e59e9422dcae100ec'}
           publisher_path=durable+'/publisher-realm-'+os.path.basename(work).split('-')[1]+'/protected-publisher-inputs.json'
           publisher_raw=read(publisher_path,0o600);publisher=json.loads(publisher_raw.decode())
-          assert publisher['source_commit']=='e993cc8dabdce048cf96f7ca5cf28d8801d59f5b' and publisher['source_tree']=='eb67c79012ebe3cea4addd25256c9bcce31282b6'
+          assert publisher['source_commit']=='305a4f35fa1018d6dba3007d59aa03c3a6258ead' and publisher['source_tree']=='a388ad2d28e0125c4790e409db146ec77410c081'
           plan['runtime']['publisher']={'path':publisher_path,'sha256':hashlib.sha256(publisher_raw).hexdigest(),'source_commit':publisher['source_commit'],'source_tree':publisher['source_tree']}
           raw=(json.dumps(plan,sort_keys=True,separators=(',',':'))+'\n').encode()
           write(output+'/protected-core-install-plan.json',raw)
@@ -1277,7 +1294,7 @@ jobs:
           scan="import os,sys;os.setgroups([]);os.setgid(1003);os.setuid(1003);sys.path.insert(0,sys.argv[1]+'/stage1');from development_pipeline import CliBackend;from native_snapshot_access import NativeSnapshotAccess;b=CliBackend({'owner/repo':sys.argv[2]+'/control.git'},sys.argv[2],sys.argv[2]+'/home','/usr/bin:/bin',['fixture'],snapshot_access=NativeSnapshotAccess(sys.argv[2],1003,1002));assert b._scan_snapshot(sys.argv[2]+'/snapshot')['newdir/new.py']['data']==b'FIXTURE_ONLY=2\\n';print('FROZEN_BACKEND_READS_GATEWAY_OUTPUT')"
           p=subprocess.run(['/usr/bin/python3','-I','-B','-c',scan,package,workspace],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)
           assert p.returncode==0,'FROZEN_BACKEND_GATEWAY_OUTPUT_SCAN_FAILED'
-          result={'schema':1,'state':'EXACT_ARTIFACT_NATIVE_SNAPSHOT_BACKEND_KERNEL_PASS','artifact_id':11819078922,'source_commit':'e993cc8dabdce048cf96f7ca5cf28d8801d59f5b','identity_access':rows,'gateway_output_import_scan':True,'model_calls':0,'services_changed':False,'canonical_ledger_changed':False,'writer_admission':False}
+          result={'schema':1,'state':'EXACT_ARTIFACT_NATIVE_SNAPSHOT_BACKEND_KERNEL_PASS','artifact_id':11824656512,'source_commit':'305a4f35fa1018d6dba3007d59aa03c3a6258ead','identity_access':rows,'gateway_output_import_scan':True,'model_calls':0,'services_changed':False,'canonical_ledger_changed':False,'writer_admission':False}
           raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
           fd=os.open(root+'/protected-frozen-snapshot-backend-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
@@ -1302,7 +1319,7 @@ jobs:
           module='file:///home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs'
           js="const m=await import("+json.dumps(module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const agentId of ['developer','platform-engineer']){const sessionKey='agent:'+agentId+':p2-fixture:"+os.path.basename(root)+"';const c=await m.resolveSandboxContext({config:cfg,agentId,sessionKey,workspaceDir:"+json.dumps(snapshot)+",requireCurrentConfig:false,assertCurrent:()=>{}});const row={agentId};for(const key of ['enabled','sessionKey','workspaceDir','agentWorkspaceDir','skillsWorkspaceDir','containerWorkdir','containerName','containerId','workspaceAccess','backendId','runtimeId']){if(c?.[key]!==undefined&&['string','boolean','number'].includes(typeof c[key]))row[key]=c[key];}rows.push(row);}console.log('P2_SDK_MOUNTS='+JSON.stringify(rows));"
           env={'PATH':'/usr/bin:/bin','LANG':'C','HOME':home,'OPENCLAW_STATE_DIR':home+'/state','OPENCLAW_HOME':home,'NO_COLOR':'1','DOCKER_HOST':'unix:///var/run/docker.sock'}
-          contexts=[];known=[];result={'schema':1,'state':'HOLD_SDK_SOURCE_MOUNTS','artifact_id':11819078922,'model_calls':0,'canonical_ledger_changed':False,'production_services_changed':False,'writer_admission':False,'contexts':contexts,'units':known}
+          contexts=[];known=[];result={'schema':1,'state':'HOLD_SDK_SOURCE_MOUNTS','artifact_id':11824656512,'model_calls':0,'canonical_ledger_changed':False,'production_services_changed':False,'writer_admission':False,'contexts':contexts,'units':known}
           def docker(*args):
               return subprocess.run(['/usr/bin/docker','--host=unix:///var/run/docker.sock']+list(args),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
           try:
