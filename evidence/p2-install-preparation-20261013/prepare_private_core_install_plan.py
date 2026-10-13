@@ -1,9 +1,9 @@
 """Render an exact private core install plan; this program never applies it."""
 import os, sys, stat, socket, json, hashlib, uuid, re
 DURABLE='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
-MANIFEST='dbe785330e881224bd16c3554a45a0a38bd8f88cb777ffa16fa35440a881efaf'
-SOURCE='932a52a5aa35d1528546bb0ae3a4d13413dae8f6'
-TREE='1a1e987c6098333b72e715c588ad3b73a45db1d1'
+MANIFEST='435282fa6a00f0e715b5ee6828eee035ed92ebf9dee71a3997a47aa68d48c4c3'
+SOURCE='0f7e150688632b250da375f23a4475c696b1a541'
+TREE='375345b337b155014532832ff171eaa96e481f1b'
 BASE='/tmp/p2pkg-38365394514-1'
 BUNDLE='/tmp/p2pkg-38371013936-1/protected-install-preparation-bundle.json'
 SDK='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/'
