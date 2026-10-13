@@ -1,6 +1,6 @@
 """P2-packaged read-only canonical inventory adapter.
 
-Derived from DOTS_NATIVE task2/3 source b098ec251a11611dd7f79465d89e8b854b86bc89. This module opens no database,
+Derived from DOTS_NATIVE task2/3 source 3c9c48c86ac05ea0baa30a02a035feb12b46b31d. This module opens no database,
 creates no queue, grants no authority and dispatches no model/provider.
 """
 from __future__ import print_function
@@ -10,7 +10,7 @@ import math
 import os
 import re
 
-DOTS_SOURCE_COMMIT='b098ec251a11611dd7f79465d89e8b854b86bc89'
+DOTS_SOURCE_COMMIT='3c9c48c86ac05ea0baa30a02a035feb12b46b31d'
 
 def canonical(value):
     return json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False)
@@ -151,6 +151,8 @@ def canonical_inventory_page(db, now, after_id=None, limit=100,
         if run is None:
             flags.append('SUPERVISION_RECORD_MISSING')
         else:
+            if run['writer_fence'] != task['fence']:
+                flags.append('RUN_FENCE_MISMATCH')
             if run['effects'] == 'UNKNOWN':
                 flags.append('UNKNOWN_EFFECT_NO_REPLAY')
             if (run['native_state'] in ('EXITED', 'FAILED', 'CANCELLED', 'NOT_FOUND')
@@ -229,6 +231,7 @@ def canonical_inventory_page(db, now, after_id=None, limit=100,
                    'epoch': run['writer_epoch'] if run and run['writer_epoch'] is not None else 'UNKNOWN',
                    'entry': (run['executor'] or 'UNKNOWN') if run else 'UNKNOWN',
                    'entry_authenticated': False,
+                   'writer_fence': run['writer_fence'] if run else 'UNKNOWN',
                    'attempt_id': attempt,
                    'lease_id': lease_id, 'task_state': task['state'],
                    'supervision_status': run['status'] if run else 'UNKNOWN',

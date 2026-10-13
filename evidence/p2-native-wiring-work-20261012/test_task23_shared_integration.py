@@ -81,4 +81,23 @@ class SharedIntegrationTests(unittest.TestCase):
         db=self._db();count=db.execute('SELECT count(*) FROM supervision_events').fetchone()[0];db.close()
         self.assertEqual(count,0)
 
+    def test_writer_fence_mismatch_is_visible_and_notice_only(self):
+        db=self._db()
+        columns=('task_id','spec_hash','executor','run_id','session_id','workdir','artifact',
+                 'dispatched_at','start_deadline','progress_deadline','result_deadline',
+                 'native_state','effects','budget_key','budget_spent','status','checkpoint',
+                 'checkpoint_hash','writer_fence','writer_epoch')
+        values=('t','b'*64,'DOTS','run','session','/fixture','artifact',0,50,50,50,
+                'RUNNING','NONE','budget',0,'STARTED','{}',
+                hashlib.sha256(b'{}').hexdigest(),3,2)
+        db.execute('INSERT INTO supervised_runs('+','.join(columns)+') VALUES('+
+                   ','.join('?' for unused in columns)+')',values)
+        db.close()
+        intent=self.observe()
+        self.assertIn('RUN_FENCE_MISMATCH',intent['attention'])
+        result=self.record(intent)
+        self.assertFalse(result['dispatch_performed'])
+        self.assertEqual(result['receiver_ack'],'NOT_PROVEN')
+
+
 if __name__=='__main__':unittest.main(verbosity=2)
