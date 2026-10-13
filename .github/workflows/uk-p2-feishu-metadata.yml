@@ -2,7 +2,7 @@ name: P2 UK existing Feishu metadata
 on:
   push:
     branches: [repair/p2-chatgpt-clean-review-20261013]
-    paths: [scripts/uk-p2-feishu-metadata.py, scripts/owner_feishu_transport.py, tests/test_owner_feishu_transport.py, .github/workflows/uk-p2-feishu-metadata.yml]
+    paths: [scripts/uk-p2-feishu-metadata.py, scripts/owner_feishu_transport.py, scripts/owner_feishu_history.py, tests/test_owner_feishu_transport.py, tests/test_owner_feishu_history.py, .github/workflows/uk-p2-feishu-metadata.yml]
 permissions:
   contents: read
   actions: read
@@ -71,7 +71,7 @@ jobs:
           PY
       - name: Existing outbox Feishu receipt and uncertainty regressions
         run: |
-          /usr/bin/python3 -B -m unittest discover -s tests -p test_owner_feishu_transport.py -v
+          /usr/bin/python3 -B -m unittest discover -s tests -p 'test_owner_feishu_*.py' -v
           echo MODEL_CALLS=0
           echo PRODUCTION_OUTBOX=NOT_TOUCHED
           echo LIVE_FEISHU_SEND=NO
