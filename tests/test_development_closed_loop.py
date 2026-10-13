@@ -140,6 +140,56 @@ class ClosedLoopTests(unittest.TestCase):
                 self.contract,self.files,reviews,KEYS,103,'review-proof',
                 'developer','CHATGPT','tester','WORK')
 
+    def test_review_contract_task_spec_checkpoint_and_attempt_fail_closed(self):
+        for field, wrong in (('task_id','another-task'),
+                             ('spec_sha256','f'*64),
+                             ('checkpoint_sha256','e'*64)):
+            contract=dict(self.contract)
+            contract[field]=wrong
+            sha=entry_review_gate.review_bundle(contract,self.files,[])['bundle_sha256']
+            reviews=[]
+            for role,key,subject in (('QA','qa-key','qa'),('SECURITY','security-key','security')):
+                reviews.append(signed(dict(reviewer={'issuer':'native','subject':subject},
+                                           role=role,bundle_sha256=sha,decision='PASS'),key))
+            with self.assertRaises(ValueError):
+                development_closed_loop.apply_code_review(
+                    self.sup,'task4','attempt-1','bad-'+field,contract,
+                    self.files,reviews,KEYS,103,'review-proof',
+                    'developer','CHATGPT','tester','WORK')
+        with self.assertRaises(ValueError):
+            development_closed_loop.apply_code_review(
+                self.sup,'task4','stale-attempt','bad-attempt',self.contract,
+                self.files,self.reviews(),KEYS,103,'review-proof',
+                'developer','CHATGPT','tester','WORK')
+        count=self.sup.db.execute("SELECT count(*) FROM events WHERE kind IN ('PROGRESS','HANDOFF_REQUESTED')").fetchone()[0]
+        self.assertEqual(count,0)
+
+    def test_handoff_ack_wrong_receiver_and_stale_attempt_fail_closed(self):
+        development_closed_loop.apply_code_review(
+            self.sup,'task4','attempt-1','review-test',self.contract,
+            self.files,self.reviews(),KEYS,103,'review-proof',
+            'developer','CHATGPT','tester','WORK')
+        for owner,entry,attempt in (('unrequested-owner','DOTS','attempt-1'),
+                                    ('tester','DOTS','attempt-1'),
+                                    ('tester','WORK','stale-attempt')):
+            with self.assertRaises(ValueError):
+                development_closed_loop.acknowledge_handoff(
+                    self.sup,'task4',attempt,'wrong-ack',104,
+                    'handoff-proof',owner,entry,
+                    dict(development_closed_loop.TRUE_PROOF))
+        state=self.sup.db.execute("SELECT state,owner,entry FROM tasks WHERE task_id='task4'").fetchone()
+        self.assertEqual(tuple(state),('HANDOFF_PENDING','reviewer','CHATGPT'))
+        self.assertEqual(self.sup.db.execute("SELECT count(*) FROM events WHERE kind='HANDOFF_ACKNOWLEDGED'").fetchone()[0],0)
+        development_closed_loop.acknowledge_handoff(
+            self.sup,'task4','attempt-1','ack-valid',104,
+            'handoff-proof','tester','WORK',
+            dict(development_closed_loop.TRUE_PROOF))
+        with self.assertRaises(ValueError):
+            development_closed_loop.acknowledge_handoff(
+                self.sup,'task4','attempt-1','replay-new',105,
+                'handoff-proof','tester','WORK',
+                dict(development_closed_loop.TRUE_PROOF))
+
     def test_no_model_or_process_dispatch_surface(self):
         raw=(ROOT/'scripts/development_closed_loop.py').read_text()
         for token in ('subprocess','Popen','openai','codex','runtime.subagent'):
