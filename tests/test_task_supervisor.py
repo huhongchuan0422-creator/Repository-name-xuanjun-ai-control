@@ -106,7 +106,7 @@ class SupervisorTests(unittest.TestCase):
     def test_receiver_without_ack_cannot_release_responsibility(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         bad=dict(receiver_accepted=True,old_writer_stopped=False,
             old_fence_invalidated=True,effects_reconciled=True,
             new_owner='qa',new_entry='WORK',
@@ -118,7 +118,7 @@ class SupervisorTests(unittest.TestCase):
     def test_exact_handoff_allows_new_claim_only_after_reconciliation(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
             new_owner='qa',new_entry='WORK',
@@ -130,7 +130,7 @@ class SupervisorTests(unittest.TestCase):
     def test_handoff_ack_exact_replay_survives_attempt_clear(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
             new_owner='qa',new_entry='WORK',
@@ -268,7 +268,7 @@ class SupervisorTests(unittest.TestCase):
     def test_two_connections_serialize_ack_and_old_terminal(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','handoff','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','handoff','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         barrier=threading.Barrier(2); results=[]
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
@@ -356,7 +356,7 @@ class SupervisorTests(unittest.TestCase):
     def test_ack_commit_blocks_old_attempt_before_new_claim(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','handoff','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','handoff','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
             new_owner='qa',new_entry='WORK',
@@ -397,7 +397,7 @@ class SupervisorTests(unittest.TestCase):
     def test_old_writer_cannot_resume_after_ack_and_new_attempt(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
             new_owner='qa',new_entry='WORK',
@@ -428,7 +428,7 @@ class SupervisorTests(unittest.TestCase):
     def test_fence_and_epoch_must_increase_after_handoff(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
             new_owner='qa',new_entry='WORK',lease_id='lease1',fence=1,epoch=1)
@@ -476,7 +476,7 @@ class SupervisorTests(unittest.TestCase):
     def test_handoff_rejects_empty_new_identity(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         bad=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
             new_owner='',new_entry='WORK',
@@ -553,7 +553,7 @@ class SupervisorTests(unittest.TestCase):
     def test_late_handoff_requires_fresh_attempt_deadlines(self):
         self.registration(); self.claim()
         self.s.record('t1','a1','start','STARTED',1001)
-        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002,payload={'next_owner':'qa','next_entry':'WORK'})
         good=dict(receiver_accepted=True,old_writer_stopped=True,
             old_fence_invalidated=True,effects_reconciled=True,
             new_owner='qa',new_entry='WORK',
