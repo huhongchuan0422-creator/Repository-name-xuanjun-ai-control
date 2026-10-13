@@ -53,3 +53,5 @@ jobs:
           echo MODEL_CALLS=0
           echo INSTALL_EFFECTS=0
 # refresh trigger for current P2 HIGH-fix artifact plan facts
+
+# Revalidate pinned-dirfd staging source2033d1a16093d9d2f97612bd70fe58b2b3b2b16a
