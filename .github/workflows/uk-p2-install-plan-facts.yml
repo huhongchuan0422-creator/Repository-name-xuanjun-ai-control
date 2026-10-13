@@ -9,11 +9,13 @@ permissions:
   contents: read
 jobs:
   facts:
+    if: github.event_name == 'push' && github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.ref == 'refs/heads/repair/p2-chatgpt-clean-review-20261013'
     runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: UK isolated private-input preparation regressions
         shell: bash
