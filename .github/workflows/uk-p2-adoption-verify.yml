@@ -21,7 +21,12 @@ jobs:
           import os,urllib.request,zipfile,io,tarfile,hashlib
           url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11831235396/zip'
           req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
-          with urllib.request.urlopen(req,timeout=60) as f:raw=f.read(2097153)
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+           def redirect_request(self,req,fp,code,msg,headers,newurl):
+            redirected=super().redirect_request(req,fp,code,msg,headers,newurl)
+            if redirected is not None:redirected.remove_header('Authorization')
+            return redirected
+          with urllib.request.build_opener(SafeRedirect()).open(req,timeout=60) as f:raw=f.read(2097153)
           assert len(raw)<=2097152 and hashlib.sha256(raw).hexdigest()=='3104d90d8ec6ad35880a52b5383bd094fe5a85f34c5aa2137a67a50c15a40a1f'
           z=zipfile.ZipFile(io.BytesIO(raw));names=[n for n in z.namelist() if n.endswith('p2-candidate.tar.gz')];assert len(names)==1
           archive=z.read(names[0]);assert hashlib.sha256(archive).hexdigest()=='12484d2a903d1cbc382b6587c1b1c1dbc39212fcba4dc7370a0b6eb6f6b81645'
