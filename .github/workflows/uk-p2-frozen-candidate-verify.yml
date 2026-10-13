@@ -9,11 +9,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11780786411"
-  P2_TAR_SHA256: "5b0e4fdbe8c299a94b5818051b959ae6b0d30f8f925f3bab7e936472bf56fb5e"
-  P2_SOURCE_COMMIT: "f168e1c6695fe9e3a092ecf095995f0ba445a074"
-  P2_SOURCE_TREE: "b74494da262c6470bec9cbfab70097b6a8d8d462"
-  P2_MANIFEST_SHA256: "ba4738d84486066220bf8dcad56911c155ba6844eaa4ba65c3c7e35f67f9c2f3"
+  P2_ARTIFACT_ID: "11780439406"
+  P2_TAR_SHA256: "8e300d826dc5eb1b50b071bb55a5da95f721a890abff8d9552c3c7fd154f2c0a"
+  P2_SOURCE_COMMIT: "1fc2df4e105b470b0d3c618b10470480b659445b"
+  P2_SOURCE_TREE: "a4f65a5618f0963446d8bb3aa1380cf23e0226ef"
+  P2_MANIFEST_SHA256: "e9afeba84e08c1c6cbb816d4348da29ae7e7c1f948632a0f8ec76eaf15748625"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -79,10 +79,19 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   'f168e1c6695fe9e3a092ecf095995f0ba445a074',
-                   'ba4738d84486066220bf8dcad56911c155ba6844eaa4ba65c3c7e35f67f9c2f3',
-                   'b74494da262c6470bec9cbfab70097b6a8d8d462')
+                   '1fc2df4e105b470b0d3c618b10470480b659445b',
+                   'e9afeba84e08c1c6cbb816d4348da29ae7e7c1f948632a0f8ec76eaf15748625',
+                   'a4f65a5618f0963446d8bb3aa1380cf23e0226ef')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
+          transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
+          assert transport['openclaw_bin']=='/home/xuanjun_dev/.openclaw/bin/openclaw'
+          assert transport['openclaw_owner_uid']==1002
+          actual=hashlib.sha256(open(transport['openclaw_bin'],'rb').read()).hexdigest()
+          assert actual==transport['openclaw_sha256']=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
+          service=open(root+'/deploy/xuanjun-development-dispatcher.service','r').read()
+          controller_sha=hashlib.sha256(open(root+'/stage1/native_gateway_controller.py','rb').read()).hexdigest()
+          assert service.count('--native-controller ')==2
+          assert service.count('--native-controller-sha256 '+controller_sha)==2
           def show(k):
               return subprocess.check_output(['/usr/bin/systemctl','show','xuanjun-uk-openclaw.service','--property='+k,'--value'],universal_newlines=True).strip()
           assert show('User')=='xuanjun_dev' and show('ActiveState')=='active' and show('SubState')=='running'
