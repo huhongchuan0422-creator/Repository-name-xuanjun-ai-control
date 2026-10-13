@@ -9,11 +9,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11782234766"
-  P2_TAR_SHA256: "7c32c1f809f32b41e203002ff6f2be3cf328fb3e1cbae3a60b2be033843f570c"
-  P2_SOURCE_COMMIT: "795ade99c771f58ba96fe4c5a623c956764bb2fe"
-  P2_SOURCE_TREE: "d6cbe59556208e2aaa4e1c52ea4e02761aa982f2"
-  P2_MANIFEST_SHA256: "97cffeac6d949b706f3d59bf76f4d1d89b27125a14b6add01eb1077428f4024e"
+  P2_ARTIFACT_ID: "11783079460"
+  P2_TAR_SHA256: "b22c1d6e1e3a62db51151ec684dc3c1f87a92ca00a373cd2bf8210d0b481b0b8"
+  P2_SOURCE_COMMIT: "0d11e5074e52127fe0942fcfc604875d38d42058"
+  P2_SOURCE_TREE: "07beeafea4d388f09e5acb66c100022f25ae4060"
+  P2_MANIFEST_SHA256: "2e59dbf45db83584e674b089357ee9dd137bce9823977e3f3027cf1466acc310"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -62,6 +62,16 @@ jobs:
           open(os.environ['P2_TAR_PATH'],'wb').write(tarbytes)
           print('P2_UK_ARTIFACT_EXTRACT=PASS')
           PY
+      - name: Python 3.6.8 WAL pagination and relay boundedness regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$P2_WORK_DIR/xuanjun-p2-package"
+          test "$(/usr/bin/python3 -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = 3.6.8
+          P2_SOURCE_ROOT="$ROOT" /usr/bin/python3 -B evidence/p2-native-wiring-work-20261012/test_service_context_task23.py
+          echo P2_UK_PYTHON368_WAL_PAGINATION_RELAY_REGRESSION=PASS
+          echo P2_SOCKET_ACTIVATION_INSTALL_ACCEPTANCE=NOT_RUN
+
       - name: Verify exact package through real installer on UK
         shell: bash
         run: |
@@ -79,12 +89,12 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   '795ade99c771f58ba96fe4c5a623c956764bb2fe',
-                   '97cffeac6d949b706f3d59bf76f4d1d89b27125a14b6add01eb1077428f4024e',
-                   'd6cbe59556208e2aaa4e1c52ea4e02761aa982f2')
+                   '0d11e5074e52127fe0942fcfc604875d38d42058',
+                   '2e59dbf45db83584e674b089357ee9dd137bce9823977e3f3027cf1466acc310',
+                   '07beeafea4d388f09e5acb66c100022f25ae4060')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
-          assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev'}
+          assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
           relay=json.load(open(root+'/deploy/p2-gateway-relay.json.template','r'))
           assert relay['openclaw_bin']=='/home/xuanjun_dev/.openclaw/bin/openclaw'
           assert relay['openclaw_owner_uid']==1002

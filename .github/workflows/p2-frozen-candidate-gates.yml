@@ -9,11 +9,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11782234766"
-  P2_TAR_SHA256: "7c32c1f809f32b41e203002ff6f2be3cf328fb3e1cbae3a60b2be033843f570c"
-  P2_SOURCE_COMMIT: "795ade99c771f58ba96fe4c5a623c956764bb2fe"
-  P2_SOURCE_TREE: "d6cbe59556208e2aaa4e1c52ea4e02761aa982f2"
-  P2_MANIFEST_SHA256: "97cffeac6d949b706f3d59bf76f4d1d89b27125a14b6add01eb1077428f4024e"
+  P2_ARTIFACT_ID: "11783079460"
+  P2_TAR_SHA256: "b22c1d6e1e3a62db51151ec684dc3c1f87a92ca00a373cd2bf8210d0b481b0b8"
+  P2_SOURCE_COMMIT: "0d11e5074e52127fe0942fcfc604875d38d42058"
+  P2_SOURCE_TREE: "07beeafea4d388f09e5acb66c100022f25ae4060"
+  P2_MANIFEST_SHA256: "2e59dbf45db83584e674b089357ee9dd137bce9823977e3f3027cf1466acc310"
 jobs:
   qa:
     runs-on: ubuntu-24.04
@@ -96,7 +96,7 @@ jobs:
           assert 'ProtectHome=yes' in dispatcher
           assert '/home/xuanjun_dev' not in dispatcher
           assert 'Requires=xuanjun-p2-gateway-relay.socket' in dispatcher
-          assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev'}
+          assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
           assert 'User=xuanjun_dev' in relay and 'ProtectHome=read-only' in relay
           ledger=(root/'stage1/execution_ledger.py').read_text()
           wake=(root/'stage1/mechanical_wake_service.py').read_text()
