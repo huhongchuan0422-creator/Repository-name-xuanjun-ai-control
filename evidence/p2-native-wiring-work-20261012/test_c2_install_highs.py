@@ -317,4 +317,18 @@ class DashboardFoundationWiringTests(unittest.TestCase):
             self.assertEqual(db.total_changes,before)
             db.close()
 
+    def test_dependency_rows_do_not_promote_done_to_accepted(self):
+        import sqlite3,owner_dashboard
+        with tempfile.TemporaryDirectory() as root:
+            path=os.path.join(root,'ledger.sqlite');db=sqlite3.connect(path)
+            db.execute('CREATE TABLE tasks(id TEXT PRIMARY KEY,state TEXT,fence INTEGER,updated REAL,depends TEXT)')
+            db.executemany('INSERT INTO tasks VALUES(?,?,?,?,?)',[
+                ('root','READY',0,2,'["dep"]'),('dep','DONE',1,1,'[]')])
+            db.commit()
+            result=owner_dashboard.snapshot(path,now=3)['foundation_views']['dependencies']
+            self.assertEqual(result['root']['status'],'HOLD')
+            self.assertEqual(result['dep']['status'],'DEPENDENCIES_EVIDENCED')
+            self.assertEqual(db.execute("SELECT state FROM tasks WHERE id='dep'").fetchone()[0],'DONE')
+            db.close()
+
 if __name__=='__main__':unittest.main(verbosity=2)
