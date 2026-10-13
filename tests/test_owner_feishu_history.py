@@ -47,7 +47,7 @@ class HistoryTests(unittest.TestCase):
             self.assertEqual(json.loads(content), json.loads(self.content))
             self.assertNotEqual(content, self.content)
             item = copy.deepcopy(self.item); item['body']['content'] = content
-            self.responses = [self.page([item])]
+            self.responses = [self.page([item]), {'code': 0, 'data': {'items': [self.item]}}]
             self.assertEqual(self.lookup(), 'UNKNOWN')
 
     def test_equivalent_json_readback_different_bytes_unknown(self):
