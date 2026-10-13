@@ -65,6 +65,15 @@ def maybe_identity(path):
     except (OSError,ValueError) as error:
         return {'path':path,'status':'UNAVAILABLE','reason':type(error).__name__}
 
+def path_fact(path):
+    try:
+        info=os.stat(path)
+        return {'path':path,'status':'PRESENT','kind':'dir' if stat.S_ISDIR(info.st_mode) else 'file',
+                'owner_uid':info.st_uid,'owner_gid':info.st_gid,'mode':stat.S_IMODE(info.st_mode)}
+    except OSError as error:
+        return {'path':path,'status':'UNAVAILABLE','reason':type(error).__name__}
+
+
 def unit_fact(unit):
     props=('Id','LoadState','ActiveState','SubState','MainPID','ControlGroup',
            'UnitFileState','FragmentPath','EnvironmentFiles','ProtectHome',
@@ -171,6 +180,13 @@ def main():
       'docker_socket':socket_identity('/var/run/docker.sock'),
       'python':file_identity('/usr/libexec/platform-python3.6',64*1024*1024),
       'openclaw':file_identity('/home/xuanjun_dev/.openclaw/bin/openclaw',16*1024*1024),
+      'openclaw_paths':[path_fact(x) for x in (
+          '/home/xuanjun_dev','/home/xuanjun_dev/.openclaw',
+          '/home/xuanjun_dev/.openclaw/bin',
+          '/home/xuanjun_dev/.openclaw/tools',
+          '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0',
+          '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node',
+          '/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw')],
     }
     print(json.dumps(result,sort_keys=True,separators=(',',':')))
 
