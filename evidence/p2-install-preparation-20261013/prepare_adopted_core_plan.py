@@ -26,7 +26,7 @@ for rel,sha in json.loads(mraw)['files'].items():
  with open(ROOT+'/'+rel,'rb') as f:
   s=os.fstat(f.fileno());assert s.st_uid==0 and not s.st_mode&0o022
   assert h(f.read())==sha
-d=B+'/adopted-core-plan-'+RUN;os.mkdir(d,0o700)
+d=B+'/adopted-core-plan-'+RUN;os.mkdir(d,0o700);os.mkdir(d+'/private-bootstrap',0o700)
 oldrelease='integration-'+OLD[:16];release='integration-'+MANIFEST[:16]
 changes=[(OLD,MANIFEST),('62d2e64d34feea1f02bffa7e8b597484bb98307f',SOURCE),('e75e549d87515aee1c022faa04e805f694088d6e',TREE),(oldrelease,release),('/tmp/p2pkg-38420216343-1/xuanjun-p2-package',ROOT)]
 def replace(v):
@@ -54,7 +54,7 @@ for i,row in enumerate(boot['files']):
  data=read(row['source'],row['sha256'])
  if row['target']=='/etc/xuanjun-development/p2-native-binding.json':
   data=replace(data.decode()).encode()
- target=d+'/bootstrap-'+str(i);write(target,data);row['source']=target;row['sha256']=h(data)
+ target=d+'/private-bootstrap/bootstrap-'+str(i);write(target,data);row['source']=target;row['sha256']=h(data)
 boot['artifact_id']=11831931331
 bootpath=d+'/protected-bootstrap-candidate-receipt.json';bootraw=pack(boot);write(bootpath,bootraw)
 p['runtime']['bootstrap']={'path':bootpath,'sha256':h(bootraw)}
