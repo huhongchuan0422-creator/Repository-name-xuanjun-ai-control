@@ -1,5 +1,5 @@
 """Apply the native snapshot ACL fix only to exact frozen source snippets."""
-import pathlib, shutil, sys
+import hashlib, json, pathlib, shutil, sys
 
 def replace_once(path, old, new):
     text=path.read_text()
@@ -8,6 +8,13 @@ def replace_once(path, old, new):
 
 def apply(source):
     here=pathlib.Path(__file__).resolve().parent
+    manifest_path=source/'deploy/integration-manifest.json'
+    manifest=json.loads(manifest_path.read_text())
+    for name in ('stage1/development_pipeline.py','stage1/development_service.py'):
+        if hashlib.sha256((source/name).read_bytes()).hexdigest()!=manifest['files'].get(name):
+            raise ValueError('NATIVE_SNAPSHOT_MANIFEST_INPUT_DRIFT:'+name)
+    if (source/'stage1/native_snapshot_access.py').exists():
+        raise ValueError('NATIVE_SNAPSHOT_MODULE_ALREADY_EXISTS')
     shutil.copy2(str(here/'native_snapshot_access.py'),str(source/'stage1/native_snapshot_access.py'))
     pipeline=source/'stage1/development_pipeline.py'
     replace_once(pipeline,
@@ -68,6 +75,9 @@ def apply(source):
         "        raise ValueError('NATIVE_SNAPSHOT_DISPATCHER_UID_REQUIRED')\n"
         "    backend.snapshot_access=NativeSnapshotAccess(config['workspace_root'],dispatcher_uid,\n"
         "                                                pwd.getpwnam('xuanjun_dev').pw_uid)")
+    for name in ('stage1/development_pipeline.py','stage1/development_service.py','stage1/native_snapshot_access.py'):
+        manifest['files'][name]=hashlib.sha256((source/name).read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest,sort_keys=True,indent=2)+'\n')
     print('NATIVE_SNAPSHOT_ACL_OVERLAY_APPLIED')
 
 if __name__=='__main__':apply(pathlib.Path(sys.argv[1]).resolve())
