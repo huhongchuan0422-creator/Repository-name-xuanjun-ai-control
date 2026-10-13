@@ -1,9 +1,9 @@
 """Render an exact private core install plan; this program never applies it."""
 import os, sys, stat, socket, json, hashlib, uuid, re
 DURABLE='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
-MANIFEST='24dfdc4414d5fcff99ccfb89b694906a9c346fc57fbdb4715e9caea3fc25c240'
-SOURCE='e023d9c1ddf4aa557c7bc95d4165ba23a4adbf40'
-TREE='aa00a9cd4f2b6c8e41defe4d28eba75571e6d85c'
+MANIFEST='dbe785330e881224bd16c3554a45a0a38bd8f88cb777ffa16fa35440a881efaf'
+SOURCE='932a52a5aa35d1528546bb0ae3a4d13413dae8f6'
+TREE='1a1e987c6098333b72e715c588ad3b73a45db1d1'
 BASE='/tmp/p2pkg-38365394514-1'
 BUNDLE='/tmp/p2pkg-38371013936-1/protected-install-preparation-bundle.json'
 SDK='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/'
@@ -37,6 +37,9 @@ def main(package,output):
     assert not os.path.lexists(VAR+'/activation/active.json'),'EXISTING_ACTIVATION_REQUIRES_REPLAN'
     with open(package+'/deploy/integration-manifest.json','rb') as f:assert sha(f.read())==MANIFEST
     prerequisites=protected(BASE+'/protected-prerequisites-subplan.json','9fbe85c665824a2c7b362dfb010fa47d3f144b67cd8dffa5b153efc4f64334a4')
+    assert set(prerequisites['groups'])=={'xuanjun-dispatcher','xuanjun-callback','xj_codex_worker','xuanjun-control-db'}
+    prerequisites['groups']['xuanjun-ledger-client']=1007  # Unreserved; real preflight checks NSS conflicts.
+
     bundle=protected(BUNDLE,'9bc378238ca9906420685c1940dd7c97511b0f022bcbd56c9471ef2cc7e09af7')
     transaction=str(uuid.uuid4());ledger=str(uuid.uuid4());instance=str(uuid.uuid4())
     dirs=[('/etc/xuanjun-development',0,0,0o755),('/etc/xuanjun-owner-callback',0,1006,0o750),
