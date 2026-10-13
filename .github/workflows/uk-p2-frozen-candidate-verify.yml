@@ -9,11 +9,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11781889683"
-  P2_TAR_SHA256: "3998a2f6018fc615f344fb4bb5ea59b27454d939b40c61a12ff6d10b4de6d597"
-  P2_SOURCE_COMMIT: "936db20b180a052b556de9bfb85982e3cde261c7"
-  P2_SOURCE_TREE: "ebcf6f715cbcf729d005d8aff7efbcbd69aed41e"
-  P2_MANIFEST_SHA256: "d1c292ce5eecc9bffdfcee3c9637437c7075d94e4b250eaebcdafaeaac3c10e6"
+  P2_ARTIFACT_ID: "11782234766"
+  P2_TAR_SHA256: "7c32c1f809f32b41e203002ff6f2be3cf328fb3e1cbae3a60b2be033843f570c"
+  P2_SOURCE_COMMIT: "795ade99c771f58ba96fe4c5a623c956764bb2fe"
+  P2_SOURCE_TREE: "d6cbe59556208e2aaa4e1c52ea4e02761aa982f2"
+  P2_MANIFEST_SHA256: "97cffeac6d949b706f3d59bf76f4d1d89b27125a14b6add01eb1077428f4024e"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -72,16 +72,16 @@ jobs:
           # before invoking the root-only release installer verifier.
           sudo -n /usr/bin/chown -R 0:0 "$P2_WORK_DIR"
           sudo -n /usr/bin/python3 -I -B - "$ROOT" <<'PY'
-          import hashlib,importlib.util,json,os,stat,subprocess,sys,grp
+          import hashlib,importlib.util,json,os,pwd,stat,subprocess,sys,grp
           assert sys.version_info[:3]==(3,6,8)
           root=sys.argv[1]
           spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   '936db20b180a052b556de9bfb85982e3cde261c7',
-                   'd1c292ce5eecc9bffdfcee3c9637437c7075d94e4b250eaebcdafaeaac3c10e6',
-                   'ebcf6f715cbcf729d005d8aff7efbcbd69aed41e')
+                   '795ade99c771f58ba96fe4c5a623c956764bb2fe',
+                   '97cffeac6d949b706f3d59bf76f4d1d89b27125a14b6add01eb1077428f4024e',
+                   'd6cbe59556208e2aaa4e1c52ea4e02761aa982f2')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
           assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev'}
@@ -104,6 +104,15 @@ jobs:
           wake=open(root+'/stage1/mechanical_wake_service.py','r').read()
           assert '_pinned_transaction' in ledger and 'record_inventory_notices' in ledger
           assert 'record_inventory_notices()' in wake
+          assert "file:/proc/self/fd/%d?mode=rw" in ledger
+          intake=open(root+'/deploy/xuanjun-github-intake.service','r').read()
+          assert 'mechanical_wake_service.py' in intake
+          try:
+              pwd.getpwnam('xuanjun-dispatcher')
+          except KeyError:
+              print('P2_UK_SERVICE_CONTEXT_LIVE_PREFLIGHT=DEFERRED_UNTIL_INSTALL_IDENTITY_CREATION')
+          else:
+              print('P2_UK_SERVICE_CONTEXT_IDENTITY_PRESENT=YES_RUNTIME_PREFLIGHT_STILL_REQUIRES_INSTALLED_RELAY')
           def show(k):
               return subprocess.check_output(['/usr/bin/systemctl','show','xuanjun-uk-openclaw.service','--property='+k,'--value'],universal_newlines=True).strip()
           assert show('User')=='xuanjun_dev' and show('ActiveState')=='active' and show('SubState')=='running'

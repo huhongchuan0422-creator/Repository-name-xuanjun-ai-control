@@ -9,11 +9,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11781889683"
-  P2_TAR_SHA256: "3998a2f6018fc615f344fb4bb5ea59b27454d939b40c61a12ff6d10b4de6d597"
-  P2_SOURCE_COMMIT: "936db20b180a052b556de9bfb85982e3cde261c7"
-  P2_SOURCE_TREE: "ebcf6f715cbcf729d005d8aff7efbcbd69aed41e"
-  P2_MANIFEST_SHA256: "d1c292ce5eecc9bffdfcee3c9637437c7075d94e4b250eaebcdafaeaac3c10e6"
+  P2_ARTIFACT_ID: "11782234766"
+  P2_TAR_SHA256: "7c32c1f809f32b41e203002ff6f2be3cf328fb3e1cbae3a60b2be033843f570c"
+  P2_SOURCE_COMMIT: "795ade99c771f58ba96fe4c5a623c956764bb2fe"
+  P2_SOURCE_TREE: "d6cbe59556208e2aaa4e1c52ea4e02761aa982f2"
+  P2_MANIFEST_SHA256: "97cffeac6d949b706f3d59bf76f4d1d89b27125a14b6add01eb1077428f4024e"
 jobs:
   qa:
     runs-on: ubuntu-24.04
@@ -102,6 +102,9 @@ jobs:
           wake=(root/'stage1/mechanical_wake_service.py').read_text()
           assert '_pinned_transaction' in ledger and 'record_inventory_notices' in ledger
           assert 'record_inventory_notices()' in wake
+          assert "file:/proc/self/fd/%d?mode=rw" in ledger
+          intake=(root/'deploy/xuanjun-github-intake.service').read_text()
+          assert 'mechanical_wake_service.py' in intake
           print('P2_RELAY_TASK23_PACKAGE_SHAPE=PASS')
           PY
           echo P2_AUTHORITATIVE_SECURITY_MECHANICAL=PASS
