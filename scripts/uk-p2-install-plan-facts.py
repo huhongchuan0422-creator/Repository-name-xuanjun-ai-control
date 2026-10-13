@@ -159,6 +159,34 @@ def gateway_auth_env_fact():
             'password_present':'OPENCLAW_GATEWAY_PASSWORD' in names,
             'url_present':'OPENCLAW_GATEWAY_URL' in names}
 
+def proposed_identity_ids():
+    free=[]
+    for value in range(21000,22000):
+        try:pwd.getpwuid(value);uid_free=False
+        except KeyError:uid_free=True
+        try:grp.getgrgid(value);gid_free=False
+        except KeyError:gid_free=True
+        if uid_free and gid_free:
+            free.append(value)
+        if len(free)==4:break
+    if len(free)!=4:raise ValueError('NO_REVIEWABLE_ID_RANGE')
+    return {'xuanjun-dispatcher':free[0],'xuanjun-callback':free[1],
+            'xj_codex_worker':free[2],'xuanjun-control-db':free[3]}
+
+def find_named_files(root,name,limit=4096):
+    found=[];scanned=0
+    for base,dirs,files in os.walk(root,followlinks=False):
+        dirs[:]=sorted(d for d in dirs if not os.path.islink(os.path.join(base,d)))
+        for item in sorted(files):
+            scanned+=1
+            if scanned>limit:raise ValueError('BINARY_SEARCH_LIMIT')
+            if item!=name:continue
+            path=os.path.join(base,item)
+            try:found.append(file_identity(path))
+            except (OSError,ValueError):continue
+            if len(found)>=8:return found
+    return found
+
 def activation_fact():
     if not os.path.exists(ACTIVATION):
         return {'status':'ABSENT','path':ACTIVATION}
@@ -191,6 +219,12 @@ def main():
       'python':file_identity('/usr/libexec/platform-python3.6',64*1024*1024),
       'openclaw':file_identity('/home/xuanjun_dev/.openclaw/bin/openclaw',16*1024*1024),
       'gateway_auth_env':gateway_auth_env_fact(),
+      'proposed_identity_ids':proposed_identity_ids(),
+      'gh_binary':maybe_identity('/usr/bin/gh'),
+      'codex_binary_candidates':find_named_files('/home/xuanjun_dev/.openclaw','codex'),
+      'plan_parents':[path_fact(x) for x in (
+          '/etc','/opt','/var/lib','/var/lib/xuanjun-development',
+          '/opt/xuanjun-runtime','/home/xuanjun_dev/uk-stage1-minimal')],
       'openclaw_paths':[path_fact(x) for x in (
           '/home/xuanjun_dev','/home/xuanjun_dev/.openclaw',
           '/home/xuanjun_dev/.openclaw/bin',
