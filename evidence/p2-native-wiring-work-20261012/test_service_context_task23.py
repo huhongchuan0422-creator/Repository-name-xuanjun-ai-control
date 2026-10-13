@@ -38,8 +38,20 @@ class FakeSocket(object):
         self.sent+=data
 
 class Controller(object):
+    def __init__(self): self.calls=0
     def preflight(self,c):
+        self.calls+=1
         return {'ready':True}
+
+class TimeoutSocket(FakeSocket):
+    def recv(self,n):
+        raise socket.timeout('fixture timeout')
+
+class OversizeSocket(FakeSocket):
+    def recv(self,n):
+        if self.done:return b''
+        self.done=True
+        return b'x'*(relay.MAXIMUM+1)
 
 class Activation(object):
     def __init__(self,path):
@@ -69,6 +81,23 @@ class Tests(unittest.TestCase):
         value=json.loads(fake.sent.decode())
         self.assertTrue(value['ok'])
         self.assertTrue(value['result']['ready'])
+
+    def test_relay_partial_timeout_and_oversize_are_bounded_then_valid_survives(self):
+        controller=Controller()
+        timeout=TimeoutSocket(31337)
+        result=relay.serve_connection(timeout,controller,31337)
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['error'],'TimeoutError')
+        self.assertEqual(controller.calls,0)
+        oversize=OversizeSocket(31337)
+        result=relay.serve_connection(oversize,controller,31337)
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['error'],'ValueError')
+        self.assertEqual(controller.calls,0)
+        valid=FakeSocket(31337)
+        result=relay.serve_connection(valid,controller,31337)
+        self.assertTrue(result['ok'])
+        self.assertEqual(controller.calls,1)
 
     def test_dispatcher_keeps_protect_home_and_uses_relay(self):
         service=(ROOT/'deploy/xuanjun-development-dispatcher.service').read_text()
