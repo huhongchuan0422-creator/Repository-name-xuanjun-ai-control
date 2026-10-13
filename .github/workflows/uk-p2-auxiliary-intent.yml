@@ -1,0 +1,26 @@
+name: P2 UK protected auxiliary intent preparation
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/uk-p2-auxiliary-intent.yml
+      - evidence/p2-install-preparation-20261013/prepare_private_auxiliary_plan.py
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-protected-auxiliary-intent
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Seal intent and recheck facts without applying runtime targets
+        env:
+          P2_AUX_RUN: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_private_auxiliary_plan.py "$P2_AUX_RUN"
