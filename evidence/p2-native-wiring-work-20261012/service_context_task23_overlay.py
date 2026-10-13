@@ -354,35 +354,33 @@ Requires=xuanjun-p2-gateway-relay.socket
     def _pinned_transaction(self):
         self._assert_activation()
         fd=os.open(self.db_path,os.O_RDWR|getattr(os,'O_NOFOLLOW',0))
-        identity=self._db_identity(fd)
-        self._assert_db_identity(fd,identity)
+        conn=None
         try:
-            # The SQLite connection is opened through the already pinned fd.
-            # If pathname replacement makes that fd no longer reopenable for
-            # SQLite/WAL, classify the observed identity drift before returning.
-            uri='file:/proc/self/fd/%d?mode=rw' % fd
-            conn=sqlite3.connect(uri,uri=True,timeout=10,isolation_level=None)
-        except sqlite3.OperationalError:
+            identity=self._db_identity(fd)
+            self._assert_db_identity(fd,identity)
             try:
+                uri='file:/proc/self/fd/%d?mode=rw' % fd
+                conn=sqlite3.connect(uri,uri=True,timeout=10,isolation_level=None)
+            except sqlite3.OperationalError:
                 self._assert_db_identity(fd,identity)
-            except LeaseLost:
-                os.close(fd)
+                raise SchemaMismatch('existing authoritative database unavailable')
+            conn.row_factory=sqlite3.Row
+            conn.execute('PRAGMA foreign_keys=ON')
+            try:
+                conn.execute('BEGIN IMMEDIATE')
+                self._assert_activation();self._assert_db_identity(fd,identity)
+                yield conn,identity
+                self._assert_activation();self._assert_db_identity(fd,identity)
+                conn.commit()
+            except BaseException:
+                conn.rollback()
                 raise
-            os.close(fd)
-            raise SchemaMismatch('existing authoritative database unavailable')
-        conn.row_factory=sqlite3.Row
-        conn.execute('PRAGMA foreign_keys=ON')
-        try:
-            conn.execute('BEGIN IMMEDIATE')
-            self._assert_activation();self._assert_db_identity(fd,identity)
-            yield conn,identity
-            self._assert_activation();self._assert_db_identity(fd,identity)
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
         finally:
-            conn.close();os.close(fd)
+            try:
+                if conn is not None:
+                    conn.close()
+            finally:
+                os.close(fd)
 
     @contextlib.contextmanager
     def _transaction(self):
@@ -395,45 +393,84 @@ Requires=xuanjun-p2-gateway-relay.socket
         "                                   claim_ttl=claim_ttl,\n"
         "                                   activation_store=self.activation_store)\n"
     )
-    inventory_method = (
-        "\n"
-        "    def record_inventory_notices(self,limit=100):\n"
-        "        if self.activation_store is None or self.activation_binding is None:\n"
-        "            raise LeaseLost('inventory notice requires active canonical generation')\n"
-        "        if type(limit) is not int or not 1<=limit<=100:\n"
-        "            raise ValueError('inventory notice limit')\n"
-        "        from execution_supervision import ExecutionSupervisor\n"
-        "        from task_supervisor_inventory_adapter import canonical_inventory_page\n"
-        "        with self._pinned_transaction() as value:\n"
-        "            conn,identity=value\n"
-        "            required=('supervised_runs','supervision_events','supervision_delivery')\n"
-        "            if any(not conn.execute(\"SELECT 1 FROM sqlite_master WHERE type='table' AND name=?\",(name,)).fetchone() for name in required):\n"
-        "                raise SchemaMismatch('existing supervision schema required')\n"
-        "            supervisor=ExecutionSupervisor.__new__(ExecutionSupervisor)\n"
-        "            supervisor.db_path=self.db_path;supervisor.clock=self.clock\n"
-        "            supervisor.activation_store=self.activation_store\n"
-        "            supervisor.activation_binding=dict(self.activation_binding)\n"
-        "            supervisor.max_delivery_attempts=3;supervisor.claim_ttl=30\n"
-        "            receipts=[];observed=0;pages=0;after_id=None\n"
-        "            while True:\n"
-        "                pages+=1\n"
-        "                if pages>64: raise ValueError('inventory pagination bound exceeded')\n"
-        "                page=canonical_inventory_page(conn,self._now(),after_id=after_id,limit=limit,\n"
-        "                    activation_binding=self.activation_binding,ledger_identity=identity)\n"
-        "                observed+=len(page['tasks'])\n"
-        "                for intent in page['tasks']:\n"
-        "                    if intent['decision']=='HOLD_AND_NOTIFY_REQUIRES_ADMISSION':\n"
-        "                        receipts.append(supervisor.record_inventory_notice(\n"
-        "                            conn,intent,self.activation_binding,identity))\n"
-        "                if page['complete']: break\n"
-        "                cursor=page['next_cursor']\n"
-        "                if not isinstance(cursor,str) or not cursor or (after_id is not None and cursor<=after_id):\n"
-        "                    raise ValueError('inventory cursor did not advance')\n"
-        "                after_id=cursor\n"
-        "            return {'state':'INVENTORY_NOTICE_PASS','ledger_identity':identity,\n"
-        "                    'observed':observed,'pages':pages,'notices':receipts,\n"
-        "                    'dispatch_performed':False}\n"
-    )
+    inventory_method = """
+    def record_inventory_notices(self,limit=100):
+        if self.activation_store is None or self.activation_binding is None:
+            raise LeaseLost('inventory notice requires active canonical generation')
+        if type(limit) is not int or not 1<=limit<=100:
+            raise ValueError('inventory notice limit')
+        from execution_supervision import ExecutionSupervisor
+        from task_supervisor_inventory_adapter import canonical_inventory_page
+        with self._pinned_transaction() as value:
+            conn,identity=value
+            required=('supervised_runs','supervision_events','supervision_delivery')
+            if any(not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(name,)).fetchone() for name in required):
+                raise SchemaMismatch('existing supervision schema required')
+            # Reuse canonical events as a durable, activation-bound scan checkpoint.
+            # No task/checkpoint/lease is fabricated or overwritten.
+            event='INVENTORY_SCAN_CHECKPOINT_V1'
+            previous=conn.execute('SELECT details FROM events WHERE event=? ORDER BY id DESC LIMIT 1',
+                                  (event,)).fetchone()
+            after_id=None;sweep_end=None
+            if previous is not None:
+                raw=previous['details']
+                if not isinstance(raw,str) or len(raw)>65536:
+                    raise SchemaMismatch('inventory scan checkpoint invalid')
+                try:
+                    checkpoint=json.loads(raw)
+                except (ValueError,TypeError):
+                    raise SchemaMismatch('inventory scan checkpoint invalid')
+                if not isinstance(checkpoint,dict) or set(checkpoint)!={'schema','binding','ledger_identity','after_id','sweep_end'} or type(checkpoint['schema']) is not int or checkpoint['schema']!=1:
+                    raise SchemaMismatch('inventory scan checkpoint invalid')
+                if checkpoint['binding']==self.activation_binding and checkpoint['ledger_identity']==identity:
+                    after_id=checkpoint['after_id'];sweep_end=checkpoint['sweep_end']
+                    if (after_id is None)!=(sweep_end is None) or (after_id is not None and
+                            (not isinstance(after_id,str) or not after_id or len(after_id)>8192
+                             or not isinstance(sweep_end,str) or not sweep_end or len(sweep_end)>8192
+                             or after_id>=sweep_end)):
+                        raise SchemaMismatch('inventory scan cursor invalid')
+            # A finite high-water mark makes each sweep finish despite new tasks.
+            # IDs inserted behind the cursor are covered by the next sweep.
+            if sweep_end is None:
+                sweep_end=conn.execute('SELECT MAX(id) FROM tasks').fetchone()[0]
+                if sweep_end is not None and (not isinstance(sweep_end,str) or not sweep_end or len(sweep_end)>8192):
+                    raise SchemaMismatch('inventory scan high-water mark invalid')
+            supervisor=ExecutionSupervisor.__new__(ExecutionSupervisor)
+            supervisor.db_path=self.db_path;supervisor.clock=self.clock
+            supervisor.activation_store=self.activation_store
+            supervisor.activation_binding=dict(self.activation_binding)
+            supervisor.max_delivery_attempts=3;supervisor.claim_ttl=30
+            receipts=[];observed=0;pages=0;complete=sweep_end is None
+            while not complete and pages<64:
+                pages+=1
+                page=canonical_inventory_page(conn,self._now(),after_id=after_id,limit=limit,
+                    activation_binding=self.activation_binding,ledger_identity=identity)
+                last=after_id
+                for intent in page['tasks']:
+                    task_id=intent['id']
+                    if task_id>sweep_end:
+                        complete=True;break
+                    observed+=1;last=task_id
+                    if intent['decision']=='HOLD_AND_NOTIFY_REQUIRES_ADMISSION':
+                        receipts.append(supervisor.record_inventory_notice(
+                            conn,intent,self.activation_binding,identity))
+                complete=complete or page['complete'] or (last is not None and last>=sweep_end)
+                if complete:
+                    break
+                cursor=page['next_cursor']
+                if not isinstance(cursor,str) or not cursor or len(cursor)>8192 or (after_id is not None and cursor<=after_id) or cursor!=last:
+                    raise ValueError('inventory cursor did not advance')
+                after_id=cursor
+            checkpoint={'schema':1,'binding':dict(self.activation_binding),
+                        'ledger_identity':identity,'after_id':None if complete else after_id,
+                        'sweep_end':None if complete else sweep_end}
+            self._event(conn,None,event,self._now(),checkpoint)
+            return {'state':'INVENTORY_NOTICE_PASS' if complete else 'INVENTORY_NOTICE_BOUNDED_PROGRESS',
+                    'ledger_identity':identity,'observed':observed,'pages':pages,
+                    'notices':receipts,'sweep_complete':complete,'scan_pending':not complete,
+                    'dispatch_performed':False}
+
+"""
     replace_once(ledger,supervisor_tail,supervisor_tail+inventory_method)
     # execution_ledger needs stat for inode checks.
     replace_once(ledger,"import sqlite3\nimport time","import sqlite3\nimport stat\nimport time")
