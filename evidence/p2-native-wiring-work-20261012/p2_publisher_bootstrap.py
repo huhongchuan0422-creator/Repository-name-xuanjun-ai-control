@@ -54,7 +54,10 @@ class PublisherBootstrap:
   for parent,dirs,files in os.walk(root,followlinks=False):
    s=os.lstat(parent)
    if not stat.S_ISDIR(s.st_mode) or (s.st_uid,s.st_gid,stat.S_IMODE(s.st_mode))!=(1003,1003,0o700) or os.path.realpath(parent)!=parent:raise ValueError('PUBLISHER_DIRECTORY_IDENTITY')
-   entries.append([os.path.relpath(parent,root),'DIR'])
+   entries.append([os.path.relpath(parent,root),'DIR',s.st_dev,s.st_ino])
+   for name in dirs:
+    p=parent+'/'+name;d=os.lstat(p)
+    if not stat.S_ISDIR(d.st_mode) or os.path.realpath(p)!=p:raise ValueError('PUBLISHER_DIRECTORY_SYMLINK')
    for name in sorted(files):
     path=parent+'/'+name;fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
     with os.fdopen(fd,'rb') as f:
@@ -67,7 +70,7 @@ class PublisherBootstrap:
       h.update(chunk)
      end=os.fstat(f.fileno())
      if (s.st_size,s.st_mtime_ns,s.st_ctime_ns)!=(end.st_size,end.st_mtime_ns,end.st_ctime_ns):raise ValueError('PUBLISHER_FILE_CHANGED')
-    entries.append([os.path.relpath(path,root),h.hexdigest()])
+    entries.append([os.path.relpath(path,root),h.hexdigest(),s.st_dev,s.st_ino,s.st_mtime_ns,s.st_ctime_ns])
    if len(entries)>10000:raise ValueError('PUBLISHER_ENTRY_LIMIT')
   return hash_bytes(json.dumps(sorted(entries),separators=(',',':')).encode())
  def apply(self,reference):

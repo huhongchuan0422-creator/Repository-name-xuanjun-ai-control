@@ -42,6 +42,13 @@ class Publisher(unittest.TestCase):
  def test_extra_hardlink_rejected(self):
   self.bp.apply({});os.link(self.targets[1]+'/hosts.yml',str(self.root/'extra'))
   with self.assertRaises(ValueError):self.bp.rollback()
+ def test_directory_symlink_rejected(self):
+  self.bp.apply({});os.symlink('/tmp',self.targets[0]+'/untracked-directory')
+  with self.assertRaisesRegex(ValueError,'PUBLISHER_DIRECTORY_SYMLINK'):self.bp.rollback()
+  self.assertTrue(all(os.path.isdir(p) for p in self.targets))
+ def test_same_bytes_replacement_rejected(self):
+  self.bp.apply({});p=pathlib.Path(self.targets[1]+'/hosts.yml');raw=p.read_bytes();p.unlink();p.write_bytes(raw);os.chown(str(p),1003,1003);p.chmod(0o600)
+  with self.assertRaisesRegex(ValueError,'HOLD_PUBLISHER_DIRECTORY_CHANGED'):self.bp.rollback()
  def test_missing_reference(self):
   with self.assertRaisesRegex(ValueError,'PUBLISHER_EXACT_REFERENCE'):self.real_prepare(None)
  def test_rename_never_overwrites(self):
