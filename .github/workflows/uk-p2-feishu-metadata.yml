@@ -1,0 +1,22 @@
+name: P2 UK existing Feishu metadata
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths: [scripts/uk-p2-feishu-metadata.py, .github/workflows/uk-p2-feishu-metadata.yml]
+permissions:
+  contents: read
+jobs:
+  metadata:
+    if: github.event_name == 'push' && github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.ref == 'refs/heads/repair/p2-chatgpt-clean-review-20261013'
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Existing channel metadata and CLI option inventory only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-p2-feishu-metadata.py
