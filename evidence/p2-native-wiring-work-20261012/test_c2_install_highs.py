@@ -129,7 +129,13 @@ class GatewayLifecycleTests(unittest.TestCase):
     def test_active_gateway_precedes_relay_and_dispatcher(self):
         with tempfile.TemporaryDirectory() as d:
             runtime=ProbeRuntime(d)
-            result=runtime.activate({'provisioning':[]},{'state':'ACTIVE'})
+            if (SOURCE/'owner_feishu_https.py').is_file():
+                with patch('owner_feishu_https.installed_binding',
+                           return_value={'package_sha256':'a'*64}):
+                    result=runtime.activate({'provisioning':[]},
+                                            {'state':'ACTIVE','release_sha256':'a'*64})
+            else:
+                result=runtime.activate({'provisioning':[]},{'state':'ACTIVE'})
             self.assertEqual(result,{'services_active':True})
             self.assertEqual(runtime.effects[:2],[('enable-boot',),('start',)])
             starts=[item[1][-1] for item in runtime.effects if item[0]=='command' and item[1][1]=='start']
