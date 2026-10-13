@@ -1,9 +1,9 @@
 """Render an exact private core install plan; this program never applies it."""
 import os, sys, stat, socket, json, hashlib, uuid, re
 DURABLE='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
-MANIFEST='afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601'
-SOURCE='f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06'
-TREE='3fc23b2a01bd8f01ea0edcef9216ded7313409c2'
+MANIFEST='35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8'
+SOURCE='a47612729dc18b03fe1f450a9c30c844d11cf724'
+TREE='3172aef4711d219c0ea848059fa5305c7d43876f'
 BASE='/tmp/p2pkg-38365394514-1'
 BUNDLE='/tmp/p2pkg-38371013936-1/protected-install-preparation-bundle.json'
 SDK='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/'
@@ -94,7 +94,8 @@ def main(package,output):
     bind('deploy/dispatcher.example.json',DEV+'dispatcher.json',0o640,1003)
     bind('deploy/root-broker.example.json',DEV+'root-broker.json',0o600)
     owner=bundle['owner_provisioning']
-    bind(owner['source'],owner['target'],owner['mode'],owner['group_gid'],owner['replacements'])
+    owner_replacements=dict(owner['replacements']);owner_replacements['@@PACKAGE_SHA256@@']=MANIFEST
+    bind(owner['source'],owner['target'],owner['mode'],owner['group_gid'],owner_replacements)
     bind('deploy/xuanjun-uk-openclaw-p2-docker.conf','/etc/systemd/system/xuanjun-uk-openclaw.service.d/20-p2-docker.conf')
     bind('deploy/uk-owner-workbench/nginx.conf.template','/etc/nginx/conf.d/xuanjun-p2-owner.conf')
     sys.path.insert(0,package+'/stage1')
