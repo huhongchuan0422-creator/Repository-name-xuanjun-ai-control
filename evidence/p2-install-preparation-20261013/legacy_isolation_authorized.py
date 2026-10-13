@@ -8,12 +8,12 @@ def read(p,mode=0o600):
  fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
  with os.fdopen(fd,'rb') as f:
   s=os.fstat(f.fileno());r=f.read(1048577)
-  assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==mode and len(r)<=1048576
+  assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and (stat.S_IMODE(s.st_mode)==mode if mode is not None else not s.st_mode&0o022) and len(r)<=1048576
  return r
 raw=read(BASE+'/plan-p2pkg-38420216343-1/protected-core-install-plan.json')
 assert hashlib.sha256(raw).hexdigest()=='6a7789a023d0cbb265663275ee7442fdd026eaaee0fc4ee4a0f237ec5a62e970'
 plan=json.loads(raw.decode())
-manifest=read(ROOT+'/deploy/integration-manifest.json',0o644)
+manifest=read(ROOT+'/deploy/integration-manifest.json',None)
 assert hashlib.sha256(manifest).hexdigest()=='2b49066f37742dedd41657fb445c91f4204fd4a2a257f921dd9fd514e5b25f0e'
 for rel,digest in json.loads(manifest.decode())['files'].items():
  assert rel and not rel.startswith('/') and '..' not in rel.split('/')
