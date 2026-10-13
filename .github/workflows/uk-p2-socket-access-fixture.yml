@@ -1,0 +1,28 @@
+name: P2 UK isolated socket permission proof (zero model)
+on:
+  push:
+    branches:
+      - repair/p2-chatgpt-clean-review-20261013
+    paths:
+      - .github/workflows/uk-p2-socket-access-fixture.yml
+      - evidence/p2-install-preparation-20261013/p2_socket_access_fixture.py
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-isolated-socket-permission
+  cancel-in-progress: false
+jobs:
+  socket-permission:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Prove socket access only in disposable numeric-UID fixture
+        shell: bash
+        env:
+          P2_PROOF_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/p2_socket_access_fixture.py "$P2_PROOF_RUN_ID"
