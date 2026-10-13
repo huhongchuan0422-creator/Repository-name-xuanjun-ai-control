@@ -79,6 +79,37 @@ def collect():
         flags=sorted(set(flag for line in lines for flag in re.findall(r'--[a-z][a-z-]*',line)
           if flag in ('--channel','--target','--account','--message','--json','--dry-run','--help')))
         result['cli_'+'_'.join(args[:-1])]={'exit_code':proc.returncode,'known_flags':flags}
+    proc=subprocess.run([cli,'sessions','--help'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=30,
+      env={'HOME':'/home/xuanjun_dev','PATH':HOME_ROOT+'/tools/node-v24.21.0/bin:/usr/bin:/bin','LANG':'C','NO_COLOR':'1'})
+    help_text=proc.stdout.decode('utf-8','replace')
+    flags=set(re.findall(r'--[a-z][a-z-]*',help_text))
+    result['sessions_cli_flags']=sorted(flags & {'--json','--all-agents','--agent','--store'})
+    if proc.returncode==0 and '--json' in flags:
+        args=[cli,'sessions','--json']
+        if '--all-agents' in flags: args.append('--all-agents')
+        p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=30,
+          env={'HOME':'/home/xuanjun_dev','PATH':HOME_ROOT+'/tools/node-v24.21.0/bin:/usr/bin:/bin','LANG':'C','NO_COLOR':'1'})
+        result['sessions_cli_exit_code']=p.returncode
+        try:
+            text=p.stdout.decode('utf-8'); start=text.find('{')
+            data=json.loads(text[start:])
+            sessions=data.get('sessions',[])
+            result['sessions_cli_total']=len(sessions) if isinstance(sessions,list) else None
+            result['sessions_cli_feishu']=[]
+            for a in sessions if isinstance(sessions,list) else []:
+                if not isinstance(a,dict):continue
+                key=a.get('key','')
+                if isinstance(key,str) and ':feishu:' in key:
+                    result['sessions_cli_feishu'].append({'kind':a.get('kind') if a.get('kind') in ('direct','group') else 'UNKNOWN',
+                      'key_direct_user_shape':bool(re.search(r':feishu:direct:ou_[A-Za-z0-9_-]+
+if __name__=='__main__':
+    if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:
+        raise SystemExit('HOLD_FIXED_UK_IDENTITY')
+    print(json.dumps(collect(),sort_keys=True))
+,key)),
+                      'updated_at':a.get('updatedAt') if type(a.get('updatedAt')) in (int,float) else None})
+        except (ValueError,UnicodeError,TypeError):
+            result['sessions_cli_status']='UNPARSEABLE_NOT_EXPORTED'
     return result
 if __name__=='__main__':
     if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:
