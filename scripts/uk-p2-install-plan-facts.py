@@ -173,7 +173,7 @@ def proposed_identity_ids():
     return {'xuanjun-dispatcher':free[0],'xuanjun-callback':free[1],
             'xj_codex_worker':free[2],'xuanjun-control-db':free[3]}
 
-def find_named_files(root,name,limit=4096):
+def find_named_files(root,name,limit=100000):
     found=[];scanned=0
     for base,dirs,files in os.walk(root,followlinks=False):
         dirs[:]=sorted(d for d in dirs if not os.path.islink(os.path.join(base,d)))
