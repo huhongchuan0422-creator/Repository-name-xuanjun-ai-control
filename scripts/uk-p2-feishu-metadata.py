@@ -105,6 +105,56 @@ def collect():
                       'updated_at':a.get('updatedAt') if type(a.get('updatedAt')) in (int,float) else None})
         except (ValueError,UnicodeError,TypeError):
             result['sessions_cli_status']='UNPARSEABLE_NOT_EXPORTED'
+    import urllib.request, urllib.error
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self,*args,**kwargs): raise ValueError('REDIRECT_REFUSED')
+    def feishu_api(path,token=None,body=None):
+        headers={'Content-Type':'application/json; charset=utf-8'}
+        if token:headers['Authorization']='Bearer '+token
+        req=urllib.request.Request('https://open.feishu.cn/open-apis/'+path,
+            data=json.dumps(body).encode('utf-8') if body is not None else None,headers=headers)
+        try:
+            response=urllib.request.build_opener(NoRedirect()).open(req,timeout=15)
+            raw=response.read(2*1024*1024+1)
+            if len(raw)>2*1024*1024:raise ValueError('HTTP_BOUND')
+            return json.loads(raw.decode('utf-8'))
+        except urllib.error.HTTPError as error:return {'code':error.code}
+    try:
+        config=read_json(HOME_ROOT+'/openclaw.json')['channels']['feishu']
+        if not isinstance(config.get('appId'),str) or not isinstance(config.get('appSecret'),str):
+            raise ValueError('CREDENTIAL_REFERENCE_REQUIRES_NATIVE_RESOLUTION')
+        auth=feishu_api('auth/v3/tenant_access_token/internal',body={'app_id':config['appId'],'app_secret':config['appSecret']})
+        result['feishu_auth_code']=auth.get('code') if type(auth.get('code')) is int else None
+        token=auth.get('tenant_access_token')
+        if auth.get('code')==0 and isinstance(token,str):
+            bot=feishu_api('bot/v3/info',token)
+            result['bot_identity_code']=bot.get('code') if type(bot.get('code')) is int else None
+            result['bot_matches_owner_screenshot']=bot.get('bot',{}).get('app_name')=='玄钧云汇开发总管'
+            routes=[]
+            for session in sessions if isinstance(sessions,list) else []:
+                key=session.get('key','') if isinstance(session,dict) else ''
+                match=re.search(r':feishu:(?:group|direct):(oc_[A-Za-z0-9_-]+)$',key)
+                if match:routes.append(match.group(1))
+            routes=sorted(set(routes))
+            result['native_chat_target_count']=len(routes)
+            result['api_chat_observations']=[]
+            for target in routes[:3]:
+                chat=feishu_api('im/v1/chats/'+target,token)
+                mode=chat.get('data',{}).get('chat_mode')
+                history=feishu_api('im/v1/messages?container_id_type=chat&container_id='+target+'&sort_type=ByCreateTimeDesc&page_size=10',token)
+                items=history.get('data',{}).get('items',[])
+                kinds=sorted(set(a.get('chat_type') for a in items if isinstance(a,dict) and a.get('chat_type') in ('p2p','group')))
+                screenshot_match=False
+                for item in items if isinstance(items,list) else []:
+                    body=item.get('body',{}) if isinstance(item,dict) else {}
+                    content=body.get('content','') if isinstance(body,dict) else ''
+                    if isinstance(content,str) and 'P2 脚本监督' in content:screenshot_match=True
+                result['api_chat_observations'].append({'chat_info_code':chat.get('code') if type(chat.get('code')) is int else None,
+                    'chat_mode':mode if mode in ('p2p','group','topic') else 'UNKNOWN',
+                    'history_code':history.get('code') if type(history.get('code')) is int else None,
+                    'message_chat_types':kinds,'matches_owner_screenshot_notification':screenshot_match})
+    except (OSError,ValueError,TypeError,KeyError,UnicodeError):
+        result['authoritative_chat_check']='HOLD_NO_SECRET_OUTPUT'
     return result
 if __name__=='__main__':
     if socket.gethostname().split('.')[0]!='iZd7oeikknn1z21sq6ji6zZ' or os.geteuid()!=pwd.getpwnam('xuanjun_dev').pw_uid:
