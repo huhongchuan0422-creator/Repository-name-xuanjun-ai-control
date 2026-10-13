@@ -608,3 +608,28 @@ jobs:
           print('ADDITIONAL_INSTALL_INPUTS_PATH='+path)
           print('ADDITIONAL_INSTALL_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
+
+      - name: Stage fixed-host protected input helper without performing Owner authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$GITHUB_WORKSPACE/evidence/p2-install-preparation-20261013/owner_github_protected_input.py" <<'PY'
+          import os,sys,stat,hashlib
+          root='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          s=os.lstat(root);assert os.geteuid()==0 and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700 and os.path.realpath(root)==root
+          source=sys.argv[1];assert os.path.realpath(source)==source
+          fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_size<16384
+              raw=f.read()
+          assert hashlib.sha256(raw).hexdigest()=='6a07af139da0ef2d9f54ef5bd6a2f425036204ab72c1ee25beca1d317674ef76'
+          dest=root+'/owner_github_protected_input.py'
+          if os.path.lexists(dest):
+              with open(dest,'rb') as f:assert f.read()==raw
+          else:
+              fd=os.open(dest,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
+              with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print('OWNER_PROTECTED_INPUT_HELPER_PREPARED='+dest)
+          print('OWNER_ACTION_REQUIRED=EXISTING_GITHUB_REFERENCE_OR_PROTECTED_AUTH_INPUT')
+          print('GITHUB_AUTH_VALUES_READ_OR_WRITTEN_BY_THIS_STEP=NO; P2_INSTALL=NO')
+          PY
