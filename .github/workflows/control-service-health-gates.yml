@@ -1,5 +1,8 @@
 name: Control service health gates
 on:
+  push:
+    branches: [build/dots-service-health-20261013]
+    paths: ['.github/workflows/control-service-health-gates.yml']
   pull_request:
     paths:
       - scripts/control_service_health.py
@@ -10,13 +13,35 @@ permissions:
   contents: read
 jobs:
   offline-fixtures:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Validate mocked read-only service observations
         run: |
           python3 -m py_compile scripts/control_service_health.py
           python3 -B -m unittest discover -s tests -p 'test_control_service_health.py' -v
+
+  uk-isolated:
+    if: github.event_name == 'push' && github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.ref == 'refs/heads/build/dots-service-health-20261013'
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: UK Python 3.6.8 reviewed isolated fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          /usr/bin/python3 -c 'import sys; assert sys.version_info[:3] == (3,6,8)'
+          /usr/bin/python3 -B -m unittest discover -s tests -p 'test_control_service_health.py' -v
+          echo DOTS_UK_ISOLATED_FIXTURES=PASS
+          echo INSTALLED_INTEGRATION=NOT_RUN
+          echo MODEL_CALLS=0
