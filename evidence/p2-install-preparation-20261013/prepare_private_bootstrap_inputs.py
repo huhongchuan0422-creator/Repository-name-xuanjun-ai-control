@@ -84,7 +84,7 @@ def prepare(package, output):
                 'pythonSha256':'ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6',
                 'bridge':bridge,'config':config,'files':{bridge:bridge_sha,config:digest(client)}},
                'gatewayIdentity':{'user':'xuanjun_dev','exe':exe,'sha256':h.hexdigest(),'cgroup':cgroup}}
-    stage('p2-native-binding.json', pack(binding), '/etc/xuanjun-development/p2-native-binding.json', 0, 1002, 0o640)
+    stage('p2-native-binding.json', pack(binding), '/etc/xuanjun-development/p2-native-binding.json', 0, 0, 0o644)
     result = {'schema':1,'state':'PRIVATE_BOOTSTRAP_CANDIDATES_NOT_APPLIED',
               'artifact_id':11796280855,'files':rows,'planned_uid_gid_unreserved':True,
               'new_owner_secrets_require_protected_delivery':True,
