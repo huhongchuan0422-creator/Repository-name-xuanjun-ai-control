@@ -1,6 +1,7 @@
 """Fixed UK Feishu metadata preflight; no credential output or sends."""
 import json, os, pwd, socket, stat, subprocess, re
 HOME_ROOT='/home/xuanjun_dev/.openclaw'
+CANARY_SEND_ENABLED=False  # One authorized canary completed; future scans stay read-only.
 def read_json(path):
     if os.path.realpath(path)!=path: raise ValueError('NONCANONICAL')
     fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
@@ -153,7 +154,7 @@ def collect():
                     'chat_mode':mode if mode in ('p2p','group','topic') else 'UNKNOWN',
                     'history_code':history.get('code') if type(history.get('code')) is int else None,
                     'message_chat_types':kinds,'matches_owner_screenshot_notification':screenshot_match})
-            if (result.get('bot_matches_owner_screenshot') is True and len(routes)==1 and
+            if (CANARY_SEND_ENABLED and result.get('bot_matches_owner_screenshot') is True and len(routes)==1 and
                 len(result['api_chat_observations'])==1 and
                 result['api_chat_observations'][0]['chat_mode']=='p2p' and
                 result['api_chat_observations'][0]['matches_owner_screenshot_notification'] is True):
