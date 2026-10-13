@@ -710,17 +710,28 @@ jobs:
           assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
           root=sys.argv[1];base='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
           marks=('resolveSandboxContext','prepareWorkspaceAuthority','prepareSandboxWorkspace','createPluginRuntime','requestScoped','before_tool_call','RequestScoped')
-          p=subprocess.run(['/usr/bin/rg','-l','--glob','*.mjs','--glob','*.js']+sum((['-e',m] for m in marks),[])+[base],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=20)
-          assert p.returncode in (0,1) and len(p.stdout)<131072
+          candidates=[];total=0
+          for parent,dirs,names in os.walk(base,followlinks=False):
+              dirs[:]=[x for x in dirs if x!='node_modules']
+              for name in names:
+                  if not name.endswith(('.mjs','.js')):continue
+                  path=parent+'/'+name
+                  if os.path.realpath(path)!=path:continue
+                  s=os.lstat(path)
+                  if not stat.S_ISREG(s.st_mode) or s.st_uid!=1002 or s.st_mode&0o022 or s.st_size>8388608:continue
+                  total+=s.st_size;assert total<536870912
+                  with open(path,'rb') as f:data=f.read()
+                  if any(m.encode() in data for m in marks):candidates.append(path)
+              assert len(candidates)<1000
           rows=[]
-          for path in sorted(set(p.stdout.decode().splitlines()))[:150]:
+          for path in sorted(set(candidates))[:150]:
               if os.path.realpath(path)!=path or not path.startswith(base+'/'):continue
               s=os.lstat(path)
               if not stat.S_ISREG(s.st_mode) or s.st_uid!=1002 or s.st_mode&0o022 or s.st_size>8388608:continue
               with open(path,'rb') as f:data=f.read()
               text=data.decode('utf-8')
-              definitions=[m for m in marks if re.search(r'(?:async\\s+)?function\\s+'+m+r'\\b',text)]
-              exports=re.findall(r'(?m)^export[^\\n]{0,600}',text)[-3:]
+              definitions=[m for m in marks if ('function '+m+'(') in text or ('function '+m+' (') in text]
+              exports=[line[:600] for line in text.splitlines() if line.startswith('export')][-3:]
               rows.append({'path':path,'sha256':hashlib.sha256(data).hexdigest(),'uid':s.st_uid,'size':s.st_size,'markers':[m for m in marks if m in text],'function_definitions':definitions,'export_declarations':exports})
           selected=base+'/workspace-sandbox-D4HRmyjR.mjs'
           js="const m=await import("+json.dumps('file://'+selected)+");console.log(JSON.stringify({module_exports:Object.keys(m).sort(),named_resolveSandboxContext:typeof m.resolveSandboxContext==='function'}))"
