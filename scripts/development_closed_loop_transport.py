@@ -44,8 +44,12 @@ class FixedPr17Transport(object):
         if value.get('login')!=OWNER:
             raise ValueError('GITHUB_ACCOUNT_IDENTITY_MISMATCH')
 
-    def reconcile(self,outbox_id):
+    def reconcile(self,row):
+        if not isinstance(row,dict) or not {'outbox_id','payload_json'} <= set(row):
+            raise ValueError('EXACT_OUTBOX_ROW_REQUIRED')
+        outbox_id=row['outbox_id']
         marker=_marker(outbox_id)
+        expected_payload=json.loads(row['payload_json'])
         rows=self._run([self.gh_bin,'api',
             'repos/'+REPOSITORY+'/issues/'+str(PR_NUMBER)+'/comments',
             '--paginate','--slurp'])
@@ -61,13 +65,17 @@ class FixedPr17Transport(object):
                     try:
                         envelope=json.loads(body[len(marker)+1:])
                     except (ValueError,TypeError):
-                        return
+                        raise ValueError('MALFORMED_EXTERNAL_RECEIPT')
                     if (isinstance(envelope,dict)
                             and envelope.get('schema')==1
                             and envelope.get('kind')=='TASK45_OUTBOX_DELIVERY'
                             and envelope.get('outbox_id')==outbox_id
                             and 'payload' in envelope):
+                        if envelope['payload']!=expected_payload:
+                            raise ValueError('CONFLICTING_EXTERNAL_RECEIPT')
                         matches.append(value)
+                    else:
+                        raise ValueError('MALFORMED_EXTERNAL_RECEIPT')
         walk(rows)
         if len(matches)>1:
             raise ValueError('DUPLICATE_EXTERNAL_RECEIPT')
@@ -80,7 +88,7 @@ class FixedPr17Transport(object):
         if not isinstance(row,dict) or not {'outbox_id','payload_json'} <= set(row):
             raise ValueError('EXACT_OUTBOX_ROW_REQUIRED')
         outbox_id=row['outbox_id'];marker=_marker(outbox_id)
-        existing=self.reconcile(outbox_id)
+        existing=self.reconcile(row)
         if existing is not None:return existing
         self._assert_owner()
         payload=json.loads(row['payload_json'])
@@ -108,7 +116,7 @@ def deliver_one(supervisor,transport,now):
     if not rows:return {'state':'NO_DUE_OUTBOX','authority_effect':'NONE'}
     row=rows[0]
     try:
-        receipt=transport.reconcile(row['outbox_id'])
+        receipt=transport.reconcile(row)
         if receipt is None:
             receipt=transport.send(row)
     except Exception as error:
