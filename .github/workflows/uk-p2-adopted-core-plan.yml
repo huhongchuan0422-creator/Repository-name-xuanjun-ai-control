@@ -7,12 +7,45 @@ on:
       - .github/workflows/uk-p2-adopted-core-plan.yml
 permissions:
   contents: read
+  actions: read
 jobs:
   prepare:
     runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
-    timeout-minutes: 4
+    timeout-minutes: 6
+    env:
+      P2_REVIEW_ROOT: /tmp/p2-adopted-plan-${{ github.run_id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_adopted_core_plan.py
+      - name: Download exact94 candidate with ZIP and TAR digest verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os,urllib.request,zipfile,io,tarfile,hashlib
+          url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11831931331/zip'
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+           def redirect_request(self,req,fp,code,msg,headers,newurl):
+            redirected=super().redirect_request(req,fp,code,msg,headers,newurl)
+            if redirected is not None:redirected.remove_header('Authorization')
+            return redirected
+          with urllib.request.build_opener(SafeRedirect()).open(req,timeout=60) as f:raw=f.read(2097153)
+          assert len(raw)<=2097152 and hashlib.sha256(raw).hexdigest()=='278f953b7de659ba3d1088cca3485d5a3846b5cd1ce5b0227e287f8a740d1b38'
+          z=zipfile.ZipFile(io.BytesIO(raw));names=[n for n in z.namelist() if n.endswith('p2-candidate.tar.gz')];assert len(names)==1
+          archive=z.read(names[0]);assert hashlib.sha256(archive).hexdigest()=='9cab867a29c61bc6ad949c26911c0e9ad45690953c99c93a663d8b1c058fcfa4'
+          out=os.environ['P2_REVIEW_ROOT'];os.mkdir(out,0o700)
+          t=tarfile.open(fileobj=io.BytesIO(archive));seen=set();total=0
+          for m in t.getmembers():
+           parts=m.name.split('/');assert parts[0]=='xuanjun-p2-package' and not m.name.startswith('/') and '..' not in parts and m.name not in seen and m.isfile()
+           seen.add(m.name);total+=m.size;assert total<=16777216
+          t.extractall(out);print('EXACT_94_ARTIFACT_HASHES=PASS')
+          
+          PY
+      - name: Prepare exact-source publisher realm without canonical changes
+        run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_adopted_publisher_realm.py "${{ github.run_id }}"
+      - name: Prepare adopted core plan and execute real CLI verify-only
+        run: |
+          sudo -n chown -R 0:0 "$P2_REVIEW_ROOT"
+          sudo -n env P2_REVIEW_ROOT="$P2_REVIEW_ROOT" /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_adopted_core_plan.py "${{ github.run_id }}"
