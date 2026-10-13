@@ -823,7 +823,8 @@ jobs:
               raw=f.read(1048577);assert len(raw)<=1048576
           cfg=json.loads(raw.decode());agents=cfg.get('agents',{})
           defaults=agents.get('defaults',{}) if isinstance(agents,dict) else {}
-          result['profile_metadata']['defaults_sandbox']=defaults.get('sandbox')
+          sandbox_defaults=defaults.get('sandbox')
+          result['profile_metadata']['defaults_sandbox']={k:sandbox_defaults.get(k) for k in ('mode','workspaceAccess','scope')} if isinstance(sandbox_defaults,dict) else None
           model=defaults.get('model',{})
           result['profile_metadata']['model_primary']=model.get('primary') if isinstance(model,dict) else model
           result['profile_metadata']['agent_sandbox']={}
@@ -843,4 +844,50 @@ jobs:
           print(json.dumps(result,sort_keys=True))
           print('NATIVE_CONTEXT_POLICY_INPUTS_PATH='+path)
           print('NATIVE_CONTEXT_POLICY_INPUTS_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
+
+      - name: Prepare private sandbox policy candidate and validate native SDK resolution without applying
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,hashlib,stat,subprocess
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];profile='/home/xuanjun_dev/.openclaw/openclaw.json'
+          fd=os.open(profile,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert s.st_uid==1002 and stat.S_IMODE(s.st_mode)==0o600
+              raw=f.read(1048577);assert len(raw)<=1048576
+          before=hashlib.sha256(raw).hexdigest()
+          assert before=='569e7f4eb66860caf05e23fc1d00098d9f67c9204347b979ab39696f184fbba3'
+          cfg=json.loads(raw.decode());agents=cfg.setdefault('agents',{})
+          items=agents.setdefault('list',[]);assert isinstance(items,list)
+          for agent_id,access in [('developer','rw'),('platform-engineer','ro')]:
+              matches=[item for item in items if isinstance(item,dict) and item.get('id')==agent_id]
+              assert len(matches)<=1
+              if matches:item=matches[0]
+              else:item={'id':agent_id};items.append(item)
+              sandbox=item.setdefault('sandbox',{});assert isinstance(sandbox,dict)
+              sandbox.update(mode='all',workspaceAccess=access,scope='agent')
+          packed=(json.dumps(cfg,sort_keys=True,separators=(',',':'))+'\n').encode()
+          candidate=root+'/protected-openclaw-sandbox-policy-candidate.json'
+          fd=os.open(candidate,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          module='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/config-CQ7BYVQS.mjs'
+          fd=os.open(module,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());data=f.read();assert s.st_uid==1002 and not s.st_mode&0o022
+          js="const m=await import("+json.dumps('file://'+module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const [id,access] of [['developer','rw'],['platform-engineer','ro']]){const r=m.i(cfg,id);if(r.mode!=='all'||r.workspaceAccess!==access||r.scope!=='agent')throw Error('POLICY_RESOLUTION');rows.push({agent_id:id,mode:r.mode,workspaceAccess:r.workspaceAccess,scope:r.scope});}console.log(JSON.stringify(rows));"
+          p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],input=packed,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C'},timeout=30)
+          result={'schema':1,'state':'HOLD_POLICY_CANDIDATE','profile_before_sha256':before,'candidate_path':candidate,'candidate_sha256':hashlib.sha256(packed).hexdigest(),'sdk_config_sha256':hashlib.sha256(data).hexdigest(),'sdk_resolution_exit':p.returncode,'applied':False,'services_changed':False,'model_calls':0,'writer_admission':False}
+          if p.returncode==0:
+              result['resolved_policy']=json.loads(p.stdout.decode().strip().splitlines()[-1]);result['state']='OFFLINE_POLICY_RESOLUTION_PASS_NO_HOST_SANDBOX_ACCEPTANCE'
+          with open(profile,'rb') as f:assert hashlib.sha256(f.read()).hexdigest()==before
+          receipt=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-sandbox-policy-candidate-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(receipt);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('SANDBOX_POLICY_CANDIDATE_RECEIPT_SHA256='+hashlib.sha256(receipt).hexdigest())
+          assert p.returncode==0,'OFFLINE_POLICY_RESOLUTION_HOLD'
           PY
