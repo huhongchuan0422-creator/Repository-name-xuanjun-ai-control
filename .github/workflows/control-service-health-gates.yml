@@ -1,0 +1,22 @@
+name: Control service health gates
+on:
+  pull_request:
+    paths:
+      - scripts/control_service_health.py
+      - tests/test_control_service_health.py
+      - docs/CONTROL_SERVICE_HEALTH.md
+      - .github/workflows/control-service-health-gates.yml
+permissions:
+  contents: read
+jobs:
+  offline-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate mocked read-only service observations
+        run: |
+          python3 -m py_compile scripts/control_service_health.py
+          python3 -B -m unittest discover -s tests -p 'test_control_service_health.py' -v
