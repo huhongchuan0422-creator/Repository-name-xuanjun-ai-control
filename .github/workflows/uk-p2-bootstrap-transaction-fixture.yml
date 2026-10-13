@@ -1,0 +1,24 @@
+name: P2 protected bootstrap transaction kernel fixture
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/uk-p2-bootstrap-transaction-fixture.yml
+      - evidence/p2-install-preparation-20261013/p2_bootstrap_transaction_fixture.py
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-bootstrap-transaction-fixture
+  cancel-in-progress: false
+jobs:
+  fixture:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise publish crash recovery and rollback in synthetic directories
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/p2_bootstrap_transaction_fixture.py --uk
