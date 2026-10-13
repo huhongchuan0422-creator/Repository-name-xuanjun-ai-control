@@ -167,3 +167,63 @@ jobs:
           print('P2_UK_MODEL_CALLS=0')
           print('P2_UK_INSTALL_EFFECTS=0')
           PY
+
+      - name: Prepare protected prerequisite inventory without install effects
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,pwd,grp,stat,hashlib,json,socket,sys
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          s=os.lstat(root)
+          assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022
+          def metadata(path,binary=False):
+              try:
+                  s=os.lstat(path)
+              except FileNotFoundError:
+                  return {'path':path,'exists':False}
+              row={'path':path,'exists':True,'uid':s.st_uid,'gid':s.st_gid,'mode':oct(stat.S_IMODE(s.st_mode)),'symlink':stat.S_ISLNK(s.st_mode),'size':s.st_size}
+              if binary and stat.S_ISREG(s.st_mode) and 0<s.st_size<134217728 and os.path.realpath(path)==path:
+                  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+                  try:
+                      before=os.fstat(fd);h=hashlib.sha256();header=os.read(fd,20);h.update(header)
+                      while True:
+                          chunk=os.read(fd,1048576)
+                          if not chunk:break
+                          h.update(chunk)
+                      after=os.fstat(fd)
+                      assert (before.st_size,before.st_mtime_ns)==(after.st_size,after.st_mtime_ns)
+                      row.update(sha256=h.hexdigest(),elf64_x86_64=header[:6]==b'\x7fELF\x02\x01' and header[18:20]==b'\x3e\x00')
+                  finally:os.close(fd)
+              return row
+          uids={u.pw_uid for u in pwd.getpwall()};gids={g.gr_gid for g in grp.getgrall()}
+          free=[x for x in range(1003,60001) if x not in uids and x not in gids][:4]
+          users={}
+          for name in ('xuanjun_dev','xuanjun-dispatcher','xuanjun-callback','xj_codex_worker'):
+              try:
+                  u=pwd.getpwnam(name);users[name]={'uid':u.pw_uid,'gid':u.pw_gid,'home':u.pw_dir,'shell':u.pw_shell,'groups':os.getgrouplist(name,u.pw_gid)}
+              except KeyError:users[name]={'exists':False}
+          sources=('/opt/xuanjun-runtime/gh/gh','/opt/xuanjun-runtime/codex-0.160.0/codex',
+           '/home/xuanjun_dev/.openclaw/tools/codex-0.160.0/codex',
+           '/home/xuanjun_dev/.openclaw/tools/codex/codex','/home/xuanjun_dev/.openclaw/bin/codex',
+           '/usr/local/bin/codex','/usr/bin/codex','/usr/local/bin/gh','/usr/bin/gh')
+          paths=('/etc/xuanjun-development','/etc/xuanjun-owner-callback','/var/lib/xuanjun-owner-callback/state',
+           '/var/lib/xuanjun-development','/opt/xuanjun-runtime','/etc/nginx','/etc/nginx/conf.d',
+           '/etc/letsencrypt/live','/sys/fs/cgroup/systemd',
+           '/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite',
+           '/home/xuanjun_dev/.openclaw/openclaw.json')
+          value={'schema':1,'state':'PREREQUISITE_INVENTORY_NOT_INSTALL_PLAN','artifact_id':11796280855,
+           'archive_sha256':'66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd',
+           'candidate_free_uid_gid_pairs_not_reserved':free,'users':users,
+           'binary_candidates':[metadata(p,True) for p in sources],'paths':[metadata(p) for p in paths],
+           'source_binaries_executed':False,'credentials_read':False,'services_changed':False,
+           'canonical_ledger_changed':False,'install_admission':'NOT_GRANTED'}
+          raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-prerequisite-inventory.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(value,sort_keys=True))
+          print('PROTECTED_PREPARATION_PATH='+path)
+          print('PROTECTED_PREPARATION_SHA256='+hashlib.sha256(raw).hexdigest())
+                    PY
