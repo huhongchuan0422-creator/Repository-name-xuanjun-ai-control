@@ -67,7 +67,8 @@ def maybe_identity(path):
 
 def unit_fact(unit):
     props=('Id','LoadState','ActiveState','SubState','MainPID','ControlGroup',
-           'UnitFileState','FragmentPath')
+           'UnitFileState','FragmentPath','EnvironmentFiles','ProtectHome',
+           'ReadOnlyPaths','BindReadOnlyPaths','BindPaths','User','Group')
     out=subprocess.check_output(['/usr/bin/systemctl','show',unit,
         '--property='+','.join(props)],universal_newlines=True,timeout=10)
     value={}
