@@ -519,89 +519,72 @@ jobs:
           print('INSTALL_PREPARATION_BUNDLE_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
 
-      - name: Prepare isolated TLS libraries and real UK certificate without P2 installation
+      - name: Persist verified private inputs without repeating certificate issuance
         shell: bash
         run: |
           set -euo pipefail
           sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
-          import os,sys,stat,json,hashlib,subprocess,socket,shutil
+          import os,sys,stat,json,hashlib,shutil,socket,subprocess
           assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
-          root=sys.argv[1];stage=root+'/isolated-tls';os.mkdir(stage,0o700)
+          root=sys.argv[1]
+          base='/var/lib/xuanjun-p2-preparation'
+          if not os.path.lexists(base):os.mkdir(base,0o700)
+          s=os.lstat(base);assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700 and os.path.realpath(base)==base
+          dest=base+'/artifact-11796280855-'+os.path.basename(root)
+          os.mkdir(dest,0o700)
+          def copy(source,target,expected,mode=0o600):
+              assert os.path.realpath(source)==source
+              fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
+              h=hashlib.sha256()
+              out=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
+              with os.fdopen(fd,'rb') as f,os.fdopen(out,'wb') as g:
+                  before=os.fstat(f.fileno());assert stat.S_ISREG(before.st_mode) and before.st_uid==0 and not before.st_mode&0o022
+                  while True:
+                      chunk=f.read(1048576)
+                      if not chunk:break
+                      h.update(chunk);g.write(chunk)
+                  after=os.fstat(f.fileno());assert (before.st_size,before.st_mtime_ns)==(after.st_size,after.st_mtime_ns)
+                  assert h.hexdigest()==expected
+                  g.flush();os.fsync(g.fileno())
+              return {'path':target,'sha256':expected,'owner_uid':0,'mode':mode}
+          def receipt(path,sha):
+              with open(path,'rb') as f:raw=f.read()
+              assert hashlib.sha256(raw).hexdigest()==sha
+              return json.loads(raw.decode())
+          tlsroot='/tmp/p2pkg-38371615004-1/isolated-tls'
+          tls=receipt(tlsroot+'/protected-tls-preparation-receipt.json','46fb6cb6bfd9d562b97548b51bb76f93db5add3ee68f1287e80d8ef9415b7569')
+          assert tls['state']=='REAL_UK_TLS_CERTIFICATE_PREPARED'
+          tlsrefs=[]
+          for i,item in enumerate(tls['tls_references']):
+              name=('fullchain.pem','privkey.pem')[i]
+              tlsrefs.append(copy(item['path'],dest+'/'+name,item['sha256']))
+          p=subprocess.run(['/bin/openssl','x509','-in',dest+'/fullchain.pem','-noout','-checkend','604800'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10);assert p.returncode==0
+          q=subprocess.run(['/bin/openssl','x509','-in',dest+'/fullchain.pem','-pubkey','-noout'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+          k=subprocess.run(['/bin/openssl','pkey','-in',dest+'/privkey.pem','-pubout'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+          assert q.returncode==k.returncode==0 and q.stdout==k.stdout
+          files=[]
+          for source,name,sha in (
+          ('/tmp/p2pkg-38370684370-1/protected-owner-binding-inputs.json','protected-owner-binding-inputs.json','5ec6adc519f473f9f6854673a34e620f6a4b1ad5d4f4ff44c519196430f1d539'),
+          ('/tmp/p2pkg-38371013936-1/protected-install-preparation-bundle.json','protected-install-preparation-bundle.json','9bc378238ca9906420685c1940dd7c97511b0f022bcbd56c9471ef2cc7e09af7'),
+          ('/tmp/p2pkg-38365394514-1/protected-prerequisites-subplan.json','protected-prerequisites-subplan.json','9fbe85c665824a2c7b362dfb010fa47d3f144b67cd8dffa5b153efc4f64334a4')):
+              files.append(copy(source,dest+'/'+name,sha))
+          os.mkdir(dest+'/pinned-binaries',0o700)
+          for name,sha in (('gh','7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b'),('codex','12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad')):
+              files.append(copy('/tmp/p2pkg-38365394514-1/pinned-binaries/'+name,dest+'/pinned-binaries/'+name,sha,0o555))
           rpmroot='/tmp/p2pkg-38369525772-1/tls-rpm-preparation'
-          with open(rpmroot+'/protected-tls-rpm-receipt.json','rb') as f:raw=f.read()
-          assert hashlib.sha256(raw).hexdigest()=='fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e'
-          receipt=json.loads(raw.decode());assert receipt['state']=='DEPENDENCY_DOWNLOAD_PREPARED'
-          tool=shutil.which('rpm2cpio');assert tool
-          extracted=0
-          for item in receipt['rpms']:
-              path=rpmroot+'/'+item['file'];assert os.path.realpath(path)==path
-              with open(path,'rb') as f:assert hashlib.sha256(f.read()).hexdigest()==item['sha256']
-              p=subprocess.run([tool,path],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=15)
-              assert p.returncode==0 and len(p.stdout)<33554432
-              data=p.stdout;offset=0
-              while offset<len(data):
-                  assert data[offset:offset+6] in (b'070701',b'070702')
-                  header=data[offset:offset+110];assert len(header)==110
-                  fields=[int(header[6+i*8:14+i*8],16) for i in range(13)]
-                  mode=fields[1];size=fields[6];namesize=fields[11]
-                  start=offset+110;name=data[start:start+namesize-1].decode('utf-8')
-                  assert data[start+namesize-1:start+namesize]==b'\0'
-                  body=(start+namesize+3)&~3;end=body+size;assert end<=len(data)
-                  offset=(end+3)&~3
-                  if name=='TRAILER!!!':break
-                  if name.startswith('./'):name=name[2:]
-                  parts=name.split('/');assert not name.startswith('/') and all(x not in ('','..','.') for x in parts)
-                  if not name.startswith(('usr/lib/python3.6/site-packages/','usr/lib64/python3.6/site-packages/')):continue
-                  target=stage+'/'+name;assert os.path.realpath(target)==target
-                  if stat.S_ISDIR(mode):os.makedirs(target,mode=0o700,exist_ok=True)
-                  elif stat.S_ISREG(mode):
-                      os.makedirs(os.path.dirname(target),mode=0o700,exist_ok=True)
-                      fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-                      with os.fdopen(fd,'wb') as f:f.write(data[body:end])
-                      extracted+=1
-                  else:raise ValueError('UNEXPECTED_LIBRARY_MEMBER_TYPE')
-          libs=stage+'/usr/lib/python3.6/site-packages'
-          launcher=stage+'/certbot-entry.py'
-          with open(launcher,'x') as f:f.write('import sys\nsys.path.insert(0,'+repr(libs)+')\nsys.path.insert(0,'+repr(stage+'/usr/lib64/python3.6/site-packages')+')\nfrom certbot.main import main\nsys.exit(main())\n')
-          os.chmod(launcher,0o600)
-          p=subprocess.run(['/usr/bin/python3','-I','-B',launcher,'--version'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
-          text=(p.stdout+p.stderr).decode('utf-8','replace')
-          result={'schema':1,'state':'ISOLATED_TLS_TOOL_READY' if p.returncode==0 and 'certbot 1.22.0' in text else 'HOLD_ISOLATED_TLS_TOOL','version_exit':p.returncode,'extracted_library_files':extracted,'packages_installed':False,'services_changed':False,'canonical_mutation':False,'certificate_requested':False}
-          if p.returncode:result['tool_error_tail']=text.splitlines()[-3:]
-          if result['state']=='ISOLATED_TLS_TOOL_READY':
-              host='uk.wenwenwenyiyiyi.work'
-              assert sorted({x[4][0] for x in socket.getaddrinfo(host,443,socket.AF_INET,socket.SOCK_STREAM)})==['8.208.119.115']
-              for port in (80,443):
-                  s=socket.socket();s.bind(('0.0.0.0',port));s.close()
-              for name in ('config','work','logs'):os.mkdir(stage+'/'+name,0o700)
-              cmd=['/usr/bin/python3','-I','-B',launcher,'certonly','--standalone','--non-interactive','--agree-tos','--register-unsafely-without-email','--preferred-challenges','http','--config-dir',stage+'/config','--work-dir',stage+'/work','--logs-dir',stage+'/logs','--cert-name',host,'-d',host]
-              result['certificate_requested']=True
-              try:
-                  p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=150)
-                  result['certificate_exit']=p.returncode
-                  output=(p.stdout+p.stderr).decode('utf-8','replace')
-                  result['acme_failure_categories']=[key for key in ('unauthorized','connection','timeout','rateLimited') if key in output]
-              except subprocess.TimeoutExpired:result['certificate_exit']='TIMEOUT'
-              refs=[]
-              for name in ('fullchain.pem','privkey.pem'):
-                  path=os.path.realpath(stage+'/config/live/'+host+'/'+name)
-                  if not path.startswith(stage+'/config/archive/'+host+'/') or not os.path.isfile(path):continue
-                  os.chmod(path,0o600)
-                  with open(path,'rb') as f:raw=f.read()
-                  refs.append({'path':path,'sha256':hashlib.sha256(raw).hexdigest(),'owner_uid':0,'mode':0o600})
-              if len(refs)==2 and result.get('certificate_exit')==0:
-                  cert=refs[0]['path']
-                  p=subprocess.run(['/bin/openssl','x509','-in',cert,'-noout','-checkend','604800'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
-                  q=subprocess.run(['/bin/openssl','x509','-in',cert,'-noout','-text'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
-                  assert p.returncode==0 and ('DNS:'+host).encode() in q.stdout
-                  result['state']='REAL_UK_TLS_CERTIFICATE_PREPARED'
-                  result['tls_references']=refs
-              else:result['state']='HOLD_REAL_UK_TLS_CERTIFICATE'
-          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
-          path=stage+'/protected-tls-preparation-receipt.json'
+          rr=receipt(rpmroot+'/protected-tls-rpm-receipt.json','fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e')
+          os.mkdir(dest+'/rpms',0o700)
+          for item in rr['rpms']:
+              assert '/' not in item['file']
+              files.append(copy(rpmroot+'/'+item['file'],dest+'/rpms/'+item['file'],item['sha256'],0o400))
+          archive='/tmp/p2-candidate-'+os.path.basename(root)[6:]+'.tar.gz'
+          files.append(copy(archive,dest+'/p2-candidate.tar.gz','66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd',0o400))
+          value={'schema':1,'state':'DURABLE_PROTECTED_INSTALL_INPUTS_PREPARED_NOT_INSTALL_PLAN','artifact_id':11796280855,'preparation_root':dest,'tls_references':tlsrefs,'files':files,'packages_installed':False,'services_changed':False,'canonical_mutation':False,'credential_values_exported':False,'release_granted':False}
+          raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=dest+'/durable-preparation-receipt.json'
           fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-          print(json.dumps(result,sort_keys=True))
-          print('ISOLATED_TLS_RECEIPT_PATH='+path)
-          print('ISOLATED_TLS_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          print(json.dumps({'state':value['state'],'preparation_root':dest,'protected_file_count':len(files)+2,'certificate_key_match':True,'services_changed':False,'packages_installed':False},sort_keys=True))
+          print('DURABLE_PREPARATION_RECEIPT_PATH='+path)
+          print('DURABLE_PREPARATION_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
