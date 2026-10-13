@@ -10,11 +10,11 @@ permissions:
   contents: read
   actions: read
 env:
-  P2_ARTIFACT_ID: "11796280855"
-  P2_TAR_SHA256: "66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd"
-  P2_SOURCE_COMMIT: "f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06"
-  P2_SOURCE_TREE: "3fc23b2a01bd8f01ea0edcef9216ded7313409c2"
-  P2_MANIFEST_SHA256: "afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601"
+  P2_ARTIFACT_ID: "11806508375"
+  P2_TAR_SHA256: "58334c0ccc8e0291e7c549bac525875a645dc67265e09a83da95b599477dc74f"
+  P2_SOURCE_COMMIT: "a47612729dc18b03fe1f450a9c30c844d11cf724"
+  P2_SOURCE_TREE: "3172aef4711d219c0ea848059fa5305c7d43876f"
+  P2_MANIFEST_SHA256: "35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8"
   P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
   P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
 jobs:
@@ -123,9 +123,9 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           m.verify(root,root+'/deploy/integration-manifest.json',
-                   'f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06',
-                   'afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601',
-                   '3fc23b2a01bd8f01ea0edcef9216ded7313409c2')
+                   'a47612729dc18b03fe1f450a9c30c844d11cf724',
+                   '35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8',
+                   '3172aef4711d219c0ea848059fa5305c7d43876f')
           assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
           transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
           assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
@@ -214,7 +214,7 @@ jobs:
            '/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite',
            '/home/xuanjun_dev/.openclaw/openclaw.json')
           value={'schema':1,'state':'PREREQUISITE_INVENTORY_NOT_INSTALL_PLAN','artifact_id':11796280855,
-           'archive_sha256':'66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd',
+           'archive_sha256':'58334c0ccc8e0291e7c549bac525875a645dc67265e09a83da95b599477dc74f',
            'candidate_free_uid_gid_pairs_not_reserved':free,'users':users,
            'binary_candidates':[metadata(p,True) for p in sources],'paths':[metadata(p) for p in paths],
            'source_binaries_executed':False,'credentials_read':False,'services_changed':False,
@@ -397,7 +397,7 @@ jobs:
                   assert len(raw)<=2097152
                   return json.loads(raw.decode())
               except urllib.error.HTTPError as e:return {'code':e.code}
-          private={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601','auth_references':[]}
+          private={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8','auth_references':[]}
           public={'schema':1,'state':'OWNER_BINDING_INPUTS_HOLD','credential_values_exported':False,'notification_sends':0,'model_calls':0,'services_changed':False,'canonical_mutation':False}
           try:
               profile='/home/xuanjun_dev/.openclaw/openclaw.json'
@@ -781,9 +781,13 @@ jobs:
               def git(*args):return subprocess.check_output(['/usr/bin/git','--git-dir='+mirror]+list(args),env=env,stderr=subprocess.DEVNULL,timeout=15).decode().strip()
               assert git('config','--get','remote.origin.url')==remote
               assert git('rev-parse','--is-bare-repository')=='true'
-              source='f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06'
-              assert git('rev-parse',source+'^{commit}')==source
-              tree=git('rev-parse',source+'^{tree}');assert tree=='3fc23b2a01bd8f01ea0edcef9216ded7313409c2'
+              source='a47612729dc18b03fe1f450a9c30c844d11cf724'
+              try:observed=git('rev-parse',source+'^{commit}')
+              except subprocess.CalledProcessError:
+                  p=subprocess.run(['/usr/bin/git','--git-dir='+mirror,'fetch','--quiet','--no-tags','origin',source+':refs/xuanjun-preparation/'+source],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120)
+                  assert p.returncode==0;observed=git('rev-parse',source+'^{commit}')
+              assert observed==source
+              tree=git('rev-parse',source+'^{tree}');assert tree=='3172aef4711d219c0ea848059fa5305c7d43876f'
               result.update(state='PROTECTED_SOURCE_MIRROR_READY_CONTENTS_READ_VERIFIED',mirror_path=mirror,source_commit=source,source_tree=tree)
           except Exception as e:result['hold_reason']=type(e).__name__
           raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
@@ -875,6 +879,8 @@ jobs:
                   else:item={'id':agent_id};items.append(item)
               sandbox=item.setdefault('sandbox',{});assert isinstance(sandbox,dict)
               sandbox.update(mode='all',workspaceAccess=access,scope='agent')
+              docker=sandbox.setdefault('docker',{});assert isinstance(docker,dict)
+              docker.update(image='sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d',user='1002:1002',network='none',readOnlyRoot=True,capDrop=['ALL'],binds=[],tmpfs=[])
           packed=(json.dumps(cfg,sort_keys=True,separators=(',',':'))+'\n').encode()
           candidate=root+'/protected-openclaw-sandbox-policy-candidate.json'
           fd=os.open(candidate,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
@@ -946,14 +952,14 @@ jobs:
           installer=package+'/scripts/uk-integration-install.py'
           spec=importlib.util.spec_from_file_location('p2_seal_verify',installer);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
           manifest=package+'/deploy/integration-manifest.json'
-          m.verify(package,manifest,'f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06','afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601',expected_tree='3fc23b2a01bd8f01ea0edcef9216ded7313409c2')
+          m.verify(package,manifest,'a47612729dc18b03fe1f450a9c30c844d11cf724','35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8',expected_tree='3172aef4711d219c0ea848059fa5305c7d43876f')
           sealed_package=output+'/xuanjun-p2-package';shutil.copytree(package,sealed_package,symlinks=False)
           for parent,dirs,files in os.walk(sealed_package):
               os.chown(parent,0,0);os.chmod(parent,0o755)
               for name in files:
                   path=parent+'/'+name;assert not os.path.islink(path)
                   os.chown(path,0,0);os.chmod(path,0o555 if os.stat(path).st_mode&0o111 else 0o444)
-          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06','afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601',expected_tree='3fc23b2a01bd8f01ea0edcef9216ded7313409c2')
+          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','a47612729dc18b03fe1f450a9c30c844d11cf724','35f7f85952bd13a52b9e8f30466530a25f4a62a0711fbac2949d3bac213aa4d8',expected_tree='3172aef4711d219c0ea848059fa5305c7d43876f')
           plan=json.loads(read(work+'/protected-core-install-plan.json',0o600).decode())
           plan['artifact']['root']=sealed_package;plan['artifact']['manifest']=sealed_package+'/deploy/integration-manifest.json'
           for item in plan['runtime']['prerequisites']['binaries']:
