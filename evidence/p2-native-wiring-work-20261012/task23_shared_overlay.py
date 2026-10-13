@@ -59,7 +59,7 @@ def main():
 """        return key
 
     def record_inventory_notice(self, db, intent, activation_binding, ledger_identity):
-        """Notice-only mutation inside the caller-owned pinned canonical transaction."""
+        # Notice-only mutation inside the caller-owned pinned canonical transaction.
         from task_supervisor_inventory_adapter import canonical_inventory_page, assert_inventory_lineage
         if not db.in_transaction or self.activation_store is None:
             raise ValueError('ADMITTED_CANONICAL_TRANSACTION_REQUIRED')
