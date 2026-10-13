@@ -86,7 +86,7 @@ def prepare(package, output):
                'gatewayIdentity':{'user':'xuanjun_dev','exe':exe,'sha256':h.hexdigest(),'cgroup':cgroup}}
     stage('p2-native-binding.json', pack(binding), '/etc/xuanjun-development/p2-native-binding.json', 0, 0, 0o644)
     result = {'schema':1,'state':'PRIVATE_BOOTSTRAP_CANDIDATES_NOT_APPLIED',
-              'artifact_id':11815238339,'files':rows,'planned_uid_gid_unreserved':True,
+              'artifact_id':11819078922,'files':rows,'planned_uid_gid_unreserved':True,
               'new_owner_secrets_require_protected_delivery':True,
               'github_write_permission':'NOT_TESTED','install':False,
               'writer_admission':False,'services_changed':False,'model_calls':0}
