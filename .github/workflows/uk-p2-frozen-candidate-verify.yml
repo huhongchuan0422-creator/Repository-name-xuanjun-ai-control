@@ -24,7 +24,7 @@ jobs:
       - linux
       - x64
       - xuanjun-uk-dev
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -369,4 +369,43 @@ jobs:
           with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
           print(json.dumps(result,sort_keys=True))
           print('PROTECTED_CALLBACK_TLS_METADATA_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Download TLS dependency transaction without installing packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,subprocess,stat,hashlib,json
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];stage=root+'/tls-rpm-preparation';os.mkdir(stage,0o700)
+          argv=['/bin/dnf','-q','-y','--setopt=cachedir='+stage+'/cache','--setopt=persistdir='+stage+'/persist','--setopt=logdir='+stage+'/log','--setopt=timeout=15','--setopt=retries=1','--setopt=gpgcheck=1','install','--downloadonly','--downloaddir='+stage,'nginx-1:1.24.0-3.0.1.2.al8.1','certbot-1.22.0-1.el8']
+          result={'schema':1,'artifact_id':11796280855,'runtime_release_sha256':'afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601','archive_sha256':'66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd','packages_installed':False,'service_changes':False,'writer_admission':'NOT_GRANTED','rpms':[]}
+          try:
+              p=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=180)
+              result['download_exit']=p.returncode
+          except subprocess.TimeoutExpired:
+              result['download_exit']='TIMEOUT'
+          for name in sorted(os.listdir(stage)):
+              if not name.endswith('.rpm'):continue
+              path=stage+'/'+name;s=os.lstat(path)
+              assert stat.S_ISREG(s.st_mode) and not stat.S_ISLNK(s.st_mode) and s.st_uid==0
+              h=hashlib.sha256()
+              with open(path,'rb') as f:
+                  while True:
+                      x=f.read(1048576)
+                      if not x:break
+                      h.update(x)
+              os.chmod(path,0o400)
+              p=subprocess.run(['/bin/rpm','--checksig',path],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+              text=(p.stdout+p.stderr).decode('utf-8','replace')
+              result['rpms'].append({'file':name,'sha256':h.hexdigest(),'size':s.st_size,'signature_check_exit':p.returncode,'signature_verified':p.returncode==0 and 'OK' in text and 'NOKEY' not in text and 'NOT OK' not in text})
+          result['state']='DEPENDENCY_DOWNLOAD_PREPARED' if result.get('download_exit')==0 and result['rpms'] and all(x['signature_verified'] for x in result['rpms']) else 'HOLD_DEPENDENCY_DOWNLOAD_OR_SIGNATURE'
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=stage+'/protected-tls-rpm-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('TLS_RPM_RECEIPT_PATH='+path)
+          print('TLS_RPM_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
