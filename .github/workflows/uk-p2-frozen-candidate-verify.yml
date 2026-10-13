@@ -68,7 +68,47 @@ jobs:
           set -euo pipefail
           ROOT="$P2_WORK_DIR/xuanjun-p2-package"
           test "$(/usr/bin/python3 -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = 3.6.8
-          P2_SOURCE_ROOT="$ROOT" /usr/bin/python3 -B evidence/p2-native-wiring-work-20261012/test_service_context_task23.py
+          P2_SOURCE_ROOT="$ROOT" /usr/bin/python3 -B -m unittest \
+            evidence.p2-native-wiring-work-20261012.test_service_context_task23.Tests.test_dispatcher_keeps_protect_home_and_uses_relay \
+            evidence.p2-native-wiring-work-20261012.test_service_context_task23.Tests.test_inode_swap_rolls_back_inventory_transaction \
+            evidence.p2-native-wiring-work-20261012.test_service_context_task23.Tests.test_inventory_paginates_beyond_first_hundred_and_restart_dedupes \
+            evidence.p2-native-wiring-work-20261012.test_service_context_task23.Tests.test_path_replacement_before_sqlite_connect_is_rejected \
+            evidence.p2-native-wiring-work-20261012.test_service_context_task23.Tests.test_production_inventory_caller_records_notice_in_existing_db \
+            evidence.p2-native-wiring-work-20261012.test_service_context_task23.Tests.test_relay_allows_only_fixed_preflight \
+            evidence.p2-native-wiring-work-20261012.test_service_context_task23.Tests.test_relay_rejects_unauthorized_peer_and_keeps_serving \
+            evidence.p2-native-wiring-work-20261012.test_service_context_task23.Tests.test_sqlite_connection_uses_pinned_fd_uri
+          P2_SOURCE_ROOT="$ROOT" /usr/bin/python3 -B - <<'PY'
+          import json,os,socket,struct,sys
+          root=os.environ['P2_SOURCE_ROOT']
+          sys.path.insert(0,root+'/stage1')
+          import p2_gateway_relay as relay
+          class Controller(object):
+              def __init__(self): self.calls=0
+              def preflight(self,c): self.calls+=1; return {'ready':True}
+          class Base(object):
+              def __init__(self,uid=31337): self.uid=uid; self.sent=b''; self.timeout=None; self.done=False
+              def settimeout(self,v): self.timeout=v
+              def getsockopt(self,*a): return struct.pack('3i',111,self.uid,222)
+              def sendall(self,d): self.sent+=d
+          class Timeout(Base):
+              def recv(self,n): raise socket.timeout('fixture timeout')
+          class Oversize(Base):
+              def recv(self,n):
+                  if self.done:return b''
+                  self.done=True;return b'x'*(relay.MAXIMUM+1)
+          class Valid(Base):
+              def recv(self,n):
+                  if self.done:return b''
+                  self.done=True;return b'{"operation":"preflight"}\n'
+          c=Controller()
+          a=relay.serve_connection(Timeout(),c,31337)
+          assert a['ok'] is False and a['error'] in ('timeout','TimeoutError') and c.calls==0
+          b=relay.serve_connection(Oversize(),c,31337)
+          assert b['ok'] is False and b['error']=='ValueError' and c.calls==0
+          v=relay.serve_connection(Valid(),c,31337)
+          assert v['ok'] is True and v['result']['ready'] is True and c.calls==1
+          print('P2_UK_RELAY_TIMEOUT_OVERSIZE_PORTABLE=PASS')
+          PY
           echo P2_UK_PYTHON368_WAL_PAGINATION_RELAY_REGRESSION=PASS
           echo P2_SOCKET_ACTIVATION_INSTALL_ACCEPTANCE=NOT_RUN
 
