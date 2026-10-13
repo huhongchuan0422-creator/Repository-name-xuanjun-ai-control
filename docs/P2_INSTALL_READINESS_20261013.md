@@ -4,17 +4,18 @@ P2 source/outcome owner: WORK_NATIVE. Same PR49/parent task; ChatGPT source stop
 
 ## Current frozen source
 
-- commit: df06290d42cb8d80d8886320e075fb479d52cde3
-- tree: 119379ffbf4b0632c163ab0945f02294813d99a7
-- artifact: 11784412668
-- tar SHA256: 08b5fca14490b969fa7deada6ef60b2c865898c782d38454a78bfb0e08dac6cd
-- manifest SHA256: b07b5c35e8effe226d5f990d8df57cdc262d64fd264562299a78da522a117e78
+- commit: 46a7c6796f61c6f196eb1d95497f2fb94e22fc00
+- tree: 4c58232c60a7f397370bab5c43631ea84adeda72
+- artifact: 11786072168
+- tar SHA256: 25999a0491a94ce8b9c1c24262ccba38bdfc737e32193ae2825c7de9202a205b
+- manifest SHA256: 9c8ded6c3c17c88e76361085b8ee752f997d947c51506656099b22e033777d4c
 - files:77
-- source regression38336308019 and freeze38336308006: SUCCESS,76 Python tests plus Node checks.
-- same-artifact mechanical QA/Security38336480483: SUCCESS.
-- UK Python3.6.8 verify-only38336482564: SUCCESS,17 transaction/pagination/relay tests plus12 lifecycle/reference tests.
+- source regression38339139876 and freeze38339139836 SUCCESS; actual80 Python tests plus Node checks.
+- same-artifact mechanical QA/Security38339218158 SUCCESS.
+- UK Python3.6.8 verify-only38339220772 SUCCESS; actual17+16=33 regression tests.
+- exact-artifact pregate38339223129 SUCCESS.
 
-The prior7c78f4f0/artifact11784690627 is a historical tested checkpoint. It does not certify the current lifecycle delta. Mechanical checks and author tests do not replace independent source/security/release approval.
+Supersedes artifact11784412668/source df06290d for current boot-lifecycle bytes. Independent source/release approval remains required. These are isolated tests and installer verify-only, not installed reboot/socket/E2E acceptance.
 
 ## Source corrections
 
@@ -34,7 +35,7 @@ Evidence: UK read-onlyfacts38336367068/job115097248332 at collector commit9f22c0
 | Owner identity/chat | owner-user-id and owner-chat-id absent | Read verified existing Owner enrollment, never guess IDs |
 | HTTPS/TLS | inspected nginx/Caddy binaries/configs and TLS dirs absent; no TLS refs found | Reuse a proven deployed reverse proxy or prepare reviewed TLS provisioning; NOT_APPLICABLE is not public HTTPS acceptance |
 | P2 identities/activation | pre-install absent | Existing prerequisite/install transaction creates reviewed isolated identities; installation-created checks remain NOT_RUN until then |
-| Boot and rollback persistence | service starts tested only as fixtures; no installed boot proof | Bind boot enablement and prior enable-state rollback in the installation plan and test restart; WantedBy text is not activation |
+| Boot and rollback persistence | Durable prior enabled/disabled journal added to existing runtime adapter; bound to exact provisioning receipt. Interrupt/restart/drift regressions PASS on hosted and UK | Independent review and installed restart/rollback proof remain required; unsupported persistent states HOLD |
 
 ## Retained completion sequence
 
@@ -53,3 +54,7 @@ Workflow source e4e7a5d7876be791377a4a332feb4fd093c222b0; run38337815855 both pr
 ## Existing Codex exact version receipt
 
 Corrected collector source35db390793b48ae918024de1aac47e926b600a7f; UKrun38338195353/job115102994438 SUCCESS, actual logs read. Both pinned candidates hashed before and after non-root xuanjun_dev --version execution with minimal environment/HOME=/nonexistent; no inference/API/model call. Existing standard candidate is codex-cli0.158.0 (SHA256167c0148a849d2444f1b5a7fb5f8bb2de1de5ae13a2a504b833fc765980f5cd9), so cannot use it as0.160.0. Required0.160.0 is /home/xuanjun_dev/.openclaw/npm/projects/openclaw-codex-8902d781d4__openclaw-generation__g-d803e8e002e42fe5/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex (SHA25612eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad, owner1002:1002, mode0700, size289101384). The latter can be explicitly bound as reviewed prerequisite source for fixed target /opt/xuanjun-runtime/codex-0.160.0/codex; no copy/install performed. First collector run38338072001 failed syntax before execution and is superseded only for this version probe. Protected credentials/OwnerIDs/TLS/boot rollback and independent release remain unresolved.
+
+## Boot lifecycle delta
+
+Before Gateway/service starts, after ACTIVE descriptor, persist all fixed units and reused Gateway prior enabled/disabled states using existing fsynced transaction receipt primitive. Enable and verify each unit. Rollback validates journal, exact provisioning digest and every current state before changing enablement; restores original persistent states, including preserving originally enabled Gateway. ENABLE_REQUESTED survives partial failure/process loss; RESTORED rejects activation reuse. Unsupported masked/runtime/static states HOLD. Source fixture and UK temporary-directory tests do not prove actual reboot. No installation performed.
