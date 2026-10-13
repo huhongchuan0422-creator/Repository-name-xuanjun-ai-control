@@ -57,4 +57,26 @@ class AdoptionTests(unittest.TestCase):
  def test_backup_symlink_holds(self):
   p=next(self.d.glob('*.backup'));raw=p.read_bytes();p.unlink();other=self.base/'elsewhere';other.write_bytes(raw);other.chmod(0o600);p.symlink_to(other)
   with self.assertRaisesRegex(ValueError,'SYMLINK'):self.a.preflight(self.plan)
+class GatewayPreflightTests(unittest.TestCase):
+ def runtime(self):
+  from p2_fixed_host_runtime import FixedHostRuntime
+  r=FixedHostRuntime.__new__(FixedHostRuntime);r.directory='/synthetic';return r
+ def test_unbound_inactive_gateway_still_holds(self):
+  import types
+  r=self.runtime();r.run=lambda *a,**kw:types.SimpleNamespace(returncode=3)
+  with self.assertRaisesRegex(ValueError,'MUST_BE_ACTIVE'):r._verify_gateway_preflight({})
+ def test_bound_adoption_uses_real_adapter_contract_without_active_command(self):
+  from unittest.mock import patch
+  r=self.runtime();r.run=lambda *a,**kw:(_ for _ in ()).throw(AssertionError('active command'))
+  p={'legacy_isolation':{'explicit':'fixture'}}
+  with patch('legacy_host_adapter.LegacyHostAdapter') as cls:
+   cls.return_value.preflight.return_value=True;r._verify_gateway_preflight({'legacy_cutover':p})
+   cls.assert_called_once_with('/synthetic');cls.return_value.preflight.assert_called_once_with(p)
+ def test_failed_adoption_never_falls_back(self):
+  from unittest.mock import patch
+  r=self.runtime();r.run=lambda *a,**kw:(_ for _ in ()).throw(AssertionError('fallback'))
+  with patch('legacy_host_adapter.LegacyHostAdapter') as cls:
+   cls.return_value.preflight.side_effect=ValueError('ADOPTION_CHANGED')
+   with self.assertRaisesRegex(ValueError,'ADOPTION_CHANGED'):r._verify_gateway_preflight({'legacy_cutover':{}})
 if __name__=='__main__':unittest.main()
+
