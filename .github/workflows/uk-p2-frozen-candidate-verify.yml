@@ -794,3 +794,53 @@ jobs:
           print('SOURCE_MIRROR_RECEIPT_PATH='+path)
           print('SOURCE_MIRROR_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
           PY
+
+      - name: Verify named native context export and actual sandbox configuration without execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,json,hashlib,stat,subprocess,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];base='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
+          files={'context_wrapper':('context-DyPstb2Q.mjs','db7fc7539455da0c564d4ded0d04da1c764a46903d1632489b8bd04641098320'),'context_implementation':('context-Dt2Gy7El.mjs','08c73a8b91a6da428617f1018218eef438040175cf74efa74af716cdd0371f47'),'plugin_runtime':('runtime-BgTk9ZFM.mjs','18d2498124bb5437ce53b8b5fa90e71ca8e99f09c34118d2931a951dd9dadf22'),'tool_hook':('agent-tools.before-tool-call.runtime-DrbwqsOU.mjs','88be9b0b2e1dcdc921606bc9a829bbd6a28ee4c088a1ea0bfab8d2f4a2f4ec46'),'request_scope_error':('error-runtime-B-G5NrRT.mjs','d43944505d8b3d98be863da5b9495c336af88c745d4eb00c78218eacb6c0eb22')}
+          result={'schema':1,'model_calls':0,'services_changed':False,'canonical_mutation':False,'sdk_files':{},'profile_metadata':{}}
+          for role,(name,sha) in files.items():
+              path=base+'/'+name;assert os.path.realpath(path)==path
+              with open(path,'rb') as f:
+                  s=os.fstat(f.fileno());raw=f.read();assert s.st_uid==1002 and not s.st_mode&0o022 and hashlib.sha256(raw).hexdigest()==sha
+              text=raw.decode()
+              imports=[line[:600] for line in text.splitlines() if line.startswith('import ') and any(x in line.lower() for x in ('sandbox','context','runtime','error'))][:20]
+              result['sdk_files'][role]={'path':path,'sha256':sha,'uid':1002,'relevant_imports':imports}
+          js="const m=await import("+json.dumps('file://'+base+'/context-DyPstb2Q.mjs')+");console.log(JSON.stringify({named_resolveSandboxContext:typeof m.resolveSandboxContext==='function',named_ensureSandboxWorkspaceForSession:typeof m.ensureSandboxWorkspaceForSession==='function'}))"
+          p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C','NO_COLOR':'1'},stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=30)
+          assert p.returncode==0
+          result['native_context_exports']=json.loads(p.stdout.decode().strip().splitlines()[-1]);assert result['native_context_exports']['named_resolveSandboxContext']
+          path='/home/xuanjun_dev/.openclaw/openclaw.json'
+          fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert s.st_uid==1002 and stat.S_IMODE(s.st_mode)==0o600
+              raw=f.read(1048577);assert len(raw)<=1048576
+          cfg=json.loads(raw.decode());agents=cfg.get('agents',{})
+          defaults=agents.get('defaults',{}) if isinstance(agents,dict) else {}
+          result['profile_metadata']['defaults_sandbox']=defaults.get('sandbox')
+          model=defaults.get('model',{})
+          result['profile_metadata']['model_primary']=model.get('primary') if isinstance(model,dict) else model
+          result['profile_metadata']['agent_sandbox']={}
+          items=agents.get('list',[]) if isinstance(agents,dict) else []
+          if isinstance(items,dict):items=[dict(value,id=key) for key,value in items.items() if isinstance(value,dict)]
+          for item in items if isinstance(items,list) else []:
+              if isinstance(item,dict) and item.get('id') in ('developer','platform-engineer','main'):
+                  sandbox=item.get('sandbox')
+                  if isinstance(sandbox,dict):
+                      result['profile_metadata']['agent_sandbox'][item['id']]={k:sandbox.get(k) for k in ('mode','workspaceAccess','scope')}
+                  else:result['profile_metadata']['agent_sandbox'][item['id']]=None
+          result['profile_sha256']=hashlib.sha256(raw).hexdigest()
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-native-context-policy-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('NATIVE_CONTEXT_POLICY_INPUTS_PATH='+path)
+          print('NATIVE_CONTEXT_POLICY_INPUTS_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
