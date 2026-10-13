@@ -828,7 +828,7 @@ jobs:
           model=defaults.get('model',{})
           result['profile_metadata']['model_primary']=model.get('primary') if isinstance(model,dict) else model
           result['profile_metadata']['agent_sandbox']={}
-          items=agents.get('list',[]) if isinstance(agents,dict) else []
+          items=agents.get('entries',agents.get('list',[])) if isinstance(agents,dict) else []
           if isinstance(items,dict):items=[dict(value,id=key) for key,value in items.items() if isinstance(value,dict)]
           for item in items if isinstance(items,list) else []:
               if isinstance(item,dict) and item.get('id') in ('developer','platform-engineer','main'):
@@ -861,12 +861,18 @@ jobs:
           before=hashlib.sha256(raw).hexdigest()
           assert before=='569e7f4eb66860caf05e23fc1d00098d9f67c9204347b979ab39696f184fbba3'
           cfg=json.loads(raw.decode());agents=cfg.setdefault('agents',{})
-          items=agents.setdefault('list',[]);assert isinstance(items,list)
+          roster=agents.get('entries')
+          if roster is not None:assert isinstance(roster,dict)
+          else:
+              items=agents.setdefault('list',[]);assert isinstance(items,list)
           for agent_id,access in [('developer','rw'),('platform-engineer','ro')]:
-              matches=[item for item in items if isinstance(item,dict) and item.get('id')==agent_id]
-              assert len(matches)<=1
-              if matches:item=matches[0]
-              else:item={'id':agent_id};items.append(item)
+              if roster is not None:
+                  item=roster.setdefault(agent_id,{});assert isinstance(item,dict)
+              else:
+                  matches=[item for item in items if isinstance(item,dict) and item.get('id')==agent_id]
+                  assert len(matches)<=1
+                  if matches:item=matches[0]
+                  else:item={'id':agent_id};items.append(item)
               sandbox=item.setdefault('sandbox',{});assert isinstance(sandbox,dict)
               sandbox.update(mode='all',workspaceAccess=access,scope='agent')
           packed=(json.dumps(cfg,sort_keys=True,separators=(',',':'))+'\n').encode()
@@ -888,11 +894,11 @@ jobs:
               for marker in ('function resolveAgentEntry(', 'function hasAgentRosterProperty(', 'function listAgentEntries('):
                   pos=txt.find(marker)
                   if pos>=0:print('SDK_AGENT_ROSTER_SOURCE='+json.dumps(txt[pos:pos+1000]))
-          js="const m=await import("+json.dumps('file://'+module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const [id,access] of [['developer','rw'],['platform-engineer','ro']]){const r=m.i(cfg,id);rows.push({agent_id:id,mode:r.mode,workspaceAccess:r.workspaceAccess,scope:r.scope});}console.log(JSON.stringify({resolver_signature:m.i.toString().slice(0,600),rows}));"
+          js="const m=await import("+json.dumps('file://'+module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const [id,access] of [['developer','rw'],['platform-engineer','ro']]){const r=m.i(cfg,id);if(r.mode!=='all'||r.workspaceAccess!==access||r.scope!=='agent')throw Error('POLICY_RESOLUTION');rows.push({agent_id:id,mode:r.mode,workspaceAccess:r.workspaceAccess,scope:r.scope});}console.log(JSON.stringify({resolver_signature:m.i.toString().slice(0,600),rows}));"
           p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],input=packed,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C'},timeout=30)
           result={'schema':1,'state':'HOLD_POLICY_CANDIDATE','profile_before_sha256':before,'candidate_path':candidate,'candidate_sha256':hashlib.sha256(packed).hexdigest(),'sdk_config_sha256':hashlib.sha256(data).hexdigest(),'sdk_resolution_exit':p.returncode,'applied':False,'services_changed':False,'model_calls':0,'writer_admission':False}
           if p.returncode==0:
-              result['sdk_resolution_diagnostics']=json.loads(p.stdout.decode().strip().splitlines()[-1]);result['state']='OFFLINE_POLICY_RESOLUTION_INSPECTED_NO_HOST_SANDBOX_ACCEPTANCE'
+              result['sdk_resolution_diagnostics']=json.loads(p.stdout.decode().strip().splitlines()[-1]);result['state']='OFFLINE_POLICY_RESOLUTION_PASS_NO_HOST_SANDBOX_ACCEPTANCE'
           if p.returncode!=0:
               result['error_type']='NODE_OFFLINE_RESOLUTION_FAILED'
               result['sdk_resolver_source_header']=data.decode().split('function resolveSandboxConfigForAgent',1)[-1][:600]
