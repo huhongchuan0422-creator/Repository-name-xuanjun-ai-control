@@ -50,6 +50,7 @@ subprocess.run(['python','-B',str(ROOT/'native_snapshot_access_overlay.py'),str(
 subprocess.run(['python','-B',str(ROOT/'sdk_layout_overlay.py'),str(source)],check=True)
 subprocess.run(['python','-B',str(ROOT/'socket_access_overlay.py'),str(source)],check=True)
 subprocess.run(['python','-B',str(ROOT/'bootstrap_install_overlay.py'),str(source)],check=True)
+subprocess.run(['python','-B',str(ROOT/'publisher_install_overlay.py'),str(source)],check=True)
 controller_digest=hashlib.sha256((source/'stage1/native_gateway_controller.py').read_bytes()).hexdigest()
 service_text=(source/'deploy/xuanjun-development-dispatcher.service').read_text()
 if service_text.count('--native-controller-sha256 '+controller_digest)!=3:
@@ -60,6 +61,7 @@ subprocess.run(['python','-B',str(ROOT/'test_native_snapshot_access.py')],env=fi
 subprocess.run(['node',str(ROOT/'test_sdk_layout.mjs')],env=final_env,check=True)
 subprocess.run(['python','-B',str(ROOT/'test_socket_access_plan.py')],env=final_env,check=True)
 subprocess.run(['sudo','-n','env','P2_SOURCE_ROOT='+str(source),'python3','-B',str(ROOT/'test_bootstrap_files.py')],check=True)
+subprocess.run(['sudo','-n','env','P2_SOURCE_ROOT='+str(source),'python3','-B',str(ROOT/'test_publisher_bootstrap.py')],check=True)
 print('FINAL_PACKAGE_CONTROLLER_SERVICE_HASH_AND_INSTALL_LIFECYCLE=PASS')
 env.update(P2_SOURCE_ROOT=str(base_fixture),P2_FEISHU_INTEGRATION_ROOT=str(source))
 subprocess.run(['python','-B','-m','unittest','discover','-s',str(repo/'tests'),'-p','test_owner_feishu_*.py','-v'],env=env,check=True)
