@@ -57,13 +57,18 @@ class TransportTests(unittest.TestCase):
             else:
                 marker=development_closed_loop_transport._marker(self.row['outbox_id'])
                 envelope=json.dumps({'schema':1,'kind':'TASK45_OUTBOX_DELIVERY',
-                    'outbox_id':self.row['outbox_id'],'payload':{'evidence':'ok'}})
+                    'outbox_id':self.row['outbox_id'],'payload':json.loads(self.row['payload_json'])})
                 if mode=='existing' or (mode=='unknown' and posted):
                     value=[[{'id':99,'body':marker+'\n'+envelope,
                              'user':{'login':development_closed_loop_transport.OWNER}}]]
                 elif mode=='duplicate':
                     item={'id':99,'body':marker+'\n'+envelope,'user':{'login':development_closed_loop_transport.OWNER}}
                     value=[[item,item]]
+                elif mode=='conflict':
+                    wrong=json.dumps({'schema':1,'kind':'TASK45_OUTBOX_DELIVERY',
+                        'outbox_id':self.row['outbox_id'],'payload':{'different':True}})
+                    value=[[{'id':99,'body':marker+'\n'+wrong,
+                             'user':{'login':development_closed_loop_transport.OWNER}}]]
                 elif mode=='malformed':
                     value=[[{'id':99,'body':marker+'\nnot-json',
                              'user':{'login':development_closed_loop_transport.OWNER}}]]
@@ -75,8 +80,14 @@ class TransportTests(unittest.TestCase):
     def test_malformed_marker_does_not_ack(self):
         tr,calls=self.fake('malformed')
         result=development_closed_loop_transport.deliver_one(self.sup,tr,103)
-        self.assertEqual(result['state'],'DELIVERED_ACKNOWLEDGED')
-        self.assertEqual(sum('--method' in a for a,k in calls),1)
+        self.assertEqual(result['state'],'DELIVERY_RECONCILE_REQUIRED')
+        self.assertFalse(any('--method' in a for a,k in calls))
+
+    def test_conflicting_payload_never_posts_or_acks(self):
+        tr,calls=self.fake('conflict')
+        result=development_closed_loop_transport.deliver_one(self.sup,tr,103)
+        self.assertEqual(result['state'],'DELIVERY_RECONCILE_REQUIRED')
+        self.assertFalse(any('--method' in a for a,k in calls))
 
     def test_missing_required_payload_is_rejected(self):
         tr,calls=self.fake('ok')
@@ -86,7 +97,7 @@ class TransportTests(unittest.TestCase):
 
     def test_paginated_reconciliation_uses_slurp(self):
         tr,calls=self.fake('existing')
-        receipt=tr.reconcile(self.row['outbox_id'])
+        receipt=tr.reconcile(self.row)
         self.assertEqual(receipt['message_id'],'99')
         self.assertIn('--slurp',calls[0][0])
 
