@@ -7,6 +7,8 @@ on:
       - scripts/development_closed_loop.py
       - tests/test_entry_review_gate.py
       - tests/test_development_closed_loop.py
+      - tests/test_development_closed_loop_transport.py
+      - scripts/development_closed_loop_transport.py
       - .github/workflows/task45-closed-loop-gates.yml
 permissions:
   contents: read
@@ -29,7 +31,7 @@ jobs:
               except TypeError: ast.parse(raw,filename=name)
           print('TASK45_PYTHON36_GRAMMAR=PASS')
           PY
-          python3 -m unittest tests.test_entry_review_gate tests.test_development_closed_loop
+          python3 -m unittest tests.test_entry_review_gate tests.test_development_closed_loop tests.test_development_closed_loop_transport
           echo TASK4_HOSTED_CLOSED_LOOP=PASS
           echo TASK5_HOSTED_REVIEW_FLOW=PASS
           echo UK_RUNTIME=NOT_RUN

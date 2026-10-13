@@ -8,6 +8,8 @@ on:
       - scripts/task_supervisor.py
       - tests/test_entry_review_gate.py
       - tests/test_development_closed_loop.py
+      - tests/test_development_closed_loop_transport.py
+      - scripts/development_closed_loop_transport.py
       - .github/workflows/uk-task45-isolated-e2e.yml
 permissions:
   contents: read
@@ -32,7 +34,7 @@ jobs:
               ast.parse(pathlib.Path(name).read_text(),filename=name)
           print('TASK45_UK_PYTHON_3_6_8=PASS')
           PY
-          /usr/bin/python3 -m unittest tests.test_entry_review_gate tests.test_development_closed_loop
+          /usr/bin/python3 -m unittest tests.test_entry_review_gate tests.test_development_closed_loop tests.test_development_closed_loop_transport
           echo TASK4_UK_ISOLATED_E2E=PASS
           echo TASK5_UK_REVIEW_REPAIR_HANDOFF=PASS
           echo MODEL_CALLS=0
