@@ -1,0 +1,19 @@
+name: P2 UK exact prerequisite plan review bytes
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-install-preparation-20261013/export_protected_prerequisite_review.py
+      - .github/workflows/uk-p2-prerequisite-review-export.yml
+permissions:
+  contents: read
+jobs:
+  export-review:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read exact metadata-only proposal bytes without opening referenced credentials or applying
+        run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/export_protected_prerequisite_review.py
