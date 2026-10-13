@@ -121,6 +121,58 @@ def review_bundle(contract,files,reviews,review_keys=None):
             'bundle_sha256':bundle_sha,'binding':binding,'authority_effect':'NONE','release_approved':False}
 
 
+
+def review_outcome(contract, files, reviews, review_keys=None):
+    """Return an exact-version review state, including durable repair intent.
+
+    Unlike review_bundle(), an authenticated FAIL is data rather than an
+    exception.  This function grants no execution/release authority.
+    """
+    base = review_bundle(contract, files, [], review_keys)
+    bundle_sha = base['bundle_sha256']
+    developer = identity(contract['developer'])
+    policies = {}
+    for policy in contract['trusted_reviewers']:
+        who = identity(policy, True)
+        if who == developer or who in policies:
+            raise ValueError('DISTINCT_INDEPENDENT_REVIEWERS_REQUIRED')
+        policies[who] = policy
+    if not isinstance(reviews, list) or len(reviews) > 2:
+        raise ValueError('BOUNDED_REVIEWS_REQUIRED')
+    roles = {}
+    record_ids = set()
+    for record in reviews:
+        value = authenticated(record, review_keys)
+        if set(value) != {'reviewer','role','bundle_sha256','decision'}:
+            raise ValueError('EXACT_REVIEW_PAYLOAD_REQUIRED')
+        who = identity(value['reviewer'])
+        policy = policies.get(who)
+        decision = value['decision']
+        if (policy is None or record['key_id'] != policy['key_id']
+                or value['role'] != policy['role']
+                or value['role'] in roles or record['record_id'] in record_ids
+                or value['bundle_sha256'] != bundle_sha
+                or decision not in ('PASS','FAIL')):
+            raise ValueError('INDEPENDENT_EXACT_VERSION_REVIEW_REQUIRED')
+        roles[value['role']] = decision
+        record_ids.add(record['record_id'])
+    if set(roles) == {'QA','SECURITY'}:
+        values = [review_keys[p['key_id']] for p in policies.values()]
+        if hmac.compare_digest(values[0], values[1]):
+            raise ValueError('DISTINCT_REVIEW_AUTHORITY_KEYS_REQUIRED')
+    failed = sorted(role for role, decision in roles.items()
+                    if decision == 'FAIL')
+    if failed:
+        state = 'REPAIR_REQUIRED'
+    elif set(roles) == {'QA','SECURITY'}:
+        state = 'ISOLATED_TEST_ELIGIBLE'
+    else:
+        state = 'HOLD_INDEPENDENT_REVIEW_REQUIRED'
+    return {'state': state, 'bundle_sha256': bundle_sha,
+            'review_roles': dict(roles), 'failed_roles': failed,
+            'authority_effect': 'NONE', 'release_approved': False}
+
+
 def continuation_due(binding,receipt_read_at,now,evidence=None,ledger_keys=None):
     fields={'task_id','attempt_id','run_id','session_id','fence','checkpoint_sha256',
             'ledger_revision','receipt_sha256','authority_key_id'}

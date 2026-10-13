@@ -1,0 +1,36 @@
+name: Task4 Task5 closed loop gates
+on:
+  push:
+    branches: [repair/task45-chatgpt-closed-loop-review-20261013]
+    paths:
+      - scripts/entry_review_gate.py
+      - scripts/development_closed_loop.py
+      - tests/test_entry_review_gate.py
+      - tests/test_development_closed_loop.py
+      - .github/workflows/task45-closed-loop-gates.yml
+permissions:
+  contents: read
+jobs:
+  hosted:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Python 3.6 grammar and exact tests
+        run: |
+          python3 - <<'PY'
+          import ast,pathlib
+          for name in ('scripts/entry_review_gate.py','scripts/development_closed_loop.py',
+                       'scripts/task_supervisor.py'):
+              raw=pathlib.Path(name).read_text()
+              try: ast.parse(raw,filename=name,feature_version=(3,6))
+              except TypeError: ast.parse(raw,filename=name)
+          print('TASK45_PYTHON36_GRAMMAR=PASS')
+          PY
+          python3 -m unittest tests.test_entry_review_gate tests.test_development_closed_loop
+          echo TASK4_HOSTED_CLOSED_LOOP=PASS
+          echo TASK5_HOSTED_REVIEW_FLOW=PASS
+          echo UK_RUNTIME=NOT_RUN
+          echo RELEASE_APPROVED=NO
