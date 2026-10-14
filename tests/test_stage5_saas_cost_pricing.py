@@ -40,4 +40,15 @@ class Costs(unittest.TestCase):
   check=preview(self.offers,self.costs,"cloud")
   self.assertIsNone(check["lines"][0]["cost_cny_minor"])
   self.assertIsNone(check["by_cadence"]["MONTHLY"]["gross_margin_cny_minor"])
+ def test_offer_cannot_publish_without_verified_cost_lines(self):
+  add_component(self.offers,"cloud","license","MODULE_LICENSE","MONTHLY",3000,500,"approved-pricebook")
+  change_offer_status(self.offers,"cloud","PREVIEW")
+  change_offer_status(self.offers,"cloud","APPROVED")
+  with self.assertRaisesRegex(ValueError,"COST_EVIDENCE_GATE_REQUIRED"):
+   change_offer_status(self.offers,"cloud","EFFECTIVE")
+  with self.assertRaisesRegex(ValueError,"COST_INCOMPLETE"):
+   change_offer_status(self.offers,"cloud","EFFECTIVE",self.costs)
+  save_cost(self.costs,"cloud","license","EVIDENCED_ESTIMATE",900,120,"documented-cost-estimate","MONTHLY")
+  change_offer_status(self.offers,"cloud","EFFECTIVE",self.costs)
+  self.assertEqual(self.offers.execute("SELECT status FROM offers WHERE offer_id='cloud'").fetchone()[0],"EFFECTIVE")
 if __name__=="__main__":unittest.main()
