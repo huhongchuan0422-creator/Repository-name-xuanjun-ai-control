@@ -308,7 +308,17 @@ def serve_local(path=":memory:",port=18791,seed_demo=True):
     owned = [db]
     try:
         merchant_db = ad_db = now = None
-        refund_db = open_refund_store()
+        source_refund = open_refund_store()
+        try:
+            runtime_refund = sqlite3.connect(":memory:",check_same_thread=False)
+            try:
+                source_refund.backup(runtime_refund)
+            except BaseException:
+                runtime_refund.close()
+                raise
+        finally:
+            source_refund.close()
+        refund_db = runtime_refund
         owned.append(refund_db)
         if seed_demo:
             from scripts.community_demo_bootstrap import fixture_stores
