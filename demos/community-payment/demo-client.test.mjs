@@ -66,3 +66,18 @@ test('reject incorrect state amounts and simulated settlement assertion',async()
   await assert.rejects(c.simulate(scope,'order1','evt1','SUCCESS','tx1',123));
  }
 });
+
+test('state denies foreign reference and unexpected response keys',async()=>{
+ const valid={amount_minor:123,currency:'CNY',state:'PENDING',provider_transaction_id:null,provider_settlement_verified:false};
+ for(const reply of [
+  {...valid,reference:'other'},
+  {...valid,reference:'order1'},
+  {...valid,merchant_id:'another'},
+  {...valid,execution_granted:true}
+ ]){
+  const client=makeDemoClient(async()=>({status:200,json:async()=>reply}));
+  await assert.rejects(client.state(scope,'order1'),/INVALID_DEMO_RESPONSE/);
+ }
+ const client=makeDemoClient(async()=>({status:200,json:async()=>valid}));
+ assert.equal((await client.state(scope,'order1')).state,'PENDING');
+});
