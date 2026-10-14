@@ -1,0 +1,27 @@
+{
+  "archive_sha256": "0917edbebaefa43e265dbd1756db9618e9964661bdf2307f1e6856f2056bc3b7",
+  "base_manifest_sha256": "9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3",
+  "changed_runtime_files": [
+    {
+      "new_sha256": "83ca91a597c3220c40a4de37c8af211463dba13eb36eac55a8802c12d5a36ac2",
+      "old_sha256": "6994736219c1b0c747c6fa69771026573992dc51907059dcd66bd6230952f901",
+      "path": "stage1/p2_fixed_host_runtime.py"
+    },
+    {
+      "new_sha256": "3ce2c341f4cf9dfc96014446f39dc63a005a1e97122fa310a1d6d3e6c3c264b7",
+      "old_sha256": "5eb316e24e32d347e776f19994a4231e09e9d0bcbe81239f72757fe72aea5ca7",
+      "path": "stage1/p2_tls_lifecycle.py"
+    }
+  ],
+  "epoch3_recovery_entrypoint": "NOT_IMPLEMENTED",
+  "independent_review": "PENDING",
+  "kind": "OFFLINE_RUNTIME_DELTA_NOT_INSTALL_ADMISSION",
+  "manifest_sha256": "338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09",
+  "old_install_or_resume_entrypoint_permitted": false,
+  "production_execution": "NOT_RUN",
+  "runtime_files": 102,
+  "schema": 1,
+  "source_commit": "1a35f744224a64d73128196f6212195d15a9d0a7",
+  "source_tree": "fa23b50843e4fc579348f403322dc3224c8ff78e",
+  "unchanged_runtime_files": 100
+}

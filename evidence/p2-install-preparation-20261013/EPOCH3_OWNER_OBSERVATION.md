@@ -43,3 +43,34 @@ is authorized by this observation; previous one-shot approval was consumed.
 
 PRODUCTION_RECOVERY=HOLD
 INSTALL_ADMISSION=NOT_GRANTED
+
+## Publisher content follow-up: confirmed by Owner
+
+Owner message Sentinel_70340102006881919c90306bcf983e8d, 2026-10-14
+07:19 UTC, executed dde7088c verifier SHA
+204e268d5075a9f884dca1d373679149e688dec71347a5a52e39ba6dd0eeee31.
+Both control.git and the gh configuration directory returned:
+content_fingerprint_matches=true, root_identity_matches=true, stage_absent=true.
+The output ended READ_ONLY_CONTENT_CHECK_NOT_INSTALL_ADMISSION. This closes the
+previous publisher-content observation gap; it does not grant recovery admission.
+
+## Offline package and binding preparation
+
+The original freezer was reused with its own SHA pinned. All original102 runtime
+files were verified; exactly2 repaired modules replaced;100 remain byte-identical.
+Two scratch builds produced the identical archive SHA
+0917edbebaefa43e265dbd1756db9618e9964661bdf2307f1e6856f2056bc3b7.
+New manifest SHA338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09.
+7 Python3.6.8 builder tests PASS. Actual new package TLS regression10 PASS on local
+system Python only. This is a runtime delta artifact, not a complete recovery kit.
+
+Offline binding preparation reproduces all24 original target hashes with the
+existing renderer, explicitly accounts for the known original7 raw-source hash
+mismatches, and computes12 changed target bindings for the new manifest.11 local
+Python3.6.8 tests PASS. The proposed epoch4 remains PREPARED and preserves the same
+DB path, generation, instance, ledger UUID and socket. No host descriptor was
+changed. Native bootstrap binding needs an exact hash-bound on-host byte transform
+at preparation; it cannot be silently reused with the old release path.
+
+Still NOT implemented: production epoch3 recovery/resume transaction and complete
+failure retention path. No review or installation command is issued for this delta.
