@@ -204,16 +204,36 @@ def server_database(path):
     checked.close()
     return sqlite3.connect(path, check_same_thread=False)
 
+def _close_all_owned(connections):
+    """Attempt every owned close; preserve first error for caller."""
+    first = None
+    for connection in connections:
+        try:
+            connection.close()
+        except Exception as exc:
+            if first is None:
+                first = exc
+    if first is not None:
+        raise first
+
 class _OwnedLocalDemoHTTPServer(HTTPServer):
     def __init__(self, address, service, owned_connections):
         self._owned_connections = owned_connections
         super().__init__(address, handler(service))
     def server_close(self):
+        base_error = None
         try:
             super().server_close()
-        finally:
-            for db in self._owned_connections:
-                db.close()
+        except Exception as exc:
+            base_error = exc
+        connections, self._owned_connections = self._owned_connections, ()
+        try:
+            _close_all_owned(connections)
+        except Exception:
+            if base_error is None:
+                raise
+        if base_error is not None:
+            raise base_error
 
 def serve_local(path=":memory:",port=18791,seed_demo=True):
     """Loopback-only local fixture; never real merchant auth or provider receipt.
@@ -238,8 +258,10 @@ def serve_local(path=":memory:",port=18791,seed_demo=True):
         return _OwnedLocalDemoHTTPServer(
             ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now),owned)
     except BaseException:
-        for connection in owned:
-            connection.close()
+        try:
+            _close_all_owned(owned)
+        except Exception:
+            pass  # never replace original startup failure
         raise
 
 if __name__=="__main__":

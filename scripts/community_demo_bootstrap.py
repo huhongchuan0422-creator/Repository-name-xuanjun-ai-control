@@ -8,15 +8,28 @@ from scripts.community_ad_contract import AMOUNT, SUCCESS
 DEMO_SCOPE = {"tenant_id":"tenant1","merchant_id":"merchant1","store_id":"store1"}
 DEMO_OTHER = {"tenant_id":"tenant1","merchant_id":"merchant2","store_id":"store1"}
 
+def _close_all(handles):
+    first = None
+    for handle in reversed(handles):
+        try:
+            handle.close()
+        except Exception as exc:
+            if first is None:
+                first = exc
+    return first
+
+def _close_quietly(handles):
+    _close_all(handles)
+
 def fixture_stores():
     """Return fresh in-memory merchant/ad stores, seeded with no customer data."""
-    m = open_store()
+    sources = []
+    runtime = []
     try:
+        m = open_store()
+        sources.append(m)
         a = open_offline()
-    except BaseException:
-        m.close()
-        raise
-    try:
+        sources.append(a)
         for identity, name in ((DEMO_SCOPE,"Demo Merchant A"),(DEMO_OTHER,"Demo Merchant B")):
             actor = {"authenticated":True,"role":"MERCHANT_ADMIN",
                      "actor_id":"OFFLINE_DEMO_FIXTURE_ONLY",
@@ -41,18 +54,25 @@ def fixture_stores():
             change_campaign_state(a,DEMO_SCOPE,cid,"ACTIVE",owner,now,4)
         # The server remains serial, but tests run serve_forever on a background
         # thread. Use one explicitly cross-thread-readable handle per store.
-        runtime_m = sqlite3.connect(":memory:",check_same_thread=False)
-        runtime_a = sqlite3.connect(":memory:",check_same_thread=False)
         try:
+            runtime_m = sqlite3.connect(":memory:",check_same_thread=False)
+            runtime.append(runtime_m)
+            runtime_a = sqlite3.connect(":memory:",check_same_thread=False)
+            runtime.append(runtime_a)
             m.backup(runtime_m)
             a.backup(runtime_a)
+            runtime_m.execute("PRAGMA foreign_keys=ON")
         except BaseException:
-            runtime_m.close();runtime_a.close()
+            _close_quietly(runtime)
             raise
-        finally:
-            a.close();m.close()
-        runtime_m.execute("PRAGMA foreign_keys=ON")
+        # Ownership transfer only after sources are BOTH closed. On cleanup
+        # failure, runtime handles must not be leaked or returned.
+        close_error = _close_all(sources)
+        sources.clear()
+        if close_error is not None:
+            _close_quietly(runtime)
+            raise close_error
         return runtime_m,runtime_a,now
     except BaseException:
-        a.close();m.close()
+        _close_quietly(sources)
         raise
