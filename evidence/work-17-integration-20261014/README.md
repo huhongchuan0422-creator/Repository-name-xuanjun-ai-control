@@ -114,3 +114,12 @@ callbacks当作可信配置。路径相同不证明SQLite FD/VFS inode锁定；�
 数据库连接来源并在任何动作前进行最新canonical原子校验。Release SHA与archive SHA
 是不同摘要，本模块不把二者误等同，也不凭预期描述符自行证明发布来源。
 本次仅提供统一调用入口和接线测试，不另起HTTP服务、不改P2当前安装文件。
+
+## Owner访问门禁接续
+
+`read_authorized_owner_foundations(owner_authorizer, **reader_arguments)`在读取前及返回前
+调用原控制器提供的可信权限闭包。闭包须验证固定Owner主体及对应task范围；必须返回布尔True。
+拒绝、异常或读取期间撤权时不返回摘要；异常内容不向外传播。绑定深拷贝防止验证器意外改写读取对象。
+控制器须只暴露此受保护入口，禁止客户端选回调或绕到内部读取函数；现有底层函数保留用于受信任内部组合。
+这不是登录服务、Session签发或真实Owner/RBAC通过证据，仍需实际控制器接入。
+新增4项门禁fixture测试及受影响12项读取回归本地通过；真实UK/登录验收未运行。

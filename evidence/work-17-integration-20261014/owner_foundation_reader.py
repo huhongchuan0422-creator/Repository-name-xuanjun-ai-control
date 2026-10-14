@@ -6,6 +6,32 @@ from foundation_integration import foundation_snapshot, chinese_summary, validat
 from producer_inventory import complete_producer_view
 
 
+def read_authorized_owner_foundations(owner_authorizer, **reader_arguments):
+    """Gate the read using the existing controller's authenticated session.
+
+    The controller supplies a trusted closure, never a request-body callback or
+    authenticated flag. It must enforce the pinned Owner principal and task
+    scope. This adapter does not authenticate a login or mint a session.
+    """
+    binding = copy.deepcopy(reader_arguments.get('binding'))
+    validate_binding(binding)
+    if not callable(owner_authorizer):
+        raise ValueError('TRUSTED_OWNER_AUTHORIZER_REQUIRED')
+    def authorized():
+        try:
+            accepted = owner_authorizer(copy.deepcopy(binding))
+        except Exception:
+            raise ValueError('OWNER_READ_ACCESS_DENIED') from None
+        if accepted is not True:
+            raise ValueError('OWNER_READ_ACCESS_DENIED')
+    authorized()
+    arguments = dict(reader_arguments)
+    arguments['binding'] = copy.deepcopy(binding)
+    result = read_owner_foundations(**arguments)
+    authorized()
+    return result
+
+
 def read_owner_foundations(db, binding, now, activation_reader, expected_activation,
                           receipts, receipt_verifier, producer_envelopes,
                           inventory_verifier, records_verifier,
