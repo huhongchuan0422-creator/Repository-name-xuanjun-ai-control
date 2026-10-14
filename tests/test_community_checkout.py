@@ -13,7 +13,7 @@ class CheckoutTests(unittest.TestCase):
         self.token = signed_qr(SCOPE, 'scan', 200, KEY)
         self.order = begin(self.token, SCOPE, 'scan', 100, KEY, 105, 'ref1', 'mini')
         self.receipt = {'state': 'SUCCESS', 'server_verified': True, 'provider_reconciled': True,
-                        'reference': 'ref1', 'amount_minor': 105, 'currency': 'CNY'}
+                        'reference': 'ref1', 'amount_minor': 105, 'currency': 'CNY', 'scope': dict(SCOPE)}
 
     def test_amount_slot_and_no_provider_action(self):
         self.assertEqual(self.order['ad_slot'], AMOUNT)
@@ -50,6 +50,30 @@ class CheckoutTests(unittest.TestCase):
                                       (SCOPE, 100, True)]:
             with self.assertRaises(ValueError):
                 begin(self.token, identity, 'scan', now, KEY, amount, 'ref2', 'official_h5')
+
+    def test_cross_tenant_merchant_store_same_reference_denied(self):
+        for field in ('tenant_id', 'merchant_id', 'store_id'):
+            with self.subTest(field=field):
+                alien = dict(SCOPE, **{field: 'other'})
+                alien_checkout = begin(signed_qr(alien, 'scan', 200, KEY), alien, 'scan', 100, KEY, 105, 'ref1', 'mini')
+                self.assertFalse(result(alien_checkout, self.receipt)['paid'])
+                with self.assertRaisesRegex(ValueError, 'UNVERIFIED_PAYMENT'):
+                    split_preview(alien_checkout, self.receipt, {'merchant': 10000})
+
+    def test_missing_scope_in_receipt_denied(self):
+        evidence = dict(self.receipt)
+        del evidence['scope']
+        self.assertFalse(result(self.order, evidence)['paid'])
+
+    def test_malformed_checkout_fails_closed(self):
+        bads = [{'state': 'PENDING'}, dict(self.order, order=None),
+                dict(self.order, order=dict(self.order['order'], amount_minor=True)),
+                dict(self.order, order=dict(self.order['order'], amount_minor=0)),
+                dict(self.order, order=dict(self.order['order'], currency='USD')),
+                dict(self.order, scope={'tenant_id':'bad'})]
+        for bad in bads:
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                result(bad, self.receipt)
 
 
 if __name__ == '__main__':
