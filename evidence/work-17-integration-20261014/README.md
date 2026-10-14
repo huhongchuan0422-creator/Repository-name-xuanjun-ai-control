@@ -123,3 +123,10 @@ callbacks当作可信配置。路径相同不证明SQLite FD/VFS inode锁定；�
 控制器须只暴露此受保护入口，禁止客户端选回调或绕到内部读取函数；现有底层函数保留用于受信任内部组合。
 这不是登录服务、Session签发或真实Owner/RBAC通过证据，仍需实际控制器接入。
 新增4项门禁fixture测试及受影响12项读取回归本地通过；真实UK/登录验收未运行。
+
+`OwnerFoundationController`作为现有已认证controller的内部适配层，只接受task_id。
+启动配置持有可信context_supplier及Owner授权闭包，supplier通过原受保护context manager
+交付既有只读事务及reader参数。请求不能提供DB、verifier、回调或预期activation；
+supplier绑定的task必须等于请求task。成功和拒绝均退出原context，资源生命周期仍由supplier负责。
+新增4项原临时SQLite组合测试通过，包括拒绝时零SQL、错任务绑定与请求注入拒绝。
+适配层不是已上线HTTP handler；真实登录入口须先认证会话，supplier连接身份保护与部署仍待验收。
