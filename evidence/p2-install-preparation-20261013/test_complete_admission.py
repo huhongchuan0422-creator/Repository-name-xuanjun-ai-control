@@ -27,6 +27,18 @@ class AdmissionTests(unittest.TestCase):
   for k in v:
    altered=dict(v);altered[k]='drift'
    with self.assertRaises(ValueError):m.bind_review(altered,g,'d'*64,'e'*64,'f'*64,'1'*64)
+ def test_auditor_and_preparer_share_source_tree_and_manifest(self):
+  import ast
+  prepare=ast.parse((ROOT/'prepare_complete_install_candidate.py').read_text())
+  constants={n.targets[0].id:n.value.s for n in prepare.body if isinstance(n,ast.Assign) and isinstance(n.targets[0],ast.Name) and isinstance(n.value,ast.Str)}
+  audit=ast.parse((ROOT/'consolidated_readiness.py').read_text())
+  comparisons={}
+  for node in ast.walk(audit):
+   if isinstance(node,ast.Compare) and len(node.ops)==1 and isinstance(node.ops[0],ast.Eq) and isinstance(node.comparators[0],ast.Str):
+    expression=ast.dump(node.left)
+    for key in ('source_commit','source_tree','manifest_sha256'):
+     if key in expression and 'artifact' in expression:comparisons[key]=node.comparators[0].s
+  self.assertEqual(comparisons,{'source_commit':constants['SOURCE'],'source_tree':constants['TREE'],'manifest_sha256':constants['MANIFEST']})
  def test_caller_and_root_loader_share_current_code_hash(self):
   expected=hashlib.sha256((ROOT/'complete_install_executor.py').read_bytes()).hexdigest()
   s=(ROOT/'execute_complete_review_bound.py').read_text();self.assertEqual(s.count(expected),2)

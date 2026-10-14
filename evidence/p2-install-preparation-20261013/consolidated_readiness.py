@@ -82,8 +82,8 @@ def execute():
     p=raw(plan_path,private=True);require(hashlib.sha256(p).hexdigest()==plan_sha,'CORE_PLAN_DRIFT')
     plan=json.loads(p.decode());root=plan['artifact']['root']
     require(plan['artifact']['source_commit']=='d75b5b6deea22b7e66569096f72f81c639516133'
-            and plan['artifact']['source_tree']=='c21de408d21cbef88363f2ee017c6b42d6211107'
-            and plan['artifact']['manifest_sha256']=='9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3','EXACT95_PLAN_BINDING')
+            and plan['artifact']['source_tree']=='60e0e41ac84ca17db96b5057ff9b2a341a4ec1f3'
+            and plan['artifact']['manifest_sha256']=='9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3','EXACT_COMPLETE_PLAN_BINDING')
     require(digest(DB)==DB_SHA,'CANONICAL_DB_DRIFT')
     for suffix in ['-wal','-journal']:
         require(not os.path.lexists(DB+suffix) or os.lstat(DB+suffix).st_size==0,'NONEMPTY_DB_JOURNAL')
