@@ -90,6 +90,7 @@ class RefundPreviewTests(unittest.TestCase):
   with self.assertRaises(sqlite3.IntegrityError):
    self.refunds.execute("INSERT OR REPLACE INTO refund_events VALUES(?,?,?,?,?,?,'OFFLINE_PREVIEW')",
                         ("t1","m1","s1","r1","ev1",1))
+  self.refunds.rollback()  # clear the external SQL attempt transaction before public API
   self.assertEqual(preview_total(self.refunds,S,"r1"),100)
   with self.assertRaisesRegex(ValueError,"EXCEEDS_ORDER"):
    record_preview(self.refunds,self.orders,S,"r1","ev2",21)
