@@ -24,6 +24,15 @@ class StackTests(unittest.TestCase):
   self.assertIn("text/html",mime)
   status,raw,mime=self.call("GET","/demo/app.js")
   self.assertEqual(status,200);self.assertIn(b"simulated" if False else b"simulate",raw)
+ def test_merchant_console_assets_same_origin(self):
+  status,raw,mime=self.call("GET","/demo/merchant/")
+  self.assertEqual(status,200)
+  self.assertIn(b"/demo/merchant/app.js",raw)
+  self.assertIn("text/html",mime)
+  status,raw,mime=self.call("GET","/demo/merchant/app.js")
+  self.assertEqual(status,200)
+  self.assertIn(b"/demo/orders/state",raw)
+  self.assertIn("text/javascript",mime)
  def test_api_full_simulated_sequence(self):
   scope={"tenant_id":"t1","merchant_id":"m1","store_id":"s1","reference":"ref_e2e","amount_minor":150}
   status,raw,_=self.call("POST","/demo/orders",scope)
