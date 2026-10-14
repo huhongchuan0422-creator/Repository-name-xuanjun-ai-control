@@ -164,6 +164,44 @@ class HTTPTests(unittest.TestCase):
         finally:
             sock.close()
         self.assertEqual(self.post('/demo/orders',json.dumps(order('after_header_timeout')))[0],200)
+    def test_absolute_deadline_rejects_trickling_request_line(self):
+        port=self.server.server_address[1]
+        client=socket.create_connection(('127.0.0.1',port),timeout=4)
+        client.settimeout(4)
+        start=time.monotonic()
+        try:
+            for ch in b"POST /demo/orders HTTP/1.1":
+                try:
+                    client.sendall(bytes([ch]))
+                except (BrokenPipeError,ConnectionResetError,OSError):
+                    break
+                time.sleep(0.2)
+            self.assertLess(time.monotonic()-start,2.8)
+        finally:
+            client.close()
+        self.assertEqual(self.post('/demo/orders',json.dumps(order('after_slow_line')))[0],200)
+
+    def test_absolute_deadline_rejects_trickling_headers(self):
+        port=self.server.server_address[1]
+        client=socket.create_connection(('127.0.0.1',port),timeout=4)
+        client.settimeout(4)
+        started=time.monotonic()
+        try:
+            client.sendall(("POST /demo/orders HTTP/1.1\\r\\n"
+                            f"Host: 127.0.0.1:{port}\\r\\n"
+                            "Content-Type: application/json\\r\\n"
+                            "X-Slow: ").encode("ascii"))
+            for _ in range(16):
+                try:
+                    client.sendall(b"x")
+                except (BrokenPipeError,ConnectionResetError,OSError):
+                    break
+                time.sleep(0.2)
+            self.assertLess(time.monotonic()-started,2.8)
+        finally:
+            client.close()
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM orders WHERE reference='slow_headers'").fetchone()[0],0)
+        self.assertEqual(self.post('/demo/orders',json.dumps(order('after_slow_headers')))[0],200)
     def test_no_real_pay_route(self):
         self.assertEqual(self.post('/api/pay/wechat','{}')[0],404)
 
