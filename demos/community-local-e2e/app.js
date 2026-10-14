@@ -2,7 +2,7 @@
 const get=id=>document.getElementById(id);
 const text=(id,value)=>{get(id).textContent=String(value);};
 const fields=["tenant","merchant","store","reference","amount"];
-let counter=0, generation=0, activeKey=null;
+let counter=0, generation=0, requestSerial=0, activeKey=null;
 function input(){
  const scope={tenant_id:get("tenant").value,merchant_id:get("merchant").value,store_id:get("store").value};
  const reference=get("reference").value,raw=get("amount").value,amount=Number(raw);
@@ -16,7 +16,7 @@ function clear(){
  get("successAd").hidden=true;
  text("status","未核实当前订单");text("merchantResult","");
 }
-function current(token,order){return token===generation && activeKey===key(order) && key(input())===activeKey;}
+function current(token,requestToken,order){return token===generation && requestToken===requestSerial && activeKey===key(order) && key(input())===activeKey;}
 async function request(path,payload){
  const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),credentials:"omit",cache:"no-store",redirect:"error"});
  if(!response||response.status!==200)throw Error("模拟接口请求失败");
@@ -49,6 +49,7 @@ async function action(kind){
  get("successAd").hidden=true;
  text("error","");
  let order,token;
+ const requestToken=++requestSerial;
  try{
   order=input();
   if(kind!=="create" && activeKey!==key(order))throw Error("请先创建当前订单");
@@ -65,13 +66,13 @@ async function action(kind){
       target:kind==="complete"?"SUCCESS":"FAILED"};
   }
   const data=await request(path,payload);
-  if(!current(token,order))return;
+  if(!current(token,requestToken,order))return;
   validate(kind,data,order);
   if(kind==="merchantQuery")text("merchantResult","模拟订单："+JSON.stringify(data));
   else text("status","本地模拟状态："+data.state+"（非真实支付凭证）");
   get("successAd").hidden=kind!=="complete";
  }catch(e){
-  if(token!==undefined && order && (token!==generation || activeKey!==key(order)))return;
+  if(requestToken!==requestSerial || token!==undefined && order && (token!==generation || activeKey!==key(order)))return;
   get("successAd").hidden=true;text("error",e.message);
  }
 }
