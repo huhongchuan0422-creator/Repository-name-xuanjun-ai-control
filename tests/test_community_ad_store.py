@@ -112,4 +112,49 @@ class OfflineAdStoreTests(unittest.TestCase):
             change_campaign_state(self.db,self.scope,"campaign1","REVIEW",
                                   dict(self.actor,tenant_id="other"),110,1)
 
+    def test_persistent_close_and_two_reopens(self):
+        import tempfile, pathlib
+        with tempfile.TemporaryDirectory() as directory:
+            path=str(pathlib.Path(directory)/"campaigns.sqlite")
+            first=open_offline(path)
+            original=self.db
+            try:
+                self.db=first
+                self.create()
+            finally:
+                self.db=original
+                first.close()
+            for _ in range(2):
+                again=open_offline(path)
+                self.assertEqual(len(list_campaigns(again,self.scope)["campaigns"]),1)
+                self.assertEqual(again.execute("SELECT count(*) FROM audit_events").fetchone()[0],1)
+                again.close()
+
+    def test_existing_incompatible_schema_rejected_without_damage(self):
+        import tempfile, pathlib,sqlite3
+        with tempfile.TemporaryDirectory() as directory:
+            path=str(pathlib.Path(directory)/"incompatible.sqlite")
+            db=sqlite3.connect(path)
+            db.execute("CREATE TABLE campaigns (unrelated TEXT)")
+            db.execute("INSERT INTO campaigns VALUES('keep')")
+            db.commit();db.close()
+            with self.assertRaises(ValueError):
+                open_offline(path)
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute("SELECT unrelated FROM campaigns").fetchone()[0],"keep")
+            db.close()
+
+    def test_partial_schema_rejected_without_reconstruction(self):
+        import tempfile,pathlib,sqlite3
+        with tempfile.TemporaryDirectory() as directory:
+            path=str(pathlib.Path(directory)/"partial.sqlite")
+            db=sqlite3.connect(path)
+            db.execute("CREATE TABLE marker (value INTEGER)")
+            db.commit();db.close()
+            with self.assertRaises(ValueError):
+                open_offline(path)
+            db=sqlite3.connect(path)
+            self.assertEqual(db.execute("SELECT name FROM sqlite_master WHERE name='marker'").fetchone()[0],"marker")
+            db.close()
+
 if __name__=="__main__": unittest.main()
