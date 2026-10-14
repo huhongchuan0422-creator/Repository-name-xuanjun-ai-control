@@ -151,4 +151,16 @@ class ManagementCatalogBrowser(unittest.TestCase):
    order=self.http._owned_connections[0].execute(
       "SELECT state,amount_minor FROM orders WHERE reference=?",(reference,)).fetchone()
    self.assertEqual(order,("PENDING",120))
+ def test_real_browser_reconciliation_preview_maintains_unknown_provider(self):
+  for route in ("/demo/merchant/","/demo/platform/"):
+   page=self.ctx.new_page()
+   page.goto(self.base+route)
+   page.locator("#loadReconciliation").click()
+   expect(page.locator("#reconciliationStatus")).to_contain_text("真实渠道对账UNKNOWN")
+   expect(page.locator("#reconciliationAmounts")).to_contain_text("渠道实收：UNKNOWN")
+   expect(page.locator("#reconciliationAmounts")).to_contain_text("模拟SUCCESS订单：2")
+   page.locator("#merchant").fill("merchant2")
+   page.locator("#loadReconciliation").click()
+   expect(page.locator("#reconciliationAmounts")).to_contain_text("模拟SUCCESS订单：0")
+   expect(page.locator("#reconciliationAmounts")).to_contain_text("渠道实收：UNKNOWN")
 if __name__=="__main__":unittest.main()
