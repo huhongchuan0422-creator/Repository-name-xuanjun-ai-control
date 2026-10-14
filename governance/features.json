@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "features": [
+    {
+      "feature_id": "GOVERNANCE_COMPLIANCE_GATE",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/FEATURE_COMPLIANCE_GATE_20261015.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/FEATURE_COMPLIANCE_GATE_20261015.md",
+        "section": "2",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "positive registry and negative omissions detected",
+          "normal PR has stable feature-compliance check",
+          "main protection is only enabled after safe bootstrap"
+        ],
+        "tests": [
+          "tests/test_feature_compliance_check.py"
+        ]
+      },
+      "reuse": [
+        "GitHub Actions",
+        "standard-library Python"
+      ]
+    },
+    {
+      "feature_id": "P2_RETAINED_RECOVERY",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/P2_RETAINED_RECOVERY.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/P2_RETAINED_RECOVERY.md",
+        "section": "2",
+        "phase": 2
+      },
+      "acceptance": {
+        "criteria": [
+          "Complete exact-version kit, manifest, plan and all required source scopes independently verified",
+          "Fresh UK mechanism proof and preflight distinguish real execution from local fixtures",
+          "One new exact approval and live writer/fence gates precede recovery; unknown effects HOLD",
+          "Failure containment independently attempts all reviewed cleanup groups; no notification replay",
+          "Production health and independent acceptance have separate actual receipts"
+        ],
+        "tests": [
+          "tests/test_p2_retained_recovery_governance.py"
+        ]
+      },
+      "reuse": [
+        "PR17 canonical task and PR58 independent review",
+        "Existing ExecutionLedger, activation/fence and retained TLS certificate",
+        "Frozen unchanged evidence reused only for exact unchanged scope"
+      ]
+    }
+  ]
+}
