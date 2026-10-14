@@ -12,6 +12,7 @@ p='stage1/p2_fixed_host_runtime.py';s=load(p)
 s=rep(s,'import p2_auxiliary_isolation as Auxiliary','import p2_auxiliary_isolation as Auxiliary\nfrom p2_tls_lifecycle import TlsLifecycle,TIMER as TLS_TIMER,SERVICE as TLS_SERVICE')
 s=rep(s,"        self.prerequisites.preflight(runtime['prerequisites'])","        if 'tls_renewal' in runtime:TlsLifecycle(self.directory).prepare(runtime['tls_renewal'])\n        self.prerequisites.preflight(runtime['prerequisites'])")
 s=rep(s,"        if 'auxiliary_isolation' in runtime:receipt['auxiliary_isolation']=runtime['auxiliary_isolation']","        if 'auxiliary_isolation' in runtime:receipt['auxiliary_isolation']=runtime['auxiliary_isolation']\n        if 'tls_renewal' in runtime:receipt['tls_renewal']=runtime['tls_renewal']")
+s=rep(s,"        create_dropin_parent=self._dropin_parent_state()", "        if 'tls_renewal' in runtime:\n            tls_value=TlsLifecycle(self.directory).prepare(runtime['tls_renewal'])\n            configs=[item for item in prepared if item['target']=='/etc/xuanjun-development/tls-renewal.json']\n            if len(configs)!=1 or json.loads(configs[0]['data'].decode())!=tls_value:raise ValueError('TLS_RENDERED_CONFIG_BINDING')\n            required={'/etc/systemd/system/'+TLS_TIMER,'/etc/systemd/system/'+TLS_SERVICE}\n            if not required.issubset({item['target'] for item in prepared}):raise ValueError('TLS_TIMER_SERVICE_BINDING')\n        create_dropin_parent=self._dropin_parent_state()")
 s=rep(s,"            PublisherBootstrap(self.directory).apply(runtime.get('publisher'))","            PublisherBootstrap(self.directory).apply(runtime.get('publisher'))\n            if 'tls_renewal' in runtime:TlsLifecycle(self.directory).apply(runtime['tls_renewal'])")
 s=rep(s,"        return tuple(ALLOWED_SERVICES)+(GATEWAY_SERVICE,)+extra","        if any(t['target']=='/etc/systemd/system/'+TLS_TIMER for t in targets):extra+=(TLS_TIMER,)\n        return tuple(ALLOWED_SERVICES)+(GATEWAY_SERVICE,)+extra")
 s=rep(s,"        return {'services_active': True}\n\n    def stop_new", "        if 'tls_renewal' in runtime:\n            self._command(['/usr/bin/systemctl','start',TLS_TIMER])\n            self._command(['/usr/bin/systemctl','is-active','--quiet',TLS_TIMER])\n        return {'services_active': True}\n\n    def stop_new")
@@ -47,9 +48,9 @@ ReadWritePaths=/var/lib/xuanjun-development/tls-acme /var/lib/xuanjun-p2-prepara
  'deploy/xuanjun-p2-tls-renew.timer':'''[Unit]
 Description=Xuanjun P2 certificate renewal schedule
 [Timer]
-OnCalendar=*-*-* 03,15:00:00
+OnActiveSec=5min
+OnUnitActiveSec=12h
 RandomizedDelaySec=900
-Persistent=true
 Unit=xuanjun-p2-tls-renew.service
 [Install]
 WantedBy=timers.target

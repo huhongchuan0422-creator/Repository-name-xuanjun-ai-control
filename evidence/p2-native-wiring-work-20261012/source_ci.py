@@ -75,6 +75,7 @@ subprocess.run(['sudo','-n','env','P2_SOURCE_ROOT='+str(source),'python3','-B',s
 subprocess.run(['sudo','-n','env','P2_SOURCE_ROOT='+str(source),'python3','-B',str(ROOT/'test_auxiliary_isolation.py')],check=True)
 subprocess.run(['python','-B',str(ROOT/'test_install_completion.py')],env=final_env,check=True)
 subprocess.run(['sudo','-n','env','P2_SOURCE_ROOT='+str(source),'python3','-B',str(ROOT/'test_tls_lifecycle.py')],check=True)
+subprocess.run(['python','-B',str(repo/'evidence/p2-install-preparation-20261013/test_complete_admission.py')],check=True)
 print('FINAL_PACKAGE_CONTROLLER_SERVICE_HASH_AND_INSTALL_LIFECYCLE=PASS')
 env.update(P2_SOURCE_ROOT=str(base_fixture),P2_FEISHU_INTEGRATION_ROOT=str(source))
 subprocess.run(['python','-B','-m','unittest','discover','-s',str(repo/'tests'),'-p','test_owner_feishu_*.py','-v'],env=env,check=True)
