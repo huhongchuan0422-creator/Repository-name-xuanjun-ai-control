@@ -1,5 +1,4 @@
 """Offline SQLite simulated order state machine. No real payment or provider credentials."""
-import json
 import sqlite3
 from scripts.community_merchant_contract import scope, payment_amount
 
@@ -22,13 +21,34 @@ CREATE TABLE order_events(
 CREATE TRIGGER event_no_update BEFORE UPDATE ON order_events BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;
 CREATE TRIGGER event_no_delete BEFORE DELETE ON order_events BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;
 """
+def _catalog(db):
+    return sorted(db.execute("SELECT type,name,tbl_name,sql FROM sqlite_master "
+                             "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'").fetchall())
+
 def connect(path=':memory:'):
     db=sqlite3.connect(path)
-    db.execute('PRAGMA foreign_keys=ON')
-    existing=db.execute("SELECT count(*) FROM sqlite_master WHERE name='orders'").fetchone()[0]
-    if not existing:
-        db.executescript(DDL)
-    return db
+    try:
+        db.execute('PRAGMA foreign_keys=ON')
+        template=sqlite3.connect(':memory:')
+        try:
+            template.executescript(DDL)
+            expected=_catalog(template)
+        finally:
+            template.close()
+        existing=_catalog(db)
+        if not existing:
+            if db.execute('PRAGMA user_version').fetchone()[0] != 0:
+                raise ValueError('INCOMPATIBLE_ORDER_SCHEMA')
+            db.executescript('BEGIN IMMEDIATE;'+DDL+'PRAGMA user_version=1;COMMIT;')
+        elif existing != expected or db.execute('PRAGMA user_version').fetchone()[0] != 1:
+            raise ValueError('INCOMPATIBLE_ORDER_SCHEMA')
+        if db.execute('PRAGMA quick_check').fetchone()[0]!='ok':
+            raise ValueError('INVALID_ORDER_DATABASE')
+        return db
+    except BaseException:
+        if db.in_transaction: db.rollback()
+        db.close()
+        raise
 
 def create_order(db, identity, reference, amount_minor):
     t,m,s=scope(identity)
