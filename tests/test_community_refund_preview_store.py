@@ -84,4 +84,58 @@ class RefundPreviewTests(unittest.TestCase):
      record_preview(b,self.orders,S,"r1","e2",50)
     self.assertEqual(preview_total(a,S,"r1"),80)
    finally:a.close();b.close()
+ def test_replace_same_scope_rejected_and_preserves_event(self):
+  successful(self.orders,S)
+  record_preview(self.refunds,self.orders,S,"r1","ev1",100)
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.refunds.execute("INSERT OR REPLACE INTO refund_events VALUES(?,?,?,?,?,?,'OFFLINE_PREVIEW')",
+                        ("t1","m1","s1","r1","ev1",1))
+  self.assertEqual(preview_total(self.refunds,S,"r1"),100)
+  with self.assertRaisesRegex(ValueError,"EXCEEDS_ORDER"):
+   record_preview(self.refunds,self.orders,S,"r1","ev2",21)
+  self.assertFalse(record_preview(self.refunds,self.orders,S,"r1","ev1",100)["recorded"])
+ def test_replace_cross_scope_collision_rejected(self):
+  successful(self.orders,S)
+  record_preview(self.refunds,self.orders,S,"r1","ev1",90)
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.refunds.execute("INSERT OR REPLACE INTO refund_events VALUES(?,?,?,?,?,?,'OFFLINE_PREVIEW')",
+                        ("t2","m2","s2","r1","ev1",2))
+  self.assertEqual(preview_total(self.refunds,S,"r1"),90)
+  self.assertEqual(preview_total(self.refunds,O,"r1"),0)
+ def test_replace_after_reopening_remains_blocked(self):
+  successful(self.orders,S)
+  with tempfile.TemporaryDirectory() as d:
+   path=os.path.join(d,"journal.sqlite")
+   a=open_refund_store(path)
+   record_preview(a,self.orders,S,"r1","ev1",100)
+   a.close()
+   b=open_refund_store(path)
+   try:
+    with self.assertRaises(sqlite3.IntegrityError):
+     b.execute("INSERT OR REPLACE INTO refund_events VALUES(?,?,?,?,?,?,'OFFLINE_PREVIEW')",
+               ("t1","m1","s1","r1","ev1",1))
+    self.assertEqual(preview_total(b,S,"r1"),100)
+   finally:b.close()
+ def test_legacy_schema_rejected_without_data_loss(self):
+  successful(self.orders,S)
+  with tempfile.TemporaryDirectory() as d:
+   path=os.path.join(d,"legacy.sqlite")
+   raw=sqlite3.connect(path)
+   from scripts.community_refund_preview_store import SCHEMA
+   legacy=SCHEMA.replace("""CREATE TRIGGER refund_events_no_replace BEFORE INSERT ON refund_events
+WHEN EXISTS(SELECT 1 FROM refund_events WHERE event_id=NEW.event_id)
+BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;
+""","")
+   raw.executescript(legacy)
+   raw.execute("PRAGMA user_version=1")
+   raw.execute("INSERT INTO refund_events VALUES(?,?,?,?,?,?,'OFFLINE_PREVIEW')",
+               ("t1","m1","s1","r1","ev1",100))
+   raw.commit();raw.close()
+   with self.assertRaisesRegex(ValueError,"INVALID_REFUND_SCHEMA"):
+    open_refund_store(path)
+   raw=sqlite3.connect(path)
+   try:
+    self.assertEqual(raw.execute("SELECT amount_minor FROM refund_events").fetchone()[0],100)
+    self.assertEqual(raw.execute("PRAGMA user_version").fetchone()[0],1)
+   finally:raw.close()
 if __name__=="__main__":unittest.main()
