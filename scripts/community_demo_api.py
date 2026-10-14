@@ -14,7 +14,7 @@ from scripts.community_merchant_contract import scope
 from scripts.community_storefront_snapshot import storefront_snapshot
 from scripts.community_ad_contract import AMOUNT, SUCCESS
 from scripts.community_ad_store import list_campaigns
-from scripts.community_refund_preview_store import preview_total, open_refund_store
+from scripts.community_refund_preview_store import preview_total, open_refund_store, record_preview
 
 MAX_BODY = 2048
 READ_TIMEOUT_SECONDS = 1.0
@@ -51,6 +51,19 @@ class DemoService:
             listed=list_campaigns(self.ad_db,identity,limit=50)
             return {"campaigns":listed["campaigns"],"has_more":listed["has_more"],
                     "simulation_only":True,"write_permissions":False}
+        if method == "POST" and path == "/demo/refunds/record-preview":
+            _object(data, FIELDS | {"event_id","amount_minor"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            reference=_id(data["reference"])
+            event_id=_id(data["event_id"])
+            if self.refund_db is None:
+                raise ValueError("REFUND_PREVIEW_NOT_CONFIGURED")
+            recorded=record_preview(self.refund_db,self.db,identity,reference,event_id,data["amount_minor"])
+            return {"recorded":recorded["recorded"],
+                    "preview_total_minor":recorded["preview_total_minor"],
+                    "provider_refund_executed":False,"simulation_only":True,
+                    "financial_receipt_issued":False}
         if method == "POST" and path == "/demo/refunds/preview":
             _object(data, FIELDS)
             identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -183,7 +196,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
