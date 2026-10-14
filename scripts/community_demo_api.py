@@ -204,12 +204,43 @@ def server_database(path):
     checked.close()
     return sqlite3.connect(path, check_same_thread=False)
 
-def serve_local(path=":memory:",port=18791):
-    if type(port) is not int or not 1024 <= port <= 65535:
+class _OwnedLocalDemoHTTPServer(HTTPServer):
+    def __init__(self, address, service, owned_connections):
+        self._owned_connections = owned_connections
+        super().__init__(address, handler(service))
+    def server_close(self):
+        try:
+            super().server_close()
+        finally:
+            for db in self._owned_connections:
+                db.close()
+
+def serve_local(path=":memory:",port=18791,seed_demo=True):
+    """Loopback-only local fixture; never real merchant auth or provider receipt.
+
+    seed_demo=True loads a fresh ephemeral non-customer fixture; no environment
+    credentials, network payments, production DBs or user-supplied actors.
+    seed_demo=False retains the original fail-closed storefront behavior.
+    """
+    if type(port) is not int or not (port == 0 or 1024 <= port <= 65535):
         raise ValueError("INVALID_PORT")
+    if type(seed_demo) is not bool:
+        raise ValueError("INVALID_DEMO_SEED")
     db = server_database(path)
-    # HTTPServer handles requests serially; no thread pool shares this connection.
-    return HTTPServer(("127.0.0.1",port),handler(DemoService(db)))
+    owned = [db]
+    try:
+        merchant_db = ad_db = now = None
+        if seed_demo:
+            from scripts.community_demo_bootstrap import fixture_stores
+            merchant_db, ad_db, now = fixture_stores()
+            owned.extend((merchant_db, ad_db))
+        # HTTPServer handles requests serially; no thread pool shares the stores.
+        return _OwnedLocalDemoHTTPServer(
+            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now),owned)
+    except BaseException:
+        for connection in owned:
+            connection.close()
+        raise
 
 if __name__=="__main__":
     print("OFFLINE_SIMULATION_ONLY_NO_REAL_WECHAT")
