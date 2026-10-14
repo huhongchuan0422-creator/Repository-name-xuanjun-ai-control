@@ -21,3 +21,8 @@ root盘点授权于2026-10-21T00:00:00Z失效。
 ## 本地验证
 bash -n通过；helper额外参数拒绝(exit2)通过。非目标主机拒绝另验。
 原cdd07e1491d0f0e5cfd7706f6b494df142df04aa获独立限定通过(review5515796568/comment6165218990)，两机实调用38542109818通过。新增hash/父路径增量仍需新HEAD CI和独立复审。本PR不合并/不执行生产变更。
+
+## sudoers审计候选与公开日志收敛
+新工作流不再公开sudo -l正文，仅记录可读取结果。
+root_policy_audit.py是只读Root审计候选，不通过Runner自动执行：用visudo本身枚举实际解析来源，检查每个来源文件及父路径所有者、权限及软链，核对固定helper摘要，验证当前githubrunner只存在固定零参数grant及env_reset，拒绝广泛/多重grant、危险环境规则和检查期间源文件变化。仅输出数量、限定结果与hash，不输出策略正文或凭据。
+该检查不是完整sudoers语义证明；输出full_sudoers_semantic_audit=NOT_VERIFIED。不能据此关闭全部规则/环境审计，更不能替代Runner全局访问政策。私有Root主机执行尚未进行，本地5项拒绝/合法路径测试通过；Hosted另取得回执。Python3.6语法兼容但实机解释器尚未验收。

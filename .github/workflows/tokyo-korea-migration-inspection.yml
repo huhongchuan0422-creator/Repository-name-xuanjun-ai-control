@@ -45,9 +45,19 @@ jobs:
             (( (8#$XJ_MODE & 0022) == 0 ))
             stat -c 'PARENT=%n UID=%u MODE=%a' "$XJ_PARENT"
           done
-          /usr/bin/sudo -n -l
+          /usr/bin/sudo -n -l >/dev/null
+          echo EFFECTIVE_SUDO_LIST_READ=YES
           echo GLOBAL_RUNNER_ACCESS_POLICY=NOT_VERIFIED
           echo FULL_SUDOERS_POLICY_AUDIT=NOT_VERIFIED
           /usr/bin/sudo -n "$XJ_HELPER"
           echo MIGRATION_EXECUTED=NO
           echo ORDER_WRITE_ENABLED=NO
+  hosted-policy-parser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s migration-prep -p 'test_root_policy_audit.py' -v
