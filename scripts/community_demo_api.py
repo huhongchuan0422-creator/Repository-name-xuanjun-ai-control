@@ -98,6 +98,36 @@ class DemoService:
                     "preview_total_minor":recorded["preview_total_minor"],
                     "provider_refund_executed":False,"simulation_only":True,
                     "financial_receipt_issued":False}
+        if method == "POST" and path == "/demo/reconciliation/preview":
+            _object(data, {"tenant_id","merchant_id","store_id"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            t,m,st=scope(identity)
+            if self.refund_db is None:
+                raise ValueError("REFUND_STORE_UNAVAILABLE")
+            # Do not silently claim full reconciliation for truncated results.
+            rows=self.db.execute(
+                "SELECT reference,amount_minor FROM orders WHERE tenant_id=? "
+                "AND merchant_id=? AND store_id=? AND state='SUCCESS' "
+                "ORDER BY reference LIMIT 101",(t,m,st)).fetchall()
+            if len(rows)>100:
+                raise ValueError("RECONCILIATION_SCOPE_TOO_LARGE")
+            total=0
+            previews=0
+            for reference,amount in rows:
+                refund=preview_total(self.refund_db,identity,reference)
+                if type(refund) is not int or refund<0 or refund>amount:
+                    raise ValueError("REFUND_PREVIEW_INCONSISTENT")
+                total+=amount
+                previews+=refund
+            return {"simulated_success_order_count":len(rows),
+                    "simulated_success_total_minor":total,
+                    "refund_preview_total_minor":previews,
+                    "simulated_net_minor":total-previews,
+                    "provider_settlement_minor":None,
+                    "provider_reconciliation_status":"UNKNOWN",
+                    "cross_database_atomic_snapshot":False,
+                    "simulation_only":True,
+                    "financial_receipt_issued":False}
         if method == "POST" and path == "/demo/splits/preview":
             _object(data, FIELDS | {"shares_bps"})
             identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -249,7 +279,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify","/demo/splits/preview","/demo/admin/profile","/demo/admin/item","/demo/admin/campaign/create","/demo/admin/campaign/state","/demo/admin/campaign/review","/demo/qr/checkout"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify","/demo/splits/preview","/demo/admin/profile","/demo/admin/item","/demo/admin/campaign/create","/demo/admin/campaign/state","/demo/admin/campaign/review","/demo/qr/checkout","/demo/reconciliation/preview"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
