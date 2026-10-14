@@ -100,4 +100,16 @@ class ManagementCatalogBrowser(unittest.TestCase):
   expect(page.locator("#refundPreviewStatus")).to_contain_text("预览登记失败")
   page.locator("#loadRefundPreview").click()
   expect(page.locator("#refundPreviewAmounts")).to_contain_text("预览退款 10分")
+ def test_both_executable_channel_shells_issue_verify_signed_demo_qr(self):
+  for route in ("/demo/mini/","/demo/official-h5/"):
+   page=self.ctx.new_page()
+   page.goto(self.base+route)
+   page.locator("#issueQR").click()
+   expect(page.locator("#result")).to_contain_text("已创建本地模拟签名凭证")
+   expect(page.locator("#token")).to_contain_text("signature")
+   page.locator("#verifyQR").click()
+   expect(page.locator("#result")).to_contain_text("签名验证通过")
+   page.locator("#merchant").fill("merchant2")
+   expect(page.locator("#token")).to_have_text("")
+   self.assertNotIn("真实支付",page.locator("#result").inner_text())
 if __name__=="__main__":unittest.main()
