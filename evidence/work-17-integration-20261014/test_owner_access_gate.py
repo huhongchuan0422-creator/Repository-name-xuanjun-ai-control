@@ -3,6 +3,8 @@ import unittest
 from unittest.mock import patch
 import test_foundation_integration  # Loads the existing SHA-pinned fixtures.
 import owner_foundation_reader as reader
+import test_owner_foundation_reader as original_reader_fixture
+import copy
 
 
 class OwnerAccessTests(unittest.TestCase):
@@ -44,6 +46,52 @@ class OwnerAccessTests(unittest.TestCase):
             self.assertFalse(result['execution_granted'])
             self.assertEqual(read.call_args[1]['binding'], self.binding)
             self.assertEqual(observed, [self.binding, self.binding])
+
+
+class OwnerAccessIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = original_reader_fixture.ReaderTests(methodName='runTest')
+        self.fixture.setUp()
+        context = self.fixture.context
+        self.arguments = dict(db=context.reader, binding=context.binding, now=100,
+                              activation_reader=lambda **_: copy.deepcopy(self.fixture.active),
+                              expected_activation=copy.deepcopy(self.fixture.active), receipts={},
+                              receipt_verifier=test_foundation_integration.verify,
+                              producer_envelopes={},
+                              inventory_verifier=test_foundation_integration.verify,
+                              records_verifier=test_foundation_integration.verify)
+
+    def tearDown(self):
+        self.fixture.tearDown()
+
+    def test_authorized_actual_canonical_snapshot_retains_unknown(self):
+        before = self.fixture.context.reader.total_changes
+        calls = []
+        def authorized(binding):
+            calls.append(binding['task_id'])
+            return binding == self.fixture.context.binding
+        result = reader.read_authorized_owner_foundations(authorized, **self.arguments)
+        self.assertEqual(len(result['views']), 7)
+        self.assertEqual(len(result['summary']), 7)
+        self.assertEqual(result['status'], 'HOLD')
+        self.assertFalse(result['execution_granted'])
+        self.assertEqual(calls, ['target', 'target'])
+        self.assertEqual(self.fixture.context.reader.total_changes, before)
+
+    def test_unauthorized_actual_connection_executes_no_sql(self):
+        statements = []
+        self.fixture.context.reader.set_trace_callback(statements.append)
+        with self.assertRaisesRegex(ValueError, 'OWNER_READ_ACCESS_DENIED'):
+            reader.read_authorized_owner_foundations(lambda _: False, **self.arguments)
+        self.assertEqual(statements, [])
+
+    def test_actual_read_revocation_discards_seven_view_result(self):
+        verdicts = iter((True, False))
+        statements = []
+        self.fixture.context.reader.set_trace_callback(statements.append)
+        with self.assertRaisesRegex(ValueError, 'OWNER_READ_ACCESS_DENIED'):
+            reader.read_authorized_owner_foundations(lambda _: next(verdicts), **self.arguments)
+        self.assertTrue(any('SELECT' in sql.upper() for sql in statements))
 
 
 if __name__ == '__main__':
