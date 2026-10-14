@@ -17,6 +17,10 @@ class ManagementCatalogBrowser(unittest.TestCase):
                        {"simulation_only":True,"scope":identity,"reference":"management_order_1","amount_minor":145,
                         "provider_transaction_id":"management_fake_transaction"})
   record_preview(cls.http._owned_connections[1],cls.http._owned_connections[0],identity,"management_order_1","offline_preview_1",45)
+  create_order(cls.http._owned_connections[0],identity,"management_preview_action",145)
+  simulated_transition(cls.http._owned_connections[0],identity,"management_preview_action","management_action_success","SUCCESS",
+                       {"simulation_only":True,"scope":identity,"reference":"management_preview_action",
+                        "amount_minor":145,"provider_transaction_id":"management_action_tx"})
   cls.thread=threading.Thread(target=cls.http.serve_forever,daemon=True)
   cls.thread.start()
   cls.base="http://127.0.0.1:"+str(cls.http.server_address[1])
@@ -84,14 +88,14 @@ class ManagementCatalogBrowser(unittest.TestCase):
    self.assertNotIn("45分",page.locator("#refundPreviewAmounts").inner_text())
  def test_append_only_refund_preview_action_real_browser(self):
   page=self.ctx.new_page();page.goto(self.base+"/demo/merchant/")
-  page.locator("#reference").fill("management_order_1")
+  page.locator("#reference").fill("management_preview_action")
   page.locator("#refundPreviewValue").fill("10")
   page.locator("#recordRefundPreview").click()
   expect(page.locator("#refundPreviewStatus")).to_contain_text("渠道退款未执行")
-  expect(page.locator("#refundPreviewAmounts")).to_contain_text("55分")
+  expect(page.locator("#refundPreviewAmounts")).to_contain_text("10分")
   page.locator("#loadRefundPreview").click()
   expect(page.locator("#refundPreviewAmounts")).to_contain_text("预览退款 55分")
-  page.locator("#refundPreviewValue").fill("100")
+  page.locator("#refundPreviewValue").fill("140")
   page.locator("#recordRefundPreview").click()
   expect(page.locator("#refundPreviewStatus")).to_contain_text("预览登记失败")
   page.locator("#loadRefundPreview").click()
