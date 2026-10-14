@@ -5,6 +5,7 @@ import json
 import re
 import sqlite3
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from urllib.parse import urlsplit
 from scripts.community_order_store import connect, DDL, create_order, state, simulated_transition
 from scripts.community_merchant_contract import scope
@@ -92,7 +93,21 @@ def handler(service):
             except Exception:
                 return self.send_json(503,{"error":"DEMO_UNAVAILABLE"})
         def do_GET(self):
-            return self.send_json(405,{"error":"POST_ONLY"})
+            expected_host = "127.0.0.1:" + str(self.server.server_address[1])
+            if self.headers.get("Host", "") != expected_host:
+                return self.send_json(403,{"error":"LOOPBACK_ONLY"})
+            files={"/demo/":"index.html","/demo/app.js":"app.js"}
+            filename=files.get(self.path)
+            if filename is None:
+                return self.send_json(404,{"error":"NOT_FOUND"})
+            data=(Path(__file__).resolve().parent.parent/"demos"/"community-local-e2e"/filename).read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type","text/javascript; charset=utf-8" if filename.endswith(".js") else "text/html; charset=utf-8")
+            self.send_header("Content-Security-Policy","default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'")
+            self.send_header("Cache-Control","no-store")
+            self.send_header("X-Content-Type-Options","nosniff")
+            self.send_header("Content-Length",str(len(data)))
+            self.end_headers();self.wfile.write(data)
         def send_json(self,status,obj):
             payload=json.dumps(obj,ensure_ascii=False,allow_nan=False).encode("utf-8")
             self.send_response(status)
