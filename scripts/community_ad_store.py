@@ -41,11 +41,41 @@ CREATE TRIGGER audit_no_update BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(
 CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT, 'AUDIT_APPEND_ONLY'); END;
 """
 
+def _schema_catalog(db):
+    return sorted((typ, name, table, statement)
+                  for typ, name, table, statement in db.execute(
+                      "SELECT type,name,tbl_name,sql FROM sqlite_master "
+                      "WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL"))
+
 def open_offline(path=":memory:"):
-    db=sqlite3.connect(path, isolation_level='DEFERRED')
-    db.execute("PRAGMA foreign_keys=ON")
-    db.executescript(SCHEMA)
-    return db
+    """Create only an empty schema; reopen only an exact compatible schema."""
+    db=sqlite3.connect(path, isolation_level="DEFERRED")
+    try:
+        db.execute("PRAGMA foreign_keys=ON")
+        existing=_schema_catalog(db)
+        expected=sqlite3.connect(":memory:")
+        try:
+            expected.executescript(SCHEMA)
+            target=_schema_catalog(expected)
+        finally:
+            expected.close()
+        if not existing:
+            if db.execute("PRAGMA user_version").fetchone()[0] != 0:
+                raise ValueError("INCOMPATIBLE_AD_SCHEMA")
+            db.executescript("BEGIN IMMEDIATE;" + SCHEMA + "PRAGMA user_version=1; COMMIT;")
+        elif existing != target:
+            raise ValueError("INCOMPATIBLE_AD_SCHEMA")
+        version=db.execute("PRAGMA user_version").fetchone()[0]
+        if version not in (0,1):
+            raise ValueError("INCOMPATIBLE_AD_SCHEMA")
+        if db.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+            raise ValueError("INVALID_AD_DATABASE")
+        return db
+    except BaseException:
+        if db.in_transaction:
+            db.rollback()
+        db.close()
+        raise
 
 def _scope(scope):
     if not isinstance(scope, dict) or set(scope) != {"tenant_id","merchant_id","store_id"}:
