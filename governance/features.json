@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "features": [
+    {
+      "feature_id": "GOVERNANCE_COMPLIANCE_GATE",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/FEATURE_COMPLIANCE_GATE_20261015.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/FEATURE_COMPLIANCE_GATE_20261015.md",
+        "section": "2",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "positive registry and negative omissions detected",
+          "normal PR has stable feature-compliance check",
+          "main protection is only enabled after safe bootstrap"
+        ],
+        "tests": [
+          "tests/test_feature_compliance_check.py"
+        ]
+      },
+      "reuse": [
+        "GitHub Actions",
+        "standard-library Python"
+      ]
+    }
+  ]
+}
