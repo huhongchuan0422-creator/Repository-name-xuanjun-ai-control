@@ -1,4 +1,5 @@
 """Trusted internal Phase1 storefront read composition, no HTTP or authentication."""
+import sqlite3
 from scripts.community_merchant_contract import scope
 from scripts.community_merchant_store import profile, list_items
 from scripts.community_ad_store import choose
@@ -9,11 +10,12 @@ def storefront_snapshot(merchant_db, ad_db, identity, now):
     if type(now) is not int or now<0: raise ValueError("INVALID_TIME")
     record=profile(merchant_db,identity)
     catalog=list_items(merchant_db,identity)
-    # Ads are nonessential; a broken ad store cannot block storefront access.
+    # Only optional advertising failures are downgraded. Merchant failures remain fatal.
     ads={}
     for slot in (AMOUNT,SUCCESS):
-        try: selected=choose(ad_db,identity,slot,now)
-        except (ValueError,TypeError,AttributeError):
+        try:
+            selected=choose(ad_db,identity,slot,now)
+        except (ValueError,TypeError,AttributeError,sqlite3.Error):
             selected=None
         ads[slot]=selected
     return {"scope":dict(identity),"merchant":{"name":record["name"],
