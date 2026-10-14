@@ -1,0 +1,22 @@
+name: P2 notifier rejected preflight read-only diagnosis
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-install-preparation-20261013/notifier_preflight_readonly_diag.py
+      - .github/workflows/uk-p2-notifier-readonly-diag.yml
+permissions:
+  contents: read
+jobs:
+  diagnosis:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: false
+          path: notifier-diagnosis-${{ github.run_id }}
+      - name: Read exact input metadata and unit state only
+        working-directory: notifier-diagnosis-${{ github.run_id }}
+        run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/notifier_preflight_readonly_diag.py

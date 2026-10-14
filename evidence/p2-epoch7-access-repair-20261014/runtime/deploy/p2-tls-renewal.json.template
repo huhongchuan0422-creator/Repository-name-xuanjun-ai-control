@@ -1,0 +1,1 @@
+{"schema":1,"domain":"uk.wenwenwenyiyiyi.work","root":"/var/lib/xuanjun-development/tls-acme","transaction_directory":"@@TRANSACTION_DIRECTORY@@","transaction_id":"@@TRANSACTION_ID@@","instance":"@@INSTANCE@@","generation":@@GENERATION@@,"ledger_uuid":"@@LEDGER_UUID@@","release_sha256":"@@PACKAGE_SHA256@@","accept_acme_terms":true}

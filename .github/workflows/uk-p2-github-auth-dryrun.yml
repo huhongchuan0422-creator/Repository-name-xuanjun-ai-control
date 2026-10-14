@@ -1,0 +1,26 @@
+name: P2 UK GitHub receive-pack authentication dry run
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/uk-p2-github-auth-dryrun.yml
+      - evidence/p2-install-preparation-20261013/github_auth_dryrun.py
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-github-auth-dryrun
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Authenticate Git receive-pack without creating a branch
+        env:
+          P2_AUTH_RUN: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/github_auth_dryrun.py "$P2_AUTH_RUN"

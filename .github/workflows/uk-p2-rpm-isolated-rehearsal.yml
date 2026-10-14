@@ -1,0 +1,22 @@
+name: P2 UK isolated RPM payload install and rollback
+on:
+  push:
+    branches:
+      - repair/p2-chatgpt-clean-review-20261013
+    paths:
+      - evidence/p2-install-preparation-20261013/rpm_isolated_rehearsal.py
+      - .github/workflows/uk-p2-rpm-isolated-rehearsal.yml
+permissions:
+  contents: read
+jobs:
+  readback:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install and erase signed RPM payloads only in disposable root with no scripts
+        env:
+          P2_CANARY_RUN: "${{ github.run_id }}"
+        run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/rpm_isolated_rehearsal.py "$P2_CANARY_RUN"

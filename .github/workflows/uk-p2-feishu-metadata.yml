@@ -1,0 +1,97 @@
+name: P2 UK existing Feishu metadata
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths: [scripts/uk-p2-feishu-metadata.py, scripts/owner_feishu_transport.py, scripts/owner_feishu_history.py, scripts/owner_feishu_claim_guard.py, tests/test_owner_feishu_transport.py, tests/test_owner_feishu_history.py, tests/test_owner_feishu_claim_guard.py, scripts/owner_feishu_ledger_endpoint.py, scripts/owner_feishu_bridge_cycle.py, scripts/owner_feishu_https.py, scripts/owner_feishu_runtime_overlay.py, tests/test_owner_feishu_runtime.py, tests/test_owner_feishu_wire.py, tests/test_owner_feishu_https.py, tests/test_owner_feishu_install_gate.py, tests/test_owner_feishu_gateway.mjs, .github/workflows/uk-p2-feishu-metadata.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  metadata:
+    if: github.event_name == 'push' && github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.ref == 'refs/heads/repair/p2-chatgpt-clean-review-20261013'
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Existing channel metadata and CLI option inventory only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-p2-feishu-metadata.py
+
+  outbox-fixtures:
+    if: github.event_name == 'push' && github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.ref == 'refs/heads/repair/p2-chatgpt-clean-review-20261013'
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    env:
+      P2_SOURCE_ROOT: /tmp/p2-feishu-${{ github.run_id }}-${{ github.run_attempt }}/xuanjun-p2-package
+      P2_FEISHU_INTEGRATION_ROOT: /tmp/p2-feishu-${{ github.run_id }}-${{ github.run_attempt }}/integration/xuanjun-p2-package
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Hash-bound existing frozen producer fixture
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import hashlib,io,json,os,pathlib,sys,tarfile,urllib.request,urllib.parse,zipfile,socket
+          assert sys.version_info[:3]==(3,6,8) and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl):
+                  parsed=urllib.parse.urlparse(newurl)
+                  if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password:raise ValueError('REDIRECT')
+                  moved=super().redirect_request(req,fp,code,msg,headers,newurl)
+                  if moved is not None and urllib.parse.urlparse(req.full_url).netloc!=parsed.netloc:moved.remove_header('Authorization')
+                  return moved
+          req=urllib.request.Request('https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11787198841/zip',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'p2-fixture'})
+          raw=urllib.request.build_opener(SafeRedirect()).open(req,timeout=30).read(8*1024*1024+1)
+          assert len(raw)<=8*1024*1024
+          data=zipfile.ZipFile(io.BytesIO(raw)).read('p2-candidate.tar.gz')
+          assert hashlib.sha256(data).hexdigest()=='3ff24eccf3a09e87b89128d33da78ae7b4ac260051a08c3c8d9814090ce3c6cd'
+          root=pathlib.Path(os.environ['P2_SOURCE_ROOT']).parent
+          root.mkdir(mode=0o700)
+          with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as tar:
+              members=tar.getmembers();assert len(members)<=300 and sum(m.size for m in members)<=20000000
+              seen=set()
+              for m in members:
+                  p=pathlib.PurePosixPath(m.name)
+                  assert m.isfile() and not p.is_absolute() and '..' not in p.parts and p.parts[0]=='xuanjun-p2-package' and m.name not in seen
+                  seen.add(m.name)
+              for m in members:
+                  p=root.joinpath(*pathlib.PurePosixPath(m.name).parts);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(tar.extractfile(m).read())
+          package=pathlib.Path(os.environ['P2_SOURCE_ROOT']);manifest=(package/'deploy/integration-manifest.json').read_bytes()
+          assert hashlib.sha256(manifest).hexdigest()=='fe73feb4435f8f32313a86e9d434a4a6a7b994492f731b1c62dd7de801e7a69c'
+          files=json.loads(manifest)['files'];assert len(files)==80
+          for name,digest in files.items():assert hashlib.sha256((package/name).read_bytes()).hexdigest()==digest
+          print('EXACT_FROZEN_PRODUCER_80_HASHES=PASS')
+          PY
+      - name: Apply exact-base complete caller integration in isolated fixture
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import os,pathlib,shutil
+          source=pathlib.Path(os.environ['P2_SOURCE_ROOT'])
+          dest=pathlib.Path(os.environ['P2_FEISHU_INTEGRATION_ROOT'])
+          dest.parent.mkdir(mode=0o700)
+          shutil.copytree(str(source),str(dest))
+          PY
+          /usr/bin/python3 -B scripts/owner_feishu_runtime_overlay.py "$P2_FEISHU_INTEGRATION_ROOT"
+      - name: Existing outbox Feishu receipt and uncertainty regressions
+        run: |
+          /usr/bin/python3 -B -m unittest discover -s tests -p 'test_owner_feishu_*.py' -v
+          echo MODEL_CALLS=0
+          echo PRODUCTION_OUTBOX=NOT_TOUCHED
+          echo LIVE_FEISHU_SEND=NO
+      - name: Clean isolated fixture
+        if: always()
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import os,pathlib,shutil
+          root=pathlib.Path(os.environ['P2_SOURCE_ROOT']).parent
+          assert str(root).startswith('/tmp/p2-feishu-')
+          if root.exists():shutil.rmtree(str(root))
+          PY

@@ -1,0 +1,19 @@
+name: P2 UK legacy writer handles read-only
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-install-preparation-20261013/inspect_legacy_writer_handles.py
+      - .github/workflows/uk-p2-legacy-handles.yml
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Inventory cgroup descendants and old database handles without opening ledger
+        run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/inspect_legacy_writer_handles.py

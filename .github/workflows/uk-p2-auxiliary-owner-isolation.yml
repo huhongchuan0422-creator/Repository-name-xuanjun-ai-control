@@ -1,0 +1,21 @@
+name: P2 UK authorized auxiliary Owner isolation
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-install-preparation-20261013/isolate_auxiliary_owner_authorized.py
+      - .github/workflows/uk-p2-auxiliary-owner-isolation.yml
+permissions:
+  contents: read
+concurrency:
+  group: uk-p2-owner-legacy-isolation
+  cancel-in-progress: false
+jobs:
+  isolate:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/isolate_auxiliary_owner_authorized.py

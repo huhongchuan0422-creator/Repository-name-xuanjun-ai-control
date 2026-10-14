@@ -1,0 +1,16 @@
+[Unit]
+Description=Xuanjun P2 fixed-domain ACME renewal with ACTIVE gate
+After=network-online.target nginx.service
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/python3 -I -B @@RELEASE@@/scripts/uk-p2-tls-renew.py
+TimeoutStartSec=300
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/xuanjun-development/tls-acme /var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5 /run/xuanjun-p2-install.lock

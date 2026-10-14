@@ -1,0 +1,18 @@
+name: P2 exact remaining callback schema facts
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths: [evidence/p2-install-preparation-20261013/remaining_callback_schema.py]
+permissions:
+  contents: read
+jobs:
+  facts:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: false
+          path: p2-schema-${{ github.run_id }}
+      - run: sudo -n /usr/bin/python3 -I -B p2-schema-${{ github.run_id }}/evidence/p2-install-preparation-20261013/remaining_callback_schema.py

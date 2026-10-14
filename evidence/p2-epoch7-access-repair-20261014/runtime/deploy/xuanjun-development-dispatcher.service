@@ -1,0 +1,38 @@
+[Unit]
+Description=Xuanjun fenced development dispatcher
+After=network-online.target xuanjun-p2-gateway-relay.socket
+Wants=network-online.target
+Requires=xuanjun-p2-gateway-relay.socket
+ConditionPathExists=/etc/xuanjun-development/dispatcher.json
+
+[Service]
+Type=simple
+User=xuanjun-dispatcher
+Group=xuanjun-dispatcher
+SupplementaryGroups=xuanjun-ledger-client
+RuntimeDirectory=xuanjun-dispatcher
+RuntimeDirectoryMode=0700
+ExecStartPre=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/development_service.py --config /etc/xuanjun-development/dispatcher.json --check-config --native-controller /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/native_gateway_controller.py --native-controller-sha256 d3d546fa491596cc4d82feac9746f0368eb65f20f3fd134164dca8055337dd3e
+ExecStartPre=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/p2_service_context_preflight.py --config /etc/xuanjun-development/dispatcher.json --native-controller /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/native_gateway_controller.py --native-controller-sha256 d3d546fa491596cc4d82feac9746f0368eb65f20f3fd134164dca8055337dd3e
+ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/development_service.py --config /etc/xuanjun-development/dispatcher.json --native-controller /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/native_gateway_controller.py --native-controller-sha256 d3d546fa491596cc4d82feac9746f0368eb65f20f3fd134164dca8055337dd3e
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryMax=3G
+CPUQuota=200%
+TasksMax=512
+ReadOnlyPaths=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@ /etc/xuanjun-development
+ReadWritePaths=/var/lib/xuanjun-development /run/xuanjun-development /run/xuanjun-dispatcher
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,112 @@
+name: P2 authoritative package mechanical QA Security
+on:
+  push:
+    branches:
+      - repair/p2-chatgpt-clean-review-20261013
+    paths:
+      - .github/workflows/p2-frozen-candidate-gates.yml
+permissions:
+  contents: read
+  actions: read
+env:
+  P2_ARTIFACT_ID: "11796280855"
+  P2_TAR_SHA256: "66cc89391b1bf4d0bdee7293ecc0fcc3ef2b3b7969da9abc72771d41042c38fd"
+  P2_SOURCE_COMMIT: "f01148fdeaa60c0a6dc1e9d30e9e707b61a65c06"
+  P2_SOURCE_TREE: "3fc23b2a01bd8f01ea0edcef9216ded7313409c2"
+  P2_MANIFEST_SHA256: "afce7dc6b5207be938c7f12619bb36073530f6f2a883353335bdcf8cc4fa3601"
+jobs:
+  qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Download exact artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
+          python3 -I -B - <<'PY'
+          import hashlib,io,os,tarfile,zipfile
+          raw=zipfile.ZipFile('/tmp/p2.zip').read('p2-candidate.tar.gz')
+          assert hashlib.sha256(raw).hexdigest()==os.environ['P2_TAR_SHA256']
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
+              seen=set()
+              for m in t.getmembers():
+                  parts=m.name.split('/')
+                  assert m.isfile() and parts[0]=='xuanjun-p2-package'
+                  assert all(p not in ('','.', '..') for p in parts) and m.name not in seen
+                  seen.add(m.name)
+              t.extractall('/tmp/p2pkg')
+          open('/tmp/p2-candidate.tar.gz','wb').write(raw)
+          PY
+      - name: Verify freezer and real release installer
+        run: |
+          set -euo pipefail
+          ROOT=/tmp/p2pkg/xuanjun-p2-package
+          python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          python3 -I -B - <<'PY'
+          import importlib.util,os
+          root='/tmp/p2pkg/xuanjun-p2-package'
+          spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          m.verify(root,root+'/deploy/integration-manifest.json',os.environ['P2_SOURCE_COMMIT'],os.environ['P2_MANIFEST_SHA256'],os.environ['P2_SOURCE_TREE'])
+          print('P2_REAL_RELEASE_INSTALLER_VERIFY=PASS')
+          PY
+          echo P2_AUTHORITATIVE_QA_MECHANICAL=PASS
+          echo RELEASE_GATE=NOT_GRANTED
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Download and inspect exact artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/$P2_ARTIFACT_ID/zip > /tmp/p2.zip
+          python3 -I -B - <<'PY'
+          import hashlib,io,os,tarfile,zipfile
+          raw=zipfile.ZipFile('/tmp/p2.zip').read('p2-candidate.tar.gz')
+          assert hashlib.sha256(raw).hexdigest()==os.environ['P2_TAR_SHA256']
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
+              seen=set()
+              for m in t.getmembers():
+                  parts=m.name.split('/')
+                  assert m.isfile() and parts[0]=='xuanjun-p2-package'
+                  assert all(p not in ('','.', '..') for p in parts) and m.name not in seen
+                  seen.add(m.name)
+              t.extractall('/tmp/p2pkg')
+          open('/tmp/p2-candidate.tar.gz','wb').write(raw)
+          PY
+          ROOT=/tmp/p2pkg/xuanjun-p2-package
+          python3 "$ROOT/tools/p2-package-freeze.py" verify --archive /tmp/p2-candidate.tar.gz --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          test "$(find "$ROOT" -type l | wc -l)" -eq 0
+          test "$(find "$ROOT" -type f -perm -0002 | wc -l)" -eq 0
+          ! grep -RInE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api[_-]?secret[[:space:]]*[:=][[:space:]]*[^<])' "$ROOT"
+          python3 -I -B - <<'PY'
+          import json,pathlib
+          root=pathlib.Path('/tmp/p2pkg/xuanjun-p2-package')
+          dispatcher=(root/'deploy/xuanjun-development-dispatcher.service').read_text()
+          relay=(root/'deploy/xuanjun-p2-gateway-relay.service').read_text()
+          transport=json.loads((root/'stage1/native_gateway_controller.py.json').read_text())
+          assert 'ProtectHome=yes' in dispatcher
+          assert '/home/xuanjun_dev' not in dispatcher
+          assert 'Requires=xuanjun-p2-gateway-relay.socket' in dispatcher
+          assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
+          assert 'User=xuanjun_dev' in relay and 'ProtectHome=read-only' in relay
+          ledger=(root/'stage1/execution_ledger.py').read_text()
+          wake=(root/'stage1/mechanical_wake_service.py').read_text()
+          assert '_pinned_transaction' in ledger and 'record_inventory_notices' in ledger
+          assert 'record_inventory_notices()' in wake
+          assert "file:/proc/self/fd/%d?mode=rw" in ledger
+          intake=(root/'deploy/xuanjun-github-intake.service').read_text()
+          assert 'mechanical_wake_service.py' in intake
+          print('P2_RELAY_TASK23_PACKAGE_SHAPE=PASS')
+          PY
+          echo P2_AUTHORITATIVE_SECURITY_MECHANICAL=PASS
+          echo MODEL_CALLS=0
+          echo RELEASE_GATE=NOT_GRANTED

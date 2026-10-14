@@ -1,0 +1,78 @@
+name: P2 UK exact94 adoption read-only verification
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths: [.github/workflows/uk-p2-adoption-verify.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    env:
+      P2_REVIEW_ROOT: /tmp/p2-adoption-review-${{ github.run_id }}
+    steps:
+      - name: Download exact94 candidate with ZIP and TAR digest verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os,urllib.request,zipfile,io,tarfile,hashlib
+          url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11831235396/zip'
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+           def redirect_request(self,req,fp,code,msg,headers,newurl):
+            redirected=super().redirect_request(req,fp,code,msg,headers,newurl)
+            if redirected is not None:redirected.remove_header('Authorization')
+            return redirected
+          with urllib.request.build_opener(SafeRedirect()).open(req,timeout=60) as f:raw=f.read(2097153)
+          assert len(raw)<=2097152 and hashlib.sha256(raw).hexdigest()=='3104d90d8ec6ad35880a52b5383bd094fe5a85f34c5aa2137a67a50c15a40a1f'
+          z=zipfile.ZipFile(io.BytesIO(raw));names=[n for n in z.namelist() if n.endswith('p2-candidate.tar.gz')];assert len(names)==1
+          archive=z.read(names[0]);assert hashlib.sha256(archive).hexdigest()=='12484d2a903d1cbc382b6587c1b1c1dbc39212fcba4dc7370a0b6eb6f6b81645'
+          out=os.environ['P2_REVIEW_ROOT'];os.mkdir(out,0o700)
+          t=tarfile.open(fileobj=io.BytesIO(archive));seen=set();total=0
+          for m in t.getmembers():
+           parts=m.name.split('/');assert parts[0]=='xuanjun-p2-package' and not m.name.startswith('/') and '..' not in parts and m.name not in seen and m.isfile()
+           seen.add(m.name);total+=m.size;assert total<=16777216
+          t.extractall(out);print('EXACT_94_ARTIFACT_HASHES=PASS')
+          
+          PY
+      - name: Validate real existing isolation and repeated no-op using exact94 runtime
+        run: |
+          sudo -n chown -R 0:0 "$P2_REVIEW_ROOT"
+          sudo -n python3 -I -B - "$P2_REVIEW_ROOT" <<'PY'
+          import os,sys,json,hashlib,stat,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]+'/xuanjun-p2-package'
+          with open(root+'/deploy/integration-manifest.json','rb') as f:raw=f.read()
+          assert hashlib.sha256(raw).hexdigest()=='663ff2bd4bd0e4e9586cbc73357332a03557d529ed0f0b8a79ea93fed751a909'
+          for rel,digest in json.loads(raw.decode())['files'].items():
+           with open(root+'/'+rel,'rb') as f:
+            info=os.fstat(f.fileno());assert info.st_uid==0 and not info.st_mode&0o022
+            assert hashlib.sha256(f.read()).hexdigest()==digest
+          B='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          D=B+'/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5'
+          def h(p):
+           with open(p,'rb') as f:return hashlib.sha256(f.read()).hexdigest()
+          def inventory():
+           return {n:h(D+'/'+n) for n in os.listdir(D)}
+          before=inventory()
+          original=B+'/plan-p2pkg-38420216343-1/protected-core-install-plan.json'
+          assert h(original)=='6a7789a023d0cbb265663275ee7442fdd026eaaee0fc4ee4a0f237ec5a62e970'
+          with open(original) as f:plan=json.load(f)['cutover']
+          plan['legacy_isolation']={'directory':D,'receipt_sha256':'70d8e244f7f72c15a16299b9eef19670cd7cdee452b1913d864af93c2f4824bc','original_plan_path':original,'original_plan_sha256':h(original),'legacy_state_sha256':h(D+'/legacy-units.json'),'database_sha256':'a6b3847009ca7ee394772b7cf0144b90f82d1c68a3e9b4d3e9c4656f50c28d60'}
+          db=plan['source'];assert h(db)==plan['legacy_isolation']['database_sha256']
+          sys.path.insert(0,root+'/stage1')
+          from legacy_host_adapter import LegacyHostAdapter
+          adapter=LegacyHostAdapter(D)
+          adapter._command=lambda *args:(_ for _ in ()).throw(AssertionError('FORBIDDEN_REPEATED_SYSTEMD_EFFECT'))
+          assert adapter.preflight(plan) is True
+          adapter.stop_and_inhibit(plan['legacy_bindings'])
+          adapter.stop_and_inhibit(plan['legacy_bindings'])
+          observation=adapter.measure_quiescence(plan['legacy_bindings'])
+          assert all(x is True for x in observation['proof'].values())
+          assert before==inventory() and h(db)==plan['legacy_isolation']['database_sha256']
+          print(json.dumps({'state':'EXACT_94_ADOPTION_REAL_UK_READONLY_PASS','source':'f0e698102db35ff1e024b1e67feebb62ef90f735','artifact':11831235396,'transaction_id':plan['transaction_id'],'adoption_reference':plan['legacy_isolation'],'original_journal_and_backups_unchanged':True,'canonical_db_unchanged':True,'repeated_stop_commands':0,'quiescence':observation,'install':False,'writer_admission':False,'fence_mutation':False,'model_calls':0},sort_keys=True))
+          
+          PY

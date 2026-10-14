@@ -1,0 +1,26 @@
+name: P2 complete candidate final consolidated checks
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-install-preparation-20261013/consolidated_readiness.py
+      - .github/workflows/uk-p2-complete-install-candidate.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prepare:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: false
+          path: p2-complete-${{ github.run_id }}
+      - name: Verify complete caller and Root loader bindings
+        working-directory: p2-complete-${{ github.run_id }}
+        run: python3 -I -B evidence/p2-install-preparation-20261013/test_complete_admission.py
+      - name: Reuse exact successful prepared plan and run final consolidated checks
+        working-directory: p2-complete-${{ github.run_id }}
+        run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/consolidated_readiness.py "${{ github.run_id }}" "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/protected-core-install-plan.json" "ec1d617857845c43eff6bed2b70a0c00a5dad8dc52df95785bed3ee3d775335a"

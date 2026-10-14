@@ -1,0 +1,234 @@
+{
+  "dispatcher_config_sha256": "b0bd583b7ce928334a6644234121cd7955a999a0844c07c804005d8265e00cda",
+  "install_admission": "NOT_GRANTED",
+  "kind": "OFFLINE_BINDING_PROPOSAL_NOT_INSTALL_PLAN",
+  "native_bootstrap_binding_rebind": "PENDING_EXACT_OLD_BYTES",
+  "new_manifest_sha256": "338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09",
+  "new_release_directory": "integration-338e488c4203e23d",
+  "old_manifest_sha256": "9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3",
+  "proposed_prepared_epoch": 4,
+  "requires_separate_approved_activation_transition": true,
+  "runtime_resume_and_failure_path": "NOT_IMPLEMENTED",
+  "schema": 1,
+  "source_commit": "1a35f744224a64d73128196f6212195d15a9d0a7",
+  "source_tree": "fa23b50843e4fc579348f403322dc3224c8ff78e",
+  "target_bindings": [
+    {
+      "changed": false,
+      "new_target_sha256": "921104f277ceef27bd7c384663f87ed3bd9185d55d35acee05ba35bdbeda784e",
+      "old_target_sha256": "921104f277ceef27bd7c384663f87ed3bd9185d55d35acee05ba35bdbeda784e",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/p2-native-ledger-client.json.template",
+      "source_sha256": "29750e5454c430de403e4fc2700ecea87f2fe688a35c799635d4f326f3ed10ff",
+      "target": "/etc/xuanjun-development/p2-native-ledger-client.json"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "df822f2e712cb43a016e46578cdbe2db35bff9fa3f002b65bac788f8c82fbfb2",
+      "old_target_sha256": "b4f5578efe6a49d787888db4047a0d93fa22258be563f571ae287969e54b3f54",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/p2-native-controller.binding.json.template",
+      "source_sha256": "219194a964f8a3eee16d1a10aebddc135a42c43352f8e53df86035f3a102e014",
+      "target": "/etc/xuanjun-development/p2-native-controller.binding.json"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "c2f2379380f113c2b134a7f5fc2d39e7563872764b55c1041b00192f9da62fca",
+      "old_target_sha256": "c2f2379380f113c2b134a7f5fc2d39e7563872764b55c1041b00192f9da62fca",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/p2-gateway-relay.json.template",
+      "source_sha256": "c2f2379380f113c2b134a7f5fc2d39e7563872764b55c1041b00192f9da62fca",
+      "target": "/etc/xuanjun-development/p2-gateway-relay.json"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "b0bd583b7ce928334a6644234121cd7955a999a0844c07c804005d8265e00cda",
+      "old_target_sha256": "083b447c3f639bc001fb6f6a44848bf2702453fc8a35084f49c1342884aa89ff",
+      "original_source_hash_kind": "ORIGINAL_RAW_HASH_KNOWN_INSTALL_BUG",
+      "source": "deploy/dispatcher.example.json",
+      "source_sha256": "d759e0531f0041ffab0f1046bda008b96161d401166c7471a45b71a15aab376b",
+      "target": "/etc/xuanjun-development/dispatcher.json"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "33845bcc073e9923a3a360c047e3dd53a560e2ea481a9374aca47a5160ba2c20",
+      "old_target_sha256": "33845bcc073e9923a3a360c047e3dd53a560e2ea481a9374aca47a5160ba2c20",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/root-broker.example.json",
+      "source_sha256": "9cc7251fece619ce8a9d1fa99d6f4b22db489e612c3305d5c24a208237530b73",
+      "target": "/etc/xuanjun-development/root-broker.json"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "da89df8fc93e0e35e03edcf03b0065a8dcd0f97add16d8b78f3b200b6cf50160",
+      "old_target_sha256": "b4a22ccec64f132fc12a2eeb5611efbaaa69f28e78046677882caa8cbe47c11b",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/p2-owner-feishu-binding.json.template",
+      "source_sha256": "95cd62095f49cf9bffe718460948f1756ffc308b4362da6ff29503e15a0e47e0",
+      "target": "/etc/xuanjun-development/p2-owner-feishu-binding.json"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "651c3bd98572e441d5c6d9c9a9b97e90ce347922acb9ce5bd62583448dc7bc2b",
+      "old_target_sha256": "651c3bd98572e441d5c6d9c9a9b97e90ce347922acb9ce5bd62583448dc7bc2b",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/xuanjun-uk-openclaw-p2-docker.conf",
+      "source_sha256": "651c3bd98572e441d5c6d9c9a9b97e90ce347922acb9ce5bd62583448dc7bc2b",
+      "target": "/etc/systemd/system/xuanjun-uk-openclaw.service.d/20-p2-docker.conf"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "45d1d641d7fa57017c277f368d13412d52a3e05dbd165aed33852f6053423846",
+      "old_target_sha256": "45d1d641d7fa57017c277f368d13412d52a3e05dbd165aed33852f6053423846",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/uk-owner-workbench/nginx.conf.template",
+      "source_sha256": "f72349f30c7c6beb950522967a3ce6a274285d48a12fcb531615ac0f84c410ef",
+      "target": "/etc/nginx/conf.d/xuanjun-p2-owner.conf"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "a01777a36599bdc253357a100ed9eb089507b6bc9cae739cb3647b8e35d49562",
+      "old_target_sha256": "a01777a36599bdc253357a100ed9eb089507b6bc9cae739cb3647b8e35d49562",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/xj-root-broker.socket",
+      "source_sha256": "a01777a36599bdc253357a100ed9eb089507b6bc9cae739cb3647b8e35d49562",
+      "target": "/etc/systemd/system/xj-root-broker.socket"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "a53e0a0416960fab027535c6420037ae19e0401663ea0bd84022d3db1209d3c3",
+      "old_target_sha256": "e146733e3bbe7b85546565ef67a1137c8aa5691de00ae31581e9e64201b2a073",
+      "original_source_hash_kind": "ORIGINAL_RAW_HASH_KNOWN_INSTALL_BUG",
+      "source": "deploy/xj-root-broker.service",
+      "source_sha256": "a53e0a0416960fab027535c6420037ae19e0401663ea0bd84022d3db1209d3c3",
+      "target": "/etc/systemd/system/xj-root-broker.service"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "a1a3d372706646da2b8954b2162e5dcd7974246b5d4660fe6098b6a699e032dd",
+      "old_target_sha256": "a1a3d372706646da2b8954b2162e5dcd7974246b5d4660fe6098b6a699e032dd",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/xuanjun-ledger.socket",
+      "source_sha256": "a1a3d372706646da2b8954b2162e5dcd7974246b5d4660fe6098b6a699e032dd",
+      "target": "/etc/systemd/system/xuanjun-ledger.socket"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "e0ae579ce9060862c5ca473c8cdf544657103c9672325e387bac78ecf7df69a7",
+      "old_target_sha256": "e9268497aced704319f769d98cf35d620863677c89abf16dee0b40dc57c22c88",
+      "original_source_hash_kind": "ORIGINAL_RAW_HASH_KNOWN_INSTALL_BUG",
+      "source": "deploy/xuanjun-ledger.service",
+      "source_sha256": "e0ae579ce9060862c5ca473c8cdf544657103c9672325e387bac78ecf7df69a7",
+      "target": "/etc/systemd/system/xuanjun-ledger.service"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "b7273e50c7796611c93be09111785d299d9c870fa3a3e5dd17f149e75968544b",
+      "old_target_sha256": "333089f7f1ffc08ee7f91d1ca3214d2d350da3ab68ee0126909ea314589a1c42",
+      "original_source_hash_kind": "ORIGINAL_RAW_HASH_KNOWN_INSTALL_BUG",
+      "source": "deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service",
+      "source_sha256": "b7273e50c7796611c93be09111785d299d9c870fa3a3e5dd17f149e75968544b",
+      "target": "/etc/systemd/system/xuanjun-uk-owner-callback.service"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "b9d45ab1b97e19d6d18552231e615e5f8399617bea09a1868cf727213e3755d3",
+      "old_target_sha256": "32db87fe158b50dc4e4e45873e76d47a3d6ff67c29ab7e3404cbb10401eaf7ac",
+      "original_source_hash_kind": "ORIGINAL_RAW_HASH_KNOWN_INSTALL_BUG",
+      "source": "deploy/uk-owner-workbench/xuanjun-uk-owner-dashboard.service",
+      "source_sha256": "b9d45ab1b97e19d6d18552231e615e5f8399617bea09a1868cf727213e3755d3",
+      "target": "/etc/systemd/system/xuanjun-uk-owner-dashboard.service"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "a08ac2421421f0d2e003e8ee0de842b17b3562dfeb344ac8b378486c4f7f5034",
+      "old_target_sha256": "a08ac2421421f0d2e003e8ee0de842b17b3562dfeb344ac8b378486c4f7f5034",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/xuanjun-p2-gateway-relay.socket",
+      "source_sha256": "a08ac2421421f0d2e003e8ee0de842b17b3562dfeb344ac8b378486c4f7f5034",
+      "target": "/etc/systemd/system/xuanjun-p2-gateway-relay.socket"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "a1fc50f0ba4bc01142c6f9c76a0981c686400b724ddb4d038c3567e8983772d2",
+      "old_target_sha256": "e5293fa99ac1f262c61a45003980f0d8e4025a57920487f9f95eee0cfc861518",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/xuanjun-p2-gateway-relay.service",
+      "source_sha256": "7f946414e984c7671fcb68fe5cb98ba269ec49653ff9b2c1ed424a2b23095991",
+      "target": "/etc/systemd/system/xuanjun-p2-gateway-relay.service"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "e8e743f2744b8ce0e9eb716d08c5d9404bd17a888f70cda7fa82894a1ce9c8e1",
+      "old_target_sha256": "776a80b82b6f9c265df71b8747535ad52e4c1f1c1281f4260b7f2b4deaedc52f",
+      "original_source_hash_kind": "ORIGINAL_RAW_HASH_KNOWN_INSTALL_BUG",
+      "source": "deploy/xuanjun-development-dispatcher.service",
+      "source_sha256": "e8e743f2744b8ce0e9eb716d08c5d9404bd17a888f70cda7fa82894a1ce9c8e1",
+      "target": "/etc/systemd/system/xuanjun-development-dispatcher.service"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "0b82e326abad52faf02efefd1d82fdbe848dca0234d27d3fdad8f07ac3dd0f97",
+      "old_target_sha256": "0b82e326abad52faf02efefd1d82fdbe848dca0234d27d3fdad8f07ac3dd0f97",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/xuanjun-github-intake.timer",
+      "source_sha256": "0b82e326abad52faf02efefd1d82fdbe848dca0234d27d3fdad8f07ac3dd0f97",
+      "target": "/etc/systemd/system/xuanjun-github-intake.timer"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "d11a8702e29b22dac0ffad4b3a88e4a5d390e5b5e59d0b8ce1be2a1a326be7de",
+      "old_target_sha256": "2f7bfbb7beaa475ba181b70465e31e4fb83a45d4e14240d9bf5ce577fb3df816",
+      "original_source_hash_kind": "ORIGINAL_RAW_HASH_KNOWN_INSTALL_BUG",
+      "source": "deploy/xuanjun-github-intake.service",
+      "source_sha256": "d11a8702e29b22dac0ffad4b3a88e4a5d390e5b5e59d0b8ce1be2a1a326be7de",
+      "target": "/etc/systemd/system/xuanjun-github-intake.service"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "e9b99ace3444e0eaa5a9cb5c6a975e7bed31bfc3cb3a15d2e54959b3fa9daef4",
+      "old_target_sha256": "e9b99ace3444e0eaa5a9cb5c6a975e7bed31bfc3cb3a15d2e54959b3fa9daef4",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/p2-nginx-main.conf",
+      "source_sha256": "e9b99ace3444e0eaa5a9cb5c6a975e7bed31bfc3cb3a15d2e54959b3fa9daef4",
+      "target": "/etc/xuanjun-development/nginx-main.conf"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "a1d6e0b8cabcfcbec8d834101b70056580135e6a235bb26e293bc904172db545",
+      "old_target_sha256": "a1d6e0b8cabcfcbec8d834101b70056580135e6a235bb26e293bc904172db545",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/p2-nginx.service",
+      "source_sha256": "a1d6e0b8cabcfcbec8d834101b70056580135e6a235bb26e293bc904172db545",
+      "target": "/etc/systemd/system/nginx.service"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "a079c2d38b2c033b0a32c5b34d5995e1fb9588600ac7d2b44c6f8f9f091f515c",
+      "old_target_sha256": "09d494c23a8ad4f4276663a7d1ffd8cee7ac9b6900a1b3d0d9f018f429e103d1",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/p2-tls-renewal.json.template",
+      "source_sha256": "0cd294c87173aa8a1b5a5c77335224776ad2a332b48a94e287dae37b231531a6",
+      "target": "/etc/xuanjun-development/tls-renewal.json"
+    },
+    {
+      "changed": true,
+      "new_target_sha256": "5fe4083d2780c297705d90d4327500e32b7c6c57b550a6713963b06ff2da859d",
+      "old_target_sha256": "42fff829bb5ba06fc51015ba30d10155c592163673c1dec4202f7c2fe032ad74",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/xuanjun-p2-tls-renew.service",
+      "source_sha256": "df95002081d4f39e788f47049919df959ecf7dcb50172e43facf393cd66b92cf",
+      "target": "/etc/systemd/system/xuanjun-p2-tls-renew.service"
+    },
+    {
+      "changed": false,
+      "new_target_sha256": "e081274ebad8ee14e1476673eedc13bf829155179e80a992b42b4651164c2fca",
+      "old_target_sha256": "e081274ebad8ee14e1476673eedc13bf829155179e80a992b42b4651164c2fca",
+      "original_source_hash_kind": "RENDERED",
+      "source": "deploy/xuanjun-p2-tls-renew.timer",
+      "source_sha256": "e081274ebad8ee14e1476673eedc13bf829155179e80a992b42b4651164c2fca",
+      "target": "/etc/systemd/system/xuanjun-p2-tls-renew.timer"
+    }
+  ],
+  "tls_config_sha256": "a079c2d38b2c033b0a32c5b34d5995e1fb9588600ac7d2b44c6f8f9f091f515c"
+}

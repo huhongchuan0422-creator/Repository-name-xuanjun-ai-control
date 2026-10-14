@@ -1,0 +1,23 @@
+name: P2 approved complete installation or fenced rollback
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths: [evidence/p2-install-preparation-20261013/approved_complete_execution.json]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  protected-execution:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: false
+          path: p2-approved-${{ github.run_id }}
+      - name: Independently enforce exact review and fresh host preconditions
+        working-directory: p2-approved-${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I -B evidence/p2-install-preparation-20261013/execute_complete_review_bound.py --binding evidence/p2-install-preparation-20261013/approved_complete_execution.json --run-id "${{ github.run_id }}"

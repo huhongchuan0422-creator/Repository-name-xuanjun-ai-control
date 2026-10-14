@@ -1,0 +1,244 @@
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ 
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ 
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ sudo python3 -I -B - <<'PY'
+> import os, socket, hashlib, json, io, tarfile, tempfile, urllib.request, subprocess, stat, fcntl
+> assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ','WRONG_HOST_OR_USER'
+> base='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520'
+> kit=base+'/epoch3-recovery-candidate'
+> commit='7df2cffc327bb3750e46dfba5bac72475de30435'
+> archive_sha='633c83a5bb608e040c1811aaac70f3dabd2ff9b8d10265046296bcee409aa53d'
+> entry_sha='4aa0acb554978a79b2abe87b78f29d74f1e3901349a96670727030fdcacd6d43'
+> kit_sha='0adcefaaad639a7fa70f69e57d21f1375aeeef15a30a3921e39ba7a17748a3a3'
+> def authority(path):
+>     i=os.lstat(path)
+>     assert os.path.realpath(path)==path and stat.S_ISDIR(i.st_mode) and (i.st_uid,i.st_gid,stat.S_IMODE(i.st_mode))==(0,0,0o700),'DIRECTORY_AUTHORITY'
+> def regular(path):
+>     assert os.path.realpath(path)==path,'FILE_ALIAS'
+>     fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+>     with os.fdopen(fd,'rb') as f:
+>         i=os.fstat(f.fileno());assert stat.S_ISREG(i.st_mode) and i.st_uid==0 and i.st_gid==0 and not i.st_mode&0o022 and i.st_nlink==1,'FILE_AUTHORITY'
+>         data=f.read(1048577)
+>     assert len(data)<=1048576,'FILE_BOUND'
+>     return data
+> class NoRedirect(urllib.request.HTTPRedirectHandler):
+>     def redirect_request(self,*args,**kwargs):raise ValueError('DOWNLOAD_REDIRECT_REFUSED')
+> authority(base)
+> lock='/run/xuanjun-p2-install.lock'
+> assert os.path.realpath(lock)==lock,'LOCK_ALIAS'
+> fd=os.open(lock,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+> try:
+>     i=os.fstat(fd)
+>     assert stat.S_ISREG(i.st_mode) and (i.st_uid,i.st_gid,stat.S_IMODE(i.st_mode),i.st_nlink)==(0,0,0o600,1),'LOCK_AUTHORITY'
+>     fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+>     now=os.lstat(lock);assert (now.st_dev,now.st_ino)==(i.st_dev,i.st_ino),'LOCK_CHANGED'
+>     if not os.path.lexists(kit):
+>         url='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/'+commit+'/evidence/p2-install-preparation-20261013/epoch3-recovery-kit.tar.gz'
+>         with urllib.request.build_opener(NoRedirect()).open(url,timeout=60) as response:data=response.read(1048577)
+>         assert len(data)==252004 and hashlib.sha256(data).hexdigest()==archive_sha,'ARCHIVE_HASH_MISMATCH'
+>         stage=tempfile.mkdtemp(prefix='.epoch3-kit-stage-',dir=base)
+>         with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
+>             members=archive.getmembers();seen=set();total=0
+>             assert len(members)<=256,'ARCHIVE_MEMBER_BOUND'
+>             for member in members:
+>                 parts=member.name.split('/')
+>                 assert parts[0]=='epoch3-recovery-candidate' and all(p not in ('','..','.') for p in parts),'ARCHIVE_PATH'
+>                 assert member.name not in seen and (member.isdir() or member.isfile()) and member.uid==0 and member.gid==0,'ARCHIVE_TYPE'
+>                 seen.add(member.name);total+=member.size
+>                 assert total<=8388608,'ARCHIVE_SIZE_BOUND'
+>             archive.extractall(stage,members=members)
+>         staged=stage+'/epoch3-recovery-candidate';authority(staged)
+>         assert not os.path.lexists(kit),'CANDIDATE_RACE'
+>         os.rename(staged,kit)
+>         parent=os.open(base,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+>         try:os.fsync(parent)
+>         finally:os.close(parent)
+>         os.rmdir(stage)
+>     authority(kit)
+>     entry=kit+'/epoch3_recovery_entry.py'
+>     assert hashlib.sha256(regular(entry)).hexdigest()==entry_sha,'ENTRY_HASH_MISMATCH'
+>     assert hashlib.sha256(regular(kit+'/recovery-kit-manifest.json')).hexdigest()==kit_sha,'KIT_MANIFEST_MISMATCH'
+> finally:os.close(fd)
+> print('EXACT_KIT_PREPARED_NO_INSTALL',flush=True)
+> for operation in ('test-only','verify-only'):
+>     print('BEGIN_'+operation.upper().replace('-','_'),flush=True)
+>     result=subprocess.run(['/usr/bin/python3','-I','-B',entry,'--kit-manifest-sha256',kit_sha,'--operation',operation],timeout=600,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C','HOME':'/root'})
+>     assert result.returncode==0,'STOP_'+operation.upper().replace('-','_')+'_FAILED'
+> print('UK_TEST_AND_READ_ONLY_PREFLIGHT_COMPLETE_NOT_INSTALL_ADMISSION',flush=True)
+> PY
+/usr/lib64/python3.6/tarfile.py:2251: RuntimeWarning: The default behavior of tarfile extraction has been changed to disallow common exploits (including CVE-2007-4559). By default, absolute/parent paths are disallowed and some mode bits are cleared. See https://access.redhat.com/articles/7004769 for more details.
+  RuntimeWarning)
+EXACT_KIT_PREPARED_NO_INSTALL
+BEGIN_TEST_ONLY
+test_active_proposal_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_appends_same_journal_without_grant (test_epoch3_activation_rebind.RebindTests) ... ok
+test_bool_like_gate_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_crash_after_journal_before_descriptor_holds (test_epoch3_activation_rebind.RebindTests) ... ok
+test_database_change_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_generation_change_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_hash_mismatch_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_lock_released_after_failure (test_epoch3_activation_rebind.RebindTests) ... ok
+test_missing_gate_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_proof_extra_key_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_repeat_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_wrong_old_epoch_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_wrong_owner_rejected (test_epoch3_activation_rebind.RebindTests) ... ok
+test_bad_hash (test_epoch3_approval.Tests) ... ok
+test_boolean_not_count (test_epoch3_approval.Tests) ... ok
+test_bound (test_epoch3_approval.Tests) ... ok
+test_consumed (test_epoch3_approval.Tests) ... ok
+test_duplicate_json (test_epoch3_approval.Tests) ... ok
+test_exact (test_epoch3_approval.Tests) ... ok
+test_extra_scope (test_epoch3_approval.Tests) ... ok
+test_old_marker (test_epoch3_approval.Tests) ... ok
+test_redirect (test_epoch3_approval.Tests) ... ok
+test_wrong_author (test_epoch3_approval.Tests) ... ok
+test_wrong_destination (test_epoch3_approval.Tests) ... ok
+test_wrong_login (test_epoch3_approval.Tests) ... ok
+test_wrong_version (test_epoch3_approval.Tests) ... ok
+test_create_and_atomic_save (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_create_write_failure_keeps_attempt_consumed (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_external_change_rejected (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_loose_parent_rejected (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_nan_rejected_before_file (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_save_write_failure_keeps_old_state (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_second_creation_rejected (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_symlink_cannot_create (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_unclaimed_existing_save_rejected (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_wrong_directory_rejected (test_epoch3_attempt_journal.AttemptTests) ... ok
+test_actual_file_drift_rejected (test_epoch3_bindings.BindingsTests) ... ok
+test_all_24_bindings (test_epoch3_bindings.BindingsTests) ... ok
+test_changed_plan_rejected (test_epoch3_bindings.BindingsTests) ... ok
+test_new_config_hash_exact (test_epoch3_bindings.BindingsTests) ... ok
+test_preserves_canonical_identity (test_epoch3_bindings.BindingsTests) ... ok
+test_public_report_omits_replacement_values (test_epoch3_bindings.BindingsTests) ... ok
+test_unrelated_delta_rejected (test_epoch3_bindings.BindingsTests) ... ok
+test_new_hash_invalid_rejected (test_epoch3_bindings.NativeBindingTests) ... ok
+test_old_bytes_mismatch_rejected (test_epoch3_bindings.NativeBindingTests) ... ok
+test_old_release_cannot_be_reused (test_epoch3_bindings.NativeBindingTests) ... ok
+test_only_bridge_paths_change (test_epoch3_bindings.NativeBindingTests) ... ok
+test_database_reopen_failure_no_activate (test_epoch3_host_driver.Tests) ... ok
+test_existing_attempt_prevents_effects (test_epoch3_host_driver.Tests) ... ok
+test_native_binding_failure_holds_new_epoch (test_epoch3_host_driver.Tests) ... ok
+test_postcheck_failure_fences_active (test_epoch3_host_driver.Tests) ... ok
+test_postchecker_receives_new_identity (test_epoch3_host_driver.Tests) ... ok
+test_real_epoch_and_journal_success (test_epoch3_host_driver.Tests) ... ok
+test_staging_failure_fences_old_epoch (test_epoch3_host_driver.Tests) ... ok
+test_stop_failure_recorded_unknown (test_epoch3_host_driver.Tests) ... ok
+test_tls_failure_fences_before_stops (test_epoch3_host_driver.Tests) ... ok
+test_activation_epoch_changed (test_epoch3_host_preflight.Tests) ... ok
+test_complete_readonly_composition (test_epoch3_host_preflight.Tests) ... ok
+test_database_changed (test_epoch3_host_preflight.Tests) ... ok
+test_journal_mismatch (test_epoch3_host_preflight.Tests) ... ok
+test_legacy_busy (test_epoch3_host_preflight.Tests) ... ok
+test_old_package_drift (test_epoch3_host_preflight.Tests) ... ok
+test_prior_effect_rejected (test_epoch3_host_preflight.Tests) ... ok
+test_process_exclusion_failure (test_epoch3_host_preflight.Tests) ... ok
+test_runner_guard_missing (test_epoch3_host_preflight.Tests) ... ok
+test_scheduler_denied (test_epoch3_host_preflight.Tests) ... ok
+test_source_already_replaced (test_epoch3_host_preflight.Tests) ... ok
+test_wrong_host (test_epoch3_host_preflight.Tests) ... ok
+test_absence (test_epoch3_inspection.InspectionTests) ... ok
+test_fifo_rejected (test_epoch3_inspection.InspectionTests) ... ok
+test_file_alias_rejected (test_epoch3_inspection.InspectionTests) ... ok
+test_file_bound (test_epoch3_inspection.InspectionTests) ... ok
+test_file_metadata_no_content (test_epoch3_inspection.InspectionTests) ... ok
+test_mask_metadata_only (test_epoch3_inspection.InspectionTests) ... ok
+test_busy_rejected (test_epoch3_install_lock.Tests) ... ok
+test_loose_mode_rejected (test_epoch3_install_lock.Tests) ... ok
+test_missing_not_created (test_epoch3_install_lock.Tests) ... ok
+test_reuses_and_releases (test_epoch3_install_lock.Tests) ... ok
+test_drift_rejected (test_epoch3_native_binding.Tests) ... ok
+test_preserve_and_replace (test_epoch3_native_binding.Tests) ... ok
+test_publish_failure_keeps_original (test_epoch3_native_binding.Tests) ... ok
+test_repeat_rejected (test_epoch3_native_binding.Tests) ... ok
+test_symlink_rejected (test_epoch3_native_binding.Tests) ... ok
+test_wrong_transform (test_epoch3_native_binding.Tests) ... ok
+test_cutover_identity_unchanged (test_epoch3_plan.Tests) ... ok
+test_explicit_failure_policy (test_epoch3_plan.Tests) ... ok
+test_missing_plugin_target_rejected (test_epoch3_plan.Tests) ... ok
+test_plugin_hashes_rebound (test_epoch3_plan.Tests) ... ok
+test_retained_bootstrap_unchanged (test_epoch3_plan.Tests) ... ok
+test_tls_reference_exact (test_epoch3_plan.Tests) ... ok
+test_wrong_manifest_rejected (test_epoch3_plan.Tests) ... ok
+test_existing_archive_not_overwritten (test_epoch3_preserve.PreserveTests) ... ok
+test_nonempty_tls_rejected_without_mutation (test_epoch3_preserve.PreserveTests) ... ok
+test_preserves_all_prior_bytes (test_epoch3_preserve.PreserveTests) ... ok
+test_receipt_change_rejected_without_mutation (test_epoch3_preserve.PreserveTests) ... ok
+test_receipt_copy_failure_keeps_originals (test_epoch3_preserve.PreserveTests) ... ok
+test_repeat_rejected (test_epoch3_preserve.PreserveTests) ... ok
+test_second_move_failure_keeps_tls_evidence (test_epoch3_preserve.PreserveTests) ... ok
+test_symlink_tls_rejected (test_epoch3_preserve.PreserveTests) ... ok
+test_bytecode_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_exact_actual_runtime_and_helpers (test_epoch3_recovery_entry.Tests) ... ok
+test_extra_helper_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_extra_runtime_module_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_loose_helpers_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_manifest_mismatch_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_modified_helper_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_wrong_host_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_approval_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_containment_failure_keeps_other_containment (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_empty_phase_evidence_not_success (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_every_phase_failure_contains_and_never_retries (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_existing_attempt_prevents_all_effects (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_final_receipt_failure_reported_unknown (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_intent_written_before_each_effect (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_preflight_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_second_execution_rejected (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_snapshot_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_success_order_and_not_final_acceptance (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_duplicate_target_rejected (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_existing_attempt_rejected (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_generic_restore_forbidden (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_nss_replay_and_removal_forbidden (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_prior_receipt_hash_rejected (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_receipt_hash_binds_serialized_file_newline (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_source_mismatch_before_receipt (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_success_order_retains_resources (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_tls_failure_does_not_restore_or_write_targets (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_approval_cannot_be_inferred (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_bootstrap_drift (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_duplicate_targets (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_epoch_changed (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_parser_failure (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_publisher_stage_present (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_receipt_drift (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_rpm_drift (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_rpm_journal_drift (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_target_effect (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_tls_new_contents (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_tls_wrong_owner (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_valid_observation_accepted (test_epoch3_retained_state.RetainedStateTests) ... ok
+test_changed_manifest_rejected (test_epoch3_runtime_build.RuntimeBuildTests) ... ok
+test_changed_patch_rejected (test_epoch3_runtime_build.RuntimeBuildTests) ... ok
+test_does_not_overwrite_output (test_epoch3_runtime_build.RuntimeBuildTests) ... ok
+test_no_install_authority_and_original_untouched (test_epoch3_runtime_build.RuntimeBuildTests) ... ok
+test_only_two_runtime_files_change (test_epoch3_runtime_build.RuntimeBuildTests) ... ok
+test_original_runtime_drift_rejected (test_epoch3_runtime_build.RuntimeBuildTests) ... ok
+test_repeat_build_byte_exact (test_epoch3_runtime_build.RuntimeBuildTests) ... ok
+test_all_stops_attempted_after_timeout (test_epoch3_service_containment.Tests) ... ok
+test_cgroup_permission_error_rejected (test_epoch3_service_containment.Tests) ... ok
+test_controller_missing_rejected (test_epoch3_service_containment.Tests) ... ok
+test_duplicate_states_rejected (test_epoch3_service_containment.Tests) ... ok
+test_forbidden_unit_never_queried (test_epoch3_service_containment.Tests) ... ok
+test_missing_unit_with_pid_rejected (test_epoch3_service_containment.Tests) ... ok
+test_nonzero_stop_not_hidden (test_epoch3_service_containment.Tests) ... ok
+test_not_yet_installed_unit_explicit_absence (test_epoch3_service_containment.Tests) ... ok
+test_query_nonzero_rejected (test_epoch3_service_containment.Tests) ... ok
+test_running_pid_rejected (test_epoch3_service_containment.Tests) ... ok
+test_state_change_rejected (test_epoch3_service_containment.Tests) ... ok
+test_unexpected_cgroup_rejected (test_epoch3_service_containment.Tests) ... ok
+test_verify_every_unit (test_epoch3_service_containment.Tests) ... ok
+
+----------------------------------------------------------------------
+Ran 160 tests in 2.143s
+
+OK
+{"kit_manifest_sha256": "0adcefaaad639a7fa70f69e57d21f1375aeeef15a30a3921e39ba7a17748a3a3", "operation": "test-only", "production_resume": "NOT_EXECUTED", "success": true, "tests": 160}
+BEGIN_VERIFY_ONLY
+
+{"epoch": 3, "install_admission": "NOT_GRANTED", "kit_manifest_sha256": "0adcefaaad639a7fa70f69e57d21f1375aeeef15a30a3921e39ba7a17748a3a3", "operation": "verify-only", "plan_sha256": "0966ab156508228670faaadbba97ff62e19dac8451cced3598eda4eb0bea7f76", "production_resume": "NOT_EXECUTED", "snapshot_sha256": "e297a8db0b4f2e2641ee3aeb6c94119a7ec5034a50a44a0e93723c996205df4e"}
+UK_TEST_AND_READ_ONLY_PREFLIGHT_COMPLETE_NOT_INSTALL_ADMISSION
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ 
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ 
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ 

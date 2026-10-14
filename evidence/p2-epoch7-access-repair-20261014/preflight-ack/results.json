@@ -1,0 +1,10 @@
+{
+  "scope": "LOCAL_PRESTART_ACK_REGRESSION_NO_HOST_RPC_OR_MODELS",
+  "python": "3.6.8",
+  "tests": 7,
+  "passed": 7,
+  "original_reproduction": "2 cases fail as expected: implicit None and HOLD_PLUGIN_PREFLIGHT",
+  "source_sha256": "7b61b682156331ea27dc19f404518c0d388c85e1f4a84a6cc7ba4de671b12833",
+  "production": "NOT_RUN",
+  "independent_review": "PENDING"
+}

@@ -1,0 +1,139 @@
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ 
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ sudo python3 -I -B - <<'PY'
+> import os,socket,hashlib,io,tarfile,tempfile,urllib.request,subprocess,stat,fcntl
+> assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ','WRONG_HOST_OR_USER'
+> base='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520'
+> kit=base+'/epoch3-recovery-candidate'
+> backup=base+'/epoch3-recovery-candidate-retained-89eb2624d3aaee99'
+> commit='07e81116edb0dcf851259f6a292a8a25e735cca7'
+> archive_sha='7e3228b293d0737d27a3f3fca57385f5b6c5628cfddf6488ce1c17c1017d619f'
+> entry_sha='5c494fe7b5c8737a972d6e012e76a74d17b005a978462a6b3ab9b3cb8daa2848'
+> kit_sha='1e13f9e1b6c2fddc135c314fbfb4c6f2b687466ef01208321116a9de10a3c71c'
+> old_entry_sha='0152ae2b5f2bef0063175b25d1db0991845d6b9d17ba364f0dbb05280cde3fef'
+> old_kit_sha='89eb2624d3aaee99117e6292f547852a61cce88d119cbb0fab57e0539c8aed5b'
+> def authority(path):
+>     i=os.lstat(path)
+>     assert os.path.realpath(path)==path and stat.S_ISDIR(i.st_mode) and (i.st_uid,i.st_gid,stat.S_IMODE(i.st_mode))==(0,0,0o700),'DIRECTORY_AUTHORITY'
+> def regular(path):
+o>     assert os.path.realpath(path)==path,'FILE_ALIAS'
+>     fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+>     with os.fdopen(fd,'rb') as f:
+>         i=os.fstat(f.fileno());assert stat.S_ISREG(i.st_mode) and i.st_uid==0 and i.st_gid==0 and not i.st_mode&0o022 and i.st_nlink==1,'FILE_AUTHORITY'
+>         data=f.read(2097153);after=os.fstat(f.fileno())
+>     assert len(data)<=2097152 and (i.st_dev,i.st_ino,i.st_size,i.st_mtime_ns,i.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),'FILE_BOUND_OR_RACE'
+>     return data
+> def verify(directory,wanted_entry,wanted_manifest):
+>     authority(directory)
+>     path=directory+'/epoch3_recovery_entry.py';raw=regular(path)
+>     assert hashlib.sha256(raw).hexdigest()==wanted_entry,'ENTRY_HASH_MISMATCH'
+>     namespace={'__name__':'kit_integrity_only','__file__':path}
+>     exec(compile(raw,path,'exec'),namespace)
+>     namespace['KIT']=directory
+>     namespace['verify_kit'](wanted_manifest)
+> def sync_parent():
+>     parent=os.open(base,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+>     try:os.fsync(parent)
+>     finally:os.close(parent)
+> class NoRedirect(urllib.request.HTTPRedirectHandler):
+>     def redirect_request(self,*args,**kwargs):raise ValueError('DOWNLOAD_REDIRECT_REFUSED')
+> authority(base)
+> lock='/run/xuanjun-p2-install.lock'
+> assert os.path.realpath(lock)==lock,'LOCK_ALIAS'
+> fd=os.open(lock,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+> try:
+>     i=os.fstat(fd)
+>     assert stat.S_ISREG(i.st_mode) and (i.st_uid,i.st_gid,stat.S_IMODE(i.st_mode),i.st_nlink)==(0,0,0o600,1),'LOCK_AUTHORITY'
+>     fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+>     now=os.lstat(lock);assert (now.st_dev,now.st_ino)==(i.st_dev,i.st_ino),'LOCK_CHANGED'
+>     assert not os.path.lexists(os.path.dirname(base)+'/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch3-recovery-execution.json'),'RECOVERY_ATTEMPT_ALREADY_EXISTS'
+>     verify(kit,old_entry_sha,old_kit_sha)
+>     assert not os.path.lexists(backup),'PRESERVED_CANDIDATE_ALREADY_EXISTS_STOP'
+>     url='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/'+commit+'/evidence/p2-install-preparation-20261013/epoch3-recovery-kit.tar.gz'
+>     with urllib.request.build_opener(NoRedirect()).open(url,timeout=60) as response:data=response.read(1048577)
+>     assert len(data)==254327 and hashlib.sha256(data).hexdigest()==archive_sha,'ARCHIVE_HASH_MISMATCH'
+>     stage=tempfile.mkdtemp(prefix='.epoch3-final-kit-stage-',dir=base)
+>     with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
+>         members=archive.getmembers();seen=set();total=0
+>         assert len(members)<=256,'ARCHIVE_MEMBER_BOUND'
+>         for member in members:
+>             parts=member.name.split('/')
+>             assert parts[0]=='epoch3-recovery-candidate' and all(p not in ('','..','.') for p in parts),'ARCHIVE_PATH'
+>             assert member.name not in seen and (member.isdir() or member.isfile()) and member.uid==0 and member.gid==0 and not member.mode&0o022,'ARCHIVE_TYPE_OR_MODE'
+>             seen.add(member.name);total+=member.size
+>             assert total<=8388608,'ARCHIVE_SIZE_BOUND'
+>         archive.extractall(stage,members=members)
+>     staged=stage+'/epoch3-recovery-candidate'
+>     verify(staged,entry_sha,kit_sha)
+>     verify(kit,old_entry_sha,old_kit_sha)
+>     assert not os.path.lexists(backup),'PRESERVED_CANDIDATE_RACE'
+>     os.rename(kit,backup);sync_parent()
+>     assert not os.path.lexists(kit),'CANDIDATE_RACE'
+>     os.rename(staged,kit);sync_parent();os.rmdir(stage)
+>     verify(kit,entry_sha,kit_sha)
+> finally:os.close(fd)
+> print('FINAL_KIT_VERIFIED_OLD_KIT_RETAINED_NO_INSTALL',flush=True)
+> entry=kit+'/epoch3_recovery_entry.py'
+> for operation in ('test-only','verify-only'):
+>     print('BEGIN_'+operation.upper().replace('-','_'),flush=True)
+>     command=['/usr/bin/python3','-I','-B',entry,'--kit-manifest-sha256',kit_sha,'--operation',operation]
+>     if operation=='test-only':command.append('--affected-only')
+>     result=subprocess.run(command,timeout=600,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C','HOME':'/root'})
+>     assert result.returncode==0,'STOP_'+operation.upper().replace('-','_')+'_FAILED'
+> print('FINAL_UK_AFFECTED_TESTS_AND_FULL_PREFLIGHT_COMPLETE_NOT_INSTALL_ADMISSION',flush=True)
+> PY
+
+
+/usr/lib64/python3.6/tarfile.py:2251: RuntimeWarning: The default behavior of tarfile extraction has been changed to disallow common exploits (including CVE-2007-4559). By default, absolute/parent paths are disallowed and some mode bits are cleared. See https://access.redhat.com/articles/7004769 for more details.
+  RuntimeWarning)
+FINAL_KIT_VERIFIED_OLD_KIT_RETAINED_NO_INSTALL
+BEGIN_TEST_ONLY
+test_boot_failure_preserves_each_cleanup_status (test_epoch3_host_driver.Tests) ... ok
+test_boot_restore_failure_still_restores_both_masks (test_epoch3_host_driver.Tests) ... ok
+test_both_stopped_observations_fail_keep_every_cleanup (test_epoch3_host_driver.Tests) ... ok
+test_database_reopen_failure_no_activate (test_epoch3_host_driver.Tests) ... ok
+test_existing_attempt_prevents_effects (test_epoch3_host_driver.Tests) ... ok
+test_failure_restores_boot_and_owner_masks (test_epoch3_host_driver.Tests) ... ok
+test_first_stopped_observation_failure_keeps_every_cleanup (test_epoch3_host_driver.Tests) ... ok
+test_legacy_mask_failure_still_attempts_remeasurement (test_epoch3_host_driver.Tests) ... ok
+test_multiple_failures_preserved_and_no_retry (test_epoch3_host_driver.Tests) ... ok
+test_native_binding_failure_holds_new_epoch (test_epoch3_host_driver.Tests) ... ok
+test_owner_mask_failure_still_attempts_legacy_and_remeasurement (test_epoch3_host_driver.Tests) ... ok
+test_post_cleanup_legacy_measurement_failure_is_durable_unknown (test_epoch3_host_driver.Tests) ... ok
+test_post_cleanup_observation_failure_is_durable_unknown (test_epoch3_host_driver.Tests) ... ok
+test_postcheck_failure_fences_active (test_epoch3_host_driver.Tests) ... ok
+test_postchecker_receives_new_identity (test_epoch3_host_driver.Tests) ... ok
+test_real_epoch_and_journal_success (test_epoch3_host_driver.Tests) ... ok
+test_staging_failure_fences_old_epoch (test_epoch3_host_driver.Tests) ... ok
+test_stop_failure_recorded_unknown (test_epoch3_host_driver.Tests) ... ok
+test_tls_failure_fences_before_stops (test_epoch3_host_driver.Tests) ... ok
+test_approval_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_containment_failure_keeps_other_containment (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_detailed_unknown_containment_evidence_saved (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_empty_phase_evidence_not_success (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_every_phase_failure_contains_and_never_retries (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_existing_attempt_prevents_all_effects (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_final_receipt_failure_reported_unknown (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_intent_written_before_each_effect (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_preflight_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_second_execution_rejected (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_snapshot_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_success_order_and_not_final_acceptance (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_bytecode_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_exact_actual_runtime_and_helpers (test_epoch3_recovery_entry.Tests) ... ok
+test_extra_helper_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_extra_runtime_module_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_loose_helpers_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_manifest_mismatch_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_modified_helper_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_wrong_host_rejected (test_epoch3_recovery_entry.Tests) ... ok
+
+----------------------------------------------------------------------
+Ran 39 tests in 2.001s
+
+OK
+{"affected_only": true, "kit_manifest_sha256": "1e13f9e1b6c2fddc135c314fbfb4c6f2b687466ef01208321116a9de10a3c71c", "operation": "test-only", "production_resume": "NOT_EXECUTED", "success": true, "tests": 39}
+BEGIN_VERIFY_ONLY
+{"epoch": 3, "install_admission": "NOT_GRANTED", "kit_manifest_sha256": "1e13f9e1b6c2fddc135c314fbfb4c6f2b687466ef01208321116a9de10a3c71c", "operation": "verify-only", "plan_sha256": "0966ab156508228670faaadbba97ff62e19dac8451cced3598eda4eb0bea7f76", "production_resume": "NOT_EXECUTED", "snapshot_sha256": "e297a8db0b4f2e2641ee3aeb6c94119a7ec5034a50a44a0e93723c996205df4e"}
+FINAL_UK_AFFECTED_TESTS_AND_FULL_PREFLIGHT_COMPLETE_NOT_INSTALL_ADMISSION
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ 
+[admin@iZd7oeikknn1z21sq6ji6zZ ~]$ 

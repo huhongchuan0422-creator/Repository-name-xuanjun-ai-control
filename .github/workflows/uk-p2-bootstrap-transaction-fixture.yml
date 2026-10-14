@@ -1,0 +1,35 @@
+name: P2 protected bootstrap transaction kernel fixture
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/uk-p2-bootstrap-transaction-fixture.yml
+      - evidence/p2-install-preparation-20261013/p2_bootstrap_transaction_fixture.py
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-bootstrap-transaction-fixture
+  cancel-in-progress: false
+jobs:
+  fixture:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise publish crash recovery and rollback in synthetic directories
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/p2_bootstrap_transaction_fixture.py --uk
+      - name: Exercise exact frozen production bootstrap module with numeric identities in disposable targets
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - <<'PY'
+          import os,hashlib,subprocess,socket
+          assert socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          package='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/plan-p2pkg-38398367985-1/xuanjun-p2-package'
+          with open(package+'/stage1/p2_bootstrap_files.py','rb') as f:assert hashlib.sha256(f.read()).hexdigest()=='fcc80f70535570155d05df555d68c3bdd1125a9662162d9ad594524efed91307'
+          env={'PATH':'/usr/bin:/bin','LANG':'C','P2_SOURCE_ROOT':package,'P2_BOOTSTRAP_UK_IDS':'1'}
+          subprocess.run(['/usr/bin/python3','-I','-B','evidence/p2-native-wiring-work-20261012/test_bootstrap_files.py'],env=env,check=True,timeout=40)
+          PY

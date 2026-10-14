@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "source": "Owner-supplied UK grouped read-only diagnostic transcript",
+  "verification_scope": "Developer reading of Owner execution receipt; not independent production acceptance",
+  "runtime_source_files_observed": 102,
+  "retained_cache_files_observed": 13,
+  "retained_cache_compilation_matches": 13,
+  "inventory_repeat_matches": true,
+  "checks": {
+    "activation": "OBSERVED",
+    "later_effects": "OBSERVED_ABSENT",
+    "legacy_isolation": "OBSERVED",
+    "new_service_exclusion": "OBSERVED_STOPPED",
+    "database_sets": "OBSERVED",
+    "runner_exclusion": "OBSERVED_STOPPED",
+    "scheduler_exclusion": "OBSERVED",
+    "runtime_references_and_plugin": "OBSERVED",
+    "final_pins": "OBSERVED"
+  },
+  "diagnostic_exit_code": 0,
+  "public_redaction": "Detailed host paths, database hashes, scheduler fingerprint and service inventory omitted; original transcript retained privately.",
+  "install_admission": "NOT_GRANTED",
+  "production_resume": "NOT_EXECUTED"
+}

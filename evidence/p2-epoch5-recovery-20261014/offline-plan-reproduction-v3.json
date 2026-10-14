@@ -1,0 +1,13 @@
+{
+  "activation_dispatcher_tls": "PASS",
+  "changed_files": 2,
+  "compiled_plan_sha256": "949dee6ed4d1a1c271f584bd995f61da238aa92171974ec05bc23bfa930465e2",
+  "new_runtime_files_verified": 102,
+  "new_target_bindings_verified": 24,
+  "old_runtime_files_verified": 102,
+  "old_target_hashes_verified": 24,
+  "plugin_bindings_verified": 3,
+  "production_effects": "NOT_RUN",
+  "release_approval": "NOT_GRANTED",
+  "unchanged_files": 100
+}

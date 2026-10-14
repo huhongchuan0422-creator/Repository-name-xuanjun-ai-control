@@ -1,0 +1,41 @@
+test_boot_restore_failure_still_restores_both_masks (test_epoch3_host_driver.Tests) ... ok
+test_database_reopen_failure_no_activate (test_epoch3_host_driver.Tests) ... ok
+test_existing_attempt_prevents_effects (test_epoch3_host_driver.Tests) ... ok
+test_failure_restores_boot_and_owner_masks (test_epoch3_host_driver.Tests) ... ok
+test_native_binding_failure_holds_new_epoch (test_epoch3_host_driver.Tests) ... ok
+test_postcheck_failure_fences_active (test_epoch3_host_driver.Tests) ... ok
+test_postchecker_receives_new_identity (test_epoch3_host_driver.Tests) ... ok
+test_real_epoch_and_journal_success (test_epoch3_host_driver.Tests) ... ok
+test_staging_failure_fences_old_epoch (test_epoch3_host_driver.Tests) ... ok
+test_stop_failure_recorded_unknown (test_epoch3_host_driver.Tests) ... ok
+test_tls_failure_fences_before_stops (test_epoch3_host_driver.Tests) ... ok
+test_changed_target_bytes_hold_before_masks (test_epoch3_retained_runtime.OwnerMaskTests) ... ok
+test_exact_two_original_owner_masks (test_epoch3_retained_runtime.OwnerMaskTests) ... ok
+test_existing_masks_preserved (test_epoch3_retained_runtime.OwnerMaskTests) ... ok
+test_mask_failure_not_hidden (test_epoch3_retained_runtime.OwnerMaskTests) ... ok
+test_old_receipt_changed (test_epoch3_retained_runtime.OwnerMaskTests) ... ok
+test_unexpected_old_mask_scope (test_epoch3_retained_runtime.OwnerMaskTests) ... ok
+test_duplicate_target_rejected (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_existing_attempt_rejected (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_generic_restore_forbidden (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_nss_replay_and_removal_forbidden (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_prior_receipt_hash_rejected (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_receipt_hash_binds_serialized_file_newline (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_source_mismatch_before_receipt (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_success_order_retains_resources (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_tls_failure_does_not_restore_or_write_targets (test_epoch3_retained_runtime.RuntimeTests) ... ok
+test_bytecode_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_exact_actual_runtime_and_helpers (test_epoch3_recovery_entry.Tests) ... ok
+test_extra_helper_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_extra_runtime_module_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_loose_helpers_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_manifest_mismatch_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_modified_helper_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_wrong_host_rejected (test_epoch3_recovery_entry.Tests) ... ok
+
+----------------------------------------------------------------------
+Ran 34 tests in 0.324s
+
+OK
+{"affected_only": true, "kit_manifest_sha256": "89eb2624d3aaee99117e6292f547852a61cce88d119cbb0fab57e0539c8aed5b", "operation": "test-only", "production_resume": "NOT_EXECUTED", "success": true, "tests": 34}
+PACKAGED_TEST_ONLY_LOCAL_NOT_UK_EXIT=0

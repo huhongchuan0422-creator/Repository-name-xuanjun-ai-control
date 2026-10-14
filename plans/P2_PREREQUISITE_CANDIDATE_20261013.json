@@ -1,0 +1,101 @@
+{
+  "binaries": [
+    {
+      "sha256": "7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b",
+      "source": "/var/lib/xuanjun-development/install-staging/gh-11784779205/gh",
+      "target": "/opt/xuanjun-runtime/gh/gh"
+    },
+    {
+      "sha256": "12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad",
+      "source": "/home/xuanjun_dev/.openclaw/npm/projects/openclaw-codex-8902d781d4__openclaw-generation__g-d803e8e002e42fe5/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+      "target": "/opt/xuanjun-runtime/codex-0.160.0/codex"
+    }
+  ],
+  "directories": [
+    {
+      "gid": 0,
+      "mode": 493,
+      "path": "/etc/xuanjun-development",
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": 493,
+      "path": "/etc/xuanjun-owner-callback",
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": 493,
+      "path": "/var/lib/xuanjun-development",
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": 493,
+      "path": "/opt/xuanjun-runtime",
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": 493,
+      "path": "/opt/xuanjun-runtime/gh",
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": 493,
+      "path": "/opt/xuanjun-runtime/codex-0.160.0",
+      "uid": 0
+    },
+    {
+      "gid": 21000,
+      "mode": 448,
+      "path": "/var/lib/xuanjun-development/xuanjun-dispatcher",
+      "uid": 21000
+    },
+    {
+      "gid": 21001,
+      "mode": 448,
+      "path": "/var/lib/xuanjun-development/xuanjun-callback",
+      "uid": 21001
+    },
+    {
+      "gid": 21002,
+      "mode": 448,
+      "path": "/var/lib/xuanjun-development/xj_codex_worker",
+      "uid": 21002
+    }
+  ],
+  "groups": {
+    "xj_codex_worker": 21002,
+    "xuanjun-callback": 21001,
+    "xuanjun-control-db": 21003,
+    "xuanjun-dispatcher": 21000
+  },
+  "schema": 1,
+  "users": {
+    "xj_codex_worker": {
+      "gid": 21002,
+      "groups": [],
+      "home": "/var/lib/xuanjun-development/xj_codex_worker",
+      "uid": 21002
+    },
+    "xuanjun-callback": {
+      "gid": 21001,
+      "groups": [
+        "xuanjun-control-db"
+      ],
+      "home": "/var/lib/xuanjun-development/xuanjun-callback",
+      "uid": 21001
+    },
+    "xuanjun-dispatcher": {
+      "gid": 21000,
+      "groups": [
+        "xuanjun-control-db"
+      ],
+      "home": "/var/lib/xuanjun-development/xuanjun-dispatcher",
+      "uid": 21000
+    }
+  }
+}

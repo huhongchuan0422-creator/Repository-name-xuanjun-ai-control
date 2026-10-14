@@ -1,0 +1,1385 @@
+name: P2 UK authoritative package verify-only
+on:
+  push:
+    branches:
+      - repair/p2-chatgpt-clean-review-20261013
+    paths:
+      - .github/workflows/uk-p2-frozen-candidate-verify.yml
+permissions:
+  contents: read
+  actions: read
+env:
+  # Native bootstrap release path is bound to this manifest prefix: integration-2b49066f37742ded.
+  P2_ARTIFACT_ID: "11825547804"
+  P2_TAR_SHA256: "a84de84e082022956de7c0e9ee6e12440b41835b7bc8828daab4954ef1f34d8d"
+  P2_SOURCE_COMMIT: "62d2e64d34feea1f02bffa7e8b597484bb98307f"
+  P2_SOURCE_TREE: "e75e549d87515aee1c022faa04e805f694088d6e"
+  P2_MANIFEST_SHA256: "2b49066f37742dedd41657fb445c91f4204fd4a2a257f921dd9fd514e5b25f0e"
+  P2_WORK_DIR: "/tmp/p2pkg-${{ github.run_id }}-${{ github.run_attempt }}"
+  P2_TAR_PATH: "/tmp/p2-candidate-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz"
+jobs:
+  verify:
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - xuanjun-uk-dev
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Reconcile previous isolated SDK fixture containers by protected receipt and inspect SDK workspace semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,stat,hashlib,subprocess,re
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];prior='/tmp/p2pkg-38389224848-1'
+          fd=os.open(prior+'/protected-native-sdk-placement-receipt.json',os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());data=f.read();assert s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o600
+          assert hashlib.sha256(data).hexdigest()=='d4b9e0953199af81e1a73f4d5cad4b3acd243bf4478af3d4ec5d3c9cf5a152c7'
+          receipt=json.loads(data.decode());rows=[]
+          for context in receipt.get('sdk_contexts',[]):
+              name=context['runtimeId'];assert re.fullmatch(r'xjp2fix-[A-Za-z0-9_.-]{1,100}',name)
+              p=subprocess.run(['/usr/bin/docker','inspect',name],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=15)
+              row={'runtime_id':name,'inspect_before_exit':p.returncode}
+              if p.returncode==0:
+                  obj=json.loads(p.stdout.decode())[0]
+                  assert obj['Name'].lstrip('/')==name and obj['Image']=='sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d'
+                  assert any(m.get('Source','').startswith(prior+'/') for m in obj.get('Mounts',[]))
+                  row['observed_mounts']=[{'type':m.get('Type'),'source':m.get('Source'),'destination':m.get('Destination'),'rw':m.get('RW')} for m in obj.get('Mounts',[])]
+                  p=subprocess.run(['/usr/bin/docker','rm','--force',obj['Id']],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20);assert p.returncode==0
+              p=subprocess.run(['/usr/bin/docker','inspect',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15)
+              row['removed_or_absent']=p.returncode!=0;assert row['removed_or_absent'];rows.append(row)
+          result={'schema':1,'state':'PREVIOUS_FIXTURE_EXACT_CONTAINER_CLEANUP_CONFIRMED','previous_name_filter_was_not_exact_container_cleanup_proof':True,'containers':rows,'production_services_changed':False,'canonical_ledger_changed':False,'model_calls':0}
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open('/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/sdk-cleanup-'+os.path.basename(root)+'.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('SDK_FIXTURE_CLEANUP_CORRECTION_SHA256='+hashlib.sha256(raw).hexdigest())
+          base='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
+          for name,markers in [('context-Dt2Gy7El.mjs',('async function resolveSandboxContext(', 'function resolveSandboxContext(')),('shared-BLNeHhmu.mjs',('function resolveSandboxWorkspaceLayoutPaths(',)),('config-CQ7BYVQS.mjs',('function resolveSandboxDockerConfig(',))]:
+              with open(base+'/'+name,'rb') as f:
+                  s=os.fstat(f.fileno());source=f.read();assert s.st_uid==1002 and not s.st_mode&0o022
+              text=source.decode()
+              for marker in markers:
+                  pos=text.find(marker)
+                  if pos>=0:print('SDK_WORKSPACE_FUNCTION_SOURCE='+json.dumps({'module':name,'sha256':hashlib.sha256(source).hexdigest(),'source':text[pos:pos+7500]}))
+          PY
+
+      - name: Download exact artifact with Python 3.6 stdlib
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          test ! -e "$P2_WORK_DIR"
+          test ! -e "$P2_TAR_PATH"
+          /usr/bin/python3 -I -B - <<'PY'
+          import hashlib,io,os,tarfile,urllib.parse,urllib.request,zipfile,sys
+          assert sys.version_info[:3]==(3,6,8)
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl):
+                  x=urllib.request.HTTPRedirectHandler.redirect_request(self,req,fp,code,msg,headers,newurl)
+                  if x is not None and urllib.parse.urlparse(req.full_url).netloc!=urllib.parse.urlparse(newurl).netloc:
+                      x.remove_header('Authorization')
+                  return x
+          url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/%s/zip'%os.environ['P2_ARTIFACT_ID']
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'p2-uk'})
+          raw=urllib.request.build_opener(SafeRedirect()).open(req,timeout=30).read(8*1024*1024+1)
+          tarbytes=zipfile.ZipFile(io.BytesIO(raw)).read('p2-candidate.tar.gz')
+          assert hashlib.sha256(tarbytes).hexdigest()==os.environ['P2_TAR_SHA256']
+          with tarfile.open(fileobj=io.BytesIO(tarbytes),mode='r:gz') as t:
+              seen=set()
+              for m in t.getmembers():
+                  parts=m.name.split('/')
+                  assert m.isfile() and parts[0]=='xuanjun-p2-package'
+                  assert all(p not in ('','.', '..') for p in parts) and m.name not in seen
+                  seen.add(m.name)
+              t.extractall(os.environ['P2_WORK_DIR'])
+          open(os.environ['P2_TAR_PATH'],'wb').write(tarbytes)
+          print('P2_UK_ARTIFACT_EXTRACT=PASS')
+          PY
+      - name: Python 3.6.8 WAL pagination and relay boundedness regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$P2_WORK_DIR/xuanjun-p2-package"
+          test "$(/usr/bin/python3 -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = 3.6.8
+          P2_SOURCE_ROOT="$ROOT" /usr/bin/python3 -B evidence/p2-native-wiring-work-20261012/test_service_context_task23.py
+          P2_SOURCE_ROOT="$ROOT" /usr/bin/python3 -B evidence/p2-native-wiring-work-20261012/test_c2_install_highs.py
+          P2_SOURCE_ROOT="$ROOT" /usr/bin/python3 -B - <<'PY'
+          import json,os,socket,struct,sys
+          root=os.environ['P2_SOURCE_ROOT']
+          sys.path.insert(0,root+'/stage1')
+          import p2_gateway_relay as relay
+          class Controller(object):
+              def __init__(self): self.calls=0
+              def preflight(self,c): self.calls+=1; return {'ready':True}
+          class Base(object):
+              def __init__(self,uid=31337): self.uid=uid; self.sent=b''; self.timeout=None; self.done=False
+              def settimeout(self,v): self.timeout=v
+              def getsockopt(self,*a): return struct.pack('3i',111,self.uid,222)
+              def sendall(self,d): self.sent+=d
+          class Timeout(Base):
+              def recv(self,n): raise socket.timeout('fixture timeout')
+          class Oversize(Base):
+              def recv(self,n):
+                  if self.done:return b''
+                  self.done=True;return b'x'*(relay.MAXIMUM+1)
+          class Valid(Base):
+              def recv(self,n):
+                  if self.done:return b''
+                  self.done=True;return b'{"operation":"preflight"}\n'
+          c=Controller()
+          a=relay.serve_connection(Timeout(),c,31337)
+          assert a['ok'] is False and a['error'] in ('timeout','TimeoutError') and c.calls==0
+          b=relay.serve_connection(Oversize(),c,31337)
+          assert b['ok'] is False and b['error']=='ValueError' and c.calls==0
+          v=relay.serve_connection(Valid(),c,31337)
+          assert v['ok'] is True and v['result']['ready'] is True and c.calls==1
+          print('P2_UK_RELAY_TIMEOUT_OVERSIZE_PORTABLE=PASS')
+          PY
+          echo P2_UK_PYTHON368_WAL_PAGINATION_RELAY_REGRESSION=PASS
+          echo P2_SOCKET_ACTIVATION_INSTALL_ACCEPTANCE=NOT_RUN
+
+      - name: Verify exact package through real installer on UK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$P2_WORK_DIR/xuanjun-p2-package"
+          /usr/bin/python3 "$ROOT/tools/p2-package-freeze.py" verify --archive "$P2_TAR_PATH" --sha256 "$P2_TAR_SHA256" --source-commit "$P2_SOURCE_COMMIT" --source-tree "$P2_SOURCE_TREE"
+          # Real install staging is root-owned. Reproduce only that ownership in /tmp
+          # before invoking the root-only release installer verifier.
+          sudo -n /usr/bin/chown -R 0:0 "$P2_WORK_DIR"
+          sudo -n /usr/bin/python3 -I -B - "$ROOT" <<'PY'
+          import hashlib,importlib.util,json,os,pwd,stat,subprocess,sys,grp
+          assert sys.version_info[:3]==(3,6,8)
+          root=sys.argv[1]
+          spec=importlib.util.spec_from_file_location('installer',root+'/scripts/uk-integration-install.py')
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          m.verify(root,root+'/deploy/integration-manifest.json',
+                   '62d2e64d34feea1f02bffa7e8b597484bb98307f',
+                   '2b49066f37742dedd41657fb445c91f4204fd4a2a257f921dd9fd514e5b25f0e',
+                   'e75e549d87515aee1c022faa04e805f694088d6e')
+          assert hashlib.sha256(open('/usr/libexec/platform-python3.6','rb').read()).hexdigest()=='ba19929d7038d0c2304f528213fa11e5f10c1ce65f0a891afa459bd167c7e5f6'
+          transport=json.load(open(root+'/stage1/native_gateway_controller.py.json','r'))
+          assert transport=={'relay_socket':'/run/xuanjun-development/p2-gateway.sock','server_user':'xuanjun_dev','client_group':'xuanjun-dispatcher'}
+          relay=json.load(open(root+'/deploy/p2-gateway-relay.json.template','r'))
+          assert relay['openclaw_bin']=='/home/xuanjun_dev/.openclaw/bin/openclaw'
+          assert relay['openclaw_owner_uid']==1002
+          actual=hashlib.sha256(open(relay['openclaw_bin'],'rb').read()).hexdigest()
+          assert actual==relay['openclaw_sha256']=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
+          service=open(root+'/deploy/xuanjun-development-dispatcher.service','r').read()
+          controller_sha=hashlib.sha256(open(root+'/stage1/native_gateway_controller.py','rb').read()).hexdigest()
+          assert 'ProtectHome=yes' in service
+          assert 'Requires=xuanjun-p2-gateway-relay.socket' in service
+          assert '/home/xuanjun_dev' not in service
+          assert service.count('--native-controller ')==3
+          assert service.count('--native-controller-sha256 '+controller_sha)==3
+          relay_service=open(root+'/deploy/xuanjun-p2-gateway-relay.service','r').read()
+          assert 'User=xuanjun_dev' in relay_service and 'ProtectHome=read-only' in relay_service
+          assert 'p2_service_context_preflight.py' in service
+          ledger=open(root+'/stage1/execution_ledger.py','r').read()
+          wake=open(root+'/stage1/mechanical_wake_service.py','r').read()
+          assert '_pinned_transaction' in ledger and 'record_inventory_notices' in ledger
+          assert 'record_inventory_notices()' in wake
+          assert "file:/proc/self/fd/%d?mode=rw" in ledger
+          intake=open(root+'/deploy/xuanjun-github-intake.service','r').read()
+          assert 'mechanical_wake_service.py' in intake
+          try:
+              pwd.getpwnam('xuanjun-dispatcher')
+          except KeyError:
+              print('P2_UK_SERVICE_CONTEXT_LIVE_PREFLIGHT=DEFERRED_UNTIL_INSTALL_IDENTITY_CREATION')
+          else:
+              print('P2_UK_SERVICE_CONTEXT_IDENTITY_PRESENT=YES_RUNTIME_PREFLIGHT_STILL_REQUIRES_INSTALLED_RELAY')
+          def show(k):
+              return subprocess.check_output(['/usr/bin/systemctl','show','xuanjun-uk-openclaw.service','--property='+k,'--value'],universal_newlines=True).strip()
+          assert show('User')=='xuanjun_dev' and show('ActiveState')=='active' and show('SubState')=='running'
+          st=os.stat('/var/run/docker.sock')
+          assert st.st_gid==grp.getgrnam('docker').gr_gid and stat.S_IMODE(st.st_mode)==0o660
+          print('P2_UK_REAL_RELEASE_INSTALLER_VERIFY=PASS')
+          print('P2_UK_PYTHON_3_6_8=PASS')
+          print('P2_UK_MODEL_CALLS=0')
+          print('P2_UK_INSTALL_EFFECTS=0')
+          PY
+
+      - name: Prepare protected prerequisite inventory without install effects
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,pwd,grp,stat,hashlib,json,socket,sys
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          s=os.lstat(root)
+          assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022
+          def metadata(path,binary=False):
+              try:
+                  s=os.lstat(path)
+              except FileNotFoundError:
+                  return {'path':path,'exists':False}
+              row={'path':path,'exists':True,'uid':s.st_uid,'gid':s.st_gid,'mode':oct(stat.S_IMODE(s.st_mode)),'symlink':stat.S_ISLNK(s.st_mode),'size':s.st_size}
+              if binary and stat.S_ISREG(s.st_mode) and 0<s.st_size<134217728 and os.path.realpath(path)==path:
+                  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+                  try:
+                      before=os.fstat(fd);h=hashlib.sha256();header=os.read(fd,20);h.update(header)
+                      while True:
+                          chunk=os.read(fd,1048576)
+                          if not chunk:break
+                          h.update(chunk)
+                      after=os.fstat(fd)
+                      assert (before.st_size,before.st_mtime_ns)==(after.st_size,after.st_mtime_ns)
+                      row.update(sha256=h.hexdigest(),elf64_x86_64=header[:6]==b'\x7fELF\x02\x01' and header[18:20]==b'\x3e\x00')
+                  finally:os.close(fd)
+              return row
+          uids={u.pw_uid for u in pwd.getpwall()};gids={g.gr_gid for g in grp.getgrall()}
+          free=[x for x in range(1003,60001) if x not in uids and x not in gids][:4]
+          users={}
+          for name in ('xuanjun_dev','xuanjun-dispatcher','xuanjun-callback','xj_codex_worker'):
+              try:
+                  u=pwd.getpwnam(name);users[name]={'uid':u.pw_uid,'gid':u.pw_gid,'home':u.pw_dir,'shell':u.pw_shell,'groups':os.getgrouplist(name,u.pw_gid)}
+              except KeyError:users[name]={'exists':False}
+          sources=('/opt/xuanjun-runtime/gh/gh','/opt/xuanjun-runtime/codex-0.160.0/codex',
+           '/home/xuanjun_dev/.openclaw/tools/codex-0.160.0/codex',
+           '/home/xuanjun_dev/.openclaw/tools/codex/codex','/home/xuanjun_dev/.openclaw/bin/codex',
+           '/usr/local/bin/codex','/usr/bin/codex','/usr/local/bin/gh','/usr/bin/gh')
+          paths=('/etc/xuanjun-development','/etc/xuanjun-owner-callback','/var/lib/xuanjun-owner-callback/state',
+           '/var/lib/xuanjun-development','/opt/xuanjun-runtime','/etc/nginx','/etc/nginx/conf.d',
+           '/etc/letsencrypt/live','/sys/fs/cgroup/systemd',
+           '/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite',
+           '/home/xuanjun_dev/.openclaw/openclaw.json')
+          value={'schema':1,'state':'PREREQUISITE_INVENTORY_NOT_INSTALL_PLAN','artifact_id':11825547804,
+           'archive_sha256':'a84de84e082022956de7c0e9ee6e12440b41835b7bc8828daab4954ef1f34d8d',
+           'candidate_free_uid_gid_pairs_not_reserved':free,'users':users,
+           'binary_candidates':[metadata(p,True) for p in sources],'paths':[metadata(p) for p in paths],
+           'source_binaries_executed':False,'credentials_read':False,'services_changed':False,
+           'canonical_ledger_changed':False,'install_admission':'NOT_GRANTED'}
+          raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-prerequisite-inventory.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(value,sort_keys=True))
+          print('PROTECTED_PREPARATION_PATH='+path)
+          print('PROTECTED_PREPARATION_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Reuse protected preparation and inspect actual UK HTTPS inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,hashlib,json,socket,subprocess,shutil
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          prior='/tmp/p2pkg-38365394514-1'
+          def protected(path,maximum=1048576):
+              if os.path.realpath(path)!=path:raise ValueError('PROTECTED_CANONICAL_PATH')
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno())
+                  if not stat.S_ISREG(s.st_mode) or s.st_uid!=0 or s.st_mode&0o077 or s.st_size>maximum:
+                      raise ValueError('PROTECTED_ROOT_FILE')
+                  return f.read(maximum+1)
+          raw=protected(prior+'/protected-prerequisites-subplan.json')
+          assert hashlib.sha256(raw).hexdigest()=='9fbe85c665824a2c7b362dfb010fa47d3f144b67cd8dffa5b153efc4f64334a4'
+          plan=json.loads(raw.decode())
+          for b in plan['binaries']:
+              p=b['source'];assert p.startswith(prior+'/pinned-binaries/') and os.path.realpath(p)==p
+              fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW);h=hashlib.sha256()
+              with os.fdopen(fd,'rb') as f:
+                  before=os.fstat(f.fileno());assert before.st_uid==0 and stat.S_IMODE(before.st_mode)==0o555
+                  while True:
+                      x=f.read(1048576)
+                      if not x:break
+                      h.update(x)
+                  after=os.fstat(f.fileno())
+                  assert (before.st_size,before.st_mtime_ns)==(after.st_size,after.st_mtime_ns)
+              assert h.hexdigest()==b['sha256']
+          print('EXISTING_PINNED_BINARIES_AND_PROTECTED_SUBPLAN_REUSED=PASS')
+          result={'schema':1,'state':'UK_HTTPS_AND_PLAN_INPUT_INVENTORY_NOT_INSTALLED',
+           'artifact_id':11825547804,'owner_hostname':'uk.wenwenwenyiyiyi.work','prior_subplan_path':prior+'/protected-prerequisites-subplan.json',
+           'prior_subplan_sha256':hashlib.sha256(raw).hexdigest(),'packages_installed':False,
+           'credentials_read':False,'services_changed':False,'canonical_ledger_changed':False}
+          try:
+              result['dns_a']=sorted({x[4][0] for x in socket.getaddrinfo(result['owner_hostname'],443,socket.AF_INET,socket.SOCK_STREAM)})
+          except Exception as e:result['dns_state']='UNKNOWN_'+type(e).__name__
+          result['required_dns_ip']='8.208.119.115';result['dns_matches_expected']=result.get('dns_a')==['8.208.119.115']
+          p=subprocess.run(['/usr/sbin/ss','-H','-ltn'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+          listeners=[]
+          for line in p.stdout.decode('utf-8','replace').splitlines():
+              parts=line.split()
+              if len(parts)>=4 and parts[3].rsplit(':',1)[-1] in ('80','443'):
+                  listeners.append(parts[3])
+          result['http_https_listeners']=listeners
+          result['available_tools']={name:shutil.which(name) for name in ('nginx','certbot','acme.sh','openssl','dnf','yum','rpm')}
+          os_data={}
+          with open('/etc/os-release') as f:
+              for line in f:
+                  key,sep,value=line.strip().partition('=')
+                  if key in ('ID','VERSION_ID','PRETTY_NAME'):os_data[key]=value.strip('"')
+          result['os']=os_data
+          paths=('/usr/sbin/nginx','/usr/bin/certbot','/root/.acme.sh/acme.sh',
+           '/etc/letsencrypt/live/uk.wenwenwenyiyiyi.work','/etc/nginx',
+           '/home/xuanjun_dev/uk-stage1-minimal','/tmp/p2pkg-38365394514-1')
+          result['paths']=[]
+          for path in paths:
+              try:
+                  s=os.lstat(path);result['paths'].append({'path':path,'exists':True,'uid':s.st_uid,'mode':oct(stat.S_IMODE(s.st_mode)),'symlink':stat.S_ISLNK(s.st_mode)})
+              except FileNotFoundError:result['paths'].append({'path':path,'exists':False})
+          result['callback_named_candidates']=[]
+          for base in ('/home/xuanjun_dev/uk-stage1-minimal','/home/xuanjun_dev'):
+              count=0
+              for name in sorted(os.listdir(base)):
+                  count+=1
+                  if count>500:break
+                  if any(word in name.lower() for word in ('callback','canary','owner')):
+                      result['callback_named_candidates'].append({'parent':base,'name':name})
+                      if len(result['callback_named_candidates'])>=30:break
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-https-plan-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('PROTECTED_HTTPS_PLAN_INPUTS_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
+
+      - name: Inspect existing callback references and vendor package candidates only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,re,subprocess,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          result={'schema':1,'state':'EXISTING_CALLBACK_AND_TLS_PACKAGE_METADATA_ONLY','artifact_id':11825547804,
+           'service_changes':False,'canonical_mutation':False,'credential_values_exported':False}
+          entries=[]
+          bases=('/home/xuanjun_dev/uk-stage1-minimal/owner-callback',
+           '/home/xuanjun_dev/uk-stage1-minimal/owner-callback.env',
+           '/home/xuanjun_dev/uk-stage1-minimal/owner-telegram',
+           '/home/xuanjun_dev/uk-owner-candidate-20261011T003934Z',
+           '/home/xuanjun_dev/uk-owner-candidate-20261011T004631Z',
+           '/home/xuanjun_dev/uk-owner-notify')
+          paths=[]
+          for base in bases:
+              try:s=os.lstat(base)
+              except FileNotFoundError:continue
+              if stat.S_ISDIR(s.st_mode) and not stat.S_ISLNK(s.st_mode):
+                  paths.extend(base+'/'+x for x in sorted(os.listdir(base))[:50] if re.fullmatch(r'[A-Za-z0-9_.-]{1,100}',x))
+              elif stat.S_ISREG(s.st_mode):paths.append(base)
+          for path in paths[:200]:
+              if os.path.realpath(path)!=path:continue
+              s=os.lstat(path)
+              row={'path':path,'uid':s.st_uid,'gid':s.st_gid,'mode':oct(stat.S_IMODE(s.st_mode)),'size':s.st_size,'regular':stat.S_ISREG(s.st_mode)}
+              if row['regular'] and 0<s.st_size<=65536 and path.endswith(('.env','.json')):
+                  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+                  with os.fdopen(fd,'rb') as f:data=f.read(65537)
+                  if path.endswith('.env'):
+                      text=data.decode('utf-8','replace')
+                      row['env_field_names']=re.findall(r'(?m)^(?:export[ ]+)?([A-Z][A-Z0-9_]{0,79})[ ]*=',text)[:40]
+                  else:
+                      try:
+                          value=json.loads(data.decode('utf-8'))
+                          if isinstance(value,dict):row['json_field_names']=[k for k in value if isinstance(k,str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,79}',k)][:40]
+                      except Exception:row['json_parse']='UNKNOWN'
+              entries.append(row)
+          result['existing_candidate_file_metadata']=entries
+          cache=root+'/dnf-preparation';os.mkdir(cache,0o700)
+          argv=['/bin/dnf','-q','--setopt=cachedir='+cache+'/cache','--setopt=persistdir='+cache+'/persist',
+           '--setopt=logdir='+cache+'/log','--setopt=timeout=15','--setopt=retries=1','list','--showduplicates','nginx','certbot','python3-certbot']
+          try:
+              p=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=90)
+              text=p.stdout.decode('utf-8','replace');rows=[]
+              for line in text.splitlines():
+                  cols=line.split()
+                  if len(cols)==3 and re.fullmatch(r'(nginx|certbot|python3-certbot)\.(x86_64|noarch)',cols[0]) and all(re.fullmatch(r'[A-Za-z0-9_.:+@-]{1,150}',x) for x in cols[1:]):
+                      rows.append(cols)
+              result['official_package_candidates']=rows[-40:]
+              result['package_query_exit']=p.returncode
+          except subprocess.TimeoutExpired:
+              result['package_query']='HOLD_TIMEOUT'
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-callback-tls-metadata.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('PROTECTED_CALLBACK_TLS_METADATA_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Resolve existing Owner binding privately without notification sends
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,socket,re,urllib.request,urllib.error
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          def read(path,uid,maximum=2097152):
+              assert os.path.realpath(path)==path
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno())
+                  assert stat.S_ISREG(s.st_mode) and s.st_uid==uid and not s.st_mode&0o077 and s.st_size<=maximum
+                  raw=f.read(maximum+1)
+                  assert len(raw)<=maximum
+                  return raw,s
+          def api(path,token=None,body=None):
+              headers={'Content-Type':'application/json'}
+              if token:headers['Authorization']='Bearer '+token
+              req=urllib.request.Request('https://open.feishu.cn/open-apis/'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
+              try:
+                  with urllib.request.urlopen(req,timeout=15) as f:raw=f.read(2097153)
+                  assert len(raw)<=2097152
+                  return json.loads(raw.decode())
+              except urllib.error.HTTPError as e:return {'code':e.code}
+          private={'schema':1,'artifact_id':11825547804,'runtime_release_sha256':'2b49066f37742dedd41657fb445c91f4204fd4a2a257f921dd9fd514e5b25f0e','auth_references':[]}
+          public={'schema':1,'state':'OWNER_BINDING_INPUTS_HOLD','credential_values_exported':False,'notification_sends':0,'model_calls':0,'services_changed':False,'canonical_mutation':False}
+          try:
+              profile='/home/xuanjun_dev/.openclaw/openclaw.json'
+              raw,s=read(profile,1002);config=json.loads(raw.decode())['channels']['feishu']
+              private['auth_references'].append({'path':profile,'sha256':hashlib.sha256(raw).hexdigest(),'owner_uid':1002,'mode':stat.S_IMODE(s.st_mode)})
+              authpath='/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite'
+              raw,s=read(authpath,1002,16777216)
+              private['auth_references'].append({'path':authpath,'sha256':hashlib.sha256(raw).hexdigest(),'owner_uid':1002,'mode':stat.S_IMODE(s.st_mode)})
+              routes=set()
+              agents='/home/xuanjun_dev/.openclaw/agents'
+              for agent in sorted(os.listdir(agents))[:32]:
+                  if not re.fullmatch(r'[A-Za-z0-9_.-]{1,80}',agent):continue
+                  path=agents+'/'+agent+'/sessions/sessions.json'
+                  try:raw,s=read(path,1002);records=json.loads(raw.decode())
+                  except (OSError,ValueError,AssertionError):continue
+                  if not isinstance(records,dict) or len(records)>10000:continue
+                  for key in records:
+                      match=re.search(r':feishu:(?:group|direct):(oc_[A-Za-z0-9_-]+)$',key)
+                      if match:routes.add(match.group(1))
+              if not routes:
+                  import subprocess
+                  cli='/home/xuanjun_dev/.openclaw/bin/openclaw'
+                  with open(cli,'rb') as f:assert hashlib.sha256(f.read()).hexdigest()=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
+                  p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--',cli,'sessions','--json','--all-agents'],env={'HOME':'/home/xuanjun_dev','PATH':'/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin:/usr/bin:/bin','LANG':'C','NO_COLOR':'1'},stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=30)
+                  public['native_session_query_exit']=p.returncode
+                  assert p.returncode==0 and len(p.stdout)<=2097152
+                  text=p.stdout.decode('utf-8')
+                  records=json.loads(text[text.index('{'):]).get('sessions',[])
+                  assert isinstance(records,list) and len(records)<=10000
+                  for record in records:
+                      match=re.search(r':feishu:(?:group|direct):(oc_[A-Za-z0-9_-]+)$',record.get('key',''))
+                      if match:routes.add(match.group(1))
+              public['existing_chat_candidate_count']=len(routes)
+              assert len(routes)==1 and re.fullmatch(r'cli_[A-Za-z0-9_-]{1,128}',config.get('appId',''))
+              chat_id=next(iter(routes))
+              auth=api('auth/v3/tenant_access_token/internal',body={'app_id':config['appId'],'app_secret':config['appSecret']})
+              public['auth_code']=auth.get('code');assert auth.get('code')==0
+              token=auth['tenant_access_token']
+              bot=api('bot/v3/info',token)
+              public['expected_bot_name_match']=bot.get('bot',{}).get('app_name')=='玄钧云汇开发总管'
+              chat=api('im/v1/chats/'+chat_id,token)
+              public['chat_is_p2p']=chat.get('code')==0 and chat.get('data',{}).get('chat_mode')=='p2p'
+              matches=[];seen=set();cursor=None
+              public.update(history_pages=0,history_items=0,history_exhausted=False)
+              for page in range(20):
+                  query={'container_id_type':'chat','container_id':chat_id,'sort_type':'ByCreateTimeDesc','page_size':'50'}
+                  if cursor:query['page_token']=cursor
+                  history=api('im/v1/messages?'+urllib.parse.urlencode(query),token)
+                  public['history_api_code']=history.get('code')
+                  if history.get('code')!=0:raise ValueError('HISTORY_API_REJECTED')
+                  data=history.get('data');assert isinstance(data,dict)
+                  items=data.get('items');assert isinstance(items,list) and len(items)<=50 and isinstance(data.get('has_more'),bool)
+                  public['history_pages']+=1;public['history_items']+=len(items)
+                  for item in items:
+                      try:
+                          value=json.loads(item.get('body',{}).get('content','')).get('text','')
+                          if isinstance(value,str) and 'XJ_P2_FEISHU_CANARY_11787198841_20261013' in value and item.get('chat_id')==chat_id:
+                              matches.append(item['message_id'])
+                      except (ValueError,TypeError,KeyError):pass
+                  if matches:
+                      public['canary_found_page']=page+1;break
+                  if not data['has_more']:
+                      public['history_exhausted']=True;break
+                  cursor=data.get('page_token')
+                  if not isinstance(cursor,str) or not cursor or len(cursor)>4096 or cursor in seen:raise ValueError('HISTORY_CURSOR_INVALID')
+                  seen.add(cursor)
+              if not matches:public['history_hold_reason']='HISTORY_EXHAUSTED_CANARY_NOT_FOUND' if public['history_exhausted'] else 'HISTORY_PAGE_LIMIT_CANARY_NOT_FOUND'
+              public['prior_canary_readback_match']=bool(matches)
+              assert public['expected_bot_name_match'] and public['chat_is_p2p'] and matches
+              private['feishu_binding']={'app_id':config['appId'],'chat_id':chat_id,'package_sha256':private['runtime_release_sha256']}
+              private['prior_canary_message_ids']=matches
+              public['state']='EXISTING_FEISHU_CHAT_BINDING_INPUTS_VERIFIED'
+          except Exception as e:public['hold_reason']=type(e).__name__
+          ghpath='/home/xuanjun_dev/.config/gh/hosts.yml'
+          try:
+              fd=os.open(ghpath,os.O_RDONLY|os.O_NOFOLLOW)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno())
+                  assert stat.S_ISREG(s.st_mode) and s.st_uid==1002 and not s.st_mode&0o077 and s.st_size<=65536
+                  raw=f.read()
+              import yaml
+              hosts=yaml.safe_load(raw.decode())
+              value=hosts.get('github.com',{}).get('oauth_token','')
+              if isinstance(value,str) and re.fullmatch(r'(ghp_[A-Za-z0-9]+|github_pat_[A-Za-z0-9_]+|gho_[A-Za-z0-9]+)',value):
+                  private['github_token_reference']={'path':ghpath,'field':'github.com.oauth_token'}
+                  public['github_auth_reference']='EXISTING_PROTECTED_GH_OAUTH_REFERENCE'
+          except (OSError,ValueError,TypeError,AssertionError,ImportError):pass
+          private['public_receipt']=public
+          raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-owner-binding-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(public,sort_keys=True))
+          print('OWNER_BINDING_INPUTS_PATH='+path)
+          print('OWNER_BINDING_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Render protected Owner binding and test exact RPM transaction without installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,subprocess,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          def protected(path,sha):
+              assert os.path.realpath(path)==path
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and not s.st_mode&0o077 and s.st_size<2097152
+                  raw=f.read()
+              assert hashlib.sha256(raw).hexdigest()==sha
+              return json.loads(raw.decode())
+          owner=protected('/tmp/p2pkg-38370684370-1/protected-owner-binding-inputs.json','5ec6adc519f473f9f6854673a34e620f6a4b1ad5d4f4ff44c519196430f1d539')
+          assert owner['public_receipt']['state']=='EXISTING_FEISHU_CHAT_BINDING_INPUTS_VERIFIED'
+          rpmroot='/tmp/p2pkg-38369525772-1/tls-rpm-preparation'
+          rpmreceipt=protected(rpmroot+'/protected-tls-rpm-receipt.json','fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e')
+          assert rpmreceipt['state']=='DEPENDENCY_DOWNLOAD_PREPARED' and len(rpmreceipt['rpms'])==16
+          rpms=[]
+          for item in rpmreceipt['rpms']:
+              name=item['file'];assert '/' not in name and name.endswith('.rpm')
+              path=rpmroot+'/'+name;assert os.path.realpath(path)==path
+              with open(path,'rb') as f:
+                  s=os.fstat(f.fileno());assert s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o400
+                  assert hashlib.sha256(f.read()).hexdigest()==item['sha256']
+              p=subprocess.run(['/bin/rpm','--checksig',path],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+              text=(p.stdout+p.stderr).decode('utf-8','replace')
+              assert p.returncode==0 and 'OK' in text and 'NOKEY' not in text and 'NOT OK' not in text
+              rpms.append(path)
+          p=subprocess.run(['/bin/rpm','-U','--test']+rpms,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60)
+          public={'schema':1,'state':'OWNER_BINDING_RENDERED_AND_RPM_TRANSACTION_PRECHECK','rpm_transaction_test_exit':p.returncode,'rpm_count':len(rpms),'packages_installed':False,'services_changed':False,'canonical_mutation':False,'secret_values_exported':False,'release_granted':False}
+          if p.returncode:public['state']='HOLD_RPM_TRANSACTION_PRECHECK'
+          template=root+'/xuanjun-p2-package/deploy/p2-owner-feishu-binding.json.template'
+          with open(template,'rb') as f:source=f.read()
+          binding=owner['feishu_binding'];replacements={'@@APP_ID@@':binding['app_id'],'@@CHAT_ID@@':binding['chat_id'],'@@PACKAGE_SHA256@@':binding['package_sha256']}
+          rendered=source
+          for key in sorted(replacements):rendered=rendered.replace(key.encode(),replacements[key].encode())
+          assert json.loads(rendered.decode())==binding
+          path=root+'/prepared-owner-feishu-binding.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(rendered);f.flush();os.fsync(f.fileno())
+          public['rendered_binding_sha256']=hashlib.sha256(rendered).hexdigest()
+          private={'schema':1,'artifact_id':11825547804,'public_receipt':public,'owner_provisioning':{'source':'deploy/p2-owner-feishu-binding.json.template','target':'/etc/xuanjun-development/p2-owner-feishu-binding.json','source_sha256':hashlib.sha256(source).hexdigest(),'rendered_sha256':hashlib.sha256(rendered).hexdigest(),'mode':0o640,'owner_uid':0,'group_gid':1002,'replacements':replacements},'auth_references':owner['auth_references'],'rpm_receipt_path':rpmroot+'/protected-tls-rpm-receipt.json','rpm_receipt_sha256':'fe610cf7024a9f1914bfa318d34d20235aa47c9cb02cbff97f8702a0aa33689e','remaining_requirements':['REAL_TLS_CERTIFICATE_REFERENCE','COMPLETE_RUNTIME_PROVISIONING_AND_CUTOVER_PLAN','EXISTING_OWNER_CALLBACK_CHAT_ID_REFERENCE','GITHUB_INTAKE_AUTH_REFERENCE','INDEPENDENT_PLAN_RELEASE_REVIEW','OWNER_MANUAL_INSTALL_BOUNDARY']}
+          raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-install-preparation-bundle.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(public,sort_keys=True))
+          print('INSTALL_PREPARATION_BUNDLE_PATH='+path)
+          print('INSTALL_PREPARATION_BUNDLE_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Reuse durable preparation and resolve remaining existing callback and GitHub inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,sqlite3,socket,re,shlex
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1]
+          prior='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          with open(prior+'/durable-preparation-receipt.json','rb') as f:raw=f.read()
+          assert hashlib.sha256(raw).hexdigest()=='28bd0dd3419b2822ec7b001596e1be1909c22f0ac1b0fa1d307db7a220aa385a'
+          private={'schema':1,'state':'ADDITIONAL_EXISTING_INSTALL_INPUTS','durable_preparation_root':prior}
+          public={'schema':1,'canonical_mutation':False,'secret_values_exported':False,'services_changed':False,'owner_callback_chat_evidence':'NOT_FOUND','github_auth_reference':'NOT_FOUND'}
+          envpaths={'/home/xuanjun_dev/uk-stage1-minimal/owner-callback.env','/home/xuanjun_dev/uk-stage1-minimal/.env','/home/xuanjun_dev/.openclaw/.env'}
+          for unit in ('xuanjun-uk-stage1-minimal.service','xuanjun-uk-openclaw.service'):
+              with open('/etc/systemd/system/'+unit) as f:text=f.read()
+              for path in re.findall(r'(?m)^EnvironmentFile=-?([^\n ]+)',text):
+                  if path.startswith('/home/xuanjun_dev/'):envpaths.add(path)
+          envs={}
+          for path in sorted(envpaths):
+              if os.path.realpath(path)!=path:continue
+              try:
+                  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+                  with os.fdopen(fd,'rb') as f:
+                      s=os.fstat(f.fileno())
+                      if not stat.S_ISREG(s.st_mode) or s.st_uid not in (0,1002) or s.st_mode&0o077 or s.st_size>65536:continue
+                      raw=f.read()
+                  fields={}
+                  for line in raw.decode().splitlines():
+                      match=re.fullmatch(r'(?:export )?([A-Z][A-Z0-9_]*)=(.*)',line)
+                      if match:
+                          values=shlex.split(match.group(2))
+                          if len(values)==1:fields[match.group(1)]=values[0]
+                  envs[path]=fields
+              except (OSError,ValueError,UnicodeError):continue
+          public['existing_env_field_names']={path:sorted(fields) for path,fields in envs.items()}
+          owner=None
+          for fields in envs.values():
+              value=fields.get('XJ_OWNER_USER_ID')
+              if value and re.fullmatch(r'[0-9]{1,20}',value):owner=value
+          if owner:
+              private['owner_callback_user_id']=owner
+              dbpath='/home/xuanjun_dev/uk-stage1-minimal/state.sqlite'
+              db=sqlite3.connect('file:'+dbpath+'?mode=ro',uri=True,timeout=3);db.execute('PRAGMA query_only=ON')
+              tables=db.execute('SELECT name FROM sqlite_master WHERE type="table" LIMIT 100').fetchall()
+              schema={};matches=set()
+              for (table,) in tables:
+                  if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,100}',table):continue
+                  cols=[x[1] for x in db.execute('PRAGMA table_info("'+table+'")')]
+                  schema[table]=cols
+                  users=[x for x in cols if x.lower() in ('user_id','owner_user_id','owner_id','sender_id')]
+                  chats=[x for x in cols if x.lower() in ('chat_id','owner_chat_id','owner_chat')]
+                  for user in users:
+                      for chat in chats:
+                          rows=db.execute('SELECT DISTINCT "'+chat+'" FROM "'+table+'" WHERE CAST("'+user+'" AS TEXT)=? LIMIT 3',(owner,)).fetchall()
+                          for (value,) in rows:
+                              if isinstance(value,(str,int)) and re.fullmatch(r'-?[0-9]{1,20}',str(value)):matches.add(str(value))
+              db.close();public['legacy_schema']=schema;public['owner_chat_candidate_count']=len(matches)
+              if len(matches)==1:
+                  private['owner_callback_chat_id']=next(iter(matches));public['owner_callback_chat_evidence']='EXISTING_LEGACY_OWNER_PAIR'
+          for path,fields in envs.items():
+              for key in ('GH_TOKEN','GITHUB_TOKEN','XJ_GITHUB_TOKEN'):
+                  value=fields.get(key)
+                  if value and re.fullmatch(r'(ghp_[A-Za-z0-9]+|github_pat_[A-Za-z0-9_]+)',value):
+                      private['github_token_reference']={'path':path,'field':key}
+                      public['github_auth_reference']='EXISTING_PROTECTED_ENV_REFERENCE'
+          private['public_receipt']=public
+          raw=(json.dumps(private,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-additional-install-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(public,sort_keys=True))
+          print('ADDITIONAL_INSTALL_INPUTS_PATH='+path)
+          print('ADDITIONAL_INSTALL_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Stage fixed-host protected input helper without performing Owner authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$GITHUB_WORKSPACE/evidence/p2-install-preparation-20261013/owner_github_protected_input.py" <<'PY'
+          import os,sys,stat,hashlib
+          root='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          s=os.lstat(root);assert os.geteuid()==0 and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700 and os.path.realpath(root)==root
+          source=sys.argv[1];assert os.path.realpath(source)==source
+          fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_size<16384
+              raw=f.read()
+          assert hashlib.sha256(raw).hexdigest()=='6a07af139da0ef2d9f54ef5bd6a2f425036204ab72c1ee25beca1d317674ef76'
+          dest=root+'/owner_github_protected_input.py'
+          if os.path.lexists(dest):
+              with open(dest,'rb') as f:assert f.read()==raw
+          else:
+              fd=os.open(dest,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
+              with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print('OWNER_PROTECTED_INPUT_HELPER_PREPARED='+dest)
+          print('OWNER_ACTION_REQUIRED=EXISTING_GITHUB_REFERENCE_OR_PROTECTED_AUTH_INPUT')
+          print('GITHUB_AUTH_VALUES_READ_OR_WRITTEN_BY_THIS_STEP=NO; P2_INSTALL=NO')
+          PY
+
+      - name: Verify Owner GitHub reference read-only and collect installed SDK hashes for complete plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,socket,re,glob,urllib.request
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];prior='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          def protected(path,uid=0,maximum=1048576):
+              assert os.path.realpath(path)==path
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_uid==uid and not s.st_mode&0o077 and s.st_size<=maximum
+                  raw=f.read(maximum+1);assert len(raw)<=maximum
+                  return raw,s
+          raw,s=protected(prior+'/github-input-receipt.json');receipt=json.loads(raw.decode())
+          raw,s=protected(prior+'/github-intake-token.input')
+          assert hashlib.sha256(raw).hexdigest()==receipt['sha256'] and receipt['repository']=='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+          token=raw.decode().strip();assert re.fullmatch(r'github_pat_[A-Za-z0-9_]{20,250}',token)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):return None
+          req=urllib.request.Request('https://api.github.com/repos/'+receipt['repository'],headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','User-Agent':'xuanjun-p2-readonly-preparation'})
+          with urllib.request.build_opener(NoRedirect()).open(req,timeout=15) as f:
+              response=f.read(1048577)
+          assert len(response)<=1048576 and json.loads(response.decode())['full_name']==receipt['repository']
+          del token
+          result={'schema':1,'artifact_id':11825547804,'github_protected_reference_verified':True,'github_read_access_verified':True,'github_write_access':'NOT_TESTED','credentials_exported':False,'services_changed':False,'canonical_mutation':False,'model_calls':0,'installed_sdk_files':[]}
+          cli='/home/xuanjun_dev/.openclaw/bin/openclaw'
+          with open(cli,'rb') as f:wrapper=f.read(65537)
+          assert hashlib.sha256(wrapper).hexdigest()=='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
+          roots=set()
+          for path in re.findall(rb'/home/xuanjun_dev/[A-Za-z0-9_./-]+',wrapper):
+              text=path.decode()
+              if 'openclaw' in text and '/node_modules/' in text:
+                  roots.add(text.split('/node_modules/openclaw')[0]+'/node_modules/openclaw')
+          for pattern in ('/home/xuanjun_dev/.openclaw/tools/*/node_modules/openclaw','/home/xuanjun_dev/.openclaw/tools/*/lib/node_modules/openclaw','/home/xuanjun_dev/.openclaw/lib/node_modules/openclaw','/home/xuanjun_dev/.openclaw/node_modules/openclaw'):
+              roots.update(glob.glob(pattern))
+          result['sdk_roots']=[]
+          for base in sorted(roots):
+              base=os.path.realpath(base)
+              if not base.startswith('/home/xuanjun_dev/.openclaw/') or not os.path.isdir(base):continue
+              result['sdk_roots'].append(base)
+              count=0
+              for parent,dirs,names in os.walk(base+'/dist',followlinks=False):
+                  dirs[:]=[x for x in dirs if x not in ('node_modules','.git')]
+                  for name in sorted(names):
+                      count+=1
+                      if count>10000:break
+                      if not name.endswith(('.js','.mjs')) or not any(word in name.lower() for word in ('sandbox','subagent','before-tool','request-scoped')):continue
+                      path=parent+'/'+name
+                      if os.path.realpath(path)!=path:continue
+                      s=os.lstat(path)
+                      if not stat.S_ISREG(s.st_mode) or s.st_uid not in (0,1002) or s.st_mode&0o022 or s.st_size>4194304:continue
+                      with open(path,'rb') as f:data=f.read()
+                      markers=[word for word in ('resolveSandboxContext','prepareWorkspaceAuthority','before_tool_call','requestScoped','resolveCliBackendDispatchEligibility') if word.encode() in data]
+                      result['installed_sdk_files'].append({'path':path,'sha256':hashlib.sha256(data).hexdigest(),'uid':s.st_uid,'mode':stat.S_IMODE(s.st_mode),'markers':markers})
+                      if len(result['installed_sdk_files'])>=100:break
+                  if count>10000 or len(result['installed_sdk_files'])>=100:break
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-auth-sdk-plan-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('AUTH_SDK_PLAN_INPUTS_PATH='+path)
+          print('AUTH_SDK_PLAN_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Inspect immutable installed SDK component exports without task execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,subprocess,re,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];base='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
+          marks=('resolveSandboxContext','prepareWorkspaceAuthority','prepareSandboxWorkspace','createPluginRuntime','requestScoped','before_tool_call','RequestScoped')
+          candidates=[];total=0
+          for parent,dirs,names in os.walk(base,followlinks=False):
+              dirs[:]=[x for x in dirs if x!='node_modules']
+              for name in names:
+                  if not name.endswith(('.mjs','.js')):continue
+                  path=parent+'/'+name
+                  if os.path.realpath(path)!=path:continue
+                  s=os.lstat(path)
+                  if not stat.S_ISREG(s.st_mode) or s.st_uid!=1002 or s.st_mode&0o022 or s.st_size>8388608:continue
+                  total+=s.st_size;assert total<536870912
+                  with open(path,'rb') as f:data=f.read()
+                  if any(m.encode() in data for m in marks):candidates.append(path)
+              assert len(candidates)<1000
+          rows=[]
+          for path in sorted(set(candidates))[:150]:
+              if os.path.realpath(path)!=path or not path.startswith(base+'/'):continue
+              s=os.lstat(path)
+              if not stat.S_ISREG(s.st_mode) or s.st_uid!=1002 or s.st_mode&0o022 or s.st_size>8388608:continue
+              with open(path,'rb') as f:data=f.read()
+              text=data.decode('utf-8')
+              definitions=[m for m in marks if ('function '+m+'(') in text or ('function '+m+' (') in text]
+              exports=[line[:600] for line in text.splitlines() if line.startswith('export')][-3:]
+              rows.append({'path':path,'sha256':hashlib.sha256(data).hexdigest(),'uid':s.st_uid,'size':s.st_size,'markers':[m for m in marks if m in text],'function_definitions':definitions,'export_declarations':exports})
+          selected=base+'/workspace-sandbox-D4HRmyjR.mjs'
+          js="const m=await import("+json.dumps('file://'+selected)+");console.log(JSON.stringify({module_exports:Object.keys(m).sort(),named_resolveSandboxContext:typeof m.resolveSandboxContext==='function'}))"
+          p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C','NO_COLOR':'1'},stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30)
+          exports={'exit':p.returncode}
+          if p.returncode==0:
+              try:exports.update(json.loads(p.stdout.decode().strip().splitlines()[-1]))
+              except Exception:exports['state']='HOLD_UNPARSEABLE'
+          else:
+              exports['error_class']='OFFLINE_IMPORT_FAILED'
+          value={'schema':1,'state':'SDK_COMPONENT_EXPORT_INSPECTION','files':rows,'context_import':exports,'model_calls':0,'services_changed':False,'canonical_mutation':False}
+          raw=(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-sdk-export-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(value,sort_keys=True))
+          print('SDK_EXPORT_INPUTS_PATH='+path)
+          print('SDK_EXPORT_INPUTS_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Prepare private source mirror with Owner authentication without GitHub mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,json,hashlib,subprocess,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];prior='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          tokenpath=prior+'/github-intake-token.input'
+          s=os.lstat(tokenpath);assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o600 and os.path.realpath(tokenpath)==tokenpath
+          helper=prior+'/git-preparation-askpass.py'
+          code=("#!/usr/bin/python3\nimport sys,os,stat\np="+repr(tokenpath)+"\nif 'Username' in sys.argv[1]: print('huhongchuan0422-creator')\nelse:\n fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)\n with os.fdopen(fd) as f:\n  s=os.fstat(f.fileno());assert s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o600\n  print(f.read().strip())\n").encode()
+          if os.path.lexists(helper):
+              with open(helper,'rb') as f:assert f.read()==code
+          else:
+              fd=os.open(helper,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o500)
+              with os.fdopen(fd,'wb') as f:f.write(code);f.flush();os.fsync(f.fileno())
+          remote='https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control.git'
+          mirror=prior+'/control-mirror.git'
+          env={'PATH':'/usr/bin:/bin','LANG':'C','GIT_TERMINAL_PROMPT':'0','GIT_ASKPASS':helper,'GIT_CONFIG_GLOBAL':'/dev/null','GIT_CONFIG_NOSYSTEM':'1'}
+          result={'schema':1,'artifact_id':11825547804,'state':'HOLD_SOURCE_MIRROR','github_mutation':False,'canonical_mutation':False,'services_changed':False,'credential_values_exported':False}
+          try:
+              if not os.path.lexists(mirror):
+                  p=subprocess.run(['/usr/bin/git','clone','--quiet','--mirror',remote,mirror],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120)
+                  result['clone_exit']=p.returncode;assert p.returncode==0
+              os.chmod(mirror,0o700)
+              def git(*args):return subprocess.check_output(['/usr/bin/git','--git-dir='+mirror]+list(args),env=env,stderr=subprocess.DEVNULL,timeout=15).decode().strip()
+              assert git('config','--get','remote.origin.url')==remote
+              assert git('rev-parse','--is-bare-repository')=='true'
+              source='62d2e64d34feea1f02bffa7e8b597484bb98307f'
+              try:observed=git('rev-parse',source+'^{commit}')
+              except subprocess.CalledProcessError:
+                  p=subprocess.run(['/usr/bin/git','--git-dir='+mirror,'fetch','--quiet','--no-tags','origin',source+':refs/xuanjun-preparation/'+source],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120)
+                  assert p.returncode==0;observed=git('rev-parse',source+'^{commit}')
+              assert observed==source
+              tree=git('rev-parse',source+'^{tree}');assert tree=='e75e549d87515aee1c022faa04e805f694088d6e'
+              result.update(state='PROTECTED_SOURCE_MIRROR_READY_CONTENTS_READ_VERIFIED',mirror_path=mirror,source_commit=source,source_tree=tree)
+          except Exception as e:result['hold_reason']=type(e).__name__
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-source-mirror-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('SOURCE_MIRROR_RECEIPT_PATH='+path)
+          print('SOURCE_MIRROR_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Verify named native context export and actual sandbox configuration without execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,json,hashlib,stat,subprocess,socket
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];base='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist'
+          files={'context_wrapper':('context-DyPstb2Q.mjs','db7fc7539455da0c564d4ded0d04da1c764a46903d1632489b8bd04641098320'),'context_implementation':('context-Dt2Gy7El.mjs','08c73a8b91a6da428617f1018218eef438040175cf74efa74af716cdd0371f47'),'plugin_runtime':('runtime-BgTk9ZFM.mjs','18d2498124bb5437ce53b8b5fa90e71ca8e99f09c34118d2931a951dd9dadf22'),'tool_hook':('agent-tools.before-tool-call.runtime-DrbwqsOU.mjs','88be9b0b2e1dcdc921606bc9a829bbd6a28ee4c088a1ea0bfab8d2f4a2f4ec46'),'request_scope_error':('error-runtime-B-G5NrRT.mjs','d43944505d8b3d98be863da5b9495c336af88c745d4eb00c78218eacb6c0eb22')}
+          result={'schema':1,'model_calls':0,'services_changed':False,'canonical_mutation':False,'sdk_files':{},'profile_metadata':{}}
+          for role,(name,sha) in files.items():
+              path=base+'/'+name;assert os.path.realpath(path)==path
+              with open(path,'rb') as f:
+                  s=os.fstat(f.fileno());raw=f.read();assert s.st_uid==1002 and not s.st_mode&0o022 and hashlib.sha256(raw).hexdigest()==sha
+              text=raw.decode()
+              imports=[line[:600] for line in text.splitlines() if line.startswith('import ') and any(x in line.lower() for x in ('sandbox','context','runtime','error'))][:20]
+              result['sdk_files'][role]={'path':path,'sha256':sha,'uid':1002,'relevant_imports':imports}
+          js="const m=await import("+json.dumps('file://'+base+'/context-DyPstb2Q.mjs')+");console.log(JSON.stringify({named_resolveSandboxContext:typeof m.resolveSandboxContext==='function',named_ensureSandboxWorkspaceForSession:typeof m.ensureSandboxWorkspaceForSession==='function'}))"
+          p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C','NO_COLOR':'1'},stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=30)
+          assert p.returncode==0
+          result['native_context_exports']=json.loads(p.stdout.decode().strip().splitlines()[-1]);assert result['native_context_exports']['named_resolveSandboxContext']
+          path='/home/xuanjun_dev/.openclaw/openclaw.json'
+          fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert s.st_uid==1002 and stat.S_IMODE(s.st_mode)==0o600
+              raw=f.read(1048577);assert len(raw)<=1048576
+          cfg=json.loads(raw.decode());agents=cfg.get('agents',{})
+          defaults=agents.get('defaults',{}) if isinstance(agents,dict) else {}
+          sandbox_defaults=defaults.get('sandbox')
+          result['profile_metadata']['defaults_sandbox']={k:sandbox_defaults.get(k) for k in ('mode','workspaceAccess','scope')} if isinstance(sandbox_defaults,dict) else None
+          model=defaults.get('model',{})
+          result['profile_metadata']['model_primary']=model.get('primary') if isinstance(model,dict) else model
+          result['profile_metadata']['agent_sandbox']={}
+          items=agents.get('entries',agents.get('list',[])) if isinstance(agents,dict) else []
+          if isinstance(items,dict):items=[dict(value,id=key) for key,value in items.items() if isinstance(value,dict)]
+          for item in items if isinstance(items,list) else []:
+              if isinstance(item,dict) and item.get('id') in ('developer','platform-engineer','main'):
+                  sandbox=item.get('sandbox')
+                  if isinstance(sandbox,dict):
+                      result['profile_metadata']['agent_sandbox'][item['id']]={k:sandbox.get(k) for k in ('mode','workspaceAccess','scope')}
+                  else:result['profile_metadata']['agent_sandbox'][item['id']]=None
+          result['profile_sha256']=hashlib.sha256(raw).hexdigest()
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-native-context-policy-inputs.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('NATIVE_CONTEXT_POLICY_INPUTS_PATH='+path)
+          print('NATIVE_CONTEXT_POLICY_INPUTS_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
+
+      - name: Prepare private sandbox policy candidate and validate native SDK resolution without applying
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,hashlib,stat,subprocess,re
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];profile='/home/xuanjun_dev/.openclaw/openclaw.json'
+          fd=os.open(profile,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert s.st_uid==1002 and stat.S_IMODE(s.st_mode)==0o600
+              raw=f.read(1048577);assert len(raw)<=1048576
+          before=hashlib.sha256(raw).hexdigest()
+          assert before=='569e7f4eb66860caf05e23fc1d00098d9f67c9204347b979ab39696f184fbba3'
+          cfg=json.loads(raw.decode());agents=cfg.setdefault('agents',{})
+          roster=agents.get('entries')
+          if roster is not None:assert isinstance(roster,dict)
+          else:
+              items=agents.setdefault('list',[]);assert isinstance(items,list)
+          for agent_id,access in [('developer','rw'),('platform-engineer','ro')]:
+              if roster is not None:
+                  item=roster.setdefault(agent_id,{});assert isinstance(item,dict)
+              else:
+                  matches=[item for item in items if isinstance(item,dict) and item.get('id')==agent_id]
+                  assert len(matches)<=1
+                  if matches:item=matches[0]
+                  else:item={'id':agent_id};items.append(item)
+              sandbox=item.setdefault('sandbox',{});assert isinstance(sandbox,dict)
+              sandbox.update(mode='all',workspaceAccess=access,scope='agent')
+              docker=sandbox.setdefault('docker',{});assert isinstance(docker,dict)
+              docker.update(image='sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d',user='1002:1002',network='none',readOnlyRoot=True,capDrop=['ALL'],binds=[],tmpfs=[])
+          packed=(json.dumps(cfg,sort_keys=True,separators=(',',':'))+'\n').encode()
+          candidate=root+'/protected-openclaw-sandbox-policy-candidate.json'
+          fd=os.open(candidate,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          module='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/config-CQ7BYVQS.mjs'
+          fd=os.open(module,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());data=f.read();assert s.st_uid==1002 and not s.st_mode&0o022
+          for imported in re.findall(r'import [^;]*resolveAgentConfig[^;]* from "([^"]+)";',data.decode()):
+              imported_path=os.path.realpath(os.path.join(os.path.dirname(module),imported))
+              assert imported_path.startswith(os.path.dirname(module)+'/')
+              with open(imported_path,'rb') as f:
+                  ins=os.fstat(f.fileno());assert ins.st_uid==1002 and not ins.st_mode&0o022
+                  imported_data=f.read(8388609);assert len(imported_data)<=8388608
+              txt=imported_data.decode();pos=txt.find('function resolveAgentConfig(')
+              if pos>=0:print('SDK_AGENT_CONFIG_RESOLVER_SOURCE='+json.dumps(txt[pos:pos+1400]))
+              for marker in ('function resolveAgentEntry(', 'function hasAgentRosterProperty(', 'function listAgentEntries('):
+                  pos=txt.find(marker)
+                  if pos>=0:print('SDK_AGENT_ROSTER_SOURCE='+json.dumps(txt[pos:pos+1000]))
+          js="const m=await import("+json.dumps('file://'+module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const [id,access] of [['developer','rw'],['platform-engineer','ro']]){const r=m.i(cfg,id);if(r.mode!=='all'||r.workspaceAccess!==access||r.scope!=='agent')throw Error('POLICY_RESOLUTION');rows.push({agent_id:id,mode:r.mode,workspaceAccess:r.workspaceAccess,scope:r.scope});}console.log(JSON.stringify({resolver_signature:m.i.toString().slice(0,600),rows}));"
+          p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],input=packed,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C'},timeout=30)
+          result={'schema':1,'state':'HOLD_POLICY_CANDIDATE','profile_before_sha256':before,'candidate_path':candidate,'candidate_sha256':hashlib.sha256(packed).hexdigest(),'sdk_config_sha256':hashlib.sha256(data).hexdigest(),'sdk_resolution_exit':p.returncode,'applied':False,'services_changed':False,'model_calls':0,'writer_admission':False}
+          if p.returncode==0:
+              result['sdk_resolution_diagnostics']=json.loads(p.stdout.decode().strip().splitlines()[-1]);result['state']='OFFLINE_POLICY_RESOLUTION_PASS_NO_HOST_SANDBOX_ACCEPTANCE'
+          if p.returncode!=0:
+              result['error_type']='NODE_OFFLINE_RESOLUTION_FAILED'
+              result['sdk_resolver_source_header']=data.decode().split('function resolveSandboxConfigForAgent',1)[-1][:600]
+          with open(profile,'rb') as f:assert hashlib.sha256(f.read()).hexdigest()==before
+          receipt=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-sandbox-policy-candidate-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(receipt);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True))
+          print('SANDBOX_POLICY_CANDIDATE_RECEIPT_SHA256='+hashlib.sha256(receipt).hexdigest())
+          assert p.returncode==0,'OFFLINE_POLICY_RESOLUTION_HOLD'
+          PY
+
+      - name: Prepare exact-source publisher realm and verify isolated UID1003 credentials without canonical effects
+        shell: bash
+        env:
+          P2_PUBLISHER_RUN: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_publisher_realm.py "$P2_PUBLISHER_RUN"
+
+      - name: Prepare private callback and native peer bootstrap candidates without applying
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_private_bootstrap_inputs.py "$P2_WORK_DIR/xuanjun-p2-package" "$P2_WORK_DIR/private-bootstrap-candidate"
+      - name: Render private complete core plan with exact frozen artifact and validate both schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_private_core_install_plan.py "$P2_WORK_DIR/xuanjun-p2-package" "$P2_WORK_DIR/protected-core-install-plan.json"
+
+      - name: Seal private core plan and bootstrap candidates then run actual runtime preflight without applying
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,json,stat,hashlib,shutil,socket,importlib.util
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          work=sys.argv[1];durable='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
+          output=durable+'/plan-'+os.path.basename(work);os.mkdir(output,0o700)
+          def read(path,mode):
+              assert os.path.realpath(path)==path
+              fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+              with os.fdopen(fd,'rb') as f:
+                  s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==mode
+                  data=f.read(1048577);assert len(data)<=1048576
+              return data
+          def write(path,data,mode=0o600):
+              fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
+              with os.fdopen(fd,'wb') as f:f.write(data);f.flush();os.fsync(f.fileno())
+          package=work+'/xuanjun-p2-package'
+          installer=package+'/scripts/uk-integration-install.py'
+          spec=importlib.util.spec_from_file_location('p2_seal_verify',installer);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          manifest=package+'/deploy/integration-manifest.json'
+          m.verify(package,manifest,'62d2e64d34feea1f02bffa7e8b597484bb98307f','2b49066f37742dedd41657fb445c91f4204fd4a2a257f921dd9fd514e5b25f0e',expected_tree='e75e549d87515aee1c022faa04e805f694088d6e')
+          sealed_package=output+'/xuanjun-p2-package';shutil.copytree(package,sealed_package,symlinks=False)
+          for parent,dirs,files in os.walk(sealed_package):
+              os.chown(parent,0,0);os.chmod(parent,0o755)
+              for name in files:
+                  path=parent+'/'+name;assert not os.path.islink(path)
+                  os.chown(path,0,0);os.chmod(path,0o555 if os.stat(path).st_mode&0o111 else 0o444)
+          m.verify(sealed_package,sealed_package+'/deploy/integration-manifest.json','62d2e64d34feea1f02bffa7e8b597484bb98307f','2b49066f37742dedd41657fb445c91f4204fd4a2a257f921dd9fd514e5b25f0e',expected_tree='e75e549d87515aee1c022faa04e805f694088d6e')
+          plan=json.loads(read(work+'/protected-core-install-plan.json',0o600).decode())
+          plan['artifact']['root']=sealed_package;plan['artifact']['manifest']=sealed_package+'/deploy/integration-manifest.json'
+          for item in plan['runtime']['prerequisites']['binaries']:
+              candidates=[]
+              count=0
+              for parent,dirs,files in os.walk(durable,followlinks=False):
+                  dirs[:]=[name for name in dirs if not name.startswith(('plan-','publisher-realm-')) and name!='control-mirror.git']
+                  ps=os.lstat(parent);assert ps.st_uid==0 and not ps.st_mode&0o022 and os.path.realpath(parent)==parent
+                  for name in files:
+                      count+=1;assert count<256
+                      path=parent+'/'+name;s=os.lstat(path)
+                      if name==os.path.basename(item['target']) and stat.S_ISREG(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o555 and os.path.realpath(path)==path:
+                          with open(path,'rb') as f:
+                              h=hashlib.sha256()
+                              for raw in iter(lambda:f.read(65536),b''):h.update(raw)
+                          if h.hexdigest()==item['sha256']:candidates.append(path)
+              assert len(candidates)==1,'PINNED_DURABLE_BINARY_NOT_UNIQUE';item['source']=candidates[0]
+          raw=(json.dumps(plan,sort_keys=True,separators=(',',':'))+'\n').encode()
+          # Core plan is sealed after bootstrap source paths are made durable.
+          policy=read(work+'/protected-openclaw-sandbox-policy-candidate.json',0o600)
+          write(output+'/protected-openclaw-sandbox-policy-candidate.json',policy)
+          bootstrap=json.loads(read(work+'/private-bootstrap-candidate/protected-bootstrap-candidate-receipt.json',0o600).decode())
+          os.mkdir(output+'/private-bootstrap',0o700)
+          for item in bootstrap['files']:
+              data=read(item['source'],0o600);assert hashlib.sha256(data).hexdigest()==item['sha256']
+              target=output+'/private-bootstrap/'+os.path.basename(item['source']);write(target,data);item['source']=target
+          bootraw=(json.dumps(bootstrap,sort_keys=True,separators=(',',':'))+'\n').encode()
+          write(output+'/protected-bootstrap-candidate-receipt.json',bootraw)
+          plan['runtime']['bootstrap']={'path':output+'/protected-bootstrap-candidate-receipt.json','sha256':hashlib.sha256(bootraw).hexdigest()}
+          plan['runtime']['sandbox_policy']={'path':output+'/protected-openclaw-sandbox-policy-candidate.json','sha256':hashlib.sha256(policy).hexdigest(),'original_sha256':'569e7f4eb66860caf05e23fc1d00098d9f67c9204347b979ab39696f184fbba3'}
+          plan['runtime']['rpm']={'path':durable+'/rpm-tls-baseline-38410346819/protected-rpm-tls-baseline.json','sha256':'f784c4809b77df7f75ded97209efc32ff8c69944be33028e59e9422dcae100ec'}
+          publisher_path=durable+'/publisher-realm-'+os.path.basename(work).split('-')[1]+'/protected-publisher-inputs.json'
+          publisher_raw=read(publisher_path,0o600);publisher=json.loads(publisher_raw.decode())
+          assert publisher['source_commit']=='62d2e64d34feea1f02bffa7e8b597484bb98307f' and publisher['source_tree']=='e75e549d87515aee1c022faa04e805f694088d6e'
+          plan['runtime']['publisher']={'path':publisher_path,'sha256':hashlib.sha256(publisher_raw).hexdigest(),'source_commit':publisher['source_commit'],'source_tree':publisher['source_tree']}
+          raw=(json.dumps(plan,sort_keys=True,separators=(',',':'))+'\n').encode()
+          write(output+'/protected-core-install-plan.json',raw)
+          sys.path.insert(0,sealed_package+'/stage1')
+          from p2_install_entrypoint import validate_plan
+          from p2_fixed_host_runtime import FixedHostRuntime
+          validate_plan(plan)
+          transaction=output+'/runtime-preflight';os.mkdir(transaction,0o700)
+          result={'schema':1,'state':'HOLD_RUNTIME_PREFLIGHT','sealed_preparation_root':output,'core_plan_sha256':hashlib.sha256(raw).hexdigest(),'bootstrap_receipt_sha256':hashlib.sha256(bootraw).hexdigest(),'policy_candidate_sha256':hashlib.sha256(policy).hexdigest(),'install':False,'writer_admission':False,'services_changed':False,'model_calls':0}
+          try:
+              FixedHostRuntime(transaction).preflight(plan['runtime'],plan['auth'],plan['tls'])
+              result['state']='ACTUAL_RUNTIME_PREFLIGHT_PASS_NO_INSTALL_ADMISSION'
+          except Exception as e:
+              result['error_type']=type(e).__name__
+              message=str(e)
+              result['hold_reason']=message if message and all(x in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_ ' for x in message) else 'DETAILS_RETAINED_PRIVATE'
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          write(output+'/protected-sealed-preparation-receipt.json',packed)
+          print(json.dumps(result,sort_keys=True))
+          print('SEALED_PREPARATION_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
+          assert result['state']=='ACTUAL_RUNTIME_PREFLIGHT_PASS_NO_INSTALL_ADMISSION'
+          PY
+
+      - name: Verify required native Docker images from candidate policy without pull or container creation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,subprocess,hashlib,stat
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];path=root+'/protected-openclaw-sandbox-policy-candidate.json'
+          fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o600
+              raw=f.read(1048577);assert len(raw)<=1048576
+          module='file:///home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/config-CQ7BYVQS.mjs'
+          js="const m=await import("+json.dumps(module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);console.log(JSON.stringify(['developer','platform-engineer'].map(id=>{const r=m.i(cfg,id);return {agent_id:id,backend:r.backend,image:r.docker?.image,network:r.docker?.network,readOnlyRoot:r.docker?.readOnlyRoot};})));"
+          p=subprocess.run(['/usr/sbin/runuser','-u','xuanjun_dev','--','/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],input=raw,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,env={'HOME':'/home/xuanjun_dev','PATH':'/usr/bin:/bin','LANG':'C'},timeout=30)
+          assert p.returncode==0;rows=json.loads(p.stdout.decode().strip().splitlines()[-1])
+          result={'schema':1,'state':'HOLD_NATIVE_DOCKER_IMAGES','agent_docker':rows,'images':[],'images_pulled':False,'containers_created':False,'services_changed':False,'model_calls':0,'writer_admission':False}
+          for image in sorted({r.get('image','') for r in rows}):
+              assert isinstance(image,str) and image and not image.startswith('-') and len(image)<256
+              p=subprocess.run(['/usr/bin/docker','image','inspect','--format','{{.Id}}',image],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=15)
+              row={'image':image,'inspect_exit':p.returncode}
+              if p.returncode==0:row['image_id']=p.stdout.decode().strip()
+              result['images'].append(row)
+          if result['images'] and all(x['inspect_exit']==0 for x in result['images']):result['state']='NATIVE_DOCKER_IMAGES_PRESENT_NO_RUNTIME_ACCEPTANCE'
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-native-docker-image-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('NATIVE_DOCKER_IMAGE_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
+
+      - name: Diagnose Docker daemon and reuse installed official sandbox build assets without execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,stat,socket,json,hashlib,subprocess
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];package='/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw'
+          with open(package+'/package.json','rb') as f:
+              s=os.fstat(f.fileno());raw=f.read(1048577);assert s.st_uid==1002 and not s.st_mode&0o022 and len(raw)<=1048576
+          meta=json.loads(raw.decode())
+          result={'schema':1,'installed_openclaw_version':meta.get('version'),'package_json_sha256':hashlib.sha256(raw).hexdigest(),'assets':[],'model_calls':0,'services_changed':False,'containers_created':False,'images_built':False,'images_pulled':False,'writer_admission':False}
+          p=subprocess.run(['/usr/bin/docker','version','--format','{{.Server.Version}}'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+          result['docker_server_exit']=p.returncode
+          if p.returncode==0:result['docker_server_version']=p.stdout.decode().strip()
+          p=subprocess.run(['systemctl','show','docker.service','--property=LoadState,ActiveState,SubState'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+          result['docker_service']=dict(line.split('=',1) for line in p.stdout.decode().splitlines() if '=' in line)
+          for image in ('openclaw-sandbox:bookworm-slim','debian:bookworm-slim'):
+              p=subprocess.run(['/usr/bin/docker','image','inspect','--format','{{.Id}}',image],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+              row={'image':image,'exit':p.returncode}
+              if p.returncode==0:row['image_id']=p.stdout.decode().strip()
+              else:
+                  error=p.stderr.decode('utf-8','replace').lower()
+                  row['failure_class']='IMAGE_NOT_FOUND' if 'no such image' in error or 'no such object' in error else 'DAEMON_OR_OTHER_ERROR'
+              result.setdefault('image_inventory',[]).append(row)
+          count=0
+          for parent,dirs,files in os.walk(package,followlinks=False):
+              dirs[:]=[x for x in dirs if x not in ('node_modules','.git')]
+              for name in files:
+                  count+=1;assert count<50000
+                  if name not in ('Dockerfile.sandbox','Dockerfile.sandbox-common','Dockerfile.sandbox-browser','sandbox-setup.sh','sandbox-common-setup.sh'):continue
+                  path=parent+'/'+name
+                  if os.path.realpath(path)!=path:continue
+                  with open(path,'rb') as f:
+                      s=os.fstat(f.fileno());data=f.read(1048577);assert s.st_uid==1002 and not s.st_mode&0o022 and len(data)<=1048576
+                  row={'path':path,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data),'uid':s.st_uid}
+                  if name.startswith('Dockerfile'):row['content']=data.decode()
+                  result['assets'].append(row)
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          path=root+'/protected-docker-build-asset-receipt.json'
+          fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('DOCKER_BUILD_ASSET_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
+
+      - name: Reproduce frozen snapshot permissions with isolated numeric identities and no canonical ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,stat,subprocess,hashlib
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];sys.path.insert(0,root+'/xuanjun-p2-package/stage1')
+          from development_pipeline import CliBackend
+          fixture=root+'/snapshot-permission-fixture';os.mkdir(fixture,0o755);os.chmod(fixture,0o755)
+          snapshot=fixture+'/snapshot'
+          backend=CliBackend.__new__(CliBackend)
+          backend._write_snapshot(snapshot,{'fixture.py':{'mode':0o100644,'data':b'FIXTURE_ONLY=1\n'}})
+          for parent,dirs,files in os.walk(snapshot):
+              os.chown(parent,1003,1003)
+              for name in files:os.chown(parent+'/'+name,1003,1003)
+          script="import os,sys,json;uid=int(sys.argv[1]);os.setgroups([]);os.setgid(uid);os.setuid(uid);path=sys.argv[2];result={'uid':uid};\nfor operation in ('read','write'):\n try:\n  fd=os.open(path,os.O_RDONLY if operation=='read' else os.O_WRONLY);os.close(fd);result[operation]='ALLOWED'\n except PermissionError:result[operation]='DENIED'\nprint(json.dumps(result))"
+          rows=[]
+          for uid in (1002,1005):
+              p=subprocess.run(['/usr/bin/python3','-I','-B','-c',script,str(uid),snapshot+'/fixture.py'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+              assert p.returncode==0;rows.append(json.loads(p.stdout.decode()))
+          result={'schema':1,'state':'SNAPSHOT_CROSS_UID_ACCESS_BLOCKED' if all(x['read']=='DENIED' for x in rows) else 'SNAPSHOT_ACCESS_REQUIRES_REVIEW','fixture_directory_mode':oct(stat.S_IMODE(os.stat(snapshot).st_mode)),'fixture_file_mode':oct(stat.S_IMODE(os.stat(snapshot+'/fixture.py').st_mode)),'snapshot_owner_uid':1003,'identity_access':rows,'canonical_ledger_changed':False,'production_paths_changed':False,'model_calls':0,'services_changed':False,'writer_admission':False}
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-snapshot-permission-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('SNAPSHOT_PERMISSION_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Prepare isolated official sandbox image cache without runtime container or model execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,hashlib,subprocess,shutil
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];build=root+'/sandbox-image-build';os.mkdir(build,0o700)
+          dockerfile="FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251\n\nENV DEBIAN_FRONTEND=noninteractive\n\nRUN apt-get update \\\n  && apt-get install -y --no-install-recommends \\\n    bash \\\n    ca-certificates \\\n    curl \\\n    git \\\n    jq \\\n    python3 \\\n    ripgrep \\\n  && rm -rf /var/lib/apt/lists/*\n\nRUN useradd --create-home --shell /bin/bash sandbox\nUSER sandbox\nWORKDIR /home/sandbox\n\nCMD [\"sleep\", \"infinity\"]\n".encode()
+          fd=os.open(build+'/Dockerfile',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(dockerfile);f.flush();os.fsync(f.fileno())
+          os.mkdir(build+'/client-config',0o700)
+          image='xuanjun-p2-sandbox:prep-base-20261013'
+          result={'schema':1,'state':'HOLD_SANDBOX_IMAGE_BUILD','official_source_commit':'bcfc88812a35243893585dbeca87ca41b48272ca','official_source_path':'scripts/docker/sandbox/Dockerfile','dockerfile_sha256':hashlib.sha256(dockerfile).hexdigest(),'adaptation':'REMOVE_APT_CACHE_MOUNTS_FOR_CLASSIC_BUILDER_AND_CLEAR_APT_LISTS','image_tag':image,'runtime_containers_created':False,'build_intermediate_containers_possible':True,'services_changed':False,'model_calls':0,'writer_admission':False}
+          assert shutil.disk_usage('/var/lib/docker').free>2147483648
+          env={'PATH':'/usr/bin:/bin','LANG':'C','DOCKER_HOST':'unix:///var/run/docker.sock','DOCKER_BUILDKIT':'0','DOCKER_CONFIG':build+'/client-config'}
+          with open(build+'/protected-build.log','xb') as log:
+              os.chmod(build+'/protected-build.log',0o600)
+              try:
+                  p=subprocess.run(['/usr/bin/docker','build','--force-rm','--memory=768m','--cpu-quota=100000','--label','xuanjun.p2.preparation=11796280855','--label','xuanjun.p2.official_source=bcfc88812a35243893585dbeca87ca41b48272ca','-t',image,'-f',build+'/Dockerfile',build],env=env,stdout=log,stderr=subprocess.STDOUT,timeout=240)
+                  result['build_exit']=p.returncode
+                  if p.returncode==0:
+                      p=subprocess.run(['/usr/bin/docker','image','inspect',image],env=env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=15)
+                      assert p.returncode==0;data=json.loads(p.stdout.decode())[0]
+                      result.update(state='SANDBOX_IMAGE_CACHE_PREPARED_NO_RUNTIME_ACCEPTANCE',image_id=data['Id'],image_user=data.get('Config',{}).get('User'))
+              except subprocess.TimeoutExpired:result['build_state']='TIMEOUT_DAEMON_COMPLETION_UNKNOWN'
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-sandbox-image-build-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('SANDBOX_IMAGE_BUILD_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Verify narrow snapshot ACL prototype and importer denial with real isolated numeric identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,stat,json,hashlib,subprocess
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];fixture=root+'/narrow-acl-fixture';os.mkdir(fixture,0o755);os.chmod(fixture,0o755)
+          source='evidence/p2-install-preparation-20261013/native_snapshot_access_prototype.py'
+          with open(source,'rb') as f:code=f.read()
+          module=fixture+'/native_snapshot_access.py'
+          fd=os.open(module,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o444)
+          with os.fdopen(fd,'wb') as f:f.write(code)
+          work=fixture+'/worktrees';os.mkdir(work,0o755);os.chown(work,1003,1003)
+          snapshot=work+'/snapshot';os.mkdir(snapshot,0o700);os.chown(snapshot,1003,1003)
+          for name,mode in [('fixture.py',0o600),('fixture.sh',0o700)]:
+              fd=os.open(snapshot+'/'+name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,mode)
+              with os.fdopen(fd,'wb') as f:f.write(b'FIXTURE_ONLY=1\n')
+              os.chown(snapshot+'/'+name,1003,1003)
+          secret=fixture+'/service-home';os.mkdir(secret,0o700);os.chown(secret,1003,1003)
+          fd=os.open(secret+'/dummy-secret',os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(b'FIXTURE_SECRET_NOT_A_CREDENTIAL\n')
+          os.chown(secret+'/dummy-secret',1003,1003)
+          env={'PATH':'/usr/bin:/bin','LANG':'C','HOME':fixture}
+          js="import os,sys,importlib.util;os.setgroups([]);os.setgid(1003);os.setuid(1003);s=importlib.util.spec_from_file_location('acl',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);a=m.NativeSnapshotAccess(sys.argv[2],1003,1002);a.share(sys.argv[2]+'/snapshot');print('ACL_SHARED')"
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',js,module,work],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+          assert p.returncode==0,'NARROW_ACL_SHARE_FAILED'
+          probe="import os,sys,json;uid=int(sys.argv[1]);os.setgroups([]);os.setgid(uid);os.setuid(uid);result={'uid':uid};\nfor key,path,flags in [('snapshot_read',sys.argv[2],os.O_RDONLY),('snapshot_write',sys.argv[2],os.O_WRONLY),('importer_read',sys.argv[3],os.O_RDONLY)]:\n try:fd=os.open(path,flags);os.close(fd);result[key]='ALLOWED'\n except PermissionError:result[key]='DENIED'\nprint(json.dumps(result))"
+          rows=[]
+          for uid in (1002,1003,1005):
+              p=subprocess.run(['/usr/bin/python3','-I','-B','-c',probe,str(uid),snapshot+'/fixture.py',secret+'/dummy-secret'],env=env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+              assert p.returncode==0;rows.append(json.loads(p.stdout.decode()))
+          assert rows[0]['snapshot_read']==rows[0]['snapshot_write']=='ALLOWED' and rows[0]['importer_read']=='DENIED'
+          assert rows[1]['snapshot_read']==rows[1]['snapshot_write']==rows[1]['importer_read']=='ALLOWED'
+          assert all(rows[2][k]=='DENIED' for k in ('snapshot_read','snapshot_write','importer_read'))
+          create="import os,sys;os.setgroups([]);os.setgid(1002);os.setuid(1002);p=sys.argv[1];os.mkdir(p+'/created-dir');f=open(p+'/created-dir/new.py','w');f.write('FIXTURE_ONLY=2\\n');f.close()"
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',create,snapshot],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=8)
+          assert p.returncode==0,'NARROW_ACL_INHERITANCE_FAILED'
+          validate="import os,sys,importlib.util;os.setgroups([]);os.setgid(1003);os.setuid(1003);s=importlib.util.spec_from_file_location('acl',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);a=m.NativeSnapshotAccess(sys.argv[2],1003,1002);p=sys.argv[2]+'/snapshot';\nfor path,directory in [(p,True),(p+'/fixture.py',False),(p+'/fixture.sh',False),(p+'/created-dir',True),(p+'/created-dir/new.py',False)]:\n fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW);a.validate(fd,directory);os.close(fd)\nprint('ACL_INHERITANCE_VALIDATED')"
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',validate,module,work],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)
+          assert p.returncode==0,'NARROW_ACL_VALIDATION_FAILED'
+          result={'schema':1,'state':'REAL_NARROW_SNAPSHOT_ACL_FIXTURE_PASS_NO_RUNTIME_ACCEPTANCE','prototype_sha256':hashlib.sha256(code).hexdigest(),'identity_access':rows,'gateway_created_file_readable_by_dispatcher':True,'default_acl_validation':True,'canonical_ledger_changed':False,'production_paths_changed':False,'services_changed':False,'model_calls':0,'writer_admission':False}
+          packed=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-narrow-acl-fixture-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(packed);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('NARROW_ACL_FIXTURE_RECEIPT_SHA256='+hashlib.sha256(packed).hexdigest())
+          PY
+
+      - name: Verify actual frozen snapshot backend across numeric UIDs without model or canonical ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,subprocess,hashlib
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];fixture=root+'/frozen-snapshot-backend-fixture';os.mkdir(fixture,0o755);os.chmod(fixture,0o755)
+          workspace=fixture+'/worktrees';os.mkdir(workspace,0o755);os.chown(workspace,1003,1003)
+          package=root+'/xuanjun-p2-package'
+          code="import os,sys,json;os.setgroups([]);os.setgid(1003);os.setuid(1003);sys.path.insert(0,sys.argv[1]+'/stage1');from development_pipeline import CliBackend;from native_snapshot_access import NativeSnapshotAccess;b=CliBackend({'owner/repo':sys.argv[2]+'/control.git'},sys.argv[2],sys.argv[2]+'/service-home','/usr/bin:/bin',['fixture'],snapshot_access=NativeSnapshotAccess(sys.argv[2],1003,1002));b._write_snapshot(sys.argv[2]+'/snapshot',{'fixture.py':{'mode':0o100644,'data':b'FIXTURE_ONLY=1\\n'},'bin/run':{'mode':0o100755,'data':b'#!/bin/sh\\n'}});v=b._scan_snapshot(sys.argv[2]+'/snapshot');assert v['fixture.py']['mode']==0o100644 and v['bin/run']['mode']==0o100755;print('FROZEN_BACKEND_SHARED_AND_SCANNED')"
+          env={'PATH':'/usr/bin:/bin','LANG':'C','HOME':fixture}
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',code,package,workspace],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+          assert p.returncode==0,'FROZEN_BACKEND_KERNEL_FIXTURE_FAILED'
+          probe="import os,sys,json;uid=int(sys.argv[1]);os.setgroups([]);os.setgid(uid);os.setuid(uid);row={'uid':uid};\nfor key,flags in [('read',os.O_RDONLY),('write',os.O_WRONLY)]:\n try:fd=os.open(sys.argv[2],flags);os.close(fd);row[key]='ALLOWED'\n except PermissionError:row[key]='DENIED'\nprint(json.dumps(row))"
+          rows=[]
+          for uid in (1002,1003,1005):
+              p=subprocess.run(['/usr/bin/python3','-I','-B','-c',probe,str(uid),workspace+'/snapshot/fixture.py'],env=env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=8)
+              assert p.returncode==0;rows.append(json.loads(p.stdout.decode()))
+          assert rows[0]['read']==rows[0]['write']==rows[1]['read']==rows[1]['write']=='ALLOWED'
+          assert rows[2]['read']==rows[2]['write']=='DENIED'
+          create="import os,sys;os.setgroups([]);os.setgid(1002);os.setuid(1002);p=sys.argv[1];os.mkdir(p+'/newdir');f=open(p+'/newdir/new.py','w');f.write('FIXTURE_ONLY=2\\n');f.close()"
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',create,workspace+'/snapshot'],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=8)
+          assert p.returncode==0
+          scan="import os,sys;os.setgroups([]);os.setgid(1003);os.setuid(1003);sys.path.insert(0,sys.argv[1]+'/stage1');from development_pipeline import CliBackend;from native_snapshot_access import NativeSnapshotAccess;b=CliBackend({'owner/repo':sys.argv[2]+'/control.git'},sys.argv[2],sys.argv[2]+'/home','/usr/bin:/bin',['fixture'],snapshot_access=NativeSnapshotAccess(sys.argv[2],1003,1002));assert b._scan_snapshot(sys.argv[2]+'/snapshot')['newdir/new.py']['data']==b'FIXTURE_ONLY=2\\n';print('FROZEN_BACKEND_READS_GATEWAY_OUTPUT')"
+          p=subprocess.run(['/usr/bin/python3','-I','-B','-c',scan,package,workspace],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)
+          assert p.returncode==0,'FROZEN_BACKEND_GATEWAY_OUTPUT_SCAN_FAILED'
+          result={'schema':1,'state':'EXACT_ARTIFACT_NATIVE_SNAPSHOT_BACKEND_KERNEL_PASS','artifact_id':11825547804,'source_commit':'62d2e64d34feea1f02bffa7e8b597484bb98307f','identity_access':rows,'gateway_output_import_scan':True,'model_calls':0,'services_changed':False,'canonical_ledger_changed':False,'writer_admission':False}
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-frozen-snapshot-backend-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('FROZEN_SNAPSHOT_BACKEND_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Verify actual SDK source mounts and readonly write denial with exact container cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 -I -B - "$P2_WORK_DIR" <<'PY'
+          import os,sys,socket,json,subprocess,hashlib,stat
+          assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ'
+          root=sys.argv[1];fixture=root+'/sdk-readonly-mount-fixture';os.mkdir(fixture,0o755);os.chmod(fixture,0o755)
+          home=fixture+'/home';os.mkdir(home,0o700);os.chown(home,1002,1002)
+          snapshot=root+'/frozen-snapshot-backend-fixture/worktrees/snapshot'
+          image='sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d'
+          roles={};gid=os.stat('/var/run/docker.sock').st_gid
+          for agent,access in [('developer','rw'),('platform-engineer','ro')]:
+              roles[agent]={'workspace':snapshot,'sandbox':{'mode':'all','scope':'agent','workspaceAccess':access,'workspaceRoot':home+'/sandbox-workspaces','backend':'docker','docker':{'image':image,'user':'1002:1002','network':'none','readOnlyRoot':True,'capDrop':['ALL'],'binds':[],'tmpfs':[],'containerPrefix':'xjfx-'+os.path.basename(root)+'-'+agent+'-'}}}
+          cfg={'agents':{'defaults':{'skipBootstrap':True},'entries':roles}}
+          module='file:///home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/context-DyPstb2Q.mjs'
+          js="const m=await import("+json.dumps(module)+");let b='';for await(const c of process.stdin)b+=c;const cfg=JSON.parse(b);const rows=[];for(const agentId of ['developer','platform-engineer']){const sessionKey='agent:'+agentId+':p2-fixture:"+os.path.basename(root)+"';const c=await m.resolveSandboxContext({config:cfg,agentId,sessionKey,workspaceDir:"+json.dumps(snapshot)+",requireCurrentConfig:false,assertCurrent:()=>{}});const row={agentId};for(const key of ['enabled','sessionKey','workspaceDir','agentWorkspaceDir','skillsWorkspaceDir','containerWorkdir','containerName','containerId','workspaceAccess','backendId','runtimeId']){if(c?.[key]!==undefined&&['string','boolean','number'].includes(typeof c[key]))row[key]=c[key];}rows.push(row);}console.log('P2_SDK_MOUNTS='+JSON.stringify(rows));"
+          env={'PATH':'/usr/bin:/bin','LANG':'C','HOME':home,'OPENCLAW_STATE_DIR':home+'/state','OPENCLAW_HOME':home,'NO_COLOR':'1','DOCKER_HOST':'unix:///var/run/docker.sock'}
+          contexts=[];known=[];result={'schema':1,'state':'HOLD_SDK_SOURCE_MOUNTS','artifact_id':11825547804,'model_calls':0,'canonical_ledger_changed':False,'production_services_changed':False,'writer_admission':False,'contexts':contexts,'units':known}
+          def docker(*args):
+              return subprocess.run(['/usr/bin/docker','--host=unix:///var/run/docker.sock']+list(args),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
+          try:
+              p=subprocess.run(['/usr/bin/setpriv','--reuid=1002','--regid=1002','--groups='+str(gid),'/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',js],input=json.dumps(cfg).encode(),env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=90)
+              result['sdk_exit']=p.returncode
+              fd=os.open(fixture+'/protected-sdk.log',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+              with os.fdopen(fd,'wb') as f:f.write(p.stdout+p.stderr)
+              assert p.returncode==0
+              lines=[line[len('P2_SDK_MOUNTS='):] for line in p.stdout.decode().splitlines() if line.startswith('P2_SDK_MOUNTS=')]
+              assert len(lines)==1;contexts.extend(json.loads(lines[0]));assert len(contexts)==2
+              for context in contexts:
+                  q=docker('inspect',context['runtimeId']);assert q.returncode==0
+                  obj=json.loads(q.stdout.decode())[0]
+                  assert obj['Image']==image and obj['Config'].get('User')=='1002:1002'
+                  assert obj['HostConfig'].get('NetworkMode')=='none' and obj['HostConfig'].get('ReadonlyRootfs') is True
+                  mounts=[{'type':m.get('Type'),'source':m.get('Source'),'destination':m.get('Destination'),'rw':m.get('RW')} for m in obj.get('Mounts',[])]
+                  assert all(m['type']=='bind' and m['source'].startswith(root+'/') for m in mounts)
+                  repo=[m for m in mounts if m['source']==snapshot];assert repo
+                  expected_rw=context['agentId']=='developer';assert any(m['rw']==expected_rw for m in repo)
+                  destination=next(m['destination'] for m in repo if m['rw']==expected_rw)
+                  row={'id':obj['Id'],'runtime_id':context['runtimeId'],'agent_id':context['agentId'],'container_pid':obj['State'].get('Pid'),'mounts':mounts,'source_destination':destination}
+                  known.append(row)
+                  payload="import os,sys,json;path=sys.argv[1];out={};\nwith open(path,'rb') as f:out['read_size']=len(f.read())\ntry:\n fd=os.open(path,os.O_WRONLY);os.close(fd);out['source_write']='ALLOWED'\nexcept OSError as e:out['source_write']='DENIED';out['write_errno']=e.errno\nprint(json.dumps(out))"
+                  q=docker('exec','--user','1002:1002',obj['Id'],'/usr/bin/python3','-B','-c',payload,destination+'/fixture.py');assert q.returncode==0
+                  row['source_io_probe']=json.loads(q.stdout.decode());assert row['source_io_probe']['source_write']==('ALLOWED' if expected_rw else 'DENIED')
+              package=root+'/xuanjun-p2-package/plugins/p2-native-controller'
+              source={'workdir':snapshot,'files':[]}
+              for directory,dirs,files in os.walk(snapshot):
+                  for name in sorted(files):
+                      absolute=directory+'/'+name;s=os.lstat(absolute);assert stat.S_ISREG(s.st_mode)
+                      with open(absolute,'rb') as f:raw=f.read()
+                      source['files'].append({'path':os.path.relpath(absolute,snapshot),'mode':'100755' if s.st_mode&0o111 else '100644','sha256':hashlib.sha256(raw).hexdigest()})
+              module_url='file://'+package
+              verifyjs="const {sandboxLayout}=await import("+json.dumps(module_url+'/sdk-layout.mjs')+");const {ContainerObserver}=await import("+json.dumps(module_url+'/workspace.mjs')+");let b='';for await(const c of process.stdin)b+=c;const input=JSON.parse(b);const observer=new ContainerObserver({binary:'/usr/bin/docker',backend:'docker'});const out=[];for(const ctx of input.contexts){const request={workdir:input.source.workdir,sandbox:ctx.workspaceAccess==='ro'?'read-only':'workspace-write'};const layout=sandboxLayout(ctx,request,ctx.sessionKey,'docker');const unit=await observer.bind({backend:'docker',name:ctx.runtimeId,sdk_layout:layout},request.workdir,[],request.sandbox);const attestation=await observer.attestSnapshot(unit,input.source);out.push({agent_id:ctx.agentId,unit_id:unit.id,cgroup:unit.cgroup,workspace_destination:unit.workspace_destination,attestation});}console.log('P2_OBSERVER_NAMESPACE='+JSON.stringify(out));"
+              q=subprocess.run(['/usr/bin/setpriv','--reuid=1002','--regid=1002','--groups='+str(gid),'/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node','--input-type=module','-e',verifyjs],input=json.dumps({'contexts':contexts,'source':source}).encode(),env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60)
+              fd=os.open(fixture+'/protected-observer.log',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+              with os.fdopen(fd,'wb') as f:f.write(q.stdout+q.stderr)
+              result['observer_exit']=q.returncode
+              assert q.returncode==0,'EXACT_CONTROLLER_OBSERVER_OR_NAMESPACE_FAILED'
+              observed=[line[len('P2_OBSERVER_NAMESPACE='):] for line in q.stdout.decode().splitlines() if line.startswith('P2_OBSERVER_NAMESPACE=')]
+              assert len(observed)==1;result['controller_observer_namespace']=json.loads(observed[0]);assert len(result['controller_observer_namespace'])==2
+              assert [r['workspace_destination'] for r in result['controller_observer_namespace']]==['/workspace','/agent']
+              result['state']='SDK_LAYOUT_ACTUAL_CONTROLLER_MOUNTS_NAMESPACE_AND_READONLY_DENIAL_PASS'
+          except Exception as e:
+              result['error_type']=type(e).__name__;message=str(e)
+              result['hold_reason']=message if message and all(x in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_ ' for x in message) else 'DETAILS_RETAINED_PRIVATE'
+          finally:
+              cleanup=[]
+              for context in contexts:
+                  name=context['runtimeId'];q=docker('inspect',name)
+                  if q.returncode==0:
+                      obj=json.loads(q.stdout.decode())[0]
+                      assert obj['Image']==image and any(m.get('Source','').startswith(root+'/') for m in obj.get('Mounts',[]))
+                      q=docker('rm','--force',obj['Id']);assert q.returncode==0
+                  q=docker('inspect',name);cleanup.append({'runtime_id':name,'removed_or_absent':q.returncode!=0})
+              result['exact_container_cleanup']=cleanup;result['fixture_cleanup_confirmed']=len(cleanup)==2 and all(x['removed_or_absent'] for x in cleanup)
+          raw=(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n').encode()
+          fd=os.open(root+'/protected-sdk-source-mount-receipt.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          print(json.dumps(result,sort_keys=True));print('SDK_SOURCE_MOUNT_RECEIPT_SHA256='+hashlib.sha256(raw).hexdigest())
+          assert result['state']=='SDK_LAYOUT_ACTUAL_CONTROLLER_MOUNTS_NAMESPACE_AND_READONLY_DENIAL_PASS' and result['fixture_cleanup_confirmed'],'SDK_CONTROLLER_FIXTURE_HOLD'
+          PY
+

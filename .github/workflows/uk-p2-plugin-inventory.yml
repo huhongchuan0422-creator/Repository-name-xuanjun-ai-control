@@ -1,0 +1,47 @@
+name: P2 UK OpenClaw plugin inventory
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/uk-p2-plugin-inventory.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - name: Read Gateway and plugin inventory only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          /usr/bin/python3 -c 'import sys; assert sys.version_info[:3] == (3,6,8); print("PYTHON_3_6_8=PASS")'
+          systemctl show xuanjun-uk-openclaw.service --property=ExecStart,WorkingDirectory,EnvironmentFiles,User,Group,SupplementaryGroups,MainPID,ActiveState,SubState
+          CLI=/home/xuanjun_dev/.openclaw/bin/openclaw
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- "$CLI" plugins list --json > /tmp/p2-plugins.json
+          /usr/bin/python3 -I -B - <<'PY'
+          from __future__ import print_function
+          import json
+          p='/tmp/p2-plugins.json'
+          with open(p,'r') as f: data=json.load(f)
+          rows=data if isinstance(data,list) else data.get('plugins',[])
+          safe=[]
+          for row in rows:
+              if not isinstance(row,dict): continue
+              safe.append({k:row.get(k) for k in ('id','name','status','enabled','origin','source','installSource','installSpec') if k in row})
+          print(json.dumps({'state':'P2_UK_PLUGIN_INVENTORY','plugins':safe,'count':len(safe)},sort_keys=True))
+          PY
+          if sudo -n /usr/sbin/runuser -u xuanjun_dev -- "$CLI" plugins inspect xuanjun-p2-native-controller --json >/tmp/p2-plugin-inspect.json 2>/tmp/p2-plugin-inspect.err; then
+            /usr/bin/python3 -I -B - <<'PY'
+          from __future__ import print_function
+          import json
+          with open('/tmp/p2-plugin-inspect.json','r') as f: d=json.load(f)
+          keys=('id','name','status','enabled','origin','source','installSource','installSpec','imported')
+          print(json.dumps({'p2_plugin':{k:d.get(k) for k in keys if k in d}},sort_keys=True))
+          PY
+          else
+            echo P2_PLUGIN_PRESENT=NO
+          fi
+          echo MODEL_CALLS=0
+          echo AUTHORITY_MUTATION=NONE

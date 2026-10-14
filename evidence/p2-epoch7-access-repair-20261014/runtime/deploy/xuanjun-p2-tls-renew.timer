@@ -1,0 +1,9 @@
+[Unit]
+Description=Xuanjun P2 certificate renewal schedule
+[Timer]
+OnActiveSec=5min
+OnUnitActiveSec=12h
+RandomizedDelaySec=900
+Unit=xuanjun-p2-tls-renew.service
+[Install]
+WantedBy=timers.target

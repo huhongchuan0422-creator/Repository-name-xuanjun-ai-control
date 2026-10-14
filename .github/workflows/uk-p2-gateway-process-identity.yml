@@ -1,0 +1,26 @@
+name: P2 UK gateway process identity
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - scripts/uk-p2-gateway-process-identity.py
+      - .github/workflows/uk-p2-gateway-process-identity.yml
+permissions:
+  contents: read
+concurrency:
+  group: p2-uk-gateway-process-identity
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read active Gateway process identity as exact service user
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          sudo -n /usr/sbin/runuser -u xuanjun_dev -- /usr/bin/python3 -I -B - < scripts/uk-p2-gateway-process-identity.py

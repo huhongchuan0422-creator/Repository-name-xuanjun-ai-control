@@ -1,0 +1,38 @@
+name: P2 notifier isolation candidate fixtures only
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-install-preparation-20261013/notifier_isolation_candidate.py
+      - evidence/p2-install-preparation-20261013/test_notifier_isolation_candidate.py
+      - .github/workflows/p2-notifier-candidate-tests.yml
+permissions:
+  contents: read
+jobs:
+  hosted-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: false
+      - name: Version and isolated unit tests only
+        run: |
+          python3 --version
+          python3 -I -B -W error::ResourceWarning evidence/p2-install-preparation-20261013/test_notifier_isolation_candidate.py -v
+  uk-fixtures:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: false
+          path: notifier-fixtures-${{ github.run_id }}
+      - name: Non-root UK compatibility; no production CLI invocation
+        working-directory: notifier-fixtures-${{ github.run_id }}
+        run: |
+          test "$(id -u)" -ne 0
+          python3 --version
+          python3 -I -B -W error::ResourceWarning evidence/p2-install-preparation-20261013/test_notifier_isolation_candidate.py -v

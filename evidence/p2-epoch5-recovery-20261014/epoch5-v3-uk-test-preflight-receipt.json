@@ -1,0 +1,25 @@
+{
+  "candidate_source": "2077f4bb24654904ac950e677efa538ce4f627a6",
+  "ci": "NOT_RUN",
+  "complete_marker_observed": true,
+  "independent_review": "PENDING",
+  "production_acceptance": "PENDING",
+  "readonly_preflight": {
+    "epoch": 5,
+    "install_admission": "NOT_GRANTED",
+    "kit_manifest_sha256": "48d4b86f48aaa3440ac8744a9e0fe99dacf4cddc1050777a7911c9a71fd89180",
+    "operation": "verify-only",
+    "plan_sha256": "949dee6ed4d1a1c271f584bd995f61da238aa92171974ec05bc23bfa930465e2",
+    "production_resume": "NOT_EXECUTED",
+    "snapshot_sha256": "0efce6f1a662c0f275db02c7114ed7ed4d43d95ffbbbc1b402f053669862dc9f"
+  },
+  "source": "Owner UK terminal receipt received 2026-10-14T13:07:44Z",
+  "test_result": {
+    "affected_only": true,
+    "kit_manifest_sha256": "48d4b86f48aaa3440ac8744a9e0fe99dacf4cddc1050777a7911c9a71fd89180",
+    "operation": "test-only",
+    "production_resume": "NOT_EXECUTED",
+    "success": true,
+    "tests": 80
+  }
+}

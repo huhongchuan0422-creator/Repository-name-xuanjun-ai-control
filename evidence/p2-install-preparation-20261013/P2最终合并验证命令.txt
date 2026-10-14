@@ -1,0 +1,87 @@
+本次只准备最终候选、补测34项受影响检查并执行完整只读预检。
+保留已通过的英国160项结果；不恢复生产，不启动服务，不修改activation或数据库。
+旧候选完整保留。任何错误停止，把完整输出发回，不执行旧安装/resume命令。
+复制以下 sudo 到最后 PY 全部内容到英国服务器执行一次。
+
+sudo python3 -I -B - <<'PY'
+import os,socket,hashlib,io,tarfile,tempfile,urllib.request,subprocess,stat,fcntl
+assert os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ','WRONG_HOST_OR_USER'
+base='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520'
+kit=base+'/epoch3-recovery-candidate'
+backup=base+'/epoch3-recovery-candidate-retained-0adcefaaad639a7f'
+commit='3f373b9766065149b9f2f402246fbb826a0f0bb3'
+archive_sha='a9c6bb2fa9bfc0114256216a6c15fe2dde241b28174e633f118e5000052524d8'
+entry_sha='0152ae2b5f2bef0063175b25d1db0991845d6b9d17ba364f0dbb05280cde3fef'
+kit_sha='89eb2624d3aaee99117e6292f547852a61cce88d119cbb0fab57e0539c8aed5b'
+old_entry_sha='4aa0acb554978a79b2abe87b78f29d74f1e3901349a96670727030fdcacd6d43'
+old_kit_sha='0adcefaaad639a7fa70f69e57d21f1375aeeef15a30a3921e39ba7a17748a3a3'
+def authority(path):
+    i=os.lstat(path)
+    assert os.path.realpath(path)==path and stat.S_ISDIR(i.st_mode) and (i.st_uid,i.st_gid,stat.S_IMODE(i.st_mode))==(0,0,0o700),'DIRECTORY_AUTHORITY'
+def regular(path):
+    assert os.path.realpath(path)==path,'FILE_ALIAS'
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(fd,'rb') as f:
+        i=os.fstat(f.fileno());assert stat.S_ISREG(i.st_mode) and i.st_uid==0 and i.st_gid==0 and not i.st_mode&0o022 and i.st_nlink==1,'FILE_AUTHORITY'
+        data=f.read(2097153);after=os.fstat(f.fileno())
+    assert len(data)<=2097152 and (i.st_dev,i.st_ino,i.st_size,i.st_mtime_ns,i.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),'FILE_BOUND_OR_RACE'
+    return data
+def verify(directory,wanted_entry,wanted_manifest):
+    authority(directory)
+    path=directory+'/epoch3_recovery_entry.py';raw=regular(path)
+    assert hashlib.sha256(raw).hexdigest()==wanted_entry,'ENTRY_HASH_MISMATCH'
+    namespace={'__name__':'kit_integrity_only','__file__':path}
+    exec(compile(raw,path,'exec'),namespace)
+    namespace['KIT']=directory
+    namespace['verify_kit'](wanted_manifest)
+def sync_parent():
+    parent=os.open(base,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:os.fsync(parent)
+    finally:os.close(parent)
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self,*args,**kwargs):raise ValueError('DOWNLOAD_REDIRECT_REFUSED')
+authority(base)
+lock='/run/xuanjun-p2-install.lock'
+assert os.path.realpath(lock)==lock,'LOCK_ALIAS'
+fd=os.open(lock,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+try:
+    i=os.fstat(fd)
+    assert stat.S_ISREG(i.st_mode) and (i.st_uid,i.st_gid,stat.S_IMODE(i.st_mode),i.st_nlink)==(0,0,0o600,1),'LOCK_AUTHORITY'
+    fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    now=os.lstat(lock);assert (now.st_dev,now.st_ino)==(i.st_dev,i.st_ino),'LOCK_CHANGED'
+    assert not os.path.lexists(os.path.dirname(base)+'/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch3-recovery-execution.json'),'RECOVERY_ATTEMPT_ALREADY_EXISTS'
+    verify(kit,old_entry_sha,old_kit_sha)
+    assert not os.path.lexists(backup),'PRESERVED_CANDIDATE_ALREADY_EXISTS_STOP'
+    url='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/'+commit+'/evidence/p2-install-preparation-20261013/epoch3-recovery-kit.tar.gz'
+    with urllib.request.build_opener(NoRedirect()).open(url,timeout=60) as response:data=response.read(1048577)
+    assert len(data)==253222 and hashlib.sha256(data).hexdigest()==archive_sha,'ARCHIVE_HASH_MISMATCH'
+    stage=tempfile.mkdtemp(prefix='.epoch3-final-kit-stage-',dir=base)
+    with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
+        members=archive.getmembers();seen=set();total=0
+        assert len(members)<=256,'ARCHIVE_MEMBER_BOUND'
+        for member in members:
+            parts=member.name.split('/')
+            assert parts[0]=='epoch3-recovery-candidate' and all(p not in ('','..','.') for p in parts),'ARCHIVE_PATH'
+            assert member.name not in seen and (member.isdir() or member.isfile()) and member.uid==0 and member.gid==0 and not member.mode&0o022,'ARCHIVE_TYPE_OR_MODE'
+            seen.add(member.name);total+=member.size
+            assert total<=8388608,'ARCHIVE_SIZE_BOUND'
+        archive.extractall(stage,members=members)
+    staged=stage+'/epoch3-recovery-candidate'
+    verify(staged,entry_sha,kit_sha)
+    verify(kit,old_entry_sha,old_kit_sha)
+    assert not os.path.lexists(backup),'PRESERVED_CANDIDATE_RACE'
+    os.rename(kit,backup);sync_parent()
+    assert not os.path.lexists(kit),'CANDIDATE_RACE'
+    os.rename(staged,kit);sync_parent();os.rmdir(stage)
+    verify(kit,entry_sha,kit_sha)
+finally:os.close(fd)
+print('FINAL_KIT_VERIFIED_OLD_KIT_RETAINED_NO_INSTALL',flush=True)
+entry=kit+'/epoch3_recovery_entry.py'
+for operation in ('test-only','verify-only'):
+    print('BEGIN_'+operation.upper().replace('-','_'),flush=True)
+    command=['/usr/bin/python3','-I','-B',entry,'--kit-manifest-sha256',kit_sha,'--operation',operation]
+    if operation=='test-only':command.append('--affected-only')
+    result=subprocess.run(command,timeout=600,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C','HOME':'/root'})
+    assert result.returncode==0,'STOP_'+operation.upper().replace('-','_')+'_FAILED'
+print('FINAL_UK_AFFECTED_TESTS_AND_FULL_PREFLIGHT_COMPLETE_NOT_INSTALL_ADMISSION',flush=True)
+PY

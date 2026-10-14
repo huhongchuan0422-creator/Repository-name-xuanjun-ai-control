@@ -1,0 +1,16 @@
+[Unit]
+Description=Xuanjun P2 HTTPS nginx with fixed reviewed configuration
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=forking
+PIDFile=/run/nginx.pid
+ExecStartPre=/usr/sbin/nginx -t -c /etc/xuanjun-development/nginx-main.conf
+ExecStart=/usr/sbin/nginx -c /etc/xuanjun-development/nginx-main.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+TimeoutStopSec=30
+KillMode=mixed
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target

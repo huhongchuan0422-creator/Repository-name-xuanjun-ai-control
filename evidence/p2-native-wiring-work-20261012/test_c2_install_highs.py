@@ -1,0 +1,343 @@
+from __future__ import print_function
+import hashlib
+import json
+import os
+import pathlib
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+SOURCE=pathlib.Path(os.environ['P2_SOURCE_ROOT'])/'stage1'
+sys.path.insert(0,str(SOURCE))
+import p2_fixed_host_runtime as mod
+
+class ProbeRuntime(mod.FixedHostRuntime):
+    def __init__(self,directory):
+        self.directory=directory
+        self.receipt_path=os.path.join(directory,'provision.json')
+        self.effects=[]
+        self.prerequisites=type('P',(object,),{'rollback':lambda s,x:self.effects.append(('prereq',x))})()
+    def _authority(self): return True
+    def _rollback_plugin(self,runtime,restart): self.effects.append(('plugin',restart))
+    def _command(self,command): self.effects.append(('command',tuple(command)))
+    def _start_gateway(self): self.effects.append(('start',))
+    def _enable_boot(self): self.effects.append(('enable-boot',))
+    def _verify_plugin_runtime(self,runtime): self.effects.append(('plugin-inspect',))
+    @staticmethod
+    def _atomic_target(path,data,mode,uid,gid): raise AssertionError('target mutation before validation')
+
+def write_receipt(root,target,current,installed=b'installed',old=b'old'):
+    backup=os.path.join(root,'target-000.backup')
+    pathlib.Path(backup).write_bytes(old)
+    pathlib.Path(target).write_bytes(current)
+    receipt={'schema':1,'targets':[{'target':target,'previous':{'backup':backup,
+        'sha256':hashlib.sha256(old).hexdigest(),'mode':0o600,'uid':os.getuid(),'gid':os.getgid()},
+        'rendered_sha256':hashlib.sha256(installed).hexdigest(),
+        'mode':0o600,'uid':os.getuid(),'gid':os.getgid()}],
+        'services':list(mod.ALLOWED_SERVICES),'rollback_complete':True,
+        'prerequisites':{},'plugin':{'id':mod.P2_PLUGIN_ID,'previous':'ABSENT',
+        'gateway_service':mod.GATEWAY_SERVICE,'dropin_parent_created':False}}
+    raw=json.dumps(receipt,sort_keys=True,separators=(',',':')).encode('utf-8')
+    pathlib.Path(os.path.join(root,'provision.json')).write_bytes(raw)
+    return {'schema':1,'receipt_sha256':hashlib.sha256(raw).hexdigest(),'rollback_complete':True}
+
+class NativeRuntimeManifestTests(unittest.TestCase):
+    def test_all_native_runtime_dependencies_are_manifested(self):
+        root=pathlib.Path(os.environ['P2_SOURCE_ROOT'])
+        manifest=json.loads((root/'deploy'/'integration-manifest.json').read_text())
+        required=set('stage1/'+name for name in (
+            'native_pipeline_runtime.py','native_gateway_controller.py',
+            'native_github_notifier.py','native_ledger_bridge.py',
+            'native_ledger_operations.py','native_peer_identity.py'))
+        self.assertTrue(required.issubset(set(manifest['files'])))
+
+class PlanTlsBindingTests(unittest.TestCase):
+    def _plan(self):
+        import p2_install_entrypoint as entry
+        h='a'*64;u='12345678-1234-4234-8234-123456789abc'
+        return {'schema':1,'transaction_id':u,
+            'artifact':{'root':'/opt/p2','manifest':'/opt/p2/manifest.json',
+                'source_commit':'b'*40,'source_tree':'c'*40,'manifest_sha256':h,
+                'releases':'/opt/xuanjun-control-releases'},
+            'cutover':{},
+            'activation':{'release_sha256':h,'config_sha256':h,'binary_sha256':h,
+                'ledger_uuid':u,'generation':1,'instance':u,
+                'db_path':'/var/lib/xuanjun-development/db.sqlite',
+                'ledger_socket':'/run/xuanjun-development/ledger.sock','expected_epoch':0},
+            'runtime':{'release_directory':'integration-'+'d'*16,
+                'provisioning':[
+                    {'target':'/etc/xuanjun-development/p2-native-controller.binding.json'},
+                    {'target':'/etc/xuanjun-development/p2-native-ledger-client.json'},
+                    {'target':'/etc/xuanjun-development/p2-gateway-relay.json'},
+                    {'target':'/etc/systemd/system/xuanjun-uk-openclaw.service.d/20-p2-docker.conf'}],
+                'services':['xuanjun-ledger.socket','xuanjun-ledger.service',
+                    'xuanjun-github-intake.service','xuanjun-github-intake.timer',
+                    'xj-root-broker.socket','xj-root-broker.service',
+                    'xuanjun-p2-gateway-relay.socket','xuanjun-p2-gateway-relay.service',
+                    'xuanjun-development-dispatcher.service'],
+                'prerequisites':{},
+                'plugin':{'id':'xuanjun-p2-native-controller','source':'plugins/p2-native-controller',
+                    'binding_file':'/etc/xuanjun-development/p2-native-controller.binding.json',
+                    'binding_sha256':h,
+                    'ledger_client_config':'/etc/xuanjun-development/p2-native-ledger-client.json',
+                    'ledger_client_sha256':h,'gateway_service':'xuanjun-uk-openclaw.service',
+                    'openclaw_bin':'/home/xuanjun_dev/.openclaw/bin/openclaw',
+                    'service_user':'xuanjun_dev',
+                    'docker_dropin':'/etc/systemd/system/xuanjun-uk-openclaw.service.d/20-p2-docker.conf',
+                    'gateway_relay_config':'/etc/xuanjun-development/p2-gateway-relay.json',
+                    'gateway_relay_sha256':h,
+                    'gateway_relay_socket':'/run/xuanjun-development/p2-gateway.sock'}},
+            'auth':{'mode':'EXISTING_OAUTH_REFERENCE','references':[{
+                'path':'/home/xuanjun_dev/.openclaw/agents/developer/agent/openclaw-agent.sqlite',
+                'sha256':h,'owner_uid':1002,'mode':0o600}]},
+            'tls':{'mode':'NOT_APPLICABLE_NO_NGINX','references':[]}}
+
+    def test_no_nginx_requires_explicit_no_tls_mode(self):
+        import p2_install_entrypoint as entry
+        plan=self._plan()
+        self.assertTrue(entry.validate_plan(plan))
+        plan['tls']={'mode':'EXISTING_TLS_REFERENCE','references':[]}
+        with self.assertRaises(ValueError):entry.validate_plan(plan)
+
+    def test_nginx_target_requires_real_tls_reference(self):
+        import p2_install_entrypoint as entry
+        plan=self._plan()
+        plan['runtime']['provisioning'].append({'target':'/etc/nginx/conf.d/p2.conf'})
+        with self.assertRaises(ValueError):entry.validate_plan(plan)
+
+class RollbackValidationTests(unittest.TestCase):
+    def test_target_drift_has_zero_external_effects(self):
+        with tempfile.TemporaryDirectory() as root:
+            target=os.path.join(root,'target.conf')
+            reference=write_receipt(root,target,b'changed')
+            runtime=ProbeRuntime(root)
+            with patch.object(mod,'ALLOWED_TARGET_PREFIXES',(root+os.sep,)):
+                with self.assertRaises(ValueError):
+                    runtime.restore(reference)
+            self.assertEqual(runtime.effects,[])
+
+    def test_unsafe_target_has_zero_external_effects(self):
+        with tempfile.TemporaryDirectory() as root:
+            target=os.path.join(root,'target.conf')
+            reference=write_receipt(root,target,b'installed')
+            runtime=ProbeRuntime(root)
+            with self.assertRaises(ValueError):
+                runtime.restore(reference)
+            self.assertEqual(runtime.effects,[])
+
+class GatewayLifecycleTests(unittest.TestCase):
+    def test_active_gateway_precedes_relay_and_dispatcher(self):
+        with tempfile.TemporaryDirectory() as d:
+            runtime=ProbeRuntime(d)
+            if (SOURCE/'owner_feishu_https.py').is_file():
+                with patch('owner_feishu_https.installed_binding',
+                           return_value={'package_sha256':'a'*64}):
+                    result=runtime.activate({'provisioning':[]},
+                                            {'state':'ACTIVE','release_sha256':'a'*64})
+            else:
+                result=runtime.activate({'provisioning':[]},{'state':'ACTIVE'})
+            self.assertEqual(result,{'services_active':True})
+            self.assertEqual(runtime.effects[:2],[('enable-boot',),('start',)])
+            starts=[item[1][-1] for item in runtime.effects if item[0]=='command' and item[1][1]=='start']
+            self.assertNotIn('xuanjun-uk-stage1-minimal.service',starts)
+            self.assertLess(starts.index('xuanjun-p2-gateway-relay.service'),
+                            starts.index('xuanjun-development-dispatcher.service'))
+
+    def test_inactive_epoch_has_zero_gateway_or_service_starts(self):
+        with tempfile.TemporaryDirectory() as d:
+            runtime=ProbeRuntime(d)
+            with self.assertRaises(ValueError):runtime.activate({'provisioning':[]},{'state':'QUIESCED'})
+            self.assertEqual(runtime.effects,[])
+
+    def test_gateway_only_restore_keeps_coordinator_masked_and_never_starts(self):
+        import legacy_host_adapter as legacy
+        with tempfile.TemporaryDirectory() as d:
+            real_open=os.open;real_replace=os.replace;real_islink=os.path.islink
+            real_readlink=os.readlink;real_mkstemp=tempfile.mkstemp
+            prefix='/etc/systemd/system/'
+            def mapped(path):
+                return os.path.join(d,'unit-'+path[len(prefix):]) if isinstance(path,str) and path.startswith(prefix) else (d if path=='/etc/systemd/system' else path)
+            units={}
+            for unit in ('xuanjun-uk-openclaw.service','xuanjun-uk-stage1-minimal.service'):
+                data=('original '+unit).encode();backup=os.path.join(d,unit+'.backup')
+                pathlib.Path(backup).write_bytes(data);os.symlink('/dev/null',mapped(prefix+unit))
+                units[unit]={'path':prefix+unit,'backup':backup,'sha256':hashlib.sha256(data).hexdigest(),
+                             'mode':0o644,'uid':0,'gid':0,'was_active':True}
+            class Adapter(legacy.LegacyHostAdapter):
+                def _state(self): return {'schema':1,'units':units,'source_before':{}}
+                def _command(self,*args): self.commands.append(args)
+            adapter=Adapter(d);adapter.commands=[]
+            def digest(path): return hashlib.sha256(pathlib.Path(mapped(path)).read_bytes()).hexdigest()
+            with patch.object(legacy,'protected_hash',side_effect=digest), \
+                 patch.object(legacy.os,'open',side_effect=lambda path,*a,**kw:real_open(mapped(path),*a,**kw)), \
+                 patch.object(legacy.os,'replace',side_effect=lambda src,dst:real_replace(src,mapped(dst))), \
+                 patch.object(legacy.os,'fchown',return_value=None), \
+                 patch.object(legacy.os.path,'islink',side_effect=lambda path:real_islink(mapped(path))), \
+                 patch.object(legacy.os,'readlink',side_effect=lambda path:real_readlink(mapped(path))), \
+                 patch.object(legacy.tempfile,'mkstemp',side_effect=lambda **kw:real_mkstemp(prefix=kw['prefix'],dir=d)):
+                result=adapter.restore_legacy_files(gateway_only=True)
+            self.assertEqual(result,{'unit_files_restored':True,'services_restarted':False})
+            self.assertFalse(real_islink(mapped(prefix+'xuanjun-uk-openclaw.service')))
+            self.assertTrue(real_islink(mapped(prefix+'xuanjun-uk-stage1-minimal.service')))
+            self.assertEqual(adapter.commands,[('daemon-reload',)])
+
+    def test_unmasked_coordinator_refuses_gateway_restore_before_effects(self):
+        import legacy_host_adapter as legacy
+        class Adapter(legacy.LegacyHostAdapter):
+            def _state(self): return {'schema':1,'units':{},'source_before':{}}
+            def _command(self,*args): raise AssertionError('effect')
+        with tempfile.TemporaryDirectory() as d:
+            with patch.object(legacy.os.path,'islink',return_value=False):
+                with self.assertRaisesRegex(ValueError,'OLD_COORDINATOR_MUST_REMAIN_MASKED'):
+                    Adapter(d).restore_legacy_files(gateway_only=True)
+
+    def test_install_restores_only_gateway_after_active_before_runtime(self):
+        import p2_install_entrypoint as entry
+        order=[]
+        class Activation(object):
+            def prepare(self,*args,**kwargs): return {'epoch':1,'instance':'12345678-1234-4234-8234-123456789abc'}
+            def transition(self,before,after,*args):
+                order.append(after);return {'state':after,'epoch':1,'instance':'12345678-1234-4234-8234-123456789abc'}
+        class Adapter(object):
+            def restore_legacy_files(self,gateway_only=False):
+                order.append(('restore',gateway_only));return {'unit_files_restored':True,'services_restarted':False}
+        class Cutover(object):
+            adapter=Adapter()
+            def execute(self,plan): return {'stage':'STAGED','quiescence':{'proof':dict.fromkeys(entry.PROOF_KEYS,True)}}
+        class Runtime(object):
+            def preflight(self,*args): return True
+            def prepare_prerequisites(self,*args): order.append('prerequisites');return True
+            def restore_prerequisites(self,*args): return True
+            def provision(self,*args): return {'schema':1,'receipt_sha256':'a'*64,'rollback_complete':True}
+            def reopen_database(self,*args): return {'database_reopened':True}
+            def activate(self,*args): order.append('runtime');return {'services_active':True}
+        with tempfile.TemporaryDirectory() as d:
+            plan=PlanTlsBindingTests()._plan()
+            expected='/opt/xuanjun-control-releases/'+plan['runtime']['release_directory']
+            result=entry.P2InstallEntrypoint(os.path.join(d,'receipt'),lambda x:expected,
+                                            Cutover(),Activation(),Runtime()).execute(plan)
+            self.assertEqual(result['stage'],'COMPLETE')
+            self.assertEqual(order[-3:],['ACTIVE',('restore',True),'runtime'])
+
+class BoundedReferenceTests(unittest.TestCase):
+    def test_existing_multi_megabyte_oauth_reference_is_read_only_and_bound(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'oauth.sqlite');data=b'x'*(5*1024*1024)
+            pathlib.Path(path).write_bytes(data);os.chmod(path,0o600)
+            ref={'path':path,'sha256':hashlib.sha256(data).hexdigest(),
+                 'owner_uid':os.getuid(),'mode':0o600}
+            before=os.stat(path)
+            mod.FixedHostRuntime._reference(ref)
+            self.assertEqual(os.stat(path).st_mtime_ns,before.st_mtime_ns)
+            ref['sha256']='0'*64
+            with self.assertRaises(ValueError):mod.FixedHostRuntime._reference(ref)
+
+    def test_oversize_reference_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=os.path.join(d,'oauth.sqlite')
+            with open(path,'wb') as f:f.truncate(16*1024*1024+1)
+            with self.assertRaises(ValueError):
+                mod.FixedHostRuntime._reference({'path':path,'sha256':'a'*64,'owner_uid':os.getuid(),'mode':0o600})
+
+class BootJournalTests(unittest.TestCase):
+    def runtime(self, root):
+        from types import SimpleNamespace
+        states={u:'disabled' for u in mod.ALLOWED_SERVICES+(mod.GATEWAY_SERVICE,)}
+        states[mod.GATEWAY_SERVICE]='enabled'
+        calls=[]
+        def run(argv,**kwargs):
+            operation,unit=argv[1:]
+            if operation=='is-enabled':
+                state=states[unit]
+                return SimpleNamespace(returncode=0 if state=='enabled' else 1,
+                                       stdout=(state+'\n').encode())
+            # Intent must already exist before first enable/disable effect.
+            value=json.loads(pathlib.Path(root,'runtime-boot.json').read_text())
+            self.assertEqual(set(value['previous']),set(states))
+            calls.append((operation,unit))
+            states[unit]='enabled' if operation=='enable' else 'disabled'
+            return SimpleNamespace(returncode=0)
+        runtime=mod.FixedHostRuntime(root,run)
+        pathlib.Path(runtime.receipt_path).write_bytes(b'{}\n')
+        os.chmod(runtime.receipt_path,0o600)
+        return runtime,states,calls
+
+    def test_enable_restart_rollback_preserves_previous_enabled_gateway(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,states,calls=self.runtime(d);r._enable_boot()
+            self.assertTrue(all(v=='enabled' for v in states.values()))
+            # New object models process loss; original states remain durable.
+            restarted=mod.FixedHostRuntime(d,r.run);restarted._restore_boot()
+            self.assertEqual(states[mod.GATEWAY_SERVICE],'enabled')
+            self.assertTrue(all(states[u]=='disabled' for u in mod.ALLOWED_SERVICES))
+            restarted._restore_boot()
+            with self.assertRaises(ValueError):restarted._enable_boot()
+
+    def test_unknown_state_rejected_before_intent_or_effect(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,states,calls=self.runtime(d);states[mod.ALLOWED_SERVICES[-1]]='enabled-runtime'
+            with self.assertRaises(ValueError):r._enable_boot()
+            self.assertEqual(calls,[])
+            self.assertFalse(os.path.exists(os.path.join(d,'runtime-boot.json')))
+
+    def test_interrupted_enable_rollback_uses_original_states(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,states,calls=self.runtime(d);original=r.run
+            def fail(argv,**kwargs):
+                if argv[1]=='enable' and len(calls)==2:raise RuntimeError('injected')
+                return original(argv,**kwargs)
+            r.run=fail
+            with self.assertRaises(RuntimeError):r._enable_boot()
+            self.assertEqual(json.loads(pathlib.Path(d,'runtime-boot.json').read_text())['state'],'ENABLE_REQUESTED')
+            r.run=original;r._restore_boot()
+            self.assertTrue(all(states[u]=='disabled' for u in mod.ALLOWED_SERVICES))
+
+    def test_receipt_drift_and_injected_unit_rejected_before_rollback(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,states,calls=self.runtime(d);r._enable_boot();before=len(calls)
+            pathlib.Path(r.receipt_path).write_bytes(b'changed')
+            with self.assertRaises(ValueError):r._restore_boot()
+            self.assertEqual(len(calls),before)
+            pathlib.Path(r.receipt_path).write_bytes(b'{}\n')
+            path=pathlib.Path(d,'runtime-boot.json');value=json.loads(path.read_text())
+            value['previous']['evil.service']='disabled';path.write_text(json.dumps(value))
+            with self.assertRaises(ValueError):r._restore_boot()
+            self.assertEqual(len(calls),before)
+
+
+class DashboardFoundationWiringTests(unittest.TestCase):
+    def test_real_snapshot_calls_cost_usage_views_without_inventing_evidence(self):
+        import sqlite3
+        import owner_dashboard
+        with tempfile.TemporaryDirectory() as root:
+            path=os.path.join(root,'ledger.sqlite')
+            db=sqlite3.connect(path)
+            db.execute('CREATE TABLE tasks(id TEXT PRIMARY KEY,state TEXT,fence INTEGER,updated REAL)')
+            db.execute("INSERT INTO tasks VALUES('task1','RUNNING',4,100)")
+            db.commit();before=db.total_changes
+            result=owner_dashboard.snapshot(path,now=101)
+            view=result['foundation_views']
+            self.assertEqual(view['evidence_status'],'HOLD_NO_CANONICAL_COST_USAGE_PRODUCER')
+            self.assertEqual(view['usage']['status'],'HOLD')
+            self.assertIsNone(view['usage']['totals']['model_calls'])
+            self.assertEqual(len(view['costs']),1)
+            self.assertFalse(view['costs'][0]['payment_granted'])
+            self.assertEqual(db.total_changes,before)
+            db.close()
+
+    def test_dependency_rows_do_not_promote_done_to_accepted(self):
+        import sqlite3,owner_dashboard
+        with tempfile.TemporaryDirectory() as root:
+            path=os.path.join(root,'ledger.sqlite');db=sqlite3.connect(path)
+            db.execute('CREATE TABLE tasks(id TEXT PRIMARY KEY,state TEXT,fence INTEGER,updated REAL,depends TEXT)')
+            db.executemany('INSERT INTO tasks VALUES(?,?,?,?,?)',[
+                ('root','READY',0,2,'["dep"]'),('dep','DONE',1,1,'[]')])
+            db.commit()
+            result=owner_dashboard.snapshot(path,now=3)['foundation_views']['dependencies']
+            self.assertEqual(result['root']['status'],'HOLD')
+            self.assertEqual(result['dep']['status'],'DEPENDENCIES_EVIDENCED')
+            self.assertEqual(db.execute("SELECT state FROM tasks WHERE id='dep'").fetchone()[0],'DONE')
+            db.close()
+
+if __name__=='__main__':unittest.main(verbosity=2)

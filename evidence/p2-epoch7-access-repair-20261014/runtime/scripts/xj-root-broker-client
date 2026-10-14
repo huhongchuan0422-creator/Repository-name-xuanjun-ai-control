@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Unprivileged fixed-schema client for the root broker Unix socket."""
+import argparse
+import json
+import re
+import socket
+import sys
+import threading
+
+
+def parse(argv):
+    if '--' not in argv:
+        raise ValueError('missing command separator')
+    split = argv.index('--')
+    options, command = argv[:split], argv[split + 1:]
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('--socket', required=True)
+    parser.add_argument('--operation', choices=('launch', 'stop', 'status'), required=True)
+    parser.add_argument('--task-id', required=True)
+    parser.add_argument('--fence', type=int, required=True)
+    parser.add_argument('--generation', type=int, required=True)
+    parser.add_argument('--epoch', type=int, required=True)
+    parser.add_argument('--instance', required=True)
+    parser.add_argument('--role', choices=('DEVELOPMENT', 'QA'), required=True)
+    parser.add_argument('--artifact-sha')
+    value = parser.parse_args(options)
+    if (not value.socket.startswith('/') or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,160}', value.task_id)
+            or value.fence < 1 or value.generation < 1 or value.epoch < 1
+            or not re.fullmatch(r'[0-9a-f-]{36}', value.instance)):
+        raise ValueError('invalid broker identity')
+    if value.role == 'QA' and not re.fullmatch(r'[0-9a-f]{40}', value.artifact_sha or ''):
+        raise ValueError('QA artifact required')
+    if value.role == 'DEVELOPMENT' and value.artifact_sha is not None:
+        raise ValueError('development artifact rejected')
+    # The command is an assertion only.  Root derives and executes these exact
+    # bytes, so injection or a future worker argv drift fails at the client.
+    expected = ['-c', 'model_provider="openai"', '-c', 'approval_policy="never"',
+                '-c', 'features.multi_agent=false', 'app-server', '--listen', 'stdio://']
+    if value.operation == 'launch' and (len(command) != len(expected) + 1
+            or command[1:] != expected):
+        raise ValueError('command is not the fixed Codex app-server argv')
+    if value.operation != 'launch' and command:
+        raise ValueError('command rejected for control operation')
+    request = {'operation': value.operation, 'task_id': value.task_id,
+               'fence': value.fence, 'generation': value.generation,
+               'epoch': value.epoch, 'instance': value.instance,
+               'role': value.role, 'artifact_sha': value.artifact_sha}
+    return value.socket, request
+
+
+def main(argv=None):
+    arguments=list(sys.argv[1:] if argv is None else argv)
+    if arguments == ['--help']:
+        print('usage: xj-root-broker-client --socket=PATH --operation=OP --task-id=ID --fence=N --generation=N --epoch=N --instance=UUID --role=ROLE [--artifact-sha=SHA] -- FIXED_CODEX_ARGV')
+        return 0
+    path, request = parse(arguments)
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.settimeout(30)
+    client.connect(path)
+    client.sendall((json.dumps(request, sort_keys=True, separators=(',', ':')) + '\n').encode('utf-8'))
+    response = bytearray()
+    while b'\n' not in response:
+        chunk = client.recv(8192 - len(response))
+        if not chunk:
+            raise RuntimeError('truncated broker response')
+        response.extend(chunk)
+    result = json.loads(bytes(response).split(b'\n', 1)[0].decode('utf-8'))
+    if result.get('ok') is not True:
+        raise RuntimeError('broker operation failed')
+    if request['operation'] == 'launch':
+        remainder = bytes(response).split(b'\n', 1)[1]
+        if remainder:
+            sys.stdout.buffer.write(remainder)
+            sys.stdout.buffer.flush()
+
+        def send_input():
+            try:
+                while True:
+                    data = sys.stdin.buffer.read(65536)
+                    if not data:
+                        break
+                    client.sendall(data)
+            finally:
+                client.shutdown(socket.SHUT_WR)
+
+        sender = threading.Thread(target=send_input)
+        sender.daemon = True
+        sender.start()
+        while True:
+            data = client.recv(65536)
+            if not data:
+                break
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+        sender.join(2)
+    else:
+        print(json.dumps(result, sort_keys=True, separators=(',', ':')))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

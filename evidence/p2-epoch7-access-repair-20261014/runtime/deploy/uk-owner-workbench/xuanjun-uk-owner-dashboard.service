@@ -1,0 +1,28 @@
+[Unit]
+Description=Xuanjun UK canonical Owner dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=xuanjun-callback
+Group=xuanjun-control-db
+SupplementaryGroups=xuanjun-ledger-client
+InaccessiblePaths=/etc/xuanjun-owner-callback/owner-user-id /etc/xuanjun-owner-callback/owner-chat-id /etc/xuanjun-owner-callback/owner-callback-auth /etc/xuanjun-owner-callback/owner-callback-hmac
+WorkingDirectory=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1
+ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/owner_dashboard.py --activation-descriptor /var/lib/xuanjun-development/activation/active.json --activation-epoch-journal /var/lib/xuanjun-development/activation/epochs.jsonl --activation-lock /var/lib/xuanjun-development/activation/activation.lock --token-file /etc/xuanjun-owner-callback/owner-dashboard-token --port 18556
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+ReadOnlyPaths=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@ /etc/xuanjun-owner-callback /var/lib/xuanjun-development/activation /var/lib/xuanjun-development/generations
+RestrictAddressFamilies=AF_INET AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
