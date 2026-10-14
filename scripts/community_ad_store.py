@@ -40,7 +40,7 @@ CREATE TABLE audit_events (
 """
 
 def open_offline(path=":memory:"):
-    db=sqlite3.connect(path, isolation_level=None)
+    db=sqlite3.connect(path, isolation_level='DEFERRED')
     db.execute("PRAGMA foreign_keys=ON")
     db.executescript(SCHEMA)
     return db
@@ -76,7 +76,7 @@ def create_campaign(db,scope,record,actor,now):
     if start>=end or not isinstance(record["title"],str) or not 1<=len(record["title"])<=160 or not safe_creative_url(record["target_url"]):
         raise ValueError("INVALID_CREATIVE")
     with db:
-        db.execute("INSERT INTO campaigns VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        db.execute("INSERT INTO campaigns VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                    (t,m,s,cid,record["slot"],"DRAFT","PENDING",record["priority"],start,end,record["title"],record["target_url"],1))
         db.execute("INSERT INTO audit_events(tenant_id,merchant_id,store_id,campaign_id,actor_id,action,previous_version,new_version,happened_at) VALUES(?,?,?,?,?,?,?,?,?)",
                    (t,m,s,cid,actor["actor_id"],"CREATE",None,1,now))
