@@ -40,6 +40,7 @@ class GovernanceTests(unittest.TestCase):
     self.feature["status"]="VERIFIED"
     self.assertIn("EXAMPLE_FEATURE: VERIFIED_WITHOUT_EVIDENCE",self.check())
  def test_new_executable_requires_feature_mapping(self):
+    self.check()
     self.assertIn("UNREGISTERED_ADDED_CODE: scripts/new_feature.py",
         check_changed_paths(self.root,"governance/features.json",[("A","scripts/new_feature.py")]))
     self.assertEqual(check_changed_paths(self.root,"governance/features.json",[("M","scripts/old.py")]),[])
