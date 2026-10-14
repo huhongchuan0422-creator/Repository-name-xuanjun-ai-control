@@ -4,6 +4,7 @@ No real payments, site publishing, secrets or external network binding.
 import json
 import re
 import socket
+import time
 import sqlite3
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlsplit
@@ -80,10 +81,20 @@ def handler(service):
                 length = int(self.headers.get("Content-Length","-1"))
                 if length < 1 or length > MAX_BODY:
                     raise ValueError("INVALID_BODY_SIZE")
-                raw_bytes = self.rfile.read(length)
-                if len(raw_bytes) != length:
-                    raise ValueError("INCOMPLETE_BODY")
-                raw = raw_bytes.decode("utf-8")
+                deadline = time.monotonic() + READ_TIMEOUT_SECONDS
+                chunks = []
+                remaining = length
+                while remaining:
+                    budget = deadline - time.monotonic()
+                    if budget <= 0:
+                        raise socket.timeout("BODY_DEADLINE_EXPIRED")
+                    self.connection.settimeout(budget)
+                    part = self.rfile.read1(min(remaining, 4096))
+                    if not part:
+                        raise ValueError("INCOMPLETE_BODY")
+                    chunks.append(part)
+                    remaining -= len(part)
+                raw = b"".join(chunks).decode("utf-8")
                 def unique_pairs(pairs):
                     values = {}
                     for key,value in pairs:
