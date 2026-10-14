@@ -36,10 +36,13 @@ def within_scope(ad, request):
 
 def select_active(ads, request, slot, now):
     """Deterministic highest-priority selection within approved active campaigns."""
-    if (slot not in SLOTS or not isinstance(now, datetime) or now.tzinfo is None\n            or not isinstance(ads, (tuple, list)) or len(ads) > 1000\n            or not isinstance(request, dict) or any(not isinstance(a, dict) for a in ads)):
+    if (slot not in SLOTS or not isinstance(now, datetime) or now.tzinfo is None
+            or not isinstance(ads, (tuple, list)) or len(ads) > 1000
+            or not isinstance(request, dict) or any(not isinstance(a, dict) for a in ads)):
         raise ValueError("INVALID_SELECTION_CONTEXT")
     eligible = [a for a in ads if within_scope(a, request)
-                and a.get("slot") == slot and a.get("status") == "ACTIVE"\n                and a.get("moderation") == "APPROVED"
+                and a.get("slot") == slot and a.get("status") == "ACTIVE"
+                and a.get("moderation") == "APPROVED"
                 and isinstance(a.get("starts_at"), datetime)
                 and isinstance(a.get("ends_at"), datetime)
                 and a["starts_at"].tzinfo is not None
@@ -82,7 +85,9 @@ def fallback(slot, ad):
 def accept_metric(event, seen):
     """Return dedup decision without mutating ledger or input set."""
     fields = ("event_id", "tenant_id", "merchant_id", "slot")
-    if (not isinstance(event, dict) or event.get("slot") not in SLOTS\n            or event.get("kind") not in ("IMPRESSION", "CLICK")\n            or not isinstance(seen, (set, frozenset))):
+    if (not isinstance(event, dict) or event.get("slot") not in SLOTS
+            or event.get("kind") not in ("IMPRESSION", "CLICK")
+            or not isinstance(seen, (set, frozenset))):
         return False
     if not all(isinstance(event.get(k), str) and event[k] for k in fields):
         return False
@@ -93,7 +98,11 @@ def audit_transition(before, after, actor, resource=None):
     return (before in ALLOWED_TRANSITIONS and after in ALLOWED_TRANSITIONS[before]
             and isinstance(actor, dict) and actor.get("authenticated") is True
             and actor.get("role") in ("MERCHANT_ADMIN", "PLATFORM_ADMIN")
-            and isinstance(actor.get("actor_id"), str) and bool(actor["actor_id"])\n            and (resource is None or (isinstance(resource, dict) and\n                (actor["role"] == "PLATFORM_ADMIN" or\n                 (all(isinstance(resource.get(k), str) and resource[k] and\n                      resource[k] == actor.get(k) for k in ("tenant_id", "merchant_id")))))))
+            and isinstance(actor.get("actor_id"), str) and bool(actor["actor_id"])
+            and (resource is None or (isinstance(resource, dict) and
+                (actor["role"] == "PLATFORM_ADMIN" or
+                 (all(isinstance(resource.get(k), str) and resource[k] and
+                      resource[k] == actor.get(k) for k in ("tenant_id", "merchant_id")))))))
 
 def ad_surface_allowed(surface, payment):
     if surface == "OWN_AMOUNT_ENTRY":
