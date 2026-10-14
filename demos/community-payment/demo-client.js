@@ -18,6 +18,26 @@ function makeDemoClient(transport){
   if(!response||response.status!==200)throw Error("DEMO_REQUEST_FAILED");
   const data=await response.json();
   if(!data||typeof data!=="object"||Array.isArray(data))throw Error("INVALID_DEMO_RESPONSE");
+  const keys=Object.keys(data);
+  const isBool=x=>typeof x==="boolean";
+  if("provider_settlement_verified" in data && data.provider_settlement_verified!==false)
+    throw Error("UNTRUSTED_SETTLEMENT");
+  if(kind==="create"){
+    if(data.reference!==body.reference || data.state!=="PENDING" ||
+       data.provider_payment_started!==false || keys.some(k=>!["reference","state","provider_payment_started"].includes(k)))
+      throw Error("INVALID_DEMO_RESPONSE");
+  }else if(kind==="state"){
+    if(!Number.isSafeInteger(data.amount_minor)||data.amount_minor<1||data.amount_minor>100000000||
+       data.currency!=="CNY" || !["PENDING","SUCCESS","FAILED","CANCELLED","REFUNDED"].includes(data.state)||
+       !("provider_settlement_verified" in data) || data.provider_settlement_verified!==false ||
+       !(data.provider_transaction_id===null || (typeof data.provider_transaction_id==="string" && ID.test(data.provider_transaction_id))))
+      throw Error("INVALID_DEMO_RESPONSE");
+  }else if(kind==="simulate"){
+    if(data.state!==body.target || !isBool(data.duplicate)||
+       (data.provider_settlement_verified!==undefined && data.provider_settlement_verified!==false) ||
+       keys.some(k=>!["state","duplicate","provider_settlement_verified"].includes(k)))
+       throw Error("INVALID_DEMO_RESPONSE");
+  }
   return data;
  }
  return Object.freeze({
