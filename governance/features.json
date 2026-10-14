@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "features": [
+    {
+      "feature_id": "SAAS_AI_PRICING",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "6.15"
+      },
+      "development": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "12.9",
+        "phase": 3
+      },
+      "acceptance": {
+        "criteria": [
+          "单模块和批量报价的独立版本",
+          "双币价格、成本UNKNOWN及供应商费用隔离",
+          "Owner审批、历史合同价格与租户隔离"
+        ],
+        "tests": [
+          "tests/test_stage5_saas_offer_catalog.py"
+        ]
+      },
+      "reuse": [
+        "scripts/community_saas_modules.py",
+        "scripts/community_saas_offer_catalog.py"
+      ]
+    }
+  ]
+}
