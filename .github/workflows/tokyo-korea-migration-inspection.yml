@@ -1,0 +1,42 @@
+name: Tokyo Korea authorized migration inspection
+on:
+  pull_request:
+    paths:
+      - .github/workflows/tokyo-korea-migration-inspection.yml
+      - migration-prep/**
+permissions:
+  contents: read
+concurrency:
+  group: tokyo-korea-migration-inspection
+  cancel-in-progress: false
+jobs:
+  inspection:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'build/tokyo-korea-migration-prep-20261014' && github.actor == 'huhongchuan0422-creator'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: xuanjun-tokyo-readonly
+            host: iZ6wee8q9z4t03hvqumwfhZ
+          - label: xuanjun-korea-binance
+            host: iZmj7a5kwr75qc1tul4kf9Z
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.label }}"]
+    timeout-minutes: 3
+    steps:
+      - name: Invoke installed fixed host helper without repository checkout
+        env:
+          XJ_EXPECTED_HOST: ${{ matrix.host }}
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          test "$(hostname -s)" = "$XJ_EXPECTED_HOST"
+          test "$(id -un)" = githubrunner
+          XJ_HELPER=/usr/local/sbin/xuanjun-migration-inspect-v1
+          test -f "$XJ_HELPER"
+          test ! -L "$XJ_HELPER"
+          test "$(stat -c %u "$XJ_HELPER")" = 0
+          test "$(stat -c %a "$XJ_HELPER")" = 755
+          sha256sum "$XJ_HELPER"
+          /usr/bin/sudo -n "$XJ_HELPER"
+          echo MIGRATION_EXECUTED=NO
+          echo ORDER_WRITE_ENABLED=NO
