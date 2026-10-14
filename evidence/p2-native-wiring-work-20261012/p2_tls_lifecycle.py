@@ -21,7 +21,13 @@ def command(args,timeout=180):
  try:out,err=p.communicate(timeout=timeout)
  except subprocess.TimeoutExpired:
   os.killpg(p.pid,signal.SIGKILL);p.communicate();raise ValueError('TLS_COMMAND_TIMEOUT_GROUP_KILLED')
- require(p.returncode==0 and len(out)+len(err)<=2097152,'TLS_EXTERNAL_COMMAND_FAILED')
+ if p.returncode!=0 or len(out)+len(err)>2097152:
+  failure={'schema':1,'returncode':p.returncode,'stdout_sha256':hashlib.sha256(out).hexdigest(),'stderr_sha256':hashlib.sha256(err).hexdigest(),'stdout':out[:1048576].decode('utf-8','replace'),'stderr':err[:1048576].decode('utf-8','replace'),'truncated':len(out)>1048576 or len(err)>1048576}
+  # Detailed diagnostics stay in the root-only TLS transaction, never a public receipt.
+  logdir=ROOT+'/logs';info=os.lstat(logdir)
+  require(stat.S_ISDIR(info.st_mode) and info.st_uid==0 and stat.S_IMODE(info.st_mode)==0o700 and os.path.realpath(logdir)==logdir,'TLS_DIAGNOSTIC_AUTHORITY')
+  _atomic_receipt(logdir+'/command-failure.json',failure)
+  raise ValueError('TLS_EXTERNAL_COMMAND_FAILED_RC_'+str(p.returncode))
  return out
 def validate(v):
  require(isinstance(v,dict) and set(v)=={'schema','domain','root','transaction_directory','transaction_id','instance','generation','ledger_uuid','release_sha256','accept_acme_terms'},'TLS_EXACT_CONFIG')
@@ -29,11 +35,13 @@ def validate(v):
  require(type(v['generation']) is int and v['generation']>0 and all(isinstance(v[k],str) and len(v[k])==36 for k in ('instance','ledger_uuid')),'TLS_ACTIVATION_IDENTITY')
  require(isinstance(v['release_sha256'],str) and len(v['release_sha256'])==64 and all(c in '0123456789abcdef' for c in v['release_sha256']),'TLS_RELEASE_DIGEST')
  return v
+def scan_error(error):
+ raise error
 def fingerprint(root):
  require(os.path.realpath(root)==root,'TLS_ROOT_ALIAS')
  i=os.lstat(root);require(stat.S_ISDIR(i.st_mode) and i.st_uid==0 and stat.S_IMODE(i.st_mode)==0o700,'TLS_ROOT_AUTHORITY')
  rows=[];total=0
- for parent,dirs,files in os.walk(root,followlinks=False):
+ for parent,dirs,files in os.walk(root,followlinks=False,onerror=scan_error):
   for name in sorted(dirs+files):
    p=parent+'/'+name;s=os.lstat(p);rel=os.path.relpath(p,root)
    require(s.st_uid==0 and (stat.S_ISLNK(s.st_mode) or not s.st_mode&0o022),'TLS_TREE_AUTHORITY')
@@ -57,7 +65,21 @@ def certificate_check():
  command(['/usr/bin/openssl','x509','-in',cert,'-noout','-checkend','86400'])
  require(command(['/usr/bin/openssl','x509','-in',cert,'-pubkey','-noout'])==command(['/usr/bin/openssl','pkey','-in',key,'-pubout']),'TLS_KEY_PAIR')
  return hashlib.sha256(command(['/usr/bin/openssl','x509','-in',cert,'-outform','DER'])).hexdigest()
-def base_args():return ['/usr/bin/certbot','--non-interactive','-c','/dev/null','--config-dir',ROOT+'/config','--work-dir',ROOT+'/work','--logs-dir',ROOT+'/logs']
+def client_config(create=False):
+ path=ROOT+'/client.ini'
+ info=os.lstat(ROOT)
+ require(stat.S_ISDIR(info.st_mode) and info.st_uid==0 and stat.S_IMODE(info.st_mode)==0o700 and os.path.realpath(ROOT)==ROOT,'TLS_CLIENT_CONFIG_ROOT')
+ if create:
+  fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+  try:os.fsync(fd)
+  finally:os.close(fd)
+  parent=os.open(ROOT,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+  try:os.fsync(parent)
+  finally:os.close(parent)
+ data=private_read(path)
+ require(data==b'','TLS_CLIENT_CONFIG_NOT_EMPTY')
+ return path
+def base_args():return ['/usr/bin/certbot','--non-interactive','-c',client_config(),'--config-dir',ROOT+'/config','--work-dir',ROOT+'/work','--logs-dir',ROOT+'/logs']
 def available_port():
  require({r[4][0] for r in socket.getaddrinfo(DOMAIN,80,socket.AF_INET)}=={'8.208.119.115'},'TLS_DNS_CHANGED')
  # A bounded bind check; no listener or ACME request during preparation.
@@ -81,6 +103,7 @@ class TlsLifecycle:
   _atomic_receipt(self.journal,record);os.mkdir(ROOT,0o700)
   try:
    for name in ('config','work','logs'):os.mkdir(ROOT+'/'+name,0o700)
+   client_config(create=True)
    command(base_args()+['certonly','--server','https://acme-v02.api.letsencrypt.org/directory','--standalone','--preferred-challenges','http','--cert-name',DOMAIN,'-d',DOMAIN,'--agree-tos','--register-unsafely-without-email','--no-eff-email'])
    record['certificate_sha256']=certificate_check()
    renewal=ROOT+'/config/renewal/'+DOMAIN+'.conf';require(os.path.realpath(renewal)==renewal and os.path.isfile(renewal),'TLS_RENEWAL_CONFIG_REQUIRED')

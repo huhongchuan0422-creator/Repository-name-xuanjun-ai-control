@@ -16,6 +16,7 @@ class LifecycleTests(unittest.TestCase):
   self.t.cleanup()
  def create(self,state='HOLD'):
   os.mkdir(self.root,0o700);pathlib.Path(self.root,'account').write_bytes(b'private-fixture');os.chmod(self.root+'/account',0o600)
+  tls.client_config(create=True)
   _atomic_receipt(self.manager.journal,{'schema':1,'config':self.config,'state':state,'fingerprint':tls.fingerprint(self.root)})
  def test_exact_scope_and_terms_required(self):
   self.assertEqual(tls.validate(self.config),self.config)
@@ -73,3 +74,4 @@ class LifecycleTests(unittest.TestCase):
   self.manager.rollback();self.manager.rollback();self.assertFalse(os.path.lexists(self.root))
 
 if __name__=='__main__':unittest.main(verbosity=2)
+
