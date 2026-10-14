@@ -36,5 +36,21 @@
    if(value.simulation_only!==true||value.provider_payment_started!==false||typeof value.valid!=="boolean")throw Error("结果格式错误");
    el("result").textContent=value.valid?"签名验证通过（本地模拟）":"签名验证失败";
   }catch(error){if(serial===generation)el("result").textContent="验证失败："+error.message;}
+ }); el("checkoutQR").addEventListener("click",async()=>{
+  const serial=++generation;
+  try{
+   if(!token)throw Error("先创建并验证场景凭证");
+   const reference=el("reference").value,raw=el("amount").value;
+   if(!/^[A-Za-z0-9_-]{1,64}$/.test(reference)||!/^[1-9][0-9]{0,8}$/.test(raw)||
+      Number(raw)>100000000)throw Error("订单金额或编号无效");
+   const result=await call("/demo/qr/checkout",
+     {...scope(),reference,amount_minor:Number(raw),token});
+   if(serial!==generation)return;
+   if(result.simulation_only!==true||result.provider_settlement_verified!==false||
+      result.provider_payment_started!==false||result.state!=="PENDING"||result.reference!==reference)
+     throw Error("订单回复不符合模拟合同");
+   el("result").textContent="已创建模拟待支付订单 "+reference+"；未启动真实支付";
+  }catch(error){if(serial===generation)el("result").textContent="模拟下单失败："+error.message;}
  });
+
 })();
