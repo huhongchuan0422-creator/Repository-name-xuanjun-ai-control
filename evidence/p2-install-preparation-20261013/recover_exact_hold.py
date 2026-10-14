@@ -9,11 +9,16 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import io
+import marshal
 import os
 import re
 import socket
 import stat
 import sys
+import struct
+import tempfile
+import types
 import urllib.request
 
 BASE = '/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
@@ -28,6 +33,23 @@ DB_SHA = 'a6b3847009ca7ee394772b7cf0144b90f82d1c68a3e9b4d3e9c4656f50c28d60'
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 MARKER = 'CHATGPT_NATIVE_TASK5_EXACT_HOLD_RECOVERY_ACCEPTANCE\n'
 RUNNER = 'actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.iZd7oeikknn1z21sq6ji6zZ.service'
+
+RETAINED_CACHE_HASHES = {
+    'stage1/__pycache__/activation_control.cpython-36.pyc': 'c29a1b0253fe6c7a2034f280cc7958b5c4d098ede58f44bc10c2fc0035e48632',
+    'stage1/__pycache__/codex_worker.cpython-36.pyc': '74c832ab2c24722dd69c980a6592b2870505f2c0d38ddcb11b02c76fbbd0f709',
+    'stage1/__pycache__/dependency_evidence_view.cpython-36.pyc': '50fc476ec33f2b2eee8f0344877ff3f8ea0cad0627cec16d9702ff81139f8b1b',
+    'stage1/__pycache__/development_loop.cpython-36.pyc': '9c59dff852906f1bdfccd8f70eeebc81ae612af867b3cd9e80f427f4705eec0f',
+    'stage1/__pycache__/development_pipeline.cpython-36.pyc': 'cf93ef0b6f5f2edcdddb0af4a5f90909072136dec629332b2c8b4176c1315758',
+    'stage1/__pycache__/development_service.cpython-36.pyc': '34d3e4471bc09d44d13f1936b0ae24487e0a1f570c22c416fb5e8f865daa5c91',
+    'stage1/__pycache__/execution_ledger.cpython-36.pyc': 'b2cca1d331ed5d8c909318344522c373ad1d9dea4ac212a78f2daac09970c555',
+    'stage1/__pycache__/native_child_adapter.cpython-36.pyc': 'd5381afcb72307cabc29e775b18801e6a724fdf950c8b3c2eaa5c01d7d349c4b',
+    'stage1/__pycache__/native_peer_identity.cpython-36.pyc': '6c2f9e047e30f53ee70d506ea41628b138b49d3c36463db09cdf605f06d7bd13',
+    'stage1/__pycache__/native_pipeline_runtime.cpython-36.pyc': '518a3e1a0733bfe1e832bc480a7aa2ae9c5eef46e4d1529efe48f33a2128edf5',
+    'stage1/__pycache__/run_usage_projection.cpython-36.pyc': 'dff62a81e062a09d16345552e45d2db4eae01e135ca6cc3d2a8120216c4c5542',
+    'stage1/__pycache__/task_cost_projection.cpython-36.pyc': '2674e1de7e3ad1ad270ccfa50346a886942f0e621154cf719f3ff15b687216b9',
+    'stage1/__pycache__/uk_owner_callback_core.cpython-36.pyc': '898b3fcb3709eb0df456bfe23202077d54e86075aeef8840e738e83cdd95c88a',
+}
+RETAINED_SIDECARS = {'-wal': (0, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'), '-shm': (32768, 'fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb')}
 
 
 def require(value, code):
@@ -159,13 +181,151 @@ def verify_prerequisites(manager, plan):
     return sha(read(manager.path, private=True)[0])
 
 
-def validate_directories(root):
+def validate_directories(root, retained_cache=False):
     for parent, dirs, files in os.walk(root, followlinks=False):
         info = os.lstat(parent)
         require(os.path.realpath(parent) == parent and stat.S_ISDIR(info.st_mode) and
                 info.st_uid == 0 and not info.st_mode & 0o022, 'RECOVERY_DIRECTORY_AUTHORITY')
         require(not any(os.path.islink(parent + '/' + name) for name in dirs), 'RECOVERY_DIRECTORY_ALIAS')
-        require(not any(name.endswith('.pyc') for name in files), 'RECOVERY_BYTECODE_PRESENT')
+        require(retained_cache or not any(name.endswith('.pyc') for name in files),
+                'RECOVERY_BYTECODE_PRESENT')
+
+
+def validate_file_inventory(root, allowed):
+    observed = set()
+    for parent, dirs, files in os.walk(root, followlinks=False):
+        for name in files:
+            path = parent + '/' + name
+            relative = os.path.relpath(path, root)
+            require(relative in allowed and stat.S_ISREG(os.lstat(path).st_mode),
+                    'RECOVERY_UNCLASSIFIED_RELEASE_FILE')
+            observed.add(relative)
+    require(observed == set(allowed), 'RECOVERY_FILE_INVENTORY_INCOMPLETE')
+
+
+def validate_release_metadata(release):
+    executable = {'scripts/xj-root-broker-client', 'scripts/uk-owner-workbench-config.py'}
+    for parent, dirs, files in os.walk(release, followlinks=False):
+        info = os.lstat(parent)
+        require(stat.S_ISDIR(info.st_mode) and info.st_uid == info.st_gid == 0 and
+                stat.S_IMODE(info.st_mode) == 0o555, 'RECOVERY_RELEASE_DIRECTORY_METADATA')
+        for name in files:
+            path = parent + '/' + name
+            info = os.lstat(path)
+            mode = 0o555 if os.path.relpath(path, release) in executable else 0o444
+            require(stat.S_ISREG(info.st_mode) and info.st_uid == info.st_gid == 0 and
+                    info.st_nlink == 1 and stat.S_IMODE(info.st_mode) == mode,
+                    'RECOVERY_RELEASE_FILE_METADATA')
+
+
+def code_identity(value):
+    """Compare bytecode without executing it; include every Python 3.6 code field."""
+    if isinstance(value, types.CodeType):
+        names = ('co_argcount', 'co_kwonlyargcount', 'co_nlocals', 'co_stacksize',
+                 'co_flags', 'co_code', 'co_consts', 'co_names', 'co_varnames',
+                 'co_filename', 'co_name', 'co_firstlineno', 'co_lnotab',
+                 'co_freevars', 'co_cellvars')
+        return ('code', tuple((n, code_identity(getattr(value, n))) for n in names))
+    if isinstance(value, tuple):
+        return ('tuple', tuple(code_identity(v) for v in value))
+    if isinstance(value, frozenset):
+        return ('frozenset', frozenset(code_identity(v) for v in value))
+    # repr distinguishes signed zero, NaN and values of different primitive types.
+    return (type(value).__name__, repr(value))
+
+
+def verify_cache_bytes(data, source, relative, source_info):
+    require(sys.version_info[:2] == (3, 6) and sys.flags.optimize == 0,
+            'RECOVERY_CACHE_REQUIRES_CPYTHON36_UNOPTIMIZED')
+    require(len(data) >= 12 and data[:4] == importlib.util.MAGIC_NUMBER,
+            'RECOVERY_CACHE_MAGIC')
+    timestamp, size = struct.unpack('<II', data[4:12])
+    require(size == len(source) and timestamp == int(source_info.st_mtime) & 0xffffffff,
+            'RECOVERY_CACHE_SOURCE_METADATA')
+    stream = io.BytesIO(data[12:])
+    try:
+        value = marshal.load(stream)
+    except (EOFError, ValueError, TypeError):
+        raise ValueError('RECOVERY_CACHE_MARSHAL')
+    require(isinstance(value, types.CodeType) and stream.read() == b'',
+            'RECOVERY_CACHE_CODE_BOUNDARY')
+    suffix = '/' + relative
+    filename = value.co_filename
+    require(isinstance(filename, str) and filename.endswith(suffix),
+            'RECOVERY_CACHE_SOURCE_FILENAME')
+    staging = filename[:-len(suffix)]
+    require(re.fullmatch(r'/opt/xuanjun-control-releases/\.integration-[0-9a-f]{16}', staging),
+            'RECOVERY_CACHE_STAGING_IDENTITY')
+    expected = compile(source, filename, 'exec', dont_inherit=True, optimize=0)
+    require(code_identity(value) == code_identity(expected), 'RECOVERY_CACHE_SOURCE_CODE_MISMATCH')
+    return staging
+
+
+def validate_retained_caches(release, payloads):
+    """Only the exact 13 observed smoke caches, each reproduced from verified source.
+
+    No cache is imported, deleted, rewritten, or accepted by filename alone.
+    This evidence is additional to (never a substitute for) all 102 source hashes.
+    """
+    observed = {}
+    staging_ids = set()
+    for parent, dirs, files in os.walk(release, followlinks=False):
+        for name in files:
+            if not name.endswith('.pyc'):
+                continue
+            path = parent + '/' + name
+            relative = os.path.relpath(path, release)
+            require(relative in RETAINED_CACHE_HASHES, 'RECOVERY_UNCLASSIFIED_CACHE')
+            data, info = read(path)
+            require(info.st_gid == 0 and stat.S_IMODE(info.st_mode) == 0o444 and
+                    sha(data) == RETAINED_CACHE_HASHES[relative], 'RECOVERY_CACHE_HASH_AUTHORITY')
+            source_relative = 'stage1/' + name[:-len('.cpython-36.pyc')] + '.py'
+            source_path = release + '/' + source_relative
+            require(source_path in payloads, 'RECOVERY_CACHE_UNBOUND_SOURCE')
+            source, source_info = read(source_path)
+            require(source == payloads[source_path][1], 'RECOVERY_CACHE_SOURCE_DRIFT')
+            staging_ids.add(verify_cache_bytes(data, source, source_relative, source_info))
+            observed[relative] = {'sha256': sha(data), 'source_sha256': sha(source)}
+    require(set(observed) == set(RETAINED_CACHE_HASHES) and len(staging_ids) == 1,
+            'RECOVERY_CACHE_SET_MISMATCH')
+    return observed
+
+
+def database_file_set(path, owner_uid, retained_source=False):
+    """Observe DB and sidecars without ever opening production SQLite."""
+    data, info = read(path, owner_uid=owner_uid, maximum=67108864)
+    evidence = {'database_sha256': sha(data), 'database_size': len(data), 'sidecars': {}}
+    for suffix in ('-wal', '-shm', '-journal'):
+        side = path + suffix
+        if not os.path.lexists(side):
+            evidence['sidecars'][suffix] = None
+            continue
+        require(retained_source and suffix in RETAINED_SIDECARS,
+                'RECOVERY_DATABASE_SIDECAR')
+        content, meta = read(side, owner_uid=owner_uid, maximum=65536)
+        wanted_size, wanted_hash = RETAINED_SIDECARS[suffix]
+        require(len(content) == wanted_size and sha(content) == wanted_hash and
+                meta.st_gid == 1002 and stat.S_IMODE(meta.st_mode) == 0o644,
+                'RECOVERY_RETAINED_SIDECAR_DRIFT')
+        evidence['sidecars'][suffix] = {'sha256': sha(content), 'size': len(content)}
+    if retained_source:
+        require(evidence['database_sha256'] == DB_SHA and
+                all(evidence['sidecars'][s] is not None for s in RETAINED_SIDECARS),
+                'RECOVERY_RETAINED_DATABASE_SET')
+    return evidence, data
+
+
+def manifest_from_copy(data, manifest_function):
+    """SQLite may create sidecars even on read-only opens: inspect a private copy."""
+    with tempfile.TemporaryDirectory(prefix='xuanjun-recovery-db-inspection-') as directory:
+        path = directory + '/snapshot.sqlite'
+        with open(path, 'xb') as stream:
+            stream.write(data)
+        os.chmod(path, 0o600)
+        result = manifest_function(path)
+    require(result['sha256'] == sha(data) and result['size'] == len(data),
+            'RECOVERY_DATABASE_INSPECTION_CHANGED_COPY')
+    return result
 
 
 def no_runner_or_old_worker():
@@ -231,11 +391,17 @@ def scheduler_exclusion():
     return sha(canonical(observed))
 
 
-def original_postcheck(plan, root, result):
+def verified_postchecker():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'complete_install_executor.py')
-    code, unused = read(path)
+    code, info = read(path)
     require(sha(code) == 'e83b769b64547d75e130423b88684459d62f247ee1bd9b604d6740e3445bdb78',
             'RECOVERY_ORIGINAL_POSTCHECK_HASH')
+    require(info.st_gid == 0, 'RECOVERY_POSTCHECK_GROUP')
+    return path, code
+
+
+def original_postcheck(plan, root, result):
+    path, code = verified_postchecker()
     ns = {'__name__': 'recovery_original_postcheck', '__file__': path}
     exec(compile(code, path, 'exec'), ns)
     return ns['post_install_checks'](plan, root, result)
@@ -262,6 +428,7 @@ def fd_exclusion(paths):
 
 def snapshot():
     import subprocess
+    unused, postchecker_code = verified_postchecker()
     plan_bytes, unused = read(CAND + '/protected-core-install-plan.json', private=True)
     require(sha(plan_bytes) == PLAN_SHA, 'RECOVERY_ORIGINAL_PLAN_HASH')
     plan = json.loads(plan_bytes.decode())
@@ -275,8 +442,17 @@ def snapshot():
     require(len(manifest['files']) == 102, 'RECOVERY_RUNTIME_COUNT')
     release = '/opt/xuanjun-control-releases/' + plan['runtime']['release_directory']
     validate_directories(root)
-    validate_directories(release)
+    validate_directories(release, retained_cache=True)
+    validate_file_inventory(root, set(manifest['files']) |
+                            {'P2_PACKAGE_PROVENANCE.json', 'tools/p2-package-freeze.py',
+                             'deploy/integration-manifest.json'})
+    validate_file_inventory(release, set(manifest['files']) |
+                            set(RETAINED_CACHE_HASHES) | {'INTEGRATION_MANIFEST.json'})
+    validate_release_metadata(release)
+    require(sha(read(release + '/INTEGRATION_MANIFEST.json')[0]) == MANIFEST_SHA,
+            'RECOVERY_INSTALLED_MANIFEST_DRIFT')
     payloads = validate_release(root, release, manifest, MANIFEST_SHA)
+    cache_evidence = validate_retained_caches(release, payloads)
     sys.path.insert(0, root + '/stage1')
     from activation_control import ActivationStore
     from ledger_backup import database_manifest
@@ -289,6 +465,12 @@ def snapshot():
     activation = ActivationStore('/var/lib/xuanjun-development/activation/active.json',
                                  '/var/lib/xuanjun-development/activation/epochs.jsonl',
                                  '/var/lib/xuanjun-development/activation/activation.lock')
+    # Mutating ActivationStore methods can create the lock; recovery must reuse it.
+    # Its reviewed contract deliberately uses 0644, unlike private receipts.
+    unused, activation_lock_info = read(activation.lock_path)
+    require(activation_lock_info.st_gid == 0 and
+            stat.S_IMODE(activation_lock_info.st_mode) == 0o644,
+            'RECOVERY_ACTIVATION_LOCK_AUTHORITY')
     active = activation.read()
     validate_hold(receipt, plan, active, cutover)
     runtime = FixedHostRuntime(DIRECTORY)
@@ -326,13 +508,16 @@ def snapshot():
                  'cgroups_empty', 'restart_inhibited')), 'RECOVERY_FRESH_QUIESCENCE')
     source, backup, generation = (plan['cutover'][k] for k in
                                    ('source', 'rollback_snapshot', 'staged_generation'))
-    for path in (source, backup, generation):
-        for suffix in ('-wal', '-shm', '-journal'):
-            require(not os.path.lexists(path + suffix), 'RECOVERY_DATABASE_SIDECAR')
-    require(sha(read(source, owner_uid=1002)[0]) == DB_SHA, 'RECOVERY_CANONICAL_DATABASE_DRIFT')
-    require(database_manifest(backup) == cutover['migration']['rollback'] and
-            database_manifest(generation) == cutover['migration']['generation'], 'RECOVERY_STAGED_DATABASE_DRIFT')
-    fds = fd_exclusion((source, backup, generation))
+    source_set, unused = database_file_set(source, 1002, retained_source=True)
+    backup_set, backup_data = database_file_set(backup, 0)
+    generation_set, generation_data = database_file_set(generation, 0)
+    database_sets = {source: source_set, backup: backup_set, generation: generation_set}
+    require(manifest_from_copy(backup_data, database_manifest) == cutover['migration']['rollback'] and
+            manifest_from_copy(generation_data, database_manifest) == cutover['migration']['generation'],
+            'RECOVERY_STAGED_DATABASE_DRIFT')
+    protected_paths = tuple(p + suffix for p in (source, backup, generation)
+                            for suffix in ('', '-wal', '-shm', '-journal'))
+    fds = fd_exclusion(protected_paths)
     no_runner_or_old_worker()
     scheduler_sha = scheduler_exclusion()
     prior_prereq = runtime.prerequisites.preflight
@@ -359,11 +544,18 @@ def snapshot():
     require(check.returncode == 0 and states.get('MainPID') == '0' and
             states.get('ActiveState') == 'inactive' and states.get('ConditionResult') == 'no' and
             os.path.isfile('/run/xuanjun-p2-runner-isolation.guard'), 'RECOVERY_RUNNER_NOT_ISOLATED')
+    require(database_file_set(source, 1002, retained_source=True)[0] == source_set and
+            database_file_set(backup, 0)[0] == backup_set and
+            database_file_set(generation, 0)[0] == generation_set,
+            'RECOVERY_DATABASE_SET_CHANGED_DURING_PREFLIGHT')
+    fd_exclusion(protected_paths)
     evidence = {'schema': 1, 'transaction_id': TX, 'artifact': 11865804223,
                 'plan_sha256': PLAN_SHA, 'manifest_sha256': MANIFEST_SHA,
                 'hold_receipt_sha256': sha(receipt_bytes), 'cutover_sha256': sha(cutover_bytes),
                 'prerequisites_sha256': prerequisites_sha, 'active': active,
-                'backup_sha256': sha(read(backup)[0]), 'generation_sha256': sha(read(generation)[0]),
+                'backup_sha256': backup_set['database_sha256'], 'generation_sha256': generation_set['database_sha256'],
+                'database_file_sets': database_sets, 'retained_cache_evidence': cache_evidence,
+                'original_postchecker_sha256': sha(postchecker_code),
                 'epoch_journal_sha256': sha(read(activation.epoch_journal)[0]),
                 'scheduler_inventory_sha256': scheduler_sha,
                 'files_verified': 102, 'fd_scope_complete': True,
@@ -387,6 +579,8 @@ def approval(review_id, expected_snapshot):
             comment.get('user', {}).get('login') == 'huhongchuan0422-creator', 'RECOVERY_APPROVAL_AUTHOR')
     body = comment.get('body', '')
     require(body.startswith(MARKER), 'RECOVERY_NEW_APPROVAL_REQUIRED')
+    require(comment.get('issue_url') == 'https://api.github.com/repos/' + REPO + '/issues/58',
+            'RECOVERY_REVIEW_DESTINATION')
     value = json.loads(body[len(MARKER):])
     code = sha(read(os.path.abspath(__file__))[0])
     expected = {'schema': 1, 'reviewer': 'CHATGPT_NATIVE_TASK5',
@@ -517,6 +711,10 @@ def main():
         require(args.review_id is not None and args.review_id > 0 and
                 args.snapshot_sha256 == digest, 'RECOVERY_FRESH_APPROVED_SNAPSHOT_REQUIRED')
         authorized = approval(args.review_id, digest)
+        # GitHub approval retrieval is an awaited external boundary. Reconcile
+        # the complete evidence again under the same lock before any effect.
+        evidence, context = snapshot()
+        require(sha(canonical(evidence)) == digest, 'RECOVERY_STATE_CHANGED_DURING_APPROVAL')
         result = resume(evidence, context, authorized)
         print('RECOVERY_RESULT=' + canonical(result).decode())
         print('PRODUCTION_ACCEPTANCE=PENDING_POSTINSTALL_CHECKS')
@@ -526,3 +724,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
