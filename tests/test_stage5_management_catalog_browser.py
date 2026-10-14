@@ -59,7 +59,7 @@ class ManagementCatalogBrowser(unittest.TestCase):
    page=self.ctx.new_page()
    page.goto(self.base+route)
    page.locator("#loadOverview").click()
-   expect(page.locator("#overviewOrders")).to_contain_text("PENDING 1")
+   expect(page.locator("#overviewOrders")).to_contain_text("SUCCESS 1")
    expect(page.locator("#overviewRevenue")).to_contain_text("145 分")
    expect(page.locator("#overviewRevenue")).to_contain_text("真实收入：未知")
    expect(page.locator("#overviewAds")).to_contain_text("sample_amount")
