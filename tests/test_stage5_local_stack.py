@@ -24,6 +24,15 @@ class StackTests(unittest.TestCase):
   self.assertIn("text/html",mime)
   status,raw,mime=self.call("GET","/demo/app.js")
   self.assertEqual(status,200);self.assertIn(b"simulated" if False else b"simulate",raw)
+ def test_platform_console_assets_same_origin(self):
+  status,raw,mime=self.call("GET","/demo/platform/")
+  self.assertEqual(status,200)
+  self.assertIn(b"/demo/platform/app.js",raw)
+  self.assertIn("text/html",mime)
+  status,raw,mime=self.call("GET","/demo/platform/app.js")
+  self.assertEqual(status,200)
+  self.assertIn(b"/demo/orders/state",raw)
+  self.assertIn("text/javascript",mime)
  def test_merchant_console_assets_same_origin(self):
   status,raw,mime=self.call("GET","/demo/merchant/")
   self.assertEqual(status,200)
