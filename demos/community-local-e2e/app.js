@@ -71,7 +71,7 @@ async function action(kind){
   else text("status","本地模拟状态："+data.state+"（非真实支付凭证）");
   get("successAd").hidden=kind!=="complete";
  }catch(e){
-  if(order && (token!==generation || activeKey!==key(order)))return;
+  if(token!==undefined && order && (token!==generation || activeKey!==key(order)))return;
   get("successAd").hidden=true;text("error",e.message);
  }
 }
