@@ -81,9 +81,9 @@ def execute():
         require(len(plan_sha)==64 and all(c in '0123456789abcdef' for c in plan_sha),'NEW_PLAN_DIGEST')
     p=raw(plan_path,private=True);require(hashlib.sha256(p).hexdigest()==plan_sha,'CORE_PLAN_DRIFT')
     plan=json.loads(p.decode());root=plan['artifact']['root']
-    require(plan['artifact']['source_commit']=='2516b8adf88a126b956c6b5ccf1a1dd186a328a6'
-            and plan['artifact']['source_tree']=='e03b72b7b9578ef5087ca8c01c9276ab73825dcb'
-            and plan['artifact']['manifest_sha256']=='44ede26d72bbb776dc813d6eb4d057581e11440d17082a6f1a207fc377689b0a','EXACT95_PLAN_BINDING')
+    require(plan['artifact']['source_commit']=='f30c40bc2a49d6ace9d30d17bd82cdf4a5fb7b7c'
+            and plan['artifact']['source_tree']=='7f40340da949764a2a8bc11b3ce5d40d9b48d37a'
+            and plan['artifact']['manifest_sha256']=='6fd121adb1363c6e734f8b302150441c06c32f7a75b67fe60009c7a6a056b027','EXACT95_PLAN_BINDING')
     require(digest(DB)==DB_SHA,'CANONICAL_DB_DRIFT')
     for suffix in ['-wal','-journal']:
         require(not os.path.lexists(DB+suffix) or os.lstat(DB+suffix).st_size==0,'NONEMPTY_DB_JOURNAL')
@@ -139,8 +139,10 @@ def execute():
                 checkpoint=json.loads(row['checkpoint'] or '{}')
                 if isinstance(checkpoint,dict) and checkpoint.get('native_execution'):native.append(row['id'])
             db.close()
+            from ledger_install_stage import stage_existing_registry,PROOF_KEYS
+            migration=stage_existing_registry(tmp+'/state.sqlite',tmp+'/backup.sqlite',tmp+'/generation.sqlite','huhongchuan0422-creator/Repository-name-xuanjun-ai-control',dict.fromkeys(PROOF_KEYS,True))
             from execution_ledger import ExecutionLedger
-            ledger=ExecutionLedger(tmp+'/state.sqlite',['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'])
+            ledger=ExecutionLedger(tmp+'/generation.sqlite',['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'])
             # No paid model or external tools: only the existing admission method on scratch.
             claim=ledger.claim('readiness-isolated-fixture')
             require(claim is None,'IMPORTED_OLD_TASK_CLAIMABLE')
@@ -158,7 +160,7 @@ def execute():
                     'original_execution_specs_table_present':'execution_specs' in tables,'fixture_claim_result':'NONE',
                     'unconsumed_expired_requests':expired,'expired_request_denials':denied,
                     'canonical_fence_changed':False,'historical_external_delivery':'UNKNOWN_NO_REPLAY',
-                    'fixture_only':True}
+                    'migration_new_tables':migration['new_tables'],'fixture_only':True}
     section('legacy_authority_and_expiry_fixture',authority_fixture)
 
     def references():
@@ -187,6 +189,8 @@ def execute():
         ips=sorted({r[4][0] for r in socket.getaddrinfo('uk.wenwenwenyiyiyi.work',443,socket.AF_INET)})
         require('8.208.119.115' in ips,'TLS_DNS_MISMATCH')
         return {'checkend_86400':True,'key_pair_match':True,'domain_match':True,'dns_ipv4':ips,
+                'certificate_dates':command(['/usr/bin/openssl','x509','-in',cert,'-noout','-dates']).decode().splitlines(),
+                'renewal_configuration_present':os.path.isdir('/etc/letsencrypt/renewal') and bool(os.listdir('/etc/letsencrypt/renewal')),
                 'https_runtime':'NOT_INSTALLED','renewal_runtime':'NOT_ACCEPTED'}
     section('fresh_tls_and_dns',tls)
 

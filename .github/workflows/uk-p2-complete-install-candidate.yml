@@ -4,6 +4,7 @@ on:
     branches: [repair/p2-chatgpt-clean-review-20261013]
     paths:
       - evidence/p2-install-preparation-20261013/prepare_complete_install_candidate.py
+      - evidence/p2-install-preparation-20261013/prepare_complete_publisher.py
       - .github/workflows/uk-p2-complete-install-candidate.yml
 permissions:
   contents: read
@@ -30,9 +31,9 @@ jobs:
             out=super().redirect_request(req,fp,code,msg,headers,newurl)
             if out is not None:out.remove_header('Authorization')
             return out
-          q=urllib.request.Request('https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11833404272/zip',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          q=urllib.request.Request('https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11863971384/zip',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
           with urllib.request.build_opener(SafeRedirect()).open(q,timeout=30) as f:b=f.read(2097153)
-          assert len(b)<=2097152 and hashlib.sha256(b).hexdigest()=='b8b33cba5f9951466e3242dfaa264471d80fdab1cbf832843baacbac43202107'
+          assert len(b)<=2097152 and hashlib.sha256(b).hexdigest()=='9abf5a9ea6a4c6370faf7322d0dd6a6ac98e9d8680afd4354d4b06fdcc67d49d'
           fd=os.open('exact95.zip',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(b)
           print('EXACT95_ZIP_FETCH_VERIFIED')
