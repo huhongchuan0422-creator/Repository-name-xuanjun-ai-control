@@ -132,3 +132,23 @@ task queue. It still requires the full recovery caller to hold the install lock.
 Remaining: wire actual retained provisioning, TLS transaction preservation,
 activation and service operations, exact approval and full host preflight into
 one concrete entrypoint; validate full integration before consolidated review.
+
+## Retained provisioning and receipt preservation implementation
+
+Added epoch3_preserve.py: exclusive protected archive, byte-pinned copies of six
+historical receipts, preservation of the empty TLS tree and original TLS journal,
+with fsync and evidence retention on partial failure. Eight local Python3.6.8
+root-mapped filesystem tests PASS. No production paths were modified.
+
+Added epoch3_retained_runtime.py: validates all24 prior target bindings, prepares
+new TLS binding, records a new provisioning attempt, applies TLS and target files,
+and installs the exact plugin without replaying RPM/NSS/bootstrap/publisher work.
+Generic restore and prerequisite replay/removal are explicitly rejected. Eight
+local Python3.6.8 fixture orchestration tests PASS; these mock host effects and
+are not UK integration evidence. Failure policy is FENCE_STOP_RETAIN_NO_REPLAY,
+not a claim that the full previous environment can be automatically restored.
+
+Still incomplete: concrete admission/approval and full preflight, release staging,
+native binding update, activation/service containment and postchecks must be wired
+and tested as one driver before the consolidated independent review. No new
+production recovery is approved or executed by this checkpoint.
