@@ -41,18 +41,23 @@ def fixture_stores():
             change_campaign_state(a,DEMO_SCOPE,cid,"ACTIVE",owner,now,4)
         # The server remains serial, but tests run serve_forever on a background
         # thread. Use one explicitly cross-thread-readable handle per store.
-        runtime_m = sqlite3.connect(":memory:",check_same_thread=False)
-        runtime_a = sqlite3.connect(":memory:",check_same_thread=False)
+        runtime = []
         try:
+            runtime_m = sqlite3.connect(":memory:",check_same_thread=False)
+            runtime.append(runtime_m)
+            runtime_a = sqlite3.connect(":memory:",check_same_thread=False)
+            runtime.append(runtime_a)
             m.backup(runtime_m)
             a.backup(runtime_a)
+            runtime_m.execute("PRAGMA foreign_keys=ON")
+            return runtime_m,runtime_a,now
         except BaseException:
-            runtime_m.close();runtime_a.close()
+            for handle in reversed(runtime):
+                try:
+                    handle.close()
+                except Exception:
+                    pass  # preserve original setup exception; best-effort all
             raise
-        finally:
-            a.close();m.close()
-        runtime_m.execute("PRAGMA foreign_keys=ON")
-        return runtime_m,runtime_a,now
     except BaseException:
         a.close();m.close()
         raise
