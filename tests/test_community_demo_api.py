@@ -3,7 +3,7 @@ import threading
 import unittest
 from http.client import HTTPConnection
 from scripts.community_order_store import connect
-from scripts.community_demo_api import DemoService, handler, MAX_BODY
+from scripts.community_demo_api import DemoService, handler, MAX_BODY, server_database
 from http.server import HTTPServer
 
 S = {'tenant_id':'t1','merchant_id':'m1','store_id':'s1'}
@@ -57,7 +57,7 @@ class IntegrationTests(unittest.TestCase):
 class HTTPTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.db=connect()
+        cls.db=server_database(':memory:')
         cls.server=HTTPServer(('127.0.0.1',0),handler(DemoService(cls.db)))
         cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True)
         cls.thread.start()
