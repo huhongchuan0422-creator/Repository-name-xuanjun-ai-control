@@ -29,4 +29,25 @@ jobs:
           EXPECTED_SHA: ${{ github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Build twice, verify archive and execute all mandatory offline suites
-        run: python -B -m unittest discover -s tests -p 'test_p2_full_kit*.py' -v
+        run: |
+          python -I -B - <<'PY'
+          import os, stat, json
+          paths=set()
+          for value in (os.getcwd(),os.environ.get('RUNNER_TEMP'),os.environ.get('HOME')):
+              if not value: continue
+              path=os.path.abspath(value)
+              while True:
+                  paths.add(path)
+                  parent=os.path.dirname(path)
+                  if parent==path: break
+                  path=parent
+          for path in sorted(paths):
+              info=os.lstat(path)
+              row={'path':path,'uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode))}
+              for key in ('system.posix_acl_access','system.posix_acl_default'):
+                  try: os.getxattr(path,key,follow_symlinks=False)
+                  except OSError as error: row[key]={'errno':error.errno}
+                  else: row[key]={'present':True}
+              print('CI_ONLY_PATH_METADATA='+json.dumps(row,sort_keys=True))
+          PY
+          python -B -m unittest discover -s tests -p 'test_p2_full_kit*.py' -v
