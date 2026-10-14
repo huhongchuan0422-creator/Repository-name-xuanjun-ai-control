@@ -15,6 +15,9 @@ CREATE TABLE refund_events(
  evidence_kind TEXT NOT NULL CHECK(evidence_kind='OFFLINE_PREVIEW'),
  PRIMARY KEY(tenant_id,merchant_id,store_id,reference,event_id)
 );
+CREATE TRIGGER refund_events_no_replace BEFORE INSERT ON refund_events
+WHEN EXISTS(SELECT 1 FROM refund_events WHERE event_id=NEW.event_id)
+BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;
 CREATE TRIGGER refund_events_no_update BEFORE UPDATE ON refund_events
 BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;
 CREATE TRIGGER refund_events_no_delete BEFORE DELETE ON refund_events
@@ -34,8 +37,8 @@ def open_refund_store(path=":memory:"):
         actual=_schema(db)
         version=db.execute("PRAGMA user_version").fetchone()[0]
         if not actual and version==0:
-            db.executescript("BEGIN IMMEDIATE;"+SCHEMA+"PRAGMA user_version=1;COMMIT;")
-        elif actual!=expected or version!=1:
+            db.executescript("BEGIN IMMEDIATE;"+SCHEMA+"PRAGMA user_version=2;COMMIT;")
+        elif actual!=expected or version!=2:
             raise ValueError("INVALID_REFUND_SCHEMA")
         if db.execute("PRAGMA quick_check").fetchone()[0]!="ok":
             raise ValueError("INVALID_REFUND_DATABASE")
