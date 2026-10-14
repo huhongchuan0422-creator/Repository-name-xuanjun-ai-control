@@ -21,4 +21,10 @@ for unit in ['xj-uk-owner-notify.timer','xj-uk-owner-notify.service','xuanjun-uk
  r=subprocess.run(['/usr/bin/systemctl','show',unit,'--property=Id,LoadState,FragmentPath,ActiveState,SubState,MainPID,ControlGroup,UnitFileState'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10)
  assert r.returncode==0
  out['units'][unit]=dict(x.split('=',1) for x in r.stdout.decode().splitlines() if '=' in x)
+out['cgroup_paths']={}
+for unit in out['units']:
+ p='/sys/fs/cgroup/systemd/system.slice/'+unit
+ try:i=os.lstat(p);row={'exists':True,'directory':stat.S_ISDIR(i.st_mode),'symlink':stat.S_ISLNK(i.st_mode)}
+ except FileNotFoundError:row={'exists':False}
+ out['cgroup_paths'][unit]=row
 print('NOTIFIER_PREFLIGHT_READONLY_DIAG='+json.dumps(out,sort_keys=True))

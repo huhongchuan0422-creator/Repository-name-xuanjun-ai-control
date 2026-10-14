@@ -172,9 +172,33 @@ class IsolationTests(unittest.TestCase):
         def denied(*args, **kwargs):
             kwargs['onerror'](PermissionError('denied'))
         with mock.patch.object(mod.os.path, 'isdir', return_value=True), \
-                mock.patch.object(mod.os.path, 'islink', return_value=False), \
+                mock.patch.object(mod.os, 'lstat', return_value=type('Info', (), {'st_mode': 0o40755})()), \
                 mock.patch.object(mod.os, 'walk', side_effect=denied):
             with self.assertRaises(PermissionError):mod.FixedHost().members(mod.SERVICE)
+
+    def test_absent_exact_unit_cgroup_is_empty_with_controller_present(self):
+        with mock.patch.object(mod.os.path, 'isdir', return_value=True), \
+                mock.patch.object(mod.os, 'lstat', side_effect=FileNotFoundError('unit removed')), \
+                mock.patch.object(mod.os, 'walk') as walk:
+            self.assertEqual(mod.FixedHost().members(mod.SERVICE), [])
+            walk.assert_not_called()
+
+    def test_missing_controller_remains_hold(self):
+        with mock.patch.object(mod.os.path, 'isdir', return_value=False):
+            with self.assertRaises(ValueError):mod.FixedHost().members(mod.SERVICE)
+
+    def test_unit_cgroup_stat_denied_remains_hold(self):
+        with mock.patch.object(mod.os.path, 'isdir', return_value=True), \
+                mock.patch.object(mod.os, 'lstat', side_effect=PermissionError('denied')):
+            with self.assertRaises(PermissionError):mod.FixedHost().members(mod.SERVICE)
+
+    def test_nested_cgroup_disappearing_during_scan_remains_hold(self):
+        def vanished(*args, **kwargs):
+            kwargs['onerror'](FileNotFoundError('nested race'))
+        with mock.patch.object(mod.os.path, 'isdir', return_value=True), \
+                mock.patch.object(mod.os, 'lstat', return_value=type('Info', (), {'st_mode': 0o40755})()), \
+                mock.patch.object(mod.os, 'walk', side_effect=vanished):
+            with self.assertRaises(FileNotFoundError):mod.FixedHost().members(mod.SERVICE)
 
 
 if __name__ == '__main__':unittest.main()

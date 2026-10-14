@@ -125,7 +125,14 @@ class FixedHost(object):
         require(unit in UNITS + PRIOR_UNITS, 'CGROUP_OUTSIDE_SCOPE')
         root = '/sys/fs/cgroup/systemd/system.slice/' + unit
         require(os.path.isdir('/sys/fs/cgroup/systemd'), 'CGROUP_HIERARCHY_UNAVAILABLE')
-        require(not os.path.islink(root), 'CGROUP_ALIAS_HOLD')
+        try:
+            root_info = os.lstat(root)
+        except FileNotFoundError:
+            # systemd removes empty unit cgroups after a stopped/masked unit.
+            # quiet() independently requires inactive/dead and PID0 before here.
+            return []
+        require(stat.S_ISDIR(root_info.st_mode) and not stat.S_ISLNK(root_info.st_mode),
+                'CGROUP_ALIAS_OR_TYPE_HOLD')
         found = set()
         count = 0
         def fail_walk(error):
