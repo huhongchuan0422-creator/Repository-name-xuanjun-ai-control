@@ -32,7 +32,7 @@ class CommunityAdOfflineTests(unittest.TestCase):
         self.assertFalse(accept_metric(e,{("a","m",AMOUNT,"CLICK","evt")}))
     def test_08_audit(self):
         actor={"authenticated":True,"role":"MERCHANT_ADMIN","actor_id":"x"}
-        self.assertTrue(audit_transition("APPROVED","ACTIVE",actor))
+        self.assertFalse(audit_transition("APPROVED","ACTIVE",actor))\n        self.assertTrue(audit_transition("APPROVED","ACTIVE",dict(actor,role="PLATFORM_ADMIN")))
         self.assertFalse(audit_transition("ARCHIVED","ACTIVE",actor))
     def test_09_hosted(self):
         p={"state":"SUCCESS","server_verified":True,"provider_reconciled":True}
