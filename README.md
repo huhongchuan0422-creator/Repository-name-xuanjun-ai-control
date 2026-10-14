@@ -18,3 +18,7 @@ Private control-plane repository for XuanJun AI / XuanJun Yunhui engineering orc
 ## Mandatory development execution rules
 
 Work and OpenClaw must read and follow [开发执行与反馈强制规则](docs/DEVELOPMENT_EXECUTION_AND_FEEDBACK_RULES_20261012.md) before dispatch or continuation. Deliver results, actively advance ready nodes, track missing receipts, preserve interrupted tasks and unblock independent work. Documentation and alerts are not proof of deployed execution capabilities.
+
+## Development document and ecology rules
+
+The synchronized V2.7 development document is [available here](docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md); [editable Word version](docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.docx). Section7.7 incorporates Owner's ecology rightsV1.1 revision, with related node2.15 and acceptance requirements. [Exact byte manifest](docs/development/MANIFEST.json) distinguishes document synchronization from runtime acceptance and physical server receipts. It does not grant P2 installation, activity launch or ecological issuance.

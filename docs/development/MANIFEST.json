@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "document_version": "V2.7_ECOLOGY_V1.1",
+  "updated_at": "2026-10-14",
+  "source": "Owner attachment 贡献权益(2).txt",
+  "status": "DOCUMENT_RULES_ONLY_NOT_RUNTIME_ACCEPTANCE",
+  "files": {
+    "DEVELOPMENT_V27_ECOLOGY_V11_20261014.md": "476497282f1c9dab6fab39d9b56a06074cc658a91333d2ce28189d37ae0939bb",
+    "ECOSYSTEM_RIGHTS_V11_SOURCE_20261013.txt": "34066f9d7b790d1700f8c1b3907c398f5b5c39a4f038af45a5b9961cea44a4a2",
+    "DEVELOPMENT_V27_ECOLOGY_V11_20261014.docx": "12a6ec0b6f19cc225d22c30ac9d66fe00b1aa620e03afe827406dd1b8c359a07"
+  },
+  "server_sync_status": "REQUIRES_PHYSICAL_RECEIPT"
+}
