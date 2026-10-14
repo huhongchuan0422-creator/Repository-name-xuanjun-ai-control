@@ -6,12 +6,12 @@ Inspect before running. Output contains counts/hashes, no plan or rendered value
 """
 import argparse,base64,gzip,hashlib,io,json,pathlib,sys,tarfile,tempfile,types
 OLD_ARCHIVE='c2d593d662fbce4a0c2fa454cc4a18dbec327c0bd0bf3d6d72849d9a5a79970d'
-NEW_ARCHIVE='9c186c8d9788ff12307bc95362d00a9315ba8f18d899c8e41fa4e45a51a5e4c0'
+NEW_ARCHIVE='8b69ec24d3f55b7010cfd98c2982b7b55a4d1b5ce27f3bb2d3c012313ab8d075'
 OLD_MANIFEST='9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3'
-NEW_MANIFEST='3332a6e63b11b75420f1bd0f1a264c89528a92a771f6bc1399f2a38009f324ef'
-KIT='48d4b86f48aaa3440ac8744a9e0fe99dacf4cddc1050777a7911c9a71fd89180'
+NEW_MANIFEST='153653ebc48d6b20680e513402dad077d50dce953ab3d4b7cc1748bcff0f64e7'
+KIT='12ec5e711b4a7de865e44323b887fefbac6cc7954d13609e58b7137bd34374e1'
 ORIGINAL_PLAN='ec1d617857845c43eff6bed2b70a0c00a5dad8dc52df95785bed3ee3d775335a'
-COMPILED_PLAN='949dee6ed4d1a1c271f584bd995f61da238aa92171974ec05bc23bfa930465e2'
+COMPILED_PLAN='5938dad82a8597f8ac18af078843cfa30e8245729101b65dbc861e38f877edeb'
 REPAIRS={'stage1/p2_fixed_host_runtime.py','stage1/p2_tls_lifecycle.py'}
 def need(ok,label):
  if not ok:raise ValueError(label)
@@ -55,7 +55,7 @@ def materialize(root,files):
   p.chmod(0o600)
 def verify(old_path,new_path,plan_path):
  oldfiles=archive(old_path,OLD_ARCHIVE,192286,'xuanjun-p2-package')
- newfiles=archive(new_path,NEW_ARCHIVE,264661,'epoch5-recovery-candidate-v3')
+ newfiles=archive(new_path,NEW_ARCHIVE,267336,'epoch5-recovery-candidate-v4')
  old,om=runtime(oldfiles,'',OLD_MANIFEST);new,nm=runtime(newfiles,'xuanjun-p2-package/',NEW_MANIFEST)
  need(set(om['files'])==set(nm['files']),'SCOPE')
  need({n for n in om['files'] if om['files'][n]!=nm['files'][n]}==REPAIRS,'DELTA')

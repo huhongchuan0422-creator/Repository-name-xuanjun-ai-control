@@ -4,18 +4,18 @@ Reviewer must inspect this aid and run it independently. Its output alone is
 not a release approval or verification of the private plan/production effects.
 """
 import argparse,base64,gzip,hashlib,io,json,pathlib,re,tarfile
-ARCHIVE='9c186c8d9788ff12307bc95362d00a9315ba8f18d899c8e41fa4e45a51a5e4c0'
-KIT='48d4b86f48aaa3440ac8744a9e0fe99dacf4cddc1050777a7911c9a71fd89180'
-ENTRY='ce7aae1b452519f6bf195c9566e37d77dce80b5518b40c10634ea38ecef3387a'
-RUNTIME='3332a6e63b11b75420f1bd0f1a264c89528a92a771f6bc1399f2a38009f324ef'
+ARCHIVE='8b69ec24d3f55b7010cfd98c2982b7b55a4d1b5ce27f3bb2d3c012313ab8d075'
+KIT='12ec5e711b4a7de865e44323b887fefbac6cc7954d13609e58b7137bd34374e1'
+ENTRY='c88330b7d7a685a049e43e29cd0413336255a34df8db4ae46f6fb4cc1acc24e6'
+RUNTIME='153653ebc48d6b20680e513402dad077d50dce953ab3d4b7cc1748bcff0f64e7'
 OLD='9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3'
 FREEZER='f1fe5dc3e199fe891a89969c07612304803ee453ee79e165815eab776eb6bb8e'
-TREE='fffd3ed502a9087ba431e7724774760381a434ce'
-PREFIX='epoch5-recovery-candidate-v3'
+TREE='c3ac139fb3c69e6826c41a10abc847d999b09f07'
+PREFIX='epoch5-recovery-candidate-v4'
 REPO_PREFIX='evidence/p2-epoch5-recovery-20261014/'
 HELPERS=set(('build_epoch5_runtime.py', 'complete_install_executor.py', 'epoch3_install_lock.py', 'epoch3_preserve.py', 'epoch3_service_containment.py', 'epoch5_activation_rebind.py', 'epoch5_approval.py', 'epoch5_attempt_journal.py', 'epoch5_host_driver.py', 'epoch5_host_preflight.py', 'epoch5_native_binding.py', 'epoch5_plan.py', 'epoch5_recovery_sequence.py', 'epoch5_retained_runtime.py', 'epoch5_retained_state.py', 'epoch5_retained_tls.py', 'inspect_epoch3.py', 'inspect_epoch5.py', 'observe_epoch5.py', 'prepare_epoch5_bindings.py', 'recover_exact_hold.py', 'verify_retained_publisher.py'))
 REPAIRS={'stage1/p2_fixed_host_runtime.py':'83ca91a597c3220c40a4de37c8af211463dba13eb36eac55a8802c12d5a36ac2',
-'stage1/p2_tls_lifecycle.py':'d890732f39b4dd9e0134fa7c26aa2f0a79deacef3e2e0f2d30e5280c903070db'}
+'stage1/p2_tls_lifecycle.py':'948ea9920d5a6785aad2ebd0cbc7384c11d93b42cf97b4014a79f15f58d554f1'}
 def need(value,label):
  if not value:raise ValueError(label)
 def sha(raw):return hashlib.sha256(raw).hexdigest()
@@ -27,7 +27,7 @@ def parse(raw):return json.loads(raw.decode('utf-8'),object_pairs_hook=pairs)
 def relative(name):return isinstance(name,str) and name and not name.startswith('/') and '\\' not in name and all(x not in ('','.','..') for x in name.split('/'))
 def blob(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
 def verify(raw,tree=None,old_manifest=None):
- need(len(raw)==264661 and sha(raw)==ARCHIVE,'ARCHIVE_BYTES')
+ need(len(raw)==267336 and sha(raw)==ARCHIVE,'ARCHIVE_BYTES')
  with gzip.GzipFile(fileobj=io.BytesIO(raw),mode='rb') as compressed:data=compressed.read(8388609)
  need(len(data)<=8388608,'TAR_BOUND')
  files={};dirs=set();seen=set();total=0
@@ -69,7 +69,7 @@ def verify(raw,tree=None,old_manifest=None):
  need(sha(files[root+'tools/p2-package-freeze.py'])==FREEZER,'FREEZER_HASH')
  provenance=parse(files[root+'P2_PACKAGE_PROVENANCE.json'])
  need(provenance['schema']==2 and provenance['runtime_manifest_sha256']==RUNTIME and provenance['runtime_files']==manifest['files'],'PROVENANCE_RUNTIME')
- need(provenance['source_commit']=='bb6ed0d40eabbb535623b0a5341cddedc9b9e38a' and provenance['source_tree']=='5c18914a59172d9a005dafaae3d4c86701240210' and provenance['verifier_sha256']==FREEZER,'PROVENANCE_SOURCE')
+ need(provenance['source_commit']=='e058a82cf20acde95dd591dd3c95eaf4d4e7aa82' and provenance['source_tree']=='a27d226d96878e8230f4d4d28d93141d0f4900de' and provenance['verifier_sha256']==FREEZER,'PROVENANCE_SOURCE')
  result={'archive_sha256':ARCHIVE,'archive_bytes':len(raw),'regular_files':len(files),'directories':len(dirs),'helpers_verified':22,'test_modules_verified':19,'runtime_files_verified':102,'manifest_entry_inventory':'PASS','package_bytes_against_pinned_hashes':'PASS','repository_blob_comparison':'NOT_PROVIDED','old100_runtime_comparison':'NOT_PROVIDED','private_plan_and_rendered24':'NOT_RUN','release_approval':'NOT_GRANTED','production_effects':'NOT_RUN'}
  if tree is not None:
   need(tree.get('truncated') is False and tree['sha']==TREE,'REPOSITORY_TREE_BINDING')
