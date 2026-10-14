@@ -1,0 +1,41 @@
+test_directory_not_read_as_file (test_epoch5_observation.ObservationTests) ... ok
+test_metadata_missing (test_epoch5_observation.ObservationTests) ... ok
+test_parse_failure_not_pass (test_epoch5_observation.ObservationTests) ... ok
+test_parse_never_invokes_certbot_main_or_issuance (test_epoch5_observation.ObservationTests) ... ok
+test_read_alias_refused (test_epoch5_observation.ObservationTests) ... ok
+test_read_bound (test_epoch5_observation.ObservationTests) ... ok
+test_read_regular (test_epoch5_observation.ObservationTests) ... ok
+test_tree_external_link_refused (test_epoch5_observation.ObservationTests) ... ok
+test_tree_permission_failure_propagates (test_epoch5_observation.ObservationTests) ... ok
+test_diagnostics_are_bounded (test_tls_config_diagnostics.ConfigTests) ... ok
+test_empty_regular_private_config (test_tls_config_diagnostics.ConfigTests) ... ok
+test_existing_config_not_overwritten (test_tls_config_diagnostics.ConfigTests) ... ok
+test_failure_diagnostic_retained_private (test_tls_config_diagnostics.ConfigTests) ... ok
+test_fingerprint_scan_denied_is_not_empty (test_tls_config_diagnostics.ConfigTests) ... ok
+test_fingerprint_scan_disappearance_is_not_empty (test_tls_config_diagnostics.ConfigTests) ... ok
+test_hardlink_config_rejected (test_tls_config_diagnostics.ConfigTests) ... ok
+test_loose_permissions_rejected (test_tls_config_diagnostics.ConfigTests) ... ok
+test_missing_config_rejected (test_tls_config_diagnostics.ConfigTests) ... ok
+test_nonempty_config_rejected (test_tls_config_diagnostics.ConfigTests) ... ok
+test_root_authority_rejected (test_tls_config_diagnostics.ConfigTests) ... ok
+test_success_does_not_create_failure_receipt (test_tls_config_diagnostics.ConfigTests) ... ok
+test_symlink_config_rejected (test_tls_config_diagnostics.ConfigTests) ... ok
+test_exact_scope_and_terms_required (test_tls_lifecycle.LifecycleTests) ... ok
+test_internal_certificate_symlink_accepted_external_refused (test_tls_lifecycle.LifecycleTests) ... ok
+test_issuance_failure_is_journaled_before_rollback (test_tls_lifecycle.LifecycleTests) ... ok
+test_missing_requested_root_is_zero_effect_rollback (test_tls_lifecycle.LifecycleTests) ... ok
+test_partial_issuance_evidence_retained_and_repeat_rollback_safe (test_tls_lifecycle.LifecycleTests) ... ok
+test_pinned_nginx_configuration_excludes_rpm_default_server (test_tls_lifecycle.LifecycleTests) ... ok
+test_renew_uses_same_pinned_nginx_config_and_updates_journal (test_tls_lifecycle.LifecycleTests) ... ok
+test_retained_evidence_drift_detected (test_tls_lifecycle.LifecycleTests) ... ok
+test_unjournaled_root_cannot_be_removed (test_tls_lifecycle.LifecycleTests) ... ok
+test_unknown_account_change_holds_without_rename (test_tls_lifecycle.LifecycleTests) ... ok
+test_both_renewal_modes_disable_internal_sleep (test_tls_renewal_deadline.DeadlineTests) ... ok
+test_calls_use_common_renewal_policy (test_tls_renewal_deadline.DeadlineTests) ... ok
+test_exit_race_still_persists_failure (test_tls_renewal_deadline.DeadlineTests) ... ok
+test_timeout_is_persisted (test_tls_renewal_deadline.DeadlineTests) ... ok
+
+----------------------------------------------------------------------
+Ran 36 tests in 0.094s
+
+OK
