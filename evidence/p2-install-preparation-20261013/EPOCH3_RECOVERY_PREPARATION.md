@@ -94,3 +94,15 @@ descriptor publication leaves journal/descriptor mismatch and rejects retry.
 13 tests PASS on local system Python. The local Python3.6.8 interpreter exits139
 before test output on ActivationStore import; Python3.6 execution is NOT PASS.
 This helper has never run on the UK host and is not independently approved.
+
+## Single-attempt sequencing (driver wiring still pending)
+
+The recovery sequence verifies approval before and inside the existing install
+lock, binds a fresh preflight snapshot, consumes an exclusive durable attempt,
+and records INTENT/COMPLETE around each effect. Failure fences activation, stops
+only new allowed services, then requires verified stopped state before preserving
+legacy masks. Failure retains prerequisite/bootstrap/publisher/database resources;
+no generic full runtime.restore or retry. Failed containment is UNKNOWN and remains
+HOLD; receipt-write failure is separately reported.11 local Python3.6.8 sequence
+fixture tests PASS, including failure injection at all9 phases. These injected
+operations do NOT prove actual host driver integration, which remains unfinished.
