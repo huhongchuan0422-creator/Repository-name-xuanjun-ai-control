@@ -26,5 +26,6 @@ jobs:
           node --check demos/community-local-e2e/app.js
           node --test demos/community-local-e2e/app.test.mjs
           node --test demos/community-local-e2e/merchant.test.mjs
+          node --test demos/community-local-e2e/platform.test.mjs
           echo REAL_BROWSER_E2E=NOT_RUN
           echo LIVE_FUNDS=NOT_RUN
