@@ -71,4 +71,29 @@ class Stage5MerchantBatch2(unittest.TestCase):
         store={"scope":self.sc,"hours":[{"weekday":1,"start":500,"end":100}]}
         with self.assertRaises(ValueError):opening_hours(self.sc,store,1,600)
 
+    def test_17_non_ascii_signature_returns_false(self):
+        token=signed_qr(self.sc,"pos1",500,self.key)
+        token["signature"]="签名"
+        self.assertFalse(verify_qr(token,self.sc,"pos1",499,self.key))
+
+    def test_18_wrong_signature_formats(self):
+        token=signed_qr(self.sc,"pos1",500,self.key)
+        for signature in ("f"*63,"G"*64,123,None):
+            self.assertFalse(verify_qr(dict(token,signature=signature),self.sc,"pos1",499,self.key))
+
+    def test_19_boolean_and_float_versions_rejected(self):
+        for version in (True,1.0):
+            token=signed_qr(self.sc,"pos1",500,self.key)
+            token["payload"]["version"]=version
+            import json,hashlib,hmac
+            raw=json.dumps(token["payload"],sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()
+            token["signature"]=hmac.new(self.key,raw,hashlib.sha256).hexdigest()
+            self.assertFalse(verify_qr(token,self.sc,"pos1",499,self.key))
+
+    def test_20_malformed_payloads_rejected(self):
+        token=signed_qr(self.sc,"pos1",500,self.key)
+        for value in ([],None,{"scope":self.sc,"context":"pos1","expires":500,"version":1,"unknown":True}):
+            self.assertFalse(verify_qr(dict(token,payload=value),self.sc,"pos1",499,self.key))
+        self.assertFalse(verify_qr(token,self.sc,object(),499,self.key))
+
 if __name__=="__main__":unittest.main()
