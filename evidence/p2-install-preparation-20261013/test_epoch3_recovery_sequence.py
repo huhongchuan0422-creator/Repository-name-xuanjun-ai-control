@@ -81,4 +81,11 @@ class SequenceTests(unittest.TestCase):
     self.assertEqual(d.records[-1]['stage'],phase+'_INTENT');return d.call(phase)
    setattr(d,phase,effect)
   subject.resume_once(d,{},{})
+ def test_detailed_unknown_containment_evidence_saved(self):
+  d=Driver('post_install_checks');evidence={'operations':{'stopped_before':{'status':'UNKNOWN','error_type':'OSError'}},'failed_operations':['stopped_before']}
+  def incomplete(plan):raise subject.ContainmentIncomplete(evidence)
+  d.verify_stopped_and_preserve_legacy_masks=incomplete
+  with self.assertRaises(subject.RecoveryHold):subject.resume_once(d,{},{})
+  row=d.records[-1]['containment']['verify_stopped_and_preserve_legacy_masks']
+  self.assertEqual(row['status'],'UNKNOWN');self.assertEqual(row['evidence'],evidence)
 if __name__=='__main__':unittest.main()

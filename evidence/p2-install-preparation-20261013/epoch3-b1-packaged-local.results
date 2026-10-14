@@ -1,0 +1,46 @@
+test_boot_failure_preserves_each_cleanup_status (test_epoch3_host_driver.Tests) ... ok
+test_boot_restore_failure_still_restores_both_masks (test_epoch3_host_driver.Tests) ... ok
+test_both_stopped_observations_fail_keep_every_cleanup (test_epoch3_host_driver.Tests) ... ok
+test_database_reopen_failure_no_activate (test_epoch3_host_driver.Tests) ... ok
+test_existing_attempt_prevents_effects (test_epoch3_host_driver.Tests) ... ok
+test_failure_restores_boot_and_owner_masks (test_epoch3_host_driver.Tests) ... ok
+test_first_stopped_observation_failure_keeps_every_cleanup (test_epoch3_host_driver.Tests) ... ok
+test_legacy_mask_failure_still_attempts_remeasurement (test_epoch3_host_driver.Tests) ... ok
+test_multiple_failures_preserved_and_no_retry (test_epoch3_host_driver.Tests) ... ok
+test_native_binding_failure_holds_new_epoch (test_epoch3_host_driver.Tests) ... ok
+test_owner_mask_failure_still_attempts_legacy_and_remeasurement (test_epoch3_host_driver.Tests) ... ok
+test_post_cleanup_legacy_measurement_failure_is_durable_unknown (test_epoch3_host_driver.Tests) ... ok
+test_post_cleanup_observation_failure_is_durable_unknown (test_epoch3_host_driver.Tests) ... ok
+test_postcheck_failure_fences_active (test_epoch3_host_driver.Tests) ... ok
+test_postchecker_receives_new_identity (test_epoch3_host_driver.Tests) ... ok
+test_real_epoch_and_journal_success (test_epoch3_host_driver.Tests) ... ok
+test_staging_failure_fences_old_epoch (test_epoch3_host_driver.Tests) ... ok
+test_stop_failure_recorded_unknown (test_epoch3_host_driver.Tests) ... ok
+test_tls_failure_fences_before_stops (test_epoch3_host_driver.Tests) ... ok
+test_approval_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_containment_failure_keeps_other_containment (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_detailed_unknown_containment_evidence_saved (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_empty_phase_evidence_not_success (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_every_phase_failure_contains_and_never_retries (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_existing_attempt_prevents_all_effects (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_final_receipt_failure_reported_unknown (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_intent_written_before_each_effect (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_preflight_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_second_execution_rejected (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_snapshot_failure_no_attempt (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_success_order_and_not_final_acceptance (test_epoch3_recovery_sequence.SequenceTests) ... ok
+test_bytecode_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_exact_actual_runtime_and_helpers (test_epoch3_recovery_entry.Tests) ... ok
+test_extra_helper_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_extra_runtime_module_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_loose_helpers_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_manifest_mismatch_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_modified_helper_rejected (test_epoch3_recovery_entry.Tests) ... ok
+test_wrong_host_rejected (test_epoch3_recovery_entry.Tests) ... ok
+
+----------------------------------------------------------------------
+Ran 39 tests in 0.365s
+
+OK
+{"affected_only": true, "kit_manifest_sha256": "1e13f9e1b6c2fddc135c314fbfb4c6f2b687466ef01208321116a9de10a3c71c", "operation": "test-only", "production_resume": "NOT_EXECUTED", "success": true, "tests": 39}
+PACKAGED_TEST_ONLY_LOCAL_NOT_UK_EXIT=0

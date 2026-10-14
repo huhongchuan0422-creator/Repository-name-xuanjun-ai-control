@@ -91,7 +91,7 @@ def main():
   os.environ.pop('P2_OBSERVATION_PATH',None)
   if args.affected_only:
    suite=unittest.TestSuite()
-   for pattern in ('test_epoch3_host_driver.py','test_epoch3_retained_runtime.py','test_epoch3_recovery_entry.py'):
+   for pattern in ('test_epoch3_host_driver.py','test_epoch3_recovery_sequence.py','test_epoch3_recovery_entry.py'):
     suite.addTests(unittest.defaultTestLoader.discover(KIT+'/tests',pattern=pattern))
   else:suite=unittest.defaultTestLoader.discover(KIT+'/tests',pattern='test_epoch3*.py')
   result=unittest.TextTestRunner(verbosity=2).run(suite)

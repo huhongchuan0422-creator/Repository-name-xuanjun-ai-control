@@ -10,6 +10,7 @@ from epoch3_plan import compile_plan,canonical,sha,ROOT,TLS_CONFIG,MANIFEST
 from epoch3_approval import expected,fetch
 from epoch3_host_preflight import capture_host
 from epoch3_attempt_journal import AttemptJournal
+from epoch3_recovery_sequence import ContainmentIncomplete
 from epoch3_install_lock import held
 from epoch3_retained_runtime import RetainedEpoch3Runtime
 from epoch3_service_containment import ServiceContainment
@@ -134,23 +135,39 @@ class HostDriver:
   return {'epoch':fenced['epoch'],'state':fenced['state'],'descriptor_sha256':store.head(fenced)}
  def stop_exact_new_services(self,plan):return self.containment.stop_all()
  def verify_stopped_and_preserve_legacy_masks(self,plan):
-  evidence=self.containment.verify_all()
+  evidence={'operations':{},'verified_stopped':False,'legacy_masks_preserved':False}
   failures=[]
-  # Independent cleanup attempts: an enable-state failure must not prevent
-  # remasking the original owner endpoints or the old Gateway/coordinator.
-  for name,operation in (
-      ('boot',lambda:self.runtime._restore_boot()),
-      ('owner_masks',lambda:self.runtime.restore_retained_owner_masks(plan)),
-      ('legacy_masks',lambda:self.context['adapter'].restore_legacy_files(preserve_mask=True))):
-   try:operation()
-   except Exception as error:failures.append(name+':'+type(error).__name__)
-  if failures:raise ValueError('DRIVER_FAILURE_RESTART_INHIBITION_UNKNOWN:'+','.join(failures))
-  evidence['previous_boot_state_restored']=True
-  evidence['original_owner_masks_restored']=True
-  # After mask restoration, read-only measurement must prove the original boundary.
-  observation=self.context['adapter'].measure_quiescence(plan['cutover']['legacy_bindings'])
-  need(all(observation['proof'].get(k) is True for k in
-           ('identity_verified','coordinator_inactive','parent_unit_inactive','cgroups_empty','restart_inhibited')),
+  def attempt(name,operation):
+   try:
+    result=operation()
+    need(isinstance(result,dict) and bool(result),'DRIVER_CLEANUP_EVIDENCE_REQUIRED')
+    # Validate serializability before recording; never let one result suppress
+    # the remaining bounded cleanup or final observations.
+    canonical(result)
+    evidence['operations'][name]={'status':'OBSERVED','evidence':result}
+   except BaseException as error:
+    failures.append(name)
+    evidence['operations'][name]={'status':'UNKNOWN','error_type':type(error).__name__}
+  def restore_boot():
+   self.runtime._restore_boot()
+   return {'previous_boot_state_restored':True}
+  def measure_legacy():
+   observed=self.context['adapter'].measure_quiescence(plan['cutover']['legacy_bindings'])
+   need(all(observed['proof'].get(k) is True for k in
+       ('identity_verified','coordinator_inactive','parent_unit_inactive','cgroups_empty','restart_inhibited')),
        'DRIVER_FAILURE_LEGACY_ISOLATION')
-  evidence['legacy_masks_preserved']=True
+   return {'legacy_proof':observed['proof']}
+  # An uncertain first observation must NEVER skip any restart-inhibition work.
+  attempt('stopped_before',self.containment.verify_all)
+  attempt('boot',restore_boot)
+  attempt('owner_masks',lambda:self.runtime.restore_retained_owner_masks(plan))
+  attempt('legacy_masks',lambda:self.context['adapter'].restore_legacy_files(preserve_mask=True))
+  # Re-observe both boundaries independently, even after any cleanup failure.
+  attempt('stopped_after',self.containment.verify_all)
+  attempt('legacy_after',measure_legacy)
+  if failures:
+   evidence['failed_operations']=failures
+   raise ContainmentIncomplete(evidence)
+  evidence.update(verified_stopped=True,previous_boot_state_restored=True,
+                  original_owner_masks_restored=True,legacy_masks_preserved=True)
   return evidence

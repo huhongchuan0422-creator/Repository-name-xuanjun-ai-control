@@ -35,6 +35,7 @@ class Tests(unittest.TestCase):
              'retained':{'native_binding_before':b'old','native_binding_after':b'new'}}
   o.installer={'install':mock.Mock(return_value='/opt/xuanjun-control-releases/integration-'+s.MANIFEST[:16])}
   o.postchecker={'post_install_checks':mock.Mock(return_value={'real_fixture_check':True})}
+  o.runtime.restore_retained_owner_masks.return_value={'original_owner_masks_restored':True}
   o.runtime.provision.return_value={'failure_policy':'FENCE_STOP_RETAIN_NO_REPLAY','retained_resources_replayed':False}
   o.runtime.reopen_database.return_value={'database_reopened':True};o.runtime.activate.return_value={'services_active':True}
   self.patchdir=mock.patch.object(journal,'DIRECTORY',root);self.patchdir.start();o.journal=journal.AttemptJournal(root)
@@ -104,4 +105,58 @@ class Tests(unittest.TestCase):
  def test_postchecker_receives_new_identity(self):
   self.execute();args=self.obj.postchecker['post_install_checks'].call_args[0]
   self.assertEqual(args[0]['activation']['release_sha256'],s.MANIFEST);self.assertEqual(args[2],{'epoch':4})
+ def assert_all_cleanup_attempted(self):
+  self.obj.runtime._restore_boot.assert_called_once()
+  self.obj.runtime.restore_retained_owner_masks.assert_called_once_with(self.plan)
+  self.obj.context['adapter'].restore_legacy_files.assert_called_with(preserve_mask=True)
+  self.assertEqual(self.obj.containment.verify_all.call_count,3)
+  self.assertGreaterEqual(self.obj.context['adapter'].measure_quiescence.call_count,1)
+ def fail_and_saved(self):
+  self.obj.runtime.activate.side_effect=ValueError('partial activation')
+  with self.assertRaises(RecoveryHold):self.execute()
+  return json.loads(pathlib.Path(self.obj.journal.path).read_text())
+ def test_first_stopped_observation_failure_keeps_every_cleanup(self):
+  self.obj.containment.verify_all.side_effect=[{'pre_rebind':True},OSError('cgroup unreadable'),{'verified_stopped':True}]
+  saved=self.fail_and_saved();self.assert_all_cleanup_attempted()
+  row=saved['containment']['verify_stopped_and_preserve_legacy_masks']
+  self.assertEqual(row['status'],'UNKNOWN')
+  self.assertEqual(row['evidence']['failed_operations'],['stopped_before'])
+  self.assertEqual(row['evidence']['operations']['stopped_after']['status'],'OBSERVED')
+ def test_both_stopped_observations_fail_keep_every_cleanup(self):
+  self.obj.containment.verify_all.side_effect=[{'pre_rebind':True},OSError('before'),OSError('after')]
+  saved=self.fail_and_saved();self.assert_all_cleanup_attempted()
+  self.assertEqual(saved['containment']['verify_stopped_and_preserve_legacy_masks']['evidence']['failed_operations'],['stopped_before','stopped_after'])
+ def test_owner_mask_failure_still_attempts_legacy_and_remeasurement(self):
+  self.obj.runtime.restore_retained_owner_masks.side_effect=PermissionError('owner')
+  saved=self.fail_and_saved();self.assert_all_cleanup_attempted()
+  self.assertIn('owner_masks',saved['containment']['verify_stopped_and_preserve_legacy_masks']['evidence']['failed_operations'])
+ def test_legacy_mask_failure_still_attempts_remeasurement(self):
+  self.obj.context['adapter'].restore_legacy_files.side_effect=PermissionError('legacy')
+  self.obj.runtime.provision.side_effect=ValueError('tls')
+  with self.assertRaises(RecoveryHold):self.execute()
+  self.assert_all_cleanup_attempted()
+  saved=json.loads(pathlib.Path(self.obj.journal.path).read_text())
+  self.assertIn('legacy_masks',saved['containment']['verify_stopped_and_preserve_legacy_masks']['evidence']['failed_operations'])
+ def test_post_cleanup_observation_failure_is_durable_unknown(self):
+  self.obj.containment.verify_all.side_effect=[{'pre_rebind':True},{'verified_stopped':True},OSError('after')]
+  saved=self.fail_and_saved();self.assert_all_cleanup_attempted()
+  self.assertEqual(saved['containment']['verify_stopped_and_preserve_legacy_masks']['evidence']['failed_operations'],['stopped_after'])
+ def test_post_cleanup_legacy_measurement_failure_is_durable_unknown(self):
+  original=self.obj.context['adapter'].measure_quiescence.return_value
+  self.obj.context['adapter'].measure_quiescence.side_effect=[original,OSError('after')]
+  saved=self.fail_and_saved();self.assert_all_cleanup_attempted()
+  self.assertEqual(saved['containment']['verify_stopped_and_preserve_legacy_masks']['evidence']['failed_operations'],['legacy_after'])
+ def test_boot_failure_preserves_each_cleanup_status(self):
+  self.obj.runtime._restore_boot.side_effect=PermissionError('boot')
+  saved=self.fail_and_saved();self.assert_all_cleanup_attempted()
+  ops=saved['containment']['verify_stopped_and_preserve_legacy_masks']['evidence']['operations']
+  self.assertEqual(ops['boot']['status'],'UNKNOWN')
+  self.assertTrue(all(ops[k]['status']=='OBSERVED' for k in ('owner_masks','legacy_masks','stopped_after','legacy_after')))
+ def test_multiple_failures_preserved_and_no_retry(self):
+  self.obj.containment.verify_all.side_effect=[{'pre_rebind':True},OSError('before'),OSError('after')]
+  self.obj.runtime._restore_boot.side_effect=PermissionError('boot')
+  self.obj.runtime.restore_retained_owner_masks.side_effect=KeyboardInterrupt()
+  saved=self.fail_and_saved();self.assert_all_cleanup_attempted()
+  self.assertEqual(saved['stage'],'HOLD');self.assertFalse(saved['automatic_retry'])
+  self.assertEqual(saved['containment']['verify_stopped_and_preserve_legacy_masks']['evidence']['failed_operations'],['stopped_before','boot','owner_masks','stopped_after'])
 if __name__=='__main__':unittest.main()

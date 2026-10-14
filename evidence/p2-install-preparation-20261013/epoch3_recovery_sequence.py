@@ -23,6 +23,13 @@ class RecoveryHold(RuntimeError):
     pass
 
 
+class ContainmentIncomplete(RuntimeError):
+    """Bounded operation evidence to preserve with an UNKNOWN durable result."""
+    def __init__(self, evidence):
+        super(ContainmentIncomplete, self).__init__('FAILURE_CONTAINMENT_INCOMPLETE')
+        self.evidence = evidence
+
+
 def resume_once(driver, plan, approval):
     """Run one admitted attempt; failures retain resources and never retry.
 
@@ -73,6 +80,8 @@ def resume_once(driver, plan, approval):
                 except BaseException as containment_error:
                     state['containment'][operation] = {'status': 'UNKNOWN',
                                                        'error_type': type(containment_error).__name__}
+                    if isinstance(containment_error, ContainmentIncomplete):
+                        state['containment'][operation]['evidence'] = containment_error.evidence
             state['recovery'] = 'MANUAL_RECONCILIATION_REQUIRED_NO_RESTART'
             try:
                 driver.save_attempt(state)
