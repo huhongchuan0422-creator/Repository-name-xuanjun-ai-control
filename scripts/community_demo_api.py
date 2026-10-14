@@ -11,6 +11,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from scripts.community_order_store import connect, DDL, create_order, state, simulated_transition
 from scripts.community_merchant_contract import scope
+from scripts.community_storefront_snapshot import storefront_snapshot
+from scripts.community_ad_contract import AMOUNT, SUCCESS
 
 MAX_BODY = 2048
 READ_TIMEOUT_SECONDS = 1.0
@@ -29,11 +31,26 @@ def _id(value):
 
 class DemoService:
     """Trusted local demo service. This is not a production access boundary."""
-    def __init__(self, db):
+    def __init__(self, db, merchant_db=None, ad_db=None, now=None):
         self.db = db
+        self.merchant_db = merchant_db
+        self.ad_db = ad_db
+        self.now = now
     def dispatch(self, method, path, data):
         if type(data) is not dict:
             raise ValueError("INVALID_REQUEST")
+        if method == "POST" and path == "/demo/storefront":
+            _object(data, {"tenant_id", "merchant_id", "store_id"})
+            identity = {k: data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            if self.merchant_db is None or type(self.now) is not int:
+                raise ValueError("STOREFRONT_NOT_CONFIGURED")
+            snapshot = storefront_snapshot(self.merchant_db, self.ad_db, identity, self.now)
+            # Never release success-placement candidates from simulated data.
+            return {"merchant":snapshot["merchant"],"products":snapshot["products"],
+                    "ads":{AMOUNT:snapshot["ads"][AMOUNT],SUCCESS:None},
+                    "simulation_only":True,"provider_settlement_verified":False,
+                    "escape_text_required":True}
         if method == "POST" and path == "/demo/orders":
             _object(data, FIELDS | {"amount_minor"})
             identity = {k: data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -108,7 +125,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
