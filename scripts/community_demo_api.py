@@ -76,7 +76,7 @@ class _HeaderDeadlineReader:
             if not byte:
                 break
             data.extend(byte)
-            if byte == b"\\n":
+            if byte == b"\n":
                 break
         return bytes(data)
 
