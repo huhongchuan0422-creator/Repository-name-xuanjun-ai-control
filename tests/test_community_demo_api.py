@@ -144,6 +144,26 @@ class HTTPTests(unittest.TestCase):
         self.assertLess(time.monotonic()-start,3.5)
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM orders WHERE reference='incomplete'").fetchone()[0],0)
         self.assertEqual(self.post('/demo/orders',json.dumps(order('after_timeout')))[0],200)
+    def test_incomplete_request_headers_timeout_and_recover(self):
+        port=self.server.server_address[1]
+        sock=socket.create_connection(('127.0.0.1',port),timeout=4)
+        sock.settimeout(4)
+        started=time.monotonic()
+        try:
+            sock.sendall(b"POST /demo/orders HTTP/1.1\r\nHost: 127.0.0.1:")
+            result=b""
+            try:
+                while True:
+                    part=sock.recv(4096)
+                    if not part:break
+                    result+=part
+            except (ConnectionResetError, BrokenPipeError):
+                pass
+            self.assertLess(time.monotonic()-started,3.5)
+            self.assertNotIn(b" 200 ",result)
+        finally:
+            sock.close()
+        self.assertEqual(self.post('/demo/orders',json.dumps(order('after_header_timeout')))[0],200)
     def test_no_real_pay_route(self):
         self.assertEqual(self.post('/api/pay/wechat','{}')[0],404)
 
