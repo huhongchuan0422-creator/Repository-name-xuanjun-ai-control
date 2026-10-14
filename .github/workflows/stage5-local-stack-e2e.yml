@@ -24,5 +24,6 @@ jobs:
           python -m unittest discover -s tests -p 'test_stage5_local_stack.py' -v
           python -m unittest discover -s tests -p 'test_community_demo_api.py' -v
           node --check demos/community-local-e2e/app.js
+          node --test demos/community-local-e2e/app.test.mjs
           echo REAL_BROWSER_E2E=NOT_RUN
           echo LIVE_FUNDS=NOT_RUN
