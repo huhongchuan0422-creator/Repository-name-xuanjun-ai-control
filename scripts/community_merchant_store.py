@@ -59,7 +59,8 @@ def upsert_profile(db,identity,actor,record,expected_version=None):
         else:
             if expected_version!=old[0]:raise ValueError("STALE_VERSION")
             version=old[0]+1
-            db.execute("UPDATE merchant_profiles SET name=?,description=?,contact=?,status=?,version=? WHERE tenant_id=? AND merchant_id=? AND store_id=? AND version=?",(record["name"],record["description"],record["contact"],record["status"],version,t,m,s,old[0]))
+            updated=db.execute("UPDATE merchant_profiles SET name=?,description=?,contact=?,status=?,version=? WHERE tenant_id=? AND merchant_id=? AND store_id=? AND version=?",(record["name"],record["description"],record["contact"],record["status"],version,t,m,s,old[0]))
+            if updated.rowcount!=1:raise ValueError("STALE_VERSION")
     return {"version":version}
 def profile(db,identity):
     t,m,s=scope(identity)
