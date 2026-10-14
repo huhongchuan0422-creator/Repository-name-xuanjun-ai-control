@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "artifact_role": "KOREA_ISOLATED_SHADOW_CANDIDATE",
   "production_authorized": false,
   "install_executed": false,
@@ -16,10 +16,17 @@
   "forbidden_secret_references": ["BINANCE_TRADING", "PLAINTEXT_ENV_SECRET"],
   "network": {
     "destination_allowlist": ["fapi.binance.com:443"],
+    "resolved_ip_allowlist_source": "ROOT_OWNED_PINNED_CONFIG_REQUIRED_NOT_INSTALLED",
     "application_method_allowlist": ["GET"],
-    "https_method_enforcement": "migration-prep/korea/get_only_policy.py",
+    "unique_transport": "migration-prep/korea/get_only_policy.py:ControlledHttpsTransport",
+    "redirect_policy": "DENY_ALL",
+    "proxy_policy": "BYPASS_ENVIRONMENT_PROXY_RAW_SOCKET",
+    "dns_policy": "RESOLVED_SET_MUST_BE_SUBSET_OF_PINNED_IP_ALLOWLIST",
+    "tls_policy": "SYSTEM_CA_HOSTNAME_VERIFICATION_AND_PEER_CERTIFICATE_DIGEST",
+    "credential_transport_scope": "BINANCE_ACCOUNT_READONLY_ONLY_NO_GENERIC_HTTP_CLIENT",
     "firewall_claim_limit": "IP_FIREWALL_ALONE_CANNOT_PROVE_HTTPS_METHOD",
-    "root_policy_status": "NOT_INSTALLED_NOT_PROVEN"
+    "root_policy_status": "NOT_INSTALLED_NOT_PROVEN",
+    "bypass_audit_status": "CANDIDATE_SOURCE_TESTED_RUNTIME_EGRESS_NOT_PROVEN"
   },
   "services": ["xuanjun-binance-shadow.service"],
   "writer_enabled": false,

@@ -14,7 +14,7 @@ FILES = (
     "restricted-executor-allowlist.json", "writer_isolation.py",
     "writer-coverage-public.json", "build_writer_coverage.py",
     "test_implementation_batch.py", "IMPLEMENTATION_BATCH.md",
-    "HUMAN_ACTIONS_REQUIRED.md", "korea/get_only_policy.py",
+    "HUMAN_ACTIONS_REQUIRED.md", "C7_EVIDENCE_GAPS.md", "korea/get_only_policy.py",
     "korea/xuanjun-binance-shadow.service.in", "korea/requirements.lock",
     "korea/deployment-manifest.json", "korea/DEPLOYMENT.md"
 )
@@ -34,10 +34,11 @@ def build(root):
         path = os.path.join(root, relative)
         files.append({"path": "migration-prep/" + relative, "size": os.path.getsize(path),
                       "sha256": digest(path)})
-    value = {"schema_version": 1,
-             "task_id": "TOKYO_KOREA_IMPLEMENTATION_AFTER_PREPARATION_AUDIT_6168878707",
-             "base_commit": "6fc018294b79cc30872c32503a8bad8f8a7908b8",
-             "base_tree": "beb05bf8eb1cfa64ae436464d4fdf69e6b98cf5f",
+    value = {"schema_version": 2,
+             "task_id": "TOKYO_KOREA_C1_C6_REMEDIATION_6169446383",
+             "audit_comment": "6169446383",
+             "base_commit": "1929506900e5cc9e0e1eb3d56510c4638a3d57d1",
+             "base_tree": "306d609af5a414c9447c8e2494258ed817a896d9",
              "files": files, "production_authorized": False,
              "binance_called": False, "production_deployed": False}
     value["candidate_content_sha256"] = hashlib.sha256(canonical_bytes(value)).hexdigest()

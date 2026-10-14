@@ -5,10 +5,17 @@ service, SecretRef, firewall rule, credential, or Writer.
 
 The candidate uses its own Python 3.11 virtual environment and dedicated service
 identity. The systemd template keeps release/config read-only and state/log roots
-writable. A destination firewall may restrict Binance HTTPS destinations, but it
-cannot inspect the encrypted HTTP method. Therefore `get_only_policy.py` is the
-mandatory application-layer method/path guard; the root egress policy remains a
-separate deployment prerequisite.
+writable. `ControlledHttpsTransport` is the only packaged HTTP transport: it has no
+generic method API, ignores proxy environment variables through raw sockets, denies
+redirects, pins resolved addresses, and requires normal TLS hostname/certificate
+verification. The service template defaults egress to deny and requires a root-owned
+expanded `@BINANCE_PINNED_IP_ALLOWLIST@` before it can be installed.
+
+This still does not prove root-controlled egress or absence of every bypass in an
+installed runtime. A destination firewall cannot inspect an encrypted HTTP method;
+application GET enforcement and root network confinement are both mandatory and
+must be independently audited after installation. No IP, unit or transport was
+installed or exercised against Binance in this batch.
 
 Shadow acceptance requires a minimum 24-hour run, zero decision/position/order/
 protective mismatches, zero unknown/in-flight state, and restart recovery. These

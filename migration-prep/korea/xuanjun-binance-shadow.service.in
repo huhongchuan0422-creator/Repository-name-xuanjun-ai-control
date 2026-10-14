@@ -9,6 +9,10 @@ User=xuanjun_binance
 Group=xuanjun_binance
 WorkingDirectory=/opt/xuanjun-binance/current
 EnvironmentFile=/etc/xuanjun-binance/shadow.env
+Environment=HTTP_PROXY=
+Environment=HTTPS_PROXY=
+Environment=ALL_PROXY=
+Environment=NO_PROXY=*
 ExecStart=/opt/xuanjun-binance/venv/bin/python -m migration_shadow_entry
 Restart=no
 NoNewPrivileges=yes
@@ -25,6 +29,8 @@ MemoryDenyWriteExecute=yes
 ReadOnlyPaths=/opt/xuanjun-binance/current /etc/xuanjun-binance
 ReadWritePaths=/var/lib/xuanjun-binance /var/log/xuanjun-binance
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=@BINANCE_PINNED_IP_ALLOWLIST@
 CapabilityBoundingSet=
 AmbientCapabilities=
 TimeoutStartSec=30s

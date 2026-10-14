@@ -1,23 +1,24 @@
 {
-  "base_commit": "6fc018294b79cc30872c32503a8bad8f8a7908b8",
-  "base_tree": "beb05bf8eb1cfa64ae436464d4fdf69e6b98cf5f",
+  "audit_comment": "6169446383",
+  "base_commit": "1929506900e5cc9e0e1eb3d56510c4638a3d57d1",
+  "base_tree": "306d609af5a414c9447c8e2494258ed817a896d9",
   "binance_called": false,
-  "candidate_content_sha256": "f78fafa4b9c21af80a57144007b95cd96094d7c3ba0b32065188c0b367dd4a76",
+  "candidate_content_sha256": "d9f171806f3b26a69d3175146cc02ceb0a1a73fc8930dce7be9d712a49012792",
   "files": [
     {
       "path": "migration-prep/readonly_reconciliation_adapter.py",
-      "sha256": "1797062178c717387ed2efc7c7c7ae06a7b436a69116b8a1497a5ba03bec6cf1",
-      "size": 15602
+      "sha256": "b2bddbc583d8ea1427b31c6cd2b2c16856921a8fcea525604417d1df29f4008d",
+      "size": 27027
     },
     {
       "path": "migration-prep/restricted_executor.py",
-      "sha256": "3bddfca20f6fd32cf448f40e25dd56316e7e46af54ef802bad87730e60b19ea1",
-      "size": 8401
+      "sha256": "b88ff89b2c93138e9c152ee7b305a3204784c2c1cdf7cde2e5a25a2268bd3d4b",
+      "size": 19711
     },
     {
       "path": "migration-prep/restricted-executor-allowlist.json",
-      "sha256": "dcf59be7d690b37e7ce0ff64668253d3c2a2c5ff6080fedf49140773c6b65083",
-      "size": 1740
+      "sha256": "3da29f79672c4c2807ed2947e20ae4a5066b8bf499e5e0569f3ae59531bdc704",
+      "size": 2119
     },
     {
       "path": "migration-prep/writer_isolation.py",
@@ -36,28 +37,33 @@
     },
     {
       "path": "migration-prep/test_implementation_batch.py",
-      "sha256": "5bdfeb5c970cfcc5f9579be459a75364dd873cc719ed37c853bdcec6e86da2e9",
-      "size": 16866
+      "sha256": "c20bed54176318772d4f24a1892e748f1370deff8411b16dc95880fc3016052d",
+      "size": 26259
     },
     {
       "path": "migration-prep/IMPLEMENTATION_BATCH.md",
-      "sha256": "a1d85a2fd9c325db51719a884a674bdefddbded1df9d2c53cfd821af930953d8",
-      "size": 3871
+      "sha256": "9b81e4842807f9781843216877ba5436cf7c49739b19107f7a062d2ed7c692c1",
+      "size": 4854
     },
     {
       "path": "migration-prep/HUMAN_ACTIONS_REQUIRED.md",
-      "sha256": "779517ae737a387e9ecfd009e21c8c7502d2ebf57cbec1db1feb6327cc556e22",
-      "size": 1980
+      "sha256": "d096a5fde960e959e299640d93b135bd0f134be48f911d95609221bb1aad6622",
+      "size": 2361
+    },
+    {
+      "path": "migration-prep/C7_EVIDENCE_GAPS.md",
+      "sha256": "39dc940a355c7120b8e38aa99342106e22c97ea42fc1c7ada84de80c6bfedc9d",
+      "size": 2436
     },
     {
       "path": "migration-prep/korea/get_only_policy.py",
-      "sha256": "bb74123a20185601e64c89d9532c357a6ef5e83d2f9c50c7d1e14b7473465530",
-      "size": 1137
+      "sha256": "0e43220e5de874c4932bf79b244ee38ff6f3ab1aa743bfbb3ea6b8438d6d8116",
+      "size": 6447
     },
     {
       "path": "migration-prep/korea/xuanjun-binance-shadow.service.in",
-      "sha256": "655e11f1200c1f8ccbc15465a2cfc7750b55976cf43457eaed85d8d021f93d82",
-      "size": 901
+      "sha256": "c483aafa157ca540ed4e2388293a62ba1543833e5732aca684dd280580ceb684",
+      "size": 1059
     },
     {
       "path": "migration-prep/korea/requirements.lock",
@@ -66,17 +72,17 @@
     },
     {
       "path": "migration-prep/korea/deployment-manifest.json",
-      "sha256": "736f24fd3a6cdc613041a091fb7418d7e6a104e24ac5a4616bf3823a7ad4bcf5",
-      "size": 2041
+      "sha256": "491cde769b3a56a406963a3080264d38769a4da5ee2dd97344cba74df4042dc3",
+      "size": 2562
     },
     {
       "path": "migration-prep/korea/DEPLOYMENT.md",
-      "sha256": "de02e464617186976377f135db89ad26ce37f3938fa2e8476b6dc53c75424f54",
-      "size": 1242
+      "sha256": "0b7f01315e6cea007234e312db72f783b6e4234b6e8f5111ddbf4daec6afeef0",
+      "size": 1749
     }
   ],
   "production_authorized": false,
   "production_deployed": false,
-  "schema_version": 1,
-  "task_id": "TOKYO_KOREA_IMPLEMENTATION_AFTER_PREPARATION_AUDIT_6168878707"
+  "schema_version": 2,
+  "task_id": "TOKYO_KOREA_C1_C6_REMEDIATION_6169446383"
 }

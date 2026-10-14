@@ -1,8 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "production_authorized": false,
   "privileged_transport": "NONE",
-  "authority_binding": "EXACT_REQUEST_SHA256_PLUS_SINGLE_USE_NONCE_REQUIRED_AT_LATER_GATE",
+  "authority_binding": "INDEPENDENT_ED25519_SIGNED_CANONICAL_POLICY_EXACT_REQUEST_SHA256_SINGLE_USE_NONCE_FIXED_RUNTIME_IDENTITY",
+  "strict_hash_format": "LOWERCASE_HEX_64_ONLY",
+  "path_validation": "CANONICAL_EXISTING_OWNER_BOUND_NO_SYMLINK_NO_GROUP_OTHER_WRITE",
+  "caller_reported_authority_sufficient": false,
   "hosts": {
     "iZ6wee8q9z4t03hvqumwfhZ": {
       "paths": [
@@ -42,5 +45,7 @@
   },
   "forbidden_units": ["xuanjun-novel-factory.service", "postgresql.service", "redis.service"],
   "timeout_seconds_max": 300,
-  "timeout_or_partial_result": "UNKNOWN_INSPECT_NO_BLIND_RETRY"
+  "timeout_or_partial_result": "UNKNOWN_INSPECT_NO_BLIND_RETRY",
+  "result_contract": "EXACT_TYPED_EFFECT_AND_POSTCONDITION_EVIDENCE_OR_UNKNOWN",
+  "actual_cgroup_isolation": "NOT_INVOKED_NOT_PROVEN_PROCESS_GROUP_ONLY"
 }

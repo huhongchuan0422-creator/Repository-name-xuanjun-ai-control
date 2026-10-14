@@ -1,39 +1,52 @@
 # Implementation batch after preparation audit
 
-Task: `TOKYO_KOREA_IMPLEMENTATION_AFTER_PREPARATION_AUDIT_6168878707`
+Task: `TOKYO_KOREA_C1_C6_REMEDIATION_6169446383`
 
-This batch extends exact reviewed tree `beb05bf8eb1cfa64ae436464d4fdf69e6b98cf5f`.
+This batch extends exact reviewed HEAD `1929506900e5cc9e0e1eb3d56510c4638a3d57d1`
+and tree `306d609af5a414c9447c8e2494258ed817a896d9`.
 It does not modify the accepted S1–S5 semantics. Production remains HOLD.
 
 ## Implemented candidates
 
 ### GET-only reconciliation adapter
 
-`readonly_reconciliation_adapter.py` opens the production business database using
-SQLite URI `mode=ro&immutable=1` plus `PRAGMA query_only=ON`, selects the latest
-snapshot group, parses persisted exchange payloads, applies open/algo/protective
-class filters, reads all eight sidecar classes, and detects unresolved anomalies,
-unknown attempts and in-flight requests. It verifies the DB byte identity before and
-after collection. Output uses exclusive-create, mode-0600 files under a mode-0700
-run directory outside the business DB tree.
+`readonly_reconciliation_adapter.py` no longer uses `immutable=1` on the live DB.
+It opens the source with `mode=ro`, captures a coherent SQLite backup into the
+separate evidence run, and uses immutable mode only on that closed copy. Main,
+WAL and SHM identities are recorded before/after capture and after collection;
+any change blocks final-snapshot admission. A concurrent-WAL commit counterexample
+proves the captured copy sees the committed row rather than silently reading a stale
+main file.
 
-`FixtureGetOnlyPager` enforces all ten surfaces, cursor continuity, terminal page,
-page/count bounds and exact BTCUSDT/ETHUSDT/SOLUSDT coverage. This batch injects
-fixtures only. The module contains no network client, credential loader, business-DB
-write, freeze, schedule or service control.
+Every local read is bound to an exact `account_id`, `snapshot_id`, independent
+capture time and max age. Every fixture page carries the same bindings and exact
+BTCUSDT/ETHUSDT/SOLUSDT coverage. Algo and protective orders require dedicated
+authoritative tables and are never inferred from ordinary order rows.
+
+`FixtureGetOnlyPager` records capture timing and explicit simulated call receipts.
+Its result is only `PASS_FIXTURE_ONLY`; `authenticated_get_receipts_verified=false`,
+`final_snapshot_live_admissible=false`, and `binance_called=false`. Independent
+current time, exchange server time, surface skew and capture deadline are checked.
 
 ### Restricted executor
 
-`restricted_executor.py` validates exact host/path/unit/action sets, candidate hash,
-expiry, authority ID, exact authorized-request hash and a unique single-use nonce.
+`restricted_executor.py` accepts only a canonical policy file verified against an
+independently stored Ed25519 public trust anchor and detached signature. Caller-
+supplied policy dictionaries are rejected. Hashes are lowercase hex-64, runtime host
+and OS identity are read locally, and allowlisted paths must be canonical, existing,
+owner-bound, non-symlink and non-group/other-writable.
+
+The request remains bound to exact host/path/unit/action, candidate hash, expiry,
+authorized-request hash and a unique single-use nonce.
 SQLite FULL/WAL transactions record INTENT before the injected runner and terminal
 SUCCEEDED/FAILED/UNKNOWN results. Timeout, worker failure, partial success or unknown
 outcome becomes UNKNOWN with inspection required and blind retry forbidden.
 
-The cgroup/systemd confinement output is data only (`DynamicUser`, strict filesystem,
-no privileges, control-group kill, deadline). The module has no sudo, SSH, systemd,
-root or host transport. `restricted-executor-allowlist.json` is the exact candidate
-scope; novel/PostgreSQL/Redis are forbidden.
+Runner results require an exact typed schema, effect list, per-effect evidence,
+boolean postcondition and evidence digest. Missing fields, bool-as-int, unverified
+effects, non-success, timeout or IPC uncertainty become `UNKNOWN` with no blind retry.
+The cgroup/systemd spec remains data only and is explicitly `NOT_INVOKED_NOT_PROVEN`;
+runtime containment is POSIX process-group best effort only.
 
 ### 95 Writer paths
 
@@ -57,16 +70,19 @@ and directories, protected SecretRef names, hardened systemd unit, loopback port
 Shadow/Canary standards and Korea-first rollback. It does not reuse Yibi's venv or
 include a Trading credential.
 
-An IP firewall cannot prove a method inside TLS. The package combines a root-owned
-destination allowlist prerequisite with `get_only_policy.py`, which enforces exact
-HTTPS host, GET method and allowlisted endpoint path at the application layer.
-Neither layer was installed or exercised against Binance in this batch.
+`ControlledHttpsTransport` is the sole candidate HTTP transport. It exposes only
+GET, bypasses environment proxies using raw sockets, denies redirects, requires DNS
+results to fit a pinned IP set, and uses system-CA TLS hostname verification while
+hashing the peer certificate into the receipt. The systemd template adds a default
+deny egress placeholder. No root egress policy/IP set was installed, so real network
+isolation and bypass closure remain unproven.
 
 ## Remaining release blockers
 
-See `HUMAN_ACTIONS_REQUIRED.md`. Additionally, live GET-only adapter binding,
-independent signed manifest, all UNKNOWN Writer routes, root egress installation,
-real Shadow duration, canary and Korea-first rollback evidence remain NOT RUN.
+See `C7_EVIDENCE_GAPS.md` and `HUMAN_ACTIONS_REQUIRED.md`. Live authenticated GET
+receipts, stable/frozen final checkpoint, production trust anchor, all UNKNOWN Writer
+routes, root egress installation, real Shadow duration, canary and Korea-first
+rollback evidence remain NOT RUN.
 
 ```text
 PRODUCTION_MIGRATION_RELEASE=HOLD
