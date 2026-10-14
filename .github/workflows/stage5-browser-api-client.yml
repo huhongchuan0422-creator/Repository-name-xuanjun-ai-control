@@ -1,0 +1,21 @@
+name: Stage5 Browser API Client
+on:
+  pull_request:
+    paths:
+      - 'demos/community-payment/demo-client*'
+      - '.github/workflows/stage5-browser-api-client.yml'
+permissions:
+  contents: read
+jobs:
+  client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify opt-in localhost demo client
+        run: |
+          node --check demos/community-payment/demo-client.js
+          node --test demos/community-payment/demo-client.test.mjs
+          echo LIVE_WECHAT=NOT_RUN
+          echo PUBLIC_BROWSER_INTEGRATION=NOT_RUN
