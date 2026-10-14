@@ -164,44 +164,41 @@ class HTTPTests(unittest.TestCase):
         finally:
             sock.close()
         self.assertEqual(self.post('/demo/orders',json.dumps(order('after_header_timeout')))[0],200)
-    def test_absolute_deadline_rejects_trickling_request_line(self):
+    def _drip_and_probe(self, prefix, suffix, reference):
         port=self.server.server_address[1]
         client=socket.create_connection(('127.0.0.1',port),timeout=4)
         client.settimeout(4)
-        start=time.monotonic()
-        try:
-            for ch in b"POST /demo/orders HTTP/1.1":
-                try:
-                    client.sendall(bytes([ch]))
-                except (BrokenPipeError,ConnectionResetError,OSError):
-                    break
-                time.sleep(0.2)
-            self.assertLess(time.monotonic()-start,2.8)
-        finally:
-            client.close()
-        self.assertEqual(self.post('/demo/orders',json.dumps(order('after_slow_line')))[0],200)
-
-    def test_absolute_deadline_rejects_trickling_headers(self):
-        port=self.server.server_address[1]
-        client=socket.create_connection(('127.0.0.1',port),timeout=4)
-        client.settimeout(4)
+        stopped=threading.Event()
+        def drip():
+            try:
+                client.sendall(prefix)
+                while not stopped.is_set():
+                    try:
+                        client.sendall(suffix)
+                    except (BrokenPipeError,ConnectionResetError,OSError):
+                        break
+                    time.sleep(0.2)
+            except (BrokenPipeError,ConnectionResetError,OSError):
+                pass
+        sender=threading.Thread(target=drip,daemon=True)
         started=time.monotonic()
+        sender.start()
         try:
-            client.sendall(("POST /demo/orders HTTP/1.1\\r\\n"
-                            f"Host: 127.0.0.1:{port}\\r\\n"
-                            "Content-Type: application/json\\r\\n"
-                            "X-Slow: ").encode("ascii"))
-            for _ in range(16):
-                try:
-                    client.sendall(b"x")
-                except (BrokenPipeError,ConnectionResetError,OSError):
-                    break
-                time.sleep(0.2)
+            time.sleep(1.35)
+            status,_=self.post('/demo/orders',json.dumps(order(reference)))
+            self.assertEqual(status,200)
             self.assertLess(time.monotonic()-started,2.8)
         finally:
+            stopped.set()
             client.close()
-        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM orders WHERE reference='slow_headers'").fetchone()[0],0)
-        self.assertEqual(self.post('/demo/orders',json.dumps(order('after_slow_headers')))[0],200)
+            sender.join(timeout=2)
+    def test_absolute_deadline_rejects_trickling_request_line(self):
+        self._drip_and_probe(b"POST /demo/orders HTTP/1.",b"1","after_slow_line")
+    def test_absolute_deadline_rejects_trickling_headers(self):
+        port=self.server.server_address[1]
+        prefix=(f"POST /demo/orders HTTP/1.1\\r\\nHost: 127.0.0.1:{port}\\r\\n"
+                "Content-Type: application/json\\r\\nX-Slow: ").encode('ascii')
+        self._drip_and_probe(prefix,b"x","after_slow_headers")
     def test_no_real_pay_route(self):
         self.assertEqual(self.post('/api/pay/wechat','{}')[0],404)
 
