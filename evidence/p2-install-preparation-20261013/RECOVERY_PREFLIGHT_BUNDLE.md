@@ -132,3 +132,36 @@ pending. No quota-consuming model operation is authorized by this source repair.
 UK Runner isolation must remain until queued work and old bindings are reconciled.
 The runtime guard is temporary across reboot. Do not advertise global writer
 exclusion from the finite observations or restart an old window/runner.
+
+## Consolidated B1/B2 follow-up to PR58 review 6161796086
+
+The dfd96068 candidate received HOLD for two fail-open directory collectors.
+This delta replaces both os.walk collectors with one bounded FD-anchored collector:
+all ancestors opened O_NOFOLLOW, child names bound with dir_fd, exact lstat/fstat
+identity checks, bounded depth/entry/file bytes, successful before/after directory
+listings, and propagated permission/ENOENT descendant/read errors. Unknown
+symlinks, devices, FIFO/socket entries and cross-device descendants are rejected.
+Only a genuinely absent optional fixed root is accepted, after readable parent
+absence checks; missing descendants after a positive observation remain errors.
+
+Notifier checks additionally validate the actual cgroup v1 name=systemd mount,
+existing readable controller/system.slice and inactive/masked state before and
+after collection; services require MainPID=0. Timers have no MainPID property;
+that explicit timer-only case still requires inactive/masked and the same complete
+cgroup absence/empty proof. Every present group must have a readable empty
+cgroup.procs. Other cgroup control files are classified but not opened or written.
+
+New source SHA256: 45affbb3b9298999d7e71bfb93b3ef5cb824464000ac78a927fd7c388614d74e.
+New test_recovery_scan_errors.py SHA256:
+7f53164b8ef969fdf801e87b90d3d280031e9197ce04dec5c8297b5935c1e97a.
+Python3.6.8 root-mapped isolated new tests: 38/38 PASS. Prior retained-evidence
+suite: 28/28 PASS on this delta. The old13 suite rerun locally crashed BEFORE tests
+at the previously disclosed ctypes _reset_cache environment fault (exit139), so
+no new local13 PASS is claimed. Owner UK prior13 PASS remains historical only.
+UK must run all13+28+38 against the new exact candidate and complete verify-only;
+no production operation is requested. The prior snapshot cannot authorize this
+new code, even if its data digest stays unchanged. Original102 artifact, runtime,
+plan, leases, workflows and installation effects are unchanged.
+
+Keep B1/B2 in one delta response to the same PR58 review, after UK evidence arrives.
+Do not submit partial defect-by-defect approvals or rerun the original installation.

@@ -347,6 +347,176 @@ def no_runner_or_old_worker():
             raise ValueError('RECOVERY_PROCESS_SCAN_RACE')
 
 
+def scan_fingerprint(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid,
+            info.st_gid, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def bounded_file_inventory(root, optional=False, cgroup=False):
+    """FD-anchored, fail-closed collector. Never suppress traversal errors.
+
+    Only ENOENT at an optional fixed path is admissible, after successfully
+    listing its existing parent twice. Descendant ENOENT is always a race.
+    All ancestor descriptors remain open and names/identities are rechecked.
+    """
+    require(root.startswith('/') and os.path.normpath(root) == root and root != '/',
+            'RECOVERY_SCAN_PATH')
+    held = []
+    links = []
+    count = [0]
+    observed = {}
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+    def same(left, right):
+        require(scan_fingerprint(left) == scan_fingerprint(right), 'RECOVERY_SCAN_RACE')
+    def metadata(parent, name):
+        return os.stat(name, dir_fd=parent, follow_symlinks=False)
+    def listing(fd):
+        names = sorted(os.listdir(fd))  # Permission/race errors propagate.
+        require(len(names) <= 8192, 'RECOVERY_SCAN_BOUND')
+        return names
+    def visit(fd, path, before, depth):
+        count[0] += 1
+        require(count[0] <= 8192 and depth <= 32, 'RECOVERY_SCAN_BOUND')
+        same(before, os.fstat(fd))
+        if stat.S_ISDIR(before.st_mode):
+            names = listing(fd)
+            if cgroup:
+                require('cgroup.procs' in names, 'RECOVERY_CGROUP_PROCS_MISSING')
+            for name in names:
+                info = metadata(fd, name)
+                require(stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode),
+                        'RECOVERY_SCAN_ENTRY_TYPE')
+                require(info.st_dev == before.st_dev, 'RECOVERY_SCAN_MOUNT_CHANGE')
+                if cgroup and stat.S_ISREG(info.st_mode) and name != 'cgroup.procs':
+                    count[0] += 1
+                    require(count[0] <= 8192, 'RECOVERY_SCAN_BOUND')
+                    same(info, metadata(fd, name))
+                    continue
+                child_flags = flags | (os.O_DIRECTORY if stat.S_ISDIR(info.st_mode) else os.O_NONBLOCK)
+                child = os.open(name, child_flags, dir_fd=fd)
+                try:
+                    visit(child, path + '/' + name, info, depth + 1)
+                    same(info, metadata(fd, name))
+                finally:
+                    os.close(child)
+            require(listing(fd) == names, 'RECOVERY_SCAN_ENTRIES_CHANGED')
+        else:
+            require(stat.S_ISREG(before.st_mode), 'RECOVERY_SCAN_ENTRY_TYPE')
+            if not cgroup or os.path.basename(path) == 'cgroup.procs':
+                chunks = []
+                total = 0
+                while True:
+                    data = os.read(fd, min(65536, 1048577 - total))
+                    if not data:
+                        break
+                    chunks.append(data); total += len(data)
+                    require(total <= 1048576, 'RECOVERY_SCAN_FILE_BOUND')
+                data = b''.join(chunks)
+                if cgroup:
+                    require(not data.strip(), 'RECOVERY_NOTIFIER_CGROUP_BUSY')
+                observed[path] = sha(data)
+        same(before, os.fstat(fd))
+    try:
+        current = os.open('/', flags | os.O_DIRECTORY)
+        held.append(current)
+        parts = root.strip('/').split('/')
+        missing = None
+        for index, name in enumerate(parts):
+            try:
+                info = metadata(current, name)
+            except FileNotFoundError:
+                require(optional, 'RECOVERY_SCAN_ROOT_MISSING')
+                parent_before = os.fstat(current)
+                require(name not in listing(current), 'RECOVERY_SCAN_ABSENCE_RACE')
+                missing = (current, name, parent_before)
+                break
+            final = index == len(parts) - 1
+            require(stat.S_ISDIR(info.st_mode) or
+                    (final and not cgroup and stat.S_ISREG(info.st_mode)),
+                    'RECOVERY_SCAN_ROOT_TYPE')
+            child_flags = flags | (os.O_DIRECTORY if stat.S_ISDIR(info.st_mode) else os.O_NONBLOCK)
+            child = os.open(name, child_flags, dir_fd=current)
+            held.append(child)
+            same(info, os.fstat(child))
+            links.append((current, name, info, child))
+            current = child
+        if missing is None:
+            visit(current, root, os.fstat(current), 0)
+        else:
+            parent, name, info = missing
+            require(name not in listing(parent), 'RECOVERY_SCAN_ABSENCE_RACE')
+            same(info, os.fstat(parent))
+        for parent, name, info, fd in reversed(links):
+            # Ancestor contents may change for unrelated services; identity/type
+            # must remain bound. The scanned root/subtree gets full metadata checks.
+            now = metadata(parent, name)
+            require((now.st_dev, now.st_ino, now.st_mode, now.st_uid, now.st_gid) ==
+                    (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid),
+                    'RECOVERY_SCAN_ANCESTOR_CHANGED')
+            require((os.fstat(fd).st_dev, os.fstat(fd).st_ino) == (info.st_dev, info.st_ino),
+                    'RECOVERY_SCAN_ANCESTOR_CHANGED')
+        return observed
+    finally:
+        for fd in reversed(held):
+            os.close(fd)
+
+
+def validate_systemd_mountinfo(data):
+    require(len(data) <= 1048576, 'RECOVERY_CGROUP_MOUNT_BOUND')
+    matches = []
+    for line in data.decode('utf-8', 'strict').splitlines():
+        require(' - ' in line, 'RECOVERY_CGROUP_MOUNT_FORMAT')
+        left, right = line.split(' - ', 1)
+        fields, filesystem = left.split(), right.split()
+        require(len(fields) >= 6 and len(filesystem) >= 3, 'RECOVERY_CGROUP_MOUNT_FORMAT')
+        if fields[4] == '/sys/fs/cgroup/systemd':
+            matches.append((fields, filesystem))
+    require(len(matches) == 1, 'RECOVERY_CGROUP_CONTROLLER_MOUNT')
+    fields, filesystem = matches[0]
+    require(fields[3] == '/' and filesystem[0] == 'cgroup' and
+            'name=systemd' in filesystem[2].split(','), 'RECOVERY_CGROUP_CONTROLLER_KIND')
+
+
+def verify_systemd_controller_mount():
+    with open('/proc/self/mountinfo', 'rb') as stream:
+        validate_systemd_mountinfo(stream.read(1048577))
+
+
+def notifier_cgroup_empty(name, controller='/sys/fs/cgroup/systemd/system.slice'):
+    import subprocess
+    require(name in ('xj-uk-owner-notify.timer', 'xj-uk-owner-notify.service'),
+            'RECOVERY_NOTIFIER_NAME')
+    def inactive():
+        value = subprocess.run(['/usr/bin/systemctl', 'show', name,
+                                '--property=ActiveState,MainPID,UnitFileState'],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+        states = dict(line.split('=', 1) for line in value.stdout.decode().splitlines() if '=' in line)
+        require(value.returncode == 0 and states.get('ActiveState') == 'inactive' and
+                states.get('MainPID', '0' if name.endswith('.timer') else None) == '0' and
+                states.get('UnitFileState') == 'masked',
+                'RECOVERY_NOTIFIER_STATE')
+    verify_systemd_controller_mount()
+    # Controller/system.slice must genuinely exist and be readable, even when
+    # systemd has removed an inactive unit's cgroup. Never infer this from isdir.
+    require(os.path.realpath(controller) == controller, 'RECOVERY_CGROUP_CONTROLLER_ALIAS')
+    fd = os.open(controller, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        require(stat.S_ISDIR(before.st_mode) and before.st_uid == 0,
+                'RECOVERY_CGROUP_CONTROLLER_TYPE')
+        os.listdir(fd)
+        inactive()
+        observed = bounded_file_inventory(controller + '/' + name, optional=True, cgroup=True)
+        inactive()
+        verify_systemd_controller_mount()
+        now = os.stat(controller, follow_symlinks=False)
+        require((before.st_dev, before.st_ino, before.st_mode) ==
+                (now.st_dev, now.st_ino, now.st_mode), 'RECOVERY_CGROUP_CONTROLLER_CHANGED')
+        return observed
+    finally:
+        os.close(fd)
+
+
 def scheduler_exclusion():
     import subprocess
     path = BASE + '/consolidated-readiness-38503324102/protected-readiness-snapshot.json'
@@ -359,22 +529,7 @@ def scheduler_exclusion():
     for root in ('/etc/crontab','/etc/cron.d','/etc/cron.hourly','/etc/cron.daily',
                  '/etc/cron.weekly','/etc/cron.monthly','/var/spool/cron','/var/spool/at',
                  '/home/xuanjun_dev/.config/systemd/user'):
-        if not os.path.lexists(root):
-            continue
-        require(not os.path.islink(root), 'RECOVERY_SCHEDULER_ALIAS')
-        paths = [root] if os.path.isfile(root) else []
-        if not paths:
-            for parent, dirs, files in os.walk(root, followlinks=False):
-                require(not any(os.path.islink(parent+'/'+n) for n in dirs), 'RECOVERY_SCHEDULER_ALIAS')
-                paths.extend(parent+'/'+n for n in files)
-                require(len(paths) <= 2048, 'RECOVERY_SCHEDULER_BOUND')
-        for path in paths:
-            require(os.path.realpath(path) == path, 'RECOVERY_SCHEDULER_ALIAS')
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
-            with os.fdopen(fd, 'rb') as stream:
-                data = stream.read(1048577)
-            require(len(data) <= 1048576, 'RECOVERY_SCHEDULER_BOUND')
-            observed[path] = sha(data)
+        observed.update(bounded_file_inventory(root, optional=True))
     require(observed == expected, 'RECOVERY_SCHEDULER_DRIFT')
     result = subprocess.run(['/usr/bin/systemctl','list-unit-files','--no-legend','--no-pager'],
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
@@ -490,18 +645,7 @@ def snapshot():
     for name in ('xj-uk-owner-notify.timer', 'xj-uk-owner-notify.service'):
         target = '/etc/systemd/system/' + name
         require(os.path.islink(target) and os.readlink(target) == '/dev/null', 'RECOVERY_NOTIFIER_MASK')
-        value = subprocess.run(['/usr/bin/systemctl', 'show', name,
-                                '--property=ActiveState,MainPID,UnitFileState'],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
-        states = dict(line.split('=', 1) for line in value.stdout.decode().splitlines() if '=' in line)
-        require(value.returncode == 0 and states.get('ActiveState') == 'inactive' and
-                states.get('MainPID', '0') == '0' and states.get('UnitFileState') == 'masked',
-                'RECOVERY_NOTIFIER_STATE')
-        group = '/sys/fs/cgroup/systemd/system.slice/' + name
-        for parent, dirs, files in os.walk(group):
-            if 'cgroup.procs' in files:
-                with open(parent + '/cgroup.procs') as stream:
-                    require(not stream.read(65537).strip(), 'RECOVERY_NOTIFIER_CGROUP')
+        notifier_cgroup_empty(name)
     observation = adapter.measure_quiescence(plan['cutover']['legacy_bindings'])
     require(all(observation['proof'].get(k) is True for k in
                 ('identity_verified', 'coordinator_inactive', 'parent_unit_inactive',
