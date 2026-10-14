@@ -96,7 +96,7 @@ def handler(service):
             expected_host = "127.0.0.1:" + str(self.server.server_address[1])
             if self.headers.get("Host", "") != expected_host:
                 return self.send_json(403,{"error":"LOOPBACK_ONLY"})
-            files={"/demo/":"index.html","/demo/app.js":"app.js","/demo/merchant/":"merchant.html","/demo/merchant/app.js":"merchant.js"}
+            files={"/demo/":"index.html","/demo/app.js":"app.js","/demo/merchant/":"merchant.html","/demo/merchant/app.js":"merchant.js","/demo/platform/":"platform.html","/demo/platform/app.js":"platform.js"}
             filename=files.get(self.path)
             if filename is None:
                 return self.send_json(404,{"error":"NOT_FOUND"})
