@@ -1,4 +1,6 @@
 import sqlite3
+import tempfile
+import os
 import unittest
 from scripts.community_order_store import connect, create_order, state, simulated_transition
 S={'tenant_id':'t1','merchant_id':'m1','store_id':'s1'}
@@ -44,4 +46,31 @@ class OrderTests(unittest.TestCase):
         self.assertEqual(state(self.db,S,'r2')['state'],'PENDING')
     def test_invalid_bool_amount(self):
         with self.assertRaises(ValueError): create_order(self.db,S,'r2',True)
+    def test_persistent_reopen_preserves_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=os.path.join(directory,'orders.sqlite')
+            first=connect(path)
+            create_order(first,S,'persist',123)
+            first.close()
+            second=connect(path)
+            self.assertEqual(state(second,S,'persist')['amount_minor'],123)
+            second.close()
+    def test_incompatible_schema_refused_without_data_loss(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=os.path.join(directory,'orders.sqlite')
+            raw=sqlite3.connect(path)
+            raw.execute('CREATE TABLE orders(sentinel TEXT)')
+            raw.execute("INSERT INTO orders VALUES('retain')")
+            raw.commit();raw.close()
+            with self.assertRaises(ValueError): connect(path)
+            verify=sqlite3.connect(path)
+            self.assertEqual(verify.execute('SELECT sentinel FROM orders').fetchone()[0],'retain')
+            verify.close()
+    def test_partial_existing_schema_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=os.path.join(directory,'orders.sqlite')
+            raw=sqlite3.connect(path)
+            raw.execute('CREATE TABLE order_events(event_id TEXT)')
+            raw.commit();raw.close()
+            with self.assertRaises(ValueError): connect(path)
 if __name__=='__main__': unittest.main()
