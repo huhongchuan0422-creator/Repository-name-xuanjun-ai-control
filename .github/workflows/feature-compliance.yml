@@ -1,12 +1,6 @@
 name: Feature Compliance Gate
 on:
   pull_request:
-    paths:
-      - 'governance/**'
-      - 'scripts/feature_compliance_check.py'
-      - 'tests/test_feature_compliance_check.py'
-      - 'docs/development/**'
-      - '.github/workflows/feature-compliance.yml'
   push:
     branches: [main]
 permissions:
