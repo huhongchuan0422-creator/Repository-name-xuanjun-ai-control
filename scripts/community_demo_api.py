@@ -14,6 +14,7 @@ from scripts.community_merchant_contract import scope
 from scripts.community_storefront_snapshot import storefront_snapshot
 from scripts.community_ad_contract import AMOUNT, SUCCESS
 from scripts.community_ad_store import list_campaigns
+from scripts.community_refund_preview_store import preview_total, open_refund_store
 
 MAX_BODY = 2048
 READ_TIMEOUT_SECONDS = 1.0
@@ -32,11 +33,12 @@ def _id(value):
 
 class DemoService:
     """Trusted local demo service. This is not a production access boundary."""
-    def __init__(self, db, merchant_db=None, ad_db=None, now=None):
+    def __init__(self, db, merchant_db=None, ad_db=None, now=None, refund_db=None):
         self.db = db
         self.merchant_db = merchant_db
         self.ad_db = ad_db
         self.now = now
+        self.refund_db = refund_db
     def dispatch(self, method, path, data):
         if type(data) is not dict:
             raise ValueError("INVALID_REQUEST")
@@ -49,6 +51,25 @@ class DemoService:
             listed=list_campaigns(self.ad_db,identity,limit=50)
             return {"campaigns":listed["campaigns"],"has_more":listed["has_more"],
                     "simulation_only":True,"write_permissions":False}
+        if method == "POST" and path == "/demo/refunds/preview":
+            _object(data, FIELDS)
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            reference=_id(data["reference"])
+            order_state=state(self.db,identity,reference)
+            if self.refund_db is None:
+                raise ValueError("REFUND_PREVIEW_NOT_CONFIGURED")
+            total=preview_total(self.refund_db,identity,reference)
+            amount=order_state["amount_minor"]
+            if type(total) is not int or total<0 or total>amount:
+                raise ValueError("INVALID_REFUND_PREVIEW_TOTAL")
+            return {"reference":reference,"order_state":order_state["state"],
+                    "order_amount_minor":amount,"preview_total_minor":total,
+                    "remaining_preview_minor":amount-total,
+                    "provider_refund_executed":False,
+                    "provider_settlement_verified":False,
+                    "simulation_only":True,
+                    "financial_receipt_issued":False}
         if method == "POST" and path == "/demo/orders/summary":
             _object(data, {"tenant_id","merchant_id","store_id"})
             identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -162,7 +183,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
@@ -287,13 +308,15 @@ def serve_local(path=":memory:",port=18791,seed_demo=True):
     owned = [db]
     try:
         merchant_db = ad_db = now = None
+        refund_db = open_refund_store()
+        owned.append(refund_db)
         if seed_demo:
             from scripts.community_demo_bootstrap import fixture_stores
             merchant_db, ad_db, now = fixture_stores()
             owned.extend((merchant_db, ad_db))
         # HTTPServer handles requests serially; no thread pool shares the stores.
         return _OwnedLocalDemoHTTPServer(
-            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now),owned)
+            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now,refund_db),owned)
     except BaseException:
         try:
             _close_all_owned(owned)
