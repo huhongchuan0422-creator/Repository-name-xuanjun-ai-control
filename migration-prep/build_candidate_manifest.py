@@ -16,7 +16,11 @@ FILES = (
     "test_implementation_batch.py", "IMPLEMENTATION_BATCH.md",
     "HUMAN_ACTIONS_REQUIRED.md", "C7_EVIDENCE_GAPS.md", "korea/get_only_policy.py",
     "korea/xuanjun-binance-shadow.service.in", "korea/requirements.lock",
-    "korea/deployment-manifest.json", "korea/DEPLOYMENT.md"
+    "korea/deployment-manifest.json", "korea/DEPLOYMENT.md",
+    "c7_acceptance.py", "test_c7_acceptance.py",
+    "c7-real-machine-execution-package.json", "C7_PRODUCTION_ACCEPTANCE_PREP.md",
+    "c7_root_inventory.py", "test_c7_root_inventory.py",
+    "c7-current-evidence.json", "C7_CURRENT_EVIDENCE.md"
 )
 
 
@@ -34,11 +38,11 @@ def build(root):
         path = os.path.join(root, relative)
         files.append({"path": "migration-prep/" + relative, "size": os.path.getsize(path),
                       "sha256": digest(path)})
-    value = {"schema_version": 2,
-             "task_id": "TOKYO_KOREA_C1_C6_REMEDIATION_6169446383",
-             "audit_comment": "6169446383",
-             "base_commit": "1929506900e5cc9e0e1eb3d56510c4638a3d57d1",
-             "base_tree": "306d609af5a414c9447c8e2494258ed817a896d9",
+    value = {"schema_version": 3,
+             "task_id": "TOKYO_KOREA_C7_PRODUCTION_ACCEPTANCE_PREPARATION_6169986588",
+             "audit_comment": "6169986588",
+             "base_commit": "84e00d64697b7d204ecbe4edf619b91477bcd1ea",
+             "base_tree": "d7b00f91b23cab4c3e2731c3be7d56e6a79c9211",
              "files": files, "production_authorized": False,
              "binance_called": False, "production_deployed": False}
     value["candidate_content_sha256"] = hashlib.sha256(canonical_bytes(value)).hexdigest()

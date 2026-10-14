@@ -1,6 +1,10 @@
 # C7 evidence gaps and unchanged production gates
 
-`STATUS=EVIDENCE_INCOMPLETE_PRODUCTION_HOLD`
+`STATUS=READONLY_EVIDENCE_PARTIAL_REAL_EXECUTION_PACKAGE_READY_PRODUCTION_HOLD`
+
+Current C7 read-only evidence and the exact remaining authority split are recorded in
+`c7-current-evidence.json`, `C7_CURRENT_EVIDENCE.md` and
+`c7-real-machine-execution-package.json`.
 
 ## 95 Writer paths
 
@@ -14,6 +18,10 @@
 - An independent reviewer still needs an approved private evidence channel to obtain
   the raw map, recompute both digests, match all 95 IDs to live trigger/runtime and
   credential evidence, and prove each actual fence or isolation action.
+- This batch did recompute the raw private-file SHA-256 and internal mapping digest and
+  matched every `WP001..WP095` ID/source hash/class to the public all-DENY manifest.
+  Therefore private artifact integrity/ID alignment now has direct evidence; runtime,
+  scheduler, credential and installed-fence coverage remain incomplete.
 - A source tarball hash proves artifact bytes only; it does not prove private-map
   content, live Writer reachability or installed fence state.
 
@@ -38,4 +46,9 @@
 10. Independent Auditor and Owner Release Gate decision bound to the exact final
     commit/tree/artifact. PR99 remains Draft and migration remains HOLD.
 
-No item above was executed by the C1-C6 candidate remediation.
+The following non-mutating portions were executed in C7 preparation: private-map
+integrity/ID validation, Tokyo/Korea fixed-helper baseline, caller-scope Gateway
+automation inventory, caller crontab digest/counts, protected-store metadata check,
+and Korea pre-install baseline. GitHub-admin, root-global, Gateway-admin, independent
+Authority and installed Korea isolation evidence remain unavailable or intentionally
+not executed. No mutating production gate was executed.

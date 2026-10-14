@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "task_id": "TOKYO_KOREA_C7_PRODUCTION_ACCEPTANCE_PREPARATION_6169986588",
+  "observed_at_window_utc": "2026-10-14T14:00:57Z/2026-10-14T14:06:00Z",
+  "production_mutation": false,
+  "binance_called": false,
+  "writer_map": {
+    "record_count": 95,
+    "private_file_sha256": "551187ebb68295a4693427ba6b39018bf6c678926d8d97dd30df9da03af718d1",
+    "private_mapping_sha256": "8f5ad7df2c63dd1b541ec4d21ab315b9cf0c23f00f77e326b59c82d92053f65b",
+    "public_ids_and_source_hashes_match": true,
+    "public_enforcement_all_deny": true,
+    "runtime_coverage_proven": false
+  },
+  "tokyo": {
+    "helper_inspection_complete": true,
+    "helper_production_mutation": false,
+    "runner_active": true,
+    "caller_crontab_active_lines": 0,
+    "caller_crontab_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "korea": {
+    "helper_inspection_complete": true,
+    "helper_production_mutation": false,
+    "runner_active": true,
+    "yibi_api_active": true,
+    "yibi_scheduler_active": true,
+    "novel_active": true,
+    "dedicated_user_present": false,
+    "dedicated_directories_present": false,
+    "shadow_unit_active": false,
+    "candidate_port_listeners": 0,
+    "caller_crontab_active_lines": 0,
+    "caller_crontab_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "gateway_automations": {
+    "visible_jobs": 2,
+    "inventory_scope": "CALLER",
+    "administrator_global_inventory_proven": false
+  },
+  "github_runner_administration": {
+    "connector_admin_endpoint_available": false,
+    "ui_admin_evidence_obtained": false,
+    "status": "BLOCKED_PERMISSION"
+  },
+  "protected_secret_store": {
+    "entry_count": 0,
+    "production_trust_anchor_or_signature_present": false
+  },
+  "root_inventory": {
+    "candidate_collector_built": true,
+    "candidate_collector_installed": false,
+    "unprivileged_execution": "HOLD_ROOT_REQUIRED",
+    "root_yibi_githubrunner_crontabs_proven": false,
+    "full_sudoers_closure_proven": false
+  },
+  "production_acceptance_ready": false,
+  "production_execution_authorized": false
+}

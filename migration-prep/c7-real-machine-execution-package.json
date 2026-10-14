@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "task_id": "TOKYO_KOREA_C7_PRODUCTION_ACCEPTANCE_PREPARATION_6169986588",
+  "audit_comment": "6169986588",
+  "base_commit": "84e00d64697b7d204ecbe4edf619b91477bcd1ea",
+  "base_tree": "d7b00f91b23cab4c3e2731c3be7d56e6a79c9211",
+  "production_execution_authorized": false,
+  "blind_retry_allowed": false,
+  "secrets_embedded": false,
+  "phases": [
+    {
+      "phase": "A_READONLY_EVIDENCE",
+      "self_executable_now": true,
+      "mutates_production": false,
+      "requires": ["existing fixed helper", "existing SSH routes", "private Writer map"],
+      "outputs": ["95-path digest receipt", "Tokyo/Korea baseline receipt", "caller-scope trigger receipt"]
+    },
+    {
+      "phase": "B_ADMIN_EVIDENCE",
+      "self_executable_now": false,
+      "mutates_production": false,
+      "requires": ["GitHub administration read", "Gateway administrator inventory", "bounded root read-only inventory"],
+      "outputs": ["Runner admission receipt", "global trigger receipt", "root cron/systemd/sudoers closure receipt"]
+    },
+    {
+      "phase": "C_INDEPENDENT_AUTHORITY",
+      "self_executable_now": false,
+      "mutates_production": false,
+      "requires": ["independent Ed25519 custody", "signed exact policy", "authority record"],
+      "outputs": ["trust-anchor fingerprint", "detached signature", "exact request/commit/tree/artifact binding"]
+    },
+    {
+      "phase": "D_INSTALL_AND_SHADOW",
+      "self_executable_now": false,
+      "mutates_production": true,
+      "requires": ["independent audit", "Owner exact-scope approval", "Release Gate PASS"],
+      "outputs": ["Korea isolated runtime", "root default-deny egress", "24h Shadow receipts"]
+    },
+    {
+      "phase": "E_RETIRE_FENCE_CANARY_CUTOVER",
+      "self_executable_now": false,
+      "mutates_production": true,
+      "requires": ["new Owner execution window", "short-lived protected Runner removal tokens", "final reconciliation PASS"],
+      "outputs": ["Runner retirement", "Yibi retirement", "single-Writer epoch", "bounded canary", "Korea-first rollback proof"]
+    }
+  ],
+  "unknown_outcome_policy": "STOP_INSPECT_RECONCILE_NO_BLIND_RETRY",
+  "rollback_order": ["KOREA_WRITER_LOCKED", "KOREA_CREDENTIAL_REVOKED", "KOREA_IP_REMOVED", "UNKNOWN_OUTCOMES_RECONCILED", "TOKYO_CHECKPOINT_RESTORED", "TOKYO_GET_ONLY_RECONCILED", "TOKYO_NEW_EPOCH_GRANTED"]
+}

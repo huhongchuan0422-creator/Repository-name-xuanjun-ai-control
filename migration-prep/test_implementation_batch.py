@@ -38,6 +38,28 @@ def runner_ok(request):
             "evidence_sha256": "f" * 64}
 
 
+def verifier_ok(request, runner_result):
+    observations = []
+    for expected in request["expected_postconditions"]:
+        observations.append({
+            "postcondition_id": expected["postcondition_id"],
+            "kind": expected["kind"],
+            "target_sha256": expected["target_sha256"],
+            "observed_state": expected["required_state"],
+            "source_class": "SYSTEMD_READBACK",
+            "verified": True,
+            "evidence_sha256": "9" * 64})
+    value = {"schema_version": 1, "tx_id": request["tx_id"],
+             "host": request["host"], "action": request["action"],
+             "candidate_sha256": request["candidate_sha256"],
+             "verifier_sha256": request["independent_verifier_sha256"],
+             "runner_result_sha256": sha256_value(runner_result),
+             "observed_at_epoch": 1900000001, "observations": observations,
+             "all_postconditions_verified": True}
+    value["evidence_sha256"] = sha256_value(value)
+    return value
+
+
 def runner_unknown(request):
     value = runner_ok(request); value["outcome"] = "UNKNOWN"
     value["postcondition_verified"] = False
@@ -246,14 +268,20 @@ class RestrictedExecutorTests(unittest.TestCase):
             "tx_id": "tx-1", "host": "iZmj7a5kwr75qc1tul4kf9Z", "action": "KOREA_DEPLOY",
             "paths": [self.allowed_path], "units": ["xuanjun-binance-shadow.service"],
             "candidate_sha256": "a" * 64, "authority_id": "independent-authority-1",
-            "one_time_nonce_sha256": "b" * 64, "timeout_seconds": 2}
+            "one_time_nonce_sha256": "b" * 64, "timeout_seconds": 2,
+            "independent_verifier_sha256": "c" * 64,
+            "expected_postconditions": [{
+                "postcondition_id": "e1", "kind": "CANDIDATE_TEST",
+                "target_sha256": "a" * 64, "required_state": "COMPLETE",
+                "is_effect": True}]}
         self.anchor = {"schema_version": 1, "algorithm": "Ed25519",
                        "authority_id": "independent-authority-1", "public_key_hex": "0" * 64}
-        self.policy = {"schema_version": 2, "policy_id": "policy-1",
+        self.policy = {"schema_version": 3, "policy_id": "policy-1",
                        "candidate_sha256": "a" * 64, "expires_at_epoch": 2000000000,
                        "one_time_authority_id": "independent-authority-1",
                        "authorized_request_sha256": sha256_value(self.request_value),
                        "execution_identity": "xuanjun_binance",
+                       "independent_verifier_sha256": "c" * 64,
                        "trust_anchor_sha256": "0" * 64,
                        "hosts": {"iZmj7a5kwr75qc1tul4kf9Z": {
                            "paths": [self.allowed_path],
@@ -285,7 +313,8 @@ class RestrictedExecutorTests(unittest.TestCase):
             os.chmod(path, 0o600)
         return load_verified_policy(paths[0], paths[1], paths[2], self.uid)
 
-    def execute(self, request=None, runner=runner_ok, tx="tx-1", nonce=None):
+    def execute(self, request=None, runner=runner_ok, verifier=verifier_ok,
+                tx="tx-1", nonce=None):
         request = dict(request or self.request_value)
         request["tx_id"] = tx
         if nonce is not None:
@@ -295,7 +324,7 @@ class RestrictedExecutorTests(unittest.TestCase):
         verified = self.signed_policy(policy)
         with mock.patch("restricted_executor.runtime_identity", return_value={
                 "host": request["host"], "os_identity": "xuanjun_binance"}):
-            return execute_candidate(request, verified, self.ledger, runner,
+            return execute_candidate(request, verified, self.ledger, runner, verifier,
                                      now_epoch=1900000000)
 
     def test_independent_signature_exact_hash_and_strict_success(self):
@@ -358,6 +387,42 @@ class RestrictedExecutorTests(unittest.TestCase):
         result = self.execute(runner=runner_slow, tx="timeout", nonce="d" * 64)
         self.assertEqual(result["status"], "UNKNOWN")
         self.assertIn("NO_CGROUP_PROOF", result["containment"])
+
+    def test_independent_verifier_and_zero_effect_policy_fail_closed(self):
+        def unverified(request, runner_result):
+            value = verifier_ok(request, runner_result)
+            value["all_postconditions_verified"] = False
+            unsigned = dict(value); unsigned.pop("evidence_sha256")
+            value["evidence_sha256"] = sha256_value(unsigned)
+            return value
+        result = self.execute(verifier=unverified, tx="bad-verifier", nonce="8" * 64)
+        self.assertEqual(result["status"], "UNKNOWN")
+        self.assertFalse(result["blind_retry_allowed"])
+
+        request = dict(self.request_value)
+        request["action"] = "READONLY_INSPECT"
+        request["expected_postconditions"] = [{
+            "postcondition_id": "readonly-no-mutation", "kind": "PRODUCTION_MUTATION",
+            "target_sha256": "1" * 64, "required_state": "NO", "is_effect": False}]
+        request["units"] = []
+        def readonly_runner(value):
+            result = runner_ok(value)
+            result["side_effects_attempted"] = False
+            result["side_effects"] = []
+            result["effect_verification"] = []
+            return result
+        policy = dict(self.policy)
+        policy["hosts"] = {request["host"]: {"paths": [self.allowed_path],
+                            "units": [], "actions": ["READONLY_INSPECT"]}}
+        request["tx_id"] = "readonly"
+        request["one_time_nonce_sha256"] = "7" * 64
+        policy["authorized_request_sha256"] = sha256_value(request)
+        verified = self.signed_policy(policy)
+        with mock.patch("restricted_executor.runtime_identity", return_value={
+                "host": request["host"], "os_identity": "xuanjun_binance"}):
+            result = execute_candidate(request, verified, self.ledger, readonly_runner,
+                                       verifier_ok, now_epoch=1900000000)
+        self.assertEqual(result["status"], "SUCCEEDED")
 
     def test_replay_and_cgroup_boundary_are_explicit(self):
         self.execute()

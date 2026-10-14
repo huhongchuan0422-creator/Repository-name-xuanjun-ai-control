@@ -138,15 +138,18 @@ class VerifiedPolicy(object):
 def validate_policy(policy, expected_path_owner_uid):
     required = ("schema_version", "policy_id", "candidate_sha256", "expires_at_epoch",
                 "hosts", "one_time_authority_id", "authorized_request_sha256",
-                "execution_identity", "trust_anchor_sha256")
+                "execution_identity", "trust_anchor_sha256",
+                "independent_verifier_sha256")
     require(isinstance(policy, dict) and set(policy) == set(required),
             "EXECUTOR_POLICY_FIELDS_INVALID")
-    require(type(policy["schema_version"]) is int and policy["schema_version"] == 2,
+    require(type(policy["schema_version"]) is int and policy["schema_version"] == 3,
             "EXECUTOR_POLICY_SCHEMA_INVALID")
     _identifier(policy["policy_id"], "EXECUTOR_POLICY_ID_INVALID")
     _hex64(policy["candidate_sha256"], "EXECUTOR_VERSION_HASH_INVALID")
     _hex64(policy["authorized_request_sha256"], "EXECUTOR_AUTHORIZED_REQUEST_HASH_INVALID")
     _hex64(policy["trust_anchor_sha256"], "EXECUTOR_TRUST_ANCHOR_HASH_INVALID")
+    _hex64(policy["independent_verifier_sha256"],
+           "EXECUTOR_INDEPENDENT_VERIFIER_HASH_INVALID")
     require(type(policy["expires_at_epoch"]) is int, "EXECUTOR_EXPIRY_INVALID")
     _identifier(policy["one_time_authority_id"], "EXECUTOR_AUTHORITY_ID_REQUIRED")
     _identifier(policy["execution_identity"], "EXECUTOR_EXECUTION_IDENTITY_INVALID")
@@ -303,13 +306,103 @@ def _strict_runner_result(value, action):
     return value
 
 
-def execute_candidate(request, verified_policy, ledger_path, runner, now_epoch=None):
+def _strict_expected_postconditions(value, action):
+    require(isinstance(value, list) and value,
+            "EXECUTOR_EXPECTED_POSTCONDITIONS_REQUIRED")
+    identifiers = []
+    for item in value:
+        require(isinstance(item, dict) and set(item) == set((
+            "postcondition_id", "kind", "target_sha256", "required_state", "is_effect")),
+            "EXECUTOR_EXPECTED_POSTCONDITION_FIELDS_INVALID")
+        _identifier(item["postcondition_id"],
+                    "EXECUTOR_EXPECTED_POSTCONDITION_ID_INVALID")
+        _identifier(item["kind"], "EXECUTOR_EXPECTED_POSTCONDITION_KIND_INVALID")
+        _hex64(item["target_sha256"],
+               "EXECUTOR_EXPECTED_POSTCONDITION_TARGET_INVALID")
+        _identifier(item["required_state"],
+                    "EXECUTOR_EXPECTED_POSTCONDITION_STATE_INVALID")
+        require(type(item["is_effect"]) is bool,
+                "EXECUTOR_EXPECTED_POSTCONDITION_EFFECT_TYPE_INVALID")
+        identifiers.append(item["postcondition_id"])
+    require(len(identifiers) == len(set(identifiers)),
+            "EXECUTOR_EXPECTED_POSTCONDITION_DUPLICATE")
+    if action == "READONLY_INSPECT":
+        require(not any(item["is_effect"] for item in value),
+                "EXECUTOR_READONLY_EFFECT_FORBIDDEN")
+    else:
+        require(all(item["is_effect"] for item in value),
+                "EXECUTOR_MUTATION_EFFECT_POSTCONDITION_REQUIRED")
+    return value
+
+
+def _strict_independent_verification(value, request, runner_result):
+    required = ("schema_version", "tx_id", "host", "action", "candidate_sha256",
+                "verifier_sha256", "runner_result_sha256", "observed_at_epoch",
+                "observations", "all_postconditions_verified", "evidence_sha256")
+    require(isinstance(value, dict) and set(value) == set(required),
+            "EXECUTOR_INDEPENDENT_VERIFICATION_FIELDS_INVALID")
+    require(type(value["schema_version"]) is int and value["schema_version"] == 1,
+            "EXECUTOR_INDEPENDENT_VERIFICATION_SCHEMA_INVALID")
+    require(value["tx_id"] == request["tx_id"] and value["host"] == request["host"] and
+            value["action"] == request["action"] and
+            value["candidate_sha256"] == request["candidate_sha256"],
+            "EXECUTOR_INDEPENDENT_VERIFICATION_REQUEST_MISMATCH")
+    require(value["verifier_sha256"] == request["independent_verifier_sha256"],
+            "EXECUTOR_INDEPENDENT_VERIFIER_NOT_REQUEST_BOUND")
+    require(value["runner_result_sha256"] == sha256_value(runner_result),
+            "EXECUTOR_INDEPENDENT_VERIFICATION_RUNNER_RESULT_MISMATCH")
+    require(type(value["observed_at_epoch"]) is int,
+            "EXECUTOR_INDEPENDENT_VERIFICATION_TIME_INVALID")
+    require(type(value["all_postconditions_verified"]) is bool and
+            value["all_postconditions_verified"] is True,
+            "EXECUTOR_INDEPENDENT_POSTCONDITIONS_NOT_VERIFIED")
+    expected = {item["postcondition_id"]: item
+                for item in request["expected_postconditions"]}
+    require(isinstance(value["observations"], list) and
+            len(value["observations"]) == len(expected),
+            "EXECUTOR_INDEPENDENT_OBSERVATION_COUNT_INVALID")
+    observed = {}
+    allowed_sources = frozenset((
+        "FILESYSTEM_DESCRIPTOR", "SYSTEMD_READBACK", "PROCESS_READBACK",
+        "GITHUB_ADMIN_API", "OPENCLAW_ADMIN_API", "NETWORK_POLICY_READBACK",
+        "DATABASE_READONLY", "EXCHANGE_GET_RECEIPT"))
+    for item in value["observations"]:
+        require(isinstance(item, dict) and set(item) == set((
+            "postcondition_id", "kind", "target_sha256", "observed_state",
+            "source_class", "verified", "evidence_sha256")),
+            "EXECUTOR_INDEPENDENT_OBSERVATION_FIELDS_INVALID")
+        identifier = item["postcondition_id"]
+        require(identifier in expected and identifier not in observed,
+                "EXECUTOR_INDEPENDENT_OBSERVATION_ID_INVALID")
+        wanted = expected[identifier]
+        require(item["kind"] == wanted["kind"] and
+                item["target_sha256"] == wanted["target_sha256"] and
+                item["observed_state"] == wanted["required_state"] and
+                item["source_class"] in allowed_sources and
+                type(item["verified"]) is bool and item["verified"] is True,
+                "EXECUTOR_INDEPENDENT_OBSERVATION_MISMATCH")
+        _hex64(item["evidence_sha256"],
+               "EXECUTOR_INDEPENDENT_OBSERVATION_EVIDENCE_INVALID")
+        observed[identifier] = item
+    unsigned = dict(value)
+    supplied_digest = unsigned.pop("evidence_sha256")
+    _hex64(supplied_digest, "EXECUTOR_INDEPENDENT_EVIDENCE_HASH_INVALID")
+    require(supplied_digest == sha256_value(unsigned),
+            "EXECUTOR_INDEPENDENT_EVIDENCE_HASH_MISMATCH")
+    return value
+
+
+def execute_candidate(request, verified_policy, ledger_path, runner,
+                      postcondition_verifier=None, now_epoch=None):
     """Execute an injected runner only after independent signed-policy proof."""
     require(isinstance(verified_policy, VerifiedPolicy), "EXECUTOR_VERIFIED_POLICY_REQUIRED")
     policy = verified_policy.policy
     require(callable(runner), "EXECUTOR_INJECTED_RUNNER_REQUIRED")
+    require(callable(postcondition_verifier),
+            "EXECUTOR_INDEPENDENT_POSTCONDITION_VERIFIER_REQUIRED")
     required = ("tx_id", "host", "action", "paths", "units", "candidate_sha256",
-                "authority_id", "one_time_nonce_sha256", "timeout_seconds")
+                "authority_id", "one_time_nonce_sha256", "timeout_seconds",
+                "independent_verifier_sha256", "expected_postconditions")
     require(isinstance(request, dict) and set(request) == set(required),
             "EXECUTOR_REQUEST_FIELDS_INVALID")
     identity = runtime_identity()
@@ -320,6 +413,9 @@ def execute_candidate(request, verified_policy, ledger_path, runner, now_epoch=N
             "EXECUTOR_AUTHORIZATION_EXPIRED")
     require(request["candidate_sha256"] == policy["candidate_sha256"],
             "EXECUTOR_VERSION_MISMATCH")
+    require(request["independent_verifier_sha256"] ==
+            policy["independent_verifier_sha256"],
+            "EXECUTOR_INDEPENDENT_VERIFIER_VERSION_MISMATCH")
     require(request["authority_id"] == policy["one_time_authority_id"],
             "EXECUTOR_AUTHORITY_MISMATCH")
     _hex64(request["one_time_nonce_sha256"], "EXECUTOR_NONCE_INVALID")
@@ -329,6 +425,8 @@ def execute_candidate(request, verified_policy, ledger_path, runner, now_epoch=N
     require(host in policy["hosts"], "EXECUTOR_HOST_NOT_ALLOWLISTED")
     allowed = policy["hosts"][host]
     require(request["action"] in allowed["actions"], "EXECUTOR_ACTION_NOT_ALLOWLISTED")
+    expected_postconditions = _strict_expected_postconditions(
+        request["expected_postconditions"], request["action"])
     require(isinstance(request["paths"], list) and len(request["paths"]) == len(set(request["paths"])) and
             set(request["paths"]).issubset(set(allowed["paths"])),
             "EXECUTOR_PATH_NOT_ALLOWLISTED")
@@ -352,7 +450,17 @@ def execute_candidate(request, verified_policy, ledger_path, runner, now_epoch=N
                           "containment": "POSIX_PROCESS_GROUP_BEST_EFFORT_NO_CGROUP_PROOF"}
                 ledger.finish(request["tx_id"], "UNKNOWN", result)
                 return result
+            effect_ids = set(item["effect_id"] for item in value["side_effects"])
+            expected_effects = set(item["postcondition_id"]
+                                   for item in expected_postconditions if item["is_effect"])
+            require(effect_ids == expected_effects,
+                    "EXECUTOR_RUNNER_EFFECTS_NOT_REQUEST_BOUND")
+            independent = bounded_call(
+                lambda: postcondition_verifier(request, value),
+                request["timeout_seconds"])
+            independent = _strict_independent_verification(independent, request, value)
             result = {"status": "SUCCEEDED", "result": value,
+                      "independent_verification": independent,
                       "production_authorized": False,
                       "containment": "POSIX_PROCESS_GROUP_ONLY_CGROUP_NOT_INVOKED"}
             ledger.finish(request["tx_id"], "SUCCEEDED", result)
