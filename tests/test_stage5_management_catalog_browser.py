@@ -137,4 +137,18 @@ class ManagementCatalogBrowser(unittest.TestCase):
   page.locator("#reference").fill("management_order_2")
   page.locator("#loadSplitPreview").click()
   expect(page.locator("#splitStatus")).to_contain_text("计算失败")
+ def test_signed_channel_qr_checkout_creates_real_pending_sqlite_order(self):
+  for route,reference in (("/demo/mini/","channel_mini_order"),("/demo/official-h5/","channel_h5_order")):
+   page=self.ctx.new_page()
+   page.goto(self.base+route)
+   page.locator("#reference").fill(reference)
+   page.locator("#issueQR").click()
+   expect(page.locator("#result")).to_contain_text("已创建本地模拟签名凭证")
+   page.locator("#verifyQR").click()
+   expect(page.locator("#result")).to_contain_text("签名验证通过")
+   page.locator("#checkoutQR").click()
+   expect(page.locator("#result")).to_contain_text("已创建模拟待支付订单")
+   order=self.http._owned_connections[0].execute(
+      "SELECT state,amount_minor FROM orders WHERE reference=?",(reference,)).fetchone()
+   self.assertEqual(order,("PENDING",120))
 if __name__=="__main__":unittest.main()
