@@ -50,7 +50,9 @@
         ],
         "tests": [
           "tests/test_p2_retained_recovery_governance.py",
-          "tests/test_p2_runtime_process_checkpoint.py"
+          "tests/test_p2_runtime_process_checkpoint.py",
+          "tests/test_p2_full_kit_checkpoint.py",
+          "tests/test_p2_full_kit_wrapper_contract.py"
         ]
       },
       "reuse": [

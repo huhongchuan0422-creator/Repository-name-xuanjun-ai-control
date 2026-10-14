@@ -1,0 +1,36 @@
+{
+  "reviewed_database.py": {
+    "functions": [
+      "database_manifest"
+    ],
+    "selected_functions_sha256": "e49f1e1fa6775204f62ecf03298188a79e8d0fab62604d2200bb4f2346ca9b98",
+    "source": "p2-epoch5-repair/runtime-v4-extracted/xuanjun-p2-package/stage1/ledger_backup.py",
+    "source_sha256": "e30fa6901b6b951419abcbcae4ce957b88a2ebd29bc5d6de49cd546be542cc84"
+  },
+  "reviewed_publisher.py": {
+    "functions": [
+      "identity",
+      "fingerprint",
+      "verify_row"
+    ],
+    "selected_functions_sha256": "a1d3876c73ce03a1517690f874bab3c076c5045c26b926eced66dfc4ef81d953",
+    "source": "p2-epoch5-repair/verify_retained_publisher.py",
+    "source_sha256": "204e268d5075a9f884dca1d373679149e688dec71347a5a52e39ba6dd0eeee31"
+  },
+  "reviewed_scanner.py": {
+    "functions": [
+      "require",
+      "canonical",
+      "sha",
+      "scan_fingerprint",
+      "bounded_file_inventory",
+      "validate_systemd_mountinfo",
+      "code_identity",
+      "verify_cache_bytes",
+      "manifest_from_copy"
+    ],
+    "selected_functions_sha256": "dcb271a38247d3e134c4235dea0dedc382c3561942d29c669856ecc91b097e18",
+    "source": "p2-epoch5-repair/kit-v4-a/epoch5-recovery-candidate-v4/helpers/recover_exact_hold.py",
+    "source_sha256": "45affbb3b9298999d7e71bfb93b3ef5cb824464000ac78a927fd7c388614d74e"
+  }
+}

@@ -1,0 +1,1087 @@
+{
+  "files": {
+    "epoch7_recovery_entry.py": {
+      "sha256": "13fd850d6a6cc0b8199af1d0c579318d401fda6e6a1d9de0dbed0e91983a14e8",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/epoch7_recovery_entry.py"
+    },
+    "helpers/epoch3_service_containment.py": {
+      "sha256": "d313933e65a82712157d5b3bd4eeec77c3398e4e57479a8c2191d7e9759bd53c",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch3_service_containment.py"
+    },
+    "helpers/epoch7_acceptance_rows.py": {
+      "sha256": "a622d16ac99801f709a2ae95f17802a20dd350c0f8c07764efa74b6b43f1243c",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_acceptance_rows.py"
+    },
+    "helpers/epoch7_additive_identity.py": {
+      "sha256": "9acaa960cba0211095982792662479ac0faa9697009b2756e01408458317836a",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_additive_identity.py"
+    },
+    "helpers/epoch7_additive_server.py": {
+      "sha256": "17f3cff1a961c4ac78c1b3c57aa77e77255d0d69b7860be6c0a2e2350f0231a3",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_additive_server.py"
+    },
+    "helpers/epoch7_approval.py": {
+      "sha256": "cdd5f74df796c3b858720f9173973df3d0dd45ed1b7cef50b2cc861bdf4d70ac",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_approval.py"
+    },
+    "helpers/epoch7_bindings.py": {
+      "sha256": "179eb0536a5907e176893b8328e21466487e2552c72af12348795e660dd12af6",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_bindings.py"
+    },
+    "helpers/epoch7_bounded_stager.py": {
+      "sha256": "e95efe37fd10d6bb5cd431306e23af90cd74274ce5b106ccf732f9e1f650a99b",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_bounded_stager.py"
+    },
+    "helpers/epoch7_command_runner.py": {
+      "sha256": "bb1f01daffb6f8324c193f688b2fc2ec6a9bf1f8828ec7d55e1f8fe890275c24",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_command_runner.py"
+    },
+    "helpers/epoch7_complete_approval.py": {
+      "sha256": "45ae82ee6e4efba300d8ee97674d61c77a5c4695555806a69fc4c6dc133a7f95",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_complete_approval.py"
+    },
+    "helpers/epoch7_delta.py": {
+      "sha256": "f181a652d240c1678ffcd7f85de89d5cf3e101d894d82e7127a4177f719e9ad7",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_delta.py"
+    },
+    "helpers/epoch7_exact_access.py": {
+      "sha256": "b79415e92c22f7c9c4dea0417ef1aaed0ce805c2627b5aeae0c3d2d5e83dd065",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_exact_access.py"
+    },
+    "helpers/epoch7_host_containment.py": {
+      "sha256": "738af2b9ad46d941b00504a57874c8f97cd83621e8067628d8d40f1047021233",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_containment.py"
+    },
+    "helpers/epoch7_host_driver.py": {
+      "sha256": "fddbdbc389d220871ab090c0b798960c34924275cc6eb32a52afc51646d5f244",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_driver.py"
+    },
+    "helpers/epoch7_host_factory.py": {
+      "sha256": "532b320e47dfe2162de34382396490204b087354089f8602560c444f9a4923ff",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_factory.py"
+    },
+    "helpers/epoch7_host_observer.py": {
+      "sha256": "dec0d2fa6e4bf585621fb87a7569bb66000dcfd6125688e61f53ceb3ca0929af",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_observer.py"
+    },
+    "helpers/epoch7_host_phases.py": {
+      "sha256": "3c7a4ce852046c3294e8943c2d61c20204cce21b798b0557778f1043db0ea22d",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_phases.py"
+    },
+    "helpers/epoch7_injected_recovery.py": {
+      "sha256": "0578a42495956e6034f7942e8fd06d0d8f2f20e3ab4c0d98fca5bebf208586b6",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_injected_recovery.py"
+    },
+    "helpers/epoch7_live_controls.py": {
+      "sha256": "45299be838ad5f83123ebc50111aecec3e66fcd3334b5c0ec46ca2143dad4cfe",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_live_controls.py"
+    },
+    "helpers/epoch7_nginx_recipe.py": {
+      "sha256": "26f6847d1b729872ec06fd8e92ef7deb43605ea4ba405e412e239c29ad438ce4",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_nginx_recipe.py"
+    },
+    "helpers/epoch7_openclaw_recipe.py": {
+      "sha256": "8d645e21589ef147a1a368784818db853280768886095a2fce725385044f9643",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_openclaw_recipe.py"
+    },
+    "helpers/epoch7_pre_active_guards.py": {
+      "sha256": "638e83aa88b02ae1e0a11e0b94d354e4c26fe8d0087011c89cbd5989d1e07891",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_pre_active_guards.py"
+    },
+    "helpers/epoch7_protected_fs.py": {
+      "sha256": "3ff6fefe53befe09cad3452ebdaf48b3f3a793a84167ac87649ceb3337457f24",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_protected_fs.py"
+    },
+    "helpers/epoch7_quiet_startup.py": {
+      "sha256": "2960487d3753bed5b4ff6f027f83cf917911d137d75b61f604ba1b658d213476",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_quiet_startup.py"
+    },
+    "helpers/epoch7_recovery_sequence.py": {
+      "sha256": "5be0e0e1c904aecbda7e5afb90485449b38b142040365dcdb68ef18fe32e450d",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_recovery_sequence.py"
+    },
+    "helpers/epoch7_resource_observer.py": {
+      "sha256": "eae262b9841f434232ab88f4ee46f8918d7d37f630eef19dd51a8885946015a3",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_resource_observer.py"
+    },
+    "helpers/epoch7_resource_plan.py": {
+      "sha256": "c77d5869ba94ce1be68d9c3a543fa9b3fedd9f5f085375f7e97abfbf0018463e",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_resource_plan.py"
+    },
+    "helpers/epoch7_runtime_acceptance.py": {
+      "sha256": "64a9c7ca8a9724d7ba292555bed1c6cc4329638759ed47da0112d849583a38db",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_runtime_acceptance.py"
+    },
+    "helpers/epoch7_runtime_effects.py": {
+      "sha256": "f7ce4159a6f376542dfd5446b1db323975f8007b870b59abc442ab2852ee26f0",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_runtime_effects.py"
+    },
+    "helpers/epoch7_service_contract.py": {
+      "sha256": "99872d9d2724c61f13c6cee6119f5444d4fae21c3e72da05cb4ba071e5456e1a",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_service_contract.py"
+    },
+    "helpers/epoch7_service_roles.py": {
+      "sha256": "908b519b6d4ec1069a9cc15aab0e6a44c08ab24f747d6052732cca2ad1fefe31",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_service_roles.py"
+    },
+    "helpers/epoch7_snapshot.py": {
+      "sha256": "d82e1e2620b5487ad467d8d020945a7c1a4e48029378f23fd26448cba2a29b15",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_snapshot.py"
+    },
+    "helpers/epoch7_timer_tail.py": {
+      "sha256": "c364fd2141be26a0a1a8880dff502677ae4f42e06e8d12161586c2a8aeb52981",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_timer_tail.py"
+    },
+    "helpers/epoch7_unit_transitions.py": {
+      "sha256": "b878a91e8bc604fe486c41b8b1a8f444d07b4b5ebf8271d0afe26d6c997f4f91",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_unit_transitions.py"
+    },
+    "helpers/exact_access_plan.py": {
+      "sha256": "a31d7d736c39d7b9d95a50031f4e935f4f7918f629ff7a2ff69b86f09b10dcfc",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/exact_access_plan.py"
+    },
+    "helpers/node_sqlite_probe.py": {
+      "sha256": "50fc45de2684e8542cb61d773f8cea044ee9b3b4c61d7b9f00ff555b56817d2c",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/node_sqlite_probe.py"
+    },
+    "helpers/observe_epoch7.py": {
+      "sha256": "2a03cb088a0b2ca4267d061202b7b79f0203d17fb2731c2736c3e1673bf962e8",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/observe_epoch7.py"
+    },
+    "helpers/openclaw_metadata.py": {
+      "sha256": "38639e8dced1a536cd4d8dc025110853bf00d687a907f4725309353be970566c",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/openclaw_metadata.py"
+    },
+    "helpers/probe_driver.py": {
+      "sha256": "4f26d860923ceb17b311075946e04e7501ba00ad02c2f9d37730b032a439d79c",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/probe_driver.py"
+    },
+    "helpers/probe_helpers.py": {
+      "sha256": "1d58d66efad61341cb3f6ff9d8ed6cc2c497c4261224d3a4b6fe6eb7ef18efe5",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/probe_helpers.py"
+    },
+    "helpers/probe_metadata.py": {
+      "sha256": "d75110699f161164e9b90002c9fcb636e2ead4602fe6e8858106e2eda018d8b4",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/probe_metadata.py"
+    },
+    "helpers/protected_command_evidence.py": {
+      "sha256": "a81de409db2cb44b53920bb83dba13502f11305b02f85bd3d497ccbd4c59b26c",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/protected_command_evidence.py"
+    },
+    "helpers/reviewed_database.py": {
+      "sha256": "a418418717442f70cc35531b4da4a0de49ceeb098227a7a3e9729ff3895c8526",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/reviewed_database.py"
+    },
+    "helpers/reviewed_publisher.py": {
+      "sha256": "98768d5b2dbbe4e7f4a9b90a43f7ff4bec3e2fc03f138a58273ccf6e79da9f22",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/reviewed_publisher.py"
+    },
+    "helpers/reviewed_scanner.py": {
+      "sha256": "0ecc82bc12b3180b48b316457f6543e0c965d859453b5c3a99a980e20bd3153b",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/reviewed_scanner.py"
+    },
+    "helpers/reviewed_sources.json": {
+      "sha256": "ecc397a0469dca6b83266dd232a7866f3dc845ed5d37f26e9d098091396798ec",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/reviewed_sources.json"
+    },
+    "helpers/snapshot_io.py": {
+      "sha256": "69a87fcb8060e9fe4c66910dd507c0b746cb5636d815cbb7654b023e3f4efed2",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/snapshot_io.py"
+    },
+    "helpers/unit_metadata.py": {
+      "sha256": "d71d1c8bd98e8cd3a52c755c2f73a1a39280fe1a941b7695fddd4a33454c9ec7",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/unit_metadata.py"
+    },
+    "tests/acceptance_rows/test_epoch7_acceptance_rows.py": {
+      "sha256": "6579ddb45a6499d0bc098402657e3a0a8bc4c6b20024f870bb6e2fed62c6e41e",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/acceptance_rows/test_epoch7_acceptance_rows.py"
+    },
+    "tests/access_plan/test_exact_access_plan.py": {
+      "sha256": "4c43f963f9b0c7009494aea3ceb072b947b4f251979d5562cb05685de3044eff",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/access_plan/test_exact_access_plan.py"
+    },
+    "tests/approval/test_epoch7_approval.py": {
+      "sha256": "7126672b9cc8046a784c2a49c50c9c14c5869dfcbc359674088efda757e6295f",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_approval.py"
+    },
+    "tests/approval/test_epoch7_bounded_fetch.py": {
+      "sha256": "8c7b157ef839fceb52c9fdd7ab69e8308f45722f5372fbc2204c094a247134a8",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_bounded_fetch.py"
+    },
+    "tests/approval/test_epoch7_complete_approval.py": {
+      "sha256": "3900a89acd5f9834c8345fb5ab01020d1e2f02ad5bab12900ceb5c8c7382049e",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_complete_approval.py"
+    },
+    "tests/command/test_epoch7_command_runner.py": {
+      "sha256": "738e0c216d5b51a72d9b1efcb806efd465b22ab0b8dec3d4f520281140e3e1ed",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/command/test_epoch7_command_runner.py"
+    },
+    "tests/diagnostics/test_protected_command_evidence.py": {
+      "sha256": "05199172e9cc11cc0eb242a673d65f8684458a6e92f1233e4a9fcc4097f0b825",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/diagnostics/test_protected_command_evidence.py"
+    },
+    "tests/host_containment/test_epoch7_host_containment.py": {
+      "sha256": "2a145c15c107f598f7ee6b0b8ca57af73de1793105332c349e02227a6c4635db",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_containment/test_epoch7_host_containment.py"
+    },
+    "tests/host_factory/test_epoch7_full_factory.py": {
+      "sha256": "721117087dd08130089d84c77130b547d48937e274d96de16ff48567e07eff54",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_factory/test_epoch7_full_factory.py"
+    },
+    "tests/host_factory/test_epoch7_full_factory_fixture.py": {
+      "sha256": "e3075080bfd76ef13dde446aa276833deb2a9bc6ee40b4c71b8ef47d59964d20",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_factory/test_epoch7_full_factory_fixture.py"
+    },
+    "tests/host_factory/test_epoch7_host_factory.py": {
+      "sha256": "31e4ea33b48a1b54afb09d01ce98ebd71faba74e1bd7365d2f4fb7ad50bfde2b",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_factory/test_epoch7_host_factory.py"
+    },
+    "tests/host_factory/test_epoch7_timer_tail.py": {
+      "sha256": "192f40f20f23dc53b61684fbe8a8618af9c2fc757d60a341e8fd9cdacaf21028",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_factory/test_epoch7_timer_tail.py"
+    },
+    "tests/host_filesystem/test_epoch7_activation_store.py": {
+      "sha256": "03ebd1d6b180ba8b47ded813c91fc75dcebe2732eddecc9750c5073ef26e0efb",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_filesystem/test_epoch7_activation_store.py"
+    },
+    "tests/host_filesystem/test_epoch7_exact_access.py": {
+      "sha256": "4e29f0f63c7a7d8d67d29cd1a2db6a1a51d1011041b3ea23393e2a1f7dbecf80",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_filesystem/test_epoch7_exact_access.py"
+    },
+    "tests/host_filesystem/test_epoch7_host_phases.py": {
+      "sha256": "4f11bcfd6b520419999a98f837978eefd174d7959996b2c11ea7f18bed970705",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_filesystem/test_epoch7_host_phases.py"
+    },
+    "tests/host_observer/test_epoch7_host_observer.py": {
+      "sha256": "15f43cd13f13094d416decc95bd8e3ed28f3077b262c78cc593d5bbb3e99f150",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_observer/test_epoch7_host_observer.py"
+    },
+    "tests/host_observer/test_epoch7_quiet_startup.py": {
+      "sha256": "5b64e47eb9cad68f434384c9d15759413c9e87e4acfd4b1cebf6e376301bb841",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_observer/test_epoch7_quiet_startup.py"
+    },
+    "tests/host_observer/test_epoch7_resource_observer.py": {
+      "sha256": "f63b418a6490f88e1bf35f3cfe70d440f4eefae7d74ff7c900936ea8f12259a6",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_observer/test_epoch7_resource_observer.py"
+    },
+    "tests/host_stager/test_epoch7_bounded_stager.py": {
+      "sha256": "5a89ac85a0a9696bc55a3dd06f01f35435909ba05dd067fd8fbcdb5c7633ad47",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_stager/test_epoch7_bounded_stager.py"
+    },
+    "tests/live_controls/test_epoch7_live_controls.py": {
+      "sha256": "be1cb5cbb5c1b34bba5b345e0dae6e2950ec3c139ee508f5d81879d8d0606ae4",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/live_controls/test_epoch7_live_controls.py"
+    },
+    "tests/live_controls/test_epoch7_observer_binding.py": {
+      "sha256": "b3bb4cabca05d27b75b0f961ff61458fa679322bf2293bf05314d883b857603b",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/live_controls/test_epoch7_observer_binding.py"
+    },
+    "tests/live_controls/test_epoch7_service_roles.py": {
+      "sha256": "58a180cfcb0e13fa4a3eabb6256641fe60ce18b1f4c4027dcfc078f4ea4996ff",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/live_controls/test_epoch7_service_roles.py"
+    },
+    "tests/live_controls/test_epoch7_unit_transitions.py": {
+      "sha256": "3343ba9e3426b37e26fe271421624afaefc5e21fd6c2e5351ab381f208b6d702",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/live_controls/test_epoch7_unit_transitions.py"
+    },
+    "tests/package_builder/test_build_runtime_overlay.py": {
+      "sha256": "924784bb4b698c061a25945e839b98ce5f59c9e83bc415f93b8f81e9ccdff897",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/package_builder/test_build_runtime_overlay.py"
+    },
+    "tests/plan/test_current_overlay_binding_smoke.py": {
+      "sha256": "1b89bd0dceb31d9e9c13c97f47b16451d0028b279c01b586717b71dfea997b5f",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/plan/test_current_overlay_binding_smoke.py"
+    },
+    "tests/plan/test_epoch7_bindings.py": {
+      "sha256": "69a533993e2ccd58f328ce0a5bf7392dc908eb1f23212986bcb08d324142dd3b",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/plan/test_epoch7_bindings.py"
+    },
+    "tests/probe/test_node_sqlite_probe.py": {
+      "sha256": "1f5c9cbbf765183e9d8c9c9c29df07dcbb514e9b5c04e8beaed48943da47286f",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/probe/test_node_sqlite_probe.py"
+    },
+    "tests/probe/test_probe_child_cleanup.py": {
+      "sha256": "a2a3945be4a8660988fbe54ddccfd2dc1a2767c06c84c0822ebb95f7324d5a69",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/probe/test_probe_child_cleanup.py"
+    },
+    "tests/probe/test_probe_driver.py": {
+      "sha256": "6cee89c75a67a097cf47fcb6eba2b41a200c0bfa2648b7ce8d1e3f2610afb0db",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/probe/test_probe_driver.py"
+    },
+    "tests/probe/test_probe_helpers.py": {
+      "sha256": "a32bf3161d38e08c5fe77e4f111194e7763338805f9621eb410f97ddb4e33cde",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/probe/test_probe_helpers.py"
+    },
+    "tests/recovery/test_epoch7_additive_identity.py": {
+      "sha256": "4d9a2b63e30cd11ebc59f9a9680e3bdefe998e093b0224b080e17eca572e0553",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery/test_epoch7_additive_identity.py"
+    },
+    "tests/recovery/test_epoch7_additive_server.py": {
+      "sha256": "85ea2d1997ad9f024f1939a06179d681d2d52408d77648794d3f504205377d56",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery/test_epoch7_additive_server.py"
+    },
+    "tests/recovery/test_epoch7_delta.py": {
+      "sha256": "645ca391dcf82576e9cc635cc4685f5ef0c21b17e14d01df027b80dd2a2e1a9b",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery/test_epoch7_delta.py"
+    },
+    "tests/recovery/test_epoch7_injected_recovery.py": {
+      "sha256": "9e315de9390968a15b11917d8bcbc456b3e7a5b39649a3b2a63134eab4ab77e8",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery/test_epoch7_injected_recovery.py"
+    },
+    "tests/recovery/test_epoch7_phase_steps.py": {
+      "sha256": "aa1dffcea4afb4fc1e3051a00590bacb20d83b7978472ebcb4cef0b1518fc532",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery/test_epoch7_phase_steps.py"
+    },
+    "tests/recovery_filesystem/test_epoch7_protected_fs.py": {
+      "sha256": "1da63b8dc9b4c6f5a62358ec86b27cfd67f6e0260f6dbd65dd313eb6ffce9922",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery_filesystem/test_epoch7_protected_fs.py"
+    },
+    "tests/resource_plan/test_epoch7_resource_plan.py": {
+      "sha256": "1b5fc32afba4d0094a2b9e6917ba16ca1ee42af9b5887941f64cc4b10dabc95d",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/resource_plan/test_epoch7_resource_plan.py"
+    },
+    "tests/runtime_acceptance/test_epoch7_runtime_acceptance.py": {
+      "sha256": "d471e55ec9687e197ba68d22a8830d7f6822d6d7f05dc8819d81a54f570053cd",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_acceptance/test_epoch7_runtime_acceptance.py"
+    },
+    "tests/runtime_effects/test_epoch7_runtime_effects.py": {
+      "sha256": "4d622411c110b1ae77773c049bab91ca841b7e48c4e9f3394824e29c1d3f39c9",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_effects/test_epoch7_runtime_effects.py"
+    },
+    "tests/runtime_identity/test_native_peer_identity.py": {
+      "sha256": "d3e24dcfd12346febe707a9bef859ad15570ced96739046f5626ecb405709f1f",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_identity/test_native_peer_identity.py"
+    },
+    "tests/runtime_identity/test_owner_process_identity.py": {
+      "sha256": "4b993fada34df90f2183e1daa368f05018c933ed75249872fee98ee534821c3b",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_identity/test_owner_process_identity.py"
+    },
+    "tests/runtime_process/test_gateway_command_lifetime.py": {
+      "sha256": "9542da5cf59a9e841d8e7f4ed7029c2778c1e4f48c57c387586118ee8bf7bdaa",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_process/test_gateway_command_lifetime.py"
+    },
+    "tests/runtime_process/test_runtime_command_lifetime.py": {
+      "sha256": "73b20f4fa16d28496cea806afade8d8497e4e8ef9ad5dd212bb3deb093a55b55",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_process/test_runtime_command_lifetime.py"
+    },
+    "tests/runtime_projection/test_entrypoint_help.py": {
+      "sha256": "3db348155345e37fd330ae518cdd7f974ecf75310afaf9752169b31f71ae28d8",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_entrypoint_help.py"
+    },
+    "tests/runtime_projection/test_ledger_read_client.py": {
+      "sha256": "fc4007b223a22fa7ee8827e22b161033ff64e271e3444913be168f0430bedc96",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_ledger_read_client.py"
+    },
+    "tests/runtime_projection/test_ledger_read_projection.py": {
+      "sha256": "d4a017586f3305e405d58f6a68de2b737395ed1cfc7d7cb37d7c7e3cf4179242",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_ledger_read_projection.py"
+    },
+    "tests/runtime_projection/test_ledger_server_identity.py": {
+      "sha256": "5dadbd6e8d72747c21ae80b5acccb27d9318a3b74b57eee1b19e04b88dd1528a",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_ledger_server_identity.py"
+    },
+    "tests/runtime_projection/test_native_server_identity.py": {
+      "sha256": "22ea198037867fbd3ed0013f01f07725e1e0f0b187e2ecff789cd91f244c7708",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_native_server_identity.py"
+    },
+    "tests/runtime_projection/test_owner_process_gate.py": {
+      "sha256": "13625ac739efe6512ed97e6641c11ff7b31e11606b53fc84f0007b2db0d88d6c",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_owner_process_gate.py"
+    },
+    "tests/runtime_projection/test_read_integration.py": {
+      "sha256": "8d7d2b3f0cf780bf840fa30fa6a4f2f6bb2c38b30fd80f69fc5a18cf5579d5ee",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_read_integration.py"
+    },
+    "tests/runtime_projection/test_read_transport.py": {
+      "sha256": "ae0a3342858dd91d6801c425186bddbb98fb9f6f468c7ee9eb5f5d73b452fb7c",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_read_transport.py"
+    },
+    "tests/runtime_wiring/test_ledger_identity_wiring.py": {
+      "sha256": "5e1edd471e5f5f2957893dd2df83710164ba6bf5a5f8004295094480ea642324",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_wiring/test_ledger_identity_wiring.py"
+    },
+    "tests/runtime_wiring/test_service_preflight_ack.py": {
+      "sha256": "6ca53208dc9742715c5b0afc4430673c465b507be41cac4312fb158c58caa92d",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_wiring/test_service_preflight_ack.py"
+    },
+    "tests/sequence/test_epoch7_recovery_sequence.py": {
+      "sha256": "74d61a56f4fec33a104aed85d821e6457741b6fc22e81d76b866189be61d1791",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/sequence/test_epoch7_recovery_sequence.py"
+    },
+    "tests/service_contract/fixtures/openclaw-LICENSE.txt": {
+      "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/fixtures/openclaw-LICENSE.txt"
+    },
+    "tests/service_contract/fixtures/openclaw-THIRD_PARTY_NOTICES.md": {
+      "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/fixtures/openclaw-THIRD_PARTY_NOTICES.md"
+    },
+    "tests/service_contract/fixtures/openclaw-source-profile.json": {
+      "sha256": "a0f49fdda4e09f5b26e0c7bee5b2608a7b26b5661536b139779e8b5a7e8fb073",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/fixtures/openclaw-source-profile.json"
+    },
+    "tests/service_contract/fixtures/public-service-units.json": {
+      "sha256": "87e1e2af203ff983914935fc7c4d7588600e1c384f174fbf84ffceae0ad0d1a1",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/fixtures/public-service-units.json"
+    },
+    "tests/service_contract/test_epoch7_openclaw_family.py": {
+      "sha256": "db59b7821fa0b691430ab078d9b45324fc2e4581fba8f2fa9b0f281ad9fbb725",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/test_epoch7_openclaw_family.py"
+    },
+    "tests/service_contract/test_epoch7_openclaw_recipe.py": {
+      "sha256": "54939840db8eb19b3d9e8012f23d05e84fa5fa21842f4235a387b4bfc9d21745",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/test_epoch7_openclaw_recipe.py"
+    },
+    "tests/service_contract/test_epoch7_openclaw_roles.py": {
+      "sha256": "62ac95237c4e5d240f1b7e8daaf0fdb606c4f4b8d78a2f8eec827aa480221ccd",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/test_epoch7_openclaw_roles.py"
+    },
+    "tests/service_contract/test_epoch7_service_contract.py": {
+      "sha256": "a1e1324efa071c8228324fb6652ce44e7af6529fb2cd61ae1539752dfd6f07f9",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/test_epoch7_service_contract.py"
+    },
+    "tests/snapshot/test_snapshot.py": {
+      "sha256": "af3b9fc25506e9eca0495984e12a48741fa98e2af43cd55aa899530066465223",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot/test_snapshot.py"
+    },
+    "tests/snapshot_portable/test_boot_background.py": {
+      "sha256": "0c5a7926d717812efee41091d065bb2447eec9cd41449cd3a170dc23d24c6cd0",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_boot_background.py"
+    },
+    "tests/snapshot_portable/test_control_git.py": {
+      "sha256": "90ca5850437b2f52098a37bd3e671fd7ff514c01ef5e23dfccbc945146faf1a9",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_control_git.py"
+    },
+    "tests/snapshot_portable/test_openclaw_metadata.py": {
+      "sha256": "e680bf676128f3975f963f4c15699ee1d67fadec71909b076d6f70315b9a2570",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_openclaw_metadata.py"
+    },
+    "tests/snapshot_portable/test_path_sources.py": {
+      "sha256": "f67b1c3852086e8081f7db7d457cdbc4728c9b021ddc040bdd347e3cb7c328ad",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_path_sources.py"
+    },
+    "tests/snapshot_portable/test_probe_metadata.py": {
+      "sha256": "60cbd8dba4b12e187d1e5b1188db3ebf01a284830879bb35a3661803f4fcbcf4",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_probe_metadata.py"
+    },
+    "tests/snapshot_portable/test_query_lifetime.py": {
+      "sha256": "9af9a7f0160a105da73ad9af92877950be88712c568707cab5e5815a3308c852",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_query_lifetime.py"
+    },
+    "tests/snapshot_portable/test_snapshot_portable.py": {
+      "sha256": "4ebef535a8b1ea96f978a39d242c3191b53b31efe9068f0a6741c4c7fa5e1a16",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_snapshot_portable.py"
+    },
+    "tests/snapshot_portable/test_timer_metadata.py": {
+      "sha256": "1bd696faf5a1de8a94c1bccb865626b8e32fda7dfa59beff808e4bb9b88d2deb",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_timer_metadata.py"
+    },
+    "tests/snapshot_portable/test_unit_metadata.py": {
+      "sha256": "013900258c6bc57767534acb2927976f8d7e45347806a297e85604e5f314c3a0",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_unit_metadata.py"
+    },
+    "tests/uk_exact_uid_acl/test_epoch7_exact_access_uk.py": {
+      "sha256": "8984cdc5a77411051fb9c2d9d81aefcd8c662e206c14f25dfa90c349f6512635",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/uk_exact_uid_acl/test_epoch7_exact_access_uk.py"
+    },
+    "tests/unit_overlay/test_unit_overlay.py": {
+      "sha256": "06384f8ade029a73d8b7e66377b951f56d7f92856c7c26185fec72d35827657e",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/unit_overlay/test_unit_overlay.py"
+    }
+  },
+  "kind": "EPOCH7_EXPLICIT_PUBLIC_SOURCE_INDEX",
+  "modules": {
+    "activation_control": "xuanjun-p2-package/stage1/activation_control.py",
+    "callback_schema_gate": "xuanjun-p2-package/stage1/callback_schema_gate.py",
+    "codex_app_server_worker": "xuanjun-p2-package/stage1/codex_app_server_worker.py",
+    "codex_worker": "xuanjun-p2-package/stage1/codex_worker.py",
+    "dependency_evidence_view": "xuanjun-p2-package/stage1/dependency_evidence_view.py",
+    "development_loop": "xuanjun-p2-package/stage1/development_loop.py",
+    "development_pipeline": "xuanjun-p2-package/stage1/development_pipeline.py",
+    "development_service": "xuanjun-p2-package/stage1/development_service.py",
+    "epoch3_service_containment": "helpers/epoch3_service_containment.py",
+    "epoch7_acceptance_rows": "helpers/epoch7_acceptance_rows.py",
+    "epoch7_additive_identity": "helpers/epoch7_additive_identity.py",
+    "epoch7_additive_server": "helpers/epoch7_additive_server.py",
+    "epoch7_approval": "helpers/epoch7_approval.py",
+    "epoch7_bindings": "helpers/epoch7_bindings.py",
+    "epoch7_bounded_stager": "helpers/epoch7_bounded_stager.py",
+    "epoch7_command_runner": "helpers/epoch7_command_runner.py",
+    "epoch7_complete_approval": "helpers/epoch7_complete_approval.py",
+    "epoch7_delta": "helpers/epoch7_delta.py",
+    "epoch7_exact_access": "helpers/epoch7_exact_access.py",
+    "epoch7_host_containment": "helpers/epoch7_host_containment.py",
+    "epoch7_host_driver": "helpers/epoch7_host_driver.py",
+    "epoch7_host_factory": "helpers/epoch7_host_factory.py",
+    "epoch7_host_observer": "helpers/epoch7_host_observer.py",
+    "epoch7_host_phases": "helpers/epoch7_host_phases.py",
+    "epoch7_injected_recovery": "helpers/epoch7_injected_recovery.py",
+    "epoch7_live_controls": "helpers/epoch7_live_controls.py",
+    "epoch7_nginx_recipe": "helpers/epoch7_nginx_recipe.py",
+    "epoch7_openclaw_recipe": "helpers/epoch7_openclaw_recipe.py",
+    "epoch7_pre_active_guards": "helpers/epoch7_pre_active_guards.py",
+    "epoch7_protected_fs": "helpers/epoch7_protected_fs.py",
+    "epoch7_quiet_startup": "helpers/epoch7_quiet_startup.py",
+    "epoch7_recovery_sequence": "helpers/epoch7_recovery_sequence.py",
+    "epoch7_resource_observer": "helpers/epoch7_resource_observer.py",
+    "epoch7_resource_plan": "helpers/epoch7_resource_plan.py",
+    "epoch7_runtime_acceptance": "helpers/epoch7_runtime_acceptance.py",
+    "epoch7_runtime_effects": "helpers/epoch7_runtime_effects.py",
+    "epoch7_service_contract": "helpers/epoch7_service_contract.py",
+    "epoch7_service_roles": "helpers/epoch7_service_roles.py",
+    "epoch7_snapshot": "helpers/epoch7_snapshot.py",
+    "epoch7_timer_tail": "helpers/epoch7_timer_tail.py",
+    "epoch7_unit_transitions": "helpers/epoch7_unit_transitions.py",
+    "exact_access_plan": "helpers/exact_access_plan.py",
+    "execution_ledger": "xuanjun-p2-package/stage1/execution_ledger.py",
+    "execution_supervision": "xuanjun-p2-package/stage1/execution_supervision.py",
+    "github_issue_consumer": "xuanjun-p2-package/stage1/github_issue_consumer.py",
+    "ledger_backup": "xuanjun-p2-package/stage1/ledger_backup.py",
+    "ledger_cutover_transaction": "xuanjun-p2-package/stage1/ledger_cutover_transaction.py",
+    "ledger_install_stage": "xuanjun-p2-package/stage1/ledger_install_stage.py",
+    "ledger_read_client": "xuanjun-p2-package/stage1/ledger_read_client.py",
+    "ledger_read_projection": "xuanjun-p2-package/stage1/ledger_read_projection.py",
+    "ledger_read_transport": "xuanjun-p2-package/stage1/ledger_read_transport.py",
+    "ledger_server_identity": "xuanjun-p2-package/stage1/ledger_server_identity.py",
+    "ledger_service": "xuanjun-p2-package/stage1/ledger_service.py",
+    "legacy_host_adapter": "xuanjun-p2-package/stage1/legacy_host_adapter.py",
+    "legacy_quiescence": "xuanjun-p2-package/stage1/legacy_quiescence.py",
+    "mechanical_wake": "xuanjun-p2-package/stage1/mechanical_wake.py",
+    "mechanical_wake_service": "xuanjun-p2-package/stage1/mechanical_wake_service.py",
+    "native_child_adapter": "xuanjun-p2-package/stage1/native_child_adapter.py",
+    "native_gateway_controller": "xuanjun-p2-package/stage1/native_gateway_controller.py",
+    "native_github_notifier": "xuanjun-p2-package/stage1/native_github_notifier.py",
+    "native_ledger_bridge": "xuanjun-p2-package/stage1/native_ledger_bridge.py",
+    "native_ledger_operations": "xuanjun-p2-package/stage1/native_ledger_operations.py",
+    "native_peer_identity": "xuanjun-p2-package/stage1/native_peer_identity.py",
+    "native_pipeline_runtime": "xuanjun-p2-package/stage1/native_pipeline_runtime.py",
+    "native_snapshot_access": "xuanjun-p2-package/stage1/native_snapshot_access.py",
+    "node_sqlite_probe": "helpers/node_sqlite_probe.py",
+    "observe_epoch7": "helpers/observe_epoch7.py",
+    "openclaw_metadata": "helpers/openclaw_metadata.py",
+    "owner_approval_dispatch": "xuanjun-p2-package/stage1/owner_approval_dispatch.py",
+    "owner_callback_server": "xuanjun-p2-package/stage1/owner_callback_server.py",
+    "owner_dashboard": "xuanjun-p2-package/stage1/owner_dashboard.py",
+    "owner_feishu_bridge_cycle": "xuanjun-p2-package/stage1/owner_feishu_bridge_cycle.py",
+    "owner_feishu_claim_guard": "xuanjun-p2-package/stage1/owner_feishu_claim_guard.py",
+    "owner_feishu_history": "xuanjun-p2-package/stage1/owner_feishu_history.py",
+    "owner_feishu_https": "xuanjun-p2-package/stage1/owner_feishu_https.py",
+    "owner_feishu_ledger_endpoint": "xuanjun-p2-package/stage1/owner_feishu_ledger_endpoint.py",
+    "owner_feishu_transport": "xuanjun-p2-package/stage1/owner_feishu_transport.py",
+    "owner_notification_outbox": "xuanjun-p2-package/stage1/owner_notification_outbox.py",
+    "owner_process_identity": "xuanjun-p2-package/stage1/owner_process_identity.py",
+    "owner_update_router": "xuanjun-p2-package/stage1/owner_update_router.py",
+    "p2_auxiliary_isolation": "xuanjun-p2-package/stage1/p2_auxiliary_isolation.py",
+    "p2_bootstrap_files": "xuanjun-p2-package/stage1/p2_bootstrap_files.py",
+    "p2_fixed_host_runtime": "xuanjun-p2-package/stage1/p2_fixed_host_runtime.py",
+    "p2_gateway_relay": "xuanjun-p2-package/stage1/p2_gateway_relay.py",
+    "p2_install_entrypoint": "xuanjun-p2-package/stage1/p2_install_entrypoint.py",
+    "p2_legacy_adoption": "xuanjun-p2-package/stage1/p2_legacy_adoption.py",
+    "p2_prerequisites": "xuanjun-p2-package/stage1/p2_prerequisites.py",
+    "p2_publisher_bootstrap": "xuanjun-p2-package/stage1/p2_publisher_bootstrap.py",
+    "p2_rpm_prerequisites": "xuanjun-p2-package/stage1/p2_rpm_prerequisites.py",
+    "p2_sandbox_profile": "xuanjun-p2-package/stage1/p2_sandbox_profile.py",
+    "p2_service_context_preflight": "xuanjun-p2-package/stage1/p2_service_context_preflight.py",
+    "p2_tls_lifecycle": "xuanjun-p2-package/stage1/p2_tls_lifecycle.py",
+    "probe_driver": "helpers/probe_driver.py",
+    "probe_helpers": "helpers/probe_helpers.py",
+    "probe_metadata": "helpers/probe_metadata.py",
+    "protected_command_evidence": "helpers/protected_command_evidence.py",
+    "reviewed_database": "helpers/reviewed_database.py",
+    "reviewed_publisher": "helpers/reviewed_publisher.py",
+    "reviewed_scanner": "helpers/reviewed_scanner.py",
+    "root_broker": "xuanjun-p2-package/stage1/root_broker.py",
+    "run_usage_projection": "xuanjun-p2-package/stage1/run_usage_projection.py",
+    "snapshot_io": "helpers/snapshot_io.py",
+    "task_cost_projection": "xuanjun-p2-package/stage1/task_cost_projection.py",
+    "task_supervisor_inventory_adapter": "xuanjun-p2-package/stage1/task_supervisor_inventory_adapter.py",
+    "telegram_owner_transport": "xuanjun-p2-package/stage1/telegram_owner_transport.py",
+    "uk_owner_callback_core": "xuanjun-p2-package/stage1/uk_owner_callback_core.py",
+    "uk_owner_notify_worker": "xuanjun-p2-package/stage1/uk_owner_notify_worker.py",
+    "unit_metadata": "helpers/unit_metadata.py"
+  },
+  "production_resume": "AUTHENTICATED_APPROVAL_GATED_SINGLE_ATTEMPT",
+  "runtime_manifest_sha256": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
+  "runtime_source_commit": "101b465ca3554bf34fef2d53d6006b96d85c4a63",
+  "runtime_source_tree": "3ae50b40c38d9a807876c175818299e344d53134",
+  "schema": 1,
+  "test_suites": {
+    "acceptance_rows": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_acceptance_rows": "tests/acceptance_rows/test_epoch7_acceptance_rows.py"
+      },
+      "reason": "Pure compiler over authenticated public runtime bytes and synthetic nonsecret records; no host effects",
+      "tests": [
+        "tests/acceptance_rows/test_epoch7_acceptance_rows.py"
+      ]
+    },
+    "access_plan": {
+      "enabled": true,
+      "imports": {
+        "test_exact_access_plan": "tests/access_plan/test_exact_access_plan.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/access_plan/test_exact_access_plan.py"
+      ]
+    },
+    "approval": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_approval": "tests/approval/test_epoch7_approval.py",
+        "test_epoch7_bounded_fetch": "tests/approval/test_epoch7_bounded_fetch.py",
+        "test_epoch7_complete_approval": "tests/approval/test_epoch7_complete_approval.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/approval/test_epoch7_approval.py",
+        "tests/approval/test_epoch7_bounded_fetch.py",
+        "tests/approval/test_epoch7_complete_approval.py"
+      ]
+    },
+    "command": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_command_runner": "tests/command/test_epoch7_command_runner.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/command/test_epoch7_command_runner.py"
+      ]
+    },
+    "diagnostics": {
+      "enabled": true,
+      "imports": {
+        "test_protected_command_evidence": "tests/diagnostics/test_protected_command_evidence.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/diagnostics/test_protected_command_evidence.py"
+      ]
+    },
+    "host_containment": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_host_containment": "tests/host_containment/test_epoch7_host_containment.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/host_containment/test_epoch7_host_containment.py"
+      ]
+    },
+    "host_factory": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_acceptance_rows": "tests/acceptance_rows/test_epoch7_acceptance_rows.py",
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_full_factory": "tests/host_factory/test_epoch7_full_factory.py",
+        "test_epoch7_full_factory_fixture": "tests/host_factory/test_epoch7_full_factory_fixture.py",
+        "test_epoch7_host_factory": "tests/host_factory/test_epoch7_host_factory.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_live_controls": "tests/live_controls/test_epoch7_live_controls.py",
+        "test_epoch7_observer_binding": "tests/live_controls/test_epoch7_observer_binding.py",
+        "test_epoch7_openclaw_family": "tests/service_contract/test_epoch7_openclaw_family.py",
+        "test_epoch7_openclaw_recipe": "tests/service_contract/test_epoch7_openclaw_recipe.py",
+        "test_epoch7_openclaw_roles": "tests/service_contract/test_epoch7_openclaw_roles.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py",
+        "test_epoch7_service_contract": "tests/service_contract/test_epoch7_service_contract.py",
+        "test_epoch7_service_roles": "tests/live_controls/test_epoch7_service_roles.py",
+        "test_epoch7_timer_tail": "tests/host_factory/test_epoch7_timer_tail.py",
+        "test_epoch7_unit_transitions": "tests/live_controls/test_epoch7_unit_transitions.py",
+        "test_node_sqlite_probe": "tests/probe/test_node_sqlite_probe.py",
+        "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
+        "test_probe_driver": "tests/probe/test_probe_driver.py",
+        "test_probe_helpers": "tests/probe/test_probe_helpers.py"
+      },
+      "reason": "Boundary-mock assembly/timer tests plus real107-source pure whole-factory compilation with synthetic measured host/probe records; only unavailable historical private sidefile pin is test-remapped, never a compiler result",
+      "tests": [
+        "tests/host_factory/test_epoch7_host_factory.py",
+        "tests/host_factory/test_epoch7_timer_tail.py",
+        "tests/host_factory/test_epoch7_full_factory.py"
+      ]
+    },
+    "host_filesystem": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_activation_store": "tests/host_filesystem/test_epoch7_activation_store.py",
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_exact_access": "tests/host_filesystem/test_epoch7_exact_access.py",
+        "test_epoch7_host_phases": "tests/host_filesystem/test_epoch7_host_phases.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py"
+      },
+      "reason": "General filesystem logic in authenticated disposable-copy confinement; exact fixed-UK-UID case separately required",
+      "tests": [
+        "tests/host_filesystem/test_epoch7_host_phases.py",
+        "tests/host_filesystem/test_epoch7_exact_access.py",
+        "tests/host_filesystem/test_epoch7_activation_store.py"
+      ]
+    },
+    "host_observer": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_host_observer": "tests/host_observer/test_epoch7_host_observer.py",
+        "test_epoch7_quiet_startup": "tests/host_observer/test_epoch7_quiet_startup.py",
+        "test_epoch7_resource_observer": "tests/host_observer/test_epoch7_resource_observer.py"
+      },
+      "reason": "General filesystem logic in authenticated disposable-copy confinement; exact fixed-UK-UID case separately required",
+      "tests": [
+        "tests/host_observer/test_epoch7_host_observer.py",
+        "tests/host_observer/test_epoch7_resource_observer.py",
+        "tests/host_observer/test_epoch7_quiet_startup.py"
+      ]
+    },
+    "host_stager": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_bounded_stager": "tests/host_stager/test_epoch7_bounded_stager.py"
+      },
+      "reason": "Read the same SHA-pinned frozen installer from authenticated current staged runtime instead of historical workspace path; namespace and bounded-command assertions unchanged.",
+      "tests": [
+        "tests/host_stager/test_epoch7_bounded_stager.py"
+      ]
+    },
+    "live_controls": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_live_controls": "tests/live_controls/test_epoch7_live_controls.py",
+        "test_epoch7_observer_binding": "tests/live_controls/test_epoch7_observer_binding.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py",
+        "test_epoch7_service_roles": "tests/live_controls/test_epoch7_service_roles.py",
+        "test_epoch7_unit_transitions": "tests/live_controls/test_epoch7_unit_transitions.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/live_controls/test_epoch7_live_controls.py",
+        "tests/live_controls/test_epoch7_observer_binding.py",
+        "tests/live_controls/test_epoch7_service_roles.py",
+        "tests/live_controls/test_epoch7_unit_transitions.py"
+      ]
+    },
+    "package_builder": {
+      "enabled": false,
+      "imports": {
+        "test_build_runtime_overlay": "tests/package_builder/test_build_runtime_overlay.py"
+      },
+      "reason": "Tests workspace package construction from historical inputs rather than staged runtime; separate local evidence",
+      "tests": [
+        "tests/package_builder/test_build_runtime_overlay.py"
+      ]
+    },
+    "plan": {
+      "enabled": false,
+      "imports": {
+        "test_current_overlay_binding_smoke": "tests/plan/test_current_overlay_binding_smoke.py",
+        "test_epoch7_bindings": "tests/plan/test_epoch7_bindings.py"
+      },
+      "reason": "Reads private prior compiled plan and historical workspace runtime; intentionally not bundled",
+      "tests": [
+        "tests/plan/test_epoch7_bindings.py",
+        "tests/plan/test_current_overlay_binding_smoke.py"
+      ]
+    },
+    "probe": {
+      "enabled": true,
+      "imports": {
+        "test_node_sqlite_probe": "tests/probe/test_node_sqlite_probe.py",
+        "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
+        "test_probe_driver": "tests/probe/test_probe_driver.py",
+        "test_probe_helpers": "tests/probe/test_probe_helpers.py"
+      },
+      "reason": "Pure policy/mocked probe and bounded harmless child/file fixtures; real systemd probe is never invoked",
+      "tests": [
+        "tests/probe/test_probe_driver.py",
+        "tests/probe/test_probe_helpers.py",
+        "tests/probe/test_probe_child_cleanup.py",
+        "tests/probe/test_node_sqlite_probe.py"
+      ]
+    },
+    "recovery": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_phase_steps": "tests/recovery/test_epoch7_phase_steps.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/recovery/test_epoch7_delta.py",
+        "tests/recovery/test_epoch7_additive_identity.py",
+        "tests/recovery/test_epoch7_additive_server.py",
+        "tests/recovery/test_epoch7_injected_recovery.py",
+        "tests/recovery/test_epoch7_phase_steps.py"
+      ]
+    },
+    "recovery_filesystem": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_protected_fs": "tests/recovery_filesystem/test_epoch7_protected_fs.py"
+      },
+      "reason": "General filesystem logic in authenticated disposable-copy confinement; exact fixed-UK-UID case separately required",
+      "tests": [
+        "tests/recovery_filesystem/test_epoch7_protected_fs.py"
+      ]
+    },
+    "resource_plan": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_acceptance_rows": "tests/acceptance_rows/test_epoch7_acceptance_rows.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_host_observer": "tests/host_observer/test_epoch7_host_observer.py",
+        "test_epoch7_resource_observer": "tests/host_observer/test_epoch7_resource_observer.py",
+        "test_epoch7_resource_plan": "tests/resource_plan/test_epoch7_resource_plan.py"
+      },
+      "reason": "All17 actual-byte resource checkpoint projections in authenticated disposable-copy confinement",
+      "tests": [
+        "tests/resource_plan/test_epoch7_resource_plan.py"
+      ]
+    },
+    "runtime_acceptance": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_runtime_acceptance": "tests/runtime_acceptance/test_epoch7_runtime_acceptance.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/runtime_acceptance/test_epoch7_runtime_acceptance.py"
+      ]
+    },
+    "runtime_effects": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_runtime_effects": "tests/runtime_effects/test_epoch7_runtime_effects.py"
+      },
+      "reason": "Import the exact already-enumerated frozen epoch3 containment source through the authenticated cache instead of reopening a mutable sibling path; all containment/effect assertions unchanged.",
+      "tests": [
+        "tests/runtime_effects/test_epoch7_runtime_effects.py"
+      ]
+    },
+    "runtime_identity": {
+      "enabled": true,
+      "imports": {
+        "test_native_peer_identity": "tests/runtime_identity/test_native_peer_identity.py",
+        "test_owner_process_identity": "tests/runtime_identity/test_owner_process_identity.py"
+      },
+      "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
+      "tests": [
+        "tests/runtime_identity/test_native_peer_identity.py",
+        "tests/runtime_identity/test_owner_process_identity.py"
+      ]
+    },
+    "runtime_process": {
+      "enabled": true,
+      "imports": {
+        "test_gateway_command_lifetime": "tests/runtime_process/test_gateway_command_lifetime.py",
+        "test_runtime_command_lifetime": "tests/runtime_process/test_runtime_command_lifetime.py"
+      },
+      "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
+      "tests": [
+        "tests/runtime_process/test_runtime_command_lifetime.py",
+        "tests/runtime_process/test_gateway_command_lifetime.py"
+      ]
+    },
+    "runtime_projection": {
+      "enabled": true,
+      "imports": {
+        "test_entrypoint_help": "tests/runtime_projection/test_entrypoint_help.py",
+        "test_ledger_read_client": "tests/runtime_projection/test_ledger_read_client.py",
+        "test_ledger_read_projection": "tests/runtime_projection/test_ledger_read_projection.py",
+        "test_ledger_server_identity": "tests/runtime_projection/test_ledger_server_identity.py",
+        "test_native_server_identity": "tests/runtime_projection/test_native_server_identity.py",
+        "test_owner_process_gate": "tests/runtime_projection/test_owner_process_gate.py",
+        "test_read_integration": "tests/runtime_projection/test_read_integration.py",
+        "test_read_transport": "tests/runtime_projection/test_read_transport.py"
+      },
+      "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
+      "tests": [
+        "tests/runtime_projection/test_ledger_read_client.py",
+        "tests/runtime_projection/test_ledger_read_projection.py",
+        "tests/runtime_projection/test_read_transport.py",
+        "tests/runtime_projection/test_ledger_server_identity.py",
+        "tests/runtime_projection/test_native_server_identity.py",
+        "tests/runtime_projection/test_read_integration.py",
+        "tests/runtime_projection/test_owner_process_gate.py",
+        "tests/runtime_projection/test_entrypoint_help.py"
+      ]
+    },
+    "runtime_wiring": {
+      "enabled": true,
+      "imports": {
+        "test_ledger_identity_wiring": "tests/runtime_wiring/test_ledger_identity_wiring.py",
+        "test_service_preflight_ack": "tests/runtime_wiring/test_service_preflight_ack.py"
+      },
+      "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
+      "tests": [
+        "tests/runtime_wiring/test_ledger_identity_wiring.py",
+        "tests/runtime_wiring/test_service_preflight_ack.py"
+      ]
+    },
+    "sequence": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/sequence/test_epoch7_recovery_sequence.py"
+      ]
+    },
+    "service_contract": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_live_controls": "tests/live_controls/test_epoch7_live_controls.py",
+        "test_epoch7_observer_binding": "tests/live_controls/test_epoch7_observer_binding.py",
+        "test_epoch7_openclaw_family": "tests/service_contract/test_epoch7_openclaw_family.py",
+        "test_epoch7_openclaw_recipe": "tests/service_contract/test_epoch7_openclaw_recipe.py",
+        "test_epoch7_openclaw_roles": "tests/service_contract/test_epoch7_openclaw_roles.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py",
+        "test_epoch7_service_contract": "tests/service_contract/test_epoch7_service_contract.py",
+        "test_epoch7_service_roles": "tests/live_controls/test_epoch7_service_roles.py",
+        "test_epoch7_unit_transitions": "tests/live_controls/test_epoch7_unit_transitions.py",
+        "test_node_sqlite_probe": "tests/probe/test_node_sqlite_probe.py",
+        "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
+        "test_probe_driver": "tests/probe/test_probe_driver.py",
+        "test_probe_helpers": "tests/probe/test_probe_helpers.py"
+      },
+      "reason": "Pure whole-service compiler and process-family tests using exact current runtime bytes plus 31 official fixed OpenClaw source rows and licenses, with explicitly synthetic host/probe records",
+      "tests": [
+        "tests/service_contract/test_epoch7_service_contract.py",
+        "tests/service_contract/test_epoch7_openclaw_recipe.py",
+        "tests/service_contract/test_epoch7_openclaw_roles.py",
+        "tests/service_contract/test_epoch7_openclaw_family.py"
+      ]
+    },
+    "snapshot": {
+      "enabled": false,
+      "imports": {
+        "test_snapshot": "tests/snapshot/test_snapshot.py"
+      },
+      "reason": "REQUIRED_NOT_RUN historical ReuseTests.test_selected_functions_identical_to_frozen_sources needs original frozen source files and reviewed_sources.json; all other general assertions are mandatory through the documented snapshot_portable adapter, including current staged identity rendering.",
+      "tests": [
+        "tests/snapshot/test_snapshot.py"
+      ]
+    },
+    "snapshot_portable": {
+      "enabled": true,
+      "imports": {
+        "test_boot_background": "tests/snapshot_portable/test_boot_background.py",
+        "test_control_git": "tests/snapshot_portable/test_control_git.py",
+        "test_openclaw_metadata": "tests/snapshot_portable/test_openclaw_metadata.py",
+        "test_path_sources": "tests/snapshot_portable/test_path_sources.py",
+        "test_probe_metadata": "tests/snapshot_portable/test_probe_metadata.py",
+        "test_query_lifetime": "tests/snapshot_portable/test_query_lifetime.py",
+        "test_snapshot": "tests/snapshot/test_snapshot.py",
+        "test_snapshot_portable": "tests/snapshot_portable/test_snapshot_portable.py",
+        "test_timer_metadata": "tests/snapshot_portable/test_timer_metadata.py",
+        "test_unit_metadata": "tests/snapshot_portable/test_unit_metadata.py"
+      },
+      "reason": "Public staged-source metadata, injected host observations and harmless owned-child fixtures; no real host collection",
+      "tests": [
+        "tests/snapshot_portable/test_probe_metadata.py",
+        "tests/snapshot_portable/test_timer_metadata.py",
+        "tests/snapshot_portable/test_control_git.py",
+        "tests/snapshot_portable/test_query_lifetime.py",
+        "tests/snapshot_portable/test_unit_metadata.py",
+        "tests/snapshot_portable/test_boot_background.py",
+        "tests/snapshot_portable/test_path_sources.py",
+        "tests/snapshot_portable/test_snapshot_portable.py",
+        "tests/snapshot_portable/test_openclaw_metadata.py"
+      ]
+    },
+    "uk_exact_uid_acl": {
+      "enabled": false,
+      "imports": {
+        "test_epoch7_activation_store": "tests/host_filesystem/test_epoch7_activation_store.py",
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_exact_access": "tests/host_filesystem/test_epoch7_exact_access.py",
+        "test_epoch7_exact_access_uk": "tests/uk_exact_uid_acl/test_epoch7_exact_access_uk.py",
+        "test_epoch7_host_phases": "tests/host_filesystem/test_epoch7_host_phases.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py"
+      },
+      "reason": "REQUIRED_NOT_RUN: ActualFDTests.test_actual_fd_acl_changes_only_two_named_access_sets needs kernel UID mappings1002/1003/1004; no substitute from mocked grants or current-UID xattr roundtrip",
+      "tests": [
+        "tests/uk_exact_uid_acl/test_epoch7_exact_access_uk.py"
+      ]
+    },
+    "unit_overlay": {
+      "enabled": false,
+      "imports": {
+        "test_unit_overlay": "tests/unit_overlay/test_unit_overlay.py"
+      },
+      "reason": "Compares historical frozen runtime and original overlay paths outside staged kit",
+      "tests": [
+        "tests/unit_overlay/test_unit_overlay.py"
+      ]
+    }
+  },
+  "tools": {
+    "README.md": {
+      "sha256": "087caf41dfa1152d5ca41ef91771f4a43d1ff10305f9f53057d76fdad0f5c022",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/README.md"
+    },
+    "audit_epoch7_imports.py": {
+      "sha256": "afd8d4ae93622cb2ee402166869a33a1360e4f1fb5d6da1053c42a7e3fd62f8d",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/audit_epoch7_imports.py"
+    },
+    "build_epoch7_kit.py": {
+      "sha256": "f74fd294bcd928d95cb0aa305f4d4f6037a8a56b892449860c7c5e3a7a0acdf0",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/build_epoch7_kit.py"
+    },
+    "extract_epoch7_kit.py": {
+      "sha256": "bb387213e7d1c2b36472161d564aabd6ec02dc59601c9f14df91915d14541134",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/extract_epoch7_kit.py"
+    },
+    "portable-tests/ADAPTERS.json": {
+      "sha256": "3aeec9ef3257ca931f23eba3b4a5759fb7e35e6fe8a57e19b7db3afbad24a418",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/portable-tests/ADAPTERS.json"
+    },
+    "run_epoch7_offline.py": {
+      "sha256": "3d2ac8db1c8a3e8de38ae2e90be7c7a4d7dcae52b96ba92f0f045973987e2788",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/run_epoch7_offline.py"
+    },
+    "run_published_kit_ci.py": {
+      "sha256": "1f15bda6fe2ac892350765be2b4115044833c8a938776f6386c29e0174a5c661",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/run_published_kit_ci.py"
+    },
+    "test_epoch7_kit.py": {
+      "sha256": "d1580add6d72468fb294fea928706c20f8f2133ffa801ac418ea98939cf01635",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/test_epoch7_kit.py"
+    }
+  }
+}

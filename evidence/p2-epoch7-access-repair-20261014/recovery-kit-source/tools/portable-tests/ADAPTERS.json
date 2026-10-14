@@ -1,0 +1,148 @@
+{
+  "kind": "EXPLICIT_STAGED_TEST_LOCATION_ADAPTERS",
+  "production_effects": "NONE",
+  "recipes": [
+    {
+      "adapted": "test_native_peer_identity.py",
+      "adapted_sha256": "d3e24dcfd12346febe707a9bef859ad15570ced96739046f5626ecb405709f1f",
+      "scope": [
+        "Replace direct file-loader with authenticated runtime import; staged runtime supplies the service-unit text.",
+        "Use an independent disposable local fixture directory; process and inode assertions unchanged.",
+        "Replace historical zero-supplementary-groups expectation with exactly one SupplementaryGroups=xuanjun-dispatcher line, matching reviewed 101b465c runtime; rejects extra groups or duplicate grants."
+      ],
+      "source": "identity-candidate/tests/test_native_peer_identity.py",
+      "source_sha256": "7903e1fa6d0e1c4907bd83e336d3c5c807960d34abc1c2d798673d41dd36fafe"
+    },
+    {
+      "adapted": "test_owner_process_identity.py",
+      "adapted_sha256": "4b993fada34df90f2183e1daa368f05018c933ed75249872fee98ee534821c3b",
+      "scope": [
+        "Remove workspace path mutation and import authenticated staged Owner identity.",
+        "Require the callback core from that same staged package; all process/gate assertions unchanged."
+      ],
+      "source": "identity-candidate/tests/test_owner_process_identity.py",
+      "source_sha256": "50a4680ffe2808eea009a87e4d0826b0a4c693f9cb45fc93236c4b48edfbf26b"
+    },
+    {
+      "adapted": "test_read_integration.py",
+      "adapted_sha256": "8d7d2b3f0cf780bf840fa30fa6a4f2f6bb2c38b30fd80f69fc5a18cf5579d5ee",
+      "scope": [
+        "Move disposable SQLite/socket fixture directory outside the protected kit; tests and assertions unchanged."
+      ],
+      "source": "projection-candidate/tests/test_read_integration.py",
+      "source_sha256": "9ab3e36d68f4e74ea55ce4381a09c878a30a7a10df3981a3095b13ff624beea7"
+    },
+    {
+      "adapted": "test_entrypoint_help.py",
+      "adapted_sha256": "3db348155345e37fd330ae518cdd7f974ecf75310afaf9752169b31f71ae28d8",
+      "scope": [
+        "Locate existing harmless --help subprocess scripts in the authenticated staged runtime; assertions unchanged."
+      ],
+      "source": "projection-candidate/tests/test_entrypoint_help.py",
+      "source_sha256": "36b950296b1d17e32f6645145960caf164e0c014823c93e2fd92d37ae3efcf46"
+    },
+    {
+      "adapted": "test_epoch7_host_phases.py",
+      "adapted_sha256": "4f11bcfd6b520419999a98f837978eefd174d7959996b2c11ea7f18bed970705",
+      "scope": [
+        "Redirect confined fixture roots to helpers/fixtures in the authenticated disposable copy; production confinement and assertions unchanged."
+      ],
+      "source": "host-driver-candidate/test_epoch7_host_phases.py",
+      "source_sha256": "f56bdc92ccbcad2f219bb4eccabfe53cbfdf5c2f020472baffde0e0d694c9a9c"
+    },
+    {
+      "adapted": "test_epoch7_exact_access.py",
+      "adapted_sha256": "4e29f0f63c7a7d8d67d29cd1a2db6a1a51d1011041b3ea23393e2a1f7dbecf80",
+      "scope": [
+        "Redirect confined fixture roots to helpers/fixtures in the authenticated disposable copy; production confinement and assertions unchanged.",
+        "General suite explicitly excludes only ActualFDTests.test_actual_fd_acl_changes_only_two_named_access_sets; that case remains in uk_exact_uid_acl, required on mapped UK UID environment and NOT_RUN here. Current-UID real xattr test remains included."
+      ],
+      "source": "host-driver-candidate/test_epoch7_exact_access.py",
+      "source_sha256": "4d8526b12f3224f9b9743ff5a871cbc928ea130c0d3d17b1bf5ef35df433201f"
+    },
+    {
+      "adapted": "test_epoch7_exact_access_uk.py",
+      "adapted_sha256": "8984cdc5a77411051fb9c2d9d81aefcd8c662e206c14f25dfa90c349f6512635",
+      "scope": [
+        "Same fixture-root adapter, selecting only the one exact kernel ACL case for UIDs1002/1003/1004; kept separately required and NOT_RUN on unsupported fixture UIDs."
+      ],
+      "source": "host-driver-candidate/test_epoch7_exact_access.py",
+      "source_sha256": "4d8526b12f3224f9b9743ff5a871cbc928ea130c0d3d17b1bf5ef35df433201f"
+    },
+    {
+      "adapted": "test_epoch7_activation_store.py",
+      "adapted_sha256": "03ebd1d6b180ba8b47ded813c91fc75dcebe2732eddecc9750c5073ef26e0efb",
+      "scope": [
+        "Redirect confined fixture roots to helpers/fixtures in the authenticated disposable copy; production confinement and assertions unchanged."
+      ],
+      "source": "host-driver-candidate/test_epoch7_activation_store.py",
+      "source_sha256": "33533950cefe05553a702f45e0440274b7f4b05698b7c774e06b8f91b1835fcd"
+    },
+    {
+      "adapted": "test_epoch7_host_observer.py",
+      "adapted_sha256": "15f43cd13f13094d416decc95bd8e3ed28f3077b262c78cc593d5bbb3e99f150",
+      "scope": [
+        "Redirect confined fixture roots to helpers/fixtures in the authenticated disposable copy; production confinement and assertions unchanged."
+      ],
+      "source": "host-driver-candidate/test_epoch7_host_observer.py",
+      "source_sha256": "592e391d876c3e48a53da184aa77d23e73fcbd903acf0bdc701ef97fadf9e612"
+    },
+    {
+      "adapted": "test_epoch7_resource_observer.py",
+      "adapted_sha256": "f63b418a6490f88e1bf35f3cfe70d440f4eefae7d74ff7c900936ea8f12259a6",
+      "scope": [
+        "Redirect confined fixture roots to helpers/fixtures in the authenticated disposable copy; production confinement and assertions unchanged."
+      ],
+      "source": "host-driver-candidate/test_epoch7_resource_observer.py",
+      "source_sha256": "445ae6b8719b7c2e0e69b8f8a80de7f3f38142c809bd20ab5f131554208b168d"
+    },
+    {
+      "adapted": "test_epoch7_resource_plan.py",
+      "adapted_sha256": "1b5fc32afba4d0094a2b9e6917ba16ca1ee42af9b5887941f64cc4b10dabc95d",
+      "scope": [
+        "Redirect confined fixture roots to helpers/fixtures in the authenticated disposable copy; production confinement and assertions unchanged."
+      ],
+      "source": "host-driver-candidate/test_epoch7_resource_plan.py",
+      "source_sha256": "889bda3a31c84b3c735350fa6a2e06abd547245c7a9d604d8090ccf0e12eb4d5"
+    },
+    {
+      "adapted": "test_epoch7_protected_fs.py",
+      "adapted_sha256": "1da63b8dc9b4c6f5a62358ec86b27cfd67f6e0260f6dbd65dd313eb6ffce9922",
+      "scope": [
+        "Redirect confined fixture roots to helpers/fixtures in the authenticated disposable copy; production confinement and assertions unchanged."
+      ],
+      "source": "recovery-design-candidate/test_epoch7_protected_fs.py",
+      "source_sha256": "01dd4f9d6885f54cda1fcbc97d41425e5eb729e4e182ba85196a66a39b99c282"
+    },
+    {
+      "adapted": "test_snapshot_portable.py",
+      "adapted_sha256": "4ebef535a8b1ea96f978a39d242c3191b53b31efe9068f0a6741c4c7fa5e1a16",
+      "scope": [
+        "All general collector, descriptor, observation and manager checks remain mandatory; temporary files use external disposable storage.",
+        "Source assertions read authenticated helper paths; exact frozen-installer rendering roundtrip uses the authenticated current107-file runtime rather than historical v4.",
+        "Only ReuseTests.test_selected_functions_identical_to_frozen_sources is separately REQUIRED_NOT_RUN because historical source originals and reviewed_sources.json are not part of the current kit."
+      ],
+      "source": "snapshot-candidate/tests/test_snapshot.py",
+      "source_sha256": "af3b9fc25506e9eca0495984e12a48741fa98e2af43cd55aa899530066465223"
+    },
+    {
+      "adapted": "test_epoch7_bounded_stager.py",
+      "adapted_sha256": "5a89ac85a0a9696bc55a3dd06f01f35435909ba05dd067fd8fbcdb5c7633ad47",
+      "scope": [
+        "Read the same SHA-pinned frozen installer from authenticated current staged runtime instead of historical workspace path; namespace and bounded-command assertions unchanged."
+      ],
+      "source": "host-driver-candidate/test_epoch7_bounded_stager.py",
+      "source_sha256": "63dc4580aaef0362d6bfb5c7a969b92ba17b48ba37648c61340c6f7f4b1d4fe1"
+    },
+    {
+      "adapted": "test_epoch7_runtime_effects.py",
+      "adapted_sha256": "4d622411c110b1ae77773c049bab91ca841b7e48c4e9f3394824e29c1d3f39c9",
+      "scope": [
+        "Import the exact already-enumerated frozen epoch3 containment source through the authenticated cache instead of reopening a mutable sibling path; all containment/effect assertions unchanged."
+      ],
+      "source": "runtime-effects-candidate/test_epoch7_runtime_effects.py",
+      "source_sha256": "03b16978f5ae6173fed1973a9697e98e5e406d10726248a562b3f834414472e8"
+    }
+  ],
+  "schema": 1
+}
