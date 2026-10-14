@@ -29,7 +29,7 @@ def validate_observation(value):
             all(r['original_state_matches'] is True for r in rows),'EPOCH5_TARGET_DRIFT')
     rows=value['bootstrap']
     require(len(rows)==7 and len({r['target'] for r in rows})==7 and
-            all(r['published_identity_matches'] is True and r['journal_state']=='PUBLISHED'
+            all((r['published_identity_matches'] is True or (r.get('recognized_epoch4_native_rebind') is True and r['target']==NATIVE)) and r['journal_state']=='PUBLISHED'
                 and r['temporary']=='ABSENT' for r in rows),'EPOCH5_BOOTSTRAP_DRIFT')
     require(value['rpm_journal_sha256']==RPM_JOURNAL_SHA and value['rpm_journal_state']=='INSTALLED',
             'EPOCH5_RPM_JOURNAL')

@@ -37,6 +37,14 @@ def metadata(path):
  if stat.S_ISDIR(i.st_mode):return {'state':'DIRECTORY','uid':i.st_uid,'gid':i.st_gid,'mode':stat.S_IMODE(i.st_mode),'dev':i.st_dev,'ino':i.st_ino}
  data,i=file_data(path)
  return {'state':'FILE','sha256':sha(data),'uid':i.st_uid,'gid':i.st_gid,'mode':stat.S_IMODE(i.st_mode),'dev':i.st_dev,'ino':i.st_ino,'nlink':i.st_nlink,'size':len(data)}
+NATIVE='/etc/xuanjun-development/p2-native-binding.json'
+NATIVE_BEFORE_SHA='94598c41b7b3342ee7be5206577d127a3c3e90f06972a2160ffdd35e6949da98'
+NATIVE_AFTER={'state':'FILE','sha256':'91c65c9fbc5c2cf68648672b4c096d7df376ecfbc605bc4cc838300bd302f629','uid':0,'gid':0,'mode':0o644,'dev':64771,'ino':1838476,'nlink':1,'size':831}
+def recognized_native_rebind(row,value,temporary):
+ return (row['target']==NATIVE and row['sha256']==NATIVE_BEFORE_SHA and
+         row['state']=='PUBLISHED' and (row['owner_uid'],row['group_gid'],row['mode'])==(0,0,0o644) and
+         temporary['state']=='ABSENT' and value==NATIVE_AFTER)
+
 def main():
  need(os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ','FIXED_ROOT_HOST')
  values={}
@@ -54,7 +62,7 @@ def main():
  for row in values[T+'/bootstrap-files.json']['files']:
   v=metadata(row['target']);temp=metadata(row['temp'])
   match=v['state']=='FILE' and all(v[k]==row[k] for k in ('sha256','dev','ino','mode')) and v['uid']==row['owner_uid'] and v['gid']==row['group_gid'] and temp['state']=='ABSENT'
-  bootstrap.append({'target':row['target'],'journal_state':row['state'],'published_identity_matches':match,'observed':v,'temporary':temp['state']})
+  bootstrap.append({'target':row['target'],'journal_state':row['state'],'published_identity_matches':match,'recognized_epoch4_native_rebind':recognized_native_rebind(row,v,temp),'observed':v,'temporary':temp['state']})
  pub=[]
  for row in values[T+'/publisher-bootstrap.json']['directories']:
   v=metadata(row['target']);stage=metadata(row['stage'])
