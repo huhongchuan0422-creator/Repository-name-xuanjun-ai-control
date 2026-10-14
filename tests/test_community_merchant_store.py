@@ -46,4 +46,31 @@ class StoreTests(unittest.TestCase):
  def test_paused_hidden(self):
   upsert_profile(self.db,S,A,dict(P,status="PAUSED"))
   with self.assertRaises(ValueError):profile(self.db,S)
+ def test_two_connections_stale_update_rejected(self):
+  with tempfile.TemporaryDirectory() as d:
+   path=os.path.join(d,"race.sqlite")
+   a=open_store(path);b=open_store(path)
+   try:
+    upsert_profile(a,S,A,P)
+    class InterleavingConnection:
+     def __init__(self,inner):self.inner=inner;self.fired=False
+     def __enter__(self):self.inner.__enter__();return self
+     def __exit__(self,*args):return self.inner.__exit__(*args)
+     def execute(self,statement,params=()):
+      if not self.fired and statement.startswith("UPDATE merchant_profiles"):
+       self.fired=True
+       self.inner.rollback()
+       upsert_profile(b,S,A,dict(P,name="B committed"),1)
+      return self.inner.execute(statement,params)
+    with self.assertRaisesRegex(ValueError,"STALE_VERSION"):
+     upsert_profile(InterleavingConnection(a),S,A,dict(P,name="A stale"),1)
+    self.assertEqual(profile(b,S)["name"],"B committed")
+    self.assertEqual(profile(b,S)["version"],2)
+   finally:a.close();b.close()
+ def test_no_false_success_after_version_collision(self):
+  self.create()
+  upsert_profile(self.db,S,A,dict(P,name="winner"),1)
+  with self.assertRaisesRegex(ValueError,"STALE_VERSION"):
+   upsert_profile(self.db,S,A,dict(P,name="loser"),1)
+  self.assertEqual(profile(self.db,S)["name"],"winner")
 if __name__=="__main__":unittest.main()
