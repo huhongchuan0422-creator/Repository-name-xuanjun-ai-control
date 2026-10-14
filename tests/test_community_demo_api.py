@@ -196,8 +196,8 @@ class HTTPTests(unittest.TestCase):
         self._drip_and_probe(b"POST /demo/orders HTTP/1.",b"1","after_slow_line")
     def test_absolute_deadline_rejects_trickling_headers(self):
         port=self.server.server_address[1]
-        prefix=(f"POST /demo/orders HTTP/1.1\\r\\nHost: 127.0.0.1:{port}\\r\\n"
-                "Content-Type: application/json\\r\\nX-Slow: ").encode('ascii')
+        prefix=(f"POST /demo/orders HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
+                "Content-Type: application/json\r\nX-Slow: ").encode('ascii')
         self._drip_and_probe(prefix,b"x","after_slow_headers")
     def test_no_real_pay_route(self):
         self.assertEqual(self.post('/api/pay/wechat','{}')[0],404)
