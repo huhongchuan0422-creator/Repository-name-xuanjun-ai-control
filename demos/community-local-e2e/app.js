@@ -100,7 +100,7 @@ function validStorefront(data){
  if(ad!==null && (!ad||typeof ad!=="object"||Array.isArray(ad)||
     !exact(ad,["id","title","url","slot"])||
     ad.slot!==slots[0]||typeof ad.title!=="string"||typeof ad.id!=="string"||
-    typeof ad.url!=="string"||!/^https:\/\/[A-Za-z0-9.-]+(?:[:]\d+)?(?:\/[^\\s]*)?$/.test(ad.url)))
+    typeof ad.url!=="string"||!/^https:\/\/[A-Za-z0-9.-]+(?:[:]\d+)?(?:\/[^\s]*)?$/.test(ad.url)))
     throw Error("广告返回数据不可信");
  return ad;
 }
