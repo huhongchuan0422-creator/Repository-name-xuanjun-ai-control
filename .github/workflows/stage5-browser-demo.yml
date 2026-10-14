@@ -1,0 +1,21 @@
+name: Stage5 Browser Demo
+on:
+  pull_request:
+    paths:
+      - 'demos/community-payment/**'
+      - '.github/workflows/stage5-browser-demo.yml'
+permissions:
+  contents: read
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Static syntax and simulated DOM tests
+        run: |
+          node --check demos/community-payment/app.js
+          node --test demos/community-payment/demo.test.mjs
+          echo REAL_WECHAT_PAYMENT=NOT_RUN
+          echo BROWSER_E2E=NOT_RUN
