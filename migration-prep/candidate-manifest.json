@@ -1,9 +1,9 @@
 {
-  "audit_comment": "6170516474",
-  "base_commit": "5f330b722eadfd887aa3228db68ee71d05ec74ca",
-  "base_tree": "fbeac46edf04b5e788c80b8405c04fde92c6e11c",
+  "audit_comment": "6171371525",
+  "base_commit": "4938ee4f7ec7b268f0714b160532e57c79ecb2b8",
+  "base_tree": "6556838968cbc9c3face52d5ea17b73745fab65c",
   "binance_called": false,
-  "candidate_content_sha256": "d53ec27217a6c3ab57422a3c1f12314bc8cf1ebe05d164633c4765229c54731a",
+  "candidate_content_sha256": "5d6dbf9836b0d516f522d09cac90b7a33ded06066c34cc7a57fc7153fb7c67dc",
   "files": [
     {
       "path": "migration-prep/readonly_reconciliation_adapter.py",
@@ -107,13 +107,13 @@
     },
     {
       "path": "migration-prep/c7_root_inventory.py",
-      "sha256": "e2f165bc6c718369fc57e1c44aeae9b9b3b4d46e98d2803239d083f35b7f2de4",
-      "size": 14274
+      "sha256": "46848b88058c8f1c94d565221f2952b08975e2b756a93a79e8adc99238ae754a",
+      "size": 18395
     },
     {
       "path": "migration-prep/test_c7_root_inventory.py",
-      "sha256": "82564a7f1a7ae265f063820986554621aa7df89cf003d194f5164ac1b2828f67",
-      "size": 5550
+      "sha256": "eff869be8016f70f1d5804c44a4fa72d09822834c660775bce7849542c05d2f3",
+      "size": 12139
     },
     {
       "path": "migration-prep/c7-current-evidence.json",
@@ -129,8 +129,8 @@
   "production_authorized": false,
   "production_deployed": false,
   "root_inventory_incomplete_can_pass": false,
-  "schema_version": 4,
+  "schema_version": 5,
   "self_asserted_receipts_can_pass": false,
-  "task_id": "TOKYO_KOREA_C7_F1_F2_REMEDIATION_6170516474",
+  "task_id": "TOKYO_KOREA_C7_F2_DEFAULT_CHAIN_REMEDIATION_6171371525",
   "trusted_adapter_installed": false
 }

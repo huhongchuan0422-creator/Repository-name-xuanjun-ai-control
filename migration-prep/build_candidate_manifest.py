@@ -38,11 +38,11 @@ def build(root):
         path = os.path.join(root, relative)
         files.append({"path": "migration-prep/" + relative, "size": os.path.getsize(path),
                       "sha256": digest(path)})
-    value = {"schema_version": 4,
-             "task_id": "TOKYO_KOREA_C7_F1_F2_REMEDIATION_6170516474",
-             "audit_comment": "6170516474",
-             "base_commit": "5f330b722eadfd887aa3228db68ee71d05ec74ca",
-             "base_tree": "fbeac46edf04b5e788c80b8405c04fde92c6e11c",
+    value = {"schema_version": 5,
+             "task_id": "TOKYO_KOREA_C7_F2_DEFAULT_CHAIN_REMEDIATION_6171371525",
+             "audit_comment": "6171371525",
+             "base_commit": "4938ee4f7ec7b268f0714b160532e57c79ecb2b8",
+             "base_tree": "6556838968cbc9c3face52d5ea17b73745fab65c",
              "files": files, "production_authorized": False,
              "binance_called": False, "production_deployed": False,
              "self_asserted_receipts_can_pass": False,

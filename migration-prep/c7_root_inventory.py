@@ -34,6 +34,12 @@ class InventoryProblem(Exception):
         self.outcome = outcome
 
 
+def _require_username(user):
+    if not isinstance(user, str) or not user or "\x00" in user:
+        raise TypeError("CRONTAB_USER_STRING_REQUIRED")
+    return user
+
+
 def digest_bytes(value):
     return hashlib.sha256(value).hexdigest()
 
@@ -75,32 +81,63 @@ class NoCrontab(Exception):
 
 
 def _read_crontab(user):
-    result = subprocess.run(["/usr/bin/crontab", "-u", user, "-l"],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            timeout=20, env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
-                                             "LC_ALL": "C"})
+    """Read one user's crontab; the callback contract is ``reader(user: str)``."""
+    user = _require_username(user)
+    try:
+        result = subprocess.run(["/usr/bin/crontab", "-u", user, "-l"],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                timeout=20,
+                                env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+                                     "LC_ALL": "C"})
+    except subprocess.TimeoutExpired:
+        raise InventoryProblem("CRONTAB_TIMEOUT")
+    except PermissionError:
+        raise InventoryProblem("CRONTAB_PERMISSION_DENIED")
+    except (OSError, subprocess.SubprocessError):
+        raise InventoryProblem("CRONTAB_SUBPROCESS_FAILED")
+    if (not isinstance(result.returncode, int) or
+            not isinstance(result.stdout, bytes) or
+            not isinstance(result.stderr, bytes)):
+        raise InventoryProblem("CRONTAB_RESULT_TYPE_INVALID")
     if result.returncode == 0:
         return result.stdout
     expected = "no crontab for {0}".format(user).encode("ascii")
     if result.returncode == 1 and result.stderr.strip() == expected:
         raise NoCrontab()
-    raise ValueError("CRONTAB_READ_FAILED")
+    raise InventoryProblem("CRONTAB_COMMAND_FAILED")
 
 
 def cron_inventory(user, runner=None):
-    runner = runner or _read_crontab
+    """Collect one user using a callable with the exact ``reader(user: str)`` contract."""
+    user = _require_username(user)
+    if runner is None:
+        runner = _read_crontab
+    if not callable(runner):
+        raise TypeError("CRONTAB_READER_CALLABLE_REQUIRED")
     try:
         pwd.getpwnam(user)
     except KeyError:
         return {"status": "USER_NOT_PRESENT", "complete": True}
     try:
-        value = redacted_text_summary(runner(
-            ["/usr/bin/crontab", "-u", user, "-l"]))
+        value = redacted_text_summary(runner(user))
         return dict({"status": "READ", "complete": True}, **value)
     except NoCrontab:
         return {"status": "CONFIRMED_NO_CRONTAB", "complete": True}
-    except (OSError, ValueError, subprocess.SubprocessError):
-        return {"status": "READ_FAILED", "complete": False}
+    except InventoryProblem as error:
+        return {"status": "READ_FAILED", "complete": False,
+                "outcome": error.outcome}
+    except subprocess.TimeoutExpired:
+        return {"status": "READ_FAILED", "complete": False,
+                "outcome": "CRONTAB_TIMEOUT"}
+    except PermissionError:
+        return {"status": "READ_FAILED", "complete": False,
+                "outcome": "CRONTAB_PERMISSION_DENIED"}
+    except (OSError, subprocess.SubprocessError):
+        return {"status": "READ_FAILED", "complete": False,
+                "outcome": "CRONTAB_READER_FAILED"}
+    except ValueError:
+        return {"status": "READ_FAILED", "complete": False,
+                "outcome": "CRONTAB_RESULT_TYPE_INVALID"}
 
 
 def _stable_regular_read(path):
@@ -129,6 +166,14 @@ def _stable_regular_read(path):
             before.st_ino != path_after.st_ino or not stat.S_ISREG(path_after.st_mode)):
         raise InventoryProblem("CONCURRENT_ALTERATION")
     return b"".join(chunks), _identity(after)
+
+
+def _validated_stable_read(reader, path):
+    value = reader(path)
+    if (not isinstance(value, tuple) or len(value) != 2 or
+            not isinstance(value[0], bytes) or not isinstance(value[1], str)):
+        raise InventoryProblem("STABLE_READER_RESULT_TYPE_INVALID")
+    return value
 
 
 def _under_roots(path, roots):
@@ -181,7 +226,7 @@ def _entry_record(path, roots, stable_reader):
             base["outcome"] = "SYMLINK_TARGET_OUTSIDE_ALLOWED_ROOTS"
             return base
         try:
-            raw, identity = stable_reader(target)
+            raw, identity = _validated_stable_read(stable_reader, target)
         except InventoryProblem as error:
             base["outcome"] = error.outcome
             return base
@@ -198,7 +243,7 @@ def _entry_record(path, roots, stable_reader):
         base["outcome"] = "NONREGULAR_SKIPPED"
         return base
     try:
-        raw, identity = stable_reader(path)
+        raw, identity = _validated_stable_read(stable_reader, path)
     except InventoryProblem as error:
         base["outcome"] = error.outcome
         return base
@@ -226,9 +271,20 @@ def _directory_record(path):
 
 
 def systemd_inventory(roots=None, walk_fn=None, stable_reader=None):
-    roots = tuple(roots or SYSTEMD_ROOTS)
-    walk_fn = walk_fn or os.walk
-    stable_reader = stable_reader or _stable_regular_read
+    if roots is None:
+        roots = SYSTEMD_ROOTS
+    if (not isinstance(roots, (tuple, list)) or not roots or
+            any(not isinstance(root, str) or not root for root in roots)):
+        raise TypeError("SYSTEMD_ROOTS_STRING_SEQUENCE_REQUIRED")
+    roots = tuple(roots)
+    if walk_fn is None:
+        walk_fn = os.walk
+    if stable_reader is None:
+        stable_reader = _stable_regular_read
+    if not callable(walk_fn):
+        raise TypeError("SYSTEMD_WALK_CALLABLE_REQUIRED")
+    if not callable(stable_reader):
+        raise TypeError("SYSTEMD_STABLE_READER_CALLABLE_REQUIRED")
     records = []
     root_results = []
     walk_errors = []
@@ -256,7 +312,16 @@ def systemd_inventory(roots=None, walk_fn=None, stable_reader=None):
             continue
         try:
             iterator = walk_fn(root, followlinks=False, onerror=onerror)
-            for directory, directories, files in iterator:
+            for item in iterator:
+                if (not isinstance(item, tuple) or len(item) != 3 or
+                        not isinstance(item[0], str) or
+                        not isinstance(item[1], list) or
+                        not isinstance(item[2], list) or
+                        any(not isinstance(name, str) for name in item[1] + item[2])):
+                    walk_errors.append({"path_sha256": _path_digest(root),
+                                        "outcome": "WALK_RESULT_TYPE_INVALID"})
+                    break
+                directory, directories, files = item
                 records.append(_directory_record(directory))
                 for name in list(directories):
                     path = os.path.join(directory, name)
@@ -303,24 +368,45 @@ def systemd_inventory(roots=None, walk_fn=None, stable_reader=None):
 
 
 def main():
+    stage = "PRECONDITION"
     try:
         if len(sys.argv) != 1 or os.geteuid() != 0:
             raise ValueError("ROOT_ZERO_ARGUMENTS_REQUIRED")
+        stage = "HOST_IDENTITY"
         host = socket.gethostname().split(".")[0]
         if host not in HOSTS:
             raise ValueError("HOST_MISMATCH")
+        stage = "SUDOERS_SYNTAX"
         visudo = run(["/usr/sbin/visudo", "-c"]).decode("utf-8", "strict")
+        stage = "SUDOERS_SOURCES"
         sources = parsed_sources(visudo)
         source_digests = sorted(protected_digest(path) for path in sources)
+        stage = "GITHUBRUNNER_POLICY"
         grant = run(["/usr/bin/sudo", "-n", "-l", "-U", "githubrunner"]).decode(
             "utf-8", "strict")
+        stage = "CRONTABS"
         crontabs = {user: cron_inventory(user) for user in USERS}
+        stage = "SYSTEMD"
         systemd = systemd_inventory()
         complete = (systemd["status"] == "PASS_COMPLETE" and
                     all(value["complete"] for value in crontabs.values()))
+        failed_items = [
+            {"stage": "CRONTAB", "subject": user,
+             "outcome": value.get("outcome", value["status"])}
+            for user, value in sorted(crontabs.items()) if not value["complete"]]
+        failed_items.extend(
+            {"stage": "SYSTEMD_ROOT", "subject_sha256": value["root_sha256"],
+             "outcome": value["outcome"]}
+            for value in systemd["roots"] if value["status"] != "PASS_COMPLETE")
+        failed_items.extend(
+            {"stage": "SYSTEMD_ENTRY", "subject_sha256": value.get("path_sha256", ""),
+             "outcome": value["outcome"]}
+            for value in systemd["outcomes"]
+            if value["outcome"] not in SUCCESS_OUTCOMES)
         value = {"schema_version": 2, "status": ("PASS_COMPLETE" if complete else
                                                    "HOLD_INCOMPLETE"),
                  "host": host, "crontabs": crontabs, "systemd": systemd,
+                 "failed_items": failed_items,
                  "sudoers_source_count": len(sources),
                  "sudoers_aggregate_sha256": digest_bytes(
                      json.dumps(source_digests, separators=(",", ":")).encode("ascii")),
@@ -330,7 +416,10 @@ def main():
         print(json.dumps(value, sort_keys=True, separators=(",", ":")))
         return 0 if complete else 2
     except BaseException as error:
-        print(json.dumps({"status": "HOLD", "error_type": type(error).__name__,
+        print(json.dumps({"status": "HOLD_INCOMPLETE",
+                          "failed_items": [{"stage": stage,
+                                            "outcome": type(error).__name__}],
+                          "error_type": type(error).__name__,
                           "production_mutation": False}, sort_keys=True))
         return 1
 
