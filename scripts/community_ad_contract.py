@@ -99,10 +99,10 @@ def audit_transition(before, after, actor, resource=None):
             and isinstance(actor, dict) and actor.get("authenticated") is True
             and actor.get("role") in ("MERCHANT_ADMIN", "PLATFORM_ADMIN")
             and isinstance(actor.get("actor_id"), str) and bool(actor["actor_id"])
-            and (resource is None or (isinstance(resource, dict) and
-                (actor["role"] == "PLATFORM_ADMIN" or
-                 (all(isinstance(resource.get(k), str) and resource[k] and
-                      resource[k] == actor.get(k) for k in ("tenant_id", "merchant_id")))))))
+            and (actor["role"] == "PLATFORM_ADMIN" or
+                 (isinstance(resource, dict) and
+                  all(isinstance(resource.get(k), str) and resource[k] and
+                      resource[k] == actor.get(k) for k in ("tenant_id", "merchant_id")))))
 
 def ad_surface_allowed(surface, payment):
     if surface == "OWN_AMOUNT_ENTRY":
