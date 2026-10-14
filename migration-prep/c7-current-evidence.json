@@ -1,16 +1,22 @@
 {
-  "schema_version": 1,
-  "task_id": "TOKYO_KOREA_C7_PRODUCTION_ACCEPTANCE_PREPARATION_6169986588",
+    "schema_version": 2,
+    "task_id": "TOKYO_KOREA_C7_F1_F2_REMEDIATION_6170516474",
   "observed_at_window_utc": "2026-10-14T14:00:57Z/2026-10-14T14:06:00Z",
   "production_mutation": false,
   "binance_called": false,
   "writer_map": {
     "record_count": 95,
     "private_file_sha256": "551187ebb68295a4693427ba6b39018bf6c678926d8d97dd30df9da03af718d1",
-    "private_mapping_sha256": "8f5ad7df2c63dd1b541ec4d21ab315b9cf0c23f00f77e326b59c82d92053f65b",
+        "private_mapping_sha256": "8f5ad7df2c63dd1b541ec4d21ab315b9cf0c23f00f77e326b59c82d92053f65b",
+        "controlled_original_mode": "0600",
+        "public_file_sha256": "e60a42ed2d45d127f3b8c9edf5f59dfa4a6f14e06ce77f338019e6e8f03f3bb5",
     "public_ids_and_source_hashes_match": true,
-    "public_enforcement_all_deny": true,
-    "runtime_coverage_proven": false
+        "public_enforcement_all_deny": true,
+        "per_path_scheduler_reachability": "UNKNOWN",
+        "per_path_dynamic_import_policy": "HASH_BOUND_DENY_UNLESS_FENCE_CONTEXT",
+        "per_path_manual_launch_policy": "DENY_DIRECT_REQUIRE_RESTRICTED_LAUNCHER",
+        "per_path_credential_reachability": "UNKNOWN",
+        "runtime_coverage_proven": false
   },
   "tokyo": {
     "helper_inspection_complete": true,
@@ -47,13 +53,25 @@
     "entry_count": 0,
     "production_trust_anchor_or_signature_present": false
   },
-  "root_inventory": {
-    "candidate_collector_built": true,
-    "candidate_collector_installed": false,
+    "root_inventory": {
+        "candidate_collector_built": true,
+        "collector_schema_version": 2,
+        "all_root_file_link_outcomes_recorded": true,
+        "incomplete_inventory_forces_hold": true,
+        "candidate_collector_installed": false,
     "unprivileged_execution": "HOLD_ROOT_REQUIRED",
     "root_yibi_githubrunner_crontabs_proven": false,
-    "full_sudoers_closure_proven": false
-  },
+        "full_sudoers_closure_proven": false
+    },
+    "admission": {
+        "unsigned_receipt_class": "FORMAL_RECEIPT_SHAPE_ONLY",
+        "unsigned_receipts_can_be_ready": false,
+        "requires_original_evidence_hash_recompute": true,
+        "requires_independently_signed_policy_and_gate_receipts": true,
+        "result_verifier_is_separate_gate": true,
+        "requires_exact_candidate_tree_subject_epoch_hosts_coverage_and_freshness": true,
+        "installed_trusted_adapter_proven": false
+    },
   "production_acceptance_ready": false,
   "production_execution_authorized": false
 }

@@ -1,9 +1,9 @@
 {
-  "audit_comment": "6169986588",
-  "base_commit": "84e00d64697b7d204ecbe4edf619b91477bcd1ea",
-  "base_tree": "d7b00f91b23cab4c3e2731c3be7d56e6a79c9211",
+  "audit_comment": "6170516474",
+  "base_commit": "5f330b722eadfd887aa3228db68ee71d05ec74ca",
+  "base_tree": "fbeac46edf04b5e788c80b8405c04fde92c6e11c",
   "binance_called": false,
-  "candidate_content_sha256": "8f6ca593be7c60bc511a07da8a90cc5e90074ac3ae15a130077ef40a1b40f34b",
+  "candidate_content_sha256": "d53ec27217a6c3ab57422a3c1f12314bc8cf1ebe05d164633c4765229c54731a",
   "files": [
     {
       "path": "migration-prep/readonly_reconciliation_adapter.py",
@@ -47,13 +47,13 @@
     },
     {
       "path": "migration-prep/HUMAN_ACTIONS_REQUIRED.md",
-      "sha256": "51faccf31a6931e2a58edcab7d856f00c9b42a559ad871f4a1a36f8c5ca958f6",
-      "size": 3882
+      "sha256": "fc9b2659b33941076e22f86efc448eeb32fe774810b16702589d2f9de076018b",
+      "size": 6389
     },
     {
       "path": "migration-prep/C7_EVIDENCE_GAPS.md",
-      "sha256": "cdda44d9ca1ea9fff58a2a6618cee7efa28e1c21eb3fdedd9e3165d9cb26ec40",
-      "size": 3398
+      "sha256": "4f13b3bf75e210c565f985a72dd39021119f3f398ff5658321b2ed801135f61c",
+      "size": 3849
     },
     {
       "path": "migration-prep/korea/get_only_policy.py",
@@ -82,47 +82,55 @@
     },
     {
       "path": "migration-prep/c7_acceptance.py",
-      "sha256": "cbfa1bd2700464fa19fb0d7e7b228d7e88fffce4b14dad95398e120fae19f426",
-      "size": 6138
+      "sha256": "f4caec094bddcd260e9e89d9e904c120cf40402be4a9d47a85c54ed932bb6437",
+      "size": 24314
+    },
+    {
+      "path": "migration-prep/c7_private_writer_verify.py",
+      "sha256": "db0e10b96a34a15dcf0e3e25c3e99ad78111e7cd1b7b3cc93756c41b746e9a11",
+      "size": 865
     },
     {
       "path": "migration-prep/test_c7_acceptance.py",
-      "sha256": "aaab649f0781a4602244dc9b22bb0f85e8014f5c964fac9f669d58c21329a5e0",
-      "size": 3934
+      "sha256": "c268a072ee080fe1d910c13193b5bbbe4066295eb56d1315a4dc61acb31e3026",
+      "size": 15379
     },
     {
       "path": "migration-prep/c7-real-machine-execution-package.json",
-      "sha256": "894f5a108d23ba1cbafadb021881a172b5f587d8b58bb053592a449a22216295",
-      "size": 2361
+      "sha256": "bf521b644e79bb54c535ba518d0dcf8a7d1dcdb82f02d896adf0f55106e122f1",
+      "size": 5971
     },
     {
       "path": "migration-prep/C7_PRODUCTION_ACCEPTANCE_PREP.md",
-      "sha256": "e526a966ccb777480e3496565a7d3ff4901d79c024fb1f9cc6520207f72be35c",
-      "size": 1586
+      "sha256": "ba5b5d50ee30136a1ff1cdb15aa98d3d12f6cdafaa741ed1ea931c244d0f59b2",
+      "size": 2810
     },
     {
       "path": "migration-prep/c7_root_inventory.py",
-      "sha256": "52aabf73d4939126b8007ad4412c45eb23e657e5ba23feb1f9366a8e172fdad5",
-      "size": 4471
+      "sha256": "e2f165bc6c718369fc57e1c44aeae9b9b3b4d46e98d2803239d083f35b7f2de4",
+      "size": 14274
     },
     {
       "path": "migration-prep/test_c7_root_inventory.py",
-      "sha256": "a29fe4c2bc015a84c5848b9e6bafd29091b900484e9dec611e7a53a3be92d0d3",
-      "size": 643
+      "sha256": "82564a7f1a7ae265f063820986554621aa7df89cf003d194f5164ac1b2828f67",
+      "size": 5550
     },
     {
       "path": "migration-prep/c7-current-evidence.json",
-      "sha256": "1c93f63b6c0368926e1ed46ed5c848dd62e97aea8e3c8a750e1b6bc3eb23e294",
-      "size": 2119
+      "sha256": "840d1c72c050cd63ea92b0a2301dc947899573fca0091d1f175d7b3210b3bc6e",
+      "size": 3154
     },
     {
       "path": "migration-prep/C7_CURRENT_EVIDENCE.md",
-      "sha256": "9e51c51405b00e7baaf175aaa71183e6ffe78e3bbcbb0082c1a17fad4141048e",
-      "size": 2611
+      "sha256": "13b0c524e7a4a8f03c551e5f7f1f472cacdcd184756d88dd8b025bd41f77f8fe",
+      "size": 4061
     }
   ],
   "production_authorized": false,
   "production_deployed": false,
-  "schema_version": 3,
-  "task_id": "TOKYO_KOREA_C7_PRODUCTION_ACCEPTANCE_PREPARATION_6169986588"
+  "root_inventory_incomplete_can_pass": false,
+  "schema_version": 4,
+  "self_asserted_receipts_can_pass": false,
+  "task_id": "TOKYO_KOREA_C7_F1_F2_REMEDIATION_6170516474",
+  "trusted_adapter_installed": false
 }

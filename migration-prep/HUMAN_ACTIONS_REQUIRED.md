@@ -1,55 +1,102 @@
-# Single consolidated human cooperation node for C7
+# One consolidated Owner/administrator evidence node — C7 F3-F5
 
-No plaintext password, API key, secret, token, cookie, private key, or TOTP is
-requested. Complete the following only through protected administrator/SecretRef
-flows after independent source review and a new Owner Release Gate.
+No plaintext password, API key, secret, token, cookie, private key, TOTP or
+remove token is requested. Use protected administrator/SecretRef channels only.
+This node is read-only. It does not authorize installation, retirement, exchange
+access, Shadow, Canary or cutover.
 
-The Developer has completed the private-map digest/ID verification, caller-scope
-Gateway inventory, fixed-helper Tokyo/Korea baselines, Korea pre-install baseline,
-independent post-state verifier, redacted root inventory candidate and deterministic
-execution package. The following cannot be completed with the current authority.
+## A. Evidence the current executor cannot obtain
 
-1. **GitHub Runner administration (read-only now; removal later)**
-   - In repository/org Settings → Actions → Runners, export or privately attest Runner
-     IDs `4/3`, exact names, repository/group assignment, pool, allowed repositories,
-     fork/PR admission and any other Runner with these hosts/labels.
-   - Impact now: read-only evidence only; no job cancellation or Runner change.
-   - Later, after a new Release Gate, issue two scoped short-lived remove tokens through
-     protected masked entry. Never paste them into PR, Feishu, files, shell history or logs.
-2. **Bounded root read-only evidence on Tokyo and Korea**
-   - Independently review `c7_root_inventory.py`, then install/invoke it through a
-     one-shot root-controlled route bound to the exact commit/artifact; do not add a
-     persistent broad Runner sudo grant.
-   - It reads root/yibi/githubrunner crontabs, systemd metadata and sudoers source
-     closure, emitting only counts/digests.
-   - Impact: read-only CPU/disk reads; no service, cron or sudoers modification.
-3. **Gateway-wide triggers (administrator read)**
-   - From an authenticated Control UI administrator turn/Automations page, export all
-     enabled and disabled automations, stream triggers, declaration jobs and owners.
-   - Impact: read-only export. Caller-scoped output is explicitly insufficient.
-4. **Independent trust and Authority** — provision an independently managed Ed25519
-   public trust anchor, publish its fingerprint through a protected authority record,
-   sign the exact canonical policy/manifest, place policy/signature/anchor in the
-   reviewed owner-bound non-symlink paths, and bind any future request to exact host,
-   execution identity, paths, units, action, candidate hash, expiry and nonce.
-5. **Owner decisions (reply once after reviewing the exact package)**
-   - Approve/change: `Shadow=24h`; zero unknown/inflight/ownership conflicts; exact
-     BTC/ETH/SOL symbol coverage; zero Writer actions; restart-recovery PASS; proposed
-     canary duration/size; Korea-first rollback timeout; evidence root; maintenance window.
-   - Impact: fixes acceptance thresholds and scheduling only. It does not itself
-     authorize deployment, live Binance GET, Writer activation or cutover.
-6. **Root network isolation (later production change)** — install and independently inspect the dedicated
-   runtime's default-deny egress, pinned DNS/IP set, credential scope, unit expansion
-   and absence of alternate clients/transports. Application GET checks alone are not
-   accepted as network isolation.
+1. **GitHub administrator — Runner admission export**
+   - Provider: repository or organization Owner with Actions/Runner administration read.
+   - Operation: export Runner IDs `4` and `3`, exact names
+     `xuanjun-tokyo-readonly` and `xuanjun-korea-binance`, repository/organization
+     and Runner Group membership, allowed repositories, public/fork/PR/workflow
+     admission, labels, active jobs and every other Runner/channel able to reach
+     either host. Include collection epoch and GitHub-generated object IDs.
+   - Return: original API/UI export bytes through the private evidence channel plus
+     its SHA-256; do not paste policy bodies or tokens into the public PR.
+   - Impact: read-only API/UI access; no job cancellation, label/group change,
+     token generation or Runner exit.
 
-7. **Protected SecretRefs (later production change)**
-   - Create only the approved read-only Binance credential namespace and any required
-     independent signature reference through masked administrator entry after Release
-     Gate. No trading/withdraw permission.
-   - Impact: credential and IP-policy change; therefore not executed in this batch.
+2. **Tokyo and Korea root administrator — bounded collector**
+   - Provider: host root through the existing Owner-controlled one-shot route.
+   - Preconditions: independent source review of `c7_root_inventory.py`; exact
+     candidate commit/tree/artifact hash; collector copied to a root-owned,
+     non-symlink, non-group/other-writable temporary path. Do not extend the
+     persistent `githubrunner` sudo grant.
+   - Operation on each host: verify file/path owner, mode and SHA-256; invoke the
+     zero-argument collector once as root; preserve original JSON bytes and exit
+     status. It inventories root/yibi/githubrunner crontabs, both systemd roots,
+     user-unit files reached by those roots, parsed sudoers sources and effective
+     githubrunner grant shape.
+   - Required result: `PASS_COMPLETE`, zero incomplete outcomes, every root recorded,
+     and separate cron `CONFIRMED_NO_CRONTAB` or `READ`; any permission/read/link/
+     nonregular/drift outcome remains HOLD.
+   - Impact: bounded metadata/content reads and hashing only; no cron/systemd/sudoers
+     write, service control or privilege expansion.
 
-After items 1–5 return, an independent reviewer can decide whether the exact install/
-Shadow execution scope may enter Release Gate. A separate fresh Owner authorization is
-still required for items 6–7 and for Runner exit, Yibi retirement, production DB freeze,
-live Binance GET, Shadow/Canary, credential/IP changes or Writer authority.
+3. **Gateway administrator — global trigger export**
+   - Provider: authenticated OpenClaw Control UI/Gateway administrator.
+   - Operation: export all enabled and disabled automations, cron declarations,
+     stream/event triggers, task owners, target agents, execution identities and
+     routes that can invoke Tokyo/Korea, Yibi or Writer code. Include collection
+     epoch and original export SHA-256.
+   - Required result: administrator-global scope marker and complete pagination.
+     The caller-visible two-job list is not acceptable.
+   - Impact: read-only export; no trigger enable/disable/edit.
+
+4. **Independent Authority custodian — existence/read-only measurement**
+   - Provider: independent key/authority owner, not the Developer or executor.
+   - Operation now: attest whether an Ed25519 trust anchor, Authority record and
+     detached policy signature already exist; return public identity/fingerprint,
+     exact policy/commit/tree/epoch/expiry binding and protected record metadata.
+     Do not create a new key/signature in this read-only node.
+   - Required result: original public record bytes and verifiable signature, or an
+     explicit `NOT_PRESENT`. A Developer-created key cannot count as independent.
+   - Impact: read-only authority inspection; private key material never leaves custody.
+
+5. **Korea root administrator — pre-install environment readback**
+   - Provider: Korea root through the existing Owner-controlled route.
+   - Operation: inventory the existing dedicated user/group (if any), install/data/
+     evidence directories, Python/runtime dependencies, unit names, candidate ports,
+     protected SecretRef metadata (names/roles only), proxy/environment presence and
+     root egress/firewall state. Bind original output to host and collection epoch.
+   - Impact: read-only. No user/directory/unit/package/SecretRef/firewall/IP change.
+
+6. **Independent verifier custodian — actual code measurement**
+   - Provider: administrator independent of the executor result producer.
+   - Operation: measure the real loaded verifier executable/module, canonical path,
+     resolved non-symlink parents, owner, mode and SHA-256; prove which service/process
+     loads it; identify the independent post-state data source and its authority.
+     Bind those measurements to the exact action and receipt epoch.
+   - Required result: installed-file and live-loader measurement. A verifier hash
+     merely written in a signed request remains candidate-only.
+   - Impact: read-only process/file inspection; no install/restart.
+
+## B. Owner decisions requested once
+
+Confirm or replace all values; blanks remain HOLD and are not inferred:
+
+- Shadow duration: proposed `24h` (not yet executed).
+- Shadow acceptance: zero unknown/inflight/ownership conflicts; complete BTC/ETH/SOL
+  coverage; zero Writer effects; restart/recovery test PASS.
+- Canary: maximum notional/order count, exact duration and stop threshold.
+- Korea-first rollback deadline and maximum time before Tokyo recovery may be considered.
+- Maintenance window, evidence root, independent Authority custodian and approvers.
+
+Replying with thresholds fixes review inputs only. It does not authorize production.
+
+## C. Later write stages — separate exact Release Gates
+
+The package prepares, but this batch does not execute: trust-anchor/signature policy
+creation; verifier/runtime install; default-deny egress; SecretRef creation; Runner
+exit; Yibi stop/disable/mask; database freeze; live Binance GET; 24h Shadow; Canary;
+Writer epoch transfer; credential/IP revocation or cutover.
+
+Every future authorization must bind the exact artifact, commit/tree, host, path,
+unit, action, transaction/epoch, expiry and single-use nonce. Timeout, partial success
+or unknown result means stop, independently inspect side effects and reconcile; never
+blind retry or replay a completed effect. Rollback order is Korea Writer locked →
+Korea credential/IP revoked → unknown outcomes reconciled → only then evaluate Tokyo
+checkpoint/read-only recovery and a new Writer epoch.

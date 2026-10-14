@@ -20,8 +20,10 @@ Current C7 read-only evidence and the exact remaining authority split are record
   credential evidence, and prove each actual fence or isolation action.
 - This batch did recompute the raw private-file SHA-256 and internal mapping digest and
   matched every `WP001..WP095` ID/source hash/class to the public all-DENY manifest.
-  Therefore private artifact integrity/ID alignment now has direct evidence; runtime,
-  scheduler, credential and installed-fence coverage remain incomplete.
+  The public record also preserves separate scheduler, dynamic-import, manual-launch
+  and credential states for every path. Therefore private artifact integrity/ID
+  alignment now has direct evidence; runtime and scheduler/credential closure and
+  installed-fence coverage remain `UNKNOWN/HOLD`.
 - A source tarball hash proves artifact bytes only; it does not prove private-map
   content, live Writer reachability or installed fence state.
 
@@ -30,11 +32,15 @@ Current C7 read-only evidence and the exact remaining authority split are record
 1. GitHub administrative Runner admission, assignment, short-lived removal authority,
    retirement and residue-cleanup evidence.
 2. Bounded root read-only cron/systemd/sudoers/source evidence and semantic closure.
+   The repaired collector now fails closed and records every outcome, but it remains
+   uninstalled and has not run as root on either host.
 3. Gateway-global OpenClaw automation/trigger inventory.
 4. Yibi `ARCHIVE_ONLY_NEVER_REENABLE` retirement while preserving novel/PostgreSQL/
    Redis, with no re-enable on failure.
 5. Independent production Ed25519 trust anchor, signed exact policy/manifest and
-   Authority record; test keys are simulation evidence only.
+   Authority record; test keys are simulation evidence only. The actual result verifier
+   file/path/owner/mode/hash, live loader and independent post-state authority also
+   remain unmeasured; a claimed signed hash is insufficient.
 6. Live authenticated Binance GET-only receipts, exact account/symbol/snapshot/time
    binding, stable SQLite/WAL/SHM or bounded freeze evidence, final consistency and
    authoritative comparison. Fixture evidence is not live evidence.
