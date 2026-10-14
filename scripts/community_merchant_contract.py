@@ -56,10 +56,18 @@ def verify_qr(token,identity,context,now,key):
     if not isinstance(token,dict) or set(token)!={"payload","signature"} or not isinstance(token["payload"],dict) or not isinstance(key,bytes) or len(key)<32 or type(now) is not int:
         return False
     p=token["payload"]
-    if set(p)!={"scope","context","expires","version"} or p["scope"]!=identity or p["context"]!=context or p["version"]!=1 or type(p["expires"]) is not int or p["expires"]<=now or not isinstance(token["signature"],str):
+    signature=token["signature"]
+    if (set(p)!={"scope","context","expires","version"} or p["scope"]!=identity
+            or not isinstance(context,str) or not valid_id(context)
+            or p["context"]!=context or type(p["version"]) is not int or p["version"]!=1
+            or type(p["expires"]) is not int or p["expires"]<=now or now<0
+            or not isinstance(signature,str) or not re.fullmatch("[0-9a-f]{64}",signature)):
         return False
-    raw=json.dumps(p,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()
-    return hmac.compare_digest(hmac.new(key,raw,hashlib.sha256).hexdigest(),token["signature"])
+    try:
+        raw=json.dumps(p,sort_keys=True,separators=(",",":"),ensure_ascii=True,allow_nan=False).encode()
+    except (TypeError,ValueError,OverflowError,RecursionError):
+        return False
+    return hmac.compare_digest(hmac.new(key,raw,hashlib.sha256).hexdigest(),signature)
 def payment_amount(amount_minor,currency,reference):
     if type(amount_minor) is not int or not 1<=amount_minor<=100000000 or currency!="CNY" or not valid_id(reference):
         raise ValueError("INVALID_PAYMENT_AMOUNT")
