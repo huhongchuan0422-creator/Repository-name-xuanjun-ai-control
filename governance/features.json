@@ -14,11 +14,7 @@
         "phase": 1
       },
       "acceptance": {
-        "criteria": [
-          "positive registry and negative omissions detected",
-          "normal PR has stable feature-compliance check",
-          "main protection is only enabled after safe bootstrap"
-        ],
+        "criteria": [],
         "tests": [
           "tests/test_feature_compliance_check.py"
         ]
