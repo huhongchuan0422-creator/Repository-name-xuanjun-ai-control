@@ -106,3 +106,29 @@ no generic full runtime.restore or retry. Failed containment is UNKNOWN and rema
 HOLD; receipt-write failure is separately reported.11 local Python3.6.8 sequence
 fixture tests PASS, including failure injection at all9 phases. These injected
 operations do NOT prove actual host driver integration, which remains unfinished.
+
+## Local compatibility blocker resolved; retained-state/journal implementation
+
+Rebuilding the local CPython3.6.8 extension modules with CFLAGS=-O0
+-fno-strict-aliasing restored ctypes and uuid imports. No UK Python/server changes
+were made. The existing local math-symbol toolchain compatibility patch remains;
+this local build is not asserted byte-identical to UK Python. Re-ran the13 actual
+ActivationStore rebind tests and10 actual delta-package TLS tests under this local
+Python3.6.8 successfully. Earlier exit139 remains historical, not erased.
+
+epoch3_retained_state.py now concretely reuses the fixed-host collector and full
+publisher verifier, rejects all mismatched retained states, binds the old native
+bootstrap bytes and computes new binding bytes in memory, then rechecks pinned
+receipts. No secret bytes are printed.13 local Python3.6.8 validation/rejection
+tests PASS using the supplied Owner observation; portable synthetic fixtures also
+exist. The complete host capture has not been run on UK as a single combined gate.
+
+epoch3_attempt_journal.py implements the exclusive durable attempt in the EXISTING
+transaction directory. It rejects existing attempts, uses fsync and atomic receipt
+updates, rejects stale/unclaimed updates, and preserves uncertain files on write
+failure.10 root-mapped local Python3.6.8 filesystem tests PASS. This is not a second
+task queue. It still requires the full recovery caller to hold the install lock.
+
+Remaining: wire actual retained provisioning, TLS transaction preservation,
+activation and service operations, exact approval and full host preflight into
+one concrete entrypoint; validate full integration before consolidated review.
