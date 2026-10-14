@@ -46,6 +46,19 @@ class DemoService:
     def dispatch(self, method, path, data):
         if type(data) is not dict:
             raise ValueError("INVALID_REQUEST")
+        if method == "POST" and path == "/demo/qr/checkout":
+            _object(data, {"tenant_id","merchant_id","store_id",
+                           "context","token","reference","amount_minor"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            context=_id(data["context"])
+            reference=_id(data["reference"])
+            if self.qr_key is None or not verify_qr(
+                  data["token"],identity,context,int(time.time()),self.qr_key):
+                raise ValueError("QR_SIGNATURE_REQUIRED")
+            result=create_order(self.db,identity,reference,data["amount_minor"])
+            return {**result,"simulation_only":True,
+                    "provider_settlement_verified":False}
         if method == "POST" and path == "/demo/qr/create":
             _object(data, {"tenant_id","merchant_id","store_id","context"})
             identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -236,7 +249,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify","/demo/splits/preview","/demo/admin/profile","/demo/admin/item","/demo/admin/campaign/create","/demo/admin/campaign/state","/demo/admin/campaign/review"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify","/demo/splits/preview","/demo/admin/profile","/demo/admin/item","/demo/admin/campaign/create","/demo/admin/campaign/state","/demo/admin/campaign/review","/demo/qr/checkout"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
