@@ -81,9 +81,9 @@ def execute():
         require(len(plan_sha)==64 and all(c in '0123456789abcdef' for c in plan_sha),'NEW_PLAN_DIGEST')
     p=raw(plan_path,private=True);require(hashlib.sha256(p).hexdigest()==plan_sha,'CORE_PLAN_DRIFT')
     plan=json.loads(p.decode());root=plan['artifact']['root']
-    require(plan['artifact']['source_commit']=='f30c40bc2a49d6ace9d30d17bd82cdf4a5fb7b7c'
-            and plan['artifact']['source_tree']=='7f40340da949764a2a8bc11b3ce5d40d9b48d37a'
-            and plan['artifact']['manifest_sha256']=='6fd121adb1363c6e734f8b302150441c06c32f7a75b67fe60009c7a6a056b027','EXACT95_PLAN_BINDING')
+    require(plan['artifact']['source_commit']=='facd639b807d9eb70813aae8943a7b18600e65a1'
+            and plan['artifact']['source_tree']=='e6879fe41cc49e7fdcef9cd8cdc4ad94ccb00aa1'
+            and plan['artifact']['manifest_sha256']=='03a07bb2f6604e136cfef67edc645ab6b16564b27efa59d0f0af84070d8f1f69','EXACT95_PLAN_BINDING')
     require(digest(DB)==DB_SHA,'CANONICAL_DB_DRIFT')
     for suffix in ['-wal','-journal']:
         require(not os.path.lexists(DB+suffix) or os.lstat(DB+suffix).st_size==0,'NONEMPTY_DB_JOURNAL')
@@ -302,7 +302,7 @@ def execute():
     print('CONSOLIDATED_READINESS_RESULT='+json.dumps(result,sort_keys=True))
     print('CONSOLIDATED_READINESS_RECEIPT_PATH='+directory+'/protected-readiness-snapshot.json')
     print('CONSOLIDATED_READINESS_RECEIPT_SHA256='+hashlib.sha256(data).hexdigest())
-    return 0
+    return 1 if result['measurement_errors'] else 0
 
 
 if __name__=='__main__':sys.exit(execute())
