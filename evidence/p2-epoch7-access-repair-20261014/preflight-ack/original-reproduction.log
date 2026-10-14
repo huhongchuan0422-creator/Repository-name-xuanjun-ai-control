@@ -1,0 +1,23 @@
+FE
+======================================================================
+ERROR: test_actual_service_main_accepts_validated_ack (test_service_preflight_ack.ServicePreflightAckTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/dbd889ed5b5e/p2-epoch7-repair/preflight-candidate/test_service_preflight_ack.py", line 24, in test_actual_service_main_accepts_validated_ack
+    self.assertEqual(service.main(self.argv),0)
+  File "/workspace/scratch/dbd889ed5b5e/p2-epoch7-repair/runtime-source-checkpoint/stage1/p2_service_context_preflight.py", line 19, in main
+    raise SystemExit('HOLD_PLUGIN_PREFLIGHT')
+SystemExit: HOLD_PLUGIN_PREFLIGHT
+
+======================================================================
+FAIL: test_returns_validated_controller_ack (test_service_preflight_ack.ServicePreflightAckTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/dbd889ed5b5e/p2-epoch7-repair/preflight-candidate/test_service_preflight_ack.py", line 17, in test_returns_validated_controller_ack
+    self.assertIs(self.runtime.preflight({}),self.ack)
+AssertionError: None is not {'ready': True, 'canonical_existing': True, 'isolation_enforced': True, 'outbox_existing': True}
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.003s
+
+FAILED (failures=1, errors=1)

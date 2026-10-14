@@ -1,0 +1,12 @@
+test_actual_service_main_accepts_validated_ack (test_service_preflight_ack.ServicePreflightAckTests) ... ok
+test_all_required_flags_remain_literal_true (test_service_preflight_ack.ServicePreflightAckTests) ... ok
+test_controller_failure_is_not_success (test_service_preflight_ack.ServicePreflightAckTests) ... ok
+test_missing_flags_rejected (test_service_preflight_ack.ServicePreflightAckTests) ... ok
+test_nondict_rejected (test_service_preflight_ack.ServicePreflightAckTests) ... ok
+test_returns_validated_controller_ack (test_service_preflight_ack.ServicePreflightAckTests) ... ok
+test_wrong_service_identity_still_rejected_before_load (test_service_preflight_ack.ServicePreflightAckTests) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.007s
+
+OK

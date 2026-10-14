@@ -136,6 +136,9 @@ class NativePipelineRuntime(object):
                 or result.get('isolation_enforced') is not True
                 or result.get('outbox_existing') is not True):
             raise NativeContractError('installed native runtime is not ready')
+        # The service-context ExecStartPre consumes this exact validated ACK.
+        # Returning None would reject a ready controller and block startup.
+        return result
 
     def worker(self, claim, workdir, sandbox):
         return NativePipelineWorker(self.controller, claim, workdir, sandbox)
