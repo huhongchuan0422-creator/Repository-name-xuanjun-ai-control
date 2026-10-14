@@ -1,0 +1,28 @@
+name: Stage5 Offline Checkout Tests
+on:
+  pull_request:
+    paths:
+      - 'scripts/community_checkout.py'
+      - 'tests/test_community_checkout.py'
+      - '.github/workflows/stage5-checkout-tests.yml'
+  push:
+    paths:
+      - 'scripts/community_checkout.py'
+      - 'tests/test_community_checkout.py'
+      - '.github/workflows/stage5-checkout-tests.yml'
+permissions:
+  contents: read
+jobs:
+  offline-checkout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline checkout and baseline contract checks
+        run: |
+          python -m unittest discover -s tests -p 'test_community_checkout.py' -v
+          python -m unittest discover -s tests -p 'test_community_merchant_contract.py' -v
+          python -m unittest discover -s tests -p 'test_community_ad_contract.py' -v
+          python -m unittest discover -s tests -p 'test_community_ad_store.py' -v
