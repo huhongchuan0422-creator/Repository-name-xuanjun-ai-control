@@ -1,10 +1,6 @@
 name: P2 native source regression (zero model)
 on:
-  push:
-    branches: [repair/p2-chatgpt-clean-review-20261013]
-    paths:
-      - evidence/p2-native-wiring-work-20261012/**
-      - .github/workflows/p2-native-source-regression.yml
+  workflow_dispatch:
 permissions:
   contents: read
   actions: read
