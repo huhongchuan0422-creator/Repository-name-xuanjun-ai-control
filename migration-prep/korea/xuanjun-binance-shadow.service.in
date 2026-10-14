@@ -1,0 +1,34 @@
+[Unit]
+Description=Xuanjun Binance Korea isolated shadow candidate
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xuanjun_binance
+Group=xuanjun_binance
+WorkingDirectory=/opt/xuanjun-binance/current
+EnvironmentFile=/etc/xuanjun-binance/shadow.env
+ExecStart=/opt/xuanjun-binance/venv/bin/python -m migration_shadow_entry
+Restart=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ReadOnlyPaths=/opt/xuanjun-binance/current /etc/xuanjun-binance
+ReadWritePaths=/var/lib/xuanjun-binance /var/log/xuanjun-binance
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

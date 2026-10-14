@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "artifact_role": "KOREA_ISOLATED_SHADOW_CANDIDATE",
+  "production_authorized": false,
+  "install_executed": false,
+  "host": "iZmj7a5kwr75qc1tul4kf9Z",
+  "identity": {"user": "xuanjun_binance", "group": "xuanjun_binance", "login_shell": "/sbin/nologin"},
+  "directories": {
+    "release_root": "/opt/xuanjun-binance",
+    "state_root": "/var/lib/xuanjun-binance",
+    "config_root": "/etc/xuanjun-binance",
+    "log_root": "/var/log/xuanjun-binance"
+  },
+  "runtime": {"python": "/usr/bin/python3.11", "venv": "/opt/xuanjun-binance/venv", "reuse_yibi_venv": false},
+  "secret_references": ["SecretRef:BINANCE_ACCOUNT_READONLY", "SecretRef:TRADING_CREDENTIAL_MASTER_KEY"],
+  "forbidden_secret_references": ["BINANCE_TRADING", "PLAINTEXT_ENV_SECRET"],
+  "network": {
+    "destination_allowlist": ["fapi.binance.com:443"],
+    "application_method_allowlist": ["GET"],
+    "https_method_enforcement": "migration-prep/korea/get_only_policy.py",
+    "firewall_claim_limit": "IP_FIREWALL_ALONE_CANNOT_PROVE_HTTPS_METHOD",
+    "root_policy_status": "NOT_INSTALLED_NOT_PROVEN"
+  },
+  "services": ["xuanjun-binance-shadow.service"],
+  "writer_enabled": false,
+  "scheduler_enabled": false,
+  "loopback_ports": [18080, 18081, 19080, 19081],
+  "shadow_acceptance": {
+    "minimum_duration_seconds": 86400,
+    "decision_mismatch_count": 0,
+    "position_mismatch_count": 0,
+    "order_mismatch_count": 0,
+    "protective_mismatch_count": 0,
+    "unknown_count": 0,
+    "inflight_count": 0,
+    "restart_recovery_required": true,
+    "owner_threshold_approval": "REQUIRED"
+  },
+  "canary_acceptance": {
+    "bounded_window_seconds": 900,
+    "max_new_entries": 0,
+    "write_authority": "NOT_INCLUDED",
+    "owner_threshold_approval": "REQUIRED"
+  },
+  "rollback_order": [
+    "KOREA_WRITER_LOCKED",
+    "KOREA_CREDENTIAL_REVOKED",
+    "KOREA_IP_REMOVED",
+    "UNKNOWN_OUTCOMES_RECONCILED",
+    "TOKYO_CHECKPOINT_RESTORED",
+    "TOKYO_GET_ONLY_RECONCILED",
+    "TOKYO_NEW_EPOCH_GRANTED"
+  ],
+  "double_writer_allowed": false
+}

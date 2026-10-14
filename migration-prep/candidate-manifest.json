@@ -1,0 +1,82 @@
+{
+  "base_commit": "6fc018294b79cc30872c32503a8bad8f8a7908b8",
+  "base_tree": "beb05bf8eb1cfa64ae436464d4fdf69e6b98cf5f",
+  "binance_called": false,
+  "candidate_content_sha256": "f78fafa4b9c21af80a57144007b95cd96094d7c3ba0b32065188c0b367dd4a76",
+  "files": [
+    {
+      "path": "migration-prep/readonly_reconciliation_adapter.py",
+      "sha256": "1797062178c717387ed2efc7c7c7ae06a7b436a69116b8a1497a5ba03bec6cf1",
+      "size": 15602
+    },
+    {
+      "path": "migration-prep/restricted_executor.py",
+      "sha256": "3bddfca20f6fd32cf448f40e25dd56316e7e46af54ef802bad87730e60b19ea1",
+      "size": 8401
+    },
+    {
+      "path": "migration-prep/restricted-executor-allowlist.json",
+      "sha256": "dcf59be7d690b37e7ce0ff64668253d3c2a2c5ff6080fedf49140773c6b65083",
+      "size": 1740
+    },
+    {
+      "path": "migration-prep/writer_isolation.py",
+      "sha256": "bce28db57bb8b79c8b61da15d262666dbf1f319c0ca7bf1747ad26887ea11700",
+      "size": 4586
+    },
+    {
+      "path": "migration-prep/writer-coverage-public.json",
+      "sha256": "e60a42ed2d45d127f3b8c9edf5f59dfa4a6f14e06ce77f338019e6e8f03f3bb5",
+      "size": 67045
+    },
+    {
+      "path": "migration-prep/build_writer_coverage.py",
+      "sha256": "42432dc4e41b3c30816419cbd86ee0bcdf4f57e6747a5934d62c58fb0d08d6a5",
+      "size": 3097
+    },
+    {
+      "path": "migration-prep/test_implementation_batch.py",
+      "sha256": "5bdfeb5c970cfcc5f9579be459a75364dd873cc719ed37c853bdcec6e86da2e9",
+      "size": 16866
+    },
+    {
+      "path": "migration-prep/IMPLEMENTATION_BATCH.md",
+      "sha256": "a1d85a2fd9c325db51719a884a674bdefddbded1df9d2c53cfd821af930953d8",
+      "size": 3871
+    },
+    {
+      "path": "migration-prep/HUMAN_ACTIONS_REQUIRED.md",
+      "sha256": "779517ae737a387e9ecfd009e21c8c7502d2ebf57cbec1db1feb6327cc556e22",
+      "size": 1980
+    },
+    {
+      "path": "migration-prep/korea/get_only_policy.py",
+      "sha256": "bb74123a20185601e64c89d9532c357a6ef5e83d2f9c50c7d1e14b7473465530",
+      "size": 1137
+    },
+    {
+      "path": "migration-prep/korea/xuanjun-binance-shadow.service.in",
+      "sha256": "655e11f1200c1f8ccbc15465a2cfc7750b55976cf43457eaed85d8d021f93d82",
+      "size": 901
+    },
+    {
+      "path": "migration-prep/korea/requirements.lock",
+      "sha256": "f089faca8c9fd0ed276eedfb054c515747dc5fdbc2c4ddd442570ec184582ec5",
+      "size": 83
+    },
+    {
+      "path": "migration-prep/korea/deployment-manifest.json",
+      "sha256": "736f24fd3a6cdc613041a091fb7418d7e6a104e24ac5a4616bf3823a7ad4bcf5",
+      "size": 2041
+    },
+    {
+      "path": "migration-prep/korea/DEPLOYMENT.md",
+      "sha256": "de02e464617186976377f135db89ad26ce37f3938fa2e8476b6dc53c75424f54",
+      "size": 1242
+    }
+  ],
+  "production_authorized": false,
+  "production_deployed": false,
+  "schema_version": 1,
+  "task_id": "TOKYO_KOREA_IMPLEMENTATION_AFTER_PREPARATION_AUDIT_6168878707"
+}

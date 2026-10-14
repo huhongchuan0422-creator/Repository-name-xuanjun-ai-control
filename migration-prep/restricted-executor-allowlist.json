@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "production_authorized": false,
+  "privileged_transport": "NONE",
+  "authority_binding": "EXACT_REQUEST_SHA256_PLUS_SINGLE_USE_NONCE_REQUIRED_AT_LATER_GATE",
+  "hosts": {
+    "iZ6wee8q9z4t03hvqumwfhZ": {
+      "paths": [
+        "/home/githubrunner/actions-runner",
+        "/usr/local/sbin/xuanjun-migration-inspect-v1",
+        "/etc/sudoers.d/xuanjun-migration-inspect-v1",
+        "/opt/trading-system/database/data/trading.db",
+        "/var/lib/xuanjun-migration-evidence"
+      ],
+      "units": [
+        "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-tokyo-readonly.service"
+      ],
+      "actions": ["READONLY_INSPECT", "RUNNER_RETIRE", "WRITER_FENCE"]
+    },
+    "iZmj7a5kwr75qc1tul4kf9Z": {
+      "paths": [
+        "/home/githubrunner/actions-runner",
+        "/opt/xuanjun-binance",
+        "/var/lib/xuanjun-binance",
+        "/etc/xuanjun-binance",
+        "/var/log/xuanjun-binance"
+      ],
+      "units": [
+        "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-korea-binance.service",
+        "yibi-api.service",
+        "yibi-scheduler.service",
+        "yibi-daily-report.service",
+        "yibi-health-check.service",
+        "yibi-mailbox-reader.service",
+        "yibi-worker.service",
+        "yibi-daily-report.timer",
+        "yibi-health-check.timer",
+        "xuanjun-binance-shadow.service"
+      ],
+      "actions": ["READONLY_INSPECT", "RUNNER_RETIRE", "YIBI_RETIRE", "KOREA_DEPLOY", "KOREA_LOCK_WRITER"]
+    }
+  },
+  "forbidden_units": ["xuanjun-novel-factory.service", "postgresql.service", "redis.service"],
+  "timeout_seconds_max": 300,
+  "timeout_or_partial_result": "UNKNOWN_INSPECT_NO_BLIND_RETRY"
+}
