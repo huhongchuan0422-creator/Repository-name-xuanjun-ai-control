@@ -1,0 +1,31 @@
+name: Stage5 Local Stack E2E
+on:
+  pull_request:
+    paths:
+      - 'scripts/community_demo_api.py'
+      - 'demos/community-local-e2e/**'
+      - 'tests/test_stage5_local_stack.py'
+      - '.github/workflows/stage5-local-stack-e2e.yml'
+permissions:
+  contents: read
+jobs:
+  local-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m unittest discover -s tests -p 'test_stage5_local_stack.py' -v
+          python -m unittest discover -s tests -p 'test_community_demo_api.py' -v
+          node --check demos/community-local-e2e/app.js
+          node --test demos/community-local-e2e/app.test.mjs
+          node --test demos/community-local-e2e/merchant.test.mjs
+          node --test demos/community-local-e2e/platform.test.mjs
+          echo REAL_BROWSER_E2E=NOT_RUN
+          echo LIVE_FUNDS=NOT_RUN
