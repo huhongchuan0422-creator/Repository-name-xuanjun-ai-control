@@ -107,7 +107,7 @@ def main():
         if args.changed_file_list:
             changed=[]
             for record in Path(args.changed_file_list).read_text(encoding="utf-8").splitlines():
-                parts=record.split("\\t")
+                parts=record.split("\t")
                 if len(parts)!=2 or not parts[0] or not parts[1]:
                     raise ValueError("INVALID_CHANGED_FILE_RECORD")
                 changed.append((parts[0],parts[1]))
