@@ -56,7 +56,7 @@ class Stage5MerchantBatch2(unittest.TestCase):
         token["payload"]["context"]="pos2"
         self.assertFalse(verify_qr(token,self.sc,"pos2",499,self.key))
     def test_12_invalid_splits(self):
-        for x in ({"a":100,"b":9900},{"a":-1,"b":10001},{}):
+        for x in ({"a":100,"b":9800},{"a":-1,"b":10001},{}):
             with self.assertRaises(ValueError):split_amounts(100,x)
     def test_13_tenant_roles(self):
         user={"authenticated":True,"role":"MERCHANT_ADMIN","tenant_id":"other","merchant_id":"m1"}
