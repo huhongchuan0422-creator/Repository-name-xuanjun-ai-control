@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from scripts.community_order_store import connect, DDL, create_order, state, simulated_transition
-from scripts.community_merchant_contract import scope, signed_qr, verify_qr
+from scripts.community_merchant_contract import scope, signed_qr, verify_qr, split_amounts
 from scripts.community_storefront_snapshot import storefront_snapshot
 from scripts.community_ad_contract import AMOUNT, SUCCESS
 from scripts.community_ad_store import list_campaigns
@@ -83,6 +83,25 @@ class DemoService:
                     "preview_total_minor":recorded["preview_total_minor"],
                     "provider_refund_executed":False,"simulation_only":True,
                     "financial_receipt_issued":False}
+        if method == "POST" and path == "/demo/splits/preview":
+            _object(data, FIELDS | {"shares_bps"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            ref=_id(data["reference"])
+            order=state(self.db,identity,ref)
+            if order["state"]!="SUCCESS" or order["provider_settlement_verified"] is not False:
+                raise ValueError("SIMULATED_SUCCESS_REQUIRED")
+            if self.refund_db is None:
+                raise ValueError("REFUND_STORE_UNAVAILABLE")
+            refund=preview_total(self.refund_db,identity,ref)
+            preview=split_amounts(order["amount_minor"],data["shares_bps"],refund)
+            return {"allocations_minor":preview["shares_minor"],
+                    "allocatable_minor":preview["allocatable_minor"],
+                    "refund_preview_minor":preview["refunded_minor"],
+                    "simulation_only":True,"provider_settlement_verified":False,
+                    "provider_split_executed":False,
+                    "financial_receipt_issued":False,
+                    "cross_database_atomic_snapshot":False}
         if method == "POST" and path == "/demo/refunds/preview":
             _object(data, FIELDS)
             identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -215,7 +234,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify","/demo/splits/preview"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
