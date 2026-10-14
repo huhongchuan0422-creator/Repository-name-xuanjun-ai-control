@@ -39,6 +39,17 @@ class DemoService:
     def dispatch(self, method, path, data):
         if type(data) is not dict:
             raise ValueError("INVALID_REQUEST")
+        if method == "POST" and path == "/demo/orders/list":
+            _object(data, {"tenant_id","merchant_id","store_id"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            t,m,st=scope(identity)
+            rows=self.db.execute(
+                "SELECT reference,amount_minor,currency,state FROM orders "
+                "WHERE tenant_id=? AND merchant_id=? AND store_id=? "
+                "ORDER BY reference LIMIT 50",(t,m,st)).fetchall()
+            return {"orders":[{"reference":ref,"amount_minor":amount,"currency":currency,
+                               "state":state_name} for ref,amount,currency,state_name in rows],
+                    "simulation_only":True,"provider_settlement_verified":False}
         if method == "POST" and path == "/demo/storefront":
             _object(data, {"tenant_id", "merchant_id", "store_id"})
             identity = {k: data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -125,7 +136,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
