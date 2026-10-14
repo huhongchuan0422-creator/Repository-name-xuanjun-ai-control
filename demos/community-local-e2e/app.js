@@ -2,7 +2,7 @@
 const get=id=>document.getElementById(id);
 const text=(id,value)=>{get(id).textContent=String(value);};
 const fields=["tenant","merchant","store","reference","amount"];
-let counter=0, generation=0, requestSerial=0, activeKey=null;
+let generation=0, requestSerial=0, activeKey=null;
 function input(){
  const scope={tenant_id:get("tenant").value,merchant_id:get("merchant").value,store_id:get("store").value};
  const reference=get("reference").value,raw=get("amount").value,amount=Number(raw);
@@ -61,8 +61,9 @@ async function action(kind){
    path="/demo/orders/state";const {amount_minor,...identity}=order;payload=identity;
   }else{
    path="/demo/orders/simulate";
-   const index=++counter;
-   payload={...order,event_id:"local_event_"+index,transaction_id:"local_tx_"+index,
+   const eventNonce=crypto.randomUUID().replace(/-/g,"");
+   const transactionNonce=crypto.randomUUID().replace(/-/g,"");
+   payload={...order,event_id:"local_event_"+eventNonce,transaction_id:"local_tx_"+transactionNonce,
       target:kind==="complete"?"SUCCESS":"FAILED"};
   }
   const data=await request(path,payload);
