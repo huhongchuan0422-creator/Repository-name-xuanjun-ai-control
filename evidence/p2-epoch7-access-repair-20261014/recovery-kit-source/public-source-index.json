@@ -333,7 +333,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery/test_epoch7_phase_steps.py"
     },
     "tests/recovery_filesystem/test_epoch7_protected_fs.py": {
-      "sha256": "1da63b8dc9b4c6f5a62358ec86b27cfd67f6e0260f6dbd65dd313eb6ffce9922",
+      "sha256": "6d301d0da2339995349d5aa3ff4b71e1941a786899324041f13ae5263e300241",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery_filesystem/test_epoch7_protected_fs.py"
     },
     "tests/resource_plan/test_epoch7_resource_plan.py": {
@@ -1068,7 +1068,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/extract_epoch7_kit.py"
     },
     "portable-tests/ADAPTERS.json": {
-      "sha256": "3aeec9ef3257ca931f23eba3b4a5759fb7e35e6fe8a57e19b7db3afbad24a418",
+      "sha256": "1932d3cd41415c109dd3318e9ecd829c6174a0082fcd0801d56755e0cf2e7836",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/portable-tests/ADAPTERS.json"
     },
     "run_epoch7_offline.py": {

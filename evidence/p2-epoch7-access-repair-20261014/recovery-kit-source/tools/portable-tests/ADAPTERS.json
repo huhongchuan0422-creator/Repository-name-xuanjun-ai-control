@@ -107,12 +107,12 @@
     },
     {
       "adapted": "test_epoch7_protected_fs.py",
-      "adapted_sha256": "1da63b8dc9b4c6f5a62358ec86b27cfd67f6e0260f6dbd65dd313eb6ffce9922",
+      "adapted_sha256": "6d301d0da2339995349d5aa3ff4b71e1941a786899324041f13ae5263e300241",
       "scope": [
         "Redirect confined fixture roots to helpers/fixtures in the authenticated disposable copy; production confinement and assertions unchanged."
       ],
       "source": "recovery-design-candidate/test_epoch7_protected_fs.py",
-      "source_sha256": "01dd4f9d6885f54cda1fcbc97d41425e5eb729e4e182ba85196a66a39b99c282"
+      "source_sha256": "f680b2ce0916995ca2f74f95137db060fa26046d51436abd4cbdd7980dcdc142"
     },
     {
       "adapted": "test_snapshot_portable.py",

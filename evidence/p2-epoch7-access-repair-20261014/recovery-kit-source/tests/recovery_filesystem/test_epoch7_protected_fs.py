@@ -35,6 +35,8 @@ class FilesystemTests(unittest.TestCase):
         for parent in (os.path.dirname(self.path), os.path.dirname(self.mask),
                        fs.TRANSACTION, d.GENERATION):
             self.local(parent).mkdir(parents=True, exist_ok=True, mode=0o755)
+            # Model the exact reviewed fixture metadata regardless of CI umask.
+            os.chmod(str(self.local(parent)), 0o755)
         os.chmod(str(self.local(fs.TRANSACTION)), 0o700)
         os.chmod(str(self.local(d.GENERATION)), 0o750)
         self.local(self.path).write_bytes(b'old protected bytes')
@@ -44,6 +46,20 @@ class FilesystemTests(unittest.TestCase):
 
     def tearDown(self): self.temp.cleanup()
     def local(self, logical): return self.root / logical.lstrip('/')
+
+    def test_fixture_parent_metadata_survives_restrictive_umask(self):
+        other = FilesystemTests('test_additive_missing_intent_blocks')
+        previous = os.umask(0o077)
+        try:
+            other.setUp()
+        finally:
+            os.umask(previous)
+        try:
+            parent = other.local(os.path.dirname(additive.PATH))
+            self.assertEqual(os.stat(str(parent)).st_mode & 0o777, 0o755)
+            other.io.read_additive_absence()
+        finally:
+            other.tearDown()
 
     def journal(self, name, state):
         value = {'schema': 1, 'name': name, 'transaction_id': d.TX,
