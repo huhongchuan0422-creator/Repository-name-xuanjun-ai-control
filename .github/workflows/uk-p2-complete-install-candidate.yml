@@ -1,0 +1,54 @@
+name: P2 complete exact95 installation candidate and consolidated checks
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-install-preparation-20261013/prepare_complete_install_candidate.py
+      - .github/workflows/uk-p2-complete-install-candidate.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prepare:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: false
+          path: p2-complete-${{ github.run_id }}
+      - name: Fetch exact frozen95 bytes without refreezing
+        working-directory: p2-complete-${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os,urllib.request,hashlib
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+           def redirect_request(self,req,fp,code,msg,headers,newurl):
+            out=super().redirect_request(req,fp,code,msg,headers,newurl)
+            if out is not None:out.remove_header('Authorization')
+            return out
+          q=urllib.request.Request('https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11833404272/zip',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.build_opener(SafeRedirect()).open(q,timeout=30) as f:b=f.read(2097153)
+          assert len(b)<=2097152 and hashlib.sha256(b).hexdigest()=='b8b33cba5f9951466e3242dfaa264471d80fdab1cbf832843baacbac43202107'
+          fd=os.open('exact95.zip',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'wb') as f:f.write(b)
+          print('EXACT95_ZIP_FETCH_VERIFIED')
+          PY
+      - name: Prepare corrected complete plan and packaged CLI preflight
+        id: plan
+        working-directory: p2-complete-${{ github.run_id }}
+        run: |
+          set -o pipefail
+          sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/prepare_complete_install_candidate.py "${{ github.run_id }}" "$PWD/exact95.zip" | tee complete-plan-receipt.txt
+          python3 - <<'PY'
+          import json,os
+          s=open('complete-plan-receipt.txt').read().splitlines()
+          j=json.loads(next(x.split('COMPLETE_INSTALL_CANDIDATE=',1)[1] for x in s if x.startswith('COMPLETE_INSTALL_CANDIDATE=')))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('plan_path='+j['plan_path']+'\nplan_sha256='+j['plan_sha256']+'\n')
+          PY
+      - name: Run all remaining metadata and authority checks against corrected plan
+        working-directory: p2-complete-${{ github.run_id }}
+        run: sudo -n /usr/bin/python3 -I -B evidence/p2-install-preparation-20261013/consolidated_readiness.py "${{ github.run_id }}" "${{ steps.plan.outputs.plan_path }}" "${{ steps.plan.outputs.plan_sha256 }}"

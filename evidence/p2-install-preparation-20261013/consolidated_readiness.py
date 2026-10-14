@@ -74,8 +74,16 @@ def execute():
     def section(name, fn):
         try:result['sections'][name]=fn()
         except Exception as error:result['errors'][name]={'type':type(error).__name__,'code':str(error) if isinstance(error,ValueError) else 'READ_OR_FIXTURE_FAILED'}
-    p=raw(PLAN,private=True);require(hashlib.sha256(p).hexdigest()==PLAN_SHA,'CORE_PLAN_DRIFT')
+    plan_path=PLAN;plan_sha=PLAN_SHA
+    if len(sys.argv)==4:
+        plan_path=sys.argv[2];plan_sha=sys.argv[3]
+        require(plan_path.startswith(BASE+'/complete-install-candidate-') and plan_path.endswith('/protected-core-install-plan.json'),'NEW_PLAN_SCOPE')
+        require(len(plan_sha)==64 and all(c in '0123456789abcdef' for c in plan_sha),'NEW_PLAN_DIGEST')
+    p=raw(plan_path,private=True);require(hashlib.sha256(p).hexdigest()==plan_sha,'CORE_PLAN_DRIFT')
     plan=json.loads(p.decode());root=plan['artifact']['root']
+    require(plan['artifact']['source_commit']=='2516b8adf88a126b956c6b5ccf1a1dd186a328a6'
+            and plan['artifact']['source_tree']=='e03b72b7b9578ef5087ca8c01c9276ab73825dcb'
+            and plan['artifact']['manifest_sha256']=='44ede26d72bbb776dc813d6eb4d057581e11440d17082a6f1a207fc377689b0a','EXACT95_PLAN_BINDING')
     require(digest(DB)==DB_SHA,'CANONICAL_DB_DRIFT')
     for suffix in ['-wal','-journal']:
         require(not os.path.lexists(DB+suffix) or os.lstat(DB+suffix).st_size==0,'NONEMPTY_DB_JOURNAL')
@@ -90,7 +98,7 @@ def execute():
             require(digest(root+'/'+rel)==h,'RUNTIME_FILE_DRIFT')
         from p2_install_entrypoint import validate_plan
         validate_plan(plan)
-        return {'files_verified':95,'plan_sha256':PLAN_SHA,'source':plan['artifact']['source_commit'],
+        return {'files_verified':95,'plan_path':plan_path,'plan_sha256':plan_sha,'source':plan['artifact']['source_commit'],
                 'manifest_sha256':plan['artifact']['manifest_sha256'],'schema_valid':True}
     section('artifact_and_plan',artifact)
 
@@ -234,8 +242,29 @@ def execute():
                 try:exe=os.readlink('/proc/'+pid+'/exe')
                 except FileNotFoundError:continue
                 processes.append({'pid':int(pid),'exe':exe})
+        schedules=[];related=[]
+        roots=['/etc/crontab','/etc/cron.d','/etc/cron.hourly','/etc/cron.daily','/etc/cron.weekly','/etc/cron.monthly',
+               '/var/spool/cron','/var/spool/at','/home/xuanjun_dev/.config/systemd/user']
+        for base in roots:
+            if not os.path.lexists(base):continue
+            if os.path.islink(base):raise ValueError('SCHEDULER_ROOT_ALIAS')
+            candidates=[]
+            if os.path.isfile(base):candidates=[base]
+            else:
+                for parent,dirs,files in os.walk(base,followlinks=False):
+                    require(not any(os.path.islink(parent+'/'+name) for name in dirs),'SCHEDULER_DIRECTORY_ALIAS')
+                    candidates.extend(parent+'/'+name for name in files)
+                    require(len(candidates)<=2048,'SCHEDULER_FILE_BOUND')
+            for path in candidates:
+                require(not os.path.islink(path),'SCHEDULER_FILE_ALIAS')
+                data=raw(path,1048576);low=data.lower()
+                matches=any(token in low for token in (b'xuanjun',b'uk-stage1-minimal',b'openclaw',b'state.sqlite'))
+                row={'path':path,'sha256':hashlib.sha256(data).hexdigest(),'control_realm_reference':matches}
+                schedules.append(row)
+                if matches:related.append(row)
         return {'registered_control_units':units,'uid1002_processes':processes,
-                'cron_and_user_schedulers':'NOT_YET_FULLY_CLASSIFIED','global_exclusion':'NOT_CLAIMED'}
+                'scheduler_files_checked':len(schedules),'scheduler_metadata':schedules,
+                'control_related_scheduler_files':related,'global_exclusion':'NOT_CLAIMED'}
     section('remaining_control_entry_inventory',control_entries)
 
     def fd_scope():
