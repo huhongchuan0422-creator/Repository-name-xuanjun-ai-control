@@ -58,6 +58,14 @@ def handler(service):
         def log_message(self, fmt, *args):
             pass
         def do_POST(self):
+            # Reject DNS-rebinding hostnames and cross-origin browser requests.
+            address = self.headers.get("Host", "")
+            expected_host = "127.0.0.1:" + str(self.server.server_address[1])
+            if address != expected_host:
+                return self.send_json(403, {"error":"LOOPBACK_ONLY"})
+            origin = self.headers.get("Origin")
+            if origin is not None and origin != "http://" + expected_host:
+                return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
                 "/demo/orders","/demo/orders/state","/demo/orders/simulate"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
