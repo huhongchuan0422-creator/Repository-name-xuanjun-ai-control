@@ -1,11 +1,11 @@
 """Nonprivileged caller; verify real approval before a hash-pinned Root load."""
 import argparse,hashlib,json,os,stat,subprocess,sys,urllib.request
-EXPECTED='f4dd7e7c37dc9744a0697e09e9147b10cf325417c5b0e441e376905d9ef4922a'
+EXPECTED='e83b769b64547d75e130423b88684459d62f247ee1bd9b604d6740e3445bdb78'
 REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 MARKER='CHATGPT_NATIVE_TASK5_COMPLETE_INSTALL_ACCEPTANCE\n'
 ROOT_LOADER=r'''
 import hashlib,os,stat,sys
-expected='f4dd7e7c37dc9744a0697e09e9147b10cf325417c5b0e441e376905d9ef4922a'
+expected='e83b769b64547d75e130423b88684459d62f247ee1bd9b604d6740e3445bdb78'
 path=sys.argv[1]
 if os.geteuid()!=0 or os.path.realpath(path)!=path:raise ValueError('ROOT_EXACT_SOURCE_REQUIRED')
 fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)

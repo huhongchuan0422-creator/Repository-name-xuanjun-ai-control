@@ -46,7 +46,7 @@ def package_check(plan,gate):
   require(not any(os.path.islink(parent+'/'+name) for name in dirs),'ADMISSION_PACKAGE_DIRECTORY_ALIAS')
   require(not any(name.endswith('.pyc') for name in files),'ADMISSION_UNREVIEWED_BYTECODE')
  b,s=read(plan['artifact']['manifest']);require(s.st_uid==0 and not s.st_mode&0o022 and digest(b)==gate['manifest_sha256'],'ADMISSION_MANIFEST_BINDING')
- manifest=json.loads(b.decode());require(len(manifest['files'])==100,'ADMISSION_COMPLETE_RUNTIME_COUNT')
+ manifest=json.loads(b.decode());require(len(manifest['files'])==102,'ADMISSION_COMPLETE_RUNTIME_COUNT')
  for name,wanted in manifest['files'].items():
   require(not name.startswith('/') and '..' not in name.split('/'),'ADMISSION_PAYLOAD_PATH')
   raw,info=read(root+'/'+name,limit=16777216)
