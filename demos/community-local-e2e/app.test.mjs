@@ -161,3 +161,25 @@ test('merchant scope change invalidates late catalog result and creative',async(
  assert.equal(ui.els.storefrontName.textContent,"");
  assert.equal(ui.els.adAmount.textContent,"金额页广告位：当前无广告（模拟）");
 });
+
+test('approved HTTPS creative with /sale and query containing s keeps catalog readable',async()=>{
+ for(const url of ['https://example.org/sale','https://example.org/sales?source=store']){
+  const data={...scopedStorefront,ads:{...scopedStorefront.ads,AD_SLOT_PAYMENT_AMOUNT:{...scopedStorefront.ads.AD_SLOT_PAYMENT_AMOUNT,url}}};
+  const ui=setup(async()=>ok(data));
+  await ui.click('loadStorefront');
+  assert.equal(ui.els.storefrontName.textContent,'Shop A');
+  assert.equal(ui.els.storefrontProducts.textContent,'Item A');
+  assert.match(ui.els.adAmount.textContent,/Approved A/);
+  assert.equal(ui.els.successAd.hidden,true);
+ }
+});
+test('creative URLs with whitespace or unsupported protocol/authority are rejected',async()=>{
+ for(const url of ['https://example.org/a b','https://example.org/a\\tb','http://example.org/sale',
+                   'javascript:alert(1)','https://user@example.org/sale','https://example.org\\\\evil']){
+  const data={...scopedStorefront,ads:{...scopedStorefront.ads,AD_SLOT_PAYMENT_AMOUNT:{...scopedStorefront.ads.AD_SLOT_PAYMENT_AMOUNT,url}}};
+  const ui=setup(async()=>ok(data));
+  await ui.click('loadStorefront');
+  assert.equal(ui.els.storefrontName.textContent,'');
+  assert.match(ui.els.storefrontStatus.textContent,/不可信|格式错误/);
+ }
+});
