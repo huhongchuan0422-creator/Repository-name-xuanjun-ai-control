@@ -1,0 +1,86 @@
+{
+  "allowed_credential_role": "BINANCE_ACCOUNT_READONLY",
+  "allowed_exchange_methods": [
+    "GET"
+  ],
+  "artifact_role": "KOREA_GET_ONLY_SHADOW_RUNTIME_CANDIDATE",
+  "binance_called": false,
+  "content_sha256": "ab6f91476d05daee0a90097a7fe057588b88595b76f8a347a1b091aa75b69c0b",
+  "entrypoint": "python -m korea.migration_shadow_entry",
+  "feature_id": "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
+  "files": [
+    {
+      "path": "migration-prep/gate_common.py",
+      "sha256": "b131612c43f873a1c3845a26b8414ffe499646417e279e896b53dcf79171d641",
+      "size": 10893
+    },
+    {
+      "path": "migration-prep/final_snapshot.py",
+      "sha256": "68b23e2e345b35068893be6899fc18cef3c5306145a9deffef8dfb14846048b8",
+      "size": 13058
+    },
+    {
+      "path": "migration-prep/readonly_reconciliation_adapter.py",
+      "sha256": "b2bddbc583d8ea1427b31c6cd2b2c16856921a8fcea525604417d1df29f4008d",
+      "size": 27027
+    },
+    {
+      "path": "migration-prep/korea/__init__.py",
+      "sha256": "907703715e9879235b468c7ef1d3630bdd7e665d77bef4d5d1b62fffb6b7031c",
+      "size": 50
+    },
+    {
+      "path": "migration-prep/korea/get_only_policy.py",
+      "sha256": "0e43220e5de874c4932bf79b244ee38ff6f3ab1aa743bfbb3ea6b8438d6d8116",
+      "size": 6447
+    },
+    {
+      "path": "migration-prep/korea/migration_shadow_entry.py",
+      "sha256": "b35d57e946ca3183642527e7bdc0051e97c60405a5ce95c38347b14ac6d582a7",
+      "size": 12497
+    },
+    {
+      "path": "migration-prep/korea/shadow-config.template.json",
+      "sha256": "d0cac38c02b383a0e7e88e785f36a2fcb736f9a1de37d472aa3745a62d4564cf",
+      "size": 851
+    },
+    {
+      "path": "migration-prep/korea/xuanjun-binance-shadow.service.in",
+      "sha256": "f5d2053205680d66ca3f7b851e53e12c1221a45b3bb06736e921f0d80e8d5e3c",
+      "size": 1477
+    },
+    {
+      "path": "migration-prep/korea/install-candidate.sh",
+      "sha256": "b0c223c656adc3f384e92048ce5066b4bcceeed851409ae42e471dffbf0d962f",
+      "size": 4016
+    },
+    {
+      "path": "migration-prep/korea/check-candidate.sh",
+      "sha256": "c071ba2886468ba0a5df41e31dcdea937420f16e1ae75ac11fb92080a91533ed",
+      "size": 1058
+    },
+    {
+      "path": "migration-prep/korea/uninstall-candidate.sh",
+      "sha256": "1b787daf54fb7868a74bb797e03691828fa30a05fbceb9daf60e17a2583b6bdb",
+      "size": 750
+    },
+    {
+      "path": "migration-prep/korea/requirements.lock",
+      "sha256": "f089faca8c9fd0ed276eedfb054c515747dc5fdbc2c4ddd442570ec184582ec5",
+      "size": 83
+    }
+  ],
+  "forbidden_credential_references": [
+    "BINANCE_TRADING",
+    "TRADING_CREDENTIAL_MASTER_KEY",
+    "PLAINTEXT_ENV_SECRET"
+  ],
+  "install_executed": false,
+  "persistent_production_launcher": "NOT_PROVEN_NOT_INCLUDED",
+  "production_authorized": false,
+  "python": "/usr/bin/python3.11",
+  "requirements": "stdlib-only",
+  "scheduler_enabled": false,
+  "schema_version": 1,
+  "writer_enabled": false
+}

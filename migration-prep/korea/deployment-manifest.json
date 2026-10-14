@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "artifact_role": "KOREA_ISOLATED_SHADOW_CANDIDATE",
   "production_authorized": false,
   "install_executed": false,
@@ -30,11 +30,14 @@
     "bypass_audit_status": "CANDIDATE_SOURCE_TESTED_RUNTIME_EGRESS_NOT_PROVEN"
   },
   "services": ["xuanjun-binance-shadow.service"],
+  "entrypoint": "python -m korea.migration_shadow_entry --once --config /etc/xuanjun-binance/shadow.json",
+  "persistent_production_launcher": "NOT_PROVEN_NOT_INCLUDED",
+  "unit_install_state": "DISABLED_DENY_ALL_NO_IP_ALLOWLIST",
   "writer_enabled": false,
   "scheduler_enabled": false,
   "loopback_ports": [18080, 18081, 19080, 19081],
   "shadow_acceptance": {
-    "minimum_duration_seconds": 86400,
+    "recommended_minimum_duration_seconds": 86400,
     "decision_mismatch_count": 0,
     "position_mismatch_count": 0,
     "order_mismatch_count": 0,
@@ -45,7 +48,7 @@
     "owner_threshold_approval": "REQUIRED"
   },
   "canary_acceptance": {
-    "bounded_window_seconds": 900,
+    "recommended_bounded_window_seconds": 900,
     "max_new_entries": 0,
     "write_authority": "NOT_INCLUDED",
     "owner_threshold_approval": "REQUIRED"

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "features": [
+    {
+      "feature_id": "GOVERNANCE_COMPLIANCE_GATE",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/FEATURE_COMPLIANCE_GATE_20261015.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/FEATURE_COMPLIANCE_GATE_20261015.md",
+        "section": "2",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "positive registry and negative omissions detected",
+          "normal PR has stable feature-compliance check",
+          "main protection is only enabled after safe bootstrap"
+        ],
+        "tests": [
+          "tests/test_feature_compliance_check.py"
+        ]
+      },
+      "reuse": [
+        "GitHub Actions",
+        "standard-library Python"
+      ]
+    },
+    {
+      "feature_id": "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1.md",
+        "section": "2",
+        "phase": 2
+      },
+      "acceptance": {
+        "criteria": [
+          "supplement original Root HOLD without broadening symlink trust",
+          "package a real GET-only Korea Shadow entry with Writer locked",
+          "keep persistent production Launcher and single-Writer phases blocked until independently bound",
+          "preserve protected Korea services and production HOLD"
+        ],
+        "tests": [
+          "tests/test_tokyo_korea_closeout.py"
+        ]
+      },
+      "reuse": [
+        "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1 policy",
+        "existing Root and Gateway evidence",
+        "existing WAL-aware reconciliation adapter",
+        "existing GET-only controlled transport",
+        "existing production factory and risk/protection/recovery components"
+      ]
+    }
+  ]
+}

@@ -8,8 +8,10 @@ identity. The systemd template keeps release/config read-only and state/log root
 writable. `ControlledHttpsTransport` is the only packaged HTTP transport: it has no
 generic method API, ignores proxy environment variables through raw sockets, denies
 redirects, pins resolved addresses, and requires normal TLS hostname/certificate
-verification. The service template defaults egress to deny and requires a root-owned
-expanded `@BINANCE_PINNED_IP_ALLOWLIST@` before it can be installed.
+verification. The installed candidate remains valid but deny-all: its base unit has
+`IPAddressDeny=any` and no `IPAddressAllow`. A separately reviewed Phase-C action
+must create a root-owned drop-in with exact pinned addresses before any live GET.
+The installation command never creates that drop-in and never starts the unit.
 
 This still does not prove root-controlled egress or absence of every bypass in an
 installed runtime. A destination firewall cannot inspect an encrypted HTTP method;

@@ -1,9 +1,9 @@
 {
-  "audit_comment": "6172954908",
-  "base_commit": "579c1bd922464b3483b847a9e8e7b9803895976b",
-  "base_tree": "f5f82eeab1311c05d4b97fa0cc143c174e8ec25a",
+  "audit_comment": "6174050426",
+  "base_commit": "4a6215e0d27e1560de3eca4ccbc5dbeaa492aaff",
+  "base_tree": "e2c647630e7fbeefbf35a3835bdb4573a0c5d3de",
   "binance_called": false,
-  "candidate_content_sha256": "ed2ab4ab5c4613b5a9a5d9ea2c27f848ff613d3a9e3ef1a400770abfc549d1d4",
+  "candidate_content_sha256": "f8655836b4fe798c67d51ae474aeaa7182bbfe26524a922784ed9fe0ff613d88",
   "canonical_migration_policy_enforced": true,
   "files": [
     {
@@ -63,8 +63,8 @@
     },
     {
       "path": "migration-prep/korea/xuanjun-binance-shadow.service.in",
-      "sha256": "c483aafa157ca540ed4e2388293a62ba1543833e5732aca684dd280580ceb684",
-      "size": 1059
+      "sha256": "f5d2053205680d66ca3f7b851e53e12c1221a45b3bb06736e921f0d80e8d5e3c",
+      "size": 1477
     },
     {
       "path": "migration-prep/korea/requirements.lock",
@@ -73,13 +73,13 @@
     },
     {
       "path": "migration-prep/korea/deployment-manifest.json",
-      "sha256": "fc849fcde9ff9e67245175f59f5672436c258fb66486466e186dcecb2f78058f",
-      "size": 2672
+      "sha256": "0b0720616aed7f19130817ec722807b8cdbfa97e4daf1541a131973f59f7a489",
+      "size": 2927
     },
     {
       "path": "migration-prep/korea/DEPLOYMENT.md",
-      "sha256": "0b7f01315e6cea007234e312db72f783b6e4234b6e8f5111ddbf4daec6afeef0",
-      "size": 1749
+      "sha256": "b6e0270c7f06861b7d97cd8189114520739ca486d5af860736e01cc1d4617f95",
+      "size": 1922
     },
     {
       "path": "migration-prep/c7_acceptance.py",
@@ -150,15 +150,92 @@
       "path": "migration-prep/test_production_dependency_inventory.py",
       "sha256": "d93cee7e3fef9d5f1f047400064eaa7f637d57969cb7da3066b24804b776d852",
       "size": 2269
+    },
+    {
+      "path": "migration-prep/collect_dracut_symlink_supplement.py",
+      "sha256": "474502a0d3e9fd555f1c57e91610a20f0cf354d66cf840c5d150ab4929d57cc1",
+      "size": 5788
+    },
+    {
+      "path": "migration-prep/production-runtime-closure.json",
+      "sha256": "bf079ce084ec5de323400535312b649c9e77c6460a2f77c0b3ede276e1121f6d",
+      "size": 2082
+    },
+    {
+      "path": "migration-prep/FINAL_CLOSEOUT_PACKAGE.md",
+      "sha256": "e04a7f6df6cff8c1f04e56e0f7c858b641885220b63748379060b78c82f206c9",
+      "size": 4306
+    },
+    {
+      "path": "migration-prep/SHARED_DATABASE_CUTOVER_PLAN.md",
+      "sha256": "2bbcc0246e083a41f0de2918aee9b789c7ddbe5a433ba4435d47fa5d093dff88",
+      "size": 3321
+    },
+    {
+      "path": "migration-prep/OWNER_ONE_TIME_COMPLETION.md",
+      "sha256": "516a04950ede3d42ae757a1036a6c851cc9783d6be1b2736545f698fca9f4001",
+      "size": 3846
+    },
+    {
+      "path": "migration-prep/PHASE_AUTHORIZATION_AND_OUTCOME_MATRIX.md",
+      "sha256": "ed3383282b167f980f56bb6fb66309e4599094e591ca3367260ca81da028b3e8",
+      "size": 2401
+    },
+    {
+      "path": "migration-prep/test_closeout_package.py",
+      "sha256": "3c162e055d5e4acfd4d624e931efc7447ab7008bdfe3e524626fc140a1423625",
+      "size": 6276
+    },
+    {
+      "path": "migration-prep/korea/__init__.py",
+      "sha256": "907703715e9879235b468c7ef1d3630bdd7e665d77bef4d5d1b62fffb6b7031c",
+      "size": 50
+    },
+    {
+      "path": "migration-prep/korea/build_minimal_runtime_manifest.py",
+      "sha256": "dbfe8395b0f9d8209b7c9a9c38ff179594b9a8ae67216f0e56ef09715455eb9c",
+      "size": 2265
+    },
+    {
+      "path": "migration-prep/korea/migration_shadow_entry.py",
+      "sha256": "b35d57e946ca3183642527e7bdc0051e97c60405a5ce95c38347b14ac6d582a7",
+      "size": 12497
+    },
+    {
+      "path": "migration-prep/korea/shadow-config.template.json",
+      "sha256": "d0cac38c02b383a0e7e88e785f36a2fcb736f9a1de37d472aa3745a62d4564cf",
+      "size": 851
+    },
+    {
+      "path": "migration-prep/korea/install-candidate.sh",
+      "sha256": "b0c223c656adc3f384e92048ce5066b4bcceeed851409ae42e471dffbf0d962f",
+      "size": 4016
+    },
+    {
+      "path": "migration-prep/korea/check-candidate.sh",
+      "sha256": "c071ba2886468ba0a5df41e31dcdea937420f16e1ae75ac11fb92080a91533ed",
+      "size": 1058
+    },
+    {
+      "path": "migration-prep/korea/uninstall-candidate.sh",
+      "sha256": "1b787daf54fb7868a74bb797e03691828fa30a05fbceb9daf60e17a2583b6bdb",
+      "size": 750
+    },
+    {
+      "path": "migration-prep/korea/minimal-runtime-manifest.json",
+      "sha256": "ca1af8c5d89109404a955cf2bd236b0f33f6355d02b9fdd23c2360c0a5b31205",
+      "size": 2922
     }
   ],
   "legacy_package_execution_accepted": false,
+  "persistent_production_launcher_proven": false,
   "production_authorized": false,
   "production_dependency_inventory_complete": false,
   "production_deployed": false,
   "root_inventory_incomplete_can_pass": false,
-  "schema_version": 6,
+  "schema_version": 7,
   "self_asserted_receipts_can_pass": false,
+  "shared_database_post_cutover_route_proven": false,
   "task_id": "TOKYO_KOREA_COMPLETE_MIGRATION_REVIEW_PACKAGE_6171881293",
   "trusted_adapter_installed": false
 }

@@ -1,0 +1,81 @@
+# Tokyo → Korea Binance final closeout package
+
+Feature: `TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1`
+
+Baseline: `4a6215e0d27e1560de3eca4ccbc5dbeaa492aaff` / `e2c647630e7fbeefbf35a3835bdb4573a0c5d3de`
+
+Production: `HOLD`
+
+## Closed evidence
+
+* Both original Root Collector receipts remain `HOLD_INCOMPLETE/exit 2`; no PASS was
+  manufactured. Exact supplements cover only the frozen 17 dracut links: target
+  bytes/hash, root-owned 0755 parent chain, 0644 targets and RPM provenance. Tokyo is
+  `dracut-059-3.alnx4.x86_64`; Korea is
+  `dracut-049-246.git20260728.0.1.1.al8.x86_64`.
+* `WALK_COMPLETE` is a collector diagnostic defect: it is emitted when `os.walk`
+  completes, then counted as failed because only `PASS` is accepted. It is not a host
+  finding and the frozen collector was not changed.
+* Tokyo coverage includes root/admin/githubrunner/yibi crontab, system cron files,
+  root-visible user units, transient units, active processes, wrapper/dynamic-call
+  capability and at-queue tool availability. No direct WP001–WP095 binding was found.
+* Gateway has four persisted scheduler jobs. Five enabled bundled hooks cover gateway
+  startup, agent bootstrap, command logging, session compaction and memory reset. The
+  Feishu channel is a real external session ingress. Neither hooks nor channel ingress
+  is the cron list, and neither contains a direct WP001–WP095 binding. Only the
+  research-only community-signal scheduler references `binance-eth-trader`.
+* Zero direct bindings is not non-reachability: all 95 remain `UNKNOWN/DENY` and are
+  not copied into the runtime artifact.
+
+## Real runtime closure
+
+No persistent production order Launcher is installed or proven. The accepted code
+composition point is `build_production_trading_execution_service`; the one-shot
+Owner smoke script is not a daemon or scheduler. Its required repositories,
+reconciliation providers, watchdog, market freshness, anomaly/recovery state,
+production risk/loss/FOMC/manual-intervention guards, protection gate, persisted risk
+limits, authorization and credential provider are listed in
+`production-runtime-closure.json`.
+
+Therefore A is not complete for a production Writer and D/E remain blocked. This is
+not solved by choosing a candidate file. The actual B/C deliverable is narrower and
+real: a stdlib-only GET-only Shadow entry, deterministic manifest, dedicated identity,
+disabled deny-all unit, install/check/uninstall commands, WAL-aware closed-copy read
+and independent exact-hash verifier hook. It loads only the dedicated read-only
+SecretRef and has no write method or scheduler.
+
+## Database and credentials
+
+See `SHARED_DATABASE_CUTOVER_PLAN.md`. Four Finance/Billing timers continue running.
+B/C uses an isolated consistent copy and a dedicated read-only credential. The
+trading credential and shared master key are forbidden. Phase D requires one
+authoritative database, exact pause/drain/final snapshot/delta reconciliation, and a
+proven post-cutover Finance route before timer resumption.
+
+## Installation commands (future Gate only)
+
+These commands are documentation, not authorization:
+
+```text
+sudo ./migration-prep/korea/install-candidate.sh SOURCE_ROOT EXPECTED_MINIMAL_MANIFEST_SHA256
+sudo ./migration-prep/korea/check-candidate.sh
+sudo ./migration-prep/korea/uninstall-candidate.sh --confirm-disabled-candidate-only
+```
+
+Install creates no credential, IP allowlist or active service. The base unit is
+deny-all and disabled. A later Phase-C signed action must materialize the read-only
+credential/config and an exact root-owned `IPAddressAllow` drop-in; application-level
+GET enforcement remains mandatory.
+
+## Acceptance and compliance
+
+The design, development sequence, acceptance references and reuse decision are in
+`docs/development/TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1.md`. The main-branch
+Feature Compliance Gate is reused byte-for-byte and the feature is registered as
+`CANDIDATE`, not verified/deployed. Focused tests and the full migration-prep suite
+must pass on the exact final head; hosted CI receipts are recorded only after the
+head exists.
+
+Human settings, suggested thresholds and independent Authority/verifier design are
+consolidated in `OWNER_ONE_TIME_COMPLETION.md`; phase scopes and every outcome state
+are in `PHASE_AUTHORIZATION_AND_OUTCOME_MATRIX.md`.

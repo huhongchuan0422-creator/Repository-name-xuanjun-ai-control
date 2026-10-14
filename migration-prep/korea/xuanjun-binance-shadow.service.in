@@ -13,7 +13,10 @@ Environment=HTTP_PROXY=
 Environment=HTTPS_PROXY=
 Environment=ALL_PROXY=
 Environment=NO_PROXY=*
-ExecStart=/opt/xuanjun-binance/venv/bin/python -m migration_shadow_entry
+Environment=PYTHONPATH=/opt/xuanjun-binance/current
+LoadCredential=binance_api_key:/etc/xuanjun-binance/secretref/BINANCE_ACCOUNT_READONLY_API_KEY
+LoadCredential=binance_api_secret:/etc/xuanjun-binance/secretref/BINANCE_ACCOUNT_READONLY_API_SECRET
+ExecStart=/opt/xuanjun-binance/venv/bin/python -m korea.migration_shadow_entry --once --config /etc/xuanjun-binance/shadow.json
 Restart=no
 NoNewPrivileges=yes
 PrivateTmp=yes
@@ -30,7 +33,8 @@ ReadOnlyPaths=/opt/xuanjun-binance/current /etc/xuanjun-binance
 ReadWritePaths=/var/lib/xuanjun-binance /var/log/xuanjun-binance
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 IPAddressDeny=any
-IPAddressAllow=@BINANCE_PINNED_IP_ALLOWLIST@
+# The installation candidate is deliberately deny-all. A separately reviewed,
+# root-owned Phase-C drop-in must add exact pinned addresses before any live GET.
 CapabilityBoundingSet=
 AmbientCapabilities=
 TimeoutStartSec=30s
