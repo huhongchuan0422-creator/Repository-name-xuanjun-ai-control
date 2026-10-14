@@ -88,6 +88,19 @@ class Tests(unittest.TestCase):
   with self.assertRaises(RecoveryHold):self.execute()
   saved=json.loads(pathlib.Path(self.obj.journal.path).read_text())
   self.assertEqual(saved['containment']['stop_exact_new_services']['status'],'UNKNOWN')
+ def test_failure_restores_boot_and_owner_masks(self):
+  self.obj.runtime.activate.side_effect=ValueError('partial start')
+  with self.assertRaises(RecoveryHold):self.execute()
+  self.obj.runtime._restore_boot.assert_called_once()
+  self.obj.runtime.restore_retained_owner_masks.assert_called_once_with(self.plan)
+ def test_boot_restore_failure_still_restores_both_masks(self):
+  self.obj.runtime.provision.side_effect=ValueError('TLS')
+  self.obj.runtime._restore_boot.side_effect=OSError('boot')
+  with self.assertRaises(RecoveryHold):self.execute()
+  self.obj.runtime.restore_retained_owner_masks.assert_called_once()
+  self.obj.context['adapter'].restore_legacy_files.assert_called_with(preserve_mask=True)
+  saved=json.loads(pathlib.Path(self.obj.journal.path).read_text())
+  self.assertEqual(saved['containment']['verify_stopped_and_preserve_legacy_masks']['status'],'UNKNOWN')
  def test_postchecker_receives_new_identity(self):
   self.execute();args=self.obj.postchecker['post_install_checks'].call_args[0]
   self.assertEqual(args[0]['activation']['release_sha256'],s.MANIFEST);self.assertEqual(args[2],{'epoch':4})

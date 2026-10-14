@@ -92,6 +92,25 @@ class RetainedEpoch3Runtime(FixedHostRuntime):
   self._install_plugin(release,runtime)
   return {'schema':1,'receipt_sha256':_digest_bytes(packed),'rollback_complete':False,
           'failure_policy':'FENCE_STOP_RETAIN_NO_REPLAY','retained_resources_replayed':False}
+ def restore_retained_owner_masks(self,plan):
+  self._authority()
+  raw=private_read(self.directory+'/runtime-provisioning.json')
+  need(hashlib.sha256(raw).hexdigest()==PINS[T+'/runtime-provisioning.json'],'EPOCH3_PRIOR_PROVISION_CHANGED')
+  old=json.loads(raw.decode())['targets']
+  masked=[row['target'] for row in old if isinstance(row.get('previous'),dict) and row['previous'].get('masked') is True]
+  need(set(masked)=={Auxiliary.UNIT_ROOT+'/'+name for name in Auxiliary.UNITS},'EPOCH3_OLD_OWNER_MASK_SCOPE')
+  new={row['target']:row for row in plan['runtime']['provisioning']}
+  # Validate all current bytes before replacing either known owner unit.
+  for target in masked:
+   if Auxiliary.is_mask(target):continue
+   data,info=_read_regular(target);row=new[target]
+   need((_digest_bytes(data),info.st_uid,info.st_gid,stat.S_IMODE(info.st_mode))==
+        (row['rendered_sha256'],row['owner_uid'],row['group_gid'],row['mode']),
+        'EPOCH3_OWNER_UNIT_UNEXPECTED_DRIFT')
+  for target in masked:Auxiliary.restore_mask(target)
+  self._command(['/usr/bin/systemctl','daemon-reload'])
+  Auxiliary.verify(plan['runtime']['auxiliary_isolation'])
+  return {'original_owner_masks_restored':True}
  def restore(self,*args,**kwargs):
   raise ValueError('EPOCH3_GENERIC_RESTORE_FORBIDDEN_USE_ADMITTED_CONTAINMENT')
  def prepare_prerequisites(self,*args,**kwargs):

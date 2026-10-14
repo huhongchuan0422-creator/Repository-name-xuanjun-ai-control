@@ -216,3 +216,34 @@ The old install receipt remains historical HOLD; the new protected
 transaction/epoch3-recovery-execution.json is the new attempt receipt. It must be
 read with the historical receipts, never silently interpret the old HOLD as new
 success. Production acceptance stays PENDING even after new postchecks pass.
+
+
+## Complete pre-install chain audit and final failure-containment increment
+
+Owner first-kit UK receipt SHA256 e0864a402a7a62dcfd76812456b0aacc59ffd7e60c4c1ce9b4b9b66a8c49d25c:
+Python3.6.8 160/160 PASS; full verify-only PASS; snapshot
+e297a8db0b4f2e2641ee3aeb6c94119a7ec5034a50a44a0e93723c996205df4e.
+This receipt binds the first kit, not the final increment below.
+
+Complete-path audit found and fixed missing failure restart inhibition: restore
+previous boot enable states and remask both original Owner endpoint units, in
+addition to existing Gateway/coordinator mask restoration. These three cleanup
+operations are independently attempted; failures are UNKNOWN/HOLD. Read the
+pinned original provisioning receipt even when preservation failed before archive
+creation. Validate both current Owner unit bytes before replacing either.
+
+Final local Python3.6.8 aggregate168/168 PASS; final packaged affected-only34/34
+PASS. Real local installer staging and six help-smoke checks PASS; all24 staged
+source hashes and fully rendered targets match the private compiled plan; all3
+plugin references match; activation dispatcher and TLS config match. Native
+ledger-client target bytes are unchanged so its retained native binding hash is
+still valid. These are local checks, not production acceptance.
+
+Final reproducible archive SHA256:
+a9c6bb2fa9bfc0114256216a6c15fe2dde241b28174e633f118e5000052524d8
+Kit manifest:89eb2624d3aaee99117e6292f547852a61cce88d119cbb0fab57e0539c8aed5b
+Entry:0152ae2b5f2bef0063175b25d1db0991845d6b9d17ba364f0dbb05280cde3fef
+Runtime and compiled plan hashes unchanged. Existing UK160 tests are retained;
+only final34 affected tests and full fresh verify-only are requested next.
+ONE independent full review follows that final receipt. No piecemeal approval,
+no current production recovery authority, no production execution.

@@ -75,9 +75,11 @@ def main():
  parser=argparse.ArgumentParser(description=__doc__)
  parser.add_argument('--kit-manifest-sha256',required=True)
  parser.add_argument('--operation',required=True,choices=('verify-only','test-only','resume'))
+ parser.add_argument('--affected-only',action='store_true')
  parser.add_argument('--review-id',type=int);parser.add_argument('--review-body-sha256');parser.add_argument('--snapshot-sha256')
  args=parser.parse_args()
  need(sys.flags.isolated and sys.dont_write_bytecode,'KIT_REQUIRE_ISOLATED_NO_BYTECODE')
+ need(not args.affected_only or args.operation=='test-only','AFFECTED_SCOPE_ONLY_FOR_TESTS')
  root=verify_kit(args.kit_manifest_sha256)
  sys.path.insert(0,root+'/stage1');sys.path.insert(0,KIT+'/helpers');sys.path.insert(0,KIT)
  if args.operation=='test-only':
@@ -87,8 +89,13 @@ def main():
                     P2_FIXES_ROOT=root+'/stage1',P2_PLAN_PATH=os.path.dirname(KIT)+'/protected-core-install-plan.json',
                     P2_REVIEWED_HELPERS=KIT+'/helpers',P2_ENTRY_PATH=os.path.abspath(__file__))
   os.environ.pop('P2_OBSERVATION_PATH',None)
-  result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover(KIT+'/tests',pattern='test_epoch3*.py'))
-  print(json.dumps({'operation':'test-only','tests':result.testsRun,'success':result.wasSuccessful(),
+  if args.affected_only:
+   suite=unittest.TestSuite()
+   for pattern in ('test_epoch3_host_driver.py','test_epoch3_retained_runtime.py','test_epoch3_recovery_entry.py'):
+    suite.addTests(unittest.defaultTestLoader.discover(KIT+'/tests',pattern=pattern))
+  else:suite=unittest.defaultTestLoader.discover(KIT+'/tests',pattern='test_epoch3*.py')
+  result=unittest.TextTestRunner(verbosity=2).run(suite)
+  print(json.dumps({'operation':'test-only','affected_only':args.affected_only,'tests':result.testsRun,'success':result.wasSuccessful(),
                     'production_resume':'NOT_EXECUTED','kit_manifest_sha256':args.kit_manifest_sha256},sort_keys=True))
   return 0 if result.wasSuccessful() else 1
  from epoch3_plan import compile_plan,canonical

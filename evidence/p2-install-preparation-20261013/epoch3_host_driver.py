@@ -135,7 +135,18 @@ class HostDriver:
  def stop_exact_new_services(self,plan):return self.containment.stop_all()
  def verify_stopped_and_preserve_legacy_masks(self,plan):
   evidence=self.containment.verify_all()
-  self.context['adapter'].restore_legacy_files(preserve_mask=True)
+  failures=[]
+  # Independent cleanup attempts: an enable-state failure must not prevent
+  # remasking the original owner endpoints or the old Gateway/coordinator.
+  for name,operation in (
+      ('boot',lambda:self.runtime._restore_boot()),
+      ('owner_masks',lambda:self.runtime.restore_retained_owner_masks(plan)),
+      ('legacy_masks',lambda:self.context['adapter'].restore_legacy_files(preserve_mask=True))):
+   try:operation()
+   except Exception as error:failures.append(name+':'+type(error).__name__)
+  if failures:raise ValueError('DRIVER_FAILURE_RESTART_INHIBITION_UNKNOWN:'+','.join(failures))
+  evidence['previous_boot_state_restored']=True
+  evidence['original_owner_masks_restored']=True
   # After mask restoration, read-only measurement must prove the original boundary.
   observation=self.context['adapter'].measure_quiescence(plan['cutover']['legacy_bindings'])
   need(all(observation['proof'].get(k) is True for k in
