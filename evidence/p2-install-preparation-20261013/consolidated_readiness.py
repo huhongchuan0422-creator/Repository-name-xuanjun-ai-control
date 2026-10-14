@@ -81,9 +81,9 @@ def execute():
         require(len(plan_sha)==64 and all(c in '0123456789abcdef' for c in plan_sha),'NEW_PLAN_DIGEST')
     p=raw(plan_path,private=True);require(hashlib.sha256(p).hexdigest()==plan_sha,'CORE_PLAN_DRIFT')
     plan=json.loads(p.decode());root=plan['artifact']['root']
-    require(plan['artifact']['source_commit']=='facd639b807d9eb70813aae8943a7b18600e65a1'
-            and plan['artifact']['source_tree']=='e6879fe41cc49e7fdcef9cd8cdc4ad94ccb00aa1'
-            and plan['artifact']['manifest_sha256']=='03a07bb2f6604e136cfef67edc645ab6b16564b27efa59d0f0af84070d8f1f69','EXACT95_PLAN_BINDING')
+    require(plan['artifact']['source_commit']=='524530a3c57897d2c10e9c25aa621ff147b85cc7'
+            and plan['artifact']['source_tree']=='c21de408d21cbef88363f2ee017c6b42d6211107'
+            and plan['artifact']['manifest_sha256']=='093833257a4bdad5f8a7cbc87e9b8d98b5170fd965293e14a4619ff6cf2178a9','EXACT95_PLAN_BINDING')
     require(digest(DB)==DB_SHA,'CANONICAL_DB_DRIFT')
     for suffix in ['-wal','-journal']:
         require(not os.path.lexists(DB+suffix) or os.lstat(DB+suffix).st_size==0,'NONEMPTY_DB_JOURNAL')
@@ -92,13 +92,13 @@ def execute():
     def artifact():
         manifest=raw(plan['artifact']['manifest'])
         require(hashlib.sha256(manifest).hexdigest()==plan['artifact']['manifest_sha256'],'MANIFEST_DRIFT')
-        files=json.loads(manifest.decode())['files'];require(len(files)==95,'EXACT95_REQUIRED')
+        files=json.loads(manifest.decode())['files'];require(len(files)==100,'EXACT_COMPLETE_REQUIRED')
         for rel,h in files.items():
             require(rel and not rel.startswith('/') and '..' not in rel.split('/'),'MANIFEST_PATH')
             require(digest(root+'/'+rel)==h,'RUNTIME_FILE_DRIFT')
         from p2_install_entrypoint import validate_plan
         validate_plan(plan)
-        return {'files_verified':95,'plan_path':plan_path,'plan_sha256':plan_sha,'source':plan['artifact']['source_commit'],
+        return {'files_verified':100,'plan_path':plan_path,'plan_sha256':plan_sha,'source':plan['artifact']['source_commit'],
                 'manifest_sha256':plan['artifact']['manifest_sha256'],'schema_valid':True}
     section('artifact_and_plan',artifact)
 
@@ -141,6 +141,8 @@ def execute():
             db.close()
             from ledger_install_stage import stage_existing_registry,PROOF_KEYS
             migration=stage_existing_registry(tmp+'/state.sqlite',tmp+'/backup.sqlite',tmp+'/generation.sqlite','huhongchuan0422-creator/Repository-name-xuanjun-ai-control',dict.fromkeys(PROOF_KEYS,True))
+            from ledger_backup import database_manifest
+            before_idle=database_manifest(tmp+'/generation.sqlite')
             from execution_ledger import ExecutionLedger
             ledger=ExecutionLedger(tmp+'/generation.sqlite',['huhongchuan0422-creator/Repository-name-xuanjun-ai-control'])
             # No paid model or external tools: only the existing admission method on scratch.
@@ -156,11 +158,13 @@ def execute():
                 else:raise ValueError('EXPIRED_CALLBACK_ACCEPTED')
             require(expired==denied,'EXPIRED_CALLBACK_PROOF_FAILED')
             require(not native,'LEGACY_NATIVE_EXECUTION_RECONCILIATION_REQUIRED')
+            after_idle=database_manifest(tmp+'/generation.sqlite')
+            require(before_idle['table_sha256']==after_idle['table_sha256'],'IMPORTED_TABLE_MUTATION_BY_IDLE_LEDGER')
             return {'old_task_count':len(tasks),'state_counts':counts,'old_lease_count':0,'native_execution_records':0,
                     'original_execution_specs_table_present':'execution_specs' in tables,'fixture_claim_result':'NONE',
                     'unconsumed_expired_requests':expired,'expired_request_denials':denied,
                     'canonical_fence_changed':False,'historical_external_delivery':'UNKNOWN_NO_REPLAY',
-                    'migration_new_tables':migration['new_tables'],'fixture_only':True}
+                    'idle_ledger_original_tables_unchanged':True,'migration_new_tables':migration['new_tables'],'fixture_only':True}
     section('legacy_authority_and_expiry_fixture',authority_fixture)
 
     def references():

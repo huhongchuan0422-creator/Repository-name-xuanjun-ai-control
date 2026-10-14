@@ -3,9 +3,9 @@ import copy,hashlib,io,json,os,socket,stat,subprocess,sys,tarfile,zipfile
 BASE='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1'
 TX='c529c379-9341-4510-8384-fc6be1e412e5'
 OLD=BASE+'/legacy-isolation-'+TX
-MANIFEST='03a07bb2f6604e136cfef67edc645ab6b16564b27efa59d0f0af84070d8f1f69'
-SOURCE='facd639b807d9eb70813aae8943a7b18600e65a1'
-TREE='e6879fe41cc49e7fdcef9cd8cdc4ad94ccb00aa1'
+MANIFEST='093833257a4bdad5f8a7cbc87e9b8d98b5170fd965293e14a4619ff6cf2178a9'
+SOURCE='524530a3c57897d2c10e9c25aa621ff147b85cc7'
+TREE='c21de408d21cbef88363f2ee017c6b42d6211107'
 def require(v,c):
  if not v:raise ValueError(c)
 def h(v):return hashlib.sha256(v).hexdigest()
@@ -24,10 +24,10 @@ def main():
  require(os.geteuid()==0 and socket.gethostname().split('.')[0]=='iZd7oeikknn1z21sq6ji6zZ','FIXED_ROOT_UK')
  run=sys.argv[1];require(run.isdigit(),'RUN_REQUIRED')
  archive_path=sys.argv[2]
- zraw=read(archive_path);require(h(zraw)=='36cca8e11bc269aee7b46d6f0e83b631f0552349b50219d92675dead04735aec','EXACT95_ZIP')
+ zraw=read(archive_path);require(h(zraw)=='072c4b4dd1c275b68ec01c64e96500307c10b9a61cc5e343964c046ca5e90cf3','EXACT95_ZIP')
  z=zipfile.ZipFile(io.BytesIO(zraw));archive=z.read('p2-candidate.tar.gz')
  require(z.read('p2-source-tree.txt').decode().strip()==TREE,'EXACT95_SOURCE_TREE_RECEIPT')
- require(h(archive)=='309ded02fdcc22cd3789a9a7afaa06bb8e1e7f27ff5218a6cb228166cbf6f63b','EXACT95_ARCHIVE')
+ require(h(archive)=='99f91f1408f16cd8739b762a208de740d204db8643744d9dc3484dc8ec6ad0bc','EXACT95_ARCHIVE')
  t=tarfile.open(fileobj=io.BytesIO(archive));members=t.getmembers();seen=set();total=0
  for m in members:
   require(m.isfile() and m.name.startswith('xuanjun-p2-package/') and '..' not in m.name.split('/') and m.name not in seen,'ARCHIVE_MEMBER_SCOPE')
@@ -46,7 +46,7 @@ def main():
   write(target,t.extractfile(m).read(),0o644)
  root=d+'/xuanjun-p2-package';manifest=read(root+'/deploy/integration-manifest.json')
  require(h(manifest)==MANIFEST,'STAGED_MANIFEST_DRIFT')
- files=json.loads(manifest.decode())['files'];require(len(files)==95,'STAGED_FILE_COUNT')
+ files=json.loads(manifest.decode())['files'];require(len(files)==100,'STAGED_FILE_COUNT')
  for rel,wanted in files.items():require(h(read(root+'/'+rel))==wanted,'STAGED_RUNTIME_HASH')
  # Rebind all version-bearing configurations, then render from exact payload.
  old_manifest=plan['artifact']['manifest_sha256']
@@ -69,10 +69,30 @@ def main():
   data=read(row['source']);require(h(data)==row['sha256'],'BOOTSTRAP_FILE_DRIFT')
   if row['target']=='/etc/xuanjun-development/p2-native-binding.json':data=rebind(data.decode()).encode()
   path=d+'/private-bootstrap/bootstrap-'+str(i);write(path,data);row['source']=path;row['sha256']=h(data)
- boot['artifact_id']=11864162446;bootpath=d+'/protected-bootstrap-candidate-receipt.json';bootraw=(json.dumps(boot,sort_keys=True,separators=(',',':'))+'\n').encode();write(bootpath,bootraw)
+ boot['artifact_id']=11865148791;bootpath=d+'/protected-bootstrap-candidate-receipt.json';bootraw=(json.dumps(boot,sort_keys=True,separators=(',',':'))+'\n').encode();write(bootpath,bootraw)
  plan['runtime']['bootstrap']={'path':bootpath,'sha256':h(bootraw)}
  previous={'root':plan['artifact']['root'],'manifest':plan['artifact']['manifest']}
  plan['artifact']['root']=root;plan['artifact']['manifest']=root+'/deploy/integration-manifest.json'
+ # Include the complete TLS lifecycle in the same reviewed plan, not a later patch.
+ tlsroot='/var/lib/xuanjun-development/tls-acme';domain='uk.wenwenwenyiyiyi.work'
+ tlsconfig={'schema':1,'domain':domain,'root':tlsroot,'transaction_directory':OLD,'transaction_id':TX,
+            'instance':plan['activation']['instance'],'generation':plan['activation']['generation'],
+            'ledger_uuid':plan['activation']['ledger_uuid'],'release_sha256':MANIFEST,'accept_acme_terms':True}
+ tlsbytes=(json.dumps(tlsconfig,sort_keys=True,separators=(',',':'))+'\n').encode()
+ tlspath=d+'/protected-tls-renewal-candidate.json';write(tlspath,tlsbytes)
+ plan['runtime']['tls_renewal']={'path':tlspath,'sha256':h(tlsbytes)}
+ for row in plan['runtime']['provisioning']:
+  if row['target']=='/etc/nginx/conf.d/xuanjun-p2-owner.conf':
+   row['replacements']['@@TLS_CERT@@']=tlsroot+'/config/live/'+domain+'/fullchain.pem'
+   row['replacements']['@@TLS_KEY@@']=tlsroot+'/config/live/'+domain+'/privkey.pem'
+ tlsreplacements={'@@TRANSACTION_DIRECTORY@@':OLD,'@@TRANSACTION_ID@@':TX,'@@INSTANCE@@':tlsconfig['instance'],
+                  '@@GENERATION@@':str(tlsconfig['generation']),'@@LEDGER_UUID@@':tlsconfig['ledger_uuid'],'@@PACKAGE_SHA256@@':MANIFEST}
+ for source,target,mode,replacements in [
+  ('deploy/p2-tls-renewal.json.template','/etc/xuanjun-development/tls-renewal.json',0o600,tlsreplacements),
+  ('deploy/xuanjun-p2-tls-renew.service','/etc/systemd/system/xuanjun-p2-tls-renew.service',0o644,{'@@RELEASE@@':'/opt/xuanjun-control-releases/integration-'+MANIFEST[:16]}),
+  ('deploy/xuanjun-p2-tls-renew.timer','/etc/systemd/system/xuanjun-p2-tls-renew.timer',0o644,{})]:
+  plan['runtime']['provisioning'].append({'source':source,'target':target,'source_sha256':'0'*64,'rendered_sha256':'0'*64,
+     'mode':mode,'owner_uid':0,'group_gid':0,'replacements':replacements})
  # Recalculate every exact source/render hash and chained configuration hash.
  rendered={}
  for row in plan['runtime']['provisioning']:
@@ -92,7 +112,7 @@ def main():
  # Persist an OUTER admission candidate: notifier binding, original adapter
  # directory, and exact package/plan. It does not grant release on its own.
  gate={'schema':1,'transaction_id':TX,'source_commit':SOURCE,'source_tree':TREE,
-       'artifact_id':11864162446,'manifest_sha256':MANIFEST,'plan_path':path,'plan_sha256':h(packed),
+       'artifact_id':11865148791,'manifest_sha256':MANIFEST,'plan_path':path,'plan_sha256':h(packed),
        'notifier_receipt_path':OLD+'/notifier/notifier-isolation-receipt.json',
        'notifier_receipt_sha256':h(notifier),'transaction_directory':OLD,
        'install_receipt':d+'/install-receipt.json','release_installer':root+'/scripts/uk-integration-install.py',
@@ -112,8 +132,8 @@ def main():
  require(r.returncode==0,'COMPLETE_CLI_PREFLIGHT_HOLD')
  proof=json.loads(r.stdout.decode());require(proof['stage']=='VERIFIED_ONLY' and proof['effects']==0,'VERIFY_ONLY_PROOF')
  fd=os.open(d,os.O_RDONLY|os.O_DIRECTORY);os.fsync(fd);os.close(fd)
- print('COMPLETE_INSTALL_CANDIDATE='+json.dumps({'schema':1,'source':SOURCE,'tree':TREE,'artifact_id':11864162446,
-       'files_verified':95,'provisioning_bindings_verified':len(plan['runtime']['provisioning']),
+ print('COMPLETE_INSTALL_CANDIDATE='+json.dumps({'schema':1,'source':SOURCE,'tree':TREE,'artifact_id':11865148791,
+       'files_verified':100,'provisioning_bindings_verified':len(plan['runtime']['provisioning']),
        'prior_package_paths':previous,'new_package_root':root,'plan_path':path,'plan_sha256':h(packed),
        'plan_bytes':len(packed),'outer_gate_path':gatepath,'outer_gate_sha256':h(gatebytes),
        'verify_only':proof,'install':False,'canonical_database_mutation':False,'transaction_directory':OLD},sort_keys=True))

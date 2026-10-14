@@ -1,4 +1,4 @@
-name: P2 complete exact95 installation candidate and consolidated checks
+name: P2 complete installation installation candidate and consolidated checks
 on:
   push:
     branches: [repair/p2-chatgpt-clean-review-20261013]
@@ -31,13 +31,16 @@ jobs:
             out=super().redirect_request(req,fp,code,msg,headers,newurl)
             if out is not None:out.remove_header('Authorization')
             return out
-          q=urllib.request.Request('https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11864162446/zip',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          q=urllib.request.Request('https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11865148791/zip',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
           with urllib.request.build_opener(SafeRedirect()).open(q,timeout=30) as f:b=f.read(2097153)
-          assert len(b)<=2097152 and hashlib.sha256(b).hexdigest()=='36cca8e11bc269aee7b46d6f0e83b631f0552349b50219d92675dead04735aec'
+          assert len(b)<=2097152 and hashlib.sha256(b).hexdigest()=='072c4b4dd1c275b68ec01c64e96500307c10b9a61cc5e343964c046ca5e90cf3'
           fd=os.open('exact95.zip',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
           with os.fdopen(fd,'wb') as f:f.write(b)
           print('EXACT95_ZIP_FETCH_VERIFIED')
           PY
+      - name: Verify caller and Root admission rejection checks on UK Python
+        working-directory: p2-complete-${{ github.run_id }}
+        run: python3 -I -B evidence/p2-install-preparation-20261013/test_complete_admission.py
       - name: Prepare corrected complete plan and packaged CLI preflight
         id: plan
         working-directory: p2-complete-${{ github.run_id }}
