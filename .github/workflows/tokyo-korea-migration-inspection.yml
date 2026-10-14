@@ -36,7 +36,18 @@ jobs:
           test ! -L "$XJ_HELPER"
           test "$(stat -c %u "$XJ_HELPER")" = 0
           test "$(stat -c %a "$XJ_HELPER")" = 755
-          sha256sum "$XJ_HELPER"
+          printf '%s  %s\n' '61bed97a32e970dd868f2d223c68ab41c012c484d314cb714c768629aac263c2' "$XJ_HELPER" | sha256sum -c -
+          for XJ_PARENT in /usr /usr/local /usr/local/sbin /usr/bin /usr/sbin /etc /etc/sudoers.d; do
+            test -d "$XJ_PARENT"
+            test ! -L "$XJ_PARENT"
+            test "$(stat -c %u "$XJ_PARENT")" = 0
+            XJ_MODE=$(stat -c %a "$XJ_PARENT")
+            (( (8#$XJ_MODE & 0022) == 0 ))
+            stat -c 'PARENT=%n UID=%u MODE=%a' "$XJ_PARENT"
+          done
+          /usr/bin/sudo -n -l
+          echo GLOBAL_RUNNER_ACCESS_POLICY=NOT_VERIFIED
+          echo FULL_SUDOERS_POLICY_AUDIT=NOT_VERIFIED
           /usr/bin/sudo -n "$XJ_HELPER"
           echo MIGRATION_EXECUTED=NO
           echo ORDER_WRITE_ENABLED=NO
