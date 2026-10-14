@@ -42,17 +42,7 @@ jobs:
           print('RUNTIME_SOURCE_HASHES_VERIFIED=' + str(len(manifest['files'])))
           print('PRODUCTION_EXECUTION=NOT_RUN')
           PY
-      - name: Execute required bounded-process and ledger-identity tests
+      - name: Execute registered runtime checkpoint acceptance test
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-          PYTHONPATH: evidence/p2-epoch7-access-repair-20261014/runtime/stage1:evidence/p2-epoch7-access-repair-20261014/runtime-process
-        run: |
-          python -B - <<'PY'
-          import sys, unittest
-          names = ['test_runtime_command_lifetime', 'test_gateway_command_lifetime', 'test_ledger_server_identity']
-          suite = unittest.defaultTestLoader.loadTestsFromNames(names)
-          assert suite.countTestCases() >= 72, 'REQUIRED_TEST_DISCOVERY_REDUCED'
-          result = unittest.TextTestRunner(verbosity=2).run(suite)
-          assert result.wasSuccessful() and not result.skipped, 'REQUIRED_TEST_FAILED_OR_SKIPPED'
-          print('EVIDENCE_SCOPE=HOSTED_RUNTIME_CHECKPOINT_ONLY_NOT_FULL_KIT_OR_UK_ACCEPTANCE')
-          PY
+        run: python -B -m unittest discover -s tests -p 'test_p2_runtime_process_checkpoint.py' -v

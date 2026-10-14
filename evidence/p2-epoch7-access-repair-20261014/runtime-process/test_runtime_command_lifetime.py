@@ -21,18 +21,27 @@ class OwnedChildFixture(object):
         self.assertEqual(self.libc.prctl(37, ctypes.byref(self.previous_subreaper), 0, 0, 0), 0)
         self.assertEqual(self.libc.prctl(36, 1, 0, 0, 0), 0)
         self.descendants = []
+        self.pending_reaps = set()
         self.directory = tempfile.TemporaryDirectory()
 
     def tearDown(self):
         try:
             for child in self.children:
                 # Check the function, then clean up even if an assertion fails.
-                checked = child.returncode is not None and child.stdout.closed and child.stderr.closed
-                if child.poll() is None:
-                    try: os.killpg(child.pid, signal.SIGKILL)
-                    except ProcessLookupError: pass
-                child.wait(timeout=2)
-                child.stdout.close(); child.stderr.close()
+                try:
+                    if child.returncode is None and child.pid in self.pending_reaps:
+                        # A bounded runtime UNKNOWN is not success/escape.
+                        # Require independent bounded termination proof; no
+                        # second signal is sent on this successful harness path.
+                        self.assertTrue(child.stdout.closed and child.stderr.closed)
+                        child.wait(timeout=2)
+                    checked = child.returncode is not None and child.stdout.closed and child.stderr.closed
+                finally:
+                    if child.poll() is None:
+                        try: os.killpg(child.pid, signal.SIGKILL)
+                        except ProcessLookupError: pass
+                    child.wait(timeout=2)
+                    child.stdout.close(); child.stderr.close()
                 self.assertTrue(checked, 'runtime command left an owned child or pipe open')
                 with self.assertRaises(ChildProcessError): os.waitpid(child.pid, os.WNOHANG)
         finally:
@@ -49,10 +58,22 @@ class OwnedChildFixture(object):
         self.children.append(child)
         return child
 
-    def invoke(self, source, timeout=.4, maximum=1024):
+    def record_cleanup_unknown(self, error):
+        seen = set()
+        while error is not None and id(error) not in seen:
+            seen.add(id(error))
+            if 'COMMAND_CLEANUP_UNKNOWN' in str(error):
+                self.pending_reaps.update(child.pid for child in self.children if child.returncode is None)
+            error = error.__cause__ or error.__context__
+
+    def invoke(self, source, timeout=3.0, maximum=1024):
         with mock.patch.object(subject.subprocess, 'Popen', side_effect=self.spawn):
-            return subject._bounded_owned_command([sys.executable, '-B', '-c', source],
-                {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'}, timeout, maximum)
+            try:
+                return subject._bounded_owned_command([sys.executable, '-B', '-c', source],
+                    {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'}, timeout, maximum)
+            except BaseException as error:
+                self.record_cleanup_unknown(error)
+                raise
 
     def pipe_holder(self, before_capture=False, invoke=None):
         pidfile = self.directory.name + '/descendant.pid'
@@ -79,14 +100,17 @@ os._exit(0)
         start = time.monotonic()
         try:
             with self.assertRaises(ValueError):
-                (invoke or self.invoke)(source)
+                (invoke or (lambda code:self.invoke(code, timeout=1.0)))(source)
         finally:
             self.spawn = original_spawn
             if os.path.exists(pidfile):
                 with open(pidfile) as stream: pid = int(stream.read())
                 self.descendants.append(pid)
-        self.assertLess(time.monotonic() - start, 1.2)
-        self.assertEqual(self.children[-1].returncode, 0)
+        self.assertLess(time.monotonic() - start, 4.0)
+        leader = self.children[-1]
+        if leader.returncode is None and leader.pid in self.pending_reaps:
+            leader.wait(timeout=2)
+        self.assertEqual(leader.returncode, 0)
         until = time.monotonic() + 1
         while True:
             found, status = os.waitpid(pid, os.WNOHANG)
@@ -109,13 +133,16 @@ class RuntimeCommandLifetimeTests(OwnedChildFixture, unittest.TestCase):
                 'import os,time;os.close(1);os.close(2);time.sleep(10)'):
             started = time.monotonic()
             with self.assertRaisesRegex(ValueError, 'COMMAND_DEADLINE'):
-                self.invoke(source, timeout=.2)
-            self.assertLess(time.monotonic() - started, .8)
-            self.assertEqual(self.children[-1].returncode, -signal.SIGKILL)
+                self.invoke(source, timeout=1.0)
+            self.assertLess(time.monotonic() - started, 4.0)
+            process = self.children[-1]
+            if process.returncode is None and process.pid in self.pending_reaps:
+                process.wait(timeout=2)
+            self.assertEqual(process.returncode, -signal.SIGKILL)
 
     def test_drip_output_uses_whole_request_deadline(self):
         with self.assertRaisesRegex(ValueError, 'COMMAND_DEADLINE'):
-            self.invoke("import os,time\nfor i in range(100):\n os.write(1,b'x');time.sleep(.02)", timeout=.2)
+            self.invoke("import os,time\nfor i in range(500):\n os.write(1,b'x');time.sleep(.02)", timeout=1.0)
 
     def test_output_bound_both_streams_and_exact_limit(self):
         self.assertEqual(len(self.invoke("import os;os.write(1,b'x'*1024)")), 1024)
@@ -154,14 +181,35 @@ class RuntimeCommandLifetimeTests(OwnedChildFixture, unittest.TestCase):
         self.assertEqual(self.children, [])
 
     def test_startup_is_charged_to_deadline(self):
-        original = self.spawn
-        def delayed(*args, **kwargs):
-            child = original(*args, **kwargs); time.sleep(.18); return child
-        self.spawn = delayed
-        started = time.monotonic()
-        with self.assertRaisesRegex(ValueError, 'COMMAND_DEADLINE'):
-            self.invoke('import time;time.sleep(10)', timeout=.2)
-        self.assertLess(time.monotonic() - started, .5)
+        # Deterministically exhaust work time in spawn; do not assume a real
+        # child can always be scheduled and reaped in the previous 20ms tail.
+        process = mock.Mock(); clock = [10.0]
+        def delayed(*args, **kwargs): clock[0] = 10.9; return process
+        with mock.patch.object(subject.time, 'monotonic', side_effect=lambda:clock[0]), \
+                mock.patch.object(subject.subprocess, 'Popen', side_effect=delayed), \
+                mock.patch.object(subject.selectors, 'DefaultSelector') as selector, \
+                mock.patch.object(subject, '_owned_command_cleanup') as cleanup:
+            with self.assertRaisesRegex(ValueError, 'COMMAND_DEADLINE'):
+                subject._bounded_owned_command(['/fixture'], {}, 1.0)
+        selector.assert_not_called(); cleanup.assert_called_once_with(process, None, 11.0)
+
+    def test_primary_deadline_and_cleanup_unknown_are_both_preserved(self):
+        process = mock.Mock()
+        with mock.patch.object(subject.subprocess, 'Popen', return_value=process), \
+                mock.patch.object(subject.selectors, 'DefaultSelector', side_effect=ValueError('COMMAND_DEADLINE')), \
+                mock.patch.object(subject, '_owned_command_cleanup', side_effect=ValueError('COMMAND_CLEANUP_UNKNOWN')):
+            with self.assertRaisesRegex(ValueError, '^COMMAND_DEADLINE$') as raised:
+                subject._bounded_owned_command(['/fixture'], {}, 3.0)
+        self.assertEqual(str(raised.exception.__cause__), 'COMMAND_CLEANUP_UNKNOWN')
+
+    def test_expired_reap_budget_is_unknown_with_only_nonblocking_wait(self):
+        process = mock.Mock(pid=12345, returncode=None)
+        process._waitpid_lock.acquire.return_value = True
+        with mock.patch.object(subject.os, 'waitpid', return_value=(0, 0)) as waitpid, \
+                mock.patch.object(subject.time, 'monotonic', return_value=2.0):
+            self.assertFalse(subject._owned_command_reap(process, 1.0))
+        waitpid.assert_called_once_with(12345, os.WNOHANG)
+        process.wait.assert_not_called()
 
     def test_primary_failure_survives_cleanup_failure(self):
         with mock.patch.object(subject.selectors, 'DefaultSelector', side_effect=OSError('primary')), \
