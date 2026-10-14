@@ -2,6 +2,7 @@
 No real payments, site publishing, secrets or external network binding.
 """
 import json
+import os
 import re
 import socket
 import time
@@ -10,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from scripts.community_order_store import connect, DDL, create_order, state, simulated_transition
-from scripts.community_merchant_contract import scope
+from scripts.community_merchant_contract import scope, signed_qr, verify_qr
 from scripts.community_storefront_snapshot import storefront_snapshot
 from scripts.community_ad_contract import AMOUNT, SUCCESS
 from scripts.community_ad_store import list_campaigns
@@ -33,15 +34,33 @@ def _id(value):
 
 class DemoService:
     """Trusted local demo service. This is not a production access boundary."""
-    def __init__(self, db, merchant_db=None, ad_db=None, now=None, refund_db=None):
+    def __init__(self, db, merchant_db=None, ad_db=None, now=None, refund_db=None, qr_key=None):
         self.db = db
         self.merchant_db = merchant_db
         self.ad_db = ad_db
         self.now = now
         self.refund_db = refund_db
+        self.qr_key = qr_key
     def dispatch(self, method, path, data):
         if type(data) is not dict:
             raise ValueError("INVALID_REQUEST")
+        if method == "POST" and path == "/demo/qr/create":
+            _object(data, {"tenant_id","merchant_id","store_id","context"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity);context=_id(data["context"])
+            if self.qr_key is None:
+                raise ValueError("QR_DEMO_NOT_CONFIGURED")
+            # HMAC key is server-owned, never returned to the browser.
+            token=signed_qr(identity,context,int(time.time())+900,self.qr_key)
+            return {"token":token,"simulation_only":True,"provider_payment_started":False}
+        if method == "POST" and path == "/demo/qr/verify":
+            _object(data, {"tenant_id","merchant_id","store_id","context","token"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity);context=_id(data["context"])
+            if self.qr_key is None:
+                raise ValueError("QR_DEMO_NOT_CONFIGURED")
+            return {"valid":verify_qr(data["token"],identity,context,int(time.time()),self.qr_key),
+                    "simulation_only":True,"provider_payment_started":False}
         if method == "POST" and path == "/demo/ads/list":
             _object(data, {"tenant_id","merchant_id","store_id"})
             identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -196,7 +215,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
@@ -339,7 +358,7 @@ def serve_local(path=":memory:",port=18791,seed_demo=True):
             owned.extend((merchant_db, ad_db))
         # HTTPServer handles requests serially; no thread pool shares the stores.
         return _OwnedLocalDemoHTTPServer(
-            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now,refund_db),owned)
+            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now,refund_db,os.urandom(32)),owned)
     except BaseException:
         try:
             _close_all_owned(owned)
