@@ -26,10 +26,10 @@ def dispatch_finance_preview(service,method,path,data):
         _object(data, {"tenant_id","merchant_id","store_id"})
         identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
         t,m,st=scope(identity)
-        if self.refund_db is None:
+        if service.refund_db is None:
             raise ValueError("REFUND_STORE_UNAVAILABLE")
         # Do not silently claim full reconciliation for truncated results.
-        rows=self.db.execute(
+        rows=service.db.execute(
             "SELECT reference,amount_minor FROM orders WHERE tenant_id=? "
             "AND merchant_id=? AND store_id=? AND state='SUCCESS' "
             "ORDER BY reference LIMIT 101",(t,m,st)).fetchall()
@@ -38,7 +38,7 @@ def dispatch_finance_preview(service,method,path,data):
         total=0
         previews=0
         for reference,amount in rows:
-            refund=preview_total(self.refund_db,identity,reference)
+            refund=preview_total(service.refund_db,identity,reference)
             if type(refund) is not int or refund<0 or refund>amount:
                 raise ValueError("REFUND_PREVIEW_INCONSISTENT")
             total+=amount
@@ -57,12 +57,12 @@ def dispatch_finance_preview(service,method,path,data):
         identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
         scope(identity)
         ref=_id(data["reference"])
-        order=state(self.db,identity,ref)
+        order=state(service.db,identity,ref)
         if order["state"]!="SUCCESS" or order["provider_settlement_verified"] is not False:
             raise ValueError("SIMULATED_SUCCESS_REQUIRED")
-        if self.refund_db is None:
+        if service.refund_db is None:
             raise ValueError("REFUND_STORE_UNAVAILABLE")
-        refund=preview_total(self.refund_db,identity,ref)
+        refund=preview_total(service.refund_db,identity,ref)
         preview=split_amounts(order["amount_minor"],data["shares_bps"],refund)
         return {"allocations_minor":preview["shares_minor"],
                 "allocatable_minor":preview["allocatable_minor"],
@@ -76,10 +76,10 @@ def dispatch_finance_preview(service,method,path,data):
         identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
         scope(identity)
         reference=_id(data["reference"])
-        order_state=state(self.db,identity,reference)
-        if self.refund_db is None:
+        order_state=state(service.db,identity,reference)
+        if service.refund_db is None:
             raise ValueError("REFUND_PREVIEW_NOT_CONFIGURED")
-        total=preview_total(self.refund_db,identity,reference)
+        total=preview_total(service.refund_db,identity,reference)
         amount=order_state["amount_minor"]
         if type(total) is not int or total<0 or total>amount:
             raise ValueError("INVALID_REFUND_PREVIEW_TOTAL")
