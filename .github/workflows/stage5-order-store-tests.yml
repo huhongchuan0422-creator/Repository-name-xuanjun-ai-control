@@ -1,0 +1,24 @@
+name: Stage5 Order Store
+on:
+  push:
+    paths:
+      - 'scripts/community_order_store.py'
+      - 'tests/test_community_order_store.py'
+      - '.github/workflows/stage5-order-store-tests.yml'
+  pull_request:
+    paths:
+      - 'scripts/community_order_store.py'
+      - 'tests/test_community_order_store.py'
+      - '.github/workflows/stage5-order-store-tests.yml'
+permissions:
+  contents: read
+jobs:
+  order-store:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run isolated offline order tests
+        run: python -m unittest discover -s tests -p 'test_community_order_store.py' -v
