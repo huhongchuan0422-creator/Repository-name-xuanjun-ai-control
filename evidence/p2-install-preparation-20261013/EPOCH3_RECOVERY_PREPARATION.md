@@ -152,3 +152,23 @@ Still incomplete: concrete admission/approval and full preflight, release stagin
 native binding update, activation/service containment and postchecks must be wired
 and tested as one driver before the consolidated independent review. No new
 production recovery is approved or executed by this checkpoint.
+
+## Window handoff checkpoint 2026-10-14 09:05 UTC
+
+Saved epoch3_host_preflight.py (12 local Python3.6.8 fixture tests PASS) and
+ epoch3_service_containment.py (11 local Python3.6.8 fixture tests PASS).
+The preflight composes retained state, exact old release validation, retained NSS,
+old/new process exclusion, reviewed scheduler/cgroup scans, copied DB manifest
+checks, activation journal and before/after comparisons. It has NOT run on UK.
+Containment attempts every fixed-unit stop even when an earlier stop fails, then
+separately observes all process/cgroup states. Host-effect calls are mocked in
+these tests; successful unit tests do not prove production containment.
+
+This is preservation of incomplete work for a window change, NOT a review request
+or installation grant. No executable complete recovery CLI exists yet. Remaining:
+exact approval verification, protected release staging, native binding CAS, actual
+activation/service wiring and post-install checks, complete integrated fault
+injection, UK read-only verification, then ONE consolidated independent review.
+Do not use old install/resume commands; both previous approvals were consumed.
+The local writer will stop after committing and writing the PR17 handoff. UK and
+other windows' live writer states require fresh observation; no lease was granted.
