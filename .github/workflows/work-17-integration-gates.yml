@@ -26,6 +26,7 @@ jobs:
           XJ_FOUNDATION_FIXTURES: ${{ runner.temp }}/work17-fixtures
         run: |
           python3 -B evidence/work-17-integration-20261014/test_foundation_integration.py -v
+          python3 -B evidence/work-17-integration-20261014/test_producer_inventory.py -v
           echo HOSTED_ISOLATED_FIXTURE_INTEGRATION=PASS
           echo UK_INSTALLED_RUNTIME_ACCEPTANCE=NOT_RUN
       - name: Remove fixture material

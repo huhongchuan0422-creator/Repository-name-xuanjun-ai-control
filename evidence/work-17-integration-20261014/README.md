@@ -77,3 +77,23 @@ GitHub Hosted精确版本CI待回执；UK部署、现有可信validator接线、
 独立审查者须审核本次新增模块、bootstrap及工作流；本开发会话不自批。
 部署前按真实controller合同核对target tenant/owner、keyring、完整inventory和activation变更，
 与dots当前P2事务分别隔离；禁止将本源码CI结果用于P2恢复放行。
+
+## 独立审核后续接（2026-10-14）
+
+原head14619fde的39项隔离检查已获另一ChatGPT会话的限定范围源码审核，
+PR72回执6161833019，PR17同步6161834490；不授予部署或运行权限。
+本次按审核建议新增`producer_inventory.py`和21项检查，原七模块及
+`foundation_integration.py`保持不变。`complete_producer_view`分别认证现有controller
+清单和生产者记录，两者绑定同task/spec/checkpoint/commit/artifact/fence/epoch，
+清单digest及整数revision必须相同；完整标志必须为布尔True，component/currency/kind
+或run/provider集合精确相等。缺一项、多一项、换币种/提供方、过期签名、冲突重复均HOLD；
+清单匹配仍不把未知值当0，也不授予quota或执行权。
+
+真实canonical inventory producer尚未存在于本分支。本模块不生成清单、添加表、
+签发批准或接受提交者自带的validator。两个验证器须由受信任运行时配置，并核对各自签发者
+角色、来源、任务范围及revision；仅签名正确不证明清单完整。调用方必须直接取得当前
+完整清单，不得把收到的局部records反推为expected清单。本辅助函数仅显示已认证声明的匹配，
+不能证明源系统没有漏记。实际controller接线和实机审核仍待完成。
+
+本地只运行新增21项，原39项通过证据保留。CI加入21项新检查；新提交须独立增量审核，
+旧head的通过结论不扩展到新文件。原清单完整性提示继续保留。
