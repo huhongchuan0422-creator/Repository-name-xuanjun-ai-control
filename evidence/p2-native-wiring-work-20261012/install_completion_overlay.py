@@ -49,6 +49,20 @@ if s.count(old)!=2:raise ValueError('COMPLETION_ROLLBACK_CALLERS')
 # Keep original adapter API for unadopted plans/fixtures.
 s=s.replace(old,"(self.cutover.adapter.restore_legacy_files(preserve_mask=True)\n             if 'legacy_isolation' in plan['cutover'] else self.cutover.adapter.restore_legacy_files())")
 texts[p]=s
+p='stage1/execution_ledger.py';s=load(p)
+s=replace(s,"                if columns != required:\n                    raise SchemaMismatch('Owner callback schema mismatch: ' + table)","""                legacy_replay = table=='owner_callback_replays' and columns==required|{'task_id'}
+                if legacy_replay:
+                    extra=next(row for row in conn.execute('PRAGMA table_info(owner_callback_replays)').fetchall() if row['name']=='task_id')
+                    if extra['type'].upper()!='TEXT' or extra['notnull']!=0 or extra['pk']!=0:
+                        raise SchemaMismatch('unsafe legacy Owner replay task column')
+                if columns != required and not legacy_replay:
+                    raise SchemaMismatch('Owner callback schema mismatch: ' + table)""")
+s=replace(s,"            conn.execute('INSERT INTO owner_callback_replays VALUES(?,?)',\n                         (update_id, request_id))", """            replay_columns={row['name'] for row in conn.execute('PRAGMA table_info(owner_callback_replays)').fetchall()}
+            if 'task_id' in replay_columns:
+                conn.execute('INSERT INTO owner_callback_replays(update_id,request_id,task_id) VALUES(?,?,?)',(update_id,request_id,task_id))
+            else:
+                conn.execute('INSERT INTO owner_callback_replays(update_id,request_id) VALUES(?,?)',(update_id,request_id))""")
+texts[p]=s
 for p,s in texts.items():
  compile(s,p,'exec');(r/p).write_text(s);m['files'][p]=hashlib.sha256(s.encode()).hexdigest()
 mp.write_text(json.dumps(m,sort_keys=True,indent=2)+'\n')

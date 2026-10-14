@@ -37,6 +37,28 @@ class SchemaMigrationTests(unittest.TestCase):
    s=pathlib.Path(t,'source.sqlite');self.source(s)
    with self.assertRaises(ValueError):stage_existing_registry(str(s),t+'/backup.sqlite',t+'/generation.sqlite','owner/repo',dict.fromkeys(PROOF_KEYS,False))
    self.assertFalse(os.path.exists(t+'/backup.sqlite'));self.assertFalse(os.path.exists(t+'/generation.sqlite'))
+ def test_actual_legacy_replay_shape_preserved_and_expired_request_denied(self):
+  with tempfile.TemporaryDirectory() as t:
+   s=pathlib.Path(t,'source.sqlite');self.source(s)
+   d=sqlite3.connect(str(s));d.execute('CREATE TABLE owner_callback_replays(update_id INTEGER PRIMARY KEY,request_id TEXT NOT NULL,task_id TEXT)');d.execute("INSERT INTO owner_callback_replays VALUES(42,'historical','old')");d.commit();d.close()
+   before=s.read_bytes();original=database_manifest(str(s))
+   stage_existing_registry(str(s),t+'/backup.sqlite',t+'/generation.sqlite','owner/repo',dict.fromkeys(PROOF_KEYS,True))
+   after=database_manifest(t+'/generation.sqlite')
+   for name,value in original['table_sha256'].items():self.assertEqual(after['table_sha256'][name],value)
+   l=ExecutionLedger(t+'/generation.sqlite',['owner/repo']);self.assertIsNone(l.claim('fixture'))
+   with self.assertRaises(PermissionError):l.owner_decision('old',1,'APPROVE','expired',100,'owner','chat','fixture',True)
+   self.assertEqual(s.read_bytes(),before)
+ def test_legacy_replay_valid_decision_and_duplicate_update_atomic_rejection(self):
+  with tempfile.TemporaryDirectory() as t:
+   s=pathlib.Path(t,'source.sqlite');self.source(s)
+   d=sqlite3.connect(str(s));d.execute('CREATE TABLE owner_callback_replays(update_id INTEGER PRIMARY KEY,request_id TEXT NOT NULL,task_id TEXT)');d.execute("INSERT INTO owner_callback_replays VALUES(42,'historical','old')")
+   d.execute("INSERT INTO tasks VALUES('new','CODEX_EXEC','WAITING_HUMAN','[]',NULL,NULL,1,'{}',1)");d.execute("INSERT INTO approvals VALUES('new','PENDING',1,NULL)");d.execute("INSERT INTO owner_callback_requests VALUES('fresh','new',1,'owner','chat',9999999999,0)");d.commit();d.close()
+   stage_existing_registry(str(s),t+'/backup.sqlite',t+'/generation.sqlite','owner/repo',dict.fromkeys(PROOF_KEYS,True))
+   l=ExecutionLedger(t+'/generation.sqlite',['owner/repo'])
+   with self.assertRaises(sqlite3.IntegrityError):l.owner_decision('new',1,'APPROVE','fresh',42,'owner','chat','fixture',True)
+   d=sqlite3.connect(t+'/generation.sqlite');self.assertEqual(d.execute("SELECT consumed FROM owner_callback_requests WHERE request_id='fresh'").fetchone()[0],0);self.assertEqual(d.execute("SELECT state FROM tasks WHERE id='new'").fetchone()[0],'WAITING_HUMAN');d.close()
+   l.owner_decision('new',1,'APPROVE','fresh',43,'owner','chat','fixture',True)
+   d=sqlite3.connect(t+'/generation.sqlite');self.assertEqual(d.execute('SELECT task_id FROM owner_callback_replays WHERE update_id=43').fetchone()[0],'new');d.close()
 
 class MaskRollbackTests(unittest.TestCase):
  def invoke(self,t,drift=False,masked=False):
