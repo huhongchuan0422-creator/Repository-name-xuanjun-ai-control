@@ -1,8 +1,9 @@
 name: Entry review and continuation gates
 on:
   push:
-    branches: [proposal/issue19-review-continuation-20261012]
+    branches: [main, proposal/issue19-review-continuation-20261012]
     paths: ['scripts/entry_review_gate.py', 'scripts/native_syntax_*.py', 'tests/test_*gate.py', 'tests/test_native_syntax_intake.py', '.github/workflows/entry-review-gates.yml', '.syntax/**']
+  workflow_dispatch:
   pull_request:
     paths: ['scripts/entry_review_gate.py', 'scripts/native_syntax_*.py', 'scripts/development_entry_intake.py', 'tests/test_*gate.py', 'tests/test_native_syntax_intake.py', '.github/workflows/entry-review-gates.yml', '.github/workflows/development-entry-intake.yml', '.syntax/**']
 permissions:
