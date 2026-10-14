@@ -119,9 +119,9 @@ class HTTPTests(unittest.TestCase):
         port=self.server.server_address[1]
         sock=socket.create_connection(('127.0.0.1',port),timeout=4)
         sock.settimeout(4)
-        request=(f"POST /demo/orders HTTP/1.1\\r\\nHost: 127.0.0.1:{port}\\r\\n"
-                 f"Content-Type: application/json\\r\\nContent-Length: {len(payload)+declared_extra}\\r\\n"
-                 "Connection: close\\r\\n\\r\\n").encode('ascii')
+        request=(f"POST /demo/orders HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
+                 f"Content-Type: application/json\r\nContent-Length: {len(payload)+declared_extra}\r\n"
+                 "Connection: close\r\n\r\n").encode('ascii')
         try:
             sock.sendall(request+payload)
             if shutdown:
