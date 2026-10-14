@@ -97,3 +97,20 @@ PR72回执6161833019，PR17同步6161834490；不授予部署或运行权限。
 
 本地只运行新增21项，原39项通过证据保留。CI加入21项新检查；新提交须独立增量审核，
 旧head的通过结论不扩展到新文件。原清单完整性提示继续保留。
+
+## 统一Owner读取入口
+
+新增`owner_foundation_reader.read_owner_foundations`把七个视图、完整cost/usage
+清单校验及中文摘要接成一次只读调用。复用原ActivationStore.validate和read回调，
+读前/读后核对完整ACTIVE描述符与epoch；连接的main数据库路径须与描述符相同。
+costs/usage禁止从旧generic receipt接口绕过完整清单路径。
+新增12项SQLite/原ActivationStore隔离检查，覆盖配置/epoch变化、读取期间切换、
+错数据库、局部成本绕过、统一视图与秘密抑制。真实生产controller还未调用此入口。
+
+部署映射：现有Owner controller验证身份/tenant和release/source/artifact provenance后，
+以原受保护读连接、原ActivationStore.read、当前完整descriptor、受信任issuer-role
+verifiers及实际producer envelopes调用本入口。不要把client提供的expected_activation或
+callbacks当作可信配置。路径相同不证明SQLite FD/VFS inode锁定；原controller仍须保护
+数据库连接来源并在任何动作前进行最新canonical原子校验。Release SHA与archive SHA
+是不同摘要，本模块不把二者误等同，也不凭预期描述符自行证明发布来源。
+本次仅提供统一调用入口和接线测试，不另起HTTP服务、不改P2当前安装文件。
