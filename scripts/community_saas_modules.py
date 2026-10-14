@@ -57,7 +57,11 @@ def connect(path=":memory:"):
   actual=db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
   if actual:
    expected={"module_prices","module_entitlements","module_events"}
-   if {row[0] for row in actual}!=expected or db.execute("PRAGMA user_version").fetchone()[0]!=1:
+   # Compatible with the additive multi-Offer extension; legacy DBs stay valid.
+   offer_tables={"saas_offer_versions","saas_offer_lines","saas_quotes"}
+   actual_names={row[0] for row in actual}
+   allowed=(actual_names==expected or actual_names==expected|offer_tables)
+   if not allowed or db.execute("PRAGMA user_version").fetchone()[0]!=1:
     raise ValueError("UNRECOGNIZED_MODULE_DATABASE")
   else:
    if db.execute("PRAGMA user_version").fetchone()[0]!=0:
