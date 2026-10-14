@@ -1,0 +1,38 @@
+name: Stage5 Current Main Source Gate
+on:
+  pull_request:
+    paths:
+      - 'scripts/community_*.py'
+      - 'tests/test_community_*.py'
+      - 'tests/test_stage5_*.py'
+      - 'demos/community-payment/**'
+      - 'demos/community-admin/**'
+      - '.github/workflows/stage5-current-main-source-gate.yml'
+permissions:
+  contents: read
+jobs:
+  current-main-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Run current-main merchant/order/refund/ad contracts
+        run: |
+          python -m unittest discover -s tests -p 'test_community_*.py' -v
+          python -m unittest discover -s tests -p 'test_stage5_*.py' -v
+      - name: Run merged consumer and admin demo regressions
+        run: |
+          node --test demos/community-payment/demo.test.mjs
+          node --test demos/community-admin/admin.test.mjs
+      - name: Honest scope marker
+        run: |
+          echo CURRENT_MAIN_SOURCE_GATE=PASS
+          echo STACKED_HTTP_AND_CHROMIUM=NOT_INCLUDED
+          echo PRODUCTION_PAYMENT_AND_AUTHENTICATION=NOT_RUN
+          echo PHASE1_ACCEPTANCE=NO
