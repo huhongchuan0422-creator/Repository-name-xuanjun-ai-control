@@ -82,6 +82,10 @@ class CleanupTests(unittest.TestCase):
                 self.calls=0
             def __getattr__(self,name):
                 return getattr(self.connection,name)
+            def __enter__(self):
+                self.connection.__enter__();return self
+            def __exit__(self,*args):
+                return self.connection.__exit__(*args)
             def backup(self,target):
                 if self.fail_backup:
                     raise ValueError("primary_backup_fault")
@@ -114,6 +118,9 @@ class CleanupTests(unittest.TestCase):
             def __init__(self,db,fail=False):
                 self.db=db;self.fail=fail;self.calls=0
             def __getattr__(self,name):return getattr(self.db,name)
+            def __enter__(self):
+                self.db.__enter__();return self
+            def __exit__(self,*args):return self.db.__exit__(*args)
             def close(self):
                 self.calls+=1
                 self.db.close()
