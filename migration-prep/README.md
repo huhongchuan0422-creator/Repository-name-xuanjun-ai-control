@@ -10,6 +10,12 @@ migration-prep/inspect-helper.sh现已按Owner实际收到的安装命令逐字�
 sudo -l列表不是所有sudoers来源、包含文件和env策略的完整审计；工作流明确FULL_SUDOERS_POLICY_AUDIT=NOT_VERIFIED。GitHub Connector不提供/actions/runners访问政策GET，浏览器未登录；GLOBAL_RUNNER_ACCESS_POLICY=NOT_VERIFIED。当前公开仓库Default Runner全局隔离尚未验证，保持生产操作HOLD。限定盘点成功不能被当作生产准入。
 root盘点授权于2026-10-21T00:00:00Z失效。
 
+## G1-G5候选增量
+
+独立审核 `6166680343` 后，新增 `G1_G5_EXECUTABLE_CANDIDATE.md` 及配套
+Python候选。所有模块默认拒绝，不执行主机命令或交易所写操作；共享生产
+Runner工作流已在本分支禁用，仅Hosted测试可运行。生产仍为HOLD。
+
 ## 已有证据与剩余工作
 - 东京Owner控制台2026-10-14T09:17:59Z：固定helper调用通过；国内模型与韩国小说模型隧道active。
 - 韩国Owner控制台2026-10-14T09:19:34Z：固定helper调用通过；小说active；易币API/调度active；可用内存1311988kB/磁盘26G。

@@ -11,7 +11,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   inspection:
-    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'build/tokyo-korea-migration-prep-20261014' && github.actor == 'huhongchuan0422-creator'
+    # Shared production runners remain in a public-repository Default pool.
+    # Candidate development must not schedule them again.  A separately
+    # authorized G1 operation removes them through SSH/OpenClaw.
+    if: ${{ false }}
     strategy:
       fail-fast: false
       matrix:
@@ -60,4 +63,4 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - run: python3 -B -m unittest discover -s migration-prep -p 'test_root_policy_audit.py' -v
+      - run: python3 -B -m unittest discover -s migration-prep -p 'test_*.py' -v

@@ -1,0 +1,19 @@
+{
+  "archive_authenticated_binding_production": "BLOCKED_MISSING_INDEPENDENT_TRUST_ANCHOR",
+  "existing_repository_python_tests": {
+    "passed": 207,
+    "skipped": 1,
+    "status": "PASS_WITH_EXISTING_CONDITIONAL_SKIP"
+  },
+  "focused_migration_gate_tests": {
+    "passed": 37,
+    "status": "PASS"
+  },
+  "json_validation": "PASS",
+  "production_migration_release": "HOLD",
+  "production_mutation": false,
+  "python_compile": "PASS",
+  "schema_version": 1,
+  "workflow_yaml_parse": "PASS",
+  "writer_runtime_coverage": "HOLD_NOT_INTEGRATED"
+}
