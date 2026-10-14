@@ -7,7 +7,7 @@ def build(source,reviewed,runtime,output):
  source,reviewed,runtime,output=map(pathlib.Path,(source,reviewed,runtime,output))
  if output.exists():raise ValueError('KIT_OUTPUT_EXISTS')
  output.mkdir(mode=0o700)
- root=output/'epoch5-recovery-candidate-v3';root.mkdir(mode=0o700)
+ root=output/'epoch5-recovery-candidate-v4';root.mkdir(mode=0o700)
  for name in ('helpers','tests'):(root/name).mkdir(mode=0o700)
  helpers={};tests={}
  for name in sorted(HELPERS):

@@ -7,8 +7,8 @@ import copy,hashlib,json,pathlib
 from inspect_epoch3 import C,T
 from prepare_epoch5_bindings import proposal
 from build_epoch5_runtime import SOURCE_COMMIT,SOURCE_TREE
-MANIFEST='3332a6e63b11b75420f1bd0f1a264c89528a92a771f6bc1399f2a38009f324ef'
-ROOT=C+'/epoch5-recovery-candidate-v3/xuanjun-p2-package'
+MANIFEST='153653ebc48d6b20680e513402dad077d50dce953ab3d4b7cc1748bcff0f64e7'
+ROOT=C+'/epoch5-recovery-candidate-v4/xuanjun-p2-package'
 TLS_CONFIG=T+'/epoch6-tls-renewal-candidate.json'
 
 def canonical(value):return json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False).encode()

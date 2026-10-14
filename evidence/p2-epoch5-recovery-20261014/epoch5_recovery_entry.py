@@ -2,8 +2,8 @@
 """Exact kit loader. No recovery effects without fresh independent PR58 approval."""
 import argparse,hashlib,json,os,pathlib,re,socket,stat,sys
 KIT=('/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/'
-     'complete-install-candidate-38503014520/epoch5-recovery-candidate-v3')
-MANIFEST='3332a6e63b11b75420f1bd0f1a264c89528a92a771f6bc1399f2a38009f324ef'
+     'complete-install-candidate-38503014520/epoch5-recovery-candidate-v4')
+MANIFEST='153653ebc48d6b20680e513402dad077d50dce953ab3d4b7cc1748bcff0f64e7'
 SHA=re.compile(r'^[0-9a-f]{64}$')
 HELPERS=frozenset(('epoch5_approval.py','epoch5_plan.py','epoch5_host_driver.py',
  'epoch5_host_preflight.py','epoch3_service_containment.py','epoch3_install_lock.py',
@@ -91,7 +91,7 @@ def main():
   os.environ.pop('P2_OBSERVATION_PATH',None)
   if args.affected_only:
    suite=unittest.TestSuite()
-   for pattern in ('test_epoch5_bootstrap_rebind.py','test_epoch5_retained_state.py','test_epoch5_host_preflight.py','test_epoch5_plan.py','test_epoch5_host_driver.py','test_epoch5_recovery_entry.py'):
+   for pattern in ('test_epoch5_bootstrap_rebind.py','test_epoch5_retained_state.py','test_epoch5_host_preflight.py','test_epoch5_plan.py','test_epoch5_host_driver.py','test_epoch5_recovery_entry.py','test_tls_renewal_deadline.py','test_tls_lifecycle.py','test_epoch5_retained_tls.py','test_epoch5_retained_runtime.py','test_epoch5_bindings.py','test_epoch5_runtime_build.py'):
     suite.addTests(unittest.defaultTestLoader.discover(KIT+'/tests',pattern=pattern))
   else:suite=unittest.defaultTestLoader.discover(KIT+'/tests',pattern='test_*.py')
   result=unittest.TextTestRunner(verbosity=2).run(suite)

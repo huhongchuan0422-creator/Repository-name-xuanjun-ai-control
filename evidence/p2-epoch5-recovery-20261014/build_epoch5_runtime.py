@@ -13,11 +13,11 @@ import runpy
 
 OLD_MANIFEST = '9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3'
 FREEZER_SHA = 'f1fe5dc3e199fe891a89969c07612304803ee453ee79e165815eab776eb6bb8e'
-SOURCE_COMMIT = 'bb6ed0d40eabbb535623b0a5341cddedc9b9e38a'
-SOURCE_TREE = '5c18914a59172d9a005dafaae3d4c86701240210'
+SOURCE_COMMIT = 'e058a82cf20acde95dd591dd3c95eaf4d4e7aa82'
+SOURCE_TREE = 'a27d226d96878e8230f4d4d28d93141d0f4900de'
 REPAIRS = {
     'stage1/p2_fixed_host_runtime.py': '83ca91a597c3220c40a4de37c8af211463dba13eb36eac55a8802c12d5a36ac2',
-    'stage1/p2_tls_lifecycle.py': 'd890732f39b4dd9e0134fa7c26aa2f0a79deacef3e2e0f2d30e5280c903070db',
+    'stage1/p2_tls_lifecycle.py': '948ea9920d5a6785aad2ebd0cbc7384c11d93b42cf97b4014a79f15f58d554f1',
 }
 
 
