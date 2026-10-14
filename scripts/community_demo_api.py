@@ -14,6 +14,7 @@ from scripts.community_order_store import connect, DDL, create_order, state, sim
 from scripts.community_merchant_contract import scope, signed_qr, verify_qr, split_amounts
 from scripts.community_storefront_snapshot import storefront_snapshot
 from scripts.community_ad_contract import AMOUNT, SUCCESS
+from scripts.community_local_admin import LocalAdminPolicy, dispatch_local_admin
 from scripts.community_ad_store import list_campaigns
 from scripts.community_refund_preview_store import preview_total, open_refund_store, record_preview
 
@@ -34,13 +35,14 @@ def _id(value):
 
 class DemoService:
     """Trusted local demo service. This is not a production access boundary."""
-    def __init__(self, db, merchant_db=None, ad_db=None, now=None, refund_db=None, qr_key=None):
+    def __init__(self, db, merchant_db=None, ad_db=None, now=None, refund_db=None, qr_key=None, admin_policy=None):
         self.db = db
         self.merchant_db = merchant_db
         self.ad_db = ad_db
         self.now = now
         self.refund_db = refund_db
         self.qr_key = qr_key
+        self.admin_policy = admin_policy
     def dispatch(self, method, path, data):
         if type(data) is not dict:
             raise ValueError("INVALID_REQUEST")
@@ -234,7 +236,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify","/demo/splits/preview"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify","/demo/splits/preview","/demo/admin/profile","/demo/admin/item","/demo/admin/campaign/create","/demo/admin/campaign/state","/demo/admin/campaign/review"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
@@ -265,11 +267,18 @@ def handler(service):
                     return values
                 data = json.loads(raw,object_pairs_hook=unique_pairs,
                                   parse_constant=lambda _: (_ for _ in ()).throw(ValueError("NONFINITE")))
-                result = service.dispatch("POST",self.path,data)
+                if self.path.startswith("/demo/admin/"):
+                    result = dispatch_local_admin(service,self.path,data,
+                                                 self.headers.get("X-Local-Admin-Capability"))
+                else:
+                    result = service.dispatch("POST",self.path,data)
                 return self.send_json(200,result)
             except (socket.timeout, TimeoutError):
                 self.close_connection = True
                 return self.send_json(408,{"error":"BODY_TIMEOUT"})
+            except PermissionError:
+                self.close_connection = True
+                return self.send_json(403,{"error":"ADMIN_ACCESS_DENIED"})
             except (ValueError,KeyError,TypeError):
                 self.close_connection = True
                 return self.send_json(400,{"error":"INVALID_DEMO_REQUEST"})
@@ -375,9 +384,17 @@ def serve_local(path=":memory:",port=18791,seed_demo=True):
             from scripts.community_demo_bootstrap import fixture_stores
             merchant_db, ad_db, now = fixture_stores()
             owned.extend((merchant_db, ad_db))
+        merchant_token=os.environ.get("XJ_STAGE5_DEMO_MERCHANT_TOKEN")
+        platform_token=os.environ.get("XJ_STAGE5_DEMO_PLATFORM_TOKEN")
+        if bool(merchant_token)!=bool(platform_token):
+            raise ValueError("INCOMPLETE_LOCAL_ADMIN_CONFIG")
+        admin_policy=None
+        if merchant_token:
+            from scripts.community_demo_bootstrap import DEMO_SCOPE
+            admin_policy=LocalAdminPolicy(merchant_token,platform_token,DEMO_SCOPE)
         # HTTPServer handles requests serially; no thread pool shares the stores.
         return _OwnedLocalDemoHTTPServer(
-            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now,refund_db,os.urandom(32)),owned)
+            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now,refund_db,os.urandom(32),admin_policy),owned)
     except BaseException:
         try:
             _close_all_owned(owned)
