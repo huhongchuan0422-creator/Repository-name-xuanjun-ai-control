@@ -1,5 +1,6 @@
 """Ephemeral, explicitly fake local storefront fixture. No user authentication or payment."""
 import time
+import sqlite3
 from scripts.community_merchant_store import open_store, upsert_profile, put_item
 from scripts.community_ad_store import open_offline, create_campaign, change_campaign_state, review_creative
 from scripts.community_ad_contract import AMOUNT, SUCCESS
@@ -38,7 +39,20 @@ def fixture_stores():
             review_creative(a,DEMO_SCOPE,cid,True,moderator,now,2)
             change_campaign_state(a,DEMO_SCOPE,cid,"APPROVED",owner,now,3)
             change_campaign_state(a,DEMO_SCOPE,cid,"ACTIVE",owner,now,4)
-        return m,a,now
+        # The server remains serial, but tests run serve_forever on a background
+        # thread. Use one explicitly cross-thread-readable handle per store.
+        runtime_m = sqlite3.connect(":memory:",check_same_thread=False)
+        runtime_a = sqlite3.connect(":memory:",check_same_thread=False)
+        try:
+            m.backup(runtime_m)
+            a.backup(runtime_a)
+        except BaseException:
+            runtime_m.close();runtime_a.close()
+            raise
+        finally:
+            a.close();m.close()
+        runtime_m.execute("PRAGMA foreign_keys=ON")
+        return runtime_m,runtime_a,now
     except BaseException:
         a.close();m.close()
         raise
