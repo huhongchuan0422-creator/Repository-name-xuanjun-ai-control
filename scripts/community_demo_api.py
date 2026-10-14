@@ -54,13 +54,47 @@ class DemoService:
                                         data["target"],evidence)
         raise ValueError("UNKNOWN_ENDPOINT")
 
+class _HeaderDeadlineReader:
+    """Unbuffered deadline-aware request-line/header reader.
+
+    Socket recv() per byte avoids a buffered readline silently extending an
+    absolute header deadline when a peer drip-feeds one character at a time.
+    Once headers finish, read1() reads the body with its separate fixed deadline.
+    """
+    def __init__(self, connection):
+        self.connection = connection
+        self.header_deadline = time.monotonic() + READ_TIMEOUT_SECONDS
+
+    def readline(self, limit=-1):
+        data = bytearray()
+        while limit < 0 or len(data) < limit:
+            remaining = self.header_deadline - time.monotonic()
+            if remaining <= 0:
+                raise socket.timeout("HEADER_DEADLINE_EXPIRED")
+            self.connection.settimeout(remaining)
+            byte = self.connection.recv(1)
+            if not byte:
+                break
+            data.extend(byte)
+            if byte == b"\\n":
+                break
+        return bytes(data)
+
+    def read1(self, length):
+        return self.connection.recv(length)
+
+    def close(self):
+        pass
+
+
 def handler(service):
     class Handler(BaseHTTPRequestHandler):
         server_version = "Stage5OfflineDemo"
         sys_version = ""
         def setup(self):
             super().setup()
-            self.connection.settimeout(READ_TIMEOUT_SECONDS)
+            self.rfile.close()
+            self.rfile = _HeaderDeadlineReader(self.connection)
         def log_message(self, fmt, *args):
             pass
         def do_POST(self):
