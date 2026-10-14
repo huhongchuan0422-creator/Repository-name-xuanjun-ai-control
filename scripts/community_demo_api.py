@@ -3,9 +3,10 @@ No real payments, site publishing, secrets or external network binding.
 """
 import json
 import re
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import sqlite3
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlsplit
-from scripts.community_order_store import connect, create_order, state, simulated_transition
+from scripts.community_order_store import connect, DDL, create_order, state, simulated_transition
 from scripts.community_merchant_contract import scope
 
 MAX_BODY = 2048
@@ -95,17 +96,23 @@ def handler(service):
             self.wfile.write(payload)
     return Handler
 
+def server_database(path):
+    """One connection, used by the strictly serial demo HTTP server only."""
+    if path == ":memory:":
+        db = sqlite3.connect(":memory:", check_same_thread=False)
+        db.executescript(DDL)
+        db.execute("PRAGMA user_version=1")
+        return db
+    checked = connect(path)
+    checked.close()
+    return sqlite3.connect(path, check_same_thread=False)
+
 def serve_local(path=":memory:",port=18791):
     if type(port) is not int or not 1024 <= port <= 65535:
         raise ValueError("INVALID_PORT")
-    db = connect(path)
-    # Deliberately single threaded: SQLite connection is not shared across concurrent threads.
-    class SingleThreadedHTTPServer(ThreadingHTTPServer):
-        daemon_threads = False
-        def process_request(self, request, client_address):
-            self.finish_request(request,client_address)
-            self.shutdown_request(request)
-    return SingleThreadedHTTPServer(("127.0.0.1",port),handler(DemoService(db)))
+    db = server_database(path)
+    # HTTPServer handles requests serially; no thread pool shares this connection.
+    return HTTPServer(("127.0.0.1",port),handler(DemoService(db)))
 
 if __name__=="__main__":
     print("OFFLINE_SIMULATION_ONLY_NO_REAL_WECHAT")
