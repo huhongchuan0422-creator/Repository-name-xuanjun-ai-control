@@ -148,8 +148,24 @@ def quote(db,quote_id,tenant_id,offer_id,version,created_at,expires_at,
     for currency in ("cny","usd"):
         vals=[(line[currency+"_minor"],line["quantity"]) for line in offer["lines"]]
         totals[currency+"_minor"]=None if any(v is None for v,q in vals) else sum(v*q for v,q in vals)
+    # Never present a sum of one-time, monthly and usage fees as an amount due.
+    # Keep legacy all-line totals for compatibility, but mark them NON_PAYABLE.
+    breakdown={}
+    for cycle in sorted(CYCLES):
+        selected=[line for line in offer["lines"] if line["cycle"]==cycle]
+        if not selected:
+            continue
+        breakdown[cycle]={}
+        for currency in ("cny","usd"):
+            values=[line[currency+"_minor"] for line in selected]
+            breakdown[cycle][currency+"_minor"]=(
+                None if any(value is None for value in values)
+                else sum(line[currency+"_minor"]*line["quantity"] for line in selected))
+    mixed_cycles=len(breakdown)>1
     snapshot={**offer,"tenant_id":tenant_id,"created_at":created_at,"expires_at":expires_at,
               "fx_source":fx_source,"fx_at":fx_at,"totals":totals,
+              "totals_by_cycle":breakdown,"mixed_billing_cycles":mixed_cycles,
+              "totals_are_payable":False,
               "payment_authorized":False,"procurement_authorized":False,
               "revenue_recognized":False}
     with db:
