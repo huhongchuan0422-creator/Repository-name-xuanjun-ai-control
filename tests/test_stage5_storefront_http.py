@@ -1,4 +1,4 @@
-import json,threading,unittest,sqlite3
+import json,threading,unittest,sqlite3,tempfile,os
 from http.client import HTTPConnection
 from http.server import HTTPServer
 from scripts.community_demo_api import DemoService,handler,server_database
@@ -11,7 +11,17 @@ P={"name":"Demo","description":"Intro","contact":"123","status":"ACTIVE"}
 def owner(s):return {"authenticated":True,"actor_id":"local-owner","role":"MERCHANT_ADMIN","tenant_id":s["tenant_id"],"merchant_id":s["merchant_id"]}
 class StorefrontHTTPTests(unittest.TestCase):
  def setUp(self):
-  self.m=open_store();self.a=open_offline();self.o=server_database(":memory:")
+  self.dir=tempfile.TemporaryDirectory()
+  mpath=os.path.join(self.dir.name,"merchants.sqlite")
+  apath=os.path.join(self.dir.name,"ads.sqlite")
+  initial=open_store(mpath);initial.close()
+  initial=open_offline(apath);initial.close()
+  # Serial HTTP handler executes in a dedicated server thread. Test database
+  # handles must be explicitly opened for cross-thread use by that one thread.
+  self.m=sqlite3.connect(mpath,check_same_thread=False)
+  self.m.execute("PRAGMA foreign_keys=ON")
+  self.a=sqlite3.connect(apath,check_same_thread=False)
+  self.o=server_database(":memory:")
   for identity,name in ((S,"Shop A"),(T,"Shop B")):
    upsert_profile(self.m,identity,owner(identity),dict(P,name=name))
    put_item(self.m,identity,owner(identity),{"id":"p1","name":name+" Item","status":"ACTIVE","sort":1})
@@ -20,6 +30,7 @@ class StorefrontHTTPTests(unittest.TestCase):
  def tearDown(self):
   self.http.shutdown();self.thread.join(3);self.http.server_close()
   for db in (self.m,self.a,self.o):db.close()
+  self.dir.cleanup()
  def post(self,identity):
   con=HTTPConnection("127.0.0.1",self.http.server_address[1],timeout=3)
   con.request("POST","/demo/storefront",json.dumps(identity),headers={"Content-Type":"application/json"})
