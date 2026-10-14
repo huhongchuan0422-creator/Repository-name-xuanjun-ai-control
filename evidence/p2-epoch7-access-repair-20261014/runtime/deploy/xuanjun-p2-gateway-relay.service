@@ -1,0 +1,32 @@
+[Unit]
+Description=Xuanjun P2 authenticated Gateway relay
+Requires=xuanjun-p2-gateway-relay.socket
+After=xuanjun-p2-gateway-relay.socket xuanjun-uk-openclaw.service
+
+[Service]
+Type=simple
+User=xuanjun_dev
+Group=xuanjun_dev
+RuntimeDirectory=xuanjun-p2-gateway-relay
+RuntimeDirectoryMode=0700
+WorkingDirectory=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1
+ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/p2_gateway_relay.py --config /etc/xuanjun-development/p2-gateway-relay.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ReadOnlyPaths=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@ /etc/xuanjun-development
+ReadWritePaths=/run/xuanjun-development /run/xuanjun-p2-gateway-relay
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

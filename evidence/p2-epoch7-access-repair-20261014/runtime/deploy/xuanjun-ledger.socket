@@ -1,0 +1,13 @@
+[Unit]
+Description=Xuanjun canonical ledger decision socket
+
+[Socket]
+ListenStream=/run/xuanjun-development/ledger.sock
+SocketUser=xuanjun-dispatcher
+SocketGroup=xuanjun-ledger-client
+SocketMode=0660
+DirectoryMode=0711
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

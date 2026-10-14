@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "dispatcher_user": "xuanjun-dispatcher",
+  "worker_user": "xj_codex_worker",
+  "codex_bin": "/opt/xuanjun-runtime/codex-0.160.0/codex",
+  "codex_sha256": "@@CODEX_SHA256@@",
+  "task_root": "/var/lib/xuanjun-development/worktrees",
+  "worker_home": "/var/lib/xuanjun-development/worker-home",
+  "codex_home": "/var/lib/xuanjun-development/codex-home",
+  "activation_descriptor": "/var/lib/xuanjun-development/activation/active.json",
+  "activation_epoch_journal": "/var/lib/xuanjun-development/activation/epochs.jsonl",
+  "activation_lock": "/var/lib/xuanjun-development/activation/activation.lock",
+  "broker_socket": "/run/xuanjun-development/broker.sock",
+  "repositories": ["huhongchuan0422-creator/Repository-name-xuanjun-ai-control"]
+}

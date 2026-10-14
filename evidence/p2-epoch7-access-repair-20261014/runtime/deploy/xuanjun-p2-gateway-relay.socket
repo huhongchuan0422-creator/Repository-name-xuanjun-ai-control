@@ -1,0 +1,14 @@
+[Unit]
+Description=Xuanjun P2 authenticated Gateway relay socket
+After=xuanjun-uk-openclaw.service
+
+[Socket]
+ListenStream=/run/xuanjun-development/p2-gateway.sock
+SocketUser=xuanjun_dev
+SocketGroup=xuanjun-dispatcher
+SocketMode=0660
+DirectoryMode=0711
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

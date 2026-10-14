@@ -1,0 +1,32 @@
+[Unit]
+Description=Xuanjun fixed-policy root broker
+Requires=xj-root-broker.socket
+After=xj-root-broker.socket
+
+[Service]
+Type=simple
+User=root
+Group=root
+SupplementaryGroups=xuanjun-ledger-client
+WorkingDirectory=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1
+ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/root_broker.py --config /etc/xuanjun-development/root-broker.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=no
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+UMask=0077
+ReadOnlyPaths=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@ /etc/xuanjun-development /var/lib/xuanjun-development/activation /var/lib/xuanjun-development/generations
+ReadWritePaths=/run/xuanjun-development /var/lib/xuanjun-development/worktrees /var/lib/xuanjun-development/worker-home /var/lib/xuanjun-development/codex-home
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

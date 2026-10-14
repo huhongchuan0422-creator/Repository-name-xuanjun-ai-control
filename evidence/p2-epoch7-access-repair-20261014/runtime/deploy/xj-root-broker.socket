@@ -1,0 +1,13 @@
+[Unit]
+Description=Xuanjun private fenced root broker socket
+
+[Socket]
+ListenStream=/run/xuanjun-development/broker.sock
+SocketUser=root
+SocketGroup=xuanjun-dispatcher
+SocketMode=0660
+DirectoryMode=0711
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

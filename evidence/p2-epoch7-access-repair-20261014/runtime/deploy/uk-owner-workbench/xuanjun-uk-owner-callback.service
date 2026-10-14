@@ -1,0 +1,36 @@
+[Unit]
+Description=Xuanjun UK fenced Owner approval callback
+After=network.target
+
+[Service]
+Type=simple
+User=xuanjun-callback
+Group=xuanjun-control-db
+SupplementaryGroups=xuanjun-ledger-client
+WorkingDirectory=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1
+ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/owner_callback_server.py --activation-descriptor /var/lib/xuanjun-development/activation/active.json --activation-epoch-journal /var/lib/xuanjun-development/activation/epochs.jsonl --activation-lock /var/lib/xuanjun-development/activation/activation.lock --auth-file /etc/xuanjun-owner-callback/owner-callback-auth --hmac-key-file /etc/xuanjun-owner-callback/owner-callback-hmac --owner-id-file /etc/xuanjun-owner-callback/owner-user-id --owner-chat-id-file /etc/xuanjun-owner-callback/owner-chat-id --port 18557 --socket-timeout 5 --max-workers 8
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@ /etc/xuanjun-owner-callback
+ReadOnlyPaths=/var/lib/xuanjun-development/activation /var/lib/xuanjun-development/generations
+RestrictAddressFamilies=AF_INET AF_UNIX
+SystemCallArchitectures=native
+MemoryMax=256M
+TasksMax=32
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

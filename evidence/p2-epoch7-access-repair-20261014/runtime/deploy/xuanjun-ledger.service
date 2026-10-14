@@ -1,0 +1,32 @@
+[Unit]
+Description=Xuanjun canonical ledger Owner-decision adapter
+Requires=xuanjun-ledger.socket
+After=xuanjun-ledger.socket
+
+[Service]
+Type=simple
+User=xuanjun-dispatcher
+Group=xuanjun-control-db
+SupplementaryGroups=xuanjun-dispatcher
+WorkingDirectory=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1
+ExecStart=/usr/bin/python3 /opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@/stage1/ledger_service.py --config /etc/xuanjun-development/dispatcher.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=CAP_SYS_PTRACE
+AmbientCapabilities=CAP_SYS_PTRACE
+SystemCallFilter=~ptrace process_vm_readv process_vm_writev
+SystemCallArchitectures=native
+ReadOnlyPaths=/opt/xuanjun-control-releases/@@RELEASE_DIRECTORY@@ /etc/xuanjun-development /var/lib/xuanjun-development/activation
+ReadWritePaths=/var/lib/xuanjun-development/generations /run/xuanjun-development
+RestrictAddressFamilies=AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

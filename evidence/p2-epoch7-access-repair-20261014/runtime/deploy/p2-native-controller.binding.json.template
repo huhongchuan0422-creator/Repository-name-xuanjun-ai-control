@@ -1,0 +1,14 @@
+{
+  "agentIds":{"workspace-write":"developer","read-only":"platform-engineer"},
+  "engine":{"backend":"docker","binary":"/usr/bin/docker"},
+  "ledger":{"python":"/usr/libexec/platform-python3.6","pythonSha256":"@@PYTHON_SHA256@@","bridge":"@@LEDGER_BRIDGE_PATH@@","config":"@@LEDGER_BRIDGE_CONFIG_PATH@@","files":{"@@LEDGER_BRIDGE_PATH@@":"@@LEDGER_BRIDGE_SHA256@@","@@LEDGER_BRIDGE_CONFIG_PATH@@":"@@LEDGER_BRIDGE_CONFIG_SHA256@@"}},
+  "workspaceRoot":"@@WORKSPACE_ROOT@@",
+  "contextPath":"@@SANDBOX_CONTEXT_PATH@@",
+  "contextFiles":{
+    "@@SANDBOX_CONTEXT_PATH@@":{"sha256":"@@SANDBOX_CONTEXT_SHA256@@","uid":1002},
+    "@@SANDBOX_PREPARE_PATH@@":{"sha256":"@@SANDBOX_PREPARE_SHA256@@","uid":1002},
+    "@@SUBAGENT_RUNTIME_PATH@@":{"sha256":"@@SUBAGENT_RUNTIME_SHA256@@","uid":1002},
+    "@@BEFORE_TOOL_HOOK_PATH@@":{"sha256":"@@BEFORE_TOOL_HOOK_SHA256@@","uid":1002},
+    "@@REQUEST_SCOPED_ERROR_PATH@@":{"sha256":"@@REQUEST_SCOPED_ERROR_SHA256@@","uid":1002}
+  }
+}

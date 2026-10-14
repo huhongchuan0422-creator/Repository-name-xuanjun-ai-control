@@ -1,0 +1,12 @@
+[Unit]
+Description=Reconcile GitHub issue intake after boot and missed events
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+AccuracySec=5s
+Persistent=true
+Unit=xuanjun-github-intake.service
+
+[Install]
+WantedBy=timers.target
