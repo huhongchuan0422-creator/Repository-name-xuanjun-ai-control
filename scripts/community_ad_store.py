@@ -7,7 +7,7 @@ import hashlib
 import json
 import sqlite3
 from datetime import datetime, timezone
-from scripts.community_ad_contract import AMOUNT, SUCCESS, SLOTS, safe_creative_url
+from scripts.community_ad_contract import AMOUNT, SUCCESS, SLOTS, safe_creative_url, ALLOWED_TRANSITIONS
 
 SCHEMA = """
 CREATE TABLE campaigns (
@@ -37,6 +37,8 @@ CREATE TABLE audit_events (
   previous_version INTEGER, new_version INTEGER, happened_at INTEGER NOT NULL,
   previous_hash TEXT, new_hash TEXT
 );
+CREATE TRIGGER audit_no_update BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(ABORT, 'AUDIT_APPEND_ONLY'); END;
+CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT, 'AUDIT_APPEND_ONLY'); END;
 """
 
 def open_offline(path=":memory:"):
@@ -109,3 +111,33 @@ def record_metric(db,scope,slot,kind,event_id,campaign_id,now):
         cur=db.execute("INSERT OR IGNORE INTO metric_events VALUES(?,?,?,?,?,?,?,?)",
                        (t,m,s,slot,kind,event_id,campaign_id,now))
     return {"recorded":cur.rowcount==1,"payment_affected":False}
+
+def change_campaign_state(db, scope, campaign_id, next_state, actor, now, expected_version):
+    """Bound optimistic state transition; no public authentication shortcut."""
+    t,m,s=_scope(scope);_now(now)
+    if type(expected_version) is not int or expected_version < 1:
+        raise ValueError("INVALID_VERSION")
+    if not isinstance(campaign_id,str) or not campaign_id or len(campaign_id)>100:
+        raise ValueError("INVALID_CAMPAIGN_ID")
+    if not isinstance(next_state,str) or next_state not in ALLOWED_TRANSITIONS:
+        raise ValueError("INVALID_STATE")
+    if (not isinstance(actor,dict) or actor.get("authenticated") is not True or
+        actor.get("role") not in ("MERCHANT_ADMIN","PLATFORM_ADMIN") or
+        not isinstance(actor.get("actor_id"),str) or not actor["actor_id"]):
+        raise ValueError("UNAUTHENTICATED_ACTOR")
+    if actor["role"]=="MERCHANT_ADMIN" and (actor.get("tenant_id"),actor.get("merchant_id"))!=(t,m):
+        raise ValueError("CROSS_TENANT_DENIED")
+    with db:
+        row=db.execute("SELECT status,moderation,version FROM campaigns WHERE tenant_id=? AND merchant_id=? AND store_id=? AND campaign_id=?",
+                       (t,m,s,campaign_id)).fetchone()
+        if row is None: raise ValueError("UNKNOWN_CAMPAIGN")
+        previous,moderation,version=row
+        if version!=expected_version: raise ValueError("STALE_VERSION")
+        if next_state not in ALLOWED_TRANSITIONS[previous]: raise ValueError("INVALID_TRANSITION")
+        if next_state=="ACTIVE" and moderation!="APPROVED": raise ValueError("MODERATION_REQUIRED")
+        changed=db.execute("UPDATE campaigns SET status=?,version=version+1 WHERE tenant_id=? AND merchant_id=? AND store_id=? AND campaign_id=? AND version=?",
+                           (next_state,t,m,s,campaign_id,expected_version))
+        if changed.rowcount!=1: raise ValueError("CONCURRENT_VERSION_CHANGE")
+        db.execute("INSERT INTO audit_events(tenant_id,merchant_id,store_id,campaign_id,actor_id,action,previous_version,new_version,happened_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                   (t,m,s,campaign_id,actor["actor_id"],"STATUS_"+next_state,version,version+1,now))
+    return {"id":campaign_id,"state":next_state,"version":version+1}
