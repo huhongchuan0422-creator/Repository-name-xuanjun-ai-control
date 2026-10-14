@@ -3,7 +3,7 @@
 No production action is executed by preparation. Online issuance/dry-run is a
 reviewed install step, before ACTIVE; failure retains evidence on rollback.
 """
-import fcntl,hashlib,json,os,signal,socket,stat,subprocess
+import fcntl,hashlib,json,os,signal,socket,stat,subprocess,time
 from ledger_cutover_transaction import _atomic_receipt
 from p2_bootstrap_files import private_read
 DOMAIN='uk.wenwenwenyiyiyi.work'
@@ -16,21 +16,79 @@ TX='c529c379-9341-4510-8384-fc6be1e412e5'
 
 def require(v,c):
  if not v:raise ValueError(c)
-def command_failure(out,err,returncode,reason,timeout):
+def command_failure(out,err,returncode,reason,timeout,cleanup=None):
  failure={'schema':1,'reason':reason,'timeout_seconds':timeout,'returncode':returncode,'stdout_sha256':hashlib.sha256(out).hexdigest(),'stderr_sha256':hashlib.sha256(err).hexdigest(),'stdout':out[:1048576].decode('utf-8','replace'),'stderr':err[:1048576].decode('utf-8','replace'),'truncated':len(out)>1048576 or len(err)>1048576}
+ if cleanup is not None:failure['cleanup']=cleanup
  # Private diagnostics are never copied into a public receipt.
  logdir=ROOT+'/logs';info=os.lstat(logdir)
  require(stat.S_ISDIR(info.st_mode) and info.st_uid==0 and stat.S_IMODE(info.st_mode)==0o700 and os.path.realpath(logdir)==logdir,'TLS_DIAGNOSTIC_AUTHORITY')
  _atomic_receipt(logdir+'/command-failure.json',failure)
+# A deadline on the first communicate does not bound inherited pipe holders.
+# Cleanup has its own shared drain/reap budget; an escaped descendant is UNKNOWN.
+COMMAND_CLEANUP_SECONDS=2.0
+DIAGNOSTIC_STREAM_LIMIT=1048576
+
+def command_partial_output(p,name,fallback):
+ # CPython3.6 POSIX TimeoutExpired does not expose partial stdout/stderr.
+ # Its completed nonblocking reads remain in this buffer. Copy at most limit+1
+ # bytes, without reading the pipe or waiting; other runtimes use exception data.
+ buffers=getattr(p,'_fileobj2output',None)
+ chunks=buffers.get(getattr(p,name,None)) if isinstance(buffers,dict) else None
+ if not isinstance(chunks,list):return fallback
+ result=bytearray()
+ for chunk in chunks:
+  if not isinstance(chunk,bytes):return fallback
+  room=DIAGNOSTIC_STREAM_LIMIT+1-len(result)
+  if room<=0:break
+  result.extend(chunk[:room])
+ return bytes(result)
+
+def bounded_command_cleanup(p,initial):
+ deadline=time.monotonic()+COMMAND_CLEANUP_SECONDS
+ out=getattr(initial,'output',None) or b'';err=getattr(initial,'stderr',None) or b''
+ evidence={'budget_seconds':COMMAND_CLEANUP_SECONDS,'group_signal':'UNKNOWN',
+           'direct_process':'UNKNOWN','output':'INCOMPLETE','descendants':'UNKNOWN'}
+ try:
+  try:os.killpg(p.pid,signal.SIGKILL);evidence['group_signal']='SENT'
+  except ProcessLookupError:evidence['group_signal']='NOT_FOUND'
+  except OSError as error:evidence['group_signal']='FAILED';evidence['signal_error_type']=type(error).__name__
+  remaining=deadline-time.monotonic()
+  if remaining>0:
+   try:
+    out,err=p.communicate(timeout=remaining);evidence['output']='COMPLETE'
+   except subprocess.TimeoutExpired as error:
+    # TimeoutExpired output is the cumulative capture; never concatenate twice.
+    if error.output is not None:out=error.output
+    if error.stderr is not None:err=error.stderr
+   except BaseException as error:evidence['drain_error_type']=type(error).__name__
+ finally:
+  # Linux pipe readers have no background communicate threads. Closing them
+  # abandons unbounded EOF waiting even when descendants escaped the killed PG.
+  for name in ('stdout','stderr'):
+   stream=getattr(p,name,None)
+   if stream is not None:
+    try:stream.close()
+    except BaseException as error:evidence[name+'_close_error_type']=type(error).__name__
+  remaining=deadline-time.monotonic()
+  try:
+   if p.poll() is None and remaining>0:p.wait(timeout=remaining)
+   if p.returncode is not None:evidence['direct_process']='EXITED'
+  except BaseException as error:evidence['reap_error_type']=type(error).__name__
+ if evidence['output']!='COMPLETE':
+  out=command_partial_output(p,'stdout',out);err=command_partial_output(p,'stderr',err)
+ evidence['captured_output_truncated']=len(out)>DIAGNOSTIC_STREAM_LIMIT or len(err)>DIAGNOSTIC_STREAM_LIMIT
+ # Hashes below describe retained prefixes when output was truncated/incomplete.
+ return out[:DIAGNOSTIC_STREAM_LIMIT],err[:DIAGNOSTIC_STREAM_LIMIT],evidence
+
 def command(args,timeout=180):
  p=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C'})
  try:out,err=p.communicate(timeout=timeout)
- except subprocess.TimeoutExpired:
-  try:os.killpg(p.pid,signal.SIGKILL)
-  except ProcessLookupError:pass
-  out,err=p.communicate()
-  command_failure(out,err,p.returncode,'TIMEOUT_GROUP_KILLED_OR_EXITED',timeout)
-  raise ValueError('TLS_COMMAND_TIMEOUT_GROUP_KILLED')
+ except BaseException as error:
+  out,err,cleanup=bounded_command_cleanup(p,error)
+  timed_out=isinstance(error,subprocess.TimeoutExpired)
+  command_failure(out,err,p.returncode,'TIMEOUT_BOUNDED_CLEANUP' if timed_out else 'INTERRUPTED_BOUNDED_CLEANUP',timeout,cleanup)
+  if timed_out:raise ValueError('TLS_COMMAND_TIMEOUT_HOLD') from error
+  raise
  if p.returncode!=0 or len(out)+len(err)>2097152:
   command_failure(out,err,p.returncode,'EXIT_OR_OUTPUT_BOUND',timeout)
   raise ValueError('TLS_EXTERNAL_COMMAND_FAILED_RC_'+str(p.returncode))

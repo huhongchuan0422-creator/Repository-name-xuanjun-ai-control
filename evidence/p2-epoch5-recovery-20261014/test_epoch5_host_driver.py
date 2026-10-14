@@ -53,6 +53,27 @@ class Tests(unittest.TestCase):
   for p in reversed(self.patches):p.stop()
   self.patchdir.stop();self.tmp.cleanup()
  def execute(self):return resume_once(self.obj,self.plan,7000000000)
+ def real_tls_hold(self,diagnostic_failure=False):
+  import time,p2_tls_lifecycle as tls
+  root=self.tmp.name+'/tls';os.mkdir(root,0o700);os.mkdir(root+'/logs',0o700)
+  code="import os,time\np=os.fork()\nif p==0:\n os.setsid()\n time.sleep(1.8)\n os._exit(0)\ntime.sleep(5)"
+  self.obj.runtime.provision.side_effect=lambda *a:tls.command([sys.executable,'-I','-B','-c',code],timeout=.15)
+  start=time.monotonic()
+  with mock.patch.object(tls,'ROOT',root),mock.patch.object(tls,'COMMAND_CLEANUP_SECONDS',.15):
+   if diagnostic_failure:
+    with mock.patch.object(tls,'command_failure',side_effect=PermissionError('diagnostic denied')):
+     with self.assertRaises(RecoveryHold):self.execute()
+   else:
+    with self.assertRaises(RecoveryHold):self.execute()
+  elapsed=time.monotonic()-start;self.assertLess(elapsed,1.2)
+  self.assert_all_cleanup_attempted();self.obj.containment.stop_all.assert_called_once()
+  self.assertEqual(self.store.read()['state'],'PREPARED');self.assertEqual(self.store.read()['epoch'],7)
+  value=json.loads(pathlib.Path(self.obj.journal.path).read_text())
+  self.assertEqual(value['stage'],'HOLD');self.assertFalse(value['automatic_retry'])
+  self.assertEqual(len(value['containment']['verify_stopped_and_preserve_legacy_masks']['evidence']['operations']),6)
+  print('REAL_TLS_TO_HOLD cleanup_groups=6 diagnostic_failure=%s elapsed=%.3f' % (diagnostic_failure,elapsed))
+ def test_real_escaped_pipe_timeout_reaches_all_containment(self):self.real_tls_hold()
+ def test_real_tls_diagnostic_failure_reaches_all_containment(self):self.real_tls_hold(diagnostic_failure=True)
  def test_real_epoch_and_journal_success(self):
   result=self.execute();self.assertEqual(self.store.read()['state'],'ACTIVE');self.assertEqual(self.store.read()['epoch'],6)
   self.assertEqual(result['completed'],list(PHASES));self.assertEqual(result['production_acceptance'],'PENDING')
