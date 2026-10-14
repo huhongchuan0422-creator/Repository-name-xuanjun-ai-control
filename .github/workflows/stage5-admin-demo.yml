@@ -1,0 +1,21 @@
+name: Stage5 Admin Browser Demo
+on:
+  pull_request:
+    paths:
+      - 'demos/community-admin/**'
+      - '.github/workflows/stage5-admin-demo.yml'
+permissions:
+  contents: read
+jobs:
+  admin-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test isolated merchant and platform UIs
+        run: |
+          node --check demos/community-admin/admin.js
+          node --test demos/community-admin/admin.test.mjs
+          echo REAL_AUTHORIZATION=NOT_RUN
+          echo REAL_PAYMENT=NOT_RUN
