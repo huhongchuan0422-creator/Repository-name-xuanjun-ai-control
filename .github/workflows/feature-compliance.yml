@@ -1,0 +1,26 @@
+name: Feature Compliance Gate
+on:
+  pull_request:
+    paths:
+      - 'governance/**'
+      - 'scripts/feature_compliance_check.py'
+      - 'tests/test_feature_compliance_check.py'
+      - 'docs/development/**'
+      - '.github/workflows/feature-compliance.yml'
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  feature-compliance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Positive and negative governance cases
+        run: python -m unittest discover -s tests -p 'test_feature_compliance_check.py' -v
+      - name: Validate feature mapping
+        run: python scripts/feature_compliance_check.py
