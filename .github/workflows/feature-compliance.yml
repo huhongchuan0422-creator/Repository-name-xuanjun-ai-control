@@ -2,7 +2,7 @@ name: Feature Compliance Gate
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, repair/p2-chatgpt-clean-review-20261013]
 permissions:
   contents: read
 jobs:
