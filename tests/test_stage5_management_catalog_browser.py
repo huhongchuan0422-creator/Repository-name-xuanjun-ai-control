@@ -5,6 +5,7 @@ from playwright.sync_api import sync_playwright, expect
 from scripts.community_demo_api import serve_local
 from scripts.community_order_store import create_order, simulated_transition
 from scripts.community_refund_preview_store import record_preview
+from scripts.community_demo_api import DemoService
 
 class ManagementCatalogBrowser(unittest.TestCase):
  @classmethod
@@ -112,4 +113,16 @@ class ManagementCatalogBrowser(unittest.TestCase):
    page.locator("#merchant").fill("merchant2")
    expect(page.locator("#token")).to_have_text("")
    self.assertNotIn("真实支付",page.locator("#result").inner_text())
+ def test_offline_split_preview_conserves_net_of_refunds_without_provider(self):
+  identity={"tenant_id":"tenant1","merchant_id":"merchant1","store_id":"store1"}
+  service=DemoService(self.http._owned_connections[0],refund_db=self.http._owned_connections[1])
+  out=service.dispatch("POST","/demo/splits/preview",{
+   **identity,"reference":"management_order_1","shares_bps":{"merchant":7000,"platform":3000}})
+  self.assertEqual(sum(out["allocations_minor"].values()),100)
+  self.assertEqual(out["allocatable_minor"],100)
+  self.assertEqual(out["refund_preview_minor"],45)
+  self.assertFalse(out["provider_settlement_verified"])
+  self.assertFalse(out["provider_split_executed"])
+  self.assertFalse(out["financial_receipt_issued"])
+  self.assertFalse(out["cross_database_atomic_snapshot"])
 if __name__=="__main__":unittest.main()
