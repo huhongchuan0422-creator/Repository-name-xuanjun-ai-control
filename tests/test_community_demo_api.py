@@ -92,6 +92,26 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.post('/demo/orders','{"amount_minor":NaN}')[0],400)
     def test_large_payload_rejected(self):
         self.assertEqual(self.post('/demo/orders','x'*(MAX_BODY+1))[0],400)
+    def test_dns_rebinding_host_and_cross_origin_rejected(self):
+        for headers in ({'Host':'evil.example'},
+                        {'Origin':'https://evil.example'},
+                        {'Origin':'null'}):
+            conn=HTTPConnection('127.0.0.1',self.server.server_address[1],timeout=3)
+            conn.request('POST','/demo/orders',body=json.dumps(order('hostfail')),
+                         headers={'Content-Type':'application/json',**headers})
+            response=conn.getresponse()
+            self.assertEqual(response.status,403)
+            response.read()
+            conn.close()
+    def test_matching_local_origin_allowed(self):
+        conn=HTTPConnection('127.0.0.1',self.server.server_address[1],timeout=3)
+        origin='http://127.0.0.1:'+str(self.server.server_address[1])
+        conn.request('POST','/demo/orders',body=json.dumps(order('localorigin')),
+                     headers={'Content-Type':'application/json','Origin':origin})
+        response=conn.getresponse()
+        self.assertEqual(response.status,200)
+        response.read()
+        conn.close()
     def test_no_real_pay_route(self):
         self.assertEqual(self.post('/api/pay/wechat','{}')[0],404)
 
