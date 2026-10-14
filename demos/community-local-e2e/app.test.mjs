@@ -7,7 +7,9 @@ function setup(fetchMock){
  const ids=['tenant','merchant','store','reference','amount','create','query','complete','fail','merchantQuery','status','merchantResult','error','successAd'];
  const els={},events={};
  for(const id of ids)els[id]={value:({tenant:'t1',merchant:'m1',store:'s1',reference:'ref1',amount:'150'})[id]||'',hidden:id==='successAd',textContent:'',addEventListener(type,fn){events[id+':'+type]=fn;}};
- const context=vm.createContext({document:{getElementById:id=>els[id]},fetch:fetchMock,JSON,Number,Object,String,Error});
+ let nonce=0;
+ const crypto={randomUUID:()=>`00000000-0000-4000-8000-${(++nonce).toString(16).padStart(12,"0")}`};
+ const context=vm.createContext({document:{getElementById:id=>els[id]},fetch:fetchMock,crypto,JSON,Number,Object,String,Error});
  vm.runInContext(source,context);
  return {els,input:(id,value)=>{els[id].value=value;events[id+':input']();},click:async id=>{events[id+':click']();await new Promise(resolve=>setImmediate(resolve));},events,context};
 }
