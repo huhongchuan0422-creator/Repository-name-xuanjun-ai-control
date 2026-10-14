@@ -1,0 +1,16 @@
+{
+  "archive_bytes": 264661,
+  "archive_sha256": "9c186c8d9788ff12307bc95362d00a9315ba8f18d899c8e41fa4e45a51a5e4c0",
+  "directories": 11,
+  "helpers_verified": 22,
+  "manifest_entry_inventory": "PASS",
+  "old100_runtime_comparison": "PASS_100_UNCHANGED_2_PINNED_REPAIRS",
+  "package_bytes_against_pinned_hashes": "PASS",
+  "private_plan_and_rendered24": "NOT_RUN",
+  "production_effects": "NOT_RUN",
+  "regular_files": 148,
+  "release_approval": "NOT_GRANTED",
+  "repository_blob_comparison": "PASS_22_HELPERS_19_TESTS_ENTRY",
+  "runtime_files_verified": 102,
+  "test_modules_verified": 19
+}
