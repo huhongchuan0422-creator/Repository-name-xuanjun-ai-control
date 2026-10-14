@@ -1,0 +1,31 @@
+name: Stage5 Refund Checkout Read
+on:
+  pull_request:
+    paths:
+      - 'scripts/community_checkout_refund_preview_read.py'
+      - 'scripts/community_checkout_read_integration.py'
+      - 'scripts/community_refund_preview_store.py'
+      - 'scripts/community_merchant_store.py'
+      - 'scripts/community_order_store.py'
+      - 'tests/test_stage5_checkout_refund_preview_read.py'
+      - '.github/workflows/stage5-refund-checkout-read.yml'
+permissions:
+  contents: read
+jobs:
+  read-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m unittest discover -s tests -p 'test_stage5_checkout_refund_preview_read.py' -v
+          python -m unittest discover -s tests -p 'test_community_refund_preview_store.py' -v
+          python -m unittest discover -s tests -p 'test_stage5_checkout_read_integration.py' -v
+          echo REAL_FINANCIAL_RECEIPT=NOT_RUN
+          echo CROSS_DB_ATOMIC_SETTLEMENT=NOT_RUN
