@@ -1,0 +1,112 @@
+"""Loopback-only demo order API. Simulation token is NOT authentication.
+No real payments, site publishing, secrets or external network binding.
+"""
+import json
+import re
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
+from scripts.community_order_store import connect, create_order, state, simulated_transition
+from scripts.community_merchant_contract import scope
+
+MAX_BODY = 2048
+FIELDS = {"tenant_id", "merchant_id", "store_id", "reference"}
+ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
+
+def _object(raw, expected):
+    if type(raw) is not dict or set(raw) != expected:
+        raise ValueError("INVALID_REQUEST")
+    return raw
+
+def _id(value):
+    if type(value) is not str or not ID.fullmatch(value):
+        raise ValueError("INVALID_ID")
+    return value
+
+class DemoService:
+    """Trusted local demo service. This is not a production access boundary."""
+    def __init__(self, db):
+        self.db = db
+    def dispatch(self, method, path, data):
+        if type(data) is not dict:
+            raise ValueError("INVALID_REQUEST")
+        if method == "POST" and path == "/demo/orders":
+            _object(data, FIELDS | {"amount_minor"})
+            identity = {k: data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            _id(data["reference"])
+            return create_order(self.db, identity, data["reference"], data["amount_minor"])
+        if method == "POST" and path == "/demo/orders/state":
+            _object(data, FIELDS)
+            identity = {k: data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            return state(self.db, identity, _id(data["reference"]))
+        if method == "POST" and path == "/demo/orders/simulate":
+            _object(data, FIELDS | {"event_id","target","transaction_id","amount_minor"})
+            identity = {k: data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            evidence = {"simulation_only":True,"scope":identity,"reference":data["reference"],
+                        "amount_minor":data["amount_minor"],"provider_transaction_id":data["transaction_id"]}
+            return simulated_transition(self.db,identity,_id(data["reference"]),_id(data["event_id"]),
+                                        data["target"],evidence)
+        raise ValueError("UNKNOWN_ENDPOINT")
+
+def handler(service):
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "Stage5OfflineDemo"
+        sys_version = ""
+        def log_message(self, fmt, *args):
+            pass
+        def do_POST(self):
+            if urlsplit(self.path).query or self.path not in (
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate"):
+                return self.send_json(404, {"error":"NOT_FOUND"})
+            if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
+                return self.send_json(415, {"error":"JSON_REQUIRED"})
+            try:
+                length = int(self.headers.get("Content-Length","-1"))
+                if length < 1 or length > MAX_BODY:
+                    raise ValueError("INVALID_BODY_SIZE")
+                raw = self.rfile.read(length).decode("utf-8")
+                def unique_pairs(pairs):
+                    values = {}
+                    for key,value in pairs:
+                        if key in values:
+                            raise ValueError("DUPLICATE_KEY")
+                        values[key] = value
+                    return values
+                data = json.loads(raw,object_pairs_hook=unique_pairs,
+                                  parse_constant=lambda _: (_ for _ in ()).throw(ValueError("NONFINITE")))
+                result = service.dispatch("POST",self.path,data)
+                return self.send_json(200,result)
+            except (ValueError,KeyError,TypeError):
+                return self.send_json(400,{"error":"INVALID_DEMO_REQUEST"})
+            except Exception:
+                return self.send_json(503,{"error":"DEMO_UNAVAILABLE"})
+        def do_GET(self):
+            return self.send_json(405,{"error":"POST_ONLY"})
+        def send_json(self,status,obj):
+            payload=json.dumps(obj,ensure_ascii=False,allow_nan=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type","application/json; charset=utf-8")
+            self.send_header("Cache-Control","no-store")
+            self.send_header("X-Content-Type-Options","nosniff")
+            self.send_header("Content-Length",str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+    return Handler
+
+def serve_local(path=":memory:",port=18791):
+    if type(port) is not int or not 1024 <= port <= 65535:
+        raise ValueError("INVALID_PORT")
+    db = connect(path)
+    # Deliberately single threaded: SQLite connection is not shared across concurrent threads.
+    class SingleThreadedHTTPServer(ThreadingHTTPServer):
+        daemon_threads = False
+        def process_request(self, request, client_address):
+            self.finish_request(request,client_address)
+            self.shutdown_request(request)
+    return SingleThreadedHTTPServer(("127.0.0.1",port),handler(DemoService(db)))
+
+if __name__=="__main__":
+    print("OFFLINE_SIMULATION_ONLY_NO_REAL_WECHAT")
+    serve_local().serve_forever()
