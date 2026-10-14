@@ -3,6 +3,7 @@ No real payments, site publishing, secrets or external network binding.
 """
 import json
 import re
+import socket
 import sqlite3
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlsplit
@@ -10,6 +11,7 @@ from scripts.community_order_store import connect, DDL, create_order, state, sim
 from scripts.community_merchant_contract import scope
 
 MAX_BODY = 2048
+READ_TIMEOUT_SECONDS = 1.0
 FIELDS = {"tenant_id", "merchant_id", "store_id", "reference"}
 ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
 
@@ -55,6 +57,9 @@ def handler(service):
     class Handler(BaseHTTPRequestHandler):
         server_version = "Stage5OfflineDemo"
         sys_version = ""
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(READ_TIMEOUT_SECONDS)
         def log_message(self, fmt, *args):
             pass
         def do_POST(self):
@@ -75,7 +80,10 @@ def handler(service):
                 length = int(self.headers.get("Content-Length","-1"))
                 if length < 1 or length > MAX_BODY:
                     raise ValueError("INVALID_BODY_SIZE")
-                raw = self.rfile.read(length).decode("utf-8")
+                raw_bytes = self.rfile.read(length)
+                if len(raw_bytes) != length:
+                    raise ValueError("INCOMPLETE_BODY")
+                raw = raw_bytes.decode("utf-8")
                 def unique_pairs(pairs):
                     values = {}
                     for key,value in pairs:
@@ -87,7 +95,11 @@ def handler(service):
                                   parse_constant=lambda _: (_ for _ in ()).throw(ValueError("NONFINITE")))
                 result = service.dispatch("POST",self.path,data)
                 return self.send_json(200,result)
+            except (socket.timeout, TimeoutError):
+                self.close_connection = True
+                return self.send_json(408,{"error":"BODY_TIMEOUT"})
             except (ValueError,KeyError,TypeError):
+                self.close_connection = True
                 return self.send_json(400,{"error":"INVALID_DEMO_REQUEST"})
             except Exception:
                 return self.send_json(503,{"error":"DEMO_UNAVAILABLE"})
