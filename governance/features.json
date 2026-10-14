@@ -49,7 +49,10 @@
           "Production health and independent acceptance have separate actual receipts"
         ],
         "tests": [
-          "tests/test_p2_retained_recovery_governance.py"
+          "tests/test_p2_retained_recovery_governance.py",
+          "evidence/p2-epoch7-access-repair-20261014/runtime-process/test_runtime_command_lifetime.py",
+          "evidence/p2-epoch7-access-repair-20261014/runtime-process/test_gateway_command_lifetime.py",
+          "evidence/p2-epoch7-access-repair-20261014/runtime-process/test_ledger_server_identity.py"
         ]
       },
       "reuse": [
