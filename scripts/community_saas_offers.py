@@ -108,10 +108,14 @@ def quote_offers(db,module_id,procurement_mode="XUANJUN_MANAGED"):
    "components":components,"total_cny_minor":total_cny,"total_usd_minor":total_usd,
    "settlement_currency":None,"fx_rate_assumed":False,"procurement_executed":False})
  return result
-def change_offer_status(db,offer_id,new_status):
+def change_offer_status(db,offer_id,new_status,cost_db=None):
  if new_status not in ("PREVIEW","APPROVED","EFFECTIVE","RETIRED"):raise ValueError("INVALID_STATUS")
  allowed={"DRAFT":"PREVIEW","PREVIEW":"APPROVED","APPROVED":"EFFECTIVE","EFFECTIVE":"RETIRED"}
  with db:
   row=db.execute("SELECT status FROM offers WHERE offer_id=?",(offer_id,)).fetchone()
   if row is None or allowed.get(row[0])!=new_status:raise ValueError("INVALID_OFFER_TRANSITION")
+  if new_status=="EFFECTIVE":
+   if cost_db is None:raise ValueError("COST_EVIDENCE_GATE_REQUIRED")
+   from scripts.community_saas_cost_pricing import assert_publishable_cost
+   assert_publishable_cost(db,cost_db,offer_id)
   db.execute("UPDATE offers SET status=? WHERE offer_id=?",(new_status,offer_id))
