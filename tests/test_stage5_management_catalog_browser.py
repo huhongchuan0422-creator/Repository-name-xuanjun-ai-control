@@ -3,7 +3,8 @@ import threading
 import unittest
 from playwright.sync_api import sync_playwright, expect
 from scripts.community_demo_api import serve_local
-from scripts.community_order_store import create_order
+from scripts.community_order_store import create_order, simulated_transition
+from scripts.community_refund_preview_store import record_preview
 
 class ManagementCatalogBrowser(unittest.TestCase):
  @classmethod
@@ -11,6 +12,11 @@ class ManagementCatalogBrowser(unittest.TestCase):
   cls.http=serve_local(port=0)
   create_order(cls.http._owned_connections[0],{"tenant_id":"tenant1","merchant_id":"merchant1","store_id":"store1"},"management_order_1",145)
   create_order(cls.http._owned_connections[0],{"tenant_id":"tenant1","merchant_id":"merchant2","store_id":"store1"},"management_order_2",290)
+  identity={"tenant_id":"tenant1","merchant_id":"merchant1","store_id":"store1"}
+  simulated_transition(cls.http._owned_connections[0],identity,"management_order_1","management_success_event","SUCCESS",
+                       {"simulation_only":True,"scope":identity,"reference":"management_order_1","amount_minor":145,
+                        "provider_transaction_id":"management_fake_transaction"})
+  record_preview(cls.http._owned_connections[1],cls.http._owned_connections[0],identity,"management_order_1","offline_preview_1",45)
   cls.thread=threading.Thread(target=cls.http.serve_forever,daemon=True)
   cls.thread.start()
   cls.base="http://127.0.0.1:"+str(cls.http.server_address[1])
@@ -63,4 +69,17 @@ class ManagementCatalogBrowser(unittest.TestCase):
    page.locator("#loadOverview").click()
    expect(page.locator("#overviewRevenue")).to_contain_text("290 分")
    expect(page.locator("#overviewAds")).to_have_text("暂无广告活动")
+ def test_refund_preview_on_both_management_pages_not_a_payment(self):
+  for route in ("/demo/merchant/","/demo/platform/"):
+   page=self.ctx.new_page();page.goto(self.base+route)
+   page.locator("#reference").fill("management_order_1")
+   page.locator("#loadRefundPreview").click()
+   expect(page.locator("#refundPreviewAmounts")).to_contain_text("预览退款 45分")
+   expect(page.locator("#refundPreviewAmounts")).to_contain_text("余量 100分")
+   expect(page.locator("#refundPreviewStatus")).to_contain_text("真实退款未执行")
+   page.locator("#merchant").fill("merchant2")
+   page.locator("#reference").fill("management_order_2")
+   page.locator("#loadRefundPreview").click()
+   expect(page.locator("#refundPreviewAmounts")).to_contain_text("预览退款 0分")
+   self.assertNotIn("45分",page.locator("#refundPreviewAmounts").inner_text())
 if __name__=="__main__":unittest.main()
