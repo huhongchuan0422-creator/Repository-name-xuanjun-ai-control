@@ -2,7 +2,7 @@
 """Exact kit loader. No recovery effects without fresh independent PR58 approval."""
 import argparse,hashlib,json,os,pathlib,re,socket,stat,sys
 KIT=('/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/'
-     'complete-install-candidate-38503014520/epoch5-recovery-candidate-v2')
+     'complete-install-candidate-38503014520/epoch5-recovery-candidate-v3')
 MANIFEST='3332a6e63b11b75420f1bd0f1a264c89528a92a771f6bc1399f2a38009f324ef'
 SHA=re.compile(r'^[0-9a-f]{64}$')
 HELPERS=frozenset(('epoch5_approval.py','epoch5_plan.py','epoch5_host_driver.py',

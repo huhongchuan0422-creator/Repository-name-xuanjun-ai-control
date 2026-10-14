@@ -37,7 +37,7 @@ class Tests(unittest.TestCase):
   self.proof={k:True for k in ('identity_verified','coordinator_inactive','parent_unit_inactive','cgroups_empty','restart_inhibited')}
   self.adapter=mock.Mock();self.adapter.measure_quiescence.return_value={'proof':self.proof}
   self.containment=mock.Mock();self.containment.verify_all.return_value={'verified_stopped':True}
-  self.patches=[mock.patch.object(subject,'RETAINED_MANIFEST',self.scanner.MANIFEST_SHA),mock.patch.object(subject.os.path,'isdir',return_value=True),mock.patch.object(subject.os.path,'realpath',side_effect=lambda p:p),mock.patch.object(subject.os,'geteuid',return_value=0),
+  self.patches=[mock.patch.object(subject,'verify_retained_release_caches',return_value={'caches':'verified'}),mock.patch.object(subject,'RETAINED_MANIFEST',self.scanner.MANIFEST_SHA),mock.patch.object(subject.os.path,'isdir',return_value=True),mock.patch.object(subject.os.path,'realpath',side_effect=lambda p:p),mock.patch.object(subject.os,'geteuid',return_value=0),
    mock.patch.object(subject.socket,'gethostname',return_value=subject.HOST),
    mock.patch.object(subject,'file_data',return_value=(self.raw,self.info)),
    mock.patch.object(subject,'PINS',{subject.C+'/protected-core-install-plan.json':hashlib.sha256(self.raw).hexdigest()}),
@@ -97,4 +97,95 @@ class Tests(unittest.TestCase):
  def test_old_package_drift(self):
   self.scanner.validate_release.side_effect=ValueError('hash changed')
   with self.assertRaises(ValueError):self.execute()
+
+class RetainedCacheTests(unittest.TestCase):
+ def setUp(self):
+  import tempfile,marshal,struct,importlib.util
+  self.temp=tempfile.TemporaryDirectory();self.root=self.temp.name+'/release';os.mkdir(self.root)
+  os.makedirs(self.root+'/stage1/__pycache__')
+  self.scanner=subject.load_reviewed_scanner(os.environ['P2_REVIEWED_HELPERS']+'/recover_exact_hold.py')
+  self.payloads={};self.hashes={};self.source=b'value = 7\n'
+  for rel in subject.RETAINED_RELEASE_CACHE_HASHES:
+   name=os.path.basename(rel)[:-len('.cpython-36.pyc')]
+   source_rel='stage1/'+name+'.py';path=self.root+'/'+source_rel
+   with open(path,'wb') as f:f.write(self.source)
+   os.utime(path,(1700000000,1700000000));os.chmod(path,0o444)
+   self.payloads[path]=(self.source,self.source)
+   code=compile(self.source,subject.RETAINED_STAGING+'/'+source_rel,'exec',dont_inherit=True,optimize=0)
+   data=importlib.util.MAGIC_NUMBER+struct.pack('<II',1700000000,len(self.source))+marshal.dumps(code)
+   cache=self.root+'/'+rel
+   with open(cache,'wb') as f:f.write(data)
+   os.chmod(cache,0o444);self.hashes[rel]=hashlib.sha256(data).hexdigest()
+  with open(self.root+'/INTEGRATION_MANIFEST.json','wb') as f:f.write(b'{}')
+  os.chmod(self.root+'/INTEGRATION_MANIFEST.json',0o444)
+  for p,ds,fs in os.walk(self.root):os.chmod(p,0o555)
+  self.patches=[mock.patch.object(subject,'RETAINED_RELEASE',self.root),mock.patch.object(subject,'RETAINED_RELEASE_CACHE_HASHES',self.hashes),mock.patch.object(subject,'RETAINED_MANIFEST',hashlib.sha256(b'{}').hexdigest())]
+  for p in self.patches:p.start()
+ def tearDown(self):
+  for p in reversed(self.patches):p.stop()
+  for p,ds,fs in os.walk(self.root):os.chmod(p,0o755)
+  self.temp.cleanup()
+ def execute(self):return subject.verify_retained_release_caches(self.scanner,self.root,self.payloads)
+ def first(self):return self.root+'/'+sorted(self.hashes)[0]
+ def test_exact_thirteen_reproduced_without_import(self):
+  value=self.execute();self.assertEqual(len(value),13)
+  self.assertEqual({r['staging'] for r in value.values()},{subject.RETAINED_STAGING})
+ def test_wrong_release(self):
+  with self.assertRaisesRegex(ValueError,'RELEASE_IDENTITY'):subject.verify_retained_release_caches(self.scanner,self.root+'x',self.payloads)
+ def test_extra_cache_rejected(self):
+  os.chmod(self.root+'/stage1/__pycache__',0o755)
+  with open(self.root+'/stage1/__pycache__/extra.pyc','wb') as f:f.write(b'extra')
+  with self.assertRaisesRegex(ValueError,'INVENTORY'):self.execute()
+ def test_missing_cache_rejected(self):
+  os.chmod(self.root+'/stage1/__pycache__',0o755);os.unlink(self.first())
+  with self.assertRaisesRegex(ValueError,'INVENTORY'):self.execute()
+ def test_cache_hash_changed(self):
+  os.chmod(self.first(),0o644)
+  with open(self.first(),'ab') as f:f.write(b'changed')
+  os.chmod(self.first(),0o444)
+  with self.assertRaisesRegex(ValueError,'INVENTORY'):self.execute()
+ def test_writable_cache_rejected(self):
+  os.chmod(self.first(),0o644)
+  with self.assertRaisesRegex(ValueError,'METADATA'):self.execute()
+ def test_writable_directory_rejected(self):
+  os.chmod(self.root+'/stage1/__pycache__',0o755)
+  with self.assertRaisesRegex(ValueError,'METADATA'):self.execute()
+ def test_cache_link_rejected(self):
+  path=self.first();os.chmod(os.path.dirname(path),0o755);os.unlink(path);os.symlink('/dev/null',path)
+  with self.assertRaisesRegex(ValueError,'ENTRY_TYPE'):self.execute()
+ def test_source_change_rejected(self):
+  path=sorted(self.payloads)[0];os.chmod(path,0o644)
+  with open(path,'wb') as f:f.write(b'value=8\n')
+  os.chmod(path,0o444)
+  with self.assertRaisesRegex(ValueError,'INVENTORY'):self.execute()
+ def test_source_mtime_change_rejected(self):
+  os.utime(sorted(self.payloads)[0],(1700000001,1700000001))
+  with self.assertRaisesRegex(ValueError,'SOURCE_METADATA'):self.execute()
+ def test_recompiled_wrong_code_rejected_even_if_hash_rebound(self):
+  import marshal,struct,importlib.util
+  rel=sorted(self.hashes)[0];source_rel='stage1/'+os.path.basename(rel)[:-len('.cpython-36.pyc')]+'.py'
+  code=compile(b'value = 8\n',subject.RETAINED_STAGING+'/'+source_rel,'exec',dont_inherit=True,optimize=0)
+  data=importlib.util.MAGIC_NUMBER+struct.pack('<II',1700000000,len(self.source))+marshal.dumps(code)
+  path=self.root+'/'+rel;os.chmod(path,0o644)
+  with open(path,'wb') as f:f.write(data)
+  os.chmod(path,0o444);self.hashes[rel]=hashlib.sha256(data).hexdigest()
+  with self.assertRaisesRegex(ValueError,'SOURCE_CODE_MISMATCH'):self.execute()
+ def test_wrong_staging_rejected(self):
+  with mock.patch.object(self.scanner,'verify_cache_bytes',return_value='/opt/xuanjun-control-releases/.integration-0000000000000000'):
+   with self.assertRaisesRegex(ValueError,'STAGING_IDENTITY'):self.execute()
+ def test_read_denied_is_not_ignored(self):
+  with mock.patch.object(self.scanner,'bounded_file_inventory',side_effect=PermissionError('denied')):
+   with self.assertRaises(PermissionError):self.execute()
+ def test_scan_race_is_not_ignored(self):
+  original=self.scanner.bounded_file_inventory;first=original(self.root)
+  with mock.patch.object(self.scanner,'bounded_file_inventory',side_effect=[first,{}]):
+   with self.assertRaisesRegex(ValueError,'SCAN_RACE'):self.execute()
+ def test_cache_pin_count_rejected(self):
+  self.hashes.pop(sorted(self.hashes)[0])
+  with self.assertRaisesRegex(ValueError,'PIN_COUNT'):self.execute()
+ def test_outside_source_payload_rejected(self):
+  self.payloads['/tmp/other.py']=(b'',b'')
+  with self.assertRaisesRegex(ValueError,'PAYLOAD_SCOPE'):self.execute()
+
 if __name__=='__main__':unittest.main()
+

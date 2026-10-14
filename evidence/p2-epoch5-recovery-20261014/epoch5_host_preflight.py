@@ -18,6 +18,55 @@ def require(value,label):
  if not value:raise ValueError(label)
 def sha(data):return hashlib.sha256(data).hexdigest()
 
+RETAINED_RELEASE='/opt/xuanjun-control-releases/integration-338e488c4203e23d'
+RETAINED_STAGING='/opt/xuanjun-control-releases/.integration-c8c55d31b001add8'
+# Owner grouped read-only receipt fe0cde525bfccdbabd71bd5f6a829b5cf491f5fd25dec9136c7978b15568c4da.
+# These caches are retained artifacts only; never imported, executed or deleted.
+RETAINED_RELEASE_CACHE_HASHES = {
+ "stage1/__pycache__/activation_control.cpython-36.pyc": "e3465b1fc00a57b061e96675b95147b5e014592aaa8e5ca7fd231fb6de271b44",
+ "stage1/__pycache__/codex_worker.cpython-36.pyc": "ef862eb66c0b814a40b837958eae81133b28e7acfe7adefc545e891f37b5fed0",
+ "stage1/__pycache__/dependency_evidence_view.cpython-36.pyc": "48ead166ebca99cc65598b01a8b37b0d971f13a5d64a8e2950e99b70e9d7c1b3",
+ "stage1/__pycache__/development_loop.cpython-36.pyc": "e2cee74d456c11c6660745b7cfea035454143250012d1b90117f987b19377fd3",
+ "stage1/__pycache__/development_pipeline.cpython-36.pyc": "b6135f292883235470e70ec51d2ba949e356983946576876d88d7115c09a8154",
+ "stage1/__pycache__/development_service.cpython-36.pyc": "c3c22bb0b47f4aa01c4f90007db6fa67f5f1dd61eaebcdcc5cfcdfbe4e698081",
+ "stage1/__pycache__/execution_ledger.cpython-36.pyc": "ea9bb9dec1250ee37cee9fca134c3ad0d3c68f9fe22af29fedc0b1833d23afa5",
+ "stage1/__pycache__/native_child_adapter.cpython-36.pyc": "fff93e3c7bd9c24b6be2936fde7e58b25eab7c58e9f6b8ea08750d2fa61c8591",
+ "stage1/__pycache__/native_peer_identity.cpython-36.pyc": "47e2180a1547ed277d358917bca47714b95b3324477b1d8d7a7b624ab8750915",
+ "stage1/__pycache__/native_pipeline_runtime.cpython-36.pyc": "9730613a9c3a83bff9098c80a885565bd8474c5afb3c0d0ef9ed3ccccd509727",
+ "stage1/__pycache__/run_usage_projection.cpython-36.pyc": "f390d9e1e15cd004de30ee89150c0ceb2e949ac2fa433432ecff9cdeb2a84025",
+ "stage1/__pycache__/task_cost_projection.cpython-36.pyc": "a641b2620fd2285692040e2c294c2fda7c6aac20b255a76cf236c795c3d2aa0c",
+ "stage1/__pycache__/uk_owner_callback_core.cpython-36.pyc": "405028c16755bc49394df34f2b3d62147083edc338f8a6976168999d57e19eca"
+}
+
+
+def verify_retained_release_caches(scanner,release,payloads):
+ require(release==RETAINED_RELEASE,'EPOCH5_CACHE_RELEASE_IDENTITY')
+ expected={p:sha(v[1]) for p,v in payloads.items()}
+ require(all(p.startswith(release+'/') for p in expected),'EPOCH5_CACHE_PAYLOAD_SCOPE')
+ require(len(RETAINED_RELEASE_CACHE_HASHES)==13,'EPOCH5_CACHE_PIN_COUNT')
+ expected[release+'/INTEGRATION_MANIFEST.json']=RETAINED_MANIFEST
+ for rel,wanted in RETAINED_RELEASE_CACHE_HASHES.items():
+  require(rel.startswith('stage1/__pycache__/') and rel.endswith('.cpython-36.pyc') and '..' not in rel.split('/'),'EPOCH5_CACHE_PIN_PATH')
+  expected[release+'/'+rel]=wanted
+ # FD-anchored recursive scan fails on unreadable directories, links and races.
+ before=scanner.bounded_file_inventory(release)
+ require(before==expected,'EPOCH5_RETAINED_RELEASE_INVENTORY')
+ scanner.validate_release_metadata(release)
+ result={}
+ for rel,wanted in sorted(RETAINED_RELEASE_CACHE_HASHES.items()):
+  path=release+'/'+rel;data,info=scanner.read(path)
+  require(sha(data)==wanted and (info.st_uid,info.st_gid,info.st_nlink,stat.S_IMODE(info.st_mode))==(0,0,1,0o444),'EPOCH5_CACHE_AUTHORITY')
+  source_rel='stage1/'+os.path.basename(rel)[:-len('.cpython-36.pyc')]+'.py'
+  source_path=release+'/'+source_rel
+  require(source_path in payloads,'EPOCH5_CACHE_UNBOUND_SOURCE')
+  source,source_info=scanner.read(source_path)
+  require(source==payloads[source_path][1],'EPOCH5_CACHE_SOURCE_DRIFT')
+  staging=scanner.verify_cache_bytes(data,source,source_rel,source_info)
+  require(staging==RETAINED_STAGING,'EPOCH5_CACHE_STAGING_IDENTITY')
+  result[rel]={'sha256':sha(data),'source_sha256':sha(source),'staging':staging}
+ require(scanner.bounded_file_inventory(release)==before,'EPOCH5_CACHE_SCAN_RACE')
+ return result
+
 def load_reviewed_scanner(path):
  raw,info=file_data(path)
  require(sha(raw)==SCANNER_SHA,'EPOCH5_REVIEWED_SCANNER_CHANGED')
@@ -63,12 +112,13 @@ def capture_host(new_manifest_sha,scanner):
  require(sha(retained_raw)==retained_manifest_sha,'EPOCH5_RETAINED_RELEASE_MANIFEST')
  retained_manifest=json.loads(retained_raw.decode())
  scanner.validate_directories(retained_root)
- scanner.validate_directories(retained_release)
+ scanner.validate_directories(retained_release,retained_cache=True)
  scanner.validate_file_inventory(retained_root,set(retained_manifest['files'])|{'P2_PACKAGE_PROVENANCE.json','tools/p2-package-freeze.py','deploy/integration-manifest.json'})
- scanner.validate_file_inventory(retained_release,set(retained_manifest['files'])|{'INTEGRATION_MANIFEST.json'})
+ scanner.validate_file_inventory(retained_release,set(retained_manifest['files'])|set(RETAINED_RELEASE_CACHE_HASHES)|{'INTEGRATION_MANIFEST.json'})
  scanner.validate_release_metadata(retained_release)
  require(sha(scanner.read(retained_release+'/INTEGRATION_MANIFEST.json')[0])==retained_manifest_sha,'EPOCH5_RETAINED_INSTALLED_MANIFEST')
- scanner.validate_release(retained_root,retained_release,retained_manifest,retained_manifest_sha)
+ retained_payloads=scanner.validate_release(retained_root,retained_release,retained_manifest,retained_manifest_sha)
+ retained_cache_evidence=verify_retained_release_caches(scanner,retained_release,retained_payloads)
  # These paths must never have been reached by the failed TLS-first execution.
  for name in ('epoch5-recovery-execution.json','epoch6-runtime-provisioning.json',
               'runtime-boot.json','sandbox-profile.json','ledger-access.json'):
@@ -132,6 +182,7 @@ def capture_host(new_manifest_sha,scanner):
  require(scanner.read(store.epoch_journal)[0]==journal,'EPOCH5_JOURNAL_RACE')
  evidence={'schema':1,'epoch':5,'retained':retained['evidence'],
            'prerequisites_sha256':prerequisites_sha,'retained_cache_evidence':cache_evidence,
+           'epoch3_retained_cache_evidence':retained_cache_evidence,
            'epoch_journal_sha256':sha(journal),'database_file_sets':sets,
            'cutover_sha256':sha(cutover_raw),'legacy_proof':observation['proof'],
            'new_service_exclusion':services,'scheduler_sha256':scheduler,
