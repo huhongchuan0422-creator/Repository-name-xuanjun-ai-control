@@ -24,6 +24,22 @@ Owner于2026-10-14明确：易币退出资源保障范围，小说暂保留，�
 停用；只有精确残留对象被证明冲突时，才提交对象、端口/资源、影响和单独
 Release Gate。生产继续 `HOLD`，本修订不授权任何写操作。
 
+正式审核 `6172954908` 已接受上述范围修订，但要求把它从文档优先级升级为
+执行器硬约束。`canonical-migration-policy.json` 现为唯一可执行阶段/范围策略；
+`restricted_executor.py` 只接受 schema 4 的独立签名策略，并同时绑定该文件的
+原始 SHA-256、固定 policy ID、阶段 ID 和所有既往阶段回执摘要。旧
+`c7-real-machine-execution-package.json` 与
+`c7-owner-scope-execution-package.json` 只保留为历史/证据输入，任何一个直接
+送入执行器都会被拒绝。`YIBI_RETIRE` 只存在于阶段 F，且必须携带 A—E 全部
+前序回执摘要；错误范围、旧顺序、缺前序、错 hash 均在 runner 调用前失败。
+
+`production_dependency_inventory.py` 对私有 95 条 Writer 映射逐项读取实际
+源码字节、import、数据路径引用、凭据引用名称、写操作标记、当前进程和可读
+systemd/cron 触发引用，并生成私有全路径清单与仓库内脱敏清单。2026-10-15
+现场结果为 95/95 字节匹配，当前用户进程及可读触发视图均未观察到直接入口；
+但 Root、Gateway 全局和 GitHub Runner 管理覆盖未闭合，因此 95/95 仍为
+`UNKNOWN/DENY`，不得把零观察解释为不存在。
+
 ## 本变更实际行为
 新工作流仅在本仓库Owner提交的指定迁移分支PR运行，在东京与韩国调用已由Owner安装的root-owned固定零参数盘点helper。没有checkout、不运行PR代码、不新增sudo权限。先核验主机、Runner用户、helper所有者和模式，记录实际安装文件SHA256；原控制仓库目前为公开仓库，只允许输出已授权的脱敏资源及服务状态，不能上传业务数据、配置正文或密钥。
 migration-prep/inspect-helper.sh现已按Owner实际收到的安装命令逐字重建；本地SHA256=61bed97a32e970dd868f2d223c68ab41c012c484d314cb714c768629aac263c2，与两台首次Actions记录完全一致。新工作流在调用前强制pin该摘要，检查root-owned非软链父目录且group/other不可写；打印当前调用者sudo -l有效策略作为脱敏证据。没有更新任何主机helper或sudoers。

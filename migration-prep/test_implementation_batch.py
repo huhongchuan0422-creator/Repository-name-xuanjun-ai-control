@@ -17,7 +17,8 @@ from readonly_reconciliation_adapter import (SYMBOLS, TABLE_SPECS,
                                               collect_fixture_evidence)
 import restricted_executor as executor
 from restricted_executor import (TransactionLedger, cgroup_candidate_spec,
-                                  execute_candidate, load_verified_policy)
+                                  execute_candidate, load_canonical_migration_policy,
+                                  load_verified_policy)
 from writer_isolation import coverage_assessment, evaluate_launch, validate_manifest
 from build_writer_coverage import build as build_coverage
 from korea import get_only_policy
@@ -264,24 +265,38 @@ class RestrictedExecutorTests(unittest.TestCase):
         self.allowed_path = os.path.join(self.temp.name, "allowed")
         os.mkdir(self.allowed_path, 0o700)
         self.ledger = os.path.join(self.temp.name, "ledger.sqlite")
+        self.canonical_policy_path = os.path.join(
+            module_dir, "canonical-migration-policy.json")
+        with open(self.canonical_policy_path, "rb") as stream:
+            self.canonical_policy_sha256 = hashlib.sha256(stream.read()).hexdigest()
         self.request_value = {
             "tx_id": "tx-1", "host": "iZmj7a5kwr75qc1tul4kf9Z", "action": "KOREA_DEPLOY",
             "paths": [self.allowed_path], "units": ["xuanjun-binance-shadow.service"],
             "candidate_sha256": "a" * 64, "authority_id": "independent-authority-1",
             "one_time_nonce_sha256": "b" * 64, "timeout_seconds": 2,
             "independent_verifier_sha256": "c" * 64,
+            "canonical_migration_policy_id":
+                "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
+            "canonical_migration_policy_sha256": self.canonical_policy_sha256,
+            "phase_id": "B_MINIMAL_KOREA_INSTALL_AND_ISOLATED_RESTORE",
+            "completed_phase_receipts": {
+                "A_EXACT_PRODUCTION_DEPENDENCY_CLOSURE": "1" * 64},
             "expected_postconditions": [{
                 "postcondition_id": "e1", "kind": "CANDIDATE_TEST",
                 "target_sha256": "a" * 64, "required_state": "COMPLETE",
                 "is_effect": True}]}
         self.anchor = {"schema_version": 1, "algorithm": "Ed25519",
                        "authority_id": "independent-authority-1", "public_key_hex": "0" * 64}
-        self.policy = {"schema_version": 3, "policy_id": "policy-1",
+        self.policy = {"schema_version": 4, "policy_id": "policy-1",
                        "candidate_sha256": "a" * 64, "expires_at_epoch": 2000000000,
                        "one_time_authority_id": "independent-authority-1",
                        "authorized_request_sha256": sha256_value(self.request_value),
                        "execution_identity": "xuanjun_binance",
                        "independent_verifier_sha256": "c" * 64,
+                       "canonical_migration_policy_id":
+                           "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
+                       "canonical_migration_policy_sha256":
+                           self.canonical_policy_sha256,
                        "trust_anchor_sha256": "0" * 64,
                        "hosts": {"iZmj7a5kwr75qc1tul4kf9Z": {
                            "paths": [self.allowed_path],
@@ -324,7 +339,8 @@ class RestrictedExecutorTests(unittest.TestCase):
         verified = self.signed_policy(policy)
         with mock.patch("restricted_executor.runtime_identity", return_value={
                 "host": request["host"], "os_identity": "xuanjun_binance"}):
-            return execute_candidate(request, verified, self.ledger, runner, verifier,
+            return execute_candidate(request, verified, self.canonical_policy_path,
+                                     self.ledger, runner, verifier,
                                      now_epoch=1900000000)
 
     def test_independent_signature_exact_hash_and_strict_success(self):
@@ -343,13 +359,15 @@ class RestrictedExecutorTests(unittest.TestCase):
 
     def test_caller_dict_or_wrong_runtime_identity_cannot_gain_execution(self):
         with self.assertRaises(GateError):
-            execute_candidate(self.request_value, self.policy, self.ledger, runner_ok,
+            execute_candidate(self.request_value, self.policy, self.canonical_policy_path,
+                              self.ledger, runner_ok,
                               now_epoch=1900000000)
         verified = self.signed_policy()
         with mock.patch("restricted_executor.runtime_identity",
                         return_value={"host": "wrong", "os_identity": "xuanjun_binance"}):
             with self.assertRaises(GateError):
-                execute_candidate(self.request_value, verified, self.ledger, runner_ok,
+                execute_candidate(self.request_value, verified, self.canonical_policy_path,
+                                  self.ledger, runner_ok,
                                   now_epoch=1900000000)
 
     def test_path_normalization_ownership_and_symlink_fail_closed(self):
@@ -367,7 +385,8 @@ class RestrictedExecutorTests(unittest.TestCase):
         with mock.patch("restricted_executor.runtime_identity", return_value={
                 "host": self.request_value["host"], "os_identity": "xuanjun_binance"}):
             with self.assertRaises(GateError):
-                execute_candidate(self.request_value, verified, self.ledger, runner_ok,
+                execute_candidate(self.request_value, verified, self.canonical_policy_path,
+                                  self.ledger, runner_ok,
                                   now_epoch=1900000000)
 
     def test_missing_wrong_type_unverified_effect_and_timeout_are_unknown(self):
@@ -401,6 +420,8 @@ class RestrictedExecutorTests(unittest.TestCase):
 
         request = dict(self.request_value)
         request["action"] = "READONLY_INSPECT"
+        request["phase_id"] = "A_EXACT_PRODUCTION_DEPENDENCY_CLOSURE"
+        request["completed_phase_receipts"] = {}
         request["expected_postconditions"] = [{
             "postcondition_id": "readonly-no-mutation", "kind": "PRODUCTION_MUTATION",
             "target_sha256": "1" * 64, "required_state": "NO", "is_effect": False}]
@@ -420,9 +441,53 @@ class RestrictedExecutorTests(unittest.TestCase):
         verified = self.signed_policy(policy)
         with mock.patch("restricted_executor.runtime_identity", return_value={
                 "host": request["host"], "os_identity": "xuanjun_binance"}):
-            result = execute_candidate(request, verified, self.ledger, readonly_runner,
+            result = execute_candidate(request, verified, self.canonical_policy_path,
+                                       self.ledger, readonly_runner,
                                        verifier_ok, now_epoch=1900000000)
         self.assertEqual(result["status"], "SUCCEEDED")
+
+    def test_legacy_package_wrong_order_and_wrong_scope_are_machine_rejected(self):
+        legacy = os.path.join(os.path.dirname(__file__),
+                              "c7-real-machine-execution-package.json")
+        with self.assertRaises(GateError):
+            load_canonical_migration_policy(legacy, self.uid)
+
+        request = dict(self.request_value)
+        request["action"] = "YIBI_RETIRE"
+        request["phase_id"] = "F_POST_ACCEPTANCE_YIBI_RETIREMENT"
+        request["completed_phase_receipts"] = {
+            "A_EXACT_PRODUCTION_DEPENDENCY_CLOSURE": "1" * 64}
+        policy = dict(self.policy)
+        policy["hosts"] = {request["host"]: {
+            "paths": [self.allowed_path], "units": request["units"],
+            "actions": ["YIBI_RETIRE"]}}
+        policy["authorized_request_sha256"] = sha256_value(request)
+        verified = self.signed_policy(policy)
+        with mock.patch("restricted_executor.runtime_identity", return_value={
+                "host": request["host"], "os_identity": "xuanjun_binance"}):
+            with self.assertRaises(GateError):
+                execute_candidate(request, verified, self.canonical_policy_path,
+                                  self.ledger, runner_ok, verifier_ok,
+                                  now_epoch=1900000000)
+
+        request = dict(self.request_value)
+        request["phase_id"] = "F_POST_ACCEPTANCE_YIBI_RETIREMENT"
+        request["completed_phase_receipts"] = {
+            name: "1" * 64 for name in (
+                "A_EXACT_PRODUCTION_DEPENDENCY_CLOSURE",
+                "B_MINIMAL_KOREA_INSTALL_AND_ISOLATED_RESTORE",
+                "C_RESOURCE_RESTART_AND_GET_ONLY_SHADOW_ACCEPTANCE",
+                "D_TOKYO_FENCE_FINAL_SNAPSHOT_AND_SINGLE_WRITER_CUTOVER",
+                "E_INDEPENDENT_BINANCE_ACCEPTANCE")}
+        policy = dict(self.policy)
+        policy["authorized_request_sha256"] = sha256_value(request)
+        verified = self.signed_policy(policy)
+        with mock.patch("restricted_executor.runtime_identity", return_value={
+                "host": request["host"], "os_identity": "xuanjun_binance"}):
+            with self.assertRaises(GateError):
+                execute_candidate(request, verified, self.canonical_policy_path,
+                                  self.ledger, runner_ok, verifier_ok,
+                                  now_epoch=1900000000)
 
     def test_replay_and_cgroup_boundary_are_explicit(self):
         self.execute()

@@ -21,7 +21,10 @@ FILES = (
     "c7-real-machine-execution-package.json", "c7-owner-scope-execution-package.json",
     "C7_PRODUCTION_ACCEPTANCE_PREP.md",
     "c7_root_inventory.py", "test_c7_root_inventory.py",
-    "c7-current-evidence.json", "C7_CURRENT_EVIDENCE.md"
+    "c7-current-evidence.json", "C7_CURRENT_EVIDENCE.md",
+    "canonical-migration-policy.json", "production_dependency_inventory.py",
+    "production-dependency-inventory-public.json",
+    "test_production_dependency_inventory.py"
 )
 
 
@@ -39,16 +42,19 @@ def build(root):
         path = os.path.join(root, relative)
         files.append({"path": "migration-prep/" + relative, "size": os.path.getsize(path),
                       "sha256": digest(path)})
-    value = {"schema_version": 5,
-             "task_id": "TOKYO_KOREA_C7_F2_DEFAULT_CHAIN_REMEDIATION_6171371525",
-             "audit_comment": "6171371525",
-             "base_commit": "4938ee4f7ec7b268f0714b160532e57c79ecb2b8",
-             "base_tree": "6556838968cbc9c3face52d5ea17b73745fab65c",
+    value = {"schema_version": 6,
+             "task_id": "TOKYO_KOREA_COMPLETE_MIGRATION_REVIEW_PACKAGE_6171881293",
+             "audit_comment": "6172954908",
+             "base_commit": "579c1bd922464b3483b847a9e8e7b9803895976b",
+             "base_tree": "f5f82eeab1311c05d4b97fa0cc143c174e8ec25a",
              "files": files, "production_authorized": False,
              "binance_called": False, "production_deployed": False,
              "self_asserted_receipts_can_pass": False,
              "root_inventory_incomplete_can_pass": False,
-             "trusted_adapter_installed": False}
+             "trusted_adapter_installed": False,
+             "canonical_migration_policy_enforced": True,
+             "legacy_package_execution_accepted": False,
+             "production_dependency_inventory_complete": False}
     value["candidate_content_sha256"] = hashlib.sha256(canonical_bytes(value)).hexdigest()
     return value
 

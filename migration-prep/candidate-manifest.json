@@ -1,9 +1,10 @@
 {
-  "audit_comment": "6171371525",
-  "base_commit": "4938ee4f7ec7b268f0714b160532e57c79ecb2b8",
-  "base_tree": "6556838968cbc9c3face52d5ea17b73745fab65c",
+  "audit_comment": "6172954908",
+  "base_commit": "579c1bd922464b3483b847a9e8e7b9803895976b",
+  "base_tree": "f5f82eeab1311c05d4b97fa0cc143c174e8ec25a",
   "binance_called": false,
-  "candidate_content_sha256": "4a8ac5dc91a127c4933c4b6c4813dcfb907d5a725b63b43b97f539fdf536cd51",
+  "candidate_content_sha256": "8b96ab8ad997ad035a3a7a88fbbe806cbf1c0d3f7ca753d1a30a5bb0d092ba8b",
+  "canonical_migration_policy_enforced": true,
   "files": [
     {
       "path": "migration-prep/readonly_reconciliation_adapter.py",
@@ -12,8 +13,8 @@
     },
     {
       "path": "migration-prep/restricted_executor.py",
-      "sha256": "9284786361a25436c6ea15dab7bf66fa9ea7be907bca0d50f30e97463c8ca10c",
-      "size": 25807
+      "sha256": "372e5ab7acac94d76d967d69f8e6cd81cc09dfef6932e95b0fdfb5be5fbc2081",
+      "size": 30554
     },
     {
       "path": "migration-prep/restricted-executor-allowlist.json",
@@ -37,8 +38,8 @@
     },
     {
       "path": "migration-prep/test_implementation_batch.py",
-      "sha256": "033784bb385431e6e495f6e0eb0888221abf1f66cbc0d2daeff62f083b4616df",
-      "size": 30744
+      "sha256": "36e545c53768533262af7115a803bee128dd575fa72468c6d8cd0bc13db59e71",
+      "size": 34490
     },
     {
       "path": "migration-prep/IMPLEMENTATION_BATCH.md",
@@ -47,8 +48,8 @@
     },
     {
       "path": "migration-prep/HUMAN_ACTIONS_REQUIRED.md",
-      "sha256": "7e2e3fee2347f007e72757eea00286fa45bffea846ce1be37fae07c9bb541890",
-      "size": 7304
+      "sha256": "ef31b4baee52d84cff66323ec2ce56c43c1cf619614ca47181b63048a1697f7a",
+      "size": 7744
     },
     {
       "path": "migration-prep/C7_EVIDENCE_GAPS.md",
@@ -129,13 +130,35 @@
       "path": "migration-prep/C7_CURRENT_EVIDENCE.md",
       "sha256": "2ee22c80709202c5f2745e1991a5e74b4480c3674dd20fc812d7a5bcd7f61122",
       "size": 5916
+    },
+    {
+      "path": "migration-prep/canonical-migration-policy.json",
+      "sha256": "b77ea994b535dd02f78ab663485fd69c3401fa31624d6c15ae5873a7a1e636e9",
+      "size": 3589
+    },
+    {
+      "path": "migration-prep/production_dependency_inventory.py",
+      "sha256": "560c6ba48e51b4a38a2e96420ff7254ed15b20c320c0faaee5abe4749991f82c",
+      "size": 15432
+    },
+    {
+      "path": "migration-prep/production-dependency-inventory-public.json",
+      "sha256": "8c6b42246bae31bdbe5fa7cb70defc67d1b457f567285136bba5ceb2aee8c8bd",
+      "size": 206304
+    },
+    {
+      "path": "migration-prep/test_production_dependency_inventory.py",
+      "sha256": "d93cee7e3fef9d5f1f047400064eaa7f637d57969cb7da3066b24804b776d852",
+      "size": 2269
     }
   ],
+  "legacy_package_execution_accepted": false,
   "production_authorized": false,
+  "production_dependency_inventory_complete": false,
   "production_deployed": false,
   "root_inventory_incomplete_can_pass": false,
-  "schema_version": 5,
+  "schema_version": 6,
   "self_asserted_receipts_can_pass": false,
-  "task_id": "TOKYO_KOREA_C7_F2_DEFAULT_CHAIN_REMEDIATION_6171371525",
+  "task_id": "TOKYO_KOREA_COMPLETE_MIGRATION_REVIEW_PACKAGE_6171881293",
   "trusted_adapter_installed": false
 }

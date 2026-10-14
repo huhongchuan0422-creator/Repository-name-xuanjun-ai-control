@@ -21,6 +21,7 @@ from gate_common import GateError, bounded_call, canonical_bytes, require, sha25
 ALLOWED_HOSTS = frozenset(("iZ6wee8q9z4t03hvqumwfhZ", "iZmj7a5kwr75qc1tul4kf9Z"))
 ALLOWED_ACTIONS = frozenset(("READONLY_INSPECT", "RUNNER_RETIRE", "YIBI_RETIRE",
                              "WRITER_FENCE", "KOREA_DEPLOY", "KOREA_LOCK_WRITER"))
+CANONICAL_MIGRATION_POLICY_ID = "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 HEX128 = re.compile(r"^[0-9a-f]{128}$")
 _VERIFIED_SENTINEL = object()
@@ -139,10 +140,11 @@ def validate_policy(policy, expected_path_owner_uid):
     required = ("schema_version", "policy_id", "candidate_sha256", "expires_at_epoch",
                 "hosts", "one_time_authority_id", "authorized_request_sha256",
                 "execution_identity", "trust_anchor_sha256",
-                "independent_verifier_sha256")
+                "independent_verifier_sha256", "canonical_migration_policy_id",
+                "canonical_migration_policy_sha256")
     require(isinstance(policy, dict) and set(policy) == set(required),
             "EXECUTOR_POLICY_FIELDS_INVALID")
-    require(type(policy["schema_version"]) is int and policy["schema_version"] == 3,
+    require(type(policy["schema_version"]) is int and policy["schema_version"] == 4,
             "EXECUTOR_POLICY_SCHEMA_INVALID")
     _identifier(policy["policy_id"], "EXECUTOR_POLICY_ID_INVALID")
     _hex64(policy["candidate_sha256"], "EXECUTOR_VERSION_HASH_INVALID")
@@ -150,6 +152,10 @@ def validate_policy(policy, expected_path_owner_uid):
     _hex64(policy["trust_anchor_sha256"], "EXECUTOR_TRUST_ANCHOR_HASH_INVALID")
     _hex64(policy["independent_verifier_sha256"],
            "EXECUTOR_INDEPENDENT_VERIFIER_HASH_INVALID")
+    require(policy["canonical_migration_policy_id"] == CANONICAL_MIGRATION_POLICY_ID,
+            "EXECUTOR_CANONICAL_MIGRATION_POLICY_ID_INVALID")
+    _hex64(policy["canonical_migration_policy_sha256"],
+           "EXECUTOR_CANONICAL_MIGRATION_POLICY_HASH_INVALID")
     require(type(policy["expires_at_epoch"]) is int, "EXECUTOR_EXPIRY_INVALID")
     _identifier(policy["one_time_authority_id"], "EXECUTOR_AUTHORITY_ID_REQUIRED")
     _identifier(policy["execution_identity"], "EXECUTOR_EXECUTION_IDENTITY_INVALID")
@@ -168,6 +174,58 @@ def validate_policy(policy, expected_path_owner_uid):
         require(isinstance(value["actions"], list) and
                 set(value["actions"]).issubset(ALLOWED_ACTIONS), "EXECUTOR_ACTION_INVALID")
     return True
+
+
+def load_canonical_migration_policy(path, expected_owner_uid):
+    """Load the only executable migration ordering/scope policy.
+
+    Legacy JSON packages are evidence inputs only.  They cannot be supplied here
+    because the exact schema, policy id, full ordered predecessor chain and raw
+    file digest are checked before a runner can be called.
+    """
+    path = _secure_file(path, expected_owner_uid, "EXECUTOR_CANONICAL_POLICY_FILE")
+    with open(path, "rb") as stream:
+        raw = stream.read()
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise GateError("EXECUTOR_CANONICAL_POLICY_JSON_INVALID")
+    required = ("schema_version", "policy_id", "production_execution_authorized",
+                "migration_subject", "supersedes", "phase_order", "phase_actions",
+                "required_predecessors", "excluded_subjects", "protected_objects",
+                "unknown_outcome_policy")
+    require(isinstance(value, dict) and set(value) == set(required),
+            "EXECUTOR_CANONICAL_POLICY_FIELDS_INVALID")
+    require(value["schema_version"] == 1 and
+            value["policy_id"] == CANONICAL_MIGRATION_POLICY_ID and
+            value["production_execution_authorized"] is False,
+            "EXECUTOR_CANONICAL_POLICY_ID_OR_SCHEMA_INVALID")
+    phases = value["phase_order"]
+    require(isinstance(phases, list) and phases and len(phases) == len(set(phases)),
+            "EXECUTOR_CANONICAL_PHASE_ORDER_INVALID")
+    require(isinstance(value["phase_actions"], dict) and
+            set(value["phase_actions"]) == set(phases) and
+            isinstance(value["required_predecessors"], dict) and
+            set(value["required_predecessors"]) == set(phases),
+            "EXECUTOR_CANONICAL_PHASE_MAP_INVALID")
+    for index, phase in enumerate(phases):
+        _identifier(phase, "EXECUTOR_CANONICAL_PHASE_ID_INVALID")
+        actions = value["phase_actions"][phase]
+        require(isinstance(actions, list) and len(actions) == len(set(actions)) and
+                set(actions).issubset(ALLOWED_ACTIONS),
+                "EXECUTOR_CANONICAL_PHASE_ACTIONS_INVALID")
+        require(value["required_predecessors"][phase] == phases[:index],
+                "EXECUTOR_CANONICAL_PREDECESSOR_ORDER_INVALID")
+    require(value["phase_actions"].get("F_POST_ACCEPTANCE_YIBI_RETIREMENT") ==
+            ["YIBI_RETIRE"], "EXECUTOR_YIBI_POST_ACCEPTANCE_ONLY_REQUIRED")
+    require("NOVEL" in value["protected_objects"] and
+            "MORELOGIN_HTTPS_443" in value["protected_objects"],
+            "EXECUTOR_PROTECTED_OBJECTS_INCOMPLETE")
+    require(isinstance(value["supersedes"], list) and
+            "c7-real-machine-execution-package.json" in value["supersedes"] and
+            "c7-owner-scope-execution-package.json" in value["supersedes"],
+            "EXECUTOR_LEGACY_PACKAGES_NOT_SUPERSEDED")
+    return {"value": value, "raw_sha256": hashlib.sha256(raw).hexdigest(), "path": path}
 
 
 def load_verified_policy(policy_path, signature_path, trust_anchor_path, expected_owner_uid):
@@ -392,7 +450,7 @@ def _strict_independent_verification(value, request, runner_result):
     return value
 
 
-def execute_candidate(request, verified_policy, ledger_path, runner,
+def execute_candidate(request, verified_policy, canonical_policy_path, ledger_path, runner,
                       postcondition_verifier=None, now_epoch=None):
     """Execute an injected runner only after independent signed-policy proof."""
     require(isinstance(verified_policy, VerifiedPolicy), "EXECUTOR_VERIFIED_POLICY_REQUIRED")
@@ -402,7 +460,9 @@ def execute_candidate(request, verified_policy, ledger_path, runner,
             "EXECUTOR_INDEPENDENT_POSTCONDITION_VERIFIER_REQUIRED")
     required = ("tx_id", "host", "action", "paths", "units", "candidate_sha256",
                 "authority_id", "one_time_nonce_sha256", "timeout_seconds",
-                "independent_verifier_sha256", "expected_postconditions")
+                "independent_verifier_sha256", "expected_postconditions",
+                "canonical_migration_policy_id", "canonical_migration_policy_sha256",
+                "phase_id", "completed_phase_receipts")
     require(isinstance(request, dict) and set(request) == set(required),
             "EXECUTOR_REQUEST_FIELDS_INVALID")
     identity = runtime_identity()
@@ -416,6 +476,25 @@ def execute_candidate(request, verified_policy, ledger_path, runner,
     require(request["independent_verifier_sha256"] ==
             policy["independent_verifier_sha256"],
             "EXECUTOR_INDEPENDENT_VERIFIER_VERSION_MISMATCH")
+    canonical = load_canonical_migration_policy(
+        canonical_policy_path, verified_policy.expected_path_owner_uid)
+    require(request["canonical_migration_policy_id"] ==
+            policy["canonical_migration_policy_id"] == canonical["value"]["policy_id"],
+            "EXECUTOR_CANONICAL_POLICY_ID_MISMATCH")
+    require(request["canonical_migration_policy_sha256"] ==
+            policy["canonical_migration_policy_sha256"] == canonical["raw_sha256"],
+            "EXECUTOR_CANONICAL_POLICY_HASH_MISMATCH")
+    phase = request["phase_id"]
+    require(phase in canonical["value"]["phase_order"],
+            "EXECUTOR_PHASE_NOT_CANONICAL")
+    require(request["action"] in canonical["value"]["phase_actions"][phase],
+            "EXECUTOR_ACTION_PHASE_ORDER_VIOLATION")
+    required_predecessors = canonical["value"]["required_predecessors"][phase]
+    receipts = request["completed_phase_receipts"]
+    require(isinstance(receipts, dict) and list(receipts) == required_predecessors,
+            "EXECUTOR_PREDECESSOR_RECEIPT_SET_INVALID")
+    for predecessor in required_predecessors:
+        _hex64(receipts[predecessor], "EXECUTOR_PREDECESSOR_RECEIPT_HASH_INVALID")
     require(request["authority_id"] == policy["one_time_authority_id"],
             "EXECUTOR_AUTHORITY_MISMATCH")
     _hex64(request["one_time_nonce_sha256"], "EXECUTOR_NONCE_INVALID")

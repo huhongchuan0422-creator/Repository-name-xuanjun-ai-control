@@ -5,6 +5,13 @@ remove token is requested. Use protected administrator/SecretRef channels only.
 This node is read-only. It does not authorize installation, retirement, exchange
 access, Shadow, Canary or cutover.
 
+The only executable ordering/scope authority is now
+`canonical-migration-policy.json`. The two older C7 JSON packages are evidence
+history only. Administrators must reject any request whose signed policy/request
+does not bind the exact canonical raw-file SHA-256, policy id, phase id and full
+ordered predecessor receipt set. In particular, Yibi retirement before an
+independent Phase E Binance acceptance receipt is mechanically invalid.
+
 ## A. Evidence the current executor cannot obtain
 
 1. **GitHub administrator — Runner admission export**
