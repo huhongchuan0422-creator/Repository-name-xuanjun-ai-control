@@ -77,15 +77,32 @@ def simulated_transition(db, identity, reference, event_id, target, evidence):
         raise ValueError('EVIDENCE_MISMATCH')
     tx=evidence.get('provider_transaction_id')
     if not valid_id(tx): raise ValueError('INVALID_TRANSACTION_ID')
-    with db:
+    # Own the write transaction BEFORE reading either the event or order state.
+    # An IMMEDIATE lock serializes competing connections and blocks stale writes.
+    if db.in_transaction:
+        raise ValueError('EXTERNAL_TRANSACTION_NOT_ALLOWED')
+    db.execute('BEGIN IMMEDIATE')
+    try:
         seen=db.execute('SELECT tenant_id,merchant_id,store_id,reference,to_state FROM order_events WHERE event_id=?',(event_id,)).fetchone()
-        if seen is not None:
-            if seen!=(t,m,s,reference,target): raise ValueError('EVENT_ID_COLLISION')
-            return {'state':target,'duplicate':True}
         row=db.execute('SELECT amount_minor,state,provider_transaction_id FROM orders WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,s,reference)).fetchone()
+        if seen is not None:
+            if (seen!=(t,m,s,reference,target) or row is None or
+                row!=(evidence['amount_minor'],target,tx)):
+                raise ValueError('EVENT_ID_COLLISION')
+            db.commit()
+            return {'state':target,'duplicate':True}
         if row is None: raise ValueError('ORDER_NOT_FOUND')
         if row[0]!=evidence['amount_minor'] or row[1]!='PENDING':
             raise ValueError('INVALID_ORDER_STATE')
-        db.execute('UPDATE orders SET state=?,provider_transaction_id=? WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(target,tx,t,m,s,reference))
-        db.execute("INSERT INTO order_events VALUES(?,?,?,?,?,?,?,'SIMULATED')",(event_id,t,m,s,reference,'PENDING',target))
-    return {'state':target,'duplicate':False,'provider_settlement_verified':False}
+        updated=db.execute("UPDATE orders SET state=?,provider_transaction_id=? "
+            "WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=? "
+            "AND state='PENDING' AND amount_minor=? AND provider_transaction_id IS NULL",
+            (target,tx,t,m,s,reference,evidence['amount_minor']))
+        if updated.rowcount!=1: raise ValueError('CONCURRENT_STATE_CONFLICT')
+        db.execute("INSERT INTO order_events VALUES(?,?,?,?,?,?,?,'SIMULATED')",
+                   (event_id,t,m,s,reference,'PENDING',target))
+        db.commit()
+        return {'state':target,'duplicate':False,'provider_settlement_verified':False}
+    except BaseException:
+        db.rollback()
+        raise
