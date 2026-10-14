@@ -45,6 +45,29 @@ class LifecycleTests(unittest.TestCase):
  def test_unjournaled_root_cannot_be_removed(self):
   os.mkdir(self.root,0o700)
   with self.assertRaisesRegex(ValueError,'UNJOURNALED_ROOT'):self.manager.rollback()
+ def test_pinned_nginx_configuration_excludes_rpm_default_server(self):
+  release=pathlib.Path(os.environ['P2_SOURCE_ROOT'])
+  main=(release/'deploy/p2-nginx-main.conf').read_text()
+  owner=(release/'deploy/uk-owner-workbench/nginx.conf.template').read_text()
+  service=(release/'deploy/p2-nginx.service').read_text()
+  self.assertEqual([x.strip() for x in main.splitlines() if 'include ' in x],['include /etc/nginx/mime.types;','include /etc/nginx/conf.d/xuanjun-p2-owner.conf;'])
+  self.assertNotIn('listen ',main);self.assertEqual([x.strip() for x in owner.splitlines() if 'listen ' in x],['listen 443 ssl http2;'])
+  self.assertIn('ExecStart=/usr/sbin/nginx -c /etc/xuanjun-development/nginx-main.conf',service)
+  self.assertIn('ExecStartPre=/usr/sbin/nginx -t -c /etc/xuanjun-development/nginx-main.conf',service)
+  runtime=(release/'stage1/p2_fixed_host_runtime.py').read_text()
+  self.assertEqual(runtime.count("self._command(['/usr/sbin/nginx', '-t', '-c', '/etc/xuanjun-development/nginx-main.conf'])"),2)
+ def test_renew_uses_same_pinned_nginx_config_and_updates_journal(self):
+  import activation_control
+  self.create('READY_ISSUED_AND_RENEWAL_DRYRUN_VERIFIED')
+  configpath=self.base+'/renew.json';pathlib.Path(configpath).write_text(json.dumps(self.config));os.chmod(configpath,0o600)
+  before={k:self.config[k] for k in ('instance','generation','ledger_uuid','release_sha256')}
+  calls=[];real_open=os.open
+  def opened(path,*args,**kwargs):return real_open(self.base+'/install.lock' if path=='/run/xuanjun-p2-install.lock' else path,*args,**kwargs)
+  with patch.object(tls,'CONFIG',configpath),patch.object(tls.TlsLifecycle,'authority',return_value=None),patch.object(tls,'available_port'),patch.object(tls,'certificate_check',return_value='b'*64),patch.object(tls,'command',side_effect=lambda args,**kw:calls.append(args) or b''),patch.object(activation_control.ActivationStore,'read',return_value=before),patch.object(tls.os,'open',side_effect=opened):
+   tls.renew()
+  self.assertIn(['/usr/sbin/nginx','-t','-c','/etc/xuanjun-development/nginx-main.conf'],calls)
+  self.assertIn(['/usr/bin/systemctl','reload','nginx.service'],calls)
+  self.assertEqual(json.loads(pathlib.Path(self.manager.journal).read_text())['certificate_sha256'],'b'*64)
  def test_missing_requested_root_is_zero_effect_rollback(self):
   _atomic_receipt(self.manager.journal,{'schema':1,'config':self.config,'state':'REQUESTED','fingerprint':None})
   self.manager.rollback();self.manager.rollback();self.assertFalse(os.path.lexists(self.root))

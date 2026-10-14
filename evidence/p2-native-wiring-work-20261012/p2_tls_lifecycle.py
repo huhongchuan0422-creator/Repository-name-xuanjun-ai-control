@@ -132,7 +132,7 @@ def renew():
   try:
    command(base_args()+['renew','--cert-name',DOMAIN,'--no-directory-hooks']);leaf=certificate_check()
    after=store.read(require_active=True);require(after==before,'TLS_RENEW_ACTIVATION_CHANGED')
-   command(['/usr/sbin/nginx','-t']);command(['/usr/bin/systemctl','reload','nginx.service'])
+   command(['/usr/sbin/nginx','-t','-c','/etc/xuanjun-development/nginx-main.conf']);command(['/usr/bin/systemctl','reload','nginx.service'])
    record['certificate_sha256']=leaf
   finally:
    record['fingerprint']=fingerprint(ROOT);_atomic_receipt(manager.journal,record)

@@ -9,10 +9,12 @@ def rep(s,a,b):
  if s.count(a)!=1:raise ValueError('TLS_OVERLAY_ANCHOR_'+a[:60])
  return s.replace(a,b)
 p='stage1/p2_fixed_host_runtime.py';s=load(p)
+if s.count("self._command(['/usr/sbin/nginx', '-t'])")!=2:raise ValueError('NGINX_CHECK_CALLSITES')
+s=rep(s,"self._command(['/usr/sbin/nginx', '-t'])","self._command(['/usr/sbin/nginx', '-t', '-c', '/etc/xuanjun-development/nginx-main.conf'])") if s.count("self._command(['/usr/sbin/nginx', '-t'])")==1 else s.replace("self._command(['/usr/sbin/nginx', '-t'])","self._command(['/usr/sbin/nginx', '-t', '-c', '/etc/xuanjun-development/nginx-main.conf'])")
 s=rep(s,'import p2_auxiliary_isolation as Auxiliary','import p2_auxiliary_isolation as Auxiliary\nfrom p2_tls_lifecycle import TlsLifecycle,TIMER as TLS_TIMER,SERVICE as TLS_SERVICE')
 s=rep(s,"        self.prerequisites.preflight(runtime['prerequisites'])","        if 'tls_renewal' in runtime:TlsLifecycle(self.directory).prepare(runtime['tls_renewal'])\n        self.prerequisites.preflight(runtime['prerequisites'])")
 s=rep(s,"        if 'auxiliary_isolation' in runtime:receipt['auxiliary_isolation']=runtime['auxiliary_isolation']","        if 'auxiliary_isolation' in runtime:receipt['auxiliary_isolation']=runtime['auxiliary_isolation']\n        if 'tls_renewal' in runtime:receipt['tls_renewal']=runtime['tls_renewal']")
-s=rep(s,"        create_dropin_parent=self._dropin_parent_state()", "        if 'tls_renewal' in runtime:\n            tls_value=TlsLifecycle(self.directory).prepare(runtime['tls_renewal'])\n            configs=[item for item in prepared if item['target']=='/etc/xuanjun-development/tls-renewal.json']\n            if len(configs)!=1 or json.loads(configs[0]['data'].decode())!=tls_value:raise ValueError('TLS_RENDERED_CONFIG_BINDING')\n            required={'/etc/systemd/system/'+TLS_TIMER,'/etc/systemd/system/'+TLS_SERVICE}\n            if not required.issubset({item['target'] for item in prepared}):raise ValueError('TLS_TIMER_SERVICE_BINDING')\n        create_dropin_parent=self._dropin_parent_state()")
+s=rep(s,"        create_dropin_parent=self._dropin_parent_state()", "        if 'tls_renewal' in runtime:\n            tls_value=TlsLifecycle(self.directory).prepare(runtime['tls_renewal'])\n            configs=[item for item in prepared if item['target']=='/etc/xuanjun-development/tls-renewal.json']\n            if len(configs)!=1 or json.loads(configs[0]['data'].decode())!=tls_value:raise ValueError('TLS_RENDERED_CONFIG_BINDING')\n            required={'/etc/systemd/system/'+TLS_TIMER,'/etc/systemd/system/'+TLS_SERVICE,'/etc/systemd/system/nginx.service','/etc/xuanjun-development/nginx-main.conf'}\n            if not required.issubset({item['target'] for item in prepared}):raise ValueError('TLS_TIMER_SERVICE_BINDING')\n        create_dropin_parent=self._dropin_parent_state()")
 s=rep(s,"            PublisherBootstrap(self.directory).apply(runtime.get('publisher'))","            PublisherBootstrap(self.directory).apply(runtime.get('publisher'))\n            if 'tls_renewal' in runtime:TlsLifecycle(self.directory).apply(runtime['tls_renewal'])")
 s=rep(s,"        return tuple(ALLOWED_SERVICES)+(GATEWAY_SERVICE,)+extra","        if any(t['target']=='/etc/systemd/system/'+TLS_TIMER for t in targets):extra+=(TLS_TIMER,)\n        return tuple(ALLOWED_SERVICES)+(GATEWAY_SERVICE,)+extra")
 s=rep(s,"        return {'services_active': True}\n\n    def stop_new", "        if 'tls_renewal' in runtime:\n            self._command(['/usr/bin/systemctl','start',TLS_TIMER])\n            self._command(['/usr/bin/systemctl','is-active','--quiet',TLS_TIMER])\n        return {'services_active': True}\n\n    def stop_new")
@@ -24,6 +26,37 @@ p='stage1/p2_install_entrypoint.py';s=load(p)
 s=rep(s,"set(runtime)-{'legacy_cutover','auxiliary_isolation'}","set(runtime)-{'legacy_cutover','auxiliary_isolation','tls_renewal'}")
 s=rep(s,"    if 'bootstrap' in runtime:","    if 'tls_renewal' in runtime:\n        ref=runtime['tls_renewal']\n        if not isinstance(ref,dict) or set(ref)!={'path','sha256'} or not _canonical(ref['path']) or not SHA256.fullmatch(ref['sha256']):raise ValueError('TLS_RENEWAL_REFERENCE')\n    if 'bootstrap' in runtime:")
 texts[p]=s
+texts.update({'deploy/p2-nginx-main.conf':'''user nginx;
+worker_processes auto;
+pid /run/nginx.pid;
+error_log /var/log/nginx/error.log warn;
+events { worker_connections 1024; }
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    access_log /var/log/nginx/access.log;
+    sendfile on;
+    keepalive_timeout 65;
+    include /etc/nginx/conf.d/xuanjun-p2-owner.conf;
+}
+''',
+ 'deploy/p2-nginx.service':'''[Unit]
+Description=Xuanjun P2 HTTPS nginx with fixed reviewed configuration
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=forking
+PIDFile=/run/nginx.pid
+ExecStartPre=/usr/sbin/nginx -t -c /etc/xuanjun-development/nginx-main.conf
+ExecStart=/usr/sbin/nginx -c /etc/xuanjun-development/nginx-main.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+TimeoutStopSec=30
+KillMode=mixed
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target
+'''})
 texts.update({'stage1/p2_tls_lifecycle.py':(here/'p2_tls_lifecycle.py').read_text(),
  'scripts/uk-p2-tls-renew.py':"#!/usr/bin/env python3\nimport os,sys\nsys.path.insert(0,os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),'stage1'))\nfrom p2_tls_lifecycle import renew\nif __name__=='__main__':renew()\n",
  'deploy/p2-tls-renewal.json.template':'''{"schema":1,"domain":"uk.wenwenwenyiyiyi.work","root":"/var/lib/xuanjun-development/tls-acme","transaction_directory":"@@TRANSACTION_DIRECTORY@@","transaction_id":"@@TRANSACTION_ID@@","instance":"@@INSTANCE@@","generation":@@GENERATION@@,"ledger_uuid":"@@LEDGER_UUID@@","release_sha256":"@@PACKAGE_SHA256@@","accept_acme_terms":true}
