@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('./app.js',import.meta.url),'utf8');
 function setup(fetchMock){
- const ids=['tenant','merchant','store','reference','amount','create','query','complete','fail','merchantQuery','status','merchantResult','error','successAd'];
+ const ids=['tenant','merchant','store','reference','amount','create','query','complete','fail','merchantQuery','status','merchantResult','error','successAd','loadStorefront','storefrontStatus','storefrontName','storefrontProducts','adAmount'];
  const els={},events={};
  for(const id of ids)els[id]={value:({tenant:'t1',merchant:'m1',store:'s1',reference:'ref1',amount:'150'})[id]||'',hidden:id==='successAd',textContent:'',addEventListener(type,fn){events[id+':'+type]=fn;}};
  let nonce=0;
@@ -127,4 +127,59 @@ test('same order: earlier simulation success cannot resurrect after later query'
  await new Promise(resolve=>setImmediate(resolve));
  assert.match(ui.els.status.textContent,/PENDING/);
  assert.equal(ui.els.successAd.hidden,true);
+});
+
+const scopedStorefront={merchant:{name:"Shop A",description:"Intro",contact:"tel"},products:[{id:"p1",name:"Item A",sort:1}],
+ ads:{AD_SLOT_PAYMENT_AMOUNT:{id:"ad1",title:"Approved A",url:"https://example.org/ad",slot:"AD_SLOT_PAYMENT_AMOUNT"},AD_SLOT_PAYMENT_SUCCESS:null},
+ simulation_only:true,provider_settlement_verified:false,escape_text_required:true};
+test('storefront load presents approved amount creative as text, never success ad',async()=>{
+ const ui=setup(async(path)=>{assert.equal(path,"/demo/storefront");return ok(scopedStorefront);});
+ await ui.click('loadStorefront');
+ assert.equal(ui.els.storefrontName.textContent,"Shop A");
+ assert.equal(ui.els.storefrontProducts.textContent,"Item A");
+ assert.match(ui.els.adAmount.textContent,/Approved A/);
+ assert.equal(ui.els.successAd.hidden,true);
+});
+test('storefront cannot render injected success placement or unknown properties',async()=>{
+ for(const data of [{...scopedStorefront,ads:{...scopedStorefront.ads,AD_SLOT_PAYMENT_SUCCESS:{id:"forged"}}},
+                      {...scopedStorefront,provider_settlement_verified:true},
+                      {...scopedStorefront,unexpected:"unsafe"}]){
+  const ui=setup(async()=>ok(data));
+  await ui.click('loadStorefront');
+  assert.equal(ui.els.storefrontName.textContent,"");
+  assert.equal(ui.els.successAd.hidden,true);
+  assert.match(ui.els.storefrontStatus.textContent,/不可信|格式错误/);
+ }
+});
+test('merchant scope change invalidates late catalog result and creative',async()=>{
+ let release;
+ const ui=setup(()=>new Promise(resolve=>{release=resolve;}));
+ ui.events['loadStorefront:click']();
+ ui.input('merchant','other');
+ release(ok(scopedStorefront));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(ui.els.storefrontName.textContent,"");
+ assert.equal(ui.els.adAmount.textContent,"金额页广告位：当前无广告（模拟）");
+});
+
+test('approved HTTPS creative with /sale and query containing s keeps catalog readable',async()=>{
+ for(const url of ['https://example.org/sale','https://example.org/sales?source=store']){
+  const data={...scopedStorefront,ads:{...scopedStorefront.ads,AD_SLOT_PAYMENT_AMOUNT:{...scopedStorefront.ads.AD_SLOT_PAYMENT_AMOUNT,url}}};
+  const ui=setup(async()=>ok(data));
+  await ui.click('loadStorefront');
+  assert.equal(ui.els.storefrontName.textContent,'Shop A');
+  assert.equal(ui.els.storefrontProducts.textContent,'Item A');
+  assert.match(ui.els.adAmount.textContent,/Approved A/);
+  assert.equal(ui.els.successAd.hidden,true);
+ }
+});
+test('creative URLs with whitespace or unsupported protocol/authority are rejected',async()=>{
+ for(const url of ['https://example.org/a b','https://example.org/a\\tb','http://example.org/sale',
+                   'javascript:alert(1)','https://user@example.org/sale','https://example.org\\\\evil']){
+  const data={...scopedStorefront,ads:{...scopedStorefront.ads,AD_SLOT_PAYMENT_AMOUNT:{...scopedStorefront.ads.AD_SLOT_PAYMENT_AMOUNT,url}}};
+  const ui=setup(async()=>ok(data));
+  await ui.click('loadStorefront');
+  assert.equal(ui.els.storefrontName.textContent,'');
+  assert.match(ui.els.storefrontStatus.textContent,/不可信|格式错误/);
+ }
 });
