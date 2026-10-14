@@ -11,22 +11,45 @@ HOSTS = ("iZ6wee8q9z4t03hvqumwfhZ", "iZmj7a5kwr75qc1tul4kf9Z")
 HELPER = "/usr/local/sbin/xuanjun-migration-inspect-v1"
 EXPECTED = "61bed97a32e970dd868f2d223c68ab41c012c484d314cb714c768629aac263c2"
 
-def protected_path(path, regular=True):
-    if not os.path.isabs(path):
-        raise ValueError("PATH_NOT_ABSOLUTE")
-    current = "/"
-    for component in path.split("/")[1:]:
-        if not component or component in (".", ".."):
-            raise ValueError("INVALID_COMPONENT")
-        current = os.path.join(current, component)
-        info = os.lstat(current)
-        if stat.S_ISLNK(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
-            raise ValueError("UNPROTECTED_PATH")
-        if current != path and not stat.S_ISDIR(info.st_mode):
-            raise ValueError("INVALID_PARENT")
-    if regular and not stat.S_ISREG(info.st_mode):
-        raise ValueError("NOT_REGULAR")
-    return info
+def protected_digest(path, owner_uid=0):
+    """Walk pinned directory descriptors; never follow a replaced symlink."""
+    components = path.split("/")[1:]
+    if not path.startswith("/") or not components or any(x in ("", ".", "..") for x in components):
+        raise ValueError("INVALID_PATH")
+    directory = os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for index, component in enumerate(components):
+            parent = os.fstat(directory)
+            if parent.st_uid != owner_uid or parent.st_mode & 0o022:
+                raise ValueError("UNPROTECTED_PARENT")
+            last = index == len(components) - 1
+            flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+            if not last:
+                flags |= os.O_DIRECTORY
+            opened = os.open(component, flags, dir_fd=directory)
+            if not last:
+                os.close(directory)
+                directory = opened
+                continue
+            try:
+                before = os.fstat(opened)
+                if not stat.S_ISREG(before.st_mode) or before.st_uid != owner_uid or before.st_mode & 0o022:
+                    raise ValueError("UNPROTECTED_FILE")
+                digest = hashlib.sha256()
+                while True:
+                    block = os.read(opened, 65536)
+                    if not block:
+                        break
+                    digest.update(block)
+                after = os.fstat(opened)
+                identity = lambda x: (x.st_dev, x.st_ino, x.st_size, x.st_mtime_ns, x.st_ctime_ns, x.st_uid, x.st_mode)
+                if identity(before) != identity(after):
+                    raise ValueError("FILE_CHANGED_DURING_READ")
+                return digest.hexdigest()
+            finally:
+                os.close(opened)
+    finally:
+        os.close(directory)
 
 def parsed_sources(text):
     paths = []
@@ -73,21 +96,16 @@ def main():
         paths = parsed_sources(run(["/usr/sbin/visudo", "-c"]))
         before = {}
         for path in paths:
-            protected_path(path)
-            with open(path, "rb") as stream:
-                before[path] = hashlib.sha256(stream.read()).hexdigest()
-        protected_path(HELPER)
-        with open(HELPER, "rb") as stream:
-            if hashlib.sha256(stream.read()).hexdigest() != EXPECTED:
-                raise ValueError("HELPER_HASH_MISMATCH")
+            before[path] = protected_digest(path)
+        if protected_digest(HELPER) != EXPECTED:
+            raise ValueError("HELPER_HASH_MISMATCH")
         grant = effective_policy(run(["/usr/bin/sudo", "-n", "-l", "-U", "githubrunner"]))
         for path, digest in before.items():
-            protected_path(path)
-            with open(path, "rb") as stream:
-                if hashlib.sha256(stream.read()).hexdigest() != digest:
-                    raise ValueError("POLICY_CHANGED_DURING_AUDIT")
+            if protected_digest(path) != digest:
+                raise ValueError("POLICY_CHANGED_DURING_AUDIT")
         print(json.dumps({"host": host, "sudoers_sources_checked": len(paths),
-                          "source_integrity": "PASS", "effective_runner_grant": grant,
+                          "observed_source_integrity": "PASS", "grant_shape_check": grant,
+                          "source_closure": "NOT_VERIFIED", "effective_policy_semantics": "NOT_VERIFIED",
                           "helper_hash": EXPECTED, "production_mutation": False,
                           "global_runner_policy": "NOT_VERIFIED",
                           "full_sudoers_semantic_audit": "NOT_VERIFIED"}, sort_keys=True))
