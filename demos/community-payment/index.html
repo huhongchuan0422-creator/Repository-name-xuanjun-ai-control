@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>社区商家扫码支付 - 离线交互演示</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;background:#f4f5f7;color:#18212f;margin:0}main{max-width:470px;margin:auto;padding:20px}.panel{background:white;border-radius:15px;padding:22px;margin:15px 0;box-shadow:0 2px 12px #0001}.sub{color:#596475}h1{font-size:23px}button,input{font:inherit}button{background:#136f57;color:white;border:0;padding:12px 18px;border-radius:10px;cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #267cd4}input{padding:10px;width:90%;border:1px solid #9ca5b1;border-radius:9px}aside{border:1px dashed #9daab7;padding:13px;background:#fafbfd;margin:18px 0}section[hidden]{display:none}.status{font-weight:700}.warn{color:#8a351b}small{display:block;margin:8px 0}</style></head>
+<body><main><h1>社区商家付款演示</h1><p class="warn">模拟界面 · 不连接微信支付 · 不产生真实订单或资金变动</p>
+<section id="storefront" class="panel"><h2 id="merchantName"></h2><p id="merchantDescription"></p><p id="storeName"></p><button id="openAmount">进入金额输入</button></section>
+<section id="amount" class="panel" hidden><h2>输入付款金额</h2><p id="beneficiary"></p><label for="payAmount">人民币（元）</label><input id="payAmount" inputmode="decimal" placeholder="例如 12.34" aria-describedby="amountHelp"><small id="amountHelp">模拟金额：0.01—1000000.00元</small>
+<aside aria-label="金额页面广告"><strong>广告展示位置 A</strong><p id="adAmount"></p></aside>
+<p id="amountError" role="alert" class="warn"></p><button id="confirm">确认模拟付款</button></section>
+<section id="pending" class="panel" hidden><h2>等待模拟支付结果</h2><p>尚未收到服务端支付成功凭证。不能显示付款成功。</p><button id="simulate">模拟服务端验证成功</button><button id="fail">模拟失败</button></section>
+<section id="receipt" class="panel" hidden><h2 id="resultTitle"></h2><p id="resultDetail" role="status"></p><aside id="successSlot" aria-label="付款成功广告" hidden><strong>广告展示位置 B</strong><p id="adSuccess"></p></aside><button id="restart">返回商家主页</button></section>
+<p class="sub">此演示只验证浏览器页面交互及两广告位展示逻辑。生产系统必须使用服务端认证、支付回调及查单对账。</p></main>
+<script src="./app.js" defer></script></body></html>
