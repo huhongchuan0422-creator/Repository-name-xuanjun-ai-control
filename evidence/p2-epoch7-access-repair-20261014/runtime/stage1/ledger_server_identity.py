@@ -8,9 +8,11 @@ protected file, boot/lifetime/IDs/cgroup. Trusted root exec/reexec is explicit.
 import errno
 import hashlib
 import json
+import math
 import os
 import re
 import selectors
+import signal
 import stat
 import struct
 import subprocess
@@ -42,6 +44,131 @@ BINDING_KEYS = {'release_sha256', 'binary_sha256', 'ledger_uuid', 'generation',
 
 def _fail(reason):
     raise ValueError('LEDGER_SERVER_PIN_' + reason)
+
+
+def _owned_command_signal(process):
+    """Keep a live/unreaped direct child's PID pinned until group signalling."""
+    if process.returncode is not None: return False
+    lock = getattr(process, '_waitpid_lock', None)
+    if lock is None or not lock.acquire(False): return False
+    try:
+        if process.returncode is not None: return False
+        row = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        if row is not None and row.si_pid != process.pid: return False
+        if os.getpgid(process.pid) != process.pid or os.getsid(process.pid) != process.pid:
+            return False
+        try: os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError: pass
+        return True
+    except ChildProcessError:
+        return False
+    finally:
+        lock.release()
+
+
+def _owned_command_reap(process, deadline):
+    """Nonblocking wait ownership and WNOHANG only, including expired budgets."""
+    while True:
+        if process.returncode is not None: return True
+        lock = getattr(process, '_waitpid_lock', None)
+        if lock is not None and lock.acquire(False):
+            try:
+                if process.returncode is not None: return True
+                pid, status = os.waitpid(process.pid, os.WNOHANG)
+                if pid == process.pid:
+                    if os.WIFEXITED(status): process.returncode = os.WEXITSTATUS(status)
+                    elif os.WIFSIGNALED(status): process.returncode = -os.WTERMSIG(status)
+                    else: _fail('COMMAND_EXIT_STATUS')
+                    return True
+                if pid != 0: _fail('COMMAND_CHILD_IDENTITY')
+            except ChildProcessError:
+                return False
+            finally:
+                lock.release()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0: return False
+        time.sleep(min(remaining, 0.005))
+
+
+def _owned_command_cleanup(process, selector, deadline):
+    failures, interrupted = [], []
+    def attempt(label, action):
+        try:
+            if action() is False: failures.append(label)
+        except BaseException as error:
+            failures.append(label)
+            if isinstance(error, (KeyboardInterrupt, SystemExit)): interrupted.append(error)
+    attempt('signal', lambda: _owned_command_signal(process))
+    if selector is not None: attempt('selector_close', selector.close)
+    for name in ('stdout', 'stderr'):
+        stream = getattr(process, name, None)
+        if stream is not None: attempt(name + '_close', stream.close)
+    attempt('reap', lambda: _owned_command_reap(process, deadline))
+    if interrupted: raise interrupted[0]
+    if failures: _fail('COMMAND_CLEANUP_UNKNOWN')
+
+
+def _bounded_owned_command(argv, environment, timeout, maximum=32768):
+    """Private shared runtime primitive; no command retries or authority checks.
+
+    Callers supply their already-authorized exact command. One wall budget covers
+    spawn, both finite streams, exit and cleanup. Exclusive child wait ownership
+    is required; no external SIGCHLD/raw waitpid reaper is supported. Synchronous
+    kernel stalls and suspension are not hard real-time guarantees.
+    """
+    if (type(timeout) not in (int, float) or not math.isfinite(timeout) or
+            not 0 < timeout <= 30 or type(maximum) is not int or
+            not 0 < maximum <= 1048576): _fail('COMMAND_BOUNDS')
+    if not all(hasattr(os, name) for name in
+            ('waitid', 'P_PID', 'WEXITED', 'WNOHANG', 'WNOWAIT', 'set_blocking')):
+        _fail('COMMAND_PLATFORM')
+    deadline = time.monotonic() + timeout
+    work_end = deadline - min(0.2, timeout / 5.0)
+    process = selector = failure = cleanup_failure = None
+    streams = {'stdout': bytearray(), 'stderr': bytearray()}
+    try:
+        process = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dict(environment),
+            close_fds=True, bufsize=0, cwd='/', start_new_session=True, shell=False)
+        if time.monotonic() >= work_end: _fail('COMMAND_DEADLINE')
+        selector = selectors.DefaultSelector()
+        for name in streams:
+            stream = getattr(process, name)
+            os.set_blocking(stream.fileno(), False)
+            selector.register(stream, selectors.EVENT_READ, name)
+        while selector.get_map():
+            remaining = work_end - time.monotonic()
+            if remaining <= 0: _fail('COMMAND_DEADLINE')
+            for key, unused in selector.select(remaining):
+                try: part = os.read(key.fd, min(65536, maximum + 1 - len(streams[key.data])))
+                except BlockingIOError: continue
+                if not part: selector.unregister(key.fileobj)
+                else:
+                    streams[key.data].extend(part)
+                    if len(streams[key.data]) > maximum: _fail('COMMAND_OUTPUT_BOUND')
+        while True:
+            remaining = work_end - time.monotonic()
+            if remaining <= 0: _fail('COMMAND_DEADLINE')
+            row = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+            if row is not None:
+                if row.si_pid != process.pid: _fail('COMMAND_CHILD_IDENTITY')
+                break
+            time.sleep(min(remaining, 0.005))
+    except BaseException as error:
+        failure = error
+    finally:
+        if process is not None:
+            try: _owned_command_cleanup(process, selector, deadline)
+            except BaseException as error: cleanup_failure = error
+    for error in (failure, cleanup_failure):
+        if isinstance(error, (KeyboardInterrupt, SystemExit)): raise error
+    if failure is not None:
+        if cleanup_failure is not None: raise failure from cleanup_failure
+        raise failure
+    if cleanup_failure is not None: raise cleanup_failure
+    if time.monotonic() > deadline: _fail('COMMAND_DEADLINE')
+    if process.returncode != 0: _fail('COMMAND_FAILED')
+    return bytes(streams['stdout'])
 
 
 def _canonical(path):
@@ -280,37 +407,17 @@ class OSBackend(object):
         # No inherited DBUS address, remote host, pager, HOME or PATH override.
         argv = ['/usr/bin/systemctl', '--system', 'show', '--no-pager',
                 '--property=' + ','.join(properties), unit]
-        deadline.check(); end = min(time.monotonic() + 1.0, time.monotonic() + deadline.check())
-        process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, env={'PATH': '/usr/bin:/bin', 'LC_ALL': 'C',
-            'SYSTEMD_PAGER': ''}, close_fds=True, bufsize=0)
-        selector, raw = selectors.DefaultSelector(), bytearray()
-        try:
-            selector.register(process.stdout, selectors.EVENT_READ)
-            while True:
-                remaining = min(deadline.check(), end - time.monotonic())
-                if remaining <= 0 or not selector.select(remaining): _fail('MANAGER_READ_DEADLINE')
-                part = os.read(process.stdout.fileno(), 32769 - len(raw))
-                if not part: break
-                raw.extend(part)
-                if len(raw) > 32768: _fail('MANAGER_READ_SIZE')
-            remaining = min(deadline.check(), end - time.monotonic())
-            if remaining <= 0 or process.wait(timeout=remaining): _fail('MANAGER_READ_FAILED')
-            value = {}
-            for line in raw.decode('utf-8').splitlines():
-                key, separator, item = line.partition('=')
-                if not separator or key not in properties or key in value or len(item) > 8192:
-                    _fail('MANAGER_PROPERTIES')
-                value[key] = normalize_exec_start(item) if key == 'ExecStart' else item
-            if set(value) != set(properties): _fail('MANAGER_PROPERTIES_MISSING')
-            if self.manager_channel(deadline) != channel: _fail('MANAGER_CHANNEL_CHANGED')
-            deadline.check(); return value
-        finally:
-            selector.close(); process.stdout.close()
-            if process.poll() is None:
-                process.kill()
-                try: process.wait(timeout=0.1)
-                except subprocess.TimeoutExpired: pass
+        raw = _bounded_owned_command(argv, {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C',
+            'SYSTEMD_PAGER': ''}, min(1.0, deadline.check()), 32768)
+        value = {}
+        for line in raw.decode('utf-8').splitlines():
+            key, separator, item = line.partition('=')
+            if not separator or key not in properties or key in value or len(item) > 8192:
+                _fail('MANAGER_PROPERTIES')
+            value[key] = normalize_exec_start(item) if key == 'ExecStart' else item
+        if set(value) != set(properties): _fail('MANAGER_PROPERTIES_MISSING')
+        if self.manager_channel(deadline) != channel: _fail('MANAGER_CHANNEL_CHANGED')
+        deadline.check(); return value
 
 
 def canonical_activation():

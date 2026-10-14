@@ -7,9 +7,9 @@ import pwd
 import socket
 import stat
 import struct
-import subprocess
 
 from native_child_adapter import NativeContractError
+from ledger_server_identity import _bounded_owned_command
 
 
 def strict_json(raw):
@@ -41,23 +41,36 @@ class GatewayController(object):
     def _run(self, argv):
         info = os.lstat(self.executable)
         if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o022
-                or info.st_uid != self.config['openclaw_owner_uid']
+                or info.st_uid != self.config['openclaw_owner_uid'] or info.st_size > 33554432
                 or os.path.realpath(self.executable) != self.executable):
             raise NativeContractError('Gateway executable unsafe')
-        with open(self.executable, 'rb') as source:
-            if hashlib.sha256(source.read()).hexdigest() != self.sha256:
-                raise NativeContractError('Gateway executable changed')
-        process = subprocess.Popen(argv, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, env={'HOME': self.config['gateway_home'],
-            'PATH': self.config['gateway_path'], 'LANG': 'C.UTF-8'})
+        # Do not let a replacement FIFO/symlink turn executable pinning into an
+        # unbounded open/read before the process deadline starts.
+        fd = os.open(self.executable, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         try:
-            output, _ = process.communicate(timeout=30)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.communicate()
+            def stamp(value):
+                return (value.st_dev, value.st_ino, value.st_mode, value.st_uid,
+                    value.st_gid, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
+            if stamp(os.fstat(fd)) != stamp(info):
+                raise NativeContractError('Gateway executable changed')
+            digest, total = hashlib.sha256(), 0
+            while True:
+                raw = os.read(fd, min(65536, 33554433 - total))
+                if not raw: break
+                total += len(raw)
+                if total > 33554432: raise NativeContractError('Gateway executable changed')
+                digest.update(raw)
+            if (total != info.st_size or digest.hexdigest() != self.sha256 or
+                    stamp(os.fstat(fd)) != stamp(info) or
+                    stamp(os.lstat(self.executable)) != stamp(info)):
+                raise NativeContractError('Gateway executable changed')
+        finally:
+            os.close(fd)
+        try:
+            output = _bounded_owned_command(argv, {'HOME': self.config['gateway_home'],
+                'PATH': self.config['gateway_path'], 'LANG': 'C.UTF-8'}, 30, 1048576)
+        except Exception:
             raise NativeContractError('Gateway effect unknown; no retry')
-        if process.returncode or len(output) > 1048576:
-            raise NativeContractError('Gateway response unconfirmed; no retry')
         return strict_json(output.decode('utf-8'))
 
     def _call(self, operation, value=None, **params):

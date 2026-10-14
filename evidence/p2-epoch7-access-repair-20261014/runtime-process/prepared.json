@@ -1,0 +1,30 @@
+{
+  "counts": {
+    "added": 5,
+    "base": 102,
+    "changed": 17,
+    "deleted": 0,
+    "final": 107,
+    "unchanged": 85
+  },
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "independent_review": "PENDING",
+  "manifest_sha256": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
+  "production": "HOLD",
+  "runtime_changes": {
+    "deploy/xuanjun-development-dispatcher.service": [
+      "runtime-process-checkpoint/xuanjun-development-dispatcher.service",
+      "c92663e6899053a357c85eb89267993c41074428a0ef931b78127770e53ded98"
+    ],
+    "stage1/ledger_server_identity.py": [
+      "projection-candidate/ledger_server_identity.py",
+      "bb47927facbd55589aed2303d0cd201a071cad4de41d71f1dcb150287bd8cbab"
+    ],
+    "stage1/native_gateway_controller.py": [
+      "runtime-source-checkpoint/stage1/native_gateway_controller.py",
+      "1de3690ede78832da9dd2f2607db0b5ae88d6f9d4de87e1cb1ce64f35dab8421"
+    ]
+  },
+  "scope": "SOURCE_CHECKPOINT_NOT_FINAL_RECOVERY_KIT",
+  "source_commit": null
+}
