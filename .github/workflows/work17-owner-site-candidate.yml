@@ -1,0 +1,26 @@
+name: Work17 Owner Site candidate gates
+on:
+  pull_request:
+    paths:
+      - 'evidence/work-17-integration-20261014/owner-site-candidate/**'
+      - '.github/workflows/work17-owner-site-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  candidate-only:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Worker source syntax and explicit fixture-only gates
+        run: |
+          node --version
+          node --check evidence/work-17-integration-20261014/owner-site-candidate/worker.mjs
+          node --check evidence/work-17-integration-20261014/owner-site-candidate/build.mjs
+          node --test evidence/work-17-integration-20261014/owner-site-candidate/test-worker.mjs
+          echo UK_RUNTIME_ACCEPTANCE=NOT_RUN
+          echo SITE_PUBLISHED=NO
