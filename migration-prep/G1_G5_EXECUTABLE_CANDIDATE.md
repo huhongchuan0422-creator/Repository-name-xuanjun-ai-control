@@ -9,6 +9,11 @@ Consumed source review: PR99 comment `6167112786`, reviewing exact candidate
 `eb900d13388a0afad940d3974d00b54af0ec06ae`. The five requested remediation
 groups are implemented together; production remains HOLD.
 
+Consumed consolidated security rereview: PR99 comment `6167741893`, reviewing
+exact HEAD `dea50155d0b4989cc30c3bd2f1b808516e2d6ccd` / tree
+`63d48c963f876b8b674414b9bdd33948eb21835a`. Residual S1-S5 are remediated in
+one candidate-only batch; no production permission is added.
+
 ## Boundary
 
 This commit is candidate code and isolated tests only. It does not remove a
@@ -57,6 +62,14 @@ phase history is a continuous prefix of receipt objects whose phase, successful
 result SHA-256 and unique execution ID match. Strings, reordered/duplicated
 phases, gaps, failed results and malformed digests fail closed. G1, G2 and G5
 use the same validator.
+
+Well-formed receipts without an independently backed result loader and
+authority verifier are explicitly `FORMAT_VALID_CANDIDATE`. When those two
+interfaces are supplied, each execution ID/phase is bound to the loaded result
+and the result is re-hashed, but the outcome is still
+`AUTHORITY_BOUND_DURABLE_RESULTS_CANDIDATE` with
+`production_authorized=false`. Phase actions are structured candidate advice,
+never production commands.
 
 This PR disables its own self-hosted inspection job. Hosted tests continue;
 no candidate push should schedule either production Runner.
@@ -109,6 +122,10 @@ always returns `execution_authorized=false` and
 path coverage and actual credential/IP revocation are `NOT_EXECUTED`; G3 cannot
 authorize an exchange write in this candidate.
 
+`reboot_verdict()` returns only `DENY` or
+`CONTRACT_VALID_NOT_AUTHORIZED`; a valid simulator contract can never be
+misread as `ALLOW` after reboot.
+
 The candidate scanner was run read-only against both declared roots after the
 implementation: 95 source files matched (`FORMAL=12`, `LEGACY=17`,
 `MANUAL_SCRIPT=58`, `PROTECTION=8`), discovery digest
@@ -136,6 +153,13 @@ in addition to the manifest hash, so recomputing JSON after weakening a sidecar
 does not pass. This tool was tested only with fixtures; no live Binance call or
 final snapshot was made.
 
+A self-consistent recomputed checkpoint that preserves only structural rules is
+reported as `STRUCTURALLY_VALID_ONLY`, never authenticated. Optional retained
+input verification re-hashes the retained exchange snapshot and re-reads every
+authoritative file identity, but still returns candidate evidence only. Release
+continues to require pinned signed freeze receipts, independent Authority
+binding, fresh live GET-only revalidation and the separate Owner Release Gate.
+
 ## G5 isolated Korea deployment, shadow/canary and rollback
 
 `cutover_gate.py` explicitly checks every required field, including Redis,
@@ -145,6 +169,11 @@ unchanged novel/PostgreSQL/Redis. Isolated launch must have no trade credential,
 Writer or scheduler. Shadow acceptance requires `NO_ORDER_WRITE`, same inputs,
 matching decisions/positions/orders/protection, zero UNKNOWN/in-flight, restart
 recovery and the declared duration.
+
+Every positive and negative isolation/shadow flag must be an exact boolean;
+`0`, `None`, empty strings and other falsey/truthy substitutes are rejected.
+UNKNOWN/in-flight counters must be exact non-negative integers and booleans are
+not accepted as counts.
 
 Forward order cannot skip: isolated deploy -> runtime -> shadow -> Tokyo fence
 -> final checkpoint -> Korea sole authority -> bounded canary -> observation.
@@ -184,10 +213,13 @@ only after the consolidated candidate is rerun.
 
 The idempotency ledger is now a SQLite `BEGIN IMMEDIATE` transaction with a
 unique key, WAL recovery and FULL synchronous durability. It is not an external
-Writer authority. Deadline calls run in a child process and terminate at the
-deadline; because a child may already have caused a side effect, timeout raises
-`OPERATION_TIMEOUT_UNCERTAIN_SIDE_EFFECTS` and requires inspection/reconciliation
-instead of claiming rollback or retry safety.
+Writer authority. Deadline calls run in a child process through a one-way Pipe
+with bounded READY/result acknowledgements. The child enters a distinct POSIX
+process group before the callable starts; forced termination targets that group
+and never treats direct-child exit as proof that descendants or effects are
+gone. Timeout, missing result IPC or a lingering child is explicitly uncertain
+and requires inspection/reconciliation instead of claiming rollback or retry
+safety.
 
 ## External blockers before production
 

@@ -145,7 +145,7 @@ def reboot_verdict(lease, rebooted_host, presented_epoch, now, binding, trust_po
                        binding, trust_policy)
     except Exception:
         return "DENY"
-    return "ALLOW"
+    return "CONTRACT_VALID_NOT_AUTHORIZED"
 
 
 def _path_class(path):

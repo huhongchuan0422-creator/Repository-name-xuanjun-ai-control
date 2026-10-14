@@ -19,7 +19,8 @@ from cutover_gate import (FORWARD_PHASES, ROLLBACK_PHASES, advance as cutover_ad
 from final_snapshot import (GetOnlyTransport, RECONCILED_STATE_CLASSES, SIDE_CAR_CLASSES,
                             build_exchange_reconciliation, build_final_checkpoint,
                             verify_checkpoint)
-from gate_common import GateError, IdempotentLedger, bounded_call, load_json, sha256_value
+from gate_common import (GateError, IdempotentLedger, bounded_call, load_json,
+                         sha256_value, validate_phase_history)
 from runner_retirement import PHASES as RUNNER_PHASES, command_plan
 from runner_retirement import enforce_order as runner_order, evaluate as evaluate_runner
 from writer_fence import (authorize_write, bind_discovery_to_coverage,
@@ -58,6 +59,20 @@ def partial_side_effect(path):
     time.sleep(10)
 
 
+def exit_without_result():
+    os._exit(9)
+
+
+def spawn_delayed_descendant(marker):
+    child = os.fork()
+    if child == 0:
+        time.sleep(0.8)
+        with open(marker, "w") as stream:
+            stream.write("escaped")
+        os._exit(0)
+    time.sleep(10)
+
+
 class RunnerGateTests(unittest.TestCase):
     def complete(self):
         runner = INVENTORY["hosts"]["tokyo"]["runner"]
@@ -90,8 +105,12 @@ class RunnerGateTests(unittest.TestCase):
 
     def test_runner_history_requires_bound_contiguous_receipts(self):
         history = receipts(RUNNER_PHASES[:1])
-        self.assertEqual(runner_order(history, "BASELINED"), "REPLAY_NOOP")
-        self.assertEqual(runner_order(history, "STOPPED"), "EXECUTE_ONCE")
+        replay = runner_order(history, "BASELINED")
+        execute = runner_order(history, "STOPPED")
+        self.assertEqual(replay["action"], "REPLAY_NOOP")
+        self.assertEqual(execute["action"], "EXECUTE_ONCE")
+        self.assertEqual(execute["history_status"], "FORMAT_VALID_CANDIDATE")
+        self.assertFalse(execute["production_authorized"])
         for invalid in (["BASELINED"], receipts(("STOPPED",)),
                         receipts(RUNNER_PHASES[:1]) * 2):
             with self.assertRaises(GateError):
@@ -132,7 +151,9 @@ class YibiGateTests(unittest.TestCase):
 
     def test_yibi_history_rejects_string_skip_and_failed_receipt(self):
         history = receipts(YIBI_PHASES[:1])
-        self.assertEqual(yibi_order(history, "TRIGGERS_FROZEN"), "EXECUTE_ONCE")
+        action = yibi_order(history, "TRIGGERS_FROZEN")
+        self.assertEqual(action["action"], "EXECUTE_ONCE")
+        self.assertFalse(action["production_authorized"])
         for invalid in (["ARCHIVE_VERIFIED"], receipts(("TRIGGERS_FROZEN",))):
             with self.assertRaises(GateError):
                 yibi_order(invalid, "SERVICES_STOPPED")
@@ -203,6 +224,12 @@ class WriterFenceTests(unittest.TestCase):
                            self.binding(), self.trust)
         self.assertEqual(reboot_verdict(self.lease, "tokyo", 42, self.now,
                                        self.binding(), self.trust), "DENY")
+
+    def test_valid_reboot_contract_never_returns_allow(self):
+        verdict = reboot_verdict(self.lease, "korea", 42, self.now,
+                                 self.binding(), self.trust)
+        self.assertEqual(verdict, "CONTRACT_VALID_NOT_AUTHORIZED")
+        self.assertNotEqual(verdict, "ALLOW")
 
     def test_path_coverage_and_discovery_fail_closed(self):
         records = [
@@ -290,12 +317,41 @@ class SnapshotTests(unittest.TestCase):
                            "expected_authoritative_files": ["trading.db"]}
             checkpoint = build_final_checkpoint(self.reconcile(), [database], sidecars,
                                                 maintenance, captured_at_ms=self.now)
-            self.assertTrue(verify_checkpoint(checkpoint))
+            structural = verify_checkpoint(checkpoint)
+            self.assertEqual(structural["status"], "STRUCTURALLY_VALID_ONLY")
+            self.assertFalse(structural["release_authorized"])
+            retained = self.reconcile()
+            reread = verify_checkpoint(checkpoint, retained, [database])
+            self.assertEqual(reread["status"], "RETAINED_INPUTS_REVALIDATED_CANDIDATE")
+            self.assertFalse(reread["authenticated_freeze"])
             checkpoint["sidecars"]["pending_queue"]["frozen"] = False
             unsigned = dict(checkpoint); unsigned.pop("checkpoint_sha256")
             checkpoint["checkpoint_sha256"] = sha256_value(unsigned)
             with self.assertRaises(GateError):
                 verify_checkpoint(checkpoint)
+
+    def test_recomputed_forged_checkpoint_is_only_structural_and_fails_retained_revalidation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = os.path.join(directory, "trading.db")
+            with open(database, "wb") as stream: stream.write(b"fixture")
+            sidecars = {name: {"content_sha256": "c" * 64,
+                               "captured_at_ms": self.now, "frozen": True}
+                        for name in SIDE_CAR_CLASSES}
+            maintenance = {"freeze_started_ms": self.now - 1,
+                           "freeze_deadline_ms": self.now + 1000,
+                           "max_freeze_ms": 2000, "new_entries_frozen": True,
+                           "inflight_drained": True,
+                           "expected_authoritative_files": ["trading.db"]}
+            retained = self.reconcile()
+            checkpoint = build_final_checkpoint(retained, [database], sidecars,
+                                                maintenance, captured_at_ms=self.now)
+            checkpoint["exchange_snapshot_sha256"] = "d" * 64
+            unsigned = dict(checkpoint); unsigned.pop("checkpoint_sha256")
+            checkpoint["checkpoint_sha256"] = sha256_value(unsigned)
+            self.assertEqual(verify_checkpoint(checkpoint)["status"],
+                             "STRUCTURALLY_VALID_ONLY")
+            with self.assertRaisesRegex(GateError, "RETAINED_EXCHANGE_SNAPSHOT_MISMATCH"):
+                verify_checkpoint(checkpoint, retained, [database])
 
 
 class CutoverTests(unittest.TestCase):
@@ -323,20 +379,42 @@ class CutoverTests(unittest.TestCase):
             value = self.isolation(); value[key] = False
             with self.assertRaises(GateError, msg=key): evaluate_isolation(value)
 
+    def test_isolation_negative_booleans_reject_ambiguous_falsey_values(self):
+        for key in ("writer_enabled", "scheduler_enabled", "trade_credentials_present"):
+            for ambiguous in (0, None, ""):
+                value = self.isolation(); value[key] = ambiguous
+                with self.assertRaises(GateError, msg=key): evaluate_isolation(value)
+
+    def test_shadow_rejects_ambiguous_boolean_and_count_types(self):
+        for key in ("no_order_write", "same_inputs", "decision_match", "position_match",
+                    "order_match", "protective_match", "restart_recovered", "duration_met",
+                    "timed_out", "partial_success"):
+            for ambiguous in (0, None, ""):
+                value = self.shadow(); value[key] = ambiguous
+                with self.assertRaises(GateError, msg=key): evaluate_shadow(value)
+        for key in ("unknown_count", "inflight_count"):
+            for ambiguous in (False, None, "", -1):
+                value = self.shadow(); value[key] = ambiguous
+                with self.assertRaises(GateError, msg=key): evaluate_shadow(value)
+
     def test_shadow_timeout_holds(self):
         value = self.shadow(); value["timed_out"] = True
         self.assertEqual(evaluate_shadow(value)["status"], "HOLD")
 
     def test_cutover_history_rejects_forged_string_and_skip(self):
         history = receipts(FORWARD_PHASES[:1])
-        self.assertEqual(cutover_advance(history, "KOREA_ISOLATED_DEPLOYED"), "REPLAY_NOOP")
+        replay = cutover_advance(history, "KOREA_ISOLATED_DEPLOYED")
+        self.assertEqual(replay["action"], "REPLAY_NOOP")
+        self.assertFalse(replay["production_authorized"])
         with self.assertRaises(GateError): cutover_advance(["OBSERVATION_PASS"], "RUNTIME_VERIFIED")
         with self.assertRaises(GateError): cutover_advance(receipts(("OBSERVATION_PASS",)), "RUNTIME_VERIFIED")
 
     def test_rollback_fences_korea_before_tokyo(self):
         self.assertEqual(rollback_verdict(receipts(ROLLBACK_PHASES[:1]))["status"], "HOLD")
-        self.assertEqual(rollback_verdict(receipts(ROLLBACK_PHASES[:3]))["status"],
-                         "READY_TO_RESTORE_TOKYO")
+        verdict = rollback_verdict(receipts(ROLLBACK_PHASES[:3]))
+        self.assertEqual(verdict["status"],
+                         "CANDIDATE_READY_TO_RESTORE_TOKYO_NOT_AUTHORIZED")
+        self.assertFalse(verdict["production_authorized"])
         self.assertFalse(uncertain_outcome("timeout")["double_writer_allowed"])
 
 
@@ -358,6 +436,41 @@ class ArchiveBindingTests(unittest.TestCase):
 
 
 class CommonFailureTests(unittest.TestCase):
+    def test_well_formed_unbacked_phase_receipts_are_format_only(self):
+        history = receipts(RUNNER_PHASES[:2])
+        assessment = validate_phase_history(RUNNER_PHASES, history, "G1")
+        self.assertEqual(assessment["status"], "FORMAT_VALID_CANDIDATE")
+        self.assertFalse(assessment["durable_results_bound"])
+        self.assertFalse(assessment["production_authorized"])
+
+        def forged_loader(execution_id):
+            index = int(execution_id.split("-")[-1])
+            return {"phase": RUNNER_PHASES[index], "execution_id": execution_id,
+                    "result": {"phase": RUNNER_PHASES[index], "index": 999},
+                    "authority_binding": {"candidate": True}}
+
+        with self.assertRaisesRegex(GateError, "DURABLE_RESULT_HASH_MISMATCH"):
+            validate_phase_history(RUNNER_PHASES, history, "G1", forged_loader,
+                                   lambda receipt, record: True)
+
+    def test_phase_receipts_can_bind_to_loader_but_still_do_not_authorize(self):
+        history = receipts(RUNNER_PHASES[:2])
+
+        def loader(execution_id):
+            index = int(execution_id.split("-")[-1])
+            return {"phase": RUNNER_PHASES[index], "execution_id": execution_id,
+                    "result": {"phase": RUNNER_PHASES[index], "index": index},
+                    "authority_binding": {"key_id": "test-authority"}}
+
+        assessment = validate_phase_history(
+            RUNNER_PHASES, history, "G1", loader,
+            lambda receipt, record: record["authority_binding"].get("key_id") ==
+            "test-authority")
+        self.assertEqual(assessment["status"],
+                         "AUTHORITY_BOUND_DURABLE_RESULTS_CANDIDATE")
+        self.assertTrue(assessment["durable_results_bound"])
+        self.assertFalse(assessment["production_authorized"])
+
     def test_idempotency_conflict_and_two_process_serialization(self):
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "events.sqlite")
@@ -383,6 +496,25 @@ class CommonFailureTests(unittest.TestCase):
             with self.assertRaisesRegex(GateError, "UNCERTAIN_SIDE_EFFECTS"):
                 bounded_call(lambda: partial_side_effect(marker), 0.2)
             self.assertTrue(os.path.exists(marker))
+
+    def test_timeout_terminates_descendant_process_group(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = os.path.join(directory, "escaped")
+            with self.assertRaisesRegex(GateError, "UNCERTAIN_SIDE_EFFECTS"):
+                bounded_call(lambda: spawn_delayed_descendant(marker), 0.2)
+            time.sleep(1)
+            self.assertFalse(os.path.exists(marker))
+
+    def test_ipc_child_exit_is_explicitly_uncertain_and_never_retried(self):
+        with self.assertRaisesRegex(GateError, "RESULT_IPC_FAILED_UNCERTAIN_SIDE_EFFECTS"):
+            bounded_call(exit_without_result, 1)
+
+    def test_unserializable_result_is_explicitly_uncertain(self):
+        with self.assertRaisesRegex(GateError, "RESULT_IPC_FAILED_UNCERTAIN_SIDE_EFFECTS"):
+            bounded_call(lambda: (lambda: None), 1)
+
+    def test_bounded_call_success_uses_structured_acknowledgement(self):
+        self.assertEqual(bounded_call(lambda: {"ok": True}, 1), {"ok": True})
 
     def test_safe_cli_renders_plans_without_execution(self):
         cli = os.path.join(HERE, "migration_gate_cli.py")

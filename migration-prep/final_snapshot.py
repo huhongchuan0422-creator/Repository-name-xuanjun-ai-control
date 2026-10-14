@@ -152,6 +152,8 @@ def _validate_checkpoint_semantics(checkpoint):
     require(checkpoint.get("schema_version") == 2, "G4_CHECKPOINT_SCHEMA_INVALID")
     require(checkpoint.get("status") == "FINAL_CHECKPOINT_CANDIDATE",
             "G4_CHECKPOINT_STATUS_INVALID")
+    require(_valid_sha256(checkpoint.get("exchange_snapshot_sha256")),
+            "G4_EXCHANGE_SNAPSHOT_HASH_INVALID")
     maintenance = checkpoint.get("maintenance")
     require(isinstance(maintenance, dict), "G4_MAINTENANCE_REQUIRED")
     for key in ("freeze_started_ms", "freeze_deadline_ms", "max_freeze_ms",
@@ -215,9 +217,50 @@ def build_final_checkpoint(exchange_snapshot, authoritative_files, sidecars, mai
     return checkpoint
 
 
-def verify_checkpoint(checkpoint):
+def verify_checkpoint(checkpoint, retained_exchange_snapshot=None,
+                      authoritative_files=None):
+    """Verify structure and optionally re-read retained inputs.
+
+    A self-consistent checkpoint is never authenticated release evidence.  A
+    production release still requires pinned signed freeze receipts, an
+    independently managed authority binding, fresh live GET-only revalidation
+    and the separate Release Gate.
+    """
     claimed = checkpoint.get("checkpoint_sha256")
     unsigned = dict(checkpoint)
     unsigned.pop("checkpoint_sha256", None)
     require(claimed == sha256_value(unsigned), "G4_CHECKPOINT_HASH_MISMATCH")
-    return _validate_checkpoint_semantics(checkpoint)
+    _validate_checkpoint_semantics(checkpoint)
+    assessment = {
+        "status": "STRUCTURALLY_VALID_ONLY",
+        "retained_inputs_revalidated": False,
+        "authenticated_freeze": False,
+        "live_revalidated": False,
+        "release_authorized": False,
+        "required_before_release": [
+            "PINNED_SIGNED_FREEZE_RECEIPTS",
+            "INDEPENDENT_AUTHORITY_BINDING",
+            "LIVE_GET_ONLY_REVALIDATION",
+            "OWNER_RELEASE_GATE"
+        ]
+    }
+    if retained_exchange_snapshot is None and authoritative_files is None:
+        return assessment
+    require(isinstance(retained_exchange_snapshot, dict) and
+            isinstance(authoritative_files, list) and authoritative_files,
+            "G4_RETAINED_INPUT_SET_REQUIRED")
+    retained_unsigned = dict(retained_exchange_snapshot)
+    retained_claimed = retained_unsigned.pop("content_sha256", None)
+    require(retained_claimed == sha256_value(retained_unsigned) and
+            retained_claimed == checkpoint["exchange_snapshot_sha256"],
+            "G4_RETAINED_EXCHANGE_SNAPSHOT_MISMATCH")
+    actual = [file_identity(path) for path in authoritative_files]
+    expected = checkpoint["authoritative_files"]
+    require(sorted(actual, key=lambda item: item["logical_name"]) ==
+            sorted(expected, key=lambda item: item["logical_name"]),
+            "G4_AUTHORITATIVE_FILE_REREAD_MISMATCH")
+    assessment.update({
+        "status": "RETAINED_INPUTS_REVALIDATED_CANDIDATE",
+        "retained_inputs_revalidated": True
+    })
+    return assessment

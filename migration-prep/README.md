@@ -23,6 +23,14 @@ Runner工作流已在本分支禁用，仅Hosted测试可运行。生产仍为HO
 必须为连续、成功、摘要绑定的回执；幂等账本改为 SQLite 事务，deadline
 在隔离子进程中执行且超时后的既有副作用明确保持不确定/HOLD。
 
+正式审核 `6167741893` 的 S1–S5 已在同一候选批次继续收敛：重启判定
+绝不返回 `ALLOW`；无外部可信结果源的阶段回执只标记
+`FORMAT_VALID_CANDIDATE`；checkpoint 自洽哈希只标记
+`STRUCTURALLY_VALID_ONLY`，并列出签名冻结回执、独立 Authority、实时 GET-only
+复核和 Owner Release Gate；G5 所有布尔与计数字段执行精确类型校验；有界调用
+改用 Pipe ACK，不依赖 `Queue.empty()`，并在超时后收敛 POSIX 子进程组、始终将
+可能副作用标记为 UNKNOWN/HOLD。以上仍不构成生产执行权。
+
 ## 已有证据与剩余工作
 - 东京Owner控制台2026-10-14T09:17:59Z：固定helper调用通过；国内模型与韩国小说模型隧道active。
 - 韩国Owner控制台2026-10-14T09:19:34Z：固定helper调用通过；小说active；易币API/调度active；可用内存1311988kB/磁盘26G。

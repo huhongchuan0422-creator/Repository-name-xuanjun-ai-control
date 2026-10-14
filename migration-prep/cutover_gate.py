@@ -35,9 +35,10 @@ def evaluate_isolation(observation):
     )
     for key in protected_and_required:
         require(observation[key] is True, "G5_ISOLATION_REQUIREMENT_FAILED:" + key)
-    require(not observation["writer_enabled"], "G5_WRITER_MUST_BE_DISABLED")
-    require(not observation["scheduler_enabled"], "G5_SCHEDULER_MUST_BE_DISABLED")
-    require(not observation["trade_credentials_present"], "G5_TRADE_CREDENTIALS_FORBIDDEN")
+    require(observation["writer_enabled"] is False, "G5_WRITER_MUST_BE_DISABLED")
+    require(observation["scheduler_enabled"] is False, "G5_SCHEDULER_MUST_BE_DISABLED")
+    require(observation["trade_credentials_present"] is False,
+            "G5_TRADE_CREDENTIALS_FORBIDDEN")
     return {"status": "PASS_ISOLATED_CANDIDATE", "production_write": False}
 
 
@@ -49,10 +50,23 @@ def evaluate_shadow(observation):
     )
     for key in required:
         require(key in observation, "G5_SHADOW_MISSING:" + key)
-    if observation["timed_out"] or observation["partial_success"]:
+    boolean_fields = (
+        "no_order_write", "same_inputs", "decision_match", "position_match",
+        "order_match", "protective_match", "restart_recovered", "duration_met",
+        "timed_out", "partial_success"
+    )
+    for key in boolean_fields:
+        require(type(observation[key]) is bool, "G5_SHADOW_BOOLEAN_REQUIRED:" + key)
+    for key in ("unknown_count", "inflight_count"):
+        require(type(observation[key]) is int and observation[key] >= 0,
+                "G5_SHADOW_COUNT_INVALID:" + key)
+    if observation["timed_out"] is True or observation["partial_success"] is True:
         return {"status": "HOLD", "reason": "G5_SHADOW_UNCERTAIN_OR_PARTIAL"}
-    require(observation["no_order_write"], "G5_SHADOW_WRITE_DETECTED")
-    require(all(observation[key] for key in ("same_inputs", "decision_match", "position_match", "order_match", "protective_match", "restart_recovered", "duration_met")), "G5_SHADOW_MISMATCH")
+    require(observation["no_order_write"] is True, "G5_SHADOW_WRITE_DETECTED")
+    require(all(observation[key] is True for key in
+                ("same_inputs", "decision_match", "position_match", "order_match",
+                 "protective_match", "restart_recovered", "duration_met")),
+            "G5_SHADOW_MISMATCH")
     require(observation["unknown_count"] == 0 and observation["inflight_count"] == 0, "G5_SHADOW_UNRESOLVED")
     return {"status": "PASS_SHADOW_CANDIDATE", "production_write": False}
 
@@ -63,13 +77,15 @@ def advance(history, requested, rollback=False):
 
 
 def rollback_verdict(history):
-    completed = validate_phase_history(ROLLBACK_PHASES, history, "G5_ROLLBACK")
+    assessment = validate_phase_history(ROLLBACK_PHASES, history, "G5_ROLLBACK")
+    completed = assessment["completed"]
     if "TOKYO_NEW_EPOCH_GRANTED" in completed:
         required = set(ROLLBACK_PHASES[:-1])
         require(required.issubset(set(completed)), "G5_TOKYO_REGRANT_BEFORE_KOREA_FENCE")
     korea_fenced = all(phase in completed for phase in ROLLBACK_PHASES[:3])
-    return {"status": "READY_TO_RESTORE_TOKYO" if korea_fenced else "HOLD",
-            "korea_fenced_first": korea_fenced}
+    return {"status": "CANDIDATE_READY_TO_RESTORE_TOKYO_NOT_AUTHORIZED" if korea_fenced else "HOLD",
+            "korea_fenced_first": korea_fenced, "history_status": assessment["status"],
+            "production_authorized": False}
 
 
 def uncertain_outcome(reason):
