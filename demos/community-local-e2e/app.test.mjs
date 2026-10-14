@@ -73,3 +73,56 @@ test('query never enables success ad even if state is SUCCESS',async()=>{
  await ui.click('create');await ui.click('query');
  assert.equal(ui.els.successAd.hidden,true);
 });
+
+test('same order: delayed old PENDING query cannot overwrite later SUCCESS',async()=>{
+ let resolveOldQuery;
+ const pending={amount_minor:150,currency:'CNY',state:'PENDING',provider_transaction_id:null,provider_settlement_verified:false};
+ const ui=setup(async(url)=>{
+  if(url.endsWith('/orders'))return ok(created);
+  if(url.endsWith('/orders/state'))return new Promise(resolve=>{resolveOldQuery=resolve;});
+  if(url.endsWith('/orders/simulate'))return ok(success);
+  throw Error('unexpected request');
+ });
+ await ui.click('create');
+ ui.events['query:click']();
+ await ui.click('complete');
+ assert.match(ui.els.status.textContent,/SUCCESS/);
+ assert.equal(ui.els.successAd.hidden,false);
+ resolveOldQuery(ok(pending));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.match(ui.els.status.textContent,/SUCCESS/);
+ assert.equal(ui.els.successAd.hidden,false);
+ assert.equal(ui.els.error.textContent,'');
+});
+test('same order: stale failed query must not clear later success',async()=>{
+ let rejectOldQuery;
+ const ui=setup(async(url)=>{
+  if(url.endsWith('/orders'))return ok(created);
+  if(url.endsWith('/orders/state'))return new Promise((_,reject)=>{rejectOldQuery=reject;});
+  return ok(success);
+ });
+ await ui.click('create');
+ ui.events['query:click']();
+ await ui.click('complete');
+ rejectOldQuery(Error('late network failure'));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.match(ui.els.status.textContent,/SUCCESS/);
+ assert.equal(ui.els.successAd.hidden,false);
+ assert.equal(ui.els.error.textContent,'');
+});
+test('same order: earlier simulation success cannot resurrect after later query',async()=>{
+ let resolveOldSuccess;
+ const pending={amount_minor:150,currency:'CNY',state:'PENDING',provider_transaction_id:null,provider_settlement_verified:false};
+ const ui=setup(async(url)=>{
+  if(url.endsWith('/orders'))return ok(created);
+  if(url.endsWith('/orders/simulate'))return new Promise(resolve=>{resolveOldSuccess=resolve;});
+  return ok(pending);
+ });
+ await ui.click('create');
+ ui.events['complete:click']();
+ await ui.click('query');
+ resolveOldSuccess(ok(success));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.match(ui.els.status.textContent,/PENDING/);
+ assert.equal(ui.els.successAd.hidden,true);
+});
