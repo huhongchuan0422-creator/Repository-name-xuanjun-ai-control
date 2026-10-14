@@ -51,6 +51,9 @@
           "tests/test_tokyo_korea_closeout.py"
         ]
       },
+      "paths": [
+        "tests/test_tokyo_korea_closeout.py"
+      ],
       "reuse": [
         "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1 policy",
         "existing Root and Gateway evidence",

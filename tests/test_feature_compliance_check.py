@@ -3,7 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from scripts.feature_compliance_check import validate
+from scripts.feature_compliance_check import validate, check_changed_paths
 
 class GovernanceTests(unittest.TestCase):
  def setUp(self):
@@ -39,6 +39,18 @@ class GovernanceTests(unittest.TestCase):
  def test_no_evidence_claim(self):
     self.feature["status"]="VERIFIED"
     self.assertIn("EXAMPLE_FEATURE: VERIFIED_WITHOUT_EVIDENCE",self.check())
+ def test_new_executable_requires_feature_mapping(self):
+    self.check()
+    self.assertIn("UNREGISTERED_ADDED_CODE: scripts/new_feature.py",
+        check_changed_paths(self.root,"governance/features.json",[("A","scripts/new_feature.py")]))
+    self.assertEqual(check_changed_paths(self.root,"governance/features.json",[("M","scripts/old.py")]),[])
+ def test_registered_executable_passes(self):
+    self.feature["paths"]=["scripts/new_feature.py"]
+    self.check()
+    self.assertEqual(check_changed_paths(self.root,"governance/features.json",[("A","scripts/new_feature.py")]),[])
+ def test_unrelated_document_not_blocked(self):
+    self.check()
+    self.assertEqual(check_changed_paths(self.root,"governance/features.json",[("A","docs/readme.md")]),[])
  def test_no_path_escape(self):
     self.feature["design"]["document"]="docs/../../etc/passwd"
     self.assertIn("EXAMPLE_FEATURE: DESIGN_DOCUMENT_NOT_FOUND",self.check())

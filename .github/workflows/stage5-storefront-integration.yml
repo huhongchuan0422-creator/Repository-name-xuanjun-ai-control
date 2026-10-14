@@ -1,0 +1,23 @@
+name: Stage5 Storefront Integration
+on:
+  pull_request:
+    paths:
+      - 'scripts/community_storefront_snapshot.py'
+      - 'tests/test_community_storefront_snapshot.py'
+      - '.github/workflows/stage5-storefront-integration.yml'
+permissions:
+  contents: read
+jobs:
+  storefront:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m unittest discover -s tests -p 'test_community_storefront_snapshot.py' -v
+          python -m unittest discover -s tests -p 'test_community_merchant_store.py' -v
+          python -m unittest discover -s tests -p 'test_community_ad_store.py' -v

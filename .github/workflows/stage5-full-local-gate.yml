@@ -1,0 +1,53 @@
+name: Stage5 Full Local Integration Gate
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'scripts/community_*.py'
+      - 'demos/community-local-e2e/**'
+      - 'demos/community-payment/**'
+      - 'demos/community-admin/**'
+      - 'tests/test_community_*.py'
+      - 'tests/test_stage5_*.py'
+      - 'plans/STAGE5_PHASE1_INTEGRATION_ACCEPTANCE_20261014.md'
+      - '.github/workflows/stage5-full-local-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install frozen headless browser runner
+        run: |
+          python -m pip install 'playwright==1.55.0'
+          python -m playwright install --with-deps chromium
+      - name: All simulated Stage5 business source tests
+        run: |
+          python -m unittest discover -s tests -p 'test_community_*.py' -v
+          python -m unittest discover -s tests -p 'test_stage5_*.py' -v
+      - name: Three-page JavaScript tests
+        run: |
+          node --test demos/community-local-e2e/app.test.mjs
+          node --test demos/community-local-e2e/merchant.test.mjs
+          node --test demos/community-local-e2e/platform.test.mjs
+          node --test demos/community-payment/demo.test.mjs
+          node --test demos/community-admin/admin.test.mjs
+      - name: Actual Chromium end-to-end simulation
+        run: python -m unittest discover -s tests -p 'test_stage5_browser_e2e.py' -v
+      - name: Explicit non-production release gate
+        run: |
+          echo FULL_LOCAL_SIMULATION_GATE=PASS
+          echo PHASE1_ALL_15_ITEMS_ACCEPTED=NO
+          echo MERCHANT_AND_PLATFORM_AUTHENTICATION=NOT_RUN
+          echo WECHAT_PROVIDER_SETTLEMENT=NOT_RUN
+          echo UK_DEPLOYMENT_AND_PRODUCTION_MIGRATION=NOT_RUN
