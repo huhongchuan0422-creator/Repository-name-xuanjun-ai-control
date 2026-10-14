@@ -3,7 +3,7 @@
   "base_commit": "579c1bd922464b3483b847a9e8e7b9803895976b",
   "base_tree": "f5f82eeab1311c05d4b97fa0cc143c174e8ec25a",
   "binance_called": false,
-  "candidate_content_sha256": "8b96ab8ad997ad035a3a7a88fbbe806cbf1c0d3f7ca753d1a30a5bb0d092ba8b",
+  "candidate_content_sha256": "ed2ab4ab5c4613b5a9a5d9ea2c27f848ff613d3a9e3ef1a400770abfc549d1d4",
   "canonical_migration_policy_enforced": true,
   "files": [
     {
@@ -38,8 +38,8 @@
     },
     {
       "path": "migration-prep/test_implementation_batch.py",
-      "sha256": "36e545c53768533262af7115a803bee128dd575fa72468c6d8cd0bc13db59e71",
-      "size": 34490
+      "sha256": "9e9a1c74edb7c81c0193dc0031f420ab601b5dc4638262a5213a8efb2deda288",
+      "size": 35103
     },
     {
       "path": "migration-prep/IMPLEMENTATION_BATCH.md",
@@ -73,8 +73,8 @@
     },
     {
       "path": "migration-prep/korea/deployment-manifest.json",
-      "sha256": "491cde769b3a56a406963a3080264d38769a4da5ee2dd97344cba74df4042dc3",
-      "size": 2562
+      "sha256": "fc849fcde9ff9e67245175f59f5672436c258fb66486466e186dcecb2f78058f",
+      "size": 2672
     },
     {
       "path": "migration-prep/korea/DEPLOYMENT.md",

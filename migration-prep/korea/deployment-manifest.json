@@ -12,8 +12,9 @@
     "log_root": "/var/log/xuanjun-binance"
   },
   "runtime": {"python": "/usr/bin/python3.11", "venv": "/opt/xuanjun-binance/venv", "reuse_yibi_venv": false},
-  "secret_references": ["SecretRef:BINANCE_ACCOUNT_READONLY", "SecretRef:TRADING_CREDENTIAL_MASTER_KEY"],
-  "forbidden_secret_references": ["BINANCE_TRADING", "PLAINTEXT_ENV_SECRET"],
+  "secret_references": ["SecretRef:BINANCE_ACCOUNT_READONLY"],
+  "forbidden_secret_references": ["BINANCE_TRADING", "TRADING_CREDENTIAL_MASTER_KEY", "PLAINTEXT_ENV_SECRET"],
+  "credential_scope_note": "PHASE_B_C_SHADOW_MUST_NOT_LOAD_A_MASTER_KEY_CAPABLE_OF_DECRYPTING_TRADING_CREDENTIAL_ROWS",
   "network": {
     "destination_allowlist": ["fapi.binance.com:443"],
     "resolved_ip_allowlist_source": "ROOT_OWNED_PINNED_CONFIG_REQUIRED_NOT_INSTALLED",

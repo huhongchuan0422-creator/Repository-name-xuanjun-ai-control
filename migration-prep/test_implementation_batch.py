@@ -589,6 +589,17 @@ class KoreaTransportTests(unittest.TestCase):
 
 
 class PackageIntegrityTests(unittest.TestCase):
+    def test_korea_shadow_cannot_load_trading_credential_or_shared_master_key(self):
+        root = os.path.dirname(__file__)
+        with open(os.path.join(root, "korea", "deployment-manifest.json")) as stream:
+            value = json.load(stream)
+        self.assertEqual(value["secret_references"],
+                         ["SecretRef:BINANCE_ACCOUNT_READONLY"])
+        self.assertIn("BINANCE_TRADING", value["forbidden_secret_references"])
+        self.assertIn("TRADING_CREDENTIAL_MASTER_KEY",
+                      value["forbidden_secret_references"])
+        self.assertFalse(value["writer_enabled"])
+
     def test_owner_scope_correction_keeps_minimal_binance_order(self):
         root = os.path.dirname(__file__)
         with open(os.path.join(root, "c7-owner-scope-execution-package.json")) as stream:

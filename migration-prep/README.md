@@ -40,6 +40,12 @@ systemd/cron 触发引用，并生成私有全路径清单与仓库内脱敏清�
 但 Root、Gateway 全局和 GitHub Runner 管理覆盖未闭合，因此 95/95 仍为
 `UNKNOWN/DENY`，不得把零观察解释为不存在。
 
+韩国阶段 B/C 的凭据范围已进一步锁定为仅
+`SecretRef:BINANCE_ACCOUNT_READONLY`。共享 `TRADING_CREDENTIAL_MASTER_KEY`
+可能解开同库中的交易凭据行，因此与 `BINANCE_TRADING` 一起在 Shadow 阶段
+明确禁止；只有后续单 Writer 阶段在独立验收和新精确 Release Gate 后才能
+提出专用交易 SecretRef，不能由 Shadow 包继承。
+
 ## 本变更实际行为
 新工作流仅在本仓库Owner提交的指定迁移分支PR运行，在东京与韩国调用已由Owner安装的root-owned固定零参数盘点helper。没有checkout、不运行PR代码、不新增sudo权限。先核验主机、Runner用户、helper所有者和模式，记录实际安装文件SHA256；原控制仓库目前为公开仓库，只允许输出已授权的脱敏资源及服务状态，不能上传业务数据、配置正文或密钥。
 migration-prep/inspect-helper.sh现已按Owner实际收到的安装命令逐字重建；本地SHA256=61bed97a32e970dd868f2d223c68ab41c012c484d314cb714c768629aac263c2，与两台首次Actions记录完全一致。新工作流在调用前强制pin该摘要，检查root-owned非软链父目录且group/other不可写；打印当前调用者sudo -l有效策略作为脱敏证据。没有更新任何主机helper或sudoers。
