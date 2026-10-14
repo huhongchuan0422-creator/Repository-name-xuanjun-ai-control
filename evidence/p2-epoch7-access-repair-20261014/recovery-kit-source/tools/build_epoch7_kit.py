@@ -65,7 +65,10 @@ def archive_bytes(files):
     """Epoch5 TarInfo pattern: stable ordering, names, modes, owners and times."""
     sink = io.BytesIO()
     with gzip.GzipFile(filename='', mode='wb', fileobj=sink, mtime=0) as gz:
-        with tarfile.open(fileobj=gz, mode='w', format=tarfile.PAX_FORMAT) as tar:
+        # USTAR's prefix/name fields represent the reviewed runtime unit paths
+        # without extension headers. The extractor deliberately rejects PAX.
+        # An unrepresentable future path fails before any output is created.
+        with tarfile.open(fileobj=gz, mode='w', format=tarfile.USTAR_FORMAT) as tar:
             for name in [''] + sorted(directories(files) | set(files)):
                 info = tarfile.TarInfo(ROOT_NAME + ('/' + name if name else ''))
                 info.uid = info.gid = 0

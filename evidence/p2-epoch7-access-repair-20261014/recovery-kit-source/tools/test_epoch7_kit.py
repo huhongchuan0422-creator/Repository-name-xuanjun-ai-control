@@ -82,6 +82,13 @@ class Fixture(unittest.TestCase):
         self.assertEqual((self.output / b.ARCHIVE).read_bytes(), (self.base / 'second' / b.ARCHIVE).read_bytes())
         self.assertNotIn(str(self.base), (self.output / 'kit-receipt.json').read_text())
 
+    def test_ustar_unrepresentable_basename_refused_before_output(self):
+        name='helpers/'+'x'*101+'.txt';data=b'synthetic bounded path fixture\n'
+        (self.source/name).write_bytes(data)
+        self.map['files'][name]={'source':name,'sha256':e.sha(data)}
+        with self.assertRaises(ValueError):self.build()
+        self.assertFalse(self.output.exists())
+
     def test_tar_metadata_and_no_implicit_extras(self):
         (self.source / 'private-plan.json').write_bytes(b'private synthetic sentinel')
         self.build()
@@ -326,7 +333,7 @@ class ExtractionTests(unittest.TestCase):
         change(rows)
         output=io.BytesIO()
         with gzip.GzipFile(filename='',mode='wb',fileobj=output,mtime=0) as zipped:
-            with tarfile.open(fileobj=zipped,mode='w') as archive:
+            with tarfile.open(fileobj=zipped,mode='w',format=tarfile.PAX_FORMAT) as archive:
                 for row,data in rows:archive.addfile(row,io.BytesIO(data) if data is not None else None)
         return output.getvalue()
 
@@ -335,6 +342,45 @@ class ExtractionTests(unittest.TestCase):
         result=x.extract(data,str(dest),*pins,owners=OWNERS)
         kit=e._verify(str(dest),r['kit_manifest_sha256'],OWNERS)
         self.assertEqual(result['files'],len(kit.cache)+1)
+
+    def test_actual_runtime_long_unit_paths_roundtrip_without_extensions(self):
+        # Exact two path names from the real107-file package; only the unit
+        # payloads here are synthetic. The full real package roundtrip is also
+        # mandatory in run_published_kit_ci, after bootstrap tests complete.
+        manifest_name=e.RUNTIME+'deploy/integration-manifest.json'
+        provenance_name=e.RUNTIME+'P2_PACKAGE_PROVENANCE.json'
+        runtime=json.loads((self.source/manifest_name).read_text())
+        paths=[]
+        for index,role in ((105,'callback'),(106,'dashboard')):
+            old='stage1/module%03d.py'%index
+            target='deploy/uk-owner-workbench/xuanjun-uk-owner-'+role+'.service'
+            name=e.RUNTIME+target;data=('[Unit]\nDescription=synthetic '+role+'\n').encode('ascii')
+            self.assertGreater(len(b.ROOT_NAME+'/'+name),100)
+            (self.source/(e.RUNTIME+old)).unlink()
+            del self.map['files'][e.RUNTIME+old];del self.map['modules']['module%03d'%index]
+            del runtime['files'][old];runtime['files'][target]=e.sha(data)
+            (self.source/name).parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+            (self.source/name).write_bytes(data)
+            self.map['files'][name]={'source':name,'sha256':e.sha(data)};paths.append(name)
+        manifest_raw=raw(runtime);self.map['runtime_manifest_sha256']=e.sha(manifest_raw)
+        provenance=json.loads((self.source/provenance_name).read_text())
+        provenance.update(runtime_files=runtime['files'],runtime_manifest_sha256=e.sha(manifest_raw))
+        for name,data in ((manifest_name,manifest_raw),(provenance_name,raw(provenance))):
+            (self.source/name).write_bytes(data);self.map['files'][name]['sha256']=e.sha(data)
+        x,receipt,data,pins=self.prepare()
+        with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
+            self.assertTrue(all(not member.pax_headers for member in archive.getmembers()))
+            self.assertTrue(all(archive.getmember(b.ROOT_NAME+'/'+name).isfile() for name in paths))
+        destination=self.base/b.ROOT_NAME;x.extract(data,str(destination),*pins,owners=OWNERS)
+        kit=e._verify(str(destination),receipt['kit_manifest_sha256'],OWNERS)
+        for name in paths:self.assertEqual(kit.cache[name],(self.source/name).read_bytes())
+
+    def test_pax_path_extension_remains_refused(self):
+        x,receipt,data,pins=self.prepare()
+        def change(rows):rows[-1][0].pax_headers={'path':rows[-1][0].name}
+        data=self.repack(x,data,change)
+        with self.assertRaisesRegex(ValueError,'ARCHIVE_METADATA'):
+            x.inspect_archive(data,x.sha(data),*pins[1:])
 
     def test_archive_hash_checked_before_tar_processing(self):
         x,r,data,pins=self.prepare()

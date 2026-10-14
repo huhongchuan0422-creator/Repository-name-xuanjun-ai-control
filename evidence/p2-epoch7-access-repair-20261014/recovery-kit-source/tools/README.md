@@ -52,7 +52,7 @@ Build command, after explicitly reviewing/updating the map hashes:
       --input-map /ABSOLUTE/REVIEWED_INPUT_MAP.json \
       --output /ABSOLUTE/NEW_OUTPUT_DIRECTORY
 
-Two independent builds from identical inputs produce identical tar.gz bytes and receipts. Archive files use0444, directories0700, owner/group0, fixed names and timestamp0; gzip has no filename and timestamp0. Build receipts contain no absolute workspace paths, bind the same manifest capability/status, and retain independent review PENDING and production NOT_RUN. A composed mode is selected only by an explicit `production_resume` input-map field; omitting it retains the historical refused mode.
+Two independent builds from identical inputs under the same Python/tarfile/zlib toolchain produce identical tar.gz bytes and receipts; cross-toolchain archive-byte equality is not claimed. USTAR prefix/name fields represent the reviewed long runtime unit paths without extension headers; unrepresentable paths fail before output creation, and the extractor still rejects every PAX extension. Archive files use0444, directories0700, owner/group0, fixed names and timestamp0; gzip has no filename and timestamp0. Build receipts contain no absolute workspace paths, bind the same manifest capability/status, and retain independent review PENDING and production NOT_RUN. A composed mode is selected only by an explicit `production_resume` input-map field; omitting it retains the historical refused mode.
 
 ## Remaining integration
 
