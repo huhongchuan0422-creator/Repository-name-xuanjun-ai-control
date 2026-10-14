@@ -141,3 +141,25 @@ def change_campaign_state(db, scope, campaign_id, next_state, actor, now, expect
         db.execute("INSERT INTO audit_events(tenant_id,merchant_id,store_id,campaign_id,actor_id,action,previous_version,new_version,happened_at) VALUES(?,?,?,?,?,?,?,?,?)",
                    (t,m,s,campaign_id,actor["actor_id"],"STATUS_"+next_state,version,version+1,now))
     return {"id":campaign_id,"state":next_state,"version":version+1}
+
+def review_creative(db, scope, campaign_id, approved, actor, now, expected_version):
+    """Only trusted platform moderator can record approval/rejection in local store."""
+    t,m,s=_scope(scope);_now(now)
+    if (not isinstance(actor,dict) or actor.get("authenticated") is not True or
+        actor.get("role")!="PLATFORM_ADMIN" or not isinstance(actor.get("actor_id"),str)
+        or not actor["actor_id"] or type(approved) is not bool or
+        type(expected_version) is not int or expected_version < 1):
+        raise ValueError("MODERATOR_REQUIRED")
+    verdict="APPROVED" if approved else "REJECTED"
+    with db:
+        row=db.execute("SELECT status,version FROM campaigns WHERE tenant_id=? AND merchant_id=? AND store_id=? AND campaign_id=?",
+                       (t,m,s,campaign_id)).fetchone()
+        if row is None: raise ValueError("UNKNOWN_CAMPAIGN")
+        if row[1]!=expected_version: raise ValueError("STALE_VERSION")
+        if row[0] not in ("REVIEW","APPROVED","PAUSED"): raise ValueError("INVALID_REVIEW_STAGE")
+        if db.execute("UPDATE campaigns SET moderation=?,version=version+1 WHERE tenant_id=? AND merchant_id=? AND store_id=? AND campaign_id=? AND version=?",
+                      (verdict,t,m,s,campaign_id,expected_version)).rowcount!=1:
+            raise ValueError("CONCURRENT_VERSION_CHANGE")
+        db.execute("INSERT INTO audit_events(tenant_id,merchant_id,store_id,campaign_id,actor_id,action,previous_version,new_version,happened_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                   (t,m,s,campaign_id,actor["actor_id"],"MODERATION_"+verdict,expected_version,expected_version+1,now))
+    return {"id":campaign_id,"moderation":verdict,"version":expected_version+1}
