@@ -22,9 +22,11 @@ class ObservationTests(unittest.TestCase):
   os.symlink('/etc/passwd',self.root+'/link')
   with self.assertRaisesRegex(ValueError,'ESCAPE'):obs.tree(self.root)
  def test_parse_never_invokes_certbot_main_or_issuance(self):
-  fake=Mock(returncode=0,stdout=b'BOTH_RENEWAL_MODES_PARSE_ONLY_PASS\n',stderr=b'')
+  fake=Mock(returncode=0,stdout=b'RENEWAL_MODE_PARSE_ONLY_PASS\n',stderr=b'')
   with patch.object(obs.subprocess,'run',return_value=fake) as run:
    self.assertTrue(obs.parse_only()['pass'])
+  self.assertEqual(run.call_count,2)
+  self.assertEqual([c[0][0][-1] for c in run.call_args_list],['renew','dry-run'])
   command=run.call_args[0][0];self.assertEqual(command[:3],['/usr/bin/python3','-B','-c'])
   self.assertIn('prepare_and_parse_args',command[3]);self.assertNotIn('certonly',command[3]);self.assertNotIn('main(',command[3])
  def test_parse_failure_not_pass(self):

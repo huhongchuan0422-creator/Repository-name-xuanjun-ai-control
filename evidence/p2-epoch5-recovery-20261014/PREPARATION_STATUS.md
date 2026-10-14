@@ -6,11 +6,13 @@ The epoch3 attempt consumed approval 6167552232 and ended in HOLD. Owner observe
 
 The issuance succeeded; the renewal dry-run logged a 261.68085359228326-second random delay against the caller's 240-second deadline. Certbot v1.22.0 officially defines `--no-random-sleep-on-renew` in `certbot/_internal/cli/__init__.py`. The new candidate applies this option to both dry-run and periodic renewal. Timeout diagnostics now retain private evidence; these logs must not be published verbatim.
 
-Local tests: 36/36 under Python3.6.8 in a root-mapped local namespace. These are unit/mocked lifecycle and observation tests, NOT UK host validation, ACME validation, CI, or production acceptance. Initial test-only use of Mock.call_args.kwargs was corrected to the Python3.6 tuple API; the final run passes. The frozen epoch3 kit and source remain unchanged.
+Local tests: 191/191 under Python3.6.8 in a root-mapped local namespace. These are unit/mocked lifecycle and observation tests, NOT UK host validation, ACME validation, CI, or production acceptance. Initial test-only use of Mock.call_args.kwargs was corrected to the Python3.6 tuple API; the final run passes. The frozen epoch3 kit and source remain unchanged. The complete epoch5 candidate also passed 191 tests from its packaged files in the local Python3.6.8 environment.
+
+Owner separately confirmed both renewal modes parse successfully on UK Certbot1.22.0 (2026-10-14T12:12:22Z). The first combined parser probe failed; separate parser subprocesses resolved the diagnostic and the collector now uses this verified approach. This is parser-only evidence, not renewal success.
 
 `observe_epoch5.py` only inventories current retained state and parses Certbot arguments in an isolated temporary config. It does not request a certificate, renew, resume, restart services, connect to the database, change activation, or grant admission. Output contains file hashes/metadata, not credential contents. A passed observation is not a full live install preflight.
 
-Remaining consolidated deliverables:
+Implemented locally, awaiting complete UK preflight and independent review:
 - Bounded retained-certificate continuation, preserving all old receipts and refusing unknown/partially applied target states.
 - Exact epoch5 -> new PREPARED generation of the existing activation journal, native binding and 24 rendered targets; no old writer restart or task/notification replay.
 - Full scanner reuse for database/FD/scheduler/cgroup/runner exclusion, fresh snapshot and single-attempt approval binding.

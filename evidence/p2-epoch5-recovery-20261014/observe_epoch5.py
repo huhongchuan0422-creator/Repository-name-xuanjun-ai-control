@@ -82,9 +82,12 @@ def parse_only():
   cfg=root+'/client.ini'
   with open(cfg,'xb'):pass
   os.chmod(cfg,0o600)
-  code="import sys; from certbot._internal import cli; from certbot._internal.plugins import disco; args=['--non-interactive','-c',sys.argv[1],'--config-dir',sys.argv[2]+'/config','--work-dir',sys.argv[2]+'/work','--logs-dir',sys.argv[2]+'/logs','renew','--cert-name','uk.wenwenwenyiyiyi.work','--no-directory-hooks','--no-random-sleep-on-renew']; plugins=disco.PluginsRegistry.find_all(); a=cli.prepare_and_parse_args(plugins,args); b=cli.prepare_and_parse_args(plugins,args+['--dry-run']); assert a.random_sleep_on_renew is False and b.random_sleep_on_renew is False and b.dry_run is True; print('BOTH_RENEWAL_MODES_PARSE_ONLY_PASS')"
-  p=subprocess.run(['/usr/bin/python3','-B','-c',code,cfg,root],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C'})
-  return {'returncode':p.returncode,'pass':p.returncode==0 and p.stdout.strip()==b'BOTH_RENEWAL_MODES_PARSE_ONLY_PASS','stderr_sha256':sha(p.stderr),'acme_called':False}
+  code="import sys,json; from certbot._internal import cli; from certbot._internal.plugins import disco; args=['--non-interactive','-c',sys.argv[1],'--config-dir',sys.argv[2]+'/config','--work-dir',sys.argv[2]+'/work','--logs-dir',sys.argv[2]+'/logs','renew','--cert-name','uk.wenwenwenyiyiyi.work','--no-directory-hooks','--no-random-sleep-on-renew']; dry=sys.argv[3]=='dry-run'; args+=['--dry-run'] if dry else []; value=cli.prepare_and_parse_args(disco.PluginsRegistry.find_all(),args); assert value.random_sleep_on_renew is False and value.dry_run is dry; print('RENEWAL_MODE_PARSE_ONLY_PASS')"
+  results=[]
+  for mode in ('renew','dry-run'):
+   p=subprocess.run(['/usr/bin/python3','-B','-c',code,cfg,root,mode],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30,env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C'})
+   results.append({'mode':mode,'returncode':p.returncode,'pass':p.returncode==0 and p.stdout.strip()==b'RENEWAL_MODE_PARSE_ONLY_PASS','stderr_sha256':sha(p.stderr),'stderr':p.stderr.decode('utf-8','replace')[:8192]})
+  return {'modes':results,'pass':all(v['pass'] for v in results),'acme_called':False}
 
 def main():
  need(os.geteuid()==0 and socket.gethostname().split('.')[0]==HOST,'FIXED_ROOT_HOST')
