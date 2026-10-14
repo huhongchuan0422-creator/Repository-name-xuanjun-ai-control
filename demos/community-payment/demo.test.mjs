@@ -8,8 +8,9 @@ const ids=['storefront','amount','pending','receipt','merchantName','merchantDes
 function freshDOM(){
  const events={};const elements={};
  for(const id of ids){
-   const opening=html.match(new RegExp('<(?:section|aside)\\b[^>]*\\bid="'+id+'"[^>]*>','i'));
-   elements[id]={textContent:'',hidden:opening? /(?:^|\\s)hidden(?:\\s|=|>)/i.test(opening[0]):false,value:'',
+   const initiallyHidden = new Set(['amount','pending','receipt','successSlot']);
+   if(initiallyHidden.has(id)) assert.ok(new RegExp('id="'+id+'"[^>]* hidden').test(html));
+   elements[id]={textContent:'',hidden:initiallyHidden.has(id),value:'',
      addEventListener:(kind,fn)=>{events[id+':'+kind]=fn;}};
  }
  const document={getElementById:id=>elements[id],addEventListener:(kind,fn)=>{events['document:'+kind]=fn;}};
