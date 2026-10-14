@@ -18,7 +18,8 @@ FILES = (
     "korea/xuanjun-binance-shadow.service.in", "korea/requirements.lock",
     "korea/deployment-manifest.json", "korea/DEPLOYMENT.md",
     "c7_acceptance.py", "c7_private_writer_verify.py", "test_c7_acceptance.py",
-    "c7-real-machine-execution-package.json", "C7_PRODUCTION_ACCEPTANCE_PREP.md",
+    "c7-real-machine-execution-package.json", "c7-owner-scope-execution-package.json",
+    "C7_PRODUCTION_ACCEPTANCE_PREP.md",
     "c7_root_inventory.py", "test_c7_root_inventory.py",
     "c7-current-evidence.json", "C7_CURRENT_EVIDENCE.md"
 )

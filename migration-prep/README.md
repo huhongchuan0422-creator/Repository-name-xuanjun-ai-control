@@ -3,6 +3,27 @@
 沿用PR17及plans/MIGRATION_SEQUENCE_V1.md；不是新任务队列。Work17原PR72保持不动，P2归Dots。
 Owner于2026-10-14明确：易币退出资源保障范围，小说暂保留，币安生产迁韩国，现有容量先承接，不预先扩容。
 
+## 2026-10-15 Owner 范围纠正（优先于旧迁移包中的扩大解释）
+
+本次只迁移**东京币安生产项目及其不可分割的生产依赖**。OpenClaw 整体、
+开发任务、测试/CI、临时 Agent/子进程、官网、客服/WeCom、模型服务、小说、
+易币和历史制品不因位于 `/opt/trading-system` 或东京主机就自动进入韩国。
+每个对象必须先分类为 `PRODUCTION_REQUIRED`、`CONDITIONAL_DEPENDENCY`、
+`DEVELOPMENT_OR_TEMPORARY` 或 `HISTORICAL_ONLY`；只有前两类且有直接依赖证据
+的对象才能进入迁移 artifact。
+
+韩国沿用当前 2核2G 配置；不以东京开发期间 OpenClaw Gateway 的 4.11GB
+占用推导扩容要求。容量由最小生产负载在韩国的安装后/Shadow 实测决定，
+检查 OOM、重启、MemoryAvailable、swap 增量、CPU、延迟、磁盘和 FD；失败则
+保持 HOLD，不自动转化为购买扩容要求。
+
+顺序为：币安最小生产闭包部署与只读验收 → Shadow → 东京 Writer 硬围栏 →
+最终一致快照 → 韩国单 Writer/Canary/独立验收 → 迁移验收 PASS → 易币精确
+归档确认并永久停用 → 确认东京全部币安生产依赖已迁出后再退役东京。
+小说只保留数据与现状，不为迁移启动或删除。易币在币安验收前不做项目级
+停用；只有精确残留对象被证明冲突时，才提交对象、端口/资源、影响和单独
+Release Gate。生产继续 `HOLD`，本修订不授权任何写操作。
+
 ## 本变更实际行为
 新工作流仅在本仓库Owner提交的指定迁移分支PR运行，在东京与韩国调用已由Owner安装的root-owned固定零参数盘点helper。没有checkout、不运行PR代码、不新增sudo权限。先核验主机、Runner用户、helper所有者和模式，记录实际安装文件SHA256；原控制仓库目前为公开仓库，只允许输出已授权的脱敏资源及服务状态，不能上传业务数据、配置正文或密钥。
 migration-prep/inspect-helper.sh现已按Owner实际收到的安装命令逐字重建；本地SHA256=61bed97a32e970dd868f2d223c68ab41c012c484d314cb714c768629aac263c2，与两台首次Actions记录完全一致。新工作流在调用前强制pin该摘要，检查root-owned非软链父目录且group/other不可写；打印当前调用者sudo -l有效策略作为脱敏证据。没有更新任何主机helper或sudoers。

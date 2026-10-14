@@ -64,6 +64,11 @@ access, Shadow, Canary or cutover.
      root egress/firewall state. Bind original output to host and collection epoch.
    - Impact: read-only. No user/directory/unit/package/SecretRef/firewall/IP change.
 
+   Existing-authority refresh already identifies 443 as
+   `morelogin-socks5-permanent.service` (`gost`, PID 996). The administrator return
+   must confirm its current socket/cgroup identity and coexistence boundary; it must
+   not stop, replace or reconfigure MoreLogin as part of read-only evidence.
+
 6. **Independent verifier custodian — actual code measurement**
    - Provider: administrator independent of the executor result producer.
    - Operation: measure the real loaded verifier executable/module, canonical path,
@@ -84,6 +89,9 @@ Confirm or replace all values; blanks remain HOLD and are not inferred:
 - Canary: maximum notional/order count, exact duration and stop threshold.
 - Korea-first rollback deadline and maximum time before Tokyo recovery may be considered.
 - Maintenance window, evidence root, independent Authority custodian and approvers.
+- Resource acceptance thresholds for the minimal Binance runtime (OOM/restart,
+  MemoryAvailable/swap delta, CPU/latency, disk/inode/FD). Do not answer with an
+  expansion purchase; existing Korea capacity is evaluated first.
 
 Replying with thresholds fixes review inputs only. It does not authorize production.
 
@@ -91,8 +99,14 @@ Replying with thresholds fixes review inputs only. It does not authorize product
 
 The package prepares, but this batch does not execute: trust-anchor/signature policy
 creation; verifier/runtime install; default-deny egress; SecretRef creation; Runner
-exit; Yibi stop/disable/mask; database freeze; live Binance GET; 24h Shadow; Canary;
+exit; database freeze; live Binance GET; Shadow; Canary;
 Writer epoch transfer; credential/IP revocation or cutover.
+
+Yibi stop/disable/mask is not a migration prerequisite. It becomes a separate exact
+post-acceptance Gate only after Binance migration PASS and archive revalidation. Before
+PASS, an alleged conflict must name the exact unit/process/port/path, direct impact and
+smallest isolated action; project-wide Yibi shutdown is forbidden. Novel remains in
+place and must not be started, stopped or deleted by this migration.
 
 Every future authorization must bind the exact artifact, commit/tree, host, path,
 unit, action, transaction/epoch, expiry and single-use nonce. Timeout, partial success

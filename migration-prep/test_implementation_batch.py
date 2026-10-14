@@ -524,6 +524,24 @@ class KoreaTransportTests(unittest.TestCase):
 
 
 class PackageIntegrityTests(unittest.TestCase):
+    def test_owner_scope_correction_keeps_minimal_binance_order(self):
+        root = os.path.dirname(__file__)
+        with open(os.path.join(root, "c7-owner-scope-execution-package.json")) as stream:
+            value = json.load(stream)
+        self.assertFalse(value["production_execution_authorized"])
+        self.assertTrue(value["production_hold"])
+        self.assertFalse(value["korea_capacity_policy"]["expansion_is_prerequisite"])
+        self.assertFalse(value["korea_capacity_policy"]["tokyo_openclaw_memory_is_comparator"])
+        self.assertIn("OPENCLAW_GATEWAY_AND_DEVELOPMENT_STATE",
+                      value["excluded_from_korea_artifact"])
+        self.assertEqual(value["korea_existing_boundaries"]["port_443_owner"],
+                         "morelogin-socks5-permanent.service")
+        phases = [item["phase"] for item in value["phases"]]
+        self.assertLess(phases.index("E_INDEPENDENT_BINANCE_ACCEPTANCE"),
+                        phases.index("F_POST_ACCEPTANCE_YIBI_RETIREMENT"))
+        self.assertLess(phases.index("F_POST_ACCEPTANCE_YIBI_RETIREMENT"),
+                        phases.index("G_TOKYO_RETIREMENT_PRECHECK"))
+
     def test_candidate_manifest_recomputes_every_file(self):
         root = os.path.dirname(__file__)
         with open(os.path.join(root, "candidate-manifest.json")) as stream:

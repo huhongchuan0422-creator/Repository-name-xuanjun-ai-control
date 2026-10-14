@@ -1,5 +1,7 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
+  "owner_scope_correction": "c7-owner-scope-execution-package.json",
+  "owner_scope_correction_precedence": "SUPERSEDES_PHASE_ORDER_AND_MIGRATION_OBJECT_SCOPE_IN_THIS_LEGACY_PACKAGE",
   "task_id": "TOKYO_KOREA_C7_F1_F2_REMEDIATION_6170516474",
   "audit_comment": "6170516474",
   "base_commit": "5f330b722eadfd887aa3228db68ee71d05ec74ca",

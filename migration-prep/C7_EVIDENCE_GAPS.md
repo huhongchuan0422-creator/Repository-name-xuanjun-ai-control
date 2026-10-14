@@ -35,8 +35,11 @@ Current C7 read-only evidence and the exact remaining authority split are record
    The repaired collector now fails closed and records every outcome, but it remains
    uninstalled and has not run as root on either host.
 3. Gateway-global OpenClaw automation/trigger inventory.
-4. Yibi `ARCHIVE_ONLY_NEVER_REENABLE` retirement while preserving novel/PostgreSQL/
-   Redis, with no re-enable on failure.
+4. Exact production-dependency closure: classify each Tokyo service, timer, process,
+   Gateway trigger, credential path and data object as `PRODUCTION_REQUIRED`,
+   `CONDITIONAL_DEPENDENCY`, `DEVELOPMENT_OR_TEMPORARY` or `HISTORICAL_ONLY`.
+   Only evidence-proven required objects enter the Korea artifact. No active Writer
+   observation is not yet proof of no Writer because global triggers remain incomplete.
 5. Independent production Ed25519 trust anchor, signed exact policy/manifest and
    Authority record; test keys are simulation evidence only. The actual result verifier
    file/path/owner/mode/hash, live loader and independent post-state authority also
@@ -46,11 +49,23 @@ Current C7 read-only evidence and the exact remaining authority split are record
    authoritative comparison. Fixture evidence is not live evidence.
 7. Korea dedicated identity/directories/runtime/SecretRefs, installed unique transport,
    root default-deny egress, pinned DNS/TLS evidence and bypass audit.
-8. Real Korea Shadow duration/restart evidence, bounded canary, Korea-first rollback,
+8. Real Korea minimal-load resource acceptance and Shadow/restart evidence, bounded
+   canary, Korea-first rollback,
    unknown-outcome reconciliation and Owner threshold/window approval.
 9. Credential/IP revocation and durable single-Writer epoch proof before any cutover.
 10. Independent Auditor and Owner Release Gate decision bound to the exact final
     commit/tree/artifact. PR99 remains Draft and migration remains HOLD.
+11. After Binance migration acceptance only: revalidate the existing Yibi archive,
+    enumerate exact Yibi units/timers/processes/ports, prove Novel/PostgreSQL/Redis
+    ownership boundaries, then stop/disable/mask Yibi only under a separate Gate.
+    Current Yibi 8000/18765 listeners do not conflict with the identified 443 owner.
+
+Korea expansion is not a prerequisite. The host is 2 CPU / about 1.83 GiB RAM with
+about 1.23 GiB currently available and about 1.90 GiB swap free. Capacity PASS/FAIL
+is derived from the installed minimal Binance production load and Shadow evidence,
+not Tokyo OpenClaw development-load memory. A capacity failure remains HOLD and is
+reported as measured evidence; it does not silently authorize expansion or scope
+growth.
 
 The following non-mutating portions were executed in C7 preparation: private-map
 integrity/ID validation, Tokyo/Korea fixed-helper baseline, caller-scope Gateway

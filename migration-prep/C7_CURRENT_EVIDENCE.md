@@ -1,6 +1,6 @@
 # C7 current real evidence
 
-Observed read-only on 2026-10-14. No Binance request or production mutation.
+Observed read-only on 2026-10-14/15. No Binance request or production mutation.
 
 ## Self-completed
 
@@ -20,6 +20,28 @@ Observed read-only on 2026-10-14. No Binance request or production mutation.
 - Verified Korea current baseline: Yibi API and scheduler and Novel remain active;
   dedicated Binance user/directories and Shadow unit are absent; candidate ports have
   zero listeners. This proves the pre-install state, not isolation.
+- Owner corrected the migration boundary: only the Tokyo Binance production project
+  and evidence-proven required dependencies move to Korea. Development tasks, CI,
+  temporary Agent/child processes, OpenClaw as a whole, unrelated website/channel/
+  model workloads and historical files are excluded. Location under Tokyo or
+  `/opt/trading-system` is not dependency evidence.
+- Refreshed Korea evidence at `2026-10-14T15:59Z`: 2 CPUs, `1915884 kB` total RAM,
+  `1290508 kB` available RAM, `2097148 kB` swap with `1987376 kB` free, and
+  `26506838016` bytes free on `/`. Port 443 belongs to
+  `morelogin-socks5-permanent.service` (`gost`, PID 996), not Yibi, Novel or nginx.
+  Yibi listens on 8000/18765 and no direct port conflict with the planned isolated
+  Binance runtime is currently proven.
+- `xuanjun-novel-factory.service` is technically active (PID 1005, zero restarts,
+  about 12 MB MemoryCurrent) and its health endpoint previously returned 200. That
+  proves a daemon, not launched business activity. It is preserved in place; this
+  migration will neither start, stop, delete nor move Novel or its data.
+- Tokyo process/systemd evidence currently shows no confirmed active Binance order
+  Writer. Four read-only/commercial timers are present (Finance collection, Owner
+  commercial ledger, weekly settlement and final invoice), while multiple active
+  `/opt/trading-system` processes belong to portal, customer channel or model/RPC
+  workloads. They are not automatically Binance migration dependencies. Global
+  trigger and credential reachability remain required before absence or inclusion
+  can be concluded.
 - Read the Gateway automation inventory available to this caller: two jobs, explicitly
   `scope=caller`. It is retained as partial evidence and cannot pass the global gate.
 - Verified the protected Secret Store is empty. No production Authority key/signature
@@ -57,6 +79,9 @@ Observed read-only on 2026-10-14. No Binance request or production mutation.
 
 ## Requires later exact approval
 
-Runner exit, Yibi stop/disable/mask, trust/SecretRef installation, Korea deployment,
+Runner exit, trust/SecretRef installation, Korea deployment,
 firewall/IP policy, live Binance GET, database freeze/final checkpoint, Shadow,
 Canary, single-Writer transfer and cutover remain separate production actions.
+Yibi retirement is now ordered strictly after Binance migration acceptance. Before
+that point, only an exact conflicting Yibi object may be proposed for separate action,
+with object identity, conflict and impact; no project-wide stop is authorized.
