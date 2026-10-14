@@ -77,8 +77,18 @@ class ProducerTests(unittest.TestCase):
         inv = copy.deepcopy(self.inventory); inv['items'].append(dict(inv['items'][0]))
         self.assertEqual(self.result(inventory=inv)['status'], 'HOLD')
 
-    def test_exact_repeated_record_idempotent(self):
-        self.assertEqual(self.result(records=self.records + [dict(self.records[0])])['currencies']['CNY']['actual_micros'], 5)
+    def test_exact_repeated_cost_record_hold(self):
+        r = self.result(records=self.records + [dict(self.records[0])])
+        self.assertEqual(r['status'], 'HOLD')
+        self.assertNotIn('currencies', r)
+        self.assertFalse(r['execution_granted'])
+
+    def test_exact_repeated_usage_record_hold(self):
+        self.usage()
+        r = self.result(records=self.records + [dict(self.records[0])])
+        self.assertEqual(r['status'], 'HOLD')
+        self.assertNotIn('totals', r)
+        self.assertFalse(r['release_granted'])
 
     def test_conflicting_duplicate_record_hold(self):
         item = dict(self.records[0]); item['amount_micros'] = 10

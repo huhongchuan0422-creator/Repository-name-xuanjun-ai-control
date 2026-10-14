@@ -51,6 +51,8 @@ def complete_producer_view(kind, binding, inventory_envelope, records_envelope,
                 raise ValueError('DUPLICATE_INVENTORY_DESCRIPTOR')
             expected.add(identity)
         observed = {_identity(kind, item) for item in data['records']}
+        if len(observed) != len(data['records']):
+            raise ValueError('DUPLICATE_PRODUCER_RECORD')
         if observed != expected:
             raise ValueError('PARTIAL_OR_EXTRA_PRODUCER_RECORDS')
         # Original modules validate schemas, typed values, task identity,
