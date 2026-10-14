@@ -21,6 +21,8 @@ jobs:
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -30,6 +32,32 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Build twice, verify archive and execute all mandatory offline suites
         run: |
+          set -euo pipefail
+          # Hosted /home has a default ACL. Keep production checks unchanged:
+          # use only a new disposable CI workspace under verified /opt ancestry.
+          python -I -B - <<'PY'
+          import os, stat, errno
+          for path in ('/', '/opt'):
+              info=os.lstat(path)
+              assert stat.S_ISDIR(info.st_mode) and info.st_uid==0 and info.st_gid==0
+              assert not info.st_mode & 0o7022
+              for name in ('system.posix_acl_access','system.posix_acl_default'):
+                  try: os.getxattr(path,name,follow_symlinks=False)
+                  except OSError as error: assert error.errno in (errno.ENODATA,errno.ENOTSUP)
+                  else: raise RuntimeError('CI_STAGING_ANCESTRY_ACL')
+          PY
+          CI_ROOT=$(sudo /usr/bin/mktemp -d /opt/xuanjun-p2-ci.XXXXXXXX)
+          sudo /usr/bin/chown "$(id -u):$(id -g)" "$CI_ROOT"
+          test "$(stat -c %a "$CI_ROOT")" = 700
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+          EXPECTED_TREE=$(git -C "$GITHUB_WORKSPACE" rev-parse "$GITHUB_SHA^{tree}")
+          git -c core.hooksPath=/dev/null clone --no-hardlinks --no-checkout -- "$GITHUB_WORKSPACE" "$CI_ROOT/repository"
+          git -C "$CI_ROOT/repository" -c core.hooksPath=/dev/null checkout --detach "$GITHUB_SHA"
+          test "$(git -C "$CI_ROOT/repository" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$CI_ROOT/repository" rev-parse 'HEAD^{tree}')" = "$EXPECTED_TREE"
+          mkdir -m 700 "$CI_ROOT/temp"
+          export RUNNER_TEMP="$CI_ROOT/temp" TMPDIR="$CI_ROOT/temp"
+          cd "$CI_ROOT/repository"
           python -I -B - <<'PY'
           import os, stat, json
           paths=set()
