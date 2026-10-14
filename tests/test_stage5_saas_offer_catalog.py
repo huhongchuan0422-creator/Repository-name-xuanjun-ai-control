@@ -1,6 +1,8 @@
 """Offline multioffer tests: no payments, procurements or ledger mutations."""
 import sqlite3
 import unittest
+import tempfile
+import os
 from scripts.community_saas_modules import connect
 from scripts.community_saas_offer_catalog import install,create_offer,list_offers,quote,read_quote,get_offer
 
@@ -48,6 +50,20 @@ class TestMultiOffer(unittest.TestCase):
     with self.assertRaises(ValueError):create_offer(self.db,"bad",1,"advertising","MONTHLY",[line(cny=True)],term_days=30)
     with self.assertRaises(ValueError):create_offer(self.db,"bad",1,"advertising","MONTHLY",[line(usd=-1)],term_days=30)
     with self.assertRaises(ValueError):create_offer(self.db,"bad",1,"advertising","BUYOUT",[line()],term_days=1)
+ def test_file_restart_preserves_offers_and_quotes(self):
+    with tempfile.TemporaryDirectory() as folder:
+        path=os.path.join(folder,"saas.sqlite")
+        first=connect(path)
+        try:
+            install(first)
+            create_offer(first,"restart",1,"advertising","MONTHLY",[line()],term_days=30)
+            quote(first,"restartQ","tenantA","restart",1,100,200)
+        finally:first.close()
+        second=connect(path)
+        try:
+            self.assertEqual(read_quote(second,"restartQ","tenantA")["totals"]["cny_minor"],1000)
+            self.assertEqual(len(list_offers(second,"advertising")),1)
+        finally:second.close()
  def test_versioned_offer_quote_snapshot(self):
     create_offer(self.db,"month",1,"advertising","MONTHLY",[line()],term_days=30)
     old=quote(self.db,"oldQ","tenantA","month",1,10,50)
