@@ -16,7 +16,9 @@ interruption, and preservation of detailed UNKNOWN state in the actual temp-file
 journal. Existing original160 and final34 Owner UK evidence retained.
 
 Local Python3.6.8 full177/177 PASS. Packaged affected suite39/39 PASS. UK amended
-39 and full verify-only pending Owner receipt; not installation approval.
+39/39 and full verify-only PASS per Owner original receipt, SHA256
+3efeca693481d0b1d79d5490b9a17cc4b9d64a7d1d7a9135b3daf3b8a9313484;
+not installation approval.
 
 Final replacement kit archive SHA256:
 7e3228b293d0737d27a3f3fca57385f5b6c5628cfddf6488ce1c17c1017d619f

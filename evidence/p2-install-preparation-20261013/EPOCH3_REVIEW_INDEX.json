@@ -1,0 +1,721 @@
+{
+  "archive_sha256": "7e3228b293d0737d27a3f3fca57385f5b6c5628cfddf6488ce1c17c1017d619f",
+  "files": [
+    {
+      "bytes": 8303,
+      "path": "epoch3_recovery_entry.py",
+      "sha256": "5c494fe7b5c8737a972d6e012e76a74d17b005a978462a6b3ab9b3cb8daa2848"
+    },
+    {
+      "bytes": 4446,
+      "path": "helpers/build_epoch3_runtime.py",
+      "sha256": "eeb0792defdfe0f26e33798229b75e57494c441791353cf7b56c6cac1fbadfab"
+    },
+    {
+      "bytes": 13695,
+      "path": "helpers/complete_install_executor.py",
+      "sha256": "e83b769b64547d75e130423b88684459d62f247ee1bd9b604d6740e3445bdb78"
+    },
+    {
+      "bytes": 3109,
+      "path": "helpers/epoch3_activation_rebind.py",
+      "sha256": "b7c5b3e797423a1cd3b71259adbbeb6f1e061f03eeb97c99f155924ca9e770c1"
+    },
+    {
+      "bytes": 3332,
+      "path": "helpers/epoch3_approval.py",
+      "sha256": "bf1dab01f21c55919f02bb3be28d6779a14e3cd550fad7e376c6a34b44ec2ed7"
+    },
+    {
+      "bytes": 2844,
+      "path": "helpers/epoch3_attempt_journal.py",
+      "sha256": "d1cefd947b5fadcf26a773ecf57e55717b317fc030aaf356feeec781fab605d6"
+    },
+    {
+      "bytes": 10019,
+      "path": "helpers/epoch3_host_driver.py",
+      "sha256": "5ec0d0f9043c0f4bb72c0f361ca05fec9bed74b3125fbc3fc9380d5908a31775"
+    },
+    {
+      "bytes": 7721,
+      "path": "helpers/epoch3_host_preflight.py",
+      "sha256": "4dfae7fa34ece32be0c6cad45b363c91f66a64938b3a49df1a94c96daea22ed6"
+    },
+    {
+      "bytes": 744,
+      "path": "helpers/epoch3_install_lock.py",
+      "sha256": "160cbfc50d0383bbcf9a4778362d7da8ea32dcbf02a7ec9b54216c130ae6ca64"
+    },
+    {
+      "bytes": 1979,
+      "path": "helpers/epoch3_native_binding.py",
+      "sha256": "77aa04cab4b67412983f5b49502ff1a6be6b57798fdf12624a83f9a63fa287fa"
+    },
+    {
+      "bytes": 2605,
+      "path": "helpers/epoch3_plan.py",
+      "sha256": "8ff17b55baa0aab773e2552f9c9199d70fd567c78b7d1731cc804c5eba1ce6a7"
+    },
+    {
+      "bytes": 3121,
+      "path": "helpers/epoch3_preserve.py",
+      "sha256": "ec4352321ffbaeec037e2ffb72a41f576b54c71eee297d63841a4309ce24ffac"
+    },
+    {
+      "bytes": 4576,
+      "path": "helpers/epoch3_recovery_sequence.py",
+      "sha256": "dcf5a6915cc97a889767cd446075dc873e3997b4735674636fd6f393abdd25d5"
+    },
+    {
+      "bytes": 7384,
+      "path": "helpers/epoch3_retained_runtime.py",
+      "sha256": "c17b835028ae3e8a7ae71d03a0284483bc3bae774bf621a913d389c6d0918384"
+    },
+    {
+      "bytes": 4726,
+      "path": "helpers/epoch3_retained_state.py",
+      "sha256": "0ac22da0760792f4459203f5c3004311f82f8a3a519ec0ef075ab807f277f459"
+    },
+    {
+      "bytes": 5094,
+      "path": "helpers/epoch3_service_containment.py",
+      "sha256": "d313933e65a82712157d5b3bd4eeec77c3398e4e57479a8c2191d7e9759bd53c"
+    },
+    {
+      "bytes": 6823,
+      "path": "helpers/inspect_epoch3.py",
+      "sha256": "1b6197cdcb83d290e5e4995cd5b3b76a76db4ad51299ea285a08d21180c12c48"
+    },
+    {
+      "bytes": 7033,
+      "path": "helpers/prepare_epoch3_bindings.py",
+      "sha256": "7e1810d7bc62d903874d1dd34d6a9977abc5de125c0da5a8187b9d53fd4a1318"
+    },
+    {
+      "bytes": 47412,
+      "path": "helpers/recover_exact_hold.py",
+      "sha256": "45affbb3b9298999d7e71bfb93b3ef5cb824464000ac78a927fd7c388614d74e"
+    },
+    {
+      "bytes": 7068,
+      "path": "helpers/verify_retained_publisher.py",
+      "sha256": "204e268d5075a9f884dca1d373679149e688dec71347a5a52e39ba6dd0eeee31"
+    },
+    {
+      "bytes": 3894,
+      "path": "recovery-kit-manifest.json",
+      "sha256": "1e13f9e1b6c2fddc135c314fbfb4c6f2b687466ef01208321116a9de10a3c71c"
+    },
+    {
+      "bytes": 4036,
+      "path": "tests/test_epoch3_activation_rebind.py",
+      "sha256": "9b083480bd91bad91efafaf48a504f7f641d565413bbb945d2e0addaa791dc83"
+    },
+    {
+      "bytes": 2334,
+      "path": "tests/test_epoch3_approval.py",
+      "sha256": "26179949ba9076067d17c4a3d3f60ab6c06d93eca8a96750f284628a6d61e742"
+    },
+    {
+      "bytes": 2491,
+      "path": "tests/test_epoch3_attempt_journal.py",
+      "sha256": "8bd43eea6f1e17b5cec1c17c9fedf9315e3b18fbe4f8f202c684757707abb8ff"
+    },
+    {
+      "bytes": 4321,
+      "path": "tests/test_epoch3_bindings.py",
+      "sha256": "e0c0708898d8a4ba34b4c2aaf38ba02f7491bfdcdb1b4faa966cd1b49f4af0f0"
+    },
+    {
+      "bytes": 11740,
+      "path": "tests/test_epoch3_host_driver.py",
+      "sha256": "33329c24a8c7246fc39471d663ce6c798cadad842dda523f7a74fe9f254a27a9"
+    },
+    {
+      "bytes": 6717,
+      "path": "tests/test_epoch3_host_preflight.py",
+      "sha256": "f7d15bb7d413afff1b36dbc594d9f5a17fb9b4caf7a6c5dba29a1a95da9db2d1"
+    },
+    {
+      "bytes": 1181,
+      "path": "tests/test_epoch3_inspection.py",
+      "sha256": "345c72e3a97e251dae82f46a90c47b48d551a3530f9c7d019919edb6855b8708"
+    },
+    {
+      "bytes": 1149,
+      "path": "tests/test_epoch3_install_lock.py",
+      "sha256": "861bb03cdb1a6eb603f841b1b8922ff90b7f6a540cb60ed1bb1710f4b7c307ca"
+    },
+    {
+      "bytes": 1990,
+      "path": "tests/test_epoch3_native_binding.py",
+      "sha256": "72a45f7a7e24974ce1b20da87be34af6e747b5e93cb989bba31d1f58b7b286b9"
+    },
+    {
+      "bytes": 2136,
+      "path": "tests/test_epoch3_plan.py",
+      "sha256": "0532afb83b5bb016f5829d685a784fc578f61a920bccf30ec43cfa375644b13b"
+    },
+    {
+      "bytes": 3564,
+      "path": "tests/test_epoch3_preserve.py",
+      "sha256": "236e1e9ebd3203bfceb373f2a362312ad84c02fbd78b62e34afcde3d6f16b9e9"
+    },
+    {
+      "bytes": 2923,
+      "path": "tests/test_epoch3_recovery_entry.py",
+      "sha256": "28294c96b9c76a765d174c1ae2021e883ebc3a6151b3f7b4def9db1e6a8e8e8b"
+    },
+    {
+      "bytes": 4779,
+      "path": "tests/test_epoch3_recovery_sequence.py",
+      "sha256": "143f7cfb41f5e6d8c240e4ab3687dfefe9ee538b8867fea341749fb33a3cdd24"
+    },
+    {
+      "bytes": 7134,
+      "path": "tests/test_epoch3_retained_runtime.py",
+      "sha256": "721e702475e076924d5f55f3ee80b9d72db67011eedc72d3433b68f69ca1f86b"
+    },
+    {
+      "bytes": 2663,
+      "path": "tests/test_epoch3_retained_state.py",
+      "sha256": "2bcd4c2595e088c812873c035845f335151853f1f27b3b6d05f356ad910556f4"
+    },
+    {
+      "bytes": 2864,
+      "path": "tests/test_epoch3_runtime_build.py",
+      "sha256": "c27db39296cd759b789476680a584e73e70c07b3cbf8ee6d02b4d717bcf47a71"
+    },
+    {
+      "bytes": 3970,
+      "path": "tests/test_epoch3_service_containment.py",
+      "sha256": "d74cbfb1e03061b2be39a2efde75a00616b61f789741200c69a87190af7e4412"
+    },
+    {
+      "bytes": 11528,
+      "path": "xuanjun-p2-package/P2_PACKAGE_PROVENANCE.json",
+      "sha256": "5bd01cab93da30b71117c4090366d1133a67f24378db1b9d2f4db712243bfc41"
+    },
+    {
+      "bytes": 1901,
+      "path": "xuanjun-p2-package/deploy/INTEGRATION_BINDING.md",
+      "sha256": "fa8518ad5eab07520a92ca1d87ccf788c56ab6550e48112bc1d505e2fa73337a"
+    },
+    {
+      "bytes": 4139,
+      "path": "xuanjun-p2-package/deploy/UK_DISPATCHER_ROLLOUT.md",
+      "sha256": "7f8929cf16b4739ac6fbf10b4bedbc1ab406ae04ccdc6d2613747c22bdb1538a"
+    },
+    {
+      "bytes": 1664,
+      "path": "xuanjun-p2-package/deploy/dispatcher.example.json",
+      "sha256": "cc449a9fd1dfa47608f32eb4d119b4b384e52ab149919fe7b101ae9291d66bff"
+    },
+    {
+      "bytes": 13062,
+      "path": "xuanjun-p2-package/deploy/integration-manifest.json",
+      "sha256": "338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09"
+    },
+    {
+      "bytes": 360,
+      "path": "xuanjun-p2-package/deploy/p2-gateway-relay.json.template",
+      "sha256": "c2f2379380f113c2b134a7f5fc2d39e7563872764b55c1041b00192f9da62fca"
+    },
+    {
+      "bytes": 972,
+      "path": "xuanjun-p2-package/deploy/p2-native-controller.binding.json.template",
+      "sha256": "219194a964f8a3eee16d1a10aebddc135a42c43352f8e53df86035f3a102e014"
+    },
+    {
+      "bytes": 90,
+      "path": "xuanjun-p2-package/deploy/p2-native-ledger-client.json.template",
+      "sha256": "29750e5454c430de403e4fc2700ecea87f2fe688a35c799635d4f326f3ed10ff"
+    },
+    {
+      "bytes": 357,
+      "path": "xuanjun-p2-package/deploy/p2-nginx-main.conf",
+      "sha256": "e9b99ace3444e0eaa5a9cb5c6a975e7bed31bfc3cb3a15d2e54959b3fa9daef4"
+    },
+    {
+      "bytes": 466,
+      "path": "xuanjun-p2-package/deploy/p2-nginx.service",
+      "sha256": "a1d6e0b8cabcfcbec8d834101b70056580135e6a235bb26e293bc904172db545"
+    },
+    {
+      "bytes": 86,
+      "path": "xuanjun-p2-package/deploy/p2-owner-feishu-binding.json.template",
+      "sha256": "95cd62095f49cf9bffe718460948f1756ffc308b4362da6ff29503e15a0e47e0"
+    },
+    {
+      "bytes": 334,
+      "path": "xuanjun-p2-package/deploy/p2-tls-renewal.json.template",
+      "sha256": "0cd294c87173aa8a1b5a5c77335224776ad2a332b48a94e287dae37b231531a6"
+    },
+    {
+      "bytes": 760,
+      "path": "xuanjun-p2-package/deploy/root-broker.example.json",
+      "sha256": "9cc7251fece619ce8a9d1fa99d6f4b22db489e612c3305d5c24a208237530b73"
+    },
+    {
+      "bytes": 2682,
+      "path": "xuanjun-p2-package/deploy/uk-owner-workbench/README.md",
+      "sha256": "a22d154a81aa293fff778b456dc4e33c3043ba06a371bd0efe0b812c84da50b2"
+    },
+    {
+      "bytes": 1900,
+      "path": "xuanjun-p2-package/deploy/uk-owner-workbench/nginx.conf.template",
+      "sha256": "f72349f30c7c6beb950522967a3ce6a274285d48a12fcb531615ac0f84c410ef"
+    },
+    {
+      "bytes": 1557,
+      "path": "xuanjun-p2-package/deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service",
+      "sha256": "844e970413d724bb468d6c701b7195a41f7c02d97018e57cd3e9b60d40469199"
+    },
+    {
+      "bytes": 1090,
+      "path": "xuanjun-p2-package/deploy/uk-owner-workbench/xuanjun-uk-owner-dashboard.service",
+      "sha256": "3e03f165fad1892465f28324f8dea2fba8ff620b759fa2c265a625dc03cd431f"
+    },
+    {
+      "bytes": 1058,
+      "path": "xuanjun-p2-package/deploy/xj-root-broker.service",
+      "sha256": "50d7781cb9c385f154fe80d9d9310411576f8ed98d4f5c84cdc1c5a0bd6de7ba"
+    },
+    {
+      "bytes": 255,
+      "path": "xuanjun-p2-package/deploy/xj-root-broker.socket",
+      "sha256": "a01777a36599bdc253357a100ed9eb089507b6bc9cae739cb3647b8e35d49562"
+    },
+    {
+      "bytes": 2051,
+      "path": "xuanjun-p2-package/deploy/xuanjun-development-dispatcher.service",
+      "sha256": "9d14ab77fd0ce4c0ee96998668938dccd11ce298606063c9721b8a3572b011ff"
+    },
+    {
+      "bytes": 1276,
+      "path": "xuanjun-p2-package/deploy/xuanjun-github-intake.service",
+      "sha256": "7b9ef4ecdcee076c24aaaa73fd546ff2287b93fe2959b3749b4afdfbca4d68b3"
+    },
+    {
+      "bytes": 225,
+      "path": "xuanjun-p2-package/deploy/xuanjun-github-intake.timer",
+      "sha256": "0b82e326abad52faf02efefd1d82fdbe848dca0234d27d3fdad8f07ac3dd0f97"
+    },
+    {
+      "bytes": 913,
+      "path": "xuanjun-p2-package/deploy/xuanjun-ledger.service",
+      "sha256": "06322ea8c0d0b2d615c0905f4ce8b231ae03693d355d403338bf16c96096247a"
+    },
+    {
+      "bytes": 271,
+      "path": "xuanjun-p2-package/deploy/xuanjun-ledger.socket",
+      "sha256": "a1a3d372706646da2b8954b2162e5dcd7974246b5d4660fe6098b6a699e032dd"
+    },
+    {
+      "bytes": 1034,
+      "path": "xuanjun-p2-package/deploy/xuanjun-p2-gateway-relay.service",
+      "sha256": "7f946414e984c7671fcb68fe5cb98ba269ec49653ff9b2c1ed424a2b23095991"
+    },
+    {
+      "bytes": 304,
+      "path": "xuanjun-p2-package/deploy/xuanjun-p2-gateway-relay.socket",
+      "sha256": "a08ac2421421f0d2e003e8ee0de842b17b3562dfeb344ac8b378486c4f7f5034"
+    },
+    {
+      "bytes": 586,
+      "path": "xuanjun-p2-package/deploy/xuanjun-p2-tls-renew.service",
+      "sha256": "df95002081d4f39e788f47049919df959ecf7dcb50172e43facf393cd66b92cf"
+    },
+    {
+      "bytes": 194,
+      "path": "xuanjun-p2-package/deploy/xuanjun-p2-tls-renew.timer",
+      "sha256": "e081274ebad8ee14e1476673eedc13bf829155179e80a992b42b4651164c2fca"
+    },
+    {
+      "bytes": 210,
+      "path": "xuanjun-p2-package/deploy/xuanjun-uk-openclaw-p2-docker.conf",
+      "sha256": "651c3bd98572e441d5c6d9c9a9b97e90ce347922acb9ce5bd62583448dc7bc2b"
+    },
+    {
+      "bytes": 916,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/canonical.mjs",
+      "sha256": "f3a40e5f90b3abfcd81bc3c5c408011995c3ab32cda72f565f124576d3d0706a"
+    },
+    {
+      "bytes": 13205,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/controller.mjs",
+      "sha256": "a0513740a5c8f1c99bf734494dab14baa8b5b2688c6f8ebdeea7e2c6cb2825b6"
+    },
+    {
+      "bytes": 10713,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/host.mjs",
+      "sha256": "3c9f5d2b4cce041ab6e7bc9a73707b467b30f5e884a450c4bd9b69a4b9c61a46"
+    },
+    {
+      "bytes": 2840,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/index.mjs",
+      "sha256": "c1867c271bc48c6f38be92d29daf2fad5addd457db2468d01f1ef3ae14467286"
+    },
+    {
+      "bytes": 2343,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/ledger.mjs",
+      "sha256": "e30e7671ba89ef8bee73f2444cbc246e41b87a08b6039338fe4cd610646b0e6b"
+    },
+    {
+      "bytes": 353,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/openclaw.plugin.json",
+      "sha256": "14916ef983942a57ffe6afe5e6bf1bdf8415d2243e2fd23dfed576b62b2d6fb5"
+    },
+    {
+      "bytes": 117,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/package.json",
+      "sha256": "002645bf81d143cebeb08aab1b0be2d519b8ebc834f398441d8d2450310e2115"
+    },
+    {
+      "bytes": 1524,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/plugin.mjs",
+      "sha256": "414102fe1fb38bdfaaf8d47505bcc8ef7416ac4fbc6521b3500aac2847effdfc"
+    },
+    {
+      "bytes": 2836,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/sdk-layout.mjs",
+      "sha256": "fa747f7bf664c5311ecbddc824387c10b3ac814a004bda0ee04364cb7938ed1e"
+    },
+    {
+      "bytes": 2269,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/strict-json.mjs",
+      "sha256": "ce10a780c983a424f11cb0de37c748eda811efd3fa317b9445ab44bc1dac82fd"
+    },
+    {
+      "bytes": 11342,
+      "path": "xuanjun-p2-package/plugins/p2-native-controller/workspace.mjs",
+      "sha256": "ca4b50aa4489087289b8726a10b3751c95f99314043eb5e8e7ddf66fbb1d8311"
+    },
+    {
+      "bytes": 24914,
+      "path": "xuanjun-p2-package/scripts/uk-integration-install.py",
+      "sha256": "943f4d04861d8b580008af457d90187622a9de2d1c8cd66c93a721b8ac2be0f3"
+    },
+    {
+      "bytes": 1995,
+      "path": "xuanjun-p2-package/scripts/uk-owner-workbench-config.py",
+      "sha256": "af0c64c5c5cf3a12167b8c6a25ef805c57f7a5296bc09c11c3eebf7ea27285ec"
+    },
+    {
+      "bytes": 4655,
+      "path": "xuanjun-p2-package/scripts/uk-p2-install.py",
+      "sha256": "ac68b6416bc7c632b121c4fe2f75961e7940da749150cb2aff69c623d7499811"
+    },
+    {
+      "bytes": 206,
+      "path": "xuanjun-p2-package/scripts/uk-p2-tls-renew.py",
+      "sha256": "763566d7b31e2bdec2e03010d60ef06481bbe2e6171ff0cb6d0495f4e56286c2"
+    },
+    {
+      "bytes": 4443,
+      "path": "xuanjun-p2-package/scripts/xj-root-broker-client",
+      "sha256": "7d7e71185b072a1beaf598fd0f3cec91989e4e6766c93d81db567771d138c8e2"
+    },
+    {
+      "bytes": 16726,
+      "path": "xuanjun-p2-package/stage1/activation_control.py",
+      "sha256": "169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4"
+    },
+    {
+      "bytes": 1264,
+      "path": "xuanjun-p2-package/stage1/callback_schema_gate.py",
+      "sha256": "a7e83427ac9fedb7e86c28f9298122e134215317bb996eae8753cfcb3d455271"
+    },
+    {
+      "bytes": 16297,
+      "path": "xuanjun-p2-package/stage1/codex_app_server_worker.py",
+      "sha256": "5008cf7f37399f2aa95fdfcd1fcef10c5b9ccc97b6414081236fced074f7baa3"
+    },
+    {
+      "bytes": 10503,
+      "path": "xuanjun-p2-package/stage1/codex_worker.py",
+      "sha256": "3973e328ad1e401dca2f104241117e343bc7e9457f329af5428f40836a058646"
+    },
+    {
+      "bytes": 2114,
+      "path": "xuanjun-p2-package/stage1/dependency_evidence_view.py",
+      "sha256": "fc4debda2f0d89988ca2677bc8b940b39c9a4f735316fbe38497f6d0cdb9d890"
+    },
+    {
+      "bytes": 5967,
+      "path": "xuanjun-p2-package/stage1/development_loop.py",
+      "sha256": "ef92d0a3ba8ce7cbe0236c6a6a8f0b79c610b02a577521982955905f59b61bfb"
+    },
+    {
+      "bytes": 88213,
+      "path": "xuanjun-p2-package/stage1/development_pipeline.py",
+      "sha256": "a3314fd071cb78ca7d52a0edc8893428c02acd1774878955189ddd2e1b44272b"
+    },
+    {
+      "bytes": 23485,
+      "path": "xuanjun-p2-package/stage1/development_service.py",
+      "sha256": "801cd1e1ed85613976aab7c913cc532702b41f837dfd2e274cc3b49e63c19402"
+    },
+    {
+      "bytes": 47107,
+      "path": "xuanjun-p2-package/stage1/execution_ledger.py",
+      "sha256": "8c607f0e2222d906b8450b302dad014a69dfedcb710a257731454e0d97aaf8c6"
+    },
+    {
+      "bytes": 51235,
+      "path": "xuanjun-p2-package/stage1/execution_supervision.py",
+      "sha256": "d39b5c95978360bf704328a037f6809ab9c6cc1fc04c5f0971681f61ca353354"
+    },
+    {
+      "bytes": 6625,
+      "path": "xuanjun-p2-package/stage1/github_issue_consumer.py",
+      "sha256": "bf757891fa434d06ee779df00bbf0fef9f2817622abf6f7b4ab68edb04d97be1"
+    },
+    {
+      "bytes": 9390,
+      "path": "xuanjun-p2-package/stage1/ledger_backup.py",
+      "sha256": "e30fa6901b6b951419abcbcae4ce957b88a2ebd29bc5d6de49cd546be542cc84"
+    },
+    {
+      "bytes": 5643,
+      "path": "xuanjun-p2-package/stage1/ledger_cutover_transaction.py",
+      "sha256": "67c9d8283c91646dee5bb543e778dcdcae21cd629e988383e5b4c4167ca62584"
+    },
+    {
+      "bytes": 3775,
+      "path": "xuanjun-p2-package/stage1/ledger_install_stage.py",
+      "sha256": "e5abc81563f8deae64e4e089b75b0257994366eb61482afca0ba1067b9569fe8"
+    },
+    {
+      "bytes": 2374,
+      "path": "xuanjun-p2-package/stage1/ledger_service.py",
+      "sha256": "6c602d1c5546b94941271443bf12b7205620edc4ea02b69a6f86800aa9ba1108"
+    },
+    {
+      "bytes": 12875,
+      "path": "xuanjun-p2-package/stage1/legacy_host_adapter.py",
+      "sha256": "c59431d75b0c74489c1edb94d3c52e92668414b3308edc91efd13fa073259864"
+    },
+    {
+      "bytes": 5718,
+      "path": "xuanjun-p2-package/stage1/legacy_quiescence.py",
+      "sha256": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e"
+    },
+    {
+      "bytes": 8015,
+      "path": "xuanjun-p2-package/stage1/mechanical_wake.py",
+      "sha256": "944bbd15249a02d299997a92468f4649e87a13dbdf9492339fc21389ca68379c"
+    },
+    {
+      "bytes": 3164,
+      "path": "xuanjun-p2-package/stage1/mechanical_wake_service.py",
+      "sha256": "88f06c8ec124dad82af0aa5794180c30cbeb61d67c9add31aaa6ab5e148cf75e"
+    },
+    {
+      "bytes": 28442,
+      "path": "xuanjun-p2-package/stage1/native_child_adapter.py",
+      "sha256": "06c6eaa7861ec9c4c95cfe5214c4cc33ff440b12cc173f985485e9913758fd44"
+    },
+    {
+      "bytes": 8076,
+      "path": "xuanjun-p2-package/stage1/native_gateway_controller.py",
+      "sha256": "d3d546fa491596cc4d82feac9746f0368eb65f20f3fd134164dca8055337dd3e"
+    },
+    {
+      "bytes": 124,
+      "path": "xuanjun-p2-package/stage1/native_gateway_controller.py.json",
+      "sha256": "004073aaf6ced59ae9208c3d2c9dfdbc8995da204c9ee688698b3b2c2f0b3802"
+    },
+    {
+      "bytes": 4728,
+      "path": "xuanjun-p2-package/stage1/native_github_notifier.py",
+      "sha256": "e909d82255d051b6ccf23229e8356da048eda2aa09a15333be4cfa72e5d781f8"
+    },
+    {
+      "bytes": 3492,
+      "path": "xuanjun-p2-package/stage1/native_ledger_bridge.py",
+      "sha256": "c07d017cb970d84ba9c8128f956f10b72011a1960452d2946b8ce2a4f83f8889"
+    },
+    {
+      "bytes": 1239,
+      "path": "xuanjun-p2-package/stage1/native_ledger_operations.py",
+      "sha256": "87ec4505e7de035cf8070ae9a9777fd2c112494b66da246dc25e4a94a863bbac"
+    },
+    {
+      "bytes": 8159,
+      "path": "xuanjun-p2-package/stage1/native_peer_identity.py",
+      "sha256": "e155d6c4874fcac8b21517c4815337c14b9a5666e0e2bc10a309166baccfd309"
+    },
+    {
+      "bytes": 9915,
+      "path": "xuanjun-p2-package/stage1/native_pipeline_runtime.py",
+      "sha256": "41914af8c264fc225801d3977fcf72e5992440f547ac0696fc973e6b5a5a12c5"
+    },
+    {
+      "bytes": 5720,
+      "path": "xuanjun-p2-package/stage1/native_snapshot_access.py",
+      "sha256": "5ab4fc08bad17d4555e7a307c63a64641edec7ddf3371c5344368d49b8df24bd"
+    },
+    {
+      "bytes": 4698,
+      "path": "xuanjun-p2-package/stage1/owner_approval_dispatch.py",
+      "sha256": "de72d6a4cf1eeabf765d9a7b537c8ec94ff83a5eda049e58695c50a2a59f88e3"
+    },
+    {
+      "bytes": 6513,
+      "path": "xuanjun-p2-package/stage1/owner_callback_server.py",
+      "sha256": "1f254a73d2d551d6d6d7045d0658d7b69b830b0b3493fe04ab8d51b715fdfd79"
+    },
+    {
+      "bytes": 8774,
+      "path": "xuanjun-p2-package/stage1/owner_dashboard.html",
+      "sha256": "3b9f31303814bd2462e66f7f2762b0f50ed9a4294dc7fcce4a357f3a194e2306"
+    },
+    {
+      "bytes": 12885,
+      "path": "xuanjun-p2-package/stage1/owner_dashboard.py",
+      "sha256": "12d39df66ad7cb66810ebd4dd84cc6b61981b8b597591880e39d4d29258f741d"
+    },
+    {
+      "bytes": 2467,
+      "path": "xuanjun-p2-package/stage1/owner_feishu_bridge_cycle.py",
+      "sha256": "85fe28d120d9c6cc932e0619966947ea2b5e5b3d57cd2e5ee9a6144a446e8add"
+    },
+    {
+      "bytes": 3290,
+      "path": "xuanjun-p2-package/stage1/owner_feishu_claim_guard.py",
+      "sha256": "71816cc0acc497e34ebc273d4b6e3e079894bad351e88419a239cb2c6ce32c26"
+    },
+    {
+      "bytes": 4459,
+      "path": "xuanjun-p2-package/stage1/owner_feishu_history.py",
+      "sha256": "f3c9be72b3c40315b5fad6c73def20828de1d83182ad7b0de659371ddabed3b1"
+    },
+    {
+      "bytes": 5842,
+      "path": "xuanjun-p2-package/stage1/owner_feishu_https.py",
+      "sha256": "4db02fd39c5b6a27b3faa185760679efacb82285ab377630463b903923e03a98"
+    },
+    {
+      "bytes": 9087,
+      "path": "xuanjun-p2-package/stage1/owner_feishu_ledger_endpoint.py",
+      "sha256": "c7da7991ee9fe4f63b4ab4fb71fffbe725e98c0fadc5ecda22b9fa8c2d9abe0c"
+    },
+    {
+      "bytes": 4373,
+      "path": "xuanjun-p2-package/stage1/owner_feishu_transport.py",
+      "sha256": "96e53b23576d6c23ba569b8e88e524f85a51fe01a115a13a0163884353d7222c"
+    },
+    {
+      "bytes": 2467,
+      "path": "xuanjun-p2-package/stage1/owner_notification_outbox.py",
+      "sha256": "6d06324e7f6c974bc38c247c5792254a93e394ee9d2e0e1558dd4c034537fdf0"
+    },
+    {
+      "bytes": 3767,
+      "path": "xuanjun-p2-package/stage1/owner_update_router.py",
+      "sha256": "002d1c2cf415df99e64bdcb0f9f3e9b879a8cfbff57d6ad52793642fa23c21c8"
+    },
+    {
+      "bytes": 4534,
+      "path": "xuanjun-p2-package/stage1/p2_auxiliary_isolation.py",
+      "sha256": "d5c18d2cb08a1f5f0225e7b68167faf69e696f9c0545e515e0afc163b39dedc4"
+    },
+    {
+      "bytes": 6496,
+      "path": "xuanjun-p2-package/stage1/p2_bootstrap_files.py",
+      "sha256": "fcc80f70535570155d05df555d68c3bdd1125a9662162d9ad594524efed91307"
+    },
+    {
+      "bytes": 41340,
+      "path": "xuanjun-p2-package/stage1/p2_fixed_host_runtime.py",
+      "sha256": "83ca91a597c3220c40a4de37c8af211463dba13eb36eac55a8802c12d5a36ac2"
+    },
+    {
+      "bytes": 3651,
+      "path": "xuanjun-p2-package/stage1/p2_gateway_relay.py",
+      "sha256": "b00ed6f412283fd3a90b36983fd52b0a448ae91543a56f8a4ce7b1a0ee226cda"
+    },
+    {
+      "bytes": 25653,
+      "path": "xuanjun-p2-package/stage1/p2_install_entrypoint.py",
+      "sha256": "b1fd157a1e126fad6dd2eb3ab1f0c770019da62f41c82f35b49b8ba4ba39e4d6"
+    },
+    {
+      "bytes": 4951,
+      "path": "xuanjun-p2-package/stage1/p2_legacy_adoption.py",
+      "sha256": "e890da7087190fb968b799d001822a27e7ee8b3c49faecb0341c7bacaaa1e0cb"
+    },
+    {
+      "bytes": 14546,
+      "path": "xuanjun-p2-package/stage1/p2_prerequisites.py",
+      "sha256": "6482c4dfcdafe9635dce6504748c79d5e043a80dfc2c361c75625d8e08509c05"
+    },
+    {
+      "bytes": 8814,
+      "path": "xuanjun-p2-package/stage1/p2_publisher_bootstrap.py",
+      "sha256": "475953e280a3efead2d966f42e3da54da95ea649387e1578ca236814cf924bfa"
+    },
+    {
+      "bytes": 8442,
+      "path": "xuanjun-p2-package/stage1/p2_rpm_prerequisites.py",
+      "sha256": "b7e2ce848b2b7a15f738e50b4a3e245e1be661615448ec09adad6c022aa72086"
+    },
+    {
+      "bytes": 6539,
+      "path": "xuanjun-p2-package/stage1/p2_sandbox_profile.py",
+      "sha256": "594afc9b9de1ed0659d46925a267c6eb77bc5e149485550ec33c35c4bf87ef00"
+    },
+    {
+      "bytes": 1163,
+      "path": "xuanjun-p2-package/stage1/p2_service_context_preflight.py",
+      "sha256": "be71b78a410ff408a015672ef1cf9996975c3f111d5a28e456a35d9f76ce1dbe"
+    },
+    {
+      "bytes": 10811,
+      "path": "xuanjun-p2-package/stage1/p2_tls_lifecycle.py",
+      "sha256": "3ce2c341f4cf9dfc96014446f39dc63a005a1e97122fa310a1d6d3e6c3c264b7"
+    },
+    {
+      "bytes": 12726,
+      "path": "xuanjun-p2-package/stage1/root_broker.py",
+      "sha256": "266a17623b45b00ec6bde39c68ab6bb65f0f36af19146330262fd3fc3862a92c"
+    },
+    {
+      "bytes": 2660,
+      "path": "xuanjun-p2-package/stage1/run_usage_projection.py",
+      "sha256": "80eeee872493fe894540efd954715972cc802ceea20a1dd483396c974ad012f1"
+    },
+    {
+      "bytes": 3701,
+      "path": "xuanjun-p2-package/stage1/task_cost_projection.py",
+      "sha256": "95ad809c67aff8929f0dc4ecfad68ca96be72cabe426cde90021dd515fef3334"
+    },
+    {
+      "bytes": 15719,
+      "path": "xuanjun-p2-package/stage1/task_supervisor_inventory_adapter.py",
+      "sha256": "3b78ab77c2faf31c124458249560cf72a97980f0504fc3c6121a99d3deac1550"
+    },
+    {
+      "bytes": 3173,
+      "path": "xuanjun-p2-package/stage1/telegram_owner_transport.py",
+      "sha256": "fd161575bfb6db99b367e712f8ad82c7941255e61364e347e5567ab56272beda"
+    },
+    {
+      "bytes": 10862,
+      "path": "xuanjun-p2-package/stage1/uk_owner_callback_core.py",
+      "sha256": "05045daacec477b2c3c979a4c90387cb1975515bb4c7aa1994be588883f34d3d"
+    },
+    {
+      "bytes": 3670,
+      "path": "xuanjun-p2-package/stage1/uk_owner_notify_worker.py",
+      "sha256": "90dee461e16d90994dfda3942c0e8312ff5b3703fbc4340f74453f690506b10d"
+    },
+    {
+      "bytes": 11289,
+      "path": "xuanjun-p2-package/tools/p2-package-freeze.py",
+      "sha256": "f1fe5dc3e199fe891a89969c07612304803ee453ee79e165815eab776eb6bb8e"
+    }
+  ],
+  "source_commit": "07e81116edb0dcf851259f6a292a8a25e735cca7"
+}

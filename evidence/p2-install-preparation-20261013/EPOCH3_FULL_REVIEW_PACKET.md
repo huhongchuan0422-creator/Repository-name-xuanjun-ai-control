@@ -1,19 +1,19 @@
 # P2 epoch3完整恢复候选：单次完整独立审核材料
 
-状态：英国首轮160项、最终增量34项及完整预检证据已齐；请求一次完整独立审核。此文档本身不是批准。
+状态：英国首轮160项、前次增量34项证据保留；B1修复新39项及最新完整预检已通过（依据Owner实机原始回执）；请求一次完整独立审核。此文档本身不是批准。
 代码负责人：Dots；独立审核：ChatGPT第5项；实际执行：Owner人工。
 沿用PR17、PR58原请求6159620928及原canonical ledger。
 
 ## 精确候选
 
-- HEAD：3f373b9766065149b9f2f402246fbb826a0f0bb3
-- Tree：81520bac146ed72a4fb3103681945833a825f69a
+- HEAD：07e81116edb0dcf851259f6a292a8a25e735cca7
+- Tree：552839cc0f55660ffe3d982c571e2c37b83763cd
 - 分支：repair/p2-chatgpt-clean-review-20261013
 - 包：evidence/p2-install-preparation-20261013/epoch3-recovery-kit.tar.gz
-- 包大小：253222字节；Git blob：5a5930c52510225bc9b624730c9e202e4d70ae5f
-- 包SHA256：a9c6bb2fa9bfc0114256216a6c15fe2dde241b28174e633f118e5000052524d8
-- Kit manifest：89eb2624d3aaee99117e6292f547852a61cce88d119cbb0fab57e0539c8aed5b
-- 入口SHA256：0152ae2b5f2bef0063175b25d1db0991845d6b9d17ba364f0dbb05280cde3fef
+- 包大小：254327字节；Git blob：6fa72f11e933faccdc02ea4de9e8c6a5021fff9a
+- 包SHA256：7e3228b293d0737d27a3f3fca57385f5b6c5628cfddf6488ce1c17c1017d619f
+- Kit manifest：1e13f9e1b6c2fddc135c314fbfb4c6f2b687466ef01208321116a9de10a3c71c
+- 入口SHA256：5c494fe7b5c8737a972d6e012e76a74d17b005a978462a6b3ab9b3cb8daa2848
 - Runtime manifest：338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09
 - 私有计划SHA256：0966ab156508228670faaadbba97ff62e19dac8451cced3598eda4eb0bea7f76
 - 运行源码修复来源：1a35f744224a64d73128196f6212195d15a9d0a7 / fa23b50843e4fc579348f403322dc3224c8ff78e
@@ -58,19 +58,17 @@
 
 ## 测试证据及限制
 
-- 本地Python3.6.8最终聚合：168/168 PASS；epoch3-final-aggregate-local.results。
-- 首轮实际打包test-only入口：160/160 PASS；最终打包affected-only入口：34/34 PASS，root映射临时目录，固定主机名/kit路径仅在本地测试中替换。
-- 实际102文件installer staging与6项 --help smoke：PASS，临时本地release，无英国修改。
-- 两次构建archive逐字节一致。
-- 41份文本GitHub读回一致；包Git blob SHA1与本地一致并核对commit tree。连接器无法解码二进制作raw读回，英国下载命令强制SHA256。
-- 单独入口/approve/parser/文件/ActivationStore/journal/失败路径等测试已包含。
-- 真实ActivationStore及持久化回执用临时文件；服务器服务/TLS/CLI/GitHub接口在driver测试中模拟，不能当生产E2E。
-- 本地Python3.6.8的ctypes重编译与sinpi工具链补丁只影响本地，不能称与英国Python字节一致。
-- GitHub Hosted CI：本候选尚无绑定成功回执，不填PASS。
-- 英国首轮test-only：160/160 PASS（Owner原始回执；first kit）。最终affected-only：34/34 PASS（Owner原始回执；final kit）。不是相加宣称194个独立测试。
-- 最终英国verify-only：PASS；snapshot SHA256 e297a8db0b4f2e2641ee3aeb6c94119a7ec5034a50a44a0e93723c996205df4e，与首轮一致；epoch=3、install_admission=NOT_GRANTED、production_resume=NOT_EXECUTED。
-- 首轮原始回执SHA256 e0864a402a7a62dcfd76812456b0aacc59ffd7e60c4c1ce9b4b9b66a8c49d25c；最终原始回执SHA256 6bc4c9d920958e0332cb814b79a1708c577bca21c34c77bf732fd9175b53bb46。
-- 生产恢复：NOT_EXECUTED；生产验收：PENDING。
+- 源码负责人本地Python3.6.8最终聚合177/177 PASS；epoch3-b1-aggregate-local.results。
+- 实际最终包的affected-only入口39/39 PASS（本地root映射临时目录）；epoch3-b1-packaged-local.results。
+- 英国首轮160/160 PASS，前次修订34/34 PASS均保留。本次B1修订39/39 PASS，含9项新增边界测试。各批次重叠，不得直接相加为独立测试数。
+- 本次英国原始回执epoch3-uk-b1-owner-receipt.txt SHA256：3efeca693481d0b1d79d5490b9a17cc4b9d64a7d1d7a9135b3daf3b8a9313484。
+- 最新完整verify-only PASS：epoch3、install_admission NOT_GRANTED、production_resume NOT_EXECUTED；snapshot e297a8db0b4f2e2641ee3aeb6c94119a7ec5034a50a44a0e93723c996205df4e。连续三批快照一致。
+- 实际102文件installer staging与6项help-smoke、24目标source/rendered hashes、3插件引用、dispatcher/TLS身份：本地PASS，未冒充英国正式安装。
+- 两次最终构建archive逐字节一致；新增源码文本GitHub读回一致；binary Git blob SHA1匹配，Owner英国实际下载SHA256通过；ASCII transport读取后与本地archive编码一致。
+- Driver服务/TLS/GitHub调用在测试中模拟；ActivationStore和attempt journal使用真实临时文件。不能把这些测试当成生产E2E。
+- 本地Python3.6.8有ctypes/sinpi工具链修正，仅本地，不能说与英国Python字节相同。英国回执单列。
+- GitHub Hosted CI：没有本次绑定成功回执，不填PASS。
+- 生产恢复NOT_EXECUTED；真实ACME/HTTPS/通知ACK/完整P2-P3 E2E和生产验收仍PENDING。
 
 ## 独立决定要求
 
@@ -114,7 +112,7 @@ CHATGPT_NATIVE_TASK5_EXACT_EPOCH3_RECOVERY_ACCEPTANCE
   "legacy_restart": false,
   "production_acceptance": "PENDING",
   "proposed_prepared_epoch": 4,
-  "recovery_kit_manifest_sha256": "89eb2624d3aaee99117e6292f547852a61cce88d119cbb0fab57e0539c8aed5b",
+  "recovery_kit_manifest_sha256": "1e13f9e1b6c2fddc135c314fbfb4c6f2b687466ef01208321116a9de10a3c71c",
   "recovery_plan_sha256": "0966ab156508228670faaadbba97ff62e19dac8451cced3598eda4eb0bea7f76",
   "reviewer": "CHATGPT_NATIVE_TASK5",
   "runtime_manifest_sha256": "338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09",
@@ -131,7 +129,7 @@ CHATGPT_NATIVE_TASK5_EXACT_EPOCH3_RECOVERY_ACCEPTANCE
 
 ```text
 /usr/bin/python3 -I -B <固定KIT>/epoch3_recovery_entry.py
-  --kit-manifest-sha256 89eb2624d3aaee99117e6292f547852a61cce88d119cbb0fab57e0539c8aed5b
+  --kit-manifest-sha256 1e13f9e1b6c2fddc135c314fbfb4c6f2b687466ef01208321116a9de10a3c71c
   --operation resume
   --review-id <独立审核人真实新批准ID>
   --review-body-sha256 <真实批准正文SHA256>
@@ -139,3 +137,19 @@ CHATGPT_NATIVE_TASK5_EXACT_EPOCH3_RECOVERY_ACCEPTANCE
 ```
 
 失败隔离由同一入口自动执行一次，不另发可重复rollback命令；要求完整撤销全部安装副作用的审核人应明确HOLD，本候选没有把保留现场策略冒充全量回滚。执行期间不要重复点击/启动，不用外层短timeout强杀安装；断线先读原attempt状态，不猜测或重试。
+
+
+## PR58 #6165869434 的B1修复（完整复审必须包含）
+
+首次停止状态验证异常导致后续恢复被跳过的问题已修复。
+新版本分别尝试 stopped_before、boot、owner_masks、legacy_masks、stopped_after、legacy_after。
+前面任何操作异常都继续后面的有限操作；初次验证异常即使后续验证通过也保持UNKNOWN/HOLD。
+ContainmentIncomplete携带每项结果，由原单次attempt回执保存；不丢失部分恢复结果。
+新增9项测试覆盖初始/最终/两次验证异常、三组恢复各自失败、事后legacy测量失败、组合异常及持久化UNKNOWN。
+相关代码：epoch3_host_driver.py、epoch3_recovery_sequence.py；入口仅调整affected-only测试集合。
+
+前次独立审核未完成整个archive、19helper及102runtime逐项核验。
+请此次完成全候选独立审查：不能仅审B1 diff后宣称全部通过。
+本次实测GitHub连接器读取binary及Git blob API均返回UTF-8限制，不能宣称独立下载验证已通过。提供同字节包的ASCII编码 epoch3-recovery-kit.base64.txt：可用GitHub文本连接器直接读取，base64解码后必须核对archive SHA256，再检查tar成员和所有manifest。该文件只是可读传输形式，解码内容与原二进制包逐字节相同，不改变执行制品。
+包Git blob标识：6fa72f11e933faccdc02ea4de9e8c6a5021fff9a。
+EPOCH3_REVIEW_INDEX.json列出包内所有helper、test、runtime哈希，供独立比较；该索引不是审核人验收证明。
