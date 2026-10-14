@@ -331,7 +331,7 @@ def handler(service):
             expected_host = "127.0.0.1:" + str(self.server.server_address[1])
             if self.headers.get("Host", "") != expected_host:
                 return self.send_json(403,{"error":"LOOPBACK_ONLY"})
-            files={"/demo/":"index.html","/demo/app.js":"app.js","/demo/merchant/":"merchant.html","/demo/merchant/app.js":"merchant.js","/demo/platform/":"platform.html","/demo/platform/app.js":"platform.js","/demo/catalog-read.js":"catalog-read.js","/demo/order-list.js":"order-list.js","/demo/business-overview.js":"business-overview.js","/demo/refund-preview.js":"refund-preview.js","/demo/mini/":"mini.html","/demo/official-h5/":"official-h5.html","/demo/channel-shell.js":"channel-shell.js","/demo/split-preview.js":"split-preview.js","/demo/admin-panel.js":"admin-panel.js"}
+            files={"/demo/":"index.html","/demo/app.js":"app.js","/demo/merchant/":"merchant.html","/demo/merchant/app.js":"merchant.js","/demo/platform/":"platform.html","/demo/platform/app.js":"platform.js","/demo/catalog-read.js":"catalog-read.js","/demo/order-list.js":"order-list.js","/demo/business-overview.js":"business-overview.js","/demo/refund-preview.js":"refund-preview.js","/demo/mini/":"mini.html","/demo/official-h5/":"official-h5.html","/demo/channel-shell.js":"channel-shell.js","/demo/split-preview.js":"split-preview.js","/demo/admin-panel.js":"admin-panel.js","/demo/reconciliation-preview.js":"reconciliation-preview.js"}
             filename=files.get(self.path)
             if filename is None:
                 return self.send_json(404,{"error":"NOT_FOUND"})
