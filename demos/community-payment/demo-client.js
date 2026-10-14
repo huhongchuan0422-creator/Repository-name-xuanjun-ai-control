@@ -28,6 +28,7 @@ function makeDemoClient(transport){
       throw Error("INVALID_DEMO_RESPONSE");
   }else if(kind==="state"){
     if(!Number.isSafeInteger(data.amount_minor)||data.amount_minor<1||data.amount_minor>100000000||
+       keys.some(k=>!["amount_minor","currency","state","provider_transaction_id","provider_settlement_verified"].includes(k)) ||
        data.currency!=="CNY" || !["PENDING","SUCCESS","FAILED","CANCELLED","REFUNDED"].includes(data.state)||
        !("provider_settlement_verified" in data) || data.provider_settlement_verified!==false ||
        !(data.provider_transaction_id===null || (typeof data.provider_transaction_id==="string" && ID.test(data.provider_transaction_id))))
