@@ -7,16 +7,16 @@ import subprocess
 import sys
 import urllib.request
 
-APPROVAL = 6158080472
-APPROVAL_BODY_SHA = 'cfd4c7a42e6797cd97b95e2a7770dee290591cc66457cbd388c01ffe4b5be05a'
-SCRIPT_SHA = '967204b970c39191eb3eff5e71a61fa0adab3be898dbf8f1fdb61131dfabb11e'
+APPROVAL = 6158214638
+APPROVAL_BODY_SHA = '775cd1a48029f657fc514b2eae4e9c2c117d0ababfa7f9bdef57e4d3e87ab764'
+SCRIPT_SHA = 'af0555ef8382213889c4d2b3390a202ab0d5218842d8b563456cad20720a8d56'
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'notifier_isolation_candidate.py')
 
 ROOT_LOADER = r'''
 import hashlib,json,os,stat,sys
 path=sys.argv[1]
-expected='967204b970c39191eb3eff5e71a61fa0adab3be898dbf8f1fdb61131dfabb11e'
+expected='af0555ef8382213889c4d2b3390a202ab0d5218842d8b563456cad20720a8d56'
 if os.geteuid()!=0:raise ValueError('ROOT_REQUIRED')
 fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
 with os.fdopen(fd,'rb') as f:
@@ -24,7 +24,7 @@ with os.fdopen(fd,'rb') as f:
  if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or len(raw)>65536:raise ValueError('SOURCE_BOUND')
 if hashlib.sha256(raw).hexdigest()!=expected:raise ValueError('ROOT_SOURCE_SHA_MISMATCH')
 # Execute the exact verified in-memory bytes, never reopen a mutable source path.
-sys.argv=[path,'--candidate-acceptance','PR58:6158080472']
+sys.argv=[path,'--candidate-acceptance','PR58:6158214638']
 namespace={'__name__':'__main__','__file__':path}
 failed=None
 try:
@@ -33,7 +33,7 @@ except BaseException as error:
  failed=type(error).__name__
 finally:
  base='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/notifier'
- result={'schema':1,'acceptance':'PR58:6158080472','script_sha256':expected,'execution_error_type':failed,'root_journal_present':os.path.lexists(base+'/notifier-isolation-receipt.json')}
+ result={'schema':1,'acceptance':'PR58:6158214638','script_sha256':expected,'execution_error_type':failed,'root_journal_present':os.path.lexists(base+'/notifier-isolation-receipt.json')}
  if result['root_journal_present']:
   digests={}
   for name in ['notifier-isolation-receipt.json','xj-uk-owner-notify.timer.backup','xj-uk-owner-notify.service.backup']:
@@ -82,7 +82,7 @@ def main():
     if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or len(raw) > 65536:
         raise ValueError('EXACT_REVIEWED_SCRIPT_BOUND')
     enforce_approval(comment, raw)
-    print('EXACT_REVIEW_CALLER_BINDING=PASS; APPROVAL=6158080472; SCRIPT_SHA256=' + SCRIPT_SHA, flush=True)
+    print('EXACT_REVIEW_CALLER_BINDING=PASS; APPROVAL=6158214638; SCRIPT_SHA256=' + SCRIPT_SHA, flush=True)
     # Credentials do not enter root environment or argv.
     minimal = {'PATH': '/usr/bin:/bin', 'LANG': 'C'}
     result = subprocess.run(['/usr/bin/sudo', '-n', '/usr/bin/python3', '-I', '-B', '-c', ROOT_LOADER, SCRIPT], env=minimal)
