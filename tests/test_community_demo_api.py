@@ -1,4 +1,6 @@
 import json
+import socket
+import time
 import threading
 import unittest
 from http.client import HTTPConnection
@@ -112,6 +114,36 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(response.status,200)
         response.read()
         conn.close()
+    def raw_partial(self,reference,declared_extra=0,shutdown=True):
+        payload=json.dumps(order(reference),separators=(',',':')).encode('utf-8')
+        port=self.server.server_address[1]
+        sock=socket.create_connection(('127.0.0.1',port),timeout=4)
+        sock.settimeout(4)
+        request=(f"POST /demo/orders HTTP/1.1\\r\\nHost: 127.0.0.1:{port}\\r\\n"
+                 f"Content-Type: application/json\\r\\nContent-Length: {len(payload)+declared_extra}\\r\\n"
+                 "Connection: close\\r\\n\\r\\n").encode('ascii')
+        try:
+            sock.sendall(request+payload)
+            if shutdown:
+                sock.shutdown(socket.SHUT_WR)
+            received=b''
+            while True:
+                part=sock.recv(4096)
+                if not part:break
+                received+=part
+            return int(received.split(b' ',2)[1])
+        finally:sock.close()
+    def test_truncated_declared_length_must_not_create_order(self):
+        status=self.raw_partial('truncated',declared_extra=20,shutdown=True)
+        self.assertEqual(status,400)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM orders WHERE reference='truncated'").fetchone()[0],0)
+    def test_unfinished_socket_body_times_out_and_server_recovers(self):
+        start=time.monotonic()
+        status=self.raw_partial('incomplete',declared_extra=20,shutdown=False)
+        self.assertEqual(status,408)
+        self.assertLess(time.monotonic()-start,3.5)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM orders WHERE reference='incomplete'").fetchone()[0],0)
+        self.assertEqual(self.post('/demo/orders',json.dumps(order('after_timeout')))[0],200)
     def test_no_real_pay_route(self):
         self.assertEqual(self.post('/api/pay/wechat','{}')[0],404)
 
