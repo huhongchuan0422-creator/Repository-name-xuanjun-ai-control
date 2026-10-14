@@ -1,4 +1,4 @@
-import hashlib,os,pathlib,tempfile,unittest
+import hashlib,json,os,pathlib,tempfile,unittest
 from unittest import mock
 import epoch3_preserve as subject
 class PreserveTests(unittest.TestCase):
@@ -15,6 +15,7 @@ class PreserveTests(unittest.TestCase):
  def tearDown(self):self.patch.stop();self.temp.cleanup()
  def test_preserves_all_prior_bytes(self):
   result=subject.preserve_prior_receipts();self.assertFalse(result['historical_receipts_deleted'])
+  self.assertEqual(json.loads(pathlib.Path(self.archive,'preservation-complete.json').read_text()),result)
   for p,data in self.data.items():self.assertEqual(pathlib.Path(self.archive,os.path.basename(p)).read_bytes(),data)
   self.assertFalse(os.path.lexists(self.tls));self.assertTrue(os.path.isdir(self.archive+'/tls-root'))
   self.assertFalse(os.path.lexists(self.t+'/tls-lifecycle.json'))

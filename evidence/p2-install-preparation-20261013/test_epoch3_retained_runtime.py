@@ -36,6 +36,12 @@ class RuntimeTests(unittest.TestCase):
   result=self.execute();self.assertEqual(self.events[:3],['receipt','tls','mkdir'])
   self.assertEqual(self.events.count('target'),24);self.assertEqual(self.events[-1],'plugin')
   self.assertFalse(result['rollback_complete']);self.assertFalse(result['retained_resources_replayed'])
+ def test_receipt_hash_binds_serialized_file_newline(self):
+  saved=[]
+  with mock.patch.object(subject,'_atomic_receipt',side_effect=lambda path,value:saved.append(value)):
+   result=self.execute()
+  raw=(json.dumps(saved[0],sort_keys=True,separators=(',',':'))+'\n').encode()
+  self.assertEqual(result['receipt_sha256'],hashlib.sha256(raw).hexdigest())
  def test_tls_failure_does_not_restore_or_write_targets(self):
   self.tls.apply.side_effect=ValueError('tls failed')
   with self.assertRaises(ValueError):self.execute()

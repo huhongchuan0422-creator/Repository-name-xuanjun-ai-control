@@ -172,3 +172,47 @@ injection, UK read-only verification, then ONE consolidated independent review.
 Do not use old install/resume commands; both previous approvals were consumed.
 The local writer will stop after committing and writing the PR17 handoff. UK and
 other windows' live writer states require fresh observation; no lease was granted.
+
+## Concrete recovery kit implemented, 2026-10-14 09:29 UTC (not approved)
+
+Owner resumed this same Dots writer; PR17 continuation6164984803 supersedes the
+window-stop checkpoint6164978196. No other source writer was started here.
+
+Added complete candidate loader and HostDriver wiring: exact new PR58 approval,
+original private plan recompilation, existing install lock, fresh full host
+preflight, exclusive attempt, exact release staging, historical evidence
+preservation, PREPARED3->4 journal rebind, native binding CAS, fresh TLS reference,
+quiescence, retained provisioning, database access, activation, service startup,
+original exact postchecks, and fence/stop/retain failure containment. No default
+resume or automatic retry. New approval marker and policy deliberately cannot
+match the two consumed prior approvals. Kit loader verifies all helpers/runtime
+files before importing them. Test-only and verify-only do not grant installation.
+
+The original native binding mode was confirmed from Owner evidence as0644; CAS
+preserves this identity and privately backs up bytes. Fixed preservation receipt
+newline and new provisioning file-digest newline during integration checks.
+Missing not-yet-installed units require explicit systemd not-found/inactive/dead
+and empty cgroups; generic query failures remain rejected.
+
+Local Python3.6.8 aggregate160/160 PASS. Actual candidate installer staged all102
+files into a temporary local release and all six --help smoke invocations passed.
+The packaged test-only entry also ran160/160 PASS under local isolated Python3.6.8,
+with only fixed hostname/kit location adapted to a temporary test directory.
+Host effects/GitHub in driver integration are mocked; ActivationStore and durable
+attempt journals use real temporary files. This is not UK acceptance. An initial
+aggregate invocation omitted required test environment variables (14 errors);
+corrected invocation passed, and the failed log is retained locally.
+
+Two independently built archives matched byte-for-byte:
+archive SHA256633c83a5bb608e040c1811aaac70f3dabd2ff9b8d10265046296bcee409aa53d
+kit manifest SHA2560adcefaaad639a7fa70f69e57d21f1375aeeef15a30a3921e39ba7a17748a3a3
+entry SHA2564aa0acb554978a79b2abe87b78f29d74f1e3901349a96670727030fdcacd6d43
+private compiled plan SHA2560966ab156508228670faaadbba97ff62e19dac8451cced3598eda4eb0bea7f76
+The kit has19 helpers,17 test modules,102 runtime files plus provenance/manifest.
+
+Still required before ONE full review: UK test-only and fresh verify-only snapshot,
+complete exact-version review packet and Owner commands. No resume approval exists.
+The old install receipt remains historical HOLD; the new protected
+transaction/epoch3-recovery-execution.json is the new attempt receipt. It must be
+read with the historical receipts, never silently interpret the old HOLD as new
+success. Production acceptance stays PENDING even after new postchecks pass.

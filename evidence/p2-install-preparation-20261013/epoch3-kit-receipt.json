@@ -1,0 +1,11 @@
+{
+  "archive_sha256": "633c83a5bb608e040c1811aaac70f3dabd2ff9b8d10265046296bcee409aa53d",
+  "entry_sha256": "4aa0acb554978a79b2abe87b78f29d74f1e3901349a96670727030fdcacd6d43",
+  "helpers": 19,
+  "independent_review": "PENDING",
+  "kit_manifest_sha256": "0adcefaaad639a7fa70f69e57d21f1375aeeef15a30a3921e39ba7a17748a3a3",
+  "production_execution": "NOT_RUN",
+  "runtime_manifest_sha256": "338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09",
+  "schema": 1,
+  "test_modules": 17
+}

@@ -37,6 +37,12 @@ class Tests(unittest.TestCase):
  def test_unexpected_cgroup_rejected(self):
   self.run.return_value.stdout=b'ActiveState=inactive\nMainPID=0\nControlPID=0\nControlGroup=/other\n'
   with self.assertRaises(ValueError):self.obj.verify_all()
+ def test_not_yet_installed_unit_explicit_absence(self):
+  self.run.return_value=subprocess.CompletedProcess([],1,b'LoadState=not-found\nActiveState=inactive\nSubState=dead\n',b'')
+  self.assertTrue(self.obj.verify_all()['verified_stopped'])
+ def test_missing_unit_with_pid_rejected(self):
+  self.run.return_value=subprocess.CompletedProcess([],1,b'LoadState=not-found\nActiveState=inactive\nSubState=dead\nMainPID=33\n',b'')
+  with self.assertRaises(ValueError):self.obj.verify_all()
  def test_query_nonzero_rejected(self):
   self.run.return_value.returncode=1
   with self.assertRaises(ValueError):self.obj.verify_all()

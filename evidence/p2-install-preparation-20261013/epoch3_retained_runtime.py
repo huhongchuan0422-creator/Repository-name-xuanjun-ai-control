@@ -21,6 +21,29 @@ class RetainedEpoch3Runtime(FixedHostRuntime):
   need(directory==T,'EPOCH3_RUNTIME_EXACT_TRANSACTION')
   super(RetainedEpoch3Runtime,self).__init__(directory,**kwargs)
   self.receipt_path=directory+'/epoch4-runtime-provisioning.json'
+ def preflight_retained(self,plan):
+  self._authority()
+  runtime=plan['runtime']
+  need(tuple(runtime['services'])==ALLOWED_SERVICES,'EPOCH3_SERVICE_ORDER')
+  need(not os.path.lexists(self.receipt_path),'EPOCH3_PROVISION_ALREADY_ATTEMPTED')
+  Auxiliary.verify(runtime['auxiliary_isolation'])
+  from p2_sandbox_profile import SandboxProfile
+  from p2_tls_lifecycle import validate,available_port
+  SandboxProfile(self.directory).prepare(runtime['sandbox_policy'])
+  config=validate(json.loads(plan['tls_config_bytes']))
+  need(config['release_sha256']==plan['artifact']['manifest_sha256'],'EPOCH3_TLS_RELEASE')
+  available_port()
+  for ref in plan['auth']['references']+plan['tls']['references']:self._reference(ref)
+  release=plan['artifact']['releases']+'/'+runtime['release_directory']
+  seen=set()
+  for row in runtime['provisioning']:
+   source,target=self._binding(row,release,runtime['auxiliary_isolation'])
+   need(target not in seen,'EPOCH3_DUPLICATE_TARGET');seen.add(target)
+  need(len(seen)==24,'EPOCH3_TARGET_COUNT')
+  need(not self._plugin_present(runtime),'EPOCH3_PLUGIN_ALREADY_PRESENT')
+  # CLI inventory must not change any existing private reference.
+  for ref in plan['auth']['references']+plan['tls']['references']:self._reference(ref)
+  return {'references_verified':True,'plugin_absent':True,'tls_port_available':True}
  def provision(self,release,runtime):
   self._authority()
   need(not os.path.lexists(self.receipt_path),'EPOCH3_PROVISION_ALREADY_ATTEMPTED')
@@ -57,7 +80,7 @@ class RetainedEpoch3Runtime(FixedHostRuntime):
            'tls_renewal':runtime['tls_renewal'],
            'plugin':{'id':P2_PLUGIN_ID,'previous':'ABSENT','gateway_service':GATEWAY_SERVICE,
                      'dropin_parent_created':True}}
-  packed=json.dumps(receipt,sort_keys=True,separators=(',',':')).encode()
+  packed=(json.dumps(receipt,sort_keys=True,separators=(',',':'))+'\n').encode()
   _atomic_receipt(self.receipt_path,receipt)
   # RPM, NSS, bootstrap and publisher publication are intentionally NOT called.
   # Failure propagates to the single-attempt driver's fence/stop/retain handler.

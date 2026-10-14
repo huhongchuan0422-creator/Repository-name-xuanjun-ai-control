@@ -53,15 +53,20 @@ class ServiceContainment:
                                '--property=LoadState,ActiveState,SubState,MainPID,ControlPID,ControlGroup'],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=15, check=False)
-            require(result.returncode == 0, 'CONTAINMENT_QUERY_FAILED')
             rows = result.stdout.decode('utf-8', 'strict').splitlines()
             require(all('=' in r for r in rows), 'CONTAINMENT_QUERY_FORMAT')
             pairs = [r.split('=', 1) for r in rows]
             require(len({r[0] for r in pairs}) == len(pairs), 'CONTAINMENT_DUPLICATE_STATE')
             values = dict(pairs)
+            absent = (values.get('LoadState') == 'not-found' and
+                      values.get('ActiveState') == 'inactive' and
+                      values.get('SubState') == 'dead' and values.get('ControlGroup', '') == '')
+            require(result.returncode == 0 or (result.returncode == 1 and absent),
+                    'CONTAINMENT_QUERY_FAILED')
+            pid_default = '0' if absent or unit.endswith(('.timer', '.socket')) else None
             require(values.get('ActiveState') in ('inactive', 'failed') and
-                    values.get('MainPID', '0' if unit.endswith(('.timer', '.socket')) else None) == '0' and
-                    values.get('ControlPID', '0' if unit.endswith(('.timer', '.socket')) else None) == '0',
+                    values.get('MainPID', pid_default) == '0' and
+                    values.get('ControlPID', pid_default) == '0',
                     'CONTAINMENT_PROCESS_STILL_PRESENT')
             require(values.get('ControlGroup', '') in ('', '/system.slice/' + unit),
                     'CONTAINMENT_UNEXPECTED_CGROUP')
