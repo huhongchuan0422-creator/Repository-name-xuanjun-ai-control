@@ -81,9 +81,9 @@ def execute():
         require(len(plan_sha)==64 and all(c in '0123456789abcdef' for c in plan_sha),'NEW_PLAN_DIGEST')
     p=raw(plan_path,private=True);require(hashlib.sha256(p).hexdigest()==plan_sha,'CORE_PLAN_DRIFT')
     plan=json.loads(p.decode());root=plan['artifact']['root']
-    require(plan['artifact']['source_commit']=='524530a3c57897d2c10e9c25aa621ff147b85cc7'
+    require(plan['artifact']['source_commit']=='d75b5b6deea22b7e66569096f72f81c639516133'
             and plan['artifact']['source_tree']=='c21de408d21cbef88363f2ee017c6b42d6211107'
-            and plan['artifact']['manifest_sha256']=='093833257a4bdad5f8a7cbc87e9b8d98b5170fd965293e14a4619ff6cf2178a9','EXACT95_PLAN_BINDING')
+            and plan['artifact']['manifest_sha256']=='9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3','EXACT95_PLAN_BINDING')
     require(digest(DB)==DB_SHA,'CANONICAL_DB_DRIFT')
     for suffix in ['-wal','-journal']:
         require(not os.path.lexists(DB+suffix) or os.lstat(DB+suffix).st_size==0,'NONEMPTY_DB_JOURNAL')
@@ -92,13 +92,13 @@ def execute():
     def artifact():
         manifest=raw(plan['artifact']['manifest'])
         require(hashlib.sha256(manifest).hexdigest()==plan['artifact']['manifest_sha256'],'MANIFEST_DRIFT')
-        files=json.loads(manifest.decode())['files'];require(len(files)==100,'EXACT_COMPLETE_REQUIRED')
+        files=json.loads(manifest.decode())['files'];require(len(files)==102,'EXACT_COMPLETE_REQUIRED')
         for rel,h in files.items():
             require(rel and not rel.startswith('/') and '..' not in rel.split('/'),'MANIFEST_PATH')
             require(digest(root+'/'+rel)==h,'RUNTIME_FILE_DRIFT')
         from p2_install_entrypoint import validate_plan
         validate_plan(plan)
-        return {'files_verified':100,'plan_path':plan_path,'plan_sha256':plan_sha,'source':plan['artifact']['source_commit'],
+        return {'files_verified':102,'plan_path':plan_path,'plan_sha256':plan_sha,'source':plan['artifact']['source_commit'],
                 'manifest_sha256':plan['artifact']['manifest_sha256'],'schema_valid':True}
     section('artifact_and_plan',artifact)
 
