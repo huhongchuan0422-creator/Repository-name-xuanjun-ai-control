@@ -6,14 +6,20 @@
     "status": "PASS_WITH_EXISTING_CONDITIONAL_SKIP"
   },
   "focused_migration_gate_tests": {
-    "passed": 37,
+    "passed": 36,
+    "status": "PASS"
+  },
+  "remediation_regression_tests": {
+    "passed": 26,
+    "review_comment": 6167112786,
     "status": "PASS"
   },
   "json_validation": "PASS",
   "production_migration_release": "HOLD",
   "production_mutation": false,
   "python_compile": "PASS",
-  "schema_version": 1,
+  "python_36_ast_parse": "PASS",
+  "schema_version": 2,
   "workflow_yaml_parse": "PASS",
   "writer_runtime_coverage": "HOLD_NOT_INTEGRATED"
 }

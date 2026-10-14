@@ -1,7 +1,7 @@
 """G5 candidate: isolated Korea deployment, shadow/canary and rollback gates."""
 from __future__ import print_function
 
-from gate_common import require
+from gate_common import next_phase_action, require, validate_phase_history
 
 
 FORWARD_PHASES = (
@@ -27,8 +27,14 @@ def evaluate_isolation(observation):
     )
     for key in required:
         require(key in observation, "G5_ISOLATION_MISSING:" + key)
-    positive = required[:10]
-    require(all(observation[key] for key in positive), "G5_ISOLATION_REQUIREMENT_FAILED")
+    protected_and_required = (
+        "dedicated_user", "dedicated_directories", "dedicated_secret_namespace",
+        "ports_non_overlapping", "runtime_versions_match", "dependencies_verified",
+        "permissions_verified", "network_get_only_verified", "novel_unchanged",
+        "postgres_unchanged", "redis_unchanged"
+    )
+    for key in protected_and_required:
+        require(observation[key] is True, "G5_ISOLATION_REQUIREMENT_FAILED:" + key)
     require(not observation["writer_enabled"], "G5_WRITER_MUST_BE_DISABLED")
     require(not observation["scheduler_enabled"], "G5_SCHEDULER_MUST_BE_DISABLED")
     require(not observation["trade_credentials_present"], "G5_TRADE_CREDENTIALS_FORBIDDEN")
@@ -51,18 +57,13 @@ def evaluate_shadow(observation):
     return {"status": "PASS_SHADOW_CANDIDATE", "production_write": False}
 
 
-def advance(completed, requested, rollback=False):
+def advance(history, requested, rollback=False):
     phases = ROLLBACK_PHASES if rollback else FORWARD_PHASES
-    completed = list(completed)
-    require(requested in phases, "G5_PHASE_INVALID")
-    if requested in completed:
-        return "REPLAY_NOOP"
-    require(len(completed) < len(phases) and requested == phases[len(completed)], "G5_PHASE_ORDER_VIOLATION")
-    return "EXECUTE_ONCE"
+    return next_phase_action(phases, history, requested, "G5")
 
 
-def rollback_verdict(completed):
-    completed = list(completed)
+def rollback_verdict(history):
+    completed = validate_phase_history(ROLLBACK_PHASES, history, "G5_ROLLBACK")
     if "TOKYO_NEW_EPOCH_GRANTED" in completed:
         required = set(ROLLBACK_PHASES[:-1])
         require(required.issubset(set(completed)), "G5_TOKYO_REGRANT_BEFORE_KOREA_FENCE")

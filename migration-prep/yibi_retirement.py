@@ -1,7 +1,7 @@
 """G2 candidate: permanent Yibi retirement without touching shared services."""
 from __future__ import print_function
 
-from gate_common import require
+from gate_common import next_phase_action, require
 
 
 PHASES = ("ARCHIVE_VERIFIED", "TRIGGERS_FROZEN", "SERVICES_STOPPED", "UNITS_DISABLED", "UNITS_MASKED", "VERIFIED")
@@ -52,13 +52,8 @@ def evaluate(yibi, observation):
     return {"status": "PASS_CANDIDATE_EVIDENCE", "archive_only": True, "re_enable_yibi": False}
 
 
-def enforce_order(completed, requested):
-    require(requested in PHASES, "G2_PHASE_INVALID")
-    completed = list(completed)
-    if requested in completed:
-        return "REPLAY_NOOP"
-    require(len(completed) < len(PHASES) and requested == PHASES[len(completed)], "G2_PHASE_ORDER_VIOLATION")
-    return "EXECUTE_ONCE"
+def enforce_order(history, requested):
+    return next_phase_action(PHASES, history, requested, "G2")
 
 
 def failure_recovery():

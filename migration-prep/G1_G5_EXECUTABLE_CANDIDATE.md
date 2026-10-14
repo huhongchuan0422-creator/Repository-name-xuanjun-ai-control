@@ -5,6 +5,10 @@
 Consumed independent review: PR99 comment `6166680343`, reviewing PR99 HEAD
 `e2f7cb80f691eb5f7f7da9cc8c21d4af6f03b0ac`.
 
+Consumed source review: PR99 comment `6167112786`, reviewing exact candidate
+`eb900d13388a0afad940d3974d00b54af0ec06ae`. The five requested remediation
+groups are implemented together; production remains HOLD.
+
 ## Boundary
 
 This commit is candidate code and isolated tests only. It does not remove a
@@ -48,8 +52,11 @@ enters a report or command file. Helper and sudoers cleanup is separate and
 must be followed by `visudo -c`. Success also requires agent IDs absent from
 GitHub administration, no service/listener/autostart residue, and a harmless
 SSH/OpenClaw canary. Timeout or partial success returns `HOLD` and
-`INSPECT_ONLY_NO_BLIND_RETRY`. Repetition is a no-op only when the phase's
-idempotency evidence matches.
+`INSPECT_ONLY_NO_BLIND_RETRY`. Repetition is a no-op only when the complete
+phase history is a continuous prefix of receipt objects whose phase, successful
+result SHA-256 and unique execution ID match. Strings, reordered/duplicated
+phases, gaps, failed results and malformed digests fail closed. G1, G2 and G5
+use the same validator.
 
 This PR disables its own self-hosted inspection job. Hosted tests continue;
 no candidate push should schedule either production Runner.
@@ -74,10 +81,13 @@ forbids starting, enabling or unmasking Yibi.
 
 ## G3 hard Writer fence
 
-`writer_fence.py` requires every write request, including protection, cancel,
-close and manual-script actions, to present a signed, unexpired external lease
-with a monotonically increasing epoch. Local file, memory or SQLite authority
-is rejected. The lease is valid only after independent evidence proves:
+`writer_fence.py` validates a contract for every prospective write request,
+including protection, cancel, close and manual-script actions. The lease must
+be signed with Ed25519 by an allowlisted authority whose public-key SHA-256 and
+store identity are pinned independently. Verification fields are exact booleans,
+fingerprints are non-empty SHA-256 values, and requested, lease and externally
+signed current epochs must be identical. Local file, memory or SQLite authority
+is rejected. The lease is valid only after signed evidence proves:
 
 1. previous epoch revoked;
 2. old-host trading credential revoked;
@@ -93,9 +103,11 @@ legacy paths must have neither credential nor scheduler access. Any new,
 missing or changed path returns `HOLD`.
 
 Candidate limitation: this commit does not patch `/opt/trading-system` or the
-legacy workspace. Therefore runtime path coverage and actual credential/IP
-revocation are `NOT_EXECUTED`; G3 is executable candidate code, not a migrated
-production fence.
+legacy workspace and has no production authority adapter. Contract evaluation
+always returns `execution_authorized=false` and
+`scope=CONTRACT_SIMULATOR_ONLY_NOT_PRODUCTION_AUTHORITY`. Therefore runtime
+path coverage and actual credential/IP revocation are `NOT_EXECUTED`; G3 cannot
+authorize an exchange write in this candidate.
 
 The candidate scanner was run read-only against both declared roots after the
 implementation: 95 source files matched (`FORMAL=12`, `LEGACY=17`,
@@ -106,22 +118,28 @@ Because no production path was patched or quarantined in this task,
 
 ## G4 GET-only reconciliation and final snapshot
 
-`final_snapshot.py` has a transport that rejects every method except `GET`.
-It requires server time, account, balances, position mode, positions, ordinary
-open orders, algo/protective orders, recent orders and trades. It also requires
-ownership conflicts, UNKNOWN orders, in-flight requests and all DB-external
-state classes to be resolved. Every surface is bounded to the exchange time
-watermark.
+`final_snapshot.py` itself invokes every surface through a transport that
+rejects every method except `GET` and records request/response digests. Exchange
+time must be fresh against the request clock; collection has a maximum duration;
+every state surface must prove complete pagination and exact symbol coverage.
+Positions, ordinary/algo/protective orders, recent orders and trades are
+explicitly compared with normalized local mirrors. UNKNOWN, in-flight and
+ownership conflicts remain blockers.
 
 The final checkpoint combines the reconciled exchange digest, authoritative
 database file identities, pending/recovery/unknown/in-flight queues,
 guard/watch state, ownership ledger and scheduler state in one content-addressed
-manifest. New entries must be frozen and in-flight work drained. This tool was
-tested only with fixtures; no live Binance call or final snapshot was made.
+manifest. The authoritative filename set is exact; every sidecar has a frozen
+content digest captured in the same bounded freeze window, and exchange
+reconciliation must also occur inside that window. Semantic verification runs
+in addition to the manifest hash, so recomputing JSON after weakening a sidecar
+does not pass. This tool was tested only with fixtures; no live Binance call or
+final snapshot was made.
 
 ## G5 isolated Korea deployment, shadow/canary and rollback
 
-`cutover_gate.py` requires dedicated user/directories/Secret namespace,
+`cutover_gate.py` explicitly checks every required field, including Redis,
+without positional slicing. It requires dedicated user/directories/Secret namespace,
 non-overlapping ports, dependency/runtime/permission/network checks and
 unchanged novel/PostgreSQL/Redis. Isolated launch must have no trade credential,
 Writer or scheduler. Shadow acceptance requires `NO_ORDER_WRITE`, same inputs,
@@ -157,12 +175,19 @@ authenticated integrity.
 
 ## Isolated test receipt
 
-Local migration tests: `37/37 PASS`; existing repository Python tests:
-`207 PASS / 1 existing conditional skip`. Python compile, JSON validation,
-workflow YAML parse and staged whitespace checks pass. Tests explicitly cover
-failure, timeout, partial success, repeat/replay, phase skipping, stale epoch,
-old-host reboot, unauthorized local authority, unknown orders, non-GET methods,
-shadow timeout, Korea-first rollback and signature tampering.
+The remediation suite adds field-by-field G5 isolation negatives; stale-clock,
+capture-duration, pagination, symbol-coverage and state-difference G4 negatives;
+string/empty/unsigned G3 negatives; forged/reordered/failed phase histories;
+two-process ledger races, transaction-crash recovery, a non-returning deadline,
+and partial-side-effect uncertainty. Exact final test and CI counts are recorded
+only after the consolidated candidate is rerun.
+
+The idempotency ledger is now a SQLite `BEGIN IMMEDIATE` transaction with a
+unique key, WAL recovery and FULL synchronous durability. It is not an external
+Writer authority. Deadline calls run in a child process and terminate at the
+deadline; because a child may already have caused a side effect, timeout raises
+`OPERATION_TIMEOUT_UNCERTAIN_SIDE_EFFECTS` and requires inspection/reconciliation
+instead of claiming rollback or retry safety.
 
 ## External blockers before production
 

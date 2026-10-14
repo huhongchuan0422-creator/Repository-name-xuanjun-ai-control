@@ -5,7 +5,7 @@ separately authorized root wrapper may consume the generated command plan.
 """
 from __future__ import print_function
 
-from gate_common import GateError, require
+from gate_common import next_phase_action, require
 
 
 PHASES = ("BASELINED", "STOPPED", "UNINSTALLED", "DEREGISTERED", "SUDO_CLEANED", "VERIFIED")
@@ -65,11 +65,5 @@ def evaluate(host, observation):
     return {"status": "PASS_CANDIDATE_EVIDENCE", "production_authority": False}
 
 
-def enforce_order(completed, requested):
-    require(requested in PHASES, "G1_PHASE_INVALID")
-    completed = list(completed)
-    if requested in completed:
-        return "REPLAY_NOOP"
-    expected = PHASES[len(completed)] if len(completed) < len(PHASES) else None
-    require(requested == expected, "G1_PHASE_ORDER_VIOLATION")
-    return "EXECUTE_ONCE"
+def enforce_order(history, requested):
+    return next_phase_action(PHASES, history, requested, "G1")

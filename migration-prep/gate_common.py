@@ -3,8 +3,9 @@ from __future__ import print_function
 
 import hashlib
 import json
+import multiprocessing
 import os
-import tempfile
+import sqlite3
 import time
 
 
@@ -38,55 +39,110 @@ def load_json(path):
         return json.load(stream)
 
 
-def atomic_write_json(path, value):
-    directory = os.path.dirname(os.path.abspath(path))
-    descriptor, temporary = tempfile.mkstemp(prefix=".gate-", dir=directory)
-    try:
-        with os.fdopen(descriptor, "w") as stream:
-            json.dump(value, stream, sort_keys=True, separators=(",", ":"))
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except Exception:
-        try:
-            os.unlink(temporary)
-        except OSError:
-            pass
-        raise
-
-
 class IdempotentLedger(object):
-    """Small durable ledger for candidate tests and later privileged wrappers."""
+    """Transactional cross-process candidate ledger.
+
+    SQLite supplies crash recovery, BEGIN IMMEDIATE serialization and a unique
+    key constraint.  This ledger is not an external Writer authority.
+    """
 
     def __init__(self, path):
         self.path = path
 
-    def _read(self):
-        if not os.path.exists(self.path):
-            return {"version": 1, "events": {}}
-        value = load_json(self.path)
-        require(value.get("version") == 1 and isinstance(value.get("events"), dict), "LEDGER_INVALID")
-        return value
+    def _connect(self):
+        connection = sqlite3.connect(self.path, timeout=10, isolation_level=None)
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA synchronous=FULL")
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS events ("
+            "idempotency_key TEXT PRIMARY KEY, digest TEXT NOT NULL, "
+            "recorded_at INTEGER NOT NULL)"
+        )
+        return connection
 
     def record(self, key, payload):
         require(isinstance(key, str) and key, "IDEMPOTENCY_KEY_REQUIRED")
         digest = sha256_value(payload)
-        current = self._read()
-        prior = current["events"].get(key)
-        if prior is not None:
-            require(prior["digest"] == digest, "IDEMPOTENCY_CONFLICT")
-            return {"replayed": True, "digest": digest}
-        current["events"][key] = {"digest": digest, "recorded_at": int(time.time())}
-        atomic_write_json(self.path, current)
-        return {"replayed": False, "digest": digest}
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT digest FROM events WHERE idempotency_key = ?", (key,)
+            ).fetchone()
+            if row is not None:
+                require(row[0] == digest, "IDEMPOTENCY_CONFLICT")
+                connection.commit()
+                return {"replayed": True, "digest": digest}
+            connection.execute(
+                "INSERT INTO events(idempotency_key,digest,recorded_at) VALUES(?,?,?)",
+                (key, digest, int(time.time()))
+            )
+            connection.commit()
+            return {"replayed": False, "digest": digest}
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
 
-def bounded_call(callable_, timeout_seconds, clock=time.monotonic):
-    """Reject a completed call that exceeded its declared evidence window."""
+def validate_phase_history(phases, history, code_prefix):
+    """Require a receipt-bound, successful, unique, continuous phase prefix."""
+    require(isinstance(history, list), code_prefix + "_HISTORY_REQUIRED")
+    require(len(history) <= len(phases), code_prefix + "_HISTORY_TOO_LONG")
+    seen_execution_ids = set()
+    for index, receipt in enumerate(history):
+        require(isinstance(receipt, dict), code_prefix + "_RECEIPT_REQUIRED")
+        require(set(receipt) == set(("phase", "status", "execution_id", "result_sha256")),
+                code_prefix + "_RECEIPT_FIELDS_INVALID")
+        require(receipt["phase"] == phases[index], code_prefix + "_HISTORY_NOT_CONTIGUOUS")
+        require(receipt["status"] == "SUCCEEDED", code_prefix + "_PHASE_NOT_SUCCEEDED")
+        require(isinstance(receipt["execution_id"], str) and receipt["execution_id"],
+                code_prefix + "_EXECUTION_ID_REQUIRED")
+        require(receipt["execution_id"] not in seen_execution_ids,
+                code_prefix + "_EXECUTION_ID_REUSED")
+        seen_execution_ids.add(receipt["execution_id"])
+        digest = receipt["result_sha256"]
+        require(isinstance(digest, str) and len(digest) == 64 and
+                all(character in "0123456789abcdef" for character in digest),
+                code_prefix + "_RESULT_DIGEST_INVALID")
+    return tuple(receipt["phase"] for receipt in history)
+
+
+def next_phase_action(phases, history, requested, code_prefix):
+    require(requested in phases, code_prefix + "_PHASE_INVALID")
+    completed = validate_phase_history(phases, history, code_prefix)
+    if requested in completed:
+        return "REPLAY_NOOP"
+    require(len(completed) < len(phases) and requested == phases[len(completed)],
+            code_prefix + "_PHASE_ORDER_VIOLATION")
+    return "EXECUTE_ONCE"
+
+
+def _call_worker(callable_, output):
+    try:
+        output.put(("ok", callable_()))
+    except BaseException as error:
+        output.put(("error", repr(error)))
+
+
+def bounded_call(callable_, timeout_seconds):
+    """Run an isolated callable with a real deadline.
+
+    A timeout terminates the child and raises an explicit uncertain-side-effect
+    error.  Callers must inspect/reconcile; this function never claims rollback.
+    """
     require(timeout_seconds > 0, "TIMEOUT_REQUIRED")
-    started = clock()
-    result = callable_()
-    elapsed = clock() - started
-    require(elapsed <= timeout_seconds, "OPERATION_TIMEOUT")
-    return result
+    output = multiprocessing.Queue()
+    process = multiprocessing.Process(target=_call_worker, args=(callable_, output))
+    process.start()
+    process.join(timeout_seconds)
+    if process.is_alive():
+        process.terminate()
+        process.join(5)
+        raise GateError("OPERATION_TIMEOUT_UNCERTAIN_SIDE_EFFECTS")
+    require(process.exitcode == 0, "OPERATION_CHILD_FAILED")
+    require(not output.empty(), "OPERATION_RESULT_MISSING")
+    status, value = output.get()
+    require(status == "ok", "OPERATION_CALLABLE_FAILED:" + str(value))
+    return value
