@@ -40,8 +40,10 @@ class StorefrontBrowser(unittest.TestCase):
   campaign(cls.a,AMOUNT,"amount_ad")
   campaign(cls.a,SUCCESS,"success_ad")
   # Test runner/thread requires explicit cross-thread connections, still one serial server.
-  cls.m.backup(cls._copy_m:=sqlite3.connect(":memory:",check_same_thread=False))
-  cls.a.backup(cls._copy_a:=sqlite3.connect(":memory:",check_same_thread=False))
+  cls._copy_m=sqlite3.connect(":memory:",check_same_thread=False)
+  cls._copy_a=sqlite3.connect(":memory:",check_same_thread=False)
+  cls.m.backup(cls._copy_m)
+  cls.a.backup(cls._copy_a)
   cls.http=HTTPServer(("127.0.0.1",0),handler(DemoService(cls.o,cls._copy_m,cls._copy_a,150)))
   cls.thread=threading.Thread(target=cls.http.serve_forever,daemon=True)
   cls.thread.start()
