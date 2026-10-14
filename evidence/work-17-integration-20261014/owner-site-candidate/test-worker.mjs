@@ -98,7 +98,8 @@ test('snapshot cannot grant any action or omit a view',async()=>{
 });
 test('response byte cap and malformed view status reject',async()=>{
   const data=envelope();data.snapshot.views.costs.status='secret /path';
-  for(const response of [upstream(data),new Response('x'.repeat(262145),{headers:{'Content-Type':'application/json'}})])
+  const token=envelope();token.snapshot.views.costs.status='SECRET_TOKEN';
+  for(const response of [upstream(data),upstream(token),new Response('x'.repeat(262145),{headers:{'Content-Type':'application/json'}})])
     await withFetch(async()=>response,async()=>assert.equal((await worker.fetch(req(),env)).status,503));
 });
 test('no success cache reused after read failure',async()=>{

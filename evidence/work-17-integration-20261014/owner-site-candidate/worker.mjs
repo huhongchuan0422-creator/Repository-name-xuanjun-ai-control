@@ -2,6 +2,9 @@
 // STATIC_FILES is embedded by build.mjs from the pinned original Site checkout.
 const LABELS = {costs:'任务费用', usage:'运行用量', dependencies:'依赖证据',
   resume:'恢复前置', alert:'人工告警', handoff:'执行权交接', canary:'端到端验收'};
+const READY = {costs:'VIEW_READY',usage:'SUPPLIED_USAGE_EVIDENCED',
+  dependencies:'DEPENDENCIES_EVIDENCED',resume:'PREREQUISITES_REPORTED',
+  alert:'PAYLOAD_READY_NOT_SENT',handoff:'HANDOFF_PROOFS_REPORTED',canary:'COVERAGE_COMPLETE'};
 const ENDPOINT = 'https://uk.wenwenwenyiyiyi.work/api/work17/read';
 const HEADERS = {'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff',
   'Referrer-Policy':'no-referrer', 'Content-Type':'application/json; charset=utf-8'};
@@ -37,7 +40,7 @@ function project(envelope, task) {
     throw new Error('SNAPSHOT_CONTRACT');
   const summary=Object.entries(LABELS).map(([kind,label])=>{
     const status=s.views[kind]?.status;
-    if (typeof status!=='string' || !/^[A-Z_]{1,48}$/.test(status)) throw new Error('VIEW_STATUS');
+    if (status!=='HOLD' && status!==READY[kind]) throw new Error('VIEW_STATUS');
     return {kind,label,status,execution_granted:false};
   });
   const status = (!s.scan_complete || summary.some(v=>v.status==='HOLD')) ? 'HOLD' : s.status;
