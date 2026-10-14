@@ -20,6 +20,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install 'playwright==1.55.0'
       - run: python -m playwright install --with-deps chromium
+      - run: node --test demos/community-local-e2e/app.test.mjs
       - run: python -m unittest discover -s tests -p 'test_stage5_browser_e2e.py' -v
       - run: |
           echo REAL_CHROMIUM_BROWSER_E2E=TESTED
