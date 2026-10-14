@@ -1,5 +1,7 @@
 name: Stage5 Full Local Integration Gate
 on:
+  push:
+    branches: [main]
   pull_request:
     paths:
       - 'scripts/community_*.py'
