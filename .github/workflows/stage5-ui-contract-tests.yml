@@ -1,0 +1,26 @@
+name: Stage5 UI Contracts
+on:
+  push:
+    paths:
+      - 'scripts/community_ui_contracts.py'
+      - 'tests/test_community_ui_contracts.py'
+      - '.github/workflows/stage5-ui-contract-tests.yml'
+  pull_request:
+    paths:
+      - 'scripts/community_ui_contracts.py'
+      - 'tests/test_community_ui_contracts.py'
+      - '.github/workflows/stage5-ui-contract-tests.yml'
+permissions:
+  contents: read
+jobs:
+  ui-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify new UI contracts and merchant baseline
+        run: |
+          python -m unittest discover -s tests -p 'test_community_ui_contracts.py' -v
+          python -m unittest discover -s tests -p 'test_community_merchant_contract.py' -v
