@@ -13,6 +13,7 @@ from scripts.community_order_store import connect, DDL, create_order, state, sim
 from scripts.community_merchant_contract import scope
 from scripts.community_storefront_snapshot import storefront_snapshot
 from scripts.community_ad_contract import AMOUNT, SUCCESS
+from scripts.community_ad_store import list_campaigns
 
 MAX_BODY = 2048
 READ_TIMEOUT_SECONDS = 1.0
@@ -39,6 +40,31 @@ class DemoService:
     def dispatch(self, method, path, data):
         if type(data) is not dict:
             raise ValueError("INVALID_REQUEST")
+        if method == "POST" and path == "/demo/ads/list":
+            _object(data, {"tenant_id","merchant_id","store_id"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            if self.ad_db is None:
+                raise ValueError("AD_STORE_UNAVAILABLE")
+            listed=list_campaigns(self.ad_db,identity,limit=50)
+            return {"campaigns":listed["campaigns"],"has_more":listed["has_more"],
+                    "simulation_only":True,"write_permissions":False}
+        if method == "POST" and path == "/demo/orders/summary":
+            _object(data, {"tenant_id","merchant_id","store_id"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            t,m,st=scope(identity)
+            rows=self.db.execute(
+                "SELECT state,COUNT(*),COALESCE(SUM(amount_minor),0) FROM orders "
+                "WHERE tenant_id=? AND merchant_id=? AND store_id=? GROUP BY state",
+                (t,m,st)).fetchall()
+            counts={name:0 for name in ("PENDING","SUCCESS","FAILED","CANCELLED","REFUNDED")}
+            total=0
+            for name,count,amount in rows:
+                counts[name]=count
+                total+=amount
+            return {"counts":counts,"order_total_minor":total,
+                    "simulation_only":True,"provider_settlement_verified":False,
+                    "real_revenue_minor":None}
         if method == "POST" and path == "/demo/orders/list":
             _object(data, {"tenant_id","merchant_id","store_id"})
             identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -136,7 +162,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
