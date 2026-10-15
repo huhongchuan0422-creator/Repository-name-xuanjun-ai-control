@@ -160,6 +160,16 @@ def advance(db,order_id,tenant_id,event_key,new_state,at,proof_ref=None,
 def status(db,order_id,tenant_id):
     read(db,order_id,tenant_id)
     row=db.execute("SELECT state,proof_ref,updated_at FROM saas_order_lifecycle WHERE order_id=?",(order_id,)).fetchone()
+    events=db.execute("SELECT old_state,new_state,proof_ref,occurred_at FROM saas_order_lifecycle_events WHERE order_id=? ORDER BY rowid",(order_id,)).fetchall()
+    previous="PREPARED"
+    last_at=read(db,order_id,tenant_id)["created_at"]
+    for old_state,new_state,proof,occurred in events:
+        if old_state!=previous or new_state not in TRANSITIONS.get(previous,set()) or occurred<last_at:
+            raise ValueError("LIFECYCLE_EVENT_INCONSISTENT")
+        previous=new_state
+        last_at=occurred
+    if (not row and events) or (row and (not events or (row[0],row[1],row[2])!=(previous,events[-1][2],last_at))):
+        raise ValueError("LIFECYCLE_PROJECTION_MISMATCH")
     return {"order_id":order_id,"tenant_id":tenant_id,
             "state":row[0] if row else "PREPARED",
             "proof_ref":row[1] if row else None,
