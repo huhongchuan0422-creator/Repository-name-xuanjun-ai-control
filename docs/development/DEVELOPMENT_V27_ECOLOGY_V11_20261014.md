@@ -1392,6 +1392,18 @@ PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recor
 
 本功能须先检查现有 Telegram 服务机器人、国内 CRM/Common Brain、飞书适配及统一身份资产，优先复用或最小扩展，不允许再建立一套独立客服账本、并行CRM或重复开发新的模型提供者。客户可视化中心的原代码/测试和所有验收证据登记原项目与模块资产映射，准确记录 `REUSE / EXTEND / MISSING / BLOCKED` 及 GitHub PR/commit，防止重复开发。
 
+### 8.2.8 自有域名统一规划、国内与英国分工及东京退役迁移（强制）
+
+规则 `XUANJUN_DOMAIN_HOST_AUTHORITY_AND_MIGRATION_V1`：玄钧自有主域 `wenwenwenyiyiyi.work` 的正式网站、SaaS市场、统一可视化中心、社区分账客户预览、客户定制预览/反馈采用**一套权威路由/身份/发布机制**。战略目标为：国内服务器提供对客可访问的官网和预览入口、英国服务器负责开发控制、版本核对、独立审核和受控发布；东京服务器计划退役，禁止建立长期新依赖，待验证所有既有网站/回调/业务迁移和回滚后才能下线；韩国保留业务隔离。除已有 `center.wenwenwenyiyiyi.work` 自定义ChatGPT域外，不把现有任何子域天然认定为网站管理/生产发布通道。
+
+**DNS与实际主机必须分层验收。** 2026-10-15用户Cloudflare截图显示：根域A和`wecom` A暂指`47.245.53.152`（东京线索），`winctl` A指国内`47.101.152.210`，`uk` A指英国`8.208.119.115`，`center` CNAME为`custom-domains.chatgpt.site`；此外存在Cloudflare邮件路由MX和邮件/自定义主机名/OpenAI验证TXT等记录。截图部分主机名及内容被截断，权威DNS导出前不得猜测完整数据；`center`、MX、SPF、DKIM、验证TXT保持原样。**DNS A指向东京不等于证明真实官网的Webroot或上游均在东京**。服务器分工必须通过真实Host/SNI/HTTP响应、nginx配置、文件哈希、运行服务及证书终止位置核验，不能因工具容器无法解析域名就断言官网故障。
+
+统一网站目标路径优先采用 `/` 官网、`/visual/` SaaS可视化中心、`/visual/community-payment/` 多角色社区分账演示、现有SaaS商品/报价入口复用、`/customer/projects/<project>/preview/` 私有客户预览。以上仅目标路由，未经受控部署并外网HTTPS回验不得对客户宣传为现成访问地址。根域路径不要求新增DNS记录，先核对旧站`/zh-cn`、`/en`与深层URL，不破坏既有语言及导航。公开预览可匿名查看演示，但私有定制、反馈、网页AI和Telegram/飞书身份归属必须经过可信认证及留证，不依赖ChatGPT登录。
+
+**迁移与发布顺序是强制门禁：** (1) Cloudflare只读导出完整RR及优先级；(2) 国内/英国/东京受控Runner或主机进行只读DNS、Nginx、root/upstream、TLS、旧站路由和回调核查；(3) 完成发布/制品SHA/备份及受控回滚；(4) 先在国内隔离环境进行官网和预览全链路测试，覆盖手机/PC、所有角色跳转、原官网、多语言和已授权反馈；(5) 经独立审核/Owner和现有Release Gate放行后才发布及切换根域DNS；(6) 全球解析、HTTPS、应用回调、订单/支付隔离、Web/CRM/Telegram/企微链路实测且稳定后，另行批准东京停机。**不能先改DNS、不能先撤东京、不能覆盖冻结PR118或更改PR17/P2门禁。**
+
+详细DNS逐项台账、服务器事实与未知项、部署验收、回滚、Work/Dots协作锚点统一放在 `plans/XUANJUN_DOMAIN_DNS_UK_DOMESTIC_MIGRATION_MASTER_20261015.md`。本次工具容器和公共网页没有获得主域实际站点响应，`WEBSITE_ACTUAL_HOST=UNKNOWN`，`FIRST_PARTY_CUSTOMER_PREVIEW_GATE=HOLD`，不得宣称已完成部署。所有任务写回原PR/Issue与资产复用台账，不新建平行产品和生产写入者。
+
 ### 8.3 购买前就绪检查
 
 PRE_PURCHASE_READINESS_CHECK 必须在正式付款前执行，以 NO_POST_PAYMENT_SURPRISE 为原则。
