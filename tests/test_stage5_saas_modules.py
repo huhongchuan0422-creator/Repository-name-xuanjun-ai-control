@@ -49,6 +49,14 @@ class SaasModuleTests(unittest.TestCase):
   self.assertFalse(entitled(self.db,"tenantEarly","storefront_catalog",300))
   row=self.db.execute("SELECT valid_from,valid_until FROM module_entitlements WHERE tenant_id=?",("tenantEarly",)).fetchone()
   self.assertEqual(row,(100,300))
+ def test_future_gap_cannot_be_disguised_as_continuous_renewal(self):
+  set_price(self.db,"storefront_catalog",1,1000,200,30)
+  grant(self.db,"tenantGap","storefront_catalog",100,200,1)
+  with self.assertRaisesRegex(ValueError,"GRANT_MUST_EXTEND"):
+   grant(self.db,"tenantGap","storefront_catalog",250,350,1)
+  self.assertTrue(entitled(self.db,"tenantGap","storefront_catalog",150))
+  self.assertFalse(entitled(self.db,"tenantGap","storefront_catalog",225))
+  self.assertEqual(self.db.execute("SELECT count(*) FROM module_events WHERE tenant_id=?",("tenantGap",)).fetchone()[0],1)
  def test_no_unauthorized_free_or_unknown_price(self):
   with self.assertRaises(ValueError):grant(self.db,"tenantA","signed_qr",100,200,1)
   with self.assertRaises(ValueError):set_price(self.db,"signed_qr",1,True,100,30)
