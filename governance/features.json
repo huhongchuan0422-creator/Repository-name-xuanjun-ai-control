@@ -19,11 +19,13 @@
           "normal PR has stable feature-compliance check",
           "main protection is only enabled after safe bootstrap",
           "Complete batch metadata rejects stale HEAD, incomplete nodes and omitted failure domains; no approval authority is inferred",
-          "Delivery-contract branch protection and real continuation remain separately evidenced deployment steps"
+          "Delivery-contract branch protection and real continuation remain separately evidenced deployment steps",
+          "Trusted default-branch data-only gate rejects protected root changes, renamed roots and forged workflow paths; formal activation needs administrator source binding and actual negative PR evidence"
         ],
         "tests": [
           "tests/test_feature_compliance_check.py",
-          "tests/test_delivery_contract_check.py"
+          "tests/test_delivery_contract_check.py",
+          "tests/test_trusted_delivery_gate.py"
         ]
       },
       "reuse": [
@@ -35,7 +37,10 @@
       "paths": [
         ".github/workflows/delivery-contract.yml",
         "scripts/delivery_contract_check.py",
-        "tests/test_delivery_contract_check.py"
+        "tests/test_delivery_contract_check.py",
+        "scripts/trusted_delivery_gate.py",
+        "tests/test_trusted_delivery_gate.py",
+        ".github/workflows/delivery-contract-candidate.yml"
       ]
     }
   ]

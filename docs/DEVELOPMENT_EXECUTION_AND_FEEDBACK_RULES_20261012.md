@@ -159,3 +159,18 @@ E. 现有确定性调度入口消费canonical ledger，复用既有回执时限�
 机械校验只能证明结构与版本绑定，不能证明证据真实性、源码质量、没有遗漏节点或审核独立性。工作流自身改变也须独立审查，不能用本PR可改的CI当不可绕过信任根。平台保护、可信执行入口和人工独审共同形成强制闭环。
 
 状态分层：规则/候选实现已提交 ≠ main已生效 ≠ 分支保护已配置 ≠ 后台持续执行已验收。每层必须有自己的实际回执。发现规则过时，通过原PR集中修订版本，不依赖聊天记忆或静默改口径。
+
+
+### 5 G1信任根整改与启用前置
+
+正式delivery-contract入口改为默认分支pull_request_target：工作流和校验器仅取GitHub提供的github.sha，校验器/规则来自该精确受信任checkout。PR正文、HEAD和文件清单只经API读取为JSON，不checkout/import/执行PR源码、工作流、测试或制品，不读取PR指定路径，不恢复PR缓存，不授予写token。每次输出trusted_source_sha、候选head_sha和无授权字段。
+
+PR候选自测单独命名delivery-contract-candidate，不得设为正式强制检查或拿其绿色替代受信任入口。正式入口对全部.github/workflows路径（含新增、删除、重命名前后）、根AGENTS、规则、注册表及校验器变更一律HOLD_TRUST_ROOT_UPDATE_REQUIRES_SEPARATE_REVIEW；PR修改同名校验器、同名job、规则及其hash不能改变受信任逻辑。正常业务PR仍校验原结构契约。
+
+信任根更新走原PR17治理维护批次：独立审核精确源码/哈希，Owner及管理员按既有受控维护权限更新受保护baseline，复核主分支来源后再继续；普通开发者不能用PR自报PASS、标签、正文或本地开关获得例外。若更新权限/审批渠道未验证，保持HOLD，不暗中关闭门禁。
+
+管理员必须绑定“受信任工作流的仓库、路径、受保护来源”，不能只绑定GitHub Actions的同名job/context：同App的同名检查不等于相同工作流来源。优先使用平台的required workflow规则绑定本文件及受保护来源；若当前账户/仓库不支持或无法回读该能力，不能声称一个required status名称解决了G1，应保持MANDATORY_ENFORCEMENT=HOLD并由管理员提供支持来源约束的执行入口。现有403管理权限限制原样保留。
+
+本PR仍是bootstrap候选：默认分支尚不存在本受信任入口，不能在独立审核前为测试合并它。候选自测、真实恶意PR数据的离线回放，与默认分支正式事件及来源绑定/拒绝合并实测分开记录；后两项未发生就标NOT_RUN，不以模拟替代。正式启用需独立审核、受控bootstrap、管理员来源绑定和真实负向PR回执，不能自批准。
+
+依据：GitHub官方pull_request_target安全说明及规则集required workflow机制。https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target 。正式上下文中永不checkout PR head。
