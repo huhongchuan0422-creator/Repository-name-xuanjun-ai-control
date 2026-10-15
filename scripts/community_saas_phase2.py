@@ -159,13 +159,18 @@ class OfflineSaas:
             return {"status":"OFFLINE_ONLY","service":"SAAS_PHASE2",
                     "finance_provider":"NOT_CONNECTED","grant_writer":"DISABLED"}
         if operation=="refund_reversal_plan":
-            order=read(self.orders,_id(params["order_id"]),tenant)
+            from scripts.community_saas_order_preparation import quote_provenance
+            order_id=_id(params["order_id"])
+            quote_provenance(self.orders,order_id,tenant)
+            lifecycle=status(self.orders,order_id,tenant)
+            order=read(self.orders,order_id,tenant)
             reason=params["reason"]
             if type(reason) is not str or not reason.strip() or len(reason)>300:
                 raise ValueError("INVALID_REFUND_REASON")
             return {"order_id":order["order_id"],"tenant_id":tenant,
                     "quote_sha256":order["quote_sha256"],
                     "action":"REFUND_REVIEW_ONLY","reason":reason,
+                    "order_lifecycle_state":lifecycle["state"],
                     "provider_refund_executed":False,"entitlement_revoked":False,
                     "revenue_reversed":False}
         raise ValueError("UNKNOWN_OPERATION")
