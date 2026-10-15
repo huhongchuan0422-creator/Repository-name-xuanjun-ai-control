@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh uk
   tokyo:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
     timeout-minutes: 2
     steps:
@@ -69,3 +70,67 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh domestic
+
+  website-source-search:
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [xuanjun-tokyo-readonly, xuanjun-domestic-ops]
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.runner }}"]
+    timeout-minutes: 2
+    steps:
+      - name: Bounded read-only website package and deployed file identification
+        run: |
+          python3 -B - <<'PY'
+          import os,json,hashlib,subprocess,time
+          from pathlib import Path
+          host=os.uname().nodename
+          assert host in ("iZ6wee8q9z4t03hvqumwfhZ","iZvt5t8tlrm8oiZ")
+          deadline=time.monotonic()+55
+          report={"host":host,"uid":os.geteuid(),"production_mutation":False,"packages":[],"sites":[],"errors":[]}
+          roots=[x for x in ("/tmp","/home/admin","/home/openclaw_ops","/opt","/var/backups") if os.path.isdir(x)]
+          cmd=["find"]+roots+["-maxdepth","9","-type","f","(","-iname","*website*20261013*","-o","-iname","*yunhui*handoff*","-o","-iname","*website*copy*","-o","-iname","*website*language*","-o","-name","website-public-copy-review.patch",")","-print0"]
+          r=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=25)
+          report["search_exit"]=r.returncode
+          report["search_permission_denied_count"]=r.stderr.count(b"Permission denied")
+          def digest(p):
+           h=hashlib.sha256()
+           with p.open("rb") as f:
+            while True:
+             if time.monotonic()>deadline: raise RuntimeError("TIME_BOUND")
+             b=f.read(1048576)
+             if not b: break
+             h.update(b)
+           return h.hexdigest()
+          for raw in sorted(set(x for x in r.stdout.split(b"\0") if x))[:30]:
+           p=Path(os.fsdecode(raw))
+           try:
+            s=p.stat();v={"path":str(p),"size":s.st_size,"mtime_epoch":s.st_mtime}
+            if s.st_size<=100*1024*1024:v["sha256"]=digest(p)
+            report["packages"].append(v)
+           except (OSError,RuntimeError):report["errors"].append("PACKAGE_READ_FAILED:"+str(p))
+          base=Path("/var/www/wenwenwenyiyiyi.work")
+          for root in (base,base/"current/public"):
+           v={"path":str(root),"resolved":str(root.resolve())}
+           try:
+            if not root.is_dir():v["status"]="ABSENT_OR_NOT_ACCESSIBLE"
+            elif not (root/"index.html").is_file():v["status"]="NO_INDEX"
+            else:
+             h=hashlib.sha256();count=0;size=0
+             for d,dirs,files in os.walk(str(root),followlinks=False):
+              dirs[:]=sorted(x for x in dirs if not x.startswith(".") and not Path(d,x).is_symlink())
+              for n in sorted(files):
+               p=Path(d,n)
+               if p.is_symlink() or p.suffix.lower() not in (".html",".css",".js"):continue
+               s=p.stat()
+               if s.st_size>20*1024*1024:raise RuntimeError("FILE_SIZE_BOUND")
+               sha=digest(p);h.update((str(p.relative_to(root))+"\0"+sha+"\n").encode())
+               count+=1;size+=s.st_size
+               if count>10000:raise RuntimeError("COUNT_BOUND")
+             v.update(status="READ_COMPLETE",web_files=count,web_bytes=size,web_manifest_sha256=h.hexdigest())
+             v["selected"]={n:digest(root/n) for n in ("index.html","yunhui.css","yunhui.js","assets/tiktok-integration.js") if (root/n).is_file()}
+           except (OSError,RuntimeError) as e:v["status"]="READ_INCOMPLETE";v["reason"]=type(e).__name__
+           report["sites"].append(v)
+          print(json.dumps(report,sort_keys=True))
+          PY
