@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import sqlite3
+from scripts.community_saas_schema_guard import install_extension
 from scripts.community_merchant_contract import valid_id
 from scripts.community_saas_order_preparation import read, status, quote_provenance
 
@@ -101,7 +102,7 @@ BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
 def install_reviews(db):
     if not isinstance(db,sqlite3.Connection):
         raise TypeError("SQLITE_CONNECTION_REQUIRED")
-    db.executescript(REVIEW_SCHEMA)
+    install_extension(db,REVIEW_SCHEMA)
 
 def create_review(db,task_id,tenant_id,order_id,kind,at,reason):
     _ident(task_id);_ident(tenant_id);_ident(order_id);_timestamp(at)
