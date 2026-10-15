@@ -1364,6 +1364,18 @@ PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recor
 
 **强制验收：** `ROLE_BASED_VISUAL_ENTRY_REQUIRED=YES`。逐角色检查入口可访问、关键页面可点击和跳转、前后流程关联正确、返回及切换后上下文保留；按可信身份验证跨租户和跨角色越权拒绝，覆盖正常/驳回/异常路径与角色可选项。每个主要业务角色至少一条真实浏览器模拟路径，核心跨角色链路须有端到端验证和绑定准确版本的证据。缺任一实际必需角色入口或跨角色流程不连通时 `ROLE_VISUAL_ACCEPTANCE_GATE=HOLD`，阻止对应模块的完整可视化验收及正式商城上架，不影响未涉该角色的其他已独立通过模块。
 
+### 8.2.6 自有域名客户预览与反馈入口（全部定制及SaaS模块强制）
+
+规则编号 `CUSTOMER_PREVIEW_FIRST_PARTY_DOMAIN_REQUIRED_V1`。**所有面向客户体验、提出反馈或进行业务验收的可视化预览，必须通过玄钧实际控制的自有域名 HTTPS 页面交付**，不得将 `chatgpt.com`、ChatGPT沙盒 `sandbox:/...`、GitHub文件查看页面、GitHub Actions工件地址或需登录ChatGPT账户的链接作为正式客户预览入口。客户点击链接后应直接进入可访问的业务页面；若项目私有，则仅通过玄钧自有域名内的独立客户身份认证/受控邀请登录，不得要求注册或登录ChatGPT。原型文件和 GitHub 地址仅保留为内部开发制品/证据，不能冒充可访问交付网址。
+
+域名规划先核实玄钧当前控制的主域 `wenwenwenyiyiyi.work`、既有站点、多语言路由、服务器、证书和反向代理能力，再按既有网站信息架构确定正式地址。示例路径如 `https://wenwenwenyiyiyi.work/demo/<project>/<version>`、`/visual/<industry-or-module>`、`/customer/projects/<project>/preview` **仅为候选路由，未经真实DNS/TLS/HTTP验证不得宣布已经上线或可访问**。优先同域复用现有网站与后端入口，不为展示单独采购服务器、增加不必要的域名和新平台；如果选择子域，必须有独立DNS、HTTPS与访问控制实测证据。
+
+客户预览应支持按行业/项目/模块打开案例、跨角色入口导航、跨模块跳转、响应式手机/PC页面、预览反馈与版本差异，并在客户自己的项目中记录意见、截图/组件定位、开发处理、复测、业务验收。打开预览无需ChatGPT身份；公开案例允许匿名只读演示，客户私有预览通过客户身份、项目成员权限和有效期受控访问。**演示数据、真实客户数据、支付密钥和生产管理操作必须严格隔离**。演示时必须标明 `DEMO / SANDBOX / REAL_CONNECTED`，模拟微信支付及分账不能标成真实到账。预览不得提供未审核的生产资金动作。
+
+新增验收断言 `FIRST_PARTY_CUSTOMER_PREVIEW_GATE=REQUIRED`：验收人员使用未登录ChatGPT的普通浏览器、PC及手机访问实际自有域名 HTTPS 链接，测试页面加载、角色导航、功能跳转、反馈提交及版本绑定；核验DNS指向、有效TLS证书、正确Host/Origin策略、链接深度导航及刷新恢复、对外可达性、私有项目越权拒绝、敏感数据不泄露。必须保留准确预览URL、域名所有权/解析与证书证据、页面版本、源码commit、测试记录、客户回验回执。没有真实公网自有域名访问证据时，`FIRST_PARTY_CUSTOMER_PREVIEW_GATE=HOLD`，即使本地HTML/CI/浏览器模拟PASS也不得宣称客户可视化交付完成。
+
+这项门禁是第8.2.3模块选购预览、第8.2.4统一可视化中心、第8.2.5多角色入口及第9.9.1开发期客户交互验收的**共同强制前提**，适用于今后所有定制开发与可视化功能模块。网站生产配置变更与部署必须单独遵守第9章审核及Release Gate，不能因为本规则生效就越权发布。
+
 ### 8.3 购买前就绪检查
 
 PRE_PURCHASE_READINESS_CHECK 必须在正式付款前执行，以 NO_POST_PAYMENT_SURPRISE 为原则。
