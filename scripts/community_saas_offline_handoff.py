@@ -61,6 +61,8 @@ def inspect_test_attestation(db, order_id, tenant_id, attestation, key, now):
     proof_id=payload.get("proof_id")
     verified_at=payload.get("verified_at")
     _ident(proof_id);_timestamp(verified_at)
+    if verified_at < read(db,order_id,tenant_id)["created_at"]:
+        raise ValueError("PRE_ORDER_ATTESTATION")
     if verified_at>now:
         raise ValueError("FUTURE_ATTESTATION")
     expected={**plan_finance_claim(db,order_id,tenant_id),
