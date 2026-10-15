@@ -5,6 +5,7 @@ execution. The socket binds only 127.0.0.1; never expose it to the internet.
 """
 import hmac
 import json
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from scripts.community_saas_phase2 import Principal,serialize_response
 
@@ -18,12 +19,32 @@ def make_handler(service,principals):
     class Handler(BaseHTTPRequestHandler):
         server_version="SaaSOffline/1"
         def log_message(self,*args):pass
+        def do_GET(self):
+            paths={"/offline/saas-panel":"saas-panel.html",
+                   "/offline/saas-panel.mjs":"saas-panel.mjs"}
+            host=self.headers.get("Host","")
+            expected={"127.0.0.1:"+str(self.server.server_port),
+                      "localhost:"+str(self.server.server_port)}
+            if host not in expected:return self.answer(403,{"error":"HOST_DENIED"})
+            asset=paths.get(self.path)
+            if not asset:return self.answer(404,{"error":"NOT_FOUND"})
+            path=Path(__file__).resolve().parents[1]/"demos"/"community-local-e2e"/asset
+            if not path.is_file():return self.answer(404,{"error":"ASSET_NOT_FOUND"})
+            blob=path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type","text/html; charset=utf-8" if asset.endswith(".html") else "text/javascript; charset=utf-8")
+            self.send_header("Content-Length",str(len(blob)))
+            self.send_header("Cache-Control","no-store")
+            self.send_header("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'")
+            self.send_header("X-Content-Type-Options","nosniff")
+            self.end_headers();self.wfile.write(blob)
         def do_POST(self):
             if self.path!="/offline/saas":
                 return self.answer(404,{"error":"NOT_FOUND"})
             host=self.headers.get("Host","")
             expected={"127.0.0.1:"+str(self.server.server_port),"localhost:"+str(self.server.server_port)}
-            if host not in expected or self.headers.get("Origin") is not None:
+            origin=self.headers.get("Origin")
+            if host not in expected or (origin is not None and origin!="http://"+host):
                 return self.answer(403,{"error":"ORIGIN_DENIED"})
             token=self.headers.get("X-Offline-Token","")
             principal=next((p for t,p in principals.items() if hmac.compare_digest(t,token)),None)
