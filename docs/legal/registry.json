@@ -149,7 +149,7 @@
     {
       "id": "custom-development",
       "title": "软件与AI定制开发主合同",
-      "version": "2026-10-15-draft.1",
+      "version": "2026-10-15-draft.2",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "定制客户",
@@ -160,7 +160,7 @@
         "合同中心"
       ],
       "source": "docs/legal/templates/custom-development.md",
-      "source_sha256": "d3fca4cb5253947d3f54068e8af50c0fe6dd6d819482e189d5a874f509faca76",
+      "source_sha256": "d417c663dffe6011cb979351c1c4a5aa218e955824fd5c31cca781e193ea6a92",
       "preview": "demos/legal/custom-development.html",
       "planned_route": "/legal/custom-development/",
       "signature_enabled": false
@@ -411,7 +411,7 @@
     {
       "id": "esign-evidence",
       "title": "电子签约、授权与合同证据规则",
-      "version": "2026-10-15-draft.1",
+      "version": "2026-10-15-draft.2",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "所有签约方",
@@ -422,7 +422,7 @@
         "合同中心"
       ],
       "source": "docs/legal/templates/esign-evidence.md",
-      "source_sha256": "73dc663a3122bd5d8531f119e8e9c2765c8cdefd2648c5bce0487d5026ce48e8",
+      "source_sha256": "4d686d814c02f856a6e4a48e85ff2d42db53f3389b68dc351b8656ec9a3ef324",
       "preview": "demos/legal/esign-evidence.html",
       "planned_route": "/legal/esign-evidence/",
       "signature_enabled": false
