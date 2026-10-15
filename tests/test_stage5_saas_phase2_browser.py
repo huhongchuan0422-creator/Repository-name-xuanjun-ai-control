@@ -74,4 +74,17 @@ class SaaSPhase2Browser(unittest.TestCase):
         page.get_by_text("未保存",exact=False).wait_for(timeout=6000)
         self.assertEqual(self.q.execute("SELECT COUNT(*) FROM saas_offer_versions WHERE offer_id='badsku'").fetchone()[0],0)
     finally:page.close()
+ def test_owner_can_save_cost_evidenced_version_and_approve(self):
+    page=self.page(OWNER)
+    try:
+        page.locator("#ownerOfferId").fill("skuowner")
+        page.locator("#ownerCreate").click()
+        page.get_by_text("已保存离线待审批版本",exact=False).wait_for(timeout=7000)
+        page.locator("#ownerApprovalRef").fill("ownerapproval")
+        page.locator("#ownerCostRef").fill("ownercost")
+        page.locator("#ownerApprove").click()
+        page.get_by_text("离线审批已记录",exact=False).wait_for(timeout=7000)
+        self.assertEqual(self.q.execute(
+            "SELECT COUNT(*) FROM saas_offer_approvals WHERE offer_id='skuowner'").fetchone()[0],1)
+    finally:page.close()
 if __name__=="__main__":unittest.main()
