@@ -100,6 +100,9 @@ CREATE TRIGGER IF NOT EXISTS saas_lifecycle_event_no_update BEFORE UPDATE ON saa
  BEGIN SELECT RAISE(ABORT,'IMMUTABLE_LIFECYCLE_EVENT'); END;
 CREATE TRIGGER IF NOT EXISTS saas_lifecycle_event_no_delete BEFORE DELETE ON saas_order_lifecycle_events
  BEGIN SELECT RAISE(ABORT,'IMMUTABLE_LIFECYCLE_EVENT'); END;
+CREATE TRIGGER saas_order_lifecycle_events_no_replace BEFORE INSERT ON saas_order_lifecycle_events
+WHEN EXISTS(SELECT 1 FROM saas_order_lifecycle_events WHERE event_key=NEW.event_key)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
 """
 TRANSITIONS={
     "PREPARED":{"AWAITING_EXTERNAL","CANCELLED","EXPIRED"},
