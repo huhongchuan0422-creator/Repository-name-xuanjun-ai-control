@@ -30,7 +30,7 @@ def plan_finance_claim(db, order_id, tenant_id):
     quote_provenance(db,order_id,tenant_id)
     order=read(db,order_id,tenant_id)
     breakdown=order["amounts_by_cycle_minor"]
-    if not breakdown or any(type(v) is not int or v<0 for v in breakdown.values()):
+    if not breakdown or any(type(v) is not int or not 0<=v<=9007199254740991 for v in breakdown.values()):
         raise ValueError("UNSETTLEABLE_AMOUNT")
     return {"order_id":_ident(order_id),"tenant_id":_ident(tenant_id),
             "quote_id":order["quote_id"],"quote_sha256":order["quote_sha256"],
