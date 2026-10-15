@@ -8,15 +8,22 @@ import os
 import pathlib
 import sqlite3
 import tempfile
+import stat
 
 def _file(path):
-    p=pathlib.Path(path).resolve()
-    if not p.is_file() or p.is_symlink():raise ValueError("SOURCE_DB_MISSING")
-    return p
+    candidate=pathlib.Path(path)
+    try:
+        mode=candidate.lstat().st_mode
+    except (OSError,ValueError):
+        raise ValueError("SOURCE_DB_MISSING")
+    if not stat.S_ISREG(mode):raise ValueError("SOURCE_DB_MISSING")
+    return candidate.resolve(strict=True)
 
 def backup(source_path, output_path):
     src=_file(source_path)
-    dest=pathlib.Path(output_path).resolve()
+    requested=pathlib.Path(output_path)
+    if requested.is_symlink() or requested.exists():raise ValueError("BACKUP_PATH_UNSAFE")
+    dest=requested.resolve()
     if dest==src or dest.exists():raise ValueError("BACKUP_PATH_UNSAFE")
     dest.parent.mkdir(parents=True,exist_ok=True)
     handle=None
@@ -33,7 +40,9 @@ def backup(source_path, output_path):
                 raise ValueError("BACKUP_INTEGRITY")
             handle.close();handle=None
             raw=temp.read_bytes()
-            os.replace(temp,dest)
+            if requested.is_symlink() or requested.exists():
+                raise ValueError("BACKUP_DESTINATION_CHANGED")
+            os.link(temp,dest)
             return {"sha256":hashlib.sha256(raw).hexdigest(),
                     "size_bytes":len(raw),
                     "destination":str(dest),
