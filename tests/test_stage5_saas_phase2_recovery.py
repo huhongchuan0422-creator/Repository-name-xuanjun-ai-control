@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 import sqlite3
 import tempfile
 import unittest
@@ -47,6 +49,19 @@ class RecoveryTests(unittest.TestCase):
     info=backup(self.source,self.target)
     with self.assertRaisesRegex(ValueError,"ROLLBACK_SOURCE_EQUALS_TARGET"):
         rollback_preview(self.target,info["sha256"],self.target)
+ def test_10_actual_subprocess_wal_restart_preserves_committed_data(self):
+    program=("import sqlite3,os,sys;"
+      "db=sqlite3.connect(sys.argv[1]);"
+      "db.execute('PRAGMA journal_mode=WAL');"
+      "db.execute(\"INSERT INTO sample VALUES(2,'committed-after-process-exit')\");"
+      "db.commit();os._exit(0)")
+    result=subprocess.run([sys.executable,"-c",program,str(self.source)],timeout=8,check=False)
+    self.assertEqual(result.returncode,0)
+    db=sqlite3.connect(self.source)
+    try:
+        self.assertEqual(db.execute("SELECT value FROM sample WHERE id=2").fetchone()[0],
+                         "committed-after-process-exit")
+    finally:db.close()
  def test_07_missing_source_fails(self):
     with self.assertRaises(ValueError):backup(self.target,Path(self.temp.name)/"other.sqlite")
 class CrossStoreAuditTests(unittest.TestCase):
