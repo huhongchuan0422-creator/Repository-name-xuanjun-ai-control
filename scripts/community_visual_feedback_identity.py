@@ -79,7 +79,7 @@ def append_message(db,event_id,channel,verified_subject,project,text,now,verifie
         parent=previous[0] if previous else "0"*64
         value=[event_id,*row,channel,verified_subject,now,text,parent]
         digest=hashlib.sha256(json.dumps(value,ensure_ascii=False,separators=(",",":")).encode()).hexdigest()
-        db.execute("INSERT INTO visual_message_evidence VALUES(?,?,?,?,?,?,?,?,?)",(event_id,*row,channel,verified_subject,now,text,parent,digest))
+        db.execute("INSERT INTO visual_message_evidence VALUES(?,?,?,?,?,?,?,?,?,?)",(event_id,*row,channel,verified_subject,now,text,parent,digest))
         db.commit()
         return {"event_id":event_id,"customer_id":row[0],"record_sha256":digest,"saved":True}
     except BaseException:db.rollback();raise
