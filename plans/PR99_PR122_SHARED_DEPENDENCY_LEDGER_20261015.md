@@ -43,3 +43,77 @@ release-control plane. PR17 receives status only.
 5. PR99 PASS does not authorize Tokyo retirement. PR122 PASS does not complete
    Binance migration. Tokyo retirement is a later standalone Gate after both
    lines and all shared rows above are closed.
+
+
+## 2026-10-15 21:50 Asia/Shanghai manual handoff: portal source evidence
+
+This supplements the existing split scope; it does not authorize a service,
+database, key, DNS or TLS change. OpenClaw remains stopped.
+
+- Domestic isolated static recovery and read-only host probes passed as
+  Owner-terminal evidence in PR122 comments6193348374/6193367992. Production
+  cutover is still HOLD.
+- Tokyo observed entry `scripts/secure_secrets_portal_server.py` SHA256
+  `528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006`.
+- Owner supplied source-only archive `PR122_PORTAL_SOURCE_REVIEW.tar.gz`,
+  SHA256 `10b9c11fb8a6e07d9edab449faf9c72f6bb36e65ced79d7d65fbf1b69c28bd23`:
+  77 regular Python files,1137922 uncompressed bytes; archive paths/types
+  checked, entry identity matched. Source inspected statically; not imported,
+  executed or deployed.
+
+### Confirmed dependencies and safe reuse boundary
+
+1. `build_service` unconditionally constructs `CredentialRepository` and
+   its status bridge. CredentialStore/intake setup additionally depends on
+   the protected master key. Existing database.connection defaults to
+   trading.db unless explicitly configured; source inspection does not prove
+   the live DATABASE_URL or authorize a new DB authority.
+2. `--state-root` relocates form-session roots but OAuth state/token stores,
+   status/disconnect and icon still reference global DEFAULT_STATE_ROOT.
+   OperationsSecretRefStore and Telegram runtime/Bridge paths are separate
+   hardwired roots. Merely changing the CLI flag is not a complete migration.
+3. OAuth helpers and operations SecretRef/file-session components can be
+   reused in an isolated successor, but the existing portal's trading imports
+   and ordinary credential-intake initialization must not be copied as a
+   Domestic deployment. Source names/SecretRefs are not permission to copy
+   actual values.
+4. TelegramCanary's default bridge reads a cert-pin file and connects to
+   loopback19443. It also maintains webhook secrets/path and dedup state.
+   Starting a copied process without its accepted bridge and state would not
+   preserve the existing channel. No webhook reset or customer send is allowed
+   as a migration shortcut.
+5. The acquisition script's AST import traversal missed lazy `_EXPORTS`
+   mappings loaded by package __getattr__. Directly identified missing files:
+   database/repositories/{anomaly_repository,audit_repository,
+   credential_repository,customer_repository,referral_partner_repository,
+   trading_execution_repository}.py and
+   database/models/trading_integration_snapshots.py. This is an intake
+   limitation, not evidence the live deployment lacks these files; further
+   transitive/dynamic imports remain unverified. Collect the source-only
+   database package submodules in one supplement, never database/data or
+   runtime files. Do not label the77-file archive a complete executable closure.
+
+### Next bounded work and acceptance
+
+- Complete source intake, map endpoint-to-store-to-caller, and reuse existing
+  Domestic portability and provider-neutral bridge assets. Review required
+  target runtime paths/identities without disclosing credentials.
+- Prepare a minimal separated website/OAuth successor (if this remains the
+  approved migration route), explicit disabled/rejected trading credential
+  paths, preserved URL/Origin/CSRF/session/state semantics, and fake-transport
+  tests with production writes unavailable. No new platform/rewrite is implied.
+- Existing Owner management/finance credential routes require their own
+  accepted protected destination; they cannot silently return success or be
+  removed during static cutover. Telegram/WeCom/Novel follow existing separate
+  rows. No whole trading.db/master-key/credential directory transfer.
+- Before new host execution, bind complete source/package and configuration,
+  independently review changed scope, prove loopback identity/health and exact
+  route/tenant/permission/state restoration. Static tests are not OAuth/
+  Telegram live-channel acceptance.
+- TLS/ACME/Nginx candidate preparation may proceed independently, but apex
+  DNS/cutover waits for every required dynamic route's accepted successor or
+  explicitly approved removal. Any interim proxy plan is only a separate
+  candidate until upstream TLS/SNI, existing access restrictions, secret-safe
+  logs, failed/UNKNOWN behavior, rollback and Owner scope are reviewed.
+- Tokyo retirement remains a standalone gate across both PR99 and PR122 and
+  all remaining domains/callers, not a result of domestic static-site PASS.
