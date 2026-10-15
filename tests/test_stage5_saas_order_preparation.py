@@ -1,5 +1,7 @@
 """No collection or entitlement changes: verify prepared-order isolation."""
 import sqlite3
+import hashlib
+import json
 import unittest
 from scripts.community_saas_modules import connect,entitled
 from scripts.community_saas_offer_catalog import install as install_quotes,create_offer,quote
@@ -20,6 +22,7 @@ class PrepareOrderTests(unittest.TestCase):
     x=prepare(self.orders,self.quotes,"orderA","tenantA","q1","CNY",20)
     self.assertEqual(x["amounts_by_cycle_minor"],{"MONTH":1000,"ONCE":5000})
     self.assertFalse(x["payment_confirmed"])
+    self.assertEqual(x["quote_sha256"],hashlib.sha256(json.dumps(x["quote_snapshot"],ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()).hexdigest())
     self.assertFalse(x["entitlement_granted"])
     self.assertFalse(entitled(self.quotes,"tenantA","storefront_catalog",20))
     self.assertEqual(read(self.orders,"orderA","tenantA"),x)
