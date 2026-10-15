@@ -62,8 +62,7 @@
           "tests/test_p2_owner_diagnostic_r6.py",
           "tests/test_p2_preparation_checkpoint_r6.py",
           "tests/test_p2_preparation_checkpoint_r6_contract.py",
-          "evidence/p2-epoch7-access-repair-20261014/preparation-diagnostic-r6/test_diagnose_preparation.py",
-          "evidence/p2-epoch7-access-repair-20261014/preparation-diagnostic-r6/test_bootstrap_template.py"
+          "tests/test_p2_preparation_diagnostic_r6.py"
         ]
       },
       "reuse": [
