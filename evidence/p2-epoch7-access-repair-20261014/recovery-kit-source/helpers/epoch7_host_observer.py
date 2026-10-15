@@ -127,10 +127,14 @@ class LinuxProcessCensus(object):
                 need(key in UNIT_FIELDS and key not in rows,'CENSUS_UNIT_OUTPUT_KEYS');rows[key]=value
             unit=rows.get('Id');need(unit in units and unit not in result,'CENSUS_UNIT_OUTPUT_IDENTITY')
             for key in ('MainPID','ControlPID'):
-                if key not in rows and unit.endswith(('.timer','.socket')):rows[key]='0'
-                need(key in rows and re.fullmatch(r'0|[1-9][0-9]{0,9}',rows[key]),'CENSUS_UNIT_PID')
-                rows[key]=int(rows[key])
-            need(set(rows)==UNIT_FIELDS,'CENSUS_EXACT_UNIT_PROPERTIES');result[unit]=rows
+                if key in rows:
+                    need(re.fullmatch(r'0|[1-9][0-9]{0,9}',rows[key]),'CENSUS_UNIT_PID')
+                    rows[key]=int(rows[key])
+            required,optional=snap.unit_process_fields(unit)
+            need((UNIT_FIELDS-snap.UNIT_PROCESS_FIELDS)|required <= set(rows) <= UNIT_FIELDS,
+                 'CENSUS_EXACT_UNIT_PROPERTIES')
+            snap.validate_unit_process_fields(unit,rows,pid_type=int)
+            result[unit]=rows
         need(set(result)==set(units),'CENSUS_EXACT_UNIT_SET');return result
 
     def _show_units(self,units):

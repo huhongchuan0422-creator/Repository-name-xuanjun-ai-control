@@ -193,8 +193,9 @@ def compile_service_contract(compiled, identity_payloads, native_before,
              props['LoadState'] in ('loaded','masked') and props['NeedDaemonReload'] == 'no' and
              all(type(x) is str for x in props.values()), 'STOPPED_BASELINE_REQUIRED')
         need(unit != snap.RUNNER or props['ConditionResult'] == 'no', 'RUNNER_BASELINE')
-        for key in ('MainPID','ControlPID'):
-            if key in state: need(state[key] in (0,'0'), 'BASELINE_LIVE_PROCESS')
+        pid_type=int if any(type(state.get(key)) is int for key in ('MainPID','ControlPID')) else str
+        main_pid,control_pid=snap.validate_unit_process_fields(unit,state,pid_type=pid_type)
+        need(main_pid==control_pid==0, 'BASELINE_LIVE_PROCESS')
         baseline[unit] = {'properties':props,'main_required':False,'main_role_sha256':None}
     for unit,(script,user,group,supplements) in sorted(DIRECT.items()):
         path = UNIT_ROOT + unit; raw = targets[path]

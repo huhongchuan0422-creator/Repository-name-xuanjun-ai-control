@@ -57,6 +57,12 @@ WRITER_UNITS = frozenset(('xuanjun-github-intake.timer', 'xuanjun-ledger.socket'
     'xuanjun-p2-tls-renew.timer', 'xuanjun-p2-tls-renew.service',
     'xuanjun-uk-stage1-minimal.service', 'xj-uk-owner-notify.timer',
     'xj-uk-owner-notify.service', RUNNER))
+# systemd239 process-property applicability, restricted to this exact writer set.
+TIMER_UNITS = frozenset(('xj-uk-owner-notify.timer', 'xuanjun-github-intake.timer',
+                         'xuanjun-p2-tls-renew.timer'))
+SOCKET_UNITS = frozenset(('xj-root-broker.socket', 'xuanjun-ledger.socket',
+                          'xuanjun-p2-gateway-relay.socket'))
+UNIT_PROCESS_FIELDS = frozenset(('MainPID', 'ControlPID', 'ControlGroup'))
 LEGACY_MASKS = frozenset('/etc/systemd/system/' + n for n in (
     'xuanjun-uk-stage1-minimal.service', 'xuanjun-uk-openclaw.service',
     'xj-uk-owner-notify.timer', 'xj-uk-owner-notify.service')) | d.OWNER_MASKS
@@ -340,6 +346,51 @@ def pin_matches(meta, pin):
          all(meta.get(k) == v for k, v in pin.items()), 'FILE_PIN_OR_AUTHORITY_CHANGED')
 
 
+def unit_process_fields(unit):
+    """Required/optional process properties for the exact supported units.
+
+    These are property applicability rules, not measured process/cgroup facts.
+    In systemd239 timers have no cgroup context or service/socket control PID;
+    sockets expose ControlPID/ControlGroup but not the service-only MainPID.
+    """
+    need(type(unit) is str and unit in WRITER_UNITS, 'UNIT_PROCESS_SCOPE')
+    optional = UNIT_PROCESS_FIELDS if unit in TIMER_UNITS else (
+        frozenset(('MainPID',)) if unit in SOCKET_UNITS else frozenset())
+    return UNIT_PROCESS_FIELDS - optional, optional
+
+
+def validate_unit_process_fields(unit, state, pid_type=str):
+    """Validate without adding absent properties; return semantic PID values.
+
+    Zero for an absent inapplicable PID is only a no-process predicate result.
+    It must never be inserted into an observed state or presented as measured.
+    Independent unit state, recursive cgroups, process and descriptor checks
+    remain mandatory at each caller's existing boundary.
+    """
+    required, optional = unit_process_fields(unit)
+    need(type(state) is dict and required <= set(state), 'UNIT_PROCESS_PROPERTIES_REQUIRED')
+    need(pid_type is str or pid_type is int, 'UNIT_PROCESS_PID_REPRESENTATION')
+    result = []
+    for key in ('MainPID', 'ControlPID'):
+        if key not in state:
+            need(key in optional, 'UNIT_PROCESS_PROPERTIES_REQUIRED');result.append(0);continue
+        value = state[key]
+        if pid_type is str:
+            need(type(value) is str and re.fullmatch(r'0|[1-9][0-9]{0,9}', value) is not None,
+                 'UNIT_PROCESS_PID_VALUE')
+            number = int(value)
+        else:
+            need(type(value) is int and 0 <= value <= 9999999999, 'UNIT_PROCESS_PID_VALUE')
+            number = value
+        need(key not in optional or number == 0, 'UNIT_INAPPLICABLE_PID_NONZERO')
+        result.append(number)
+    if 'ControlGroup' in state:
+        value = state['ControlGroup']
+        allowed = ('',) if unit in TIMER_UNITS else ('', '/system.slice/' + unit)
+        need(type(value) is str and value in allowed, 'UNIT_PROCESS_CONTROL_GROUP')
+    return tuple(result)
+
+
 def validate_writers(value):
     d.keys(value, ('units', 'masks', 'scheduler_sha256', 'control_files', 'processes', 'manager'), 'WRITER_EVIDENCE_KEYS')
     d.keys(value['units'], WRITER_UNITS, 'WRITER_UNIT_SET')
@@ -347,11 +398,10 @@ def validate_writers(value):
     for unit, row in value['units'].items():
         d.keys(row, ('state', 'cgroup_entries'), 'WRITER_UNIT_EVIDENCE')
         state = row['state']
+        main_pid, control_pid = validate_unit_process_fields(unit, state)
         need(state.get('Id') == unit and state.get('LoadState') in ('loaded', 'masked') and
              state.get('ActiveState') in ('inactive', 'failed') and
-             state.get('MainPID', '0' if unit.endswith(('.timer', '.socket')) else None) == '0' and
-             state.get('ControlPID', '0' if unit.endswith(('.timer', '.socket')) else None) == '0' and
-             state.get('ControlGroup') in ('', '/system.slice/' + unit) and
+             main_pid == control_pid == 0 and
              state.get('NeedDaemonReload') == 'no', 'WRITER_NOT_STOPPED')
         entries = row['cgroup_entries']
         need(isinstance(entries, dict) and all(p.startswith('/sys/fs/cgroup/systemd/system.slice/' + unit + '/') and

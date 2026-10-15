@@ -666,11 +666,12 @@ class LocalReadOnlyIO(DescriptorReader):
         for line in raw.decode('utf-8', 'strict').splitlines():
             c.need('=' in line, 'UNIT_QUERY_FORMAT'); key, value = line.split('=', 1)
             c.need(key in props and key not in result, 'UNIT_QUERY_KEYS'); result[key] = value
-        required = set(props) - ({'MainPID', 'ControlPID', 'ConditionResult'} if name.endswith(('.timer', '.socket')) else set())
+        unused, optional = c.unit_process_fields(name)
+        required = set(props) - optional
+        main_pid, control_pid = c.validate_unit_process_fields(name, result)
         c.need(required <= set(result) and result['Id'] == name and
                result['ActiveState'] in ('inactive', 'failed') and
-               result.get('MainPID', '0') == result.get('ControlPID', '0') == '0' and
-               result['ControlGroup'] in ('', '/system.slice/' + name) and
+               main_pid == control_pid == 0 and
                result['NeedDaemonReload'] == 'no', 'UNIT_NOT_EXCLUDED')
         if name == c.RUNNER:
             c.need(result['ConditionResult'] == 'no' and not self.absent(c.RUNNER_GUARD), 'RUNNER_GUARD')

@@ -1,0 +1,37 @@
+{
+  "bootstrap": {
+    "python": [
+      "3.6.8",
+      "3.12.14"
+    ],
+    "skips": 0,
+    "tests": 173
+  },
+  "ci": "PENDING",
+  "host_operations": "NOT_RUN",
+  "kind": "R3_TYPED_UNIT_LOCAL_EVIDENCE",
+  "production": "HOLD",
+  "runs": [
+    {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "7c5c1d000d5770bd0cd5642a955062677d690112dbb65ac0f98cd608317c0ea0",
+      "map_sha256": "e41ce6abaafebc24945591d6694be9e444a6d8165c9903cb967c19f72f7f429a",
+      "passed": 2003,
+      "python": "3.12.14",
+      "skipped": 9,
+      "tests": 2012
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "397a87cdb81bc305bead9ca1f3ff83d0df68da60e783d986d05121871418a5cb",
+      "map_sha256": "e41ce6abaafebc24945591d6694be9e444a6d8165c9903cb967c19f72f7f429a",
+      "passed": 2003,
+      "python": "3.6.8",
+      "skipped": 9,
+      "tests": 2012
+    }
+  ],
+  "runtime_changed": false
+}

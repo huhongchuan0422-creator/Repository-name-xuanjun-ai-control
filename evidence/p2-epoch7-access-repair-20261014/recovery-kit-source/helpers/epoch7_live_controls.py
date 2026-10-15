@@ -230,7 +230,7 @@ def validate_contract(contract, context):
 
 
 def validate_unit_row(unit, row, policy=None, stopped=False):
-    """Require MainPID/ControlPID and the complete supplied cgroup inventory.
+    """Require type-applicable properties and the complete cgroup inventory.
 
     The concrete reader must obtain manager state before/after recursive cgroup
     traversal and report absent cgroups explicitly. is-active alone cannot fit
@@ -239,19 +239,18 @@ def validate_unit_row(unit, row, policy=None, stopped=False):
     need(unit in snap.WRITER_UNITS and type(row) is dict and set(row) ==
          {'before', 'after', 'cgroup_present', 'cgroups'}, 'UNIT_OBSERVATION_SCHEMA')
     before, after = row['before'], row['after']
-    need(type(before) is dict and set(before) == UNIT_FIELDS and before == after,
+    required,optional = snap.unit_process_fields(unit)
+    need(type(before) is dict and STATIC_UNIT_FIELDS | required <= set(before) <= UNIT_FIELDS and before == after,
          'UNIT_STATE_RACE_OR_MISSING_PID')
-    need(before['Id'] == unit and type(before['MainPID']) is int and type(before['ControlPID']) is int,
-         'UNIT_PID_TYPES')
-    _integer(before['MainPID']); _integer(before['ControlPID'])
-    need(before['ControlPID'] == 0 and before['ControlGroup'] in ('', '/system.slice/' + unit),
-         'UNIT_CONTROL_OR_CGROUP')
+    need(before['Id'] == unit, 'UNIT_PID_TYPES')
+    main_pid,control_pid = snap.validate_unit_process_fields(unit,before,pid_type=int)
+    need(control_pid == 0, 'UNIT_CONTROL_OR_CGROUP')
     need(before['LoadState'] in ('loaded','masked','not-found'), 'UNIT_LOAD_STATE_UNKNOWN')
     if policy is not None:
         need({k: before[k] for k in STATIC_UNIT_FIELDS} == policy['properties'], 'UNIT_PROPERTIES_DRIFT')
-        need((before['MainPID'] > 0) is policy['main_required'], 'UNIT_MAIN_PID_POLICY')
+        need((main_pid > 0) is policy['main_required'], 'UNIT_MAIN_PID_POLICY')
     if stopped or before['ActiveState'] in ('inactive', 'failed'):
-        need(before['ActiveState'] in ('inactive','failed') and before['MainPID'] == 0,
+        need(before['ActiveState'] in ('inactive','failed') and main_pid == 0,
              'UNIT_NOT_STOPPED')
     groups = row['cgroups']
     need(type(row['cgroup_present']) is bool and type(groups) is dict and len(groups) <= MAX_CGROUP_FILES,
@@ -267,8 +266,9 @@ def validate_unit_row(unit, row, policy=None, stopped=False):
         for pid in entries: _integer(pid, 1)
         pids.extend(entries)
     need(len(pids) == len(set(pids)) and len(pids) <= MAX_PROCESSES, 'CGROUP_DUPLICATE_OR_BOUND')
-    if stopped or before['ActiveState'] != 'active': need(not pids, 'CGROUP_NOT_EMPTY')
-    if before['MainPID']: need(before['MainPID'] in pids, 'MAIN_PID_NOT_IN_CGROUP')
+    if stopped or before['ActiveState'] != 'active' or unit in snap.TIMER_UNITS:
+        need(not pids, 'CGROUP_NOT_EMPTY')
+    if main_pid: need(main_pid in pids, 'MAIN_PID_NOT_IN_CGROUP')
     return set(pids)
 
 
@@ -318,7 +318,7 @@ def validate_process_view(value, contract, checkpoint, observer_pid, allow_obser
             need(role in contract['process_roles'] or identity['pid'] in scoped_assignments, 'UNREVIEWED_WRITER_PROCESS')
             if unit is not None:
                 need(checkpoint['units'][unit]['properties']['ActiveState'] == 'active', 'WRITER_UNIT_NOT_ALLOWED')
-                if value['units'][unit]['before']['MainPID'] == identity['pid']:
+                if snap.validate_unit_process_fields(unit,value['units'][unit]['before'],pid_type=int)[0] == identity['pid']:
                     role_hash = scoped_assignments.get(identity['pid'],digest(role))
                     need(role_hash == checkpoint['units'][unit]['main_role_sha256'], 'MAIN_PROCESS_IDENTITY_DRIFT')
             allowed[identity['pid']] = identity

@@ -234,7 +234,7 @@ class CollectorTests(unittest.TestCase):
         self.assertIn('relay_cwd',result['missing_fields'])
         self.io.add(ROOT+'/stage1/.env',b'TOKEN=secret');self.assertIn('relay_cwd',self.io.collect()['missing_fields'])
     def test_occupied_original_kit_has_no_staged_cwd_or_dotenv_authority(self):
-        old=c.CAND+'/epoch7-recovery-candidate/xuanjun-p2-package'
+        old=c.CAND+'/epoch7-recovery-candidate-r2/xuanjun-p2-package'
         with mock.patch.object(o,'SOURCE_HASHES',self.io.expected):
             result=o.collect_openclaw_profile(self.io,self.io.observation['unit_metadata'],self.io.observation,old)
         self.assertIn('relay_cwd',result['missing_fields'])

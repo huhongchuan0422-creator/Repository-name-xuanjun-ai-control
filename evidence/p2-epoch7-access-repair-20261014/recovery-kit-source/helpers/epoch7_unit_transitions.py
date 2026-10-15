@@ -8,6 +8,7 @@ import copy
 import os.path
 
 import epoch7_injected_recovery as retained
+import epoch7_snapshot as snap
 from epoch7_service_roles import _receipt
 
 META=frozenset(('kind','sha256','uid','gid','mode','dev','ino','nlink','size','mtime_ns','ctime_ns'))
@@ -109,8 +110,9 @@ def effective_policies(evidence,contract,checkpoint,index,context_sha,units,hash
         actual=units[unit]['before'];old=policy['before'];new=policy['reloaded']
         expected=result[unit]['properties']
         if reload is None:
-            need(actual['ActiveState'] in ('inactive','failed') and actual['MainPID']==0 and
-                 actual['ControlPID']==0,'CACHED_UNIT_MUST_STAY_STOPPED')
+            main_pid,control_pid=snap.validate_unit_process_fields(unit,actual,pid_type=int)
+            need(actual['ActiveState'] in ('inactive','failed') and main_pid==control_pid==0,
+                 'CACHED_UNIT_MUST_STAY_STOPPED')
             need(actual['LoadState'] in (old['LoadState'],new['LoadState']) and
                  actual['UnitFileState'] in (old['UnitFileState'],new['UnitFileState']) and
                  actual['NeedDaemonReload'] in ('yes','no'),'FINITE_CACHED_PROPERTIES')

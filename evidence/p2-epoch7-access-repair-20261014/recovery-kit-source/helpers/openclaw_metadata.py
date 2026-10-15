@@ -322,7 +322,7 @@ def collect_openclaw_profile(io,unit_facts,observation,candidate_root=None):
     relay_value=section('relay',relay)
     def staged_cwd():
         from probe_metadata import RUNTIME_MANIFEST
-        need(candidate_root==c.CAND+'/epoch7-recovery-candidate-r2/xuanjun-p2-package','OPENCLAW_STAGED_CWD_REQUIRED')
+        need(candidate_root==c.CAND+'/epoch7-recovery-candidate-r3/xuanjun-p2-package','OPENCLAW_STAGED_CWD_REQUIRED')
         raw,row=read(candidate_root+'/deploy/integration-manifest.json',1048576,0)
         need(row['sha256']==RUNTIME_MANIFEST and 'stage1/.env' not in c.decode(raw)['files'],'OPENCLAW_STAGED_MANIFEST')
         missing(candidate_root+'/stage1/.env')
@@ -424,7 +424,7 @@ def prime_profile_scope(io,unit_facts,candidate_root=None):
         raw,row=stable_read(io,legacy['backup_path'],65536);protected(row,65536)
         need(row['sha256']==legacy['backup_sha256'],'OPENCLAW_RESTORED_UNIT_BINDING')
         paths.update(dotenv_paths(raw))
-        if candidate_root==c.CAND+'/epoch7-recovery-candidate-r2/xuanjun-p2-package':paths.add(candidate_root+'/stage1/.env')
+        if candidate_root==c.CAND+'/epoch7-recovery-candidate-r3/xuanjun-p2-package':paths.add(candidate_root+'/stage1/.env')
         for path in sorted(paths):
             try:io.absent(path)
             except (KeyboardInterrupt,SystemExit):raise
