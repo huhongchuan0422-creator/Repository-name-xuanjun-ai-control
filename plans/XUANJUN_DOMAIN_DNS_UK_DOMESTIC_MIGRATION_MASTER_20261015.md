@@ -349,3 +349,27 @@ IP初步分类：入口client_address用于日志；入口X-Forwarded-Proto用�
 下一可自主动作是按实际入口使用的符号解析上述懒加载映射及其本地目标，继续只读AST/哈希，不执行生产import、不查询数据库或读取凭据。外围WAF、日志使用方及Owner临时IP审计差异接受仍缺证据。
 
 截至本节：DNS_RELEASE=HOLD；动态鉴权/真实业务写验收仍NOT_TESTED；东京退役HOLD；原生产配置制品312efdd3及官网/current未改。等待独立审核只消费增量，不能将探针提交或CI SUCCESS当生产批准。
+
+
+### 9.12 2026-10-16：数据库懒加载覆盖补齐（限定源码证据）
+
+本轮先读取PR122自6199294955之后回执：未见新的独立发布结论。沿用9.11，不重跑DNS、静态、HEAD或16条安全GET，不修改已批准配置/官网/current。准确探针提交 `8e7f8db4142a5b5acde406019a5dd114a285ec20`；[Run38794274496](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38794274496)，东京Job116626465013 SUCCESS。英国、韩国、国内及原dispatch作业SKIPPED。
+
+为消除上一轮仅递归import漏过懒加载数据库模块的风险，本次采用**保守扩大源码集合**，不是执行__getattr__/__import__：从实际入口解析本地imports，同时纳入database顶层、models及repositories全部可读.py，再递归这些文件本地依赖。最终83模块（其中数据库50），pending0、read_errors0、未触及300文件/35秒上限。每个文件均记录SHA256和imports；生产入口哈希仍528a3b5b…b5006。没有生产import、没有业务数据库/凭据读取、没有网络请求或服务操作。
+
+必须保留工具限制：符号导出映射自动提取器仅匹配含database.的顶层字面量，返回lazy_exports=[]，**不等于没有懒加载，也不能声称每个动态目标已语义求值**。本次通过覆盖整个数据库源码集合而非运行动态分派补足本地文件范围。仍记录三处动态调用：models/__init__.py的__getattr__第117行；repositories/__init__.py的__getattr__第36行；trading_integration_repository.py的count_billing_operations_job_runs_by_status第1440行。外部库、运行时注入和外围WAF不在本次证明范围。
+
+| 分类 | 直接证据 | 能得出的结论 |
+| --- | --- | --- |
+| AUDIT_ONLY（入口源码） | secure_secrets_portal_server.py第1207行，client_address在log_message | 实际入口里所扫描的客户端对端地址使用是日志；不是Owner已经接受IP审计差异 |
+| Origin构造 | 同入口第1237行，X-Forwarded-Proto在_origin | 与可信代理头覆盖有关，不能用“IP仅日志”忽略协议头语义 |
+| RATE_LIMIT（非IP源码符号） | secure_secrets_portal.py第1668行_validate_submit_session；session.attempts、form_key、count、max_attempts_per_form | 限流函数符号指向会话/表单计数；未发现该函数使用remote/client IP，不等于真实POST安全验收通过 |
+| 数据库本地源码集合 | 本轮50个数据库.py中无所扫描IP属性/键命中 | 关闭“只读到懒加载入口，漏扫其目录内源码”的范围缺口；不是任意动态运行行为无IP依赖的证明 |
+| AUTH/SECURITY（整体） | 83模块扫描未见更多客户端来源IP属性/键命中 | NO_ADDITIONAL_DEPENDENCY_OBSERVED，不能升级为全系统NO_DEPENDENCY |
+| 外围WAF、第三方库、日志使用方 | 本通道无对应运行策略/消费方验收 | UNKNOWN，不能由开发方自接受风险 |
+
+旧HEAD错误已由9.11精确函数复现；本轮不重复复现、不向生产写补丁、不重启。原11项职责矩阵及安全GET结果继续沿用，真实POST/授权/消息/支付/交易仍NOT_TESTED。
+
+集中送审状态不新增批次：将本节作为6198144163/6199294955的源码证据补充，独立执行者据其范围判断，不要求重新审核未变83/45/115或生产配置制品。当前仍缺Owner对临时IP审计差异的明确接受（如采用该方案）、外围IP安全依赖闭环、旧HEAD错误路径发布影响裁定，以及DNS切换前管理面精确记录读回。DNS_RELEASE=HOLD；东京退役HOLD；不冒充网站/服务器迁移完成。
+
+下次若无新独立回执，可安全读取国内已安装apex续期Timer的首次自动运行状态（不手动触发续期、Hook或reload），形成运行证据；已完成的源码/请求探针不盲重跑。
