@@ -5,7 +5,7 @@
   ],
   "artifact_role": "KOREA_GET_ONLY_SHADOW_RUNTIME_CANDIDATE",
   "binance_called": false,
-  "content_sha256": "717b480bd8e5e69c978a79b42880fc0ec775cc28f4697d8db0271281551c3828",
+  "content_sha256": "c0fa91a473e64c040b0a7f2edf3e3508c3730cf20f573bf6a456b24912fbb8ea",
   "entrypoint": "python -m korea.migration_shadow_entry --continuous",
   "feature_id": "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
   "files": [
@@ -76,8 +76,8 @@
     },
     {
       "path": "migration-prep/korea/install-candidate.sh",
-      "sha256": "473c9e0ef20c64a759ad6e2afa213419b9356805dc847e17f1bbba10897dd654",
-      "size": 13777
+      "sha256": "2959055dc0e92852f60610ad7578e0e55902f11f5228e7fa94dbb884aed7b606",
+      "size": 19024
     },
     {
       "path": "migration-prep/korea/check-candidate.sh",

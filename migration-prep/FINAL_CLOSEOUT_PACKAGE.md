@@ -119,3 +119,18 @@ are in `PHASE_AUTHORIZATION_AND_OUTCOME_MATRIX.md`.
   peak/OOM evidence fail closed.
 - No candidate test claims Korea installation, real publisher/verifier wiring,
   or continuous Shadow acceptance.  Production migration remains HOLD.
+
+## R2 cleanup-accounting completion boundary (receipt 6182188035)
+
+- The R6 candidate result above is reused unchanged and is not reopened.
+- Transaction/current/unit/staging/release/venv/pycache objects are bound to
+  their attempt-created identity.  Content or identity drift, deletion failure,
+  and a still-present post-cleanup object are retained evidence and force
+  `CLEANUP=PARTIAL`.
+- Attempt-created user/group identities are compared before deletion and
+  checked afterward.  Lookup uncertainty, identity drift, deletion failure,
+  or a remaining identity fails closed.  A required systemd daemon reload
+  failure is also an explicit partial-cleanup result.
+- The cleanup receipt is derived from final read-only residual checks; a
+  non-directory or identity cleanup failure cannot be hidden by `|| true` or
+  reported as `CLEANUP=COMPLETE`.  There is no automatic retry.

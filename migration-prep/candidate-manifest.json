@@ -1,9 +1,9 @@
 {
-  "audit_comment": "6181898666",
-  "base_commit": "5c991c91351d30f36c0075bbfd83782cf7fc8dfa",
-  "base_tree": "a5ccc767f8d4a8324a3283af3a9e91cf367d51d3",
+  "audit_comment": "6182188035",
+  "base_commit": "fb504070c632dc62625ada38b13791ce89eb77ea",
+  "base_tree": "672b24e431d2e563a66a7ef0080a732c855d479e",
   "binance_called": false,
-  "candidate_content_sha256": "244ea4f833309e58ba5acf6b6c17ec07079a621878313017a4e22d7fd2d60c9f",
+  "candidate_content_sha256": "2343dd08d8fa89581fca55446e477072b5a3ae5a519c9f02b634736409148247",
   "canonical_migration_policy_enforced": true,
   "files": [
     {
@@ -78,8 +78,8 @@
     },
     {
       "path": "migration-prep/korea/DEPLOYMENT.md",
-      "sha256": "8633ee7c887a7b749f48b5f2a9ab12636dfea5a8b51a4b2583f8ed5321f5484c",
-      "size": 6633
+      "sha256": "4992f34c0bbcff1bc2b58e0890467ffe07612aec6fa88846adf568c0f93cff74",
+      "size": 7295
     },
     {
       "path": "migration-prep/c7_acceptance.py",
@@ -163,8 +163,8 @@
     },
     {
       "path": "migration-prep/FINAL_CLOSEOUT_PACKAGE.md",
-      "sha256": "dbbba85ba14a4a6e87c70a90660ebea282429a162cdfe75fe504b14b4a16e031",
-      "size": 6935
+      "sha256": "18ac75ea7ddf57e28f5df1b038110f74cc031e8e073cd29dc309fbb900317d10",
+      "size": 7819
     },
     {
       "path": "migration-prep/SHARED_DATABASE_CUTOVER_PLAN.md",
@@ -193,8 +193,8 @@
     },
     {
       "path": "migration-prep/test_korea_install_shell_behavior.py",
-      "sha256": "164e289ffb56f036630df38240e2bf5ac4db04ac6fe4041678df05411cfe27df",
-      "size": 12144
+      "sha256": "cf49974e5162fee5f6217317768df3cd8f994aa20640a81da11c751854e9a8f8",
+      "size": 20530
     },
     {
       "path": "migration-prep/korea/__init__.py",
@@ -243,8 +243,8 @@
     },
     {
       "path": "migration-prep/korea/install-candidate.sh",
-      "sha256": "473c9e0ef20c64a759ad6e2afa213419b9356805dc847e17f1bbba10897dd654",
-      "size": 13777
+      "sha256": "2959055dc0e92852f60610ad7578e0e55902f11f5228e7fa94dbb884aed7b606",
+      "size": 19024
     },
     {
       "path": "migration-prep/korea/check-candidate.sh",
@@ -258,7 +258,7 @@
     },
     {
       "path": "migration-prep/korea/minimal-runtime-manifest.json",
-      "sha256": "b5b79c677cb27548064d7821fdf737aa53af2d1953e96727d17730ee82b72fec",
+      "sha256": "176cb998efe718d007c87872a821a0b432dc34e2cc9e7e450ad2717f4d9eebb4",
       "size": 3838
     }
   ],
@@ -268,7 +268,7 @@
   "production_dependency_inventory_complete": false,
   "production_deployed": false,
   "root_inventory_incomplete_can_pass": false,
-  "schema_version": 10,
+  "schema_version": 11,
   "self_asserted_receipts_can_pass": false,
   "shared_database_post_cutover_route_proven": false,
   "task_id": "TOKYO_KOREA_COMPLETE_MIGRATION_REVIEW_PACKAGE_6171881293",

@@ -103,3 +103,14 @@ not substitutes.
 Candidate tests do not prove Korea host installation compatibility, a real
 publisher/verifier/Authority wiring, or a continuous Shadow window.  Those
 remain separate post-install, independently witnessed acceptance gates.
+# Transaction cleanup evidence
+
+Failed candidate installation never authorizes a retry.  Cleanup removes only
+objects and identities created by that exact attempt and still matching their
+recorded identity.  Every removal is followed by a read-only residual check.
+Object or account identity drift, deletion failure, lookup uncertainty,
+remaining objects/identities, or daemon-reload failure produces
+`CLEANUP=PARTIAL` with a retained-item list.  `CLEANUP=COMPLETE` means the final
+checks found no attempt-owned residual; it is not inferred from ignored command
+status.  This candidate behavior is test evidence only and does not authorize a
+Korea installation.
