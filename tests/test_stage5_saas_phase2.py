@@ -210,4 +210,17 @@ class Phase2Nodes(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"INVALID_QUOTE_AMOUNT"):
             prepare(self.o,self.q,"unsafe1","tenantA","qunsafe","CNY",20)
     self.assertEqual(self.o.execute("SELECT COUNT(*) FROM saas_order_preparations").fetchone()[0],0)
+ def test_42_refund_review_rejects_unverified_quote_provenance(self):
+    from unittest.mock import patch
+    self.ordered()
+    with patch("scripts.community_saas_order_preparation.quote_provenance",
+               side_effect=ValueError("QUOTE_SNAPSHOT_DIGEST_MISMATCH")):
+        with self.assertRaisesRegex(ValueError,"QUOTE_SNAPSHOT_DIGEST_MISMATCH"):
+            self.call("refund_reversal_plan",
+                      {"order_id":"order1","reason":"request"},self.admin)
+ def test_43_refund_review_includes_actual_lifecycle_without_refund(self):
+    self.ordered()
+    view=self.call("refund_reversal_plan",{"order_id":"order1","reason":"request"},self.admin)
+    self.assertEqual(view["order_lifecycle_state"],"PREPARED")
+    self.assertFalse(view["provider_refund_executed"])
 if __name__=="__main__":unittest.main()
