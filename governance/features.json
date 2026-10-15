@@ -207,6 +207,40 @@
         "scripts/community_onboarding_offline.py",
         "tests/test_stage5_onboarding_offline.py"
       ]
+    },
+    {
+      "feature_id": "LEGAL_CONTRACT_CENTER",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/LEGAL_CONTRACT_CENTER_20261015.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/LEGAL_CONTRACT_CENTER_20261015.md",
+        "section": "2",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "22份版本化草案及五项社区协议完整、来源/角色/页面映射准确，草案不签署不付款",
+          "模板哈希、确定性转义预览、安全失败与阅读链接验证通过",
+          "正式主体/费率/渠道/隐私字段补齐、法律审核、真实签约证据及生产门禁独立验收"
+        ],
+        "tests": [
+          "tests/test_legal_contract_center.py"
+        ],
+        "test_scope": "仅离线合同草案和静态阅读入口；不证明签约集成、支付准入或生产法律合规"
+      },
+      "reuse": [
+        "复用BUSINESS_ONBOARDING、Approval、Finance/PriceBook、退款补偿及统一身份/审计",
+        "复用原PR122页面，不改RG1源包或发布器，不新建CRM或支付平台"
+      ],
+      "paths": [
+        "scripts/build_legal_previews.py",
+        "tests/test_legal_contract_center.py",
+        "docs/legal/**",
+        "demos/legal/**"
+      ]
     }
   ]
 }

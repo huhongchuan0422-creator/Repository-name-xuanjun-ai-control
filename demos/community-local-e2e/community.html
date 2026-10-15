@@ -8,7 +8,7 @@
 <section><h2>独立角色业务视图</h2><p>本页面是社区管理专属信息结构及交互原型，不复用平台管理员页面。无真实登录、租户授权、微信支付或结算接口；所有数据均为固定模拟示例。</p>
 <div class="grid"><article class="tile"><strong>社区所属商户</strong><p>样例门店 A</p><small>演示数据 / 不代表真实授权</small></article><article class="tile"><strong>模拟分账待核查</strong><p>待核查账目</p><small>模拟订单 DEMO-001（渠道结算：UNKNOWN）</small></article><article class="tile"><strong>异常记录</strong><p>待办事项</p><small>等待授权服务端权限和真实对账接口</small></article></div></section>
 <section><h2>角色操作流程演示</h2><p>点击查看角色职责与下一步需要的权威证据。此操作只更新本页文字，不写入服务器、不发送任何审核或付款请求。</p><button type="button" id="inspect">查看模拟待办</button><p id="status" role="status">尚未查看</p><ul id="tasks"></ul></section>
-<section><h2>正式上线门禁</h2><ul><li>服务端 principal、tenant_id 与角色权限验证；禁止依赖浏览器隐藏按钮授权。</li><li>按角色限制商户与分账接收方数据范围，并测试跨租户拒绝。</li><li>真实数据只能来自经验证的业务/分账回执；UNKNOWN 不得转换成到账成功或金额零。</li><li>增量消息、异常、撤销、重放、回滚与审计证据必须在后台独立验收。</li></ul></section></main>
+<section><h2>正式上线门禁</h2><ul><li>服务端 principal、tenant_id 与角色权限验证；禁止依赖浏览器隐藏按钮授权。</li><li>按角色限制商户与分账接收方数据范围，并测试跨租户拒绝。</li><li>真实数据只能来自经验证的业务/分账回执；UNKNOWN 不得转换成到账成功或金额零。</li><li>增量消息、异常、撤销、重放、回滚与审计证据必须在后台独立验收。</li></ul></section><section data-legal-drafts="2026-10-15"><h2>协议与合同 · 草案阅读</h2><p>尚未生效或开放真实签署；真实业务需绑定已审核版本。本页不采集签名或真实证件。</p><nav aria-label="协议草案"><a href="../legal/index.html">协议与合同中心</a> <a href="../legal/community-split.html">多方分账协议</a> · <a href="../legal/refund-responsibility.html">退款责任</a> · <a href="../legal/privacy.html">隐私政策</a></nav></section></main>
 <script>
 "use strict";
 const entries=["核对社区关联商户的授权和状态","查看辖区模拟交易概要（结算未知）","提交异常待办须等待认证后端"];
@@ -18,3 +18,4 @@ for(const entry of entries){const li=document.createElement("li");li.textContent
 document.getElementById("status").textContent="只读演示已展开；未向服务器提交任何操作。";
 });
 </script></body></html>
+
