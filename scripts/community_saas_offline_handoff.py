@@ -91,6 +91,12 @@ CREATE TRIGGER IF NOT EXISTS saas_review_events_update BEFORE UPDATE ON saas_rev
  BEGIN SELECT RAISE(ABORT,'REVIEW_EVENT_IMMUTABLE'); END;
 CREATE TRIGGER IF NOT EXISTS saas_review_events_delete BEFORE DELETE ON saas_review_events
  BEGIN SELECT RAISE(ABORT,'REVIEW_EVENT_IMMUTABLE'); END;
+CREATE TRIGGER saas_review_tasks_no_replace BEFORE INSERT ON saas_review_tasks
+WHEN EXISTS(SELECT 1 FROM saas_review_tasks WHERE task_id=NEW.task_id)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
+CREATE TRIGGER saas_review_events_no_replace BEFORE INSERT ON saas_review_events
+WHEN EXISTS(SELECT 1 FROM saas_review_events WHERE event_id=NEW.event_id)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
 """
 def install_reviews(db):
     if not isinstance(db,sqlite3.Connection):
