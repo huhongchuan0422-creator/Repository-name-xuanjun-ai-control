@@ -1,0 +1,69 @@
+{
+  "additional_proc_reads": 0,
+  "authenticated_archive": {
+    "cache_file_count": 249,
+    "frozen_collector_and_process_fixture_cases": 10,
+    "member_count": 250,
+    "sha256": "e0fbc766d53a961f180a9ddfcdd1a40bdc6f8d809236f1b9bfb9cf4d3a929776"
+  },
+  "bootstrap": {
+    "commit": "PENDING_PUBLICATION",
+    "host_execution": "NOT_RUN",
+    "tests_each_interpreter": 23
+  },
+  "changed_pid_rows_max": 64,
+  "diagnostic_output_bound": 65536,
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "host_execution": "NOT_RUN",
+  "independent_review": {
+    "host_execution": "NOT_RUN",
+    "interpreters": [
+      "3.6.8",
+      "3.12.14"
+    ],
+    "isolation_flags": [
+      "-I",
+      "-B",
+      "-S"
+    ],
+    "policy_or_admission_conclusion": "NONE",
+    "source_sha256": "7179cceabd458d403fadf6b3d54e681c7e97f345ebe32b18251ae42b200da042",
+    "status": "SCOPED_PASS",
+    "test_sha256": "efe85665ab04435be3b4ad0dba0554aee557efbf93d6b06631b69d3152a345d6",
+    "tests_each_interpreter": 85
+  },
+  "install_admission": "NOT_GRANTED",
+  "intermediate_logs": "RETAINED_LOCALLY_NOT_FINAL_EVIDENCE",
+  "kind": "LOCAL_FROZEN_R5_WRITER_ATTRIBUTION_EVIDENCE",
+  "limitations": [
+    "Diagnostic timing can perturb the measured system.",
+    "Observed comm labels are names only, not executable identity or trust.",
+    "Changed PID rows are capped at 64 with explicit truncation.",
+    "Incomplete attribution remains UNKNOWN."
+  ],
+  "process_detail_binding": "EXACT_ORIGINAL_RETURN_CODE_SELF_FRAME_PID_START_KERNEL_FD_SUM",
+  "production_resume": "NOT_EXECUTED",
+  "retained_scope": "ORIGINAL_R5_COLLECTION_AND_TYPED_SAFETY_COMPARISON",
+  "schema": 1,
+  "source_bytes": 28922,
+  "source_sha256": "7179cceabd458d403fadf6b3d54e681c7e97f345ebe32b18251ae42b200da042",
+  "test_sha256": "efe85665ab04435be3b4ad0dba0554aee557efbf93d6b06631b69d3152a345d6",
+  "tests": {
+    "python3.12.14": {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "916b4a4f89ac5a2082d8bb57f3bfdc9b03456e422c68bac61d7b0ea2514fd8b0",
+      "passed": 85,
+      "run": 85,
+      "skips": 0
+    },
+    "python3.6.8": {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "b995f7a66f4ecdae3a33e1d2ac71a197b1984fc52b39a58b00813b05014147f1",
+      "passed": 85,
+      "run": 85,
+      "skips": 0
+    }
+  }
+}
