@@ -691,6 +691,15 @@ class MinimalNginxIntegrationTest(unittest.TestCase):
             response=connection.getresponse();return response.status,response.getheader('Content-Security-Policy'),response.read().decode()
         finally:connection.close()
 
+    def test_three_http01_server_candidates_parse_in_real_nginx(self):
+        for name in ('tokyo-apex-http-acme.conf','domestic-apex-http-bootstrap.conf','domestic-apex-http-final.conf'):
+            with self.subTest(config=name):
+                text=(self.base/name).read_text()
+                main=self.root/'http01.conf'
+                main.write_text('error_log stderr; pid '+str(self.root/'http01.pid')+'; events {} http { '+text+' }')
+                result=subprocess.run([self.nginx,'-p',str(self.root)+'/', '-c',str(main),'-t'],capture_output=True,text=True,timeout=10)
+                self.assertEqual(result.returncode,0,result.stderr)
+
     def test_all_62_static_alias_samples_and_default_deny(self):
         self.start();self.assertEqual(len(self.static_cases),62)
         for uri,expected in self.static_cases:

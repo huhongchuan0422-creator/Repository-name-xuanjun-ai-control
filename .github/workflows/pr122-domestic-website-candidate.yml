@@ -76,6 +76,8 @@ jobs:
                     root/"governance/features.json",
                     root/".github/workflows/pr122-domestic-website-candidate.yml",
                     root/".github/workflows/v27-four-server-batch-readonly.yml"]
+          paths += sorted(p for p in (root/"deploy/pr122-domestic-website/tls").glob("*.sh") if p.is_file())
+          paths += sorted(p for p in (root/"deploy/pr122-domestic-website/systemd").glob("xuanjun-apex-cert-renew.*") if p.is_file())
           binding = {
               "schema_version":1,
               "status":"REVIEW_ONLY_NO_INSTALLER",

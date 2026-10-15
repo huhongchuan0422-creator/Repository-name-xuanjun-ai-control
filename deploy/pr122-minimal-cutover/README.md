@@ -56,3 +56,13 @@ default cafile paths were absent (capath may still provide trust). No host chang
 or blind retry occurred. Corrected discovery checked the existing distro bundle
 paths; run38765986129 passed. ACME public root already exists as root0755 and
 is not a symlink. None of this issues a certificate or reloads Nginx.
+
+Consolidated completion: server-content-evidence.json contains actual Tokyo and
+Domestic1187-file hashes (1186 identical; only approved TikTok overlay differs).
+Owner UK limited search found no matching packages; Tokyo /tmp contains the
+copy-update, language-guard and patch names from Owner screenshot. Package search
+permissions are incomplete; actual public file comparison is direct evidence.
+See RELEASE_SEQUENCE.md for complete preparation/renewal/pre-DNS/DNS/rollback
+steps and explicit remaining root, authentication/client-IP and109-URL gates.
+New Tokyo HTTP-only ACME block avoids modifying existing Tokyo HTTPS contents.
+No installer or root operation has been run by preparing these files.
