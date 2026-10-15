@@ -45,6 +45,15 @@ CREATE TRIGGER IF NOT EXISTS saas_line_no_update BEFORE UPDATE ON saas_offer_lin
  BEGIN SELECT RAISE(ABORT,'IMMUTABLE_OFFER_LINE'); END;
 CREATE TRIGGER IF NOT EXISTS saas_line_no_delete BEFORE DELETE ON saas_offer_lines
  BEGIN SELECT RAISE(ABORT,'IMMUTABLE_OFFER_LINE'); END;
+CREATE TRIGGER saas_offer_versions_no_replace BEFORE INSERT ON saas_offer_versions
+WHEN EXISTS(SELECT 1 FROM saas_offer_versions WHERE offer_id=NEW.offer_id AND version=NEW.version)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
+CREATE TRIGGER saas_offer_lines_no_replace BEFORE INSERT ON saas_offer_lines
+WHEN EXISTS(SELECT 1 FROM saas_offer_lines WHERE offer_id=NEW.offer_id AND version=NEW.version AND line_no=NEW.line_no)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
+CREATE TRIGGER saas_quotes_no_replace BEFORE INSERT ON saas_quotes
+WHEN EXISTS(SELECT 1 FROM saas_quotes WHERE quote_id=NEW.quote_id)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
 """
 def install(db):
     """Add offer extension to an existing trusted module database transactionally.
