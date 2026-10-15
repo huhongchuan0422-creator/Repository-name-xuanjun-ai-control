@@ -52,7 +52,8 @@
           "tests/test_stage5_saas_offline_handoff.py",
           "tests/test_stage5_audit_regressions.py",
           "tests/test_stage5_saas_phase2.py",
-          "tests/test_stage5_saas_phase2_http.py"
+          "tests/test_stage5_saas_phase2_http.py",
+          "tests/test_stage5_saas_phase2_package.py"
         ]
       },
       "reuse": [
@@ -88,7 +89,9 @@
         "demos/community-local-e2e/saas-panel.mjs",
         "demos/community-local-e2e/saas-panel.test.mjs",
         "scripts/community_saas_phase2_http.py",
-        "tests/test_stage5_saas_phase2_http.py"
+        "tests/test_stage5_saas_phase2_http.py",
+        "scripts/community_saas_phase2_package.py",
+        "tests/test_stage5_saas_phase2_package.py"
       ]
     }
   ]
