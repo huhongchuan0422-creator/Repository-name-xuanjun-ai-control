@@ -1376,6 +1376,22 @@ PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recor
 
 这项门禁是第8.2.3模块选购预览、第8.2.4统一可视化中心、第8.2.5多角色入口及第9.9.1开发期客户交互验收的**共同强制前提**，适用于今后所有定制开发与可视化功能模块。网站生产配置变更与部署必须单独遵守第9章审核及Release Gate，不能因为本规则生效就越权发布。
 
+### 8.2.7 可视化反馈多渠道统一客户身份与证据留存（强制）
+
+规则编号 `VISUAL_FEEDBACK_OMNICHANNEL_IDENTITY_EVIDENCE_V1`。玄钧自有域名的可视化预览须支持三个客户联系入口：①网页内嵌 AI 对话窗口；②Telegram 官方客服机器人；③飞书（Feishu/Lark，待实际连接授权）。**三条渠道都必须归属同一权威客户/租户/项目身份**，不因渠道平台的昵称、展示名称、头像或浏览器自报客户ID而自行合并；不得让客户在不同渠道产生无法归集的孤立反馈工单。
+
+统一身份层复用 Tenant/Customer/Project/RBAC 和既有 CRM/Common Brain。数据关系由服务端维护：`customer_id / tenant_id / project_id / channel / external_subject_id / link_status / verified_at / link_proof / consent_scope`，渠道绑定唯一且可撤销；Telegram以真实 bot webhook 取得的发送者平台ID为准，飞书以经签名/授权核验的开放ID/用户ID为准，网页AI以玄钧站内有效登录/邀请会话为准。首次跨渠道关联必须由同一已认证客户执行一次性、短有效期、一次使用的受控绑定挑战（例如站内授权后跳转机器人携带随机绑定码），验证成功才建立关系；禁止仅凭用户发送文字“我是某某”、邮箱、手机号或昵称进行自动关联。错绑、重复绑定、跨租户、过期、撤销、账号更换和非法代理均应拒绝或由受控申诉流程处理。
+
+统一反馈证据模型至少包括 `message_id`、`conversation_id`、`customer_id`、`tenant_id`、`project_id`、`module_id`、`preview_version`、`source_channel`、`external_event_id`、`sender_role`、`server_received_at`、`provider_occurred_at`、`text_or_attachment_ref`、`content_sha256`、`previous_record_digest`、`record_digest`、`consent_version`、`retention_policy`、`delivery_status` 和 `task_ref`。保存客户消息、AI答复、人工审核意见、附件引用及后续处理结果；以追加事件/不可变记录、去重键和哈希链保留轨迹，不覆盖旧历史。对话留存用于交付争议的**辅助证据**，不是天然具有公证、司法或不可否认效力；需能导出带版本、时间、身份绑定、摘要和审计信息的客户可核验记录，并遵循数据保护、告知、同意、保存期限及删除/纠正请求流程。
+
+页面反馈提交与网页AI对话应使用已有模型路由/Common Brain、知识与权限边界，禁止浏览器持有 AI API 密钥、Telegram Bot Token、飞书应用密钥或数据库写凭证。AI可以解释界面、协助归类需求、草拟反馈和联系人工，但未经明确授权不能改价格、合同、生产权限、发布或真实资金。飞书未连接时可展示「待开通」及平台接入状态，不伪造消息已送达。Telegram/飞书若需外部网络或用户账号授权，仅在对应连接配置真实通过后标 `CONNECTED`。所有入口的回执必须分别记录 RECEIVED / PENDING / UNKNOWN / FAILED 等真实状态，不能因前端点击提交就宣称已保存。
+
+平台统一可视化中心提供「AI咨询」「Telegram」「飞书」三个入口，并显示当前客户、项目关联状态以及可追溯消息/处理记录；客户可在同一项目下查看有权访问的跨渠道对话和反馈状态。运营后台可按项目、角色和客户检索经授权的记录，敏感消息须脱敏/按权限限制并留查询审计。禁止跨客户读取、跨渠道伪造发言或在公开预览下创建具实名身份的记录。
+
+上线验收门禁 `OMNICHANNEL_FEEDBACK_IDENTITY_EVIDENCE_GATE=REQUIRED`：验证网页会话、Telegram webhook、飞书授权事件的真实签名/身份绑定；首次绑定、解绑、重复回调、跨租户、过期挑战、重放和重新绑定；客户/Owner权限与敏感字段保护；AI真实模型调用和中断回退；不可变记录与数据库重启恢复、导出一致性及留存处理。缺少真实渠道授权时仅允许已验证渠道独立通过，整套三渠道统一联动必须保持 `HOLD`，不得在页面暗示飞书已接通或三者身份已自动关联。
+
+本功能须先检查现有 Telegram 服务机器人、国内 CRM/Common Brain、飞书适配及统一身份资产，优先复用或最小扩展，不允许再建立一套独立客服账本、并行CRM或重复开发新的模型提供者。客户可视化中心的原代码/测试和所有验收证据登记原项目与模块资产映射，准确记录 `REUSE / EXTEND / MISSING / BLOCKED` 及 GitHub PR/commit，防止重复开发。
+
 ### 8.3 购买前就绪检查
 
 PRE_PURCHASE_READINESS_CHECK 必须在正式付款前执行，以 NO_POST_PAYMENT_SURPRISE 为原则。
