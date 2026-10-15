@@ -54,3 +54,9 @@ The runtime107 files remain unchanged. This continuation corrects helper-side ob
 The latest UK receipts establish the native transition, Python pair, five SDK hashes and31 source files. Fresh Node-alias/binary/32nd-source verification, permission effects, new complete observation and isolated execution proof remain separate requirements. Local helper tests do not satisfy them. The three permission changes have not yet been applied at this source checkpoint.
 
 Current validation must include all previous mandatory suites plus the new prerequisite-effect tests. A local run with nine socket-limited skips remains incomplete; hosted exact-commit CI must execute those tests. New byte changes cannot inherit an old install approval. Final package, plan, fresh host evidence and independent approval remain required before recovery.
+
+## 6 Bound Owner diagnostic entry
+
+The separate owner-diagnostic-r2 checkpoint pins the exact reviewed kit source4798cda235b24b31a18b57d3957fbc0d396d634b and immutable archive publication965c0f8bd7e5145dc353a9145388c733e0660ab5. Its dedicated hosted test compares wrapper/test bytes against the actual checkout HEAD blobs, validates all immutable download pins and runs25 mocked boundary cases with zero skips. It never downloads, changes host permissions or starts a service in CI. The unchanged full kit retains its independent1982-case plus170-bootstrap CI receipt38669612327; this small outer checkpoint does not rerun that unchanged kit.
+
+A successful outer CI is only delivery readiness for the explicitly authorized prerequisite and diagnostic command. Real three-directory effects, fresh UK observation and isolated mechanism proof remain separate. Any mismatch or partial effect is HOLD, with no automatic retry and no restoration of broader permissions. Final production recovery still requires its own exact independent approval and live admission.
