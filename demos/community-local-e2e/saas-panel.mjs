@@ -8,9 +8,11 @@ export function safeText(value){
  return value==null?"UNKNOWN":String(value);
 }
 export function offerCycles(offer){
- const totals={};
+ const totals=Object.create(null);
  for(const line of Array.isArray(offer.lines)?offer.lines:[]){
-  const cycle=safeText(line.cycle),entry=totals[cycle]??{cny:0,usd:0,unknownCNY:false,unknownUSD:false};
+  if(!line||typeof line!=="object"||Array.isArray(line))throw Error("INVALID_QUOTE_LINE");
+  const cycle=typeof line.cycle==="string"&&/^[A-Z][A-Z0-9_]{0,31}$/.test(line.cycle)?line.cycle:"UNKNOWN";
+  const entry=totals[cycle]??{cny:0,usd:0,unknownCNY:false,unknownUSD:false};
   const qty=line.quantity;
   for(const [curr,key] of [["cny","cny_minor"],["usd","usd_minor"]]){
    const unknownKey=curr==="cny"?"unknownCNY":"unknownUSD";
