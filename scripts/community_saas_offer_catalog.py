@@ -7,7 +7,8 @@ may provide a trusted FX quote or recognize revenue.
 import json
 import sqlite3
 from scripts.community_merchant_contract import valid_id
-from scripts.community_saas_modules import MODULES
+from scripts.community_saas_modules import MODULES, SCHEMA as MODULE_SCHEMA
+from scripts.community_saas_schema_guard import verify,transactional_install
 
 KINDS = frozenset(("MONTHLY", "YEARLY", "BUYOUT", "FREE", "PROMOTION", "METERED", "CUSTOM"))
 COMPONENTS = frozenset(("MODULE_FEE", "SUPPLIER_COST", "AGENCY_FEE", "DEPLOYMENT", "MAINTENANCE", "TAX", "PAYMENT_FX", "OTHER"))
@@ -63,8 +64,18 @@ def install(db):
     if not isinstance(db, sqlite3.Connection):
         raise TypeError("SQLITE_CONNECTION_REQUIRED")
     db.execute("PRAGMA foreign_keys=ON")
-    with db:
-        db.executescript(SCHEMA)
+    base={"module_prices","module_entitlements","module_events"}
+    ext={"saas_offer_versions","saas_offer_lines","saas_quotes"}
+    names={row[0] for row in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+    if names==base:
+        verify(db,MODULE_SCHEMA,base)
+        transactional_install(db,SCHEMA,
+            lambda:verify(db,MODULE_SCHEMA,base|ext,extra_schema=SCHEMA))
+    elif names==base|ext:
+        verify(db,MODULE_SCHEMA,base|ext,extra_schema=SCHEMA)
+    else:
+        raise ValueError("UNRECOGNIZED_OFFER_INSTALL_SCHEMA")
 
 def _identifier(value):
     if type(value) is not str or not valid_id(value):
