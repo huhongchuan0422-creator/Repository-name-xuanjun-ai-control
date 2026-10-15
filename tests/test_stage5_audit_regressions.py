@@ -1,5 +1,7 @@
 """Independent-review R1-R7 negative probes. All local, no provider or money."""
 import sqlite3
+import tempfile
+import os
 import unittest
 from scripts.community_saas_modules import connect,set_price,grant
 from scripts.community_saas_offer_catalog import install,create_offer,quote,approve_offer
@@ -97,15 +99,14 @@ class FullScopeAuditProbes(unittest.TestCase):
         self.assertEqual([x["offer_id"] for x in quote_offers(o,"storefront_catalog",tenant_id="tenantA")],["a"])
     finally:o.close();costs.close()
  def test_r4_fake_module_schema_rejected(self):
-    db=sqlite3.connect(":memory:")
-    try:
+    with tempfile.TemporaryDirectory() as folder:
+        path=os.path.join(folder,"fake.sqlite")
+        db=sqlite3.connect(path)
         for name in ("module_prices","module_entitlements","module_events"):
             db.execute("CREATE TABLE "+name+"(fake INTEGER)")
         db.execute("PRAGMA user_version=1")
-        with self.assertRaises(ValueError):
-            # separate connection to same named in-memory database required
-            pass
-    finally:db.close()
+        db.close()
+        with self.assertRaises(ValueError):connect(path)
  def test_r5_missing_projection_held(self):
     self.ready()
     advance(self.orders,"ord","tenantA","ev1","AWAITING_EXTERNAL",21)
