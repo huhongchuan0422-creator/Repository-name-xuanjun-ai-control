@@ -114,3 +114,9 @@ remaining objects/identities, or daemon-reload failure produces
 checks found no attempt-owned residual; it is not inferred from ignored command
 status.  This candidate behavior is test evidence only and does not authorize a
 Korea installation.
+
+Both successful installation and successful same-version re-entry pass through
+one terminal-state finalizer.  It releases and verifies the attempt-owned lock
+before setting the committed state or printing `STATUS=PASS`.  A retained or
+identity-changed lock instead exits nonzero with `CLEANUP=PARTIAL`; on re-entry,
+the pre-existing valid installation and transaction are preserved unchanged.

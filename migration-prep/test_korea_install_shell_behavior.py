@@ -88,7 +88,15 @@ fi
 set -eu
 match=${KOREA_TEST_RM_FAIL_MATCH:-}
 if [[ -n $match ]]; then
-  for argument in "$@"; do [[ $argument == *"$match"* ]] && exit 44; done
+  for argument in "$@"; do
+    if [[ $argument == *"$match"* ]]; then
+      if [[ ${KOREA_TEST_RM_REPLACE_MATCH:-0} == 1 ]]; then
+        /bin/mv -- "$argument" "${argument}.injected-original"
+        printf 'injected-lock-owner\n' >"$argument"
+      fi
+      exit 44
+    fi
+  done
 fi
 exec /bin/rm "$@"
 ''')
@@ -341,6 +349,42 @@ set -eu
         self.assertIn("CLEANUP=PARTIAL", result.stderr)
         self.assertTrue((self.root / "run/xuanjun-binance-install.lock/owner").is_file())
         self.assertFalse((self.root / "etc/xuanjun-binance/install-transaction.json").exists())
+
+    def test_same_version_reentry_never_passes_when_lock_release_is_incomplete(self):
+        for name, replace_owner in (("delete-failure", False), ("identity-drift", True)):
+            with self.subTest(name=name):
+                self._reset_root()
+                installed = self._run_install()
+                self.assertEqual(installed.returncode, 0, installed.stderr)
+                transaction = self.root / "etc/xuanjun-binance/install-transaction.json"
+                unit = self.root / "etc/systemd/system/xuanjun-binance-shadow.service"
+                current = self.root / "opt/xuanjun-binance/current"
+                release = current.resolve()
+                before = {
+                    "transaction": transaction.read_bytes(),
+                    "unit": unit.read_bytes(),
+                    "current": os.readlink(current),
+                    "release": tuple(
+                        (str(path.relative_to(release)), hashlib.sha256(path.read_bytes()).hexdigest())
+                        for path in sorted(release.rglob("*")) if path.is_file()
+                    ),
+                }
+                env = dict(self.env); env["KOREA_TEST_RM_FAIL_MATCH"] = "/owner"
+                if replace_owner:
+                    env["KOREA_TEST_RM_REPLACE_MATCH"] = "1"
+                reentry = self._run_install(env=env)
+                self.assertEqual(reentry.returncode, 2, reentry.stdout + reentry.stderr)
+                self.assertNotIn("STATUS=PASS ALREADY_INSTALLED=YES", reentry.stdout + reentry.stderr)
+                self.assertIn("REENTRY_LOCK_RELEASE_INCOMPLETE", reentry.stderr)
+                self.assertIn("CLEANUP=PARTIAL", reentry.stderr)
+                self.assertTrue((self.root / "run/xuanjun-binance-install.lock/owner").is_file())
+                self.assertEqual(transaction.read_bytes(), before["transaction"])
+                self.assertEqual(unit.read_bytes(), before["unit"])
+                self.assertEqual(os.readlink(current), before["current"])
+                self.assertEqual(tuple(
+                    (str(path.relative_to(release)), hashlib.sha256(path.read_bytes()).hexdigest())
+                    for path in sorted(release.rglob("*")) if path.is_file()
+                ), before["release"])
 
     def test_identity_and_reload_cleanup_failures_are_explicit(self):
         cases = (

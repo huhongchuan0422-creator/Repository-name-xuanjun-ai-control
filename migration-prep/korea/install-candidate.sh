@@ -149,6 +149,14 @@ release_lock() {
   record_remaining_path "$lock"
   lock_owned=0
 }
+complete_success() {
+  local success_stage=$1 lock_failure_reason=$2 success_fields=$3
+  stage=$success_stage
+  release_lock
+  [[ ${#cleanup_retained[@]} -eq 0 ]] || fail "$lock_failure_reason"
+  committed=1
+  printf 'INSTALL_STAGE=%s STATUS=PASS %s\n' "$success_stage" "$success_fields"
+}
 cleanup() {
   local status=$? index path inode cleanup_state identity identity_rc
   trap - EXIT INT TERM
@@ -272,8 +280,8 @@ PY
   [[ $installed_manifest == "$expected_manifest" ]] || fail DIFFERENT_VERSION_REQUIRES_SEPARATE_APPROVED_UPGRADE
   "${candidate_root}/migration-prep/korea/check-candidate.sh" --expected-transaction "$transaction" \
     --expected-manifest-sha256 "$expected_manifest" || fail EXISTING_TRANSACTION_CHECK_FAILED
-  committed=1
-  printf 'INSTALL_STAGE=LOCKED_PREFLIGHT STATUS=PASS ALREADY_INSTALLED=YES SAME_VERSION=YES\n'
+  complete_success LOCKED_PREFLIGHT REENTRY_LOCK_RELEASE_INCOMPLETE \
+    'ALREADY_INSTALLED=YES SAME_VERSION=YES'
   exit 0
 fi
 for path in "$(root_path /opt/xuanjun-binance)" "$(root_path /var/lib/xuanjun-binance)" \
@@ -361,7 +369,5 @@ systemctl is-active --quiet xuanjun-binance-shadow.service && fail SERVICE_UNEXP
 systemd-analyze verify "$unit"
 "$release/migration-prep/korea/check-candidate.sh" --expected-transaction "$transaction" \
   --expected-manifest-sha256 "$expected_manifest"
-release_lock
-[[ ${#cleanup_retained[@]} -eq 0 ]] || fail COMMIT_LOCK_RELEASE_INCOMPLETE
-committed=1
-printf 'INSTALL_STAGE=COMMIT STATUS=PASS SERVICE_ENABLED=NO SERVICE_STARTED=NO TRANSACTION_ID=%s\n' "$transaction_id"
+complete_success COMMIT COMMIT_LOCK_RELEASE_INCOMPLETE \
+  "SERVICE_ENABLED=NO SERVICE_STARTED=NO TRANSACTION_ID=${transaction_id}"

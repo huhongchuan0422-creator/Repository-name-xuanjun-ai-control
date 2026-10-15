@@ -134,3 +134,15 @@ are in `PHASE_AUTHORIZATION_AND_OUTCOME_MATRIX.md`.
 - The cleanup receipt is derived from final read-only residual checks; a
   non-directory or identity cleanup failure cannot be hidden by `|| true` or
   reported as `CLEANUP=COMPLETE`.  There is no automatic retry.
+
+## R2 same-version terminal-state boundary (receipt 6182780546)
+
+- Initial commit and same-version re-entry use the same success finalizer:
+  release the attempt-owned installation lock, verify the retained-item result,
+  and only then mark the transaction committed and emit `STATUS=PASS`.
+- Lock owner deletion failure or identity drift on same-version re-entry is a
+  nonzero `HOLD` with `CLEANUP=PARTIAL`; it cannot inherit the pre-cleanup exit
+  status.  The already-installed release, current link, unit and transaction
+  remain byte-for-byte unchanged.
+- R6 and the prior accepted R2 cleanup-accounting branches are unchanged.  This
+  candidate evidence does not authorize installation or production migration.
