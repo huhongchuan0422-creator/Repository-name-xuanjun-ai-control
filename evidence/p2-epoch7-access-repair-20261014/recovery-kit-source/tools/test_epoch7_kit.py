@@ -664,7 +664,11 @@ class HostedRunnerTests(unittest.TestCase):
     def test_unprivileged_runner_executes_all_exact_suites_without_host_mode(self):
         runner,root,receipt=self.runnable()
         result=self.invoke(runner,root,receipt)
-        self.assertTrue(result['success']);self.assertEqual(len(result['suites']),len(runner.PORTABLE_SUITES))
+        self.assertTrue(result['success']);self.assertEqual(len(result['suites']),25)
+        self.assertEqual(len(runner.PORTABLE_SUITES),25)
+        self.assertIn('owner_prerequisite',runner.PORTABLE_SUITES)
+        self.assertIn('epoch7_owner_prerequisite',runner.REQUIRED_HELPERS)
+        self.assertIn('epoch7_python_identity',runner.REQUIRED_HELPERS)
         self.assertEqual(result['isolated_probe'],'NOT_RUN')
         self.assertEqual(result['host_observation'],'NOT_RUN')
         self.assertEqual(result['production_acceptance'],'NOT_VERIFIED')
@@ -699,6 +703,49 @@ class HostedRunnerTests(unittest.TestCase):
         path=pathlib.Path(root)/e.MANIFEST;value=json.loads(path.read_text())
         value['test_suites']['approval']['enabled']=False;data=raw(value)
         path.chmod(0o600);path.write_bytes(data);receipt['kit_manifest_sha256']=e.sha(data)
+        with self.assertRaisesRegex(ValueError,'EXACT_PORTABLE_SUITE_SET'):self.invoke(runner,root,receipt)
+
+    def replace_manifest(self, root, receipt, value):
+        path=pathlib.Path(root)/e.MANIFEST;data=raw(value)
+        path.chmod(0o600);path.write_bytes(data);receipt['kit_manifest_sha256']=e.sha(data)
+
+    def missing_one_required_helper(self, name):
+        runner,root,receipt=self.runnable()
+        value=json.loads((pathlib.Path(root)/e.MANIFEST).read_text())
+        target=value['modules'].pop(name);del value['files'][target]
+        (pathlib.Path(root)/target).unlink()
+        self.replace_manifest(root,receipt,value)
+        with self.assertRaisesRegex(ValueError,'REQUIRED_HELPERS_MISSING'):self.invoke(runner,root,receipt)
+
+    def test_missing_owner_prerequisite_helper_refused(self):
+        self.missing_one_required_helper('epoch7_owner_prerequisite')
+
+    def test_missing_python_identity_helper_refused(self):
+        self.missing_one_required_helper('epoch7_python_identity')
+
+    def test_missing_prerequisite_suite_refused(self):
+        runner,root,receipt=self.runnable()
+        value=json.loads((pathlib.Path(root)/e.MANIFEST).read_text())
+        del value['test_suites']['owner_prerequisite']
+        self.replace_manifest(root,receipt,value)
+        with self.assertRaisesRegex(ValueError,'EXACT_PORTABLE_SUITE_SET'):self.invoke(runner,root,receipt)
+
+    def test_disabled_prerequisite_suite_refused(self):
+        runner,root,receipt=self.runnable()
+        value=json.loads((pathlib.Path(root)/e.MANIFEST).read_text())
+        value['test_suites']['owner_prerequisite']['enabled']=False
+        self.replace_manifest(root,receipt,value)
+        with self.assertRaisesRegex(ValueError,'EXACT_PORTABLE_SUITE_SET'):self.invoke(runner,root,receipt)
+
+    def test_extra_enabled_suite_refused(self):
+        runner,root,receipt=self.runnable()
+        value=json.loads((pathlib.Path(root)/e.MANIFEST).read_text())
+        target='tests/unreviewed/test_extra.py';data=b'import unittest\nclass T(unittest.TestCase):\n def test_x(self): pass\n'
+        path=pathlib.Path(root)/target;path.parent.mkdir(mode=0o700);path.write_bytes(data)
+        value['files'][target]=e.sha(data)
+        value['test_suites']['unreviewed']={'enabled':True,'reason':'SYNTHETIC_UNREVIEWED',
+            'tests':[target],'imports':{'test_extra':target}}
+        self.replace_manifest(root,receipt,value)
         with self.assertRaisesRegex(ValueError,'EXACT_PORTABLE_SUITE_SET'):self.invoke(runner,root,receipt)
 
     def test_helper_source_commit_is_distinct_and_required(self):

@@ -21,7 +21,7 @@ PORTABLE_SUITES = ('access_plan', 'approval', 'command', 'diagnostics', 'recover
                   'runtime_projection', 'runtime_process', 'runtime_identity', 'runtime_wiring',
                   'acceptance_rows', 'snapshot_portable', 'host_factory', 'probe', 'service_contract',
                   'host_filesystem', 'host_observer', 'recovery_filesystem', 'resource_plan',
-                  'host_stager', 'runtime_effects')
+                  'host_stager', 'runtime_effects', 'owner_prerequisite')
 REQUIRED_HELPERS = ('epoch7_approval', 'epoch7_complete_approval', 'epoch7_command_runner',
     'protected_command_evidence', 'epoch7_delta', 'epoch7_injected_recovery',
     'epoch7_recovery_sequence', 'epoch7_live_controls', 'epoch7_snapshot', 'snapshot_io',
@@ -31,7 +31,7 @@ REQUIRED_HELPERS = ('epoch7_approval', 'epoch7_complete_approval', 'epoch7_comma
     'epoch7_runtime_effects', 'epoch7_runtime_acceptance', 'epoch7_bindings',
     'probe_driver', 'probe_helpers', 'node_sqlite_probe', 'unit_metadata', 'openclaw_metadata', 'epoch7_acceptance_rows',
     'epoch7_service_roles', 'epoch7_service_contract', 'epoch7_unit_transitions', 'epoch7_nginx_recipe',
-    'epoch7_openclaw_recipe')
+    'epoch7_openclaw_recipe', 'epoch7_owner_prerequisite', 'epoch7_python_identity')
 
 
 def need(value, label):
