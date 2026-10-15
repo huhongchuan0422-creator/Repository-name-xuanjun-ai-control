@@ -1711,8 +1711,54 @@
       "gid": 0,
       "mode": "0644",
       "path": "en/capabilities/data-reporting.html",
-      "sha256": "31c5547dd9f9726444424a76ad4e5fd44ced43b4d1eacb392935c09458ce072:—§
-V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,-production.html",
+      "sha256": "31c5547dd9f9726444424a76ad4e5fd44ced43b4d1eacb392935c09458ce0720",
+      "size": 5848,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "en/capabilities/data-reporting/index.html",
+      "sha256": "31c5547dd9f9726444424a76ad4e5fd44ced43b4d1eacb392935c09458ce0720",
+      "size": 5848,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "en/capabilities/index.html",
+      "sha256": "63f8c1c67dfa2dd6443c056410717dd1853de6220dae8ac013870723994d41e9",
+      "size": 7734,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "en/capabilities/intelligent-crm.html",
+      "sha256": "0fc86f5fe0b82bf13a93e7f50ec796a9ccac8021606a79a3cc4c740a27b2503d",
+      "size": 5945,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "en/capabilities/local-tools.html",
+      "sha256": "1281b7a03079a4ead43fed4baab004758fb0c0dce79359c88174a8a10c091cc3",
+      "size": 5682,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "en/capabilities/local-tools/index.html",
+      "sha256": "1281b7a03079a4ead43fed4baab004758fb0c0dce79359c88174a8a10c091cc3",
+      "size": 5682,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "en/capabilities/novel-production.html",
       "sha256": "e096341f6f1df169b638e447a53d917f3fb6f05bcd183a7ed632e6cc7d30e5b3",
       "size": 9378,
       "uid": 0
@@ -3431,8 +3477,49 @@ V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,-production.htm
     },
     {
       "gid": 0,
-:—§
-V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,88cf42e9589bc77e88c8bc764ec2956147ad667f1b552d229cb26",
+      "mode": "0644",
+      "path": "es/solutions/customer-service-sales.html",
+      "sha256": "425e765a1bcba48653a619a02b7dac21e57a47fac4122392a4af2d9a4e527c5c",
+      "size": 1447,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "es/solutions/customer-service-sales/index.html",
+      "sha256": "425e765a1bcba48653a619a02b7dac21e57a47fac4122392a4af2d9a4e527c5c",
+      "size": 1447,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "es/solutions/customer-service.html",
+      "sha256": "fa659952b743010f0ce4b1c93d33cb0b3b04acb6c4b16eb9c6f5b0167aa64d58",
+      "size": 1411,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "es/solutions/data-observation.html",
+      "sha256": "97a8978513b0b76deebbac05736a6de5ee620f31536f14e920f73aa4c47031c1",
+      "size": 1411,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "es/solutions/data-observation/index.html",
+      "sha256": "97a8978513b0b76deebbac05736a6de5ee620f31536f14e920f73aa4c47031c1",
+      "size": 1411,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "es/solutions/enterprise-workflow.html",
+      "sha256": "c2fe8c3bced88cf42e9589bc77e88c8bc764ec2956147ad667f1b552d229cb26",
       "size": 1429,
       "uid": 0
     },
@@ -5157,8 +5244,52 @@ V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,88cf42e9589bc77
       "uid": 0
     },
     {
-     :—§
-V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,
+      "gid": 0,
+      "mode": "0644",
+      "path": "ja/features.html",
+      "sha256": "d87065862af7cb339607fefbb0c599600a4f58a579dfe2d320550250a81359a4",
+      "size": 1274,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "ja/guides.html",
+      "sha256": "56d8b5b4b004184bcd15d216e4af3b3bcdee9f070948088d1cd4f201283a7ea9",
+      "size": 1262,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "ja/guides/buying-fees.html",
+      "sha256": "8795cde9f632ea64d06bc7202540b28b9b7d00b9a7d34bf21281a71335e4a35e",
+      "size": 1334,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "ja/guides/buying-fees/index.html",
+      "sha256": "8795cde9f632ea64d06bc7202540b28b9b7d00b9a7d34bf21281a71335e4a35e",
+      "size": 1334,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "ja/guides/faq.html",
+      "sha256": "ab8d63cad022742beaa829a3331cc061e8bc9860baee0e39e5083d464b625924",
+      "size": 1286,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "ja/guides/faq/index.html",
+      "sha256": "ab8d63cad022742beaa829a3331cc061e8bc9860baee0e39e5083d464b625924",
+      "size": 1286,
+      "uid": 0
     },
     {
       "gid": 0,
@@ -6886,8 +7017,57 @@ V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,
       "path": "labs/verifiable-accounting/index.html",
       "sha256": "5909a397dd7c614b828f408b44924e5be1b5b8e56932ace4651985c96d1afc22",
       "size": 5882,
-    :—§
-V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,   {
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "privacy.html",
+      "sha256": "ff92d1d7cb042ecfed888444e8c5f5aa03c68aadd9d2125d0592c8a4e7f79d54",
+      "size": 5728,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "release-manifest.json",
+      "sha256": "f41eae1d3bc120acf856f1efab41ccb777855a29afe625269a638f4c245d31da",
+      "size": 131657,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "robots.txt",
+      "sha256": "7400a12d59f992b2de4998b472585fef6c2400f26d4903675767def3abed8cdb",
+      "size": 73,
+      "uid": 0
+    },
+    {
+      "gid": 1000,
+      "mode": "0644",
+      "path": "search-index.json",
+      "sha256": "95b0a3ada4a94325a0355bca690a97bea51de0d572b0673dab4d5c4df0b448fd",
+      "size": 20649,
+      "uid": 1000
+    },
+    {
+      "gid": 1000,
+      "mode": "0644",
+      "path": "search.html",
+      "sha256": "d10af357af218c4861a8b2475a2c6b175a45d25923c89b23e5c170025bbfa53e",
+      "size": 5295,
+      "uid": 1000
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "site.js",
+      "sha256": "be64486c6b3f03361c2831495da85fc7bf0d8af7539db3d106cae8209799c05b",
+      "size": 48243,
+      "uid": 0
+    },
+    {
       "gid": 0,
       "mode": "0644",
       "path": "sitemap.xml",
@@ -8582,8 +8762,51 @@ V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,   {
       "sha256": "01c49c709fd93ed824e243d634d9ac02c176d15eaeadbfe1af3e969eaa4ec496",
       "size": 1429,
       "uid": 0
-    }:—§
-V°¶»§q«^uÜ§jhœ¶Š%­ë.–Ú+Š§j^¹ç~œ…ªìÁè †×nç`zŞ¸ÓM+z»§Â+aªë£«j¸,bilities/workflow-collaboration/index.html",
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "zh-tw/capabilities/platform-connection/index.html",
+      "sha256": "01c49c709fd93ed824e243d634d9ac02c176d15eaeadbfe1af3e969eaa4ec496",
+      "size": 1429,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "zh-tw/capabilities/system-connections.html",
+      "sha256": "d8a68cdbef5c2d4825cc1abc3cc810f99ab08bc07a0969a148a2e5ec53e63a1b",
+      "size": 1423,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "zh-tw/capabilities/system-connections/index.html",
+      "sha256": "d8a68cdbef5c2d4825cc1abc3cc810f99ab08bc07a0969a148a2e5ec53e63a1b",
+      "size": 1423,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "zh-tw/capabilities/workflow-automation.html",
+      "sha256": "3b2a5e9e0dd10e96a53abc2a547fd40ea52d349ac74c8a5352e4569dabcaed7f",
+      "size": 1429,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "zh-tw/capabilities/workflow-collaboration.html",
+      "sha256": "ac07d02ee23a0a72a45bc2ad11afe821766b7371e732d4c75ac4e047d3f982d8",
+      "size": 1447,
+      "uid": 0
+    },
+    {
+      "gid": 0,
+      "mode": "0644",
+      "path": "zh-tw/capabilities/workflow-collaboration/index.html",
       "sha256": "ac07d02ee23a0a72a45bc2ad11afe821766b7371e732d4c75ac4e047d3f982d8",
       "size": 1447,
       "uid": 0
