@@ -1315,6 +1315,15 @@ Foundation、Module 与 Connector 依赖；资料和认证；营业执照或行�
 
 PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recorded_at、language、caption/transcript、input_sample、evidence_id、demo_type和rights_status。模拟演示明显标记；真实演示去除客户身份与Secret，版本变化后自动标记需复核。演示视频、字幕及文字描述共同接受事实、版权和隐私审核。
 
+#### 8.2.2 勾选渠道时的即时展示
+
+客户勾选渠道时立即展示该渠道支持的具体动作和发布模式、账号/主体/地区要求、认证与应用审核、授权范围、素材规格、频率/配额、版权和商业/AI披露要求、链接限制、可读取指标、数据延迟、客户待办、第三方费用与规则核实日期。适用版本与来源可展开查看，不能只显示一个平台Logo和支持标签。
+
+逐项前置条件显示已满足、待客户处理、硬阻塞或未核实。允许客户选择受阻渠道用于评估，但明确说明该动作暂不可交付；硬阻塞或未知不得进入普通付款。若方案允许剔除受阻动作、改为用户确认或导出，必须展示新交付范围并重新报价及确认，不静默降级。
+
+选择多个渠道时逐渠道检查，同时核对内容格式、权限和跨渠道费用。付款前保存channel_requirement_snapshot和customer_acknowledgement，部署和每次发布前再核实实时授权及政策；快照用于追溯而不是冻结平台规则。
+
+
 #### 8.2.3 模块选购页可交互体验（强制）
 
 规则编号 `MODULE_MARKETPLACE_INTERACTIVE_PREVIEW_REQUIRED_V1`，适用于玄钧云汇全部可售、试用、免费、买断、月付/年付与客户专属功能模块。模块搜索结果、卡片及选购详情须在价格、依赖与适用范围旁提供**功能说明及可点击的真实可操作预览入口**，允许不离开选购流程打开预览；必要时支持新窗口/全屏。预览必须包含该模块代表性页面、导航跳转、表单输入、按钮点击、主要角色页面切换与至少一条完整演示路径，不得以静态截图、宣传视频、死链接或仅有按钮外观替代。模块纯API/后台能力须提供相应可交互配置或接口测试工作台。
@@ -1324,14 +1333,6 @@ PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recor
 预览环境必须使用隔离的示例租户/脱敏数据，明示 `DEMO / SANDBOX / REAL_CONNECTED` 和功能差异。无商户支付资质、渠道授权或真实数据时，仅开放允许的模拟路径，禁止把模拟分账、收益、退款、付款成功、权益开通当成真实结果。正式客户账号与权限由服务端验证；预览地址不得泄露他人客户数据、测试密钥或生产权限。
 
 `MODULE_PREVIEW` 作为模块注册视图和商业详情共用的标准对象，至少登记：`module_id`、`module_version`、`preview_version`、`preview_url_or_route`、`entry_role`、`demo_scope`、`interactive_scenarios`、`navigation_routes`、`offer_ids`、`availability`、`test_data_policy`、`last_verified_at`、`evidence_ref`。预览版本与正式功能版本、验收证据关联；链接不可用、核心跳转失效、演示与说明不一致时，阻止该Offer的公开上架/可购买状态（`MARKETPLACE_INTERACTIVE_PREVIEW_GATE=HOLD`），不能标作PASS。
-
-#### 8.2.2 勾选渠道时的即时展示
-
-客户勾选渠道时立即展示该渠道支持的具体动作和发布模式、账号/主体/地区要求、认证与应用审核、授权范围、素材规格、频率/配额、版权和商业/AI披露要求、链接限制、可读取指标、数据延迟、客户待办、第三方费用与规则核实日期。适用版本与来源可展开查看，不能只显示一个平台Logo和支持标签。
-
-逐项前置条件显示已满足、待客户处理、硬阻塞或未核实。允许客户选择受阻渠道用于评估，但明确说明该动作暂不可交付；硬阻塞或未知不得进入普通付款。若方案允许剔除受阻动作、改为用户确认或导出，必须展示新交付范围并重新报价及确认，不静默降级。
-
-选择多个渠道时逐渠道检查，同时核对内容格式、权限和跨渠道费用。付款前保存channel_requirement_snapshot和customer_acknowledgement，部署和每次发布前再核实实时授权及政策；快照用于追溯而不是冻结平台规则。
 
 ### 8.3 购买前就绪检查
 
