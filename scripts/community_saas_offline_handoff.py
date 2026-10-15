@@ -150,7 +150,12 @@ def admin_snapshot(db,tenant_id,at):
                     (tenant_id,)).fetchall()
     orders=[]
     for oid,created,snapshot in rows:
-        state=status(db,oid,tenant_id)
+        try:
+            state=status(db,oid,tenant_id)
+        except ValueError as error:
+            if str(error) not in ("LIFECYCLE_EVENT_INCONSISTENT","LIFECYCLE_PROJECTION_MISMATCH"):
+                raise
+            state={"state":"STATE_INCONSISTENT"}
         item=json.loads(snapshot)
         orders.append({"order_id":oid,"created_at":created,
                        "state":state["state"],"currency":item["currency"],
@@ -168,6 +173,7 @@ def recovery_check(db,tenant_id):
     data=admin_snapshot(db,tenant_id,0)
     return {"tenant_id":tenant_id,
             "awaiting_review":[x["order_id"] for x in data["orders"]
-                               if x["state"] in ("CONFIRMATION_UNKNOWN","AWAITING_EXTERNAL")],
+                               if x["state"] in ("CONFIRMATION_UNKNOWN","AWAITING_EXTERNAL","STATE_INCONSISTENT")],
+            "integrity_hold":[x["order_id"] for x in data["orders"] if x["state"]=="STATE_INCONSISTENT"],
             "open_tasks":[x["task_id"] for x in data["review_tasks"] if x["state"]=="PENDING"],
             "resend_payment_requests":False,"automatic_reconcile_executed":False}
