@@ -50,7 +50,8 @@
           "tests/test_stage5_saas_offer_catalog.py",
           "tests/test_stage5_saas_order_preparation.py",
           "tests/test_stage5_saas_offline_handoff.py",
-          "tests/test_stage5_audit_regressions.py"
+          "tests/test_stage5_audit_regressions.py",
+          "tests/test_stage5_saas_phase2.py"
         ]
       },
       "reuse": [
@@ -79,7 +80,12 @@
         "scripts/community_saas_offline_handoff.py",
         "tests/test_stage5_saas_offline_handoff.py",
         "scripts/community_saas_schema_guard.py",
-        "tests/test_stage5_audit_regressions.py"
+        "tests/test_stage5_audit_regressions.py",
+        "scripts/community_saas_phase2.py",
+        "tests/test_stage5_saas_phase2.py",
+        "demos/community-local-e2e/saas-panel.html",
+        "demos/community-local-e2e/saas-panel.mjs",
+        "demos/community-local-e2e/saas-panel.test.mjs"
       ]
     }
   ]
