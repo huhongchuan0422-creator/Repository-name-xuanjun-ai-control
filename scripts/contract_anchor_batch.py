@@ -35,3 +35,16 @@ def verify(commitment,proof,root):
    node=_digest(b'\x01'+(sibling+node if item['side']=='left' else node+sibling))
   return node.hex()==root
  except (TypeError,KeyError,ValueError):return False
+
+def monthly_cost(days, interval_seconds, active_batches, unit_price_minor, fixed_fee_minor=0):
+ """Planning only: integer currency minor units; no provider quote or budget approval."""
+ for value in (days,interval_seconds,active_batches,unit_price_minor,fixed_fee_minor):
+  if type(value) is not int or value<0:raise ValueError('INVALID_COST_INPUT')
+ if days==0 or interval_seconds==0:raise ValueError('INVALID_COST_INPUT')
+ # Fixed interval planning ceiling, not a cap when count/urgent triggers are enabled.
+ scheduled=(days*86400+interval_seconds-1)//interval_seconds
+ if active_batches>scheduled:raise ValueError('EXCEEDS_TIME_ONLY_SCHEDULE')
+ return {'scheduled_batches':scheduled,'submitted_batches':active_batches,
+         'transaction_cost_minor':active_batches*unit_price_minor,
+         'total_cost_minor':active_batches*unit_price_minor+fixed_fee_minor,
+         'scope':'TIME_ONLY_ESTIMATE_NOT_PROVIDER_QUOTE'}
