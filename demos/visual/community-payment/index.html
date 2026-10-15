@@ -30,11 +30,26 @@ label{display:block;margin:12px 0}small{color:#738198}
 <p>这是流程说明入口。完整的可操作入驻申请和平台审核原型由客户独立演示包提供；其正式网站页面部署、附件安全存储、审核员身份及持久化仍须验证。</p>
 <div class="grid"><div class="card"><strong>① 申请人</strong><span>商户资料和门店信息、示例附件、申请提交</span></div><div class="card"><strong>② 平台审核员</strong><span>通过、要求补正、驳回及明确审核意见</span></div><div class="card"><strong>③ 商户回验</strong><span>查看驳回原因、补充资料、重新提交</span></div></div>
 </section>
-<section><h2>客户试用反馈</h2><p>正式反馈必须使用自有域名后端保存至项目任务。该纯静态入口在未接安全反馈服务前，不冒充已提交成功。</p>
+<section><h2>客户体验与意见反馈 · 三渠道统一客户身份</h2><p>可使用网页AI、Telegram或飞书与玄钧联系。正式消息记录必须先通过玄钧站内客户身份与项目绑定，再由统一CRM保存。此静态预览暂未接通认证、AI模型或消息留证，<strong>不会把输入内容伪装成已发送</strong>。</p>
+<div class="grid" aria-label="客户反馈渠道">
+<div class="card"><strong>💬 网页AI对话</strong><span>首选：在玄钧域名内咨询当前界面与项目反馈</span><button id="openAi" type="button">展开AI会话预览</button></div>
+<div class="card"><strong>✈ Telegram</strong><span>官方客服机器人：需完成站内绑定才能和当前客户的项目记录合并</span><button id="telegramConnect" type="button">查看Telegram关联方式</button></div>
+<div class="card"><strong>🗂 飞书</strong><span>预留飞书客户沟通入口；正式授权连接尚未核验</span><button id="feishuConnect" type="button">查看飞书接入状态</button></div>
+</div>
+<div id="aiChat" hidden><h3>网页AI会话窗口（待接入真实模型）</h3>
+<p>当前身份：<strong>尚未通过玄钧客户登录验证</strong> · 当前项目：社区分账 · 消息留存：<strong>未连接</strong></p>
+<div id="chatHistory" role="log" aria-live="polite">需要有效客户会话与后端消息证据服务。当前不会向外部发送消息。</div>
+<label>输入咨询内容<textarea id="chatText" rows="3" placeholder="例如：我希望商家入驻的审核页增加补正附件"></textarea></label>
+<button id="sendChat" type="button" disabled>提交并保存对话（连接后启用）</button>
+<p id="chatStatus" role="status">AI_PROVIDER=NOT_CONNECTED；IDENTITY=UNVERIFIED；EVIDENCE_LEDGER=NOT_CONNECTED。</p></div>
+<p id="channelNotice" role="status">渠道关联必须使用玄钧站内一次性绑定流程，不能仅凭昵称或手机号匹配客户。</p>
 <label>体验页面<input id="page" placeholder="消费者/商家/入驻审核/社区/分账方"></label><label>修改建议<textarea id="suggestion" rows="4" placeholder="请描述您希望调整的界面及交互"></textarea></label>
 <button id="feedback" type="button">查看反馈提交状态</button><p id="result" role="status"><small>尚未接入客户反馈API。</small></p>
 </section></main>
 <script>
+document.getElementById('openAi').addEventListener('click',()=>{const x=document.getElementById('aiChat');x.hidden=!x.hidden;});
+document.getElementById('telegramConnect').addEventListener('click',()=>{document.getElementById('channelNotice').textContent='Telegram官方客服：@XuanJunAI_ServiceBot。首次绑定需从玄钧自有域名认证后获取一次性绑定码。目前没有有效的身份链接，不能证明此对话已归属当前项目。';});
+document.getElementById('feishuConnect').addEventListener('click',()=>{document.getElementById('channelNotice').textContent='飞书对话入口尚未完成正式授权和客户绑定：FEISHU_CONNECTION=PENDING。';});
 document.getElementById('feedback').addEventListener('click',()=>{
  document.getElementById('result').textContent='当前为静态预览，尚无已认证的反馈保存服务；请勿输入敏感资料，反馈未发送。';
 });
