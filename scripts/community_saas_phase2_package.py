@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import pathlib
+import re
 import zipfile
 
 ASSETS=(
@@ -62,6 +63,10 @@ def inspect(blob):
         if sorted(names)!=sorted([*ASSETS,"manifest.json"]) or len(names)!=len(set(names)):
             raise ValueError("PACKAGE_ASSET_MISMATCH")
         for info in z.infolist():
+            if info.flag_bits & 1 or info.compress_type not in (zipfile.ZIP_STORED,zipfile.ZIP_DEFLATED):
+                raise ValueError("PACKAGE_MEMBER_UNSAFE")
+            if info.filename=="manifest.json" and info.file_size>65536:
+                raise ValueError("PACKAGE_MEMBER_UNSAFE")
             kind=(info.external_attr>>16)&0o170000
             if kind not in (0,0o100000) or info.file_size>4_000_000:
                 raise ValueError("PACKAGE_MEMBER_UNSAFE")
@@ -85,7 +90,7 @@ def inspect(blob):
             raise ValueError("MANIFEST_ASSET_MISMATCH")
         for path in ASSETS:
             expected=manifest["assets_sha256"][path]
-            if type(expected) is not str or len(expected)!=64:
+            if type(expected) is not str or re.fullmatch(r"[0-9a-f]{64}",expected) is None:
                 raise ValueError("INVALID_ASSET_DIGEST")
             if hashlib.sha256(z.read(path)).hexdigest()!=expected:
                 raise ValueError("PACKAGE_CONTENT_TAMPERED")

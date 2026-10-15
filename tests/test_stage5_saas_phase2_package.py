@@ -82,6 +82,21 @@ class OfflinePackage(unittest.TestCase):
         blob=build(d)["archive_bytes"]
         with self.assertRaisesRegex(ValueError,"DUPLICATE_MANIFEST_KEY"):
             inspect(self.mutated(blob,lambda raw:raw[:-1]+b',"production_install_authorized":false}'))
+ def test_12_reject_invalid_hex_digest(self):
+    with tempfile.TemporaryDirectory() as d:
+        self.source(d)
+        blob=build(d)["archive_bytes"]
+        def change(raw):
+            m=json.loads(raw);m["assets_sha256"][ASSETS[0]]="z"*64
+            return json.dumps(m).encode()
+        with self.assertRaisesRegex(ValueError,"INVALID_ASSET_DIGEST"):
+            inspect(self.mutated(blob,change))
+ def test_13_reject_large_manifest_member(self):
+    with tempfile.TemporaryDirectory() as d:
+        self.source(d)
+        blob=build(d)["archive_bytes"]
+        with self.assertRaisesRegex(ValueError,"PACKAGE_MEMBER_UNSAFE"):
+            inspect(self.mutated(blob,lambda raw:raw+b" "*70000))
  def test_11_reject_undeclared_manifest_fields(self):
     with tempfile.TemporaryDirectory() as d:
         self.source(d)
