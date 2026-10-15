@@ -64,6 +64,7 @@ jobs:
           raise SystemExit(result.returncode)
           PY
       - name: Observe existing bridge identity and health (no auth or mutation)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           if command -v python3.11 >/dev/null 2>&1; then
             XJ_PR122_PYTHON=python3.11
@@ -109,4 +110,38 @@ jobs:
               connection.close()
           assert pid() == before, "BRIDGE_PID_CHANGED_DURING_OBSERVATION"
           print(json.dumps(result,indent=2,sort_keys=True))
+          PY
+      - name: Observe existing system CA and ACME directory (no mutation)
+        if: github.event_name == 'push'
+        run: |
+          python3 -B - <<'PY'
+          import hashlib,json,os,pwd,ssl,stat
+          from pathlib import Path
+          assert os.uname().nodename=='iZvt5t8tlrm8oiZ'
+          assert pwd.getpwuid(os.geteuid()).pw_name=='githubrunner'
+          defaults=ssl.get_default_verify_paths()
+          candidates=sorted(set(p for p in (defaults.cafile,defaults.openssl_cafile) if p))
+          result={'host':os.uname().nodename,'user':'githubrunner','ca_bundles':[],
+                  'production_mutation':False,'bridge_probed':False,'sudo_used':False}
+          for raw in candidates:
+              p=Path(raw)
+              if not p.is_file():continue
+              resolved=p.resolve()
+              assert str(resolved).startswith(('/etc/pki/','/etc/ssl/','/usr/share/'))
+              data=resolved.read_bytes()
+              assert len(data)<2000000
+              info=resolved.stat()
+              ctx=ssl.create_default_context(cafile=str(resolved))
+              result['ca_bundles'].append({'requested_path':str(p),'resolved_path':str(resolved),
+                  'sha256':hashlib.sha256(data).hexdigest(),'uid':info.st_uid,
+                  'mode':oct(stat.S_IMODE(info.st_mode)),
+                  'cert_count':len(ctx.get_ca_certs())})
+          p=Path('/var/www/letsencrypt')
+          try:
+              info=p.lstat()
+              result['acme_root']={'exists':True,'uid':info.st_uid,
+                  'mode':oct(stat.S_IMODE(info.st_mode)),'symlink':stat.S_ISLNK(info.st_mode)}
+          except FileNotFoundError:result['acme_root']={'exists':False}
+          assert result['ca_bundles'],'SYSTEM_CA_NOT_READABLE'
+          print(json.dumps(result,sort_keys=True,indent=2))
           PY
