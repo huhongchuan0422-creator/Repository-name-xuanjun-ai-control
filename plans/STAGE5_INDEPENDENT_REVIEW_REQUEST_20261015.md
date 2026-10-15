@@ -3,7 +3,7 @@
 This request is for a **different reviewer from the submitting development actor**. Do not interpret it as an independent approval.
 
 ## Immutable candidate
-HEAD: `6e33197047d9c7cb8bf6d16fb195f144dc14995a`. PR118 remains Draft and must not be merged pending separate approval. No production writer, P2 Release Gate, payment execution, real refund, split or procurement is authorized.
+Original request code baseline: `6e33197047d9c7cb8bf6d16fb195f144dc14995a` (before request-file commit); original reviewed HEAD: `ad2849ed1fdc081c8e0aad3e345345457a7c2b1f`; all subsequent remediation must bind to the exact HEAD recorded in the latest GitHub audit request/comment. PR118 remains Draft and must not be merged pending separate approval. No production writer, P2 Release Gate, payment execution, real refund, split or procurement is authorized.
 
 ## Exact review scope
 Review the entire current PR118 tree, **not merely latest diff**: all `scripts/community_saas_*.py`, `scripts/community_finance_preview_extension.py`, Stage5 merchant/admin/http paths, SQLite schemas/triggers/migrations, `governance/features.json`, docs development chapter 6.10-6.15 and chapter 12.9, and six-batch acceptance mapping `plans/STAGE5_SIX_BATCH_OFFLINE_ACCEPTANCE_20261015.md`. Verify dependency/tenant trust boundaries and actual CI logs.
