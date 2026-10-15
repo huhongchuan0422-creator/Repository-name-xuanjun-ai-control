@@ -56,7 +56,9 @@
           "tests/test_p2_owner_diagnostic_r2.py",
           "tests/test_p2_owner_diagnostic_r3.py",
           "tests/test_p2_owner_diagnostic_r4.py",
-          "tests/test_p2_owner_diagnostic_r5.py"
+          "tests/test_p2_owner_diagnostic_r5.py",
+          "tests/test_p2_preparation_checkpoint.py",
+          "tests/test_p2_preparation_checkpoint_contract.py"
         ]
       },
       "reuse": [
