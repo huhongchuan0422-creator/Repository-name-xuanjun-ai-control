@@ -17,15 +17,25 @@
         "criteria": [
           "positive registry and negative omissions detected",
           "normal PR has stable feature-compliance check",
-          "main protection is only enabled after safe bootstrap"
+          "main protection is only enabled after safe bootstrap",
+          "Complete batch metadata rejects stale HEAD, incomplete nodes and omitted failure domains; no approval authority is inferred",
+          "Delivery-contract branch protection and real continuation remain separately evidenced deployment steps"
         ],
         "tests": [
-          "tests/test_feature_compliance_check.py"
+          "tests/test_feature_compliance_check.py",
+          "tests/test_delivery_contract_check.py"
         ]
       },
       "reuse": [
         "GitHub Actions",
-        "standard-library Python"
+        "standard-library Python",
+        "docs/DEVELOPMENT_EXECUTION_AND_FEEDBACK_RULES_20261012.md",
+        "existing PR17 / canonical ledger and entry_review_gate continuation checks"
+      ],
+      "paths": [
+        ".github/workflows/delivery-contract.yml",
+        "scripts/delivery_contract_check.py",
+        "tests/test_delivery_contract_check.py"
       ]
     }
   ]
