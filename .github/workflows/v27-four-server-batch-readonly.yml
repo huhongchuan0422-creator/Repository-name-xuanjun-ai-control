@@ -71,67 +71,80 @@ jobs:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh domestic
 
-  website-source-search:
+
+  website-https-acceptance:
     if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
         runner: [xuanjun-tokyo-readonly, xuanjun-domestic-ops]
     runs-on: [self-hosted, Linux, X64, "${{ matrix.runner }}"]
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
-      - name: Bounded read-only website package and deployed file identification
+      - name: Real HTTPS static sitemap and nonmutating health acceptance
         run: |
           python3 -B - <<'PY'
-          import os,json,hashlib,subprocess,time
+          import os,json,time,ssl,socket,http.client,hashlib,xml.etree.ElementTree as ET,concurrent.futures
           from pathlib import Path
+          from urllib.parse import urlsplit,unquote
           host=os.uname().nodename
-          assert host in ("iZ6wee8q9z4t03hvqumwfhZ","iZvt5t8tlrm8oiZ")
-          deadline=time.monotonic()+55
-          report={"host":host,"uid":os.geteuid(),"production_mutation":False,"packages":[],"sites":[],"errors":[]}
-          roots=[x for x in ("/tmp","/home/admin","/home/openclaw_ops","/opt","/var/backups") if os.path.isdir(x)]
-          cmd=["find"]+roots+["-maxdepth","9","-type","f","(","-iname","*website*20261013*","-o","-iname","*yunhui*handoff*","-o","-iname","*website*copy*","-o","-iname","*website*language*","-o","-name","website-public-copy-review.patch",")","-print0"]
-          r=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=25)
-          report["search_exit"]=r.returncode
-          report["search_permission_denied_count"]=r.stderr.count(b"Permission denied")
-          def digest(p):
-           h=hashlib.sha256()
-           with p.open("rb") as f:
-            while True:
-             if time.monotonic()>deadline: raise RuntimeError("TIME_BOUND")
-             b=f.read(1048576)
-             if not b: break
-             h.update(b)
-           return h.hexdigest()
-          for raw in sorted(set(x for x in r.stdout.split(b"\0") if x))[:30]:
-           p=Path(os.fsdecode(raw))
+          domestic=host=="iZvt5t8tlrm8oiZ"
+          assert domestic or host=="iZ6wee8q9z4t03hvqumwfhZ"
+          root=Path("/var/www/wenwenwenyiyiyi.work")/("current/public" if domestic else "")
+          domain="wenwenwenyiyiyi.work";ip="47.101.152.210" if domestic else "47.245.53.152"
+          ctx=ssl.create_default_context();started=time.monotonic()
+          report={"host":host,"target_ip":ip,"production_mutation":False,"routes":[],"errors":[],"historical_109_list_identity":"NOT_ESTABLISHED"}
+          def get(path,target=ip):
+           raw=socket.create_connection((target,443),timeout=6)
+           tls=ctx.wrap_socket(raw,server_hostname=domain)
+           c=http.client.HTTPConnection(domain,timeout=6);c.sock=tls
            try:
-            s=p.stat();v={"path":str(p),"size":s.st_size,"mtime_epoch":s.st_mtime}
-            if s.st_size<=100*1024*1024:v["sha256"]=digest(p)
-            report["packages"].append(v)
-           except (OSError,RuntimeError):report["errors"].append("PACKAGE_READ_FAILED:"+str(p))
-          base=Path("/var/www/wenwenwenyiyiyi.work")
-          for root in (base,base/"current/public"):
-           v={"path":str(root),"resolved":str(root.resolve())}
+            c.request("GET",path,headers={"Host":domain,"Connection":"close"})
+            r=c.getresponse();body=r.read(2000000)
+            return r.status,body,{"csp":bool(r.getheader("Content-Security-Policy")),"nosniff":r.getheader("X-Content-Type-Options")}
+           finally:c.close()
+          sitemap=root/"sitemap.xml"
+          paths=set(("/", "/yunhui.css","/yunhui.js","/sitemap.xml","/robots.txt","/assets/tiktok-integration.js","/search"))
+          if sitemap.is_file():
+           tree=ET.fromstring(sitemap.read_bytes());locs=[n.text for n in tree.iter() if n.tag.rsplit("}",1)[-1]=="loc" and n.text]
+           report["sitemap_loc_count"]=len(locs)
+           for u in locs:
+            v=urlsplit(u)
+            if v.hostname==domain and not v.query and not v.fragment:paths.add(v.path or "/")
+          assert len(paths)<=1800
+          blocked=("/p/","/submit/","/telegram-webhook/","/telegram-canary/","/healthz")
+          def local(path):
+           clean=unquote(path)
+           if not clean.startswith("/") or ".." in clean.split("/"):return None
+           if clean.startswith(blocked) or "/oauth/" in clean or clean.endswith(("/status","/disconnect")):return None
+           rel=clean.lstrip("/")
+           candidates=[root/"index.html"] if path=="/" else [root/rel,root/(rel+".html"),root/rel/"index.html"]
+           for p in candidates:
+            if p.is_file() and not p.is_symlink():return p
+           return None
+          selected=[]
+          for path in sorted(paths):
+           p=local(path)
+           if p: selected.append((path,hashlib.sha256(p.read_bytes()).hexdigest()))
+           else: report["errors"].append({"path":path,"reason":"NO_APPROVED_STATIC_LOCAL_TARGET"})
+          def check(item):
+           path,expected=item
+           if time.monotonic()-started>95:return {"path":path,"pass":False,"reason":"DEADLINE"}
            try:
-            if not root.is_dir():v["status"]="ABSENT_OR_NOT_ACCESSIBLE"
-            elif not (root/"index.html").is_file():v["status"]="NO_INDEX"
-            else:
-             h=hashlib.sha256();count=0;size=0;manifest={}
-             for d,dirs,files in os.walk(str(root),followlinks=False):
-              dirs[:]=sorted(x for x in dirs if not x.startswith(".") and not Path(d,x).is_symlink())
-              for n in sorted(files):
-               p=Path(d,n)
-               if p.is_symlink():continue
-               s=p.stat()
-               if s.st_size>20*1024*1024:raise RuntimeError("FILE_SIZE_BOUND")
-               sha=digest(p);h.update((str(p.relative_to(root))+"\0"+sha+"\n").encode())
-               manifest[str(p.relative_to(root))]=sha
-               count+=1;size+=s.st_size
-               if count>10000:raise RuntimeError("COUNT_BOUND")
-             v.update(status="READ_COMPLETE",web_files=count,web_bytes=size,web_manifest_sha256=h.hexdigest(),file_manifest=manifest)
-             v["selected"]={n:digest(root/n) for n in ("index.html","yunhui.css","yunhui.js","assets/tiktok-integration.js") if (root/n).is_file()}
-           except (OSError,RuntimeError) as e:v["status"]="READ_INCOMPLETE";v["reason"]=type(e).__name__
-           report["sites"].append(v)
+            status,body,headers=get(path)
+            return {"path":path,"status":status,"sha256":hashlib.sha256(body).hexdigest(),"expected_sha256":expected,"headers":headers,"pass":status==200 and hashlib.sha256(body).hexdigest()==expected}
+           except Exception as e:return {"path":path,"pass":False,"reason":type(e).__name__}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:report["routes"]=list(pool.map(check,selected))
+          report["static_checked"]=len(report["routes"]);report["static_pass"]=sum(x["pass"] for x in report["routes"])
+          for target in ("47.101.152.210","47.245.53.152"):
+           try:
+            status,body,headers=get("/",target);report.setdefault("cross_origin_home",[]).append({"ip":target,"status":status,"sha256":hashlib.sha256(body).hexdigest(),"tls_verify":True})
+           except Exception as e:report["errors"].append({"ip":target,"reason":type(e).__name__})
+          # Existing health endpoint GET only; no OAuth, submissions, customer messages or credentials.
+          try:
+           status,body,headers=get("/healthz");report["health_status"]=status;report["health_body_sha256"]=hashlib.sha256(body).hexdigest()
+          except Exception as e:report["health_error"]=type(e).__name__
+          report["elapsed_seconds"]=round(time.monotonic()-started,2)
+          report["status"]="STATIC_GET_PASS" if report["static_checked"] and report["static_checked"]==report["static_pass"] and not report["errors"] else "HOLD"
           print(json.dumps(report,sort_keys=True))
           PY
