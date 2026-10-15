@@ -223,4 +223,32 @@ class Phase2Nodes(unittest.TestCase):
     view=self.call("refund_reversal_plan",{"order_id":"order1","reason":"request"},self.admin)
     self.assertEqual(view["order_lifecycle_state"],"PREPARED")
     self.assertFalse(view["provider_refund_executed"])
+ def test_44_verify_missing_stores_does_not_create_files(self):
+    with tempfile.TemporaryDirectory() as d:
+        q=os.path.join(d,"never-created-quote.sqlite")
+        o=os.path.join(d,"never-created-order.sqlite")
+        with self.assertRaisesRegex(ValueError,"STORE_MISSING"):
+            verify_persistent_stores(q,o)
+        self.assertFalse(os.path.exists(q))
+        self.assertFalse(os.path.exists(o))
+ def test_45_verify_quote_symlink_rejected_without_mutation(self):
+    with tempfile.TemporaryDirectory() as d:
+        q=os.path.join(d,"q.sqlite");o=os.path.join(d,"o.sqlite")
+        actual=connect(q);install(actual);actual.close()
+        odb=sqlite3.connect(o);order_install(odb);install_lifecycle(odb);install_reviews(odb);odb.close()
+        link=os.path.join(d,"alias.sqlite");os.symlink(q,link)
+        with self.assertRaisesRegex(ValueError,"STORE_NOT_REGULAR"):
+            verify_persistent_stores(link,o)
+        self.assertTrue(verify_persistent_stores(q,o)["read_only"])
+ def test_46_verify_existing_store_does_not_modify_bytes(self):
+    with tempfile.TemporaryDirectory() as d:
+        q=os.path.join(d,"q.sqlite");o=os.path.join(d,"o.sqlite")
+        a=connect(q);install(a);a.close()
+        b=sqlite3.connect(o);order_install(b);install_lifecycle(b);install_reviews(b);b.close()
+        import hashlib
+        def digest(path):
+            with open(path,"rb") as fp:return hashlib.sha256(fp.read()).hexdigest()
+        previous=(digest(q),digest(o))
+        self.assertTrue(verify_persistent_stores(q,o)["verified"])
+        self.assertEqual(previous,(digest(q),digest(o)))
 if __name__=="__main__":unittest.main()
