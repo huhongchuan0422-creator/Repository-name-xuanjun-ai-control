@@ -1,0 +1,53 @@
+{
+  "authenticated_archive": {
+    "cache_file_count": 248,
+    "member_count": 249,
+    "sha256": "2b1885a9b1cec024abf657a82c790d420f1e5b4fe8ce1776d9cba4616b4b97b9",
+    "unchanged_collector_and_observer_fixture_cases": 6
+  },
+  "bootstrap": {
+    "commit": "PENDING_PUBLICATION",
+    "host_execution": "NOT_RUN",
+    "tests_each_interpreter": 23
+  },
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "historical_failed_test": {
+    "cause": "Python-version-specific AST rendering in test; replaced by exact function source-slice hash comparison",
+    "file": "python368-checkpoint-ast-tests.log",
+    "sha256": "d28836b63b30c4ee77dd26f057dd09b3b1a959b3b6f16c5a55b30d9e8b53e65e"
+  },
+  "host_execution": "NOT_RUN",
+  "independent_review": {
+    "bootstrap_tests_each_interpreter": 23,
+    "host_execution": "NOT_RUN",
+    "source_sha256": "f06f6bc0b72e7f4dcf6a6bd65dbcaca32da16fbd84b7d87bbd2fdf5fa69abdf1",
+    "status": "SCOPED_PASS",
+    "test_sha256": "98f868174e7585a9499042ba897e71ab65982b992d623a580fe8767b8fc8a695",
+    "wrapper_tests_each_interpreter": 48
+  },
+  "install_admission": "NOT_GRANTED",
+  "kind": "LOCAL_FROZEN_WRITER_DIAGNOSTIC_EVIDENCE",
+  "production_resume": "NOT_EXECUTED",
+  "schema": 1,
+  "source_bytes": 16756,
+  "source_sha256": "f06f6bc0b72e7f4dcf6a6bd65dbcaca32da16fbd84b7d87bbd2fdf5fa69abdf1",
+  "test_sha256": "98f868174e7585a9499042ba897e71ab65982b992d623a580fe8767b8fc8a695",
+  "tests": {
+    "python3.12.14": {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "2481861f9963c4bbb4a07adaaddee4e5ab441a546d0aba5204f0c9f8f41de62f",
+      "passed": 48,
+      "run": 48,
+      "skips": 0
+    },
+    "python3.6.8": {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "2e4387b208737107a905ba182723f8a2c893367a52785defec0cfc3c24a626ee",
+      "passed": 48,
+      "run": 48,
+      "skips": 0
+    }
+  }
+}
