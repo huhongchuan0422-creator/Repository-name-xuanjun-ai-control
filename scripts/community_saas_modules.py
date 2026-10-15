@@ -116,7 +116,7 @@ def grant(db,tenant_id,module_id,valid_from,valid_until,version,source="OFFLINE_
       (module_id,version)).fetchone() is None:raise ValueError("UNKNOWN_PRICE_VERSION")
   before=db.execute("SELECT valid_until FROM module_entitlements WHERE tenant_id=? AND module_id=?",
       (tenant_id,module_id)).fetchone()
-  if before and valid_until<=before[0]:raise ValueError("GRANT_MUST_EXTEND")
+  if before and (valid_until<=before[0] or valid_from>before[0]):raise ValueError("GRANT_MUST_EXTEND")
   db.execute("INSERT INTO module_entitlements VALUES(?,?,?,?,?,?) "
     "ON CONFLICT(tenant_id,module_id) DO UPDATE SET valid_from=MIN(module_entitlements.valid_from,excluded.valid_from), "
     "valid_until=excluded.valid_until,price_version=excluded.price_version,source=excluded.source",
