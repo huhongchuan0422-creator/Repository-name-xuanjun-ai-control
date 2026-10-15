@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>玄钧云汇 · 社区分账多角色可视化中心</title>
+<style>
+:root{font-family:system-ui,"Microsoft YaHei",sans-serif;color:#20304b;background:#f3f6fb}
+*{box-sizing:border-box}body{margin:0}header{background:#142a51;color:white;padding:30px 6vw}
+header h1{font-size:27px}header p{color:#cad9ee}main{max-width:1120px;margin:26px auto;padding:0 20px}
+section{background:white;padding:25px;border-radius:14px;border:1px solid #e4e8f1;margin-bottom:22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+a.card{display:block;text-decoration:none;padding:20px;border:1px solid #d6e1f3;border-radius:12px;color:#174579;background:#f9fbff}
+a.card:hover,a.card:focus{background:#eaf1ff;outline:2px solid #5f8ee3}
+a.card strong{display:block;font-size:17px}a.card span{display:block;color:#68758c;font-size:13px;margin-top:9px}
+.tag{display:inline-block;background:#e3efff;color:#2751a9;border-radius:12px;padding:5px 11px;font-size:12px}
+button{padding:10px 15px;background:#214e9c;border:0;border-radius:7px;color:white;cursor:pointer}
+input,textarea{width:100%;padding:10px;border:1px solid #cbd7e7;border-radius:7px}
+label{display:block;margin:12px 0}small{color:#738198}
+</style></head>
+<body><header><h1>玄钧云汇 · 社区分账可视化中心</h1><p>按角色体验 · 跨页面跳转 · 演示流程 · 收集反馈</p><span class="tag">DEMO · 未接真实微信支付 · 不产生资金变化</span></header>
+<main>
+<section><h2>按角色进入业务界面</h2><p>一个社区分账模块涵盖消费者、商家、社区分账方和平台管理等不同角色。</p>
+<div class="grid">
+<a class="card" href="../../community-local-e2e/index.html"><strong>📱 消费者入口</strong><span>扫码金额输入 → 模拟付款 → 支付结果与广告</span></a>
+<a class="card" href="../../community-local-e2e/merchant.html"><strong>🏪 商家入口</strong><span>商户订单、退款、分账记录和商家管理</span></a>
+<a class="card" href="../../community-local-e2e/platform.html"><strong>🛡 平台运营入口</strong><span>入驻审核、商户管理、退款及分账核查</span></a>
+<a class="card" href="../../community-local-e2e/saas-panel.html"><strong>🧩 SaaS模块与Owner入口</strong><span>模块选配、价格、权益和审批演示</span></a>
+<a class="card" href="../../community-local-e2e/platform.html"><strong>🏘 社区管理入口</strong><span>社区分账视角与对账业务演示（待独立角色界面接线）</span></a>
+<a class="card" href="../../community-local-e2e/platform.html"><strong>💰 分账方入口</strong><span>查看分账应收及状态（独立角色界面待完善）</span></a>
+</div></section>
+<section><h2>商家入驻申请 → 审核 → 驳回补正</h2>
+<p>这是流程说明入口。完整的可操作入驻申请和平台审核原型由客户独立演示包提供；其正式网站页面部署、附件安全存储、审核员身份及持久化仍须验证。</p>
+<div class="grid"><div class="card"><strong>① 申请人</strong><span>商户资料和门店信息、示例附件、申请提交</span></div><div class="card"><strong>② 平台审核员</strong><span>通过、要求补正、驳回及明确审核意见</span></div><div class="card"><strong>③ 商户回验</strong><span>查看驳回原因、补充资料、重新提交</span></div></div>
+</section>
+<section><h2>客户试用反馈</h2><p>正式反馈必须使用自有域名后端保存至项目任务。该纯静态入口在未接安全反馈服务前，不冒充已提交成功。</p>
+<label>体验页面<input id="page" placeholder="消费者/商家/入驻审核/社区/分账方"></label><label>修改建议<textarea id="suggestion" rows="4" placeholder="请描述您希望调整的界面及交互"></textarea></label>
+<button id="feedback" type="button">查看反馈提交状态</button><p id="result" role="status"><small>尚未接入客户反馈API。</small></p>
+</section></main>
+<script>
+document.getElementById('feedback').addEventListener('click',()=>{
+ document.getElementById('result').textContent='当前为静态预览，尚无已认证的反馈保存服务；请勿输入敏感资料，反馈未发送。';
+});
+</script></body></html>
