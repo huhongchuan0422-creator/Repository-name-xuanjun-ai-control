@@ -1,0 +1,91 @@
+{
+  "actual_frozen_archive_files_inspected": 233,
+  "audit_corrections": [
+    "UNCAUGHT_TEST_TIMEOUT_PERIODIC_CLEANUP_ALARM",
+    "BOUNDED_FINAL_REVERIFICATION",
+    "PRESERVED_PRIMARY_OUTCOME_WITH_SECONDARY_FAILURE_FLAGS"
+  ],
+  "cached_import_selection": "ONE_EXACT_CASE_ON_BOTH_INTERPRETERS_BODY_NOT_EXECUTED",
+  "exact_uid_kernel_case": "NOT_RUN",
+  "files": {
+    "REVIEW_HANDOFF.md": {
+      "bytes": 12838,
+      "sha256": "3c1cf2015b6c616b41d17803ca37c501b15b0cce70439b1fcec1abb495b9cfbf"
+    },
+    "cached-selection-python312.log": {
+      "bytes": 521,
+      "sha256": "7f73165c531971980f442fd6ffdb2e6b182cb00dc10b78bc91b4cdce52782d57"
+    },
+    "cached-selection-python368.log": {
+      "bytes": 519,
+      "sha256": "9ce994765f2cb0e57fcbe5e2b514fbc87effce115eb2d2f6a68f4ed30c3a5abb"
+    },
+    "local-evidence.pre-audit.json": {
+      "bytes": 2051,
+      "sha256": "061c9501b60f66643ff81961eaa9d4df6de19033962b949dd35cc52af763a72c"
+    },
+    "owner_diagnostic.py": {
+      "bytes": 17415,
+      "sha256": "93c891542b6eb77da05e665ce56cbfe97918a2c09c66b2a90720107f13d28968"
+    },
+    "pre-audit-python312-tests.log": {
+      "bytes": 7538,
+      "sha256": "5f6f0fbbbab33cbc0ac64beb5df6cad4e526d1fab7643085a343a3e54f2e0658"
+    },
+    "pre-audit-python368-tests.log": {
+      "bytes": 5228,
+      "sha256": "1e68ebdd238618a0166607220d890392a2095e2cafa49f6c874f833a2f9ab2be"
+    },
+    "python312-tests.log": {
+      "bytes": 8422,
+      "sha256": "dca44b216d53c65119ad8fc0c242b06485a0c2ad50415ff8babe42fb736ad714"
+    },
+    "python368-tests-first.log": {
+      "bytes": 3271,
+      "sha256": "126963ec1e68b56b0c8cacfbc74363f8ca18df8cfdec90886581dc1a29b4a7a8"
+    },
+    "python368-tests.log": {
+      "bytes": 5811,
+      "sha256": "fcc343637b5ba0d498142dc931f01c454ac92481e981a761f86ab271394759c4"
+    },
+    "scoped-review.json": {
+      "bytes": 1068,
+      "sha256": "a8b34f2b8a5e78c7ffb1a63eb1948cdd6bb8feea5d7ef8f6f5487c4da6f3d309"
+    },
+    "test_owner_diagnostic.py": {
+      "bytes": 27780,
+      "sha256": "b1d81c1fe2851771c8c4bccaa81f78de2c321883dded784a1c57dcd88e8531ec"
+    }
+  },
+  "finite_probe": "NOT_RUN",
+  "formal_production_approval": "NOT_GRANTED",
+  "frozen_kit_manifest_sha256": "01dc59516509435def70b5c3d10ba1cb1f97f2d1ba87f61695e856eefd80800c",
+  "frozen_kit_source_commit": "3b87d10b66ae791086cdb05a554ad44ed0f4ad90",
+  "frozen_source_index_sha256": "4b69ab76e3c1538a0325a7c3df0d938284965463c04657814d7d9e780e9241e6",
+  "host_operations": "NOT_RUN",
+  "independent_corrected_source_rereview": "TWO_FINDINGS_RESOLVED_NO_ADDITIONAL_CONFIRMED_BLOCKER_IN_SCOPED_REVIEW",
+  "independent_review_replay": {
+    "python3.12.14": "6/6 PASS",
+    "python3.6.8": "6/6 PASS",
+    "subset_of_66": true
+  },
+  "kind": "LOCAL_OWNER_DIAGNOSTIC_REVIEW_CANDIDATE_EVIDENCE",
+  "local_source_frozen": true,
+  "network_operations": "NOT_RUN",
+  "owner_action_time_approval": "PENDING",
+  "production_resume": "NOT_EXECUTED",
+  "publication": "PENDING_ROOT_PUBLICATION_NOT_PERFORMED_BY_WRAPPER_WORKER",
+  "schema": 1,
+  "tests": {
+    "python3.12.14": {
+      "passed": 66,
+      "run": 66,
+      "skipped": 0
+    },
+    "python3.6.8": {
+      "passed": 66,
+      "run": 66,
+      "skipped": 0
+    }
+  }
+}

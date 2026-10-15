@@ -1,0 +1,62 @@
+{
+  "actual_frozen_archive_files_inspected": 233,
+  "cached_import_selection": "ONE_EXACT_CASE_ON_BOTH_INTERPRETERS_BODY_NOT_EXECUTED",
+  "exact_uid_kernel_case": "NOT_RUN",
+  "files": {
+    "REVIEW_HANDOFF.md": {
+      "bytes": 11211,
+      "sha256": "19eb80e54362cfe2409ca5b87158ef89d1c5e4163facbf7dd9262c8d108ad8d5"
+    },
+    "cached-selection-python312.log": {
+      "bytes": 521,
+      "sha256": "7f73165c531971980f442fd6ffdb2e6b182cb00dc10b78bc91b4cdce52782d57"
+    },
+    "cached-selection-python368.log": {
+      "bytes": 519,
+      "sha256": "9ce994765f2cb0e57fcbe5e2b514fbc87effce115eb2d2f6a68f4ed30c3a5abb"
+    },
+    "owner_diagnostic.py": {
+      "bytes": 15239,
+      "sha256": "ffa5727cd4aad43ed862071be4779bc974d84610e06d7d77dfedbfdb229c61de"
+    },
+    "python312-tests.log": {
+      "bytes": 7538,
+      "sha256": "5f6f0fbbbab33cbc0ac64beb5df6cad4e526d1fab7643085a343a3e54f2e0658"
+    },
+    "python368-tests-first.log": {
+      "bytes": 3271,
+      "sha256": "126963ec1e68b56b0c8cacfbc74363f8ca18df8cfdec90886581dc1a29b4a7a8"
+    },
+    "python368-tests.log": {
+      "bytes": 5228,
+      "sha256": "1e68ebdd238618a0166607220d890392a2095e2cafa49f6c874f833a2f9ab2be"
+    },
+    "test_owner_diagnostic.py": {
+      "bytes": 24321,
+      "sha256": "cb4564bac01d06795a511f4c5212228ef446e8808e102cc8441de21971a297dd"
+    }
+  },
+  "finite_probe": "NOT_RUN",
+  "frozen_kit_manifest_sha256": "01dc59516509435def70b5c3d10ba1cb1f97f2d1ba87f61695e856eefd80800c",
+  "frozen_kit_source_commit": "3b87d10b66ae791086cdb05a554ad44ed0f4ad90",
+  "host_operations": "NOT_RUN",
+  "independent_wrapper_review": "PENDING",
+  "kind": "LOCAL_OWNER_DIAGNOSTIC_REVIEW_CANDIDATE_EVIDENCE",
+  "network_operations": "NOT_RUN",
+  "owner_action_time_approval": "PENDING",
+  "production_resume": "NOT_EXECUTED",
+  "publication": "NOT_REQUESTED_NOT_PERFORMED",
+  "schema": 1,
+  "tests": {
+    "python3.12.14": {
+      "passed": 60,
+      "run": 60,
+      "skipped": 0
+    },
+    "python3.6.8": {
+      "passed": 60,
+      "run": 60,
+      "skipped": 0
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "additional_confirmed_blocker": "NONE_IN_THIS_SCOPED_REVIEW",
+  "independent_replay": {
+    "python3.12.14": {
+      "passed": 6,
+      "run": 6
+    },
+    "python3.6.8": {
+      "passed": 6,
+      "run": 6
+    }
+  },
+  "kind": "SCOPED_READ_ONLY_REVIEW_RECEIPT_FROM_TEAM_REPORT",
+  "remaining_limits": [
+    "RETAINED_PARTIAL_COPY_POSSIBLE",
+    "UNINTERRUPTIBLE_KERNEL_CALLS",
+    "DEFAULT_SIGTERM_OUTSIDE_PROBE",
+    "OWNER_ACTION_TIME_APPROVAL_PENDING",
+    "UK_HOST_NOT_RUN"
+  ],
+  "replay_scope": "Six new real-alarm and paired-failure regressions; subset of the66 total, not additive test coverage. Read-only/in-memory execution.",
+  "report_source": "audit_release_access message2026-10-15T00:17UTC",
+  "reviewed_findings": {
+    "secondary_verification_replacing_primary_outcome": "RESOLVED",
+    "swallowed_timeout_and_unbounded_final_verification": "RESOLVED"
+  },
+  "schema": 1,
+  "test_sha256": "b1d81c1fe2851771c8c4bccaa81f78de2c321883dded784a1c57dcd88e8531ec",
+  "wrapper_sha256": "93c891542b6eb77da05e665ce56cbfe97918a2c09c66b2a90720107f13d28968"
+}
