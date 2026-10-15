@@ -80,8 +80,9 @@ class OfflineSaas:
             return {"offers":_customer_view(list_offers(self.quotes,params["module_id"],tenant_id=tenant))}
         if operation=="quote":
             _id(params["quote_id"]);_id(params["offer_id"])
-            return _customer_view(quote(self.quotes,params["quote_id"],tenant,
-                params["offer_id"],params["version"],now,_time(params["expires_at"])))
+            result=quote(self.quotes,params["quote_id"],tenant,
+                params["offer_id"],params["version"],now,_time(params["expires_at"]))
+            return {"quote_id":params["quote_id"],**_customer_view(result)}
         if operation=="quote_read":
             return _customer_view(read_quote(self.quotes,_id(params["quote_id"]),tenant))
         if operation=="order_prepare":
