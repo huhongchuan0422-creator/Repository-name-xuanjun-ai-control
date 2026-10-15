@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>玄钧云汇 · 社区管理 · 离线演示</title>
+<style>
+:root{font-family:system-ui,"Microsoft YaHei",sans-serif;color:#20304b;background:#f3f6fb}*{box-sizing:border-box}body{margin:0}header{background:#142a51;color:#fff;padding:26px max(20px,calc((100vw - 1080px)/2))}main{max-width:1080px;margin:26px auto;padding:0 20px}section{background:white;border:1px solid #dce6f4;border-radius:12px;padding:22px;margin:18px 0}h1{font-size:26px}h2{font-size:19px}.tag{display:inline-block;padding:5px 10px;border:1px solid #f1d39a;background:#fff6e5;color:#795008;border-radius:8px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.tile{border:1px solid #dce6f4;border-radius:10px;padding:14px}.tile strong{display:block;margin-bottom:10px}button{background:#214e9c;color:white;border:0;padding:10px 14px;border-radius:6px;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid #396ec6}nav a{margin-right:18px;color:#194c91}p,li{line-height:1.7}
+</style></head><body><header><h1>社区管理工作台</h1><p>社区视角查看辖区商户、模拟分账明细和异常待办</p><span class="tag">DEMO_ONLY · 无真实资金 · 未验证身份</span></header>
+<main><nav><a href="../visual/community-payment/index.html">可视化中心</a><a href="./platform.html">平台模拟工作台</a><a href="./merchant.html">商家模拟工作台</a></nav>
+<section><h2>独立角色业务视图</h2><p>本页面是社区管理专属信息结构及交互原型，不复用平台管理员页面。无真实登录、租户授权、微信支付或结算接口；所有数据均为固定模拟示例。</p>
+<div class="grid"><article class="tile"><strong>社区所属商户</strong><p>样例门店 A</p><small>演示数据 / 不代表真实授权</small></article><article class="tile"><strong>模拟分账待核查</strong><p>待核查账目</p><small>模拟订单 DEMO-001（渠道结算：UNKNOWN）</small></article><article class="tile"><strong>异常记录</strong><p>待办事项</p><small>等待授权服务端权限和真实对账接口</small></article></div></section>
+<section><h2>角色操作流程演示</h2><p>点击查看角色职责与下一步需要的权威证据。此操作只更新本页文字，不写入服务器、不发送任何审核或付款请求。</p><button type="button" id="inspect">查看模拟待办</button><p id="status" role="status">尚未查看</p><ul id="tasks"></ul></section>
+<section><h2>正式上线门禁</h2><ul><li>服务端 principal、tenant_id 与角色权限验证；禁止依赖浏览器隐藏按钮授权。</li><li>按角色限制商户与分账接收方数据范围，并测试跨租户拒绝。</li><li>真实数据只能来自经验证的业务/分账回执；UNKNOWN 不得转换成到账成功或金额零。</li><li>增量消息、异常、撤销、重放、回滚与审计证据必须在后台独立验收。</li></ul></section></main>
+<script>
+"use strict";
+const entries=["核对社区关联商户的授权和状态","查看辖区模拟交易概要（结算未知）","提交异常待办须等待认证后端"];
+document.getElementById("inspect").addEventListener("click",()=>{
+const ul=document.getElementById("tasks");ul.replaceChildren();
+for(const entry of entries){const li=document.createElement("li");li.textContent=entry;ul.append(li);}
+document.getElementById("status").textContent="只读演示已展开；未向服务器提交任何操作。";
+});
+</script></body></html>
