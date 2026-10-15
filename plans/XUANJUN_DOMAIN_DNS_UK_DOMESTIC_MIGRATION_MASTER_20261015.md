@@ -401,3 +401,37 @@ IP初步分类：入口client_address用于日志；入口X-Forwarded-Proto用�
 至此，9.10—9.13的主动缺口取证已保存原PR。后续没有新HEAD、新独立审核或新事实时，不再推送同样探针、不重复运行或追加同义回执。剩余为独立审核对旧HEAD缺陷及动态边界的裁定、外围IP安全依赖/日志审计差异闭环（必要时Owner明确接受），以及DNS变更前已授权管理面的当前单条配置核对。当前会话无admin/root或Cloudflare管理面接入，不扩权，不读取/搬用其他流程凭据，不为获取权限启动OpenClaw或英国P2。
 
 DNS_RELEASE=HOLD；东京退役HOLD；Work官网/current、桥接/隧道、PR99/Finance均不因本观察变更。网站入口切换与整体服务器迁移仍未完成，不用自动检查成功替代生产放行。
+
+
+### 9.14 2026-10-16：Owner要求继续W01—W10；W06最小整改已交付
+
+Owner询问十节点进展并明确要求继续实际执行。当前节点状态以下表为准，覆盖§9.2中早期状态文字，但不删除历史证据。
+
+| 节点 | 当前状态 | 已完成与剩余 |
+| --- | --- | --- |
+| W01 现有官网/制品基线 | 完成（已确认服务器范围） | 实际服务器1187路径及1186相同+批准TikTok差异已绑定；保护Work官网 |
+| W02 国内静态隔离验收 | 完成 | 原RG1/stage/指针及本地验收继承 |
+| W03 全路由责任清单 | 完成 | 75条规则、11动态职责及109历史URL身份绑定 |
+| W04 最小Nginx候选及审核 | 完成（限定范围） | 精确312efdd3配置制品及独立审核继承；不是DNS批准 |
+| W05 证书/续期/HTTP | 完成（已验收范围） | 国内HTTPS、dry-run、Hook、Timer、HTTP308/ACME；03:40自动检查成功，实际换证未证实且非当前到期必需 |
+| W06 切DNS前整站验收 | 部分完成，当前推进 | 两地静态115通过；动态非写证据已集中。旧HEAD错误现有最小修复候选+16项针对测试，生产尚未应用；动态鉴权/IP差异仍未闭环 |
+| W07 网站切换放行 | HOLD | 原独立审核尚未批准DNS，不能自签 |
+| W08 DNS切换 | 未执行 | 管理面当前单条核对/实际变更尚未执行 |
+| W09 公网切换后观察 | 未执行 | 等W08；预发布直连校验不等于公网切换观察 |
+| W10 网站迁移关闭 | 未完成 | 等W06—W09全部满足；东京后台依赖仍保留 |
+
+本轮完成的实际整改候选（**未应用生产**）：
+- 准确提交 `ce211a606e82845bfe4d7a6e3d511f3872d53147`，tree `efb065512863f57692a6e8b207ede3ed8c04c32f`。
+- 仅改变现有生产Portal的log_message函数。保留数值状态参数，其余参数脱敏；内部格式异常退回脱敏信息；错误请求URL解析失败不再让日志函数抛错。没有增加do_HEAD或放宽方法，未支持方法恢复为标准501而非上游断开造成502。
+- 原源文件SHA256 `528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006`；候选源SHA256 `d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0`。
+- 从Owner已上传原文件取回字节并复算，哈希吻合。内存builder要求准确原哈希，只替换唯一日志方法；源码不符即拒绝，没有安装CLI或生产写操作。
+- 新候选目录deploy/pr122-portal-log-fix与既有已批准网站/配置制品分开；不改原网站或OAuth包。不能用新OAuth架构替换实际旧Portal来解决单个日志问题，所以采用此最小局部修复。
+- 本地16/16 PASS，包含原版混合%d/%s TypeError与实际隔离HTTP HEAD断开复现；修正版HEAD/OPTIONS/DELETE/PATCH/TRACE/CONNECT返回501，GET200；参数脱敏、畸形格式、错误URL、源哈希拒绝及除日志方法外AST/字节不变。
+- 东京既有非root Runner对实际/opt/trading-system/scripts/secure_secrets_portal_server.py取源，同样16/16 PASS。Run [38826287071](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38826287071)，Job116734398956 SUCCESS，准确checkout ce211a60。日志PR122_LOG_FIX_RECEIPT明确PASS_ISOLATED_ONLY，production_source_write=false、service_restart=false、production_imports=false、dns_change=false。
+- 测试只提取日志AST，在临时127.0.0.1随机端口的假HTTP服务中执行；不运行生产app、不查询数据库、不发送真实业务请求，不代表修复已在18080运行。
+- Artifact12014899180，ZIP12778字节，SHA256 `76605c4c71c341770a12881f7182f0c12161fae58e2b6b1e38c5037ae41f08ad`。本执行方实际下载原ZIP复算，6文件=5份绑定输入+1份REVIEW_BINDING；5/5哈希一致，额外文件0。此为开发方核验，不冒充独立审核。
+- 既有PR会按其累计diff自动触发其他托管工作流；本次只新增上述16项针对回归，不以自动重跑的历史套件替代既有精确制品审核，也不重新构建官网或改变已批准312efdd3发布范围。
+
+继续顺序：同一原PR集中增量复核上述6文件/实际日志；接受后通过既有批准root路径绑定备份、准确原/新哈希及回滚，再执行原子安装/服务重启及目标动态复验。当前会话没有已接入admin/root或DNS管理面，不能从非root测试推断有生产执行权。外围IP依赖、Owner对临时审计差异的明确接受（如采用）、实际动态鉴权和DNS切换门禁依然独立保留。
+
+准确结论：W01—W05完成，正在W06；本轮已从取证推进到最小整改候选、真实Runner针对测试及制品交付。W07—W10未完成。未切DNS，未停止东京，未覆盖Work官网。
