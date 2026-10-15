@@ -72,79 +72,105 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  website-https-acceptance:
+  boundary-evidence:
     if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
         runner: [xuanjun-tokyo-readonly, xuanjun-domestic-ops]
     runs-on: [self-hosted, Linux, X64, "${{ matrix.runner }}"]
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
-      - name: Real HTTPS static sitemap and nonmutating health acceptance
+      - name: Read-only IP dependency and eleven HEAD boundary receipts
         run: |
           python3 -B - <<'PY'
-          import os,json,time,ssl,socket,http.client,hashlib,xml.etree.ElementTree as ET,concurrent.futures
+          import os,json,hashlib,re,ast,ssl,socket,http.client,subprocess,shutil,glob
           from pathlib import Path
-          from urllib.parse import urlsplit,unquote
           host=os.uname().nodename
+          assert host in ("iZvt5t8tlrm8oiZ","iZ6wee8q9z4t03hvqumwfhZ")
           domestic=host=="iZvt5t8tlrm8oiZ"
-          assert domestic or host=="iZ6wee8q9z4t03hvqumwfhZ"
-          root=Path("/var/www/wenwenwenyiyiyi.work")/("current/public" if domestic else "")
-          domain="wenwenwenyiyiyi.work";ip="47.101.152.210" if domestic else "47.245.53.152"
-          ctx=ssl.create_default_context();started=time.monotonic()
-          report={"host":host,"target_ip":ip,"production_mutation":False,"routes":[],"errors":[],"historical_109_list_identity":"NOT_ESTABLISHED"}
-          def get(path,target=ip):
-           raw=socket.create_connection((target,443),timeout=6)
-           tls=ctx.wrap_socket(raw,server_hostname=domain)
-           c=http.client.HTTPConnection(domain,timeout=6);c.sock=tls
+          ip="47.101.152.210" if domestic else "47.245.53.152"
+          domain="wenwenwenyiyiyi.work"
+          report={"host":host,"commit":os.environ["GITHUB_SHA"],"production_mutation":False,"dns_release":"HOLD","dynamic":[],"source":[],"nginx":[],"gaps":[]}
+          entry=Path("/opt/trading-system/scripts/secure_secrets_portal_server.py")
+          if not domestic:
            try:
-            c.request("GET",path,headers={"Host":domain,"Connection":"close"})
-            r=c.getresponse();body=r.read(2000000)
-            return r.status,body,{"csp":bool(r.getheader("Content-Security-Policy")),"nosniff":r.getheader("X-Content-Type-Options")}
+            data=entry.read_bytes();tree=ast.parse(data);methods=sorted({n.name for n in ast.walk(tree) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name.startswith("do_")})
+            report["portal_entry"]={"sha256":hashlib.sha256(data).hexdigest(),"matches_owner_entry":hashlib.sha256(data).hexdigest()=="528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006","handler_methods":methods}
+            assert "do_HEAD" not in methods and "do_OPTIONS" not in methods,"Unexpected method handler"
+           except Exception as e:
+            report["gaps"].append("PORTAL_ENTRY:"+type(e).__name__)
+           for folder in ("scripts","ai_service","accounts","douyin","tiktok","database","trading_execution"):
+            base=Path("/opt/trading-system")/folder
+            for p in sorted(base.rglob("*.py"))[:500]:
+             if p.is_symlink():continue
+             try:
+              data=p.read_bytes()
+              if len(data)>2000000:continue
+              lines=data.decode("utf-8").splitlines();hits=[]
+              for i,line in enumerate(lines,1):
+               tags=[token for token in ("client_address","remote_addr","X-Real-IP","X-Forwarded-For","X-Forwarded-Proto","REMOTE_ADDR","ip_address","rate_limit","ip_whitelist","ip_blacklist") if token.lower() in line.lower()]
+               if tags:hits.append({"line":i,"tokens":tags})
+              report["source"].append({"path":str(p.relative_to("/opt/trading-system")),"sha256":hashlib.sha256(data).hexdigest(),"ip_security_hits":hits})
+             except (OSError,UnicodeError):report["gaps"].append("SOURCE_UNREADABLE:"+str(p.relative_to("/opt/trading-system")))
+          # Read configurations as data, never nginx -T, sudo, key files, or production imports.
+          pending=[Path("/etc/nginx/nginx.conf")];seen=set()
+          while pending and len(seen)<80:
+           p=pending.pop()
+           if str(p) in seen:continue
+           seen.add(str(p))
+           try:
+            if not str(p.resolve()).startswith("/etc/nginx/"):continue
+            data=p.read_bytes()
+            if len(data)>1000000:continue
+            text=data.decode();items=[]
+            for i,line in enumerate(text.splitlines(),1):
+             s=line.split("#",1)[0].strip()
+             if not s:continue
+             key=s.split(None,1)[0]
+             if key=="include":
+              value=s.split(None,1)[1].rstrip(";").strip()
+              if value.startswith("/etc/nginx/"):pending.extend(Path(x) for x in glob.glob(value))
+             if key in ("allow","deny","real_ip_header","set_real_ip_from","real_ip_recursive","limit_req","limit_req_zone","limit_conn","limit_conn_zone","auth_request","auth_basic","proxy_next_upstream","proxy_pass_request_headers","proxy_ssl_verify","proxy_ssl_name","proxy_set_header","access_log","log_format","geo","map","if"):
+              item={"line":i,"directive":key}
+              if key=="proxy_set_header":
+               parts=s.split()
+               item["header"]=parts[1] if len(parts)>1 else "UNKNOWN"
+               if item["header"].lower() in ("x-real-ip","x-forwarded-for","x-forwarded-proto","host","connection"):item["value"]=" ".join(parts[2:])
+               else:item["value"]="REDACTED"
+              elif key in ("real_ip_header","set_real_ip_from","real_ip_recursive","allow","deny","proxy_next_upstream","proxy_ssl_verify","proxy_ssl_name"):item["value"]=s[len(key):].strip()
+              else:item["value"]="REDACTED"
+              items.append(item)
+            report["nginx"].append({"path":str(p),"sha256":hashlib.sha256(data).hexdigest(),"security_directives":items})
+           except (OSError,UnicodeError):report["gaps"].append("CONFIG_UNREADABLE:"+str(p))
+          routes=[("/p/","/p/pr122-nonexistent-readonly"),("/submit/douyin","/submit/douyin"),("/submit/tiktok","/submit/tiktok"),("/integrations/douyin/oauth/callback","/integrations/douyin/oauth/callback"),("/integrations/tiktok/oauth/start","/integrations/tiktok/oauth/start"),("/integrations/tiktok/oauth/callback","/integrations/tiktok/oauth/callback"),("/integrations/tiktok/status","/integrations/tiktok/status"),("/integrations/tiktok/disconnect","/integrations/tiktok/disconnect"),("/healthz","/healthz"),("/telegram-webhook/","/telegram-webhook/pr122-nonexistent-readonly"),("/telegram-canary/status","/telegram-canary/status")]
+          ctx=ssl.create_default_context()
+          def probe(path,variant):
+           raw=socket.create_connection((ip,443),timeout=5);tls=ctx.wrap_socket(raw,server_hostname=domain)
+           c=http.client.HTTPConnection(domain,timeout=5);c.sock=tls
+           try:
+            headers={"Host":domain,"Connection":"close"}
+            if variant=="spoofed_source":headers.update({"X-Real-IP":"192.0.2.123","X-Forwarded-For":"192.0.2.123","X-Forwarded-Proto":"http","Origin":"https://invalid.example"})
+            c.request("HEAD",path,headers=headers);r=c.getresponse()
+            return {"variant":variant,"method":"HEAD","status":r.status,"tls_verified":True,"location_present":bool(r.getheader("Location")),"set_cookie_present":bool(r.getheader("Set-Cookie"))}
            finally:c.close()
-          sitemap=root/"sitemap.xml"
-          paths=set(("/", "/yunhui.css","/yunhui.js","/sitemap.xml","/robots.txt","/assets/tiktok-integration.js","/search"))
-          if sitemap.is_file():
-           tree=ET.fromstring(sitemap.read_bytes());locs=[n.text for n in tree.iter() if n.tag.rsplit("}",1)[-1]=="loc" and n.text]
-           report["sitemap_loc_count"]=len(locs)
-           for u in locs:
-            v=urlsplit(u)
-            if v.hostname==domain and not v.query and not v.fragment:paths.add(v.path or "/")
-          assert len(paths)<=1800
-          blocked=("/p/","/submit/","/telegram-webhook/","/telegram-canary/","/healthz")
-          def local(path):
-           clean=unquote(path)
-           if not clean.startswith("/") or ".." in clean.split("/"):return None
-           if clean.startswith(blocked) or "/oauth/" in clean or clean.endswith(("/status","/disconnect")):return None
-           rel=clean.lstrip("/")
-           candidates=[root/"index.html"] if path=="/" else [root/rel,root/(rel+".html"),root/rel/"index.html"]
-           for p in candidates:
-            if p.is_file() and not p.is_symlink():return p
-           return None
-          selected=[]
-          for path in sorted(paths):
-           p=local(path)
-           if p: selected.append((path,hashlib.sha256(p.read_bytes()).hexdigest()))
-           else: report["errors"].append({"path":path,"reason":"NO_APPROVED_STATIC_LOCAL_TARGET"})
-          def check(item):
-           path,expected=item
-           if time.monotonic()-started>95:return {"path":path,"pass":False,"reason":"DEADLINE"}
-           try:
-            status,body,headers=get(path)
-            return {"path":path,"status":status,"sha256":hashlib.sha256(body).hexdigest(),"expected_sha256":expected,"headers":headers,"pass":status==200 and hashlib.sha256(body).hexdigest()==expected}
-           except Exception as e:return {"path":path,"pass":False,"reason":type(e).__name__}
-          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:report["routes"]=list(pool.map(check,selected))
-          report["static_checked"]=len(report["routes"]);report["static_pass"]=sum(x["pass"] for x in report["routes"])
-          for target in ("47.101.152.210","47.245.53.152"):
-           try:
-            status,body,headers=get("/",target);report.setdefault("cross_origin_home",[]).append({"ip":target,"status":status,"sha256":hashlib.sha256(body).hexdigest(),"tls_verify":True})
-           except Exception as e:report["errors"].append({"ip":target,"reason":type(e).__name__})
-          # Existing health endpoint GET only; no OAuth, submissions, customer messages or credentials.
-          try:
-           status,body,headers=get("/healthz");report["health_status"]=status;report["health_body_sha256"]=hashlib.sha256(body).hexdigest()
-          except Exception as e:report["health_error"]=type(e).__name__
-          report["elapsed_seconds"]=round(time.monotonic()-started,2)
-          report["status"]="STATIC_GET_PASS" if report["static_checked"] and report["static_checked"]==report["static_pass"] and not report["errors"] else "HOLD"
-          print(json.dumps(report,sort_keys=True))
+          for responsibility,path in routes:
+           item={"responsibility":responsibility,"path":path,"checks":[],"business_write":"NOT_TESTED","oauth_get":"NOT_TESTED","authorization_contract":"NOT_ESTABLISHED_BY_HEAD"}
+           for variant in ("baseline","spoofed_source"):
+            try:item["checks"].append(probe(path,variant))
+            except Exception as e:item["checks"].append({"variant":variant,"error":type(e).__name__})
+           report["dynamic"].append(item)
+          report["dns_addresses"]=sorted(set(x[4][0] for x in socket.getaddrinfo(domain,443,type=socket.SOCK_STREAM)))
+          dig=shutil.which("dig")
+          if dig:
+           report["public_dns"]={}
+           for kind in ("A","AAAA","NS","SOA"):
+            try:
+             r=subprocess.run([dig,"+time=3","+tries=1","+noall","+answer",domain,kind],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=5)
+             report["public_dns"][kind]=r.stdout[:5000]
+            except Exception as e:report["gaps"].append("DNS_"+kind+":"+type(e).__name__)
+          else:report["gaps"].append("DIG_UNAVAILABLE_CONFIGURED_DNS_TTL_UNKNOWN")
+          report["gaps"]+=["DNS_PROVIDER_PROXY_AND_EXACT_ROLLBACK_NOT_VERIFIED","CLOUD_WAF_AND_PERIPHERAL_IP_DEPENDENCIES_NOT_VERIFIED","HEAD_DOES_NOT_ESTABLISH_GET_POST_AUTHORIZATION","OWNER_IP_AUDIT_DIFFERENCE_ACCEPTANCE_NOT_GRANTED"]
+          print("PR122_BOUNDARY_RECEIPT="+json.dumps(report,sort_keys=True))
+          
           PY
