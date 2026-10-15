@@ -181,4 +181,22 @@ class Phase2Nodes(unittest.TestCase):
     with self.assertRaises(PermissionError):
         self.call("owner_approve_offer",{"offer_id":"sku","version":1,
          "approval_ref":"approved","cost_evidence_ref":"evidence"},self.admin)
+ def test_39_finance_handoff_rejects_unsafe_integer_amount(self):
+    from unittest.mock import patch
+    from scripts.community_saas_offline_handoff import plan_finance_claim
+    fake={"quote_id":"q1","quote_sha256":"a"*64,"currency":"CNY",
+          "amounts_by_cycle_minor":{"MONTH":9007199254740992}}
+    with patch("scripts.community_saas_offline_handoff.quote_provenance",return_value={}):
+        with patch("scripts.community_saas_offline_handoff.read",return_value=fake):
+            with self.assertRaisesRegex(ValueError,"UNSETTLEABLE_AMOUNT"):
+                plan_finance_claim(self.o,"order1","tenantA")
+ def test_40_finance_handoff_rejects_boolean_amount(self):
+    from unittest.mock import patch
+    from scripts.community_saas_offline_handoff import plan_finance_claim
+    fake={"quote_id":"q1","quote_sha256":"a"*64,"currency":"CNY",
+          "amounts_by_cycle_minor":{"MONTH":True}}
+    with patch("scripts.community_saas_offline_handoff.quote_provenance",return_value={}):
+        with patch("scripts.community_saas_offline_handoff.read",return_value=fake):
+            with self.assertRaisesRegex(ValueError,"UNSETTLEABLE_AMOUNT"):
+                plan_finance_claim(self.o,"order1","tenantA")
 if __name__=="__main__":unittest.main()
