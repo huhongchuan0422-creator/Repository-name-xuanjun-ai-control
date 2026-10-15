@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS saas_offer_approvals(
  cost_evidence_ref TEXT NOT NULL,approved_at INTEGER NOT NULL,
  PRIMARY KEY(offer_id,version),
  FOREIGN KEY(offer_id,version) REFERENCES saas_offer_versions(offer_id,version));
+CREATE TRIGGER saas_offer_lines_approved_no_insert BEFORE INSERT ON saas_offer_lines
+WHEN EXISTS(SELECT 1 FROM saas_offer_approvals WHERE offer_id=NEW.offer_id AND version=NEW.version)
+BEGIN SELECT RAISE(ABORT,'APPROVED_OFFER_FROZEN'); END;
 CREATE TRIGGER saas_offer_approvals_no_replace BEFORE INSERT ON saas_offer_approvals
 WHEN EXISTS(SELECT 1 FROM saas_offer_approvals WHERE offer_id=NEW.offer_id AND version=NEW.version)
 BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
