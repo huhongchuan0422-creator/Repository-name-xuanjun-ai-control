@@ -1,0 +1,14 @@
+{
+  "candidate_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+  "files": {
+    ".github/workflows/v27-four-server-batch-readonly.yml": "91ffb8c0eab276202d59f89f57a2d20fe0a5c747680cd0d6b862709043b8767b",
+    "deploy/pr122-portal-log-fix/README.md": "9c22f527a456b389a4048b78a6f8882d790165571d8a56af2bad02f71cc75622",
+    "deploy/pr122-portal-log-fix/portal-log-message.patch": "e38f17b752f895fca314c566ecdd6bb32ba18f53c6d630d41e9bdb4e7f8db0b1",
+    "scripts/pr122_legacy_portal_log_fix.py": "b757a1b191445e7ef57322b05bde8b63ed8392be78abfda92762f4e879da3378",
+    "tests/test_legacy_portal_logging_regression.py": "463080b0316ac541627da6ebad480311abb20a78f9d56bdd9a03143ace95f364"
+  },
+  "independent_review": "PENDING",
+  "production_execution": "NOT_EXECUTED",
+  "schema_version": 1,
+  "source_sha256": "528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006"
+}

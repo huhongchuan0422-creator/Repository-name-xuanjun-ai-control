@@ -72,45 +72,49 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  renewal-timer-observation:
+  legacy-portal-log-regression:
     if: github.event_name == 'push'
-    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
-    timeout-minutes: 2
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 3
     steps:
-      - name: Read first scheduled renewal result without starting any service
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Exact live source and isolated regression only
+        env:
+          PR122_PORTAL_SOURCE: /opt/trading-system/scripts/secure_secrets_portal_server.py
         run: |
+          python3 -B -m unittest discover -s tests -p test_legacy_portal_logging_regression.py -v
           python3 -B - <<'PY'
-          import os,json,subprocess,hashlib,stat,ssl,socket
+          import ast,hashlib,json,os
           from pathlib import Path
-          assert os.uname().nodename=="iZvt5t8tlrm8oiZ"
-          r={"host":os.uname().nodename,"commit":os.environ["GITHUB_SHA"],"production_mutation":False,"manual_renewal":False,"reload":False,"dns_change":False,"units":{},"installed_files":[]}
-          for name,properties in (
-           ("xuanjun-apex-cert-renew.timer",["Id","LoadState","ActiveState","SubState","UnitFileState","LastTriggerUSec","NextElapseUSecRealtime","Triggers"]),
-           ("xuanjun-apex-cert-renew.service",["Id","LoadState","ActiveState","SubState","Result","ExecMainCode","ExecMainStatus","ExecMainStartTimestamp","ExecMainExitTimestamp","InvocationID"])):
-           cmd=["systemctl","show",name,"--no-pager"]
-           for key in properties:cmd.extend(["-p",key])
-           p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=10)
-           r["units"][name]={"exit":p.returncode,"properties":dict(x.split("=",1) for x in p.stdout.splitlines() if "=" in x)}
-          for raw in ("/usr/local/libexec/xuanjun-apex-cert-renew","/usr/local/libexec/xuanjun-apex-nginx-deploy-hook","/etc/systemd/system/xuanjun-apex-cert-renew.service","/etc/systemd/system/xuanjun-apex-cert-renew.timer"):
-           p=Path(raw);item={"path":raw}
-           try:
-            s=p.lstat();item.update({"uid":s.st_uid,"gid":s.st_gid,"mode":oct(stat.S_IMODE(s.st_mode)),"symlink":stat.S_ISLNK(s.st_mode)})
-            if stat.S_ISREG(s.st_mode):item["sha256"]=hashlib.sha256(p.read_bytes()).hexdigest()
-           except Exception as e:item["error"]=type(e).__name__
-           r["installed_files"].append(item)
-          try:
-           with socket.create_connection(("47.101.152.210",443),timeout=6) as raw:
-            with ssl.create_default_context().wrap_socket(raw,server_hostname="wenwenwenyiyiyi.work") as tls:
-             cert=tls.getpeercert()
-             r["tls"]={"verified":True,"serial":cert.get("serialNumber"),"notBefore":cert.get("notBefore"),"notAfter":cert.get("notAfter"),"san":cert.get("subjectAltName")}
-          except Exception as e:r["tls"]={"error":type(e).__name__}
-          timer=r["units"]["xuanjun-apex-cert-renew.timer"]["properties"]
-          service=r["units"]["xuanjun-apex-cert-renew.service"]["properties"]
-          trigger=timer.get("LastTriggerUSec","")
-          started=service.get("ExecMainStartTimestamp","")
-          r["first_automatic_service_observation"]="SUCCESS" if trigger and started and service.get("Result")=="success" and service.get("ExecMainStatus")=="0" else "NOT_ESTABLISHED"
-          r["actual_certificate_renewal"]="NOT_ESTABLISHED_SERVICE_SUCCESS_MAY_MEAN_NOT_DUE"
-          r["dns_release"]="HOLD"
-          print("PR122_RENEWAL_TIMER_RECEIPT="+json.dumps(r,sort_keys=True))
-          
+          from scripts.pr122_legacy_portal_log_fix import build_candidate
+          root=Path("deploy/pr122-portal-log-fix")
+          binding=json.loads((root/"REVIEW_BINDING.json").read_text())
+          for name,digest in binding["files"].items():
+              assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==digest,name
+          source=Path(os.environ["PR122_PORTAL_SOURCE"]).read_bytes()
+          candidate=build_candidate(source)
+          assert hashlib.sha256(candidate).hexdigest()==binding["candidate_sha256"]
+          ast.parse(candidate)
+          print("PR122_LOG_FIX_RECEIPT="+json.dumps({
+              "commit":os.environ["GITHUB_SHA"],"host":os.uname().nodename,
+              "source_sha256":hashlib.sha256(source).hexdigest(),
+              "candidate_sha256":hashlib.sha256(candidate).hexdigest(),
+              "tests":16,"result":"PASS_ISOLATED_ONLY",
+              "production_imports":False,"production_source_write":False,
+              "service_restart":False,"dns_change":False,
+              "production_release":"HOLD"},sort_keys=True))
           PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-legacy-portal-log-fix-${{ github.sha }}
+          path: |
+            deploy/pr122-portal-log-fix/
+            scripts/pr122_legacy_portal_log_fix.py
+            tests/test_legacy_portal_logging_regression.py
+            .github/workflows/v27-four-server-batch-readonly.yml
+          if-no-files-found: error
+          retention-days: 14
+
