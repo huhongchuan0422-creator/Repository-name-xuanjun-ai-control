@@ -134,4 +134,29 @@ class Phase2Nodes(unittest.TestCase):
     self.ordered()
     with self.assertRaisesRegex(ValueError,"INVALID_REFUND_REASON"):
         self.call("refund_reversal_plan",{"order_id":"order1","reason":""},self.admin)
+ def test_31_owner_create_version(self):
+    owner=Principal("tenantA","PLATFORM_OWNER")
+    record=self.call("owner_create_offer",{"offer_id":"sku2","version":1,
+        "module_id":"storefront_catalog","kind":"MONTHLY",
+        "lines":[line()],"term_days":30,"tenant_scope":"tenantA",
+        "supplier_payment":"NONE"},owner)
+    self.assertTrue(record["requires_separate_approval"])
+    self.assertFalse(record["payment_authorized"])
+ def test_32_owner_approve_creates_immutable_evidence(self):
+    self.test_31_owner_create_version()
+    owner=Principal("tenantA","PLATFORM_OWNER")
+    record=self.call("owner_approve_offer",{"offer_id":"sku2","version":1,
+      "approval_ref":"approved","cost_evidence_ref":"evidence"},owner)
+    self.assertTrue(record["approved"])
+    self.assertFalse(record["production_release_authorized"])
+ def test_33_customer_cannot_create_offer(self):
+    with self.assertRaises(PermissionError):
+        self.call("owner_create_offer",{"offer_id":"bad","version":1,
+            "module_id":"storefront_catalog","kind":"MONTHLY",
+            "lines":[line()],"term_days":30,"tenant_scope":None,
+            "supplier_payment":"NONE"})
+ def test_34_merchant_cannot_approve_prices(self):
+    with self.assertRaises(PermissionError):
+        self.call("owner_approve_offer",{"offer_id":"sku","version":1,
+         "approval_ref":"approved","cost_evidence_ref":"evidence"},self.admin)
 if __name__=="__main__":unittest.main()
