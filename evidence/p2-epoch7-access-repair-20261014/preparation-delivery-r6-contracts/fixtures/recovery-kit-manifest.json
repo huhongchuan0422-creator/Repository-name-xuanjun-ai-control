@@ -1,0 +1,888 @@
+{
+  "epoch": 7,
+  "files": {
+    "epoch7_recovery_entry.py": "c56ba6d8281eeb1ecc062875a7f13defc223f6d5dd073a4490d1602b8cf1d3a5",
+    "helpers/epoch3_service_containment.py": "d313933e65a82712157d5b3bd4eeec77c3398e4e57479a8c2191d7e9759bd53c",
+    "helpers/epoch7_acceptance_rows.py": "a622d16ac99801f709a2ae95f17802a20dd350c0f8c07764efa74b6b43f1243c",
+    "helpers/epoch7_additive_identity.py": "9acaa960cba0211095982792662479ac0faa9697009b2756e01408458317836a",
+    "helpers/epoch7_additive_server.py": "17f3cff1a961c4ac78c1b3c57aa77e77255d0d69b7860be6c0a2e2350f0231a3",
+    "helpers/epoch7_approval.py": "cdd5f74df796c3b858720f9173973df3d0dd45ed1b7cef50b2cc861bdf4d70ac",
+    "helpers/epoch7_bindings.py": "55bf7955aea9a051996f2c44ff8660a2a770ba832e63412aeab0531e8260fe36",
+    "helpers/epoch7_bounded_stager.py": "e95efe37fd10d6bb5cd431306e23af90cd74274ce5b106ccf732f9e1f650a99b",
+    "helpers/epoch7_command_runner.py": "bb1f01daffb6f8324c193f688b2fc2ec6a9bf1f8828ec7d55e1f8fe890275c24",
+    "helpers/epoch7_complete_approval.py": "45ae82ee6e4efba300d8ee97674d61c77a5c4695555806a69fc4c6dc133a7f95",
+    "helpers/epoch7_delta.py": "f181a652d240c1678ffcd7f85de89d5cf3e101d894d82e7127a4177f719e9ad7",
+    "helpers/epoch7_exact_access.py": "b79415e92c22f7c9c4dea0417ef1aaed0ce805c2627b5aeae0c3d2d5e83dd065",
+    "helpers/epoch7_host_containment.py": "738af2b9ad46d941b00504a57874c8f97cd83621e8067628d8d40f1047021233",
+    "helpers/epoch7_host_driver.py": "fddbdbc389d220871ab090c0b798960c34924275cc6eb32a52afc51646d5f244",
+    "helpers/epoch7_host_factory.py": "9b8e5a60f16d41934fc77c655797aba0f42f1de39b8a1def3e31df90745d3450",
+    "helpers/epoch7_host_observer.py": "4723ab0610c94b8f6b3a399ae3f8c8f16bc2a7a81c8ea4ec01d4359a23860b05",
+    "helpers/epoch7_host_phases.py": "d90bfaa54177614d327a3ab4ac8aee65595ef77000cb583ce7d800141c2c335b",
+    "helpers/epoch7_injected_recovery.py": "0578a42495956e6034f7942e8fd06d0d8f2f20e3ab4c0d98fca5bebf208586b6",
+    "helpers/epoch7_live_controls.py": "0673b8788153e3c47e6a49ea271891790415bbbcb66e9940190127b0df5b0a13",
+    "helpers/epoch7_nginx_recipe.py": "26f6847d1b729872ec06fd8e92ef7deb43605ea4ba405e412e239c29ad438ce4",
+    "helpers/epoch7_openclaw_recipe.py": "1ea1b8d136ddc8d3ee46d4afd37ef0daf50dd2a3be3f905ebb471562823822a3",
+    "helpers/epoch7_owner_prerequisite.py": "f46b42039019a34cd3c5f61a7868a1cd7483c117f9d6f423c37f4d0d84a6cdc9",
+    "helpers/epoch7_pre_active_guards.py": "2932434405bec02320e58e4589700386a3c66615dee1a319cf395662bb609a4f",
+    "helpers/epoch7_protected_fs.py": "3ff6fefe53befe09cad3452ebdaf48b3f3a793a84167ac87649ceb3337457f24",
+    "helpers/epoch7_python_identity.py": "f78f24aea096a2674c4e6db42ff4b87a0f3c8b0042bf362f3e16f610945e4260",
+    "helpers/epoch7_quiet_startup.py": "e0372ccd301208c4dbd2be6dc8e8b363d71a2b9e78744ca02748084879b0cc49",
+    "helpers/epoch7_recovery_sequence.py": "5be0e0e1c904aecbda7e5afb90485449b38b142040365dcdb68ef18fe32e450d",
+    "helpers/epoch7_resource_observer.py": "756497e46ece02b9707259255e9ee5595bdd5f18380f115fff7fa67722d313d9",
+    "helpers/epoch7_resource_plan.py": "a1d5455da9acbfd08e446eda68e6eb82637d93000e82f0d5c58b364ad9dde79a",
+    "helpers/epoch7_runtime_acceptance.py": "64a9c7ca8a9724d7ba292555bed1c6cc4329638759ed47da0112d849583a38db",
+    "helpers/epoch7_runtime_effects.py": "f7ce4159a6f376542dfd5446b1db323975f8007b870b59abc442ab2852ee26f0",
+    "helpers/epoch7_service_contract.py": "97c00c4eb12b5c308931f64b456b0e29d1f3996b275b88092d7f163916a8f907",
+    "helpers/epoch7_service_roles.py": "8de0632dac04730d88b67daca31c1fb4b12d395b7487051fe05d951780593b4d",
+    "helpers/epoch7_snapshot.py": "eec8386ebc77d85d24cb5a148b298f82580930f1393120ed1eed6519e5137be2",
+    "helpers/epoch7_timer_tail.py": "c364fd2141be26a0a1a8880dff502677ae4f42e06e8d12161586c2a8aeb52981",
+    "helpers/epoch7_unit_transitions.py": "b38d070fb2575af250c3d10a45e01bc9994763f3438451ba9ac7550bc273a9c4",
+    "helpers/exact_access_plan.py": "a31d7d736c39d7b9d95a50031f4e935f4f7918f629ff7a2ff69b86f09b10dcfc",
+    "helpers/node_sqlite_probe.py": "c2f580021c36e72574e3a67201c90a9fc09f22ee7ede396650dc970757151f7a",
+    "helpers/observe_epoch7.py": "ef61d1f059e024d7cb9c78802644ee511997620a7056289185dcd2b3ee00cc70",
+    "helpers/openclaw_metadata.py": "5afd22f3651accede90e254df96f21c2306e2cf973243abba24a457995ee1d1e",
+    "helpers/probe_driver.py": "90f203a4aafe591fa508a444847557b8115df79bbad4e4096bd1cc371a935dbd",
+    "helpers/probe_helpers.py": "0b62410b57193eb7ce984f5002bf71e1c31242e37e58f6296ad74da247cc1468",
+    "helpers/probe_metadata.py": "af2c1c88b9f47971919cbe6eecb03d8adfa760de7f30c7de0b6be0dca540a025",
+    "helpers/protected_command_evidence.py": "9d8f984d7ec7ffbd348c3eb40b870b1877f546c5388392db04f262c710e910a7",
+    "helpers/reviewed_database.py": "a418418717442f70cc35531b4da4a0de49ceeb098227a7a3e9729ff3895c8526",
+    "helpers/reviewed_publisher.py": "98768d5b2dbbe4e7f4a9b90a43f7ff4bec3e2fc03f138a58273ccf6e79da9f22",
+    "helpers/reviewed_scanner.py": "0ecc82bc12b3180b48b316457f6543e0c965d859453b5c3a99a980e20bd3153b",
+    "helpers/reviewed_sources.json": "ecc397a0469dca6b83266dd232a7866f3dc845ed5d37f26e9d098091396798ec",
+    "helpers/snapshot_io.py": "8ff9c0569642d602ac9bdde58f03c1e7d0075d66a4927c595d9ee5b3982f1420",
+    "helpers/unit_metadata.py": "cbb1e9b9abab583d19a6dc0c91fcc8a37912ae1b259fa02770cb281d489d42e3",
+    "tests/acceptance_rows/test_epoch7_acceptance_rows.py": "6579ddb45a6499d0bc098402657e3a0a8bc4c6b20024f870bb6e2fed62c6e41e",
+    "tests/access_plan/test_exact_access_plan.py": "4c43f963f9b0c7009494aea3ceb072b947b4f251979d5562cb05685de3044eff",
+    "tests/approval/test_epoch7_approval.py": "7126672b9cc8046a784c2a49c50c9c14c5869dfcbc359674088efda757e6295f",
+    "tests/approval/test_epoch7_bounded_fetch.py": "8c7b157ef839fceb52c9fdd7ab69e8308f45722f5372fbc2204c094a247134a8",
+    "tests/approval/test_epoch7_complete_approval.py": "3900a89acd5f9834c8345fb5ab01020d1e2f02ad5bab12900ceb5c8c7382049e",
+    "tests/command/test_epoch7_command_runner.py": "738e0c216d5b51a72d9b1efcb806efd465b22ab0b8dec3d4f520281140e3e1ed",
+    "tests/diagnostics/test_protected_command_evidence.py": "68d6d9a3a6921d81f134a5cb16d4ceb36aa7fceb833244ab974d70ae4177af56",
+    "tests/host_containment/test_epoch7_host_containment.py": "2a145c15c107f598f7ee6b0b8ca57af73de1793105332c349e02227a6c4635db",
+    "tests/host_factory/test_epoch7_full_factory.py": "1dcf5e7bfbfe8f20b180af090f374344bab2b23e4f5f9f60344717e260670e77",
+    "tests/host_factory/test_epoch7_full_factory_fixture.py": "68e6ee980776634f0decdae0e168a83868e9b0f207103627a5df9ad8c6898ff2",
+    "tests/host_factory/test_epoch7_host_factory.py": "c08b588c08b975560946131a9627916d36d8c92c5b2b3d552b4d77cfd72cae90",
+    "tests/host_factory/test_epoch7_timer_tail.py": "192f40f20f23dc53b61684fbe8a8618af9c2fc757d60a341e8fd9cdacaf21028",
+    "tests/host_factory/test_epoch7_unit_types.py": "451fec393b7363a9136ad49c27987b462de5922682c033089447a5a185eff0cc",
+    "tests/host_factory/test_native_sidefile_transition.py": "2d96b0f19da9a52f158d28c113795ecf00cd58f67206ef2fc8de66e8deab3891",
+    "tests/host_filesystem/test_epoch7_activation_store.py": "03ebd1d6b180ba8b47ded813c91fc75dcebe2732eddecc9750c5073ef26e0efb",
+    "tests/host_filesystem/test_epoch7_exact_access.py": "4e29f0f63c7a7d8d67d29cd1a2db6a1a51d1011041b3ea23393e2a1f7dbecf80",
+    "tests/host_filesystem/test_epoch7_host_phases.py": "e85b6bdd87a5c48fb052fe72cb22c91c28ec042e46f46bee9f02534af85a8438",
+    "tests/host_observer/test_epoch7_host_observer.py": "15f43cd13f13094d416decc95bd8e3ed28f3077b262c78cc593d5bbb3e99f150",
+    "tests/host_observer/test_epoch7_quiet_startup.py": "5b64e47eb9cad68f434384c9d15759413c9e87e4acfd4b1cebf6e376301bb841",
+    "tests/host_observer/test_epoch7_resource_observer.py": "f63b418a6490f88e1bf35f3cfe70d440f4eefae7d74ff7c900936ea8f12259a6",
+    "tests/host_stager/test_epoch7_bounded_stager.py": "5a89ac85a0a9696bc55a3dd06f01f35435909ba05dd067fd8fbcdb5c7633ad47",
+    "tests/live_controls/test_epoch7_live_controls.py": "2bc698ee53f20f698bc7aecb84074a682d0561ff64c36b759baf622c80eff5e0",
+    "tests/live_controls/test_epoch7_observer_binding.py": "b3bb4cabca05d27b75b0f961ff61458fa679322bf2293bf05314d883b857603b",
+    "tests/live_controls/test_epoch7_service_roles.py": "58a180cfcb0e13fa4a3eabb6256641fe60ce18b1f4c4027dcfc078f4ea4996ff",
+    "tests/live_controls/test_epoch7_unit_transitions.py": "3343ba9e3426b37e26fe271421624afaefc5e21fd6c2e5351ab381f208b6d702",
+    "tests/owner_prerequisite/test_epoch7_owner_prerequisite.py": "d7cd0316a4112eab0db700fdc14a29aec8dffbcbbbfc317961cabb7317c1c4f1",
+    "tests/package_builder/test_build_runtime_overlay.py": "924784bb4b698c061a25945e839b98ce5f59c9e83bc415f93b8f81e9ccdff897",
+    "tests/plan/test_current_overlay_binding_smoke.py": "1b89bd0dceb31d9e9c13c97f47b16451d0028b279c01b586717b71dfea997b5f",
+    "tests/plan/test_epoch7_bindings.py": "39bde1549f019ae0ff7ba019232ef9d2a1a55f6732a56166d43280446f313d28",
+    "tests/probe/test_node_sqlite_probe.py": "4f9cc1fa12ad21b7a2ff3341c1872e376e62c2612336a7d06b35342a9a5e8834",
+    "tests/probe/test_probe_child_cleanup.py": "a2a3945be4a8660988fbe54ddccfd2dc1a2767c06c84c0822ebb95f7324d5a69",
+    "tests/probe/test_probe_driver.py": "05f8aab39378a2fb4291ddc0b6a7793c4e33b98837c3b3481b255e486b629932",
+    "tests/probe/test_probe_helpers.py": "84e3f25931b958199cb27f7869194cc444e9895a37417b626c05ad6382bb8c67",
+    "tests/probe/test_probe_python_identity.py": "55dd7750dabc4b6fd3d1c6ca0120578038f1e1985c9812198fdb01850ee74245",
+    "tests/recovery/test_epoch7_additive_identity.py": "4d9a2b63e30cd11ebc59f9a9680e3bdefe998e093b0224b080e17eca572e0553",
+    "tests/recovery/test_epoch7_additive_server.py": "85ea2d1997ad9f024f1939a06179d681d2d52408d77648794d3f504205377d56",
+    "tests/recovery/test_epoch7_delta.py": "645ca391dcf82576e9cc635cc4685f5ef0c21b17e14d01df027b80dd2a2e1a9b",
+    "tests/recovery/test_epoch7_injected_recovery.py": "9e315de9390968a15b11917d8bcbc456b3e7a5b39649a3b2a63134eab4ab77e8",
+    "tests/recovery/test_epoch7_phase_steps.py": "aa1dffcea4afb4fc1e3051a00590bacb20d83b7978472ebcb4cef0b1518fc532",
+    "tests/recovery_filesystem/test_epoch7_protected_fs.py": "6d301d0da2339995349d5aa3ff4b71e1941a786899324041f13ae5263e300241",
+    "tests/resource_plan/test_epoch7_node_resource.py": "38d455c0d047949e5dbdd726797eb602bcf289af7a1fde2a677f5b32436583dd",
+    "tests/resource_plan/test_epoch7_python_resource.py": "ae660bb2b300b941014d7b9898b0daa89a3a49ba1697a71b0a5a4968ab988166",
+    "tests/resource_plan/test_epoch7_resource_plan.py": "1b5fc32afba4d0094a2b9e6917ba16ca1ee42af9b5887941f64cc4b10dabc95d",
+    "tests/runtime_acceptance/test_epoch7_runtime_acceptance.py": "d471e55ec9687e197ba68d22a8830d7f6822d6d7f05dc8819d81a54f570053cd",
+    "tests/runtime_effects/test_epoch7_runtime_effects.py": "4d622411c110b1ae77773c049bab91ca841b7e48c4e9f3394824e29c1d3f39c9",
+    "tests/runtime_identity/test_native_peer_identity.py": "d3e24dcfd12346febe707a9bef859ad15570ced96739046f5626ecb405709f1f",
+    "tests/runtime_identity/test_owner_process_identity.py": "4b993fada34df90f2183e1daa368f05018c933ed75249872fee98ee534821c3b",
+    "tests/runtime_process/test_gateway_command_lifetime.py": "9542da5cf59a9e841d8e7f4ed7029c2778c1e4f48c57c387586118ee8bf7bdaa",
+    "tests/runtime_process/test_runtime_command_lifetime.py": "73b20f4fa16d28496cea806afade8d8497e4e8ef9ad5dd212bb3deb093a55b55",
+    "tests/runtime_projection/test_entrypoint_help.py": "3db348155345e37fd330ae518cdd7f974ecf75310afaf9752169b31f71ae28d8",
+    "tests/runtime_projection/test_ledger_read_client.py": "fc4007b223a22fa7ee8827e22b161033ff64e271e3444913be168f0430bedc96",
+    "tests/runtime_projection/test_ledger_read_projection.py": "d4a017586f3305e405d58f6a68de2b737395ed1cfc7d7cb37d7c7e3cf4179242",
+    "tests/runtime_projection/test_ledger_server_identity.py": "5dadbd6e8d72747c21ae80b5acccb27d9318a3b74b57eee1b19e04b88dd1528a",
+    "tests/runtime_projection/test_native_server_identity.py": "22ea198037867fbd3ed0013f01f07725e1e0f0b187e2ecff789cd91f244c7708",
+    "tests/runtime_projection/test_owner_process_gate.py": "13625ac739efe6512ed97e6641c11ff7b31e11606b53fc84f0007b2db0d88d6c",
+    "tests/runtime_projection/test_read_integration.py": "8d7d2b3f0cf780bf840fa30fa6a4f2f6bb2c38b30fd80f69fc5a18cf5579d5ee",
+    "tests/runtime_projection/test_read_transport.py": "ae0a3342858dd91d6801c425186bddbb98fb9f6f468c7ee9eb5f5d73b452fb7c",
+    "tests/runtime_wiring/test_ledger_identity_wiring.py": "5e1edd471e5f5f2957893dd2df83710164ba6bf5a5f8004295094480ea642324",
+    "tests/runtime_wiring/test_service_preflight_ack.py": "6ca53208dc9742715c5b0afc4430673c465b507be41cac4312fb158c58caa92d",
+    "tests/sequence/test_epoch7_recovery_sequence.py": "74d61a56f4fec33a104aed85d821e6457741b6fc22e81d76b866189be61d1791",
+    "tests/service_contract/fixtures/openclaw-LICENSE.txt": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+    "tests/service_contract/fixtures/openclaw-THIRD_PARTY_NOTICES.md": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+    "tests/service_contract/fixtures/openclaw-direct-source-profile.json": "02bcf5032076139f6e22b11644bd994d977cd2f01087ed347e6e93a930a0a12f",
+    "tests/service_contract/fixtures/openclaw-source-profile.json": "a0f49fdda4e09f5b26e0c7bee5b2608a7b26b5661536b139779e8b5a7e8fb073",
+    "tests/service_contract/fixtures/public-service-units.json": "87e1e2af203ff983914935fc7c4d7588600e1c384f174fbf84ffceae0ad0d1a1",
+    "tests/service_contract/test_epoch7_openclaw_direct.py": "c93b53055531a331b49920f834940ecc497c019f6827812459042177b33469cc",
+    "tests/service_contract/test_epoch7_openclaw_family.py": "7ab2eee6d6a3d3b6574ce5b16947bf7775c8d39a83e60a07d0f2e550f3e5b6cd",
+    "tests/service_contract/test_epoch7_openclaw_recipe.py": "54939840db8eb19b3d9e8012f23d05e84fa5fa21842f4235a387b4bfc9d21745",
+    "tests/service_contract/test_epoch7_openclaw_roles.py": "62ac95237c4e5d240f1b7e8daaf0fdb606c4f4b8d78a2f8eec827aa480221ccd",
+    "tests/service_contract/test_epoch7_service_contract.py": "a1e1324efa071c8228324fb6652ce44e7af6529fb2cd61ae1539752dfd6f07f9",
+    "tests/snapshot/test_snapshot.py": "137dc6c85174c984150d3ff4782c171fe20584653f0aac2435b1d49ade975290",
+    "tests/snapshot_portable/test_boot_background.py": "0c5a7926d717812efee41091d065bb2447eec9cd41449cd3a170dc23d24c6cd0",
+    "tests/snapshot_portable/test_control_git.py": "0abee60ec88033ffe833be237f32bc3b3dd68efd7ec28e9706d2ad22aada7174",
+    "tests/snapshot_portable/test_declared_directory_authority.py": "3ac8591ec3571d01f4869299920094cfd608ce1b9d213efaf00fccaabbeb8008",
+    "tests/snapshot_portable/test_native_transition.py": "076d435be5d76018bd8d5cdc5df5f7c9b8f1e107c7c3b63d0c47e64bdd17b503",
+    "tests/snapshot_portable/test_node_directory_alias.py": "23f626ca2575c9cc68d4aa69caf71f21a9a8d1ad012377e9d9b1be4e892312c8",
+    "tests/snapshot_portable/test_openclaw_metadata.py": "fe8bbcb6253c42f4e4bc2013416cafd4796361a456b0017f0c2b47495779eec7",
+    "tests/snapshot_portable/test_path_sources.py": "f67b1c3852086e8081f7db7d457cdbc4728c9b021ddc040bdd347e3cb7c328ad",
+    "tests/snapshot_portable/test_probe_metadata.py": "f0ff7d742b8d888a0b201bd5c013e9535e3a27d3d0c6c7f31cad9fcb59b24a5b",
+    "tests/snapshot_portable/test_python_identity.py": "476918463363f51266c02c46effa3f7b2787a6a8c135c3b24244ff55767fd4a7",
+    "tests/snapshot_portable/test_python_pair_adapters.py": "e16c910dbfd24a299bea43505afb9e70086d5aaff9afc19b676eaefddb98a4d5",
+    "tests/snapshot_portable/test_query_lifetime.py": "b560f71a0fc7992811563905ad342e7b9e6ab008b22be5564d8cf09739d70b60",
+    "tests/snapshot_portable/test_snapshot_portable.py": "3d2cb2797287465a4cf1e41eb0d9d95e9ee0aa13f21ae39ba897cd474504c735",
+    "tests/snapshot_portable/test_timer_metadata.py": "1bd696faf5a1de8a94c1bccb865626b8e32fda7dfa59beff808e4bb9b88d2deb",
+    "tests/snapshot_portable/test_unit_metadata.py": "17f9632cbc7d047b4b88292ff6f8f18576c4cdb60de25dff04f2bcf1be135c72",
+    "tests/snapshot_portable/test_unit_process_fields.py": "89b2884f97fc5d387d0df4de4e8095e6c32ad7c4620f9634a7524c19c064b329",
+    "tests/snapshot_portable/test_writer_comparison.py": "a5474686381aef8112ffb26aa3ce52e060a11c446b634f19ba4612ba4950efcb",
+    "tests/uk_exact_uid_acl/test_epoch7_exact_access_uk.py": "8984cdc5a77411051fb9c2d9d81aefcd8c662e206c14f25dfa90c349f6512635",
+    "tests/unit_overlay/test_unit_overlay.py": "06384f8ade029a73d8b7e66377b951f56d7f92856c7c26185fec72d35827657e",
+    "xuanjun-p2-package/P2_PACKAGE_PROVENANCE.json": "7e19b0cd641954468c36112a4bdecd36994dd18b3d00d323f7cffaa8241f5e4f",
+    "xuanjun-p2-package/deploy/INTEGRATION_BINDING.md": "fa8518ad5eab07520a92ca1d87ccf788c56ab6550e48112bc1d505e2fa73337a",
+    "xuanjun-p2-package/deploy/UK_DISPATCHER_ROLLOUT.md": "7f8929cf16b4739ac6fbf10b4bedbc1ab406ae04ccdc6d2613747c22bdb1538a",
+    "xuanjun-p2-package/deploy/dispatcher.example.json": "cc449a9fd1dfa47608f32eb4d119b4b384e52ab149919fe7b101ae9291d66bff",
+    "xuanjun-p2-package/deploy/integration-manifest.json": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
+    "xuanjun-p2-package/deploy/p2-gateway-relay.json.template": "c2f2379380f113c2b134a7f5fc2d39e7563872764b55c1041b00192f9da62fca",
+    "xuanjun-p2-package/deploy/p2-native-controller.binding.json.template": "219194a964f8a3eee16d1a10aebddc135a42c43352f8e53df86035f3a102e014",
+    "xuanjun-p2-package/deploy/p2-native-ledger-client.json.template": "298fea0242e60aa7687b588233959a226b5a1f5c875edc2189e984cc1eaf3d8c",
+    "xuanjun-p2-package/deploy/p2-nginx-main.conf": "e9b99ace3444e0eaa5a9cb5c6a975e7bed31bfc3cb3a15d2e54959b3fa9daef4",
+    "xuanjun-p2-package/deploy/p2-nginx.service": "a1d6e0b8cabcfcbec8d834101b70056580135e6a235bb26e293bc904172db545",
+    "xuanjun-p2-package/deploy/p2-owner-feishu-binding.json.template": "95cd62095f49cf9bffe718460948f1756ffc308b4362da6ff29503e15a0e47e0",
+    "xuanjun-p2-package/deploy/p2-tls-renewal.json.template": "0cd294c87173aa8a1b5a5c77335224776ad2a332b48a94e287dae37b231531a6",
+    "xuanjun-p2-package/deploy/root-broker.example.json": "9cc7251fece619ce8a9d1fa99d6f4b22db489e612c3305d5c24a208237530b73",
+    "xuanjun-p2-package/deploy/uk-owner-workbench/README.md": "a22d154a81aa293fff778b456dc4e33c3043ba06a371bd0efe0b812c84da50b2",
+    "xuanjun-p2-package/deploy/uk-owner-workbench/nginx.conf.template": "f72349f30c7c6beb950522967a3ce6a274285d48a12fcb531615ac0f84c410ef",
+    "xuanjun-p2-package/deploy/uk-owner-workbench/xuanjun-uk-owner-callback.service": "844e970413d724bb468d6c701b7195a41f7c02d97018e57cd3e9b60d40469199",
+    "xuanjun-p2-package/deploy/uk-owner-workbench/xuanjun-uk-owner-dashboard.service": "8d44263630358bae7f25851c4145505fecda5f6c5ac35409404806bd9783b5c8",
+    "xuanjun-p2-package/deploy/xj-root-broker.service": "1851dca659e500496703bb8d9af2f2f6d8cc42c2cac0b1a77e2a2dc86668acb5",
+    "xuanjun-p2-package/deploy/xj-root-broker.socket": "b4ffe5842ef3d36d6c42ad10e4c3a09c22ce8d396a6d71bf866e64563df0c952",
+    "xuanjun-p2-package/deploy/xuanjun-development-dispatcher.service": "c92663e6899053a357c85eb89267993c41074428a0ef931b78127770e53ded98",
+    "xuanjun-p2-package/deploy/xuanjun-github-intake.service": "625e70ae319c7086c777a311d59be14b7b340a3b542d479579846f6ce16b417a",
+    "xuanjun-p2-package/deploy/xuanjun-github-intake.timer": "0b82e326abad52faf02efefd1d82fdbe848dca0234d27d3fdad8f07ac3dd0f97",
+    "xuanjun-p2-package/deploy/xuanjun-ledger.service": "88e222e77e21562db41e5bfa729b684033ff11a997279303fe018c1fd259e1fc",
+    "xuanjun-p2-package/deploy/xuanjun-ledger.socket": "a1a3d372706646da2b8954b2162e5dcd7974246b5d4660fe6098b6a699e032dd",
+    "xuanjun-p2-package/deploy/xuanjun-p2-gateway-relay.service": "7f946414e984c7671fcb68fe5cb98ba269ec49653ff9b2c1ed424a2b23095991",
+    "xuanjun-p2-package/deploy/xuanjun-p2-gateway-relay.socket": "a08ac2421421f0d2e003e8ee0de842b17b3562dfeb344ac8b378486c4f7f5034",
+    "xuanjun-p2-package/deploy/xuanjun-p2-tls-renew.service": "df95002081d4f39e788f47049919df959ecf7dcb50172e43facf393cd66b92cf",
+    "xuanjun-p2-package/deploy/xuanjun-p2-tls-renew.timer": "e081274ebad8ee14e1476673eedc13bf829155179e80a992b42b4651164c2fca",
+    "xuanjun-p2-package/deploy/xuanjun-uk-openclaw-p2-docker.conf": "651c3bd98572e441d5c6d9c9a9b97e90ce347922acb9ce5bd62583448dc7bc2b",
+    "xuanjun-p2-package/plugins/p2-native-controller/canonical.mjs": "f3a40e5f90b3abfcd81bc3c5c408011995c3ab32cda72f565f124576d3d0706a",
+    "xuanjun-p2-package/plugins/p2-native-controller/controller.mjs": "a0513740a5c8f1c99bf734494dab14baa8b5b2688c6f8ebdeea7e2c6cb2825b6",
+    "xuanjun-p2-package/plugins/p2-native-controller/host.mjs": "3c9f5d2b4cce041ab6e7bc9a73707b467b30f5e884a450c4bd9b69a4b9c61a46",
+    "xuanjun-p2-package/plugins/p2-native-controller/index.mjs": "c1867c271bc48c6f38be92d29daf2fad5addd457db2468d01f1ef3ae14467286",
+    "xuanjun-p2-package/plugins/p2-native-controller/ledger.mjs": "cd5aed8ef78bcf0e95ee3b35102a7c228078d7425d53d5cee9eb91965bf0fa24",
+    "xuanjun-p2-package/plugins/p2-native-controller/openclaw.plugin.json": "14916ef983942a57ffe6afe5e6bf1bdf8415d2243e2fd23dfed576b62b2d6fb5",
+    "xuanjun-p2-package/plugins/p2-native-controller/package.json": "002645bf81d143cebeb08aab1b0be2d519b8ebc834f398441d8d2450310e2115",
+    "xuanjun-p2-package/plugins/p2-native-controller/plugin.mjs": "1c0af2ce5723a5bfe8a025bb150e26a92e21be2e02b2da054e05456a2ac87bfc",
+    "xuanjun-p2-package/plugins/p2-native-controller/sdk-layout.mjs": "fa747f7bf664c5311ecbddc824387c10b3ac814a004bda0ee04364cb7938ed1e",
+    "xuanjun-p2-package/plugins/p2-native-controller/strict-json.mjs": "ce10a780c983a424f11cb0de37c748eda811efd3fa317b9445ab44bc1dac82fd",
+    "xuanjun-p2-package/plugins/p2-native-controller/workspace.mjs": "ca4b50aa4489087289b8726a10b3751c95f99314043eb5e8e7ddf66fbb1d8311",
+    "xuanjun-p2-package/scripts/uk-integration-install.py": "943f4d04861d8b580008af457d90187622a9de2d1c8cd66c93a721b8ac2be0f3",
+    "xuanjun-p2-package/scripts/uk-owner-workbench-config.py": "af0c64c5c5cf3a12167b8c6a25ef805c57f7a5296bc09c11c3eebf7ea27285ec",
+    "xuanjun-p2-package/scripts/uk-p2-install.py": "ac68b6416bc7c632b121c4fe2f75961e7940da749150cb2aff69c623d7499811",
+    "xuanjun-p2-package/scripts/uk-p2-tls-renew.py": "763566d7b31e2bdec2e03010d60ef06481bbe2e6171ff0cb6d0495f4e56286c2",
+    "xuanjun-p2-package/scripts/xj-root-broker-client": "7d7e71185b072a1beaf598fd0f3cec91989e4e6766c93d81db567771d138c8e2",
+    "xuanjun-p2-package/stage1/activation_control.py": "169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4",
+    "xuanjun-p2-package/stage1/callback_schema_gate.py": "a7e83427ac9fedb7e86c28f9298122e134215317bb996eae8753cfcb3d455271",
+    "xuanjun-p2-package/stage1/codex_app_server_worker.py": "5008cf7f37399f2aa95fdfcd1fcef10c5b9ccc97b6414081236fced074f7baa3",
+    "xuanjun-p2-package/stage1/codex_worker.py": "3973e328ad1e401dca2f104241117e343bc7e9457f329af5428f40836a058646",
+    "xuanjun-p2-package/stage1/dependency_evidence_view.py": "fc4debda2f0d89988ca2677bc8b940b39c9a4f735316fbe38497f6d0cdb9d890",
+    "xuanjun-p2-package/stage1/development_loop.py": "ef92d0a3ba8ce7cbe0236c6a6a8f0b79c610b02a577521982955905f59b61bfb",
+    "xuanjun-p2-package/stage1/development_pipeline.py": "a3314fd071cb78ca7d52a0edc8893428c02acd1774878955189ddd2e1b44272b",
+    "xuanjun-p2-package/stage1/development_service.py": "801cd1e1ed85613976aab7c913cc532702b41f837dfd2e274cc3b49e63c19402",
+    "xuanjun-p2-package/stage1/execution_ledger.py": "8c607f0e2222d906b8450b302dad014a69dfedcb710a257731454e0d97aaf8c6",
+    "xuanjun-p2-package/stage1/execution_supervision.py": "d39b5c95978360bf704328a037f6809ab9c6cc1fc04c5f0971681f61ca353354",
+    "xuanjun-p2-package/stage1/github_issue_consumer.py": "bf757891fa434d06ee779df00bbf0fef9f2817622abf6f7b4ab68edb04d97be1",
+    "xuanjun-p2-package/stage1/ledger_backup.py": "e30fa6901b6b951419abcbcae4ce957b88a2ebd29bc5d6de49cd546be542cc84",
+    "xuanjun-p2-package/stage1/ledger_cutover_transaction.py": "67c9d8283c91646dee5bb543e778dcdcae21cd629e988383e5b4c4167ca62584",
+    "xuanjun-p2-package/stage1/ledger_install_stage.py": "e5abc81563f8deae64e4e089b75b0257994366eb61482afca0ba1067b9569fe8",
+    "xuanjun-p2-package/stage1/ledger_read_client.py": "d791055a94bbd603dc5202f76533f5065c9d1c8a291ff227572a223a3cc0e2ce",
+    "xuanjun-p2-package/stage1/ledger_read_projection.py": "86fa6454fc295c8b885108ab643bb8b89f5ea1bc1e1132358717ca5f868ac000",
+    "xuanjun-p2-package/stage1/ledger_read_transport.py": "ae5bca7e31803f0d4f92249c8852f55417bd6d4926f8f699cda346fa6ac97a6d",
+    "xuanjun-p2-package/stage1/ledger_server_identity.py": "bb47927facbd55589aed2303d0cd201a071cad4de41d71f1dcb150287bd8cbab",
+    "xuanjun-p2-package/stage1/ledger_service.py": "6c254ed8d36f1eac692636ad482924a9cfb0d4567831aaa67814275ef68388ef",
+    "xuanjun-p2-package/stage1/legacy_host_adapter.py": "c59431d75b0c74489c1edb94d3c52e92668414b3308edc91efd13fa073259864",
+    "xuanjun-p2-package/stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e",
+    "xuanjun-p2-package/stage1/mechanical_wake.py": "944bbd15249a02d299997a92468f4649e87a13dbdf9492339fc21389ca68379c",
+    "xuanjun-p2-package/stage1/mechanical_wake_service.py": "88f06c8ec124dad82af0aa5794180c30cbeb61d67c9add31aaa6ab5e148cf75e",
+    "xuanjun-p2-package/stage1/native_child_adapter.py": "06c6eaa7861ec9c4c95cfe5214c4cc33ff440b12cc173f985485e9913758fd44",
+    "xuanjun-p2-package/stage1/native_gateway_controller.py": "1de3690ede78832da9dd2f2607db0b5ae88d6f9d4de87e1cb1ce64f35dab8421",
+    "xuanjun-p2-package/stage1/native_gateway_controller.py.json": "004073aaf6ced59ae9208c3d2c9dfdbc8995da204c9ee688698b3b2c2f0b3802",
+    "xuanjun-p2-package/stage1/native_github_notifier.py": "e909d82255d051b6ccf23229e8356da048eda2aa09a15333be4cfa72e5d781f8",
+    "xuanjun-p2-package/stage1/native_ledger_bridge.py": "3a5e72e5c3f24c718807ad1d87299358440469dc18c87339721008a93fdcb0c3",
+    "xuanjun-p2-package/stage1/native_ledger_operations.py": "87ec4505e7de035cf8070ae9a9777fd2c112494b66da246dc25e4a94a863bbac",
+    "xuanjun-p2-package/stage1/native_peer_identity.py": "e77aac8ade0beb071408a1adac805c86d9fdde9356c19f66ca7e903f04b63832",
+    "xuanjun-p2-package/stage1/native_pipeline_runtime.py": "7b61b682156331ea27dc19f404518c0d388c85e1f4a84a6cc7ba4de671b12833",
+    "xuanjun-p2-package/stage1/native_snapshot_access.py": "5ab4fc08bad17d4555e7a307c63a64641edec7ddf3371c5344368d49b8df24bd",
+    "xuanjun-p2-package/stage1/owner_approval_dispatch.py": "de72d6a4cf1eeabf765d9a7b537c8ec94ff83a5eda049e58695c50a2a59f88e3",
+    "xuanjun-p2-package/stage1/owner_callback_server.py": "1f254a73d2d551d6d6d7045d0658d7b69b830b0b3493fe04ab8d51b715fdfd79",
+    "xuanjun-p2-package/stage1/owner_dashboard.html": "3b9f31303814bd2462e66f7f2762b0f50ed9a4294dc7fcce4a357f3a194e2306",
+    "xuanjun-p2-package/stage1/owner_dashboard.py": "cad96295a2ee6caed6f7e1c3469338f9f1540d7df99faabba7797f50d7ea313d",
+    "xuanjun-p2-package/stage1/owner_feishu_bridge_cycle.py": "85fe28d120d9c6cc932e0619966947ea2b5e5b3d57cd2e5ee9a6144a446e8add",
+    "xuanjun-p2-package/stage1/owner_feishu_claim_guard.py": "71816cc0acc497e34ebc273d4b6e3e079894bad351e88419a239cb2c6ce32c26",
+    "xuanjun-p2-package/stage1/owner_feishu_history.py": "f3c9be72b3c40315b5fad6c73def20828de1d83182ad7b0de659371ddabed3b1",
+    "xuanjun-p2-package/stage1/owner_feishu_https.py": "4db02fd39c5b6a27b3faa185760679efacb82285ab377630463b903923e03a98",
+    "xuanjun-p2-package/stage1/owner_feishu_ledger_endpoint.py": "c7da7991ee9fe4f63b4ab4fb71fffbe725e98c0fadc5ecda22b9fa8c2d9abe0c",
+    "xuanjun-p2-package/stage1/owner_feishu_transport.py": "96e53b23576d6c23ba569b8e88e524f85a51fe01a115a13a0163884353d7222c",
+    "xuanjun-p2-package/stage1/owner_notification_outbox.py": "6d06324e7f6c974bc38c247c5792254a93e394ee9d2e0e1558dd4c034537fdf0",
+    "xuanjun-p2-package/stage1/owner_process_identity.py": "53b38cb9c66394baa7c2b8608b7dbf9c8e1cf58196a46bb00e524315a837b408",
+    "xuanjun-p2-package/stage1/owner_update_router.py": "002d1c2cf415df99e64bdcb0f9f3e9b879a8cfbff57d6ad52793642fa23c21c8",
+    "xuanjun-p2-package/stage1/p2_auxiliary_isolation.py": "d5c18d2cb08a1f5f0225e7b68167faf69e696f9c0545e515e0afc163b39dedc4",
+    "xuanjun-p2-package/stage1/p2_bootstrap_files.py": "fcc80f70535570155d05df555d68c3bdd1125a9662162d9ad594524efed91307",
+    "xuanjun-p2-package/stage1/p2_fixed_host_runtime.py": "83ca91a597c3220c40a4de37c8af211463dba13eb36eac55a8802c12d5a36ac2",
+    "xuanjun-p2-package/stage1/p2_gateway_relay.py": "b00ed6f412283fd3a90b36983fd52b0a448ae91543a56f8a4ce7b1a0ee226cda",
+    "xuanjun-p2-package/stage1/p2_install_entrypoint.py": "b1fd157a1e126fad6dd2eb3ab1f0c770019da62f41c82f35b49b8ba4ba39e4d6",
+    "xuanjun-p2-package/stage1/p2_legacy_adoption.py": "e890da7087190fb968b799d001822a27e7ee8b3c49faecb0341c7bacaaa1e0cb",
+    "xuanjun-p2-package/stage1/p2_prerequisites.py": "6482c4dfcdafe9635dce6504748c79d5e043a80dfc2c361c75625d8e08509c05",
+    "xuanjun-p2-package/stage1/p2_publisher_bootstrap.py": "475953e280a3efead2d966f42e3da54da95ea649387e1578ca236814cf924bfa",
+    "xuanjun-p2-package/stage1/p2_rpm_prerequisites.py": "b7e2ce848b2b7a15f738e50b4a3e245e1be661615448ec09adad6c022aa72086",
+    "xuanjun-p2-package/stage1/p2_sandbox_profile.py": "594afc9b9de1ed0659d46925a267c6eb77bc5e149485550ec33c35c4bf87ef00",
+    "xuanjun-p2-package/stage1/p2_service_context_preflight.py": "be71b78a410ff408a015672ef1cf9996975c3f111d5a28e456a35d9f76ce1dbe",
+    "xuanjun-p2-package/stage1/p2_tls_lifecycle.py": "948ea9920d5a6785aad2ebd0cbc7384c11d93b42cf97b4014a79f15f58d554f1",
+    "xuanjun-p2-package/stage1/root_broker.py": "5e4cdd747bd4bc5b248472998960a570f3cf1ffc24f2cefec420735c0690b5d6",
+    "xuanjun-p2-package/stage1/run_usage_projection.py": "80eeee872493fe894540efd954715972cc802ceea20a1dd483396c974ad012f1",
+    "xuanjun-p2-package/stage1/task_cost_projection.py": "95ad809c67aff8929f0dc4ecfad68ca96be72cabe426cde90021dd515fef3334",
+    "xuanjun-p2-package/stage1/task_supervisor_inventory_adapter.py": "3b78ab77c2faf31c124458249560cf72a97980f0504fc3c6121a99d3deac1550",
+    "xuanjun-p2-package/stage1/telegram_owner_transport.py": "fd161575bfb6db99b367e712f8ad82c7941255e61364e347e5567ab56272beda",
+    "xuanjun-p2-package/stage1/uk_owner_callback_core.py": "9e3866167c5698c70849ffcea28a3fbb96ccb108b0e0b64e2d7b9aed7a6feb6c",
+    "xuanjun-p2-package/stage1/uk_owner_notify_worker.py": "90dee461e16d90994dfda3942c0e8312ff5b3703fbc4340f74453f690506b10d",
+    "xuanjun-p2-package/tools/p2-package-freeze.py": "f1fe5dc3e199fe891a89969c07612304803ee453ee79e165815eab776eb6bb8e"
+  },
+  "kit_source_commit": "0c8a0f2a97da0c3f00f53659cd6ef7fc7d4ec3ba",
+  "kit_source_tree": "7d0f402b495b1398637c86463d9c10b4d4559d1f",
+  "modules": {
+    "activation_control": "xuanjun-p2-package/stage1/activation_control.py",
+    "callback_schema_gate": "xuanjun-p2-package/stage1/callback_schema_gate.py",
+    "codex_app_server_worker": "xuanjun-p2-package/stage1/codex_app_server_worker.py",
+    "codex_worker": "xuanjun-p2-package/stage1/codex_worker.py",
+    "dependency_evidence_view": "xuanjun-p2-package/stage1/dependency_evidence_view.py",
+    "development_loop": "xuanjun-p2-package/stage1/development_loop.py",
+    "development_pipeline": "xuanjun-p2-package/stage1/development_pipeline.py",
+    "development_service": "xuanjun-p2-package/stage1/development_service.py",
+    "epoch3_service_containment": "helpers/epoch3_service_containment.py",
+    "epoch7_acceptance_rows": "helpers/epoch7_acceptance_rows.py",
+    "epoch7_additive_identity": "helpers/epoch7_additive_identity.py",
+    "epoch7_additive_server": "helpers/epoch7_additive_server.py",
+    "epoch7_approval": "helpers/epoch7_approval.py",
+    "epoch7_bindings": "helpers/epoch7_bindings.py",
+    "epoch7_bounded_stager": "helpers/epoch7_bounded_stager.py",
+    "epoch7_command_runner": "helpers/epoch7_command_runner.py",
+    "epoch7_complete_approval": "helpers/epoch7_complete_approval.py",
+    "epoch7_delta": "helpers/epoch7_delta.py",
+    "epoch7_exact_access": "helpers/epoch7_exact_access.py",
+    "epoch7_host_containment": "helpers/epoch7_host_containment.py",
+    "epoch7_host_driver": "helpers/epoch7_host_driver.py",
+    "epoch7_host_factory": "helpers/epoch7_host_factory.py",
+    "epoch7_host_observer": "helpers/epoch7_host_observer.py",
+    "epoch7_host_phases": "helpers/epoch7_host_phases.py",
+    "epoch7_injected_recovery": "helpers/epoch7_injected_recovery.py",
+    "epoch7_live_controls": "helpers/epoch7_live_controls.py",
+    "epoch7_nginx_recipe": "helpers/epoch7_nginx_recipe.py",
+    "epoch7_openclaw_recipe": "helpers/epoch7_openclaw_recipe.py",
+    "epoch7_owner_prerequisite": "helpers/epoch7_owner_prerequisite.py",
+    "epoch7_pre_active_guards": "helpers/epoch7_pre_active_guards.py",
+    "epoch7_protected_fs": "helpers/epoch7_protected_fs.py",
+    "epoch7_python_identity": "helpers/epoch7_python_identity.py",
+    "epoch7_quiet_startup": "helpers/epoch7_quiet_startup.py",
+    "epoch7_recovery_sequence": "helpers/epoch7_recovery_sequence.py",
+    "epoch7_resource_observer": "helpers/epoch7_resource_observer.py",
+    "epoch7_resource_plan": "helpers/epoch7_resource_plan.py",
+    "epoch7_runtime_acceptance": "helpers/epoch7_runtime_acceptance.py",
+    "epoch7_runtime_effects": "helpers/epoch7_runtime_effects.py",
+    "epoch7_service_contract": "helpers/epoch7_service_contract.py",
+    "epoch7_service_roles": "helpers/epoch7_service_roles.py",
+    "epoch7_snapshot": "helpers/epoch7_snapshot.py",
+    "epoch7_timer_tail": "helpers/epoch7_timer_tail.py",
+    "epoch7_unit_transitions": "helpers/epoch7_unit_transitions.py",
+    "exact_access_plan": "helpers/exact_access_plan.py",
+    "execution_ledger": "xuanjun-p2-package/stage1/execution_ledger.py",
+    "execution_supervision": "xuanjun-p2-package/stage1/execution_supervision.py",
+    "github_issue_consumer": "xuanjun-p2-package/stage1/github_issue_consumer.py",
+    "ledger_backup": "xuanjun-p2-package/stage1/ledger_backup.py",
+    "ledger_cutover_transaction": "xuanjun-p2-package/stage1/ledger_cutover_transaction.py",
+    "ledger_install_stage": "xuanjun-p2-package/stage1/ledger_install_stage.py",
+    "ledger_read_client": "xuanjun-p2-package/stage1/ledger_read_client.py",
+    "ledger_read_projection": "xuanjun-p2-package/stage1/ledger_read_projection.py",
+    "ledger_read_transport": "xuanjun-p2-package/stage1/ledger_read_transport.py",
+    "ledger_server_identity": "xuanjun-p2-package/stage1/ledger_server_identity.py",
+    "ledger_service": "xuanjun-p2-package/stage1/ledger_service.py",
+    "legacy_host_adapter": "xuanjun-p2-package/stage1/legacy_host_adapter.py",
+    "legacy_quiescence": "xuanjun-p2-package/stage1/legacy_quiescence.py",
+    "mechanical_wake": "xuanjun-p2-package/stage1/mechanical_wake.py",
+    "mechanical_wake_service": "xuanjun-p2-package/stage1/mechanical_wake_service.py",
+    "native_child_adapter": "xuanjun-p2-package/stage1/native_child_adapter.py",
+    "native_gateway_controller": "xuanjun-p2-package/stage1/native_gateway_controller.py",
+    "native_github_notifier": "xuanjun-p2-package/stage1/native_github_notifier.py",
+    "native_ledger_bridge": "xuanjun-p2-package/stage1/native_ledger_bridge.py",
+    "native_ledger_operations": "xuanjun-p2-package/stage1/native_ledger_operations.py",
+    "native_peer_identity": "xuanjun-p2-package/stage1/native_peer_identity.py",
+    "native_pipeline_runtime": "xuanjun-p2-package/stage1/native_pipeline_runtime.py",
+    "native_snapshot_access": "xuanjun-p2-package/stage1/native_snapshot_access.py",
+    "node_sqlite_probe": "helpers/node_sqlite_probe.py",
+    "observe_epoch7": "helpers/observe_epoch7.py",
+    "openclaw_metadata": "helpers/openclaw_metadata.py",
+    "owner_approval_dispatch": "xuanjun-p2-package/stage1/owner_approval_dispatch.py",
+    "owner_callback_server": "xuanjun-p2-package/stage1/owner_callback_server.py",
+    "owner_dashboard": "xuanjun-p2-package/stage1/owner_dashboard.py",
+    "owner_feishu_bridge_cycle": "xuanjun-p2-package/stage1/owner_feishu_bridge_cycle.py",
+    "owner_feishu_claim_guard": "xuanjun-p2-package/stage1/owner_feishu_claim_guard.py",
+    "owner_feishu_history": "xuanjun-p2-package/stage1/owner_feishu_history.py",
+    "owner_feishu_https": "xuanjun-p2-package/stage1/owner_feishu_https.py",
+    "owner_feishu_ledger_endpoint": "xuanjun-p2-package/stage1/owner_feishu_ledger_endpoint.py",
+    "owner_feishu_transport": "xuanjun-p2-package/stage1/owner_feishu_transport.py",
+    "owner_notification_outbox": "xuanjun-p2-package/stage1/owner_notification_outbox.py",
+    "owner_process_identity": "xuanjun-p2-package/stage1/owner_process_identity.py",
+    "owner_update_router": "xuanjun-p2-package/stage1/owner_update_router.py",
+    "p2_auxiliary_isolation": "xuanjun-p2-package/stage1/p2_auxiliary_isolation.py",
+    "p2_bootstrap_files": "xuanjun-p2-package/stage1/p2_bootstrap_files.py",
+    "p2_fixed_host_runtime": "xuanjun-p2-package/stage1/p2_fixed_host_runtime.py",
+    "p2_gateway_relay": "xuanjun-p2-package/stage1/p2_gateway_relay.py",
+    "p2_install_entrypoint": "xuanjun-p2-package/stage1/p2_install_entrypoint.py",
+    "p2_legacy_adoption": "xuanjun-p2-package/stage1/p2_legacy_adoption.py",
+    "p2_prerequisites": "xuanjun-p2-package/stage1/p2_prerequisites.py",
+    "p2_publisher_bootstrap": "xuanjun-p2-package/stage1/p2_publisher_bootstrap.py",
+    "p2_rpm_prerequisites": "xuanjun-p2-package/stage1/p2_rpm_prerequisites.py",
+    "p2_sandbox_profile": "xuanjun-p2-package/stage1/p2_sandbox_profile.py",
+    "p2_service_context_preflight": "xuanjun-p2-package/stage1/p2_service_context_preflight.py",
+    "p2_tls_lifecycle": "xuanjun-p2-package/stage1/p2_tls_lifecycle.py",
+    "probe_driver": "helpers/probe_driver.py",
+    "probe_helpers": "helpers/probe_helpers.py",
+    "probe_metadata": "helpers/probe_metadata.py",
+    "protected_command_evidence": "helpers/protected_command_evidence.py",
+    "reviewed_database": "helpers/reviewed_database.py",
+    "reviewed_publisher": "helpers/reviewed_publisher.py",
+    "reviewed_scanner": "helpers/reviewed_scanner.py",
+    "root_broker": "xuanjun-p2-package/stage1/root_broker.py",
+    "run_usage_projection": "xuanjun-p2-package/stage1/run_usage_projection.py",
+    "snapshot_io": "helpers/snapshot_io.py",
+    "task_cost_projection": "xuanjun-p2-package/stage1/task_cost_projection.py",
+    "task_supervisor_inventory_adapter": "xuanjun-p2-package/stage1/task_supervisor_inventory_adapter.py",
+    "telegram_owner_transport": "xuanjun-p2-package/stage1/telegram_owner_transport.py",
+    "uk_owner_callback_core": "xuanjun-p2-package/stage1/uk_owner_callback_core.py",
+    "uk_owner_notify_worker": "xuanjun-p2-package/stage1/uk_owner_notify_worker.py",
+    "unit_metadata": "helpers/unit_metadata.py"
+  },
+  "production_resume": "AUTHENTICATED_APPROVAL_GATED_SINGLE_ATTEMPT",
+  "runtime_manifest_sha256": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
+  "runtime_source_commit": "101b465ca3554bf34fef2d53d6006b96d85c4a63",
+  "runtime_source_tree": "3ae50b40c38d9a807876c175818299e344d53134",
+  "schema": 1,
+  "status": "COMPOSED_CANDIDATE_REQUIRES_FRESH_APPROVAL",
+  "test_suites": {
+    "acceptance_rows": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_acceptance_rows": "tests/acceptance_rows/test_epoch7_acceptance_rows.py"
+      },
+      "reason": "Pure compiler over authenticated public runtime bytes and synthetic nonsecret records; no host effects",
+      "tests": [
+        "tests/acceptance_rows/test_epoch7_acceptance_rows.py"
+      ]
+    },
+    "access_plan": {
+      "enabled": true,
+      "imports": {
+        "test_exact_access_plan": "tests/access_plan/test_exact_access_plan.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/access_plan/test_exact_access_plan.py"
+      ]
+    },
+    "approval": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_approval": "tests/approval/test_epoch7_approval.py",
+        "test_epoch7_bounded_fetch": "tests/approval/test_epoch7_bounded_fetch.py",
+        "test_epoch7_complete_approval": "tests/approval/test_epoch7_complete_approval.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/approval/test_epoch7_approval.py",
+        "tests/approval/test_epoch7_bounded_fetch.py",
+        "tests/approval/test_epoch7_complete_approval.py"
+      ]
+    },
+    "command": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_command_runner": "tests/command/test_epoch7_command_runner.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/command/test_epoch7_command_runner.py"
+      ]
+    },
+    "diagnostics": {
+      "enabled": true,
+      "imports": {
+        "test_protected_command_evidence": "tests/diagnostics/test_protected_command_evidence.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/diagnostics/test_protected_command_evidence.py"
+      ]
+    },
+    "host_containment": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_host_containment": "tests/host_containment/test_epoch7_host_containment.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/host_containment/test_epoch7_host_containment.py"
+      ]
+    },
+    "host_factory": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_acceptance_rows": "tests/acceptance_rows/test_epoch7_acceptance_rows.py",
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_full_factory": "tests/host_factory/test_epoch7_full_factory.py",
+        "test_epoch7_full_factory_fixture": "tests/host_factory/test_epoch7_full_factory_fixture.py",
+        "test_epoch7_host_factory": "tests/host_factory/test_epoch7_host_factory.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_live_controls": "tests/live_controls/test_epoch7_live_controls.py",
+        "test_epoch7_observer_binding": "tests/live_controls/test_epoch7_observer_binding.py",
+        "test_epoch7_openclaw_direct": "tests/service_contract/test_epoch7_openclaw_direct.py",
+        "test_epoch7_openclaw_family": "tests/service_contract/test_epoch7_openclaw_family.py",
+        "test_epoch7_openclaw_recipe": "tests/service_contract/test_epoch7_openclaw_recipe.py",
+        "test_epoch7_openclaw_roles": "tests/service_contract/test_epoch7_openclaw_roles.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py",
+        "test_epoch7_service_contract": "tests/service_contract/test_epoch7_service_contract.py",
+        "test_epoch7_service_roles": "tests/live_controls/test_epoch7_service_roles.py",
+        "test_epoch7_timer_tail": "tests/host_factory/test_epoch7_timer_tail.py",
+        "test_epoch7_unit_transitions": "tests/live_controls/test_epoch7_unit_transitions.py",
+        "test_epoch7_unit_types": "tests/host_factory/test_epoch7_unit_types.py",
+        "test_native_sidefile_transition": "tests/host_factory/test_native_sidefile_transition.py",
+        "test_node_sqlite_probe": "tests/probe/test_node_sqlite_probe.py",
+        "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
+        "test_probe_driver": "tests/probe/test_probe_driver.py",
+        "test_probe_helpers": "tests/probe/test_probe_helpers.py",
+        "test_snapshot": "tests/snapshot/test_snapshot.py",
+        "test_unit_process_fields": "tests/snapshot_portable/test_unit_process_fields.py"
+      },
+      "reason": "Boundary-mock assembly/timer tests plus real107-source pure whole-factory compilation with synthetic measured host/probe records; only unavailable historical private sidefile pin is test-remapped, never a compiler result",
+      "tests": [
+        "tests/host_factory/test_epoch7_host_factory.py",
+        "tests/host_factory/test_epoch7_timer_tail.py",
+        "tests/host_factory/test_epoch7_full_factory.py",
+        "tests/host_factory/test_native_sidefile_transition.py",
+        "tests/host_factory/test_epoch7_unit_types.py"
+      ]
+    },
+    "host_filesystem": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_activation_store": "tests/host_filesystem/test_epoch7_activation_store.py",
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_exact_access": "tests/host_filesystem/test_epoch7_exact_access.py",
+        "test_epoch7_host_phases": "tests/host_filesystem/test_epoch7_host_phases.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_snapshot": "tests/snapshot/test_snapshot.py"
+      },
+      "reason": "General filesystem logic in authenticated disposable-copy confinement; exact fixed-UK-UID case separately required",
+      "tests": [
+        "tests/host_filesystem/test_epoch7_host_phases.py",
+        "tests/host_filesystem/test_epoch7_exact_access.py",
+        "tests/host_filesystem/test_epoch7_activation_store.py"
+      ]
+    },
+    "host_observer": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_host_observer": "tests/host_observer/test_epoch7_host_observer.py",
+        "test_epoch7_quiet_startup": "tests/host_observer/test_epoch7_quiet_startup.py",
+        "test_epoch7_resource_observer": "tests/host_observer/test_epoch7_resource_observer.py"
+      },
+      "reason": "General filesystem logic in authenticated disposable-copy confinement; exact fixed-UK-UID case separately required",
+      "tests": [
+        "tests/host_observer/test_epoch7_host_observer.py",
+        "tests/host_observer/test_epoch7_resource_observer.py",
+        "tests/host_observer/test_epoch7_quiet_startup.py"
+      ]
+    },
+    "host_stager": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_bounded_stager": "tests/host_stager/test_epoch7_bounded_stager.py"
+      },
+      "reason": "Read the same SHA-pinned frozen installer from authenticated current staged runtime instead of historical workspace path; namespace and bounded-command assertions unchanged.",
+      "tests": [
+        "tests/host_stager/test_epoch7_bounded_stager.py"
+      ]
+    },
+    "live_controls": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_live_controls": "tests/live_controls/test_epoch7_live_controls.py",
+        "test_epoch7_observer_binding": "tests/live_controls/test_epoch7_observer_binding.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py",
+        "test_epoch7_service_roles": "tests/live_controls/test_epoch7_service_roles.py",
+        "test_epoch7_unit_transitions": "tests/live_controls/test_epoch7_unit_transitions.py",
+        "test_snapshot": "tests/snapshot/test_snapshot.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/live_controls/test_epoch7_live_controls.py",
+        "tests/live_controls/test_epoch7_observer_binding.py",
+        "tests/live_controls/test_epoch7_service_roles.py",
+        "tests/live_controls/test_epoch7_unit_transitions.py"
+      ]
+    },
+    "owner_prerequisite": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_owner_prerequisite": "tests/owner_prerequisite/test_epoch7_owner_prerequisite.py"
+      },
+      "reason": "Bounded synthetic prerequisite tests; no host execution",
+      "tests": [
+        "tests/owner_prerequisite/test_epoch7_owner_prerequisite.py"
+      ]
+    },
+    "package_builder": {
+      "enabled": false,
+      "imports": {
+        "test_build_runtime_overlay": "tests/package_builder/test_build_runtime_overlay.py"
+      },
+      "reason": "Tests workspace package construction from historical inputs rather than staged runtime; separate local evidence",
+      "tests": [
+        "tests/package_builder/test_build_runtime_overlay.py"
+      ]
+    },
+    "plan": {
+      "enabled": false,
+      "imports": {
+        "test_current_overlay_binding_smoke": "tests/plan/test_current_overlay_binding_smoke.py",
+        "test_epoch7_bindings": "tests/plan/test_epoch7_bindings.py"
+      },
+      "reason": "Reads private prior compiled plan and historical workspace runtime; intentionally not bundled",
+      "tests": [
+        "tests/plan/test_epoch7_bindings.py",
+        "tests/plan/test_current_overlay_binding_smoke.py"
+      ]
+    },
+    "probe": {
+      "enabled": true,
+      "imports": {
+        "test_node_sqlite_probe": "tests/probe/test_node_sqlite_probe.py",
+        "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
+        "test_probe_driver": "tests/probe/test_probe_driver.py",
+        "test_probe_helpers": "tests/probe/test_probe_helpers.py",
+        "test_probe_python_identity": "tests/probe/test_probe_python_identity.py"
+      },
+      "reason": "Pure policy/mocked probe and bounded harmless child/file fixtures; real systemd probe is never invoked",
+      "tests": [
+        "tests/probe/test_probe_driver.py",
+        "tests/probe/test_probe_helpers.py",
+        "tests/probe/test_probe_child_cleanup.py",
+        "tests/probe/test_node_sqlite_probe.py",
+        "tests/probe/test_probe_python_identity.py"
+      ]
+    },
+    "recovery": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_phase_steps": "tests/recovery/test_epoch7_phase_steps.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/recovery/test_epoch7_delta.py",
+        "tests/recovery/test_epoch7_additive_identity.py",
+        "tests/recovery/test_epoch7_additive_server.py",
+        "tests/recovery/test_epoch7_injected_recovery.py",
+        "tests/recovery/test_epoch7_phase_steps.py"
+      ]
+    },
+    "recovery_filesystem": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_protected_fs": "tests/recovery_filesystem/test_epoch7_protected_fs.py"
+      },
+      "reason": "General filesystem logic in authenticated disposable-copy confinement; exact fixed-UK-UID case separately required",
+      "tests": [
+        "tests/recovery_filesystem/test_epoch7_protected_fs.py"
+      ]
+    },
+    "resource_plan": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_acceptance_rows": "tests/acceptance_rows/test_epoch7_acceptance_rows.py",
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_full_factory": "tests/host_factory/test_epoch7_full_factory.py",
+        "test_epoch7_full_factory_fixture": "tests/host_factory/test_epoch7_full_factory_fixture.py",
+        "test_epoch7_host_factory": "tests/host_factory/test_epoch7_host_factory.py",
+        "test_epoch7_host_observer": "tests/host_observer/test_epoch7_host_observer.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_live_controls": "tests/live_controls/test_epoch7_live_controls.py",
+        "test_epoch7_node_resource": "tests/resource_plan/test_epoch7_node_resource.py",
+        "test_epoch7_observer_binding": "tests/live_controls/test_epoch7_observer_binding.py",
+        "test_epoch7_openclaw_direct": "tests/service_contract/test_epoch7_openclaw_direct.py",
+        "test_epoch7_openclaw_family": "tests/service_contract/test_epoch7_openclaw_family.py",
+        "test_epoch7_openclaw_recipe": "tests/service_contract/test_epoch7_openclaw_recipe.py",
+        "test_epoch7_openclaw_roles": "tests/service_contract/test_epoch7_openclaw_roles.py",
+        "test_epoch7_python_resource": "tests/resource_plan/test_epoch7_python_resource.py",
+        "test_epoch7_quiet_startup": "tests/host_observer/test_epoch7_quiet_startup.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py",
+        "test_epoch7_resource_observer": "tests/host_observer/test_epoch7_resource_observer.py",
+        "test_epoch7_resource_plan": "tests/resource_plan/test_epoch7_resource_plan.py",
+        "test_epoch7_service_contract": "tests/service_contract/test_epoch7_service_contract.py",
+        "test_epoch7_service_roles": "tests/live_controls/test_epoch7_service_roles.py",
+        "test_epoch7_timer_tail": "tests/host_factory/test_epoch7_timer_tail.py",
+        "test_epoch7_unit_transitions": "tests/live_controls/test_epoch7_unit_transitions.py",
+        "test_epoch7_unit_types": "tests/host_factory/test_epoch7_unit_types.py",
+        "test_native_sidefile_transition": "tests/host_factory/test_native_sidefile_transition.py",
+        "test_node_sqlite_probe": "tests/probe/test_node_sqlite_probe.py",
+        "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
+        "test_probe_driver": "tests/probe/test_probe_driver.py",
+        "test_probe_helpers": "tests/probe/test_probe_helpers.py",
+        "test_python_identity": "tests/snapshot_portable/test_python_identity.py",
+        "test_snapshot": "tests/snapshot/test_snapshot.py",
+        "test_unit_process_fields": "tests/snapshot_portable/test_unit_process_fields.py"
+      },
+      "reason": "All17 actual-byte resource checkpoint projections in authenticated disposable-copy confinement",
+      "tests": [
+        "tests/resource_plan/test_epoch7_resource_plan.py",
+        "tests/resource_plan/test_epoch7_python_resource.py",
+        "tests/resource_plan/test_epoch7_node_resource.py"
+      ]
+    },
+    "runtime_acceptance": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_runtime_acceptance": "tests/runtime_acceptance/test_epoch7_runtime_acceptance.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/runtime_acceptance/test_epoch7_runtime_acceptance.py"
+      ]
+    },
+    "runtime_effects": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_runtime_effects": "tests/runtime_effects/test_epoch7_runtime_effects.py"
+      },
+      "reason": "Import the exact already-enumerated frozen epoch3 containment source through the authenticated cache instead of reopening a mutable sibling path; all containment/effect assertions unchanged.",
+      "tests": [
+        "tests/runtime_effects/test_epoch7_runtime_effects.py"
+      ]
+    },
+    "runtime_identity": {
+      "enabled": true,
+      "imports": {
+        "test_native_peer_identity": "tests/runtime_identity/test_native_peer_identity.py",
+        "test_owner_process_identity": "tests/runtime_identity/test_owner_process_identity.py"
+      },
+      "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
+      "tests": [
+        "tests/runtime_identity/test_native_peer_identity.py",
+        "tests/runtime_identity/test_owner_process_identity.py"
+      ]
+    },
+    "runtime_process": {
+      "enabled": true,
+      "imports": {
+        "test_gateway_command_lifetime": "tests/runtime_process/test_gateway_command_lifetime.py",
+        "test_runtime_command_lifetime": "tests/runtime_process/test_runtime_command_lifetime.py"
+      },
+      "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
+      "tests": [
+        "tests/runtime_process/test_runtime_command_lifetime.py",
+        "tests/runtime_process/test_gateway_command_lifetime.py"
+      ]
+    },
+    "runtime_projection": {
+      "enabled": true,
+      "imports": {
+        "test_entrypoint_help": "tests/runtime_projection/test_entrypoint_help.py",
+        "test_ledger_read_client": "tests/runtime_projection/test_ledger_read_client.py",
+        "test_ledger_read_projection": "tests/runtime_projection/test_ledger_read_projection.py",
+        "test_ledger_server_identity": "tests/runtime_projection/test_ledger_server_identity.py",
+        "test_native_server_identity": "tests/runtime_projection/test_native_server_identity.py",
+        "test_owner_process_gate": "tests/runtime_projection/test_owner_process_gate.py",
+        "test_read_integration": "tests/runtime_projection/test_read_integration.py",
+        "test_read_transport": "tests/runtime_projection/test_read_transport.py"
+      },
+      "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
+      "tests": [
+        "tests/runtime_projection/test_ledger_read_client.py",
+        "tests/runtime_projection/test_ledger_read_projection.py",
+        "tests/runtime_projection/test_read_transport.py",
+        "tests/runtime_projection/test_ledger_server_identity.py",
+        "tests/runtime_projection/test_native_server_identity.py",
+        "tests/runtime_projection/test_read_integration.py",
+        "tests/runtime_projection/test_owner_process_gate.py",
+        "tests/runtime_projection/test_entrypoint_help.py"
+      ]
+    },
+    "runtime_wiring": {
+      "enabled": true,
+      "imports": {
+        "test_ledger_identity_wiring": "tests/runtime_wiring/test_ledger_identity_wiring.py",
+        "test_service_preflight_ack": "tests/runtime_wiring/test_service_preflight_ack.py"
+      },
+      "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
+      "tests": [
+        "tests/runtime_wiring/test_ledger_identity_wiring.py",
+        "tests/runtime_wiring/test_service_preflight_ack.py"
+      ]
+    },
+    "sequence": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py"
+      },
+      "reason": "Portable synthetic tests; no production acceptance",
+      "tests": [
+        "tests/sequence/test_epoch7_recovery_sequence.py"
+      ]
+    },
+    "service_contract": {
+      "enabled": true,
+      "imports": {
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py",
+        "test_epoch7_live_controls": "tests/live_controls/test_epoch7_live_controls.py",
+        "test_epoch7_observer_binding": "tests/live_controls/test_epoch7_observer_binding.py",
+        "test_epoch7_openclaw_direct": "tests/service_contract/test_epoch7_openclaw_direct.py",
+        "test_epoch7_openclaw_family": "tests/service_contract/test_epoch7_openclaw_family.py",
+        "test_epoch7_openclaw_recipe": "tests/service_contract/test_epoch7_openclaw_recipe.py",
+        "test_epoch7_openclaw_roles": "tests/service_contract/test_epoch7_openclaw_roles.py",
+        "test_epoch7_recovery_sequence": "tests/sequence/test_epoch7_recovery_sequence.py",
+        "test_epoch7_service_contract": "tests/service_contract/test_epoch7_service_contract.py",
+        "test_epoch7_service_roles": "tests/live_controls/test_epoch7_service_roles.py",
+        "test_epoch7_unit_transitions": "tests/live_controls/test_epoch7_unit_transitions.py",
+        "test_node_sqlite_probe": "tests/probe/test_node_sqlite_probe.py",
+        "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
+        "test_probe_driver": "tests/probe/test_probe_driver.py",
+        "test_probe_helpers": "tests/probe/test_probe_helpers.py",
+        "test_snapshot": "tests/snapshot/test_snapshot.py"
+      },
+      "reason": "Exact root-entry and direct-entry profiles, synthetic host facts, fixed 31 plus conditional 32nd official source; no deployed admission",
+      "tests": [
+        "tests/service_contract/test_epoch7_service_contract.py",
+        "tests/service_contract/test_epoch7_openclaw_recipe.py",
+        "tests/service_contract/test_epoch7_openclaw_roles.py",
+        "tests/service_contract/test_epoch7_openclaw_family.py",
+        "tests/service_contract/test_epoch7_openclaw_direct.py"
+      ]
+    },
+    "snapshot": {
+      "enabled": false,
+      "imports": {
+        "test_snapshot": "tests/snapshot/test_snapshot.py"
+      },
+      "reason": "REQUIRED_NOT_RUN historical ReuseTests.test_selected_functions_identical_to_frozen_sources needs original frozen source files and reviewed_sources.json; all other general assertions are mandatory through the documented snapshot_portable adapter, including current staged identity rendering.",
+      "tests": [
+        "tests/snapshot/test_snapshot.py"
+      ]
+    },
+    "snapshot_portable": {
+      "enabled": true,
+      "imports": {
+        "test_boot_background": "tests/snapshot_portable/test_boot_background.py",
+        "test_control_git": "tests/snapshot_portable/test_control_git.py",
+        "test_declared_directory_authority": "tests/snapshot_portable/test_declared_directory_authority.py",
+        "test_native_transition": "tests/snapshot_portable/test_native_transition.py",
+        "test_node_directory_alias": "tests/snapshot_portable/test_node_directory_alias.py",
+        "test_openclaw_metadata": "tests/snapshot_portable/test_openclaw_metadata.py",
+        "test_path_sources": "tests/snapshot_portable/test_path_sources.py",
+        "test_probe_metadata": "tests/snapshot_portable/test_probe_metadata.py",
+        "test_python_identity": "tests/snapshot_portable/test_python_identity.py",
+        "test_python_pair_adapters": "tests/snapshot_portable/test_python_pair_adapters.py",
+        "test_query_lifetime": "tests/snapshot_portable/test_query_lifetime.py",
+        "test_snapshot": "tests/snapshot/test_snapshot.py",
+        "test_snapshot_portable": "tests/snapshot_portable/test_snapshot_portable.py",
+        "test_timer_metadata": "tests/snapshot_portable/test_timer_metadata.py",
+        "test_unit_metadata": "tests/snapshot_portable/test_unit_metadata.py",
+        "test_unit_process_fields": "tests/snapshot_portable/test_unit_process_fields.py",
+        "test_writer_comparison": "tests/snapshot_portable/test_writer_comparison.py"
+      },
+      "reason": "Public staged-source metadata, injected host observations and harmless owned-child fixtures; no real host collection",
+      "tests": [
+        "tests/snapshot_portable/test_probe_metadata.py",
+        "tests/snapshot_portable/test_timer_metadata.py",
+        "tests/snapshot_portable/test_control_git.py",
+        "tests/snapshot_portable/test_query_lifetime.py",
+        "tests/snapshot_portable/test_unit_metadata.py",
+        "tests/snapshot_portable/test_boot_background.py",
+        "tests/snapshot_portable/test_path_sources.py",
+        "tests/snapshot_portable/test_snapshot_portable.py",
+        "tests/snapshot_portable/test_openclaw_metadata.py",
+        "tests/snapshot_portable/test_native_transition.py",
+        "tests/snapshot_portable/test_python_identity.py",
+        "tests/snapshot_portable/test_python_pair_adapters.py",
+        "tests/snapshot_portable/test_node_directory_alias.py",
+        "tests/snapshot_portable/test_unit_process_fields.py",
+        "tests/snapshot_portable/test_declared_directory_authority.py",
+        "tests/snapshot_portable/test_writer_comparison.py"
+      ]
+    },
+    "uk_exact_uid_acl": {
+      "enabled": false,
+      "imports": {
+        "test_epoch7_activation_store": "tests/host_filesystem/test_epoch7_activation_store.py",
+        "test_epoch7_additive_identity": "tests/recovery/test_epoch7_additive_identity.py",
+        "test_epoch7_additive_server": "tests/recovery/test_epoch7_additive_server.py",
+        "test_epoch7_delta": "tests/recovery/test_epoch7_delta.py",
+        "test_epoch7_exact_access": "tests/host_filesystem/test_epoch7_exact_access.py",
+        "test_epoch7_exact_access_uk": "tests/uk_exact_uid_acl/test_epoch7_exact_access_uk.py",
+        "test_epoch7_host_phases": "tests/host_filesystem/test_epoch7_host_phases.py",
+        "test_epoch7_injected_recovery": "tests/recovery/test_epoch7_injected_recovery.py"
+      },
+      "reason": "REQUIRED_NOT_RUN: ActualFDTests.test_actual_fd_acl_changes_only_two_named_access_sets needs kernel UID mappings1002/1003/1004; no substitute from mocked grants or current-UID xattr roundtrip",
+      "tests": [
+        "tests/uk_exact_uid_acl/test_epoch7_exact_access_uk.py"
+      ]
+    },
+    "unit_overlay": {
+      "enabled": false,
+      "imports": {
+        "test_unit_overlay": "tests/unit_overlay/test_unit_overlay.py"
+      },
+      "reason": "Compares historical frozen runtime and original overlay paths outside staged kit",
+      "tests": [
+        "tests/unit_overlay/test_unit_overlay.py"
+      ]
+    }
+  }
+}

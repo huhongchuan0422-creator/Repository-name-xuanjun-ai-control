@@ -1,0 +1,109 @@
+{
+  "destination_prefix": "evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r6-contracts/",
+  "excluded_local_only": [
+    "LOCAL_STATUS.json",
+    "PRESERVED_INPUTS.json",
+    "*.log",
+    "all private observation and receipt bytes"
+  ],
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "host_execution": "NOT_RUN",
+  "observation_id": "1311b9e9fa97cfd4",
+  "observation_sha256": "b961df049e2861e4706f28f29fcf994a14fe28e153263a23ec82d4e822b9b246",
+  "own_delivery_commit": null,
+  "owner_bootstrap_delivery_publication_bound": false,
+  "preparation_leaf": "epoch7-preparation-candidate-r6-contracts",
+  "preparation_publication_bound": true,
+  "preparation_source_commit": "8ab751a84922b76b80c8e8641cbe96e82fa5d391",
+  "preparation_source_prefix": "evidence/p2-epoch7-access-repair-20261014/preparation-source-r6-contracts/",
+  "preparation_sources": {
+    "epoch7_prepare.py": {
+      "bytes": 42190,
+      "sha256": "44b181cac0da6da287bd98455a0d49fc4285a83d8a58c875bf1af98ebf49295d"
+    },
+    "epoch7_prepare_data.py": {
+      "bytes": 13888,
+      "sha256": "71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1"
+    },
+    "epoch7_topology_projection.py": {
+      "bytes": 27151,
+      "sha256": "f8b731a8668a5b5374e18dab9a59657f80fc8d11ea2d9c4588a62942dbf74854"
+    }
+  },
+  "private_plan": "NOT_RUN",
+  "production": "HOLD",
+  "public_files": {
+    "OWNER_PREPARATION_UNBOUND.txt": {
+      "bytes": 5118,
+      "sha256": "239c7f7b3a42d33fafc9513045407a9544fe8aa9651c62c3d966212f564c9f7d"
+    },
+    "PUBLIC_RESULTS.json": {
+      "bytes": 2099,
+      "sha256": "1e39c985904bdaf96a0668254682cf2000aa91dad4ed3b1149869a3816bf4f22"
+    },
+    "README.md": {
+      "bytes": 5378,
+      "sha256": "b0226656d127f60cfb2d8d4a7660e87bc7ecc40a108a1aaeccdbdbc937ee2143"
+    },
+    "epoch7_prepare_delivery.py": {
+      "bytes": 24426,
+      "sha256": "371fe4e39b2e2f455049c47e45020a62269116c0a152964816e9bc0bae12b139"
+    },
+    "fixtures/diagnose_preparation.py": {
+      "bytes": 15641,
+      "sha256": "9cd065c6fb7d7f756314420d0867d4f639fcef090d82b449fdc3a20570eeed25"
+    },
+    "fixtures/preparation-source/epoch7_prepare.py": {
+      "bytes": 42190,
+      "sha256": "44b181cac0da6da287bd98455a0d49fc4285a83d8a58c875bf1af98ebf49295d"
+    },
+    "fixtures/preparation-source/epoch7_prepare_data.py": {
+      "bytes": 13888,
+      "sha256": "71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1"
+    },
+    "fixtures/preparation-source/epoch7_topology_projection.py": {
+      "bytes": 27151,
+      "sha256": "f8b731a8668a5b5374e18dab9a59657f80fc8d11ea2d9c4588a62942dbf74854"
+    },
+    "fixtures/recovery-kit-manifest.json": {
+      "bytes": 67342,
+      "sha256": "70c76e30ae8390963f345813f87267bf1d2f024bc01031c8023733c84aa571cc"
+    },
+    "test_epoch7_prepare_bootstrap_binding.py": {
+      "bytes": 5592,
+      "sha256": "0768391f381319e2a79a52e319f79c933c7d1e743d60ba718dfd6ebb22616e41"
+    },
+    "test_epoch7_prepare_delivery.py": {
+      "bytes": 24972,
+      "sha256": "56977fa33015959567e4a89cfa6aa845bda91a5100f6e1eb5cdf5e477253cd8c"
+    },
+    "test_epoch7_prepare_delivery_projection.py": {
+      "bytes": 12090,
+      "sha256": "9f5797294bef7cb1df7f52fc6dbdac82e151add7346538c54e47b9a1db5097d4"
+    }
+  },
+  "recovery_kit_leaf": "epoch7-recovery-candidate-r6",
+  "schema": 1,
+  "state": "SCOPED_BOUND_DELIVERY_REVIEW_PASS_OWN_PUBLICATION_PENDING",
+  "test_contract": {
+    "commands": [
+      "$PYTHON -I -B -S test_epoch7_prepare_delivery.py",
+      "$PYTHON -I -B -S test_epoch7_prepare_delivery_projection.py",
+      "$PYTHON -I -B -S test_epoch7_prepare_bootstrap_binding.py"
+    ],
+    "fixture_layout": "Self-contained exact public bytes in fixtures/, test-only and never consumed by the delivery helper; no private or sibling-directory dependency",
+    "python_versions": [
+      "3.6.8",
+      "3.12.14"
+    ],
+    "tests_per_interpreter": 66,
+    "zero_errors_failures_skips": true
+  },
+  "test_only_public_fixtures": [
+    "fixtures/diagnose_preparation.py",
+    "fixtures/preparation-source/epoch7_prepare.py",
+    "fixtures/preparation-source/epoch7_prepare_data.py",
+    "fixtures/preparation-source/epoch7_topology_projection.py",
+    "fixtures/recovery-kit-manifest.json"
+  ]
+}

@@ -1,0 +1,83 @@
+# Verify all three delivery publication pins before use; observation is fixed.
+# Manual Owner action: exclusive staging of three private files, then unsigned topology proposal only.
+# This stages only three preparation sources and proposes a topology review.
+sudo /usr/libexec/platform-python3.6 -I -B -S - <<'PY'
+import contextlib,hashlib,json,os,re,signal,socket,sys,time,types,urllib.request
+DELIVERY_COMMIT=None
+DELIVERY_SHA256=None
+DELIVERY_BYTES=None
+OBSERVATION_PATH='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/epoch7-observation-1311b9e9fa97cfd4.private.json'
+OBSERVATION_SHA256='b961df049e2861e4706f28f29fcf994a14fe28e153263a23ec82d4e822b9b246'
+URL_PREFIX='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/'
+SOURCE_PATH='evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r6-contracts/epoch7_prepare_delivery.py'
+CAND='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520'
+class Hold(Exception):pass
+class CleanupError(Exception):pass
+class DeliveryError(Exception):pass
+def need(ok):
+    if not ok:raise Hold()
+@contextlib.contextmanager
+def budget(seconds):
+    need(signal.getitimer(signal.ITIMER_REAL)==(0.,0.));old=signal.getsignal(signal.SIGALRM);primary=None;end=time.monotonic()+seconds
+    def expired(a,b):raise Hold()
+    try:
+        signal.signal(signal.SIGALRM,expired);signal.setitimer(signal.ITIMER_REAL,seconds,.1)
+        yield end;need(time.monotonic()<end)
+    except BaseException as error:primary=error;raise
+    finally:
+        failed=False
+        try:signal.setitimer(signal.ITIMER_REAL,0)
+        except BaseException:failed=True
+        try:signal.signal(signal.SIGALRM,old)
+        except BaseException:failed=True
+        if failed:
+            if primary is None:raise CleanupError()
+            primary.cleanup_unknown=True
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self,*a,**k):raise Hold()
+def output(value):
+    try:
+        with budget(5) as end:
+            raw=json.dumps(value,sort_keys=True,separators=(',',':')).encode('ascii')+b'\n';need(len(raw)<=4096);offset=0
+            while offset<len(raw):
+                need(time.monotonic()<end);n=os.write(1,raw[offset:]);need(type(n) is int and 0<n<=len(raw)-offset);offset+=n
+            need(time.monotonic()<end)
+    except BaseException:raise DeliveryError() from None
+def main():
+    phase='BINDING_CHECK'
+    try:
+        need(type(DELIVERY_COMMIT) is str and re.fullmatch('[0-9a-f]{40}',DELIVERY_COMMIT))
+        need(type(DELIVERY_SHA256) is str and re.fullmatch('[0-9a-f]{64}',DELIVERY_SHA256) and type(DELIVERY_BYTES) is int and 0<DELIVERY_BYTES<=65536)
+        need(type(OBSERVATION_PATH) is str and os.path.dirname(OBSERVATION_PATH)==CAND and re.fullmatch('epoch7-observation-[0-9a-f]{16}\\.private\\.json',os.path.basename(OBSERVATION_PATH)))
+        need(type(OBSERVATION_SHA256) is str and re.fullmatch('[0-9a-f]{64}',OBSERVATION_SHA256))
+        need(os.geteuid()==os.getegid()==0 and socket.gethostname()=='iZd7oeikknn1z21sq6ji6zZ')
+        need(sys.flags.isolated and sys.flags.no_site and sys.dont_write_bytecode)
+        phase='DOWNLOAD_VERIFIED_DELIVERY'
+        with budget(30) as end:
+            url=URL_PREFIX+DELIVERY_COMMIT+'/'+SOURCE_PATH;response=None;primary=None
+            try:
+                opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+                response=opener.open(urllib.request.Request(url,headers={'Accept-Encoding':'identity'}),timeout=10)
+                need(response.status==200 and response.geturl()==url and response.headers.get('Content-Encoding','identity')=='identity')
+                need(response.headers.get('Content-Length') in (None,str(DELIVERY_BYTES)))
+                raw=response.read(DELIVERY_BYTES+1);need(time.monotonic()<end)
+                need(len(raw)==DELIVERY_BYTES and hashlib.sha256(raw).hexdigest()==DELIVERY_SHA256)
+            except BaseException as error:primary=error;raise
+            finally:
+                if response is not None:
+                    try:response.close()
+                    except BaseException:
+                        if primary is None:raise CleanupError()
+                        primary.cleanup_unknown=True
+            module=types.ModuleType('verified_preparation_delivery');module.__file__='<verified-preparation-delivery>'
+            exec(compile(raw,module.__file__,'exec'),module.__dict__)
+        phase='STAGE_AND_PROPOSE'
+        return module.entrypoint(['--observation',OBSERVATION_PATH,'--observation-sha256',OBSERVATION_SHA256])
+    except BaseException as error:
+        try:output({'state':'HOLD','phase':phase,'failure_code':type(error).__name__,
+            'cleanup_unknown':isinstance(error,CleanupError) or bool(getattr(error,'cleanup_unknown',False)),
+            'install_admission':'NOT_GRANTED','production_resume':'NOT_EXECUTED'})
+        except DeliveryError:pass
+        return 2
+if __name__=='__main__':sys.exit(main())
+PY

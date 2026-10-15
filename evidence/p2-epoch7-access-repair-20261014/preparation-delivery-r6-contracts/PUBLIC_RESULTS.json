@@ -1,0 +1,70 @@
+{
+  "actual_host_execution": "NOT_RUN",
+  "delivery_publication_commit": null,
+  "filesystem": "TEMPORARY_LOCAL_FIXTURES_ONLY",
+  "fixtures": "TEST_ONLY_PUBLIC_BYTES_NOT_USED_BY_DELIVERY_HELPER",
+  "git_operations": "NOT_RUN",
+  "independent_scoped_review": {
+    "pending": "Actual delivery publication and owner bootstrap own-publication binding",
+    "prior_unbound_source_sha256": "af737beaff22bcfcb8b3993e18212399b1a2f7ea976fa81630696310911b9460",
+    "python_versions": [
+      "3.6.8",
+      "3.12.14"
+    ],
+    "scope": "Exact two-assignment preparation-publication binding and actual-binding test delta from independently reviewed unbound checkpoint",
+    "source": {
+      "bytes": 24426,
+      "sha256": "371fe4e39b2e2f455049c47e45020a62269116c0a152964816e9bc0bae12b139"
+    },
+    "status": "PASS",
+    "tests_per_interpreter": 66,
+    "zero_errors_failures_skips": true
+  },
+  "install_admission": "NOT_GRANTED",
+  "network": "MOCKED_ONLY",
+  "observation_id": "1311b9e9fa97cfd4",
+  "observation_sha256": "b961df049e2861e4706f28f29fcf994a14fe28e153263a23ec82d4e822b9b246",
+  "owner_bootstrap_delivery_publication_bound": false,
+  "preparation_publication_bound": true,
+  "preparation_publication_commit": "8ab751a84922b76b80c8e8641cbe96e82fa5d391",
+  "private_plan": "NOT_RUN",
+  "production": "HOLD",
+  "schema": 1,
+  "state": "SCOPED_BOUND_DELIVERY_REVIEW_PASS_OWN_PUBLICATION_PENDING",
+  "suites": [
+    {
+      "errors": 0,
+      "failures": 0,
+      "file": "test_epoch7_prepare_delivery.py",
+      "python_versions": [
+        "3.6.8",
+        "3.12.14"
+      ],
+      "skips": 0,
+      "tests": 41
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "file": "test_epoch7_prepare_delivery_projection.py",
+      "python_versions": [
+        "3.6.8",
+        "3.12.14"
+      ],
+      "skips": 0,
+      "tests": 19
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "file": "test_epoch7_prepare_bootstrap_binding.py",
+      "python_versions": [
+        "3.6.8",
+        "3.12.14"
+      ],
+      "skips": 0,
+      "tests": 6
+    }
+  ],
+  "tests_per_interpreter": 66
+}
