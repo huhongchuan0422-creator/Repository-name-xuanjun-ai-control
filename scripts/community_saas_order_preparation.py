@@ -4,6 +4,7 @@ A prepared order cannot activate entitlements or represent confirmed payment.
 External authoritative finance confirmation must be integrated in a later stage.
 """
 import json
+import hashlib
 import sqlite3
 from scripts.community_merchant_contract import valid_id
 from scripts.community_saas_offer_catalog import read_quote
@@ -50,7 +51,9 @@ def prepare(db,quote_db,order_id,tenant_id,quote_id,currency,now):
     totals={cycle:group[key] for cycle,group in breakdown.items()}
     if any(type(v) is not int or v<0 for v in totals.values()):
         raise ValueError("INVALID_QUOTE_AMOUNT")
-    snapshot={"order_id":order_id,"tenant_id":tenant_id,"quote_id":quote_id,
+    quote_canonical=json.dumps(q,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+    quote_sha256=hashlib.sha256(quote_canonical.encode("utf-8")).hexdigest()
+    snapshot={"quote_sha256":quote_sha256,"quote_snapshot":q,"order_id":order_id,"tenant_id":tenant_id,"quote_id":quote_id,
               "module_id":q["module_id"],"offer_id":q["offer_id"],
               "offer_version":q["version"],"currency":currency,
               "created_at":now,"amounts_by_cycle_minor":totals,
