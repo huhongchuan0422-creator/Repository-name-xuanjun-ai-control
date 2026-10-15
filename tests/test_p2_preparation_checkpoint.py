@@ -3,8 +3,8 @@ import hashlib,json,os,pathlib,re,resource,shutil,signal,stat,subprocess,sys,tem
 
 PREFIX='evidence/p2-epoch7-access-repair-20261014/preparation-source/'
 PINS_BOUND=True
-PUBLIC_INPUTS_SHA='20230adc62a9d6c2a9de0201617ab5abc12ca13cc4e41cd1d4945476525a794a'
-EXPECTED_TEST_COUNT=77
+PUBLIC_INPUTS_SHA='2c347d53bffab6744846ae5b341b1cab4d4dddbe9f2ad0faa49dde287ba7249a'
+EXPECTED_TEST_COUNT=80
 PUBLIC_FILES=('README.md','epoch7_prepare.py','epoch7_prepare_data.py','epoch7_topology_projection.py',
               'run_local_tests.py','test_epoch7_prepare.py','test_epoch7_topology_projection.py')
 ARCHIVE_PATH='evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-9c40fc81.tar.gz'

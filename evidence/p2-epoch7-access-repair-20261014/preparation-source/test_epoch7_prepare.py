@@ -194,12 +194,19 @@ def mapped_info(info):
     return types.SimpleNamespace(**values)
 
 
+def fixture_owners():
+    # Offline fixture policy only: Hosted '/' is root-owned, while the private
+    # checkout and fixture directories belong to the nonroot test runner.
+    # Production still calls DescriptorTree with its unchanged root-only default.
+    return ((0,0),(os.getuid(),os.getgid()))
+
+
 def local_entry():
     root=pathlib.Path(__file__).resolve().parent.parent
     real=p.load_entry((fixture_kit()/'epoch7_recovery_entry.py').read_bytes())
     class Tree(object):
         def __init__(self,path):
-            self.real=real.DescriptorTree(path,owners=((os.getuid(),os.getgid()),))
+            self.real=real.DescriptorTree(path,owners=fixture_owners())
             self.fd=self.real.fd;self.closed=False
             self.opened=[[fd,parent,name,logical,tuple(list(stamp[:3])+[0,0]+list(stamp[5:]))]
                          for fd,parent,name,logical,stamp in self.real.opened]
@@ -284,6 +291,38 @@ class FilesystemTests(unittest.TestCase):
         self.assertEqual(len(os.listdir(self.root)),2)
         for name in os.listdir(self.root):self.assertEqual(os.stat(self.root+'/'+name).st_mode&0o777,0o600)
 
+
+class FixtureAuthorityTests(unittest.TestCase):
+    setUp=FilesystemTests.setUp
+    def test_fixture_owners_are_only_root_and_current_coherent_pair(self):
+        with mock.patch.object(os,'getuid',return_value=1001),mock.patch.object(os,'getgid',return_value=1007):
+            self.assertEqual(fixture_owners(),((0,0),(1001,1007)))
+    def test_original_authority_accepts_exact_pairs_and_rejects_foreign_or_mixed(self):
+        real=p.load_entry((fixture_kit()/'epoch7_recovery_entry.py').read_bytes())
+        tree=object.__new__(real.DescriptorTree);tree.owners=((0,0),(1001,1007))
+        for uid,gid,accepted in ((0,0,True),(1001,1007,True),(1001,0,False),(0,1007,False),(1002,1007,False)):
+            info=types.SimpleNamespace(st_mode=0o40755,st_uid=uid,st_gid=gid)
+            with self.subTest(uid=uid,gid=gid),mock.patch.object(real.os,'fstat',return_value=info),\
+                 mock.patch.object(real.os,'getxattr',side_effect=OSError(errno.ENODATA,'no fixture ACL')):
+                if accepted:self.assertIs(tree._authority(42,True),info)
+                else:
+                    with self.assertRaisesRegex(ValueError,'UNTRUSTED_AUTHORITY'):tree._authority(42,True)
+    def test_real_full_ancestry_and_hosted_mixed_ownership(self):
+        tree=self.entry.DescriptorTree(self.root)
+        try:
+            tree.real.recheck();tree.recheck()
+            rows=tree.real.opened
+            self.assertEqual(rows[0][3],'/');self.assertEqual(rows[-1][3],self.root)
+            pairs=[(os.fstat(row[0]).st_uid,os.fstat(row[0]).st_gid) for row in rows]
+            self.assertTrue(all(pair in fixture_owners() for pair in pairs))
+            self.assertEqual(pairs[-1],(os.getuid(),os.getgid()))
+            if os.environ.get('GITHUB_ACTIONS')=='true':
+                self.assertNotEqual(os.geteuid(),0)
+                self.assertEqual(pairs[0],(0,0))
+                self.assertIn((os.getuid(),os.getgid()),pairs)
+                self.assertGreater(len(set(pairs)),1)
+        finally:tree.real.close()
+
 class SocketInventoryTests(unittest.TestCase):
     setUp=FilesystemTests.setUp
     # These additional cases use the same exact reader and map only the three
@@ -337,13 +376,13 @@ class SourceLoadingTests(unittest.TestCase):
 raw=pathlib.Path(%r).read_bytes();module=types.ModuleType('prep');module.__file__=%r
 exec(compile(raw,module.__file__,'exec'),module.__dict__)
 entry=module.load_entry(pathlib.Path(%r).read_bytes())
-kit=entry._verify(%r,module.KIT_SHA,((os.getuid(),os.getgid()),))
+kit=entry._verify(%r,module.KIT_SHA,%r)
 cache={name:pathlib.Path(%r+'/'+name+'.py').read_bytes() for name in module.PREPARATION_SOURCES}
 with kit.imports(),module.preparation_modules(cache) as pair:
  import epoch7_host_factory
  assert len(pair)==2
  print('AUTHENTICATED_CACHED_IMPORTS_OK')
-"""%(str(wrapper),str(wrapper),str(kit/'epoch7_recovery_entry.py'),str(kit),str(pathlib.Path(__file__).resolve().parent))
+"""%(str(wrapper),str(wrapper),str(kit/'epoch7_recovery_entry.py'),str(kit),fixture_owners(),str(pathlib.Path(__file__).resolve().parent))
         result=subprocess.run([p.sys.executable,'-I','-B','-S','-c',script],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30)
         self.assertEqual(result.returncode,0,result.stderr.decode('utf-8','replace'))
         self.assertEqual(result.stdout,b'AUTHENTICATED_CACHED_IMPORTS_OK\n')
