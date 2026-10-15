@@ -66,7 +66,7 @@ from pathlib import Path
 '''
 
 
-def build(source, destination):
+def build(source, destination, http_adapter):
     # Fail instead of overwriting any earlier candidate or receipt.
     destination.mkdir(mode=0o700)
     pkg = destination / 'pr122_oauth_candidate'
@@ -142,15 +142,19 @@ def configure_state_root(root):
     # Require explicit configuration instead of retaining Tokyo runtime paths.
     helpers = helpers.replace("DEFAULT_STATE_ROOT = Path('/opt/trading-system/runtime/secure-secrets-portal')", '')
     (pkg / 'oauth.py').write_text(helpers + '\n')
+    adapter_source = http_adapter.read_text()
+    ast.parse(adapter_source)
+    (pkg / 'http_candidate.py').write_text(adapter_source)
     hashes = {}
     for path in sorted(pkg.glob('*.py')):
         ast.parse(path.read_text())
         hashes[str(path.relative_to(destination))] = hashlib.sha256(path.read_bytes()).hexdigest()
     (destination / 'MANIFEST.json').write_text(json.dumps({
-        'status': 'OFFLINE_LIBRARY_CANDIDATE_NOT_DEPLOYABLE',
+        'status': 'OFFLINE_HTTP_CANDIDATE_NOT_DEPLOYABLE',
         'source_archive_sha256': SOURCE_SHA, 'source_entry_sha256': ENTRY_SHA,
-        'production_change': False, 'files': hashes,
-        'remaining': ['HTTP adapter', 'protected state handoff', 'existing non-OAuth route successors',
+        'production_change': False, 'provider_calls_default': False, 'files': hashes,
+        'http_adapter_sha256': hashlib.sha256(adapter_source.encode()).hexdigest(),
+        'remaining': ['protected state handoff', 'existing non-OAuth route successors',
                       'independent review', 'host acceptance', 'TLS and DNS gates']
     }, indent=2, sort_keys=True) + '\n')
 
@@ -159,5 +163,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source_archive', type=Path)
     parser.add_argument('new_output_directory', type=Path)
+    parser.add_argument('--http-adapter', type=Path, default=Path(__file__).resolve().parents[1]
+                        / 'deploy/pr122-oauth-candidate/pr122_oauth_candidate/http_candidate.py')
     args = parser.parse_args()
-    build(source_archive(args.source_archive), args.new_output_directory)
+    build(source_archive(args.source_archive), args.new_output_directory, args.http_adapter)

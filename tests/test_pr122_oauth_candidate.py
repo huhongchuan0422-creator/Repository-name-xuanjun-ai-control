@@ -3,6 +3,11 @@ import ast
 import json
 import importlib.util
 import io
+import http.client
+import threading
+import socket
+import hashlib
+import urllib.parse
 import os
 import sys
 import tempfile
@@ -18,6 +23,7 @@ ROOT = Path(os.environ.get('PR122_CANDIDATE_ROOT',
             str(Path(__file__).resolve().parents[1]/'deploy/pr122-oauth-candidate')))
 sys.path.insert(0, str(ROOT))
 from pr122_oauth_candidate import core, oauth
+from pr122_oauth_candidate import http_candidate
 
 ORIGIN = 'https://wenwenwenyiyiyi.work'
 
@@ -29,6 +35,10 @@ class CandidateTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.service = core.SecureSecretsPortalService(self.root/'state', self.root/'ops')
         oauth.configure_state_root(self.root/'state')
+        transport = patch('urllib.request.urlopen',side_effect=AssertionError('EXTERNAL_NETWORK_FORBIDDEN'))
+        blocked = transport.start()
+        self.addCleanup(transport.stop)
+        self.addCleanup(blocked.assert_not_called)
 
     def session(self, form):
         return self.service.create_session('synthetic-customer', 'synthetic-account', ORIGIN, [form])
@@ -51,6 +61,13 @@ class CandidateTests(unittest.TestCase):
                 self.assertFalse({x.split('.')[0] for x in names} & forbidden, file.name)
             self.assertNotIn('/opt/trading-system', file.read_text())
         self.assertFalse(forbidden & set(sys.modules))
+
+    def test_manifest_matches_all_modules(self):
+        manifest = json.loads((ROOT/'MANIFEST.json').read_text())
+        actual = {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in (ROOT/'pr122_oauth_candidate').glob('*.py')}
+        self.assertEqual(manifest['files'],actual)
+        self.assertFalse(manifest['production_change'])
 
     def test_forbidden_forms(self):
         for forms in (None, [], ['binance_trading'], ['finance_collection_readonly'], ['tiktok','telegram']):
@@ -196,6 +213,108 @@ class InventoryTests(unittest.TestCase):
         self.assertNotIn('synthetic-sensitive',output.getvalue())
         self.assertIn(['sudo','-n','-l'],calls)
         self.assertTrue(all(c[0] in {'ss','systemctl','sudo'} for c in calls))
+
+
+class HttpTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.server = http_candidate.make_server(root/'state',root/'ops')
+        self.thread = threading.Thread(target=self.server.serve_forever,daemon=True)
+        self.thread.start()
+        self.addCleanup(self.cleanup)
+        transport = patch('urllib.request.urlopen',side_effect=AssertionError('EXTERNAL_NETWORK_FORBIDDEN'))
+        blocked = transport.start()
+        self.addCleanup(transport.stop)
+        self.addCleanup(blocked.assert_not_called)
+
+    def cleanup(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5)
+        self.tmp.cleanup()
+
+    def request(self,method,path,body=None,headers=None):
+        conn = http.client.HTTPConnection(*self.server.server_address,timeout=5)
+        base = {'Host':http_candidate.HOST,'X-Forwarded-Proto':'https'}
+        base.update(headers or {})
+        try:
+            conn.request(method,path,body,base)
+            response = conn.getresponse()
+            return response.status,dict(response.getheaders()),response.read().decode()
+        finally:
+            conn.close()
+
+    def test_health_is_not_production_ready(self):
+        status,headers,body = self.request('GET','/healthz')
+        self.assertEqual(status,200)
+        self.assertFalse(json.loads(body)['production_accepted'])
+        self.assertIn('Content-Security-Policy',headers)
+
+    def test_wrong_host_and_plaintext_rejected(self):
+        for headers in ({'Host':'wrong.invalid'},{'X-Forwarded-Proto':'http'}):
+            self.assertEqual(self.request('GET','/healthz',headers=headers)[0],400)
+
+    def test_old_capabilities_are_never_faked(self):
+        for method,path in [('POST','/submit/siliconflow'),('POST','/telegram-webhook/example'),
+                            ('GET','/telegram-canary/status'),('POST','/integrations/tiktok/disconnect')]:
+            self.assertEqual(self.request(method,path)[0],503)
+
+    def test_provider_calls_disabled_by_default(self):
+        with patch.object(oauth.TikTokOpenApiClient,'exchange_access_token') as exchange:
+            self.assertEqual(self.request('GET',oauth.TIKTOK_REDIRECT_PATH+'?state=x&code=x')[0],503)
+            exchange.assert_not_called()
+
+    def test_http_render_submit_and_replay(self):
+        service = self.server.portal_service
+        session = service.create_session('synthetic','synthetic',ORIGIN,['tiktok'])
+        self.assertEqual(self.request('GET','/p/'+session['session_id'])[0],200)
+        body = urllib.parse.urlencode({'session_id':session['session_id'],
+                'csrf_token':session['csrf_token'],'client_key':'synthetic-key',
+                'client_secret':'synthetic-secret'})
+        headers = {'Origin':ORIGIN,'Content-Type':'application/x-www-form-urlencoded'}
+        status,_,response = self.request('POST','/submit/tiktok',body,headers)
+        self.assertEqual(status,200)
+        self.assertNotIn('synthetic-secret',response)
+        status,_,_ = self.request('POST','/submit/tiktok',body,headers)
+        self.assertEqual(status,400)
+
+    def test_body_and_origin_limits(self):
+        self.assertEqual(self.request('POST','/submit/tiktok','x=1')[0],403)
+        headers = {'Origin':ORIGIN,'Content-Type':'application/x-www-form-urlencoded'}
+        self.assertEqual(self.request('POST','/submit/tiktok','x='+'a'*8192,headers)[0],413)
+        self.assertEqual(self.request('POST','/submit/tiktok','x=1&x=2',headers)[0],400)
+        self.assertEqual(self.request('POST','/submit/tiktok','x=1',{'Origin':ORIGIN,'Content-Type':'application/json'})[0],415)
+
+    def test_second_state_root_rejected(self):
+        with self.assertRaisesRegex(RuntimeError,'ONE_STATE_ROOT_PER_PROCESS'):
+            http_candidate.make_server(Path(self.tmp.name)/'second',Path(self.tmp.name)/'other')
+
+    def test_duplicate_content_length_rejected(self):
+        conn = http.client.HTTPConnection(*self.server.server_address,timeout=5)
+        try:
+            conn.putrequest('POST','/submit/tiktok',skip_host=True)
+            for key,value in [('Host',http_candidate.HOST),('X-Forwarded-Proto','https'),
+                              ('Origin',ORIGIN),('Content-Length','0'),('Content-Length','0')]:
+                conn.putheader(key,value)
+            conn.endheaders()
+            response = conn.getresponse()
+            self.assertEqual(response.status,400)
+            response.read()
+        finally:
+            conn.close()
+
+
+class FactoryTests(unittest.TestCase):
+    def test_bind_failure_does_not_deadlock_or_keep_global_lease(self):
+        with tempfile.TemporaryDirectory() as directory,socket.socket() as occupied:
+            root = Path(directory)
+            occupied.bind(('127.0.0.1',0))
+            occupied.listen(1)
+            with self.assertRaises(OSError):
+                http_candidate.make_server(root/'failed',root/'ops',port=occupied.getsockname()[1])
+            server = http_candidate.make_server(root/'fresh',root/'ops')
+            server.server_close()
 
 
 if __name__ == '__main__':
