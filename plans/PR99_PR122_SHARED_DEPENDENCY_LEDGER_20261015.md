@@ -117,3 +117,67 @@ database, key, DNS or TLS change. OpenClaw remains stopped.
   logs, failed/UNKNOWN behavior, rollback and Owner scope are reviewed.
 - Tokyo retirement remains a standalone gate across both PR99 and PR122 and
   all remaining domains/callers, not a result of domestic static-site PASS.
+
+
+## 2026-10-15 23:35 Asia/Shanghai: OAuth source/artifact gate closed; host gates remain open
+
+This entry supersedes only the OAuth candidate development/review TODO above.
+It does not advance production or alter any PR99/shared-resource authority.
+
+| Gate | Exact evidence | State |
+|---|---|---|
+| R1–R3 OAuth source correction | Independent review PR122#6195784574; exact commit d584cd60b31bf09ee45f27a73ad227bcd0e1110f | PASS_WITH_SCOPE_LIMITS |
+| Original artifact bytes and bindings | Independent review PR122#6195906963; Artifact11985605874; 15 binding files +7 modules,16 regular TAR entries | PASS |
+| Accurate feature-commit CI | Push38759580678/job116506986251 checks out d584cd60...;45/45 | PASS_CANDIDATE_ONLY |
+| PR integration preview | PR38759587631/job116507008501; merge preview79d235c includes d584cd60... | PASS_PREVIEW_ONLY |
+| Merged main / live provider / Domestic corrected host acceptance | No corresponding execution receipt | NOT_RUN |
+| Production, DNS/TLS cutover, Tokyo retirement | Separate gates below and shared rows remain unresolved | HOLD |
+
+Frozen functional tree:1c36452d4756f8b017f33644922ea05a5b4f0adb.
+Original ZIP SHA256:e0e55cbb30c9816c71f1ecc8317574845f98e69b676903aa0d78b3a134718fa4.
+Inner review TAR SHA256:aeff6534cdafb1986d788444dc52be56bba49b1b41b8a7c6773d6b40187e9041.
+These approvals bind that exact candidate and artifact, not subsequent shared
+branch HEADs. Existing static RG1 source, releases and receipts remain unchanged.
+Do not rebuild, repackage or rerun45 tests merely to acknowledge this gate.
+
+### One next integration scope, with explicit stop conditions
+
+1. **Protected state compatibility/custody — NOT_IMPLEMENTED/NOT_RUN.**
+   The reviewed seven-module candidate uses a new private SQLite store and
+   rejects legacy plaintext session/secret directories. It is not a drop-in
+   installer for Tokyo18080. Before host activation, prepare one reviewed,
+   account/provider-bound custody and reconciliation path for required
+   credentials, sessions, OAuth lifecycle and verified account bindings.
+   Do not put real secrets in GitHub/chat/artifacts or copy trading.db/master
+   keys. If continuity cannot be established, keep the old protected authority
+   and route, rather than silently making sessions/account state disappear.
+2. **Required route successors — INCOMPLETE.**
+   Cover every existing required apex route: public aliases/static files,
+   mixed /p and /submit capabilities, OAuth status/callback/start/disconnect,
+   health and Telegram edge/status. The current OAuth candidate explicitly
+   returns503 for non-OAuth and disconnect capabilities. No accepted removal
+   or interim proxy has been granted. Keep all affected old callers served;
+   unresolved routes block apex cutover.
+3. **Bounded isolated host acceptance — NOT_RUN.**
+   Only after configuration, state custody and exact execution scope are
+   reviewed may a fresh private candidate runtime use a nonproduction
+   loopback port. Verify user/path/mode, state restoration, identity/Origin,
+   restart/rollback and negative routes; prove provider-timeout/write-lock
+   contention and parallel capacity noted in source audit. No live provider
+   call or customer send is included without its separate scope.
+4. **TLS/ingress and final release — HOLD.**
+   Keep winctl and all existing domains/certificates unchanged. Accepted
+   dynamic destinations, exact Nginx Host/SNI/109-route responsibility,
+   host-local apex certificate/renewal proof, immutable release/rollback
+   binding and final independent release receipt precede any DNS change.
+   This ledger is a planning/status record, not execution authorization.
+5. **Tokyo retirement — separate HOLD.**
+   Resolve every shared resource row, PR99 authority and all Telegram/WeCom/
+   Novel/model dependencies before any Tokyo service stop or decommission.
+
+Current execution boundary: no server operation is authorized by the above
+audit receipts. No Domestic workflow/runner, service, bridge, tunnel,19443/18443,
+root permission, DNS/TLS, PR99/P2 or OpenClaw operation was performed in this
+acknowledgement. OpenClaw remains stopped. No whole-server migration completion
+is claimed. The next missing deliverable is the consolidated custody + route +
+isolated runtime acceptance implementation/configuration, not more R1–R3 review.
