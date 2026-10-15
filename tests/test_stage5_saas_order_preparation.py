@@ -6,18 +6,19 @@ import tempfile
 import os
 import unittest
 from scripts.community_saas_modules import connect,entitled
-from scripts.community_saas_offer_catalog import install as install_quotes,create_offer,quote
+from scripts.community_saas_offer_catalog import install as install_quotes,create_offer,quote,approve_offer
 from scripts.community_saas_order_preparation import install,prepare,read,install_lifecycle,advance,status,entitlement_intent,renewal_intent,quote_provenance
 
 def fee(cny=1000,usd=200,cycle="MONTH"):
     return {"type":"MODULE_FEE","label":"license","cycle":cycle,"quantity":1,
-            "cny_minor":cny,"usd_minor":usd}
+            "cny_minor":cny,"usd_minor":usd,"cost_cny_minor":0,"cost_usd_minor":0}
 class PrepareOrderTests(unittest.TestCase):
  def setUp(self):
     self.quotes=connect();install_quotes(self.quotes)
     self.orders=sqlite3.connect(":memory:");install(self.orders);install_lifecycle(self.orders)
     create_offer(self.quotes,"monthly",1,"storefront_catalog","MONTHLY",
                  [fee(),fee(5000,800,"ONCE")],term_days=30)
+    approve_offer(self.quotes,"monthly",1,"approvalA","costA",10)
     quote(self.quotes,"q1","tenantA","monthly",1,10,100)
  def tearDown(self):self.quotes.close();self.orders.close()
  def test_snapshot_cycles_no_payment_and_entitlement(self):
