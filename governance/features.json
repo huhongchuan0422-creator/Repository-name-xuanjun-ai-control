@@ -54,7 +54,8 @@
           "tests/test_p2_full_kit_checkpoint.py",
           "tests/test_p2_full_kit_wrapper_contract.py",
           "tests/test_p2_owner_diagnostic_r2.py",
-          "tests/test_p2_owner_diagnostic_r3.py"
+          "tests/test_p2_owner_diagnostic_r3.py",
+          "tests/test_p2_owner_diagnostic_r4.py"
         ]
       },
       "reuse": [
