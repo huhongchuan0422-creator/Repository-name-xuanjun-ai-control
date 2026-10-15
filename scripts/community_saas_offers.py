@@ -19,9 +19,10 @@ CREATE TABLE offers(
  mode TEXT NOT NULL,version INTEGER NOT NULL CHECK(version>0),
  status TEXT NOT NULL CHECK(status IN ('DRAFT','PREVIEW','APPROVED','EFFECTIVE','RETIRED')),
  availability TEXT NOT NULL CHECK(availability IN ('PUBLIC','CUSTOMER_PRIVATE')),
- tenant_scope TEXT, CHECK((availability='PUBLIC' AND tenant_scope IS NULL) OR (availability='CUSTOMER_PRIVATE' AND tenant_scope IS NOT NULL)),
+ tenant_scope TEXT,
  term_days INTEGER,renewable INTEGER NOT NULL CHECK(renewable IN (0,1)),
  license_scope TEXT NOT NULL,price_basis TEXT NOT NULL,
+ CHECK((availability='PUBLIC' AND tenant_scope IS NULL) OR (availability='CUSTOMER_PRIVATE' AND tenant_scope IS NOT NULL)),
  CHECK(term_days IS NULL OR term_days>0)
 );
 CREATE TABLE components(
