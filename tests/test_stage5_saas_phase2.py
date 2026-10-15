@@ -121,6 +121,28 @@ class Phase2Nodes(unittest.TestCase):
     state=self.call("health")
     self.assertEqual(state["finance_provider"],"NOT_CONNECTED")
     self.assertEqual(state["grant_writer"],"DISABLED")
+ def test_35_health_detail_admin_only(self):
+    with self.assertRaises(PermissionError):
+        self.call("health_detail")
+    healthy=self.call("health_detail",principal=self.admin)
+    self.assertEqual(healthy["status"],"OFFLINE_CHECKED")
+    self.assertFalse(healthy["production_release_authorized"])
+ def test_36_health_detail_pending_task_hold(self):
+    self.ordered()
+    self.call("review_open",{"task_id":"task1","order_id":"order1",
+        "kind":"FINANCE_EVIDENCE","reason":"manual review"},self.admin)
+    state=self.call("health_detail",principal=self.admin)
+    self.assertEqual(state["status"],"HOLD")
+    self.assertEqual(state["report"]["open_tasks"],["task1"])
+ def test_37_health_detail_tenant_scoped(self):
+    other=Principal("tenantB","MERCHANT_ADMIN")
+    self.ordered()
+    self.assertEqual(self.call("health_detail",principal=other)["report"]["open_tasks"],[])
+ def test_38_health_detail_fails_closed_on_corrupt_schema(self):
+    self.o.execute("DROP TABLE saas_review_tasks")
+    result=self.call("health_detail",principal=self.admin)
+    self.assertEqual(result["status"],"HOLD")
+    self.assertEqual(result["reason"],"OFFLINE_STORE_CHECK_FAILED")
  def test_29_refund_plan_admin_only(self):
     self.ordered()
     params={"order_id":"order1","reason":"customer requested reversal"}
