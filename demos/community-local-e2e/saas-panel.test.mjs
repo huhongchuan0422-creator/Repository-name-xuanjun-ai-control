@@ -18,3 +18,18 @@ test("unknown cost must remain visible as unknown",()=>{
  const view=offerCycles({lines:[{cycle:"MONTH",quantity:1,cny_minor:null,usd_minor:200}]});
  assert.match(view,/UNKNOWN/);
 });
+
+
+test("quote quantity multiplication overflow fails closed per currency",()=>{
+ const view=offerCycles({lines:[{cycle:"MONTH",quantity:3,cny_minor:Number.MAX_SAFE_INTEGER,usd_minor:100}]});
+ assert.match(view,/MONTH UNKNOWN \/ \$3\.00/);
+});
+test("quote accumulation overflow fails closed and does not affect other cycles",()=>{
+ const view=offerCycles({lines:[
+ {cycle:"ONCE",quantity:1,cny_minor:Number.MAX_SAFE_INTEGER-10,usd_minor:100},
+ {cycle:"ONCE",quantity:1,cny_minor:20,usd_minor:100},
+ {cycle:"MONTH",quantity:1,cny_minor:300,usd_minor:300}
+ ]});
+ assert.match(view,/ONCE UNKNOWN \/ \$2\.00/);
+ assert.match(view,/MONTH ¥3\.00 \/ \$3\.00/);
+});
