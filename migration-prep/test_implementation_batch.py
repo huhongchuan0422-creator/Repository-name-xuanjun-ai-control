@@ -235,7 +235,11 @@ class ReadOnlyAdapterTests(unittest.TestCase):
                     (1002 if symbol == "ETHUSDT" else 1004),
                 "request_finished_ms": 1001 if symbol in (None, "BTCUSDT") else
                     (1003 if symbol == "ETHUSDT" else 1005),
-                "response_sha256": sha256_value(response), "auth_evidence_sha256": "a" * 64}
+                "response_sha256": sha256_value(response), "auth_evidence_sha256": "a" * 64,
+                "network_evidence": {"method": "GET",
+                    "path": dict(SURFACE_REQUESTS)[surface],
+                    "body_sha256": "b" * 64,
+                    "normalized_response_sha256": sha256_value(response)}}
             return response, receipt
         pager = AuthenticatedGetOnlyPager(transport, lambda receipt, response: True,
                                          clock, 2000)

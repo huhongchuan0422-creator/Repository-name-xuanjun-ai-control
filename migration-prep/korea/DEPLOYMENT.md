@@ -1,7 +1,34 @@
 # Korea isolated deployment candidate
 
 This directory is packaging input only. Nothing here installs a user, directory,
-service, SecretRef, firewall rule, credential, or Writer.
+service, SecretRef, firewall rule, credential, or Writer until a separately approved
+root transaction invokes `install-candidate.sh` on Korea.
+
+## Self-contained delivery and default validation
+
+Build and validate the exact extracted input from the repository root:
+
+```text
+PYTHONPATH=migration-prep python3.11 -m korea.build_runtime_candidate /root/private/runtime-candidate
+python3.11 /root/private/runtime-candidate/migration-prep/korea/validate_runtime_candidate.py \
+  /root/private/runtime-candidate --expected-manifest-sha256 <sha256>
+```
+
+The directory includes every declared Python dependency. Validation rejects
+missing/extra bytes, normal or dangling symlinks, and uses `python -I` with only
+the extracted `migration-prep` directory inserted. It cannot borrow workspace files
+and performs no network call.
+
+Before any mutation, install validates a root-private staging chain, the complete
+manifest/import, existing identity attributes, root-owned target parents and every
+target with both `-e` and `-L`. It copies to a private staging directory, validates
+again, then atomically renames one content-addressed release. Its transaction record
+binds the manifest/content, release, venv Python, unit and exact owned objects.
+Check verifies installed bytes, real current/venv identity, the disabled/inactive
+service and effective unit/drop-ins. Re-entry succeeds only for the same valid
+transaction. Uninstall requires the transaction hash and refuses replaced objects;
+it retains state, credentials, evidence and identity. Failure reports its stage and
+cleans only objects created by that attempt.
 
 The candidate uses its own Python 3.11 virtual environment and dedicated service
 identity. The systemd template keeps release/config read-only and state/log roots
@@ -19,10 +46,20 @@ application GET enforcement and root network confinement are both mandatory and
 must be independently audited after installation. No IP, unit or transport was
 installed or exercised against Binance in this batch.
 
-Shadow acceptance requires a minimum 24-hour run, zero decision/position/order/
-protective mismatches, zero unknown/in-flight state, and restart recovery. These
-thresholds are candidate defaults and still need Owner approval. The canary in this
-artifact permits zero new entries because no production Writer authority is packaged.
+The business `snapshot_id` is selected inside the closed WAL-aware copy for the exact
+account and freshness window; it is never the evidence-only `observation_run_id`.
+The real entry uses the shared server-time/surface-window/pagination/state core,
+independently verified raw network evidence and one overall capture deadline. PASS
+exits 0, HOLD exits 2 and UNKNOWN exits 3.
+
+The unit is wired to bounded continuous sampling. A separate acceptance config must
+carry Owner-approved duration, interval, sample count, resource/latency thresholds,
+approval id and window id. The checked-in template deliberately has
+`owner_approved=false`, so it cannot execute acceptance. A hash-bound window ledger
+survives restart and aggregates every cycle, latency and RSS/MemAvailable/swap sample.
+Unknown state, insufficient samples, threshold breach or config drift fails closed.
+Template numbers are suggestions, not approvals. The candidate permits zero new
+entries because no production Writer authority is packaged.
 
 Rollback is Korea-first: lock Korea Writer, revoke its credential, remove its IP,
 reconcile every unknown outcome, and only then consider Tokyo restoration and a new

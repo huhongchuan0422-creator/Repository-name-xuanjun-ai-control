@@ -11,11 +11,13 @@ import hashlib
 import hmac
 import json
 import os
+import signal
 import stat
 import subprocess
 import sys
 import time
 from urllib.parse import urlencode
+from contextlib import contextmanager
 
 from gate_common import GateError, canonical_bytes, require, sha256_value
 from final_snapshot import REQUIRED_SURFACES, RECONCILED_STATE_CLASSES, SURFACE_REQUESTS
@@ -26,6 +28,7 @@ from readonly_reconciliation_adapter import (
     LOCAL_COMPARE_SURFACES,
     ReadOnlyBusinessDatabase,
     SYMBOLS,
+    evaluate_reconciliation,
 )
 
 
@@ -33,6 +36,25 @@ ROLE = "BINANCE_ACCOUNT_READONLY"
 WRITE_WORDS = frozenset(("POST", "PUT", "PATCH", "DELETE", "ORDER", "CANCEL"))
 SINGLETON_SURFACES = frozenset(("server_time", "account", "balances", "position_mode"))
 PAGED_SURFACES = frozenset(("recent_orders", "trades"))
+
+
+@contextmanager
+def _hard_deadline(seconds):
+    """Bound DNS, TLS, body reads and SQLite capture, not only socket calls."""
+    require(isinstance(seconds, (int, float)) and seconds > 0,
+            "SHADOW_OVERALL_CAPTURE_DEADLINE_EXCEEDED")
+    require(hasattr(signal, "setitimer") and hasattr(signal, "ITIMER_REAL"),
+            "SHADOW_HARD_DEADLINE_UNAVAILABLE")
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    def expired(unused_signum, unused_frame):
+        raise GateError("SHADOW_OVERALL_CAPTURE_DEADLINE_EXCEEDED")
+    signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
 
 
 def _read_secure_file(path, label):
@@ -80,7 +102,7 @@ def _load_config(path):
 
 
 class IndependentReceiptVerifier(object):
-    def __init__(self, command, expected_sha256):
+    def __init__(self, command, expected_sha256, monotonic=None, deadline_monotonic=None):
         require(isinstance(command, str) and command.startswith("/"),
                 "SHADOW_VERIFIER_COMMAND_REQUIRED")
         require(os.path.isfile(command) and not os.path.islink(command),
@@ -92,12 +114,19 @@ class IndependentReceiptVerifier(object):
             digest = hashlib.sha256(stream.read()).hexdigest()
         require(digest == expected_sha256, "SHADOW_VERIFIER_HASH_MISMATCH")
         self.command = command
+        self.monotonic = monotonic or time.monotonic
+        self.deadline_monotonic = deadline_monotonic
 
     def __call__(self, receipt, response):
+        remaining = 10
+        if self.deadline_monotonic is not None:
+            remaining = min(remaining, self.deadline_monotonic - self.monotonic())
+        if remaining <= 0:
+            return False
         result = subprocess.run(
             [self.command, "verify-shadow-receipt"],
             input=canonical_bytes({"receipt": receipt, "response": response}),
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, check=False,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=remaining, check=False,
         )
         if result.returncode != 0:
             return False
@@ -105,30 +134,61 @@ class IndependentReceiptVerifier(object):
             value = json.loads(result.stdout.decode("utf-8"))
         except (UnicodeDecodeError, ValueError):
             return False
-        return value == {"verified": True}
+        expected = {
+            "verified": True,
+            "request_id": receipt["request_id"],
+            "account_id": receipt["account_id"],
+            "credential_role": receipt["credential_role"],
+            "response_sha256": receipt["response_sha256"],
+            "network_evidence_sha256": sha256_value(receipt["network_evidence"]),
+        }
+        return value == expected
 
 
 class SignedReadonlyTransport(object):
     """Surface adapter whose only network primitive is ControlledHttpsTransport.get."""
-    def __init__(self, transport, api_key, api_secret, clock_ms=None):
+    def __init__(self, transport, api_key, api_secret, observation_run_id,
+                 deadline_monotonic, clock_ms=None, monotonic=None):
         require(isinstance(transport, ControlledHttpsTransport),
                 "SHADOW_CONTROLLED_TRANSPORT_REQUIRED")
         self.transport = transport
         self.api_key = api_key.decode("utf-8")
         self.api_secret = api_secret
         self.clock_ms = clock_ms or (lambda: int(time.time() * 1000))
+        self.monotonic = monotonic or time.monotonic
+        self.deadline_monotonic = deadline_monotonic
+        self.observation_run_id = observation_run_id
         self.paths = dict(SURFACE_REQUESTS)
 
     @staticmethod
     def _items(surface, value):
+        require(not (isinstance(value, dict) and "code" in value and "msg" in value),
+                "SHADOW_BINANCE_ERROR_RESPONSE")
         if surface in SINGLETON_SURFACES:
             require(isinstance(value, (dict, list)), "SHADOW_SINGLETON_RESPONSE_INVALID")
+            if surface == "server_time":
+                require(isinstance(value, dict) and type(value.get("serverTime")) is int,
+                        "SHADOW_SERVER_TIME_RESPONSE_INVALID")
+            elif surface == "position_mode":
+                require(isinstance(value, dict) and type(value.get("dualSidePosition")) is bool,
+                        "SHADOW_POSITION_MODE_RESPONSE_INVALID")
+            elif surface == "balances":
+                require(isinstance(value, list) and all(
+                    isinstance(item, dict) and isinstance(item.get("asset"), str)
+                    for item in value), "SHADOW_BALANCE_RESPONSE_INVALID")
+            elif surface == "account":
+                require(isinstance(value, dict) and isinstance(value.get("assets"), list),
+                        "SHADOW_ACCOUNT_RESPONSE_INVALID")
             return value
         require(isinstance(value, list), "SHADOW_LIST_RESPONSE_INVALID")
+        require(all(isinstance(item, dict) for item in value),
+                "SHADOW_LIST_ITEM_RESPONSE_INVALID")
         return value
 
     def __call__(self, surface, symbol, cursor, account_id, snapshot_id):
         require(surface in REQUIRED_SURFACES, "SHADOW_SURFACE_NOT_ALLOWLISTED")
+        remaining = self.deadline_monotonic - self.monotonic()
+        require(remaining > 0, "SHADOW_OVERALL_CAPTURE_DEADLINE_EXCEEDED")
         path = self.paths[surface]
         started = self.clock_ms()
         parameters = {}
@@ -147,10 +207,13 @@ class SignedReadonlyTransport(object):
             ).hexdigest()
         query = urlencode(sorted(parameters.items()))
         headers = {} if surface == "server_time" else {"X-MBX-APIKEY": self.api_key}
-        body, network_receipt = self.transport.get(
-            "https://fapi.binance.com" + path + (("?" + query) if query else ""),
-            headers=headers,
-        )
+        with _hard_deadline(remaining):
+            body, network_receipt = self.transport.get(
+                "https://fapi.binance.com" + path + (("?" + query) if query else ""),
+                headers=headers, timeout_seconds=min(self.transport.timeout_seconds, remaining),
+            )
+        require(self.monotonic() <= self.deadline_monotonic,
+                "SHADOW_OVERALL_CAPTURE_DEADLINE_EXCEEDED")
         finished = self.clock_ms()
         try:
             decoded = json.loads(body.decode("utf-8"))
@@ -165,64 +228,82 @@ class SignedReadonlyTransport(object):
             next_cursor = str(last + 1)
         response = {"items": items, "next_cursor": next_cursor,
                     "observed_at_ms": finished}
+        network_evidence = dict(network_receipt)
+        network_evidence["normalized_response_sha256"] = sha256_value(response)
         receipt = {
             "method": "GET", "endpoint": path,
-            "request_id": hashlib.sha256((snapshot_id + surface + str(symbol) +
-                                           str(cursor)).encode("utf-8")).hexdigest(),
+            "request_id": hashlib.sha256((self.observation_run_id + snapshot_id + surface +
+                                           str(symbol) + str(cursor)).encode("utf-8")).hexdigest(),
             "credential_role": ROLE, "account_id": account_id,
             "request_started_ms": started, "request_finished_ms": finished,
             "response_sha256": sha256_value(response),
             "auth_evidence_sha256": hashlib.sha256(canonical_bytes({
                 "credential_role": ROLE, "endpoint": path,
                 "query_keys": sorted(key for key in parameters if key != "signature"),
-                "network_receipt": network_receipt,
+                "network_evidence_sha256": sha256_value(network_evidence),
             })).hexdigest(),
+            "network_evidence": network_evidence,
         }
         return response, receipt
 
 
-def run_once(config, now_ms=None):
-    started = int(time.time() * 1000) if now_ms is None else now_ms
+def run_once(config, now_ms=None, clock_ms=None, monotonic=None,
+             transport_factory=None, verifier_factory=None):
+    clock = clock_ms or (lambda: int(time.time() * 1000))
+    monotonic_clock = monotonic or time.monotonic
+    started = clock() if now_ms is None else now_ms
+    capture_started_ms = clock()
+    capture_started_monotonic = monotonic_clock()
+    deadline_monotonic = capture_started_monotonic + (config["capture_timeout_ms"] / 1000.0)
     api_key = _read_secure_file(config["api_key_file"], "READONLY_API_KEY")
     api_secret = _read_secure_file(config["api_secret_file"], "READONLY_API_SECRET")
-    verifier = IndependentReceiptVerifier(config["verifier_command"],
-                                          config["verifier_sha256"])
+    if verifier_factory is None:
+        verifier = IndependentReceiptVerifier(
+            config["verifier_command"], config["verifier_sha256"],
+            monotonic=monotonic_clock, deadline_monotonic=deadline_monotonic)
+    else:
+        verifier = verifier_factory(config["verifier_command"], config["verifier_sha256"])
     directory = EvidenceDirectory(config["evidence_root"], config["business_database"])
-    run_id = "shadow-" + str(started)
-    run_dir = directory.create_run(run_id)
-    database = ReadOnlyBusinessDatabase(
-        config["business_database"], run_dir, config["account_id"], run_id,
-        started, config["snapshot_max_age_ms"],
-    )
+    observation_run_id = "shadow-observation-" + str(started)
+    run_dir = directory.create_run(observation_run_id)
+    database = None
     try:
-        local = database.snapshot()
-        deadline = started + config["capture_timeout_ms"]
+        with _hard_deadline(deadline_monotonic - monotonic_clock()):
+            database = ReadOnlyBusinessDatabase(
+                config["business_database"], run_dir, config["account_id"], None,
+                started, config["snapshot_max_age_ms"],
+            )
+            local = database.snapshot()
+        authoritative_snapshot_id = local["snapshot_id"]
+        transport = ((transport_factory or ControlledHttpsTransport)(
+            "fapi.binance.com", config["pinned_ips"]))
         transport = SignedReadonlyTransport(
-            ControlledHttpsTransport("fapi.binance.com", config["pinned_ips"]),
-            api_key, api_secret,
+            transport, api_key, api_secret, observation_run_id,
+            deadline_monotonic, clock_ms=clock, monotonic=monotonic_clock,
         )
         pager = AuthenticatedGetOnlyPager(
-            transport, verifier, lambda: int(time.time() * 1000), deadline,
+            transport, verifier, clock, started + config["capture_timeout_ms"],
         )
-        surfaces = dict((surface, pager.collect(
-            surface, SYMBOLS, config["account_id"], run_id
-        )) for surface in REQUIRED_SURFACES)
-        blockers = []
-        for name in LOCAL_COMPARE_SURFACES:
-            if sha256_value(local["exchange_mirror"][name]) != sha256_value(surfaces[name]["data"]):
-                blockers.append("STATE_MISMATCH:" + name)
-        if local["unknown_orders"]:
-            blockers.append("UNKNOWN_EXECUTION")
-        if local["inflight_requests"]:
-            blockers.append("INFLIGHT_REQUESTS")
-        if local["ownership_conflicts"]:
-            blockers.append("OWNERSHIP_CONFLICTS")
-        verification = database.close_and_verify()
+        surfaces = {}
+        for surface in REQUIRED_SURFACES:
+            require(monotonic_clock() <= deadline_monotonic,
+                    "SHADOW_OVERALL_CAPTURE_DEADLINE_EXCEEDED")
+            surfaces[surface] = pager.collect(
+                surface, SYMBOLS, config["account_id"], authoritative_snapshot_id)
+        capture_finished_ms = clock()
+        blockers = evaluate_reconciliation(
+            local, surfaces, pager.calls, started, capture_started_ms,
+            capture_finished_ms, max_capture_ms=config["capture_timeout_ms"],
+            require_authenticated=True)
+        with _hard_deadline(deadline_monotonic - monotonic_clock()):
+            verification = database.close_and_verify()
         if not verification["source_stable_through_read"]:
             blockers.append("SQLITE_SOURCE_CHANGED_AFTER_CAPTURE")
         result = {
             "schema_version": 1, "feature_id": config["feature_id"],
-            "mode": "KOREA_GET_ONLY_SHADOW", "run_id": run_id,
+            "mode": "KOREA_GET_ONLY_SHADOW",
+            "observation_run_id": observation_run_id,
+            "authoritative_business_snapshot_id": authoritative_snapshot_id,
             "status": "PASS_READONLY_SHADOW_CYCLE" if not blockers else "HOLD",
             "blockers": blockers, "surfaces": surfaces, "calls": pager.calls,
             "local_state_sha256": sha256_value(local),
@@ -235,13 +316,24 @@ def run_once(config, now_ms=None):
             directory.write_once(run_dir, "local-state.json", local),
             directory.write_once(run_dir, "reconciliation.json", result),
         ]
-        return {"status": result["status"], "run_id": run_id, "files": files}
-    except Exception:
+        return {"status": result["status"], "observation_run_id": observation_run_id,
+                "authoritative_business_snapshot_id": authoritative_snapshot_id,
+                "files": files}
+    except Exception as error:
         try:
-            database.connection.close()
+            if database is not None:
+                database.connection.close()
         except Exception:
             pass
-        raise
+        failure = {"schema_version": 1, "status": "HOLD",
+                   "observation_run_id": observation_run_id,
+                   "error_type": type(error).__name__, "production_authorized": False,
+                   "writer_enabled": False, "scheduler_enabled": False}
+        try:
+            directory.write_once(run_dir, "reconciliation.json", failure)
+        except Exception:
+            pass
+        return failure
 
 
 def self_check():
@@ -262,14 +354,26 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--config")
     parser.add_argument("--once", action="store_true")
+    parser.add_argument("--continuous", action="store_true")
+    parser.add_argument("--acceptance-config")
     parser.add_argument("--self-check", action="store_true")
     args = parser.parse_args(argv)
     if args.self_check:
         print(json.dumps(self_check(), sort_keys=True))
         return 0
-    require(args.once and args.config, "SHADOW_EXPLICIT_ONCE_AND_CONFIG_REQUIRED")
-    print(json.dumps(run_once(_load_config(args.config)), sort_keys=True))
-    return 0
+    require(bool(args.once) != bool(args.continuous) and args.config,
+            "SHADOW_EXACTLY_ONE_MODE_AND_CONFIG_REQUIRED")
+    if args.continuous:
+        require(args.acceptance_config, "SHADOW_ACCEPTANCE_CONFIG_REQUIRED")
+        from korea.shadow_acceptance import load_acceptance_config, run_continuous
+        result = run_continuous(_load_config(args.config),
+                                load_acceptance_config(args.acceptance_config))
+    else:
+        result = run_once(_load_config(args.config))
+    print(json.dumps(result, sort_keys=True))
+    if str(result.get("status", "")).startswith("PASS"):
+        return 0
+    return 3 if result.get("status") == "UNKNOWN" else 2
 
 
 if __name__ == "__main__":
@@ -278,4 +382,5 @@ if __name__ == "__main__":
     except Exception as error:
         print(json.dumps({"status": "HOLD", "error_type": type(error).__name__,
                           "production_authorized": False}, sort_keys=True), file=sys.stderr)
+        sys.exit(2)
         sys.exit(2)

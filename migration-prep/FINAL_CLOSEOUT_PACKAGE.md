@@ -1,5 +1,32 @@
 # Tokyo → Korea Binance final closeout package
 
+## Consolidated R1-R6 remediation after independent review 6181062368
+
+The accepted parent is `82025a45acefb7ef4ae3708bc37f71000ad32b92` /
+`db8bbf12b405d9cdb3a9805e4523414935b884a2`. Unchanged accepted evidence is
+reused. This delta changes only the Korea B/C candidate and focused tests:
+
+* R1: deterministic self-contained runtime builder and clean-extract validator;
+  isolated import cannot fall back to workspace files.
+* R2: mutation follows full preflight, private staging, second byte verification,
+  transaction ownership, effective-unit verification and hash-bound uninstall.
+* R3: evidence `observation_run_id` is separate from the authoritative business
+  `snapshot_id` selected in the closed WAL-aware copy by account/freshness.
+* R4: the real entry shares server-time, surface-window, pagination and state
+  checks; raw network evidence is independently verified and the whole capture has
+  one deadline.
+* R5: PASS exits 0, HOLD exits 2, UNKNOWN exits 3; failures retain a structured
+  receipt and never report success through exit 0.
+* R6: the unit uses an Owner-parameterized bounded continuous sampler with
+  restart-resumable window evidence and resource/latency aggregation. The
+  unapproved template cannot run.
+
+Offline focused tests exercise only-extracted-artifact validation, the real default
+entry on a redacted production-shaped SQLite schema with an existing snapshot id,
+clock skew, slow response, malformed response, incomplete pagination, verifier
+rejection, nonzero failure exits, installer failure boundaries and continuous-window
+aggregation. No Binance or production host is contacted.
+
 Feature: `TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1`
 
 Baseline: `4a6215e0d27e1560de3eca4ccbc5dbeaa492aaff` / `e2c647630e7fbeefbf35a3835bdb4573a0c5d3de`

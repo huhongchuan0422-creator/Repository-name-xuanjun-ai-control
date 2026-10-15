@@ -14,6 +14,10 @@ FILES = (
     "migration-prep/korea/__init__.py",
     "migration-prep/korea/get_only_policy.py",
     "migration-prep/korea/migration_shadow_entry.py",
+    "migration-prep/korea/shadow_acceptance.py",
+    "migration-prep/korea/shadow-acceptance.template.json",
+    "migration-prep/korea/validate_runtime_candidate.py",
+    "migration-prep/korea/build_runtime_candidate.py",
     "migration-prep/korea/shadow-config.template.json",
     "migration-prep/korea/xuanjun-binance-shadow.service.in",
     "migration-prep/korea/install-candidate.sh",
@@ -31,10 +35,10 @@ def build():
                         "sha256": hashlib.sha256(raw).hexdigest()})
     content = "\n".join(item["path"] + "\0" + item["sha256"] for item in records)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "feature_id": "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
         "artifact_role": "KOREA_GET_ONLY_SHADOW_RUNTIME_CANDIDATE",
-        "entrypoint": "python -m korea.migration_shadow_entry",
+        "entrypoint": "python -m korea.migration_shadow_entry --continuous",
         "python": "/usr/bin/python3.11",
         "requirements": "stdlib-only",
         "files": records,

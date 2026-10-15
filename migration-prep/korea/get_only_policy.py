@@ -11,6 +11,7 @@ import http.client
 import ipaddress
 import socket
 import ssl
+import time
 from urllib.parse import urlsplit
 
 
@@ -97,7 +98,7 @@ class ControlledHttpsTransport(object):
         if not 200 <= status < 300:
             raise PolicyDenied("HTTP_NON_SUCCESS_FORBIDDEN")
 
-    def get(self, url, headers=None):
+    def get(self, url, headers=None, timeout_seconds=None):
         decision = validate_request("GET", url)
         if decision["host"] != self.host:
             raise PolicyDenied("TRANSPORT_HOST_MISMATCH")
@@ -111,8 +112,12 @@ class ControlledHttpsTransport(object):
             context.minimum_version = ssl.TLSVersion.TLSv1_2
         parsed = urlsplit(url)
         request_target = parsed.path + (("?" + parsed.query) if parsed.query else "")
+        effective_timeout = self.timeout_seconds if timeout_seconds is None else timeout_seconds
+        if not isinstance(effective_timeout, (int, float)) or not 0 < effective_timeout <= self.timeout_seconds:
+            raise PolicyDenied("TRANSPORT_REQUEST_TIMEOUT_INVALID")
+        started_monotonic = time.monotonic()
         connection = PinnedHTTPSConnection(self.host, pinned_ip, 443,
-                                           self.timeout_seconds, context)
+                                           effective_timeout, context)
         try:
             connection.request("GET", request_target, headers=safe_headers)
             response = connection.getresponse()
@@ -123,6 +128,9 @@ class ControlledHttpsTransport(object):
             certificate = connection.sock.getpeercert(binary_form=True)
             if not certificate:
                 raise PolicyDenied("TLS_PEER_CERTIFICATE_REQUIRED")
+            finished_monotonic = time.monotonic()
+            if finished_monotonic - started_monotonic > effective_timeout:
+                raise PolicyDenied("HTTP_REQUEST_DEADLINE_EXCEEDED")
             receipt = {"method": "GET", "host": self.host, "path": parsed.path,
                        "status": response.status, "resolved_ip_sha256":
                            hashlib.sha256(pinned_ip.encode("ascii")).hexdigest(),
@@ -131,6 +139,8 @@ class ControlledHttpsTransport(object):
                        "tls_peer_certificate_sha256": hashlib.sha256(certificate).hexdigest(),
                        "proxy_used": False, "redirect_followed": False,
                        "root_egress_isolation_proven": False,
+                       "request_timeout_seconds": effective_timeout,
+                       "elapsed_ms": int((finished_monotonic - started_monotonic) * 1000),
                        "body_sha256": hashlib.sha256(body).hexdigest()}
             self.receipts.append(receipt)
             return body, receipt

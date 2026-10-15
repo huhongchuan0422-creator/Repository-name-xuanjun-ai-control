@@ -7,16 +7,17 @@ Wants=network-online.target
 Type=simple
 User=xuanjun_binance
 Group=xuanjun_binance
-WorkingDirectory=/opt/xuanjun-binance/current
+WorkingDirectory=/opt/xuanjun-binance/current/migration-prep
 EnvironmentFile=/etc/xuanjun-binance/shadow.env
 Environment=HTTP_PROXY=
 Environment=HTTPS_PROXY=
 Environment=ALL_PROXY=
 Environment=NO_PROXY=*
-Environment=PYTHONPATH=/opt/xuanjun-binance/current
+Environment=PYTHONPATH=/opt/xuanjun-binance/current/migration-prep
+Environment=PYTHONDONTWRITEBYTECODE=1
 LoadCredential=binance_api_key:/etc/xuanjun-binance/secretref/BINANCE_ACCOUNT_READONLY_API_KEY
 LoadCredential=binance_api_secret:/etc/xuanjun-binance/secretref/BINANCE_ACCOUNT_READONLY_API_SECRET
-ExecStart=/opt/xuanjun-binance/venv/bin/python -m korea.migration_shadow_entry --once --config /etc/xuanjun-binance/shadow.json
+ExecStart=/opt/xuanjun-binance/venv/bin/python -m korea.migration_shadow_entry --continuous --config /etc/xuanjun-binance/shadow.json --acceptance-config /etc/xuanjun-binance/shadow-acceptance.json
 Restart=no
 NoNewPrivileges=yes
 PrivateTmp=yes

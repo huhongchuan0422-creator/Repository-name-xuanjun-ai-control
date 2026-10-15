@@ -160,7 +160,8 @@ class ReadOnlyBusinessDatabase(object):
                  max_age_ms=DEFAULT_MAX_AGE_MS, before_backup_hook=None):
         self.path = _real(path)
         self.account_id = _valid_identifier(account_id, "G4_ACCOUNT_ID_INVALID")
-        self.snapshot_id = _valid_identifier(snapshot_id, "G4_SNAPSHOT_ID_INVALID")
+        if snapshot_id is not None:
+            _valid_identifier(snapshot_id, "G4_SNAPSHOT_ID_INVALID")
         require(type(captured_at_ms) is int and captured_at_ms > 0, "G4_CAPTURE_TIME_INVALID")
         require(type(max_age_ms) is int and 0 < max_age_ms <= 300000, "G4_MAX_AGE_INVALID")
         self.captured_at_ms, self.max_age_ms = captured_at_ms, max_age_ms
@@ -169,6 +170,65 @@ class ReadOnlyBusinessDatabase(object):
         self.connection = sqlite3.connect(uri, uri=True)
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA query_only=ON")
+        self.snapshot_selection = self._select_authoritative_snapshot(snapshot_id)
+        self.snapshot_id = self.snapshot_selection["snapshot_id"]
+
+    def _select_authoritative_snapshot(self, requested_snapshot_id):
+        """Select a real business snapshot independently from the observation id.
+
+        Selection happens only inside the closed WAL-aware copy.  A caller may
+        bind an already-known authoritative id, or leave it unset and accept the
+        unique freshest account snapshot inside the configured time window.
+        """
+        require("account_snapshots" in self._tables(), "G4_DB_TABLE_MISSING:account_snapshots")
+        columns = set(row[1] for row in self.connection.execute(
+            "PRAGMA table_info(account_snapshots)"))
+        required = set(("id", "snapshot_id", "account_id", "created_time", "payload_json"))
+        require(required.issubset(columns), "G4_DB_COLUMNS_MISSING:account_snapshots")
+        rows = [dict(row) for row in self.connection.execute(
+            'SELECT "id","snapshot_id","account_id","created_time" '
+            'FROM account_snapshots WHERE "account_id"=? ORDER BY id',
+            (self.account_id,))]
+        candidates = []
+        for row in rows:
+            snapshot = _valid_identifier(row.get("snapshot_id"), "G4_SNAPSHOT_ID_INVALID")
+            observed = _epoch_ms(row.get("created_time"))
+            require(observed <= self.captured_at_ms + DEFAULT_MAX_CLOCK_SKEW_MS,
+                    "G4_SNAPSHOT_FROM_FUTURE")
+            if self.captured_at_ms - observed <= self.max_age_ms:
+                candidates.append((observed, snapshot, row["id"]))
+        require(candidates, "G4_AUTHORITATIVE_SNAPSHOT_NOT_FOUND")
+        if requested_snapshot_id is None:
+            latest = max(item[0] for item in candidates)
+            latest_ids = set(item[1] for item in candidates if item[0] == latest)
+            require(len(latest_ids) == 1, "G4_AUTHORITATIVE_SNAPSHOT_AMBIGUOUS")
+            selected = next(iter(latest_ids))
+        else:
+            selected = requested_snapshot_id
+            require(any(item[1] == selected for item in candidates),
+                    "G4_REQUESTED_AUTHORITATIVE_SNAPSHOT_NOT_FOUND")
+        selected_rows = [item for item in candidates if item[1] == selected]
+        require(len(selected_rows) == 1, "G4_ACCOUNT_SNAPSHOT_EXACT_ROW_REQUIRED")
+
+        linked_tables = []
+        for logical_name, (table, table_columns) in sorted(TABLE_SPECS.items()):
+            if "snapshot_id" not in table_columns or table in linked_tables:
+                continue
+            linked_tables.append(table)
+            require(table in self._tables(), "G4_DB_TABLE_MISSING:" + table)
+            actual = set(row[1] for row in self.connection.execute(
+                "PRAGMA table_info({0})".format(table)))
+            require(set(table_columns).issubset(actual), "G4_DB_COLUMNS_MISSING:" + table)
+            if "account_id" in table_columns:
+                wrong = self.connection.execute(
+                    'SELECT COUNT(*) FROM {0} WHERE "snapshot_id"=? AND "account_id"<>?'.format(table),
+                    (selected, self.account_id)).fetchone()[0]
+                require(wrong == 0, "G4_SNAPSHOT_CROSS_ACCOUNT_LINKAGE:" + table)
+        return {"snapshot_id": selected, "account_id": self.account_id,
+                "selected_created_time_ms": selected_rows[0][0],
+                "selection_mode": ("EXPLICIT_AUTHORITY_ID" if requested_snapshot_id is not None
+                                   else "UNIQUE_FRESHEST_ACCOUNT_SNAPSHOT"),
+                "linked_snapshot_tables": linked_tables}
 
     def _tables(self):
         return set(row[0] for row in self.connection.execute(
@@ -249,6 +309,7 @@ class ReadOnlyBusinessDatabase(object):
                      str(row.get("new_positions_locked")) in ("1", "true", "True")]
         return {"expected_symbols": list(SYMBOLS), "account_id": self.account_id,
                 "snapshot_id": self.snapshot_id, "captured_at_ms": self.captured_at_ms,
+                "snapshot_selection": self.snapshot_selection,
                 "exchange_mirror": exchange,
                 "db_external_state": dict((name, {"sha256": sha256_value(rows)})
                                           for name, rows in sidecars.items()),
@@ -328,7 +389,7 @@ class AuthenticatedGetOnlyPager(object):
     RECEIPT_FIELDS = frozenset((
         "method", "endpoint", "request_id", "credential_role", "account_id",
         "request_started_ms", "request_finished_ms", "response_sha256",
-        "auth_evidence_sha256"))
+        "auth_evidence_sha256", "network_evidence"))
 
     def __init__(self, transport, receipt_verifier, clock_ms, capture_deadline_ms):
         require(callable(transport) and callable(receipt_verifier) and callable(clock_ms),
@@ -368,6 +429,13 @@ class AuthenticatedGetOnlyPager(object):
                     "G4_AUTHENTICATED_RECEIPT_HASH_INVALID")
         require(receipt["response_sha256"] == sha256_value(response),
                 "G4_AUTHENTICATED_RESPONSE_HASH_MISMATCH")
+        network = receipt["network_evidence"]
+        require(isinstance(network, dict) and network.get("method") == "GET" and
+                network.get("path") == self.paths[surface] and
+                network.get("normalized_response_sha256") == receipt["response_sha256"] and
+                isinstance(network.get("body_sha256"), str) and
+                len(network.get("body_sha256")) == 64,
+                "G4_AUTHENTICATED_NETWORK_EVIDENCE_INVALID")
         require(self.receipt_verifier(receipt, response) is True,
                 "G4_AUTHENTICATED_RECEIPT_INDEPENDENT_VERIFICATION_FAILED")
         self.calls.append(receipt)
@@ -409,6 +477,53 @@ class AuthenticatedGetOnlyPager(object):
                 "authenticated_get_receipts_verified": True}
 
 
+def evaluate_reconciliation(local, surfaces, calls, independent_current_time_ms,
+                            capture_started_ms, capture_finished_ms,
+                            max_capture_ms=DEFAULT_MAX_CAPTURE_MS,
+                            max_skew_ms=DEFAULT_MAX_CLOCK_SKEW_MS,
+                            require_authenticated=False):
+    """Shared fail-closed clock/window/pagination/account reconciliation core."""
+    require(type(independent_current_time_ms) is int and independent_current_time_ms > 0,
+            "G4_INDEPENDENT_CURRENT_TIME_INVALID")
+    require(type(capture_started_ms) is int and type(capture_finished_ms) is int and
+            capture_started_ms <= capture_finished_ms and
+            capture_finished_ms - capture_started_ms <= max_capture_ms,
+            "G4_CAPTURE_DEADLINE_EXCEEDED")
+    require(set(surfaces) == set(REQUIRED_SURFACES), "G4_SURFACE_SET_INCOMPLETE")
+    server = surfaces["server_time"].get("data")
+    require(isinstance(server, dict) and type(server.get("serverTime")) is int,
+            "G4_SERVER_TIME_INVALID")
+    exchange_ms = server["serverTime"]
+    blockers = []
+    if abs(exchange_ms - independent_current_time_ms) > max_skew_ms:
+        blockers.append("EXCHANGE_CLOCK_NOT_BOUND_TO_INDEPENDENT_CURRENT_TIME")
+    for name, value in sorted(surfaces.items()):
+        require(isinstance(value, dict) and value.get("pagination_complete") is True,
+                "G4_PAGINATION_INCOMPLETE:" + name)
+        observed = value.get("observed_at_ms")
+        require(type(observed) is int, "G4_SURFACE_TIME_INVALID:" + name)
+        if abs(observed - exchange_ms) > max_skew_ms:
+            blockers.append("SURFACE_SKEW:" + name)
+        if require_authenticated:
+            require(value.get("authenticated_get_receipts_verified") is True,
+                    "G4_SURFACE_AUTHENTICATION_NOT_VERIFIED:" + name)
+    require(len(calls) >= len(REQUIRED_SURFACES) and
+            all(call.get("method") == "GET" for call in calls),
+            "G4_GET_EVIDENCE_INCOMPLETE")
+    if require_authenticated:
+        require(all(isinstance(call.get("network_evidence"), dict) for call in calls),
+                "G4_INDEPENDENT_NETWORK_EVIDENCE_INCOMPLETE")
+    for name in LOCAL_COMPARE_SURFACES:
+        if sha256_value(local["exchange_mirror"][name]) != sha256_value(surfaces[name]["data"]):
+            blockers.append("STATE_MISMATCH:" + name)
+    if local["unknown_orders"]: blockers.append("UNKNOWN_EXECUTION")
+    if local["inflight_requests"]: blockers.append("INFLIGHT_REQUESTS")
+    if local["ownership_conflicts"]: blockers.append("OWNERSHIP_CONFLICTS")
+    if not local["sqlite_capture"]["source_stable_during_capture"]:
+        blockers.append("SQLITE_SOURCE_CHANGED_DURING_CAPTURE")
+    return blockers
+
+
 def collect_fixture_evidence(database_path, evidence_root, run_id, fixture,
                              account_id, snapshot_id, current_time_ms=None,
                              max_age_ms=DEFAULT_MAX_AGE_MS,
@@ -430,28 +545,10 @@ def collect_fixture_evidence(database_path, evidence_root, run_id, fixture,
         surfaces = dict((surface, pager.collect(surface, SYMBOLS, clock_now,
                                                 account_id, snapshot_id))
                         for surface in REQUIRED_SURFACES)
-        server = surfaces["server_time"]["data"]
-        require(isinstance(server, dict) and type(server.get("serverTime")) is int,
-                "G4_SERVER_TIME_INVALID")
         finished_ms = int(time.time() * 1000)
-        require(finished_ms - started_ms <= max_capture_ms, "G4_CAPTURE_DEADLINE_EXCEEDED")
-        blockers = []
-        if abs(server["serverTime"] - clock_now) > DEFAULT_MAX_CLOCK_SKEW_MS:
-            blockers.append("EXCHANGE_CLOCK_NOT_BOUND_TO_INDEPENDENT_CURRENT_TIME")
-        for name in LOCAL_COMPARE_SURFACES:
-            if sha256_value(local["exchange_mirror"][name]) != sha256_value(surfaces[name]["data"]):
-                blockers.append("STATE_MISMATCH:" + name)
-        for name, value in surfaces.items():
-            if abs(value["observed_at_ms"] - server["serverTime"]) > DEFAULT_MAX_CLOCK_SKEW_MS:
-                blockers.append("SURFACE_SKEW:" + name)
-        require(len(pager.calls) >= len(REQUIRED_SURFACES) and
-                all(call["method"] == "GET" for call in pager.calls),
-                "G4_GET_EVIDENCE_INCOMPLETE")
-        if local["unknown_orders"]: blockers.append("UNKNOWN_EXECUTION")
-        if local["inflight_requests"]: blockers.append("INFLIGHT_REQUESTS")
-        if local["ownership_conflicts"]: blockers.append("OWNERSHIP_CONFLICTS")
-        if not local["sqlite_capture"]["source_stable_during_capture"]:
-            blockers.append("SQLITE_SOURCE_CHANGED_DURING_CAPTURE")
+        blockers = evaluate_reconciliation(
+            local, surfaces, pager.calls, clock_now, started_ms, finished_ms,
+            max_capture_ms=max_capture_ms, require_authenticated=False)
         verification = database.close_and_verify()
         if not verification["source_stable_through_read"]:
             blockers.append("SQLITE_SOURCE_CHANGED_AFTER_CAPTURE")

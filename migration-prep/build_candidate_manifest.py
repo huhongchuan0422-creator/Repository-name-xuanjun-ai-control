@@ -29,9 +29,11 @@ FILES = (
     "production-runtime-closure.json",
     "FINAL_CLOSEOUT_PACKAGE.md", "SHARED_DATABASE_CUTOVER_PLAN.md",
     "OWNER_ONE_TIME_COMPLETION.md", "PHASE_AUTHORIZATION_AND_OUTCOME_MATRIX.md",
-    "test_closeout_package.py",
+    "test_closeout_package.py", "test_r1_r6_closeout.py",
     "korea/__init__.py", "korea/build_minimal_runtime_manifest.py",
+    "korea/build_runtime_candidate.py", "korea/validate_runtime_candidate.py",
     "korea/migration_shadow_entry.py", "korea/shadow-config.template.json",
+    "korea/shadow_acceptance.py", "korea/shadow-acceptance.template.json",
     "korea/install-candidate.sh", "korea/check-candidate.sh",
     "korea/uninstall-candidate.sh", "korea/minimal-runtime-manifest.json"
 )
@@ -51,11 +53,11 @@ def build(root):
         path = os.path.join(root, relative)
         files.append({"path": "migration-prep/" + relative, "size": os.path.getsize(path),
                       "sha256": digest(path)})
-    value = {"schema_version": 7,
+    value = {"schema_version": 8,
              "task_id": "TOKYO_KOREA_COMPLETE_MIGRATION_REVIEW_PACKAGE_6171881293",
-             "audit_comment": "6174050426",
-             "base_commit": "4a6215e0d27e1560de3eca4ccbc5dbeaa492aaff",
-             "base_tree": "e2c647630e7fbeefbf35a3835bdb4573a0c5d3de",
+             "audit_comment": "6181062368",
+             "base_commit": "82025a45acefb7ef4ae3708bc37f71000ad32b92",
+             "base_tree": "db8bbf12b405d9cdb3a9805e4523414935b884a2",
              "files": files, "production_authorized": False,
              "binance_called": False, "production_deployed": False,
              "self_asserted_receipts_can_pass": False,

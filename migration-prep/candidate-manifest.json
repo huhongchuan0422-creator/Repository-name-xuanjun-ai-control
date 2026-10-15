@@ -1,15 +1,15 @@
 {
-  "audit_comment": "6174050426",
-  "base_commit": "4a6215e0d27e1560de3eca4ccbc5dbeaa492aaff",
-  "base_tree": "e2c647630e7fbeefbf35a3835bdb4573a0c5d3de",
+  "audit_comment": "6181062368",
+  "base_commit": "82025a45acefb7ef4ae3708bc37f71000ad32b92",
+  "base_tree": "db8bbf12b405d9cdb3a9805e4523414935b884a2",
   "binance_called": false,
-  "candidate_content_sha256": "f8655836b4fe798c67d51ae474aeaa7182bbfe26524a922784ed9fe0ff613d88",
+  "candidate_content_sha256": "0ff6701338128b2ba12c2a5d2885ba22343fd04e23a20c72436801175ab61c4e",
   "canonical_migration_policy_enforced": true,
   "files": [
     {
       "path": "migration-prep/readonly_reconciliation_adapter.py",
-      "sha256": "b2bddbc583d8ea1427b31c6cd2b2c16856921a8fcea525604417d1df29f4008d",
-      "size": 27027
+      "sha256": "ab62223e737804480261415d04eda7aea3d8395a12beb6b1f653edd49041b577",
+      "size": 32787
     },
     {
       "path": "migration-prep/restricted_executor.py",
@@ -38,8 +38,8 @@
     },
     {
       "path": "migration-prep/test_implementation_batch.py",
-      "sha256": "9e9a1c74edb7c81c0193dc0031f420ab601b5dc4638262a5213a8efb2deda288",
-      "size": 35103
+      "sha256": "72851b2fbead4defc55cc12c4de1a68e93f6f0ac11db54f24ee29c2ac98f279f",
+      "size": 35338
     },
     {
       "path": "migration-prep/IMPLEMENTATION_BATCH.md",
@@ -58,13 +58,13 @@
     },
     {
       "path": "migration-prep/korea/get_only_policy.py",
-      "sha256": "0e43220e5de874c4932bf79b244ee38ff6f3ab1aa743bfbb3ea6b8438d6d8116",
-      "size": 6447
+      "sha256": "e5ddfc9fd558f65e56b525e90a5ee1d588b362f45782085496b9cbea490684ec",
+      "size": 7155
     },
     {
       "path": "migration-prep/korea/xuanjun-binance-shadow.service.in",
-      "sha256": "f5d2053205680d66ca3f7b851e53e12c1221a45b3bb06736e921f0d80e8d5e3c",
-      "size": 1477
+      "sha256": "f725c84e321065a3a14d0680abef96e654f3a482d6fe807bfe01998e07672bdb",
+      "size": 1615
     },
     {
       "path": "migration-prep/korea/requirements.lock",
@@ -78,8 +78,8 @@
     },
     {
       "path": "migration-prep/korea/DEPLOYMENT.md",
-      "sha256": "b6e0270c7f06861b7d97cd8189114520739ca486d5af860736e01cc1d4617f95",
-      "size": 1922
+      "sha256": "92a12466aa556424c7d4e205811f4fa8a4bb0f548deb0bd5a197efc1298dd2a0",
+      "size": 4147
     },
     {
       "path": "migration-prep/c7_acceptance.py",
@@ -163,8 +163,8 @@
     },
     {
       "path": "migration-prep/FINAL_CLOSEOUT_PACKAGE.md",
-      "sha256": "e04a7f6df6cff8c1f04e56e0f7c858b641885220b63748379060b78c82f206c9",
-      "size": 4306
+      "sha256": "12b28450c81ee3e562a0823d72183b428931124efd52b0ac2fbb4c6f27acd8e8",
+      "size": 5928
     },
     {
       "path": "migration-prep/SHARED_DATABASE_CUTOVER_PLAN.md",
@@ -183,8 +183,13 @@
     },
     {
       "path": "migration-prep/test_closeout_package.py",
-      "sha256": "3c162e055d5e4acfd4d624e931efc7447ab7008bdfe3e524626fc140a1423625",
-      "size": 6276
+      "sha256": "e8b5f8352caa63ad8570ca590ab0f3191ccc13a318c12c8fa81279eeca2a5738",
+      "size": 6501
+    },
+    {
+      "path": "migration-prep/test_r1_r6_closeout.py",
+      "sha256": "c8419ef2e807c97cfe22dc6eacd0b1ce3941761624b9fd5c7f723ef59806f31c",
+      "size": 13499
     },
     {
       "path": "migration-prep/korea/__init__.py",
@@ -193,13 +198,23 @@
     },
     {
       "path": "migration-prep/korea/build_minimal_runtime_manifest.py",
-      "sha256": "dbfe8395b0f9d8209b7c9a9c38ff179594b9a8ae67216f0e56ef09715455eb9c",
-      "size": 2265
+      "sha256": "6f1372d07e90b837fb85e0449cb30d400261b723089916a2dddb615b5c5ede77",
+      "size": 2500
+    },
+    {
+      "path": "migration-prep/korea/build_runtime_candidate.py",
+      "sha256": "0136cf44a8b7ab88171bcd0f73286097457159528eef9fa1984573059f0f15b8",
+      "size": 1310
+    },
+    {
+      "path": "migration-prep/korea/validate_runtime_candidate.py",
+      "sha256": "fb6f5d801ea099cf04e796d0315085a3c74a983b83c7d9fd3f396579d97f187e",
+      "size": 4834
     },
     {
       "path": "migration-prep/korea/migration_shadow_entry.py",
-      "sha256": "b35d57e946ca3183642527e7bdc0051e97c60405a5ce95c38347b14ac6d582a7",
-      "size": 12497
+      "sha256": "a9c7e695f64746cbd1f884d4243423b8af8c63d583f601e963db3c06a97a430f",
+      "size": 18224
     },
     {
       "path": "migration-prep/korea/shadow-config.template.json",
@@ -207,24 +222,34 @@
       "size": 851
     },
     {
+      "path": "migration-prep/korea/shadow_acceptance.py",
+      "sha256": "6ef83524408773a7099ae57545ab234f3d3ab65c0930ae5a208cd7a82be54f97",
+      "size": 10674
+    },
+    {
+      "path": "migration-prep/korea/shadow-acceptance.template.json",
+      "sha256": "0b2f34fafe560c1b82d7ebc886ea272347af0ebea959453629aa5801a7b7c79a",
+      "size": 483
+    },
+    {
       "path": "migration-prep/korea/install-candidate.sh",
-      "sha256": "b0c223c656adc3f384e92048ce5066b4bcceeed851409ae42e471dffbf0d962f",
-      "size": 4016
+      "sha256": "f2e12a5e10ef335733fca7bbb5789ff8bced129209874d3c0df0b811cc47a049",
+      "size": 8733
     },
     {
       "path": "migration-prep/korea/check-candidate.sh",
-      "sha256": "c071ba2886468ba0a5df41e31dcdea937420f16e1ae75ac11fb92080a91533ed",
-      "size": 1058
+      "sha256": "f0bceab99da48797e5e24c8ccd46dd5126c949110825af259995a844052d3b2a",
+      "size": 3639
     },
     {
       "path": "migration-prep/korea/uninstall-candidate.sh",
-      "sha256": "1b787daf54fb7868a74bb797e03691828fa30a05fbceb9daf60e17a2583b6bdb",
-      "size": 750
+      "sha256": "f87e4ced485b99e1b3b29a763d074c4b4f386cc5d9823bb5b8f453fadba1b893",
+      "size": 2459
     },
     {
       "path": "migration-prep/korea/minimal-runtime-manifest.json",
-      "sha256": "ca1af8c5d89109404a955cf2bd236b0f33f6355d02b9fdd23c2360c0a5b31205",
-      "size": 2922
+      "sha256": "abeebb34625fd7691866dfb245afe0c82d6608e849ee22765a70a960b273b32c",
+      "size": 3662
     }
   ],
   "legacy_package_execution_accepted": false,
@@ -233,7 +258,7 @@
   "production_dependency_inventory_complete": false,
   "production_deployed": false,
   "root_inventory_incomplete_can_pass": false,
-  "schema_version": 7,
+  "schema_version": 8,
   "self_asserted_receipts_can_pass": false,
   "shared_database_post_cutover_route_proven": false,
   "task_id": "TOKYO_KOREA_COMPLETE_MIGRATION_REVIEW_PACKAGE_6171881293",

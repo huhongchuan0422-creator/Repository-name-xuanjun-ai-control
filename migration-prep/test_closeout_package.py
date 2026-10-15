@@ -17,8 +17,9 @@ class FakeControlledTransport(ControlledHttpsTransport):
     def __init__(self, payload):
         self.payload = payload
         self.urls = []
+        self.timeout_seconds = 10
 
-    def get(self, url, headers=None):
+    def get(self, url, headers=None, timeout_seconds=None):
         self.urls.append((url, dict(headers or {})))
         body = json.dumps(self.payload).encode("utf-8")
         return body, {"method": "GET", "body_sha256": hashlib.sha256(body).hexdigest()}
@@ -34,7 +35,9 @@ class CloseoutPackageTests(unittest.TestCase):
 
     def test_signed_transport_has_no_write_primitive_or_secret_receipt(self):
         fake = FakeControlledTransport({"serverTime": 123})
-        reader = SignedReadonlyTransport(fake, b"read-only-key", b"secret", clock_ms=lambda: 123)
+        reader = SignedReadonlyTransport(fake, b"read-only-key", b"secret",
+                                         "observation-1", 999,
+                                         clock_ms=lambda: 123, monotonic=lambda: 1)
         response, receipt = reader("server_time", None, None, "account", "snapshot")
         self.assertEqual(response["items"], {"serverTime": 123})
         self.assertEqual(receipt["method"], "GET")
@@ -101,6 +104,7 @@ class CloseoutPackageTests(unittest.TestCase):
         self.assertIn("systemctl disable", install)
         self.assertIn("SOURCE_MANIFEST_CONTENT_PASS", install)
         self.assertIn("! grep -Eq '^IPAddressAllow='", check)
+        self.assertIn("--continuous", unit)
 
     def test_production_closure_refuses_to_invent_launcher(self):
         path = Path(__file__).resolve().parent / "production-runtime-closure.json"
