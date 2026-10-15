@@ -351,6 +351,8 @@ def serve_local(path=":memory:",port=18791,seed_demo=True):
         runtime_refund = sqlite3.connect(":memory:",check_same_thread=False)
         owned.append(runtime_refund)
         source_refund.backup(runtime_refund)
+        source_refund.close()
+        owned.remove(source_refund)
         refund_db = runtime_refund
         if seed_demo:
             from scripts.community_demo_bootstrap import fixture_stores
