@@ -1,0 +1,42 @@
+{
+  "archive": "build-4798cda2-python312-a/epoch7-recovery-kit.tar.gz",
+  "archive_bytes": 1009595,
+  "ci_archive_sha256_matches": true,
+  "ci_python_version": "3.11.17",
+  "extraction": {
+    "archive_sha256": "7c67ef5e1e2d756898b982bcce625fd9168e4c3d93c3ed2153d4ed8fd8e37d71",
+    "entry_sha256": "999803b505bbebdef8a2f3303954f8e773cdf6bb10f9c2855563d36b1f759dd2",
+    "files": 246,
+    "install_admission": "NOT_GRANTED",
+    "kit_manifest_sha256": "560d8bf9bae026ffd64b4b0fc43e87216a177070f2a0c948489c884a1296c8b3",
+    "production_execution": "NOT_RUN",
+    "stage": "EXTRACTED_HASH_VERIFIED"
+  },
+  "host_operations": "NOT_RUN",
+  "kind": "CI_MATCHING_TOOLCHAIN_ARTIFACT",
+  "python368_archive_member_data_and_manifest_identical": true,
+  "python_version": "3.12.14",
+  "receipt": {
+    "archive_sha256": "7c67ef5e1e2d756898b982bcce625fd9168e4c3d93c3ed2153d4ed8fd8e37d71",
+    "entry_sha256": "999803b505bbebdef8a2f3303954f8e773cdf6bb10f9c2855563d36b1f759dd2",
+    "files": 246,
+    "independent_review": "PENDING",
+    "input_map_sha256": "26633bfd7530888f3253c52972427b0a4411dd6829057b8c0c63d8bfcacc9c21",
+    "kit_manifest_sha256": "560d8bf9bae026ffd64b4b0fc43e87216a177070f2a0c948489c884a1296c8b3",
+    "kit_source_commit": "4798cda235b24b31a18b57d3957fbc0d396d634b",
+    "kit_source_tree": "f050e9e6810decb7a4f62a14f3a5679908451c1f",
+    "production_execution": "NOT_RUN",
+    "production_resume": "AUTHENTICATED_APPROVAL_GATED_SINGLE_ATTEMPT",
+    "runtime_files": 107,
+    "runtime_manifest_sha256": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
+    "runtime_source_commit": "101b465ca3554bf34fef2d53d6006b96d85c4a63",
+    "runtime_source_tree": "3ae50b40c38d9a807876c175818299e344d53134",
+    "schema": 1,
+    "status": "COMPOSED_CANDIDATE_REQUIRES_FRESH_APPROVAL"
+  },
+  "retained_evidence_only_error": "artifact-toolchain-4798cda2-first-comparison-error.log",
+  "schema": 1,
+  "second_archive": "build-4798cda2-python312-b/epoch7-recovery-kit.tar.gz",
+  "two_builds_identical": true,
+  "zlib_version": "1.3.2"
+}
