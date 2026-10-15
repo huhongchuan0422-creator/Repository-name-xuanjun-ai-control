@@ -103,12 +103,12 @@ def create_review(db,task_id,tenant_id,order_id,kind,at,reason):
         raise ValueError("INVALID_REASON")
     read(db,order_id,tenant_id)
     with db:
-        existing=db.execute("SELECT tenant_id,order_id,kind,created_at,reason FROM saas_review_tasks WHERE task_id=?",
+        existing=db.execute("SELECT tenant_id,order_id,kind,created_at,reason,state FROM saas_review_tasks WHERE task_id=?",
                             (task_id,)).fetchone()
         record=(tenant_id,order_id,kind,at,reason)
         if existing:
-            if existing!=record: raise ValueError("REVIEW_TASK_CONFLICT")
-            return {"task_id":task_id,"state":"PENDING_OR_PREVIOUS"}
+            if existing[:5]!=record: raise ValueError("REVIEW_TASK_CONFLICT")
+            return {"task_id":task_id,"state":existing[5]}
         db.execute("INSERT INTO saas_review_tasks VALUES(?,?,?,?,?,'PENDING',?)",
                    (task_id,tenant_id,order_id,kind,at,reason))
     return {"task_id":task_id,"state":"PENDING"}
