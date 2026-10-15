@@ -1334,6 +1334,26 @@ PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recor
 
 `MODULE_PREVIEW` 作为模块注册视图和商业详情共用的标准对象，至少登记：`module_id`、`module_version`、`preview_version`、`preview_url_or_route`、`entry_role`、`demo_scope`、`interactive_scenarios`、`navigation_routes`、`offer_ids`、`availability`、`test_data_policy`、`last_verified_at`、`evidence_ref`。预览版本与正式功能版本、验收证据关联；链接不可用、核心跳转失效、演示与说明不一致时，阻止该Offer的公开上架/可购买状态（`MARKETPLACE_INTERACTIVE_PREVIEW_GATE=HOLD`），不能标作PASS。
 
+### 8.2.4 SaaS统一可视化中心（平台必建基础功能，强制）
+
+规则编号 `SAAS_VISUAL_EXPERIENCE_CENTER_REQUIRED_V1`；功能定位为玄钧云汇 SaaS 平台正式公共能力 `VISUAL_EXPERIENCE_CENTER`，不属于社区分账项目专用页面，也不得由每个客户定制项目重复建设。统一复用第3.10节的 Module Registry、Offer Catalog、租户身份/RBAC、行业/解决方案目录、Demo Asset、Workflow、客户反馈及验收事件。主体框架与可视化中心的基础浏览/预览能力遵循既有免费 Foundation 规则；独立收费的业务模块、供应商服务和实际授权按第6章公开计费，不将观看预览作为隐性购买。
+
+**中心入口与三条用户旅程：**
+
+1. **按行业/项目查看案例：** 客户从行业、实际业务问题、适用角色、项目案例、解决方案包及使用场景筛选进入；案例页面展示目标、参与角色、应用模块、依赖、实施条件、功能范围、证据/演示版本与前后端可交互页面。支持从案例进入具体模块详情、对应 Offer、组合预览和咨询/定制入口；不虚构客户业绩、生产支付或案例授权。
+2. **按功能模块选配、搭配并联动预览：** 客户搜索/勾选一个或多个模块，系统实时生成模块关系图和按角色贯通的业务流（起点 → 页面 → 表单/点击 → 接口模拟/受控服务 → 结果 → 下一页面），支持跳转、返回、上一步/下一步、改选模块后刷新路径。单模块预览与跨模块组合预览共用权威 Module Preview，展示连接成功、缺失模块、不可用依赖、权限冲突及当前联调覆盖率；不能将几张无关静态图片拼接冒充系统已互通。
+3. **选购和定制开发中直接体验：** 功能市场的模块卡片/价格说明旁可打开中心预览，保留用户原有模块组合、Offer、币种、费用和依赖选择；开发中的客户项目使用同一中心的私有、版本绑定预览空间，提交页面/组件/流程意见，返回原开发任务修订及回验。入口互通但权限和数据空间严格隔离，不因某客户定制预览而公开其私有代码、商业价格、流程和资料。
+
+**中心必须具备的界面与对象：** 首页（行业/项目/功能搜索、筛选与案例卡片）、案例详情、单模块交互预览、模块选配与搭配器、跨模块流程画布/步骤导航、按角色切换的页面预览、报价与依赖侧栏、客户定制项目演示空间、反馈及版本差异/验收工作台、Owner案例/预览/权限/版本管理后台。支持PC与手机端响应式布局、可访问链接、深层导航、错误返回与恢复；页面动作必须真实可点击、可跳转，不能只渲染截图。案例/方案/模块/流程可相互跳转，也可返回选购和原开发节点。
+
+**结构化对象最小集：** `VISUAL_CASE`（case_id、industry_id、scenario、visibility、owner、evidence、version）、`VISUAL_SCENARIO`（角色、起止节点、必选模块、模块可选项、步骤及可用状态）、`MODULE_PREVIEW`（复用8.2.3，含真实入口/版本）、`COMPOSITE_PREVIEW`（selected_module_ids、compatible_versions、role_routes、edges、dependency_status、preview_state）、`VISUAL_FEEDBACK`（复用9.9.1任务绑定、截图/组件定位、处理决定和客户确认）、`VISUAL_ACCEPTANCE_RECORD`（project_id、tenant_id、commit、demo_version、test_environment、journey_test_evidence、approver、decision）。与现有模块和客户身份引用关联，不复制真实支付或财务账本。案例与可视化数据按 `PUBLIC_MARKET / INVITE_BETA / CUSTOMER_PRIVATE / INTERNAL` 分级；未经授权的客户内容不得进入公开案例库。
+
+**安全与功能真实性：** `DEMO / SANDBOX / REAL_CONNECTED` 必须逐步骤标记。组合预览中的模拟结算、商家A收款/社区分账、收益、退款、采购、权益或第三方API动作只能使用隔离演示数据；未经权威财务/服务商验证不声称真正到账、授权或外部发布。预览中的真实高风险操作必须独立身份、审批和生产门禁授权，默认禁止。模块未开发、组合不兼容、资质缺失或真实接口未连接时，允许透明展示“可预览但不可交付/不可购买”的范围，禁止伪造完整可用性。不得让客户任意使用他人租户、私有演示和Owner权限。
+
+**强制验收及上线门禁：** `VISUAL_EXPERIENCE_CENTER_REQUIRED=YES`。平台商城正式开放前，必须完成（A）按至少两种行业/项目筛选并进入案例，（B）从案例跳模块再返回，（C）单模块输入、点击、跳转与结果，（D）多模块增删选配与真实导航联动，（E）缺依赖/角色越权/私有案例拒绝，（F）组合方案和双币费用状态与选择同步，（G）开发中客户提交意见、开发更新、重试与验收结果可追踪，（H）PC/手机浏览器端到端自动化与权限隔离，（I）Demo版本、准确代码提交、独立QA/审计和客户业务验收绑定。任何必要项缺证据，`VISUAL_EXPERIENCE_CENTER_GATE=HOLD`，不得宣称可视化中心完成或 SaaS 商城完整验收。8.2.3选购模块与9.9.1开发期客户验收仍分别强制执行，中心不是取消这两项门禁的替代物。
+
+**开发顺序和复用要求：** 此中心是第3阶段“产品层与 Marketplace V1”上线所需公共能力，应与 Module Registry、Marketplace、组合配置器及客户项目中心的架构同步设计，先建可复用的最小基础框架和真实交互/跳转契约，再由社区分账试点打通首个端到端案例；随后为其他行业与客户定制项目增量注册案例，不重复开发预览引擎。相关工程测试、需求变更、现有代码复用检查和独立审核沿用第9章的权威开发门禁。
+
 ### 8.3 购买前就绪检查
 
 PRE_PURCHASE_READINESS_CHECK 必须在正式付款前执行，以 NO_POST_PAYMENT_SURPRISE 为原则。
