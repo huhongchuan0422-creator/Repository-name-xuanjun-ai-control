@@ -96,6 +96,9 @@ CREATE TABLE IF NOT EXISTS saas_order_lifecycle(
  order_id TEXT PRIMARY KEY, state TEXT NOT NULL
  CHECK(state IN ('PREPARED','AWAITING_EXTERNAL','CONFIRMATION_UNKNOWN','CONFIRMED_EXTERNAL','CANCELLED','EXPIRED')),
  proof_ref TEXT, updated_at INTEGER NOT NULL);
+CREATE TRIGGER saas_lifecycle_no_replace BEFORE INSERT ON saas_order_lifecycle
+WHEN EXISTS(SELECT 1 FROM saas_order_lifecycle WHERE order_id=NEW.order_id)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
 CREATE TABLE IF NOT EXISTS saas_order_lifecycle_events(
  event_key TEXT PRIMARY KEY, order_id TEXT NOT NULL, old_state TEXT NOT NULL,
  new_state TEXT NOT NULL, proof_ref TEXT, occurred_at INTEGER NOT NULL);
