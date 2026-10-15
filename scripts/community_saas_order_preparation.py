@@ -54,6 +54,8 @@ def prepare(db,quote_db,order_id,tenant_id,quote_id,currency,now):
     totals={cycle:group[key] for cycle,group in breakdown.items()}
     if any(type(v) is not int or v<0 for v in totals.values()):
         raise ValueError("INVALID_QUOTE_AMOUNT")
+    if not q.get("offer_governed") or not q.get("approval_ref") or not q.get("cost_evidence_ref"):
+        raise ValueError("OFFER_APPROVAL_REQUIRED")
     quote_canonical=json.dumps(q,ensure_ascii=False,sort_keys=True,separators=(",",":"))
     quote_sha256=hashlib.sha256(quote_canonical.encode("utf-8")).hexdigest()
     snapshot={"quote_sha256":quote_sha256,"quote_snapshot":q,"order_id":order_id,"tenant_id":tenant_id,"quote_id":quote_id,
