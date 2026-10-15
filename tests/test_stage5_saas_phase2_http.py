@@ -55,6 +55,27 @@ class LoopbackSaasTests(unittest.TestCase):
     self.assertEqual(self.request('{"operation":"catalog","operation":"admin_snapshot","params":{},"at":20}')[0],400)
  def test_09_nonfinite_json(self):
     self.assertEqual(self.request('{"operation":"catalog","params":{},"at":NaN}')[0],400)
+ def test_11_local_dashboard_html(self):
+    c=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=4)
+    c.request("GET","/offline/saas-panel")
+    res=c.getresponse();data=res.read();c.close()
+    self.assertEqual(res.status,200)
+    self.assertIn(b"SaaS",data)
+ def test_12_local_dashboard_script(self):
+    c=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=4)
+    c.request("GET","/offline/saas-panel.mjs")
+    res=c.getresponse();data=res.read();c.close()
+    self.assertEqual(res.status,200)
+    self.assertIn(b"loadDashboard",data)
+ def test_13_same_origin_api_allowed(self):
+    host="http://127.0.0.1:"+str(self.server.server_port)
+    self.assertEqual(self.request_same_origin(host)[0],200)
+ def request_same_origin(self,origin):
+    c=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=4)
+    c.request("POST","/offline/saas",body=self.payload(),headers={
+        "Content-Type":"application/json","X-Offline-Token":KEY,"Origin":origin})
+    res=c.getresponse();code=res.status;body=res.read();c.close()
+    return code,body
  def test_10_extra_field(self):
     self.assertEqual(self.request('{"operation":"catalog","params":{},"at":20,"payment_confirmed":true}')[0],400)
 if __name__=="__main__":unittest.main()
