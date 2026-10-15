@@ -1,0 +1,55 @@
+{
+  "approval_issued": false,
+  "errors": 0,
+  "failures": 0,
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "final_plan_fresh_authority": "PENDING_SEPARATE_REVIEW",
+  "historical_failed_draft_logs_retained": true,
+  "host_operation": "NOT_RUN",
+  "hosted_ci": "PENDING_EXACT_PUBLICATION",
+  "independent_review": {
+    "bootstrap_each": 23,
+    "pure_adapters_each": 54,
+    "scope": "SAVED_ONLY_EXPORT_AND_SUBSET_RECOMPUTATION",
+    "source_and_schema_each": 51,
+    "state": "PASS",
+    "total_each": 128
+  },
+  "interpreters": [
+    "3.6.8",
+    "3.12.14"
+  ],
+  "local_log_sha256": {
+    "bootstrap/final-unbound-python312.log": "fa1cbde7038c7254891ef9dc3f45e4b03a2479a35bac345621f7d8e3c56f25dd",
+    "bootstrap/final-unbound-python368.log": "56658798d5a9ed7d8e36d2b9b40bd2e09269bce7e4a3c72be60e145ef56df040",
+    "final-orchestration-python312.log": "3e2418024269c40c107adb874ea41c41f736bf4e070a43e53690d89b229c953f",
+    "final-orchestration-python368.log": "84a1274b4709ec91481c56e7523f2a486bd42520cfd47ce9eb38cf031963d4f4"
+  },
+  "local_test_counts": {
+    "bootstrap": 23,
+    "orchestration": 35,
+    "pure_data": 15,
+    "pure_topology": 39,
+    "strict_schema": 16,
+    "total_each_interpreter": 128
+  },
+  "observation_id": "8df3b22b3762070f",
+  "schema": 1,
+  "skips": 0,
+  "source_files": {
+    "evidence/p2-epoch7-access-repair-20261014/r7-saved-preparation/epoch7_prepare_data.py": "71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1",
+    "evidence/p2-epoch7-access-repair-20261014/r7-saved-preparation/epoch7_topology_projection.py": "0e9817a1474dc4e54cf1779c0b4c243cf16e6204cab3a25210a12e41e03d00b6",
+    "evidence/p2-epoch7-access-repair-20261014/r7-saved-preparation/test_epoch7_prepare_data_r7.py": "e76d894610a9391ea02f2d29ce6cc89189cc4dc184dfc7cf8c0bc0e41d22eeed",
+    "evidence/p2-epoch7-access-repair-20261014/r7-saved-preparation/test_epoch7_topology_projection.py": "38e96133f4d3134e409cc7124f10426ea85cc59d01dd1e2392fb977c8e87dbcb",
+    "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/bootstrap/test_owner_bootstrap.py": "a6a010e0673eb88a112efd9edfe2b5c3fdddc4fd631ac280b2a0329a20155a9f",
+    "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/export_saved_evidence.py": "a436d97072bf0062a94f9ccbd030aef1a08214f12f74645efd12d89d9f464815",
+    "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/export_schema.py": "df216347c7e969942be4e8eea42dfe580b3b155ff4a36d1383e9bca0cf253629",
+    "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/run_local_tests.py": "c78e01de01972fa4038a220b95605a606321399ba8c1874a60afabf3b96bb229",
+    "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/test_export_saved_evidence.py": "4e0f3425a88004e367c7c546b7b1e39f425b8b40690019096f49896a86dc85e9",
+    "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/test_export_schema.py": "9ea8d6a03157228f208758a1e3791f374ef8ab9f445a7f77c83faed258ea32a3",
+    "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/test_fixtures/reviewed_reader_mechanics.py": "0a46e801b096b888398be31b93db5f3750e835af1f3ded48cddc17d8b8736fe4",
+    "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/verify_exported_evidence.py": "b5c7b39fa3403dda95e21cfdf5ab402d1f32656fe93951d356b1fe62464d71be"
+  },
+  "state": "LOCAL_SOURCE_REVIEW_PASS_HOST_NOT_RUN",
+  "whole_observation_recomputed_offline": false
+}
