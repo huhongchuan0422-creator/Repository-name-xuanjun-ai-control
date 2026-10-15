@@ -5,7 +5,7 @@ import json
 import unittest
 from scripts.community_saas_modules import connect,entitled
 from scripts.community_saas_offer_catalog import install as install_quotes,create_offer,quote
-from scripts.community_saas_order_preparation import install,prepare,read,install_lifecycle,advance,status
+from scripts.community_saas_order_preparation import install,prepare,read,install_lifecycle,advance,status,entitlement_intent
 
 def fee(cny=1000,usd=200,cycle="MONTH"):
     return {"type":"MODULE_FEE","label":"license","cycle":cycle,"quantity":1,
@@ -69,6 +69,20 @@ class OfflineLifecycleTests(PrepareOrderTests):
     self.assertEqual(advance(self.orders,"orderA","tenantA","ev3","CONFIRMED_EXTERNAL",23,"proofA",True),result)
     with self.assertRaisesRegex(ValueError,"INVALID_STATE_TRANSITION"):
         advance(self.orders,"orderA","tenantA","ev4","CANCELLED",24)
+ def test_entitlement_handoff_is_non_executable(self):
+    prepare(self.orders,self.quotes,"orderA","tenantA","q1","CNY",20)
+    with self.assertRaisesRegex(ValueError,"CONFIRMATION_EVIDENCE_REQUIRED"):
+        entitlement_intent(self.orders,"orderA","tenantA",100)
+    advance(self.orders,"orderA","tenantA","ev1","AWAITING_EXTERNAL",21)
+    advance(self.orders,"orderA","tenantA","ev2","CONFIRMATION_UNKNOWN",22)
+    advance(self.orders,"orderA","tenantA","ev3","CONFIRMED_EXTERNAL",23,"proofA",True)
+    intent=entitlement_intent(self.orders,"orderA","tenantA",100)
+    self.assertEqual(intent["proposed_valid_until"],100+30*86400)
+    self.assertIsNone(intent["legacy_price_version"])
+    self.assertFalse(intent["entitlement_granted"])
+    self.assertTrue(intent["needs_authoritative_finance_link"])
+    with self.assertRaisesRegex(ValueError,"ORDER_NOT_FOUND"):
+        entitlement_intent(self.orders,"orderA","tenantB",100)
  def test_cancel_and_wrong_tenant_do_not_mutate(self):
     prepare(self.orders,self.quotes,"orderA","tenantA","q1","CNY",20)
     with self.assertRaisesRegex(ValueError,"ORDER_NOT_FOUND"):
