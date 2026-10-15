@@ -103,11 +103,12 @@ if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
   }catch{currentQuoteId=null;status.textContent="离线报价失败；请检查方案和权限。";}
  });
  const ownerValue=id=>document.getElementById(id).value.trim();
- const money=id=>{const x=Number(ownerValue(id));if(!Number.isSafeInteger(x)||x<0)throw Error("BAD_MONEY");return x};
+ const money=id=>{const raw=ownerValue(id);if(!/^(0|[1-9][0-9]*)$/.test(raw))throw Error("BAD_MONEY");const x=Number(raw);if(!Number.isSafeInteger(x))throw Error("BAD_MONEY");return x};
+ const version=()=>{const n=money("ownerOfferVersion");if(n<1)throw Error("BAD_VERSION");return n};
  document.getElementById("ownerCreate")?.addEventListener("click",async()=>{
   const state=document.getElementById("ownerStatus");
   try{
-   const values={offer_id:ownerValue("ownerOfferId"),version:1,
+   const values={offer_id:ownerValue("ownerOfferId"),version:version(),
     module_id:ownerValue("ownerModuleId"),kind:"MONTHLY",
     lines:[{type:"MODULE_FEE",label:"月度功能订阅",cycle:"MONTH",quantity:1,
       cny_minor:money("ownerCny"),usd_minor:money("ownerUsd"),
@@ -121,7 +122,7 @@ if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
   const state=document.getElementById("ownerStatus");
   try{
    await offlineAction(fetch,ownerValue("offlineToken"),"owner_approve_offer",{
-    offer_id:ownerValue("ownerOfferId"),version:1,approval_ref:ownerValue("ownerApprovalRef"),
+    offer_id:ownerValue("ownerOfferId"),version:version(),approval_ref:ownerValue("ownerApprovalRef"),
     cost_evidence_ref:ownerValue("ownerCostRef")});
    state.textContent="离线审批已记录；不授权真实交易或生产发布。";
   }catch{state.textContent="审批失败：需要Owner身份、成本完整和有效证据。";}
