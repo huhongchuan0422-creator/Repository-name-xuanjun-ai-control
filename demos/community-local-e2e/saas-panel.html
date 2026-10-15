@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>玄钧云汇 · SaaS 离线业务台</title>
+<style>body{font:16px system-ui,sans-serif;max-width:1040px;margin:auto;padding:28px;background:#f7f8fb;color:#1d2636}header,section{background:white;border-radius:12px;padding:22px;margin:18px 0;border:1px solid #e4e8ef}h1{margin:0 0 10px}small{color:#637083}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}button,input,select{font:inherit;padding:9px;border-radius:7px;border:1px solid #aaa}button{cursor:pointer;background:#182d54;color:white}button:disabled{background:#aaa}pre{white-space:pre-wrap;word-break:break-word;background:#edf0f5;padding:12px}label{display:block;margin:10px 0}</style></head>
+<body><header><h1>玄钧云汇 · SaaS 功能与订单</h1><small>离线模拟 · 只读预览 · 不连接真实微信支付 / 不发放权益</small></header>
+<div class="grid">
+<section><h2>功能市场</h2><div id="moduleCatalog" role="list"></div><h3>人民币 / 美元报价</h3><pre id="quoteDetails" aria-live="polite"></pre></section>
+<section><h2>客户订单</h2><div id="orderDetails" aria-live="polite"></div><h3>服务权益</h3><div id="entitlementDetails"></div><h3>续费规划</h3><pre id="renewalDetails"></pre></section>
+<section><h2>管理端待办</h2><div id="reviewQueue"></div><h3>恢复状态</h3><pre id="recoveryState"></pre></section>
+</div>
+<section><h2>使用边界</h2><p>此页面仅渲染经服务端可信租户身份过滤的演示数据。任何交易确认、退款、分账或续费扣款都必须通过另行授权的生产服务执行。</p></section>
+<script type="module" src="./saas-panel.mjs"></script></body></html>
