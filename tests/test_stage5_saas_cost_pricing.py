@@ -1,6 +1,6 @@
 """Offer pricing cost evidence regressions: no price with unknown underlying cost."""
 import unittest
-from scripts.community_saas_offers import open_offer_store,register_offer,add_component,change_offer_status
+from scripts.community_saas_offers import open_offer_store,register_offer,add_component,change_offer_status,quote_offers
 from scripts.community_saas_cost_pricing import open_cost_store,save_cost,preview,assert_publishable_cost
 class Costs(unittest.TestCase):
  def setUp(self):
@@ -46,6 +46,28 @@ class Costs(unittest.TestCase):
   self.assertIsNone(v["by_cadence"]["MONTHLY"]["cost_cny_minor"])
   with self.assertRaisesRegex(ValueError,"COST_INCOMPLETE"):
    assert_publishable_cost(self.offers,self.costs,"cloud")
+ def test_effective_offer_uses_separate_cadence_totals(self):
+  add_component(self.offers,"cloud","license","MODULE_LICENSE","MONTHLY",2000,300,"pricing-v1")
+  add_component(self.offers,"cloud","setup","DEPLOYMENT_ONCE","ONCE",4000,600,"pricing-v1")
+  save_cost(self.costs,"cloud","license","VERIFIED_ACTUAL",500,60,"real-usage","MONTHLY")
+  save_cost(self.costs,"cloud","setup","VERIFIED_ACTUAL",1000,100,"real-deployment","ONCE")
+  for state in ("PREVIEW","APPROVED","EFFECTIVE"):
+   change_offer_status(self.offers,"cloud",state,self.costs)
+  record=quote_offers(self.offers,"merchant_operations")[0]
+  self.assertTrue(record["mixed_billing_cadences"])
+  self.assertFalse(record["totals_are_payable"])
+  self.assertEqual(record["totals_by_cadence"]["MONTHLY"]["cny_minor"],2000)
+  self.assertEqual(record["totals_by_cadence"]["ONCE"]["cny_minor"],4000)
+  self.assertEqual(record["total_cny_minor"],6000)
+ def test_discount_cannot_hide_negative_monthly_with_positive_setup(self):
+  add_component(self.offers,"cloud","setup","DEPLOYMENT_ONCE","ONCE",5000,700,"pricing-v1")
+  add_component(self.offers,"cloud","discount","DISCOUNT","MONTHLY",1000,100,"pricing-v1")
+  save_cost(self.costs,"cloud","setup","VERIFIED_ACTUAL",1000,100,"work-order","ONCE")
+  save_cost(self.costs,"cloud","discount","VERIFIED_ACTUAL",0,0,"promotion-evidence","MONTHLY")
+  for state in ("PREVIEW","APPROVED","EFFECTIVE"):
+   change_offer_status(self.offers,"cloud",state,self.costs)
+  with self.assertRaisesRegex(ValueError,"NEGATIVE_QUOTE_TOTAL"):
+   quote_offers(self.offers,"merchant_operations")
  def test_unknown_is_not_free_zero(self):
   add_component(self.offers,"cloud","subscription","THIRD_PARTY_SUBSCRIPTION_BASE",
                 "MONTHLY",1000,150,"official-verified","provider")
