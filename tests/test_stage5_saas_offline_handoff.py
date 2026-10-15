@@ -5,7 +5,7 @@ import tempfile
 import os
 import unittest
 from scripts.community_saas_modules import connect
-from scripts.community_saas_offer_catalog import install as offer_install,create_offer,quote
+from scripts.community_saas_offer_catalog import install as offer_install,create_offer,quote,approve_offer
 from scripts.community_saas_order_preparation import install as order_install,install_lifecycle,prepare,advance
 from scripts.community_saas_offline_handoff import (
     plan_finance_claim,make_test_attestation,inspect_test_attestation,
