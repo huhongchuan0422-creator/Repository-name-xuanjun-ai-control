@@ -115,6 +115,46 @@ class FullScopeAuditProbes(unittest.TestCase):
     v=recovery_check(self.orders,"tenantA")
     self.assertEqual(v["integrity_hold"],["ord"])
     self.assertIn("ord",v["awaiting_review"])
+ def test_r4_offer_extension_install_atomic_on_denied_trigger(self):
+    # Fail after some CREATE TABLE operations: rollback cannot leave partial tables.
+    db=connect()
+    try:
+        before={row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        def forbid(action,arg1,arg2,db_name,origin):
+            return sqlite3.SQLITE_DENY if action==sqlite3.SQLITE_CREATE_TRIGGER else sqlite3.SQLITE_OK
+        db.set_authorizer(forbid)
+        try:
+            with self.assertRaises(sqlite3.DatabaseError):
+                install(db)
+        finally:db.set_authorizer(None)
+        after={row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        self.assertEqual(before,after)
+        install(db)
+    finally:db.close()
+ def test_r4_partial_offer_extension_rejected(self):
+    db=connect()
+    try:
+        db.execute("CREATE TABLE saas_quotes(fake INTEGER)")
+        with self.assertRaisesRegex(ValueError,"UNRECOGNIZED_OFFER_INSTALL_SCHEMA"):
+            install(db)
+    finally:db.close()
+ def test_r5_projection_wrong_terminal_state_detected(self):
+    self.ready()
+    advance(self.orders,"ord","tenantA","ev1","AWAITING_EXTERNAL",21)
+    self.orders.execute("UPDATE saas_order_lifecycle SET state='CANCELLED' WHERE order_id='ord'")
+    self.assertEqual(recovery_check(self.orders,"tenantA")["integrity_hold"],["ord"])
+ def test_r2_approved_components_locked_sqlite(self):
+    o=open_offer_store()
+    try:
+        register_offer(o,"one","storefront_catalog","MONTHLY",1,30,True,"term","basis")
+        add_component(o,"one","base","MODULE_LICENSE","MONTHLY",100,20,"pricebook")
+        change_offer_status(o,"one","PREVIEW")
+        change_offer_status(o,"one","APPROVED")
+        with self.assertRaisesRegex(ValueError,"OFFER_COMPONENTS_FROZEN"):
+            add_component(o,"one","extra","MODULE_LICENSE","MONTHLY",400,50,"pricebook")
+        with self.assertRaises(sqlite3.IntegrityError):
+            o.execute("DELETE FROM components WHERE offer_id='one'")
+    finally:o.close()
  def test_r7_pre_order_proof_rejected(self):
     self.ready()
     att=make_test_attestation(plan_finance_claim(self.orders,"ord","tenantA"),"proof",0,KEY)
