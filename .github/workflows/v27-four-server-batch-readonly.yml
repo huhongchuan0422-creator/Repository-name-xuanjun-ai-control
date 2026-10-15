@@ -117,18 +117,19 @@ jobs:
             if not root.is_dir():v["status"]="ABSENT_OR_NOT_ACCESSIBLE"
             elif not (root/"index.html").is_file():v["status"]="NO_INDEX"
             else:
-             h=hashlib.sha256();count=0;size=0
+             h=hashlib.sha256();count=0;size=0;manifest={}
              for d,dirs,files in os.walk(str(root),followlinks=False):
               dirs[:]=sorted(x for x in dirs if not x.startswith(".") and not Path(d,x).is_symlink())
               for n in sorted(files):
                p=Path(d,n)
-               if p.is_symlink() or p.suffix.lower() not in (".html",".css",".js"):continue
+               if p.is_symlink():continue
                s=p.stat()
                if s.st_size>20*1024*1024:raise RuntimeError("FILE_SIZE_BOUND")
                sha=digest(p);h.update((str(p.relative_to(root))+"\0"+sha+"\n").encode())
+               manifest[str(p.relative_to(root))]=sha
                count+=1;size+=s.st_size
                if count>10000:raise RuntimeError("COUNT_BOUND")
-             v.update(status="READ_COMPLETE",web_files=count,web_bytes=size,web_manifest_sha256=h.hexdigest())
+             v.update(status="READ_COMPLETE",web_files=count,web_bytes=size,web_manifest_sha256=h.hexdigest(),file_manifest=manifest)
              v["selected"]={n:digest(root/n) for n in ("index.html","yunhui.css","yunhui.js","assets/tiktok-integration.js") if (root/n).is_file()}
            except (OSError,RuntimeError) as e:v["status"]="READ_INCOMPLETE";v["reason"]=type(e).__name__
            report["sites"].append(v)
