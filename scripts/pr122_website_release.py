@@ -434,14 +434,29 @@ def capture_previous_envelope(base,release,uid,deadline):
         name:identity(path,"directory",0o755,uid,deadline) for name,path in paths.items()
     }}
 
+def direct_previous_release(base,link):
+    """Return only a direct releases/<id> target; aliases and path jumps fail closed."""
+    if not isinstance(link,str) or not link: raise Hold("PREVIOUS_POINTER_LINK_INVALID")
+    raw=Path(link); releases=base/"releases"
+    if raw.is_absolute():
+        old=raw
+        if old.parent!=releases: raise Hold("PREVIOUS_POINTER_NOT_DIRECT_RELEASE")
+    else:
+        if len(raw.parts)!=2 or raw.parts[0]!="releases":
+            raise Hold("PREVIOUS_POINTER_NOT_DIRECT_RELEASE")
+        old=base/raw
+    try: valid_id(old.name,"previous_release_id")
+    except Hold as error: raise Hold("PREVIOUS_POINTER_NOT_DIRECT_RELEASE") from error
+    if old.parent!=releases: raise Hold("PREVIOUS_POINTER_NOT_DIRECT_RELEASE")
+    return old
+
 def verify_previous_release(base,previous,uid,deadline):
     if not isinstance(previous,dict) or not isinstance(previous.get("link"),str):
         raise Hold("PREVIOUS_RELEASE_EVIDENCE_MISSING")
     raw=previous.get("release")
     if not isinstance(raw,str): raise Hold("PREVIOUS_RELEASE_EVIDENCE_MISSING")
-    old=Path(raw)
-    releases=base/"releases"
-    if not old.is_absolute() or old.parent!=releases or old.name in ("",".",".."):
+    old=direct_previous_release(base,previous["link"])
+    if raw!=str(old):
         raise Hold("PREVIOUS_RELEASE_PATH_INVALID")
     if old.is_symlink() or not old.is_dir(): raise Hold("PREVIOUS_RELEASE_MISSING")
     wanted=previous.get("release_envelope")
@@ -455,6 +470,18 @@ def verify_previous_release(base,previous,uid,deadline):
     manifest=previous.get("manifest")
     if not isinstance(manifest,dict): raise Hold("PREVIOUS_RELEASE_MANIFEST_MISSING")
     verify_tree(old/"public",manifest,deadline,uid)
+    return old
+
+def verify_previous_pointer_target(base,current,previous,pointer_identity,uid,deadline):
+    verify_symlink_identity(current,pointer_identity,uid)
+    old=verify_previous_release(base,previous,uid,deadline)
+    try:
+        resolved=current.resolve(strict=True)
+        same=os.path.samefile(current,old)
+    except OSError as error:
+        raise Hold("ROLLBACK_POINTER_TARGET_UNAVAILABLE") from error
+    if resolved!=old or not same:
+        raise Hold("ROLLBACK_POINTER_TARGET_MISMATCH")
     return old
 
 def target_residual_failure(base,r,uid,deadline):
@@ -478,8 +505,8 @@ def activate(args,deadline=None):
         previous=None
         if current.is_symlink():
             if current.lstat().st_uid!=uid: raise Hold("PREVIOUS_POINTER_OWNER_MISMATCH")
-            link=os.readlink(current); old=(base/link).resolve() if not Path(link).is_absolute() else Path(link).resolve()
-            if old.parent!=(base/"releases").resolve() or old.is_symlink() or not old.is_dir(): raise Hold("PREVIOUS_POINTER_OUTSIDE_RELEASE_NAMESPACE")
+            link=os.readlink(current); old=direct_previous_release(base,link)
+            if old.is_symlink() or not old.is_dir(): raise Hold("PREVIOUS_POINTER_OUTSIDE_RELEASE_NAMESPACE")
             old_manifest=snapshot(old/"public",deadline); verify_tree(old/"public",old_manifest,deadline,uid)
             previous={"link":link,"release":str(old),"manifest":old_manifest,
                       "release_envelope":capture_previous_envelope(base,old,uid,deadline)}
@@ -583,8 +610,7 @@ def reconcile_rollback(base,r,path,uid,deadline):
     if observed==expected:
         try:
             if r.get("previous_current") is not None:
-                verify_symlink_identity(current,r.get("rollback_pointer_identity"),uid)
-                verify_previous_release(base,r["previous_current"],uid,deadline)
+                verify_previous_pointer_target(base,current,r["previous_current"],r.get("rollback_pointer_identity"),uid,deadline)
         except Hold as error:
             r.update(state="UNKNOWN_AFTER_ROLLBACK",last_stage="ROLLBACK_FINAL_VALIDATION_FAILED",
                      observed_current=observed,rollback_final_validation_failure=str(error)); atomic_json(path,r)
@@ -638,8 +664,7 @@ def rollback(args,deadline=None):
             pointer_identity=symlink_identity(current,uid)
             if not same_symlink_object(pointer_identity,prepared_pointer_identity): raise Hold("ROLLBACK_POINTER_IDENTITY_DRIFT")
             r.update(last_stage="ROLLBACK_POINTER_SWITCHED",rollback_pointer_identity=pointer_identity); atomic_json(path,r)
-            verify_symlink_identity(current,pointer_identity,uid)
-            verify_previous_release(base,previous,uid,deadline)
+            verify_previous_pointer_target(base,current,previous,pointer_identity,uid,deadline)
         r.update(state="ROLLED_BACK",last_stage="ROLLBACK_COMMITTED"); atomic_json(path,r); return r
     finally:
         if ctx: ctx.__exit__(None,None,None)

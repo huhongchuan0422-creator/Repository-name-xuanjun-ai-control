@@ -56,7 +56,11 @@ server blocks or certificates.
    prior release path, manifest, root/public identity, and explicit
    CSP/metadata present-or-absent state. Rollback and rollback reconciliation
    revalidate that prior release plus the exact prepared rollback-pointer
-   identity before reporting completion. Damage to the retired new release is
+   identity before reporting completion. An existing pointer is accepted only
+   when it is an absolute or relative direct link to `releases/<id>`; aliases,
+   multi-hop links, and path jumps fail closed before activation intent. Final
+   rollback validation also proves that the pointer resolves to the exact
+   frozen prior directory object. Damage to the retired new release is
    retained as residual evidence and never blocks proof of a healthy restored
    prior release; no release object is deleted automatically.
 

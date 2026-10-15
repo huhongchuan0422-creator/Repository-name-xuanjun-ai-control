@@ -204,6 +204,43 @@ class ReleaseTest(unittest.TestCase):
         self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
         self.assertEqual(release.reconcile(self.args())["state"],"ROLLED_BACK")
         self.assertEqual((self.base/"current").resolve(),(self.base/"releases/old").resolve())
+    def test_rw3_relative_direct_previous_pointer_rolls_back_and_reconciles(self):
+        old=self.existing_old(); current=self.base/"current"; current.unlink(); current.symlink_to("releases/old")
+        self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
+        self.assertEqual(release.reconcile(self.args())["state"],"ROLLED_BACK")
+        self.assertEqual(os.readlink(current),"releases/old"); self.assertEqual(current.resolve(),old.resolve())
+    def test_rw3_absolute_intermediate_alias_is_rejected_before_activation_intent(self):
+        old=self.existing_old(); current=self.base/"current"; alias=self.base/"old-alias"
+        alias.symlink_to(old); current.unlink(); current.symlink_to(alias)
+        self.prepared()
+        with self.assertRaisesRegex(release.Hold,"PREVIOUS_POINTER_NOT_DIRECT_RELEASE"): release.activate(self.args())
+        receipt=json.loads((self.base/"transactions/tx-1.json").read_text())
+        self.assertEqual(receipt["state"],"PREPARED"); self.assertEqual(current.resolve(),old.resolve())
+    def test_rw3_relative_and_multilayer_aliases_are_rejected_before_activation_intent(self):
+        old=self.existing_old(); current=self.base/"current"; alias1=self.base/"old-alias"; alias2=self.base/"old-alias-2"
+        alias2.symlink_to("releases/old"); alias1.symlink_to("old-alias-2"); current.unlink(); current.symlink_to("old-alias")
+        self.prepared()
+        with self.assertRaisesRegex(release.Hold,"PREVIOUS_POINTER_NOT_DIRECT_RELEASE"): release.activate(self.args())
+        receipt=json.loads((self.base/"transactions/tx-1.json").read_text())
+        self.assertEqual(receipt["state"],"PREPARED"); self.assertEqual(current.resolve(),old.resolve())
+    def test_rw3_relative_path_jump_is_rejected_before_activation_intent(self):
+        old=self.existing_old(); current=self.base/"current"; (self.base/"releases/jump").mkdir()
+        current.unlink(); current.symlink_to("releases/jump/../old")
+        self.prepared()
+        with self.assertRaisesRegex(release.Hold,"PREVIOUS_POINTER_NOT_DIRECT_RELEASE"): release.activate(self.args())
+        receipt=json.loads((self.base/"transactions/tx-1.json").read_text())
+        self.assertEqual(receipt["state"],"PREPARED"); self.assertEqual(current.resolve(),old.resolve())
+    def test_rw3_legacy_alias_receipt_after_final_write_failure_cannot_report_complete(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
+        current=self.base/"current"; alias=self.base/"old-alias"; wrong=self.base/"releases/wrong"
+        (wrong/"public").mkdir(parents=True); alias.symlink_to(old); current.unlink(); current.symlink_to(alias)
+        path=self.base/"transactions/tx-1.json"; receipt=json.loads(path.read_text())
+        receipt["previous_current"]["link"]=str(alias)
+        receipt["rollback_pointer_identity"]=release.symlink_identity(current,os.geteuid())
+        path.write_text(json.dumps(receipt)); alias.unlink(); alias.symlink_to(wrong)
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_FINAL_STATE_UNPROVEN:PREVIOUS_POINTER_NOT_DIRECT_RELEASE"):
+            release.reconcile(self.args())
+        self.assertEqual(current.resolve(),wrong.resolve()); self.assertTrue(old.is_dir())
     def test_rw3_reconcile_rejects_damaged_restored_previous_content(self):
         old=self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
         (old/"public/index.html").write_text("damaged")
