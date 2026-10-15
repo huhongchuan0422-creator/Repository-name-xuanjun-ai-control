@@ -32,8 +32,10 @@ The status-only log excludes URI/query/body/headers/IP. Raw request-bearing
 error logging is suppressed; this trades diagnostic detail for secret safety.
 Operational status/error monitoring and acceptance remain pre-release gates.
 
-__HOST_CA_BUNDLE__ must be replaced by a validated existing host trust bundle
-path. Unrendered configs are not installable. No config installer/reload,
+The CA path is now bound to observed Domestic root-owned0444 system bundle
+/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem (148 certificates), verified
+by non-root run38765986129/job116529173285. Revalidate its identity and trust
+state at installation; no verification disable or private-key transfer is used. No config installer/reload,
 certbot invocation, DNS action, new root grant or merge is provided here.
 Existing reviewed bootstrap/ACME/renewal assets stay separate and reusable.
 Installing this candidate in addition to the old apex config would conflict;
@@ -48,3 +50,9 @@ This candidate never grants Tokyo retirement or claims all-server migration.
 CI real-Nginx tests use a loopback HTTP frontend and a fake TLS upstream; they
 prove routing/upstream TLS behavior, not the Domestic public443 certificate or
 loaded production config. Those remain W05/W06 gates.
+
+Read-only CA discovery history: first run38765774173 stopped because Python's
+default cafile paths were absent (capath may still provide trust). No host change
+or blind retry occurred. Corrected discovery checked the existing distro bundle
+paths; run38765986129 passed. ACME public root already exists as root0755 and
+is not a symlink. None of this issues a certificate or reloads Nginx.

@@ -546,6 +546,12 @@ class MinimalCutoverTest(unittest.TestCase):
         self.assertNotIn('^~ /submit/',matches)
         self.assertFalse(self.routes['approval'])
 
+    def test_complete_minimal_review_manifest(self):
+        manifest=json.loads((self.base/'REVIEW_MANIFEST.json').read_text())
+        actual={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in self.base.iterdir() if p.is_file() and p.name!='REVIEW_MANIFEST.json'}
+        self.assertEqual(actual,manifest['files'])
+        self.assertFalse(manifest['production_approved'])
+
     def test_proxy_security_and_no_dns_recursion(self):
         text=(self.base/'tokyo-proxy-settings.conf').read_text()
         for directive in ['proxy_pass https://47.245.53.152;',
@@ -659,7 +665,7 @@ class MinimalNginxIntegrationTest(unittest.TestCase):
             text=text.replace('listen [::]:443 ssl;','').replace('    http2 on;','')
             # Test HTTP frontend only; upstream remains real TLS with verify ON.
             text='\n'.join(l for l in text.splitlines() if not l.strip().startswith(('ssl_certificate ','ssl_certificate_key ')))+'\n'
-            text=text.replace('__HOST_CA_BUNDLE__',str(self.cert))
+            text=text.replace('/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem',str(self.cert))
             text=text.replace('https://47.245.53.152','https://127.0.0.1:'+str(self.backend.server_port))
             text=text.replace('proxy_read_timeout 30s;','proxy_read_timeout 1s;')
             if wrong_sni:text=text.replace('proxy_ssl_name wenwenwenyiyiyi.work;','proxy_ssl_name wrong.invalid;')
