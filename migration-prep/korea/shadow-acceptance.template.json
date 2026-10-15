@@ -12,5 +12,7 @@
   "mem_available_floor_mib": 512,
   "swap_growth_mib": 128,
   "latency_p95_ms": 2000,
-  "latency_p99_ms": 5000
+  "latency_p99_ms": 5000,
+  "max_sample_gap_seconds": 600,
+  "max_restart_count": 0
 }

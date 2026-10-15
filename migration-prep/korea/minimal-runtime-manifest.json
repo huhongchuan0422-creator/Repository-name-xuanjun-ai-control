@@ -5,7 +5,7 @@
   ],
   "artifact_role": "KOREA_GET_ONLY_SHADOW_RUNTIME_CANDIDATE",
   "binance_called": false,
-  "content_sha256": "df6cac2dd1052a618bbe58222fae93011c342b940e288e3d9aa2d305afae166d",
+  "content_sha256": "cb84b0c9e80d61abf124a9675772700905664baa9da04a9aa7dd3fd289c4b974",
   "entrypoint": "python -m korea.migration_shadow_entry --continuous",
   "feature_id": "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
   "files": [
@@ -36,18 +36,23 @@
     },
     {
       "path": "migration-prep/korea/migration_shadow_entry.py",
-      "sha256": "a9c7e695f64746cbd1f884d4243423b8af8c63d583f601e963db3c06a97a430f",
-      "size": 18224
+      "sha256": "6b524a8feffd484979eea2300ff2eaee4b71a1c625d6b9eeb22774a1b8017b38",
+      "size": 20390
+    },
+    {
+      "path": "migration-prep/korea/snapshot_handoff.py",
+      "sha256": "0d6bc631b2a51ee01da2f1a0c0e33d00a079f7dca7be36e898133663bed741a2",
+      "size": 3148
     },
     {
       "path": "migration-prep/korea/shadow_acceptance.py",
-      "sha256": "6ef83524408773a7099ae57545ab234f3d3ab65c0930ae5a208cd7a82be54f97",
-      "size": 10674
+      "sha256": "58f5e2034c4cd7a5b41a2ed5e040fc7d7b2f72c2a41d115f487f0f1cb4613cff",
+      "size": 18031
     },
     {
       "path": "migration-prep/korea/shadow-acceptance.template.json",
-      "sha256": "0b2f34fafe560c1b82d7ebc886ea272347af0ebea959453629aa5801a7b7c79a",
-      "size": 483
+      "sha256": "ac78bbdde482a3c7a57c4267c9a1477fbb123e45b5015391bde438569d8b03e2",
+      "size": 542
     },
     {
       "path": "migration-prep/korea/validate_runtime_candidate.py",
@@ -61,8 +66,8 @@
     },
     {
       "path": "migration-prep/korea/shadow-config.template.json",
-      "sha256": "d0cac38c02b383a0e7e88e785f36a2fcb736f9a1de37d472aa3745a62d4564cf",
-      "size": 851
+      "sha256": "dfb89244a39d93b2dac948a58a2c109e80fc777fb325b96e1a4161c9e2f99bb0",
+      "size": 1190
     },
     {
       "path": "migration-prep/korea/xuanjun-binance-shadow.service.in",
@@ -71,18 +76,18 @@
     },
     {
       "path": "migration-prep/korea/install-candidate.sh",
-      "sha256": "f2e12a5e10ef335733fca7bbb5789ff8bced129209874d3c0df0b811cc47a049",
-      "size": 8733
+      "sha256": "618e0a2dc8b977e6c695a50001024e28d20591ad3d046212e453aef1da0d3c6a",
+      "size": 13113
     },
     {
       "path": "migration-prep/korea/check-candidate.sh",
-      "sha256": "f0bceab99da48797e5e24c8ccd46dd5126c949110825af259995a844052d3b2a",
-      "size": 3639
+      "sha256": "7750f2a58ef561b56f8a419382bbdc078042b34139d2dca4274db300c721d59b",
+      "size": 4328
     },
     {
       "path": "migration-prep/korea/uninstall-candidate.sh",
-      "sha256": "f87e4ced485b99e1b3b29a763d074c4b4f386cc5d9823bb5b8f453fadba1b893",
-      "size": 2459
+      "sha256": "fef0c3772622916fc5e5a24d921080be40426c4b27ea41876ff190dc6a91096b",
+      "size": 3461
     },
     {
       "path": "migration-prep/korea/requirements.lock",

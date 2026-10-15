@@ -24,7 +24,8 @@ manifest/import, existing identity attributes, root-owned target parents and eve
 target with both `-e` and `-L`. It copies to a private staging directory, validates
 again, then atomically renames one content-addressed release. Its transaction record
 binds the manifest/content, release, venv Python, unit and exact owned objects.
-Check verifies installed bytes, real current/venv identity, the disabled/inactive
+Check requires the exact transaction path and expected manifest SHA-256, then
+verifies installed bytes, real current/venv identity, the disabled/inactive
 service and effective unit/drop-ins. Re-entry succeeds only for the same valid
 transaction. Uninstall requires the transaction hash and refuses replaced objects;
 it retains state, credentials, evidence and identity. Failure reports its stage and
@@ -56,10 +57,29 @@ The unit is wired to bounded continuous sampling. A separate acceptance config m
 carry Owner-approved duration, interval, sample count, resource/latency thresholds,
 approval id and window id. The checked-in template deliberately has
 `owner_approved=false`, so it cannot execute acceptance. A hash-bound window ledger
-survives restart and aggregates every cycle, latency and RSS/MemAvailable/swap sample.
-Unknown state, insufficient samples, threshold breach or config drift fails closed.
+binds the acceptance config, runtime config, artifact, account, database path,
+verifier and snapshot-publisher identity. Restart is accepted only within the
+Owner-approved restart count and maximum gap; expiry, a long gap, tested-object
+drift or incomplete end coverage permanently holds that window. Every cycle requires
+a fresh independently verified `XUANJUN_SQLITE_WAL_BACKUP_ATOMIC_HANDOFF_V1`
+receipt for an atomically published, closed WAL-aware SQLite snapshot. A static copy
+cannot satisfy a long window. Resource monitoring samples during each cycle,
+includes cgroup peak/OOM evidence, and hard-stops immediately on a non-PASS status
+or resource/latency threshold breach. Failed samples cannot be waived.
 Template numbers are suggestions, not approvals. The candidate permits zero new
 entries because no production Writer authority is packaged.
+
+The refresh handoff is deliberately narrower than a scheduler or transfer agent.
+An independently authorized source-side collector must reuse the existing
+`ReadOnlyBusinessDatabase`/SQLite read-only backup path against the live WAL database
+without freezing it, close and integrity
+check the copy, and issue an independently verifiable receipt binding capture time,
+account, publisher identity, runtime manifest and database SHA-256. A destination
+publisher must verify those fields and atomically rename the closed copy and receipt
+into the configured input paths. The Shadow process admits that generation only
+after byte-hash and verifier checks. Neither collector nor publisher is installed,
+scheduled or authorized by this candidate; absent that real route, continuous
+acceptance remains HOLD rather than relaxing `snapshot_max_age_ms`.
 
 Rollback is Korea-first: lock Korea Writer, revoke its credential, remove its IP,
 reconcile every unknown outcome, and only then consider Tokyo restoration and a new

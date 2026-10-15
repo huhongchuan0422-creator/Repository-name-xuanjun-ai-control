@@ -57,6 +57,10 @@ class CloseoutPackageTests(unittest.TestCase):
                 "credential_role": "BINANCE_ACCOUNT_READONLY", "api_key_file": "/run/key",
                 "api_secret_file": "/run/secret", "verifier_command": "/usr/local/bin/verifier",
                 "verifier_sha256": "0" * 64, "snapshot_max_age_ms": 30000,
+                "runtime_manifest_sha256": "4" * 64,
+                "snapshot_handoff_receipt": "/var/lib/xuanjun-binance/input/trading-shadow.handoff.json",
+                "snapshot_refresh_protocol": "XUANJUN_SQLITE_WAL_BACKUP_ATOMIC_HANDOFF_V1",
+                "snapshot_publisher_identity_sha256": "5" * 64,
                 "capture_timeout_ms": 30000, "writer_enabled": True, "scheduler_enabled": False,
             }
             path.write_text(json.dumps(value)); path.chmod(0o600)

@@ -14,6 +14,7 @@ FILES = (
     "migration-prep/korea/__init__.py",
     "migration-prep/korea/get_only_policy.py",
     "migration-prep/korea/migration_shadow_entry.py",
+    "migration-prep/korea/snapshot_handoff.py",
     "migration-prep/korea/shadow_acceptance.py",
     "migration-prep/korea/shadow-acceptance.template.json",
     "migration-prep/korea/validate_runtime_candidate.py",

@@ -85,8 +85,8 @@ These commands are documentation, not authorization:
 
 ```text
 sudo ./migration-prep/korea/install-candidate.sh SOURCE_ROOT EXPECTED_MINIMAL_MANIFEST_SHA256
-sudo ./migration-prep/korea/check-candidate.sh
-sudo ./migration-prep/korea/uninstall-candidate.sh --confirm-disabled-candidate-only
+sudo ./migration-prep/korea/check-candidate.sh --expected-transaction /etc/xuanjun-binance/install-transaction.json --expected-manifest-sha256 EXPECTED_MINIMAL_MANIFEST_SHA256
+sudo ./migration-prep/korea/uninstall-candidate.sh --confirm-disabled-candidate-only --transaction-sha256 EXPECTED_TRANSACTION_SHA256
 ```
 
 Install creates no credential, IP allowlist or active service. The base unit is

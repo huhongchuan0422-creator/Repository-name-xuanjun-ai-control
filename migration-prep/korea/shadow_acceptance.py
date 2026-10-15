@@ -6,6 +6,7 @@ import json
 import math
 import os
 import stat
+import threading
 import time
 
 from gate_common import canonical_bytes, require, sha256_value
@@ -17,6 +18,7 @@ ACCEPTANCE_FIELDS = frozenset((
     "minimum_samples", "max_failed_samples", "rss_peak_mib",
     "mem_available_floor_mib", "swap_growth_mib", "latency_p95_ms",
     "latency_p99_ms",
+    "max_sample_gap_seconds", "max_restart_count",
 ))
 
 
@@ -56,6 +58,8 @@ def validate_acceptance_config(value):
         "swap_growth_mib": (0, 1048576),
         "latency_p95_ms": (1, 3600000),
         "latency_p99_ms": (1, 3600000),
+        "max_sample_gap_seconds": (1, 7200),
+        "max_restart_count": (0, 1000),
     }
     for name, bounds in integer_ranges.items():
         require(type(value[name]) is int and bounds[0] <= value[name] <= bounds[1],
@@ -66,6 +70,11 @@ def validate_acceptance_config(value):
                 value["sample_interval_seconds"])
     require(value["minimum_samples"] <= possible,
             "SHADOW_ACCEPTANCE_MINIMUM_SAMPLES_UNREACHABLE")
+    require(value["max_failed_samples"] == 0,
+            "SHADOW_FAILED_SAMPLES_CANNOT_BE_WAIVED")
+    require(value["max_sample_gap_seconds"] <=
+            value["sample_interval_seconds"] * 2,
+            "SHADOW_MAX_GAP_TOO_BROAD")
     return value
 
 
@@ -90,6 +99,33 @@ def sample_resources():
             "SHADOW_RESOURCE_SAMPLE_INCOMPLETE")
     values["mem_available_mib"] = memory["MemAvailable"]
     values["swap_used_mib"] = memory["SwapTotal"] - memory["SwapFree"]
+    values["cgroup_memory_peak_mib"] = values["rss_mib"]
+    values["cgroup_oom"] = 0
+    cgroup_root = "/sys/fs/cgroup"
+    try:
+        with open("/proc/self/cgroup", "r", encoding="utf-8") as stream:
+            unified = [line.strip().split(":", 2)[2] for line in stream
+                       if line.startswith("0::")]
+        if len(unified) == 1:
+            candidate = os.path.realpath(os.path.join(cgroup_root, unified[0].lstrip("/")))
+            require(candidate == cgroup_root or candidate.startswith(cgroup_root + os.sep),
+                    "SHADOW_CGROUP_PATH_INVALID")
+            cgroup_root = candidate
+    except OSError:
+        pass
+    for peak_path in (os.path.join(cgroup_root, "memory.peak"),):
+        try:
+            with open(peak_path, "r", encoding="utf-8") as stream:
+                values["cgroup_memory_peak_mib"] = max(
+                    values["cgroup_memory_peak_mib"], int(stream.read().strip()) / 1048576.0)
+        except (OSError, ValueError):
+            pass
+    try:
+        with open(os.path.join(cgroup_root, "memory.events"), "r", encoding="utf-8") as stream:
+            events = dict(line.split() for line in stream if line.strip())
+        values["cgroup_oom"] = int(events.get("oom", 0)) + int(events.get("oom_kill", 0))
+    except (OSError, ValueError):
+        pass
     return values
 
 
@@ -105,6 +141,18 @@ def _state_path(config, acceptance):
     require(os.path.isdir(root) and not os.path.islink(config["evidence_root"]),
             "SHADOW_EVIDENCE_ROOT_REQUIRED")
     return os.path.join(root, "shadow-window-" + acceptance["window_id"] + ".json")
+
+
+def _tested_object(config):
+    return {
+        "runtime_config_sha256": sha256_value(config),
+        "runtime_manifest_sha256": config["runtime_manifest_sha256"],
+        "account_id": config["account_id"],
+        "business_database": os.path.realpath(config["business_database"]),
+        "verifier_sha256": config["verifier_sha256"],
+        "snapshot_refresh_protocol": config["snapshot_refresh_protocol"],
+        "snapshot_publisher_identity_sha256": config["snapshot_publisher_identity_sha256"],
+    }
 
 
 def _write_state(path, value, create=False):
@@ -128,26 +176,49 @@ def _write_state(path, value, create=False):
 def _load_or_create_state(config, acceptance, now_ms, resources):
     path = _state_path(config, acceptance)
     config_sha = sha256_value(acceptance)
+    tested_object = _tested_object(config)
+    tested_object_sha = sha256_value(tested_object)
     if os.path.lexists(path):
         require(os.path.isfile(path) and not os.path.islink(path),
                 "SHADOW_WINDOW_STATE_INVALID")
         with open(path, "rb") as stream:
             state = json.loads(stream.read().decode("utf-8"))
         require(state.get("acceptance_config_sha256") == config_sha and
-                state.get("window_id") == acceptance["window_id"],
+                state.get("window_id") == acceptance["window_id"] and
+                state.get("tested_object_sha256") == tested_object_sha and
+                state.get("tested_object") == tested_object,
                 "SHADOW_WINDOW_RESTART_CONFIG_MISMATCH")
         require(state.get("status") in ("RUNNING", "HOLD_INTERRUPTED"),
                 "SHADOW_WINDOW_ALREADY_FINAL")
         state["restart_count"] += 1
+        max_gap_ms = acceptance["max_sample_gap_seconds"] * 1000
+        last = (state["samples"][-1]["sample_finished_ms"]
+                if state["samples"] else state["started_at_ms"])
+        blockers = []
+        if now_ms > state["deadline_ms"]:
+            blockers.append("SHADOW_WINDOW_EXPIRED_BEFORE_RESUME")
+        if now_ms - last > max_gap_ms:
+            blockers.append("SHADOW_CONTINUITY_GAP_EXCEEDED")
+        if state["restart_count"] > acceptance["max_restart_count"]:
+            blockers.append("SHADOW_RESTART_LIMIT_EXCEEDED")
+        if blockers:
+            state["status"] = "HOLD"; state["blockers"] = blockers
+            state["resume_rejected_at_ms"] = now_ms
+            state["evidence_sha256"] = sha256_value(state)
+            _write_state(path, state)
+            return path, state
         state["status"] = "RUNNING"
         return path, state
     state = {
         "schema_version": 1, "window_id": acceptance["window_id"],
         "owner_approval_id": acceptance["owner_approval_id"],
         "acceptance_config_sha256": config_sha,
+        "tested_object": tested_object,
+        "tested_object_sha256": tested_object_sha,
         "started_at_ms": now_ms,
         "deadline_ms": now_ms + acceptance["duration_seconds"] * 1000,
         "initial_swap_used_mib": resources["swap_used_mib"],
+        "initial_cgroup_oom": resources.get("cgroup_oom", 0),
         "restart_count": 0, "samples": [], "status": "RUNNING",
         "production_authorized": False, "writer_enabled": False,
     }
@@ -160,13 +231,28 @@ def _finalize(state, acceptance):
     latencies = [sample["latency_ms"] for sample in samples]
     failures = [sample for sample in samples if not str(sample["cycle_status"]).startswith("PASS")]
     blockers = []
+    max_gap_ms = acceptance["max_sample_gap_seconds"] * 1000
     if len(samples) < acceptance["minimum_samples"]:
         blockers.append("SHADOW_MINIMUM_SAMPLES_NOT_MET")
     if len(failures) > acceptance["max_failed_samples"]:
         blockers.append("SHADOW_FAILED_SAMPLE_LIMIT_EXCEEDED")
     if samples:
-        if max(sample["resources"]["rss_mib"] for sample in samples) > acceptance["rss_peak_mib"]:
+        gaps = [samples[0]["sample_started_ms"] - state["started_at_ms"]]
+        gaps.extend(samples[index]["sample_started_ms"] - samples[index - 1]["sample_finished_ms"]
+                    for index in range(1, len(samples)))
+        gaps.append(state["deadline_ms"] - samples[-1]["sample_finished_ms"])
+        state["maximum_observed_gap_ms"] = max(gaps)
+        if max(gaps) > max_gap_ms:
+            blockers.append("SHADOW_CONTINUITY_GAP_EXCEEDED")
+        generations = [sample.get("snapshot_generation_id") for sample in samples]
+        if any(not value for value in generations):
+            blockers.append("SHADOW_SNAPSHOT_GENERATION_EVIDENCE_MISSING")
+    if samples:
+        if max(max(sample["resources"]["rss_mib"], sample["resources"].get("cgroup_memory_peak_mib", 0)) for sample in samples) > acceptance["rss_peak_mib"]:
             blockers.append("SHADOW_RSS_THRESHOLD_EXCEEDED")
+        if any(sample["resources"].get("cgroup_oom", 0) > state.get("initial_cgroup_oom", 0)
+               for sample in samples):
+            blockers.append("SHADOW_CGROUP_OOM_OBSERVED")
         if min(sample["resources"]["mem_available_mib"] for sample in samples) < acceptance["mem_available_floor_mib"]:
             blockers.append("SHADOW_MEM_AVAILABLE_THRESHOLD_BREACHED")
         growth = max(sample["resources"]["swap_used_mib"] for sample in samples) - state["initial_swap_used_mib"]
@@ -197,6 +283,8 @@ def run_continuous(config, acceptance, cycle_runner=None, clock_ms=None,
         cycle_runner = run_once
     initial_resources = resources_fn()
     path, state = _load_or_create_state(config, acceptance, clock(), initial_resources)
+    if state["status"] == "HOLD":
+        return state
     interval_ms = acceptance["sample_interval_seconds"] * 1000
     next_due = (state["samples"][-1]["sample_started_ms"] + interval_ms
                 if state["samples"] else state["started_at_ms"])
@@ -207,8 +295,32 @@ def run_continuous(config, acceptance, cycle_runner=None, clock_ms=None,
                 sleeper(min((next_due - current) / 1000.0, 1.0))
                 continue
             before = clock()
-            result = cycle_runner(config, now_ms=before)
+            observations = [resources_fn()]; monitor_errors = []
+            stop_monitor = threading.Event()
+            def monitor():
+                while not stop_monitor.wait(0.05):
+                    try:
+                        observations.append(resources_fn())
+                    except BaseException as error:
+                        monitor_errors.append(type(error).__name__)
+                        return
+            monitor_thread = threading.Thread(target=monitor, name="shadow-resource-monitor")
+            monitor_thread.daemon = True; monitor_thread.start()
+            try:
+                result = cycle_runner(config, now_ms=before)
+            finally:
+                stop_monitor.set(); monitor_thread.join(timeout=1.0)
+                observations.append(resources_fn())
+            require(not monitor_errors, "SHADOW_RESOURCE_MONITOR_FAILED")
             after = clock()
+            resources = {
+                "rss_mib": max(value["rss_mib"] for value in observations),
+                "cgroup_memory_peak_mib": max(value.get("cgroup_memory_peak_mib", value["rss_mib"]) for value in observations),
+                "mem_available_mib": min(value["mem_available_mib"] for value in observations),
+                "swap_used_mib": max(value["swap_used_mib"] for value in observations),
+                "cgroup_oom": max(value.get("cgroup_oom", 0) for value in observations),
+                "sample_count": len(observations),
+            }
             sample = {
                 "sequence": len(state["samples"]) + 1,
                 "sample_started_ms": before, "sample_finished_ms": after,
@@ -217,14 +329,34 @@ def run_continuous(config, acceptance, cycle_runner=None, clock_ms=None,
                 "observation_run_id": result.get("observation_run_id"),
                 "authoritative_business_snapshot_id":
                     result.get("authoritative_business_snapshot_id"),
-                "resources": resources_fn(),
+                "snapshot_generation_id": result.get("snapshot_generation_id"),
+                "resources": resources,
             }
             state["samples"].append(sample)
             state["last_sample_at_ms"] = after
             _write_state(path, state)
-            if sample["cycle_status"] == "UNKNOWN":
+            hard_blockers = []
+            if sample["cycle_status"] != "PASS_READONLY_SHADOW_CYCLE":
+                hard_blockers.append("SHADOW_NONPASS_SAMPLE_FAIL_CLOSED:" + str(sample["cycle_status"]))
+            if max(resources["rss_mib"], resources["cgroup_memory_peak_mib"]) > acceptance["rss_peak_mib"]:
+                hard_blockers.append("SHADOW_RSS_THRESHOLD_EXCEEDED")
+            if resources["mem_available_mib"] < acceptance["mem_available_floor_mib"]:
+                hard_blockers.append("SHADOW_MEM_AVAILABLE_THRESHOLD_BREACHED")
+            if resources["cgroup_oom"] > state.get("initial_cgroup_oom", 0):
+                hard_blockers.append("SHADOW_CGROUP_OOM_OBSERVED")
+            if after - before > acceptance["latency_p99_ms"]:
+                hard_blockers.append("SHADOW_CYCLE_HARD_LATENCY_EXCEEDED")
+            previous_generation = (state["samples"][-2].get("snapshot_generation_id")
+                                   if len(state["samples"]) > 1 else None)
+            if not sample["snapshot_generation_id"]:
+                hard_blockers.append("SHADOW_SNAPSHOT_GENERATION_EVIDENCE_MISSING")
+            elif previous_generation == sample["snapshot_generation_id"] and \
+                    after - state["samples"][-2]["sample_finished_ms"] > config["snapshot_max_age_ms"]:
+                hard_blockers.append("SHADOW_STATIC_SNAPSHOT_EXPIRED")
+            if hard_blockers:
                 state["status"] = "HOLD"
-                state["blockers"] = ["SHADOW_UNKNOWN_SAMPLE_FAIL_CLOSED"]
+                state["blockers"] = hard_blockers
+                state["hard_stopped_at_sequence"] = sample["sequence"]
                 state["evidence_sha256"] = sha256_value(state)
                 _write_state(path, state)
                 return state

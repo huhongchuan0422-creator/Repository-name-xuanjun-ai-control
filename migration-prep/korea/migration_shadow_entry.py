@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from gate_common import GateError, canonical_bytes, require, sha256_value
 from final_snapshot import REQUIRED_SURFACES, RECONCILED_STATE_CLASSES, SURFACE_REQUESTS
 from korea.get_only_policy import ControlledHttpsTransport
+from korea.snapshot_handoff import PROTOCOL as SNAPSHOT_PROTOCOL, admit_snapshot_handoff
 from readonly_reconciliation_adapter import (
     AuthenticatedGetOnlyPager,
     EvidenceDirectory,
@@ -76,6 +77,8 @@ def _load_config(path):
         "business_database", "evidence_root", "pinned_ips", "credential_role",
         "api_key_file", "api_secret_file", "verifier_command",
         "verifier_sha256", "snapshot_max_age_ms", "capture_timeout_ms",
+        "runtime_manifest_sha256", "snapshot_handoff_receipt",
+        "snapshot_refresh_protocol", "snapshot_publisher_identity_sha256",
         "writer_enabled", "scheduler_enabled",
     ))
     require(isinstance(value, dict) and frozenset(value) == expected,
@@ -98,6 +101,15 @@ def _load_config(path):
     require(type(value["capture_timeout_ms"]) is int and
             0 < value["capture_timeout_ms"] <= 300000,
             "SHADOW_CAPTURE_TIMEOUT_INVALID")
+    require(value["snapshot_refresh_protocol"] == SNAPSHOT_PROTOCOL,
+            "SHADOW_SNAPSHOT_REFRESH_PROTOCOL_INVALID")
+    for name in ("runtime_manifest_sha256", "snapshot_publisher_identity_sha256"):
+        require(isinstance(value[name], str) and len(value[name]) == 64 and
+                all(character in "0123456789abcdef" for character in value[name]),
+                "SHADOW_CONFIG_HASH_INVALID:" + name)
+    require(isinstance(value["snapshot_handoff_receipt"], str) and
+            value["snapshot_handoff_receipt"].startswith("/"),
+            "SHADOW_SNAPSHOT_HANDOFF_PATH_INVALID")
     return value
 
 
@@ -143,6 +155,30 @@ class IndependentReceiptVerifier(object):
             "network_evidence_sha256": sha256_value(receipt["network_evidence"]),
         }
         return value == expected
+
+    def verify_snapshot_handoff(self, receipt):
+        remaining = 10
+        if self.deadline_monotonic is not None:
+            remaining = min(remaining, self.deadline_monotonic - self.monotonic())
+        if remaining <= 0:
+            return False
+        result = subprocess.run(
+            [self.command, "verify-snapshot-handoff"], input=canonical_bytes(receipt),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=remaining, check=False,
+        )
+        if result.returncode != 0:
+            return False
+        try:
+            value = json.loads(result.stdout.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            return False
+        return value == {
+            "verified": True,
+            "snapshot_generation_id": receipt["snapshot_generation_id"],
+            "database_sha256": receipt["database_sha256"],
+            "runtime_manifest_sha256": receipt["runtime_manifest_sha256"],
+            "publisher_identity_sha256": receipt["publisher_identity_sha256"],
+        }
 
 
 class SignedReadonlyTransport(object):
@@ -269,6 +305,7 @@ def run_once(config, now_ms=None, clock_ms=None, monotonic=None,
     database = None
     try:
         with _hard_deadline(deadline_monotonic - monotonic_clock()):
+            handoff = admit_snapshot_handoff(config, verifier, started)
             database = ReadOnlyBusinessDatabase(
                 config["business_database"], run_dir, config["account_id"], None,
                 started, config["snapshot_max_age_ms"],
@@ -310,6 +347,8 @@ def run_once(config, now_ms=None, clock_ms=None, monotonic=None,
             "source_verification": verification, "binance_methods": ["GET"],
             "writer_enabled": False, "scheduler_enabled": False,
             "production_authorized": False,
+            "snapshot_generation_id": handoff["snapshot_generation_id"],
+            "snapshot_handoff_database_sha256": handoff["database_sha256"],
         }
         files = [
             directory.write_once(run_dir, "exchange-pages.json", surfaces),
@@ -318,6 +357,7 @@ def run_once(config, now_ms=None, clock_ms=None, monotonic=None,
         ]
         return {"status": result["status"], "observation_run_id": observation_run_id,
                 "authoritative_business_snapshot_id": authoritative_snapshot_id,
+                "snapshot_generation_id": handoff["snapshot_generation_id"],
                 "files": files}
     except Exception as error:
         try:
