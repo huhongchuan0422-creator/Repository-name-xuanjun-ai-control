@@ -324,7 +324,7 @@ class CollectorTests(unittest.TestCase):
     def test_writer_observation_drift_blocks(self):
         count=[0]
         def writer(p,paths):
-            count[0]+=1;value=writer_fixture();value['processes']['fd_count']=count[0];return value
+            count[0]+=1;value=writer_fixture();value['processes']['process_identity_sha256']=h(str(count[0]));return value
         self.io.writers=writer
         with self.assertRaisesRegex(ValueError,'WRITER_OBSERVATION'):self.collect()
     def test_missing_writer_evidence_blocks(self):

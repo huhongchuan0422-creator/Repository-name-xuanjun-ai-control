@@ -655,7 +655,7 @@ class VerifiedKit(object):
         """
         need(self.manifest['production_resume'] == RESUME_COMPOSED, 'RESUME_REFUSED_UNCOMPOSED')
         need(os.geteuid() == 0 and os.uname().nodename.split('.')[0] == FIXED_HOST and
-             self.root == CANDIDATE_PARENT + '/epoch7-recovery-candidate-r4', 'RESUME_FIXED_HOST_ROOT')
+             self.root == CANDIDATE_PARENT + '/epoch7-recovery-candidate-r5', 'RESUME_FIXED_HOST_ROOT')
         need(type(review_id) is int and review_id > 0 and type(review_body_sha) is str and
              SHA.fullmatch(review_body_sha), 'FRESH_REVIEW_ARGUMENTS_REQUIRED')
         need(all(type(value) is str and SHA.fullmatch(value) for value in (plan_sha, seed_sha)),
@@ -738,7 +738,7 @@ class VerifiedKit(object):
             need(os.path.dirname(output) == observer.c.CAND and re.fullmatch(
                  r'epoch7-observation-[0-9a-f]{16}\.private\.json', os.path.basename(output)),
                  'OBSERVATION_OUTPUT_SCOPE')
-            need(self.root == observer.c.CAND + '/epoch7-recovery-candidate-r4',
+            need(self.root == observer.c.CAND + '/epoch7-recovery-candidate-r5',
                  'OBSERVATION_EXACT_STAGED_KIT')
             # Refuse existing output before observation/probe effects. Final
             # writer still uses O_EXCL, no-follow ancestry and private readback.

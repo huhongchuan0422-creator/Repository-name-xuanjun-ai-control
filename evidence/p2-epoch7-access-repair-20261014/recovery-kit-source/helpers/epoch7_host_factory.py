@@ -367,7 +367,11 @@ def observation_inputs(observation):
          'FACTORY_COMPLETE_OBSERVATION_REQUIRED')
     for name in ('snapshot','evidence','policy','probe_metadata','unit_metadata'):
         need(d.digest(observation[name])==observation[name+'_sha256'],'FACTORY_OBSERVATION_'+name.upper()+'_DIGEST')
-    manager=observation['evidence']['writers']['manager']
+    support=observation['evidence'];writers=support['writers']
+    snap.validate_writer_comparison(support.get('writer_observation_comparison'),writers)
+    need(d.digest(writers)==observation['snapshot']['writer_exclusion']['evidence_sha256'],
+         'FACTORY_WRITER_SNAPSHOT_BINDING')
+    manager=writers['manager']
     need(manager.get('uids')==[0,0,0,0] and all(type(v) is int for v in manager['uids']) and
          manager['pid']==1 and manager['binary_path'] in ('/usr/lib/systemd/systemd','/lib/systemd/systemd'),
          'FACTORY_MEASURED_SYSTEM_MANAGER')

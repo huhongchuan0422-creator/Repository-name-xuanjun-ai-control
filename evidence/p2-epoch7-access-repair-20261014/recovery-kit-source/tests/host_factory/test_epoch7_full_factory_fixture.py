@@ -22,7 +22,7 @@ from test_epoch7_delta import fixture as delta_fixture
 from test_node_sqlite_probe import fixture_attempt,fixture_proof
 import node_sqlite_probe as np
 import activation_control
-from test_snapshot import native_transition_fixture,native_pin_context
+from test_snapshot import native_transition_fixture,native_pin_context,writer_fixture
 
 
 def packed(value):return d.canonical(value)+b'\n'
@@ -171,7 +171,8 @@ def make_seed(service_fixture=complete_fixture):
         'selected_nonlinks':{},'scan_scope':'BOUNDED_RECURSIVE_NOFOLLOW','all_link_inventory_sha256':d.digest('fixture')}
     sections['boot_links']['evidence']={'units':sorted(f.BOOT_RESTORED),'roots':roots,'unsupported_roots':[]}
     states=copy.deepcopy(facts['unit_states'])
-    for unit in f.BOOT_RESTORED:states[unit].update(LoadState='masked',UnitFileState='masked')
+    for unit in f.BOOT_RESTORED | {os.path.basename(path) for path in snap.LEGACY_MASKS}:
+        states[unit].update(LoadState='masked',UnitFileState='masked')
     manager={'pid':1,'uids':[0]*4,'gids':[0]*4,'groups':[0,777],'starttime':1,'boot_id':'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         'binary_path':'/usr/lib/systemd/systemd','binary_sha256':d.digest('manager'),'channels':{}}
     files[manager['binary_path']]=dict(meta(b'manager',mode=0o755),sha256=manager['binary_sha256'])
@@ -232,8 +233,12 @@ def make_seed(service_fixture=complete_fixture):
         'releases':releases,'databases':{p:dict({k:v['file'][k] for k in ('sha256','uid','gid','mode')},sidecars={},logical_manifest_sha256=d.digest('logical')) for p,v in databases.items()},
         'scheduler_files':{},'control_units':{u:{'/etc/systemd/system/'+u:d.digest(u)} for u in snap.WRITER_UNITS if u.startswith(('xj-','xuanjun-'))},'executables':executables}
     retained['policy_sha256']=d.digest(policy);snapshot['retained_resource_sha256']=d.digest(retained)
-    evidence={'retained':retained,'snapshot_sha256':d.digest(snapshot),'writers':{'manager':manager,
-        'units':{u:{'state':v} for u,v in states.items()},'processes':{'background_processes':[],'background_processes_sha256':d.digest([])}}}
+    writers=writer_fixture();writers['manager']=manager
+    writers['units']={u:{'state':{k:str(v) if k in ('MainPID','ControlPID') else v
+        for k,v in state.items()},'cgroup_entries':{}} for u,state in states.items()}
+    snapshot['writer_exclusion']['evidence_sha256']=d.digest(writers)
+    evidence={'retained':retained,'snapshot_sha256':d.digest(snapshot),'writers':writers,
+        'writer_observation_comparison':snap.validate_writer_transition(writers,writers)}
     resolution=copy.deepcopy(facts['command_resolutions']['xuanjun-development-dispatcher.service'])
     sections['command_resolutions']['evidence']={'unit':'xuanjun-development-dispatcher.service','resolution':resolution,
         'collector_path_used':False,'provenance':{'source':'SYSTEM_MANAGER_CHILD_ENVIRONMENT','manager_sha256':d.digest(manager),

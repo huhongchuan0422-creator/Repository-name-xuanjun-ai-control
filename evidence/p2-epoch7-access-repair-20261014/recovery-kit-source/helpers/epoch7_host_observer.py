@@ -580,6 +580,9 @@ class Epoch7HostObserver(object):
             need(self.guard_deadline is not None,'HOST_PREFLIGHT_GUARD_BUDGET')
             io.deadline=min(io.deadline,self.guard_deadline)
             snapshot,evidence=snap.collect(self.policy,io)
+            snap.validate_writer_comparison(evidence.get('writer_observation_comparison'),evidence['writers'])
+            need(d.digest(evidence['writers'])==snapshot['writer_exclusion']['evidence_sha256'],
+                 'HOST_PREFLIGHT_WRITER_SNAPSHOT_BINDING')
             need(d.same(immutable_snapshot(snapshot),immutable_snapshot(self.reviewed_snapshot)),
                  'HOST_PREFLIGHT_IMMUTABLE_SNAPSHOT_DRIFT')
             # Provenance stays the approved snapshot. The fresh proof is kept in

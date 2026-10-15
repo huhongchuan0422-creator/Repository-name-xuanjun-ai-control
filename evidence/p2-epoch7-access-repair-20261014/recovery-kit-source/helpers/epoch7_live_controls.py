@@ -479,10 +479,11 @@ class FiniteLiveControls(object):
         d.validate_snapshot(snapshot, context['snapshot_sha256'])
         need(type(evidence) is dict and set(evidence) == {'schema','kind','snapshot_sha256','retained','writers',
              'install_admission','production_acceptance','target_mutations','fresh_snapshot_sha256',
-             'fresh_writer_exclusion','fresh_process_proof'} and type(evidence['schema']) is int and
+             'fresh_writer_exclusion','fresh_process_proof','writer_observation_comparison'} and type(evidence['schema']) is int and
              evidence['schema'] == 1 and evidence['kind'] == 'PRIVATE_EPOCH7_ADMISSION_SPLIT_EVIDENCE' and
              evidence.get('snapshot_sha256') == context['snapshot_sha256'] and
              digest(evidence.get('retained')) == snapshot['retained_resource_sha256'], 'SNAPSHOT_SUPPORT_BINDING')
+        snap.validate_writer_comparison(evidence['writer_observation_comparison'],evidence['writers'])
         need(evidence['install_admission'] == 'NOT_GRANTED' and
              evidence['production_acceptance'] == 'NOT_VERIFIED' and
              type(evidence['target_mutations']) is int and evidence['target_mutations'] == 0,

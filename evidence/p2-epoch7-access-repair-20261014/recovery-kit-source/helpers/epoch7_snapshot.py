@@ -415,6 +415,7 @@ def validate_writers(value):
     need(isinstance(value['control_files'], dict) and value['control_files'], 'CONTROL_FILES_UNMEASURED')
     d.keys(value['processes'], ('process_identity_sha256', 'fd_count','background_processes','background_processes_sha256'), 'PROCESS_SCAN_EVIDENCE')
     d.hash_value(value['processes']['process_identity_sha256']); d.integer(value['processes']['fd_count'])
+    need(value['processes']['fd_count'] <= 1000000, 'FD_SCAN_EVIDENCE_BOUND')
     background=value['processes']['background_processes']
     need(type(background) is list and len(background)<=128 and
          d.digest(background)==value['processes']['background_processes_sha256'],'BACKGROUND_PROCESS_EVIDENCE')
@@ -433,6 +434,50 @@ def validate_writers(value):
         d.hash_value(row['executable_sha256']);d.hash_value(row['argv_sha256'])
     need(isinstance(value['manager'], dict) and value['manager'], 'ROOT_MANAGER_UNMEASURED')
     return value
+
+
+def validate_writer_transition(before, after):
+    """Compare every writer-safety field; retain aggregate FD count telemetry.
+
+    The concrete census still checks every observed descriptor against all DB
+    inode identities and rejects within-scan FD/UID/PID races. Only the total
+    descriptor count across otherwise unchanged system processes may differ
+    between two complete scans. Neither input is changed or projected by an
+    allowlist: removing this one exact key leaves every other field in scope.
+    """
+    validate_writers(before); validate_writers(after)
+    first, last = copy.deepcopy(before), copy.deepcopy(after)
+    before_count = first['processes'].pop('fd_count')
+    after_count = last['processes'].pop('fd_count')
+    need(d.same(first, last), 'WRITER_OBSERVATION_CHANGED')
+    return {'schema': 1, 'comparison': 'EXACT_EXCEPT_AGGREGATE_FD_COUNT',
+        'before_sha256': d.digest(before), 'after_sha256': d.digest(after),
+        'safety_sha256': d.digest(last),
+        'fd_count_before': before_count, 'fd_count_after': after_count}
+
+
+def validate_writer_comparison(record, after):
+    """Bind the compact transient record to the complete raw AFTER evidence.
+
+    Exact safety equality makes BEFORE recoverable by replacing only its FD
+    count. The record belongs outside immutable retained-resource evidence.
+    This checks structure/binding, not caller provenance or install authority.
+    """
+    d.keys(record, ('schema', 'comparison', 'before_sha256', 'after_sha256',
+                   'safety_sha256', 'fd_count_before', 'fd_count_after'),
+           'WRITER_COMPARISON_KEYS')
+    need(type(record['schema']) is int and record['schema'] == 1 and
+         record['comparison'] == 'EXACT_EXCEPT_AGGREGATE_FD_COUNT',
+         'WRITER_COMPARISON_RULE')
+    for key in ('before_sha256', 'after_sha256', 'safety_sha256'): d.hash_value(record[key])
+    for key in ('fd_count_before', 'fd_count_after'):
+        d.integer(record[key]); need(record[key] <= 1000000, 'FD_SCAN_EVIDENCE_BOUND')
+    validate_writers(after)
+    before = copy.deepcopy(after)
+    before['processes']['fd_count'] = record['fd_count_before']
+    expected = validate_writer_transition(before, after)
+    need(d.same(record, expected), 'WRITER_COMPARISON_BINDING')
+    return expected
 
 
 def collect(policy, io):
@@ -533,7 +578,7 @@ def collect(policy, io):
         receipts['publisher-bootstrap.json'])
     caches = {root: io.release(root, pin) for root, pin in sorted(p['releases'].items())}
     after_writers = validate_writers(io.writers(p, DATABASES))
-    need(before_writers == after_writers, 'WRITER_OBSERVATION_CHANGED')
+    writer_comparison = validate_writer_transition(before_writers, after_writers)
     # Full reread, not only stat/hash of the descriptor or a single database.
     for name, first in files.items():
         data, row = io.read(name); need(row == first and data == raw[name], 'RETAINED_FILE_RACE')
@@ -584,6 +629,7 @@ def collect(policy, io):
     d.validate_snapshot(result, d.digest(result)); d.validate_provision_before(result, raw[TRANSACTION + '/epoch6-runtime-provisioning.json'])
     evidence = {'schema': 1, 'kind': 'PRIVATE_DIGEST_ONLY_EPOCH7_SNAPSHOT', 'snapshot_sha256': d.digest(result),
         'retained': retained, 'writers': after_writers, 'install_admission': 'NOT_GRANTED',
+        'writer_observation_comparison': writer_comparison,
         'production_acceptance': 'NOT_VERIFIED', 'target_mutations': 0}
     return result, evidence
 

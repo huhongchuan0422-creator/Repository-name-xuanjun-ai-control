@@ -1,0 +1,27 @@
+{
+  "runs": [
+    {
+      "classification": "LOCAL_SOCKET_LIMITATIONS_NOT_PASS_FOR_SKIPS",
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "b1645fbc45b42f3f3f7892cb52e849bd6ff3f42eada62d649fdafd82b0f840b4",
+      "passed": 2078,
+      "python": "3.12.14",
+      "skipped": 9,
+      "tests": 2087
+    },
+    {
+      "classification": "LOCAL_SOCKET_LIMITATIONS_NOT_PASS_FOR_SKIPS",
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "9c9f9635480224bfcde8de223e5757062473a7d941c811d462b2dccc798413d0",
+      "passed": 2078,
+      "python": "3.6.8",
+      "skipped": 9,
+      "tests": 2087
+    }
+  ],
+  "source_index_sha256": "75783e64b65f3aaff8e439ee616917a9098b8e3d753d172442ecc96b65116e61",
+  "staged_map_sha256": "709faa848a37e422047b874d2682e3189925a63193951407d5ae52eba0bb2327",
+  "state": "ALL_EXECUTED_ASSERTIONS_PASS_WITH_9_LOCAL_SKIPS_EACH"
+}

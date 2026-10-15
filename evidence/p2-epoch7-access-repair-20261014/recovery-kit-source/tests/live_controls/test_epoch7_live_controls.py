@@ -13,6 +13,7 @@ sys.path[:0] = [str(HERE), str(HERE.parent/'snapshot-candidate'),
 import epoch7_live_controls as live
 import epoch7_recovery_sequence as sequence
 from test_epoch7_recovery_sequence import Rig, h
+from test_snapshot import writer_fixture
 
 
 def identity(pid, role, kernel_thread=False):
@@ -417,10 +418,11 @@ class ControlsTests(unittest.TestCase):
         raw=live.canonical({'live_controls':contract});lock=Lock();authority=Authority(lock)
         observer=Observer(rig,context,contract,views)
         control=live.FiniteLiveControls(raw,context,Verifier(raw,context),lock,authority,observer)
-        writers={'fixture':'fresh benign root process/FD evidence'}
+        writers=writer_fixture()
         fresh=copy.deepcopy(snapshot);fresh['writer_exclusion']['evidence_sha256']=live.digest(writers)
         evidence={'schema':1,'kind':'PRIVATE_EPOCH7_ADMISSION_SPLIT_EVIDENCE',
             'snapshot_sha256':context['snapshot_sha256'],'retained':retained,'writers':writers,
+            'writer_observation_comparison':live.snap.validate_writer_transition(writers,writers),
             'install_admission':'NOT_GRANTED','production_acceptance':'NOT_VERIFIED','target_mutations':0,
             'fresh_snapshot_sha256':live.digest(fresh),'fresh_writer_exclusion':fresh['writer_exclusion'],
             'fresh_process_proof':process_view(contract,0)}
@@ -434,12 +436,36 @@ class ControlsTests(unittest.TestCase):
         self.assertEqual(result['evidence_sha256'],live.digest(evidence))
         self.assertEqual(live.digest(snapshot),context['snapshot_sha256'])
 
+    def test_admission_comparison567_to568_is_bound_outside_retained(self):
+        control,context,snapshot,evidence=self._preflight_fixture()
+        retained=copy.deepcopy(evidence['retained']);before=copy.deepcopy(evidence['writers'])
+        before['processes']['fd_count']=567;evidence['writers']['processes']['fd_count']=568
+        evidence['writer_observation_comparison']=live.snap.validate_writer_transition(before,evidence['writers'])
+        fresh=copy.deepcopy(snapshot);fresh['writer_exclusion']['evidence_sha256']=live.digest(evidence['writers'])
+        evidence['fresh_writer_exclusion']=fresh['writer_exclusion'];evidence['fresh_snapshot_sha256']=live.digest(fresh)
+        result=control.preflight(context)
+        self.assertEqual(result['evidence_sha256'],live.digest(evidence))
+        self.assertEqual(evidence['retained'],retained)
+        self.assertEqual(snapshot['retained_resource_sha256'],live.digest(retained))
+
+    def test_missing_or_forged_comparison_cannot_reach_admission(self):
+        for defect in ('missing','extra','before','after','safety','count','rule','security'):
+            control,context,snapshot,evidence=self._preflight_fixture()
+            record=evidence['writer_observation_comparison']
+            if defect=='missing':evidence.pop('writer_observation_comparison')
+            elif defect=='extra':record['ignore']='uid'
+            elif defect in ('before','after','safety'):record[defect+'_sha256']=h('forged')
+            elif defect=='count':record['fd_count_after']+=1
+            elif defect=='rule':record['comparison']='IGNORE_ALL_CHANGES'
+            else:evidence['writers']['processes']['process_identity_sha256']=h('security drift')
+            with self.subTest(defect=defect),self.assertRaises(ValueError):control.preflight(context)
+
     def test_admission_split_rejects_fresh_hash_exclusion_or_process_drift(self):
         for defect in ('hash','exclusion','writer_digest','process','old_kind'):
             control,context,snapshot,evidence=self._preflight_fixture()
             if defect=='hash':evidence['fresh_snapshot_sha256']=h('fake')
             elif defect=='exclusion':evidence['fresh_writer_exclusion']['all_stopped']=False
-            elif defect=='writer_digest':evidence['writers']['fixture']='other proof'
+            elif defect=='writer_digest':evidence['writers']['processes']['process_identity_sha256']=h('other proof')
             elif defect=='old_kind':evidence['kind']='PRIVATE_DIGEST_ONLY_EPOCH7_SNAPSHOT'
             else:evidence['fresh_process_proof']['pids_after'].append(os.getpid()+9999)
             with self.subTest(defect=defect),self.assertRaises(ValueError):control.preflight(context)

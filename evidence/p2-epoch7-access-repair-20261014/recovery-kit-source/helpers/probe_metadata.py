@@ -79,7 +79,7 @@ def binding(io):
 def candidate_sources(io, root):
     need(isinstance(root,str), 'CANDIDATE_ROOT_NOT_SUPPLIED')
     c.path(root)
-    need(root == c.CAND+'/epoch7-recovery-candidate-r4/xuanjun-p2-package','PROBE_STAGED_CANDIDATE_SCOPE')
+    need(root == c.CAND+'/epoch7-recovery-candidate-r5/xuanjun-p2-package','PROBE_STAGED_CANDIDATE_SCOPE')
     raw, metadata = stable_read(io, root+'/deploy/integration-manifest.json', 1048576)
     protected(metadata, 1048576)
     need(c.sha(raw) == RUNTIME_MANIFEST, 'PROBE_EXACT_STAGED_RUNTIME')
