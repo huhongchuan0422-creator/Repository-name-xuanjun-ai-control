@@ -68,7 +68,7 @@ def connect(path=":memory:"):
    from scripts.community_saas_offer_catalog import SCHEMA as OFFER_SCHEMA
    verify(db,SCHEMA,expected|offer_tables,extra_schema=OFFER_SCHEMA)
   elif not names and db.execute("PRAGMA user_version").fetchone()[0]==0:
-   transactional_install(db,SCHEMA,lambda:verify(db,SCHEMA,expected))
+   transactional_install(db,SCHEMA+"\nPRAGMA user_version=1;",lambda:verify(db,SCHEMA,expected))
   else:
    raise ValueError("UNRECOGNIZED_MODULE_DATABASE")
   return db
