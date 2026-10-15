@@ -82,6 +82,15 @@ class OfflinePackage(unittest.TestCase):
         blob=build(d)["archive_bytes"]
         with self.assertRaisesRegex(ValueError,"DUPLICATE_MANIFEST_KEY"):
             inspect(self.mutated(blob,lambda raw:raw[:-1]+b',"production_install_authorized":false}'))
+ def test_14_reject_parent_directory_symlink(self):
+    with tempfile.TemporaryDirectory() as d:
+        self.source(d)
+        parent=Path(d)/"demos"
+        original=Path(d)/"actual_demos"
+        parent.rename(original)
+        parent.symlink_to(original, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError,"UNSAFE_OR_MISSING_ASSET"):
+            build(d)
  def test_12_reject_invalid_hex_digest(self):
     with tempfile.TemporaryDirectory() as d:
         self.source(d)

@@ -33,7 +33,12 @@ def build(root):
     with zipfile.ZipFile(out,"w",compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
         for relative in ASSETS:
             requested=root/relative
-            if requested.is_symlink():raise ValueError("UNSAFE_OR_MISSING_ASSET")
+            # Reject symlink at any relative path component, not only the leaf.
+            cursor=root
+            for part in pathlib.PurePosixPath(relative).parts:
+                cursor=cursor/part
+                if cursor.is_symlink():
+                    raise ValueError("UNSAFE_OR_MISSING_ASSET")
             path=requested.resolve()
             if not path.is_relative_to(root) or not path.is_file():
                 raise ValueError("UNSAFE_OR_MISSING_ASSET")
