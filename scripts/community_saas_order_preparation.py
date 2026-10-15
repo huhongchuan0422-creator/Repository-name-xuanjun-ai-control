@@ -159,3 +159,27 @@ def status(db,order_id,tenant_id):
             "proof_ref":row[1] if row else None,
             "updated_at":row[2] if row else None,
             "entitlement_granted":False,"payment_settled_by_this_module":False}
+
+def entitlement_intent(db,order_id,tenant_id,start_at):
+    """Return a non-executable entitlement proposal for a separate authority.
+
+    The legacy module grant requires module_prices.price_version and a trusted
+    payment callback: offer_version must never be silently treated as one.
+    """
+    if type(start_at) is not int or start_at<0:
+        raise ValueError("INVALID_ENTITLEMENT_START")
+    view=status(db,order_id,tenant_id)
+    if view["state"]!="CONFIRMED_EXTERNAL":
+        raise ValueError("CONFIRMATION_EVIDENCE_REQUIRED")
+    order=read(db,order_id,tenant_id)
+    q=order["quote_snapshot"]
+    term=q.get("term_days")
+    if type(term) is not int or term<1:
+        raise ValueError("TERM_OR_LICENSE_REVIEW_REQUIRED")
+    return {"tenant_id":tenant_id,"order_id":order_id,
+            "module_id":order["module_id"],"offer_id":order["offer_id"],
+            "offer_version":order["offer_version"],"quote_sha256":order["quote_sha256"],
+            "proposed_valid_from":start_at,"proposed_valid_until":start_at+term*86400,
+            "legacy_price_version":None,"needs_authoritative_finance_link":True,
+            "needs_entitlement_approval":True,"entitlement_granted":False,
+            "automatic_renewal_authorized":False}
