@@ -40,6 +40,25 @@ export function renderDashboard(doc,model){
  doc.getElementById("recoveryState").textContent=view.label;
  return view;
 }
+export async function loadDashboard(fetcher,token,now=Math.floor(Date.now()/1000)){
+ if(typeof token!=="string"||token.length<32)throw Error("TOKEN_REQUIRED");
+ const post=async(operation,params={})=>{
+  const response=await fetcher("/offline/saas",{method:"POST",headers:{"Content-Type":"application/json","X-Offline-Token":token},body:JSON.stringify({operation,params,at:now})});
+  if(!response.ok)throw Error("OFFLINE_REQUEST_DENIED");
+  const body=await response.json();return body.result;
+ };
+ const modules=(await post("catalog")).modules;
+ let orders=[],reviews=[];
+ try{const panel=await post("admin_snapshot");orders=panel.orders;reviews=panel.review_tasks}catch(error){if(error.message!=="OFFLINE_REQUEST_DENIED")throw error}
+ return {modules,orders,reviews};
+}
 if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
  renderDashboard(document,{modules:[],orders:[],reviews:[]});
+ document.getElementById("loadCatalog")?.addEventListener("click",async()=>{
+  const token=document.getElementById("offlineToken").value;
+  const state=document.getElementById("requestState");
+  state.textContent="正在读取本地离线业务数据…";
+  try{const model=await loadDashboard(fetch,token);renderDashboard(document,model);state.textContent="仅展示已授权的离线数据；没有支付或权限发放。"}
+  catch(error){state.textContent="读取失败：请检查本地访问权限；未执行资金动作。"}
+ });
 }
