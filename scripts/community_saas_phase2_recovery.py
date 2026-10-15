@@ -55,3 +55,30 @@ def verify_backup(path,expected_sha256):
             raise ValueError("BACKUP_INTEGRITY")
     finally:db.close()
     return {"verified":True,"restored":False,"production_release_authorized":False}
+
+def cross_store_audit(quote_db,order_db,tenant_id):
+    """Read-only, per-tenant integrity audit across separate SQLite files.
+
+    A cross-database sale is NOT atomic. This audit detects inconsistency and
+    returns HOLD rather than inventing a successful payment or restoration.
+    """
+    from scripts.community_merchant_contract import valid_id
+    from scripts.community_saas_order_preparation import quote_provenance,status
+    from scripts.community_saas_offer_catalog import read_quote
+    if type(tenant_id) is not str or not valid_id(tenant_id):
+        raise ValueError("INVALID_TENANT")
+    rows=order_db.execute(
+        "SELECT order_id,quote_id FROM saas_order_preparations "
+        "WHERE tenant_id=? ORDER BY order_id",(tenant_id,)).fetchall()
+    pending=[]
+    for order_id,quote_id in rows:
+        try:
+            quote_provenance(order_db,order_id,tenant_id)
+            read_quote(quote_db,quote_id,tenant_id)
+            status(order_db,order_id,tenant_id)
+        except (ValueError,sqlite3.DatabaseError):
+            pending.append(order_id)
+    return {"tenant_id":tenant_id,"orders_checked":len(rows),
+            "integrity_hold":pending,"approval_for_payment":False,
+            "automatic_repair_executed":False,
+            "cross_database_atomicity_proven":False}
