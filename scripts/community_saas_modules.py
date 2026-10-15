@@ -118,7 +118,7 @@ def grant(db,tenant_id,module_id,valid_from,valid_until,version,source="OFFLINE_
       (tenant_id,module_id)).fetchone()
   if before and valid_until<=before[0]:raise ValueError("GRANT_MUST_EXTEND")
   db.execute("INSERT INTO module_entitlements VALUES(?,?,?,?,?,?) "
-    "ON CONFLICT(tenant_id,module_id) DO UPDATE SET valid_from=excluded.valid_from, "
+    "ON CONFLICT(tenant_id,module_id) DO UPDATE SET valid_from=MIN(module_entitlements.valid_from,excluded.valid_from), "
     "valid_until=excluded.valid_until,price_version=excluded.price_version,source=excluded.source",
     (tenant_id,module_id,valid_from,valid_until,version,source))
   db.execute("INSERT INTO module_events(tenant_id,module_id,action,old_until,new_until,occurred_at) "
