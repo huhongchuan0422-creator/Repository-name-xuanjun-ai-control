@@ -39,7 +39,7 @@ CREATE TRIGGER components_no_insert_after_review BEFORE INSERT ON components
 WHEN (SELECT status FROM offers WHERE offer_id=NEW.offer_id)!='DRAFT'
 BEGIN SELECT RAISE(ABORT,'OFFER_COMPONENTS_FROZEN'); END;
 CREATE TRIGGER components_no_update_after_review BEFORE UPDATE ON components
-WHEN (SELECT status FROM offers WHERE offer_id=OLD.offer_id)!='DRAFT'
+WHEN (SELECT status FROM offers WHERE offer_id=OLD.offer_id)!='DRAFT' OR (SELECT status FROM offers WHERE offer_id=NEW.offer_id)!='DRAFT'
 BEGIN SELECT RAISE(ABORT,'OFFER_COMPONENTS_FROZEN'); END;
 CREATE TRIGGER components_no_delete_after_review BEFORE DELETE ON components
 WHEN (SELECT status FROM offers WHERE offer_id=OLD.offer_id)!='DRAFT'
