@@ -33,3 +33,26 @@ test("quote accumulation overflow fails closed and does not affect other cycles"
  assert.match(view,/ONCE UNKNOWN \/ \$2\.00/);
  assert.match(view,/MONTH ¥3\.00 \/ \$3\.00/);
 });
+
+
+test("quote prototype-like cycle keys remain data and cannot pollute totals",()=>{
+ const view=offerCycles({lines:[
+  {cycle:"__proto__",quantity:1,cny_minor:100,usd_minor:50},
+  {cycle:"MONTH",quantity:1,cny_minor:200,usd_minor:100}
+ ]});
+ assert.match(view,/UNKNOWN ¥1\.00 \/ \$0\.50/);
+ assert.match(view,/MONTH ¥2\.00 \/ \$1\.00/);
+ assert.equal(Object.prototype.cny,undefined);
+});
+test("malformed quote lines reject without silent zero prices",()=>{
+ for(const line of [null,undefined,4,[],false])
+  assert.throws(()=>offerCycles({lines:[line]}),/INVALID_QUOTE_LINE/);
+});
+test("unknown quote cycle remains visibly unknown without affecting known cycle",()=>{
+ const view=offerCycles({lines:[
+  {cycle:{"toString":"unexpected"},quantity:1,cny_minor:75,usd_minor:80},
+  {cycle:"ONCE",quantity:1,cny_minor:120,usd_minor:150}
+ ]});
+ assert.match(view,/UNKNOWN ¥0\.75 \/ \$0\.80/);
+ assert.match(view,/ONCE ¥1\.20 \/ \$1\.50/);
+});
