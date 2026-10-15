@@ -7,7 +7,7 @@ only already approved frozen catalog versions and in-process finance previews.
 import json
 import sqlite3
 from scripts.community_saas_modules import catalog,capability_allowed,entitled
-from scripts.community_saas_offer_catalog import list_offers,quote,read_quote
+from scripts.community_saas_offer_catalog import list_offers,quote,read_quote,create_offer,approve_offer
 from scripts.community_saas_order_preparation import (
     prepare,read,status,renewal_intent,entitlement_intent)
 from scripts.community_saas_offline_handoff import (
@@ -72,11 +72,26 @@ class OfflineSaas:
             "review_close":{"task_id","event_id","state"},
             "recovery":set(),
             "refund_reversal_plan":{"order_id","reason"},
-            "health":set()
+            "health":set(),
+            "owner_create_offer":{"offer_id","version","module_id","kind","lines","term_days","tenant_scope","supplier_payment"},
+            "owner_approve_offer":{"offer_id","version","approval_ref","cost_evidence_ref"}
         }
         if operation not in fields or set(params)!=fields[operation]:
             raise ValueError("INVALID_REQUEST_FIELDS")
         tenant=principal.tenant_id
+        if operation in ("owner_create_offer","owner_approve_offer"):
+            if principal.role!="PLATFORM_OWNER":
+                raise PermissionError("OWNER_ROLE_REQUIRED")
+            if operation=="owner_create_offer":
+                offer_id,version=create_offer(self.quotes,_id(params["offer_id"]),
+                    params["version"],params["module_id"],params["kind"],params["lines"],
+                    term_days=params["term_days"],tenant_scope=params["tenant_scope"],
+                    supplier_payment=params["supplier_payment"])
+                return {"offer_id":offer_id,"version":version,
+                        "requires_separate_approval":True,"payment_authorized":False}
+            approved=approve_offer(self.quotes,_id(params["offer_id"]),params["version"],
+                _id(params["approval_ref"]),_id(params["cost_evidence_ref"]),now)
+            return {**approved,"production_release_authorized":False}
         if operation=="catalog":
             return {"modules":catalog(),"framework_free":True,"production":False}
         if operation=="offers":
