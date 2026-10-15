@@ -47,7 +47,8 @@
           "Owner审批、历史合同价格与租户隔离"
         ],
         "tests": [
-          "tests/test_stage5_saas_offer_catalog.py"
+          "tests/test_stage5_saas_offer_catalog.py",
+          "tests/test_stage5_saas_order_preparation.py"
         ]
       },
       "reuse": [
@@ -70,7 +71,9 @@
         "tests/test_stage5_saas_cost_pricing.py",
         "tests/test_stage5_saas_modules.py",
         "tests/test_stage5_saas_offer_catalog.py",
-        "tests/test_stage5_saas_unit_economics.py"
+        "tests/test_stage5_saas_unit_economics.py",
+        "scripts/community_saas_order_preparation.py",
+        "tests/test_stage5_saas_order_preparation.py"
       ]
     }
   ]
