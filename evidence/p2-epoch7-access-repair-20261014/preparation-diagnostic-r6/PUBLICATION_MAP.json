@@ -1,0 +1,90 @@
+{
+  "delivery_source": {
+    "bytes": 14950,
+    "commit": "f21fc4f4efe1a2793740ebe45aa1e9f2ad88ba61",
+    "path": "evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r6/epoch7_prepare_delivery.py",
+    "sha256": "9a87f740ee8d81fb95fe41e1644584c85b723fe5823f309ea0bf07796140cf9f"
+  },
+  "destination_prefix": "evidence/p2-epoch7-access-repair-20261014/preparation-diagnostic-r6/",
+  "excluded_local_only": [
+    "test-python312.log",
+    "test-python368.log",
+    "bootstrap-python312.log",
+    "bootstrap-python368.log",
+    "any later bound Owner command",
+    "all private observation, receipt and plan bytes"
+  ],
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "host_execution": "NOT_RUN",
+  "kit_manifest_sha256": "70c76e30ae8390963f345813f87267bf1d2f024bc01031c8023733c84aa571cc",
+  "observation_id": "1311b9e9fa97cfd4",
+  "observation_sha256": "b961df049e2861e4706f28f29fcf994a14fe28e153263a23ec82d4e822b9b246",
+  "own_diagnostic_commit": null,
+  "owner_bootstrap_publication_bound": false,
+  "preparation_source_commit": "e8b9ebb3fb215fa5b1ef0a8dc0b31a77efd0ab67",
+  "preparation_source_prefix": "evidence/p2-epoch7-access-repair-20261014/preparation-source-r6/",
+  "preparation_sources": {
+    "epoch7_prepare.py": {
+      "bytes": 41352,
+      "sha256": "83c218fc10d19094446494e10767be58593f09dbc92866cbc8779d9a0e776ebc"
+    },
+    "epoch7_prepare_data.py": {
+      "bytes": 13888,
+      "sha256": "71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1"
+    },
+    "epoch7_topology_projection.py": {
+      "bytes": 27151,
+      "sha256": "f8b731a8668a5b5374e18dab9a59657f80fc8d11ea2d9c4588a62942dbf74854"
+    }
+  },
+  "private_plan": "NOT_RUN",
+  "production": "HOLD",
+  "public_files": {
+    "OWNER_DIAGNOSTIC_UNBOUND.txt": {
+      "bytes": 5054,
+      "sha256": "42c73239afa87a98809341d749464ac608a6636bc4483595d883913f5dcf7f8c"
+    },
+    "PUBLIC_RESULTS.json": {
+      "bytes": 852,
+      "sha256": "31472010a3d9652fe9aba6baff9c0d9ae49753857a6157bb7ae1010e14ac00e8"
+    },
+    "README.md": {
+      "bytes": 4373,
+      "sha256": "fa9d66e6c1d8326b5049be96047b1f701a18d80bc3f09b81d61cbfd23ed42f35"
+    },
+    "diagnose_preparation.py": {
+      "bytes": 15641,
+      "sha256": "9cd065c6fb7d7f756314420d0867d4f639fcef090d82b449fdc3a20570eeed25"
+    },
+    "test_bootstrap_template.py": {
+      "bytes": 3729,
+      "sha256": "708865424750253985d6e637eff7746517584dd4101283adf3fbd9fa2e848599"
+    },
+    "test_diagnose_preparation.py": {
+      "bytes": 17209,
+      "sha256": "cfe62756b59ce23b5e2cbd9eb79f75c7093bb46d3979066183430c16033b6b5c"
+    },
+    "verify_bootstrap_binding.py": {
+      "bytes": 1832,
+      "sha256": "07de7260d4a73856a6d637e16de2c3c714de605e093869abf72767aab69a8e25"
+    }
+  },
+  "schema": 1,
+  "state": "FROZEN_LOCAL_REVIEW_PASS_OWNER_PUBLICATION_BINDING_PENDING",
+  "test_contract": {
+    "commands": [
+      "$PYTHON -I -B -S test_diagnose_preparation.py",
+      "$PYTHON -I -B -S test_bootstrap_template.py"
+    ],
+    "expected_counts": [
+      29,
+      4
+    ],
+    "fixture_layout": "See README for exact sibling layout of four published source files and one authenticated r6 manifest; no private fixture",
+    "python_versions": [
+      "3.6.8",
+      "3.12.14"
+    ],
+    "zero_errors_failures_skips": true
+  }
+}

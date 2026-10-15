@@ -1,0 +1,35 @@
+{
+  "actual_first_failure": "UNKNOWN_PENDING_READONLY_DIAGNOSIS",
+  "confirmed_downstream_native_conflict": {
+    "frozen_preparation_authority": [
+      0,
+      1002,
+      "0640"
+    ],
+    "frozen_snapshot_authority": [
+      0,
+      0,
+      "0644"
+    ],
+    "original_reader_regression": true
+  },
+  "host_execution": "NOT_RUN",
+  "independent_review": "PASS_EXACT_FIVE_FILE_CHECKPOINT_33_TESTS_EACH_INTERPRETER",
+  "original_frozen_sources_changed": false,
+  "output_scope": "UNSIGNED_PROPOSAL_AND_HOST_VALIDATED_EVIDENCE_BINDINGS_OR_SAFE_HOLD",
+  "per_interpreter": {
+    "bootstrap": 4,
+    "diagnostic": 29,
+    "errors": 0,
+    "failures": 0,
+    "skips": 0
+  },
+  "private_plan": "NOT_RUN",
+  "production": "HOLD",
+  "python_versions": [
+    "3.6.8",
+    "3.12.14"
+  ],
+  "schema": 1,
+  "state": "FROZEN_LOCAL_REVIEW_PASS_HOST_NOT_RUN"
+}
