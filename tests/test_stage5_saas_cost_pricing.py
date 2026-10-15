@@ -68,6 +68,15 @@ class Costs(unittest.TestCase):
    change_offer_status(self.offers,"cloud",state,self.costs)
   with self.assertRaisesRegex(ValueError,"NEGATIVE_QUOTE_TOTAL"):
    quote_offers(self.offers,"merchant_operations")
+ def test_currency_specific_negative_discount_is_not_offset_by_setup(self):
+  add_component(self.offers,"cloud","setup","DEPLOYMENT_ONCE","ONCE",1000,2000,"pricing-v1")
+  add_component(self.offers,"cloud","discount","DISCOUNT","MONTHLY",0,200,"pricing-v1")
+  save_cost(self.costs,"cloud","setup","VERIFIED_ACTUAL",200,100,"work-order","ONCE")
+  save_cost(self.costs,"cloud","discount","VERIFIED_ACTUAL",0,0,"campaign-evidence","MONTHLY")
+  for state in ("PREVIEW","APPROVED","EFFECTIVE"):
+   change_offer_status(self.offers,"cloud",state,self.costs)
+  with self.assertRaisesRegex(ValueError,"NEGATIVE_QUOTE_TOTAL"):
+   quote_offers(self.offers,"merchant_operations")
  def test_unknown_is_not_free_zero(self):
   add_component(self.offers,"cloud","subscription","THIRD_PARTY_SUBSCRIPTION_BASE",
                 "MONTHLY",1000,150,"official-verified","provider")
