@@ -13,7 +13,8 @@ export function modelToView(model){
  const orders=Array.isArray(model.orders)?model.orders:[];
  const reviews=Array.isArray(model.reviews)?model.reviews:[];
  return {
- modules:modules.map(x=>({title:safeText(x.title),id:safeText(x.id)})),
+ modules:modules.map(x=>({title:safeText(x.title),id:safeText(x.id),
+   offers:Array.isArray(x.offers)?x.offers.map(o=>safeText(o.offer_id)+" v"+safeText(o.version)):[]})),
  orders:orders.map(x=>({id:safeText(x.order_id),state:safeText(x.state),
    cny:safeText(x.currency==="CNY"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.cny_minor,"CNY"):"—"),
    usd:safeText(x.currency==="USD"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.usd_minor,"USD"):"—")})),
@@ -31,7 +32,7 @@ export function renderDashboard(doc,model){
  const orders=doc.getElementById("orderDetails");
  const queue=doc.getElementById("reviewQueue");
  catalog.replaceChildren();orders.replaceChildren();queue.replaceChildren();
- for(const item of view.modules)appendText(doc,catalog,item.title,item.id);
+ for(const item of view.modules)appendText(doc,catalog,item.title,item.id+(item.offers.length?" · "+item.offers.join(", "):" · 暂无选配报价"));
  for(const x of view.orders)appendText(doc,orders,x.id,x.state+" · "+x.cny+" / "+x.usd);
  for(const x of view.reviews)appendText(doc,queue,x.kind,x.state);
  doc.getElementById("quoteDetails").textContent="所有价格须经版本审核；成本未知不等于零。";
@@ -48,6 +49,7 @@ export async function loadDashboard(fetcher,token,now=Math.floor(Date.now()/1000
   const body=await response.json();return body.result;
  };
  const modules=(await post("catalog")).modules;
+ for(const item of modules){item.offers=(await post("offers",{module_id:item.id})).offers;}
  const orders=(await post("customer_orders")).orders;
  let reviews=[];
  try{const panel=await post("admin_snapshot");reviews=panel.review_tasks}catch(error){if(error.message!=="OFFLINE_REQUEST_DENIED")throw error}
