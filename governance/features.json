@@ -126,7 +126,8 @@
           "Domestic apex candidate preserves the existing winctl boundary",
           "generated CSP hashes preserve inline language layout and interaction in real Chromium",
           "OAuth-only source candidate excludes trading/database imports and preserves synthetic session, callback, failure and replay tests; no production acceptance is implied",
-          "Existing domestic Runner inventory is non-root and does not disclose sudo policy or secret values"
+          "Existing domestic Runner inventory is non-root and does not disclose sudo policy or secret values",
+          "R1-R3: process-safe one-time OAuth state, atomic credential/session commits, verified token/account generation activation; actual process races, write faults and SIGKILL/SIGTERM restart tests remain synthetic and require independent review"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",

@@ -1,3 +1,6 @@
+from .storage import Database, private_directory
+from .core import _sha, utc_now
+from datetime import datetime
 import argparse
 import json
 import os
@@ -6,8 +9,8 @@ import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from .douyin import DOUYIN_USER_INFO_URL, TEST_ACCOUNT_WHITELIST_SCOPE, DouyinOAuthStateStore, DouyinOpenApiClient, DouyinTokenLifecycleStore, parse_token_response, sanitize_user_info_response
-from .tiktok import MINIMUM_READONLY_SCOPES as TIKTOK_MINIMUM_READONLY_SCOPES, TIKTOK_USER_INFO_URL, TikTokOAuthStateStore, TikTokOpenApiClient, TikTokTokenLifecycleStore, build_authorization_url as build_tiktok_authorization_url, fingerprint as tiktok_fingerprint, parse_token_response as parse_tiktok_token_response, sanitize_user_info_response as sanitize_tiktok_user_info_response
+from .douyin import DOUYIN_USER_INFO_URL, TEST_ACCOUNT_WHITELIST_SCOPE, DouyinOAuthStateStore, DouyinOpenApiClient, parse_token_response, sanitize_user_info_response
+from .tiktok import MINIMUM_READONLY_SCOPES as TIKTOK_MINIMUM_READONLY_SCOPES, TIKTOK_USER_INFO_URL, TikTokOAuthStateStore, TikTokOpenApiClient, build_authorization_url as build_tiktok_authorization_url, fingerprint as tiktok_fingerprint, parse_token_response as parse_tiktok_token_response, sanitize_user_info_response as sanitize_tiktok_user_info_response
 from .core import DOUYIN_ACCESS_TOKEN_REF, DOUYIN_CLIENT_KEY_REF, DOUYIN_CLIENT_SECRET_REF, DOUYIN_REFRESH_TOKEN_REF, TIKTOK_ACCESS_TOKEN_REF, TIKTOK_CLIENT_KEY_REF, TIKTOK_CLIENT_SECRET_REF, TIKTOK_REFRESH_TOKEN_REF, secure_headers
 
 
@@ -69,53 +72,8 @@ def _finish_douyin_callback(service, payload):
     return payload
 
 def handle_douyin_oauth_callback(service, origin, query):
-    error = (query.get('error') or [''])[0]
-    if error:
-        return _finish_douyin_callback(service, {'status': 'REJECTED', 'sanitized_error_code': 'AUTHORIZATION_DENIED'})
-    code = (query.get('code') or [''])[0]
-    state = (query.get('state') or [''])[0]
-    if not code or not state:
-        return _finish_douyin_callback(service, {'status': 'REJECTED', 'sanitized_error_code': 'CALLBACK_ARGUMENT_MISSING'})
-    consumed = DouyinOAuthStateStore(DEFAULT_STATE_ROOT / 'douyin-oauth-state').consume_state(state)
-    if consumed.get('status') != 'PASS':
-        return _finish_douyin_callback(service, consumed)
-    expected_redirect_uri = consumed['state'].get('redirect_uri')
-    actual_redirect_uri = origin.rstrip('/') + DOUYIN_REDIRECT_PATH
-    if expected_redirect_uri != actual_redirect_uri:
-        return _finish_douyin_callback(service, {'status': 'REJECTED', 'sanitized_error_code': 'REDIRECT_URI_MISMATCH'})
-    scopes = consumed['state'].get('scopes') or []
-    if scopes == [TEST_ACCOUNT_WHITELIST_SCOPE]:
-        return _finish_douyin_callback(service, {'status': 'PASS', 'oauth_callback': 'PASS', 'test_account_whitelist_authorization': 'PASS', 'access_token_exchange': 'SKIPPED_FOR_TRIAL_WHITELIST', 'token_stored_securely': 'SKIPPED_FOR_TRIAL_WHITELIST', 'user_info_api': 'SKIPPED_FOR_TRIAL_WHITELIST', 'secret_value_exposed': False})
-    client_key = service.operations_store.read_secret(DOUYIN_CLIENT_KEY_REF)
-    client_secret = service.operations_store.read_secret(DOUYIN_CLIENT_SECRET_REF)
-    if not client_key or not client_secret:
-        return _finish_douyin_callback(service, {'status': 'REJECTED', 'sanitized_error_code': 'SECRETREF_MISSING'})
-    client = DouyinOpenApiClient(timeout_seconds=10)
-    try:
-        token_payload = client.exchange_access_token(client_key=client_key, client_secret=client_secret, code=code)
-    except Exception:
-        return _finish_douyin_callback(service, {'status': 'REJECTED', 'sanitized_error_code': 'AUTH_CODE_EXCHANGE_FAILED'})
-    parsed = parse_token_response(token_payload, client_key=client_key)
-    if parsed.get('status') != 'PASS':
-        return _finish_douyin_callback(service, parsed)
-    access_token = parsed['access_token']
-    refresh_token = parsed['refresh_token']
-    open_id = parsed['open_id']
-    lifecycle = parsed['lifecycle']
-    for ref, value, purpose in ((DOUYIN_ACCESS_TOKEN_REF, access_token, 'douyin access token for readonly user_info canary'), (DOUYIN_REFRESH_TOKEN_REF, refresh_token, 'douyin refresh token for lifecycle management')):
-        result = service.operations_store.store_secret(ref, value, 'douyin', 'douyin_open_api_oauth', purpose, actor='OWNER-HHC', metadata=lifecycle.as_public_dict())
-        if result.get('status') != 'CONFIGURED':
-            return _finish_douyin_callback(service, {'status': 'REJECTED', 'sanitized_error_code': 'TOKEN_STORAGE_FAILED'})
-    DouyinTokenLifecycleStore(DEFAULT_STATE_ROOT / 'douyin-token-state').save(lifecycle)
-    try:
-        user_info = client.user_info(access_token=access_token, open_id=open_id)
-    except Exception:
-        return _finish_douyin_callback(service, {'status': 'REJECTED', 'sanitized_error_code': 'USER_INFO_API_FAILED'})
-    sanitized_user = sanitize_user_info_response(user_info)
-    if sanitized_user.get('status') != 'PASS':
-        return _finish_douyin_callback(service, sanitized_user)
-    service.operations_store.record_audit({'operation': 'DOUYIN_USER_INFO_CANARY', 'provider': 'douyin', 'endpoint': DOUYIN_USER_INFO_URL, 'origin': origin, 'open_id_masked': sanitized_user['open_id_masked'], 'nickname': sanitized_user.get('nickname', ''), 'result': 'PASS'})
-    return _finish_douyin_callback(service, {'status': 'PASS', 'oauth_callback': 'PASS', 'access_token_exchange': 'PASS', 'token_stored_securely': 'PASS', 'user_info_api': 'PASS', 'open_id_masked': sanitized_user['open_id_masked'], 'union_id_masked': sanitized_user['union_id_masked'], 'nickname': sanitized_user.get('nickname', ''), 'secret_value_exposed': False})
+    return _handle_callback(service, 'douyin', origin, query)
+
 
 def _record_tiktok_audit(service, payload):
     event = {'operation': payload.get('operation', 'TIKTOK_LOGIN_KIT'), 'provider': 'tiktok', 'result': payload.get('status', 'REJECTED'), 'sanitized_error_code': payload.get('sanitized_error_code', ''), 'oauth_callback': payload.get('oauth_callback', ''), 'access_token_exchange': payload.get('access_token_exchange', ''), 'token_stored_securely': payload.get('token_stored_securely', ''), 'user_info_api': payload.get('user_info_api', ''), 'secret_value_exposed': False}
@@ -128,12 +86,7 @@ def _finish_tiktok(service, payload):
     _record_tiktok_audit(service, payload)
     return payload
 
-def _tiktok_existing_binding_payload(token_store):
-    existing = token_store.load_status().get('account') or {}
-    existing_account = existing.get('account') or {}
-    if existing.get('status') != 'CONNECTED' or existing_account.get('status') != 'PASS':
-        return None
-    return {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'PASS', 'oauth_callback': 'PASS', 'access_token_exchange': 'PASS', 'token_stored_securely': 'PASS', 'account_binding': 'EXISTING', 'user_info_api': 'TEMPORARY_FAILED_EXISTING_BINDING_USED', 'open_id_masked': existing_account.get('open_id_masked', 'MISSING'), 'union_id_masked': existing_account.get('union_id_masked', 'MISSING'), 'display_name': existing_account.get('display_name', ''), 'secret_value_exposed': False}
+
 
 def handle_tiktok_oauth_start(service, origin):
     client_key = service.operations_store.read_secret(TIKTOK_CLIENT_KEY_REF)
@@ -146,69 +99,25 @@ def handle_tiktok_oauth_start(service, origin):
     return (url, None)
 
 def handle_tiktok_oauth_callback(service, origin, query):
-    error = (query.get('error') or [''])[0]
-    if error:
-        return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'REJECTED', 'sanitized_error_code': 'AUTHORIZATION_DENIED'})
-    code = (query.get('code') or [''])[0]
-    state = (query.get('state') or [''])[0]
-    if not code or not state:
-        return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'REJECTED', 'sanitized_error_code': 'CALLBACK_ARGUMENT_MISSING'})
-    consumed = TikTokOAuthStateStore(DEFAULT_STATE_ROOT / 'tiktok-oauth-state').consume_state(state)
-    if consumed.get('status') != 'PASS':
-        consumed['operation'] = 'TIKTOK_OAUTH_CALLBACK'
-        return _finish_tiktok(service, consumed)
-    expected_redirect_uri = consumed['state'].get('redirect_uri')
-    actual_redirect_uri = origin.rstrip('/') + TIKTOK_REDIRECT_PATH
-    if expected_redirect_uri != actual_redirect_uri:
-        return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'REJECTED', 'sanitized_error_code': 'REDIRECT_URI_MISMATCH'})
-    if consumed['state'].get('scopes') != list(TIKTOK_MINIMUM_READONLY_SCOPES):
-        return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'REJECTED', 'sanitized_error_code': 'UNEXPECTED_SCOPE'})
-    client_key = service.operations_store.read_secret(TIKTOK_CLIENT_KEY_REF)
-    client_secret = service.operations_store.read_secret(TIKTOK_CLIENT_SECRET_REF)
-    if not client_key or not client_secret:
-        return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'REJECTED', 'sanitized_error_code': 'SECRETREF_MISSING'})
-    client = TikTokOpenApiClient(timeout_seconds=10)
-    try:
-        token_payload = client.exchange_access_token(client_key=client_key, client_secret=client_secret, code=code, redirect_uri=actual_redirect_uri)
-    except Exception:
-        return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'REJECTED', 'sanitized_error_code': 'AUTH_CODE_EXCHANGE_FAILED'})
-    parsed = parse_tiktok_token_response(token_payload, client_key=client_key)
-    if parsed.get('status') != 'PASS':
-        parsed['operation'] = 'TIKTOK_OAUTH_CALLBACK'
-        return _finish_tiktok(service, parsed)
-    access_token = parsed['access_token']
-    refresh_token = parsed['refresh_token']
-    lifecycle = parsed['lifecycle']
-    for ref, value, purpose in ((TIKTOK_ACCESS_TOKEN_REF, access_token, 'tiktok sandbox access token for user.info.basic canary'), (TIKTOK_REFRESH_TOKEN_REF, refresh_token, 'tiktok sandbox refresh token for lifecycle management')):
-        result = service.operations_store.store_secret(ref, value, 'tiktok', 'tiktok_login_kit_sandbox', purpose, actor='OWNER-HHC', metadata=lifecycle.as_public_dict())
-        if result.get('status') != 'CONFIGURED':
-            return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'REJECTED', 'sanitized_error_code': 'TOKEN_STORAGE_FAILED'})
-    token_store = TikTokTokenLifecycleStore(DEFAULT_STATE_ROOT / 'tiktok-token-state')
-    token_store.save(lifecycle)
-    try:
-        user_info = client.user_info(access_token=access_token)
-    except Exception:
-        fallback = _tiktok_existing_binding_payload(token_store)
-        if fallback:
-            return _finish_tiktok(service, fallback)
-        return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'REJECTED', 'sanitized_error_code': 'USER_INFO_API_FAILED'})
-    sanitized_user = sanitize_tiktok_user_info_response(user_info)
-    if sanitized_user.get('status') != 'PASS':
-        fallback = _tiktok_existing_binding_payload(token_store)
-        if fallback:
-            fallback['user_info_api'] = 'SANITIZED_FAILED_EXISTING_BINDING_USED'
-            return _finish_tiktok(service, fallback)
-        sanitized_user['operation'] = 'TIKTOK_OAUTH_CALLBACK'
-        return _finish_tiktok(service, sanitized_user)
-    token_store.save_account_binding(sanitized_user)
-    service.operations_store.record_audit({'operation': 'TIKTOK_USER_INFO_BASIC_CANARY', 'provider': 'tiktok', 'endpoint': TIKTOK_USER_INFO_URL, 'origin': origin, 'open_id_masked': sanitized_user['open_id_masked'], 'display_name': sanitized_user.get('display_name', ''), 'result': 'PASS'})
-    return _finish_tiktok(service, {'operation': 'TIKTOK_OAUTH_CALLBACK', 'status': 'PASS', 'oauth_callback': 'PASS', 'access_token_exchange': 'PASS', 'token_stored_securely': 'PASS', 'account_binding': 'PASS', 'user_info_api': 'PASS', 'open_id_masked': sanitized_user['open_id_masked'], 'union_id_masked': sanitized_user['union_id_masked'], 'display_name': sanitized_user.get('display_name', ''), 'secret_value_exposed': False})
+    return _handle_callback(service, 'tiktok', origin, query)
+
 
 def tiktok_connection_status():
-    state = TikTokTokenLifecycleStore(DEFAULT_STATE_ROOT / 'tiktok-token-state').load_status()
-    account = state.get('account')
-    connected = bool(account and account.get('status') == 'CONNECTED')
-    return {'status': 'PASS', 'provider': 'tiktok', 'connected': connected, 'scope': 'user.info.basic', 'account': account.get('account') if connected else None, 'token_status': state.get('token', {}).get('status', 'MISSING'), 'secret_value_exposed': False, 'content_posting_api_added': False, 'video_upload': False, 'direct_post': False, 'publication': False, 'comment_write': False, 'private_message_write': False}
+    database = Database(DEFAULT_STATE_ROOT)
+    with database.transaction():
+        generation = database.get('binding:tiktok')
+        connected = bool(generation and generation.get('verified')
+            and generation['lifecycle'].get('access_token_expires_at')
+            and datetime.fromisoformat(generation['lifecycle']['access_token_expires_at']) > utc_now()
+            and generation.get('client_key_fingerprint') == _sha(
+                database.get('secret:TIKTOK_CLIENT_KEY')['value'])[:12])
+        account = generation['account'] if connected else None
+    return {'status': 'PASS', 'provider': 'tiktok', 'connected': connected,
+        'scope': 'user.info.basic', 'account': account,
+        'token_status': 'PASS' if connected else 'MISSING', 'secret_value_exposed': False,
+        'content_posting_api_added': False, 'video_upload': False, 'direct_post': False,
+        'publication': False, 'comment_write': False, 'private_message_write': False}
+
 
 def tiktok_callback_redirect_location(payload):
     result = 'pass' if payload.get('status') == 'PASS' else 'check_status'
@@ -220,3 +129,110 @@ def configure_state_root(root):
     DEFAULT_STATE_ROOT = Path(root)
     TIKTOK_APP_ICON_PATH = DEFAULT_STATE_ROOT / 'public' / 'xuanjun-tiktok-icon.png'
 
+
+
+def _handle_callback(service, provider, origin, query):
+    """Consume once, stage in memory, verify identity, activate one transaction.
+
+    An interrupted exchange/commit is UNKNOWN, never connected by fallback.
+    OAuth state consumption is deliberately outside credential activation: an
+    uncertain provider call must not make the authorization code reusable.
+    """
+    finish = _finish_tiktok if provider == 'tiktok' else _finish_douyin_callback
+    def reject(code, status='REJECTED'):
+        return finish(service, {'status': status, 'sanitized_error_code': code,
+                               'secret_value_exposed': False})
+    if (query.get('error') or [''])[0]:
+        return reject('AUTHORIZATION_DENIED')
+    code, state = (query.get('code') or [''])[0], (query.get('state') or [''])[0]
+    if not code or not state:
+        return reject('CALLBACK_ARGUMENT_MISSING')
+    state_class = TikTokOAuthStateStore if provider == 'tiktok' else DouyinOAuthStateStore
+    try:
+        consumed = state_class(DEFAULT_STATE_ROOT / (provider + '-oauth-state')).consume_state(state)
+    except Exception:
+        return reject('STATE_CONSUMPTION_UNKNOWN', 'UNKNOWN')
+    if consumed.get('status') != 'PASS':
+        return finish(service, consumed)
+    data = consumed['state']
+    redirect = origin.rstrip('/') + (TIKTOK_REDIRECT_PATH if provider == 'tiktok' else DOUYIN_REDIRECT_PATH)
+    if data.get('redirect_uri') != redirect:
+        return reject('REDIRECT_URI_MISMATCH')
+    if provider == 'douyin' and data.get('scopes') == [TEST_ACCOUNT_WHITELIST_SCOPE]:
+        return finish(service, {'status': 'PASS', 'oauth_callback': 'PASS',
+            'test_account_whitelist_authorization': 'PASS',
+            'access_token_exchange': 'SKIPPED_FOR_TRIAL_WHITELIST',
+            'token_stored_securely': 'SKIPPED_FOR_TRIAL_WHITELIST',
+            'user_info_api': 'SKIPPED_FOR_TRIAL_WHITELIST', 'secret_value_exposed': False})
+    scopes = list(TIKTOK_MINIMUM_READONLY_SCOPES) if provider == 'tiktok' else ['user_info']
+    if data.get('scopes') != scopes:
+        return reject('UNEXPECTED_SCOPE')
+    prefix = provider.upper()
+    try:
+        with service.database.transaction():
+            client_key = service.operations_store.read_secret(prefix + '_CLIENT_KEY')
+            client_secret = service.operations_store.read_secret(prefix + '_CLIENT_SECRET')
+            if not client_key or not client_secret:
+                return reject('SECRETREF_MISSING')
+            if data.get('client_key_fingerprint') != _sha(client_key)[:12]:
+                return reject('CLIENT_KEY_CHANGED')
+            client = (TikTokOpenApiClient if provider == 'tiktok' else DouyinOpenApiClient)(timeout_seconds=10)
+            kwargs = {'client_key': client_key, 'client_secret': client_secret, 'code': code}
+            if provider == 'tiktok':
+                kwargs['redirect_uri'] = redirect
+            try:
+                token_payload = client.exchange_access_token(**kwargs)
+            except Exception:
+                return reject('AUTH_CODE_EXCHANGE_FAILED', 'UNKNOWN')
+            parser = parse_tiktok_token_response if provider == 'tiktok' else parse_token_response
+            try:
+                parsed = parser(token_payload, client_key=client_key)
+            except (ValueError, TypeError, KeyError):
+                return reject('INVALID_TOKEN_RESPONSE')
+            if parsed.get('status') != 'PASS':
+                return reject('INVALID_TOKEN_RESPONSE')
+            # Tokens remain only in this process until BOTH provider responses
+            # identify the same exact account. Masked IDs cannot establish this.
+            identity = parsed['open_id']
+            if (not isinstance(identity, str) or not identity
+                    or list(parsed['lifecycle'].granted_scopes) != scopes
+                    or parsed['lifecycle'].access_token_expires_at <= utc_now()):
+                return reject('INVALID_TOKEN_LIFECYCLE')
+            try:
+                if provider == 'tiktok':
+                    user = client.user_info(access_token=parsed['access_token'])
+                    raw_identity = (user.get('data') or {}).get('user', {}).get('open_id')
+                    sanitized = sanitize_tiktok_user_info_response(user)
+                else:
+                    user = client.user_info(access_token=parsed['access_token'], open_id=identity)
+                    raw_identity = (user.get('data') or {}).get('open_id')
+                    sanitized = sanitize_user_info_response(user)
+            except Exception:
+                return reject('USER_INFO_API_FAILED', 'UNKNOWN')
+            if sanitized.get('status') != 'PASS' or not identity or raw_identity != identity:
+                return reject('ACCOUNT_IDENTITY_MISMATCH')
+            binding = service.database.get('binding:' + provider)
+            identity_hash = _sha(identity)
+            if binding and binding.get('identity_hash') != identity_hash:
+                return reject('ACCOUNT_BINDING_MISMATCH')
+            lifecycle = parsed['lifecycle'].as_public_dict()
+            for suffix, value in [('ACCESS_TOKEN', parsed['access_token']),
+                                   ('REFRESH_TOKEN', parsed['refresh_token'])]:
+                stored = service.operations_store.store_secret(prefix + '_' + suffix, value,
+                    provider, 'readonly_oauth', 'verified account generation',
+                    actor='OWNER-HHC', metadata=lifecycle)
+                if stored.get('status') != 'CONFIGURED':
+                    raise RuntimeError('TOKEN_STORAGE_FAILED')
+            service.database.put('binding:' + provider, {'verified': True,
+                'identity_hash': identity_hash, 'account': sanitized, 'lifecycle': lifecycle,
+                'client_key_fingerprint': _sha(client_key)[:12]})
+            service.database.put('lifecycle:' + provider, lifecycle)
+        # Return PASS only AFTER durable commit acknowledgement.
+        return finish(service, {'status': 'PASS', 'oauth_callback': 'PASS',
+            'access_token_exchange': 'PASS', 'token_stored_securely': 'PASS',
+            'account_binding': 'PASS', 'user_info_api': 'PASS',
+            'open_id_masked': sanitized['open_id_masked'],
+            'union_id_masked': sanitized.get('union_id_masked', 'MISSING'),
+            'secret_value_exposed': False})
+    except Exception:
+        return reject('TOKEN_ACTIVATION_UNKNOWN', 'UNKNOWN')

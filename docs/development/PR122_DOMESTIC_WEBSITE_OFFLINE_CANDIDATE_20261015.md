@@ -95,3 +95,67 @@ The offline candidate now includes a loopback-only HTTP adapter factory. It pres
 HTTP boundaries: exact Host and forwarded HTTPS identity, Origin and framing/content-type/body-size checks for secret submissions, duplicate form/framing rejection, no request/query/body logging, serialized state handling per server, one server/state root per process, bounded generic failures preserving evidence. Port bind failure releases the process-local factory lease. The shared original OAuth library's direct calls remain a review scope; an adapter-level lock does not establish cross-process exactly-once acceptance.
 
 25 local tests PASS, including real isolated loopback HTTP health/form/submission/replay, Origin/Host/TLS rejection, forbidden-route503, external-provider calls disabled, body/framing/content-type limits, manifest completeness, port bind failure and root isolation, plus the15 original tests. Tests explicitly block and assert no urllib provider transport invocation; successful callback tests use fake clients and synthetic secrets only. GitHub CI for this increment must be checked separately. Status remains OFFLINE_HTTP_CANDIDATE_NOT_DEPLOYABLE. Still pending: protected live-state custody, non-OAuth caller successors, live bridge/channel acceptance, consolidated independent review and root/TLS/DNS execution gates.
+
+
+
+### R1—R3 consolidated source correction (independent review pending)
+
+This section supersedes the original inherited JSON persistence and token-first
+callback behavior; it does not change previously accepted static RG1 bytes.
+Audit reference: PR122 comment6195357263, HOLD_ALL_BLOCKERS_CONSOLIDATED.
+
+R1: both provider state stores use a dedicated candidate-only SQLite database,
+BEGIN IMMEDIATE, rollback journaling and synchronous=FULL. Consumption commits
+before PASS; cross-process contenders see exactly one consumed state. A lost
+commit acknowledgement remains unknown and cannot justify replay.
+
+R2: sessions, credential values, metadata and redacted audit records share one
+candidate database under the explicitly supplied private state root. A bounded
+SQLite write transaction covers validation, attempt accounting, both Client Key
+and Secret, and used_forms. It serializes separate sessions configuring the same
+provider as well as duplicate calls on one session. Exceptions roll back all
+uncommitted changes. A commit acknowledgement failure returns UNKNOWN, never
+CONFIGURED; no blind retry is authorized. SQLite lock wait is at most5seconds.
+
+R3: newly exchanged tokens stay in process memory until user_info verifies the
+same exact unmasked open_id as the token response. A different previously bound
+account is rejected, not silently rebound. Only then are Access/Refresh Token,
+lifecycle and verified account binding activated in the same transaction. Failed
+or uncertain exchange/user_info/storage returns REJECTED or UNKNOWN and preserves
+the old committed generation. The TikTok existing-binding success fallback and
+the alternate mutable lifecycle-file stores have been removed. Status also
+requires an unexpired token generation matching the configured Client Key.
+
+Storage boundary: this is a NEW candidate-only SQLite file, not trading.db and
+not any Finance/credential_records table. Standard-library sqlite3 is used; no
+trading/database package imports, master keys or live state are added. Existing
+plaintext session/secret files cause LEGACY_*_HANDOFF_REQUIRED, rather than an
+implicit migration. Root owner/mode and symlink/hardlink database checks apply.
+No secrets are imported to GitHub or copied between hosts. Protected live-state
+custody remains a separate uncompleted gate. No production format compatibility
+or automatic restart of an existing portal is claimed.
+
+Builder boundary: pinned Tokyo archive/entry SHA values remain provenance. After
+R1—R3, the builder deliberately uses seven reviewed maintained source templates,
+verifies the complete module MANIFEST, then copies exact bytes to a fresh output;
+it does not regenerate vulnerable upstream persistence. Local rebuild compared
+byte-for-byte with the candidate (including MANIFEST). The builder, all seven
+modules, tests, workflows, governance and this document are included in the new
+review artifact. Artifact hash and CI run bindings must be read from that exact
+run; historical artifact hashes do not approve these changed bytes.
+
+45 local tests PASS. New coverage uses actual forked processes, simultaneous
+state/callback/submission races, every credential/activation write exception,
+SIGKILL at state/write/commit boundaries, SIGTERM during uncommitted submission,
+restart rollback recovery, lost commit acknowledgement, expiry/replay, wrong
+Token/user identity, old/new account mismatch, user_info timeout, Client Key
+rotation and old generation preservation. All provider responses and secrets
+are synthetic; urllib provider transport is blocked. The new persistence paths
+justify running the complete OAuth suite in hosted CI. Per Owner instruction,
+no Domestic Runner workflow is changed or triggered in this correction round.
+Domestic45-test execution is NOT_RUN; historical25 tests do not cover this new
+version. The tunnel, bridge and all production services remain untouched.
+
+SOURCE_FIX=DEVELOPER_TESTED_PENDING_INDEPENDENT_REVIEW. Provider calls remain
+OFF by default. Production deployment, DNS/TLS, Tokyo retirement and PR99/P2
+remain HOLD. No installer, sudo grant, SSH key or service activation is supplied.

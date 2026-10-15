@@ -57,7 +57,10 @@ jobs:
                     root/"scripts/pr122_build_oauth_candidate.py",
                     root/"scripts/pr122_domestic_channel_inventory.py",
                     root/"tests/test_pr122_oauth_candidate.py",
-                    root/"docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md"]
+                    root/"docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md",
+                    root/"governance/features.json",
+                    root/".github/workflows/pr122-domestic-website-candidate.yml",
+                    root/".github/workflows/domestic-runner-preflight.yml"]
           binding = {
               "schema_version":1,
               "status":"REVIEW_ONLY_NO_INSTALLER",
@@ -88,3 +91,4 @@ jobs:
           path: ${{ runner.temp }}/pr122-oauth-review/
           if-no-files-found: error
           retention-days: 14
+

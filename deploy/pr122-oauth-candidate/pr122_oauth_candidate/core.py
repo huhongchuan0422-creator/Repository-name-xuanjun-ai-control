@@ -1,3 +1,4 @@
+from .storage import Database, private_directory
 import fcntl, hashlib, html, json, os, secrets, tempfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -52,100 +53,56 @@ def _iso(value):
 def _sha(value):
     return hashlib.sha256(value.encode('utf-8')).hexdigest()
 
-def _write_json_0600(path, payload):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix=path.name + '.', dir=str(path.parent))
-    try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
-            json.dump(payload, handle, ensure_ascii=True, sort_keys=True, indent=2)
-            handle.write('\n')
-        os.chmod(tmp_name, 384)
-        os.replace(tmp_name, path)
-        os.chmod(path, 384)
-    finally:
-        if os.path.exists(tmp_name):
-            os.unlink(tmp_name)
 
-def _write_text_0600(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix=path.name + '.', dir=str(path.parent))
-    try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
-            handle.write(value)
-        os.chmod(tmp_name, 384)
-        os.replace(tmp_name, path)
-        os.chmod(path, 384)
-    finally:
-        if os.path.exists(tmp_name):
-            os.unlink(tmp_name)
 
 def secure_headers():
     return {'Cache-Control': 'no-store', 'Pragma': 'no-cache', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'", 'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff'}
 
 class OperationsSecretRefStore:
-    """File-backed operations SecretRef store, separate from CredentialStore."""
-
-    def __init__(self, root):
-        self.root = Path(root)
-        self.value_dir = self.root / 'values'
-        self.metadata_dir = self.root / 'metadata'
-        self.audit_file = self.root / 'audit.jsonl'
-        self._ensure()
-
-    def _ensure(self):
-        for directory in (self.root, self.value_dir, self.metadata_dir):
-            directory.mkdir(parents=True, exist_ok=True)
-            os.chmod(directory, 448)
-
-    def _safe_name(self, ref):
-        return ''.join((char if char.isalnum() or char in '-_.' else '_' for char in ref))
+    """Atomic candidate store. Legacy plaintext files require explicit handoff."""
+    def __init__(self, root, database=None):
+        self.root = private_directory(root)
+        self.value_dir = private_directory(self.root / 'values')
+        self.metadata_dir = private_directory(self.root / 'metadata')
+        if any(self.value_dir.iterdir()) or any(self.metadata_dir.iterdir()):
+            raise RuntimeError('LEGACY_SECRET_HANDOFF_REQUIRED')
+        self.database = database or Database(self.root)
 
     def store_secret(self, ref, value, provider, scope, purpose, actor, metadata=None):
-        if not value or '\n' in value or '\r' in value:
-            return {'status': 'INVALID', 'reason': 'SECRET_FORMAT_INVALID'}
-        safe = self._safe_name(ref)
-        value_path = self.value_dir / (safe + '.secret')
-        metadata_path = self.metadata_dir / (safe + '.json')
-        _write_text_0600(value_path, value)
-        payload = {'provider': provider, 'ref': ref, 'scope': scope, 'purpose': purpose, 'configured': True, 'value_path': str(value_path), 'value_recorded': False, 'created_at': _iso(utc_now()), 'actor': actor, 'metadata': metadata or {}}
-        _write_json_0600(metadata_path, payload)
-        self.record_audit({'operation': 'OPERATIONS_SECRETREF_STORE', 'provider': provider, 'ref': ref, 'scope': scope, 'purpose': purpose, 'actor': actor, 'result': 'CONFIGURED'})
-        return {'status': 'CONFIGURED', 'ref': ref, 'metadata_path': str(metadata_path), 'returns_secret': False}
+        if not isinstance(value, str) or not value or '\n' in value or '\r' in value:
+            raise ValueError('SECRET_FORMAT_INVALID')
+        with self.database.transaction():
+            self.database.put('secret:' + ref, {'value': value, 'provider': provider,
+                'scope': scope, 'purpose': purpose, 'actor': actor, 'metadata': metadata or {}})
+            self.record_audit({'operation': 'SECRETREF_STORE', 'provider': provider,
+                               'ref': ref, 'result': 'CONFIGURED'})
+        return {'status': 'CONFIGURED', 'ref': ref, 'returns_secret': False}
 
     def read_secret(self, ref):
-        safe = self._safe_name(ref)
-        value_path = self.value_dir / (safe + '.secret')
-        if not value_path.exists():
-            return None
-        return value_path.read_text(encoding='utf-8')
-
-    def record_audit(self, event):
-        redacted = dict(event)
-        for key in list(redacted):
-            if any((token in key.lower() for token in ('secret', 'token', 'api_key', 'api_secret', 'authorization'))):
-                redacted[key] = '[REDACTED]'
-        redacted['timestamp'] = _iso(utc_now())
-        with self.audit_file.open('a', encoding='utf-8') as handle:
-            handle.write(json.dumps(redacted, ensure_ascii=True, sort_keys=True) + '\n')
-        os.chmod(self.audit_file, 384)
+        record = self.database.get('secret:' + ref)
+        return record['value'] if record else None
 
     def status(self, ref):
-        metadata_path = self.metadata_dir / (self._safe_name(ref) + '.json')
-        if not metadata_path.exists():
-            return 'MISSING'
-        metadata = json.loads(metadata_path.read_text(encoding='utf-8'))
-        return 'CONFIGURED' if metadata.get('configured') else 'MISSING'
+        return 'CONFIGURED' if self.database.get('secret:' + ref) else 'MISSING'
 
     def all_configured(self, refs):
-        return all((self.status(ref) == 'CONFIGURED' for ref in refs))
+        with self.database.transaction():
+            return all(self.status(ref) == 'CONFIGURED' for ref in refs)
+
+    def record_audit(self, event):
+        redacted = {k: '[REDACTED]' if any(t in k.lower() for t in
+            ('secret', 'token', 'api_key', 'authorization')) else v for k,v in event.items()}
+        redacted['timestamp'] = _iso(utc_now())
+        self.database.put('audit:' + secrets.token_hex(16), redacted)
 
 class FileBackedSubmissionSessionRepository:
     """Durable repository for existing CredentialSubmissionSession objects."""
 
-    def __init__(self, root):
-        self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.root, 448)
+    def __init__(self, root, database=None):
+        self.root = private_directory(root)
+        if list(self.root.glob('*.json')):
+            raise RuntimeError('LEGACY_SESSION_HANDOFF_REQUIRED')
+        self.database = database or Database(self.root)
 
     def _path(self, submission_id):
         safe = ''.join((char if char.isalnum() or char in '-_.' else '_' for char in str(submission_id)))
@@ -167,40 +124,32 @@ class FileBackedSubmissionSessionRepository:
         return session
 
     def save(self, session):
-        _write_json_0600(self._path(session.submission_id), self._serialize(session))
+        self.database.put('session:' + session.submission_id, self._serialize(session))
         return session
 
     def get(self, submission_id):
-        path = self._path(submission_id)
-        if not path.exists():
-            return None
-        return self._deserialize(json.loads(path.read_text(encoding='utf-8')))
+        payload = self.database.get('session:' + str(submission_id))
+        return self._deserialize(payload) if payload else None
 
     def get_by_token_hash(self, token_hash):
-        for path in sorted(self.root.glob('*.json')):
-            payload = json.loads(path.read_text(encoding='utf-8'))
+        for _, payload in self.database.items('session:'):
             if payload.get('token_hash') == token_hash:
                 return self._deserialize(payload)
         return None
 
     @contextmanager
     def locked(self, submission_id):
-        """Hold a cross-thread/process lock for one session transaction."""
-        lock_path = self._path(submission_id).with_suffix('.lock')
-        descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 384)
-        os.chmod(lock_path, 384)
-        with os.fdopen(descriptor, 'r+') as lock_file:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-            try:
-                yield self.get(submission_id)
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        # Database-wide write lock also serializes different sessions configuring
+        # the same provider. No independent secret-file writes exist.
+        with self.database.transaction():
+            yield self.get(submission_id)
 
 class SecureSecretsPortalService:
 
     def __init__(self, state_root, operations_root):
-        self.operations_store = OperationsSecretRefStore(operations_root)
-        self.sessions = FileBackedSubmissionSessionRepository(Path(state_root) / 'sessions')
+        self.database = Database(state_root)
+        self.operations_store = OperationsSecretRefStore(operations_root, self.database)
+        self.sessions = FileBackedSubmissionSessionRepository(Path(state_root) / 'sessions', self.database)
         self.ttl_seconds = 1800
         self.max_attempts_per_form = 3
 
@@ -217,6 +166,15 @@ class SecureSecretsPortalService:
         return {**self._sanitized_session(session), 'csrf_token': csrf}
 
     def submit_douyin(self, session_id, csrf_token, origin, payload, actor='owner'):
+        try:
+            with self.sessions.locked(session_id):
+                return self._submit_douyin(session_id, csrf_token, origin, payload, actor)
+        except Exception:
+            # Commit acknowledgement can be interrupted. Never claim CONFIGURED
+            # or automatic retry; durable state must be inspected after restart.
+            return {'status': 'UNKNOWN', 'sanitized_error_code': 'SUBMISSION_TRANSACTION_UNKNOWN'}
+
+    def _submit_douyin(self, session_id, csrf_token, origin, payload, actor='owner'):
         form_key = 'douyin'
         checked = self._validate_submit(session_id, csrf_token, origin, None, None, form_key)
         if checked['status'] != 'PASS':
@@ -237,6 +195,15 @@ class SecureSecretsPortalService:
         return {'status': 'INVALID', 'reason': 'DOUYIN_SECRETREF_STORE_FAILED'}
 
     def submit_tiktok(self, session_id, csrf_token, origin, payload, actor='owner'):
+        try:
+            with self.sessions.locked(session_id):
+                return self._submit_tiktok(session_id, csrf_token, origin, payload, actor)
+        except Exception:
+            # Commit acknowledgement can be interrupted. Never claim CONFIGURED
+            # or automatic retry; durable state must be inspected after restart.
+            return {'status': 'UNKNOWN', 'sanitized_error_code': 'SUBMISSION_TRANSACTION_UNKNOWN'}
+
+    def _submit_tiktok(self, session_id, csrf_token, origin, payload, actor='owner'):
         form_key = 'tiktok'
         checked = self._validate_submit(session_id, csrf_token, origin, None, None, form_key)
         if checked['status'] != 'PASS':

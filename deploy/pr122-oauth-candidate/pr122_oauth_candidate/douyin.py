@@ -9,6 +9,8 @@ are outside this contract.
 
 from __future__ import annotations
 
+from .storage import Database, private_directory
+
 import hashlib
 import json
 import os
@@ -108,28 +110,14 @@ def build_authorization_url(
     return DOUYIN_AUTHORIZE_URL + "?" + query
 
 
-def _write_json_0600(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=True, sort_keys=True, indent=2)
-            handle.write("\n")
-        os.chmod(tmp_name, 0o600)
-        os.replace(tmp_name, path)
-        os.chmod(path, 0o600)
-    finally:
-        if os.path.exists(tmp_name):
-            os.unlink(tmp_name)
 
 
 class DouyinOAuthStateStore:
     """Durable one-time OAuth state repository."""
 
     def __init__(self, root: Path | str):
-        self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.root, 0o700)
+        self.root = private_directory(root)
+        self.database = Database(self.root)
 
     def _path(self, state: str) -> Path:
         return self.root / (sha256_hex(state) + ".json")
@@ -154,7 +142,7 @@ class DouyinOAuthStateStore:
             "expires_at": iso(created_at + timedelta(seconds=STATE_TTL_SECONDS)),
             "consumed_at": None,
         }
-        _write_json_0600(self._path(state), payload)
+        self.database.put('state:' + sha256_hex(state), payload)
         return {
             "state": state,
             "state_hash": payload["state_hash"],
@@ -164,19 +152,19 @@ class DouyinOAuthStateStore:
         }
 
     def consume_state(self, state: str, *, now: datetime | None = None) -> dict[str, Any]:
-        current = now or utc_now()
-        path = self._path(state)
-        if not path.exists():
-            return {"status": "REJECTED", "sanitized_error_code": "STATE_NOT_FOUND"}
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("consumed_at"):
-            return {"status": "REJECTED", "sanitized_error_code": "STATE_ALREADY_CONSUMED"}
-        expires_at = datetime.fromisoformat(payload["expires_at"])
-        if current >= expires_at:
-            return {"status": "REJECTED", "sanitized_error_code": "STATE_EXPIRED"}
-        payload["consumed_at"] = iso(current)
-        _write_json_0600(path, payload)
-        return {"status": "PASS", "state": payload}
+        with self.database.transaction():
+            current = now or utc_now()
+            key = 'state:' + sha256_hex(state)
+            payload = self.database.get(key)
+            if payload is None:
+                return {'status': 'REJECTED', 'sanitized_error_code': 'STATE_NOT_FOUND'}
+            if payload.get('consumed_at'):
+                return {'status': 'REJECTED', 'sanitized_error_code': 'STATE_ALREADY_CONSUMED'}
+            if current >= datetime.fromisoformat(payload['expires_at']):
+                return {'status': 'REJECTED', 'sanitized_error_code': 'STATE_EXPIRED'}
+            payload['consumed_at'] = iso(current)
+            self.database.put(key, payload)
+        return {'status': 'PASS', 'state': payload}
 
 
 @dataclass(frozen=True)
@@ -257,30 +245,6 @@ def parse_token_response(
     }
 
 
-class DouyinTokenLifecycleStore:
-    """Stores token metadata only; token values live in OperationsSecretRefStore."""
-
-    def __init__(self, root: Path | str):
-        self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.root, 0o700)
-
-    @property
-    def state_path(self) -> Path:
-        return self.root / "douyin_token_lifecycle.json"
-
-    def save(self, lifecycle: DouyinTokenLifecycle) -> dict[str, Any]:
-        payload = lifecycle.as_public_dict()
-        payload["task_id"] = TASK_ID
-        payload["secret_value_exposed"] = False
-        _write_json_0600(self.state_path, payload)
-        return {"status": "PASS", "path": str(self.state_path), "state": payload}
-
-    def load_status(self) -> dict[str, Any]:
-        if not self.state_path.exists():
-            return {"status": "MISSING", "reauthorization_required": True}
-        payload = json.loads(self.state_path.read_text(encoding="utf-8"))
-        return {"status": "PASS", **payload}
 
 
 class DouyinOpenApiClient:

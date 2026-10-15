@@ -1,11 +1,12 @@
 {
   "files": {
     "pr122_oauth_candidate/__init__.py": "22abbd4cf62b08e2bda4b51a2c53c9ce0839088efb1e877fbed23100c3de463b",
-    "pr122_oauth_candidate/core.py": "340eaf4e82a7b269adb8a74f434a61c2d032280c2de429739eccc7d6dc31c8b5",
-    "pr122_oauth_candidate/douyin.py": "cb9ca6f29796a1e280f88681cf84a3533a3529b955efab38975030582c9d8140",
+    "pr122_oauth_candidate/core.py": "9de722f47b628f6eb216fb1ca160628345d74d2e7034e4524e4828d0a24c37d2",
+    "pr122_oauth_candidate/douyin.py": "2d2627d76b5d5f76a6046c5793f2f9721448923257e1155fcf08f3b459c6cb39",
     "pr122_oauth_candidate/http_candidate.py": "ad58f196ee306bc400831efa3c955956f882218917cd145baa33bcf932f4f66e",
-    "pr122_oauth_candidate/oauth.py": "fba7e04713314e428476e5477c7effb1e7b5e24c3e0c2873b5088eaca33ff803",
-    "pr122_oauth_candidate/tiktok.py": "cce9f45ccdfe681e88117814227a714aa17e49e22881c1d922eb3ccd191c2afe"
+    "pr122_oauth_candidate/oauth.py": "4f0b0bc68e9b949b46c54b50ebad672d5e63028c59b0e999814a13f779f9c50a",
+    "pr122_oauth_candidate/storage.py": "646b0f379797534b3f0e5bc5ad9281be271c8fd30e7263ef7247ea755e2f0ac8",
+    "pr122_oauth_candidate/tiktok.py": "037bbdbb7be5b89f6991257ae6c39b7c8046cb60da9f9857fe9a09bb0b2d4235"
   },
   "http_adapter_sha256": "ad58f196ee306bc400831efa3c955956f882218917cd145baa33bcf932f4f66e",
   "production_change": false,
@@ -19,5 +20,6 @@
   ],
   "source_archive_sha256": "10b9c11fb8a6e07d9edab449faf9c72f6bb36e65ced79d7d65fbf1b69c28bd23",
   "source_entry_sha256": "528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006",
-  "status": "OFFLINE_HTTP_CANDIDATE_NOT_DEPLOYABLE"
+  "status": "OFFLINE_HTTP_CANDIDATE_NOT_DEPLOYABLE",
+  "storage": "candidate-only SQLite FULL synchronous transactions; no automatic legacy state migration"
 }

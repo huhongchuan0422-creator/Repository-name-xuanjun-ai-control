@@ -2,7 +2,8 @@
 """Build an OFFLINE OAuth library candidate from pinned Tokyo source.
 
 No installer, service start, credential import or production acceptance implied.
-Only the source dependency boundary is changed; independent review is required.
+Validates pinned upstream provenance and copies hash-bound maintained templates.
+Persistence differs from upstream to address R1-R3; independent review is required.
 """
 import argparse
 import ast
@@ -67,96 +68,36 @@ from pathlib import Path
 
 
 def build(source, destination, http_adapter):
-    # Fail instead of overwriting any earlier candidate or receipt.
+    # The upstream archive remains provenance, not an authority to regenerate
+    # vulnerable original persistence. R1-R3 use reviewed maintained templates.
+    template = http_adapter.parent
+    manifest_path = template.parent / 'MANIFEST.json'
+    manifest = json.loads(manifest_path.read_text())
+    if (manifest['source_archive_sha256'] != SOURCE_SHA
+            or manifest['source_entry_sha256'] != ENTRY_SHA):
+        raise ValueError('TEMPLATE_PROVENANCE_MISMATCH')
+    expected = {'__init__.py','core.py','oauth.py','douyin.py','tiktok.py',
+                'http_candidate.py','storage.py'}
+    if {p.name for p in template.glob('*.py')} != expected:
+        raise ValueError('TEMPLATE_MODULE_SET_MISMATCH')
+    files = {}
+    for name in sorted(expected):
+        path = template / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('UNTRUSTED_TEMPLATE')
+        data = path.read_bytes()
+        ast.parse(data)
+        relative = 'pr122_oauth_candidate/' + name
+        if hashlib.sha256(data).hexdigest() != manifest['files'].get(relative):
+            raise ValueError('TEMPLATE_HASH_MISMATCH')
+        files[relative] = data
+    if set(files) != set(manifest['files']):
+        raise ValueError('TEMPLATE_MANIFEST_MISMATCH')
     destination.mkdir(mode=0o700)
-    pkg = destination / 'pr122_oauth_candidate'
-    pkg.mkdir(mode=0o700)
-    (pkg / '__init__.py').write_text('"""Offline candidate, no production entry point."""\n')
-    portal = declarations(source['ai_service/secure_secrets_portal.py'])
-    intake = declarations(source['trading_execution/secure_credential_intake.py'])
-    # Reuse the original passive session record; exclude all trading services.
-    portal['CredentialSubmissionSession'] = intake['CredentialSubmissionSession']
-    service = portal['SecureSecretsPortalService']
-    store_init = next(n for n in portal['OperationsSecretRefStore'].body
-                      if isinstance(n, ast.FunctionDef) and n.name == '__init__')
-    store_init.args.defaults = []
-    store_init.body[0] = ast.parse('self.root = Path(root)').body[0]
-    keep = {'create_session', 'submit_douyin', 'submit_tiktok', '_require_session',
-            '_validate_submit', '_validate_submit_session', '_sanitized_session', '_status_only'}
-    service.body = [n for n in service.body if isinstance(n, ast.FunctionDef) and n.name in keep]
-    init = ast.parse('''def __init__(self, state_root, operations_root):
-    self.operations_store = OperationsSecretRefStore(operations_root)
-    self.sessions = FileBackedSubmissionSessionRepository(Path(state_root) / 'sessions')
-    self.ttl_seconds = 1800
-    self.max_attempts_per_form = 3
-''').body[0]
-    service.body.insert(0, init)
-    # Scope restriction applies to direct library calls too, not only HTTP.
-    method = next(n for n in service.body if n.name == 'create_session')
-    method.body[0:0] = ast.parse('''if not allowed_forms or not set(allowed_forms) <= {'douyin', 'tiktok'}:
-    raise ValueError('OAUTH_FORMS_ONLY')
-''').body
-    # Former unrestricted defaults are unreachable; remove their declarations.
-    for node in ast.walk(method):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'tuple':
-            node.args = [ast.Name(id='allowed_forms', ctx=ast.Load())]
-    ast.fix_missing_locations(service)
-    core_seeds = {
-        'CredentialSubmissionSession', 'SecureSecretsPortalService', 'OperationsSecretRefStore',
-        'FileBackedSubmissionSessionRepository', 'secure_headers'}
-    core_seeds.update(n for n in portal if n.startswith(('TIKTOK_', 'DOUYIN_')) and n.endswith('_REF'))
-    core = CORE_IMPORTS + '\nSTATUS_PENDING = "PENDING"\n' + closure(portal, core_seeds)
-    (pkg / 'core.py').write_text(core + '\n')
-    for provider in ('douyin', 'tiktok'):
-        (pkg / (provider + '.py')).write_text(source[provider + '/open_api_foundation.py'])
-    entry = source['scripts/secure_secrets_portal_server.py']
-    nodes = declarations(entry)
-    selected = closure(nodes, {'render_douyin_page', 'render_tiktok_page',
-        'handle_douyin_oauth_callback', 'handle_tiktok_oauth_start',
-        'handle_tiktok_oauth_callback', 'tiktok_connection_status',
-        'tiktok_callback_redirect_location', 'TIKTOK_URL_PROPERTY_VERIFICATION_FILES'})
-    imports = []
-    for node in ast.parse(entry).body:
-        if isinstance(node, ast.Import):
-            imports.append(ast.unparse(node))
-        elif isinstance(node, ast.ImportFrom):
-            if node.module in ('http', 'http.server', 'pathlib'):
-                imports.append(ast.unparse(node))
-            elif node.module in ('douyin.open_api_foundation', 'tiktok.open_api_foundation'):
-                node.module = node.module.split('.')[0]
-                node.level = 1
-                imports.append(ast.unparse(node))
-    # Only actually defined core constants are imported, not unrelated defaults.
-    names = declarations(core)
-    used = {n.id for n in ast.walk(ast.parse(selected)) if isinstance(n, ast.Name)}
-    names_to_import = sorted(used & names.keys())
-    helpers = '\n'.join(imports) + '\nfrom .core import ' + ', '.join(names_to_import) + '\n' + selected
-    helpers += '''
-
-def configure_state_root(root):
-    """Call once before serving. No default production root is permitted."""
-    global DEFAULT_STATE_ROOT, TIKTOK_APP_ICON_PATH
-    DEFAULT_STATE_ROOT = Path(root)
-    TIKTOK_APP_ICON_PATH = DEFAULT_STATE_ROOT / 'public' / 'xuanjun-tiktok-icon.png'
-'''
-    # Require explicit configuration instead of retaining Tokyo runtime paths.
-    helpers = helpers.replace("DEFAULT_STATE_ROOT = Path('/opt/trading-system/runtime/secure-secrets-portal')", '')
-    (pkg / 'oauth.py').write_text(helpers + '\n')
-    adapter_source = http_adapter.read_text()
-    ast.parse(adapter_source)
-    (pkg / 'http_candidate.py').write_text(adapter_source)
-    hashes = {}
-    for path in sorted(pkg.glob('*.py')):
-        ast.parse(path.read_text())
-        hashes[str(path.relative_to(destination))] = hashlib.sha256(path.read_bytes()).hexdigest()
-    (destination / 'MANIFEST.json').write_text(json.dumps({
-        'status': 'OFFLINE_HTTP_CANDIDATE_NOT_DEPLOYABLE',
-        'source_archive_sha256': SOURCE_SHA, 'source_entry_sha256': ENTRY_SHA,
-        'production_change': False, 'provider_calls_default': False, 'files': hashes,
-        'http_adapter_sha256': hashlib.sha256(adapter_source.encode()).hexdigest(),
-        'remaining': ['protected state handoff', 'existing non-OAuth route successors',
-                      'independent review', 'host acceptance', 'TLS and DNS gates']
-    }, indent=2, sort_keys=True) + '\n')
+    (destination/'pr122_oauth_candidate').mkdir(mode=0o700)
+    for relative, data in files.items():
+        (destination/relative).write_bytes(data)
+    (destination/'MANIFEST.json').write_bytes(manifest_path.read_bytes())
 
 
 if __name__ == '__main__':

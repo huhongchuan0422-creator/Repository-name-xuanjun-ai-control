@@ -9,6 +9,8 @@ control are outside this contract.
 
 from __future__ import annotations
 
+from .storage import Database, private_directory
+
 import hashlib
 import json
 import os
@@ -105,28 +107,14 @@ def build_authorization_url(
     return TIKTOK_AUTHORIZE_URL + "?" + query
 
 
-def _write_json_0600(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=True, sort_keys=True, indent=2)
-            handle.write("\n")
-        os.chmod(tmp_name, 0o600)
-        os.replace(tmp_name, path)
-        os.chmod(path, 0o600)
-    finally:
-        if os.path.exists(tmp_name):
-            os.unlink(tmp_name)
 
 
 class TikTokOAuthStateStore:
     """Durable one-time OAuth state repository."""
 
     def __init__(self, root: Path | str):
-        self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.root, 0o700)
+        self.root = private_directory(root)
+        self.database = Database(self.root)
 
     def _path(self, state: str) -> Path:
         return self.root / (sha256_hex(state) + ".json")
@@ -151,7 +139,7 @@ class TikTokOAuthStateStore:
             "expires_at": iso(created_at + timedelta(seconds=STATE_TTL_SECONDS)),
             "consumed_at": None,
         }
-        _write_json_0600(self._path(state), payload)
+        self.database.put('state:' + sha256_hex(state), payload)
         return {
             "state": state,
             "state_hash": payload["state_hash"],
@@ -161,19 +149,19 @@ class TikTokOAuthStateStore:
         }
 
     def consume_state(self, state: str, *, now: datetime | None = None) -> dict[str, Any]:
-        current = now or utc_now()
-        path = self._path(state)
-        if not path.exists():
-            return {"status": "REJECTED", "sanitized_error_code": "STATE_NOT_FOUND"}
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("consumed_at"):
-            return {"status": "REJECTED", "sanitized_error_code": "STATE_ALREADY_CONSUMED"}
-        expires_at = datetime.fromisoformat(payload["expires_at"])
-        if current >= expires_at:
-            return {"status": "REJECTED", "sanitized_error_code": "STATE_EXPIRED"}
-        payload["consumed_at"] = iso(current)
-        _write_json_0600(path, payload)
-        return {"status": "PASS", "state": payload}
+        with self.database.transaction():
+            current = now or utc_now()
+            key = 'state:' + sha256_hex(state)
+            payload = self.database.get(key)
+            if payload is None:
+                return {'status': 'REJECTED', 'sanitized_error_code': 'STATE_NOT_FOUND'}
+            if payload.get('consumed_at'):
+                return {'status': 'REJECTED', 'sanitized_error_code': 'STATE_ALREADY_CONSUMED'}
+            if current >= datetime.fromisoformat(payload['expires_at']):
+                return {'status': 'REJECTED', 'sanitized_error_code': 'STATE_EXPIRED'}
+            payload['consumed_at'] = iso(current)
+            self.database.put(key, payload)
+        return {'status': 'PASS', 'state': payload}
 
 
 @dataclass(frozen=True)
@@ -241,62 +229,6 @@ def parse_token_response(
     }
 
 
-class TikTokTokenLifecycleStore:
-    """Stores token metadata and sanitized account binding only."""
-
-    def __init__(self, root: Path | str):
-        self.root = Path(root)
-        self.root.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.root, 0o700)
-
-    @property
-    def state_path(self) -> Path:
-        return self.root / "tiktok_token_lifecycle.json"
-
-    @property
-    def account_path(self) -> Path:
-        return self.root / "tiktok_account_binding.json"
-
-    def save(self, lifecycle: TikTokTokenLifecycle) -> dict[str, Any]:
-        payload = lifecycle.as_public_dict()
-        payload["task_id"] = TASK_ID
-        payload["secret_value_exposed"] = False
-        _write_json_0600(self.state_path, payload)
-        return {"status": "PASS", "path": str(self.state_path), "state": payload}
-
-    def save_account_binding(self, sanitized_user_info: dict[str, Any]) -> dict[str, Any]:
-        payload = {
-            "task_id": TASK_ID,
-            "status": "CONNECTED",
-            "provider": "tiktok",
-            "scope": "user.info.basic",
-            "updated_at": iso(utc_now()),
-            "account": sanitized_user_info,
-            "secret_value_exposed": False,
-        }
-        _write_json_0600(self.account_path, payload)
-        return {"status": "PASS", "path": str(self.account_path), "state": payload}
-
-    def load_status(self) -> dict[str, Any]:
-        token_state = {"status": "MISSING", "reauthorization_required": True}
-        if self.state_path.exists():
-            token_state = json.loads(self.state_path.read_text(encoding="utf-8"))
-            token_state = {"status": "PASS", **token_state}
-        account = None
-        if self.account_path.exists():
-            account = json.loads(self.account_path.read_text(encoding="utf-8"))
-        return {"token": token_state, "account": account}
-
-    def disconnect(self) -> dict[str, Any]:
-        disconnected = {
-            "task_id": TASK_ID,
-            "status": "DISCONNECTED",
-            "provider": "tiktok",
-            "updated_at": iso(utc_now()),
-            "secret_value_exposed": False,
-        }
-        _write_json_0600(self.account_path, disconnected)
-        return {"status": "PASS", "account": disconnected}
 
 
 class TikTokOpenApiClient:

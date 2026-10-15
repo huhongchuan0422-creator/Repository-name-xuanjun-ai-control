@@ -156,14 +156,14 @@ class CandidateTests(unittest.TestCase):
         self.assertNotIn('synthetic-access',json.dumps(result))
         self.assertNotIn('synthetic-refresh',json.dumps(result))
         self.assertEqual(oauth.handle_tiktok_oauth_callback(self.service,ORIGIN,query)['status'],'REJECTED')
-        self.assertTrue((self.root/'state/tiktok-token-state').is_dir())
+        self.assertTrue(self.service.database.get('binding:tiktok')['verified'])
         self.assertEqual(self.service.operations_store.read_secret(core.TIKTOK_ACCESS_TOKEN_REF),'synthetic-access')
 
     def test_douyin_full_fake_callback_and_replay(self):
         self.configure('douyin')
         state = oauth.DouyinOAuthStateStore(self.root/'state/douyin-oauth-state').create_state(
             redirect_uri=ORIGIN+oauth.DOUYIN_REDIRECT_PATH, scopes=['user_info'],
-            client_key_fingerprint='synthetic')
+            client_key_fingerprint=core._sha('synthetic-key')[:12])
         query = {'state':[state['state']],'code':['synthetic']}
         token = {'data': {'access_token':'synthetic-access','refresh_token':'synthetic-refresh',
                          'open_id':'synthetic-open-id','scope':'user_info','expires_in':3600}}
@@ -315,6 +315,347 @@ class FactoryTests(unittest.TestCase):
                 http_candidate.make_server(root/'failed',root/'ops',port=occupied.getsockname()[1])
             server = http_candidate.make_server(root/'fresh',root/'ops')
             server.server_close()
+
+
+# Actual child processes are used below; no provider/network calls are made.
+import multiprocessing
+import signal
+from pr122_oauth_candidate.storage import Database
+
+
+def process_consume(root, form, state, barrier, output):
+    cls = oauth.TikTokOAuthStateStore if form == 'tiktok' else oauth.DouyinOAuthStateStore
+    store = cls(Path(root)/('state/'+form+'-oauth-state'))
+    barrier.wait(timeout=10)
+    output.put(store.consume_state(state)['status'])
+
+
+def process_submit(root, form, session, barrier, output):
+    root = Path(root)
+    service = core.SecureSecretsPortalService(root/'state',root/'ops')
+    barrier.wait(timeout=10)
+    result = getattr(service,'submit_'+form)(session['session_id'],session['csrf_token'],ORIGIN,
+        {'client_key':'parallel-key','client_secret':'parallel-secret'})
+    output.put(result['status'])
+
+
+def process_crash(root, form, session, phase, sender):
+    root = Path(root)
+    service = core.SecureSecretsPortalService(root/'state', root/'ops')
+    def checkpoint(point):
+        if point == phase:
+            sender.send('REACHED')
+            signal.pause()
+    service.database.checkpoint = checkpoint
+    getattr(service,'submit_'+form)(session['session_id'],session['csrf_token'],ORIGIN,
+                                   {'client_key':'new-key','client_secret':'new-secret'})
+
+
+def process_callback(root, form, state, barrier, output, phase=None, sender=None):
+    root = Path(root)
+    service = core.SecureSecretsPortalService(root/'state',root/'ops')
+    oauth.configure_state_root(root/'state')
+    token = {'access_token':'activated-access','refresh_token':'activated-refresh',
+        'open_id':'synthetic-open-id','scope':'user.info.basic' if form == 'tiktok' else 'user_info',
+        'expires_in':3600}
+    user = {'data':{'user':{'open_id':'synthetic-open-id'}}} if form == 'tiktok' else {'data':{'open_id':'synthetic-open-id'}}
+    client = oauth.TikTokOpenApiClient if form == 'tiktok' else oauth.DouyinOpenApiClient
+    def checkpoint(point):
+        if point == phase:
+            sender.send('REACHED'); signal.pause()
+    if phase: service.database.checkpoint = checkpoint
+    if barrier: barrier.wait(timeout=10)
+    with patch.object(client,'exchange_access_token',return_value=token if form == 'tiktok' else {'data':token}), \
+         patch.object(client,'user_info',return_value=user):
+        result = getattr(oauth,'handle_'+form+'_oauth_callback')(service,ORIGIN,
+            {'state':[state],'code':['synthetic']})
+    if output: output.put(result['status'])
+
+
+def process_state_crash(root, form, state, phase, sender):
+    cls = oauth.TikTokOAuthStateStore if form == 'tiktok' else oauth.DouyinOAuthStateStore
+    store = cls(Path(root)/('state/'+form+'-oauth-state'))
+    def checkpoint(point):
+        if point == phase:
+            sender.send('REACHED'); signal.pause()
+    store.database.checkpoint = checkpoint
+    store.consume_state(state)
+
+
+class AtomicityTests(unittest.TestCase):
+    setUp = CandidateTests.setUp
+    session = CandidateTests.session
+    configure = CandidateTests.configure
+    def state(self, form, **kwargs):
+        cls = oauth.TikTokOAuthStateStore if form == 'tiktok' else oauth.DouyinOAuthStateStore
+        store = cls(self.root/('state/'+form+'-oauth-state'))
+        scopes = ['user.info.basic'] if form == 'tiktok' else ['user_info']
+        return store, store.create_state(redirect_uri=ORIGIN+'/integrations/'+form+'/oauth/callback',
+            scopes=scopes,client_key_fingerprint=core._sha('synthetic-key')[:12],**kwargs)
+
+    def parallel(self, target, args, count=6):
+        ctx = multiprocessing.get_context('fork')
+        barrier, output = ctx.Barrier(count), ctx.Queue()
+        children = [ctx.Process(target=target,args=(*args,barrier,output)) for _ in range(count)]
+        try:
+            for child in children: child.start()
+            results = [output.get(timeout=20) for _ in children]
+            for child in children:
+                child.join(timeout=5)
+                self.assertEqual(child.exitcode,0)
+            return results
+        finally:
+            for child in children:
+                if child.is_alive(): child.kill()
+                child.join(timeout=5)
+            output.close()
+
+    def test_r1_both_providers_process_race_exactly_one_pass(self):
+        for form in ('douyin','tiktok'):
+            _, state = self.state(form)
+            results = self.parallel(process_consume,(str(self.root),form,state['state']))
+            self.assertEqual(results.count('PASS'),1)
+            self.assertEqual(results.count('REJECTED'),5)
+
+    def test_r1_expiry_and_restart_replay(self):
+        for form in ('douyin','tiktok'):
+            store, expired = self.state(form,now=core.utc_now()-timedelta(days=1))
+            self.assertEqual(store.consume_state(expired['state'])['sanitized_error_code'],'STATE_EXPIRED')
+            store, fresh = self.state(form)
+            self.assertEqual(store.consume_state(fresh['state'])['status'],'PASS')
+            reloaded = type(store)(store.root)
+            self.assertEqual(reloaded.consume_state(fresh['state'])['sanitized_error_code'],'STATE_ALREADY_CONSUMED')
+
+    def test_r1_write_failure_never_pass_and_can_recover(self):
+        for form in ('douyin','tiktok'):
+            store, state = self.state(form)
+            with patch.object(store.database,'checkpoint',side_effect=OSError('synthetic')):
+                with self.assertRaises(OSError): store.consume_state(state['state'])
+            self.assertEqual(type(store)(store.root).consume_state(state['state'])['status'],'PASS')
+
+    def test_r1_commit_ack_loss_does_not_allow_replay(self):
+        for form in ('douyin','tiktok'):
+            store, state = self.state(form)
+            def checkpoint(point):
+                if point == 'after_commit': raise OSError('synthetic')
+            with patch.object(store.database,'checkpoint',side_effect=checkpoint):
+                with self.assertRaises(OSError): store.consume_state(state['state'])
+            self.assertEqual(type(store)(store.root).consume_state(state['state'])['sanitized_error_code'],'STATE_ALREADY_CONSUMED')
+
+    def test_r2_both_provider_process_duplicate_rejected(self):
+        for form in ('douyin','tiktok'):
+            session = self.session(form)
+            results = self.parallel(process_submit,(str(self.root),form,session))
+            self.assertEqual(results.count('CONFIGURED'),1)
+            self.assertEqual(results.count('REJECTED'),5)
+            self.assertEqual(self.service.operations_store.read_secret(form.upper()+'_CLIENT_KEY'),'parallel-key')
+            self.assertEqual(self.service.operations_store.read_secret(form.upper()+'_CLIENT_SECRET'),'parallel-secret')
+
+    def test_r2_every_write_failure_preserves_old_pair_and_form(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form)
+            # attempts, key, audit, secret, audit, used_forms = six writes.
+            for fail_at in range(1,7):
+                session = self.session(form)
+                calls = []
+                def checkpoint(point):
+                    if point.startswith('write:'):
+                        calls.append(point)
+                        if len(calls) == fail_at: raise OSError('synthetic partial write')
+                with patch.object(self.service.database,'checkpoint',side_effect=checkpoint):
+                    r = getattr(self.service,'submit_'+form)(session['session_id'],session['csrf_token'],ORIGIN,
+                        {'client_key':'new-key','client_secret':'new-secret'})
+                self.assertEqual(r['status'],'UNKNOWN')
+                restored = core.SecureSecretsPortalService(self.root/'state',self.root/'ops')
+                self.assertEqual(restored.operations_store.read_secret(form.upper()+'_CLIENT_KEY'),'synthetic-key')
+                self.assertEqual(restored.operations_store.read_secret(form.upper()+'_CLIENT_SECRET'),'synthetic-secret')
+                self.assertEqual(restored.sessions.get(session['session_id']).used_forms,{})
+
+    def test_r2_sigkill_before_and_after_commit_restart_consistency(self):
+        ctx = multiprocessing.get_context('fork')
+        for form in ('douyin','tiktok'):
+            self.configure(form)
+            for phase in ('write:secret:'+form.upper()+'_CLIENT_KEY','before_commit','after_commit'):
+                session = self.session(form)
+                receiver,sender = ctx.Pipe(duplex=False)
+                child = ctx.Process(target=process_crash,args=(str(self.root),form,session,phase,sender))
+                child.start()
+                try:
+                    self.assertTrue(receiver.poll(10),'fault point not reached')
+                    self.assertEqual(receiver.recv(),'REACHED')
+                    child.kill();child.join(timeout=5)
+                    self.assertEqual(child.exitcode,-signal.SIGKILL)
+                    restored = core.SecureSecretsPortalService(self.root/'state',self.root/'ops')
+                    used = restored.sessions.get(session['session_id']).used_forms
+                    if phase == 'after_commit':
+                        self.assertEqual(used,{form:'CONFIGURED'})
+                        self.assertEqual(restored.operations_store.read_secret(form.upper()+'_CLIENT_KEY'),'new-key')
+                        self.assertEqual(restored.operations_store.read_secret(form.upper()+'_CLIENT_SECRET'),'new-secret')
+                    else:
+                        self.assertEqual(used,{})
+                        self.assertEqual(restored.operations_store.read_secret(form.upper()+'_CLIENT_KEY'),'synthetic-key')
+                        self.assertEqual(restored.operations_store.read_secret(form.upper()+'_CLIENT_SECRET'),'synthetic-secret')
+                finally:
+                    if child.is_alive(): child.kill()
+                    child.join(timeout=5); receiver.close(); sender.close()
+
+    def callback(self, form, identity='synthetic-open-id', user_identity=None, fail_user=False):
+        store,state = self.state(form)
+        token = {'access_token':'new-access','refresh_token':'new-refresh','open_id':identity,
+                 'scope':'user.info.basic' if form == 'tiktok' else 'user_info','expires_in':3600}
+        user_identity = identity if user_identity is None else user_identity
+        user = {'data':{'user':{'open_id':user_identity,'display_name':'Synthetic'}}} if form == 'tiktok' else {'data':{'open_id':user_identity,'nickname':'Synthetic'}}
+        client = oauth.TikTokOpenApiClient if form == 'tiktok' else oauth.DouyinOpenApiClient
+        response = token if form == 'tiktok' else {'data':token}
+        with patch.object(client,'exchange_access_token',return_value=response), \
+             patch.object(client,'user_info',side_effect=TimeoutError if fail_user else None,return_value=user):
+            return getattr(oauth,'handle_'+form+'_oauth_callback')(self.service,ORIGIN,
+                {'state':[state['state']],'code':['synthetic']})
+
+    def protected(self, form):
+        with self.service.database.transaction():
+            return {key:self.service.database.get(key) for key in (
+                'secret:'+form.upper()+'_ACCESS_TOKEN','secret:'+form.upper()+'_REFRESH_TOKEN',
+                'binding:'+form,'lifecycle:'+form)}
+
+    def test_r3_user_timeout_preserves_verified_old_generation(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form)
+            self.assertEqual(self.callback(form)['status'],'PASS')
+            old = self.protected(form)
+            result = self.callback(form,identity='other-account',fail_user=True)
+            self.assertEqual(result['status'],'UNKNOWN')
+            self.assertEqual(self.protected(form),old)
+            self.assertNotIn('EXISTING',json.dumps(result))
+
+    def test_r3_token_user_identity_mismatch_never_activated(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form)
+            self.assertEqual(self.callback(form,user_identity='other-account')['sanitized_error_code'],'ACCOUNT_IDENTITY_MISMATCH')
+            self.assertTrue(all(v is None for v in self.protected(form).values()))
+
+    def test_r3_existing_different_account_rejected(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form); self.assertEqual(self.callback(form)['status'],'PASS')
+            old = self.protected(form)
+            self.assertEqual(self.callback(form,identity='different-account')['sanitized_error_code'],'ACCOUNT_BINDING_MISMATCH')
+            self.assertEqual(self.protected(form),old)
+
+    def test_r3_each_activation_write_failure_preserves_generation(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form); self.assertEqual(self.callback(form)['status'],'PASS')
+            old = self.protected(form)
+            for fail_at in range(1,7):
+                calls = []
+                def checkpoint(point):
+                    if point.startswith(('write:secret:','write:audit:','write:binding:','write:lifecycle:')):
+                        calls.append(point)
+                        if len(calls) == fail_at: raise OSError('synthetic')
+                with patch.object(self.service.database,'checkpoint',side_effect=checkpoint):
+                    result = self.callback(form)
+                self.assertEqual(result['status'],'UNKNOWN')
+                self.assertEqual(self.protected(form),old)
+
+    def kill_at(self, target, args, signum=signal.SIGKILL):
+        ctx = multiprocessing.get_context('fork')
+        receiver,sender = ctx.Pipe(duplex=False)
+        child = ctx.Process(target=target,args=(*args,sender))
+        child.start()
+        try:
+            self.assertTrue(receiver.poll(10),'fault point not reached')
+            self.assertEqual(receiver.recv(),'REACHED')
+            os.kill(child.pid,signum); child.join(timeout=5)
+            self.assertEqual(child.exitcode,-signum)
+        finally:
+            if child.is_alive(): child.kill()
+            child.join(timeout=5); receiver.close(); sender.close()
+
+    def test_r1_sigkill_durable_claim_and_rollback(self):
+        for form in ('douyin','tiktok'):
+            for phase in ('before_commit','after_commit'):
+                store,state = self.state(form)
+                self.kill_at(process_state_crash,(str(self.root),form,state['state'],phase))
+                result = type(store)(store.root).consume_state(state['state'])
+                self.assertEqual(result['status'],'REJECTED' if phase == 'after_commit' else 'PASS')
+
+    def test_r3_same_state_callbacks_across_processes_one_pass(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form); _, state = self.state(form)
+            results = self.parallel(process_callback,(str(self.root),form,state['state']))
+            self.assertEqual(results.count('PASS'),1)
+            self.assertEqual(results.count('REJECTED'),5)
+
+    def test_r3_sigkill_every_activation_write_and_commit(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form); self.assertEqual(self.callback(form)['status'],'PASS')
+            for phase in ('write:secret:'+form.upper()+'_ACCESS_TOKEN',
+                          'write:secret:'+form.upper()+'_REFRESH_TOKEN',
+                          'write:binding:'+form,'write:lifecycle:'+form,
+                          'before_commit','after_commit'):
+                old = self.protected(form)
+                _, state = self.state(form)
+                self.kill_at(process_callback,(str(self.root),form,state['state'],None,None,phase))
+                self.service = core.SecureSecretsPortalService(self.root/'state',self.root/'ops')
+                current = self.protected(form)
+                if phase == 'after_commit':
+                    self.assertEqual(current['secret:'+form.upper()+'_ACCESS_TOKEN']['value'],'activated-access')
+                    self.assertEqual(current['secret:'+form.upper()+'_REFRESH_TOKEN']['value'],'activated-refresh')
+                    self.assertTrue(current['binding:'+form]['verified'])
+                else: self.assertEqual(current,old)
+                cls = oauth.TikTokOAuthStateStore if form == 'tiktok' else oauth.DouyinOAuthStateStore
+                self.assertEqual(cls(self.root/('state/'+form+'-oauth-state')).consume_state(state['state'])['status'],'REJECTED')
+
+    def test_r2_sigterm_rolls_back_uncommitted_pair(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form); session = self.session(form)
+            self.kill_at(process_crash,(str(self.root),form,session,'write:secret:'+form.upper()+'_CLIENT_KEY'),signal.SIGTERM)
+            restored = core.SecureSecretsPortalService(self.root/'state',self.root/'ops')
+            self.assertEqual(restored.operations_store.read_secret(form.upper()+'_CLIENT_KEY'),'synthetic-key')
+            self.assertEqual(restored.operations_store.read_secret(form.upper()+'_CLIENT_SECRET'),'synthetic-secret')
+            self.assertEqual(restored.sessions.get(session['session_id']).used_forms,{})
+
+    def test_r3_commit_ack_failure_reports_unknown_not_connected(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form)
+            def checkpoint(point):
+                if point == 'after_commit': raise OSError('synthetic ack loss')
+            with patch.object(self.service.database,'checkpoint',side_effect=checkpoint):
+                result = self.callback(form)
+            self.assertEqual(result['status'],'UNKNOWN')
+            self.assertTrue(self.protected(form)['binding:'+form]['verified'])
+
+    def test_r2_invalid_second_credential_keeps_old_generation(self):
+        for form in ('douyin','tiktok'):
+            self.configure(form); session = self.session(form)
+            result = getattr(self.service,'submit_'+form)(session['session_id'],session['csrf_token'],ORIGIN,
+                {'client_key':'different-key','client_secret':'synthetic\nbad-secret'})
+            self.assertEqual(result['status'],'UNKNOWN')
+            self.assertEqual(self.service.operations_store.read_secret(form.upper()+'_CLIENT_KEY'),'synthetic-key')
+            self.assertEqual(self.service.operations_store.read_secret(form.upper()+'_CLIENT_SECRET'),'synthetic-secret')
+            self.assertEqual(self.service.sessions.get(session['session_id']).used_forms,{})
+
+    def test_r3_status_requires_current_valid_generation(self):
+        self.configure('tiktok'); self.assertEqual(self.callback('tiktok')['status'],'PASS')
+        self.assertTrue(oauth.tiktok_connection_status()['connected'])
+        with self.service.database.transaction():
+            binding = self.service.database.get('binding:tiktok')
+            binding['lifecycle']['access_token_expires_at'] = (core.utc_now()-timedelta(seconds=1)).isoformat()
+            self.service.database.put('binding:tiktok',binding)
+        self.assertFalse(oauth.tiktok_connection_status()['connected'])
+
+    def test_r3_changed_client_key_state_rejected(self):
+        self.configure('tiktok'); _,state = self.state('tiktok')
+        self.service.operations_store.store_secret(core.TIKTOK_CLIENT_KEY_REF,'changed','tiktok','readonly','test','synthetic')
+        with patch.object(oauth.TikTokOpenApiClient,'exchange_access_token') as exchange:
+            result = oauth.handle_tiktok_oauth_callback(self.service,ORIGIN,
+                {'state':[state['state']],'code':['synthetic']})
+            self.assertEqual(result['sanitized_error_code'],'CLIENT_KEY_CHANGED')
+            exchange.assert_not_called()
+
+    def test_database_private_and_symlink_rejected(self):
+        self.assertEqual(self.service.database.path.stat().st_mode & 0o777,0o600)
+        linked = self.root/'linked'; linked.symlink_to(self.root/'state',target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError,'SYMLINK'): Database(linked)
 
 
 if __name__ == '__main__':
