@@ -1,0 +1,20 @@
+[
+  {
+    "actual_archive_files": 250,
+    "actual_cached_sources": 249,
+    "exit_code": 0,
+    "host_operations": "NOT_RUN",
+    "log_sha256": "288a01be5e1988c5221eb0d3f590de11ebb21f9d1685aab6ec851cee0cd0808d",
+    "python": "368",
+    "uid_fixture": "NOT_IMPORTED_OR_EXECUTED"
+  },
+  {
+    "actual_archive_files": 250,
+    "actual_cached_sources": 249,
+    "exit_code": 0,
+    "host_operations": "NOT_RUN",
+    "log_sha256": "3752d9f330d90e0267ea8398fa804fb7ac4c0bf6baecf6f04a1a0d0a25115fdd",
+    "python": "312",
+    "uid_fixture": "NOT_IMPORTED_OR_EXECUTED"
+  }
+]
