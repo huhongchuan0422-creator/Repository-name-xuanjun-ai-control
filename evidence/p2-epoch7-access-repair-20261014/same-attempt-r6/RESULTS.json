@@ -1,0 +1,54 @@
+{
+  "additional_proc_reads": 0,
+  "automatic_retry": false,
+  "bootstrap_publication_commit": "PENDING_PUBLICATION",
+  "changed_pid_rows_max": 64,
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "host_execution": "NOT_RUN",
+  "independent_review": {
+    "interpreters": [
+      "3.6.8",
+      "3.12.14"
+    ],
+    "isolation_flags": [
+      "-I",
+      "-B",
+      "-S"
+    ],
+    "status": "SCOPED_PASS",
+    "tests_each_interpreter": 56
+  },
+  "install_admission": "NOT_GRANTED",
+  "intermediate_logs": "RETAINED_LOCALLY_NOT_FINAL_EVIDENCE",
+  "kind": "FROZEN_LOCAL_SAME_ATTEMPT_R6_REVIEW",
+  "kit_manifest_sha256": "70c76e30ae8390963f345813f87267bf1d2f024bc01031c8023733c84aa571cc",
+  "kit_source_commit": "0c8a0f2a97da0c3f00f53659cd6ef7fc7d4ec3ba",
+  "new_hosted_checkpoint": "NOT_RUN_OR_CLAIMED",
+  "original_outer_commit": "3199565b2f0d91d788251a7d52e6b749937b991d",
+  "production_resume": "NOT_EXECUTED",
+  "same_attempt_observe_invocations": 1,
+  "schema": 1,
+  "source_bytes": 37118,
+  "source_sha256": "aa3d4f3f4b8882a203d964ac66479228f82f364be1352ed4c75af00d9ad9e5aa",
+  "supplemental_output_bound": 65536,
+  "test_scope": "ACTUAL_AUTHENTICATED_R6_CACHE_AND_ORIGINAL_FUNCTIONS_WITH_SYNTHETIC_IO_PERSISTENCE_AND_PROBE",
+  "test_sha256": "b90c98b2050c1794530701048c12caa722d8c9b414f822352034b9279a23f511",
+  "tests": {
+    "3.12.14": {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "21a93232603f17117240e59c03a9b8b2ce5537d39d6c87031215dfc5a6dca11d",
+      "passed": 56,
+      "run": 56,
+      "skips": 0
+    },
+    "3.6.8": {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "81ec2d99e8ce2cc6005f570d0ddf8a334dbc99e57301d55625b74d1107e7dc2f",
+      "passed": 56,
+      "run": 56,
+      "skips": 0
+    }
+  }
+}
