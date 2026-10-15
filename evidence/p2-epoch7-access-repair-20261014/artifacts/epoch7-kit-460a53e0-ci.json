@@ -1,0 +1,226 @@
+{
+  "archive_sha256": "c56a11e78914d567f91a94118d676d49f65775161b3c46b16583ece1403c1d85",
+  "bootstrap_tests": {
+    "errors": 0,
+    "exit_code": 0,
+    "failures": 0,
+    "host_operations": "NOT_RUN",
+    "kind": "EXACT_PUBLISHED_BOOTSTRAP_UNIT_EVIDENCE_ONLY",
+    "log_sha256": "5fb056cc362bb0819ddf45e71b84b41b5b57d3ba8f320c3d6c56bff276d06800",
+    "python_version": "3.11.17",
+    "runner_uid": 1001,
+    "skipped": 0,
+    "source_map_sha256": "3492839e12910c4d2a6cf92979c9e68f1b64bbc1bca1ecfa70a61fae25735584",
+    "source_sha256": {
+      "README.md": "9daa595b99a77ae1dc1a90a84f6fbc15a6dbaf8bace2300a4fbc2fb490e38189",
+      "audit_epoch7_imports.py": "afd8d4ae93622cb2ee402166869a33a1360e4f1fb5d6da1053c42a7e3fd62f8d",
+      "build_epoch7_kit.py": "2d530268876fde434b340a07f48a9ded7271c23fb1437ddf702c7c7b4a3190e4",
+      "epoch7_recovery_entry.py": "24ad01d9b216e2a2771180c169c0d8d858173f6dee2a6b0cf9e35f9ad97108d4",
+      "extract_epoch7_kit.py": "87122167bf6c63f5f96452369d6e3d7d59c5254fade9a2ed52d3e959d8538261",
+      "portable-tests/ADAPTERS.json": "1932d3cd41415c109dd3318e9ecd829c6174a0082fcd0801d56755e0cf2e7836",
+      "run_epoch7_offline.py": "4c4612493386d1557c6d302412f5b865703566b3070a2c968964768737ff2a7e",
+      "run_published_kit_ci.py": "1f15bda6fe2ac892350765be2b4115044833c8a938776f6386c29e0174a5c661",
+      "test_epoch7_kit.py": "ad6539ad9282018a02b3cca761e8181b115a6d55fdf3d620c002a4db74aefeb7"
+    },
+    "success": true,
+    "tests": 173
+  },
+  "entry_sha256": "24ad01d9b216e2a2771180c169c0d8d858173f6dee2a6b0cf9e35f9ad97108d4",
+  "host_operations": "NOT_RUN",
+  "kind": "EXACT_PUBLISHED_OFFLINE_KIT_CI",
+  "kit_manifest_sha256": "e6618cf3012bc5edf8f3c9fb9982494dad7d916fbc7adcaeab39ebe0733cc3b8",
+  "kit_source_commit": "460a53e0f702fb416811e785a6ef8d6c39b2d003",
+  "kit_source_tree": "20f382a534da9f1c39fa2c2c97e7a484917f8aa5",
+  "mandatory_test_log_sha256": "26c9d273bef83706f68eafa169cc90e6cd35783729a484b0ca9ef007383a928f",
+  "production_acceptance": "NOT_VERIFIED",
+  "reproducible_build": true,
+  "required_import_closure": true,
+  "runtime_manifest_sha256": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
+  "runtime_source_commit": "101b465ca3554bf34fef2d53d6006b96d85c4a63",
+  "runtime_source_tree": "3ae50b40c38d9a807876c175818299e344d53134",
+  "source_index_sha256": "970a0cd34e5d245239c5818ad906a7b12f10b71eb9cb01f3c23bb5232f1dd755",
+  "success": true,
+  "test_exit_code": 0,
+  "tests": {
+    "entry_sha256": "24ad01d9b216e2a2771180c169c0d8d858173f6dee2a6b0cf9e35f9ad97108d4",
+    "host_observation": "NOT_RUN",
+    "install_admission": "NOT_GRANTED",
+    "isolated_probe": "NOT_RUN",
+    "kind": "HOSTED_OFFLINE_UNIT_EVIDENCE_ONLY",
+    "kit_manifest_sha256": "e6618cf3012bc5edf8f3c9fb9982494dad7d916fbc7adcaeab39ebe0733cc3b8",
+    "kit_source_commit": "460a53e0f702fb416811e785a6ef8d6c39b2d003",
+    "kit_source_tree": "20f382a534da9f1c39fa2c2c97e7a484917f8aa5",
+    "operation": "test-only",
+    "portable_tests_complete": true,
+    "production_acceptance": "NOT_VERIFIED",
+    "production_execution": "NOT_RUN",
+    "production_resume": "NOT_EXECUTED",
+    "python_version": "3.11.17",
+    "runner_uid": 1001,
+    "runtime_manifest_sha256": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
+    "runtime_source_commit": "101b465ca3554bf34fef2d53d6006b96d85c4a63",
+    "runtime_source_tree": "3ae50b40c38d9a807876c175818299e344d53134",
+    "success": true,
+    "suites": [
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "access_plan",
+        "tests": 15
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "approval",
+        "tests": 75
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "command",
+        "tests": 20
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "diagnostics",
+        "tests": 39
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "recovery",
+        "tests": 150
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "sequence",
+        "tests": 223
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "host_containment",
+        "tests": 14
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "live_controls",
+        "tests": 104
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "runtime_acceptance",
+        "tests": 31
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "runtime_projection",
+        "tests": 143
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "runtime_process",
+        "tests": 33
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "runtime_identity",
+        "tests": 83
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "runtime_wiring",
+        "tests": 16
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "acceptance_rows",
+        "tests": 38
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "snapshot_portable",
+        "tests": 386
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "host_factory",
+        "tests": 71
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "probe",
+        "tests": 148
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "service_contract",
+        "tests": 116
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "host_filesystem",
+        "tests": 45
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "host_observer",
+        "tests": 49
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "recovery_filesystem",
+        "tests": 39
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "resource_plan",
+        "tests": 69
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "host_stager",
+        "tests": 7
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "runtime_effects",
+        "tests": 35
+      },
+      {
+        "skipped": 0,
+        "success": true,
+        "suite": "owner_prerequisite",
+        "tests": 63
+      }
+    ],
+    "test_workspace": "AUTHENTICATED_DISPOSABLE_COPY_REMOVED",
+    "unavailable_suites": {
+      "package_builder": "Tests workspace package construction from historical inputs rather than staged runtime; separate local evidence",
+      "plan": "Reads private prior compiled plan and historical workspace runtime; intentionally not bundled",
+      "snapshot": "REQUIRED_NOT_RUN historical ReuseTests.test_selected_functions_identical_to_frozen_sources needs original frozen source files and reviewed_sources.json; all other general assertions are mandatory through the documented snapshot_portable adapter, including current staged identity rendering.",
+      "uk_exact_uid_acl": "REQUIRED_NOT_RUN: ActualFDTests.test_actual_fd_acl_changes_only_two_named_access_sets needs kernel UID mappings1002/1003/1004; no substitute from mocked grants or current-UID xattr roundtrip",
+      "unit_overlay": "Compares historical frozen runtime and original overlay paths outside staged kit"
+    }
+  },
+  "verified_archive_roundtrip": true
+}
