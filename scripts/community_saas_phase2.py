@@ -57,6 +57,7 @@ class OfflineSaas:
         fields={
             "catalog":set(),
             "offers":{"module_id"},
+            "customer_orders":set(),
             "quote":{"quote_id","offer_id","version","expires_at"},
             "quote_read":{"quote_id"},
             "order_prepare":{"order_id","quote_id","currency"},
@@ -80,6 +81,9 @@ class OfflineSaas:
             return {"modules":catalog(),"framework_free":True,"production":False}
         if operation=="offers":
             return {"offers":_customer_view(list_offers(self.quotes,params["module_id"],tenant_id=tenant))}
+        if operation=="customer_orders":
+            admin=admin_snapshot(self.orders,tenant,now)
+            return {"orders":admin["orders"],"finance_state":"NOT_VERIFIED_BY_ADAPTER"}
         if operation=="quote":
             _id(params["quote_id"]);_id(params["offer_id"])
             result=quote(self.quotes,params["quote_id"],tenant,
