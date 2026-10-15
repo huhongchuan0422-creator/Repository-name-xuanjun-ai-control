@@ -7,6 +7,20 @@ export function presentAmount(minor,currency){
 export function safeText(value){
  return value==null?"UNKNOWN":String(value);
 }
+export function offerCycles(offer){
+ const totals={};
+ for(const line of Array.isArray(offer.lines)?offer.lines:[]){
+  const cycle=safeText(line.cycle),entry=totals[cycle]??{cny:0,usd:0,unknownCNY:false,unknownUSD:false};
+  const qty=line.quantity;
+  for(const [curr,key] of [["cny","cny_minor"],["usd","usd_minor"]]){
+   if(!Number.isSafeInteger(qty)||qty<=0||!Number.isSafeInteger(line[key])||line[key]<0){
+    entry[curr==="cny"?"unknownCNY":"unknownUSD"]=true;
+   } else entry[curr]+=qty*line[key];
+  }
+  totals[cycle]=entry;
+ }
+ return Object.entries(totals).map(([cycle,x])=>cycle+" "+(x.unknownCNY?"UNKNOWN":presentAmount(x.cny,"CNY"))+" / "+(x.unknownUSD?"UNKNOWN":presentAmount(x.usd,"USD"))).join("；");
+}
 export function modelToView(model){
  if(!model||typeof model!=="object"||Array.isArray(model))throw Error("INVALID_MODEL");
  const modules=Array.isArray(model.modules)?model.modules:[];
@@ -14,7 +28,8 @@ export function modelToView(model){
  const reviews=Array.isArray(model.reviews)?model.reviews:[];
  return {
  modules:modules.map(x=>({title:safeText(x.title),id:safeText(x.id),
-   offers:Array.isArray(x.offers)?x.offers.map(o=>safeText(o.offer_id)+" v"+safeText(o.version)):[]})),
+   offers:Array.isArray(x.offers)?x.offers.map(o=>safeText(o.offer_id)+" v"+safeText(o.version)+" · "+offerCycles(o)):[],
+   active:x.active===true})),
  orders:orders.map(x=>({id:safeText(x.order_id),state:safeText(x.state),
    cny:safeText(x.currency!=="USD"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.cny_minor,"CNY"):"—"),
    usd:safeText(x.currency!=="CNY"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.usd_minor,"USD"):"—")})),
@@ -32,7 +47,7 @@ export function renderDashboard(doc,model){
  const orders=doc.getElementById("orderDetails");
  const queue=doc.getElementById("reviewQueue");
  catalog.replaceChildren();orders.replaceChildren();queue.replaceChildren();
- for(const item of view.modules)appendText(doc,catalog,item.title,item.id+(item.offers.length?" · "+item.offers.join(", "):" · 暂无选配报价"));
+ for(const item of view.modules)appendText(doc,catalog,item.title,item.id+(item.offers.length?" · "+item.offers.join(", "):" · 暂无选配报价")+" · 权益："+(item.active?"有效":"未授权"));
  for(const x of view.orders)appendText(doc,orders,x.id,x.state+" · "+x.cny+" / "+x.usd);
  for(const x of view.reviews)appendText(doc,queue,x.kind,x.state);
  doc.getElementById("quoteDetails").textContent="所有价格须经版本审核；成本未知不等于零。";
@@ -49,7 +64,8 @@ export async function loadDashboard(fetcher,token,now=Math.floor(Date.now()/1000
   const body=await response.json();return body.result;
  };
  const modules=(await post("catalog")).modules;
- for(const item of modules){item.offers=(await post("offers",{module_id:item.id})).offers;}
+ for(const item of modules){item.offers=(await post("offers",{module_id:item.id})).offers;
+  item.active=(await post("entitlement",{module_id:item.id})).active;}
  const orders=(await post("customer_orders")).orders;
  let reviews=[];
  try{const panel=await post("admin_snapshot");reviews=panel.review_tasks}catch(error){if(error.message!=="OFFLINE_REQUEST_DENIED")throw error}
