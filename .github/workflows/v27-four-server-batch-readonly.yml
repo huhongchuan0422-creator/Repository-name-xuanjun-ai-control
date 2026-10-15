@@ -72,52 +72,107 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  head-diagnosis:
+  remaining-evidence:
     if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
         runner: [xuanjun-tokyo-readonly, xuanjun-domestic-ops]
     runs-on: [self-hosted, Linux, X64, "${{ matrix.runner }}"]
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
-      - name: Distinguish legacy HEAD error from service outage without production imports
+      - name: Import closure, exact logger reproduction, authoritative DNS and safe GET rejection
         run: |
           python3 -B - <<'PY'
-          import os,json,socket,ssl,http.client,subprocess,hashlib,ast
+          import os,json,ast,hashlib,re,subprocess,shutil,ssl,socket,http.client,types,urllib.parse,sys,io,contextlib
           from pathlib import Path
           host=os.uname().nodename
           assert host in ("iZvt5t8tlrm8oiZ","iZ6wee8q9z4t03hvqumwfhZ")
-          domain="wenwenwenyiyiyi.work"
-          report={"host":host,"production_mutation":False,"checks":[]}
-          targets=[("47.101.152.210",443,True),("47.245.53.152",443,True)]
+          domain="wenwenwenyiyiyi.work";root=Path("/opt/trading-system")
+          report={"host":host,"commit":os.environ["GITHUB_SHA"],"production_mutation":False,"dns_release":"HOLD"}
           if host=="iZ6wee8q9z4t03hvqumwfhZ":
-           targets.append(("127.0.0.1",18080,False))
-           for cmd in (["systemctl","show","secure-secrets-portal.service","-p","ActiveState","-p","SubState","-p","MainPID"],["ss","-H","-lntp","sport = :18080"]):
-            r=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=5)
-            report.setdefault("service_evidence",[]).append(r.stdout[:2000])
-           p=Path("/etc/nginx/nginx.conf");data=p.read_bytes()
-           needle=b"include /etc/nginx/conf.d/wecom.conf;"
-           approved=b"\n    include /etc/nginx/conf.d/pr122-apex-acme-http.conf;"
-           report["tokyo_main"]={"sha256":hashlib.sha256(data).hexdigest(),"acme_include_count":data.count(approved),"main_without_added_include_sha256":hashlib.sha256(data.replace(approved,b"",1)).hexdigest(),"original_expected":"80b49c552823e5684ec35abdf23af52e37081620a654124320e0c3a7974242f4"}
-           # Isolate the exact logging defect without importing or executing the production application.
-           try:
-            fmt="code %d, message %s";args=(501,"Unsupported method")
-            fmt % tuple("[REDACTED]" for _ in args)
-            report["legacy_error_logging_reproducer"]="NO_ERROR"
-           except Exception as e:report["legacy_error_logging_reproducer"]=type(e).__name__
-          for address,port,tls in targets:
-           for method,path in (("GET","/healthz"),("HEAD","/healthz")):
-            item={"target":address,"port":port,"method":method,"path":path}
+           entry=root/"scripts/secure_secrets_portal_server.py";data=entry.read_bytes()
+           assert hashlib.sha256(data).hexdigest()=="528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006"
+           tree=ast.parse(data);queue=[entry];seen=set();records=[];external=set();gaps=[]
+           while queue and len(seen)<250:
+            p=queue.pop()
+            if p in seen:continue
+            seen.add(p)
             try:
-             c=http.client.HTTPConnection(address,port,timeout=5)
-             if tls:c.sock=ssl.create_default_context().wrap_socket(socket.create_connection((address,port),timeout=5),server_hostname=domain)
+             b=p.read_bytes()
+             if len(b)>2000000:raise ValueError()
+             t=ast.parse(b)
+            except Exception as e:gaps.append({"path":str(p.relative_to(root)),"error":type(e).__name__});continue
+            imported=[];hits=[];stack=[]
+            class Visitor(ast.NodeVisitor):
+             def visit_FunctionDef(self,n):
+              stack.append(n.name);self.generic_visit(n);stack.pop()
+             visit_AsyncFunctionDef=visit_FunctionDef
+             def visit_Import(self,n):imported.extend(a.name for a in n.names)
+             def visit_ImportFrom(self,n):
+              if n.level:
+               parts=p.relative_to(root).parent.parts
+               prefix=".".join(parts[:len(parts)-n.level+1])
+               imported.append(".".join(x for x in (prefix,n.module) if x))
+              elif n.module:imported.append(n.module)
+             def visit_Attribute(self,n):
+              if n.attr in ("client_address","remote_addr"):hits.append({"line":n.lineno,"function":".".join(stack),"kind":n.attr})
+              self.generic_visit(n)
+             def visit_Constant(self,n):
+              if isinstance(n.value,str) and n.value.lower() in ("x-real-ip","x-forwarded-for","x-forwarded-proto","remote_addr","ip_whitelist","ip_address","rate_limit"):
+               hits.append({"line":n.lineno,"function":".".join(stack),"kind":n.value.lower()})
+             def visit_Call(self,n):
+              name=n.func.id if isinstance(n.func,ast.Name) else n.func.attr if isinstance(n.func,ast.Attribute) else ""
+              if name in ("__import__","import_module","exec","eval"):hits.append({"line":n.lineno,"function":".".join(stack),"kind":"DYNAMIC_RESOLUTION:"+name})
+              self.generic_visit(n)
+            Visitor().visit(t)
+            for module in set(imported):
+             target=root.joinpath(*module.split("."))
+             candidates=(target.with_suffix(".py"),target/"__init__.py")
+             found=next((x for x in candidates if x.is_file() and not x.is_symlink()),None)
+             if found:queue.append(found)
+             else:external.add(module)
+            records.append({"path":str(p.relative_to(root)),"sha256":hashlib.sha256(b).hexdigest(),"imports":sorted(set(imported)),"ip_or_dynamic_hits":hits})
+           report["entry_import_closure"]={"modules":records,"unresolved_or_external_modules":sorted(external),"read_errors":gaps,"scan_limit_reached":bool(queue)}
+           cls=next(n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=="PortalHandler")
+           method=next(n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name=="log_message")
+           module=ast.Module(body=[method],type_ignores=[]);ast.fix_missing_locations(module)
+           ns={"urllib":urllib,"sys":sys}
+           exec(compile(module,"<isolated-exact-log-method>","exec"),ns)
+           fake=types.SimpleNamespace(path="/healthz",client_address=("127.0.0.1",1),log_date_time_string=lambda:"fixed")
+           tests=[]
+           for fmt,args in (('"%s" %s %s',("HEAD /healthz HTTP/1.1",501,"-")),("code %d, message %s",(501,"Unsupported method"))):
+            with contextlib.redirect_stderr(io.StringIO()):
+             try:ns["log_message"](fake,fmt,*args);result="OK"
+             except Exception as e:result=type(e).__name__
+            tests.append({"format_kind":"mixed_numeric" if "%d" in fmt else "strings","result":result})
+           report["exact_ast_log_method_reproducer"]=tests
+          # Query authoritative servers directly: AA/rcode, A/AAAA and observed TTL; never infer provider proxy settings.
+          dig=shutil.which("dig");report["authoritative_dns"]=[]
+          if dig:
+           for ns in ("celine.ns.cloudflare.com","chris.ns.cloudflare.com"):
+            for kind in ("A","AAAA"):
              try:
-              c.request(method,path,headers={"Host":domain,"Connection":"close"});r=c.getresponse();body=r.read(1024)
-              item.update({"status":r.status,"body_sha256":hashlib.sha256(body).hexdigest()})
+              r=subprocess.run([dig,"@"+ns,domain,kind,"+norecurse","+time=3","+tries=1","+noall","+comments","+answer","+authority"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=5)
+              report["authoritative_dns"].append({"server":ns,"type":kind,"exit":r.returncode,"response":r.stdout[:4000]})
+             except Exception as e:report["authoritative_dns"].append({"server":ns,"type":kind,"error":type(e).__name__})
+          # Unsupported GET routes are read-only fallthrough in pinned old handler; no /p/, OAuth, status, or POST.
+          ip="47.245.53.152" if host=="iZ6wee8q9z4t03hvqumwfhZ" else "47.101.152.210"
+          report["safe_get_rejections"]=[]
+          for path in ("/submit/douyin","/submit/tiktok","/integrations/tiktok/disconnect","/integrations/tiktok/pr122-invalid-readonly"):
+           for variant in ("baseline","wrong_origin_and_source"):
+            item={"path":path,"variant":variant}
+            try:
+             raw=socket.create_connection((ip,443),timeout=5);tls=ssl.create_default_context().wrap_socket(raw,server_hostname=domain)
+             c=http.client.HTTPConnection(domain,timeout=5);c.sock=tls
+             try:
+              headers={"Host":domain,"Connection":"close"}
+              if variant!="baseline":headers.update({"Origin":"https://invalid.example","X-Real-IP":"192.0.2.123","X-Forwarded-For":"192.0.2.123","X-Forwarded-Proto":"http"})
+              c.request("GET",path,headers=headers);r=c.getresponse();body=r.read(2048)
+              item.update({"status":r.status,"body_sha256":hashlib.sha256(body).hexdigest(),"set_cookie":bool(r.getheader("Set-Cookie"))})
              finally:c.close()
             except Exception as e:item["error"]=type(e).__name__
-            report["checks"].append(item)
-          print("PR122_HEAD_DIAGNOSIS="+json.dumps(report,sort_keys=True))
+            report["safe_get_rejections"].append(item)
+          print("PR122_CLOSURE_DNS_RECEIPT="+json.dumps(report,sort_keys=True))
           
           PY
