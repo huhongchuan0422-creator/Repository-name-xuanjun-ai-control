@@ -60,7 +60,7 @@ def connect(path=":memory:"):
   db.execute("PRAGMA foreign_keys=ON")
   actual=db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
   expected={"module_prices","module_entitlements","module_events"}
-  offer_tables={"saas_offer_versions","saas_offer_lines","saas_quotes"}
+  offer_tables={"saas_offer_versions","saas_offer_lines","saas_quotes","saas_offer_approvals"}
   names={row[0] for row in actual}
   if names==expected:
    verify(db,SCHEMA,expected)
