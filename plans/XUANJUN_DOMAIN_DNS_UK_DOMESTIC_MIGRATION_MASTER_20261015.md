@@ -283,3 +283,43 @@ index.html两机均4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90
 结论以本次服务器实读为准：国内既有候选保留当前已确认Tokyo实际官网全部1187路径，1186文件字节相同，仅有历史批准TikTok修正；没有证据需要重新构建官网、上传旧包覆盖或重做RG1。
 9.7保护Owner官网约束继续有效；其“内容基准未直接核实”缺口对本次实际Tokyo现网/国内候选比对已关闭，不扩大为英国全盘来源或另一个未知版本已核实。
 现场内容不会因本核对自动替换。生产apex配置、证书/续期、W06真实路由、DNS和东京退役均未执行；统一送审仍需完整发布/回滚与现场门禁，不能报迁移完成。
+
+
+### 9.10 夜间自动现场证据（2026-10-16 CST；仅增量）
+
+Owner 已授权夜间继续自主获取两地证据。通过原 GitHub 非 root Runner 执行；无 sudo、新权限、生产文件修改、DNS 修改、服务重启或真实业务写请求。已通过的 83 项、OAuth45、两地115静态检查全部继承。
+
+- 边界采集提交 `81855c0e3feb3244c70be1a219be9fe1f94ba485`，Run [38776953939](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38776953939)。
+  - 国内 Job116566967318，东京 Job116566967626；两者执行成功，不等于动态验收通过。
+  - 11项职责各 baseline/spoofed_source HEAD，共44个两地请求。10项各502；Telegram无效路径405。无重定向、无Set-Cookie。响应相同只能证明这组方法的外部行为，不能证明后台头覆盖或GET/POST鉴权通过。
+  - OAuth start/callback GET、凭据提交、disconnect POST、消息/支付/交易全部 NOT_TESTED，未调用。
+  - 东京生产入口文件 SHA256 `528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006`，与Owner原文件一致；仅do_GET/do_POST。
+  - 东京153个可读Python文件记录路径、哈希及IP相关token行号，未导出源码内容或凭据。词匹配不等于完整调用链分析。
+  - 国内受审代理配置真实哈希 `307930ba9ea726a34a7c0365d8a7446cd2967c8331682e0b9a52ac60e3936201`，X-Real-IP/X-Forwarded-For覆盖为$remote_addr，X-Forwarded-Proto=https，固定Host/SNI、上游证书校验on、proxy_next_upstream=off。东京又覆盖X-Real-IP=$remote_addr；未发现real_ip信任配置。不能据此宣称所有外围服务均无客户端IP依赖。
+
+- 针对502的增量定位提交 `a7643ed9d28a7c01bb5e75d707bd5e08f153cc7a`，Run [38777134734](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38777134734)：
+  - 东京 Job116567589539，国内 Job116567589902。
+  - 两地分别访问国内/东京 /healthz GET均200，正文SHA256 `a12b7cb43c9d9134b5bb1b35e9096b66775d9e92e7611d1cc92b02edd6782a87`。同路径HEAD均502。
+  - 东京127.0.0.1:18080 GET200，HEAD RemoteDisconnected；服务active/running，MainPID2023577未变，18080仍监听。支持“旧后端不支持方法的处理异常”，不支持“后台整体停机”判断。
+  - 原入口log_message第1207附近将带%s的格式串全部参数替换为字符串；BaseHTTPRequestHandler的错误日志含%d和%s，独立最小表达式复现TypeError。与HEAD直连断开相符；未读取生产异常栈，因果诊断仍标为高置信待独立复核，未修改旧后台。
+  - 东京nginx.conf当前SHA256 `d7cf6b60d85b5a6b36df7437a26249d643bc756b4f6ac31fa1521ef1487dcef3`；新增ACME include恰好1次。移除该单行后的字节SHA256严格恢复原 `80b49c552823e5684ec35abdf23af52e37081620a654124320e0c3a7974242f4`。ACME独立配置SHA256仍为受审190f7180…d27383；wecom.conf仍ca380c77…9931c0。关闭实际单行include差异证据缺口，root私有备份内容仍沿用Owner证据。
+
+| 动态职责 | 两地 HEAD baseline/伪造来源头 | 业务方法/鉴权 |
+| --- | --- | --- |
+| /p/ | 502 / 502 | NOT_TESTED |
+| /submit/douyin | 502 / 502 | NOT_TESTED |
+| /submit/tiktok | 502 / 502 | NOT_TESTED |
+| /integrations/douyin/oauth/callback | 502 / 502 | NOT_TESTED |
+| /integrations/tiktok/oauth/start | 502 / 502 | NOT_TESTED |
+| /integrations/tiktok/oauth/callback | 502 / 502 | NOT_TESTED |
+| /integrations/tiktok/status | 502 / 502 | NOT_TESTED |
+| /integrations/tiktok/disconnect | 502 / 502 | NOT_TESTED |
+| /healthz | 502 / 502；GET200 | GET只读通过 |
+| /telegram-webhook/ | 405 / 405（固定无效后缀） | 真实POST/密钥鉴权 NOT_TESTED |
+| /telegram-canary/status | 502 / 502 | NOT_TESTED |
+
+DNS两台公共解析一致：A=47.245.53.152，AAAA应答为空，NS=celine.ns.cloudflare.com/chris.ns.cloudflare.com，SOA serial2417364535。递归答复TTL=10是观测值，**不是DNS控制台配置TTL**。未获得Cloudflare记录ID、proxy状态、原配置TTL与精确回滚绑定，不放行DNS。AAAA空答复也不冒充权威不存在证明。
+
+IP初步分类：入口client_address用于日志；入口X-Forwarded-Proto用于Origin构造；secure_secrets_portal可读历史代码限流按session/form计数；交易模块ip_whitelist描述外部交易所密钥IP限制，不能据词匹配判断受本次域名入口影响。完整转移调用链、外围WAF与日志使用方仍UNKNOWN。Owner未接受临时审计差异。
+
+终态：DNS_RELEASE=HOLD；DYNAMIC_ACCEPTANCE=NOT_PASS（旧HEAD错误路径异常待处理/裁定）；东京退役HOLD；Work官网未改。夜间续接仅增量处理上述证据，禁止反复重跑已通过检查或自批准生产。
