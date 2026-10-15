@@ -442,6 +442,40 @@ def load_server_verifier(activation=None, policy_path=POLICY_PATH, _backend=None
     return RootManagerVerifier(policy, _digest(raw), identity, activation or canonical_activation(), backend)
 
 
+def _delivery_phase(dynamic):
+    """Only the two paired Accept=no states in the reviewed systemd lifecycle.
+
+    listening is a pre-activation state, not proof of a live response sender.
+    A running socket must be associated with the already-pinned live service.
+    Transitional/inconsistent observations fail closed; no request is retried.
+    """
+    listener, service = dynamic[SOCKET_UNIT], dynamic[SERVICE_UNIT]
+    if listener['ActiveState'] != 'active': _fail('LISTENER_NOT_ACTIVE')
+    if (service['ActiveState'], service['SubState']) == ('inactive', 'dead'):
+        if (service['MainPID'] != '0' or type(service['InvocationID']) is not str
+                or (service['InvocationID'] != '' and
+                    not re.fullmatch('[0-9a-f]{32}', service['InvocationID']))):
+            _fail('SERVICE_NOT_ACTIVE')
+        if listener['SubState'] != 'listening': _fail('SOCKET_SERVICE_STATE')
+        return 'IDLE'
+    if (service['ActiveState'] != 'active' or service['SubState'] != 'running'
+            or type(service['MainPID']) is not str
+            or not re.fullmatch('[1-9][0-9]*', service['MainPID'])
+            or type(service['InvocationID']) is not str
+            or not re.fullmatch('[0-9a-f]{32}', service['InvocationID'])):
+        _fail('SERVICE_NOT_ACTIVE')
+    if listener['SubState'] != 'running': _fail('SOCKET_SERVICE_STATE')
+    return 'RUNNING'
+
+
+def _delivery_transition(before, after):
+    """One-way activation; an observed running invocation cannot be replaced."""
+    prior, current = _delivery_phase(before), _delivery_phase(after)
+    if prior == 'RUNNING' or current == 'IDLE':
+        if before[SERVICE_UNIT] != after[SERVICE_UNIT]:
+            _fail('SERVICE_RESTART_DURING_REQUEST')
+
+
 class RootManagerVerifier(object):
     def __init__(self, policy, policy_sha256, policy_identity, activation, backend):
         self.policy = validate_policy(policy)
@@ -499,8 +533,7 @@ class RootManagerVerifier(object):
             observed = b.unit(unit, deadline)
             if {key: observed[key] for key in UNIT_PROPERTIES[unit]} != expected: _fail('LOADED_UNIT_CHANGED')
             dynamic[unit] = {key: observed[key] for key in DYNAMIC[unit]}
-        if dynamic[SOCKET_UNIT]['ActiveState'] != 'active' or dynamic[SOCKET_UNIT]['SubState'] != 'listening':
-            _fail('LISTENER_NOT_ACTIVE')
+        _delivery_phase(dynamic)
         if before != self.checkpoint(deadline): _fail('SNAPSHOT_CHANGED')
         deadline.check()
         return before + (dynamic,)
@@ -517,9 +550,13 @@ class RootManagerSession(object):
         p = self.verifier.policy['creator']
         if (any(type(item) is not int for item in credentials)
                 or tuple(credentials) != (p['pid'], p['uid'], p['gid'])): _fail('PEER_CREDENTIALS')
-        check = self.verifier.checkpoint(self.deadline)
-        if self.before[:5] != check: _fail('CONNECT_RACE')
-        self.connected = check + (self.before[5],)
+        # Bind a service invocation observed after connect too. Socket activation
+        # may have occurred since the initial idle snapshot; any later restart
+        # must be rejected even when that initial snapshot was inactive.
+        check = self.verifier.snapshot(self.deadline)
+        if self.before[:5] != check[:5]: _fail('CONNECT_RACE')
+        _delivery_transition(self.before[5], check[5])
+        self.connected = check
         self.peer = tuple(credentials)
         return True
 
@@ -528,10 +565,6 @@ class RootManagerSession(object):
                 or tuple(credentials) != self.peer): _fail('PEER_CHANGED')
         after = self.verifier.snapshot(self.deadline)
         if self.connected[:5] != after[:5]: _fail('RESPONSE_RACE')
-        service = after[5][SERVICE_UNIT]
-        if (service['ActiveState'] != 'active' or service['SubState'] != 'running'
-                or not service['MainPID'].isdigit() or int(service['MainPID']) < 1
-                or not re.fullmatch('[0-9a-f]{32}', service['InvocationID'])): _fail('SERVICE_NOT_ACTIVE')
-        prior = self.connected[5][SERVICE_UNIT]
-        if prior['ActiveState'] == 'active' and service != prior: _fail('SERVICE_RESTART_DURING_REQUEST')
+        if _delivery_phase(after[5]) != 'RUNNING': _fail('SERVICE_NOT_ACTIVE')
+        _delivery_transition(self.connected[5], after[5])
         return True

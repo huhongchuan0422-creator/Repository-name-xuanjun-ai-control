@@ -62,7 +62,7 @@
     "stage1/ledger_read_client.py": "d791055a94bbd603dc5202f76533f5065c9d1c8a291ff227572a223a3cc0e2ce",
     "stage1/ledger_read_projection.py": "86fa6454fc295c8b885108ab643bb8b89f5ea1bc1e1132358717ca5f868ac000",
     "stage1/ledger_read_transport.py": "ae5bca7e31803f0d4f92249c8852f55417bd6d4926f8f699cda346fa6ac97a6d",
-    "stage1/ledger_server_identity.py": "bb47927facbd55589aed2303d0cd201a071cad4de41d71f1dcb150287bd8cbab",
+    "stage1/ledger_server_identity.py": "c18b35dcaa1c9abb0ce926e5e044e131b222c3b6960af6aa40ce451c3502cd33",
     "stage1/ledger_service.py": "6c254ed8d36f1eac692636ad482924a9cfb0d4567831aaa67814275ef68388ef",
     "stage1/legacy_host_adapter.py": "c59431d75b0c74489c1edb94d3c52e92668414b3308edc91efd13fa073259864",
     "stage1/legacy_quiescence.py": "027b9e6e59c32ca6c3903def8088c1c60b3ec7d30141877ebfc302f23b73d05e",

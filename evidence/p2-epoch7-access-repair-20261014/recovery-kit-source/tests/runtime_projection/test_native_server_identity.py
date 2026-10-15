@@ -34,7 +34,7 @@ class NativeServerIdentityTests(unittest.TestCase):
         verifier = load_server_verifier(store, _backend=backend)
         result, connection = self.invoke(verifier=verifier)
         self.assertEqual(result, {'x': 1})
-        self.assertEqual(len([c for c in backend.calls if c[0] == 'unit']), 4)
+        self.assertEqual(len([c for c in backend.calls if c[0] == 'unit']), 6)
     def test_missing_policy_fails_before_socket_creation(self):
         with mock.patch.object(bridge, 'load_server_verifier', side_effect=ValueError('missing policy')), \
                 mock.patch.object(socket, 'socket', side_effect=AssertionError('socket creation')):

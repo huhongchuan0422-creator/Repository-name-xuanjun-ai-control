@@ -1,0 +1,127 @@
+{
+  "cases": [
+    {
+      "case": 1,
+      "units": {
+        "service": {
+          "ActiveState": "active",
+          "InvocationID": "4d6552f1ffef4b6d8716a671b85f2f18",
+          "MainPID": "896618",
+          "SubState": "running"
+        },
+        "socket": {
+          "ActiveState": "active",
+          "SubState": "running"
+        }
+      }
+    },
+    {
+      "case": 2,
+      "units": {
+        "service": {
+          "ActiveState": "active",
+          "InvocationID": "4d6552f1ffef4b6d8716a671b85f2f18",
+          "MainPID": "896618",
+          "SubState": "running"
+        },
+        "socket": {
+          "ActiveState": "active",
+          "SubState": "running"
+        }
+      }
+    },
+    {
+      "case": 3,
+      "units": {
+        "service": {
+          "ActiveState": "active",
+          "InvocationID": "4d6552f1ffef4b6d8716a671b85f2f18",
+          "MainPID": "896618",
+          "SubState": "running"
+        },
+        "socket": {
+          "ActiveState": "active",
+          "SubState": "running"
+        }
+      }
+    },
+    {
+      "case": 4,
+      "units": {
+        "service": {
+          "ActiveState": "active",
+          "InvocationID": "4d6552f1ffef4b6d8716a671b85f2f18",
+          "MainPID": "896618",
+          "SubState": "running"
+        },
+        "socket": {
+          "ActiveState": "active",
+          "SubState": "running"
+        }
+      }
+    },
+    {
+      "case": 5,
+      "units": {
+        "service": {
+          "ActiveState": "active",
+          "InvocationID": "6eaf4d6eee6f44169a1e118793dca693",
+          "MainPID": "896718",
+          "SubState": "running"
+        },
+        "socket": {
+          "ActiveState": "active",
+          "SubState": "running"
+        }
+      }
+    },
+    {
+      "case": 6,
+      "units": {
+        "service": {
+          "ActiveState": "active",
+          "InvocationID": "987dc6f89d404436bd1248e90c14f882",
+          "MainPID": "896768",
+          "SubState": "running"
+        },
+        "socket": {
+          "ActiveState": "active",
+          "SubState": "running"
+        }
+      }
+    },
+    {
+      "case": 7,
+      "units": {
+        "service": {
+          "ActiveState": "active",
+          "InvocationID": "faa0f5ecce4c4039ac94a39b6aa89430",
+          "MainPID": "896798",
+          "SubState": "running"
+        },
+        "socket": {
+          "ActiveState": "active",
+          "SubState": "running"
+        }
+      }
+    },
+    {
+      "case": 8,
+      "units": {
+        "service": {
+          "ActiveState": "inactive",
+          "InvocationID": "",
+          "MainPID": "0",
+          "SubState": "dead"
+        },
+        "socket": {
+          "ActiveState": "active",
+          "SubState": "listening"
+        }
+      }
+    }
+  ],
+  "schema": 1,
+  "source_path": "saved-mechanism-evidence-1311b9e9fa97cfd4.json",
+  "source_sha256": "365d4d361907b3687bf5f444b7d329e484b372563c58be0dcaa8f2bf1da2803d"
+}

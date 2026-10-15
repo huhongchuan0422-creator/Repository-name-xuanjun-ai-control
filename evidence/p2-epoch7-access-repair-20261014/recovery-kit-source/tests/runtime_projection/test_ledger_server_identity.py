@@ -61,7 +61,7 @@ class Backend(object):
         self.creator_value = {'boot_id': '12345678-1234-1234-1234-123456789abc', 'starttime': 123,
                               'cgroup_sha256': policy['creator']['cgroup_sha256']}
         self.units = copy.deepcopy(policy['units'])
-        self.units[identity.SOCKET_UNIT].update(ActiveState='active', SubState='listening')
+        self.units[identity.SOCKET_UNIT].update(ActiveState='active', SubState='running')
         self.units[identity.SERVICE_UNIT].update(ActiveState='active', SubState='running',
             MainPID='70', InvocationID='d' * 32)
         self.calls = []
@@ -95,7 +95,7 @@ class IdentityTests(unittest.TestCase):
         session = self.session()
         self.assertIs(session.verify((1, 0, 0)), True)
         self.assertIs(session.finish((1, 0, 0)), True)
-        self.assertEqual(len([c for c in self.b.calls if c[0] == 'unit']), 4)
+        self.assertEqual(len([c for c in self.b.calls if c[0] == 'unit']), 6)
         self.assertTrue(all(c[2] for c in self.b.calls if c[0] == 'read'))
     def test_policy_is_not_a_callable_true_shortcut(self):
         with self.assertRaisesRegex(ValueError, 'LIFECYCLE'): self.load()(1, 0, 0, identity.SOCKET_PATH)
@@ -175,9 +175,11 @@ class IdentityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'SERVICE_RESTART'): session.finish((1, 0, 0))
         another = self.session(); another.verify((1, 0, 0)); self.assertTrue(another.finish((1, 0, 0)))
     def test_inactive_service_may_activate_but_response_requires_live_approved_unit(self):
+        self.b.units[identity.SOCKET_UNIT]['SubState'] = 'listening'
         self.b.units[identity.SERVICE_UNIT].update(ActiveState='inactive', SubState='dead', MainPID='0', InvocationID='')
         session = self.session(); session.verify((1, 0, 0))
         with self.assertRaisesRegex(ValueError, 'SERVICE_NOT_ACTIVE'): session.finish((1, 0, 0))
+        self.b.units[identity.SOCKET_UNIT]['SubState'] = 'running'
         self.b.units[identity.SERVICE_UNIT].update(ActiveState='active', SubState='running', MainPID='80', InvocationID='e'*32)
         self.assertTrue(session.finish((1, 0, 0)))
     def test_new_boot_and_recreated_socket_between_sessions_need_no_pin_rewrite(self):
