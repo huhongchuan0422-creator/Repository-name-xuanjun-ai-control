@@ -73,7 +73,7 @@ export async function loadDashboard(fetcher,token,now=Math.floor(Date.now()/1000
 }
 export async function offlineAction(fetcher,token,operation,params,now=Math.floor(Date.now()/1000)){
  if(typeof token!=="string"||token.length<32)throw Error("TOKEN_REQUIRED");
- if(!["quote","order_prepare","renewal_plan"].includes(operation))throw Error("OPERATION_NOT_ALLOWED");
+ if(!["quote","order_prepare","renewal_plan","owner_create_offer","owner_approve_offer"].includes(operation))throw Error("OPERATION_NOT_ALLOWED");
  const response=await fetcher("/offline/saas",{method:"POST",
   headers:{"Content-Type":"application/json","X-Offline-Token":token},
   body:JSON.stringify({operation,params,at:now})});
@@ -93,6 +93,30 @@ if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
     document.getElementById("quoteDetails").textContent=JSON.stringify({quote_id:currentQuoteId,amounts_by_cycle:q.totals_by_cycle,settlement_authorized:false},null,2);
     status.textContent="离线报价已冻结；未发生真实支付。";
   }catch{currentQuoteId=null;status.textContent="离线报价失败；请检查方案和权限。";}
+ });
+ const ownerValue=id=>document.getElementById(id).value.trim();
+ const money=id=>{const x=Number(ownerValue(id));if(!Number.isSafeInteger(x)||x<0)throw Error("BAD_MONEY");return x};
+ document.getElementById("ownerCreate")?.addEventListener("click",async()=>{
+  const state=document.getElementById("ownerStatus");
+  try{
+   const values={offer_id:ownerValue("ownerOfferId"),version:1,
+    module_id:ownerValue("ownerModuleId"),kind:"MONTHLY",
+    lines:[{type:"MODULE_FEE",label:"月度功能订阅",cycle:"MONTH",quantity:1,
+      cny_minor:money("ownerCny"),usd_minor:money("ownerUsd"),
+      cost_cny_minor:money("ownerCostCny"),cost_usd_minor:money("ownerCostUsd")}],
+    term_days:30,tenant_scope:null,supplier_payment:"NONE"};
+   await offlineAction(fetch,ownerValue("offlineToken"),"owner_create_offer",values);
+   state.textContent="已保存离线待审批版本，未发布、未收费。";
+  }catch{state.textContent="未保存：请核对Owner身份及价格、成本证据。";}
+ });
+ document.getElementById("ownerApprove")?.addEventListener("click",async()=>{
+  const state=document.getElementById("ownerStatus");
+  try{
+   await offlineAction(fetch,ownerValue("offlineToken"),"owner_approve_offer",{
+    offer_id:ownerValue("ownerOfferId"),version:1,approval_ref:ownerValue("ownerApprovalRef"),
+    cost_evidence_ref:ownerValue("ownerCostRef")});
+   state.textContent="离线审批已记录；不授权真实交易或生产发布。";
+  }catch{state.textContent="审批失败：需要Owner身份、成本完整和有效证据。";}
  });
  document.getElementById("previewRenewal")?.addEventListener("click",async()=>{
   const status=document.getElementById("requestState");
