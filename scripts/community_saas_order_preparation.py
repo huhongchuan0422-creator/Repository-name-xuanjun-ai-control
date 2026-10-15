@@ -160,6 +160,35 @@ def status(db,order_id,tenant_id):
             "updated_at":row[2] if row else None,
             "entitlement_granted":False,"payment_settled_by_this_module":False}
 
+def quote_provenance(db,order_id,tenant_id):
+    """Verify the immutable quotation digest before an external handoff."""
+    order=read(db,order_id,tenant_id)
+    actual=hashlib.sha256(json.dumps(order["quote_snapshot"],ensure_ascii=False,
+        sort_keys=True,separators=(",",":")).encode("utf-8")).hexdigest()
+    if actual!=order["quote_sha256"]:
+        raise ValueError("QUOTE_SNAPSHOT_DIGEST_MISMATCH")
+    return {"order_id":order_id,"quote_id":order["quote_id"],
+            "quote_sha256":actual,"verified":True}
+
+def renewal_intent(db,order_id,tenant_id,now,existing_valid_until=None):
+    """Read-only schedule proposal; cannot authorize or execute a renewal.
+
+    With an active subscription, propose a contiguous extension. An expired
+    subscription is proposed to start at now. Neither grants entitlements.
+    """
+    if type(now) is not int or now<0 or (existing_valid_until is not None and
+        (type(existing_valid_until) is not int or existing_valid_until<0)):
+        raise ValueError("INVALID_RENEWAL_CONTEXT")
+    order=read(db,order_id,tenant_id)
+    if order["quote_snapshot"]["kind"] not in ("MONTHLY","YEARLY","PROMOTION"):
+        raise ValueError("RENEWAL_KIND_UNSUPPORTED")
+    start=max(now,existing_valid_until) if existing_valid_until is not None else now
+    proposal=entitlement_intent(db,order_id,tenant_id,start)
+    return {**proposal,"mode":"RENEWAL_REVIEW_ONLY",
+        "existing_valid_until":existing_valid_until,
+        "continuous":existing_valid_until is not None and existing_valid_until>=now,
+        "payment_confirmed_by_adapter":False}
+
 def entitlement_intent(db,order_id,tenant_id,start_at):
     """Return a non-executable entitlement proposal for a separate authority.
 
@@ -171,6 +200,7 @@ def entitlement_intent(db,order_id,tenant_id,start_at):
     view=status(db,order_id,tenant_id)
     if view["state"]!="CONFIRMED_EXTERNAL":
         raise ValueError("CONFIRMATION_EVIDENCE_REQUIRED")
+    quote_provenance(db,order_id,tenant_id)
     order=read(db,order_id,tenant_id)
     q=order["quote_snapshot"]
     term=q.get("term_days")
