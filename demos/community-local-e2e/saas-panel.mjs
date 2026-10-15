@@ -4,6 +4,12 @@ export function presentAmount(minor,currency){
  if(currency!=="CNY"&&currency!=="USD")throw Error("INVALID_CURRENCY");
  return (currency==="CNY"?"¥":"$")+(minor/100).toFixed(2);
 }
+export function parseOwnerInteger(raw,requirePositive=false){
+ if(typeof raw!=="string"||!/^(0|[1-9][0-9]*)$/.test(raw))throw Error("INVALID_OWNER_INTEGER");
+ const n=Number(raw);
+ if(!Number.isSafeInteger(n)||(requirePositive&&n===0))throw Error("INVALID_OWNER_INTEGER");
+ return n;
+}
 export function safeText(value){
  return value==null?"UNKNOWN":String(value);
 }
@@ -103,8 +109,8 @@ if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
   }catch{currentQuoteId=null;status.textContent="离线报价失败；请检查方案和权限。";}
  });
  const ownerValue=id=>document.getElementById(id).value.trim();
- const money=id=>{const raw=ownerValue(id);if(!/^(0|[1-9][0-9]*)$/.test(raw))throw Error("BAD_MONEY");const x=Number(raw);if(!Number.isSafeInteger(x))throw Error("BAD_MONEY");return x};
- const version=()=>{const n=money("ownerOfferVersion");if(n<1)throw Error("BAD_VERSION");return n};
+ const money=id=>parseOwnerInteger(ownerValue(id));
+ const version=()=>parseOwnerInteger(ownerValue("ownerOfferVersion"),true);
  document.getElementById("ownerCreate")?.addEventListener("click",async()=>{
   const state=document.getElementById("ownerStatus");
   try{
