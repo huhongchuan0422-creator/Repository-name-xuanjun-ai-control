@@ -174,6 +174,39 @@
         "Contribution/Provenance/Credential and append-only audit"
       ],
       "paths": []
+    },
+    {
+      "feature_id": "BUSINESS_ONBOARDING",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "18.5"
+      },
+      "development": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "18.2",
+        "phase": 5,
+        "node": "5.2"
+      },
+      "acceptance": {
+        "criteria": [
+          "离线草稿保存、必填校验、提交、补正重提、拒绝及批准状态迁移",
+          "租户范围读取、角色限制及版本冲突拒绝；非法和终止状态转换拒绝",
+          "事件摘要哈希链关联；完整商家/审核员可视化及真实准入按18.5独立验收，MERCHANT_ONBOARDING_VISUAL_GATE保持HOLD"
+        ],
+        "tests": [
+          "tests/test_stage5_onboarding_offline.py"
+        ],
+        "test_scope": "Offline SQLite state-machine regression only; caller-supplied tenant/actor/role is not authenticated identity. Six tests do not establish concurrent multi-connection atomicity, restart recovery, attachment security, browser E2E or production approval. MERCHANT_ONBOARDING_VISUAL_GATE=HOLD."
+      },
+      "reuse": [
+        "既有BUSINESS_ONBOARDING与APPROVAL_WORKFLOW模块及18.2节点5.2，不新建任务队列",
+        "SQLite及标准库hashlib；后续接入既有服务端Identity/tenant和统一审计"
+      ],
+      "paths": [
+        "scripts/community_onboarding_offline.py",
+        "tests/test_stage5_onboarding_offline.py"
+      ]
     }
   ]
 }
