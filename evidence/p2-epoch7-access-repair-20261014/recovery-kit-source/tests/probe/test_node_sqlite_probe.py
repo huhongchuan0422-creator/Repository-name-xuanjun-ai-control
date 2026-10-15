@@ -104,6 +104,21 @@ class AttemptBindingTests(unittest.TestCase):
             if mutation=='hash':raw+=b' '
             if mutation=='metadata':metadata['ino']+=1
             with self.assertRaises(ValueError):n.authenticate_receipt_binding(raw,metadata,observation)
+    def test_protected_receipt_pending_case_refused_despite_complete_result(self):
+        for incomplete in ({'completion':False}, {}, False, []):
+            attempt,unused,observation,unused2=fixture_attempt();observation['finite_probe']=attempt
+            attempt['result']['incomplete_case']=None
+            value=n.parse(fixture_receipt(attempt));value['incomplete_case']=incomplete
+            raw=n.canonical(value)+b'\n';reported=attempt['result']['created_receipt']
+            reported['metadata']['size']=len(raw);reported['sha256']=n.digest(raw)
+            with self.assertRaisesRegex(ValueError,'PROTECTED_RECEIPT_SCOPE'):
+                n.authenticate_receipt_binding(raw,reported['metadata'],observation)
+    def test_protected_receipt_explicit_none_remains_compatible(self):
+        attempt,unused,observation,expected=fixture_attempt();observation['finite_probe']=attempt
+        value=n.parse(fixture_receipt(attempt));value['incomplete_case']=None
+        raw=n.canonical(value)+b'\n';reported=attempt['result']['created_receipt']
+        reported['metadata']['size']=len(raw);reported['sha256']=n.digest(raw)
+        self.assertEqual(n.authenticate_receipt_binding(raw,reported['metadata'],observation)['policy_sha256'],expected)
     def test_original_policy_and_observation_path(self):
         args=fixture_attempt();value=n.validated_proof_from_attempt(*args)
         self.assertEqual(value['proof'],args[0]['result']['node_sqlite'])
@@ -134,6 +149,18 @@ class AttemptBindingTests(unittest.TestCase):
             if mutation=='receipt':result['created_receipt']['node_sqlite_event_sha256']='0'*64
             if mutation=='command':result['last_command_cleanup']=['CHILD_REAP_UNCONFIRMED']
             with self.assertRaises(ValueError):n.validated_proof_from_attempt(attempt,policy,observation,expected)
+    def test_incomplete_case_invalidates_otherwise_complete_whole_proof(self):
+        for incomplete in ({'completion':False}, {}, False, []):
+            args=fixture_attempt();result=args[0]['result']
+            self.assertIsNone(result['failure']);self.assertEqual(len(result['cases']),8)
+            result['incomplete_case']=incomplete
+            with self.assertRaisesRegex(ValueError,'WHOLE_PROBE_NOT_VERIFIED'):
+                n.validated_proof_from_attempt(*args)
+    def test_missing_or_none_incomplete_case_remains_compatible(self):
+        for explicit in (False,True):
+            args=fixture_attempt()
+            if explicit:args[0]['result']['incomplete_case']=None
+            self.assertEqual(n.validated_proof_from_attempt(*args)['policy_sha256'],args[3])
     def test_receipt_authority_and_path_are_exact(self):
         for key,bad in (('uid',False),('gid',1002),('mode',0o644),('size',0)):
             args=fixture_attempt();args[0]['result']['created_receipt']['metadata'][key]=bad

@@ -74,6 +74,8 @@ class HelperTests(unittest.TestCase):
             frame={'schema':1,'nonce':config['nonce'],'case':case,'challenge':'PUBLIC_INERT_PROBE'}
             connections.append(BytesSocket([h.canonical(frame)+b'\n']))
         listener=BytesSocket([]);listener.getsockname=lambda:self.root+'/ledger.sock'
+        listener.getsockopt=lambda level,option: {socket.SO_DOMAIN:socket.AF_UNIX,
+            socket.SO_TYPE:socket.SOCK_STREAM,socket.SO_ACCEPTCONN:1}[option]
         pending=list(connections);listener.accept=lambda:(pending.pop(0),None)
         with mock.patch.object(h.socket,'socket',return_value=listener),mock.patch.dict(h.os.environ,{'LISTEN_PID':str(os.getpid()),'LISTEN_FDS':'1'}),\
              mock.patch.object(h,'endpoint',return_value={}),mock.patch.object(h,'process',return_value={}),\
@@ -136,7 +138,6 @@ class FileTests(unittest.TestCase):
         killed.assert_called_once_with(34567,h.signal.SIGKILL)
 
 
-if __name__=='__main__':unittest.main()
 
 
 class GlobalBudgetTests(unittest.TestCase):
@@ -193,3 +194,104 @@ class IsolatedSyscallTests(unittest.TestCase):
             self.assertEqual(result['cleanup_errors'],['FORK_REAP_UNCONFIRMED'])
     def test_missing_libc_symbol_is_not_success(self):
         self.assertEqual(h.isolated_syscall('ptrace',object(),34567,None,None,10**15)['status'],'NOT_VERIFIED')
+
+
+class InheritedSocketCompatibilityTests(unittest.TestCase):
+    def test_actual_unix_descriptor_uses_explicit_family_on_both_pythons(self):
+        left,right=socket.socketpair(socket.AF_UNIX,socket.SOCK_STREAM)
+        real_socket=socket.socket;opened=[]
+        def construct(*args,**kwargs):
+            self.assertEqual(args,(socket.AF_UNIX,socket.SOCK_STREAM))
+            self.assertEqual(kwargs,{'fileno':3})
+            result=real_socket(*args,fileno=os.dup(left.fileno()));opened.append(result)
+            self.assertEqual(result.family,socket.AF_UNIX)
+            self.assertEqual(result.getsockopt(socket.SOL_SOCKET,socket.SO_DOMAIN),socket.AF_UNIX)
+            self.assertEqual(result.getsockopt(socket.SOL_SOCKET,socket.SO_TYPE),socket.SOCK_STREAM)
+            return result
+        try:
+            with mock.patch.object(h.socket,'socket',side_effect=construct):
+                self.assertRaisesRegex(ValueError,'EXACT_INHERITED_LISTENER',h.inherited_listener,'/fixed')
+            self.assertEqual(len(opened),1);self.assertEqual(opened[0].fileno(),-1)
+        finally:left.close();right.close()
+    def test_real_regular_file_fd_is_not_a_listener(self):
+        real_socket=socket.socket
+        with tempfile.TemporaryFile() as file:
+            duplicate=os.dup(file.fileno())
+            def construct(*args,**kwargs):
+                self.assertEqual(args,(socket.AF_UNIX,socket.SOCK_STREAM))
+                self.assertEqual(kwargs,{'fileno':3})
+                return real_socket(*args,fileno=duplicate)
+            try:
+                with mock.patch.object(h.socket,'socket',side_effect=construct):
+                    with self.assertRaises(OSError) as caught:h.inherited_listener('/fixed')
+                self.assertEqual(caught.exception.errno,errno.ENOTSOCK)
+            finally:
+                try:os.close(duplicate)
+                except OSError as error:
+                    if error.errno!=errno.EBADF:raise
+    def listener(self,domain=socket.AF_UNIX,kind=socket.SOCK_STREAM,listening=1,name='/fixed/ledger.sock'):
+        result=mock.Mock();result.getsockname.return_value=name
+        result.getsockopt.side_effect=lambda level,option:{socket.SO_DOMAIN:domain,
+            socket.SO_TYPE:kind,socket.SO_ACCEPTCONN:listening}[option]
+        return result
+    def test_actual_kernel_domain_cannot_be_supplied_by_constructor_flags(self):
+        listener=self.listener(domain=socket.AF_INET)
+        with mock.patch.object(h.socket,'socket',return_value=listener):
+            self.assertRaisesRegex(ValueError,'EXACT_INHERITED_LISTENER',h.inherited_listener,'/fixed')
+        listener.close.assert_called_once_with()
+    def test_datagram_kernel_type_rejected(self):
+        listener=self.listener(kind=socket.SOCK_DGRAM)
+        with mock.patch.object(h.socket,'socket',return_value=listener):
+            self.assertRaisesRegex(ValueError,'EXACT_INHERITED_LISTENER',h.inherited_listener,'/fixed')
+        listener.close.assert_called_once_with()
+    def test_nonlistener_rejected(self):
+        listener=self.listener(listening=0)
+        with mock.patch.object(h.socket,'socket',return_value=listener):
+            self.assertRaisesRegex(ValueError,'EXACT_INHERITED_LISTENER',h.inherited_listener,'/fixed')
+    def test_other_nonce_name_rejected(self):
+        listener=self.listener(name='/other/ledger.sock')
+        with mock.patch.object(h.socket,'socket',return_value=listener):
+            self.assertRaisesRegex(ValueError,'EXACT_INHERITED_LISTENER',h.inherited_listener,'/fixed')
+    def test_socket_validation_primary_survives_close_failure(self):
+        listener=self.listener(listening=0);listener.close.side_effect=KeyboardInterrupt()
+        with mock.patch.object(h.socket,'socket',return_value=listener):
+            self.assertRaisesRegex(ValueError,'EXACT_INHERITED_LISTENER',h.inherited_listener,'/fixed')
+    def test_real_listener_and_unnamed_client_runtime_current_flow(self):
+        # Mandatory Hosted regression; this local executor may disallow socket()
+        # despite allowing socketpair(). That environmental skip is explicit.
+        try:listener=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+        except PermissionError:
+            if os.environ.get('GITHUB_ACTIONS')=='true':raise
+            self.skipTest('LOCAL_AF_UNIX_CREATION_DENIED_HOSTED_MUST_RUN')
+        real_socket=socket.socket
+        try:
+            with tempfile.TemporaryDirectory(prefix='p2-unix-') as root:
+                listener.bind(root+'/ledger.sock');listener.listen(1);listener.settimeout(1)
+                for mode in ('fixed_helper','runtime107_implicit_listener'):
+                    client=None;wrapped=None;connection=None
+                    try:
+                        if mode=='fixed_helper':
+                            def construct(*args,**kwargs):
+                                self.assertEqual(args,(socket.AF_UNIX,socket.SOCK_STREAM))
+                                self.assertEqual(kwargs,{'fileno':3})
+                                return real_socket(*args,fileno=os.dup(listener.fileno()))
+                            with mock.patch.object(h.socket,'socket',side_effect=construct):wrapped=h.inherited_listener(root)
+                        else:
+                            # Exact runtime107 pattern: implicit listening FD,
+                            # accepted address discarded, no family assertion.
+                            wrapped=real_socket(fileno=os.dup(listener.fileno()))
+                        wrapped.settimeout(1)
+                        client=real_socket(socket.AF_UNIX,socket.SOCK_STREAM);client.settimeout(1)
+                        client.connect(root+'/ledger.sock');connection,unused=wrapped.accept()
+                        connection.settimeout(1)
+                        self.assertEqual(struct.unpack('3i',connection.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12)),
+                                         (os.getpid(),os.getuid(),os.getgid()))
+                        client.sendall(b'PUBLIC\n');self.assertEqual(connection.recv(16),b'PUBLIC\n')
+                        connection.sendall(b'REPLY\n');self.assertEqual(client.recv(16),b'REPLY\n')
+                    finally:
+                        for item in (connection,client,wrapped):
+                            if item is not None:item.close()
+        finally:listener.close()
+
+
+if __name__=='__main__':unittest.main()

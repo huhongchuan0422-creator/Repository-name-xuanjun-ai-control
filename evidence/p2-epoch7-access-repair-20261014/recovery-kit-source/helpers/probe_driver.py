@@ -70,6 +70,28 @@ def identity(info):
         'mtime_ns':info.st_mtime_ns,'ctime_ns':info.st_ctime_ns}
 
 
+def non_json_diagnostic(raw):
+    """Only bounded static error metadata; never persist traceback bodies."""
+    need(type(raw) is bytes and len(raw)<=65536,'OUTPUT_DIAGNOSTIC_BOUND')
+    lines=[line for line in raw.splitlines() if line and not line.startswith(b'{')]
+    if not lines:return None
+    body=b'\n'.join(lines)+b'\n';last=lines[-1]
+    classes=('ValueError','TypeError','OSError','PermissionError','FileNotFoundError',
+             'TimeoutError','RuntimeError','KeyboardInterrupt','SystemExit')
+    codes=('EXACT_SYSTEMD_INHERITED_FD','EXACT_INHERITED_LISTENER','INHERITED_ROOT_BUDGET_FDS',
+           'BUDGET_BOUND','EXACT_BUDGET','GLOBAL_EIGHT_CONNECTION_LIMIT','BUDGET_SHORT_WRITE',
+           'CONFIG_SCHEMA','CONFIG_PURPOSE','CONFIG_NONCE','CONFIG_CASE','CONFIG_ROLE_MODE',
+           'EXACT_CONFIG_BINDING','CONFIG_IDENTITY','CONFIG_READ_SCOPE','ACTUAL_HELPER_IDENTITY',
+           'CONFIG_ROOT_ROOT_0644','EXACT_HELPER_MODE','PROTECTED_ANCESTRY','REGULAR_SIZE_IDENTITY',
+           'ROOT_PROTECTED_FILE','READ_RACE_OR_BOUND','HELPER_DEADLINE','PROC_READ_SCOPE','PROC_BOUND')
+    kind,separator,message=last.partition(b': ')
+    label=kind.decode('ascii','replace');code=message.decode('ascii','replace')
+    return {'kind':'TRACEBACK' if lines[0]==b'Traceback (most recent call last):' else 'NON_JSON',
+            'bytes':len(body),'sha256':digest(body),
+            'exception_class':label if label in classes else 'UNCLASSIFIED',
+            'failure_code':code if separator and code in codes else 'REDACTED_UNKNOWN'}
+
+
 def validate_policy(policy):
     keys(policy,('schema','purpose','nonce','hostname','machine_id_sha256','runtime_manifest_sha256',
         'driver_sha256','helper_sha256','python','systemctl','profiles','sdk_bindings','public_files',
@@ -452,7 +474,17 @@ class HostOps(object):
         try:os.fsync(parent)
         finally:os.close(parent)
     def event(self,name,detail=None):
-        self.receipt['events'].append({'event':name,'detail':detail});self.save_receipt()
+        pending=self.receipt.get('incomplete_case')
+        if name=='CASE_OBSERVED' and pending is not None:
+            need(same(pending['result'],detail),'CASE_CAPTURE_CHANGED')
+            self.receipt.pop('incomplete_case')
+        self.receipt['events'].append({'event':name,'detail':detail})
+        try:self.save_receipt()
+        except BaseException:
+            if name=='CASE_OBSERVED':
+                self.receipt['events'].pop()
+                if pending is not None:self.receipt['incomplete_case']=pending
+            raise
     def publish(self,target,raw):
         need(self.operator_acknowledged is True and self.receipt is not None,'OPERATOR_ACK_AND_ATTEMPT_REQUIRED')
         allowed=(target.startswith(self.paths['root']+'/') or target in ['/run/systemd/system/'+x for x in
@@ -596,6 +628,8 @@ class HostOps(object):
             detail={'path':target,'sha256':digest(raw),'bytes':len(raw)}
             if role=='ledger' and leaf.endswith('.jsonl'):
                 detail['observations']=[parse(line) for line in raw.splitlines() if line.startswith(b'{')]
+                diagnostic=non_json_diagnostic(raw)
+                if diagnostic is not None:detail['non_json_diagnostic']=diagnostic
             self.event('OUTPUT_CAPTURED',detail)
     def restart_service(self):
         self.command(['stop',self.paths['service_unit']],timeout=1);self.capture_output('ledger')
@@ -656,6 +690,13 @@ class HostOps(object):
         observed['namespace_proof']=namespace
         if kind in ('restart_during','recreate_during'):
             observed['expected_rejection_observed']=observed.get('bound_before_failure') is True and observed.get('status')=='FAIL_OBSERVED'
+        need(type(observed) is dict and type(observed.get('case')) is int and observed['case']==case and
+             len(canonical(observed))<=16384,'CASE_RESULT_CAPTURE_BOUND')
+        # One private pending record survives stop/budget/receipt failures. It
+        # is never placed in completed cases and never grants acceptance.
+        self.receipt['incomplete_case']={'case':case,'role':role,'kind':kind,'completion':False,
+                                         'result':copy.deepcopy(observed)}
+        self.save_receipt()
         self.command(['stop',unit])
         need(self.capture_budget()==case,'UNEXPECTED_OR_MISSING_CONNECTION')
         return observed
@@ -755,8 +796,8 @@ class Probe(object):
                 self.ops.receipt['connections_reserved']+=1
                 need(self.ops.receipt['connections_reserved']<=8,'CONNECTION_BUDGET')
                 self.ops.event('CASE_INTENT',{'case':case,'role':role,'kind':kind})
-                result=self.ops.run_case(case,role,kind);cases.append(result)
-                self.ops.event('CASE_OBSERVED',result)
+                result=self.ops.run_case(case,role,kind)
+                self.ops.event('CASE_OBSERVED',result);cases.append(result)
                 if kind in ('restart_during','recreate_during'):
                     need(result.get('expected_rejection_observed') is True,'EXPECTED_RACE_REJECTION_NOT_OBSERVED')
                 else:need(result.get('status')=='PASS_OBSERVED','UNEXPECTED_CASE_RESULT')
@@ -774,7 +815,9 @@ class Probe(object):
         observations=[]
         for event in self.ops.receipt.get('events',[]) if self.ops.receipt else []:
             if event.get('event')=='OUTPUT_CAPTURED':observations.extend((event.get('detail') or {}).get('observations',[]))
-        return {'schema':1,'cases':cases,'node_sqlite':node_proof,'created_receipt':receipt_binding,
+        return {'schema':1,'cases':cases,
+            'incomplete_case':copy.deepcopy(self.ops.receipt.get('incomplete_case')) if self.ops.receipt else None,
+            'node_sqlite':node_proof,'created_receipt':receipt_binding,
             'server_observations':observations,'failure':failure,'cleanup':cleanup,
             'last_command_cleanup':getattr(self.ops,'last_command_cleanup',[]),
             'intentionally_retained':[scope(self.policy)['root'],scope(self.policy)['receipt']],

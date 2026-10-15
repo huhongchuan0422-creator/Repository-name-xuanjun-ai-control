@@ -16,7 +16,7 @@ import stat
 import sys
 import tarfile
 
-ROOT_NAME = 'epoch7-recovery-candidate-r5'
+ROOT_NAME = 'epoch7-recovery-candidate-r6'
 ENTRY = 'epoch7_recovery_entry.py'
 MANIFEST = 'recovery-kit-manifest.json'
 MAX_COMPRESSED = 32 * 1024 * 1024

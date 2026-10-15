@@ -15,7 +15,7 @@ import probe_metadata as p
 import observe_epoch7 as observe
 import snapshot_io
 
-ROOT = c.CAND+'/epoch7-recovery-candidate-r5/xuanjun-p2-package'
+ROOT = c.CAND+'/epoch7-recovery-candidate-r6/xuanjun-p2-package'
 try:
     import activation_control as staged_activation
 except ImportError:
@@ -225,6 +225,12 @@ class IngredientsTests(unittest.TestCase):
         self.assertFalse(any(n.startswith('/opt/new-release') for n,unused in self.io.reads))
     def test_occupied_original_kit_root_is_not_an_alternate(self):
         old=c.CAND+'/epoch7-recovery-candidate-r4/xuanjun-p2-package'
+        with self.assertRaisesRegex(ValueError,'PROBE_STAGED_CANDIDATE_SCOPE'):
+            p.candidate_sources(self.io,old)
+        self.assertEqual(self.io.reads,[])
+        self.assertEqual(p.candidate_sources(self.io,ROOT)['root'],ROOT)
+    def test_occupied_r5_kit_root_is_not_an_alternate(self):
+        old=c.CAND+'/epoch7-recovery-candidate-r5/xuanjun-p2-package'
         with self.assertRaisesRegex(ValueError,'PROBE_STAGED_CANDIDATE_SCOPE'):
             p.candidate_sources(self.io,old)
         self.assertEqual(self.io.reads,[])

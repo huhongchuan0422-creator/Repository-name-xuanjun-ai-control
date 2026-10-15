@@ -207,7 +207,6 @@ class InstallContractTests(unittest.TestCase):
             self.assertRaises(ValueError,ops.command,['daemon-reload'])
 
 
-if __name__=='__main__':unittest.main()
 
 
 class CleanupTests(unittest.TestCase):
@@ -335,3 +334,122 @@ class RaceAdmissionTests(unittest.TestCase):
     def test_deadline_expiration_never_returns_nonpositive_budget(self):
         clock=mock.Mock(side_effect=[10.,12.]);deadline=p.Deadline(2,clock=clock)
         self.assertRaises(TimeoutError,deadline.remaining)
+
+
+class IncompleteCaseEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        self.policy,self.helper,unused,unused2=fixture()
+        self.ops=p.HostOps(self.policy,'1'*64);self.ops.receipt={'events':[],'connections_reserved':1}
+        self.ops.command=mock.Mock();self.ops.capture_output=mock.Mock();self.ops.replace_created=mock.Mock()
+        self.ops.socket_identity=mock.Mock(return_value={});self.ops.namespace_proof=mock.Mock(return_value={'status':'NOT_VERIFIED'})
+        self.ops.save_receipt=mock.Mock();self.ops.capture_budget=mock.Mock(return_value=0)
+        self.observed={'case':1,'status':'FAIL_OBSERVED','reason':'TimeoutError:timed out','sdk':[]}
+        self.ops.wait_output=mock.Mock(return_value={'result':self.observed})
+    def test_missing_connection_keeps_partial_result_and_original_error(self):
+        with self.assertRaisesRegex(ValueError,'UNEXPECTED_OR_MISSING_CONNECTION'):
+            self.ops.run_case(1,'native','cold')
+        row=self.ops.receipt['incomplete_case'];self.assertFalse(row['completion'])
+        self.assertEqual(row['result'],self.observed);self.assertEqual(row['role'],'native')
+        self.assertEqual(row['result']['namespace_proof'],{'status':'NOT_VERIFIED'})
+        self.assertIsNot(row['result'],self.observed)
+        self.assertEqual(self.ops.capture_budget.call_count,1)
+    def test_extra_connection_keeps_original_budget_rejection(self):
+        self.ops.capture_budget.return_value=2
+        self.assertRaisesRegex(ValueError,'UNEXPECTED_OR_MISSING_CONNECTION',self.ops.run_case,1,'native','cold')
+        self.assertFalse(self.ops.receipt['incomplete_case']['completion'])
+    def test_stop_failure_retains_result_before_postcheck(self):
+        count=[0]
+        def command(argv,*args,**kwargs):
+            if argv==['stop',self.ops.paths['client_units']['native']]:
+                count[0]+=1
+                if count[0]==2:raise OSError('STOP_FAILED')
+        self.ops.command=command
+        self.assertRaisesRegex(OSError,'STOP_FAILED',self.ops.run_case,1,'native','cold')
+        self.ops.capture_budget.assert_not_called();self.assertFalse(self.ops.receipt['incomplete_case']['completion'])
+    def test_budget_success_does_not_yet_clear_pending_until_observed_saved(self):
+        self.ops.capture_budget.return_value=1
+        result=self.ops.run_case(1,'native','cold');self.assertIn('incomplete_case',self.ops.receipt)
+        self.ops.event('CASE_OBSERVED',result);self.assertNotIn('incomplete_case',self.ops.receipt)
+    def test_receipt_save_failure_preserves_pending_and_original_exception(self):
+        self.ops.capture_budget.return_value=1;result=self.ops.run_case(1,'native','cold')
+        self.ops.save_receipt.side_effect=KeyboardInterrupt()
+        self.assertRaises(KeyboardInterrupt,self.ops.event,'CASE_OBSERVED',result)
+        self.assertFalse(self.ops.receipt['incomplete_case']['completion'])
+    def test_wrong_result_cannot_clear_pending(self):
+        self.ops.capture_budget.return_value=1;result=self.ops.run_case(1,'native','cold')
+        other=dict(result,status='PASS_OBSERVED')
+        self.assertRaisesRegex(ValueError,'CASE_CAPTURE_CHANGED',self.ops.event,'CASE_OBSERVED',other)
+        self.assertIn('incomplete_case',self.ops.receipt)
+    def test_oversized_result_refused_without_postcheck(self):
+        self.observed['unexpected']='x'*16385
+        self.assertRaisesRegex(ValueError,'CASE_RESULT_CAPTURE_BOUND',self.ops.run_case,1,'native','cold')
+        self.ops.capture_budget.assert_not_called()
+    def test_partial_case_not_counted_as_completed_by_coordinator(self):
+        ops=FakeOps();ops.policy=self.policy;ops.policy_sha=p.digest(p.canonical(self.policy)+b'\n')
+        def fail(*unused):
+            ops.receipt['incomplete_case']={'case':1,'completion':False,'result':self.observed}
+            raise ValueError('UNEXPECTED_OR_MISSING_CONNECTION')
+        ops.run_case=fail
+        result=p.Probe(self.policy,ops.policy_sha,ops).apply(self.helper,True)
+        self.assertEqual(result['cases'],[]);self.assertFalse(result['incomplete_case']['completion'])
+        self.assertEqual(result['failure'],'ValueError:UNEXPECTED_OR_MISSING_CONNECTION')
+        self.assertFalse(result['resume_authority'])
+    def test_pre_ready_traceback_retains_only_safe_category_and_hash(self):
+        raw=b'Traceback (most recent call last):\n  File "PRIVATE", line 1\nValueError: EXACT_INHERITED_LISTENER\n'
+        result=p.non_json_diagnostic(raw)
+        self.assertEqual(result,{'kind':'TRACEBACK','bytes':len(raw),'sha256':p.digest(raw),
+            'exception_class':'ValueError','failure_code':'EXACT_INHERITED_LISTENER'})
+        self.assertNotIn('PRIVATE',p.canonical(result).decode())
+    def test_unknown_traceback_message_is_opaque(self):
+        raw=b'Traceback (most recent call last):\nOSError: PRIVATE_TOKEN=secret\n'
+        result=p.non_json_diagnostic(raw)
+        self.assertEqual(result['exception_class'],'OSError');self.assertEqual(result['failure_code'],'REDACTED_UNKNOWN')
+        self.assertNotIn('secret',p.canonical(result).decode())
+    def test_json_only_has_no_traceback_diagnostic(self):
+        self.assertIsNone(p.non_json_diagnostic(b'{"event":"SERVER_READY"}\n'))
+    def test_non_json_diagnostic_bound(self):
+        self.assertRaisesRegex(ValueError,'OUTPUT_DIAGNOSTIC_BOUND',p.non_json_diagnostic,b'x'*65537)
+    def test_capture_output_persists_server_failure_metadata_without_body(self):
+        target=self.ops.paths['root']+'/output-ledger.jsonl';error=self.ops.paths['root']+'/error-ledger.txt'
+        info={k:1 for k in ('dev','ino','uid','gid','mode','nlink')}
+        self.ops.created=[{'path':path,'identity':dict(info)} for path in (target,error)]
+        raw=b'Traceback (most recent call last):\nValueError: EXACT_INHERITED_LISTENER\n'
+        self.ops.read_file=lambda path,maximum:(raw if path==target else b'',dict(info))
+        p.HostOps.capture_output(self.ops,'ledger')
+        event=self.ops.receipt['events'][0]['detail']
+        self.assertEqual(event['observations'],[]);self.assertEqual(event['non_json_diagnostic']['failure_code'],'EXACT_INHERITED_LISTENER')
+        self.assertEqual(event['sha256'],p.digest(raw));self.assertNotIn('Traceback',p.canonical(event).decode())
+    def test_clean_ledger_capture_keeps_exact_historical_fields(self):
+        target=self.ops.paths['root']+'/output-ledger.jsonl';error=self.ops.paths['root']+'/error-ledger.txt'
+        info={k:1 for k in ('dev','ino','uid','gid','mode','nlink')}
+        self.ops.created=[{'path':path,'identity':dict(info)} for path in (target,error)]
+        self.ops.read_file=lambda path,maximum:(b'{"event":"SERVER_READY"}\n' if path==target else b'',dict(info))
+        p.HostOps.capture_output(self.ops,'ledger')
+        self.assertEqual(set(self.ops.receipt['events'][0]['detail']),{'path','sha256','bytes','observations'})
+
+
+class CasePublicationFailureTests(unittest.TestCase):
+    def test_failed_case_publication_never_enters_completed_cases_or_events(self):
+        policy,helper,unused,unused2=fixture();sha=p.digest(p.canonical(policy)+b'\n')
+        class SavingOps(FakeOps):
+            def begin(self):
+                super(SavingOps,self).begin();self.receipt['events']=[]
+            def event(self,name,detail=None):p.HostOps.event(self,name,detail)
+            def save_receipt(self):
+                if self.receipt['events'] and self.receipt['events'][-1]['event']=='CASE_OBSERVED':
+                    raise OSError('CASE_SAVE_FAILED')
+            def run_case(self,case,role,kind):
+                result={'case':case,'status':'PASS_OBSERVED'}
+                self.receipt['incomplete_case']={'case':case,'completion':False,'result':copy.deepcopy(result)}
+                return result
+            def cleanup(self):
+                self.save_receipt();return super(SavingOps,self).cleanup()
+        ops=SavingOps();ops.policy=policy;ops.policy_sha=sha
+        result=p.Probe(policy,sha,ops).apply(helper,True)
+        self.assertEqual(result['failure'],'OSError:CASE_SAVE_FAILED')
+        self.assertEqual(result['cases'],[]);self.assertFalse(result['incomplete_case']['completion'])
+        self.assertFalse(any(row['event']=='CASE_OBSERVED' for row in ops.receipt['events']))
+        self.assertIn(('cleanup',),ops.events)
+
+
+if __name__=='__main__':unittest.main()

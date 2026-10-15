@@ -191,6 +191,7 @@ def validated_proof_from_attempt(attempt,original_policy,original_observation,ex
         attempt.get('policy_sha256')==expected_policy_sha256 and same(attempt.get('policy'),original_policy),
         'AUTHENTICATED_ATTEMPT_BINDING')
     result=attempt['result'];need(type(result) is dict and result.get('failure') is None and
+        result.get('incomplete_case') is None and
         result.get('resume_authority') is False and result.get('last_command_cleanup')==[],
         'WHOLE_PROBE_NOT_VERIFIED')
     cases=result.get('cases');need(type(cases) is list and len(cases)==8,'EIGHT_CASES_REQUIRED')
@@ -233,7 +234,7 @@ def authenticate_receipt_binding(receipt_raw,observed_metadata,observation):
         receipt.get('purpose')=='ISOLATED_PROBE_CREATION_RECEIPT' and
         receipt.get('nonce')==attempt['nonce'] and receipt.get('operator_acknowledged') is True and
         receipt.get('external_approval_authenticated') is False and receipt.get('attempt_consumed') is True and
-        receipt.get('stage')=='CLEANUP_OBSERVED' and
+        receipt.get('stage')=='CLEANUP_OBSERVED' and receipt.get('incomplete_case') is None and
         type(receipt.get('connections_reserved')) is int and receipt['connections_reserved']==8 and
         type(receipt.get('accepted_connections')) is int and receipt['accepted_connections']==8,
         'PROTECTED_RECEIPT_SCOPE')

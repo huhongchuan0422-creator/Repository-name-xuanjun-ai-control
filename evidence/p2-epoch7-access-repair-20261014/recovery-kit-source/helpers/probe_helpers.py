@@ -482,12 +482,26 @@ def connection_budget(config,claim=False):
  finally:fcntl.flock(1,fcntl.LOCK_UN)
 
 
+def inherited_listener(root):
+ # Python 3.6 does not infer AF_UNIX from fileno. Supplied constructor flags
+ # are not evidence: independently verify the actual kernel socket options.
+ listener=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM,fileno=3)
+ try:
+  need(listener.getsockopt(socket.SOL_SOCKET,socket.SO_DOMAIN)==socket.AF_UNIX and
+       listener.getsockopt(socket.SOL_SOCKET,socket.SO_TYPE)==socket.SOCK_STREAM and
+       listener.getsockopt(socket.SOL_SOCKET,socket.SO_ACCEPTCONN)==1 and
+       listener.getsockname()==root+'/ledger.sock','EXACT_INHERITED_LISTENER')
+ except BaseException:
+  try:listener.close()
+  except BaseException:pass
+  raise
+ return listener
+
+
 def server(config,root):
  need(config['role']=='ledger' and os.environ.get('LISTEN_PID')==str(os.getpid()) and
       os.environ.get('LISTEN_FDS')=='1','EXACT_SYSTEMD_INHERITED_FD')
- listener=socket.socket(fileno=3)
- need(listener.family==socket.AF_UNIX and listener.type&socket.SOCK_STREAM and
-      listener.getsockname()==root+'/ledger.sock','EXACT_INHERITED_LISTENER')
+ listener=inherited_listener(root)
  if connection_budget(config)>=8:listener.close();return
  end=time.monotonic()+20;seen=set();accepted=0
  emit({'event':'SERVER_READY','own':process(os.getpid()),'listener':endpoint(root+'/ledger.sock'),

@@ -427,10 +427,10 @@ class ExtractionTests(unittest.TestCase):
         data=self.repack(x,data,change)
         with self.assertRaisesRegex(ValueError,'EXTRA_OR_MISSING_DIRECTORY'):x.inspect_archive(data,x.sha(data),*pins[1:])
 
-    def test_exact_r5_root_and_old_root_refused(self):
+    def test_exact_r6_root_and_old_root_refused(self):
         x,r,data,pins=self.prepare()
         self.assertEqual(x.ROOT_NAME,b.ROOT_NAME)
-        self.assertEqual(b.ROOT_NAME,'epoch7-recovery-candidate-r5')
+        self.assertEqual(b.ROOT_NAME,'epoch7-recovery-candidate-r6')
         with self.assertRaisesRegex(ValueError,'ABSOLUTE_EXACT_OUTPUT'):
             x.extract(data,str(self.base/'epoch7-recovery-candidate'),*pins,owners=OWNERS)
         self.assertFalse((self.base/'epoch7-recovery-candidate').exists())
@@ -459,6 +459,15 @@ class ExtractionTests(unittest.TestCase):
             x.extract(data,str(self.base/'epoch7-recovery-candidate-r4'),*pins,owners=OWNERS)
         def prior(rows):
             for member,payload in rows:member.name=member.name.replace(b.ROOT_NAME,'epoch7-recovery-candidate-r4',1)
+        data=self.repack(x,data,prior)
+        with self.assertRaisesRegex(ValueError,'ROOT_SCOPE'):x.inspect_archive(data,x.sha(data),*pins[1:])
+
+    def test_prior_r5_archive_and_destination_refused(self):
+        x,r,data,pins=self.prepare()
+        with self.assertRaisesRegex(ValueError,'ABSOLUTE_EXACT_OUTPUT'):
+            x.extract(data,str(self.base/'epoch7-recovery-candidate-r5'),*pins,owners=OWNERS)
+        def prior(rows):
+            for member,payload in rows:member.name=member.name.replace(b.ROOT_NAME,'epoch7-recovery-candidate-r5',1)
         data=self.repack(x,data,prior)
         with self.assertRaisesRegex(ValueError,'ROOT_SCOPE'):x.inspect_archive(data,x.sha(data),*pins[1:])
 
@@ -491,7 +500,7 @@ class CompositionTests(unittest.TestCase):
     def setUp(self):
         import contextlib
         self.output='/fixed/candidate/epoch7-observation-'+'a'*16+'.private.json'
-        self.root='/fixed/candidate/epoch7-recovery-candidate-r5'
+        self.root='/fixed/candidate/epoch7-recovery-candidate-r6'
         self.observer=mock.Mock()
         self.observer.c=types.SimpleNamespace(CAND='/fixed/candidate',path=lambda value:None)
         @contextlib.contextmanager
@@ -613,12 +622,12 @@ class CompositionTests(unittest.TestCase):
 
 
     def test_lexical_root_alias_blocks_new_observation(self):
-        self.kit.root='/fixed/candidate/../candidate/epoch7-recovery-candidate-r5'
+        self.kit.root='/fixed/candidate/../candidate/epoch7-recovery-candidate-r6'
         with self.assertRaisesRegex(ValueError,'EXACT_STAGED_KIT'):self.run_probe()
         self.observer.observe_host.assert_not_called()
 
     def test_wrong_staging_root_blocks_observation(self):
-        self.kit.root='/other/epoch7-recovery-candidate-r5'
+        self.kit.root='/other/epoch7-recovery-candidate-r6'
         with self.assertRaisesRegex(ValueError,'EXACT_STAGED_KIT'):self.run_probe()
         self.observer.observe_host.assert_not_called()
 
@@ -637,6 +646,17 @@ class CompositionTests(unittest.TestCase):
         self.driver.execute_reviewed_probe.return_value['failure']='synthetic rejected case'
         result=self.run_probe();self.assertFalse(result['success'])
         self.assertEqual(result['probe_stage'],'RESULT_RECORDED')
+
+    def test_incomplete_case_never_reports_complete_even_with_all_cases(self):
+        value=self.driver.execute_reviewed_probe.return_value
+        self.assertIsNone(value.get('failure'))
+        self.assertEqual(len(value['cases']),len(self.driver.CASES))
+        for incomplete in ({'completion':False}, {}, False, []):
+            value['incomplete_case']=incomplete
+            result=self.run_probe()
+            self.assertFalse(result['success'])
+            self.assertFalse(result['probe_observations_complete'])
+            self.assertEqual(result['probe_stage'],'RESULT_RECORDED')
 
     def test_unknown_cleanup_not_reported_as_success(self):
         self.driver.execute_reviewed_probe.return_value['cleanup']=[{'status':'UNKNOWN'}]
@@ -1183,7 +1203,7 @@ class ResumeInputTests(unittest.TestCase):
         sources={'stage1/a.py':e.sha(b'a'),'scripts/uk-integration-install.py':e.sha(b'installer')}
         cache={e.RUNTIME+'deploy/integration-manifest.json':raw({'files':sources}),
             e.RUNTIME+'stage1/a.py':b'a',e.RUNTIME+'scripts/uk-integration-install.py':b'installer'}
-        self.kit=e.VerifiedKit(str(self.parent)+'/epoch7-recovery-candidate-r5',manifest,cache,'4'*64,OWNERS)
+        self.kit=e.VerifiedKit(str(self.parent)+'/epoch7-recovery-candidate-r6',manifest,cache,'4'*64,OWNERS)
         self.factory=mock.Mock();self.factory.INPUTS=e.PRIVATE_SEED_FIELDS|e.CACHE_SEED_FIELDS
         self.factory.DERIVED_INPUTS=frozenset();self.factory.compiled_bytes.side_effect=lambda value:dict(value)
         self.factory.prepare_host_inputs.return_value={'state':'COMPILED_NOT_ADMITTED','unresolved':[],
