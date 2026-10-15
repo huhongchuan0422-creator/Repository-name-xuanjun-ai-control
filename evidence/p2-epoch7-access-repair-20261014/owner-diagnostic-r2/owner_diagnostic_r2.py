@@ -45,6 +45,9 @@ PREREQUISITE_SOURCE = 'helpers/epoch7_owner_prerequisite.py'
 UK_TEST = 'tests/uk_exact_uid_acl/test_epoch7_exact_access_uk.py'
 UK_TEST_SHA = '8984cdc5a77411051fb9c2d9d81aefcd8c662e206c14f25dfa90c349f6512635'
 UK_ALIAS = 'test_epoch7_exact_access_uk'
+UK_FIXTURE_ALIAS = 'test_snapshot'
+UK_FIXTURE_SOURCE = 'tests/snapshot/test_snapshot.py'
+UK_FIXTURE_SHA = '608caeca2010ed094190f9b3fd37a4c4764a6847dfd76f074099e5e25ea2592c'
 UK_CASE = UK_ALIAS + '.ActualFDTests.test_actual_fd_acl_changes_only_two_named_access_sets'
 SHA = re.compile(r'^[0-9a-f]{64}$')
 ALARM_CLEANUP_INTERVAL = 1.0
@@ -241,20 +244,55 @@ class SilentResult(unittest.TestResult):
         self.skipped.append((test.id(), 'UID_MAPPING_UNAVAILABLE'))
 
 
-def exact_uid_test(entry, kit):
+def exact_uk_imports(kit):
+    """One fixed cached fixture completes the immutable kit's UK-only closure."""
     row = kit.manifest['test_suites']['uk_exact_uid_acl']
     need(row['tests'] == [UK_TEST] and row['imports'].get(UK_ALIAS) == UK_TEST and
          sha(kit.cache[UK_TEST]) == UK_TEST_SHA, 'EXACT_UK_TEST_REQUIRED')
+    need(UK_FIXTURE_ALIAS not in row['imports'], 'EXACT_UK_FIXTURE_ALIAS_CONFLICT')
+    need(kit.manifest['files'].get(UK_FIXTURE_SOURCE) == UK_FIXTURE_SHA and
+         type(kit.cache.get(UK_FIXTURE_SOURCE)) is bytes and
+         sha(kit.cache[UK_FIXTURE_SOURCE]) == UK_FIXTURE_SHA,
+         'EXACT_UK_FIXTURE_SOURCE_REQUIRED')
+    imports = dict(row['imports'])
+    imports[UK_FIXTURE_ALIAS] = UK_FIXTURE_SOURCE
+    return imports
+
+
+def load_exact_uid_suite():
+    """Import and select only; caller owns cached imports and any execution."""
+    module = importlib.import_module(UK_ALIAS)
+    suite = unittest.defaultTestLoader.loadTestsFromModule(module)
+    cases = list(suite)
+    need(len(cases) == 1 and isinstance(cases[0], unittest.TestCase) and
+         cases[0].id() == UK_CASE, 'EXACT_ONE_TEST_REQUIRED')
+    return suite
+
+
+def exact_uid_test(entry, kit):
+    imports = exact_uk_imports(kit)
     result = SilentResult()
-    with reverify_after(entry):
-        with bounded_stage(60):
-            with preserve_cleanup(kit.test_workspace(), 'workspace_cleanup') as workspace:
-                with preserve_cleanup(workspace.imports(row['imports']), 'import_cleanup'):
-                    module = importlib.import_module(UK_ALIAS)
-                    suite = unittest.defaultTestLoader.loadTestsFromModule(module)
-                    cases = list(suite)
-                    need(len(cases) == 1 and cases[0].id() == UK_CASE, 'EXACT_ONE_TEST_REQUIRED')
-                    suite.run(result)
+    phase = 'WORKSPACE'
+    try:
+        with reverify_after(entry):
+            with bounded_stage(60):
+                with preserve_cleanup(kit.test_workspace(), 'workspace_cleanup') as workspace:
+                    phase = 'IMPORT_CONTEXT'
+                    with preserve_cleanup(workspace.imports(imports), 'import_cleanup'):
+                        phase = 'LOAD'
+                        suite = load_exact_uid_suite()
+                        phase = 'EXECUTION'
+                        suite.run(result)
+                        phase = 'POSTCHECK'
+    except Exception as error:
+        if isinstance(error, DiagnosticHold):
+            raise
+        failure = DiagnosticHold('EXACT_UID_' + phase + '_FAILED')
+        for label in ('reverification', 'workspace_cleanup', 'import_cleanup', 'timer_cleanup'):
+            attribute = 'diagnostic_' + label + '_failed'
+            if getattr(error, attribute, False) is True:
+                setattr(failure, attribute, True)
+        raise failure from error
     passed = (result.testsRun == 1 and result.wasSuccessful() and not result.skipped and
               not result.expectedFailures and not result.unexpectedSuccesses)
     return {'case': UK_CASE, 'source_sha256': UK_TEST_SHA, 'tests': result.testsRun,

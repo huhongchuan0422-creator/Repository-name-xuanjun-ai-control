@@ -4,6 +4,8 @@ import copy
 import io
 import json
 import re
+import sys
+import types
 import unittest
 from unittest import mock
 import owner_diagnostic_r2 as d
@@ -174,6 +176,70 @@ class CachedPrerequisiteTests(unittest.TestCase):
 
     def test_raw_extra_detail_is_not_printed(self):
         self.value['raw_private']='SECRET BODY';result=self.call();self.assertNotIn('SECRET',str(result))
+
+
+class UKClosureTests(unittest.TestCase):
+    def setUp(self):
+        self.test_raw=b'# fixed synthetic UK test bytes\n'
+        self.fixture_raw=b'# fixed synthetic snapshot fixture bytes\n'
+        self.stack=contextlib.ExitStack();self.addCleanup(self.stack.close)
+        self.stack.enter_context(mock.patch.object(d,'UK_TEST_SHA',d.sha(self.test_raw)))
+        self.stack.enter_context(mock.patch.object(d,'UK_FIXTURE_SHA',d.sha(self.fixture_raw)))
+        self.original={d.UK_ALIAS:d.UK_TEST,'test_epoch7_host_phases':'tests/host_filesystem/test_epoch7_host_phases.py'}
+        self.kit=types.SimpleNamespace(manifest={'test_suites':{'uk_exact_uid_acl':{
+            'tests':[d.UK_TEST],'imports':dict(self.original)}},'files':{
+                d.UK_FIXTURE_SOURCE:d.sha(self.fixture_raw)}},
+            cache={d.UK_TEST:self.test_raw,d.UK_FIXTURE_SOURCE:self.fixture_raw})
+    def test_exact_fixed_alias_added_without_manifest_mutation(self):
+        result=d.exact_uk_imports(self.kit)
+        self.assertEqual(result,dict(self.original,test_snapshot=d.UK_FIXTURE_SOURCE))
+        self.assertEqual(self.kit.manifest['test_suites']['uk_exact_uid_acl']['imports'],self.original)
+    def test_missing_cached_fixture_refused(self):
+        del self.kit.cache[d.UK_FIXTURE_SOURCE]
+        with self.assertRaisesRegex(d.DiagnosticHold,'EXACT_UK_FIXTURE_SOURCE_REQUIRED'):d.exact_uk_imports(self.kit)
+    def test_changed_cached_fixture_refused(self):
+        self.kit.cache[d.UK_FIXTURE_SOURCE]+=b'changed'
+        with self.assertRaisesRegex(d.DiagnosticHold,'EXACT_UK_FIXTURE_SOURCE_REQUIRED'):d.exact_uk_imports(self.kit)
+    def test_wrong_manifest_fixture_digest_refused(self):
+        self.kit.manifest['files'][d.UK_FIXTURE_SOURCE]='0'*64
+        with self.assertRaisesRegex(d.DiagnosticHold,'EXACT_UK_FIXTURE_SOURCE_REQUIRED'):d.exact_uk_imports(self.kit)
+    def test_any_preexisting_alias_refused(self):
+        for target in (d.UK_FIXTURE_SOURCE,'tests/other/test_snapshot.py'):
+            self.kit.manifest['test_suites']['uk_exact_uid_acl']['imports'][d.UK_FIXTURE_ALIAS]=target
+            with self.assertRaisesRegex(d.DiagnosticHold,'EXACT_UK_FIXTURE_ALIAS_CONFLICT'):d.exact_uk_imports(self.kit)
+    def test_exact_case_selection_does_not_run_case(self):
+        module=types.ModuleType(d.UK_ALIAS)
+        def forbidden(self):raise AssertionError('SELECTION_MUST_NOT_RUN_FIXTURE')
+        case=type('ActualFDTests',(unittest.TestCase,),{'__module__':d.UK_ALIAS,
+            'test_actual_fd_acl_changes_only_two_named_access_sets':forbidden})
+        module.ActualFDTests=case
+        module.load_tests=lambda loader,tests,pattern:loader.loadTestsFromTestCase(case)
+        with mock.patch.dict(sys.modules,{d.UK_ALIAS:module}):
+            suite=d.load_exact_uid_suite()
+        self.assertEqual([item.id() for item in suite],[d.UK_CASE])
+    def test_extra_case_is_rejected_before_execution(self):
+        module=types.ModuleType(d.UK_ALIAS)
+        module.Extra=type('Extra',(unittest.TestCase,),{'__module__':d.UK_ALIAS,'test_other':lambda self:None})
+        with mock.patch.dict(sys.modules,{d.UK_ALIAS:module}):
+            with self.assertRaisesRegex(d.DiagnosticHold,'EXACT_ONE_TEST_REQUIRED'):d.load_exact_uid_suite()
+    def uid_error(self,error):
+        entry=mock.Mock();workspace=types.SimpleNamespace(imports=no_alarm)
+        @contextlib.contextmanager
+        def temporary():yield workspace
+        kit=types.SimpleNamespace(test_workspace=temporary)
+        with mock.patch.object(d,'exact_uk_imports',return_value={}),mock.patch.object(d,'bounded_stage',no_alarm), \
+             mock.patch.object(d,'load_exact_uid_suite',side_effect=error):
+            d.exact_uid_test(entry,kit)
+    def test_unknown_import_error_has_static_stage_and_preserved_cause(self):
+        original=ModuleNotFoundError('PRIVATE_IMPORT_DETAIL');original.diagnostic_import_cleanup_failed=True
+        with self.assertRaisesRegex(d.DiagnosticHold,'^EXACT_UID_LOAD_FAILED$') as caught:self.uid_error(original)
+        self.assertIs(caught.exception.__cause__,original)
+        self.assertTrue(caught.exception.diagnostic_import_cleanup_failed)
+        self.assertNotIn('PRIVATE',str(caught.exception))
+    def test_interrupt_not_replaced_by_static_exception_translation(self):
+        original=KeyboardInterrupt()
+        with self.assertRaises(KeyboardInterrupt) as caught:self.uid_error(original)
+        self.assertIs(caught.exception,original)
 
 
 if __name__=='__main__':unittest.main()
