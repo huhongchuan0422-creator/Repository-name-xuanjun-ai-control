@@ -72,105 +72,52 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  boundary-evidence:
+  head-diagnosis:
     if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
         runner: [xuanjun-tokyo-readonly, xuanjun-domestic-ops]
     runs-on: [self-hosted, Linux, X64, "${{ matrix.runner }}"]
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
-      - name: Read-only IP dependency and eleven HEAD boundary receipts
+      - name: Distinguish legacy HEAD error from service outage without production imports
         run: |
           python3 -B - <<'PY'
-          import os,json,hashlib,re,ast,ssl,socket,http.client,subprocess,shutil,glob
+          import os,json,socket,ssl,http.client,subprocess,hashlib,ast
           from pathlib import Path
           host=os.uname().nodename
           assert host in ("iZvt5t8tlrm8oiZ","iZ6wee8q9z4t03hvqumwfhZ")
-          domestic=host=="iZvt5t8tlrm8oiZ"
-          ip="47.101.152.210" if domestic else "47.245.53.152"
           domain="wenwenwenyiyiyi.work"
-          report={"host":host,"commit":os.environ["GITHUB_SHA"],"production_mutation":False,"dns_release":"HOLD","dynamic":[],"source":[],"nginx":[],"gaps":[]}
-          entry=Path("/opt/trading-system/scripts/secure_secrets_portal_server.py")
-          if not domestic:
+          report={"host":host,"production_mutation":False,"checks":[]}
+          targets=[("47.101.152.210",443,True),("47.245.53.152",443,True)]
+          if host=="iZ6wee8q9z4t03hvqumwfhZ":
+           targets.append(("127.0.0.1",18080,False))
+           for cmd in (["systemctl","show","secure-secrets-portal.service","-p","ActiveState","-p","SubState","-p","MainPID"],["ss","-H","-lntp","sport = :18080"]):
+            r=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=5)
+            report.setdefault("service_evidence",[]).append(r.stdout[:2000])
+           p=Path("/etc/nginx/nginx.conf");data=p.read_bytes()
+           needle=b"include /etc/nginx/conf.d/wecom.conf;"
+           approved=b"\n    include /etc/nginx/conf.d/pr122-apex-acme-http.conf;"
+           report["tokyo_main"]={"sha256":hashlib.sha256(data).hexdigest(),"acme_include_count":data.count(approved),"main_without_added_include_sha256":hashlib.sha256(data.replace(approved,b"",1)).hexdigest(),"original_expected":"80b49c552823e5684ec35abdf23af52e37081620a654124320e0c3a7974242f4"}
+           # Isolate the exact logging defect without importing or executing the production application.
            try:
-            data=entry.read_bytes();tree=ast.parse(data);methods=sorted({n.name for n in ast.walk(tree) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name.startswith("do_")})
-            report["portal_entry"]={"sha256":hashlib.sha256(data).hexdigest(),"matches_owner_entry":hashlib.sha256(data).hexdigest()=="528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006","handler_methods":methods}
-            assert "do_HEAD" not in methods and "do_OPTIONS" not in methods,"Unexpected method handler"
-           except Exception as e:
-            report["gaps"].append("PORTAL_ENTRY:"+type(e).__name__)
-           for folder in ("scripts","ai_service","accounts","douyin","tiktok","database","trading_execution"):
-            base=Path("/opt/trading-system")/folder
-            for p in sorted(base.rglob("*.py"))[:500]:
-             if p.is_symlink():continue
-             try:
-              data=p.read_bytes()
-              if len(data)>2000000:continue
-              lines=data.decode("utf-8").splitlines();hits=[]
-              for i,line in enumerate(lines,1):
-               tags=[token for token in ("client_address","remote_addr","X-Real-IP","X-Forwarded-For","X-Forwarded-Proto","REMOTE_ADDR","ip_address","rate_limit","ip_whitelist","ip_blacklist") if token.lower() in line.lower()]
-               if tags:hits.append({"line":i,"tokens":tags})
-              report["source"].append({"path":str(p.relative_to("/opt/trading-system")),"sha256":hashlib.sha256(data).hexdigest(),"ip_security_hits":hits})
-             except (OSError,UnicodeError):report["gaps"].append("SOURCE_UNREADABLE:"+str(p.relative_to("/opt/trading-system")))
-          # Read configurations as data, never nginx -T, sudo, key files, or production imports.
-          pending=[Path("/etc/nginx/nginx.conf")];seen=set()
-          while pending and len(seen)<80:
-           p=pending.pop()
-           if str(p) in seen:continue
-           seen.add(str(p))
-           try:
-            if not str(p.resolve()).startswith("/etc/nginx/"):continue
-            data=p.read_bytes()
-            if len(data)>1000000:continue
-            text=data.decode();items=[]
-            for i,line in enumerate(text.splitlines(),1):
-             s=line.split("#",1)[0].strip()
-             if not s:continue
-             key=s.split(None,1)[0]
-             if key=="include":
-              value=s.split(None,1)[1].rstrip(";").strip()
-              if value.startswith("/etc/nginx/"):pending.extend(Path(x) for x in glob.glob(value))
-             if key in ("allow","deny","real_ip_header","set_real_ip_from","real_ip_recursive","limit_req","limit_req_zone","limit_conn","limit_conn_zone","auth_request","auth_basic","proxy_next_upstream","proxy_pass_request_headers","proxy_ssl_verify","proxy_ssl_name","proxy_set_header","access_log","log_format","geo","map","if"):
-              item={"line":i,"directive":key}
-              if key=="proxy_set_header":
-               parts=s.split()
-               item["header"]=parts[1] if len(parts)>1 else "UNKNOWN"
-               if item["header"].lower() in ("x-real-ip","x-forwarded-for","x-forwarded-proto","host","connection"):item["value"]=" ".join(parts[2:])
-               else:item["value"]="REDACTED"
-              elif key in ("real_ip_header","set_real_ip_from","real_ip_recursive","allow","deny","proxy_next_upstream","proxy_ssl_verify","proxy_ssl_name"):item["value"]=s[len(key):].strip()
-              else:item["value"]="REDACTED"
-              items.append(item)
-            report["nginx"].append({"path":str(p),"sha256":hashlib.sha256(data).hexdigest(),"security_directives":items})
-           except (OSError,UnicodeError):report["gaps"].append("CONFIG_UNREADABLE:"+str(p))
-          routes=[("/p/","/p/pr122-nonexistent-readonly"),("/submit/douyin","/submit/douyin"),("/submit/tiktok","/submit/tiktok"),("/integrations/douyin/oauth/callback","/integrations/douyin/oauth/callback"),("/integrations/tiktok/oauth/start","/integrations/tiktok/oauth/start"),("/integrations/tiktok/oauth/callback","/integrations/tiktok/oauth/callback"),("/integrations/tiktok/status","/integrations/tiktok/status"),("/integrations/tiktok/disconnect","/integrations/tiktok/disconnect"),("/healthz","/healthz"),("/telegram-webhook/","/telegram-webhook/pr122-nonexistent-readonly"),("/telegram-canary/status","/telegram-canary/status")]
-          ctx=ssl.create_default_context()
-          def probe(path,variant):
-           raw=socket.create_connection((ip,443),timeout=5);tls=ctx.wrap_socket(raw,server_hostname=domain)
-           c=http.client.HTTPConnection(domain,timeout=5);c.sock=tls
-           try:
-            headers={"Host":domain,"Connection":"close"}
-            if variant=="spoofed_source":headers.update({"X-Real-IP":"192.0.2.123","X-Forwarded-For":"192.0.2.123","X-Forwarded-Proto":"http","Origin":"https://invalid.example"})
-            c.request("HEAD",path,headers=headers);r=c.getresponse()
-            return {"variant":variant,"method":"HEAD","status":r.status,"tls_verified":True,"location_present":bool(r.getheader("Location")),"set_cookie_present":bool(r.getheader("Set-Cookie"))}
-           finally:c.close()
-          for responsibility,path in routes:
-           item={"responsibility":responsibility,"path":path,"checks":[],"business_write":"NOT_TESTED","oauth_get":"NOT_TESTED","authorization_contract":"NOT_ESTABLISHED_BY_HEAD"}
-           for variant in ("baseline","spoofed_source"):
-            try:item["checks"].append(probe(path,variant))
-            except Exception as e:item["checks"].append({"variant":variant,"error":type(e).__name__})
-           report["dynamic"].append(item)
-          report["dns_addresses"]=sorted(set(x[4][0] for x in socket.getaddrinfo(domain,443,type=socket.SOCK_STREAM)))
-          dig=shutil.which("dig")
-          if dig:
-           report["public_dns"]={}
-           for kind in ("A","AAAA","NS","SOA"):
+            fmt="code %d, message %s";args=(501,"Unsupported method")
+            fmt % tuple("[REDACTED]" for _ in args)
+            report["legacy_error_logging_reproducer"]="NO_ERROR"
+           except Exception as e:report["legacy_error_logging_reproducer"]=type(e).__name__
+          for address,port,tls in targets:
+           for method,path in (("GET","/healthz"),("HEAD","/healthz")):
+            item={"target":address,"port":port,"method":method,"path":path}
             try:
-             r=subprocess.run([dig,"+time=3","+tries=1","+noall","+answer",domain,kind],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=5)
-             report["public_dns"][kind]=r.stdout[:5000]
-            except Exception as e:report["gaps"].append("DNS_"+kind+":"+type(e).__name__)
-          else:report["gaps"].append("DIG_UNAVAILABLE_CONFIGURED_DNS_TTL_UNKNOWN")
-          report["gaps"]+=["DNS_PROVIDER_PROXY_AND_EXACT_ROLLBACK_NOT_VERIFIED","CLOUD_WAF_AND_PERIPHERAL_IP_DEPENDENCIES_NOT_VERIFIED","HEAD_DOES_NOT_ESTABLISH_GET_POST_AUTHORIZATION","OWNER_IP_AUDIT_DIFFERENCE_ACCEPTANCE_NOT_GRANTED"]
-          print("PR122_BOUNDARY_RECEIPT="+json.dumps(report,sort_keys=True))
+             c=http.client.HTTPConnection(address,port,timeout=5)
+             if tls:c.sock=ssl.create_default_context().wrap_socket(socket.create_connection((address,port),timeout=5),server_hostname=domain)
+             try:
+              c.request(method,path,headers={"Host":domain,"Connection":"close"});r=c.getresponse();body=r.read(1024)
+              item.update({"status":r.status,"body_sha256":hashlib.sha256(body).hexdigest()})
+             finally:c.close()
+            except Exception as e:item["error"]=type(e).__name__
+            report["checks"].append(item)
+          print("PR122_HEAD_DIAGNOSIS="+json.dumps(report,sort_keys=True))
           
           PY
