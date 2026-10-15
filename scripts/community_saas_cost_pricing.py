@@ -57,11 +57,13 @@ def preview(offer_db,cost_db,offer_id):
   record=cost_db.execute("SELECT cost_cny_minor,cost_usd_minor,status,evidence_ref,cadence "
     "FROM component_costs WHERE offer_id=? AND component_id=?",(offer_id,cid)).fetchone()
   cc,cu,state,evidence,cost_cadence=record if record else (None,None,"UNKNOWN",None,cadence)
-  if state=="UNKNOWN" or cc is None or cu is None or cost_cadence!=cadence:incomplete=True
+  cadence_incomplete=(state=="UNKNOWN" or cc is None or cu is None or cost_cadence!=cadence)
+  if cadence_incomplete:incomplete=True
   if state=="EVIDENCED_ESTIMATE":estimate=True
   sale_cny=0 if included else -cny if kind=="DISCOUNT" else cny
   sale_usd=0 if included else -usd if kind=="DISCOUNT" else usd
-  group=groups.setdefault(cadence,{"sale_cny_minor":0,"sale_usd_minor":0,"cost_cny_minor":0,"cost_usd_minor":0})
+  group=groups.setdefault(cadence,{"sale_cny_minor":0,"sale_usd_minor":0,"cost_cny_minor":0,"cost_usd_minor":0,"cost_unknown":False})
+  group["cost_unknown"]=group["cost_unknown"] or cadence_incomplete
   group["sale_cny_minor"]+=sale_cny
   group["sale_usd_minor"]+=sale_usd
   if cc is not None:group["cost_cny_minor"]+=cc
@@ -71,9 +73,9 @@ def preview(offer_db,cost_db,offer_id):
    "cost_cny_minor":cc,"cost_usd_minor":cu,"cost_status":state,
    "cost_evidence_ref":evidence,"cost_cadence":cost_cadence})
  for row in groups.values():
-  row["gross_margin_cny_minor"]=None if incomplete else row["sale_cny_minor"]-row["cost_cny_minor"]
-  row["gross_margin_usd_minor"]=None if incomplete else row["sale_usd_minor"]-row["cost_usd_minor"]
-  if incomplete:
+  row["gross_margin_cny_minor"]=None if row["cost_unknown"] else row["sale_cny_minor"]-row["cost_cny_minor"]
+  row["gross_margin_usd_minor"]=None if row["cost_unknown"] else row["sale_usd_minor"]-row["cost_usd_minor"]
+  if row["cost_unknown"]:
    row["cost_cny_minor"]=None
    row["cost_usd_minor"]=None
  return {"offer_id":offer_id,"publishable_cost_evidence":not incomplete,
