@@ -1,0 +1,9 @@
+import test from "node:test";import assert from "node:assert/strict";
+import {presentAmount,safeText,modelToView,renderDashboard} from "./saas-panel.mjs";
+test("dual currency integer minor units",()=>{assert.equal(presentAmount(1999,"CNY"),"¥19.99");assert.equal(presentAmount(500,"USD"),"$5.00")});
+test("unknown costs and invalid numerics stay UNKNOWN",()=>{assert.equal(presentAmount(null,"USD"),"UNKNOWN");assert.equal(presentAmount(-1,"CNY"),"UNKNOWN");assert.equal(presentAmount(1.5,"USD"),"UNKNOWN")});
+test("currency never implicitly converted",()=>assert.throws(()=>presentAmount(100,"JPY"),/INVALID_CURRENCY/));
+test("untrusted values become data not markup",()=>assert.equal(safeText("<img src=x onerror=alert(1)>"),"<img src=x onerror=alert(1)>"));
+test("review and order mapping",()=>{const v=modelToView({modules:[{id:"cat",title:"Catalog"}],orders:[{order_id:"o",state:"PREPARED",cny_minor:100,usd_minor:20}],reviews:[{kind:"FINANCE",state:"PENDING"}]});assert.equal(v.orders[0].cny,"¥1.00");assert.equal(v.reviews[0].state,"PENDING");assert.match(v.label,/OFFLINE_ONLY/)});
+test("invalid model rejected",()=>assert.throws(()=>modelToView([]),/INVALID_MODEL/));
+test("DOM rendering only via textContent and document.createTextNode",()=>{let usedHTML=false;const els=new Map();function el(){return {nodes:[],replaceChildren(){this.nodes=[]},append(x){this.nodes.push(x)},set textContent(v){this.txt=v},get textContent(){return this.txt}}}const document={getElementById(id){if(!els.has(id))els.set(id,el());return els.get(id)},createElement(){return el()},createTextNode(v){return {value:v}}}; const result=renderDashboard(document,{modules:[{id:"<script>",title:"Unsafe"}],orders:[],reviews:[]});assert.equal(result.modules[0].id,"<script>");assert.ok(els.get("moduleCatalog").nodes.length>0);assert.equal(usedHTML,false)});
