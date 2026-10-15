@@ -30,6 +30,16 @@ class Principal:
             raise ValueError("INVALID_ROLE")
         self.role=role
 
+def _customer_view(value):
+    """Remove internal cost evidence, supplier prices and approval references."""
+    if type(value) is list:return [_customer_view(item) for item in value]
+    if type(value) is dict:
+        return {key:_customer_view(val) for key,val in value.items()
+                if key not in ("cost_cny_minor","cost_usd_minor","cost_evidence_ref",
+                               "approval_ref","fx_source","fx_at","source_evidence",
+                               "supplier_id","quote_snapshot")}
+    return value
+
 class OfflineSaas:
     def __init__(self,quote_db,order_db,module_db):
         self.quotes=quote_db
@@ -67,18 +77,18 @@ class OfflineSaas:
         if operation=="catalog":
             return {"modules":catalog(),"framework_free":True,"production":False}
         if operation=="offers":
-            return {"offers":list_offers(self.quotes,params["module_id"],tenant_id=tenant)}
+            return {"offers":_customer_view(list_offers(self.quotes,params["module_id"],tenant_id=tenant))}
         if operation=="quote":
             _id(params["quote_id"]);_id(params["offer_id"])
-            return quote(self.quotes,params["quote_id"],tenant,
-                params["offer_id"],params["version"],now,_time(params["expires_at"]))
+            return _customer_view(quote(self.quotes,params["quote_id"],tenant,
+                params["offer_id"],params["version"],now,_time(params["expires_at"])))
         if operation=="quote_read":
-            return read_quote(self.quotes,_id(params["quote_id"]),tenant)
+            return _customer_view(read_quote(self.quotes,_id(params["quote_id"]),tenant))
         if operation=="order_prepare":
-            return prepare(self.orders,self.quotes,_id(params["order_id"]),tenant,
-                           _id(params["quote_id"]),params["currency"],now)
+            return _customer_view(prepare(self.orders,self.quotes,_id(params["order_id"]),tenant,
+                           _id(params["quote_id"]),params["currency"],now))
         if operation=="order_read":
-            return read(self.orders,_id(params["order_id"]),tenant)
+            return _customer_view(read(self.orders,_id(params["order_id"]),tenant))
         if operation=="order_status":
             return status(self.orders,_id(params["order_id"]),tenant)
         if operation=="entitlement":
