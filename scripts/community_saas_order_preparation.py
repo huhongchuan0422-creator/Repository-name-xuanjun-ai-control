@@ -82,3 +82,80 @@ def read(db,order_id,tenant_id):
     if not row:
         raise ValueError("ORDER_NOT_FOUND")
     return json.loads(row[0])
+
+# Evidence is recorded as an append-only offline handoff. It does not attest
+# third-party payment validity: production Finance must verify independently.
+LIFECYCLE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS saas_order_lifecycle(
+ order_id TEXT PRIMARY KEY, state TEXT NOT NULL
+ CHECK(state IN ('PREPARED','AWAITING_EXTERNAL','CONFIRMATION_UNKNOWN','CONFIRMED_EXTERNAL','CANCELLED','EXPIRED')),
+ proof_ref TEXT, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS saas_order_lifecycle_events(
+ event_key TEXT PRIMARY KEY, order_id TEXT NOT NULL, old_state TEXT NOT NULL,
+ new_state TEXT NOT NULL, proof_ref TEXT, occurred_at INTEGER NOT NULL);
+CREATE TRIGGER IF NOT EXISTS saas_lifecycle_event_no_update BEFORE UPDATE ON saas_order_lifecycle_events
+ BEGIN SELECT RAISE(ABORT,'IMMUTABLE_LIFECYCLE_EVENT'); END;
+CREATE TRIGGER IF NOT EXISTS saas_lifecycle_event_no_delete BEFORE DELETE ON saas_order_lifecycle_events
+ BEGIN SELECT RAISE(ABORT,'IMMUTABLE_LIFECYCLE_EVENT'); END;
+"""
+TRANSITIONS={
+    "PREPARED":{"AWAITING_EXTERNAL","CANCELLED","EXPIRED"},
+    "AWAITING_EXTERNAL":{"CONFIRMATION_UNKNOWN","CANCELLED","EXPIRED"},
+    "CONFIRMATION_UNKNOWN":{"CONFIRMED_EXTERNAL","CANCELLED","EXPIRED"},
+}
+def install_lifecycle(db):
+    if not isinstance(db,sqlite3.Connection):
+        raise TypeError("SQLITE_CONNECTION_REQUIRED")
+    db.executescript(LIFECYCLE_SCHEMA)
+
+def advance(db,order_id,tenant_id,event_key,new_state,at,proof_ref=None,
+            trusted_finance_attestation=False):
+    """Offline state transition; trusted attestation supplied by authorized caller.
+
+    CONFIRMED_EXTERNAL means an external verification proof was recorded, not
+    that this adapter verified the payment, provisioned access or credited money.
+    """
+    _identifier(order_id);_identifier(tenant_id);_identifier(event_key)
+    if type(at) is not int or at<0 or type(trusted_finance_attestation) is not bool:
+        raise ValueError("INVALID_TRANSITION_CONTEXT")
+    if proof_ref is not None and (type(proof_ref) is not str or not valid_id(proof_ref)):
+        raise ValueError("INVALID_PROOF_REF")
+    if new_state=="CONFIRMED_EXTERNAL" and (
+        not trusted_finance_attestation or proof_ref is None):
+        raise ValueError("FINANCE_ATTESTATION_REQUIRED")
+    if new_state not in ("AWAITING_EXTERNAL","CONFIRMATION_UNKNOWN","CONFIRMED_EXTERNAL","CANCELLED","EXPIRED"):
+        raise ValueError("INVALID_TARGET_STATE")
+    with db:
+        row=db.execute("SELECT tenant_id,created_at FROM saas_order_preparations WHERE order_id=?",(order_id,)).fetchone()
+        if row is None or row[0]!=tenant_id:
+            raise ValueError("ORDER_NOT_FOUND")
+        existing=db.execute("SELECT order_id,new_state,proof_ref,occurred_at FROM saas_order_lifecycle_events WHERE event_key=?",
+                            (event_key,)).fetchone()
+        if existing is not None:
+            if existing!=(order_id,new_state,proof_ref,at):
+                raise ValueError("EVENT_IDEMPOTENCY_CONFLICT")
+            return status(db,order_id,tenant_id)
+        current=db.execute("SELECT state,updated_at FROM saas_order_lifecycle WHERE order_id=?",(order_id,)).fetchone()
+        old=current[0] if current else "PREPARED"
+        if at<(current[1] if current else row[1]):
+            raise ValueError("STALE_EVENT_TIME")
+        if new_state not in TRANSITIONS.get(old,set()):
+            raise ValueError("INVALID_STATE_TRANSITION")
+        if current:
+            db.execute("UPDATE saas_order_lifecycle SET state=?,proof_ref=?,updated_at=? WHERE order_id=?",
+                       (new_state,proof_ref,at,order_id))
+        else:
+            db.execute("INSERT INTO saas_order_lifecycle VALUES(?,?,?,?)",
+                       (order_id,new_state,proof_ref,at))
+        db.execute("INSERT INTO saas_order_lifecycle_events VALUES(?,?,?,?,?,?)",
+                   (event_key,order_id,old,new_state,proof_ref,at))
+    return status(db,order_id,tenant_id)
+
+def status(db,order_id,tenant_id):
+    read(db,order_id,tenant_id)
+    row=db.execute("SELECT state,proof_ref,updated_at FROM saas_order_lifecycle WHERE order_id=?",(order_id,)).fetchone()
+    return {"order_id":order_id,"tenant_id":tenant_id,
+            "state":row[0] if row else "PREPARED",
+            "proof_ref":row[1] if row else None,
+            "updated_at":row[2] if row else None,
+            "entitlement_granted":False,"payment_settled_by_this_module":False}
