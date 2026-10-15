@@ -1,0 +1,32 @@
+name: P2 Owner R6 Continuation Boundary Checkpoint
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - 'evidence/p2-epoch7-access-repair-20261014/owner-diagnostic-r6/**'
+      - 'tests/test_p2_owner_diagnostic_r6.py'
+      - '.github/workflows/p2-owner-diagnostic-r6.yml'
+permissions:
+  contents: read
+concurrency:
+  group: p2-owner-r6-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  mocked-owner-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Execute exact continuation wrapper mocked tests and core cache verification
+        run: python -B -m unittest discover -s tests -p 'test_p2_owner_diagnostic_r6.py' -v
