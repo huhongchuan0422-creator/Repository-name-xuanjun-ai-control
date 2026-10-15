@@ -3,6 +3,7 @@ import base64
 import ctypes
 from contextlib import ExitStack
 import hashlib
+import io
 import json
 import os
 import pathlib
@@ -12,6 +13,7 @@ import sys
 import tempfile
 import time
 import threading
+import types
 import unittest
 from unittest.mock import patch
 
@@ -404,6 +406,101 @@ class CaptureTests(unittest.TestCase):
                 self.assertNotIn(node.func.attr, ('communicate', 'Popen', 'run', 'system'))
                 if node.func.attr == 'wait':
                     self.assertTrue(any(k.arg == 'timeout' for k in node.keywords))
+
+
+class DeadlineBoundaryTests(unittest.TestCase):
+    """Deterministic EOF/clock boundaries; no subprocess or signal is launched."""
+    def capture(self, select_times=(.01,), read_time=None, poll_time=None,
+                first_read=None, cleanup_read_error=False):
+        clock=[0.0];reads=[0];polls=[0]
+        process=object.__new__(subprocess.Popen)
+        process._child_created=False;process.pid=os.getpid()+1000000
+        process.returncode=0;process.stdin=None
+        for name in ('stdout','stderr'):
+            read_fd,write_fd=os.pipe();os.close(write_fd)
+            setattr(process,name,io.FileIO(read_fd,'rb',closefd=True))
+        class Selector(object):
+            def __init__(self):self.keys={};self.calls=0;self.closed=False
+            def register(self,stream,events,name):
+                self.keys[stream.fileno()]=types.SimpleNamespace(fd=stream.fileno(),fileobj=stream,data=name)
+            def get_map(self):return self.keys
+            def select(self,timeout):
+                clock[0]=max(clock[0],select_times[min(self.calls,len(select_times)-1)])
+                self.calls+=1
+                return [(key,None) for unused,key in sorted(self.keys.items())]
+            def unregister(self,stream):self.keys.pop(stream.fileno())
+            def close(self):self.closed=True
+        selector=Selector();real_read=os.read
+        def read(fd,count):
+            reads[0]+=1
+            if read_time is not None:clock[0]=max(clock[0],read_time)
+            if reads[0]==1 and first_read is not None:
+                if isinstance(first_read,BaseException):raise first_read
+                return first_read
+            if cleanup_read_error:raise OSError('SECRET-cleanup')
+            return real_read(fd,count)
+        def poll():
+            polls[0]+=1
+            if poll_time is not None:clock[0]=max(clock[0],poll_time)
+            return 0
+        process.poll=poll
+        try:
+            with patch.object(evidence.selectors,'DefaultSelector',return_value=selector), \
+                    patch.object(evidence.time,'monotonic',side_effect=lambda:clock[0]), \
+                    patch.object(evidence.os,'read',side_effect=read), \
+                    patch.object(evidence.os,'killpg') as kill, \
+                    patch.object(evidence.os,'getpgid') as pgid, \
+                    patch.object(evidence.os,'getsid') as sid:
+                result=evidence.capture_owned_process(process,PHASE,OP,7,1,.05,.05,1)
+            kill.assert_not_called();pgid.assert_not_called();sid.assert_not_called()
+            self.assertTrue(process.stdout.closed and process.stderr.closed and selector.closed)
+            self.assertEqual(result['cleanup']['descendants'],'UNKNOWN')
+            return result
+        finally:
+            process.stdout.close();process.stderr.close()
+
+    def test_on_time_final_eof_is_success(self):
+        result=self.capture()
+        self.assertEqual(result['reason'],'SUCCESS')
+        self.assertEqual(result['cleanup']['group_signal'],'NOT_NEEDED')
+        self.assertEqual(result['cleanup']['output'],'COMPLETE')
+
+    def test_late_final_eof_is_timeout_without_signalling_reaped_pid(self):
+        result=self.capture(select_times=(1.0,))
+        self.assertEqual(result['reason'],'TIMEOUT')
+        self.assertEqual(result['cleanup']['group_signal'],'SKIPPED_UNPROVEN')
+
+    def test_exact_deadline_final_eof_is_timeout(self):
+        self.assertEqual(self.capture(select_times=(.05,))['reason'],'TIMEOUT')
+
+    def test_deadline_crossed_inside_final_read_is_timeout(self):
+        self.assertEqual(self.capture(read_time=1.0)['reason'],'TIMEOUT')
+
+    def test_deadline_crossed_inside_terminal_poll_is_timeout(self):
+        self.assertEqual(self.capture(poll_time=1.0)['reason'],'TIMEOUT')
+
+    def test_first_output_limit_survives_cleanup_timeout(self):
+        result=self.capture(select_times=(.01,1.0),first_read=b'xx')
+        self.assertEqual(result['reason'],'OUTPUT_LIMIT')
+        self.assertEqual(result['stdout']['observed_bytes'],2)
+
+    def test_first_capture_error_survives_late_cleanup(self):
+        result=self.capture(select_times=(.01,1.0),first_read=OSError('SECRET-primary'))
+        self.assertEqual(result['reason'],'CAPTURE_ERROR')
+        self.assertEqual(result['failure_class'],'OSError')
+        self.assertNotIn('SECRET',json.dumps(result))
+
+    def test_first_interruption_survives_late_cleanup(self):
+        result=self.capture(select_times=(.01,1.0),first_read=KeyboardInterrupt('SECRET-primary'))
+        self.assertEqual(result['reason'],'INTERRUPTED')
+        self.assertTrue(result['interruption_requires_propagation'])
+        self.assertNotIn('SECRET',json.dumps(result))
+
+    def test_first_timeout_survives_cleanup_read_error(self):
+        result=self.capture(select_times=(1.0,),cleanup_read_error=True)
+        self.assertEqual(result['reason'],'TIMEOUT')
+        self.assertEqual(result['cleanup']['drain_error_class'],'OSError')
+        self.assertNotIn('SECRET',json.dumps(result))
 
 
 class PublicationTests(unittest.TestCase):

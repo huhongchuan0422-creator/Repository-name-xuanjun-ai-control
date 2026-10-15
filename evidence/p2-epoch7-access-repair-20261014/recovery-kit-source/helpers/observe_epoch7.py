@@ -36,12 +36,20 @@ def authority(logical, info, declared=None):
     """Directory owners are scoped to existing user-private subtrees only."""
     if declared and logical in declared:
         row = declared[logical]
-        c.need(logical.startswith(('/var/lib/xuanjun-development/', '/etc/xuanjun-', '/opt/xuanjun-')) and
+        c.need((logical == '/var/lib/xuanjun-development' or
+                logical.startswith(('/var/lib/xuanjun-development/', '/etc/xuanjun-', '/opt/xuanjun-'))) and
                row['uid'] in (0,1003,1004,1005,1008) and not row['mode'] & 0o7022 and
                stat.S_ISDIR(info.st_mode) and
                (info.st_uid,info.st_gid,stat.S_IMODE(info.st_mode)) == (row['uid'],row['gid'],row['mode']),
                'OBSERVATION_DECLARED_DIRECTORY_AUTHORITY')
         return {k:row[k] for k in ('uid','gid','mode')}
+    # The measured existing XDG parent is root-owned; this exception is one
+    # exact directory and one exact root profile, not a home-subtree rule.
+    if logical == '/home/xuanjun_dev/.config' and info.st_uid == 0:
+        c.need(stat.S_ISDIR(info.st_mode) and
+               (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) == (0, 0, 0o755),
+               'OBSERVATION_ANCESTOR_AUTHORITY')
+        return {'uid': 0, 'gid': 0, 'mode': 0o755}
     uid = 0
     if logical == '/home/xuanjun_dev' or logical.startswith('/home/xuanjun_dev/'):
         uid = 1002

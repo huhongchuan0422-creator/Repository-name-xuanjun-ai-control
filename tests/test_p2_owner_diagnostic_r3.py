@@ -47,7 +47,7 @@ def verify_uk_case_import(root,head,wrapper):
     """Actual frozen-kit loader, selecting only; never run the UID-specific case."""
     archive,archive_sha=verified_path(root,head,wrapper.ARCHIVE_PATH)
     need(archive_sha==ARCHIVE_SHA and len(archive)==1015797,'UK_IMPORT_ARCHIVE_PIN')
-    extractor_path='evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/extract_epoch7_kit.py'
+    extractor_path=PREFIX+'extract_epoch7_kit_r3.py'
     extractor_raw,extractor_sha=verified_path(root,head,extractor_path)
     need(extractor_sha==wrapper.EXTRACTOR_SHA and len(extractor_raw)==wrapper.EXTRACTOR_SIZE,'UK_IMPORT_EXTRACTOR_PIN')
     extractor=types.ModuleType('verified_ci_archive_inspector')

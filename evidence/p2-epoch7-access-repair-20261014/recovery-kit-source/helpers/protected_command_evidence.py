@@ -184,6 +184,8 @@ def capture_owned_process(process, phase, operation, epoch, sequence,
             if remaining <= 0:
                 return 'TIMEOUT'
             events = selector.select(min(remaining, 0.05))
+            if time.monotonic() >= until:
+                return 'TIMEOUT'
             for key, unused in events:
                 try:
                     chunk = os.read(key.fd, READ_CHUNK)
@@ -200,12 +202,20 @@ def capture_owned_process(process, phase, operation, epoch, sequence,
                     retained[name].extend(chunk[:room])
                 if enforce_limit and observed[name] > stream_limit:
                     return 'OUTPUT_LIMIT'
-        while process.poll() is None:
+            # The final EOF batch can empty the map: do not skip its deadline
+            # check or reap our owned leader before an already-late cleanup.
+            if time.monotonic() >= until:
+                return 'TIMEOUT'
+        while True:
+            if time.monotonic() >= until:
+                return 'TIMEOUT'
+            exited = process.poll() is not None
             remaining = until - time.monotonic()
             if remaining <= 0:
                 return 'TIMEOUT'
+            if exited:
+                return None
             time.sleep(min(remaining, 0.01))
-        return None
 
     try:
         selector = selectors.DefaultSelector()

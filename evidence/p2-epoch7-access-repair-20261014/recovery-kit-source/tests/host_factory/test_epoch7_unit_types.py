@@ -16,7 +16,9 @@ import epoch7_snapshot as snap
 import epoch7_unit_transitions as transitions
 from test_epoch7_live_controls import fixture,process_view
 import test_epoch7_unit_transitions as transition_tests
-from test_epoch7_full_factory_fixture import make_seed,native_pins
+from test_epoch7_full_factory_fixture import make_seed,native_pins,packed,meta
+from test_node_sqlite_probe import fixture_proof
+import node_sqlite_probe
 from test_epoch7_openclaw_direct import direct_fixture
 import test_epoch7_openclaw_direct as direct_tests
 from test_unit_process_fields import actual_unit_rows,DIAGNOSTIC_SOURCE_SHA256
@@ -150,6 +152,48 @@ class UnitTypeTests(unittest.TestCase):
         case.check()
         case.view['service_role_evidence']['units']['xuanjun-uk-openclaw.service']['start']['returncode']=1
         with self.assertRaises(ValueError):case.check()
+
+    def test_real107_factory_accepts_measured_root_config_and_absent_openclaw(self):
+        # Selected Owner topology only: the rest is synthetic host metadata,
+        # including an internally consistent fixture probe, never admission.
+        seed=make_seed(service_fixture=typed_fixture)
+        observation=seed['observation'];path='/home/xuanjun_dev/.config'
+        observation['policy']['directories'][path]={'uid':0,'gid':0,'mode':0o755}
+        self.assertNotIn(path+'/openclaw',observation['policy']['directories'])
+        retained=observation['evidence']['retained']
+        retained['policy_sha256']=factory.d.digest(observation['policy'])
+        observation['snapshot']['retained_resource_sha256']=factory.d.digest(retained)
+        observation['evidence']['snapshot_sha256']=factory.d.digest(observation['snapshot'])
+        for key in ('snapshot','evidence','policy'):
+            observation[key+'_sha256']=factory.d.digest(observation[key])
+        # The synthetic prior probe must bind the changed observation. All real
+        # validators still run; no compiler or acceptance result is mocked.
+        attempt=observation['finite_probe'];policy=attempt['policy']
+        policy['node_sqlite']=node_sqlite_probe.binding_from_observation(observation)
+        pin=factory.sha(packed(policy));binding=policy['node_sqlite']
+        proof=fixture_proof(binding['node'],policy['nonce'],pin,binding['probe_input_sha256'])
+        receipt=packed({'schema':1,'nonce':policy['nonce'],'policy_sha256':pin,
+            'events':[{'event':'NODE_SQLITE_OBSERVED','detail':proof}]})
+        attempt['policy_sha256']=pin;attempt['result']['node_sqlite']=proof
+        attempt['result']['created_receipt'].update(sha256=factory.sha(receipt),
+            metadata={k:v for k,v in meta(receipt,mode=0o600).items() if k not in ('kind','sha256')},
+            node_sqlite_event_sha256=factory.d.digest(proof))
+        with native_pins(seed):
+            result=factory.prepare_host_inputs(seed)
+            self.assertEqual(result['state'],'COMPILED_NOT_ADMITTED',result.get('unresolved'))
+            contract=factory.compile_host_contract(result['inputs'])
+        inputs=result['inputs'];self.assertEqual(len(inputs['source_payloads']),107)
+        self.assertEqual(len(inputs['resource_views']),17)
+        self.assertEqual({k:inputs['resource_directories'][path][0][k] for k in ('uid','gid','mode')},
+                         {'uid':0,'gid':0,'mode':0o755})
+        self.assertNotIn(path+'/openclaw',inputs['resource_directories'])
+        # Missing dotenv ancestry is proved by the quiet reader's shared
+        # DescriptorReader, not represented as an existing resource parent.
+        for view in inputs['resource_views']:
+            self.assertFalse(any(row['path']==path+'/openclaw/gateway.env'
+                                 for rows in view.values() for row in rows))
+        self.assertEqual(contract['host_contract']['production_acceptance'],'PENDING')
+        self.assertFalse(result['install_admission'])
 
     def test_real107_whole_factory_with_three_missing_timer_fields_then_live(self):
         seed=make_seed(service_fixture=typed_fixture)

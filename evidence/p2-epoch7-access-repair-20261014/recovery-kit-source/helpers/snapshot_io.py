@@ -95,6 +95,7 @@ class DescriptorReader(object):
     def parent(self, logical, missing=False):
         c.path(logical)
         held, links = [], []
+        primary = None
         try:
             current = os.open(self.root, DIRFLAGS); held.append(current)
             c.need(stamp(os.fstat(current))[:5] == self.root_identity, 'READER_ROOT_CHANGED')
@@ -111,18 +112,31 @@ class DescriptorReader(object):
                     yield None, None
                     c.need(sorted(os.listdir(current)) == names and stamp(os.fstat(current)) == first,
                            'ABSENCE_PARENT_CHANGED')
-                    return
+                    # Missing descendants still require the same held
+                    # ancestor/root identity reread as an existing leaf.
+                    break
                 child = os.open(part, DIRFLAGS, dir_fd=current); held.append(child)
                 c.need(stamp(before) == stamp(os.fstat(child)), 'ANCESTOR_OPEN_RACE')
                 self._authority(child, at)
                 links.append((current, part, before, child)); current = child
-            yield current, logical.rsplit('/', 1)[1]
+            else:
+                yield current, logical.rsplit('/', 1)[1]
             for parent, name, before, child in reversed(links):
                 c.need(stamp(os.stat(name, dir_fd=parent, follow_symlinks=False))[:5] == stamp(before)[:5] and
                        stamp(os.fstat(child))[:5] == stamp(before)[:5], 'ANCESTOR_REPLACED')
             c.need(stamp(os.lstat(self.root))[:5] == self.root_identity, 'READER_ROOT_REPLACED')
+        except BaseException as error:
+            primary = error; raise
         finally:
-            for fd in reversed(held): os.close(fd)
+            failure = None
+            for fd in reversed(held):
+                # Every owned descriptor gets one independent attempt. A close
+                # interrupted after release is ambiguous, so never retry it.
+                try: os.close(fd)
+                except BaseException as error:
+                    if failure is None: failure = error
+            if failure is not None:
+                raise (primary if primary is not None else failure) from ValueError('READER_PARENT_CLEANUP_UNKNOWN')
 
     def read(self, logical, maximum=MAXIMUM):
         c.need(type(maximum) is int and 0 < maximum <= 536870912, 'READ_LIMIT')

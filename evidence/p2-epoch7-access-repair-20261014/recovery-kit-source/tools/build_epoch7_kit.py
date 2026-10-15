@@ -17,7 +17,7 @@ from epoch7_recovery_entry import (DescriptorTree, ENTRY, MANIFEST, RUNTIME,
     MAX_TOTAL, MAX_FILES, need, sha, decode, relative, directories, validate_manifest, validate_runtime,
     PUBLIC_FIXTURE_SOURCES, MODE_STATUS, RESUME_REFUSED)
 
-ROOT_NAME = 'epoch7-recovery-candidate-r3'
+ROOT_NAME = 'epoch7-recovery-candidate-r4'
 ARCHIVE = 'epoch7-recovery-kit.tar.gz'
 
 
