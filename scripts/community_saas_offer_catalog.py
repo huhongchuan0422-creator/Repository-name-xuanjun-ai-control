@@ -152,15 +152,26 @@ def approve_offer(db,offer_id,version,approval_ref,cost_evidence_ref,approved_at
     _identifier(approval_ref);_identifier(cost_evidence_ref)
     if type(approved_at) is not int or approved_at<0:
         raise ValueError("INVALID_APPROVAL_TIME")
-    offer=get_offer(db,offer_id,version)
-    if any(line["cost_cny_minor"] is None or line["cost_usd_minor"] is None
-           for line in offer["lines"]):
-        raise ValueError("COST_EVIDENCE_REQUIRED")
-    if not offer["active"]:
-        raise ValueError("OFFER_NOT_AVAILABLE")
-    with db:
+    # Acquire the SQLite writer reservation BEFORE reading any charge/cost line.
+    # A plain "with db" does not acquire this lock for preceding SELECTs.
+    # Explicitly reject nesting so no caller transaction is committed implicitly.
+    if db.in_transaction:
+        raise ValueError("APPROVAL_REQUIRES_OWN_TRANSACTION")
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        offer=get_offer(db,offer_id,version)
+        if not offer["lines"] or any(
+            line["cost_cny_minor"] is None or line["cost_usd_minor"] is None
+            for line in offer["lines"]):
+            raise ValueError("COST_EVIDENCE_REQUIRED")
+        if not offer["active"]:
+            raise ValueError("OFFER_NOT_AVAILABLE")
         db.execute("INSERT INTO saas_offer_approvals VALUES(?,?,?,?,?)",
                    (offer_id,version,approval_ref,cost_evidence_ref,approved_at))
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
     return {"offer_id":offer_id,"version":version,"approved":True}
 
 def get_offer(db,offer_id,version):
