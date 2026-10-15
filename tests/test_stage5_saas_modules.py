@@ -39,6 +39,16 @@ class SaasModuleTests(unittest.TestCase):
   self.assertEqual(events,4)
   with self.assertRaises(sqlite3.IntegrityError):
    self.db.execute("UPDATE module_events SET action='FRAUD'")
+ def test_early_renewal_preserves_existing_active_entitlement(self):
+  set_price(self.db,"storefront_catalog",1,1000,200,30)
+  grant(self.db,"tenantEarly","storefront_catalog",100,200,1)
+  grant(self.db,"tenantEarly","storefront_catalog",190,300,1)
+  self.assertTrue(entitled(self.db,"tenantEarly","storefront_catalog",110))
+  self.assertTrue(entitled(self.db,"tenantEarly","storefront_catalog",199))
+  self.assertTrue(entitled(self.db,"tenantEarly","storefront_catalog",250))
+  self.assertFalse(entitled(self.db,"tenantEarly","storefront_catalog",300))
+  row=self.db.execute("SELECT valid_from,valid_until FROM module_entitlements WHERE tenant_id=?",("tenantEarly",)).fetchone()
+  self.assertEqual(row,(100,300))
  def test_no_unauthorized_free_or_unknown_price(self):
   with self.assertRaises(ValueError):grant(self.db,"tenantA","signed_qr",100,200,1)
   with self.assertRaises(ValueError):set_price(self.db,"signed_qr",1,True,100,30)
