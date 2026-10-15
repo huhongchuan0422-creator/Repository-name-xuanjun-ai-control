@@ -83,6 +83,11 @@ CREATE TABLE IF NOT EXISTS saas_review_tasks(
  kind TEXT NOT NULL CHECK(kind IN ('FINANCE_EVIDENCE','ENTITLEMENT','RENEWAL','CONTRACT','REFUND','DEPLOYMENT')),
  created_at INTEGER NOT NULL, state TEXT NOT NULL CHECK(state IN ('PENDING','RESOLVED','CANCELLED')),
  reason TEXT NOT NULL);
+CREATE TRIGGER saas_review_identity_immutable BEFORE UPDATE ON saas_review_tasks
+WHEN NEW.tenant_id!=OLD.tenant_id OR NEW.order_id!=OLD.order_id OR
+     NEW.kind!=OLD.kind OR NEW.created_at!=OLD.created_at OR NEW.reason!=OLD.reason OR
+     OLD.state!='PENDING' OR NEW.state NOT IN ('RESOLVED','CANCELLED')
+BEGIN SELECT RAISE(ABORT,'REVIEW_IDENTITY_OR_TRANSITION_IMMUTABLE'); END;
 CREATE TRIGGER IF NOT EXISTS saas_review_no_delete BEFORE DELETE ON saas_review_tasks
  BEGIN SELECT RAISE(ABORT,'REVIEW_TASK_DELETE_BLOCKED'); END;
 CREATE TABLE IF NOT EXISTS saas_review_events(
