@@ -89,6 +89,7 @@ def quote_offers(db,module_id,procurement_mode="XUANJUN_MANAGED"):
  for oid,mode,version,term,renewable,scope,basis in rows:
   components=[]
   total_cny=total_usd=0
+  by_cadence={}
   for cid,kind,cadence,cny,usd,discount,supplier,evidence,included in db.execute(
       "SELECT component_id,kind,cadence,cny_minor,usd_minor,discount,supplier_id,source_evidence,included "
       "FROM components WHERE offer_id=? ORDER BY component_id",(oid,)):
@@ -98,14 +99,24 @@ def quote_offers(db,module_id,procurement_mode="XUANJUN_MANAGED"):
    charge_cny=0 if included else cny*adjustment
    charge_usd=0 if included else usd*adjustment
    total_cny+=charge_cny;total_usd+=charge_usd
+   period=by_cadence.setdefault(cadence,{"cny_minor":0,"usd_minor":0})
+   period["cny_minor"]+=charge_cny
+   period["usd_minor"]+=charge_usd
    components.append({"component_id":cid,"kind":kind,"cadence":cadence,"cny_minor":charge_cny,
       "usd_minor":charge_usd,"supplier_id":supplier,"evidence":evidence,"included":bool(included)})
-  if total_cny<0 or total_usd<0:raise ValueError("NEGATIVE_QUOTE_TOTAL")
+  # Discounts must not make any billing cadence negative, even if another
+  # cadence is positive. An arithmetic sum across cadences is never payable.
+  if total_cny<0 or total_usd<0 or any(
+      amount["cny_minor"]<0 or amount["usd_minor"]<0
+      for amount in by_cadence.values()):
+   raise ValueError("NEGATIVE_QUOTE_TOTAL")
   if mode in ("FREE","PROMO_ZERO") and (total_cny!=0 or total_usd!=0):
    raise ValueError("FREE_OFFER_HAS_PAYABLE_COMPONENTS")
   result.append({"offer_id":oid,"mode":mode,"version":version,"term_days":term,
    "renewable":bool(renewable),"license_scope":scope,"price_basis":basis,
    "components":components,"total_cny_minor":total_cny,"total_usd_minor":total_usd,
+   "totals_by_cadence":by_cadence,"mixed_billing_cadences":len(by_cadence)>1,
+   "totals_are_payable":False,
    "settlement_currency":None,"fx_rate_assumed":False,"procurement_executed":False})
  return result
 def change_offer_status(db,offer_id,new_status,cost_db=None):
