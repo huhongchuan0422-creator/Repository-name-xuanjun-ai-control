@@ -53,7 +53,7 @@ def prepare(db,quote_db,order_id,tenant_id,quote_id,currency,now):
     if not breakdown or any(group.get(key) is None for group in breakdown.values()):
         raise ValueError("UNKNOWN_QUOTE_AMOUNT")
     totals={cycle:group[key] for cycle,group in breakdown.items()}
-    if any(type(v) is not int or v<0 for v in totals.values()):
+    if any(type(v) is not int or not 0<=v<=9007199254740991 for v in totals.values()):
         raise ValueError("INVALID_QUOTE_AMOUNT")
     if not q.get("offer_governed") or not q.get("approval_ref") or not q.get("cost_evidence_ref"):
         raise ValueError("OFFER_APPROVAL_REQUIRED")
