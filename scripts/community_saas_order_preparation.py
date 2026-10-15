@@ -186,6 +186,13 @@ def quote_provenance(db,order_id,tenant_id):
         sort_keys=True,separators=(",",":")).encode("utf-8")).hexdigest()
     if actual!=order["quote_sha256"]:
         raise ValueError("QUOTE_SNAPSHOT_DIGEST_MISMATCH")
+    q=order["quote_snapshot"]
+    key=order["currency"].lower()+"_minor"
+    expected={cycle:amount.get(key) for cycle,amount in q["totals_by_cycle"].items()}
+    if (q["tenant_id"]!=tenant_id or q["module_id"]!=order["module_id"]
+            or q["offer_id"]!=order["offer_id"] or q["version"]!=order["offer_version"]
+            or expected!=order["amounts_by_cycle_minor"]):
+        raise ValueError("ORDER_QUOTE_BINDING_MISMATCH")
     return {"order_id":order_id,"quote_id":order["quote_id"],
             "quote_sha256":actual,"verified":True}
 
