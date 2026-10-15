@@ -42,7 +42,7 @@ def open_offer_store(path=":memory:"):
   row=db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
   expected={"offers","components"}
   if not row and db.execute("PRAGMA user_version").fetchone()[0]==0:
-   transactional_install(db,SCHEMA,lambda:verify(db,SCHEMA,expected))
+   transactional_install(db,SCHEMA+"\nPRAGMA user_version=1;",lambda:verify(db,SCHEMA,expected))
   else:
    verify(db,SCHEMA,expected)
   return db
