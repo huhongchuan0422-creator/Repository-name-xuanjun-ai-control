@@ -61,7 +61,7 @@ def compiler_fixture():
         'executables':{'/usr/bin/python3':executable},'runtime_manifest_bytes':manifest,
         'background_processes':[],'source_bytes':{},'command_resolutions':{},'boot_before':{u:'disabled' for u in boot},
         'dropin_inventory':{u:{prefix+'/'+u+'.d':{'present':False,'files':{}} for prefix in
-            ('/etc/systemd/system','/run/systemd/system','/usr/lib/systemd/system')} for u in sc.DIRECT}}
+            ('/etc/systemd/system','/run/systemd/system','/usr/lib/systemd/system')} for u in set(sc.DIRECT)|set(live.SOCKET_SERVICES)}}
     cb='/etc/systemd/system/xuanjun-uk-owner-callback.service';raw=compiled['rendered_targets'][cb]
     argv=sc.literal_argv(sc.one(sc.unit_sections(raw)['Service'],'ExecStart'))
     owner={'argv':argv,'python_exe':executable['path'],'python_sha256':executable['sha256'],
@@ -445,6 +445,70 @@ class ObservationAdapterTests(unittest.TestCase):
     def test_missing_cpu_measurement_does_not_create_nginx_recipe(self):
         self.observation['unit_metadata']['sections'].pop('online_cpus');self.repin()
         self.assertNotIn('nginx_recipe_evidence',self.normalize()['fresh_facts'])
+
+
+class SocketDeclarationTests(unittest.TestCase):
+    def compile(self,args,delta):return sc.compile_service_contract(*args,candidate_delta=delta)
+    def test_all_three_final_sockets_derive_running_with_exact_association(self):
+        args,delta=compiler_fixture();result=self.compile(args,delta)
+        for socket_unit,(service_unit,endpoint) in live.SOCKET_SERVICES.items():
+            derived=result['derivations'][socket_unit]
+            self.assertEqual(derived['service'],service_unit);self.assertEqual(derived['endpoint'],endpoint)
+            self.assertEqual(derived['preactivation_substate'],'listening')
+            for index in (15,16):
+                point=result['derived_unit_checkpoints'][index]
+                self.assertEqual(point[socket_unit]['properties']['SubState'],'running')
+                self.assertEqual(point[service_unit]['properties']['SubState'],'running')
+    def test_accept_service_endpoint_and_listener_kind_are_not_wildcards(self):
+        for addition in ('Accept=yes','Service=foreign.service','ListenDatagram=/run/foreign',
+                         'ListenStream=/run/foreign','Accept=no\nAccept=no'):
+            args,delta=compiler_fixture();path=sc.UNIT_ROOT+'xuanjun-ledger.socket'
+            raw=args[0]['rendered_targets'][path].replace('[Socket]','[Socket]\n'+addition)
+            args[0]['rendered_targets'][path]=raw
+            next(x for x in args[0]['runtime']['provisioning'] if x['target']==path)['rendered_sha256']=sc.sha(raw.encode())
+            with self.subTest(addition=addition),self.assertRaises(ValueError):self.compile(args,delta)
+    def test_real_dropin_producer_normalizer_and_compiler_agree(self):
+        import unit_metadata as u
+        import snapshot_io as reader
+        from test_unit_metadata import Fake,native_pin_context
+        io=Fake();concrete=object.__new__(reader.LocalReadOnlyIO);paths=[]
+        def absent(path):paths.append(path);return True
+        concrete.absent=absent
+        io.unit_dropins=concrete.unit_dropins
+        with native_pin_context(io.native_raws):metadata=u.collect_unit_facts(io)
+        self.assertEqual(metadata['sections']['dropins']['state'],'MEASURED_UNREVIEWED')
+        self.assertEqual(len(set(paths)),33)
+        args,delta=compiler_fixture();facts=args[4]
+        # Feed the genuine collector-produced section through the real adapter.
+        # The remaining synthetic service facts retain their existing fixture.
+        value={'sections':{'dropins':metadata['sections']['dropins']},'unsupported_sections':[]}
+        observation={'unit_metadata':value,'unit_metadata_sha256':live.digest(value),
+            'evidence':{'writers':{'units':{unit:{'state':row} for unit,row in facts['unit_states'].items()},
+            'processes':{'background_processes':[],'background_processes_sha256':live.digest([])}}}}
+        normalized=sc.service_facts_from_observation(observation,facts['runtime_manifest_bytes'],facts['boot_before'])
+        facts['dropin_inventory']=normalized['fresh_facts']['dropin_inventory']
+        self.assertEqual(set(facts['dropin_inventory']),set(u.DROPIN_UNITS))
+        result=sc.compile_service_contract(*args,candidate_delta=delta)
+        self.assertFalse(any(row['code']=='EFFECTIVE_UNIT_DROPIN_CLOSURE' for row in result['unresolved']))
+        for unit in u.SOCKET_UNITS:
+            altered=copy.deepcopy(args);del altered[4]['dropin_inventory'][unit]
+            result=sc.compile_service_contract(*altered,candidate_delta=delta)
+            self.assertTrue(any(row['code']=='EFFECTIVE_UNIT_DROPIN_CLOSURE' and row['unit']==unit for row in result['unresolved']))
+
+    def test_all_socket_dropin_scopes_are_required_even_when_manager_reports_empty(self):
+        for socket_unit in live.SOCKET_SERVICES:
+            for mode in ('missing','unknown','hidden'):
+                args,delta=compiler_fixture();scope=args[4]['dropin_inventory']
+                if mode=='missing':scope.pop(socket_unit)
+                elif mode=='unknown':scope[socket_unit][next(iter(scope[socket_unit]))]['state']='UNKNOWN'
+                else:scope[socket_unit][next(iter(scope[socket_unit]))]['files']={'override.conf':{}}
+                result=self.compile(args,delta)
+                self.assertIn({'code':'EFFECTIVE_UNIT_DROPIN_CLOSURE','unit':socket_unit,'fields':['DropInPaths']},result['unresolved'])
+    def test_missing_fixed_socket_declaration_rejected(self):
+        args,delta=compiler_fixture();path=sc.UNIT_ROOT+'xuanjun-ledger.socket'
+        args[0]['rendered_targets'].pop(path)
+        args[0]['runtime']['provisioning']=[x for x in args[0]['runtime']['provisioning'] if x['target']!=path]
+        with self.assertRaisesRegex(ValueError,'EXACT_SOCKET_UNIT_SET'):self.compile(args,delta)
 
 
 if __name__=='__main__':unittest.main()

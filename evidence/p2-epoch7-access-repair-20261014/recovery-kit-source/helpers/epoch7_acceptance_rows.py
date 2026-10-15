@@ -154,8 +154,9 @@ def acceptance_facts_from_observation(observation):
     unit_evidence(gateway,gateway['path'],True)
     dropins=sections['dropins']['evidence'];need(dropins.get('unsupported')==[] and
         dropins.get('raw_unit_bytes_returned') is False,'COMPLETE_PUBLIC_DROPINS')
-    units={row[0] for row in ROLES.values()};all_units=units|{'xj-root-broker.service','nginx.service'}
-    keys(dropins['units'],all_units,'COMPLETE_EIGHT_UNIT_INVENTORY');projected={}
+    units={row[0] for row in ROLES.values()};all_units=units|{'xj-root-broker.service','nginx.service',
+        'xj-root-broker.socket','xuanjun-ledger.socket','xuanjun-p2-gateway-relay.socket'}
+    keys(dropins['units'],all_units,'COMPLETE_ELEVEN_UNIT_INVENTORY');projected={}
     for unit,roots in dropins['units'].items():
         expected={prefix+'/'+unit+'.d' for prefix in
             ('/etc/systemd/system','/run/systemd/system','/usr/lib/systemd/system')}

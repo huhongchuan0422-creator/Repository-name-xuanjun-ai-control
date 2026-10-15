@@ -87,8 +87,10 @@ class ServerPolicyTests(unittest.TestCase):
         self.assertFalse(result['permission_applied'])
     def test_superseded_validator_pin_rejected(self):
         from unittest.mock import patch
-        with patch.object(server,'VALIDATOR_CONTRACT_SHA256','19d60f4d567a0bad477b616fc427f3ba7acf38b8ee959786f20047b092ac4971'):
-            with self.assertRaisesRegex(ValueError,'REVIEWED_VALIDATOR_CONTRACT'):self.compile()
+        for superseded in ('19d60f4d567a0bad477b616fc427f3ba7acf38b8ee959786f20047b092ac4971',
+                           'bb47927facbd55589aed2303d0cd201a071cad4de41d71f1dcb150287bd8cbab'):
+            with self.subTest(pin=superseded),patch.object(server,'VALIDATOR_CONTRACT_SHA256',superseded):
+                with self.assertRaisesRegex(ValueError,'REVIEWED_VALIDATOR_CONTRACT'):self.compile()
     def test_compiled_validator_source_cannot_change(self):
         value=self.compile(); value['provenance']['validator_source_sha256']=h('other source')
         with self.assertRaisesRegex(ValueError,'PROVENANCE_BINDING'):

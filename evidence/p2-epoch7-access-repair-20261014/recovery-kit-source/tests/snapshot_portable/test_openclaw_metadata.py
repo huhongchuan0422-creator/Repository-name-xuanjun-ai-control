@@ -244,6 +244,17 @@ class CollectorTests(unittest.TestCase):
         self.assertNotIn(old+'/stage1/.env',self.io.absences)
         o.prime_profile_scope(self.io,self.io.observation['unit_metadata'],ROOT)
         self.assertIn(ROOT+'/stage1/.env',self.io.absences)
+    def test_occupied_r6_kit_has_no_staged_cwd_or_dotenv_authority(self):
+        old=c.CAND+'/epoch7-recovery-candidate-r6/xuanjun-p2-package'
+        with mock.patch.object(o,'SOURCE_HASHES',self.io.expected):
+            result=o.collect_openclaw_profile(self.io,self.io.observation['unit_metadata'],self.io.observation,old)
+        self.assertIn('relay_cwd',result['missing_fields'])
+        self.assertEqual(result['sections']['relay_cwd']['reason'],'OPENCLAW_STAGED_CWD_REQUIRED')
+        self.io.absences=[]
+        o.prime_profile_scope(self.io,self.io.observation['unit_metadata'],old)
+        self.assertNotIn(old+'/stage1/.env',self.io.absences)
+        o.prime_profile_scope(self.io,self.io.observation['unit_metadata'],ROOT)
+        self.assertIn(ROOT+'/stage1/.env',self.io.absences)
     def test_late_file_change_refused(self):
         read=self.io.read;count=[0]
         def changed(path,maximum=16777216):

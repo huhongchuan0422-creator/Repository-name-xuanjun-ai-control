@@ -22,9 +22,9 @@ from epoch7_complete_approval import CompleteApprovalVerifier
 from epoch7_bounded_stager import FrozenBoundedInstaller
 from activation_control import ActivationStore
 
-MANIFEST = '26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa'
-SOURCE = '101b465ca3554bf34fef2d53d6006b96d85c4a63'
-SOURCE_TREE = '3ae50b40c38d9a807876c175818299e344d53134'
+MANIFEST = '0ac28c96636ee63364015b375202779e2ef1dd0bd9f1b81e77d4387b6754316c'
+SOURCE = '4ed2f5114e2f065266af26eedd8d62aebdbf0957'
+SOURCE_TREE = '0c2cbcb0f898331865bbdfdf39f2c85ef675a88a'
 BRIDGE_SHA256 = '3a5e72e5c3f24c718807ad1d87299358440469dc18c87339721008a93fdcb0c3'
 READY = 'READY_ISSUED_AND_RENEWAL_DRYRUN_VERIFIED'
 TLS_JOURNAL = fs.TRANSACTION + '/tls-lifecycle.json'

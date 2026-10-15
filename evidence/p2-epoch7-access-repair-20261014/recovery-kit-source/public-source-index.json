@@ -1,7 +1,7 @@
 {
   "files": {
     "epoch7_recovery_entry.py": {
-      "sha256": "c56ba6d8281eeb1ecc062875a7f13defc223f6d5dd073a4490d1602b8cf1d3a5",
+      "sha256": "1be06802e012b5747f837af02ff8746fec9864ef94715b561f67c39be95e0948",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/epoch7_recovery_entry.py"
     },
     "helpers/epoch3_service_containment.py": {
@@ -9,7 +9,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch3_service_containment.py"
     },
     "helpers/epoch7_acceptance_rows.py": {
-      "sha256": "a622d16ac99801f709a2ae95f17802a20dd350c0f8c07764efa74b6b43f1243c",
+      "sha256": "a009ad14d93aaca008dabd70863f975f19dc7e4ebaf10f5206fec406556c936d",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_acceptance_rows.py"
     },
     "helpers/epoch7_additive_identity.py": {
@@ -17,7 +17,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_additive_identity.py"
     },
     "helpers/epoch7_additive_server.py": {
-      "sha256": "17f3cff1a961c4ac78c1b3c57aa77e77255d0d69b7860be6c0a2e2350f0231a3",
+      "sha256": "37aa9151d76be4934d6d7b62816944b034ddf8b76db368306ed7e861a8fea89c",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_additive_server.py"
     },
     "helpers/epoch7_approval.py": {
@@ -25,7 +25,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_approval.py"
     },
     "helpers/epoch7_bindings.py": {
-      "sha256": "55bf7955aea9a051996f2c44ff8660a2a770ba832e63412aeab0531e8260fe36",
+      "sha256": "f64ee85fb26aa48678fb68c5e4954714e2f3068a1af58c19d21b6d343dcaa61a",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_bindings.py"
     },
     "helpers/epoch7_bounded_stager.py": {
@@ -41,7 +41,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_complete_approval.py"
     },
     "helpers/epoch7_delta.py": {
-      "sha256": "f181a652d240c1678ffcd7f85de89d5cf3e101d894d82e7127a4177f719e9ad7",
+      "sha256": "eb367505281d4a56e3665d3b35fd5c55f40aa4885393d2d5738e87f447447d12",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_delta.py"
     },
     "helpers/epoch7_exact_access.py": {
@@ -65,7 +65,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_observer.py"
     },
     "helpers/epoch7_host_phases.py": {
-      "sha256": "d90bfaa54177614d327a3ab4ac8aee65595ef77000cb583ce7d800141c2c335b",
+      "sha256": "f0c5e77767ce36d8c9c34c153311b444a29c6226ecf3a73a79ac5bca3c3a29e5",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_phases.py"
     },
     "helpers/epoch7_injected_recovery.py": {
@@ -73,7 +73,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_injected_recovery.py"
     },
     "helpers/epoch7_live_controls.py": {
-      "sha256": "0673b8788153e3c47e6a49ea271891790415bbbcb66e9940190127b0df5b0a13",
+      "sha256": "258301e7772a1b197ff6b49c58731bdef5f447ed1d2995cd29e4258c782346c8",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_live_controls.py"
     },
     "helpers/epoch7_nginx_recipe.py": {
@@ -121,11 +121,11 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_runtime_acceptance.py"
     },
     "helpers/epoch7_runtime_effects.py": {
-      "sha256": "f7ce4159a6f376542dfd5446b1db323975f8007b870b59abc442ab2852ee26f0",
+      "sha256": "568d88003792f5ea89f2575d53bb956ecdf5a419df8004cf51cfcb7082323f17",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_runtime_effects.py"
     },
     "helpers/epoch7_service_contract.py": {
-      "sha256": "97c00c4eb12b5c308931f64b456b0e29d1f3996b275b88092d7f163916a8f907",
+      "sha256": "a8a3f0ff8534c56d2dc5af76367ec4993ab0e91dcf146d78bec510dea172f4f1",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_service_contract.py"
     },
     "helpers/epoch7_service_roles.py": {
@@ -157,11 +157,11 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/observe_epoch7.py"
     },
     "helpers/openclaw_metadata.py": {
-      "sha256": "5afd22f3651accede90e254df96f21c2306e2cf973243abba24a457995ee1d1e",
+      "sha256": "a9fe22832f135dded6b6f25482bd1341923bfe0d2e349a571b7bead114361b8b",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/openclaw_metadata.py"
     },
     "helpers/probe_driver.py": {
-      "sha256": "90f203a4aafe591fa508a444847557b8115df79bbad4e4096bd1cc371a935dbd",
+      "sha256": "18bdc9ed897a084e69aaf7da80763b4f43f3298f0b79f7b35e8a04e5dcbd6808",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/probe_driver.py"
     },
     "helpers/probe_helpers.py": {
@@ -169,7 +169,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/probe_helpers.py"
     },
     "helpers/probe_metadata.py": {
-      "sha256": "af2c1c88b9f47971919cbe6eecb03d8adfa760de7f30c7de0b6be0dca540a025",
+      "sha256": "ec8935f96bad8ffb1e9dade4f77bcd3538ac73cd3254e6a1fa01d2511d1c31f8",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/probe_metadata.py"
     },
     "helpers/protected_command_evidence.py": {
@@ -193,15 +193,15 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/reviewed_sources.json"
     },
     "helpers/snapshot_io.py": {
-      "sha256": "8ff9c0569642d602ac9bdde58f03c1e7d0075d66a4927c595d9ee5b3982f1420",
+      "sha256": "3f24884eaee91e9738397a952927c1be324350f88c631ff546a11efc259c8f85",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/snapshot_io.py"
     },
     "helpers/unit_metadata.py": {
-      "sha256": "cbb1e9b9abab583d19a6dc0c91fcc8a37912ae1b259fa02770cb281d489d42e3",
+      "sha256": "ebc126a70a7876b5521d0331a0a45334c371e3e0f8a2e3fac93a3d110f37bea0",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/unit_metadata.py"
     },
     "tests/acceptance_rows/test_epoch7_acceptance_rows.py": {
-      "sha256": "6579ddb45a6499d0bc098402657e3a0a8bc4c6b20024f870bb6e2fed62c6e41e",
+      "sha256": "186b85dd51d1193af4e9706623ecb14dbcac588c872f7174dc97f6232aaa7415",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/acceptance_rows/test_epoch7_acceptance_rows.py"
     },
     "tests/access_plan/test_exact_access_plan.py": {
@@ -285,7 +285,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/host_stager/test_epoch7_bounded_stager.py"
     },
     "tests/live_controls/test_epoch7_live_controls.py": {
-      "sha256": "2bc698ee53f20f698bc7aecb84074a682d0561ff64c36b759baf622c80eff5e0",
+      "sha256": "61c1d79a956aeb03cbcb31d78bca2e6a3f751580d2fe9bac89d378c58eeef8a3",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/live_controls/test_epoch7_live_controls.py"
     },
     "tests/live_controls/test_epoch7_observer_binding.py": {
@@ -341,7 +341,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery/test_epoch7_additive_identity.py"
     },
     "tests/recovery/test_epoch7_additive_server.py": {
-      "sha256": "85ea2d1997ad9f024f1939a06179d681d2d52408d77648794d3f504205377d56",
+      "sha256": "ea3c57e793d1bb1af5bf16c7eb700485a4de307bc12942c124d3ded394022f3e",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/recovery/test_epoch7_additive_server.py"
     },
     "tests/recovery/test_epoch7_delta.py": {
@@ -396,6 +396,10 @@
       "sha256": "73b20f4fa16d28496cea806afade8d8497e4e8ef9ad5dd212bb3deb093a55b55",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_process/test_runtime_command_lifetime.py"
     },
+    "tests/runtime_projection/saved_socket_states.json": {
+      "sha256": "0f4ae4706c4f8902485fe363c6d4c566f60a028631cf79f478ebaf4d114d4fab",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/saved_socket_states.json"
+    },
     "tests/runtime_projection/test_entrypoint_help.py": {
       "sha256": "3db348155345e37fd330ae518cdd7f974ecf75310afaf9752169b31f71ae28d8",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_entrypoint_help.py"
@@ -409,11 +413,11 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_ledger_read_projection.py"
     },
     "tests/runtime_projection/test_ledger_server_identity.py": {
-      "sha256": "5dadbd6e8d72747c21ae80b5acccb27d9318a3b74b57eee1b19e04b88dd1528a",
+      "sha256": "0b7f19a7d0c1e5a7691db1b6be96e426bd35ebe1ffc77390550f0b2bc9082b34",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_ledger_server_identity.py"
     },
     "tests/runtime_projection/test_native_server_identity.py": {
-      "sha256": "22ea198037867fbd3ed0013f01f07725e1e0f0b187e2ecff789cd91f244c7708",
+      "sha256": "5b4e6659290ea94c881b68e7b2a96bde3647942e1c03d086bdf8a07fb5c99fa6",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_native_server_identity.py"
     },
     "tests/runtime_projection/test_owner_process_gate.py": {
@@ -427,6 +431,14 @@
     "tests/runtime_projection/test_read_transport.py": {
       "sha256": "ae0a3342858dd91d6801c425186bddbb98fb9f6f468c7ee9eb5f5d73b452fb7c",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_read_transport.py"
+    },
+    "tests/runtime_projection/test_socket_lifecycle.py": {
+      "sha256": "18c6819fb8af3f2fa146966f25dfa653e9564f79b08ad9cec96d8cde4dcff605",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_socket_lifecycle.py"
+    },
+    "tests/runtime_projection/test_socket_lifecycle_wiring.py": {
+      "sha256": "a4909234904931eca266336e59340d6d988d0a390c6bc2ed4beb014bbda4ac84",
+      "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/runtime_projection/test_socket_lifecycle_wiring.py"
     },
     "tests/runtime_wiring/test_ledger_identity_wiring.py": {
       "sha256": "5e1edd471e5f5f2957893dd2df83710164ba6bf5a5f8004295094480ea642324",
@@ -457,7 +469,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/fixtures/openclaw-source-profile.json"
     },
     "tests/service_contract/fixtures/public-service-units.json": {
-      "sha256": "87e1e2af203ff983914935fc7c4d7588600e1c384f174fbf84ffceae0ad0d1a1",
+      "sha256": "d8a52c19221d1ebcc2da9d301a2d7def02ebd3d9c7b90c2029d6e8e4acc6d37a",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/fixtures/public-service-units.json"
     },
     "tests/service_contract/test_epoch7_openclaw_direct.py": {
@@ -477,7 +489,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/test_epoch7_openclaw_roles.py"
     },
     "tests/service_contract/test_epoch7_service_contract.py": {
-      "sha256": "a1e1324efa071c8228324fb6652ce44e7af6529fb2cd61ae1539752dfd6f07f9",
+      "sha256": "1e7c631feabd7ac4fa495a075701be37ac34c82f7767e28204b64fb989f5ee04",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/service_contract/test_epoch7_service_contract.py"
     },
     "tests/snapshot/test_snapshot.py": {
@@ -505,7 +517,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_node_directory_alias.py"
     },
     "tests/snapshot_portable/test_openclaw_metadata.py": {
-      "sha256": "fe8bbcb6253c42f4e4bc2013416cafd4796361a456b0017f0c2b47495779eec7",
+      "sha256": "45fe6aaef53efcb6aa30ae3738aa5d5afd97a87e1d28380193be7b783f2201a7",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_openclaw_metadata.py"
     },
     "tests/snapshot_portable/test_path_sources.py": {
@@ -513,7 +525,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_path_sources.py"
     },
     "tests/snapshot_portable/test_probe_metadata.py": {
-      "sha256": "f0ff7d742b8d888a0b201bd5c013e9535e3a27d3d0c6c7f31cad9fcb59b24a5b",
+      "sha256": "33aea6ac9645aa49ab4ebb411e32f052aa244dca4e8dae9327d3d55769fc7a9d",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_probe_metadata.py"
     },
     "tests/snapshot_portable/test_python_identity.py": {
@@ -537,7 +549,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_timer_metadata.py"
     },
     "tests/snapshot_portable/test_unit_metadata.py": {
-      "sha256": "17f9632cbc7d047b4b88292ff6f8f18576c4cdb60de25dff04f2bcf1be135c72",
+      "sha256": "5ea4cffb8b7db9af37059e72e51e73c862f85eee95f8870c7a443b9b5cfcfce8",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/snapshot_portable/test_unit_metadata.py"
     },
     "tests/snapshot_portable/test_unit_process_fields.py": {
@@ -671,9 +683,9 @@
     "unit_metadata": "helpers/unit_metadata.py"
   },
   "production_resume": "AUTHENTICATED_APPROVAL_GATED_SINGLE_ATTEMPT",
-  "runtime_manifest_sha256": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
-  "runtime_source_commit": "101b465ca3554bf34fef2d53d6006b96d85c4a63",
-  "runtime_source_tree": "3ae50b40c38d9a807876c175818299e344d53134",
+  "runtime_manifest_sha256": "0ac28c96636ee63364015b375202779e2ef1dd0bd9f1b81e77d4387b6754316c",
+  "runtime_source_commit": "4ed2f5114e2f065266af26eedd8d62aebdbf0957",
+  "runtime_source_tree": "0c2cbcb0f898331865bbdfdf39f2c85ef675a88a",
   "schema": 1,
   "test_suites": {
     "acceptance_rows": {
@@ -776,7 +788,9 @@
         "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
         "test_probe_driver": "tests/probe/test_probe_driver.py",
         "test_probe_helpers": "tests/probe/test_probe_helpers.py",
+        "test_probe_metadata": "tests/snapshot_portable/test_probe_metadata.py",
         "test_snapshot": "tests/snapshot/test_snapshot.py",
+        "test_unit_metadata": "tests/snapshot_portable/test_unit_metadata.py",
         "test_unit_process_fields": "tests/snapshot_portable/test_unit_process_fields.py"
       },
       "reason": "Boundary-mock assembly/timer tests plus real107-source pure whole-factory compilation with synthetic measured host/probe records; only unavailable historical private sidefile pin is test-remapped, never a compiler result",
@@ -969,8 +983,10 @@
         "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
         "test_probe_driver": "tests/probe/test_probe_driver.py",
         "test_probe_helpers": "tests/probe/test_probe_helpers.py",
+        "test_probe_metadata": "tests/snapshot_portable/test_probe_metadata.py",
         "test_python_identity": "tests/snapshot_portable/test_python_identity.py",
         "test_snapshot": "tests/snapshot/test_snapshot.py",
+        "test_unit_metadata": "tests/snapshot_portable/test_unit_metadata.py",
         "test_unit_process_fields": "tests/snapshot_portable/test_unit_process_fields.py"
       },
       "reason": "All17 actual-byte resource checkpoint projections in authenticated disposable-copy confinement",
@@ -1038,7 +1054,9 @@
         "test_native_server_identity": "tests/runtime_projection/test_native_server_identity.py",
         "test_owner_process_gate": "tests/runtime_projection/test_owner_process_gate.py",
         "test_read_integration": "tests/runtime_projection/test_read_integration.py",
-        "test_read_transport": "tests/runtime_projection/test_read_transport.py"
+        "test_read_transport": "tests/runtime_projection/test_read_transport.py",
+        "test_socket_lifecycle": "tests/runtime_projection/test_socket_lifecycle.py",
+        "test_socket_lifecycle_wiring": "tests/runtime_projection/test_socket_lifecycle_wiring.py"
       },
       "reason": "Offline staged-runtime tests with local disposable fixtures; no UK capability or production acceptance",
       "tests": [
@@ -1049,7 +1067,9 @@
         "tests/runtime_projection/test_native_server_identity.py",
         "tests/runtime_projection/test_read_integration.py",
         "tests/runtime_projection/test_owner_process_gate.py",
-        "tests/runtime_projection/test_entrypoint_help.py"
+        "tests/runtime_projection/test_entrypoint_help.py",
+        "tests/runtime_projection/test_socket_lifecycle.py",
+        "tests/runtime_projection/test_socket_lifecycle_wiring.py"
       ]
     },
     "runtime_wiring": {
@@ -1099,7 +1119,9 @@
         "test_probe_child_cleanup": "tests/probe/test_probe_child_cleanup.py",
         "test_probe_driver": "tests/probe/test_probe_driver.py",
         "test_probe_helpers": "tests/probe/test_probe_helpers.py",
-        "test_snapshot": "tests/snapshot/test_snapshot.py"
+        "test_probe_metadata": "tests/snapshot_portable/test_probe_metadata.py",
+        "test_snapshot": "tests/snapshot/test_snapshot.py",
+        "test_unit_metadata": "tests/snapshot_portable/test_unit_metadata.py"
       },
       "reason": "Exact root-entry and direct-entry profiles, synthetic host facts, fixed 31 plus conditional 32nd official source; no deployed admission",
       "tests": [
@@ -1191,7 +1213,7 @@
   },
   "tools": {
     "README.md": {
-      "sha256": "98b5e8da8d83ee2f0657e3ec633d11c69948b3648222e4f4640f0478c3046a57",
+      "sha256": "0aec017a6f57a46272c8e1ada1c9ba54b3aa4ce85f44e085f702048d670e7728",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/README.md"
     },
     "audit_epoch7_imports.py": {
@@ -1199,11 +1221,11 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/audit_epoch7_imports.py"
     },
     "build_epoch7_kit.py": {
-      "sha256": "6d384c53477a89e3a22fb00f5a9a655944c9ac8e315f339db75db1f87965317b",
+      "sha256": "b27c943a521640625b46b54b3a5e0b2635fd1fbc35aff40fb1bf3d5d00c67acc",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/build_epoch7_kit.py"
     },
     "extract_epoch7_kit.py": {
-      "sha256": "e7977f5b849489befff4f782f35023f9267dd49a20b9b3e5f052eeb83758875d",
+      "sha256": "eba0e2de223f0e0853968cd2a47f827a0dfe670c437a2071ea82cfd13b36dbf0",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/extract_epoch7_kit.py"
     },
     "portable-tests/ADAPTERS.json": {
@@ -1215,11 +1237,11 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/run_epoch7_offline.py"
     },
     "run_published_kit_ci.py": {
-      "sha256": "1f15bda6fe2ac892350765be2b4115044833c8a938776f6386c29e0174a5c661",
+      "sha256": "f7098efa1c4a2e06c430cb2265afaa8a9f22aae953884a799ab910606895e937",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/run_published_kit_ci.py"
     },
     "test_epoch7_kit.py": {
-      "sha256": "8fd0ca0fd43d3f4806e52454da972a812eeb9bccbd207a0f182198bf3da59a05",
+      "sha256": "9e66a5969b9e864a8b622c2182b947eb5b19361da023ab0bde32ad527a78a68e",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/test_epoch7_kit.py"
     }
   }

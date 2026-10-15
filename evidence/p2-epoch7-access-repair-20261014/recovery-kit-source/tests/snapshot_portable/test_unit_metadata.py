@@ -44,7 +44,7 @@ class Fake(ProbeFake):
         self.add(dispatcher,b'[Service]\nEnvironment=LANG=C\nExecStart=/usr/bin/python3 -B /fixed/dispatcher.py\n',mode=0o644)
         receipt=c.decode(self.files[u.PROVISION]);pin=next(row for row in receipt['targets'] if row['target']==dispatcher)
         pin['rendered_sha256']=c.sha(self.files[dispatcher]);self.add(u.PROVISION,packed(receipt))
-        self.dropins={unit:{prefix+'/'+unit+'.d':{'present':False,'files':{}} for prefix in PREFIXES} for unit in u.UNITS}
+        self.dropins={unit:{prefix+'/'+unit+'.d':{'present':False,'files':{}} for prefix in PREFIXES} for unit in u.DROPIN_UNITS}
         self.unit_accounts={'accounts':{'xuanjun-dispatcher':{'uid':1003,'primary_gid':1003,'global_group_gids':[1003]}},
             'named_groups':{'xuanjun-control-db':1006,'xuanjun-dispatcher':1003,'nginx':997},
             'nss_by_primary':{'xuanjun-dispatcher':{'1003':[1003],'1006':[1006]}},
@@ -66,7 +66,7 @@ class Fake(ProbeFake):
         return {'reference_path':path,'links':[],'final':{'path':target,'sha256':h(target),'format':'ELF',
             'metadata':{'uid':0,'gid':0,'mode':0o755,'nlink':1}}}
     def online_cpus(self):return 2
-    def unit_dropins(self,units):return copy.deepcopy(self.dropins)
+    def unit_dropins(self,units):return copy.deepcopy({unit:self.dropins[unit] for unit in units})
 
 class UnitFactsTests(unittest.TestCase):
     def setUp(self):self.io=Fake()
@@ -145,10 +145,28 @@ class UnitFactsTests(unittest.TestCase):
         self.assertEqual(e['nss_by_primary']['xuanjun-dispatcher']['1006'],[1006])
         self.assertEqual(e['accounts']['xuanjun-dispatcher']['global_group_gids'],[1003])
     def test_all_dropin_roots_explicit_empty(self):
-        e=self.evidence(self.collect(),'dropins');self.assertEqual(set(e['units']),set(u.UNITS))
+        e=self.evidence(self.collect(),'dropins');self.assertEqual(set(e['units']),set(u.DROPIN_UNITS))
         for unit,roots in e['units'].items():
             self.assertEqual(set(roots),{prefix+'/'+unit+'.d' for prefix in PREFIXES})
             for row in roots.values():self.assertEqual(row,{'present':False,'files':{}})
+    def test_collector_reads_eleven_unit_scope_twice_and_late(self):
+        original=self.io.unit_dropins;calls=[]
+        def read(units):calls.append(tuple(units));return original(units)
+        self.io.unit_dropins=read;report=self.collect()
+        self.assertEqual(report['state'],'COMPLETE_UNREVIEWED')
+        self.assertEqual(calls,[u.DROPIN_UNITS]*3)
+    def test_socket_root_change_is_not_accepted_by_initial_or_late_read(self):
+        original=self.io.unit_dropins;unit=u.SOCKET_UNITS[0];root=PREFIXES[0]+'/'+unit+'.d'
+        for changed_call in (2,3):
+            calls=[0]
+            def read(units):
+                calls[0]+=1;value=original(units)
+                if calls[0]==changed_call:value[unit][root]['present']=True
+                return value
+            self.io.unit_dropins=read;report=self.collect()
+            section='dropins' if changed_call==2 else 'command_resolutions'
+            self.assertEqual(report['sections'][section]['state'],'UNKNOWN')
+
     def test_dropin_group_reset_append_preserved(self):
         root=PREFIXES[0]+'/'+u.GATEWAY+'.d';path=root+'/20-p2-docker.conf'
         raw=b'[Service]\nSupplementaryGroups=\nSupplementaryGroups=docker xuanjun-ledger-client\n'
@@ -160,7 +178,7 @@ class UnitFactsTests(unittest.TestCase):
         self.io.add(path,('[Service]\nEnvironment=TOKEN='+SECRET+'\n').encode(),mode=0o644)
         self.io.dropins[u.GATEWAY][root]={'present':True,'files':{path:self.io.read(path)}}
         r=self.collect();self.assertIn('dropins',r['unsupported_sections']);self.assertNotIn(SECRET.encode(),packed(r))
-        self.assertEqual(len(self.evidence(r,'dropins')['units']),len(u.UNITS))
+        self.assertEqual(len(self.evidence(r,'dropins')['units']),len(u.DROPIN_UNITS))
     def test_all_missing_facts_reported_together(self):
         del self.io.files[c.NATIVE];del self.io.files[self.io.backup];del self.io.files[u.NGINX_CONFIG]
         self.io.unit_accounts['unsupported']={'group:nginx':'EXPECTED_FIELD_OR_NSS_RECORD_MISSING'}
@@ -327,6 +345,19 @@ class ConcreteDropinTests(unittest.TestCase):
         self.assertEqual(result[u.GATEWAY][broken]['state'],'UNKNOWN')
         self.assertEqual(result[u.GATEWAY][broken]['reason'],'READ_PERMISSION_UNAVAILABLE')
         self.assertEqual(sum(len(roots) for roots in result.values()),24)
+    def test_exact_eleven_units_and_thirty_three_absence_roots(self):
+        self.io.absent=mock.Mock(return_value=True)
+        result=self.io.unit_dropins(u.DROPIN_UNITS)
+        expected={prefix+'/'+unit+'.d' for unit in u.DROPIN_UNITS for prefix in PREFIXES}
+        self.assertEqual(len(expected),33);self.assertEqual(set(result),set(u.DROPIN_UNITS))
+        self.assertEqual({row[0][0] for row in self.io.absent.call_args_list},expected)
+        self.assertEqual(set(u.DROPIN_UNITS)-set(u.UNITS),set(u.SOCKET_UNITS))
+    def test_socket_only_and_partial_expansion_rejected_without_read(self):
+        self.io.absent=mock.Mock(return_value=True)
+        for units in (u.SOCKET_UNITS,u.UNITS+u.SOCKET_UNITS[:1],u.DROPIN_UNITS+('unknown.socket',)):
+            with self.assertRaisesRegex(ValueError,'UNIT_DROPIN_SCOPE'):self.io.unit_dropins(units)
+        self.io.absent.assert_not_called()
+
     def test_unknown_or_missing_unit_rejected_before_any_read(self):
         self.io.absent=mock.Mock(return_value=True)
         for units in (u.UNITS[:-1],u.UNITS+('arbitrary.service',)):

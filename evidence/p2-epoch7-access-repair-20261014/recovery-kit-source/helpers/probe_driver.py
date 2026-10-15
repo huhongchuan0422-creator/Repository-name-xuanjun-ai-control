@@ -27,7 +27,7 @@ import epoch7_python_identity
 
 EXPECTED_HOST='iZd7oeikknn1z21sq6ji6zZ'
 PREFIX = 'xj-p2-proof-'
-RUNTIME_MANIFEST = '26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa'
+RUNTIME_MANIFEST = '0ac28c96636ee63364015b375202779e2ef1dd0bd9f1b81e77d4387b6754316c'
 CANDIDATE_SOURCES = ('stage1/ledger_service.py','stage1/ledger_server_identity.py','stage1/activation_control.py')
 ROLES = ('ledger', 'broker', 'dashboard', 'callback', 'native')
 USERS={'ledger':'xuanjun-dispatcher','broker':'root','dashboard':'xuanjun-callback','callback':'xuanjun-callback','native':'xuanjun_dev'}

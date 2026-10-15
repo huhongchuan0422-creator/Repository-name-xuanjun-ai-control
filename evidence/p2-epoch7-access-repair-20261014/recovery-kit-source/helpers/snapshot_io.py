@@ -880,7 +880,12 @@ class LocalReadOnlyIO(DescriptorReader):
         expected={'xuanjun-uk-openclaw.service','xuanjun-p2-gateway-relay.service',
             'xuanjun-development-dispatcher.service','xuanjun-ledger.service',
             'xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.service','xj-root-broker.service','nginx.service'}
-        c.need(set(units)==expected,'UNIT_DROPIN_SCOPE')
+        sockets={'xj-root-broker.socket','xuanjun-ledger.socket','xuanjun-p2-gateway-relay.socket'}
+        # Existing quiet/startup callers retain their exact service-only scope.
+        # The collector additionally measures all three fixed socket closures.
+        requested=set(units)
+        c.need(requested==expected or requested==expected|sockets,'UNIT_DROPIN_SCOPE')
+        expected=requested
         def inventory(root):
             if self.absent(root):return {'present':False,'files':{}}
             with self.parent(root) as (parent,name):

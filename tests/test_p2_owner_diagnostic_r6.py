@@ -14,7 +14,7 @@ EXTRACTOR_SHA='e7977f5b849489befff4f782f35023f9267dd49a20b9b3e5f052eeb83758875d'
 EXTRACTOR_SIZE=9582
 ARCHIVE_PATH='evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-0c8a0f2a.tar.gz'
 EXPECTED_TEST_COUNT=61
-EXTRACTOR_PATH='evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/extract_epoch7_kit.py'
+EXTRACTOR_PATH='evidence/p2-epoch7-access-repair-20261014/owner-diagnostic-r6/extract_epoch7_kit_r6.py'
 PIN_NAMES=('SOURCE','TREE','PUBLICATION','ARCHIVE_SHA','MANIFEST_SHA','ARCHIVE_SIZE','KIT_SOURCE_FILES','ENTRY_SHA','EXTRACTOR_SHA','EXTRACTOR_SIZE','ARCHIVE_PATH')
 
 def need(value,label):

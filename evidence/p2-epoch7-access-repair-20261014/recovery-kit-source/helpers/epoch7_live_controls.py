@@ -46,6 +46,12 @@ WRITER_UIDS = frozenset((1002, 1003, 1004, 1005, 1008))
 FORBIDDEN_ACTIVE = snap.WRITER_UNITS - frozenset(STOP_UNITS)
 REQUIRED_ACTIVE = frozenset(STOP_UNITS) - {'xuanjun-github-intake.service', 'xuanjun-p2-tls-renew.service'}
 DEFERRED_TIMER = 'xuanjun-p2-tls-renew.timer'
+# Fixed Accept=no endpoints. Their rendered declarations are checked by the compiler.
+SOCKET_SERVICES = {
+    'xj-root-broker.socket': ('xj-root-broker.service', '/run/xuanjun-development/broker.sock'),
+    'xuanjun-ledger.socket': ('xuanjun-ledger.service', '/run/xuanjun-development/ledger.sock'),
+    'xuanjun-p2-gateway-relay.socket': ('xuanjun-p2-gateway-relay.service', '/run/xuanjun-development/p2-gateway.sock'),
+}
 UNIT_FIELDS = frozenset(('Id', 'LoadState', 'ActiveState', 'SubState', 'MainPID',
     'ControlPID', 'ControlGroup', 'UnitFileState', 'NeedDaemonReload', 'ConditionResult'))
 STATIC_UNIT_FIELDS = UNIT_FIELDS - {'MainPID', 'ControlPID', 'ControlGroup'}
@@ -170,6 +176,13 @@ def validate_contract(contract, context):
             else: need(policy['main_role_sha256'] is None, 'INACTIVE_MAIN_ROLE')
             if unit == snap.RUNNER:
                 need(props['ConditionResult'] == 'no', 'RUNNER_CONDITION_REQUIRED')
+        if index > PHASES.index('activate_new_services'):
+            for socket_unit, (service_unit, unused_path) in SOCKET_SERVICES.items():
+                socket_props = point['units'][socket_unit]['properties']
+                service_props = point['units'][service_unit]['properties']
+                need((socket_props['ActiveState'], socket_props['SubState']) == ('active','running') and
+                     (service_props['ActiveState'], service_props['SubState']) == ('active','running'),
+                     'FINAL_ACCEPT_NO_SOCKET_SERVICE_STATE')
         if index:
             changed = {name for name in SECTIONS if point['resources'][name] !=
                        checkpoints[index-1]['resources'][name]}
@@ -562,6 +575,9 @@ class FiniteLiveControls(object):
                 need(type(row) is dict and type(row.get('before')) is dict, 'INTERMEDIATE_UNIT_ROW')
                 actual = row['before']; old = point['units'][unit]; new = after['units'][unit]
                 choices_by_key={k:{old['properties'][k],new['properties'][k]} for k in STATIC_UNIT_FIELDS}
+                socket_start = phase == 'activate_new_services' and unit in SOCKET_SERVICES
+                if socket_start:
+                    choices_by_key['SubState'].add('listening')
                 if self.contract.get('schema')==2:
                     cached=self.contract['unit_transition_contract']['units'].get(unit)
                     if cached is not None:
@@ -577,8 +593,21 @@ class FiniteLiveControls(object):
                      'UNREVIEWED_INTERMEDIATE_PROPERTY')
                 pair = (actual.get('ActiveState'), actual.get('SubState'))
                 choices = [(p['properties']['ActiveState'], p['properties']['SubState']) for p in (old,new)]
+                if socket_start:
+                    service_unit = SOCKET_SERVICES[unit][0]
+                    service_props = measured['units'][service_unit]['before']
+                    service_pair = (service_props.get('ActiveState'), service_props.get('SubState'))
+                    if pair == ('active','listening'):
+                        expected = self.contract['checkpoints'][self.next_index]['units'][service_unit]['properties']
+                        need(service_pair == (expected['ActiveState'], expected['SubState']) and
+                             service_pair[0] in ('inactive','failed'), 'SOCKET_LISTENING_BEFORE_SERVICE_ONLY')
+                        choices.append(pair)
+                    elif pair == ('active','running'):
+                        need(service_pair == ('active','running'), 'SOCKET_RUNNING_SERVICE_REQUIRED')
+                    elif service_pair == ('active','running'):
+                        need(False, 'ACTIVE_SERVICE_SOCKET_REQUIRED')
                 need(pair in choices, 'UNREVIEWED_INTERMEDIATE_STATE')
-                chosen = new if pair == choices[1] else old
+                chosen = new if pair == choices[1] or socket_start and pair == ('active','listening') else old
                 point['units'][unit] = {'properties':{k:actual[k] for k in STATIC_UNIT_FIELDS},
                     'main_required':chosen['main_required'], 'main_role_sha256':chosen['main_role_sha256']}
         validate_process_view(measured, self.contract, point, self.owner_pid,

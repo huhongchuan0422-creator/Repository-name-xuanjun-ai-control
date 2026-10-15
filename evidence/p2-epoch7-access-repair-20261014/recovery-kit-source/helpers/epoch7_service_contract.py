@@ -197,6 +197,28 @@ def compile_service_contract(compiled, identity_payloads, native_before,
         main_pid,control_pid=snap.validate_unit_process_fields(unit,state,pid_type=pid_type)
         need(main_pid==control_pid==0, 'BASELINE_LIVE_PROCESS')
         baseline[unit] = {'properties':props,'main_required':False,'main_role_sha256':None}
+    # systemd239 Accept=no uses listening before activation, then running while
+    # the exact related service runs. Prove the finite association from rendered
+    # source; a different Service/Accept/listener cannot borrow this lifecycle.
+    need({path[len(UNIT_ROOT):] for path in targets if path.startswith(UNIT_ROOT) and
+          path.endswith('.socket')} == set(live.SOCKET_SERVICES), 'EXACT_SOCKET_UNIT_SET')
+    for socket_unit,(service_unit,endpoint) in sorted(live.SOCKET_SERVICES.items()):
+        section = unit_sections(targets[UNIT_ROOT+socket_unit]).get('Socket',{})
+        need(one(section,'Accept','no') == 'no' and
+             one(section,'Service',socket_unit[:-7]+'.service') == service_unit and
+             one(section,'ListenStream') == endpoint and
+             {name for name in section if name.startswith('Listen')} == {'ListenStream'},
+             'EXACT_ACCEPT_NO_SOCKET_ASSOCIATION')
+        inventory=fresh_facts['dropin_inventory'].get(socket_unit)
+        roots={prefix+'/'+socket_unit+'.d' for prefix in ('/etc/systemd/system','/run/systemd/system','/usr/lib/systemd/system')}
+        closed=(type(inventory) is dict and set(inventory)==roots and
+            all(type(row) is dict and row.get('present') in (True,False) and type(row.get('files')) is dict and
+                row['files']=={} and row.get('state')!='UNKNOWN' for row in inventory.values()))
+        if states[socket_unit].get('DropInPaths') != '' or not closed:
+            missing('EFFECTIVE_UNIT_DROPIN_CLOSURE',socket_unit,['DropInPaths'])
+        derivations[socket_unit]={'kind':'FIXED_ACCEPT_NO_SOCKET_LIFECYCLE',
+            'unit_sha256':sha(targets[UNIT_ROOT+socket_unit]),'service':service_unit,'endpoint':endpoint,
+            'preactivation_substate':'listening','active_service_substate':'running'}
     for unit,(script,user,group,supplements) in sorted(DIRECT.items()):
         path = UNIT_ROOT + unit; raw = targets[path]
         service = unit_sections(raw).get('Service',{})
@@ -346,8 +368,7 @@ def compile_service_contract(compiled, identity_payloads, native_before,
             props=derived[index][unit]['properties']
             props.update(LoadState='loaded',UnitFileState='enabled',NeedDaemonReload='no')
             if unit in required:
-                props.update(ActiveState='active',SubState=('listening' if unit.endswith('.socket') else
-                             'waiting' if unit.endswith('.timer') else 'running'),ConditionResult='yes')
+                props.update(ActiveState='active',SubState=('waiting' if unit.endswith('.timer') else 'running'),ConditionResult='yes')
                 if unit.endswith('.service'):
                     derived[index][unit].update(main_required=True,main_role_sha256=main_roles.get(unit))
         for unit in set(states)-live.REQUIRED_ACTIVE:

@@ -14,7 +14,7 @@ import epoch7_python_identity as python_identity
 MACHINE_ID = '/etc/machine-id'
 CONTROLLER = '/etc/xuanjun-development/p2-native-controller.binding.json'
 PROVISION = c.TRANSACTION + '/epoch6-runtime-provisioning.json'
-RUNTIME_MANIFEST = '26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa'
+RUNTIME_MANIFEST = '0ac28c96636ee63364015b375202779e2ef1dd0bd9f1b81e77d4387b6754316c'
 CANDIDATE_SOURCES = ('stage1/ledger_service.py', 'stage1/ledger_server_identity.py', 'stage1/activation_control.py')
 INGREDIENT_FIELDS = frozenset(('hostname','machine_id_sha256','python','systemctl','profiles','sdk_bindings','manager'))
 PYTHON = re.compile(r'/usr/(?:bin/python3(?:\.6)?|libexec/platform-python(?:3\.6)?)')
@@ -79,7 +79,7 @@ def binding(io):
 def candidate_sources(io, root):
     need(isinstance(root,str), 'CANDIDATE_ROOT_NOT_SUPPLIED')
     c.path(root)
-    need(root == c.CAND+'/epoch7-recovery-candidate-r6/xuanjun-p2-package','PROBE_STAGED_CANDIDATE_SCOPE')
+    need(root == c.CAND+'/epoch7-recovery-candidate-r7/xuanjun-p2-package','PROBE_STAGED_CANDIDATE_SCOPE')
     raw, metadata = stable_read(io, root+'/deploy/integration-manifest.json', 1048576)
     protected(metadata, 1048576)
     need(c.sha(raw) == RUNTIME_MANIFEST, 'PROBE_EXACT_STAGED_RUNTIME')

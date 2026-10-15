@@ -19,9 +19,9 @@ import types
 
 PREFIX = 'evidence/p2-epoch7-access-repair-20261014/recovery-kit-source'
 RUNTIME = 'evidence/p2-epoch7-access-repair-20261014/runtime'
-RUNTIME_COMMIT = '101b465ca3554bf34fef2d53d6006b96d85c4a63'
-RUNTIME_TREE = '3ae50b40c38d9a807876c175818299e344d53134'
-RUNTIME_MANIFEST = '26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa'
+RUNTIME_COMMIT = '4ed2f5114e2f065266af26eedd8d62aebdbf0957'
+RUNTIME_TREE = '0c2cbcb0f898331865bbdfdf39f2c85ef675a88a'
+RUNTIME_MANIFEST = '0ac28c96636ee63364015b375202779e2ef1dd0bd9f1b81e77d4387b6754316c'
 MAX_FILE = 16 * 1024 * 1024
 REQUIRED_TOOLS = frozenset(('build_epoch7_kit.py', 'extract_epoch7_kit.py',
     'run_epoch7_offline.py', 'audit_epoch7_imports.py', 'run_published_kit_ci.py', 'test_epoch7_kit.py'))

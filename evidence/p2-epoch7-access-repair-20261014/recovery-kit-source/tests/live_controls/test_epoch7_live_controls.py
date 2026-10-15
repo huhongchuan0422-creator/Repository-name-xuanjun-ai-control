@@ -543,6 +543,7 @@ class ControlsTests(unittest.TestCase):
         def mixed(context,phase,boundary):
             before=process_view(contract,14);after=process_view(contract,15)
             unit='xuanjun-ledger.service';before['units'][unit]=after['units'][unit]
+            before['units']['xuanjun-ledger.socket']=after['units']['xuanjun-ledger.socket']
             pid=after['units'][unit]['before']['MainPID'];before['processes'][str(pid)]=after['processes'][str(pid)]
             before['pids_before']=before['pids_after']=sorted(int(p) for p in before['processes'])
             return before
@@ -615,6 +616,79 @@ class ControlsTests(unittest.TestCase):
         control,observer,authority,contract,context=controls()
         observer.preflight=lambda context: (observer.rig.snapshot,{'snapshot_sha256':context['snapshot_sha256'],'retained':{}})
         with self.assertRaisesRegex(ValueError,'SUPPORT_BINDING'):control.preflight(context)
+
+
+# Exact metadata-only projection of public saved packet92dab6479bb248859ae5e5972fc268aeb0312b464786e2f27c8ecbfa60047dd5.
+# Case8 is deliberate endpoint recreation and an expected rejection, never an admitted listening/running pair.
+SAVED_SOCKET_LIFECYCLE = [{'case': 1, 'socket': {'ActiveState': 'active', 'SubState': 'running', 'Accept': 'no'}, 'service': {'ActiveState': 'active', 'SubState': 'running'}, 'expected_rejection': False}, {'case': 2, 'socket': {'ActiveState': 'active', 'SubState': 'running', 'Accept': 'no'}, 'service': {'ActiveState': 'active', 'SubState': 'running'}, 'expected_rejection': False}, {'case': 3, 'socket': {'ActiveState': 'active', 'SubState': 'running', 'Accept': 'no'}, 'service': {'ActiveState': 'active', 'SubState': 'running'}, 'expected_rejection': False}, {'case': 4, 'socket': {'ActiveState': 'active', 'SubState': 'running', 'Accept': 'no'}, 'service': {'ActiveState': 'active', 'SubState': 'running'}, 'expected_rejection': False}, {'case': 5, 'socket': {'ActiveState': 'active', 'SubState': 'running', 'Accept': 'no'}, 'service': {'ActiveState': 'active', 'SubState': 'running'}, 'expected_rejection': False}, {'case': 6, 'socket': {'ActiveState': 'active', 'SubState': 'running', 'Accept': 'no'}, 'service': {'ActiveState': 'active', 'SubState': 'running'}, 'expected_rejection': True}, {'case': 7, 'socket': {'ActiveState': 'active', 'SubState': 'running', 'Accept': 'no'}, 'service': {'ActiveState': 'active', 'SubState': 'running'}, 'expected_rejection': False}, {'case': 8, 'socket': {'ActiveState': 'active', 'SubState': 'listening', 'Accept': 'no'}, 'service': {'ActiveState': 'inactive', 'SubState': 'dead'}, 'expected_rejection': True}]
+
+class AcceptNoLifecycleTests(unittest.TestCase):
+    def effect(self,value):
+        control,observer,authority,contract,context=controls();phase=sequence.PHASES[14]
+        control.next_index=14;authority.current=phase;control.before_phase(context,phase)
+        observer.processes=lambda *unused:copy.deepcopy(value)
+        return control.effect_check(context,phase)
+    def test_saved_case1_through7_running_match_final_checkpoint(self):
+        unused,context,contract,unused=fixture()
+        for captured in SAVED_SOCKET_LIFECYCLE[:7]:
+            self.assertEqual(captured['socket']['Accept'],'no')
+            self.assertEqual(captured['socket']['SubState'],'running')
+            value=process_view(contract,15)
+            for side in ('before','after'):
+                value['units']['xuanjun-ledger.socket'][side].update({k:captured['socket'][k] for k in ('ActiveState','SubState')})
+                value['units']['xuanjun-ledger.service'][side].update(captured['service'])
+            live.validate_process_view(value,contract,contract['checkpoints'][15],os.getpid())
+            self.assertTrue(self.effect(value))
+    def test_saved_case8_recreated_listening_socket_is_not_a_success_checkpoint(self):
+        unused,context,contract,unused=fixture();captured=SAVED_SOCKET_LIFECYCLE[7]
+        self.assertTrue(captured['expected_rejection']);self.assertEqual(captured['socket']['SubState'],'listening')
+        value=process_view(contract,15)
+        for side in ('before','after'):value['units']['xuanjun-ledger.socket'][side]['SubState']='listening'
+        with self.assertRaisesRegex(ValueError,'UNIT_PROPERTIES_DRIFT'):
+            live.validate_process_view(value,contract,contract['checkpoints'][15],os.getpid())
+        with self.assertRaisesRegex(ValueError,'SOCKET_LISTENING_BEFORE_SERVICE_ONLY'):self.effect(value)
+    def test_each_fixed_socket_listens_only_before_its_service_starts(self):
+        unused,context,contract,unused=fixture()
+        for socket_unit in live.SOCKET_SERVICES:
+            value=process_view(contract,14)
+            for side in ('before','after'):
+                value['units'][socket_unit][side].update(ActiveState='active',SubState='listening',UnitFileState='enabled')
+            self.assertTrue(self.effect(value))
+    def test_running_socket_with_inactive_service_rejected_for_all_pairs(self):
+        unused,context,contract,unused=fixture()
+        for socket_unit in live.SOCKET_SERVICES:
+            value=process_view(contract,14)
+            for side in ('before','after'):
+                value['units'][socket_unit][side].update(ActiveState='active',SubState='running',UnitFileState='enabled')
+            with self.assertRaisesRegex(ValueError,'SOCKET_RUNNING_SERVICE_REQUIRED'):self.effect(value)
+    def test_final_contract_cannot_reintroduce_listening_or_unknown_socket(self):
+        for substate in ('listening','activating','unknown','dead'):
+            unused,context,contract,unused=fixture()
+            contract['checkpoints'][15]['units']['xuanjun-ledger.socket']['properties']['SubState']=substate
+            with self.assertRaisesRegex(ValueError,'FINAL_ACCEPT_NO_SOCKET_SERVICE_STATE'):live.validate_contract(contract,context)
+    def test_startup_does_not_allow_arbitrary_active_or_mixed_before_after(self):
+        unused,context,contract,unused=fixture()
+        for state in ('start','stop','failed','unknown'):
+            value=process_view(contract,14)
+            for side in ('before','after'):value['units']['xuanjun-ledger.socket'][side].update(ActiveState='active',SubState=state)
+            with self.assertRaisesRegex(ValueError,'INTERMEDIATE'):self.effect(value)
+        value=process_view(contract,14)
+        value['units']['xuanjun-ledger.socket']['before'].update(ActiveState='active',SubState='listening')
+        with self.assertRaisesRegex(ValueError,'RACE'):self.effect(value)
+    def test_socket_model_does_not_relax_identity_controlpid_or_cgroup_checks(self):
+        unused,context,contract,unused=fixture()
+        for defect in ('control','id','cgroup','manager','process'):
+            value=process_view(contract,15)
+            if defect=='control':
+                for side in ('before','after'):value['units']['xuanjun-ledger.socket'][side]['ControlPID']=2
+            elif defect=='id':
+                for side in ('before','after'):value['units']['xuanjun-ledger.socket'][side]['Id']='foreign.socket'
+            elif defect=='cgroup':value['units']['xuanjun-ledger.socket']['cgroups']={'/foreign/cgroup.procs':[]}
+            elif defect=='manager':value['manager_after']['starttime']+=1
+            else:
+                pid=value['units']['xuanjun-ledger.service']['before']['MainPID']
+                for side in ('before','after'):value['processes'][str(pid)][side]['argv_sha256']='0'*64
+            with self.subTest(defect=defect),self.assertRaises(ValueError):self.effect(value)
 
 
 if __name__=='__main__':unittest.main()

@@ -26,6 +26,8 @@ DIRECT_DIST_WRAPPER_SHA='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b
 UNITS=(GATEWAY,'xuanjun-p2-gateway-relay.service','xuanjun-development-dispatcher.service',
        'xuanjun-ledger.service','xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.service',
        'xj-root-broker.service','nginx.service')
+SOCKET_UNITS=('xj-root-broker.socket','xuanjun-ledger.socket','xuanjun-p2-gateway-relay.socket')
+DROPIN_UNITS=UNITS+SOCKET_UNITS
 NGINX_CONFIG='/etc/xuanjun-development/nginx-main.conf'
 SAFE_FIELDS=('Type','User','Group','SupplementaryGroups')
 NAME=re.compile(r'[a-z_][a-z0-9_-]*')
@@ -310,9 +312,9 @@ def collect_unit_facts(io):
         return {'online_count':first,'source':'sysconf_SC_NPROCESSORS_ONLN','future_worker_count':'BOUND_ONLY_NOT_INFERRED'}
     measure('online_cpus',cpus)
     def dropins():
-        first=io.unit_dropins(UNITS);need(io.unit_dropins(UNITS)==first,'UNIT_DROPIN_INVENTORY_RACE')
+        first=io.unit_dropins(DROPIN_UNITS);need(io.unit_dropins(DROPIN_UNITS)==first,'UNIT_DROPIN_INVENTORY_RACE')
         dropin_observed['raw']=first
-        need(type(first) is dict and set(first)==set(UNITS),'UNIT_DROPIN_UNIT_SET')
+        need(type(first) is dict and set(first)==set(DROPIN_UNITS),'UNIT_DROPIN_UNIT_SET')
         result={};unsupported=[]
         for unit,roots in first.items():
             expected={prefix+'/'+unit+'.d' for prefix in
@@ -365,7 +367,7 @@ def collect_unit_facts(io):
         first=io.dispatcher_manager_path();need(io.dispatcher_manager_path()==first,'PATH_COMMAND_RESOLUTION_CHANGED')
         need(stable_read(io,path,65536)==(raw,meta) and stable_read(io,PROVISION,1048576)==(receipt_raw,receipt_meta),
              'PATH_UNIT_LATE_RACE')
-        need(io.unit_dropins(UNITS)==dropin_observed['raw'],'PATH_UNIT_DROPIN_LATE_RACE')
+        need(io.unit_dropins(DROPIN_UNITS)==dropin_observed['raw'],'PATH_UNIT_DROPIN_LATE_RACE')
         return {'unit':unit,'resolution':{k:first[k] for k in ('command','path_environment','entries')},
             'provenance':dict(first['provenance'],unit_sha256=c.sha(raw),dropins_sha256=d.digest(inventory),
                 public_unit_environment=public),'collector_path_used':False}

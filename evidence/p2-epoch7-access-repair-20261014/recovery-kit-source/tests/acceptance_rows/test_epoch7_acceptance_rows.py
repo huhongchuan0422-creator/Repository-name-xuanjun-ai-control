@@ -57,7 +57,8 @@ def observation_fixture(facts):
         'named_groups':dict(facts['group_ids'],root=0,nginx=991),'unsupported':{}}
     nss['accounts']['root']={'uid':0,'primary_gid':0,'global_group_gids':[0]}
     nss['nss_by_primary']['root']={'0':[0]}
-    all_units={row[0] for row in m.ROLES.values()}|{'xj-root-broker.service','nginx.service'};units={}
+    all_units={row[0] for row in m.ROLES.values()}|{'xj-root-broker.service','nginx.service',
+        'xj-root-broker.socket','xuanjun-ledger.socket','xuanjun-p2-gateway-relay.socket'};units={}
     for unit in all_units:
         roots={prefix+'/'+unit+'.d':{'present':False,'files':{}} for prefix in
             ('/etc/systemd/system','/run/systemd/system','/usr/lib/systemd/system')}
@@ -99,15 +100,25 @@ class ObservationProjectionTests(unittest.TestCase):
         roots=self.observation['unit_metadata']['sections']['dropins']['evidence']['units']['xj-root-broker.service']
         next(iter(roots.values()))['state']='UNKNOWN';self.update_metadata_hash()
         with self.assertRaisesRegex(ValueError,'MEASURED_DROPIN_ROOT'):m.acceptance_facts_from_observation(self.observation)
-    def test_exact_eight_unit_inventory_required_before_six_role_projection(self):
+    def test_exact_eleven_unit_inventory_required_before_six_role_projection(self):
         units=self.observation['unit_metadata']['sections']['dropins']['evidence']['units']
-        self.assertEqual(set(units),{row[0] for row in m.ROLES.values()}|{'xj-root-broker.service','nginx.service'})
-        self.assertEqual(len(units),8)
+        self.assertEqual(set(units),{row[0] for row in m.ROLES.values()}|{'xj-root-broker.service','nginx.service',
+            'xj-root-broker.socket','xuanjun-ledger.socket','xuanjun-p2-gateway-relay.socket'})
+        self.assertEqual(len(units),11)
         self.assertEqual(set(m.acceptance_facts_from_observation(self.observation)['unit_dropins']),
                          {row[0] for row in m.ROLES.values()})
         units.pop('nginx.service');self.update_metadata_hash()
-        with self.assertRaisesRegex(ValueError,'COMPLETE_EIGHT_UNIT_INVENTORY'):
+        with self.assertRaisesRegex(ValueError,'COMPLETE_ELEVEN_UNIT_INVENTORY'):
             m.acceptance_facts_from_observation(self.observation)
+    def test_missing_or_extra_socket_inventory_rejected_before_projection(self):
+        for unit in ('xj-root-broker.socket','xuanjun-ledger.socket','xuanjun-p2-gateway-relay.socket','unknown.socket'):
+            value=copy.deepcopy(self.observation);units=value['unit_metadata']['sections']['dropins']['evidence']['units']
+            if unit=='unknown.socket':units[unit]={}
+            else:units.pop(unit)
+            value['unit_metadata_sha256']=m.digest(value['unit_metadata'])
+            with self.subTest(unit=unit),self.assertRaisesRegex(ValueError,'COMPLETE_ELEVEN_UNIT_INVENTORY'):
+                m.acceptance_facts_from_observation(value)
+
     def test_unknown_or_missing_eighth_unit_root_not_silently_ignored(self):
         for prefix in ('/etc/systemd/system','/run/systemd/system','/usr/lib/systemd/system'):
             value=copy.deepcopy(self.observation)

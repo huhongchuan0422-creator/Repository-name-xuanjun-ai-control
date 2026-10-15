@@ -8,7 +8,7 @@ import json
 import epoch7_delta as d
 import epoch7_additive_identity as a
 
-VALIDATOR_CONTRACT_SHA256 = 'bb47927facbd55589aed2303d0cd201a071cad4de41d71f1dcb150287bd8cbab'
+VALIDATOR_CONTRACT_SHA256 = 'c18b35dcaa1c9abb0ce926e5e044e131b222c3b6960af6aa40ce451c3502cd33'
 PATH = '/etc/xuanjun-development/p2-ledger-server-identity.json'
 SOCKET_PATH = '/run/xuanjun-development/ledger.sock'
 CONFIG_PATH = '/etc/xuanjun-development/dispatcher.json'

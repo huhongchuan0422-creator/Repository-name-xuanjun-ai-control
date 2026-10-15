@@ -28,7 +28,7 @@ from p2_fixed_host_runtime import (ALLOWED_SERVICES, GATEWAY_SERVICE,
 from p2_prerequisites import Prerequisites, validate as validate_prerequisites
 from p2_tls_lifecycle import TIMER as TLS_TIMER
 
-MANIFEST = '26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa'
+MANIFEST = '0ac28c96636ee63364015b375202779e2ef1dd0bd9f1b81e77d4387b6754316c'
 TRANSACTION = ('/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/'
                'legacy-isolation-' + delta.TX)
 RELEASE = '/opt/xuanjun-control-releases/integration-' + MANIFEST[:16]
