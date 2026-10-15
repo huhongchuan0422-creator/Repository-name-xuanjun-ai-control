@@ -77,3 +77,12 @@ authorization contracts are accepted.
   `winctl` files and its certificate names are absent from mutation lists.
 - Preview pages, controlled APIs, feedback persistence and real dynamic
   backends remain explicitly incomplete and are never reported as deployed.
+
+
+## 2026-10-15 manual continuation: isolated OAuth source library
+
+The existing static candidate and RG1 host evidence are reused. `deploy/pr122-oauth-candidate` is an **OFFLINE_LIBRARY_CANDIDATE_NOT_DEPLOYABLE**, not a replacement live portal. `scripts/pr122_build_oauth_candidate.py` verifies the Tokyo source archive and entry hashes, then derives passive session/store code and only the Douyin/TikTok service methods and OAuth helpers from the pinned source. The generated package has no trading/database imports, no master-key loader and no Tokyo runtime default. State and operations roots are explicitly supplied. Exchange/Finance/Telegram/WeCom capabilities are not implemented by this library. Original provider helpers are reused; source extraction changes are subject to independent review.
+
+Local synthetic tests: 15 PASS, including complete fake Douyin/TikTok token/user-info callbacks, replay, redirect mismatch, missing inputs, exchange timeout, CSRF/origin, cross-form denial, expired forms, forbidden trading forms, restart persistence, file modes, import boundary and inventory redaction/wrong-host rejection. This is not live OAuth, a full exception/concurrency audit, protected state handoff, or server migration acceptance. The HTTP adapter, protected source-to-target custody, mixed administrative form successors, Telegram edge continuity and production root gate remain outstanding. No installer is supplied and no existing secret/database was copied.
+
+Domestic GitHub channel: run38748827497 and bounded follow-up run38749282394 succeeded on `iZvt5t8tlrm8oiZ` as `githubrunner`. Existing `provider-neutral-domestic-bridge.service` is active as `openclaw_ops`, PID188767, cwd `/home/openclaw_ops/v8-domestic-operations/runtime/internal-bridge`. Observed loopback TCP ports include19444, not19443; no particular process-to-port association is inferred. `sudo -n -l` was unavailable to the Runner; this channel does not establish root installation authority. Read-only collection never exercised sudo commands. Production, DNS/TLS switch and Tokyo retirement remain HOLD.

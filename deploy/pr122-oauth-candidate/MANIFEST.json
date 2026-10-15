@@ -1,0 +1,21 @@
+{
+  "files": {
+    "pr122_oauth_candidate/__init__.py": "22abbd4cf62b08e2bda4b51a2c53c9ce0839088efb1e877fbed23100c3de463b",
+    "pr122_oauth_candidate/core.py": "340eaf4e82a7b269adb8a74f434a61c2d032280c2de429739eccc7d6dc31c8b5",
+    "pr122_oauth_candidate/douyin.py": "cb9ca6f29796a1e280f88681cf84a3533a3529b955efab38975030582c9d8140",
+    "pr122_oauth_candidate/oauth.py": "fba7e04713314e428476e5477c7effb1e7b5e24c3e0c2873b5088eaca33ff803",
+    "pr122_oauth_candidate/tiktok.py": "cce9f45ccdfe681e88117814227a714aa17e49e22881c1d922eb3ccd191c2afe"
+  },
+  "production_change": false,
+  "remaining": [
+    "HTTP adapter",
+    "protected state handoff",
+    "existing non-OAuth route successors",
+    "independent review",
+    "host acceptance",
+    "TLS and DNS gates"
+  ],
+  "source_archive_sha256": "10b9c11fb8a6e07d9edab449faf9c72f6bb36e65ced79d7d65fbf1b69c28bd23",
+  "source_entry_sha256": "528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006",
+  "status": "OFFLINE_LIBRARY_CANDIDATE_NOT_DEPLOYABLE"
+}

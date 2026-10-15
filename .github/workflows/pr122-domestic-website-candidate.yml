@@ -5,6 +5,8 @@ on:
       - 'deploy/pr122-domestic-website/**'
       - 'scripts/pr122_*website*.py'
       - 'tests/test_pr122_*'
+      - 'deploy/pr122-oauth-candidate/**'
+      - 'scripts/pr122_build_oauth_candidate.py'
       - 'docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md'
       - 'governance/features.json'
   push:
@@ -13,6 +15,8 @@ on:
       - 'deploy/pr122-domestic-website/**'
       - 'scripts/pr122_*website*.py'
       - 'tests/test_pr122_*'
+      - 'deploy/pr122-oauth-candidate/**'
+      - 'scripts/pr122_build_oauth_candidate.py'
       - 'docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md'
       - 'governance/features.json'
 permissions:
@@ -31,6 +35,7 @@ jobs:
           node-version: '24'
       - run: python -m pip install 'playwright==1.55.0'
       - run: python -m playwright install --with-deps chromium
+      - run: python -B tests/test_pr122_oauth_candidate.py -v
       - run: python -m unittest tests/test_pr122_website_release.py -v
       - run: python -m unittest tests/test_pr122_csp_browser.py -v
       - run: node --test tests/test_pr122_tiktok_integration.mjs

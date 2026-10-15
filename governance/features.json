@@ -124,12 +124,15 @@
           "delta bundle remains bound to the immutable 1187-file source archive",
           "prepare activate check rollback and unknown states fail closed",
           "Domestic apex candidate preserves the existing winctl boundary",
-          "generated CSP hashes preserve inline language layout and interaction in real Chromium"
+          "generated CSP hashes preserve inline language layout and interaction in real Chromium",
+          "OAuth-only source candidate excludes trading/database imports and preserves synthetic session, callback, failure and replay tests; no production acceptance is implied",
+          "Existing domestic Runner inventory is non-root and does not disclose sudo policy or secret values"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
           "tests/test_pr122_tiktok_integration.mjs",
-          "tests/test_pr122_csp_browser.py"
+          "tests/test_pr122_csp_browser.py",
+          "tests/test_pr122_oauth_candidate.py"
         ]
       },
       "reuse": [
@@ -142,7 +145,11 @@
         "scripts/pr122_website_release.py",
         "tests/test_pr122_website_release.py",
         "tests/test_pr122_tiktok_integration.mjs",
-        "tests/test_pr122_csp_browser.py"
+        "tests/test_pr122_csp_browser.py",
+        "scripts/pr122_domestic_channel_inventory.py",
+        "scripts/pr122_build_oauth_candidate.py",
+        "tests/test_pr122_oauth_candidate.py",
+        "deploy/pr122-oauth-candidate/**"
       ]
     },
     {
