@@ -142,6 +142,38 @@
         "tests/test_pr122_tiktok_integration.mjs",
         "tests/test_pr122_csp_browser.py"
       ]
+    },
+    {
+      "feature_id": "ECOSYSTEM_SERVICE_PACKAGE_WEB3_RECORDS",
+      "status": "PLANNED",
+      "design": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "7.7"
+      },
+      "development": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "12.10",
+        "phase": 2
+      },
+      "acceptance": {
+        "criteria": [
+          "2000万ECV总量与分池守恒；普通来源每份500元一次性金额，购包赠ECV不附带金额；使用不再赠、用完不恢复",
+          "服务包10元起多份购买、按批准SKU叠加；购包一次赠送，使用/核销不再赠送",
+          "交易/推荐/权益全量事件签名账本、outbox、批次锚定及独立包含证明，敏感原文不上公开链",
+          "真实专项测试、支付/链回执及费用/隐私/生产验收未完成前不得宣称上线"
+        ],
+        "tests": [
+          "tests/test_stage5_saas_phase2.py",
+          "tests/test_stage5_visual_feedback_identity.py"
+        ],
+        "test_scope": "Existing shared order/identity baseline only; dedicated service-package/ECV/Web3 tests must be added before implementation acceptance; NOT_IMPLEMENTED"
+      },
+      "reuse": [
+        "Finance/Billing and versioned Offer/PriceBook",
+        "Referral and tenant/customer/project Identity",
+        "Contribution/Provenance/Credential and append-only audit"
+      ],
+      "paths": []
     }
   ]
 }
