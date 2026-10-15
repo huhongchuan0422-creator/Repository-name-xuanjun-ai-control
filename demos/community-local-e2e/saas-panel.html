@@ -4,7 +4,7 @@
 <body><header><h1>玄钧云汇 · SaaS 功能与订单</h1><small>离线模拟 · 只读预览 · 不连接真实微信支付 / 不发放权益</small></header>
 <section><label>离线演示访问令牌（仅本次会话，不存储）<input type="password" id="offlineToken" autocomplete="off" aria-label="离线演示访问令牌"></label><button id="loadCatalog" type="button">读取功能与订单</button><p id="requestState" aria-live="polite">需要本地服务端分配的测试访问权限。</p></section><div class="grid">
 <section><h2>功能市场</h2><div id="moduleCatalog" role="list"></div><h3>离线报价与订单准备</h3><label>选配Offer ID <input id="offerId" value="" autocomplete="off"></label><label>Offer版本 <input id="offerVersion" type="number" value="1" min="1"></label><button id="makeQuote" type="button">生成离线报价</button> <button id="prepareOrder" type="button">准备离线订单</button><h3>人民币 / 美元报价</h3><pre id="quoteDetails" aria-live="polite"></pre></section>
-<section><h2>客户订单</h2><div id="orderDetails" aria-live="polite"></div><h3>服务权益</h3><div id="entitlementDetails"></div><h3>续费规划</h3><pre id="renewalDetails"></pre></section>
+<section><h2>客户订单</h2><div id="orderDetails" aria-live="polite"></div><h3>服务权益</h3><div id="entitlementDetails"></div><h3>续费规划（只读）</h3><label>已有订单ID <input id="renewalOrderId" autocomplete="off"></label><label>旧权益结束时间（Unix秒）<input id="previousExpiry" type="number" min="0" value="0"></label><button id="previewRenewal" type="button">生成续费规划</button><pre id="renewalDetails"></pre></section>
 <section><h2>管理端待办</h2><div id="reviewQueue"></div><h3>恢复状态</h3><pre id="recoveryState"></pre></section>
 </div>
 <section><h2>使用边界</h2><p>此页面仅渲染经服务端可信租户身份过滤的演示数据。任何交易确认、退款、分账或续费扣款都必须通过另行授权的生产服务执行。</p></section>
