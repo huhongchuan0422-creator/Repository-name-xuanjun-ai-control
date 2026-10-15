@@ -3,6 +3,7 @@ Keep cost status UNKNOWN as NULL, never automatically convert to zero.
 A cadence-specific quote is not an accounting income statement.
 """
 import sqlite3
+from scripts.community_saas_schema_guard import verify,transactional_install
 from scripts.community_saas_offers import open_offer_store
 
 SCHEMA = """
@@ -19,11 +20,10 @@ def open_cost_store(path=":memory:"):
  db=sqlite3.connect(path)
  try:
   tables={x[0] for x in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
-  if not tables:
-   if db.execute("PRAGMA user_version").fetchone()[0]!=0:raise ValueError("INVALID_COST_SCHEMA")
-   db.executescript("BEGIN IMMEDIATE;"+SCHEMA+"PRAGMA user_version=1;COMMIT;")
-  elif tables!={"component_costs"} or db.execute("PRAGMA user_version").fetchone()[0]!=1:
-   raise ValueError("INVALID_COST_SCHEMA")
+  if not tables and db.execute("PRAGMA user_version").fetchone()[0]==0:
+   transactional_install(db,SCHEMA+"\nPRAGMA user_version=1;",lambda:verify(db,SCHEMA,{"component_costs"}))
+  else:
+   verify(db,SCHEMA,{"component_costs"})
   return db
  except BaseException:
   db.close();raise
