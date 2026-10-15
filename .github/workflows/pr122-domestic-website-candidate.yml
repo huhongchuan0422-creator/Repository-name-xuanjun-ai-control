@@ -9,6 +9,7 @@ on:
       - 'scripts/pr122_build_oauth_candidate.py'
       - 'docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md'
       - 'governance/features.json'
+      - '.github/workflows/pr122-domestic-website-candidate.yml'
   push:
     branches: [feature/stage5-next25-integration-20261015]
     paths:
@@ -19,6 +20,7 @@ on:
       - 'scripts/pr122_build_oauth_candidate.py'
       - 'docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md'
       - 'governance/features.json'
+      - '.github/workflows/pr122-domestic-website-candidate.yml'
 permissions:
   contents: read
 jobs:
@@ -42,3 +44,47 @@ jobs:
       - run: python -m py_compile scripts/pr122_build_website_candidate.py scripts/pr122_website_release.py
       - run: bash -n deploy/pr122-domestic-website/tls/*.sh
       - run: python scripts/feature_compliance_check.py
+      - name: Package exact source for independent review (no installer)
+        run: |
+          python - <<'PY'
+          import gzip, hashlib, io, json, os, tarfile
+          from pathlib import Path
+          root = Path(".")
+          out = Path(os.environ["RUNNER_TEMP"]) / "pr122-oauth-review"
+          out.mkdir(mode=0o700)
+          paths = sorted((root/"deploy/pr122-oauth-candidate").rglob("*.py"))
+          paths += [root/"deploy/pr122-oauth-candidate/MANIFEST.json",
+                    root/"scripts/pr122_build_oauth_candidate.py",
+                    root/"scripts/pr122_domestic_channel_inventory.py",
+                    root/"tests/test_pr122_oauth_candidate.py",
+                    root/"docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md"]
+          binding = {
+              "schema_version":1,
+              "status":"REVIEW_ONLY_NO_INSTALLER",
+              "commit":os.environ["GITHUB_SHA"],
+              "run_id":os.environ["GITHUB_RUN_ID"],
+              "production_approved":False,
+              "files":{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+          }
+          package = out/"PR122_OAUTH_HTTP_REVIEW.tar.gz"
+          with package.open("xb") as raw, gzip.GzipFile(filename="",mode="wb",fileobj=raw,mtime=0) as compressed:
+              with tarfile.open(fileobj=compressed,mode="w") as archive:
+                  entries = [(str(p),p.read_bytes()) for p in paths]
+                  entries.append(("REVIEW_BINDING.json",(json.dumps(binding,indent=2,sort_keys=True)+"\n").encode()))
+                  for name,data in entries:
+                      info = tarfile.TarInfo(name)
+                      info.size = len(data)
+                      info.mode = 0o444
+                      info.mtime = 0
+                      archive.addfile(info,io.BytesIO(data))
+          digest = hashlib.sha256(package.read_bytes()).hexdigest()
+          (out/"SHA256SUMS").write_text(digest+"  "+package.name+"\n")
+          print("REVIEW_PACKAGE_SHA256="+digest)
+          print("PACKAGE_STATUS=REVIEW_ONLY_NO_INSTALLER")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-oauth-review-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr122-oauth-review/
+          if-no-files-found: error
+          retention-days: 14
