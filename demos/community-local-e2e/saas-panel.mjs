@@ -13,9 +13,15 @@ export function offerCycles(offer){
   const cycle=safeText(line.cycle),entry=totals[cycle]??{cny:0,usd:0,unknownCNY:false,unknownUSD:false};
   const qty=line.quantity;
   for(const [curr,key] of [["cny","cny_minor"],["usd","usd_minor"]]){
+   const unknownKey=curr==="cny"?"unknownCNY":"unknownUSD";
    if(!Number.isSafeInteger(qty)||qty<=0||!Number.isSafeInteger(line[key])||line[key]<0){
-    entry[curr==="cny"?"unknownCNY":"unknownUSD"]=true;
-   } else entry[curr]+=qty*line[key];
+    entry[unknownKey]=true;
+   } else {
+    const subtotal=qty*line[key];
+    if(!Number.isSafeInteger(subtotal)||!Number.isSafeInteger(entry[curr]+subtotal)){
+     entry[unknownKey]=true;
+    } else entry[curr]+=subtotal;
+   }
   }
   totals[cycle]=entry;
  }
