@@ -1,5 +1,5 @@
 import test from "node:test";import assert from "node:assert/strict";
-import {presentAmount,safeText,modelToView,renderDashboard,offerCycles} from "./saas-panel.mjs";
+import {presentAmount,safeText,modelToView,renderDashboard,offerCycles,parseOwnerInteger} from "./saas-panel.mjs";
 test("dual currency integer minor units",()=>{assert.equal(presentAmount(1999,"CNY"),"¥19.99");assert.equal(presentAmount(500,"USD"),"$5.00")});
 test("unknown costs and invalid numerics stay UNKNOWN",()=>{assert.equal(presentAmount(null,"USD"),"UNKNOWN");assert.equal(presentAmount(-1,"CNY"),"UNKNOWN");assert.equal(presentAmount(1.5,"USD"),"UNKNOWN")});
 test("currency never implicitly converted",()=>assert.throws(()=>presentAmount(100,"JPY"),/INVALID_CURRENCY/));
@@ -55,4 +55,16 @@ test("unknown quote cycle remains visibly unknown without affecting known cycle"
  ]});
  assert.match(view,/UNKNOWN ¥0\.75 \/ \$0\.80/);
  assert.match(view,/ONCE ¥1\.20 \/ \$1\.50/);
+});
+
+test("Owner integer price input rejects decimals, scientific notation and overflow",()=>{
+ for(const raw of ["", " ", "-1", "1.5", "1e3", "01", "Infinity", "9007199254740992", "0x10"])
+  assert.throws(()=>parseOwnerInteger(raw),/INVALID_OWNER_INTEGER/);
+ assert.equal(parseOwnerInteger("0"),0);
+ assert.equal(parseOwnerInteger("500"),500);
+});
+test("Owner offer version must be a positive safe integer",()=>{
+ assert.equal(parseOwnerInteger("2",true),2);
+ for(const raw of ["0","-1","1.1","99999999999999999"])
+  assert.throws(()=>parseOwnerInteger(raw,true),/INVALID_OWNER_INTEGER/);
 });
