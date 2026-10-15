@@ -302,15 +302,17 @@ def run_once(config, now_ms=None, clock_ms=None, monotonic=None,
     directory = EvidenceDirectory(config["evidence_root"], config["business_database"])
     observation_run_id = "shadow-observation-" + str(started)
     run_dir = directory.create_run(observation_run_id)
-    database = None
+    database = None; admitted = None
     try:
         with _hard_deadline(deadline_monotonic - monotonic_clock()):
-            handoff = admit_snapshot_handoff(config, verifier, started)
+            admitted = admit_snapshot_handoff(config, verifier, started)
+            authenticated_generation = admitted.materialize(run_dir)
             database = ReadOnlyBusinessDatabase(
-                config["business_database"], run_dir, config["account_id"], None,
+                authenticated_generation["path"], run_dir, config["account_id"], None,
                 started, config["snapshot_max_age_ms"],
             )
             local = database.snapshot()
+            admitted.close()
         authoritative_snapshot_id = local["snapshot_id"]
         transport = ((transport_factory or ControlledHttpsTransport)(
             "fapi.binance.com", config["pinned_ips"]))
@@ -347,8 +349,9 @@ def run_once(config, now_ms=None, clock_ms=None, monotonic=None,
             "source_verification": verification, "binance_methods": ["GET"],
             "writer_enabled": False, "scheduler_enabled": False,
             "production_authorized": False,
-            "snapshot_generation_id": handoff["snapshot_generation_id"],
-            "snapshot_handoff_database_sha256": handoff["database_sha256"],
+            "snapshot_generation_id": admitted["snapshot_generation_id"],
+            "snapshot_handoff_database_sha256": admitted["database_sha256"],
+            "authenticated_generation": authenticated_generation,
         }
         files = [
             directory.write_once(run_dir, "exchange-pages.json", surfaces),
@@ -357,12 +360,17 @@ def run_once(config, now_ms=None, clock_ms=None, monotonic=None,
         ]
         return {"status": result["status"], "observation_run_id": observation_run_id,
                 "authoritative_business_snapshot_id": authoritative_snapshot_id,
-                "snapshot_generation_id": handoff["snapshot_generation_id"],
+                "snapshot_generation_id": admitted["snapshot_generation_id"],
                 "files": files}
     except Exception as error:
         try:
             if database is not None:
                 database.connection.close()
+        except Exception:
+            pass
+        try:
+            if admitted is not None:
+                admitted.close()
         except Exception:
             pass
         failure = {"schema_version": 1, "status": "HOLD",

@@ -55,11 +55,11 @@ def build(root):
         path = os.path.join(root, relative)
         files.append({"path": "migration-prep/" + relative, "size": os.path.getsize(path),
                       "sha256": digest(path)})
-    value = {"schema_version": 9,
+    value = {"schema_version": 10,
              "task_id": "TOKYO_KOREA_COMPLETE_MIGRATION_REVIEW_PACKAGE_6171881293",
-             "audit_comment": "6181476937",
-             "base_commit": "29d42a130505653ab608bb4ac252e7e26394da6e",
-             "base_tree": "fa4631cb72bc826ded0979bbdf0f1407467cfcec",
+             "audit_comment": "6181898666",
+             "base_commit": "5c991c91351d30f36c0075bbfd83782cf7fc8dfa",
+             "base_tree": "a5ccc767f8d4a8324a3283af3a9e91cf367d51d3",
              "files": files, "production_authorized": False,
              "binance_called": False, "production_deployed": False,
              "self_asserted_receipts_can_pass": False,

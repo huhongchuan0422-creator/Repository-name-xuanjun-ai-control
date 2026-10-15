@@ -18,15 +18,69 @@ FIELDS = frozenset((
 ))
 
 
-def _sha256_file(path):
+def _sha256_stream(stream):
     digest = hashlib.sha256()
-    with open(path, "rb") as stream:
-        while True:
-            block = stream.read(1024 * 1024)
-            if not block:
-                break
-            digest.update(block)
+    while True:
+        block = stream.read(1024 * 1024)
+        if not block:
+            break
+        digest.update(block)
     return digest.hexdigest()
+
+
+def _fd_identity(value):
+    return {
+        "device": value.st_dev, "inode": value.st_ino, "size": value.st_size,
+        "mtime_ns": getattr(value, "st_mtime_ns", int(value.st_mtime * 1000000000)),
+    }
+
+
+class AdmittedSnapshotGeneration(object):
+    """An authenticated generation held open across verification and capture."""
+
+    def __init__(self, receipt, descriptor, identity):
+        self.receipt = receipt
+        self.descriptor = descriptor
+        self.identity = identity
+        self.materialized = None
+
+    def __getitem__(self, name):
+        return self.receipt[name]
+
+    def materialize(self, run_dir):
+        require(self.descriptor is not None, "SHADOW_SNAPSHOT_GENERATION_ALREADY_CLOSED")
+        target = os.path.join(run_dir, "authenticated-generation.sqlite")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        target_fd = os.open(target, flags, 0o600)
+        source_fd = os.dup(self.descriptor)
+        try:
+            with os.fdopen(source_fd, "rb") as source, os.fdopen(target_fd, "wb") as output:
+                source_fd = None; target_fd = None
+                source.seek(0)
+                while True:
+                    block = source.read(1024 * 1024)
+                    if not block:
+                        break
+                    output.write(block)
+                output.flush(); os.fsync(output.fileno())
+        finally:
+            if source_fd is not None: os.close(source_fd)
+            if target_fd is not None: os.close(target_fd)
+        with open(target, "rb") as stream:
+            digest = _sha256_stream(stream)
+        require(digest == self.receipt["database_sha256"],
+                "SHADOW_SNAPSHOT_MATERIALIZED_HASH_MISMATCH")
+        self.materialized = {
+            "path": target, "sha256": digest,
+            "admitted_source_identity": self.identity,
+            "materialized_identity": _fd_identity(os.stat(target)),
+            "binding": "AUTHENTICATED_OPEN_DESCRIPTOR_TO_PRIVATE_IMMUTABLE_COPY",
+        }
+        return self.materialized
+
+    def close(self):
+        if self.descriptor is not None:
+            os.close(self.descriptor); self.descriptor = None
 
 
 def admit_snapshot_handoff(config, verifier, now_ms):
@@ -62,8 +116,25 @@ def admit_snapshot_handoff(config, verifier, now_ms):
             captured <= published <= now_ms and
             now_ms - captured <= config["snapshot_max_age_ms"],
             "SHADOW_SNAPSHOT_HANDOFF_STALE")
-    require(_sha256_file(config["business_database"]) == receipt["database_sha256"],
-            "SHADOW_SNAPSHOT_HANDOFF_DATABASE_HASH_MISMATCH")
-    require(verifier.verify_snapshot_handoff(receipt),
-            "SHADOW_SNAPSHOT_HANDOFF_INDEPENDENT_VERIFICATION_FAILED")
-    return receipt
+    database_path = config["business_database"]
+    require(not os.path.lexists(database_path + "-wal") and
+            not os.path.lexists(database_path + "-shm"),
+            "SHADOW_SNAPSHOT_GENERATION_NOT_CLOSED")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(database_path, flags)
+    try:
+        opened = os.fstat(descriptor)
+        require(stat.S_ISREG(opened.st_mode), "SHADOW_SNAPSHOT_DATABASE_REGULAR_REQUIRED")
+        path_identity = os.stat(database_path, follow_symlinks=False)
+        require(_fd_identity(opened) == _fd_identity(path_identity),
+                "SHADOW_SNAPSHOT_DATABASE_PATH_IDENTITY_MISMATCH")
+        with os.fdopen(os.dup(descriptor), "rb") as stream:
+            digest = _sha256_stream(stream)
+        require(digest == receipt["database_sha256"],
+                "SHADOW_SNAPSHOT_HANDOFF_DATABASE_HASH_MISMATCH")
+        require(verifier.verify_snapshot_handoff(receipt),
+                "SHADOW_SNAPSHOT_HANDOFF_INDEPENDENT_VERIFICATION_FAILED")
+        return AdmittedSnapshotGeneration(receipt, descriptor, _fd_identity(opened))
+    except Exception:
+        os.close(descriptor)
+        raise

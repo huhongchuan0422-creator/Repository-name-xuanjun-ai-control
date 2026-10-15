@@ -80,18 +80,32 @@ printf '%s\n' "$lock_token" >"$lock/owner"; chmod 0600 "$lock/owner"
 lock_owned=1
 created_group=0; created_user=0; created_staging=0; created_release=0
 created_current=0; created_unit=0; created_venv=0; created_transaction=0
+created_directories=(); created_directory_inodes=(); cleanup_retained=()
 staging=; release=; unit_sha=; transaction_id="install-${expected_manifest:0:16}"
 committed=0; interrupt_reason=
 
 same_inode() { [[ -e $1 && ! -L $1 && $(stat -c '%d:%i' "$1") == "$2" ]]; }
+create_owned_directory() {
+  local mode=$1 path=$2 inode
+  [[ ! -e $path && ! -L $path ]] || fail PREEXISTING_OR_DANGLING_TARGET
+  install -d -m "$mode" "$path"
+  if ! inode=$(stat -c '%d:%i' "$path"); then
+    cleanup_retained+=("$path:IDENTITY_UNAVAILABLE")
+    fail CREATED_DIRECTORY_IDENTITY_UNAVAILABLE
+  fi
+  created_directories+=("$path"); created_directory_inodes+=("$inode")
+}
 release_lock() {
   if [[ $lock_owned -eq 1 && -f $lock/owner && ! -L $lock/owner && $(cat "$lock/owner") == "$lock_token" ]]; then
-    rm -f -- "$lock/owner"; rmdir -- "$lock" 2>/dev/null || true
+    rm -f -- "$lock/owner"
+    rmdir -- "$lock" 2>/dev/null || cleanup_retained+=("$lock:REMOVE_FAILED")
+  elif [[ $lock_owned -eq 1 ]]; then
+    cleanup_retained+=("$lock:IDENTITY_CHANGED")
   fi
   lock_owned=0
 }
 cleanup() {
-  local status=$?
+  local status=$? index path inode cleanup_state
   trap - EXIT INT TERM
   if [[ $committed -eq 0 ]]; then
     if [[ $created_transaction -eq 1 && -f $transaction && ! -L $transaction ]]; then
@@ -105,15 +119,16 @@ PY
     [[ $created_staging -eq 1 && -n $staging ]] && same_inode "$staging" "$staging_inode" && rm -rf --one-file-system "$staging" || true
     [[ $created_release -eq 1 && -n $release ]] && same_inode "$release" "$release_inode" && rm -rf --one-file-system "$release" || true
     [[ $created_venv -eq 1 ]] && same_inode "$venv" "$venv_inode" && rm -rf --one-file-system "$venv" || true
-    [[ -d $releases ]] && rmdir "$releases" 2>/dev/null || true
-    [[ -d $(root_path /opt/xuanjun-binance) ]] && rmdir "$(root_path /opt/xuanjun-binance)" 2>/dev/null || true
-    [[ -d $(root_path /etc/xuanjun-binance/secretref) ]] && rmdir "$(root_path /etc/xuanjun-binance/secretref)" 2>/dev/null || true
-    [[ -d $(root_path /etc/xuanjun-binance) ]] && rmdir "$(root_path /etc/xuanjun-binance)" 2>/dev/null || true
-    [[ -d $(root_path /var/lib/xuanjun-binance/input) ]] && rmdir "$(root_path /var/lib/xuanjun-binance/input)" 2>/dev/null || true
-    [[ -d $(root_path /var/lib/xuanjun-binance/evidence) ]] && rmdir "$(root_path /var/lib/xuanjun-binance/evidence)" 2>/dev/null || true
     [[ -n ${pycache_inode:-} ]] && same_inode "$(root_path /var/lib/xuanjun-binance/pycache)" "$pycache_inode" && rm -rf --one-file-system "$(root_path /var/lib/xuanjun-binance/pycache)" || true
-    [[ -d $(root_path /var/lib/xuanjun-binance) ]] && rmdir "$(root_path /var/lib/xuanjun-binance)" 2>/dev/null || true
-    [[ -d $(root_path /var/log/xuanjun-binance) ]] && rmdir "$(root_path /var/log/xuanjun-binance)" 2>/dev/null || true
+    for ((index=${#created_directories[@]}-1; index>=0; index--)); do
+      path=${created_directories[$index]}; inode=${created_directory_inodes[$index]}
+      [[ ! -e $path && ! -L $path ]] && continue
+      if ! same_inode "$path" "$inode"; then
+        cleanup_retained+=("$path:IDENTITY_CHANGED")
+      elif ! rmdir -- "$path" 2>/dev/null; then
+        cleanup_retained+=("$path:REMOVE_FAILED")
+      fi
+    done
     if [[ $test_mode != 1 ]]; then
       [[ $created_user -eq 1 ]] && userdel xuanjun_binance >/dev/null 2>&1 || true
       [[ $created_group -eq 1 ]] && groupdel xuanjun_binance >/dev/null 2>&1 || true
@@ -121,7 +136,14 @@ PY
     [[ $created_unit -eq 1 ]] && systemctl daemon-reload >/dev/null 2>&1 || true
   fi
   release_lock
-  [[ -z $interrupt_reason ]] || printf 'INSTALL_STAGE=%s STATUS=HOLD REASON=%s CLEANUP=COMPLETE\n' "$stage" "$interrupt_reason" >&2
+  cleanup_state=COMPLETE
+  if [[ ${#cleanup_retained[@]} -gt 0 ]]; then cleanup_state=PARTIAL; fi
+  if [[ $committed -eq 0 ]]; then
+    printf 'INSTALL_STAGE=%s STATUS=HOLD CLEANUP=%s' "$stage" "$cleanup_state" >&2
+    [[ ${#cleanup_retained[@]} -eq 0 ]] || printf ' RETAINED=%s' "$(IFS=,; printf '%s' "${cleanup_retained[*]}")" >&2
+    printf '\n' >&2
+  fi
+  [[ -z $interrupt_reason ]] || printf 'INSTALL_STAGE=%s STATUS=HOLD REASON=%s CLEANUP=%s\n' "$stage" "$interrupt_reason" "$cleanup_state" >&2
   exit "$status"
 }
 on_int() { interrupt_reason=INTERRUPTED_SIGINT; exit 130; }
@@ -159,11 +181,16 @@ if [[ $test_mode != 1 ]]; then
     useradd --system --gid xuanjun_binance --home-dir /var/lib/xuanjun-binance --shell /sbin/nologin xuanjun_binance; created_user=1
   fi
 fi
-install -d -m 0755 "$(root_path /opt/xuanjun-binance)" "$releases"
-install -d -m 0700 "$(root_path /var/lib/xuanjun-binance)" "$(root_path /var/lib/xuanjun-binance/input)" \
-  "$(root_path /var/lib/xuanjun-binance/evidence)" "$(root_path /var/lib/xuanjun-binance/pycache)" "$(root_path /var/log/xuanjun-binance)"
+create_owned_directory 0755 "$(root_path /opt/xuanjun-binance)"
+create_owned_directory 0755 "$releases"
+create_owned_directory 0700 "$(root_path /var/lib/xuanjun-binance)"
+create_owned_directory 0700 "$(root_path /var/lib/xuanjun-binance/input)"
+create_owned_directory 0700 "$(root_path /var/lib/xuanjun-binance/evidence)"
+create_owned_directory 0700 "$(root_path /var/lib/xuanjun-binance/pycache)"
+create_owned_directory 0700 "$(root_path /var/log/xuanjun-binance)"
 pycache_inode=$(stat -c '%d:%i' "$(root_path /var/lib/xuanjun-binance/pycache)")
-install -d -m 0750 "$(root_path /etc/xuanjun-binance)" "$(root_path /etc/xuanjun-binance/secretref)"
+create_owned_directory 0750 "$(root_path /etc/xuanjun-binance)"
+create_owned_directory 0750 "$(root_path /etc/xuanjun-binance/secretref)"
 if [[ $test_mode != 1 ]]; then
   chown xuanjun_binance:xuanjun_binance "$(root_path /var/lib/xuanjun-binance)" "$(root_path /var/lib/xuanjun-binance/input)" \
     "$(root_path /var/lib/xuanjun-binance/evidence)" "$(root_path /var/lib/xuanjun-binance/pycache)" "$(root_path /var/log/xuanjun-binance)"

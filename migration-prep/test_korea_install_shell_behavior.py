@@ -105,6 +105,26 @@ exec /bin/cp "$@"
         different = self._run_install(candidate_b, manifest_b)
         self.assertEqual(different.returncode, 2)
         self.assertIn("DIFFERENT_VERSION_REQUIRES_SEPARATE_APPROVED_UPGRADE", different.stderr)
+        self.assertTrue((self.root / "opt/xuanjun-binance/current").is_symlink())
+        self.assertTrue((self.root / "etc/xuanjun-binance/install-transaction.json").is_file())
+
+    def test_rejected_install_preserves_every_preexisting_empty_target_directory(self):
+        targets = ("opt/xuanjun-binance", "var/lib/xuanjun-binance",
+                   "etc/xuanjun-binance", "var/log/xuanjun-binance")
+        for relative in targets:
+            with self.subTest(relative=relative):
+                target = self.root / relative
+                target.mkdir(mode=0o700)
+                identity = (target.stat().st_dev, target.stat().st_ino, target.stat().st_mode)
+                result = self._run_install()
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("PREEXISTING_OR_DANGLING_TARGET", result.stderr)
+                self.assertIn("CLEANUP=COMPLETE", result.stderr)
+                self.assertTrue(target.is_dir())
+                self.assertEqual(identity,
+                                 (target.stat().st_dev, target.stat().st_ino,
+                                  target.stat().st_mode))
+                target.rmdir()
 
     def test_exclusive_lock_and_partial_copy_cleanup_are_real_shell_behaviors(self):
         sleeping_env = dict(self.env); sleeping_env["KOREA_TEST_CP_SLEEP"] = "1"
@@ -152,6 +172,30 @@ exec /bin/cp "$@"
         self.assertIn("INTERRUPTED_SIGTERM", stderr)
         self.assertFalse((self.root / "run/xuanjun-binance-install.lock").exists())
         self.assertFalse((self.root / "etc/xuanjun-binance/install-transaction.json").exists())
+
+    def test_cleanup_identity_change_is_retained_and_reported_partial(self):
+        env = dict(self.env); env["KOREA_TEST_CP_SLEEP"] = "1"
+        process = subprocess.Popen(
+            [str(self.install), str(self.candidate), self.manifest_sha],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
+            start_new_session=True,
+        )
+        marker = self.root / "cp-started"
+        for _ in range(200):
+            if marker.exists(): break
+            time.sleep(0.02)
+        self.assertTrue(marker.exists())
+        changed = self.root / "var/log/xuanjun-binance"
+        changed.rmdir()
+        replacement = self.root / "replacement-log"; replacement.mkdir(mode=0o700)
+        changed.symlink_to(replacement)
+        os.killpg(process.pid, signal.SIGTERM)
+        unused_stdout, stderr = process.communicate(timeout=10)
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("CLEANUP=PARTIAL", stderr)
+        self.assertIn("IDENTITY_CHANGED", stderr)
+        self.assertTrue(changed.is_symlink())
+        self.assertEqual(changed.resolve(), replacement.resolve())
 
     def test_replaced_unit_is_refused_by_check_and_uninstall(self):
         installed = self._run_install()

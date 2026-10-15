@@ -18,9 +18,9 @@ from gate_common import sha256_value
 from korea.build_runtime_candidate import build_candidate
 from korea.get_only_policy import ControlledHttpsTransport
 from korea.migration_shadow_entry import main, run_once
-from korea.shadow_acceptance import run_continuous, validate_acceptance_config
+from korea.shadow_acceptance import run_continuous, sample_resources, validate_acceptance_config
 from korea.validate_runtime_candidate import validate
-from readonly_reconciliation_adapter import TABLE_SPECS
+from readonly_reconciliation_adapter import ReadOnlyBusinessDatabase, TABLE_SPECS
 
 
 class FakeExchangeTransport(ControlledHttpsTransport):
@@ -58,6 +58,13 @@ class AlwaysBoundVerifier(object):
 
 class RejectingVerifier(AlwaysBoundVerifier):
     def __call__(self, receipt, response): return False
+
+
+class CallbackHandoffVerifier(AlwaysBoundVerifier):
+    callback = None
+    def verify_snapshot_handoff(self, receipt):
+        self.callback()
+        return True
 
 
 class R1R6CloseoutTests(unittest.TestCase):
@@ -113,6 +120,15 @@ class R1R6CloseoutTests(unittest.TestCase):
         }
 
     def tearDown(self): self.temp.cleanup()
+
+    @staticmethod
+    def _resource(rss=100, peak=100, oom=0, version="v2"):
+        return {"rss_mib": rss, "mem_available_mib": 1000,
+                "swap_used_mib": 10, "cgroup_memory_peak_mib": peak,
+                "cgroup_oom": oom, "cgroup_version": version,
+                "cgroup_oom_semantics": ("memory.events:oom+oom_kill" if version == "v2"
+                                          else "memory.failcnt+memory.oom_control:under_oom"),
+                "cgroup_evidence_complete": True}
 
     def test_clean_extracted_artifact_is_self_contained_and_has_exact_default_import(self):
         output = Path(self.temp.name) / "runtime-candidate"
@@ -249,8 +265,7 @@ class R1R6CloseoutTests(unittest.TestCase):
                     "observation_run_id": "obs-" + str(now_ms),
                     "authoritative_business_snapshot_id": "business-snapshot-7",
                     "snapshot_generation_id": "generation-" + str(now_ms)}
-        resource = lambda: {"rss_mib": 100, "mem_available_mib": 1000,
-                            "swap_used_mib": 10}
+        resource = self._resource
         value = run_continuous(self.config, acceptance, cycle_runner=cycle,
                                clock_ms=clock, sleep_fn=sleep, resource_sampler=resource)
         self.assertEqual(value["status"], "PASS_SHADOW_WINDOW")
@@ -282,9 +297,7 @@ class R1R6CloseoutTests(unittest.TestCase):
         }
 
     def test_long_or_expired_restart_and_tested_object_drift_hold(self):
-        resource = lambda: {"rss_mib": 100, "mem_available_mib": 1000,
-                            "swap_used_mib": 10, "cgroup_memory_peak_mib": 100,
-                            "cgroup_oom": 0}
+        resource = self._resource
         moment = {"value": 0}
         def interrupted(unused_config, now_ms=None):
             raise KeyboardInterrupt()
@@ -337,6 +350,117 @@ class R1R6CloseoutTests(unittest.TestCase):
                           verifier_factory=AlwaysBoundVerifier)
         self.assertEqual(result["status"], "HOLD")
 
+    def test_verified_generation_is_the_database_actually_consumed_across_path_rotation(self):
+        original_sha = hashlib.sha256(self.db.read_bytes()).hexdigest()
+        replacement = Path(self.temp.name) / "replacement.sqlite"
+        with sqlite3.connect(str(replacement)) as connection:
+            connection.execute("CREATE TABLE marker(value TEXT)")
+            connection.execute("INSERT INTO marker VALUES('new-generation')")
+        replacement_sha = hashlib.sha256(replacement.read_bytes()).hexdigest()
+
+        def rotate():
+            os.replace(str(replacement), str(self.db))
+        CallbackHandoffVerifier.callback = staticmethod(rotate)
+        result = run_once(self.config,
+                          transport_factory=lambda host, ips: FakeExchangeTransport(host, ips),
+                          verifier_factory=CallbackHandoffVerifier)
+        self.assertEqual(result["status"], "PASS_READONLY_SHADOW_CYCLE")
+        evidence = json.loads((self.evidence / result["observation_run_id"] /
+                               "reconciliation.json").read_text())
+        self.assertEqual(evidence["authenticated_generation"]["sha256"], original_sha)
+        self.assertEqual(evidence["snapshot_handoff_database_sha256"], original_sha)
+        self.assertEqual(hashlib.sha256(self.db.read_bytes()).hexdigest(), replacement_sha)
+        self.assertNotEqual(original_sha, replacement_sha)
+
+    def test_authenticated_generation_survives_rotation_before_sqlite_backup(self):
+        original_sha = hashlib.sha256(self.db.read_bytes()).hexdigest()
+        replacement = Path(self.temp.name) / "before-backup.sqlite"
+        with sqlite3.connect(str(replacement)) as connection:
+            connection.execute("CREATE TABLE marker(value TEXT)")
+        replacement_sha = hashlib.sha256(replacement.read_bytes()).hexdigest()
+
+        class RotateBeforeBackup(ReadOnlyBusinessDatabase):
+            def __init__(inner_self, *args, **kwargs):
+                os.replace(str(replacement), str(self.db))
+                super(RotateBeforeBackup, inner_self).__init__(*args, **kwargs)
+
+        with mock.patch("korea.migration_shadow_entry.ReadOnlyBusinessDatabase",
+                        RotateBeforeBackup):
+            result = run_once(
+                self.config,
+                transport_factory=lambda host, ips: FakeExchangeTransport(host, ips),
+                verifier_factory=AlwaysBoundVerifier)
+        self.assertEqual(result["status"], "PASS_READONLY_SHADOW_CYCLE")
+        evidence = json.loads((self.evidence / result["observation_run_id"] /
+                               "reconciliation.json").read_text())
+        self.assertEqual(evidence["authenticated_generation"]["sha256"], original_sha)
+        self.assertEqual(hashlib.sha256(self.db.read_bytes()).hexdigest(), replacement_sha)
+
+    def test_authenticated_generation_survives_rotation_after_sqlite_backup(self):
+        original_sha = hashlib.sha256(self.db.read_bytes()).hexdigest()
+        replacement = Path(self.temp.name) / "after-backup.sqlite"
+        with sqlite3.connect(str(replacement)) as connection:
+            connection.execute("CREATE TABLE marker(value TEXT)")
+        replacement_sha = hashlib.sha256(replacement.read_bytes()).hexdigest()
+
+        def factory(host, ips):
+            os.replace(str(replacement), str(self.db))
+            return FakeExchangeTransport(host, ips)
+        result = run_once(self.config, transport_factory=factory,
+                          verifier_factory=AlwaysBoundVerifier)
+        self.assertEqual(result["status"], "PASS_READONLY_SHADOW_CYCLE")
+        evidence = json.loads((self.evidence / result["observation_run_id"] /
+                               "reconciliation.json").read_text())
+        self.assertEqual(evidence["authenticated_generation"]["sha256"], original_sha)
+        self.assertEqual(hashlib.sha256(self.db.read_bytes()).hexdigest(), replacement_sha)
+
+    def test_snapshot_sidecars_and_old_generation_replay_fail_closed(self):
+        for offset, suffix in enumerate(("-wal", "-shm")):
+            sidecar = Path(str(self.db) + suffix); sidecar.write_bytes(b"interrupted-rotation")
+            result = run_once(self.config, now_ms=self.now + offset,
+                              transport_factory=lambda host, ips: FakeExchangeTransport(host, ips),
+                              verifier_factory=AlwaysBoundVerifier)
+            self.assertEqual(result["status"], "HOLD")
+            sidecar.unlink()
+        with sqlite3.connect(str(self.db)) as connection:
+            connection.execute("CREATE TABLE replay_marker(value TEXT)")
+        replay = run_once(self.config, now_ms=self.now + 2,
+                          transport_factory=lambda host, ips: FakeExchangeTransport(host, ips),
+                          verifier_factory=AlwaysBoundVerifier)
+        self.assertEqual(replay["status"], "HOLD")
+
+    def test_cgroup_v1_v2_are_explicit_and_missing_evidence_holds(self):
+        root = Path(self.temp.name) / "resources"
+        proc = root / "proc"; (proc / "self").mkdir(parents=True)
+        (proc / "self/status").write_text("Name:\ttest\nVmRSS:\t102400 kB\n")
+        (proc / "meminfo").write_text(
+            "MemAvailable: 2048000 kB\nSwapTotal: 102400 kB\nSwapFree: 51200 kB\n")
+        cgroup = root / "cgroup"; (cgroup / "scope").mkdir(parents=True)
+        (proc / "self/cgroup").write_text("0::/scope\n")
+        (cgroup / "scope/memory.peak").write_text(str(256 * 1048576))
+        (cgroup / "scope/memory.events").write_text("oom 2\noom_kill 1\n")
+        v2 = sample_resources(str(proc), str(cgroup))
+        self.assertEqual((v2["cgroup_version"], v2["cgroup_oom"]), ("v2", 3))
+        (cgroup / "scope/memory.events").unlink()
+        with self.assertRaises((OSError, ValueError, Exception)):
+            sample_resources(str(proc), str(cgroup))
+
+        v1root = root / "cgroup-v1"; (v1root / "memory/scope").mkdir(parents=True)
+        (proc / "self/cgroup").write_text("7:memory:/scope\n")
+        (v1root / "memory/scope/memory.max_usage_in_bytes").write_text(str(128 * 1048576))
+        (v1root / "memory/scope/memory.failcnt").write_text("4")
+        (v1root / "memory/scope/memory.oom_control").write_text(
+            "oom_kill_disable 0\nunder_oom 0\n")
+        v1 = sample_resources(str(proc), str(v1root))
+        self.assertEqual((v1["cgroup_version"], v1["cgroup_oom"]), ("v1", 4))
+        incomplete = lambda: {"rss_mib": 1, "mem_available_mib": 1000,
+                              "swap_used_mib": 0}
+        with self.assertRaises(Exception):
+            run_continuous(self.config, self._acceptance("missing-cgroup"),
+                           cycle_runner=lambda config, now_ms=None: {"status": "HOLD"},
+                           clock_ms=lambda: 0, sleep_fn=lambda seconds: None,
+                           resource_sampler=incomplete)
+
     def test_resource_threshold_and_nonpass_cycle_hard_stop_immediately(self):
         moment = {"value": 0}
         def clock(): return moment["value"]
@@ -345,9 +469,7 @@ class R1R6CloseoutTests(unittest.TestCase):
             return {"status": "PASS_READONLY_SHADOW_CYCLE",
                     "observation_run_id": "obs", "authoritative_business_snapshot_id": "snap",
                     "snapshot_generation_id": "generation-1"}
-        resource = lambda: {"rss_mib": 700, "mem_available_mib": 1000,
-                            "swap_used_mib": 10, "cgroup_memory_peak_mib": 700,
-                            "cgroup_oom": 0}
+        resource = lambda: self._resource(rss=700, peak=700)
         held = run_continuous(self.config, self._acceptance("resource-window"),
                               cycle_runner=cycle, clock_ms=clock,
                               sleep_fn=lambda seconds: None, resource_sampler=resource)

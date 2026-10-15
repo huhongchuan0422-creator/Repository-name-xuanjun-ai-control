@@ -85,3 +85,21 @@ Rollback is Korea-first: lock Korea Writer, revoke its credential, remove its IP
 reconcile every unknown outcome, and only then consider Tokyo restoration and a new
 Tokyo epoch. Yibi, novel, PostgreSQL, Redis and either production Runner are outside
 this artifact and must remain unchanged.
+
+The handoff admission path opens the published closed generation with
+`O_NOFOLLOW`, hashes and independently verifies that exact descriptor, and
+materializes the bytes from the still-open descriptor into the private run
+directory before SQLite backup/consumption.  Concurrent replacement of the
+configured path therefore cannot pair generation A's receipt with generation
+B's database.  A published path with `-wal` or `-shm` sidecars is incomplete
+and is rejected rather than guessed or merged.
+
+Resource acceptance requires explicit cgroup v2 `memory.peak` plus
+`memory.events` evidence, or cgroup v1 `memory.max_usage_in_bytes`,
+`memory.failcnt`, and `memory.oom_control` evidence.  Missing, unreadable, or
+unsupported cgroup evidence is HOLD; RSS and a synthetic zero OOM count are
+not substitutes.
+
+Candidate tests do not prove Korea host installation compatibility, a real
+publisher/verifier/Authority wiring, or a continuous Shadow window.  Those
+remain separate post-install, independently witnessed acceptance gates.

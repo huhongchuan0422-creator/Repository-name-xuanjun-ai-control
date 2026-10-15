@@ -82,15 +82,29 @@ def load_acceptance_config(path):
     return validate_acceptance_config(_secure_json(path))
 
 
-def sample_resources():
+def _read_integer(path):
+    with open(path, "r", encoding="utf-8") as stream:
+        return int(stream.read().strip())
+
+
+def _bounded_cgroup_path(root, relative, controller=None):
+    base = os.path.join(root, controller) if controller else root
+    candidate = os.path.realpath(os.path.join(base, relative.lstrip("/")))
+    real_base = os.path.realpath(base)
+    require(candidate == real_base or candidate.startswith(real_base + os.sep),
+            "SHADOW_CGROUP_PATH_INVALID")
+    return candidate
+
+
+def sample_resources(proc_root="/proc", cgroup_root="/sys/fs/cgroup"):
     values = {}
-    with open("/proc/self/status", "r", encoding="utf-8") as stream:
+    with open(os.path.join(proc_root, "self/status"), "r", encoding="utf-8") as stream:
         for line in stream:
             if line.startswith("VmRSS:"):
                 values["rss_mib"] = int(line.split()[1]) / 1024.0
                 break
     memory = {}
-    with open("/proc/meminfo", "r", encoding="utf-8") as stream:
+    with open(os.path.join(proc_root, "meminfo"), "r", encoding="utf-8") as stream:
         for line in stream:
             name, raw = line.split(":", 1)
             if name in ("MemAvailable", "SwapTotal", "SwapFree"):
@@ -99,34 +113,52 @@ def sample_resources():
             "SHADOW_RESOURCE_SAMPLE_INCOMPLETE")
     values["mem_available_mib"] = memory["MemAvailable"]
     values["swap_used_mib"] = memory["SwapTotal"] - memory["SwapFree"]
-    values["cgroup_memory_peak_mib"] = values["rss_mib"]
-    values["cgroup_oom"] = 0
-    cgroup_root = "/sys/fs/cgroup"
-    try:
-        with open("/proc/self/cgroup", "r", encoding="utf-8") as stream:
-            unified = [line.strip().split(":", 2)[2] for line in stream
-                       if line.startswith("0::")]
-        if len(unified) == 1:
-            candidate = os.path.realpath(os.path.join(cgroup_root, unified[0].lstrip("/")))
-            require(candidate == cgroup_root or candidate.startswith(cgroup_root + os.sep),
-                    "SHADOW_CGROUP_PATH_INVALID")
-            cgroup_root = candidate
-    except OSError:
-        pass
-    for peak_path in (os.path.join(cgroup_root, "memory.peak"),):
-        try:
-            with open(peak_path, "r", encoding="utf-8") as stream:
-                values["cgroup_memory_peak_mib"] = max(
-                    values["cgroup_memory_peak_mib"], int(stream.read().strip()) / 1048576.0)
-        except (OSError, ValueError):
-            pass
-    try:
-        with open(os.path.join(cgroup_root, "memory.events"), "r", encoding="utf-8") as stream:
+    with open(os.path.join(proc_root, "self/cgroup"), "r", encoding="utf-8") as stream:
+        entries = [line.strip().split(":", 2) for line in stream if line.strip()]
+    require(entries and all(len(item) == 3 for item in entries),
+            "SHADOW_CGROUP_MEMBERSHIP_UNAVAILABLE")
+    unified = [item[2] for item in entries if item[0] == "0" and item[1] == ""]
+    if len(unified) == 1:
+        location = _bounded_cgroup_path(cgroup_root, unified[0])
+        peak = _read_integer(os.path.join(location, "memory.peak"))
+        with open(os.path.join(location, "memory.events"), "r", encoding="utf-8") as stream:
             events = dict(line.split() for line in stream if line.strip())
-        values["cgroup_oom"] = int(events.get("oom", 0)) + int(events.get("oom_kill", 0))
-    except (OSError, ValueError):
-        pass
+        require("oom" in events and "oom_kill" in events,
+                "SHADOW_CGROUP_V2_OOM_FIELDS_MISSING")
+        values["cgroup_version"] = "v2"
+        values["cgroup_memory_peak_mib"] = peak / 1048576.0
+        values["cgroup_oom"] = int(events["oom"]) + int(events["oom_kill"])
+        values["cgroup_oom_semantics"] = "memory.events:oom+oom_kill"
+    else:
+        memory_entries = [item for item in entries if "memory" in item[1].split(",")]
+        require(len(memory_entries) == 1, "SHADOW_CGROUP_MEMORY_CONTROLLER_UNAVAILABLE")
+        location = _bounded_cgroup_path(cgroup_root, memory_entries[0][2], "memory")
+        peak = _read_integer(os.path.join(location, "memory.max_usage_in_bytes"))
+        failcnt = _read_integer(os.path.join(location, "memory.failcnt"))
+        with open(os.path.join(location, "memory.oom_control"), "r", encoding="utf-8") as stream:
+            oom_control = dict(line.split() for line in stream if line.strip())
+        require("under_oom" in oom_control, "SHADOW_CGROUP_V1_OOM_FIELDS_MISSING")
+        values["cgroup_version"] = "v1"
+        values["cgroup_memory_peak_mib"] = peak / 1048576.0
+        values["cgroup_oom"] = failcnt + int(oom_control["under_oom"])
+        values["cgroup_oom_semantics"] = "memory.failcnt+memory.oom_control:under_oom"
+    require(values["cgroup_memory_peak_mib"] >= 0 and values["cgroup_oom"] >= 0,
+            "SHADOW_CGROUP_RESOURCE_VALUES_INVALID")
+    values["cgroup_evidence_complete"] = True
     return values
+
+
+def _validated_resource_sample(value):
+    required = ("rss_mib", "mem_available_mib", "swap_used_mib",
+                "cgroup_memory_peak_mib", "cgroup_oom", "cgroup_version",
+                "cgroup_oom_semantics", "cgroup_evidence_complete")
+    require(isinstance(value, dict) and all(name in value for name in required),
+            "SHADOW_CGROUP_RESOURCE_EVIDENCE_UNAVAILABLE")
+    require(value["cgroup_evidence_complete"] is True and
+            value["cgroup_version"] in ("v1", "v2") and
+            isinstance(value["cgroup_oom_semantics"], str) and value["cgroup_oom_semantics"],
+            "SHADOW_CGROUP_RESOURCE_EVIDENCE_UNAVAILABLE")
+    return value
 
 
 def _percentile(values, percentile):
@@ -281,7 +313,7 @@ def run_continuous(config, acceptance, cycle_runner=None, clock_ms=None,
     if cycle_runner is None:
         from korea.migration_shadow_entry import run_once
         cycle_runner = run_once
-    initial_resources = resources_fn()
+    initial_resources = _validated_resource_sample(resources_fn())
     path, state = _load_or_create_state(config, acceptance, clock(), initial_resources)
     if state["status"] == "HOLD":
         return state
@@ -295,12 +327,12 @@ def run_continuous(config, acceptance, cycle_runner=None, clock_ms=None,
                 sleeper(min((next_due - current) / 1000.0, 1.0))
                 continue
             before = clock()
-            observations = [resources_fn()]; monitor_errors = []
+            observations = [_validated_resource_sample(resources_fn())]; monitor_errors = []
             stop_monitor = threading.Event()
             def monitor():
                 while not stop_monitor.wait(0.05):
                     try:
-                        observations.append(resources_fn())
+                        observations.append(_validated_resource_sample(resources_fn()))
                     except BaseException as error:
                         monitor_errors.append(type(error).__name__)
                         return
@@ -310,8 +342,11 @@ def run_continuous(config, acceptance, cycle_runner=None, clock_ms=None,
                 result = cycle_runner(config, now_ms=before)
             finally:
                 stop_monitor.set(); monitor_thread.join(timeout=1.0)
-                observations.append(resources_fn())
+                observations.append(_validated_resource_sample(resources_fn()))
             require(not monitor_errors, "SHADOW_RESOURCE_MONITOR_FAILED")
+            require(len(set(value["cgroup_version"] for value in observations)) == 1 and
+                    len(set(value["cgroup_oom_semantics"] for value in observations)) == 1,
+                    "SHADOW_CGROUP_RESOURCE_EVIDENCE_CHANGED")
             after = clock()
             resources = {
                 "rss_mib": max(value["rss_mib"] for value in observations),
@@ -319,6 +354,9 @@ def run_continuous(config, acceptance, cycle_runner=None, clock_ms=None,
                 "mem_available_mib": min(value["mem_available_mib"] for value in observations),
                 "swap_used_mib": max(value["swap_used_mib"] for value in observations),
                 "cgroup_oom": max(value.get("cgroup_oom", 0) for value in observations),
+                "cgroup_version": observations[0]["cgroup_version"],
+                "cgroup_oom_semantics": observations[0]["cgroup_oom_semantics"],
+                "cgroup_evidence_complete": True,
                 "sample_count": len(observations),
             }
             sample = {

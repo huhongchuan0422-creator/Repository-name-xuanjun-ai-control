@@ -106,3 +106,16 @@ head exists.
 Human settings, suggested thresholds and independent Authority/verifier design are
 consolidated in `OWNER_ONE_TIME_COMPLETION.md`; phase scopes and every outcome state
 are in `PHASE_AUTHORIZATION_AND_OUTCOME_MATRIX.md`.
+# R2/R6 residual independent-review boundary (receipt 6181898666)
+
+- Installer rollback removes only directories created by the current attempt
+  and still matching the recorded device/inode.  Pre-existing empty targets
+  survive every rejection path; identity changes or removal failures are
+  retained and reported as `CLEANUP=PARTIAL`.
+- Snapshot admission and consumption share one authenticated open descriptor
+  and private immutable generation copy.  Path rotation before or after SQLite
+  backup cannot change the database consumed for the accepted receipt.
+- WAL/SHM presence, stale replay, incomplete rotation, and missing cgroup v1/v2
+  peak/OOM evidence fail closed.
+- No candidate test claims Korea installation, real publisher/verifier wiring,
+  or continuous Shadow acceptance.  Production migration remains HOLD.
