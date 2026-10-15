@@ -152,6 +152,8 @@ def advance(db,order_id,tenant_id,event_key,new_state,at,proof_ref=None,
             if existing!=(order_id,new_state,proof_ref,at):
                 raise ValueError("EVENT_IDEMPOTENCY_CONFLICT")
             return status(db,order_id,tenant_id)
+        # Validate committed projection/event chain before any mutation.
+        status(db,order_id,tenant_id)
         current=db.execute("SELECT state,updated_at FROM saas_order_lifecycle WHERE order_id=?",(order_id,)).fetchone()
         old=current[0] if current else "PREPARED"
         if at<(current[1] if current else row[1]):
@@ -166,7 +168,9 @@ def advance(db,order_id,tenant_id,event_key,new_state,at,proof_ref=None,
                        (order_id,new_state,proof_ref,at))
         db.execute("INSERT INTO saas_order_lifecycle_events VALUES(?,?,?,?,?,?)",
                    (event_key,order_id,old,new_state,proof_ref,at))
-    return status(db,order_id,tenant_id)
+        # Validation must occur inside the same transaction: failure rolls back.
+        verified=status(db,order_id,tenant_id)
+    return verified
 
 def status(db,order_id,tenant_id):
     read(db,order_id,tenant_id)
@@ -175,7 +179,11 @@ def status(db,order_id,tenant_id):
     previous="PREPARED"
     last_at=read(db,order_id,tenant_id)["created_at"]
     for old_state,new_state,proof,occurred in events:
-        if old_state!=previous or new_state not in TRANSITIONS.get(previous,set()) or occurred<last_at:
+        if (old_state!=previous or new_state not in TRANSITIONS.get(previous,set())
+            or type(occurred) is not int or occurred<last_at
+            or (new_state=="CONFIRMED_EXTERNAL" and
+                (type(proof) is not str or not valid_id(proof)))
+            or (new_state!="CONFIRMED_EXTERNAL" and proof is not None)):
             raise ValueError("LIFECYCLE_EVENT_INCONSISTENT")
         previous=new_state
         last_at=occurred
