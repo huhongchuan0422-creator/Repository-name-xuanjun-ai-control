@@ -2,6 +2,7 @@
 import sqlite3
 import tempfile
 import os
+from unittest.mock import patch
 import unittest
 from scripts.community_saas_modules import connect,set_price,grant
 from scripts.community_saas_offer_catalog import install,create_offer,quote,approve_offer
@@ -155,6 +156,19 @@ class FullScopeAuditProbes(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             o.execute("DELETE FROM components WHERE offer_id='one'")
     finally:o.close()
+ def test_r6_refund_backup_failure_closes_both_and_preserves_first_exception(self):
+    from scripts.community_demo_api import serve_local
+    with patch("scripts.community_demo_api.server_database") as primary, \
+         patch("scripts.community_demo_api.open_refund_store") as source, \
+         patch("scripts.community_demo_api.sqlite3.connect") as runtime:
+        source.return_value.backup.side_effect=RuntimeError("backup-original")
+        source.return_value.close.side_effect=RuntimeError("source-close-secondary")
+        runtime.return_value.close.side_effect=RuntimeError("runtime-close-secondary")
+        with self.assertRaisesRegex(RuntimeError,"backup-original"):
+            serve_local(port=0)
+        self.assertEqual(source.return_value.close.call_count,1)
+        self.assertEqual(runtime.return_value.close.call_count,1)
+        self.assertEqual(primary.return_value.close.call_count,1)
  def test_r7_pre_order_proof_rejected(self):
     self.ready()
     att=make_test_attestation(plan_finance_claim(self.orders,"ord","tenantA"),"proof",0,KEY)
