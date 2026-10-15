@@ -61,12 +61,32 @@ def inspect(blob):
         names=z.namelist()
         if sorted(names)!=sorted([*ASSETS,"manifest.json"]) or len(names)!=len(set(names)):
             raise ValueError("PACKAGE_ASSET_MISMATCH")
-        manifest=json.loads(z.read("manifest.json"))
+        for info in z.infolist():
+            kind=(info.external_attr>>16)&0o170000
+            if kind not in (0,0o100000) or info.file_size>4_000_000:
+                raise ValueError("PACKAGE_MEMBER_UNSAFE")
+        def strict_pairs(pairs):
+            value={}
+            for key,item in pairs:
+                if key in value:raise ValueError("DUPLICATE_MANIFEST_KEY")
+                value[key]=item
+            return value
+        manifest=json.loads(z.read("manifest.json"),object_pairs_hook=strict_pairs)
+        if type(manifest) is not dict or set(manifest)!={"kind","production_install_authorized",
+                "wechat_payment_connected","customer_entitlement_execution_connected","assets_sha256"}:
+            raise ValueError("INVALID_MANIFEST_FIELDS")
+        if manifest["kind"]!="STAGE5_PHASE2_OFFLINE_CANDIDATE" or (
+                manifest["wechat_payment_connected"] is not False or
+                manifest["customer_entitlement_execution_connected"] is not False):
+            raise ValueError("INVALID_OFFLINE_SCOPE")
         if manifest.get("production_install_authorized") is not False:
             raise ValueError("PRODUCTION_FLAG_NOT_ALLOWED")
-        if set(manifest.get("assets_sha256",{}))!=set(ASSETS):
+        if type(manifest["assets_sha256"]) is not dict or set(manifest["assets_sha256"])!=set(ASSETS):
             raise ValueError("MANIFEST_ASSET_MISMATCH")
         for path in ASSETS:
-            if hashlib.sha256(z.read(path)).hexdigest()!=manifest["assets_sha256"][path]:
+            expected=manifest["assets_sha256"][path]
+            if type(expected) is not str or len(expected)!=64:
+                raise ValueError("INVALID_ASSET_DIGEST")
+            if hashlib.sha256(z.read(path)).hexdigest()!=expected:
                 raise ValueError("PACKAGE_CONTENT_TAMPERED")
     return {"verified":True,"production_install_authorized":False}

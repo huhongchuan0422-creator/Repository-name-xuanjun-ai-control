@@ -1,4 +1,7 @@
 import hashlib
+import io
+import json
+import zipfile
 import os
 import tempfile
 import unittest
@@ -56,4 +59,36 @@ class OfflinePackage(unittest.TestCase):
         self.assertIn("scripts/community_saas_phase2_recovery.py",manifest["assets_sha256"])
         self.assertIn("scripts/community_saas_offline_handoff.py",manifest["assets_sha256"])
         self.assertNotIn("production.env",manifest["assets_sha256"])
+ def mutated(self,blob,change):
+    with zipfile.ZipFile(io.BytesIO(blob)) as source:
+        items=[(x,source.read(x.filename)) for x in source.infolist()]
+    result=io.BytesIO()
+    with zipfile.ZipFile(result,"w",compression=zipfile.ZIP_DEFLATED) as target:
+        for info,data in items:
+            target.writestr(info,change(data) if info.filename=="manifest.json" else data)
+    return result.getvalue()
+ def test_09_reject_false_live_provider_flags(self):
+    with tempfile.TemporaryDirectory() as d:
+        self.source(d)
+        blob=build(d)["archive_bytes"]
+        def change(raw):
+            m=json.loads(raw);m["wechat_payment_connected"]=True
+            return json.dumps(m).encode()
+        with self.assertRaisesRegex(ValueError,"INVALID_OFFLINE_SCOPE"):
+            inspect(self.mutated(blob,change))
+ def test_10_reject_duplicate_manifest_keys(self):
+    with tempfile.TemporaryDirectory() as d:
+        self.source(d)
+        blob=build(d)["archive_bytes"]
+        with self.assertRaisesRegex(ValueError,"DUPLICATE_MANIFEST_KEY"):
+            inspect(self.mutated(blob,lambda raw:raw[:-1]+b',"production_install_authorized":false}'))
+ def test_11_reject_undeclared_manifest_fields(self):
+    with tempfile.TemporaryDirectory() as d:
+        self.source(d)
+        blob=build(d)["archive_bytes"]
+        def change(raw):
+            m=json.loads(raw);m["extra_approved"]=True
+            return json.dumps(m).encode()
+        with self.assertRaisesRegex(ValueError,"INVALID_MANIFEST_FIELDS"):
+            inspect(self.mutated(blob,change))
 if __name__=="__main__":unittest.main()
