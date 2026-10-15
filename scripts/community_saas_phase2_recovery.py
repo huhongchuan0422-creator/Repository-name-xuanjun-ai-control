@@ -95,8 +95,10 @@ def cross_store_audit(quote_db,order_db,tenant_id):
 def rollback_preview(backup_path, expected_sha256, target_path):
     """Read-only plan. Never replace a live database automatically."""
     verified=verify_backup(backup_path,expected_sha256)
-    target=pathlib.Path(target_path).resolve()
-    saved=pathlib.Path(backup_path).resolve()
+    requested=pathlib.Path(target_path)
+    if requested.is_symlink():raise ValueError("ROLLBACK_TARGET_SYMLINK")
+    target=requested.resolve()
+    saved=_file(backup_path)
     if target==saved:
         raise ValueError("ROLLBACK_SOURCE_EQUALS_TARGET")
     return {"backup_verified":verified["verified"],
