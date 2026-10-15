@@ -34,6 +34,15 @@ CREATE TABLE components(
  included INTEGER NOT NULL CHECK(included IN (0,1)),
  PRIMARY KEY(offer_id,component_id),
  FOREIGN KEY(offer_id) REFERENCES offers(offer_id));
+CREATE TRIGGER components_no_insert_after_review BEFORE INSERT ON components
+WHEN (SELECT status FROM offers WHERE offer_id=NEW.offer_id)!='DRAFT'
+BEGIN SELECT RAISE(ABORT,'OFFER_COMPONENTS_FROZEN'); END;
+CREATE TRIGGER components_no_update_after_review BEFORE UPDATE ON components
+WHEN (SELECT status FROM offers WHERE offer_id=OLD.offer_id)!='DRAFT'
+BEGIN SELECT RAISE(ABORT,'OFFER_COMPONENTS_FROZEN'); END;
+CREATE TRIGGER components_no_delete_after_review BEFORE DELETE ON components
+WHEN (SELECT status FROM offers WHERE offer_id=OLD.offer_id)!='DRAFT'
+BEGIN SELECT RAISE(ABORT,'OFFER_COMPONENTS_FROZEN'); END;
 """
 def open_offer_store(path=":memory:"):
  db=sqlite3.connect(path)
@@ -85,13 +94,17 @@ def add_component(db,offer_id,component_id,kind,cadence,cny_minor,usd_minor,
   db.execute("INSERT INTO components VALUES(?,?,?,?,?,?,?,?,?,?)",
    (offer_id,component_id,kind,cadence,cny_minor,usd_minor,int(kind=="DISCOUNT"),
     supplier_id,source_evidence,int(included)))
-def quote_offers(db,module_id,procurement_mode="XUANJUN_MANAGED",tenant_id=None):
+def quote_offers(db,module_id,procurement_mode="XUANJUN_MANAGED",tenant_id=None,cost_db=None):
  if module_id not in MODULES or procurement_mode not in ("XUANJUN_MANAGED","CUSTOMER_MANAGED","HYBRID") or (tenant_id is not None and (type(tenant_id) is not str or not tenant_id)):
   raise ValueError("INVALID_QUOTE_CONTEXT")
  result=[]
  rows=db.execute("SELECT offer_id,mode,version,term_days,renewable,license_scope,price_basis FROM offers "
                  "WHERE module_id=? AND status='EFFECTIVE' AND (availability='PUBLIC' OR tenant_scope=?) ORDER BY offer_id",(module_id,tenant_id)).fetchall()
  for oid,mode,version,term,renewable,scope,basis in rows:
+  if cost_db is None:
+   raise ValueError("COST_EVIDENCE_GATE_REQUIRED")
+  from scripts.community_saas_cost_pricing import assert_publishable_cost
+  assert_publishable_cost(db,cost_db,oid)
   components=[]
   total_cny=total_usd=0
   by_cadence={}
@@ -108,7 +121,7 @@ def quote_offers(db,module_id,procurement_mode="XUANJUN_MANAGED",tenant_id=None)
    period["cny_minor"]+=charge_cny
    period["usd_minor"]+=charge_usd
    components.append({"component_id":cid,"kind":kind,"cadence":cadence,"cny_minor":charge_cny,
-      "usd_minor":charge_usd,"supplier_id":supplier,"evidence":evidence,"included":bool(included)})
+      "usd_minor":charge_usd,"supplier_id":supplier,"included":bool(included)})
   # Discounts must not make any billing cadence negative, even if another
   # cadence is positive. An arithmetic sum across cadences is never payable.
   if total_cny<0 or total_usd<0 or any(
