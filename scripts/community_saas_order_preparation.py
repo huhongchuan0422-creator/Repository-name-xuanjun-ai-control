@@ -6,6 +6,7 @@ External authoritative finance confirmation must be integrated in a later stage.
 import json
 import hashlib
 import sqlite3
+from scripts.community_saas_schema_guard import install_extension
 from scripts.community_merchant_contract import valid_id
 from scripts.community_saas_offer_catalog import read_quote
 
@@ -27,7 +28,7 @@ def install(db):
     if not isinstance(db,sqlite3.Connection):
         raise TypeError("SQLITE_CONNECTION_REQUIRED")
     db.execute("PRAGMA foreign_keys=ON")
-    db.executescript(SCHEMA)
+    install_extension(db,SCHEMA)
 
 def _identifier(v):
     if type(v) is not str or not valid_id(v):
@@ -114,7 +115,7 @@ TRANSITIONS={
 def install_lifecycle(db):
     if not isinstance(db,sqlite3.Connection):
         raise TypeError("SQLITE_CONNECTION_REQUIRED")
-    db.executescript(LIFECYCLE_SCHEMA)
+    install_extension(db,LIFECYCLE_SCHEMA)
 
 def advance(db,order_id,tenant_id,event_key,new_state,at,proof_ref=None,
             trusted_finance_attestation=False):
