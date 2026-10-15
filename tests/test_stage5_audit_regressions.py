@@ -1,5 +1,6 @@
 """Independent-review R1-R7 negative probes. All local, no provider or money."""
 import sqlite3
+import threading
 import tempfile
 import os
 import json
@@ -246,4 +247,90 @@ class FullScopeAuditProbes(unittest.TestCase):
     with self.assertRaisesRegex(ValueError,"LIFECYCLE_EVENT_INCONSISTENT"):
         from scripts.community_saas_order_preparation import entitlement_intent
         entitlement_intent(self.orders,"ord","tenantA",24)
+class AtomicApprovalConcurrentTests(unittest.TestCase):
+ def setUp(self):
+    self.tmp=tempfile.TemporaryDirectory()
+    self.path=os.path.join(self.tmp.name,"approval.sqlite")
+    self.setup=connect(self.path);install(self.setup)
+    create_offer(self.setup,"race",1,"storefront_catalog","MONTHLY",
+                 [price()],term_days=30)
+    self.setup.close()
+ def tearDown(self):self.tmp.cleanup()
+ def connection(self,timeout=1):
+    db=sqlite3.connect(self.path,timeout=timeout)
+    db.execute("PRAGMA foreign_keys=ON")
+    return db
+ def test_r2_atomic_cost_read_prevents_two_connection_unknown_line_race(self):
+    ready=threading.Event();resume=threading.Event();result=[]
+    import scripts.community_saas_offer_catalog as catalog
+    real=catalog.get_offer
+    def gated(db,oid,version):
+        offer=real(db,oid,version)
+        ready.set()
+        if not resume.wait(5):
+            raise RuntimeError("TEST_BARRIER_TIMEOUT")
+        return offer
+    def approver():
+        db=self.connection()
+        try:
+            with patch.object(catalog,"get_offer",gated):
+                result.append(catalog.approve_offer(db,"race",1,"approval","costref",10))
+        except Exception as exc:result.append(exc)
+        finally:db.close()
+    thread=threading.Thread(target=approver)
+    thread.start()
+    try:
+        self.assertTrue(ready.wait(5))
+        writer=self.connection(timeout=0)
+        try:
+            with self.assertRaises(sqlite3.OperationalError) as failure:
+                writer.execute("""INSERT INTO saas_offer_lines VALUES
+                    ('race',1,2,'AGENCY_FEE','unapproved','MONTH',1,900,180,NULL,NULL)""")
+            self.assertIn("locked",str(failure.exception).lower())
+        finally:writer.close()
+    finally:
+        resume.set();thread.join(6)
+    self.assertFalse(thread.is_alive())
+    self.assertEqual(len(result),1)
+    if isinstance(result[0],Exception):raise result[0]
+    db=self.connection()
+    try:
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM saas_offer_lines").fetchone()[0],1)
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM saas_offer_approvals").fetchone()[0],1)
+        with self.assertRaises(sqlite3.IntegrityError):
+            db.execute("""INSERT INTO saas_offer_lines VALUES
+                ('race',1,2,'AGENCY_FEE','unapproved','MONTH',1,900,180,NULL,NULL)""")
+    finally:db.close()
+ def test_r2_unknown_cost_rejected_without_half_approval(self):
+    db=self.connection()
+    try:
+        db.execute("""INSERT INTO saas_offer_lines VALUES
+                ('race',1,2,'AGENCY_FEE','unknown','MONTH',1,900,180,NULL,NULL)""")
+        db.commit()
+        with self.assertRaisesRegex(ValueError,"COST_EVIDENCE_REQUIRED"):
+            approve_offer(db,"race",1,"approval","costref",10)
+        self.assertFalse(db.in_transaction)
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM saas_offer_approvals").fetchone()[0],0)
+    finally:db.close()
+ def test_r2_nested_transaction_does_not_commit_caller(self):
+    db=self.connection()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        with self.assertRaisesRegex(ValueError,"APPROVAL_REQUIRES_OWN_TRANSACTION"):
+            approve_offer(db,"race",1,"approval","costref",10)
+        self.assertTrue(db.in_transaction)
+        db.rollback()
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM saas_offer_approvals").fetchone()[0],0)
+    finally:db.close()
+ def test_r2_approval_insert_failure_rolls_back(self):
+    db=self.connection()
+    try:
+        db.execute("CREATE TRIGGER block_approval BEFORE INSERT ON saas_offer_approvals BEGIN SELECT RAISE(ABORT,'AUDIT_INJECTED'); END;")
+        db.commit()
+        with self.assertRaises(sqlite3.IntegrityError):
+            approve_offer(db,"race",1,"approval","costref",10)
+        self.assertFalse(db.in_transaction)
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM saas_offer_approvals").fetchone()[0],0)
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM saas_offer_lines").fetchone()[0],1)
+    finally:db.close()
 if __name__=="__main__":unittest.main()
