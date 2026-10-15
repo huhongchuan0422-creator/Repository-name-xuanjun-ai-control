@@ -18,6 +18,7 @@ CREATE TABLE offers(
  mode TEXT NOT NULL,version INTEGER NOT NULL CHECK(version>0),
  status TEXT NOT NULL CHECK(status IN ('DRAFT','PREVIEW','APPROVED','EFFECTIVE','RETIRED')),
  availability TEXT NOT NULL CHECK(availability IN ('PUBLIC','CUSTOMER_PRIVATE')),
+ tenant_scope TEXT, CHECK((availability='PUBLIC' AND tenant_scope IS NULL) OR (availability='CUSTOMER_PRIVATE' AND tenant_scope IS NOT NULL)),
  term_days INTEGER,renewable INTEGER NOT NULL CHECK(renewable IN (0,1)),
  license_scope TEXT NOT NULL,price_basis TEXT NOT NULL,
  CHECK(term_days IS NULL OR term_days>0)
@@ -49,7 +50,7 @@ def open_offer_store(path=":memory:"):
   db.close()
   raise
 def register_offer(db,offer_id,module_id,mode,version,term_days,renewable,license_scope,
-                   price_basis,availability="PUBLIC"):
+                   price_basis,availability="PUBLIC",tenant_scope=None):
  if not isinstance(offer_id,str) or not offer_id or len(offer_id)>90 or module_id not in MODULES or mode not in PAYMENT_MODES:
   raise ValueError("INVALID_OFFER")
  if type(version) is not int or version<1 or type(renewable) is not bool or (term_days is not None and (type(term_days) is not int or term_days<1)):
@@ -62,9 +63,11 @@ def register_offer(db,offer_id,module_id,mode,version,term_days,renewable,licens
   raise ValueError("FREE_LICENSE_SCOPE_REQUIRED")
  if availability not in ("PUBLIC","CUSTOMER_PRIVATE") or not isinstance(price_basis,str) or not price_basis:
   raise ValueError("INVALID_OFFER_METADATA")
+ if (availability=="CUSTOMER_PRIVATE" and (type(tenant_scope) is not str or not tenant_scope)) or (availability=="PUBLIC" and tenant_scope is not None):
+  raise ValueError("TENANT_SCOPE_REQUIRED")
  with db:
-  db.execute("INSERT INTO offers VALUES(?,?,?,?,?,?,?,?,?,?)",
-    (offer_id,module_id,mode,version,"DRAFT",availability,term_days,int(renewable),license_scope,price_basis))
+  db.execute("INSERT INTO offers VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+    (offer_id,module_id,mode,version,"DRAFT",availability,tenant_scope,term_days,int(renewable),license_scope,price_basis))
 def add_component(db,offer_id,component_id,kind,cadence,cny_minor,usd_minor,
                   source_evidence,supplier_id=None,included=False):
  if kind not in COMPONENT_KINDS or cadence not in BILLING_CADENCES or not isinstance(component_id,str) or not component_id:
@@ -77,15 +80,17 @@ def add_component(db,offer_id,component_id,kind,cadence,cny_minor,usd_minor,
   raise ValueError("INVALID_SUPPLIER")
  if kind.startswith("THIRD_PARTY") and not supplier_id:raise ValueError("SUPPLIER_REQUIRED")
  with db:
+  row=db.execute("SELECT status FROM offers WHERE offer_id=?",(offer_id,)).fetchone()
+  if row is None or row[0]!="DRAFT":raise ValueError("OFFER_COMPONENTS_FROZEN")
   db.execute("INSERT INTO components VALUES(?,?,?,?,?,?,?,?,?,?)",
    (offer_id,component_id,kind,cadence,cny_minor,usd_minor,int(kind=="DISCOUNT"),
     supplier_id,source_evidence,int(included)))
-def quote_offers(db,module_id,procurement_mode="XUANJUN_MANAGED"):
- if module_id not in MODULES or procurement_mode not in ("XUANJUN_MANAGED","CUSTOMER_MANAGED","HYBRID"):
+def quote_offers(db,module_id,procurement_mode="XUANJUN_MANAGED",tenant_id=None):
+ if module_id not in MODULES or procurement_mode not in ("XUANJUN_MANAGED","CUSTOMER_MANAGED","HYBRID") or (tenant_id is not None and (type(tenant_id) is not str or not tenant_id)):
   raise ValueError("INVALID_QUOTE_CONTEXT")
  result=[]
  rows=db.execute("SELECT offer_id,mode,version,term_days,renewable,license_scope,price_basis FROM offers "
-                 "WHERE module_id=? AND status='EFFECTIVE' ORDER BY offer_id",(module_id,)).fetchall()
+                 "WHERE module_id=? AND status='EFFECTIVE' AND (availability='PUBLIC' OR tenant_scope=?) ORDER BY offer_id",(module_id,tenant_id)).fetchall()
  for oid,mode,version,term,renewable,scope,basis in rows:
   components=[]
   total_cny=total_usd=0
