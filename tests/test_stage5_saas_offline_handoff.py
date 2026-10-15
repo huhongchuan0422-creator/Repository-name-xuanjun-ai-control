@@ -69,11 +69,15 @@ class OfflineBatch(unittest.TestCase):
         inspect_test_attestation(self.orders,"ord1","tenantA",{},KEY,30)
  def test_17_review_open(self):self.assertEqual(self.review()["state"],"PENDING")
  def test_18_review_idempotent(self):
-    self.review();self.assertEqual(self.review()["state"],"PENDING_OR_PREVIOUS")
+    self.review();self.assertEqual(self.review()["state"],"PENDING")
  def test_19_review_conflict(self):
     self.review()
     with self.assertRaisesRegex(ValueError,"REVIEW_TASK_CONFLICT"):
         create_review(self.orders,"task1","tenantA","ord1","ENTITLEMENT",21,"needs audit")
+ def test_19b_review_replay_after_resolution_returns_truth(self):
+    self.review()
+    change_review(self.orders,"task1","tenantA","ev1","RESOLVED",22)
+    self.assertEqual(self.review()["state"],"RESOLVED")
  def test_20_review_scope(self):
     with self.assertRaisesRegex(ValueError,"ORDER_NOT_FOUND"):
         create_review(self.orders,"task1","tenantB","ord1","FINANCE_EVIDENCE",21,"needs audit")
