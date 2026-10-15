@@ -53,7 +53,8 @@
           "tests/test_stage5_audit_regressions.py",
           "tests/test_stage5_saas_phase2.py",
           "tests/test_stage5_saas_phase2_http.py",
-          "tests/test_stage5_saas_phase2_package.py"
+          "tests/test_stage5_saas_phase2_package.py",
+          "tests/test_stage5_saas_phase2_recovery.py"
         ]
       },
       "reuse": [
@@ -91,7 +92,9 @@
         "scripts/community_saas_phase2_http.py",
         "tests/test_stage5_saas_phase2_http.py",
         "scripts/community_saas_phase2_package.py",
-        "tests/test_stage5_saas_phase2_package.py"
+        "tests/test_stage5_saas_phase2_package.py",
+        "scripts/community_saas_phase2_recovery.py",
+        "tests/test_stage5_saas_phase2_recovery.py"
       ]
     }
   ]
