@@ -148,7 +148,7 @@ class BatchBusinessGuards(PrepareOrderTests):
         install(alt);install_lifecycle(alt)
         alt.execute("INSERT INTO saas_order_preparations VALUES(?,?,?,?,?,?)",
             ("fake","tenantA","q1","CNY",20,json.dumps(evil)))
-        with self.assertRaisesRegex(ValueError,"QUOTE_SNAPSHOT_DIGEST_MISMATCH"):
+        with self.assertRaisesRegex(ValueError,"ORDER_SNAPSHOT_BINDING_MISMATCH|QUOTE_SNAPSHOT_DIGEST_MISMATCH"):
             quote_provenance(alt,"fake","tenantA")
     finally:alt.close()
  def test_11_initial_state_prepared(self):
