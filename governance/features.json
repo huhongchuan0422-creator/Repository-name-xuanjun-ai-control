@@ -55,7 +55,8 @@
           "tests/test_stage5_saas_phase2_http.py",
           "tests/test_stage5_saas_phase2_package.py",
           "tests/test_stage5_saas_phase2_recovery.py",
-          "tests/test_stage5_saas_phase2_browser.py"
+          "tests/test_stage5_saas_phase2_browser.py",
+          "tests/test_stage5_visual_feedback_identity.py"
         ]
       },
       "reuse": [
@@ -96,7 +97,11 @@
         "tests/test_stage5_saas_phase2_package.py",
         "scripts/community_saas_phase2_recovery.py",
         "tests/test_stage5_saas_phase2_recovery.py",
-        "tests/test_stage5_saas_phase2_browser.py"
+        "tests/test_stage5_saas_phase2_browser.py",
+        "scripts/community_visual_feedback_identity.py",
+        "tests/test_stage5_visual_feedback_identity.py",
+        "demos/visual/community-payment/index.html",
+        "plans/COMMUNITY_VISUAL_OMNICHANNEL_ASSET_AND_DEPLOYMENT_20261015.md"
       ]
     }
   ]
