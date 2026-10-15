@@ -696,7 +696,7 @@ class MinimalNginxIntegrationTest(unittest.TestCase):
             with self.subTest(config=name):
                 text=(self.base/name).read_text()
                 main=self.root/'http01.conf'
-                main.write_text('error_log stderr; pid '+str(self.root/'http01.pid')+'; events {} http { '+text+' }')
+                main.write_text('error_log stderr; pid '+str(self.root/'http01.pid')+'; events {} http { access_log off; '+text+' }')
                 result=subprocess.run([self.nginx,'-p',str(self.root)+'/', '-c',str(main),'-t'],capture_output=True,text=True,timeout=10)
                 self.assertEqual(result.returncode,0,result.stderr)
 
