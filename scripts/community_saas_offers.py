@@ -4,6 +4,7 @@ Multiple offers per reusable module. Explicit CNY and USD line prices require
 versioned source evidence; never infer FX, supplier invoices or commission.
 """
 import sqlite3
+from scripts.community_saas_schema_guard import verify,transactional_install
 from scripts.community_saas_modules import MODULES
 PAYMENT_MODES = frozenset(("MONTHLY","YEARLY","BUYOUT","FREE","PROMO_ZERO","USAGE","HYBRID","CUSTOM"))
 COMPONENT_KINDS = frozenset((
@@ -40,11 +41,10 @@ def open_offer_store(path=":memory:"):
   db.execute("PRAGMA foreign_keys=ON")
   row=db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
   expected={"offers","components"}
-  if not row:
-   if db.execute("PRAGMA user_version").fetchone()[0]!=0:raise ValueError("INCOMPATIBLE_OFFER_SCHEMA")
-   db.executescript("BEGIN IMMEDIATE;"+SCHEMA+"PRAGMA user_version=1;COMMIT;")
-  elif {x[0] for x in row}!=expected or db.execute("PRAGMA user_version").fetchone()[0]!=1:
-   raise ValueError("INCOMPATIBLE_OFFER_SCHEMA")
+  if not row and db.execute("PRAGMA user_version").fetchone()[0]==0:
+   transactional_install(db,SCHEMA,lambda:verify(db,SCHEMA,expected))
+  else:
+   verify(db,SCHEMA,expected)
   return db
  except BaseException:
   db.close()
