@@ -15,15 +15,15 @@ export function modelToView(model){
  return {
  modules:modules.map(x=>({title:safeText(x.title),id:safeText(x.id)})),
  orders:orders.map(x=>({id:safeText(x.order_id),state:safeText(x.state),
-   cny:safeText(x.cny_minor===undefined?"UNKNOWN":presentAmount(x.cny_minor,"CNY")),
-   usd:safeText(x.usd_minor===undefined?"UNKNOWN":presentAmount(x.usd_minor,"USD"))})),
+   cny:safeText(x.currency==="CNY"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.cny_minor,"CNY"):"—"),
+   usd:safeText(x.currency==="USD"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.usd_minor,"USD"):"—")})),
  reviews:reviews.map(x=>({kind:safeText(x.kind),state:safeText(x.state)})),
  label:"OFFLINE_ONLY_NO_PAYMENT_NO_ENTITLEMENT"
  };
 }
-function appendText(el,title,text){
- const p=document.createElement("p");const strong=document.createElement("strong");
- strong.textContent=title+": ";p.append(strong,document.createTextNode(text));el.append(p);
+function appendText(doc,el,title,text){
+ const p=doc.createElement("p");const strong=doc.createElement("strong");
+ strong.textContent=title+": ";p.append(strong,doc.createTextNode(text));el.append(p);
 }
 export function renderDashboard(doc,model){
  const view=modelToView(model);
@@ -31,9 +31,9 @@ export function renderDashboard(doc,model){
  const orders=doc.getElementById("orderDetails");
  const queue=doc.getElementById("reviewQueue");
  catalog.replaceChildren();orders.replaceChildren();queue.replaceChildren();
- for(const item of view.modules)appendText(catalog,item.title,item.id);
- for(const x of view.orders)appendText(orders,x.id,x.state+" · "+x.cny+" / "+x.usd);
- for(const x of view.reviews)appendText(queue,x.kind,x.state);
+ for(const item of view.modules)appendText(doc,catalog,item.title,item.id);
+ for(const x of view.orders)appendText(doc,orders,x.id,x.state+" · "+x.cny+" / "+x.usd);
+ for(const x of view.reviews)appendText(doc,queue,x.kind,x.state);
  doc.getElementById("quoteDetails").textContent="所有价格须经版本审核；成本未知不等于零。";
  doc.getElementById("entitlementDetails").textContent="未取得权威授权：不自动开通";
  doc.getElementById("renewalDetails").textContent="只读续费计划；不会自动扣款";
@@ -48,8 +48,9 @@ export async function loadDashboard(fetcher,token,now=Math.floor(Date.now()/1000
   const body=await response.json();return body.result;
  };
  const modules=(await post("catalog")).modules;
- let orders=[],reviews=[];
- try{const panel=await post("admin_snapshot");orders=panel.orders;reviews=panel.review_tasks}catch(error){if(error.message!=="OFFLINE_REQUEST_DENIED")throw error}
+ const orders=(await post("customer_orders")).orders;
+ let reviews=[];
+ try{const panel=await post("admin_snapshot");reviews=panel.review_tasks}catch(error){if(error.message!=="OFFLINE_REQUEST_DENIED")throw error}
  return {modules,orders,reviews};
 }
 if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
