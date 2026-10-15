@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/domestic-runner-preflight.yml'
       - 'scripts/pr122_domestic_channel_inventory.py'
+      - 'deploy/pr122-oauth-candidate/**'
+      - 'tests/test_pr122_oauth_candidate.py'
 permissions:
   contents: read
 jobs:
@@ -22,3 +24,13 @@ jobs:
         run: |
           bash scripts/domestic-runner-preflight.sh
           python3 -B scripts/pr122_domestic_channel_inventory.py
+      - name: Isolated OAuth candidate tests (synthetic only)
+        working-directory: pr122-domestic-readonly
+        run: |
+          if command -v python3.11 >/dev/null 2>&1; then
+            XJ_PR122_PYTHON=python3.11
+          else
+            XJ_PR122_PYTHON=python3
+          fi
+          "$XJ_PR122_PYTHON" --version
+          "$XJ_PR122_PYTHON" -B tests/test_pr122_oauth_candidate.py -v
