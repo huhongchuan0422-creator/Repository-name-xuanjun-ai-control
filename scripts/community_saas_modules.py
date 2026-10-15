@@ -46,6 +46,9 @@ CREATE TRIGGER module_events_immutable_update BEFORE UPDATE ON module_events
 BEGIN SELECT RAISE(ABORT,'MODULE_EVENT_APPEND_ONLY'); END;
 CREATE TRIGGER module_events_immutable_delete BEFORE DELETE ON module_events
 BEGIN SELECT RAISE(ABORT,'MODULE_EVENT_APPEND_ONLY'); END;
+CREATE TRIGGER module_events_no_replace BEFORE INSERT ON module_events
+WHEN EXISTS(SELECT 1 FROM module_events WHERE id=NEW.id)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
 """
 def _id(v):
  if not valid_id(v):raise ValueError("INVALID_TENANT_OR_MODULE_ID")
