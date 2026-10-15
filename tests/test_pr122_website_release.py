@@ -694,7 +694,7 @@ class MinimalNginxIntegrationTest(unittest.TestCase):
     def test_three_http01_server_candidates_parse_in_real_nginx(self):
         for name in ('tokyo-apex-http-acme.conf','domestic-apex-http-bootstrap.conf','domestic-apex-http-final.conf'):
             with self.subTest(config=name):
-                text=(self.base/name).read_text()
+                text=(self.base/name).read_text().replace('listen 80;', 'listen 127.0.0.1:'+str(self.port)+';').replace('listen [::]:80;', '')
                 main=self.root/'http01.conf'
                 main.write_text('error_log stderr; pid '+str(self.root/'http01.pid')+'; events {} http { access_log off; '+text+' }')
                 result=subprocess.run([self.nginx,'-p',str(self.root)+'/', '-c',str(main),'-t'],capture_output=True,text=True,timeout=10)
