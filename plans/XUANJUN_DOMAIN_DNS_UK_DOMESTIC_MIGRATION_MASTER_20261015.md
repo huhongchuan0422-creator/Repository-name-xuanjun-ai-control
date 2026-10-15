@@ -259,3 +259,27 @@ Push CI run38766304600/job116530278769 SUCCESS，82/82（含真实临时Nginx与
 
 统一送审尚未提交：英国实际部署内容基准未直接核实；现有GitHub连接不能直接读取英国主机文件，已知英国Runner停止/隔离，禁止为取证擅自恢复。无已接入admin/root或DNS写通道。上述缺口不能以GitHub源码/制品推断补齐。
 尚未执行生产网站覆盖、指针切换、安装/reload、证书签发、DNS变更或东京退役。后续集中审核应同时包含服务器内容基准、配置制品、证书/续期、真实路由验收及回滚；未完成项不得写PASS。
+
+### 9.9 服务器实际内容核对完成（2026-10-16 00:35 Asia/Shanghai）
+
+Owner英国admin只读搜索：指定/tmp、/home/admin、/home/xuanjun_dev、/opt、/var/backups、/root内深度9的包名搜索，MATCHES=0、EXIT=0。仅证明限定搜索未命中，不声称英国全盘无网站。
+
+随后本窗口自主通过东京/国内既有非root Runner取得实际文件证据：
+- 初次定位commit8230ef7382b921f296a0ebbbc882ec775f1d1f25，run38770056799。
+- 全文件核对commitd9deff2f31ca8a96a36928d720c80a2aef356e27，run38770145783；Tokyo job116543508444、Domestic job116543507998。
+- Tokio /tmp找到Owner截图对应website-public-copy-review.patch、两份相同copy-update包及language-guard包。
+- copy-update SHA256=733751a5505add8b42d1dcde697865f01f7e3e004f62e6cbebbd1d72c9c8a2cc。
+- language-guard SHA256=b4ec4abf57e95c6bf460632f798471d717078c89e6be5102526c70bd47a2212f。
+- 两机包搜索存在权限受限，search_exit=1（Tokyo269处、Domestic252处Permission denied）；禁止据此声明全盘没有其他包。已找到的包及以下可读实际站点文件有直接证据。
+
+实际Tokyo站点/var/www/wenwenwenyiyiyi.work：1187文件、11090003字节。
+实际Domestic /var/www/wenwenwenyiyiyi.work/current/public解析至已验收recovery-stage：1187文件、11090700字节。
+逐文件相对路径及SHA256比较：新增0、缺失0、相同1186、差异1。
+唯一差异assets/tiktok-integration.js：
+Tokyo=01f08d5021d6b232f7f67f775c5cecd430e8a2713551cf8cea24277954ba4c0d；
+Domestic=6fa38b952b70862e5a835ae79e4eedfe4b3d0323a8d819bbfb7ef81bddd8aa67（原已批准overlay）。
+index.html两机均4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20；yunhui.css、yunhui.js亦完全相同。
+
+结论以本次服务器实读为准：国内既有候选保留当前已确认Tokyo实际官网全部1187路径，1186文件字节相同，仅有历史批准TikTok修正；没有证据需要重新构建官网、上传旧包覆盖或重做RG1。
+9.7保护Owner官网约束继续有效；其“内容基准未直接核实”缺口对本次实际Tokyo现网/国内候选比对已关闭，不扩大为英国全盘来源或另一个未知版本已核实。
+现场内容不会因本核对自动替换。生产apex配置、证书/续期、W06真实路由、DNS和东京退役均未执行；统一送审仍需完整发布/回滚与现场门禁，不能报迁移完成。
