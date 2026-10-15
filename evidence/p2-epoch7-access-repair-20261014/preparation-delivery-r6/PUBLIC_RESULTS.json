@@ -1,0 +1,57 @@
+{
+  "actual_proposal_execution": "PENDING_MANUAL_OWNER_EXECUTION",
+  "approval": "NOT_GRANTED",
+  "independent_raw_case_audit": "NOT_ESTABLISHED_BY_HASHES_ALONE",
+  "independent_review": {
+    "errors": 0,
+    "failures": 0,
+    "python_versions": [
+      "3.6.8",
+      "3.12.14"
+    ],
+    "result": "PASS",
+    "skips": 0,
+    "tests_each_interpreter": 41
+  },
+  "local_host_operations": "NOT_RUN",
+  "local_network_requests": "NOT_RUN",
+  "local_runs": [
+    {
+      "errors": 0,
+      "failures": 0,
+      "python": "3.12.14",
+      "skips": 0,
+      "state": "PASS",
+      "tests": 41
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "python": "3.6.8",
+      "skips": 0,
+      "state": "PASS",
+      "tests": 41
+    }
+  ],
+  "output_scope": "UNSIGNED_PROPOSAL_PLUS_HOST_VALIDATED_EVIDENCE_BINDINGS",
+  "owner_bootstrap_delivery_publication_bound": false,
+  "private_plan": "NOT_RUN",
+  "production": "HOLD",
+  "reviewed_files": {
+    "OWNER_PREPARATION_UNBOUND.txt": {
+      "bytes": 5125,
+      "sha256": "1504337014217b714685d06b1ea998b958f5730853dff768023f38fc55d199c8"
+    },
+    "epoch7_prepare_delivery.py": {
+      "bytes": 14950,
+      "sha256": "9a87f740ee8d81fb95fe41e1644584c85b723fe5823f309ea0bf07796140cf9f"
+    },
+    "test_epoch7_prepare_delivery.py": {
+      "bytes": 24607,
+      "sha256": "acd6261251e28167fdd27d3023bf7af755532663b8903570e195b65536392b61"
+    }
+  },
+  "schema": 1,
+  "scope": "OBSERVATION_BOUND_STAGE_THREE_SOURCES_AND_PROPOSE_TOPOLOGY_ONLY",
+  "state": "SCOPED_LOCAL_REVIEW_PASS_HOST_NOT_RUN"
+}

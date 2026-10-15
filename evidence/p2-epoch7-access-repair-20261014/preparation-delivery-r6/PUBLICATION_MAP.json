@@ -1,0 +1,68 @@
+{
+  "destination_prefix": "evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r6/",
+  "excluded_local_only": [
+    "LOCAL_STATUS.json",
+    "PRESERVED_INPUTS.json",
+    "delivery-python312.log",
+    "delivery-python368.log",
+    "all private observation and receipt bytes"
+  ],
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "host_execution": "NOT_RUN",
+  "observation_id": "1311b9e9fa97cfd4",
+  "observation_sha256": "b961df049e2861e4706f28f29fcf994a14fe28e153263a23ec82d4e822b9b246",
+  "own_delivery_commit": null,
+  "owner_bootstrap_delivery_publication_bound": false,
+  "preparation_source_commit": "e8b9ebb3fb215fa5b1ef0a8dc0b31a77efd0ab67",
+  "preparation_source_prefix": "evidence/p2-epoch7-access-repair-20261014/preparation-source-r6/",
+  "preparation_sources": {
+    "epoch7_prepare.py": {
+      "bytes": 41352,
+      "sha256": "83c218fc10d19094446494e10767be58593f09dbc92866cbc8779d9a0e776ebc"
+    },
+    "epoch7_prepare_data.py": {
+      "bytes": 13888,
+      "sha256": "71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1"
+    },
+    "epoch7_topology_projection.py": {
+      "bytes": 27151,
+      "sha256": "f8b731a8668a5b5374e18dab9a59657f80fc8d11ea2d9c4588a62942dbf74854"
+    }
+  },
+  "private_plan": "NOT_RUN",
+  "production": "HOLD",
+  "public_files": {
+    "OWNER_PREPARATION_UNBOUND.txt": {
+      "bytes": 5125,
+      "sha256": "1504337014217b714685d06b1ea998b958f5730853dff768023f38fc55d199c8"
+    },
+    "PUBLIC_RESULTS.json": {
+      "bytes": 1547,
+      "sha256": "38bc6d14d33c2098ba9dafbb0e7227dc7092f7c12121d46784aa15e26cdfa6b6"
+    },
+    "README.md": {
+      "bytes": 2596,
+      "sha256": "b5cb9731efab73845f7b17d40a67842ecd6148c82f8ecd09307bd546d531f57a"
+    },
+    "epoch7_prepare_delivery.py": {
+      "bytes": 14950,
+      "sha256": "9a87f740ee8d81fb95fe41e1644584c85b723fe5823f309ea0bf07796140cf9f"
+    },
+    "test_epoch7_prepare_delivery.py": {
+      "bytes": 24607,
+      "sha256": "acd6261251e28167fdd27d3023bf7af755532663b8903570e195b65536392b61"
+    }
+  },
+  "schema": 1,
+  "state": "FROZEN_LOCAL_REVIEW_PASS_OWNER_PUBLICATION_BINDING_PENDING",
+  "test_contract": {
+    "command": "$PYTHON -I -B -S test_epoch7_prepare_delivery.py",
+    "expected_tests": 41,
+    "fixture_layout": "Three hash-verified preparation_sources files in sibling r6-preparation-candidate directory; no private fixture",
+    "python_versions": [
+      "3.6.8",
+      "3.12.14"
+    ],
+    "zero_errors_failures_skips": true
+  }
+}
