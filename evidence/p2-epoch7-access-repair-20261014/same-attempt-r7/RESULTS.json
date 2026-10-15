@@ -1,0 +1,38 @@
+{
+  "errors": 0,
+  "failures": 0,
+  "files": {
+    "observe_with_writer_capture.py": {
+      "bytes": 38675,
+      "sha256": "c82f4a75ec051003e3beab82d4b5b338d628fb81b4ad0bb05d7b9b57e7cef57e"
+    },
+    "test_observe_with_writer_capture.py": {
+      "bytes": 37417,
+      "sha256": "15bfdc8f64e257137334af50bbc71652eaf2087c04c797707daaed9fb0d7ead3"
+    }
+  },
+  "host_operations": "NOT_RUN",
+  "kind": "R7_SAME_ATTEMPT_LOCAL_SOURCE_VALIDATION",
+  "logs": {
+    "bound-tests312.log": {
+      "bytes": 8387,
+      "sha256": "6c5cce082f89393664c19841634b526d1bc83d9dc0a3ba0255b05ed26bab4f36"
+    },
+    "bound-tests368.log": {
+      "bytes": 5115,
+      "sha256": "5f64a214c8e2dab3ac9105af05a729814ad849fd0d76e3a56c78740bd47bb841"
+    }
+  },
+  "network_operations": "NOT_RUN",
+  "original_r6_reader_functions": "BYTE_IDENTICAL",
+  "outer_commit": "7fc9ae35d81167d1fe06f32a8d072a4c45fd4417",
+  "production_admission": "NOT_GRANTED",
+  "python_versions": [
+    "3.6.8",
+    "3.12.14"
+  ],
+  "schema": 1,
+  "skips": 0,
+  "target_fixture": "ACTUAL_IMMUTABLE_DC18_PUBLIC_KIT_CACHE_WITH_SYNTHETIC_HOST_INPUTS",
+  "tests_per_interpreter": 68
+}

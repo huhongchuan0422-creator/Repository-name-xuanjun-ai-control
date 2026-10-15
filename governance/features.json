@@ -66,7 +66,8 @@
           "tests/test_p2_preparation_contracts_r6.py",
           "tests/test_p2_preparation_contracts_r6_contract.py",
           "tests/test_p2_saved_probe_evidence_r6.py",
-          "tests/test_p2_owner_diagnostic_r7.py"
+          "tests/test_p2_owner_diagnostic_r7.py",
+          "tests/test_p2_same_attempt_r7.py"
         ]
       },
       "reuse": [
