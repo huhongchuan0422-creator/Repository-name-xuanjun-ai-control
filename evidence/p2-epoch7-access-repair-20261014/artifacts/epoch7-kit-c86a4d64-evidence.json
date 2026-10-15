@@ -1,0 +1,21 @@
+{
+  "kind": "R4_IMMUTABLE_ARTIFACT_PUBLICATION",
+  "source": "c86a4d6402859b628a7e604c36fa1ea4d8111b41",
+  "tree": "46c553bf366df5d8447ebac9cb9687f3ce74ffbd",
+  "archive_sha256": "2b1885a9b1cec024abf657a82c790d420f1e5b4fe8ce1776d9cba4616b4b97b9",
+  "archive_bytes": 1021728,
+  "archive_git_blob": "29d9bb585d9433246dc46c4d550b3f965241c023",
+  "kit_manifest_sha256": "0f233ca650ddacc6b0ad969813bc192f1a9031286666dd28dedb265e8d34211c",
+  "entry_sha256": "53cbb0cf2aa60c92bb75ae20a5db17c256d8c7d8e09a4d1a8476bb83f96b90e6",
+  "ci_run": 38682242057,
+  "ci_job": 116249145735,
+  "ci_raw_log_sha256": "f1e7bc84d3268bcd7e593a2a3ff2f813605da48eafd3c4cfbfe5ef9161e075d8",
+  "mandatory_tests": 2052,
+  "mandatory_skips": 0,
+  "bootstrap_tests": 176,
+  "source_files": 248,
+  "total_members": 249,
+  "host_operations": "NOT_RUN",
+  "production_acceptance": "PENDING",
+  "production_resume": "NOT_EXECUTED"
+}
