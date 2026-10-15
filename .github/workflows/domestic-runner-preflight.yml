@@ -120,7 +120,9 @@ jobs:
           assert os.uname().nodename=='iZvt5t8tlrm8oiZ'
           assert pwd.getpwuid(os.geteuid()).pw_name=='githubrunner'
           defaults=ssl.get_default_verify_paths()
-          candidates=sorted(set(p for p in (defaults.cafile,defaults.openssl_cafile) if p))
+          candidates=sorted(set(p for p in (defaults.cafile,defaults.openssl_cafile,
+              '/etc/pki/tls/certs/ca-bundle.crt','/etc/ssl/certs/ca-certificates.crt',
+              '/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem','/etc/ssl/cert.pem') if p))
           result={'host':os.uname().nodename,'user':'githubrunner','ca_bundles':[],
                   'production_mutation':False,'bridge_probed':False,'sudo_used':False}
           for raw in candidates:
@@ -142,6 +144,6 @@ jobs:
               result['acme_root']={'exists':True,'uid':info.st_uid,
                   'mode':oct(stat.S_IMODE(info.st_mode)),'symlink':stat.S_ISLNK(info.st_mode)}
           except FileNotFoundError:result['acme_root']={'exists':False}
-          assert result['ca_bundles'],'SYSTEM_CA_NOT_READABLE'
           print(json.dumps(result,sort_keys=True,indent=2))
+          assert result['ca_bundles'],'SYSTEM_CA_NOT_READABLE'
           PY
