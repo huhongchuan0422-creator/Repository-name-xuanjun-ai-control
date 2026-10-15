@@ -301,6 +301,41 @@ class AtomicApprovalConcurrentTests(unittest.TestCase):
             db.execute("""INSERT INTO saas_offer_lines VALUES
                 ('race',1,2,'AGENCY_FEE','unapproved','MONTH',1,900,180,NULL,NULL)""")
     finally:db.close()
+ def test_r2_complete_cost_line_cannot_sneak_between_read_and_approval(self):
+    ready=threading.Event();resume=threading.Event();out=[]
+    import scripts.community_saas_offer_catalog as catalog
+    original=catalog.get_offer
+    def gated(db,oid,version):
+        value=original(db,oid,version)
+        ready.set()
+        if not resume.wait(5):raise RuntimeError("TEST_BARRIER_TIMEOUT")
+        return value
+    def task():
+        db=self.connection()
+        try:
+            with patch.object(catalog,"get_offer",gated):
+                out.append(catalog.approve_offer(db,"race",1,"approval","costref",10))
+        except Exception as exc:out.append(exc)
+        finally:db.close()
+    t=threading.Thread(target=task);t.start()
+    try:
+        self.assertTrue(ready.wait(5))
+        db=self.connection(timeout=0)
+        try:
+            with self.assertRaises(sqlite3.OperationalError):
+                db.execute("""INSERT INTO saas_offer_lines VALUES
+                    ('race',1,2,'AGENCY_FEE','late','MONTH',1,900,180,20,4)""")
+        finally:db.close()
+    finally:
+        resume.set();t.join(6)
+    self.assertFalse(t.is_alive())
+    self.assertEqual(len(out),1)
+    if isinstance(out[0],Exception):raise out[0]
+    db=self.connection()
+    try:
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM saas_offer_lines").fetchone()[0],1)
+        self.assertEqual(db.execute("SELECT COUNT(*) FROM saas_offer_approvals").fetchone()[0],1)
+    finally:db.close()
  def test_r2_unknown_cost_rejected_without_half_approval(self):
     db=self.connection()
     try:
