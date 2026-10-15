@@ -69,7 +69,9 @@ class OfflineSaas:
             "admin_snapshot":set(),
             "review_open":{"task_id","order_id","kind","reason"},
             "review_close":{"task_id","event_id","state"},
-            "recovery":set()
+            "recovery":set(),
+            "refund_reversal_plan":{"order_id","reason"},
+            "health":set()
         }
         if operation not in fields or set(params)!=fields[operation]:
             raise ValueError("INVALID_REQUEST_FIELDS")
@@ -102,7 +104,7 @@ class OfflineSaas:
             return renewal_intent(self.orders,_id(params["order_id"]),tenant,now,
                                   params["valid_until"])
         if operation in ("finance_requirements","admin_snapshot","review_open",
-                         "review_close","recovery"):
+                         "review_close","recovery","refund_reversal_plan"):
             if principal.role not in ("MERCHANT_ADMIN","PLATFORM_OWNER"):
                 raise PermissionError("ADMIN_ROLE_REQUIRED")
         if operation=="finance_requirements":
@@ -117,6 +119,19 @@ class OfflineSaas:
                 _id(params["event_id"]),params["state"],now)
         if operation=="recovery":
             return recovery_check(self.orders,tenant)
+        if operation=="health":
+            return {"status":"OFFLINE_ONLY","service":"SAAS_PHASE2",
+                    "finance_provider":"NOT_CONNECTED","grant_writer":"DISABLED"}
+        if operation=="refund_reversal_plan":
+            order=read(self.orders,_id(params["order_id"]),tenant)
+            reason=params["reason"]
+            if type(reason) is not str or not reason.strip() or len(reason)>300:
+                raise ValueError("INVALID_REFUND_REASON")
+            return {"order_id":order["order_id"],"tenant_id":tenant,
+                    "quote_sha256":order["quote_sha256"],
+                    "action":"REFUND_REVIEW_ONLY","reason":reason,
+                    "provider_refund_executed":False,"entitlement_revoked":False,
+                    "revenue_reversed":False}
         raise ValueError("UNKNOWN_OPERATION")
 
 def serialize_response(value):
