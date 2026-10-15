@@ -16,8 +16,8 @@ export function modelToView(model){
  modules:modules.map(x=>({title:safeText(x.title),id:safeText(x.id),
    offers:Array.isArray(x.offers)?x.offers.map(o=>safeText(o.offer_id)+" v"+safeText(o.version)):[]})),
  orders:orders.map(x=>({id:safeText(x.order_id),state:safeText(x.state),
-   cny:safeText(x.currency==="CNY"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.cny_minor,"CNY"):"—"),
-   usd:safeText(x.currency==="USD"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.usd_minor,"USD"):"—")})),
+   cny:safeText(x.currency!=="USD"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.cny_minor,"CNY"):"—"),
+   usd:safeText(x.currency!=="CNY"?presentAmount(x.amounts_by_cycle_minor?.MONTH??x.usd_minor,"USD"):"—")})),
  reviews:reviews.map(x=>({kind:safeText(x.kind),state:safeText(x.state)})),
  label:"OFFLINE_ONLY_NO_PAYMENT_NO_ENTITLEMENT"
  };
