@@ -10,8 +10,10 @@ SOURCE_PREFIX="package/public/"
 APPROVED_BASE=Path("/var/www/wenwenwenyiyiyi.work")
 ID_RE=re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}\Z")
 MAX_DEADLINE=900.0
+FAILURE_RECEIPT_GRACE=0.10
 
 class Hold(RuntimeError): pass
+class Unknown(Hold): pass
 
 def valid_seconds(value,name):
     if not math.isfinite(value) or value <= 0 or value > MAX_DEADLINE: raise Hold("INVALID_"+name.upper())
@@ -36,6 +38,21 @@ class Deadline:
     def __exit__(self,*_):
         signal.setitimer(signal.ITIMER_REAL,0); signal.signal(signal.SIGALRM,self.old_handler)
         if self.old_timer[0] > 0: signal.setitimer(signal.ITIMER_REAL,*self.old_timer)
+    @contextmanager
+    def failure_grace(self):
+        """Bound failure reporting after the one-shot overall alarm fired."""
+        remaining=max(0.0,self.end-time.monotonic())
+        budget=remaining if remaining else FAILURE_RECEIPT_GRACE
+        signal.setitimer(signal.ITIMER_REAL,budget)
+        try: yield
+        finally: signal.setitimer(signal.ITIMER_REAL,0)
+
+@contextmanager
+def termination_guard():
+    old=signal.getsignal(signal.SIGTERM)
+    signal.signal(signal.SIGTERM,lambda *_: (_ for _ in ()).throw(Unknown("PROCESS_INTERRUPTED_SIGTERM")))
+    try: yield
+    finally: signal.signal(signal.SIGTERM,old)
 
 def fsync_dir(path):
     fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -64,6 +81,50 @@ def load_json(path,deadline=None):
     if not isinstance(value,dict): raise Hold("JSON_OBJECT_REQUIRED")
     return value
 
+def trusted_chain(path,uid):
+    """Reject replaceable/symlinked input ancestry; sticky root-owned /tmp is allowed."""
+    absolute=path.absolute()
+    for current in [absolute,*absolute.parents]:
+        try: info=os.lstat(current)
+        except OSError as error: raise Hold("TRUSTED_INPUT_PATH_UNAVAILABLE:"+str(current)) from error
+        if stat.S_ISLNK(info.st_mode): raise Hold("TRUSTED_INPUT_PATH_LINK:"+str(current))
+        if current!=absolute and not stat.S_ISDIR(info.st_mode): raise Hold("TRUSTED_INPUT_PARENT_NOT_DIRECTORY:"+str(current))
+        mode=stat.S_IMODE(info.st_mode)
+        if info.st_uid not in (0,uid): raise Hold("TRUSTED_INPUT_PATH_OWNER:"+str(current))
+        sticky_root=stat.S_ISDIR(info.st_mode) and bool(mode&stat.S_ISVTX) and info.st_uid==0
+        if mode&0o022 and not sticky_root: raise Hold("TRUSTED_INPUT_PATH_WRITABLE:"+str(current))
+
+@contextmanager
+def open_trusted_file(path,uid,deadline=None):
+    path=Path(path).absolute(); trusted_chain(path,uid)
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+    try:
+        info=os.fstat(fd); live=os.stat(path,follow_symlinks=False)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=uid or stat.S_IMODE(info.st_mode)&0o022:
+            raise Hold("TRUSTED_INPUT_FILE_IDENTITY:"+str(path))
+        if (info.st_dev,info.st_ino)!=(live.st_dev,live.st_ino): raise Hold("TRUSTED_INPUT_FILE_REPLACED:"+str(path))
+        if deadline: deadline.check("TRUSTED_INPUT_OPEN")
+        yield fd,info
+        live=os.stat(path,follow_symlinks=False)
+        if (info.st_dev,info.st_ino)!=(live.st_dev,live.st_ino): raise Hold("TRUSTED_INPUT_FILE_REPLACED:"+str(path))
+    finally: os.close(fd)
+
+def read_trusted_bytes(path,uid,deadline=None):
+    data=bytearray()
+    with open_trusted_file(path,uid,deadline) as (fd,info):
+        while True:
+            if deadline: deadline.check("TRUSTED_INPUT_READ")
+            chunk=os.read(fd,1024*1024)
+            if not chunk: break
+            data.extend(chunk)
+    return bytes(data),{"device":info.st_dev,"inode":info.st_ino,"uid":info.st_uid,"mode":stat.S_IMODE(info.st_mode),"size":info.st_size}
+
+def json_bytes(data,name):
+    try: value=json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError,json.JSONDecodeError) as error: raise Hold("INVALID_JSON:"+name) from error
+    if not isinstance(value,dict): raise Hold("JSON_OBJECT_REQUIRED:"+name)
+    return value
+
 def atomic_json(path,value):
     tmp=path.with_name("."+path.name+"."+uuid.uuid4().hex)
     fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
@@ -74,6 +135,12 @@ def atomic_json(path,value):
         os.fsync(fd)
     finally: os.close(fd)
     os.replace(tmp,path); fsync_dir(path.parent)
+
+def bounded_failure_receipt(deadline,path,value,original):
+    try:
+        with deadline.failure_grace(): atomic_json(path,value)
+    except BaseException as receipt_error:
+        raise Unknown("FAILURE_RECEIPT_UNAVAILABLE:"+type(receipt_error).__name__) from original
 
 def safe_relative(name):
     pure=PurePosixPath(name)
@@ -106,9 +173,11 @@ def preflight(args,creating):
     if creating:
         for candidate in (Path(args.bundle).absolute(),Path(args.source_archive).absolute()):
             if candidate.is_symlink() or not candidate.exists(): raise Hold("TRUSTED_INPUT_MISSING_OR_LINK")
-            info=candidate.stat(follow_symlinks=False)
-            if not args.allow_non_root_test and (info.st_uid != 0 or stat.S_IMODE(info.st_mode)&0o022):
-                raise Hold("TRUSTED_INPUT_WRITABLE_OR_UNOWNED")
+        expected_owner=uid
+        bundle=Path(args.bundle).absolute(); trusted_chain(bundle,expected_owner)
+        bundle_info=bundle.stat(follow_symlinks=False)
+        if not stat.S_ISDIR(bundle_info.st_mode) or bundle_info.st_uid!=expected_owner or stat.S_IMODE(bundle_info.st_mode)&0o022:
+            raise Hold("TRUSTED_INPUT_DIRECTORY_IDENTITY")
     return base,uid
 
 @contextmanager
@@ -162,9 +231,8 @@ def verify_tree(public,manifest,deadline,uid=None):
     for name,wanted in expected.items():
         if actual[name]!={"size":wanted["size"],"sha256":wanted["sha256"]}: raise Hold("RELEASE_CONTENT_MISMATCH:"+name)
 
-def extract_source(source,public,pin,deadline):
-    fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW)
-    try:
+def extract_source(source,public,pin,deadline,uid):
+    with open_trusted_file(source,uid,deadline) as (fd,info):
         info=os.fstat(fd); h=hashlib.sha256()
         while True:
             deadline.check("SOURCE_DIGEST"); chunk=os.read(fd,1024*1024)
@@ -192,7 +260,8 @@ def extract_source(source,public,pin,deadline):
                             os.write(out,chunk)
                         os.fsync(out)
                     finally: os.close(out)
-    finally: os.close(fd)
+        live=os.stat(source,follow_symlinks=False)
+        if (info.st_dev,info.st_ino)!=(live.st_dev,live.st_ino): raise Hold("SOURCE_ARCHIVE_REPLACED")
 
 def seal_tree(root,uid):
     for path in sorted(root.rglob("*"),key=lambda p:len(p.parts),reverse=True):
@@ -233,17 +302,61 @@ def write_csp_metadata(public,release_root,deadline):
         "script_hashes":sorted(hashes["script"]),"style_hashes":sorted(hashes["style"]),"policy":policy},indent=2,sort_keys=True)+"\n")
     return {"html_count":html_count,"script_hash_count":len(hashes["script"]),"style_hash_count":len(hashes["style"])}
 
-def trusted_bundle(args,deadline):
+def identity(path,kind,mode,uid,deadline=None,with_digest=False):
+    if path.is_symlink(): raise Hold("RELEASE_ENVELOPE_LINK:"+str(path))
+    info=path.stat(follow_symlinks=False)
+    expected_type=stat.S_ISDIR if kind=="directory" else stat.S_ISREG
+    if not expected_type(info.st_mode) or info.st_uid!=uid or stat.S_IMODE(info.st_mode)!=mode:
+        raise Hold("RELEASE_ENVELOPE_IDENTITY:"+str(path))
+    value={"kind":kind,"device":info.st_dev,"inode":info.st_ino,"uid":info.st_uid,"mode":mode}
+    if with_digest: value.update(size=info.st_size,sha256=digest(path,deadline))
+    return value
+
+def capture_release_envelope(base,release,uid,deadline):
+    paths={"base":(base,"directory",0o755,False),"releases":(base/"releases","directory",0o755,False),
+           "release":(release,"directory",0o755,False),"public":(release/"public","directory",0o755,False),
+           "metadata":(release/"release-metadata","directory",0o755,False),
+           "csp_conf":(release/"release-metadata/inline-csp.conf","file",0o644,True),
+           "csp_json":(release/"release-metadata/inline-csp.json","file",0o644,True)}
+    envelope={name:identity(path,kind,mode,uid,deadline,dig) for name,(path,kind,mode,dig) in paths.items()}
+    csp=json_bytes((release/"release-metadata/inline-csp.json").read_bytes(),"inline-csp.json")
+    expected=('add_header Content-Security-Policy "'+csp["policy"]+'" always;\n').encode()
+    if (release/"release-metadata/inline-csp.conf").read_bytes()!=expected: raise Hold("CSP_JSON_CONF_MISMATCH")
+    envelope["nginx_include"]="current/release-metadata/inline-csp.conf"
+    return envelope
+
+def verify_release_envelope(base,release,receipt,uid,deadline):
+    wanted=receipt.get("release_envelope")
+    if not isinstance(wanted,dict): raise Hold("RELEASE_ENVELOPE_MISSING")
+    actual=capture_release_envelope(base,release,uid,deadline)
+    if actual!=wanted: raise Hold("RELEASE_ENVELOPE_DRIFT")
+    inventory=receipt.get("csp_inventory",{})
+    csp=json_bytes((release/"release-metadata/inline-csp.json").read_bytes(),"inline-csp.json")
+    observed={"html_count":csp.get("html_count"),"script_hash_count":len(csp.get("script_hashes",[])),
+              "style_hash_count":len(csp.get("style_hashes",[]))}
+    if observed!=inventory: raise Hold("CSP_INVENTORY_DRIFT")
+
+def trusted_bundle(args,deadline,uid):
     bundle=Path(args.bundle).absolute(); mp=bundle/"candidate-manifest.json"; sp=bundle/"source-pin.json"; pp=bundle/"PACKAGE_MANIFEST.json"
-    manifest=load_json(mp,deadline); pin=load_json(sp,deadline); package=load_json(pp,deadline); manifest_map(manifest)
+    blobs={}; identities={}
+    for name,path in (("candidate-manifest.json",mp),("source-pin.json",sp),("PACKAGE_MANIFEST.json",pp)):
+        blobs[name],identities[name]=read_trusted_bytes(path,uid,deadline)
+    approved=getattr(args,"approved_package_manifest_sha256",None)
+    if not approved or not re.fullmatch(r"[0-9a-f]{64}",approved): raise Hold("APPROVED_PACKAGE_MANIFEST_SHA256_REQUIRED")
+    if hashlib.sha256(blobs["PACKAGE_MANIFEST.json"]).hexdigest()!=approved:
+        raise Hold("APPROVED_PACKAGE_MANIFEST_IDENTITY_MISMATCH")
+    manifest=json_bytes(blobs["candidate-manifest.json"],"candidate-manifest.json")
+    pin=json_bytes(blobs["source-pin.json"],"source-pin.json")
+    package=json_bytes(blobs["PACKAGE_MANIFEST.json"],"PACKAGE_MANIFEST.json"); manifest_map(manifest)
     files={x["path"]:x for x in package.get("files",[])}
-    for name,path in (("candidate-manifest.json",mp),("source-pin.json",sp)):
+    for name in ("candidate-manifest.json","source-pin.json"):
         item=files.get(name)
-        if not item or item["size"]!=path.stat().st_size or item["sha256"]!=digest(path,deadline):
+        if not item or item["size"]!=len(blobs[name]) or item["sha256"]!=hashlib.sha256(blobs[name]).hexdigest():
             raise Hold("PACKAGE_MANIFEST_IDENTITY_MISMATCH:"+name)
-    ids={"candidate_manifest_sha256":digest(mp,deadline),"source_pin_sha256":digest(sp,deadline),
-         "package_manifest_sha256":digest(pp,deadline),"source_archive_sha256":pin["source_archive_sha256"],
-         "source_archive_size":pin["source_archive_size"]}
+    ids={"candidate_manifest_sha256":hashlib.sha256(blobs["candidate-manifest.json"]).hexdigest(),
+         "source_pin_sha256":hashlib.sha256(blobs["source-pin.json"]).hexdigest(),
+         "package_manifest_sha256":approved,"trusted_input_identities":identities,
+         "source_archive_sha256":pin["source_archive_sha256"],"source_archive_size":pin["source_archive_size"]}
     return manifest,pin,ids
 
 def prepare(args,deadline=None):
@@ -255,38 +368,40 @@ def prepare(args,deadline=None):
         secure_dir(releases,0o755,uid,True); secure_dir(transactions,0o700,uid,True)
         release=releases/args.release_id; receipt_path=transactions/(args.transaction_id+".json"); staging=base/(".staging-"+args.transaction_id)
         if any(x.exists() or x.is_symlink() for x in (release,receipt_path,staging)): raise Hold("TARGET_OR_TRANSACTION_ALREADY_EXISTS")
-        manifest,pin,ids=trusted_bundle(args,deadline); source=Path(args.source_archive).absolute()
-        if source.stat().st_size!=ids["source_archive_size"] or digest(source,deadline)!=ids["source_archive_sha256"]: raise Hold("SOURCE_ARCHIVE_IDENTITY_MISMATCH")
+        manifest,pin,ids=trusted_bundle(args,deadline,uid); source=Path(args.source_archive).absolute()
         receipt={"schema_version":2,"transaction_id":args.transaction_id,"release_id":args.release_id,"state":"PREPARE_INTENT",
                  "last_stage":"PREPARE_INTENT","release":str(release),"trusted_manifest":manifest,**ids,"residuals":[]}
         atomic_json(receipt_path,receipt)
         try:
             staging.mkdir(mode=0o700); receipt.update(last_stage="STAGING_CREATED",residuals=[str(staging)]); atomic_json(receipt_path,receipt)
-            public=staging/"public"; public.mkdir(mode=0o700); extract_source(source,public,pin,deadline)
+            public=staging/"public"; public.mkdir(mode=0o700); extract_source(source,public,pin,deadline,uid)
             for name,baseline in pin["overlay_baselines"].items():
                 target=public/safe_relative(name); overlay=Path(args.bundle).absolute()/"overlay/public"/safe_relative(name)
                 if target.is_symlink() or not target.is_file() or digest(target,deadline)!=baseline: raise Hold("OVERLAY_BASELINE_DRIFT:"+name)
                 if overlay.is_symlink() or not overlay.is_file(): raise Hold("OVERLAY_MISSING:"+name)
-                data_fd=os.open(overlay,os.O_RDONLY|os.O_NOFOLLOW); out=os.open(target,os.O_WRONLY|os.O_TRUNC|os.O_NOFOLLOW)
-                try:
-                    while True:
-                        deadline.check("OVERLAY_COPY"); chunk=os.read(data_fd,1024*1024)
-                        if not chunk: break
-                        os.write(out,chunk)
-                    os.fsync(out)
-                finally: os.close(data_fd); os.close(out)
+                with open_trusted_file(overlay,uid,deadline) as (data_fd,_):
+                    out=os.open(target,os.O_WRONLY|os.O_TRUNC|os.O_NOFOLLOW)
+                    try:
+                        while True:
+                            deadline.check("OVERLAY_COPY"); chunk=os.read(data_fd,1024*1024)
+                            if not chunk: break
+                            os.write(out,chunk)
+                        os.fsync(out)
+                    finally: os.close(out)
             csp=write_csp_metadata(public,staging,deadline)
             seal_tree(staging,uid); verify_tree(public,manifest,deadline,uid)
-            receipt.update(last_stage="SEALED_VERIFIED",csp_inventory=csp,
-                           csp_include_sha256=digest(staging/"release-metadata/inline-csp.conf",deadline)); atomic_json(receipt_path,receipt)
+            receipt.update(last_stage="SEALED_VERIFIED",csp_inventory=csp); atomic_json(receipt_path,receipt)
             os.replace(staging,release); fsync_dir(releases); verify_tree(release/"public",manifest,deadline,uid)
-            receipt.update(state="PREPARED",last_stage="PREPARED_COMMIT",residuals=[str(release)]); atomic_json(receipt_path,receipt); return receipt
+            receipt.update(state="PREPARED",last_stage="PREPARED_COMMIT",residuals=[str(release)],
+                           release_envelope=capture_release_envelope(base,release,uid,deadline)); atomic_json(receipt_path,receipt); return receipt
         except BaseException as error:
-            receipt.update(state="HOLD_PARTIAL",failure=type(error).__name__+":"+str(error)); atomic_json(receipt_path,receipt); raise
+            receipt.update(state="HOLD_PARTIAL",failure=type(error).__name__+":"+str(error))
+            bounded_failure_receipt(deadline,receipt_path,receipt,error)
+            raise
     finally:
         if ctx: ctx.__exit__(None,None,None)
 
-def receipt_for(args,states,deadline,verify_release=True):
+def receipt_for(args,states,deadline,verify_release=True,verify_envelope=True):
     base,uid=preflight(args,False); transactions=base/"transactions"; secure_dir(transactions,0o700,uid,False)
     path=transactions/(args.transaction_id+".json"); receipt=load_json(path,deadline)
     if receipt.get("schema_version")!=2 or receipt.get("transaction_id")!=args.transaction_id or receipt.get("release_id")!=args.release_id:
@@ -294,9 +409,13 @@ def receipt_for(args,states,deadline,verify_release=True):
     if receipt.get("state") not in states: raise Hold("TRANSACTION_STATE_NOT_ELIGIBLE")
     release=base/"releases"/args.release_id
     if release.is_symlink() or str(release)!=receipt.get("release") or not release.is_dir(): raise Hold("PREPARED_RELEASE_IDENTITY_DRIFT")
+    if verify_envelope: verify_release_envelope(base,release,receipt,uid,deadline)
     if verify_release: verify_tree(release/"public",receipt["trusted_manifest"],deadline,uid)
-    if args.bundle and digest(Path(args.bundle).absolute()/"candidate-manifest.json",deadline)!=receipt["candidate_manifest_sha256"]:
-        raise Hold("CALLER_BUNDLE_DOES_NOT_MATCH_RECEIPT")
+    if args.bundle:
+        try: _,_,caller_ids=trusted_bundle(args,deadline,uid)
+        except Hold as error: raise Hold("CALLER_BUNDLE_DOES_NOT_MATCH_RECEIPT:"+str(error)) from error
+        for key in ("candidate_manifest_sha256","source_pin_sha256","package_manifest_sha256"):
+            if caller_ids[key]!=receipt[key]: raise Hold("CALLER_BUNDLE_DOES_NOT_MATCH_RECEIPT:"+key)
     return base,receipt,path,uid
 
 def snapshot(public,deadline):
@@ -317,8 +436,9 @@ def activate(args,deadline=None):
             if old.parent!=(base/"releases").resolve() or old.is_symlink() or not old.is_dir(): raise Hold("PREVIOUS_POINTER_OUTSIDE_RELEASE_NAMESPACE")
             old_manifest=snapshot(old/"public",deadline); verify_tree(old/"public",old_manifest,deadline,uid)
             previous={"link":link,"release":str(old),"manifest":old_manifest}
-        r.update(state="ACTIVATION_INTENT",last_stage="ACTIVATION_INTENT_DURABLE",previous_current=previous,target_current=str(target)); atomic_json(path,r)
         tmp=base/(".current-"+args.transaction_id)
+        r.update(state="ACTIVATION_INTENT",last_stage="ACTIVATION_INTENT_DURABLE",previous_current=previous,
+                 target_current=str(target),activation_temp=str(tmp)); atomic_json(path,r)
         if tmp.exists() or tmp.is_symlink(): raise Hold("TEMPORARY_POINTER_EXISTS")
         os.symlink(str(target),tmp); fsync_dir(base); os.replace(tmp,current); fsync_dir(base)
         if not current.is_symlink() or current.resolve()!=target.resolve():
@@ -332,14 +452,24 @@ def reconcile(args,deadline=None):
     own=deadline is None; ctx=Deadline(args.deadline_seconds) if own else None
     if ctx: deadline=ctx.__enter__()
     try:
-        base,r,path,uid=receipt_for(args,{"ACTIVATION_INTENT","UNKNOWN_AFTER_ACTIVATE"},deadline); current=base/"current"; target=base/"releases"/args.release_id
+        base,r,path,uid=receipt_for(args,{"ACTIVATION_INTENT","UNKNOWN_AFTER_ACTIVATE","ROLLBACK_INTENT","ROLLBACK_PENDING","UNKNOWN_AFTER_ROLLBACK"},deadline,verify_envelope=False)
+        current=base/"current"; target=base/"releases"/args.release_id
+        if r["state"] in {"ROLLBACK_INTENT","ROLLBACK_PENDING","UNKNOWN_AFTER_ROLLBACK"}:
+            return reconcile_rollback(base,r,path,uid,deadline)
+        verify_release_envelope(base,target,r,uid,deadline)
+        tmp=Path(r.get("activation_temp",base/(".current-"+args.transaction_id)))
+        if tmp.exists() or tmp.is_symlink():
+            if not tmp.is_symlink() or tmp.resolve()!=target.resolve():
+                r.update(state="UNKNOWN_AFTER_RECONCILE",last_stage="ACTIVATION_TEMP_UNKNOWN"); atomic_json(path,r); raise Hold("RECONCILIATION_AMBIGUOUS")
         if current.is_symlink() and current.resolve()==target.resolve():
+            if tmp.is_symlink(): tmp.unlink(); fsync_dir(base)
             r.update(state="ACTIVATED",last_stage="RECONCILED_SWITCH_COMMITTED",reconciliation="TARGET_PRESENT")
         else:
             observed=os.readlink(current) if current.is_symlink() else (None if not current.exists() else "NON_SYMLINK")
             expected=None if r.get("previous_current") is None else r["previous_current"]["link"]
             if observed!=expected:
                 r.update(state="UNKNOWN_AFTER_RECONCILE",observed_current=observed); atomic_json(path,r); raise Hold("RECONCILIATION_AMBIGUOUS")
+            if tmp.is_symlink(): tmp.unlink(); fsync_dir(base)
             r.update(state="PREPARED",last_stage="RECONCILED_NO_SWITCH",reconciliation="PREVIOUS_OR_ABSENT")
         atomic_json(path,r); return r
     finally:
@@ -349,36 +479,78 @@ def check(args,deadline=None):
     own=deadline is None; ctx=Deadline(args.deadline_seconds) if own else None
     if ctx: deadline=ctx.__enter__()
     try:
-        base,r,path,uid=receipt_for(args,{"ACTIVATED"},deadline); current=base/"current"; target=base/"releases"/args.release_id
+        base,r,path,uid=receipt_for(args,{"ACTIVATED","CHECKED"},deadline); current=base/"current"; target=base/"releases"/args.release_id
         if not current.is_symlink() or current.resolve()!=target.resolve():
             r.update(state="UNKNOWN_AFTER_CHECK",last_stage="CURRENT_RELEASE_MISMATCH"); atomic_json(path,r); raise Hold("CURRENT_RELEASE_MISMATCH")
         verify_tree(target/"public",r["trusted_manifest"],deadline,uid)
-        r.update(state="CHECKED",last_stage="CHECK_COMMITTED"); atomic_json(path,r)
+        repeat=r["state"]=="CHECKED"
+        if not repeat:
+            r.update(state="CHECKED",last_stage="CHECK_COMMITTED"); atomic_json(path,r)
         return {"state":"PASS","release_id":args.release_id,"candidate_manifest_sha256":r["candidate_manifest_sha256"]}
     except Hold as error:
-        if "r" in locals() and r.get("state")=="ACTIVATED":
-            r.update(state="CHECK_FAILED",failure=str(error)); atomic_json(path,r)
+        if "r" in locals() and r.get("state") in {"ACTIVATED","CHECKED"}:
+            r.update(state="CHECK_FAILED",failure=str(error)); bounded_failure_receipt(deadline,path,r,error)
         raise
     finally:
         if ctx: ctx.__exit__(None,None,None)
+
+def expected_rollback_observation(base,r):
+    previous=r.get("previous_current")
+    if previous is None: return None
+    return previous["link"]
+
+def observe_pointer(current,target):
+    if current.is_symlink():
+        if current.resolve()==target.resolve(): return "TARGET"
+        return os.readlink(current)
+    return None if not current.exists() else "NON_SYMLINK"
+
+def reconcile_rollback(base,r,path,uid,deadline):
+    current=base/"current"; target=base/"releases"/r["release_id"]
+    observed=observe_pointer(current,target); expected=expected_rollback_observation(base,r)
+    tmp=Path(r.get("rollback_temp",base/(".rollback-"+r["transaction_id"])))
+    if tmp.exists() or tmp.is_symlink():
+        previous=r.get("previous_current")
+        if not previous or not tmp.is_symlink() or os.readlink(tmp)!=previous["link"]:
+            r.update(state="UNKNOWN_AFTER_ROLLBACK",last_stage="ROLLBACK_TEMP_UNKNOWN",observed_current=observed); atomic_json(path,r)
+            raise Hold("ROLLBACK_RECONCILIATION_AMBIGUOUS")
+    if observed==expected:
+        if tmp.is_symlink(): tmp.unlink(); fsync_dir(base)
+        r.update(state="ROLLED_BACK",last_stage="ROLLBACK_RECONCILED_COMMITTED",reconciliation="EXPECTED_FINAL_PRESENT")
+        atomic_json(path,r); return r
+    if observed=="TARGET":
+        r.update(state="ROLLBACK_PENDING",last_stage="ROLLBACK_RECONCILED_NOT_APPLIED",reconciliation="TARGET_STILL_PRESENT")
+        atomic_json(path,r); return r
+    r.update(state="UNKNOWN_AFTER_ROLLBACK",last_stage="ROLLBACK_RESULT_UNKNOWN",observed_current=observed); atomic_json(path,r)
+    raise Hold("ROLLBACK_RECONCILIATION_AMBIGUOUS")
 
 def rollback(args,deadline=None):
     own=deadline is None; ctx=Deadline(args.deadline_seconds) if own else None
     if ctx: deadline=ctx.__enter__()
     try:
-        states={"ACTIVATED","CHECKED","CHECK_FAILED","UNKNOWN_AFTER_CHECK","ACTIVATION_INTENT","UNKNOWN_AFTER_ACTIVATE"}
-        base,r,path,uid=receipt_for(args,states,deadline,verify_release=False); current=base/"current"; target=base/"releases"/args.release_id
-        if not current.is_symlink() or current.resolve()!=target.resolve(): raise Hold("CURRENT_IDENTITY_UNKNOWN_NO_ROLLBACK")
-        previous=r.get("previous_current"); r.update(state="ROLLBACK_INTENT",last_stage="ROLLBACK_INTENT_DURABLE"); atomic_json(path,r)
+        states={"ACTIVATED","CHECKED","CHECK_FAILED","UNKNOWN_AFTER_CHECK","ACTIVATION_INTENT","UNKNOWN_AFTER_ACTIVATE","ROLLBACK_INTENT","ROLLBACK_PENDING"}
+        base,r,path,uid=receipt_for(args,states,deadline,verify_release=False,verify_envelope=False); current=base/"current"; target=base/"releases"/args.release_id
+        envelope_failure=None
+        try: verify_release_envelope(base,target,r,uid,deadline)
+        except Hold as error: envelope_failure=str(error)
+        observed=observe_pointer(current,target); expected=expected_rollback_observation(base,r)
+        if r["state"] in {"ROLLBACK_INTENT","ROLLBACK_PENDING"} and observed==expected:
+            return reconcile_rollback(base,r,path,uid,deadline)
+        if observed!="TARGET": raise Hold("CURRENT_IDENTITY_UNKNOWN_NO_ROLLBACK")
+        previous=r.get("previous_current"); tmp=base/(".rollback-"+args.transaction_id)
+        if r["state"] not in {"ROLLBACK_INTENT","ROLLBACK_PENDING"}:
+            r.update(state="ROLLBACK_INTENT",last_stage="ROLLBACK_INTENT_DURABLE",rollback_temp=str(tmp),target_envelope_failure=envelope_failure); atomic_json(path,r)
         if previous is None:
             current.unlink(); fsync_dir(base)
             if current.exists() or current.is_symlink(): raise Hold("ROLLBACK_RESULT_UNKNOWN")
         else:
             old=Path(previous["release"])
             if old.parent!=(base/"releases").resolve() or not old.is_dir(): raise Hold("PREVIOUS_RELEASE_MISSING")
-            verify_tree(old/"public",previous["manifest"],deadline,uid); tmp=base/(".rollback-"+args.transaction_id)
-            if tmp.exists() or tmp.is_symlink(): raise Hold("TEMPORARY_POINTER_EXISTS")
-            os.symlink(previous["link"],tmp); fsync_dir(base); os.replace(tmp,current); fsync_dir(base)
+            verify_tree(old/"public",previous["manifest"],deadline,uid)
+            if tmp.exists() or tmp.is_symlink():
+                if not tmp.is_symlink() or os.readlink(tmp)!=previous["link"]: raise Hold("TEMPORARY_POINTER_EXISTS")
+            else: os.symlink(previous["link"],tmp); fsync_dir(base)
+            os.replace(tmp,current); fsync_dir(base)
             if not current.is_symlink() or current.resolve()!=old.resolve(): raise Hold("ROLLBACK_RESULT_UNKNOWN")
             verify_tree(old/"public",previous["manifest"],deadline,uid)
         r.update(state="ROLLED_BACK",last_stage="ROLLBACK_COMMITTED"); atomic_json(path,r); return r
@@ -389,6 +561,7 @@ def parser():
     p=argparse.ArgumentParser(); p.add_argument("command",choices=("prepare","activate","reconcile","check","rollback"))
     p.add_argument("--webroot-base",type=Path,required=True); p.add_argument("--bundle",type=Path); p.add_argument("--source-archive",type=Path)
     p.add_argument("--transaction-id",required=True); p.add_argument("--release-id",required=True)
+    p.add_argument("--approved-package-manifest-sha256",help="Externally approved SHA-256 of PACKAGE_MANIFEST.json")
     p.add_argument("--lock-wait-seconds",type=float,default=5); p.add_argument("--deadline-seconds",type=float,default=120)
     p.add_argument("--allow-non-root-test",action="store_true",help=argparse.SUPPRESS); return p
 
@@ -400,11 +573,16 @@ def main():
         creating=args.command=="prepare"
         if creating and (not args.bundle or not args.source_archive): raise Hold("PREPARE_INPUT_REQUIRED")
         if args.command=="check" and not args.bundle: raise Hold("CHECK_BUNDLE_REQUIRED")
-        base,uid=preflight(args,creating)
-        with Deadline(args.deadline_seconds) as deadline:
-            with lock(base,min(args.lock_wait_seconds,args.deadline_seconds),deadline,uid):
-                result={"prepare":prepare,"activate":activate,"reconcile":reconcile,"check":check,"rollback":rollback}[args.command](args,deadline)
+        with termination_guard():
+            base,uid=preflight(args,creating)
+            with Deadline(args.deadline_seconds) as deadline:
+                with lock(base,min(args.lock_wait_seconds,args.deadline_seconds),deadline,uid):
+                    result={"prepare":prepare,"activate":activate,"reconcile":reconcile,"check":check,"rollback":rollback}[args.command](args,deadline)
         print(json.dumps(result,sort_keys=True)); return 0
+    except Unknown as error:
+        print(json.dumps({"state":"UNKNOWN","reason":str(error)}),file=sys.stderr); return 2
+    except KeyboardInterrupt:
+        print(json.dumps({"state":"UNKNOWN","reason":"PROCESS_INTERRUPTED_SIGINT"}),file=sys.stderr); return 130
     except (Hold,OSError,ValueError,KeyError,json.JSONDecodeError) as error:
         print(json.dumps({"state":"HOLD","reason":str(error)}),file=sys.stderr); return 1
 

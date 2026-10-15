@@ -30,6 +30,11 @@ server blocks or certificates.
    files 0644. The receipt embeds the trusted Manifest and binds the source,
    source pin and package hashes. It also generates the exact inline CSP hash
    include under `current/release-metadata`.
+   The Gate must pass the independently approved `PACKAGE_MANIFEST.json`
+   digest through `--approved-package-manifest-sha256`; the bundle directory,
+   all three consumed JSON inputs, the source archive, every overlay file and
+   their path chains must be trusted and not group/world writable. A manifest
+   and content that merely agree with each other are not sufficient.
 3. Install the exact apex HTTP bootstrap only after config conflict review;
    run `nginx -t`; do not reload without the Gate.
 4. Apex DNS remains on Tokyo. The separate Tokyo candidate forwards only the
@@ -40,12 +45,18 @@ server blocks or certificates.
    verify `nginx -t`, SAN/chain, renewal dry-run and existing winctl health.
 5. Run `activate`, then `check`. A durable activation intent precedes pointer
    replacement; after interruption use only `reconcile`, never blind retry.
+   `check` is repeatable and revalidates the release root, releases parent,
+   public tree, metadata directory, CSP JSON/CONF association and exact CSP
+   content on every invocation. Rollback intent and owned temporary links have
+   explicit bounded reconciliation paths.
    DNS remains unchanged until independent
    review and a separate Owner-approved cutover.
 6. Use `rollback` only for the exact transaction. Pointer identity drift or an
    unknown result stops without blind retry.
 
-Every failure, timeout, partial state or unknown state is `HOLD`. A prepared
+Every failure, timeout or partial state is `HOLD`; an unavailable bounded
+failure receipt or an interrupted result is `UNKNOWN`. Neither state permits
+automatic retry. A prepared
 release is not an active release; an active release is not a production
 deployment; and an Nginx syntax pass is not DNS/TLS/business acceptance.
 `cutover-gate.json` remains HOLD while any dynamic route is unresolved.
@@ -61,3 +72,10 @@ TikTok/Douyin/Telegram/WeCom/Novel backends remain owned by their original
 developers and Release Gates. The dynamic-hold include returns fail-closed
 responses until those dependencies have accepted commits and evidence. No
 payment, finance, customer message or production write is enabled here.
+
+The Hosted Chromium test proves the generated hash policy with a synthetic
+representative page only. It does not prove the immutable 1187-file source
+archive, deep URLs, language selector, TikTok page or a deployed Nginx response
+in a browser. That source-package/browser acceptance remains pending an
+isolated environment with the private source archive; no 109-route recollection
+is required.

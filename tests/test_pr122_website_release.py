@@ -1,4 +1,4 @@
-import hashlib, importlib.util, io, json, math, os, signal, subprocess, sys, tarfile, tempfile, time, unittest
+import hashlib, importlib.util, io, json, math, os, pwd, signal, subprocess, sys, tarfile, tempfile, time, unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -11,6 +11,7 @@ def sha(data): return hashlib.sha256(data).hexdigest()
 class ReleaseTest(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.root=Path(self.temp.name); self.bundle=self.root/"bundle"
+        os.chmod(self.root,0o755)
         (self.bundle/"overlay/public/assets").mkdir(parents=True)
         self.original=b"old\n"; self.updated=b"new\n"
         (self.bundle/"overlay/public/assets/tiktok-integration.js").write_bytes(self.updated)
@@ -30,10 +31,12 @@ class ReleaseTest(unittest.TestCase):
         files=[]
         for name in ("source-pin.json","candidate-manifest.json"):
             path=self.bundle/name; files.append({"path":name,"size":path.stat().st_size,"sha256":release.digest(path)})
-        (self.bundle/"PACKAGE_MANIFEST.json").write_text(json.dumps({"schema_version":2,"files":files}))
+        package=self.bundle/"PACKAGE_MANIFEST.json"; package.write_text(json.dumps({"schema_version":2,"files":files}))
+        self.package_hash=release.digest(package)
     def args(self,**kw):
         values=dict(bundle=self.bundle,source_archive=self.source,webroot_base=self.base,transaction_id="tx-1",
-                    release_id="release-1",deadline_seconds=5,lock_wait_seconds=1,allow_non_root_test=True)
+                    release_id="release-1",deadline_seconds=5,lock_wait_seconds=1,allow_non_root_test=True,
+                    approved_package_manifest_sha256=self.package_hash)
         values.update(kw); return SimpleNamespace(**values)
     def prepared(self): return release.prepare(self.args())
 
@@ -42,9 +45,18 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(tree.stat().st_mode&0o777,0o755)
         self.assertEqual((tree/"public/assets/tiktok-integration.js").stat().st_mode&0o777,0o644)
         self.assertEqual((tree/"public/assets").stat().st_mode&0o777,0o755)
-        nobody=65534 if os.geteuid()==0 else os.geteuid()
-        code="import os,sys; os.setgid(int(sys.argv[1])); os.setuid(int(sys.argv[1])); p=sys.argv[2]; assert open(p,'rb').read()==b'new\\n';\ntry: open(p,'ab')\nexcept PermissionError: pass\nelse: raise SystemExit(2)"
-        if os.geteuid()==0: subprocess.run([sys.executable,"-c",code,str(nobody),str(tree/"public/assets/tiktok-integration.js")],check=True)
+        if os.geteuid()==0:
+            nobody=pwd.getpwnam("nobody")
+            code="import os,sys; os.setgroups([]); os.setgid(int(sys.argv[1])); os.setuid(int(sys.argv[2])); p=sys.argv[3]; assert open(p,'rb').read()==b'new\\n';\ntry: open(p,'ab')\nexcept PermissionError: pass\nelse: raise SystemExit(2)"
+            result=subprocess.run([sys.executable,"-c",code,str(nobody.pw_gid),str(nobody.pw_uid),str(tree/"public/assets/tiktok-integration.js")],capture_output=True,text=True)
+            if result.returncode and "Invalid argument" in result.stderr: self.skipTest("real non-root worker identity unavailable in this user namespace")
+            self.assertEqual(result.returncode,0,result.stderr)
+        else:
+            code="import sys; p=sys.argv[1]; assert open(p,'rb').read()==b'new\\n';\ntry: open(p,'ab')\nexcept PermissionError: pass\nelse: raise SystemExit(2)"
+            result=subprocess.run(["sudo","-n","-u","nobody","--",sys.executable,"-c",code,str(tree/"public/assets/tiktok-integration.js")],capture_output=True,text=True)
+            if result.returncode and ("password" in result.stderr.lower() or "not permitted" in result.stderr.lower()):
+                self.skipTest("sudo non-root worker proof unavailable; mode assertions completed")
+            self.assertEqual(result.returncode,0,result.stderr)
 
     def test_w2_tamper_before_activate_is_rejected(self):
         self.prepared(); (self.base/"releases/release-1/public/assets/tiktok-integration.js").write_bytes(b"bad")
@@ -59,6 +71,43 @@ class ReleaseTest(unittest.TestCase):
     def test_w2_receipt_binds_all_artifact_ids(self):
         r=self.prepared()
         for key in ("candidate_manifest_sha256","source_pin_sha256","package_manifest_sha256","source_archive_sha256","trusted_manifest"): self.assertIn(key,r)
+    def test_rw1_csp_conf_tamper_is_rejected(self):
+        self.prepared(); (self.base/"releases/release-1/release-metadata/inline-csp.conf").write_text("bad\n")
+        with self.assertRaisesRegex(release.Hold,"RELEASE_ENVELOPE_DRIFT|CSP_JSON_CONF_MISMATCH"): release.activate(self.args())
+    def test_rw1_csp_json_link_substitution_is_rejected(self):
+        self.prepared(); path=self.base/"releases/release-1/release-metadata/inline-csp.json"; copy=self.root/"csp.json"
+        copy.write_bytes(path.read_bytes()); path.unlink(); path.symlink_to(copy)
+        with self.assertRaisesRegex(release.Hold,"RELEASE_ENVELOPE_LINK"): release.activate(self.args())
+    def test_rw1_release_root_and_parent_mode_drift_are_rejected(self):
+        self.prepared(); release_root=self.base/"releases/release-1"; os.chmod(release_root,0o777)
+        with self.assertRaisesRegex(release.Hold,"RELEASE_ENVELOPE_IDENTITY"): release.activate(self.args())
+        os.chmod(release_root,0o755); os.chmod(self.base/"releases",0o777)
+        with self.assertRaisesRegex(release.Hold,"RELEASE_ENVELOPE_IDENTITY"): release.activate(self.args())
+    def test_rw2_all_consumed_manifest_files_must_be_immutable(self):
+        for name in ("candidate-manifest.json","source-pin.json","PACKAGE_MANIFEST.json"):
+            with self.subTest(name=name):
+                path=self.bundle/name; old=path.stat().st_mode&0o777; os.chmod(path,0o666)
+                try:
+                    with self.assertRaisesRegex(release.Hold,"TRUSTED_INPUT_(FILE_IDENTITY|PATH_WRITABLE)"): release.prepare(self.args())
+                finally: os.chmod(path,old)
+    def test_rw2_overlay_and_parent_must_be_immutable(self):
+        overlay=self.bundle/"overlay/public/assets/tiktok-integration.js"; os.chmod(overlay,0o666)
+        with self.assertRaisesRegex(release.Hold,"TRUSTED_INPUT_(FILE_IDENTITY|PATH_WRITABLE)"): release.prepare(self.args())
+        os.chmod(overlay,0o644); os.chmod(self.bundle,0o775)
+        with self.assertRaisesRegex(release.Hold,"TRUSTED_INPUT_PATH_WRITABLE|TRUSTED_INPUT_DIRECTORY_IDENTITY"): release.prepare(self.args())
+    def test_rw2_external_package_hash_rejects_self_consistent_replacement(self):
+        self.manifest["files"][0]["sha256"]="0"*64; self.write_bundle(); approved=self.package_hash
+        self.manifest["files"][0]["sha256"]="1"*64; self.write_bundle()
+        with self.assertRaisesRegex(release.Hold,"APPROVED_PACKAGE_MANIFEST_IDENTITY_MISMATCH"):
+            release.prepare(self.args(approved_package_manifest_sha256=approved))
+    def test_rw2_open_descriptor_detects_path_replacement(self):
+        path=self.bundle/"candidate-manifest.json"; replacement=self.root/"replacement.json"; replacement.write_bytes(path.read_bytes())
+        with self.assertRaisesRegex(release.Hold,"TRUSTED_INPUT_FILE_REPLACED"):
+            with release.open_trusted_file(path,os.geteuid()) as (_fd,_info): os.replace(replacement,path)
+    def test_rw2_non_root_owned_input_is_rejected(self):
+        path=self.bundle/"candidate-manifest.json"; unauthorized_expected_uid=os.geteuid()+1
+        with self.assertRaisesRegex(release.Hold,"TRUSTED_INPUT_PATH_OWNER|TRUSTED_INPUT_FILE_IDENTITY"):
+            with release.open_trusted_file(path,unauthorized_expected_uid): pass
 
     def test_w3_traversal_and_absolute_ids_have_no_side_effect(self):
         for bad in ("../../outside","/absolute","a/b"):
@@ -117,6 +166,49 @@ class ReleaseTest(unittest.TestCase):
         self.pin["overlay_baselines"]["assets/tiktok-integration.js"]="0"*64; self.write_bundle()
         with self.assertRaisesRegex(release.Hold,"OVERLAY_BASELINE_DRIFT"): self.prepared()
         r=json.loads((self.base/"transactions/tx-1.json").read_text()); self.assertEqual(r["state"],"HOLD_PARTIAL"); self.assertTrue(r["residuals"])
+    def test_rw3_check_is_repeatable_and_detects_later_drift(self):
+        self.prepared(); release.activate(self.args()); self.assertEqual(release.check(self.args())["state"],"PASS")
+        self.assertEqual(release.check(self.args())["state"],"PASS")
+        (self.base/"releases/release-1/release-metadata/inline-csp.conf").write_text("bad\n")
+        with self.assertRaisesRegex(release.Hold,"RELEASE_ENVELOPE_DRIFT|CSP_JSON_CONF_MISMATCH"): release.check(self.args())
+    def test_rw3_csp_drift_is_detected_but_safe_rollback_remains_available(self):
+        self.prepared(); release.activate(self.args()); (self.base/"releases/release-1/release-metadata/inline-csp.conf").write_text("bad\n")
+        with self.assertRaisesRegex(release.Hold,"RELEASE_ENVELOPE_DRIFT|CSP_JSON_CONF_MISMATCH"): release.check(self.args())
+        result=release.rollback(self.args()); self.assertEqual(result["state"],"ROLLED_BACK")
+        self.assertRegex(result["target_envelope_failure"],"RELEASE_ENVELOPE_DRIFT|CSP_JSON_CONF_MISMATCH"); self.assertFalse((self.base/"current").exists())
+    def test_rw3_interrupted_absent_rollback_reconciles_final_state(self):
+        self.prepared(); release.activate(self.args()); real=release.atomic_json
+        def fail_commit(path,value):
+            if value.get("state")=="ROLLED_BACK": raise OSError("injected")
+            return real(path,value)
+        with mock.patch.object(release,"atomic_json",side_effect=fail_commit):
+            with self.assertRaisesRegex(OSError,"injected"): release.rollback(self.args())
+        self.assertFalse((self.base/"current").exists())
+        self.assertEqual(release.reconcile(self.args())["state"],"ROLLED_BACK")
+    def test_rw3_interrupted_previous_rollback_reconciles_final_state(self):
+        old=self.base/"releases/old/public"; old.mkdir(parents=True); (old/"index.html").write_text("old")
+        for p in (self.base,self.base/"releases",self.base/"releases/old",old): os.chmod(p,0o755)
+        os.chmod(old/"index.html",0o644); (self.base/"current").symlink_to(self.base/"releases/old")
+        self.prepared(); release.activate(self.args()); real=release.atomic_json
+        with mock.patch.object(release,"atomic_json",side_effect=lambda p,v: (_ for _ in ()).throw(OSError("injected")) if v.get("state")=="ROLLED_BACK" else real(p,v)):
+            with self.assertRaisesRegex(OSError,"injected"): release.rollback(self.args())
+        self.assertEqual(release.reconcile(self.args())["state"],"ROLLED_BACK")
+        self.assertEqual((self.base/"current").resolve(),(self.base/"releases/old").resolve())
+    def test_rw3_owned_activation_temp_is_cleaned_without_switch(self):
+        self.prepared(); path=self.base/"transactions/tx-1.json"; r=json.loads(path.read_text()); target=self.base/"releases/release-1"
+        tmp=self.base/".current-tx-1"; r.update(state="ACTIVATION_INTENT",previous_current=None,activation_temp=str(tmp)); path.write_text(json.dumps(r)); tmp.symlink_to(target)
+        result=release.reconcile(self.args()); self.assertEqual(result["state"],"PREPARED"); self.assertFalse(tmp.exists())
+    def test_rw3_rollback_not_applied_reconciles_pending_then_finishes_explicitly(self):
+        self.prepared(); release.activate(self.args()); path=self.base/"transactions/tx-1.json"; r=json.loads(path.read_text())
+        r.update(state="ROLLBACK_INTENT",rollback_temp=str(self.base/".rollback-tx-1")); path.write_text(json.dumps(r))
+        self.assertEqual(release.reconcile(self.args())["state"],"ROLLBACK_PENDING")
+        self.assertEqual(release.rollback(self.args())["state"],"ROLLED_BACK"); self.assertFalse((self.base/"current").exists())
+    def test_rw3_unknown_rollback_pointer_is_preserved(self):
+        self.prepared(); release.activate(self.args()); path=self.base/"transactions/tx-1.json"; r=json.loads(path.read_text())
+        r.update(state="ROLLBACK_INTENT",rollback_temp=str(self.base/".rollback-tx-1")); path.write_text(json.dumps(r))
+        unknown=self.base/"releases/unknown"; (unknown/"public").mkdir(parents=True); (self.base/"current").unlink(); (self.base/"current").symlink_to(unknown)
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_RECONCILIATION_AMBIGUOUS"): release.reconcile(self.args())
+        self.assertTrue((self.base/"current").is_symlink()); self.assertEqual((self.base/"current").resolve(),unknown.resolve())
 
     def test_w5_rejects_nan_inf_zero_and_excessive(self):
         for value in (math.nan,math.inf,0,-1,901):
@@ -141,6 +233,15 @@ class ReleaseTest(unittest.TestCase):
         with mock.patch.object(release,"atomic_json",side_effect=interrupt):
             with self.assertRaises(KeyboardInterrupt): release.activate(self.args())
         self.assertEqual(json.loads(path.read_text())["state"],"ACTIVATION_INTENT")
+    def test_rw4_failure_receipt_block_is_bounded_and_unknown(self):
+        real=release.atomic_json
+        def receipt_write(path,value):
+            if value.get("state")=="HOLD_PARTIAL": time.sleep(5)
+            return real(path,value)
+        started=time.monotonic()
+        with mock.patch.object(release,"extract_source",side_effect=lambda *_: time.sleep(.2)), mock.patch.object(release,"atomic_json",side_effect=receipt_write):
+            with self.assertRaisesRegex(release.Unknown,"FAILURE_RECEIPT_UNAVAILABLE"): release.prepare(self.args(deadline_seconds=.05))
+        self.assertLess(time.monotonic()-started,.4)
 
     def test_unsafe_archive_member_is_rejected(self):
         with tarfile.open(self.source,"w:gz") as a:
@@ -169,7 +270,9 @@ class CandidateContractTest(unittest.TestCase):
     def test_w6_cross_object_contract_is_non_executable(self):
         contract=json.loads((self.base/"production-action-contract.json").read_text())
         self.assertEqual(contract["execution_state"],"NOT_AUTHORIZED")
-        self.assertIn("winctl",json.dumps(contract)); self.assertTrue((self.base/"PRODUCTION_EXECUTION.lock").is_file())
+        serialized=json.dumps(contract); self.assertIn("winctl",serialized); self.assertTrue((self.base/"PRODUCTION_EXECUTION.lock").is_file())
+        for required in ("/usr/local/libexec/pr122_website_release.py","pr122-dynamic-hold.locations.conf","xuanjun-apex-http-redirect.conf","inline-csp"):
+            self.assertIn(required,serialized)
     def test_existing_winctl_is_not_mutation_target(self):
         for path in list((self.base/"nginx").glob("*"))+list((self.base/"tls").glob("*")):
             self.assertNotIn("server_name winctl.wenwenwenyiyiyi.work",path.read_text())

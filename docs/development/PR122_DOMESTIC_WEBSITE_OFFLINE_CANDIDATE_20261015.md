@@ -29,7 +29,8 @@ authorization contracts are accepted.
    across lock and I/O. Include negative cases for A-receipt/B-bundle, content,
    mode, traversal, wrong IDs, link substitution, write failure, interruption,
    ambiguous state, NaN/Inf and actual timeout.
-5. Test W6 as one cutover contract: generated CSP hashes in real Chromium,
+5. Test W6 as one cutover contract: generated CSP hashes in real Chromium on
+   a synthetic representative page (not the private 1187-file source archive),
    Tokyo-only ACME challenge forwarding while DNS remains unchanged, exact
    existing Domestic certbot path/version, dynamic-route cutover HOLD, and a
    non-executable cross-object backup/rollback contract that protects winctl.
@@ -51,10 +52,22 @@ authorization contracts are accepted.
   but not writable by a real non-root worker identity.
 - Activate/check consume the receipt-embedded trusted manifest and reject a
   substituted bundle, release, mode, owner, pointer, lock or transaction.
+- The externally approved package-manifest SHA-256 is a required input.
+  Every consumed JSON/overlay/source file is read from a trusted immutable
+  object, and release/CSP metadata identities are revalidated at activate,
+  check, reconcile and rollback boundaries.
+- Check is repeatable. Rollback intent, pointer-side-effect boundaries and
+  owned temporary links reconcile to completed, not-applied or UNKNOWN without
+  blind retry or duplicate effects.
 - Every command shares a finite process deadline; NaN, Inf, non-positive and
-  excessive limits fail before side effects.
+  excessive limits fail before side effects. Failure-receipt I/O gets only a
+  fixed 100 ms tail budget; inability to persist it returns UNKNOWN.
 - Inline script/style compatibility uses exact generated hashes and is tested
   in real Chromium; no unsafe-inline exception is added.
+- Full source-package browser coverage (language selector, deep URLs, TikTok
+  page and an actual Nginx response) is not claimed by the synthetic Chromium
+  test and remains a later isolated acceptance check using the existing private
+  archive. The 109 public routes are not recollected.
 - Apex certificate issuance uses the proven Domestic
   /usr/local/bin/certbot 5.8.0 and a separately gated Tokyo ACME-only forward,
   never an early DNS switch.

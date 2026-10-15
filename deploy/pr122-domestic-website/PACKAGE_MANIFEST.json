@@ -7,8 +7,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "f91afe9b715b7e38884d3f56b7de56a7fe3c2705b5b0d89376c09e09151a572e",
-      "size": 3413
+      "sha256": "ba65aefc141183cea625c59105370f00f8ea5641c1be3ec048b51f4ac4426944",
+      "size": 4560
     },
     {
       "path": "candidate-manifest.json",
@@ -52,8 +52,8 @@
     },
     {
       "path": "production-action-contract.json",
-      "sha256": "bdf2f47bc9f02e23ed5976fc15dda8c57eed050de1b8db6a90feb5a000306374",
-      "size": 2666
+      "sha256": "6b2808b62f8110fa871afd341722a2e8760b3e5783ce7a6f7d946438521e85f8",
+      "size": 3646
     },
     {
       "path": "source-pin.json",
@@ -87,8 +87,8 @@
     },
     {
       "path": "bin/pr122_website_release.py",
-      "sha256": "88b25f8928009e8ba72402de4453703344195599dfdc099f3d8a304a02c629b3",
-      "size": 25111
+      "sha256": "046fa34e26a4a9917ceaf39587a0ac8d978369f19a58a5f5c441c07517a09d5c",
+      "size": 35713
     }
   ],
   "schema_version": 1

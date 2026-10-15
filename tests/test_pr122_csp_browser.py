@@ -16,7 +16,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self,*_): pass
 
 class CspBrowserTest(unittest.TestCase):
-    def test_hashed_inline_language_layout_and_interaction_in_real_chromium(self):
+    def test_synthetic_hashed_inline_language_layout_and_interaction_in_real_chromium(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td); public=root/"public"; public.mkdir()
             (public/"index.html").write_text("""<!doctype html><html><head>
