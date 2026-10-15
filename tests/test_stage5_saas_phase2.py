@@ -117,4 +117,21 @@ class Phase2Nodes(unittest.TestCase):
         db=connect(q);install(db);db.close()
         x=sqlite3.connect(o);x.execute("CREATE TABLE saas_order_preparations(fake INTEGER)");x.close()
         with self.assertRaises(ValueError):verify_persistent_stores(q,o)
+ def test_28_no_finance_or_grant_writer_health(self):
+    state=self.call("health")
+    self.assertEqual(state["finance_provider"],"NOT_CONNECTED")
+    self.assertEqual(state["grant_writer"],"DISABLED")
+ def test_29_refund_plan_admin_only(self):
+    self.ordered()
+    params={"order_id":"order1","reason":"customer requested reversal"}
+    with self.assertRaises(PermissionError):
+        self.call("refund_reversal_plan",params)
+    result=self.call("refund_reversal_plan",params,self.admin)
+    self.assertFalse(result["provider_refund_executed"])
+    self.assertFalse(result["entitlement_revoked"])
+    self.assertFalse(result["revenue_reversed"])
+ def test_30_refund_plan_invalid_reason(self):
+    self.ordered()
+    with self.assertRaisesRegex(ValueError,"INVALID_REFUND_REASON"):
+        self.call("refund_reversal_plan",{"order_id":"order1","reason":""},self.admin)
 if __name__=="__main__":unittest.main()
