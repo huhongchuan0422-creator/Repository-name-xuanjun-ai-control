@@ -87,8 +87,8 @@
     },
     {
       "path": "bin/pr122_website_release.py",
-      "sha256": "09f0f5b6700ce0c472fc1f8472821fd60238ac39f6bc18c5b85e0714769fedb4",
-      "size": 42070
+      "sha256": "7253f3b86a6ad17dadc85c26deda17a5ccaaa8f76c65da21572be39658993895",
+      "size": 44119
     }
   ],
   "schema_version": 1

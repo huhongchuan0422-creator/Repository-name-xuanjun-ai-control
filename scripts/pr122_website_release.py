@@ -147,12 +147,52 @@ def safe_relative(name):
     if pure.is_absolute() or not pure.parts or ".." in pure.parts: raise Hold("UNSAFE_ARCHIVE_MEMBER_PATH")
     return Path(*pure.parts)
 
+def create_secure_dir(path,mode,uid):
+    """Create one directory, then set its exact mode through the created fd.
+
+    mkdir modes are filtered by the process umask.  The chmod is safe only
+    after an exclusive mkdir and descriptor/inode verification; an existing
+    object is never repaired here.
+    """
+    parent=path.parent
+    try: parent_info=os.lstat(parent)
+    except OSError as error: raise Hold("TRUSTED_DIRECTORY_PARENT_UNAVAILABLE:"+str(parent)) from error
+    if (stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode)
+            or parent_info.st_uid!=uid or stat.S_IMODE(parent_info.st_mode)&0o022):
+        raise Hold("TRUSTED_DIRECTORY_PARENT_IDENTITY_MISMATCH:"+str(parent))
+    flags=os.O_RDONLY|os.O_DIRECTORY|getattr(os,"O_NOFOLLOW",0)
+    parent_fd=os.open(parent,flags)
+    child_fd=None
+    try:
+        opened_parent=os.fstat(parent_fd)
+        live_parent=os.stat(parent,follow_symlinks=False)
+        if (opened_parent.st_dev,opened_parent.st_ino)!=(live_parent.st_dev,live_parent.st_ino):
+            raise Hold("TRUSTED_DIRECTORY_PARENT_REPLACED:"+str(parent))
+        try: os.mkdir(path.name,0o700,dir_fd=parent_fd)
+        except FileExistsError as error: raise Hold("TRUSTED_DIRECTORY_ALREADY_EXISTS:"+str(path)) from error
+        child_fd=os.open(path.name,flags,dir_fd=parent_fd)
+        created=os.fstat(child_fd)
+        if not stat.S_ISDIR(created.st_mode) or created.st_uid!=uid:
+            raise Hold("TRUSTED_DIRECTORY_CREATED_IDENTITY_MISMATCH:"+str(path))
+        os.fchmod(child_fd,mode)
+        final=os.fstat(child_fd)
+        if stat.S_IMODE(final.st_mode)!=mode:
+            raise Hold("TRUSTED_DIRECTORY_CREATED_MODE_MISMATCH:"+str(path))
+        os.fsync(child_fd); os.fsync(parent_fd)
+    finally:
+        if child_fd is not None: os.close(child_fd)
+        os.close(parent_fd)
+    live=os.stat(path,follow_symlinks=False)
+    if (live.st_dev,live.st_ino)!=(final.st_dev,final.st_ino):
+        raise Hold("TRUSTED_DIRECTORY_CREATED_REPLACED:"+str(path))
+
 def secure_dir(path,mode,uid,create):
-    if path.is_symlink(): raise Hold("TRUSTED_DIRECTORY_LINK_REJECTED")
-    if not path.exists():
+    try: info=os.lstat(path)
+    except FileNotFoundError:
         if not create: raise Hold("TRUSTED_DIRECTORY_MISSING")
-        path.mkdir(mode=mode); fsync_dir(path.parent)
-    info=path.stat(follow_symlinks=False)
+        create_secure_dir(path,mode,uid)
+        info=os.lstat(path)
+    if stat.S_ISLNK(info.st_mode): raise Hold("TRUSTED_DIRECTORY_LINK_REJECTED")
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != uid or stat.S_IMODE(info.st_mode) != mode:
         raise Hold("TRUSTED_DIRECTORY_IDENTITY_MISMATCH:"+str(path))
 

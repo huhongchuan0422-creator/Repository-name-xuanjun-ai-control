@@ -1,4 +1,4 @@
-import hashlib, importlib.util, io, json, math, os, pwd, signal, subprocess, sys, tarfile, tempfile, time, unittest
+import hashlib, importlib.util, io, json, math, os, pwd, signal, stat, subprocess, sys, tarfile, tempfile, time, unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -54,6 +54,80 @@ class ReleaseTest(unittest.TestCase):
         real=release.atomic_json
         with mock.patch.object(release,"atomic_json",side_effect=lambda p,v: (_ for _ in ()).throw(OSError("injected")) if v.get("state")=="ROLLED_BACK" else real(p,v)):
             with self.assertRaisesRegex(OSError,"injected"): release.rollback(self.args())
+
+    def run_cli(self,command,transaction="tx-1",release_id="release-1",bundle=True,source=False):
+        args=[sys.executable,str(ROOT/"scripts/pr122_website_release.py"),command,
+              "--webroot-base",str(self.base),"--transaction-id",transaction,
+              "--release-id",release_id,"--deadline-seconds","5","--lock-wait-seconds","1",
+              "--allow-non-root-test"]
+        if bundle:
+            args.extend(["--bundle",str(self.bundle),"--approved-package-manifest-sha256",self.package_hash])
+        if source: args.extend(["--source-archive",str(self.source)])
+        return subprocess.run(args,capture_output=True,text=True,preexec_fn=lambda: os.umask(0o077))
+
+    def test_umask_077_real_subprocess_canary_and_stage_lifecycle(self):
+        sequence=[("prepare","canary-tx","canary-release",True),
+                  ("activate","canary-tx","canary-release",False),
+                  ("check","canary-tx","canary-release",False),
+                  ("rollback","canary-tx","canary-release",False),
+                  ("prepare","stage-tx","stage-release",True),
+                  ("activate","stage-tx","stage-release",False),
+                  ("check","stage-tx","stage-release",False)]
+        for command,transaction,release_id,needs_source in sequence:
+            result=self.run_cli(command,transaction,release_id,source=needs_source)
+            self.assertEqual(result.returncode,0,(command,result.stdout,result.stderr))
+        self.assertEqual((self.base.stat().st_mode&0o777),0o755)
+        self.assertEqual((self.base/"releases").stat().st_mode&0o777,0o755)
+        self.assertEqual((self.base/"transactions").stat().st_mode&0o777,0o700)
+        self.assertEqual(json.loads((self.base/"transactions/canary-tx.json").read_text())["state"],"ROLLED_BACK")
+        self.assertEqual(json.loads((self.base/"transactions/stage-tx.json").read_text())["state"],"CHECKED")
+        self.assertEqual((self.base/"current").resolve(),(self.base/"releases/stage-release").resolve())
+
+    def test_umask_077_preexisting_bad_directory_is_rejected_unchanged(self):
+        self.base.mkdir(mode=0o700); os.chmod(self.base,0o700)
+        before=self.base.stat(follow_symlinks=False)
+        result=self.run_cli("prepare",source=True)
+        after=self.base.stat(follow_symlinks=False)
+        self.assertEqual(result.returncode,1,(result.stdout,result.stderr))
+        self.assertIn("TRUSTED_DIRECTORY_IDENTITY_MISMATCH",result.stderr)
+        self.assertEqual((before.st_dev,before.st_ino,stat.S_IMODE(before.st_mode)),
+                         (after.st_dev,after.st_ino,stat.S_IMODE(after.st_mode)))
+        self.assertEqual(list(self.base.iterdir()),[])
+
+    def test_umask_077_partial_failure_preserves_receipt_and_staging(self):
+        (self.bundle/"overlay/public/assets/tiktok-integration.js").unlink()
+        result=self.run_cli("prepare",source=True)
+        self.assertEqual(result.returncode,1,(result.stdout,result.stderr))
+        receipt=json.loads((self.base/"transactions/tx-1.json").read_text())
+        self.assertEqual(receipt["state"],"HOLD_PARTIAL")
+        self.assertIn("OVERLAY_MISSING",receipt["failure"])
+        self.assertTrue((self.base/".staging-tx-1").is_dir())
+
+    def test_umask_077_sigterm_preserves_unknown_failure_evidence(self):
+        code="""import importlib.util,sys,time
+spec=importlib.util.spec_from_file_location('release',sys.argv[1]); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+m.extract_source=lambda *_: time.sleep(30)
+sys.argv=[sys.argv[1],*sys.argv[2:]]
+raise SystemExit(m.main())
+"""
+        args=[sys.executable,"-c",code,str(ROOT/"scripts/pr122_website_release.py"),"prepare",
+              "--webroot-base",str(self.base),"--bundle",str(self.bundle),"--source-archive",str(self.source),
+              "--transaction-id","signal-tx","--release-id","signal-release",
+              "--approved-package-manifest-sha256",self.package_hash,"--deadline-seconds","5",
+              "--lock-wait-seconds","1","--allow-non-root-test"]
+        process=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,
+                                 preexec_fn=lambda: os.umask(0o077))
+        receipt=self.base/"transactions/signal-tx.json"
+        until=time.time()+3
+        while time.time()<until and not receipt.exists(): time.sleep(.01)
+        self.assertTrue(receipt.exists(),"subprocess did not reach durable PREPARE_INTENT")
+        process.terminate(); stdout,stderr=process.communicate(timeout=3)
+        self.assertEqual(process.returncode,2,(stdout,stderr))
+        self.assertIn("PROCESS_INTERRUPTED_SIGTERM",stderr)
+        saved=json.loads(receipt.read_text())
+        self.assertEqual(saved["state"],"HOLD_PARTIAL")
+        self.assertIn("PROCESS_INTERRUPTED_SIGTERM",saved["failure"])
+        self.assertTrue((self.base/".staging-signal-tx").is_dir())
 
     def test_w1_sealed_release_is_worker_readable_and_not_worker_writable(self):
         self.prepared(); tree=self.base/"releases/release-1"
