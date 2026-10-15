@@ -27,6 +27,18 @@ CREATE TABLE IF NOT EXISTS saas_offer_lines (
  cny_minor INTEGER, usd_minor INTEGER, cost_cny_minor INTEGER, cost_usd_minor INTEGER,
  PRIMARY KEY(offer_id,version,line_no),
  FOREIGN KEY(offer_id,version) REFERENCES saas_offer_versions(offer_id,version));
+CREATE TABLE IF NOT EXISTS saas_offer_approvals(
+ offer_id TEXT NOT NULL,version INTEGER NOT NULL,approval_ref TEXT NOT NULL,
+ cost_evidence_ref TEXT NOT NULL,approved_at INTEGER NOT NULL,
+ PRIMARY KEY(offer_id,version),
+ FOREIGN KEY(offer_id,version) REFERENCES saas_offer_versions(offer_id,version));
+CREATE TRIGGER saas_offer_approvals_no_replace BEFORE INSERT ON saas_offer_approvals
+WHEN EXISTS(SELECT 1 FROM saas_offer_approvals WHERE offer_id=NEW.offer_id AND version=NEW.version)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
+CREATE TRIGGER saas_offer_approvals_no_update BEFORE UPDATE ON saas_offer_approvals
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_APPROVAL'); END;
+CREATE TRIGGER saas_offer_approvals_no_delete BEFORE DELETE ON saas_offer_approvals
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_APPROVAL'); END;
 CREATE TABLE IF NOT EXISTS saas_quotes (
  quote_id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL,
  offer_id TEXT NOT NULL, offer_version INTEGER NOT NULL,
@@ -65,7 +77,7 @@ def install(db):
         raise TypeError("SQLITE_CONNECTION_REQUIRED")
     db.execute("PRAGMA foreign_keys=ON")
     base={"module_prices","module_entitlements","module_events"}
-    ext={"saas_offer_versions","saas_offer_lines","saas_quotes"}
+    ext={"saas_offer_versions","saas_offer_lines","saas_quotes","saas_offer_approvals"}
     names={row[0] for row in db.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
     if names==base:
@@ -132,6 +144,22 @@ def create_offer(db, offer_id, version, module_id, kind, lines,
                        [(offer_id,version,i,*row) for i,row in enumerate(parsed,1)])
     return (offer_id,version)
 
+def approve_offer(db,offer_id,version,approval_ref,cost_evidence_ref,approved_at):
+    """Offline explicit governance snapshot; no real money or finance authority."""
+    _identifier(approval_ref);_identifier(cost_evidence_ref)
+    if type(approved_at) is not int or approved_at<0:
+        raise ValueError("INVALID_APPROVAL_TIME")
+    offer=get_offer(db,offer_id,version)
+    if any(line["cost_cny_minor"] is None or line["cost_usd_minor"] is None
+           for line in offer["lines"]):
+        raise ValueError("COST_EVIDENCE_REQUIRED")
+    if not offer["active"]:
+        raise ValueError("OFFER_NOT_AVAILABLE")
+    with db:
+        db.execute("INSERT INTO saas_offer_approvals VALUES(?,?,?,?,?)",
+                   (offer_id,version,approval_ref,cost_evidence_ref,approved_at))
+    return {"offer_id":offer_id,"version":version,"approved":True}
+
 def get_offer(db,offer_id,version):
     _identifier(offer_id)
     if type(version) is not int or version<1:raise ValueError("INVALID_VERSION")
@@ -163,6 +191,8 @@ def quote(db,quote_id,tenant_id,offer_id,version,created_at,expires_at,
     offer=get_offer(db,offer_id,version)
     if not offer["active"] or offer["tenant_scope"] not in (None,tenant_id):
         raise ValueError("OFFER_NOT_AVAILABLE")
+    approval=db.execute("SELECT approval_ref,cost_evidence_ref FROM saas_offer_approvals WHERE offer_id=? AND version=?",
+                        (offer_id,version)).fetchone()
     # Prices are configured in both currencies. No implicit exchange rate is invented.
     totals={}
     for currency in ("cny","usd"):
@@ -185,7 +215,9 @@ def quote(db,quote_id,tenant_id,offer_id,version,created_at,expires_at,
     snapshot={**offer,"tenant_id":tenant_id,"created_at":created_at,"expires_at":expires_at,
               "fx_source":fx_source,"fx_at":fx_at,"totals":totals,
               "totals_by_cycle":breakdown,"mixed_billing_cycles":mixed_cycles,
-              "totals_are_payable":False,
+              "totals_are_payable":False,"offer_governed":bool(approval),
+              "approval_ref":approval[0] if approval else None,
+              "cost_evidence_ref":approval[1] if approval else None,
               "payment_authorized":False,"procurement_authorized":False,
               "revenue_recognized":False}
     with db:
