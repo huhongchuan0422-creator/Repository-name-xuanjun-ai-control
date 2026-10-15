@@ -2,8 +2,8 @@
 """Observation-bound r7-fresh preparation delivery. No installation or approval operation."""
 import argparse,ast,contextlib,errno,hashlib,json,os,re,signal,socket,stat,sys,time,types,urllib.request
 
-PINS_BOUND=False
-PUBLICATION_COMMIT=None
+PINS_BOUND=True
+PUBLICATION_COMMIT='c9fe40be1e44d4e41ca741e80ea257356a6b2ebb'
 RAW_PREFIX='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/'
 PUBLIC_PREFIX='evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/'
 CAND='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520'

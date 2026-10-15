@@ -4,11 +4,11 @@ FEATURE_ID=P2_RETAINED_RECOVERY. No host operation, private-plan check or admiss
 import ast,hashlib,json,os,pathlib,re,resource,shutil,signal,stat,subprocess,sys,tempfile,time,types,unittest
 
 PINS_BOUND=True
-PUBLIC_INPUTS_SHA='664cd15cb3797d1c0ad3b42d958bde42dcc9ac17b78aacc70681eb00959fbe4c'
+PUBLIC_INPUTS_SHA='7b30430d9ff77c1b72a4abb074c02144c552d985ca65c583b5f2e1db9fbb2d5b'
 EXPECTED_PREPARATION_COUNT=189
 EXPECTED_DELIVERY_COUNT=84
-DELIVERY_PUBLICATION_BOUND=False
-DELIVERY_SOURCE_COMMIT=None
+DELIVERY_PUBLICATION_BOUND=True
+DELIVERY_SOURCE_COMMIT='c9fe40be1e44d4e41ca741e80ea257356a6b2ebb'
 PREP_PREFIX='evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/'
 DELIVERY_PREFIX='evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/'
 CI_PREFIX='evidence/p2-epoch7-access-repair-20261014/preparation-fresh-r7-ci/'

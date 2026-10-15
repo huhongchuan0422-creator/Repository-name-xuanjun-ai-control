@@ -21,13 +21,13 @@ def completed_result():
 
 class ContractTests(unittest.TestCase):
     def test_r6_contracts_publication_and_genuine_observation_bound(self):
-        self.assertIs(m.PINS_BOUND,False)
-        self.assertIsNone(m.PUBLICATION_COMMIT)
+        self.assertIs(m.PINS_BOUND,True)
+        self.assertEqual(m.PUBLICATION_COMMIT,'c9fe40be1e44d4e41ca741e80ea257356a6b2ebb')
         self.assertEqual(m.PUBLIC_PREFIX,'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/')
         self.assertEqual(m.PREP_ROOT,m.CAND+'/epoch7-preparation-candidate-r7-fresh')
         self.assertEqual(m.OBSERVATION_PATH,m.CAND+'/epoch7-observation-8df3b22b3762070f.private.json')
         self.assertEqual(m.OBSERVATION_SHA256,'a3f7042a1b3099c5699aaef547b22c8f744f0bdc514043a2a91a9847639f4f68')
-        with self.assertRaisesRegex(m.Hold,'UNBOUND'):m.bound()
+        m.bound()
 
     def test_different_valid_observation_binding_refuses_before_host_or_download(self):
         rows=((m.CAND+'/epoch7-observation-'+'1'*16+'.private.json',m.OBSERVATION_SHA256),

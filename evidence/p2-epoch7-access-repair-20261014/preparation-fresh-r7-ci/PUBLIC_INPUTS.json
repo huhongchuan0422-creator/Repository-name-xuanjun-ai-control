@@ -1,8 +1,8 @@
 {
   "delivery_expected_tests": 84,
   "delivery_readiness": {
-    "publication_bound": false,
-    "source_commit": null
+    "publication_bound": true,
+    "source_commit": "c9fe40be1e44d4e41ca741e80ea257356a6b2ebb"
   },
   "delivery_test_modules": [
     "test_epoch7_prepare_delivery",
@@ -44,8 +44,8 @@
       "target": "r7-fresh-preparation-delivery-candidate/README.md"
     },
     "evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/epoch7_prepare_delivery.py": {
-      "sha256": "564054d47f37ebf91002953d70a4dc8cf0887adabf4ecb22e82d7f1ab41b81a4",
-      "size": 27384,
+      "sha256": "087df34edd0e2568870ced2c53c9bb0c28ae900d0a4bf7ec8642d8db80a30313",
+      "size": 27421,
       "target": "r7-fresh-preparation-delivery-candidate/epoch7_prepare_delivery.py"
     },
     "evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/run_local_tests.py": {
@@ -59,8 +59,8 @@
       "target": "r7-fresh-preparation-delivery-candidate/test_epoch7_prepare_bootstrap_binding.py"
     },
     "evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/test_epoch7_prepare_delivery.py": {
-      "sha256": "27dece925a4aa3335c6f598c3c8ea0cb6a9b62c09a2fffd7d2052f8aebcf7070",
-      "size": 25801,
+      "sha256": "13f4cb0a85ee6a096a0f0a85026ad34d0f5288154f6ab56014bec52b2d405314",
+      "size": 25796,
       "target": "r7-fresh-preparation-delivery-candidate/test_epoch7_prepare_delivery.py"
     },
     "evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/test_epoch7_prepare_delivery_projection.py": {
