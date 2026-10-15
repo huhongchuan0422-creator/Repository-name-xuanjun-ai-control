@@ -73,7 +73,7 @@ export async function loadDashboard(fetcher,token,now=Math.floor(Date.now()/1000
 }
 export async function offlineAction(fetcher,token,operation,params,now=Math.floor(Date.now()/1000)){
  if(typeof token!=="string"||token.length<32)throw Error("TOKEN_REQUIRED");
- if(!["quote","order_prepare"].includes(operation))throw Error("OPERATION_NOT_ALLOWED");
+ if(!["quote","order_prepare","renewal_plan"].includes(operation))throw Error("OPERATION_NOT_ALLOWED");
  const response=await fetcher("/offline/saas",{method:"POST",
   headers:{"Content-Type":"application/json","X-Offline-Token":token},
   body:JSON.stringify({operation,params,at:now})});
@@ -93,6 +93,20 @@ if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
     document.getElementById("quoteDetails").textContent=JSON.stringify({quote_id:currentQuoteId,amounts_by_cycle:q.totals_by_cycle,settlement_authorized:false},null,2);
     status.textContent="离线报价已冻结；未发生真实支付。";
   }catch{currentQuoteId=null;status.textContent="离线报价失败；请检查方案和权限。";}
+ });
+ document.getElementById("previewRenewal")?.addEventListener("click",async()=>{
+  const status=document.getElementById("requestState");
+  try{
+   const orderId=document.getElementById("renewalOrderId").value.trim();
+   const until=Number(document.getElementById("previousExpiry").value);
+   if(!Number.isSafeInteger(until)||until<0)throw Error("BAD_TIME");
+   const view=await offlineAction(fetch,document.getElementById("offlineToken").value,"renewal_plan",{order_id:orderId,valid_until:until});
+   document.getElementById("renewalDetails").textContent=JSON.stringify({
+     start:view.proposed_valid_from,end:view.proposed_valid_until,
+     no_auto_renewal:!view.automatic_renewal_authorized,
+     needs_approval:view.needs_entitlement_approval},null,2);
+   status.textContent="续费仅供审阅，不执行扣款。";
+  }catch{status.textContent="续费规划不可用：需要有效订单和经核验的确认凭证。";}
  });
  document.getElementById("prepareOrder")?.addEventListener("click",async()=>{
   const status=document.getElementById("requestState");
