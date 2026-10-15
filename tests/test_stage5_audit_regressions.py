@@ -2,6 +2,7 @@
 import sqlite3
 import tempfile
 import os
+import json
 from unittest.mock import patch
 import unittest
 from scripts.community_saas_modules import connect,set_price,grant
@@ -178,4 +179,71 @@ class FullScopeAuditProbes(unittest.TestCase):
     self.ready()
     att=make_test_attestation(plan_finance_claim(self.orders,"ord","tenantA"),"proof",20,KEY)
     self.assertFalse(inspect_test_attestation(self.orders,"ord","tenantA",att,KEY,30)["production_eligible"])
+ def test_r1_secondary_unique_replace_rejected(self):
+    self.ready()
+    previous=self.orders.execute("SELECT order_id,snapshot FROM saas_order_preparations").fetchall()
+    with self.assertRaises(sqlite3.IntegrityError):
+        self.orders.execute("""INSERT OR REPLACE INTO saas_order_preparations
+            SELECT 'replacement_order',tenant_id,quote_id,currency,created_at,snapshot
+            FROM saas_order_preparations WHERE order_id='ord'""")
+    self.assertEqual(self.orders.execute("SELECT order_id,snapshot FROM saas_order_preparations").fetchall(),previous)
+ def test_r1_review_task_id_cannot_change(self):
+    self.ready()
+    create_review(self.orders,"task","tenantA","ord","FINANCE_EVIDENCE",21,"reason")
+    with self.assertRaises(sqlite3.IntegrityError):
+        self.orders.execute("UPDATE saas_review_tasks SET task_id='changed',state='RESOLVED' WHERE task_id='task'")
+    self.assertEqual(self.orders.execute("SELECT task_id,state FROM saas_review_tasks").fetchall(),[("task","PENDING")])
+ def test_r1_mismatched_order_snapshot_rejected(self):
+    self.ready()
+    row=self.orders.execute("SELECT tenant_id,quote_id,currency,created_at,snapshot FROM saas_order_preparations").fetchone()
+    self.orders.execute("DELETE FROM saas_order_preparations WHERE 0")
+    fake=json.loads(row[4])
+    # Invalid preexisting record fixture, not an application write path.
+    self.orders.execute("INSERT INTO saas_order_preparations VALUES(?,?,?,?,?,?)",
+                        ("different",*row[:4],json.dumps(fake)))
+    with self.assertRaisesRegex(ValueError,"ORDER_SNAPSHOT_BINDING_MISMATCH"):
+        from scripts.community_saas_order_preparation import read
+        read(self.orders,"different","tenantA")
+ def test_r2_catalog_approved_line_immutable(self):
+    create_offer(self.base,"offer",1,"storefront_catalog","MONTHLY",[price()],term_days=30)
+    approve_offer(self.base,"offer",1,"approval","cost",10)
+    count=self.base.execute("SELECT COUNT(*) FROM saas_offer_lines").fetchone()[0]
+    with self.assertRaises(sqlite3.IntegrityError):
+        self.base.execute("INSERT INTO saas_offer_lines VALUES('offer',1,2,'AGENCY_FEE','new','MONTH',1,900,180,NULL,NULL)")
+    self.assertEqual(self.base.execute("SELECT COUNT(*) FROM saas_offer_lines").fetchone()[0],count)
+ def test_r2_cannot_move_draft_component_to_effective(self):
+    o=open_offer_store();costs=open_cost_store()
+    try:
+        for oid in ("draft","published"):
+            register_offer(o,oid,"storefront_catalog","MONTHLY",1,30,True,"term","basis")
+            add_component(o,oid,"charge","MODULE_LICENSE","MONTHLY",100,20,"pricebook")
+        save_cost(costs,"published","charge","VERIFIED_ACTUAL",10,1,"invoice","MONTHLY")
+        for state in ("PREVIEW","APPROVED","EFFECTIVE"):
+            change_offer_status(o,"published",state,costs)
+        with self.assertRaises(sqlite3.IntegrityError):
+            o.execute("UPDATE components SET offer_id='published' WHERE offer_id='draft'")
+        self.assertEqual(o.execute("SELECT offer_id FROM components WHERE offer_id='draft'").fetchone()[0],"draft")
+    finally:o.close();costs.close()
+ def test_r5_corrupt_projection_advance_does_not_commit(self):
+    self.ready()
+    advance(self.orders,"ord","tenantA","ev1","AWAITING_EXTERNAL",21)
+    self.orders.execute("DELETE FROM saas_order_lifecycle WHERE order_id='ord'")
+    self.orders.commit()
+    before=self.orders.execute("SELECT COUNT(*) FROM saas_order_lifecycle_events").fetchone()[0]
+    with self.assertRaisesRegex(ValueError,"LIFECYCLE"):
+        advance(self.orders,"ord","tenantA","ev2","CANCELLED",22)
+    self.assertEqual(self.orders.execute("SELECT COUNT(*) FROM saas_order_lifecycle_events").fetchone()[0],before)
+    self.assertEqual(self.orders.execute("SELECT COUNT(*) FROM saas_order_lifecycle").fetchone()[0],0)
+ def test_r5_null_confirmation_proof_held(self):
+    self.ready()
+    advance(self.orders,"ord","tenantA","ev1","AWAITING_EXTERNAL",21)
+    advance(self.orders,"ord","tenantA","ev2","CONFIRMATION_UNKNOWN",22)
+    # Fault injection via direct SQLite; public advance must never permit this.
+    self.orders.execute("INSERT INTO saas_order_lifecycle_events VALUES('ev3','ord','CONFIRMATION_UNKNOWN','CONFIRMED_EXTERNAL',NULL,23)")
+    self.orders.execute("UPDATE saas_order_lifecycle SET state='CONFIRMED_EXTERNAL',proof_ref=NULL,updated_at=23 WHERE order_id='ord'")
+    self.orders.commit()
+    self.assertEqual(recovery_check(self.orders,"tenantA")["integrity_hold"],["ord"])
+    with self.assertRaisesRegex(ValueError,"LIFECYCLE_EVENT_INCONSISTENT"):
+        from scripts.community_saas_order_preparation import entitlement_intent
+        entitlement_intent(self.orders,"ord","tenantA",24)
 if __name__=="__main__":unittest.main()
