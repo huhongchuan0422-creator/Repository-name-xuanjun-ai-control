@@ -29,7 +29,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - run: python -m pip install 'playwright==1.55.0'
+      - run: python -m playwright install --with-deps chromium
       - run: python -m unittest tests/test_pr122_website_release.py -v
+      - run: python -m unittest tests/test_pr122_csp_browser.py -v
       - run: node --test tests/test_pr122_tiktok_integration.mjs
       - run: python -m py_compile scripts/pr122_build_website_candidate.py scripts/pr122_website_release.py
       - run: bash -n deploy/pr122-domestic-website/tls/*.sh

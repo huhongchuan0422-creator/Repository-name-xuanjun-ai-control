@@ -15,10 +15,19 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 77
 fi
 
-# The HTTP bootstrap server and DNS routing to this host must be independently
-# proven before this command is authorized. This script is not run by CI.
-exec certbot certonly --webroot \
+# Apex DNS remains on Tokyo. A separately reviewed Tokyo location must forward
+# only this challenge prefix to Domestic before authorization. Never switch DNS
+# or expose the rest of the bootstrap server to obtain the certificate.
+CERTBOT=/usr/local/bin/certbot
+[[ -x "$CERTBOT" ]] || { echo "HOLD: proven Domestic certbot path missing" >&2; exit 78; }
+[[ "$("$CERTBOT" --version 2>&1)" == "certbot 5.8.0" ]] || {
+  echo "HOLD: certbot version drift" >&2; exit 78;
+}
+exec "$CERTBOT" certonly --webroot \
   --webroot-path /var/www/letsencrypt \
+  --config-dir /etc/letsencrypt \
+  --work-dir /var/lib/letsencrypt \
+  --logs-dir /var/log/letsencrypt \
   --cert-name wenwenwenyiyiyi.work \
   --domain wenwenwenyiyiyi.work \
   --key-type ecdsa \

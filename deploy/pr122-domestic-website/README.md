@@ -25,15 +25,22 @@ server blocks or certificates.
 ## Candidate sequence (not executed)
 
 1. Independently verify the delta bundle and pinned source archive hashes.
-2. Run `bin/pr122_website_release.py prepare` as root under the approved Release
-   Gate. It validates archive identity/member types, overlay baseline, and the
-   complete post-overlay manifest before installing an immutable release.
+2. Run `bin/pr122_website_release.py prepare` only under a later Gate. Private
+   staging remains 0700; the final release is root-owned directories 0755 and
+   files 0644. The receipt embeds the trusted Manifest and binds the source,
+   source pin and package hashes. It also generates the exact inline CSP hash
+   include under `current/release-metadata`.
 3. Install the exact apex HTTP bootstrap only after config conflict review;
    run `nginx -t`; do not reload without the Gate.
-4. After ACME routing is proven, run `issue-apex-certificate.sh` with its exact
+4. Apex DNS remains on Tokyo. The separate Tokyo candidate forwards only the
+   ACME challenge prefix to Domestic. Domestic reuses proven
+   `/usr/local/bin/certbot` 5.8.0; no PATH assumption or DNS cutover is used.
+   After both-host routing is proven, run `issue-apex-certificate.sh` with its exact
    approval argument. Install the apex HTTPS and isolated renewal candidates;
    verify `nginx -t`, SAN/chain, renewal dry-run and existing winctl health.
-5. Run `activate`, then `check`. DNS remains unchanged until independent
+5. Run `activate`, then `check`. A durable activation intent precedes pointer
+   replacement; after interruption use only `reconcile`, never blind retry.
+   DNS remains unchanged until independent
    review and a separate Owner-approved cutover.
 6. Use `rollback` only for the exact transaction. Pointer identity drift or an
    unknown result stops without blind retry.
@@ -41,6 +48,10 @@ server blocks or certificates.
 Every failure, timeout, partial state or unknown state is `HOLD`. A prepared
 release is not an active release; an active release is not a production
 deployment; and an Nginx syntax pass is not DNS/TLS/business acceptance.
+`cutover-gate.json` remains HOLD while any dynamic route is unresolved.
+`production-action-contract.json` defines the cross-object backup/rollback
+order, and `PRODUCTION_EXECUTION.lock` intentionally prevents treating this
+offline package as an executable installer.
 
 ## Explicitly incomplete
 
