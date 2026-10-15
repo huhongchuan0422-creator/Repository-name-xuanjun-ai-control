@@ -323,3 +323,29 @@ DNS两台公共解析一致：A=47.245.53.152，AAAA应答为空，NS=celine.ns.
 IP初步分类：入口client_address用于日志；入口X-Forwarded-Proto用于Origin构造；secure_secrets_portal可读历史代码限流按session/form计数；交易模块ip_whitelist描述外部交易所密钥IP限制，不能据词匹配判断受本次域名入口影响。完整转移调用链、外围WAF与日志使用方仍UNKNOWN。Owner未接受临时审计差异。
 
 终态：DNS_RELEASE=HOLD；DYNAMIC_ACCEPTANCE=NOT_PASS（旧HEAD错误路径异常待处理/裁定）；东京退役HOLD；Work官网未改。夜间续接仅增量处理上述证据，禁止反复重跑已通过检查或自批准生产。
+
+
+### 9.11 2026-10-16 02:30 CST：权威DNS、精确日志函数及安全GET增量
+
+本节仅补缺口，不重复9.10的44次HEAD、既有静态115/83/45检查。准确探针提交 `c2caa95967fbc8f51129cec064ce5c4358066b1a`；Run [38785334400](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38785334400)，国内Job116595748814、东京Job116595748929均SUCCESS。成功仅表示取证执行完成。
+
+**DNS原资料复用与实时权威核对：**
+重新读取原已核验回执[6184420192](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/122#issuecomment-6184420192)，没有要求Owner重新提供资料。原Cloudflare导出SHA256 `531bc71f3d5eff6cb7ad5c7e6aea3912578a8a91ff8ade740ef2e40d2e7eb771`，导出标注2026-10-15 04:27:26（未声明时区）。当时12条清单已经通过；A/CNAME的cf-proxied:false、TTL字段1均已有**历史**证据。9.10缺口应理解为“切换前当前管理面状态未重验”，不得误写为从未提供过代理/TTL资料。
+两台Runner分别直接查询celine.ns.cloudflare.com和chris.ns.cloudflare.com：
+- A：均NOERROR、AA、47.245.53.152、权威应答TTL300。
+- AAAA：均NOERROR、AA、ANSWER0及SOA，serial2417364535、negative TTL1800。关闭“只有递归空答复”的证据缺口；不等于管理面记录枚举已完成。
+- 原导出TTL字段1、权威TTL300和此前递归TTL10分别保存，不混为同一字段。
+- 原apex回滚基线可绑定：A/47.245.53.152、历史proxied:false、历史导出TTL1；待发布时必须通过已授权管理面核对该单条当前值/记录身份/代理和TTL。目标只改apex至47.101.152.210，禁止重新导入区域或改其他11条。此处是回滚基线，未执行DNS修改，也没有获得当前Cloudflare账户控制权。
+
+**旧HEAD日志异常的精确源码复现：**
+在东京读取哈希仍为528a3b5b…b5006的生产入口，用AST仅提取PortalHandler.log_message，独立命名空间执行其精确函数；没有import生产程序、数据库或执行启动代码。
+字符串格式请求日志正常；标准错误日志混合%d/%s输入抛TypeError。它将数值参数也替换为[REDACTED]，因此%d失配。此前只验证最小表达式，本次已验证实际函数。结合直连HEAD断开/GET200，旧错误日志缺陷证据进一步收敛。未读取生产异常栈、未修复或重启旧服务；任何修复仍需准确最小补丁、回归和增量审核，不能把它说成国内反代新引入的问题。
+
+**安全GET拒绝：**
+两台分别请求/submit/douyin、/submit/tiktok、/integrations/tiktok/disconnect及固定非法/integrations/tiktok/pr122-invalid-readonly；每条baseline及wrong_origin_and_source共16请求，全部404、无Set-Cookie。前三条两地正文SHA一致；非法路径的404错误页字节两地不同，未标内容等价。错误Origin/XFF/XRealIP/XFP组合没有把这些GET变为成功，但不证明POST的CSRF/认证，也不单独证明上游收到的具体头。未访问/p/会话、OAuth start/callback GET、真实状态或任何POST写请求。
+
+**IP调用链证据的真实范围：**
+东京从入口递归解析本地import模块，取得42个模块哈希、import关系和IP/动态解析位置；read_error0、未触及250上限。入口client_address仅在log_message，X-Forwarded-Proto在_origin；portal限流命中_validate_submit_session。发现database/repositories/__init__.py和database/models/__init__.py的__getattr__/__import__懒加载，静态import递归尚未展开这些分支，因此不能声称完整闭包通过。外部cryptography/SQLAlchemy及标准库也未被此静态扫描审核。
+下一可自主动作是按实际入口使用的符号解析上述懒加载映射及其本地目标，继续只读AST/哈希，不执行生产import、不查询数据库或读取凭据。外围WAF、日志使用方及Owner临时IP审计差异接受仍缺证据。
+
+截至本节：DNS_RELEASE=HOLD；动态鉴权/真实业务写验收仍NOT_TESTED；东京退役HOLD；原生产配置制品312efdd3及官网/current未改。等待独立审核只消费增量，不能将探针提交或CI SUCCESS当生产批准。
