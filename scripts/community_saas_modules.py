@@ -6,6 +6,7 @@ All money values are quoted configuration; no transaction is settled here.
 """
 import sqlite3
 import re
+from scripts.community_saas_schema_guard import verify,transactional_install
 from scripts.community_merchant_contract import valid_id
 
 MODULES = {
@@ -58,18 +59,18 @@ def connect(path=":memory:"):
  try:
   db.execute("PRAGMA foreign_keys=ON")
   actual=db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
-  if actual:
-   expected={"module_prices","module_entitlements","module_events"}
-   # Compatible with the additive multi-Offer extension; legacy DBs stay valid.
-   offer_tables={"saas_offer_versions","saas_offer_lines","saas_quotes"}
-   actual_names={row[0] for row in actual}
-   allowed=(actual_names==expected or actual_names==expected|offer_tables)
-   if not allowed or db.execute("PRAGMA user_version").fetchone()[0]!=1:
-    raise ValueError("UNRECOGNIZED_MODULE_DATABASE")
+  expected={"module_prices","module_entitlements","module_events"}
+  offer_tables={"saas_offer_versions","saas_offer_lines","saas_quotes"}
+  names={row[0] for row in actual}
+  if names==expected:
+   verify(db,SCHEMA,expected)
+  elif names==expected|offer_tables:
+   from scripts.community_saas_offer_catalog import SCHEMA as OFFER_SCHEMA
+   verify(db,SCHEMA,expected|offer_tables,extra_schema=OFFER_SCHEMA)
+  elif not names and db.execute("PRAGMA user_version").fetchone()[0]==0:
+   transactional_install(db,SCHEMA,lambda:verify(db,SCHEMA,expected))
   else:
-   if db.execute("PRAGMA user_version").fetchone()[0]!=0:
-    raise ValueError("UNRECOGNIZED_MODULE_DATABASE")
-   db.executescript("BEGIN IMMEDIATE;"+SCHEMA+"PRAGMA user_version=1;COMMIT;")
+   raise ValueError("UNRECOGNIZED_MODULE_DATABASE")
   return db
  except BaseException:
   db.close()
