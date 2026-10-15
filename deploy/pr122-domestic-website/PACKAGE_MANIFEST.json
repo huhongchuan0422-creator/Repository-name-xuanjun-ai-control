@@ -7,8 +7,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "ba65aefc141183cea625c59105370f00f8ea5641c1be3ec048b51f4ac4426944",
-      "size": 4560
+      "sha256": "98774ec6e0a7363adb3e69fc149eeb6be4412e4dfcb1a94e84782f1bfce67ca5",
+      "size": 5028
     },
     {
       "path": "candidate-manifest.json",
@@ -87,8 +87,8 @@
     },
     {
       "path": "bin/pr122_website_release.py",
-      "sha256": "046fa34e26a4a9917ceaf39587a0ac8d978369f19a58a5f5c441c07517a09d5c",
-      "size": 35713
+      "sha256": "36196cce687cbf959fad4bf36d6d80b241de28d1e410dfb0325f1c5396c25fd0",
+      "size": 41004
     }
   ],
   "schema_version": 1

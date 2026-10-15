@@ -39,6 +39,21 @@ class ReleaseTest(unittest.TestCase):
                     approved_package_manifest_sha256=self.package_hash)
         values.update(kw); return SimpleNamespace(**values)
     def prepared(self): return release.prepare(self.args())
+    def existing_old(self,with_metadata=False):
+        old=self.base/"releases/old"; public=old/"public"; public.mkdir(parents=True); (public/"index.html").write_text("old")
+        if with_metadata:
+            metadata=old/"release-metadata"; metadata.mkdir()
+            policy="default-src 'self'"
+            (metadata/"inline-csp.json").write_text(json.dumps({"schema_version":1,"html_count":1,"script_hashes":[],"style_hashes":[],"policy":policy}))
+            (metadata/"inline-csp.conf").write_text('add_header Content-Security-Policy "'+policy+'" always;\n')
+        for path in [self.base,self.base/"releases",old,*[p for p in old.rglob("*") if p.is_dir()]]: os.chmod(path,0o755)
+        for path in [p for p in old.rglob("*") if p.is_file()]: os.chmod(path,0o644)
+        (self.base/"current").symlink_to(old)
+        return old
+    def rollback_with_failed_final_receipt(self):
+        real=release.atomic_json
+        with mock.patch.object(release,"atomic_json",side_effect=lambda p,v: (_ for _ in ()).throw(OSError("injected")) if v.get("state")=="ROLLED_BACK" else real(p,v)):
+            with self.assertRaisesRegex(OSError,"injected"): release.rollback(self.args())
 
     def test_w1_sealed_release_is_worker_readable_and_not_worker_writable(self):
         self.prepared(); tree=self.base/"releases/release-1"
@@ -186,14 +201,69 @@ class ReleaseTest(unittest.TestCase):
         self.assertFalse((self.base/"current").exists())
         self.assertEqual(release.reconcile(self.args())["state"],"ROLLED_BACK")
     def test_rw3_interrupted_previous_rollback_reconciles_final_state(self):
-        old=self.base/"releases/old/public"; old.mkdir(parents=True); (old/"index.html").write_text("old")
-        for p in (self.base,self.base/"releases",self.base/"releases/old",old): os.chmod(p,0o755)
-        os.chmod(old/"index.html",0o644); (self.base/"current").symlink_to(self.base/"releases/old")
-        self.prepared(); release.activate(self.args()); real=release.atomic_json
-        with mock.patch.object(release,"atomic_json",side_effect=lambda p,v: (_ for _ in ()).throw(OSError("injected")) if v.get("state")=="ROLLED_BACK" else real(p,v)):
-            with self.assertRaisesRegex(OSError,"injected"): release.rollback(self.args())
+        self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
         self.assertEqual(release.reconcile(self.args())["state"],"ROLLED_BACK")
         self.assertEqual((self.base/"current").resolve(),(self.base/"releases/old").resolve())
+    def test_rw3_reconcile_rejects_damaged_restored_previous_content(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
+        (old/"public/index.html").write_text("damaged")
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_FINAL_STATE_UNPROVEN:RELEASE_CONTENT_MISMATCH"):
+            release.reconcile(self.args())
+        receipt=json.loads((self.base/"transactions/tx-1.json").read_text())
+        self.assertEqual(receipt["state"],"UNKNOWN_AFTER_ROLLBACK"); self.assertTrue((self.base/"current").is_symlink())
+    def test_rw3_reconcile_rejects_missing_restored_previous_release(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
+        moved=self.root/"old-moved"; old.rename(moved)
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_FINAL_STATE_UNPROVEN:PREVIOUS_RELEASE_MISSING"):
+            release.reconcile(self.args())
+        self.assertTrue((self.base/"current").is_symlink()); self.assertTrue(moved.is_dir())
+    def test_rw3_reconcile_allows_damaged_retired_target_when_previous_is_proved(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
+        target=self.base/"releases/release-1/public/assets/tiktok-integration.js"; target.write_text("damaged")
+        result=release.reconcile(self.args())
+        self.assertEqual(result["state"],"ROLLED_BACK"); self.assertIn("RELEASE_CONTENT_MISMATCH",result["target_residual_failure"])
+        self.assertTrue(target.exists()); self.assertEqual((self.base/"current").resolve(),old.resolve())
+    def test_rw3_rollback_rejects_previous_damage_before_pointer_change(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); (old/"public/index.html").write_text("damaged")
+        with self.assertRaisesRegex(release.Hold,"RELEASE_CONTENT_MISMATCH"): release.rollback(self.args())
+        self.assertEqual(os.readlink(self.base/"current"),str(self.base/"releases/release-1"))
+    def test_rw3_reconcile_rejects_previous_root_identity_drift(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt(); os.chmod(old,0o777)
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_FINAL_STATE_UNPROVEN:PREVIOUS_RELEASE_ENVELOPE_DRIFT"):
+            release.reconcile(self.args())
+    def test_rw3_reconcile_rejects_previous_public_identity_drift(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt(); os.chmod(old/"public",0o777)
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_FINAL_STATE_UNPROVEN:PREVIOUS_RELEASE_ENVELOPE_DRIFT"):
+            release.reconcile(self.args())
+    def test_rw3_reconcile_rejects_previous_csp_drift(self):
+        old=self.existing_old(with_metadata=True); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
+        (old/"release-metadata/inline-csp.conf").write_text("bad\n")
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_FINAL_STATE_UNPROVEN:PREVIOUS_RELEASE_ENVELOPE_DRIFT"):
+            release.reconcile(self.args())
+    def test_rw3_reconcile_rejects_same_text_current_pointer_replacement(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); self.rollback_with_failed_final_receipt()
+        current=self.base/"current"; current.unlink(); current.symlink_to(old)
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_FINAL_STATE_UNPROVEN:ROLLBACK_POINTER_IDENTITY_DRIFT"):
+            release.reconcile(self.args())
+        self.assertTrue(current.is_symlink()); self.assertEqual(os.readlink(current),str(old))
+    def test_rw3_post_switch_identity_receipt_failure_stays_unknown(self):
+        old=self.existing_old(); self.prepared(); release.activate(self.args()); real=release.atomic_json
+        def fail_post_switch(path,value):
+            if value.get("last_stage")=="ROLLBACK_POINTER_SWITCHED": raise OSError("injected-post-switch")
+            return real(path,value)
+        with mock.patch.object(release,"atomic_json",side_effect=fail_post_switch):
+            with self.assertRaisesRegex(OSError,"injected-post-switch"): release.rollback(self.args())
+        self.assertEqual((self.base/"current").resolve(),old.resolve())
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_FINAL_STATE_UNPROVEN:ROLLBACK_POINTER_IDENTITY_DRIFT"):
+            release.reconcile(self.args())
+        receipt=json.loads((self.base/"transactions/tx-1.json").read_text())
+        self.assertEqual(receipt["state"],"UNKNOWN_AFTER_ROLLBACK"); self.assertTrue(old.exists())
+    def test_rw3_unknown_rollback_temp_is_preserved(self):
+        self.existing_old(); self.prepared(); release.activate(self.args()); path=self.base/"transactions/tx-1.json"; r=json.loads(path.read_text())
+        tmp=self.base/".rollback-tx-1"; r.update(state="ROLLBACK_INTENT",rollback_temp=str(tmp)); path.write_text(json.dumps(r))
+        unknown=self.base/"releases/unknown"; unknown.mkdir(); tmp.symlink_to(unknown)
+        with self.assertRaisesRegex(release.Hold,"ROLLBACK_RECONCILIATION_AMBIGUOUS"): release.reconcile(self.args())
+        self.assertTrue(tmp.is_symlink()); self.assertEqual(tmp.resolve(),unknown.resolve())
     def test_rw3_owned_activation_temp_is_cleaned_without_switch(self):
         self.prepared(); path=self.base/"transactions/tx-1.json"; r=json.loads(path.read_text()); target=self.base/"releases/release-1"
         tmp=self.base/".current-tx-1"; r.update(state="ACTIVATION_INTENT",previous_current=None,activation_temp=str(tmp)); path.write_text(json.dumps(r)); tmp.symlink_to(target)

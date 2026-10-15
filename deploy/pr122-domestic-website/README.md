@@ -52,7 +52,13 @@ server blocks or certificates.
    DNS remains unchanged until independent
    review and a separate Owner-approved cutover.
 6. Use `rollback` only for the exact transaction. Pointer identity drift or an
-   unknown result stops without blind retry.
+   unknown result stops without blind retry. Activation intent freezes the
+   prior release path, manifest, root/public identity, and explicit
+   CSP/metadata present-or-absent state. Rollback and rollback reconciliation
+   revalidate that prior release plus the exact prepared rollback-pointer
+   identity before reporting completion. Damage to the retired new release is
+   retained as residual evidence and never blocks proof of a healthy restored
+   prior release; no release object is deleted automatically.
 
 Every failure, timeout or partial state is `HOLD`; an unavailable bounded
 failure receipt or an interrupted result is `UNKNOWN`. Neither state permits

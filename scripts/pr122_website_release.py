@@ -401,14 +401,15 @@ def prepare(args,deadline=None):
     finally:
         if ctx: ctx.__exit__(None,None,None)
 
-def receipt_for(args,states,deadline,verify_release=True,verify_envelope=True):
+def receipt_for(args,states,deadline,verify_release=True,verify_envelope=True,verify_target_identity=True):
     base,uid=preflight(args,False); transactions=base/"transactions"; secure_dir(transactions,0o700,uid,False)
     path=transactions/(args.transaction_id+".json"); receipt=load_json(path,deadline)
     if receipt.get("schema_version")!=2 or receipt.get("transaction_id")!=args.transaction_id or receipt.get("release_id")!=args.release_id:
         raise Hold("RECEIPT_IDENTITY_MISMATCH")
     if receipt.get("state") not in states: raise Hold("TRANSACTION_STATE_NOT_ELIGIBLE")
     release=base/"releases"/args.release_id
-    if release.is_symlink() or str(release)!=receipt.get("release") or not release.is_dir(): raise Hold("PREPARED_RELEASE_IDENTITY_DRIFT")
+    if str(release)!=receipt.get("release"): raise Hold("PREPARED_RELEASE_IDENTITY_DRIFT")
+    if verify_target_identity and (release.is_symlink() or not release.is_dir()): raise Hold("PREPARED_RELEASE_IDENTITY_DRIFT")
     if verify_envelope: verify_release_envelope(base,release,receipt,uid,deadline)
     if verify_release: verify_tree(release/"public",receipt["trusted_manifest"],deadline,uid)
     if args.bundle:
@@ -424,6 +425,50 @@ def snapshot(public,deadline):
         if path.is_file() and not path.is_symlink(): files.append({"path":path.relative_to(public).as_posix(),"size":path.stat().st_size,"sha256":digest(path,deadline)})
     return {"schema_version":2,"files":files}
 
+def capture_previous_envelope(base,release,uid,deadline):
+    metadata=release/"release-metadata"
+    if metadata.exists() or metadata.is_symlink():
+        return {"metadata_state":"PRESENT","objects":capture_release_envelope(base,release,uid,deadline)}
+    paths={"base":base,"releases":base/"releases","release":release,"public":release/"public"}
+    return {"metadata_state":"ABSENT","objects":{
+        name:identity(path,"directory",0o755,uid,deadline) for name,path in paths.items()
+    }}
+
+def verify_previous_release(base,previous,uid,deadline):
+    if not isinstance(previous,dict) or not isinstance(previous.get("link"),str):
+        raise Hold("PREVIOUS_RELEASE_EVIDENCE_MISSING")
+    raw=previous.get("release")
+    if not isinstance(raw,str): raise Hold("PREVIOUS_RELEASE_EVIDENCE_MISSING")
+    old=Path(raw)
+    releases=base/"releases"
+    if not old.is_absolute() or old.parent!=releases or old.name in ("",".",".."):
+        raise Hold("PREVIOUS_RELEASE_PATH_INVALID")
+    if old.is_symlink() or not old.is_dir(): raise Hold("PREVIOUS_RELEASE_MISSING")
+    wanted=previous.get("release_envelope")
+    if not isinstance(wanted,dict) or wanted.get("metadata_state") not in {"PRESENT","ABSENT"}:
+        raise Hold("PREVIOUS_RELEASE_ENVELOPE_MISSING")
+    try: actual=capture_previous_envelope(base,old,uid,deadline)
+    except Hold as error:
+        if str(error).startswith("OVERALL_DEADLINE_EXCEEDED"): raise
+        raise Hold("PREVIOUS_RELEASE_ENVELOPE_DRIFT:"+str(error)) from error
+    if actual!=wanted: raise Hold("PREVIOUS_RELEASE_ENVELOPE_DRIFT")
+    manifest=previous.get("manifest")
+    if not isinstance(manifest,dict): raise Hold("PREVIOUS_RELEASE_MANIFEST_MISSING")
+    verify_tree(old/"public",manifest,deadline,uid)
+    return old
+
+def target_residual_failure(base,r,uid,deadline):
+    target=base/"releases"/r["release_id"]
+    try:
+        if str(target)!=r.get("release") or target.is_symlink() or not target.is_dir():
+            raise Hold("PREPARED_RELEASE_IDENTITY_DRIFT")
+        verify_release_envelope(base,target,r,uid,deadline)
+        verify_tree(target/"public",r["trusted_manifest"],deadline,uid)
+    except Hold as error:
+        if str(error).startswith("OVERALL_DEADLINE_EXCEEDED"): raise
+        return str(error)
+    return None
+
 def activate(args,deadline=None):
     own=deadline is None; ctx=Deadline(args.deadline_seconds) if own else None
     if ctx: deadline=ctx.__enter__()
@@ -432,10 +477,12 @@ def activate(args,deadline=None):
         if current.exists() and not current.is_symlink(): raise Hold("CURRENT_NOT_SYMLINK")
         previous=None
         if current.is_symlink():
+            if current.lstat().st_uid!=uid: raise Hold("PREVIOUS_POINTER_OWNER_MISMATCH")
             link=os.readlink(current); old=(base/link).resolve() if not Path(link).is_absolute() else Path(link).resolve()
             if old.parent!=(base/"releases").resolve() or old.is_symlink() or not old.is_dir(): raise Hold("PREVIOUS_POINTER_OUTSIDE_RELEASE_NAMESPACE")
             old_manifest=snapshot(old/"public",deadline); verify_tree(old/"public",old_manifest,deadline,uid)
-            previous={"link":link,"release":str(old),"manifest":old_manifest}
+            previous={"link":link,"release":str(old),"manifest":old_manifest,
+                      "release_envelope":capture_previous_envelope(base,old,uid,deadline)}
         tmp=base/(".current-"+args.transaction_id)
         r.update(state="ACTIVATION_INTENT",last_stage="ACTIVATION_INTENT_DURABLE",previous_current=previous,
                  target_current=str(target),activation_temp=str(tmp)); atomic_json(path,r)
@@ -452,11 +499,14 @@ def reconcile(args,deadline=None):
     own=deadline is None; ctx=Deadline(args.deadline_seconds) if own else None
     if ctx: deadline=ctx.__enter__()
     try:
-        base,r,path,uid=receipt_for(args,{"ACTIVATION_INTENT","UNKNOWN_AFTER_ACTIVATE","ROLLBACK_INTENT","ROLLBACK_PENDING","UNKNOWN_AFTER_ROLLBACK"},deadline,verify_envelope=False)
+        base,r,path,uid=receipt_for(args,{"ACTIVATION_INTENT","UNKNOWN_AFTER_ACTIVATE","ROLLBACK_INTENT","ROLLBACK_PENDING","UNKNOWN_AFTER_ROLLBACK"},deadline,
+                                    verify_release=False,verify_envelope=False,verify_target_identity=False)
         current=base/"current"; target=base/"releases"/args.release_id
         if r["state"] in {"ROLLBACK_INTENT","ROLLBACK_PENDING","UNKNOWN_AFTER_ROLLBACK"}:
             return reconcile_rollback(base,r,path,uid,deadline)
+        if target.is_symlink() or not target.is_dir(): raise Hold("PREPARED_RELEASE_IDENTITY_DRIFT")
         verify_release_envelope(base,target,r,uid,deadline)
+        verify_tree(target/"public",r["trusted_manifest"],deadline,uid)
         tmp=Path(r.get("activation_temp",base/(".current-"+args.transaction_id)))
         if tmp.exists() or tmp.is_symlink():
             if not tmp.is_symlink() or tmp.resolve()!=target.resolve():
@@ -499,24 +549,50 @@ def expected_rollback_observation(base,r):
     if previous is None: return None
     return previous["link"]
 
-def observe_pointer(current,target):
+def symlink_identity(path,uid):
+    if not path.is_symlink(): raise Hold("POINTER_NOT_SYMLINK")
+    info=path.lstat()
+    if info.st_uid!=uid: raise Hold("POINTER_OWNER_MISMATCH")
+    return {"device":info.st_dev,"inode":info.st_ino,"ctime_ns":info.st_ctime_ns,"uid":info.st_uid,"link":os.readlink(path)}
+
+def verify_symlink_identity(path,wanted,uid):
+    if not isinstance(wanted,dict) or symlink_identity(path,uid)!=wanted:
+        raise Hold("ROLLBACK_POINTER_IDENTITY_DRIFT")
+
+def same_symlink_object(observed,wanted):
+    keys=("device","inode","uid","link")
+    return isinstance(wanted,dict) and all(observed.get(key)==wanted.get(key) for key in keys)
+
+def observe_pointer(current,target,uid=None):
     if current.is_symlink():
-        if current.resolve()==target.resolve(): return "TARGET"
-        return os.readlink(current)
+        if uid is not None and current.lstat().st_uid!=uid: return "SYMLINK_OWNER_MISMATCH"
+        link=os.readlink(current)
+        if link==str(target): return "TARGET"
+        return link
     return None if not current.exists() else "NON_SYMLINK"
 
 def reconcile_rollback(base,r,path,uid,deadline):
     current=base/"current"; target=base/"releases"/r["release_id"]
-    observed=observe_pointer(current,target); expected=expected_rollback_observation(base,r)
+    observed=observe_pointer(current,target,uid); expected=expected_rollback_observation(base,r)
     tmp=Path(r.get("rollback_temp",base/(".rollback-"+r["transaction_id"])))
     if tmp.exists() or tmp.is_symlink():
         previous=r.get("previous_current")
-        if not previous or not tmp.is_symlink() or os.readlink(tmp)!=previous["link"]:
+        if not previous or not tmp.is_symlink() or tmp.lstat().st_uid!=uid or os.readlink(tmp)!=previous["link"]:
             r.update(state="UNKNOWN_AFTER_ROLLBACK",last_stage="ROLLBACK_TEMP_UNKNOWN",observed_current=observed); atomic_json(path,r)
             raise Hold("ROLLBACK_RECONCILIATION_AMBIGUOUS")
     if observed==expected:
+        try:
+            if r.get("previous_current") is not None:
+                verify_symlink_identity(current,r.get("rollback_pointer_identity"),uid)
+                verify_previous_release(base,r["previous_current"],uid,deadline)
+        except Hold as error:
+            r.update(state="UNKNOWN_AFTER_ROLLBACK",last_stage="ROLLBACK_FINAL_VALIDATION_FAILED",
+                     observed_current=observed,rollback_final_validation_failure=str(error)); atomic_json(path,r)
+            raise Hold("ROLLBACK_FINAL_STATE_UNPROVEN:"+str(error)) from error
+        residual=target_residual_failure(base,r,uid,deadline)
         if tmp.is_symlink(): tmp.unlink(); fsync_dir(base)
-        r.update(state="ROLLED_BACK",last_stage="ROLLBACK_RECONCILED_COMMITTED",reconciliation="EXPECTED_FINAL_PRESENT")
+        r.update(state="ROLLED_BACK",last_stage="ROLLBACK_RECONCILED_COMMITTED",reconciliation="EXPECTED_FINAL_PRESENT",
+                 target_residual_failure=residual)
         atomic_json(path,r); return r
     if observed=="TARGET":
         r.update(state="ROLLBACK_PENDING",last_stage="ROLLBACK_RECONCILED_NOT_APPLIED",reconciliation="TARGET_STILL_PRESENT")
@@ -529,30 +605,41 @@ def rollback(args,deadline=None):
     if ctx: deadline=ctx.__enter__()
     try:
         states={"ACTIVATED","CHECKED","CHECK_FAILED","UNKNOWN_AFTER_CHECK","ACTIVATION_INTENT","UNKNOWN_AFTER_ACTIVATE","ROLLBACK_INTENT","ROLLBACK_PENDING"}
-        base,r,path,uid=receipt_for(args,states,deadline,verify_release=False,verify_envelope=False); current=base/"current"; target=base/"releases"/args.release_id
+        base,r,path,uid=receipt_for(args,states,deadline,verify_release=False,verify_envelope=False,verify_target_identity=False); current=base/"current"; target=base/"releases"/args.release_id
         envelope_failure=None
-        try: verify_release_envelope(base,target,r,uid,deadline)
+        try:
+            if target.is_symlink() or not target.is_dir(): raise Hold("PREPARED_RELEASE_IDENTITY_DRIFT")
+            verify_release_envelope(base,target,r,uid,deadline)
+            verify_tree(target/"public",r["trusted_manifest"],deadline,uid)
         except Hold as error: envelope_failure=str(error)
-        observed=observe_pointer(current,target); expected=expected_rollback_observation(base,r)
+        observed=observe_pointer(current,target,uid); expected=expected_rollback_observation(base,r)
         if r["state"] in {"ROLLBACK_INTENT","ROLLBACK_PENDING"} and observed==expected:
             return reconcile_rollback(base,r,path,uid,deadline)
         if observed!="TARGET": raise Hold("CURRENT_IDENTITY_UNKNOWN_NO_ROLLBACK")
         previous=r.get("previous_current"); tmp=base/(".rollback-"+args.transaction_id)
+        if previous is not None: verify_previous_release(base,previous,uid,deadline)
         if r["state"] not in {"ROLLBACK_INTENT","ROLLBACK_PENDING"}:
             r.update(state="ROLLBACK_INTENT",last_stage="ROLLBACK_INTENT_DURABLE",rollback_temp=str(tmp),target_envelope_failure=envelope_failure); atomic_json(path,r)
         if previous is None:
             current.unlink(); fsync_dir(base)
             if current.exists() or current.is_symlink(): raise Hold("ROLLBACK_RESULT_UNKNOWN")
         else:
-            old=Path(previous["release"])
-            if old.parent!=(base/"releases").resolve() or not old.is_dir(): raise Hold("PREVIOUS_RELEASE_MISSING")
-            verify_tree(old/"public",previous["manifest"],deadline,uid)
+            old=verify_previous_release(base,previous,uid,deadline)
             if tmp.exists() or tmp.is_symlink():
-                if not tmp.is_symlink() or os.readlink(tmp)!=previous["link"]: raise Hold("TEMPORARY_POINTER_EXISTS")
+                if not tmp.is_symlink() or tmp.lstat().st_uid!=uid or os.readlink(tmp)!=previous["link"]: raise Hold("TEMPORARY_POINTER_EXISTS")
             else: os.symlink(previous["link"],tmp); fsync_dir(base)
+            prepared_pointer_identity=symlink_identity(tmp,uid)
+            existing_identity=r.get("rollback_prepared_pointer_identity")
+            if existing_identity is not None and not same_symlink_object(prepared_pointer_identity,existing_identity):
+                raise Hold("ROLLBACK_POINTER_IDENTITY_DRIFT")
+            r.update(last_stage="ROLLBACK_POINTER_PREPARED",rollback_prepared_pointer_identity=prepared_pointer_identity); atomic_json(path,r)
             os.replace(tmp,current); fsync_dir(base)
-            if not current.is_symlink() or current.resolve()!=old.resolve(): raise Hold("ROLLBACK_RESULT_UNKNOWN")
-            verify_tree(old/"public",previous["manifest"],deadline,uid)
+            if observe_pointer(current,target,uid)!=expected: raise Hold("ROLLBACK_RESULT_UNKNOWN")
+            pointer_identity=symlink_identity(current,uid)
+            if not same_symlink_object(pointer_identity,prepared_pointer_identity): raise Hold("ROLLBACK_POINTER_IDENTITY_DRIFT")
+            r.update(last_stage="ROLLBACK_POINTER_SWITCHED",rollback_pointer_identity=pointer_identity); atomic_json(path,r)
+            verify_symlink_identity(current,pointer_identity,uid)
+            verify_previous_release(base,previous,uid,deadline)
         r.update(state="ROLLED_BACK",last_stage="ROLLBACK_COMMITTED"); atomic_json(path,r); return r
     finally:
         if ctx: ctx.__exit__(None,None,None)
