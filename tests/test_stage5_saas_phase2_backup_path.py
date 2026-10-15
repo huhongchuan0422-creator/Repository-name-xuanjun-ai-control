@@ -5,7 +5,7 @@ import sqlite3
 import tempfile
 import unittest
 
-from scripts.community_saas_phase2_recovery import backup, verify_backup
+from scripts.community_saas_phase2_recovery import backup, verify_backup, rollback_preview
 
 class BackupPathSafety(unittest.TestCase):
     def setUp(self):
@@ -45,6 +45,22 @@ class BackupPathSafety(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"BACKUP_PATH_UNSAFE"):
             backup(self.source,target)
         self.assertEqual(target.read_text(),"do not replace")
+
+    def test_rollback_target_symlink_rejected(self):
+        saved=self.root/"copy.sqlite"
+        receipt=backup(self.source,saved)
+        target=self.root/"target.sqlite"
+        target.symlink_to(self.source)
+        with self.assertRaisesRegex(ValueError,"ROLLBACK_TARGET_SYMLINK"):
+            rollback_preview(saved,receipt["sha256"],target)
+
+    def test_rollback_source_symlink_rejected(self):
+        saved=self.root/"copy.sqlite"
+        receipt=backup(self.source,saved)
+        alias=self.root/"alias.sqlite"
+        alias.symlink_to(saved)
+        with self.assertRaisesRegex(ValueError,"SOURCE_DB_MISSING"):
+            rollback_preview(alias,receipt["sha256"],self.root/"restored.sqlite")
 
     def test_destination_created_during_backup_not_replaced(self):
         target=self.root/"copy.sqlite"
