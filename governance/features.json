@@ -76,7 +76,8 @@
         "scripts/community_saas_order_preparation.py",
         "tests/test_stage5_saas_order_preparation.py",
         "scripts/community_saas_offline_handoff.py",
-        "tests/test_stage5_saas_offline_handoff.py"
+        "tests/test_stage5_saas_offline_handoff.py",
+        "scripts/community_saas_schema_guard.py"
       ]
     }
   ]
