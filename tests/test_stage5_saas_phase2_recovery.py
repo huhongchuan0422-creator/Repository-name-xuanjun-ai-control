@@ -3,7 +3,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from scripts.community_saas_phase2_recovery import backup,verify_backup,cross_store_audit
+from scripts.community_saas_phase2_recovery import backup,verify_backup,cross_store_audit,rollback_preview
 class RecoveryTests(unittest.TestCase):
  def setUp(self):
     self.temp=tempfile.TemporaryDirectory()
@@ -37,6 +37,16 @@ class RecoveryTests(unittest.TestCase):
     a=sqlite3.connect(self.target)
     try:self.assertEqual(a.execute("SELECT value FROM sample").fetchone()[0],"immutable")
     finally:a.close()
+ def test_08_rollback_preview_does_not_restore(self):
+    info=backup(self.source,self.target)
+    plan=rollback_preview(self.target,info["sha256"],self.source)
+    self.assertTrue(plan["backup_verified"])
+    self.assertFalse(plan["rollback_executed"])
+    self.assertEqual(plan["production_gate"],"HOLD")
+ def test_09_rollback_preview_rejects_same_path(self):
+    info=backup(self.source,self.target)
+    with self.assertRaisesRegex(ValueError,"ROLLBACK_SOURCE_EQUALS_TARGET"):
+        rollback_preview(self.target,info["sha256"],self.target)
  def test_07_missing_source_fails(self):
     with self.assertRaises(ValueError):backup(self.target,Path(self.temp.name)/"other.sqlite")
 class CrossStoreAuditTests(unittest.TestCase):
