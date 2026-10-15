@@ -19,6 +19,9 @@ CREATE TRIGGER IF NOT EXISTS saas_order_prep_immutable_update
 BEFORE UPDATE ON saas_order_preparations BEGIN SELECT RAISE(ABORT,'IMMUTABLE_ORDER_PREPARATION'); END;
 CREATE TRIGGER IF NOT EXISTS saas_order_prep_immutable_delete
 BEFORE DELETE ON saas_order_preparations BEGIN SELECT RAISE(ABORT,'IMMUTABLE_ORDER_PREPARATION'); END;
+CREATE TRIGGER saas_order_preparations_no_replace BEFORE INSERT ON saas_order_preparations
+WHEN EXISTS(SELECT 1 FROM saas_order_preparations WHERE order_id=NEW.order_id)
+BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
 """
 def install(db):
     if not isinstance(db,sqlite3.Connection):
