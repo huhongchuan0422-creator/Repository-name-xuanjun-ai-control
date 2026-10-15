@@ -95,8 +95,8 @@ class FullScopeAuditProbes(unittest.TestCase):
             add_component(o,oid,"license","MODULE_LICENSE","MONTHLY",100,10,"pricebook")
             save_cost(costs,oid,"license","VERIFIED_ACTUAL",20,2,"invoice","MONTHLY")
             for step in ("PREVIEW","APPROVED","EFFECTIVE"):change_offer_status(o,oid,step,costs)
-        self.assertEqual(quote_offers(o,"storefront_catalog"),[])
-        self.assertEqual([x["offer_id"] for x in quote_offers(o,"storefront_catalog",tenant_id="tenantA")],["a"])
+        self.assertEqual(quote_offers(o,"storefront_catalog",cost_db=costs),[])
+        self.assertEqual([x["offer_id"] for x in quote_offers(o,"storefront_catalog",tenant_id="tenantA",cost_db=costs)],["a"])
     finally:o.close();costs.close()
  def test_r4_fake_module_schema_rejected(self):
     with tempfile.TemporaryDirectory() as folder:
