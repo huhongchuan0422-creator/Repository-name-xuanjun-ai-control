@@ -14,13 +14,14 @@ from scripts.community_saas_offline_handoff import (
 KEY=b"offline-test-key-not-a-provider-credential-01234567"
 def fee():
     return {"type":"MODULE_FEE","label":"license","cycle":"MONTH","quantity":1,
-            "cny_minor":1000,"usd_minor":200}
+            "cny_minor":1000,"usd_minor":200,"cost_cny_minor":0,"cost_usd_minor":0}
 class OfflineBatch(unittest.TestCase):
  def setUp(self):
     self.quotes=connect();offer_install(self.quotes)
     self.orders=sqlite3.connect(":memory:")
     order_install(self.orders);install_lifecycle(self.orders);install_reviews(self.orders)
     create_offer(self.quotes,"offer1",1,"storefront_catalog","MONTHLY",[fee()],term_days=30)
+    approve_offer(self.quotes,"offer1",1,"approvalA","costA",10)
     quote(self.quotes,"q1","tenantA","offer1",1,10,200)
     prepare(self.orders,self.quotes,"ord1","tenantA","q1","CNY",20)
  def tearDown(self):
