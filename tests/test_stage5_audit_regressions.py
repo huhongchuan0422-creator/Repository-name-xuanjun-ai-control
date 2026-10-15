@@ -200,10 +200,10 @@ class FullScopeAuditProbes(unittest.TestCase):
     fake=json.loads(row[4])
     # Invalid preexisting record fixture, not an application write path.
     self.orders.execute("INSERT INTO saas_order_preparations VALUES(?,?,?,?,?,?)",
-                        ("different",*row[:4],json.dumps(fake)))
+                        ("different","tenantB",row[1],row[2],row[3],json.dumps(fake)))
     with self.assertRaisesRegex(ValueError,"ORDER_SNAPSHOT_BINDING_MISMATCH"):
         from scripts.community_saas_order_preparation import read
-        read(self.orders,"different","tenantA")
+        read(self.orders,"different","tenantB")
  def test_r2_catalog_approved_line_immutable(self):
     create_offer(self.base,"offer",1,"storefront_catalog","MONTHLY",[price()],term_days=30)
     approve_offer(self.base,"offer",1,"approval","cost",10)
