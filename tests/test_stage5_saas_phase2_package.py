@@ -40,4 +40,20 @@ class OfflinePackage(unittest.TestCase):
         self.source(d)
         m=build(d)["manifest"]
         self.assertEqual(m["assets_sha256"][ASSETS[0]],hashlib.sha256((Path(d)/ASSETS[0]).read_bytes()).hexdigest())
+ def test_07_source_symlink_rejected(self):
+    with tempfile.TemporaryDirectory() as d:
+        self.source(d)
+        origin=Path(d)/ASSETS[0]
+        real=origin.with_suffix(".real")
+        origin.rename(real)
+        origin.symlink_to(real)
+        with self.assertRaisesRegex(ValueError,"UNSAFE_OR_MISSING_ASSET"):
+            build(d)
+ def test_08_complete_candidate_contains_recovery_and_finance_contract(self):
+    with tempfile.TemporaryDirectory() as d:
+        self.source(d)
+        manifest=build(d)["manifest"]
+        self.assertIn("scripts/community_saas_phase2_recovery.py",manifest["assets_sha256"])
+        self.assertIn("scripts/community_saas_offline_handoff.py",manifest["assets_sha256"])
+        self.assertNotIn("production.env",manifest["assets_sha256"])
 if __name__=="__main__":unittest.main()

@@ -19,14 +19,14 @@ def _id(v):
     return v
 
 def _time(v):
-    if type(v) is not int or v<0:raise ValueError("INVALID_TIME")
+    if type(v) is not int or not 0<=v<=9007199254740991:raise ValueError("INVALID_TIME")
     return v
 
 class Principal:
     """Identity supplied by trusted server policy, never from client JSON."""
     def __init__(self,tenant_id,role):
         self.tenant_id=_id(tenant_id)
-        if role not in ("CUSTOMER","MERCHANT_ADMIN","PLATFORM_OWNER"):
+        if type(role) is not str or role not in ("CUSTOMER","MERCHANT_ADMIN","PLATFORM_OWNER"):
             raise ValueError("INVALID_ROLE")
         self.role=role
 
@@ -47,7 +47,7 @@ class OfflineSaas:
         self.modules=module_db
 
     def dispatch(self,principal,operation,params,now):
-        if not isinstance(principal,Principal):
+        if type(principal) is not Principal:
             raise PermissionError("TRUSTED_PRINCIPAL_REQUIRED")
         _time(now)
         if type(params) is not dict:
@@ -77,7 +77,7 @@ class OfflineSaas:
             "owner_create_offer":{"offer_id","version","module_id","kind","lines","term_days","tenant_scope","supplier_payment"},
             "owner_approve_offer":{"offer_id","version","approval_ref","cost_evidence_ref"}
         }
-        if operation not in fields or set(params)!=fields[operation]:
+        if type(operation) is not str or operation not in fields or set(params)!=fields[operation]:
             raise ValueError("INVALID_REQUEST_FIELDS")
         tenant=principal.tenant_id
         if operation in ("owner_create_offer","owner_approve_offer"):

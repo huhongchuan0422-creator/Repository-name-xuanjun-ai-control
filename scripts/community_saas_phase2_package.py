@@ -12,11 +12,18 @@ import zipfile
 ASSETS=(
     "scripts/community_saas_phase2.py",
     "scripts/community_saas_phase2_http.py",
+    "scripts/community_saas_phase2_recovery.py",
+    "scripts/community_saas_order_preparation.py",
+    "scripts/community_saas_offline_handoff.py",
     "demos/community-local-e2e/saas-panel.html",
     "demos/community-local-e2e/saas-panel.mjs",
     "demos/community-local-e2e/saas-panel.test.mjs",
     "tests/test_stage5_saas_phase2.py",
     "tests/test_stage5_saas_phase2_http.py",
+    "tests/test_stage5_saas_phase2_recovery.py",
+    "tests/test_stage5_saas_phase2_backup_path.py",
+    "tests/test_stage5_saas_order_preparation.py",
+    "tests/test_stage5_saas_offline_handoff.py",
 )
 def build(root):
     root=pathlib.Path(root).resolve()
@@ -24,8 +31,10 @@ def build(root):
     out=io.BytesIO()
     with zipfile.ZipFile(out,"w",compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
         for relative in ASSETS:
-            path=(root/relative).resolve()
-            if not path.is_relative_to(root) or not path.is_file() or path.is_symlink():
+            requested=root/relative
+            if requested.is_symlink():raise ValueError("UNSAFE_OR_MISSING_ASSET")
+            path=requested.resolve()
+            if not path.is_relative_to(root) or not path.is_file():
                 raise ValueError("UNSAFE_OR_MISSING_ASSET")
             data=path.read_bytes()
             if b"BEGIN PRIVATE KEY" in data or b"sk_live_" in data:

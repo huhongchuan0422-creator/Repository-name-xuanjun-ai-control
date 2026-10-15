@@ -251,4 +251,20 @@ class Phase2Nodes(unittest.TestCase):
         previous=(digest(q),digest(o))
         self.assertTrue(verify_persistent_stores(q,o)["verified"])
         self.assertEqual(previous,(digest(q),digest(o)))
+ def test_47_trusted_principal_must_be_exact_type(self):
+    class Forged(Principal): pass
+    forged=Forged("tenantA","PLATFORM_OWNER")
+    with self.assertRaisesRegex(PermissionError,"TRUSTED_PRINCIPAL_REQUIRED"):
+        self.api.dispatch(forged,"catalog",{},20)
+ def test_48_non_string_operation_rejected_without_side_effects(self):
+    for operation in ([],{},None,False):
+        with self.assertRaisesRegex(ValueError,"INVALID_REQUEST_FIELDS"):
+            self.api.dispatch(self.customer,operation,{},20)
+    self.assertEqual(self.o.execute("SELECT count(*) FROM saas_order_preparations").fetchone()[0],0)
+ def test_49_time_outside_safe_integer_rejected(self):
+    with self.assertRaisesRegex(ValueError,"INVALID_TIME"):
+        self.api.dispatch(self.customer,"catalog",{},9007199254740992)
+ def test_50_customer_cannot_read_internal_health_detail(self):
+    with self.assertRaisesRegex(PermissionError,"ADMIN_ROLE_REQUIRED"):
+        self.api.dispatch(self.customer,"health_detail",{},20)
 if __name__=="__main__":unittest.main()
