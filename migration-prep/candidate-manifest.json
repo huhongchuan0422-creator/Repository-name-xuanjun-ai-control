@@ -3,7 +3,7 @@
   "base_commit": "29d42a130505653ab608bb4ac252e7e26394da6e",
   "base_tree": "fa4631cb72bc826ded0979bbdf0f1407467cfcec",
   "binance_called": false,
-  "candidate_content_sha256": "70a4960c86dd24504b1a83a9f482110247ab37b8a333a6954240df7282b0f928",
+  "candidate_content_sha256": "d1becba97737722430a9587c2902280d3aa3dc09ff4af0cbe202c7149878ee75",
   "canonical_migration_policy_enforced": true,
   "files": [
     {
@@ -193,8 +193,8 @@
     },
     {
       "path": "migration-prep/test_korea_install_shell_behavior.py",
-      "sha256": "3a8561f684fdfb0455bfebba3b17f829e087691e7e32b8548a01f60f7dcde422",
-      "size": 9748
+      "sha256": "0d26054ff848d436cbf5858407cc26c4bf686f06d5160c963abbb45687413d01",
+      "size": 9824
     },
     {
       "path": "migration-prep/korea/__init__.py",

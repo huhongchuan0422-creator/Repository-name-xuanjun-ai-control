@@ -6,6 +6,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -28,6 +29,7 @@ class KoreaInstallShellBehaviorTests(unittest.TestCase):
         manifest = build_candidate(self.candidate)
         self.manifest_sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
         self.fakebin = self.base / "fakebin"; self.fakebin.mkdir()
+        (self.fakebin / "python3.11").symlink_to(sys.executable)
         self._write_executable("systemctl", r'''#!/usr/bin/env bash
 set -eu
 root=${KOREA_CANDIDATE_TEST_ROOT:?}
