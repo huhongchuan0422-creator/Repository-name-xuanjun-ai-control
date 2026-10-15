@@ -373,3 +373,31 @@ IP初步分类：入口client_address用于日志；入口X-Forwarded-Proto用�
 集中送审状态不新增批次：将本节作为6198144163/6199294955的源码证据补充，独立执行者据其范围判断，不要求重新审核未变83/45/115或生产配置制品。当前仍缺Owner对临时IP审计差异的明确接受（如采用该方案）、外围IP安全依赖闭环、旧HEAD错误路径发布影响裁定，以及DNS切换前管理面精确记录读回。DNS_RELEASE=HOLD；东京退役HOLD；不冒充网站/服务器迁移完成。
 
 下次若无新独立回执，可安全读取国内已安装apex续期Timer的首次自动运行状态（不手动触发续期、Hook或reload），形成运行证据；已完成的源码/请求探针不盲重跑。
+
+
+### 9.13 2026-10-16：首次自动续期检查回执（仅观察）
+
+先读原PR最新回执及本计划，未见新的独立DNS放行；上轮提到的Timer首次自动运行现已取得直接非root证据。准确观察提交 `e09f66ae78d756fd2bee8d41fed8bced262538be`；[Run38801685875](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38801685875)，国内Job116652042081 SUCCESS。东京/英国/韩国/原dispatch作业均SKIPPED。只调用systemctl show、读取四个公开安装文件及一次验证证书的TLS握手；无sudo、无手动续期、无service start、无Hook执行、无reload、无DNS修改。
+
+- Timer xuanjun-apex-cert-renew.timer：loaded、enabled、active/waiting。
+- LastTriggerUSec：2026-10-16 03:40:31 CST。
+- Service开始03:40:31、结束03:40:33 CST；Result=success、ExecMainCode=1（CLD_EXITED）、ExecMainStatus=0。
+- Type=oneshot服务检查完成后inactive/dead是正常终态，不误报为后台故障。
+- 下次计划时间：2026-10-16 15:43:00 CST（当时观测，带随机延迟）。
+- InvocationID：94ae2e4cfd6d40b8b6dc92e08932534a，绑定这次实际服务运行。
+- 当前国内证书：系统CA/SNI验证通过，SAN=wenwenwenyiyiyi.work，serial=05B84F2C5179B9BF9C474D5A0085A57EEF4D；notBefore=2026-10-15 16:03:59 UTC，notAfter=2027-01-13 16:03:58 UTC。仅读取公开TLS证书，不触碰私钥。
+
+| 已安装文件 | SHA256 | Owner/mode |
+| --- | --- | --- |
+| /usr/local/libexec/xuanjun-apex-cert-renew | cb2a9e645cff03e04c667c1001b3eec627119a0498395b013324de909d9f357e | root:root 0755 |
+| /usr/local/libexec/xuanjun-apex-nginx-deploy-hook | adb7d7efd5c4255b7aabefd3a0bc74ae7af0df221e32fcf92bf7044bc13b6be8 | root:root 0755 |
+| /etc/systemd/system/xuanjun-apex-cert-renew.service | d68bc892873d52f8cf8a9ac95c09938c10564abba6f9bcf82d713a2a76a005b8 | root:root 0644 |
+| /etc/systemd/system/xuanjun-apex-cert-renew.timer | 4ce36b58ba0e599d37458f3aecb0c3c20a588175ffca66834228d405da73807e | root:root 0644 |
+
+另直接读取已批准准确提交312efdd3eb4d24ff1fceecc480c4ba302bf22073的对应四份源码，并重新计算其SHA256，与上述现场4/4相同；四个现场文件均非symlink。这是安装后具体四文件绑定核对，不重打包或重跑83项测试。
+
+结论限于**首次自动续期检查执行成功**。Certbot renew在证书未到期时可成功退出而不续签；当前无证据证明这次更换了serial/到期日，故ACTUAL_CERTIFICATE_RENEWAL=NOT_ESTABLISHED，不能称“首次真实续签已成功”，也不能推断这次deploy-hook已经运行。既有Owner dry-run和Hook手工执行证据继续继承。
+
+至此，9.10—9.13的主动缺口取证已保存原PR。后续没有新HEAD、新独立审核或新事实时，不再推送同样探针、不重复运行或追加同义回执。剩余为独立审核对旧HEAD缺陷及动态边界的裁定、外围IP安全依赖/日志审计差异闭环（必要时Owner明确接受），以及DNS变更前已授权管理面的当前单条配置核对。当前会话无admin/root或Cloudflare管理面接入，不扩权，不读取/搬用其他流程凭据，不为获取权限启动OpenClaw或英国P2。
+
+DNS_RELEASE=HOLD；东京退役HOLD；Work官网/current、桥接/隧道、PR99/Finance均不因本观察变更。网站入口切换与整体服务器迁移仍未完成，不用自动检查成功替代生产放行。
