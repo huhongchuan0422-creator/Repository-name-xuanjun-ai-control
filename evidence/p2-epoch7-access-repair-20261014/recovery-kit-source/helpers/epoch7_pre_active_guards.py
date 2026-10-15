@@ -13,12 +13,13 @@ import time
 import epoch7_delta as d
 import epoch7_snapshot as snap
 import epoch7_protected_fs as fs
+import epoch7_python_identity as python_identity
 from epoch7_injected_recovery import RecoveryGate
 from epoch7_command_runner import ExactCommandRunner
 from epoch7_live_controls import validate_cleanup_process_view,FiniteLiveControls
 from epoch7_host_phases import CoreHostPhases,need,sha
 from epoch7_host_observer import Epoch7HostObserver
-from snapshot_io import LocalReadOnlyIO
+from snapshot_io import LocalReadOnlyIO,PYTHON_REFERENCES
 
 STABLE_DIR={'path','kind','uid','gid','mode','dev','ino','access_acl','default_acl'}
 
@@ -95,6 +96,48 @@ class PreActiveGateGuards(object):
         result=ExactCommandRunner({'query':spec},admitted,self.diagnostics).run('query')
         need(self.executable(binary) is True,'INNER_QUERY_BINARY_AFTER_PIN');return result.stdout
 
+    def _preserved_file(self,path,wanted,maximum=16777216):
+        self._check()
+        if 'python_identity' in wanted:
+            proof=python_identity.validate_pair_proof(wanted['python_identity'])
+            need(path in python_identity.PYTHON_PATHS and
+                 d.same(wanted,dict(proof['sample']['files'][path],python_identity=proof)),
+                 'INNER_EXACT_PYTHON_PAIR_ROW')
+            actual=self.io.read_python(path,maximum=maximum)[1]
+        else:actual=self.io.read(path,maximum=maximum)[1]
+        need(d.same(actual,wanted),'INNER_PRESERVED_FILE_DRIFT')
+        self._check();return actual
+
+    def _native_python_reference(self,components,native_raw):
+        reference=components.get('python_reference')
+        paired=any('python_identity' in row for row in components['components'].values())
+        need(reference is not None or not paired,'INNER_NATIVE_PYTHON_REFERENCE_REQUIRED')
+        if reference is None:return
+        path=snap.decode(native_raw)['ledger']['python']
+        need(type(reference) is dict and set(reference)=={'reference_path','links','final'} and
+             path in PYTHON_REFERENCES and reference['reference_path']==path and
+             reference['final']['path']==path and reference['links']==[],
+             'INNER_NATIVE_PYTHON_REFERENCE_SCOPE')
+        self._check();actual=self.io.executable_reference(path)
+        need(d.same(actual,reference),'INNER_NATIVE_PYTHON_REFERENCE_DRIFT');self._check()
+
+    def _native_node_reference(self,native_raw):
+        # This proof is already bound to all17 approved immutable views. Inner
+        # CAS guards repeat it even though no active process profile exists yet.
+        quiet=getattr(self.observer,'quiet',None)
+        proof=getattr(quiet,'node_reference',None)
+        from epoch7_openclaw_recipe import DIRECT_WRAPPER_SHA,LAUNCHER,GATEWAY
+        blocks=(getattr(self.observer,'live_contract',None) or {}).get('service_role_contract',{}).get('units',{})
+        direct=blocks.get(GATEWAY,{}).get('sources',{}).get(LAUNCHER)==DIRECT_WRAPPER_SHA
+        need(not direct or proof is not None,'INNER_NATIVE_NODE_REFERENCE_REQUIRED')
+        if proof is None:return
+        from unit_metadata import validate_node_reference
+        identity=snap.decode(native_raw)['gatewayIdentity']
+        expected=validate_node_reference(proof,identity['exe'],identity['sha256'])
+        self._check();actual=self.io.node_directory_reference(identity['exe'],identity['sha256'])
+        from epoch7_resource_observer import same_node_reference
+        need(same_node_reference(actual,expected,self.authority),'INNER_NATIVE_NODE_REFERENCE_DRIFT');self._check()
+
     def _prerequisites(self,retained):
         raw=self.io.read(snap.PLAN)[0];plan=snap.decode(raw)['runtime']['prerequisites']
         expected=retained['prerequisites'];identities={}
@@ -116,7 +159,7 @@ class PreActiveGateGuards(object):
             else:actual=self.io.directory(path);wanted=before
             need(all(actual[k]==wanted[k] for k in STABLE_DIR),'INNER_DIRECTORY_AUTHORITY_DRIFT')
         for path,wanted in expected['binaries'].items():
-            need(self.io.read(path,maximum=536870912)[1]==wanted,'INNER_RETAINED_BINARY_DRIFT')
+            self._preserved_file(path,wanted,maximum=536870912)
         rpm=snap.decode(self.io.read(snap.TRANSACTION+'/rpm-prerequisites.json')[0])
         versions={}
         for row in rpm['packages']:
@@ -130,14 +173,16 @@ class PreActiveGateGuards(object):
         mutable={snap.ACTIVE,snap.EPOCHS,snap.NATIVE}|set(d.TARGETS)
         for path,wanted in retained['files'].items():
             if path not in mutable:
-                need(self.io.read(path)[1]==wanted,'INNER_IMMUTABLE_RETAINED_FILE_DRIFT')
+                self._preserved_file(path,wanted)
         native=self.io.read(snap.NATIVE)[0]
         active=self.core.store.read()
         expected_native=self.core.native_before if active['epoch']==7 else self.core.native_after
         need(native==expected_native,'INNER_OWNED_NATIVE_TRANSITION_DRIFT')
         for path,wanted in retained['native_components']['components'].items():
             if path not in d.TARGETS:
-                need(self.io.read(path,maximum=268435456)[1]==wanted,'INNER_NATIVE_COMPONENT_DRIFT')
+                self._preserved_file(path,wanted,maximum=268435456)
+        self._native_python_reference(retained['native_components'],expected_native)
+        self._native_node_reference(expected_native)
         for path,expected in retained['database_sets'].items():
             need(self.io.read(path,maximum=67108864)[1]==expected['file'],'INNER_PRESERVED_DB_DRIFT')
             for suffix in ('-wal','-shm','-journal'):

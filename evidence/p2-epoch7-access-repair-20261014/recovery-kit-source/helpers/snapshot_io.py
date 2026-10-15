@@ -23,8 +23,11 @@ import epoch7_delta as d
 import reviewed_scanner as reviewed
 import reviewed_database
 import reviewed_publisher
+import epoch7_python_identity as python_identity
 
 MAXIMUM = 16777216
+PYTHON_REFERENCES = ('/usr/bin/python3', '/usr/bin/python3.6', '/etc/alternatives/python3',
+                     '/usr/libexec/platform-python', python_identity.PYTHON_PATHS[0])
 FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, 'O_CLOEXEC', 0)
 DIRFLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0)
 CONTROL_GIT = '/var/lib/xuanjun-development/control.git'
@@ -157,6 +160,86 @@ class DescriptorReader(object):
             finally:os.close(fd)
             c.need(stamp(os.stat(name,dir_fd=parent,follow_symlinks=False))==stamp(before),'PROBE_FILE_METADATA_RACE')
             return dict(metadata(before),kind='FILE')
+
+    def _python_pair_round(self):
+        """One fixed no-follow pair round; no generic file rule is relaxed."""
+        held, directories, files, links, raw_files = [], {}, {}, [], {}
+        def attributes(fd):
+            values = {key: xattr(fd, name) for key, name in (
+                ('access_acl','system.posix_acl_access'),
+                ('default_acl','system.posix_acl_default'),
+                ('capability','security.capability'))}
+            c.need(all(value is None for value in values.values()), 'PYTHON_PAIR_XATTR_PRESENT_OR_UNKNOWN')
+            return {key: False for key in values}
+        try:
+            root = os.open(self.root, DIRFLAGS); held.append(root)
+            first = os.fstat(root)
+            c.need(stamp(first)[:5] == self.root_identity, 'PYTHON_PAIR_ROOT_CHANGED')
+            self._authority(root, '/')
+            directories['/'] = (root, first)
+            current = root
+            for part, logical in (('usr','/usr'), ('libexec','/usr/libexec')):
+                before = os.stat(part, dir_fd=current, follow_symlinks=False)
+                fd = os.open(part, DIRFLAGS, dir_fd=current); held.append(fd)
+                c.need(stamp(os.fstat(fd)) == stamp(before), 'PYTHON_PAIR_ANCESTOR_OPEN_RACE')
+                self._authority(fd, logical)
+                directories[logical] = (fd, before)
+                links.append((current,part,before)); current = fd
+            sample = {'ancestors': {}, 'files': {}}
+            for path, (fd, before) in directories.items():
+                sample['ancestors'][path] = dict(metadata(before), kind='DIRECTORY', **attributes(fd))
+            for path in python_identity.PYTHON_PATHS:
+                name = path.rsplit('/',1)[1]
+                before = os.stat(name, dir_fd=current, follow_symlinks=False)
+                c.need(stat.S_ISREG(before.st_mode) and before.st_uid == before.st_gid == 0 and
+                       stat.S_IMODE(before.st_mode) == 0o755 and before.st_nlink == 2 and
+                       before.st_size == python_identity.RETAINED_SIZE, 'PYTHON_PAIR_FIXED_FILE_AUTHORITY')
+                fd = os.open(name, FLAGS, dir_fd=current); held.append(fd)
+                c.need(stamp(os.fstat(fd)) == stamp(before), 'PYTHON_PAIR_FILE_OPEN_RACE')
+                attrs = attributes(fd); chunks, count = [], 0
+                while True:
+                    chunk = os.read(fd, min(65536, python_identity.RETAINED_SIZE + 1 - count))
+                    if not chunk: break
+                    chunks.append(chunk); count += len(chunk)
+                    c.need(count <= python_identity.RETAINED_SIZE, 'PYTHON_PAIR_CONTENT_BOUND')
+                raw = b''.join(chunks)
+                c.need(count == before.st_size and raw.startswith(b'\x7fELF'), 'PYTHON_PAIR_ELF_OR_SIZE')
+                sample['files'][path] = dict(metadata(before), kind='FILE', sha256=c.sha(raw),
+                                              elf_header=True, **attrs)
+                raw_files[path] = raw; files[path] = (fd, before)
+            for path, (fd, before) in files.items():
+                c.need(stamp(os.fstat(fd)) == stamp(before) and
+                       stamp(os.stat(path.rsplit('/',1)[1],dir_fd=current,follow_symlinks=False)) == stamp(before),
+                       'PYTHON_PAIR_FILE_REREAD_RACE')
+                c.need(attributes(fd) == {key:sample['files'][path][key] for key in python_identity.XATTR_FIELDS},
+                       'PYTHON_PAIR_FILE_XATTR_RACE')
+            for parent, name, before in reversed(links):
+                c.need(stamp(os.stat(name,dir_fd=parent,follow_symlinks=False)) == stamp(before),
+                       'PYTHON_PAIR_ANCESTOR_PATH_RACE')
+            for path, (fd, before) in directories.items():
+                c.need(stamp(os.fstat(fd)) == stamp(before), 'PYTHON_PAIR_ANCESTOR_FD_RACE')
+                c.need(attributes(fd) == {key:sample['ancestors'][path][key] for key in python_identity.XATTR_FIELDS},
+                       'PYTHON_PAIR_ANCESTOR_XATTR_RACE')
+            c.need(stamp(os.lstat(self.root)) == stamp(first), 'PYTHON_PAIR_ROOT_PATH_RACE')
+            return python_identity.validate_pair_sample(sample), raw_files
+        finally:
+            failure = None
+            for fd in reversed(held):
+                try: os.close(fd)
+                except OSError as error:
+                    if failure is None: failure = error
+            if failure is not None: raise failure
+
+    def read_python(self, logical, maximum=33554432):
+        """Dedicated retained-pair API. Ordinary read/file_info still require nlink1."""
+        c.need(logical in python_identity.PYTHON_PATHS and type(maximum) is int and
+               python_identity.RETAINED_SIZE <= maximum <= 536870912, 'PYTHON_PAIR_READ_SCOPE')
+        before, first = self._python_pair_round()
+        after, last = self._python_pair_round()
+        c.need(first == last, 'PYTHON_PAIR_CONTENT_CHANGED')
+        proof = python_identity.build_pair_proof(before, after, python_identity.package_claim())
+        row = dict(proof['sample']['files'][logical], python_identity=proof)
+        return last[logical], row
 
     def absent(self, logical):
         with self.parent(logical, missing=True) as (parent, name):
@@ -334,6 +417,12 @@ class LocalReadOnlyIO(DescriptorReader):
         self.check_locks()
         return super(LocalReadOnlyIO, self).read(*args, **kwargs)
 
+    def read_python(self, *args, **kwargs):
+        self.check_locks()
+        result = super(LocalReadOnlyIO, self).read_python(*args, **kwargs)
+        self.check_locks()
+        return result
+
     def command(self, label, args):
         self.check_locks()
         pin = self.policy['executables'][label]
@@ -406,7 +495,7 @@ class LocalReadOnlyIO(DescriptorReader):
                pwd.getpwnam(gateway['user']).pw_uid == 1002 and
                gateway['cgroup'] == '/system.slice/xuanjun-uk-openclaw.service', 'NATIVE_GATEWAY_IDENTITY')
         client = '/etc/xuanjun-development/p2-native-ledger-client.json'
-        old_bridge = '/opt/xuanjun-control-releases/integration-' + c.RETAINED_NATIVE_RELEASE[:16] + '/stage1/native_ledger_bridge.py'
+        old_bridge = '/opt/xuanjun-control-releases/integration-' + d.OLD_MANIFEST[:16] + '/stage1/native_ledger_bridge.py'
         live_bridge = '/opt/xuanjun-control-releases/integration-' + d.OLD_MANIFEST[:16] + '/stage1/native_ledger_bridge.py'
         c.need(ledger['bridge'] == old_bridge and current['bridge'] == live_bridge and
                ledger['config'] == current['config'] == client and
@@ -414,19 +503,35 @@ class LocalReadOnlyIO(DescriptorReader):
                ledger['python'] == current['python'] and ledger['pythonSha256'] == current['pythonSha256'],
                'NATIVE_RETAINED_AND_CURRENT_BINDING')
         # The current client file belongs to the retained v4 target receipt. The
-        # separately retained338e sidefile still describes an older client hash.
-        # Verify both immutable bridge sources, but use the v4 controller-binding
-        # target for the current client. Never relabel the sidefile as1536.
+        # completed owned epoch5 rebind changed only the bridge path to153653.
+        # Its historical client hash is unchanged. The central transition gate
+        # authenticates this rebind; current client bytes remain receipt-bound.
         expected = [(gateway['exe'],gateway['sha256'],1002), (ledger['python'],ledger['pythonSha256'],0),
                     (old_bridge,ledger['files'][old_bridge],0)]
         expected += [(name,digest,0) for name,digest in current['files'].items()]
-        result = {}
+        result = {}; python_reference = None
         for name,digest,uid in expected:
             c.path(name); d.hash_value(digest)
-            raw, row = self.read(name, maximum=268435456)
+            if name == ledger['python']:
+                c.need(name in PYTHON_REFERENCES, 'NATIVE_PYTHON_REFERENCE_SCOPE')
+                python_reference = self.executable_reference(name)
+                final = python_reference['final']; row = final['metadata']
+                c.need(final['sha256'] == digest and row['sha256'] == digest and row['uid'] == uid,
+                       'NATIVE_COMPONENT_PIN')
+                if final['path'] in python_identity.PYTHON_PATHS:
+                    c.need(final['path'] == python_identity.PYTHON_PATHS[0] and digest == python_identity.RETAINED_SHA256,
+                           'NATIVE_EXACT_PYTHON_PAIR_BINDING')
+                    proof = python_identity.validate_pair_proof(row['python_identity'])
+                    for member in python_identity.PYTHON_PATHS:
+                        result[member] = dict(proof['sample']['files'][member], python_identity=proof)
+                else:result[final['path']] = row
+                continue
+            else:
+                raw, row = self.read(name, maximum=268435456)
             c.need(row['sha256'] == digest and row['uid'] == uid, 'NATIVE_COMPONENT_PIN')
             result[name] = row
-        return {'components':result, 'retained_sidefile_release_sha256':c.RETAINED_NATIVE_RELEASE,
+        return {'components':result, 'python_reference':python_reference,
+                'retained_sidefile_release_sha256':d.OLD_MANIFEST,
                 'effective_target_release_sha256':d.OLD_MANIFEST,
                 'retained_client_sha256':ledger['files'][client],
                 'current_client_sha256':current['files'][client],
@@ -670,15 +775,9 @@ class LocalReadOnlyIO(DescriptorReader):
         return socket.gethostname()
 
     def canonical_python(self, reference):
-        import re
-        allowed = r'/usr/(?:bin/python3(?:\.6)?|libexec/platform-python(?:3\.6)?)'
-        c.need(re.fullmatch(allowed, reference), 'PROBE_PYTHON_REFERENCE_SCOPE')
-        resolved = os.path.realpath(reference)
-        c.need(re.fullmatch(allowed, resolved), 'PROBE_PYTHON_CANONICAL_SCOPE')
-        # Hash comparison is against the root-protected binding, not an alias.
-        self.read(resolved, maximum=33554432)
-        c.need(os.path.realpath(reference) == resolved, 'PROBE_PYTHON_REFERENCE_RACE')
-        return resolved
+        c.need(reference in PYTHON_REFERENCES, 'PROBE_PYTHON_REFERENCE_SCOPE')
+        # A bounded descriptor-checked alias chain, never realpath authority.
+        return self.executable_reference(reference)['final']['path']
 
     def probe_manager(self):
         target = os.readlink('/proc/1/exe')
@@ -727,10 +826,10 @@ class LocalReadOnlyIO(DescriptorReader):
     def python_reference(self):return self.executable_reference('/usr/bin/python3')
 
     def executable_reference(self,reference):
-        scopes={'/usr/bin/python3':{'/usr/bin/python3','/usr/bin/python3.6','/etc/alternatives/python3',
-                    '/usr/libexec/platform-python','/usr/libexec/platform-python3.6'},
-                '/usr/sbin/runuser':{'/usr/sbin/runuser','/usr/bin/runuser'},
+        scopes={path:set(PYTHON_REFERENCES) for path in PYTHON_REFERENCES}
+        scopes.update({'/usr/sbin/runuser':{'/usr/sbin/runuser','/usr/bin/runuser'},
                 '/usr/sbin/nginx':{'/usr/sbin/nginx','/usr/bin/nginx'}}
+        )
         c.need(reference in scopes,'EXECUTABLE_REFERENCE_SCOPE');allowed=scopes[reference]
         def walk():
             current=reference;links=[];seen=set()
@@ -739,15 +838,22 @@ class LocalReadOnlyIO(DescriptorReader):
                 seen.add(current)
                 with self.parent(current) as (parent,name):
                     before=os.stat(name,dir_fd=parent,follow_symlinks=False)
-                    c.need(before.st_uid==before.st_gid==0 and before.st_nlink==1,'EXECUTABLE_ALIAS_AUTHORITY')
+                    pair = reference in PYTHON_REFERENCES and current == python_identity.PYTHON_PATHS[0]
+                    c.need(before.st_uid==before.st_gid==0 and
+                           (before.st_nlink==2 if pair and stat.S_ISREG(before.st_mode) else before.st_nlink==1),
+                           'EXECUTABLE_ALIAS_AUTHORITY')
                     if stat.S_ISLNK(before.st_mode):
                         link=os.readlink(name,dir_fd=parent)
+                        c.need(type(link) is str and 0<len(link)<=4096 and
+                               __import__('re').fullmatch(r'/?[A-Za-z0-9_.+-]+(?:/[A-Za-z0-9_.+-]+)*',link) and
+                               all(part not in ('.','..') for part in link.split('/')), 'EXECUTABLE_ALIAS_TARGET_FORM')
                         c.need(stamp(os.stat(name,dir_fd=parent,follow_symlinks=False))==stamp(before),'EXECUTABLE_ALIAS_RACE')
                         links.append({'path':current,'link':link,'metadata':metadata(before)})
                     else:
                         c.need(stat.S_ISREG(before.st_mode),'EXECUTABLE_ALIAS_FINAL_TYPE');link=None
                 if link is None:
-                    raw,row=self.read(current,maximum=33554432)
+                    raw,row=(self.read_python(current,maximum=33554432) if pair else
+                             self.read(current,maximum=33554432))
                     c.need(all(row.get(k)==v for k,v in metadata(before).items()),'EXECUTABLE_ALIAS_FINAL_RACE')
                     c.need(raw.startswith(b'\x7fELF') and row['uid']==row['gid']==0 and row['mode']&0o111,'EXECUTABLE_ALIAS_FINAL_ELF')
                     return {'reference_path':reference,'links':links,
@@ -806,6 +912,108 @@ class LocalReadOnlyIO(DescriptorReader):
             c.need(stamp(os.stat(name,dir_fd=parent,follow_symlinks=False))==stamp(before),'OPENCLAW_NODE_PATH_RACE')
         return {'path':path,'sha256':expected['sha256'],'metadata':{k:expected[k] for k in
             ('dev','ino','mode','uid','gid','nlink','size','mtime_ns','ctime_ns')}}
+
+    def _node_directory_reference(self, expected_exe, expected_sha256, measurement_only=False):
+        """Measure the one fixed directory alias; never follow a discovered path.
+
+        Each round opens the canonical fixed chain with O_NOFOLLOW, streams at
+        most256MiB, and rechecks all held descriptors, path links and xattrs.
+        Unknown target, writable ancestry or any race remains a HOLD.
+        """
+        import unit_metadata as u
+        c.need(expected_exe==u.NODE_CANONICAL_PATH,'NODE_REFERENCE_CANONICAL_SCOPE');d.hash_value(expected_sha256)
+        def attributes(fd):
+            names=(('access_acl','system.posix_acl_access'),('default_acl','system.posix_acl_default'),
+                   ('capability','security.capability'))
+            c.need(all(xattr(fd,name) is None for key,name in names),'NODE_REFERENCE_XATTR_PRESENT_OR_UNKNOWN')
+            return {key:False for key,name in names}
+        def round_():
+            self.check_locks();held=[];directories={};links=[];primary=None
+            try:
+                current=os.open(self.root,DIRFLAGS);held.append(current);root=current
+                first=os.fstat(root)
+                c.need(stamp(first)[:5]==self.root_identity,'NODE_REFERENCE_ROOT_CHANGED')
+                self._authority(root,'/');directories['/']=(root,first)
+                at='';tools_fd=None;alias_before=None;target=None
+                for part in ('home','xuanjun_dev','.openclaw','tools','node-v24.21.0','bin'):
+                    at+='/'+part
+                    before=os.stat(part,dir_fd=current,follow_symlinks=False)
+                    child=os.open(part,DIRFLAGS,dir_fd=current);held.append(child)
+                    c.need(stamp(os.fstat(child))==stamp(before),'NODE_REFERENCE_DIRECTORY_OPEN_RACE')
+                    narrowable=(measurement_only and at in (u.NODE_TOOLS,u.NODE_VERSION_DIRECTORY) and
+                                stat.S_ISDIR(before.st_mode) and
+                                (before.st_uid,before.st_gid,stat.S_IMODE(before.st_mode))==(1002,1002,0o775))
+                    if not narrowable:self._authority(child,at)
+                    directories[at]=(child,before)
+                    links.append((current,part,before));current=child
+                    if at==u.NODE_TOOLS:
+                        tools_fd=current;alias_before=os.stat('node',dir_fd=tools_fd,follow_symlinks=False)
+                        c.need(stat.S_ISLNK(alias_before.st_mode),'NODE_REFERENCE_DIRECTORY_ALIAS_TYPE')
+                        target=os.readlink('node',dir_fd=tools_fd)
+                        c.need(target in ('node-v24.21.0',u.NODE_VERSION_DIRECTORY),'NODE_REFERENCE_EXACT_TARGET')
+                        c.need(stamp(os.stat('node',dir_fd=tools_fd,follow_symlinks=False))==stamp(alias_before),
+                               'NODE_REFERENCE_ALIAS_OPEN_RACE')
+                ancestor_rows={path:dict(metadata(info),kind='DIRECTORY',**attributes(fd))
+                               for path,(fd,info) in directories.items()}
+                before=os.stat('node',dir_fd=current,follow_symlinks=False)
+                c.need(stat.S_ISREG(before.st_mode) and before.st_uid==before.st_gid==1002 and
+                       before.st_nlink==1 and before.st_mode&0o100 and not before.st_mode&0o7022 and
+                       0<before.st_size<=u.NODE_MAXIMUM,'NODE_REFERENCE_ELF_AUTHORITY')
+                fd=os.open('node',FLAGS,dir_fd=current);held.append(fd)
+                c.need(stamp(os.fstat(fd))==stamp(before),'NODE_REFERENCE_FILE_OPEN_RACE')
+                attrs=attributes(fd);digest=hashlib.sha256();count=0;magic=b''
+                while True:
+                    self.check_locks()
+                    chunk=os.read(fd,min(65536,u.NODE_MAXIMUM+1-count))
+                    if not chunk:break
+                    if len(magic)<4:magic=(magic+chunk)[:4]
+                    count+=len(chunk);c.need(count<=u.NODE_MAXIMUM,'NODE_REFERENCE_FILE_BOUND');digest.update(chunk)
+                c.need(count==before.st_size and magic==b'\x7fELF' and digest.hexdigest()==expected_sha256,
+                       'NODE_REFERENCE_RETAINED_ELF_HASH')
+                row=dict(metadata(before),kind='FILE',sha256=digest.hexdigest(),elf_header=True,**attrs)
+                c.need(stamp(os.fstat(fd))==stamp(before) and
+                       stamp(os.stat('node',dir_fd=current,follow_symlinks=False))==stamp(before) and
+                       attributes(fd)==attrs,'NODE_REFERENCE_FILE_REREAD_RACE')
+                c.need(os.readlink('node',dir_fd=tools_fd)==target and
+                       stamp(os.stat('node',dir_fd=tools_fd,follow_symlinks=False))==stamp(alias_before),
+                       'NODE_REFERENCE_ALIAS_REREAD_RACE')
+                for parent,name,info in reversed(links):
+                    c.need(stamp(os.stat(name,dir_fd=parent,follow_symlinks=False))==stamp(info),
+                           'NODE_REFERENCE_DIRECTORY_PATH_RACE')
+                for path,(directory,info) in directories.items():
+                    c.need(stamp(os.fstat(directory))==stamp(info) and
+                           attributes(directory)=={key:ancestor_rows[path][key] for key in ('access_acl','default_acl','capability')},
+                           'NODE_REFERENCE_DIRECTORY_REREAD_RACE')
+                c.need(stamp(os.lstat(self.root))==stamp(first),'NODE_REFERENCE_ROOT_PATH_RACE')
+                value={'schema':1,'kind':'FIXED_NODE_DIRECTORY_ALIAS','reference_path':u.NODE_REFERENCE_PATH,
+                    'link':{'path':u.NODE_ALIAS_PATH,'target':target,'metadata':dict(metadata(alias_before),kind='SYMLINK')},
+                    'final':{'path':expected_exe,'sha256':expected_sha256,'metadata':row},
+                    'ancestors':ancestor_rows,'reread':'EXACT_PRE_POST'}
+                if measurement_only:
+                    value.update(kind='FIXED_NODE_DIRECTORY_ALIAS_MEASUREMENT',admission='NOT_GRANTED',
+                        unsafe_ancestors=sorted(path for path,row in ancestor_rows.items() if row['mode']&0o022))
+                    return u.validate_node_reference_measurement(value,expected_exe,expected_sha256)
+                return u.validate_node_reference(value,expected_exe,expected_sha256)
+            except BaseException as error:
+                primary=error;raise
+            finally:
+                failure=None
+                for fd in reversed(held):
+                    # A signal can interrupt close after the kernel released
+                    # this descriptor. Never retry that ambiguous descriptor.
+                    try:os.close(fd)
+                    except BaseException as error:
+                        if failure is None:failure=error
+                if failure is not None:
+                    raise (primary if primary is not None else failure) from ValueError('NODE_REFERENCE_CLEANUP_UNKNOWN')
+        first=round_();last=round_();self.check_locks()
+        c.need(first==last,'NODE_REFERENCE_COMPLETE_ROUND_RACE');return last
+
+    def node_directory_reference(self, expected_exe, expected_sha256):
+        return self._node_directory_reference(expected_exe,expected_sha256)
+
+    def measure_node_directory_reference(self, expected_exe, expected_sha256):
+        return self._node_directory_reference(expected_exe,expected_sha256,measurement_only=True)
 
     def gateway_account_home(self):
         first=pwd.getpwnam('xuanjun_dev');second=pwd.getpwnam('xuanjun_dev')
@@ -1065,20 +1273,28 @@ class LocalReadOnlyIO(DescriptorReader):
 
 @contextlib.contextmanager
 def existing_locks(reader, policy):
-    locks = {}
+    locks = {}; held = []; primary = None
     try:
         for name in (c.INSTALL_LOCK, c.ACTIVATION_LOCK):
             data, row = reader.read(name); c.pin_matches(row, policy['files'][name])
             with reader.parent(name) as (parent, leaf):
-                fd = os.open(leaf, FLAGS, dir_fd=parent)
-                try:
-                    first = stamp(os.fstat(fd)); c.need(metadata(os.fstat(fd)) == {k: row[k] for k in metadata(os.fstat(fd))}, 'LOCK_OPEN_RACE')
-                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    locks[name] = (fd, first)
-                except BaseException: os.close(fd); raise
+                fd = os.open(leaf, FLAGS, dir_fd=parent); held.append(fd)
+                first = stamp(os.fstat(fd)); c.need(metadata(os.fstat(fd)) == {k: row[k] for k in metadata(os.fstat(fd))}, 'LOCK_OPEN_RACE')
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                locks[name] = (fd, first)
         yield locks
+    except BaseException as error:
+        primary = error; raise
     finally:
-        for fd, unused in reversed(list(locks.values())): os.close(fd)
+        failure = None
+        for fd in reversed(held):
+            # One attempt per owned descriptor, including failed setup. An
+            # interrupted close is ambiguous and must never be retried.
+            try: os.close(fd)
+            except BaseException as error:
+                if failure is None: failure = error
+        if failure is not None:
+            raise (primary if primary is not None else failure) from ValueError('EXISTING_LOCKS_CLEANUP_UNKNOWN')
 
 
 def collect_host(policy_path, policy_sha256):

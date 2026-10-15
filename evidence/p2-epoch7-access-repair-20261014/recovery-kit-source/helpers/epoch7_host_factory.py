@@ -11,6 +11,7 @@ import os
 import epoch7_delta as d
 import epoch7_snapshot as snap
 import epoch7_protected_fs as fs
+import epoch7_python_identity as python_identity
 import epoch7_bindings as bindings
 from epoch7_injected_recovery import RecoveryGate, required_authorization
 from epoch7_complete_approval import (CompleteApprovalVerifier, preapproval_sequence_contract,
@@ -21,7 +22,7 @@ from epoch7_runtime_effects import Epoch7RuntimeEffects, BOOT_UNITS, command_con
 from epoch7_runtime_acceptance import RuntimeAcceptanceChecks, compile_acceptance_contract
 from epoch7_host_phases import (ExistingInstallLock, BoundedActivationStore, ClaimAuthority,
     HostPhaseFilesystem, CoreHostPhases, MANIFEST, SOURCE, SOURCE_TREE, need, sha, decode,
-    tls_metadata_candidate)
+    tls_metadata_candidate, retained_native_transition)
 from epoch7_bounded_stager import FrozenBoundedInstaller, INSTALLER_SHA
 from epoch7_exact_access import ExactAccessApplier, TARGETS as ACCESS_TARGETS
 from epoch7_host_observer import LinuxProcessCensus, BoundedRetainedTLS, Epoch7HostObserver
@@ -51,17 +52,18 @@ def missing_inputs(inputs):
 
 
 def _fingerprint(value):
-    # Typed encoding prevents a raw-byte sentinel from colliding with a dict.
+    # Typed child hashes prevent sentinel collisions and keep repeated full
+    #17-checkpoint proofs below the unchanged2MiB canonical object bound.
     if type(value) is bytes:return ['bytes',len(value),sha(value)]
     if type(value) is dict:
         need(all(type(k) is str for k in value),'FACTORY_STRING_KEYS')
-        return ['dict',[[k,_fingerprint(v)] for k,v in sorted(value.items())]]
-    if type(value) in (list,tuple):return ['list',[_fingerprint(v) for v in value]]
+        return ['dict',len(value),[[k,d.digest(_fingerprint(v))] for k,v in sorted(value.items())]]
+    if type(value) in (list,tuple):return [type(value).__name__,len(value),[d.digest(_fingerprint(v)) for v in value]]
     need(type(value) in (str,int,bool,type(None)),'FACTORY_FINITE_INPUT_TYPES')
     return [type(value).__name__,value]
 
 
-def input_digest(inputs):return d.digest(_fingerprint(inputs))
+def input_digest(inputs):return d.digest(['EPOCH7_TYPED_INPUT_V2',_fingerprint(inputs)])
 
 
 def compiled_bytes(compiled):
@@ -137,17 +139,41 @@ def build_executable_specs(observation,native_before):
     retained=observation['evidence']['retained'];policy=observation['policy']
     need(d.digest(policy)==observation['policy_sha256'] and
          d.digest(observation['evidence'])==observation['evidence_sha256'], 'FACTORY_OBSERVATION_DIGESTS')
-    measured=dict(retained['files']);measured.update(retained['native_components']['components'])
+    components=retained['native_components']['components']
+    for path in python_identity.PYTHON_PATHS:
+        rows=[source[path] for source in (retained['files'],components) if path in source]
+        if any('python_identity' in row for row in rows):
+            specs=[file_spec(path,row) for row in rows]
+            need(all(spec==specs[0] for spec in specs),'FACTORY_PYTHON_PAIR_MEASUREMENT_CONFLICT')
+    measured=dict(retained['files']);measured.update(components)
     result={}
     for tool in policy['executables'].values():
         path=tool['path'];need(path in measured,'FACTORY_MEASURED_COMMAND_FILE')
         result[path]=file_spec(path,measured[path])
     native=decode(native_before)
-    for path in (native['ledger']['python'],native['gatewayIdentity']['exe']):
+    python_scope={'/usr/bin/python3','/usr/bin/python3.6','/etc/alternatives/python3',
+        '/usr/libexec/platform-python','/usr/libexec/platform-python3.6','/usr/libexec/platform-python3.6m'}
+    path=native['ledger']['python'];native_reference=retained['native_components'].get('python_reference')
+    if native_reference is None:
         need(path in measured,'FACTORY_NATIVE_EXECUTABLE_METADATA');result[path]=file_spec(path,measured[path])
+    else:
+        need(set(native_reference)=={'reference_path','links','final'} and
+             native_reference['reference_path']==path and path in python_scope and
+             {row['path'] for row in native_reference['links']}|{native_reference['final']['path']}<=python_scope,
+             'FACTORY_NATIVE_PYTHON_ALIAS_SCOPE')
+        final=native_reference['final']
+        # The frozen bridge/peer runtime requires a canonical native interpreter.
+        # Unit ExecStart aliases have a separate measured reference below.
+        need(final['path']==path and native_reference['links']==[],
+             'FACTORY_NATIVE_PYTHON_CANONICAL_REQUIRED')
+        spec=file_spec(final['path'],final['metadata'])
+        need(final['path'] in measured and file_spec(final['path'],measured[final['path']])==spec,
+             'FACTORY_NATIVE_PYTHON_FINAL_BINDING')
+        result[final['path']]=spec
+    path=native['gatewayIdentity']['exe']
+    need(path in measured,'FACTORY_NATIVE_EXECUTABLE_METADATA');result[path]=file_spec(path,measured[path])
     sections=metadata['sections']
-    scopes={'/usr/bin/python3':{'/usr/bin/python3','/usr/bin/python3.6','/etc/alternatives/python3',
-               '/usr/libexec/platform-python','/usr/libexec/platform-python3.6'},
+    scopes={'/usr/bin/python3':python_scope,
             '/usr/sbin/runuser':{'/usr/sbin/runuser','/usr/bin/runuser'},
             '/usr/sbin/nginx':{'/usr/sbin/nginx','/usr/bin/nginx'}}
     for name,path in (('python_reference','/usr/bin/python3'),('runuser_binary','/usr/sbin/runuser'),('nginx_binary','/usr/sbin/nginx')):
@@ -155,14 +181,40 @@ def build_executable_specs(observation,native_before):
         need(set(proof)=={'reference_path','links','final'} and proof['reference_path']==path and
              {row['path'] for row in proof['links']}|{proof['final']['path']}<=scopes[path],
              'FACTORY_EXECUTABLE_ALIAS_SCOPE')
-        result[path]={'path':path,'kind':'EXECUTABLE_REFERENCE','reference':copy.deepcopy(proof)}
-        final=proof['final'];result.setdefault(final['path'],file_spec(final['path'],final['metadata']))
+        final=proof['final'];spec=file_spec(final['path'],final['metadata'])
+        need(final['path'] not in result or result[final['path']]==spec,'FACTORY_EXECUTABLE_FINAL_CONFLICT')
+        wrapper={'path':path,'kind':'EXECUTABLE_REFERENCE','reference':copy.deepcopy(proof)}
+        need(path not in result or result[path]==wrapper or (path==final['path'] and result[path]==spec),
+             'FACTORY_EXECUTABLE_REFERENCE_CONFLICT')
+        result[path]=wrapper
+        if final['path']!=path:result[final['path']]=spec
     launcher=sections['launcher']['evidence']
     need(launcher['path']=='/home/xuanjun_dev/.openclaw/bin/openclaw' and
          launcher['sha256']==launcher['metadata']['sha256'],'FACTORY_LAUNCHER_BINDING')
     result[launcher['path']]=file_spec(launcher['path'],launcher['metadata'])
     entry=launcher['entry_script'];need(entry['sha256']==entry['metadata']['sha256'],'FACTORY_LAUNCHER_ENTRY_BINDING')
     result[entry['path']]=file_spec(entry['path'],entry['metadata'])
+    from epoch7_openclaw_recipe import DIRECT_WRAPPER_SHA,DIRECT_ENTRY
+    if launcher['sha256']==DIRECT_WRAPPER_SHA:
+        from unit_metadata import validate_node_reference
+        identity=native['gatewayIdentity']
+        reference=validate_node_reference(launcher.get('node_reference'),identity['exe'],identity['sha256'])
+        final=reference['final'];actual=measured[identity['exe']]
+        need(entry['path']==DIRECT_ENTRY and all(actual[k]==final['metadata'][k] for k in
+             ('dev','ino','uid','gid','mode','nlink','size','mtime_ns','ctime_ns','sha256')),
+             'FACTORY_DIRECT_NODE_REFERENCE_BINDING')
+        result[identity['exe']]=dict(result[identity['exe']],node_reference=reference)
+    else:need('node_reference' not in launcher,'FACTORY_ROOT_NODE_REFERENCE_FORBIDDEN')
+    pairs=[spec['python_identity'] for spec in result.values() if 'python_identity' in spec]
+    if pairs:
+        proof=python_identity.validate_pair_proof(pairs[0])
+        need(all(item==proof for item in pairs),'FACTORY_PYTHON_PAIR_PROOF_CONFLICT')
+        for path in python_identity.PYTHON_PATHS:
+            need(path in measured and measured[path].get('python_identity')==proof,
+                 'FACTORY_PYTHON_PAIR_BOTH_MEASURED')
+            spec=file_spec(path,measured[path])
+            need(path not in result or result[path]==spec,'FACTORY_PYTHON_PAIR_SPEC_CONFLICT')
+            result[path]=spec
     return result
 
 
@@ -265,10 +317,11 @@ def boot_before_from_observation(observation,compiled):
 
 def startup_source_specs(observation,facts):
     from epoch7_resource_plan import file_spec
-    from openclaw_metadata import SOURCE_HASHES
+    from epoch7_openclaw_recipe import source_hashes
     value=facts['openclaw_recipe_evidence'];root=value['package_root'];rows=[]
-    need(set(value['files'])==set(SOURCE_HASHES),'FACTORY_COMPLETE_STARTUP_SOURCE_SET')
-    for name,pin in sorted(SOURCE_HASHES.items()):
+    pins=source_hashes(value['launcher']['sha256'])
+    need(set(value['files'])==set(pins),'FACTORY_COMPLETE_STARTUP_SOURCE_SET')
+    for name,pin in sorted(pins.items()):
         row=value['files'][name]
         need(row['sha256']==pin,'FACTORY_STARTUP_SOURCE_PIN')
         rows.append(file_spec(root+'/'+name,dict(row['metadata'],sha256=pin)))
@@ -369,8 +422,9 @@ def _proposal(inputs):
     authorization=required_authorization(delta,inputs['kit_manifest_sha256'],security,additions)
     neutral=preapproval_sequence_contract(delta,authorization)
     native=decode(inputs['native_before']);old=native['ledger']
+    native_transition,unused_native_records=retained_native_transition(s,support,inputs['native_before'])
     native_after=bindings.native_sidefile_delta(inputs['native_before'],compiled,
-        old['files'][old['bridge']],old['files'][old['config']])
+        old['files'][old['bridge']],old['files'][old['config']],native_transition)
     tls_after=tls_metadata_candidate(inputs['tls_journal_before'],compiled['tls_config_bytes'],s['tls'])
     need(sha(inputs['installer_source'])==INSTALLER_SHA,'FACTORY_PINNED_STAGER_SOURCE')
     a=inputs['artifact']
@@ -481,6 +535,8 @@ def prepare_host_inputs(seed):
             'code':'ORIGINAL_FINITE_PROBE_PACKAGE_REQUIRED'}],'install_admission':False,'inputs':None}
     validated_finite_probe(value['observation'])
     compiled=compiled_bytes(value['compiled'])
+    native_transition,unused_native_records=retained_native_transition(
+        value['snapshot'],value['supporting_evidence'],value['native_before'])
     value['candidate']=candidate_from_compiled(compiled,value['snapshot'])
     value['boot_before']=boot_before_from_observation(value['observation'],compiled)
     value['executable_specs']=build_executable_specs(value['observation'],value['native_before'])
@@ -497,7 +553,8 @@ def prepare_host_inputs(seed):
                 'install_admission':False,'inputs':None}
     service=require_complete_service_contract(service)
     old=decode(value['native_before'])['ledger']
-    native_after=bindings.native_sidefile_delta(value['native_before'],compiled,old['files'][old['bridge']],old['files'][old['config']])
+    native_after=bindings.native_sidefile_delta(value['native_before'],compiled,
+        old['files'][old['bridge']],old['files'][old['config']],native_transition)
     views=build_resource_views(value['snapshot'],value['supporting_evidence'],compiled,value['additive_deltas'],
         access,value['source_manifest_raw'],value['source_payloads'],value['installer_source'],native_after,
         value['tls_journal_before'],value['sandbox_candidate_raw'],decode(value['legacy_units_raw']),executable_specs=value['executable_specs'],policy=value['snapshot_policy'],
@@ -576,9 +633,11 @@ def assemble_host_driver(approved_plan_raw,inputs,review_id,review_body_sha256):
     outer_io=HostPhaseFilesystem(authority);retained_io=fs.ProtectedFilesystem(gate)
     installer=FrozenBoundedInstaller(inputs['installer_source'],inputs['artifact']['root'],decode(inputs['native_before'])['ledger']['python'],
         lambda:controls.effect_check(context,'stage_exact_release'),executable,diagnostics)
+    native_transition,native_records=retained_native_transition(inputs['snapshot'],inputs['supporting_evidence'],inputs['native_before'])
     core=CoreHostPhases(outer_io,activation,controls,context,sha(approved_plan_raw),inputs['snapshot'],
         inputs['candidate'],inputs['native_before'],native_after,files[snap.NATIVE],
-        compiled['tls_config_bytes'],installer,inputs['artifact'])
+        compiled['tls_config_bytes'],installer,inputs['artifact'],
+        native_transition=native_transition,native_proof_metadata=native_records)
     guards.bind(gate,retained_io,core,controls)
     checks=RuntimeAcceptanceChecks(context,inputs['acceptance_access_rows'],tls,controls.effect_check,
         diagnostics,d.digest(acceptance))

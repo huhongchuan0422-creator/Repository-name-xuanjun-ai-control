@@ -1,0 +1,54 @@
+{
+  "aggregate": [
+    {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "c4d2279e1d547bcb56a84eb2f54f0171b6d0f54725370936da385f9798f1be5a",
+      "python_version": "3.12.14",
+      "skipped": 9,
+      "test_map_sha256": "283ce53fe03e2db5060f6283959841843375dff18e647d1d824ae889e11e94ef",
+      "tests": 1973
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "72d49151e92b339ac6bcc8435f5634e5ff5c6d4c01fff1e5560a18547e8ea22c",
+      "python_version": "3.6.8",
+      "skipped": 9,
+      "test_map_sha256": "283ce53fe03e2db5060f6283959841843375dff18e647d1d824ae889e11e94ef",
+      "tests": 1973
+    }
+  ],
+  "delta_scope": [
+    "helpers/epoch7_owner_prerequisite.py",
+    "tests/owner_prerequisite/test_epoch7_owner_prerequisite.py"
+  ],
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "final_prerequisite_delta": [
+    {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "fb56c261af99942986b167cbeca25d168261c89285bfd2ff8fd44ea160d7b486",
+      "python_version": "3.12.14",
+      "skipped": 0,
+      "test_map_sha256": "6ef0eee2360551baf42f875529d76acc2d1b12471928c1b894e4453d47487b05",
+      "tests": 63
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "log_sha256": "e44c2843137aebde956b390517d7dff03e299f919bfbdbe0c9b6de00f21393d1",
+      "python_version": "3.6.8",
+      "skipped": 0,
+      "test_map_sha256": "6ef0eee2360551baf42f875529d76acc2d1b12471928c1b894e4453d47487b05",
+      "tests": 63
+    }
+  ],
+  "final_source_index_sha256": "d10e50a9cb5dabe5529ab699a82bf5c77c3c3d2e879db5666f10f89ea6b0d7a3",
+  "host_operations": "NOT_RUN",
+  "kind": "LOCAL_INCREMENTAL_VALIDATION_NOT_HOSTED_CI",
+  "production_admission": "NOT_GRANTED",
+  "remaining_required_socket_tests": 9,
+  "runtime_manifest_sha256": "26ae77d8fff38c8a69ddcf3e35caeb18d4724ab17eca8fbecf9dc4f76bc797aa",
+  "schema": 1
+}

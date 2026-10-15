@@ -86,6 +86,13 @@ class ObservationIO(ObservationReader, concrete.LocalReadOnlyIO):
         self.observed_metadata[name] = result[1]
         return result
 
+    def read_python(self, name, maximum=33554432):
+        result = concrete.LocalReadOnlyIO.read_python(self, name, maximum=maximum)
+        proof = concrete.python_identity.validate_pair_proof(result[1]['python_identity'])
+        for member, row in proof['sample']['files'].items():
+            self.observed_metadata[member] = dict(row, python_identity=proof)
+        return result
+
 
 def measured_policy(io):
     """Bounded discovery from fixed roots and protected journal-declared whitelists.
@@ -101,7 +108,8 @@ def measured_policy(io):
     for name in sorted(c.MANDATORY_FILES | BOOTSTRAP | {READINESS}): measure(name)
     c.need(c.sha(raw[c.PLAN]) == ORIGINAL_PLAN_SHA, 'OBSERVATION_ORIGINAL_PLAN_PIN')
     c.need(c.sha(raw[READINESS]) == READINESS_SHA, 'OBSERVATION_READINESS_PIN')
-    c.need(c.sha(raw[c.NATIVE]) == c.RETAINED_NATIVE_SHA, 'OBSERVATION_RETAINED_NATIVE_PIN')
+    c.validate_native_transition(raw[c.NATIVE], raw[c.NATIVE_PRIOR],
+                                 raw[c.NATIVE_ORIGINAL], raw[c.NATIVE_ATTEMPT])
     transaction = io.inventory(c.TRANSACTION)
     c.need(0 < len(transaction) <= 4096, 'OBSERVATION_TRANSACTION_BOUND')
     for name, digest in transaction.items():

@@ -1,7 +1,7 @@
 """Public test fixture: real107 runtime/source compilers, synthetic host facts.
 
-Only epoch7_bindings.RETAINED_NATIVE_SHA is test-mapped to the synthetic retained
-sidefile. No compiler, approval, observation parser or COMPLETE result is mocked.
+Only the central validator's four immutable private byte pins are test-mapped
+to synthetic retained evidence. No validator or compiler result is mocked.
 This module never observes or mutates production paths and grants no authority.
 """
 import base64
@@ -22,6 +22,7 @@ from test_epoch7_delta import fixture as delta_fixture
 from test_node_sqlite_probe import fixture_attempt,fixture_proof
 import node_sqlite_probe as np
 import activation_control
+from test_snapshot import native_transition_fixture,native_pin_context
 
 
 def packed(value):return d.canonical(value)+b'\n'
@@ -34,8 +35,20 @@ def directory(uid=0,gid=0,mode=0o755,ino=500):
             'mtime_ns':11,'ctime_ns':12,'access_acl':decode_acl(None,mode),'default_acl':''}
 
 
-def make_seed():
-    args,unused=complete_fixture();service,identities,native_gateway,gateway_raw,facts=copy.deepcopy(args)
+def native_fixture_raws(seed):
+    value=json.loads(seed['native_before'].decode());ledger=value['ledger'];previous=ledger['bridge']
+    original='/opt/xuanjun-control-releases/integration-'+snap.NATIVE_ORIGINAL_RELEASE[:16]+'/stage1/native_ledger_bridge.py'
+    ledger['bridge']=original;ledger['files'][original]=ledger['files'].pop(previous)
+    raws=native_transition_fixture(value)
+    if raws[0]!=seed['native_before']:raise ValueError('SYNTHETIC_NATIVE_BYTES_CHANGED')
+    return raws
+
+
+def native_pins(seed):return native_pin_context(native_fixture_raws(seed))
+
+
+def make_seed(service_fixture=complete_fixture):
+    args,unused=service_fixture();service,identities,native_gateway,gateway_raw,facts=copy.deepcopy(args)
     compiled,unused,manifest_raw,rendered,acceptance=access_fixture()
     package=pathlib.Path(activation_control.__file__).resolve().parent.parent
     manifest=json.loads(manifest_raw.decode());payloads={p:(package/p).read_bytes() for p in manifest['files']}
@@ -65,11 +78,14 @@ def make_seed():
         'gateway_service':runtime.GATEWAY_SERVICE,'openclaw_bin':oc.LAUNCHER,'service_user':'xuanjun_dev',
         'source':'plugins/p2-native-controller','binding_file':f.bindings.BINDING,
         'binding_sha256':h.sha(compiled['rendered_targets'][f.bindings.BINDING])})
-    old_bridge='/opt/xuanjun-control-releases/integration-'+f.bindings.RETAINED_NATIVE_RELEASE[:16]+'/stage1/native_ledger_bridge.py'
+    old_bridge='/opt/xuanjun-control-releases/integration-'+snap.NATIVE_ORIGINAL_RELEASE[:16]+'/stage1/native_ledger_bridge.py'
     newledger=json.loads(compiled['rendered_targets'][f.bindings.BINDING].decode())['ledger']
     oldledger=copy.deepcopy(newledger);oldledger.update(bridge=old_bridge,files={old_bridge:d.digest('synthetic retained bridge'),
         f.bindings.CLIENT:h.sha(compiled['old_rendered_targets'][f.bindings.CLIENT])})
-    native=packed({'ledger':oldledger,'gatewayIdentity':json.loads(native_gateway.decode())['gatewayIdentity']})
+    native_raws=native_transition_fixture({'ledger':oldledger,'gatewayIdentity':json.loads(native_gateway.decode())['gatewayIdentity']})
+    native,native_prior,native_original,native_attempt=native_raws
+    oldledger=json.loads(native.decode())['ledger'];old_bridge=oldledger['bridge']
+    with native_pin_context(native_raws):native_transition=snap.validate_native_transition(*native_raws)
     legacy={'schema':1,'units':{},'source_before':{}}
     for unit in (oc.GATEWAY,'xuanjun-uk-stage1-minimal.service'):
         raw=gateway_raw if unit==oc.GATEWAY else b'[Service]\nExecStart=/bin/false\n'
@@ -88,7 +104,8 @@ def make_seed():
         'state':'PUBLISHED','dev':8,'ino':700+i,'fingerprint':d.digest(path)} for i,path in enumerate(sorted(snap.PUBLISHERS))]}
     publisher_raw=packed(publishers)
     special={'legacy-units.json':legacy_raw,'tls-lifecycle.json':tls_before,'epoch6-runtime-provisioning.json':prior,
-             'publisher-bootstrap.json':publisher_raw}
+             'publisher-bootstrap.json':publisher_raw,'epoch5-prior-native-binding.json':native_prior,
+             'epoch5-recovery-execution.json':native_attempt}
     files={p:meta(packed({'fixture':p}),mode=0o600) for p in snap.MANDATORY_FILES}
     for path,row in snapshot['targets'].items():
         if row['kind']=='FILE':files[path]=copy.deepcopy(row)
@@ -96,6 +113,7 @@ def make_seed():
         raw=special.get(name,packed({'synthetic':name}));files[snap.TRANSACTION+'/'+name]=meta(raw,mode=0o600)
         snapshot['receipts'][name]=h.sha(raw)
     snapshot['attempt']['sha256']=snapshot['receipts']['epoch5-recovery-execution.json']
+    files[snap.NATIVE_ORIGINAL]=meta(native_original,mode=0o600)
     snapshot['sandbox']['journal_sha256']=snapshot['receipts']['sandbox-profile.json']
     for path,raw,owner,group,mode in ((snap.NATIVE,native,0,0,0o644),(snap.PROFILE,profile,1002,1002,0o600),
             (snap.ACTIVE,packed(snapshot['activation']),0,0,0o644),(snap.EPOCHS,b'synthetic epoch chain\n',0,0,0o644),
@@ -137,9 +155,12 @@ def make_seed():
         if label=='nginx_binary':row['sha256']=facts['executables'][path]['sha256']
         ref=reference(path,path,row);sections[label]['evidence']=dict(ref['final'],reference=ref);files[path]=row
     wrapper_sha=source['launcher']['sha256'];wrapperrow=meta(b'synthetic wrapper',1002,1002,0o755);wrapperrow['sha256']=wrapper_sha
-    entry=source['package_root']+'/openclaw.mjs';entryrow=dict(source['files']['openclaw.mjs']['metadata'],sha256=oc.SOURCE_HASHES['openclaw.mjs'])
+    entry=source['launcher']['recipe']['entry_script'];relative=entry[len(source['package_root'])+1:]
+    entryrow=dict(source['files'][relative]['metadata'],sha256=oc.source_hashes(wrapper_sha)[relative])
     sections['launcher']['evidence']={'path':oc.LAUNCHER,'sha256':wrapper_sha,'metadata':wrapperrow,
         'entry_script':{'path':entry,'sha256':entryrow['sha256'],'metadata':entryrow},'recipe':source['launcher']['recipe']}
+    if 'node_reference' in source['launcher']:
+        sections['launcher']['evidence']['node_reference']=copy.deepcopy(source['launcher']['node_reference'])
     sections['legacy_gateway']['evidence'].update(backup_path=legacy['units'][oc.GATEWAY]['backup'],
         backup_sha256=h.sha(gateway_raw),journal_sha256=h.sha(legacy_raw),original_unit={k:legacy['units'][oc.GATEWAY][k] for k in ('path','sha256','uid','gid','mode')},
         public_service_fields=acceptance['gateway_base_unit']['public_service_fields'],
@@ -179,7 +200,7 @@ def make_seed():
         'publisher_reference_sha256':d.digest('publisher ref'),'publisher_journal_sha256':h.sha(publisher_raw),
         'publisher_fingerprint_sha256':d.digest('publisher fp'),'git_sha256':files['/usr/bin/git']['sha256']}
     compiled['control_repository_reconciliation']={'observation':control,'observation_sha256':d.digest(control)}
-    retained={'files':files,'native_components':{'components':components},'prerequisites':prerequisites,
+    retained={'files':files,'native_components':{'components':components},'native_binding_transition':native_transition,'prerequisites':prerequisites,
         'release_evidence':release_evidence,'database_sets':databases,'tls':{'file_metadata':{}},
         'bootstrap':acceptance['bootstrap'],'control_git':control}
     # Complete source profile + MIME bytes are public fixture content only.
@@ -195,12 +216,15 @@ def make_seed():
     observation['source_review_inputs']=source_review;observation['source_review_inputs_sha256']=d.digest(source_review)
     # Every source ancestor is explicitly synthetic/pinned, never a host default.
     dirs={'/':{'uid':0,'gid':0,'mode':0o755}}
-    allpaths=set(files)|set(components)|{source['package_root']+'/'+name for name in oc.SOURCE_HASHES}|{mime['path'],oc.LAUNCHER,entry}
+    allpaths=set(files)|set(components)|{source['package_root']+'/'+name for name in oc.source_hashes(wrapper_sha)}|{mime['path'],oc.LAUNCHER,entry}
     for path in allpaths|set(snap.DATABASES):
         parent=os.path.dirname(path)
         while parent!='/':
             dirs[parent]={'uid':0,'gid':0,'mode':0o700 if parent==snap.TRANSACTION or parent.startswith(snap.TRANSACTION+'/') else 0o755}
             parent=os.path.dirname(parent)
+    if 'node_reference' in source['launcher']:
+        for path,row in source['launcher']['node_reference']['ancestors'].items():
+            dirs[path]={k:row[k] for k in ('uid','gid','mode')}
     dirs[d.GENERATION]={'uid':1003,'gid':1006,'mode':0o750};dirs['/opt/xuanjun-control-releases']={'uid':0,'gid':0,'mode':0o750}
     policy={'schema':1,'kind':'EPOCH7_MEASURED_READ_ONLY_PINS','hostname':snap.HOST,'transaction_id':d.TX,
         'owner_evidence_sha256':d.digest('synthetic owner'),'files':{p:{k:v[k] for k in ('sha256','uid','gid','mode')} for p,v in files.items()},

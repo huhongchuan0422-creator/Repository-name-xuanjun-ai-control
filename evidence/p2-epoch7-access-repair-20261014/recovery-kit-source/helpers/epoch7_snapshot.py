@@ -23,6 +23,17 @@ PLAN = CAND + '/protected-core-install-plan.json'
 NATIVE = '/etc/xuanjun-development/p2-native-binding.json'
 RETAINED_NATIVE_SHA = '91c65c9fbc5c2cf68648672b4c096d7df376ecfbc605bc4cc838300bd302f629'
 RETAINED_NATIVE_RELEASE = '338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09'
+# Historical pins above remain the preserved BEFORE, never the live sidefile.
+NATIVE_ORIGINAL_SHA = '94598c41b7b3342ee7be5206577d127a3c3e90f06972a2160ffdd35e6949da98'
+NATIVE_ORIGINAL_RELEASE = '9bb1d7ae186e43b4ea9fa720f7368475af3979d225bee830db4ac90b5083b1e3'
+NATIVE_CURRENT_SHA = 'c0766fd42f0f4ab25bffa03bb6620910e9d1cd5c6a90315d94a922b5cdf6dd7a'
+NATIVE_ATTEMPT_SHA = '4eb5090ee3f094ae73116bf59412756681641be3df613cad183d8f7b06597e3a'
+NATIVE_PRIOR = TRANSACTION + '/epoch5-prior-native-binding.json'
+NATIVE_ORIGINAL = TRANSACTION + '/epoch3-prior-receipts/native-binding-original.json'
+NATIVE_ATTEMPT = TRANSACTION + '/epoch5-recovery-execution.json'
+NATIVE_PHASES = ('stage_exact_release', 'preserve_prior_receipts', 'rebind_prepared_epoch',
+    'quiesce_exact_epoch', 'provision_from_retained_resources', 'reopen_existing_database',
+    'activate_exact_epoch', 'activate_new_services', 'post_install_checks')
 PROFILE = '/home/xuanjun_dev/.openclaw/openclaw.json'
 TLS = '/var/lib/xuanjun-development/tls-acme'
 TLS_CONFIG = '/etc/xuanjun-development/tls-renewal.json'
@@ -102,6 +113,106 @@ def relative(value):
     return value
 
 
+def _native_transform(raw, before_release, after_release):
+    """Exactly the reviewed epoch5 bridge-path-only transform; no I/O."""
+    need(type(raw) is bytes and 0 < len(raw) <= 65536, 'NATIVE_TRANSITION_BYTES_BOUND')
+    value = decode(raw)
+    d.keys(value, ('ledger', 'gatewayIdentity'), 'NATIVE_BINDING_SCHEMA')
+    ledger = value['ledger']
+    d.keys(ledger, ('python', 'pythonSha256', 'bridge', 'config', 'files'), 'NATIVE_LEDGER_SCHEMA')
+    old = '/opt/xuanjun-control-releases/integration-' + before_release[:16] + '/stage1/native_ledger_bridge.py'
+    new = '/opt/xuanjun-control-releases/integration-' + after_release[:16] + '/stage1/native_ledger_bridge.py'
+    client = '/etc/xuanjun-development/p2-native-ledger-client.json'
+    need(ledger['bridge'] == old and ledger['config'] == client and
+         type(ledger['files']) is dict and set(ledger['files']) == {old, client}, 'NATIVE_BINDING_PATHS')
+    path(ledger['python']); d.hash_value(ledger['pythonSha256'])
+    for digest in ledger['files'].values(): d.hash_value(digest)
+    gateway = value['gatewayIdentity']
+    d.keys(gateway, ('user', 'exe', 'sha256', 'cgroup'), 'NATIVE_GATEWAY_KEYS')
+    need(gateway['user'] == 'xuanjun_dev' and
+         gateway['cgroup'] == '/system.slice/xuanjun-uk-openclaw.service', 'NATIVE_GATEWAY_IDENTITY')
+    path(gateway['exe']); d.hash_value(gateway['sha256'])
+    ledger['bridge'] = new; ledger['files'][new] = ledger['files'].pop(old)
+    return d.canonical(value) + b'\n'
+
+
+def _native_transition_evidence():
+    return {'schema': 1, 'kind': 'EPOCH5_NATIVE_REBIND_COMPLETED',
+        'phase': 'rebind_prepared_epoch', 'approval_id': 6170703284,
+        'attempt_sha256': NATIVE_ATTEMPT_SHA, 'original_sha256': NATIVE_ORIGINAL_SHA,
+        'before_sha256': RETAINED_NATIVE_SHA, 'after_sha256': NATIVE_CURRENT_SHA,
+        'before_release_sha256': RETAINED_NATIVE_RELEASE, 'after_release_sha256': d.OLD_MANIFEST,
+        'original_preserved': True}
+
+
+def validate_native_transition_evidence(evidence, current_raw):
+    """Validate a digest-bound collector projection and exact current bytes.
+
+    This pure check does not authenticate caller provenance. Downstream callers
+    must bind evidence to the protected observation and complete approval gate.
+    """
+    need(type(evidence) is dict and d.same(evidence, _native_transition_evidence()),
+         'NATIVE_TRANSITION_EVIDENCE')
+    need(type(current_raw) is bytes and 0 < len(current_raw) <= 65536 and
+         sha(current_raw) == NATIVE_CURRENT_SHA, 'NATIVE_CURRENT_EXACT_BYTES')
+    need(_native_transform(current_raw, d.OLD_MANIFEST, d.OLD_MANIFEST) == current_raw,
+         'NATIVE_CURRENT_CANONICAL_BYTES')
+    need(sha(_native_transform(current_raw, d.OLD_MANIFEST, RETAINED_NATIVE_RELEASE)) == RETAINED_NATIVE_SHA,
+         'NATIVE_HISTORICAL_REVERSE_TRANSFORM')
+    return copy.deepcopy(evidence)
+
+
+def validate_native_transition(current_raw, prior_raw, original_raw, attempt_raw):
+    """Recognize only the already completed owned epoch5 native rebind.
+
+    Callers read the four fixed paths with protected metadata/no-follow checks.
+    No live file, journal, approval or historical pin is changed here.
+    """
+    for raw in (current_raw, prior_raw, original_raw):
+        need(type(raw) is bytes and 0 < len(raw) <= 65536, 'NATIVE_TRANSITION_BYTES_BOUND')
+    need(type(attempt_raw) is bytes and 0 < len(attempt_raw) <= 1048576, 'NATIVE_ATTEMPT_BOUND')
+    need(sha(prior_raw) == RETAINED_NATIVE_SHA and sha(original_raw) == NATIVE_ORIGINAL_SHA,
+         'NATIVE_PRESERVED_BEFORE_PIN')
+    need(sha(attempt_raw) == NATIVE_ATTEMPT_SHA, 'NATIVE_OWNED_ATTEMPT_PIN')
+    attempt = decode(attempt_raw)
+    need(type(attempt) is dict and type(attempt.get('schema')) is int and attempt['schema'] == 1 and
+         attempt.get('stage') == 'HOLD' and attempt.get('automatic_retry') is False and
+         attempt.get('historical_replay') is False and attempt.get('legacy_restart') is False and
+         attempt.get('production_acceptance') == 'PENDING', 'NATIVE_OWNED_ATTEMPT_SCOPE')
+    authorization = attempt.get('authorization', {})
+    need(type(authorization) is dict and type(authorization.get('review_id')) is int and
+         authorization['review_id'] == 6170703284, 'NATIVE_OWNED_APPROVAL')
+    approval = authorization.get('approval')
+    expected = {'schema': 1, 'reviewer': 'CHATGPT_NATIVE_TASK5',
+        'decision': 'APPROVED_ONE_EXACT_EPOCH5_RESUME_WITH_FENCED_RETAIN_ON_FAILURE',
+        'transaction_id': d.TX, 'runtime_manifest_sha256': d.OLD_MANIFEST,
+        'expected_epoch': 5, 'proposed_prepared_epoch': 6, 'authorized_attempts': 1,
+        'failure_policy': 'FENCE_STOP_RETAIN_NO_REPLAY', 'legacy_restart': False,
+        'historical_notification_replay': False, 'production_acceptance': 'PENDING'}
+    need(type(approval) is dict and all(k in approval and d.same(approval[k], v) for k, v in expected.items()),
+         'NATIVE_OWNED_APPROVAL_BINDING')
+    d.hash_value(authorization.get('body_sha256'))
+    for attempt_key, approval_key in (('plan_sha256', 'recovery_plan_sha256'),
+            ('kit_manifest_sha256', 'recovery_kit_manifest_sha256'), ('snapshot_sha256', 'snapshot_sha256')):
+        d.hash_value(attempt.get(attempt_key))
+        need(attempt[attempt_key] == approval.get(approval_key), 'NATIVE_OWNED_APPROVAL_HASH_BINDING')
+    completed = attempt.get('completed'); phases = attempt.get('phase_evidence')
+    need(type(completed) is list and 3 <= len(completed) <= len(NATIVE_PHASES) and
+         completed == list(NATIVE_PHASES[:len(completed)]) and type(phases) is dict and
+         set(phases) == set(completed) and all(type(v) is dict and v for v in phases.values()),
+         'NATIVE_OWNED_PHASE_ORDER')
+    phase = phases['rebind_prepared_epoch']
+    d.keys(phase, ('descriptor_sha256', 'epoch', 'native_binding', 'tls_reference_sha256'), 'NATIVE_REBIND_PHASE_KEYS')
+    need(type(phase['epoch']) is int and phase['epoch'] == 6, 'NATIVE_REBIND_EPOCH')
+    for key in ('descriptor_sha256', 'tls_reference_sha256'): d.hash_value(phase[key])
+    need(d.same(phase['native_binding'], {'old_sha256': sha(prior_raw), 'new_sha256': sha(current_raw),
+                                        'original_preserved': True}), 'NATIVE_OWNED_REBIND_HASHES')
+    need(_native_transform(original_raw, NATIVE_ORIGINAL_RELEASE, RETAINED_NATIVE_RELEASE) == prior_raw and
+         _native_transform(original_raw, NATIVE_ORIGINAL_RELEASE, d.OLD_MANIFEST) == current_raw,
+         'NATIVE_EXACT_COMPLETED_TRANSFORM')
+    return validate_native_transition_evidence(_native_transition_evidence(), current_raw)
+
+
 def validate_policy(p):
     d.keys(p, POLICY_KEYS, 'MEASURED_POLICY_KEYS')
     need(type(p['schema']) is int and p['schema'] == 1 and
@@ -116,7 +227,7 @@ def validate_policy(p):
         d.hash_value(pin['sha256'])
         for key in ('uid', 'gid', 'mode'): d.integer(pin[key])
         need(pin['mode'] <= 0o777 and not pin['mode'] & 0o022, 'PIN_FILE_AUTHORITY')
-    for name in set(TRANSACTION + '/' + n for n in d.PRESERVED_RECEIPTS) | {PLAN}:
+    for name in set(TRANSACTION + '/' + n for n in d.PRESERVED_RECEIPTS) | {PLAN, NATIVE_ORIGINAL}:
         need(tuple(files[name][k] for k in ('uid', 'gid', 'mode')) == (0, 0, 0o600),
              'PROTECTED_RECEIPT_PIN')
     for name, expected in ((NATIVE,(0,0,0o644)),(PROFILE,(1002,1002,0o600)),
@@ -351,14 +462,8 @@ def collect(policy, io):
     profile = decode(raw[PROFILE]); plugins = profile.get('plugins', {})
     need(isinstance(plugins, dict) and all(PLUGIN not in plugins.get(k, {}) for k in ('entries', 'installs')) and
          PLUGIN not in plugins.get('allow', []), 'PLUGIN_REGISTERED')
-    need(sha(raw[NATIVE]) == RETAINED_NATIVE_SHA, 'NATIVE_RETAINED_EXACT_BYTES')
-    native = decode(raw[NATIVE]); original = decode(raw[TRANSACTION + '/epoch3-prior-receipts/native-binding-original.json'])
-    need(set(native) == set(original) == {'ledger', 'gatewayIdentity'}, 'NATIVE_BINDING_SCHEMA')
-    transformed = copy.deepcopy(original); ledger = transformed['ledger']; old_bridge = ledger['bridge']
-    new_bridge = '/opt/xuanjun-control-releases/integration-' + RETAINED_NATIVE_RELEASE[:16] + '/stage1/native_ledger_bridge.py'
-    need(old_bridge in ledger['files'] and ledger['config'] == '/etc/xuanjun-development/p2-native-ledger-client.json', 'NATIVE_BINDING_PATH')
-    ledger['bridge'] = new_bridge; ledger['files'][new_bridge] = ledger['files'].pop(old_bridge)
-    need(native == transformed, 'NATIVE_BINDING_REBIND_DRIFT')
+    native_transition = validate_native_transition(raw[NATIVE], raw[NATIVE_PRIOR], raw[NATIVE_ORIGINAL], raw[NATIVE_ATTEMPT])
+    native = decode(raw[NATIVE])
     need(tuple(files[NATIVE][k] for k in ('uid','gid','mode')) == (0,0,0o644), 'NATIVE_BINDING_AUTHORITY')
     native_components = io.native_identity(native, decode(raw['/etc/xuanjun-development/p2-native-controller.binding.json']))
     bootstrap = decode(raw[TRANSACTION + '/bootstrap-files.json'])
@@ -405,7 +510,8 @@ def collect(policy, io):
     io.check_locks()
     retained = {'schema': 1, 'policy_sha256': d.digest(p), 'files': files, 'activation_chain': chain,
         'transaction_inventory': tx_inventory, 'transaction_directories': tx_directories, 'database_sets': db_sets, 'tls': tls_observed,
-        'bootstrap': bootstrap_evidence, 'native_components': native_components, 'prerequisites': prerequisites, 'publishers': publishers, 'control_git': control_git, 'release_evidence': caches,
+        'bootstrap': bootstrap_evidence, 'native_components': native_components,
+        'native_binding_transition': native_transition, 'prerequisites': prerequisites, 'publishers': publishers, 'control_git': control_git, 'release_evidence': caches,
         'additive_paths_absent': sorted(ADDITIVE_PATHS), 'production_sockets_absent': sorted(SOCKET_PATHS),
         'plugin_path_absent': PLUGIN_PATH}
     db = db_sets[d.DB]['file']

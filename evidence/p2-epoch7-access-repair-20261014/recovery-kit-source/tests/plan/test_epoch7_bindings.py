@@ -3,6 +3,8 @@ import json
 import pathlib
 import unittest
 import epoch7_bindings as m
+import epoch7_snapshot as snap
+from test_snapshot import native_transition_fixture, native_pin_context
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BASE = ROOT/'p2-epoch5-repair/runtime-v4-extracted/xuanjun-p2-package'
@@ -201,28 +203,47 @@ class NativeSidefileTests(unittest.TestCase):
     raw = BindingsTests.raw
     call = BindingsTests.call
     def fixture(self):
-        from unittest.mock import patch
         v=self.call();ledger=copy.deepcopy(json.loads(v['old_rendered_targets'][m.BINDING].decode())['ledger'])
-        previous=ledger['bridge'];retained='/opt/xuanjun-control-releases/integration-'+m.RETAINED_NATIVE_RELEASE[:16]+'/stage1/native_ledger_bridge.py'
-        ledger['bridge']=retained;ledger['files'][retained]=ledger['files'].pop(previous)
-        raw=(json.dumps({'ledger':ledger,'gatewayIdentity':{'fixture':'PRIVATE_UNCHANGED'}},sort_keys=True)+'\n').encode()
-        return v,raw,ledger['files'][retained],ledger['files'][m.CLIENT],patch.object(m,'RETAINED_NATIVE_SHA',m.sha(raw))
+        previous=ledger['bridge'];original='/opt/xuanjun-control-releases/integration-'+snap.NATIVE_ORIGINAL_RELEASE[:16]+'/stage1/native_ledger_bridge.py'
+        ledger['bridge']=original;ledger['files'][original]=ledger['files'].pop(previous)
+        gateway={'user':'xuanjun_dev','exe':'/home/xuanjun_dev/bin/node','sha256':'b'*64,
+                 'cgroup':'/system.slice/xuanjun-uk-openclaw.service'}
+        raws=native_transition_fixture({'ledger':ledger,'gatewayIdentity':gateway})
+        with native_pin_context(raws):proof=snap.validate_native_transition(*raws)
+        return v,raws[0],ledger['files'][original],ledger['files'][m.CLIENT],native_pin_context(raws),proof
     def test_native_retained_gateway_identity_preserved(self):
-        v,raw,b,c,p=self.fixture()
-        with p: after=m.native_sidefile_delta(raw,v,b,c)
-        a=json.loads(after.decode());self.assertEqual(a['gatewayIdentity'],{'fixture':'PRIVATE_UNCHANGED'})
+        v,raw,b,c,p,proof=self.fixture()
+        with p: after=m.native_sidefile_delta(raw,v,b,c,proof)
+        a=json.loads(after.decode());self.assertEqual(a['gatewayIdentity'],json.loads(raw.decode())['gatewayIdentity'])
         self.assertEqual(a['ledger'],json.loads(v['rendered_targets'][m.BINDING].decode())['ledger'])
     def test_native_wrong_before_hash_rejected(self):
-        v,raw,b,c,p=self.fixture()
-        with self.assertRaisesRegex(ValueError,'NATIVE_RETAINED_BYTES'):m.native_sidefile_delta(raw,v,b,c)
+        v,raw,b,c,p,proof=self.fixture()
+        with self.assertRaisesRegex(ValueError,'NATIVE_TRANSITION_EVIDENCE'):m.native_sidefile_delta(raw,v,b,c,proof)
     def test_native_before_file_pin_drift_rejected(self):
-        v,raw,b,c,p=self.fixture()
+        v,raw,b,c,p,proof=self.fixture()
         with p:
-            with self.assertRaisesRegex(ValueError,'NATIVE_OLD_FILE_PINS'):m.native_sidefile_delta(raw,v,'0'*64,c)
+            with self.assertRaisesRegex(ValueError,'NATIVE_OLD_FILE_PINS'):m.native_sidefile_delta(raw,v,'0'*64,c,proof)
     def test_native_interpreter_change_rejected(self):
-        v,raw,b,c,p=self.fixture();payload=json.loads(v['rendered_targets'][m.BINDING].decode());payload['ledger']['python']='/bin/other'
+        v,raw,b,c,p,proof=self.fixture();payload=json.loads(v['rendered_targets'][m.BINDING].decode());payload['ledger']['python']='/bin/other'
         v['rendered_targets'][m.BINDING]=json.dumps(payload).encode()
         with p:
-            with self.assertRaisesRegex(ValueError,'NATIVE_COMPILED_TARGET_DRIFT'):m.native_sidefile_delta(raw,v,b,c)
+            with self.assertRaisesRegex(ValueError,'NATIVE_COMPILED_TARGET_DRIFT'):m.native_sidefile_delta(raw,v,b,c,proof)
+    def test_native_current_requires_exact_owned_proof(self):
+        for kind in ('missing','approval','prior','after','preserved'):
+            v,raw,b,c,p,proof=self.fixture()
+            if kind=='missing':proof=None
+            elif kind=='approval':proof['approval_id']+=1
+            elif kind=='prior':proof['before_sha256']='0'*64
+            elif kind=='after':proof['after_release_sha256']=m.RETAINED_NATIVE_RELEASE
+            else:proof['original_preserved']=False
+            with self.subTest(kind=kind),p,self.assertRaisesRegex(ValueError,'NATIVE_TRANSITION_EVIDENCE'):
+                m.native_sidefile_delta(raw,v,b,c,proof)
+    def test_prior_or_reformatted_bytes_are_not_current(self):
+        v,raw,b,c,p,proof=self.fixture()
+        prior=raw.replace(snap.d.OLD_MANIFEST[:16].encode(),m.RETAINED_NATIVE_RELEASE[:16].encode())
+        with p:
+            for altered in (prior,raw+b' ',raw.replace(b'xuanjun_dev',b'changed')):
+                with self.assertRaisesRegex(ValueError,'NATIVE_CURRENT_EXACT_BYTES'):
+                    m.native_sidefile_delta(altered,v,b,c,proof)
 
 if __name__=='__main__':unittest.main()

@@ -26,6 +26,52 @@ def packed(v): return d.canonical(v) + b'\n'
 def h(v): return hashlib.sha256(v.encode()).hexdigest()
 
 
+def native_transition_fixture(original=None):
+    """Synthetic bytes, never actual UK evidence or an authority bypass."""
+    old = '/opt/xuanjun-control-releases/integration-' + c.NATIVE_ORIGINAL_RELEASE[:16] + '/stage1/native_ledger_bridge.py'
+    client = '/etc/xuanjun-development/p2-native-ledger-client.json'
+    if original is None:
+        original = {'ledger': {'python': '/usr/bin/python3', 'pythonSha256': h('python'), 'bridge': old,
+            'config': client, 'files': {old: h('bridge'), client: h('historical client')}},
+            'gatewayIdentity': {'user': 'xuanjun_dev', 'exe': '/home/xuanjun_dev/bin/node',
+                'sha256': h('node'), 'cgroup': '/system.slice/xuanjun-uk-openclaw.service'}}
+    original = copy.deepcopy(original)
+    def rendered(release):
+        value = copy.deepcopy(original); ledger = value['ledger']; previous = ledger['bridge']
+        bridge = '/opt/xuanjun-control-releases/integration-' + release[:16] + '/stage1/native_ledger_bridge.py'
+        ledger['bridge'] = bridge; ledger['files'][bridge] = ledger['files'].pop(previous)
+        return packed(value)
+    prior, current = rendered(c.RETAINED_NATIVE_RELEASE), rendered(d.OLD_MANIFEST)
+    approval = {'schema': 1, 'reviewer': 'CHATGPT_NATIVE_TASK5',
+        'decision': 'APPROVED_ONE_EXACT_EPOCH5_RESUME_WITH_FENCED_RETAIN_ON_FAILURE',
+        'transaction_id': d.TX, 'runtime_manifest_sha256': d.OLD_MANIFEST,
+        'expected_epoch': 5, 'proposed_prepared_epoch': 6, 'authorized_attempts': 1,
+        'failure_policy': 'FENCE_STOP_RETAIN_NO_REPLAY', 'legacy_restart': False,
+        'historical_notification_replay': False, 'production_acceptance': 'PENDING',
+        'recovery_plan_sha256': h('plan'), 'recovery_kit_manifest_sha256': h('kit'), 'snapshot_sha256': h('snapshot')}
+    completed = list(c.NATIVE_PHASES[:5])
+    phases = {phase: {'fixture': True} for phase in completed}
+    phases['rebind_prepared_epoch'] = {'epoch': 6, 'descriptor_sha256': h('epoch6'),
+        'tls_reference_sha256': h('tls candidate'), 'native_binding': {
+            'old_sha256': c.sha(prior), 'new_sha256': c.sha(current), 'original_preserved': True}}
+    attempt = {'schema': 1, 'stage': 'HOLD', 'automatic_retry': False, 'historical_replay': False,
+        'legacy_restart': False, 'production_acceptance': 'PENDING', 'completed': completed, 'phase_evidence': phases,
+        'authorization': {'review_id': 6170703284, 'body_sha256': h('approval'), 'approval': approval},
+        'plan_sha256': h('plan'), 'kit_manifest_sha256': h('kit'), 'snapshot_sha256': h('snapshot')}
+    return current, prior, packed(original), packed(attempt)
+
+
+def native_raws(backend):
+    return tuple(backend.raw[name] for name in (c.NATIVE, c.NATIVE_PRIOR, c.NATIVE_ORIGINAL, c.NATIVE_ATTEMPT))
+
+
+def native_pin_context(raws):
+    """Only map immutable byte pins for explicitly synthetic local fixtures."""
+    current, prior, original, attempt = raws
+    return mock.patch.multiple(c, NATIVE_CURRENT_SHA=c.sha(current), RETAINED_NATIVE_SHA=c.sha(prior),
+        NATIVE_ORIGINAL_SHA=c.sha(original), NATIVE_ATTEMPT_SHA=c.sha(attempt))
+
+
 def writer_fixture():
     units = {}
     for name in c.WRITER_UNITS:
@@ -107,14 +153,8 @@ def fixture():
     f.add(c.TRANSACTION + '/epoch6-tls-renewal-candidate.json', packed(tls_config))
     f.add(c.TRANSACTION + '/tls-lifecycle.json', packed(dict(schema=1, state='READY_ISSUED_AND_RENEWAL_DRYRUN_VERIFIED',
         config=tls_config, fingerprint=h('tree'), certificate_sha256=h('cert'))))
-    old_bridge = '/opt/xuanjun-control-releases/integration-' + '1'*16 + '/stage1/native_ledger_bridge.py'
-    original = {'ledger': {'python': '/usr/bin/python3', 'pythonSha256': h('python'), 'bridge': old_bridge,
-        'config': '/etc/xuanjun-development/p2-native-ledger-client.json', 'files': {old_bridge: h('bridge')}},
-        'gatewayIdentity': {'fixture': 'no secret'}}
-    f.add(c.TRANSACTION + '/epoch3-prior-receipts/native-binding-original.json', packed(original))
-    native = copy.deepcopy(original); new_bridge = '/opt/xuanjun-control-releases/integration-' + c.RETAINED_NATIVE_RELEASE[:16] + '/stage1/native_ledger_bridge.py'
-    native['ledger']['bridge'] = new_bridge; native['ledger']['files'][new_bridge] = native['ledger']['files'].pop(old_bridge)
-    f.add(c.NATIVE, packed(native), mode=0o644)
+    for name, raw in zip((c.NATIVE, c.NATIVE_PRIOR, c.NATIVE_ORIGINAL, c.NATIVE_ATTEMPT), native_transition_fixture()):
+        f.add(name, raw, mode=0o644 if name == c.NATIVE else 0o600)
     boots = []
     for i in range(7):
         name = c.NATIVE if i == 0 else '/etc/xuanjun-owner-callback/fixture-' + str(i)
@@ -179,7 +219,7 @@ def fixture():
 class CollectorTests(unittest.TestCase):
     def setUp(self):
         self.p,self.io=fixture()
-        self.native_patch=mock.patch.object(c,'RETAINED_NATIVE_SHA',c.sha(self.io.raw[c.NATIVE]));self.native_patch.start()
+        self.native_patch=native_pin_context(native_raws(self.io));self.native_patch.start()
     def tearDown(self): self.native_patch.stop()
     def collect(self): return c.collect(self.p,self.io)
     def alter(self,name,value):
@@ -190,6 +230,7 @@ class CollectorTests(unittest.TestCase):
         s,e=self.collect();self.assertEqual(d.validate_snapshot(s,d.digest(s)),s)
         self.assertEqual(len(s['targets']),24);self.assertEqual(sum(r['kind']=='FILE' for r in s['targets'].values()),22)
         self.assertEqual(d.digest(e['retained']),s['retained_resource_sha256']);self.assertEqual(len(e['retained']['database_sets']),3)
+        self.assertEqual(e['retained']['native_binding_transition'],c.validate_native_transition(*native_raws(self.io)))
         self.assertEqual(e['install_admission'],'NOT_GRANTED')
     def test_full_stamp_metadata_emitted(self):
         s,e=self.collect()
@@ -265,7 +306,7 @@ class CollectorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'SANDBOX'):self.collect()
     def test_native_identity_fields_cannot_change(self):
         x=c.decode(self.io.raw[c.NATIVE]);x['gatewayIdentity']['fixture']='changed';self.alter(c.NATIVE,x)
-        with self.assertRaisesRegex(ValueError,'NATIVE_RETAINED_EXACT_BYTES'):self.collect()
+        with self.assertRaisesRegex(ValueError,'NATIVE_OWNED_REBIND_HASHES'):self.collect()
     def test_bootstrap_temporary_blocks(self):
         self.io.present.add(c.NATIVE+'.tmp')
         with self.assertRaisesRegex(ValueError,'BOOTSTRAP'):self.collect()
@@ -420,7 +461,7 @@ class ObservationTests(unittest.TestCase):
         self.patch(d,'OLD_MANIFEST',self.manifests[-1][0])
         self.patch(observation,'RELEASE_MANIFESTS',tuple(x[0] for x in self.manifests))
         self.p,self.f=fixture();self.f.pins=copy.deepcopy(self.p['directories']);self.f.policy={}
-        self.patch(c,'RETAINED_NATIVE_SHA',c.sha(self.f.raw[c.NATIVE]))
+        native_patch=native_pin_context(native_raws(self.f));native_patch.start();self.patches.append(native_patch)
         self.patch(observation,'ORIGINAL_PLAN_SHA',c.sha(self.f.raw[c.PLAN]))
         baseline=packed({'sections':{'remaining_control_entry_inventory':{'scheduler_metadata':[], 'registered_control_units':{}}}})
         self.f.add(observation.READINESS,baseline);self.patch(observation,'READINESS_SHA',c.sha(baseline))
@@ -491,15 +532,13 @@ class ObservationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'UNCLASSIFIED_DB_SIDECAR'):self.o.measured_policy(self.f)
     def test_no_host_fallback_or_execution(self):
         with self.assertRaisesRegex(ValueError,'FIXED_HOST_ROOT'):self.o.observe_host()
-    def test_native_retained_release_is_338e(self):
+    def test_native_historical_before_release_stays_338e(self):
         self.assertEqual(c.RETAINED_NATIVE_RELEASE[:16],'338e488c4203e23d')
         self.assertNotEqual(c.RETAINED_NATIVE_RELEASE,d.OLD_MANIFEST)
-    def test_wrong_native_1536_after_version_rejected_even_when_policy_repin_attempted(self):
-        current=c.decode(self.f.raw[c.NATIVE]);old=current['ledger']['bridge']
-        new='/opt/xuanjun-control-releases/integration-'+d.OLD_MANIFEST[:16]+'/stage1/native_ledger_bridge.py'
-        current['ledger']['bridge']=new;current['ledger']['files'][new]=current['ledger']['files'].pop(old)
+    def test_wrong_native_after_bytes_rejected_even_when_policy_repin_attempted(self):
+        current=c.decode(self.f.raw[c.NATIVE]);current['ledger']['pythonSha256']=h('unknown interpreter')
         self.f.add(c.NATIVE,packed(current),mode=0o644)
-        with self.assertRaisesRegex(ValueError,'RETAINED_NATIVE_PIN'):self.o.measured_policy(self.f)
+        with self.assertRaises(ValueError):self.o.measured_policy(self.f)
     def test_private_output_requires_new_fixed_scope_path(self):
         with self.assertRaisesRegex(ValueError,'OUTPUT_SCOPE'):self.o.persist_private('/tmp/not-authorized.json',{})
     def test_observation_does_not_contain_final_candidate_manifest(self):
@@ -516,13 +555,16 @@ class NativeComponentTests(unittest.TestCase):
         self.old='/opt/xuanjun-control-releases/integration-'+c.RETAINED_NATIVE_RELEASE[:16]+'/stage1/native_ledger_bridge.py'
         self.live='/opt/xuanjun-control-releases/integration-'+d.OLD_MANIFEST[:16]+'/stage1/native_ledger_bridge.py'
         gateway={'user':'xuanjun_dev','exe':'/home/xuanjun_dev/bin/node','sha256':h('node'),'cgroup':'/system.slice/xuanjun-uk-openclaw.service'}
-        self.before={'ledger':{'python':'/usr/bin/python3','pythonSha256':h('python'),'bridge':self.old,'config':client,
-                              'files':{self.old:h('oldbridge'),client:h('oldclient')}},'gatewayIdentity':gateway}
+        self.before={'ledger':{'python':'/usr/bin/python3','pythonSha256':h('python'),'bridge':self.live,'config':client,
+                              'files':{self.live:h('livebridge'),client:h('oldclient')}},'gatewayIdentity':gateway}
         self.current=copy.deepcopy(self.before);self.current['ledger'].update(bridge=self.live,files={self.live:h('livebridge'),client:h('currentclient')})
         self.rows={'/usr/bin/python3':(h('python'),0),gateway['exe']:(h('node'),1002),self.old:(h('oldbridge'),0),
                    self.live:(h('livebridge'),0),client:(h('currentclient'),0)}
         class Proxy:pass
         self.proxy=Proxy();self.proxy.read=lambda name,maximum=0:(b'',{'sha256':self.rows[name][0],'uid':self.rows[name][1]})
+        self.proxy.executable_reference=lambda name:{'reference_path':name,'links':[],
+            'final':{'path':name,'sha256':self.rows[name][0],'format':'ELF',
+                     'metadata':self.proxy.read(name)[1]}}
     def tearDown(self):self.uid.stop()
     def run_check(self):return io.LocalReadOnlyIO.native_identity(self.proxy,self.before,self.current)
     def test_retained_old_client_hash_does_not_masquerade_as_current_client(self):
@@ -534,7 +576,7 @@ class NativeComponentTests(unittest.TestCase):
         self.current.update(contextFiles={},contextPath='/fixture',agentIds={},engine={},workspaceRoot='/fixture')
         self.assertEqual(self.run_check()['identity_admission'],'NOT_GRANTED')
     def test_wrong_retained_bridge_version(self):
-        self.before['ledger']['bridge']=self.live
+        self.before['ledger']['bridge']=self.old
         with self.assertRaisesRegex(ValueError,'RETAINED_AND_CURRENT'):self.run_check()
     def test_wrong_current_config_hash(self):
         self.current['ledger']['files'][self.current['ledger']['config']]=h('oldclient')

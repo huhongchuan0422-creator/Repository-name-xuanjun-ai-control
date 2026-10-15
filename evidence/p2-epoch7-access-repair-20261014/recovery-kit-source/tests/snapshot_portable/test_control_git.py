@@ -82,7 +82,7 @@ class ControlGitTests(unittest.TestCase):
             call.assert_not_called()
     def test_snapshot_binds_head_proof(self):
         policy,backend=fixtures.fixture()
-        with mock.patch.object(c,'RETAINED_NATIVE_SHA',c.sha(backend.raw[c.NATIVE])):
+        with fixtures.native_pin_context(fixtures.native_raws(backend)):
             snapshot,evidence=c.collect(policy,backend)
         proof=evidence['retained']['control_git']
         self.assertEqual(proof['path'],io.CONTROL_GIT)
@@ -95,7 +95,7 @@ class ControlGitTests(unittest.TestCase):
             if count[0]>1:value['head_commit']='c'*40
             return value
         backend.control_git_source=changed
-        with mock.patch.object(c,'RETAINED_NATIVE_SHA',c.sha(backend.raw[c.NATIVE])):
+        with fixtures.native_pin_context(fixtures.native_raws(backend)):
             with self.assertRaisesRegex(ValueError,'CONTROL_GIT_SCAN_RACE'):c.collect(policy,backend)
     def test_git_pin_mandatory(self):
         policy,backend=fixtures.fixture();policy['executables'].pop('git')

@@ -16,6 +16,7 @@ import time
 import epoch7_delta as d
 import epoch7_snapshot as snap
 import epoch7_protected_fs as fs
+import epoch7_python_identity as python_identity
 from epoch7_live_controls import PHASES, SECTIONS
 from epoch7_exact_access import get_attr, decode_acl, ACCESS, DEFAULT
 from epoch7_host_phases import need, sha
@@ -23,6 +24,50 @@ from epoch7_host_phases import need, sha
 MAX_BYTES=536870912
 DIRECTORY_FIELDS={'uid','gid','mode','access_acl','default_acl'}
 FILE_FIELDS={'path','kind','uid','gid','mode','sha256','access_acl'}
+
+
+def same_node_reference(actual,expected,authority):
+    """Allow only the config parent's timestamps after this attempt's write.
+
+    The concrete sampler still double-checks every stamp. Historical link/ELF,
+    all other ancestors and this parent's inode/authority/nlink remain exact.
+    """
+    from unit_metadata import validate_node_reference
+    final=expected['final'];validate_node_reference(expected,final['path'],final['sha256'])
+    validate_node_reference(actual,final['path'],final['sha256'])
+    if actual==expected:return True
+    projected=copy.deepcopy(actual);parent=os.path.dirname(snap.PROFILE)
+    for key in ('size','mtime_ns','ctime_ns'):
+        projected['ancestors'][parent][key]=expected['ancestors'][parent][key]
+    need(projected==expected,'RESOURCE_NODE_REFERENCE_IMMUTABLE_DRIFT')
+    authority.receipt();need(authority.io is not None,'RESOURCE_NODE_OWNED_CONFIG_RECEIPT_REQUIRED')
+    from epoch7_recovery_sequence import OUTER_NAME
+    outer=authority.validate_outer(authority.io.read_journal(OUTER_NAME)['data'])['state']
+    index=PHASES.index('apply_fresh_sandbox');permitted=False
+    for phase_index,phase in enumerate(PHASES):
+        if phase_index<index:continue
+        for suffix,completed in (('_INTENT',list(PHASES[:phase_index])),
+                                 ('_COMPLETE',list(PHASES[:phase_index+1]))):
+            if outer.get('stage')==phase+suffix and outer.get('completed')==completed:
+                permitted=True
+    need(outer.get('admission')=='ADMITTED' and permitted,'RESOURCE_NODE_OWNED_CONFIG_PHASE_REQUIRED')
+    name=fs.TRANSACTION+'/epoch7-sandbox-profile.json'
+    parent_fd,leaf=authority.io._parent(name)
+    try:metadata,raw=authority.io._read_at(parent_fd,leaf,maximum=65536)
+    finally:os.close(parent_fd)
+    need((metadata['uid'],metadata['gid'],metadata['mode'],metadata['nlink'])==(0,0,0o600,1),
+         'RESOURCE_NODE_PRIVATE_SANDBOX_RECEIPT')
+    row=snap.decode(raw)
+    need(type(row) is dict and set(row)=={'schema','context_sha256','original_sha256','candidate_sha256',
+         'current_sha256','state'} and type(row['schema']) is int and row['schema']==1 and
+         row['context_sha256']==authority.context['context_sha256'] and row['state'] in ('APPLIED','CLI_CAPTURED'),
+         'RESOURCE_NODE_OWNED_CONFIG_RECEIPT_REQUIRED')
+    for key in ('original_sha256','candidate_sha256','current_sha256'):d.hash_value(row[key])
+    need(row['state']!='APPLIED' or row['current_sha256']==row['candidate_sha256'],
+         'RESOURCE_NODE_OWNED_CONFIG_HASH_REQUIRED')
+    need(row['state']!='CLI_CAPTURED' or 'apply_fresh_sandbox' in outer['completed'],
+         'RESOURCE_NODE_CLI_AFTER_SANDBOX_REQUIRED')
+    authority.receipt();return True
 
 
 class ResourceReader(object):
@@ -85,6 +130,99 @@ class ResourceReader(object):
         finally:
             for fd in reversed(held):os.close(fd)
 
+    def _python_metadata(self,fd,kind):
+        """No-follow pair descriptors only; unreadable xattrs are a hard failure."""
+        self.check();before=os.fstat(fd)
+        need(stat.S_ISREG(before.st_mode) if kind=='FILE' else stat.S_ISDIR(before.st_mode),
+             'RESOURCE_PYTHON_PAIR_KIND')
+        row=dict(fs.metadata(before),kind=kind)
+        for key,name in (('access_acl',ACCESS),('default_acl',DEFAULT),('capability','security.capability')):
+            row[key]=get_attr(fd,name) is not None
+        need(fs.stamp(os.fstat(fd))==fs.stamp(before),'RESOURCE_PYTHON_PAIR_METADATA_RACE')
+        return row
+
+    def _python_pair_sample(self):
+        """Read both fixed names while retaining every file/ancestor descriptor.
+
+        A second independent round is required by python_file. No execution or
+        package lookup occurs. Full metadata and xattrs are checked again before
+        closing descriptors; the central validator binds both rounds to the plan.
+        """
+        records=[];sample={'files':{},'ancestors':{}}
+        try:
+            for path in python_identity.PYTHON_PATHS:
+                self.check();held,links,parent,leaf=self._parent(path)
+                record={'held':held,'links':links,'parent':parent,'leaf':leaf,'fd':None,'ancestors':[]}
+                records.append(record)
+                need(len(held)==len(python_identity.ANCESTOR_PATHS),'RESOURCE_PYTHON_PAIR_ANCESTORS')
+                for ancestor,fd in zip(python_identity.ANCESTOR_PATHS,held):
+                    row=self._python_metadata(fd,'DIRECTORY')
+                    need(ancestor not in sample['ancestors'] or sample['ancestors'][ancestor]==row,
+                         'RESOURCE_PYTHON_PAIR_ANCESTOR_RACE')
+                    sample['ancestors'][ancestor]=row;record['ancestors'].append((fd,row))
+                before=os.stat(leaf,dir_fd=parent,follow_symlinks=False)
+                need(stat.S_ISREG(before.st_mode) and before.st_nlink==2 and
+                     before.st_size==python_identity.RETAINED_SIZE,'RESOURCE_PYTHON_PAIR_FILE_BOUND')
+                fd=os.open(leaf,fs.READ_FLAGS,dir_fd=parent);record['fd']=fd
+                need(fs.stamp(os.fstat(fd))==fs.stamp(before),'RESOURCE_PYTHON_PAIR_OPEN_RACE')
+                row=self._python_metadata(fd,'FILE');record['metadata']=row;record['before']=before
+                chunks=[];count=0
+                while True:
+                    self.check();raw=os.read(fd,min(65536,python_identity.RETAINED_SIZE+1-count))
+                    if not raw:break
+                    chunks.append(raw);count+=len(raw)
+                    need(count<=python_identity.RETAINED_SIZE,'RESOURCE_PYTHON_PAIR_READ_BOUND')
+                need(count==before.st_size,'RESOURCE_PYTHON_PAIR_READ_SIZE');raw=b''.join(chunks)
+                sample['files'][path]=dict(row,sha256=sha(raw),elf_header=raw.startswith(b'\x7fELF'))
+            for record in records:
+                self.check()
+                need(self._python_metadata(record['fd'],'FILE')==record['metadata'] and
+                     fs.stamp(os.stat(record['leaf'],dir_fd=record['parent'],follow_symlinks=False))==
+                     fs.stamp(record['before']),'RESOURCE_PYTHON_PAIR_FILE_RACE')
+                for fd,row in record['ancestors']:
+                    need(self._python_metadata(fd,'DIRECTORY')==row,'RESOURCE_PYTHON_PAIR_ANCESTOR_RACE')
+            return sample
+        finally:
+            failures=[]
+            for record in reversed(records):
+                try:
+                    if record['fd'] is not None:os.close(record['fd'])
+                except BaseException as exc:failures.append(exc)
+                try:self._finish(record['held'],record['links'])
+                except BaseException as exc:failures.append(exc)
+            if failures:raise failures[0]
+
+    def python_file(self,spec):
+        need(set(spec)==FILE_FIELDS|{'python_identity'} and spec['kind']=='FILE' and
+             spec['path'] in python_identity.PYTHON_PATHS,'RESOURCE_PYTHON_PAIR_SPEC')
+        proof=python_identity.validate_pair_proof(spec['python_identity'])
+        wanted=proof['sample']['files'][spec['path']]
+        need(all(type(spec[k]) is int and spec[k]==wanted[k] for k in ('uid','gid','mode')) and
+             spec['sha256']==wanted['sha256'] and spec['access_acl']==decode_acl(None,wanted['mode']),
+             'RESOURCE_PYTHON_PAIR_SPEC_BINDING')
+        self.check();before=self._python_pair_sample();after=self._python_pair_sample()
+        python_identity.validate_pair_reread(proof,before,after)
+        self.check();return copy.deepcopy(spec)
+
+    def node_file(self,spec):
+        """One fixed directory alias, checked by the collector's bounded reader."""
+        from unit_metadata import validate_node_reference,NODE_CANONICAL_PATH
+        from snapshot_io import LocalReadOnlyIO,DescriptorReader
+        need(set(spec)==FILE_FIELDS|{'node_reference'} and spec['kind']=='FILE' and
+             spec['path']==NODE_CANONICAL_PATH,'RESOURCE_NODE_REFERENCE_SPEC')
+        proof=validate_node_reference(spec['node_reference'],spec['path'],spec['sha256'])
+        wanted=proof['final']['metadata']
+        need(all(type(spec[k]) is int and spec[k]==wanted[k] for k in ('uid','gid','mode')) and
+             spec['access_acl']==decode_acl(None,wanted['mode']),'RESOURCE_NODE_REFERENCE_SPEC_BINDING')
+        owner=self
+        class NodeReadOnlyIO(LocalReadOnlyIO):
+            def __init__(self):DescriptorReader.__init__(self,{},root=owner.root)
+            def check_locks(self):owner.check()
+            def _authority(self,fd,path):return owner._directory(fd,path)
+        self.check();actual=NodeReadOnlyIO().node_directory_reference(spec['path'],spec['sha256'])
+        need(same_node_reference(actual,proof,self.authority),'RESOURCE_NODE_REFERENCE_DRIFT')
+        self.check();return copy.deepcopy(spec)
+
     def executable_reference(self,proof):
         """Verify an exact measured symlink chain and its canonical ELF inode."""
         need(type(proof) is dict and set(proof)=={'reference_path','links','final'} and
@@ -107,13 +245,25 @@ class ResourceReader(object):
         need(type(final) is dict and set(final)=={'path','sha256','format','metadata'} and final['path']==current and
              current not in seen and final['format']=='ELF' and final['metadata']['kind']=='FILE' and
              final['metadata']['sha256']==final['sha256'],'RESOURCE_EXECUTABLE_CANONICAL_ELF')
-        meta=final['metadata'];spec={k:meta[k] for k in ('kind','uid','gid','mode','sha256')}
+        meta=final['metadata']
+        base_fields=set(python_identity.METADATA_FIELDS)|{'kind','sha256'}
+        need(set(meta)==base_fields or ('python_identity' in meta and set(meta) in
+             (base_fields|{'python_identity'},set(python_identity.FILE_FIELDS)|{'python_identity'})),
+             'RESOURCE_EXECUTABLE_METADATA_FIELDS')
+        if 'python_identity' in meta:
+            identity=python_identity.validate_pair_proof(meta['python_identity'])
+            need(current in python_identity.PYTHON_PATHS and all(
+                 type(meta[k]) is type(identity['sample']['files'][current][k]) and
+                 meta[k]==identity['sample']['files'][current][k] for k in meta if k!='python_identity'),
+                 'RESOURCE_EXECUTABLE_PYTHON_METADATA_BINDING')
+        spec={k:meta[k] for k in ('kind','uid','gid','mode','sha256')}
         spec.update(path=current,access_acl=decode_acl(None,meta['mode']))
+        if 'python_identity' in meta:spec['python_identity']=copy.deepcopy(meta['python_identity'])
         held,links,parent,leaf=self._parent(current)
         try:
             before=os.stat(leaf,dir_fd=parent,follow_symlinks=False)
             need(stat.S_ISREG(before.st_mode) and all(fs.metadata(before)[k]==v for k,v in meta.items()
-                 if k not in ('kind','sha256')),'RESOURCE_EXECUTABLE_FINAL_IDENTITY')
+                 if k in python_identity.METADATA_FIELDS),'RESOURCE_EXECUTABLE_FINAL_IDENTITY')
             self.observe(spec)
             fd=os.open(leaf,fs.READ_FLAGS,dir_fd=parent)
             try:
@@ -153,6 +303,8 @@ class ResourceReader(object):
         self.check();return copy.deepcopy(spec)
 
     def observe(self,spec):
+        if type(spec) is dict and 'python_identity' in spec:return self.python_file(spec)
+        if type(spec) is dict and 'node_reference' in spec:return self.node_file(spec)
         if type(spec) is dict and spec.get('kind')=='NSS_BINDINGS':return self.nss_bindings(spec)
         if type(spec) is dict and spec.get('kind')=='OPTIONAL_INVENTORY':
             need(set(spec)=={'path','kind','sha256'} and spec['path'] in snap.SCHEDULER_ROOTS,

@@ -146,13 +146,29 @@ def validate_contract(contract,digest,path_validator,role_validator):
                 seen.add(current['name']);current=lookup[current['parent']['role']]
             key=digest(role);need(key not in by_hash,'DUPLICATE_ROLE');by_hash[key]=role
         unions=[r for r in roles if r['command']['mode']=='EXACT_ARGV_OR_NUL_PADDED_TITLES']
-        if unions:
+        from epoch7_openclaw_recipe import DIRECT_WRAPPER_SHA
+        direct=sources.get('/home/xuanjun_dev/.openclaw/bin/openclaw')==DIRECT_WRAPPER_SHA
+        if unions or direct:
             need('quiet_startup' in block,'SOURCE_BACKED_QUIET_POLICY_REQUIRED')
-            from epoch7_openclaw_recipe import SOURCE_HASHES
+            from epoch7_openclaw_recipe import source_hashes, DIRECT_WRAPPER_SHA, DIRECT_PACKAGE_ROOT, DIRECT_NODE_PATH, SOURCE_HASHES
             root=block['quiet_startup']['package_root']
-            need(all(sources.get(root+'/'+name)==pin for name,pin in SOURCE_HASHES.items()),
+            direct=sources.get('/home/xuanjun_dev/.openclaw/bin/openclaw')==DIRECT_WRAPPER_SHA
+            pins=source_hashes(sources.get('/home/xuanjun_dev/.openclaw/bin/openclaw'))
+            need(all(sources.get(root+'/'+name)==pin for name,pin in pins.items()),
                  'EXACT_OPENCLAW_BOOTSTRAP_SOURCE_PROFILE')
-        if unions and unit=='xuanjun-uk-openclaw.service':
+        if (unions or direct) and unit=='xuanjun-uk-openclaw.service':
+            if direct:
+                main=lookup['main'];bridge=lookup.get('bridge_main')
+                need(root==DIRECT_PACKAGE_ROOT and block['topology_source_sha256']==SOURCE_HASHES['dist/entry.js'] and
+                     set(names)=={'main','bridge_main'} and {r['name'] for r in unions}=={'main'} and
+                     main['identity']['executable']==DIRECT_NODE_PATH,'GATEWAY_DIRECT_ENTRY_ROLE_SET')
+                need(bridge is not None and not bridge['main'] and bridge['maximum']==1 and
+                     bridge['parent']=={'kind':'ROLE','role':'main'} and
+                     bridge['command']['mode']=='EXACT_ARGV_SHA256' and
+                     bridge['identity']['executable']!=main['identity']['executable'] and
+                     all(bridge['identity'][k]==main['identity'][k] for k in ('uids','gids','groups')),
+                     'GATEWAY_DIRECT_BRIDGE_IDENTITY_AND_PARENT')
+                continue
             need({r['name'] for r in unions}=={'main','compile_cache_child'},'GATEWAY_BOOTSTRAP_ROLE_SET')
             main=lookup['main'];child=lookup['compile_cache_child']
             need(main['main'] and not child['main'] and child['parent']=={'kind':'ROLE','role':'main'} and

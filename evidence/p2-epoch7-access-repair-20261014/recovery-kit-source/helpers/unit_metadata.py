@@ -1,13 +1,28 @@
 """Finite read-only unit facts; public parsed fields/digests only, no admission."""
 import re
 import shlex
+import copy
 
 import epoch7_snapshot as c
 import epoch7_delta as d
+import epoch7_python_identity as python_identity
 from probe_metadata import stable_read,protected,error_label,need,PROVISION
 
 GATEWAY='xuanjun-uk-openclaw.service'
 LAUNCHER='/home/xuanjun_dev/.openclaw/bin/openclaw'
+NODE_TOOLS='/home/xuanjun_dev/.openclaw/tools'
+NODE_ALIAS_PATH=NODE_TOOLS+'/node'
+NODE_REFERENCE_PATH=NODE_ALIAS_PATH+'/bin/node'
+NODE_VERSION_DIRECTORY=NODE_TOOLS+'/node-v24.21.0'
+NODE_CANONICAL_PATH=NODE_VERSION_DIRECTORY+'/bin/node'
+NODE_PACKAGE_ROOT=NODE_VERSION_DIRECTORY+'/lib/node_modules/openclaw'
+NODE_REFERENCE_ANCESTORS=('/', '/home', '/home/xuanjun_dev', '/home/xuanjun_dev/.openclaw',
+    NODE_TOOLS, NODE_VERSION_DIRECTORY, NODE_VERSION_DIRECTORY+'/bin')
+NODE_MAXIMUM=268435456
+DIRECT_DIST_WRAPPER=(
+    '#!/usr/bin/env bash\nset -euo pipefail\nexec "'+NODE_REFERENCE_PATH+'" "'+
+    NODE_PACKAGE_ROOT+'/dist/entry.js" "$@"\n').encode('ascii')
+DIRECT_DIST_WRAPPER_SHA='b6aff1f40be0d46330c167e44525ef9080d66e40bb36dbb66c3811b4103fe3f2'
 UNITS=(GATEWAY,'xuanjun-p2-gateway-relay.service','xuanjun-development-dispatcher.service',
        'xuanjun-ledger.service','xuanjun-uk-owner-callback.service','xuanjun-uk-owner-dashboard.service',
        'xj-root-broker.service','nginx.service')
@@ -95,8 +110,69 @@ def user_program(io,path,maximum=8388608):
     return raw,row
 
 
+def _validate_node_reference(proof, expected_exe, expected_sha256, measurement_only=False):
+    """Pure fixed directory-alias proof; caller supplies the retained native pin."""
+    integers=('uid','gid','mode','dev','ino','nlink','size','mtime_ns','ctime_ns')
+    attrs=('access_acl','default_acl','capability')
+    def fields(value,names,label):need(type(value) is dict and set(value)==set(names),label)
+    def meta(row,kind,extra=()):
+        fields(row,integers+('kind',)+extra,'NODE_REFERENCE_METADATA_FIELDS')
+        need(row['kind']==kind and all(type(row[k]) is int and 0<=row[k]<2**64 for k in integers) and
+             row['dev']>0 and row['ino']>0 and row['nlink']>0 and row['mode']<=0o7777 and
+             row['uid']<2**32 and row['gid']<2**32,'NODE_REFERENCE_TYPED_METADATA')
+    d.hash_value(expected_sha256)
+    need(expected_exe==NODE_CANONICAL_PATH,'NODE_REFERENCE_CANONICAL_SCOPE')
+    extras=('admission','unsafe_ancestors') if measurement_only else ()
+    fields(proof,('schema','kind','reference_path','link','final','ancestors','reread')+extras,'NODE_REFERENCE_FIELDS')
+    kind='FIXED_NODE_DIRECTORY_ALIAS_MEASUREMENT' if measurement_only else 'FIXED_NODE_DIRECTORY_ALIAS'
+    need(type(proof['schema']) is int and proof['schema']==1 and proof['kind']==kind and
+         proof['reference_path']==NODE_REFERENCE_PATH and proof['reread']=='EXACT_PRE_POST','NODE_REFERENCE_SCOPE')
+    link=proof['link'];fields(link,('path','target','metadata'),'NODE_REFERENCE_LINK_FIELDS')
+    need(link['path']==NODE_ALIAS_PATH and link['target'] in ('node-v24.21.0',NODE_VERSION_DIRECTORY),
+         'NODE_REFERENCE_EXACT_TARGET')
+    meta(link['metadata'],'SYMLINK');row=link['metadata']
+    need((row['uid'],row['gid']) in ((0,0),(1002,1002)) and (row['mode'],row['nlink'])==(0o777,1) and
+         row['size']==len(link['target'].encode('ascii')),'NODE_REFERENCE_LINK_AUTHORITY')
+    final=proof['final'];fields(final,('path','sha256','metadata'),'NODE_REFERENCE_FINAL_FIELDS')
+    need(final['path']==expected_exe and final['sha256']==expected_sha256,'NODE_REFERENCE_RETAINED_HASH')
+    meta(final['metadata'],'FILE',('sha256','elf_header')+attrs);row=final['metadata']
+    need((row['uid'],row['gid'],row['nlink'])==(1002,1002,1) and row['mode']&0o100 and
+         not row['mode']&0o7022 and 0<row['size']<=NODE_MAXIMUM and row['sha256']==expected_sha256 and
+         row['elf_header'] is True and all(row[k] is False for k in attrs),'NODE_REFERENCE_ELF_AUTHORITY')
+    fields(proof['ancestors'],NODE_REFERENCE_ANCESTORS,'NODE_REFERENCE_ANCESTOR_SET')
+    unsafe=[]
+    for path,row in proof['ancestors'].items():
+        meta(row,'DIRECTORY',attrs)
+        allowed=(0,) if path in ('/','/home') else (0,1002)
+        narrowable=(measurement_only and path in (NODE_TOOLS,NODE_VERSION_DIRECTORY) and
+                    (row['uid'],row['gid'],row['mode'])==(1002,1002,0o775))
+        if narrowable:unsafe.append(path)
+        need(row['uid'] in allowed and row['gid'] in (0,1002) and (not row['mode']&0o7022 or narrowable) and
+             row['mode']&0o100 and (row['mode']&1 or row['uid']==1002 or row['gid']==1002 and row['mode']&0o10) and
+             all(row[k] is False for k in attrs),'NODE_REFERENCE_ANCESTOR_AUTHORITY')
+    if measurement_only:
+        need(proof['admission']=='NOT_GRANTED' and proof['unsafe_ancestors']==sorted(unsafe),
+             'NODE_REFERENCE_MEASUREMENT_ONLY')
+    return copy.deepcopy(proof)
+
+
+def validate_node_reference(proof, expected_exe, expected_sha256):
+    return _validate_node_reference(proof,expected_exe,expected_sha256)
+
+
+def validate_node_reference_measurement(proof, expected_exe, expected_sha256):
+    """Pre-narrowing diagnostic only; its result cannot pass admission validation."""
+    return _validate_node_reference(proof,expected_exe,expected_sha256,measurement_only=True)
+
+
 def launcher_recipe(raw, expected_exe):
     need(type(raw) is bytes and 0<len(raw)<=65536,'LAUNCHER_SOURCE_BOUND')
+    if raw==DIRECT_DIST_WRAPPER:
+        need(len(raw)==188 and c.sha(raw)==DIRECT_DIST_WRAPPER_SHA and expected_exe==NODE_CANONICAL_PATH,
+             'LAUNCHER_DIRECT_DIST_BINDING')
+        return {'executable':NODE_REFERENCE_PATH,'entry_script':NODE_PACKAGE_ROOT+'/dist/entry.js',
+            'forwards_unit_arguments':True,'shebang':'#!/usr/bin/env bash','environment_names':[],
+            'source_execution':'NOT_PERFORMED'}
     lines=raw.decode('utf-8','strict').splitlines();need(lines and lines[0] in
         ('#!/bin/bash','#!/usr/bin/bash','#!/bin/sh','#!/usr/bin/env bash'),'LAUNCHER_SHEBANG_UNSUPPORTED')
     environment=[];recipe=None
@@ -140,15 +216,30 @@ def collect_unit_facts(io):
     value=measure('unit_nss',nss)
     if value is not None and value['unsupported']:
         sections['unit_nss']['state']='UNKNOWN';sections['unit_nss']['reason']='NSS_PAIRS_OR_GROUPS_UNAVAILABLE'
-    measure('python_reference',lambda:io.python_reference())
+    def python_reference():
+        value=io.python_reference();final=value['final'];row=final['metadata']
+        if final['path'] in python_identity.PYTHON_PATHS:
+            need(final['path']==python_identity.PYTHON_PATHS[0] and
+                 final['sha256']==python_identity.RETAINED_SHA256,'UNIT_EXACT_PYTHON_PAIR_BINDING')
+            proof=python_identity.validate_pair_proof(row.get('python_identity'))
+            need(row==dict(proof['sample']['files'][final['path']],python_identity=proof),
+                 'UNIT_PYTHON_PAIR_METADATA_BINDING')
+        else:need('python_identity' not in row and row.get('nlink')==1,'UNIT_UNSCOPED_PYTHON_PAIR_PROOF')
+        return value
+    measure('python_reference',python_reference)
     def native():
         raw,row=stable_read(io,c.NATIVE,65536);protected(row,65536)
-        need(c.sha(raw)==c.RETAINED_NATIVE_SHA,'UNIT_NATIVE_RETAINED_PIN')
+        need(row['mode']==0o644,'UNIT_NATIVE_CURRENT_AUTHORITY')
+        buffers=[]
+        for path,maximum in ((c.NATIVE_PRIOR,65536),(c.NATIVE_ORIGINAL,65536),(c.NATIVE_ATTEMPT,1048576)):
+            data,meta=stable_read(io,path,maximum);protected(meta,maximum)
+            need(meta['mode']==0o600,'UNIT_NATIVE_RECEIPT_AUTHORITY');buffers.append(data)
+        transition=c.validate_native_transition(raw,*buffers)
         fields=c.decode(raw)['gatewayIdentity']
         d.keys(fields,('user','exe','sha256','cgroup'),'UNIT_NATIVE_FIELDS')
         need(fields['user']=='xuanjun_dev' and fields['cgroup']=='/system.slice/'+GATEWAY,'UNIT_NATIVE_ROLE')
         c.path(fields['exe']);d.hash_value(fields['sha256'])
-        return {'source_path':c.NATIVE,'source_sha256':c.sha(raw),'gateway_identity':fields,
+        return {'source_path':c.NATIVE,'source_sha256':c.sha(raw),'gateway_identity':fields,'native_binding_transition':transition,
                 'executable_evidence':'retained.native_components.components[exe]'}
     native_value=measure('native_gateway',native)
     def backup():
@@ -179,11 +270,19 @@ def collect_unit_facts(io):
             need(native_value is not None,'LAUNCHER_NATIVE_PIN_UNAVAILABLE')
             recipe=launcher_recipe(raw,native_value['gateway_identity']['exe'])
             result['recipe']=recipe
+            if recipe['executable']!=native_value['gateway_identity']['exe']:
+                need(raw==DIRECT_DIST_WRAPPER,'LAUNCHER_DIRECTORY_ALIAS_SCOPE')
+                result['node_reference']=validate_node_reference(io.node_directory_reference(
+                    native_value['gateway_identity']['exe'],native_value['gateway_identity']['sha256']),
+                    native_value['gateway_identity']['exe'],native_value['gateway_identity']['sha256'])
             entry,entry_meta=user_program(io,recipe['entry_script'])
             result['entry_script']={'path':recipe['entry_script'],'sha256':c.sha(entry),'metadata':entry_meta}
             result['recipe_state']='PARSED_UNREVIEWED'
         except Exception as error:result.update(recipe_state='UNKNOWN',reason=error_label(error))
         need(stable_read(io,LAUNCHER,65536)==(raw,row),'LAUNCHER_LATE_RACE')
+        if 'node_reference' in result:
+            need(io.node_directory_reference(native_value['gateway_identity']['exe'],
+                 native_value['gateway_identity']['sha256'])==result['node_reference'],'LAUNCHER_NODE_ALIAS_LATE_RACE')
         return result
     value=measure('launcher',launcher)
     if value is not None and value['recipe_state']=='UNKNOWN':
@@ -358,7 +457,10 @@ def collect_source_review_inputs(io, unit_facts):
         package_public=package['public_fields'];bin_spec=package_public.get('bin',{})
         bin_spec={'openclaw':bin_spec} if type(bin_spec) is str else bin_spec
         exact_version=package_public['version']=='2026.9.9'
-        exact_entry=bin_spec.get('openclaw') in ('openclaw.mjs','./openclaw.mjs') and entry==root+'/openclaw.mjs'
+        exact_entry=bin_spec.get('openclaw') in ('openclaw.mjs','./openclaw.mjs') and (
+            entry==root+'/openclaw.mjs' or launcher.get('sha256')==DIRECT_DIST_WRAPPER_SHA and
+            entry==NODE_PACKAGE_ROOT+'/dist/entry.js' and root==NODE_PACKAGE_ROOT and
+            recipe['executable']==NODE_REFERENCE_PATH and 'node_reference' in launcher)
         if exact_version:
             known={'state':'UNKNOWN','reason':'OPENCLAW_2026_9_9_BIN_OR_LITERAL_ENTRY_UNVERIFIED'}
         while pending:
@@ -388,8 +490,10 @@ def collect_source_review_inputs(io, unit_facts):
             item['private_content_base64']=base64.b64encode(raw).decode('ascii');files[path]=item
             if path==entry and exact_version and exact_entry:
                 edges=set(re.findall(r'''\btryImport\s*\(\s*["']\./dist/entry\.(js|mjs)["']\s*\)''',text))
-                if edges=={'js','mjs'}:
-                    known={'state':'MEASURED_LITERAL_CANDIDATES_UNREVIEWED','entry_candidates':{},'build_info':{}}
+                direct=(launcher.get('sha256')==DIRECT_DIST_WRAPPER_SHA and entry==NODE_PACKAGE_ROOT+'/dist/entry.js')
+                if edges=={'js','mjs'} or direct:
+                    known={'state':'MEASURED_DIRECT_ENTRY_UNREVIEWED' if direct else 'MEASURED_LITERAL_CANDIDATES_UNREVIEWED',
+                           'entry_candidates':{},'build_info':{}}
                     for suffix in ('js','mjs'):
                         candidate=root+'/dist/entry.'+suffix
                         if io.absent(candidate):known['entry_candidates'][candidate]={'state':'ABSENT'}

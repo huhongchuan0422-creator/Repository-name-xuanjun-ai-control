@@ -427,6 +427,14 @@ class ExtractionTests(unittest.TestCase):
         data=self.repack(x,data,change)
         with self.assertRaisesRegex(ValueError,'EXTRA_OR_MISSING_DIRECTORY'):x.inspect_archive(data,x.sha(data),*pins[1:])
 
+    def test_exact_r2_root_and_old_root_refused(self):
+        x,r,data,pins=self.prepare()
+        self.assertEqual(x.ROOT_NAME,b.ROOT_NAME)
+        self.assertEqual(b.ROOT_NAME,'epoch7-recovery-candidate-r2')
+        with self.assertRaisesRegex(ValueError,'ABSOLUTE_EXACT_OUTPUT'):
+            x.extract(data,str(self.base/'epoch7-recovery-candidate'),*pins,owners=OWNERS)
+        self.assertFalse((self.base/'epoch7-recovery-candidate').exists())
+
     def test_existing_destination_not_overwritten(self):
         x,r,data,pins=self.prepare();dest=self.base/b.ROOT_NAME;dest.mkdir()
         with self.assertRaises(FileExistsError):x.extract(data,str(dest),*pins,owners=OWNERS)
@@ -456,7 +464,7 @@ class CompositionTests(unittest.TestCase):
     def setUp(self):
         import contextlib
         self.output='/fixed/candidate/epoch7-observation-'+'a'*16+'.private.json'
-        self.root='/fixed/candidate/epoch7-recovery-candidate'
+        self.root='/fixed/candidate/epoch7-recovery-candidate-r2'
         self.observer=mock.Mock()
         self.observer.c=types.SimpleNamespace(CAND='/fixed/candidate',path=lambda value:None)
         @contextlib.contextmanager
@@ -559,8 +567,18 @@ class CompositionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'OUTPUT_EXISTS'):self.run_probe()
         self.observer.observe_host.assert_not_called();self.driver.execute_reviewed_probe.assert_not_called()
 
+    def test_old_root_blocks_new_observation_before_host_read(self):
+        self.kit.root='/fixed/candidate/epoch7-recovery-candidate'
+        with self.assertRaisesRegex(ValueError,'EXACT_STAGED_KIT'):self.run_probe()
+        self.observer.observe_host.assert_not_called()
+
+    def test_lexical_root_alias_blocks_new_observation(self):
+        self.kit.root='/fixed/candidate/../candidate/epoch7-recovery-candidate-r2'
+        with self.assertRaisesRegex(ValueError,'EXACT_STAGED_KIT'):self.run_probe()
+        self.observer.observe_host.assert_not_called()
+
     def test_wrong_staging_root_blocks_observation(self):
-        self.kit.root='/other/epoch7-recovery-candidate'
+        self.kit.root='/other/epoch7-recovery-candidate-r2'
         with self.assertRaisesRegex(ValueError,'EXACT_STAGED_KIT'):self.run_probe()
         self.observer.observe_host.assert_not_called()
 
@@ -877,6 +895,57 @@ class PublicOpenclawFixtureTests(unittest.TestCase):
         finally: fixture.tearDown()
 
 
+class PublicDirectOpenclawFixtureTests(unittest.TestCase):
+    def fixture(self):
+        import base64
+        base=PublicOpenclawFixtureTests();value,cache=base.fixture()
+        content=b'x'*1461
+        direct={'extends':'openclaw-source-profile.json','fixture_scope':value['fixture_scope'],
+            'npm_tar_sha256':value['npm_tar_sha256'],'files':{e.PUBLIC_OPENCLAW_DIRECT_PATH:
+            {'sha256':e.PUBLIC_OPENCLAW_DIRECT_SHA,'content_base64':base64.b64encode(content).decode('ascii')}}}
+        cache['helpers/epoch7_openclaw_recipe.py']+=(
+            '\nDIRECT_SOURCE_HASHES=dict(SOURCE_HASHES,**'+repr({e.PUBLIC_OPENCLAW_DIRECT_PATH:e.PUBLIC_OPENCLAW_DIRECT_SHA})+')\n').encode()
+        cache[e.PUBLIC_OPENCLAW_DIRECT_FIXTURE]=raw(direct)
+        return base,value,cache,direct,content
+    def check(self,base,value,cache,direct,content):
+        original=e.sha
+        def synthetic(data):return e.PUBLIC_OPENCLAW_DIRECT_SHA if data==content else original(data)
+        cache[e.PUBLIC_OPENCLAW_DIRECT_FIXTURE]=raw(direct)
+        with mock.patch.object(e,'sha',side_effect=synthetic):base.check(value,cache)
+    def test_exact_literal_extension_does_not_execute_recipe(self):
+        base,value,cache,direct,content=self.fixture()
+        cache['helpers/epoch7_openclaw_recipe.py']+=b'\nraise RuntimeError("do not execute")\n'
+        self.check(base,value,cache,direct,content)
+    def test_wrong_extension_schema_or_path_or_hash_or_bytes_refused(self):
+        for variant in ('extra','wrong_path','wrong_sha','wrong_bytes','short','extends','tar','scope'):
+            base,value,cache,direct,content=self.fixture();row=direct['files'][e.PUBLIC_OPENCLAW_DIRECT_PATH]
+            if variant=='extra':direct['private']='forbidden'
+            elif variant=='wrong_path':direct['files']={'other.js':row}
+            elif variant=='wrong_sha':row['sha256']='0'*64
+            elif variant=='wrong_bytes':row['content_base64']='eQ=='*487
+            elif variant=='short':row['content_base64']='eA=='
+            elif variant=='extends':direct['extends']='other.json'
+            elif variant=='tar':direct['npm_tar_sha256']='0'*64
+            else:direct['fixture_scope']='HOST_EVIDENCE'
+            with self.subTest(variant=variant),self.assertRaises(ValueError):self.check(base,value,cache,direct,content)
+    def test_missing_or_nonliteral_recipe_extension_refused(self):
+        for text in ('','DIRECT_SOURCE_HASHES=dict()','DIRECT_SOURCE_HASHES=dict(SOURCE_HASHES,**{ "wrong": "0" })'):
+            base,value,cache,direct,content=self.fixture()
+            cache['helpers/epoch7_openclaw_recipe.py']=cache['helpers/epoch7_openclaw_recipe.py'].split(b'\nDIRECT_SOURCE_HASHES')[0]+b'\n'+text.encode()
+            with self.assertRaises(ValueError):self.check(base,value,cache,direct,content)
+    def test_direct_without_base_fixture_refused(self):
+        base,value,cache,direct,content=self.fixture();del cache[e.PUBLIC_OPENCLAW_LICENSE]
+        with self.assertRaisesRegex(ValueError,'COMPLETE_SET'):self.check(base,value,cache,direct,content)
+    def test_builder_allows_only_exact_public_extension_path(self):
+        fixture=Fixture();fixture.setUp()
+        try:
+            fixture.map['files'][e.PUBLIC_OPENCLAW_DIRECT_FIXTURE]={'source':e.PUBLIC_FIXTURE_SOURCES[e.PUBLIC_OPENCLAW_DIRECT_FIXTURE],'sha256':'a'*64}
+            b.validate_input(fixture.map)
+            fixture.map['files'][e.PUBLIC_OPENCLAW_DIRECT_FIXTURE]['source']='p2-epoch7-repair/sequence-candidate/fixtures/unreviewed.json'
+            with self.assertRaisesRegex(ValueError,'PRIVATE_INPUT'):b.validate_input(fixture.map)
+        finally:fixture.tearDown()
+
+
 class ImportClosureTests(unittest.TestCase):
     def analyze(self, source, enabled=True):
         import audit_epoch7_imports as audit
@@ -1027,7 +1096,7 @@ class ResumeInputTests(unittest.TestCase):
         sources={'stage1/a.py':e.sha(b'a'),'scripts/uk-integration-install.py':e.sha(b'installer')}
         cache={e.RUNTIME+'deploy/integration-manifest.json':raw({'files':sources}),
             e.RUNTIME+'stage1/a.py':b'a',e.RUNTIME+'scripts/uk-integration-install.py':b'installer'}
-        self.kit=e.VerifiedKit(str(self.parent)+'/epoch7-recovery-candidate',manifest,cache,'4'*64,OWNERS)
+        self.kit=e.VerifiedKit(str(self.parent)+'/epoch7-recovery-candidate-r2',manifest,cache,'4'*64,OWNERS)
         self.factory=mock.Mock();self.factory.INPUTS=e.PRIVATE_SEED_FIELDS|e.CACHE_SEED_FIELDS
         self.factory.DERIVED_INPUTS=frozenset();self.factory.compiled_bytes.side_effect=lambda value:dict(value)
         self.factory.prepare_host_inputs.return_value={'state':'COMPILED_NOT_ADMITTED','unresolved':[],

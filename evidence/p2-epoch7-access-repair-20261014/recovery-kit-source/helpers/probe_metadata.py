@@ -9,6 +9,7 @@ import re
 
 import epoch7_delta as d
 import epoch7_snapshot as c
+import epoch7_python_identity as python_identity
 
 MACHINE_ID = '/etc/machine-id'
 CONTROLLER = '/etc/xuanjun-development/p2-native-controller.binding.json'
@@ -78,7 +79,7 @@ def binding(io):
 def candidate_sources(io, root):
     need(isinstance(root,str), 'CANDIDATE_ROOT_NOT_SUPPLIED')
     c.path(root)
-    need(root == c.CAND+'/epoch7-recovery-candidate/xuanjun-p2-package','PROBE_STAGED_CANDIDATE_SCOPE')
+    need(root == c.CAND+'/epoch7-recovery-candidate-r2/xuanjun-p2-package','PROBE_STAGED_CANDIDATE_SCOPE')
     raw, metadata = stable_read(io, root+'/deploy/integration-manifest.json', 1048576)
     protected(metadata, 1048576)
     need(c.sha(raw) == RUNTIME_MANIFEST, 'PROBE_EXACT_STAGED_RUNTIME')
@@ -177,11 +178,26 @@ def collect_probe_ingredients(io, candidate_root=None):
             need(isinstance(ref,str) and PYTHON.fullmatch(ref),'PROBE_PYTHON_REFERENCE_SCOPE');d.hash_value(expected)
             resolved=io.canonical_python(ref)
             need(PYTHON.fullmatch(resolved),'PROBE_PYTHON_CANONICAL_SCOPE')
-            raw,row=stable_read(io,resolved,PUBLIC_MAXIMUM);protected(row)
+            if resolved in python_identity.PYTHON_PATHS:
+                need(resolved==python_identity.PYTHON_PATHS[0] and expected==python_identity.RETAINED_SHA256,
+                     'PROBE_EXACT_PYTHON_PAIR_BINDING')
+                raw,row=io.read_python(resolved,maximum=PUBLIC_MAXIMUM)
+                again,last=io.read_python(resolved,maximum=PUBLIC_MAXIMUM)
+                need(raw==again and row==last,'PROBE_PYTHON_PAIR_CHANGED')
+                pair=python_identity.validate_pair_proof(row.get('python_identity'))
+                need(row==dict(pair['sample']['files'][resolved],python_identity=pair) and len(raw)==row['size'],
+                     'PROBE_PYTHON_PAIR_METADATA_BINDING')
+            else:
+                raw,row=stable_read(io,resolved,PUBLIC_MAXIMUM);protected(row)
+                need('python_identity' not in row,'PROBE_UNSCOPED_PYTHON_PAIR_PROOF')
             need(row['mode'] & 0o111 and c.sha(raw)==expected and io.canonical_python(ref)==resolved,'PROBE_PYTHON_PIN_OR_RACE')
-            return {'path':resolved,'sha256':expected,'metadata':row,'reference_path':ref}
+            value={'path':resolved,'sha256':expected,'metadata':row,'reference_path':ref}
+            if 'python_identity' in row:value['python_identity']=row['python_identity']
+            return value
         value=section('python',python)
-        if value is not None:ingredients['python']={k:value[k] for k in ('path','sha256')}
+        if value is not None:
+            ingredients['python']={k:value[k] for k in ('path','sha256')}
+            if 'python_identity' in value:ingredients['python']['python_identity']=value['python_identity']
         def sdk():
             entries=settings.get('contextFiles');context=settings.get('contextPath')
             need(isinstance(entries,dict) and 1<=len(entries)<=5 and context in entries,'PROBE_SDK_BINDING_SET')

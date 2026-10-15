@@ -57,6 +57,27 @@ def record_digest(record):
     return d.digest({k: sha(v) if k == 'data' else v for k, v in record.items()})
 
 
+def retained_native_transition(snapshot, supporting, current_raw):
+    """Bind the central owned-transition proof to this measured snapshot."""
+    retained=supporting['retained']
+    need(supporting['snapshot_sha256']==d.digest(snapshot) and
+         d.digest(retained)==snapshot['retained_resource_sha256'], 'NATIVE_RETAINED_OBSERVATION_BINDING')
+    evidence=snap.validate_native_transition_evidence(retained.get('native_binding_transition'),current_raw)
+    paths={snap.NATIVE:'after_sha256',snap.NATIVE_PRIOR:'before_sha256',
+           snap.NATIVE_ORIGINAL:'original_sha256',snap.NATIVE_ATTEMPT:'attempt_sha256'}
+    rows={}
+    for path,key in paths.items():
+        row=retained['files'][path]
+        need(row['kind']=='FILE' and row['sha256']==evidence[key] and row['nlink']==1 and
+             (row['uid'],row['gid'],row['mode'])==(0,0,0o644 if path==snap.NATIVE else 0o600),
+             'NATIVE_PROTECTED_PROOF_METADATA')
+        rows[path]=copy.deepcopy(row)
+    need(snapshot['receipts']['epoch5-prior-native-binding.json']==evidence['before_sha256'] and
+         snapshot['receipts']['epoch5-recovery-execution.json']==evidence['attempt_sha256'],
+         'NATIVE_PRESERVED_RECEIPT_BINDING')
+    return evidence,rows
+
+
 class ExistingInstallLock(object):
     """Open only the measured existing lock; never create, repair or replace it."""
     def __init__(self, expected, root='/'):
@@ -290,7 +311,7 @@ class HostPhaseFilesystem(fs.ProtectedFilesystem):
             os.close(parent)
 
     def read_exact(self, path):
-        need(path in {snap.NATIVE, TLS_JOURNAL, TLS_CANDIDATE} or
+        need(path in {snap.NATIVE, snap.NATIVE_ORIGINAL, TLS_JOURNAL, TLS_CANDIDATE} or
              path in {fs.TRANSACTION + '/' + name for name in d.PRESERVED_RECEIPTS | ARCHIVES},
              'FIXED_READ_PATH')
         parent, name = self._parent(path)
@@ -403,7 +424,7 @@ class CoreHostPhases(object):
     """
     def __init__(self, io, store, observer, context, plan_sha256, snapshot,
                  candidate, native_before, native_after, native_metadata,
-                 tls_config_raw, installer, artifact):
+                 tls_config_raw, installer, artifact, *, native_transition, native_proof_metadata):
         need(isinstance(io, HostPhaseFilesystem) and isinstance(store, BoundedActivationStore),
              'PROTECTED_PHASE_IO_AND_BOUNDED_ACTIVATION_REQUIRED')
         d.hash_value(plan_sha256)
@@ -411,8 +432,20 @@ class CoreHostPhases(object):
              'EXACT_CANDIDATE_MANIFEST')
         need(type(native_before) is bytes and type(native_after) is bytes and
              sha(native_before) == native_metadata['sha256'], 'NATIVE_BYTES_BINDING')
-        from epoch7_bindings import RETAINED_NATIVE_SHA
-        need(sha(native_before) == RETAINED_NATIVE_SHA, 'RECOGNIZED_NATIVE_BEFORE')
+        transition=snap.validate_native_transition_evidence(native_transition,native_before)
+        need(set(native_proof_metadata)=={snap.NATIVE,snap.NATIVE_PRIOR,snap.NATIVE_ORIGINAL,snap.NATIVE_ATTEMPT}
+             and d.same(native_proof_metadata[snap.NATIVE],native_metadata), 'NATIVE_PROOF_RECORD_SET')
+        need(native_metadata['kind']=='FILE' and native_metadata['nlink']==1 and
+             (native_metadata['uid'],native_metadata['gid'],native_metadata['mode'])==(0,0,0o644),
+             'NATIVE_CURRENT_RECORD_AUTHORITY')
+        for path,key in ((snap.NATIVE_PRIOR,'before_sha256'),(snap.NATIVE_ORIGINAL,'original_sha256'),
+                         (snap.NATIVE_ATTEMPT,'attempt_sha256')):
+            row=native_proof_metadata[path]
+            need(row['kind']=='FILE' and row['sha256']==transition[key] and row['nlink']==1 and
+                 (row['uid'],row['gid'],row['mode'])==(0,0,0o600),'NATIVE_PROOF_RECORD_AUTHORITY')
+        need(snapshot['receipts']['epoch5-recovery-execution.json']==transition['attempt_sha256'] and
+             snapshot['receipts']['epoch5-prior-native-binding.json']==transition['before_sha256'],
+             'NATIVE_PROOF_RECEIPT_BINDING')
         old, new = decode(native_before), decode(native_after)
         need(set(old) == set(new) == {'ledger', 'gatewayIdentity'} and
              d.same(old['gatewayIdentity'], new['gatewayIdentity']) and
@@ -435,8 +468,20 @@ class CoreHostPhases(object):
         self.context, self.snapshot, self.candidate = copy.deepcopy(context), copy.deepcopy(snapshot), copy.deepcopy(candidate)
         self.plan_sha, self.native_before, self.native_after = plan_sha256, native_before, native_after
         self.native_metadata, self.tls_raw = copy.deepcopy(native_metadata), tls_config_raw
+        self.native_transition,self.native_proof_metadata=copy.deepcopy(transition),copy.deepcopy(native_proof_metadata)
         self.installer, self.artifact = installer, copy.deepcopy(artifact)
         self.started = set(); self.current = copy.deepcopy(snapshot['activation'])
+
+    def _recheck_native_transition(self,current_raw):
+        raws={snap.NATIVE:current_raw}
+        for path in (snap.NATIVE_PRIOR,snap.NATIVE_ORIGINAL,snap.NATIVE_ATTEMPT):
+            raw,row=self.io.read_exact(path)
+            need(d.same(row,self.native_proof_metadata[path]),'NATIVE_PROOF_FULL_STAMP_CHANGED')
+            raws[path]=raw
+        proof=snap.validate_native_transition(*(raws[path] for path in
+            (snap.NATIVE,snap.NATIVE_PRIOR,snap.NATIVE_ORIGINAL,snap.NATIVE_ATTEMPT)))
+        need(d.same(proof,self.native_transition),'NATIVE_OWNED_PROOF_CHANGED')
+        return proof
 
     def _enter(self, context, phase):
         need(d.same(context, self.context) and phase not in self.started, 'PHASE_NO_RETRY_OR_REBIND')
@@ -473,6 +518,10 @@ class CoreHostPhases(object):
 
     def rebind_prepared_epoch(self, context, diagnostics):
         phase = 'rebind_prepared_epoch'; self._enter(context, phase)
+        raw,before=self.io.read_exact(snap.NATIVE)
+        need(raw==self.native_before and d.same(before,self.native_metadata),'NATIVE_BEFORE_CHANGED')
+        self._recheck_native_transition(raw)
+        need(self.io.read_exact(snap.NATIVE)==(raw,before),'NATIVE_PROOF_READ_RACE')
         proposed = self.candidate['activation']
         delta = d.build_delta(self.snapshot, context['snapshot_sha256'], self.candidate)
         need(d.digest(delta) == context['delta_sha256'], 'REBIND_APPROVED_DELTA')
@@ -489,6 +538,7 @@ class CoreHostPhases(object):
         need(raw == self.native_before and d.same(before, self.native_metadata), 'NATIVE_BEFORE_CHANGED')
         saved = self.io.archive_exact(phase, 'epoch7-prior-native-binding.json', raw)
         need(self.io.read_exact(snap.NATIVE) == (raw, before), 'NATIVE_ARCHIVE_RACE')
+        self._recheck_native_transition(raw)
         after = self.io.replace_file_exact(phase, snap.NATIVE, before, self.native_after, 0, 0, 0o644)
         tls = self.io.publish_tls_candidate(self.tls_raw)
         return observation(context, phase, d.digest({'activation': self.current,

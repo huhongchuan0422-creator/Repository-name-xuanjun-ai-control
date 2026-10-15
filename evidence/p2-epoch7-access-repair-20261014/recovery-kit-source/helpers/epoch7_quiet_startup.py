@@ -12,6 +12,7 @@ import epoch7_delta as d
 import epoch7_snapshot as snap
 import epoch7_protected_fs as fs
 from epoch7_host_phases import need,sha
+from epoch7_resource_observer import same_node_reference
 from epoch7_command_runner import ExactCommandRunner
 from epoch7_recovery_sequence import PHASES,BoundedDiagnostics
 from openclaw_metadata import (GATEWAY,LAUNCHER,RELAY,ENV_KEYS,ABSENT,
@@ -30,7 +31,7 @@ class BoundedQuietStartup(object):
              'QUIET_CONCRETE_CENSUS')
         self.authority,self.census=authority,census
         self.deadline=None;self.phase=None
-        self.relay_metadata=None
+        self.relay_metadata=None;self.node_reference=None
         owner=self
         class QuietReadOnlyIO(LocalReadOnlyIO):
             def check_locks(self):owner._check()
@@ -51,6 +52,17 @@ class BoundedQuietStartup(object):
             values.append(value)
         need(all(value==values[0] for value in values),'QUIET_RELAY_METADATA_TRANSITION')
         self.relay_metadata=copy.deepcopy(values[0])
+        from unit_metadata import validate_node_reference,NODE_CANONICAL_PATH
+        references=[]
+        for view in views:
+            rows=[row for section in view.values() for row in section if 'node_reference' in row]
+            need(len(rows)<=1,'QUIET_NODE_REFERENCE_UNIQUE')
+            if not rows:references.append(None);continue
+            row=rows[0]
+            need(row.get('kind')=='FILE' and row['path']==NODE_CANONICAL_PATH,'QUIET_NODE_REFERENCE_SCOPE')
+            references.append(validate_node_reference(row['node_reference'],row['path'],row['sha256']))
+        need(all(item==references[0] for item in references),'QUIET_NODE_REFERENCE_TRANSITION')
+        self.node_reference=copy.deepcopy(references[0])
 
     def _check(self):
         self.authority.receipt()
@@ -110,7 +122,17 @@ class BoundedQuietStartup(object):
         need(sha(unit_raw)==blocks[GATEWAY]['sources'][BASE],'QUIET_UNIT_SOURCE_PIN')
         wrapper=read(LAUNCHER,65536,1002)
         need(sha(wrapper)==blocks[GATEWAY]['sources'][LAUNCHER],'QUIET_WRAPPER_SOURCE_PIN')
-        node=blocks[GATEWAY]['roles'][0]['identity']['executable']
+        identity=blocks[GATEWAY]['roles'][0]['identity'];node=identity['executable']
+        from epoch7_openclaw_recipe import DIRECT_WRAPPER_SHA
+        reference=None
+        if sha(wrapper)==DIRECT_WRAPPER_SHA:
+            from unit_metadata import validate_node_reference
+            reference=validate_node_reference(self.node_reference,node,identity['executable_sha256'])
+            need(blocks[GATEWAY]['sources'].get(node)==identity['executable_sha256'],
+                 'QUIET_NODE_SOURCE_PIN')
+            need(same_node_reference(self.io.node_directory_reference(node,identity['executable_sha256']),reference,self.authority),
+                 'QUIET_NODE_REFERENCE_DRIFT')
+        else:need(self.node_reference is None,'QUIET_ROOT_NODE_REFERENCE_FORBIDDEN')
         profile=read(snap.PROFILE,1048576,1002);relay=read(RELAY,65536,0,self.relay_metadata)
         inventory=self.io.unit_dropins(UNITS);raws=[]
         need(set(inventory)==set(UNITS),'QUIET_COMPLETE_DROPIN_SCOPE')
@@ -128,7 +150,8 @@ class BoundedQuietStartup(object):
         for name in ABSENT:absent(wanted['package_root']+'/'+name)
         # Relay executes from the sealed release stage1, not the collector cwd.
         if phase not in ('stage_exact_release',):absent(RELEASE+'/stage1/.env')
-        projected=quiet_projection(selected,account,unit_raw,wrapper,node,profile,dotenv,relay,raws)
+        projected=quiet_projection(selected,account,unit_raw,wrapper,node,profile,dotenv,relay,raws,
+            node_reference=reference,node_sha256=identity.get('executable_sha256') if reference is not None else None)
         actual={'schema':1,'package_root':wanted['package_root'],
             'package_absence':{name:'ABSENT' for name in ABSENT}}
         actual.update({key:projected[key] for key in
@@ -137,6 +160,9 @@ class BoundedQuietStartup(object):
         for path,(raw,row,maximum) in sorted(captures.items()):
             self._check();need(self.io.read(path,maximum=maximum)==(raw,row),'QUIET_LATE_FILE_RACE')
         for path in sorted(absences):self._check();need(self.io.absent(path) is True,'QUIET_LATE_ABSENCE_RACE')
+        if reference is not None:
+            need(same_node_reference(self.io.node_directory_reference(node,identity['executable_sha256']),reference,self.authority),
+                 'QUIET_LATE_NODE_REFERENCE_DRIFT')
         if masked:need(self.io.mask(BASE)==mask,'QUIET_LATE_MASK_RACE')
         need(self.io.unit_dropins(UNITS)==inventory,'QUIET_LATE_DROPIN_RACE')
         need(self.io.gateway_account_home()==account and self._environment()==selected and

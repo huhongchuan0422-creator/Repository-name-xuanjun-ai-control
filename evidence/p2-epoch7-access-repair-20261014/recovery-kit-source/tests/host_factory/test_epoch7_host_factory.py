@@ -44,6 +44,19 @@ class FactoryTests(unittest.TestCase):
         self.assertNotEqual(f.input_digest({'x':b'private'}),f.input_digest({'x':{'type':'bytes','length':7,'sha256':h.sha(b'private')}}))
         self.assertNotEqual(f.input_digest({'x':True}),f.input_digest({'x':1}))
         self.assertNotEqual(f.input_digest({'x':b'private'}),f.input_digest({'x':b'private2'}))
+    def test_nested_container_digest_binds_order_type_length_and_values(self):
+        base={'a':[{'x':b'one'},2],'b':False}
+        self.assertEqual(f.input_digest(base),f.input_digest({'b':False,'a':[{'x':b'one'},2]}))
+        for changed in ({'a':[{'x':b'two'},2],'b':False},{'a':({'x':b'one'},2),'b':False},
+                        {'a':[2,{'x':b'one'}],'b':False},{'a':[{'x':b'one'},2,2],'b':False},
+                        {'a':[{'x':b'one'},2],'b':0}):
+            self.assertNotEqual(f.input_digest(base),f.input_digest(changed))
+        self.assertNotEqual(f.input_digest(b'one'),d.digest(['bytes',3,h.sha(b'one')]))
+    def test_repeated_nested_proofs_keep_existing_canonical_limit(self):
+        proof={'files':{str(i):{'stamp':list(range(9)),'raw':b'x'*2048} for i in range(128)}}
+        repeated={'checkpoints':[copy.deepcopy(proof) for unused in range(17)]}
+        pin=f.input_digest(repeated);repeated['checkpoints'][8]['files']['77']['raw']+=b'y'
+        self.assertNotEqual(pin,f.input_digest(repeated))
     def test_no_live_callable_can_be_hidden_in_inputs(self):
         with self.assertRaisesRegex(ValueError,'FINITE_INPUT_TYPES'):f.input_digest({'x':lambda:True})
     def test_database_before_uses_supporting_full_stamp_and_renames_keys(self):
@@ -167,7 +180,7 @@ class SnapshotProjectionTests(unittest.TestCase):
         a,c=fixture();a['writer_exclusion']['database_fds_excluded']=False
         with self.assertRaises(ValueError):o.immutable_snapshot(a)
     def test_policy_bytes_and_target_state_are_not_omitted(self):
-        a,c=fixture();b=copy.deepcopy(a);b['targets'][next(p for p in d.TARGETS if p not in d.OWNER_MASKS)]['sha256']=d.digest('changed')
+        a,c=fixture();b=copy.deepcopy(a);b['targets'][next(p for p in sorted(d.TARGETS) if p not in d.OWNER_MASKS and p!='/etc/xuanjun-development/dispatcher.json')]['sha256']=d.digest('changed')
         self.assertNotEqual(o.immutable_snapshot(a),o.immutable_snapshot(b))
 
 

@@ -15,6 +15,7 @@ import epoch7_delta as d
 import snapshot_io as s
 import unit_metadata as u
 from test_probe_metadata import Fake as ProbeFake,packed,h
+from test_snapshot import native_transition_fixture,native_pin_context
 
 PREFIXES=('/etc/systemd/system','/run/systemd/system','/usr/lib/systemd/system')
 NODE='/home/xuanjun_dev/.nvm/versions/node/v22.16.0/bin/node'
@@ -26,7 +27,11 @@ class Fake(ProbeFake):
         super(Fake,self).__init__()
         self.native={'gatewayIdentity':{'user':'xuanjun_dev','exe':NODE,'sha256':h('node'),
             'cgroup':'/system.slice/'+u.GATEWAY}}
-        self.add(c.NATIVE,packed(self.native),mode=0o644)
+        original=c.decode(native_transition_fixture()[2]);original['gatewayIdentity']=self.native['gatewayIdentity']
+        self.native_raws=native_transition_fixture(original)
+        self.native=c.decode(self.native_raws[0])
+        for path,raw in zip((c.NATIVE,c.NATIVE_PRIOR,c.NATIVE_ORIGINAL,c.NATIVE_ATTEMPT),self.native_raws):
+            self.add(path,raw,mode=0o644 if path==c.NATIVE else 0o600)
         self.backup=c.TRANSACTION+'/'+u.GATEWAY+'.backup'
         self.add(self.backup,('[Service]\nType=simple\nUser=xuanjun_dev\nGroup=xuanjun_dev\n'
             'SupplementaryGroups=docker\nEnvironment=TOKEN='+SECRET+'\nExecStart='+u.LAUNCHER+' gateway --port 18789\n').encode())
@@ -59,15 +64,45 @@ class Fake(ProbeFake):
     def executable_reference(self,path):
         target='/usr/bin/python3.6' if path=='/usr/bin/python3' else path
         return {'reference_path':path,'links':[],'final':{'path':target,'sha256':h(target),'format':'ELF',
-            'metadata':{'uid':0,'gid':0,'mode':0o755}}}
+            'metadata':{'uid':0,'gid':0,'mode':0o755,'nlink':1}}}
     def online_cpus(self):return 2
     def unit_dropins(self,units):return copy.deepcopy(self.dropins)
 
 class UnitFactsTests(unittest.TestCase):
     def setUp(self):self.io=Fake()
     def collect(self):
-        with mock.patch.object(c,'RETAINED_NATIVE_SHA',c.sha(packed(self.io.native))):return u.collect_unit_facts(self.io)
+        with native_pin_context(self.io.native_raws):return u.collect_unit_facts(self.io)
     def evidence(self,r,name):return r['sections'][name]['evidence']
+    def test_native_completed_transition_is_measured_not_admitted(self):
+        report=self.collect();proof=self.evidence(report,'native_gateway')['native_binding_transition']
+        self.assertEqual(proof['kind'],'EPOCH5_NATIVE_REBIND_COMPLETED')
+        self.assertEqual(proof['after_sha256'],c.sha(self.io.files[c.NATIVE]))
+        self.assertEqual(proof['before_release_sha256'],c.RETAINED_NATIVE_RELEASE)
+        self.assertEqual(proof['after_release_sha256'],d.OLD_MANIFEST)
+        self.assertEqual(report['install_admission'],'NOT_GRANTED')
+    def test_native_all_three_archives_are_read_at_fixed_bounds(self):
+        self.collect()
+        for path,bound in ((c.NATIVE_PRIOR,65536),(c.NATIVE_ORIGINAL,65536),(c.NATIVE_ATTEMPT,1048576)):
+            self.assertEqual(self.io.reads.count((path,bound)),2)
+    def test_native_archive_authority_must_remain_private(self):
+        for path in (c.NATIVE_PRIOR,c.NATIVE_ORIGINAL,c.NATIVE_ATTEMPT):
+            self.io=Fake();self.io.metadata[path]['mode']=0o644
+            self.assertEqual(self.collect()['sections']['native_gateway']['reason'],'UNIT_NATIVE_RECEIPT_AUTHORITY')
+    def test_native_current_mode_must_remain_exact(self):
+        self.io.metadata[c.NATIVE]['mode']=0o600
+        self.assertEqual(self.collect()['sections']['native_gateway']['reason'],'UNIT_NATIVE_CURRENT_AUTHORITY')
+    def test_native_wrong_owned_journal_is_unknown(self):
+        raw=self.io.files[c.NATIVE_ATTEMPT]+b' ';self.io.add(c.NATIVE_ATTEMPT,raw)
+        self.assertEqual(self.collect()['sections']['native_gateway']['reason'],'NATIVE_OWNED_ATTEMPT_PIN')
+    def test_native_missing_archive_is_unknown_not_old_pin_fallback(self):
+        del self.io.files[c.NATIVE_PRIOR]
+        self.assertIn('native_gateway',self.collect()['unsupported_sections'])
+    def test_group_writable_home_ancestors_still_rejected(self):
+        import observe_epoch7 as observe
+        for path in ('/home/xuanjun_dev/.openclaw/bin','/home/xuanjun_dev/.openclaw/tools'):
+            row=types.SimpleNamespace(st_mode=stat.S_IFDIR|0o775,st_uid=1002,st_gid=1002)
+            with self.assertRaisesRegex(ValueError,'OBSERVATION_ANCESTOR_AUTHORITY'):
+                observe.authority(path,row)
     def test_complete_finite_sections(self):
         r=self.collect();self.assertEqual(r['state'],'COMPLETE_UNREVIEWED');self.assertEqual(r['unsupported_sections'],[])
         self.assertEqual(set(r['sections']),{'unit_nss','python_reference','native_gateway','legacy_gateway','launcher',

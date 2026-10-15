@@ -14,8 +14,9 @@ GW='xuanjun-uk-openclaw.service';RELAY='xuanjun-p2-gateway-relay.service'
 
 
 class SourceFamilyTests(unittest.TestCase):
+    fixture=staticmethod(complete_fixture)
     def setUp(self):
-        args,delta=complete_fixture();compiled=sc.compile_service_contract(*args,candidate_delta=delta)
+        args,delta=self.fixture();compiled=sc.compile_service_contract(*args,candidate_delta=delta)
         self.context,self.contract,self.view=fixture2()
         self.blocks={u:compiled['service_role_contract']['units'][u] for u in (GW,RELAY)}
         self.contract['service_role_contract']['units'].update(copy.deepcopy(self.blocks))

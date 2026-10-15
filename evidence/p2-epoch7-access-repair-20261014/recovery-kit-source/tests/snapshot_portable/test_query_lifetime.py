@@ -1,5 +1,7 @@
 """Harmless local child fixtures; no UK commands or external connections."""
 import ctypes
+import contextlib
+import stat
 import os
 import pathlib
 import signal
@@ -188,5 +190,53 @@ class CleanupTests(unittest.TestCase):
                 self.assertFalse(io._query_reap(child,time.monotonic()+0.02));wait.assert_not_called()
             self.assertLess(time.monotonic()-started,0.1)
         finally:child._waitpid_lock.release()
+
+class ExistingLocksCleanupTests(unittest.TestCase):
+    def setUp(self):
+        self.info=types.SimpleNamespace(st_dev=1,st_ino=2,st_mode=stat.S_IFREG|0o600,
+            st_uid=0,st_gid=0,st_nlink=1,st_size=0,st_mtime_ns=3,st_ctime_ns=4)
+        row=dict(io.metadata(self.info),kind='FILE',sha256=io.c.sha(b''))
+        @contextlib.contextmanager
+        def parent(name):yield 9,name.rsplit('/',1)[1]
+        self.reader=types.SimpleNamespace(read=lambda name:(b'',dict(row)),parent=parent)
+        self.policy={'files':{name:dict(row) for name in (io.c.INSTALL_LOCK,io.c.ACTIVATION_LOCK)}}
+        self.stack=contextlib.ExitStack();self.addCleanup(self.stack.close)
+        self.open=self.stack.enter_context(mock.patch.object(io.os,'open',side_effect=[11,12]))
+        self.stat=self.stack.enter_context(mock.patch.object(io.os,'fstat',return_value=self.info))
+        self.flock=self.stack.enter_context(mock.patch.object(io.fcntl,'flock'))
+        self.close=self.stack.enter_context(mock.patch.object(io.os,'close'))
+    def test_normal_closes_each_lock_once(self):
+        with io.existing_locks(self.reader,self.policy) as locks:
+            self.assertEqual(set(locks),{io.c.INSTALL_LOCK,io.c.ACTIVATION_LOCK})
+        self.assertEqual(self.close.call_args_list,[mock.call(12),mock.call(11)])
+    def test_first_close_interrupt_cannot_skip_second_lock(self):
+        interrupted=KeyboardInterrupt('fixture close interrupt');self.close.side_effect=[interrupted,None]
+        with self.assertRaises(KeyboardInterrupt) as caught:
+            with io.existing_locks(self.reader,self.policy):pass
+        self.assertIs(caught.exception,interrupted)
+        self.assertEqual(str(caught.exception.__cause__),'EXISTING_LOCKS_CLEANUP_UNKNOWN')
+        self.assertEqual(self.close.call_args_list,[mock.call(12),mock.call(11)])
+    def test_failed_second_setup_preserves_primary_during_cleanup_interrupt(self):
+        primary=ValueError('FIXTURE_LOCK_SETUP_FAILED');self.flock.side_effect=[None,primary]
+        self.close.side_effect=[KeyboardInterrupt('fixture close interrupt'),None]
+        with self.assertRaises(ValueError) as caught:
+            with io.existing_locks(self.reader,self.policy):self.fail('setup must not yield')
+        self.assertIs(caught.exception,primary)
+        self.assertEqual(str(caught.exception.__cause__),'EXISTING_LOCKS_CLEANUP_UNKNOWN')
+        self.assertEqual(self.close.call_args_list,[mock.call(12),mock.call(11)])
+    def test_body_interrupt_preserved_with_multiple_cleanup_failures(self):
+        primary=KeyboardInterrupt('fixture body interrupt')
+        self.close.side_effect=[SystemExit('fixture cleanup exit'),OSError('fixture close failure')]
+        with self.assertRaises(KeyboardInterrupt) as caught:
+            with io.existing_locks(self.reader,self.policy):raise primary
+        self.assertIs(caught.exception,primary)
+        self.assertEqual(str(caught.exception.__cause__),'EXISTING_LOCKS_CLEANUP_UNKNOWN')
+        self.assertEqual(self.close.call_args_list,[mock.call(12),mock.call(11)])
+    def test_first_setup_failure_fd_is_closed_once_and_primary_unchanged(self):
+        primary=ValueError('FIXTURE_FIRST_STAT_FAILED');self.stat.side_effect=primary
+        with self.assertRaises(ValueError) as caught:
+            with io.existing_locks(self.reader,self.policy):self.fail('setup must not yield')
+        self.assertIs(caught.exception,primary);self.assertIsNone(caught.exception.__cause__)
+        self.close.assert_called_once_with(11)
 
 if __name__=='__main__':unittest.main()

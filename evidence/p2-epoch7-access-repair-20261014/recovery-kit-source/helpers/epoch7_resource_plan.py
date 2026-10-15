@@ -10,6 +10,7 @@ import os
 import epoch7_delta as d
 import epoch7_snapshot as snap
 import epoch7_protected_fs as fs
+import epoch7_python_identity as python_identity
 from epoch7_recovery_sequence import PHASES
 from epoch7_live_controls import SECTIONS
 from epoch7_host_phases import MANIFEST, need, sha, decode, packed, tls_metadata_candidate
@@ -22,6 +23,23 @@ CLIENT='/etc/xuanjun-development/p2-native-ledger-client.json'
 
 def file_spec(path,row):
     need(row['kind']=='FILE','RESOURCE_PLAN_REGULAR_FILE')
+    proof=row.get('python_identity')
+    if proof is not None:
+        proof=python_identity.validate_pair_proof(proof)
+        need(path in python_identity.PYTHON_PATHS,'RESOURCE_PLAN_PYTHON_PAIR_PATH')
+        expected=proof['sample']['files'][path]
+        need(all(type(row.get(k)) is int and row[k]==expected[k] for k in python_identity.METADATA_FIELDS)
+             and row['sha256']==expected['sha256'],'RESOURCE_PLAN_PYTHON_PAIR_METADATA')
+        need(all(key not in row or row[key] is False for key in ('default_acl','capability')) and
+             ('elf_header' not in row or row['elf_header'] is True),'RESOURCE_PLAN_PYTHON_PAIR_SECURITY')
+        access=decode_acl(None,row['mode'])
+        need('access_acl' not in row or row['access_acl'] is False or row['access_acl']==access,
+             'RESOURCE_PLAN_PYTHON_PAIR_ACL')
+        return dict({k:row[k] for k in ('kind','uid','gid','mode','sha256')},path=path,
+                    access_acl=access,python_identity=proof)
+    need('python_identity' not in row,'RESOURCE_PLAN_PYTHON_PAIR_REQUIRED')
+    need('nlink' not in row or (type(row['nlink']) is int and row['nlink']==1),
+         'RESOURCE_PLAN_SINGLE_LINK_REQUIRED')
     return dict({k:row[k] for k in ('kind','uid','gid','mode','sha256')},path=path,
                 access_acl=row.get('access_acl',decode_acl(None,row['mode'])))
 
@@ -102,7 +120,14 @@ def build_resource_views(snapshot,support,compiled,additions,security_rows,manif
     for path,row in retained['prerequisites']['binaries'].items():historical(path,row)
     need(type(executable_specs) is dict and executable_specs,'RESOURCE_PLAN_COMMAND_COVERAGE')
     for path,spec in executable_specs.items():
-        if spec['kind']=='FILE':put('historical',spec)
+        if spec['kind']=='FILE':
+            put('historical',spec)
+            if 'node_reference' in spec:
+                from unit_metadata import validate_node_reference
+                proof=validate_node_reference(spec['node_reference'],path,spec['sha256']);link=proof['link']
+                need(path==proof['final']['path'],'RESOURCE_PLAN_NODE_REFERENCE_PATH')
+                put('historical',{'path':link['path'],'kind':'LINK','uid':link['metadata']['uid'],
+                    'gid':link['metadata']['gid'],'sha256':sha(link['target'].encode('ascii'))})
         else:
             need(spec['kind']=='EXECUTABLE_REFERENCE','RESOURCE_PLAN_COMMAND_KIND')
             proof=spec['reference']

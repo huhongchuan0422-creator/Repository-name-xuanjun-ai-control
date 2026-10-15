@@ -8,6 +8,8 @@ import epoch7_delta as d
 import epoch7_snapshot as c
 from probe_metadata import stable_read,protected,error_label,need,PROVISION
 from unit_metadata import LAUNCHER,GATEWAY,UNITS,user_program,launcher_recipe
+from unit_metadata import (NODE_REFERENCE_PATH,NODE_CANONICAL_PATH,NODE_PACKAGE_ROOT,
+    DIRECT_DIST_WRAPPER,DIRECT_DIST_WRAPPER_SHA,validate_node_reference)
 
 VERSION='2026.9.9'
 SOURCE_HASHES={'dist/build-info.json': '6550ed6d598ceeab9dcbd94aa01c21337cabc35031e8891c699ae96fb333f58b', 'dist/cli/run-main.js': 'f03b82c2aedf493f3e1ddfda2fd46e2d0d38163127d1987827546b70058636ca', 'dist/config-env-vars-CFjF0--K.mjs': '29f159448563ce483e436cf8bb901f19ff4d94084320fa3e3479c51a808ebd4b', 'dist/dotenv-BAzkwZo-.mjs': 'a6ef09086515a1cf6d97aa8a2a4f87584685e0d0189cd80a7c18c3889c64b0ca', 'dist/dotenv-global-CP3dmTvh.mjs': '414082ecd363c4ba15f46e25075b3d75434b3e366a015e0ce7207b17cea910c3', 'dist/entry.js': '043980dff22859cd96fef04fe00d26c395a7ef8d2f67463777758c2987145a41', 'dist/entry.respawn-3dMNRLSy.mjs': '7b240a4c78e35f1ef0ff404ec2b96a9f6ed89a4417ef89a10ed2cf382aa4181e', 'dist/gateway-run-argv-DFDqy1EF.mjs': '038cc3f634aaab022f8adb8e541b2b6f5245fe08ad50d5b412899d85a3af57f1', 'dist/home-dir-D0b-ywue.mjs': '5fcab562e46b4b88dfea7d630ea621eee80bd6185e52895e6b08befa4d2e4a3c', 'dist/node-version-DdJ6cN09.mjs': 'b3d6d9d11f313ae70042380340f688a1db52e506c894b6b4dfdca11d56a85c0e', 'dist/paths-CtO6iw0c.mjs': '0fcef768ea381d210de1044327b4afb4602c76d1167a6f7147c729e7fd579b70', 'dist/pre-bootstrap-8enrRXrE.mjs': '82f668899640e0748f920e771cfabdd28589c68a044f1ba3ba41f5a6f00b43c8', 'dist/pre-bootstrap-qgGGBbez.mjs': '01c4e4e21872b7da6483e37c21ef43f9e4c48b0d9ad71935dd88eb529e0510eb', 'dist/proxy-lifecycle-Dl57fEmL.mjs': 'de283d5f397582801b5f35b43ffbe17cb4f49e70c14233a7d6bac2ac3fb794f6', 'dist/run-BNH_gC9b.mjs': '55673f688f7e455cd1bfdaf6a0f26270ff5e6565881403c1b066a82530ab810f', 'dist/run-command-D-K_dOJ-.mjs': 'a582d782e039327d2584c118517ca257aaeaf15e019bab520485764bd27edc8b', 'dist/run-command-DZaWbUcA.mjs': 'b0b889bbf65757684fc5b052965526a4362e31c1be0ba176bca7d1692c189fdc', 'dist/runtime-guard-BRBHlR8W.mjs': 'c35961cf02388fff4958c78fcfb8d39b412b148c37217b869ac9ec43368bf38a', 'dist/runtime-guard-BavKlA92.mjs': 'e226a9f84ad87249fe25619b1cf41c3e01f1e1a897feece811070971733bed77', 'dist/shell-env-Cxj7hKd1.mjs': '37f49b3b8654ceef1b17aeac0c5483baa7eee93e4ac006b5151ed5a542c7038b', 'dist/shell-env-Dc8Sl1Pk.mjs': '091a2a5ad70945a2c4ecd2825d9f5ab080292206f54e849bc274200b995ab626', 'dist/state-dir-CfAW6S2K.mjs': '09c4aeab9d9b6bfd37a4990b9c0489bffcd1f2a303d0f312f7515ad4d5c35854', 'dist/utils-DUAwk2p5.mjs': 'a0ad72edaa78c5f486c81e7a6c4ca954a860943d5e0675437f685d30f349f4c2', 'gateway-run-argv.mjs': 'aa1787742da5e06cef78d0fcdcd70932e3bab6a11b114a662355c57bd9fdc07a', 'node-compile-cache.mjs': '4b8842b79af6812f2e895ef458777db43591e96048859e3412717c28462fa9f7', 'node-host-launcher.mjs': 'b5e6a4c7f6ff08ef4ee4feb091054bada9577108edb3f0071870356ab3c28ab8', 'node-runtime-recovery.mjs': '2b2912ac98fb309d0948bb2218dd108da85eabfc71ec39870f01bc53cadbe579', 'node-sqlite.mjs': 'ef9e2430552069dfa8a8eb0900fd053ef6dc4218c5841693f3a0f9c8dae59aba', 'node-version.mjs': 'dfe6682632f769468297d877e2eab95212113cb37a7bdf5268795a838e49b26d', 'openclaw.mjs': 'aa8606ca0d62ff133ef5b7bd2323ec8ff3f8eb384404399cd5e742918d63b0a1', 'package.json': '214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95'}
@@ -17,6 +19,25 @@ SELECTORS=('HOME','OPENCLAW_HOME','OPENCLAW_STATE_DIR','OPENCLAW_CONFIG_PATH')
 META=('kind','dev','ino','uid','gid','mode','nlink','size','mtime_ns','ctime_ns')
 NODE_META=tuple(k for k in META if k!='kind')
 RELAY='/etc/xuanjun-development/p2-gateway-relay.json'
+DIRECT_ONLY_SOURCE_HASHES={'dist/is-main-DYSvvM1W.mjs':
+    'cedd59a24eadaaf873515fabea73b776a66d40773c8ee5298f4946b9eef10469'}
+
+
+def source_hashes(launcher_sha256):
+    values=dict(SOURCE_HASHES)
+    if launcher_sha256==DIRECT_DIST_WRAPPER_SHA:values.update(DIRECT_ONLY_SOURCE_HASHES)
+    return values
+
+
+def package_root(recipe):
+    entry=recipe['entry_script']
+    if entry==NODE_PACKAGE_ROOT+'/dist/entry.js':
+        need(recipe['executable']==NODE_REFERENCE_PATH,'OPENCLAW_DIRECT_LITERAL_SCOPE')
+        return NODE_PACKAGE_ROOT
+    root=os.path.dirname(entry);c.path(root)
+    need(root.startswith('/home/xuanjun_dev/') and root.endswith('/lib/node_modules/openclaw') and
+         entry==root+'/openclaw.mjs','OPENCLAW_FIXED_PACKAGE_SCOPE')
+    return root
 
 
 def quiet_environment(value):
@@ -63,8 +84,12 @@ def literal_unit_environment(raw):
     return {'selected':selected,'selectors':selectors,'working_directory':working or '/'}
 
 
-def literal_wrapper_environment(raw,node):
+def literal_wrapper_environment(raw,node,node_reference=None,node_sha256=None):
     recipe=launcher_recipe(raw,node);need(set(recipe['environment_names'])<={'HOME','PATH','LANG'},'OPENCLAW_WRAPPER_ENVIRONMENT_NAMES')
+    if recipe['executable']!=node:
+        need(raw==DIRECT_DIST_WRAPPER and node_sha256 is not None,'OPENCLAW_DIRECT_NODE_PROOF_REQUIRED')
+        validate_node_reference(node_reference,node,node_sha256)
+    else:need(node_reference is None,'OPENCLAW_ROOT_PROFILE_ALIAS_PROOF_FORBIDDEN')
     values={};executed=False
     for line in raw.decode('utf-8','strict').splitlines()[1:]:
         line=line.strip()
@@ -133,7 +158,7 @@ def dotenv_paths(unit_raw):
 
 
 def quiet_projection(manager_selected,account,unit_raw,wrapper_raw,node_path,config_raw,
-                     dotenv_raw_by_path,relay_config_raw,dropin_raws=()):
+                     dotenv_raw_by_path,relay_config_raw,dropin_raws=(),node_reference=None,node_sha256=None):
     """Pure source-reviewed projection shared with fresh post-edit live guards.
 
     Inputs are private bytes from separately protected readers. None of the raw
@@ -148,7 +173,8 @@ def quiet_projection(manager_selected,account,unit_raw,wrapper_raw,node_path,con
     for raw in dropin_raws:
         fields=service_fields(raw)
         need(not fields['User'] and not fields['Group'],'OPENCLAW_DROPIN_CREDENTIAL_OVERRIDE')
-    unit=literal_unit_environment(unit_raw);recipe,wrapper=literal_wrapper_environment(wrapper_raw,node_path)
+    unit=literal_unit_environment(unit_raw);recipe,wrapper=literal_wrapper_environment(
+        wrapper_raw,node_path,node_reference,node_sha256)
     selected=copy.deepcopy(manager_selected)
     # v239 synthesizes HOME for the explicit User before literal unit env wins.
     selected['HOME']=account['home'];selected.update(unit['selected'])
@@ -193,16 +219,19 @@ def collect_openclaw_profile(io,unit_facts,observation,candidate_root=None):
     identity=section('native_identity',lambda:measured('native_gateway')['gateway_identity'])
     def launcher():
         need(identity is not None,'OPENCLAW_NATIVE_UNAVAILABLE')
-        raw,row=read(LAUNCHER,65536);recipe,unused=literal_wrapper_environment(raw,identity['exe'])
-        original=measured('launcher');need(row['sha256']==original['sha256'] and recipe==original['recipe'],'OPENCLAW_LAUNCHER_BINDING')
-        root=os.path.dirname(recipe['entry_script']);c.path(root)
-        need(root.startswith('/home/xuanjun_dev/') and root.endswith('/lib/node_modules/openclaw') and
-             recipe['entry_script']==root+'/openclaw.mjs','OPENCLAW_FIXED_PACKAGE_SCOPE')
-        return {'raw':raw,'root':root,'public':{'path':LAUNCHER,'sha256':row['sha256'],
-            'recipe':recipe,'entry_realpath':recipe['entry_script']}}
+        raw,row=read(LAUNCHER,65536);original=measured('launcher');reference=original.get('node_reference')
+        recipe,unused=literal_wrapper_environment(raw,identity['exe'],reference,identity['sha256'])
+        need(row['sha256']==original['sha256'] and recipe==original['recipe'],'OPENCLAW_LAUNCHER_BINDING')
+        root=package_root(recipe)
+        public={'path':LAUNCHER,'sha256':row['sha256'],'recipe':recipe,'entry_realpath':recipe['entry_script']}
+        if reference is not None:
+            need(io.node_directory_reference(identity['exe'],identity['sha256'])==reference,'OPENCLAW_NODE_REFERENCE_CHANGED')
+            public['node_reference']=copy.deepcopy(reference)
+        return {'raw':raw,'root':root,'public':public}
     launch=section('launcher',launcher)
     files={};total=[0]
-    for relative,pin in sorted(SOURCE_HASHES.items()):
+    expected_sources=source_hashes(c.sha(launch['raw']) if launch is not None else None)
+    for relative,pin in sorted(expected_sources.items()):
         def source(relative=relative,pin=pin):
             need(launch is not None,'OPENCLAW_PACKAGE_ROOT_UNAVAILABLE')
             need(total[0]<33554432,'OPENCLAW_PROFILE_AGGREGATE_BOUND')
@@ -222,6 +251,9 @@ def collect_openclaw_profile(io,unit_facts,observation,candidate_root=None):
         need(identity is not None,'OPENCLAW_NATIVE_UNAVAILABLE')
         row=observation['evidence']['retained']['native_components']['components'][identity['exe']]
         need(row['sha256']==identity['sha256'],'OPENCLAW_NATIVE_HASH_BINDING')
+        if launch is not None and 'node_reference' in launch['public']:
+            referenced=launch['public']['node_reference']['final']['metadata']
+            need(all(referenced[key]==row[key] for key in META+('sha256',)), 'OPENCLAW_ALIAS_NATIVE_DESCRIPTOR_BINDING')
         return io.verify_node_descriptor(identity['exe'],row)
     descriptor=section('node',node)
     def manager():
@@ -290,7 +322,7 @@ def collect_openclaw_profile(io,unit_facts,observation,candidate_root=None):
     relay_value=section('relay',relay)
     def staged_cwd():
         from probe_metadata import RUNTIME_MANIFEST
-        need(candidate_root==c.CAND+'/epoch7-recovery-candidate/xuanjun-p2-package','OPENCLAW_STAGED_CWD_REQUIRED')
+        need(candidate_root==c.CAND+'/epoch7-recovery-candidate-r2/xuanjun-p2-package','OPENCLAW_STAGED_CWD_REQUIRED')
         raw,row=read(candidate_root+'/deploy/integration-manifest.json',1048576,0)
         need(row['sha256']==RUNTIME_MANIFEST and 'stage1/.env' not in c.decode(raw)['files'],'OPENCLAW_STAGED_MANIFEST')
         missing(candidate_root+'/stage1/.env')
@@ -300,11 +332,14 @@ def collect_openclaw_profile(io,unit_facts,observation,candidate_root=None):
         need(all(x is not None for x in (manager_value,account,unit_value,launch,profile,relay_value,dropin_value)),
              'OPENCLAW_QUIET_INPUT_UNAVAILABLE')
         return quiet_projection(manager_value['selected'],account,unit_value['raw'],launch['raw'],identity['exe'],
-            profile[0],dotenv,relay_value,dropin_value)
+            profile[0],dotenv,relay_value,dropin_value,launch['public'].get('node_reference'),identity['sha256'])
     projected=section('quiet_projection',quiet)
     def stable():
         if dropin_value is not None:need(dropins()==dropin_value,'OPENCLAW_LATE_DROPIN_RACE')
         if descriptor is not None:need(node()==descriptor,'OPENCLAW_LATE_NODE_RACE')
+        if launch is not None and 'node_reference' in launch['public']:
+            need(io.node_directory_reference(identity['exe'],identity['sha256'])==launch['public']['node_reference'],
+                 'OPENCLAW_LATE_NODE_REFERENCE_RACE')
         if 'policy' in observation:
             directories=observation['policy']['directories']
             for path in captures:
@@ -382,15 +417,14 @@ def prime_profile_scope(io,unit_facts,candidate_root=None):
     failures={}
     try:
         recipe=unit_facts['sections']['launcher']['evidence']['recipe']
-        root=os.path.dirname(recipe['entry_script']);c.path(root)
-        need(root.startswith('/home/xuanjun_dev/') and root.endswith('/lib/node_modules/openclaw') and
-             recipe['entry_script']==root+'/openclaw.mjs','OPENCLAW_FIXED_PACKAGE_SCOPE')
-        paths={root+'/'+name for name in tuple(SOURCE_HASHES)+ABSENT}
+        root=package_root(recipe)
+        launcher=unit_facts['sections']['launcher']['evidence']
+        paths={root+'/'+name for name in tuple(source_hashes(launcher['sha256']))+ABSENT}
         legacy=unit_facts['sections']['legacy_gateway']['evidence']
         raw,row=stable_read(io,legacy['backup_path'],65536);protected(row,65536)
         need(row['sha256']==legacy['backup_sha256'],'OPENCLAW_RESTORED_UNIT_BINDING')
         paths.update(dotenv_paths(raw))
-        if candidate_root==c.CAND+'/epoch7-recovery-candidate/xuanjun-p2-package':paths.add(candidate_root+'/stage1/.env')
+        if candidate_root==c.CAND+'/epoch7-recovery-candidate-r2/xuanjun-p2-package':paths.add(candidate_root+'/stage1/.env')
         for path in sorted(paths):
             try:io.absent(path)
             except (KeyboardInterrupt,SystemExit):raise

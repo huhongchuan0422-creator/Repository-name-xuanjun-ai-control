@@ -23,6 +23,7 @@ import subprocess
 import sys
 import time
 import node_sqlite_probe
+import epoch7_python_identity
 
 EXPECTED_HOST='iZd7oeikknn1z21sq6ji6zZ'
 PREFIX = 'xj-p2-proof-'
@@ -88,7 +89,12 @@ def validate_policy(policy):
     node_sqlite_probe.validate_node(binding['node']);sha(binding['probe_input_sha256'])
     need(binding['diagnostic_sha256']==digest(node_sqlite_probe.SOURCE),'EXACT_NODE_DIAGNOSTIC')
     for tool in ('python','systemctl'):
-        keys(policy[tool],('path','sha256'),'TOOL_KEYS');path(policy[tool]['path']);sha(policy[tool]['sha256'])
+        wanted=('path','sha256','python_identity') if tool=='python' and type(policy[tool]) is dict and 'python_identity' in policy[tool] else ('path','sha256')
+        keys(policy[tool],wanted,'TOOL_KEYS');path(policy[tool]['path']);sha(policy[tool]['sha256'])
+    if 'python_identity' in policy['python']:
+        epoch7_python_identity.validate_pair_proof(policy['python']['python_identity'])
+        need(policy['python']['path']==epoch7_python_identity.PYTHON_PATHS[0] and
+             policy['python']['sha256']==epoch7_python_identity.RETAINED_SHA256,'EXACT_PYTHON_PAIR_BINDING')
     need(policy['systemctl']['path']=='/usr/bin/systemctl','FIXED_SYSTEMCTL')
     need(re.fullmatch(r'/usr/(?:bin/python3(?:\.6)?|libexec/platform-python(?:3\.6)?)',policy['python']['path']),
          'CANONICAL_PYTHON_SCOPE')
@@ -244,9 +250,10 @@ class HostOps(object):
         need(socket.gethostname()==self.policy['hostname'],'EXACT_HOST_REQUIRED')
         raw=self.read_file('/etc/machine-id',4096,protected=True)[0]
         need(digest(raw)==self.policy['machine_id_sha256'],'EXACT_MACHINE_ID_REQUIRED')
-        for tool in ('python','systemctl'):
-            raw,unused=self.read_file(self.policy[tool]['path'],32*1024*1024,protected=True)
-            need(digest(raw)==self.policy[tool]['sha256'],'TOOL_SOURCE_CHANGED')
+        raw,unused=self.read_python()
+        need(digest(raw)==self.policy['python']['sha256'],'TOOL_SOURCE_CHANGED')
+        raw,unused=self.read_file(self.policy['systemctl']['path'],32*1024*1024,protected=True)
+        need(digest(raw)==self.policy['systemctl']['sha256'],'TOOL_SOURCE_CHANGED')
         for role,row in self.policy['profiles'].items():
             account=pwd.getpwnam(row['user']); group=grp.getgrnam(row['group'])
             need((account.pw_uid,group.gr_gid)==(row['uid'],row['gid']),'NSS_IDENTITY_CHANGED')
@@ -288,6 +295,66 @@ class HostOps(object):
                  identity(info)==identity(os.lstat(target)),'FILE_CHANGED_OR_BOUND')
             return raw,identity(info)
         finally:os.close(fd)
+    def _python_pair_sample(self):
+        # This bounded exception belongs only to the measured fixed Python pair.
+        # Generic reads (including executable/systemctl reads) remain nlink == 1.
+        sample={'files':{},'ancestors':{}};contents={}
+        for target in ('/','/usr','/usr/libexec')+tuple(epoch7_python_identity.PYTHON_PATHS):
+            directory=target in ('/','/usr','/usr/libexec')
+            before=os.lstat(target)
+            flags=os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK
+            if directory:flags|=os.O_DIRECTORY
+            fd=os.open(target,flags)
+            try:
+                info=os.fstat(fd)
+                need(identity(before)==identity(info) and before.st_mode==info.st_mode,
+                     'PYTHON_PAIR_OPEN_RACE')
+                need((stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)),
+                     'PYTHON_PAIR_TYPE')
+                need(info.st_uid==0 and info.st_gid==0 and not info.st_mode&0o022,
+                     'PYTHON_PAIR_PROTECTED')
+                attributes=set(os.listxattr(fd))
+                row=identity(info)
+                row.update(kind='DIRECTORY' if directory else 'FILE',
+                    access_acl='system.posix_acl_access' in attributes,
+                    default_acl='system.posix_acl_default' in attributes,
+                    capability='security.capability' in attributes)
+                need(not (row['access_acl'] or row['default_acl'] or row['capability']),
+                     'PYTHON_PAIR_ACL_OR_CAPABILITY')
+                if not directory:
+                    need(info.st_nlink==2 and info.st_mode==(stat.S_IFREG|0o755) and
+                         0<info.st_size<=32*1024*1024,'PYTHON_PAIR_FILE_SCOPE')
+                    raw=b''
+                    while len(raw)<=32*1024*1024:
+                        self.deadline.remaining()
+                        part=os.read(fd,min(65536,32*1024*1024+1-len(raw)))
+                        if not part:break
+                        raw+=part
+                    need(len(raw)==info.st_size,'PYTHON_PAIR_READ_BOUND')
+                    row.update(sha256=digest(raw),elf_header=raw.startswith(b'\x7fELF'))
+                    contents[target]=raw
+                final_attributes=set(os.listxattr(fd))
+                after=os.fstat(fd);named=os.lstat(target)
+                need(identity(info)==identity(after)==identity(named) and
+                     info.st_mode==after.st_mode==named.st_mode and
+                     attributes==final_attributes, 'PYTHON_PAIR_CHANGED')
+                sample['ancestors' if directory else 'files'][target]=row
+            finally:os.close(fd)
+        epoch7_python_identity.validate_pair_sample(sample)
+        return sample,contents
+    def read_python(self):
+        binding=self.policy['python']
+        if 'python_identity' not in binding:
+            return self.read_file(binding['path'],32*1024*1024,protected=True)
+        proof=binding['python_identity']
+        epoch7_python_identity.validate_pair_proof(proof)
+        need(binding['path']==epoch7_python_identity.PYTHON_PATHS[0] and
+             binding['sha256']==epoch7_python_identity.RETAINED_SHA256,'EXACT_PYTHON_PAIR_BINDING')
+        before,unused=self._python_pair_sample()
+        after,contents=self._python_pair_sample()
+        epoch7_python_identity.validate_pair_reread(proof,before,after)
+        return contents[binding['path']], {key:after['files'][binding['path']][key]
+                                         for key in epoch7_python_identity.METADATA_FIELDS}
     def command(self,args,mutating=True,timeout=2):
         allowed=('start','stop','restart','show','daemon-reload','--version')
         need(args and args[0] in allowed,'MANAGER_ACTION_SCOPE')

@@ -198,14 +198,16 @@ def compile_retained_bindings(old_plan_raw, old_manifest_raw, old_payload,
         'tls_config_bytes':targets[TLS], 'install_admission':False,
         'additional_identity_targets':'REQUIRES_FINAL_COMPILERS_AND_MEASUREMENTS'}
 
-# Last recognized native sidefile is from the retained epoch4 rebind, not v4's
-# rendered controller-binding target. Fresh snapshot must re-establish this hash.
+# Immutable epoch4 baseline, retained only as history. The current epoch7
+# sidefile must be authenticated by the completed epoch5 owned-transition proof.
 RETAINED_NATIVE_SHA = '91c65c9fbc5c2cf68648672b4c096d7df376ecfbc605bc4cc838300bd302f629'
 RETAINED_NATIVE_RELEASE = '338e488c4203e23d6375726ec8067af815c2d0ec9ee74adc6925f8ef49de9c09'
 
-def native_sidefile_delta(before, compiled, old_bridge_sha256, old_client_sha256):
+def native_sidefile_delta(before, compiled, old_bridge_sha256, old_client_sha256,
+                          native_transition):
     """Return exact proposed bytes only. No filesystem access, CAS or admission."""
-    need(type(before) is bytes and sha(before) == RETAINED_NATIVE_SHA, 'NATIVE_RETAINED_BYTES')
+    from epoch7_snapshot import validate_native_transition_evidence
+    validate_native_transition_evidence(native_transition,before)
     need(type(compiled) is dict and compiled.get('kind') == 'PRIVATE_RETAINED_BINDINGS_NOT_INSTALL_PLAN'
          and compiled.get('install_admission') is False, 'COMPILED_BINDINGS_REQUIRED')
     value = parse(before)
@@ -213,7 +215,7 @@ def native_sidefile_delta(before, compiled, old_bridge_sha256, old_client_sha256
     ledger=value['ledger']
     need(type(ledger) is dict and set(ledger)=={'python','pythonSha256','bridge','config','files'},
          'NATIVE_LEDGER_SCHEMA')
-    old_bridge='/opt/xuanjun-control-releases/integration-'+RETAINED_NATIVE_RELEASE[:16]+'/stage1/native_ledger_bridge.py'
+    old_bridge='/opt/xuanjun-control-releases/integration-'+native_transition['after_release_sha256'][:16]+'/stage1/native_ledger_bridge.py'
     need(ledger['bridge']==old_bridge and ledger['config']==CLIENT and
          ledger['files']=={old_bridge:old_bridge_sha256, CLIENT:old_client_sha256}, 'NATIVE_OLD_FILE_PINS')
     manifest_sha = compiled.get('manifest_sha256')
@@ -232,5 +234,7 @@ def native_sidefile_delta(before, compiled, old_bridge_sha256, old_client_sha256
          'NATIVE_INTERPRETER_CHANGED')
     value['ledger']=copy.deepcopy(new_ledger)
     after=(json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False)+'\n').encode()
-    need(RETAINED_NATIVE_RELEASE[:16].encode() not in after, 'NATIVE_STALE_RELEASE')
+    need(all(pin[:16].encode() not in after for pin in
+         (native_transition['before_release_sha256'],native_transition['after_release_sha256'])),
+         'NATIVE_STALE_RELEASE')
     return after

@@ -292,11 +292,14 @@ def validate_manifest(value):
 
 PUBLIC_SERVICE_FIXTURE = 'tests/service_contract/fixtures/public-service-units.json'
 PUBLIC_OPENCLAW_FIXTURE = 'tests/service_contract/fixtures/openclaw-source-profile.json'
+PUBLIC_OPENCLAW_DIRECT_FIXTURE = 'tests/service_contract/fixtures/openclaw-direct-source-profile.json'
+PUBLIC_OPENCLAW_DIRECT_PATH = 'dist/is-main-DYSvvM1W.mjs'
+PUBLIC_OPENCLAW_DIRECT_SHA = 'cedd59a24eadaaf873515fabea73b776a66d40773c8ee5298f4946b9eef10469'
 PUBLIC_OPENCLAW_LICENSE = 'tests/service_contract/fixtures/openclaw-LICENSE.txt'
 PUBLIC_OPENCLAW_NOTICES = 'tests/service_contract/fixtures/openclaw-THIRD_PARTY_NOTICES.md'
 PUBLIC_FIXTURE_SOURCES = {
     target: 'p2-epoch7-repair/sequence-candidate/fixtures/' + target.rsplit('/', 1)[1]
-    for target in (PUBLIC_SERVICE_FIXTURE, PUBLIC_OPENCLAW_FIXTURE,
+    for target in (PUBLIC_SERVICE_FIXTURE, PUBLIC_OPENCLAW_FIXTURE, PUBLIC_OPENCLAW_DIRECT_FIXTURE,
                    PUBLIC_OPENCLAW_LICENSE, PUBLIC_OPENCLAW_NOTICES)}
 PUBLIC_SERVICE_UNITS = {
     '/etc/systemd/system/' + name: 'deploy/' + name for name in (
@@ -346,7 +349,7 @@ def validate_public_service_fixture(value, cache):
 def validate_public_openclaw_fixture(cache):
     """Review-only public bytes; parse literal pins without importing the recipe."""
     names = {PUBLIC_OPENCLAW_FIXTURE, PUBLIC_OPENCLAW_LICENSE, PUBLIC_OPENCLAW_NOTICES}
-    if not names.intersection(cache): return
+    if not (names | {PUBLIC_OPENCLAW_DIRECT_FIXTURE}).intersection(cache): return
     need(names <= set(cache) and 'helpers/epoch7_openclaw_recipe.py' in cache,
          'PUBLIC_OPENCLAW_COMPLETE_SET')
     import ast
@@ -394,6 +397,29 @@ def validate_public_openclaw_fixture(cache):
     need(sha(cache[PUBLIC_OPENCLAW_NOTICES]) ==
          'c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5',
          'PUBLIC_OPENCLAW_NOTICES')
+    if PUBLIC_OPENCLAW_DIRECT_FIXTURE in cache:
+        extension={PUBLIC_OPENCLAW_DIRECT_PATH:PUBLIC_OPENCLAW_DIRECT_SHA}
+        assignments=[node for node in ast.parse(cache['helpers/epoch7_openclaw_recipe.py']).body
+            if isinstance(node,ast.Assign) and any(isinstance(target,ast.Name) and target.id=='DIRECT_SOURCE_HASHES'
+                                                  for target in node.targets)]
+        need(len(assignments)==1,'PUBLIC_OPENCLAW_DIRECT_ASSIGNMENT')
+        node=assignments[0];call=node.value
+        need(len(node.targets)==1 and isinstance(call,ast.Call) and isinstance(call.func,ast.Name) and
+             call.func.id=='dict' and len(call.args)==1 and isinstance(call.args[0],ast.Name) and
+             call.args[0].id=='SOURCE_HASHES' and len(call.keywords)==1 and call.keywords[0].arg is None and
+             isinstance(call.keywords[0].value,ast.Dict) and len(call.keywords[0].value.keys)==1 and
+             ast.literal_eval(call.keywords[0].value)==extension,'PUBLIC_OPENCLAW_DIRECT_LITERAL_PIN')
+        direct=decode(cache[PUBLIC_OPENCLAW_DIRECT_FIXTURE])
+        need(type(direct) is dict and set(direct)=={'extends','fixture_scope','npm_tar_sha256','files'} and
+             direct['extends']=='openclaw-source-profile.json' and direct['fixture_scope']==fixture['fixture_scope'] and
+             direct['npm_tar_sha256']==constants['TARBALL'] and type(direct['files']) is dict and
+             set(direct['files'])=={PUBLIC_OPENCLAW_DIRECT_PATH},'PUBLIC_OPENCLAW_DIRECT_SCHEMA')
+        row=direct['files'][PUBLIC_OPENCLAW_DIRECT_PATH]
+        need(type(row) is dict and set(row)=={'content_base64','sha256'} and row['sha256']==PUBLIC_OPENCLAW_DIRECT_SHA and
+             type(row['content_base64']) is str and len(row['content_base64'])==1948,'PUBLIC_OPENCLAW_DIRECT_ROW')
+        content=base64.b64decode(row['content_base64'].encode('ascii'),validate=True)
+        need(len(content)==1461 and base64.b64encode(content).decode('ascii')==row['content_base64'] and
+             sha(content)==PUBLIC_OPENCLAW_DIRECT_SHA,'PUBLIC_OPENCLAW_DIRECT_BYTES')
 
 
 def validate_runtime(value, cache):
@@ -629,7 +655,7 @@ class VerifiedKit(object):
         """
         need(self.manifest['production_resume'] == RESUME_COMPOSED, 'RESUME_REFUSED_UNCOMPOSED')
         need(os.geteuid() == 0 and os.uname().nodename.split('.')[0] == FIXED_HOST and
-             self.root == CANDIDATE_PARENT + '/epoch7-recovery-candidate', 'RESUME_FIXED_HOST_ROOT')
+             self.root == CANDIDATE_PARENT + '/epoch7-recovery-candidate-r2', 'RESUME_FIXED_HOST_ROOT')
         need(type(review_id) is int and review_id > 0 and type(review_body_sha) is str and
              SHA.fullmatch(review_body_sha), 'FRESH_REVIEW_ARGUMENTS_REQUIRED')
         need(all(type(value) is str and SHA.fullmatch(value) for value in (plan_sha, seed_sha)),
@@ -712,7 +738,7 @@ class VerifiedKit(object):
             need(os.path.dirname(output) == observer.c.CAND and re.fullmatch(
                  r'epoch7-observation-[0-9a-f]{16}\.private\.json', os.path.basename(output)),
                  'OBSERVATION_OUTPUT_SCOPE')
-            need(self.root == observer.c.CAND + '/epoch7-recovery-candidate',
+            need(self.root == observer.c.CAND + '/epoch7-recovery-candidate-r2',
                  'OBSERVATION_EXACT_STAGED_KIT')
             # Refuse existing output before observation/probe effects. Final
             # writer still uses O_EXCL, no-follow ancestry and private readback.

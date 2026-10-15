@@ -13,6 +13,7 @@ import epoch7_delta as d
 import epoch7_host_phases as h
 import epoch7_protected_fs as fs
 from test_epoch7_delta import fixture
+from test_snapshot import native_transition_fixture,native_pin_context
 
 
 class Authority(h.ClaimAuthority):
@@ -130,6 +131,108 @@ class Store(object):
     def _write_descriptor(self, value):
         if self.fail == 'write': raise KeyboardInterrupt()
         self.current = copy.deepcopy(value)
+
+
+class NativeTransitionTests(unittest.TestCase):
+    def setUp(self):
+        self.raws=native_transition_fixture();self.pins=native_pin_context(self.raws)
+        self.pins.start();self.addCleanup(self.pins.stop)
+        self.proof=h.snap.validate_native_transition(*self.raws)
+        paths=(h.snap.NATIVE,h.snap.NATIVE_PRIOR,h.snap.NATIVE_ORIGINAL,h.snap.NATIVE_ATTEMPT)
+        self.records={path:{'kind':'FILE','sha256':h.sha(raw),'uid':0,'gid':0,
+            'mode':0o644 if path==h.snap.NATIVE else 0o600,'dev':8,'ino':100+index,'nlink':1,
+            'size':len(raw),'mtime_ns':11,'ctime_ns':12} for index,(path,raw) in enumerate(zip(paths,self.raws))}
+        self.content=dict(zip(paths,self.raws));self.snapshot,self.candidate=fixture()
+        self.candidate['manifest_sha256']=h.MANIFEST
+        self.snapshot['receipts']['epoch5-prior-native-binding.json']=self.proof['before_sha256']
+        self.snapshot['receipts']['epoch5-recovery-execution.json']=self.proof['attempt_sha256']
+        self.snapshot['attempt']['sha256']=self.proof['attempt_sha256']
+        self.retained={'files':copy.deepcopy(self.records),'native_binding_transition':copy.deepcopy(self.proof)}
+        self.support=self.rebind_support()
+    def rebind_support(self):
+        self.snapshot['retained_resource_sha256']=d.digest(self.retained)
+        return {'snapshot_sha256':d.digest(self.snapshot),'retained':self.retained}
+    def core(self):
+        before=self.raws[0];after=h.decode(before)
+        bridge='/opt/xuanjun-control-releases/integration-'+h.MANIFEST[:16]+'/stage1/native_ledger_bridge.py'
+        client=after['ledger']['config'];after['ledger'].update(bridge=bridge,files={bridge:h.BRIDGE_SHA256,
+            client:self.candidate['targets'][client]['sha256']})
+        tls={'release_sha256':h.MANIFEST,'fixture':'retained TLS identity'};tlsraw=h.packed(tls)
+        self.candidate['targets']['/etc/xuanjun-development/tls-renewal.json']['sha256']=h.sha(tlsraw)
+        self.snapshot['tls']['config_identity_sha256']=d.digest({'fixture':'retained TLS identity'})
+        self.candidate['tls_config_identity_sha256']=self.snapshot['tls']['config_identity_sha256']
+        context={'runtime_manifest_sha256':h.MANIFEST,'snapshot_sha256':d.digest(self.snapshot)}
+        context['context_sha256']='c'*64
+        context['delta_sha256']=d.digest(d.build_delta(self.snapshot,context['snapshot_sha256'],self.candidate))
+        io=mock.Mock(spec=h.HostPhaseFilesystem);io.authority=mock.Mock()
+        io.authority.binding={'approval_body_sha256':'a'*64}
+        io.read_exact.side_effect=lambda path:(self.content[path],copy.deepcopy(self.records[path]))
+        io.archive_exact.return_value={'sha256':h.sha(before)}
+        io.replace_file_exact.return_value={'sha256':h.sha(h.packed(after))};io.publish_tls_candidate.return_value={}
+        store=mock.Mock(spec=h.BoundedActivationStore);store.head.side_effect=d.digest
+        artifact={'source_commit':h.SOURCE,'source_tree':h.SOURCE_TREE,'manifest_sha256':h.MANIFEST,
+                  'releases':'/opt/xuanjun-control-releases'}
+        value=h.CoreHostPhases(io,store,mock.Mock(),context,'b'*64,self.snapshot,self.candidate,
+            before,h.packed(after),self.records[h.snap.NATIVE],tlsraw,mock.Mock(spec=h.FrozenBoundedInstaller),
+            artifact,native_transition=self.proof,native_proof_metadata=self.records)
+        return value,context,io
+    def test_retained_proof_binds_current_and_all_private_metadata(self):
+        proof,rows=h.retained_native_transition(self.snapshot,self.support,self.raws[0])
+        self.assertEqual(proof,self.proof);self.assertEqual(rows,self.records)
+        rows[h.snap.NATIVE]['ino']+=1;self.assertNotEqual(rows,self.records)
+    def test_self_hashed_forged_proof_or_private_record_rejected(self):
+        for change in ('proof','mode','hash','receipt'):
+            original=copy.deepcopy((self.retained,self.snapshot))
+            if change=='proof':self.retained['native_binding_transition']['original_preserved']=False
+            elif change=='mode':self.retained['files'][h.snap.NATIVE_ATTEMPT]['mode']=0o644
+            elif change=='hash':self.retained['files'][h.snap.NATIVE_PRIOR]['sha256']='0'*64
+            else:self.snapshot['receipts']['epoch5-recovery-execution.json']='0'*64
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                h.retained_native_transition(self.snapshot,self.rebind_support(),self.raws[0])
+            self.retained,self.snapshot=original
+    def test_current_prior_and_attempt_bytes_are_not_interchangeable(self):
+        for raw in self.raws[1:]:
+            with self.assertRaises(ValueError):h.retained_native_transition(self.snapshot,self.support,raw)
+    def test_phase_rechecks_real_transition_before_effect_and_after_archive(self):
+        core,context,io=self.core()
+        with mock.patch.object(h,'rebind_prepared_epoch7',return_value=self.candidate['activation']),\
+             mock.patch.object(h.snap,'validate_native_transition',wraps=h.snap.validate_native_transition) as validate:
+            core.rebind_prepared_epoch(context,mock.Mock())
+        self.assertEqual(validate.call_count,2);io.replace_file_exact.assert_called_once()
+        self.assertEqual(io.archive_exact.call_args[0][2],self.raws[0])
+    def test_phase_constructor_requires_central_proof_and_exact_private_authority(self):
+        for kind in ('proof','metadata','current'):
+            oldproof,oldrecords=copy.deepcopy(self.proof),copy.deepcopy(self.records)
+            if kind=='proof':self.proof['approval_id']+=1
+            elif kind=='metadata':self.records[h.snap.NATIVE_ORIGINAL]['mode']=0o644
+            else:self.records[h.snap.NATIVE]['gid']=1002
+            with self.subTest(kind=kind),self.assertRaises(ValueError):self.core()
+            self.proof,self.records=oldproof,oldrecords
+    def test_proof_stamp_drift_stops_before_activation_or_archive(self):
+        core,context,io=self.core();self.records[h.snap.NATIVE_ATTEMPT]['ctime_ns']+=1
+        with mock.patch.object(h,'rebind_prepared_epoch7') as activate,self.assertRaisesRegex(ValueError,'FULL_STAMP'):
+            core.rebind_prepared_epoch(context,mock.Mock())
+        activate.assert_not_called();io.archive_exact.assert_not_called();io.replace_file_exact.assert_not_called()
+    def test_current_race_during_proof_read_stops_before_activation(self):
+        core,context,io=self.core();read=io.read_exact.side_effect
+        def changed(path):
+            result=read(path)
+            if path==h.snap.NATIVE_ATTEMPT:self.records[h.snap.NATIVE]['ctime_ns']+=1
+            return result
+        io.read_exact.side_effect=changed
+        with mock.patch.object(h,'rebind_prepared_epoch7') as activate,self.assertRaisesRegex(ValueError,'NATIVE_PROOF_READ_RACE'):
+            core.rebind_prepared_epoch(context,mock.Mock())
+        activate.assert_not_called();io.archive_exact.assert_not_called()
+    def test_proof_bytes_or_archive_time_drift_stops_native_cas(self):
+        for late in (False,True):
+            core,context,io=self.core();old=self.content[h.snap.NATIVE_PRIOR]
+            def changed(*unused):
+                self.content[h.snap.NATIVE_PRIOR]=old+b' ';return {'sha256':h.sha(self.raws[0])}
+            if late:io.archive_exact.side_effect=changed
+            else:changed()
+            with mock.patch.object(h,'rebind_prepared_epoch7',return_value=self.candidate['activation']),\
+                 self.subTest(late=late),self.assertRaises(ValueError):core.rebind_prepared_epoch(context,mock.Mock())
+            io.replace_file_exact.assert_not_called();self.content[h.snap.NATIVE_PRIOR]=old
 
 
 class ActivationTests(unittest.TestCase):
