@@ -199,4 +199,15 @@ class Phase2Nodes(unittest.TestCase):
         with patch("scripts.community_saas_offline_handoff.read",return_value=fake):
             with self.assertRaisesRegex(ValueError,"UNSETTLEABLE_AMOUNT"):
                 plan_finance_claim(self.o,"order1","tenantA")
+ def test_41_order_prepare_rejects_unsafe_quote_total(self):
+    from unittest.mock import patch
+    from scripts.community_saas_order_preparation import prepare
+    quote={"created_at":10,"expires_at":100,"kind":"MONTHLY",
+           "supplier_payment":"NONE","totals_by_cycle":{"MONTH":{"cny_minor":9007199254740992}},
+           "offer_governed":True,"approval_ref":"approved","cost_evidence_ref":"evidence",
+           "module_id":"storefront_catalog","offer_id":"sku","version":1}
+    with patch("scripts.community_saas_order_preparation.read_quote",return_value=quote):
+        with self.assertRaisesRegex(ValueError,"INVALID_QUOTE_AMOUNT"):
+            prepare(self.o,self.q,"unsafe1","tenantA","qunsafe","CNY",20)
+    self.assertEqual(self.o.execute("SELECT COUNT(*) FROM saas_order_preparations").fetchone()[0],0)
 if __name__=="__main__":unittest.main()
