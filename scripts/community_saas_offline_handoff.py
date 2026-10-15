@@ -172,12 +172,12 @@ def admin_snapshot(db,tenant_id,at):
 def recovery_check(db,tenant_id):
     """Deterministic reconciliation report: no retry, no external side effects."""
     data=admin_snapshot(db,tenant_id,0)
-    orphans=[oid for (oid,) in db.execute(
-        "SELECT DISTINCT e.order_id FROM saas_order_lifecycle_events e "
+    orphan_exists=db.execute(
+        "SELECT EXISTS(SELECT 1 FROM saas_order_lifecycle_events e "
         "LEFT JOIN saas_order_preparations p ON e.order_id=p.order_id "
-        "WHERE p.order_id IS NULL ORDER BY e.order_id").fetchall()]
+        "WHERE p.order_id IS NULL)").fetchone()[0]
     return {"tenant_id":tenant_id,
-            "orphan_lifecycle_events_global_hold":orphans,
+            "orphan_lifecycle_events_global_hold":bool(orphan_exists),
             "awaiting_review":[x["order_id"] for x in data["orders"]
                                if x["state"] in ("CONFIRMATION_UNKNOWN","AWAITING_EXTERNAL","STATE_INCONSISTENT")],
             "integrity_hold":[x["order_id"] for x in data["orders"] if x["state"]=="STATE_INCONSISTENT"],
