@@ -1,0 +1,105 @@
+{
+  "approval_issued": false,
+  "cases": [
+    {
+      "case": 1,
+      "expected_rejection_observed": null,
+      "reason": null,
+      "status": "PASS_OBSERVED"
+    },
+    {
+      "case": 2,
+      "expected_rejection_observed": null,
+      "reason": null,
+      "status": "PASS_OBSERVED"
+    },
+    {
+      "case": 3,
+      "expected_rejection_observed": null,
+      "reason": null,
+      "status": "PASS_OBSERVED"
+    },
+    {
+      "case": 4,
+      "expected_rejection_observed": null,
+      "reason": null,
+      "status": "PASS_OBSERVED"
+    },
+    {
+      "case": 5,
+      "expected_rejection_observed": null,
+      "reason": null,
+      "status": "PASS_OBSERVED"
+    },
+    {
+      "case": 6,
+      "expected_rejection_observed": true,
+      "reason": "BrokenPipeError:[Errno 32] Broken pipe",
+      "status": "FAIL_OBSERVED"
+    },
+    {
+      "case": 7,
+      "expected_rejection_observed": null,
+      "reason": null,
+      "status": "PASS_OBSERVED"
+    },
+    {
+      "case": 8,
+      "expected_rejection_observed": true,
+      "reason": "BrokenPipeError:[Errno 32] Broken pipe",
+      "status": "FAIL_OBSERVED"
+    }
+  ],
+  "cleanup_status_counts": {
+    "REMOVED": 34,
+    "STOPPED_AND_EMPTY": 6
+  },
+  "computed": {
+    "evidence_records_sha256": "e26b2333f78a76e94261449d83b05d0467f930dc9c17e8963cd70b2735e3852e",
+    "expected_review_body_sha256": "cc4764bdab37c3bedad9171e72aafd86b59812e82b6acdf196a39a1257a6df36",
+    "probe_input_sha256": "71817761e1b5c805140bf340a214998898a74227dc24aed4c5e1edf3947d548b",
+    "probe_policy_sha256": "7083a3ba187606702dd21b1b390948ed1c348897219082cf2e4aa3a8962ec5be",
+    "probe_receipt_sha256": "b6d0676992cb973d39f31dc652ea6aecf2d9747964a50f0ede23ed76ca1088b5",
+    "socket_dropins_sha256": "7412f8e70c998cf6fd8cedcbc444c0715747ff7421e49910c08d66cec43df7b7",
+    "topology_sha256": "9cc4fa1ccc90cd2f950283b3ff6a0ae22350f21b2163edcae4643ff76f22757c"
+  },
+  "counts": {
+    "cases": 8,
+    "cleanup_rows": 40,
+    "receipt_events": 129,
+    "resources": 35,
+    "server_observations": 9
+  },
+  "feature_id": "P2_RETAINED_RECOVERY",
+  "file_with_lf_bytes": 289252,
+  "file_with_lf_sha256": "365d4d361907b3687bf5f444b7d329e484b372563c58be0dcaa8f2bf1da2803d",
+  "host_operations_in_this_verification": "NONE",
+  "independent_loader_runs": "PASS_BOTH",
+  "independent_mechanism_review": "STILL_REQUIRED",
+  "interpreters": [
+    "3.6.8",
+    "3.12.14"
+  ],
+  "node_sqlite_cleanup_state": "OBSERVED",
+  "node_sqlite_status": "PASS_OBSERVED",
+  "packet_bytes": 289251,
+  "packet_sha256": "92dab6479bb248859ae5e5972fc268aeb0312b464786e2f27c8ecbfa60047dd5",
+  "privacy_validation": {
+    "exact_strict_schema": "PASS",
+    "free_form_strings": "REJECTED_BY_SCHEMA",
+    "raw_configuration_or_environment_payload_exported": false,
+    "raw_receipt": "EXACT_VALIDATED_CANONICAL_JSON_PLUS_LF",
+    "redaction_applied": false,
+    "unknown_fields": "REJECTED_BY_SCHEMA"
+  },
+  "production_resume": "NOT_EXECUTED",
+  "schema": 1,
+  "schema_sha256": "4b3560afaebfb62fc7dc18d7648f0131a4d6756a5c971ea5469b7741d32126e8",
+  "source_publication_commit": "09984e00b446f74549480516778fedd85f94bed2",
+  "source_sha256": "dd1f6c2a701dbf849ff5e3361e226b5be505cd72d65aa3d58f6b0a1e68ee30fc",
+  "state": "PASS_ACTUAL_EXPORTED_SUBSET_RECOMPUTED",
+  "verifier_sha256": "054658a06d039d577236cb8edf5d6ade4890161f5bdd8d55d7fc87c52770a20b",
+  "whole_observation_authentication": "REPORTED_BY_HASH_PINNED_HOST_EXPORTER",
+  "whole_observation_binding": "2536b5fddff1e918222a10fdd97846832af82e3b2f14919ce150ca5bd6ef3820",
+  "whole_observation_recomputed": false
+}
