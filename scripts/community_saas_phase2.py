@@ -180,20 +180,53 @@ def serialize_response(value):
                       allow_nan=False)
 
 def verify_persistent_stores(quote_path,order_path):
-    """Fail closed on unknown schemas; does not create or migrate data."""
-    from scripts.community_saas_modules import connect
+    """Read-only verification of two pre-existing offline SQLite stores.
+
+    Does not create, install, migrate, repair or authorize production data.
+    Rejects absent databases and symlink leaves before opening mode=ro.
+    """
+    import pathlib
+    import stat
+    from scripts.community_saas_modules import SCHEMA as MODULE_SCHEMA
+    from scripts.community_saas_offer_catalog import SCHEMA as OFFER_SCHEMA
+    from scripts.community_saas_modules import MODULES
+    from scripts.community_saas_schema_guard import verify,verify_extension
     from scripts.community_saas_order_preparation import SCHEMA,LIFECYCLE_SCHEMA
     from scripts.community_saas_offline_handoff import REVIEW_SCHEMA
-    from scripts.community_saas_schema_guard import verify_extension
-    module=connect(quote_path)
-    try:
-        db=sqlite3.connect(order_path)
+
+    def existing_store(path):
+        if type(path) not in (str,pathlib.Path):
+            raise ValueError("STORE_PATH_INVALID")
+        candidate=pathlib.Path(path)
         try:
-            verify_extension(db,SCHEMA)
-            verify_extension(db,LIFECYCLE_SCHEMA)
-            verify_extension(db,REVIEW_SCHEMA)
-            integrity=db.execute("PRAGMA integrity_check").fetchone()[0]
-            if integrity!="ok":raise ValueError("DB_INTEGRITY_FAIL")
-        finally:db.close()
-    finally:module.close()
-    return {"verified":True,"payment_processing":False,"migration_executed":False}
+            identity=candidate.lstat()
+        except OSError:
+            raise ValueError("STORE_MISSING")
+        if not stat.S_ISREG(identity.st_mode):
+            raise ValueError("STORE_NOT_REGULAR")
+        resolved=candidate.resolve(strict=True)
+        # SQLite URI mode=ro never silently creates a database.
+        db=sqlite3.connect(resolved.as_uri()+"?mode=ro",uri=True)
+        db.execute("PRAGMA query_only=ON")
+        return db
+
+    module=existing_store(quote_path)
+    try:
+        order=existing_store(order_path)
+        try:
+            expected={"module_prices","module_entitlements","module_events",
+                      "saas_offer_versions","saas_offer_lines",
+                      "saas_quotes","saas_offer_approvals"}
+            verify(module,MODULE_SCHEMA,expected,extra_schema=OFFER_SCHEMA)
+            verify_extension(order,SCHEMA)
+            verify_extension(order,LIFECYCLE_SCHEMA)
+            verify_extension(order,REVIEW_SCHEMA)
+            for db in (module,order):
+                if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
+                    raise ValueError("DB_INTEGRITY_FAIL")
+        finally:
+            order.close()
+    finally:
+        module.close()
+    return {"verified":True,"payment_processing":False,
+            "migration_executed":False,"read_only":True}
