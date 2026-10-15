@@ -463,4 +463,71 @@ class CandidateContractTest(unittest.TestCase):
             path=ROOT/"scripts/pr122_website_release.py" if item["path"]=="bin/pr122_website_release.py" else self.base/item["path"]
             self.assertEqual(path.stat().st_size,item["size"],item["path"]); self.assertEqual(release.digest(path),item["sha256"],item["path"])
 
+
+class NginxInventoryTest(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name)
+        spec=importlib.util.spec_from_file_location('pr122_inventory',ROOT/'scripts/pr122_domestic_channel_inventory.py')
+        self.inventory=importlib.util.module_from_spec(spec);spec.loader.exec_module(self.inventory)
+
+    def scan(self,body):
+        path=self.root/'nginx.conf';path.write_text(body)
+        return self.inventory.nginx_inventory(path,permitted_roots=[self.root])
+
+    def test_exact_domain_excludes_wecom(self):
+        result=self.scan('http { server {server_name wecom.wenwenwenyiyiyi.work;} server {server_name wenwenwenyiyiyi.work; location / {try_files $uri /index.html;}}}')
+        self.assertEqual(len(result['apex_servers']),1)
+        self.assertEqual(result['apex_servers'][0]['locations'][0]['match'],'/')
+
+    def test_includes_expanded_and_provenance_bound(self):
+        (self.root/'locations.conf').write_text('location /p/ {proxy_pass http://127.0.0.1:18080;}')
+        r=self.scan('http {server {server_name wenwenwenyiyiyi.work;include locations.conf;}}')
+        self.assertEqual(len(r['files']),2)
+        target=r['apex_servers'][0]['locations'][0]['proxy_pass'][0]
+        self.assertEqual(target['port'],18080)
+
+    def test_auth_headers_and_webhook_secrets_not_exported(self):
+        r=self.scan('http {server {server_name wenwenwenyiyiyi.work; location /telegram-webhook/synthetic-private-token { auth_basic "private realm";proxy_set_header Authorization "Bearer synthetic-secret";proxy_pass https://u:p@127.0.0.1:18080/private-key;}}}')
+        text=json.dumps(r)
+        for secret in ['synthetic-private-token','synthetic-secret','private realm','private-key','u:p']:
+            self.assertNotIn(secret,text)
+        self.assertIn('credentials_present',text)
+        self.assertIn('REDACTED',text)
+
+    def test_inherited_access_controls_are_retained(self):
+        r=self.scan('http {deny all;server {server_name wenwenwenyiyiyi.work;auth_basic "private";location /p/ {allow 127.0.0.1;deny all;}}}')
+        b=r['apex_servers'][0]
+        self.assertEqual(b['http_security'][0]['directive'],'deny')
+        self.assertEqual(b['server_security'][0]['directive'],'auth_basic')
+        self.assertEqual(len(b['locations'][0]['security']),2)
+
+    def test_quoted_braces_and_comments(self):
+        tree=self.inventory.nginx_parse('http { # comment\n server {auth_basic "realm # { text";}}')
+        self.assertEqual(tree[0]['children'][0]['children'][0]['args'],['realm # { text'])
+
+    def test_unbalanced_config_rejected(self):
+        for text in ['http {','http {server {','http { x','}']:
+            with self.assertRaises(ValueError):self.inventory.nginx_parse(text)
+
+    def test_include_cycle_rejected(self):
+        with self.assertRaisesRegex(ValueError,'CYCLE'):
+            self.scan('include nginx.conf;')
+
+    def test_private_include_outside_root_rejected(self):
+        with self.assertRaisesRegex(ValueError,'OUTSIDE'):
+            self.scan('include /etc/passwd;')
+
+    def test_host_mismatch_never_reads_config(self):
+        with mock.patch.object(self.inventory.os,'uname',return_value=SimpleNamespace(nodename='wrong')),mock.patch.object(self.inventory,'nginx_inventory') as call:
+            with self.assertRaises(SystemExit):self.inventory.nginx_readonly_main()
+            call.assert_not_called()
+
+    def test_inventory_never_invokes_subprocess(self):
+        with mock.patch.object(self.inventory,'command',side_effect=AssertionError('command forbidden')):
+            result=self.scan('http {server {server_name wenwenwenyiyiyi.work;}}')
+        self.assertFalse(result['production_mutation'])
+        self.assertFalse(result['private_keys_read'])
+
 if __name__=="__main__": unittest.main()
+

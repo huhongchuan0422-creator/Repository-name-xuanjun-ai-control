@@ -1,6 +1,10 @@
 name: V2.7 Four Server Read-Only Batch
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/stage5-next25-integration-20261015]
+    paths:
+      - '.github/workflows/v27-four-server-batch-readonly.yml'
 permissions:
   contents: read
 concurrency:
@@ -8,6 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   uk:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-uk-dev]
     timeout-minutes: 6
     steps:
@@ -15,17 +20,50 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh uk
   tokyo:
     runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
-    timeout-minutes: 6
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
       - run: bash scripts/v27-batch-readonly.sh tokyo
+        if: github.event_name == 'workflow_dispatch'
+      - name: PR122 bounded public Nginx source inventory (no sudo or key reads)
+        if: github.event_name == 'push'
+        env:
+          XJ_PR122_SOURCE: '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'
+        run: |
+          python3 -B - <<'PYCODE'
+          import base64,gzip,hashlib,json,os,subprocess,sys
+          from pathlib import Path
+          data=gzip.decompress(base64.b64decode(os.environ['XJ_PR122_SOURCE'],validate=True))
+          assert len(data)<50000 and hashlib.sha256(data).hexdigest()=='605b225f280bbbffcce6c041ed7483d9acd598ca4905f874fae2e3dc1a272bf5'
+          env=dict(os.environ);env.pop('XJ_PR122_SOURCE',None);env['XJ_PR122_NGINX_READONLY']='1'
+          result=subprocess.run([sys.executable,'-B','-c',data.decode()],env=env,capture_output=True,text=True,timeout=25)
+          try: report=json.loads(result.stdout)
+          except Exception: report={'status':'INVENTORY_HOLD','reason':'NO_VALID_JSON_RECEIPT','production_mutation':False}
+          report['delivery_commit']=os.environ['GITHUB_SHA']
+          report['inventory_source_sha256']='605b225f280bbbffcce6c041ed7483d9acd598ca4905f874fae2e3dc1a272bf5'
+          out=Path(os.environ['RUNNER_TEMP'])/'pr122-tokyo-nginx-inventory.json'
+          fd=os.open(out,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'w') as handle:json.dump(report,handle,indent=2,sort_keys=True)
+          print(json.dumps(report,indent=2,sort_keys=True))
+          raise SystemExit(result.returncode)
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event_name == 'push'
+        with:
+          name: pr122-tokyo-nginx-${{ github.sha }}
+          path: ${{ runner.temp }}/pr122-tokyo-nginx-inventory.json
+          if-no-files-found: error
+          retention-days: 14
   korea:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh korea
   domestic:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 6
     steps:
