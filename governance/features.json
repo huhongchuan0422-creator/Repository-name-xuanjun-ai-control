@@ -2,6 +2,33 @@
   "schema_version": 1,
   "features": [
     {
+      "feature_id": "GOVERNANCE_COMPLIANCE_GATE",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/FEATURE_COMPLIANCE_GATE_20261015.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/FEATURE_COMPLIANCE_GATE_20261015.md",
+        "section": "2",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "positive registry and negative omissions detected",
+          "normal PR has stable feature-compliance check",
+          "main protection is only enabled after safe bootstrap"
+        ],
+        "tests": [
+          "tests/test_feature_compliance_check.py"
+        ]
+      },
+      "reuse": [
+        "GitHub Actions",
+        "standard-library Python"
+      ]
+    },
+    {
       "feature_id": "SAAS_AI_PRICING",
       "status": "IN_DEVELOPMENT",
       "design": {
@@ -26,6 +53,24 @@
       "reuse": [
         "scripts/community_saas_modules.py",
         "scripts/community_saas_offer_catalog.py"
+      ],
+      "paths": [
+        "scripts/community_finance_preview_extension.py",
+        "scripts/community_local_admin.py",
+        "scripts/community_saas_cost_pricing.py",
+        "scripts/community_saas_modules.py",
+        "scripts/community_saas_offer_catalog.py",
+        "scripts/community_saas_offers.py",
+        "scripts/community_saas_unit_economics.py",
+        "tests/test_stage5_admin_browser.py",
+        "tests/test_stage5_admin_http.py",
+        "tests/test_stage5_integrated_restart.py",
+        "tests/test_stage5_management_catalog_browser.py",
+        "tests/test_stage5_qr_http.py",
+        "tests/test_stage5_saas_cost_pricing.py",
+        "tests/test_stage5_saas_modules.py",
+        "tests/test_stage5_saas_offer_catalog.py",
+        "tests/test_stage5_saas_unit_economics.py"
       ]
     }
   ]
