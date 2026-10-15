@@ -53,7 +53,7 @@ class Costs(unittest.TestCase):
   save_cost(self.costs,"cloud","setup","VERIFIED_ACTUAL",1000,100,"real-deployment","ONCE")
   for state in ("PREVIEW","APPROVED","EFFECTIVE"):
    change_offer_status(self.offers,"cloud",state,self.costs)
-  record=quote_offers(self.offers,"merchant_operations")[0]
+  record=quote_offers(self.offers,"merchant_operations",cost_db=self.costs)[0]
   self.assertTrue(record["mixed_billing_cadences"])
   self.assertFalse(record["totals_are_payable"])
   self.assertEqual(record["totals_by_cadence"]["MONTHLY"]["cny_minor"],2000)
@@ -67,7 +67,7 @@ class Costs(unittest.TestCase):
   for state in ("PREVIEW","APPROVED","EFFECTIVE"):
    change_offer_status(self.offers,"cloud",state,self.costs)
   with self.assertRaisesRegex(ValueError,"NEGATIVE_QUOTE_TOTAL"):
-   quote_offers(self.offers,"merchant_operations")
+   quote_offers(self.offers,"merchant_operations",cost_db=self.costs)
  def test_currency_specific_negative_discount_is_not_offset_by_setup(self):
   add_component(self.offers,"cloud","setup","DEPLOYMENT_ONCE","ONCE",1000,2000,"pricing-v1")
   add_component(self.offers,"cloud","discount","DISCOUNT","MONTHLY",0,200,"pricing-v1")
@@ -76,7 +76,7 @@ class Costs(unittest.TestCase):
   for state in ("PREVIEW","APPROVED","EFFECTIVE"):
    change_offer_status(self.offers,"cloud",state,self.costs)
   with self.assertRaisesRegex(ValueError,"NEGATIVE_QUOTE_TOTAL"):
-   quote_offers(self.offers,"merchant_operations")
+   quote_offers(self.offers,"merchant_operations",cost_db=self.costs)
  def test_unknown_is_not_free_zero(self):
   add_component(self.offers,"cloud","subscription","THIRD_PARTY_SUBSCRIPTION_BASE",
                 "MONTHLY",1000,150,"official-verified","provider")
