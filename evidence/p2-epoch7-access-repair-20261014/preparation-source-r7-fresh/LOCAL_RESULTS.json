@@ -1,0 +1,43 @@
+{
+  "actual_host_private_plan": "NOT_RUN",
+  "expected_unsigned_review_body_sha256": "37ee583dfda581361caf38e8cccf5ffb9b25f28c8f732e17e0cbf6e72982c9b7",
+  "genuine_topology_review_id": null,
+  "independent_review": "RECORDED_SEPARATELY",
+  "install_admission": "NOT_GRANTED",
+  "production_files": {
+    "epoch7_prepare.py": "b95c5bb675219b831f4d715ba5a5702537f4e36841316237d05f5a92a6c95a6e",
+    "epoch7_prepare_data.py": "71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1",
+    "epoch7_topology_projection.py": "0e9817a1474dc4e54cf1779c0b4c243cf16e6204cab3a25210a12e41e03d00b6"
+  },
+  "production_resume": "NOT_EXECUTED",
+  "results": [
+    {
+      "errors": 0,
+      "failures": 0,
+      "host_NOT_RUN": true,
+      "log_sha256": "84b9915dccd692797f53a8b81cc06777c681086ebf7a0ec9aa473bfea67a6889",
+      "privateplan_NOT_RUN": true,
+      "python": "3.12.14",
+      "schema": 1,
+      "skips": 0,
+      "state": "PASS",
+      "tests": 189
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "host_NOT_RUN": true,
+      "log_sha256": "51295c073aed5856a9759403ca95c83a84ef70552596470f70d49e6ead3151f9",
+      "privateplan_NOT_RUN": true,
+      "python": "3.6.8",
+      "schema": 1,
+      "skips": 0,
+      "state": "PASS",
+      "tests": 189
+    }
+  ],
+  "saved_projection_source_manifest_sha256": "311c5150f628c0232298bc62d233d2eccf26681d1d0fdfa379b4cab8d242f1d3",
+  "schema": 1,
+  "state": "LOCAL_TESTS_PASS_HOST_NOT_RUN",
+  "test_scope": "SYNTHETIC_HOST_AND_APPROVAL_BOUNDARIES_REAL_R7_CACHE_AND_COMPILERS"
+}

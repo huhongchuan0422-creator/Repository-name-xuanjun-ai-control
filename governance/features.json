@@ -69,7 +69,9 @@
           "tests/test_p2_owner_diagnostic_r7.py",
           "tests/test_p2_same_attempt_r7.py",
           "tests/test_p2_saved_evidence_r7.py",
-          "tests/test_p2_saved_evidence_r7_contract.py"
+          "tests/test_p2_saved_evidence_r7_contract.py",
+          "tests/test_p2_preparation_fresh_r7.py",
+          "tests/test_p2_preparation_fresh_r7_contract.py"
         ]
       },
       "reuse": [
