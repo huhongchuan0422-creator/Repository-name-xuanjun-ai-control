@@ -1,0 +1,1197 @@
+{
+  "apex_servers": [
+    {
+      "http_security": [],
+      "listen": [
+        [
+          "443",
+          "ssl"
+        ],
+        [
+          "[::]:443",
+          "ssl"
+        ]
+      ],
+      "locations": [
+        {
+          "match": "= /yunhui.css",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/yunhui.css",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /yunhui.js",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/yunhui.js",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /search-index.json",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/search-index.json",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /search",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/search.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /.well-known/acme-challenge/",
+          "nested_control_present": false,
+          "root": [
+            [
+              "/var/www/letsencrypt"
+            ]
+          ],
+          "security": []
+        },
+        {
+          "match": "/p/",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /submit/douyin",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /submit/tiktok",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /integrations/douyin/oauth/callback",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /integrations/tiktok/oauth/start",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /integrations/tiktok/oauth/callback",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /integrations/tiktok/status",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /integrations/tiktok/disconnect",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /healthz",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "^~ /telegram-webhook/[REDACTED]",
+          "nested_control_present": true,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Telegram-Bot-Api-Secret-Token",
+                "REDACTED"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /telegram-canary/status",
+          "nested_control_present": false,
+          "proxy_pass": [
+            {
+              "credentials_present": false,
+              "host": "127.0.0.1",
+              "path_present": false,
+              "port": 18080,
+              "scheme": "http"
+            }
+          ],
+          "security": [
+            {
+              "arguments": [
+                "Host",
+                "$host"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Forwarded-Proto",
+                "https"
+              ],
+              "directive": "proxy_set_header"
+            },
+            {
+              "arguments": [
+                "X-Real-IP",
+                "$remote_addr"
+              ],
+              "directive": "proxy_set_header"
+            }
+          ]
+        },
+        {
+          "match": "= /",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /features",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/features.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /use-cases",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/use-cases.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /integrations",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/integrations.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /integrations/douyin",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/integrations/douyin.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /integrations/tiktok",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/integrations/tiktok.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /capabilities",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/capabilities.html",
+              "/capabilities/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /custom-ai/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /guides",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/guides.html",
+              "/guides/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /guides/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /about/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /custom-ai",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/custom-ai.html",
+              "/custom-ai/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /capabilities/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /solutions",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/solutions.html",
+              "/solutions/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /solutions/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /labs",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/labs.html",
+              "/labs/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /labs/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /contact",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/contact.html",
+              "/contact/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /about",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/about.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /privacy",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/privacy.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /privacy/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/privacy.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /terms",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/terms.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /terms/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/terms.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok-review",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok-review.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok-review/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok-review.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok-review/privacy",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok-review-privacy.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok-review/privacy/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok-review-privacy.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok-review/terms",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok-review-terms.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok-review/terms/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok-review-terms.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok-review/callback",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok-review-callback.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok-review/callback/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok-review-callback.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktok64gtkWxc679WXcGsU11O6ZoKEkzZeCH0.txt",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktok64gtkWxc679WXcGsU11O6ZoKEkzZeCH0.txt",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktokVSWc6dimWZFJAQltpQZXPC6iku7JY0gj.txt",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktokVSWc6dimWZFJAQltpQZXPC6iku7JY0gj.txt",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /tiktokVSWc6dimWZFJAQltpQZXPC6jku7JY0gi.txt",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktokVSWc6dimWZFJAQltpQZXPC6jku7JY0gi.txt",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /terms/tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /styles.css",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/styles.css",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /site.js",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/site.js",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /growth-foundation.json",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/growth-foundation.json",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /robots.txt",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/robots.txt",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /sitemap.xml",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/sitemap.xml",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /assets/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /zh-cn",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/zh-cn/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /zh-cn/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /en",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/en/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /en/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /zh-tw",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/zh-tw/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /zh-tw/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /ja",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/ja/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /ja/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /ko",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/ko/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /ko/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /es",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/es/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /es/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /fr",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/fr/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /fr/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "= /de",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "/de/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "^~ /de/",
+          "nested_control_present": false,
+          "security": [],
+          "try_files": [
+            [
+              "$uri",
+              "$uri.html",
+              "$uri/index.html",
+              "=404"
+            ]
+          ]
+        },
+        {
+          "match": "/",
+          "nested_control_present": false,
+          "return": [
+            [
+              "404",
+              "BODY_OR_LOCATION_REDACTED"
+            ]
+          ],
+          "security": []
+        }
+      ],
+      "public_roots": [
+        [
+          "/var/www/wenwenwenyiyiyi.work"
+        ]
+      ],
+      "server_names": [
+        "wenwenwenyiyiyi.work"
+      ],
+      "server_security": [
+        {
+          "arguments": [
+            "16k"
+          ],
+          "directive": "client_max_body_size"
+        }
+      ]
+    }
+  ],
+  "delivery_commit": "6e747401b170fbd8179ca93e69c16529d73e853a",
+  "files": {
+    "/etc/nginx/conf.d/wecom.conf": {
+      "bytes": 2933,
+      "sha256": "ca380c772ee923af24f420256c8de6cec3b774791cc9deb5bd7fdba1059931c0"
+    },
+    "/etc/nginx/mime.types": {
+      "bytes": 38661,
+      "sha256": "845b3cf44e3d178299f218f6fffc4067a989d3f88895dc03bd931c7c9e7230c4"
+    },
+    "/etc/nginx/nginx.conf": {
+      "bytes": 16813,
+      "sha256": "80b49c552823e5684ec35abdf23af52e37081620a654124320e0c3a7974242f4"
+    }
+  },
+  "inventory_source_sha256": "605b225f280bbbffcce6c041ed7483d9acd598ca4905f874fae2e3dc1a272bf5",
+  "private_keys_read": false,
+  "production_mutation": false,
+  "raw_config_exported": false,
+  "release_authorization": false,
+  "schema_version": 1,
+  "status": "READ_ONLY_SOURCE_INVENTORY"
+}

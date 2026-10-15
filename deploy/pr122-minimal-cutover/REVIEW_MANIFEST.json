@@ -1,0 +1,17 @@
+{
+  "files": {
+    "README.md": "5f2b52781fee9d7835d41eb76ab19569f378007a1d1a2fa86afcf5a93981d516",
+    "apex-https.conf": "e50dc3123a827de331cb81236d15420b05c50cd7283b932ca6e64bb7c4a5ac25",
+    "apex.locations.conf": "42e9af3573135e6b8ef08905d1a5628051fb5fd2df014be8f8ce914aa353ccd1",
+    "http-support.conf": "ec79d13b7b4e3586088cdff794f7538a9ff13fc8aa0a9018f913f7b39bbc1a1e",
+    "route-responsibility.json": "5681761a88f8663915331cb325dd327c3638c52d4b8ae89618ef0d91733bcdf3",
+    "static-security.conf": "a54d27fe31c70ac644ed0cffbbec16cdeb6687fcc881e403c2fef27ff67d67ea",
+    "tokyo-nginx-source-inventory.json": "6ede1f5dbdb45e3f2107dd3951d06ee1feccf9388f5fe7fca3dbcbb99921fe2c",
+    "tokyo-proxy-settings.conf": "c78b3d2411283c26b246959bbc1e341d778fccc2934ed85f299c4fdf12052883"
+  },
+  "inherits_oauth_exact_commit": "d584cd60b31bf09ee45f27a73ad227bcd0e1110f",
+  "inherits_static_rg1": true,
+  "production_approved": false,
+  "schema_version": 1,
+  "status": "REVIEW_CANDIDATE_NO_INSTALLER"
+}

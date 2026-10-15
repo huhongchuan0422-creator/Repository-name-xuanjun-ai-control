@@ -529,5 +529,209 @@ class NginxInventoryTest(unittest.TestCase):
         self.assertFalse(result['production_mutation'])
         self.assertFalse(result['private_keys_read'])
 
+
+class MinimalCutoverTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.base=ROOT/'deploy/pr122-minimal-cutover'
+        cls.routes=json.loads((cls.base/'route-responsibility.json').read_text())
+
+    def test_all_75_locations_mapped_without_broad_submit_proxy(self):
+        self.assertEqual(self.routes['location_count'],75)
+        self.assertEqual(self.routes['dynamic_count'],11)
+        matches=[r['candidate_match'] for r in self.routes['routes']]
+        self.assertEqual(len(matches),len(set(matches)))
+        self.assertIn('= /privacy/',matches)
+        self.assertIn('= /tiktok-review/privacy/',matches)
+        self.assertNotIn('^~ /submit/',matches)
+        self.assertFalse(self.routes['approval'])
+
+    def test_proxy_security_and_no_dns_recursion(self):
+        text=(self.base/'tokyo-proxy-settings.conf').read_text()
+        for directive in ['proxy_pass https://47.245.53.152;',
+            'proxy_ssl_verify on;','proxy_ssl_name wenwenwenyiyiyi.work;',
+            'proxy_next_upstream off;','proxy_cache off;',
+            'proxy_request_buffering off;','proxy_buffering off;']:
+            self.assertIn(directive,text)
+        self.assertNotIn('proxy_pass https://wenwenwenyiyiyi.work',text)
+        self.assertNotIn('proxy_set_header Authorization',text)
+        self.assertNotIn('proxy_set_header X-Telegram',text)
+
+    def test_csp_only_static_and_secret_safe_logs(self):
+        server=(self.base/'apex-https.conf').read_text()
+        self.assertNotIn('inline-csp',server)
+        self.assertIn('inline-csp.conf',(self.base/'static-security.conf').read_text())
+        log=(self.base/'http-support.conf').read_text()
+        for variable in ['$request_uri','$args','$request_body','$http_authorization','$http_cookie','$remote_addr']:
+            self.assertNotIn(variable,log)
+
+
+class MinimalNginxIntegrationTest(unittest.TestCase):
+    """Real Nginx + fake TLS upstream; no real hosts/providers are contacted."""
+    @classmethod
+    def setUpClass(cls):
+        import shutil
+        if not shutil.which('nginx') and os.environ.get('GITHUB_ACTIONS')=='true':
+            raise RuntimeError('required CI Nginx integration dependency missing')
+        if not shutil.which('nginx'):
+            raise unittest.SkipTest('nginx not installed locally; required hosted CI installs nginx')
+        cls.nginx=shutil.which('nginx')
+        cls.base=ROOT/'deploy/pr122-minimal-cutover'
+        cls.shared=tempfile.TemporaryDirectory();cls.shared_root=Path(cls.shared.name)
+        cls.cert=cls.shared_root/'cert.pem';cls.key=cls.shared_root/'key.pem'
+        subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1',
+            '-keyout',str(cls.key),'-out',str(cls.cert),'-subj','/CN=wenwenwenyiyiyi.work',
+            '-addext','subjectAltName=DNS:wenwenwenyiyiyi.work'],check=True,capture_output=True,timeout=20)
+        cls.key.chmod(0o600)
+
+    @classmethod
+    def tearDownClass(cls):cls.shared.cleanup()
+
+    def setUp(self):
+        import socket,ssl,threading,http.server
+        self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)
+        self.addCleanup(self.temp.cleanup)
+        self.hits=[];hits=self.hits
+        class Backend(http.server.BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def do_GET(self):self.respond()
+            def do_POST(self):self.respond()
+            def respond(self):
+                size=int(self.headers.get('Content-Length','0'))
+                body=self.rfile.read(size).decode()
+                record={'path':self.path,'method':self.command,'body':body,
+                    'host':self.headers.get('Host'),'origin':self.headers.get('Origin'),
+                    'authorization':self.headers.get('Authorization'),'cookie':self.headers.get('Cookie'),
+                    'telegram':self.headers.get('X-Telegram-Bot-Api-Secret-Token')}
+                hits.append(record)
+                if body=='synthetic-slow':time.sleep(2)
+                data=json.dumps(record).encode()
+                try:
+                    self.send_response(200);self.send_header('Content-Type','application/json')
+                    self.send_header('Content-Security-Policy','default-src https:')
+                    self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+                except (BrokenPipeError,ConnectionResetError,ssl.SSLError):pass
+        self.backend=http.server.ThreadingHTTPServer(('127.0.0.1',0),Backend)
+        ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.load_cert_chain(self.cert,self.key)
+        self.sni=[];ctx.set_servername_callback(lambda sock,name,context:self.sni.append(name))
+        self.backend.socket=ctx.wrap_socket(self.backend.socket,server_side=True)
+        self.thread=threading.Thread(target=self.backend.serve_forever,daemon=True);self.thread.start()
+        self.addCleanup(self.close_backend)
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1',0));self.port=sock.getsockname()[1]
+        self.public=self.root/'public';self.public.mkdir()
+        self.routes=json.loads((self.base/'route-responsibility.json').read_text())['routes']
+        self.static_cases=[]
+        for route in self.routes:
+            if route['handler']!='DOMESTIC_IMMUTABLE_STATIC':continue
+            match=route['candidate_match'];uri=match.split()[-1];tries=route['try_files']
+            if '$uri' in tries:
+                uri=uri+'synthetic-item'+('.txt' if tries==['$uri','=404'] else '')
+                target=uri if tries==['$uri','=404'] else uri+'.html'
+            else:target=tries[0]
+            file=self.public/target.lstrip('/');file.parent.mkdir(parents=True,exist_ok=True)
+            content='synthetic-static:'+target;file.write_text(content)
+            self.static_cases.append((uri,content))
+        self.csp=self.root/'inline-csp.conf';self.csp.write_text('add_header Content-Security-Policy "default-src self" always;\n')
+        self.proc=None
+        self.addCleanup(self.close_nginx)
+
+    def close_backend(self):
+        self.backend.shutdown();self.backend.server_close();self.thread.join(timeout=5)
+
+    def close_nginx(self):
+        if self.proc and self.proc.poll() is None:
+            os.killpg(self.proc.pid,signal.SIGTERM)
+            try:self.proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(self.proc.pid,signal.SIGKILL);self.proc.wait(timeout=5)
+        if hasattr(self,'output'):self.output.close()
+
+    def start(self,wrong_sni=False):
+        import socket
+        self.config=self.root/'config';self.config.mkdir()
+        for path in self.base.glob('*.conf'):
+            text=path.read_text().replace('/etc/nginx/pr122-minimal-cutover/',str(self.config)+'/')
+            text=text.replace('/var/www/wenwenwenyiyiyi.work/current/public',str(self.public))
+            text=text.replace('/var/www/wenwenwenyiyiyi.work/current/release-metadata/inline-csp.conf',str(self.csp))
+            text=text.replace('/var/log/nginx/pr122-minimal-status.log',str(self.root/'status.log'))
+            text=text.replace('listen 443 ssl;','listen 127.0.0.1:'+str(self.port)+';')
+            text=text.replace('listen [::]:443 ssl;','').replace('    http2 on;','')
+            # Test HTTP frontend only; upstream remains real TLS with verify ON.
+            text='\n'.join(l for l in text.splitlines() if not l.strip().startswith(('ssl_certificate ','ssl_certificate_key ')))+'\n'
+            text=text.replace('__HOST_CA_BUNDLE__',str(self.cert))
+            text=text.replace('https://47.245.53.152','https://127.0.0.1:'+str(self.backend.server_port))
+            text=text.replace('proxy_read_timeout 30s;','proxy_read_timeout 1s;')
+            if wrong_sni:text=text.replace('proxy_ssl_name wenwenwenyiyiyi.work;','proxy_ssl_name wrong.invalid;')
+            (self.config/path.name).write_text(text)
+        main=self.root/'nginx.conf'
+        main.write_text('worker_processes 1;error_log stderr;pid '+str(self.root/'nginx.pid')+';\nevents {worker_connections 128;}\nhttp {include /etc/nginx/mime.types;include '+str(self.config/'http-support.conf')+';include '+str(self.config/'apex-https.conf')+';}\n')
+        check=subprocess.run([self.nginx,'-p',str(self.root)+'/', '-c',str(main),'-t'],capture_output=True,text=True,timeout=10)
+        self.assertEqual(check.returncode,0,check.stderr)
+        self.output=(self.root/'process.log').open('wb')
+        self.proc=subprocess.Popen([self.nginx,'-p',str(self.root)+'/', '-c',str(main),'-g','daemon off;'],stdout=self.output,stderr=self.output,start_new_session=True)
+        for _ in range(50):
+            self.assertIsNone(self.proc.poll())
+            try:
+                with socket.create_connection(('127.0.0.1',self.port),timeout=.1):return
+            except OSError:time.sleep(.05)
+        self.fail('test Nginx startup timeout')
+
+    def request(self,method,path,body=None,headers=None):
+        import http.client
+        connection=http.client.HTTPConnection('127.0.0.1',self.port,timeout=5)
+        try:
+            connection.request(method,path,body,{'Host':'wenwenwenyiyiyi.work',**(headers or {})})
+            response=connection.getresponse();return response.status,response.getheader('Content-Security-Policy'),response.read().decode()
+        finally:connection.close()
+
+    def test_all_62_static_alias_samples_and_default_deny(self):
+        self.start();self.assertEqual(len(self.static_cases),62)
+        for uri,expected in self.static_cases:
+            with self.subTest(uri=uri):
+                status,csp,body=self.request('GET',uri)
+                self.assertEqual(status,200);self.assertEqual(body,expected);self.assertEqual(csp,'default-src self')
+        self.assertEqual(self.request('GET','/nonexistent-private-route')[0],404)
+        self.assertEqual(self.request('POST','/submit/binance')[0],404)
+
+    def test_verified_tls_and_exact_request_forwarding(self):
+        self.start()
+        status,csp,body=self.request('POST','/submit/tiktok?synthetic=query','synthetic-body',{
+            'Origin':'https://wenwenwenyiyiyi.work','Authorization':'Bearer synthetic-auth',
+            'Cookie':'synthetic-cookie','X-Telegram-Bot-Api-Secret-Token':'synthetic-header'})
+        self.assertEqual(status,200);self.assertEqual(csp,'default-src https:')
+        record=json.loads(body)
+        self.assertEqual(record['path'],'/submit/tiktok?synthetic=query')
+        self.assertEqual(record['body'],'synthetic-body')
+        self.assertEqual(record['authorization'],'Bearer synthetic-auth')
+        self.assertEqual(record['cookie'],'synthetic-cookie')
+        self.assertEqual(record['telegram'],'synthetic-header')
+        self.assertEqual(record['origin'],'https://wenwenwenyiyiyi.work')
+        self.assertIn('wenwenwenyiyiyi.work',self.sni)
+        log=(self.root/'status.log').read_text()
+        for secret in ['synthetic=query','synthetic-body','synthetic-auth','synthetic-cookie','synthetic-header']:
+            self.assertNotIn(secret,log)
+
+    def test_all_11_dynamic_routes_forward_to_same_fake_tls_backend(self):
+        self.start()
+        for route in self.routes:
+            if route['handler']!='TOKYO_HTTPS_EXISTING_BACKEND':continue
+            uri=route['candidate_match'].split()[-1]
+            if uri.endswith('/'):uri+='synthetic'
+            self.assertEqual(self.request('GET',uri)[0],200,uri)
+        self.assertEqual(len(self.hits),11)
+
+    def test_wrong_upstream_tls_name_fails_closed(self):
+        self.start(wrong_sni=True)
+        self.assertEqual(self.request('GET','/p/synthetic')[0],502)
+        self.assertEqual(self.hits,[])
+
+    def test_sensitive_post_timeout_is_not_retried_or_success(self):
+        self.start()
+        status,_,_=self.request('POST','/integrations/tiktok/disconnect','synthetic-slow')
+        self.assertEqual(status,504)
+        self.assertEqual(len(self.hits),1)
+        self.assertEqual(self.hits[0]['method'],'POST')
+
 if __name__=="__main__": unittest.main()
 

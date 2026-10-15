@@ -127,7 +127,8 @@
           "generated CSP hashes preserve inline language layout and interaction in real Chromium",
           "OAuth-only source candidate excludes trading/database imports and preserves synthetic session, callback, failure and replay tests; no production acceptance is implied",
           "Existing domestic Runner inventory is non-root and does not disclose sudo policy or secret values",
-          "R1-R3: process-safe one-time OAuth state, atomic credential/session commits, verified token/account generation activation; actual process races, write faults and SIGKILL/SIGTERM restart tests remain synthetic and require independent review"
+          "R1-R3: process-safe one-time OAuth state, atomic credential/session commits, verified token/account generation activation; actual process races, write faults and SIGKILL/SIGTERM restart tests remain synthetic and require independent review",
+          "Minimal cutover derives all75 Tokyo locations, preserves62 static aliases and11 existing HTTPS backend routes; verified upstream TLS, no sensitive retry, no secret-bearing logs, and real Nginx synthetic integration are required; production remains independently gated"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
@@ -150,7 +151,8 @@
         "scripts/pr122_domestic_channel_inventory.py",
         "scripts/pr122_build_oauth_candidate.py",
         "tests/test_pr122_oauth_candidate.py",
-        "deploy/pr122-oauth-candidate/**"
+        "deploy/pr122-oauth-candidate/**",
+        "deploy/pr122-minimal-cutover/**"
       ]
     },
     {
