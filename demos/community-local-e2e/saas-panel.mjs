@@ -55,8 +55,37 @@ export async function loadDashboard(fetcher,token,now=Math.floor(Date.now()/1000
  try{const panel=await post("admin_snapshot");reviews=panel.review_tasks}catch(error){if(error.message!=="OFFLINE_REQUEST_DENIED")throw error}
  return {modules,orders,reviews};
 }
+export async function offlineAction(fetcher,token,operation,params,now=Math.floor(Date.now()/1000)){
+ if(typeof token!=="string"||token.length<32)throw Error("TOKEN_REQUIRED");
+ if(!["quote","order_prepare"].includes(operation))throw Error("OPERATION_NOT_ALLOWED");
+ const response=await fetcher("/offline/saas",{method:"POST",
+  headers:{"Content-Type":"application/json","X-Offline-Token":token},
+  body:JSON.stringify({operation,params,at:now})});
+ if(!response.ok)throw Error("OFFLINE_REQUEST_DENIED");
+ const value=await response.json();return value.result;
+}
 if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
  renderDashboard(document,{modules:[],orders:[],reviews:[]});
+ let currentQuoteId=null;
+ document.getElementById("makeQuote")?.addEventListener("click",async()=>{
+  const status=document.getElementById("requestState");
+  const token=document.getElementById("offlineToken").value;
+  currentQuoteId="q"+crypto.randomUUID().replaceAll("-","");
+  const offer=document.getElementById("offerId").value.trim();
+  const version=Number(document.getElementById("offerVersion").value);
+  try{const q=await offlineAction(fetch,token,"quote",{quote_id:currentQuoteId,offer_id:offer,version,expires_at:Math.floor(Date.now()/1000)+1800});
+    document.getElementById("quoteDetails").textContent=JSON.stringify({quote_id:currentQuoteId,amounts_by_cycle:q.totals_by_cycle,settlement_authorized:false},null,2);
+    status.textContent="离线报价已冻结；未发生真实支付。";
+  }catch{currentQuoteId=null;status.textContent="离线报价失败；请检查方案和权限。";}
+ });
+ document.getElementById("prepareOrder")?.addEventListener("click",async()=>{
+  const status=document.getElementById("requestState");
+  if(!currentQuoteId){status.textContent="请先生成离线报价。";return}
+  try{const orderId="o"+crypto.randomUUID().replaceAll("-","");
+    const o=await offlineAction(fetch,document.getElementById("offlineToken").value,"order_prepare",{order_id:orderId,quote_id:currentQuoteId,currency:"CNY"});
+    status.textContent="订单准备成功 "+o.order_id+"；不代表支付成功，也未开通权益。";
+  }catch{status.textContent="订单准备失败；未执行付款。";}
+ });
  document.getElementById("loadCatalog")?.addEventListener("click",async()=>{
   const token=document.getElementById("offlineToken").value;
   const state=document.getElementById("requestState");
