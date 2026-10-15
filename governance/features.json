@@ -229,7 +229,8 @@
         ],
         "tests": [
           "tests/test_legal_contract_center.py",
-          "tests/test_online_contract_candidate.py"
+          "tests/test_online_contract_candidate.py",
+          "tests/test_contract_anchor_batch.py"
         ],
         "test_scope": "仅离线合同草案和静态阅读入口；不证明签约集成、支付准入或生产法律合规"
       },
@@ -243,7 +244,9 @@
         "docs/legal/**",
         "demos/legal/**",
         "scripts/online_contract_candidate.py",
-        "tests/test_online_contract_candidate.py"
+        "tests/test_online_contract_candidate.py",
+        "scripts/contract_anchor_batch.py",
+        "tests/test_contract_anchor_batch.py"
       ]
     }
   ]

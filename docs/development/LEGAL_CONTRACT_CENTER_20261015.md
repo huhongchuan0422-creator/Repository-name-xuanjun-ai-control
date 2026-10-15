@@ -43,3 +43,9 @@ FEATURE_ID沿用LEGAL_CONTRACT_CENTER，不新建任务或签约平台。参考�
 开发顺序：修订合同→离线参数/权限/版本反例→复用现有服务端接线→身份授权/订单原子确认/证据下载真实验收→地区法律批准→独立发布。确认记录状态与法律有效性、付款、上链状态分开；不默认强制人脸、不发币、不用开发者自签自验冒充客户确认。
 测试覆盖：普通有效输入、无/过期/撤销/越界授权、错误租户/版本/确认、未审地区、未提示重要条款；离线测试不是上线或法律保证。
 参考：https://help.aliyun.com/zh/ram/user-guide/grant-permissions-to-the-ram-user 、https://cloud.tencent.com/document/product/301/1967 、https://www.cac.gov.cn/2020-06/01/c_15925617772683192.htm 、https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX%3A32008R0593 、https://uncitral.un.org/en/texts/ecommerce/conventions/electronic_communications 、https://www.govinfo.gov/link/uscode/15/7001 。
+
+## 6. 批量链存证策略
+默认候选参数：100条已冻结凭证或最老待存凭证等待300秒，先到者封批；低流量不无限等待，高流量不必等时间到。参数可配置，重大项目可独立即时批次。定时触发器仍须真实服务端接线，本轮仅离线Merkle构造/验证，不发送链交易。
+完整证据包加密离链保存；每凭证用密码学随机nonce与规范化完整包构造带域分隔的承诺（nonce随私有证据包供授权核验），叶子与内部节点分域，批次冻结后不得加入新凭证。保留每项Merkle路径、算法版本、批次ID、签名及原始证据。独立公链锚定不等于独立见证上链前内容，不能保证法律有效。
+复用既有outbox持久化和幂等：PENDING→SEALED→SUBMITTED→CONFIRMED；提交超时/广播不明为UNKNOWN，先按固定批次/交易身份查询，禁止盲发；链重组退回待确认，不能以节点受理冒充最终确认。保存chain_id、合约地址、txid、区块高度/hash、回执、确认策略和验证证明；链费用预算/额度熔断不影响已成立合同。公网链选择、人民币服务采购/虚拟货币限制、隐私跨境、备案及实名适用性须审核，未批准不买币不发币不转移个人资料。
+不按每次阅读或页面点击收费上链，只记录合同成立证据、正式变更、验收、解除等关键事件；原始业务交易保留完整账本，按同一批次适配器汇总。新增3项离线测试验证双阈值、奇偶/单叶证明和篡改失败，不冒充链网络或真实法律验收。

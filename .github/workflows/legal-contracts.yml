@@ -9,6 +9,8 @@ on:
       - 'demos/visual/community-payment/index.html'
       - 'scripts/build_legal_previews.py'
       - 'tests/test_legal_contract_center.py'
+      - 'scripts/contract_anchor_batch.py'
+      - 'tests/test_contract_anchor_batch.py'
       - 'scripts/online_contract_candidate.py'
       - 'tests/test_online_contract_candidate.py'
       - '.github/workflows/legal-contracts.yml'
@@ -28,5 +30,6 @@ jobs:
           python-version: '3.11'
       - run: python -m unittest discover -s tests -p test_legal_contract_center.py -v
       - run: python -m unittest discover -s tests -p test_online_contract_candidate.py -v
+      - run: python -m unittest discover -s tests -p test_contract_anchor_batch.py -v
       - run: python scripts/build_legal_previews.py && git diff --exit-code -- demos/legal
       - run: python scripts/feature_compliance_check.py
