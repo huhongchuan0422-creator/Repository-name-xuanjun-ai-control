@@ -121,11 +121,13 @@
           "TikTok network and parse failures never render a connected state",
           "delta bundle remains bound to the immutable 1187-file source archive",
           "prepare activate check rollback and unknown states fail closed",
-          "Domestic apex candidate preserves the existing winctl boundary"
+          "Domestic apex candidate preserves the existing winctl boundary",
+          "generated CSP hashes preserve inline language layout and interaction in real Chromium"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
-          "tests/test_pr122_tiktok_integration.mjs"
+          "tests/test_pr122_tiktok_integration.mjs",
+          "tests/test_pr122_csp_browser.py"
         ]
       },
       "reuse": [
@@ -137,7 +139,8 @@
         "scripts/pr122_build_website_candidate.py",
         "scripts/pr122_website_release.py",
         "tests/test_pr122_website_release.py",
-        "tests/test_pr122_tiktok_integration.mjs"
+        "tests/test_pr122_tiktok_integration.mjs",
+        "tests/test_pr122_csp_browser.py"
       ]
     }
   ]
