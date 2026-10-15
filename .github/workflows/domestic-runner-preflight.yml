@@ -1,6 +1,11 @@
 name: Domestic Runner Read-Only Preflight
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/stage5-next25-integration-20261015]
+    paths:
+      - '.github/workflows/domestic-runner-preflight.yml'
+      - 'scripts/pr122_domestic_channel_inventory.py'
 permissions:
   contents: read
 jobs:
@@ -8,6 +13,12 @@ jobs:
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          path: pr122-domestic-readonly
       - name: Read-only preflight
-        run: bash scripts/domestic-runner-preflight.sh
+        working-directory: pr122-domestic-readonly
+        run: |
+          bash scripts/domestic-runner-preflight.sh
+          python3 -B scripts/pr122_domestic_channel_inventory.py
