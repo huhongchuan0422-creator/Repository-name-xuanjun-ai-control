@@ -21,7 +21,7 @@ BEFORE UPDATE ON saas_order_preparations BEGIN SELECT RAISE(ABORT,'IMMUTABLE_ORD
 CREATE TRIGGER IF NOT EXISTS saas_order_prep_immutable_delete
 BEFORE DELETE ON saas_order_preparations BEGIN SELECT RAISE(ABORT,'IMMUTABLE_ORDER_PREPARATION'); END;
 CREATE TRIGGER saas_order_preparations_no_replace BEFORE INSERT ON saas_order_preparations
-WHEN EXISTS(SELECT 1 FROM saas_order_preparations WHERE order_id=NEW.order_id)
+WHEN EXISTS(SELECT 1 FROM saas_order_preparations WHERE order_id=NEW.order_id OR (tenant_id=NEW.tenant_id AND quote_id=NEW.quote_id AND currency=NEW.currency))
 BEGIN SELECT RAISE(ABORT,'IMMUTABLE_CONFLICT'); END;
 """
 def install(db):
@@ -87,7 +87,12 @@ def read(db,order_id,tenant_id):
                    (order_id,tenant_id)).fetchone()
     if not row:
         raise ValueError("ORDER_NOT_FOUND")
-    return json.loads(row[0])
+    value=json.loads(row[0])
+    actual=db.execute("SELECT order_id,tenant_id,quote_id,currency,created_at FROM saas_order_preparations WHERE order_id=? AND tenant_id=?",(order_id,tenant_id)).fetchone()
+    if (value.get("order_id"),value.get("tenant_id"),value.get("quote_id"),
+        value.get("currency"),value.get("created_at"))!=actual:
+        raise ValueError("ORDER_SNAPSHOT_BINDING_MISMATCH")
+    return value
 
 # Evidence is recorded as an append-only offline handoff. It does not attest
 # third-party payment validity: production Finance must verify independently.
