@@ -48,7 +48,8 @@
         ],
         "tests": [
           "tests/test_stage5_saas_offer_catalog.py",
-          "tests/test_stage5_saas_order_preparation.py"
+          "tests/test_stage5_saas_order_preparation.py",
+          "tests/test_stage5_saas_offline_handoff.py"
         ]
       },
       "reuse": [
@@ -73,7 +74,9 @@
         "tests/test_stage5_saas_offer_catalog.py",
         "tests/test_stage5_saas_unit_economics.py",
         "scripts/community_saas_order_preparation.py",
-        "tests/test_stage5_saas_order_preparation.py"
+        "tests/test_stage5_saas_order_preparation.py",
+        "scripts/community_saas_offline_handoff.py",
+        "tests/test_stage5_saas_offline_handoff.py"
       ]
     }
   ]
