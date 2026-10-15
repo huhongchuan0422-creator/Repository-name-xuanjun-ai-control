@@ -42,3 +42,30 @@ def transactional_install(db, schema, checker):
             db.rollback()
         raise
     checker()
+
+def verify_extension(db, schema):
+    """Attest exact expected DDL objects without rejecting sibling extensions."""
+    reference=sqlite3.connect(":memory:")
+    try:
+        reference.executescript(schema)
+        wanted=objects(reference)
+        actual=objects(db)
+        if any(actual.get(key)!=statement for key,statement in wanted.items()):
+            raise ValueError("UNRECOGNIZED_EXTENSION_SCHEMA")
+    finally:
+        reference.close()
+
+def install_extension(db, schema):
+    """Never partially install an extension or silently accept a fake table."""
+    reference=sqlite3.connect(":memory:")
+    try:
+        reference.executescript(schema)
+        keys=set(objects(reference))
+    finally:
+        reference.close()
+    found=set(objects(db)) & keys
+    if found==keys:
+        return verify_extension(db,schema)
+    if found:
+        raise ValueError("PARTIAL_EXTENSION_SCHEMA")
+    return transactional_install(db,schema,lambda:verify_extension(db,schema))
