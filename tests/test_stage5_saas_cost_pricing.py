@@ -33,6 +33,19 @@ class Costs(unittest.TestCase):
   self.assertEqual(result["by_cadence"]["MONTHLY"]["gross_margin_cny_minor"],1950)
   self.assertEqual(result["by_cadence"]["ONCE"]["gross_margin_cny_minor"],600)
   self.assertFalse(result["commissions_payable"])
+ def test_unknown_monthly_does_not_erase_evidenced_once_margin(self):
+  add_component(self.offers,"cloud","deployment","DEPLOYMENT_ONCE","ONCE",5000,700,"verified-list")
+  add_component(self.offers,"cloud","support","SUPPORT_RECURRING","MONTHLY",2000,300,"verified-list")
+  save_cost(self.costs,"cloud","deployment","VERIFIED_ACTUAL",2000,250,"work-order","ONCE")
+  v=preview(self.offers,self.costs,"cloud")
+  self.assertTrue(v["cost_unknown"])
+  self.assertFalse(v["publishable_cost_evidence"])
+  self.assertEqual(v["by_cadence"]["ONCE"]["gross_margin_cny_minor"],3000)
+  self.assertEqual(v["by_cadence"]["ONCE"]["gross_margin_usd_minor"],450)
+  self.assertIsNone(v["by_cadence"]["MONTHLY"]["gross_margin_cny_minor"])
+  self.assertIsNone(v["by_cadence"]["MONTHLY"]["cost_cny_minor"])
+  with self.assertRaisesRegex(ValueError,"COST_INCOMPLETE"):
+   assert_publishable_cost(self.offers,self.costs,"cloud")
  def test_unknown_is_not_free_zero(self):
   add_component(self.offers,"cloud","subscription","THIRD_PARTY_SUBSCRIPTION_BASE",
                 "MONTHLY",1000,150,"official-verified","provider")
