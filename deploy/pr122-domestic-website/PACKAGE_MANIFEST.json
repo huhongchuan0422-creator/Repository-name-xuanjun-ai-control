@@ -1,0 +1,75 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "dc70fc0a7be1c9567c1e523bc4f81280df1bc8927dad4aba594ff861c72c38d0",
+      "size": 2678
+    },
+    {
+      "path": "candidate-manifest.json",
+      "sha256": "eb2fcc07825e9da350122d3a110b716a8df1b43341f40312bde7ff95591c52f7",
+      "size": 265212
+    },
+    {
+      "path": "nginx/pr122-dynamic-hold.locations.conf",
+      "sha256": "d9ad7db13abe6ce35fd95c9290dd50fff0c4fb26c70eb9b3fc95845b37c4a673",
+      "size": 1082
+    },
+    {
+      "path": "nginx/xuanjun-apex-http-bootstrap.conf",
+      "sha256": "2785edc26a0292a6e68e240f40bdda717caa5697314146070f84fe3eac19d727",
+      "size": 431
+    },
+    {
+      "path": "nginx/xuanjun-apex-http-redirect.conf",
+      "sha256": "520359718375fbf431a48a74124e7ac40e8239793c77533518edf385a42c977b",
+      "size": 386
+    },
+    {
+      "path": "nginx/xuanjun-apex-https.conf",
+      "sha256": "dc8e243d3f2c98d5c558f4449443014542edb810fc10c1ac7262542a352b5b8f",
+      "size": 1197
+    },
+    {
+      "path": "overlay/public/assets/tiktok-integration.js",
+      "sha256": "6fa38b952b70862e5a835ae79e4eedfe4b3d0323a8d819bbfb7ef81bddd8aa67",
+      "size": 2452
+    },
+    {
+      "path": "source-pin.json",
+      "sha256": "b49bc42ec92c9982f8adffd069fc1b9dec3aa6af091146571b5de5770338d599",
+      "size": 590
+    },
+    {
+      "path": "systemd/xuanjun-apex-cert-renew.service",
+      "sha256": "d68bc892873d52f8cf8a9ac95c09938c10564abba6f9bcf82d713a2a76a005b8",
+      "size": 229
+    },
+    {
+      "path": "systemd/xuanjun-apex-cert-renew.timer",
+      "sha256": "4ce36b58ba0e599d37458f3aecb0c3c20a588175ffca66834228d405da73807e",
+      "size": 219
+    },
+    {
+      "path": "tls/issue-apex-certificate.sh",
+      "sha256": "e5bc8da8b19164c100d8797c968f1abaccaae7a22b096987c302e626953072a9",
+      "size": 815
+    },
+    {
+      "path": "tls/renew-apex-certificate.sh",
+      "sha256": "1fb2246b284270f30d7df4cca3643d62ef1269c55f6a3090b7248e2038c9f9c0",
+      "size": 263
+    },
+    {
+      "path": "tls/xuanjun-apex-nginx-deploy-hook.sh",
+      "sha256": "adb7d7efd5c4255b7aabefd3a0bc74ae7af0df221e32fcf92bf7044bc13b6be8",
+      "size": 159
+    },
+    {
+      "path": "bin/pr122_website_release.py",
+      "sha256": "cee86a7c186c928ba5cd50befe86291c2fedbc9d7671decc81d1bd0e06fc2182",
+      "size": 11802
+    }
+  ],
+  "schema_version": 1
+}

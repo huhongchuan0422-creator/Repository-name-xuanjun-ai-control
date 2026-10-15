@@ -102,3 +102,15 @@ Nginx候选配置仅新增主域server，静态root拟 /var/www/wenwenwenyiyiyi.
 附件已发送至飞书私聊不等于附件已进入Work会话。Work必须取得原tar.gz字节，先核对包hash再安全检查成员/Manifest及所有文件，不重新要求OpenClaw构建同一包。没有字节时标NOT_RUN，不编造制品验收。
 UK仅能确认SSH传输响应与单次PERMISSION_DENIED；命名profile0、未找到当前可调用的批准Runner，不能自动修复认证或安装公钥。优先由既有维护者确认原有准确user/已绑定公钥；如确需修改authorized_keys须另有明确权限修改授权，不能冒充只读步骤。
 当前可以继续规划和离线核验，生产目录创建、root复制/切换、TLS签发、nginx-t/reload与DNS仍等待精确Gate；当前不要求Owner提供私钥或密码。
+
+## 10 Work独立核验、增量候选与跨PR依赖（2026-10-15）
+
+Work回执#6184961744已独立核验原包字节、1187/1187文件、11090003bytes、包与Manifest哈希、109/109离线路由及8类资源引用。原始包保持不可变回滚基线，不重新打包或重复全量采集。
+
+本轮候选仅增加`deploy/pr122-domestic-website/`增量overlay、完整目标Manifest、独立apex Nginx/TLS配置和事务化prepare/activate/check/rollback工具。`tiktok-integration.js`的状态请求网络失败、非JSON、HTTP失败或断开结果未知均清空账户展示、隐藏账户区、禁用断开操作并显示UNKNOWN/失败，不再误显示“已连接”。
+
+国内私有控制基座继续位于`/home/openclaw_ops/v8-domestic-operations/website`且不放宽`/home/openclaw_ops`的0700。Nginx只读取root管理的`/var/www/wenwenwenyiyiyi.work/current/public`。候选仅新增精确主域server和精确apex证书名；现有`winctl`配置、证书、18444上游和续期路径不在候选修改清单。
+
+失败、超时、部分完成、锁等待超时、目标已存在、source/overlay漂移、指针身份漂移及结果未知均为非零HOLD；未知状态不得重试覆盖。候选未执行安装、证书申请、Nginx校验/reload、权限变更或DNS切换。
+
+共享依赖及跨任务顺序见`plans/PR99_PR122_SHARED_DEPENDENCY_LEDGER_20261015.md`。PR99 exact HEAD `632bbe6f204a2c9ef778d3c91e425593c079abb1`、R2待独立复审和已接受R6保持不变；本分支不修改PR99安装器或备份。`trading.db`、四个Finance/Billing timers、共享master key和`18080`管理/凭据能力均不进入官网静态包。预览页面、受控API、可信反馈、CRM/CommonBrain真实绑定及动态渠道迁移仍由原开发方和各自Gate闭合，当前`PREVIEW=HOLD`、`PRODUCTION=HOLD`。

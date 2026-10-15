@@ -1,0 +1,36 @@
+name: PR122 Domestic Website Offline Candidate
+on:
+  pull_request:
+    paths:
+      - 'deploy/pr122-domestic-website/**'
+      - 'scripts/pr122_*website*.py'
+      - 'tests/test_pr122_*'
+      - 'docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md'
+      - 'governance/features.json'
+  push:
+    branches: [feature/stage5-next25-integration-20261015]
+    paths:
+      - 'deploy/pr122-domestic-website/**'
+      - 'scripts/pr122_*website*.py'
+      - 'tests/test_pr122_*'
+      - 'docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md'
+      - 'governance/features.json'
+permissions:
+  contents: read
+jobs:
+  offline-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m unittest tests/test_pr122_website_release.py -v
+      - run: node --test tests/test_pr122_tiktok_integration.mjs
+      - run: python -m py_compile scripts/pr122_build_website_candidate.py scripts/pr122_website_release.py
+      - run: bash -n deploy/pr122-domestic-website/tls/*.sh
+      - run: python scripts/feature_compliance_check.py

@@ -103,6 +103,42 @@
         "demos/visual/community-payment/index.html",
         "plans/COMMUNITY_VISUAL_OMNICHANNEL_ASSET_AND_DEPLOYMENT_20261015.md"
       ]
+    },
+    {
+      "feature_id": "PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md",
+        "section": "2",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "TikTok network and parse failures never render a connected state",
+          "delta bundle remains bound to the immutable 1187-file source archive",
+          "prepare activate check rollback and unknown states fail closed",
+          "Domestic apex candidate preserves the existing winctl boundary"
+        ],
+        "tests": [
+          "tests/test_pr122_website_release.py",
+          "tests/test_pr122_tiktok_integration.mjs"
+        ]
+      },
+      "reuse": [
+        "PR122 immutable Tokyo source archive and manifest",
+        "existing Domestic root-managed /var/www and Certbot patterns",
+        "existing PR99 transaction and unknown-state safety principles"
+      ],
+      "paths": [
+        "scripts/pr122_build_website_candidate.py",
+        "scripts/pr122_website_release.py",
+        "tests/test_pr122_website_release.py",
+        "tests/test_pr122_tiktok_integration.mjs"
+      ]
     }
   ]
 }
