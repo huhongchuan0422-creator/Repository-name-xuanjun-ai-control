@@ -52,7 +52,9 @@
 - 涉及05：可信角色/租户；11/13：Finance审核职责隔离；22：离线HTTP输入边界。修改路径仅为 `community_saas_phase2` 服务与HTTP以及配套测试，不包括Work/Dots/OpenClaw/生产门禁。
 - `FINANCE_EVIDENCE`、`REFUND`、`DEPLOYMENT` 等待审核状态禁止商家自己标记RESOLVED或CANCELLED，只有可信PLATFORM_OWNER在相同tenant作用域内可以结案；离线结案**不代表**实际Finance核销或真实退款。
 - JSON解析时拒绝1e9999及负指数溢出为无限大的浮点数；普通有限浮点数保留为数字，再由业务入参验证。新增精确失败路径测试。
-- 当前阶段 `SOURCE_CANDIDATE/CI_PENDING/INDEPENDENT_AUDIT_PENDING`。以本文件所在Commit的准确HEAD和PR122同次CI/回执为准；上方PARTIAL不因源码提交提升为PASS。DNS及生产门禁仍HOLD。
+- 源码准确提交 `ae7249a4356f859942e6cbf1895795bdd6233184`，Tree `c7bb377042dfd850e8d1dd1c5f4c1f0bd934c8fe`，四个源码/测试文件+本推进表同一受保护提交。代码当前为 `SOURCE_PATCH_TESTED`，**独立审核仍PENDING**，上方PARTIAL节点不升总体PASS。
+- 精确源码提交的GitHub Actions **8/8 SUCCESS**：Local Stack `38839021568`、Full Local Integration `38839021559`、Current Main Source `38839021553`、Control `38839021550`、Feature Compliance `38839021566`、Native Entry `38839021549`、Legal `38839021528`、PR122 Website `38839021460`。原始完整集成Job `116774564443` 显示真实新增的5个角色权限测试和3个JSON测试均 `ok`，342项Python回归通过，另有144项相关分组及Chromium验证。独立审核/真实Finance授权/生产验收均不可据CI认定PASS。
+- 本次纯文档证据记录不重写以上已测试源码；若HEAD变化须重新核实精确文件及CI关系。PR122保持Draft，真实财务、DNS、东京退役继续HOLD。
 
 ## C. 历史ChatGPT相关控制面任务（责任逐PR确认）
 
