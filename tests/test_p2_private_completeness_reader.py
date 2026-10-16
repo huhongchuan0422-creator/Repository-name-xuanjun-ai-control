@@ -192,6 +192,7 @@ FORMAT = {'bounds': {'gzip': 70000, 'raw': 16777216, 'stdout': 98304},
                        'factory.compile_host_contract',
                        'factory._proposal',
                        'factory.compile_timer_contract',
+                       'schema.path_scope_from_packet',
                        'schema.build_preimages',
                        'schema.verify_preimages',
                        'schema.privacy_project',
@@ -834,6 +835,17 @@ class LifecycleArchiveFixture:
             claim = importlib.import_module('epoch7_claim_successor')
             factory = importlib.import_module('epoch7_host_factory')
             approval = importlib.import_module('epoch7_complete_approval')
+            measured = {'measurement': {'schema': 1, 'record': {}, 'ancestors': {}, 'absent': {}},
+                'transaction_inventory': {factory.snap.TRANSACTION + '/' + rel: pin
+                    for rel, pin in private['observation']['policy']['transaction_inventory'].items()},
+                'transaction_directories': {path: dict(pin, path=path, kind='DIRECTORY',
+                    dev=1, ino=index + 1, nlink=2, size=4096, mtime_ns=1, ctime_ns=1,
+                    access_acl='user::rwx\ngroup::---\nother::---\n', default_acl='')
+                    for index, (path, pin) in enumerate(sorted(private['observation']['policy']['directories'].items()))
+                    if path == factory.snap.TRANSACTION or path.startswith(factory.snap.TRANSACTION + '/')},
+                'transaction_parent_delta': {key: {'historical': 0, 'live': 0}
+                    for key in ('size', 'mtime_ns', 'ctime_ns')}}
+            measured['transaction_inventory'][factory.snap.TRANSACTION + '/' + claim.OLD_OUTER] = claim.PREDECESSOR_SHA256
             private['claim_successor'] = {'schema': 1, 'kind': 'EXACT_CLAIM_ONLY_SUCCESSOR',
                 'timing_policy': claim.TIMING_POLICY, 'predecessor': claim.predecessor_contract(),
                 'implementation': {'source_commit': m.SOURCE, 'source_tree': m.TREE,
@@ -841,7 +853,7 @@ class LifecycleArchiveFixture:
                 'admission_expires_at_utc': FORMAT['candidate']['admission_expires_at_utc'],
                 'authorized_successors': 1, 'automatic_retry': False,
                 'effect_scope': 'UNCHANGED_107_PAYLOADS_16_PHASES',
-                'measured_predecessor_sha256': factory.d.digest('SYNTHETIC predecessor observation')}
+                'measured_predecessor_sha256': factory.d.digest(measured['measurement'])}
             self.new = {'schema': 2, 'seed': private}
             hydrated = self.kit._hydrate_seed(private, factory)
             prepared = factory.prepare_host_inputs(hydrated)
@@ -856,11 +868,18 @@ class LifecycleArchiveFixture:
                 'compiler_kit_manifest_sha256': self.kit.digest,
                 'claim_successor': copy.deepcopy(private['claim_successor']),
                 'fresh_release_parent': copy.deepcopy(private['fresh_release_parent']),
+                'measured_predecessor': copy.deepcopy(measured),
                 'final_review_body': body, 'final_review_id': None, 'final_review_body_sha256': None}
         self.raws = [packed(self.new), packed(self.old), packed(self.plan), packed(self.packet)]
         self.pins = tuple((role, leaf, len(raw), m.sha(raw))
                           for (role, leaf, size, pin), raw in zip(m.INPUTS, self.raws))
+        # Bind only synthetic saved-Packet identity/count constants in the
+        # authenticated test copy. The exact constructor/validation code runs.
         self.schema_raw = (HERE / 'evidence_schema.py').read_bytes()
+        self.schema_raw += ('\nPACKET_SIZE = %r\nPACKET_SHA256 = %r\n'
+            'PACKET_INVENTORY_COUNT = %r\nPACKET_DIRECTORY_COUNT = %r\n' %
+            (self.pins[3][2], self.pins[3][3], len(measured['transaction_inventory']),
+             len(measured['transaction_directories']))).encode('ascii')
         self.candidate = dict(FORMAT['candidate'], plan_sha256=self.pins[2][3],
             packet_sha256=self.pins[3][3], body_bytes=len(m.canonical(body)), body_sha256=m.sha(m.canonical(body)))
 
@@ -1683,8 +1702,16 @@ class FrozenProducerBoundaryTests(unittest.TestCase):
         }
         for name, digest in expected.items():
             with self.subTest(function=name):
-                source = inspect.getsource(getattr(m, name)).encode('utf-8')
-                self.assertEqual(hashlib.sha256(source).hexdigest(), digest)
+                source = inspect.getsource(getattr(m, name))
+                if name == 'compile_proof':
+                    # Reverse only the authenticated Packet-scope wiring. The
+                    # old compile/validation/commitment logic stays byte-exact.
+                    added = '        path_scope=schema.path_scope_from_packet(packet)\n'
+                    self.assertEqual(source.count(added), 1)
+                    source = source.replace(added, '')
+                    self.assertEqual(source.count(',path_scope=path_scope)'), 4)
+                    source = source.replace(',path_scope=path_scope)', ')')
+                self.assertEqual(hashlib.sha256(source.encode('utf-8')).hexdigest(), digest)
 
 
 

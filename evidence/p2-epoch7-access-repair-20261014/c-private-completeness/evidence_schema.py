@@ -13,12 +13,19 @@ import copy
 import hashlib
 import json
 import re
+from types import MappingProxyType
 
 MAX_BYTES = 8 * 1024 * 1024
 MAX_SEGMENT_BYTES = 2097152
 MAX_RECORDS = 32768
 MAX_ROWS = 8192
 MAX_TOTAL_INDICES = 17 * 15 * MAX_ROWS
+
+# Exact authenticated private Packet identity, not a proof-supplied allowlist.
+PACKET_SIZE = 29665
+PACKET_SHA256 = '2bf597ef911cba70b5c94559ee36d8f90c2a339a3de1bfd2d8f58547900b8dec'
+PACKET_INVENTORY_COUNT = 47
+PACKET_DIRECTORY_COUNT = 9
 
 SECTIONS = ('access',
  'activation',
@@ -1632,9 +1639,99 @@ _FIXED_PATHS = frozenset(FIXED_RESOURCE_PATHS) | frozenset(FIXED_DIRECTORY_PATHS
     '/opt/xuanjun-runtime/gh', '/opt/xuanjun-runtime/gh/gh'}
 
 
-def _path(value):
+# These finite additions are independently present in the authenticated public
+# factory source. They do not grant neighboring names or a different kind.
+_EXECUTABLE_ALIAS_PATHS = frozenset(('/usr/bin/python3.6', '/etc/alternatives/python3',
+    '/usr/libexec/platform-python', '/usr/bin/runuser', '/usr/bin/nginx'))
+_DIRECT_SOURCE_PATH = NODE_ROOT + '/lib/node_modules/openclaw/dist/is-main-DYSvvM1W.mjs'
+_DIRECT_SOURCE_SHA256 = 'cedd59a24eadaaf873515fabea73b776a66d40773c8ee5298f4946b9eef10469'
+_ROOT_FILE_ACL = 'user::rw-\ngroup::---\nother::---\n'
+_ROOT_DIRECTORY_ACL = 'user::rwx\ngroup::---\nother::---\n'
+_PATH_SCOPE_TOKEN = object()
+
+
+class _PacketPathScope:
+    """An immutable local-only result of exact Packet authentication."""
+    __slots__ = ('files', 'directories')
+
+    def __init__(self, token, files, directories):
+        need(token is _PATH_SCOPE_TOKEN, 'PREIMAGE_PATH_SCOPE_HOLD')
+        object.__setattr__(self, 'files', MappingProxyType(dict(files)))
+        object.__setattr__(self, 'directories', MappingProxyType({
+            path: MappingProxyType(dict(row)) for path, row in directories.items()}))
+
+    def __setattr__(self, name, value):
+        raise StaticHold('PREIMAGE_PATH_SCOPE_HOLD')
+
+    def __delattr__(self, name):
+        raise StaticHold('PREIMAGE_PATH_SCOPE_HOLD')
+
+
+def _check_path_scope(path_scope):
+    need(path_scope is None or type(path_scope) is _PacketPathScope, 'PREIMAGE_PATH_SCOPE_HOLD')
+
+
+def _transaction_scope_path(path, root=False):
+    need(type(path) is str and len(path) <= 4096, 'PREIMAGE_PATH_SCOPE_HOLD')
+    if root and path == TRANSACTION: return
+    need(path.startswith(TRANSACTION + '/'), 'PREIMAGE_PATH_SCOPE_HOLD')
+    parts = path[len(TRANSACTION) + 1:].split('/')
+    need(all(1 <= len(part) <= 255 and part not in ('.', '..') and
+        re.fullmatch(r'[A-Za-z0-9_.-]+', part) is not None for part in parts),
+        'PREIMAGE_PATH_SCOPE_HOLD')
+
+
+def path_scope_from_packet(packet):
+    """Authenticate the exact canonical Packet plus LF before deriving scope.
+
+    The caller independently supplies the retained private Packet onsite/offline.
+    Neither a proof nor its claimed scope can confer path authority. This result
+    and the inventory it contains MUST NOT be exported in any projection.
+    """
+    try:
+        need(type(packet) is dict, 'PREIMAGE_PACKET_BINDING_HOLD')
+        _budget(packet)
+        raw = canonical(packet, MAX_BYTES) + b'\n'
+        need(len(raw) == PACKET_SIZE and hashlib.sha256(raw).hexdigest() == PACKET_SHA256,
+            'PREIMAGE_PACKET_BINDING_HOLD')
+        measured = packet['measured_predecessor']
+        _keys(measured, {'measurement', 'transaction_inventory', 'transaction_directories', 'transaction_parent_delta'})
+        measurement = measured['measurement']
+        _keys(measurement, {'schema', 'record', 'ancestors', 'absent'})
+        need(type(measurement['schema']) is int and measurement['schema'] == 1)
+        need(all(type(measurement[key]) is dict for key in ('record', 'ancestors', 'absent')))
+        delta = measured['transaction_parent_delta']; _keys(delta, {'size', 'mtime_ns', 'ctime_ns'})
+        for row in delta.values():
+            _keys(row, {'historical', 'live'})
+            for value in row.values(): _uint(value)
+        files = measured['transaction_inventory']; directories = measured['transaction_directories']
+        need(type(files) is dict and len(files) == PACKET_INVENTORY_COUNT, 'PREIMAGE_PATH_SCOPE_HOLD')
+        need(type(directories) is dict and len(directories) == PACKET_DIRECTORY_COUNT and
+            TRANSACTION in directories, 'PREIMAGE_PATH_SCOPE_HOLD')
+        for path, sha in files.items():
+            _transaction_scope_path(path); _hash(sha)
+            need(path not in directories and path.rsplit('/', 1)[0] in directories, 'PREIMAGE_PATH_SCOPE_HOLD')
+        for path, row in directories.items():
+            _transaction_scope_path(path, root=True)
+            _keys(row, META_INTS | {'path', 'kind', 'access_acl', 'default_acl'})
+            need(row['path'] == path and row['kind'] == 'DIRECTORY', 'PREIMAGE_PATH_SCOPE_HOLD')
+            for key in META_INTS: _uint(row[key], (1 << 32) - 1 if key in ('uid', 'gid') else (1 << 64) - 1)
+            need(row['dev'] > 0 and row['ino'] > 0 and row['nlink'] > 0 and
+                (row['uid'], row['gid'], row['mode']) == (0, 0, 0o700) and
+                row['access_acl'] == _ROOT_DIRECTORY_ACL and row['default_acl'] == '', 'PREIMAGE_PATH_SCOPE_HOLD')
+            need(path == TRANSACTION or path.rsplit('/', 1)[0] in directories, 'PREIMAGE_PATH_SCOPE_HOLD')
+        return _PacketPathScope(_PATH_SCOPE_TOKEN, files, directories)
+    except StaticHold:
+        raise
+    except (ValueError, TypeError, KeyError, IndexError, UnicodeError, OverflowError, RecursionError, AttributeError):
+        raise StaticHold('PREIMAGE_PATH_SCOPE_HOLD') from None
+
+
+def _path(value, path_scope=None):
+    _check_path_scope(path_scope)
     need(type(value) is str and len(value) <= 4096 and '\x00' not in value)
-    if value in _FIXED_PATHS: return
+    if value in _FIXED_PATHS or value in _EXECUTABLE_ALIAS_PATHS or value == _DIRECT_SOURCE_PATH: return
+    if path_scope is not None and (value in path_scope.files or value in path_scope.directories): return
     match = re.fullmatch(re.escape(RELEASE_PARENT) + r'/integration-[0-9a-f]{16}(?:/(.+))?', value)
     if match:
         relative = match.group(1)
@@ -1765,9 +1862,48 @@ def _directory_state(value):
     need(value['default_acl'] == ''); _acl(value['access_acl'])
 
 
-def _resource(value):
+def _previously_supported_path(path):
+    try:
+        _path(path)
+        return True
+    except StaticHold as exc:
+        if str(exc) != 'PREIMAGE_UNSUPPORTED_PATH_HOLD': raise
+        return False
+
+
+def _scoped_directory(path, row, path_scope=None):
+    _check_path_scope(path_scope)
+    # Exact public additions represent files/links, never directories.
+    need(path not in _EXECUTABLE_ALIAS_PATHS and path != _DIRECT_SOURCE_PATH, 'PREIMAGE_PATH_KIND_HOLD')
+    if _previously_supported_path(path): return
+    need(path_scope is not None and path in path_scope.directories, 'PREIMAGE_PATH_SCOPE_HOLD')
+    expected = path_scope.directories[path]
+    need(all(key in expected and type(value) is type(expected[key]) and value == expected[key]
+        for key, value in row.items()), 'PREIMAGE_PATH_METADATA_HOLD')
+
+
+def _scoped_resource(value, path_scope=None):
+    path = value['path']; kind = value['kind']
+    if path == _DIRECT_SOURCE_PATH:
+        need(kind == 'FILE' and value.get('sha256') == _DIRECT_SOURCE_SHA256, 'PREIMAGE_PATH_KIND_HOLD')
+    if path in _EXECUTABLE_ALIAS_PATHS:
+        need(kind in ('FILE', 'LINK'), 'PREIMAGE_PATH_KIND_HOLD')
+    if _previously_supported_path(path): return
+    need(path_scope is not None, 'PREIMAGE_PATH_SCOPE_HOLD')
+    if path in path_scope.files:
+        need(kind == 'FILE' and value.get('sha256') == path_scope.files[path] and
+            all(type(value.get(key)) is int and value[key] == expected for key, expected in
+                (('uid', 0), ('gid', 0), ('mode', 0o600))) and
+            value.get('access_acl') == _ROOT_FILE_ACL, 'PREIMAGE_PATH_METADATA_HOLD')
+    else:
+        need(path in path_scope.directories and kind == 'DIRECTORY', 'PREIMAGE_PATH_KIND_HOLD')
+        _scoped_directory(path, {key: item for key, item in value.items() if key not in ('path', 'kind')}, path_scope=path_scope)
+
+
+def _resource(value, path_scope=None):
     need(type(value) is dict and 'kind' in value and 'path' in value)
-    _path(value['path']); kind = value['kind']
+    _path(value['path'], path_scope=path_scope); kind = value['kind']
+    _scoped_resource(value, path_scope=path_scope)
     base = {'path', 'kind', 'uid', 'gid', 'mode', 'sha256', 'access_acl'}
     shapes = {'ABSENT': {'path', 'kind'}, 'FILE': base,
         'SANDBOX_STABLE': base, 'MASK': {'path', 'kind', 'uid', 'gid', 'link'},
@@ -1856,14 +1992,14 @@ def _timer(saved, contract):
     need(canonical(contract) == canonical(expected), 'PREIMAGE_TIMER_BINDING_HOLD')
 
 
-def _resources(value):
+def _resources(value, path_scope=None):
     _keys(value, {'schema', 'records', 'ordered_index', 'directories'})
     need(type(value['schema']) is int and value['schema'] == 1)
     records = value['records']; indexes = value['ordered_index']; directories = value['directories']
     need(type(records) is list and 1 <= len(records) <= MAX_RECORDS)
     seen = set()
     for row in records:
-        _resource(row); raw = canonical(row)
+        _resource(row, path_scope=path_scope); raw = canonical(row)
         need(raw not in seen, 'PREIMAGE_DUPLICATE_RECORD_HOLD'); seen.add(raw)
     need(type(indexes) is list and len(indexes) == 17)
     views = []; used = set(); next_first = 0; count = 0; segments = []
@@ -1884,15 +2020,16 @@ def _resources(value):
     need(type(directories) is dict and 1 <= len(directories) <= MAX_ROWS and '/' in directories)
     leaves = []
     for path in sorted(directories):
-        _path(path); rows = directories[path]; need(type(rows) is list and 1 <= len(rows) <= 3)
-        for row in rows: _directory_state(row)
+        _path(path, path_scope=path_scope); rows = directories[path]; need(type(rows) is list and 1 <= len(rows) <= 3)
+        for row in rows:
+            _directory_state(row); _scoped_directory(path, row, path_scope=path_scope)
         leaves.append(digest(['EPOCH7_RESOURCE_DIRECTORY_LEAF_V1', path, rows]))
     return views, {'views_sha256': digest(['EPOCH7_RESOURCE_VIEWS_SEGMENTED_V1', 17, segments]),
         'directories_sha256': digest(['EPOCH7_RESOURCE_DIRECTORIES_SEGMENTED_V1', len(leaves), leaves]),
         'record_count': len(records), 'ordered_row_count': count, 'directory_count': len(directories)}
 
 
-def _validate(preimages):
+def _validate(preimages, path_scope=None):
     _budget(preimages); _keys(preimages, ROOT_FIELDS)
     need(type(preimages['schema']) is int and preimages['schema'] == 1)
     for key, schema in TEMPLATES.items(): _match(preimages[key], schema, (key,))
@@ -1948,10 +2085,10 @@ def _validate(preimages):
         ident = row['identity']
         need(ident['groups'] == sorted(set(ident['nss_groups'] + ident['unit_supplementary_groups'] + [ident['gid']])))
     _timer(preimages['timer_saved_baseline'], preimages['timer_contract'])
-    return _resources(preimages['resources'])
+    return _resources(preimages['resources'], path_scope=path_scope)
 
 
-def build_preimages(factory, inputs, proposal_tuple, timer_contract):
+def build_preimages(factory, inputs, proposal_tuple, timer_contract, path_scope=None):
     """Use the actual already-validated proposal tuple; never call or import a kit.
 
     factory is retained for call-site clarity; no authority is inferred from it.
@@ -1970,7 +2107,7 @@ def build_preimages(factory, inputs, proposal_tuple, timer_contract):
                 rows = view[name]; need(type(rows) is list and 1 <= len(rows) <= MAX_ROWS)
                 ids = []
                 for row in rows:
-                    _resource(row); packed = canonical(row)
+                    _resource(row, path_scope=path_scope); packed = canonical(row)
                     if packed not in seen:
                         need(len(records) < MAX_RECORDS); seen[packed] = len(records); records.append(copy.deepcopy(row))
                     ids.append(seen[packed])
@@ -1980,7 +2117,7 @@ def build_preimages(factory, inputs, proposal_tuple, timer_contract):
             'access_rows': inputs['access_rows'], 'acceptance_contract': proposal_tuple[8],
             'timer_saved_baseline': {k: v.decode('ascii') for k, v in raw.items()}, 'timer_contract': timer_contract,
             'resources': {'schema': 1, 'records': records, 'ordered_index': indexes, 'directories': inputs['resource_directories']}}
-        _validate(value)
+        _validate(value, path_scope=path_scope)
         return copy.deepcopy(value)
     except StaticHold:
         raise
@@ -1988,10 +2125,10 @@ def build_preimages(factory, inputs, proposal_tuple, timer_contract):
         raise StaticHold('PREIMAGE_BUILD_HOLD') from None
 
 
-def verify_preimages(preimages, plan, body):
+def verify_preimages(preimages, plan, body, path_scope=None):
     """ONSITE full metadata-preimage consistency only, never host/seed truth."""
     try:
-        unused_views, resources = _validate(preimages)
+        unused_views, resources = _validate(preimages, path_scope=path_scope)
         need(type(plan) is dict and type(body) is dict)
         auth = body['retained_authorization']; host = plan['host_contract']; observer = plan['resource_observer']
         delta = preimages['retained_delta']; additions = preimages['additive_targets']
@@ -2085,17 +2222,18 @@ def _validate_target_projection(targets):
         else: need(before['gid'] == after['gid'] == 0 and after['mode'] == 0o644)
 
 
-def _visible_directory_digest(directories):
+def _visible_directory_digest(directories, path_scope=None):
     need(type(directories) is dict and 1 <= len(directories) <= MAX_ROWS and '/' in directories)
     leaves = []
     for path in sorted(directories):
-        _path(path); rows = directories[path]; need(type(rows) is list and 1 <= len(rows) <= 3)
-        for row in rows: _directory_state(row)
+        _path(path, path_scope=path_scope); rows = directories[path]; need(type(rows) is list and 1 <= len(rows) <= 3)
+        for row in rows:
+            _directory_state(row); _scoped_directory(path, row, path_scope=path_scope)
         leaves.append(digest(['EPOCH7_RESOURCE_DIRECTORY_LEAF_V1', path, rows]))
     return digest(['EPOCH7_RESOURCE_DIRECTORIES_SEGMENTED_V1', len(leaves), leaves])
 
 
-def privacy_project(preimages, key, context):
+def privacy_project(preimages, key, context, path_scope=None):
     """Export only the confirmed narrow projection; no raw sensitive digests.
 
     Caller MUST first run verify_preimages(preimages, exact_plan, exact_body).
@@ -2109,7 +2247,7 @@ def privacy_project(preimages, key, context):
         import hmac
         need(type(key) is bytes and len(key) == 32, 'PREIMAGE_PRIVACY_KEY_HOLD')
         _privacy_context(context)
-        unused_views, unused_resources = _validate(preimages)
+        unused_views, unused_resources = _validate(preimages, path_scope=path_scope)
         segments = {'retained_delta': preimages['retained_delta'], 'access_rows': preimages['access_rows'],
             'acceptance_contract': preimages['acceptance_contract'], 'resource_views': preimages['resources']}
         withheld = {}
@@ -2133,7 +2271,7 @@ def privacy_project(preimages, key, context):
                 'resource_section_counts': [{name: len(index[name]) for name in SECTIONS}
                     for index in preimages['resources']['ordered_index']]},
             'onsite_only_roots': list(ONSITE_ONLY_ROOTS)}
-        _validate_projected(value)
+        _validate_projected(value, path_scope=path_scope)
         return value
     except StaticHold:
         raise
@@ -2141,7 +2279,7 @@ def privacy_project(preimages, key, context):
         raise StaticHold('PREIMAGE_PRIVACY_PROJECTION_HOLD') from None
 
 
-def _validate_projected(value):
+def _validate_projected(value, path_scope=None):
     _budget(value); _keys(value, PROJECTED_FIELDS)
     need(type(value['schema']) is int and value['schema'] == 2 and value['kind'] == PRIVACY_KIND)
     _privacy_context(value['context'])
@@ -2155,7 +2293,7 @@ def _validate_projected(value):
             need(provenance['validator_source_sha256'] == 'c18b35dcaa1c9abb0ce926e5e044e131b222c3b6960af6aa40ce451c3502cd33'
                 and provenance['topology_review']['evidence_sha256'] == provenance['topology_evidence_sha256'])
     _timer(visible['timer_saved_baseline'], visible['timer_contract'])
-    directory_digest = _visible_directory_digest(visible['resource_directories'])
+    directory_digest = _visible_directory_digest(visible['resource_directories'], path_scope=path_scope)
     _keys(value['withheld'], PRIVATE_SEGMENTS)
     for name, row in value['withheld'].items():
         _keys(row, WITHHELD_FIELDS)
@@ -2172,14 +2310,14 @@ def _validate_projected(value):
     return directory_digest
 
 
-def verify_projected_preimages(projected, plan, body):
+def verify_projected_preimages(projected, plan, body, path_scope=None):
     """Verify ONLY visible safe preimages; hidden roots remain onsite-only.
 
     A well-formed commitment cannot independently prove its hidden value or the
     Owner's computation. No HMAC equality/authenticity claim is made here.
     """
     try:
-        directory_digest = _validate_projected(projected)
+        directory_digest = _validate_projected(projected, path_scope=path_scope)
         visible = projected['visible']; additions = visible['additive_targets']
         need(type(plan) is dict and type(body) is dict)
         auth = body['retained_authorization']; host = plan['host_contract']; observer = plan['resource_observer']

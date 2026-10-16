@@ -1,44 +1,44 @@
 {
   "files": [
     {
-      "bytes": 159517,
+      "bytes": 167374,
       "path": "evidence_schema.py",
-      "sha256": "9afafd3a0fd862b21876cf23acf43edb39581105145390d4084d427ace648396"
+      "sha256": "77224da12e75653417877b883b98e38e865ac212d2eda5bd1ae704d3531f0484"
     },
     {
-      "bytes": 67274,
+      "bytes": 70084,
       "path": "validate_private_completeness.py",
-      "sha256": "cc03d604cb4a91d3faffd47078662e4a705641dfb9d6963047e221e3b3ecfdef"
+      "sha256": "38214c077ad4705487a6da90f984ecf2e4d984d472d41ccb1149235693bc02f5"
     },
     {
-      "bytes": 26844,
+      "bytes": 27497,
       "path": "verify_evidence.py",
-      "sha256": "e2ee2855a688956d01ce66367827df6b6f741785437acc30360a298aac4b668f"
+      "sha256": "2377c53bc99dc3e5980ba2a464c417bba6dff5d706e35221e7220ef94db9b1e5"
     },
     {
-      "bytes": 18141,
+      "bytes": 20894,
       "path": "README.md",
-      "sha256": "290879572a2e3f2ee2c4bc7d8fbd5e6a1719cb33ba1bf867dc96016d3f3718c2"
+      "sha256": "06515ad2530116d3d39d539d47ad99f8c02c353c84d929fb8a3e54a03487cbdb"
     },
     {
-      "bytes": 52710,
+      "bytes": 55602,
       "path": "OWNER_COMMAND_TEMPLATE.txt",
-      "sha256": "1016a78c1dcd288c5e70532d679f01cc4dee953a68ca4db2a68bd21621960d8b"
+      "sha256": "7388bab8c79f85caf224cb6630ac81c95ba2062edeb0e984aeef2ab8355ef61d"
     },
     {
-      "bytes": 20128,
+      "bytes": 48841,
       "path": "test_evidence_schema.py",
-      "sha256": "d7db4531f379222d74615f62821f2b5d460dab1ea88911b3828828cc4d289a0c"
+      "sha256": "77f8189aa6d9b5fccd470510d5d3c7b5ea91c7507d30d1c1b9fbb7caded11f83"
     },
     {
-      "bytes": 96856,
+      "bytes": 99034,
       "path": "test_validate_private_completeness.py",
-      "sha256": "ae7fdbd5666c7bde3156c4f5039fb3054c7a58f59e874a4d7d843fcbb091aac5"
+      "sha256": "08372c2c1a88a38f7f0d503296bdd95991fda113472a25a633e7e473c6c55aa6"
     },
     {
-      "bytes": 27701,
+      "bytes": 35997,
       "path": "test_verify_evidence.py",
-      "sha256": "133e36cadf163fd26359342fd9ddeecb79e028898b51c5a3e89a91b4d8129e5d"
+      "sha256": "cf629f3838612f0d2a2c49d582442bd4863525c94d92303216a4cbac34c0ea84"
     }
   ],
   "schema": 1

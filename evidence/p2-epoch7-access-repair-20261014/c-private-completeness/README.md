@@ -15,6 +15,47 @@ installation, recovery attempt, claim publication or service operation. The
 command template remains unauthorized. A source review and a separate Owner
 permission for one precisely scoped run are required before execution.
 
+## Exact source-bound path compatibility increment (local review candidate)
+
+The reported Owner attempt stopped before preview with the fixed
+`PREIMAGE_UNSUPPORTED_PATH_HOLD` label. Its first rejected path is unknown.
+Offline comparison proves 31 required paths missing from the previous schema:
+one exact public direct-profile startup source, 23 immutable transaction files,
+and seven transaction directories. The earlier production-shaped fixture covered
+the ordinary startup profile and a smaller synthetic transaction inventory.
+These are schema coverage defects, not evidence of unauthorized host changes.
+
+This candidate derives the transaction scope only after authenticating the exact
+already-received Packet's complete canonical bytes. The producer and offline
+verifier independently construct the scope from their own fixed Packet input;
+proof-supplied scope, neighboring paths, alternate roots and wrong file/directory
+roles cannot confer permission. New inventory-file rows must match the exact
+inventory SHA and root-only 0600 metadata; directory projections must match their
+actual retained fields in the authenticated root-only 0700 directory record.
+The scope and complete inventory are not added to the exported proof.
+
+The public direct-profile source is restricted to its exact path, FILE kind and
+published content pin. Five missing aliases from the original factory's ten-path
+finite executable reference policy are included only as FILE/LINK roles. Both
+public startup profiles and the full finite executable policy are covered by
+source-linked regressions. Existing generic path checks are not a complete duplicate
+of the factory role/hash contracts; those remain enforced by the unchanged real
+factory and exact onsite Plan comparisons. The five aliases are possible producer shapes; the
+actual received Plan does not prove they were used in this failed attempt.
+
+This changes representation coverage only. The four protected content reads,
+original compiler, full onsite comparisons, whole-segment privacy commitments,
+TTY review, recipients, output limits and deadlines are retained. Accepting a
+path in an already-compiled metadata object never opens that path or grants a new
+read permission. No actual Seed is available locally; passing the identified
+coverage checks does not prove that every actual private preimage will pass.
+Unknown shapes still HOLD without a payload. There is no automatic retry.
+
+The template remains unauthorized. The prior one-run permission is consumed;
+new source review and a new explicit Owner permission would be required. The
+existing 2026-10-16T18:00:00Z bound is unchanged and is not renewed by this repair.
+The retained original package is commit835c691fcc137a28369964253aca5add5b011ff5.
+
 ## Local actual-value preview and recipient confirmation increment
 
 This candidate adds a local human-readable preview before any transferable proof.

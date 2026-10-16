@@ -427,6 +427,7 @@ RUNTIME_CALL_PATH = ['entry.verify_kit',
  'factory.compile_host_contract',
  'factory._proposal',
  'factory.compile_timer_contract',
+ 'schema.path_scope_from_packet',
  'schema.build_preimages',
  'schema.verify_preimages',
  'schema.privacy_project',
@@ -548,7 +549,7 @@ def verify_evidence(evidence, plan_raw, packet_raw, package_directory=None):
     source_identity, verify_projected_preimages = load_verification_components(package_directory)
     _validate_runtime(evidence['runtime'], source_identity)
     try:
-        checks = verify_projected_preimages(evidence['preimages'], plan, body)
+        checks = verify_projected_preimages(evidence['preimages'], plan, body, packet)
     except BaseException:
         raise Hold('PREIMAGE_REJECTED')
     _validate_preimage_result(checks)
@@ -631,18 +632,28 @@ def load_source_identity(package_directory=None):
 
 
 def load_verification_components(package_directory=None):
+    """Bind both path authority and verification to authenticated schema bytes.
+
+    The returned callback accepts the independently authenticated reference
+    Packet. A report cannot grant its own path scope, and neither callable is
+    resolved through sys.path or a preloaded module.
+    """
     identity, schema_raw = _load_source_bytes(package_directory)
     namespace = {'__name__': '_reviewed_private_completeness_schema',
                  '__file__': '<authenticated-evidence-schema>'}
     try:
         exec(compile(schema_raw, namespace['__file__'], 'exec', dont_inherit=True), namespace)
         verifier = namespace['verify_projected_preimages']
-        need(callable(verifier), 'SCHEMA_ENTRYPOINT')
+        path_scope_from_packet = namespace['path_scope_from_packet']
+        need(callable(verifier) and callable(path_scope_from_packet), 'SCHEMA_ENTRYPOINT')
     except Hold:
         raise
     except BaseException:
         raise Hold('SCHEMA_LOAD')
-    return identity, verifier
+    def verify_with_reference_scope(preimages, plan, body, packet):
+        path_scope = path_scope_from_packet(packet)
+        return verifier(preimages, plan, body, path_scope=path_scope)
+    return identity, verify_with_reference_scope
 
 
 if __name__ == '__main__':

@@ -142,7 +142,7 @@ jobs:
           assert all(summary[key] == 0 for key in summary if key != 'tests')
           """
           suites = (('test_validate_private_completeness.py', 63),
-                    ('test_evidence_schema.py', 14), ('test_verify_evidence.py', 57))
+                    ('test_evidence_schema.py', 24), ('test_verify_evidence.py', 61))
           results = []
           for name, count in suites:
               argv = [sys.executable, '-I', '-B', '-S', '-c', child_program,

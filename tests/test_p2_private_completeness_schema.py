@@ -1,14 +1,19 @@
 """New local tests only: real pure factories, wholly synthetic private objects."""
 import copy
+import ast
+import base64
 import gzip
 import hashlib
 import io
 import importlib.util
+import inspect
 import json
 import pathlib
 import sys
 import subprocess
+import tarfile
 import unittest
+from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -290,6 +295,441 @@ print('COLD_IMPORT_OK')
         schema._validate(value)
         row['mtime_ns'] = 'SECRETSENTINEL'
         with self.assertRaises(schema.StaticHold): schema._validate(value)
+
+class ExactPathScopeTests(unittest.TestCase):
+    """Local-only regression: authenticated synthetic paths, no private Packet.
+
+    The public kit is authenticated before its entry constants are read with
+    ast.literal_eval; its source is never imported or executed by these helpers.
+    Every additional transaction leaf and content hash below is synthetic.
+    """
+
+    FILE_ACL = 'user::rw-\ngroup::---\nother::---\n'
+    DIRECTORY_ACL = 'user::rwx\ngroup::---\nother::---\n'
+    PUBLIC_ALIASES = ('/usr/bin/python3.6', '/etc/alternatives/python3',
+        '/usr/libexec/platform-python', '/usr/bin/runuser', '/usr/bin/nginx')
+    CONTEXT = {'session_nonce': '1' * 32, 'new_seed_sha256': '2' * 64,
+        'old_seed_sha256': '3' * 64}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.packet = cls.synthetic_packet()
+        cls.scope = cls.authenticated_scope(cls.packet)
+        cls.profiles, cls.public_constants = cls.public_openclaw_profiles()
+
+    @classmethod
+    def synthetic_packet(cls):
+        paths = [schema.TRANSACTION] + [schema.TRANSACTION +
+            '/synthetic-pathscope-directory-%02d' % index for index in range(8)]
+        directories = {path: {'path': path, 'kind': 'DIRECTORY', 'uid': 0,
+            'gid': 0, 'mode': 0o700, 'dev': 8, 'ino': 80000 + index,
+            'nlink': 2, 'size': 4096, 'mtime_ns': 10000 + index,
+            'ctime_ns': 20000 + index, 'access_acl': cls.DIRECTORY_ACL,
+            'default_acl': ''} for index, path in enumerate(paths)}
+        inventory = {paths[1 + index % 8] +
+            '/SYNTHETIC_PATH_SCOPE_SECRET_%02d.private' % index:
+            hashlib.sha256(('SYNTHETIC_PATH_SCOPE_CONTENT_%02d' % index).encode()).hexdigest()
+            for index in range(47)}
+        return {'measured_predecessor': {
+            'measurement': {'schema': 1, 'record': {}, 'ancestors': {}, 'absent': {}},
+            'transaction_inventory': inventory,
+            'transaction_directories': directories,
+            'transaction_parent_delta': {key: {'historical': 1, 'live': 2}
+                for key in ('size', 'mtime_ns', 'ctime_ns')}}}
+
+    @staticmethod
+    def authenticated_scope(packet):
+        # Patching both pins is confined to wholly synthetic test bytes. The
+        # production authenticated Packet is never opened by this test class.
+        raw = schema.canonical(packet, schema.MAX_BYTES) + b'\n'
+        with mock.patch.object(schema, 'PACKET_SIZE', len(raw)), \
+                mock.patch.object(schema, 'PACKET_SHA256', hashlib.sha256(raw).hexdigest()):
+            return schema.path_scope_from_packet(packet)
+
+    @staticmethod
+    def public_openclaw_profiles():
+        path = HERE.parent / 'c-capability-lifecycle-candidate/artifact/epoch7-kit-claim-lifecycle.tar.gz'
+        raw = path.read_bytes()
+        if len(raw) != 1074448 or hashlib.sha256(raw).hexdigest() != \
+                'bd3708d5887c4dc2b866e9e0acb04da426e71ad88d89c23fe2576b5ed943a2c3':
+            raise AssertionError('PUBLIC_KIT_AUTHENTICATION_FAILED')
+        with tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz') as archive:
+            names = archive.getnames()
+            entries = [name for name in names if name.endswith('/epoch7_recovery_entry.py')]
+            if len(entries) != 1:
+                raise AssertionError('PUBLIC_ENTRY_NOT_UNIQUE')
+            entry = entries[0]
+            prefix = entry.rsplit('/', 1)[0] + '/'
+            wanted = {'PUBLIC_OPENCLAW_FIXTURE', 'PUBLIC_OPENCLAW_DIRECT_FIXTURE',
+                'PUBLIC_OPENCLAW_DIRECT_PATH', 'PUBLIC_OPENCLAW_DIRECT_SHA'}
+            constants = {}
+            for node in ast.parse(archive.extractfile(entry).read()).body:
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Name) and target.id in wanted:
+                            constants[target.id] = ast.literal_eval(node.value)
+            if set(constants) != wanted:
+                raise AssertionError('PUBLIC_CONSTANTS_INCOMPLETE')
+            profiles = []
+            for key in ('PUBLIC_OPENCLAW_FIXTURE', 'PUBLIC_OPENCLAW_DIRECT_FIXTURE'):
+                name = prefix + constants[key]
+                if names.count(name) != 1:
+                    raise AssertionError('PUBLIC_PROFILE_NOT_UNIQUE')
+                profile = json.loads(archive.extractfile(name).read())
+                for row in profile['files'].values():
+                    content = base64.b64decode(row['content_base64'], validate=True)
+                    if hashlib.sha256(content).hexdigest() != row['sha256']:
+                        raise AssertionError('PUBLIC_PROFILE_CONTENT_MISMATCH')
+                profiles.append(profile)
+        return profiles, constants
+
+    def held(self, operation):
+        with self.assertRaises(schema.StaticHold) as caught:
+            operation()
+        self.assertRegex(str(caught.exception), r'^PREIMAGE_[A-Z_]+_HOLD$')
+        self.assertNotIn('SYNTHETIC_PATH_SCOPE', str(caught.exception))
+        self.assertNotIn('SECRETSENTINEL', str(caught.exception))
+        self.assertLess(len(str(caught.exception)), 128)
+
+    @classmethod
+    def private_file(cls, path, content_hash):
+        return {'path': path, 'kind': 'FILE', 'uid': 0, 'gid': 0, 'mode': 0o600,
+            'sha256': content_hash, 'access_acl': cls.FILE_ACL}
+
+    @staticmethod
+    def directory_projection(metadata, inode=True):
+        fields = ('uid', 'gid', 'mode', 'access_acl', 'default_acl')
+        if inode:
+            fields += ('dev', 'ino')
+        return {key: metadata[key] for key in fields}
+
+    @classmethod
+    def scoped_fixture(cls):
+        unused_preimages, plan, body, fixture, inputs, proposal, timer = prepared_preimages()
+        measured = cls.packet['measured_predecessor']
+        directories = measured['transaction_directories']
+        extra_files = [cls.private_file(path, content_hash)
+            for path, content_hash in measured['transaction_inventory'].items()]
+        for view in inputs['resource_views']:
+            for rows in view.values():
+                for row in rows:
+                    if row['path'] in directories and row['kind'] == 'DIRECTORY':
+                        expected = directories[row['path']]
+                        row.update({key: expected[key] for key in row})
+            view['historical'].extend(copy.deepcopy(extra_files))
+        for path, metadata in directories.items():
+            inputs['resource_directories'][path] = [cls.directory_projection(metadata)]
+        preimages = schema.build_preimages(fixture.factory, inputs, proposal, timer,
+            path_scope=cls.scope)
+        # Bind the enlarged public synthetic fixture with the genuine factory's
+        # original digest routines, not a second implementation of those roots.
+        observer = plan['resource_observer']
+        observer['views_sha256'] = fixture.factory.resource_views_digest(inputs['resource_views'])
+        observer['directories_sha256'] = fixture.factory.resource_directories_digest(inputs['resource_directories'])
+        for checkpoint, view in zip(plan['live_controls']['checkpoints'], inputs['resource_views']):
+            checkpoint['resources'] = {name: fixture.delta.digest(view[name]) for name in schema.SECTIONS}
+        return preimages, plan, body, fixture, inputs, proposal, timer
+
+    def test_optional_scope_api_is_explicit_and_legacy_default_preserved(self):
+        self.assertEqual(list(inspect.signature(schema.path_scope_from_packet).parameters), ['packet'])
+        for name in ('build_preimages', 'verify_preimages', 'privacy_project',
+                'verify_projected_preimages', '_validate', '_resources', '_resource',
+                '_path', '_visible_directory_digest', '_validate_projected'):
+            with self.subTest(api=name):
+                parameters = list(inspect.signature(getattr(schema, name)).parameters.values())
+                self.assertEqual(parameters[-1].name, 'path_scope')
+                self.assertIsNone(parameters[-1].default)
+        preimages, plan, body, unused_fixture, unused_inputs, unused_proposal, unused_timer = prepared_preimages()
+        self.assertEqual(schema.verify_preimages(preimages, plan, body),
+            schema.verify_preimages(preimages, plan, body, path_scope=None))
+        self.assertEqual(schema.PACKET_SIZE, 29665)
+        self.assertRegex(schema.PACKET_SHA256, r'^[0-9a-f]{64}$')
+
+    def test_public_aliases_accept_only_files_or_links(self):
+        for path in self.PUBLIC_ALIASES:
+            file = dict(self.private_file(path, 'a' * 64), mode=0o755,
+                access_acl='user::rwx\ngroup::r-x\nother::r-x\n')
+            link = {'path': path, 'kind': 'LINK', 'uid': 0, 'gid': 0, 'sha256': 'b' * 64}
+            with self.subTest(path=path):
+                schema._resource(file)
+                schema._resource(link)
+                for row in ({'path': path, 'kind': 'ABSENT'},
+                        {'path': path, 'kind': 'TREE_INVENTORY', 'sha256': 'b' * 64},
+                        {'path': path, 'kind': 'MASK', 'uid': 0, 'gid': 0, 'link': '/dev/null'},
+                        dict(path=path, kind='DIRECTORY', uid=0, gid=0, mode=0o700,
+                            access_acl=self.DIRECTORY_ACL, default_acl='')):
+                    self.held(lambda row=row: schema._resource(row))
+                for nearby in (path + '.nearby', path + '/child', path + '/', path + '/../SECRETSENTINEL'):
+                    self.held(lambda nearby=nearby: schema._path(nearby))
+                directory = dict(uid=0, gid=0, mode=0o700,
+                    access_acl=self.DIRECTORY_ACL, default_acl='')
+                self.held(lambda: schema._visible_directory_digest({'/': [directory], path: [directory]}))
+
+    def test_two_authenticated_public_openclaw_profiles_and_direct_leaf(self):
+        self.assertEqual([len(profile['files']) for profile in self.profiles], [31, 1])
+        root = schema.NODE_ROOT + '/lib/node_modules/openclaw/'
+        for profile in self.profiles:
+            for relative, source in profile['files'].items():
+                row = dict(self.private_file(root + relative, source['sha256']), uid=1002,
+                    gid=1002, mode=0o644, access_acl='user::rw-\ngroup::r--\nother::r--\n')
+                with self.subTest(relative=relative):
+                    schema._resource(row)
+        relative = self.public_constants['PUBLIC_OPENCLAW_DIRECT_PATH']
+        pin = self.public_constants['PUBLIC_OPENCLAW_DIRECT_SHA']
+        self.assertEqual(self.profiles[1]['files'][relative]['sha256'], pin)
+        row = dict(self.private_file(root + relative, pin), uid=1002, gid=1002,
+            mode=0o644, access_acl='user::rw-\ngroup::r--\nother::r--\n')
+        for mutation in ({'sha256': '0' * 64}, {'kind': 'SANDBOX_STABLE'},
+                {'path': root + relative + '.nearby'},
+                {'path': root + relative.replace('dist/', 'dist/../dist/')},
+                {'path': root.replace('node-v24.21.0', 'node-v24.21.1') + relative}):
+            self.held(lambda mutation=mutation: schema._resource(dict(row, **mutation)))
+        for replacement in ({'path': row['path'], 'kind': 'ABSENT'},
+                {'path': row['path'], 'kind': 'LINK', 'uid': 1002, 'gid': 1002, 'sha256': pin},
+                {'path': row['path'], 'kind': 'TREE_INVENTORY', 'sha256': pin}):
+            self.held(lambda replacement=replacement: schema._resource(replacement))
+
+    def test_whole_packet_bytes_and_newline_are_authenticated_before_scope(self):
+        packet = copy.deepcopy(self.packet)
+        raw = schema.canonical(packet, schema.MAX_BYTES) + b'\n'
+        self.assertEqual(len(packet['measured_predecessor']['transaction_inventory']), 47)
+        self.assertEqual(len(packet['measured_predecessor']['transaction_directories']), 9)
+        self.held(lambda: schema.path_scope_from_packet(packet))
+        for size, pin in ((len(raw) - 1, hashlib.sha256(raw).hexdigest()),
+                (len(raw) + 1, hashlib.sha256(raw).hexdigest()),
+                (len(raw), '0' * 64),
+                (len(raw) - 1, hashlib.sha256(raw[:-1]).hexdigest())):
+            with self.subTest(size=size, pin=pin), mock.patch.object(schema, 'PACKET_SIZE', size), \
+                    mock.patch.object(schema, 'PACKET_SHA256', pin):
+                self.held(lambda: schema.path_scope_from_packet(packet))
+        with mock.patch.object(schema, 'PACKET_SIZE', len(raw)), \
+                mock.patch.object(schema, 'PACKET_SHA256', hashlib.sha256(raw).hexdigest()):
+            packet['measured_predecessor']['measurement']['record']['SECRETSENTINEL'] = 1
+            self.held(lambda: schema.path_scope_from_packet(packet))
+            for value in (raw, raw.decode(), [], True, None):
+                self.held(lambda value=value: schema.path_scope_from_packet(value))
+
+    def test_authenticated_packet_nested_schema_count_and_type_fail_closed(self):
+        def measured(packet): return packet['measured_predecessor']
+        first_file = next(iter(self.packet['measured_predecessor']['transaction_inventory']))
+        first_directory = next(iter(self.packet['measured_predecessor']['transaction_directories']))
+        mutations = [
+            lambda p: p.pop('measured_predecessor'),
+            lambda p: measured(p).update(extra='SECRETSENTINEL'),
+            lambda p: measured(p).pop('measurement'),
+            lambda p: measured(p).update(measurement=[]),
+            lambda p: measured(p)['measurement'].update(schema=True),
+            lambda p: measured(p)['measurement'].update(schema=2),
+            lambda p: measured(p)['measurement'].update(extra='SECRETSENTINEL'),
+            lambda p: measured(p)['measurement'].pop('record'),
+            lambda p: measured(p)['measurement'].update(record=[]),
+            lambda p: measured(p)['measurement'].update(ancestors=[]),
+            lambda p: measured(p)['measurement'].update(absent=[]),
+            lambda p: measured(p).update(transaction_inventory=[]),
+            lambda p: measured(p)['transaction_inventory'].pop(first_file),
+            lambda p: measured(p)['transaction_inventory'].update({schema.TRANSACTION + '/SYNTHETIC_EXTRA.private': 'a' * 64}),
+            lambda p: measured(p)['transaction_inventory'].update({first_file: True}),
+            lambda p: measured(p)['transaction_inventory'].update({first_file: 'A' * 64}),
+            lambda p: measured(p).update(transaction_directories=[]),
+            lambda p: measured(p)['transaction_directories'].pop(first_directory),
+            lambda p: measured(p)['transaction_directories'][first_directory].pop('path'),
+            lambda p: measured(p)['transaction_directories'][first_directory].update(path=first_directory + '/other'),
+            lambda p: measured(p)['transaction_directories'][first_directory].update(extra='SECRETSENTINEL'),
+            lambda p: measured(p)['transaction_directories'][first_directory].update(kind='FILE'),
+            lambda p: measured(p)['transaction_directories'][first_directory].update(uid=1),
+            lambda p: measured(p)['transaction_directories'][first_directory].update(gid=1),
+            lambda p: measured(p)['transaction_directories'][first_directory].update(mode=0o755),
+            lambda p: measured(p)['transaction_directories'][first_directory].update(access_acl='user::rwx\ngroup::r-x\nother::---\n'),
+            lambda p: measured(p)['transaction_directories'][first_directory].update(default_acl='default:user::rwx\n'),
+            lambda p: measured(p)['transaction_parent_delta'].pop('size'),
+            lambda p: measured(p)['transaction_parent_delta'].update(extra={}),
+            lambda p: measured(p)['transaction_parent_delta']['size'].pop('historical'),
+            lambda p: measured(p)['transaction_parent_delta']['size'].update(extra=1),
+            lambda p: measured(p)['transaction_parent_delta']['size'].update(live=-1),
+            lambda p: measured(p)['transaction_parent_delta']['size'].update(live=True)]
+        for field in ('uid', 'gid', 'mode', 'dev', 'ino', 'nlink', 'size', 'mtime_ns', 'ctime_ns'):
+            mutations.append(lambda p, field=field: measured(p)['transaction_directories'][first_directory].update({field: True}))
+            mutations.append(lambda p, field=field: measured(p)['transaction_directories'][first_directory].update({field: -1}))
+        for mutate in mutations:
+            packet = copy.deepcopy(self.packet)
+            mutate(packet)
+            with self.subTest(mutation=mutate):
+                self.held(lambda packet=packet: self.authenticated_scope(packet))
+
+    def test_authenticated_scope_rejects_path_escape_overlap_and_missing_parents(self):
+        measured = self.packet['measured_predecessor']
+        first_file = next(iter(measured['transaction_inventory']))
+        first_child = next(path for path in measured['transaction_directories'] if path != schema.TRANSACTION)
+        invalid_files = (schema.TRANSACTION + '-nearby/SYNTHETIC.private',
+            schema.TRANSACTION + '/../SYNTHETIC.private',
+            schema.TRANSACTION + '/./SYNTHETIC.private',
+            schema.TRANSACTION + '//SYNTHETIC.private',
+            schema.TRANSACTION + '/SYNTHETIC_ORPHAN/file.private',
+            schema.TRANSACTION + '/SYNTHETIC\x00.private', first_child,
+            '/tmp/SYNTHETIC_PATH_SCOPE_SECRET.private', 7)
+        for path in invalid_files:
+            packet = copy.deepcopy(self.packet)
+            inventory = packet['measured_predecessor']['transaction_inventory']
+            content_hash = inventory.pop(first_file); inventory[path] = content_hash
+            with self.subTest(kind='file', path=path):
+                self.held(lambda packet=packet: self.authenticated_scope(packet))
+        for path in (schema.TRANSACTION + '/SYNTHETIC_ORPHAN/child',
+                schema.TRANSACTION + '/../SYNTHETIC_DIRECTORY',
+                schema.TRANSACTION + '/./SYNTHETIC_DIRECTORY',
+                schema.TRANSACTION + '//SYNTHETIC_DIRECTORY',
+                schema.TRANSACTION + '-nearby', first_file):
+            packet = copy.deepcopy(self.packet)
+            directories = packet['measured_predecessor']['transaction_directories']
+            row = directories.pop(first_child); row['path'] = path; directories[path] = row
+            with self.subTest(kind='directory', path=path):
+                self.held(lambda packet=packet: self.authenticated_scope(packet))
+        packet = copy.deepcopy(self.packet)
+        extra = schema.TRANSACTION + '/SYNTHETIC_TENTH_DIRECTORY'
+        row = copy.deepcopy(packet['measured_predecessor']['transaction_directories'][first_child])
+        row['path'] = extra
+        packet['measured_predecessor']['transaction_directories'][extra] = row
+        self.held(lambda: self.authenticated_scope(packet))
+
+    def test_exact_private_file_pins_permissions_and_kinds(self):
+        inventory = self.packet['measured_predecessor']['transaction_inventory']
+        for path, content_hash in inventory.items():
+            row = self.private_file(path, content_hash)
+            with self.subTest(path=path):
+                schema._path(path, path_scope=self.scope)
+                schema._resource(row, path_scope=self.scope)
+                self.held(lambda: schema._resource(row))
+        path, content_hash = next(iter(inventory.items()))
+        row = self.private_file(path, content_hash)
+        mutations = ({'uid': 1}, {'gid': 1}, {'mode': 0o640}, {'mode': 0o400},
+            {'sha256': '0' * 64}, {'uid': False}, {'gid': False},
+            {'access_acl': 'user::rw-\ngroup::r--\nother::---\n'},
+            {'access_acl': self.FILE_ACL + 'user:1002:r--\n'},
+            {'access_acl': 'group::---\nuser::rw-\nother::---\n'},
+            {'kind': 'SANDBOX_STABLE'}, {'extra': 'SECRETSENTINEL'})
+        for mutation in mutations:
+            self.held(lambda mutation=mutation: schema._resource(dict(row, **mutation), path_scope=self.scope))
+        for replacement in ({'path': path, 'kind': 'ABSENT'},
+                {'path': path, 'kind': 'LINK', 'uid': 0, 'gid': 0, 'sha256': content_hash},
+                {'path': path, 'kind': 'TREE_INVENTORY', 'sha256': content_hash},
+                dict(path=path, kind='DIRECTORY', uid=0, gid=0, mode=0o700,
+                    access_acl=self.DIRECTORY_ACL, default_acl='')):
+            self.held(lambda replacement=replacement: schema._resource(replacement, path_scope=self.scope))
+        for unknown in (path + '.nearby', str(pathlib.PurePosixPath(path).parent) + '/SYNTHETIC_UNKNOWN.private',
+                path + '/child', path.replace('/SYNTHETIC_', '/../SYNTHETIC_')):
+            self.held(lambda unknown=unknown: schema._resource(dict(row, path=unknown), path_scope=self.scope))
+
+    def test_directory_projections_match_every_present_packet_field(self):
+        directories = self.packet['measured_predecessor']['transaction_directories']
+        for path, metadata in directories.items():
+            for inode in (False, True):
+                projection = self.directory_projection(metadata, inode=inode)
+                row = dict(projection, path=path, kind='DIRECTORY')
+                with self.subTest(path=path, inode=inode):
+                    schema._resource(row, path_scope=self.scope)
+                    # The existing public transaction root keeps its legacy
+                    # policy; exact Packet metadata binds newly added paths.
+                    if path == schema.TRANSACTION:
+                        continue
+                    for key, value in projection.items():
+                        wrong = value + 1 if type(value) is int else value + 'SECRETSENTINEL'
+                        self.held(lambda key=key, wrong=wrong: schema._resource(
+                            dict(row, **{key: wrong}), path_scope=self.scope))
+        path = next(path for path in directories if path != schema.TRANSACTION)
+        metadata = directories[path]
+        self.held(lambda: schema._resource(self.private_file(path, 'a' * 64), path_scope=self.scope))
+        self.held(lambda: schema._resource({'path': path, 'kind': 'ABSENT'}, path_scope=self.scope))
+        safe_root = {'uid': 0, 'gid': 0, 'mode': 0o755,
+            'access_acl': 'user::rwx\ngroup::r-x\nother::r-x\n', 'default_acl': ''}
+        projected = {'/': [safe_root], path: [self.directory_projection(metadata)]}
+        schema._visible_directory_digest(projected, path_scope=self.scope)
+        self.held(lambda: schema._visible_directory_digest(projected))
+        for key in self.directory_projection(metadata):
+            changed = copy.deepcopy(projected)
+            value = changed[path][0][key]
+            changed[path][0][key] = value + 1 if type(value) is int else value + 'SECRETSENTINEL'
+            self.held(lambda changed=changed: schema._visible_directory_digest(changed, path_scope=self.scope))
+
+    def test_scope_is_copied_immutable_and_self_supplied_dict_is_not_authority(self):
+        packet = copy.deepcopy(self.packet)
+        scope = self.authenticated_scope(packet)
+        measured = packet['measured_predecessor']
+        path, content_hash = next(iter(measured['transaction_inventory'].items()))
+        directory = str(pathlib.PurePosixPath(path).parent)
+        old_directory = copy.deepcopy(measured['transaction_directories'][directory])
+        measured['transaction_inventory'][path] = '0' * 64
+        measured['transaction_directories'][directory]['ino'] += 1
+        injected_path = directory + '/SYNTHETIC_INJECTED.private'
+        measured['transaction_inventory'][injected_path] = 'a' * 64
+        schema._resource(self.private_file(path, content_hash), path_scope=scope)
+        schema._resource(dict(self.directory_projection(old_directory), path=directory,
+            kind='DIRECTORY'), path_scope=scope)
+        self.held(lambda: schema._resource(self.private_file(path, '0' * 64), path_scope=scope))
+        self.held(lambda: schema._resource(self.private_file(injected_path, 'a' * 64), path_scope=scope))
+        with self.assertRaises((AttributeError, TypeError, schema.StaticHold)):
+            scope.synthetic_override = True
+        self.held(lambda: type(scope)(object(), {}, {}))
+        with self.assertRaises(TypeError):
+            scope.files[path] = '0' * 64
+        with self.assertRaises(TypeError):
+            scope.directories[directory]['ino'] = 0
+        self.held(lambda: setattr(scope, 'files', {}))
+        self.held(lambda: delattr(scope, 'directories'))
+        for impostor in (packet, measured, measured['transaction_inventory'], {}, [], True, object()):
+            self.held(lambda impostor=impostor: schema._path(path, path_scope=impostor))
+            self.held(lambda impostor=impostor: schema._resource(
+                self.private_file(path, content_hash), path_scope=impostor))
+
+    def test_scope_threads_through_build_verify_and_hmac_only_projection(self):
+        preimages, plan, body, fixture, inputs, proposal, timer = self.scoped_fixture()
+        checks = schema.verify_preimages(preimages, plan, body, path_scope=self.scope)
+        self.assertTrue(checks['resource_views'])
+        self.assertTrue(checks['resource_directories'])
+        views, info = schema._resources(preimages['resources'], path_scope=self.scope)
+        self.assertEqual(views, inputs['resource_views'])
+        self.assertEqual(info['directories_sha256'], plan['resource_observer']['directories_sha256'])
+        projected = schema.privacy_project(preimages, b'k' * 32, self.CONTEXT, path_scope=self.scope)
+        visible = schema.verify_projected_preimages(projected, plan, body, path_scope=self.scope)
+        self.assertTrue(visible['resource_directories'])
+        self.assertFalse(visible['hidden_commitments_independently_verified'])
+        self.assertEqual(projected['visible']['resource_directories'], inputs['resource_directories'])
+        raw = schema.canonical(projected, schema.MAX_BYTES)
+        for path, content_hash in self.packet['measured_predecessor']['transaction_inventory'].items():
+            self.assertNotIn(path.encode(), raw)
+            self.assertNotIn(content_hash.encode(), raw)
+        for forbidden in (b'transaction_inventory', b'transaction_parent_delta', b'measured_predecessor',
+                b'path_scope', b'ordered_index', b'"records"', b'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+                plan['resource_observer']['views_sha256'].encode()):
+            self.assertNotIn(forbidden, raw)
+        for operation in (
+                lambda: schema.build_preimages(fixture.factory, inputs, proposal, timer),
+                lambda: schema.verify_preimages(preimages, plan, body),
+                lambda: schema.privacy_project(preimages, b'k' * 32, self.CONTEXT),
+                lambda: schema.verify_projected_preimages(projected, plan, body)):
+            self.held(operation)
+        for operation in (
+                lambda: schema.build_preimages(fixture.factory, inputs, proposal, timer, path_scope={}),
+                lambda: schema.verify_preimages(preimages, plan, body, path_scope={}),
+                lambda: schema.privacy_project(preimages, b'k' * 32, self.CONTEXT, path_scope={}),
+                lambda: schema.verify_projected_preimages(projected, plan, body, path_scope={})):
+            self.held(operation)
+        changed_packet = copy.deepcopy(self.packet)
+        path = next(iter(changed_packet['measured_predecessor']['transaction_inventory']))
+        new_hash = hashlib.sha256(b'SYNTHETIC_CHANGED_PRIVATE_CONTENT').hexdigest()
+        changed_packet['measured_predecessor']['transaction_inventory'][path] = new_hash
+        changed_scope = self.authenticated_scope(changed_packet)
+        changed_preimages = copy.deepcopy(preimages)
+        next(row for row in changed_preimages['resources']['records'] if row['path'] == path)['sha256'] = new_hash
+        changed = schema.privacy_project(changed_preimages, b'k' * 32, self.CONTEXT, path_scope=changed_scope)
+        self.assertNotEqual(projected['withheld']['resource_views']['commitment'],
+            changed['withheld']['resource_views']['commitment'])
+        self.assertNotIn(new_hash.encode(), schema.canonical(changed, schema.MAX_BYTES))
+        for name in set(schema.PRIVATE_SEGMENTS) - {'resource_views'}:
+            self.assertEqual(projected['withheld'][name], changed['withheld'][name])
+        tampered = copy.deepcopy(projected)
+        tampered['withheld']['resource_views']['commitment'] = 'f' * 64
+        self.assertFalse(schema.verify_projected_preimages(tampered, plan, body,
+            path_scope=self.scope)['hidden_commitments_independently_verified'])
+
 
 if __name__ == '__main__':
     unittest.main()

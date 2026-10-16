@@ -230,6 +230,8 @@ class RootContractTests(unittest.TestCase):
         self.identity = {'validator': {'bytes': 1234, 'sha256': '4' * 64},
                          'schema_source_sha256': '5' * 64}
         self.plan = {'host_contract': {'input_sha256': '6' * 64}}
+        self.packet = {'synthetic_packet_marker': True}
+        self.body = {'synthetic_body_marker': True}
         self.evidence = {
             'schema': 1, 'kind': verifier.KIND, 'state': verifier.STATE,
             'compiler': copy.deepcopy(verifier.EXPECTED_COMPILER),
@@ -267,7 +269,8 @@ class RootContractTests(unittest.TestCase):
 
     def verify(self, evidence=None, preimage_result=None):
         callback = mock.Mock(return_value=synthetic_preimage_result() if preimage_result is None else preimage_result)
-        with mock.patch.object(verifier, 'load_reference_pair', return_value=(self.plan, {}, {})), \
+        self.last_callback = callback
+        with mock.patch.object(verifier, 'load_reference_pair', return_value=(self.plan, self.packet, self.body)), \
              mock.patch.object(verifier, 'load_verification_components', return_value=(self.identity, callback)):
             return verifier.verify_evidence(self.evidence if evidence is None else evidence,
                                             b'unit-test-plan', b'unit-test-packet')
@@ -283,6 +286,20 @@ class RootContractTests(unittest.TestCase):
         self.assertFalse(result['current_host_state_verified'])
         self.assertIn('NOT_AUTHENTICATED', result['hidden_inputs'])
         self.assertNotIn('field_commitments', result)
+
+    def test_callback_receives_packet_from_authenticated_reference_pair(self):
+        self.verify()
+        self.last_callback.assert_called_once_with(self.evidence['preimages'],
+                                                   self.plan, self.body, self.packet)
+
+    def test_packet_failure_prevents_source_loading_and_path_validation(self):
+        with mock.patch.object(verifier, 'load_reference_pair',
+                               side_effect=verifier.Hold('PACKET_IDENTITY')), \
+             mock.patch.object(verifier, 'load_verification_components') as loader:
+            with self.assertRaises(verifier.Hold) as caught:
+                verifier.verify_evidence(self.evidence, b'plan', b'wrong-packet')
+        self.assertEqual(str(caught.exception), 'PACKET_IDENTITY')
+        loader.assert_not_called()
 
     def test_each_root_section_required(self):
         for key in verifier.ROOT_KEYS:
@@ -492,6 +509,36 @@ class IntegratedSyntheticTests(unittest.TestCase):
         context = {'session_nonce': evidence['hidden_inputs']['session_nonce'],
                    'new_seed_sha256': verifier.NEW_SEED_SHA256, 'old_seed_sha256': verifier.OLD_SEED_SHA256}
         evidence['preimages'] = evidence_schema.privacy_project(preimages, b'K' * 32, context)
+        # Wholly synthetic Packet authority, never the retained private Packet.
+        # Keep the real constructor and change only its fixed identity constants
+        # in these test-only authenticated schema bytes.
+        transaction = evidence_schema.TRANSACTION
+        scoped_directory = transaction + '/synthetic-verifier-directory'
+        def directory_row(path):
+            return {'path': path, 'kind': 'DIRECTORY', 'uid': 0, 'gid': 0,
+                    'mode': 0o700, 'dev': 1, 'ino': 1, 'nlink': 1, 'size': 0,
+                    'mtime_ns': 0, 'ctime_ns': 0,
+                    'access_acl': 'user::rwx\ngroup::---\nother::---\n', 'default_acl': ''}
+        packet = {'measured_predecessor': {
+            'measurement': {'schema': 1, 'record': {}, 'ancestors': {}, 'absent': {}},
+            'transaction_inventory': {transaction + '/synthetic-verifier-file': 'a' * 64},
+            'transaction_directories': {path: directory_row(path)
+                                        for path in (transaction, scoped_directory)},
+            'transaction_parent_delta': {key: {'historical': 0, 'live': 0}
+                                         for key in ('size', 'mtime_ns', 'ctime_ns')}}}
+        packet_raw = verifier.canonical(packet) + b'\n'
+        visible_directories = evidence['preimages']['visible']['resource_directories']
+        visible_directories[scoped_directory] = [{key: value for key, value in
+            directory_row(scoped_directory).items()
+            if key in ('uid', 'gid', 'mode', 'dev', 'ino', 'access_acl', 'default_acl')}]
+        leaves = [evidence_schema.digest(['EPOCH7_RESOURCE_DIRECTORY_LEAF_V1', path,
+                                          visible_directories[path]])
+                  for path in sorted(visible_directories)]
+        plan['resource_observer']['directories_sha256'] = evidence_schema.digest(
+            ['EPOCH7_RESOURCE_DIRECTORIES_SEGMENTED_V1', len(leaves), leaves])
+        # The added directory cannot be accepted through the old static scope.
+        with self.assertRaises(evidence_schema.StaticHold):
+            evidence_schema.verify_projected_preimages(evidence['preimages'], plan, body)
         evidence['hidden_inputs']['input_root_sha256'] = plan['host_contract']['input_sha256']
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -499,6 +546,11 @@ class IntegratedSyntheticTests(unittest.TestCase):
             here = pathlib.Path(__file__).resolve().parent
             for name in ('validate_private_completeness.py', 'evidence_schema.py'):
                 raw = (here / name).read_bytes()
+                if name == 'evidence_schema.py':
+                    raw += ('\n# TEST ONLY: wholly synthetic Packet fixed identity.\n'
+                            'PACKET_SIZE = %r\nPACKET_SHA256 = %r\n'
+                            'PACKET_INVENTORY_COUNT = 1\nPACKET_DIRECTORY_COUNT = 2\n' %
+                            (len(packet_raw), verifier.sha256(packet_raw))).encode('ascii')
                 (root / name).write_bytes(raw)
                 rows.append({'path': name, 'bytes': len(raw), 'sha256': verifier.sha256(raw)})
             (root / 'SOURCE_MANIFEST.json').write_bytes(verifier.canonical({'schema': 1, 'files': rows}))
@@ -510,16 +562,56 @@ class IntegratedSyntheticTests(unittest.TestCase):
             decoded = verifier.decode_evidence(wire)
             # Actual authenticated source loader + actual preimage validator.
             # Only fixed private references are substituted with synthetic ones.
-            with mock.patch.object(verifier, 'load_reference_pair', return_value=(plan, {}, body)):
+            with mock.patch.object(verifier, 'load_reference_pair', return_value=(plan, packet, body)):
                 result = verifier.verify_evidence(decoded, b'synthetic-plan', b'synthetic-packet', str(root))
             self.assertEqual(result['status'], 'PASS_VISIBLE_PREIMAGES_AND_OWNER_REPORT_STRUCTURE')
             self.assertFalse(result['remote_attestation'])
+            self.assertEqual(result['resource_directories_verified'], len(visible_directories))
+            for wrong_packet in ({}, dict(packet, extra='PRIVATE_SENTINEL'),
+                                 {'path_scope': [scoped_directory]}):
+                with mock.patch.object(verifier, 'load_reference_pair',
+                                       return_value=(plan, wrong_packet, body)):
+                    with self.assertRaises(verifier.Hold) as caught:
+                        verifier.verify_evidence(decoded, b'synthetic-plan', b'synthetic-packet', str(root))
+                self.assertEqual(str(caught.exception), 'PREIMAGE_REJECTED')
+            self_report = copy.deepcopy(decoded)
+            self_report['preimages']['path_scope'] = [scoped_directory]
+            with mock.patch.object(verifier, 'load_reference_pair', return_value=(plan, packet, body)):
+                with self.assertRaises(verifier.Hold) as caught:
+                    verifier.verify_evidence(self_report, b'synthetic-plan', b'synthetic-packet', str(root))
+            self.assertEqual(str(caught.exception), 'PREIMAGE_REJECTED')
+            # Cold isolated execution uses the genuine schema and constructor,
+            # with no producer imports or private inputs inside that process.
+            import subprocess
+            payload = root / 'synthetic-input.json'
+            payload.write_bytes(verifier.canonical([decoded['preimages'], plan, body, packet]))
+            program = ("import json,runpy,sys; n=runpy.run_path(sys.argv[1]); "
+                       "i,v=n['load_verification_components'](sys.argv[2]); "
+                       "args=json.loads(n['read_local'](sys.argv[3],n['MAX_RAW_BYTES'])); "
+                       "result=v(*args); n['_validate_preimage_result'](result); "
+                       "print('PASS_COLD_GENUINE_SCHEMA_PACKET_SCOPE')")
+            cold = subprocess.run([sys.executable, '-I', '-B', '-S', '-c', program,
+                                   str(pathlib.Path(verifier.__file__).resolve()),
+                                   str(root), str(payload)], stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE, timeout=20)
+            self.assertEqual(cold.returncode, 0)
+            self.assertEqual(cold.stdout, b'PASS_COLD_GENUINE_SCHEMA_PACKET_SCOPE\n')
+            self.assertEqual(cold.stderr, b'')
+            self.assertFalse((root / '__pycache__').exists())
 
 
 class AuthenticatedLoaderIsolationTests(unittest.TestCase):
+    packet = {'approved_path': '/synthetic/exact'}
+
     def package(self, directory):
         root = pathlib.Path(directory)
-        schema = b"def verify_projected_preimages(a, b, c):\n    return {'exact_authenticated_source': True}\n"
+        schema = (b"def path_scope_from_packet(packet):\n"
+                  b"    if packet != {'approved_path': '/synthetic/exact'}:\n"
+                  b"        raise ValueError('FIXTURE_PACKET_IDENTITY')\n"
+                  b"    return frozenset((packet['approved_path'],))\n"
+                  b"def verify_projected_preimages(a, b, c, path_scope=None):\n"
+                  b"    assert path_scope == frozenset(('/synthetic/exact',))\n"
+                  b"    return {'exact_authenticated_source': True}\n")
         producer = b'# synthetic producer only\n'
         rows = []
         for name, raw in (('validate_private_completeness.py', producer), ('evidence_schema.py', schema)):
@@ -537,12 +629,39 @@ class AuthenticatedLoaderIsolationTests(unittest.TestCase):
             (poison / 'evidence_schema.py').write_text("raise RuntimeError('POISONED_PATH')\n")
             module = types.ModuleType('evidence_schema')
             module.verify_preimages = mock.Mock(side_effect=RuntimeError('POISONED_PRELOAD'))
+            module.verify_projected_preimages = mock.Mock(side_effect=RuntimeError('POISONED_PRELOAD'))
+            module.path_scope_from_packet = mock.Mock(side_effect=RuntimeError('POISONED_PRELOAD'))
             with mock.patch.dict(sys.modules, {'evidence_schema': module}), \
                  mock.patch.object(sys, 'path', [str(poison)] + sys.path):
                 unused_identity, callback = verifier.load_verification_components(str(root))
-                self.assertEqual(callback({}, {}, {}), {'exact_authenticated_source': True})
+                self.assertEqual(callback({}, {}, {}, self.packet), {'exact_authenticated_source': True})
             module.verify_preimages.assert_not_called()
+            module.verify_projected_preimages.assert_not_called()
+            module.path_scope_from_packet.assert_not_called()
             self.assertFalse((root / '__pycache__').exists())
+
+    def test_wrong_extra_and_self_reported_packet_fail_before_allowed_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.package(directory)
+            unused_identity, callback = verifier.load_verification_components(str(root))
+            projection = {'path_scope': ['/synthetic/exact'],
+                          'packet': dict(self.packet)}
+            for packet in ({}, {'approved_path': '/synthetic/other'},
+                           dict(self.packet, extra='PRIVATE_SENTINEL'),
+                           {'path_scope': ['/synthetic/exact']}):
+                with self.subTest(packet=packet):
+                    with self.assertRaises(ValueError) as caught:
+                        callback(projection, {}, {}, packet)
+                    self.assertEqual(str(caught.exception), 'FIXTURE_PACKET_IDENTITY')
+
+    def test_missing_or_noncallable_scope_constructor_fails_closed(self):
+        for source in (b'def verify_projected_preimages(a,b,c,path_scope=None): return {}\n',
+                       b'def verify_projected_preimages(a,b,c,path_scope=None): return {}\n'
+                       b'path_scope_from_packet = None\n'):
+            with self.subTest(source=source):
+                with mock.patch.object(verifier, '_load_source_bytes', return_value=({}, source)):
+                    with self.assertRaises(verifier.Hold):
+                        verifier.load_verification_components()
 
     def test_cold_isolated_loader_and_cli(self):
         import subprocess
@@ -552,7 +671,8 @@ class AuthenticatedLoaderIsolationTests(unittest.TestCase):
             executable = pathlib.Path(verifier.__file__).resolve()
             program = ("import runpy,sys; n=runpy.run_path(sys.argv[1]); "
                        "i,v=n['load_verification_components'](sys.argv[2]); "
-                       "assert v({}, {}, {})=={'exact_authenticated_source':True}; "
+                       "assert v({}, {}, {}, {'approved_path':'/synthetic/exact'})=="
+                       "{'exact_authenticated_source':True}; "
                        "print('PASS_COLD_AUTHENTICATED_SCHEMA')")
             result = subprocess.run([sys.executable, '-I', '-B', '-S', '-c', program,
                                      str(executable), str(root)], stdout=subprocess.PIPE,
