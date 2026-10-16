@@ -1,0 +1,24 @@
+{
+  "host": "iZvt5t8tlrm8oiZ",
+  "source_head": "dd81041042ef3acca031d6b64684941c38ed72ef",
+  "static_artifact_sha256": "18cd49ff3936895171b889099871e58dd2f1576508c8dc3e4db16a9fd935902e",
+  "package_manifest_sha256": "35639f5d3530e56f525e7fb861be6566f9a4e6e33cc8c3039331275dbf4d65b8",
+  "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
+  "publisher_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
+  "installed_publisher_sha256": "7253f3b86a6ad17dadc85c26deda17a5ccaaa8f76c65da21572be39658993895",
+  "live_digest": "a05cf7c23e8ad3a8f63f7af07b68e0219fc79cc4c0c417ded86e2a947054fe09",
+  "previous_release": "/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage",
+  "nginx": {
+    "/etc/nginx/nginx.conf": "8dcb91c45cde2792cecbd5367678bb595c23db1d979879cec74196dad0f71071",
+    "/etc/nginx/conf.d/pr122-00-logformat.conf": "ec79d13b7b4e3586088cdff794f7538a9ff13fc8aa0a9018f913f7b39bbc1a1e",
+    "/etc/nginx/conf.d/pr122-apex-http.conf": "e36fcc4f0d34f088c2030b915421442086fed4e7dfa19758107fd780e4902071",
+    "/etc/nginx/conf.d/pr122-apex-https.conf": "e50dc3123a827de331cb81236d15420b05c50cd7283b932ca6e64bb7c4a5ac25",
+    "/etc/nginx/conf.d/winctl.windows-interaction-ip.conf": "bd3cb5931aabcab5855e72c3509ecc44d7a5d603b14830592b1448ae6f0e185d",
+    "/etc/nginx/conf.d/winctl.windows-interaction.conf": "e089825a7bc21edcdbe4ee911923f996f9e7fedae87ca979a225558f4a24d7d1",
+    "/etc/nginx/mime.types": "845b3cf44e3d178299f218f6fffc4067a989d3f88895dc03bd931c7c9e7230c4",
+    "/etc/nginx/pr122-minimal-cutover/apex.locations.conf": "42e9af3573135e6b8ef08905d1a5628051fb5fd2df014be8f8ce914aa353ccd1",
+    "/etc/nginx/pr122-minimal-cutover/static-security.conf": "a54d27fe31c70ac644ed0cffbbec16cdeb6687fcc881e403c2fef27ff67d67ea",
+    "/etc/nginx/pr122-minimal-cutover/tokyo-proxy-settings.conf": "307930ba9ea726a34a7c0365d8a7446cd2967c8331682e0b9a52ac60e3936201",
+    "/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage/release-metadata/inline-csp.conf": "e8112b7de7817f9d0ff8cebaca23b83ffe33aff4b95ef2d9371945eccd341826"
+  }
+}

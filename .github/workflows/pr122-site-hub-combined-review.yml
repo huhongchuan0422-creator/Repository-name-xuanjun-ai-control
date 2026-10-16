@@ -1,0 +1,47 @@
+name: PR122 combined wrapper review only
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - scripts/pr122_site_hub_combined*.py
+      - deploy/pr122-site-hub-combined/**
+      - tests/test_pr122_site_hub_combined.py
+      - tests/pr122_site_hub_combined_nginx.py
+      - .github/workflows/pr122-site-hub-combined-review.yml
+permissions:
+  contents: read
+jobs:
+  wrapper-and-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Combined transaction regression on explicitly synthetic full-shape source
+        run: |
+          mkdir -p /tmp/pr122-combined-review
+          sudo -n "$(command -v python)" -m unittest tests.test_pr122_site_hub_combined -v > /tmp/pr122-combined-review/WRAPPER_TESTS.log 2>&1 || { cat /tmp/pr122-combined-review/WRAPPER_TESTS.log; exit 1; }
+          cat /tmp/pr122-combined-review/WRAPPER_TESTS.log
+      - name: Install Hosted Nginx fixture dependency
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y nginx
+      - name: Actual isolated Nginx exact routes, MIME, CSP, proxy and session isolation
+        run: python tests/pr122_site_hub_combined_nginx.py > /tmp/pr122-combined-review/NGINX_ROUTING.json
+      - name: Package exact wrapper without release approval
+        run: python scripts/pr122_site_hub_combined_package.py --output /tmp/pr122-combined-review/distribution
+      - name: Bind evidence to actual checkout
+        run: |
+          python - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          data={'head':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'production_release':'HOLD','domestic_deployment':'NOT_EXECUTED','wrapper_host_effects':'FAKE_SYSTEMD_NGINX','hosted_original_source':'SYNTHETIC_FIXTURE','routing':'REAL_HOSTED_NGINX_AND_FROZEN_RUNTIME_LOOPBACK_HTTP','independent_wrapper_review':'PENDING'}
+          Path('/tmp/pr122-combined-review/CI_BINDING.json').write_text(json.dumps(data,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-combined-review-${{ github.sha }}
+          path: /tmp/pr122-combined-review/
+          retention-days: 14
