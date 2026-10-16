@@ -256,8 +256,40 @@ class AdapterContractTests(unittest.TestCase):
         self.assertLess(text.index('Require clean native Python import'),text.index('Verify exact public focused fixture'))
     def test_workflow_preserves_acl_safe_root_owned_ancestry(self):
         text=workflow()
-        for expected in ("for path in ('/',):",'info.st_uid==0 and info.st_gid==0',"('system.posix_acl_access','system.posix_acl_default')",'CI_STAGING_ANCESTRY_ACL','/usr/bin/mktemp -d /xuanjun-p2-parentfix-ci.XXXXXXXX','--no-hardlinks --no-checkout','EXPECTED_TREE=',"rev-parse 'HEAD^{tree}'",'export RUNNER_TEMP="$CI_ROOT/temp" TMPDIR="$CI_ROOT/temp"'):
+        for expected in ("for path in ('/',):",'info.st_uid==0 and info.st_gid==0',"('system.posix_acl_access','system.posix_acl_default')",'CI_STAGING_ANCESTRY_ACL','"$MKTEMP" -d /xuanjun-p2-parentfix-ci.XXXXXXXX','--no-hardlinks --no-checkout','EXPECTED_TREE=',"rev-parse 'HEAD^{tree}'",'export RUNNER_TEMP="$CI_ROOT/temp" TMPDIR="$CI_ROOT/temp"'):
             self.assertIn(expected,text)
+        for tool in ('git','mktemp','chown','id','stat','mkdir'):
+            self.assertIn('$(command -v '+tool+')',text)
+        self.assertIn('"$GIT" -c safe.directory="$GITHUB_WORKSPACE" -C "$GITHUB_WORKSPACE" rev-parse HEAD',text)
+        self.assertIn('"$GIT" -c safe.directory="$GITHUB_WORKSPACE" -C "$GITHUB_WORKSPACE" rev-parse "$GITHUB_SHA^{tree}"',text)
+        self.assertIn('"$GIT" -c safe.directory="$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE/.git" -c core.hooksPath=/dev/null clone',text)
+        self.assertEqual(text.count('-c safe.directory='),4)
+        for forbidden in ('/usr/bin/mktemp','/usr/bin/chown','config --global','safe.directory=*','safe.directory="*"'):
+            self.assertNotIn(forbidden,text)
+    def test_registry_accepts_other_additions_but_requires_own_exact_registration(self):
+        value={'schema_version':1,'features':[{'feature_id':self.m.FEATURE_ID,'status':'IN_DEVELOPMENT',
+            'acceptance':{'tests':[self.m.GATE_PATH,self.m.CONTRACT_PATH]}}]}
+        packed=lambda v:json.dumps(v).encode('ascii')
+        self.m.registry_contract(packed(value))
+        future=json.loads(json.dumps(value));future['features'][0]['acceptance']['tests'].insert(0,'tests/test_future.py')
+        future['features'][0]['acceptance']['tests'].reverse();self.m.registry_contract(packed(future))
+        for mode in ('missing','duplicate','wrong_status','duplicate_feature','bad_path','boolean_schema'):
+            candidate=json.loads(json.dumps(value));feature=candidate['features'][0];tests=feature['acceptance']['tests']
+            if mode=='missing':tests.remove(self.m.GATE_PATH)
+            elif mode=='duplicate':tests.append(self.m.CONTRACT_PATH)
+            elif mode=='wrong_status':feature['status']='COMPLETE'
+            elif mode=='duplicate_feature':candidate['features'].append(feature)
+            elif mode=='bad_path':tests.append('tests/../private.py')
+            else:candidate['schema_version']=True
+            with self.subTest(mode=mode),self.assertRaises(ValueError):self.m.registry_contract(packed(candidate))
+    def test_ci_successor_preserves_published_compiler_source_identity(self):
+        self.assertEqual(self.m.COMPILER_SOURCE_COMMIT,'dacd45a2f6888cae7b751cae5becacd3099c1ed2')
+        self.assertEqual(self.m.COMPILER_SOURCE_TREE,'f31ae40b6f7c48f09846f6d70f5bb599f4980fe1')
+        source=GATE.read_text()
+        self.assertIn("'current_checkout':{'commit':head,'tree':tree}",source)
+        self.assertIn("'compiler_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE}",source)
+        self.assertIn("build_exact_source(work,pathlib.Path(folder)/'artifact',COMPILER_SOURCE_COMMIT,COMPILER_SOURCE_TREE)",source)
+        self.assertNotIn("build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)",source)
     def test_worker_rechecks_head_records_and_fixture_after_each_suite(self):
         for kind,label in (('head','HEAD_CHANGED'),('records','INPUT_CHANGED_AFTER_TEST')):
             reports=[(0,json.dumps(self.m.summary(name,count)).encode()) for name,count in self.m.SUITES+self.m.ADDITIONAL_SUITES]
@@ -274,10 +306,11 @@ class AdapterContractTests(unittest.TestCase):
                 check=stack.enter_context(mock.patch.object(self.m,'check_materialized'))
                 run=stack.enter_context(mock.patch.object(self.m,'run_child',side_effect=reports))
                 stack.enter_context(mock.patch.object(self.m,'clean_import'))
-                stack.enter_context(mock.patch.object(self.m,'build_exact_source'))
+                build=stack.enter_context(mock.patch.object(self.m,'build_exact_source'))
                 stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
                 with self.assertRaisesRegex(ValueError,label):self.m.worker()
                 self.assertEqual(run.call_count,5);self.assertEqual(check.call_count,7)
+                self.assertEqual(build.call_args[0][2:],(self.m.COMPILER_SOURCE_COMMIT,self.m.COMPILER_SOURCE_TREE))
                 self.assertTrue(all(call[2]['new_session'] is False for call in run.mock_calls))
                 for call,(name,unused) in zip(run.call_args_list,self.m.SUITES+self.m.ADDITIONAL_SUITES):
                     self.assertEqual(call[0],([sys.executable,'-I','-B','-S',str(GATE),'--suite',str(HERE/'synthetic-fixture'),name],HERE/'synthetic-fixture',180))
@@ -309,9 +342,9 @@ class GitBoundaryTests(unittest.TestCase):
 
 if __name__=='__main__':
     suite=unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])
-    if suite.countTestCases()!=37:raise ValueError('EXACT_ADAPTER_CONTRACT_COUNT')
+    if suite.countTestCases()!=39:raise ValueError('EXACT_ADAPTER_CONTRACT_COUNT')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
-    ok=result.wasSuccessful() and not result.skipped and result.testsRun==37
+    ok=result.wasSuccessful() and not result.skipped and result.testsRun==39
     print(json.dumps({'schema':1,'state':'PASS' if ok else 'FAIL','tests':result.testsRun,'errors':len(result.errors),
         'failures':len(result.failures),'skips':len(result.skipped),'python':sys.version.split()[0],
         'host_NOT_RUN':True,'network_NOT_RUN':True},sort_keys=True))

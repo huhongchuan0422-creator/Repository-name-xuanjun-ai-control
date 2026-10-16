@@ -61,11 +61,20 @@ jobs:
       - name: Verify exact checkout
         env:
           EXPECTED_SHA: ${{ github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+        run: |
+          set -euo pipefail
+          GIT=$(command -v git)
+          test "$("$GIT" -c safe.directory="$GITHUB_WORKSPACE" -C "$GITHUB_WORKSPACE" rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Verify exact public focused fixture
         run: |
           set -euo pipefail
           python3 --version
+          GIT=$(command -v git)
+          MKTEMP=$(command -v mktemp)
+          CHOWN=$(command -v chown)
+          ID=$(command -v id)
+          STAT=$(command -v stat)
+          MKDIR=$(command -v mkdir)
           umask 0077
           # Preserve the reviewed ACL-safe staging outside hosted /home. Keep production checks unchanged:
           # use only a new disposable CI workspace under the verified filesystem root.
@@ -80,16 +89,16 @@ jobs:
                   except OSError as error: assert error.errno in (errno.ENODATA,errno.ENOTSUP)
                   else: raise RuntimeError('CI_STAGING_ANCESTRY_ACL')
           PY
-          CI_ROOT=$(/usr/bin/mktemp -d /xuanjun-p2-parentfix-ci.XXXXXXXX)
-          /usr/bin/chown "$(id -u):$(id -g)" "$CI_ROOT"
-          test "$(stat -c %a "$CI_ROOT")" = 700
+          CI_ROOT=$("$MKTEMP" -d /xuanjun-p2-parentfix-ci.XXXXXXXX)
+          "$CHOWN" "$("$ID" -u):$("$ID" -g)" "$CI_ROOT"
+          test "$("$STAT" -c %a "$CI_ROOT")" = 700
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-          EXPECTED_TREE=$(git -C "$GITHUB_WORKSPACE" rev-parse "$GITHUB_SHA^{tree}")
-          git -c core.hooksPath=/dev/null clone --no-hardlinks --no-checkout -- "$GITHUB_WORKSPACE" "$CI_ROOT/repository"
-          git -C "$CI_ROOT/repository" -c core.hooksPath=/dev/null checkout --detach "$GITHUB_SHA"
-          test "$(git -C "$CI_ROOT/repository" rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git -C "$CI_ROOT/repository" rev-parse 'HEAD^{tree}')" = "$EXPECTED_TREE"
-          mkdir -m 700 "$CI_ROOT/temp"
+          EXPECTED_TREE=$("$GIT" -c safe.directory="$GITHUB_WORKSPACE" -C "$GITHUB_WORKSPACE" rev-parse "$GITHUB_SHA^{tree}")
+          "$GIT" -c safe.directory="$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE/.git" -c core.hooksPath=/dev/null clone --no-hardlinks --no-checkout -- "$GITHUB_WORKSPACE" "$CI_ROOT/repository"
+          "$GIT" -C "$CI_ROOT/repository" -c core.hooksPath=/dev/null checkout --detach "$GITHUB_SHA"
+          test "$("$GIT" -C "$CI_ROOT/repository" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$("$GIT" -C "$CI_ROOT/repository" rev-parse 'HEAD^{tree}')" = "$EXPECTED_TREE"
+          "$MKDIR" -m 700 "$CI_ROOT/temp"
           export RUNNER_TEMP="$CI_ROOT/temp" TMPDIR="$CI_ROOT/temp"
           cd "$CI_ROOT/repository"
           python3 -I -B -S - <<'PY'

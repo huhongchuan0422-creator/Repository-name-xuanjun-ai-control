@@ -261,18 +261,26 @@ class AdapterContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.m.terminal(raw,'reporter',2)
         with self.assertRaisesRegex(ValueError,'DUPLICATE_JSON_KEY'):
             self.m.strict_json(b'{"schema":1,"schema":1}')
-    def test_registry_adds_only_two_acceptance_test_paths(self):
-        path=HERE.parent/'governance/features.json'
-        value=json.loads(path.read_text());features=value['features']
-        retained=[row for row in features if row['feature_id']=='P2_RETAINED_RECOVERY']
-        self.assertEqual(len(retained),1)
-        tests=retained[0]['acceptance']['tests']
-        self.assertEqual(tests[-2:],[self.m.GATE_PATH,self.m.CONTRACT_PATH])
-        self.assertEqual(len(tests),len(set(tests)))
-        self.assertEqual(retained[0]['status'],'IN_DEVELOPMENT')
-        del tests[-2:]
-        canonical=json.dumps(value,sort_keys=True,separators=(',',':')).encode()
-        self.assertEqual(hashlib.sha256(canonical).hexdigest(),'3b7b5d9e1ac344970bab0ddd67193f7ae388992c0837103770d3da75f0f2855e')
+    def test_registry_requires_own_two_unique_paths(self):
+        value=json.loads((HERE.parent/'governance/features.json').read_text())
+        def packed(row):return json.dumps(row,sort_keys=True,separators=(',',':')).encode()
+        self.m.registry_contract(packed(value))
+        future=json.loads(json.dumps(value))
+        retained=next(row for row in future['features'] if row['feature_id']=='P2_RETAINED_RECOVERY')
+        retained['acceptance']['tests'].insert(0,'tests/test_future_fixture.py')
+        retained['acceptance']['tests'].reverse()
+        self.m.registry_contract(packed(future))
+        for mode in ('missing','duplicate','wrong_status','duplicate_feature','bad_path','boolean_schema'):
+            candidate=json.loads(json.dumps(value))
+            retained=next(row for row in candidate['features'] if row['feature_id']=='P2_RETAINED_RECOVERY')
+            tests=retained['acceptance']['tests']
+            if mode=='missing':tests.remove(self.m.GATE_PATH)
+            elif mode=='duplicate':tests.append(self.m.CONTRACT_PATH)
+            elif mode=='wrong_status':retained['status']='COMPLETE'
+            elif mode=='duplicate_feature':candidate['features'].append(retained)
+            elif mode=='bad_path':tests.append('tests/../private.py')
+            else:candidate['schema_version']=True
+            with self.subTest(mode=mode),self.assertRaises(ValueError):self.m.registry_contract(packed(candidate))
     def test_bootstrap_and_legacy_suites_are_not_run_by_gate(self):
         source=GATE.read_text()
         self.assertNotIn('preparation_suite(',source)

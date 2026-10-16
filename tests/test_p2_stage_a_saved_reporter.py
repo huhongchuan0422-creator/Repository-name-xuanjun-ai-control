@@ -22,8 +22,6 @@ SUITES=(('reporter', 43), ('coverage', 66))
 PINS_BOUND=True
 WORKFLOW_SIZE=4968
 WORKFLOW_SHA='941bf2e72d7c82e20d881f1548d3569b8ea40cc12d1a2c6dbf8c54f64dc406b8'
-REGISTRY_SIZE=3384
-REGISTRY_SHA='eff240fd689cdf7d13c85f306b0229ebb879d0182fc6017ffda13b26c7299445'
 PINS={'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter/report_saved_stage_a.py': (93912, '8ebd1ae2d572818677e5e404647f2d53ddae40f3aafa32320dcaf36d7384bde0', 'stage-a-saved-reporter-candidate/report_saved_stage_a.py'), 'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter/test_report_saved_stage_a.py': (23582, '2c69922bdd3e5aa3005f6190d6ad242dff03deaf4335a05101cca0f9e66bd88c', 'stage-a-saved-reporter-candidate/test_report_saved_stage_a.py'), 'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter/run_local_tests.py': (1371, '6f147d6abce5348af826cbbdbfb89197ad3c4074a89fadda950bc2b66e1e725a', 'stage-a-saved-reporter-candidate/run_local_tests.py'), 'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-coverage/saved_authority_coverage.py': (21159, 'ac4be6793ec07c9294cf21c8f892e3a83ff4002fe9ba768416fee30d125afb9e', 'stage-a-saved-coverage-candidate/saved_authority_coverage.py'), 'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-coverage/test_saved_authority_coverage.py': (21241, 'f598fbe0c71e374cf6d761b407bf6c39376f9a95c60d897ac2e5cf7f4186cda7', 'stage-a-saved-coverage-candidate/test_saved_authority_coverage.py'), 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/export_saved_evidence.py': (49401, 'a436d97072bf0062a94f9ccbd030aef1a08214f12f74645efd12d89d9f464815', 'saved-evidence-r7/export_saved_evidence.py'), 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/verify_exported_evidence.py': (11327, 'b5c7b39fa3403dda95e21cfdf5ab402d1f32656fe93951d356b1fe62464d71be', 'saved-evidence-r7/verify_exported_evidence.py'), 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/export_schema.py': (23175, 'df216347c7e969942be4e8eea42dfe580b3b155ff4a36d1383e9bca0cf253629', 'saved-evidence-r7/export_schema.py'), 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/test_export_schema.py': (19773, '9ea8d6a03157228f208758a1e3791f374ef8ab9f445a7f77c83faed258ea32a3', 'saved-evidence-r7/test_export_schema.py'), 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/test_export_saved_evidence.py': (18366, '4e0f3425a88004e367c7c546b7b1e39f425b8b40690019096f49896a86dc85e9', 'saved-evidence-r7/test_export_saved_evidence.py'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_prepare_data.py': (13888, '71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1', 'r7-saved-preparation-candidate/epoch7_prepare_data.py'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_topology_projection.py': (36482, '0e9817a1474dc4e54cf1779c0b4c243cf16e6204cab3a25210a12e41e03d00b6', 'r7-saved-preparation-candidate/epoch7_topology_projection.py'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/test_epoch7_prepare_data_r7.py': (15985, 'e76d894610a9391ea02f2d29ce6cc89189cc4dc184dfc7cf8c0bc0e41d22eeed', 'r7-saved-preparation-candidate/test_epoch7_prepare_data_r7.py'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/test_epoch7_topology_projection.py': (35404, '38e96133f4d3134e409cc7124f10426ea85cc59d01dd1e2392fb977c8e87dbcb', 'r7-saved-preparation-candidate/test_epoch7_topology_projection.py'), 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7-actual-20261015/packet.json': (294949, '45b832dce9577b49e6ee718f1637862eebd775c6c10f87d9150ed0a87476fdf7', 'saved-evidence-r7-actual-20261015/packet.json')}
 SOURCE_TARGETS={'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter/report_saved_stage_a.py': 'stage-a-saved-reporter-candidate/report_saved_stage_a.py', 'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter/test_report_saved_stage_a.py': 'stage-a-saved-reporter-candidate/test_report_saved_stage_a.py', 'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter/run_local_tests.py': 'stage-a-saved-reporter-candidate/run_local_tests.py', 'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-coverage/saved_authority_coverage.py': 'stage-a-saved-coverage-candidate/saved_authority_coverage.py', 'evidence/p2-epoch7-access-repair-20261014/stage-a-saved-coverage/test_saved_authority_coverage.py': 'stage-a-saved-coverage-candidate/test_saved_authority_coverage.py', 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/export_saved_evidence.py': 'saved-evidence-r7/export_saved_evidence.py', 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/verify_exported_evidence.py': 'saved-evidence-r7/verify_exported_evidence.py', 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/export_schema.py': 'saved-evidence-r7/export_schema.py', 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/test_export_schema.py': 'saved-evidence-r7/test_export_schema.py', 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7/test_export_saved_evidence.py': 'saved-evidence-r7/test_export_saved_evidence.py', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_prepare_data.py': 'r7-saved-preparation-candidate/epoch7_prepare_data.py', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_topology_projection.py': 'r7-saved-preparation-candidate/epoch7_topology_projection.py', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/test_epoch7_prepare_data_r7.py': 'r7-saved-preparation-candidate/test_epoch7_prepare_data_r7.py', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/test_epoch7_topology_projection.py': 'r7-saved-preparation-candidate/test_epoch7_topology_projection.py', 'evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7-actual-20261015/packet.json': 'saved-evidence-r7-actual-20261015/packet.json'}
 PUBLIC_DIRECTORIES=('evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter',
@@ -62,8 +60,6 @@ def publication_pins():
         safe_name(path);safe_name(target)
     need(type(WORKFLOW_SIZE) is int and 0<WORKFLOW_SIZE<=65536 and type(WORKFLOW_SHA) is str
          and len(WORKFLOW_SHA)==64 and all(c in '0123456789abcdef' for c in WORKFLOW_SHA),'WORKFLOW_NOT_BOUND')
-    need(type(REGISTRY_SIZE) is int and 0<REGISTRY_SIZE<=1048576 and type(REGISTRY_SHA) is str
-         and len(REGISTRY_SHA)==64 and all(c in '0123456789abcdef' for c in REGISTRY_SHA),'REGISTRY_NOT_BOUND')
 
 def read_pin(root,relative,size,pin):
     path=root/relative;need(path.resolve()==path,'PUBLIC_PATH_ALIAS')
@@ -136,12 +132,34 @@ def public_inventory(root):
     expected={path for path in SOURCE_TARGETS if any(path.startswith(prefix+'/') for prefix in PUBLIC_DIRECTORIES)}
     need(found==expected,'PUBLIC_SOURCE_ALLOWLIST')
 
+def registry_contract(raw):
+    # Registry additions are allowed; this gate authenticates its own registration
+    # in the exact current HEAD rather than pinning an unrelated historical file.
+    need(type(raw) is bytes and 0<len(raw)<=1048576,'REGISTRY_BOUND')
+    value=strict_json(raw)
+    need(type(value) is dict and type(value.get('schema_version')) is int and
+         value['schema_version']==1 and type(value.get('features')) is list and
+         0<len(value['features'])<=256,'REGISTRY_SCHEMA')
+    need(all(type(row) is dict for row in value['features']),'REGISTRY_FEATURE_SHAPE')
+    rows=[row for row in value['features'] if row.get('feature_id')==FEATURE_ID]
+    need(len(rows)==1 and rows[0].get('status')=='IN_DEVELOPMENT','REGISTRY_FEATURE_SCOPE')
+    acceptance=rows[0].get('acceptance')
+    need(type(acceptance) is dict and type(acceptance.get('tests')) is list,'REGISTRY_TESTS')
+    paths=acceptance['tests']
+    need(0<len(paths)<=1024 and all(type(path) is str and
+         re.fullmatch(r'tests/[A-Za-z0-9_./-]+\.py',path) and
+         all(part not in ('','.','..') for part in path.split('/')) for path in paths),
+         'REGISTRY_TEST_PATH')
+    need(len(paths)==len(set(paths)) and
+         all(paths.count(path)==1 for path in (GATE_PATH,CONTRACT_PATH)),
+         'REGISTRY_REQUIRED_TESTS')
+
 def checkout_records(root,head):
     paths=set(PINS)|{GATE_PATH,CONTRACT_PATH,WORKFLOW_PATH,REGISTRY_PATH,ARCHIVE_PATH}
     records={path:verified_path(root,head,path,ARCHIVE_SIZE if path==ARCHIVE_PATH else 1048576) for path in sorted(paths)}
     need(pathlib.Path(__file__).read_bytes()==records[GATE_PATH],'CHECKPOINT_NOT_EXACT_HEAD')
     need(len(records[WORKFLOW_PATH])==WORKFLOW_SIZE and digest(records[WORKFLOW_PATH])==WORKFLOW_SHA,'WORKFLOW_PIN')
-    need(len(records[REGISTRY_PATH])==REGISTRY_SIZE and digest(records[REGISTRY_PATH])==REGISTRY_SHA,'REGISTRY_PIN')
+    registry_contract(records[REGISTRY_PATH])
     return records
 
 def materialize(root,files):

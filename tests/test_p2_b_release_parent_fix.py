@@ -1,5 +1,6 @@
 """Exact-public-checkout B release-parent source regression gate; no host admission."""
 import hashlib,io,json,os,pathlib,re,resource,signal,stat,subprocess,sys,tarfile,tempfile,time,types,unittest
+FEATURE_ID='P2_RETAINED_RECOVERY'
 MAX_LOG=1048576
 ARCHIVE_PATH='evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-dc18f73e.tar.gz'
 ARCHIVE_SIZE=1041263
@@ -17,17 +18,18 @@ CONTRACT_PATH='tests/test_p2_b_release_parent_fix_contract.py'
 SUITE_NAMES=('consumer','wrapper','pipeline','affected')
 SUITES=(('consumer',23),('wrapper',39),('pipeline',7),('affected',97))
 ADDITIONAL_SUITES=(('builder',24),)
+# CI-only successor commits do not redefine the published compiler artifact.
+COMPILER_SOURCE_COMMIT='dacd45a2f6888cae7b751cae5becacd3099c1ed2'
+COMPILER_SOURCE_TREE='f31ae40b6f7c48f09846f6d70f5bb599f4980fe1'
 PINS_BOUND=True
-WORKFLOW_SIZE=5707
-WORKFLOW_SHA='f14b5b105f820c128d7192abae3f0cc7f115367493e0801492f0ef9420d8573c'
+WORKFLOW_SIZE=6183
+WORKFLOW_SHA='79630ded08c30fff770a21ddf1a08383717651ba08b446d70b58338ec08caa8f'
 SOURCE_TARGETS={'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/epoch7_recovery_entry.py': 'b-release-parent-fix-candidate/kit-overlay/epoch7_recovery_entry.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/helpers/epoch7_host_factory.py': 'b-release-parent-fix-candidate/kit-overlay/helpers/epoch7_host_factory.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/helpers/epoch7_resource_plan.py': 'b-release-parent-fix-candidate/kit-overlay/helpers/epoch7_resource_plan.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/host_factory/test_epoch7_full_factory.py': 'b-release-parent-fix-candidate/kit-overlay/tests/host_factory/test_epoch7_full_factory.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/host_factory/test_epoch7_full_factory_fixture.py': 'b-release-parent-fix-candidate/kit-overlay/tests/host_factory/test_epoch7_full_factory_fixture.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/host_factory/test_epoch7_host_factory.py': 'b-release-parent-fix-candidate/kit-overlay/tests/host_factory/test_epoch7_host_factory.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/resource_plan/test_epoch7_python_resource.py': 'b-release-parent-fix-candidate/kit-overlay/tests/resource_plan/test_epoch7_python_resource.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/resource_plan/test_epoch7_resource_plan.py': 'b-release-parent-fix-candidate/kit-overlay/tests/resource_plan/test_epoch7_resource_plan.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/tests/test_fresh_release_parent.py': 'b-release-parent-fix-candidate/tests/test_fresh_release_parent.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/reference-tests/test_epoch7_prepare.py': 'b-release-parent-fix-candidate/reference-tests/test_epoch7_prepare.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/epoch7_prepare.py': 'b-release-parent-fix-candidate/preparation/epoch7_prepare.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/epoch7_prepare_data.py': 'b-release-parent-fix-candidate/preparation/epoch7_prepare_data.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/epoch7_topology_projection.py': 'b-release-parent-fix-candidate/preparation/epoch7_topology_projection.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/test_fresh_release_parent.py': 'b-release-parent-fix-candidate/preparation/test_fresh_release_parent.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/test_release_parent_pipeline.py': 'b-release-parent-fix-candidate/preparation/test_release_parent_pipeline.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/README.md': 'b-release-parent-fix-candidate/preparation/README.md', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/build/build_parentfix_kit.py': 'b-release-parent-fix-candidate/build/build_parentfix_kit.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/build/test_build_parentfix_kit.py': 'b-release-parent-fix-candidate/build/test_build_parentfix_kit.py', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/build/OVERLAY_INPUTS.json': 'b-release-parent-fix-candidate/build/OVERLAY_INPUTS.json', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_prepare_data.py': 'fixtures/r7-saved-preparation-candidate/epoch7_prepare_data.py', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_topology_projection.py': 'fixtures/r7-saved-preparation-candidate/epoch7_topology_projection.py', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/test_epoch7_prepare_data_r7.py': 'fixtures/r7-saved-preparation-candidate/test_epoch7_prepare_data_r7.py', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/test_epoch7_topology_projection.py': 'fixtures/r7-saved-preparation-candidate/test_epoch7_topology_projection.py', 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_prepare.py': 'b-release-parent-fix-candidate/baseline-preparation/epoch7_prepare.py'}
 PINS={'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/epoch7_recovery_entry.py': (55771, '33e4ad415c9496feb72a9e151603dcb808714e84d9af0d60b39542d92e967180', 'b-release-parent-fix-candidate/kit-overlay/epoch7_recovery_entry.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/helpers/epoch7_host_factory.py': (46824, '590edb0801641888303d34016015f03d3f9e26cb03e27367991dd50fb7cd3ac7', 'b-release-parent-fix-candidate/kit-overlay/helpers/epoch7_host_factory.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/helpers/epoch7_resource_plan.py': (24137, '48b48b9f6d6dfb2902546bc16c908468aefdf060f32807c848a6a6ea519c900e', 'b-release-parent-fix-candidate/kit-overlay/helpers/epoch7_resource_plan.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/host_factory/test_epoch7_full_factory.py': (6102, 'fe348c2029a4f2ace94eba1dfdf18a3a8f4b3493ef9ab94ac344d802c70bf470', 'b-release-parent-fix-candidate/kit-overlay/tests/host_factory/test_epoch7_full_factory.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/host_factory/test_epoch7_full_factory_fixture.py': (24277, '5d5272ec32481f40fbef93e440fd26de6dca48982fc2e9ea0662b22a5e7a747d', 'b-release-parent-fix-candidate/kit-overlay/tests/host_factory/test_epoch7_full_factory_fixture.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/host_factory/test_epoch7_host_factory.py': (22963, '902ff141034c634c798c0061cc03ed8c29b2b112f75faaccfd5f102a8bf09172', 'b-release-parent-fix-candidate/kit-overlay/tests/host_factory/test_epoch7_host_factory.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/resource_plan/test_epoch7_python_resource.py': (21112, '95a8329360eeece05ccd1f0b99e2ebf46b802ba11d9d47292fe48fe7bf40514f', 'b-release-parent-fix-candidate/kit-overlay/tests/resource_plan/test_epoch7_python_resource.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/tests/resource_plan/test_epoch7_resource_plan.py': (23773, 'e1f24e289c936c0940f97ccf666edf10689bd742881d2a49a0a89243faf21d2e', 'b-release-parent-fix-candidate/kit-overlay/tests/resource_plan/test_epoch7_resource_plan.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/tests/test_fresh_release_parent.py': (17229, '1df4eb37f1a7e9dacd3c157d6b69b626db0bb99dc8e9e2fc2c4467be992e67dc', 'b-release-parent-fix-candidate/tests/test_fresh_release_parent.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/reference-tests/test_epoch7_prepare.py': (40245, '556187e54fa38a2901ca5dd3703a9c3afe54b0685a25eac565ce12c1dd5f43ae', 'b-release-parent-fix-candidate/reference-tests/test_epoch7_prepare.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/epoch7_prepare.py': (55703, '1c2f09c0e8b1c7397ce35fc72da9c199df564a2dc6c458eebc0fac7ba6ea9b69', 'b-release-parent-fix-candidate/preparation/epoch7_prepare.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/epoch7_prepare_data.py': (13888, '71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1', 'b-release-parent-fix-candidate/preparation/epoch7_prepare_data.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/epoch7_topology_projection.py': (36482, '0e9817a1474dc4e54cf1779c0b4c243cf16e6204cab3a25210a12e41e03d00b6', 'b-release-parent-fix-candidate/preparation/epoch7_topology_projection.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/test_fresh_release_parent.py': (35301, '085184295d7acc49f4a980d559c62fabca79064b45c28898ec8ff28d98d6c2ce', 'b-release-parent-fix-candidate/preparation/test_fresh_release_parent.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/test_release_parent_pipeline.py': (11769, '7390e05fc27f40c4d37d661e66c415ab0a1fcec9589418acfdf2e42f2657e5b4', 'b-release-parent-fix-candidate/preparation/test_release_parent_pipeline.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/README.md': (5564, '71d9fd14c6d52db097d11de205d764c985f795690e54c6b8e1e807f9ace7a546', 'b-release-parent-fix-candidate/preparation/README.md'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/build/build_parentfix_kit.py': (17234, 'a41c6eb3af16f9a34eb0565e5a028cb799e052e88fc4ad918a88a59bf8fa4ec5', 'b-release-parent-fix-candidate/build/build_parentfix_kit.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/build/test_build_parentfix_kit.py': (14348, '6a42663902c9d4cce3422c953b2ec4602396cec36fca01c76f8cec6b2e1ebb7d', 'b-release-parent-fix-candidate/build/test_build_parentfix_kit.py'), 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/build/OVERLAY_INPUTS.json': (3928, 'e46daccb06e7b616e9f8d0bfd20dc085a4e84cbb2a25f555636fd5bcce1b8763', 'b-release-parent-fix-candidate/build/OVERLAY_INPUTS.json'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_prepare_data.py': (13888, '71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1', 'fixtures/r7-saved-preparation-candidate/epoch7_prepare_data.py'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_topology_projection.py': (36482, '0e9817a1474dc4e54cf1779c0b4c243cf16e6204cab3a25210a12e41e03d00b6', 'fixtures/r7-saved-preparation-candidate/epoch7_topology_projection.py'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/test_epoch7_prepare_data_r7.py': (15985, 'e76d894610a9391ea02f2d29ce6cc89189cc4dc184dfc7cf8c0bc0e41d22eeed', 'fixtures/r7-saved-preparation-candidate/test_epoch7_prepare_data_r7.py'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/test_epoch7_topology_projection.py': (35404, '38e96133f4d3134e409cc7124f10426ea85cc59d01dd1e2392fb977c8e87dbcb', 'fixtures/r7-saved-preparation-candidate/test_epoch7_topology_projection.py'), 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_prepare.py': (48550, 'b95c5bb675219b831f4d715ba5a5702537f4e36841316237d05f5a92a6c95a6e', 'b-release-parent-fix-candidate/baseline-preparation/epoch7_prepare.py')}
 DERIVED_TARGETS={'b-release-parent-fix-candidate/baseline-preparation/epoch7_prepare_data.py': 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_prepare_data.py', 'b-release-parent-fix-candidate/baseline-preparation/epoch7_topology_projection.py': 'evidence/p2-epoch7-access-repair-20261014/preparation-source-r7-fresh/epoch7_topology_projection.py'}
 PUBLIC_DIRECTORIES=('evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/tests', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/reference-tests', 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/build')
 
 REGISTRY_PATH='governance/features.json'
-REGISTRY_SIZE=3495
-REGISTRY_SHA='23d5a12e34f417be54e82b58c30b23dae69049e1b2d0883a0e3127b3d0815fbe'
 
 def need(value,label):
     if not value:raise ValueError(label)
@@ -135,12 +137,34 @@ def public_inventory(root):
     expected={path for path in SOURCE_TARGETS if any(path.startswith(prefix+'/') for prefix in PUBLIC_DIRECTORIES)}
     need(found==expected,'PUBLIC_SOURCE_ALLOWLIST')
 
+def registry_contract(raw):
+    # Registry additions are allowed; this gate authenticates its own registration
+    # in the exact current HEAD rather than pinning an unrelated historical file.
+    need(type(raw) is bytes and 0<len(raw)<=1048576,'REGISTRY_BOUND')
+    value=strict_json(raw)
+    need(type(value) is dict and type(value.get('schema_version')) is int and
+         value['schema_version']==1 and type(value.get('features')) is list and
+         0<len(value['features'])<=256,'REGISTRY_SCHEMA')
+    need(all(type(row) is dict for row in value['features']),'REGISTRY_FEATURE_SHAPE')
+    rows=[row for row in value['features'] if row.get('feature_id')==FEATURE_ID]
+    need(len(rows)==1 and rows[0].get('status')=='IN_DEVELOPMENT','REGISTRY_FEATURE_SCOPE')
+    acceptance=rows[0].get('acceptance')
+    need(type(acceptance) is dict and type(acceptance.get('tests')) is list,'REGISTRY_TESTS')
+    paths=acceptance['tests']
+    need(0<len(paths)<=1024 and all(type(path) is str and
+         re.fullmatch(r'tests/[A-Za-z0-9_./-]+\.py',path) and
+         all(part not in ('','.','..') for part in path.split('/')) for path in paths),
+         'REGISTRY_TEST_PATH')
+    need(len(paths)==len(set(paths)) and
+         all(paths.count(path)==1 for path in (GATE_PATH,CONTRACT_PATH)),
+         'REGISTRY_REQUIRED_TESTS')
+
 def checkout_records(root,head):
     paths=set(PINS)|{GATE_PATH,CONTRACT_PATH,WORKFLOW_PATH,REGISTRY_PATH,ARCHIVE_PATH}
     records={path:verified_path(root,head,path,ARCHIVE_SIZE if path==ARCHIVE_PATH else 1048576) for path in sorted(paths)}
     need(pathlib.Path(__file__).read_bytes()==records[GATE_PATH],'CHECKPOINT_NOT_EXACT_HEAD')
     need(len(records[WORKFLOW_PATH])==WORKFLOW_SIZE and digest(records[WORKFLOW_PATH])==WORKFLOW_SHA,'WORKFLOW_PIN')
-    need(len(records[REGISTRY_PATH])==REGISTRY_SIZE and digest(records[REGISTRY_PATH])==REGISTRY_SHA,'REGISTRY_PIN')
+    registry_contract(records[REGISTRY_PATH])
     return records
 
 def materialize(root,files):
@@ -303,6 +327,8 @@ def worker():
     root=pathlib.Path(__file__).resolve().parents[1]
     head=git(root,['rev-parse','--verify','HEAD']);public_inventory(root)
     tree=git(root,['rev-parse','--verify',head+'^{tree}'])
+    print('CI_SOURCE_IDENTITIES='+json.dumps({'current_checkout':{'commit':head,'tree':tree},
+        'compiler_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE}},sort_keys=True))
     records=checkout_records(root,head);files=fixtures(root,records)
     clean_import()
     with tempfile.TemporaryDirectory(prefix='p2-parentfix-public-') as folder:
@@ -314,7 +340,7 @@ def worker():
             print(raw.decode('utf-8','replace'));need(code==0,'PUBLIC_TEST_PROCESS_FAILED')
             terminal(raw,name,wanted)
             check_materialized(work,files)
-        build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)
+        build_exact_source(work,pathlib.Path(folder)/'artifact',COMPILER_SOURCE_COMMIT,COMPILER_SOURCE_TREE)
         check_materialized(work,files)
         public_inventory(root)
         need(git(root,['rev-parse','--verify','HEAD'])==head,'HEAD_CHANGED')
