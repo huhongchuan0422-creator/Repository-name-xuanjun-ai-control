@@ -80,7 +80,8 @@ class InstallTests(unittest.TestCase):
             self.calls.append("stop")
             self.pid, self.active = "0", "inactive"
         self.op = INSTALL.Operation(self.engine, self.root, self.source, self.summary,
-            inspect=inspect, restart=restart, health=health, negative=negative, stop=stop)
+            inspect=inspect, restart=restart, health=health, negative=negative, stop=stop,
+            offline_confirm=lambda: True)
 
     def test_install_exact_backup_source_fresh_pid_and_fixed_denial(self):
         receipt = self.op.install()
@@ -145,6 +146,14 @@ class InstallTests(unittest.TestCase):
             self.op.rollback_offline()
         self.assertEqual(self.source.read_bytes(), self.candidate)
         self.assertEqual(self.pid, "200")
+
+    def test_residual_backend_listener_blocks_restore_even_with_pid_zero(self):
+        self.op.install()
+        self.op.offline_confirm = lambda: False
+        with self.assertRaisesRegex(ValueError, "PORTAL_STOP_NOT_CONFIRMED"):
+            self.op.rollback_offline()
+        self.assertEqual(self.pid, "0")
+        self.assertEqual(self.source.read_bytes(), self.candidate)
 
     def test_tampered_backup_blocks_rollback_before_stop(self):
         self.op.install()

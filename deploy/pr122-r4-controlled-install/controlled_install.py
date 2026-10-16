@@ -7,6 +7,7 @@ Never reads OAuth state, credentials or a business database.
 import ast
 import base64
 import fcntl
+import errno
 import hashlib
 import http.client
 import json
@@ -77,6 +78,15 @@ def stop_backend():
         env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"})
 
 
+def backend_closed():
+    with socket.socket() as connection:
+        connection.settimeout(2)
+        try:
+            return connection.connect_ex(("127.0.0.1", 18080)) == errno.ECONNREFUSED
+        except OSError:
+            return False
+
+
 def running(state):
     return (state.get("ActiveState") == "active" and state.get("SubState") == "running"
         and state.get("User") == "admin" and state.get("WorkingDirectory") == "/opt/trading-system"
@@ -86,9 +96,10 @@ def running(state):
 class Operation:
     def __init__(self, engine, root=STATE, source=TARGET, summary=SUMMARY,
                  inspect=service_state, restart=None, health=None, negative=None,
-                 stop=stop_backend):
+                 stop=stop_backend, offline_confirm=backend_closed):
         self.engine, self.root, self.source, self.summary = engine, Path(root), Path(source), Path(summary)
         self.inspect, self.stop = inspect, stop
+        self.offline_confirm = offline_confirm
         self.health = health or (lambda: engine.verify_live(501))
         self.negative = negative or self.verify_disabled_http
         self.cap = engine.Capability(root=self.root, source=self.source,
@@ -218,7 +229,9 @@ class Operation:
         try:
             self.stop()
             stopped = self.inspect()
-            if stopped.get("MainPID") != "0" or stopped.get("ActiveState") not in ("inactive", "failed"):
+            if (stopped.get("MainPID") != "0"
+                    or stopped.get("ActiveState") not in ("inactive", "failed")
+                    or not self.offline_confirm()):
                 raise ValueError("PORTAL_STOP_NOT_CONFIRMED")
             self.current(self.engine.CANDIDATE_SHA256)
             self.engine.atomic_write(self.source, backup, info.st_uid, info.st_gid, 0o755)

@@ -105,7 +105,7 @@ jobs:
                   for path in paths:
                       data=Path(path).read_bytes();item=tarfile.TarInfo(path);item.size=len(data);item.mode=0o400;item.mtime=0
                       tar.addfile(item,io.BytesIO(data))
-          receipt={"status":"PASS_SYNTHETIC_INSTALL_MODEL_ONLY","commit":os.environ["GITHUB_SHA"],"tests":19,"fixture":"SYNTHETIC_TEMPORARY_ROOT_FILESYSTEM","source_scope_approval":"PR122#6205371670","installation_plan_approval":"PENDING","reused_engine_sha256":module.HELPER_SHA256,"approved_builder_sha256":module.GUARD_SHA256,"installer_sha256":plan["installer_sha256"],"tar_sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),"tar_size":archive.stat().st_size,"bound_files":len(binding["files"]),"archive_entries":len(paths),"production_root":False,"production_install":False,"production_post":False,"production_stop_restart":False,"dns_change":False}
+          receipt={"status":"PASS_SYNTHETIC_INSTALL_MODEL_ONLY","commit":os.environ["GITHUB_SHA"],"tests":20,"fixture":"SYNTHETIC_TEMPORARY_ROOT_FILESYSTEM","source_scope_approval":"PR122#6205371670","installation_plan_approval":"PENDING","reused_engine_sha256":module.HELPER_SHA256,"approved_builder_sha256":module.GUARD_SHA256,"installer_sha256":plan["installer_sha256"],"tar_sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),"tar_size":archive.stat().st_size,"bound_files":len(binding["files"]),"archive_entries":len(paths),"production_root":False,"production_install":False,"production_post":False,"production_stop_restart":False,"dns_change":False}
           (out/"CI_RECEIPT.json").write_text(json.dumps(receipt,indent=2,sort_keys=True)+"\n")
           print("PR122_R4_INSTALL_MODEL_RECEIPT="+json.dumps(receipt,sort_keys=True))
           PY
@@ -115,3 +115,4 @@ jobs:
           path: ${{ runner.temp }}/pr122-r4-install-review/
           if-no-files-found: error
           retention-days: 14
+

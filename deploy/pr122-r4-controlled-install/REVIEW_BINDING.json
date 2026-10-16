@@ -1,15 +1,15 @@
 {
   "files": {
-    ".github/workflows/v27-four-server-batch-readonly.yml": "72935d730d2b7078e710c278ee45779270f182f4c479caa27980a9dc1f5f94e4",
+    ".github/workflows/v27-four-server-batch-readonly.yml": "2c180525aa0543bebdfc8fac8fb5534169ef2cf1a32be0cf7bfe90b8aac7b4b2",
     "deploy/pr122-portal-log-capability/portal_log_capability.py": "0e61a4cab72a18e94ed8b97c81e035ee023dfe0969c871c50651cf75792cbcbe",
-    "deploy/pr122-r4-controlled-install/INSTALL_PLAN.json": "9085c260a276e0c0b3c5270dc0ff1b3eeb2338833c6087efcf4aae6a4655d8b4",
-    "deploy/pr122-r4-controlled-install/README.md": "317ef6a3bc281f4d81b14c0bf76d635299f6024476eb49632d175575ab7d4a63",
-    "deploy/pr122-r4-controlled-install/controlled_install.py": "2e10d3869b42cfa4a612dff5d6099321222651a583cfb2f82f85e13397753c96",
-    "docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md": "6bf5ed6a8d0e92aaebec336bd39bc104410481adbbae44d665e7bbf540a6cc19",
+    "deploy/pr122-r4-controlled-install/INSTALL_PLAN.json": "68605d9268afecf45cf6cca97a943ea0218ae90c06cfaf0f25bb9d9561b78398",
+    "deploy/pr122-r4-controlled-install/README.md": "e5950e8c8f90e56efc1816ac45b1430362f1eda6d137b31566e57a0f908de13f",
+    "deploy/pr122-r4-controlled-install/controlled_install.py": "883d89ef15e3c2ee6535100c71c18f69a6d39bbfce20a2a1aa9dd96f2ca94e45",
+    "docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md": "5a89fe0205777fb2d9108f287a1737bb476a16979d78bcbeb4d32cd25b545164",
     "governance/features.json": "f0247f5a086359e0b5278b600daf4944864c97553d0f03851c465e1ce29aa1ba",
     "scripts/pr122_legacy_disconnect_guard.py": "1afc01c6b19cb8bfc82c16eab257a06dd95b0420118dc6a0dc4726f25a0d6d93",
     "tests/test_legacy_disconnect_guard.py": "272fecfc1fbe0b3b2618c099fffc7e4697ad6e34fe229950c607b25a2492bfd9",
-    "tests/test_r4_controlled_install.py": "a939f0f65bd4db45691e1637054d3a376caed97041f05c4093a4eb11245c4190"
+    "tests/test_r4_controlled_install.py": "aabad0dcb0ee624c47bf3936c95549337236c48847c7220de306cffe110f35f6"
   },
   "install_plan_approval": "PENDING",
   "original_artifact_id": 12016977176,

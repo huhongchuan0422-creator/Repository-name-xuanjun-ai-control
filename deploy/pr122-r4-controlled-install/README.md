@@ -53,7 +53,7 @@ state remain unchanged.
 
 Never automatic and not a normal acceptance step. --rollback-offline requires
 the exact guarded current source, exact root0400 old backup and an unused rollback
-marker. Stop ONLY Portal, require MainPID0/inactive (or failed), THEN restore the
+marker. Stop ONLY Portal, require MainPID0/inactive (or failed) AND localhost18080 ECONNREFUSED, THEN restore the
 exact previous source. Keep Portal stopped; do not restart vulnerable old code.
 Receipt says ROLLED_BACK_BACKEND_STOPPED, not PASS. Static Nginx/VM stays up, but
 dynamic routes will be unavailable. This outage behavior requires the independent
@@ -63,7 +63,7 @@ If stop cannot be confirmed, do not restore; preserve current code and evidence.
 
 ## Tests and operations notice
 
-19 tests use a temporary filesystem, a synthetic source, injected service/network
+20 tests use a temporary filesystem, a synthetic source, injected service/network
 actions and the unchanged real transaction-engine code. Hosted root is only an
 ephemeral test identity; local namespaceUID fallback is test-only. No production
 root preflight, install, restart, POST, disconnect or rollback is executed by CI.
