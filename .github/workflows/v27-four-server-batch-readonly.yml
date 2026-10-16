@@ -527,7 +527,7 @@ jobs:
           retention-days: 14
 
   tokyo-fixed-source-writers:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.sha == '35b49881bb7ca8674c4a2dbb266b3eef859c4d5f'
     runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
     timeout-minutes: 3
     steps:

@@ -1,0 +1,434 @@
+{
+  "schema_version": 1,
+  "probe_commit": "35b49881bb7ca8674c4a2dbb266b3eef859c4d5f",
+  "run": 38846124307,
+  "job": 116796939783,
+  "job_status": "SUCCESS",
+  "raw_checkout_verified": true,
+  "synthetic_tests": 5,
+  "skipped": 0,
+  "receipt": {
+    "all_writer_custody_proven": false,
+    "delivery_commit": "35b49881bb7ca8674c4a2dbb266b3eef859c4d5f",
+    "files": [
+      {
+        "lexical_write_capable_calls": [
+          {
+            "call": "consume_state",
+            "line": 877,
+            "scope": "handle_douyin_oauth_callback"
+          },
+          {
+            "call": "store_secret",
+            "line": 928,
+            "scope": "handle_douyin_oauth_callback"
+          },
+          {
+            "call": "save",
+            "line": 942,
+            "scope": "handle_douyin_oauth_callback"
+          },
+          {
+            "call": "create_state",
+            "line": 1027,
+            "scope": "handle_tiktok_oauth_start"
+          },
+          {
+            "call": "consume_state",
+            "line": 1063,
+            "scope": "handle_tiktok_oauth_callback"
+          },
+          {
+            "call": "store_secret",
+            "line": 1114,
+            "scope": "handle_tiktok_oauth_callback"
+          },
+          {
+            "call": "save",
+            "line": 1130,
+            "scope": "handle_tiktok_oauth_callback"
+          },
+          {
+            "call": "save_account_binding",
+            "line": 1150,
+            "scope": "handle_tiktok_oauth_callback"
+          }
+        ],
+        "path": "scripts/secure_secrets_portal_server.py",
+        "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+        "status": "PUBLIC_SOURCE_BYTES_MATCH"
+      },
+      {
+        "lexical_write_capable_calls": [
+          {
+            "call": "replace",
+            "line": 513,
+            "scope": "utc_now"
+          },
+          {
+            "call": "replace",
+            "line": 532,
+            "scope": "_write_json_0600"
+          },
+          {
+            "call": "unlink",
+            "line": 536,
+            "scope": "_write_json_0600"
+          },
+          {
+            "call": "replace",
+            "line": 546,
+            "scope": "_write_text_0600"
+          },
+          {
+            "call": "unlink",
+            "line": 550,
+            "scope": "_write_text_0600"
+          },
+          {
+            "call": "_write_text_0600",
+            "line": 610,
+            "scope": "OperationsSecretRefStore.store_secret"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 623,
+            "scope": "OperationsSecretRefStore.store_secret"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 723,
+            "scope": "FileBackedSubmissionSessionRepository.save"
+          },
+          {
+            "call": "save",
+            "line": 804,
+            "scope": "SecureSecretsPortalService.create_session"
+          },
+          {
+            "call": "save",
+            "line": 890,
+            "scope": "SecureSecretsPortalService.submit_binance_credential"
+          },
+          {
+            "call": "store_secret",
+            "line": 900,
+            "scope": "SecureSecretsPortalService.submit_siliconflow"
+          },
+          {
+            "call": "save",
+            "line": 914,
+            "scope": "SecureSecretsPortalService.submit_siliconflow"
+          },
+          {
+            "call": "store_secret",
+            "line": 934,
+            "scope": "SecureSecretsPortalService.submit_wecom"
+          },
+          {
+            "call": "store_secret",
+            "line": 943,
+            "scope": "SecureSecretsPortalService.submit_wecom"
+          },
+          {
+            "call": "store_secret",
+            "line": 952,
+            "scope": "SecureSecretsPortalService.submit_wecom"
+          },
+          {
+            "call": "save",
+            "line": 964,
+            "scope": "SecureSecretsPortalService.submit_wecom"
+          },
+          {
+            "call": "store_secret",
+            "line": 1037,
+            "scope": "SecureSecretsPortalService.submit_wecom_customer_service"
+          },
+          {
+            "call": "save",
+            "line": 1054,
+            "scope": "SecureSecretsPortalService.submit_wecom_customer_service"
+          },
+          {
+            "call": "store_secret",
+            "line": 1125,
+            "scope": "SecureSecretsPortalService.submit_wecom_customer_contact"
+          },
+          {
+            "call": "save",
+            "line": 1143,
+            "scope": "SecureSecretsPortalService.submit_wecom_customer_contact"
+          },
+          {
+            "call": "store_secret",
+            "line": 1184,
+            "scope": "SecureSecretsPortalService.submit_wecom_novel"
+          },
+          {
+            "call": "save",
+            "line": 1201,
+            "scope": "SecureSecretsPortalService.submit_wecom_novel"
+          },
+          {
+            "call": "store_secret",
+            "line": 1244,
+            "scope": "SecureSecretsPortalService.submit_wecom_novel_callback"
+          },
+          {
+            "call": "save",
+            "line": 1261,
+            "scope": "SecureSecretsPortalService.submit_wecom_novel_callback"
+          },
+          {
+            "call": "store_secret",
+            "line": 1300,
+            "scope": "SecureSecretsPortalService.submit_wecom_novel_identity"
+          },
+          {
+            "call": "save",
+            "line": 1318,
+            "scope": "SecureSecretsPortalService.submit_wecom_novel_identity"
+          },
+          {
+            "call": "store_secret",
+            "line": 1342,
+            "scope": "SecureSecretsPortalService.submit_telegram"
+          },
+          {
+            "call": "save",
+            "line": 1360,
+            "scope": "SecureSecretsPortalService.submit_telegram"
+          },
+          {
+            "call": "store_secret",
+            "line": 1396,
+            "scope": "SecureSecretsPortalService._submit_feishu_customer_app_secret_for_session"
+          },
+          {
+            "call": "save",
+            "line": 1415,
+            "scope": "SecureSecretsPortalService._submit_feishu_customer_app_secret_for_session"
+          },
+          {
+            "call": "store_secret",
+            "line": 1441,
+            "scope": "SecureSecretsPortalService.submit_domestic_gateway_remote_auth"
+          },
+          {
+            "call": "save",
+            "line": 1460,
+            "scope": "SecureSecretsPortalService.submit_domestic_gateway_remote_auth"
+          },
+          {
+            "call": "store_secret",
+            "line": 1483,
+            "scope": "SecureSecretsPortalService.submit_douyin"
+          },
+          {
+            "call": "store_secret",
+            "line": 1498,
+            "scope": "SecureSecretsPortalService.submit_douyin"
+          },
+          {
+            "call": "save",
+            "line": 1516,
+            "scope": "SecureSecretsPortalService.submit_douyin"
+          },
+          {
+            "call": "store_secret",
+            "line": 1543,
+            "scope": "SecureSecretsPortalService.submit_tiktok"
+          },
+          {
+            "call": "store_secret",
+            "line": 1560,
+            "scope": "SecureSecretsPortalService.submit_tiktok"
+          },
+          {
+            "call": "save",
+            "line": 1580,
+            "scope": "SecureSecretsPortalService.submit_tiktok"
+          },
+          {
+            "call": "save",
+            "line": 1686,
+            "scope": "SecureSecretsPortalService._validate_submit_session"
+          }
+        ],
+        "path": "ai_service/secure_secrets_portal.py",
+        "sha256": "3804d540281c0e07480e5c95ef98f800b498fd09e2f14966d9d3737830157ba7",
+        "status": "PUBLIC_SOURCE_BYTES_MATCH"
+      },
+      {
+        "lexical_write_capable_calls": [
+          {
+            "call": "replace",
+            "line": 48,
+            "scope": "utc_now"
+          },
+          {
+            "call": "replace",
+            "line": 119,
+            "scope": "_write_json_0600"
+          },
+          {
+            "call": "unlink",
+            "line": 123,
+            "scope": "_write_json_0600"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 157,
+            "scope": "DouyinOAuthStateStore.create_state"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 178,
+            "scope": "DouyinOAuthStateStore.consume_state"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 276,
+            "scope": "DouyinTokenLifecycleStore.save"
+          }
+        ],
+        "path": "douyin/open_api_foundation.py",
+        "sha256": "cb9ca6f29796a1e280f88681cf84a3533a3529b955efab38975030582c9d8140",
+        "status": "PUBLIC_SOURCE_BYTES_MATCH"
+      },
+      {
+        "lexical_write_capable_calls": [
+          {
+            "call": "replace",
+            "line": 47,
+            "scope": "utc_now"
+          },
+          {
+            "call": "replace",
+            "line": 116,
+            "scope": "_write_json_0600"
+          },
+          {
+            "call": "unlink",
+            "line": 120,
+            "scope": "_write_json_0600"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 154,
+            "scope": "TikTokOAuthStateStore.create_state"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 175,
+            "scope": "TikTokOAuthStateStore.consume_state"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 264,
+            "scope": "TikTokTokenLifecycleStore.save"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 277,
+            "scope": "TikTokTokenLifecycleStore.save_account_binding"
+          },
+          {
+            "call": "_write_json_0600",
+            "line": 298,
+            "scope": "TikTokTokenLifecycleStore.disconnect"
+          }
+        ],
+        "path": "tiktok/open_api_foundation.py",
+        "sha256": "cce9f45ccdfe681e88117814227a714aa17e49e22881c1d922eb3ccd191c2afe",
+        "status": "PUBLIC_SOURCE_BYTES_MATCH"
+      },
+      {
+        "lexical_write_capable_calls": [
+          {
+            "call": "replace",
+            "line": 82,
+            "scope": "utc_now"
+          },
+          {
+            "call": "replace",
+            "line": 108,
+            "scope": "_redact"
+          },
+          {
+            "call": "write_text",
+            "line": 290,
+            "scope": "DomesticSyntheticCore._save_state"
+          },
+          {
+            "call": "replace",
+            "line": 292,
+            "scope": "DomesticSyntheticCore._save_state"
+          },
+          {
+            "call": "replace",
+            "line": 746,
+            "scope": "ProviderNeutralBridgeServer._handle_model_rpc"
+          }
+        ],
+        "path": "ai_service/internal_provider_neutral_bridge.py",
+        "sha256": "9a7703b0ecac1dbd614668ffa1aa88e265989513a3babb05333b3fd2226daff1",
+        "status": "PUBLIC_SOURCE_BYTES_MATCH"
+      }
+    ],
+    "host": "iZ6wee8q9z4t03hvqumwfhZ",
+    "http_requests": 0,
+    "lexical_catalogue_only": true,
+    "limitations": [
+      "Five fixed source files only; no whole-host/repository writer census",
+      "Lexical calls do not prove reachability, authentication, scheduling or exclusive custody",
+      "Source match does not authorize stopping any writer or transmitting private values"
+    ],
+    "observed_epoch": 1792121627,
+    "private_state_reads": 0,
+    "production_changes": 0,
+    "production_module_imports": 0,
+    "schema_version": 1,
+    "status": "FIXED_SOURCE_SCOPE_MATCH",
+    "uid": 1001,
+    "unknown_external_writers": true
+  },
+  "source_archive_context": {
+    "sha256": "10b9c11fb8a6e07d9edab449faf9c72f6bb36e65ced79d7d65fbf1b69c28bd23",
+    "python_files": 77,
+    "old_entry_sha256": "528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006",
+    "not_current_entry": true
+  },
+  "pr99_handoff": {
+    "comment": 6207421398,
+    "readback_confirmed": true,
+    "approval": false,
+    "real_install": "NOT_RUN"
+  },
+  "analysis": {
+    "production_entry_hash_matches_accepted_R4": true,
+    "entry_disconnect_call_observed": false,
+    "entry_calls": [
+      "handle_douyin_oauth_callback.consume_state/store_secret/save",
+      "handle_tiktok_oauth_start.create_state",
+      "handle_tiktok_oauth_callback.consume_state/store_secret/save/save_account_binding"
+    ],
+    "shared_session_repository_supports_multiple_business_forms": true,
+    "lexical_catalogue_not_actual_reachable_callgraph": true,
+    "replace_calls_include_non_filesystem_string_datetime_operations": true,
+    "external_writers_not_enumerated": true,
+    "bridge_contract_forbids_secretref_transport": true,
+    "private_transport_still_not_implemented_or_admitted": true,
+    "whole_portal_stop_outage_scope_not_granted_by_this_probe": true
+  },
+  "unchanged_boundaries": {
+    "website_content": "UNCHANGED",
+    "current": "UNCHANGED",
+    "dns": "UNCHANGED",
+    "bridge_tunnel": "UNCHANGED",
+    "tokyo_service_stop": false,
+    "finance_or_pr99_server_operations": false,
+    "tokyo_retirement": "HOLD"
+  }
+}

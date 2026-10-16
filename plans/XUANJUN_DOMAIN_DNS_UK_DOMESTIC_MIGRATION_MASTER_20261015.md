@@ -698,3 +698,14 @@ PR99下一Phase-B输入沿原632bbe6f：已下载17声明文件逐字节匹配�
 PR122继续补S05 writer custody的前置边界，新增source_inventory.py：仅东京非root、五个固定公开Python源码路径、有界非链接/身份/读前后检查；仅SHA等于已批准R4入口或Owner已交77源文件归档中的准确模块后作AST词法清单，绝不执行/import生产模块、不输出字面量/源码/原始异常、不读runtime/env/凭据/DB、不HTTP/操作服务。新5项合成测试本地PASS；原队列只跑新5项及一次现场源码清单，旧57/韩国打包/旧现场均锁定原提交不重跑。真实读取结果以原日志为准，不预写PASS。
 
 源代码包PR122_PORTAL_SOURCE_REVIEW.tar.gz实际SHA10b9c11fb8a6e07d9edab449faf9c72f6bb36e65ced79d7d65fbf1b69c28bd23/77Python文件；其旧entry528a不冒充现行57e38，collector按正式R4新entry57e38绑定。静态分析确认旧Portal会话保存与多个运营提交共享同一文件存储，Douyin/TikTok callback均有state消费、SecretRef和lifecycle写入；现有bridge契约禁止携带SecretRef，不能用其作凭据搬迁通道。仅五文件词法清单不证明全仓/全主机所有writer、不证明路由可达或鉴权，all_writer_custody_proven=false始终保持。精确私有传输和root执行尚未实现/准入，不将本批说成已搬数据或可停东京。
+
+
+### 9.39 2026-10-16：东京五份实际源码与写入词法清单采集完成
+
+准确35b49881bb7ca8674c4a2dbb266b3eef859c4d5f，原v27队列Run38846124307/东京Job116796939783 SUCCESS；原始日志确认准确checkout、新5/5合成测试及PR122_SOURCE_WRITER_RECEIPT。真实host东京/uid1001，五份公开源码SHA均匹配：Portal入口57e38、公共Portal3804d540、Douyin基础cb9ca6f2、TikTok基础cce9f45c、bridge9a7703b0。仅静态AST，不执行/import生产模块，不读私有状态/env/凭据/DB，不发HTTP，不操作服务；其他旧57/韩国打包/现场全部SKIPPED。
+
+实际入口保留Douyin callback consume_state/store_secret/lifecycle.save、TikTok start create_state和callback consume_state/store_secret/lifecycle/account_binding写入；入口中未再观察disconnect调用，符合正式R4遏制。公共Portal仍共享session repository并承载多类业务，不能把整个Portal当独立OAuth服务直接搬走或擅停。列表为词法过近似，replace也可为datetime/string操作；不能将每条都视为已证实文件写、外部可达或安全缺陷，亦不能据此声明全主机没有其它writer。既有bridge契约禁传SecretRef，不能改用其搬私有值。
+
+S05的生产前置现收敛为：准确选定会话/账户及范围、全部相关writer/在途和旧多业务Portal的维护影响、受保护专用传输、root精确准入和目标安装/激活、未迁非OAuth/渠道后继。以上仍未完成/准入，本次证据不授权Portal停止、数据导出或迁移。韩国Phase-B仍等PR99#6207421398链正式制品/执行范围裁定，暂无安装批准；不重复催审/R2测试，不要Owner重复收集资料。东京保持运行。
+
+完整原始结构化结果及边界evidence/pr122-r4-controlled-install/SOURCE_WRITER_BOUNDARY_20261016.json。采集job固定本次准确提交；后续不再读取现场，下一新增探针必须针对剩余具体缺口，不重复已过源码和静态站点。
