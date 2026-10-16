@@ -14,8 +14,6 @@ class TestIntakePages(unittest.TestCase):
   for x in ('id="items"','id="detail"','id="save"','id="submit"','id="correct"','role="status"'):
    self.assertIn(x,html)
   self.assertIn('未接入客户真实登录',html)
-if __name__=='__main__':unittest.main()
-
  def test_review_actions_explicitly_forbidden_in_customer_demo(self):
   js=(ROOT/'demos/customer-intake/project-intake.js').read_text(encoding='utf-8')
   self.assertIn('kind!=="save"&&kind!=="submit"',js)
