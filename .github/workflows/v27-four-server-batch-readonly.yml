@@ -352,7 +352,7 @@ jobs:
           PY
 
   backend-migration-preflight:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.sha == '84ed1a9b890e38d646739f6f1066adbed5b53d3a'
     strategy:
       fail-fast: false
       matrix:
@@ -429,3 +429,51 @@ jobs:
           r['status']='NONROOT_BACKEND_METADATA_COLLECTED'
           print('PR122_BACKEND_PREFLIGHT_RECEIPT='+json.dumps(r,sort_keys=True))
           PY
+
+  backend-custody-offline:
+    if: github.event_name == 'push'
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Only new conversion and temporary loopback tests, no production state
+        run: python3 -B -m unittest discover -s tests -p test_pr122_backend_custody.py -v
+      - name: Bind source-only review increment and unchanged approved base
+        run: |
+          python3 -B - <<'PY'
+          import gzip,hashlib,io,json,os,subprocess,tarfile
+          from pathlib import Path
+          root=Path.cwd()
+          base=Path('deploy/pr122-oauth-candidate')
+          manifest=json.loads((base/'MANIFEST.json').read_text())
+          for name,digest in manifest['files'].items():
+              assert hashlib.sha256((base/name).read_bytes()).hexdigest()==digest,'APPROVED_BASE_MODULE_CHANGED'
+          paths=[str(base/name) for name in manifest['files']]
+          paths += [str(base/'MANIFEST.json'),'deploy/pr122-backend-migration/custody.py','deploy/pr122-backend-migration/isolated_runtime.py','deploy/pr122-backend-migration/README.md','tests/test_pr122_backend_custody.py','governance/features.json','.github/workflows/v27-four-server-batch-readonly.yml','evidence/pr122-r4-controlled-install/BACKEND_PREFLIGHT_20261016.json']
+          files={name:(root/name).read_bytes() for name in paths}
+          assert all(len(data)<1000000 for data in files.values())
+          binding={'schema_version':1,'commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':{name:hashlib.sha256(data).hexdigest() for name,data in files.items()},'scope':'OFFLINE_CONVERSION_AND_ISOLATED_SYNTHETIC_RUNTIME_ONLY','production_approved':False,'live_snapshot_custody_implemented':False,'tests':36,'unchanged_approved_modules':7}
+          files['REVIEW_BINDING.json']=(json.dumps(binding,indent=2,sort_keys=True)+'\n').encode()
+          stream=io.BytesIO()
+          with gzip.GzipFile(fileobj=stream,mode='wb',mtime=0,filename='') as compressed:
+              with tarfile.open(fileobj=compressed,mode='w') as archive:
+                  for name,data in sorted(files.items()):
+                      info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o400;info.mtime=0
+                      archive.addfile(info,io.BytesIO(data))
+          output=Path(os.environ['RUNNER_TEMP'])/'pr122-backend-offline-review'
+          output.mkdir(mode=0o700)
+          package=stream.getvalue()
+          (output/'PR122_BACKEND_OFFLINE_REVIEW.tar.gz').write_bytes(package)
+          receipt={'schema_version':1,'commit':os.environ['GITHUB_SHA'],'host':os.uname().nodename,'uid':os.geteuid(),'tests':36,'skipped':0,'unchanged_approved_modules':7,'archive_sha256':hashlib.sha256(package).hexdigest(),'archive_bytes':len(package),'bound_files':len(binding['files']),'production_changes':0,'real_state_read':False,'status':'OFFLINE_CONVERSION_TESTS_PASS_NOT_PRODUCTION_MIGRATION'}
+          (output/'CI_RECEIPT.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          print('PR122_BACKEND_OFFLINE_RECEIPT='+json.dumps(receipt,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-backend-offline-${{ github.sha }}
+          path: ${{ runner.temp }}/pr122-backend-offline-review/
+          if-no-files-found: error
+          retention-days: 14

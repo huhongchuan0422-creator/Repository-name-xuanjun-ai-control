@@ -132,7 +132,8 @@
           "Legacy Portal log-message exact-byte correction and persistent fixed-action root adapter preserve original source, backup and one-shot rollback; isolated tests do not imply production installation or DNS release",
           "R4 temporary containment candidate disables HTTP disconnect before store/body/audit business state access for every caller; full authenticated disconnect remains NOT_IMPLEMENTED and migration scope acceptance requires independent decision",
           "R4 controlled-install preparation reuses exact root engine and approved guard; fixed one-shot action, source/new-PID gates, proposed empty403 acceptance and explicit backend-offline rollback require independent plan approval; synthetic root filesystem tests are not production acceptance",
-          "I1: exact independently received action approval must be separately pinned by Owner root; canonical GitHub commit/tree/code/ZIP facts plus one-attempt durable consumption and distinct outage-consented offline rollback fail closed before state or service mutation; shared GitHub author is not reviewer independence"
+          "I1: exact independently received action approval must be separately pinned by Owner root; canonical GitHub commit/tree/code/ZIP facts plus one-attempt durable consumption and distinct outage-consented offline rollback fail closed before state or service mutation; shared GitHub author is not reviewer independence",
+          "后台迁移增量仅验证私有离线generation转换、会话/一次性state保持、精确账号锚点拒绝、进程竞争/中断保留及loopback隔离；真实快照托管/传输/身份验证适配与生产迁移未实现，不以36项synthetic测试冒充安装许可"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
@@ -143,7 +144,8 @@
           "tests/test_portal_log_capability.py",
           "tests/test_legacy_disconnect_guard.py",
           "tests/test_r4_controlled_install.py",
-          "tests/test_r4_install_approval.py"
+          "tests/test_r4_install_approval.py",
+          "tests/test_pr122_backend_custody.py"
         ]
       },
       "reuse": [
@@ -172,7 +174,9 @@
         "deploy/pr122-r4-disconnect-containment/**",
         "deploy/pr122-r4-controlled-install/**",
         "tests/test_r4_controlled_install.py",
-          "tests/test_r4_install_approval.py"
+        "tests/test_r4_install_approval.py",
+        "deploy/pr122-backend-migration/**",
+        "tests/test_pr122_backend_custody.py"
       ]
     },
     {
@@ -285,4 +289,3 @@
     }
   ]
 }
-

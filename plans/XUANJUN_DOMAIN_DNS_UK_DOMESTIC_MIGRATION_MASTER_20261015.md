@@ -627,3 +627,16 @@ S01/S02继续沿原共享依赖账本整理现有实际消费者/目标与阻塞
 两机命名范围没有观察到fail2ban/crowdsec/modsecurity等列举工具的unit或固定目录，但不能扩成全机没有封禁。两机aliyun.service为active/running且存在AliYunDun/Monitor/Update进程；aegis.service虽inactive/PID0，不能据此称安全代理停止。两机auditd/rsyslog均active。此为存在性事实，不是新增源码缺陷，也不说明这些代理实际按IP封禁；对应云策略、rsyslog/远端消费规则尚未读到。缺口从笼统外围UNKNOWN收敛到已命名服务和适用策略，非root元数据不能签该策略的放行。
 
 集中证据evidence/pr122-r4-controlled-install/IP_PERIPHERAL_METADATA_AND_REMAINING_GATE_20261016.json。继续复用83源/Nginx链路；请原独审只判定本次限定范围和明确所需的具体策略证据，不重开网站/HTTPS/R4/OAuth/旧制品。Owner对Tokyo peer/header审计差异的接受仍未给出，开发方不代签；更不能用审计接受替代未知安全规则验收。当前不操作DNS、不修改代理头或信任配置、不停安全代理、不重启任何后台。
+
+
+### 9.32 2026-10-16：按Owner加速服务器迁移，完成现场最小预检与状态转换增量
+
+Owner明确要求现在推进服务器迁移。沿PR122/S01—S12继续，不重开已完成网站/DNS，也不绕过PR99。准确非root预检84ed1a9b890e38d646739f6f1066adbed5b53d3a，Run38841122656：东京Job116781192331、国内Job116781192005均SUCCESS，已读取PR122_BACKEND_PREFLIGHT_RECEIPT。两机Python3.11.6；国内约14GB空闲、目标候选18880未观察到监听；既有18443/18080/19443/18761/18770/18780/18781及所列服务状态见BACKEND_PREFLIGHT_20261016.json。仅读元数据，不碰Finance/DB/凭据内容/配置/实际状态数据，不能把目录PermissionDenied写成空。
+
+实际权限缺口已明确：东京Portal状态目录admin0700，非rootRunner1001无权枚举；国内openclaw_ops根链亦不可读。长期Owner授权有效，但已安装固定root入口只支持已消费的日志修复动作，并非通用迁移读写/安装通道。不得借其运行任意root脚本或搬用密钥；真实受保护快照、托管传输和精确账号身份验证仍无已实现并准入的适配。
+
+新增deploy/pr122-backend-migration/custody.py及isolated_runtime.py：复用七模块已审OAuth原字节，纯私有内存格式转新离线SQLite generation；保留会话身份/CSRF/次数/幂等/used_forms与一次性OAuth状态，拒绝交易/混合会话和不完整凭据。活跃旧Token需精确私有账号锚点+显式身份验证适配，不能用masked ID冒充。新generation不覆盖、不激活current；中断/部分提交保留、无盲重试。loopback运行默认禁用provider并继承R4固定403。**本轮只实现转换与隔离运行，真实reader/transport/identity adapter/root installer均未实现；不是可生产安装包，不将S05/S06写完成。**
+
+新增本地36/36测试PASS，包含真实临时SQLite/进程竞争/os._exit与loopback合成HTTP，无生产数据或Provider请求；旧OAuth45/静态115/83/R4不重跑。国内Runner将只运行这36项及准确源制品绑定；真实CI以原始日志为准，当前不预写PASS。预检job固定本次提交，后续不重复采集。PR99仍准确632bbe6f，R2复审#6182995760待判；不能在本线复制trading.db或停Finance。
+
+此为开发断点，不逐点请求生产批准。待受保护交接/执行通道及其实际范围完整可审后统一送审；东京后台/隧道/客服保留。网站入口已迁国内，完整后台迁移未执行完成、东京退役HOLD。
