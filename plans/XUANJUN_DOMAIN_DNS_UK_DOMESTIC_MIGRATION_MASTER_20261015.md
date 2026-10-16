@@ -618,3 +618,12 @@ Owner通过自己的Cloudflare管理面报告已保存；编辑截图显示完�
 当前仅补两机可见的来源IP外围依赖：同一v27队列、非root、固定systemctl列表/只读show元数据、ps仅comm和固定安全工具目录lstat；不读取ExecStart/Environment、服务配置内容、原始日志、凭据、DB、firewall或云策略，不HTTP/POST、不服务操作。仅以命名范围给出可见安全/日志代理存在性与状态；未知自定义/远端消费方和云策略不能推断不存在。原83本地源码及Nginx/Portal IP路径证据不重做。若发现明确服务依赖则集中列最小核验；无论结果如何，Owner尚未接受的审计差异不由开发方代签。
 
 S01/S02继续沿原共享依赖账本整理现有实际消费者/目标与阻塞，PR99/Finance/英国P2/隧道/WeCom实际迁移本轮不操作。S05保护状态兼容与托管仍NOT_IMPLEMENTED/NOT_RUN，已审SQLite候选不是旧Portal的即插即用替代，不能为“迁完服务器”直接复制启动。东京18080、Telegram、Finance及隧道继续在线，退役HOLD。
+
+
+### 9.31 2026-10-16 10:26 CST：外围IP元数据补证完成，剩余策略缺口具体化
+
+准确探针de30ac366cd907e6b8337c4c7eba74d146254e8d；原v27队列Run38840397178，东京Job116778914578、国内Job116778914372均SUCCESS，已读原始PR122_IP_PERIPHERAL_RECEIPT。仅非root systemctl元数据、ps comm和9个固定路径lstat，配置/原始日志/凭据/业务数据/HTTP/POST/root/生产写入全部0；旧R4、DNS观察、四机dispatch全部SKIPPED。本次探针限定本次精确提交，后续不重复。
+
+两机命名范围没有观察到fail2ban/crowdsec/modsecurity等列举工具的unit或固定目录，但不能扩成全机没有封禁。两机aliyun.service为active/running且存在AliYunDun/Monitor/Update进程；aegis.service虽inactive/PID0，不能据此称安全代理停止。两机auditd/rsyslog均active。此为存在性事实，不是新增源码缺陷，也不说明这些代理实际按IP封禁；对应云策略、rsyslog/远端消费规则尚未读到。缺口从笼统外围UNKNOWN收敛到已命名服务和适用策略，非root元数据不能签该策略的放行。
+
+集中证据evidence/pr122-r4-controlled-install/IP_PERIPHERAL_METADATA_AND_REMAINING_GATE_20261016.json。继续复用83源/Nginx链路；请原独审只判定本次限定范围和明确所需的具体策略证据，不重开网站/HTTPS/R4/OAuth/旧制品。Owner对Tokyo peer/header审计差异的接受仍未给出，开发方不代签；更不能用审计接受替代未知安全规则验收。当前不操作DNS、不修改代理头或信任配置、不停安全代理、不重启任何后台。

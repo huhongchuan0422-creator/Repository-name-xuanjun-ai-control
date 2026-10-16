@@ -268,7 +268,7 @@ jobs:
           PY
 
   ip-peripheral-metadata:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.sha == 'de30ac366cd907e6b8337c4c7eba74d146254e8d'
     strategy:
       fail-fast: false
       matrix:
