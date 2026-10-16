@@ -98,7 +98,7 @@
       "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
       "independent_byte_review_comment_id": 6213125007
     },
-    "next_development": "API and live Shadow are deferred by explicit Owner scope. Reuse existing encrypted baseline; preserve fixed channels. Prepare one Owner-root private ciphertext pull using existing SSH trust, no new keys/grants/software, no decryption or service action. Actual transfer is NOT_RUN; existing inspect/install does not imply arbitrary remote root access.",
+    "next_development": "Owner explicitly defers API and live Shadow. Existing fixed channels retained. Owner-root ciphertext transfer Tokyo to Korea is IN_PROGRESS; wait for full size/hash before claiming offsite baseline success. Explicit prefix-verified resume prepared for original 900-second timeout; never run alongside an active writer.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NO_API_ACTION; PRIVATE_TRANSFER_ROUTE_REQUIRED_FOR_ACTUAL_OFFLINE_COPY",
+  "owner_action_now": "KEEP_CURRENT_TRANSFER_RUNNING; USE_EXPLICIT_PREFIX_VERIFIED_RESUME_ONLY_AFTER_CURRENT_WRITER_EXITS_IF_NEEDED",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -322,20 +322,24 @@
     "sha256": "ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093",
     "scope": "HISTORICAL_OWNER_ROOT_ENCRYPTED_BASELINE_NOT_CURRENT_FINAL_SNAPSHOT",
     "code_and_db_restore": "HISTORICALLY_REPORTED_PRIVATE_PASS_NOT_REPLAYED",
-    "offhost_tokyo_baseline_copy_on_korea": "NOT_PROVEN",
+    "offhost_tokyo_baseline_copy_on_korea": "IN_PROGRESS_OWNER_TERMINAL_NOT_COMPLETED",
     "contains_broader_original_scope": true,
     "wholesale_restore_allowed": false,
     "reencryption_or_rebackup_performed": false
   },
   "offline_relocation_blocker": {
-    "kind": "SSH_HOST_TRUST_PENDING_SCOPED_PIN; AUTHENTICATION_NOT_YET_TESTED",
-    "detail": "Current Runner root capability cannot access the root-private baseline or run ssh as admin/root. One bounded Owner-root ciphertext pull can use existing SSH authentication/trust, if already available; stop if that route is unavailable. No new key/trust/grant may be created implicitly.",
+    "kind": "TRANSFER_IN_PROGRESS_NOT_AN_API_OR_AUTHENTICATION_BLOCKER",
+    "detail": "Tokyo root password authentication succeeded in Owner terminal. Initial copy uses timeout 900 seconds, shorter than observed throughput requires. Continuation preserves partial bytes and verifies source prefix; no automatic retry or decryption.",
     "api_is_blocker": false,
     "last_owner_attempt": {
-      "result": "STOP_BEFORE_TARGET_CREATION",
-      "error": "NO_ECDSA_HOST_KEY_KNOWN_STRICT_CHECKING",
-      "copied_bytes": 0,
-      "target_directory_created_by_attempt": false
+      "result": "CIPHERTEXT_TRANSFER_STARTED",
+      "evidence_origin": "OWNER_TERMINAL_TRANSCRIPT_NOT_DIRECT_HOST_SAMPLING",
+      "observed_copied_bytes": 6553600,
+      "observed_elapsed_seconds": 18,
+      "observed_bytes_per_second": 364000,
+      "source_sha256": "ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093",
+      "original_transfer_timeout_seconds": 900,
+      "transfer_complete": false
     },
     "verified_tokyo_public_host_identity": {
       "run": 38888460739,
@@ -343,8 +347,8 @@
       "delivery_commit": "3ac74d53280722a505b617aa690439fa0ec95ff3",
       "ecdsa_fingerprint": "SHA256:hxqnfjlczczDNLsJlY+x9OrBF5guN+x62gJF2RHIw7w",
       "scope": "ROOT_OWNED_PUBLIC_KEY_BYTES_ONLY_NO_PRIVATE_KEYS",
-      "temporary_known_hosts_command": "PREPARED_NOT_EXECUTED",
-      "authentication": "NOT_TESTED"
+      "temporary_known_hosts_command": "OWNER_EXECUTED_PINNED_HOST_CHECK_SUCCEEDED",
+      "authentication": "TOKYO_ROOT_PASSWORD_AUTHENTICATION_SUCCEEDED_IN_OWNER_TERMINAL"
     }
   }
 }
