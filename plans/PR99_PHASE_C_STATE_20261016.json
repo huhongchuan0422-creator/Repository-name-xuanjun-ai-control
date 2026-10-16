@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "FORWARD_EXISTING_RESTART_REQUEST_6218181967_WITH_NEW_ROOT_LOGIN_PROOF; WAIT_EXACT_REPLACEMENT_PERMISSION_NO_CODE_REAUDIT",
+  "owner_action_now": "RUN_EXACT_APPROVED_RESTART_LAUNCHER_ON_KOREA_ONCE_TWO_TERMINAL_PASSWORD_PHASES",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -726,7 +726,7 @@
       "replacement_permission_request": {
         "comment_id": 6218181967,
         "read_back": true,
-        "status": "PENDING_NEW_OWNER_ROOT_LOGIN_AND_SOURCE_ABSENCE_EVIDENCE_SUPPLIED",
+        "status": "APPROVED_WITH_EXACT_PRECONDITIONS_6218349901",
         "scope": "SAME_FROZEN_VERSION_EXACT_FAILED_AUTH_HANDOFF_NEW_ONCE_PERMISSION"
       },
       "login_preflight": {
@@ -756,6 +756,23 @@
           "Preserve old local stage by exact authorized new name, no overwrite/delete",
           "Execute original frozen script under new single-use approval once"
         ]
+      },
+      "replacement_approval": {
+        "comment_id": 6218349901,
+        "body_sha256": "37c365385bada2ecfd8c0d2bc6f5eec8591b2c59ec5d09dde8917f9bd31b54bf",
+        "issued_at": 1792162996,
+        "expires_at": 1792184596,
+        "max_attempts": 1,
+        "scope": "EXACT_FAILED_LOCAL_STAGE_ATOMIC_PRESERVATION_THEN_ORIGINAL_SCRIPT_ONE_RUN",
+        "status": "ISSUED_NOT_EXECUTED"
+      },
+      "restart_launcher": {
+        "path": "evidence/pr99-service-handoff/s06-candidate/restart-6218349901.py",
+        "sha256": "3675969fd831e8dec0afa3f30db5cf5953fa35ca48dea9832e56c73b0e0bf6c3",
+        "original_capture_script_changed": false,
+        "old_tests": "INHERITED_NOT_RERUN",
+        "local_launcher_checks": "SOURCE_HASH_OLD_FAILURE_SHA_PROGRESS_REJECTION_EXCLUSIVE_NOREPLACE_RENAME_PRESERVED_INODE_BYTES_REPLAY_REFUSAL; SYNTHETIC_LOCAL_ONLY",
+        "production_executed": false
       }
     }
   },
