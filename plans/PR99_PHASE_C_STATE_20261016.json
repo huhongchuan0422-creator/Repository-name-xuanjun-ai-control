@@ -567,5 +567,28 @@
       "exact_candidate": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
       "evidence_commit": "9fbd573852eea301268575c750cda1f2f904321d"
     }
+  },
+  "service_handoff": {
+    "status": "THREE_HOST_NONROOT_DEPENDENCIES_COLLECTED_NOT_CUTOVER",
+    "run": 38904470291,
+    "source_commit": "e4dfdf03a246fd911a226d911970854d2606328e",
+    "jobs": {
+      "domestic": 116984492029,
+      "tokyo": 116984492318,
+      "korea": 116984492559
+    },
+    "evidence": "evidence/pr99-offline-copy/THREE_HOST_CHANNEL_DEPENDENCIES_20261016.json",
+    "plan": "plans/PR99_SERVICE_HANDOFF_EXECUTION_LEDGER_20261016.md",
+    "production_actions": 0,
+    "current_point_permission": "PENDING_6215860038",
+    "domestic_same_named_portal_and_wecom_units": "NOT_FOUND_AT_SAMPLE",
+    "tokyo_finance_timers": "4_ACTIVE_NOT_CHANGED",
+    "unresolved": [
+      "provider-neutral-tunnel exact unit vs similarly named Tokyo tunnel",
+      "Korea443 listener owner, nginx unit not-found",
+      "private current channel configs, root/admin cron, user services and containers",
+      "actual service installation and upstream cutover",
+      "current offline point permission and execution"
+    ]
   }
 }
