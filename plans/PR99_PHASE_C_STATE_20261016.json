@@ -10,7 +10,7 @@
     "review_artifact": "INDEPENDENT_BYTES_PASS_SOURCE_PASS_WITH_SCOPE_LIMITS",
     "root_preflight": "NOT_EXECUTED",
     "started_service_confinement": "NOT_EXERCISED",
-    "live_get": "NOT_AUTHORIZED_NOT_RUN",
+    "live_get": "DEFERRED_BY_OWNER_NOT_RUN",
     "required_streams": [
       "systemd239-compatible enforced egress",
       "readonly credential custody",
@@ -49,7 +49,7 @@
     },
     "execution_controller": "STOPPED_INSTALL_FENCE_PREFLIGHT_LIVE_SUPERVISOR_AND_STOP_GUARD_IMPLEMENTED_NOT_APPROVED_NOT_RUN",
     "independent_network_verifier": "NEW_SEPARATE_GET_BROKER_RSA_SIGNATURE_ADAPTER",
-    "production_bindings": "ACTUAL_READONLY_SECRETREF_ACCOUNT_PERMISSION_TRANSPORT_IDENTITIES_SOURCE_DB_SCHEMA_AND_WINDOW_UNBOUND",
+    "production_bindings": "DEFERRED_FOR_OFFLINE_RELOCATION_NOT_WAIVED_FOR_FUTURE_ACTIVATION",
     "root_install_controller": {
       "implemented": true,
       "production_approved": false,
@@ -98,7 +98,7 @@
       "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
       "independent_byte_review_comment_id": 6213125007
     },
-    "next_development": "Consume the one installed fixed inspect receipt; bind missing actual private identities, source and transport inputs; prepare exact stopped C install admission without re-running passed B/C tests.",
+    "next_development": "API and live Shadow are deferred by explicit Owner scope. Reuse existing encrypted baseline; preserve fixed channels. Prepare one Owner-root private ciphertext pull using existing SSH trust, no new keys/grants/software, no decryption or service action. Actual transfer is NOT_RUN; existing inspect/install does not imply arbitrary remote root access.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -273,15 +273,63 @@
         "other_hosts": "SKIPPED",
         "repeated": false
       }
+    },
+    "binding_preflight": {
+      "run": 38886874470,
+      "korea_job": 116926645339,
+      "tokyo_job": 116926645389,
+      "receipt_file": "evidence/pr99-phase-c/BINDING_METADATA_20261016.json",
+      "worker_uid_gid_1986": "UNALLOCATED_AT_SAMPLE_NOT_CREATED",
+      "binance_dns": "RESOLVED_NO_HTTP_NOT_API_ACCEPTANCE",
+      "database_opened": false,
+      "credentials_read": false
     }
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NO_REINSTALL; PREPARE_ACTUAL_PRIVATE_BINDINGS_AND_EXACT_PHASE_C_INSTALL_APPROVAL",
+  "owner_action_now": "NO_API_ACTION; PRIVATE_TRANSFER_ROUTE_REQUIRED_FOR_ACTUAL_OFFLINE_COPY",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
     "website Work current DNS",
     "Tokyo production and all shared services"
-  ]
+  ],
+  "owner_scope_update": {
+    "local_date": "2026-10-16",
+    "decision": "MINIMUM_OFFLINE_SERVER_RELOCATION_API_DEFERRED_KEEP_EXISTING_CHANNELS",
+    "origin": "OWNER_EXPLICIT_CURRENT_CONVERSATION",
+    "existing_api": "DO_NOT_INSPECT_DECRYPT_RECONFIGURE_PROVISION_OR_USE; EXISTING_ENCRYPTED_BASELINE_MAY_BE_PRESERVED_AS_CIPHERTEXT_ONLY",
+    "api_recreation": "LATER_OWNER_TASK",
+    "preserve": [
+      "Existing fixed root execution channel",
+      "Existing bridge and tunnel settings and connectivity",
+      "Passed Phase-B install and Phase-C artifacts"
+    ],
+    "do_not_add": [
+      "New API provisioning",
+      "New signing identities solely to perform offline relocation",
+      "Readonly Shadow as a prerequisite to copying stopped files"
+    ],
+    "production_activation_authorized": false
+  },
+  "active_next_stage": "REUSE_EXISTING_PRIVATE_BASELINE_AND_MINIMUM_OFFLINE_RELOCATION_WITH_SERVICES_STOPPED",
+  "existing_recovery_baseline": {
+    "acceptance_comment_id": 6166680343,
+    "owner_receipt_comment_id": 6166635563,
+    "host": "iZ6wee8q9z4t03hvqumwfhZ",
+    "path": "/root/xj-recovery-package.DZWI6n/recovery-baseline.tar.gz.enc",
+    "bytes": 1320571760,
+    "sha256": "ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093",
+    "scope": "HISTORICAL_OWNER_ROOT_ENCRYPTED_BASELINE_NOT_CURRENT_FINAL_SNAPSHOT",
+    "code_and_db_restore": "HISTORICALLY_REPORTED_PRIVATE_PASS_NOT_REPLAYED",
+    "offhost_tokyo_baseline_copy_on_korea": "NOT_PROVEN",
+    "contains_broader_original_scope": true,
+    "wholesale_restore_allowed": false,
+    "reencryption_or_rebackup_performed": false
+  },
+  "offline_relocation_blocker": {
+    "kind": "PRIVATE_TRANSFER_EXECUTION_ROUTE",
+    "detail": "Current Runner root capability cannot access the root-private baseline or run ssh as admin/root. One bounded Owner-root ciphertext pull can use existing SSH authentication/trust, if already available; stop if that route is unavailable. No new key/trust/grant may be created implicitly.",
+    "api_is_blocker": false
+  }
 }
