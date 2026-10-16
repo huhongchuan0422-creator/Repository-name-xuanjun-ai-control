@@ -549,3 +549,12 @@ PATCH_PRODUCTION_INSTALL=EXECUTED_PASS_TARGETED_HEALTH；W06仍部分完成（�
 详细可复查证据evidence/pr122-r4-controlled-install/I1_CI_ARTIFACT_20261016.json，操作与信任边界见准确提交deploy/pr122-r4-controlled-install/ADMISSION.md。新准入代码和文档仅请求原独审窗口6205624143集中复审；真实独审执行批准/Owner root准入文件均未创建。通过后仍需原独审窗口另外给出精确限时一次动作批准及全文摘要供Owner-root固定登记；开发方不能代签。现有非rootRunner不具备新动作登记能力。
 
 SOURCE_I1_INCREMENT=READY_FOR_REVIEW；INDEPENDENT_INSTALL_PLAN_APPROVAL=PENDING；PRODUCTION_INSTALL/POST/RESTART/ROLLBACK=NOT_EXECUTED；DNS_RELEASE=HOLD；东京退役HOLD。客户端IP审计差异/外围依赖及DNS管理面精确核对仍未关闭。Work官网/current和312efdd3生产配置未更改。此为证据断点记录，不改变安装制品中绑定的代码/文档快照或批准身份。
+
+
+### 9.24 2026-10-16：独审6205924529关闭I1，转入单次安装许可
+
+已实际读取6205924529：准确候选b4b8ed3fa7dc9435e4959da11dfc335b04385100 / tree3cb913dd66338da904a67d30bd22ff2827f28c62的I1_SOURCE_GATE_DEFECT=CLOSED_WITH_TRUST_BOUNDARY、ARTIFACT_REVIEW=PASS、HOSTED_CI_REVIEW=PASS_60_OF_60。原ZIP/TAR和13文件均由独审独立复算；没有新增源码缺陷，不再修改、打包或重复审核此候选。
+
+当前INSTALL_ACTION_APPROVAL=NOT_ISSUED，OWNER_ROOT_PIN=NOT_REGISTERED。下一步只请求原独审窗口根据既有ADMISSION协议另作准确版本、限时、单次install动作决定，包含一份源文件原子替换、一次Portal重启及新源/新PID/health通过后的四次空body403检查；不包含回滚、DNS、网站/current或其他服务器变更。全部准确常量及执行/失败边界已保存evidence/pr122-r4-controlled-install/INSTALL_ACTION_REQUEST_20261016.json，显式NOT_APPROVED、时间/nonce为空；不能用作批准。只增加交接材料，不改已批准源码、制品、绑定文件、workflow或生产配置，不重新跑60/18/44/83/45/115。
+
+真正准入需原独审窗口单独签发，并在发布后独立计算原始评论全文SHA，将实际ID/全文摘要由独审渠道交给Owner；随后由可信root登记固定私有锚点。开发方不代签、不创建锚点。现有非rootRunner及旧已消费helper没有新动作登记权限；长期Owner授权有效，但不能虚构技术接入。生产安装/POST/重启/回滚均NOT_EXECUTED；DNS_RELEASE和东京退役继续HOLD。IP审计、外围动态边界和DNS管理面核对未关闭。其他writer的SaaS修改保留，按新HEAD/CAS续接。

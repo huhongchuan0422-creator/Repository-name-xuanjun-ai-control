@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "document_kind": "INSTALL_ACTION_AUTHORIZATION_REQUEST_NOT_APPROVAL",
+  "status": "AWAITING_SEPARATE_INDEPENDENT_ACTION_DECISION",
+  "source_and_artifact_review": "PR122#6205924529",
+  "standing_owner_authority": "OWNER_LONG_TERM_DOMESTIC_TOKYO_MIGRATION_UNCHANGED",
+  "exact_candidate": {
+    "schema_version": 1,
+    "kind": "PR122_R4_ACTION_APPROVAL",
+    "decision": "NOT_APPROVED_REQUEST_ONLY",
+    "reviewer_role": "PENDING_INDEPENDENT_AUDITOR_ACTION",
+    "repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control",
+    "pr_number": 122,
+    "host": "iZ6wee8q9z4t03hvqumwfhZ",
+    "action": "install",
+    "max_attempts": 1,
+    "source_commit": "b4b8ed3fa7dc9435e4959da11dfc335b04385100",
+    "source_tree": "3cb913dd66338da904a67d30bd22ff2827f28c62",
+    "installer_sha256": "ec727883f682aa8ddf47c2e3f5fdfb1d1bac3d20909f627236553d8b0dc7dd28",
+    "binding_sha256": "cf2e15e6be74ba80fc4754f15a581470dc4309ad37404571fe5a5dc37999e958",
+    "artifact_id": 12017734234,
+    "artifact_zip_sha256": "359500422ed934ad6b80bf1042c4a2a1c844987a1bde9283844ce9f22f84ed24",
+    "artifact_tar_sha256": "64d8e3ac64b8018b859ddf0b0fedfeccfc2da89b5d42aeed17b558a9e07f2a56",
+    "expected_source_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+    "result_source_sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+    "helper_sha256": "0e61a4cab72a18e94ed8b97c81e035ee023dfe0969c871c50651cf75792cbcbe",
+    "allowed_effects": [
+      "backup_single_source",
+      "write_single_source",
+      "restart_portal_once",
+      "empty_negative_post_4"
+    ],
+    "negative_post_requests_max": 4,
+    "issued_at": null,
+    "expires_at": null,
+    "approval_nonce": null
+  },
+  "required_independent_issuance": [
+    "Make a separate explicit install-action decision, not another source/artifact review",
+    "If approved, issue the exact machine-readable block required by the already reviewed ADMISSION.md; choose fresh issued_at/expires_at<=24h/32hex nonce and actual INDEPENDENT_AUDITOR role",
+    "After publishing, independently compute SHA256 of the exact entire canonical GitHub comment UTF-8 body; give the actual comment ID and full digest to Owner through the original independent review window",
+    "Do not use this request or source review6205924529 as an action approval or root-pin ID"
+  ],
+  "root_handoff": "After genuine independent action approval only: trusted Owner/admin root flow registers the fixed private pin from the independently received comment ID/body hash; root0400 installer, root0700 private parent and root0600 pin. Current Runner cannot create/register the pin. This request generates none.",
+  "pre_execution_live_checks": [
+    "Approved Tokyo hostname/root identity and installed helper bytes unchanged",
+    "Actual source owner/mode/nlink/hash, candidate hash, expected active admin Portal service and WorkingDirectory must match",
+    "Unused exact-action receipt plus live GitHub body/code/artifact identity/expiry and <=30s ticket",
+    "Acquire original and R4 nonblocking locks; recheck; exclusive durable consumption before R4 state/source/service mutation"
+  ],
+  "normal_actions": [
+    {
+      "target": "/opt/trading-system/scripts/secure_secrets_portal_server.py",
+      "operation": "preserve exact private backup then atomically replace only approved source"
+    },
+    {
+      "target": "secure-secrets-portal.service",
+      "operation": "one bounded restart; require fresh running expected PID and approved source"
+    },
+    {
+      "operation": "inherited GET/HEAD health checks; four empty synthetic POST negative checks only after new source/PID verified",
+      "endpoints": [
+        "https://47.245.53.152 with verified apex SNI/Host",
+        "https://47.101.152.210 with verified apex SNI/Host"
+      ],
+      "expected": "403 exact fixed JSON operation_performed=false; no Set-Cookie; empty body; no real account/session/credentials"
+    },
+    {
+      "operation": "preserve bounded private evidence and allowlisted public receipt for existing nonroot Runner"
+    }
+  ],
+  "excluded": [
+    "No DNS release or DNS modification",
+    "No website content/current or approved312efdd3 Nginx/TLS config modification",
+    "No actual TikTok account disconnect, OAuth authorization, customer messages, payment or trading",
+    "No new keys, sudoers expansion, generic root dispatch or second execution queue",
+    "No bridge/tunnel, UK/P2, PR99/Finance or Tokyo VM shutdown",
+    "No rollback action permission; offline rollback requires distinct approval and explicit Owner outage consent"
+  ],
+  "failure_policy": "HOLD_PRESERVE_EVIDENCE; consumed or partial markers retained; no blind retry, cleanup, automatic rollback or vulnerable backend restart",
+  "post_execution_review": "Actual root receipt plus exact source/new PID, GET/HEAD and four controlled403 results must be reviewed as host acceptance; source/model PASS cannot substitute. DNS/IP/audit/peripheral release gates remain separate.",
+  "actual_action_approval": "NOT_ISSUED",
+  "actual_root_pin": "NOT_CREATED",
+  "production_install": "NOT_EXECUTED",
+  "dns_release": "HOLD",
+  "tokyo_retirement": "HOLD"
+}
