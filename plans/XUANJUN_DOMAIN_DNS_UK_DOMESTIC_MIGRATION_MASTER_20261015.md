@@ -757,3 +757,16 @@ Owner集中只读补验实际返回：PrivateNetwork=yes/typed b true；systemct
 原工作流Run38852538748/Hosted Job116816737809原始日志准确checkout19f0e27d、185/185 PASS（新增18方法），当前专项44/44本地PASS；host Job116816739228 SKIPPED，未再跑现场。实际下载Artifact12025343420：ZIP65027bytes SHA96ea3889c120b0d48b5cdb0647ced542b35d60f635964098272c0b64ff17b116；TAR64527bytes SHA35caaf41040c734565e68ff0c3a25a40be7304b1d58838596aa73f5acb23ff24，10常规成员/9绑定实际字节全匹配，与本地确定性复构一致。源码/制品/新受控空锁接管与单次收尾许可已在原PR99#6208366964集中申请并回读；旧R2/R6/17源/已批准unit不重审。
 
 当前实际配置落地但Phase-B待finalization；新收尾许可NOT_ISSUED、新anchor NOT_REGISTERED、新收尾NOT_EXECUTED，锁保留。Phase-C/生产/DB/Writer/真实交易/东京退役继续HOLD；东京继续在线，网站/DNS/Work当前内容不改。
+
+
+### 9.44 2026-10-16：收尾CLI缺-B在准入前生成缓存被拒绝；现场零attempt确认，申请原版本启动修正许可
+
+原独审#6208548645/单次许可#6208552859已签发，Owner-root实际登记新anchor并调用一次原19f0e27d finalizer。TAR35ca...ff24校验通过，CLI返回EXTRACTED_FILE_SET；按原许可失败后禁重试，未再次调用，不删目录/缓存/锁。根因是开发方手工命令漏Python -B；入口importlib导入controlled_repair生成__pycache__，与原精确包清单冲突。原185函数/模型测试是-B环境，没有覆盖这一手工CLI启动方式。责任在开发方，禁止通过放宽清单或删缓存让验收通过。
+
+本地同一原TAR/未改源码做子进程对照（Python3.12.14模型，非韩国实机）：无-B生成__pycache__并真实EXTRACTED_FILE_SET；有-B目录精确10项、原package_files通过，随后在模型缺私有anchor处拒绝；两例均未创建模型finalize attempt。没有重复185、改源码/重打包。
+
+2026-10-16 13:22 Owner韩国Python3.11 -I -B集中只读实证：10个准确归档成员之外仅__pycache__/controlled_repair.cpython-311.pyc；FINALIZE_ATTEMPT_EXISTS=False。实际新anchor已登记ID6208552859，完整文件SHA44701367ce05fd904429a64dc65900a4d96bbaadc323155983b813a55945fadf。保留空锁device25/inode4716/uid0/mode0700/empty=true，与该anchor严格相符；原失败receipt字节SHA亦与anchor相符。没有进入新动作admission/永久attempt，没有service检查或锁释放；这不等于自动获得重试许可。
+
+上述真实补证已补入原PR99#6208696010并回读。仅请求原独审签发同19f0e27d/同TAR/同9源码绑定的启动修正单次许可：全新root私有暂存保留旧package/cache不动；核无finalize attempt、旧anchor完整SHA4470...45fadf及旧批准body c0c9...943f5、同device25/inode4716/同旧receipt；旧anchor原字节备份后以新独审ID/正文SHA原子更新，保留原lock/receipt绑定；启动改Python3.11 -I -B -u。原6208552859不复用，不自行延长，许可未到前不交付重试执行命令。新的范围不含unit/transaction/current/runtime写、reload、服务启停、数据库/凭据/币安/Writer/东京停机。源码/制品/185审结继承，不再重审。
+
+当前根因与现场已闭环，服务器配置此前typed D-Bus证据继承；实际收尾仍未完成、空锁仍保留，新启动修正许可NOT_ISSUED/续接NOT_EXECUTED。Phase-C/生产迁移/东京退役HOLD；网站/DNS及Work内容不改。

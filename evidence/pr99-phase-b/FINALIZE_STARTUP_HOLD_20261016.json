@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "evidence_source": "OWNER_KOREA_ROOT_READONLY_TERMINAL_20261016_1322",
+  "host": "iZmj7a5kwr75qc1tul4kf9Z",
+  "approved_source": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
+  "tar_sha256": "35caaf41040c734565e68ff0c3a25a40be7304b1d58838596aa73f5acb23ff24",
+  "failed_cli_invocations": 1,
+  "error": "EXTRACTED_FILE_SET",
+  "root_cause": "MISSING_PYTHON_B_FLAG_GENERATED_BYTECODE",
+  "package_expected_entries": 10,
+  "package_extra": [
+    "__pycache__"
+  ],
+  "cache_files": [
+    "controlled_repair.cpython-311.pyc"
+  ],
+  "finalize_attempt_exists": false,
+  "root_anchor": {
+    "registered": true,
+    "comment_id": 6208552859,
+    "sha256": "44701367ce05fd904429a64dc65900a4d96bbaadc323155983b813a55945fadf"
+  },
+  "retained_lock": {
+    "device": 25,
+    "inode": 4716,
+    "uid": 0,
+    "mode": "0700",
+    "empty": true,
+    "matches_anchor": true
+  },
+  "old_failed_receipt_matches_anchor": true,
+  "source_changed": false,
+  "artifact_rebuilt": false,
+  "full185_tests_repeated": false,
+  "new_execution_request": 6208696010,
+  "new_explicit_execution_permission": "NOT_ISSUED",
+  "continuation_executed": false,
+  "lock_released": false,
+  "production_migration": "HOLD",
+  "phase_c": "HOLD",
+  "tokyo_retirement": "HOLD",
+  "website_changed": false,
+  "dns_changed": false
+}
