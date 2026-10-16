@@ -9,6 +9,7 @@ import tarfile
 from pathlib import Path, PurePosixPath
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.pr122_site_hub_public_copy import public_page
 from scripts.pr122_site_hub_english import translate_fragment
 from scripts.pr122_site_hub_experience import CSS as EXPERIENCE_CSS, disclosures, home as improve_home
 from scripts.pr122_website_release import write_csp_metadata, Deadline
@@ -29,16 +30,16 @@ def icp_footer(text):
     return text[:footer.end()-9]+link+text[footer.end()-9:]
 
 MENUS = [
-    ('solutions', [('产品可视化中心', '/visual/'), ('行业案例', '/visual/catalog/'), ('社区分账演示', '/visual/community-payment/')]),
+    ('solutions', [('产品可视化中心', '/visual/'), ('行业案例', '/visual/catalog/')]),
     ('capabilities', [('SaaS产品目录', '/marketplace/modules/'), ('功能选配', '/marketplace/modules/'), ('产品与购买', '/marketplace/')]),
-    ('custom-ai', [('定制开发服务', '/custom-ai'), ('客户项目中心', '/customer/projects/'), ('项目预览与验收', '/customer/projects/acceptance/')]),
+    ('custom-ai', [('社区分账演示', '/visual/community-payment/'), ('定制开发服务', '/custom-ai'), ('客户项目中心', '/customer/projects/'), ('项目预览与验收', '/customer/projects/acceptance/')]),
     ('labs', [('共建共享', '/ecosystem/'), ('权益等级与开发折扣', '/ecosystem/tiers/'), ('共创项目广场', '/ecosystem/co-create/'), ('共创收益共享', '/ecosystem/profit-sharing/'), ('权益及专项金额说明', '/ecosystem/ledger/'), ('生态活动', '/ecosystem/activities/'), ('生态治理', '/ecosystem/governance/')]),
 ]
-EN = {'产品可视化中心':'Product visual center', '行业案例':'Industry examples', '社区分账演示':'Community payment demo', 'SaaS产品目录':'SaaS catalog', '功能选配':'Module options', '产品与购买':'Products and purchase', '共建共享':'Co-build and share', '权益等级与开发折扣':'ECV tiers and development discounts', '定制开发服务':'Custom development', '客户项目中心':'Customer projects', '项目预览与验收':'Preview and acceptance', '共创项目广场':'Co-creation projects'}
+EN = {'产品可视化中心':'Product visual center', '行业案例':'Industry examples', '社区分账演示':'Community payment demo', 'SaaS产品目录':'SaaS catalog', '功能选配':'Module options', '产品与购买':'Products and purchase', '共建共享':'Co-build and share', '权益等级与开发折扣':'Yunhui Ecosystem Rights and development discounts', '定制开发服务':'Custom development', '客户项目中心':'Customer projects', '项目预览与验收':'Preview and acceptance', '共创项目广场':'Co-creation projects'}
 EN.update({'共创收益共享':'Co-creation profit sharing','权益及专项金额说明':'Rights and service-credit guidance','生态活动':'Ecosystem activities','生态治理':'Ecosystem governance'})
 CSS = '''/* Verified selectors: live apex and pinned Work V2 source. */
 .primary-nav .nav-group{display:flex;flex-wrap:wrap;column-gap:5px}.primary-nav .nav-group>a{padding-right:0;flex:0 1 auto}.primary-nav .nav-group>button{width:24px;padding:0;text-align:left;flex:none}.primary-nav .nav-panel{flex-basis:100%}
-.xj-hub{padding:36px 0 60px}.xj-hub .hero{display:block;min-height:0;padding:28px;background:#fff;border:1px solid #dce5f1;border-radius:18px;margin:20px 0}.xj-hub .hero h1{font-size:clamp(28px,5vw,48px)}.xj-hub .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px}.xj-hub .card{min-height:0;margin:10px 0;padding:22px}.xj-hub .card h2{font-size:22px}.xj-hub .btn{display:inline-block;padding:10px 16px;background:#2057d4;color:white;border-radius:10px;margin:6px}.xj-hub input{max-width:100%;padding:8px;border:1px solid #abbcd4;border-radius:6px}.xj-hub label{display:block;margin:12px 0}.xj-hub table{display:block;overflow:auto}.xj-hub th,.xj-hub td{padding:10px;text-align:left}.xj-hub a:focus-visible,.xj-hub button:focus-visible,.xj-hub input:focus-visible{outline:3px solid #75a7ff;outline-offset:3px}
+.xj-hub{padding:36px 0 60px}.xj-hub .hero{display:block;min-height:0;padding:28px;background:#fff;border:1px solid #dce5f1;border-radius:18px;margin:20px 0}.xj-hub .hero h1{font-size:clamp(28px,5vw,48px)}.xj-hub .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px}.xj-hub .card{min-height:0;margin:10px 0;padding:22px}.xj-hub .card h2{font-size:22px}.xj-hub .btn{display:inline-block;padding:10px 16px;background:#2057d4;color:white;border-radius:10px;margin:6px}.xj-hub input{max-width:100%;padding:8px;border:1px solid #abbcd4;border-radius:6px}.xj-hub label{display:block;margin:12px 0}.xj-hub table{display:block;overflow:auto}.xj-hub th,.xj-hub td{padding:14px;text-align:left;border-bottom:1px solid #e6e9ee;white-space:normal;overflow-wrap:break-word}.xj-hub caption{text-align:left;font-size:20px;font-weight:650;padding:20px 0 12px}.xj-hub table{width:100%;border-collapse:collapse;margin:22px 0}.xj-hub .hero p{max-width:76ch;line-height:1.8;margin:18px 0}.xj-hub .actions{display:flex;flex-wrap:wrap;gap:8px}.xj-hub a:focus-visible,.xj-hub button:focus-visible,.xj-hub input:focus-visible{outline:3px solid #75a7ff;outline-offset:3px}
 '''
 
 def menu_patch(text):
@@ -164,6 +165,7 @@ def build(root, source, output, fixture=None):
                 text=text.replace('</main>','<section class="hero"><p>'+rule+'</p></section></main>',1)
             if str(relative)=='visual/community-payment/index.html' and locale=='en/':
                 text=text.replace('</main>','<p class="notice">The existing role demo is currently in Chinese and uses synthetic data only.</p></main>',1)
+            text=public_page(text, relative.as_posix(), locale=='en/')
             header=re.sub(r'href="/(?:zh-cn/|en/)?" lang="(zh-CN|en)"',lambda m:'href="/'+('en/' if m[1]=='en' else 'zh-cn/')+relative.parent.as_posix()+'/" lang="'+m[1]+'"',header)
             header=re.sub(r'aria-current="page"','',header)
             current='en/' if locale=='en/' else 'zh-cn/'

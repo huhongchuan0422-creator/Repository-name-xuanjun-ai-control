@@ -24,7 +24,7 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
   page.on('pageerror',e=>failures.push(e.message));
   page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|Refused to/.test(m.text()))failures.push(m.text());});
   page.on('response',r=>{if(r.status()>=400&&/\.(?:css|js|mjs)(?:\?|$)/.test(r.url()))resources.push({url:r.url(),status:r.status()});});
-  for(const width of [1440,390]){
+  for(const width of [1440,390,320]){
    await page.setViewportSize({width,height:1000});
    for(const prefix of ['','zh-cn/','en/'])for(const route of roots){
     const r=await page.goto(origin+'/'+prefix+route);assert.equal(r.status(),200);
@@ -50,8 +50,9 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
   await page.keyboard.press('Escape');assert.equal(await button.getAttribute('aria-expanded'),'false');
   checks.push({test:'keyboard_navigation_and_text_arrow_geometry',gap_pixels:gaps,result:'PASS'});
   await page.locator('#credit').fill('5000');await page.locator('#ecvQuote button').click();
-  let text=await page.locator('#quoteResult').innerText();assert.match(text,/2400\.00/);assert.match(text,/1200\.00/);assert.match(text,/本单无正毛利/);
-  await page.locator('#directCost').fill('');await page.locator('#ecvQuote button').click();assert.match(await page.locator('#quoteResult').innerText(),/成本未知，不可结算/);
+  let text=await page.locator('#quoteResult').innerText();assert.match(text,/2400\.00/);assert.match(text,/1200\.00/);assert.match(text,/仅为费用估算/);
+  assert.equal(await page.locator('#directCost').count(),0);
+  assert.doesNotMatch(text,/毛利|直接成本/);
   await page.locator('#serviceKind').selectOption('ordinary');await page.locator('#listPrice').fill('100');await page.locator('#credit').fill('100');await page.locator('#ecvQuote button').click();
   text=await page.locator('#quoteResult').innerText();assert.match(text,/上限90%/);assert.match(text,/预计实付：¥10\.00/);
   checks.push({test:'quote_6000_2400_1200_ordinary90_custom50_cost_unknown',result:'PASS'});
@@ -78,8 +79,17 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
    assert.equal(await page.locator('.primary-nav .nav-group').nth(1).locator('a[href*="/ecosystem/"]').count(),0);
    assert(await page.locator('#discover-ecosystem a[href="/ecosystem/"]').isVisible());
    assert.equal(await page.locator('#discover-work a').count(),3);
-   assert.equal(await page.locator('#discover-work a[href="/showcase/projects/"]').count(),1);
+   assert.equal(await page.locator('#discover-work a[href="/visual/community-payment/"]').count(),1);
   }
+  for(const [route,rows] of [['ecosystem/tiers/',9],['ecosystem/profit-sharing/',8]]){
+   await page.setViewportSize({width:390,height:844});await page.goto(origin+'/'+route);
+   assert.equal(await page.locator('main tbody tr').count(),rows);
+   assert.doesNotMatch(await page.locator('main').innerText(),/ECV|EVC|成本.?×.?3/);
+   await page.screenshot({path:path.join(path.dirname(out),route.includes('tiers')?'PUBLIC_TIERS_390.png':'PUBLIC_SHARING_390.png'),fullPage:true});
+  }
+  await page.goto(origin+'/');assert(await page.locator('#discover-benefits').isVisible());
+  await page.locator('#discover-benefits').screenshot({path:path.join(path.dirname(out),'HOME_BENEFITS_390.png')});
+  checks.push({test:'public_benefits_tables_and_commercial_confidentiality',result:'PASS'});
   checks.push({test:'home_entry_hierarchy_header_alignment_disclosure_stationary',widths:[320,390,780,1180,1440],result:'PASS'});
   await page.goto(origin+'/visual/community-payment/merchant-dashboard/');
   for(const id of ['grocer','cafe','home']){

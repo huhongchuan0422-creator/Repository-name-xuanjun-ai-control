@@ -9,6 +9,7 @@ import threading
 import unittest
 
 from scripts.pr122_site_hub_stage import build, icp_footer, ICP_NUMBER, ICP_URL
+from scripts.pr122_site_hub_public_copy import wording
 from scripts.pr122_site_hub_preflight import Page
 from scripts.pr122_site_hub_test_server import serve
 
@@ -89,7 +90,7 @@ class IntegrationTests(unittest.TestCase):
             # business detail sections and links remain available in a disclosure.
             oldmain=re.search(r'<main>.*?</main>',old,re.S)[0]
             oldhero=re.search(r'<section class="hero">.*?</section>',oldmain,re.S)[0]
-            self.assertIn(oldmain.split(oldhero,1)[1][:-7],new)
+            self.assertIn(wording(oldmain.split(oldhero,1)[1][:-7],locale=='en/'),new)
             for key in ('products','visual','work','ecosystem','delivery'):
                 self.assertIn('id="discover-'+key+'"',new)
             self.assertIn('class="xj-more"',new)
@@ -102,6 +103,32 @@ class IntegrationTests(unittest.TestCase):
             self.assertNotIn('/ecosystem/',market)
             self.assertIn('/'+locale+'ecosystem/',ecosystem)
             self.assertIn('/'+locale+'ecosystem/governance/',ecosystem)
+
+    def test_public_benefits_tables_and_no_internal_pricing(self):
+        for locale in ('','zh-cn/','en/'):
+            home=(self.public/locale/'index.html').read_text()
+            self.assertIn('id="discover-benefits"',home)
+            self.assertNotIn('href="/showcase/',home)
+            self.assertIn('90%',home)
+            self.assertIn('50%',home)
+            for route in ('tiers','profit-sharing'):
+                text=(self.public/locale/'ecosystem'/route/'index.html').read_text()
+                self.assertEqual(text.count('<tbody>'),2 if route=='tiers' else 1)
+                self.assertEqual(len(re.findall(r'<td>',text)),21 if route=='tiers' else 24)
+            for page in (self.public/locale/'ecosystem').rglob('*.html'):
+                main=re.search(r'<main\b.*?</main>',page.read_text(),re.S)[0]
+                self.assertNotRegex(main,r'成本.?[×*].?3|cost.?[×*].?3|\bECV\b|\bEVC\b')
+            market=(self.public/locale/'marketplace/index.html').read_text()
+            self.assertNotIn('id="directCost"',market)
+            self.assertIn('id="ecvUnits"',market)  # stable internal field, public name changes only
+
+    def test_community_project_belongs_to_delivery(self):
+        for locale in ('','zh-cn/','en/'):
+            text=(self.public/locale/'index.html').read_text()
+            solution=re.search(r'<div class="nav-group"><a href="/'+locale+r'solutions">.*?</div></div>',text,re.S)[0]
+            delivery=re.search(r'<div class="nav-group"><a href="/'+locale+r'custom-ai">.*?</div></div>',text,re.S)[0]
+            self.assertNotIn('community-payment',solution)
+            self.assertIn('/'+locale+'visual/community-payment/',delivery)
 
     def test_merchant_script_is_preserved_and_externalized(self):
         page=self.public/'visual/community-payment/merchant-dashboard/index.html'
