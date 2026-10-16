@@ -106,3 +106,11 @@ Owner当前不需重复取B资料或执行旧命令；未来必须需要其协�
 实际存在readonly角色描述接口，但凭据存储接口也有master_key及TRADING_CREDENTIAL_MASTER_KEY标记；不据此猜测/调用load_credential，更不能复用交易master key。真实只读SecretRef/权限、源库schema和私有collector/传递身份仍未证明。这是当前实际接入缺口，不能用源码名称或模型PASS代替。全部真实结果保存evidence/pr99-phase-c/TOKYO_SOURCE_CONTRACT_METADATA_20261016.json。
 
 本次仍不发起拆分的生产执行申请；完整C执行包及真实绑定齐备后统一送审，不让Owner复跑旧命令。既有官网、DNS、B现场、东京和共享业务均未操作。
+
+### 新准确源码CI/制品终态
+
+源码32801fc886824447aaf51f4afd4a22d7c7b0ce1f，Run38868898561/Hosted Job116868059787，Python3.11.17，77/77 PASS/skip0，生产inspection仍if:false/SKIPPED。已读取原始日志，新增root安装/交接模型与旧适配集成一起验证；韩国Root执行仍0。
+
+实际下载Artifact12032422528并复算：ZIP 8d256daf7b90cf5f565d4587cec1236b9887b5895a08211bbb3e843ac1c699f7；TAR 8200ccb5d86f09cb1d03a449921eddba4ab421e73cee6736a7ce9d951339bacd（82181字节），34普通条目、33/33绑定及25/25runtime hash匹配，本地重建TAR逐字节一致。旧08c7e90c制品保留历史，不将其审核/CI扩大到新安装器。新包是可复核候选，不是独立审核PASS或安装许可。
+
+本批控制器/交接器的离线实现完成；实际只读托管/私有传递绑定与live运行、失败停止/撤销控制器仍待完成，真实C观察未开始。完整C生产执行方案齐全再统一送审，未要求Owner分段批许可或搬运数据。

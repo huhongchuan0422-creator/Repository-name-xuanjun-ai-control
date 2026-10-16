@@ -7,7 +7,7 @@
   "phase_c": {
     "design": "RECORDED",
     "adapter_implementation": "OFFLINE_ADAPTERS_AND_STOPPED_CANDIDATE_INSTALL_CONTROLLER_IMPLEMENTED",
-    "review_artifact": "NEW_CONTROL_CANDIDATE_BUILD_PENDING",
+    "review_artifact": "ROOT_INSTALL_CANDIDATE_BUILT_DEVELOPER_BYTE_VERIFIED_NOT_APPROVED",
     "root_preflight": "NOT_EXECUTED",
     "started_service_confinement": "NOT_EXERCISED",
     "live_get": "NOT_AUTHORIZED_NOT_RUN",
@@ -39,10 +39,13 @@
       ]
     },
     "hosted_tests": {
-      "status": "PENDING_NEW_EXACT_HEAD",
-      "previous_source": "08c7e90cc02de270bd63c4dfc0de9803d6a6a81c",
-      "previous_passed": 44,
-      "new_tests": 77
+      "status": "PASS",
+      "tests": 77,
+      "skipped": 0,
+      "python": "3.11.17",
+      "run": 38868898561,
+      "job": 116868059787,
+      "exact_checkout": "32801fc886824447aaf51f4afd4a22d7c7b0ce1f"
     },
     "execution_controller": "OFFLINE_INSTALL_IMPLEMENTED_NOT_APPROVED_NOT_RUN_LIVE_OBSERVE_CONTROLLER_PENDING",
     "independent_network_verifier": "NEW_SEPARATE_GET_BROKER_RSA_SIGNATURE_ADAPTER",
@@ -55,7 +58,8 @@
       "action": "PR99_PHASE_C_OFFLINE_CANDIDATE_INSTALL_V1",
       "independent_permission": "NOT_REQUESTED",
       "bootstrap": "STDLIB_ONLY_BEFORE_CANDIDATE_IMPORT_WITH_EXACT_PIN",
-      "private_authorization": "NEW_C_EXACT_PERMIT_AND_ROOT_ANCHOR_NOT_ISSUED"
+      "private_authorization": "NEW_C_EXACT_PERMIT_AND_ROOT_ANCHOR_NOT_ISSUED",
+      "source_commit": "32801fc886824447aaf51f4afd4a22d7c7b0ce1f"
     },
     "previous_artifact": {
       "id": 12030856104,
@@ -74,7 +78,18 @@
       "actual_secretref_readonly_permission": "NOT_PROVEN",
       "database_opened": false,
       "production_module_imported": false
-    }
+    },
+    "artifact": {
+      "id": 12032422528,
+      "zip_sha256": "8d256daf7b90cf5f565d4587cec1236b9887b5895a08211bbb3e843ac1c699f7",
+      "tar_sha256": "8200ccb5d86f09cb1d03a449921eddba4ab421e73cee6736a7ce9d951339bacd",
+      "tar_bytes": 82181,
+      "binding_files": 33,
+      "runtime_files": 25,
+      "developer_download_verified": true,
+      "independent_review": "NOT_REQUESTED_PENDING_COMPLETE_C_EXECUTION_PACKAGE"
+    },
+    "next_development": "Bind real readonly custody and private snapshot transport, then complete reviewed live observation/start/failure-stop/revoke control; no separate offline-install permission requested"
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
