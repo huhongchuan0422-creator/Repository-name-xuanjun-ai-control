@@ -103,9 +103,19 @@ class ChannelTests(unittest.TestCase):
         class Account:pw_uid=1002
         with tempfile.TemporaryDirectory(prefix='pr122-channel-test-',dir='/root') as t:
             p=Path(t);base=p/'channel';exe=p/'libexec';exe.mkdir();sudoers=p/'sudoers';sudoers.mkdir()
+            # Validate a complete isolated sudoers include tree with the real
+            # binary; the Hosted runner's unrelated global policy is not ours.
+            global_rules=p/'sudoers.global'
+            global_rules.write_text('root ALL=(ALL:ALL) ALL\n@includedir '+str(sudoers)+'\n')
+            global_rules.chmod(0o440)
+            real_run=c.subprocess.run
+            def isolated_visudo(args, **kwargs):
+                if args == ['/usr/sbin/visudo','-c']:
+                    args=['/usr/sbin/visudo','-cf',str(global_rules)]
+                return real_run(args, **kwargs)
             staging=p/'frozen.tar.gz';shutil.copyfile(path,staging)
             source=p/'installer.py';source.write_bytes(Path(c.__file__).read_bytes())
-            with patch.multiple(c,BASE=base,EXEC=exe/'channel',POLICY=sudoers/'channel',STAGED_ARCHIVE=staging,__file__=str(source)), patch.object(c.pwd,'getpwnam',return_value=Account()), patch.dict(os.environ,{'SUDO_UID':'1000'}):
+            with patch.multiple(c,BASE=base,EXEC=exe/'channel',POLICY=sudoers/'channel',STAGED_ARCHIVE=staging,__file__=str(source)), patch.object(c.pwd,'getpwnam',return_value=Account()), patch.dict(os.environ,{'SUDO_UID':'1000'}),patch.object(c.subprocess,'run',side_effect=isolated_visudo):
                 self.assertEqual(c.grant()['state'],'GRANTED')
                 self.assertEqual(c.validate_bundle(),base/'candidate')
                 with self.assertRaises(RuntimeError):c.grant()
@@ -126,6 +136,9 @@ class ChannelTests(unittest.TestCase):
                 self.assertEqual(c.revoke()['state'],'CHANNEL_REVOKED')
                 self.assertFalse(c.POLICY.exists())
                 self.assertTrue((base/'channel.py').exists())
+                global_rules.write_text('this is invalid sudoers syntax !!!\n')
+                with self.assertRaises(c.subprocess.CalledProcessError):
+                    c.subprocess.run(['/usr/sbin/visudo','-c'],check=True,stdout=c.subprocess.DEVNULL,stderr=c.subprocess.DEVNULL)
 
     def test_partial_grant_retains_evidence_and_rejects_retry(self):
         class Account:pw_uid=1002
