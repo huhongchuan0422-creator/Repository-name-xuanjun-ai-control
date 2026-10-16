@@ -1,0 +1,113 @@
+{
+  "actual_new_host_execution": "NOT_RUN",
+  "admission": "NOT_GRANTED",
+  "baseline_failure": {
+    "chain": [
+      "epoch7_host_factory.py:491",
+      "epoch7_delta.py:94",
+      "epoch7_delta.py:85",
+      "epoch7_delta.py:79"
+    ],
+    "error": "PROPOSAL_SIZE_BOUND",
+    "result": "EXPECTED_REPRODUCED"
+  },
+  "ci": {
+    "builder_test_compatibility_fix": "REMOVED_TEST_ONLY_PY312_GATE; NATIVE_PY36_PARSER_OR_EXPLICIT_PY36_GRAMMAR; SAME32_TESTS_NO_SKIP",
+    "contracts": 45,
+    "correction": "FINITE_32MiB_BUILDER_FILE_LIMIT; LOGS_REMAIN_1MiB; ORDINARY_CHILDREN_REMAIN_1MiB",
+    "fixture": "DISPOSABLE_LOCAL_GIT_ONLY",
+    "focused_inner": 75,
+    "head_before_after": "MATCH",
+    "hosted": "NOT_RUN",
+    "independent_review": "PASS",
+    "initial_failure": "BUILDER_ARCHIVE_EXCEEDED_CI_1MiB_FILE_LIMIT",
+    "new_compiler_files": 256,
+    "new_compiler_pins": 255,
+    "outer_gate": 2,
+    "published_source_identity": "PENDING",
+    "suite_counts": {
+      "aggregate": 25,
+      "builder": 32,
+      "diagnostics": 12,
+      "observer": 6
+    }
+  },
+  "compiler_binding": "UNBOUND",
+  "directory_long_path_case": {
+    "canonical_calls": 8193,
+    "entries": 8192,
+    "last_envelope_bytes_below": 600000,
+    "length4096_entries": 8191,
+    "root_entries": 1,
+    "whole_map_canonical": "REJECTED_PROPOSAL_SIZE_BOUND"
+  },
+  "errors": 0,
+  "failures": 0,
+  "independent_scope": "SOURCE_AND_25_PLUS_12_PLUS_6_PLUS_32_PLUS_45_SCOPED_PASS",
+  "inputs": {
+    "overlay_map_sha256": "eca79573770c1cedd4f21b06f77a078d996ed6a01532843573ecd6abd818f060",
+    "parent_archive_sha256": "6553938a56b882e17d13029fa9a06787131bb55a5c55bc1138e2b825277b7307",
+    "parent_manifest_sha256": "b33b365ef1fd18458d85bcbbec44d883f3cc33bf859064cbdca6bfc3fad7d571",
+    "parent_source_commit": "dacd45a2f6888cae7b751cae5becacd3099c1ed2",
+    "parent_source_tree": "f31ae40b6f7c48f09846f6d70f5bb599f4980fe1"
+  },
+  "limits": {
+    "directory_entries": 8192,
+    "directory_states_per_path": 3,
+    "global_canonical_bytes": 2097152,
+    "path_characters": 4096,
+    "per_section_bytes": 2097152,
+    "plan_bytes": 2097152,
+    "private_seed_bytes": 67108864,
+    "review_packet_bytes": 2097152,
+    "rows_per_section": 8192,
+    "sections_per_view": 15,
+    "views": 17
+  },
+  "measurements": {
+    "historical_release_cache_counts": [
+      48,
+      48,
+      48
+    ],
+    "historical_release_file_counts": [
+      102,
+      102,
+      102
+    ],
+    "largest_section_bytes": 150776,
+    "packet_bytes": 8241,
+    "plan_bytes": 140247,
+    "scope": "SYNTHETIC_HOST_FACTS_REAL107_COMPILERS_NO_HOST_AUTHORITY",
+    "seed_bytes": 337692,
+    "views_bytes": 3325808
+  },
+  "new_test_sources": {
+    "resource_aggregate_fixture.py": "4e6a35f9c3e297e4fd63d783a46b3ce432bfb5c121e6621dfaee96c3f97307fb",
+    "test_resource_aggregate_closure.py": "b417b2a9df5972e429151d2edad121c11248ce581067cb70b7a366cf6c9b95a1"
+  },
+  "python": "3.12.14",
+  "python36": "NATIVE_PYTHON3.6.8_COMPILE_ONLY_17_PUBLIC_PYTHON_FILES; NO_MODULE_EXECUTION_OR_RUNTIME_COMPATIBILITY_CLAIM",
+  "schema": 1,
+  "skips": 0,
+  "state": "LOCAL_EXACT_HEAD_CI_PASSED_PENDING_PUBLICATION",
+  "suites": {
+    "affected_observer_binding": 6,
+    "builder": 32,
+    "failure_labels_and_version_gates": 12,
+    "large_resource_closure": 25
+  },
+  "tested_candidate_production_files": {
+    "kit-overlay/epoch7_recovery_entry.py": "071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5",
+    "kit-overlay/helpers/epoch7_host_factory.py": "f7c08543aa703859092fff9073ad27bedd4b281fdaa45eeb5de5bcd960bc94b3",
+    "kit-overlay/helpers/epoch7_host_observer.py": "ec0d0618251469a5e0df241097c14b2aa608a6152ad6ea24ee1bed3ee1466cee",
+    "kit-overlay/helpers/epoch7_resource_observer.py": "c0caee8274378c442da3cd5acbb77a99c999d309122f046f233cedce8f4f2e04",
+    "kit-overlay/tests/host_factory/test_fresh_release_parent.py": "cc09a45c213c1385c6297f95ff237ab75c501dca7b70f771fa92ba101b2eb7e2",
+    "kit-overlay/tests/live_controls/test_epoch7_observer_binding.py": "fde0be3b536c504a8dda2eb4732dd99b2366c7e565b97fdba2e7fec4805515a2"
+  },
+  "tested_frozen_preparation_files": {
+    "epoch7_prepare.py": "1c2f09c0e8b1c7397ce35fc72da9c199df564a2dc6c458eebc0fac7ba6ea9b69",
+    "epoch7_prepare_data.py": "71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1",
+    "epoch7_topology_projection.py": "0e9817a1474dc4e54cf1779c0b4c243cf16e6204cab3a25210a12e41e03d00b6"
+  }
+}

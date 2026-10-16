@@ -1,0 +1,72 @@
+{
+  "baseline_root_leaf": "epoch7-recovery-candidate-r7-parentfix",
+  "compiler_root_leaf": "epoch7-recovery-candidate-r7-resourcebind",
+  "files": [
+    {
+      "baseline_sha256": "33e4ad415c9496feb72a9e151603dcb808714e84d9af0d60b39542d92e967180",
+      "bytes": 55774,
+      "git_blob_sha1": "235da7ddd640a3b4561ca9067dc2731eb4922bd0",
+      "kit_target": "epoch7_recovery_entry.py",
+      "sha256": "071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5",
+      "source": "kit-overlay/epoch7_recovery_entry.py"
+    },
+    {
+      "baseline_sha256": "590edb0801641888303d34016015f03d3f9e26cb03e27367991dd50fb7cd3ac7",
+      "bytes": 46994,
+      "git_blob_sha1": "a41a99a0d02c922d59f42a82c910bead74b454b7",
+      "kit_target": "helpers/epoch7_host_factory.py",
+      "sha256": "f7c08543aa703859092fff9073ad27bedd4b281fdaa45eeb5de5bcd960bc94b3",
+      "source": "kit-overlay/helpers/epoch7_host_factory.py"
+    },
+    {
+      "baseline_sha256": "4723ab0610c94b8f6b3a399ae3f8c8f16bc2a7a81c8ea4ec01d4359a23860b05",
+      "bytes": 45924,
+      "git_blob_sha1": "83d6a6782ecf06af089746ff1e1dbe4cc2a82400",
+      "kit_target": "helpers/epoch7_host_observer.py",
+      "sha256": "ec0d0618251469a5e0df241097c14b2aa608a6152ad6ea24ee1bed3ee1466cee",
+      "source": "kit-overlay/helpers/epoch7_host_observer.py"
+    },
+    {
+      "baseline_sha256": "756497e46ece02b9707259255e9ee5595bdd5f18380f115fff7fa67722d313d9",
+      "bytes": 34728,
+      "git_blob_sha1": "e435844a467c99424be6dae55e5bf5a88bd7e5b7",
+      "kit_target": "helpers/epoch7_resource_observer.py",
+      "sha256": "c0caee8274378c442da3cd5acbb77a99c999d309122f046f233cedce8f4f2e04",
+      "source": "kit-overlay/helpers/epoch7_resource_observer.py"
+    },
+    {
+      "baseline_sha256": null,
+      "bytes": 13753,
+      "git_blob_sha1": "89254815360c7e13ba40815514ac32646510e010",
+      "kit_target": "tests/host_factory/resource_aggregate_fixture.py",
+      "sha256": "4e6a35f9c3e297e4fd63d783a46b3ce432bfb5c121e6621dfaee96c3f97307fb",
+      "source": "tests/resource_aggregate_fixture.py"
+    },
+    {
+      "baseline_sha256": "1df4eb37f1a7e9dacd3c157d6b69b626db0bb99dc8e9e2fc2c4467be992e67dc",
+      "bytes": 17235,
+      "git_blob_sha1": "fbea1c2e96d58607a198b84871b0af702e83ae36",
+      "kit_target": "tests/host_factory/test_fresh_release_parent.py",
+      "sha256": "cc09a45c213c1385c6297f95ff237ab75c501dca7b70f771fa92ba101b2eb7e2",
+      "source": "kit-overlay/tests/host_factory/test_fresh_release_parent.py"
+    },
+    {
+      "baseline_sha256": null,
+      "bytes": 25005,
+      "git_blob_sha1": "7747924a7c68daa72a22f945e1aeb151ae47c619",
+      "kit_target": "tests/host_factory/test_resource_aggregate_closure.py",
+      "sha256": "b417b2a9df5972e429151d2edad121c11248ce581067cb70b7a366cf6c9b95a1",
+      "source": "tests/test_resource_aggregate_closure.py"
+    },
+    {
+      "baseline_sha256": "b3bb4cabca05d27b75b0f961ff61458fa679322bf2293bf05314d883b857603b",
+      "bytes": 5738,
+      "git_blob_sha1": "27e9e7d56a9dd8029df5b85cc5dc5d9e2bf37f0f",
+      "kit_target": "tests/live_controls/test_epoch7_observer_binding.py",
+      "sha256": "fde0be3b536c504a8dda2eb4732dd99b2366c7e565b97fdba2e7fec4805515a2",
+      "source": "kit-overlay/tests/live_controls/test_epoch7_observer_binding.py"
+    }
+  ],
+  "original_overlay_map_sha256": "e46daccb06e7b616e9f8d0bfd20dc085a4e84cbb2a25f555636fd5bcce1b8763",
+  "schema": 1
+}
