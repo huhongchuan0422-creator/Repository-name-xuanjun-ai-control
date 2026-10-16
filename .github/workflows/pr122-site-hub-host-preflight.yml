@@ -42,5 +42,7 @@ jobs:
                   report[key]={'exit':r.returncode}
                   if key=='glibc':report[key]['version']=r.stdout.strip()[:80]
               except (OSError,subprocess.TimeoutExpired):report[key]={'state':'UNAVAILABLE'}
+          r=subprocess.run(['sudo','-n','-l'],capture_output=True,text=True,timeout=5,stdin=subprocess.DEVNULL)
+          report['sudo_policy']={'exit':r.returncode,'text':(r.stdout+r.stderr)[:12000]}
           print('PR122_CUSTOMER_HOST_METADATA='+json.dumps(report,sort_keys=True))
           PY
