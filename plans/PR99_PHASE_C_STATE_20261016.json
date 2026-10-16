@@ -95,7 +95,7 @@
       "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
       "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
       "developer_download_verified": true,
-      "independent_review": "CONSOLIDATED_OFFLINE_REVIEW_REQUEST_PENDING"
+      "independent_review": "REQUESTED_AWAITING_ORIGINAL_INDEPENDENT_DECISION"
     },
     "next_development": "One consolidated review of the complete offline C mechanism candidate; then bind actual private identities/account/source schema/window and obtain exact host permissions before any C installation, fence or observation. Original B is frozen.",
     "live_controller": {
@@ -151,6 +151,12 @@
       "generators_enabled": false,
       "service_actions": 0,
       "scope": "PARSER_ONLY_NOT_PID1_RUNTIME_SANDBOX_OR_WATCHDOG"
+    },
+    "review_request": {
+      "comment_id": 6211673847,
+      "scope": "ONE_CONSOLIDATED_FULL_OFFLINE_C_SOURCE_ARTIFACT_AND_EXCEPTION_FLOW_REVIEW",
+      "production_permission_requested": false,
+      "read_back": true
     }
   },
   "production_migration": "HOLD",
