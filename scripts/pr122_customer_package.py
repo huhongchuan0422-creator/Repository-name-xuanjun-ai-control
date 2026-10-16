@@ -16,7 +16,7 @@ def build(output,commit,tree):
     paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'deploy/pr122-customer-center').rglob('*') if p.is_file())
     paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'tests').glob('test_pr122_customer_*.py'))
     paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'tests').glob('pr122_customer_*') if p.is_file())
-    paths.update({'docs/development/PR122_CUSTOMER_CENTER_PRIVATE_MATERIALS_RULES_V1_20261016.md','docs/development/PR122_CUSTOMER_CENTER_IMPLEMENTATION_20261016.md','.github/workflows/pr122-customer-center.yml'})
+    paths.update({'docs/development/PR122_CUSTOMER_CENTER_PRIVATE_MATERIALS_RULES_V1_20261016.md','docs/development/PR122_CUSTOMER_CENTER_IMPLEMENTATION_20261016.md','.github/workflows/pr122-customer-center.yml','docs/development/PR122_CUSTOMER_CENTER_CHANGE_CONTROL_20261016.md'})
     pending=list(paths)
     while pending:
         name=pending.pop()

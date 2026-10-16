@@ -1,5 +1,8 @@
 import unittest
+import json
 from tests.test_pr122_customer_center import CustomerTests
+from tests.test_pr122_customer_http import HttpTests
+from scripts.pr122_customer_http import COOKIE
 from scripts.pr122_customer_changes import Changes
 from scripts.pr122_customer_core import Denied, Conflict
 
@@ -55,5 +58,22 @@ class ChangeTests(unittest.TestCase):
     def test_evidence_and_feedback_are_encrypted_and_append_only(self):
         r=self.request();row=self.c.db.execute('SELECT payload FROM change_events WHERE case_id=?',(r['id'],)).fetchone();self.assertNotIn('按钮'.encode(),row[0])
         with self.assertRaises(Exception):self.c.db.execute('DELETE FROM change_events')
+
+
+class ChangeHTTPTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture=HttpTests();self.addCleanup(self.fixture.doCleanups);self.fixture.setUp()
+
+    def test_real_http_feedback_and_project_isolation(self):
+        f=self.fixture;request={'project':'project-a','page':'/preview/consumer/','version':'a'*64,'text':'调整付款按钮位置'}
+        status,_,body=f.request('api/change_submit',request,f.auth_headers());self.assertEqual(status,200);self.assertEqual(json.loads(body)['state'],'REQUESTED')
+        status,_,body=f.request('api/changes/project-a',headers=f.auth_headers());self.assertEqual(status,200);self.assertIn('调整付款按钮位置',body.decode())
+        self.assertEqual(f.request('api/changes/project-a',headers={'Cookie':COOKIE+'='+f.users['other']['token']})[0],403)
+
+    def test_real_http_csrf_actor_injection_and_static_widget(self):
+        f=self.fixture;request={'project':'project-a','page':'/preview/consumer/','version':'a'*64,'text':'调整付款按钮位置'}
+        self.assertEqual(f.request('api/change_submit',request,{**f.auth_headers(),'X-CSRF-Token':'bad'})[0],403)
+        self.assertEqual(f.request('api/change_submit',{**request,'actor':f.other},f.auth_headers())[0],400)
+        status,headers,body=f.request('feedback.js');self.assertEqual(status,200);self.assertIn('javascript',headers['Content-Type']);self.assertIn(b'change_submit',body)
 
 
