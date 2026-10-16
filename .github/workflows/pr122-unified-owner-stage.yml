@@ -1,0 +1,49 @@
+name: PR122 Approved Unified Owner Input Staging
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths: ['.github/workflows/pr122-unified-owner-stage.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  approved-data-only:
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pr122-unified-static-f0df8fd70f28263d60f8f2ce3e5bdfbf295d3ae6
+          run-id: 38918571551
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/pr122-approved-unified-6218264390
+      - name: Verify approved data and stage for Owner; no root or production writes
+        env:
+          INPUT_DIR: ${{ runner.temp }}/pr122-approved-unified-6218264390
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,re,time,urllib.request
+          from pathlib import Path
+          assert os.geteuid()==1002 and os.uname().nodename=='iZvt5t8tlrm8oiZ'
+          def sha(b):return hashlib.sha256(b).hexdigest()
+          comments={}
+          for ident,expected in [(6218256074,'401bbc7f49216add360f1ea92857dcf002714328f41368e017189134bc0632e1'),(6218264390,'0680009180dda7aa3dc176673c32cd3bd2b4858c8fb04b22025a679eb937bbdc')]:
+              url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/issues/comments/'+str(ident)
+              req=urllib.request.Request(url,headers={'Accept':'application/vnd.github+json','Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'PR122-Approved-Data-Staging'})
+              with urllib.request.urlopen(req,timeout=20) as f:j=json.load(f)
+              assert j['id']==ident and j['user']['login']=='huhongchuan0422-creator' and sha(j['body'].encode())==expected
+              comments[ident]=j['body']
+          match=re.search(r'<!-- PR122_PUBLIC_MOBILE_UNIFIED_APPROVAL_V1\s*(\{.*?\})\s*PR122_PUBLIC_MOBILE_UNIFIED_APPROVAL_V1 -->',comments[6218264390],re.S)
+          a=json.loads(match[1]);assert a['issued_unix']<=time.time()<a['expires_unix']
+          assert a['implementation_commit']=='f0df8fd70f28263d60f8f2ce3e5bdfbf295d3ae6' and a['max_executions']==1
+          p=Path(os.environ['INPUT_DIR'])/'pr122-unified-distribution/PR122_UNIFIED_RELEASE_REVIEW_ONLY.tar.gz'
+          assert p.is_file() and not p.is_symlink()
+          raw=p.read_bytes();assert len(raw)==406102 and sha(raw)=='d6a73acb1037e55babbc882a82d6f98c23331a49faa1addfe9d9df5e82e5e125'
+          target=Path('/home/githubrunner/pr122-unified-release-6218264390');target.mkdir(mode=0o700,exist_ok=False)
+          out=target/'approved-release.tar.gz'
+          fd=os.open(out,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
+          with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+          assert sha(out.read_bytes())==sha(raw)
+          print(json.dumps({'state':'APPROVED_DATA_STAGED_ROOT_NOT_CALLED','path':str(out),'size':len(raw),'sha256':sha(raw),'approval_comment_id':6218264390,'implementation_commit':a['implementation_commit'],'production_changes':0}))
+          PY
