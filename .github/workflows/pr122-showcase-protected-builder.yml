@@ -1,0 +1,51 @@
+name: PR122 Protected Showcase Builder
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - 'scripts/pr122_showcase*.py'
+      - 'tests/test_pr122_showcase*.py'
+      - 'deploy/pr122-showcase/**'
+      - 'docs/development/PR122_DYNAMIC_SHOWCASE_PROTOCOL_20261016.md'
+      - '.github/workflows/pr122-showcase-protected-builder.yml'
+permissions:
+  contents: read
+jobs:
+  protected-builder-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Real isolated root tests with failure propagation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pr122-protected-builder
+          sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_protected_build tests.test_pr122_showcase_trust tests.test_pr122_showcase tests.test_pr122_showcase_sources tests.test_pr122_showcase_install tests.test_pr122_showcase_poll tests.test_pr122_showcase_promote -v 2>&1 | tee /tmp/pr122-protected-builder/TEST_LOG.txt
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          text=Path('/tmp/pr122-protected-builder/TEST_LOG.txt').read_text()
+          assert re.search(r'Ran 61 tests in ',text) and re.search(r'^OK$',text,re.M)
+          assert not re.search(r'FAILED|ERROR:|FAIL:|skipped=',text)
+          PY
+      - name: Validate candidate service and package exact dependency closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          systemd-analyze verify deploy/pr122-showcase/xuanjun-showcase-build.service
+          python -m scripts.pr122_showcase_mechanism_package --output /tmp/pr122-protected-builder --source-commit "$GITHUB_SHA"
+          python - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          record={'commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'tests':61,'scope':'Synthetic data-only builder and existing showcase dependency regressions; no domestic execution','production_changes':0,'production_trust_enrollment':'NOT_EXECUTED','protected_builder_install':'NOT_EXECUTED','real_SHOWCASE_RELEASE':'NOT_BUILT'}
+          Path('/tmp/pr122-protected-builder/CI_BINDING.json').write_text(json.dumps(record,sort_keys=True,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-protected-builder-${{ github.sha }}
+          path: /tmp/pr122-protected-builder/
+          retention-days: 14
