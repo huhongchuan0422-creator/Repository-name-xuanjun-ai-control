@@ -127,7 +127,7 @@ anchors 按真实评论 ID 的十进制字符串索引，每项固定 body_sha25
 
 新增 `pr122_showcase_protected_build.py` 与 `xuanjun-showcase-build.service`，仅候选源码，无现场安装或执行许可。
 执行代码固定为已安装 `/usr/local/lib/xuanjun-showcase`，由机制Manifest完整绑定且root保护；不得从内容提交执行Python、workflow、构建钩子或其他命令。
-CLI无任意参数；固定国内主机/root检查。服务启动前先核验Owner私有请求中的准确机制Manifest哈希和脚本文件哈希，再导入固定代码；main再检查完整机制清单、路径、所有者、写权限、自身绑定及全部文件size/SHA。
+CLI无任意参数；固定国内主机/root检查。服务启动前先核验Owner私有请求中的准确机制Manifest哈希和脚本文件哈希，再导入固定代码；main再检查机制清单绑定的完整scripts执行依赖、路径、所有者、写权限、自身绑定及脚本文件size/SHA。旧安装器只复制scripts执行闭包；文档/静态数据/服务候选留在送审包，不错误要求它们全部存在于CODE目录。
 
 请求固定路径 `/etc/xuanjun-showcase/BUILDER_REQUEST.json`，root所有0600单硬链接，祖先root不可组/其他写、无符号链接。schema=1，准确字段：commit、ci_run_id、review_comment_ids、reviewer_logins、mechanism_manifest_sha256、shell_tar_sha256、legacy_pages_sha256、issued_unix、expires_unix；一次请求有效期最多两小时。
 它只选择待构建数据，不签发内容批准或发布许可；reviewer_logins本身不能授权。

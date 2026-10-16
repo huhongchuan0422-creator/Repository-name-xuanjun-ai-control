@@ -127,7 +127,10 @@ def verified_code(expected):
     manifest_path=CODE/'MECHANISM_MANIFEST.json'
     raw=manifest_path.read_bytes();site.need(site.sha(raw)==expected,'BUILDER_CODE_MANIFEST')
     manifest=json.loads(raw)
+    # The existing installer installs the executable dependency closure only;
+    # documentation/data/service candidates stay in the reviewed source package.
     for row in manifest['files']:
+        if not row['path'].startswith('scripts/'):continue
         name=Path(row['path'])
         site.need(not name.is_absolute() and '..' not in name.parts,'BUILDER_CODE_PATH')
         target=CODE/name

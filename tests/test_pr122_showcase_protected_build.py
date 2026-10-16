@@ -93,6 +93,7 @@ class PrivateInputTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir='/root') as td:
             root=Path(td);code=root/'scripts/pr122_showcase_protected_build.py';code.parent.mkdir();code.write_bytes(b'# fixture code')
             manifest={'files':[{'path':str(code.relative_to(root)),'size':len(code.read_bytes()),'sha256':s.sha(code.read_bytes())}]}
+            manifest['files'].append({'path':'docs/not-installed.md','size':1,'sha256':'a'*64})
             raw=s.canonical(manifest);(root/'MECHANISM_MANIFEST.json').write_bytes(raw)
             with mock.patch.object(b,'CODE',root),mock.patch.object(b,'__file__',str(code)):
                 b.verified_code(s.sha(raw))
