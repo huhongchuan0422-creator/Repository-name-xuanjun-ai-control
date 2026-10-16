@@ -11,10 +11,14 @@ def table(caption, headers, rows):
 
 
 def wording(text, en=False):
-    if en:
-        return re.sub(r'\b(?:ECV|EVC|ecosystem[- ]values?)\b', EN_NAME, text, flags=re.I)
-    text = re.sub(r'(?:生态权益值|生态权益|权益值|ECV|EVC)', NAME, text)
-    return text.replace('云汇'+NAME, NAME)
+    # Display text only: never rename resource URLs, IDs or ledger fields.
+    parts=re.split(r'(<[^>]*>)',text)
+    for i in range(0,len(parts),2):
+        if en:
+            parts[i]=re.sub(r'\b(?:ECV|EVC|ecosystem[- ]values?)\b', EN_NAME, parts[i], flags=re.I)
+        else:
+            parts[i]=re.sub(r'(?:生态权益值|生态权益|权益值|ECV|EVC)', NAME, parts[i]).replace('云汇'+NAME, NAME)
+    return ''.join(parts)
 
 
 def content(relative, en=False):

@@ -128,6 +128,7 @@ class IntegrationTests(unittest.TestCase):
         new=legacy_public_wording(source)
         self.assertIn('<script>const ECV="ECV";</script>',new)
         self.assertIn('云汇生态权益',new)
+        self.assertEqual(wording('<script src="/assets/ecv-quote.js"></script>',True),'<script src="/assets/ecv-quote.js"></script>')
         for p in self.public.rglob('*.html'):
             if 'id="primary-nav"' in p.read_text():
                 self.assertNotIn('生态权益值',p.read_text())
