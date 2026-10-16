@@ -4,7 +4,7 @@
 
 ## 本次当前恢复点真实执行（2026-10-16 晚）
 
-Owner在韩国通过sudo-root完成许可#6217030577的一次R2执行，终端返回`CURRENT_OFFLINE_POINT_RECEIVED_PASS`。原1363文件匹配，WAL-aware SQLite恢复副本integrity_check PASS；目标`/root/pr99-current-point-received-v2`。数据库SHA`6d451dfdc4714ca9bc704d719dcb47b02ec1e2ce243f886bfb2578a27fbca232`，密文SHA`2ac42b9e69c69260c99387b2e1ae339dd2e80b3f01c1984858e458e6c8872d32`。这是Owner-root回执支持的真实执行，不是审核窗口直接读取私有原件。原V1失败现场保留；成功R2不得重跑。未冻结Writer、未部署生产、服务动作0、API请求0。独立实机回执验收待申请，不自批。
+Owner在韩国通过sudo-root完成许可#6217030577的一次R2执行，终端返回`CURRENT_OFFLINE_POINT_RECEIVED_PASS`。原1363文件匹配，WAL-aware SQLite恢复副本integrity_check PASS；目标`/root/pr99-current-point-received-v2`。数据库SHA`6d451dfdc4714ca9bc704d719dcb47b02ec1e2ce243f886bfb2578a27fbca232`，密文SHA`2ac42b9e69c69260c99387b2e1ae339dd2e80b3f01c1984858e458e6c8872d32`。这是Owner-root回执支持的真实执行，不是审核窗口直接读取私有原件。原V1失败现场保留；成功R2不得重跑。未冻结Writer、未部署生产、服务动作0、API请求0。R2执行回执已由独审#6217422554限定接受；不升级为独立私有数据库复算。
 
 ## 最新原始证据
 
@@ -20,8 +20,8 @@ Run38904470291，提交e4dfdf03a246fd911a226d911970854d2606328e。国内Job11698
 | S02 异机备份及密钥 | #6215371855限定通过，历史密文与恢复密钥在韩国 | 不重复传输，不冒充当前数据 |
 | S03 历史恢复和依赖环境 | 历史1374文件、13项依赖和pip/import验收已通过 | 不重装历史环境 |
 | S04 当前源文件身份 | 服务器1363文件19,350,718字节逐文件摘要已取得 | R2已按原服务器摘要复制1363份选定源码；原清单含436份历史backup，不冒充全部当前应用闭包 |
-| S05 当前SQLite恢复点 | 原20项继承，R2新增7项通过；#6217030577批准后Owner-root一次执行成功 | 离线恢复点完整性PASS（Owner-root证据）；待独立验收回执，不是交易final checkpoint |
-| S06 生产目录与运行合同 | 三机实际依赖属性已采样；B未启动，所有原共享服务保持 | 私有当前配置、运行用户/目录/端口/数据绑定、受控候选与回滚批准；不能整包恢复/etc |
+| S05 当前SQLite恢复点 | 原20项继承，R2新增7项通过；#6217030577批准后Owner-root一次执行成功 | 离线恢复点已由#6217422554限定接受（Owner-root证据），不是交易final checkpoint |
+| S06 生产目录与运行合同 | 10份unit、1份drop-in及私有元数据已按#6218349901接收；Owner-root成功回执；旧失败现场已保留 | 私有当前配置、运行用户/目录/端口/数据绑定、受控候选与回滚批准；不能整包恢复/etc |
 | S07 客户网站动态入口 | 国内静态网站原通过；东京Portal/WeCom仍在运行，国内同名unit不存在 | 国内逐服务接续、真实非写验收、入口上游切换与回滚；不得用历史Portal覆盖R4 |
 | S08 模型/RPC/小说/VPN通道 | 三机端口和systemd依赖关系已取得 | 私有配置/证书身份、双端通道与客户端指向验证；UK既有P2由原writer负责，本分支不恢复UK |
 | S09 调度与最后增量 | 东京四财务timer实际active；未知root/admin cron已明确登记 | 定时任务保留/迁移/停止的明确决策、私有cron核查、最终数据时点和单Writer安排 |
@@ -46,7 +46,7 @@ S04/S05本次批准范围内的真实离线复制已完成；不等于1363选定
 | xj-tokyo-vpn | 东京active且Requires docker；docker active | 需要容器/网络/访问端的独立受控接续；韩国tailscaled active仅证明进程存在，不证明VPN用户已迁或可替代东京容器 |
 | Binance运行资产 | 韩国B inactive/PID0、PrivateNetwork=yes；当前恢复点R2已接收，S06运行接续未完成 | 本轮只做离线资产，原B和current不改变；未来交易启动另行验证唯一Writer/对账，不能拿API延后当批准 |
 
-韩国ss出现443监听但nginx.service not-found；不能假定该端口空闲，也不能假设监听进程是Nginx。任何未来部署前必须核实所属者。更多自定义服务、用户级进程、容器和cron尚未穷尽，本次不是完整服务器职责闭包。
+后续S06 Owner-root回执已确认韩国443归属morelogin-socks5-permanent.service（gost PID996/root），不得占用、改写或重启该共享服务。19444归属sshd PID1283/UID1000，未证明其具体远端或systemd单元。任何未来部署前必须核实所属者。更多自定义服务、用户级进程、容器和cron尚未穷尽，本次不是完整服务器职责闭包。
 
 ## 四项财务调度逐项保留
 
@@ -77,3 +77,14 @@ Run38913529642，提交69eeefabee15fcacc8b0d5deb0fc287898d56b27；三机三个Jo
 ## R2验收关闭，S06新候选已形成
 
 独审#6217422554已认可R2 Owner-root离线复制回执；S04/S05在该限定证据范围通过，禁止再用#6217030577重跑。下一批S06候选准确源码4c9460a215b793259228f9d2e0fbfe5ea50267a1，Hosted Run38916022943/Job117023586355新增19/19 PASS，原历史测试未重跑，全部生产Runner SKIPPED。候选仅10份unit、1份drop-in及私有运行元数据一次加密交接，不读取EnvironmentFile/Token/SecretRef或数据库，不安装或改变服务。unit原件可能内联认证，全部保持root私有，不可宣称凭据内容绝不存在或上传GitHub。新动作PR99_S06_PRIVATE_RUNTIME_CONTRACT_V1需另行准确许可，原R2许可不能代替。完整API/运行秘密、容器/调度闭包及服务接续仍不冒充完成。
+
+
+## S06真实私有采集成功（2026-10-16 23:14 Owner消息）
+
+替代许可#6218349901已执行一次，原脚本SHA9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca未改。Owner终端报告TOKYO_ROOT_PREFLIGHT=PASS、SOURCE_STAGE=ABSENT、OLD_FAILURE_ATOMICALLY_PRESERVED，随后返回S06_PRIVATE_RUNTIME_CONTRACT_RECEIVED_PASS。准确回执见`evidence/pr99-service-handoff/s06-candidate/OWNER_SUCCESS_20261016.json`。原失败目录保存在`/root/pr99-s06-runtime-received-v1.auth-failed-6217834919`，成功材料在原v1接收目录；两个许可均已消费，不再重跑。
+
+10份unit、1份drop-in及1份私有元数据已加密私有接收；archive SHA ec11ca6f579beb681adfd739bfeca5b836a22812676fd86a298340913c5243fd，cipher SHA d9bb83a859e0bfc307890539aa22ed872d9ab51c63db79a63f1e5cbeaa683e06。没有EnvironmentFiles读取、数据库读取、业务API请求或服务操作；unit可能内联认证，原件和密钥不公开。证据是Owner-root执行回执，不是开发方/独审方重新登录后重算私有原件。
+
+韩国443的UNKNOWN已由本次Owner-root采样关闭为MoreLogin gost PID996/UID0；这只解决端口所属者，不等于任何新服务安装可占该端口。19444为sshd PID1283/UID1000，通道端点/认证及最终责任仍需核实。
+
+下一步直接使用已接收材料形成脱敏的运行入口/路径/依赖清单和S07/S08候选，不再采集或重传上述11份配置、不重跑19项测试。已收集配置尚未等于生产迁移：EnvironmentFiles、实际通道身份、容器、root/admin调度、目标目录/账号/端口和回滚仍未闭包；不恢复API、不启动交易、不动Finance或UK/P2。剩余服务落点与受控安装/切换另行准确批准，东京继续运行。

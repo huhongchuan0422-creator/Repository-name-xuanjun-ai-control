@@ -604,7 +604,7 @@
     }
   },
   "service_handoff": {
-    "status": "THREE_HOST_NONROOT_DEPENDENCIES_COLLECTED_NOT_CUTOVER",
+    "status": "S06_PRIVATE_CONTRACT_RECEIVED_OWNER_ROOT_NOT_CUTOVER",
     "run": 38904470291,
     "source_commit": "e4dfdf03a246fd911a226d911970854d2606328e",
     "jobs": {
@@ -620,12 +620,11 @@
     "tokyo_finance_timers": "4_ACTIVE_NOT_CHANGED",
     "unresolved": [
       "provider-neutral-tunnel exact unit vs similarly named Tokyo tunnel",
-      "Korea443 listener owner, nginx unit not-found",
       "private current channel configs, root/admin cron, user services and containers",
       "actual service installation and upstream cutover"
     ],
     "current_point_receipt": "evidence/pr99-current-point-r2/OWNER_EXECUTION_RECEIPT_20261016.json",
-    "next": "S06_CURRENT_RUNTIME_AND_PRIVATE_CHANNEL_CONTRACTS_NOT_PRODUCTION_CUTOVER",
+    "next": "LOCAL_RECEIVED_CONTRACT_PROJECTION_AND_S07_S08_CONTROLLED_HANDOFF_CANDIDATES_NOT_RETIREMENT",
     "runtime_metadata": {
       "run": 38913529642,
       "delivery_commit": "69eeefabee15fcacc8b0d5deb0fc287898d56b27",
@@ -638,16 +637,16 @@
       "evidence": "evidence/pr99-service-handoff/RUNTIME_METADATA_20261016.json",
       "next_contract": "evidence/pr99-service-handoff/S06_PRIVATE_HANDOFF_CONTRACT_20261016.md",
       "tunnel_generic_unit": "NOT_FOUND_AT_TOKYO",
-      "korea443_owner": "UNKNOWN_NONROOT_PERMISSION",
+      "korea443_owner": "RESOLVED_BY_LATER_OWNER_ROOT_S06_RECEIPT_MORELOGIN_GOST_PID996",
       "root_admin_scheduling": "UNKNOWN_PRIVATE_CONTENTS_NOT_READ",
       "protect_other_writer": "DOMESTIC_XUANJUN_SITE_HUB_PREVIEW_ACTIVE"
     },
     "s06_private_candidate": {
       "action": "PR99_S06_PRIVATE_RUNTIME_CONTRACT_V1",
-      "status": "OWNER_AUTH_PREFLIGHT_FAILED_PRESERVE_STAGE",
+      "status": "S06_PRIVATE_RUNTIME_CONTRACT_RECEIVED_PASS_OWNER_ROOT_EXECUTION_REVIEW_PENDING",
       "scope": "TEN_FIXED_UNIT_FILES_ONE_DROPIN_PRIVATE_RUNTIME_METADATA_ONLY_ENCRYPTED_NOT_INSTALL",
       "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
-      "permission": "NOT_ISSUED",
+      "permission": "REPLACEMENT_6218349901_CONSUMED_SUCCESS_NO_REUSE",
       "production_executed": false,
       "environment_files_opened": false,
       "database_opened": false,
@@ -678,7 +677,7 @@
         "comment_id": 6217723972,
         "read_back": true,
         "scope": "ONE_CONSOLIDATED_NEW_PRIVATE_UNIT_CONTRACT_EXPORT_REVIEW_AND_NEW_ONCE_PERMISSION",
-        "decision": "PENDING",
+        "decision": "APPROVED_6217834919_ORIGINAL_AND_6218349901_REPLACEMENT",
         "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
         "delivery_commit": "76f231cc253c5589041c38a778595a5d720fdad0"
       },
@@ -764,7 +763,7 @@
         "expires_at": 1792184596,
         "max_attempts": 1,
         "scope": "EXACT_FAILED_LOCAL_STAGE_ATOMIC_PRESERVATION_THEN_ORIGINAL_SCRIPT_ONE_RUN",
-        "status": "ISSUED_NOT_EXECUTED"
+        "status": "CONSUMED_SUCCESS_OWNER_ROOT_NO_REUSE"
       },
       "restart_launcher": {
         "path": "evidence/pr99-service-handoff/s06-candidate/restart-6218349901.py",
@@ -772,8 +771,22 @@
         "original_capture_script_changed": false,
         "old_tests": "INHERITED_NOT_RERUN",
         "local_launcher_checks": "SOURCE_HASH_OLD_FAILURE_SHA_PROGRESS_REJECTION_EXCLUSIVE_NOREPLACE_RENAME_PRESERVED_INODE_BYTES_REPLAY_REFUSAL; SYNTHETIC_LOCAL_ONLY",
-        "production_executed": false
-      }
+        "production_executed": true
+      },
+      "owner_success_receipt": "evidence/pr99-service-handoff/s06-candidate/OWNER_SUCCESS_20261016.json",
+      "private_capture_executed": true,
+      "production_service_deployed": false,
+      "host_independent_pass": false,
+      "production_executed_definition": "Production deployment/activation false; private capture did execute successfully as separately recorded",
+      "execution_acceptance": "PENDING_INDEPENDENT_RECEIPT_REVIEW_NO_SOURCE_REVIEW_OR_REEXECUTION"
+    },
+    "korea443_owner": {
+      "evidence_origin": "OWNER_ROOT_RECEIPT",
+      "unit": "morelogin-socks5-permanent.service",
+      "exe": "/opt/opnana-proxy/bin/gost-3.3.0/gost",
+      "pid": 996,
+      "uid": 0,
+      "protect": true
     }
   },
   "current_recovery_point_r2": {
