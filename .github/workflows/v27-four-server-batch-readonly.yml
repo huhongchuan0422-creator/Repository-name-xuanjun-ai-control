@@ -431,7 +431,7 @@ jobs:
           PY
 
   backend-custody-offline:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.sha == 'fa2a474f7c37a3dac4bc1d4278ff611ff94fb081'
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 4
     steps:
@@ -475,5 +475,53 @@ jobs:
         with:
           name: pr122-backend-offline-${{ github.sha }}
           path: ${{ runner.temp }}/pr122-backend-offline-review/
+          if-no-files-found: error
+          retention-days: 14
+
+  korea-runtime-package:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 632bbe6f204a2c9ef778d3c91e425593c079abb1
+          persist-credentials: false
+      - name: Build exact previously reviewed Korea runtime without server or network operations
+        run: |
+          test "$(git rev-parse HEAD)" = 632bbe6f204a2c9ef778d3c91e425593c079abb1
+          export PYTHONPATH="$GITHUB_WORKSPACE/migration-prep"
+          python3 -B -m korea.build_runtime_candidate "$RUNNER_TEMP/pr99-runtime-candidate"
+          python3 -I "$RUNNER_TEMP/pr99-runtime-candidate/migration-prep/korea/validate_runtime_candidate.py" "$RUNNER_TEMP/pr99-runtime-candidate" --expected-manifest-sha256 f887b085508e3ed4831dbed22152e35af5e8aba95b85b899b4697c61449917de
+      - name: Archive source only with exact commit and manifest receipt
+        run: |
+          python3 -B - <<'PY'
+          import gzip,hashlib,io,json,os,subprocess,tarfile
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'pr99-runtime-candidate'
+          manifest=json.loads((root/'minimal-runtime-manifest.json').read_text())
+          files={item['path']:(root/item['path']).read_bytes() for item in manifest['files']}
+          files['minimal-runtime-manifest.json']=(root/'minimal-runtime-manifest.json').read_bytes()
+          assert len(files)==18
+          for item in manifest['files']:
+              assert hashlib.sha256(files[item['path']]).hexdigest()==item['sha256']
+          buffer=io.BytesIO()
+          with gzip.GzipFile(fileobj=buffer,mode='wb',mtime=0,filename='') as compressed:
+              with tarfile.open(fileobj=compressed,mode='w') as archive:
+                  for name,data in sorted(files.items()):
+                      info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o755 if name.endswith('.sh') else 0o644;info.mtime=0
+                      if name=='minimal-runtime-manifest.json':info.mode=0o600
+                      archive.addfile(info,io.BytesIO(data))
+          out=Path(os.environ['RUNNER_TEMP'])/'pr99-runtime-review';out.mkdir(mode=0o700)
+          data=buffer.getvalue()
+          (out/'PR99_KOREA_RUNTIME_632bbe6f.tar.gz').write_bytes(data)
+          receipt={'schema_version':1,'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'workflow_commit':os.environ['GITHUB_SHA'],'manifest_sha256':hashlib.sha256(files['minimal-runtime-manifest.json']).hexdigest(),'archive_sha256':hashlib.sha256(data).hexdigest(),'archive_bytes':len(data),'regular_entries':18,'bound_source_files':17,'runtime_validation':'RUNTIME_CANDIDATE_INPUT_PASS','production_authorized':False,'server_install':False,'service_started':False,'binance_called':False,'original137_tests_rerun':False}
+          (out/'BUILD_RECEIPT.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          print('PR99_RUNTIME_PACKAGE_RECEIPT='+json.dumps(receipt,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr99-korea-runtime-632bbe6f
+          path: ${{ runner.temp }}/pr99-runtime-review/
           if-no-files-found: error
           retention-days: 14
