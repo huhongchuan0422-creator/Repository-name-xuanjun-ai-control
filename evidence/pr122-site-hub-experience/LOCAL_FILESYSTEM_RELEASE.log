@@ -1,0 +1,12 @@
+test_complete_static_update_and_rollback (tests.test_pr122_site_hub_experience_release.ExperienceTests.test_complete_static_update_and_rollback) ... ok
+test_fault_after_every_completed_phase (tests.test_pr122_site_hub_experience_release.ExperienceTests.test_fault_after_every_completed_phase) ... ok
+test_no_apply_retry (tests.test_pr122_site_hub_experience_release.ExperienceTests.test_no_apply_retry) ... ok
+test_refuse_foreign_config_rollback (tests.test_pr122_site_hub_experience_release.ExperienceTests.test_refuse_foreign_config_rollback) ... ok
+test_reject_old_gate_without_changes (tests.test_pr122_site_hub_experience_release.ExperienceTests.test_reject_old_gate_without_changes) ... ok
+test_reject_public_drift (tests.test_pr122_site_hub_experience_release.ExperienceTests.test_reject_public_drift) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 83.051s
+
+OK
+COMBINED_TEST_SOURCE=ACTUAL_APPROVED_ARCHIVE_1187_PLUS_90; SYSTEMD_NGINX=FAKE

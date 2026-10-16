@@ -14,12 +14,15 @@ on:
       - 'deploy/pr122-site-hub-preview/**'
       - 'evidence/pr122-site-hub/PR122_SITE_HUB_REVIEW_ONLY.tar.gz'
       - '.github/workflows/pr122-site-hub-preflight.yml'
+      - 'tests/test_pr122_site_hub_experience_release.py'
+      - 'deploy/pr122-site-hub-experience/**'
+      - 'evidence/pr122-site-hub-experience/**'
 permissions:
   contents: read
 jobs:
   static-and-synthetic:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,6 +54,24 @@ jobs:
         run: |
           python -m unittest tests.test_pr122_site_hub_release_delta.AdditionTests -v
           sudo -n "$(command -v python)" scripts/pr122_site_hub_release_regression.py
+      - name: New static UI package and r2-preserving release transaction
+        run: |
+          python - <<'PYCODE'
+          import json,shutil
+          from pathlib import Path
+          from scripts import pr122_site_hub_experience_release as r
+          folder=Path('evidence/pr122-site-hub-experience')
+          pins=json.loads(r.PINS.read_text())
+          data=r.entries((folder/'PR122_SITE_HUB_REVIEW_ONLY.tar.gz').read_bytes(),pins)
+          snippet,routes=r.routes(data)
+          assert snippet==(folder/'locations.conf').read_bytes()
+          assert len(routes)==182 and sum(k=='file' for k,t in routes.values())==137
+          for name in ('PR122_SITE_HUB_REVIEW_ONLY.tar.gz','PACKAGE_RECEIPT.json','locations.conf'):
+              shutil.copyfile(folder/name,Path('/tmp/pr122-site-hub')/('EXPERIENCE_'+name))
+          print('EXPERIENCE_PACKAGE_PASS; 449_REGULAR_MEMBERS; 448_MANIFEST_FILES; NO_DEPLOYMENT')
+          PYCODE
+          python -m scripts.pr122_site_hub_experience_package --output /tmp/pr122-site-hub
+          sudo -n env XJ_COMBINED_SYNTHETIC_FIXTURE=1 "$(command -v python)" -m unittest tests.test_pr122_site_hub_experience_release.ExperienceTests -v
       - name: Reuse exact unchanged browser source audit
         id: browser-baseline
         run: |

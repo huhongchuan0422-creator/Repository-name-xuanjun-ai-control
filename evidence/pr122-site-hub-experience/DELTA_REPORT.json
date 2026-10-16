@@ -1,0 +1,13 @@
+{
+  "added": [
+    "assets/hub-script-dc888cd7b15b4e6f.js",
+    "visual/community-payment/merchant-dashboard/index.html"
+  ],
+  "changed_existing": 357,
+  "deleted": [],
+  "new_files": 1279,
+  "old_files": 1277,
+  "publisher_unchanged": true,
+  "runtime_unchanged": true,
+  "state": "LOCAL_REVIEW_EVIDENCE_NOT_INDEPENDENT_APPROVAL"
+}

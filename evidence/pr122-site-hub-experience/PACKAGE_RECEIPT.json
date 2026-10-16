@@ -1,0 +1,14 @@
+{
+  "candidate_manifest_sha256": "cdf6d4c0a3d0a021d52ef88993b4ac9ec5febd3b3f94380895da0c4693cf95b8",
+  "content_commit": "2ecee38d65b0c5353521019dd08030245e902e0d",
+  "new_file_count": 92,
+  "overlay_file_count": 407,
+  "package_manifest_sha256": "88438176206310a92ff4073185dc5c2c99ab1e7b4b50acaf67e9c8c02ceadd12",
+  "production_deployed": false,
+  "public_file_count": 1279,
+  "publisher_source_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
+  "review_scope": "NEW_STATIC_UI_ONLY; OLD_RUNTIME_AND_PUBLISHER_BYTES_UNCHANGED",
+  "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
+  "state": "REVIEW_ONLY_NOT_APPROVED",
+  "tar_sha256": "a3c083c7b38d2ff0bd5264cd67abac7e61ce95c9e82c0848d94f71bfd5b533e9"
+}
