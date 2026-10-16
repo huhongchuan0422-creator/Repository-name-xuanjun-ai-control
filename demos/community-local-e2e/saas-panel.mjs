@@ -85,6 +85,24 @@ export async function loadDashboard(fetcher,token,now=Math.floor(Date.now()/1000
  try{const panel=await post("admin_snapshot");reviews=panel.review_tasks}catch(error){if(error.message!=="OFFLINE_REQUEST_DENIED")throw error}
  return {modules,orders,reviews};
 }
+export function validateRenewalPreview(view, requestedOrderId, oldExpiry, now){
+ if(typeof requestedOrderId!=="string"||! /^[A-Za-z0-9_-]{1,128}$/.test(requestedOrderId))
+  throw Error("INVALID_RENEWAL_ORDER");
+ if(!Number.isSafeInteger(oldExpiry)||oldExpiry<0||
+    !Number.isSafeInteger(now)||now<0)throw Error("INVALID_RENEWAL_TIME");
+ if(view===null||typeof view!=="object"||Array.isArray(view))
+  throw Error("INVALID_RENEWAL_PREVIEW");
+ const start=view.proposed_valid_from,end=view.proposed_valid_until;
+ if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<Math.max(now,oldExpiry)||end<=start)
+  throw Error("INVALID_RENEWAL_WINDOW");
+ if(view.order_id!==requestedOrderId||view.entitlement_granted!==false||
+    view.automatic_renewal_authorized!==false||
+    view.needs_entitlement_approval!==true||
+    view.needs_authoritative_finance_link!==true)
+  throw Error("UNSAFE_RENEWAL_PREVIEW");
+ return {order_id:requestedOrderId,start,end,no_auto_renewal:true,
+  needs_approval:true,finance_verified:false,entitlement_granted:false};
+}
 export async function offlineAction(fetcher,token,operation,params,now=Math.floor(Date.now()/1000)){
  if(typeof token!=="string"||token.length<32)throw Error("TOKEN_REQUIRED");
  if(!["quote","order_prepare","renewal_plan","owner_create_offer","owner_approve_offer"].includes(operation))throw Error("OPERATION_NOT_ALLOWED");
@@ -139,11 +157,10 @@ if(typeof document!=="undefined"&&document.getElementById("moduleCatalog")){
    const orderId=document.getElementById("renewalOrderId").value.trim();
    const until=Number(document.getElementById("previousExpiry").value);
    if(!Number.isSafeInteger(until)||until<0)throw Error("BAD_TIME");
-   const view=await offlineAction(fetch,document.getElementById("offlineToken").value,"renewal_plan",{order_id:orderId,valid_until:until});
-   document.getElementById("renewalDetails").textContent=JSON.stringify({
-     start:view.proposed_valid_from,end:view.proposed_valid_until,
-     no_auto_renewal:!view.automatic_renewal_authorized,
-     needs_approval:view.needs_entitlement_approval},null,2);
+   const now=Math.floor(Date.now()/1000);
+   const view=await offlineAction(fetch,document.getElementById("offlineToken").value,"renewal_plan",{order_id:orderId,valid_until:until},now);
+   document.getElementById("renewalDetails").textContent=JSON.stringify(
+     validateRenewalPreview(view,orderId,until,now),null,2);
    status.textContent="续费仅供审阅，不执行扣款。";
   }catch{status.textContent="续费规划不可用：需要有效订单和经核验的确认凭证。";}
  });

@@ -1,5 +1,5 @@
 import test from "node:test";import assert from "node:assert/strict";
-import {presentAmount,safeText,modelToView,renderDashboard,offerCycles,parseOwnerInteger} from "./saas-panel.mjs";
+import {presentAmount,safeText,modelToView,renderDashboard,offerCycles,parseOwnerInteger,validateRenewalPreview} from "./saas-panel.mjs";
 test("dual currency integer minor units",()=>{assert.equal(presentAmount(1999,"CNY"),"¥19.99");assert.equal(presentAmount(500,"USD"),"$5.00")});
 test("unknown costs and invalid numerics stay UNKNOWN",()=>{assert.equal(presentAmount(null,"USD"),"UNKNOWN");assert.equal(presentAmount(-1,"CNY"),"UNKNOWN");assert.equal(presentAmount(1.5,"USD"),"UNKNOWN")});
 test("currency never implicitly converted",()=>assert.throws(()=>presentAmount(100,"JPY"),/INVALID_CURRENCY/));
@@ -67,4 +67,28 @@ test("Owner offer version must be a positive safe integer",()=>{
  assert.equal(parseOwnerInteger("2",true),2);
  for(const raw of ["0","-1","1.1","99999999999999999"])
   assert.throws(()=>parseOwnerInteger(raw,true),/INVALID_OWNER_INTEGER/);
+});
+
+test("renewal read-only preview binds order and Finance/entitlement flags",()=>{
+ const now=100, expiry=200;
+ const view={order_id:"order1",proposed_valid_from:200,proposed_valid_until:300,
+  entitlement_granted:false,automatic_renewal_authorized:false,
+  needs_entitlement_approval:true,needs_authoritative_finance_link:true};
+ assert.deepEqual(validateRenewalPreview(view,"order1",expiry,now),{
+  order_id:"order1",start:200,end:300,no_auto_renewal:true,
+  needs_approval:true,finance_verified:false,entitlement_granted:false});
+ for(const bad of [{...view,order_id:"order2"},{...view,entitlement_granted:true},
+  {...view,automatic_renewal_authorized:true},{...view,needs_authoritative_finance_link:false},
+  {...view,proposed_valid_from:199},{...view,proposed_valid_until:200},
+  {...view,proposed_valid_until:Number.MAX_SAFE_INTEGER+1}])
+ assert.throws(()=>validateRenewalPreview(bad,"order1",expiry,now),/RENEWAL/);
+});
+test("renewal preview rejects unsafe expiry and malformed orders",()=>{
+ const good={order_id:"order1",proposed_valid_from:200,proposed_valid_until:300,
+  entitlement_granted:false,automatic_renewal_authorized:false,
+  needs_entitlement_approval:true,needs_authoritative_finance_link:true};
+ for(const n of [NaN,Infinity,-1,1.5,Number.MAX_SAFE_INTEGER+1])
+  assert.throws(()=>validateRenewalPreview(good,"order1",n,100),/INVALID_RENEWAL_TIME/);
+ for(const id of ["","../other","<script>"])
+  assert.throws(()=>validateRenewalPreview(good,id,200,100),/INVALID_RENEWAL_ORDER/);
 });
