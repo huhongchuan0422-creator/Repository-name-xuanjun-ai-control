@@ -79,7 +79,9 @@
           "tests/test_p2_b_resource_aggregate_fix.py",
           "tests/test_p2_b_resource_aggregate_fix_contract.py",
           "tests/test_p2_claim_successor.py",
-          "tests/test_p2_claim_successor_contract.py"
+          "tests/test_p2_claim_successor_contract.py",
+          "tests/test_p2_capability_lifecycle.py",
+          "tests/test_p2_capability_lifecycle_contract.py"
         ]
       },
       "reuse": [

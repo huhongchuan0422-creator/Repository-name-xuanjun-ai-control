@@ -1,0 +1,18 @@
+UNBOUND / NOT_AUTHORIZED. This is a review-only invocation description, not a shell command.
+
+Future separately authorized launcher: trusted isolated Python with -I -S -B.
+Target source: delivery/epoch7_prepare_successor_delivery.py.
+Target kit sibling: epoch7-recovery-candidate-r7-claim-lifecycle.
+Target preparation sibling: epoch7-preparation-candidate-r7-claim-lifecycle.
+Required schema-1 timing policy: PREPARED_START_30S_ORDERED_GUARDS_PUBLICATION_MIN_V1.
+Operation: prepare.
+Required option: --admission-expires-at-utc <UNBOUND_EXACT_UTC_EXPIRY>.
+
+Do not execute or substitute local-test hashes. Binding requires a real immutable source
+publication commit/tree, published archive SHA-256 and exact size, manifest/entry
+SHA-256 and entry size, and the exact published preparation dependency SHA-256/size.
+Publication and staging do not grant installation admission. The three new private
+outputs require a subsequent exact review; no approval ID is required to form them.
+
+The earlier successor source, approval, C attempt and expiry cannot authorize this
+changed lifecycle. All new publication and private-plan identities remain UNBOUND.
