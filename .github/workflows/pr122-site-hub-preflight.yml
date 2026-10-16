@@ -33,6 +33,7 @@ on:
       - 'evidence/pr122-site-hub/PR122_SITE_HUB_REVIEW_ONLY.tar.gz'
       - '.github/workflows/pr122-site-hub-preflight.yml'
       - 'tests/test_pr122_site_hub_experience_release.py'
+      - 'tests/pr122_site_hub_experience_nginx.py'
       - 'deploy/pr122-site-hub-experience/**'
       - 'evidence/pr122-site-hub-experience/**'
 permissions:
@@ -92,6 +93,7 @@ jobs:
           print('EXPERIENCE_PACKAGE_PASS; 449_REGULAR_MEMBERS; 448_MANIFEST_FILES; NO_DEPLOYMENT')
           PYCODE
           python -m scripts.pr122_site_hub_experience_package --output /tmp/pr122-site-hub
+          python tests/pr122_site_hub_experience_nginx.py
           sudo -n env XJ_COMBINED_SYNTHETIC_FIXTURE=1 "$(command -v python)" -m unittest tests.test_pr122_site_hub_experience_release.ExperienceTests -v
       - name: Reuse exact unchanged browser source audit
         id: browser-baseline

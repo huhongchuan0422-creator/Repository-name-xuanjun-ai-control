@@ -26,9 +26,9 @@
   "public_file_count": 1279,
   "publisher_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
   "publisher_source_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
-  "release_id": "pr122-hub-experience-ca7ab933",
+  "release_id": "pr122-hub-experience-ca7ab933-r2",
   "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
   "source_head": "ca7ab93306a66de1697833201d3c0bc6c98910d9",
   "static_artifact_sha256": "b66eba8c958b10925064053f41dc575a6eb301616bc414d139cdddd98a2e7cb3",
-  "transaction_id": "pr122-hub-experience-20261016"
+  "transaction_id": "pr122-hub-experience-20261016-r2"
 }

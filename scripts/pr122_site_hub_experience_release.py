@@ -72,6 +72,27 @@ def routes(data):
     return (text+data['runtime-config/server-location.conf'].decode()).encode(),route_map
 
 
+def smoke_routes(data):
+    """Probe published URLs, not root HTML filenames denied by the old router.
+
+    Existing apex exact locations expose /about -> /about.html (and / ->
+    /index.html). Keep that contract; do not open a generic HTML location.
+    Other overlays are already reachable under the existing prefix locations.
+    """
+    result=dict(routes(data)[1])
+    for name in data:
+        if not name.startswith('overlay/public/'):
+            continue
+        target='/'+name.removeprefix('overlay/public/')
+        route=target
+        if target=='/index.html':route='/'
+        elif target.count('/')==1 and target.endswith('.html'):route=target[:-5]
+        row=('file',target)
+        need(route not in result or result[route]==row,'SMOKE_ROUTE_COLLISION:'+route)
+        result[route]=row
+    return result
+
+
 def gate(value,pins):
     fields={'decision':'RELEASE_APPROVED','operation':'PR122_STATIC_EXPERIENCE','transaction_id':pins['transaction_id'],
             'source_head':pins['source_head'],'wrapper_sha256':digest(c.read(HERE)),'host_pins_sha256':digest(c.read(PINS)),
@@ -164,7 +185,7 @@ class Transaction(c.Transaction):
             self.step('NGINX_STAGED',lambda:c.write(c.LOCATIONS,routes(self.entries)[0],expected=self.pins['nginx'][str(c.LOCATIONS)]))
             self.step('NGINX_VALIDATED',self.ops.nginx_test);self.step('ACTIVATION_DRIFT_CHECK',self.before_activation)
             self.step('STATIC_ACTIVATED',lambda:self.publisher('activate'));self.step('NGINX_RELOADED',self.ops.reload_nginx)
-            self.data['https']=self.step('HTTPS_SMOKE',lambda:self.ops.smoke(self.entries,{**routes(self.entries)[1],**{'/'+p.removeprefix('overlay/public/'):('file','/'+p.removeprefix('overlay/public/')) for p in self.entries if p.startswith('overlay/public/')}}))
+            self.data['https']=self.step('HTTPS_SMOKE',lambda:self.ops.smoke(self.entries,smoke_routes(self.entries)))
             self.step('STATIC_CHECK',lambda:self.publisher('check'))
             self.data.update(state='HTTPS_SMOKE_PASS_AWAIT_BROWSER',production_browser='PENDING');c.atomic(self.receipt,self.data);return self.data
         except BaseException as error:
