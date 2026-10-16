@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "KOREA_OWNER_ROOT_EXECUTE_APPROVED_CURRENT_POINT_ONCE; TOKYO_PASSWORD_TERMINAL_ONLY; NO_REPEATED_PRIOR_WORK",
+  "owner_action_now": "READ_ONLY_TOKYO_FAILURE_RECEIPT_AND_STAGING_METADATA; DO_NOT_REEXECUTE_OR_REUSE_LICENSE",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -537,9 +537,9 @@
     "action": "PR99_CURRENT_OFFLINE_RECOVERY_POINT_V1",
     "binding_sha256": "1785c311ab9eb0b5e88c43dbb2bb3da8dce3a519635d6ca7b0e2ad9a68161fa1",
     "scope": "SERVER_PINNED_SOURCE_AND_ONE_WAL_AWARE_SQLITE_OFFLINE_POINT_PRIVATE_COPY_ONLY",
-    "production_executed": false,
+    "production_executed": "OWNER_REPORTED_ONE_ATTEMPT_FAILED_UNKNOWN_REMOTE_PROGRESS",
     "permission": {
-      "status": "APPROVED_ONCE_NOT_EXECUTED",
+      "status": "ATTEMPT_STARTED_FAILED_NO_RETRY",
       "comment_id": 6216441589,
       "body_sha256": "390e8e7fdeec17b001162e0c2f4b0ce7c6ad0f2a6a7257a7cf5693e7af4ce306",
       "issued_at": 1792156935,
@@ -574,6 +574,20 @@
       "decision": "PASS_WITH_EXACT_PRECONDITIONS",
       "exact_candidate": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
       "evidence_commit": "9fbd573852eea301268575c750cda1f2f904321d"
+    },
+    "execution": {
+      "origin": "OWNER_KOREA_ROOT_TERMINAL_NOT_DIRECT_LOGIN",
+      "status": "HOLD_PRESERVE_EVIDENCE",
+      "local_workdir": "/root/pr99-current-point-received-v1",
+      "package": "/root/pr99-current-point-package-c6ba6ac8",
+      "approval_comment_id": 6216441589,
+      "failed_step": "REMOTE_PREPARE_SSH_RETURNED_NONZERO",
+      "public_reason": "SSH_STEP_FAILED",
+      "remote_state": "INSPECT_BEFORE_ANY_NEW_AUTHORITY",
+      "source_failure_receipt": "NOT_YET_READ",
+      "real_database_copy": "NOT_PROVEN",
+      "retry_allowed": false,
+      "coordinator_diagnostic_gap": "SSH STDERR CAPTURED_IN_MEMORY_BUT_NOT_PERSISTED_ON_NONZERO"
     }
   },
   "service_handoff": {
