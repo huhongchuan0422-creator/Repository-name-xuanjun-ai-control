@@ -4,6 +4,11 @@ on:
     branches: [feature/work-pr122-site-hub-integration-20261016]
     paths:
       - 'scripts/pr122_site_hub_unified_package.py'
+      - 'scripts/pr122_site_hub_unified_release.py'
+      - 'scripts/pr122_site_hub_unified_distribution.py'
+      - 'tests/test_pr122_site_hub_unified_release.py'
+      - 'deploy/pr122-site-hub-unified/**'
+      - 'evidence/pr122-unified-release/**'
       - 'tests/test_pr122_site_hub_unified_package.py'
       - 'tests/pr122_site_hub_unified_nginx.py'
       - '.github/workflows/pr122-unified-release-review.yml'
@@ -33,6 +38,11 @@ jobs:
           GITHUB_SHA=790937a5c96afcf3b3660e36cf36cfaab2002a72 python -m scripts.pr122_community_experience_package --output /tmp/pr122-reviewed-mobile
           python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-unified-stage
           python -m scripts.pr122_site_hub_unified_package --static evidence/pr122-public-presentation/PR122_PUBLIC_PRESENTATION_REVIEW_ONLY.tar.gz --mobile /tmp/pr122-reviewed-mobile/COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz --output /tmp/pr122-unified-candidate --stage /tmp/pr122-unified-stage
+      - name: Frozen unified wrapper, full release and controlled rollback regression
+        run: |
+          set -euo pipefail
+          sudo -n env XJ_COMBINED_SYNTHETIC_FIXTURE=1 "$(command -v python)" -m unittest tests.test_pr122_site_hub_unified_release.UnifiedTransactionTests -v
+          python -m scripts.pr122_site_hub_unified_distribution --candidate /tmp/pr122-unified-candidate/PR122_UNIFIED_REVIEW_ONLY.tar.gz --output /tmp/pr122-unified-distribution
       - name: Browser and real Nginx test dependencies
         run: |
           set -euo pipefail
@@ -65,4 +75,5 @@ jobs:
           path: |
             /tmp/pr122-unified-reports/
             /tmp/pr122-unified-candidate/
+            /tmp/pr122-unified-distribution/
           retention-days: 14

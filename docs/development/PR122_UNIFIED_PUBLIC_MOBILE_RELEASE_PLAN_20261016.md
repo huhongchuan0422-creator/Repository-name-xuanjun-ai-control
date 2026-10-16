@@ -46,3 +46,15 @@
 ## 验证层级
 
 离线组合测试、Hosted真实Nginx、Hosted浏览器、国内普通用户只读观察、Owner-root只读回执、独立制品核验、正式单次许可和生产HTTPS验收分别记录。任何缺失保持PENDING/HOLD。
+
+## Owner-root现场输入已取得（22:42回传）
+
+Owner终端只读回执已归档 evidence/pr122-unified-release/OWNER_ROOT_READONLY.json。准确旧r2 receipt SHA256为2c7507be447676e1cbb6ed649198081850403020c9d1856733b0de0f1eec83a8，状态HTTPS_SMOKE_PASS_AWAIT_BROWSER、intent为空、备份已验证。Nginx测试PASS；master85106执行/usr/sbin/nginx且默认配置命令绑定；内存配置无法直接内省，不伪称可验证。Runtime UID62621/PID269238，BPF直附及有效进出过滤均存在，挂载命名空间独立。此为Owner现场回执，不冒充独审远程登录。
+
+国内普通用户观察CI38916842426/Job117026376801及组合CI38916842527/Job117026379268通过。目标新Host Pins已绑定13个Nginx实际源哈希、旧1279文件Manifest及上述准确receipt，不沿用旧1277基线。
+
+新脚本pr122_site_hub_unified_release.py沿用ca8d2dda既有静态事务包装，保留原冻结helper8c403aac和preflight6b6a8b5f；仅更新新Pins路径、459/458归档与Manifest计数、1288候选/1279旧站/1281备份成员计数、101新增路径、当前体验r2回执路径、独立操作类型PR122_PUBLIC_MOBILE_UNIFIED及组合Manifest绑定。旧发布脚本和旧事务不修改。
+
+新操作类型必须使用新单次许可；原PR122_STATIC_EXPERIENCE和PR122_COMBINED_WEBSITE不能放行。组合制品中的PENDING_ROOT_RECEIPT是先前组合构建时的历史状态；本次发布权威绑定以准确Host Pins及Owner归档证据为准，不更写旧组合包制造相同哈希假象。
+
+发布包装依赖完整旧源包SHA74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63，仅从原Owner受保护目录复用，不上传私有原始源包。包装不包含许可文件，也不自动部署。

@@ -1,0 +1,43 @@
+{
+  "apply_called": false,
+  "backup_verified": true,
+  "completed": [
+    "BACKUP_VERIFIED",
+    "SEALED_BUNDLE",
+    "STATIC_PREPARED",
+    "NGINX_STAGED",
+    "NGINX_VALIDATED",
+    "ACTIVATION_DRIFT_CHECK",
+    "STATIC_ACTIVATED",
+    "NGINX_RELOADED",
+    "HTTPS_SMOKE",
+    "STATIC_CHECK"
+  ],
+  "current": "/var/www/wenwenwenyiyiyi.work/releases/pr122-hub-experience-ca7ab933-r2",
+  "host": "iZvt5t8tlrm8oiZ",
+  "intent": null,
+  "nginx_identity": {
+    "default_config_command_bound": true,
+    "executable": "/usr/sbin/nginx",
+    "master_pid": 85106,
+    "memory_config_identity": "NOT_INTROSPECTABLE"
+  },
+  "nginx_test": "PASS",
+  "provenance": "Owner pasted domestic root terminal output; not an independent remote login",
+  "receipt_sha256": "2c7507be447676e1cbb6ed649198081850403020c9d1856733b0de0f1eec83a8",
+  "reported_at_beijing": "2026-10-16T22:42:59+08:00",
+  "runtime_sandbox": {
+    "bpf_direct_effective_ingress_egress_program_counts": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "mainpid": 269238,
+    "mount_namespace_separate": true,
+    "uid": "62621"
+  },
+  "service_reload": false,
+  "state": "HTTPS_SMOKE_PASS_AWAIT_BROWSER",
+  "transaction_id": "pr122-hub-experience-20261016-r2"
+}

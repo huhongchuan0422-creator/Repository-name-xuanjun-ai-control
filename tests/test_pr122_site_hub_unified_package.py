@@ -47,3 +47,10 @@ class UnifiedTests(unittest.TestCase):
         p=json.loads(self.files['source-pin.json']);self.assertEqual(sum(v is None for v in p['overlay_baselines'].values()),101)
         self.assertEqual(sum(k.startswith('overlay/public/') for k in self.files),416)
         self.assertIn('overlay/public/visual/community-local-e2e/index.html',self.files)
+
+    def test_controlled_wrapper_and_candidate_routes_are_identical(self):
+        from scripts import pr122_site_hub_unified_release as release
+        pins=json.loads(release.PINS.read_bytes())
+        self.assertEqual(package_sha:=u.sha(u.archive(self.files)),pins['static_artifact_sha256'])
+        self.assertEqual(release.routes(self.files),u.routes(self.files))
+        self.assertEqual(release.smoke_routes(self.files),u.smoke_routes(self.files))
