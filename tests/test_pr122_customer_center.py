@@ -17,7 +17,7 @@ class CustomerTests(unittest.TestCase):
   self.addCleanup(lambda:self.c.db.close());self.users={}
   for name in ('owner','reviewer','other','member'):
    addr=name+'@example.com';self.c.register(addr,'correct-password-123')
-   r=self.c.db.execute('SELECT * FROM outbox ORDER BY rowid DESC LIMIT 1').fetchone();token=json.loads(self.c.decrypt(r['payload'],'outbox:'+r['id']))['token'];self.c.verify(token)
+   r=self.c.db.execute('SELECT * FROM outbox ORDER BY rowid DESC LIMIT 1').fetchone();token=json.loads(self.c.decrypt(r['payload'],'outbox:'+r['id']))['token'];self.c.verify(token,'correct-password-123')
    self.users[name]=self.c.login(addr,'correct-password-123')
   self.q={'id':'license','title':'企业授权','purpose':'核实签约关系','required':True,'identity_requirements':'原签约代表','official_url':'https://www.gsxt.gov.cn/','instructions':'通过官方入口核实主体，再在项目私有入口提交证明。','minimum_permissions':'仅核验','fees':'UNKNOWN','verified_at':None,'formats':['application/pdf','image/png','image/jpeg'],'valid_until':None,'submission_type':'PRIVATE_DOCUMENT','category':'MATERIAL'}
   self.p={'id':'project-a','tenant':'tenant-a','customer':'customer-a','owner_email':'owner@example.com','contract_ref':'contract-a','order_ref':'order-a','verified_entity':True,'title':'社区分账项目','requirements':[dict(self.q),{**self.q,'id':'extra','title':'补充材料'}],'reviewer_emails':['reviewer@example.com']}
@@ -129,6 +129,15 @@ class CustomerTests(unittest.TestCase):
  def test_unknown_price_not_zero_and_requirement_history(self):
   self.accept();self.imported(2,[{**self.p,'requirements':[{**self.q,'id':'new','fees':'UNKNOWN'}]}]);self.assertEqual(self.c.checklist(self.owner,'project-a')['items'][0]['fees'],'UNKNOWN');self.assertEqual(self.c.db.execute('SELECT count(*) FROM project_history').fetchone()[0],2)
   oid=self.c.db.execute('SELECT id FROM objects').fetchone()[0];self.c.download(self.owner,'project-a',oid)
+ def test_verification_pre_registration_password_cannot_survive(self):
+  self.c.register('victim@example.com','attacker-password-123')
+  self.c.register('victim@example.com','ignored-reregistration-password')
+  rows=self.c.db.execute("SELECT * FROM outbox WHERE kind='VERIFY' ORDER BY rowid DESC LIMIT 2").fetchall()
+  token=json.loads(self.c.decrypt(rows[0]['payload'],'outbox:'+rows[0]['id']))['token'];old=json.loads(self.c.decrypt(rows[1]['payload'],'outbox:'+rows[1]['id']))['token']
+  with self.assertRaises(Denied):self.c.verify(old,'mailbox-owner-password')
+  self.c.verify(token,'mailbox-owner-password')
+  with self.assertRaises(Denied):self.c.login('victim@example.com','attacker-password-123')
+  self.c.login('victim@example.com','mailbox-owner-password')
  def test_historical_internal_acl_survives_requirement_reclassification(self):
   internal={**self.q,'id':'internal','category':'INTERNAL'};self.imported(2,[{**self.p,'requirements':[internal]}]);self.c.save(self.reviewer,'project-a','internal',0,'DOCUMENT',b'%PDF-internal confidential')
   oid=self.c.db.execute('SELECT id FROM objects').fetchone()[0];self.imported(3,[{**self.p,'requirements':[{**internal,'category':'MATERIAL'}]}])
@@ -136,6 +145,18 @@ class CustomerTests(unittest.TestCase):
   self.assertEqual(self.c.checklist(self.owner,'project-a')['items'][0]['versions'],[])
   with self.assertRaises(Denied):self.c.transition(self.owner,'project-a','internal',1,'submit')
   self.c.download(self.reviewer,'project-a',oid)
+ def test_expired_reset_and_invitation_tokens_fail_without_effects(self):
+  self.c.request_reset('owner@example.com');r=self.c.db.execute("SELECT * FROM outbox WHERE kind='RESET'").fetchone();token=json.loads(self.c.decrypt(r['payload'],'outbox:'+r['id']))['token']
+  invitation=self.c.invite(self.owner,'project-a','member@example.com','EDITOR')['invitation'];self.now+=601
+  with self.assertRaises(Denied):self.c.reset(token,'new-password-1234')
+  with self.assertRaises(Denied):self.c.accept_invite(self.member,invitation)
+  self.assertEqual(self.c.session(self.users['owner']['token']),self.owner)
+ def test_wrong_backup_key_or_tampered_backup_never_creates_restore(self):
+  out=Path(self.tmp.name)/'backup-corruption.enc';backup(self.c,out,b'b'*32,'kms:test');target=Path(self.tmp.name)/'denied-restore'
+  with self.assertRaises(Exception):restore(out,target,b'x'*32,{'v1':self.key},'v1')
+  self.assertFalse(target.exists());raw=out.read_bytes();out.write_bytes(raw[:-1]+bytes([raw[-1]^1]))
+  with self.assertRaises(Exception):restore(out,target,b'b'*32,{'v1':self.key},'v1')
+  self.assertFalse(target.exists())
  def test_expired_material_and_rate_limit_persisted(self):
   s=self.c.save(self.owner,'project-a','license',0,'DOCUMENT',b'%PDF-expiring',self.now+5);self.now+=6
   with self.assertRaises(Denied):self.c.transition(self.owner,'project-a','license',s['revision'],'submit')

@@ -130,8 +130,14 @@ class Center:
         address=email(address); salt=secrets.token_bytes(16); pw=self.password(password,salt)
         with self.tx():
             self.limit('register:'+address,3)
-            old=self.db.execute('SELECT id FROM accounts WHERE email_idx=?',(self.idx(address),)).fetchone()
-            if old: return {'status':'CHECK_VERIFICATION_CHANNEL'}
+            old=self.db.execute('SELECT id,verified FROM accounts WHERE email_idx=?',(self.idx(address),)).fetchone()
+            if old:
+                if not old['verified']:
+                    self.db.execute("UPDATE challenges SET used=1 WHERE user_id=? AND kind='verify'",(old['id'],))
+                    self.db.execute("UPDATE outbox SET status='CANCELLED' WHERE user_id=? AND kind='VERIFY' AND status='PENDING'",(old['id'],))
+                    token=self.challenge('verify',old['id'],{});oid=secrets.token_hex(16)
+                    self.db.execute('INSERT INTO outbox VALUES(?,?,?,?,?,?)',(oid,'VERIFY',old['id'],self.encrypt(canonical({'email':address,'token':token}),'outbox:'+oid),'PENDING',self.now()))
+                return {'status':'CHECK_VERIFICATION_CHANNEL'}
             uid='u_'+secrets.token_hex(12)
             self.db.execute('INSERT INTO accounts(id,email_idx,email_enc,salt,password) VALUES(?,?,?,?,?)',(uid,self.idx(address),self.encrypt(address.encode(),uid),salt,pw))
             token=self.challenge('verify',uid,{})
@@ -139,9 +145,12 @@ class Center:
             self.db.execute('INSERT INTO outbox VALUES(?,?,?,?,?,?)',(oid,'VERIFY',uid,self.encrypt(canonical({'email':address,'token':token}),'outbox:'+oid),'PENDING',self.now()))
             self.audit('',uid,'REGISTER',uid)
         return {'status':'CHECK_VERIFICATION_CHANNEL'}
-    def verify(self,token):
+    def verify(self,token,password):
+        # Mailbox owner sets the activation password; a pre-registration attacker
+        # must not retain the password chosen before email ownership verification.
+        salt=secrets.token_bytes(16);pw=self.password(password,salt)
         with self.tx():
-            uid,_=self.consume(token,'verify'); self.db.execute('UPDATE accounts SET verified=1 WHERE id=?',(uid,)); self.audit('',uid,'EMAIL_VERIFIED',uid)
+            uid,_=self.consume(token,'verify'); self.db.execute('UPDATE accounts SET verified=1,salt=?,password=?,epoch=epoch+1 WHERE id=?',(salt,pw,uid)); self.audit('',uid,'EMAIL_VERIFIED',uid)
         return {'verified':True}
     def login(self,address,password):
         address=email(address)

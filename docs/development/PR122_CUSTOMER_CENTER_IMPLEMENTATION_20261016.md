@@ -54,3 +54,5 @@ plan输出含实际Nginx include全集和master启动身份、current、配置ha
 服务以专用账号和nginx补充组建立0660 Unix socket，其他本机服务不能抢占TCP端口冒充客户后端；实际Nginx用户必须属于已映射nginx组，否则只读plan HOLD，不临时放宽权限。SIGKILL留下socket时保留现场并停止自动重启成功假象，须受保护核实后恢复，不能盲删socket。
 
 网页AI接线为固定本机Unix网关 /run/xuanjun-customer-ai/reply.sock，校验SO_PEERCRED、完整请求摘要、客户/项目/消息上下文及受保护配置批准的OpenAI model_key。先归档客户消息，网络前持久UNKNOWN；返回后再检查成员权限并归档回复，未知不重试、不假装回答。缺实际网关/身份/模型映射显示待接通，不把国内Qwen运营模型当主客服。测试RPC为夹具，未调用付费模型。
+
+邮箱验证时由邮箱持有人设置激活密码，覆盖预注册密码，防止他人预注册账号后利用持有人验证继承旧密码。主动再次注册未核验邮箱会作限流的新挑战，作废旧验证挑战/未发送邮件；不自动重发UNKNOWN邮件。源码负测覆盖预注册密码不能继续登录。

@@ -52,7 +52,7 @@ class HttpTests(CustomerTests):
  def test_http_actual_registration_verification_login_reset_roundtrip(self):
   address='httpuser@example.com';self.assertEqual(self.request('api/register',{'email':address,'password':'correct-password-123'})[0],200)
   r=self.c.db.execute('SELECT * FROM outbox ORDER BY rowid DESC LIMIT 1').fetchone();token=json.loads(self.c.decrypt(r['payload'],'outbox:'+r['id']))['token']
-  self.assertEqual(self.request('api/verify',{'token':token})[0],200);self.assertEqual(self.request('api/verify',{'token':token})[0],403)
+  self.assertEqual(self.request('api/verify',{'token':token,'password':'correct-password-123'})[0],200);self.assertEqual(self.request('api/verify',{'token':token,'password':'correct-password-123'})[0],403)
   self.assertEqual(self.request('api/login',{'email':address,'password':'correct-password-123'})[0],200)
 
 # Inherited core cases are collected only in their original test module.

@@ -86,7 +86,7 @@ class App:
                             event,subject,text=value;result=center.channel_event('FEISHU',event,subject,text)
                         return self.reply(200,{'ok':True}) # Never return identity or stored confirmation tokens to provider.
                     operation=path[len(PREFIX+'api/'):]
-                    public={'register':({'email','password'},center.register),'verify':({'token'},center.verify),'login':({'email','password'},center.login),'request_reset':({'email'},center.request_reset),'reset':({'token','password'},center.reset)}
+                    public={'register':({'email','password'},center.register),'verify':({'token','password'},center.verify),'login':({'email','password'},center.login),'request_reset':({'email'},center.request_reset),'reset':({'token','password'},center.reset)}
                     if operation in public:
                         if self.command!='POST':return self.reply(405,{'error':'POST_REQUIRED'})
                         fields,func=public[operation]
