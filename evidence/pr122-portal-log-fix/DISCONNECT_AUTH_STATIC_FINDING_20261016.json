@@ -35,5 +35,22 @@
     "path": "/integrations/tiktok/disconnect"
   },
   "scope_limit": "AST extraction of actual do_POST; injected fake store/audit/response. Does not establish all-layer public exploitability or cloud WAF state. Other production code is not imported.",
-  "source_boundary_reproduced": true
+  "source_boundary_reproduced": true,
+  "source_method_line": 1371,
+  "source_branch_lines": [
+    1386,
+    1395
+  ],
+  "source_excerpt": "    def do_POST(self):\n        parsed = urllib.parse.urlsplit(self.path)\n        if parsed.path.startswith(\"/telegram-webhook/\"):\n            length = int(self.headers.get(\"Content-Length\", \"0\") or \"0\")\n            if length > 16384:\n                self._send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, \"REQUEST_TOO_LARGE\\n\")\n                return\n            body = self.rfile.read(length)\n            status, payload = self.server.telegram_canary.handle_webhook(\n                parsed.path,\n                self.headers.get(\"X-Telegram-Bot-Api-Secret-Token\", \"\"),\n                body,\n            )\n            self._send(status, json.dumps(payload, ensure_ascii=True, sort_keys=True) + \"\\n\", content_type=\"application/json; charset=utf-8\")\n            return\n        if parsed.path == TIKTOK_DISCONNECT_PATH:\n            payload = TikTokTokenLifecycleStore(DEFAULT_STATE_ROOT / \"tiktok-token-state\").disconnect()\n            self.server.portal_service.operations_store.record_audit({\n                \"operation\": \"TIKTOK_DISCONNECT\",\n                \"provider\": \"tiktok\",\n                \"result\": \"PASS\",\n                \"secret_value_exposed\": False,\n            })\n            self._send(HTTPStatus.OK, json.dumps(payload, ensure_ascii=True, sort_keys=True) + \"\\n\", content_type=\"application/json; charset=utf-8\")\n            return",
+  "handler_bases": [
+    "BaseHTTPRequestHandler"
+  ],
+  "handler_declared_methods": [
+    "log_message",
+    "_send",
+    "_send_bytes",
+    "_origin",
+    "do_GET",
+    "do_POST"
+  ]
 }
