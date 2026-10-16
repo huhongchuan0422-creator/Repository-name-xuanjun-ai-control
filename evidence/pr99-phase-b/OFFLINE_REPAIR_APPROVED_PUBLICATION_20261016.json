@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "source_commit": "bf9373ab6ba2d02dbb7cb5e421cc74632d2cc794",
+  "approval_comment_id": 6208184098,
+  "approval_body_sha256": "bdd8aa3d1a3c9f03943c91114f81873ceaee6fb5bc9e07e97effba6af837dc26",
+  "source_artifact": 12025121935,
+  "tar_sha256": "4c351cdd87a4997c91d311b0345e6dd78192886f4aa657932d549c51af1f016b",
+  "tar_bytes": 57787,
+  "publication": "VERBATIM_APPROVED_ARCHIVE_NO_REBUILD",
+  "root_anchor": "NOT_REGISTERED",
+  "repair": "NOT_EXECUTED",
+  "phase_c": "NOT_AUTHORIZED",
+  "service_start_allowed": false
+}
