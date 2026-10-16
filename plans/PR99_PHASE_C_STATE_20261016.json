@@ -778,7 +778,14 @@
       "production_service_deployed": false,
       "host_independent_pass": false,
       "production_executed_definition": "Production deployment/activation false; private capture did execute successfully as separately recorded",
-      "execution_acceptance": "PENDING_INDEPENDENT_RECEIPT_REVIEW_NO_SOURCE_REVIEW_OR_REEXECUTION"
+      "execution_acceptance": "PENDING_INDEPENDENT_RECEIPT_REVIEW_NO_SOURCE_REVIEW_OR_REEXECUTION",
+      "local_received_projection": {
+        "path": "evidence/pr99-service-handoff/s06-candidate/project_received_contract.py",
+        "scope": "READ_ALREADY_RECEIVED_COPY_ONLY_NO_NETWORK_WRITES_INSTALL_OR_NEW_CAPTURE",
+        "status": "PREPARED_NOT_EXECUTED_ON_KOREA",
+        "local_new_tests": "7_PASS_SYNTHETIC_NOT_HOSTED_OR_HOST_ACCEPTANCE",
+        "old_tests": "INHERITED_NOT_RERUN"
+      }
     },
     "korea443_owner": {
       "evidence_origin": "OWNER_ROOT_RECEIPT",
