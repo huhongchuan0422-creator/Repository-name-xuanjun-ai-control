@@ -593,3 +593,10 @@ R4临时遏制实际执行成功且得到两地非root证据支持，集中请�
 集中边界/回滚材料evidence/pr122-r4-controlled-install/REMAINING_IP_DNS_DECISION_20261016.json：请求只裁定本次临时入口的具体IP差异及实际受影响的外围策略，不扩大回头审未变源码。Cloudflare原12条导出、proxied:false/TTL字段1及权威A47.245.53.152/TTL300、AAAA权威NODATA继续按历史证据复用；不重索全区导出。真正仍缺切换前当前管理面的zone/单条recordID、A/AAAA枚举、代理/TTL读回和同记录回退绑定。
 
 已检查当前工具及Cloudflare DNS插件目录检索，没有找到可用DNS管理连接（目录检索非穷尽，未推荐无关插件）。GitHub本身不是Cloudflare账户执行通道；不读取凭据或把公共解析当账户快照。下一接入仅需合法Cloudflare管理面读取权限，当前不修改DNS。DNS_RELEASE=HOLD；官网/current、生产配置、桥接/隧道和所有服务本轮未改。
+
+
+### 9.28 2026-10-16：Owner报告已保存主域A，进入单次非写观察
+
+Owner通过自己的Cloudflare管理面报告已保存；编辑截图显示完整apex名称，保存后记录列表截图image(20261016-021723).png显示A/47.101.152.210/仅DNS/TTL自动。这里只确认Owner操作与可见字段，不把截图当公网传播、AAAA枚举或准确recordID证明；旧47.245.53.152仅按既有历史证据保留。开发窗口未修改DNS，也未代签既有IP差异及DNS发布许可。正式DNS_RELEASE仍未获批准；如当前已生效，应按实际已发生的Owner变更记录，不改写为预先批准或迁移全部完成。
+
+原v27同一concurrency队列准备一次国内/东京非root观察，仅公共A/AAAA/DNS答复、主域和国内固定IP的TLS校验GET首页、主域只读healthz GET、HTTP根重定向及本机已批准Work首页/current哈希。禁止OAuth路径、POST、读取凭据/数据库、root调用、源码/配置/服务/DNS变更、自动回滚或重试。原R4公开回执采集限定原执行提交，避免重新采集已通过安装；tokyo旧dispatch作业保留。不是重新审核源码/旧制品/静态115，结果以新job原始PR122_DNS_POSTSAVE_RECEIPT为准。
