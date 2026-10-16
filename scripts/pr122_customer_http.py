@@ -131,8 +131,10 @@ class App:
                             data,mime=center.download(uid,parts[1],parts[2]);return self.reply(200,data,mime)
                         return self.reply(404,{'error':'NOT_FOUND'})
                     operations={
-                        'change_submit':({'project','page','version','text'},lambda:Changes(center).submit(uid,body['project'],body['page'],body['version'],body['text'])),
-                        'change_baseline':({'project','page','version','text'},lambda:Changes(center).baseline(uid,body['project'],body['page'],body['version'],body['text'])),
+                        'change_context':({'project','page','version'},lambda:Changes(center)._preview(uid,body['project'],body['page'],body['version'])),
+                        'change_submit':({'project','page','version','text','intent'},lambda:Changes(center).submit(uid,body['project'],body['page'],body['version'],body['text'],body['intent'])),
+                        'change_baseline':({'project','page','version','document_id'},lambda:Changes(center).baseline(uid,body['project'],body['page'],body['version'],body['document_id'])),
+                        'change_confirm_new_scope':({'project','case','revision','document_id'},lambda:Changes(center).confirm_new_scope(uid,body['project'],body['case'],body['revision'],body['document_id'])),
                         'change_assess':({'project','case','revision','category','minutes','lines','evidence','explanation'},lambda:Changes(center).assess(uid,body['project'],body['case'],body['revision'],body['category'],body['minutes'],body['lines'],body['evidence'],body['explanation'])),
                         'change_respond':({'project','case','revision','action','reason'},lambda:Changes(center).respond(uid,body['project'],body['case'],body['revision'],body['action'],body['reason'])),
                         'logout':(set(),lambda:center.logout(self.token()) or {'logged_out':True}),

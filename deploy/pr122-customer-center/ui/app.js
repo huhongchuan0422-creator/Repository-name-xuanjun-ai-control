@@ -36,10 +36,12 @@ async function refreshChanges(){
   card.append(node('p',labels[last.payload.state]||'处理中'));
   const assessment=[...events].reverse().find(e=>e.kind==='ASSESSMENT');
   if(assessment){const a=assessment.payload;card.append(node('p','预计工作量：'+a.estimated_minutes+'分钟'),node('p',a.explanation));
+   if(a.state==='NEEDS_EVIDENCE'||!a.totals){card.append(node('p','费用待核实，尚未形成报价。'));}else{
    const table=node('table'),head=node('tr');for(const title of ['整改项目','人民币','美元'])head.append(node('th',title));table.append(head);
    for(const line of a.lines){const row=node('tr');row.append(node('td',line.description),node('td','¥'+(line.cny_minor/100).toFixed(2)),node('td','US$'+(line.usd_minor/100).toFixed(2)));table.append(row);}card.append(table);
    card.append(node('p','合计：¥'+(a.totals.cny_minor/100).toFixed(2)+' / US$'+(a.totals.usd_minor/100).toFixed(2)));
-   for(const e of a.evidence){const d=node('details');d.append(node('summary','查看此前确认的需求与证据'));d.append(node('p',e.requirement),node('p','确认时间：'+new Date(e.confirmed_at*1000).toISOString()),node('p','确认主体：'+e.actor),node('p','证据编号：'+e.event_id),node('p','证据SHA256：'+e.sha256));card.append(d);}
+   }
+   for(const e of a.evidence){const d=node('details');d.append(node('summary','查看此前确认的需求与证据'));d.append(node('p',e.requirement),node('p','确认时间：'+new Date(e.confirmed_at*1000).toISOString()),node('p','确认主体：'+e.actor),node('p','证据编号：'+e.event_id),node('p','证据SHA256：'+e.sha256),node('p','合同文档SHA256：'+(e.document_sha256||'未核验')),node('p','合同版本SHA256：'+(e.version_sha256||'未核验')),node('p','权威来源：'+(e.source_ref||'未核验')));card.append(d);}
   }
   if(role==='OWNER'&&last.kind==='ASSESSMENT'&&['QUOTED','FREE_APPROVED'].includes(last.payload.state)){
    for(const [action,label] of [['CONFIRM','确认本次范围与费用'],['DISPUTE','提出异议']]){const b=node('button',label);b.type='button';b.addEventListener('click',async()=>{try{await api('change_respond',{project,case:item.id,revision:last.seq,action,reason:label});await refreshChanges();}catch(e){notice(e.message);}});card.append(b);}

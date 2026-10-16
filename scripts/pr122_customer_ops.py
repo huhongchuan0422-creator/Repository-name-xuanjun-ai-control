@@ -90,7 +90,7 @@ def restore(backup_file,target,backup_key,keys,active_key):
     finally:c.db.close()
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','import-authority','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','import-authority','import-change-authority','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
     if os.geteuid()!=0 and args.action not in ('serve','worker'):raise SystemExit('HOLD: PROTECTED_OPERATOR_REQUIRED')
     if os.uname().nodename!=HOST:raise SystemExit('HOLD: WRONG_HOST')
     if args.action in ('serve','worker'):
@@ -119,6 +119,9 @@ def main():
             result=c.import_authority(json.loads(private_path(args.input).read_bytes()),base64.b64decode(config['authority_verify_key'],validate=True))
             # Resume is a separate reviewed operator decision after restore; CLI
             # import alone intentionally does not clear maintenance.
+        elif args.action=='import-change-authority':
+            from scripts.pr122_customer_change_authority import import_snapshot
+            result=import_snapshot(c,json.loads(private_path(args.input).read_bytes()),base64.b64decode(config['authority_verify_key'],validate=True))
         elif args.action=='integrity':result=c.check_integrity()
         elif args.action=='backup':result=backup(c,args.output,base64.b64decode(config['backup_key'],validate=True),config['backup_key_ref'])
         else:result=restore(args.input,args.output,base64.b64decode(config['backup_key'],validate=True),c.keys,c.key_id)
