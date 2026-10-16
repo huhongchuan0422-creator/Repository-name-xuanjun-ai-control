@@ -115,7 +115,7 @@ def served(c,uid,project,page_key,version,rendered):
     with c.tx():
         found,_,_=original(c,uid,project,page_key,version)
         eid='pv_'+secrets.token_hex(16)
-        payload={'project':project,'actor':uid,'page':found['page'],'page_sha256':version,'manifest_sha256':found['manifest_sha256'],'artifact_sha256':found['artifact_sha256'],'render_sha256':digest(rendered),'source_commit':found['source_commit'],'authority_revision':load(c)['revision'],'created':c.now(),'evidence':'AUTHENTICATED_HTTP_BYTES_SERVED','browser_acceptance':'NOT_ESTABLISHED','tls_acceptance':'NOT_ESTABLISHED'}
+        payload={'project':project,'actor':uid,'project_revision':found['project_revision'],'page':found['page'],'page_sha256':version,'manifest_sha256':found['manifest_sha256'],'artifact_sha256':found['artifact_sha256'],'render_sha256':digest(rendered),'source_commit':found['source_commit'],'authority_revision':load(c)['revision'],'created':c.now(),'evidence':'AUTHENTICATED_HTTP_BYTES_SERVED','browser_acceptance':'NOT_ESTABLISHED','tls_acceptance':'NOT_ESTABLISHED'}
         c.db.execute('INSERT INTO preview_serves VALUES(?,?,?,?,?,?,?,?)',(eid,project,uid,found['manifest_sha256'],version,payload['render_sha256'],c.encrypt(canonical(payload),eid),c.now()))
         c.audit(project,uid,'PRIVATE_PREVIEW_SERVED',digest(canonical(payload)))
     return {'id':eid,'sha256':digest(canonical(payload))}

@@ -37,8 +37,8 @@ def issue(c,project,case,serve_id,report,trust,source_key):
     if test['harness_sha256'] not in trust['allowed_harness_sha256'] or type(test['checks']) is not dict or set(test['checks'])!=REQUIRED or any(v!='PASS' for v in test['checks'].values()):raise Denied('EXACT_TESTS_REQUIRED')
     if any(type(test[k]) is not int for k in ('issued_at','expires')) or not test['issued_at']<=row['created']<=c.now()<test['expires'] or test['expires']-test['issued_at']>86400:raise Denied('TEST_REPORT_EXPIRED_OR_PREDEPLOYMENT')
     if test['project']!=project or test['case']!=case or test['request_sha256']!=Changes(c)._request_sha(events) or test['page']!=request['page'] or test['before_sha256']!=request['page_sha256']:raise Denied('TEST_REQUEST_BINDING')
-    selected=next((r for r in current['previews'] if r['project']==project and r['page']==test['page'] and r['page_sha256']==test['after_sha256']),None)
-    if not selected or served['authority_revision']!=current['revision'] or served['page']!=test['page'] or served['page_sha256']!=test['after_sha256'] or served['manifest_sha256']!=selected['manifest_sha256']:raise Denied('CURRENT_DEPLOYMENT_REQUIRED')
+    selected=next((r for r in current['previews'] if r['project']==project and r['project_revision']==p['revision'] and r['owner']==p['owner'] and r.get('execution_scope')=='TRUSTED_CUSTOMER_FRONTEND' and r['page']==test['page'] and r['page_sha256']==test['after_sha256']),None)
+    if not selected or served['authority_revision']>current['revision'] or served.get('project_revision')!=p['revision'] or served['page']!=test['page'] or served['page_sha256']!=test['after_sha256'] or served['manifest_sha256']!=selected['manifest_sha256']:raise Denied('CURRENT_DEPLOYMENT_REQUIRED')
     for field in ('manifest_sha256','source_commit','artifact_sha256','render_sha256'):
         if test[field]!=served[field]:raise Denied('TEST_DEPLOYMENT_BINDING')
     source=c.db.execute('SELECT payload FROM change_authority_history WHERE revision=?',(current['revision'],)).fetchone()

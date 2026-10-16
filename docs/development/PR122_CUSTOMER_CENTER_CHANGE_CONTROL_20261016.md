@@ -91,3 +91,17 @@ plan不写入；apply须Owner另行登记root600的UPGRADE_TRUST.json，绑定�
 隔离测试覆盖8个中断子阶段BACKUP_VERIFIED/STAGED/FENCED/OLD_MOVED/CANDIDATE_MOVED/CODE_REPLACED/TAR_REPLACED/GRANTED；它们是参数化子案例，不分别虚增unittest数量。真实国内执行仍未获许可。
 
 国内首次独立运行测试Run38938322922的Hosted部分通过，但self-hosted在checkout阶段因github.com网络连接失败，不能计入运行依赖PASS。后续目标job去除checkout，从同一Hosted run精确制品取得stdlib构建器与固定wheel，核对source commit/run/builder SHA后运行，不绕过TLS，不调用root，不把旧job失败抹为成功。
+
+### 无逐页Owner人工的自动签发接线
+
+为避免“每页必须Owner运行issue-preview-delivery”，新增持久化签名报告队列与受保护publication worker。独立测试自动化身份以当前项目REVIEWER身份调用change_delivery_report，只能排队；客户OWNER不能把自己的声明直接作为测试报告。报告仍须独立保管测试签名、获审harness及准确项目/请求/字节等全部校验，队列接收成功不等于发布成功。
+
+API落库后向固定本地Unix datagram socket发1字节唤醒，socket只允许运行账户访问；定时器30秒兜底处理已持久化队列。纯本地事件，无模型或远程网络调用。每轮最多8项，重复同一packet为同一任务。断电后PROCESSING及失败HOLD_UNKNOWN不自动重试；这仅是异常恢复围栏，普通成功流程不找Owner逐页操作。
+
+publisher.service启动时仅从Root systemd credential读取最小publisher.json，随后清空补充组并降为专用运行UID/GID，内核prctl验证不可dump；没有SMTP、Telegram、飞书或模型凭据，没有网络或shell执行能力。CREDENTIAL_DIRECTORY仍为Root私有，HTTP进程不读取签发密钥。Root仅在读取受保护凭据及降权前短暂存在，capability只保留SETUID/SETGID用于不可逆降权。真实目标机仍须核验该事实，不凭unit配置判PASS。
+
+安装plan增加publisher.json准确哈希及测试签发者保管证据，安装后、Nginx接线前实际启动并核对publisher的准确FragmentPath、空DropInPaths、成功退出；固定源码在运行时降权/不可dump校验失败必须退出。回滚先停新增socket/timer和publisher，再处理原后台与文件。根通道升级不自动批准这些生产服务安装。
+
+全局来源revision递增不会误拒其他项目/请求的相同已审页面：以当前项目授权revision、Manifest/源码/制品/页面/渲染哈希和签名测试为准；允许更早来源revision的真实取页记录，但当前撤销/页面改变/权限变化均拒绝。新增双报告顺序处理回归，防止第一个成功发布覆盖或卡住第二个。
+
+尚未完成：生产测试私钥的独立保管与harness登记、真实测试系统自动签名/排队及实际客户预览运行；自由文本自动改代码执行器、生产依赖Root重建、扫描器和真实合同映射。当前完成的是可测试的自动队列/签发链源码，不冒称这些生产接线已启用。下一次集中审核应包括本轮全部实际增量和生成的通道代码，旧通过部分不重审。

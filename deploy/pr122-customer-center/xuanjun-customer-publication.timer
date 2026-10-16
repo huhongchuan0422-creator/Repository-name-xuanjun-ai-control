@@ -1,0 +1,9 @@
+[Unit]
+Description=Recovery drain of durable signed preview report queue
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Unit=xuanjun-customer-publication.service
+[Install]
+WantedBy=timers.target

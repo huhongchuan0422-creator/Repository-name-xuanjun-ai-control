@@ -90,9 +90,12 @@ def restore(backup_file,target,backup_key,keys,active_key):
     finally:c.db.close()
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','import-authority','import-change-authority','issue-preview-delivery','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','publisher','import-authority','import-change-authority','issue-preview-delivery','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
     if os.geteuid()!=0 and args.action not in ('serve','worker'):raise SystemExit('HOLD: PROTECTED_OPERATOR_REQUIRED')
     if os.uname().nodename!=HOST:raise SystemExit('HOLD: WRONG_HOST')
+    if args.action=='publisher':
+        from scripts.pr122_customer_publication_worker import main_worker
+        print(json.dumps(main_worker(),sort_keys=True));return
     delivery_input=None
     if args.action=='issue-preview-delivery':
         path=private_path(args.input)

@@ -28,7 +28,7 @@ UNIT=Path('/etc/systemd/system')
 TXN='pr122-customer-center-install-20261016'
 ANCHOR=b'include /etc/nginx/pr122-site-hub/locations.conf;'
 INCLUDE=b'include /etc/nginx/pr122-customer-center/locations.conf;\n    '
-UNITS=('xuanjun-customer-center.service','xuanjun-customer-delivery.service','xuanjun-customer-delivery.timer')
+UNITS=('xuanjun-customer-center.service','xuanjun-customer-delivery.service','xuanjun-customer-delivery.timer','xuanjun-customer-publication.service','xuanjun-customer-publication.socket','xuanjun-customer-publication.timer')
 LOCK=Path('/var/lib/xuanjun-pr122-site-hub/transaction.lock')
 OWNER='huhongchuan0422-creator'
 REPO=OWNER+'/Repository-name-xuanjun-ai-control'
@@ -90,10 +90,14 @@ def plan(folder):
     import base64
     need(len(base64.b64decode(c['backup_key'],validate=True))==32 and len(base64.b64decode(c['authority_verify_key'],validate=True))>=32,'PROTECTED_KEYS_REQUIRED')
     need(c['backup_key_ref'] and c['active_key'] in c['keys'] and all(len(base64.b64decode(v,validate=True))==32 for v in c['keys'].values()),'DATA_KEY_MAPPING')
+    publisher=private_config(CONFIG/'publisher.json')
+    need(set(publisher)=={'keys','active_key','authority_sign_key','preview_test_trust'} and publisher['keys']==c['keys'] and publisher['active_key']==c['active_key'] and publisher['authority_sign_key']==c['authority_verify_key'],'PUBLISHER_CONFIG_BINDING')
+    test_trust=publisher['preview_test_trust']
+    need(type(test_trust) is dict and set(test_trust)=={'source_writer_principal','keys','allowed_harness_sha256'} and bool(test_trust['keys']) and bool(test_trust['allowed_harness_sha256']),'ENROLLED_TEST_PUBLISHER_REQUIRED')
     providers=Providers(runtime['providers']).status();need(all(runtime['providers'].get(k) for k in ('smtp','telegram','feishu','secretref','web_ai')),'REAL_PROVIDER_CONFIG_REQUIRED')
     # Source-only tests cannot satisfy actual scan/KMS/provider/authority evidence.
     acceptance=private_config(CONFIG/'TARGET_ACCEPTANCE.json')
-    required=('canonical_identity_mapping','canonical_order_contract_export','canonical_customer_project_mapping','key_backup_recovery','scanner_clean_and_eicar','smtp_verified_account_recovery','telegram_callback_identity','feishu_callback_identity','secretref_metadata_authority','web_ai_provider_identity','telegram_token_path_confidentiality')
+    required=('canonical_identity_mapping','canonical_order_contract_export','canonical_customer_project_mapping','key_backup_recovery','scanner_clean_and_eicar','smtp_verified_account_recovery','telegram_callback_identity','feishu_callback_identity','secretref_metadata_authority','web_ai_provider_identity','telegram_token_path_confidentiality','preview_test_signer_custody')
     need(set(acceptance)=={'manifest_sha256','evidence'} and acceptance['manifest_sha256']==digest(raw) and set(acceptance['evidence'])==set(required),'TARGET_ACCEPTANCE_BINDING')
     for key in required:
         v=acceptance['evidence'][key];need(type(v) is dict and set(v)=={'sha256','path'} and len(v['sha256'])==64,'TARGET_EVIDENCE_SCHEMA')
@@ -112,7 +116,7 @@ def plan(folder):
     need(nginx_uid>0,'NON_ROOT_NGINX_WORKER_REQUIRED')
     trust=private_config(CONFIG/'INDEPENDENT_REVIEW_TRUST.json')
     tar_sha=archive_binding(folder,manifest,raw)
-    return {'isolated_python':runtime_identity,'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'telegram_credential_evidence_sha256':acceptance['evidence']['telegram_token_path_confidentiality']['sha256'],'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
+    return {'publisher_config_sha256':digest((CONFIG/'publisher.json').read_bytes()),'isolated_python':runtime_identity,'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'telegram_credential_evidence_sha256':acceptance['evidence']['telegram_token_path_confidentiality']['sha256'],'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
 
 def archive_binding(folder,manifest,manifest_raw):
     import tarfile
@@ -187,11 +191,17 @@ def apply(folder,comment):
                 receipt['intent']=str(p);receipt['owned'][str(p)]=digest(b);save();secure_write(p,b);os.chmod(p,0o644);receipt['intent']=None;save()
             receipt['intent']='START_RUNTIME';save();run(['/usr/bin/systemctl','daemon-reload']);run(['/usr/bin/systemd-analyze','verify',*[str(UNIT/u) for u in UNITS]]);run(['/usr/bin/systemctl','start',UNITS[0]]);receipt['completed'].append('RUNTIME_STARTED');receipt['intent']=None;save()
             runtime_check(observed['account_uid'])
+            receipt['intent']='VERIFY_PUBLICATION_WORKER';save()
+            for property,expected in (('FragmentPath',str(UNIT/UNITS[3])),('DropInPaths','')):
+                need(run(['/usr/bin/systemctl','show',UNITS[3],'-p',property,'--value']).decode().strip()==expected,'PUBLISHER_LOADED_UNIT_IDENTITY')
+            run(['/usr/bin/systemctl','start',UNITS[3]])
+            need(run(['/usr/bin/systemctl','show',UNITS[3],'-p','Result','--value']).decode().strip()=='success','PUBLISHER_REAL_START_FAILED')
+            receipt['completed'].append('PUBLISHER_ROOT_TO_NONROOT_VERIFIED');receipt['intent']=None;save()
             need(time.time()<approval['expires_unix'],'APPROVAL_EXPIRED_BEFORE_NGINX')
             need(digest(HTTPS.read_bytes())==observed['previous_https_sha256'] and inventory()==observed['nginx'] and os.readlink(CURRENT)==observed['main_current'],'BEFORE_NGINX_DRIFT')
             new=old.replace(ANCHOR,INCLUDE+ANCHOR);receipt['new_https_sha256']=digest(new);receipt['intent']='NGINX_INSTALL';save()
             temp=HTTPS.with_name('pr122-customer.temporary');secure_write(temp,new);os.chmod(temp,0o644);os.replace(temp,HTTPS);receipt['completed'].append('NGINX_INSTALLED');receipt['intent']=None;save()
-            run(['/usr/sbin/nginx','-t']);run(['/usr/bin/systemctl','reload','nginx']);run(['/usr/bin/systemctl','enable','--now',UNITS[2]])
+            run(['/usr/sbin/nginx','-t']);run(['/usr/bin/systemctl','reload','nginx']);run(['/usr/bin/systemctl','enable','--now',UNITS[2],UNITS[4],UNITS[5]])
             data=run(['/usr/bin/curl','--noproxy','*','--resolve','wenwenwenyiyiyi.work:443:127.0.0.1','--fail','--silent','--show-error','--max-time','15','https://wenwenwenyiyiyi.work/customer/center/'])
             need(digest(data)==digest(files['deploy/pr122-customer-center/ui/index.html']),'REAL_HTTPS_HTML')
             receipt['state']='HTTPS_SMOKE_PASS_AWAIT_14_REAL_ACCEPTANCE';receipt['completed'].append('HTTPS_SMOKE');save();return receipt
@@ -225,11 +235,12 @@ def _rollback_locked():
     for p,h in oldmap.items():
         if p!=str(HTTPS):need(observed.get(p)==h,'FOREIGN_NGINX_DRIFT')
     need(set(observed).issubset(set(oldmap)|{str(SNIPPET)}),'FOREIGN_NGINX_ADDITION')
-    enable=UNIT/'timers.target.wants'/UNITS[2]
-    if os.path.lexists(enable):need(enable.is_symlink() and enable.lstat().st_uid==0 and os.readlink(enable)==str(UNIT/UNITS[2]),'FOREIGN_TIMER_ENABLE')
-    r['state']='ROLLING_BACK';atomic_json(txn/'receipt.json',r)
-    # Only newly-owned units; absent/not-started phases are handled explicitly.
-    if str(UNIT/UNITS[2]) in r['owned'] and (UNIT/UNITS[2]).exists():run(['/usr/bin/systemctl','disable','--now',UNITS[2]])
+    for unit in (UNITS[2],UNITS[4],UNITS[5]):
+        target='sockets.target.wants' if unit.endswith('.socket') else 'timers.target.wants'
+        enable=UNIT/target/unit
+        if os.path.lexists(enable):need(enable.is_symlink() and enable.lstat().st_uid==0 and os.readlink(enable)==str(UNIT/unit),'FOREIGN_TRIGGER_ENABLE')
+        if str(UNIT/unit) in r['owned'] and (UNIT/unit).exists():run(['/usr/bin/systemctl','disable','--now',unit])
+    if str(UNIT/UNITS[3]) in r['owned'] and (UNIT/UNITS[3]).exists():run(['/usr/bin/systemctl','stop',UNITS[3]])
     if str(UNIT/UNITS[0]) in r['owned'] and (UNIT/UNITS[0]).exists():run(['/usr/bin/systemctl','stop',UNITS[0]])
     if digest(current)!=digest(old):
         temp=HTTPS.with_name('pr122-customer.rollback');secure_write(temp,old);os.chmod(temp,0o644);os.replace(temp,HTTPS);run(['/usr/sbin/nginx','-t']);run(['/usr/bin/systemctl','reload','nginx'])

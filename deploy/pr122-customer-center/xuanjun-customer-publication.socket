@@ -1,0 +1,12 @@
+[Unit]
+Description=Local signed preview report activation
+[Socket]
+ListenDatagram=/run/xuanjun-customer-publication/notify.sock
+SocketUser=xuanjun-customer
+SocketGroup=xuanjun-customer
+SocketMode=0600
+DirectoryMode=0755
+RemoveOnStop=yes
+Service=xuanjun-customer-publication.service
+[Install]
+WantedBy=sockets.target

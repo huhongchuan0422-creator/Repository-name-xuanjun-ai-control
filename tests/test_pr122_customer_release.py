@@ -30,6 +30,8 @@ class ReleaseTests(unittest.TestCase):
   self.calls.append(args)
   if self.fail and self.fail(args):raise Denied('SIMULATED_INTERRUPTION')
   if args[0].endswith('curl'):return b'fixture html'
+  if args[:3]==['/usr/bin/systemctl','show',r.UNITS[3]]:
+   return (str(r.UNIT/r.UNITS[3]).encode() if 'FragmentPath' in args else b'success' if 'Result' in args else b'')
   return b''
  def inventory(self):
   f={str(r.HTTPS):digest(r.HTTPS.read_bytes())}

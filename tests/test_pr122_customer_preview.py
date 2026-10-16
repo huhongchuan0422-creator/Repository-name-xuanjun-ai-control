@@ -98,6 +98,12 @@ class PreviewHTTPTests(HttpTests):
         status,h,raw=self.request(url,headers=self.auth_headers());self.assertEqual(status,200);self.assertIn(b'data-project-feedback',raw);self.assertIn('no-store',h['Cache-Control']);self.assertIn("frame-ancestors 'none'",h['Content-Security-Policy'])
         self.assertEqual(self.request(url)[0],403);self.assertEqual(self.request(url,headers={**self.auth_headers(),'Range':'bytes=0-2'})[0],403)
         self.assertEqual(self.request('api/previews/project-a',headers=self.auth_headers())[0],200)
+    def test_http_delivery_report_queue_requires_reviewer_not_customer(self):
+        body={'project':'project-a','case':'change_fixture','serve_id':'pv_fixture','report':{'payload':{},'key_id':'not-enrolled','signature':'invalid'}}
+        self.assertEqual(self.request('api/change_delivery_report',body,self.auth_headers())[0],403)
+        user=self.users['reviewer'];headers={'Cookie':__import__('scripts.pr122_customer_http',fromlist=['COOKIE']).COOKIE+'='+user['token'],'X-CSRF-Token':user['csrf']}
+        self.assertEqual(self.request('api/change_delivery_report',body,headers)[0],200)
+        self.assertEqual(self.c.db.execute('SELECT state FROM preview_publication_jobs').fetchone()[0],'QUEUED')
     def test_no_http_publisher_or_report_writer(self):
         for name in ('issue-preview-delivery','import-preview','preview-served'):
             self.assertEqual(self.request('api/'+name,{},self.auth_headers())[0],404)
