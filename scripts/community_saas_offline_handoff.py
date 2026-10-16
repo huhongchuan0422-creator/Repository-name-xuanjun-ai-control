@@ -6,6 +6,7 @@ All output is read-only workflow intent. This module is not a payment gateway.
 import hashlib
 import hmac
 import json
+import re
 import sqlite3
 from scripts.community_saas_schema_guard import install_extension
 from scripts.community_merchant_contract import valid_id
@@ -17,7 +18,7 @@ def _ident(v):
     return v
 
 def _timestamp(v):
-    if type(v) is not int or v < 0:
+    if type(v) is not int or not 0 <= v <= 9007199254740991:
         raise ValueError("INVALID_TIME")
     return v
 
@@ -57,7 +58,7 @@ def inspect_test_attestation(db, order_id, tenant_id, attestation, key, now):
     if type(attestation) is not dict or set(attestation)!={"payload","signature"}:
         raise ValueError("INVALID_ATTESTATION")
     payload,signature=attestation["payload"],attestation["signature"]
-    if type(payload) is not dict or type(signature) is not str or len(signature)!=64:
+    if type(payload) is not dict or type(signature) is not str or re.fullmatch(r"[0-9a-f]{64}",signature) is None:
         raise ValueError("INVALID_ATTESTATION")
     proof_id=payload.get("proof_id")
     verified_at=payload.get("verified_at")
