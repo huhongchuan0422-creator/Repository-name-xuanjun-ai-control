@@ -473,3 +473,17 @@ Owner在东京admin终端运行准确4975724d安装器，SHA256 e95d2c08…f1b3a
 立即将原工作流push job中的apply调用移除，改为两地非root部署后核验：新源哈希/owner/mode/新PID、根入口status、Work首页与国内current不变、11项HEAD baseline/spoofed_source。HEAD只证明不支持方法边界，不能替代GET/POST认证；OAuth GET/业务写继续禁用。执行结果另附真实回执，不提前PASS。
 
 PATCH_PRODUCTION_INSTALL=EXECUTED_PASS_TARGETED_HEALTH；W06仍部分完成（动态业务鉴权、IP审计差异及外围策略未闭环）；W07/DNS_RELEASE=HOLD；东京后台继续保留。未改网站内容/current、DNS、桥接隧道、英国P2或Finance。原未执行文字保留为历史，仅此新增事实覆盖补丁状态。
+
+
+### 9.18 2026-10-16：部署后两地HEAD边界通过；鉴权缺口具体化
+
+准确只读核验提交f5625637f5f0e8ef78bb67dcdc8c2a9d6bd01a00；Run38829320821。东京Job116744154336、国内Job116744154573均SUCCESS；已读两台原始日志PR122_POSTFIX_BOUNDARY_RECEIPT。各11项职责x2组头=22次，两地共44次：10项各501/501，Telegram固定非法后缀405/405；无重定向、无Set-Cookie，TLS验证通过。此为POST_FIX_METHOD_BOUNDARY_PASS，HEAD不证明GET/POST认证，也不证明真实客户端IP头消费语义。OAuth start/callback GET、任何真实POST/消息/支付/交易均未调用。
+
+东京部署源实际SHA256=d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0，admin1000:1000/0755/regular/nlink1；Portal active/running/Useradmin，新PID3075458（旧2023577）。root固定status=LIVE_HEAD_GET_PASS，rollback_started=false。东京及国内首页SHA256均保持4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20，国内current仍pr122-d8b08ed-recovery-stage。只核对本次保护对象，不重跑整套静态115/83/OAuth45。原工作流apply job已移除，后续此版本只有非写核验。
+
+**鉴权边界新增具体发现（旧代码既有，不是日志补丁引入）：**
+当前准确生产源的do_POST在/integrations/tiktok/disconnect分支直接实例化生命周期存储并disconnect/record_audit/200，没有显式Origin/session/CSRF校验。为遵守禁止真实断开，未发任何POST。仅从实际候选字节AST提取do_POST，以fake store/audit/response执行；空headers、无session/body时FAKE_DISCONNECT_CALLED并FAKE_RESPONSE200。没有import生产app、没有真实存储/凭据/DB操作。证据仅证明处理函数分支缺显式鉴权，外层代理/WAF全链可利用性未作实机写测试，不冒充已被攻击或全系统无防护。
+
+复用原东京Job116566967626的Nginx只读收据：nginx.conf与所含ACME/wecom配置未记录auth_basic/auth_request/allow/deny；当前312efdd3已审国内location也直接代理disconnect。外围策略最新状态仍UNKNOWN。新增finding详见evidence/pr122-portal-log-fix/DISCONNECT_AUTH_STATIC_FINDING_20261016.json，供同一次集中独审判定发布影响和最小整改；不擅改既有批准生产配置或调用真实断开。
+
+所有11项业务方法的限制继续逐项继承：/p/真实会话、两项submit POST、三项OAuth GET、status真实状态、disconnect POST、Telegram POST/密钥及canary状态均NOT_TESTED；只有healthz GET实机200。以前安全GET拒绝证据继续有效，不用HEAD501冒充认证通过。IP依赖源码范围沿用§9.12，外围WAF/日志使用方和Owner审计差异接受未关闭；DNS当前管理面记录ID/代理/TTL/回滚核对未取得。DNS_RELEASE=HOLD、东京退役HOLD，网站入口和整体服务器迁移尚未完成。

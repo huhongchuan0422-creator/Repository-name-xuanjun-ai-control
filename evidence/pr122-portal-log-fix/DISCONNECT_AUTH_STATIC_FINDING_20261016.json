@@ -1,0 +1,39 @@
+{
+  "classification": "EXISTING_SOURCE_BRANCH_NO_EXPLICIT_AUTH_CHECK",
+  "credential_read": false,
+  "finding_id": "PR122_LEGACY_DISCONNECT_AUTH_BOUNDARY",
+  "handler_ast_sha256": "bb8b052ad8cbb050afb5bd3f21c7d8b7d091dd504c8f13582ac5415722dc6c65",
+  "introduced_by_log_patch": false,
+  "isolated_events": [
+    {
+      "event": "construct_fake_store"
+    },
+    {
+      "event": "FAKE_DISCONNECT_CALLED"
+    },
+    {
+      "event": "FAKE_AUDIT_CALLED",
+      "operation": "TIKTOK_DISCONNECT"
+    },
+    {
+      "event": "FAKE_RESPONSE",
+      "status": 200
+    }
+  ],
+  "live_candidate_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+  "live_post_executed": false,
+  "next_gate": "Independent classification and minimum correction decision before DNS release; no live disconnect test authorized",
+  "nginx_evidence": "Prior raw Tokyo receipt run38776953939/job116566967626: no auth_basic/auth_request/allow/deny directives recorded in included nginx configs. Current external/WAF state remains unverified.",
+  "production_imports": false,
+  "production_mutation": false,
+  "real_store_instantiated": false,
+  "request_model": {
+    "authenticated_session": "NOT_PROVIDED",
+    "body": "NOT_READ",
+    "headers": {},
+    "method": "POST",
+    "path": "/integrations/tiktok/disconnect"
+  },
+  "scope_limit": "AST extraction of actual do_POST; injected fake store/audit/response. Does not establish all-layer public exploitability or cloud WAF state. Other production code is not imported.",
+  "source_boundary_reproduced": true
+}
