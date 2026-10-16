@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "CURRENT_POINT_REVIEW_PACKAGE_COMPLETE; NEXT_EXACT_INDEPENDENT_ONCE_PERMISSION; NO_DB_EXPORT_OR_SERVICE_CUTOVER_YET",
+  "owner_action_now": "KOREA_OWNER_ROOT_EXECUTE_APPROVED_CURRENT_POINT_ONCE; TOKYO_PASSWORD_TERMINAL_ONLY; NO_REPEATED_PRIOR_WORK",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -538,7 +538,15 @@
     "binding_sha256": "1785c311ab9eb0b5e88c43dbb2bb3da8dce3a519635d6ca7b0e2ad9a68161fa1",
     "scope": "SERVER_PINNED_SOURCE_AND_ONE_WAL_AWARE_SQLITE_OFFLINE_POINT_PRIVATE_COPY_ONLY",
     "production_executed": false,
-    "permission": "NOT_ISSUED",
+    "permission": {
+      "status": "APPROVED_ONCE_NOT_EXECUTED",
+      "comment_id": 6216441589,
+      "body_sha256": "390e8e7fdeec17b001162e0c2f4b0ce7c6ad0f2a6a7257a7cf5693e7af4ce306",
+      "issued_at": 1792156935,
+      "expires_at": 1792200135,
+      "max_attempts": 1,
+      "body_and_machine_contract_verified": true
+    },
     "root_channel_expanded": false,
     "source_commit": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
     "hosted_ci": {
@@ -563,7 +571,7 @@
     "approval_request": {
       "comment_id": 6215860038,
       "read_back": true,
-      "decision": "PENDING",
+      "decision": "PASS_WITH_EXACT_PRECONDITIONS",
       "exact_candidate": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
       "evidence_commit": "9fbd573852eea301268575c750cda1f2f904321d"
     }
@@ -580,7 +588,7 @@
     "evidence": "evidence/pr99-offline-copy/THREE_HOST_CHANNEL_DEPENDENCIES_20261016.json",
     "plan": "plans/PR99_SERVICE_HANDOFF_EXECUTION_LEDGER_20261016.md",
     "production_actions": 0,
-    "current_point_permission": "PENDING_6215860038",
+    "current_point_permission": "APPROVED_ONCE_6216441589_NOT_EXECUTED",
     "domestic_same_named_portal_and_wecom_units": "NOT_FOUND_AT_SAMPLE",
     "tokyo_finance_timers": "4_ACTIVE_NOT_CHANGED",
     "unresolved": [
