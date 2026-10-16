@@ -19,6 +19,10 @@ from korea.phase_c.security import DetachedRSA, digest, hash_value, read_file, s
 def load_config(path):
     # Public configuration contains references, never key material. Root owns it.
     config = strict_json(read_file(path, modes=(0o444, 0o644), limit=32768))
+    return validate_config(config)
+
+
+def validate_config(config):
     fields = {"schema_version", "feature_id", "account_id", "symbols", "business_database",
         "evidence_root", "credential_role", "snapshot_max_age_ms", "capture_timeout_ms",
         "runtime_manifest_sha256", "snapshot_refresh_protocol", "snapshot_publisher_identity_sha256",
@@ -125,8 +129,10 @@ def main(argv=None):
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        status = main()
     except BaseException as error:
         print(json.dumps({"status": "HOLD_PHASE_C", "error_type": type(error).__name__,
                           "retry_allowed": False}), file=sys.stderr)
         sys.exit(2)
+    else:
+        sys.exit(status)

@@ -94,3 +94,15 @@ Owner当前不需重复取B资料或执行旧命令；未来必须需要其协�
 实际下载Artifact12030856104，ZIP c95fe723429aa294d30bd72df13b5449ec5be8ea523cc65ea3c316982c212be5，TAR a41487dbb26b2ce353ee238e39e14683f3d119cc91dde79f498b0f81beb98e09（59363字节），27常规条目、26文件绑定和22 runtime文件hash均复算通过，与本地确定性TAR逐字节一致。这是开发方真实字节复核，不自称独立审核通过。
 
 本次不请求对未齐全的C生产方案分段签许可；先保留这批实际实现与可复算制品，原B不重审。下一准确缺口仍为真实只读托管/源端collector/跨主机私有接收绑定、新worker身份、完整root一次控制器及新的C准入；无现有Korea C固定root通道，不能使用已消费B许可绕过。
+
+## 后续实现：停止状态C安装控制器与东京真实接口元数据
+
+本轮新增authorization.py、install_controller.py及仅标准库root_handoff.py。入口在首次导入候选代码前核验准确归档/plan/许可/hash；创建受保护的新交接目录，子进程-I -B。root单次安装器只可创建新的停止C候选与专用非交互worker，核冻结B17/current/unit/transaction/六共享服务，daemon-reload一次后typed D-Bus/角色/字节读回、准确空锁释放后才成功。不加载nft、不启用/启动服务、不读取真实凭据或DB。owner_approved保持false、live-admission必须不存在。新源码并非实际root执行或已获安装许可，完整C观察启动/退出/撤销控制器仍待真实托管与传递绑定后实现。
+
+测试覆盖准确/旧/错误/过期/编辑撤回批准、root私有锚点/载入源码身份、归档炸弹/路径/字节、父目录与umask077、bootstrap导入顺序及退出码、真实私有文件模式、部分安装、中断、并发、reload失败、锁漂移、共享服务与旧B保护。新增原生Python环境探针确认env-i/LANG=C可由CPython添加LC_CTYPE=C.UTF-8，准入显式接受此标准locale，仍拒绝PYTHON/SSL/loader等额外注入。77项本地70通过7受namespace/Unix约束跳过，Hosted Python3.11须新准确HEAD零跳过；旧B185不重跑。
+
+没有要求Owner取资料。原PR122载体55ef5b94ef66ec9286b9aae9a165b019499a69a7通过同一v27队列仅一次Tokyo非root取证：Run38867192724/Job116862631607 SUCCESS，其余主机job全SKIPPED，无checkout/sudo/模块导入/HTTP/服务动作。源代码仅AST标识符与hash，不输出源码/常量/默认值；accounts.credential_store、secure_credential_intake、dual_api_readiness及repositories初始化4份均取得接口。源库/opt/trading-system/database/data/trading.db仅lstat，46907392字节、uid/gid1000、mode0644；没有打开DB、读schema或业务记录。mode/可stat不等于完成ACL或数据泄露核验，不自行chmod源库。
+
+实际存在readonly角色描述接口，但凭据存储接口也有master_key及TRADING_CREDENTIAL_MASTER_KEY标记；不据此猜测/调用load_credential，更不能复用交易master key。真实只读SecretRef/权限、源库schema和私有collector/传递身份仍未证明。这是当前实际接入缺口，不能用源码名称或模型PASS代替。全部真实结果保存evidence/pr99-phase-c/TOKYO_SOURCE_CONTRACT_METADATA_20261016.json。
+
+本次仍不发起拆分的生产执行申请；完整C执行包及真实绑定齐备后统一送审，不让Owner复跑旧命令。既有官网、DNS、B现场、东京和共享业务均未操作。

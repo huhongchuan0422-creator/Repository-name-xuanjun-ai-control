@@ -6,8 +6,8 @@
   "source_baseline": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
   "phase_c": {
     "design": "RECORDED",
-    "adapter_implementation": "OFFLINE_ADAPTERS_IMPLEMENTED_NOT_DEPLOYMENT_CONTROLLER",
-    "review_artifact": "BUILT_AND_DEVELOPER_BYTE_VERIFIED",
+    "adapter_implementation": "OFFLINE_ADAPTERS_AND_STOPPED_CANDIDATE_INSTALL_CONTROLLER_IMPLEMENTED",
+    "review_artifact": "NEW_CONTROL_CANDIDATE_BUILD_PENDING",
     "root_preflight": "NOT_EXECUTED",
     "started_service_confinement": "NOT_EXERCISED",
     "live_get": "NOT_AUTHORIZED_NOT_RUN",
@@ -28,28 +28,36 @@
     "iptables_version": "UNKNOWN_MULTICALL_ARGV0_LIMIT",
     "root_enforcement": "NOT_VERIFIED",
     "local_tests": {
-      "count": 44,
-      "passed": 41,
-      "skipped": 3,
+      "count": 77,
+      "passed": 70,
+      "skipped": 7,
       "python": "3.12.14",
       "limitations": [
-        "UID0-only local namespace",
-        "new AF_UNIX listener denied; hosted root validation required"
+        "Local user namespace maps UID0 only",
+        "AF_UNIX listener blocked locally",
+        "Account/systemd actions and frozen B contents explicitly synthetic models"
       ]
     },
     "hosted_tests": {
-      "status": "PASS",
-      "tests": 44,
-      "skipped": 0,
-      "python": "3.11.17",
-      "run": 38864763014,
-      "job": 116854934203,
-      "exact_checkout": "08c7e90cc02de270bd63c4dfc0de9803d6a6a81c"
+      "status": "PENDING_NEW_EXACT_HEAD",
+      "previous_source": "08c7e90cc02de270bd63c4dfc0de9803d6a6a81c",
+      "previous_passed": 44,
+      "new_tests": 77
     },
-    "execution_controller": "NOT_IMPLEMENTED_PENDING_REAL_BINDINGS",
+    "execution_controller": "OFFLINE_INSTALL_IMPLEMENTED_NOT_APPROVED_NOT_RUN_LIVE_OBSERVE_CONTROLLER_PENDING",
     "independent_network_verifier": "NEW_SEPARATE_GET_BROKER_RSA_SIGNATURE_ADAPTER",
-    "production_bindings": "SECRETREF_ACCOUNT_PUBLISHER_TRANSFER_WORKER_UID_WINDOW_NOT_BOUND",
-    "artifact": {
+    "production_bindings": "SOURCE_API_NAMES_AND_DB_STAT_OBSERVED_REAL_SECRETREF_PERMISSION_AND_TRANSFER_SOURCE_SCHEMA_STILL_UNBOUND",
+    "root_install_controller": {
+      "implemented": true,
+      "production_approved": false,
+      "executed": false,
+      "scope": "NEW_STOPPED_C_CANDIDATE_NO_NETWORK_NO_CREDENTIALS_NO_DB",
+      "action": "PR99_PHASE_C_OFFLINE_CANDIDATE_INSTALL_V1",
+      "independent_permission": "NOT_REQUESTED",
+      "bootstrap": "STDLIB_ONLY_BEFORE_CANDIDATE_IMPORT_WITH_EXACT_PIN",
+      "private_authorization": "NEW_C_EXACT_PERMIT_AND_ROOT_ANCHOR_NOT_ISSUED"
+    },
+    "previous_artifact": {
       "id": 12030856104,
       "zip_sha256": "c95fe723429aa294d30bd72df13b5449ec5be8ea523cc65ea3c316982c212be5",
       "tar_sha256": "a41487dbb26b2ce353ee238e39e14683f3d119cc91dde79f498b0f81beb98e09",
@@ -57,6 +65,15 @@
       "runtime_files": 22,
       "developer_download_verified": true,
       "independent_review": "NOT_REQUESTED_PENDING_COMPLETE_C_EXECUTION_PACKAGE"
+    },
+    "tokyo_source_contracts": {
+      "run": 38867192724,
+      "job": 116862631607,
+      "delivery_commit": "55ef5b94ef66ec9286b9aae9a165b019499a69a7",
+      "files_observed": 4,
+      "actual_secretref_readonly_permission": "NOT_PROVEN",
+      "database_opened": false,
+      "production_module_imported": false
     }
   },
   "production_migration": "HOLD",
@@ -67,5 +84,5 @@
     "website Work current DNS",
     "Tokyo production and all shared services"
   ],
-  "note": "New Phase-C code is an offline preparation candidate; Phase-B frozen and actual C execution remains unapproved/unrun."
+  "note": "Standalone stopped-C installation controller is now implemented but not approved or executed; real observation/start/stop/revoke controller and private bindings remain pending. No extra per-step production approval requested."
 }

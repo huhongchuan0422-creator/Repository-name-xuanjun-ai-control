@@ -26,7 +26,7 @@ RSA签发身份、源端publisher身份和执行授权身份在部署时必须�
 
 ## 生产准入仍缺什么（不可伪造或填默认值）
 
-- 新C精确配置及单次独立执行许可；可信root私有锚点、一次消费和控制器。**本包没有root安装/启动控制器**，也不复用旧B许可证。完成这些前不可直接运行broker/worker模式。
+- 新C精确配置及单次独立执行许可；可信root私有锚点及一次消费。**本包现有的install_controller仅安装停止状态的独立C候选；没有真实观察启动/退出/撤销控制器**，不复用旧B许可证。完成剩余准入前不可直接运行broker/worker模式。
 - root核验UID986没有其他业务进程，新worker UID/GID及精确对象、原B冻结状态、共享服务元数据；准确nft程序/旧规则私有摘要/专用表不存在、语法及实际围栏读回/负向网络证明。nft -c不等于阻断证明。
 - 真正的独立只读SecretRef、账号及提供方只读权限证明、受信custodian provider接线；真实值不进GitHub/env/argv/日志。生成短期私有交付和分别受控签名身份，配置只放引用/公钥/hash。
 - 当前东京权威源库身份/授权账号/schema及WAL collector实际接线，固定身份的私有跨主机接收通道和逐周期新代；禁止把业务数据/回执正文上传GitHub。本测试只操作临时合成数据库。
@@ -46,3 +46,24 @@ python3 -I -B -c "import sys,unittest;sys.path.insert(0,'migration-prep');s=unit
 文件身份测试要求root所有权的合成临时目录。当前本地user namespace只映射UID0，不能伪称执行了UID986交付或真实Unix listener；这些项目要求Hosted root测试补齐，跳过不能算完整CI通过。本地其余测试使用真实SQLite WAL、OpenSSL签名、文件权限及原子rename，窗口时钟/资源和少量UID为明确模型，不是观察了真实60秒/24小时。
 
 `artifact.build(root, exact_commit, output)`生成确定性TAR、独立runtime Manifest和REVIEW_BINDING；严格固定源列表，只打包本批代码、复用依赖、测试/模板/本文。无业务DB、实际凭据、私钥、生产配置或安装权限。runtime入口要求root固定Manifest与逐文件hash/身份，不是只相信版本字符串。制品下载后按原始字节核验，不能用开发者的PASS声明替代独立审核。
+
+## 独立C候选安装控制器（源码已实现，未经许可/实机执行）
+
+`authorization.py`和`install_controller.py`补齐后续安装支持，不要求现在把它拆成一个审批节点。真实只读托管和传递绑定未齐前，不申请执行。具体行为：
+
+- 必须在准确韩国主机，以干净环境root从root持有的准确归档源码运行。载入的整个runtime逐文件与归档比较；根目录/父路径/文件owner-mode、普通文件、非link检查真实执行，不要求/root父目录为0700。
+- `root_handoff.py`为仅标准库的独立交接入口：先核root私有锚点、批准全文/当前GitHub正文、归档/plan/交接器/控制器准确hash，再在/var/lib新建0700专用目录安全展开；**首次导入候选模块之前**完成源字节认证。禁止重复使用交接目录，压缩展开限制16MiB，不使用/tmp或/var/tmp作为可信导入路径；整个子进程-I -B、干净环境，错误保留日志。它本身也必须由Owner-root独立核验准确SHA后运行，不能自我授权。
+- 原始归档/严格清单/精确commit/controller/具体plan SHA须与独立许可匹配；root私有锚点0700/0600，批准全文哈希、GitHub当前原始正文、准确主机/动作/版本/时效/max1和所有禁止项逐项校验；过期、旧批准、编辑/撤回或GitHub不可达均停止，未创建永久attempt。root锚点本身须由可信root渠道从独立审核取得，开发方不能自行代签。
+- 公钥输入只能来自固定root私有phase-c-public-inputs目录的broker/source/authority.pem三份文件。交接文件、归档和plan也须在root所有且父路径不可被他人写入的位置；不从Runner checkout或world-writable临时路径直接导入代码。实际密钥/托管/传递接线仍未进行。
+- root副作用前核固定B的17文件、manifest/current/unit/transaction和disabled/inactive/PID0、六共享unit元数据、新C全部目标不存在、UID986和新worker身份/进程、三份**不同**公钥的实际hash/RSA有效性。源库、密钥和凭据内容都不读。
+- 一次性私有attempt与独立锁，创建专用非交互worker（仅在准确plan/permit明确允许且UID/GID未冲突时），新内容寻址release/配置/公钥/私有证据目录、三个未启用的单元；只保存候选nft文本，**不加载网络规则**。owner_approved保持false，live-admission文件必须不存在。
+- root创建0755/0711目录时显式处理umask077，整代no-replace发布及fsync，绝不覆盖B。systemd-analyze verify不启用generators；daemon-reload只一次，然后读回实际角色、单元文件与typed D-Bus PrivateNetwork/RestrictAddressFamilies（兼容239的[unprintable]），保持static/disabled、inactive/dead/PID0。
+- 成功必须在准确空锁身份核验并释放后才记PASS；任何中断/未知/部分写入、权限/锁漂移、共享对象变化，保留新旧现场和有界私有失败回执，不自动清理、回滚或重试。不执行服务start/enable/stop、真实GET、凭据操作、数据库操作或东京操作。
+
+安装终态仅为`C_OFFLINE_CANDIDATE_INSTALLED_NOT_STARTED`，不能当成C Shadow成功。其测试使用真实root持有的临时文件/权限、原子发布与公钥解析，但账号/systemd/root服务动作及17份B内容是明确合成模型，**不是韩国生产安装**。生产CLI没有test-root/model参数；测试Context不可从命令行选择。准确生产常量继续绑定原已接受B哈希；没有重跑B185或更改原B安装器。
+
+## 东京源码接口元数据取证
+
+`source_contracts.py`仅为非root独立探针，不属于Korea runtime闭包。固定读取4份.py代码的AST、标识符接口与hash，另对已知源库路径lstat；不输出源码/常量值/默认值/文档串，不导入生产模块，不读取凭据文件或DB字节。真实接口与路径元数据结果另存evidence，不能用角色标记出现推导真实SecretRef已存在、权限正确或完整调用链已审。
+
+原v27队列本轮一次性东京job，无checkout/sudo，其他主机job跳过。取证代码SHA256 `0b4c7804c3f786fdadc57548c85d48c683530fc1a76bf9d47fe72727a10cb545`，delivery `55ef5b94ef66ec9286b9aae9a165b019499a69a7`，Run38867192724/Job116862631607。4源接口已取，权威候选库路径/46907392字节等仅为stat；schema与业务内容没有打开。CredentialStore接口含master_key及交易master-key标记，因此不能未审调用load_credential或将交易master key作为C只读托管捷径；实际独立只读provider仍NOT_PROVEN。
