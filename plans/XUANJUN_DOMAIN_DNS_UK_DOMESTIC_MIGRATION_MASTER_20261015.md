@@ -812,3 +812,13 @@ Phase-C已集中映射现有GET transport、secure file输入、WAL handoff严�
 采集v1的iptables/ip6tables版本因resolve后调用multicall别名丢失而UNKNOWN；未加载xt_owner/proc匹配清单缺失不是不支持证明。未来v2已保留绝对alias并通过本地实际symlink回归，未在韩国重跑，旧v1 hash f027131c...32576和原始回执不改。实际metadata保存evidence/pr99-phase-c/KOREA_NONROOT_METADATA_20261016.json，源码/限制/后续断点同目录。
 
 Phase-B正式限定闭环；Phase-C实现/完整制品仍未完成，不把准备文档或软件版本当实机许可/生产通过。接下来集中实现四链路后统一完整送审；本轮不请求零散root许可，不重跑185/安装/修复。Owner当前无操作，Phase-C liveGET/Shadow、DB/Writer切换及东京退役HOLD；网站/Work/current/DNS及其它业务不变。
+
+## 9.49 PR99 C后续：受控停止候选安装器与东京接口取证（不执行生产安装）
+
+原PR99源码32801fc886824447aaf51f4afd4a22d7c7b0ce1f；文档证据ada4281dd816fe33c6f4059c92d68cb48b5c3876。新增仅标准库root交接器、准确独审/root私有锚点准入、单次停止C候选安装器、原B17/current/unit/事务/共享服务保护与typed D-Bus验收。动作只准备新C用户/目录/runtime/停止单元与一次daemon-reload，源码没有start/enable/nft加载/真实凭据或DB读取入口；实际韩国root调用为0，新的C许可/root锚点均未签发/登记。
+
+Hosted Run38868898561/Job116868059787，准确源码checkout、Python3.11.17，77/77 PASS、skip0；生产inspection固定if:false/SKIPPED。实际Artifact12032422528下载复算ZIP 8d256daf7b90cf5f565d4587cec1236b9887b5895a08211bbb3e843ac1c699f7 / TAR 8200ccb5d86f09cb1d03a449921eddba4ab421e73cee6736a7ce9d951339bacd，82181字节、33/33文件绑定、25/25 runtime hash通过，与本地TAR逐字节一致。此为开发方核验，不冒充独审或韩国实机验收。
+
+本轮通过原v27队列一次Tokyo非root job取源码AST接口及源库lstat，delivery55ef5b94ef66ec9286b9aae9a165b019499a69a7，Run38867192724/Job116862631607 SUCCESS；其他主机job全SKIPPED，无checkout/sudo。4份接口取到；/opt/trading-system/database/data/trading.db仅stat为46907392字节，未打开schema/业务记录。CredentialStore存在master_key接口与交易master-key标记，readonly角色描述接口也存在，但实际只读SecretRef/提供方权限尚未证明，禁止直接借用交易master key。源码正文/常量值/默认值未导出，凭据/业务库读取均0。
+
+剩余只集中处理真正的独立只读托管、源库schema/collector及私有接收身份、完整live观察启动/失败停止/撤销控制器和新C准确准入。此处不是拆分生产送审；完整C执行包齐备后统一交原独审，B与未变已审内容继续继承。C真实GET/观察未开始，Writer/生产迁移/东京退役继续HOLD；现有官网内容/current/DNS、东京及共享服务不操作。
