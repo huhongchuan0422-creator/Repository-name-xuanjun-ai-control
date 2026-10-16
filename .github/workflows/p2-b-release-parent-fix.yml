@@ -3,6 +3,11 @@ on:
   push:
     branches: [repair/p2-chatgpt-clean-review-20261013]
     paths:
+      - 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-bound/**'
+      - 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-delivery/**'
+      - 'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-parentfix-dacd45a2.tar.gz'
+      - 'evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/epoch7_prepare_delivery.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/test_epoch7_prepare_delivery.py'
       - 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/kit-overlay/**'
       - 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/preparation/**'
       - 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-fix/tests/**'

@@ -206,7 +206,7 @@ class AdapterContractTests(unittest.TestCase):
         prefix='evidence/p2-epoch7-access-repair-20261014/'
         candidate=prefix+'b-release-parent-fix/'
         self.assertEqual(self.m.KIT_TARGET,'kit/epoch7-recovery-candidate-r7')
-        self.assertEqual(len(self.m.PINS),24)
+        self.assertEqual(len(self.m.PINS),35)
         self.assertEqual(self.m.PINS[candidate+'tests/test_fresh_release_parent.py'][:2],(17229,'1df4eb37f1a7e9dacd3c157d6b69b626db0bb99dc8e9e2fc2c4467be992e67dc'))
         for path,target in self.m.SOURCE_TARGETS.items():
             self.assertNotIn('private',path.lower())
@@ -239,7 +239,7 @@ class AdapterContractTests(unittest.TestCase):
         for bad in ('secrets.','self-hosted','upload-artifact','curl ','wget ','pip ','pull_request_target','workflow_dispatch','chmod 777'):
             self.assertNotIn(bad,text)
     def test_separate_builder_count_and_ephemeral_build_contract(self):
-        self.assertEqual(self.m.ADDITIONAL_SUITES,(('builder',24),))
+        self.assertEqual(self.m.ADDITIONAL_SUITES,(('builder',24),('binding',10),('delivery',36)))
         self.assertEqual(self.m.aggregate()['tests'],166)
         self.assertEqual(self.m.aggregate()['builder_tests'],24)
         self.assertTrue(self.m.aggregate()['source_bound_build_verified'])
@@ -266,6 +266,26 @@ class AdapterContractTests(unittest.TestCase):
         self.assertEqual(text.count('-c safe.directory='),4)
         for forbidden in ('/usr/bin/mktemp','/usr/bin/chown','config --global','safe.directory=*','safe.directory="*"'):
             self.assertNotIn(forbidden,text)
+    def test_selected_compiler_and_delivery_fixture_closure(self):
+        prefix='evidence/p2-epoch7-access-repair-20261014/'
+        candidate=self.m.CANDIDATE_TARGET
+        for folder,public,names in (
+            ('preparation-bound','b-release-parent-bound',('epoch7_prepare.py','epoch7_prepare_data.py','epoch7_topology_projection.py','test_compiler_binding.py')),
+            ('delivery-candidate','b-release-parent-delivery',('epoch7_prepare_delivery.py','extract_epoch7_compiler_kit.py','test_parentfix_delivery.py','README.md'))):
+            for name in names:self.assertEqual(self.m.SOURCE_TARGETS[prefix+public+'/'+name],candidate+'/'+folder+'/'+name)
+        self.assertEqual(self.m.PINS[self.m.SELECTED_COMPILER_ARCHIVE_PATH],
+            (1045651,'6553938a56b882e17d13029fa9a06787131bb55a5c55bc1138e2b825277b7307',self.m.SELECTED_COMPILER_ARCHIVE_TARGET))
+        self.assertEqual(self.m.SELECTED_COMPILER_MANIFEST_SHA,'b33b365ef1fd18458d85bcbbec44d883f3cc33bf859064cbdca6bfc3fad7d571')
+        self.assertEqual(self.m.aggregate()['tests'],166)
+        self.assertEqual(self.m.aggregate()['builder_tests'],24)
+        self.assertEqual(self.m.aggregate()['binding_tests'],10)
+        self.assertEqual(self.m.aggregate()['delivery_tests'],36)
+    def test_new_suite_routing_isolated_and_preserves_old_test_sources(self):
+        source=GATE.read_text()
+        self.assertIn("'binding':[candidate/'preparation-bound/test_compiler_binding.py']",source)
+        self.assertIn("'delivery':[candidate/'delivery-candidate/test_parentfix_delivery.py']",source)
+        self.assertIn("os.environ['EPOCH7_COMPILER_TEST_ARCHIVE']=str(root/SELECTED_COMPILER_ARCHIVE_TARGET)",source)
+        self.assertIn("[sys.executable,'-I','-B','-S'",source)
     def test_registry_accepts_other_additions_but_requires_own_exact_registration(self):
         value={'schema_version':1,'features':[{'feature_id':self.m.FEATURE_ID,'status':'IN_DEVELOPMENT',
             'acceptance':{'tests':[self.m.GATE_PATH,self.m.CONTRACT_PATH]}}]}
@@ -309,7 +329,7 @@ class AdapterContractTests(unittest.TestCase):
                 build=stack.enter_context(mock.patch.object(self.m,'build_exact_source'))
                 stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
                 with self.assertRaisesRegex(ValueError,label):self.m.worker()
-                self.assertEqual(run.call_count,5);self.assertEqual(check.call_count,7)
+                self.assertEqual(run.call_count,7);self.assertEqual(check.call_count,9)
                 self.assertEqual(build.call_args[0][2:],(self.m.COMPILER_SOURCE_COMMIT,self.m.COMPILER_SOURCE_TREE))
                 self.assertTrue(all(call[2]['new_session'] is False for call in run.mock_calls))
                 for call,(name,unused) in zip(run.call_args_list,self.m.SUITES+self.m.ADDITIONAL_SUITES):
@@ -342,9 +362,9 @@ class GitBoundaryTests(unittest.TestCase):
 
 if __name__=='__main__':
     suite=unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])
-    if suite.countTestCases()!=39:raise ValueError('EXACT_ADAPTER_CONTRACT_COUNT')
+    if suite.countTestCases()!=41:raise ValueError('EXACT_ADAPTER_CONTRACT_COUNT')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
-    ok=result.wasSuccessful() and not result.skipped and result.testsRun==39
+    ok=result.wasSuccessful() and not result.skipped and result.testsRun==41
     print(json.dumps({'schema':1,'state':'PASS' if ok else 'FAIL','tests':result.testsRun,'errors':len(result.errors),
         'failures':len(result.failures),'skips':len(result.skipped),'python':sys.version.split()[0],
         'host_NOT_RUN':True,'network_NOT_RUN':True},sort_keys=True))
