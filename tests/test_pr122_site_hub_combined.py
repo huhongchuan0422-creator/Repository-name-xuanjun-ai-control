@@ -132,7 +132,7 @@ class CombinedTests(unittest.TestCase):
                    'issued_unix':int(time.time())-1,'expires_unix':int(time.time())+600}
         self.gatepath=self.temp/'approval.json';self.gatepath.write_bytes(c.canonical(self.gate));os.chmod(self.gatepath,0o600)
     def apply(self):return self.tx.apply(self.gatepath)
-    def test_complete_actual_1277_file_publish_and_restore(self):
+    def test_complete_1277_file_publish_and_restore(self):
         r=self.apply();self.assertEqual(r['state'],'HTTPS_SMOKE_PASS_AWAIT_BROWSER')
         self.assertEqual(len(list((c.BASE/'current/public').rglob('*')))>1277,True)
         self.assertTrue(self.ops.active);self.assertTrue(c.ENABLE.is_symlink())
@@ -169,7 +169,7 @@ class CombinedTests(unittest.TestCase):
         # Each case gets a clean disposable namespace with actual frozen publisher.
         for stage in stages:
             with self.subTest(stage=stage):
-                case=CombinedTests('test_complete_actual_1277_file_publish_and_restore');case.setUp()
+                case=CombinedTests('test_complete_1277_file_publish_and_restore');case.setUp()
                 try:
                     real=case.tx.step
                     def step(name,action):
@@ -204,6 +204,27 @@ class CombinedTests(unittest.TestCase):
         self.tx.verify_before_activation=drift
         with self.assertRaisesRegex(c.Hold,'STAGED_CONFIG_DRIFT'):self.apply()
         self.assertEqual(os.readlink(c.BASE/'current'),self.pins['previous_release'])
+    def test_unproved_sandbox_stops_before_nginx_and_can_recover(self):
+        self.ops.sandbox=mock.Mock(side_effect=c.Hold('UNSUPPORTED_BPF'))
+        with self.assertRaisesRegex(c.Hold,'UNSUPPORTED_BPF'):self.apply()
+        self.assertFalse(c.LIMIT.exists());self.assertEqual(os.readlink(c.BASE/'current'),self.pins['previous_release'])
+        self.assertEqual(self.tx.rollback()['state'],'ROLLED_BACK');self.assertFalse(self.ops.active)
+    def test_foreign_runtime_is_not_stopped_or_deleted(self):
+        self.apply();p=c.RUNTIME/c.RELEASE/'scripts/pr122_site_hub_preview.py';p.write_bytes(b'foreign-runtime')
+        with self.assertRaisesRegex(c.Hold,'SEALED_RUNTIME_MANIFEST_DRIFT'):self.tx.rollback()
+        self.assertTrue(self.ops.active);self.assertEqual(p.read_bytes(),b'foreign-runtime')
+    def test_approval_expiring_before_activation_is_held_and_recoverable(self):
+        real=self.tx.verify_before_activation
+        def expired():
+            self.tx.data['approval']['expires_unix']=0;return real()
+        self.tx.verify_before_activation=expired
+        with self.assertRaisesRegex(c.Hold,'EXPIRED_OR_INVALID_GATE'):self.apply()
+        self.assertEqual(os.readlink(c.BASE/'current'),self.pins['previous_release'])
+        self.assertEqual(self.tx.rollback()['state'],'ROLLED_BACK')
+    def test_group_writable_approval_is_rejected(self):
+        self.gatepath.chmod(0o660)
+        with self.assertRaisesRegex(c.Hold,'WRITABLE_TRUST_CHAIN'):self.apply()
+        self.assertFalse(self.tx.receipt.exists());self.assertEqual(self.ops.calls,[])
 
 class PureTests(unittest.TestCase):
     def test_exact_routes_are_manifest_bounded(self):

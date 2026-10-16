@@ -67,7 +67,7 @@ intent/completion markers around every stage; the same ID cannot be reapplied.
 1. Verify both archives, all 446 members, publisher hash, host config, 1187 live
    file digest, vacant port and absent new unit/runtime/config objects.
 2. Before production writes, save all 11 config sources plus the previous 1187
-   public files and inline-CSP conf in a root-private backup. Read the archive
+   public files and both inline-CSP conf/JSON in a root-private backup. Read the archive
    back and compare every member's bytes. Preserve the old release in place.
 3. Seal the frozen bundle privately; invoke the existing reviewed publisher
    prepare. Stage approved runtime files, unit and one exact enable symlink;

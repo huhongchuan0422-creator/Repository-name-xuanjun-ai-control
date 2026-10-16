@@ -224,11 +224,12 @@ class Ops:
         try:
             libc=ctypes.CDLL(None,use_errno=True)
             for kind in (0,1):
-                q=Query(target_fd=fd,attach_type=kind,query_flags=1)
-                result=libc.syscall(321,16,ctypes.byref(q),ctypes.sizeof(q))
-                need(result==0 and q.prog_cnt>0,'CGROUP_BPF_FILTER_UNPROVEN:'+str(kind));counts.append(q.prog_cnt)
+                for flags in (0,1):
+                    q=Query(target_fd=fd,attach_type=kind,query_flags=flags)
+                    result=libc.syscall(321,16,ctypes.byref(q),ctypes.sizeof(q))
+                    need(result==0 and q.prog_cnt>0,'CGROUP_BPF_FILTER_UNPROVEN:'+str(kind)+':'+str(flags));counts.append(q.prog_cnt)
         finally:os.close(fd)
-        return {'uid':status['Uid'].split()[0],'mainpid':pid,'bpf_ingress_egress_program_counts':counts,'mount_namespace_separate':True}
+        return {'uid':status['Uid'].split()[0],'mainpid':pid,'bpf_direct_effective_ingress_egress_program_counts':counts,'mount_namespace_separate':True}
     def request(self,path,method='GET',data=None,cookie=None,origin=None,https=False,extra=None):
         connection=http.client.HTTPSConnection(HOST,443,timeout=8) if https else http.client.HTTPConnection('127.0.0.1',18793,timeout=5)
         headers={'Host':HOST,'X-Forwarded-Proto':'https','Sec-Fetch-Site':'same-origin'}
@@ -322,13 +323,14 @@ class Transaction:
         for name,row in files.items():
             raw=read(old/'public'/name);need(sha(raw)==row['sha256'],'BACKUP_PUBLIC_DRIFT');entries['public/'+name]=raw
         entries['release-metadata/inline-csp.conf']=read(old/'release-metadata/inline-csp.conf')
+        entries['release-metadata/inline-csp.json']=read(old/'release-metadata/inline-csp.json')
         stream=io.BytesIO()
         with gzip.GzipFile(filename='',fileobj=stream,mode='wb',mtime=0) as zipped,tarfile.open(fileobj=zipped,mode='w') as archive:
             for name,raw in sorted(entries.items()):
                 member=tarfile.TarInfo(name);member.size=len(raw);member.mode=0o644;archive.addfile(member,io.BytesIO(raw))
         raw=stream.getvalue();write(backup/'previous-static.tar.gz',raw,0o600)
         with tarfile.open(fileobj=io.BytesIO(read(backup/'previous-static.tar.gz'))) as archive:
-            members=archive.getmembers();need(len(members)==1188,'BACKUP_MEMBER_COUNT')
+            members=archive.getmembers();need(len(members)==1189,'BACKUP_MEMBER_COUNT')
             for m in members:need(m.isfile() and archive.extractfile(m).read()==entries[m.name],'BACKUP_ROUNDTRIP')
         self.data.update(backup={'nginx':nginx,'static_sha256':sha(raw),'static_files':files,'archive_verified':True},previous_link=os.readlink(BASE/'current'))
     def seal_bundle(self):
