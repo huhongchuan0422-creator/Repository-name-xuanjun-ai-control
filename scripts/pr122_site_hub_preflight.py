@@ -65,7 +65,7 @@ def inspect(root):
             parser.feed(path.read_text())
             demo_assets.update(ref for tag, attr, ref in parser.refs if attr == 'src')
     return {
-        'source_head': HEAD,
+        'original_handoff_head': HEAD,
         'release_decision': 'HOLD',
         'production_deployed': False,
         'candidate_file_count': len(files),
@@ -78,7 +78,7 @@ def inspect(root):
         'limitations': [
             'Static inspection, not browser, hosted CI, independent audit or production acceptance.',
             'Demo uses /demo POST APIs; copying files alone cannot provide its interactions.',
-            'New handoff pages are zh-CN only; English integration remains unverified.',
+            'Original handoff pages are zh-CN; staging generates reviewed English variants separately.',
             'Inline calculator requires exact CSP hash or externalization; never weaken CSP.',
         ],
     }
@@ -89,7 +89,7 @@ def main():
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     result = inspect(args.root)
-    if result['candidate_file_count'] != 19 or result['html_page_count'] != 15:
+    if result['candidate_file_count'] != 20 or result['html_page_count'] != 15:
         raise SystemExit('HANDOFF_INVENTORY_DRIFT')
     payload = json.dumps(result, ensure_ascii=False, indent=2) + '\n'
     if args.output:

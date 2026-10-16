@@ -6,6 +6,9 @@ on:
       - 'demos/xuanjun-site-hub/**'
       - 'demos/community-local-e2e/**'
       - 'scripts/pr122_site_hub_*.py'
+      - 'tests/test_pr122_site_hub_integration.py'
+      - 'tests/pr122_site_hub_browser.cjs'
+      - 'tests/fixtures/pr122-site-shell/**'
       - '.github/workflows/pr122-site-hub-preflight.yml'
 permissions:
   contents: read
@@ -25,6 +28,19 @@ jobs:
         run: python scripts/pr122_site_hub_preflight.py --output /tmp/pr122-site-hub/STATIC_PREFLIGHT.json
       - name: Offline quote and simulated frontend regressions
         run: node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs demos/community-local-e2e/*.test.mjs
+      - name: Isolated integrated HTTP and language tests
+        run: python -m unittest tests/test_pr122_site_hub_integration.py -v
+      - name: Install pinned browser test dependencies in temporary directory
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pr122-browser" --no-save playwright@1.55.0
+          "$RUNNER_TEMP/pr122-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Build explicitly limited old-shell fixture with actual new content
+        run: python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-site-browser
+      - name: Chromium desktop, mobile, CSP and existing loopback simulation flows
+        env:
+          XJ_HUB_STAGE: /tmp/pr122-site-browser
+          XJ_HUB_REPORT: /tmp/pr122-site-hub/BROWSER_REPORT.json
+        run: PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright" node tests/pr122_site_hub_browser.cjs
       - name: Bind receipt to actual checkout
         run: |
           python - <<'PY'

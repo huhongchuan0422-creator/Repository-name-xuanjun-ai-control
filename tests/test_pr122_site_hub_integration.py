@@ -1,0 +1,88 @@
+import hashlib
+import http.client
+import json
+import os
+from pathlib import Path
+import re
+import tempfile
+import threading
+import unittest
+
+from scripts.pr122_site_hub_stage import build
+from scripts.pr122_site_hub_preflight import Page
+from scripts.pr122_site_hub_test_server import serve
+
+ROOT=Path(__file__).resolve().parents[1]
+
+class IntegrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp=tempfile.TemporaryDirectory()
+        cls.stage=Path(cls.temp.name)/'stage'
+        build(ROOT,None,cls.stage,ROOT/'tests/fixtures/pr122-site-shell')
+        cls.public=cls.stage/'public'
+        cls.server=serve(cls.stage)
+        cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True);cls.thread.start()
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown();cls.thread.join();cls.server.server_close();cls.temp.cleanup()
+    def request(self,path,body=None,headers=None):
+        c=http.client.HTTPConnection('127.0.0.1',self.server.server_port,timeout=5)
+        data=json.dumps(body) if body is not None else None
+        c.request('POST' if body is not None else 'GET',path,data,headers or ({'Content-Type':'application/json'} if body is not None else {}))
+        r=c.getresponse();result=(r.status,r.getheader('Content-Security-Policy'),r.read());c.close();return result
+    def test_42_localized_pages_have_original_navigation_and_no_inline_attributes(self):
+        pages=list((ROOT/'demos/xuanjun-site-hub').rglob('*.html'))
+        pages=[p.relative_to(ROOT/'demos/xuanjun-site-hub') for p in pages if p.parent.name!='xuanjun-site-hub']
+        self.assertEqual(len(pages),14)
+        for locale in ('','zh-cn/','en/'):
+            for p in pages:
+                text=(self.public/locale/p).read_text()
+                self.assertIn('id="primary-nav"',text)
+                self.assertEqual(text.count('class="nav-group"'),3)
+                self.assertNotRegex(text,r'\s(?:style|onclick)=')
+                self.assertNotIn('<script>',text)
+                main=re.search(r'<main\b.*?</main>',text,re.S)[0]
+                if locale=='en/':self.assertNotRegex(re.sub(r'<[^>]*>','',main),r'[\u4e00-\u9fff]')
+                parser=Page();parser.feed(main)
+                for tag,attr,ref in parser.refs:
+                    if not ref.startswith('/'):continue
+                    path=ref.split('?',1)[0].split('#',1)[0]
+                    target=self.public/path.lstrip('/')
+                    self.assertTrue(target.is_file() or (target/'index.html').is_file(),ref)
+    def test_demo_resources_and_fixed_returns_are_mapped(self):
+        for name in ('index.html','merchant.html','platform.html','community.html','beneficiary.html','saas-panel.html'):
+            text=(self.public/'visual/community-local-e2e'/name).read_text();p=Page();p.feed(text)
+            for tag,attr,ref in p.refs:
+                if attr=='src' and ref.startswith('/'):
+                    self.assertTrue((self.public/ref.lstrip('/')).is_file(),ref)
+                self.assertNotIn('../visual/',ref)
+                self.assertNotIn('../legal/',ref)
+    def test_quote_ui_and_csp_have_no_unsafe_inline(self):
+        policy=json.loads((self.stage/'release-metadata/inline-csp.json').read_text())['policy']
+        self.assertNotIn('unsafe-inline',policy)
+        self.assertTrue((self.public/'assets/ecv-quote-ui.js').is_file())
+        self.assertIn('value="ordinary"',(self.public/'marketplace/index.html').read_text())
+    def test_existing_home_body_title_and_links_preserved(self):
+        for locale in ('','en/','zh-cn/'):
+            old=(ROOT/'tests/fixtures/pr122-site-shell'/locale/'index.html').read_text()
+            new=(self.public/locale/'index.html').read_text()
+            a=Page();a.feed(old);b=Page();b.feed(new)
+            self.assertLessEqual(set(a.refs),set(b.refs))
+            self.assertEqual(re.search(r'<title>.*?</title>',old)[0],re.search(r'<title>.*?</title>',new)[0])
+            oldmain=re.search(r'<main>.*?</main>',old,re.S)[0]
+            self.assertIn(oldmain[:-7],new)
+    def test_http_negative_and_real_simulated_order_flow(self):
+        self.assertEqual(self.request('/missing-site-hub-page')[0],404)
+        self.assertEqual(self.request('/.env')[0],403)
+        self.assertEqual(self.request('/',headers={'Host':'external.example'})[0],403)
+        scope={'tenant_id':'tenant1','merchant_id':'merchant1','store_id':'store1','reference':'integration_test'}
+        status,_,body=self.request('/demo/orders',{**scope,'amount_minor':120})
+        self.assertEqual(status,200);self.assertEqual(json.loads(body)['state'],'PENDING')
+        status,_,body=self.request('/demo/orders/simulate',{**scope,'amount_minor':120,'event_id':'sim_1','target':'SUCCESS','transaction_id':'sim_tx_1'})
+        self.assertEqual(status,200);self.assertEqual(json.loads(body)['state'],'SUCCESS')
+        status,_,body=self.request('/demo/admin/profile',{'anything':'invalid'})
+        self.assertNotEqual(status,200)
+        self.assertEqual(self.request('/demo/orders',scope,{'Content-Type':'application/json','Origin':'https://external.example'})[0],403)
+
+if __name__=='__main__':unittest.main()

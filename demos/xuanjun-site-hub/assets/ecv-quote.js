@@ -7,8 +7,8 @@ function calculateQuote({listPriceCents,ecvUnits,creditCents,directCostCents=nul
  if(!["custom","ordinary"].includes(kind))throw new RangeError("unknown service kind");
  let pct=100;
  if(kind==="custom")for(const [minimum,rate] of TIERS)if(ecvUnits>=minimum)pct=rate;
- const discounted=Math.round(listPriceCents*pct/100);
- const cap=Math.floor(discounted*(kind==="custom"?50:90)/100);
+ const discounted=Number((BigInt(listPriceCents)*BigInt(pct)+50n)/100n);
+ const cap=Number(BigInt(discounted)*BigInt(kind==="custom"?50:90)/100n);
  const deducted=Math.min(cap,creditCents);
  const cash=discounted-deducted;
  // This is an offline quote projection, not an authoritative Finance commission settlement.
