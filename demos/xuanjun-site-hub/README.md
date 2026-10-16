@@ -17,3 +17,8 @@
 已将经Owner确认的「普通自营服务90%专项抵扣；定制开发先按ECV等级折扣、再抵扣折后开发费50%」写入权威开发文档§7.7.15B，网站候选的/ecosystem/、/marketplace/及导航同步更新。6000→2400→1200、核实直接成本2000、当单毛利-800且当单无正佣金为标准示例。页面报价模拟仅离线，不是Finance实付确认。
 
 工作区为独立受控分支，不能因为此处完成静态页面而覆盖已有国内官网。正式导航、公共域名路由、原站语言/深链、真实模块市场Price Book、身份/Finance、共创共享财务和生产制品必须由相应原Owner审核接线。
+
+## 最终静态页面列表
+入口根页：/marketplace/、/visual/、/visual/community-payment/、/ecosystem/、/customer/projects/。
+二级独立页面：/marketplace/modules/、/visual/catalog/、/ecosystem/tiers/、/ecosystem/co-create/、/ecosystem/profit-sharing/、/ecosystem/ledger/、/ecosystem/activities/、/ecosystem/governance/、/customer/projects/acceptance/。
+保留Work现有官网一级入口「解决方案」「功能市场」「定制与交付」，原下拉箭头与文字间距改为4至6px；将「产品销售」融入现有功能市场、将客户项目融入定制与交付、可视化与共建共享作为现有菜单下拉项/适当独立可见入口，由Work按真实源码接线。严禁覆盖Work现有首页。独立站点源码及ECV规则文档仅为受控候选，需测试、独立审核和生产部署门禁。
