@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "S06_CONSOLIDATED_REVIEW_NEW_ONCE_PRIVATE_CONTRACT_PERMISSION; NO_SERVER_COMMAND_YET",
+  "owner_action_now": "FORWARD_REVIEW_6217723972_TO_EXISTING_INDEPENDENT_REVIEW_WINDOW; NO_SERVER_EXECUTION_BEFORE_NEW_SCOPE_PERMISSION",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -674,7 +674,14 @@
         "zip_verification": "ACTUAL_GITHUB_JOB_UPLOAD_DIGEST_AND_ARTIFACT_API_NOT_INDEPENDENT_ZIP_DOWNLOAD",
         "local_tar_reproduction": "BYTE_IDENTICAL_TO_HOSTED_BUILD"
       },
-      "review_request": "TO_BE_POSTED"
+      "review_request": {
+        "comment_id": 6217723972,
+        "read_back": true,
+        "scope": "ONE_CONSOLIDATED_NEW_PRIVATE_UNIT_CONTRACT_EXPORT_REVIEW_AND_NEW_ONCE_PERMISSION",
+        "decision": "PENDING",
+        "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+        "delivery_commit": "76f231cc253c5589041c38a778595a5d720fdad0"
+      }
     }
   },
   "current_recovery_point_r2": {
