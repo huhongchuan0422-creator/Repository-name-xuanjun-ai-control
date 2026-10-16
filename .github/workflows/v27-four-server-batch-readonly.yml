@@ -552,3 +552,28 @@ jobs:
         run: python3 -B -m unittest discover -s tests -p test_pr122_backend_source_inventory.py -v
       - name: Read only five hash-bound public Python sources, no state or service operation
         run: python3 -I -B deploy/pr122-backend-migration/source_inventory.py
+
+  tokyo-phase-c-source-contracts:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'PR99_PHASE_C_SOURCE_CONTRACTS_ONCE_20261016' && github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 2
+    steps:
+      - name: Read fixed Python source interfaces and database stat only
+        env:
+          XJ_DELIVERY_SHA: ${{ github.sha }}
+          XJ_SOURCE_GZIP: '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'
+          XJ_SOURCE_SHA256: '0b4c7804c3f786fdadc57548c85d48c683530fc1a76bf9d47fe72727a10cb545'
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import base64,gzip,hashlib,json,os
+          raw=gzip.decompress(base64.b64decode(os.environ['XJ_SOURCE_GZIP'],validate=True))
+          assert hashlib.sha256(raw).hexdigest()==os.environ['XJ_SOURCE_SHA256']
+          namespace={'__name__':'fixed_contract_metadata'}
+          exec(compile(raw,'fixed_contract_metadata','exec'),namespace)
+          result=namespace['collect']()
+          result['delivery_commit']=os.environ['XJ_DELIVERY_SHA']
+          result['probe_sha256']=os.environ['XJ_SOURCE_SHA256']
+          print('PR99_PHASE_C_SOURCE_CONTRACT_RECEIPT='+json.dumps(result,sort_keys=True))
+          PY
