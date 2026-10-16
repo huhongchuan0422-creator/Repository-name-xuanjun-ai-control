@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "OWNER_REQUESTED_REEXECUTION; SEEK_EXACT_REPLACEMENT_PERMISSION_WITH_RETAINED_AUTH_FAILURE_NOT_REVIEW_SOURCE",
+  "owner_action_now": "FORWARD_EXISTING_RESTART_REQUEST_6218181967_WITH_NEW_ROOT_LOGIN_PROOF; WAIT_EXACT_REPLACEMENT_PERMISSION_NO_CODE_REAUDIT",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -726,8 +726,36 @@
       "replacement_permission_request": {
         "comment_id": 6218181967,
         "read_back": true,
-        "status": "PENDING",
+        "status": "PENDING_NEW_OWNER_ROOT_LOGIN_AND_SOURCE_ABSENCE_EVIDENCE_SUPPLIED",
         "scope": "SAME_FROZEN_VERSION_EXACT_FAILED_AUTH_HANDOFF_NEW_ONCE_PERMISSION"
+      },
+      "login_preflight": {
+        "schema_version": 1,
+        "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_WITH_REMOTE_FIXED_HOSTKEY_READONLY_SSH_NOT_ASSISTANT_ROOT_LOGIN",
+        "reported_local_time_window": "2026-10-16 22:57 Asia/Shanghai (message context, not independently host-timestamped)",
+        "old_approval_comment_id": 6217834919,
+        "old_local_failure_sha256": "9f48d4a2e1940af1c426d09cf044cc294b6ebb5e295420075b26d20317dbd362",
+        "old_local_failure_status": "HOLD_PRESERVE_EVIDENCE",
+        "old_local_failure_reason": "CalledProcessError",
+        "old_failure_hash_unchanged": true,
+        "tokyo_login_identity_test": "PASS",
+        "source_host": "iZ6wee8q9z4t03hvqumwfhZ",
+        "source_root_uid_test": "PASS",
+        "source_workdir": "/root/pr99-s06-runtime-contract-v1",
+        "source_workdir_lexical_existence": "ABSENT_SUPPORTED_BY_OWNER_ROOT_TEST_E_AND_TEST_L",
+        "host_key_check": "STRICT_PINNED_ECDSA_USING_PREVIOUS_PRIVATE_KNOWN_HOSTS",
+        "authentication_secret_values_published": false,
+        "ssh_new_keys_installed": false,
+        "unit_content_read": false,
+        "capture_invoked": false,
+        "service_actions": 0,
+        "production_changes": 0,
+        "remaining_restart_preconditions": [
+          "New independent replacement permission ID/body SHA/expiry",
+          "Before atomic failed-stage rename: revalidate old approval.json, private identity, no unexpected capture progress, no active old coordinator, fresh Tokyo source absence",
+          "Preserve old local stage by exact authorized new name, no overwrite/delete",
+          "Execute original frozen script under new single-use approval once"
+        ]
       }
     }
   },
