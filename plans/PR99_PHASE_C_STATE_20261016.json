@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "RUN_STORAGE_WIRING_STATIC_PROJECTION_ON_EXISTING_KOREA_PRIVATE_COPY_NO_APP_IMPORT",
+  "owner_action_now": "RUN_PINNED_S07_PRIVATE_MATERIAL_STAGE_ON_KOREA_ENTER_TOKYO_ROOT_PASSWORD_ONLY_IN_TERMINAL",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -941,7 +941,36 @@
         "next_script": "evidence/pr99-service-handoff/s07-runtime-inventory/resolve_storage_contract.py",
         "next_source_commit": "d25e5a562acea75e793c18a31d8f536fc7f52d35",
         "next_script_sha256": "cc27913ca76e1cae58008c8c7c5997bba04ceee7950ff3dacec30bcb9f9a78eb",
-        "next_status": "PREPARED_NOT_HOST_EXECUTED"
+        "next_status": "OWNER_EXECUTED_S07_STORAGE_WIRING_STATIC_PROJECTION_NOT_HOST_RUNTIME_ACCEPTANCE",
+        "storage_wiring_receipt": "evidence/pr99-service-handoff/s07-runtime-inventory/OWNER_STORAGE_WIRING_20261017.json"
+      },
+      "private_runtime_material_staging": {
+        "status": "PREPARED_NOT_EXECUTED",
+        "script": "evidence/pr99-service-handoff/s07-runtime-materials/stage_runtime_materials.py",
+        "source_commit": "8f80d0cb60ff68a3bcbbfed6506eda3126cb4761",
+        "script_sha256": "0076b30aec052366ac2f7ec6adfa5ff13b9c54f21fa50221c72d9415ddfc6c7f",
+        "local_tests": 7,
+        "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+        "scope": "BOUNDED_TOKYO_S07_RUNTIME_CONFIG_CREDENTIAL_AND_PRELIMINARY_SQLITE_BACKUP_TO_KOREA_PRIVATE_STAGING_ONLY",
+        "source_code_and_unit_current_hash_gates": true,
+        "unit_overrides": "UNKNOWN_STORAGE_ARGUMENTS_OR_DROPINS_REJECT",
+        "allowed_runtime_trees": [
+          "runtime/secure-secrets-portal",
+          "runtime/v8-domestic-operations/operations-secretref-store",
+          "runtime/v8-domestic-operations/wecom-customer-contact",
+          "runtime/v8-domestic-operations/wecom-customer-service"
+        ],
+        "data": "database/data/trading.db VIA_SQLITE_BACKUP_NOT_COPY_WAL",
+        "optional_exact_files": "knowledge/data/production_knowledge_v1.json; config/model_provider_rate_cards.json; two known exact referral config JSON files",
+        "source_services_stopped": false,
+        "source_writer_frozen": false,
+        "final_cutover_snapshot": false,
+        "domestic_install": false,
+        "service_actions": 0,
+        "api_requests": 0,
+        "production_cutover": false,
+        "private_archive_upload": "FORBIDDEN_DO_NOT_SEND_TO_CHAT_GITHUB_OR_CI",
+        "execution_authority": "OWNER_DIRECT_MIGRATION_6219362469_NOT_REPLAY_OF_R2_OR_S06_PERMIT"
       }
     }
   },
