@@ -21,3 +21,30 @@ jobs:
           echo 'APPROVAL_REFERENCE=PR122#6213703300; ACTION=inspect'
           sudo -n /usr/local/libexec/xuanjun-customer-channel inspect
           echo 'FIXED_ROOT_INSPECT_EXIT=0; CUSTOMER_INSTALL_NOT_CALLED'
+
+      - name: Unprivileged runtime and reusable service metadata inventory
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import importlib.metadata,json,os,pwd,shutil,signal,ssl,subprocess
+          signal.alarm(40)
+          assert os.uname().nodename=='iZvt5t8tlrm8oiZ' and os.getuid()==1002
+          report={'production_mutations':0,'dependency_versions':{},'tools':{},'service_units':[]}
+          for name in ('cryptography','cffi','pycparser'):
+              try:report['dependency_versions'][name]=importlib.metadata.version(name)
+              except importlib.metadata.PackageNotFoundError:report['dependency_versions'][name]='ABSENT'
+          report['openssl']=ssl.OPENSSL_VERSION
+          for name in ('clamdscan','clamscan','systemd-analyze'):
+              report['tools'][name]=shutil.which(name)
+          try:
+              p=pwd.getpwnam('xuanjun-customer')
+              report['customer_account']={'uid':p.pw_uid,'gid':p.pw_gid,'shell':p.pw_shell}
+          except KeyError:report['customer_account']='ABSENT'
+          r=subprocess.run(['/usr/bin/systemctl','list-unit-files','--type=service','--no-legend','--no-pager'],capture_output=True,text=True,timeout=10)
+          if r.returncode==0:
+              for line in r.stdout.splitlines():
+                  name=line.split()[0] if line.split() else ''
+                  if any(word in name.lower() for word in ('xuanjun','domestic','identity','crm','clam','telegram','feishu','bridge','secretref')):
+                      report['service_units'].append(name)
+          else:report['service_inventory']='UNKNOWN'
+          print('CUSTOMER_RUNTIME_METADATA='+json.dumps(report,sort_keys=True))
+          PY
