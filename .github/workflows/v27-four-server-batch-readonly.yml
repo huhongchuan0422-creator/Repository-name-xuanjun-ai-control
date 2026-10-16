@@ -516,3 +516,68 @@ jobs:
           print("PR99_SOURCE_SET_DIAGNOSIS_RECEIPT="+json.dumps(value,sort_keys=True))
           
           PY
+
+  pr99-current-point-r2-offline-review:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_CURRENT_POINT_R2_OFFLINE_REVIEW_ONCE_20261016' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Only seven new R2 regression cases; no production host
+        working-directory: evidence/pr99-current-point-r2
+        run: sudo "$(command -v python)" -B -m unittest -v test_current_point.RecoveryR2
+      - name: Verify inherited core source and bind deterministic R2 artifact
+        working-directory: evidence/pr99-current-point-r2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PY'
+          import ast,gzip,hashlib,io,json,os,tarfile
+          from pathlib import Path
+          old=Path('../pr99-current-point');new=Path('.')
+          unchanged={}
+          for name,functions in [('current_point.py',('backup_database','sqlite_check','stable_bytes','make_archive','receive_archive','prepare','manifest_rows')),('run_current_point.py',('verify_approval','get_approval','load_bundle'))]:
+              def bodies(p):
+                  s=p.read_text();t=ast.parse(s)
+                  return {n.name:ast.get_source_segment(s,n) for n in t.body if isinstance(n,ast.FunctionDef)}
+              a,b=bodies(old/name),bodies(new/name)
+              for f in functions: assert a[f]==b[f],f
+              unchanged[name]=list(functions)
+          assert hashlib.sha256((old/'current_point.py').read_bytes()).hexdigest()=='56d0a9d7fc1ff6447fc9fd5cf995bf79c61765d04ca2e058e675675967627e03'
+          assert hashlib.sha256((old/'run_current_point.py').read_bytes()).hexdigest()=='088d80531066c20e0f2bca74393d73633a51830c7a500f651afd66bee9f3b2f1'
+          assert (new/'source-identities.json').read_bytes()==(old/'source-identities.json').read_bytes()
+          binding=json.loads((new/'BINDING.json').read_text())
+          expected={'README.md','current_point.py','run_current_point.py','source-identities.json','test_current_point.py'}
+          assert set(binding['files'])==expected
+          for n,h in binding['files'].items(): assert hashlib.sha256((new/n).read_bytes()).hexdigest()==h
+          p=Path(os.environ['RUNNER_TEMP'])/'PR99_CURRENT_POINT_R2_REVIEW.tar.gz'
+          with p.open('xb') as raw:
+              with gzip.GzipFile(fileobj=raw,mode='wb',filename='',mtime=0) as gz:
+                  with tarfile.open(fileobj=gz,mode='w',format=tarfile.USTAR_FORMAT) as t:
+                      for n in sorted(expected|{'BINDING.json'}):
+                          data=(new/n).read_bytes();m=tarfile.TarInfo(n);m.size=len(data);m.mode=0o400;m.mtime=0
+                          t.addfile(m,io.BytesIO(data))
+          r={'schema_version':1,'source_commit':os.environ['GITHUB_SHA'],'new_tests':7,'skipped':0,'original_20':'INHERITED_NOT_REEXECUTED','unchanged_functions':unchanged,'binding_sha256':hashlib.sha256((new/'BINDING.json').read_bytes()).hexdigest(),'tar_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'tar_bytes':p.stat().st_size,'bound_files':5,'regular_members':6,'production_hosts_used':False,'database_exported':False,'production_actions':0,'status':'R2_OFFLINE_INCREMENTAL_REVIEW_ONLY'}
+          print('PR99_CURRENT_POINT_R2_CI_RECEIPT='+json.dumps(r,sort_keys=True))
+          (p.parent/'PR99_CURRENT_POINT_R2_CI_RECEIPT.json').write_text(json.dumps(r,sort_keys=True,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr99-current-point-r2-review-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/PR99_CURRENT_POINT_R2_REVIEW.tar.gz
+            ${{ runner.temp }}/PR99_CURRENT_POINT_R2_CI_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 14

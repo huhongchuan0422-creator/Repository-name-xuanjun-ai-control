@@ -1,0 +1,11 @@
+{
+  "action": "PR99_CURRENT_OFFLINE_RECOVERY_POINT_V1",
+  "files": {
+    "README.md": "f5024b0681ce6cf02c3739250168eff7271be26caa31422e17e3db7ec0870912",
+    "current_point.py": "4eb77f6cd44beeae9270f33bf3997491560288d06e09763ae1700b38e1f94c5f",
+    "run_current_point.py": "8b3a1f7dc15698425939e5d77f49494ba7af5a0bc1c056f7e8c9a9ac1b87c2de",
+    "source-identities.json": "4114048fe0ecf17ed5e4185b0bbc37d114ed485a2340f8cce2418817cc6ae941",
+    "test_current_point.py": "2d03cfac8715e371fc5143877043f0747da3210b8c6be42a8a2d7e6a59e30621"
+  },
+  "schema_version": 1
+}
