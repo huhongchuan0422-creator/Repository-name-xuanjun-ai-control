@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "evidence_origin": "OWNER_KOREA_SUDO_ROOT_TERMINAL_TRANSCRIPT_NOT_INDEPENDENT_HOST_LOGIN",
+  "reported_local_date": "2026-10-16",
+  "reported_local_time_window": "22:04-22:05 Asia/Shanghai (terminal login and message context; no precise execution timestamp claimed)",
+  "launch_directory": "/root/pr99-copy-r2-approved.DriMeUBj",
+  "source_host": "iZ6wee8q9z4t03hvqumwfhZ",
+  "target_workdir": "/root/pr99-current-point-received-v2",
+  "source_workdir": "/root/pr99-current-point-v2",
+  "approval_body_sha256": "1103a7a7a053ae862abefcb4c056812b572bbd79d74139f082cecf5777b4b7f3",
+  "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+  "approved_artifact_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+  "terminal_receipt": {
+    "api_requests": 0,
+    "approval_comment_id": 6217030577,
+    "cipher_sha256": "2ac42b9e69c69260c99387b2e1ae339dd2e80b3f01c1984858e458e6c8872d32",
+    "current_final_trading_snapshot": false,
+    "database_integrity_check": "PASS",
+    "database_sha256": "6d451dfdc4714ca9bc704d719dcb47b02ec1e2ce243f886bfb2578a27fbca232",
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "production_deployed": false,
+    "retry_allowed": false,
+    "service_actions": 0,
+    "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+    "source_files": 1363,
+    "source_manifest_matched": true,
+    "status": "CURRENT_OFFLINE_POINT_RECEIVED_PASS",
+    "tokyo_retirement": "HOLD"
+  },
+  "limits": [
+    "Owner-root transcript; reviewer has not read private original bytes",
+    "selected original1363 includes436 historical backup files; not full server filesystem",
+    "live Writer not frozen; not final trading cutover point",
+    "no service installation/start/cutover or Finance/DNS operation",
+    "single-use approval consumed; do not replay successful export"
+  ],
+  "next": "S06 current service/runtime contract and private channel handoff; preserve R4 live Portal and all shared services."
+}

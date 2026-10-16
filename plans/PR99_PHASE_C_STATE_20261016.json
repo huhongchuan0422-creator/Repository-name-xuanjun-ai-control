@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NO_SERVER_RETRY; R2_INCREMENTAL_REVIEW_AND_NEW_EXACT_ONCE_PERMISSION_REQUIRED",
+  "owner_action_now": "CURRENT_POINT_SUCCEEDED_NO_RETRY; PREPARE_S06_PRIVATE_RUNTIME_AND_CHANNEL_HANDOFF",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -312,7 +312,7 @@
     ],
     "production_activation_authorized": false
   },
-  "active_next_stage": "REUSE_EXISTING_PRIVATE_BASELINE_AND_MINIMUM_OFFLINE_RELOCATION_WITH_SERVICES_STOPPED",
+  "active_next_stage": "S06_SERVICE_RUNTIME_CONTRACT_AND_PRIVATE_CHANNEL_HANDOFF",
   "existing_recovery_baseline": {
     "acceptance_comment_id": 6166680343,
     "owner_receipt_comment_id": 6166635563,
@@ -442,34 +442,46 @@
     }
   },
   "offline_relocation_blocker": {
-    "kind": "CURRENT_CONSISTENT_SNAPSHOT_AND_REMAINING_SERVICE_HANDOFF_PERMISSION_PENDING",
-    "detail": "Audit6215371855 is accepted and not reopened. Actual Tokyo source inventory1363 files/19350718bytes is frozen independently of GitHub; git identity UNKNOWN and current tree is not an atomic snapshot. Current DB metadata46907392bytes with no WAL/SHM at that sampling instant does not prove consistency/quiescence. Business DB/WAL export, C install, live API, Writer and retirement remain unapproved. Prepare one exact offline recovery-point/current-source handoff batch without adding deferred API/Shadow requirements.",
+    "kind": "CURRENT_POINT_RECEIVED_REMAINING_SERVICE_RUNTIME_AND_CHANNEL_HANDOFF",
+    "detail": "R2 current selected source and WAL-aware SQLite recovery point succeeded in Owner-root transcript under6217030577. This closes real offline copy execution, not final Writer consistency or full service migration. Prepare private service/runtime contracts, remaining channel responsibilities and final handoff; old API deferred. Preserve all successful and failed evidence.",
     "api_is_blocker": false,
     "last_owner_attempt": {
       "schema_version": 1,
-      "status": "ENCRYPTED_BASELINE_OFFSITE_PASS_OWNER_ROOT_RECEIPT",
-      "reported_local_time": "2026-10-16T19:35:54+08:00",
-      "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_NOT_INDEPENDENT_HOST_READ",
+      "evidence_origin": "OWNER_KOREA_SUDO_ROOT_TERMINAL_TRANSCRIPT_NOT_INDEPENDENT_HOST_LOGIN",
+      "reported_local_date": "2026-10-16",
+      "reported_local_time_window": "22:04-22:05 Asia/Shanghai (terminal login and message context; no precise execution timestamp claimed)",
+      "launch_directory": "/root/pr99-copy-r2-approved.DriMeUBj",
       "source_host": "iZ6wee8q9z4t03hvqumwfhZ",
-      "target_host": "iZmj7a5kwr75qc1tul4kf9Z",
-      "target": "/root/xuanjun-offline-baseline-20261016/recovery-baseline.tar.gz.enc",
-      "bytes": 1320571760,
-      "sha256": "ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093",
-      "initial_partial_bytes": 498335744,
-      "resumed_bytes": 822236016,
-      "resume_seconds": 1824.5,
-      "resume_source_commit": "6f14f692d6c8fcc70263b38f92ebba1e38e692c6",
-      "resume_script_sha256": "3ed4c8c928e7d05e31e3d5a4aa5ca72fe8bb75dc093649b66905852510656041",
-      "partial_prefix_verified_by_script": true,
-      "final_size_and_sha256_verified_by_script": true,
-      "api_untouched": true,
-      "service_actions": 0,
-      "decryption_performed": false,
-      "key_custody_on_target": "NOT_PROVEN",
-      "selective_restore": "NOT_EXECUTED",
-      "final_current_snapshot": "NOT_PRODUCED",
-      "production_migration": "HOLD",
-      "tokyo_retirement": "HOLD"
+      "target_workdir": "/root/pr99-current-point-received-v2",
+      "source_workdir": "/root/pr99-current-point-v2",
+      "approval_body_sha256": "1103a7a7a053ae862abefcb4c056812b572bbd79d74139f082cecf5777b4b7f3",
+      "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+      "approved_artifact_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+      "terminal_receipt": {
+        "api_requests": 0,
+        "approval_comment_id": 6217030577,
+        "cipher_sha256": "2ac42b9e69c69260c99387b2e1ae339dd2e80b3f01c1984858e458e6c8872d32",
+        "current_final_trading_snapshot": false,
+        "database_integrity_check": "PASS",
+        "database_sha256": "6d451dfdc4714ca9bc704d719dcb47b02ec1e2ce243f886bfb2578a27fbca232",
+        "host": "iZmj7a5kwr75qc1tul4kf9Z",
+        "production_deployed": false,
+        "retry_allowed": false,
+        "service_actions": 0,
+        "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+        "source_files": 1363,
+        "source_manifest_matched": true,
+        "status": "CURRENT_OFFLINE_POINT_RECEIVED_PASS",
+        "tokyo_retirement": "HOLD"
+      },
+      "limits": [
+        "Owner-root transcript; reviewer has not read private original bytes",
+        "selected original1363 includes436 historical backup files; not full server filesystem",
+        "live Writer not frozen; not final trading cutover point",
+        "no service installation/start/cutover or Finance/DNS operation",
+        "single-use approval consumed; do not replay successful export"
+      ],
+      "next": "S06 current service/runtime contract and private channel handoff; preserve R4 live Portal and all shared services."
     },
     "verified_tokyo_public_host_identity": {
       "run": 38888460739,
@@ -603,21 +615,22 @@
     "evidence": "evidence/pr99-offline-copy/THREE_HOST_CHANNEL_DEPENDENCIES_20261016.json",
     "plan": "plans/PR99_SERVICE_HANDOFF_EXECUTION_LEDGER_20261016.md",
     "production_actions": 0,
-    "current_point_permission": "APPROVED_ONCE_6216441589_NOT_EXECUTED",
+    "current_point_permission": "APPROVED_6217030577_CONSUMED_SUCCESS_OWNER_ROOT",
     "domestic_same_named_portal_and_wecom_units": "NOT_FOUND_AT_SAMPLE",
     "tokyo_finance_timers": "4_ACTIVE_NOT_CHANGED",
     "unresolved": [
       "provider-neutral-tunnel exact unit vs similarly named Tokyo tunnel",
       "Korea443 listener owner, nginx unit not-found",
       "private current channel configs, root/admin cron, user services and containers",
-      "actual service installation and upstream cutover",
-      "current offline point permission and execution"
-    ]
+      "actual service installation and upstream cutover"
+    ],
+    "current_point_receipt": "evidence/pr99-current-point-r2/OWNER_EXECUTION_RECEIPT_20261016.json",
+    "next": "S06_CURRENT_RUNTIME_AND_PRIVATE_CHANNEL_CONTRACTS_NOT_PRODUCTION_CUTOVER"
   },
   "current_recovery_point_r2": {
     "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
     "action": "PR99_CURRENT_OFFLINE_RECOVERY_POINT_V1",
-    "status": "SEVEN_NEW_TESTS_PASS_PENDING_INCREMENTAL_REVIEW_AND_REPLACEMENT_PERMISSION",
+    "status": "CURRENT_OFFLINE_POINT_RECEIVED_PASS_OWNER_ROOT_REPORTED",
     "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
     "old_approval_comment_id": 6216441589,
     "korea_old_failure_sha256": "44f232571ce267f6a5cf9c801b1fba366fd9fa8f4a82d01aa592c249592bd35d",
@@ -675,14 +688,60 @@
     },
     "source_workdir": "/root/pr99-current-point-v2",
     "target_workdir": "/root/pr99-current-point-received-v2",
-    "production_executed": false,
-    "permission": "NOT_ISSUED",
+    "production_executed": true,
+    "permission": "APPROVED_6217030577_CONSUMED_SUCCESS_NO_REPLAY",
     "original_20": "INHERITED_NOT_RERUN",
     "request": {
       "comment_id": 6216916733,
       "read_back": true,
-      "decision": "PENDING",
+      "decision": "PASS_WITH_EXACT_PRECONDITIONS_6217030577",
       "scope": "SEVEN_CASE_INCREMENTAL_SOURCE_VISIBILITY_LOGGING_AND_NEW_ONCE_RECOVERY_PERMISSION"
-    }
+    },
+    "approval": {
+      "comment_id": 6217030577,
+      "body_sha256": "1103a7a7a053ae862abefcb4c056812b572bbd79d74139f082cecf5777b4b7f3",
+      "issued_at": 1792158839,
+      "expires_at": 1792180439,
+      "max_attempts": 1
+    },
+    "owner_execution": {
+      "schema_version": 1,
+      "evidence_origin": "OWNER_KOREA_SUDO_ROOT_TERMINAL_TRANSCRIPT_NOT_INDEPENDENT_HOST_LOGIN",
+      "reported_local_date": "2026-10-16",
+      "reported_local_time_window": "22:04-22:05 Asia/Shanghai (terminal login and message context; no precise execution timestamp claimed)",
+      "launch_directory": "/root/pr99-copy-r2-approved.DriMeUBj",
+      "source_host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "target_workdir": "/root/pr99-current-point-received-v2",
+      "source_workdir": "/root/pr99-current-point-v2",
+      "approval_body_sha256": "1103a7a7a053ae862abefcb4c056812b572bbd79d74139f082cecf5777b4b7f3",
+      "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+      "approved_artifact_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+      "terminal_receipt": {
+        "api_requests": 0,
+        "approval_comment_id": 6217030577,
+        "cipher_sha256": "2ac42b9e69c69260c99387b2e1ae339dd2e80b3f01c1984858e458e6c8872d32",
+        "current_final_trading_snapshot": false,
+        "database_integrity_check": "PASS",
+        "database_sha256": "6d451dfdc4714ca9bc704d719dcb47b02ec1e2ce243f886bfb2578a27fbca232",
+        "host": "iZmj7a5kwr75qc1tul4kf9Z",
+        "production_deployed": false,
+        "retry_allowed": false,
+        "service_actions": 0,
+        "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+        "source_files": 1363,
+        "source_manifest_matched": true,
+        "status": "CURRENT_OFFLINE_POINT_RECEIVED_PASS",
+        "tokyo_retirement": "HOLD"
+      },
+      "limits": [
+        "Owner-root transcript; reviewer has not read private original bytes",
+        "selected original1363 includes436 historical backup files; not full server filesystem",
+        "live Writer not frozen; not final trading cutover point",
+        "no service installation/start/cutover or Finance/DNS operation",
+        "single-use approval consumed; do not replay successful export"
+      ],
+      "next": "S06 current service/runtime contract and private channel handoff; preserve R4 live Portal and all shared services."
+    },
+    "independent_execution_acceptance": "REQUEST_PENDING_NOT_SELF_APPROVED"
   }
 }
