@@ -47,6 +47,13 @@
 
 原计划外部依赖：12、14、16、24、25，不混入20项。PR122保持Draft；生产Release Gate仍HOLD。此表保留仓库现有登记的PARTIAL，未取得独立验收不升PASS。
 
+## B.1 本次有界源码修复登记（2026-10-16）
+
+- 涉及05：可信角色/租户；11/13：Finance审核职责隔离；22：离线HTTP输入边界。修改路径仅为 `community_saas_phase2` 服务与HTTP以及配套测试，不包括Work/Dots/OpenClaw/生产门禁。
+- `FINANCE_EVIDENCE`、`REFUND`、`DEPLOYMENT` 等待审核状态禁止商家自己标记RESOLVED或CANCELLED，只有可信PLATFORM_OWNER在相同tenant作用域内可以结案；离线结案**不代表**实际Finance核销或真实退款。
+- JSON解析时拒绝1e9999及负指数溢出为无限大的浮点数；普通有限浮点数保留为数字，再由业务入参验证。新增精确失败路径测试。
+- 当前阶段 `SOURCE_CANDIDATE/CI_PENDING/INDEPENDENT_AUDIT_PENDING`。以本文件所在Commit的准确HEAD和PR122同次CI/回执为准；上方PARTIAL不因源码提交提升为PASS。DNS及生产门禁仍HOLD。
+
 ## C. 历史ChatGPT相关控制面任务（责任逐PR确认）
 
 | 锚点 | 已知事实 | 执行状态 | 下一动作 |

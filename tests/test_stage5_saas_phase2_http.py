@@ -78,4 +78,18 @@ class LoopbackSaasTests(unittest.TestCase):
     return code,body
  def test_10_extra_field(self):
     self.assertEqual(self.request('{"operation":"catalog","params":{},"at":20,"payment_confirmed":true}')[0],400)
+ def test_14_exponent_overflow_is_rejected_during_parse(self):
+    for value in ("1e9999","-1e9999","1E9999"):
+        code,body=self.request('{"operation":"catalog","params":{},"at":'+value+'}')
+        self.assertEqual(code,400)
+        self.assertEqual(body["error"],"NONFINITE_JSON")
+ def test_15_nested_exponent_overflow_rejected(self):
+    code,body=self.request('{"operation":"catalog","params":{"x":1e9999},"at":20}')
+    self.assertEqual(code,400)
+    self.assertEqual(body["error"],"NONFINITE_JSON")
+ def test_16_finite_float_is_not_coerced_to_string(self):
+    code,body=self.request('{"operation":"catalog","params":{},"at":1.25}')
+    self.assertEqual(code,400)
+    self.assertEqual(body["error"],"INVALID_TIME")
+    self.assertEqual(self.request(self.payload(at=20))[0],200)
 if __name__=="__main__":unittest.main()

@@ -5,6 +5,7 @@ execution. The socket binds only 127.0.0.1; never expose it to the internet.
 """
 import hmac
 import json
+import math
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from scripts.community_saas_phase2 import Principal,serialize_response
@@ -66,7 +67,12 @@ def make_handler(service,principals):
                         if k in result:raise ValueError("DUPLICATE_JSON_KEY")
                         result[k]=x
                     return result
-                body=json.loads(raw,object_pairs_hook=pairs,
+                def finite_float(token):
+                    value=float(token)
+                    if not math.isfinite(value):
+                        raise ValueError("NONFINITE_JSON")
+                    return value
+                body=json.loads(raw,object_pairs_hook=pairs,parse_float=finite_float,
                                 parse_constant=lambda x:(_ for _ in ()).throw(ValueError("NONFINITE_JSON")))
                 if type(body) is not dict or set(body)!={"operation","params","at"}:
                     raise ValueError("INVALID_PAYLOAD")

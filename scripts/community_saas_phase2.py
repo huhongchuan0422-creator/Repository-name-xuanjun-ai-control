@@ -136,8 +136,17 @@ class OfflineSaas:
             return create_review(self.orders,_id(params["task_id"]),tenant,
                 _id(params["order_id"]),params["kind"],now,params["reason"])
         if operation=="review_close":
-            return change_review(self.orders,_id(params["task_id"]),tenant,
-                _id(params["event_id"]),params["state"],now)
+            task_id=_id(params["task_id"])
+            event_id=_id(params["event_id"])
+            row=self.orders.execute("SELECT kind FROM saas_review_tasks WHERE task_id=? AND tenant_id=?",
+                                    (task_id,tenant)).fetchone()
+            if row is None:
+                raise ValueError("REVIEW_NOT_FOUND")
+            # Offline manual review does not attest provider funds or grant access.
+            # A merchant cannot self-close a finance, refund or deployment HOLD.
+            if row[0] in ("FINANCE_EVIDENCE","REFUND","DEPLOYMENT") and principal.role!="PLATFORM_OWNER":
+                raise PermissionError("OWNER_REVIEW_REQUIRED")
+            return change_review(self.orders,task_id,tenant,event_id,params["state"],now)
         if operation=="recovery":
             return recovery_check(self.orders,tenant)
         if operation=="health_detail":

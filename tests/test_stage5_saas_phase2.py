@@ -76,7 +76,7 @@ class Phase2Nodes(unittest.TestCase):
  def test_16_review_complete(self):
     self.test_15_review_create()
     self.assertEqual(self.call("review_close",{"task_id":"task1","event_id":"ev1","state":"RESOLVED"},
-                               self.admin,now=22)["state"],"RESOLVED")
+                               Principal("tenantA","PLATFORM_OWNER"),now=22)["state"],"RESOLVED")
  def test_17_recovery(self):
     self.test_15_review_create()
     self.assertEqual(self.call("recovery",principal=self.admin)["open_tasks"],["task1"])
@@ -267,4 +267,38 @@ class Phase2Nodes(unittest.TestCase):
  def test_50_customer_cannot_read_internal_health_detail(self):
     with self.assertRaisesRegex(PermissionError,"ADMIN_ROLE_REQUIRED"):
         self.api.dispatch(self.customer,"health_detail",{},20)
+ def test_51_merchant_cannot_self_close_finance_review(self):
+    self.ordered()
+    self.call("review_open",{"task_id":"finance1","order_id":"order1","kind":"FINANCE_EVIDENCE","reason":"pending"},self.admin)
+    before=self.o.total_changes
+    for state in ("RESOLVED","CANCELLED"):
+        with self.assertRaisesRegex(PermissionError,"OWNER_REVIEW_REQUIRED"):
+            self.call("review_close",{"task_id":"finance1","event_id":"event"+state,"state":state},self.admin,now=22)
+    self.assertEqual(before,self.o.total_changes)
+    self.assertEqual(self.call("recovery",principal=self.admin)["open_tasks"],["finance1"])
+ def test_52_owner_close_does_not_settle_payment(self):
+    self.ordered()
+    self.call("review_open",{"task_id":"finance1","order_id":"order1","kind":"FINANCE_EVIDENCE","reason":"pending"},self.admin)
+    owner=Principal("tenantA","PLATFORM_OWNER")
+    self.assertEqual(self.call("review_close",{"task_id":"finance1","event_id":"eventowner","state":"RESOLVED"},owner,now=22)["state"],"RESOLVED")
+    self.assertFalse(self.call("admin_snapshot",principal=owner)["orders"][0]["payment_settled"])
+    self.assertEqual(self.call("order_status",{"order_id":"order1"})["state"],"PREPARED")
+ def test_53_merchant_can_close_contract_review(self):
+    self.ordered()
+    self.call("review_open",{"task_id":"contract1","order_id":"order1","kind":"CONTRACT","reason":"checked"},self.admin)
+    self.assertEqual(self.call("review_close",{"task_id":"contract1","event_id":"eventcontract","state":"RESOLVED"},self.admin,now=22)["state"],"RESOLVED")
+ def test_54_refund_and_deployment_owner_restriction(self):
+    self.ordered()
+    for kind in ("REFUND","DEPLOYMENT"):
+        task_id="review"+kind.lower()
+        self.call("review_open",{"task_id":task_id,"order_id":"order1","kind":kind,"reason":"checked"},self.admin)
+        with self.assertRaisesRegex(PermissionError,"OWNER_REVIEW_REQUIRED"):
+            self.call("review_close",{"task_id":task_id,"event_id":"event"+kind,"state":"CANCELLED"},self.admin,now=22)
+        self.assertEqual(self.call("review_close",{"task_id":task_id,"event_id":"owner"+kind,"state":"CANCELLED"},Principal("tenantA","PLATFORM_OWNER"),now=22)["state"],"CANCELLED")
+ def test_55_foreign_owner_cannot_close_review(self):
+    self.ordered()
+    self.call("review_open",{"task_id":"finance1","order_id":"order1","kind":"FINANCE_EVIDENCE","reason":"pending"},self.admin)
+    with self.assertRaisesRegex(ValueError,"REVIEW_NOT_FOUND"):
+        self.call("review_close",{"task_id":"finance1","event_id":"foreign1","state":"RESOLVED"},Principal("tenantB","PLATFORM_OWNER"),now=22)
+    self.assertEqual(self.call("recovery",principal=self.admin)["open_tasks"],["finance1"])
 if __name__=="__main__":unittest.main()
