@@ -7,7 +7,7 @@
   "phase_c": {
     "design": "RECORDED",
     "adapter_implementation": "OFFLINE_ADAPTERS_IMPLEMENTED_NOT_DEPLOYMENT_CONTROLLER",
-    "review_artifact": "HOSTED_BUILD_PENDING",
+    "review_artifact": "BUILT_AND_DEVELOPER_BYTE_VERIFIED",
     "root_preflight": "NOT_EXECUTED",
     "started_service_confinement": "NOT_EXERCISED",
     "live_get": "NOT_AUTHORIZED_NOT_RUN",
@@ -37,10 +37,27 @@
         "new AF_UNIX listener denied; hosted root validation required"
       ]
     },
-    "hosted_tests": "PENDING_EXACT_HEAD_PYTHON311_ZERO_SKIP",
+    "hosted_tests": {
+      "status": "PASS",
+      "tests": 44,
+      "skipped": 0,
+      "python": "3.11.17",
+      "run": 38864763014,
+      "job": 116854934203,
+      "exact_checkout": "08c7e90cc02de270bd63c4dfc0de9803d6a6a81c"
+    },
     "execution_controller": "NOT_IMPLEMENTED_PENDING_REAL_BINDINGS",
     "independent_network_verifier": "NEW_SEPARATE_GET_BROKER_RSA_SIGNATURE_ADAPTER",
-    "production_bindings": "SECRETREF_ACCOUNT_PUBLISHER_TRANSFER_WORKER_UID_WINDOW_NOT_BOUND"
+    "production_bindings": "SECRETREF_ACCOUNT_PUBLISHER_TRANSFER_WORKER_UID_WINDOW_NOT_BOUND",
+    "artifact": {
+      "id": 12030856104,
+      "zip_sha256": "c95fe723429aa294d30bd72df13b5449ec5be8ea523cc65ea3c316982c212be5",
+      "tar_sha256": "a41487dbb26b2ce353ee238e39e14683f3d119cc91dde79f498b0f81beb98e09",
+      "binding_files": 26,
+      "runtime_files": 22,
+      "developer_download_verified": true,
+      "independent_review": "NOT_REQUESTED_PENDING_COMPLETE_C_EXECUTION_PACKAGE"
+    }
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",

@@ -86,3 +86,11 @@ Owner当前不需重复取B资料或执行旧命令；未来必须需要其协�
 特别说明：原Shadow自报网络receipt不是独立证据，原占位CLI未被伪填verified=true；新C候选用不同UID的固定GET采集器只签自己实际获得的响应，worker无私钥/凭据，用外部固定公钥验证。broker仍UID986，worker需新独立用户，1986仅是测试数字。共享admin1000/Runner1001不允许作worker。
 
 本批仍不包含生产安装/启动控制器。真实SecretRef/账号只读证明、源库身份/schema/collector及受信跨主机接收接线、新worker身份、观察参数与实际root围栏/签名身份/单次准入尚未绑定。README逐项列明，不能把“适配源码已实现”称为完整C执行包、实机隔离或服务器迁移完成。未来同一C集中执行包补齐这些准确绑定、root一次消费/失败停止撤销后才申请生产范围批准；本次不向Owner发旧命令、不启动服务或重复申请B审核。
+
+### 已读回的实际CI与制品（只补证据，不重跑）
+
+源码08c7e90cc02de270bd63c4dfc0de9803d6a6a81c，Run38864763014/Job116854934203，准确checkout，Hosted Python3.11.17，44/44、skip0、SUCCESS。此前本地无法执行的真实UID986交付/worker拒读和Unix SO_PEERCRED监听测试在Hosted通过；仍不是韩国systemd239实测。生产inspection job维持if:false/SKIPPED。
+
+实际下载Artifact12030856104，ZIP c95fe723429aa294d30bd72df13b5449ec5be8ea523cc65ea3c316982c212be5，TAR a41487dbb26b2ce353ee238e39e14683f3d119cc91dde79f498b0f81beb98e09（59363字节），27常规条目、26文件绑定和22 runtime文件hash均复算通过，与本地确定性TAR逐字节一致。这是开发方真实字节复核，不自称独立审核通过。
+
+本次不请求对未齐全的C生产方案分段签许可；先保留这批实际实现与可复算制品，原B不重审。下一准确缺口仍为真实只读托管/源端collector/跨主机私有接收绑定、新worker身份、完整root一次控制器及新的C准入；无现有Korea C固定root通道，不能使用已消费B许可绕过。
