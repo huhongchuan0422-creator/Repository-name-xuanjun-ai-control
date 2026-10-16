@@ -431,7 +431,7 @@ jobs:
           PY
 
   backend-custody-offline:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.sha == 'dbcca8877905879046dc4ecea1089ebcc360cdb7'
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 4
     steps:

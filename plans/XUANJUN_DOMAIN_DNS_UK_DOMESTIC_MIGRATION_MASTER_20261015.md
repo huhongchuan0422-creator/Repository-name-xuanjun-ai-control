@@ -640,3 +640,14 @@ Owner明确要求现在推进服务器迁移。沿PR122/S01—S12继续，不重
 新增本地36/36测试PASS，包含真实临时SQLite/进程竞争/os._exit与loopback合成HTTP，无生产数据或Provider请求；旧OAuth45/静态115/83/R4不重跑。国内Runner将只运行这36项及准确源制品绑定；真实CI以原始日志为准，当前不预写PASS。预检job固定本次提交，后续不重复采集。PR99仍准确632bbe6f，R2复审#6182995760待判；不能在本线复制trading.db或停Finance。
 
 此为开发断点，不逐点请求生产批准。待受保护交接/执行通道及其实际范围完整可审后统一送审；东京后台/隧道/客服保留。网站入口已迁国内，完整后台迁移未执行完成、东京退役HOLD。
+
+
+### 9.33 2026-10-16 10:47 CST：新增36项国内Runner通过，准确源码制品已下载核验
+
+准确开发提交dbcca8877905879046dc4ecea1089ebcc360cdb7，tree4aa447c6b2bf4e501ddec1c51da107b333fd5b2d。原队列Run38842201027 / 国内Job116784611308 SUCCESS，原始日志明确checkout dbcca887、Ran36/OK/skip0，PR122_BACKEND_OFFLINE_RECEIPT核实uid1002/实际国内主机、unchanged_approved_modules7、production_changes0、real_state_read=false。旧预检/DNS/IP/R4/四台dispatch均SKIPPED。仓库既有其他自动CI依原触发执行，状态元数据SUCCESS，未手动重跑；不将PR merge preview状态当准确push的实机36项日志。
+
+实际下载Artifact12021334458 ZIP49751字节并复算SHA25669e505c030a8168d26bbf2afc231960db2c79ba81b3b32fdfdbd00944d0c8f84；内层TAR49117字节 SHA2565693e1a06802d19098c77b7f46a9ccaabc158852b97482c342674501a2f6c14f。16个常规成员=15份绑定源文件+REVIEW_BINDING；逐项实际字节哈希15/15匹配，7个原OAuth模块准确旧Manifest一致，4份新增源/README/测试与本地输入逐字节一致，无额外/特殊文件。这是开发方复算，不冒充独审。
+
+状态转换/隔离运行增量可保留开发证据，完整服务器迁移未完成；本批不是生产可安装包，不逐点请求生产批准。真实legacy reader、主机间受保护托管传输、精确账号验证适配及root安装/激活尚未实现/准入，旧混合会话和非OAuth/Telegram后继也未完成。长期Owner授权不等于非rootRunner有数据权限。当前不要求Owner重复查资料或继续修改DNS，不虚构已读私有数据/已搬数据。S01/S02预检推进、S04/S05部分离线开发推进；S03真实一致备份、S05真实搬迁、S06等实际去依赖及S12仍待完成。
+
+集中开发检查点evidence/pr122-r4-controlled-install/BACKEND_OFFLINE_CI_ARTIFACT_20261016.json。将新36测试job限制本次提交，防止后续重复；不改批准制品312efdd3或7模块。下一独立开发动作为受保护快照读取/托管/执行适配的完整可审核实现；不能只凭当前转换库申请搬迁许可。PR99原R2待审外部依赖另在原PR同步，不复制新队列、不停Finance。东京继续在线、退役HOLD。
