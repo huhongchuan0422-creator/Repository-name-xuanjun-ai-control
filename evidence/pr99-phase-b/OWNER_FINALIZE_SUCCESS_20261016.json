@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "evidence_origin": "OWNER_PASTED_KOREA_EXISTING_ADMIN_ROOT_TERMINAL",
+  "received_at": "2026-10-16T13:52:07+08:00",
+  "independent_host_review": "PENDING",
+  "developer_direct_root_login": false,
+  "launcher_sha256": "c3734464ceb267b34dd9d5fb16082f8bbec8da7bdda0bb8a0d05880af69ba352",
+  "launcher_carrier_commit": "c1cb26033652f9a1c1fa5b093701f36300951c23",
+  "approval_comment_id": 6208995784,
+  "approval_body_sha256": "0b81f5a6049eb7626eef547de3643810e7e68efb7dbfa390185b05b6d09a1414",
+  "owner_output": [
+    "start.py: OK",
+    "ROOT_ANCHOR_UPDATED; START_ONE_FINALIZER_MINUS_B; LOGS=/root/pr99-offline-finalize-19f0e27d-b",
+    "FINALIZE_EXIT=0 REINSTALL=NO RELOAD=NO SERVICE_START=NO PHASE_C=HOLD TOKYO=UNCHANGED"
+  ],
+  "root_receipt": {
+    "action": "PR99_PHASE_B_OFFLINE_REPAIR_FINALIZE_V1",
+    "address_family_allowlist": [
+      "AF_UNIX"
+    ],
+    "approval_comment_id": 6208995784,
+    "artifact_sha256": "35caaf41040c734565e68ff0c3a25a40be7304b1d58838596aa73f5acb23ff24",
+    "binance_called": false,
+    "credentials_read": false,
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "lock_origin": "EXPLICIT_NEW_OWNER_ROOT_ADOPTION_NOT_HISTORICAL_INODE_PROOF",
+    "lock_released": true,
+    "phase_c": "NOT_AUTHORIZED",
+    "prior_failed_receipt_sha256": "4ad939dec8a0c82861d23e58b62d85a079135121b883e386ef94e763de286d0c",
+    "private_network": true,
+    "reload": false,
+    "retained_lock": {
+      "device": 25,
+      "inode": 4716
+    },
+    "retry_allowed": false,
+    "runtime_files_unchanged": 17,
+    "runtime_manifest_sha256": "f887b085508e3ed4831dbed22152e35af5e8aba95b85b899b4697c61449917de",
+    "schema_version": 1,
+    "service_started": false,
+    "shared_named_unit_metadata_unchanged": true,
+    "source_commit": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
+    "started_service_confinement": "NOT_EXERCISED",
+    "status": "OFFLINE_REPAIR_FINALIZE_PASS_WITH_SCOPE_LIMITS",
+    "transaction_rewritten": false,
+    "transaction_sha256": "ee81a70bb417e66dbb58bad5a79a776d1e7a0bce35d0e72bf638a2fe0844eb75",
+    "unit_rewritten": false,
+    "unit_sha256": "824fc0cbe3d879b61ea36b0bd7c45fb8c1e9fb6c463f46ada741ac3f2299899b"
+  },
+  "private_receipt_file": "/var/lib/xuanjun-pr99-offline-finalize-v1/receipt.json",
+  "full_private_receipt_file_sha256": "NOT_COLLECTED_DO_NOT_INVENT",
+  "phase_b": "OWNER_ROOT_POSTFLIGHT_PASS_WITH_SCOPE_LIMITS",
+  "phase_c": "NOT_AUTHORIZED",
+  "production_migration": "HOLD",
+  "tokyo_retirement": "HOLD"
+}

@@ -781,3 +781,12 @@ Owner集中只读补验实际返回：PrivateNetwork=yes/typed b true；systemct
 唯一逻辑修正：trusted(STAGE.parent, directory=True, private=True)改为trusted(STAGE.parent, directory=True)，仍要求root所有、非链接、无组/其他写权限；新stage/package/anchor/lock维持严格0700/0600。真实本地文件系统权限检查11项PASS；非root owner夹具chown被环境拒绝，未冒充该测试通过；不是韩国实机验收。此前全量mock trusted的交接模型没有覆盖该问题，证据已纠正。
 
 6208766288明确任何失败后无第二次重试，本窗口不自行复用。已准备同原包/原finalizer的替代启动申请：固定原anchor44701367...45fadf、同dev25/inode4716、同旧receipt、无永久attempt；仅父目录检查修正和新许可字面绑定，旧目录/缓存/日志保留，不重审已通过源码/制品/185。此后仅新明确许可与真实收尾回执可推进。Phase-C/生产迁移/东京退役HOLD，网站/Work/DNS不改。
+
+
+### 9.46 韩国Phase-B原版本收尾实际成功，空锁释放；后续Shadow仍未开始（2026-10-16 13:52 CST）
+
+Owner已按新许可6208995784执行一次c3734464...ba352交接。输出ROOT_ANCHOR_UPDATED、原finalizer的OFFLINE_REPAIR_FINALIZE_PASS_WITH_SCOPE_LIMITS及FINALIZE_EXIT=0。准确空锁device25/inode4716已释放；原17份运行文件及manifest f887...917de、unit824fc...9899b/transaction ee81...4eb75不变，共享命名unit元数据不变；未reinstall/reload/启停服务/读取凭据/调用币安。旧失败receipt SHA4ad939dec8a0c82861d23e58b62d85a079135121b883e386ef94e763de286d0c作为补充收尾历史绑定保留。
+
+本条来源为Owner既有admin/root终端输出，开发窗口未直接root登录；PRIVATE receipt文件完整SHA未采集不编造，独立实机复核待裁定。对应evidence/pr99-phase-b/OWNER_FINALIZE_SUCCESS_20261016.json已保存完整公开JSON字段。
+
+Phase-B兼容离线安装的Owner-root收尾成功，不再把该收尾写成待执行，也不得重跑修复或旧安装。Phase-C/只读Shadow未获授权未运行；started_service_confinement=NOT_EXERCISED，整体交易后台迁移/Writer切换/东京退役HOLD。沿原PR99阶段矩阵继续准备凭据交付/真实网络围栏/WAL快照发布验证链/观察阈值等方案；现有offline unit只self_check，不伪称Shadow。systemd239旧LoadCredential/BPF限制不能忽略。网站/Work/国内current/DNS不改。
