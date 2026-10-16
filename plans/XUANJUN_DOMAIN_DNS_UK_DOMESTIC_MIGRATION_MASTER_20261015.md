@@ -709,3 +709,12 @@ PR122继续补S05 writer custody的前置边界，新增source_inventory.py：�
 S05的生产前置现收敛为：准确选定会话/账户及范围、全部相关writer/在途和旧多业务Portal的维护影响、受保护专用传输、root精确准入和目标安装/激活、未迁非OAuth/渠道后继。以上仍未完成/准入，本次证据不授权Portal停止、数据导出或迁移。韩国Phase-B仍等PR99#6207421398链正式制品/执行范围裁定，暂无安装批准；不重复催审/R2测试，不要Owner重复收集资料。东京保持运行。
 
 完整原始结构化结果及边界evidence/pr122-r4-controlled-install/SOURCE_WRITER_BOUNDARY_20261016.json。采集job固定本次准确提交；后续不再读取现场，下一新增探针必须针对剩余具体缺口，不重复已过源码和静态站点。
+
+
+### 9.40 2026-10-16：PR99 Phase-B正式范围批准已读，原包直接交付Owner-root执行
+
+已独立回读PR99#6207630392，DECISION=PHASE_B_OFFLINE_INSTALL_SCOPE_APPROVED_WITH_CONDITIONS；原ZIP/TAR/Manifest/17源码及原打包CI由独审确认PASS，R2/R6/137继承。下一门禁是既有可信韩国Owner admin/sudo终端，无需也不允许把非root Runner扩展为任意root。Owner长期迁移授权有效，实际root操作必须由该已认证终端执行并满足准确原包/主机/无testflags/共享服务保护/单次安装+check等条件。
+
+为免Owner手工下载GitHub登录制品再上传，直接发布Artifact12021864830中已批准的原TAR字节到evidence/pr99-phase-b/PR99_KOREA_RUNTIME_632bbe6f.tar.gz：38980字节，SHAf7cba56c2c45910901cdbd44056ad7c971a7497ffe67518a4adefb40ef660ba9；不是重新构建/打包，不改PR99准确632bbe6f或其安装器。不包含DB/凭据/env。旁证PUBLICATION.json绑定正式批准正文SHA3bf40a0d7d5c8d6c531345e92476d7a35366d13f4af797d106f85b831ba30b84与原Manifest。Owner执行步骤仅取得准确原包到/root私有暂存、原validator、原install-candidate和紧随原check，不安装新sudo规则或root helper、不自动从Runner调用。
+
+尚未在韩国运行；不能把公开原包或本记录当作安装完成。异常保留暂存和日志、不盲重试。服务必须disabled/inactive/deny-all、无Allow；不投凭据、不搬DB、不运行Shadow/交易、不变更韩国现有服务、不停东京。待真实root回执及后续非root元数据复核后再作Phase-B实机结论。
