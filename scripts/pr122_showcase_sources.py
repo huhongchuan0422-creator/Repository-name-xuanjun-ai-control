@@ -40,6 +40,10 @@ def verify_review(comment_id,objects,approved_reviewers,fetch=github,known_only=
         if identifier not in cache:cache[identifier]=fetch('git/blobs/'+identifier)
         return cache[identifier]
     need(type(review.get('object_sha256')) is list and review['object_sha256'] and all(type(h) is str and len(h)==64 and all(ch in '0123456789abcdef' for ch in h) for h in review['object_sha256']),'REVIEW_OBJECT_BINDING')
+    admissions=review.get('module_admission_sha256',[])
+    need(type(admissions) is list and all(h in review['object_sha256'] for h in admissions),'MODULE_ADMISSION_BINDING')
+    known_modules={sha(canonical(o)) for o in objects if o['kind']=='module'}
+    need(all(h in known_modules or (known_only and h not in hashes) for h in admissions),'MODULE_ADMISSION_KIND')
     if known_only:review['object_sha256']=[h for h in review['object_sha256'] if h in hashes]
     if not review['object_sha256']:return {}
     need(all(h in hashes for h in review['object_sha256']),'REVIEW_OBJECT_BINDING')
@@ -57,7 +61,7 @@ def verify_review(comment_id,objects,approved_reviewers,fetch=github,known_only=
                 raw=blob(row['sha'])
                 if json.loads(base64.b64decode(raw['content']))==item:found=True;break
             need(found,'OBJECT_NOT_IN_REVIEWED_COMMIT')
-    return {h:{'decision':review['decision'],'comment_id':comment_id,'commit':commit,'ci_run_id':review['ci_run_id']} for h in review['object_sha256']}
+    return {h:{'decision':review['decision'],'comment_id':comment_id,'commit':commit,'ci_run_id':review['ci_run_id'],'module_admission':h in review.get('module_admission_sha256',[])} for h in review['object_sha256']}
 
 def reviewed_objects(ids,objects,reviewers,fetch=github):
     result={};cache={}
@@ -89,6 +93,10 @@ def module_prices(offer_path,cost_path,package_bindings):
             identifier=module['id']
             if identifier not in package_bindings:continue
             quotes=quote_offers(offers,identifier,cost_db=costs)
+            for quote in quotes:
+                need(quote['mode'] in __import__('scripts.community_saas_offers',fromlist=['PAYMENT_MODES']).PAYMENT_MODES,'UNKNOWN_AUTHORITY_PAYMENT_MODE')
+                for cadence,amount in quote['totals_by_cadence'].items():
+                    need(cadence in ('ONCE','MONTHLY','YEARLY','PER_UNIT') and set(amount)=={'cny_minor','usd_minor'} and all(type(v) is int and 0<=v<=9007199254740991 for v in amount.values()),'INVALID_AUTHORITY_MONEY')
             if quotes:result[identifier]={'publication_eligible':True,'package_sha256':package_bindings[identifier],'offers':quotes,'purchase_href':None}
     finally:offers.close();costs.close()
     return result

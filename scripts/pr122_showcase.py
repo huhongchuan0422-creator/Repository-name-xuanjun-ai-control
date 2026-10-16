@@ -35,7 +35,7 @@ def validate(item):
     need(item.get('visibility') in ('PUBLIC','PRIVATE'),'VISIBILITY')
     for key in ('title','summary'):
         need(type(item.get(key)) is dict and set(item[key])=={'zh','en'} and all(type(v) is str and 0<len(v)<=2000 for v in item[key].values()),'BILINGUAL_COPY_REQUIRED')
-    fields={'project':{'state','scenarios','required_milestones'},'page':{'href','role','artifact_sha256','release_artifact_sha256'},'milestone':{'state','evidence_url'},'acceptance':{'project_version','snapshot_sha256','evidence_url','members'},'module':{'module_id','package_sha256','demo_href'},'ecology':{'initiator_nickname'}}
+    fields={'project':{'state','scenarios','required_milestones'},'page':{'href','role','artifact_sha256','release_artifact_sha256'},'milestone':{'state','evidence_url'},'acceptance':{'project_version','snapshot_sha256','evidence_url','members'},'module':{'module_id','package_sha256','demo_href','requirements'},'ecology':{'initiator_nickname'}}
     required={'kind','id','project_id','version','visibility','title','summary'}|fields[item['kind']]
     optional={'sort_order'} if item['kind'] in ('page','milestone') else set()
     if 'sort_order' in item:need(type(item['sort_order']) is int and 0<=item['sort_order']<=9999,'SORT_ORDER')
@@ -58,6 +58,7 @@ def validate(item):
         need(type(item.get('module_id')) is str and re.fullmatch(r'[a-z][a-z0-9_]{0,79}',item['module_id']),'MODULE_ID')
         need(SHA.fullmatch(item.get('package_sha256','')) is not None,'MODULE_PACKAGE_BINDING')
         local_url(item['demo_href'])
+        need(type(item['requirements']) is list and all(type(r) is dict and set(r)=={'zh','en'} and all(type(v) is str and v for v in r.values()) for r in item['requirements']),'MODULE_REQUIREMENTS_REQUIRED')
     if item['kind']=='ecology':need(type(item.get('initiator_nickname')) is str and 0<len(item['initiator_nickname'])<=40,'PUBLIC_NICKNAME_REQUIRED')
     return item
 
@@ -84,10 +85,10 @@ def compile_catalog(items,approvals,prices=None,published_pages=None):
             pending.append({'project_id':item['project_id'],'kind':item['kind'],'id':item['id'],'version':item['version']});continue
         if item['kind']=='page' and (published_pages or {}).get(item['href'])!={'artifact_sha256':item['artifact_sha256'],'release_artifact_sha256':item['release_artifact_sha256']}:
             pending.append({'project_id':item['project_id'],'kind':'page','id':item['id'],'version':item['version']});continue
-        approved_versions.append({**item,'review':{'comment_id':proof['comment_id'],'commit':proof['commit'],'ci_run_id':proof['ci_run_id']}})
+        approved_versions.append({**item,'review':{'comment_id':proof['comment_id'],'commit':proof['commit'],'ci_run_id':proof['ci_run_id'],'module_admission':proof.get('module_admission',False)}})
         key=identity(item)
         if key not in selected or item['version']>selected[key]['version']:
-            selected[key]={**item,'review':{'comment_id':proof['comment_id'],'commit':proof['commit'],'ci_run_id':proof['ci_run_id']}}
+            selected[key]={**item,'review':{'comment_id':proof['comment_id'],'commit':proof['commit'],'ci_run_id':proof['ci_run_id'],'module_admission':proof.get('module_admission',False)}}
     projects=[];module_queue=[];market=[];events=[]
     for project in sorted((i for i in selected.values() if i['kind']=='project'),key=lambda i:i['project_id']):
         pid=project['project_id'];members=[i for i in selected.values() if i['project_id']==pid]
@@ -105,8 +106,8 @@ def compile_catalog(items,approvals,prices=None,published_pages=None):
             if item['kind']=='ecology':events.append(item)
             if item['kind']=='module':
                 module_queue.append(item);quote=(prices or {}).get(item['module_id'])
-                if quote and quote.get('publication_eligible') is True and quote.get('package_sha256')==item['package_sha256']:
-                    market.append({**item,'offers':quote['offers'],'purchase_href':None,'purchase_enabled':False})
+                if item['review'].get('module_admission') is True and quote and quote.get('publication_eligible') is True and quote.get('package_sha256')==item['package_sha256']:
+                    market.append({**item,'dependencies':next((m['dependencies'] for m in module_catalog() if m['id']==item['module_id']),[]),'offers':quote['offers'],'purchase_href':None,'purchase_enabled':False})
     # All existing independently defined modules enter registration discovery, but
     # an unreviewed definition/offer never becomes a public product.
     cases={p['project_id']:p for p in projects if p['state']=='ACCEPTED'}
@@ -190,7 +191,13 @@ def render(catalog,output,preview=False,project_files=None,shell=None):
         modules=''
         for item in catalog['modules']:
             offers=''.join('<li>'+escape(modes[offer['mode']][en])+' · '+escape(cadences[cadence][en])+': ¥'+str(amount['cny_minor']//100)+'.'+str(amount['cny_minor']%100).zfill(2)+' / US$'+str(amount['usd_minor']//100)+'.'+str(amount['usd_minor']%100).zfill(2)+'</li>' for offer in item['offers'] for cadence,amount in offer['totals_by_cadence'].items())
-            modules+='<article class="card"><h2>'+escape(item['title'][language])+'</h2><p>'+escape(item['summary'][language])+'</p><a href="'+escape(item['demo_href'],quote=True)+'">'+('Demo' if en else '功能演示')+'</a><ul>'+offers+'</ul><p>'+('Purchasing is not enabled.' if en else '真实购买尚未开放。')+'</p></article>'
+            modules+='<article class="card"><h2><a href="/showcase/'+prefix+'modules/'+item['module_id']+'/">'+escape(item['title'][language])+'</a></h2><p>'+escape(item['summary'][language])+'</p><a href="'+escape(item['demo_href'],quote=True)+'">'+('Demo' if en else '功能演示')+'</a><ul>'+offers+'</ul><p>'+('Purchasing is not enabled.' if en else '真实购买尚未开放。')+'</p></article>'
+            requirements='<ul>'+''.join('<li>'+escape(r[language])+'</li>' for r in item['requirements'])+'</ul>' if item['requirements'] else '<p>'+('No additional preparation requirements are declared for this reviewed listing.' if en else '本次获审上架记录未声明额外准备材料。')+'</p>'
+            dependency_labels={m['id']:m['title'] for m in module_catalog()}
+            dependency_english={'storefront_catalog':'Product catalog','merchant_operations':'Merchant operations','advertising':'Ad management','refund_preview':'Refund preview','split_preview':'Sharing preview','reconciliation_preview':'Reconciliation preview','signed_qr':'Signed QR entry'}
+            dependencies=', '.join((dependency_english.get(d,'Required module') if en else dependency_labels.get(d,'依赖模块')) for d in item['dependencies']) or ('None declared' if en else '未声明额外依赖')
+            body='<p class="showcase-lead">'+escape(item['summary'][language])+'</p><p>'+('Dependencies: ' if en else '功能依赖：')+escape(dependencies)+'</p><p><a class="showcase-action" href="'+escape(item['demo_href'],quote=True)+'">'+('Try the demo' if en else '体验功能')+' →</a></p><h2>'+('Pricing options' if en else '价格与付款方式')+'</h2><ul>'+offers+'</ul><h2>'+('Preparation and conditions' if en else '准备材料与适用条件')+'</h2>'+requirements+'<p class="notice">'+('Live purchasing and payments are not enabled.' if en else '真实购买与付款尚未开放。')+'</p>'
+            page(prefix+'modules/'+item['module_id']+'/index.html',item['title'][language],body,en)
         page(prefix+'modules/index.html',labels['modules'][en],modules or '<p>'+('No modules have passed listing admission yet.' if en else '模块通过测试、审核和上架准入后自动展示。')+'</p>',en)
         ecology='<p>'+('Rules and project contributions are separate from ownership of the platform foundation.' if en else '共创项目贡献与平台自研基础模块归属分开登记。')+'</p><nav><a href="/ecosystem/">'+('Rules' if en else '共建共享规则')+'</a><a href="/ecosystem/tiers/">'+('Tiers and discounts' if en else '等级与开发折扣')+'</a><a href="/ecosystem/ledger/">'+('Service credits' if en else '专项金额说明')+'</a><a href="/ecosystem/profit-sharing/">'+('Profit sharing' if en else '共创净利润共享')+'</a></nav>'
         ecology+=''.join('<article class="card"><h2>'+escape(e['title'][language])+'</h2><p>'+escape(e['summary'][language])+'</p><small>'+('Initiator: ' if en else '共创发起人：')+escape(e['initiator_nickname'])+'</small></article>' for e in catalog['ecology'])

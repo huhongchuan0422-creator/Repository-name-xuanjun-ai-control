@@ -8,6 +8,7 @@ test_new_customer_page_bundle_publishes_with_navigation_atomically (tests.test_p
 test_new_role_discovered_only_after_review_and_deployment (tests.test_pr122_showcase.ShowcaseTests.test_new_role_discovered_only_after_review_and_deployment) ... ok
 test_no_author_supplied_approved_flag (tests.test_pr122_showcase.ShowcaseTests.test_no_author_supplied_approved_flag) ... ok
 test_private_and_unknown_fields_do_not_leak (tests.test_pr122_showcase.ShowcaseTests.test_private_and_unknown_fields_do_not_leak) ... ok
+test_public_content_review_without_commercial_admission_does_not_list_module (tests.test_pr122_showcase.ShowcaseTests.test_public_content_review_without_commercial_admission_does_not_list_module) ... ok
 test_real_github_review_origin_and_exact_ci (tests.test_pr122_showcase.ShowcaseTests.test_real_github_review_origin_and_exact_ci) ... ok
 test_register_parallel_projects_and_independent_entries (tests.test_pr122_showcase.ShowcaseTests.test_register_parallel_projects_and_independent_entries) ... ok
 test_render_escapes_copy_and_keeps_icp_bilingual (tests.test_pr122_showcase.ShowcaseTests.test_render_escapes_copy_and_keeps_icp_bilingual) ... ok
@@ -38,6 +39,6 @@ test_partial_file_install_can_roll_back_before_service_creation (tests.test_pr12
 test_preexisting_objects_are_not_adopted (tests.test_pr122_showcase_install.InstallTests.test_preexisting_objects_are_not_adopted) ... ok
 
 ----------------------------------------------------------------------
-Ran 38 tests in 0.971s
+Ran 39 tests in 0.404s
 
 OK

@@ -93,7 +93,7 @@ class PromotionTests(unittest.TestCase):
         milestone=obj('milestone','verified-demo',state='DONE',evidence_url='https://github.com/example/test/issues/1');items.append(milestone);authority=approvals(items)
         catalog,assets=compile_snapshot();acceptance=obj('acceptance','acceptance',project_version=1,snapshot_sha256=catalog['projects'][0]['snapshot_sha256'],members=catalog['projects'][0]['snapshot_members'],evidence_url='https://github.com/example/test/issues/2');items.append(acceptance)
         sealed=view.sha((Path(__file__).resolve().parents[1]/'scripts/community_saas_modules.py').read_bytes())
-        module=obj('module','merchant-module',module_id='merchant_operations',package_sha256=sealed,demo_href='/showcase/projects/community-payment/views/consumer/v1/');items.append(module);authority=approvals(items)
+        module=obj('module','merchant-module',module_id='merchant_operations',requirements=[],package_sha256=sealed,demo_href='/showcase/projects/community-payment/views/consumer/v1/');items.append(module);authority=approvals(items)
         offers=self.root/'offers.sqlite';costs=self.root/'costs.sqlite';db=open_offer_store(offers);cost=open_cost_store(costs)
         register_offer(db,'test-offer','merchant_operations','MONTHLY',1,30,True,'TEST LICENSE','TEST PRICE BASIS')
         add_component(db,'test-offer','license','MODULE_LICENSE','MONTHLY',10000,1990,'TEST PRICE SOURCE')

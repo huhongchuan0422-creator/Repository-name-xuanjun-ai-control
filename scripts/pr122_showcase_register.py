@@ -29,7 +29,8 @@ def register(args):
         destination.parent.mkdir(parents=True,exist_ok=True);shutil.copytree(args.public,destination,symlinks=True)
         need(scan_public_tree(destination)[0]==rows,'SOURCE_CHANGED_DURING_REGISTRATION')
     else:
-        item.update(module_id=args.module_id,package_sha256=args.package_sha256,demo_href=args.demo_href)
+        need(args.requirements is not None,'MODULE_REQUIREMENTS_FILE_REQUIRED')
+        item.update(module_id=args.module_id,package_sha256=args.package_sha256,demo_href=args.demo_href,requirements=json.loads(args.requirements.read_text()))
     validate(item)
     with target.open('x') as stream:stream.write(json.dumps(item,ensure_ascii=False,indent=2)+'\n')
     return {'state':'REGISTERED_PENDING_REVIEW','object_sha256':sha(canonical(item)),'path':str(target),'production_changes':0}
@@ -38,4 +39,4 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('kind',choices=('project','page','module'));p.add_argument('--registry',type=Path,default=Path('showcase'))
     for name in ('project-id','id','title-zh','title-en','summary-zh','summary-en'):p.add_argument('--'+name,required=True)
     p.add_argument('--version',type=int,required=True);p.add_argument('--public',type=Path);p.add_argument('--scenario-zh');p.add_argument('--scenario-en');p.add_argument('--milestone',action='append')
-    p.add_argument('--module-id');p.add_argument('--package-sha256');p.add_argument('--demo-href');print(json.dumps(register(p.parse_args()),ensure_ascii=False))
+    p.add_argument('--requirements',type=Path);p.add_argument('--module-id');p.add_argument('--package-sha256');p.add_argument('--demo-href');print(json.dumps(register(p.parse_args()),ensure_ascii=False))

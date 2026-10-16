@@ -14,7 +14,7 @@ def obj(kind,identifier,version=1,project='community-payment',**fields):
 def project(identifier='community-payment'):return obj('project',identifier,project=identifier,state='DEVELOPING',scenarios=[{'zh':'社区生活服务','en':'Community services'}],required_milestones=['checkout','merchant'])
 def milestone(identifier):return obj('milestone',identifier,state='DONE',evidence_url='https://github.com/example/repo/issues/1')
 def page(version=1,**fields):return obj('page','consumer',version,href='/visual/demo/',role='消费者',artifact_sha256=str(version)*64,release_artifact_sha256='a'*64,**fields)
-def approvals(items):return {s.sha(s.canonical(i)):{'decision':'PUBLIC_CONTENT_APPROVED','comment_id':1,'commit':'a'*40,'ci_run_id':2} for i in items}
+def approvals(items):return {s.sha(s.canonical(i)):{'decision':'PUBLIC_CONTENT_APPROVED','comment_id':1,'commit':'a'*40,'ci_run_id':2,'module_admission':i['kind']=='module'} for i in items}
 def published(items):return {i['href']:{'artifact_sha256':i['artifact_sha256'],'release_artifact_sha256':i['release_artifact_sha256']} for i in items if i['kind']=='page'}
 
 class ShowcaseTests(unittest.TestCase):
@@ -41,14 +41,14 @@ class ShowcaseTests(unittest.TestCase):
         items.append(obj('acceptance','accepted',project_version=1,snapshot_sha256=c['projects'][0]['snapshot_sha256'],members=c['projects'][0]['snapshot_members'],evidence_url='https://github.com/example/repo/issues/2'))
         c=s.compile_catalog(items,approvals(items),published_pages=published(items));self.assertEqual(c['cases'],[]);self.assertEqual(c['projects'][0]['progress'],{'done':1,'total':2,'percent':None})
     def test_module_registration_then_reviewed_dual_currency_listing(self):
-        module=obj('module','merchant-module',module_id='merchant_operations',package_sha256='b'*64,demo_href='/visual/demo/')
+        module=obj('module','merchant-module',module_id='merchant_operations',requirements=[],package_sha256='b'*64,demo_href='/visual/demo/')
         items=[project(),module];c=s.compile_catalog(items,approvals(items));self.assertEqual(c['modules'],[]);self.assertTrue(c['registration_candidates'])
         prices={'merchant_operations':{'publication_eligible':True,'package_sha256':'b'*64,'offers':[{'mode':'MONTHLY','totals_by_cadence':{'MONTHLY':{'cny_minor':10000,'usd_minor':1990}}}]}}
         c=s.compile_catalog(items,approvals(items),prices);self.assertEqual(len(c['modules']),1);self.assertFalse(c['modules'][0]['purchase_enabled'])
         with tempfile.TemporaryDirectory() as td:
-            out=Path(td)/'public';s.render(c,out);text=(out/'showcase/modules/index.html').read_text();self.assertIn('¥100.00 / US$19.90',text)
+            out=Path(td)/'public';s.render(c,out);text=(out/'showcase/modules/index.html').read_text();self.assertIn('¥100.00 / US$19.90',text);self.assertTrue((out/'showcase/modules/merchant_operations/index.html').is_file())
     def test_changed_package_cannot_reuse_module_price_admission(self):
-        item=obj('module','module',module_id='merchant_operations',package_sha256='b'*64,demo_href='/demo/')
+        item=obj('module','module',module_id='merchant_operations',requirements=[],package_sha256='b'*64,demo_href='/demo/')
         c=s.compile_catalog([project(),item],approvals([project(),item]),{'merchant_operations':{'publication_eligible':True,'package_sha256':'c'*64,'offers':[]}});self.assertEqual(c['modules'],[])
     def test_private_and_unknown_fields_do_not_leak(self):
         private=project('private-project');private['visibility']='PRIVATE';items=[project(),private];c=s.compile_catalog(items,approvals(items));self.assertEqual(len(c['projects']),1)
@@ -117,5 +117,13 @@ class ShowcaseTests(unittest.TestCase):
             out=Path(td)/'public';s.render(c,out)
             self.assertIn('/visual/demo/',(out/'showcase/cases/community-payment/index.html').read_text())
             self.assertIn('/visual/demo-v2/',(out/'showcase/projects/community-payment/index.html').read_text())
+
+    def test_public_content_review_without_commercial_admission_does_not_list_module(self):
+        module=obj('module','merchant-module',module_id='merchant_operations',requirements=[],package_sha256='b'*64,demo_href='/demo/')
+        items=[project(),module];authority=approvals(items)
+        authority[s.sha(s.canonical(module))]['module_admission']=False
+        quote={'merchant_operations':{'publication_eligible':True,'package_sha256':'b'*64,'offers':[]}}
+        c=s.compile_catalog(items,authority,quote)
+        self.assertEqual(c['modules'],[]);self.assertEqual(len(c['reviewed_module_candidates']),1)
 
 if __name__=='__main__':unittest.main()
