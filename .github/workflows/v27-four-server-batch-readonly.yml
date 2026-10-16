@@ -602,3 +602,37 @@ jobs:
           result['probe_sha256']=os.environ['XJ_SOURCE_SHA256']
           print('PR99_PHASE_C_SOURCE_SCHEMA_RECEIPT='+json.dumps(result,sort_keys=True))
           PY
+
+  korea-phase-c-systemd239-parse:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'PR99_PHASE_C_SYSTEMD239_PARSE_ONCE_20261016' && github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
+    timeout-minutes: 2
+    steps:
+      - name: Parse four public candidate unit files only (no generators or PID1 reload)
+        env:
+          XJ_DELIVERY_SHA: ${{ github.sha }}
+          XJ_UNIT_GZIP: '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'
+          XJ_UNIT_SHA256: '3e1a492c761b1bb074e21d0e5990ea354ce687e971a7390ff1a4da9a3b064107'
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import base64,gzip,hashlib,json,os,subprocess,tempfile
+          from pathlib import Path
+          assert os.uname().nodename=='iZmj7a5kwr75qc1tul4kf9Z' and os.geteuid()==1001
+          raw=gzip.decompress(base64.b64decode(os.environ['XJ_UNIT_GZIP'],validate=True))
+          assert len(raw)<=32768 and hashlib.sha256(raw).hexdigest()==os.environ['XJ_UNIT_SHA256']
+          files=json.loads(raw)
+          expected={'xuanjun-binance-phase-c-broker.service','xuanjun-binance-phase-c-worker.service','xuanjun-binance-phase-c-controller.service','xuanjun-phase-c-network-verified.target'}
+          assert set(files)==expected
+          os.umask(0o077)
+          work=Path(tempfile.mkdtemp(prefix='pr99-c-unit-parse-',dir=os.environ['RUNNER_TEMP']))
+          for name,data in files.items():
+              with (work/name).open('x') as f:f.write(data)
+          env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C','SYSTEMD_LOG_LEVEL':'warning','SYSTEMD_COLORS':'0'}
+          r=subprocess.run(['/usr/bin/systemd-analyze','verify',*[str(work/n) for n in sorted(files)]],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env,timeout=25)
+          version=subprocess.check_output(['/usr/bin/systemctl','--version'],text=True,timeout=5).splitlines()[0]
+          result=dict(host=os.uname().nodename,uid=os.geteuid(),systemd=version,unit_count=len(files),unit_sha256=os.environ['XJ_UNIT_SHA256'],delivery_commit=os.environ['XJ_DELIVERY_SHA'],exit=r.returncode,diagnostics=(r.stdout+r.stderr)[:6000].splitlines(),scope='CANDIDATE_UNIT_PARSE_ONLY_NOT_PID1_OR_SANDBOX_PROOF',root=False,service_actions=0,generators_enabled=False,temporary_directory=str(work))
+          print('PR99_PHASE_C_SYSTEMD239_PARSE_RECEIPT='+json.dumps(result,sort_keys=True))
+          raise SystemExit(r.returncode!=0)
+          PY
