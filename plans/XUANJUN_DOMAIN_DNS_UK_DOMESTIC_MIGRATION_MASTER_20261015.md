@@ -729,3 +729,16 @@ Owner通过已认证韩国admin/sudo终端执行批准#6207630392范围内的一
 新拒绝误报源码在原PR99准确94f8e10deed7dbbe876cb170ca0093d0574feeba：同一check验证器拒绝零退出Unknown指令/无防火墙及任何未解释诊断；install在锁/用户/目标创建前先执行只读私有合成unit解析预检，探针仅/bin/true、/dev/null占位且不启动，原R2终态/锁/清理与运行模块不重写。新增4方法与原13专项合为本地17/17 PASS，Bash语法PASS；Hosted原CI因源码变更自动运行，原始结果另记。此只修正误报，不是兼容unit或修复安装器，不部署到现有韩国现场，不逐点送独审生产申请。
 
 最小恢复尚需root短命无报文netns能力和systemd版本，才能判定PrivateNetwork类离线替代是否成立；不猜内核支持、不全局升级内核/systemd或防火墙，不改既有桥接/服务。原安装与日志保持，禁止盲重试或用新installer覆盖已有事务。完整兼容修复和准确root修复范围齐备后再集中审核。Phase-C未授权，东京退役HOLD。
+
+
+### 9.42 2026-10-16：韩国netns能力确认，完整离线兼容恢复候选集中送审
+
+Owner-root新终端证据：kernel5.10.134-19.8.al8.x86_64/systemd239 (239-82.0.4.5.al8.5)，短命unshare --net退出0、独立namespace且接口只有lo。它证明临时子进程netns能力，不是已启动systemd服务的隔离验收。旧实际安装与0700私有日志保留，当前Phase-B安全验收继续HOLD。
+
+原PR99准确新提交bf9373ab6ba2d02dbb7cb5e421cc74632d2cc794/tree53f089df4e6def0803fbf40467c223ea334609b9，完整恢复说明migration-prep/korea-offline-repair/README.md。只替换已安装unit及原事务unit_sha256字段；原632bbe6f的17 Runtime文件、Manifest f887b085、release/current、venv和专属身份/数据目录保持。PrivateNetwork=yes/AF_UNIX、移除旧systemd不支持的LoadCredential及无效BPF依赖、无凭据EnvironmentFile，入口仅原self_check。服务disabled/inactive/PID0；不启动Shadow，不读凭据/DB、不发业务或交易请求、不改六命名单元或全局防火墙/内核，不停东京。
+
+包含准确单次独审+Owner-root私有锚点准入、实际包/提交/helper/unit/旧transaction绑定、最长12h、原安装锁共享互斥、永久单次attempt、旧现场备份、原子替换/仅unit hash事务更新、daemon-reload后有效manager属性/源/current/venv/共享元数据检查、锁释放先于PASS；失败/SIGTERM/漂移/部分写入均保留现场，不自动重试或回滚。旧范围批准6207630392已经用于原安装，不能代替新恢复批准；不开放CLI测试旁路或新sudo权限。旧release模板与checker是保留历史，不作为新offline profile验收工具；原fresh guard仍未部署。
+
+原PR99工作流Run38850683705/Hosted Job116810987462原始日志确认准确checkout bf9373ab、167/167 PASS（141既有回归+26新增），host Job116810988506 SKIPPED，未新增队列。实际下载Artifact12025121935复算ZIP58286bytes SHA23a781efbe2a53a62acec5f786407f20b5b10f617388f17a4d976dee3e84c731；TAR57787bytes SHA4c351cdd87a4997c91d311b0345e6dd78192886f4aa657932d549c51af1f016b，8常规成员/7绑定实际SHA全匹配，本地确定性复构与实际TAR字节一致。模型不冒充韩国内核执行。
+
+已在原PR99#6208118622集中送审并回读，一次覆盖源码/制品/精确恢复范围及限时单次执行许可要求，不重审原R2/R6/17份未变Runtime。新恢复独审批准NOT_ISSUED、Owner-root锚点NOT_REGISTERED、真实修复NOT_EXECUTED，服务未启动。源码准备和测试制品成功，不称服务器迁移完成。PR99/PR122保持Draft；Phase-C/DB/Writer/生产迁移/东京退役继续HOLD；已完成的国内网站/DNS/Work官网及current不修改。
