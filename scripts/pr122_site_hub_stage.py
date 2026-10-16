@@ -9,7 +9,7 @@ import tarfile
 from pathlib import Path, PurePosixPath
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.pr122_site_hub_public_copy import public_page
+from scripts.pr122_site_hub_public_copy import public_page, legacy_public_wording
 from scripts.pr122_site_hub_english import translate_fragment
 from scripts.pr122_site_hub_experience import CSS as EXPERIENCE_CSS, disclosures, home as improve_home
 from scripts.pr122_website_release import write_csp_metadata, Deadline
@@ -105,7 +105,7 @@ def build(root, source, output, fixture=None):
     home=(public/'index.html').read_text()
     for p in public.rglob('*.html'):
         text=p.read_text()
-        patched=menu_patch(text)
+        patched=legacy_public_wording(menu_patch(text), bool(re.search(r'<html[^>]*lang="en"',text)))
         if patched!=text:p.write_text(patched)
     hub=root/'demos/xuanjun-site-hub'
     extra_styles={}

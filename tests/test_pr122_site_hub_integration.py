@@ -122,6 +122,16 @@ class IntegrationTests(unittest.TestCase):
             self.assertNotIn('id="directCost"',market)
             self.assertIn('id="ecvUnits"',market)  # stable internal field, public name changes only
 
+    def test_legacy_name_keeps_script_bytes_and_removes_stale_total(self):
+        from scripts.pr122_site_hub_public_copy import legacy_public_wording
+        source='<p>生态权益值规则设计总量为1000万</p><script>const ECV="ECV";</script>'
+        new=legacy_public_wording(source)
+        self.assertIn('<script>const ECV="ECV";</script>',new)
+        self.assertIn('云汇生态权益',new)
+        for p in self.public.rglob('*.html'):
+            if 'id="primary-nav"' in p.read_text():
+                self.assertNotIn('生态权益值',p.read_text())
+
     def test_community_project_belongs_to_delivery(self):
         for locale in ('','zh-cn/','en/'):
             text=(self.public/locale/'index.html').read_text()

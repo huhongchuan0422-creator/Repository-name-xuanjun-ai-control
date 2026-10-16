@@ -12,7 +12,7 @@ def table(caption, headers, rows):
 
 def wording(text, en=False):
     if en:
-        return re.sub(r'\b(?:ECV|EVC)\b', EN_NAME, text)
+        return re.sub(r'\b(?:ECV|EVC|ecosystem[- ]values?)\b', EN_NAME, text, flags=re.I)
     text = re.sub(r'(?:生态权益值|生态权益|权益值|ECV|EVC)', NAME, text)
     return text.replace('云汇'+NAME, NAME)
 
@@ -86,3 +86,13 @@ def home_promotion(locale):
         note='抵扣不超过可用合格余额；第三方成本除外，不能提现。参与资格与开放时间以正式活动规则为准。'
         cta='查看活动与优惠规则'
     return '<section class="xj-discover xj-benefits" id="discover-benefits"><h2>'+title+'</h2><p>'+lead+'</p><div class="xj-discover-grid">'+''.join('<article class="xj-feature"><h3>'+a+'</h3><p>'+b+'</p></article>' for a,b in cards)+'</div><p>'+note+'</p><a class="button" href="/'+locale+'ecosystem/activities/">'+cta+'</a></section>'
+
+
+def legacy_public_wording(text, en=False):
+    """Apply the approved public name to legacy copy without modifying scripts or URLs."""
+    parts=re.split(r'(<script\b.*?</script>|<style\b.*?</style>)',text,flags=re.S|re.I)
+    for i in range(0,len(parts),2):
+        parts[i]=wording(parts[i],en)
+        parts[i]=parts[i].replace('The documented Yunhui Ecosystem Rights design total is 10 million; a design total is not evidence of issuance.','Yunhui Ecosystem Rights have a fixed total of 20 million units; the total is not evidence of issuance.')
+        parts[i]=parts[i].replace('文档所述云汇生态权益规则设计总量为1000万；规则总量不等于已发放。','云汇生态权益总量固定2,000万份；总量不等于已发放数量。')
+    return ''.join(parts)
