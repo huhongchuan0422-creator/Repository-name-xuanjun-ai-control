@@ -32,7 +32,10 @@ def main():
     owned_pages,project_files=display.project_public_pages(args.registry,objects,approvals)
     pages={**pages,**owned_pages}
     catalog=display.compile_catalog(objects,approvals,prices,pages)
-    manifest=display.render(catalog,args.output,args.preview,project_files)
+    root=Path(__file__).resolve().parents[1]
+    pins=json.loads((root/'deploy/pr122-site-hub-experience/HOST_PINS.json').read_text())
+    shell=display.official_shell(root/'evidence/pr122-site-hub-experience/PR122_SITE_HUB_REVIEW_ONLY.tar.gz',pins['static_artifact_sha256'])
+    manifest=display.render(catalog,args.output,args.preview,project_files,shell)
     (args.output/'SHOWCASE_MANIFEST.json').write_text(json.dumps(manifest,sort_keys=True,indent=2)+'\n')
     print(json.dumps({'state':'PREVIEW_ONLY' if args.preview else 'REVIEWED_CANDIDATE_NOT_DEPLOYED','files':len(manifest['files']),'projects':len(catalog['projects']),'modules':len(catalog['modules']),'production_changes':0}))
 

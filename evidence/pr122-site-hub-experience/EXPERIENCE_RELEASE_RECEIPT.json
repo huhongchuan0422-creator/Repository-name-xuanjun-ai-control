@@ -1,10 +1,10 @@
 {
-  "distribution_manifest_sha256": "5c87f37ea3f95cd34609788bbfbb6c57dbd862d18199222105dfd5edf9c1d407",
-  "host_pins_sha256": "1b1f9d6689f996ee51c9365613e2e87df66df5e57fe027f468e260de98b6df4c",
+  "distribution_manifest_sha256": "3f37a34974b02f9e97fd585eee7b9248741b68f668b737577d6ad7ea0c6cbbbf",
+  "host_pins_sha256": "59f2e45e16e45c7e266202f4f1aa26792fda0a518b847bbb63e82a226d331f36",
   "member_count": 7,
   "production_changes": 0,
   "state": "REVIEW_ONLY_NOT_APPROVED",
-  "tar_sha256": "017db26368a6d2bc014b186e4d46d3372f977f4c22c073d0d6fbda78e677e8d6",
+  "tar_sha256": "79f9738593f9be8082c238cf8ed6ba4d913bbcea468fe77bea139339ede3dfb4",
   "transaction_id": "pr122-hub-experience-20261016",
   "wrapper_sha256": "73941859e97b6c51b6fc885e7094893c35da2ab908ce34b725c576134b4ac68d"
 }

@@ -4,11 +4,11 @@ Review-only. No release permission is bundled. No production action has been exe
 
 ## Exact scope
 
-Content commit: `2ecee38d65b0c5353521019dd08030245e902e0d`.
+Content commit: `ca7ab93306a66de1697833201d3c0bc6c98910d9`.
 The containing commit adds only packaging, transaction controls, evidence and CI.
 
-The existing three navigation names and links remain. Home exposes four business
-sections with direct product, visual, co-creation/ecology and customer entrances.
+The existing three navigation names and links remain. Home exposes five business
+sections with direct product, visual, project-progress, co-creation/ecology and customer entrances.
 Ecology links belong to the existing Labs/co-creation entry. The mobile header
 aligns its logo/menu/language controls. Only the dropdown glyph rotates. The new
 Chinese merchant dashboard offers three clearly marked fictional merchants.
@@ -20,7 +20,7 @@ proxy rules and publisher bytes are unchanged. The existing 356 ICP footers are 
 ## Protected transaction
 
 ID: `pr122-hub-experience-20261016`.
-New release: `pr122-hub-experience-2ecee38d`.
+New release: `pr122-hub-experience-ca7ab933`.
 Previous release: `pr122-site-hub-dd810410`.
 Domestic host only: `iZvt5t8tlrm8oiZ`.
 

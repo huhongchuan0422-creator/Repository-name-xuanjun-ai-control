@@ -6,7 +6,7 @@ test_reject_old_gate_without_changes (tests.test_pr122_site_hub_experience_relea
 test_reject_public_drift (tests.test_pr122_site_hub_experience_release.ExperienceTests.test_reject_public_drift) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 83.051s
+Ran 6 tests in 85.307s
 
 OK
 COMBINED_TEST_SOURCE=ACTUAL_APPROVED_ARCHIVE_1187_PLUS_90; SYSTEMD_NGINX=FAKE

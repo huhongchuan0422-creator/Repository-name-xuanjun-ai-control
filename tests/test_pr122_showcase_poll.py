@@ -38,4 +38,9 @@ class PollTests(unittest.TestCase):
         comments=[{'id':90,'user':{'login':'owner'},'body':'XUANJUN_SHOWCASE_RELEASE\n'+json.dumps({'artifact_id':1,'expires_unix':9999999999})}]
         self.assertEqual(poller.poll(self.policy,self.engine,lambda _:comments,lambda *_:self.fail('Unexpected artifact download'))['state'],'NO_NEW_APPROVED_RELEASE')
 
+    def test_persistent_hold_prevents_repeated_network_attempts(self):
+        (self.base/'AUTOMATION_HOLD.json').write_bytes(canonical({'state':'HOLD_REQUIRES_OPERATOR'}))
+        with self.assertRaisesRegex(ValueError,'OPERATOR_RECOVERY_REQUIRED'):
+            poller.poll(self.policy,self.engine,lambda *_:self.fail('Unexpected network retry'))
+
 if __name__=='__main__':unittest.main()

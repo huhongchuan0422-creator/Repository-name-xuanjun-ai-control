@@ -9,11 +9,12 @@
     "en": "Consumer simulation"
   },
   "summary": {
-    "zh": "仅模拟演示，不涉及真实付款。",
-    "en": "Simulation only; no real payment."
+    "zh": "输入金额，查看广告位，并体验模拟付款与订单状态。",
+    "en": "Enter an amount, view ad placements and explore simulated payment and order status."
   },
   "href": "/visual/community-local-e2e/",
   "role": "consumer",
   "artifact_sha256": "7e48f84d4505818dba0da5e09163311e0b27fb40bf8c1da905b9bd173661880c",
-  "release_artifact_sha256": "dcf96b124cea6170453bdec52e60fc94d157864f342e2d1706801d54568abafb"
+  "release_artifact_sha256": "dcf96b124cea6170453bdec52e60fc94d157864f342e2d1706801d54568abafb",
+  "sort_order": 10
 }

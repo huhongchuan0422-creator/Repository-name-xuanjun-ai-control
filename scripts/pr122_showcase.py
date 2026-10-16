@@ -37,7 +37,8 @@ def validate(item):
         need(type(item.get(key)) is dict and set(item[key])=={'zh','en'} and all(type(v) is str and 0<len(v)<=2000 for v in item[key].values()),'BILINGUAL_COPY_REQUIRED')
     fields={'project':{'state','scenarios','required_milestones'},'page':{'href','role','artifact_sha256','release_artifact_sha256'},'milestone':{'state','evidence_url'},'acceptance':{'project_version','snapshot_sha256','evidence_url','members'},'module':{'module_id','package_sha256','demo_href'},'ecology':{'initiator_nickname'}}
     required={'kind','id','project_id','version','visibility','title','summary'}|fields[item['kind']]
-    optional=set()
+    optional={'sort_order'} if item['kind'] in ('page','milestone') else set()
+    if 'sort_order' in item:need(type(item['sort_order']) is int and 0<=item['sort_order']<=9999,'SORT_ORDER')
     need(required<=set(item)<=required|optional,'UNKNOWN_OR_MISSING_FIELDS')
     if item['kind']=='project':
         need(item.get('state') in ('PLANNED','DEVELOPING'),'PROJECT_STATE_REQUIRES_ACCEPTANCE_EVENT')
@@ -90,8 +91,8 @@ def compile_catalog(items,approvals,prices=None,published_pages=None):
     projects=[];module_queue=[];market=[];events=[]
     for project in sorted((i for i in selected.values() if i['kind']=='project'),key=lambda i:i['project_id']):
         pid=project['project_id'];members=[i for i in selected.values() if i['project_id']==pid]
-        pages=sorted((i for i in members if i['kind']=='page' and (published_pages or {}).get(i['href'])=={'artifact_sha256':i['artifact_sha256'],'release_artifact_sha256':i['release_artifact_sha256']}),key=lambda i:i['id'])
-        milestones=sorted((i for i in members if i['kind']=='milestone'),key=lambda i:i['id'])
+        pages=sorted((i for i in members if i['kind']=='page' and (published_pages or {}).get(i['href'])=={'artifact_sha256':i['artifact_sha256'],'release_artifact_sha256':i['release_artifact_sha256']}),key=lambda i:(i.get('sort_order',999),i['id']))
+        milestones=sorted((i for i in members if i['kind']=='milestone'),key=lambda i:(i.get('sort_order',999),i['id']))
         snapshot=sha(canonical({'project':{k:v for k,v in project.items() if k!='review'},'pages':[{k:v for k,v in p.items() if k!='review'} for p in pages],'milestones':[{k:v for k,v in m.items() if k!='review'} for m in milestones]}))
         member_refs=[{'kind':i['kind'],'id':i['id'],'version':i['version'],'object_sha256':sha(canonical({k:v for k,v in i.items() if k!='review'}))} for i in [project,*pages,*milestones]]
         acceptance=next((i for i in members if i['kind']=='acceptance' and i['project_version']==project['version'] and i['snapshot_sha256']==snapshot and sorted(map(canonical,i['members']))==sorted(map(canonical,member_refs))),None)
@@ -120,7 +121,7 @@ def compile_catalog(items,approvals,prices=None,published_pages=None):
             members.append(record)
         originals=[i for i in members if i['kind']=='project']
         if len(originals)!=1:continue
-        original=originals[0];pages=sorted((i for i in members if i['kind']=='page'),key=lambda i:i['id']);milestones=sorted((i for i in members if i['kind']=='milestone'),key=lambda i:i['id'])
+        original=originals[0];pages=sorted((i for i in members if i['kind']=='page'),key=lambda i:(i.get('sort_order',999),i['id']));milestones=sorted((i for i in members if i['kind']=='milestone'),key=lambda i:(i.get('sort_order',999),i['id']))
         need(len({identity(i) for i in members})==len(members) and len(originals)+len(pages)+len(milestones)==len(members),'ACCEPTANCE_MEMBER_SET')
         payload={'project':{k:v for k,v in original.items() if k!='review'},'pages':[{k:v for k,v in i.items() if k!='review'} for i in pages],'milestones':[{k:v for k,v in i.items() if k!='review'} for i in milestones]}
         required=set(original['required_milestones']);done={i['id'] for i in milestones if i['state']=='DONE'}
@@ -132,9 +133,23 @@ def compile_catalog(items,approvals,prices=None,published_pages=None):
             'developing':[p for p in projects if p['state']=='DEVELOPING'],'planned':[p for p in projects if p['state']=='PLANNED'],
             'modules':market,'ecology':events,'registration_candidates':module_catalog(),'review_queue':pending,'reviewed_module_candidates':module_queue}
 
+def official_shell(package,expected_sha):
+    import io,tarfile
+    raw=Path(package).read_bytes();need(sha(raw)==expected_sha,'OFFICIAL_SHELL_PACKAGE_HASH')
+    result={}
+    with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
+        for language,prefix in (('zh',''),('en','en/')):
+            text=archive.extractfile('pr122-site-hub/overlay/public/'+prefix+'index.html').read().decode()
+            header=re.search(r'<header\b.*?</header>',text,re.S);footer=re.search(r'<footer\b.*?</footer>',text,re.S)
+            need(header and footer and all(label in header[0] for label in (('Solutions','Function Market','Custom') if language=='en' else ('解决方案','功能市场','定制与交付'))),'OFFICIAL_SHELL_STRUCTURE')
+            result[language]={'header':header[0],'footer':footer[0]}
+    return result
+
 CSS='''body{margin:0;background:#f5f5f7;color:#1d1d1f;font:17px/1.6 system-ui,sans-serif}header,main,footer{max-width:1120px;margin:auto;padding:24px}nav{display:flex;gap:18px;flex-wrap:wrap}a{color:#0066cc}h1{font-size:clamp(32px,5vw,60px);line-height:1.12}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:22px}.card{background:white;border-radius:24px;padding:28px}small{color:#606068}.notice{border-left:3px solid #0066cc;padding:12px}a:focus-visible{outline:3px solid #0066cc;outline-offset:4px}@media(max-width:600px){header,main,footer{padding:18px}.card{padding:22px}}'''
 
-def render(catalog,output,preview=False,project_files=None):
+CSS += '\n.showcase-main{max-width:1120px;margin:auto;padding:44px 24px 70px}.showcase-main h1{letter-spacing:-.04em;margin:40px 0 22px}.showcase-main h2{font-size:30px;letter-spacing:-.025em;margin:54px 0 24px}.showcase-main h3{font-size:22px;line-height:1.35;margin:18px 0 14px}.showcase-main a{text-decoration:none}.showcase-main a:hover{text-decoration:underline}.showcase-subnav{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:26px;border-bottom:1px solid #dedee4}.showcase-subnav a{padding:8px 14px;border-radius:20px;color:#4a4a50;background:#fff;font-size:14px}.showcase-lead{max-width:760px;font-size:20px;color:#606068}.showcase-tags{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0}.showcase-tags span,.showcase-status{padding:5px 11px;border-radius:20px;background:#e9edf5;font-size:13px;color:#4d5e77}.showcase-progress{color:#6e6e73;margin:26px 0}.showcase-main .card{border:1px solid #e8e8ed;box-shadow:none;margin:0}.showcase-main .card p{color:#606068;margin:12px 0 24px}.showcase-main .showcase-action{display:inline-block;font-weight:600}.showcase-main .role-cards{margin:28px 0 44px}.showcase-main .milestone h3{font-size:20px}.showcase-main .milestone a{font-size:14px}.showcase-main .notice{font-size:14px;color:#6e6e73;margin:26px 0}@media(max-width:600px){.showcase-main{padding:24px 18px 48px}.showcase-main h1{margin:30px 0 18px}.showcase-main h2{font-size:26px}.showcase-lead{font-size:18px}.showcase-main .card{padding:24px}}\n'
+
+def render(catalog,output,preview=False,project_files=None,shell=None):
     output=Path(output);need(not output.exists(),'OUTPUT_ALREADY_EXISTS')
     base=output/'showcase';base.mkdir(parents=True);(base/'assets').mkdir();(base/'assets/showcase.css').write_text(CSS)
     labels={'cases':('成熟项目案例','Completed projects'),'projects':('正在开发的项目','Projects in development'),'modules':('SaaS功能市场','SaaS modules'),'roadmap':('产品发展路线','Product roadmap'),'ecosystem':('生态共建共享','Co-creation ecosystem')}
@@ -145,7 +160,17 @@ def render(catalog,output,preview=False,project_files=None):
         languages='<nav aria-label="Language"><a lang="zh-CN" href="/showcase/'+clean+'">中文</a><a lang="en" href="/showcase/en/'+clean+'">EN</a></nav>'
         banner='<p class="notice">'+('Review preview — not published' if en else '送审预览，尚未公开发布')+'</p>' if preview else ''
         target=base/relative;target.parent.mkdir(parents=True,exist_ok=True)
-        target.write_text('<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escape(title)+'｜玄钧云汇</title><link rel="stylesheet" href="/showcase/assets/showcase.css"></head><body><header><a href="/">玄钧云汇</a><nav>'+nav+'</nav>'+languages+'</header><main>'+banner+'<h1>'+escape(title)+'</h1>'+body+'</main><footer><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026024862号</a></footer></body></html>')
+        global_header=(shell or {}).get('en' if en else 'zh',{}).get('header')
+        global_footer=(shell or {}).get('en' if en else 'zh',{}).get('footer')
+        head_assets=('<link rel="stylesheet" href="/yunhui.css?v=yunhui-work-v2-20261013"><link rel="stylesheet" href="/assets/xuanjun-site-integration.css">' if global_header else '')
+        script='<script src="/yunhui.js?v=yunhui-work-v2-20261013" defer></script>' if global_header else ''
+        if global_header:
+            global_header=re.sub(r'\saria-current="page"','',global_header)
+            global_header=re.sub(r'href="[^"]*" lang="(zh-CN|en)"',lambda m:'href="/showcase/'+('en/' if m[1]=='en' else '')+clean+'" lang="'+m[1]+'"'+(' aria-current="page"' if m[1]==lang else ''),global_header)
+        header=global_header or '<header><a href="/">玄钧云汇</a></header>'
+        footer=global_footer or '<footer><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026024862号</a></footer>'
+        canonical_url='https://wenwenwenyiyiyi.work/showcase/'+relative.removesuffix('index.html')
+        target.write_text('<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escape(title)+'｜玄钧云汇</title><link rel="canonical" href="'+canonical_url+'">'+head_assets+'<link rel="stylesheet" href="/showcase/assets/showcase.css"></head><body>'+header+'<main class="showcase-main"><nav class="showcase-subnav" aria-label="'+('Explore work' if en else '作品展示')+'">'+nav+'</nav>'+('' if global_header else languages)+banner+'<h1>'+escape(title)+'</h1>'+body+'</main>'+footer+script+'</body></html>')
     for en in (False,True):
         language='en' if en else 'zh';prefix='en/' if en else '';escape=html.escape
         states={'PLANNED':('规划中','Planned'),'DEVELOPING':('开发中','In development'),'IN_PROGRESS':('进行中','In progress'),'DONE':('已完成','Completed'),'ACCEPTED':('已验收','Accepted')}
@@ -155,14 +180,16 @@ def render(catalog,output,preview=False,project_files=None):
             items=catalog['cases'] if key=='cases' else catalog['developing'] if key=='projects' else catalog['projects']
             page(prefix+key+'/index.html',labels[key][en],cards(items,key=='cases'),en)
         for project,is_case in [(p,False) for p in catalog['projects']]+[(p,True) for p in catalog['cases']]:
-            roles=''.join('<li><a href="'+escape(p['href'],quote=True)+'">'+escape(p['title'][language])+'</a></li>' for p in project['pages'])
-            milestones=''.join('<li>'+escape(m['title'][language])+': '+escape(states[m['state']][en])+' <a href="'+escape(m['evidence_url'],quote=True)+'">'+('Record' if en else '开发记录')+'</a></li>' for m in project['milestones'])
-            progress=project['progress'];scenarios='<ul>'+''.join('<li>'+escape(v[language])+'</li>' for v in project['scenarios'])+'</ul>'
-            body='<p>'+escape(project['summary'][language])+'</p>'+scenarios+'<p>'+('Evidenced milestones: ' if en else '有记录的里程碑：')+str(progress['done'])+'/'+str(progress['total'])+'</p><ul>'+roles+'</ul><h2>'+labels['roadmap'][en]+'</h2><ul>'+milestones+'</ul>'
+            roles='<div class="grid role-cards">'+''.join('<article class="card"><h3>'+escape(p['title'][language])+'</h3><p>'+escape(p['summary'][language])+'</p><a class="showcase-action" href="'+escape(p['href'],quote=True)+'">'+('Try the demo' if en else '进入体验')+' →</a></article>' for p in project['pages'])+'</div>'
+            milestones=''.join('<article class="card milestone"><span class="showcase-status">'+escape(states[m['state']][en])+'</span><h3>'+escape(m['title'][language])+'</h3><a href="'+escape(m['evidence_url'],quote=True)+'">'+('View record' if en else '查看记录')+' →</a></article>' for m in project['milestones'])
+            progress=project['progress'];scenarios='<div class="showcase-tags">'+''.join('<span>'+escape(v[language])+'</span>' for v in project['scenarios'])+'</div>'
+            body='<p class="showcase-lead">'+escape(project['summary'][language])+'</p>'+scenarios+'<p class="showcase-progress">'+('Verified milestones: ' if en else '已核验完成：')+str(progress['done'])+' / '+str(progress['total'])+'</p>'+roles+'<h2>'+labels['roadmap'][en]+'</h2><div class="grid">'+milestones+'</div>'
             page(prefix+('cases/' if is_case else 'projects/')+project['project_id']+'/index.html',project['title'][language],body,en)
+        modes={'MONTHLY':('月付','Monthly'),'YEARLY':('年付','Yearly'),'BUYOUT':('一次买断','One-time license'),'FREE':('免费','Free'),'PROMO_ZERO':('零元优惠','Zero-price promotion'),'USAGE':('按量','Usage-based'),'HYBRID':('组合计费','Mixed billing'),'CUSTOM':('按约定','Contract terms')}
+        cadences={'MONTHLY':('每月','per month'),'YEARLY':('每年','per year'),'ONCE':('一次性','one time'),'PER_UNIT':('按单位','per unit')}
         modules=''
         for item in catalog['modules']:
-            offers=''.join('<li>'+escape(offer['mode'])+' · '+escape(cadence)+': ¥'+str(amount['cny_minor']//100)+'.'+str(amount['cny_minor']%100).zfill(2)+' / US$'+str(amount['usd_minor']//100)+'.'+str(amount['usd_minor']%100).zfill(2)+'</li>' for offer in item['offers'] for cadence,amount in offer['totals_by_cadence'].items())
+            offers=''.join('<li>'+escape(modes[offer['mode']][en])+' · '+escape(cadences[cadence][en])+': ¥'+str(amount['cny_minor']//100)+'.'+str(amount['cny_minor']%100).zfill(2)+' / US$'+str(amount['usd_minor']//100)+'.'+str(amount['usd_minor']%100).zfill(2)+'</li>' for offer in item['offers'] for cadence,amount in offer['totals_by_cadence'].items())
             modules+='<article class="card"><h2>'+escape(item['title'][language])+'</h2><p>'+escape(item['summary'][language])+'</p><a href="'+escape(item['demo_href'],quote=True)+'">'+('Demo' if en else '功能演示')+'</a><ul>'+offers+'</ul><p>'+('Purchasing is not enabled.' if en else '真实购买尚未开放。')+'</p></article>'
         page(prefix+'modules/index.html',labels['modules'][en],modules or '<p>'+('No modules have passed listing admission yet.' if en else '模块通过测试、审核和上架准入后自动展示。')+'</p>',en)
         ecology='<p>'+('Rules and project contributions are separate from ownership of the platform foundation.' if en else '共创项目贡献与平台自研基础模块归属分开登记。')+'</p><nav><a href="/ecosystem/">'+('Rules' if en else '共建共享规则')+'</a><a href="/ecosystem/tiers/">'+('Tiers and discounts' if en else '等级与开发折扣')+'</a><a href="/ecosystem/ledger/">'+('Service credits' if en else '专项金额说明')+'</a><a href="/ecosystem/profit-sharing/">'+('Profit sharing' if en else '共创净利润共享')+'</a></nav>'

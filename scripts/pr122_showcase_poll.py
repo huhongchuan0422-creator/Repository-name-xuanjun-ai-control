@@ -39,6 +39,10 @@ def artifact_package(identifier,token):
 
 def poll(policy,engine=None,fetch=promote.github,download=artifact_package):
     engine=engine or promote.load_engine()
+    marker=promote.BASE/'AUTOMATION_HOLD.json'
+    if marker.exists():
+        engine.read_trusted_bytes(marker,0)
+        raise ValueError('OPERATOR_RECOVERY_REQUIRED_NO_NETWORK_OR_RETRY')
     # Incomplete/unknown transactions stop automation rather than being retried.
     if (promote.BASE/'transactions').exists():
         for path in (promote.BASE/'transactions').glob('*.json'):
@@ -91,7 +95,12 @@ def main():
     path=promote.BASE/'poll.lock';fd=os.open(path,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     try:
         need(os.fstat(fd).st_uid==0 and __import__('stat').S_ISREG(os.fstat(fd).st_mode),'POLL_LOCK_IDENTITY')
-        fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB);print(json.dumps(poll(policy,engine),sort_keys=True))
+        fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        try:print(json.dumps(poll(policy,engine),sort_keys=True))
+        except BaseException as error:
+            marker=promote.BASE/'AUTOMATION_HOLD.json'
+            if not marker.exists():engine.atomic_json(marker,{'state':'HOLD_REQUIRES_OPERATOR','failure_class':type(error).__name__,'fingerprint':sha((type(error).__name__+str(error)).encode()),'created_unix':int(__import__('time').time()),'automatic_retry':False})
+            raise
     finally:os.close(fd)
 
 if __name__=='__main__':main()

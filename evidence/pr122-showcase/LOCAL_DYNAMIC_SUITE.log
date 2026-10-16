@@ -28,6 +28,7 @@ test_checked_pointer_without_https_receipt_remains_unknown (tests.test_pr122_sho
 test_consumed_artifact_is_not_applied_again (tests.test_pr122_showcase_poll.PollTests.test_consumed_artifact_is_not_applied_again) ... ok
 test_no_approved_event_has_no_publication_effect (tests.test_pr122_showcase_poll.PollTests.test_no_approved_event_has_no_publication_effect) ... ok
 test_nonprivate_credential_is_not_used (tests.test_pr122_showcase_poll.PollTests.test_nonprivate_credential_is_not_used) ... ok
+test_persistent_hold_prevents_repeated_network_attempts (tests.test_pr122_showcase_poll.PollTests.test_persistent_hold_prevents_repeated_network_attempts) ... ok
 test_unknown_previous_transaction_stops_before_network_or_retry (tests.test_pr122_showcase_poll.PollTests.test_unknown_previous_transaction_stops_before_network_or_retry) ... ok
 test_complete_install_restore_does_not_touch_main_current (tests.test_pr122_showcase_install.InstallTests.test_complete_install_restore_does_not_touch_main_current) ... ok
 test_foreign_config_blocks_rollback (tests.test_pr122_showcase_install.InstallTests.test_foreign_config_blocks_rollback) ... ok
@@ -37,6 +38,6 @@ test_partial_file_install_can_roll_back_before_service_creation (tests.test_pr12
 test_preexisting_objects_are_not_adopted (tests.test_pr122_showcase_install.InstallTests.test_preexisting_objects_are_not_adopted) ... ok
 
 ----------------------------------------------------------------------
-Ran 37 tests in 0.392s
+Ran 38 tests in 0.480s
 
 OK

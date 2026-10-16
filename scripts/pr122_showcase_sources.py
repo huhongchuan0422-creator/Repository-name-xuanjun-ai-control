@@ -19,7 +19,7 @@ def github(path):
     with urllib.request.urlopen(request,timeout=20) as response:
         raw=response.read(2000001);need(len(raw)<=2000000,'GITHUB_RESPONSE_LIMIT');return json.loads(raw)
 
-def verify_review(comment_id,objects,approved_reviewers,fetch=github):
+def verify_review(comment_id,objects,approved_reviewers,fetch=github,known_only=False):
     """Only real PR122 comments + exact successful CI may approve declarations.
 
     The reviewer allowlist is protected operator policy, not project content.
@@ -39,7 +39,10 @@ def verify_review(comment_id,objects,approved_reviewers,fetch=github):
     def blob(identifier):
         if identifier not in cache:cache[identifier]=fetch('git/blobs/'+identifier)
         return cache[identifier]
-    need(type(review.get('object_sha256')) is list and review['object_sha256'] and all(h in hashes for h in review['object_sha256']),'REVIEW_OBJECT_BINDING')
+    need(type(review.get('object_sha256')) is list and review['object_sha256'] and all(type(h) is str and len(h)==64 and all(ch in '0123456789abcdef' for ch in h) for h in review['object_sha256']),'REVIEW_OBJECT_BINDING')
+    if known_only:review['object_sha256']=[h for h in review['object_sha256'] if h in hashes]
+    if not review['object_sha256']:return {}
+    need(all(h in hashes for h in review['object_sha256']),'REVIEW_OBJECT_BINDING')
     # Verify the approved object bytes actually belonged to that tested commit.
     tree=fetch('git/trees/'+commit+'?recursive=1');need(not tree.get('truncated'),'TRUNCATED_SOURCE_TREE')
     blobs={row['sha'] for row in tree['tree'] if row['type']=='blob' and row['path'].startswith('showcase/projects/') and row['path'].endswith('.json') and len(row['path'].split('/'))==4}
@@ -62,7 +65,7 @@ def reviewed_objects(ids,objects,reviewers,fetch=github):
         if path not in cache:cache[path]=fetch(path)
         return cache[path]
     for identifier in sorted(set(ids)):
-        result.update(verify_review(identifier,objects,reviewers,cached))
+        result.update(verify_review(identifier,objects,reviewers,cached,known_only=True))
     return result
 
 def read_only_db(path):

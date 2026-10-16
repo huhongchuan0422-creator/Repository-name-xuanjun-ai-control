@@ -1,0 +1,22 @@
+{
+  "expected_nginx_files": {
+    "/etc/nginx/conf.d/pr122-00-logformat.conf": "ec79d13b7b4e3586088cdff794f7538a9ff13fc8aa0a9018f913f7b39bbc1a1e",
+    "/etc/nginx/conf.d/pr122-apex-http.conf": "e36fcc4f0d34f088c2030b915421442086fed4e7dfa19758107fd780e4902071",
+    "/etc/nginx/conf.d/pr122-apex-https.conf": "b1337493bc6d6c3692bf9d3124cffdffcc380262b7c84ecdc65da70d5a0a958e",
+    "/etc/nginx/conf.d/pr122-site-hub-limit.conf": "64c0b735311ec2660f552d645d419c3670b32986cddf916a56c59ce22ce6a770",
+    "/etc/nginx/conf.d/winctl.windows-interaction-ip.conf": "bd3cb5931aabcab5855e72c3509ecc44d7a5d603b14830592b1448ae6f0e185d",
+    "/etc/nginx/conf.d/winctl.windows-interaction.conf": "e089825a7bc21edcdbe4ee911923f996f9e7fedae87ca979a225558f4a24d7d1",
+    "/etc/nginx/mime.types": "845b3cf44e3d178299f218f6fffc4067a989d3f88895dc03bd931c7c9e7230c4",
+    "/etc/nginx/nginx.conf": "8dcb91c45cde2792cecbd5367678bb595c23db1d979879cec74196dad0f71071",
+    "/etc/nginx/pr122-minimal-cutover/apex.locations.conf": "42e9af3573135e6b8ef08905d1a5628051fb5fd2df014be8f8ce914aa353ccd1",
+    "/etc/nginx/pr122-minimal-cutover/static-security.conf": "a54d27fe31c70ac644ed0cffbbec16cdeb6687fcc881e403c2fef27ff67d67ea",
+    "/etc/nginx/pr122-minimal-cutover/tokyo-proxy-settings.conf": "307930ba9ea726a34a7c0365d8a7446cd2967c8331682e0b9a52ac60e3936201",
+    "/etc/nginx/pr122-site-hub/locations.conf": "06c4da2139e6704c36be2a888679298656f38e2ac0bd90fb7c349b40ffa5a1df",
+    "/var/www/wenwenwenyiyiyi.work/releases/pr122-hub-experience-ca7ab933/release-metadata/inline-csp.conf": "d466094e2dddac86bb8d77c54899a0ca5bedfb2fdc9071126f359b433dbb2741"
+  },
+  "main_current": "/var/www/wenwenwenyiyiyi.work/releases/pr122-hub-experience-ca7ab933",
+  "previous_https_sha256": "b1337493bc6d6c3692bf9d3124cffdffcc380262b7c84ecdc65da70d5a0a958e",
+  "previous_nginx_inventory_sha256": "68f33ee40d9fa018afa42a071ff36864e2643c5e818ac5f61f41d99bdd4e80b9",
+  "source_commit": "ca7ab93306a66de1697833201d3c0bc6c98910d9",
+  "state": "PROJECTED_APPROVED_UI_BASELINE_NOT_TARGET_OBSERVATION"
+}

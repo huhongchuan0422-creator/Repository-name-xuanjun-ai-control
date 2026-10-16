@@ -4,10 +4,20 @@
     "visual/community-payment/merchant-dashboard/index.html"
   ],
   "changed_existing": 357,
+  "content_commit": "ca7ab93306a66de1697833201d3c0bc6c98910d9",
   "deleted": [],
   "new_files": 1279,
+  "new_ui_tar_sha256": "b66eba8c958b10925064053f41dc575a6eb301616bc414d139cdddd98a2e7cb3",
   "old_files": 1277,
+  "old_r2_tar_sha256": "dcf96b124cea6170453bdec52e60fc94d157864f342e2d1706801d54568abafb",
   "publisher_unchanged": true,
   "runtime_unchanged": true,
-  "state": "LOCAL_REVIEW_EVIDENCE_NOT_INDEPENDENT_APPROVAL"
+  "since_previous_ui_candidate_changed_members": [
+    "PACKAGE_MANIFEST.json",
+    "candidate-manifest.json",
+    "overlay/public/en/index.html",
+    "overlay/public/index.html",
+    "overlay/public/zh-cn/index.html"
+  ],
+  "state": "REVIEW_ONLY_NOT_APPROVED"
 }

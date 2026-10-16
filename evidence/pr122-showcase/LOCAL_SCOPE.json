@@ -1,6 +1,6 @@
 {
   "status": "PASS",
-  "tests": 37,
+  "tests": 38,
   "scope": "Local deterministic catalog, real disposable root filesystem and publisher; fake GitHub/systemd/Nginx/HTTPS where explicitly injected; not a production receipt",
   "production_changes": 0,
   "independent_review": "PENDING",

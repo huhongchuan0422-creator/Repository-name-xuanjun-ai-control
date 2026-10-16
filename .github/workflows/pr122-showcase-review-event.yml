@@ -3,7 +3,7 @@ on:
   issue_comment:
     types: [created]
 permissions:
-  contents: read
+  contents: write
   issues: read
   actions: write
 jobs:
@@ -12,12 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Bind a review event to the exact current canonical branch before dispatch
+      - name: Pin an immutable reviewed commit tag before dispatch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
-          import json,os,urllib.request
+          import json,os,re,urllib.request,urllib.error
           event=json.load(open(os.environ['GITHUB_EVENT_PATH']))
           comment=event['comment'];body=comment['body']
           assert body.startswith('XUANJUN_SHOWCASE_REVIEW\n')
@@ -25,16 +25,22 @@ jobs:
           assert review['reviewer_role']=='INDEPENDENT_AUDITOR'
           assert review['decision'] in ('PUBLIC_CONTENT_APPROVED','PUBLIC_CONTENT_REVOKED')
           repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
-          branch='feature/work-pr122-site-hub-integration-20261016'
+          commit=review['commit']
+          assert re.fullmatch(r'[0-9a-f]{40}',commit)
+          tag='pr122-reviewed-'+commit
           def call(path,data=None):
               raw=None if data is None else json.dumps(data).encode()
               request=urllib.request.Request('https://api.github.com/repos/'+repo+'/'+path,data=raw,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
               with urllib.request.urlopen(request,timeout=20) as response:
                   content=response.read();return json.loads(content) if content else None
-          head=call('git/ref/heads/'+branch)['object']['sha']
-          assert head==review['commit'],'Branch moved: obtain review of the new exact head; do not dispatch a different version'
           run=call('actions/runs/'+str(review['ci_run_id']))
-          assert run['head_sha']==head and run['conclusion']=='success' and run['workflow_id']==386249451
-          call('actions/workflows/pr122-site-hub-preflight.yml/dispatches',{'ref':branch,'inputs':{'showcase_review_ids':str(comment['id'])}})
+          assert run['head_sha']==commit and run['conclusion']=='success' and run['workflow_id']==386249451
+          try:
+              existing=call('git/ref/tags/'+tag)
+              assert existing['object']['type']=='commit' and existing['object']['sha']==commit,'Existing review tag identity mismatch'
+          except urllib.error.HTTPError as error:
+              if error.code!=404:raise
+              call('git/refs',{'ref':'refs/tags/'+tag,'sha':commit})
+          call('actions/workflows/pr122-site-hub-preflight.yml/dispatches',{'ref':tag,'inputs':{'showcase_review_ids':str(comment['id'])}})
           print('REVIEW_EVENT_DISPATCHED; PRODUCTION_CHANGES=0')
           PY

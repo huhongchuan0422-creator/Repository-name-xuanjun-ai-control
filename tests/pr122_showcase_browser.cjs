@@ -16,6 +16,7 @@ function htmlFiles(root,prefix='') {return fs.readdirSync(root,{withFileTypes:tr
  try{
   const context=await browser.newContext();
   await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
+  await context.route('**/assets/*.png',route=>route.fulfill({status:200,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j/kcAAAAASUVORK5CYII=','base64')}));
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|Refused to/.test(m.text()))errors.push(m.text());});
   page.on('response',r=>{if(r.status()>=400&&/\.(css|js|mjs)(\?|$)/.test(r.url()))resources.push(r.url());});
@@ -24,18 +25,23 @@ function htmlFiles(root,prefix='') {return fs.readdirSync(root,{withFileTypes:tr
    await page.setViewportSize({width,height:1000});
    for(const file of pages){
     const response=await page.goto(base+'/'+file);assert.equal(response.status(),200);
+    if(!file.includes('/views/'))assert.equal(await page.locator('.primary-nav .nav-group').count(),4);
     assert.equal(await page.locator('footer a[href="https://beian.miit.gov.cn/"]').count(),1);
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),file+' overflow '+width);
    }
   }
   await page.setViewportSize({width:1440,height:1000});await page.goto(base+'/showcase/projects/community-payment/');
   assert.equal(await page.locator('a[href="/showcase/projects/community-payment/views/merchant/v1/"]').count(),1);
+  assert.deepEqual(await page.locator('.primary-nav .nav-group>a').allTextContents(),['解决方案','功能市场','定制与交付','共创生态']);
+  await page.locator('.language>button').click();await page.locator('.language-panel a[lang="en"]').click();await page.waitForURL(base+'/showcase/en/projects/community-payment/');
+  assert.equal(await page.locator('html').getAttribute('lang'),'en');assert.doesNotMatch(await page.locator('main').innerText(),/[\u4e00-\u9fff]/);
+  await page.locator('.language>button').click();await page.locator('.language-panel a[lang="zh-CN"]').click();await page.waitForURL(base+'/showcase/projects/community-payment/');
   await page.screenshot({path:process.env.XJ_SHOWCASE_REPORT_DIR+'/SHOWCASE_PROJECT_DESKTOP.png',fullPage:true});
-  await page.setViewportSize({width:390,height:844});await page.screenshot({path:process.env.XJ_SHOWCASE_REPORT_DIR+'/SHOWCASE_PROJECT_MOBILE.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});await page.locator('.mobile-toggle').click();assert(await page.locator('.primary-nav').isVisible());await page.locator('.mobile-toggle').click();await page.screenshot({path:process.env.XJ_SHOWCASE_REPORT_DIR+'/SHOWCASE_PROJECT_MOBILE.png',fullPage:true});
   await page.goto(base+'/showcase/projects/community-payment/views/merchant/v1/');
   for(const merchant of ['grocer','cafe','home']){await page.locator('#merchantSelect').selectOption(merchant);assert.match(await page.locator('#merchantIdentity').innerText(),/模拟商家/);assert.equal(await page.locator('#orderRows tr').count(),3);}
   await page.screenshot({path:process.env.XJ_SHOWCASE_REPORT_DIR+'/SHOWCASE_MERCHANT_MOBILE.png',fullPage:true});
   assert.deepEqual(errors,[]);assert.deepEqual(resources,[]);
-  fs.writeFileSync(process.env.XJ_SHOWCASE_REPORT_DIR+'/SHOWCASE_BROWSER_REPORT.json',JSON.stringify({status:'PASS',scope:'Generated catalog and self-contained merchant on loopback fixture; not production HTTPS',pages:pages.length,viewports:[1440,390],project_navigation:'PASS',three_simulated_merchants:'PASS',js_errors:errors,failed_assets:resources,production_browser:'NOT_RUN'},null,2)+'\n');
+  fs.writeFileSync(process.env.XJ_SHOWCASE_REPORT_DIR+'/SHOWCASE_BROWSER_REPORT.json',JSON.stringify({status:'PASS',scope:'Generated catalog and self-contained merchant on loopback fixture; not production HTTPS',pages:pages.length,viewports:[1440,390],project_navigation:'PASS',official_header:'PASS',old_shell_images:'TEST_PLACEHOLDERS',three_simulated_merchants:'PASS',js_errors:errors,failed_assets:resources,production_browser:'NOT_RUN'},null,2)+'\n');
  } finally{await browser.close();server.kill('SIGTERM');}
 })().catch(e=>{console.error(e);server.kill('SIGTERM');process.exitCode=1;});
