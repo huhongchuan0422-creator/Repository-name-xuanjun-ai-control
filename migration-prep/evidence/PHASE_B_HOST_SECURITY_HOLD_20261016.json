@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "source_commit_installed": "632bbe6f204a2c9ef778d3c91e425593c079abb1",
+  "scope_approval": 6207630392,
+  "owner_receipt": true,
+  "root_session_directly_controlled_by_this_window": false,
+  "installer_invocations": 1,
+  "install_commit": "REPORTED_PASS",
+  "service": "REPORTED_DISABLED_INACTIVE_PID0",
+  "install_lock": "REPORTED_RELEASED",
+  "named_shared_unit_metadata": "REPORTED_UNCHANGED",
+  "transaction_sha256": "c79182446ab8c2e447cb6942061710fb4a864addb4b9718f967402ef8c30cfe2",
+  "private_logs": "/root/pr99-phaseb-632bbe6f",
+  "warnings": [
+    "UNKNOWN_LOADCREDENTIAL_LVALUE",
+    "BPF_CGROUP_FIREWALL_UNSUPPORTED_PROCEEDING_WITHOUT_FIREWALLING"
+  ],
+  "security_acceptance": "HOLD",
+  "new_source_scope": "FAIL_CLOSED_DIAGNOSTICS_NOT_A_COMPATIBLE_REPAIR",
+  "new_local_shell_tests": 17,
+  "root_retry_allowed": false,
+  "source_repair_deployed": false,
+  "namespace_support": "NOT_VERIFIED_ON_REAL_ROOT_HOST",
+  "phase_c": "NOT_AUTHORIZED",
+  "tokyo_retirement": "HOLD",
+  "independent_recovery_review": "WAIT_COMPLETE_RECOVERY_SCOPE_NOT_PIECEWISE"
+}

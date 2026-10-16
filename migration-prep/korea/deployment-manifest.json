@@ -4,21 +4,39 @@
   "production_authorized": false,
   "install_executed": false,
   "host": "iZmj7a5kwr75qc1tul4kf9Z",
-  "identity": {"user": "xuanjun_binance", "group": "xuanjun_binance", "login_shell": "/sbin/nologin"},
+  "identity": {
+    "user": "xuanjun_binance",
+    "group": "xuanjun_binance",
+    "login_shell": "/sbin/nologin"
+  },
   "directories": {
     "release_root": "/opt/xuanjun-binance",
     "state_root": "/var/lib/xuanjun-binance",
     "config_root": "/etc/xuanjun-binance",
     "log_root": "/var/log/xuanjun-binance"
   },
-  "runtime": {"python": "/usr/bin/python3.11", "venv": "/opt/xuanjun-binance/venv", "reuse_yibi_venv": false},
-  "secret_references": ["SecretRef:BINANCE_ACCOUNT_READONLY"],
-  "forbidden_secret_references": ["BINANCE_TRADING", "TRADING_CREDENTIAL_MASTER_KEY", "PLAINTEXT_ENV_SECRET"],
+  "runtime": {
+    "python": "/usr/bin/python3.11",
+    "venv": "/opt/xuanjun-binance/venv",
+    "reuse_yibi_venv": false
+  },
+  "secret_references": [
+    "SecretRef:BINANCE_ACCOUNT_READONLY"
+  ],
+  "forbidden_secret_references": [
+    "BINANCE_TRADING",
+    "TRADING_CREDENTIAL_MASTER_KEY",
+    "PLAINTEXT_ENV_SECRET"
+  ],
   "credential_scope_note": "PHASE_B_C_SHADOW_MUST_NOT_LOAD_A_MASTER_KEY_CAPABLE_OF_DECRYPTING_TRADING_CREDENTIAL_ROWS",
   "network": {
-    "destination_allowlist": ["fapi.binance.com:443"],
+    "destination_allowlist": [
+      "fapi.binance.com:443"
+    ],
     "resolved_ip_allowlist_source": "ROOT_OWNED_PINNED_CONFIG_REQUIRED_NOT_INSTALLED",
-    "application_method_allowlist": ["GET"],
+    "application_method_allowlist": [
+      "GET"
+    ],
     "unique_transport": "migration-prep/korea/get_only_policy.py:ControlledHttpsTransport",
     "redirect_policy": "DENY_ALL",
     "proxy_policy": "BYPASS_ENVIRONMENT_PROXY_RAW_SOCKET",
@@ -29,13 +47,20 @@
     "root_policy_status": "NOT_INSTALLED_NOT_PROVEN",
     "bypass_audit_status": "CANDIDATE_SOURCE_TESTED_RUNTIME_EGRESS_NOT_PROVEN"
   },
-  "services": ["xuanjun-binance-shadow.service"],
+  "services": [
+    "xuanjun-binance-shadow.service"
+  ],
   "entrypoint": "python -m korea.migration_shadow_entry --once --config /etc/xuanjun-binance/shadow.json",
   "persistent_production_launcher": "NOT_PROVEN_NOT_INCLUDED",
   "unit_install_state": "DISABLED_DENY_ALL_NO_IP_ALLOWLIST",
   "writer_enabled": false,
   "scheduler_enabled": false,
-  "loopback_ports": [18080, 18081, 19080, 19081],
+  "loopback_ports": [
+    18080,
+    18081,
+    19080,
+    19081
+  ],
   "shadow_acceptance": {
     "recommended_minimum_duration_seconds": 86400,
     "decision_mismatch_count": 0,
@@ -62,5 +87,15 @@
     "TOKYO_GET_ONLY_RECONCILED",
     "TOKYO_NEW_EPOCH_GRANTED"
   ],
-  "double_writer_allowed": false
+  "double_writer_allowed": false,
+  "host_acceptance_20261016": {
+    "installed_source_commit": "632bbe6f204a2c9ef778d3c91e425593c079abb1",
+    "owner_install_report": "COMMITTED_DISABLED_INACTIVE",
+    "transaction_sha256": "c79182446ab8c2e447cb6942061710fb4a864addb4b9718f967402ef8c30cfe2",
+    "security_acceptance": "HOLD_UNSUPPORTED_LOADCREDENTIAL_AND_BPF_FIREWALL",
+    "new_source_scope": "DIAGNOSTIC_FAIL_CLOSED_ONLY_NOT_HOST_REPAIR",
+    "compatible_repair": "NOT_IMPLEMENTED_NOT_AUTHORIZED",
+    "runtime_confinement": "NOT_EXERCISED",
+    "root_logs": "/root/pr99-phaseb-632bbe6f"
+  }
 }

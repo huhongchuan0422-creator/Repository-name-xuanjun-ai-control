@@ -50,7 +50,7 @@ esac
         self._write_executable("systemd-analyze", r'''#!/usr/bin/env bash
 set -eu
 root=${KOREA_CANDIDATE_TEST_ROOT:?}
-if [[ -n ${KOREA_TEST_MUTATE_TARGET:-} ]]; then
+if [[ -n ${KOREA_TEST_MUTATE_TARGET:-} && ${2##*/} != pr99-security-preflight.service ]]; then
   target="$root/${KOREA_TEST_MUTATE_TARGET}"
   case ${KOREA_TEST_MUTATE_KIND:-file} in
     file) printf '\n# injected identity change\n' >>"$target" ;;
@@ -66,6 +66,13 @@ if [[ -n ${KOREA_TEST_MUTATE_TARGET:-} ]]; then
     user) printf 'xuanjun_binance:x:1992:991::/var/lib/xuanjun-binance:/sbin/nologin\n' >"$root/test-passwd" ;;
     group) printf 'xuanjun_binance:x:1991:\n' >"$root/test-group" ;;
   esac
+fi
+if [[ -n ${KOREA_TEST_SYSTEMD_DIAGNOSTIC:-} && ( ${KOREA_TEST_DIAGNOSTIC_ONLY_INSTALLED:-0} != 1 || ${2##*/} != pr99-security-preflight.service ) ]]; then
+  printf '%s\n' "$KOREA_TEST_SYSTEMD_DIAGNOSTIC" >&2
+fi
+if [[ ${2##*/} == pr99-security-preflight.service ]]; then
+  if [[ -n ${KOREA_TEST_CAPTURE_PROBE:-} ]]; then /bin/cp -- "$2" "$KOREA_TEST_CAPTURE_PROBE"; fi
+  exit "${KOREA_TEST_PREFLIGHT_EXIT:-0}"
 fi
 exit "${KOREA_TEST_SYSTEMD_ANALYZE_EXIT:-0}"
 ''')
@@ -168,6 +175,60 @@ set -eu
         manifest_path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
         manifest_path.chmod(0o600)
         return hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
+    def test_zero_exit_security_warnings_reject_before_install_mutation(self):
+        cases=(
+            ("Unknown lvalue 'LoadCredential' in section 'Service'", "SYSTEMD_UNSUPPORTED_DIRECTIVE"),
+            ("Proceeding WITHOUT firewalling in effect!", "SYSTEMD_IP_FIREWALL_UNAVAILABLE"),
+            ("local system does not support BPF/cgroup based firewalling", "SYSTEMD_IP_FIREWALL_UNAVAILABLE"),
+            ("unclassified diagnostic SYNTHETIC_PRIVATE_VALUE", "SYSTEMD_VERIFY_DIAGNOSTICS_REQUIRE_REVIEW"),
+        )
+        for diagnostic,reason in cases:
+            with self.subTest(reason=reason):
+                env=dict(self.env,KOREA_TEST_SYSTEMD_DIAGNOSTIC=diagnostic)
+                result=self._run_install(env=env)
+                self.assertEqual(result.returncode,2,result.stderr)
+                self.assertIn(reason,result.stderr)
+                self.assertNotIn('STATUS=PASS',result.stdout+result.stderr)
+                self.assertNotIn('SYNTHETIC_PRIVATE_VALUE',result.stdout+result.stderr)
+                for path in ('opt/xuanjun-binance','etc/xuanjun-binance','var/lib/xuanjun-binance',
+                             'var/log/xuanjun-binance','run/xuanjun-binance-install.lock','test-passwd','test-group'):
+                    self.assertFalse(os.path.lexists(self.root/path),path)
+
+    def test_nonzero_security_verify_rejects_before_install_lock(self):
+        result=self._run_install(env=dict(self.env,KOREA_TEST_PREFLIGHT_EXIT='9'))
+        self.assertEqual(result.returncode,2)
+        self.assertIn('SYSTEMD_SECURITY_VERIFY_FAILED',result.stderr)
+        self.assertFalse((self.root/'run/xuanjun-binance-install.lock').exists())
+        self.assertFalse((self.root/'opt/xuanjun-binance').exists())
+
+    def test_existing_check_refuses_zero_exit_security_diagnostic_without_changes(self):
+        first=self._run_install()
+        self.assertEqual(first.returncode,0,first.stderr)
+        paths=[self.root/'etc/xuanjun-binance/install-transaction.json',
+               self.root/'etc/systemd/system/xuanjun-binance-shadow.service']
+        before={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+        for diagnostic,reason in (("Unknown lvalue 'LoadCredential'",'SYSTEMD_UNSUPPORTED_DIRECTIVE'),
+                                  ('Proceeding WITHOUT firewalling in effect!','SYSTEMD_IP_FIREWALL_UNAVAILABLE')):
+            env=dict(self.env,KOREA_TEST_SYSTEMD_DIAGNOSTIC=diagnostic)
+            result=subprocess.run([str(self.candidate/'migration-prep/korea/check-candidate.sh'),
+                '--expected-transaction',str(paths[0]),'--expected-manifest-sha256',self.manifest_sha],
+                capture_output=True,text=True,env=env,timeout=30)
+            self.assertEqual(result.returncode,2,result.stderr)
+            self.assertIn(reason,result.stderr)
+            self.assertNotIn('STATUS=PASS',result.stdout+result.stderr)
+            self.assertEqual(before,{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths})
+
+    def test_security_probe_uses_no_runtime_or_real_credential_paths(self):
+        capture=self.base/'probe-copy.service'
+        result=self._run_install(env=dict(self.env,KOREA_TEST_CAPTURE_PROBE=str(capture)))
+        self.assertEqual(result.returncode,0,result.stderr)
+        text=capture.read_text()
+        self.assertIn('ExecStart=/bin/true',text)
+        self.assertIn('LoadCredential=pr99_probe_key:/dev/null',text)
+        self.assertNotIn('/etc/xuanjun-binance/secretref/',text)
+        self.assertNotIn('ExecStart=/opt/',text)
+        self.assertIn('RUNTIME_CONFINEMENT=NOT_EXERCISED',result.stdout)
 
     def test_same_version_is_idempotent_but_different_version_holds(self):
         first = self._run_install()

@@ -56,6 +56,11 @@ python3.11 "${candidate_root}/migration-prep/korea/validate_runtime_candidate.py
   "$candidate_root" --expected-manifest-sha256 "$expected_manifest" >/dev/null || fail INPUT_VALIDATION_FAILED
 printf 'SOURCE_MANIFEST_CONTENT_PASS\n'
 
+stage=SECURITY_CAPABILITY_PREFLIGHT
+bash "${candidate_root}/migration-prep/korea/check-candidate.sh" --security-preflight \
+  "${candidate_root}/migration-prep/korea/xuanjun-binance-shadow.service.in" || fail SECURITY_CAPABILITY_PREFLIGHT_FAILED
+stage=NO_SIDE_EFFECT_PREFLIGHT
+
 python3.11 - "$root_prefix" "$test_mode" <<'PY' || fail TARGET_AND_IDENTITY_PREFLIGHT_FAILED
 import grp, os, pwd, stat, sys
 prefix, test_mode = sys.argv[1], sys.argv[2] == "1"

@@ -120,3 +120,47 @@ one terminal-state finalizer.  It releases and verifies the attempt-owned lock
 before setting the committed state or printing `STATUS=PASS`.  A retained or
 identity-changed lock instead exits nonzero with `CLEANUP=PARTIAL`; on re-entry,
 the pre-existing valid installation and transaction are preserved unchanged.
+
+
+## 2026-10-16 real Phase-B host warning / false-success correction
+
+Owner-root installed exact632bbe6f once under review6207630392; transaction
+install-f887b085508e3ed4 SHA256c79182446ab8c2e447cb6942061710fb4a864addb4b9718f967402ef8c30cfe2.
+The candidate is disabled/inactive/PID0 and the install lock was released.
+This commits installation only: host security acceptance is HOLD. The actual
+verify output reported unknown LoadCredential directives and no BPF/cgroup
+firewall support, explicitly proceeding without firewalling. Exit0 and an
+IPAddressDeny line did not establish enforcement; the former PASS must not be
+used as a Phase-C or network-isolation approval.
+
+The source correction adds a diagnostic-sensitive preflight before install
+locks/identities/targets and the same refusal during installed checks. A private
+synthetic unit uses /bin/true and /dev/null credential references; verify does
+not start it, access a provider, import runtime or read real credential files.
+All nonempty verify diagnostics fail closed, including zero-exit warnings.
+NO_NETWORK in the old check describes the import self-check, not actual kernel
+enforcement; the new output explicitly says RUNTIME_CONFINEMENT=NOT_EXERCISED.
+Synthetic adapters test refusal/cleanup and do not establish host capability.
+
+This patch is NOT a repair installer, compatible fallback unit, authorized
+upgrade or proof that the old host can enforce isolation. Do not rerun the
+new installer on the installed target; do not edit its release/unit/transaction
+or stop existing business services. Preserve /root/pr99-phaseb-632bbe6f and the
+old17-file release as evidence. No automatic cleanup or uninstall is proposed.
+
+A complete minimal recovery remains pending actual host capabilities. Prefer
+an offline-only private network namespace if the real kernel and unit manager
+support it; test only a short-lived, no-packet child namespace through the
+existing Owner-root terminal. Do not infer support from the directive text or
+change global firewall/kernel/systemd. A fallback must bind exact unit and
+transaction changes, existing-source hashes, backups, rollback/failure states
+and continued disabled/inactive status in one review before deployment.
+Credential delivery for Phase-C remains separate: removing an unsupported
+LoadCredential line is not a credential-custody implementation. No Shadow,
+exchange request, credentials, database copy, Finance/Writer or Tokyo action is
+authorized. R2 lock-finalization and R6 approvals remain inherited; their code
+is not rewritten for this compatibility issue.
+
+Primary directive reference: https://github.com/systemd/systemd/blob/main/man/systemd.exec.xml
+LoadCredential was introduced in v247; PrivateNetwork is a different isolation
+mechanism and is only a possible offline fallback, not yet accepted on this host.

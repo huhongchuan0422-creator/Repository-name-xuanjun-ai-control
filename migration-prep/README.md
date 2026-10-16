@@ -90,3 +90,10 @@ bash -n通过；helper额外参数拒绝(exit2)通过。非目标主机拒绝另
 新工作流不再公开sudo -l正文，仅记录可读取结果。
 root_policy_audit.py是只读Root审计候选，不通过Runner自动执行：用visudo本身枚举实际解析来源，检查每个来源文件及父路径所有者、权限及软链，核对固定helper摘要，验证当前githubrunner只存在固定零参数grant及env_reset，拒绝广泛/多重grant、危险环境规则和检查期间源文件变化。仅输出数量、限定结果与hash，不输出策略正文或凭据。
 该检查不是完整sudoers语义证明；输出full_sudoers_semantic_audit=NOT_VERIFIED。不能据此关闭全部规则/环境审计，更不能替代Runner全局访问政策。私有Root主机执行尚未进行，本地5项拒绝/合法路径测试通过；Hosted另取得回执。Python3.6语法兼容但实机解释器尚未验收。
+
+
+## 2026-10-16 韩国Phase-B实机安装已提交，安全验收HOLD
+
+Owner按独审6207630392执行一次准确632bbe6f安装，事务install-f887b085508e3ed4，SHA256c79182446ab8c2e447cb6942061710fb4a864addb4b9718f967402ef8c30cfe2；disabled/inactive/PID0/锁释放和六命名单元元数据未变均有Owner输出。现场同时出现LoadCredential未知及BPF/cgroup防火墙无效的明确告警，因此不能接受旧检查器末尾的PHASE_B=PASS作隔离通过；当前PHASE_B_SECURITY_ACCEPTANCE=HOLD，Phase-C与东京退役仍HOLD。完整结果见原PR99#6207782855。
+
+本批只修正源码检查器的零退出告警误报并增加首次锁/用户/目标变更之前的能力预检，新17项Shell专项本地通过。真实兼容隔离方案仍需主机能力验证、准确修复计划与独审后才能执行；不覆盖/重装现有现场，不升级全机systemd/kernel或改全局防火墙。新的源码未部署，不重复已关闭R2/R6的独立审核。未变原137测试作为历史基线保留；源变更按既有CI自动验证，不冒充重复的root验收。

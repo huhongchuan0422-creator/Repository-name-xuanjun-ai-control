@@ -1,9 +1,9 @@
 {
-  "audit_comment": "6182780546",
-  "base_commit": "fc05abeb25bc49437a30a0df5b3406fba1fa0442",
-  "base_tree": "0ce639f1a84713b6e157e1adbd0121a9716b6cdd",
+  "audit_comment": "6206991380",
+  "base_commit": "632bbe6f204a2c9ef778d3c91e425593c079abb1",
+  "base_tree": "59a48168764e8465e62fd17a55504c29812365b3",
   "binance_called": false,
-  "candidate_content_sha256": "bf648bf5363051a1d37e04b9e92c58cc0b7f70d5693babf8fea5f02bf9f1aa51",
+  "candidate_content_sha256": "2f191af416d90410e187e671dfe55bfb68b3ec326d7c5d9bad1ce56ec6aceab0",
   "canonical_migration_policy_enforced": true,
   "files": [
     {
@@ -73,13 +73,13 @@
     },
     {
       "path": "migration-prep/korea/deployment-manifest.json",
-      "sha256": "0b0720616aed7f19130817ec722807b8cdbfa97e4daf1541a131973f59f7a489",
-      "size": 2927
+      "sha256": "e53fe8f2b60f84d38b9db4b1c2dc96b75cb562c6f603485d152cecc0de6ec989",
+      "size": 3599
     },
     {
       "path": "migration-prep/korea/DEPLOYMENT.md",
-      "sha256": "b99f061fc8a69f1c2729cd4d6144976a2ba457906f9b9331ab653edd32441fff",
-      "size": 7689
+      "sha256": "71d4aee06f9e1a94743d2fcb1dc49e1f58cda2b5494d8455ff1c34b69a9e9703",
+      "size": 10522
     },
     {
       "path": "migration-prep/c7_acceptance.py",
@@ -193,8 +193,8 @@
     },
     {
       "path": "migration-prep/test_korea_install_shell_behavior.py",
-      "sha256": "05c4f5d458b46eab88ffaaeb156e2123b75e23e1c515fc83ba528dc1e9baf3c5",
-      "size": 23000
+      "sha256": "4fc71cc1390f112fd69b7d7449417761eb328e57df7e24d1a05d63cdf9a6fe04",
+      "size": 27073
     },
     {
       "path": "migration-prep/korea/__init__.py",
@@ -243,13 +243,13 @@
     },
     {
       "path": "migration-prep/korea/install-candidate.sh",
-      "sha256": "a94254f339d865514620701348cdbb2fa504ee6796deefe85b6d6eede8179938",
-      "size": 19234
+      "sha256": "96482082bb735c9a8b1c9fcf4b456593b6c0363ac2815fa3e684b86d964ae70a",
+      "size": 19512
     },
     {
       "path": "migration-prep/korea/check-candidate.sh",
-      "sha256": "7750f2a58ef561b56f8a419382bbdc078042b34139d2dca4274db300c721d59b",
-      "size": 4328
+      "sha256": "5cd2c56dff086b10a0ec9d8e4ccc5699279738fe2d8b6bcc6bb51812a0835441",
+      "size": 5972
     },
     {
       "path": "migration-prep/korea/uninstall-candidate.sh",
@@ -258,10 +258,12 @@
     },
     {
       "path": "migration-prep/korea/minimal-runtime-manifest.json",
-      "sha256": "f887b085508e3ed4831dbed22152e35af5e8aba95b85b899b4697c61449917de",
+      "sha256": "4a6c60c4393f088332240932d532c30bc78857479b1aaeae4e10a4a63288e10d",
       "size": 3838
     }
   ],
+  "host_outcome_comment": "6207782855",
+  "host_security_acceptance": "HOLD_UNSUPPORTED_SECURITY_CAPABILITIES",
   "legacy_package_execution_accepted": false,
   "persistent_production_launcher_proven": false,
   "production_authorized": false,
