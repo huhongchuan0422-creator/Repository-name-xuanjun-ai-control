@@ -15,3 +15,20 @@ class TestIntakePages(unittest.TestCase):
    self.assertIn(x,html)
   self.assertIn('未接入客户真实登录',html)
 if __name__=='__main__':unittest.main()
+
+ def test_review_actions_explicitly_forbidden_in_customer_demo(self):
+  js=(ROOT/'demos/customer-intake/project-intake.js').read_text(encoding='utf-8')
+  self.assertIn('kind!=="save"&&kind!=="submit"',js)
+  self.assertIn('x.minimum_permissions',js)
+  self.assertIn('x.reviewer_role',js)
+ def test_authoritative_guide_mirror(self):
+  import json,re
+  doc=json.loads((ROOT/'docs/customer-intake/project-requirements.v1.json').read_text(encoding='utf-8'))
+  js=(ROOT/'demos/customer-intake/project-intake.js').read_text(encoding='utf-8')
+  m=re.search(r'const guides=(\[.*?\]);\s*const REQUIREMENTS=',js,re.S)
+  self.assertIsNotNone(m)
+  mirrored=json.loads(m.group(1))
+  self.assertEqual([x['id'] for x in mirrored],[x['id'] for x in doc['items']])
+  for source,view in zip(doc['items'],mirrored):
+   for original,rendered in [('title','title'),('materials','materials'),('instructions','instructions'),('official_url','url'),('submission_type','method'),('purpose','purpose'),('minimum_permissions','minimum_permissions'),('expiry_policy','expiry_policy'),('reviewer_role','reviewer_role'),('verification_method','verification_method'),('fallback','fallback'),('steps','steps')]:
+    self.assertEqual(source[original],view[rendered])
