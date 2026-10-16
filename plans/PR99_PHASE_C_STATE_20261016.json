@@ -722,6 +722,12 @@
         "retry_allowed_under_old_permission": false,
         "owner_requested_reexecution": true,
         "secret_values_omitted": true
+      },
+      "replacement_permission_request": {
+        "comment_id": 6218181967,
+        "read_back": true,
+        "status": "PENDING",
+        "scope": "SAME_FROZEN_VERSION_EXACT_FAILED_AUTH_HANDOFF_NEW_ONCE_PERMISSION"
       }
     }
   },
