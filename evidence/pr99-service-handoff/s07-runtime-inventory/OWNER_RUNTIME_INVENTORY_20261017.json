@@ -1,0 +1,559 @@
+{
+  "application_imports": 0,
+  "database_or_config_or_key_files_opened": false,
+  "environment_values_disclosed": false,
+  "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_NOT_DIRECT_HOST_LOGIN",
+  "evidence_scope": "RECEIVED_PRIVATE_COPIES_STATIC_SYNTAX_ONLY",
+  "network_requests": 0,
+  "owner_launch_directory": "/root/pr99-s07-runtime-inventory.8no57zD5",
+  "production_cutover": false,
+  "runtime_closure_proven": false,
+  "script_sha256": "295b3e4df882793978042edcb3222c1068c493a9a33e47370ae8558d37095134",
+  "service_actions": 0,
+  "source_clues": {
+    "ai_service/common_brain.py": {
+      "environment_variable_names": [
+        "MODEL_PROVIDER_RATE_CARD_PATH"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "candidate.read_text",
+          "line": 709
+        }
+      ],
+      "literal_path_clues": [
+        "/opt/trading-system/config/model_provider_rate_cards.json",
+        "model_provider_rate_cards.json"
+      ]
+    },
+    "ai_service/customer_context_core.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "AUTHORITATIVE_REFERRAL_CONFIG_PATH.read_text",
+          "line": 2456
+        }
+      ],
+      "literal_path_clues": [
+        "/home/admin/.openclaw/workspace/xuanjun-agent-coordination/CUSTOMER_REFERRAL_CONFIG.json",
+        "CUSTOMER_REFERRAL_CONFIG.json"
+      ]
+    },
+    "ai_service/domestic_deployment_package.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [],
+      "literal_path_clues": [
+        ".env"
+      ]
+    },
+    "ai_service/domestic_model_provider_canary.py": {
+      "environment_variable_names": [
+        "MODEL_PROVIDER_RESTRICTED_RPC_ENABLED",
+        "MODEL_PROVIDER_RPC_CERT_SHA256",
+        "MODEL_PROVIDER_RPC_HOST",
+        "MODEL_PROVIDER_RPC_PORT",
+        "MODEL_PROVIDER_RPC_SECRET_DIR",
+        "MODEL_PROVIDER_RPC_SECRET_FILE",
+        "MODEL_PROVIDER_TRANSPORT",
+        "OPERATIONS_SECRET_ROOT"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "metadata_path.read_text",
+          "line": 1113
+        },
+        {
+          "call": "value_path.read_text",
+          "line": 1121
+        }
+      ],
+      "literal_path_clues": [
+        ".json"
+      ]
+    },
+    "ai_service/domestic_packaging_artifact.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.open",
+          "line": 78
+        },
+        {
+          "call": "target.parent.mkdir",
+          "line": 107
+        },
+        {
+          "call": "path.read_text",
+          "line": 119
+        },
+        {
+          "call": "path.read_text",
+          "line": 179
+        },
+        {
+          "call": "path.read_text",
+          "line": 206
+        },
+        {
+          "call": "sums_path.write_text",
+          "line": 229
+        },
+        {
+          "call": "report_path.write_text",
+          "line": 273
+        },
+        {
+          "call": "payload_root.mkdir",
+          "line": 289
+        },
+        {
+          "call": "manifest_path.write_text",
+          "line": 338
+        },
+        {
+          "call": "manifest_path.write_text",
+          "line": 353
+        },
+        {
+          "call": "manifest_sha_path.write_text",
+          "line": 359
+        }
+      ],
+      "literal_path_clues": [
+        "manifest.json"
+      ]
+    },
+    "ai_service/internal_provider_neutral_bridge.py": {
+      "environment_variable_names": [
+        "DOMESTIC_BRIDGE_CUSTOMER_STATE"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "secret_path.read_text",
+          "line": 123
+        },
+        {
+          "call": "self.state_path.read_text",
+          "line": 283
+        },
+        {
+          "call": "self.state_path.parent.mkdir",
+          "line": 288
+        },
+        {
+          "call": "tmp.write_text",
+          "line": 290
+        },
+        {
+          "call": "self.audit_path.parent.mkdir",
+          "line": 838
+        },
+        {
+          "call": "self.audit_path.open",
+          "line": 839
+        }
+      ],
+      "literal_path_clues": [
+        "/home/openclaw_ops/v8-domestic-operations/runtime/internal-bridge/state/customer_service_state.json"
+      ]
+    },
+    "ai_service/model_immutable_boundary.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "EXPRESSION.open",
+          "line": 98
+        },
+        {
+          "call": "config_file.read_text",
+          "line": 110
+        }
+      ],
+      "literal_path_clues": [
+        "/home/admin/.openclaw/agents/main/agent/models.json",
+        "/home/admin/.openclaw/openclaw.json"
+      ]
+    },
+    "ai_service/provider_health_alert.py": {
+      "environment_variable_names": [
+        "PROVIDER_HEALTH_ALERT_ENABLED"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "self.target_file.read_text",
+          "line": 198
+        },
+        {
+          "call": "self.state_file.read_text",
+          "line": 219
+        },
+        {
+          "call": "self.state_file.parent.mkdir",
+          "line": 231
+        },
+        {
+          "call": "self.audit_file.parent.mkdir",
+          "line": 266
+        },
+        {
+          "call": "self.audit_file.open",
+          "line": 273
+        }
+      ],
+      "literal_path_clues": [
+        "/home/admin/.openclaw/openclaw.json",
+        "provider_health_state.json"
+      ]
+    },
+    "ai_service/restricted_rpc_openai_shim.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "open",
+          "line": 424
+        }
+      ],
+      "literal_path_clues": []
+    },
+    "ai_service/secure_secrets_portal.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.parent.mkdir",
+          "line": 525
+        },
+        {
+          "call": "path.parent.mkdir",
+          "line": 540
+        },
+        {
+          "call": "directory.mkdir",
+          "line": 598
+        },
+        {
+          "call": "value_path.read_text",
+          "line": 645
+        },
+        {
+          "call": "self.audit_file.open",
+          "line": 653
+        },
+        {
+          "call": "metadata_path.read_text",
+          "line": 661
+        },
+        {
+          "call": "self.root.mkdir",
+          "line": 673
+        },
+        {
+          "call": "path.read_text",
+          "line": 730
+        },
+        {
+          "call": "path.read_text",
+          "line": 734
+        },
+        {
+          "call": "os.open",
+          "line": 743
+        }
+      ],
+      "literal_path_clues": [
+        ".json"
+      ]
+    },
+    "ai_service/telegram_customer_service_canary.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.parent.mkdir",
+          "line": 127
+        },
+        {
+          "call": "path.read_text",
+          "line": 148
+        },
+        {
+          "call": "BRIDGE_CERT_PIN_FILE.read_text",
+          "line": 232
+        },
+        {
+          "call": "self.path_file.read_text",
+          "line": 273
+        },
+        {
+          "call": "self.secret_file.read_text",
+          "line": 287
+        },
+        {
+          "call": "self.secret_file.read_text",
+          "line": 339
+        },
+        {
+          "call": "self.secret_file.read_text",
+          "line": 409
+        },
+        {
+          "call": "lock_path.parent.mkdir",
+          "line": 787
+        },
+        {
+          "call": "lock_path.open",
+          "line": 789
+        }
+      ],
+      "literal_path_clues": [
+        "state.json"
+      ]
+    },
+    "ai_service/wecom_connectivity_canary.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "metadata_path.read_text",
+          "line": 132
+        },
+        {
+          "call": "value_path.read_text",
+          "line": 140
+        }
+      ],
+      "literal_path_clues": [
+        ".json"
+      ]
+    },
+    "ai_service/wecom_customer_contact_service.py": {
+      "environment_variable_names": [
+        "WECOM_CONTACT_HOST",
+        "WECOM_CONTACT_PORT"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "self.runtime_root.mkdir",
+          "line": 61
+        },
+        {
+          "call": "self.audit_path.open",
+          "line": 164
+        }
+      ],
+      "literal_path_clues": []
+    },
+    "ai_service/wecom_customer_service.py": {
+      "environment_variable_names": [
+        "WECOM_KF_HOST",
+        "WECOM_KF_PORT"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.parent.mkdir",
+          "line": 74
+        },
+        {
+          "call": "self.runtime_root.mkdir",
+          "line": 227
+        },
+        {
+          "call": "EXPRESSION.read_text",
+          "line": 237
+        },
+        {
+          "call": "self.state_path.read_text",
+          "line": 406
+        },
+        {
+          "call": "self.audit_path.open",
+          "line": 419
+        }
+      ],
+      "literal_path_clues": [
+        "state.json"
+      ]
+    },
+    "crm/channel_referral_attribution.py": {
+      "environment_variable_names": [
+        "CUSTOMER_REFERRAL_CONFIG_PATH"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.read_text",
+          "line": 57
+        }
+      ],
+      "literal_path_clues": [
+        "/home/admin/.openclaw/workspace/xuanjun-agent-coordination/CUSTOMER_REFERRAL_CONFIG.json",
+        "/home/openclaw_ops/v8-domestic-operations/config/customer-referral/CUSTOMER_REFERRAL_CONFIG.json"
+      ]
+    },
+    "database/connection.py": {
+      "environment_variable_names": [
+        "TRADING_DATABASE_URL"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "create_engine",
+          "line": 22
+        }
+      ],
+      "literal_path_clues": [
+        "trading.db"
+      ]
+    },
+    "douyin/open_api_foundation.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.parent.mkdir",
+          "line": 112
+        },
+        {
+          "call": "self.root.mkdir",
+          "line": 131
+        },
+        {
+          "call": "path.read_text",
+          "line": 171
+        },
+        {
+          "call": "self.root.mkdir",
+          "line": 265
+        },
+        {
+          "call": "self.state_path.read_text",
+          "line": 282
+        }
+      ],
+      "literal_path_clues": [
+        ".json",
+        "douyin_token_lifecycle.json"
+      ]
+    },
+    "knowledge/service.py": {
+      "environment_variable_names": [
+        "KNOWLEDGE_SOURCE_PATH"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.read_text",
+          "line": 292
+        }
+      ],
+      "literal_path_clues": [
+        "production_knowledge_v1.json"
+      ]
+    },
+    "scripts/secure_secrets_portal_server.py": {
+      "environment_variable_names": [
+        "TRADING_CREDENTIAL_MASTER_KEY"
+      ],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.mkdir",
+          "line": 96
+        },
+        {
+          "call": "DEFAULT_CREDENTIAL_ENV_FILE.read_text",
+          "line": 104
+        },
+        {
+          "call": "TIKTOK_APP_ICON_PATH.read_bytes",
+          "line": 1270
+        }
+      ],
+      "literal_path_clues": [
+        "credential-store.env"
+      ]
+    },
+    "tiktok/open_api_foundation.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.parent.mkdir",
+          "line": 109
+        },
+        {
+          "call": "self.root.mkdir",
+          "line": 128
+        },
+        {
+          "call": "path.read_text",
+          "line": 168
+        },
+        {
+          "call": "self.root.mkdir",
+          "line": 249
+        },
+        {
+          "call": "self.state_path.read_text",
+          "line": 283
+        },
+        {
+          "call": "self.account_path.read_text",
+          "line": 287
+        }
+      ],
+      "literal_path_clues": [
+        ".json",
+        "tiktok_account_binding.json",
+        "tiktok_token_lifecycle.json"
+      ]
+    },
+    "trading_execution/business_fee_foundation.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "path.read_text",
+          "line": 200
+        }
+      ],
+      "literal_path_clues": [
+        "CUSTOMER_REFERRAL_CONFIG.json"
+      ]
+    },
+    "trading_execution/fomc_blackout.py": {
+      "environment_variable_names": [],
+      "io_or_dynamic_call_sites": [
+        {
+          "call": "open",
+          "line": 111
+        }
+      ],
+      "literal_path_clues": [
+        "/opt/trading-system/config/fomc_calendar.json"
+      ]
+    }
+  },
+  "source_commit": "442a70918965bb39faf9d0cd54aaaae8db0bfde1",
+  "source_files": 79,
+  "status": "S07_RECEIVED_RUNTIME_STATIC_INVENTORY",
+  "units": {
+    "secure-secrets-portal.service": {
+      "Group": "admin",
+      "User": "admin",
+      "WorkingDirectory": "/opt/trading-system",
+      "inline_environment_variable_names": [
+        "PYTHONPATH"
+      ],
+      "unit_sha256": "3023bd5152e1bc26f35cea3ee1cf8196a67c69a736faad7ecf53887882dad0a7"
+    },
+    "xuanjun-wecom-customer-contact.service": {
+      "Group": "admin",
+      "User": "admin",
+      "WorkingDirectory": "/opt/trading-system",
+      "inline_environment_variable_names": [
+        "PYTHONPATH"
+      ],
+      "unit_sha256": "f855698347cc734112d6abd102773eb1a39444a332a90a503f8a4f746ecec5aa"
+    },
+    "xuanjun-wecom-customer-service.service": {
+      "Group": "admin",
+      "User": "admin",
+      "WorkingDirectory": "/opt/trading-system",
+      "inline_environment_variable_names": [
+        "PYTHONPATH"
+      ],
+      "unit_sha256": "53669b3e6e5646f22b512df5e9dd14feef0796fcd0ac4cb336161c83aa876791"
+    }
+  }
+}
