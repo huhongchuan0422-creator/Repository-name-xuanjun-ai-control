@@ -560,6 +560,12 @@
       "bound_files": 5,
       "regular_members": 6
     },
-    "approval_request": "PENDING_POST_CONSOLIDATED_COMMENT"
+    "approval_request": {
+      "comment_id": 6215860038,
+      "read_back": true,
+      "decision": "PENDING",
+      "exact_candidate": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
+      "evidence_commit": "9fbd573852eea301268575c750cda1f2f904321d"
+    }
   }
 }
