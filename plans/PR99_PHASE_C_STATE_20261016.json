@@ -990,11 +990,19 @@
           "scope": "ROOT_AND_THREE_UNIT_PATHS_ONLY_DEEPER_PATHS_NOT_PROVEN",
           "next_script": "evidence/pr99-service-handoff/s07-runtime-materials/inspect_all_candidate_paths.py",
           "source_commit": "ceb3942afd8db530540ddc485d7eab7c893a9af3",
-          "script_sha256": "a089bfa39d6fee38f866000e80861d384bb2a2352c66eab569f7c796c7efa054",
+          "script_sha256": "6d68a59982d41dbba710a8735690026a7ba1d9917367e0101c2c97f0dc41755e",
           "local_checks": "PARENT_LINK_NESTED_LINK_NO_CONTENT_MISSING_PATH_AND_COMPILE_PASS",
           "hosted_ci": "NOT_RUN",
           "host_execution": "NOT_RUN",
-          "symlink_guard_relaxed": false
+          "symlink_guard_relaxed": false,
+          "hash_correction": {
+            "incorrect_previous_sha256": "a089bfa39d6fee38f866000e80861d384bb2a2352c66eab569f7c796c7efa054",
+            "cause": "LOCAL_TEST_HEREDOC_ADDED_ONE_EXTRA_TRAILING_NEWLINE_TO_GITHUB_BYTES",
+            "github_bytes": 4933,
+            "github_original_re_read": true,
+            "owner_old_check": "FAILED_BEFORE_EXECUTION_NO_TOKYO_CONNECTION",
+            "script_source_changed": false
+          }
         }
       }
     }
