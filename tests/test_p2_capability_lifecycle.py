@@ -19,8 +19,23 @@ SELECTED_ARCHIVE_SIZE=1056853
 SELECTED_ARCHIVE_SHA='6244cca1b41037b7c240f71b93f867c5660a770d451c4a5a661b283f61ce819e'
 SELECTED_MANIFEST_SHA='6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030'
 SELECTED_ENTRY_SHA='071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5'
-COMPILER_SOURCE_COMMIT='ef21ca95331769622c294c65bb60ec7ceed0c392'
-COMPILER_SOURCE_TREE='5a70c5627afe75fcd475c20e71ee9bfb0b6a156d'
+BASELINE_SOURCE_COMMIT='ef21ca95331769622c294c65bb60ec7ceed0c392'
+BASELINE_SOURCE_TREE='5a70c5627afe75fcd475c20e71ee9bfb0b6a156d'
+# Immutable source identity is separate from the later current checkout HEAD.
+COMPILER_SOURCE_COMMIT='105996ed06a0bdb5d025914cf08ebd448425f739'
+COMPILER_SOURCE_TREE='343d315b3ead6266a626b5875dbdd6c2fa0309af'
+DEPENDENCY_PUBLICATION_COMMIT='e2df38160e635af96dcfd63a1b75cf64671e4935'
+DEPENDENCY_PUBLICATION_TREE='ac85f40c5717ccf147606d265808e629127cc918'
+SUCCESSOR_ARCHIVE_PATH=PUBLIC_PREFIX+'artifact/epoch7-kit-claim-lifecycle.tar.gz'
+SUCCESSOR_ARCHIVE_TARGET=CANDIDATE_TARGET+'/artifact/epoch7-kit-claim-lifecycle.tar.gz'
+SUCCESSOR_MANIFEST_PATH=PUBLIC_PREFIX+'artifact/recovery-kit-manifest.json'
+SUCCESSOR_REPORT_PATH=PUBLIC_PREFIX+'artifact/build-result.json'
+SUCCESSOR_ARCHIVE_SIZE=1074448
+SUCCESSOR_ARCHIVE_SHA='bd3708d5887c4dc2b866e9e0acb04da426e71ad88d89c23fe2576b5ed943a2c3'
+SUCCESSOR_MANIFEST_SHA='91252ba75c38b4a6d12f9b64eb06cb8793fabd97f03646bece97224178c28392'
+SUCCESSOR_ENTRY_SHA='21a982161bc4cb8ffd7e67e4b9a8e24bf23916df6d78c3dd43376af3cfb34890'
+SUCCESSOR_ENTRY_BYTES=56593
+
 KIT_TARGET=CANDIDATE_TARGET+'/baseline'
 SUITE_NAMES=('collector','preflight','routing','factory','census','transactions','lifecycle','preparation','delivery','builder')
 SUITES=(('collector', 26),
@@ -30,7 +45,7 @@ SUITES=(('collector', 26),
  ('census', 12),
  ('transactions', 55),
  ('lifecycle', 40),
- ('preparation', 30),
+ ('preparation', 31),
  ('delivery', 47),
  ('builder', 50))
 PINS_BOUND=True
@@ -40,6 +55,9 @@ SOURCE_TARGETS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/C_TRANSACTION_SEMANTICS.md': 'c-capability-lifecycle-candidate/C_TRANSACTION_SEMANTICS.md',
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/README.md': 'c-capability-lifecycle-candidate/README.md',
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/SOURCE_IDENTITY.json': 'c-capability-lifecycle-candidate/SOURCE_IDENTITY.json',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/artifact/build-result.json': 'c-capability-lifecycle-candidate/artifact/build-result.json',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/artifact/epoch7-kit-claim-lifecycle.tar.gz': 'c-capability-lifecycle-candidate/artifact/epoch7-kit-claim-lifecycle.tar.gz',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/artifact/recovery-kit-manifest.json': 'c-capability-lifecycle-candidate/artifact/recovery-kit-manifest.json',
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/build/OVERLAY_INPUTS.json': 'c-capability-lifecycle-candidate/build/OVERLAY_INPUTS.json',
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/build/build_claim_successor_kit.py': 'c-capability-lifecycle-candidate/build/build_claim_successor_kit.py',
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/build/test_build_claim_successor_kit.py': 'c-capability-lifecycle-candidate/build/test_build_claim_successor_kit.py',
@@ -80,12 +98,21 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifa
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/C_TRANSACTION_SEMANTICS.md': (4905,
                                                                                                  '34eec14744d724316805efa8e60bf5ad3f36a6aa67b24c3211b2105fea02449b',
                                                                                                  'c-capability-lifecycle-candidate/C_TRANSACTION_SEMANTICS.md'),
- 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/README.md': (4094,
-                                                                                '50e9cda6e8ef1823d073d8240f7b9a9866e34bb3c547fd96c23ac462d25a68ff',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/README.md': (7801,
+                                                                                'bf75a69ae187519dd71c4db68eef7c735152e5338c58d978017add5126041d77',
                                                                                 'c-capability-lifecycle-candidate/README.md'),
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/SOURCE_IDENTITY.json': (13121,
                                                                                            '506af286886ff0706265e0d23a336a52311739b78f46e60d9012e572fdb35924',
                                                                                            'c-capability-lifecycle-candidate/SOURCE_IDENTITY.json'),
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/artifact/build-result.json': (79105,
+                                                                                                 'bf4eeed1654fe037e76a9ecdd9400595bf4d2b13dfc785001316621ee4b25c40',
+                                                                                                 'c-capability-lifecycle-candidate/artifact/build-result.json'),
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/artifact/epoch7-kit-claim-lifecycle.tar.gz': (1074448,
+                                                                                                                 'bd3708d5887c4dc2b866e9e0acb04da426e71ad88d89c23fe2576b5ed943a2c3',
+                                                                                                                 'c-capability-lifecycle-candidate/artifact/epoch7-kit-claim-lifecycle.tar.gz'),
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/artifact/recovery-kit-manifest.json': (62752,
+                                                                                                          '91252ba75c38b4a6d12f9b64eb06cb8793fabd97f03646bece97224178c28392',
+                                                                                                          'c-capability-lifecycle-candidate/artifact/recovery-kit-manifest.json'),
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/build/OVERLAY_INPUTS.json': (5251,
                                                                                                 'da06828800dcf97abffd41e89981d68777790f54eaa82eb5a06069356c551f32',
                                                                                                 'c-capability-lifecycle-candidate/build/OVERLAY_INPUTS.json'),
@@ -95,20 +122,20 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifa
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/build/test_build_claim_successor_kit.py': (35763,
                                                                                                               '4a4d3637acf2fb287b9003d6ec884a2c81aa1e6d0e9988d05e4641bb4ed1f9d1',
                                                                                                               'c-capability-lifecycle-candidate/build/test_build_claim_successor_kit.py'),
- 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/PREPARATION_COMMAND.UNBOUND.txt': (1147,
-                                                                                                               '7bd1c397330acebe0664f7c6c212cd2ef97ee552bba7ad2ce9bd93923cc9ea03',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/PREPARATION_COMMAND.UNBOUND.txt': (1023,
+                                                                                                               'afb40f8be4110bf1fdc704bdfb12488a122dedc532dda19dd825a5b08c18c291',
                                                                                                                'c-capability-lifecycle-candidate/delivery/PREPARATION_COMMAND.UNBOUND.txt'),
- 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/README.md': (2930,
-                                                                                         '7a5c247fb9b2defc0fca87b8425e08d6bb71e8f825e347821603a22c3eb0d1a7',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/README.md': (4072,
+                                                                                         '0f6ab10be9b0dee07f12dc7bf27fc7795e72766ca68ead6801ee7696feaedba3',
                                                                                          'c-capability-lifecycle-candidate/delivery/README.md'),
- 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/epoch7_prepare_successor_delivery.py': (42065,
-                                                                                                                    '83d3e4f41b03724ad9095982c583ccda887f78c47d2090f0ad7a8c6307466981',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/epoch7_prepare_successor_delivery.py': (42469,
+                                                                                                                    '252385a552b81f6c3c390bdace95a013dc07db0afffef276739bac67b463106a',
                                                                                                                     'c-capability-lifecycle-candidate/delivery/epoch7_prepare_successor_delivery.py'),
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/extract_epoch7_successor_kit.py': (10222,
                                                                                                                '30c5fa4fd0e818b2baa95bc7163f88bb0a60b548e9ca23d1cf0b1142c6b6d50f',
                                                                                                                'c-capability-lifecycle-candidate/delivery/extract_epoch7_successor_kit.py'),
- 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/test_successor_delivery.py': (33904,
-                                                                                                          '61b646211977092de62cfc9a6ad708a7f711ccf8ece8fe88a6eb0a7d57022889',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/test_successor_delivery.py': (35589,
+                                                                                                          '713efcd9c16744cf6aa44c7f776cbbcb13a9cb01aba5c3c3b2ee75be5eaf8753',
                                                                                                           'c-capability-lifecycle-candidate/delivery/test_successor_delivery.py'),
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/kit-overlay/epoch7_recovery_entry.py': (56593,
                                                                                                            '21a982161bc4cb8ffd7e67e4b9a8e24bf23916df6d78c3dd43376af3cfb34890',
@@ -155,14 +182,14 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifa
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/kit-overlay/helpers/epoch7_snapshot.py': (56532,
                                                                                                              '99e5a13f94b14b09b1434c0cb6cb19c02ea7394c45b2896a5d24d006b0b59f73',
                                                                                                              'c-capability-lifecycle-candidate/kit-overlay/helpers/epoch7_snapshot.py'),
- 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/README.md': (10025,
-                                                                                            '35dfcba545d4a31219f2a836a35731ad378d508d0b715c362c0c4198232dfe25',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/README.md': (11758,
+                                                                                            '7f37fd3f2d5356e082ee22f32d4064940cd9ef630d357d4bc11abb5dfaa92524',
                                                                                             'c-capability-lifecycle-candidate/preparation/README.md'),
- 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/epoch7_prepare_successor.py': (37189,
-                                                                                                              'ca25cea569035b391742f62918ef8a8ef7b8f4766d39e390b8697b9c8eddb259',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/epoch7_prepare_successor.py': (37390,
+                                                                                                              '71b7f9b6a63e96042194b218042a44929ed51033065c445aa9281feae76b38f5',
                                                                                                               'c-capability-lifecycle-candidate/preparation/epoch7_prepare_successor.py'),
- 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/test_prepare_successor.py': (33829,
-                                                                                                            'f7a1a01478b312982d4354fe60ebed2442e3686a5bdbb8040cb8194b4351587a',
+ 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/test_prepare_successor.py': (34833,
+                                                                                                            'd51bf4d1026454c1d0c3eb81b4bdc97a3eb994a1cbd329e497106d0016e41e7a',
                                                                                                             'c-capability-lifecycle-candidate/preparation/test_prepare_successor.py'),
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/tests/synthetic_historical_seed.py': (3140,
                                                                                                          'a46fc664f0ecb489796fedd22042b0a181871737ede5b5347c6b8abb61e701f0',
@@ -188,7 +215,7 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifa
  'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/tests/test_successor_transactions.py': (63942,
                                                                                                            'b244b8c8478cf54fbf0ff2200591f28d296d8b0887939421e30a60dc376db996',
                                                                                                            'c-capability-lifecycle-candidate/tests/test_successor_transactions.py')}
-PUBLIC_DIRECTORIES=(PUBLIC_PREFIX+'kit-overlay',PUBLIC_PREFIX+'tests',PUBLIC_PREFIX+'build',PUBLIC_PREFIX+'preparation',PUBLIC_PREFIX+'delivery')
+PUBLIC_DIRECTORIES=(PUBLIC_PREFIX+'kit-overlay',PUBLIC_PREFIX+'tests',PUBLIC_PREFIX+'build',PUBLIC_PREFIX+'preparation',PUBLIC_PREFIX+'delivery',PUBLIC_PREFIX+'artifact')
 
 def need(value,label):
     if not value:raise ValueError(label)
@@ -268,8 +295,8 @@ def selected_archive_files(raw):
     manifest=strict_json(files['recovery-kit-manifest.json'])
     need(len(manifest['files'])==255 and set(files)==set(manifest['files'])|{'recovery-kit-manifest.json'},'EXACT_SELECTED_ARCHIVE_FILES')
     for name,pin in manifest['files'].items():need(digest(files[name])==pin,'SELECTED_ARCHIVE_SOURCE_PIN')
-    need(manifest['kit_source_commit']==COMPILER_SOURCE_COMMIT and
-        manifest['kit_source_tree']==COMPILER_SOURCE_TREE,'SELECTED_COMPILER_SOURCE')
+    need(manifest['kit_source_commit']==BASELINE_SOURCE_COMMIT and
+        manifest['kit_source_tree']==BASELINE_SOURCE_TREE,'SELECTED_COMPILER_SOURCE')
     need(digest(files['epoch7_recovery_entry.py'])==SELECTED_ENTRY_SHA,'SELECTED_ENTRY_PIN')
     return files
 
@@ -312,8 +339,10 @@ def write_fixture_file(path,name,raw):
     if len(raw)<=MAX_LOG:
         with path.open('xb') as stream:stream.write(raw)
         return
-    need(name==SELECTED_ARCHIVE_TARGET and len(raw)==SELECTED_ARCHIVE_SIZE and
-        digest(raw)==SELECTED_ARCHIVE_SHA,'OVERSIZED_FIXTURE_NOT_SELECTED_ARCHIVE')
+    archives={SELECTED_ARCHIVE_TARGET:(SELECTED_ARCHIVE_SIZE,SELECTED_ARCHIVE_SHA),
+              SUCCESSOR_ARCHIVE_TARGET:(SUCCESSOR_ARCHIVE_SIZE,SUCCESSOR_ARCHIVE_SHA)}
+    need(name in archives and len(raw)==archives[name][0] and
+        digest(raw)==archives[name][1],'OVERSIZED_FIXTURE_NOT_SELECTED_ARCHIVE')
     before=resource.getrlimit(resource.RLIMIT_FSIZE)
     need(before[1]==resource.RLIM_INFINITY or before[1]>=MAX_ARTIFACT_FILE,'ARTIFACT_STAGING_HARD_BOUND')
     try:
@@ -414,6 +443,9 @@ def clean_import():
 
 def publication_pins():
     need(PINS_BOUND is True,'CLAIM_SUCCESSOR_CI_PUBLICATION_NOT_BOUND')
+    need(all(type(value) is str and re.fullmatch('[0-9a-f]{40}',value) and value!='0'*40
+         for value in (DEPENDENCY_PUBLICATION_COMMIT,DEPENDENCY_PUBLICATION_TREE)),
+         'DEPENDENCY_PUBLICATION_NOT_BOUND')
     need(type(SUITES) is tuple and tuple(name for name,count in SUITES)==SUITE_NAMES
          and all(type(count) is int and count>0 for name,count in SUITES),'EXACT_SUITE_COUNTS_NOT_BOUND')
     need(len(set(SOURCE_TARGETS.values()))==len(SOURCE_TARGETS),'EXACT_PUBLIC_TARGETS')
@@ -428,6 +460,86 @@ def publication_pins():
          and re.fullmatch('[0-9a-f]{64}',WORKFLOW_SHA),'WORKFLOW_NOT_BOUND')
 
 
+def successor_archive_files(raw):
+    need(type(raw) is bytes and len(raw)==SUCCESSOR_ARCHIVE_SIZE and digest(raw)==SUCCESSOR_ARCHIVE_SHA,'SUCCESSOR_ARCHIVE_PIN')
+    files={};prefix='epoch7-recovery-candidate-r7-claim-lifecycle/'
+    with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
+        rows=archive.getmembers();need(len(rows)==299,'SUCCESSOR_ARCHIVE_HEADER_COUNT')
+        seen=set();dirs=set()
+        for row in rows:
+            safe_name(row.name);need(row.name not in seen,'SUCCESSOR_ARCHIVE_DUPLICATE');seen.add(row.name)
+            need(row.name==prefix[:-1] or row.name.startswith(prefix),'SUCCESSOR_ARCHIVE_ROOT')
+            need(not row.pax_headers and not row.linkname,'SUCCESSOR_ARCHIVE_EXTENDED_OR_LINK')
+            if row.isdir():
+                need(row.size==0,'SUCCESSOR_DIRECTORY_BYTES');dirs.add(row.name);continue
+            need(row.isreg() and row.name.startswith(prefix) and 0<=row.size<=33554432,'SUCCESSOR_ARCHIVE_MEMBER')
+            name=safe_name(row.name[len(prefix):]);need(name not in files,'SUCCESSOR_ARCHIVE_NAME')
+            with archive.extractfile(row) as stream:body=stream.read(row.size+1)
+            need(len(body)==row.size,'SUCCESSOR_ARCHIVE_BYTES');files[name]=body
+    full={prefix+name for name in files}
+    expected_dirs={name.rsplit('/',i)[0] for name in full for i in range(1,name.count('/')+1)}
+    need(dirs==expected_dirs and not dirs.intersection(full),'SUCCESSOR_DIRECTORY_CLOSURE')
+    need(len(files)==257,'SUCCESSOR_ARCHIVE_MEMBER_COUNT')
+    need(digest(files['recovery-kit-manifest.json'])==SUCCESSOR_MANIFEST_SHA,'SUCCESSOR_MANIFEST_PIN')
+    manifest=strict_json(files['recovery-kit-manifest.json'])
+    need(len(manifest['files'])==256 and set(files)==set(manifest['files'])|{'recovery-kit-manifest.json'},'EXACT_SUCCESSOR_ARCHIVE_FILES')
+    for name,pin in manifest['files'].items():need(digest(files[name])==pin,'SUCCESSOR_ARCHIVE_SOURCE_PIN')
+    need(manifest['kit_source_commit']==COMPILER_SOURCE_COMMIT and
+        manifest['kit_source_tree']==COMPILER_SOURCE_TREE,'SUCCESSOR_COMPILER_SOURCE')
+    need(digest(files['epoch7_recovery_entry.py'])==SUCCESSOR_ENTRY_SHA,'SUCCESSOR_ENTRY_PIN')
+    return files
+
+def literal_contract(raw,names,label):
+    values={}
+    for node in ast.parse(raw.decode('utf-8')).body:
+        if isinstance(node,ast.Assign) and len(node.targets)==1 and isinstance(node.targets[0],ast.Name):
+            name=node.targets[0].id
+            if name in names:
+                need(name not in values,label+'_DUPLICATE_CONSTANT')
+                values[name]=ast.literal_eval(node.value)
+    need(set(values)==set(names),label+'_CONSTANT_SCOPE')
+    return values
+
+def equal_contract(actual,expected,label):
+    # Serialized comparison retains the bool/int distinction Python equality loses.
+    need(json.dumps(actual,sort_keys=True)==json.dumps(expected,sort_keys=True),label)
+
+def bound_preparer_contract(raw):
+    expected={'NEW_KIT_SHA':SUCCESSOR_MANIFEST_SHA,'NEW_ENTRY_SHA':SUCCESSOR_ENTRY_SHA,
+        'NEW_ENTRY_BYTES':SUCCESSOR_ENTRY_BYTES,'NEW_SOURCE':COMPILER_SOURCE_COMMIT,
+        'NEW_TREE':COMPILER_SOURCE_TREE}
+    equal_contract(literal_contract(raw,expected,'PREPARER'),expected,'BOUND_PREPARER_CONTRACT')
+
+def bound_delivery_contract(raw):
+    prep=PUBLIC_PREFIX+'preparation/epoch7_prepare_successor.py'
+    expected={'PINS_BOUND':True,'PUBLICATION_COMMIT':DEPENDENCY_PUBLICATION_COMMIT,
+        'ARCHIVE_COMMIT':DEPENDENCY_PUBLICATION_COMMIT,'ARCHIVE_SHA':SUCCESSOR_ARCHIVE_SHA,
+        'ARCHIVE_SIZE':SUCCESSOR_ARCHIVE_SIZE,'COMPILER_SOURCE':COMPILER_SOURCE_COMMIT,
+        'COMPILER_TREE':COMPILER_SOURCE_TREE,'COMPILER_MANIFEST_SHA':SUCCESSOR_MANIFEST_SHA,
+        'COMPILER_ENTRY_SHA':SUCCESSOR_ENTRY_SHA,'COMPILER_ENTRY_BYTES':SUCCESSOR_ENTRY_BYTES,
+        'COMPILER_CACHE_COUNT':256,'SOURCES':{'epoch7_prepare_successor.py':(PINS[prep][1],PINS[prep][0])}}
+    equal_contract(literal_contract(raw,expected,'DELIVERY'),expected,'BOUND_DELIVERY_CONTRACT')
+
+def bound_dependency_contract(records):
+    selected=successor_archive_files(records[SUCCESSOR_ARCHIVE_PATH])
+    need(selected['recovery-kit-manifest.json']==records[SUCCESSOR_MANIFEST_PATH],
+         'SUCCESSOR_STANDALONE_MANIFEST')
+    report=strict_json(records[SUCCESSOR_REPORT_PATH]);out=report['output']
+    equal_contract({key:out[key] for key in ('root','archive_bytes','archive_sha256','manifest_sha256',
+        'source_commit','source_tree','file_count','manifest_pin_count')},
+        {'root':'epoch7-recovery-candidate-r7-claim-lifecycle','archive_bytes':SUCCESSOR_ARCHIVE_SIZE,
+         'archive_sha256':SUCCESSOR_ARCHIVE_SHA,'manifest_sha256':SUCCESSOR_MANIFEST_SHA,
+         'source_commit':COMPILER_SOURCE_COMMIT,'source_tree':COMPILER_SOURCE_TREE,
+         'file_count':257,'manifest_pin_count':256},'SUCCESSOR_REPORT_SCOPE')
+    equal_contract(out['files'],{name:digest(body) for name,body in selected.items()},
+                   'SUCCESSOR_REPORT_FILES')
+    need(report['host_collection']=='NOT_RUN' and report['production_resume_authorized'] is False
+         and report['runtime_files_preserved']==107 and report['runtime_package_files_preserved']==110
+         and report['business_phases_preserved']==16,'SUCCESSOR_REPORT_AUTHORITY')
+    bound_preparer_contract(records[PUBLIC_PREFIX+'preparation/epoch7_prepare_successor.py'])
+    bound_delivery_contract(records[PUBLIC_PREFIX+'delivery/epoch7_prepare_successor_delivery.py'])
+
+
 def checkout_records(root,head):
     paths=set(PINS)|{GATE_PATH,CONTRACT_PATH,WORKFLOW_PATH,REGISTRY_PATH}
     records={path:verified_path(root,head,path,max(MAX_LOG,PINS[path][0]) if path in PINS else MAX_LOG)
@@ -435,6 +547,7 @@ def checkout_records(root,head):
     need(pathlib.Path(__file__).read_bytes()==records[GATE_PATH],'CHECKPOINT_NOT_EXACT_HEAD')
     need(len(records[WORKFLOW_PATH])==WORKFLOW_SIZE and digest(records[WORKFLOW_PATH])==WORKFLOW_SHA,'WORKFLOW_PIN')
     registry_contract(records[REGISTRY_PATH])
+    bound_dependency_contract(records)
     return records
 
 
@@ -446,6 +559,7 @@ def fixtures(root,records=None):
         need(type(raw) is bytes and len(raw)==size and digest(raw)==pin,'PUBLIC_FILE_PIN')
         result[target]=raw
     selected=selected_archive_files(result[SELECTED_ARCHIVE_TARGET])
+    successor_archive_files(result[SUCCESSOR_ARCHIVE_TARGET])
     result.update({KIT_TARGET+'/'+name:body for name,body in selected.items()})
     return result
 
@@ -469,7 +583,10 @@ def aggregate():
         'c_scope':'LOCAL_SYNTHETIC_CAPABILITY_LIFECYCLE_ONLY','old_suites_NOT_RUN':True,
         'source_bound_build_verified':True,'manifest_pin_count':256,'artifact_file_count':257,
         'runtime_files_preserved':107,'runtime_package_files_preserved':110,'business_phases_preserved':16,
-        'selected_archive_sha256':SELECTED_ARCHIVE_SHA,'selected_manifest_sha256':SELECTED_MANIFEST_SHA}
+        'selected_archive_sha256':SELECTED_ARCHIVE_SHA,'selected_manifest_sha256':SELECTED_MANIFEST_SHA,
+        'successor_archive_sha256':SUCCESSOR_ARCHIVE_SHA,'successor_manifest_sha256':SUCCESSOR_MANIFEST_SHA,
+        'compiler_source_commit':COMPILER_SOURCE_COMMIT,'compiler_source_tree':COMPILER_SOURCE_TREE,
+        'bound_preparation_and_delivery_verified':True,'selected_successor_contents_reproduced':True}
 
 
 def run_suite(root,name):
@@ -477,6 +594,7 @@ def run_suite(root,name):
     os.umask(0o022)
     candidate=root/CANDIDATE_TARGET;kit=root/KIT_TARGET
     os.environ['CLAIM_SUCCESSOR_BASELINE_ARCHIVE']=str(root/SELECTED_ARCHIVE_TARGET)
+    os.environ['EPOCH7_SUCCESSOR_PREPARATION']=str(candidate/'preparation')
     paths=[candidate/'tests',candidate/'kit-overlay/helpers',kit/'helpers',
            kit/'xuanjun-p2-package/stage1',kit/'xuanjun-p2-package/scripts']
     paths.extend(sorted(p for p in (kit/'tests').iterdir() if p.is_dir()))
@@ -560,6 +678,19 @@ def build_exact_source(work,output_dir,head,tree):
             need(body==expected[name],'REBUILD_EXPECTED_BYTES');rebuilt[name]=body
     need(set(rebuilt)==set(expected),'REBUILD_EXACT_EXPECTED_FILES')
     need(out['manifest_sha256']==digest(expected['recovery-kit-manifest.json']),'REBUILD_MANIFEST')
+    selected_successor=successor_archive_files((work/SUCCESSOR_ARCHIVE_TARGET).read_bytes())
+    need(rebuilt==selected_successor,'REBUILD_SELECTED_SUCCESSOR_BYTES')
+    need(out['manifest_sha256']==SUCCESSOR_MANIFEST_SHA,'REBUILD_SELECTED_SUCCESSOR_MANIFEST')
+    published_report=strict_json((work/CANDIDATE_TARGET/'artifact/build-result.json').read_bytes())
+    normalized=dict(value);normalized['output']=dict(out)
+    for key in ('archive_bytes','archive_sha256'):
+        normalized['output'][key]=published_report['output'][key]
+    need(json.dumps(normalized,sort_keys=True)==json.dumps(published_report,sort_keys=True),
+         'REBUILD_SELECTED_METADATA')
+    print('SELECTED_SUCCESSOR_CONTENTS_VERIFIED='+json.dumps({'files':len(rebuilt),
+        'manifest_sha256':SUCCESSOR_MANIFEST_SHA,'selected_archive_sha256':SUCCESSOR_ARCHIVE_SHA,
+        'rebuilt_archive_sha256':out['archive_sha256'],
+        'compressed_bytes_identical':out['archive_sha256']==SUCCESSOR_ARCHIVE_SHA},sort_keys=True))
     print('SOURCE_BOUND_BUILD_VERIFIED='+json.dumps(final,sort_keys=True))
 
 
@@ -569,7 +700,9 @@ def worker():
     head=git(root,['rev-parse','--verify','HEAD']);public_inventory(root)
     tree=git(root,['rev-parse','--verify',head+'^{tree}'])
     print('CI_SOURCE_IDENTITIES='+json.dumps({'current_checkout':{'commit':head,'tree':tree},
-        'selected_baseline_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE}},sort_keys=True))
+        'selected_baseline_source':{'commit':BASELINE_SOURCE_COMMIT,'tree':BASELINE_SOURCE_TREE},
+        'claim_successor_build_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE},
+        'dependency_publication':{'commit':DEPENDENCY_PUBLICATION_COMMIT,'tree':DEPENDENCY_PUBLICATION_TREE}},sort_keys=True))
     records=checkout_records(root,head);files=fixtures(root,records);clean_import()
     with tempfile.TemporaryDirectory(prefix='p2-claim-successor-public-') as folder:
         work=materialize(pathlib.Path(folder)/'fixture',files);check_materialized(work,files)
@@ -579,7 +712,7 @@ def worker():
                                file_limit=MAX_ARTIFACT_FILE if name=='builder' else MAX_LOG)
             print(raw.decode('utf-8','replace'));need(code==0,'PUBLIC_TEST_PROCESS_FAILED')
             terminal(raw,name,wanted);check_materialized(work,files)
-        build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)
+        build_exact_source(work,pathlib.Path(folder)/'artifact',COMPILER_SOURCE_COMMIT,COMPILER_SOURCE_TREE)
         check_materialized(work,files);public_inventory(root)
         need(git(root,['rev-parse','--verify','HEAD'])==head,'HEAD_CHANGED')
         need(checkout_records(root,head)==records,'INPUT_CHANGED_AFTER_TEST')

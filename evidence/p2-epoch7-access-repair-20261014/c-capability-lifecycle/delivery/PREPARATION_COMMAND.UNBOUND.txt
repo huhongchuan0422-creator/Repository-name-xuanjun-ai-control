@@ -1,18 +1,16 @@
-UNBOUND / NOT_AUTHORIZED. This is a review-only invocation description, not a shell command.
+BOUND DEPENDENCIES / HOST EXECUTION NOT_AUTHORIZED. Review-only invocation description, not a shell command.
 
 Future separately authorized launcher: trusted isolated Python with -I -S -B.
-Target source: delivery/epoch7_prepare_successor_delivery.py.
-Target kit sibling: epoch7-recovery-candidate-r7-claim-lifecycle.
-Target preparation sibling: epoch7-preparation-candidate-r7-claim-lifecycle.
-Required schema-1 timing policy: PREPARED_START_30S_ORDERED_GUARDS_PUBLICATION_MIN_V1.
-Operation: prepare.
-Required option: --admission-expires-at-utc <UNBOUND_EXACT_UTC_EXPIRY>.
+Delivery source: delivery/epoch7_prepare_successor_delivery.py.
+Compiler source:105996ed06a0bdb5d025914cf08ebd448425f739/tree343d315b3ead6266a626b5875dbdd6c2fa0309af.
+Dependency publication: e2df38160e635af96dcfd63a1b75cf64671e4935.
+Kit sibling:epoch7-recovery-candidate-r7-claim-lifecycle.
+Preparation sibling:epoch7-preparation-candidate-r7-claim-lifecycle.
+Operation:prepare.
+Required option:--admission-expires-at-utc <UNBOUND_EXACT_UTC_EXPIRY>.
+Timing policy:PREPARED_START_30S_ORDERED_GUARDS_PUBLICATION_MIN_V1.
 
-Do not execute or substitute local-test hashes. Binding requires a real immutable source
-publication commit/tree, published archive SHA-256 and exact size, manifest/entry
-SHA-256 and entry size, and the exact published preparation dependency SHA-256/size.
-Publication and staging do not grant installation admission. The three new private
-outputs require a subsequent exact review; no approval ID is required to form them.
-
-The earlier successor source, approval, C attempt and expiry cannot authorize this
-changed lifecycle. All new publication and private-plan identities remain UNBOUND.
+The actual dependency pins are bound. No expiry, host invocation, final approval
+or C authorization is supplied. Staging and preparing three new private files
+require separate Owner permission and never grant installation admission.
+The previous approval, expiry and attempt cannot authorize this changed lifecycle.
