@@ -98,7 +98,7 @@
       "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
       "independent_byte_review_comment_id": 6213125007
     },
-    "next_development": "1373 dormant source/dependency files plus exact historical trading backup have been recovered and verified. Dependency installation, runtime entrypoint validation, current data timing and live channel relocation remain unaccepted. No service activation or Tokyo shutdown. Existing Phase-B environment is inspected for reuse rather than rebuilt. API operations remain deferred.",
+    "next_development": "Existing historical source and DB are recovered. Both Korea Python3.11 system and existing Phase-B venv lack all 13 declared dependencies. New helper reads Tokyo package metadata only, requires an exact 13-package source profile, installs into a distinct new venv as existing nonroot UID986, freezes ownership, runs pip check and verifies imports in a new loopback-only netns. No existing venv/unit/source deployment, API read/call, service start or Phase-C installation.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "INSPECT_RESTORED_DEPENDENCIES_AND_REUSE_EXISTING_ENVIRONMENT_BEFORE_ANY_PACKAGE_INSTALL",
+  "owner_action_now": "PREPARED_ONE_MANUAL_ROOT_COMMAND_TO_CAPTURE_TOKYO_PACKAGE_VERSIONS_AND_BUILD_NEW_DORMANT_ENVIRONMENT_NOT_EXECUTED",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -353,11 +353,35 @@
       "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT_NOT_INDEPENDENT_LOGIN",
       "script_commit": "8d50a4d1c5695413c7d3e68f16b93d44e4e3a671",
       "script_sha256": "18db4e6b41c548325044b8b30baf7afc39efd4f6b16bc5f73059ccf063f424ec"
+    },
+    "environment_inspection": {
+      "status": "RESTORED_REQUIREMENTS_AND_EXISTING_ENV_INSPECTED",
+      "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT",
+      "requirements": [
+        "numpy",
+        "pandas",
+        "requests",
+        "websocket-client",
+        "python-dotenv",
+        "pyyaml",
+        "sqlalchemy",
+        "pymysql",
+        "redis",
+        "cryptography",
+        "ccxt",
+        "ta",
+        "loguru"
+      ],
+      "all_13_missing_in_system_and_existing_phase_b": true,
+      "packages_installed": 0,
+      "production_imports": 0,
+      "service_actions": 0,
+      "network_requests": 0
     }
   },
   "offline_relocation_blocker": {
-    "kind": "HISTORICAL_FILES_RECOVERED_RUNTIME_AND_CURRENT_STATE_NOT_COMPLETE",
-    "detail": "1373 dormant source/dependency files plus exact historical trading backup have been recovered and verified. Dependency installation, runtime entrypoint validation, current data timing and live channel relocation remain unaccepted. No service activation or Tokyo shutdown.",
+    "kind": "13_DEPENDENCIES_MISSING_NEW_ISOLATED_ENVIRONMENT_PREPARED_NOT_EXECUTED",
+    "detail": "Existing historical source and DB are recovered. Both Korea Python3.11 system and existing Phase-B venv lack all 13 declared dependencies. New helper reads Tokyo package metadata only, requires an exact 13-package source profile, installs into a distinct new venv as existing nonroot UID986, freezes ownership, runs pip check and verifies imports in a new loopback-only netns. No existing venv/unit/source deployment, API read/call, service start or Phase-C installation.",
     "api_is_blocker": false,
     "last_owner_attempt": {
       "schema_version": 1,
