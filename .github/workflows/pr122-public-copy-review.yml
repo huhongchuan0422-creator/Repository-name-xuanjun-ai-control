@@ -1,0 +1,86 @@
+name: PR122 Public Presentation Increment
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - 'evidence/pr122-public-presentation/**'
+      - '.github/workflows/pr122-public-copy-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-presentation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Integration, UNKNOWN cost and quote rules
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_pr122_site_hub_integration tests.test_pr122_site_hub_preview -v
+          node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs
+      - name: Exact full-source candidate and current rendered content
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pr122-public-report
+          python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-public-stage
+          python - <<'PY'
+          import hashlib,io,json,tarfile
+          from pathlib import Path
+          root=Path('evidence/pr122-public-presentation')
+          receipt=json.loads((root/'PACKAGE_RECEIPT.json').read_bytes())
+          raw=(root/'PR122_PUBLIC_PRESENTATION_REVIEW_ONLY.tar.gz').read_bytes()
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          assert sha(raw)==receipt['tar_sha256']
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as a:
+              members=a.getmembers()
+              assert len({m.name for m in members})==len(members)
+              assert all(m.isfile() and m.name.startswith('pr122-site-hub/') and '..' not in Path(m.name).parts for m in members)
+              files={m.name.removeprefix('pr122-site-hub/'):a.extractfile(m).read() for m in members}
+          manifest=files['PACKAGE_MANIFEST.json']
+          assert sha(manifest)==receipt['package_manifest_sha256']
+          items=json.loads(manifest)['files']
+          assert set(files)=={x['path'] for x in items}|{'PACKAGE_MANIFEST.json'}
+          for x in items:
+              assert len(files[x['path']])==x['size'] and sha(files[x['path']])==x['sha256']
+          candidate=json.loads(files['candidate-manifest.json'])
+          assert len(candidate['files'])==receipt['public_file_count']==1279
+          for x in candidate['files']:
+              key='overlay/public/'+x['path']
+              if key in files:assert sha(files[key])==x['sha256'] and len(files[key])==x['size']
+          checked=[]
+          for p in Path('/tmp/pr122-public-stage/public').rglob('*'):
+              if not p.is_file():continue
+              name=p.relative_to('/tmp/pr122-public-stage/public').as_posix()
+              key='overlay/public/'+name
+              if key in files:
+                  assert p.read_bytes()==files[key],name
+                  checked.append(name)
+          assert len(checked)>=90
+          report={'source_commit':__import__('os').environ['GITHUB_SHA'],'state':'REVIEW_ONLY_NOT_DEPLOYED','members':len(files),'manifest_files':len(items),'rendered_files_compared':len(checked),'tar_sha256':sha(raw),'production_changes':0}
+          Path('/tmp/pr122-public-report/CANDIDATE_VERIFICATION.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report))
+          PY
+      - name: Browser dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pr122-browser" --no-save playwright@1.55.0
+          "$RUNNER_TEMP/pr122-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Real desktop and mobile browser regression
+        env:
+          XJ_HUB_STAGE: /tmp/pr122-public-stage
+          XJ_HUB_REPORT: /tmp/pr122-public-report/BROWSER_REPORT.json
+        run: PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright" node tests/pr122_site_hub_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr122-public-presentation-${{ github.sha }}
+          path: |
+            /tmp/pr122-public-report/
+            evidence/pr122-public-presentation/
+          retention-days: 14
