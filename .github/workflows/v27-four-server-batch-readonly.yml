@@ -479,7 +479,7 @@ jobs:
           retention-days: 14
 
   korea-runtime-package:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.sha == '1a7e9cb60a995d1a5b4e46518a4253d805bfe063'
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
