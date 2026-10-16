@@ -21,6 +21,7 @@ test_versions_review_separation_and_incremental_preservation (tests.test_pr122_c
 test_wrong_backup_key_or_tampered_backup_never_creates_restore (tests.test_pr122_customer_center.CustomerTests.test_wrong_backup_key_or_tampered_backup_never_creates_restore) ... ok
 test_http_actual_registration_verification_login_reset_roundtrip (tests.test_pr122_customer_http.HttpTests.test_http_actual_registration_verification_login_reset_roundtrip) ... ok
 test_http_csp_static_routes_and_webhook_rejection (tests.test_pr122_customer_http.HttpTests.test_http_csp_static_routes_and_webhook_rejection) ... ok
+test_http_logout_clears_revoked_cookie_and_rejects_cross_origin (tests.test_pr122_customer_http.HttpTests.test_http_logout_clears_revoked_cookie_and_rejects_cross_origin) ... ok
 test_http_private_upload_download_no_range_cache_or_enumeration (tests.test_pr122_customer_http.HttpTests.test_http_private_upload_download_no_range_cache_or_enumeration) ... ok
 test_http_session_injection_csrf_origin_and_secure_cookie (tests.test_pr122_customer_http.HttpTests.test_http_session_injection_csrf_origin_and_secure_cookie) ... ok
 test_feishu_real_algorithm_encrypted_verification_and_scope (tests.test_pr122_customer_providers.ProviderTests.test_feishu_real_algorithm_encrypted_verification_and_scope) ... ok
@@ -36,6 +37,6 @@ test_source_drift_rejected_before_any_install (tests.test_pr122_customer_release
 test_unknown_and_foreign_config_prevent_rollback (tests.test_pr122_customer_release.ReleaseTests.test_unknown_and_foreign_config_prevent_rollback) ... ok
 
 ----------------------------------------------------------------------
-Ran 36 tests in 14.926s
+Ran 37 tests in 17.114s
 
 OK

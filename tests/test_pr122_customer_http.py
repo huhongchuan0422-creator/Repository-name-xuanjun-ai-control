@@ -49,6 +49,10 @@ class HttpTests(CustomerTests):
   self.assertEqual(self.request('webhooks/telegram',{'verified_provider':True,'subject':'123'})[0],503)
   self.assertEqual(self.request('api/me',headers={**self.auth_headers(),'Host':'evil.example'})[0],403)
   self.assertEqual(self.request('api/../objects')[0],403)
+ def test_http_logout_clears_revoked_cookie_and_rejects_cross_origin(self):
+  self.c.logout(self.users['owner']['token'])
+  status,headers,_=self.request('api/logout',{},self.auth_headers());self.assertEqual(status,200);self.assertIn('Max-Age=0',headers['Set-Cookie'])
+  self.assertEqual(self.request('api/logout',{}, {**self.auth_headers(),'Origin':'https://evil.example'})[0],403)
  def test_http_actual_registration_verification_login_reset_roundtrip(self):
   address='httpuser@example.com';self.assertEqual(self.request('api/register',{'email':address,'password':'correct-password-123'})[0],200)
   r=self.c.db.execute('SELECT * FROM outbox ORDER BY rowid DESC LIMIT 1').fetchone();token=json.loads(self.c.decrypt(r['payload'],'outbox:'+r['id']))['token']

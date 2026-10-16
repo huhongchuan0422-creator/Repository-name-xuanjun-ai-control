@@ -97,6 +97,13 @@ class App:
                             cookie=COOKIE+'='+result.pop('token')+'; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=3600'
                             return self.reply(200,result,cookie=cookie)
                         return self.reply(200,result)
+                    # Clearing an expired/revoked browser cookie must remain possible.
+                    # This operation grants no access; same-origin JSON POST is
+                    # mandatory even when the old session can no longer authenticate.
+                    if operation=='logout' and self.command=='POST':
+                        if body:raise ValueError('INVALID_FIELDS')
+                        center.logout(self.token())
+                        return self.reply(200,{'logged_out':True},cookie=COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0')
                     uid=center.session(self.token(),self.headers.get('X-CSRF-Token','') if self.command=='POST' else None)
                     if self.command in ('GET','HEAD'):
                         if operation=='me':return self.reply(200,{'user_id':uid,'projects':center.projects(uid),'channels':app.providers.status()})
