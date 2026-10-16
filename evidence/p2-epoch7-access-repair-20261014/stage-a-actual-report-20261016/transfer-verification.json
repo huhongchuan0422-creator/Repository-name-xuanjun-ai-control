@@ -1,0 +1,167 @@
+{
+  "A2_counts": {
+    "absent_count": 30,
+    "empty_present_count": 2,
+    "file_count": 1,
+    "nonempty_present_count": 1,
+    "present_count": 3,
+    "root_count": 3,
+    "scope_count": 33,
+    "unit_count": 11
+  },
+  "B_C": "NOT_AUTHORIZED",
+  "TASK5_APPROVAL": "NOT_ISSUED",
+  "UK_STAGE_A": "OWNER_REPORT_RECEIVED_NOT_ACCEPTED",
+  "ancillary_limits": [
+    {
+      "block_index": 0,
+      "recursive_status_counts": [
+        {
+          "record_count": 1,
+          "state": "COMPLETE_UNREVIEWED"
+        },
+        {
+          "record_count": 16,
+          "state": "MEASURED_UNREVIEWED"
+        },
+        {
+          "record_count": 6,
+          "state": "UNRECOGNIZED"
+        }
+      ],
+      "source_closure_counts": [],
+      "truncated": false,
+      "unresolved_count": 0
+    },
+    {
+      "block_index": 1,
+      "recursive_status_counts": [
+        {
+          "record_count": 1,
+          "state": "COMPLETE_UNREVIEWED"
+        },
+        {
+          "record_count": 12,
+          "state": "MEASURED_UNREVIEWED"
+        },
+        {
+          "record_count": 1,
+          "state": "NOT_VERIFIED"
+        },
+        {
+          "record_count": 1,
+          "state": "UNKNOWN"
+        },
+        {
+          "record_count": 4,
+          "state": "UNRECOGNIZED"
+        }
+      ],
+      "source_closure_counts": [
+        {
+          "record_count": 1,
+          "state": "NOT_VERIFIED"
+        }
+      ],
+      "truncated": false,
+      "unresolved_count": 0
+    },
+    {
+      "block_index": 2,
+      "recursive_status_counts": [
+        {
+          "record_count": 1,
+          "state": "COMPLETE_UNREVIEWED"
+        },
+        {
+          "record_count": 3,
+          "state": "MEASURED_UNREVIEWED"
+        },
+        {
+          "record_count": 2,
+          "state": "NOT_VERIFIED"
+        },
+        {
+          "record_count": 4,
+          "state": "UNRECOGNIZED"
+        }
+      ],
+      "source_closure_counts": [
+        {
+          "record_count": 2,
+          "state": "NOT_VERIFIED"
+        }
+      ],
+      "truncated": false,
+      "unresolved_count": 132
+    },
+    {
+      "block_index": 3,
+      "recursive_status_counts": [
+        {
+          "record_count": 1,
+          "state": "COMPLETE_UNREVIEWED"
+        },
+        {
+          "record_count": 52,
+          "state": "MEASURED_UNREVIEWED"
+        },
+        {
+          "record_count": 4,
+          "state": "UNRECOGNIZED"
+        }
+      ],
+      "source_closure_counts": [],
+      "truncated": false,
+      "unresolved_count": 0
+    }
+  ],
+  "command_sha256": "36df056cc3cd9b345cf5cf51e831385fe112799eab1f6f952abff31934f85bd3",
+  "copied_command_match": "MATCH_AFTER_ONLY_TERMINAL_CRLF_AND_LITERAL_PS2_REMOVAL",
+  "delivery_commit": "5d96f73a5efd6b12d74f9760d4f90dd481e738a6",
+  "delivery_review": 6205748180,
+  "independent_local_checks": [
+    "original_records_exact_substrings",
+    "reviewed_command_and_marker_pins",
+    "duplicate_key_and_whitelist_rejection",
+    "canonical_encoding",
+    "saved_packet_33_rows_and_file_record_hashes",
+    "seven_projection_hashes",
+    "eight_case_digests_and_counts",
+    "1928_byte_body_and21_field_hashes"
+  ],
+  "kind": "OWNER_STAGE_A_REPORT_TRANSFER_VERIFICATION",
+  "local_checker_python_versions": [
+    "3.6.8",
+    "3.12.14"
+  ],
+  "not_independently_measured": [
+    "UK_private_full_observation_bytes",
+    "final_output_timer_teardown",
+    "filesystem_atime_effect",
+    "shell_exit_code"
+  ],
+  "raw_terminal_retained_privately": true,
+  "raw_terminal_sha256": "7e32205e2ecc6eb54f1b72ca0d45863d3345ffaa5a64061421094d6fd52b4fc2",
+  "records": [
+    {
+      "bytes": 231,
+      "encoding": "ORIGINAL_UTF8_JSON_LINE_WITH_CRLF",
+      "name": "bootstrap-marker.original.json",
+      "sha256": "80b4786be1337d4e32533a9cc9c38bdd774443cc5ebd4485c03b76480359533d"
+    },
+    {
+      "bytes": 58345,
+      "encoding": "ORIGINAL_UTF8_JSON_LINE_WITH_CRLF",
+      "name": "stage-a-report.original.json",
+      "sha256": "811154526f07be4567b619bc45994c9562c34f67316ccc025a89070d92178b53"
+    }
+  ],
+  "report_state": "EVIDENCE_COLLECTED_WITH_LIMITATIONS",
+  "reporting_complete": true,
+  "schema": 1,
+  "source": "OWNER_SUPPLIED_UK_TERMINAL_OUTPUT_NOT_INDEPENDENT_HOST_LOGIN",
+  "source_commit": "5dcf1c12d62671e44c443dfcbc773ccb0cc2b284",
+  "source_review": 6205641864,
+  "task5_handoff": 6205767099
+}
