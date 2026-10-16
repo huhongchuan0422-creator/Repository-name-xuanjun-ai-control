@@ -487,3 +487,17 @@ PATCH_PRODUCTION_INSTALL=EXECUTED_PASS_TARGETED_HEALTH；W06仍部分完成（�
 复用原东京Job116566967626的Nginx只读收据：nginx.conf与所含ACME/wecom配置未记录auth_basic/auth_request/allow/deny；当前312efdd3已审国内location也直接代理disconnect。外围策略最新状态仍UNKNOWN。新增finding详见evidence/pr122-portal-log-fix/DISCONNECT_AUTH_STATIC_FINDING_20261016.json，供同一次集中独审判定发布影响和最小整改；不擅改既有批准生产配置或调用真实断开。
 
 所有11项业务方法的限制继续逐项继承：/p/真实会话、两项submit POST、三项OAuth GET、status真实状态、disconnect POST、Telegram POST/密钥及canary状态均NOT_TESTED；只有healthz GET实机200。以前安全GET拒绝证据继续有效，不用HEAD501冒充认证通过。IP依赖源码范围沿用§9.12，外围WAF/日志使用方和Owner审计差异接受未关闭；DNS当前管理面记录ID/代理/TTL/回滚核对未取得。DNS_RELEASE=HOLD、东京退役HOLD，网站入口和整体服务器迁移尚未完成。
+
+
+### 9.19 2026-10-16：R4开发责任及最小遏制候选（范围待裁定）
+
+原开发方就是本ChatGPT开发窗口，继续原PR122/原分支负责，不转OpenClaw、不另建队列。已读取6205227893：日志实机验收与44HEAD继承PASS，R4 High需处理。现有旧Portal没有可直接复用的已认证断开账号授权链；凭据提交会话或未部署的OAuth候选不等于登录身份/账号所有权。
+
+为响应Owner最小化迁移，新增独立候选deploy/pr122-r4-disconnect-containment：准确源d5ab592a…bbdf0，仅将旧HTTP disconnect分支替换为固定403、operation_performed=false及常量安全拒绝日志，在Token存储构造/请求体读取/账号绑定/业务audit之前返回。全部调用者均拒绝，其他字节不变。候选哈希57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1。
+
+本地18项实际handler AST隔离测试通过，覆盖原漏洞复现、无登录/错账号/CSRF/Origin/伪造代理头、重复/并发拒绝、存储失败不可达、脱敏、精确哈希和真实临时loopback403。所有拒绝store/disconnect/business-audit次数0；只有常量安全拒绝日志。正向授权断开与其事务恢复没有实现，不将全拒绝测试冒充完整R4鉴权修复。东京Runner将对实际已部署源运行同18项并生成准确制品；CI结果以实际日志为准。
+
+此为**暂停该HTTP写能力的受限迁移候选**，需要同次独审明确接受该发布范围；不能预设功能退场已获批准。AUTHENTICATED_DISCONNECT=NOT_IMPLEMENTED；R4_FULL_REMEDIATION=OPEN；CONTAINMENT_SCOPE_ACCEPTANCE=PENDING；DNS_RELEASE=HOLD；东京退役HOLD。已有固定root helper仅支持已消费的日志补丁动作，不能部署此候选；源安装/服务重启/权限扩展均NOT_EXECUTED。长期Owner授权有效，动作登记与独审仍需真实技术接线。
+
+只改原工作流push job为上述18项隔离测试，不重跑旧日志16/HEAD44/静态115/配置83/OAuth45。已通过生产网站/current与312efdd3配置不改。IP审计差异、外围依赖、DNS当前管理面核对仍须集中关闭，不能承诺未经证实的固定过审或切站时间。
+

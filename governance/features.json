@@ -129,7 +129,8 @@
           "Existing domestic Runner inventory is non-root and does not disclose sudo policy or secret values",
           "R1-R3: process-safe one-time OAuth state, atomic credential/session commits, verified token/account generation activation; actual process races, write faults and SIGKILL/SIGTERM restart tests remain synthetic and require independent review",
           "Minimal cutover derives all75 Tokyo locations, preserves62 static aliases and11 existing HTTPS backend routes; verified upstream TLS, no sensitive retry, no secret-bearing logs, and real Nginx synthetic integration are required; production remains independently gated",
-          "Legacy Portal log-message exact-byte correction and persistent fixed-action root adapter preserve original source, backup and one-shot rollback; isolated tests do not imply production installation or DNS release"
+          "Legacy Portal log-message exact-byte correction and persistent fixed-action root adapter preserve original source, backup and one-shot rollback; isolated tests do not imply production installation or DNS release",
+          "R4 temporary containment candidate disables HTTP disconnect before store/body/audit business state access for every caller; full authenticated disconnect remains NOT_IMPLEMENTED and migration scope acceptance requires independent decision"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
@@ -137,7 +138,8 @@
           "tests/test_pr122_csp_browser.py",
           "tests/test_pr122_oauth_candidate.py",
           "tests/test_legacy_portal_logging_regression.py",
-          "tests/test_portal_log_capability.py"
+          "tests/test_portal_log_capability.py",
+          "tests/test_legacy_disconnect_guard.py"
         ]
       },
       "reuse": [
@@ -160,7 +162,10 @@
         "tests/test_legacy_portal_logging_regression.py",
         "tests/test_portal_log_capability.py",
         "deploy/pr122-portal-log-fix/**",
-        "deploy/pr122-portal-log-capability/**"
+        "deploy/pr122-portal-log-capability/**",
+        "scripts/pr122_legacy_disconnect_guard.py",
+        "tests/test_legacy_disconnect_guard.py",
+        "deploy/pr122-r4-disconnect-containment/**"
       ]
     },
     {

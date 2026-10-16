@@ -1,0 +1,17 @@
+{
+  "candidate_sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+  "decision_scope": "TEMPORARY_DISABLE_WRITE_NOT_FULL_AUTH_REMEDIATION",
+  "files": {
+    ".github/workflows/v27-four-server-batch-readonly.yml": "5b8f111cb55faae1f8e189a1b2b6fefd8e4126f8b2ad26f1ac12d26896940ab2",
+    "deploy/pr122-r4-disconnect-containment/README.md": "4eaac695395e3e815de722d2019388c15aa1ce6a7b2d232844583fdb5b0db142",
+    "deploy/pr122-r4-disconnect-containment/disconnect-disabled.patch": "eb2e0f7f497b659def79f4255950c2acaccc217a7dc7ee2b3257c38d24f98b1c",
+    "docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md": "bda8de26bf0c8039b543cfdf5f8dea0ea7831e4c336cd2c589545ede7ba726bd",
+    "governance/features.json": "461413296b6c335221507a5a01c62a308c9d53f0b7b9a2c43a31083f85956ef6",
+    "scripts/pr122_legacy_disconnect_guard.py": "1afc01c6b19cb8bfc82c16eab257a06dd95b0420118dc6a0dc4726f25a0d6d93",
+    "tests/test_legacy_disconnect_guard.py": "272fecfc1fbe0b3b2618c099fffc7e4697ad6e34fe229950c607b25a2492bfd9"
+  },
+  "production_install": false,
+  "review_request": "PR122#6205227893",
+  "schema_version": 1,
+  "source_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0"
+}
