@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "CURRENT_POINT_SUCCEEDED_NO_RETRY; PREPARE_S06_PRIVATE_RUNTIME_AND_CHANNEL_HANDOFF",
+  "owner_action_now": "NO_R2_RETRY; S06_CANDIDATE_HOSTED_CI_AND_ONE_CONSOLIDATED_REVIEW",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -641,6 +641,18 @@
       "korea443_owner": "UNKNOWN_NONROOT_PERMISSION",
       "root_admin_scheduling": "UNKNOWN_PRIVATE_CONTENTS_NOT_READ",
       "protect_other_writer": "DOMESTIC_XUANJUN_SITE_HUB_PREVIEW_ACTIVE"
+    },
+    "s06_private_candidate": {
+      "action": "PR99_S06_PRIVATE_RUNTIME_CONTRACT_V1",
+      "status": "NEW_CANDIDATE_19_LOCAL_TESTS_PASS_HOSTED_AND_REVIEW_PENDING",
+      "scope": "TEN_FIXED_UNIT_FILES_ONE_DROPIN_PRIVATE_RUNTIME_METADATA_ONLY_ENCRYPTED_NOT_INSTALL",
+      "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
+      "permission": "NOT_ISSUED",
+      "production_executed": false,
+      "environment_files_opened": false,
+      "database_opened": false,
+      "inline_unit_authentication": "POSSIBLE_PRIVATE_BYTES_NOT_USED_OR_PUBLIC",
+      "root_channel_extended": false
     }
   },
   "current_recovery_point_r2": {
@@ -758,11 +770,16 @@
       ],
       "next": "S06 current service/runtime contract and private channel handoff; preserve R4 live Portal and all shared services."
     },
-    "independent_execution_acceptance": "REQUEST_PENDING_NOT_SELF_APPROVED",
+    "independent_execution_acceptance": {
+      "comment_id": 6217422554,
+      "decision": "PASS_WITH_SCOPE_LIMITS",
+      "evidence_class": "OWNER_ROOT_RECEIPT_NOT_INDEPENDENT_PRIVATE_BYTES",
+      "read_back": true
+    },
     "execution_review_request": {
       "comment_id": 6217284394,
       "read_back": true,
-      "decision": "PENDING"
+      "decision": "PASS_WITH_SCOPE_LIMITS_6217422554"
     }
   }
 }
