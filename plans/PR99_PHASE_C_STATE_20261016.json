@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NONE_FOR_PASSED_STAGE; DEVELOPER_COLLECTING_CURRENT_SOURCE_AND_DB_WAL_METADATA_WITH_EXISTING_NONROOT_RUNNER",
+  "owner_action_now": "NO_REPEAT_INSTALL; CURRENT_SERVER_MANIFEST_CAPTURED; PREPARE_EXACT_PRIVATE_CURRENT_SNAPSHOT_AND_SERVICE_HANDOFF_SCOPE_BEFORE_REQUESTING_EXECUTION",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -442,8 +442,8 @@
     }
   },
   "offline_relocation_blocker": {
-    "kind": "OFFLINE_RECOVERY_AND_ENV_PASS_TOKYO_RUNNING_RESPONSIBILITIES_AND_CURRENT_STATE_REMAIN",
-    "detail": "Runner independently confirmed new Korea environment package versions and stopped Phase-B. Tokyo still hosts Portal, RPC/model/novel/customer channels and four Finance/Billing timers. Nonroot metadata inventory is not a private config/credential audit or a service migration. Historical restored source/database must not be promoted as final current production state.",
+    "kind": "CURRENT_CONSISTENT_SNAPSHOT_AND_REMAINING_SERVICE_HANDOFF_PERMISSION_PENDING",
+    "detail": "Audit6215371855 is accepted and not reopened. Actual Tokyo source inventory1363 files/19350718bytes is frozen independently of GitHub; git identity UNKNOWN and current tree is not an atomic snapshot. Current DB metadata46907392bytes with no WAL/SHM at that sampling instant does not prove consistency/quiescence. Business DB/WAL export, C install, live API, Writer and retirement remain unapproved. Prepare one exact offline recovery-point/current-source handoff batch without adding deferred API/Shadow requirements.",
     "api_is_blocker": false,
     "last_owner_attempt": {
       "schema_version": 1,
@@ -515,5 +515,21 @@
     "actual_database": "NOT_OPENED_BY_RUNNER",
     "private_channel_config": "NOT_READ",
     "all_services_changed": 0
+  },
+  "current_source_inventory": {
+    "run": 38900814302,
+    "job": 116972320673,
+    "delivery_commit": "f717c07e8c8290424ffec4b23edc40ed8566f8c0",
+    "status": "SUCCESS_NONROOT_CURRENT_SOURCE_AND_DB_METADATA_ONLY",
+    "file_count": 1363,
+    "bytes": 19350718,
+    "source_aggregate_sha256": "7e9859b04806aba717cbd7414d2aff52c041d810c78d5be902168898ae8300de",
+    "source_git_head": "UNKNOWN_GIT_IDENTITY",
+    "source_manifest": "evidence/pr99-offline-copy/CURRENT_SOURCE_IDENTITIES_20261016.json",
+    "source_tree_collection_atomic": false,
+    "database_opened": false,
+    "wal_bytes_read": false,
+    "credentials_read": false,
+    "root_cron_read": false
   }
 }
