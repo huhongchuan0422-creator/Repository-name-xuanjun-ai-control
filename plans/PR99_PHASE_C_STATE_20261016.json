@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "RUN_BOUNDED_ALL_CANDIDATE_PATH_METADATA_NO_MATERIAL_STAGE_REPLAY",
+  "owner_action_now": "RUN_PINNED_S07_MATERIAL_CONTINUATION_V2_ON_KOREA_ENTER_TOKYO_ROOT_PASSWORD",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -993,7 +993,7 @@
           "script_sha256": "6d68a59982d41dbba710a8735690026a7ba1d9917367e0101c2c97f0dc41755e",
           "local_checks": "PARENT_LINK_NESTED_LINK_NO_CONTENT_MISSING_PATH_AND_COMPILE_PASS",
           "hosted_ci": "NOT_RUN",
-          "host_execution": "NOT_RUN",
+          "host_execution": "OWNER_EXECUTED_S07_BOUNDED_PATH_METADATA_COMPLETE",
           "symlink_guard_relaxed": false,
           "hash_correction": {
             "incorrect_previous_sha256": "a089bfa39d6fee38f866000e80861d384bb2a2352c66eab569f7c796c7efa054",
@@ -1002,7 +1002,45 @@
             "github_original_re_read": true,
             "owner_old_check": "FAILED_BEFORE_EXECUTION_NO_TOKYO_CONNECTION",
             "script_source_changed": false
-          }
+          },
+          "actual_link": {
+            "path": "/home/admin/.openclaw/workspace",
+            "target": "/mnt/btrfs-workspace/ws-398ab6",
+            "link_device": 64771,
+            "link_inode": 654102,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": "0o777",
+            "target_device": 37,
+            "target_inode": 259,
+            "target_mode": "0o755",
+            "target_uid": 1000,
+            "target_gid": 1000
+          },
+          "owner_observed_metadata_entries": 293,
+          "missing_optional_root": "/home/openclaw_ops",
+          "failure_trace": "remote_pack line114 -> read_file line48 -> need line40; source script confirms file payload-read loop before master-key check or source staging/SQLite backup"
+        },
+        "continuation_v2": {
+          "status": "PREPARED_NOT_EXECUTED",
+          "source_commit": "127e4a942d1cbeadb67b545a47758e1e6827c8dd",
+          "script": "evidence/pr99-service-handoff/s07-runtime-materials/stage_runtime_materials.py",
+          "script_sha256": "137a2acea1924b4c62e43abfe6f8689c64450db868c7a216d759a16779c939b4",
+          "github_bytes": 16917,
+          "github_byte_readback": true,
+          "local_tests": 14,
+          "new_tests": 7,
+          "affected_previous_tests": 7,
+          "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+          "local_stage": "/root/pr99-s07-private-materials-v2",
+          "prior_stage_preserved": true,
+          "preconditions": "v1 exact failure JSON; missing success receipt; zero-byte prior tar; SYMLINK_PARENT in private log",
+          "alias_exception_scope": "ONE_EXACT_REFERRAL_JSON_ONLY_NOT_RECURSIVE_OPENCLAW_OR_GLOBAL_SYMLINK_ALLOW",
+          "actual_alias_and_target_identities_bound": true,
+          "all_other_link_rejections_preserved": true,
+          "service_actions": 0,
+          "domestic_install": false,
+          "final_cutover_snapshot": false
         }
       }
     }
