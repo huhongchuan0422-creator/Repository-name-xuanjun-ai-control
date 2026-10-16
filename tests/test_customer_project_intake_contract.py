@@ -10,7 +10,8 @@ class ContractTests(unittest.TestCase):
  def test_incremental_flow(self):
   self.assertEqual(transition("NOT_STARTED","save_draft",True),"PARTIAL")
   self.assertEqual(transition("PARTIAL","submit",True),"SUBMITTED")
-  self.assertEqual(transition("SUBMITTED","request_changes",True),"NEEDS_CORRECTION")
+  self.assertEqual(transition("SUBMITTED","start_review",True),"UNDER_REVIEW")
+  self.assertEqual(transition("UNDER_REVIEW","request_changes",True),"NEEDS_CORRECTION")
   with self.assertRaises(IntakeRejected):transition("PARTIAL","submit",False)
   with self.assertRaises(IntakeRejected):transition("ACCEPTED","save_draft",True)
  def test_guides(self):

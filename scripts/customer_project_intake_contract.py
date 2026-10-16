@@ -1,5 +1,5 @@
 """Source-only authorization contract; identity and membership must come from a trusted server."""
-GUIDES = {k: (v["title"],v["instructions"]) for k,v in []}
+GUIDES = {\n "company_identity": ("企业主体及代表授权", "经授权的项目通道提交，不收集登录密码。"),\n "domain_control": ("域名与DNS控制权", "以服务端一次性TXT挑战核验。"),\n "wechat_merchant": ("微信支付商户及分账能力", "官方商户平台核验；API密钥走SecretRef。"),\n "wechat_miniapp": ("微信小程序及公众号", "AppID可登记，AppSecret走SecretRef。"),\n "douyin_oauth": ("抖音开放平台应用", "按授权Scope使用OAuth。"),\n "x_oauth": ("X开发者应用", "使用OAuth并核查费用与权限。")\n}
 class IntakeRejected(ValueError): pass
 STATES=("NOT_STARTED","PARTIAL","SUBMITTED","UNDER_REVIEW","NEEDS_CORRECTION","ACCEPTED")
 TRANSITIONS={
