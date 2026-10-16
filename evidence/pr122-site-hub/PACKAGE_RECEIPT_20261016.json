@@ -1,12 +1,12 @@
 {
-  "candidate_manifest_sha256": "5f126da9f4daaffc15ae9f428acf4e04ee111cfeecf4b2f7783b3771c0112e53",
+  "candidate_manifest_sha256": "6ce5ed029fced010ebffbd188b3f676763ba397775122880474288c36573a683",
   "new_file_count": 90,
   "overlay_file_count": 405,
-  "package_manifest_sha256": "35639f5d3530e56f525e7fb861be6566f9a4e6e33cc8c3039331275dbf4d65b8",
+  "package_manifest_sha256": "fa40958f5a28b91a1b4f096706fc946a1a91072d8145c7bf6d1addb570341b65",
   "production_deployed": false,
   "public_file_count": 1277,
   "publisher_source_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
   "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
   "state": "REVIEW_ONLY_NOT_APPROVED",
-  "tar_sha256": "18cd49ff3936895171b889099871e58dd2f1576508c8dc3e4db16a9fd935902e"
+  "tar_sha256": "dcf96b124cea6170453bdec52e60fc94d157864f342e2d1706801d54568abafb"
 }

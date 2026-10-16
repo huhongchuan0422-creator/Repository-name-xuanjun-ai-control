@@ -1,8 +1,8 @@
 {
   "host": "iZvt5t8tlrm8oiZ",
-  "source_head": "dd81041042ef3acca031d6b64684941c38ed72ef",
-  "static_artifact_sha256": "18cd49ff3936895171b889099871e58dd2f1576508c8dc3e4db16a9fd935902e",
-  "package_manifest_sha256": "35639f5d3530e56f525e7fb861be6566f9a4e6e33cc8c3039331275dbf4d65b8",
+  "source_head": "84e9b6b5c7d33d11e51eb42f38d60a537e80db12",
+  "static_artifact_sha256": "dcf96b124cea6170453bdec52e60fc94d157864f342e2d1706801d54568abafb",
+  "package_manifest_sha256": "fa40958f5a28b91a1b4f096706fc946a1a91072d8145c7bf6d1addb570341b65",
   "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
   "publisher_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
   "installed_publisher_sha256": "7253f3b86a6ad17dadc85c26deda17a5ccaaa8f76c65da21572be39658993895",

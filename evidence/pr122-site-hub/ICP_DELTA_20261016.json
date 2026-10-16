@@ -1,0 +1,13 @@
+{
+  "content_source_head": "84e9b6b5c7d33d11e51eb42f38d60a537e80db12",
+  "changed_html_count": 356,
+  "delta": "Exactly one ICP paragraph appended within each shared official footer; all other bytes identical",
+  "archive_members": 447,
+  "public_files": 1277,
+  "overlay_files": 405,
+  "new_files": 90,
+  "runtime_and_publisher": "BYTE_IDENTICAL",
+  "old_tar_sha256": "18cd49ff3936895171b889099871e58dd2f1576508c8dc3e4db16a9fd935902e",
+  "new_tar_sha256": "dcf96b124cea6170453bdec52e60fc94d157864f342e2d1706801d54568abafb",
+  "production_deployed": false
+}
