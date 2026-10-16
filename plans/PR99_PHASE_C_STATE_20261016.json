@@ -98,7 +98,7 @@
       "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
       "independent_byte_review_comment_id": 6213125007
     },
-    "next_development": "Owner-root restored 1374 historical files and prepared separate source-version-pinned Python environment with pip check and offline netns imports. Do not rerun passed recovery/environment install. Current source/data timing, remaining Tokyo service/channel dependencies and activation/retirement are still not accepted. One existing-queue nonroot metadata probe is prepared, no new root authority.",
+    "next_development": "Do not reopen passed Phase-B/C source/artifact or rerun offline recovery/dependency installation. Consolidate real Owner-root receipts with two-runner readback. Subsequent migration must bind current source/data and explicitly handle retained Portal/model/tunnel/customer duties and four Finance/Billing timers without installing old API credentials or overwriting current website/Phase-B. Tokyo remains online.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NONE_NOW_DEVELOPER_READING_EXISTING_RUNNERS_FOR_TARGET_ENVIRONMENT_AND_REMAINING_TOKYO_CHANNEL_METADATA",
+  "owner_action_now": "NO_REPEAT_INSTALL; ONE_CONSOLIDATED_REVIEW_OF_ACTUAL_OFFLINE_RECOVERY_AND_ENV_EVIDENCE; REMAINING_TOKYO_SERVICES_NOT_SWITCHED",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -415,11 +415,21 @@
       "venv": "/opt/xuanjun-binance-offline-env-20261016/venv",
       "helper_commit": "c7f16605e2836c15c8d2b1cac9243838634a4fee",
       "helper_sha256": "e3b820dc7230240308be62b9f9237473738804c345cb892c93f9121860289b13"
+    },
+    "post_recovery_runner_verification": {
+      "run": 38898164991,
+      "korea_job": 116963569222,
+      "tokyo_job": 116963568932,
+      "delivery_commit": "129633f7aaff9c68f73a8adec7b12ab37437a698",
+      "status": "BOTH_JOBS_SUCCESS",
+      "target_dependency_versions": "13_EXACT_MATCH",
+      "existing_phase_b_service": "DISABLED_INACTIVE_PID0_CURRENT_UNCHANGED",
+      "root_private_receipts_read": false
     }
   },
   "offline_relocation_blocker": {
-    "kind": "HISTORICAL_RECOVERY_AND_DEPENDENCY_ENVIRONMENT_COMPLETE_FULL_SERVICE_AND_CURRENT_DATA_MIGRATION_PENDING",
-    "detail": "Owner-root restored 1374 historical files and prepared separate source-version-pinned Python environment with pip check and offline netns imports. Do not rerun passed recovery/environment install. Current source/data timing, remaining Tokyo service/channel dependencies and activation/retirement are still not accepted. One existing-queue nonroot metadata probe is prepared, no new root authority.",
+    "kind": "OFFLINE_RECOVERY_AND_ENV_PASS_TOKYO_RUNNING_RESPONSIBILITIES_AND_CURRENT_STATE_REMAIN",
+    "detail": "Runner independently confirmed new Korea environment package versions and stopped Phase-B. Tokyo still hosts Portal, RPC/model/novel/customer channels and four Finance/Billing timers. Nonroot metadata inventory is not a private config/credential audit or a service migration. Historical restored source/database must not be promoted as final current production state.",
     "api_is_blocker": false,
     "last_owner_attempt": {
       "schema_version": 1,
@@ -456,5 +466,40 @@
       "temporary_known_hosts_command": "OWNER_EXECUTED_PINNED_HOST_CHECK_SUCCEEDED",
       "authentication": "TOKYO_ROOT_PASSWORD_AUTHENTICATION_SUCCEEDED_IN_OWNER_TERMINAL"
     }
+  },
+  "remaining_tokyo_responsibilities": {
+    "evidence_run": 38898164991,
+    "metadata_only": true,
+    "portal": {
+      "unit": "secure-secrets-portal.service",
+      "pid": 3082952,
+      "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+      "migration": "NOT_EXECUTED",
+      "historical_portal_must_not_replace_live_r4_containment": true
+    },
+    "rpc_and_tunnel_units": [
+      "domestic-model-rpc-tunnel.service",
+      "korea-novel-model-rpc-tunnel.service",
+      "provider-neutral-tokyo-tunnel.service",
+      "restricted-rpc-openai-shim.service",
+      "tokyo-restricted-model-executor.service",
+      "xj-tokyo-vpn.service"
+    ],
+    "legacy_channel_units": [
+      "xuanjun-wecom-customer-contact.service",
+      "xuanjun-wecom-customer-service.service",
+      "xuanjun-wecom-novel-ingress.service"
+    ],
+    "finance_timer_units": [
+      "finance-collection-sync.timer",
+      "owner-commercial-ledger-sync.timer",
+      "billing-operations-weekly-settlement.timer",
+      "billing-operations-weekly-final-invoice.timer"
+    ],
+    "finance_operations": "NOT_AUTHORIZED_BY_THIS_OFFLINE_PREPARATION_NO_CHANGES",
+    "root_crontabs": "NOT_READ_NONROOT",
+    "actual_database": "NOT_OPENED_BY_RUNNER",
+    "private_channel_config": "NOT_READ",
+    "all_services_changed": 0
   }
 }

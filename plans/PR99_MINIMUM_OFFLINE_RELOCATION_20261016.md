@@ -1,86 +1,38 @@
-# PR99 最小离线搬迁：Owner范围收敛（2026-10-16）
+# PR99 最小离线搬迁：当前准确进度（2026-10-16）
 
-本页沿原PR99/原分支补充执行范围，不新建任务。Owner明确：API以后重建；当前已有API不单独读取、解密、配置或使用，只保留接入通道；既有加密恢复包仅按密文保全。API和新签名身份不再作为离线文件搬迁的前提。
+沿用原PR99和原分支。Owner决定：旧API暂不重建、不使用；保留已有通道。不得把API建设或真实Shadow作为私有文件搬迁的前提。该范围收敛没有自动授权交易启动、财务操作或东京退役。
 
-## 本轮完成口径
-目标是把需要保留的代码、运行环境和必要历史数据安全落到目标机，并保留原执行/桥接/隧道通道；韩国交易服务保持停止。完成文件搬迁不能报告真实交易或唯一Writer切换通过。已有B安装和C候选均保留，不重开发/打包/测试，不新增C安装器。
+## 已实际完成
 
-## 已有可复用成果（不重做）
-- B离线安装及收尾：#6209166651限定验收通过。
-- 固定root通道：Owner-root安装成功；实际Runner调用成功，Run38886245115/Job116924571943；只支持inspect/install，不支持任意shell/备份导出。
-- 原冻结C制品：#6213125007已补齐44/44绑定及30/30 runtime独立核验；本次不安装或启动C。
-- 既有东京加密恢复基线：#6166635563、#6166680343。
-  固定路径 /root/xj-recovery-package.DZWI6n/recovery-baseline.tar.gz.enc；
-  1,320,571,760字节，SHA256 ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093。
-  此为历史Owner-root回执；当前没有重新读取/解密/备份。
-  历史基线覆盖范围比币安最小迁移广，禁止整包覆盖/etc、/home、生产API或现有服务；韩国已有小说/PostgreSQL/Redis/MoreLogin保持不动。
+| 节点 | 真实结果 | 证据边界 |
+|---|---|---|
+| 韩国原Phase-B安装及兼容收尾 | 原#6209166651通过，继续继承 | 不重新安装、不改17份原文件 |
+| 固定root通道 | Owner-root安装，原Runner固定inspect通过 | 只允许固定动作，不代表任意root登录 |
+| 东京历史密文异机保全 | 韩国1,320,571,760字节，SHA256 ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093 | Owner-root终端回执；不重传 |
+| 专用恢复密钥托管 | root私有0600；完整解密流SHA256 1784372b17b3466ad4de946e03fc1a1866abccdab791fc871db08b827757154a | 密钥未公开，完整明文归档未落盘 |
+| 选择性历史恢复 | 1373份源码/依赖文件+1份交易库，共66,552,325字节 | 新私有目录；不部署源码或旧API配置 |
+| 历史交易库 | SHA256 d0bb23c5cede3a66567373b92221b058aa18e07aa510daf0bc02f8f4770bd0a5，完整性通过 | 历史备份，不是当前最终业务快照 |
+| 独立Python依赖环境 | 13项包与东京项目venv版本一致，pip check及一次性无外网namespace导入通过 | 不修改系统/原B环境，不运行交易程序 |
+| 两台Runner反采样 | Run38898164991，两Job SUCCESS | UID1001、无sudo/HTTP/凭据/业务库读取；不冒充root私有状态审核 |
 
-## 最少执行顺序
-1. 固定上述既有基线身份，核实受保护异机副本及恢复密钥托管是否已经存在；已有则直接复用。只搬密文不等于恢复能力完备，密钥只能走既有私有管理通道。
-2. 如缺异机副本，经可信admin/root私有路径拷贝固定密文至韩国新私有隔离目录，目标验证准确大小和SHA；不中途解密，不把备份或密钥上传GitHub、日志或聊天，不覆盖任何生产对象。
-3. 如需恢复，只按原最小范围提取代码/必要历史数据到新的隔离目录，核对内容及运行依赖；不解密或激活旧API、不导入整套旧systemd/cron，不启动服务/调度，不创建Writer。
-4. 保存真实目标文件/校验/隔离回执。最终数据时点、真实业务激活与东京退役仍须独立确认；不把历史基线作为当前最终一致快照。
+韩国新环境：/opt/xuanjun-binance-offline-env-20261016/venv。
+历史恢复目录：/root/xuanjun-offline-selected-20261016。
+韩国原B仍disabled/inactive/PID0，current仍指向/opt/xuanjun-binance/releases/f887b085508e3ed4。
+密文、恢复密钥、业务数据库和私有文件清单不得进入公开GitHub或聊天。
 
-## 真实新增现场事实
-Run38886874470：韩国Job116926645339、东京Job116926645389 SUCCESS；非root UID1001，无checkout、sudo、HTTP、凭据或数据库内容读取。
-- 韩国broker xuanjun_binance=UID/GID986、nologin；worker名称未创建；1986–1995 UID/GID均未分配（采样时点）。
-- 韩国三个C候选根目录均ABSENT。
-- 东京权威数据库文件为46,907,392字节，dev64771/inode1601016；采样时WAL/SHM未见。未打开数据库、未读取schema/订单；瞬时未见WAL不证明无Writer，也不授权普通文件复制活库。
-- DNS解析为一次只读候选信息，不是API权限/网络验收；Owner已取消把API作为当前搬迁前置。
-原C134/通道22及重新打包步骤在本次Hosted CI已明确SKIPPED；CI范围门禁真实Run38886880295/Job116926661256通过。
+## 尚未完成的真实运行迁移
 
-## 当前真实执行缺口
-root私有基线的受保护异机复制尚无执行回执。当前韩国固定通道不能导出/导入备份，东京旧固定helper也只提供巡检；不能用这两条命令冒充已经拥有任意root文件传输能力。
-因此本窗口未拷贝、解密或恢复该基线，未修改API、网络通道、数据库或服务。下一动作只解决这条私有文件搬运路径；不因该缺口扩大到API建设或重新审C源码。
+1. 当前源码/数据的增量时点尚未形成受验收的最终交接。历史恢复目录不能直接替换当前生产；东京现用Portal仍是已通过R4遏制的57e38fc9...版本。
+2. Portal、模型/RPC/隧道和旧客户入口仍在东京运行。先明确目标及安全接续，不以“API以后再建”为由默默丢弃通道。
+3. 四项财务定时任务仍加载在东京：finance-collection-sync、owner-commercial-ledger-sync、billing-operations-weekly-settlement、billing-operations-weekly-final-invoice。本轮没有操作、停用或迁移它们。
+4. root/admin crontab与私有通道配置尚未由本次非root采样读取。不能以该采样宣称全部后台依赖已经清零。
+5. 真实应用启用、唯一Writer切换、交易所对账及东京退役均未完成。旧API延后重建，不等于这些生产动作获批。
 
-## 最小私有搬运方式
+## 下一执行顺序
 
-在当前韩国Owner-root终端，通过已有SSH信任向固定东京admin@47.245.53.152拉取固定密文。StrictHostKeyChecking=yes、BatchMode=yes、ConnectTimeout=10，不新增SSH密钥/known_hosts/权限；实际hostname必须等于东京固定主机；源SHA和目标SHA都绑定历史已审基线。只写韩国新的0700私有目录；全程不解密、不触碰已有API/桥接/隧道/生产目录或服务。
-若现有SSH路由不可用，在创建目标目录之前停止并报告该唯一通道缺口，不能自行关闭主机校验或改用明文/公开制品。实际命令尚未执行。备份解密密钥的私有托管及应用选择性恢复仍未实机确认，不把密文落地单独算作完整迁移。
+- 集中核验已完成的离线保全、恢复和环境实机回执；原B/C及未变制品/测试全部继承。
+- 以刚取得的运行职责清单确定增量交接和目标落点，保留既有网站、B候选、共享服务与通道；私有配置只能走私有执行路径。
+- 只对明确范围准备必要执行及回滚方案，不启动第二writer，不整包恢复/etc或/home，不自动启用旧脚本/调度。
+- 各项实际运行职责完成接续或Owner明确决定保留/停止后，才讨论东京退役。当前必须继续运行。
 
-## SSH身份校验补证
-
-Owner首次私有拉取在严格主机校验阶段失败：No ECDSA host key is known。未进入目标目录创建或文件复制。开发方已通过东京既有Runner读取固定root拥有0644 SSH主机公钥，Run38888460739/Job116931876479 SUCCESS；ECDSA指纹已独立复算为 SHA256:hxqnfjlczczDNLsJlY+x9OrBF5guN+x62gJF2RHIw7w。
-新命令只生成本次使用的root私有known_hosts文件，固定此公钥和ECDSA算法；StrictHostKeyChecking保持yes，不使用ssh-keyscan或关闭校验，不改原/root/.ssh/known_hosts。SSH账号认证和备份读取仍需实际通过，不能把主机公钥补齐当作复制成功。
-
-```bash
-bash <<'BASH'
-set -euo pipefail
-test "$EUID" -eq 0
-test "$(hostname -s)" = iZmj7a5kwr75qc1tul4kf9Z
-umask 077
-XJ_KH=$(mktemp /root/pr99-tokyo-hostkey.XXXXXXXX)
-printf '%s\n' '47.245.53.152 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMfngQ3DTnuC8aP0TZ0fBhcq+8p7Yw0c7VEYKWSpFrtpqWf+shoFTiyrAWj1OlrnoeOlsZq1SS1zOavODbJOnzs=' >"$XJ_KH"
-XJ_SSH=(-T -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$XJ_KH" -o GlobalKnownHostsFile=/dev/null -o HostKeyAlgorithms=ecdsa-sha2-nistp256 -o UpdateHostKeys=no -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ClearAllForwardings=yes)
-ssh "${XJ_SSH[@]}" admin@47.245.53.152 'test "$(hostname -s)" = iZ6wee8q9z4t03hvqumwfhZ && sudo -n test -r /root/xj-recovery-package.DZWI6n/recovery-baseline.tar.gz.enc' || { echo 'STOP：SSH身份认证或源备份读取未通过，尚未复制。'; exit 2; }
-
-D=/root/xuanjun-offline-baseline-20261016
-mkdir -m 0700 "$D"
-trap 'echo "HOLD：保留私有目录和未完成文件，不覆盖、不重跑。"; exit 2' ERR
-timeout 900 ssh "${XJ_SSH[@]}" admin@47.245.53.152 'sudo -n /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C /bin/bash -s' <<'REMOTE' | dd of="$D/baseline.enc.partial" bs=4M status=progress
-set -euo pipefail
-test "$EUID" -eq 0
-test "$(hostname -s)" = iZ6wee8q9z4t03hvqumwfhZ
-F=/root/xj-recovery-package.DZWI6n/recovery-baseline.tar.gz.enc
-test -f "$F" && test ! -L "$F"
-test "$(stat -c %u:%h "$F")" = 0:1
-test "$(stat -c %s "$F")" = 1320571760
-printf '%s  %s\n' ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093 "$F" | sha256sum -c - >/dev/null
-cat "$F"
-REMOTE
-test "$(stat -c %s "$D/baseline.enc.partial")" = 1320571760
-printf '%s  %s\n' ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093 "$D/baseline.enc.partial" | sha256sum -c -
-mv -T "$D/baseline.enc.partial" "$D/recovery-baseline.tar.gz.enc"
-sync -f "$D/recovery-baseline.tar.gz.enc"
-echo "ENCRYPTED_BASELINE_OFFSITE=PASS API_UNTOUCHED=YES SERVICE_ACTIONS=0"
-BASH
-```
-
-## 2026-10-16 19:35 Owner-root实际进度更新（取代上文未执行状态）
-
-- 既有东京root密码SSH身份认证已通过；原900秒超时保留498,335,744字节。
-- 已执行前缀校验续传：新增822,236,016字节，合计1,320,571,760字节；整包SHA256与历史批准值一致。
-- 最终文件：/root/xuanjun-offline-baseline-20261016/recovery-baseline.tar.gz.enc；终态ENCRYPTED_BASELINE_OFFSITE=PASS。
-- 证据来源是Owner韩国root终端，不冒充本窗口独立登录取证；本轮没有解密、恢复、API操作或服务动作。
-- 不再执行上文初始复制命令，也不重跑续传；旧脚本及失败记录保留。
-- 下一步仅核对基线专用密钥的私有托管，再选择性恢复。密钥内容不得进入GitHub、聊天、命令行参数或公开日志。历史大包禁止整体覆盖目标机；未做实际恢复前不报告服务器迁移完成。
+本轮没有新生产服务动作，没有DNS/官网/current修改，没有交易API或Finance操作。离线资产和环境准备完成，不等于服务器完整业务迁移完成。
