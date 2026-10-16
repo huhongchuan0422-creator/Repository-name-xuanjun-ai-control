@@ -28,8 +28,8 @@ PREP_ROOT = CAND+'/epoch7-preparation-candidate-r7-resourcebind'
 # Original saved-evidence kit stays immutable. The independent compiler artifact
 # must be published and reviewed before these fixed pins can be bound.
 COMPILER_KIT_ROOT = CAND+'/epoch7-recovery-candidate-r7-resourcebind'
-COMPILER_KIT_SHA = None
-COMPILER_ENTRY_SHA = None
+COMPILER_KIT_SHA = '6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030'
+COMPILER_ENTRY_SHA = '071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5'
 RELEASE_PARENT = '/opt/xuanjun-control-releases'
 KIT_SHA = '7b926fda92065d9ff981bfeaad490d5568dd5901d2b1089d1f1dfac94eae8bb4'
 ENTRY_SHA = '1be06802e012b5747f837af02ff8746fec9864ef94715b561f67c39be95e0948'

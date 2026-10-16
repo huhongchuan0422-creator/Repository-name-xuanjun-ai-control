@@ -1,0 +1,37 @@
+{
+  "actual_host": "NOT_RUN",
+  "archive_bytes": 1056853,
+  "archive_git_blob_sha1": "b588ef4e9333969b02f9322621dd7abe7641f23c",
+  "archive_sha256": "6244cca1b41037b7c240f71b93f867c5660a770d451c4a5a661b283f61ce819e",
+  "cache_pins": 255,
+  "entry_bytes": 55774,
+  "entry_sha256": "071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5",
+  "files": 256,
+  "hosted": {
+    "errors": 0,
+    "failures": 0,
+    "gzip_cross_version_byte_equality": false,
+    "manifest_match": true,
+    "result": "SUCCESS",
+    "run_id": 38862332226,
+    "selected_312_archive_matches_local": true,
+    "skips": 0,
+    "source_commit": "ef21ca95331769622c294c65bb60ec7ceed0c392",
+    "tests_per_version": 122,
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38862332226",
+    "versions": [
+      "3.6.15",
+      "3.12.15"
+    ]
+  },
+  "installation_approval": "NOT_GRANTED",
+  "manifest_bytes": 62561,
+  "manifest_sha256": "6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030",
+  "original_a_evidence_kit_unchanged": true,
+  "runtime_package_files_byte_preserved": 110,
+  "runtime_payloads_byte_preserved": 107,
+  "schema": 1,
+  "selected_compression_runtime": "3.12.14",
+  "source_commit": "ef21ca95331769622c294c65bb60ec7ceed0c392",
+  "source_tree": "5a70c5627afe75fcd475c20e71ee9bfb0b6a156d"
+}
