@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_REDACTED_NO_SECRET_VALUES",
+  "reported_local_time": "2026-10-16T22:51+08:00",
+  "approval_comment_id": 6217834919,
+  "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+  "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
+  "status": "HOLD_PRESERVE_EVIDENCE",
+  "first_failed_stage": "INITIAL_SSH_LOGIN_IDENTITY_PREFLIGHT",
+  "ssh_exit": 255,
+  "korea_failure_sha256": "9f48d4a2e1940af1c426d09cf044cc294b6ebb5e295420075b26d20317dbd362",
+  "failure_reason": "CalledProcessError",
+  "later_invocations": [
+    {
+      "launch_directory": "/root/pr99-s06-approved.pJSsKySO",
+      "reason": "FileExistsError_TARGET_MKDIR"
+    },
+    {
+      "launch_directory": "/root/pr99-s06-approved.66ER1spv",
+      "reason": "FileExistsError_TARGET_MKDIR"
+    }
+  ],
+  "local_target": "/root/pr99-s06-runtime-received-v1",
+  "source_workdir": "/root/pr99-s06-runtime-contract-v1",
+  "capture_function_reached_in_reported_invocations": false,
+  "source_stage_absence_independently_verified": false,
+  "unit_configuration_capture_success": false,
+  "private_transfer_success": false,
+  "service_actions": 0,
+  "retry_allowed_under_old_permission": false,
+  "owner_requested_reexecution": true,
+  "secret_values_omitted": true
+}
