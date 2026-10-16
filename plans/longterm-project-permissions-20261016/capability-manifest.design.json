@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "kind": "DESIGN_ONLY_NON_EXECUTABLE",
+  "title": "玄钧云汇一次性长期开发与运维权限设计",
+  "as_of_utc": "2026-10-16T00:30:00Z",
+  "canonical_task_url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17",
+  "authority_receipt_url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6205097820",
+  "activation_state": "NOT_ACTIVATED",
+  "host_mutation": "NOT_EXECUTED",
+  "external_publication": "NOT_EXECUTED",
+  "new_credentials": "NOT_CREATED",
+  "new_canonical_ledger": false,
+  "current_p2_source_modified": false,
+  "existing_inventory_reused": true,
+  "persistent_activation_requires": "ONE_EXACT_PACKAGE_ACTION_TIME_CONFIRMATION_AFTER_IMPLEMENTATION_AND_INDEPENDENT_REVIEW",
+  "capabilities": [
+    "development_repository_and_workspace",
+    "dependency_build_cache",
+    "test_and_resource_isolation",
+    "artifact_freeze_review_promotion",
+    "release_installation",
+    "service_lifecycle",
+    "project_configuration",
+    "observability_alerting",
+    "incident_diagnostics_containment",
+    "bounded_data_access_maintenance",
+    "consistent_backup",
+    "restore_disaster_recovery",
+    "existing_certificate_lifecycle",
+    "host_runtime_maintenance",
+    "exact_rollback",
+    "protected_audit",
+    "permission_revocation",
+    "independent_review_platform_governance"
+  ],
+  "hosts": {
+    "uk": {
+      "role": "DEVELOPMENT_CONTROL_PLANE",
+      "observed_existing_accounts": {
+        "admin": 1000,
+        "githubrunner": 1001,
+        "xuanjun_dev": 1002,
+        "xuanjun-dispatcher": 1003
+      },
+      "runner": "INACTIVE_DEAD_OWNER_REPORTED",
+      "mechanical": "INACTIVE_DEAD_OWNER_REPORTED",
+      "scope": "REUSE_P2_CONTROLS_KEEP_INACTIVE_UNTIL_EXISTING_RECOVERY_GATES",
+      "full_effective_sudo": "UNKNOWN_CURRENT_HISTORICAL_BROAD_GRANTS_RECORDED",
+      "production_trading": "FORBIDDEN"
+    },
+    "domestic": {
+      "role": "LONG_TERM_OPERATIONS",
+      "observed_existing_accounts": {
+        "admin": 1000,
+        "openclaw_ops": 1001,
+        "githubrunner": 1002
+      },
+      "runner": "ACTIVE_RUNNING_OWNER_REPORTED",
+      "bridge": "ACTIVE_RUNNING_OWNER_REPORTED",
+      "target_service_path_data_certificate_maps": "UNKNOWN_REQUIRES_BOUND_EVIDENCE"
+    },
+    "korea": {
+      "role": "LONG_TERM_OPERATIONS",
+      "observed_existing_accounts": {
+        "admin": 1000,
+        "githubrunner": 1001
+      },
+      "runner": "ACTIVE_RUNNING_OWNER_REPORTED",
+      "target_service_path_data_certificate_maps": "UNKNOWN_REQUIRES_BOUND_EVIDENCE",
+      "trading_financial_actions": "EXISTING_GATES_UNCHANGED"
+    },
+    "tokyo": {
+      "role": "MIGRATION_ONLY",
+      "observed_existing_accounts": {
+        "admin": 1000,
+        "githubrunner": 1001
+      },
+      "runner": "ACTIVE_RUNNING_OWNER_REPORTED",
+      "long_term_executor": false,
+      "retirement": "ONLY_AFTER_MIGRATION_ACCEPTANCE_AND_VALID_AUTHORITY"
+    }
+  },
+  "implementation_contract": {
+    "trusted_entrypoint": "UNKNOWN_NOT_FABRICATED",
+    "bundle_sha256": null,
+    "install_command": null,
+    "verify_only_command": null,
+    "revoke_command": null,
+    "rollback_command": null,
+    "reason": "Live effective sudo, trusted broker/helper implementation, exact host targets, original state and final reviewed bytes are not yet bound.",
+    "prohibited": [
+      "NOPASSWD_ALL_FOR_PR_RUNNERS",
+      "ARBITRARY_ROOT_SHELL_ARGV_PATH_UID",
+      "UNTRUSTED_PR_CODE_AS_ROOT_INSTALLER",
+      "P2_RESTART_BY_PERMISSION_SETUP",
+      "REVIEW_IDENTITY_IMPERSONATION",
+      "UNKNOWN_EFFECT_BLIND_RETRY",
+      "SECRET_EXPORT",
+      "RESTORE_REVOKED_BROAD_PRIVILEGES"
+    ]
+  },
+  "platform_admin": {
+    "state": "UNAVAILABLE_403",
+    "classification": "EXTERNAL_PLATFORM_PERMISSION_LIMIT_NOT_OWNER_CONSENT_GAP",
+    "required_actor": "VERIFIED_GITHUB_ADMINISTRATOR"
+  },
+  "p2_reuse": {
+    "kit_source": "dc18f73e67818dc59f5acea247dbf05443bde10d",
+    "delivery": "9b52943b8520657d43b18fbdd0429b2f97d1c24a",
+    "fresh_preparation_delivery": "609407afa118c527299f33885d82b6acc1c020fb",
+    "broker_scope": "FIXED_LAUNCH_STOP_STATUS_LAUNCH_EXPLICITLY_DENIED",
+    "general_operations_adapter": "NOT_IMPLEMENTED_BY_THIS_PACKAGE"
+  },
+  "review_state": "LOCAL_DESIGN_REVIEW_CORRECTIONS_VERIFIED_NO_REMAINING_DOCUMENT_SCOPE_BLOCKER",
+  "test_state": "PLAN_ONLY_ALL_NEW_CAPABILITY_TESTS_NOT_RUN",
+  "runtime_isolation": "KERNEL_ENFORCED_TASK_FILESYSTEM_PROCESS_BOUNDARY_REQUIRED_SAME_UID_NOT_SUFFICIENT",
+  "trusted_baseline": "INDEPENDENT_PROVENANCE_REQUIRED_AFTER_HISTORICAL_ROOT_CAPABILITY_NO_COMPROMISE_CLAIM",
+  "audit_order": "DURABLE_AUTHORIZED_INTENT_BEFORE_EFFECT_OUTCOME_OR_UNKNOWN_AFTER_EFFECT_LOCAL_PERSISTENCE_FAILURE_DENIES_NEW_MUTATION",
+  "revoke_drill": "REVOKED_DISABLED_THEN_VALID_EXACT_TRANSACTION_REACTIVATION_CONFIRMATION_AND_EFFECTIVE_READBACK_BEFORE_ACTIVE",
+  "review_limit": "NOT_IMPLEMENTATION_TEST_NOT_FORMAL_TASK5_OR_PLATFORM_APPROVAL_NOT_ACTIVATION_AUTHORITY"
+}

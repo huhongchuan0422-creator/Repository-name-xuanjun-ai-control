@@ -1,0 +1,123 @@
+[
+  {
+    "id": "S01",
+    "title": "PR17长期授权与已完成四机盘点",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6205097820"
+  },
+  {
+    "id": "S02",
+    "title": "历史英国宽sudo准备",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6120059520"
+  },
+  {
+    "id": "S03",
+    "title": "历史英国宽sudo安装回执",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6120119999"
+  },
+  {
+    "id": "S04",
+    "title": "R7冻结制品独立复审",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/58#issuecomment-6194645101"
+  },
+  {
+    "id": "S05",
+    "title": "R7保存拓扑证据",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/58#issuecomment-6196471967"
+  },
+  {
+    "id": "S06",
+    "title": "R7准备源码与交付集中请求",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/58#issuecomment-6197359699"
+  },
+  {
+    "id": "S07",
+    "title": "R7 fresh preparation预审限定通过",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/58#issuecomment-6197494649"
+  },
+  {
+    "id": "S08",
+    "title": "Task5一次性证据标准",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/58#issuecomment-6197750473"
+  },
+  {
+    "id": "S09",
+    "title": "A2分层证据可接受条件",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/58#issuecomment-6197897838"
+  },
+  {
+    "id": "S10",
+    "title": "三入口六门禁与条件启用",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6195539678"
+  },
+  {
+    "id": "S11",
+    "title": "PR123可信来源候选及403",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6194791267"
+  },
+  {
+    "id": "S12",
+    "title": "deploy/INTEGRATION_BINDING.md",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/dc18f73e67818dc59f5acea247dbf05443bde10d/evidence/p2-epoch7-access-repair-20261014/runtime/deploy/INTEGRATION_BINDING.md",
+    "git_blob_sha": "104f08a6229c4a89a42bee7d2dcbc9e21585767c",
+    "ref": "dc18f73e67818dc59f5acea247dbf05443bde10d"
+  },
+  {
+    "id": "S13",
+    "title": "deploy/UK_DISPATCHER_ROLLOUT.md",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/dc18f73e67818dc59f5acea247dbf05443bde10d/evidence/p2-epoch7-access-repair-20261014/runtime/deploy/UK_DISPATCHER_ROLLOUT.md",
+    "git_blob_sha": "fdcbd9be017461ed3b7db8bd089e35d3dadfa295",
+    "ref": "dc18f73e67818dc59f5acea247dbf05443bde10d"
+  },
+  {
+    "id": "S14",
+    "title": "stage1/root_broker.py",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/dc18f73e67818dc59f5acea247dbf05443bde10d/evidence/p2-epoch7-access-repair-20261014/runtime/stage1/root_broker.py",
+    "git_blob_sha": "2176d7acd62cd64e61d465112a360f142a950e7d",
+    "ref": "dc18f73e67818dc59f5acea247dbf05443bde10d"
+  },
+  {
+    "id": "S15",
+    "title": "stage1/development_service.py",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/dc18f73e67818dc59f5acea247dbf05443bde10d/evidence/p2-epoch7-access-repair-20261014/runtime/stage1/development_service.py",
+    "git_blob_sha": "bc5a5271d91b894069af38d5091353ead11d3236",
+    "ref": "dc18f73e67818dc59f5acea247dbf05443bde10d"
+  },
+  {
+    "id": "S16",
+    "title": "deploy/xj-root-broker.service",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/dc18f73e67818dc59f5acea247dbf05443bde10d/evidence/p2-epoch7-access-repair-20261014/runtime/deploy/xj-root-broker.service",
+    "git_blob_sha": "51a0117f70dfe80afe67b30a6fab6865afae098b",
+    "ref": "dc18f73e67818dc59f5acea247dbf05443bde10d"
+  },
+  {
+    "id": "S17",
+    "title": "deploy/xj-root-broker.socket",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/dc18f73e67818dc59f5acea247dbf05443bde10d/evidence/p2-epoch7-access-repair-20261014/runtime/deploy/xj-root-broker.socket",
+    "git_blob_sha": "6b1c1c4fd85a7f8322fa652a052e5b2b0ad7411e",
+    "ref": "dc18f73e67818dc59f5acea247dbf05443bde10d"
+  },
+  {
+    "id": "S18",
+    "title": ".github/workflows/v27-four-server-batch-readonly.yml",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/main/.github/workflows/v27-four-server-batch-readonly.yml",
+    "git_blob_sha": "0a5a8ad5cba660911f87a5e7283cbf7c8c292fe4"
+  },
+  {
+    "id": "S19",
+    "title": "docs/DEVELOPMENT_EXECUTION_AND_FEEDBACK_RULES_20261012.md",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/277c5c7faeed10cc9ecc9f4a539cdb2eac6e4edd/docs/DEVELOPMENT_EXECUTION_AND_FEEDBACK_RULES_20261012.md",
+    "git_blob_sha": "fa256dfab0984267ba879bd56a6b9ba821c1171b"
+  },
+  {
+    "id": "S20",
+    "title": "docs/THREE_NATIVE_ENTRY_HANDOFF.md",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/main/docs/THREE_NATIVE_ENTRY_HANDOFF.md",
+    "git_blob_sha": "c5d4a8198002cf05bc95ab2750a3dd90136c62a5"
+  },
+  {
+    "id": "S21",
+    "title": "PR122新Tokyo helper应用结果（已核验项目回执，本设计未独立复验原始日志）",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38829135481/job/116743548144",
+    "status": "PROJECT_RECEIPT_VERIFIED; independent helper review6205089607 and exact installation authorization still outstanding"
+  }
+]
