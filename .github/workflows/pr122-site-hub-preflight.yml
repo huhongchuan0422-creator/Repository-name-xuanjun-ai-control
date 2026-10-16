@@ -2,6 +2,10 @@ name: PR122 Site Hub Preflight
 on:
   workflow_dispatch:
     inputs:
+      protected_builder:
+        description: 'Invoke only the separately installed candidate-only fixed root channel'
+        type: boolean
+        default: false
       showcase_review_ids:
         description: 'Approved PR122 content-review comment IDs; blank means preview only'
         required: false
@@ -37,6 +41,7 @@ permissions:
   issues: read
 jobs:
   static-and-synthetic:
+    if: github.event_name != 'workflow_dispatch' || inputs.protected_builder != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -123,7 +128,7 @@ jobs:
       - name: Dynamic showcase lifecycle and isolated static publisher
         run: |
           python -m unittest tests.test_pr122_showcase tests.test_pr122_showcase_sources -v
-          sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_trust tests.test_pr122_showcase_protected_build -v
+          sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_trust tests.test_pr122_showcase_protected_build tests.test_pr122_showcase_build_channel -v
           sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_install -v
           sudo -n env XJ_SHOWCASE_REPORT_DIR=/tmp/pr122-site-hub "$(command -v python)" -m unittest tests.test_pr122_showcase_promote tests.test_pr122_showcase_poll -v
           python -m scripts.pr122_showcase_build --registry showcase --output /tmp/pr122-showcase-preview --preview
@@ -193,4 +198,37 @@ jobs:
         with:
           name: pr122-site-hub-preflight-${{ github.sha }}
           path: /tmp/pr122-site-hub/
+          retention-days: 14
+
+  protected-domestic-candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.protected_builder == true && vars.PR122_SHOWCASE_PIPELINE_ENABLED == 'true' && startsWith(github.ref, 'refs/tags/pr122-showcase-builder-')
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 8
+    steps:
+      - name: Invoke fixed candidate-only root capability without checking out code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -u)" = 1002
+          mkdir -p "$RUNNER_TEMP/pr122-reviewed-candidate"
+          sudo -n /usr/local/libexec/xuanjun-showcase-build build > "$RUNNER_TEMP/pr122-reviewed-candidate/STATUS.json"
+          sudo -n /usr/local/libexec/xuanjun-showcase-build export > "$RUNNER_TEMP/pr122-reviewed-candidate/EXPORT.json"
+          python3 - <<'PY'
+          import base64,hashlib,json,os
+          from pathlib import Path
+          folder=Path(os.environ['RUNNER_TEMP'])/'pr122-reviewed-candidate'
+          envelope=json.loads((folder/'EXPORT.json').read_bytes());receipt=envelope['receipt']
+          assert receipt['mechanism_source_commit']==os.environ['GITHUB_SHA']
+          raw=base64.b64decode(envelope['tar_base64'],validate=True)
+          assert len(raw)<=16000000 and hashlib.sha256(raw).hexdigest()==receipt['tar_sha256']
+          (folder/'SHOWCASE_RELEASE.tar.gz').write_bytes(raw)
+          (folder/'BUILD_RECEIPT.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
+          (folder/'CI_BINDING.json').write_text(json.dumps({'workflow_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'content_commit':receipt['source_commit'],'production_publication':'NOT_EXECUTED'},sort_keys=True)+'\n')
+          (folder/'EXPORT.json').unlink()
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-reviewed-showcase-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr122-reviewed-candidate/
           retention-days: 14

@@ -79,6 +79,18 @@ class BuilderTests(unittest.TestCase):
             if path.startswith('git/trees/'):r['truncated']=True
             return r
         with self.assertRaisesRegex(ValueError,'BUILDER_SOURCE_TREE'):b.construct(self.request,self.stage,None,truncated)
+    def test_runtime_with_effective_capabilities_is_rejected(self):
+        raw='Uid: 0 0 0 0\nCapEff: 0000000000000001\nNoNewPrivs: 1\n'
+        with mock.patch.object(Path,'read_text',return_value=raw):
+            with self.assertRaisesRegex(ValueError,'BUILDER_EFFECTIVE_PRIVILEGES'):b.runtime_evidence()
+    def test_authenticated_api_uses_private_header_and_sanitizes_failure(self):
+        secret='SYNTHETIC_TOKEN_NOT_A_CREDENTIAL'
+        opener=mock.Mock();opener.open.side_effect=RuntimeError(secret)
+        with mock.patch.object(b,'private_bytes',return_value=secret.encode()),mock.patch.object(b.urllib.request,'build_opener',return_value=opener):
+            with self.assertRaisesRegex(ValueError,'BUILDER_GITHUB_REQUEST_FAILED') as error:b.fetch('actions/runs/9')
+        self.assertNotIn(secret,str(error.exception))
+        request=opener.open.call_args.args[0]
+        self.assertNotIn(secret,request.full_url);self.assertEqual(request.headers['Authorization'],'Bearer '+secret)
     def test_expired_request_and_duplicate_review_ids_rejected(self):
         for change in [{'expires_unix':0},{'review_comment_ids':[7,7]}]:
             with self.subTest(change=change):
@@ -92,7 +104,7 @@ class PrivateInputTests(unittest.TestCase):
     def test_installed_code_manifest_and_self_binding(self):
         with tempfile.TemporaryDirectory(dir='/root') as td:
             root=Path(td);code=root/'scripts/pr122_showcase_protected_build.py';code.parent.mkdir();code.write_bytes(b'# fixture code')
-            manifest={'files':[{'path':str(code.relative_to(root)),'size':len(code.read_bytes()),'sha256':s.sha(code.read_bytes())}]}
+            manifest={'source_commit':'c'*40,'files':[{'path':str(code.relative_to(root)),'size':len(code.read_bytes()),'sha256':s.sha(code.read_bytes())}]}
             manifest['files'].append({'path':'docs/not-installed.md','size':1,'sha256':'a'*64})
             raw=s.canonical(manifest);(root/'MECHANISM_MANIFEST.json').write_bytes(raw)
             with mock.patch.object(b,'CODE',root),mock.patch.object(b,'__file__',str(code)):
@@ -122,7 +134,7 @@ class PipelineTests(unittest.TestCase):
         self.fixture.request['shell_tar_sha256']=s.sha(shell.read_bytes());self.request.write_bytes(s.canonical(self.fixture.request))
         for target,name,value in [(b,'BASE',self.base),(b,'REQUEST',self.request),(b,'SHELL',shell),(trust,'TRUST',self.policy),(b,'fetch',self.fixture.api)]:
             patch=mock.patch.object(target,name,value);patch.start();self.addCleanup(patch.stop)
-        for target,name,value in [(b,'verified_code',None),(b.site,'official_shell',None)]:
+        for target,name,value in [(b,'verified_code',None),(b.site,'official_shell',None),(b,'runtime_evidence',{'effective':True,'mount_namespace':'SYNTHETIC_SANDBOX_NS'})]:
             patch=mock.patch.object(target,name,return_value=value);patch.start();self.addCleanup(patch.stop)
         patch=mock.patch.object(b.os,'uname',return_value=SimpleNamespace(nodename='iZvt5t8tlrm8oiZ'));patch.start();self.addCleanup(patch.stop)
         self.original=b.construct

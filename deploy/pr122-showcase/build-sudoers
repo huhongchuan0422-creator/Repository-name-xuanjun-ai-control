@@ -1,0 +1,3 @@
+Defaults:githubrunner !requiretty
+Cmnd_Alias XUANJUN_SHOWCASE_BUILD = /usr/local/libexec/xuanjun-showcase-build inspect, /usr/local/libexec/xuanjun-showcase-build build, /usr/local/libexec/xuanjun-showcase-build export
+githubrunner ALL=(root) NOPASSWD: XUANJUN_SHOWCASE_BUILD

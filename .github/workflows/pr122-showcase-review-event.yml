@@ -5,14 +5,28 @@ on:
 permissions:
   contents: read
   issues: read
+  actions: write
 jobs:
-  review-notification-only:
-    if: github.event.issue.number == 122 && (startsWith(github.event.comment.body, 'XUANJUN_SHOWCASE_REVIEW') || startsWith(github.event.comment.body, 'XUANJUN_SHOWCASE_BUILD_REQUEST'))
+  dispatch-candidate-only:
+    if: vars.PR122_SHOWCASE_PIPELINE_ENABLED == 'true' && github.event.issue.number == 122 && github.event.comment.user.login == 'huhongchuan0422-creator' && (startsWith(github.event.comment.body, 'XUANJUN_SHOWCASE_REVIEW') || startsWith(github.event.comment.body, 'XUANJUN_SHOWCASE_BUILD_REQUEST'))
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Require independent protected builder admission
+      - name: Dispatch fixed installed builder; comment grants no root authority
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILDER_REF: ${{ vars.PR122_SHOWCASE_BUILDER_REF }}
         run: |
-          echo 'HOLD_OWNER_ANCHORED_REVIEW_REQUIRED'
-          echo 'Comment events cannot authorize tags, dispatches, or production builds.'
-          echo 'Use the approved protected builder with independently enrolled exact anchors.'
+          python3 - <<'PY'
+          import json,os,re,urllib.request
+          ref=os.environ['BUILDER_REF']
+          assert re.fullmatch(r'pr122-showcase-builder-[0-9a-f]{40}',ref)
+          repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+          raw=json.dumps({'ref':ref,'inputs':{'protected_builder':True}}).encode()
+          request=urllib.request.Request('https://api.github.com/repos/'+repo+'/actions/workflows/pr122-site-hub-preflight.yml/dispatches',data=raw,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):return None
+          opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+          with opener.open(request,timeout=20) as response:assert response.status==204
+          print('CANDIDATE_BUILD_DISPATCHED; ROOT_AUTHORITY_REMAINS_OWNER_ENROLLED; NO_PUBLICATION')
+          PY

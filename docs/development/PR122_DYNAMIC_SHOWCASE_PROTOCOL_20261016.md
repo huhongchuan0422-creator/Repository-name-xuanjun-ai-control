@@ -151,3 +151,50 @@ CLI无任意参数；固定国内主机/root检查。服务启动前先核验Own
 - 正式实际SHOWCASE_RELEASE生成、制品独审与单次发布许可、真实域名浏览器和手机验收。
 
 该增量完成“固定代码、数据分离、生成候选”的核心，并明确保留上述部署/自动接线门禁；不将核心代码完成夸大为整条自动更新系统已上线。模拟测试使用测试信任和网络夹具，不登记真实信任或生产批准。
+
+
+## 完整生产接线候选：安装、事件、固定能力及上传（2026-10-16，未执行）
+
+本节替代上个核心节点“安装器未扩展/事件尚未实现”的现状描述；此前已审核心和9项内容不重做。
+源码现已提供以下完整调用链，实际安装/默认分支激活/Owner信任登记/国内验收仍未执行。
+
+### 一次性安装及准确计划
+原安装器增加只读plan，完整核对机制文件、现网Nginx/current/主进程、Runner UID1002、Owner私有输入、现有sudoers与新sudoers。输出plan及plan_sha256，不安装或改current。
+原install要求新scope=STATIC_SHOWCASE_WITH_CANDIDATE_BUILDER、准确manifest源码commit、plan_sha256、单次/最多两小时/允许本事务回滚的独立许可；旧scope许可不能重用。
+在原事务内增加builder unit、root0700输出目录、固定wrapper与精确sudoers；写文件后通过fchmod设置准确权限，不受umask077影响。激活前重验私有输入摘要、独审许可、Nginx/进程及期限。
+只安装builder服务，不在安装过程中构建内容。原publisher timer与/showcase/ include仍按原许可流程处理；不改主站current、DNS、原隔离演示Runtime或客户中心。
+回滚先核对所有权/哈希及旧配置，停用本事务服务，移除本事务wrapper/sudoers/unit、复核真实visudo并恢复原include。输出目录和证据保留，不删除Owner私有输入。失败/未知保留事务，不再次install。
+
+### Owner私有输入（不得由作者伪造）
+固定root配置目录下应由Owner通过私有方式准备：
+- INDEPENDENT_REVIEW_TRUST.json：独审主体、真实保管证据、首批CONTENT评论6214465866及完整body SHA、获审新MECHANISM评论及准确全文摘要/范围/有效期/撤销状态。作者不代签或自动登记。
+- github-readonly-token：仅仓库只读API/Actions读取，root0600。不贴GitHub、聊天或CI日志。
+- APPROVED_SITE_SHELL.tar.gz：获审真实官网外壳包，root0600，不能用测试占位壳。
+- BUILDER_POLICY.json：root0600，schema=1及准确mechanism_manifest_sha256、shell_tar_sha256、legacy_pages_sha256、reviewer_logins。私有政策不能由评论或workflow传入。
+BUILDER_REQUEST.json必须在首次安装前不存在；以后只由固定channel从Owner已登记的真实内容评论派生。它不是额外人工维护每个页面的菜单或商品列表。
+
+### 候选专用root能力
+新独立wrapper /usr/local/libexec/xuanjun-showcase-build只允许inspect、build、export三种无额外参数动作；不修改原客户中心四动作通道。
+bootstrap先验证Owner政策及已安装机制的脚本闭包，再导入固定代码。shebang只用单个-I参数，入口显式关闭pyc写入，避免Linux把多参数shebang当成一个无效选项。
+build只使用Owner私有CONTENT锚，验证真实评论ID/正文/范围/独立主体/有效期，派生受保护请求并调用唯一builder unit。评论自身和事件都不能授予root或选定命令/路径。
+按完整政策/信任/评论快照摘要去重，成功不再次构建；PREPARING/HOLD/未知状态先于网络检查拒绝重跑。失败/超时持久HOLD。
+与安装/回滚共用既有外层事务锁，再持有内部build/export锁，避免撤回通道时又启动新构建。活动审核选择有数量和时间预算，不无穷扫描。
+export只导出已完成构建的静态TAR与非秘密回执；再次核对信任/撤销/输出哈希，既不导出政策/Token/信任文件，也不执行发布。
+
+### 实际内核证据及凭据保护
+builder必须在实际服务中证明UID0但CapEff=0、NoNewPrivs=1、代码/配置挂载只读、输出挂载可写，并记录自己的mount namespace；channel要求它与调用者namespace不同。未达到则不封存/导出候选。
+CI另外增加真实Hosted transient systemd sandbox probe；它不等于国内目标机验收。模拟单元测试明确使用合成runtime记录。
+Github只读token从固定root0600文件读取，放Authorization头；API固定api.github.com仓库路径，不走环境代理、不跟随重定向，TLS客户端不启用环境keylog，错误对外清洗。此实现不冒称客户中心Telegram R3目标机已验收。
+
+### 事件到正式候选上传
+原issue_comment工作流默认不运行；仅Owner设置PR122_SHOWCASE_PIPELINE_ENABLED=true并配置PR122_SHOWCASE_BUILDER_REF后才调度候选构建。ref必须为pr122-showcase-builder-加40位获审源码SHA的固定tag；事件不创建或覆盖tag，不合并源码，不签发root许可。
+调度原pr122-site-hub-preflight.yml的protected_builder=true分支。该job只在获准tag、Owner启用开关下使用国内既有Runner，校验实际host/UID1002；没有checkout/执行远端源码步骤。
+调用固定root build/export后，在普通Runner临时目录解码静态TAR并核对SHA；回执内mechanism_source_commit必须等于workflow GITHUB_SHA。然后上传TAR、BUILD_RECEIPT和CI_BINDING到Actions Artifact；源码CI/内容CI/制品CI分别记录，不混同。
+原workflow ID保持不变，兼容原发行器的准确CI/Artifact门禁。数据内容提交可继续前进，执行代码仍冻结为获审tag。新功能页面只需原目录登记、内容审核与Owner受保护准入，不需要Work改中央菜单。
+审核评论在Owner登记之前到达只会WAIT，不产生root请求；登记后可在原PR122发BUILD_REQUEST作为恢复触发，仍不代替内容批准。
+
+### 部署顺序及仍需的实际许可
+先按既有体验事务发布获审首页/导航/商家UI；再针对更新后实际站点生成本机制的新plan并取得准确安装许可，避免旧UI包装的Nginx基线与新include互相冲突。
+Owner完成私有登记后，按准确plan单次安装新机制；验证实际unit/sudoers/Runner固定调用及隔离。由既有受保护GitHub通道将两份准确workflow激活到default并固定获审tag及两项Owner变量，不绕过分支保护、不合无关Stage5历史、不另建业务任务。
+然后运行一次真实候选构建/上传；对实际TAR/ZIP/Manifest/Root运行证据集中独审，再签新单次SHOWCASE发行许可，执行HTTPS/手机/旧导航与回滚验收。
+尚未取得新的安装或发布许可；没有执行上述生产步骤。现网、客户资料接入及客户中心准备门禁保持原状。若私有主体/保管证据或真实凭据缺失，保留具体缺项，不伪造配置或要求客户把秘密贴到聊天。

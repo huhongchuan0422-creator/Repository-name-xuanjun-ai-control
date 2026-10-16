@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import ssl
 import time
 import urllib.request
 from scripts import pr122_showcase as site
@@ -37,14 +38,22 @@ def private_bytes(path, limit=16000000):
 
 
 def fetch(path):
-    # Public repository; no token/proxy/keylog env is consumed by this adapter.
+    # Reuse only the existing root-private read-only GitHub credential. No URL
+    # token, environment proxy, redirects, TLS keylog or arbitrary API origin.
+    token=private_bytes(CONFIG/'github-readonly-token',10000).decode().strip()
+    site.need(bool(token) and not any(c.isspace() for c in token),'BUILDER_GITHUB_TOKEN_FORMAT')
     request = urllib.request.Request('https://api.github.com/repos/'+REPO+'/'+path,
-        headers={'Accept':'application/vnd.github+json','User-Agent':'XuanJun-Protected-Builder'})
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    with opener.open(request, timeout=20) as response:
-        raw=response.read(12000001)
-        site.need(len(raw)<=12000000,'BUILDER_GITHUB_RESPONSE_LIMIT')
-        return json.loads(raw)
+        headers={'Accept':'application/vnd.github+json','User-Agent':'XuanJun-Protected-Builder','Authorization':'Bearer '+token})
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self,*args,**kwargs):return None
+    context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT);context.load_default_certs();context.minimum_version=ssl.TLSVersion.TLSv1_2
+    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=context),NoRedirect())
+    try:
+        with opener.open(request, timeout=20) as response:
+            raw=response.read(12000001)
+            site.need(len(raw)<=12000000,'BUILDER_GITHUB_RESPONSE_LIMIT')
+            return json.loads(raw)
+    except Exception:raise ValueError('BUILDER_GITHUB_REQUEST_FAILED') from None
 
 
 def safe_data_path(name):
@@ -138,6 +147,16 @@ def verified_code(expected):
             s=ancestor.lstat();site.need(s.st_uid==0 and not stat.S_ISLNK(s.st_mode) and not s.st_mode&0o022,'BUILDER_CODE_OWNER')
         data=target.read_bytes();site.need(len(data)==row['size'] and site.sha(data)==row['sha256'],'BUILDER_CODE_DRIFT')
     site.need(any(r['path']=='scripts/pr122_showcase_protected_build.py' for r in manifest['files']),'BUILDER_SELF_BINDING')
+    site.need(type(manifest.get('source_commit')) is str and re.fullmatch('[0-9a-f]{40}',manifest['source_commit']),'BUILDER_MECHANISM_COMMIT')
+    return manifest['source_commit']
+
+
+def runtime_evidence():
+    fields=dict(line.split(':',1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
+    site.need(fields['Uid'].split()==['0','0','0','0'] and int(fields['CapEff'].strip(),16)==0 and fields['NoNewPrivs'].strip()=='1','BUILDER_EFFECTIVE_PRIVILEGES')
+    readonly={str(p):bool(os.statvfs(p).f_flag & os.ST_RDONLY) for p in (CODE,CONFIG)}
+    site.need(all(readonly.values()) and not os.statvfs(BASE).f_flag&os.ST_RDONLY,'BUILDER_EFFECTIVE_MOUNTS')
+    return {'effective':True,'uid':0,'cap_eff':'0','no_new_privs':True,'readonly_paths':readonly,'output_writable':True,'mount_namespace':os.readlink('/proc/self/ns/mnt')}
 
 
 def durable_write(path, raw):
@@ -148,7 +167,7 @@ def durable_write(path, raw):
 def main():
     site.need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','BUILDER_FIXED_HOST_ROOT')
     raw=private_bytes(REQUEST);request=json.loads(raw);validate_request(request,time.time())
-    verified_code(request['mechanism_manifest_sha256'])
+    mechanism_commit=verified_code(request['mechanism_manifest_sha256'])
     site.need(site.sha(private_bytes(SHELL))==request['shell_tar_sha256'],'BUILDER_SHELL_HASH')
     shell=site.official_shell(SHELL,request['shell_tar_sha256'])
     before=private_bytes(trust.TRUST)
@@ -158,7 +177,9 @@ def main():
     s=BASE.lstat();site.need(stat.S_ISDIR(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700 and not BASE.is_symlink(),'BUILDER_BASE_REQUIRED')
     stage=BASE/('build-'+site.sha(raw));stage.mkdir(mode=0o700)
     try:
+        runtime=runtime_evidence()
         result=construct(request,stage,shell)
+        result['runtime']=runtime
         site.need(private_bytes(REQUEST)==raw and private_bytes(trust.TRUST)==before,'BUILDER_REQUEST_OR_TRUST_DRIFT')
         validate_request(request,time.time())
         # Recheck exact comments, CI and trust immediately before candidate seal.
@@ -167,7 +188,7 @@ def main():
             verify_review(identifier,objects,set(request['reviewer_logins']),fetch,known_only=True)
         site.need(private_bytes(trust.TRUST)==before,'BUILDER_FINAL_TRUST_DRIFT')
         validate_request(request,time.time())
-        result.update(request_sha256=site.sha(raw),trust_snapshot_sha256=site.sha(before),mechanism_manifest_sha256=request['mechanism_manifest_sha256'])
+        result.update(mechanism_source_commit=mechanism_commit,request_sha256=site.sha(raw),trust_snapshot_sha256=site.sha(before),mechanism_manifest_sha256=request['mechanism_manifest_sha256'])
         durable_write(stage/'BUILD_RECEIPT.json',site.canonical(result))
         with (stage/'SHOWCASE_RELEASE.pending').open('rb') as stream:os.fsync(stream.fileno())
         os.rename(stage/'SHOWCASE_RELEASE.pending',stage/'SHOWCASE_RELEASE.tar.gz')

@@ -24,6 +24,10 @@ HTTPS=Path('/etc/nginx/conf.d/pr122-apex-https.conf')
 STATE=Path('/var/lib/xuanjun-showcase-install')
 SERVICE=Path('/etc/systemd/system/xuanjun-showcase-publish.service')
 TIMER=Path('/etc/systemd/system/xuanjun-showcase-publish.timer')
+BUILD_SERVICE=Path('/etc/systemd/system/xuanjun-showcase-build.service')
+BUILD_BASE=Path('/var/lib/xuanjun-showcase-builder')
+BUILD_WRAPPER=Path('/usr/local/libexec/xuanjun-showcase-build')
+BUILD_SUDOERS=Path('/etc/sudoers.d/xuanjun-showcase-build')
 MAIN_CURRENT=Path('/var/www/wenwenwenyiyiyi.work/current')
 ENABLE=Path('/etc/systemd/system/timers.target.wants/xuanjun-showcase-publish.timer')
 OWNER='huhongchuan0422-creator'
@@ -41,7 +45,7 @@ def gate(comment_id,manifest_sha,fetch=github):
     need(comment['id']==comment_id and comment['user']['login']==OWNER and comment['issue_url'].endswith('/issues/122'),'INSTALL_APPROVAL_ORIGIN')
     need(comment['body'].startswith('XUANJUN_SHOWCASE_INSTALL\n'),'INSTALL_APPROVAL_FORMAT')
     approval=json.loads(comment['body'].split('\n',1)[1])
-    need(approval.get('decision')=='INSTALL_APPROVED' and approval.get('mechanism_manifest_sha256')==manifest_sha and approval.get('max_executions')==1 and approval.get('rollback_approved') is True,'INSTALL_APPROVAL_BINDING')
+    need(approval.get('scope')=='STATIC_SHOWCASE_WITH_CANDIDATE_BUILDER' and approval.get('decision')=='INSTALL_APPROVED' and approval.get('mechanism_manifest_sha256')==manifest_sha and approval.get('max_executions')==1 and approval.get('rollback_approved') is True,'INSTALL_APPROVAL_BINDING')
     need(type(approval.get('issued_unix')) is int and type(approval.get('expires_unix')) is int and approval['issued_unix']<=time.time()<approval['expires_unix'] and 0<approval['expires_unix']-approval['issued_unix']<=7200,'INSTALL_APPROVAL_EXPIRY')
     review=fetch('issues/comments/'+str(approval['review_comment_id']))
     need(review['user']['login']==OWNER and review['issue_url'].endswith('/issues/122') and review['body'].startswith('XUANJUN_SHOWCASE_MECHANISM_REVIEW\n'),'INSTALL_INDEPENDENT_REVIEW_ORIGIN')
@@ -70,13 +74,37 @@ def read(path,engine):return engine.read_trusted_bytes(path,0)[0]
 def write_new(path,raw,mode=0o644):
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
     try:
-        with os.fdopen(fd,'wb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
+        with os.fdopen(fd,'wb') as stream:stream.write(raw);stream.flush();os.fchmod(stream.fileno(),mode);os.fsync(stream.fileno())
     except BaseException:raise
+
+
+def plan(source):
+    engine=promotion.load_engine();source=Path(source)
+    manifest_raw=read(source/'MECHANISM_MANIFEST.json',engine);manifest=json.loads(manifest_raw)
+    for row in manifest['files']:
+        name=Path(row['path']);need(not name.is_absolute() and '..' not in name.parts,'SOURCE_PATH')
+        raw=read(source/name,engine);need(len(raw)==row['size'] and sha(raw)==row['sha256'],'INSTALL_SOURCE_HASH')
+    for path in (CODE,NGINX.parent,SERVICE,TIMER,ENABLE,BUILD_SERVICE,BUILD_BASE,BUILD_WRAPPER,BUILD_SUDOERS):
+        need(not path.exists() and not path.is_symlink(),'PREEXISTING_INSTALL_OBJECT:'+str(path))
+    from scripts import pr122_showcase_build_channel as channel
+    value=channel.policy();need(value['mechanism_manifest_sha256']==sha(manifest_raw),'BUILDER_POLICY_MECHANISM')
+    from scripts import pr122_showcase_trust as trusted
+    private_trust=trusted.load()
+    from scripts.pr122_showcase_protected_build import private_bytes
+    need(sha(private_bytes(CONFIG/'APPROVED_SITE_SHELL.tar.gz'))==value['shell_tar_sha256'],'APPROVED_SHELL_HASH')
+    token=private_bytes(CONFIG/'github-readonly-token',10000);need(bool(token.strip()),'READONLY_GITHUB_CREDENTIAL_REQUIRED')
+    import pwd
+    need(pwd.getpwnam('githubrunner').pw_uid==1002,'FIXED_RUNNER_IDENTITY')
+    command(['/usr/sbin/visudo','-c']);command(['/usr/sbin/visudo','-cf',str(source/'deploy/pr122-showcase/build-sudoers')])
+    old=read(HTTPS,engine);need(old.count(ANCHOR)==1 and EXTRA not in old,'HTTPS_BASELINE')
+    return {'state':'READONLY_PLAN','transaction_id':'pr122-showcase-install-20261016','scope':'STATIC_SHOWCASE_WITH_CANDIDATE_BUILDER','mechanism_manifest_sha256':sha(manifest_raw),'source_commit':manifest['source_commit'],'previous_https_sha256':sha(old),'main_current':os.readlink(MAIN_CURRENT),'previous_nginx_inventory_sha256':nginx_snapshot(),'nginx_process_identity':nginx_identity(),'builder_policy_sha256':sha(private_bytes(CONFIG/'BUILDER_POLICY.json')),'trust_sha256':sha(canonical(private_trust)),'production_changes':0}
 
 
 def install(source,comment_id):
     engine=promotion.load_engine();source=Path(source)
+    observed=plan(source)
     raw=read(source/'MECHANISM_MANIFEST.json',engine);manifest=json.loads(raw);approval=gate(comment_id,sha(raw))
+    need(approval.get('commit')==manifest['source_commit'] and approval.get('plan_sha256')==sha(canonical(observed)),'EXACT_INSTALL_PLAN_REQUIRED')
     need(approval['transaction_id']=='pr122-showcase-install-20261016','FIXED_INSTALL_TRANSACTION')
     folder=STATE/approval['transaction_id'];need(not folder.exists(),'INSTALL_TRANSACTION_EXISTS_NO_RETRY')
     files={}
@@ -84,8 +112,13 @@ def install(source,comment_id):
         relative=Path(row['path']);need(not relative.is_absolute() and '..' not in relative.parts,'SOURCE_PATH')
         raw=read(source/relative,engine);need(len(raw)==row['size'] and sha(raw)==row['sha256'],'INSTALL_SOURCE_HASH');files[row['path']]=raw
     # Read-only preflight, before any installation transaction is created.
-    for path in (CODE,NGINX.parent,SERVICE,TIMER,ENABLE):need(not path.exists() and not path.is_symlink(),'PREEXISTING_INSTALL_OBJECT:'+str(path))
+    for path in (CODE,NGINX.parent,SERVICE,TIMER,ENABLE,BUILD_SERVICE,BUILD_BASE,BUILD_WRAPPER,BUILD_SUDOERS):need(not path.exists() and not path.is_symlink(),'PREEXISTING_INSTALL_OBJECT:'+str(path))
     need(not (CONFIG/'policy.json').exists(),'PREEXISTING_POLICY')
+    from scripts.pr122_showcase_build_channel import policy as builder_policy
+    need(builder_policy()['mechanism_manifest_sha256']==sha(read(source/'MECHANISM_MANIFEST.json',engine)),'BUILDER_POLICY_MECHANISM')
+    need(not (CONFIG/'BUILDER_REQUEST.json').exists(),'PREEXISTING_BUILDER_REQUEST')
+    command(['/usr/sbin/visudo','-c'])
+    command(['/usr/sbin/visudo','-cf',str(source/'deploy/pr122-showcase/build-sudoers')])
     token=CONFIG/'github-readonly-token';raw=read(token,engine)
     need(raw.strip() and not token.stat().st_mode&0o077,'READONLY_GITHUB_CREDENTIAL_REQUIRED')
     old=read(HTTPS,engine);need(sha(old)==approval['previous_https_sha256'] and old.count(ANCHOR)==1 and EXTRA not in old,'HTTPS_BASELINE_DRIFT')
@@ -99,10 +132,11 @@ def install(source,comment_id):
     write_new(folder/'previous-https.conf',old,0o600)
     receipt={'state':'INSTALLING','approval':approval,'completed':[],'owned_files':{},'previous_https_sha256':sha(old),'main_current':current,'previous_nginx_files':nginx_files()}
     def save():engine.atomic_json(folder/'receipt.json',receipt)
-    def emit(path,data):
-        receipt['owned_files'][str(path)]=sha(data);save();write_new(path,data)
+    def emit(path,data,mode=0o644):
+        receipt['owned_files'][str(path)]=sha(data);save();write_new(path,data,mode)
     save()
     try:
+        engine.secure_dir(BUILD_BASE,0o700,0,True)
         engine.secure_dir(CODE,0o755,0,True);engine.secure_dir(CODE/'scripts',0o755,0,True)
         engine.secure_dir(NGINX.parent,0o755,0,True);engine.secure_dir(promotion.BASE,0o755,0,True)
         for name,data in files.items():
@@ -113,10 +147,18 @@ def install(source,comment_id):
         emit(CONFIG/'policy.json',canonical(policy))
         emit(SERVICE,files['deploy/pr122-showcase/xuanjun-showcase-publish.service'])
         emit(TIMER,files['deploy/pr122-showcase/xuanjun-showcase-publish.timer'])
+        emit(BUILD_SERVICE,files['deploy/pr122-showcase/xuanjun-showcase-build.service'])
+        emit(BUILD_WRAPPER,files['deploy/pr122-showcase/build-channel'],0o755)
+        emit(BUILD_SUDOERS,files['deploy/pr122-showcase/build-sudoers'],0o440)
+        command(['/usr/sbin/visudo','-c'])
         receipt['completed'].append('FILES_INSTALLED');save()
-        command(['/usr/bin/systemd-analyze','verify',str(SERVICE),str(TIMER)])
+        command(['/usr/bin/systemd-analyze','verify',str(SERVICE),str(TIMER),str(BUILD_SERVICE)])
         # Existing HTTPS bytes must still match immediately before replacement.
         need(time.time()<approval['expires_unix'],'INSTALL_APPROVAL_EXPIRED_BEFORE_ACTIVATION')
+        from scripts.pr122_showcase_protected_build import private_bytes
+        from scripts.pr122_showcase_trust import load as load_trust
+        need(sha(private_bytes(CONFIG/'BUILDER_POLICY.json'))==observed['builder_policy_sha256'] and sha(canonical(load_trust()))==observed['trust_sha256'],'INSTALL_PRIVATE_INPUT_DRIFT')
+        gate(comment_id,sha(read(source/'MECHANISM_MANIFEST.json',engine)))
         need(nginx_snapshot()==previous_inventory and nginx_identity()==previous_process,'NGINX_CHANGED_DURING_INSTALL')
         need(read(HTTPS,engine)==old,'HTTPS_CHANGED_DURING_INSTALL')
         patched=old.replace(ANCHOR,EXTRA+ANCHOR)
@@ -152,21 +194,25 @@ def rollback():
     receipt.update(state='ROLLBACK_IN_PROGRESS');engine.atomic_json(folder/'receipt.json',receipt)
     command(['/usr/bin/systemctl','daemon-reload'])
     if str(TIMER) in receipt['owned_files'] and TIMER.exists():command(['/usr/bin/systemctl','disable','--now',TIMER.name])
+    if str(BUILD_SERVICE) in receipt['owned_files'] and BUILD_SERVICE.exists():command(['/usr/bin/systemctl','stop',BUILD_SERVICE.name])
     if str(SERVICE) in receipt['owned_files'] and SERVICE.exists():command(['/usr/bin/systemctl','stop',SERVICE.name])
     if read(HTTPS,engine)!=old:
         temporary=HTTPS.with_name(HTTPS.name+'.showcase-restore');write_new(temporary,old);os.replace(temporary,HTTPS);engine.fsync_dir(HTTPS.parent)
     command(['/usr/sbin/nginx','-t']);command(['/usr/bin/systemctl','reload','nginx.service'])
     for name in receipt['owned_files']:
         if Path(name).exists():Path(name).unlink()
+    command(['/usr/sbin/visudo','-c'])
     command(['/usr/bin/systemctl','daemon-reload'])
     need(read(HTTPS,engine)==old,'RESTORED_HTTPS_HASH')
     receipt.update(state='ROLLED_BACK',intent=None,runtime_changes=0,main_current_changes=0);engine.atomic_json(folder/'receipt.json',receipt);return receipt
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('command',choices=('install','rollback'));p.add_argument('--source',type=Path);p.add_argument('--approval-comment-id',type=int);args=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('command',choices=('plan','install','rollback'));p.add_argument('--source',type=Path);p.add_argument('--approval-comment-id',type=int);args=p.parse_args()
     need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','FIXED_HOST_ROOT_REQUIRED');os.umask(0o022)
     if args.command=='install':need(args.source and args.approval_comment_id,'INSTALL_INPUTS_REQUIRED')
+    if args.command=='plan':
+        need(args.source,'PLAN_SOURCE_REQUIRED');observed=plan(args.source);print(json.dumps({'plan':observed,'plan_sha256':sha(canonical(observed))},sort_keys=True));return
     import fcntl
     lock=Path('/var/lib/xuanjun-pr122-site-hub/transaction.lock')
     engine=promotion.load_engine()
