@@ -870,3 +870,42 @@ jobs:
           path: /tmp/pr99-handoff-resolution-review/
           if-no-files-found: error
           retention-days: 7
+
+  s07-domestic-install-target-preflight:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_S07_DOMESTIC_INSTALL_PREFLIGHT_20261017' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 3
+    steps:
+      - name: Target public identity and protected service metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'PY'
+          import base64,hashlib,json,os,shutil,socket,stat,subprocess,sys
+          from pathlib import Path
+          assert os.geteuid()!=0 and os.uname().nodename=='iZvt5t8tlrm8oiZ'
+          result={'schema_version':1,'status':'DOMESTIC_INSTALL_TARGET_PREFLIGHT','host':os.uname().nodename,'uid':os.geteuid(),'python':sys.version.split()[0],'python_path':sys.executable,'architecture':os.uname().machine,'free_bytes':shutil.disk_usage('/opt').free,'sudo_calls':0,'private_key_reads':0,'business_requests':0,'service_actions':0}
+          pub=Path('/etc/ssh/ssh_host_ecdsa_key.pub')
+          fd=os.open(pub,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022 and s.st_size<4096
+              raw=f.read(4096)
+          fields=raw.decode().split();assert fields[0]=='ecdsa-sha2-nistp256'
+          key=base64.b64decode(fields[1],validate=True)
+          result['ssh_public_host_key']='47.101.152.210 '+fields[0]+' '+fields[1]
+          result['ssh_fingerprint']='SHA256:'+base64.b64encode(hashlib.sha256(key).digest()).decode().rstrip('=')
+          units=['nginx.service','provider-neutral-domestic-bridge.service','xuanjun-site-hub-preview.service','secure-secrets-portal.service','xuanjun-wecom-customer-contact.service','xuanjun-wecom-customer-service.service']
+          r=subprocess.run(['/usr/bin/systemctl','show',*units,'-p','Id','-p','LoadState','-p','ActiveState','-p','SubState','-p','MainPID','--no-pager'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=15)
+          result['protected_service_metadata']={'exit':r.returncode,'text':r.stdout}
+          try:
+              s=Path('/opt/xuanjun-migration-s07').lstat();result['candidate_base']='EXISTS'
+          except FileNotFoundError:result['candidate_base']='ABSENT'
+          except PermissionError:result['candidate_base']='UNKNOWN_PERMISSION'
+          print('PR99_S07_TARGET_RECEIPT='+json.dumps(result,sort_keys=True))
+          PY
