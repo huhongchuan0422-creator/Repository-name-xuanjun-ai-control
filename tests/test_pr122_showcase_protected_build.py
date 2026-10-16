@@ -145,10 +145,16 @@ class PipelineTests(unittest.TestCase):
         folder=next(self.base.iterdir());self.assertTrue((folder/'BUILD_HOLD.json').exists())
         self.assertFalse((folder/'SHOWCASE_RELEASE.tar.gz').exists())
     def test_final_review_recheck_failure_cannot_seal(self):
-        def denied(*args,**kwargs):raise ValueError('FIXTURE_REVOKED_AT_FINAL_CHECK')
+        original=b.verify_review;calls=[]
+        def denied(*args,**kwargs):
+            calls.append(1)
+            if len(calls)==2:raise ValueError('FIXTURE_REVOKED_AT_FINAL_CHECK')
+            return original(*args,**kwargs)
         with mock.patch.object(b,'verify_review',side_effect=denied):
             with self.assertRaisesRegex(ValueError,'FIXTURE_REVOKED_AT_FINAL_CHECK'):b.main()
+        self.assertEqual(len(calls),2)
         folder=next(self.base.iterdir());self.assertTrue((folder/'BUILD_HOLD.json').exists())
+        self.assertTrue((folder/'SHOWCASE_RELEASE.pending').exists())
         self.assertFalse((folder/'SHOWCASE_RELEASE.tar.gz').exists())
 
 if __name__=='__main__':unittest.main()
