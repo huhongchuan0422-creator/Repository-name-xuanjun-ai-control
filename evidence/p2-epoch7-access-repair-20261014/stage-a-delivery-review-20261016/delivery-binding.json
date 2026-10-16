@@ -1,0 +1,111 @@
+{
+  "archive": {
+    "bytes": 1274167,
+    "file": "stage-a-local-candidate.tar.gz",
+    "historical_status": "LOCAL_VALIDATED_PUBLICATION_UNBOUND",
+    "regular_members": 39,
+    "role": "UNCHANGED_RECONSTRUCTED_SOURCE_STAGE_ARCHIVE",
+    "sha256": "353a93b968551d8f9db161e9781b468bd339ebb5983cf5a4870c5fb449fb63c2"
+  },
+  "bootstrap": {
+    "bytes": 4725,
+    "change_from_unbound_template": "SOLE_COMMIT_LITERAL_SUBSTITUTION",
+    "execution": "UNAPPROVED_NOT_RUN",
+    "file": "OWNER_COMMAND_UNAPPROVED.txt",
+    "sha256": "36df056cc3cd9b345cf5cf51e831385fe112799eab1f6f952abff31934f85bd3",
+    "source_commit": "5dcf1c12d62671e44c443dfcbc773ccb0cc2b284",
+    "unbound_template_bytes": 4692,
+    "unbound_template_sha256": "80ed57e57184d79e1038d34a7447d33682dd460fb23a92bacad44bdfef5511c1"
+  },
+  "evidence_limits": [
+    "Saved observation wall-clock is NOT_RETAINED.",
+    "Historical per-check descriptor/inode transcripts and cross-scan descriptor joins are NOT_RETAINED.",
+    "Existing read primitives may change filesystem access times; atime effects are not measured.",
+    "The reporter retains Stage A HOLD and exits 2 even when evidence reporting completes.",
+    "The original archive retains historical UNBOUND and Hosted NOT_RUN fields; current publication/CI facts are separately recorded here."
+  ],
+  "execution_status": {
+    "STAGE_B": "NOT_AUTHORIZED",
+    "STAGE_C": "NOT_AUTHORIZED",
+    "TASK5_APPROVAL": "NOT_ISSUED",
+    "UK_STAGE_A": "NOT_RUN"
+  },
+  "feature_hosted_ci": {
+    "commit": "5dcf1c12d62671e44c443dfcbc773ccb0cc2b284",
+    "compliance": "PASS",
+    "state": "SUCCESS",
+    "tests": 7,
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38830407324/job/116747641954"
+  },
+  "formal_work_review": {
+    "archive_delivery_review": "NOT_YET_INDEPENDENTLY_REVIEWED_BY_ORIGINAL_WORK",
+    "final_bootstrap_delivery_review": "PENDING",
+    "new_confirmed_source_defects": 0,
+    "scope": "FROZEN_P2_SOURCE_ONLY; NOT_CURRENT_PR_HEAD_OR_MERGE_APPROVAL",
+    "source_review": "PASS_WITH_SCOPE_LIMITS",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/58#issuecomment-6205641864",
+    "work_did_not_run_python36_or_bootstrap23": true
+  },
+  "kind": "STAGE_A_DELIVERY_REVIEW_BINDING",
+  "local_bootstrap_mock_tests": [
+    {
+      "errors": 0,
+      "failures": 0,
+      "python": "3.6.8",
+      "skips": 0,
+      "tests": 23
+    },
+    {
+      "errors": 0,
+      "failures": 0,
+      "python": "3.12.14",
+      "skips": 0,
+      "tests": 23
+    }
+  ],
+  "local_checks": {
+    "archive_all_39_member_sizes_and_hashes": "MATCH",
+    "archive_eleven_published_dependency_bytes": "MATCH",
+    "archive_nine_publication_source_rows": "MATCH",
+    "bootstrap_exact_commit_only_delta": "MATCH",
+    "scope": "LOCAL_CONTENT_AND_MOCK_VALIDATION; NOT_UK_EXECUTION"
+  },
+  "manifest": {
+    "bytes": 10571,
+    "file": "MANIFEST.json",
+    "role": "EXACT_EXTERNAL_ARCHIVE_AND_MEMBER_INVENTORY",
+    "sha256": "5bda61fb6108e6f4091160004fdff1a661cfe552909511c8812929ea6de2074e"
+  },
+  "privacy_scope": {
+    "excluded": "Full private observation, arbitrary private configuration bodies, secret environment values, credentials, private source buffers and raw private process output.",
+    "included": "Public source/tests, published R7 archive and privacy-validated public subset, successful local test logs, reproducibility metadata; fixed infrastructure hostname/paths, allowlisted PATH/service/group/ExecStart and numeric metadata may appear.",
+    "scope_limit": "The archive is broader than the future reporter output whitelist. Source/test literals and local test paths are visible. No new live host or private observation inspection was performed."
+  },
+  "purpose": "REVIEW_ONLY",
+  "schema": 1,
+  "source": {
+    "bytes": 93912,
+    "commit": "5dcf1c12d62671e44c443dfcbc773ccb0cc2b284",
+    "path": "evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter/report_saved_stage_a.py",
+    "sha256": "8ebd1ae2d572818677e5e404647f2d53ddae40f3aafa32320dcaf36d7384bde0",
+    "tree": "228f4d9b1f0f930464b6379e52246d4a16bec091",
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/5dcf1c12d62671e44c443dfcbc773ccb0cc2b284/evidence/p2-epoch7-access-repair-20261014/stage-a-saved-reporter/report_saved_stage_a.py"
+  },
+  "source_hosted_ci": {
+    "commit": "5dcf1c12d62671e44c443dfcbc773ccb0cc2b284",
+    "errors": 0,
+    "failures": 0,
+    "python": "3.12.3",
+    "scope": "DISPOSABLE_PUBLIC_FIXTURES_ONLY",
+    "skips": 0,
+    "state": "SUCCESS",
+    "test_counts": {
+      "contracts": 37,
+      "mapper": 66,
+      "outer": 2,
+      "reporter": 43,
+      "total": 148
+    },
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38830407370/job/116747642358"
+  }
+}
