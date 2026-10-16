@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "RUN_EXACT_APPROVED_RESTART_LAUNCHER_ON_KOREA_ONCE_TWO_TERMINAL_PASSWORD_PHASES",
+  "owner_action_now": "RUN_PINNED_EXISTING_COPY_RUNTIME_INVENTORY_ON_KOREA_NO_REINSTALL",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -846,7 +846,7 @@
       "manual_next_action": "ONE_OWNER_MEDIATED_REVIEWED_LOCAL_RESOLUTION_UNDER_EXPLICIT_OWNER_AUTHORIZATION_NOT_MACHINE_SIGNED_PERMIT"
     },
     "domestic_code_environment_install": {
-      "status": "OWNER_ROOT_ATTEMPT_PARTIAL_SOURCE_WRITTEN_DEPENDENCY_TIMEOUT_NOT_ACCEPTED",
+      "status": "OWNER_ROOT_SOURCE_AND_DEPENDENCIES_COMPLETE_RUNTIME_SERVICE_CUTOVER_PENDING",
       "authority_comment_id": 6219362469,
       "roles": [
         "portal",
@@ -877,7 +877,7 @@
       "independent_new_host_pass": false,
       "production_executed_definition": "Private new-prefix installation attempted; no service deployment/activation/cutover",
       "owner_failure_receipt": "evidence/pr99-service-handoff/s07-domestic-stage/OWNER_INSTALL_TIMEOUT_20261017.json",
-      "dependencies_complete": false,
+      "dependencies_complete": true,
       "protected_after_snapshot_completed": false,
       "retry_allowed": false,
       "owner_diagnosis": {
@@ -897,7 +897,7 @@
         "service_actions": 0
       },
       "dependency_continuation": {
-        "status": "OWNER_AUTHORIZED_MANUAL_CONTINUATION_PREPARED_NOT_EXECUTED",
+        "status": "DOMESTIC_S07_OFFLINE_DEPENDENCY_CONTINUATION_PASS_OWNER_REPORTED",
         "script": "evidence/pr99-service-handoff/s07-wheel-continuation/continue_dependencies.py",
         "script_sha256": "577d2e9a69186d6010dba2904e486de6617c657141e03d60eefb7975cb39a848",
         "new_local_tests": 9,
@@ -906,8 +906,32 @@
         "old_install_replayed": false,
         "original_source_rewritten": false,
         "service_actions": 0,
-        "production_executed": false,
-        "authority_comment_id": 6219362469
+        "production_executed": true,
+        "authority_comment_id": 6219362469,
+        "evidence_origin": "OWNER_ROOT_TERMINAL_TRANSCRIPT_NOT_DIRECT_HOST_LOGIN_OR_INDEPENDENT_AUDIT",
+        "receipt_comment_id": 6220815091,
+        "first_attempt": "REMOTE_RESULT_UNKNOWN_PRESERVE_LOGS_EMPTY_REMOTE_DIRECTORY_ABSENT_PROCESS_COUNT_ZERO",
+        "executed_patch": "FILE_STDIN_EXACT_TAR_LENGTH_REUSE_HASH_VERIFIED_CACHED_WHEELS_NEW_KOREA_V2_DIRECTORY",
+        "owner_launch_directory": "/root/pr99-s07-transfer-fix.h8Mz9ued",
+        "package_sha256": "9b702576d48883786d051b2f1b49972baf94db3d1e8bf330ee59250a5974efa3",
+        "wheel_tar_sha256": "b04409509e43e80aff7fb655cc91b76cff2dad04ea01b8087837ebe7ec4c289a",
+        "source_files": 79,
+        "source_hashes": "PASS",
+        "pip_check": "PASS",
+        "dependency_imports": "PASS",
+        "protected_state_unchanged_during_continuation": true,
+        "original_failure_preserved": true,
+        "services_installed": false,
+        "production_cutover": false,
+        "runtime_configuration_ready": false,
+        "root_cause": "NOT_PROVEN"
+      },
+      "runtime_inventory": {
+        "script": "evidence/pr99-service-handoff/s07-runtime-inventory/inspect_received_runtime.py",
+        "source_commit": "442a70918965bb39faf9d0cd54aaaae8db0bfde1",
+        "status": "PREPARED_NOT_HOST_EXECUTED",
+        "scope": "STATIC_EXISTING_RECEIVED_COPIES_ENV_NAMES_PATH_CLUES_AND_IO_CALL_SITES_NO_VALUES_OR_NEW_CAPTURE",
+        "local_checks": "VALUE_REDACTION_ENV_SUBSCRIPT_UNIT_NAMES_PATH_REJECTION_COMPILE_PASS_NOT_HOST_ACCEPTANCE"
       }
     }
   },
