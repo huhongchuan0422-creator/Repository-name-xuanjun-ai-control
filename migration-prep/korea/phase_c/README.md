@@ -46,7 +46,11 @@ RSA签发身份、源端publisher身份和执行授权身份在部署时必须�
 - 成功仅在整窗时长、精确PASS样本/不同generation、原窗口资源门禁、停机/临时隔离及准确锁释放之后成立。账号/systemd/nft/时间测试为明确模型；这不是实机网络隔离、真实只读GET或24小时观察。控制器SIGKILL/主机掉电不能保证立即执行finally；候选服务自身RuntimeMaxSec、签名期限和Restart=no限制剩余运行，但独立失联看护和实际断电恢复证据仍须纳入生产准入，不能把此限制隐去。
 - `source_schema.py`是下一轮**非root源码声明**探针：只输出既有15表的批准列名匹配和源码hash，不输出SQL/常量，不打开DB或导入生产模块。即使源码声明兼容，也不能当成现有DB schema/账号数据已验证。
 
-当前外部真实缺口：独立只读SecretRef/提供方权限证明与托管投放；专用传输双端身份及固定私有端点；权威账号/实际schema与持续collector；root围栏加载、内核负向证据及看护；准确窗口参数、单次许可和可信root执行渠道。上述适配代码不补造这些值，不申请拆散的生产安装批准。
+`fence.py`补齐与观察控制器分开的、单次准确root准入的围栏执行入口：只为已安装且两UID均空闲的新C候选创建专用inet表；先核准入、B/共享元数据、全局无同名表和nft语法，再仅一次从固定stdin加载已审compile_rules文本。为UID986及新worker各发IPv4/IPv6 loopback TCP负向连接（127.0.0.1/::1:9、无载荷、非provider），必须逐项看到该UID准确DROP规则的内核包计数正增量；仅连接超时/拒绝不算围栏证明。读回表语义摘要，其他stateless全局规则及共享对象不变、两UID重新无进程且准确锁释放后才输出root私有NETWORK_PROOF，其准确hash还须绑定后续独立live批准。已存在表、部分加载/未知、无计数增量、语义/共享漂移全部保留HOLD；不delete/flush或自动重试，不读凭据/业务库或启动服务。测试nft/systemd/UID计数是明确模型，实际韩国内核仍NOT_EXERCISED。nft命令/JSON/UID与counter依据官方文档：https://netfilter.org/projects/nftables/manpage.html 。
+
+东京真实源码探针已完成：原队列Run38871973602、Job116877943391、delivery5830a6e6f69744132fb74b341abb9929ae1632d6；50份源码中13张所需表的声明与既有列契约匹配，algo_order_snapshots及protective_order_snapshots未解析到声明。此结果不是DB缺表证明；实际只读schema/权威状态仍需现场准入后确认。绝不创建空表、编造零订单或用普通订单冒充保护单来凑验收。
+
+当前真实缺口：独立只读SecretRef/提供方权限证明与托管投放；专用传输双端身份及固定私有端点；权威账号/实际schema与持续collector投放；root围栏实机执行及内核负向证据；独立失联看护及实机验证；准确窗口参数、单次许可和可信root执行渠道。围栏加载代码已实现但未在主机执行，失联看护不能冒充已实现。上述适配代码不补造这些值，不申请拆散的生产安装批准。
 
 ## 构建与验证
 

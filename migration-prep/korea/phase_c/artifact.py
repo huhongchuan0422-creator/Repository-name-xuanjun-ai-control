@@ -15,7 +15,7 @@ PREFIX = "migration-prep/korea/phase_c/"
 ADAPTERS = tuple(PREFIX + name for name in (
     "__init__.py", "security.py", "network.py", "credentials.py", "snapshots.py",
     "broker.py", "runtime.py", "entry.py", "artifact.py", "prepare.py", "resources.py",
-    "authorization.py", "install_controller.py", "root_handoff.py", "private_transfer.py", "lifecycle.py"))
+    "authorization.py", "install_controller.py", "root_handoff.py", "private_transfer.py", "lifecycle.py", "fence.py"))
 REUSED = tuple("migration-prep/" + name for name in (
     "gate_common.py", "final_snapshot.py", "readonly_reconciliation_adapter.py",
     "korea/__init__.py", "korea/get_only_policy.py", "korea/migration_shadow_entry.py",
@@ -23,7 +23,7 @@ REUSED = tuple("migration-prep/" + name for name in (
 TEMPLATES = tuple(PREFIX + name for name in ("broker.service.in", "worker.service.in", "network-verified.target.in"))
 RUNTIME_FILES = tuple(sorted(ADAPTERS + REUSED + TEMPLATES))
 REVIEW_FILES = RUNTIME_FILES + tuple(PREFIX + name for name in (
-    "test_phase_c.py", "test_install_controller.py", "test_root_handoff.py", "test_private_transfer.py", "test_lifecycle.py", "source_contracts.py", "test_source_contracts.py", "source_schema.py", "test_source_schema.py", "README.md")) + ("migration-prep/korea/shadow-acceptance.template.json",)
+    "test_phase_c.py", "test_install_controller.py", "test_root_handoff.py", "test_private_transfer.py", "test_lifecycle.py", "test_fence.py", "source_contracts.py", "test_source_contracts.py", "source_schema.py", "test_source_schema.py", "README.md")) + ("migration-prep/korea/shadow-acceptance.template.json",)
 
 
 def runtime_manifest(root):
