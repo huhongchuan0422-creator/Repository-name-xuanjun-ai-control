@@ -5,6 +5,7 @@ on:
     paths: [.github/workflows/pr122-site-hub-host-preflight.yml]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: pr122-domestic-readonly
   cancel-in-progress: false
@@ -64,4 +65,38 @@ jobs:
               assert not p.is_symlink() and p.is_file() and p.stat().st_size<10000000
               assert hashlib.sha256(p.read_bytes()).hexdigest()==h
           print('FROZEN_WHEELS=3_OF_3_HASH_PASS; INSTALL_NOT_CALLED')
+          PY
+
+  stage-approved-static-experience:
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 5
+    steps:
+      - name: Download exact independently reviewed artifact
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '12045212414'
+          run-id: '38898777645'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/pr122-experience-6215846584
+      - name: Stage hashed package as unprivileged data only
+        env:
+          INPUT_DIR: ${{ runner.temp }}/pr122-experience-6215846584
+        run: |
+          /usr/bin/python3 -I -B - <<'PY'
+          import hashlib,json,os,stat
+          from pathlib import Path
+          assert os.uname().nodename=='iZvt5t8tlrm8oiZ' and os.getuid()==1002
+          sources=list(Path(os.environ['INPUT_DIR']).rglob('PR122_EXPERIENCE_RELEASE_REVIEW_ONLY.tar.gz'))
+          assert len(sources)==1
+          raw=sources[0].read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='79f9738593f9be8082c238cf8ed6ba4d913bbcea468fe77bea139339ede3dfb4'
+          destination=Path('/home/githubrunner/pr122-experience-6215846584')
+          destination.mkdir(mode=0o700,exist_ok=False)
+          p=destination/'approved-release.tar.gz'
+          fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
+          with os.fdopen(fd,'wb') as out:
+              out.write(raw);out.flush();os.fsync(out.fileno())
+          print('STAGED_PACKAGE='+str(p))
+          print('PACKAGE_SHA256='+hashlib.sha256(raw).hexdigest())
+          print('ROOT_NOT_CALLED; APPLY_NOT_CALLED; PRODUCTION_CHANGES=0')
           PY
