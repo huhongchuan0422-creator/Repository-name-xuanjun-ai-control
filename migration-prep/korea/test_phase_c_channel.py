@@ -77,7 +77,8 @@ class ChannelTests(unittest.TestCase):
             runner='githubrunner', runner_uid=1001, arbitrary_root_commands_allowed=False,
             phase_c_install_allowed=False, service_actions_allowed=False,
             network_changes_allowed=False, credentials_allowed=False, database_export_allowed=False,
-            writer_allowed=False, source_commit='a' * 40, issued_at=NOW-1, expires_at=NOW+3600)
+            writer_allowed=False, source_commit='a' * 40, auditor_role='INDEPENDENT_AUDITOR',
+            issued_at=NOW-1, expires_at=NOW+3600)
         self.set_record()
 
     def tearDown(self):
@@ -86,11 +87,13 @@ class ChannelTests(unittest.TestCase):
     def set_record(self):
         body = 'SYNTHETIC TEST ONLY\n<!-- '+grant.MARKER+'\n'+json.dumps(self.a)+'\n'+grant.MARKER+' -->'
         self.model.record = dict(id=123, body=body,
+            user=dict(id=332398908, login='huhongchuan0422-creator', type='User'),
             issue_url='https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/issues/99')
         self.body_sha = grant.sha(body.encode())
 
     def execute_grant(self):
-        return grant.grant(self.dispatcher, 123, self.body_sha, self.installer, self.model)
+        return grant.grant(self.dispatcher, 123, self.body_sha, self.installer, self.model,
+            expected_source_commit='a'*40, owner_root_trusts_independent_auditor=True)
 
     def test_dispatcher_digest_and_frozen_handoff_pin_match_actual_source(self):
         self.assertEqual(grant.sha(self.source), grant.DISPATCHER_SHA)
@@ -103,6 +106,9 @@ class ChannelTests(unittest.TestCase):
         original = copy.deepcopy(self.a)
         for change in (dict(action='OLD_PHASE_B'), dict(host='other'), dict(max_attempts=2),
                        dict(expires_at=NOW), dict(source_commit='invalid'),
+                       dict(source_commit='b'*40),
+                       dict(source_commit='28057fc19230d6cda093882ca05a2333348d36fe'),
+                       dict(auditor_role='DEVELOPER'),
                        dict(dispatcher_sha256='0'*64), dict(installer_sha256='0'*64),
                        dict(wrapper_sha256='0'*64), dict(sudoers_sha256='0'*64),
                        dict(phase_c_install_allowed=True), dict(runner_uid=True)):
@@ -132,6 +138,54 @@ class ChannelTests(unittest.TestCase):
         with mock.patch.object(self.model, 'current', side_effect=[self.model.record, changed]):
             with self.assertRaises(ValueError):
                 self.execute_grant()
+        self.assertFalse(self.model.path(grant.WORK).exists())
+
+    def test_c1_untrusted_actual_github_author_id_login_or_type_rejected(self):
+        actual = copy.deepcopy(self.model.record)
+        for user in ({'id':123,'login':'attacker','type':'User'},
+                     {'id':332398908,'login':'attacker','type':'User'},
+                     {'id':123,'login':'huhongchuan0422-creator','type':'User'},
+                     {'id':True,'login':'huhongchuan0422-creator','type':'User'},
+                     {'id':332398908,'login':'huhongchuan0422-creator','type':'Bot'}, {}):
+            self.model.record = dict(actual, user=user)
+            with self.subTest(user=user), self.assertRaisesRegex(ValueError,'UNTRUSTED_GITHUB_APPROVAL_AUTHOR'):
+                self.execute_grant()
+            self.assertFalse(self.model.path(grant.WORK).exists())
+
+    def test_c1_comment_role_alone_never_supplies_owner_root_trust(self):
+        with self.assertRaisesRegex(ValueError,'OWNER_ROOT_AUDITOR_TRUST_REQUIRED'):
+            grant.grant(self.dispatcher,123,self.body_sha,self.installer,self.model,
+                        expected_source_commit='a'*40)
+        self.assertFalse(self.model.path(grant.WORK).exists())
+
+    def test_c1_second_response_author_change_before_claim_rejected(self):
+        changed = dict(self.model.record, user=dict(id=123,login='attacker',type='User'))
+        with mock.patch.object(self.model,'current',side_effect=[self.model.record,changed]):
+            with self.assertRaisesRegex(ValueError,'UNTRUSTED_GITHUB_APPROVAL_AUTHOR'):
+                self.execute_grant()
+        self.assertFalse(self.model.path(grant.WORK).exists())
+
+    def test_c2_exact_owner_root_pin_missing_or_different_from_approval_rejected(self):
+        for pin in (None,'wrong','b'*40,'28057fc19230d6cda093882ca05a2333348d36fe'):
+            with self.subTest(pin=pin),self.assertRaises(ValueError):
+                grant.grant(self.dispatcher,123,self.body_sha,self.installer,self.model,
+                    expected_source_commit=pin,owner_root_trusts_independent_auditor=True)
+            self.assertFalse(self.model.path(grant.WORK).exists())
+
+    def test_c1_c2_valid_author_role_and_fixed_source_pass_and_trust_is_private(self):
+        result=self.execute_grant()
+        self.assertEqual(result['status'],'FIXED_CHANNEL_READY_NO_PHASE_C_EXECUTION')
+        p=self.model.path(grant.WORK)/'consumed-approval.json'
+        stored=json.loads(p.read_text())
+        self.assertEqual(stored['trusted_auditor']['github_id'],332398908)
+        self.assertEqual(stored['expected_source_commit'],'a'*40)
+        self.assertEqual(stat.S_IMODE(p.stat().st_mode),0o600)
+
+    def test_c1_missing_actual_author_does_not_fall_back_to_body_or_owner_association(self):
+        self.model.record.pop('user')
+        self.model.record['author_association']='OWNER'
+        with self.assertRaisesRegex(ValueError,'UNTRUSTED_GITHUB_APPROVAL_AUTHOR'):
+            self.execute_grant()
         self.assertFalse(self.model.path(grant.WORK).exists())
 
     def test_duplicate_json_and_nonfinite_constants_rejected(self):

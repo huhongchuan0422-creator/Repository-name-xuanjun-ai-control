@@ -39,3 +39,13 @@ Owner-root提供从独审取得的真实评论ID和全文SHA；安装器原始AP
 审核应一次覆盖安装器、dispatcher、wrapper/sudoers、原handoff调用及失败/并发/权限漂移，并核对9绑定/10常规条目。原C134及B185不重跑。新增测试中的主机、账号及visudo控制流为明确模型；Hosted另用真实visudo对临时sudoers做语法检查，不写Hosted系统sudoers。
 
 完整服务器迁移仍需真实私有身份/源真值/传输、围栏/PID1、只读观察以及后续唯一Writer切换验收，不能通过授权通道跳过。
+
+## C1/C2 准入整改（原审核6212980863）
+
+C1：原始GitHub响应record.user必须同时为id整数332398908、login=huhongchuan0422-creator、type=User；不能使用正文自报作者、author_association或缺失user的回退。批准JSON新增auditor_role=INDEPENDENT_AUDITOR，并必须由Owner-root通过--confirm-independent-auditor明确登记该主体的独审身份；正文角色字符串本身不产生信任。两次API读回均验证实际作者，期间变更拒绝。通过后将GitHub ID/login/role、确认来源和准确源SHA持久保存在0600私有消费登记内。
+
+这是实际GitHub账户身份加Owner-root从独立渠道取得的正文SHA和显式角色登记，不是独立审计人的密码学签名。同一GitHub账户被多个聊天入口共用时，GitHub元数据不能区分聊天窗口；Owner必须依据独立审核渠道取得准确正文SHA，不将开发方自报PASS当独审。这项限制不被隐藏。
+
+C2：原安装器不能内嵌其自身新Git提交SHA（会造成自引用）。改为要求Owner-root的准确启动命令提供--expected-source-commit，值固定为本次复审的新提交、与下载URL一致；绝不从批准正文、分支HEAD或默认值推导。验证器将批准source_commit逐字等于此独立root固定值，旧28057fc1、其他合法40位及缺失固定值都拒绝。批准同时绑定新安装器实际字节SHA，旧许可不能批准修正版。最终Owner命令必须硬编码审核冻结的新SHA；不能使用从远端批准里提取出来的期望值。
+
+仅安装器、相关测试与本合同/原开发文档改动。Dispatcher、wrapper、sudoers和冻结C runtime未变。新增6项回归合计22项，旧B185和C134不重跑。旧Owner暂存目录28057fc1保持不变；修正版尚未许可/执行。

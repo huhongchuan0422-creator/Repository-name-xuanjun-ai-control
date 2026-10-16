@@ -25,6 +25,8 @@ POLICY = '/etc/sudoers.d/xuanjun-pr99-phase-c-channel'
 WORK = '/var/lib/xuanjun-pr99-phase-c-channel-grant-v1'
 MARKER = 'PR99_PHASE_C_CHANNEL_GRANT_APPROVAL_V1'
 ACTION = 'PR99_KOREA_FIXED_PHASE_C_CHANNEL_GRANT_V1'
+TRUSTED_AUDITOR_ID = 332398908
+TRUSTED_AUDITOR_LOGIN = 'huhongchuan0422-creator'
 WRAPPER_BYTES = ("#!/bin/sh\nexec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C "
                  "/usr/bin/python3.11 -I -B " + PROGRAM + ' "$@"\n').encode()
 POLICY_BYTES = ('githubrunner ALL=(root) NOPASSWD:NOSETENV: ' + WRAPPER + ' inspect\n' +
@@ -116,7 +118,18 @@ def approval_record(comment_id):
     return parse(raw)
 
 
-def verify(record, comment_id, body_sha, installer_raw, now):
+def verify(record, comment_id, body_sha, installer_raw, now, expected_source_commit,
+           owner_root_trusts_independent_auditor):
+    # Owner pins this exact release OUTSIDE the approval body. A commit cannot
+    # embed its own Git commit hash; the reviewed root launch command supplies
+    # the fixed immutable download commit, never a value taken from the comment.
+    require(type(expected_source_commit) is str and
+            re.fullmatch('[0-9a-f]{40}', expected_source_commit) is not None, 'ROOT_SOURCE_PIN_REQUIRED')
+    require(owner_root_trusts_independent_auditor is True, 'OWNER_ROOT_AUDITOR_TRUST_REQUIRED')
+    author = record.get('user', {})
+    require(type(author.get('id')) is int and author['id'] == TRUSTED_AUDITOR_ID and
+            author.get('login') == TRUSTED_AUDITOR_LOGIN and author.get('type') == 'User',
+            'UNTRUSTED_GITHUB_APPROVAL_AUTHOR')
     body = record['body']
     require(record['id'] == comment_id and sha(body.encode()) == body_sha, 'APPROVAL_BODY_PIN')
     require(record['issue_url'] == 'https://api.github.com/repos/huhongchuan0422-creator/'
@@ -131,11 +144,11 @@ def verify(record, comment_id, body_sha, installer_raw, now):
         runner='githubrunner', runner_uid=1001, arbitrary_root_commands_allowed=False,
         phase_c_install_allowed=False, service_actions_allowed=False,
         network_changes_allowed=False, credentials_allowed=False,
-        database_export_allowed=False, writer_allowed=False)
-    require(set(a) == set(expected) | {'issued_at', 'expires_at', 'source_commit'}, 'APPROVAL_FIELDS')
+        database_export_allowed=False, writer_allowed=False,
+        source_commit=expected_source_commit, auditor_role='INDEPENDENT_AUDITOR')
+    require(set(a) == set(expected) | {'issued_at', 'expires_at'}, 'APPROVAL_FIELDS')
     for k, v in expected.items():
         require(type(a[k]) is type(v) and a[k] == v, 'APPROVAL_BINDING:' + k)
-    require(re.fullmatch('[0-9a-f]{40}', a['source_commit']) is not None, 'SOURCE_COMMIT')
     require(type(a['issued_at']) is int and type(a['expires_at']) is int and
             a['issued_at'] <= now < a['expires_at'] and
             0 < a['expires_at'] - a['issued_at'] <= 43200, 'APPROVAL_EXPIRED')
@@ -171,7 +184,8 @@ class Context:
         require(r.returncode == 0, 'SUDOERS_VALIDATION')
 
 
-def grant(dispatcher, comment_id, body_sha, installer_raw, ctx=None):
+def grant(dispatcher, comment_id, body_sha, installer_raw, ctx=None, *,
+          expected_source_commit=None, owner_root_trusts_independent_auditor=False):
     ctx = ctx or Context()
     ctx.identity()
     require(type(comment_id) is int and comment_id > 0 and
@@ -180,7 +194,8 @@ def grant(dispatcher, comment_id, body_sha, installer_raw, ctx=None):
     require(sha(data) == DISPATCHER_SHA, 'DISPATCHER_BYTES')
     compile(data, 'approved_fixed_channel', 'exec')  # Never import input code.
     record = ctx.current(comment_id)
-    a = verify(record, comment_id, body_sha, installer_raw, ctx.now())
+    a = verify(record, comment_id, body_sha, installer_raw, ctx.now(), expected_source_commit,
+               owner_root_trusts_independent_auditor)
     targets = (PROGRAM, WRAPPER, POLICY, WORK)
     for raw in targets:
         p = ctx.path(raw)
@@ -188,14 +203,19 @@ def grant(dispatcher, comment_id, body_sha, installer_raw, ctx=None):
         require(not os.path.lexists(p), 'EXISTING_CHANNEL_OBJECT')
     ctx.visudo()
     # Revalidate current exact authority immediately before a permanent claim.
-    verify(ctx.current(comment_id), comment_id, body_sha, installer_raw, ctx.now())
+    verify(ctx.current(comment_id), comment_id, body_sha, installer_raw, ctx.now(),
+           expected_source_commit, owner_root_trusts_independent_auditor)
     work = ctx.path(WORK)
     work.mkdir(mode=0o700)
     work.chmod(0o700)
     fsync_dir(work.parent)
     write_new(work / 'consumed-approval.json',
               json.dumps(dict(approval_comment_id=comment_id, approval_body_sha256=body_sha,
-                              approval_body=record['body']), sort_keys=True).encode(), 0o600)
+                              approval_body=record['body'],
+                              trusted_auditor=dict(github_id=TRUSTED_AUDITOR_ID,
+                                  login=TRUSTED_AUDITOR_LOGIN, role='INDEPENDENT_AUDITOR',
+                                  origin='EXPLICIT_OWNER_ROOT_CONFIRMATION_NOT_COMMENT_ROLE_ALONE'),
+                              expected_source_commit=expected_source_commit), sort_keys=True).encode(), 0o600)
     status = dict(status='INSTALLING_CHANNEL', approval_comment_id=comment_id,
                   phase_c_install_called=False, service_actions=0, retry_allowed=False)
     try:
@@ -227,10 +247,13 @@ def main():
     p.add_argument('--dispatcher', required=True)
     p.add_argument('--approval-id', type=int, required=True)
     p.add_argument('--approval-sha256', required=True)
+    p.add_argument('--expected-source-commit', required=True)
+    p.add_argument('--confirm-independent-auditor', action='store_true', required=True)
     a = p.parse_args()
     os.umask(0o077)
     return grant(a.dispatcher, a.approval_id, a.approval_sha256,
-                 read_once(__file__, 65536))
+                 read_once(__file__, 65536), expected_source_commit=a.expected_source_commit,
+                 owner_root_trusts_independent_auditor=a.confirm_independent_auditor)
 
 
 if __name__ == '__main__':
