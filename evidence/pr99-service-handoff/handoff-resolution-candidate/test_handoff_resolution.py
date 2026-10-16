@@ -12,11 +12,15 @@ class ResolutionTests(unittest.TestCase):
         p = m.command_plan(raw, {'ai_service/wecom_customer_service.py'})
         self.assertEqual(p['source_entry'], 'ai_service/wecom_customer_service.py')
         self.assertNotIn('DO_NOT_PRINT', json.dumps(p))
-        self.assertIsNone(m.command_plan(raw, set())['source_entry'])
+        missing = m.command_plan(raw, set())
+        self.assertIsNone(missing['source_entry'])
+        self.assertEqual(missing['unmatched_entry']['name'], 'ai_service.wecom_customer_service')
+        self.assertNotIn('DO_NOT_PRINT', json.dumps(missing))
 
     def test_unknown_python_inline_code_is_never_evaluated(self):
         p = m.command_plan(b'[Service]\nExecStart=/usr/bin/python3.11 -c "raise RuntimeError(\'DO_NOT_PRINT\')"\n', set())
         self.assertIsNone(p['source_entry'])
+        self.assertNotIn('DO_NOT_PRINT', json.dumps(p['unmatched_entry']))
         self.assertNotIn('DO_NOT_PRINT', json.dumps(p))
 
     def test_ssh_forward_direction_and_credentials_remain_private(self):

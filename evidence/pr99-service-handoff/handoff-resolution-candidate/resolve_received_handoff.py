@@ -176,6 +176,18 @@ def python_entry(args, source_names):
     return None
 
 
+def unmatched_python_entry(args):
+    """Only the interpreter's module/script slot, never following parameters."""
+    rest = args[1:]
+    while rest and re.fullmatch(r'-[uIBEOsS]+', rest[0]):
+        rest = rest[1:]
+    if len(rest) > 1 and rest[0] == '-m' and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.]{0,180}', rest[1]):
+        return {'kind': 'MODULE', 'name': rest[1], 'status': 'NOT_IN_RECEIVED_SOURCE_MANIFEST'}
+    if rest and re.fullmatch(r'/?[A-Za-z0-9_./-]{1,220}\.py', rest[0]) and '..' not in rest[0].split('/'):
+        return {'kind': 'SCRIPT_PATH', 'name': rest[0], 'status': 'NOT_IN_RECEIVED_SOURCE_MANIFEST'}
+    return {'status': 'UNRECOGNIZED_INTERPRETER_OPTIONS_OR_ENTRY'}
+
+
 def command_plan(raw, source_names):
     f = unit_service(raw)
     result = {'program': 'UNKNOWN', 'source_entry': None, 'exec_start_count': len(f.get('ExecStart', [])),
@@ -198,8 +210,11 @@ def command_plan(raw, source_names):
         return result
     # A single leading '-' is systemd's ignore-exit-status prefix, not shell syntax.
     exe = args[0][1:] if args[0].startswith('-/') else args[0]
+    result['executable'] = exe if re.fullmatch(r'/(?:usr/(?:local/)?s?bin|s?bin|opt)/[A-Za-z0-9_./-]{1,220}', exe) and '..' not in exe.split('/') else 'UNKNOWN_REDACTED'
     if re.fullmatch(r'(?:/usr/bin/|/opt/trading-system/venv/bin/)python(?:3(?:\.11)?)?', exe):
         result.update(program='PYTHON', source_entry=python_entry([exe] + args[1:], source_names))
+        if result['source_entry'] is None:
+            result['unmatched_entry'] = unmatched_python_entry([exe] + args[1:])
     elif exe in ('/usr/bin/ssh', '/bin/ssh'):
         result.update(program='SSH', ssh=ssh_plan(args))
     elif exe in ('/usr/bin/docker', '/bin/docker', '/usr/local/bin/docker', '/usr/bin/docker-compose', '/usr/local/bin/docker-compose'):
