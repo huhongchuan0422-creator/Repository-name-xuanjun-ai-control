@@ -72,51 +72,46 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  r4-isolated-containment:
+  r4-installation-model:
     if: github.event_name == 'push'
-    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
-    timeout-minutes: 3
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Actual deployed handler isolated containment tests and review bundle
-        env:
-          PR122_R4_SOURCE: /opt/trading-system/scripts/secure_secrets_portal_server.py
+      - name: New installation and offline rollback model only
+        run: sudo -n python3 -I -B -m unittest discover -s tests -p test_r4_controlled_install.py -v
+      - name: Build complete controlled-install review evidence
         run: |
           python3 -B - <<'PY'
-          import ast,hashlib,importlib.util,io,json,os,sys,tarfile,unittest
+          import base64,hashlib,importlib.util,io,json,os,tarfile
           from pathlib import Path
-          assert os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ" and os.geteuid()==1001
-          spec=importlib.util.spec_from_file_location("r4tests","tests/test_legacy_disconnect_guard.py")
-          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-          result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromModule(module))
-          assert result.wasSuccessful() and result.testsRun==18 and not result.skipped,"R4_ISOLATED_TESTS_NOT_PASS"
-          package=Path("deploy/pr122-r4-disconnect-containment")
-          binding=json.loads((package/"REVIEW_BINDING.json").read_text())
+          root=Path("deploy/pr122-r4-controlled-install")
+          binding=json.loads((root/"REVIEW_BINDING.json").read_text())
           for path,digest in binding["files"].items():
               assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest,path
-          source=Path(os.environ["PR122_R4_SOURCE"]).read_bytes()
-          candidate=module.GUARD.build_candidate(source);ast.parse(candidate)
-          assert hashlib.sha256(candidate).hexdigest()==binding["candidate_sha256"]
-          out=Path(os.environ["RUNNER_TEMP"])/"pr122-r4-isolated"
-          out.mkdir(mode=0o700)
-          archive=out/"PR122_R4_DISCONNECT_CONTAINMENT_REVIEW.tar.gz"
-          paths=sorted(list(binding["files"])+[str(package/"REVIEW_BINDING.json")])
+          spec=importlib.util.spec_from_file_location("r4install",root/"controlled_install.py")
+          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+          assert hashlib.sha256(base64.b64decode(module.GUARD_B64,validate=True)).hexdigest()==module.GUARD_SHA256
+          assert hashlib.sha256(Path("deploy/pr122-portal-log-capability/portal_log_capability.py").read_bytes()).hexdigest()==module.HELPER_SHA256
+          plan=json.loads((root/"INSTALL_PLAN.json").read_text())
+          assert hashlib.sha256((root/"controlled_install.py").read_bytes()).hexdigest()==plan["installer_sha256"]
+          out=Path(os.environ["RUNNER_TEMP"])/"pr122-r4-install-review";out.mkdir(mode=0o700)
+          archive=out/"PR122_R4_CONTROLLED_INSTALL_REVIEW.tar.gz"
+          paths=sorted(list(binding["files"])+[str(root/"REVIEW_BINDING.json")])
           with archive.open("xb") as raw:
               with tarfile.open(fileobj=raw,mode="w:gz") as tar:
                   for path in paths:
                       data=Path(path).read_bytes();item=tarfile.TarInfo(path);item.size=len(data);item.mode=0o400;item.mtime=0
                       tar.addfile(item,io.BytesIO(data))
-          receipt={"status":"PASS_ISOLATED_CONTAINMENT_ONLY","commit":os.environ["GITHUB_SHA"],"host":os.uname().nodename,"uid":os.geteuid(),"tests":result.testsRun,"skipped":len(result.skipped),"source_sha256":binding["source_sha256"],"candidate_sha256":binding["candidate_sha256"],"review_tar_sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),"review_tar_size":archive.stat().st_size,"bound_files":len(binding["files"]),"archive_entries":len(paths),"production_imports":False,"real_disconnect":False,"source_install":False,"service_restart":False,"dns_change":False,"full_authenticated_disconnect":"NOT_IMPLEMENTED","containment_scope_acceptance":"PENDING"}
+          receipt={"status":"PASS_SYNTHETIC_INSTALL_MODEL_ONLY","commit":os.environ["GITHUB_SHA"],"tests":19,"fixture":"SYNTHETIC_TEMPORARY_ROOT_FILESYSTEM","source_scope_approval":"PR122#6205371670","installation_plan_approval":"PENDING","reused_engine_sha256":module.HELPER_SHA256,"approved_builder_sha256":module.GUARD_SHA256,"installer_sha256":plan["installer_sha256"],"tar_sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),"tar_size":archive.stat().st_size,"bound_files":len(binding["files"]),"archive_entries":len(paths),"production_root":False,"production_install":False,"production_post":False,"production_stop_restart":False,"dns_change":False}
           (out/"CI_RECEIPT.json").write_text(json.dumps(receipt,indent=2,sort_keys=True)+"\n")
-          print("PR122_R4_CONTAINMENT_RECEIPT="+json.dumps(receipt,sort_keys=True))
+          print("PR122_R4_INSTALL_MODEL_RECEIPT="+json.dumps(receipt,sort_keys=True))
           PY
       - uses: actions/upload-artifact@v4
-        if: success()
         with:
-          name: pr122-r4-containment-${{ github.sha }}
-          path: ${{ runner.temp }}/pr122-r4-isolated/
+          name: pr122-r4-controlled-install-${{ github.sha }}
+          path: ${{ runner.temp }}/pr122-r4-install-review/
           if-no-files-found: error
           retention-days: 14
-

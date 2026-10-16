@@ -509,3 +509,18 @@ PATCH_PRODUCTION_INSTALL=EXECUTED_PASS_TARGETED_HEALTH；W06仍部分完成（�
 实际下载Artifact12016977176 ZIP23440字节并复算SHA256 e3ce083c8a2fd792e83eadde5495a84bbf43e6b2cbb55aa34db2e0b0a9443c5a；ZIP恰好内层TAR+CI_RECEIPT两项。TAR22675字节，SHA25607ce8a15460ea8c280c36c02825fce73b0b947b1dfde9e52452e306e39acf8b4；8项=7份绑定文件+REVIEW_BINDING，7/7哈希匹配，无额外/链接/特殊类型。绑定含builder、18项测试、只改分支patch、README、workflow、governance和开发说明。此为开发方下载复算，不冒充独审。
 
 本轮候选准备已完成并可集中审核；其目标仍是请求**暂停HTTP disconnect能力**的范围裁定，不是正向授权断开已实现。R4_FULL_REMEDIATION=OPEN；CONTAINMENT_SCOPE_ACCEPTANCE=PENDING；PRODUCTION_INSTALL=NOT_EXECUTED。日志已审生产修复、网站/HTTPS/现有current继续保持。待审核方裁定此最小范围及其他既有IP/DNS门禁，不承诺固定切站时间、不直接切DNS。
+
+
+### 9.21 2026-10-16：6205371670已接收，R4受控安装候选准备完成
+
+正式独审接受临时关闭HTTP断开写能力；完整鉴权仍OPEN且不阻断该缩减范围。原18测试/源码审查继承；原12016977176制品全字节独审、实际安装/实机验收与DNS仍PENDING。当前会话继续原开发任务，不自签发布、不切DNS。
+
+新增deploy/pr122-r4-controlled-install：独立Owner-root固定脚本（没有新sudoers或权限扩展），仅复用已安装完整SHA0e61a4ca…2cbcbe的事务引擎并在内存绑定准确R4 builder1afc01c6…a0d6d93、原源d5ab592a、新源57e38fc9。原helper文件/原状态不替换。脚本完整SHA2e10d3869b42cfa4a612dff5d6099321222651a583cfb2f82f85e13397753c96。固定root/admin源身份、原锁与新锁、root私有备份和一次apply标记、有界Portal重启、精确新源及新PID、两地health检查，随后才提出四个空body/合成头403负向请求。这四个安全POST属于**本次待审安装计划**，当前没有获准执行或实际调用。
+
+新回执公开仅固定运维元数据，root0644，供现有非rootRunner后续自动读取；私有grant/receipt0600、源备份0400保留root0700目录，绝不导出Token状态或业务DB。运营说明明确：安装验收后该HTTP断开功能对包括管理员在内所有人不可用，不会主动断开现有账号。
+
+回滚方案仅Owner显式--rollback-offline：准确候选及备份绑定、原子记录开始，先停Portal并确认PID0，再恢复原源并**保持Portal离线**，不自动重启已知存在R4的旧代码。Nginx/VM/静态网站不停止，但动态路由将临时不可用；此异常恢复影响须独审明确接受，当前不执行。停止不明则不恢复，异常保留现场、不盲重试。
+
+本地19项临时root文件系统/合成源/假服务与网络测试PASS，含一次安装/禁止重试、新PID门禁、源漂移阻断POST、状态/正文/cookie拒绝、固定root代码字节、备份篡改拒绝、停服未确认不恢复、离线恢复不重启和公开回执白名单。生产root/安装/POST/服务停止重启均NOT_EXECUTED。托管CI只跑新19模型测试，不重复原18/20/44/83/45/115；最终以绑定job原始日志为准。
+
+已知技术接入限制继续明确：长期Owner运维授权有效，既有Runner固化入口仍不能执行新R4安装动作。安装计划及制品通过前不提供生产执行命令；通过后需现有东京admin/root实际运行准确脚本，非rootRunner可自行收集已设计公开回执和验收，不要求Owner手工采数据。
