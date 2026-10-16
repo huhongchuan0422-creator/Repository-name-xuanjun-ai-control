@@ -98,7 +98,7 @@
       "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
       "independent_byte_review_comment_id": 6213125007
     },
-    "next_development": "Do not reopen passed Phase-B/C source/artifact or rerun offline recovery/dependency installation. Consolidate real Owner-root receipts with two-runner readback. Subsequent migration must bind current source/data and explicitly handle retained Portal/model/tunnel/customer duties and four Finance/Billing timers without installing old API credentials or overwriting current website/Phase-B. Tokyo remains online.",
+    "next_development": "Audit6215371855 accepted historical offsite preservation and new environment within evidence limits. Next collect actual current source identities and DB/WAL metadata without business export; current WAL export/C install/real GET/Writer/retirement remain explicitly unapproved. Do not force API rebuild or live Shadow into Owner-deferred offline scope.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NO_REPEAT_INSTALL; ONE_CONSOLIDATED_REVIEW_OF_ACTUAL_OFFLINE_RECOVERY_AND_ENV_EVIDENCE; REMAINING_TOKYO_SERVICES_NOT_SWITCHED",
+  "owner_action_now": "NONE_FOR_PASSED_STAGE; DEVELOPER_COLLECTING_CURRENT_SOURCE_AND_DB_WAL_METADATA_WITH_EXISTING_NONROOT_RUNNER",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -425,6 +425,20 @@
       "target_dependency_versions": "13_EXACT_MATCH",
       "existing_phase_b_service": "DISABLED_INACTIVE_PID0_CURRENT_UNCHANGED",
       "root_private_receipts_read": false
+    },
+    "independent_consolidated_acceptance": {
+      "comment_id": 6215371855,
+      "decision": "PASS_WITH_SCOPE_LIMITS",
+      "evidence_commit": "306acd666c466f564cb2349b3d68eface5460187",
+      "offsite_cipher": "PASS_OWNER_ROOT_NOT_INDEPENDENT_PRIVATE_BYTES",
+      "key_custody": "PASS_OWNER_ROOT",
+      "historical_restore": "PASS_OWNER_ROOT",
+      "dependency_environment": "PASS_OWNER_ROOT_WITH_RUNNER_METADATA_CORROBORATION",
+      "korea_runner": "PASS",
+      "tokyo_runner": "PASS",
+      "current_trading_snapshot": "NOT_PROVEN",
+      "full_service_migration": "NOT_COMPLETE",
+      "read_back": true
     }
   },
   "offline_relocation_blocker": {

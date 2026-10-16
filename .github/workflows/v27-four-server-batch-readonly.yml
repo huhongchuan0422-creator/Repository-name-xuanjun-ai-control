@@ -283,3 +283,63 @@ jobs:
           print("PR99_OFFLINE_ENV_CHANNEL_RECEIPT="+json.dumps(r,sort_keys=True))
           
           PY
+
+  tokyo-current-source-and-wal-metadata:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_CURRENT_SOURCE_IDENTITY_ONCE_6215371855' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 3
+    steps:
+      - name: Current selected source identity and DB/WAL metadata; no checkout or sudo
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import hashlib,json,os,stat,subprocess,time
+          from pathlib import Path
+          assert os.geteuid()==1001 and os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
+          root=Path("/opt/trading-system")
+          excluded={".git",".venv","venv","node_modules","__pycache__",".pytest_cache","site-packages","runtime","logs","backups","secrets","credentials","config","state","data"}
+          rows=[];unknown=[];budget=0;started=time.monotonic()
+          for base,dirs,files in os.walk(root,followlinks=False):
+           dirs[:]=sorted(d for d in dirs if d.lower() not in excluded and not d.startswith(".") and not (Path(base)/d).is_symlink())
+           for leaf in sorted(files):
+            dependency=leaf in {"pyproject.toml","setup.cfg","Pipfile","Pipfile.lock","poetry.lock","uv.lock"} or leaf.endswith(".txt") and leaf.startswith(("requirements","constraints"))
+            if leaf.startswith(".") or not (dependency or leaf.endswith((".py",".pyi",".sql",".sh"))):continue
+            p=Path(base)/leaf;rel=str(p.relative_to(root))
+            assert len(rows)+len(unknown)<20000 and time.monotonic()-started<90,"INVENTORY_BUDGET"
+            try:
+             s=p.lstat()
+             if not stat.S_ISREG(s.st_mode) or s.st_uid not in (0,1000) or s.st_mode&0o022 or s.st_nlink!=1:
+              unknown.append({"path":rel,"reason":"IDENTITY_NOT_ACCEPTED"});continue
+             if not 0<=s.st_size<=64*1048576:unknown.append({"path":rel,"reason":"SIZE_LIMIT"});continue
+             budget+=s.st_size;assert budget<=512*1048576,"SOURCE_SIZE_BUDGET"
+             fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+             with os.fdopen(fd,"rb") as f:
+              first=os.fstat(f.fileno());h=hashlib.sha256();count=0
+              for block in iter(lambda:f.read(1048576),b""):h.update(block);count+=len(block)
+              after=os.fstat(f.fileno())
+             current=p.lstat();fields=("st_dev","st_ino","st_size","st_mtime_ns","st_ctime_ns")
+             if not count==first.st_size or any(getattr(first,k)!=getattr(after,k) or getattr(after,k)!=getattr(current,k) for k in fields):
+              unknown.append({"path":rel,"reason":"CHANGED_DURING_READ"});continue
+             rows.append({"path":rel,"sha256":h.hexdigest(),"bytes":count,"mtime_ns":current.st_mtime_ns,"dependency_manifest":dependency})
+            except (PermissionError,FileNotFoundError):unknown.append({"path":rel,"reason":"UNREADABLE_OR_CHANGED"})
+          rows.sort(key=lambda x:x["path"]);aggregate=hashlib.sha256()
+          for row in rows:aggregate.update((row["path"]+"\0"+row["sha256"]+"\0"+str(row["bytes"])+"\n").encode())
+          def identity(p):
+           try:
+            s=Path(p).lstat()
+            return {"present":True,"regular":stat.S_ISREG(s.st_mode),"symlink":stat.S_ISLNK(s.st_mode),"uid":s.st_uid,"gid":s.st_gid,"mode":oct(stat.S_IMODE(s.st_mode)),"bytes":s.st_size,"device":s.st_dev,"inode":s.st_ino,"mtime_ns":s.st_mtime_ns}
+           except FileNotFoundError:return {"present":False}
+           except PermissionError:return {"status":"UNKNOWN_PERMISSION"}
+          env=dict(os.environ,GIT_OPTIONAL_LOCKS="0",GIT_TERMINAL_PROMPT="0")
+          g=subprocess.run(["git","--no-optional-locks","-c","safe.directory=/opt/trading-system","-C",str(root),"rev-parse","--verify","HEAD"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env,timeout=15)
+          head=g.stdout.strip() if g.returncode==0 and len(g.stdout.strip())==40 else "UNKNOWN_GIT_IDENTITY"
+          r={"schema_version":1,"host":os.uname().nodename,"uid":os.geteuid(),"delivery_commit":os.environ["GITHUB_SHA"],"epoch":int(time.time()),"source_git_head":head,"source_files":len(rows),"source_bytes":sum(x["bytes"] for x in rows),"aggregate_algorithm":"SHA256(sorted relative_path NUL file_sha256 NUL decimal_bytes LF)","source_aggregate_sha256":aggregate.hexdigest(),"files":rows,"unresolved":unknown,"database_file_identities":{p:identity(p) for p in ("/opt/trading-system/database/data/trading.db","/opt/trading-system/database/data/trading.db-wal","/opt/trading-system/database/data/trading.db-shm")},"database_opened":False,"wal_bytes_read":False,"credentials_read":False,"source_literal_values_exported":False,"sudo_calls":0,"service_actions":0,"api_requests":0,"production_changes":0,"collection_atomic_across_tree":False,"root_cron":"NOT_READ_NONROOT","status":"CURRENT_SOURCE_IDENTITY_AND_DB_WAL_METADATA_ONLY"}
+          print("PR99_CURRENT_SOURCE_IDENTITY_RECEIPT="+json.dumps(r,sort_keys=True))
+          
+          PY
