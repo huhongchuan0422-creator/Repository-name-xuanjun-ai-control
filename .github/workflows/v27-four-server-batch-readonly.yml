@@ -350,3 +350,82 @@ jobs:
           result['status'] = 'READONLY_PERIPHERAL_METADATA_COLLECTED'
           print('PR122_IP_PERIPHERAL_RECEIPT='+json.dumps(result, sort_keys=True))
           PY
+
+  backend-migration-preflight:
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            runner: xuanjun-tokyo-readonly
+          - side: domestic
+            runner: xuanjun-domestic-ops
+    runs-on: [self-hosted, Linux, X64, '${{ matrix.runner }}']
+    timeout-minutes: 3
+    steps:
+      - name: Bounded backend host readiness and directory metadata only
+        env:
+          XJ_BACKEND_SIDE: ${{ matrix.side }}
+        run: |
+          python3 -I -B - <<'PY'
+          import collections, json, os, re, shutil, socket, stat, subprocess, sys, time
+          from pathlib import Path
+          side=os.environ['XJ_BACKEND_SIDE']
+          hosts={'tokyo':'iZ6wee8q9z4t03hvqumwfhZ','domestic':'iZvt5t8tlrm8oiZ'}
+          assert os.geteuid()!=0 and os.uname().nodename==hosts[side]
+          r={'schema_version':1,'side':side,'host':hosts[side],'uid':os.geteuid(),
+             'delivery_commit':os.environ['GITHUB_SHA'],'observed_epoch':int(time.time()),
+             'production_writes':0,'root_calls':0,'http_requests':0,'file_contents_read':False,
+             'python_version':list(sys.version_info[:3]),'cpu_count':os.cpu_count(),
+             'disk_free_bytes':shutil.disk_usage('/var/tmp').free,'services':[],'paths':[]}
+          def command(label,args):
+           try:
+            p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=12)
+            r.setdefault('command_exit',{})[label]=p.returncode
+            return p.stdout if p.returncode==0 else ''
+           except Exception as e:r.setdefault('command_errors',{})[label]=type(e).__name__;return ''
+          listed=command('services',['systemctl','list-units','--all','--type=service','--plain','--no-legend','--no-pager'])
+          names={line.split()[0] for line in listed.splitlines() if line.split() and re.search(r'secure-secrets-portal|provider-neutral|telegram|wecom|novel.*tunnel|model-rpc',line.split()[0])}
+          for unit in sorted(names)[:40]:
+           text=command(unit,['systemctl','show',unit,'-p','Id','-p','ActiveState','-p','SubState','-p','MainPID','-p','User','-p','WorkingDirectory','-p','FragmentPath'])
+           r['services'].append(dict(x.split('=',1) for x in text.splitlines() if '=' in x))
+          ports={18080,18081,18443,19443,18761,18770,18780,18781,18880}
+          lines=command('listeners',['ss','-H','-lnt']).splitlines()
+          r['listeners']=[x.split()[3] for x in lines if len(x.split())>=4 and any(x.split()[3].endswith(':'+str(port)) for port in ports)]
+          paths=(['/opt/trading-system/runtime/secure-secrets-portal',
+           '/opt/trading-system/runtime/secure-secrets-portal/sessions',
+           '/opt/trading-system/runtime/secure-secrets-portal/tiktok-oauth-state',
+           '/opt/trading-system/runtime/secure-secrets-portal/douyin-oauth-state',
+           '/opt/trading-system/runtime/secure-secrets-portal/tiktok-token-state',
+           '/opt/trading-system/runtime/secure-secrets-portal/douyin-token-state',
+           '/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store',
+           '/opt/trading-system/runtime/v8-domestic-operations/telegram-customer-service-canary'] if side=='tokyo' else
+           ['/home/openclaw_ops/v8-domestic-operations',
+           '/home/openclaw_ops/v8-domestic-operations/runtime',
+           '/home/openclaw_ops/v8-domestic-operations/runtime/internal-bridge',
+           '/opt/trading-system/runtime/secure-secrets-portal','/var/lib/xuanjun-operations-portal'])
+          for raw in paths:
+           item={'path':raw}
+           try:
+            info=os.lstat(raw);item.update(exists=True,uid=info.st_uid,gid=info.st_gid,mode=oct(stat.S_IMODE(info.st_mode)),is_directory=stat.S_ISDIR(info.st_mode),is_symlink=stat.S_ISLNK(info.st_mode))
+            if stat.S_ISDIR(info.st_mode):
+             try:
+              count=0;extensions=collections.Counter()
+              with os.scandir(raw) as entries:
+               for entry in entries:
+                count+=1
+                if count>2000:item['enumeration']='BOUNDED_TRUNCATED';break
+                suffix=Path(entry.name).suffix
+                extensions[suffix if suffix in ('.json','.sqlite3','.secret','.env','.jsonl') else 'other']+=1
+              item['entry_count']=min(count,2000);item['extension_counts']=dict(extensions)
+             except PermissionError:item['enumeration']='PERMISSION_DENIED'
+           except FileNotFoundError:item['exists']=False
+           except PermissionError:item['visibility']='PERMISSION_DENIED_NOT_ABSENT'
+           r['paths'].append(item)
+          r['limitations']=['Counts are metadata, not consistent snapshots or account/credential inventory',
+           'Permission denied means unknown, never empty; no state/secret/DB/config contents read',
+           'No service start/stop, migration, provider calls, bridge change or authority transfer']
+          r['status']='NONROOT_BACKEND_METADATA_COLLECTED'
+          print('PR122_BACKEND_PREFLIGHT_RECEIPT='+json.dumps(r,sort_keys=True))
+          PY
