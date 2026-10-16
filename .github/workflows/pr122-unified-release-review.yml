@@ -1,0 +1,68 @@
+name: PR122 Unified Static Candidate
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - 'scripts/pr122_site_hub_unified_package.py'
+      - 'tests/test_pr122_site_hub_unified_package.py'
+      - 'tests/pr122_site_hub_unified_nginx.py'
+      - '.github/workflows/pr122-unified-release-review.yml'
+permissions:
+  contents: read
+jobs:
+  unified-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Composition and inherited integration regressions
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_pr122_site_hub_unified_package tests.test_pr122_site_hub_integration tests.test_pr122_site_hub_preview -v
+          node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs
+      - name: Reproduce reviewed phone bytes and compose exact candidate
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pr122-unified-reports
+          GITHUB_SHA=790937a5c96afcf3b3660e36cf36cfaab2002a72 python -m scripts.pr122_community_experience_package --output /tmp/pr122-reviewed-mobile
+          python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-unified-stage
+          python -m scripts.pr122_site_hub_unified_package --static evidence/pr122-public-presentation/PR122_PUBLIC_PRESENTATION_REVIEW_ONLY.tar.gz --mobile /tmp/pr122-reviewed-mobile/COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz --output /tmp/pr122-unified-candidate --stage /tmp/pr122-unified-stage
+      - name: Browser and real Nginx test dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y nginx
+          npm install --prefix "$RUNNER_TEMP/pr122-browser" --no-save playwright@1.55.0
+          "$RUNNER_TEMP/pr122-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: All canonical and exact routes in isolated real Nginx
+        run: sudo -n "$(command -v python)" -m tests.pr122_site_hub_unified_nginx --candidate /tmp/pr122-unified-candidate/PR122_UNIFIED_REVIEW_ONLY.tar.gz --report /tmp/pr122-unified-reports/NGINX_REPORT.json
+      - name: Integrated public pages and reviewed mobile role flows
+        env:
+          XJ_HUB_STAGE: /tmp/pr122-unified-stage
+          XJ_HUB_REPORT: /tmp/pr122-unified-reports/PUBLIC_BROWSER_REPORT.json
+          TEST_STAGE: /tmp/pr122-unified-stage
+          REPORT_DIR: /tmp/pr122-unified-reports
+        run: |
+          set -euo pipefail
+          export PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright"
+          node tests/pr122_site_hub_browser.cjs
+          node tests/community-experience/browser.cjs
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          Path('/tmp/pr122-unified-reports/CI_BINDING.json').write_text(json.dumps({'source_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'production_changes':0,'production_release_approved':False},indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr122-unified-static-${{ github.sha }}
+          path: |
+            /tmp/pr122-unified-reports/
+            /tmp/pr122-unified-candidate/
+          retention-days: 14
