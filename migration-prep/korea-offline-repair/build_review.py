@@ -12,13 +12,17 @@ import tarfile
 def build(folder, output, commit):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("EXACT_COMMIT_REQUIRED")
-    names = ("controlled_repair.py", "offline.service", "installed-runtime-manifest.json",
+    names = ("controlled_repair.py", "finalize_repair.py", "offline.service", "installed-runtime-manifest.json",
              "approved-runtime-632bbe6f.tar.gz", "README.md", "build_review.py")
     files = {name: (folder / name).read_bytes() for name in names}
     tests = folder / "test_korea_offline_repair.py"
     if not tests.is_file():
         tests = folder.parent / "test_korea_offline_repair.py"
     files["test_korea_offline_repair.py"] = tests.read_bytes()
+    tests2 = folder / "test_korea_offline_finalize.py"
+    if not tests2.is_file():
+        tests2 = folder.parent / "test_korea_offline_finalize.py"
+    files["test_korea_offline_finalize.py"] = tests2.read_bytes()
     binding = {"schema_version": 1, "source_commit": commit,
                "production_authorized": False,
                "files": {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}}

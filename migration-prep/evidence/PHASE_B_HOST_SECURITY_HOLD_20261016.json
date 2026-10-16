@@ -1,4 +1,23 @@
 {
+  "actual_repair_attempt": {
+    "address_families_dbus": "(bas) true 1 \"AF_UNIX\"",
+    "approval": 6208184098,
+    "attempts": 1,
+    "current_unchanged": true,
+    "error": "MANAGER_NETWORK_PROFILE_NOT_LOADED",
+    "lock_retained": true,
+    "private_network_dbus": "b true",
+    "root_cause": "VERIFIER_TEXT_RENDERING_ASSUMPTION",
+    "runtime_17_mismatches": 0,
+    "shared_named_unit_metadata_unchanged": true,
+    "source": "OWNER_TERMINAL",
+    "started_service_confinement": "NOT_EXERCISED",
+    "status": "HOLD_PRESERVE_EVIDENCE",
+    "systemctl_address_families": "[unprintable]",
+    "transaction_sha256": "ee81a70bb417e66dbb58bad5a79a776d1e7a0bce35d0e72bf638a2fe0844eb75",
+    "unit_hash_only_transaction_delta": true,
+    "unit_sha256": "824fc0cbe3d879b61ea36b0bd7c45fb8c1e9fb6c463f46ada741ac3f2299899b"
+  },
   "complete_repair_candidate": {
     "actual_repair": "NOT_EXECUTED",
     "af_unix_only": true,
@@ -10,6 +29,17 @@
     "private_network": true,
     "root_anchor": "NOT_REGISTERED",
     "scope": "UNIT_AND_TRANSACTION_UNIT_HASH_ONLY"
+  },
+  "finalization_candidate": {
+    "action": "PR99_PHASE_B_OFFLINE_REPAIR_FINALIZE_V1",
+    "daemon_reload": false,
+    "execution": "NOT_EXECUTED",
+    "historical_lock_inode_persisted": false,
+    "new_approval_required": true,
+    "new_private_anchor_required": true,
+    "scope": "READ_ONLY_POSTFLIGHT_PLUS_EXPLICITLY_ADOPTED_EMPTY_LOCK_RELEASE_AND_LINKED_RECEIPT",
+    "transaction_rewrite": false,
+    "unit_rewrite": false
   },
   "independent_recovery_review": "WAIT_COMPLETE_RECOVERY_SCOPE_NOT_PIECEWISE",
   "install_commit": "REPORTED_PASS",

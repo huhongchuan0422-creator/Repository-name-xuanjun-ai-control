@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import shlex
 import signal
 import stat
 import subprocess
@@ -199,8 +200,20 @@ def service(ctx, repaired):
                    "User": "xuanjun_binance", "Group": "xuanjun_binance"}.items():
         require(v.get(k) == val, "SERVICE_IDENTITY_OR_STATE")
     if repaired:
-        require(v.get("PrivateNetwork") == "yes" and v.get("RestrictAddressFamilies") == "AF_UNIX",
-                "MANAGER_NETWORK_PROFILE_NOT_LOADED")
+        # systemd239's systemctl prints this compound property as [unprintable].
+        # Query its typed D-Bus (boolean allow-list, array) instead of accepting
+        # that placeholder or guessing that configured text is effective.
+        obj = "/org/freedesktop/systemd1/unit/xuanjun_2dbinance_2dshadow_2eservice"
+        for name, expected in (("PrivateNetwork", ["b", "true"]),
+                               ("RestrictAddressFamilies", ["(bas)", "true", "1", "AF_UNIX"])):
+            r = ctx.run(["/usr/bin/busctl", "get-property", "org.freedesktop.systemd1", obj,
+                         "org.freedesktop.systemd1.Service", name])
+            try:
+                actual = shlex.split(r.stdout)
+            except ValueError:
+                actual = []
+            require(r.returncode == 0 and actual == expected,
+                    "MANAGER_NETWORK_PROFILE_NOT_LOADED")
 
 
 def shared(ctx):

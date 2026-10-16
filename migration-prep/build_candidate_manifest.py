@@ -42,7 +42,8 @@ FILES = (
     "korea-offline-repair/controlled_repair.py", "korea-offline-repair/offline.service",
     "korea-offline-repair/installed-runtime-manifest.json",
     "korea-offline-repair/approved-runtime-632bbe6f.tar.gz",
-    "korea-offline-repair/build_review.py", "korea-offline-repair/README.md"
+    "korea-offline-repair/build_review.py", "korea-offline-repair/README.md",
+    "korea-offline-repair/finalize_repair.py", "test_korea_offline_finalize.py"
 )
 
 
@@ -64,10 +65,10 @@ def build(root):
              "task_id": "TOKYO_KOREA_COMPLETE_MIGRATION_REVIEW_PACKAGE_6171881293",
              "audit_comment": "6206991380",
              "host_outcome_comment": "6207782855",
-             "host_security_acceptance": "HOLD_UNSUPPORTED_SECURITY_CAPABILITIES",
-             "offline_repair_review": "NEW_COMPLETE_CANDIDATE_NOT_EXECUTED",
-             "base_commit": "94f8e10deed7dbbe876cb170ca0093d0574feeba",
-             "base_tree": "be9acd81d82d37681c9d7573c930cdced159a2a6",
+             "host_security_acceptance": "HOLD_PENDING_STOPPED_FINALIZATION",
+             "offline_repair_review": "ACTUAL_TYPED_DBUS_PASS_FINALIZATION_CANDIDATE_NOT_EXECUTED",
+             "base_commit": "bf9373ab6ba2d02dbb7cb5e421cc74632d2cc794",
+             "base_tree": "53f089df4e6def0803fbf40467c223ea334609b9",
              "files": files, "production_authorized": False,
              "binance_called": False, "production_deployed": False,
              "self_asserted_receipts_can_pass": False,

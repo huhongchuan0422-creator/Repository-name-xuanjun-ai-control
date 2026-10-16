@@ -34,6 +34,7 @@ class Model(repair.Context):
         self.reload_fail = False
         self.loaded_private = "yes"
         self.shared_changed = False
+        self.dbus_family = '(bas) true 1 "AF_UNIX"'
 
     def path(self, value):
         return self.trust_root / value.lstrip("/")
@@ -41,7 +42,12 @@ class Model(repair.Context):
     def run(self, args):
         self.commands.append(args)
         out, err, code = "", "", 0
-        if args[0].endswith("systemd-analyze"):
+        if args[0].endswith("busctl"):
+            if args[-1] == "PrivateNetwork":
+                out = "b true" if self.loaded_private == "yes" else "b false"
+            else:
+                out = self.dbus_family
+        elif args[0].endswith("systemd-analyze"):
             err = self.warning
         elif args[1] == "is-enabled":
             out, code = "disabled\n", 1
@@ -53,7 +59,7 @@ class Model(repair.Context):
                  "MainPID": "0", "FragmentPath": str(self.path(repair.UNIT)),
                  "DropInPaths": "drift.conf" if self.dropin else "", "User": "xuanjun_binance",
                  "Group": "xuanjun_binance", "PrivateNetwork": self.loaded_private if self.loaded else "no",
-                 "RestrictAddressFamilies": "AF_UNIX"}
+                 "RestrictAddressFamilies": "[unprintable]"}
             out = "\n".join(k + "=" + v for k, v in v.items())
         else:
             out = "\n".join("Id=" + name + "\nMainPID=1" for name in repair.SHARED)
@@ -226,6 +232,19 @@ class KoreaOfflineRepairTests(unittest.TestCase):
     def test_manager_must_load_private_network(self):
         self.ctx.loaded_private = "no"
         self._hold("MANAGER_NETWORK_PROFILE_NOT_LOADED")
+
+    def test_typed_family_must_be_exact_allowlist(self):
+        # No placeholder, blacklist, extra family, malformed count or partial
+        # result can satisfy the typed exact AF_UNIX allow-list comparison.
+        repair.service(self.ctx, False)
+        self.ctx.loaded = True
+        for value in ('(bas) false 1 "AF_UNIX"', '(bas) true 2 "AF_UNIX" "AF_INET"',
+                      '(bas) true 0', '[unprintable]', '(bas) true 1 "AF_UNIX',
+                      '(bas) true 2 "AF_UNIX"', '(bas) true 1 "AF_INET"'):
+            with self.subTest(value=value):
+                self.ctx.dbus_family = value
+                with self.assertRaisesRegex(repair.Hold, 'MANAGER_NETWORK_PROFILE_NOT_LOADED'):
+                    repair.service(self.ctx, True)
 
     def test_partial_failure_preserves_old_transaction_and_backup(self):
         def fail(name):

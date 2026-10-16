@@ -1,9 +1,9 @@
 {
   "audit_comment": "6206991380",
-  "base_commit": "94f8e10deed7dbbe876cb170ca0093d0574feeba",
-  "base_tree": "be9acd81d82d37681c9d7573c930cdced159a2a6",
+  "base_commit": "bf9373ab6ba2d02dbb7cb5e421cc74632d2cc794",
+  "base_tree": "53f089df4e6def0803fbf40467c223ea334609b9",
   "binance_called": false,
-  "candidate_content_sha256": "07a06e33399d0ffb51b075c19aaa48f1de210bd33c8ed8f6fa6dfe78a3effc29",
+  "candidate_content_sha256": "d9f31023a2af18a2fd045b3487cd41651e2b5415d1bc8478c2b4e8ef73a9f4ba",
   "canonical_migration_policy_enforced": true,
   "files": [
     {
@@ -263,13 +263,13 @@
     },
     {
       "path": "migration-prep/test_korea_offline_repair.py",
-      "sha256": "1af88664e3a733eff6dcf046536b4857d918ce48d98e222f069ca7cd22a4a7f9",
-      "size": 16136
+      "sha256": "4eddd3ff1d31babda56962853ef920149d26b5605c12e03e66a76407c4be838b",
+      "size": 17174
     },
     {
       "path": "migration-prep/korea-offline-repair/controlled_repair.py",
-      "sha256": "2d65912eaa405e0fc2a5d3a506f8ec08e6add8c6c4d9cfbac9ccf3a985d4262f",
-      "size": 17240
+      "sha256": "f524d6408f5b39414391b5c4f93b7a13a052abb4fb9945ff8b3194b1b32bbc9f",
+      "size": 17985
     },
     {
       "path": "migration-prep/korea-offline-repair/offline.service",
@@ -288,19 +288,29 @@
     },
     {
       "path": "migration-prep/korea-offline-repair/build_review.py",
-      "sha256": "9e198f3ab08a8ca8b96292c1cfe134d3aa82e2f226d01c4b0609d515cd197a9a",
-      "size": 2119
+      "sha256": "c9fd3a759bd5c8ceaac9c5dab640d8674ecb45037bea3298f70a929741419a7d",
+      "size": 2357
     },
     {
       "path": "migration-prep/korea-offline-repair/README.md",
-      "sha256": "ada82da4ba9b727554d213749c6c6c2582165174268637b4579abb5f79aefa20",
-      "size": 8530
+      "sha256": "e419511d5a6a421f58983c409577868c36a33f37594df25f47360f42fcaa404f",
+      "size": 14768
+    },
+    {
+      "path": "migration-prep/korea-offline-repair/finalize_repair.py",
+      "sha256": "99565713e359cb583563b2d673282439aae55022d88ee3d3cb189758fe51134a",
+      "size": 10020
+    },
+    {
+      "path": "migration-prep/test_korea_offline_finalize.py",
+      "sha256": "1169043a95c82e90a79f5bfd4d7e06852341be2edcf2c0956254831dde5ced86",
+      "size": 9448
     }
   ],
   "host_outcome_comment": "6207782855",
-  "host_security_acceptance": "HOLD_UNSUPPORTED_SECURITY_CAPABILITIES",
+  "host_security_acceptance": "HOLD_PENDING_STOPPED_FINALIZATION",
   "legacy_package_execution_accepted": false,
-  "offline_repair_review": "NEW_COMPLETE_CANDIDATE_NOT_EXECUTED",
+  "offline_repair_review": "ACTUAL_TYPED_DBUS_PASS_FINALIZATION_CANDIDATE_NOT_EXECUTED",
   "persistent_production_launcher_proven": false,
   "production_authorized": false,
   "production_dependency_inventory_complete": false,

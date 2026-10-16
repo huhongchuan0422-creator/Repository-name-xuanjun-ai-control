@@ -64,15 +64,15 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
       - run: python3 -B -m unittest discover -s migration-prep -p 'test_*.py' -v
-      - name: Build exact offline repair review artifact (no host action)
+      - name: Build exact offline finalization review artifact (no host action)
         shell: bash
         run: |
           mkdir -m 0700 /tmp/pr99-offline-review
-          python3 -B migration-prep/korea-offline-repair/build_review.py --commit "$(git rev-parse HEAD)" --output /tmp/pr99-offline-review/PR99_OFFLINE_REPAIR.tar.gz > /tmp/pr99-offline-review/BUILD_RECEIPT.json
+          python3 -B migration-prep/korea-offline-repair/build_review.py --commit "$(git rev-parse HEAD)" --output /tmp/pr99-offline-review/PR99_OFFLINE_FINALIZE.tar.gz > /tmp/pr99-offline-review/BUILD_RECEIPT.json
           cat /tmp/pr99-offline-review/BUILD_RECEIPT.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: pr99-offline-repair-review
+          name: pr99-offline-finalize-review
           path: /tmp/pr99-offline-review/
           if-no-files-found: error
           retention-days: 7
