@@ -123,7 +123,7 @@ jobs:
       - name: Dynamic showcase lifecycle and isolated static publisher
         run: |
           python -m unittest tests.test_pr122_showcase tests.test_pr122_showcase_sources -v
-          sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_trust -v
+          sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_trust tests.test_pr122_showcase_protected_build -v
           sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_install -v
           sudo -n env XJ_SHOWCASE_REPORT_DIR=/tmp/pr122-site-hub "$(command -v python)" -m unittest tests.test_pr122_showcase_promote tests.test_pr122_showcase_poll -v
           python -m scripts.pr122_showcase_build --registry showcase --output /tmp/pr122-showcase-preview --preview
@@ -137,7 +137,7 @@ jobs:
           python -m scripts.pr122_showcase_package --public /tmp/pr122-showcase-preview --output /tmp/pr122-site-hub/SHOWCASE_PREVIEW.tar.gz --preview
           sudo -n "$(command -v python)" -m tests.pr122_showcase_nginx --public /tmp/pr122-showcase-preview --report /tmp/pr122-site-hub/SHOWCASE_NGINX_REPORT.json
           python -m scripts.pr122_showcase_mechanism_package --output /tmp/pr122-site-hub --source-commit "$GITHUB_SHA"
-          sudo systemd-analyze verify deploy/pr122-showcase/xuanjun-showcase-publish.service deploy/pr122-showcase/xuanjun-showcase-publish.timer
+          sudo systemd-analyze verify deploy/pr122-showcase/xuanjun-showcase-publish.service deploy/pr122-showcase/xuanjun-showcase-publish.timer deploy/pr122-showcase/xuanjun-showcase-build.service
           XJ_SHOWCASE_PUBLIC=/tmp/pr122-showcase-preview XJ_SHOWCASE_REPORT_DIR=/tmp/pr122-site-hub XJ_HUB_STAGE=/tmp/pr122-site-browser PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright" node tests/pr122_showcase_browser.cjs
       - name: Build a reviewed publication only after actual content-review events
         if: github.event_name == 'workflow_dispatch' && inputs.showcase_review_ids != ''

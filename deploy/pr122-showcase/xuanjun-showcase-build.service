@@ -1,0 +1,27 @@
+[Unit]
+Description=Build a reviewed static showcase candidate without activating it
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+WorkingDirectory=/usr/local/lib/xuanjun-showcase
+ExecStart=/usr/bin/python3 -I -B -c "import hashlib,json,pathlib,stat,sys,runpy; r=pathlib.Path('/usr/local/lib/xuanjun-showcase'); p=pathlib.Path('/etc/xuanjun-showcase/BUILDER_REQUEST.json'); a=[p,*p.parents,r,*r.parents]; assert all(x.lstat().st_uid==0 and not x.is_symlink() and not x.lstat().st_mode&0o022 for x in a); assert stat.S_IMODE(p.stat().st_mode)==0o600 and p.stat().st_nlink==1; q=json.loads(p.read_bytes()); raw=(r/'MECHANISM_MANIFEST.json').read_bytes(); assert hashlib.sha256(raw).hexdigest()==q['mechanism_manifest_sha256']; m=json.loads(raw); assert all(hashlib.sha256((r/f['path']).read_bytes()).hexdigest()==f['sha256'] for f in m['files'] if f['path'].startswith('scripts/')); sys.path.insert(0,str(r)); runpy.run_module('scripts.pr122_showcase_protected_build',run_name='__main__')"
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/var/lib/xuanjun-showcase-builder
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LimitCORE=0
+UnsetEnvironment=GITHUB_TOKEN GH_TOKEN PYTHONPATH PYTHONHOME HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy SSLKEYLOGFILE
+TimeoutStartSec=240
+MemoryMax=536870912
+TasksMax=16

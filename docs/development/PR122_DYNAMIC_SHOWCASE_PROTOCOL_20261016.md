@@ -116,3 +116,38 @@ anchors 按真实评论 ID 的十进制字符串索引，每项固定 body_sha25
 这是关闭不安全旧入口的明确限制，不将通知工作流称为已经恢复自动正式发布。后续受保护 builder 的身份、独立凭据保管、只读信任装载与撤销同步须另绑定准确实现审核。
 原 review-comment-id/reviewer 参数仍仅用于筛选评论，不能授权。最终制品独审、单次限时发布许可、备份、回滚和现场验收继续必需。
 源码测试夹具的信任对象只供隔离测试，不复制到生产或当作真实审核。
+
+
+## 受保护构建器候选增量（2026-10-16，尚未部署）
+
+真实首批内容审核评论6214465866已回读：完整原始正文UTF-8 SHA256为
+`156711523974f62e2f9df7753af9af3d1879c5f45678ace617b0ed2471aa181c`。
+绑定内容提交80e77b7249dfa6ec73f1ffccb74200ec7eda4ad5、CI38892258900、9对象、无module商业上架。
+此处记录真实评论身份，不产生生产信任。Owner仍须实际核实独审主体与保管证据，并在原固定信任文件登记CONTENT锚；不得把源码作者或本候选文档当作独审保管证明。
+
+新增 `pr122_showcase_protected_build.py` 与 `xuanjun-showcase-build.service`，仅候选源码，无现场安装或执行许可。
+执行代码固定为已安装 `/usr/local/lib/xuanjun-showcase`，由机制Manifest完整绑定且root保护；不得从内容提交执行Python、workflow、构建钩子或其他命令。
+CLI无任意参数；固定国内主机/root检查。服务启动前先核验Owner私有请求中的准确机制Manifest哈希和脚本文件哈希，再导入固定代码；main再检查完整机制清单、路径、所有者、写权限、自身绑定及全部文件size/SHA。
+
+请求固定路径 `/etc/xuanjun-showcase/BUILDER_REQUEST.json`，root所有0600单硬链接，祖先root不可组/其他写、无符号链接。schema=1，准确字段：commit、ci_run_id、review_comment_ids、reviewer_logins、mechanism_manifest_sha256、shell_tar_sha256、legacy_pages_sha256、issued_unix、expires_unix；一次请求有效期最多两小时。
+它只选择待构建数据，不签发内容批准或发布许可；reviewer_logins本身不能授权。
+当前首批commit/CI/comment分别为上述准确值、38892258900、[6214465866]。机制哈希必须取新增builder通过独审后的新机制制品，不能复用旧41文件清单。
+外壳包固定 `/etc/xuanjun-showcase/APPROVED_SITE_SHELL.tar.gz`，root0600、完整TAR SHA绑定，由已审核的官网体验包提供；不接受测试占位外壳替代正式页面。
+
+从GitHub只读API取得准确commit/tree与成功指定workflow CI后，只下载showcase/projects内声明/静态资源以及published-main-r2.json；拒绝链接模式、隐藏/穿越路径、Python等非公开资源、重复路径、截断树、Blob Git SHA错误和超限文件。
+远端源码/工作流不会被执行。静态JS作为审核后的网页资源打包，不在builder执行。
+固定受保护CONTENT锚验证后才进入原发现/选择/页面hash/模板/打包调用链。模块价格当前为空，未接权威库时不伪造商品或价格。
+旧页面映射JSON另受请求SHA绑定；这只绑定候选所引用的基线，不声称生产旧URL再次浏览器验收通过。真实站点仍需发布前漂移检查及HTTPS回验。
+
+输出只在预先经许可创建的root:root 0700 `/var/lib/xuanjun-showcase-builder` 下，按完整请求SHA生成唯一build目录；已有目录拒绝，不清理、不盲目重试。
+生成pending候选后，重新读取请求/信任、检查有效期，再回读真实审核评论/CI并重新验证独审锚。最后检查信任未变、期限仍有效，写fsync回执、fsync候选并更名SHOWCASE_RELEASE.tar.gz、fsync目录。
+失败保留BUILD_HOLD.json和输入，retry_allowed=false；没有调用原发布器、Nginx/systemctl、current切换或客户中心动作。
+候选回执绑定源码/tree/CI、评论、请求摘要、信任快照摘要、机制摘要与最终TAR/Manifest哈希。回执及候选不是生产发布许可；后续发行前仍须重新审实际制品、核查撤销及取得新单次许可。
+
+仍未实现/未执行的现场接线：
+- Owner实际信任/请求/外壳注入、目录及代码安装；本增量不增加客户root通道动作，不通过inspect代装。
+- 候选builder unit的国内隔离验收、实际启动及回滚归属；新service未加入旧install器自动安装范围，需准确一次性安装事务审查，不能声称旧install会装它。
+- GitHub事件到受保护请求更新、固定root调用和正式候选上传Actions Artifact/CI绑定。当前通知workflow继续HOLD，不自动执行新builder。
+- 正式实际SHOWCASE_RELEASE生成、制品独审与单次发布许可、真实域名浏览器和手机验收。
+
+该增量完成“固定代码、数据分离、生成候选”的核心，并明确保留上述部署/自动接线门禁；不将核心代码完成夸大为整条自动更新系统已上线。模拟测试使用测试信任和网络夹具，不登记真实信任或生产批准。
