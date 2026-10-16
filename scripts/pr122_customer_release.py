@@ -59,10 +59,25 @@ def private_config(path):
     need(parent.stat().st_uid==0 and not parent.stat().st_mode&0o022,'ROOT_CONFIG_DIRECTORY_REQUIRED')
     s=path.stat();need(s.st_uid==0 and stat.S_ISREG(s.st_mode) and not s.st_mode&0o077,'ROOT_CONFIG_MODE');return json.loads(path.read_bytes())
 
+def isolated_python_identity():
+    executable=Path('/usr/local/lib/xuanjun-customer-runtime/venv/bin/python')
+    config=executable.parent.parent/'pyvenv.cfg'
+    for target in (executable,config):
+        private_path(target)
+        for item in (target,*target.parents):
+            info=item.lstat();need(info.st_uid==0 and not info.st_mode&0o022,'ISOLATED_RUNTIME_ROOT_OWNERSHIP')
+        need(target.is_file() and target.stat().st_nlink==1,'ISOLATED_RUNTIME_REGULAR_FILE')
+    base=Path('/usr/bin/python3').resolve(strict=True)
+    need(digest(executable.read_bytes())==digest(base.read_bytes()),'PINNED_SYSTEM_PYTHON_COPY_REQUIRED')
+    values=dict(line.split(' = ',1) for line in config.read_text().splitlines() if ' = ' in line)
+    need(values.get('include-system-site-packages')=='false' and values.get('version','').startswith('3.11.'),'ISOLATED_RUNTIME_CONFIGURATION')
+    return {'path':str(executable),'sha256':digest(executable.read_bytes()),'config_sha256':digest(config.read_bytes())}
+
 def plan(folder):
     need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','HOST_OR_ROOT')
     manifest,raw,files=source(folder)
     need(sys.version_info[:2]>=(3,11),'PYTHON_3_11_REQUIRED')
+    runtime_identity=isolated_python_identity()
     import cryptography
     need(cryptography.__version__=='46.0.3','REVIEWED_CRYPTOGRAPHY_46_0_3_REQUIRED')
     account=pwd.getpwnam('xuanjun-customer');need(account.pw_uid>0 and account.pw_gid>0 and account.pw_shell in ('/sbin/nologin','/usr/sbin/nologin','/bin/false'),'ISOLATED_ACCOUNT_REQUIRED')
@@ -97,7 +112,7 @@ def plan(folder):
     need(nginx_uid>0,'NON_ROOT_NGINX_WORKER_REQUIRED')
     trust=private_config(CONFIG/'INDEPENDENT_REVIEW_TRUST.json')
     tar_sha=archive_binding(folder,manifest,raw)
-    return {'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'telegram_credential_evidence_sha256':acceptance['evidence']['telegram_token_path_confidentiality']['sha256'],'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
+    return {'isolated_python':runtime_identity,'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'telegram_credential_evidence_sha256':acceptance['evidence']['telegram_token_path_confidentiality']['sha256'],'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
 
 def archive_binding(folder,manifest,manifest_raw):
     import tarfile

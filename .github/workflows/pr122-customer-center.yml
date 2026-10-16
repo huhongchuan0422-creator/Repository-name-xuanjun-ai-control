@@ -12,6 +12,7 @@ on:
       - '.github/workflows/pr122-customer-center.yml'
 permissions:
   contents: read
+  actions: read
 jobs:
   isolated-customer-center:
     runs-on: ubuntu-latest
@@ -34,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests tests.test_pr122_customer_revision tests.test_pr122_customer_changes.ChangeTests tests.test_pr122_customer_changes.ChangeHTTPTests tests.test_pr122_customer_preview.PreviewTests tests.test_pr122_customer_preview.PreviewHTTPTests -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
+          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests tests.test_pr122_customer_revision tests.test_pr122_customer_changes.ChangeTests tests.test_pr122_customer_changes.ChangeHTTPTests tests.test_pr122_customer_preview.PreviewTests tests.test_pr122_customer_preview.PreviewHTTPTests tests.test_pr122_customer_runtime.RuntimeTests tests.test_pr122_customer_channel_binding.BindingTests -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
           python -m py_compile scripts/pr122_customer_*.py
           python - <<'PY'
           import json,re
@@ -58,6 +59,9 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install --no-install-recommends -y nginx
+          # Disposable Hosted syntax fixture only; not a domestic runtime install.
+          sudo install -d -m 0755 /usr/local/lib/xuanjun-customer-runtime/venv/bin
+          sudo install -m 0755 "$(command -v python)" /usr/local/lib/xuanjun-customer-runtime/venv/bin/python
           sudo systemd-analyze verify deploy/pr122-customer-center/xuanjun-customer-center.service deploy/pr122-customer-center/xuanjun-customer-delivery.service deploy/pr122-customer-center/xuanjun-customer-delivery.timer
           python - <<'PY'
           import pathlib,subprocess,tempfile
@@ -78,8 +82,49 @@ jobs:
           import json,os,subprocess,pathlib
           pathlib.Path('/tmp/pr122-customer/CI_BINDING.json').write_text(json.dumps({'commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'scope':'ISOLATED_FIXTURE_ONLY','host_mutations':0,'production_acceptance_14':'NOT_RUN','independent_review':'PENDING','production_release':'HOLD'},indent=2))
           PY
+      - name: Build exact fixed-channel rebind candidate no root execution
+        run: |
+          python - <<'PYCODE'
+          import urllib.request
+          from pathlib import Path
+          from scripts.pr122_customer_channel_binding import bind
+          from scripts.pr122_customer_core import canonical
+          url='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/7e5d42f5a5331dc261074ddd780413d03de9c591/scripts/pr122_domestic_customer_channel.py'
+          with urllib.request.urlopen(url,timeout=20) as response:original=response.read(100001)
+          code,binding=bind(original,Path('/tmp/pr122-customer/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes(),'/tmp/pr122-customer/wheels')
+          out=Path('/tmp/pr122-customer/rebind-candidate');out.mkdir()
+          (out/'channel.py').write_bytes(code);(out/'REBIND_BINDING.json').write_bytes(canonical(binding))
+          print(canonical(binding).decode())
+          PYCODE
       - uses: actions/upload-artifact@v4
         with:
           name: pr122-customer-center-${{ github.sha }}
           path: /tmp/pr122-customer/
+          retention-days: 14
+
+  isolated-domestic-runtime:
+    needs: isolated-customer-center
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: pr122-customer-center-${{ github.sha }}
+          path: ${{ runner.temp }}/pr122-customer-runtime-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Exact offline wheel ABI and crypto verification as non-root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -u)" = 1002
+          /usr/bin/python3 -I -B "$GITHUB_WORKSPACE/scripts/pr122_customer_runtime.py" --wheels "$RUNNER_TEMP/pr122-customer-runtime-input-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/wheels" --output "$RUNNER_TEMP/pr122-customer-runtime-output-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-domestic-runtime-${{ github.sha }}
+          path: ${{ runner.temp }}/pr122-customer-runtime-output-${{ github.run_id }}-${{ github.run_attempt }}/RUNTIME_REPORT.json
+          if-no-files-found: error
           retention-days: 14

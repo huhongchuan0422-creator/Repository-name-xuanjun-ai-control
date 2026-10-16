@@ -67,3 +67,15 @@ import-change-authority是现有受保护operator工具中的新数据导入动�
 新增issue-preview-delivery是Owner受保护operator命令，不是HTTP接口，也没有加入旧固定root通道或sudoers。输入仅允许root私有普通文件，生产测试私钥不由writer生成，受保护配置preview_test_trust尚待登记。测试中的Ed25519私钥只用于隔离fixture。
 
 本候选不安装服务、不修改Nginx或网站current，不将来源接口代码存在当作国内生产交付。现有固定root包、运行依赖准备与准确安装事务仍需后续受审的升级；生产HOLD不变。此前获审且未改变的身份、存储、轻量整改与费用证据逻辑继续继承。
+
+### 隔离Python依赖与固定通道候选重绑定
+
+国内非特权实查Run38936844086/Job117094369498：Alibaba Cloud Linux4.0.4 Agentic Edition，Python3.11.6、glibc2.38、x86_64，dnf/rpm可用，venv可用；62622在实查时UID/GID均未占用（不是永久预留，root准备仍须即时复核）。未运行root或包管理安装。
+
+pr122_customer_runtime.py仅使用stdlib，以非root身份构建全新临时venv，不调用pip、不改系统包、不联网。三份wheel精确固定SHA，拒绝额外wheel、路径穿越、symlink、.pth及.data安装hook，按获审字节拷贝至独立site-packages，验证准确版本、AES-GCM和Ed25519。构建目录是Runner证据，不是可信生产安装；Owner-root必须按获审事务在固定目录重新构建并验收，禁止将Runner可写venv直接用于root或生产服务。
+
+两个systemd候选改用固定独立解释器/usr/local/lib/xuanjun-customer-runtime/venv/bin/python，安装plan校验它是root只读的系统Python准确副本，venv禁止system-site-packages；解释器和配置SHA纳入完整plan。Hosted systemd语法验证只在一次性Hosted主机创建同名可执行文件满足检查，不冒充实际国内运行隔离。
+
+pr122_customer_channel_binding.py是离线构建器：固定原获审通道源码SHA0804e33e…，AST只更新准确客户包SOURCE/TAR/Manifest及成员数，并新增固定160份vendor文件的root只读权限和精确哈希校验，全部匹配后才允许root加载获审依赖及客户安装器。不会从Runner路径加载Python，也不更改系统Python搜索目录。四个Runner动作仍只有inspect/plan/apply/rollback；生成候选未安装，不增加sudoers动作。每次构建输出channel.py及REBIND_BINDING.json，绑定准确新客户包和vendor闭包。审查时必须核验完整生成代码，而不只审核构建器声明。
+
+该构建器不提供Owner升级执行器，也不触碰旧GRANTED、旧包或sudoers。旧通道仍绑定旧包，新候选必须经过独立审核，并在包含原件备份、激活中断及准确恢复的Owner受保护事务内安装；不能运行新--grant覆盖旧通道。运行账户、生产venv重建、扫描器、私有配置/独审公钥、真实服务映射及相应现场许可尚未完成，不据本候选声称客户中心可以正式安装。
