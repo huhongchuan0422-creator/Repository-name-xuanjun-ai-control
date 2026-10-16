@@ -9,6 +9,7 @@ import pathlib
 import sqlite3
 import tempfile
 import stat
+import re
 
 def _file(path):
     candidate=pathlib.Path(path)
@@ -27,7 +28,7 @@ def backup(source_path, output_path):
     if dest==src or dest.exists():raise ValueError("BACKUP_PATH_UNSAFE")
     dest.parent.mkdir(parents=True,exist_ok=True)
     handle=None
-    db=sqlite3.connect("file:"+str(src)+"?mode=ro",uri=True)
+    db=sqlite3.connect(src.as_uri()+"?mode=ro",uri=True)
     try:
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("SOURCE_DB_INTEGRITY")
@@ -53,12 +54,12 @@ def backup(source_path, output_path):
     finally:db.close()
 
 def verify_backup(path,expected_sha256):
-    if type(expected_sha256) is not str or len(expected_sha256)!=64:
+    if type(expected_sha256) is not str or re.fullmatch(r"[0-9a-f]{64}",expected_sha256) is None:
         raise ValueError("INVALID_BACKUP_DIGEST")
     p=_file(path)
     digest=hashlib.sha256(p.read_bytes()).hexdigest()
     if digest!=expected_sha256:raise ValueError("BACKUP_DIGEST_MISMATCH")
-    db=sqlite3.connect("file:"+str(p)+"?mode=ro",uri=True)
+    db=sqlite3.connect(p.as_uri()+"?mode=ro",uri=True)
     try:
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("BACKUP_INTEGRITY")
@@ -96,7 +97,11 @@ def rollback_preview(backup_path, expected_sha256, target_path):
     """Read-only plan. Never replace a live database automatically."""
     verified=verify_backup(backup_path,expected_sha256)
     requested=pathlib.Path(target_path)
-    if requested.is_symlink():raise ValueError("ROLLBACK_TARGET_SYMLINK")
+    cursor=requested
+    while True:
+        if cursor.is_symlink():raise ValueError("ROLLBACK_TARGET_SYMLINK")
+        if cursor==cursor.parent:break
+        cursor=cursor.parent
     target=requested.resolve()
     saved=_file(backup_path)
     if target==saved:

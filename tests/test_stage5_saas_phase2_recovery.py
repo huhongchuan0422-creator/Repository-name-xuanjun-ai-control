@@ -20,6 +20,28 @@ class RecoveryTests(unittest.TestCase):
  def test_01_backup_creates_verified_copy(self):
     x=backup(self.source,self.target)
     self.assertTrue(verify_backup(self.target,x["sha256"])["verified"])
+ def test_11_uri_encoded_source_path(self):
+    with tempfile.TemporaryDirectory(prefix="saas recovery #") as d:
+        src=Path(d)/"source ? #%.sqlite"
+        dst=Path(d)/"backup.sqlite"
+        db=sqlite3.connect(src)
+        db.execute("CREATE TABLE evidence(id INTEGER)")
+        db.execute("INSERT INTO evidence VALUES(123)")
+        db.commit();db.close()
+        receipt=backup(src,dst)
+        self.assertTrue(verify_backup(dst,receipt["sha256"])["verified"])
+ def test_12_reject_invalid_backup_sha_format(self):
+    backup(self.source,self.target)
+    with self.assertRaisesRegex(ValueError,"INVALID_BACKUP_DIGEST"):
+        verify_backup(self.target,"z"*64)
+ def test_13_reject_rollback_parent_symlink(self):
+    receipt=backup(self.source,self.target)
+    original=Path(self.temp.name)/"real"
+    original.mkdir()
+    linked=Path(self.temp.name)/"link"
+    linked.symlink_to(original,target_is_directory=True)
+    with self.assertRaisesRegex(ValueError,"ROLLBACK_TARGET_SYMLINK"):
+        rollback_preview(self.target,receipt["sha256"],linked/"target.sqlite")
  def test_02_no_in_place_overwrite(self):
     with self.assertRaises(ValueError):backup(self.source,self.source)
  def test_03_no_overwrite_existing_backup(self):
