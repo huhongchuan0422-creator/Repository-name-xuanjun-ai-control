@@ -1,0 +1,13 @@
+{
+  "action": "PR99_S07_PRIVATE_CODE_ENV_INSTALL_V1",
+  "authority": "OWNER_DIRECT_MIGRATION_6219362469_NOT_NEW_INDEPENDENT_HOST_PASS",
+  "files": {
+    "README.md": "b03228d48490b8cc2a3ce7b79235f4539dcf943fbda7445fca5a446f90cd6dcf",
+    "install_received_services.py": "745c67d34cf4b0d546aee28c74c11b1586a315a03d970cbebc37508ebc61f8fd",
+    "test_install_received_services.py": "31ff1211812b35e1389e6df7105b454dd5c858b89f13389590de27a8265e9048"
+  },
+  "new_model_tests": 10,
+  "schema_version": 1,
+  "service_activation": false,
+  "source_only": true
+}

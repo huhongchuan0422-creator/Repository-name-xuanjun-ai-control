@@ -909,3 +909,63 @@ jobs:
           except PermissionError:result['candidate_base']='UNKNOWN_PERMISSION'
           print('PR99_S07_TARGET_RECEIPT='+json.dumps(result,sort_keys=True))
           PY
+
+  s07-private-stage-mechanism-tests:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_S07_STAGE_TESTS_20261017' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: '3.11'
+      - name: Only ten new synthetic install-mechanism tests; no production host
+        env:
+          XJ_STAGE_PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          sudo -n -- "$XJ_STAGE_PYTHON" -I -B - <<'PY'
+          import sys,unittest
+          sys.path.insert(0,'evidence/pr99-service-handoff/s07-domestic-stage')
+          r=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromName('test_install_received_services'))
+          print('S07_INSTALL_MODEL_TESTS=%d SKIPPED=%d PRODUCTION_HOST_ACTIONS=0'%(r.testsRun,len(r.skipped)))
+          raise SystemExit(not r.wasSuccessful() or bool(r.skipped) or r.testsRun!=10)
+          PY
+      - name: Build exact source-only package without private source data
+        env:
+          XJ_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$XJ_EXPECTED_HEAD"
+          python -I -B - <<'PY'
+          import gzip,hashlib,io,json,os,pathlib,tarfile
+          root=pathlib.Path('evidence/pr99-service-handoff/s07-domestic-stage')
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          files={p:(root/p).read_bytes() for p in ('install_received_services.py','test_install_received_services.py','README.md','BINDING.json')}
+          b=json.loads(files['BINDING.json'])
+          assert set(b['files'])==set(files)-{'BINDING.json'} and all(sha(files[p])==h for p,h in b['files'].items())
+          buf=io.BytesIO()
+          with tarfile.open(fileobj=buf,mode='w',format=tarfile.USTAR_FORMAT) as t:
+              for p,data in sorted(files.items()):
+                  i=tarfile.TarInfo(p);i.size=len(data);i.mode=0o400;i.uid=i.gid=i.mtime=0;t.addfile(i,io.BytesIO(data))
+          raw=gzip.compress(buf.getvalue(),mtime=0)
+          out=pathlib.Path('/tmp/pr99-s07-stage-review');out.mkdir(mode=0o700)
+          (out/'PR99_S07_STAGE_SOURCE_REVIEW.tar.gz').write_bytes(raw)
+          r=dict(source_commit=os.environ['XJ_EXPECTED_HEAD'],script_sha256=sha(files['install_received_services.py']),binding_sha256=sha(files['BINDING.json']),tar_sha256=sha(raw),tar_bytes=len(raw),bound_files=3,regular_members=4,new_tests=10,production_executed=False)
+          (out/'BUILD_RECEIPT.json').write_text(json.dumps(r,sort_keys=True)+'\n')
+          print(json.dumps(r,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr99-s07-private-code-env-source-review
+          path: /tmp/pr99-s07-stage-review/
+          if-no-files-found: error
+          retention-days: 7
