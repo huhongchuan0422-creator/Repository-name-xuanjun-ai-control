@@ -678,6 +678,11 @@
     "production_executed": false,
     "permission": "NOT_ISSUED",
     "original_20": "INHERITED_NOT_RERUN",
-    "request": "PENDING_POST"
+    "request": {
+      "comment_id": 6216916733,
+      "read_back": true,
+      "decision": "PENDING",
+      "scope": "SEVEN_CASE_INCREMENTAL_SOURCE_VISIBILITY_LOGGING_AND_NEW_ONCE_RECOVERY_PERMISSION"
+    }
   }
 }
