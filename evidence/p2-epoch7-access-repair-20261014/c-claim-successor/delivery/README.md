@@ -1,17 +1,21 @@
-# Local successor delivery candidate
+# Source-bound successor delivery candidate
 
-Status: UNBOUND / NOT_AUTHORIZED. No public publication or host execution is authorized.
+Status: BOUND_REQUIRES_SEPARATE_AUTHORIZATION. Publication does not authorize host execution.
+The original reviewed UNBOUND source checkpoint is preserved separately.
 
-Production paths are fixed sibling roots under the existing candidate parent:
+Exact source commit: f4345dd385de9b87dc821cd26bb42bb9b045d03f.
+Exact source tree: 235a78f5aafc3e60a50ac29f52a9cf86d5cbb965.
+Verified artifact and preparation dependency publication:
+bdc8d6da448a5678588da9878536828f07e1a14e.
+All artifact/source/preparer pins and both immutable dependency URLs are now bound.
+The embedded extractor checksum authenticates the embedded extractor bytes;
+adapter identity is verified separately.
+
+Production paths remain fixed sibling roots under the existing candidate parent:
 - epoch7-recovery-candidate-r7-claim-successor
 - epoch7-preparation-candidate-r7-claim-successor (one preparation source only)
 
-The adapter reuses the reviewed resource-bind downloader, safe archive extractor,
-protected staging readers, bounded status projection and no-overwrite behavior.
-All new artifact/source/preparer dependency pins remain None. An embedded extractor
-checksum verifies the adapter's own shipped source, not publication authority.
-
-After real publication and separate authorization, the intended finite path is:
+The finite preparation path requires separate authorization:
 1. Validate every pin before any network or host read/write.
 2. Download exact pinned preparation source and archive; inspect the whole archive
    and authenticate every member, manifest, entry and source identity before mkdir.
@@ -25,5 +29,9 @@ retry, resume, probe, claim/journal mutation or service action. The fresh predec
 read and original input authentication are owned by the preparation tool. Preparation
 creates a proposal, never installation admission or final approval.
 
-The command description is deliberately non-executable. Focused local tests use
-synthetic sources or immutable local fixtures and mocks for external/host boundaries.
+The command description remains deliberately non-executable and supplies no expiry.
+The focused 47-case suite uses synthetic archive/entry fixtures, explicitly mocked
+host/external boundaries and local disposable filesystem staging. Bound dependency
+source is checked without invoking preparation. Explicit false/None refusal tests
+remain active. Local tests can select a separate preparation directory through
+EPOCH7_SUCCESSOR_PREPARATION; the default assembled path remains preparation/.

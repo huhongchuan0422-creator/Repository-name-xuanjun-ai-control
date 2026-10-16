@@ -1,12 +1,15 @@
-UNBOUND / NOT_AUTHORIZED. This is a review-only invocation description, not a shell command.
+REVIEW-ONLY / NOT_AUTHORIZED. This is an invocation description, not a shell command.
+The historical UNBOUND filename is retained as the already approved public path.
+
+Published source: f4345dd385de9b87dc821cd26bb42bb9b045d03f.
+Artifact and preparation dependency publication: bdc8d6da448a5678588da9878536828f07e1a14e.
+The adapter now contains their exact source/artifact/dependency bindings.
 
 Future separately authorized launcher: trusted isolated Python with -I -S -B.
 Target source: delivery/epoch7_prepare_successor_delivery.py.
 Operation: prepare.
-Required option: --admission-expires-at-utc <UNBOUND_EXACT_UTC_EXPIRY>.
+Required option: --admission-expires-at-utc <REQUIRES_SEPARATE_REVIEWED_VALUE>.
 
-Do not execute or substitute local-test hashes. Binding requires a real immutable source
-publication commit/tree, published archive SHA-256 and exact size, manifest/entry
-SHA-256 and entry size, and the exact published preparation dependency SHA-256/size.
-Publication and staging do not grant installation admission. The three new private
-outputs require a subsequent exact review; no approval ID is required to form them.
+No expiry is proposed here. Do not execute this description. Binding and staging do
+not grant installation admission. The three new private outputs require a subsequent
+exact review; no approval ID is required to form the preparation proposal.

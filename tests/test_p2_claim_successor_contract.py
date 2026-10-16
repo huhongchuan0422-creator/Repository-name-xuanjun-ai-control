@@ -408,11 +408,12 @@ class AdapterContractTests(unittest.TestCase):
         self.assertIn("if name in ('routing','transactions'):",body)
         self.assertIn("need(suite.countTestCases()==wanted,'EXACT_FOCUSED_TEST_COUNT')",body)
         self.assertIn('not result.skipped and result.testsRun==wanted',body)
+        self.assertIn("os.environ['EPOCH7_SUCCESSOR_PREPARATION']=str(candidate/'preparation')",body)
 
-    def test_build_uses_actual_current_checkout_not_baseline_identity(self):
+    def test_build_uses_fixed_published_compiler_identity_separate_from_checkout(self):
         source=GATE.read_text()
-        self.assertIn("build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)",source)
-        self.assertNotIn("build_exact_source(work,pathlib.Path(folder)/'artifact',COMPILER_SOURCE_COMMIT",source)
+        self.assertIn("build_exact_source(work,pathlib.Path(folder)/'artifact',COMPILER_SOURCE_COMMIT,COMPILER_SOURCE_TREE)",source)
+        self.assertNotIn("build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)",source)
         self.assertIn("'--source-commit',head,'--source-tree',tree",source)
         for expected in ("out['file_count']==257","out['manifest_pin_count']==256",
                          "value['runtime_package_files_preserved']==110","value['business_phases_preserved']==16",
@@ -440,11 +441,102 @@ class AdapterContractTests(unittest.TestCase):
                 stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
                 with self.assertRaisesRegex(ValueError,label):self.m.worker()
                 self.assertEqual(run.call_count,len(self.m.SUITES));self.assertEqual(check.call_count,len(self.m.SUITES)+2)
-                self.assertEqual(build.call_args[0][2:],('a'*40,'c'*40))
+                self.assertEqual(build.call_args[0][2:],(self.m.COMPILER_SOURCE_COMMIT,self.m.COMPILER_SOURCE_TREE))
                 self.assertTrue(all(call[2]['new_session'] is False for call in run.mock_calls))
                 for call,(name,unused) in zip(run.call_args_list,self.m.SUITES):
                     self.assertEqual(call[0],([sys.executable,'-I','-B','-S',str(GATE),'--suite',str(HERE/'synthetic-fixture'),name],HERE/'synthetic-fixture',240))
                     self.assertEqual(call[1]['file_limit'],self.m.MAX_ARTIFACT_FILE if name=='builder' else self.m.MAX_LOG)
+
+    def test_fixed_published_and_baseline_source_identities(self):
+        self.assertEqual(self.m.COMPILER_SOURCE_COMMIT,'f4345dd385de9b87dc821cd26bb42bb9b045d03f')
+        self.assertEqual(self.m.COMPILER_SOURCE_TREE,'235a78f5aafc3e60a50ac29f52a9cf86d5cbb965')
+        self.assertEqual(self.m.BASELINE_SOURCE_COMMIT,'ef21ca95331769622c294c65bb60ec7ceed0c392')
+        self.assertEqual(self.m.BASELINE_SOURCE_TREE,'5a70c5627afe75fcd475c20e71ee9bfb0b6a156d')
+        source=GATE.read_text()
+        self.assertIn("'current_checkout':{'commit':head,'tree':tree}",source)
+        self.assertIn("'claim_successor_build_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE}",source)
+        self.assertIn("'selected_baseline_source':{'commit':BASELINE_SOURCE_COMMIT,'tree':BASELINE_SOURCE_TREE}",source)
+
+    def test_dependency_publication_requires_nonzero_real_object_shapes(self):
+        self.m.PINS_BOUND=True
+        for name in ('DEPENDENCY_PUBLICATION_COMMIT','DEPENDENCY_PUBLICATION_TREE'):
+            original=getattr(self.m,name)
+            for value in (None,False,'','0'*40,'a'*39,'g'*40):
+                setattr(self.m,name,value)
+                with self.subTest(name=name,value=value),self.assertRaisesRegex(ValueError,'DEPENDENCY_PUBLICATION_NOT_BOUND'):
+                    self.m.publication_pins()
+            setattr(self.m,name,original)
+
+    def test_three_successor_artifacts_are_exact_current_head_inputs(self):
+        wanted={self.m.SUCCESSOR_ARCHIVE_PATH,self.m.SUCCESSOR_MANIFEST_PATH,self.m.SUCCESSOR_REPORT_PATH}
+        self.assertTrue(wanted<=set(self.m.PINS))
+        self.assertEqual({path for path in self.m.PINS if path.startswith(self.m.PUBLIC_PREFIX+'artifact/')},wanted)
+        self.assertEqual(self.m.PINS[self.m.SUCCESSOR_ARCHIVE_PATH][:2],(1071141,'364a92a4f9a2a59d8c1d0ba8f4945d1c4345ac86da90b087091203c757dab978'))
+        self.assertEqual(self.m.PINS[self.m.SUCCESSOR_MANIFEST_PATH][1],'113085ffe1980a30aae1700df988676d4497be7c21d78192990458a4a16fe1a6')
+        self.assertIn(self.m.PUBLIC_PREFIX+'artifact',self.m.PUBLIC_DIRECTORIES)
+
+    def test_wrong_successor_archive_never_opens_tar(self):
+        with mock.patch.object(self.m.tarfile,'open',side_effect=AssertionError('UNVERIFIED_TAR')):
+            with self.assertRaisesRegex(ValueError,'SUCCESSOR_ARCHIVE_PIN'):self.m.successor_archive_files(b'wrong')
+
+    def test_successor_archive_header_count_independent_of_checksum(self):
+        raw=b'synthetic';self.m.SUCCESSOR_ARCHIVE_SIZE=len(raw);self.m.SUCCESSOR_ARCHIVE_SHA=self.m.digest(raw)
+        archive=mock.MagicMock();archive.__enter__.return_value=archive;archive.getmembers.return_value=[]
+        with mock.patch.object(self.m.tarfile,'open',return_value=archive):
+            with self.assertRaisesRegex(ValueError,'SUCCESSOR_ARCHIVE_HEADER_COUNT'):self.m.successor_archive_files(raw)
+
+    def test_preparer_five_real_pins_and_strict_types(self):
+        value={'NEW_KIT_SHA':self.m.SUCCESSOR_MANIFEST_SHA,'NEW_ENTRY_SHA':self.m.SUCCESSOR_ENTRY_SHA,
+               'NEW_ENTRY_BYTES':self.m.SUCCESSOR_ENTRY_BYTES,'NEW_SOURCE':self.m.COMPILER_SOURCE_COMMIT,
+               'NEW_TREE':self.m.COMPILER_SOURCE_TREE}
+        raw=lambda v:('\n'.join(k+'='+repr(item) for k,item in sorted(v.items()))+'\n').encode()
+        self.m.bound_preparer_contract(raw(value))
+        for key,bad in (('NEW_SOURCE',None),('NEW_TREE','0'*40),('NEW_KIT_SHA','0'*64),('NEW_ENTRY_SHA','1'*64),('NEW_ENTRY_BYTES',True)):
+            changed=dict(value);changed[key]=bad
+            with self.subTest(key=key),self.assertRaisesRegex(ValueError,'BOUND_PREPARER_CONTRACT'):
+                self.m.bound_preparer_contract(raw(changed))
+        with self.assertRaisesRegex(ValueError,'PREPARER_DUPLICATE_CONSTANT'):
+            self.m.bound_preparer_contract(raw(value)+b'NEW_SOURCE=None\n')
+        del value['NEW_SOURCE']
+        with self.assertRaisesRegex(ValueError,'PREPARER_CONSTANT_SCOPE'):self.m.bound_preparer_contract(raw(value))
+
+    def test_delivery_exact_dependency_archive_preparer_and_strict_types(self):
+        prep=self.m.PUBLIC_PREFIX+'preparation/epoch7_prepare_successor.py'
+        value={'PINS_BOUND':True,'PUBLICATION_COMMIT':self.m.DEPENDENCY_PUBLICATION_COMMIT,
+            'ARCHIVE_COMMIT':self.m.DEPENDENCY_PUBLICATION_COMMIT,'ARCHIVE_SHA':self.m.SUCCESSOR_ARCHIVE_SHA,
+            'ARCHIVE_SIZE':self.m.SUCCESSOR_ARCHIVE_SIZE,'COMPILER_SOURCE':self.m.COMPILER_SOURCE_COMMIT,
+            'COMPILER_TREE':self.m.COMPILER_SOURCE_TREE,'COMPILER_MANIFEST_SHA':self.m.SUCCESSOR_MANIFEST_SHA,
+            'COMPILER_ENTRY_SHA':self.m.SUCCESSOR_ENTRY_SHA,'COMPILER_ENTRY_BYTES':self.m.SUCCESSOR_ENTRY_BYTES,
+            'COMPILER_CACHE_COUNT':256,'SOURCES':{'epoch7_prepare_successor.py':(self.m.PINS[prep][1],self.m.PINS[prep][0])}}
+        raw=lambda v:('\n'.join(k+'='+repr(item) for k,item in sorted(v.items()))+'\n').encode()
+        self.m.bound_delivery_contract(raw(value))
+        for key,bad in (('PINS_BOUND',1),('PINS_BOUND',False),('PUBLICATION_COMMIT',None),('ARCHIVE_COMMIT','0'*40),
+                        ('COMPILER_SOURCE',self.m.BASELINE_SOURCE_COMMIT),('COMPILER_CACHE_COUNT',True),
+                        ('SOURCES',{'epoch7_prepare_successor.py':('0'*64,1)})):
+            changed=dict(value);changed[key]=bad
+            with self.subTest(key=key,bad=bad),self.assertRaisesRegex(ValueError,'BOUND_DELIVERY_CONTRACT'):
+                self.m.bound_delivery_contract(raw(changed))
+        with self.assertRaisesRegex(ValueError,'DELIVERY_DUPLICATE_CONSTANT'):
+            self.m.bound_delivery_contract(raw(value)+b'PINS_BOUND=True\n')
+
+    def test_rebuild_compares_all_selected_contents_allowing_only_compression_variance(self):
+        source=GATE.read_text();body=source.split('def build_exact_source(',1)[1].split('def worker():',1)[0]
+        for expected in ("rebuilt==selected_successor","out['manifest_sha256']==SUCCESSOR_MANIFEST_SHA",
+                         "for key in ('archive_bytes','archive_sha256'):","'REBUILD_SELECTED_METADATA'",
+                         "'compressed_bytes_identical':out['archive_sha256']==SUCCESSOR_ARCHIVE_SHA"):
+            self.assertIn(expected,body)
+        self.assertIn('bound_dependency_contract(records)',source.split('def checkout_records(',1)[1].split('def fixtures(',1)[0])
+
+    def test_second_selected_archive_staging_has_same_finite_cap_and_restoration(self):
+        raw=b'x'*(self.m.MAX_LOG+1);self.m.SUCCESSOR_ARCHIVE_SIZE=len(raw);self.m.SUCCESSOR_ARCHIVE_SHA=self.m.digest(raw)
+        before=(self.m.MAX_LOG,self.m.MAX_ARTIFACT_FILE)
+        with tempfile.TemporaryDirectory() as folder:
+            target=pathlib.Path(folder)/'successor'
+            with mock.patch.object(self.m.resource,'getrlimit',return_value=before),mock.patch.object(self.m.resource,'setrlimit') as cap:
+                self.m.write_fixture_file(target,self.m.SUCCESSOR_ARCHIVE_TARGET,raw)
+                self.assertEqual(cap.call_args_list,[mock.call(self.m.resource.RLIMIT_FSIZE,(self.m.MAX_ARTIFACT_FILE,before[1])),mock.call(self.m.resource.RLIMIT_FSIZE,before)])
+            self.assertEqual(target.read_bytes(),raw)
+
 
 class GitBoundaryTests(unittest.TestCase):
     def setUp(self):
@@ -473,9 +565,9 @@ class GitBoundaryTests(unittest.TestCase):
 
 if __name__=='__main__':
     suite=unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])
-    if suite.countTestCases()!=45:raise ValueError('EXACT_ADAPTER_CONTRACT_45')
+    if suite.countTestCases()!=54:raise ValueError('EXACT_ADAPTER_CONTRACT_45')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
-    ok=result.wasSuccessful() and not result.skipped and result.testsRun==45
+    ok=result.wasSuccessful() and not result.skipped and result.testsRun==54
     print(json.dumps({'schema':1,'state':'PASS' if ok else 'FAIL','tests':result.testsRun,'errors':len(result.errors),
         'failures':len(result.failures),'skips':len(result.skipped),'python':sys.version.split()[0],
         'host_NOT_RUN':True,'network_NOT_RUN':True},sort_keys=True))

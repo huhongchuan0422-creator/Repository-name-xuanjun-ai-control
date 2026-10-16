@@ -19,8 +19,23 @@ SELECTED_ARCHIVE_SIZE=1056853
 SELECTED_ARCHIVE_SHA='6244cca1b41037b7c240f71b93f867c5660a770d451c4a5a661b283f61ce819e'
 SELECTED_MANIFEST_SHA='6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030'
 SELECTED_ENTRY_SHA='071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5'
-COMPILER_SOURCE_COMMIT='ef21ca95331769622c294c65bb60ec7ceed0c392'
-COMPILER_SOURCE_TREE='5a70c5627afe75fcd475c20e71ee9bfb0b6a156d'
+BASELINE_SOURCE_COMMIT='ef21ca95331769622c294c65bb60ec7ceed0c392'
+BASELINE_SOURCE_TREE='5a70c5627afe75fcd475c20e71ee9bfb0b6a156d'
+# Immutable source identity is separate from the later current checkout HEAD.
+COMPILER_SOURCE_COMMIT='f4345dd385de9b87dc821cd26bb42bb9b045d03f'
+COMPILER_SOURCE_TREE='235a78f5aafc3e60a50ac29f52a9cf86d5cbb965'
+DEPENDENCY_PUBLICATION_COMMIT='bdc8d6da448a5678588da9878536828f07e1a14e'
+DEPENDENCY_PUBLICATION_TREE='9ab39e00175a79e11c183f6ed4d3ee1464e0bf5f'
+SUCCESSOR_ARCHIVE_PATH=PUBLIC_PREFIX+'artifact/epoch7-kit-claim-successor.tar.gz'
+SUCCESSOR_ARCHIVE_TARGET=CANDIDATE_TARGET+'/artifact/epoch7-kit-claim-successor.tar.gz'
+SUCCESSOR_MANIFEST_PATH=PUBLIC_PREFIX+'artifact/recovery-kit-manifest.json'
+SUCCESSOR_REPORT_PATH=PUBLIC_PREFIX+'artifact/build-result.json'
+SUCCESSOR_ARCHIVE_SIZE=1071141
+SUCCESSOR_ARCHIVE_SHA='364a92a4f9a2a59d8c1d0ba8f4945d1c4345ac86da90b087091203c757dab978'
+SUCCESSOR_MANIFEST_SHA='113085ffe1980a30aae1700df988676d4497be7c21d78192990458a4a16fe1a6'
+SUCCESSOR_ENTRY_SHA='788ca6631defa489a1dc9f81c96f507b262e40cf6af05713df71a80843db77df'
+SUCCESSOR_ENTRY_BYTES=56593
+
 KIT_TARGET=CANDIDATE_TARGET+'/baseline'
 SUITE_NAMES=('collector','preflight','routing','factory','census','transactions','preparation','delivery','builder')
 SUITES=(('collector', 26),
@@ -29,7 +44,7 @@ SUITES=(('collector', 26),
  ('factory', 26),
  ('census', 12),
  ('transactions', 55),
- ('preparation', 30),
+ ('preparation', 31),
  ('delivery', 47),
  ('builder', 50))
 PINS_BOUND=True
@@ -39,6 +54,9 @@ SOURCE_TARGETS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/C_TRANSACTION_SEMANTICS.md': 'c-claim-successor-candidate/C_TRANSACTION_SEMANTICS.md',
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/README.md': 'c-claim-successor-candidate/README.md',
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/SOURCE_IDENTITY.json': 'c-claim-successor-candidate/SOURCE_IDENTITY.json',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/artifact/build-result.json': 'c-claim-successor-candidate/artifact/build-result.json',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/artifact/epoch7-kit-claim-successor.tar.gz': 'c-claim-successor-candidate/artifact/epoch7-kit-claim-successor.tar.gz',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/artifact/recovery-kit-manifest.json': 'c-claim-successor-candidate/artifact/recovery-kit-manifest.json',
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/build/OVERLAY_INPUTS.json': 'c-claim-successor-candidate/build/OVERLAY_INPUTS.json',
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/build/build_claim_successor_kit.py': 'c-claim-successor-candidate/build/build_claim_successor_kit.py',
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/build/test_build_claim_successor_kit.py': 'c-claim-successor-candidate/build/test_build_claim_successor_kit.py',
@@ -78,12 +96,21 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifa
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/C_TRANSACTION_SEMANTICS.md': (11601,
                                                                                             'd4ef16e392d5589c47f3eefade5a597ec13d0c8825991c170f395f83e63ad75c',
                                                                                             'c-claim-successor-candidate/C_TRANSACTION_SEMANTICS.md'),
- 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/README.md': (7183,
-                                                                           'e39a5f068cf040ed41fdada033a4940196af3019faf5991f5a16b17e4fa804c1',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/README.md': (9957,
+                                                                           '57f099d92800978dc0ba80a830131c4d93bf316646260e08cde6e9e959c9917d',
                                                                            'c-claim-successor-candidate/README.md'),
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/SOURCE_IDENTITY.json': (13121,
                                                                                       '506af286886ff0706265e0d23a336a52311739b78f46e60d9012e572fdb35924',
                                                                                       'c-claim-successor-candidate/SOURCE_IDENTITY.json'),
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/artifact/build-result.json': (79105,
+                                                                                            '16e53e0dcd777e7171bba020bfbc6f5893cec9553ef711899a0f77f2a00608a8',
+                                                                                            'c-claim-successor-candidate/artifact/build-result.json'),
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/artifact/epoch7-kit-claim-successor.tar.gz': (1071141,
+                                                                                                            '364a92a4f9a2a59d8c1d0ba8f4945d1c4345ac86da90b087091203c757dab978',
+                                                                                                            'c-claim-successor-candidate/artifact/epoch7-kit-claim-successor.tar.gz'),
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/artifact/recovery-kit-manifest.json': (62752,
+                                                                                                     '113085ffe1980a30aae1700df988676d4497be7c21d78192990458a4a16fe1a6',
+                                                                                                     'c-claim-successor-candidate/artifact/recovery-kit-manifest.json'),
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/build/OVERLAY_INPUTS.json': (5251,
                                                                                            'e3a0999e0746b99c26cd56118742ee5314297ea31ea97752ca63dcdda301611b',
                                                                                            'c-claim-successor-candidate/build/OVERLAY_INPUTS.json'),
@@ -93,20 +120,20 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifa
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/build/test_build_claim_successor_kit.py': (35763,
                                                                                                          '4a4d3637acf2fb287b9003d6ec884a2c81aa1e6d0e9988d05e4641bb4ed1f9d1',
                                                                                                          'c-claim-successor-candidate/build/test_build_claim_successor_kit.py'),
- 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/PREPARATION_COMMAND.UNBOUND.txt': (750,
-                                                                                                          'e5f330bddabeefa59028d44d53fa151ed532291edb536e1683d3a07c0e8b9181',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/PREPARATION_COMMAND.UNBOUND.txt': (879,
+                                                                                                          '98633ace0b3c23510442d9933f7f89869b73afdbaa9efa743c5910851515a0c2',
                                                                                                           'c-claim-successor-candidate/delivery/PREPARATION_COMMAND.UNBOUND.txt'),
- 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/README.md': (1804,
-                                                                                    '30b6f56c61533ce9dd39e98dcee9d8d5dd07a0067d5606c453795ce430f9b0f3',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/README.md': (2297,
+                                                                                    'c256bd4864d4e5fd6e13fb1e0278784ccc72779884b5ba28144c58bad6d570ae',
                                                                                     'c-claim-successor-candidate/delivery/README.md'),
- 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/epoch7_prepare_successor_delivery.py': (42055,
-                                                                                                               '9e616a75e94d543043e7403c923eda0ac6151f9a16503ae5832d04206d94d8ef',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/epoch7_prepare_successor_delivery.py': (42459,
+                                                                                                               '4f046cd437f13a248e8e4cf2f5c534e92b049418f90d20bf200a921cb6b8533c',
                                                                                                                'c-claim-successor-candidate/delivery/epoch7_prepare_successor_delivery.py'),
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/extract_epoch7_successor_kit.py': (10222,
                                                                                                           '7de66b8c760de9f26de158fda95c80b8c8b3052025bb1c65bc0ecccd7a1afb03',
                                                                                                           'c-claim-successor-candidate/delivery/extract_epoch7_successor_kit.py'),
- 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/test_successor_delivery.py': (33574,
-                                                                                                     '514fb609266a0e72ee703b5fb5bd5bbdd083e002585073d3ab00e7a029c4805b',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/delivery/test_successor_delivery.py': (35261,
+                                                                                                     'bd72970ded6a940d3ecab04d6709edfab8286084583dce771b943c80edfd0ba5',
                                                                                                      'c-claim-successor-candidate/delivery/test_successor_delivery.py'),
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/kit-overlay/epoch7_recovery_entry.py': (56593,
                                                                                                       '788ca6631defa489a1dc9f81c96f507b262e40cf6af05713df71a80843db77df',
@@ -153,14 +180,14 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifa
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/kit-overlay/helpers/epoch7_snapshot.py': (56532,
                                                                                                         '99e5a13f94b14b09b1434c0cb6cb19c02ea7394c45b2896a5d24d006b0b59f73',
                                                                                                         'c-claim-successor-candidate/kit-overlay/helpers/epoch7_snapshot.py'),
- 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/preparation/README.md': (7111,
-                                                                                       '3e61c19fb72941f4e47a0decbb9692f9c5e4ec97e958ea5474923e2fd16d33b7',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/preparation/README.md': (8397,
+                                                                                       '7ef065f85c5cc14acccab5afc35105db15ee41da2b12bb57cc4faa5fb3f631a0',
                                                                                        'c-claim-successor-candidate/preparation/README.md'),
- 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/preparation/epoch7_prepare_successor.py': (37108,
-                                                                                                         '36d81e854345109e8e11edad135b70ab70121e9a443aa006895de7ee7840ff3e',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/preparation/epoch7_prepare_successor.py': (37309,
+                                                                                                         '70ea53e273ea5e1ca97a70177e6ef4532e5bddd5139c00016bfff5209e5598a0',
                                                                                                          'c-claim-successor-candidate/preparation/epoch7_prepare_successor.py'),
- 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/preparation/test_prepare_successor.py': (30511,
-                                                                                                       'd263d8b0cf5268a047bf4766e44a6d96ed7ef9ad3d6ee916d863c59a996d43af',
+ 'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/preparation/test_prepare_successor.py': (31570,
+                                                                                                       'd93ff17105db494685641beca34471c4981ccc3076bcc3ce7974884cebdaec9f',
                                                                                                        'c-claim-successor-candidate/preparation/test_prepare_successor.py'),
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/tests/synthetic_historical_seed.py': (3140,
                                                                                                     'a46fc664f0ecb489796fedd22042b0a181871737ede5b5347c6b8abb61e701f0',
@@ -183,7 +210,7 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifa
  'evidence/p2-epoch7-access-repair-20261014/c-claim-successor/tests/test_successor_transactions.py': (62702,
                                                                                                       'f608aaa598bddeb3493787764d8804c58a33a76434fc16088acfc0038cde0894',
                                                                                                       'c-claim-successor-candidate/tests/test_successor_transactions.py')}
-PUBLIC_DIRECTORIES=(PUBLIC_PREFIX+'kit-overlay',PUBLIC_PREFIX+'tests',PUBLIC_PREFIX+'build',PUBLIC_PREFIX+'preparation',PUBLIC_PREFIX+'delivery')
+PUBLIC_DIRECTORIES=(PUBLIC_PREFIX+'kit-overlay',PUBLIC_PREFIX+'tests',PUBLIC_PREFIX+'build',PUBLIC_PREFIX+'preparation',PUBLIC_PREFIX+'delivery',PUBLIC_PREFIX+'artifact')
 
 def need(value,label):
     if not value:raise ValueError(label)
@@ -263,9 +290,39 @@ def selected_archive_files(raw):
     manifest=strict_json(files['recovery-kit-manifest.json'])
     need(len(manifest['files'])==255 and set(files)==set(manifest['files'])|{'recovery-kit-manifest.json'},'EXACT_SELECTED_ARCHIVE_FILES')
     for name,pin in manifest['files'].items():need(digest(files[name])==pin,'SELECTED_ARCHIVE_SOURCE_PIN')
-    need(manifest['kit_source_commit']==COMPILER_SOURCE_COMMIT and
-        manifest['kit_source_tree']==COMPILER_SOURCE_TREE,'SELECTED_COMPILER_SOURCE')
+    need(manifest['kit_source_commit']==BASELINE_SOURCE_COMMIT and
+        manifest['kit_source_tree']==BASELINE_SOURCE_TREE,'SELECTED_COMPILER_SOURCE')
     need(digest(files['epoch7_recovery_entry.py'])==SELECTED_ENTRY_SHA,'SELECTED_ENTRY_PIN')
+    return files
+
+
+def successor_archive_files(raw):
+    need(type(raw) is bytes and len(raw)==SUCCESSOR_ARCHIVE_SIZE and digest(raw)==SUCCESSOR_ARCHIVE_SHA,'SUCCESSOR_ARCHIVE_PIN')
+    files={};prefix='epoch7-recovery-candidate-r7-claim-successor/'
+    with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
+        rows=archive.getmembers();need(len(rows)==299,'SUCCESSOR_ARCHIVE_HEADER_COUNT')
+        seen=set();dirs=set()
+        for row in rows:
+            safe_name(row.name);need(row.name not in seen,'SUCCESSOR_ARCHIVE_DUPLICATE');seen.add(row.name)
+            need(row.name==prefix[:-1] or row.name.startswith(prefix),'SUCCESSOR_ARCHIVE_ROOT')
+            need(not row.pax_headers and not row.linkname,'SUCCESSOR_ARCHIVE_EXTENDED_OR_LINK')
+            if row.isdir():
+                need(row.size==0,'SUCCESSOR_DIRECTORY_BYTES');dirs.add(row.name);continue
+            need(row.isreg() and row.name.startswith(prefix) and 0<=row.size<=33554432,'SUCCESSOR_ARCHIVE_MEMBER')
+            name=safe_name(row.name[len(prefix):]);need(name not in files,'SUCCESSOR_ARCHIVE_NAME')
+            with archive.extractfile(row) as stream:body=stream.read(row.size+1)
+            need(len(body)==row.size,'SUCCESSOR_ARCHIVE_BYTES');files[name]=body
+    full={prefix+name for name in files}
+    expected_dirs={name.rsplit('/',i)[0] for name in full for i in range(1,name.count('/')+1)}
+    need(dirs==expected_dirs and not dirs.intersection(full),'SUCCESSOR_DIRECTORY_CLOSURE')
+    need(len(files)==257,'SUCCESSOR_ARCHIVE_MEMBER_COUNT')
+    need(digest(files['recovery-kit-manifest.json'])==SUCCESSOR_MANIFEST_SHA,'SUCCESSOR_MANIFEST_PIN')
+    manifest=strict_json(files['recovery-kit-manifest.json'])
+    need(len(manifest['files'])==256 and set(files)==set(manifest['files'])|{'recovery-kit-manifest.json'},'EXACT_SUCCESSOR_ARCHIVE_FILES')
+    for name,pin in manifest['files'].items():need(digest(files[name])==pin,'SUCCESSOR_ARCHIVE_SOURCE_PIN')
+    need(manifest['kit_source_commit']==COMPILER_SOURCE_COMMIT and
+        manifest['kit_source_tree']==COMPILER_SOURCE_TREE,'SUCCESSOR_COMPILER_SOURCE')
+    need(digest(files['epoch7_recovery_entry.py'])==SUCCESSOR_ENTRY_SHA,'SUCCESSOR_ENTRY_PIN')
     return files
 
 
@@ -307,8 +364,10 @@ def write_fixture_file(path,name,raw):
     if len(raw)<=MAX_LOG:
         with path.open('xb') as stream:stream.write(raw)
         return
-    need(name==SELECTED_ARCHIVE_TARGET and len(raw)==SELECTED_ARCHIVE_SIZE and
-        digest(raw)==SELECTED_ARCHIVE_SHA,'OVERSIZED_FIXTURE_NOT_SELECTED_ARCHIVE')
+    archives={SELECTED_ARCHIVE_TARGET:(SELECTED_ARCHIVE_SIZE,SELECTED_ARCHIVE_SHA),
+              SUCCESSOR_ARCHIVE_TARGET:(SUCCESSOR_ARCHIVE_SIZE,SUCCESSOR_ARCHIVE_SHA)}
+    need(name in archives and len(raw)==archives[name][0] and
+        digest(raw)==archives[name][1],'OVERSIZED_FIXTURE_NOT_SELECTED_ARCHIVE')
     before=resource.getrlimit(resource.RLIMIT_FSIZE)
     need(before[1]==resource.RLIM_INFINITY or before[1]>=MAX_ARTIFACT_FILE,'ARTIFACT_STAGING_HARD_BOUND')
     try:
@@ -409,6 +468,9 @@ def clean_import():
 
 def publication_pins():
     need(PINS_BOUND is True,'CLAIM_SUCCESSOR_CI_PUBLICATION_NOT_BOUND')
+    need(all(type(value) is str and re.fullmatch('[0-9a-f]{40}',value) and value!='0'*40
+         for value in (DEPENDENCY_PUBLICATION_COMMIT,DEPENDENCY_PUBLICATION_TREE)),
+         'DEPENDENCY_PUBLICATION_NOT_BOUND')
     need(type(SUITES) is tuple and tuple(name for name,count in SUITES)==SUITE_NAMES
          and all(type(count) is int and count>0 for name,count in SUITES),'EXACT_SUITE_COUNTS_NOT_BOUND')
     need(len(set(SOURCE_TARGETS.values()))==len(SOURCE_TARGETS),'EXACT_PUBLIC_TARGETS')
@@ -423,6 +485,61 @@ def publication_pins():
          and re.fullmatch('[0-9a-f]{64}',WORKFLOW_SHA),'WORKFLOW_NOT_BOUND')
 
 
+def literal_contract(raw,names,label):
+    values={}
+    for node in ast.parse(raw.decode('utf-8')).body:
+        if isinstance(node,ast.Assign) and len(node.targets)==1 and isinstance(node.targets[0],ast.Name):
+            name=node.targets[0].id
+            if name in names:
+                need(name not in values,label+'_DUPLICATE_CONSTANT')
+                values[name]=ast.literal_eval(node.value)
+    need(set(values)==set(names),label+'_CONSTANT_SCOPE')
+    return values
+
+
+def equal_contract(actual,expected,label):
+    # Serialized comparison retains the bool/int distinction Python equality loses.
+    need(json.dumps(actual,sort_keys=True)==json.dumps(expected,sort_keys=True),label)
+
+
+def bound_preparer_contract(raw):
+    expected={'NEW_KIT_SHA':SUCCESSOR_MANIFEST_SHA,'NEW_ENTRY_SHA':SUCCESSOR_ENTRY_SHA,
+        'NEW_ENTRY_BYTES':SUCCESSOR_ENTRY_BYTES,'NEW_SOURCE':COMPILER_SOURCE_COMMIT,
+        'NEW_TREE':COMPILER_SOURCE_TREE}
+    equal_contract(literal_contract(raw,expected,'PREPARER'),expected,'BOUND_PREPARER_CONTRACT')
+
+
+def bound_delivery_contract(raw):
+    prep=PUBLIC_PREFIX+'preparation/epoch7_prepare_successor.py'
+    expected={'PINS_BOUND':True,'PUBLICATION_COMMIT':DEPENDENCY_PUBLICATION_COMMIT,
+        'ARCHIVE_COMMIT':DEPENDENCY_PUBLICATION_COMMIT,'ARCHIVE_SHA':SUCCESSOR_ARCHIVE_SHA,
+        'ARCHIVE_SIZE':SUCCESSOR_ARCHIVE_SIZE,'COMPILER_SOURCE':COMPILER_SOURCE_COMMIT,
+        'COMPILER_TREE':COMPILER_SOURCE_TREE,'COMPILER_MANIFEST_SHA':SUCCESSOR_MANIFEST_SHA,
+        'COMPILER_ENTRY_SHA':SUCCESSOR_ENTRY_SHA,'COMPILER_ENTRY_BYTES':SUCCESSOR_ENTRY_BYTES,
+        'COMPILER_CACHE_COUNT':256,'SOURCES':{'epoch7_prepare_successor.py':(PINS[prep][1],PINS[prep][0])}}
+    equal_contract(literal_contract(raw,expected,'DELIVERY'),expected,'BOUND_DELIVERY_CONTRACT')
+
+
+def bound_dependency_contract(records):
+    selected=successor_archive_files(records[SUCCESSOR_ARCHIVE_PATH])
+    need(selected['recovery-kit-manifest.json']==records[SUCCESSOR_MANIFEST_PATH],
+         'SUCCESSOR_STANDALONE_MANIFEST')
+    report=strict_json(records[SUCCESSOR_REPORT_PATH]);out=report['output']
+    equal_contract({key:out[key] for key in ('root','archive_bytes','archive_sha256','manifest_sha256',
+        'source_commit','source_tree','file_count','manifest_pin_count')},
+        {'root':'epoch7-recovery-candidate-r7-claim-successor','archive_bytes':SUCCESSOR_ARCHIVE_SIZE,
+         'archive_sha256':SUCCESSOR_ARCHIVE_SHA,'manifest_sha256':SUCCESSOR_MANIFEST_SHA,
+         'source_commit':COMPILER_SOURCE_COMMIT,'source_tree':COMPILER_SOURCE_TREE,
+         'file_count':257,'manifest_pin_count':256},'SUCCESSOR_REPORT_SCOPE')
+    equal_contract(out['files'],{name:digest(body) for name,body in selected.items()},
+                   'SUCCESSOR_REPORT_FILES')
+    need(report['host_collection']=='NOT_RUN' and report['production_resume_authorized'] is False
+         and report['runtime_files_preserved']==107 and report['runtime_package_files_preserved']==110
+         and report['business_phases_preserved']==16,'SUCCESSOR_REPORT_AUTHORITY')
+    bound_preparer_contract(records[PUBLIC_PREFIX+'preparation/epoch7_prepare_successor.py'])
+    bound_delivery_contract(records[PUBLIC_PREFIX+'delivery/epoch7_prepare_successor_delivery.py'])
+
+
 def checkout_records(root,head):
     paths=set(PINS)|{GATE_PATH,CONTRACT_PATH,WORKFLOW_PATH,REGISTRY_PATH}
     records={path:verified_path(root,head,path,max(MAX_LOG,PINS[path][0]) if path in PINS else MAX_LOG)
@@ -430,6 +547,7 @@ def checkout_records(root,head):
     need(pathlib.Path(__file__).read_bytes()==records[GATE_PATH],'CHECKPOINT_NOT_EXACT_HEAD')
     need(len(records[WORKFLOW_PATH])==WORKFLOW_SIZE and digest(records[WORKFLOW_PATH])==WORKFLOW_SHA,'WORKFLOW_PIN')
     registry_contract(records[REGISTRY_PATH])
+    bound_dependency_contract(records)
     return records
 
 
@@ -441,6 +559,7 @@ def fixtures(root,records=None):
         need(type(raw) is bytes and len(raw)==size and digest(raw)==pin,'PUBLIC_FILE_PIN')
         result[target]=raw
     selected=selected_archive_files(result[SELECTED_ARCHIVE_TARGET])
+    successor_archive_files(result[SUCCESSOR_ARCHIVE_TARGET])
     result.update({KIT_TARGET+'/'+name:body for name,body in selected.items()})
     return result
 
@@ -464,7 +583,10 @@ def aggregate():
         'c_scope':'LOCAL_SYNTHETIC_CLAIM_SUCCESSOR_ONLY','old_suites_NOT_RUN':True,
         'source_bound_build_verified':True,'manifest_pin_count':256,'artifact_file_count':257,
         'runtime_files_preserved':107,'runtime_package_files_preserved':110,'business_phases_preserved':16,
-        'selected_archive_sha256':SELECTED_ARCHIVE_SHA,'selected_manifest_sha256':SELECTED_MANIFEST_SHA}
+        'selected_archive_sha256':SELECTED_ARCHIVE_SHA,'selected_manifest_sha256':SELECTED_MANIFEST_SHA,
+        'successor_archive_sha256':SUCCESSOR_ARCHIVE_SHA,'successor_manifest_sha256':SUCCESSOR_MANIFEST_SHA,
+        'compiler_source_commit':COMPILER_SOURCE_COMMIT,'compiler_source_tree':COMPILER_SOURCE_TREE,
+        'bound_preparation_and_delivery_verified':True,'selected_successor_contents_reproduced':True}
 
 
 def run_suite(root,name):
@@ -472,6 +594,7 @@ def run_suite(root,name):
     os.umask(0o022)
     candidate=root/CANDIDATE_TARGET;kit=root/KIT_TARGET
     os.environ['CLAIM_SUCCESSOR_BASELINE_ARCHIVE']=str(root/SELECTED_ARCHIVE_TARGET)
+    os.environ['EPOCH7_SUCCESSOR_PREPARATION']=str(candidate/'preparation')
     paths=[candidate/'tests',candidate/'kit-overlay/helpers',kit/'helpers',
            kit/'xuanjun-p2-package/stage1',kit/'xuanjun-p2-package/scripts']
     paths.extend(sorted(p for p in (kit/'tests').iterdir() if p.is_dir()))
@@ -552,6 +675,19 @@ def build_exact_source(work,output_dir,head,tree):
             need(body==expected[name],'REBUILD_EXPECTED_BYTES');rebuilt[name]=body
     need(set(rebuilt)==set(expected),'REBUILD_EXACT_EXPECTED_FILES')
     need(out['manifest_sha256']==digest(expected['recovery-kit-manifest.json']),'REBUILD_MANIFEST')
+    selected_successor=successor_archive_files((work/SUCCESSOR_ARCHIVE_TARGET).read_bytes())
+    need(rebuilt==selected_successor,'REBUILD_SELECTED_SUCCESSOR_BYTES')
+    need(out['manifest_sha256']==SUCCESSOR_MANIFEST_SHA,'REBUILD_SELECTED_SUCCESSOR_MANIFEST')
+    published_report=strict_json((work/CANDIDATE_TARGET/'artifact/build-result.json').read_bytes())
+    normalized=dict(value);normalized['output']=dict(out)
+    for key in ('archive_bytes','archive_sha256'):
+        normalized['output'][key]=published_report['output'][key]
+    need(json.dumps(normalized,sort_keys=True)==json.dumps(published_report,sort_keys=True),
+         'REBUILD_SELECTED_METADATA')
+    print('SELECTED_SUCCESSOR_CONTENTS_VERIFIED='+json.dumps({'files':len(rebuilt),
+        'manifest_sha256':SUCCESSOR_MANIFEST_SHA,'selected_archive_sha256':SUCCESSOR_ARCHIVE_SHA,
+        'rebuilt_archive_sha256':out['archive_sha256'],
+        'compressed_bytes_identical':out['archive_sha256']==SUCCESSOR_ARCHIVE_SHA},sort_keys=True))
     print('SOURCE_BOUND_BUILD_VERIFIED='+json.dumps(final,sort_keys=True))
 
 
@@ -561,7 +697,9 @@ def worker():
     head=git(root,['rev-parse','--verify','HEAD']);public_inventory(root)
     tree=git(root,['rev-parse','--verify',head+'^{tree}'])
     print('CI_SOURCE_IDENTITIES='+json.dumps({'current_checkout':{'commit':head,'tree':tree},
-        'selected_baseline_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE}},sort_keys=True))
+        'selected_baseline_source':{'commit':BASELINE_SOURCE_COMMIT,'tree':BASELINE_SOURCE_TREE},
+        'claim_successor_build_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE},
+        'dependency_publication':{'commit':DEPENDENCY_PUBLICATION_COMMIT,'tree':DEPENDENCY_PUBLICATION_TREE}},sort_keys=True))
     records=checkout_records(root,head);files=fixtures(root,records);clean_import()
     with tempfile.TemporaryDirectory(prefix='p2-claim-successor-public-') as folder:
         work=materialize(pathlib.Path(folder)/'fixture',files);check_materialized(work,files)
@@ -571,7 +709,7 @@ def worker():
                                file_limit=MAX_ARTIFACT_FILE if name=='builder' else MAX_LOG)
             print(raw.decode('utf-8','replace'));need(code==0,'PUBLIC_TEST_PROCESS_FAILED')
             terminal(raw,name,wanted);check_materialized(work,files)
-        build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)
+        build_exact_source(work,pathlib.Path(folder)/'artifact',COMPILER_SOURCE_COMMIT,COMPILER_SOURCE_TREE)
         check_materialized(work,files);public_inventory(root)
         need(git(root,['rev-parse','--verify','HEAD'])==head,'HEAD_CHANGED')
         need(checkout_records(root,head)==records,'INPUT_CHANGED_AFTER_TEST')

@@ -26,6 +26,7 @@ from unittest import mock
 
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parent
+PREPARATION=Path(os.environ.get('EPOCH7_SUCCESSOR_PREPARATION',str(ROOT/'preparation')))
 KIT_LEAF='epoch7-recovery-candidate-r7-claim-successor'
 PREP_LEAF='epoch7-preparation-candidate-r7-claim-successor'
 EXPIRY='2030-01-01T00:00:00Z'
@@ -98,11 +99,13 @@ def completed():
         'install_admission':'NOT_GRANTED','production_resume':'NOT_EXECUTED'}
 
 class BindingTests(unittest.TestCase):
-    def test_saved_candidate_has_no_new_artifact_source_or_dependency_pins(self):
-        self.assertIs(m.PINS_BOUND,False)
-        for name in PIN_VALUES:
-            if name not in ('PINS_BOUND','SOURCES'):self.assertIsNone(getattr(m,name),name)
-        self.assertEqual(m.SOURCES,{'epoch7_prepare_successor.py':(None,None)})
+    def test_saved_candidate_has_exact_pins_and_real_dependency_publication(self):
+        self.assertIs(m.PINS_BOUND,True)
+        self.assertEqual(m.PUBLICATION_COMMIT,'bdc8d6da448a5678588da9878536828f07e1a14e')
+        self.assertEqual(m.ARCHIVE_COMMIT,'bdc8d6da448a5678588da9878536828f07e1a14e')
+        expected={'ARCHIVE_SHA': '364a92a4f9a2a59d8c1d0ba8f4945d1c4345ac86da90b087091203c757dab978', 'ARCHIVE_SIZE': 1071141, 'COMPILER_MANIFEST_SHA': '113085ffe1980a30aae1700df988676d4497be7c21d78192990458a4a16fe1a6', 'COMPILER_ENTRY_SHA': '788ca6631defa489a1dc9f81c96f507b262e40cf6af05713df71a80843db77df', 'COMPILER_ENTRY_BYTES': 56593, 'COMPILER_SOURCE': 'f4345dd385de9b87dc821cd26bb42bb9b045d03f', 'COMPILER_TREE': '235a78f5aafc3e60a50ac29f52a9cf86d5cbb965', 'SOURCES': {'epoch7_prepare_successor.py': ('70ea53e273ea5e1ca97a70177e6ef4532e5bddd5139c00016bfff5209e5598a0', 37309)}}
+        for name,value in expected.items():self.assertEqual(getattr(m,name),value,name)
+
 
     def test_each_missing_pin_blocks_before_network_host_or_staging(self):
         for name in PIN_VALUES:
@@ -124,7 +127,10 @@ class BindingTests(unittest.TestCase):
              mock.patch.object(m,'fetch_sources',side_effect=AssertionError('network')),mock.patch.object(m,'deliver_status') as status:
             self.assertEqual(m.entrypoint(['--operation','input-contract']),0)
         row=status.call_args[0][0]
-        self.assertEqual(row['state'],'UNBOUND_NOT_AUTHORIZED')
+        self.assertEqual(row['state'],'BOUND_REQUIRES_SEPARATE_AUTHORIZATION')
+        with mock.patch.object(m,'PINS_BOUND',False),mock.patch.object(m,'PUBLICATION_COMMIT',None),mock.patch.object(m,'ARCHIVE_COMMIT',None),mock.patch.object(m,'deliver_status') as status:
+            self.assertEqual(m.entrypoint(['--operation','input-contract']),0)
+        self.assertEqual(status.call_args[0][0]['state'],'UNBOUND_NOT_AUTHORIZED')
         self.assertEqual((row['archive_files'],row['source_files'],row['runtime_payloads'],row['business_phases']),(257,256,107,16))
         self.assertEqual(row['preparation_root'],m.CAND+'/'+PREP_LEAF)
         self.assertEqual(row['successor_kit_root'],m.CAND+'/'+KIT_LEAF)
@@ -145,11 +151,20 @@ class BindingTests(unittest.TestCase):
         self.assertEqual(m.safe_extractor_bytes(),(HERE/'extract_epoch7_successor_kit.py').read_bytes())
         with mock.patch.object(m,'EXTRACTOR_Z',m.EXTRACTOR_Z+'junk'),self.assertRaises(Exception):m.safe_extractor_bytes()
 
-    def test_real_unbound_preparer_refuses_before_host_read(self):
-        cache={'epoch7_prepare_successor.py':(ROOT/'preparation/epoch7_prepare_successor.py').read_bytes()}
-        with pins(SOURCES=source_pins(cache)),mock.patch.object(m.os,'open',side_effect=AssertionError('host read')):
-            with self.assertRaises(Exception) as caught:m.preparer(cache)
+    def test_real_preparer_bindings_match_and_explicit_unbound_source_refuses(self):
+        raw=(PREPARATION/'epoch7_prepare_successor.py').read_bytes()
+        cache={'epoch7_prepare_successor.py':raw}
+        with mock.patch.object(m.os,'open',side_effect=AssertionError('host read')):
+            self.assertEqual(m.preparer(cache).NEW_SOURCE,m.COMPILER_SOURCE)
+        tree=ast.parse(raw)
+        source=next(row for row in tree.body if isinstance(row,ast.Assign) and
+                    isinstance(row.targets[0],ast.Name) and row.targets[0].id=='NEW_SOURCE')
+        lines=raw.decode('ascii').splitlines(True);lines[source.lineno-1]='NEW_SOURCE = None\n'
+        unbound={'epoch7_prepare_successor.py':''.join(lines).encode('ascii')}
+        with mock.patch.object(m,'SOURCES',source_pins(unbound)),mock.patch.object(m.os,'open',side_effect=AssertionError('host read')):
+            with self.assertRaises(Exception) as caught:m.preparer(unbound)
         self.assertEqual(caught.exception.args,('SUCCESSOR_ARTIFACT_UNBOUND',))
+
 
     def test_bound_preparer_must_match_fixed_dependency_contract(self):
         vals={'CAND':m.CAND,'HOST':m.HOST,'OLD_ROOT':m.KIT_ROOT,'NEW_ROOT':m.COMPILER_ROOT,
@@ -434,7 +449,7 @@ class FlowTests(unittest.TestCase):
             else:error.preparation_outputs[0]['bytes']=True
             with self.subTest(change=change),self.assertRaises(m.Hold):m.retained_outputs(error)
     def test_preparer_cleanup_classifier_retains_nested_cleanup_uncertainty(self):
-        prep=load(ROOT/'preparation/epoch7_prepare_successor.py','real_unbound_preparer_classifier')
+        prep=load(PREPARATION/'epoch7_prepare_successor.py','real_unbound_preparer_classifier')
         error=ValueError('private primary');error.__cause__=OSError(errno.EIO,'private cleanup')
         row=m.failure(error,'PREPARE_PRIVATE_PLAN',prep,frozenset())
         self.assertTrue(row['cleanup_unknown']);self.assertNotIn('private',json.dumps(row))
