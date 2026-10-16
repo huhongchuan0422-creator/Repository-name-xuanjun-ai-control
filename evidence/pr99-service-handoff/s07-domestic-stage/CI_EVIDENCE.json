@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "source_commit": "ae5e03d9452132de5884f11392ab95eea9d47e3f",
+  "run": 38930522163,
+  "job": 117073018686,
+  "result": "SUCCESS",
+  "new_tests": 10,
+  "skipped": 0,
+  "test_scope": "HOSTED_SYNTHETIC_INSTALL_MECHANISMS_NOT_REAL_DEPENDENCY_INSTALL_OR_PRODUCTION_HOST",
+  "production_jobs": "ALL_SKIPPED",
+  "script_sha256": "745c67d34cf4b0d546aee28c74c11b1586a315a03d970cbebc37508ebc61f8fd",
+  "binding_sha256": "661b9a04ab8558d4776b538b8925257ddcf679bff8d893e12f660f30115d52cf",
+  "tar_sha256": "6ca0bec0f70862043deeeda00ddff74f1ec34139f393c534d9d1e9b90d3f15f0",
+  "tar_bytes": 11634,
+  "bound_files": 3,
+  "regular_members": 4,
+  "artifact_id": 12059130294,
+  "zip_bytes": 12231,
+  "zip_sha256": "07fc8cc9a35c98887fa6d1395a7a2fa42d337f349e56129f09cea3f300d84cc1",
+  "zip_evidence": "GITHUB_UPLOAD_LOG_AND_ARTIFACT_API_NOT_INDEPENDENT_DOWNLOAD",
+  "authority_comment": 6219362469,
+  "root_install_executed": false
+}

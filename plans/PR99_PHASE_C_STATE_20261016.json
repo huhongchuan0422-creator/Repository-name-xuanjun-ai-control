@@ -604,7 +604,7 @@
     }
   },
   "service_handoff": {
-    "status": "S06_PRIVATE_CONTRACT_RECEIVED_OWNER_ROOT_NOT_CUTOVER",
+    "status": "S07_NEW_PRIVATE_CODE_ENV_INSTALL_PREPARED_ACTUAL_SERVICE_CUTOVER_PENDING",
     "run": 38904470291,
     "source_commit": "e4dfdf03a246fd911a226d911970854d2606328e",
     "jobs": {
@@ -846,7 +846,7 @@
       "manual_next_action": "ONE_OWNER_MEDIATED_REVIEWED_LOCAL_RESOLUTION_UNDER_EXPLICIT_OWNER_AUTHORIZATION_NOT_MACHINE_SIGNED_PERMIT"
     },
     "domestic_code_environment_install": {
-      "status": "CANDIDATE_PREPARED_NEW10_MODEL_TESTS_NOT_YET_HOSTED_OR_ROOT_INSTALL",
+      "status": "EXACT_HOSTED10_PASS_READY_OWNER_MANUAL_INSTALL_NOT_YET_EXECUTED",
       "authority_comment_id": 6219362469,
       "roles": [
         "portal",
@@ -867,7 +867,14 @@
         "Actual units, start, authenticated functional checks and protected proxy switch",
         "Novel missing source and VPN guard/container/channel identity",
         "S09 final state/scheduling; S10 separate retirement acceptance"
-      ]
+      ],
+      "source_commit": "ae5e03d9452132de5884f11392ab95eea9d47e3f",
+      "run": 38930522163,
+      "job": 117073018686,
+      "artifact_id": 12059130294,
+      "mechanism_tests": 10,
+      "execution_authority": "OWNER_EXPLICIT_DIRECT_MIGRATION_6219362469_NO_ADDITIONAL_PERMISSION_REQUESTED",
+      "independent_new_host_pass": false
     }
   },
   "current_recovery_point_r2": {
