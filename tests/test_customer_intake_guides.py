@@ -20,3 +20,14 @@ class TestGuideContract(unittest.TestCase):
   self.assertNotIn('type="file"',s)
   self.assertNotIn('type="password"',s)
 if __name__=='__main__':unittest.main()
+
+ def test_full_tutorial_fields_in_static_pages(self):
+  data=json.loads((ROOT/'docs/customer-intake/project-requirements.v1.json').read_text(encoding='utf-8'))
+  page=(ROOT/'demos/customer-intake/index.html').read_text(encoding='utf-8')
+  js=(ROOT/'demos/customer-intake/project-intake.js').read_text(encoding='utf-8')
+  for item in data['items']:
+   for key in ('purpose','minimum_permissions','expiry_policy','reviewer_role','verification_method','fallback'):
+    self.assertTrue(item[key])
+    self.assertIn(item[key].replace('&','&amp;'),page)
+   self.assertTrue(item['steps'])
+   self.assertIn(item['id'],js)
