@@ -167,11 +167,43 @@
       "read_back": true,
       "full_tar_member_recalculation": "NOT_PERFORMED_BY_INDEPENDENT_REVIEWER",
       "production_authority": false
+    },
+    "root_execution_channel": {
+      "status": "IMPLEMENTED_TESTED_REVIEW_AND_GRANT_LICENSE_REQUESTED_NOT_INSTALLED",
+      "source_commit": "28057fc19230d6cda093882ca05a2333348d36fe",
+      "review_request_comment_id": 6212869194,
+      "owner_terminal": "OWNER_REPORTED_KOREA_ROOT_READY_NOT_DIRECTLY_ATTACHED",
+      "hosted": {
+        "run": 38883187475,
+        "job": 116914573967,
+        "tests": 16,
+        "skipped": 0,
+        "python": "3.11.17",
+        "status": "PASS"
+      },
+      "artifact": {
+        "id": 12038128889,
+        "zip_sha256": "375bc867dfd01fd164bd2b2694b3085fc2a0ba17e63a73df23e7a59f687e02ef",
+        "zip_bytes": 20242,
+        "tar_sha256": "9593b73c71aab1eaec254eb682d1ecb004966ba904d19a32d385f951f67baafa",
+        "tar_bytes": 19760,
+        "bound_files": 9,
+        "entries": 10,
+        "origin": "DEVELOPER_ACTUAL_BYTES_NOT_INDEPENDENT_REVIEW",
+        "local_files_match": true
+      },
+      "fixed_actions": [
+        "inspect",
+        "install"
+      ],
+      "grant_executed": false,
+      "phase_c_install_authorized": false,
+      "forbidden": "No arbitrary root command, service, nft, credential, DB, Writer or Tokyo action; install separately checks original C exact authority."
     }
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NO_SERVER_COMMAND_NOW; DO_NOT_RELAY_THE_SAME_REVIEW_AGAIN; FUTURE_TRUSTED_ROOT_AND_PRIVATE_PROVIDER_BINDINGS_REQUIRED",
+  "owner_action_now": "KOREA_ROOT_READY_BY_OWNER_REPORT; EXACT_NEW_CHANNEL_REVIEW_AND_SINGLE_GRANT_APPROVAL_PENDING; DO_NOT_EXECUTE_UNAPPROVED_INSTALLER",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
