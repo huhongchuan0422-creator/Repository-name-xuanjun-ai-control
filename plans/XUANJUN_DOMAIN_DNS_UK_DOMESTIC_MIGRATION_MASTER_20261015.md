@@ -718,3 +718,14 @@ S05的生产前置现收敛为：准确选定会话/账户及范围、全部相�
 为免Owner手工下载GitHub登录制品再上传，直接发布Artifact12021864830中已批准的原TAR字节到evidence/pr99-phase-b/PR99_KOREA_RUNTIME_632bbe6f.tar.gz：38980字节，SHAf7cba56c2c45910901cdbd44056ad7c971a7497ffe67518a4adefb40ef660ba9；不是重新构建/打包，不改PR99准确632bbe6f或其安装器。不包含DB/凭据/env。旁证PUBLICATION.json绑定正式批准正文SHA3bf40a0d7d5c8d6c531345e92476d7a35366d13f4af797d106f85b831ba30b84与原Manifest。Owner执行步骤仅取得准确原包到/root私有暂存、原validator、原install-candidate和紧随原check，不安装新sudo规则或root helper、不自动从Runner调用。
 
 尚未在韩国运行；不能把公开原包或本记录当作安装完成。异常保留暂存和日志、不盲重试。服务必须disabled/inactive/deny-all、无Allow；不投凭据、不搬DB、不运行Shadow/交易、不变更韩国现有服务、不停东京。待真实root回执及后续非root元数据复核后再作Phase-B实机结论。
+
+
+### 9.41 2026-10-16：韩国Phase-B已真实安装提交，但安全隔离验收HOLD
+
+Owner通过已认证韩国admin/sudo终端执行批准#6207630392范围内的一次准确632bbe6f安装。原包/17文件/Manifest核对通过，原安装器COMMIT、transaction install-f887b085508e3ed4，实际transaction SHA c79182446ab8c2e447cb6942061710fb4a864addb4b9718f967402ef8c30cfe2；服务disabled/inactive/PID0、锁已释放、原六个共享命名单元元数据相同。Owner私有日志/root/pr99-phaseb-632bbe6f。状态不再记NOT_RUN，但不能据末尾PHASE_B=PASS写完整安全验收成功。
+
+三次真实verify均报告LoadCredential Unknown lvalue，且本机不支持BPF/cgroup防火墙、明确Proceeding WITHOUT firewalling in effect。旧check仅看verify退出码及IPAddressDeny文本，未拒绝零退出告警，因此实际安全能力验收HOLD。服务停止且未投凭据/搬DB/运行Shadow/币安；东京继续在线。完整Owner结果已写回原PR99#6207782855，非本窗口直接root取证。
+
+新拒绝误报源码在原PR99准确94f8e10deed7dbbe876cb170ca0093d0574feeba：同一check验证器拒绝零退出Unknown指令/无防火墙及任何未解释诊断；install在锁/用户/目标创建前先执行只读私有合成unit解析预检，探针仅/bin/true、/dev/null占位且不启动，原R2终态/锁/清理与运行模块不重写。新增4方法与原13专项合为本地17/17 PASS，Bash语法PASS；Hosted原CI因源码变更自动运行，原始结果另记。此只修正误报，不是兼容unit或修复安装器，不部署到现有韩国现场，不逐点送独审生产申请。
+
+最小恢复尚需root短命无报文netns能力和systemd版本，才能判定PrivateNetwork类离线替代是否成立；不猜内核支持、不全局升级内核/systemd或防火墙，不改既有桥接/服务。原安装与日志保持，禁止盲重试或用新installer覆盖已有事务。完整兼容修复和准确root修复范围齐备后再集中审核。Phase-C未授权，东京退役HOLD。
