@@ -328,8 +328,23 @@
     "reencryption_or_rebackup_performed": false
   },
   "offline_relocation_blocker": {
-    "kind": "PRIVATE_TRANSFER_EXECUTION_ROUTE",
+    "kind": "SSH_HOST_TRUST_PENDING_SCOPED_PIN; AUTHENTICATION_NOT_YET_TESTED",
     "detail": "Current Runner root capability cannot access the root-private baseline or run ssh as admin/root. One bounded Owner-root ciphertext pull can use existing SSH authentication/trust, if already available; stop if that route is unavailable. No new key/trust/grant may be created implicitly.",
-    "api_is_blocker": false
+    "api_is_blocker": false,
+    "last_owner_attempt": {
+      "result": "STOP_BEFORE_TARGET_CREATION",
+      "error": "NO_ECDSA_HOST_KEY_KNOWN_STRICT_CHECKING",
+      "copied_bytes": 0,
+      "target_directory_created_by_attempt": false
+    },
+    "verified_tokyo_public_host_identity": {
+      "run": 38888460739,
+      "job": 116931876479,
+      "delivery_commit": "3ac74d53280722a505b617aa690439fa0ec95ff3",
+      "ecdsa_fingerprint": "SHA256:hxqnfjlczczDNLsJlY+x9OrBF5guN+x62gJF2RHIw7w",
+      "scope": "ROOT_OWNED_PUBLIC_KEY_BYTES_ONLY_NO_PRIVATE_KEYS",
+      "temporary_known_hosts_command": "PREPARED_NOT_EXECUTED",
+      "authentication": "NOT_TESTED"
+    }
   }
 }

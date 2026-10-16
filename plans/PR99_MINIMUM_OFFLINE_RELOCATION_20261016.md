@@ -38,9 +38,10 @@ root私有基线的受保护异机复制尚无执行回执。当前韩国固定�
 在当前韩国Owner-root终端，通过已有SSH信任向固定东京admin@47.245.53.152拉取固定密文。StrictHostKeyChecking=yes、BatchMode=yes、ConnectTimeout=10，不新增SSH密钥/known_hosts/权限；实际hostname必须等于东京固定主机；源SHA和目标SHA都绑定历史已审基线。只写韩国新的0700私有目录；全程不解密、不触碰已有API/桥接/隧道/生产目录或服务。
 若现有SSH路由不可用，在创建目标目录之前停止并报告该唯一通道缺口，不能自行关闭主机校验或改用明文/公开制品。实际命令尚未执行。备份解密密钥的私有托管及应用选择性恢复仍未实机确认，不把密文落地单独算作完整迁移。
 
-## Owner-root一次密文私有拉取命令（未执行）
+## SSH身份校验补证
 
-以下只在韩国Owner-root终端运行；既有SSH信任失败就停止，不增加权限或改主机校验。
+Owner首次私有拉取在严格主机校验阶段失败：No ECDSA host key is known。未进入目标目录创建或文件复制。开发方已通过东京既有Runner读取固定root拥有0644 SSH主机公钥，Run38888460739/Job116931876479 SUCCESS；ECDSA指纹已独立复算为 SHA256:hxqnfjlczczDNLsJlY+x9OrBF5guN+x62gJF2RHIw7w。
+新命令只生成本次使用的root私有known_hosts文件，固定此公钥和ECDSA算法；StrictHostKeyChecking保持yes，不使用ssh-keyscan或关闭校验，不改原/root/.ssh/known_hosts。SSH账号认证和备份读取仍需实际通过，不能把主机公钥补齐当作复制成功。
 
 ```bash
 bash <<'BASH'
@@ -48,8 +49,11 @@ set -euo pipefail
 test "$EUID" -eq 0
 test "$(hostname -s)" = iZmj7a5kwr75qc1tul4kf9Z
 umask 077
-XJ_SSH=(-T -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ClearAllForwardings=yes)
-ssh "${XJ_SSH[@]}" admin@47.245.53.152 'test "$(hostname -s)" = iZ6wee8q9z4t03hvqumwfhZ && sudo -n test -r /root/xj-recovery-package.DZWI6n/recovery-baseline.tar.gz.enc' || { echo 'STOP：现有东京SSH/root读取通道不可用；未复制，未新增权限。'; exit 2; }
+XJ_KH=$(mktemp /root/pr99-tokyo-hostkey.XXXXXXXX)
+printf '%s\n' '47.245.53.152 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMfngQ3DTnuC8aP0TZ0fBhcq+8p7Yw0c7VEYKWSpFrtpqWf+shoFTiyrAWj1OlrnoeOlsZq1SS1zOavODbJOnzs=' >"$XJ_KH"
+XJ_SSH=(-T -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$XJ_KH" -o GlobalKnownHostsFile=/dev/null -o HostKeyAlgorithms=ecdsa-sha2-nistp256 -o UpdateHostKeys=no -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ClearAllForwardings=yes)
+ssh "${XJ_SSH[@]}" admin@47.245.53.152 'test "$(hostname -s)" = iZ6wee8q9z4t03hvqumwfhZ && sudo -n test -r /root/xj-recovery-package.DZWI6n/recovery-baseline.tar.gz.enc' || { echo 'STOP：SSH身份认证或源备份读取未通过，尚未复制。'; exit 2; }
+
 D=/root/xuanjun-offline-baseline-20261016
 mkdir -m 0700 "$D"
 trap 'echo "HOLD：保留私有目录和未完成文件，不覆盖、不重跑。"; exit 2' ERR
@@ -69,6 +73,5 @@ printf '%s  %s\n' ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e010
 mv -T "$D/baseline.enc.partial" "$D/recovery-baseline.tar.gz.enc"
 sync -f "$D/recovery-baseline.tar.gz.enc"
 echo "ENCRYPTED_BASELINE_OFFSITE=PASS API_UNTOUCHED=YES SERVICE_ACTIONS=0"
-echo "PRIVATE_DESTINATION=$D/recovery-baseline.tar.gz.enc DECRYPTION=NOT_RUN"
 BASH
 ```
