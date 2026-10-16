@@ -1,0 +1,43 @@
+name: PR122 Site Hub Live Baseline Read Only
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths: ['.github/workflows/pr122-site-hub-live-baseline.yml']
+permissions:
+  contents: read
+jobs:
+  public-baseline-only:
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 3
+    steps:
+      - name: Hash only existing public website, without checkout or root
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, signal, stat
+          signal.alarm(45)
+          expected='a05cf7c23e8ad3a8f63f7af07b68e0219fc79cc4c0c417ded86e2a947054fe09'
+          base=pathlib.Path('/var/www/wenwenwenyiyiyi.work')
+          pointer=base/'current'
+          before=pointer.lstat()
+          root=(pointer/'public').resolve(strict=True)
+          if not root.is_relative_to(base/'releases'):
+              raise SystemExit('HOLD_UNEXPECTED_PUBLIC_ROOT')
+          identity=root.stat()
+          records={};total=0
+          for directory,dirs,files in os.walk(root,followlinks=False):
+              for name in dirs:
+                  if (pathlib.Path(directory)/name).is_symlink():raise SystemExit('HOLD_LINK_IN_PUBLIC')
+              for name in files:
+                  path=pathlib.Path(directory)/name; info=path.lstat()
+                  if not stat.S_ISREG(info.st_mode) or info.st_size>8388608:raise SystemExit('HOLD_UNEXPECTED_FILE')
+                  total+=info.st_size
+                  if total>33554432 or len(records)>=2000:raise SystemExit('HOLD_PUBLIC_BOUND_EXCEEDED')
+                  payload=path.read_bytes();after=path.lstat()
+                  if (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns)!=(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns):raise SystemExit('HOLD_FILE_CHANGED')
+                  records[path.relative_to(root).as_posix()]={'size':len(payload),'sha256':hashlib.sha256(payload).hexdigest()}
+          after=pointer.lstat();final=root.stat()
+          if (before.st_dev,before.st_ino,before.st_mtime_ns)!=(after.st_dev,after.st_ino,after.st_mtime_ns) or (pointer/'public').resolve()!=root or (identity.st_dev,identity.st_ino)!=(final.st_dev,final.st_ino):raise SystemExit('HOLD_POINTER_CHANGED')
+          digest=hashlib.sha256(json.dumps(records,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+          print('PR122_SITE_HUB_LIVE_BASELINE='+json.dumps({'status':'MATCH' if digest==expected else 'DRIFT_HOLD','expected_manifest_digest':expected,'actual_manifest_digest':digest,'file_count':len(records),'total_bytes':total,'public_root':str(root),'root_uid':identity.st_uid,'root_mode':oct(stat.S_IMODE(identity.st_mode)),'uid':os.getuid(),'selected':{k:records.get(k) for k in ('index.html','en/index.html','zh-cn/index.html','assets/tiktok-integration.js')},'production_mutations':0},sort_keys=True))
+          if digest!=expected:raise SystemExit('LIVE_BASELINE_DRIFT_HOLD')
+          PY

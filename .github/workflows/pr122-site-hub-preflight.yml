@@ -9,6 +9,8 @@ on:
       - 'tests/test_pr122_site_hub_integration.py'
       - 'tests/pr122_site_hub_browser.cjs'
       - 'tests/fixtures/pr122-site-shell/**'
+      - 'tests/test_pr122_site_hub_release_delta.py'
+      - 'evidence/pr122-site-hub/PR122_SITE_HUB_REVIEW_ONLY.tar.gz'
       - '.github/workflows/pr122-site-hub-preflight.yml'
 permissions:
   contents: read
@@ -30,13 +32,38 @@ jobs:
         run: node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs demos/community-local-e2e/*.test.mjs
       - name: Isolated integrated HTTP and language tests
         run: python -m unittest tests/test_pr122_site_hub_integration.py -v
+      - name: Controlled publisher addition delta and existing transaction regressions
+        run: |
+          python -m unittest tests.test_pr122_site_hub_release_delta.AdditionTests -v
+          sudo -n "$(command -v python)" scripts/pr122_site_hub_release_regression.py
+      - name: Reuse exact unchanged browser source audit
+        id: browser-baseline
+        run: |
+          python - <<'PY'
+          import hashlib,json,os,shutil
+          from pathlib import Path
+          pins=json.loads(Path('evidence/pr122-site-hub/BROWSER_SOURCE_PINS_d1e57c91.json').read_text())
+          def same(p,expected):
+              path=Path(p)
+              if not path.is_file():return False
+              b=path.read_bytes()
+              return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()==expected
+          reused=all(same(p,h) for p,h in pins.items())
+          with open(os.environ['GITHUB_OUTPUT'],'a') as stream:stream.write('reuse='+str(reused).lower()+'\n')
+          if reused:
+              shutil.copyfile('evidence/pr122-site-hub/BROWSER_REPORT_d1e57c91.json','/tmp/pr122-site-hub/BROWSER_REPORT.json')
+              print('BROWSER_AUDIT_REUSED=d1e57c918c5578104ba8f55f4fc8505cedbaec61; RUN=38846477623; ARTIFACT=12023297533; EXACT_DEPENDENCIES='+str(len(pins)))
+          PY
       - name: Install pinned browser test dependencies in temporary directory
+        if: steps.browser-baseline.outputs.reuse != 'true'
         run: |
           npm install --prefix "$RUNNER_TEMP/pr122-browser" --no-save playwright@1.55.0
           "$RUNNER_TEMP/pr122-browser/node_modules/.bin/playwright" install --with-deps chromium
       - name: Build explicitly limited old-shell fixture with actual new content
+        if: steps.browser-baseline.outputs.reuse != 'true'
         run: python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-site-browser
       - name: Chromium desktop, mobile, CSP and existing loopback simulation flows
+        if: steps.browser-baseline.outputs.reuse != 'true'
         env:
           XJ_HUB_STAGE: /tmp/pr122-site-browser
           XJ_HUB_REPORT: /tmp/pr122-site-hub/BROWSER_REPORT.json
@@ -46,8 +73,32 @@ jobs:
           python - <<'PY'
           import json, os, subprocess
           from pathlib import Path
-          receipt = {'commit': subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(), 'tree': subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(), 'run_id':os.environ['GITHUB_RUN_ID'], 'tests':'static inventory and synthetic frontend only', 'production_release':'HOLD', 'browser_acceptance':'NOT_RUN', 'independent_review':'PENDING'}
+          browser=json.loads(Path('/tmp/pr122-site-hub/BROWSER_REPORT.json').read_text())
+          receipt = {'commit': subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(), 'tree': subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(), 'run_id':os.environ['GITHUB_RUN_ID'], 'tests':'inventory, synthetic frontend, integrated HTTP and controlled publisher delta', 'production_release':'HOLD', 'browser_fixture_acceptance':browser['status'], 'browser_scope':browser['scope'], 'production_browser_acceptance':'NOT_RUN', 'independent_review':'PENDING'}
           Path('/tmp/pr122-site-hub/CI_BINDING.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          PY
+      - name: Bind review-only overlay archive without activating any release
+        run: |
+          python - <<'PY'
+          import hashlib,json,shutil,tarfile
+          from pathlib import Path
+          receipt=json.loads(Path('evidence/pr122-site-hub/PACKAGE_RECEIPT_20261016.json').read_text())
+          archive=Path('evidence/pr122-site-hub/PR122_SITE_HUB_REVIEW_ONLY.tar.gz')
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()==receipt['tar_sha256']
+          with tarfile.open(archive) as bundle:
+              members=bundle.getmembers()
+              assert len({m.name for m in members})==len(members)
+              assert all(m.isfile() and not m.name.startswith('/') and '..' not in Path(m.name).parts for m in members)
+              manifest=json.loads(bundle.extractfile('pr122-site-hub/PACKAGE_MANIFEST.json').read())
+              assert hashlib.sha256(bundle.extractfile('pr122-site-hub/PACKAGE_MANIFEST.json').read()).hexdigest()==receipt['package_manifest_sha256']
+              for entry in manifest['files']:
+                  data=bundle.extractfile('pr122-site-hub/'+entry['path']).read()
+                  assert len(data)==entry['size'] and hashlib.sha256(data).hexdigest()==entry['sha256']
+              from scripts.pr122_site_hub_release_delta import publisher_source
+              assert bundle.extractfile('pr122-site-hub/bin/pr122_website_release.py').read()==publisher_source()
+          shutil.copyfile(archive,'/tmp/pr122-site-hub/'+archive.name)
+          shutil.copyfile('evidence/pr122-site-hub/PACKAGE_RECEIPT_20261016.json','/tmp/pr122-site-hub/PACKAGE_RECEIPT.json')
+          print('REVIEW_ARCHIVE_PASS; NO_INSTALL_EXECUTED; SHA256='+receipt['tar_sha256'])
           PY
       - uses: actions/upload-artifact@v4
         with:

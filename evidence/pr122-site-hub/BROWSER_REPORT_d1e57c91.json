@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "scope": "Real generated new pages on pinned five-file old-shell fixture; ephemeral loopback demo service",
+  "old_shell_images": "TEST_PLACEHOLDERS",
+  "full_1187_file_browser_acceptance": "NOT_RUN",
+  "production_domain_https_acceptance": "NOT_RUN",
+  "checks": [
+    {
+      "test": "all_42_content_pages",
+      "viewport": 1440,
+      "result": "PASS"
+    },
+    {
+      "test": "all_42_content_pages",
+      "viewport": 390,
+      "result": "PASS"
+    },
+    {
+      "test": "keyboard_navigation_and_text_arrow_geometry",
+      "gap_pixels": [
+        5,
+        5,
+        5
+      ],
+      "result": "PASS"
+    },
+    {
+      "test": "quote_6000_2400_1200_ordinary90_custom50_cost_unknown",
+      "result": "PASS"
+    },
+    {
+      "test": "route_preserving_English_switch_and_calculator",
+      "result": "PASS"
+    },
+    {
+      "test": "mobile_navigation",
+      "result": "PASS"
+    },
+    {
+      "test": "consumer_amount_first_ad_simulated_payment_second_ad_refresh",
+      "result": "PASS"
+    },
+    {
+      "test": "merchant_and_platform_read_views_and_fixture_ad_review",
+      "result": "PASS"
+    },
+    {
+      "test": "community_beneficiary_returns_and_unconnected_saas_disabled",
+      "result": "PASS"
+    },
+    {
+      "test": "six_role_pages_mobile_layout",
+      "result": "PASS"
+    },
+    {
+      "test": "404_403_host_negative_paths",
+      "result": "PASS"
+    }
+  ],
+  "js_errors": [],
+  "failed_script_style_resources": []
+}
