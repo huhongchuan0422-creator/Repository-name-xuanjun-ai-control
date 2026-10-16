@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests tests.test_pr122_customer_revision tests.test_pr122_customer_changes.ChangeTests tests.test_pr122_customer_changes.ChangeHTTPTests tests.test_pr122_customer_preview.PreviewTests tests.test_pr122_customer_preview.PreviewHTTPTests tests.test_pr122_customer_runtime.RuntimeTests tests.test_pr122_customer_channel_binding.BindingTests tests.test_pr122_customer_channel_upgrade.UpgradeTests tests.test_pr122_customer_publication_worker.PublicationTests -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
+          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests tests.test_pr122_customer_revision tests.test_pr122_customer_changes.ChangeTests tests.test_pr122_customer_changes.ChangeHTTPTests tests.test_pr122_customer_preview.PreviewTests tests.test_pr122_customer_preview.PreviewHTTPTests tests.test_pr122_customer_runtime.RuntimeTests tests.test_pr122_customer_channel_binding.BindingTests tests.test_pr122_customer_channel_upgrade.UpgradeTests tests.test_pr122_customer_publication_worker.PublicationTests tests.test_pr122_customer_small_edit.SmallEditTests -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
           python -m py_compile scripts/pr122_customer_*.py
           python - <<'PY'
           import json,re
