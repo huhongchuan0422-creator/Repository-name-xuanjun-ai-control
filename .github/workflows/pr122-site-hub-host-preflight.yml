@@ -5,48 +5,19 @@ on:
     paths: [.github/workflows/pr122-site-hub-host-preflight.yml]
 permissions:
   contents: read
-  actions: read
 concurrency:
   group: pr122-domestic-readonly
   cancel-in-progress: false
 jobs:
-  owner-grant-inputs:
+  fixed-channel-inspect:
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
-    timeout-minutes: 4
+    timeout-minutes: 2
     steps:
-      - name: Check exact host and unprivileged staging identity
+      - name: Approved post-recovery fixed inspect only
         run: |
+          set -euo pipefail
           test "$(hostname -s)" = iZvt5t8tlrm8oiZ
           test "$(id -u)" = 1002
-          test ! -e /home/githubrunner/pr122-channel-modefix-inputs
-          mkdir -m 0700 /home/githubrunner/pr122-channel-modefix-inputs
-      - uses: actions/download-artifact@v4
-        with:
-          name: pr122-domestic-customer-channel-df38bcffba6e5ad9798facad35aed0e6a0fb0fe9
-          run-id: 38888387295
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: /home/githubrunner/pr122-channel-modefix-inputs/channel
-      - uses: actions/download-artifact@v4
-        with:
-          name: pr122-customer-center-feaef687ee296dcd55f094bf240fe843445d5ad7
-          run-id: 38883029225
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: /home/githubrunner/pr122-channel-modefix-inputs/customer
-      - name: Hash approved inputs without importing or installing any code
-        run: |
-          /usr/bin/python3 -I -B - <<'PY'
-          import hashlib,io,tarfile
-          from pathlib import Path
-          root=Path('/home/githubrunner/pr122-channel-modefix-inputs')
-          raw=(root/'channel/PR122_DOMESTIC_CUSTOMER_CHANNEL.tar.gz').read_bytes()
-          assert hashlib.sha256(raw).hexdigest()=='94dd112ac61cd074e979029b934953c3d37a1c0df0673af8df050e39b423473b'
-          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
-              members=t.getmembers()
-              assert len(members)==5 and len({m.name for m in members})==5 and all(m.isfile() and not m.name.startswith('/') and '..' not in Path(m.name).parts for m in members)
-              code=t.extractfile('scripts/pr122_domestic_customer_channel.py').read()
-          assert hashlib.sha256(code).hexdigest()=='d685037af45cd044a6a1bfadfc4dcdf14f36b4bf83cc035e47acec4f653b5d1a'
-          (root/'approved-channel.py').write_bytes(code)
-          frozen=(root/'customer/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes()
-          assert hashlib.sha256(frozen).hexdigest()=='7dd77ef573c338201ddc886b23585422ad4a07ae563a9c6ff92fe5b2f9d97b98'
-          print('OWNER_INPUTS_STAGED=PASS; UID1002; NO_ROOT_OPERATIONS; CHANNEL_GRANT_NOT_CALLED')
-          PY
+          echo 'APPROVAL_REFERENCE=PR122#6213703300; ACTION=inspect'
+          sudo -n /usr/local/libexec/xuanjun-customer-channel inspect
+          echo 'FIXED_ROOT_INSPECT_EXIT=0; CUSTOMER_INSTALL_NOT_CALLED'
