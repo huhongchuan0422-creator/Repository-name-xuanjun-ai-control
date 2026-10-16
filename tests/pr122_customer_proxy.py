@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 from scripts.pr122_customer_core import Center
-from scripts.pr122_customer_http import App
+from scripts.pr122_customer_http import App,CustomerUnixServer
 from scripts.pr122_customer_source import TrustedNginxSource
 from scripts.pr122_customer_providers import Providers
 from tests.test_pr122_customer_center import CustomerTests
@@ -24,7 +24,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='pr122-proxy-') as folder:
             root=pathlib.Path(folder);root.chmod(0o755);sock=root/'app.sock';uid=pwd.getpwnam('www-data').pw_uid
             def factory():return Center(fixture.root,{'v1':fixture.key},'v1',clock=lambda:fixture.now,mail_ready=True,scanner=lambda b:True)
-            server=socketserver.UnixStreamServer(str(sock),App(factory,Providers({}),'https://wenwenwenyiyiyi.work','deploy/pr122-customer-center/ui',source_identity=TrustedNginxSource(uid)).handler());sock.chmod(0o666)
+            server=CustomerUnixServer(str(sock),App(factory,Providers({}),'https://wenwenwenyiyiyi.work','deploy/pr122-customer-center/ui',source_identity=TrustedNginxSource(uid)).handler());sock.chmod(0o666)
             thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
             snippet=pathlib.Path('deploy/pr122-customer-center/locations.conf').read_text().replace('/run/xuanjun-customer-api/http.sock',str(sock))
             conf=root/'nginx.conf';conf.write_text('user www-data; pid '+str(root/'nginx.pid')+'; error_log '+str(root/'error.log')+' crit; events {} http { access_log off; server { listen 127.0.0.1:18796; '+snippet.replace('/var/log/nginx/xuanjun-customer-error.log',str(root/'proxy-errors.log'))+' } }')
@@ -52,7 +52,7 @@ def main():
             keys=[x[0] for x in fixture.c.db.execute('SELECT k FROM rate_limits')]
             assert fixture.c.idx('auth-source:127.0.0.2') in keys
             assert fixture.c.idx('auth-source:203.0.113.100') not in keys
-            report={'status':'PASS','scope':'Disposable root Nginx/Unix peer, real HTTP, 10 loopback source IPs; NOT production','malicious_source_limited':True,'other_source_login':True,'parallel_clients':8,'spoofed_forwarded_headers_ignored':True,'real_so_peercred':True}
+            report={'status':'PASS','scope':'Disposable root Nginx/Unix peer, real HTTP, 10 loopback source IPs; NOT production','malicious_source_limited':True,'other_source_login':True,'parallel_clients':8,'spoofed_forwarded_headers_ignored':True,'real_so_peercred':True,'bounded_listen_backlog':server.request_queue_size}
             output=pathlib.Path(os.environ.get('XJ_CUSTOMER_REPORT_DIR','/tmp/pr122-customer'));output.mkdir(exist_ok=True);(output/'CUSTOMER_PROXY_REPORT.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
     finally:
         if nginx:nginx.terminate();nginx.wait(timeout=5)

@@ -5,6 +5,7 @@ import base64
 import binascii
 import json
 import re
+import socketserver
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from pathlib import Path
@@ -28,6 +29,10 @@ def strict_json(raw):
     d=json.loads(raw,object_pairs_hook=pairs,parse_constant=reject)
     if type(d) is not dict:raise ValueError('OBJECT_REQUIRED')
     return d
+
+class CustomerUnixServer(socketserver.UnixStreamServer):
+    # Bounded queue for bursts; serial request/state semantics stay unchanged.
+    request_queue_size=128
 
 class App:
     def __init__(self,factory,providers,origin,assets,*,source_identity=reject_untrusted):
@@ -168,7 +173,7 @@ def serve(factory,providers,assets):
     # Private service-owned directory plus pinned Nginx group prevents another
     # local application impersonating a crashed loopback backend.
     if path.exists() or path.is_symlink():raise RuntimeError('SOCKET_EXISTS_INSPECT_FIRST')
-    server=socketserver.UnixStreamServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid)).handler())
+    server=CustomerUnixServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid)).handler())
     os.chown(path,-1,grp.getgrnam('nginx').gr_gid);os.chmod(path,0o660)
     try:server.serve_forever()
     finally:server.server_close();path.unlink(missing_ok=True)

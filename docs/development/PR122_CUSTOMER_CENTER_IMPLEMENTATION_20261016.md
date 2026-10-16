@@ -91,3 +91,5 @@ Telegram官方Bot API协议要求Token在服务端请求路径，本候选不伪
 service/delivery显式UnsetEnvironment代理、SSLKEYLOGFILE及可覆盖CA的SSL_CERT_FILE/SSL_CERT_DIR，LimitCORE=0。凭据仍仅从root配置经systemd Credential注入，不在请求参数/源码/审计/GitHub记录中。测试采用合成Token，覆盖代理环境、调试、keylog、异常/标准traceback/stdout/stderr、跳转、响应反射Token。没有向真实Telegram发送测试消息。
 
 生产仍须证明：进程启动没有URL/局部变量捕获的自动监控/插桩，未启用解密TLS的中间代理、secret路径追踪或核心转储；代理/审计/诊断策略准确无Token，真实配置权限与必要的安全网络连通已验证。普通异常脱敏测试不能证明外部网络/供应商不记录路径。本节新增TARGET_ACCEPTANCE的telegram_token_path_confidentiality真实私有证据绑定，缺失即HOLD。不得把源码整改直接写成生产凭据保密验收PASS。
+
+R1实际并发回归另定位UnixStreamServer默认监听队列5不足以吸收8个同时到达的代理连接。生产类CustomerUnixServer固定有界backlog128，保留单进程顺序处理语义；真实Nginx测试直接复用该生产类而非独立放宽测试服务器。首次CI的1个502保留，修订后须重新验证8/8并发请求。
