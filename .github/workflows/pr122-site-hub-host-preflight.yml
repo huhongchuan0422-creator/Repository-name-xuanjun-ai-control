@@ -74,13 +74,13 @@ jobs:
       - name: Download exact independently reviewed artifact
         uses: actions/download-artifact@v4
         with:
-          artifact-ids: '12045212414'
-          run-id: '38898777645'
+          artifact-ids: '12047517541'
+          run-id: '38904927962'
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/pr122-experience-6215846584
+          path: ${{ runner.temp }}/pr122-experience-6216329680
       - name: Stage hashed package as unprivileged data only
         env:
-          INPUT_DIR: ${{ runner.temp }}/pr122-experience-6215846584
+          INPUT_DIR: ${{ runner.temp }}/pr122-experience-6216329680
         run: |
           /usr/bin/python3 -I -B - <<'PY'
           import hashlib,json,os,stat
@@ -89,8 +89,8 @@ jobs:
           sources=list(Path(os.environ['INPUT_DIR']).rglob('PR122_EXPERIENCE_RELEASE_REVIEW_ONLY.tar.gz'))
           assert len(sources)==1
           raw=sources[0].read_bytes()
-          assert hashlib.sha256(raw).hexdigest()=='79f9738593f9be8082c238cf8ed6ba4d913bbcea468fe77bea139339ede3dfb4'
-          destination=Path('/home/githubrunner/pr122-experience-6215846584')
+          assert hashlib.sha256(raw).hexdigest()=='d1458c593c2c8538742fc7c6c743e4b70ddf7e6f575db5fed0fc38fce7f967f3'
+          destination=Path('/home/githubrunner/pr122-experience-6216329680')
           destination.mkdir(mode=0o700,exist_ok=False)
           p=destination/'approved-release.tar.gz'
           fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
