@@ -72,55 +72,84 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  r4-installation-model:
+  r4-postinstall-evidence:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            runner: xuanjun-tokyo-readonly
+          - side: domestic
+            runner: xuanjun-domestic-ops
+    runs-on: [self-hosted, Linux, X64, '${{ matrix.runner }}']
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: I1 admission plus affected installation and offline rollback models
+          persist-credentials: false
+      - name: Read existing public receipt, source, service and Work protection only
+        env:
+          XJ_R4_SIDE: ${{ matrix.side }}
         run: |
-          sudo -n python3 -I -B - <<'PY'
-          import unittest
-          suite=unittest.defaultTestLoader.discover('tests',pattern='test_r4_*.py')
-          result=unittest.TextTestRunner(verbosity=2).run(suite)
-          assert result.testsRun==60 and not result.skipped and result.wasSuccessful()
-          PY
-      - name: Build complete controlled-install review evidence
-        run: |
-          python3 -B - <<'PY'
-          import base64,hashlib,importlib.util,io,json,os,tarfile
+          python3 -I -B - <<'PY'
+          import hashlib,json,os,stat,subprocess
           from pathlib import Path
-          root=Path("deploy/pr122-r4-controlled-install")
-          binding=json.loads((root/"REVIEW_BINDING.json").read_text())
-          for path,digest in binding["files"].items():
-              assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest,path
-          spec=importlib.util.spec_from_file_location("r4install",root/"controlled_install.py")
-          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-          assert hashlib.sha256(base64.b64decode(module.GUARD_B64,validate=True)).hexdigest()==module.GUARD_SHA256
-          assert base64.b64decode(module.GATE_B64,validate=True)==(root/"approval_gate.py").read_bytes()
-          assert hashlib.sha256(base64.b64decode(module.GATE_B64,validate=True)).hexdigest()==module.GATE_SHA256
-          assert hashlib.sha256(Path("deploy/pr122-portal-log-capability/portal_log_capability.py").read_bytes()).hexdigest()==module.HELPER_SHA256
-          plan=json.loads((root/"INSTALL_PLAN.json").read_text())
-          assert hashlib.sha256((root/"controlled_install.py").read_bytes()).hexdigest()==plan["installer_sha256"]
-          out=Path(os.environ["RUNNER_TEMP"])/"pr122-r4-install-review";out.mkdir(mode=0o700)
-          archive=out/"PR122_R4_CONTROLLED_INSTALL_REVIEW.tar.gz"
-          paths=sorted(list(binding["files"])+[str(root/"REVIEW_BINDING.json")])
-          with archive.open("xb") as raw:
-              with tarfile.open(fileobj=raw,mode="w:gz") as tar:
-                  for path in paths:
-                      data=Path(path).read_bytes();item=tarfile.TarInfo(path);item.size=len(data);item.mode=0o400;item.mtime=0
-                      tar.addfile(item,io.BytesIO(data))
-          receipt={"status":"PASS_SYNTHETIC_INSTALL_MODEL_ONLY","commit":os.environ["GITHUB_SHA"],"tests":60,"admission_tests":40,"affected_installation_models":20,"fixture":"SYNTHETIC_TEMPORARY_ROOT_FILESYSTEM","source_scope_approval":"PR122#6205371670","installation_plan_approval":"PENDING","reused_engine_sha256":module.HELPER_SHA256,"approved_builder_sha256":module.GUARD_SHA256,"installer_sha256":plan["installer_sha256"],"tar_sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),"tar_size":archive.stat().st_size,"bound_files":len(binding["files"]),"archive_entries":len(paths),"production_root":False,"production_install":False,"production_post":False,"production_stop_restart":False,"dns_change":False}
-          (out/"CI_RECEIPT.json").write_text(json.dumps(receipt,indent=2,sort_keys=True)+"\n")
-          print("PR122_R4_INSTALL_MODEL_RECEIPT="+json.dumps(receipt,sort_keys=True))
+          
+          side=os.environ["XJ_R4_SIDE"]
+          hosts={"tokyo":"iZ6wee8q9z4t03hvqumwfhZ","domestic":"iZvt5t8tlrm8oiZ"}
+          assert os.geteuid()!=0 and os.uname().nodename==hosts[side],"NONROOT_APPROVED_HOST_REQUIRED"
+          old="d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0"
+          new="57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1"
+          home="4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20"
+          def read_regular(path,limit,uid=None,mode=None):
+              fd=os.open(str(path),os.O_RDONLY|os.O_NOFOLLOW)
+              with os.fdopen(fd,"rb") as handle:
+                  info=os.fstat(handle.fileno())
+                  assert stat.S_ISREG(info.st_mode) and info.st_nlink==1,"REGULAR_SINGLE_LINK_REQUIRED"
+                  if uid is not None:assert info.st_uid==uid,"FILE_OWNER_CHANGED"
+                  if mode is not None:assert stat.S_IMODE(info.st_mode)==mode,"FILE_MODE_CHANGED"
+                  data=handle.read(limit+1);assert len(data)<=limit,"BOUNDED_READ_REQUIRED"
+              return data,{"uid":info.st_uid,"gid":info.st_gid,"mode":oct(stat.S_IMODE(info.st_mode)),"size":info.st_size,"sha256":hashlib.sha256(data).hexdigest()}
+          report={"schema_version":1,"status":"READONLY_EVIDENCE_PENDING","side":side,
+              "host":os.uname().nodename,"uid":os.geteuid(),"delivery_commit":os.environ["GITHUB_SHA"],
+              "approved_install_candidate":"b4b8ed3fa7dc9435e4959da11dfc335b04385100",
+              "install_action_approval":6206046505,"collector_used_root":False,
+              "collector_post_requests":0,"collector_http_requests":0,"collector_service_actions":0,
+              "collector_production_writes":False,"dns_change":False}
+          if side=="tokyo":
+              data,identity=read_regular(Path("/var/lib/xuanjun-pr122-r4-containment-receipt.json"),65536,0,0o644)
+              receipt=json.loads(data)
+              assert receipt["status"]=="LIVE_R4_CONTAINMENT_PASS" and receipt["host"]==hosts[side]
+              assert receipt["source_sha256"]==old and receipt["candidate_sha256"]==new
+              assert receipt["apply_started"] is True and receipt["offline_rollback_started"] is False
+              assert receipt["dns_change"] is False and receipt["website_files_changed"] is False and receipt["error"] is None
+              assert receipt["tiktok_http_disconnect"]=="TEMPORARILY_DISABLED" and receipt["authenticated_disconnect"]=="NOT_IMPLEMENTED"
+              expected=[(a,m,s,None) for a in ("47.245.53.152","47.101.152.210") for m,s in (("GET",200),("HEAD",501))]
+              expected += [(a,"POST",403,v) for a in ("47.245.53.152","47.101.152.210") for v in ("empty","synthetic_untrusted_headers")]
+              actual=[(c["address"],c["method"],c["status"],c.get("variant")) for c in receipt["checks"]]
+              assert actual==expected,"ROOT_RECEIPT_CHECKS_CHANGED"
+              assert all(c["synthetic_empty_request"] is True and c["tls_verified"] is True for c in receipt["checks"] if c["method"]=="POST")
+              assert receipt["service_before"]["MainPID"]=="3075458" and receipt["service_after"]["MainPID"]=="3082952"
+              run=subprocess.run(["systemctl","show","secure-secrets-portal.service","-p","MainPID","-p","User","-p","ActiveState","-p","SubState","-p","WorkingDirectory"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,check=True,timeout=10)
+              service=dict(x.split("=",1) for x in run.stdout.splitlines() if "=" in x)
+              assert service==receipt["service_after"],"CURRENT_SERVICE_DIFFERS_FROM_ROOT_RECEIPT"
+              source_data,source_info=read_regular(Path("/opt/trading-system/scripts/secure_secrets_portal_server.py"),200000,1000,0o755)
+              assert source_info["sha256"]==new,"CURRENT_SOURCE_CHANGED"
+              assert service["ActiveState"]=="active" and service["SubState"]=="running" and service["User"]=="admin" and service["WorkingDirectory"]=="/opt/trading-system"
+              report.update(public_root_receipt=receipt,public_receipt_identity=identity,current_source=source_info,current_service=service,
+                  private_root_anchor_backup_consumption="NOT_READ_BY_NONROOT_COLLECTOR")
+              homepage=Path("/var/www/wenwenwenyiyiyi.work/index.html")
+          else:
+              current=Path("/var/www/wenwenwenyiyiyi.work/current")
+              expected="/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage"
+              assert current.is_symlink() and os.readlink(str(current))==expected,"DOMESTIC_CURRENT_CHANGED"
+              report["domestic_current"]=expected
+              homepage=current/"public/index.html"
+          unused,identity=read_regular(homepage,2000000)
+          assert identity["sha256"]==home,"WORK_HOMEPAGE_CHANGED"
+          report["homepage"]=identity
+          report["status"]="NONROOT_POSTINSTALL_EVIDENCE_PASS"
+          print("PR122_R4_POSTINSTALL_RECEIPT="+json.dumps(report,sort_keys=True))
           PY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pr122-r4-controlled-install-${{ github.sha }}
-          path: ${{ runner.temp }}/pr122-r4-install-review/
-          if-no-files-found: error
-          retention-days: 14
-

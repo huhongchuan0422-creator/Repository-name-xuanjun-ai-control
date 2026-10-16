@@ -558,3 +558,14 @@ SOURCE_I1_INCREMENT=READY_FOR_REVIEW；INDEPENDENT_INSTALL_PLAN_APPROVAL=PENDING
 当前INSTALL_ACTION_APPROVAL=NOT_ISSUED，OWNER_ROOT_PIN=NOT_REGISTERED。下一步只请求原独审窗口根据既有ADMISSION协议另作准确版本、限时、单次install动作决定，包含一份源文件原子替换、一次Portal重启及新源/新PID/health通过后的四次空body403检查；不包含回滚、DNS、网站/current或其他服务器变更。全部准确常量及执行/失败边界已保存evidence/pr122-r4-controlled-install/INSTALL_ACTION_REQUEST_20261016.json，显式NOT_APPROVED、时间/nonce为空；不能用作批准。只增加交接材料，不改已批准源码、制品、绑定文件、workflow或生产配置，不重新跑60/18/44/83/45/115。
 
 真正准入需原独审窗口单独签发，并在发布后独立计算原始评论全文SHA，将实际ID/全文摘要由独审渠道交给Owner；随后由可信root登记固定私有锚点。开发方不代签、不创建锚点。现有非rootRunner及旧已消费helper没有新动作登记权限；长期Owner授权有效，但不能虚构技术接入。生产安装/POST/重启/回滚均NOT_EXECUTED；DNS_RELEASE和东京退役继续HOLD。IP审计、外围动态边界和DNS管理面核对未关闭。其他writer的SaaS修改保留，按新HEAD/CAS续接。
+
+
+### 9.25 2026-10-16：Owner东京root安装成功，启动两地非root公开证据采集
+
+Owner已从原独审窗口独立提供正式动作许可6206046505及完整原始正文SHA2569d08d0b49af0d40ad228928fca87c6d327b3db77b1bceb26daefbb215efb06bb。开发窗口实际读取原评论核对匹配；许可为准确b4b8ed3f/install/1次，2026-10-16北京时间21:37:45到期，不包含回滚、DNS或东京退役。
+
+本次Owner在东京admin/root实际完成私有锚点登记和准确安装器调用，终端返回INSTALL_EXIT=0、LIVE_R4_CONTAINMENT_PASS。工作目录/var/tmp/pr122-r4-approved-29hspn8q；source原d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0→候选57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1，Portal PID3075458→3082952、active/running/admin/既定WD。两地GET200/HEAD501；两地空头及合成不可信头共4次空body POST均403、TLSverified、synthetic_empty_request=true。rollback_started=false、error=null、website_files_changed=false、dns_change=false。此段为Owner实机终端证据，独立实机审核未提前PASS。
+
+复用现有v27只读工作流，移除已完成60模型/打包push job，仅新增两地非root公开证据采集：东京读root0644公开回执、准确源fstat/hash、固定服务状态及Work首页SHA；国内核对current和同一首页SHA。采集器不调用root、不读私有准入/备份/消费目录或凭据，不import生产应用，不发送任何HTTP/POST、不改服务/配置或DNS。它不能将未读私有文件冒充独立核验。旧60/18/44/83/45/115不重跑；已审b4源/原制品不变。最终非root证据以实际Job原始日志为准，尚不预写PASS。
+
+安装后HTTP TikTok断开对所有人（含管理员）暂不可用；完整鉴权仍NOT_IMPLEMENTED。后续只集中验收实际执行回执及既有IP/DNS发布缺口，不扩大源码审核。DNS_RELEASE=HOLD，东京后台与桥接保留，东京退役HOLD。
