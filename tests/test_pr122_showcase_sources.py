@@ -4,6 +4,8 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+from unittest import mock
+from tests.test_pr122_showcase_trust import anchored
 from scripts import pr122_showcase_sources as source
 from scripts import pr122_showcase_promote as promotion
 from scripts.community_saas_offers import open_offer_store,register_offer,add_component,change_offer_status
@@ -38,6 +40,7 @@ class AuthorityTests(unittest.TestCase):
             if path=='actions/runs/20':return {'head_sha':'c'*40,'conclusion':'success','status':'completed','workflow_id':source.WORKFLOW_ID,'event':'workflow_dispatch'}
             if path=='actions/artifacts/10':return {'expired':False,'workflow_run':{'id':20,'head_sha':'c'*40}}
             raise AssertionError(path)
+        patch=mock.patch('scripts.pr122_showcase_trust.load',side_effect=lambda: anchored(fetch('issues/comments/30'), 'PUBLICATION'));patch.start();self.addCleanup(patch.stop)
         return gate,fetch,{'publishers':['owner'],'reviewers':['auditor']}
     def test_separate_publication_review_ci_artifact_and_one_use_permission(self):
         gate,fetch,policy=self.gate_fixture();result=promotion.approval(40,policy,fetch);self.assertEqual(result['release_comment_id'],40)

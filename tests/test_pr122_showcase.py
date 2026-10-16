@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
+from tests.test_pr122_showcase_trust import anchored
 from scripts import pr122_showcase as s
 from scripts import pr122_showcase_sources as source
 
@@ -70,6 +72,7 @@ class ShowcaseTests(unittest.TestCase):
             if path.startswith('actions/runs/'):return {'head_sha':'a'*40,'status':'completed','conclusion':'success','workflow_id':source.WORKFLOW_ID,'event':'push'}
             if path.startswith('git/trees/'):return {'truncated':False,'tree':[{'type':'blob','sha':blobsha,'path':'showcase/projects/community-payment/project-v1.json'}]}
             return {'content':base64.b64encode(raw).decode()}
+        patch=mock.patch('scripts.pr122_showcase_trust.load',side_effect=lambda: anchored(fetch('issues/comments/7'), 'CONTENT'));patch.start();self.addCleanup(patch.stop)
         self.assertIn(identifier,source.verify_review(7,items,{'reviewer'},fetch))
         with self.assertRaisesRegex(ValueError,'REVIEW_ORIGIN'):source.verify_review(7,items,{'author'},fetch)
         review['commit']='b'*40

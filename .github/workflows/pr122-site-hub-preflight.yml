@@ -123,6 +123,7 @@ jobs:
       - name: Dynamic showcase lifecycle and isolated static publisher
         run: |
           python -m unittest tests.test_pr122_showcase tests.test_pr122_showcase_sources -v
+          sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_trust -v
           sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_install -v
           sudo -n env XJ_SHOWCASE_REPORT_DIR=/tmp/pr122-site-hub "$(command -v python)" -m unittest tests.test_pr122_showcase_promote tests.test_pr122_showcase_poll -v
           python -m scripts.pr122_showcase_build --registry showcase --output /tmp/pr122-showcase-preview --preview

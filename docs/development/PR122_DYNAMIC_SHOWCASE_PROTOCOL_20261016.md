@@ -93,3 +93,26 @@ project：项目简介、场景和必需里程碑。page：角色入口及页面
 真实支付、真实购买、余额、佣金发放、客户身份/权限后台、未交付的多角色产品界面及新业务 Runtime 的自动升级，均不因本机制建立而宣称已完成。
 
 本轮同时继承 PR122_CUSTOMER_CENTER_PRIVATE_MATERIALS_RULES_V1_20261016.md。公开展示目录和 visibility 标记不是私有资料权限系统；当前动态展示不得接收合同、身份证明、客户附件或密钥。客户中心及其14项真实验收另按同一 PR122 要求实现，不在本批公开展示测试中冒记 PASS。
+
+
+## S1 修订：Owner 受保护独审锚（2026-10-16）
+
+本节替代此前仅以 GitHub login 白名单和 reviewer_role 作为独审授权的说明。
+GitHub 评论账户可以相同，但必须由 Owner 另行核实不同的源码作者与独立审核主体、保管证据，并在受保护执行机固定路径
+`/etc/xuanjun-showcase/INDEPENDENT_REVIEW_TRUST.json` 登记准确审核锚。源码、评论、CLI、环境变量和仓库 policy.example 均不能注册此信任。
+文件必须 root:root 0600、单硬链接，所有父目录 root 所有且不可被组或其他用户写入，不接受符号链接。代码不提供登记、签名或生成独审凭据的接口。
+
+信任 schema=1，字段为 source_writer_principal、reviewers、revoked_review_ids、anchors。
+reviewers 按独立主体索引，包含 status=ACTIVE 与 custody_evidence_sha256。
+anchors 按真实评论 ID 的十进制字符串索引，每项固定 body_sha256、scope、reviewer_principal、custody_evidence_sha256、issued_unix、expires_unix。
+锚有效期最多7天；主体不得等于源码作者；保管证据必须匹配 Owner 登记。scope 仅 CONTENT、PUBLICATION、MECHANISM 三种且不互通。
+完整原始评论字节的哈希同时绑定评论中的对象哈希、源码版本、CI、模块上架范围或制品身份；已有准确源码/CI/对象成员检查继续执行。
+评论修改、审核撤销、主体停用、身份混同、过期、范围变化或缺失登记全部拒绝，不回退到旧角色字符串校验。
+该方案依赖 Owner 受保护锚的真实登记过程，不把角色自述当作独立身份，也不宣称生产保管证据已经取得。
+
+原 issue_comment 工作流现在仅提供 HOLD 通知，权限为 contents/issues read；不创建标签、不调用 dispatch、不执行评论指定的源码。
+正式构建仍需在获准的受保护构建通道读取固定信任文件，普通 Hosted preview 不需要该文件。
+当前没有替用户登记真实信任，也没有部署受保护 builder，因此真实审核事件自动构建接线仍 HOLD。
+这是关闭不安全旧入口的明确限制，不将通知工作流称为已经恢复自动正式发布。后续受保护 builder 的身份、独立凭据保管、只读信任装载与撤销同步须另绑定准确实现审核。
+原 review-comment-id/reviewer 参数仍仅用于筛选评论，不能授权。最终制品独审、单次限时发布许可、备份、回滚和现场验收继续必需。
+源码测试夹具的信任对象只供隔离测试，不复制到生产或当作真实审核。

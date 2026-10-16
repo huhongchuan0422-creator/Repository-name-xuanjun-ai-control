@@ -28,6 +28,8 @@ def verify_review(comment_id,objects,approved_reviewers,fetch=github,known_only=
     need(type(comment_id) is int and comment_id>0,'COMMENT_ID')
     c=fetch('issues/comments/'+str(comment_id))
     need(c['id']==comment_id and c['user']['login'] in approved_reviewers and c.get('issue_url','').endswith('/issues/122'),'REVIEW_ORIGIN')
+    from scripts.pr122_showcase_trust import verify as verify_independent
+    verify_independent(c, 'CONTENT')
     body=c['body'].strip();need(body.startswith('XUANJUN_SHOWCASE_REVIEW\n'),'REVIEW_FORMAT')
     review=json.loads(body.split('\n',1)[1])
     need(review.get('decision') in ('PUBLIC_CONTENT_APPROVED','PUBLIC_CONTENT_REVOKED') and review.get('reviewer_role')=='INDEPENDENT_AUDITOR','INDEPENDENT_REVIEW_REQUIRED')

@@ -44,6 +44,8 @@ def approval(comment_id,policy,fetch=github,now=None):
     need(gate['review_comment_id']!=comment_id,'SEPARATE_REVIEW_REQUIRED')
     review=fetch('issues/comments/'+str(gate['review_comment_id']))
     need(review['id']==gate['review_comment_id'] and review['user']['login'] in policy['reviewers'] and review['issue_url'].endswith('/issues/122') and review['body'].startswith('XUANJUN_SHOWCASE_PUBLICATION_REVIEW\n'),'PUBLICATION_REVIEW_ORIGIN')
+    from scripts.pr122_showcase_trust import verify as verify_independent
+    verify_independent(review, 'PUBLICATION')
     body=json.loads(review['body'].split('\n',1)[1]);need(body.get('decision')=='AUDIT_PASS' and body.get('reviewer_role')=='INDEPENDENT_AUDITOR','INDEPENDENT_PUBLICATION_REVIEW')
     for key in ('tar_sha256','package_manifest_sha256','commit','ci_run_id'):need(body.get(key)==gate[key],'PUBLICATION_REVIEW_BINDING:'+key)
     run=fetch('actions/runs/'+str(gate['ci_run_id']))

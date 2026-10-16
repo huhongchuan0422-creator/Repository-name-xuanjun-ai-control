@@ -45,6 +45,8 @@ def gate(comment_id,manifest_sha,fetch=github):
     need(type(approval.get('issued_unix')) is int and type(approval.get('expires_unix')) is int and approval['issued_unix']<=time.time()<approval['expires_unix'] and 0<approval['expires_unix']-approval['issued_unix']<=7200,'INSTALL_APPROVAL_EXPIRY')
     review=fetch('issues/comments/'+str(approval['review_comment_id']))
     need(review['user']['login']==OWNER and review['issue_url'].endswith('/issues/122') and review['body'].startswith('XUANJUN_SHOWCASE_MECHANISM_REVIEW\n'),'INSTALL_INDEPENDENT_REVIEW_ORIGIN')
+    from scripts.pr122_showcase_trust import verify as verify_independent
+    verify_independent(review, 'MECHANISM')
     verdict=json.loads(review['body'].split('\n',1)[1])
     need(verdict.get('decision')=='AUDIT_PASS' and verdict.get('reviewer_role')=='INDEPENDENT_AUDITOR' and verdict.get('mechanism_manifest_sha256')==manifest_sha,'INSTALL_INDEPENDENT_REVIEW_BINDING')
     need(review['id']!=comment_id,'SEPARATE_INSTALL_REVIEW')
