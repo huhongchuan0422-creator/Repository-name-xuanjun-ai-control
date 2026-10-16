@@ -809,7 +809,7 @@
     "received_handoff_resolution": {
       "path": "evidence/pr99-service-handoff/handoff-resolution-candidate/resolve_received_handoff.py",
       "action": "PR99_RECEIVED_HANDOFF_RESOLUTION_V1",
-      "status": "EXACT_HOSTED_10_PASS_REVIEW_PACKAGE_READY_NOT_EXECUTED",
+      "status": "REVIEWED_10_PASS_READY_ONE_OWNER_MANUAL_LOCAL_RESOLUTION_NOT_YET_EXECUTED",
       "source_inputs": "ALREADY_RECEIVED_S06_AND_R2_VERIFIED_CODE_ONLY",
       "new_production_collection": false,
       "production_executed": false,
@@ -822,14 +822,27 @@
       "run": 38925978297,
       "job": 117057495984,
       "artifact_id": 12056701653,
-      "execution_permission": "PENDING_NEW_SCOPE_REVIEW_NOT_OLD_CAPTURE_PERMISSION",
+      "execution_permission": "OWNER_EXPLICIT_MANUAL_OBSERVATIONAL_AUTHORIZATION_6219362469_NOT_OLD_S06_PERMIT",
       "review_request": {
         "comment_id": 6219132029,
         "read_back": true,
-        "status": "PENDING_CONCENTRATED_NEW_READONLY_SCOPE_REVIEW_NO_SERVER_EXECUTION",
+        "status": "SOURCE_PASS_WITH_SCOPE_LIMITS_6219285784",
         "source_commit": "51c23aaa0666f1a056deea5bf70a5bba4b5a23d3",
         "delivery_commit": "5cb6530b73a57804d667f31147035a987c2d0dc8"
+      },
+      "independent_source_review": {
+        "comment_id": 6219285784,
+        "decision": "PASS_WITH_SCOPE_LIMITS",
+        "read_back": true,
+        "scope": "SOURCE_ONLY_MANUAL_OWNER_OBSERVATION_ALLOWED_IF_EXPLICITLY_AUTHORIZED"
       }
+    },
+    "owner_direct_migration_authorization": {
+      "comment_id": 6219362469,
+      "read_back": true,
+      "scope": "S07_S10_CONTROLLED_DIRECT_MIGRATION_PRESERVE_SHARED_SERVICES_NO_EARLY_TOKYO_RETIREMENT",
+      "root_channel_limit": "EXISTING_RUNNER_CHANNEL_ONLY_FIXED_PHASE_C_ACTIONS_NOT_ARBITRARY_S07_S08_INSTALL",
+      "manual_next_action": "ONE_OWNER_MEDIATED_REVIEWED_LOCAL_RESOLUTION_UNDER_EXPLICIT_OWNER_AUTHORIZATION_NOT_MACHINE_SIGNED_PERMIT"
     }
   },
   "current_recovery_point_r2": {
