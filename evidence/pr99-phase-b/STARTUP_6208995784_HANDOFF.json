@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "approval_comment_id": 6208995784,
+  "approval_body_sha256": "0b81f5a6049eb7626eef547de3643810e7e68efb7dbfa390185b05b6d09a1414",
+  "handoff_sha256": "c3734464ceb267b34dd9d5fb16082f8bbec8da7bdda0bb8a0d05880af69ba352",
+  "source_commit": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
+  "artifact_sha256": "35caaf41040c734565e68ff0c3a25a40be7304b1d58838596aa73f5acb23ff24",
+  "expires_at": 1792136792,
+  "server_execution": "NOT_EXECUTED",
+  "only_changes_from_prior_handoff": [
+    "approved STAGE.parent check removes private=True; protected ownership/link/write checks retained",
+    "new approval comment/body hash and issued/expires literal bindings"
+  ],
+  "checks": {
+    "body_sha": "PASS",
+    "syntax": "PASS",
+    "exact_allowed_substitution": "PASS",
+    "original_artifact": "PASS",
+    "local_filesystem_permission_matrix": "11 PASS inherited for identical one-line change",
+    "handoff_models": "4 PASS; actual filesystem parent0755 and private files checked; synthetic host/lock identity, old anchor, and finalizer child. Python3.12; NOT Korea root acceptance."
+  },
+  "old_stage": "PRESERVED",
+  "old_anchor_sha256": "44701367ce05fd904429a64dc65900a4d96bbaadc323155983b813a55945fadf",
+  "retained_lock": {
+    "device": 25,
+    "inode": 4716
+  },
+  "phase_c": "HOLD",
+  "tokyo_retirement": "HOLD"
+}
