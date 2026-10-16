@@ -297,11 +297,11 @@
       "status": "IN_DEVELOPMENT",
       "design": {
         "document": "docs/development/CUSTOMER_PROJECT_INTAKE_AND_PRIVATE_MATERIALS_20261016.md",
-        "section": "客户资料登录、教程和权限"
+        "section": "玄钧云汇客户登录、项目资料分批提交及私有协议渠道"
       },
       "development": {
         "document": "docs/development/CUSTOMER_PROJECT_INTAKE_API_CONTRACT_20261016.md",
-        "section": "权威状态与权限矩阵",
+        "section": "权威状态与权限矩阵（R1/R2）",
         "phase": 3
       },
       "acceptance": {
