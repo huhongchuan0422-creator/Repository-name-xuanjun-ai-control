@@ -879,7 +879,36 @@
       "owner_failure_receipt": "evidence/pr99-service-handoff/s07-domestic-stage/OWNER_INSTALL_TIMEOUT_20261017.json",
       "dependencies_complete": false,
       "protected_after_snapshot_completed": false,
-      "retry_allowed": false
+      "retry_allowed": false,
+      "owner_diagnosis": {
+        "reported_local_time": "2026-10-17T00:52+08:00",
+        "evidence_origin": "OWNER_ROOT_READONLY_DOMESTIC_SSH_TRANSCRIPT",
+        "source_files": 79,
+        "source_mismatches": [],
+        "installed_packages": {
+          "pip": "23.3.1",
+          "setuptools": "68.0.0"
+        },
+        "dependency_install_completed": false,
+        "observed_download_kbytes_per_second": "10.7–16.1",
+        "cause": "OFFICIAL_PYPI_WHEEL_DOWNLOAD_STILL_IN_PROGRESS_AT_900_SECOND_TIMEOUT",
+        "log_bytes": 3431,
+        "venv_log_bytes": 0,
+        "service_actions": 0
+      },
+      "dependency_continuation": {
+        "status": "OWNER_AUTHORIZED_MANUAL_CONTINUATION_PREPARED_NOT_EXECUTED",
+        "script": "evidence/pr99-service-handoff/s07-wheel-continuation/continue_dependencies.py",
+        "script_sha256": "577d2e9a69186d6010dba2904e486de6617c657141e03d60eefb7975cb39a848",
+        "new_local_tests": 9,
+        "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+        "scope": "KOREA_OFFICIAL_PYPI_DOWNLOAD_HASHED_WHEELS_DOMESTIC_EXISTING_VENV_NO_INDEX_CONTINUATION",
+        "old_install_replayed": false,
+        "original_source_rewritten": false,
+        "service_actions": 0,
+        "production_executed": false,
+        "authority_comment_id": 6219362469
+      }
     }
   },
   "current_recovery_point_r2": {

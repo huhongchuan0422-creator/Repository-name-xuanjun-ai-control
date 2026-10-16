@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "reported_local_time": "2026-10-17T00:52+08:00",
+  "evidence_origin": "OWNER_ROOT_READONLY_DOMESTIC_SSH_TRANSCRIPT",
+  "source_files": 79,
+  "source_mismatches": [],
+  "installed_packages": {
+    "pip": "23.3.1",
+    "setuptools": "68.0.0"
+  },
+  "dependency_install_completed": false,
+  "observed_download_kbytes_per_second": "10.7–16.1",
+  "cause": "OFFICIAL_PYPI_WHEEL_DOWNLOAD_STILL_IN_PROGRESS_AT_900_SECOND_TIMEOUT",
+  "log_bytes": 3431,
+  "venv_log_bytes": 0,
+  "service_actions": 0,
+  "original_source_commit": "ae5e03d9452132de5884f11392ab95eea9d47e3f",
+  "remaining": "Complete isolated dependencies before runtime data, units, start and upstream cutover; Tokyo retained",
+  "private_logs_published": false
+}

@@ -104,3 +104,10 @@ Run38913529642，提交69eeefabee15fcacc8b0d5deb0fc287898d56b27；三机三个Jo
 Owner在韩国执行准确ae5e03d9安装器，国内root认证后进入源码落盘及独立环境阶段，最终返回`DOMESTIC_STAGE_HOLD_PRESERVE / DEPENDENCY_STEP_TIMEOUT`，协调端返回`REMOTE_INSTALL_FAILED_OR_UNKNOWN_PRESERVE`。本次是实际私有新目录安装尝试；没有得到依赖安装、安装后源码复核或保护对象前后相等的成功回执，不能认定S07完成。准确终端证据已脱敏保存为`evidence/pr99-service-handoff/s07-domestic-stage/OWNER_INSTALL_TIMEOUT_20261017.json`。
 
 保留国内`/opt/xuanjun-migration-s07`、`/var/lib/xuanjun-pr99-s07-stage-v1`及韩国`/root/pr99-s07-domestic-stage-v1`。原安装器的超时处理会终止自己创建的依赖子进程组，原目录和日志不删除、不重跑原安装器。下一步只读核对具体失败日志分类、已装依赖元数据、源码哈希及当前保护状态，再形成有准确前置条件的依赖续接。下载/网络错误尚未从日志确认，不提前归因。未执行unit安装、服务启动或反代切换；东京继续运行。
+
+
+## S07超时原因已实机定位，改走韩国下载+国内离线安装
+
+2026-10-17 00:52 Owner-root只读输出：79份源码无摘要差异；venv只有pip/setuptools；依赖日志显示官方PyPI实际下载约10–16 KB/s，到900秒仍在下载idna。准确脱敏诊断见`s07-wheel-continuation/OWNER_DIAGNOSIS_20261017.json`。不是源码校验失败，也没有业务包安装成功。
+
+按#6219362469直接迁移授权形成新续接脚本：保留原目录/日志/源码，在韩国下载相同三个准确版本及wheel依赖，整包和逐wheel摘要验证后国内--no-index --require-hashes离线安装。旧安装器不重跑；旧失败不覆盖；新续接单独目录、失败保留。新增本地9项边界测试通过，不冒充Hosted CI或主机PASS。当前新续接未执行；完成后还需实际运行材料、服务及入口接续。东京继续运行。
