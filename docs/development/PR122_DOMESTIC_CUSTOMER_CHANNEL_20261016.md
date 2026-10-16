@@ -22,6 +22,14 @@ Owner 在 root 终端手动 --revoke 只删除与本通道准确内容一致的 
 
 ## 4. 验收与边界
 
+### 国内首次grant权限故障及准确恢复
+
+Owner现场确认原grant已完成冻结包与wrapper/sudoers写入，state仍PREPARING；sudoers为0400，实际visudo -c要求0440，wrapper为0700。根因是umask077屏蔽os.open请求mode中的组/其他权限，exclusive未显式fchmod。旧17项测试未断言最终权限，故漏检。修复只增加打开文件描述符上的fchmod并增加准确权限回归。
+
+原grant不允许重跑或清除BASE。新增Owner-only --repair-modes仅用于本次准确旧代码SHA0804e33…、冻结34文件包、PREPARING正文、准确wrapper/rules且四文件当前模式恰好为0400/0700/0400/0400的状态。先完整核对所有字节/父目录/链接并检查真实候选sudoers，再锁定原代码inode，仅恢复channel.py0444、wrapper0755、候选及已安装sudoers0440；实际全局visudo成功后才将state持久化为GRANTED。不更换已安装原代码、不重复grant、不调用客户操作、不扩充sudoers。
+
+恢复中断/未知不自动重试，保留文件与状态；部分修复模式不符合精确前置会拒绝。--repair-modes不列入Runner授权；必须原独审批准这次权限恢复后，由Owner原root终端执行。20项测试含原有17项、077下准确mode、准确旧包恢复、非本批代码拒绝；生产仍待恢复许可与实机inspect。
+
 初版0575b4c1的Hosted Job虽然SUCCESS，但原始日志实际为17项中1项ERROR（全局visudo -c）；不得引用为17/17。最小修订只调整测试与CI：测试使用真实visudo检查临时完整sudoers及include树，避免依赖Hosted全局策略；另以故意损坏的临时sudoers验证真实非零拒绝。生产脚本仍校验实际全局sudoers，未放宽。工作流显式set -euo pipefail，并实测false管道返回失败；同时要求日志包含Ran 17与单独OK行。旧错误记录保留，最终必须引用新准确CI。
 
 tests/test_pr122_domestic_customer_channel.py 为 root 临时夹具，真实 visudo 与冻结客户归档校验；只在临时 root 目录写夹具，不写实际 sudoers。Hosted 证据不是国内安装证据。准确 CI、通道制品哈希、独审结论及 Owner 执行回执取得前，不提供生产 --grant 命令、不声称授权已落地。后续角色/依赖/配置准备若需要新的特权动作，必须明确注册审核，不能用此通道偷偷扩展。
