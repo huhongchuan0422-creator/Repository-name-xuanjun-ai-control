@@ -72,44 +72,59 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  capability-offline-verification:
+  tokyo-approved-logfix-execution:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 4
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-      - name: Root filesystem lifecycle in ephemeral hosted runner only
-        run: |
-          sudo -n env PR122_CAPABILITY_SYNTHETIC_TEST=1 python3 -B -m unittest discover -s tests -p test_portal_log_capability.py -v
-      - name: Embedded payload, manifest and actual sudoers syntax
+      - name: Apply exact approved patch once through installed fixed root capability
         run: |
           python3 -B - <<'PY'
-          import base64,hashlib,importlib.util,json,subprocess,tempfile
+          import hashlib,json,os,stat,subprocess,time
           from pathlib import Path
-          root=Path("deploy/pr122-portal-log-capability")
-          spec=importlib.util.spec_from_file_location("grant",root/"install_grant.py")
-          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-          data=base64.b64decode(module.PAYLOAD_B64,validate=True)
-          assert data==(root/"portal_log_capability.py").read_bytes()
-          assert hashlib.sha256(data).hexdigest()==module.PAYLOAD_SHA256
-          policy=module.rule_bytes()
-          assert policy.count(b"sha256:")==4 and b"NOPASSWD: ALL" not in policy
-          with tempfile.TemporaryDirectory() as raw:
-              p=Path(raw)/"sudoers";p.write_bytes(policy)
-              subprocess.run(["sudo","-n","visudo","-cf",str(p)],check=True)
-          binding=json.loads((root/"REVIEW_BINDING.json").read_text())
-          for name,digest in binding["files"].items():
-              assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==digest,name
-          print("PR122_CAPABILITY_OFFLINE=PASS tests=20 fixture=SYNTHETIC production_operations=NONE")
+          assert os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
+          assert os.geteuid()==1001
+          helper=Path("/usr/local/sbin/xuanjun-pr122-portal-logfix-v1")
+          report={"schema_version":1,"host":os.uname().nodename,"delivery_commit":os.environ["GITHUB_SHA"],"patch_approval":"PR122#6204793589","owner_grant":"OWNER_LONG_TERM_DOMESTIC_TOKYO_MIGRATION","apply_invocations_this_job":0,"dns_change":False,"website_files_changed":False,"bridge_tunnel_changed":False,"tokyo_retirement":False}
+          out=Path(os.environ["RUNNER_TEMP"])/("pr122-root-execution-"+os.environ["GITHUB_RUN_ID"]+".json")
+          def call(mode,seconds):
+              p=subprocess.run(["sudo","-n","--",str(helper),mode],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=seconds)
+              assert len(p.stdout)<65536 and len(p.stderr)<65536,"BOUNDED_OUTPUT_EXCEEDED"
+              try:r=json.loads(p.stdout)
+              except ValueError:r={"status":"UNKNOWN_NO_JSON","exit_code":p.returncode}
+              return p.returncode,r
+          try:
+              for path in (Path("/"),Path("/usr"),Path("/usr/local"),helper.parent):
+                  s=path.lstat()
+                  assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,"HELPER_PARENT_IDENTITY"
+              s=helper.lstat()
+              assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and s.st_nlink==1 and stat.S_IMODE(s.st_mode)==0o755,"HELPER_IDENTITY"
+              digest=hashlib.sha256(helper.read_bytes()).hexdigest()
+              assert digest=="0e61a4cab72a18e94ed8b97c81e035ee023dfe0969c871c50651cf75792cbcbe","HELPER_SHA256_MISMATCH"
+              report["installed_helper_sha256"]=digest
+              rc,before=call("status",15);report["before"]=before
+              assert rc==0 and before["status"]=="READY" and before["apply_started"] is False and before["rollback_started"] is False,"NOT_READY_NO_RETRY"
+              report["apply_invocations_this_job"]=1
+              rc,result=call("apply",180);report["apply_exit"]=rc;report["apply"]=result
+              after_rc,after=call("status",15);report["after"]=after
+              assert rc==0 and after_rc==0 and result["status"]=="LIVE_HEAD_GET_PASS" and after["status"]=="LIVE_HEAD_GET_PASS","HOLD_PRESERVE_EVIDENCE_NO_RETRY"
+              report["status"]="LIVE_PATCH_ACCEPTANCE_PASS"
+          except BaseException as error:
+              report["status"]="HOLD_PRESERVE_EVIDENCE"
+              report["error"]=type(error).__name__
+              report["reason"]=str(error)[:200]
+              try:report["final_status"]=call("status",15)[1]
+              except BaseException:report["final_status"]={"status":"UNKNOWN"}
+          finally:
+              fd=os.open(out,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+              with os.fdopen(fd,"w") as handle:json.dump(report,handle,indent=2,sort_keys=True)
+              print("PR122_ROOT_EXECUTION_RECEIPT="+json.dumps(report,sort_keys=True))
+          raise SystemExit(0 if report["status"]=="LIVE_PATCH_ACCEPTANCE_PASS" else 1)
           PY
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: pr122-persistent-capability-${{ github.sha }}
-          path: |
-            deploy/pr122-portal-log-capability/
-            tests/test_portal_log_capability.py
+          name: pr122-tokyo-root-execution-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr122-root-execution-${{ github.run_id }}.json
           if-no-files-found: error
           retention-days: 14
-

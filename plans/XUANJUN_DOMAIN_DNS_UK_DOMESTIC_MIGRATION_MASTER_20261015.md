@@ -451,3 +451,12 @@ Owner明确要求提供放权步骤，并补充“给你授权长期的，不只
 
 ROOT_CAPABILITY_INSTALL=NOT_EXECUTED；PATCH_PRODUCTION_INSTALL=NOT_EXECUTED；W06仍部分完成；DNS_RELEASE=HOLD；TOKYO_RETIREMENT=HOLD。首次接入需要Owner现有东京admin终端安装固定入口一次，此后现有GitHub Runner可调用已注册命令。生产官网/current与批准312efdd3配置制品未改。
 
+
+
+### 9.16 2026-10-16 08:21 CST：Owner首次安装长期入口成功，启动单次已审补丁执行
+
+Owner在东京admin终端运行准确4975724d安装器，SHA256 e95d2c08…f1b3a0通过，原sudoers/新增规则visudo均通过；实际输出PERSISTENT_SCOPED_CHANNEL_READY、READY/apply_started=false/rollback_started=false。该回执为Owner root实机证据，安装未应用补丁、未重启服务。
+
+本次沿用原v27工作流及同一concurrency组，由东京githubrunner调用已安装摘要绑定helper，不复制新的root脚本、不改权限规则。执行前核验实际host/UID/helper root身份及完整SHA2560e61a4ca…2cbcbe，固定status必须READY才允许调用一次apply；异常不重试、不自动回滚、不改变桥接隧道/DNS/网站/current。准确原源备份、候选替换、仅Portal一次重启及两地GET/HEAD健康检查由固定helper执行。此段记录执行意图，最终以绑定本次job的原始PR122_ROOT_EXECUTION_RECEIPT为准；尚不预报生产PASS。
+
+补丁独审6204793589和Owner长期授权已具备；新增固定入口的集中复核6205089607尚无独立结论，不将20项synthetic或Owner安装成功冒充完整执行机制独审通过。DNS_RELEASE=HOLD、东京退役HOLD继续。
