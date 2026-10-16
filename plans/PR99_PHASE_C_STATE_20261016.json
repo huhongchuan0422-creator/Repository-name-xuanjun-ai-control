@@ -625,7 +625,23 @@
       "actual service installation and upstream cutover"
     ],
     "current_point_receipt": "evidence/pr99-current-point-r2/OWNER_EXECUTION_RECEIPT_20261016.json",
-    "next": "S06_CURRENT_RUNTIME_AND_PRIVATE_CHANNEL_CONTRACTS_NOT_PRODUCTION_CUTOVER"
+    "next": "S06_CURRENT_RUNTIME_AND_PRIVATE_CHANNEL_CONTRACTS_NOT_PRODUCTION_CUTOVER",
+    "runtime_metadata": {
+      "run": 38913529642,
+      "delivery_commit": "69eeefabee15fcacc8b0d5deb0fc287898d56b27",
+      "jobs": {
+        "domestic": 117015069212,
+        "korea": 117015069611,
+        "tokyo": 117015069721
+      },
+      "status": "THREE_SUCCESS_NONROOT_METADATA_NOT_INSTALL",
+      "evidence": "evidence/pr99-service-handoff/RUNTIME_METADATA_20261016.json",
+      "next_contract": "evidence/pr99-service-handoff/S06_PRIVATE_HANDOFF_CONTRACT_20261016.md",
+      "tunnel_generic_unit": "NOT_FOUND_AT_TOKYO",
+      "korea443_owner": "UNKNOWN_NONROOT_PERMISSION",
+      "root_admin_scheduling": "UNKNOWN_PRIVATE_CONTENTS_NOT_READ",
+      "protect_other_writer": "DOMESTIC_XUANJUN_SITE_HUB_PREVIEW_ACTIVE"
+    }
   },
   "current_recovery_point_r2": {
     "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
@@ -742,6 +758,11 @@
       ],
       "next": "S06 current service/runtime contract and private channel handoff; preserve R4 live Portal and all shared services."
     },
-    "independent_execution_acceptance": "REQUEST_PENDING_NOT_SELF_APPROVED"
+    "independent_execution_acceptance": "REQUEST_PENDING_NOT_SELF_APPROVED",
+    "execution_review_request": {
+      "comment_id": 6217284394,
+      "read_back": true,
+      "decision": "PENDING"
+    }
   }
 }

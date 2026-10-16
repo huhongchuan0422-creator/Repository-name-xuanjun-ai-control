@@ -67,3 +67,8 @@ S04/S05本次批准范围内的真实离线复制已完成；不等于1363选定
 4. 为实际新安装和上游切换提交一次集中范围裁定。未变的B/C、旧20项测试、官网/HTTPS/R4不再审核。
 
 当前复制许可已消费且成功。本分支仍没有任意root终端，既有固定通道不包含任意私有配置读取或服务切换；不能扩大旧许可。能在当前GitHub通道完成的采样/证据/准备继续推进；需要真实私有数据或服务切换时保留准确阻塞。
+
+
+## S06 新增实际采样
+
+Run38913529642，提交69eeefabee15fcacc8b0d5deb0fc287898d56b27；三机三个Job全部SUCCESS。完整证据见`evidence/pr99-service-handoff/RUNTIME_METADATA_20261016.json`，下一批边界见`evidence/pr99-service-handoff/S06_PRIVATE_HANDOFF_CONTRACT_20261016.md`。本次确认东京generic provider-neutral-tunnel unit为not-found，不能当作Tokyo命名unit的别名；韩国443归属仍受非root权限限制UNKNOWN，不能盲占。国内site-hub-preview属于其他writer，保护不动。Root/admin cron及其他用户/proc详情仍UNKNOWN，不扩展为root验收。没有服务安装、启动、重启或配置改写。
