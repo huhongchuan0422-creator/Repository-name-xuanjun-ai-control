@@ -742,3 +742,18 @@ Owner-root新终端证据：kernel5.10.134-19.8.al8.x86_64/systemd239 (239-82.0.
 原PR99工作流Run38850683705/Hosted Job116810987462原始日志确认准确checkout bf9373ab、167/167 PASS（141既有回归+26新增），host Job116810988506 SKIPPED，未新增队列。实际下载Artifact12025121935复算ZIP58286bytes SHA23a781efbe2a53a62acec5f786407f20b5b10f617388f17a4d976dee3e84c731；TAR57787bytes SHA4c351cdd87a4997c91d311b0345e6dd78192886f4aa657932d549c51af1f016b，8常规成员/7绑定实际SHA全匹配，本地确定性复构与实际TAR字节一致。模型不冒充韩国内核执行。
 
 已在原PR99#6208118622集中送审并回读，一次覆盖源码/制品/精确恢复范围及限时单次执行许可要求，不重审原R2/R6/17份未变Runtime。新恢复独审批准NOT_ISSUED、Owner-root锚点NOT_REGISTERED、真实修复NOT_EXECUTED，服务未启动。源码准备和测试制品成功，不称服务器迁移完成。PR99/PR122保持Draft；Phase-C/DB/Writer/生产迁移/东京退役继续HOLD；已完成的国内网站/DNS/Work官网及current不修改。
+
+
+### 9.43 2026-10-16：韩国配置已准确落地，systemctl239显示问题阻断收尾；新typed验收与无部署收尾集中送审
+
+原独审单次许可PR99#6208184098（正文SHAbdd8aa3d1a3c9f03943c91114f81873ceaee6fb5bc9e07e97effba6af837dc26）已由Owner-root登记并实际执行一次。准确原包SHA通过，unit替换/事务仅unit_sha256更新/一次daemon-reload后，原helper因MANAGER_NETWORK_PROFILE_NOT_LOADED安全停止，原HOLD receipt/备份/锁保留，没有重跑或自动cleanup。失败记录PR99#6208244331。原许可已使用，不能复用。
+
+Owner集中只读补验实际返回：PrivateNetwork=yes/typed b true；systemctl239 RestrictAddressFamilies=[unprintable]，但typed D-Bus (bas) true 1 "AF_UNIX"。官方systemd v239 src/core/dbus-execute.c字段address_families_whitelist证实true为允许列表。根因是开发方验收器的复合属性打印假设，不是配置缺失。真实unitSHA824fc0cbe3d879b61ea36b0bd7c45fb8c1e9fb6c463f46ada741ac3f2299899b匹配已批版本；transaction SHAee81a70bb417e66dbb58bad5a79a776d1e7a0bce35d0e72bf638a2fe0844eb75，仅unit_sha256改变；inactive/dead/PID0、正确fragment/无dropin、17源无变化、current与六共享命名单元元数据相同。此为Owner root实机证据，非本窗口直接登录；服务启动隔离仍NOT_EXERCISED。
+
+原PR99新准确19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb/treedb28205e0ff72623db05aa59bb481d42df631815，仅typed校验增量和独立finalize_repair：不再调用apply，不写unit/transaction/current/runtime，不reload/启停服务/读凭据DB/接业务或币安。完整postflight复核manager typed白名单、disabled/inactive/PID0/身份/dropins、旧备份和精确当前unit/tx、原17源/Manifest/current/venv及六共享元数据，然后释放准确空锁并出新的关联补充回执，旧HOLD历史不覆盖。单独永久attempt防重放；失败/SIGTERM/rmdir失败均保留，不重试回滚。
+
+锁来源限制明确公开：原helper仅内存保留inode，不能虚构历史inode证明。新收尾需独审明确准许可信Owner-root接管当前root0700/非链接/空保留锁，在新私有anchor绑定实际dev/inode和旧失败receipt SHA；finalizer核固定现场并在rmdir前重核身份/空目录/有效期。未取得新批准前绝不删锁或登记新anchor。本批不是重新安装许可。
+
+原工作流Run38852538748/Hosted Job116816737809原始日志准确checkout19f0e27d、185/185 PASS（新增18方法），当前专项44/44本地PASS；host Job116816739228 SKIPPED，未再跑现场。实际下载Artifact12025343420：ZIP65027bytes SHA96ea3889c120b0d48b5cdb0647ced542b35d60f635964098272c0b64ff17b116；TAR64527bytes SHA35caaf41040c734565e68ff0c3a25a40be7304b1d58838596aa73f5acb23ff24，10常规成员/9绑定实际字节全匹配，与本地确定性复构一致。源码/制品/新受控空锁接管与单次收尾许可已在原PR99#6208366964集中申请并回读；旧R2/R6/17源/已批准unit不重审。
+
+当前实际配置落地但Phase-B待finalization；新收尾许可NOT_ISSUED、新anchor NOT_REGISTERED、新收尾NOT_EXECUTED，锁保留。Phase-C/生产/DB/Writer/真实交易/东京退役继续HOLD；东京继续在线，网站/DNS/Work当前内容不改。
