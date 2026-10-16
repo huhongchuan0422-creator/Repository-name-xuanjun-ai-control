@@ -1,0 +1,40 @@
+name: PR122 Site Hub Preflight
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - 'demos/xuanjun-site-hub/**'
+      - 'demos/community-local-e2e/**'
+      - 'scripts/pr122_site_hub_*.py'
+      - '.github/workflows/pr122-site-hub-preflight.yml'
+permissions:
+  contents: read
+jobs:
+  static-and-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exact source inventory, not a release gate
+        run: python scripts/pr122_site_hub_preflight.py --output /tmp/pr122-site-hub/STATIC_PREFLIGHT.json
+      - name: Offline quote and simulated frontend regressions
+        run: node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs demos/community-local-e2e/*.test.mjs
+      - name: Bind receipt to actual checkout
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          receipt = {'commit': subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(), 'tree': subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(), 'run_id':os.environ['GITHUB_RUN_ID'], 'tests':'static inventory and synthetic frontend only', 'production_release':'HOLD', 'browser_acceptance':'NOT_RUN', 'independent_review':'PENDING'}
+          Path('/tmp/pr122-site-hub/CI_BINDING.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-site-hub-preflight-${{ github.sha }}
+          path: /tmp/pr122-site-hub/
+          retention-days: 14

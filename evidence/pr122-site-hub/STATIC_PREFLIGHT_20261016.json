@@ -1,0 +1,193 @@
+{
+  "source_head": "aed5820c4dd8ca6f7e9a2020ea92a498cb41ae76",
+  "release_decision": "HOLD",
+  "production_deployed": false,
+  "candidate_file_count": 19,
+  "html_page_count": 15,
+  "files": {
+    "demos/xuanjun-site-hub/README.md": "e9312f7148fb811d6396aa72d90469097c170fc92aa3644d61ced2a31cdc09dd",
+    "demos/xuanjun-site-hub/assets/ecv-quote.js": "f152627a760ebb521454cc70741e3c39834944d2e291730725c20d123a3474d0",
+    "demos/xuanjun-site-hub/assets/ecv-quote.test.cjs": "03a03f3a0e9f366eec240d72db07414985ab9faae89a43e75afec07b419dc1c6",
+    "demos/xuanjun-site-hub/assets/xuanjun-hub.css": "567dbab092fb370c2105d96a9aadfc65fedf70ffb2e51270aeaeb4796e5f63cb",
+    "demos/xuanjun-site-hub/customer/projects/acceptance/index.html": "3a65f354fff17370ce4a259cdcb792aacf91bd91f70117f275fcb5ae0921c0d9",
+    "demos/xuanjun-site-hub/customer/projects/index.html": "bb7cbd0b93eb3a99610c9190996260be8d28276143c199efc8d39e068cc7ad45",
+    "demos/xuanjun-site-hub/ecosystem/activities/index.html": "6cea4cb0453a9cd83d0fcf0a9a3aede4affd464ab83f68ba50766b3838f52a32",
+    "demos/xuanjun-site-hub/ecosystem/co-create/index.html": "96bc42f47d957d87b2d4818820f9540f56fd81e66da7a97574d536de78aef899",
+    "demos/xuanjun-site-hub/ecosystem/governance/index.html": "4eff29767729d9d00c7e5b07302bb963e509ab7c85a2e89a0024005776faf711",
+    "demos/xuanjun-site-hub/ecosystem/index.html": "2e9528cae827e6faf6faeb23919e2b18d820f1956f92a435a25b646c88d85e1c",
+    "demos/xuanjun-site-hub/ecosystem/ledger/index.html": "4f1c6e21f971b651083eafc5ccf341575c24b3f9940d44516c57b81aa71721ec",
+    "demos/xuanjun-site-hub/ecosystem/profit-sharing/index.html": "a59bddd31a314e5ba074eea126f2017d8307a20474eae283a958efa06f84e78e",
+    "demos/xuanjun-site-hub/ecosystem/tiers/index.html": "1815b09cbf9a75fdafa550236b4d7aca2cf56514b036b62a85c9d7b3ce455ca4",
+    "demos/xuanjun-site-hub/index.html": "5488363e203fd9b834c753971693d62dc0b7be81ba7d9293e1c6e54afa2c1960",
+    "demos/xuanjun-site-hub/marketplace/index.html": "11097ef9753a337ff0c3a386f014b398f65d24bde534db31e83cf9f93a578b6b",
+    "demos/xuanjun-site-hub/marketplace/modules/index.html": "712df239f9e44e2d2eef263bdae4da6185058d525308390bf13ba06264673567",
+    "demos/xuanjun-site-hub/visual/catalog/index.html": "c049a51ceb95226f65c9f40193cf75346bf4acf2e1db3bd13e8e2bee263c23ae",
+    "demos/xuanjun-site-hub/visual/community-payment/index.html": "fe11bb69705c117f671f358c31404fb5228c1ae3ae4d5f389434d0e396019691",
+    "demos/xuanjun-site-hub/visual/index.html": "22baae7352e0bdc07fdffc39af7b8d64b9698c8fd243c1839cd12a1ce600edd8"
+  },
+  "pages": [
+    {
+      "path": "demos/xuanjun-site-hub/customer/projects/acceptance/index.html",
+      "route": "/customer/projects/acceptance/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/customer/projects/index.html",
+      "route": "/customer/projects/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/ecosystem/activities/index.html",
+      "route": "/ecosystem/activities/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/ecosystem/co-create/index.html",
+      "route": "/ecosystem/co-create/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/ecosystem/governance/index.html",
+      "route": "/ecosystem/governance/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/ecosystem/index.html",
+      "route": "/ecosystem/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/ecosystem/ledger/index.html",
+      "route": "/ecosystem/ledger/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/ecosystem/profit-sharing/index.html",
+      "route": "/ecosystem/profit-sharing/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/ecosystem/tiers/index.html",
+      "route": "/ecosystem/tiers/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/index.html",
+      "route": "/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/marketplace/index.html",
+      "route": "/marketplace/",
+      "language": "zh-CN",
+      "inline_script_count": 1
+    },
+    {
+      "path": "demos/xuanjun-site-hub/marketplace/modules/index.html",
+      "route": "/marketplace/modules/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/visual/catalog/index.html",
+      "route": "/visual/catalog/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/visual/community-payment/index.html",
+      "route": "/visual/community-payment/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    },
+    {
+      "path": "demos/xuanjun-site-hub/visual/index.html",
+      "route": "/visual/",
+      "language": "zh-CN",
+      "inline_script_count": 0
+    }
+  ],
+  "mapping_required": [
+    {
+      "page": "/visual/community-payment/",
+      "target": "/visual/community-local-e2e/index.html",
+      "demo_source_exists": true
+    },
+    {
+      "page": "/visual/community-payment/",
+      "target": "/visual/community-local-e2e/merchant.html",
+      "demo_source_exists": true
+    },
+    {
+      "page": "/visual/community-payment/",
+      "target": "/visual/community-local-e2e/platform.html",
+      "demo_source_exists": true
+    },
+    {
+      "page": "/visual/community-payment/",
+      "target": "/visual/community-local-e2e/community.html",
+      "demo_source_exists": true
+    },
+    {
+      "page": "/visual/community-payment/",
+      "target": "/visual/community-local-e2e/beneficiary.html",
+      "demo_source_exists": true
+    },
+    {
+      "page": "/visual/community-payment/",
+      "target": "/visual/community-local-e2e/saas-panel.html",
+      "demo_source_exists": true
+    }
+  ],
+  "demo_api_routes_referenced": [
+    "/demo/admin/campaign/create",
+    "/demo/admin/campaign/review",
+    "/demo/admin/campaign/state",
+    "/demo/admin/item",
+    "/demo/admin/profile",
+    "/demo/ads/list",
+    "/demo/orders",
+    "/demo/orders/list",
+    "/demo/orders/simulate",
+    "/demo/orders/state",
+    "/demo/orders/summary",
+    "/demo/qr/checkout",
+    "/demo/qr/create",
+    "/demo/qr/verify",
+    "/demo/reconciliation/preview",
+    "/demo/refunds/preview",
+    "/demo/refunds/record-preview",
+    "/demo/splits/preview",
+    "/demo/storefront"
+  ],
+  "demo_script_paths_referenced": [
+    "./saas-panel.mjs",
+    "/demo/admin-panel.js",
+    "/demo/app.js",
+    "/demo/business-overview.js",
+    "/demo/catalog-read.js",
+    "/demo/channel-shell.js",
+    "/demo/merchant/app.js",
+    "/demo/order-list.js",
+    "/demo/platform/app.js",
+    "/demo/reconciliation-preview.js",
+    "/demo/refund-preview.js",
+    "/demo/split-preview.js"
+  ],
+  "limitations": [
+    "Static inspection, not browser, hosted CI, independent audit or production acceptance.",
+    "Demo uses /demo POST APIs; copying files alone cannot provide its interactions.",
+    "New handoff pages are zh-CN only; English integration remains unverified.",
+    "Inline calculator requires exact CSP hash or externalization; never weaken CSP."
+  ]
+}

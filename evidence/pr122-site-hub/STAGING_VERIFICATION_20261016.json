@@ -1,0 +1,10 @@
+{
+  "baseline_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
+  "patched_original_pages_checked": 314,
+  "old_links_retained": true,
+  "original_main_and_title_preserved": true,
+  "new_content_pages": 14,
+  "browser_acceptance": "NOT_RUN",
+  "production": "NOT_DEPLOYED",
+  "independent_review": "PENDING"
+}
