@@ -19,8 +19,6 @@ class TestGuideContract(unittest.TestCase):
   self.assertNotIn('<form',s)
   self.assertNotIn('type="file"',s)
   self.assertNotIn('type="password"',s)
-if __name__=='__main__':unittest.main()
-
  def test_full_tutorial_fields_in_static_pages(self):
   data=json.loads((ROOT/'docs/customer-intake/project-requirements.v1.json').read_text(encoding='utf-8'))
   page=(ROOT/'demos/customer-intake/index.html').read_text(encoding='utf-8')
