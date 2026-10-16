@@ -1,0 +1,80 @@
+{
+  "baseline_root_leaf": "epoch7-recovery-candidate-r7",
+  "compiler_root_leaf": "epoch7-recovery-candidate-r7-parentfix",
+  "files": [
+    {
+      "baseline_sha256": "1be06802e012b5747f837af02ff8746fec9864ef94715b561f67c39be95e0948",
+      "bytes": 55771,
+      "git_blob_sha1": "5b6003e8c0f3b1a1bcca16656fa84c6ce43e73c5",
+      "kit_target": "epoch7_recovery_entry.py",
+      "sha256": "33e4ad415c9496feb72a9e151603dcb808714e84d9af0d60b39542d92e967180",
+      "source": "kit-overlay/epoch7_recovery_entry.py"
+    },
+    {
+      "baseline_sha256": "9b8e5a60f16d41934fc77c655797aba0f42f1de39b8a1def3e31df90745d3450",
+      "bytes": 46824,
+      "git_blob_sha1": "603816aa793b050926bcde60d355817ba25bf841",
+      "kit_target": "helpers/epoch7_host_factory.py",
+      "sha256": "590edb0801641888303d34016015f03d3f9e26cb03e27367991dd50fb7cd3ac7",
+      "source": "kit-overlay/helpers/epoch7_host_factory.py"
+    },
+    {
+      "baseline_sha256": "a1d5455da9acbfd08e446eda68e6eb82637d93000e82f0d5c58b364ad9dde79a",
+      "bytes": 24137,
+      "git_blob_sha1": "2cac8b1fe95996164e01f4effbc3b79ebd3fb73d",
+      "kit_target": "helpers/epoch7_resource_plan.py",
+      "sha256": "48b48b9f6d6dfb2902546bc16c908468aefdf060f32807c848a6a6ea519c900e",
+      "source": "kit-overlay/helpers/epoch7_resource_plan.py"
+    },
+    {
+      "baseline_sha256": "1dcf5e7bfbfe8f20b180af090f374344bab2b23e4f5f9f60344717e260670e77",
+      "bytes": 6102,
+      "git_blob_sha1": "40b8081022bcdedd384d55b95f563050c3c73870",
+      "kit_target": "tests/host_factory/test_epoch7_full_factory.py",
+      "sha256": "fe348c2029a4f2ace94eba1dfdf18a3a8f4b3493ef9ab94ac344d802c70bf470",
+      "source": "kit-overlay/tests/host_factory/test_epoch7_full_factory.py"
+    },
+    {
+      "baseline_sha256": "68e6ee980776634f0decdae0e168a83868e9b0f207103627a5df9ad8c6898ff2",
+      "bytes": 24277,
+      "git_blob_sha1": "8262e2a235f6fd63ec1c4817be4a3f630a8de567",
+      "kit_target": "tests/host_factory/test_epoch7_full_factory_fixture.py",
+      "sha256": "5d5272ec32481f40fbef93e440fd26de6dca48982fc2e9ea0662b22a5e7a747d",
+      "source": "kit-overlay/tests/host_factory/test_epoch7_full_factory_fixture.py"
+    },
+    {
+      "baseline_sha256": "c08b588c08b975560946131a9627916d36d8c92c5b2b3d552b4d77cfd72cae90",
+      "bytes": 22963,
+      "git_blob_sha1": "ec7bce0f5b0caa3a124b37b0083648bf2663d428",
+      "kit_target": "tests/host_factory/test_epoch7_host_factory.py",
+      "sha256": "902ff141034c634c798c0061cc03ed8c29b2b112f75faaccfd5f102a8bf09172",
+      "source": "kit-overlay/tests/host_factory/test_epoch7_host_factory.py"
+    },
+    {
+      "baseline_sha256": null,
+      "bytes": 17229,
+      "git_blob_sha1": "abd391b507a7fc9eb14890681b4a93b5ddef2897",
+      "kit_target": "tests/host_factory/test_fresh_release_parent.py",
+      "sha256": "1df4eb37f1a7e9dacd3c157d6b69b626db0bb99dc8e9e2fc2c4467be992e67dc",
+      "source": "tests/test_fresh_release_parent.py"
+    },
+    {
+      "baseline_sha256": "ae660bb2b300b941014d7b9898b0daa89a3a49ba1697a71b0a5a4968ab988166",
+      "bytes": 21112,
+      "git_blob_sha1": "5ed5735cdabfe82cf51a015997390ff0be30179d",
+      "kit_target": "tests/resource_plan/test_epoch7_python_resource.py",
+      "sha256": "95a8329360eeece05ccd1f0b99e2ebf46b802ba11d9d47292fe48fe7bf40514f",
+      "source": "kit-overlay/tests/resource_plan/test_epoch7_python_resource.py"
+    },
+    {
+      "baseline_sha256": "1b5fc32afba4d0094a2b9e6917ba16ca1ee42af9b5887941f64cc4b10dabc95d",
+      "bytes": 23773,
+      "git_blob_sha1": "e9cb932e362a4944df0a80a8dee78a34bb52eebf",
+      "kit_target": "tests/resource_plan/test_epoch7_resource_plan.py",
+      "sha256": "e1f24e289c936c0940f97ccf666edf10689bd742881d2a49a0a89243faf21d2e",
+      "source": "kit-overlay/tests/resource_plan/test_epoch7_resource_plan.py"
+    }
+  ],
+  "original_overlay_map_sha256": "d50fe46d90a7d1fe0ca2c437e4c2abd64ab1a7602f6766fd54e4df5fb10f8295",
+  "schema": 1
+}

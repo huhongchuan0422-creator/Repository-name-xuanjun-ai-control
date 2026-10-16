@@ -73,7 +73,9 @@
           "tests/test_p2_preparation_fresh_r7.py",
           "tests/test_p2_preparation_fresh_r7_contract.py",
           "tests/test_p2_stage_a_saved_reporter.py",
-          "tests/test_p2_stage_a_saved_reporter_contract.py"
+          "tests/test_p2_stage_a_saved_reporter_contract.py",
+          "tests/test_p2_b_release_parent_fix.py",
+          "tests/test_p2_b_release_parent_fix_contract.py"
         ]
       },
       "reuse": [
