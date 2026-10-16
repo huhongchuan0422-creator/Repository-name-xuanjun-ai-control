@@ -72,41 +72,23 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  tokyo-production-channel-check:
+  existing-scoped-command-check:
     if: github.event_name == 'push'
     runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
     timeout-minutes: 2
     steps:
-      - name: Inspect existing authority and exact source without modifying production
+      - name: Identify existing scoped executable permissions only
         run: |
           python3 -B - <<'PY'
-          import os,json,subprocess,shutil,re,stat,hashlib
-          from pathlib import Path
+          import os,json,re,subprocess
           assert os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
-          r={"host":os.uname().nodename,"runner_uid":os.getuid(),"commit":os.environ["GITHUB_SHA"],"production_mutation":False,"permission_expansion":False}
-          sudo=shutil.which("sudo")
-          if sudo:
-           p=subprocess.run([sudo,"-n","-l"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=10)
-           text=p.stdout
-           r["sudo_policy"]={"exit":p.returncode,"nopasswd_all_observed":bool(re.search(r"NOPASSWD:\s*ALL\s*$",text,re.M)),"python_rule_observed":"NOPASSWD:" in text and "python" in text,"pr122_command_paths":sorted(set(re.findall(r"/[A-Za-z0-9/_.-]*pr122[A-Za-z0-9/_.-]*",text)))}
-           # Existing root authority check only; no commands that modify production state.
-           if r["sudo_policy"]["nopasswd_all_observed"] or r["sudo_policy"]["python_rule_observed"]:
-            p=subprocess.run([sudo,"-n","python3","-c","import os; print(os.geteuid())"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=10)
-            r["root_python_identity"]={"exit":p.returncode,"uid0":p.stdout.strip()=="0"}
-          else:r["sudo_policy"]={"available":False}
-          paths=["/opt","/opt/trading-system","/opt/trading-system/scripts","/opt/trading-system/scripts/secure_secrets_portal_server.py"]
-          r["source_paths"]=[]
-          for raw in paths:
-           p=Path(raw);item={"path":raw}
-           try:
-            s=p.lstat();item.update({"uid":s.st_uid,"gid":s.st_gid,"mode":oct(stat.S_IMODE(s.st_mode)),"symlink":stat.S_ISLNK(s.st_mode),"device":s.st_dev,"inode":s.st_ino,"links":s.st_nlink})
-            if p.name=="secure_secrets_portal_server.py":item["sha256"]=hashlib.sha256(p.read_bytes()).hexdigest()
-           except Exception as e:item["error"]=type(e).__name__
-           r["source_paths"].append(item)
-          cmd=["systemctl","show","secure-secrets-portal.service","--no-pager"]
-          for key in ("Id","User","ActiveState","SubState","MainPID","WorkingDirectory","FragmentPath"):cmd+=["-p",key]
-          p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=10)
-          r["portal_service"]={"exit":p.returncode,"properties":dict(x.split("=",1) for x in p.stdout.splitlines() if "=" in x)}
-          print("PR122_PRODUCTION_CHANNEL_RECEIPT="+json.dumps(r,sort_keys=True))
+          p=subprocess.run(["sudo","-n","-l"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=10)
+          rules=[]
+          for line in p.stdout.splitlines():
+           m=re.match(r"^\s*\(([^)]+)\)\s*(.*)",line)
+           if not m:continue
+           rhs=m.group(2)
+           rules.append({"runas":m.group(1),"nopasswd":"NOPASSWD:" in rhs,"all_token":bool(re.search(r"(?:^|[\s,:])ALL(?:$|[\s,])",rhs)),"executable_paths":re.findall(r"(?<!\S)/[A-Za-z0-9/_.-]+",rhs)})
+          print("PR122_EXISTING_RULES="+json.dumps({"host":os.uname().nodename,"commit":os.environ["GITHUB_SHA"],"exit":p.returncode,"rules":rules,"production_mutation":False,"permission_expansion":False},sort_keys=True))
           
           PY
