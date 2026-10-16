@@ -1,0 +1,24 @@
+{
+  "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_NOT_DIRECT_HOST_LOGIN_OR_INDEPENDENT_AUDIT",
+  "reported_local_time": "2026-10-17T07:50+08:00",
+  "launch_directory": "/root/pr99-s07-material-v2-launch.mgOIzkS1",
+  "source_commit": "127e4a942d1cbeadb67b545a47758e1e6827c8dd",
+  "script_sha256": "137a2acea1924b4c62e43abfe6f8689c64450db868c7a216d759a16779c939b4",
+  "terminal_receipt": {
+    "api_requests": 0,
+    "bytes": 47099890,
+    "current_three_unit_hashes": "PASS",
+    "database_integrity": "PASS",
+    "file_hashes": "PASS",
+    "files": 165,
+    "final_cutover_snapshot": false,
+    "private_credentials_preserved": true,
+    "production_cutover": false,
+    "runtime_configuration_complete": false,
+    "service_actions": 0,
+    "services_installed": false,
+    "source_code_79_hashes": "PASS",
+    "status": "S07_PRIVATE_MATERIALS_RECEIVED_PRELIMINARY_PASS",
+    "tokyo_retirement": "HOLD"
+  }
+}
