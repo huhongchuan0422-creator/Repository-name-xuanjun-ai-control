@@ -1,0 +1,69 @@
+name: PR122 Customer Center Isolated Review
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - 'scripts/pr122_customer_*.py'
+      - 'tests/test_pr122_customer_*.py'
+      - 'tests/pr122_customer_*'
+      - 'deploy/pr122-customer-center/**'
+      - 'docs/development/PR122_CUSTOMER_CENTER*'
+      - '.github/workflows/pr122-customer-center.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-customer-center:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exact isolated runtime dependencies and wheel hashes
+        run: |
+          mkdir -p /tmp/pr122-customer/wheels
+          python -m pip download --only-binary=:all: --dest /tmp/pr122-customer/wheels cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
+          sha256sum /tmp/pr122-customer/wheels/* > /tmp/pr122-customer/WHEEL_SHA256SUMS
+          python -m pip install --no-index --find-links /tmp/pr122-customer/wheels cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
+      - name: Authentication authorization material channels and encrypted restore
+        run: |
+          python -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
+          python -m py_compile scripts/pr122_customer_*.py
+      - name: Install isolated browser only
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pr122-customer-browser" --no-save playwright@1.55.0
+          "$RUNNER_TEMP/pr122-customer-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Authenticated desktop and mobile fixture flows
+        env:
+          XJ_CUSTOMER_REPORT_DIR: /tmp/pr122-customer
+        run: PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-customer-browser/node_modules/playwright" node tests/pr122_customer_browser.cjs
+      - name: Validate isolated service candidates and Nginx route
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y nginx
+          sudo systemd-analyze verify deploy/pr122-customer-center/xuanjun-customer-center.service deploy/pr122-customer-center/xuanjun-customer-delivery.service deploy/pr122-customer-center/xuanjun-customer-delivery.timer
+          python - <<'PY'
+          import pathlib,subprocess,tempfile
+          root=pathlib.Path.cwd()
+          with tempfile.TemporaryDirectory() as folder:
+              p=pathlib.Path(folder)/'nginx.conf'
+              p.write_text('pid '+folder+'/nginx.pid; error_log '+folder+'/error.log; events {} http { server { listen 127.0.0.1:18796; include '+str(root/'deploy/pr122-customer-center/locations.conf')+'; } }')
+              subprocess.run(['sudo','nginx','-t','-c',str(p)],check=True)
+          PY
+      - name: Bind complete review-only package to exact checkout
+        run: |
+          python -m scripts.pr122_customer_package --output /tmp/pr122-customer --source-commit "$GITHUB_SHA"
+          python - <<'PY'
+          import json,os,subprocess,pathlib
+          pathlib.Path('/tmp/pr122-customer/CI_BINDING.json').write_text(json.dumps({'commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'scope':'ISOLATED_FIXTURE_ONLY','host_mutations':0,'production_acceptance_14':'NOT_RUN','independent_review':'PENDING','production_release':'HOLD'},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-customer-center-${{ github.sha }}
+          path: /tmp/pr122-customer/
+          retention-days: 14

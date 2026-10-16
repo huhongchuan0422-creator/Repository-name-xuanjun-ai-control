@@ -1,0 +1,8 @@
+[Unit]
+Description=Customer outbox mechanical polling, no model calls
+[Timer]
+OnBootSec=90
+OnUnitInactiveSec=30
+Unit=xuanjun-customer-delivery.service
+[Install]
+WantedBy=timers.target

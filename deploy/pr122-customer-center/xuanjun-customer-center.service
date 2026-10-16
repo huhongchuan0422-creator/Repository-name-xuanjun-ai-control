@@ -1,0 +1,36 @@
+[Unit]
+Description=Xuanjun customer authenticated private project service
+After=network.target
+[Service]
+Type=simple
+User=xuanjun-customer
+Group=xuanjun-customer
+SupplementaryGroups=nginx
+WorkingDirectory=/usr/local/lib/xuanjun-customer-center
+ExecStart=/usr/bin/python3 -I -B /usr/local/lib/xuanjun-customer-center/boot.py serve
+LoadCredential=runtime.json:/etc/xuanjun-customer-center/runtime.json
+UMask=0077
+StateDirectory=xuanjun-customer-center
+StateDirectoryMode=0700
+RuntimeDirectory=xuanjun-customer-scan xuanjun-customer-api
+RuntimeDirectoryMode=0755
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/xuanjun-customer-center /run/xuanjun-customer-scan /run/xuanjun-customer-api
+MemoryMax=384M
+TasksMax=24
+Restart=on-failure
+RestartSec=10
+[Install]
+WantedBy=multi-user.target

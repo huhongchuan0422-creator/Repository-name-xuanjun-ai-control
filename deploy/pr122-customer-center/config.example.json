@@ -1,0 +1,15 @@
+{
+  "state": "EXAMPLE_NOT_DEPLOYABLE_NO_CREDENTIALS",
+  "keys": {},
+  "active_key": "kms-key-version-required",
+  "authority_verify_key": "PROTECTED_CANONICAL_EXPORTER_KEY_REQUIRED",
+  "backup_key": "SEPARATE_OFFLINE_KEY_REQUIRED",
+  "backup_key_ref": "KMS_MAPPING_NOT_VERIFIED",
+  "providers": {
+    "smtp": null,
+    "telegram": null,
+    "feishu": null,
+    "secretref": null,
+    "web_ai": null
+  }
+}
