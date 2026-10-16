@@ -1,0 +1,47 @@
+[Unit]
+Description=Xuanjun Phase-C fixed GET broker (candidate only)
+Requisite=xuanjun-phase-c-network-verified.target
+After=xuanjun-phase-c-network-verified.target
+StopWhenUnneeded=yes
+# No Install section: installation must leave this separate candidate disabled.
+
+[Service]
+Type=simple
+User=xuanjun_binance
+Group=xuanjun_binance_shadow
+WorkingDirectory=@C_RELEASE@/migration-prep
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HTTP_PROXY=
+Environment=HTTPS_PROXY=
+Environment=ALL_PROXY=
+Environment=NO_PROXY=*
+ExecStart=@PYTHON@ -I -B -c "import sys;sys.path.insert(0,'@C_RELEASE@/migration-prep');from korea.phase_c.entry import main;raise SystemExit(main(['broker','--config','@C_CONFIG@']))"
+Restart=no
+UMask=0077
+RuntimeDirectory=xuanjun-phase-c-broker
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+PrivateNetwork=no
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=@C_RELEASE@ @C_CONFIG_ROOT@ @C_CREDENTIAL_ROOT@ @C_KEY_ROOT@
+ReadWritePaths=/run/xuanjun-phase-c-broker
+MemoryAccounting=yes
+MemoryLimit=134217728
+TasksMax=16
+LimitNOFILE=128
+RuntimeMaxSec=@RUNTIME_SECONDS@
+TimeoutStopSec=15s
+KillMode=control-group

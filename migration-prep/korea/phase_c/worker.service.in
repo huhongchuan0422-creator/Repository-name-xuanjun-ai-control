@@ -1,0 +1,41 @@
+[Unit]
+Description=Xuanjun Phase-C read-only reconciliation worker (candidate only)
+Requires=xuanjun-binance-phase-c-broker.service
+BindsTo=xuanjun-binance-phase-c-broker.service
+After=xuanjun-binance-phase-c-broker.service
+# No Install section; old Phase-B unit/current/transaction remain unchanged.
+
+[Service]
+Type=simple
+User=xuanjun_binance_shadow
+Group=xuanjun_binance_shadow
+WorkingDirectory=@C_RELEASE@/migration-prep
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=@PYTHON@ -I -B -c "import sys;sys.path.insert(0,'@C_RELEASE@/migration-prep');from korea.phase_c.entry import main;raise SystemExit(main(['worker','--config','@C_CONFIG@']))"
+Restart=no
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=@C_RELEASE@ @C_CONFIG_ROOT@ @C_SNAPSHOT_ROOT@
+InaccessiblePaths=@C_CREDENTIAL_ROOT@ @C_PRIVATE_KEY_ROOT@
+ReadWritePaths=@C_EVIDENCE_ROOT@
+MemoryAccounting=yes
+MemoryLimit=402653184
+TasksMax=16
+LimitNOFILE=128
+RuntimeMaxSec=@RUNTIME_SECONDS@
+TimeoutStopSec=15s
+KillMode=control-group

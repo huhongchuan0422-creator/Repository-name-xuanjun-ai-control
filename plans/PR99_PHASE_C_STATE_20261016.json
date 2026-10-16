@@ -6,8 +6,8 @@
   "source_baseline": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
   "phase_c": {
     "design": "RECORDED",
-    "adapter_implementation": "NOT_COMPLETE",
-    "review_artifact": "NOT_BUILT",
+    "adapter_implementation": "OFFLINE_ADAPTERS_IMPLEMENTED_NOT_DEPLOYMENT_CONTROLLER",
+    "review_artifact": "HOSTED_BUILD_PENDING",
     "root_preflight": "NOT_EXECUTED",
     "started_service_confinement": "NOT_EXERCISED",
     "live_get": "NOT_AUTHORIZED_NOT_RUN",
@@ -26,7 +26,21 @@
     "nft_version": "1.0.4",
     "preferred_network_candidate": "DEDICATED_NFT_INET_META_SKUID_TABLE_NOT_INSTALLED",
     "iptables_version": "UNKNOWN_MULTICALL_ARGV0_LIMIT",
-    "root_enforcement": "NOT_VERIFIED"
+    "root_enforcement": "NOT_VERIFIED",
+    "local_tests": {
+      "count": 44,
+      "passed": 41,
+      "skipped": 3,
+      "python": "3.12.14",
+      "limitations": [
+        "UID0-only local namespace",
+        "new AF_UNIX listener denied; hosted root validation required"
+      ]
+    },
+    "hosted_tests": "PENDING_EXACT_HEAD_PYTHON311_ZERO_SKIP",
+    "execution_controller": "NOT_IMPLEMENTED_PENDING_REAL_BINDINGS",
+    "independent_network_verifier": "NEW_SEPARATE_GET_BROKER_RSA_SIGNATURE_ADAPTER",
+    "production_bindings": "SECRETREF_ACCOUNT_PUBLISHER_TRANSFER_WORKER_UID_WINDOW_NOT_BOUND"
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
@@ -36,5 +50,5 @@
     "website Work current DNS",
     "Tokyo production and all shared services"
   ],
-  "note": "Preparation design is not executable approval or completed C implementation."
+  "note": "New Phase-C code is an offline preparation candidate; Phase-B frozen and actual C execution remains unapproved/unrun."
 }

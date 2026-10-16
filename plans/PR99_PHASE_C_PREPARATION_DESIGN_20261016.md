@@ -67,8 +67,8 @@
 ### 进度分类（避免把设计当完成）
 - PHASE_B=PASS_WITH_SCOPE_LIMITS（独立6209166651）
 - PHASE_C_DESIGN=RECORDED
-- PHASE_C_ADAPTER_IMPLEMENTATION=NOT_COMPLETE
-- PHASE_C_REVIEW_ARTIFACT=NOT_BUILT
+- PHASE_C_ADAPTER_IMPLEMENTATION=OFFLINE_ADAPTERS_IMPLEMENTED_ROOT_CONTROLLER_PENDING
+- PHASE_C_REVIEW_ARTIFACT=HOSTED_BUILD_PENDING
 - PHASE_C_ROOT_PREFLIGHT=NOT_EXECUTED
 - PHASE_C_SERVICE_CONFINEMENT=NOT_EXERCISED
 - PHASE_C_LIVE_GET/SHADOW=NOT_AUTHORIZED_NOT_RUN
@@ -76,3 +76,13 @@
 - TOKYO_RETIREMENT=HOLD
 
 Owner当前不需重复取B资料或执行旧命令；未来必须需要其协助时，一次交付准确、已完整复审的root操作，不能把本设计文档当执行命令。
+
+## 本轮实际离线实现（延续本计划，不替换原B）
+
+原分支新增migration-prep/korea/phase_c独立包：nft规则编译/无DNS固定IP传输、原子只读凭据整代交付、WAL闭合副本/源端签名/接收/整代指针/固定代读取、独立GET broker与签名客户端、原pager/对账/window接线、双进程cgroup资源采样、严格准入/Manifest核验、systemd239单元模板及确定性审核打包。原8份复用源码与原分支逐字节核对相同，原B17/原unit/transaction/current未改。
+
+已完成44项离线测试实现；本地Python3.12运行41通过、3明确跳过（本地namespace仅映射UID0，且禁止新建AF_UNIX listener）。Hosted Python3.11必须44项零跳过才记CI通过，当前待读取准确HEAD实际日志。不以跳过冒充所有权/跨UID拒绝或真实Unix监听通过。完整合成周期使用真实SQLite WAL、OpenSSL签名与原对账；观察窗口的时钟/资源/少量UID为显式模型，不是实际观察时长。
+
+特别说明：原Shadow自报网络receipt不是独立证据，原占位CLI未被伪填verified=true；新C候选用不同UID的固定GET采集器只签自己实际获得的响应，worker无私钥/凭据，用外部固定公钥验证。broker仍UID986，worker需新独立用户，1986仅是测试数字。共享admin1000/Runner1001不允许作worker。
+
+本批仍不包含生产安装/启动控制器。真实SecretRef/账号只读证明、源库身份/schema/collector及受信跨主机接收接线、新worker身份、观察参数与实际root围栏/签名身份/单次准入尚未绑定。README逐项列明，不能把“适配源码已实现”称为完整C执行包、实机隔离或服务器迁移完成。未来同一C集中执行包补齐这些准确绑定、root一次消费/失败停止撤销后才申请生产范围批准；本次不向Owner发旧命令、不启动服务或重复申请B审核。

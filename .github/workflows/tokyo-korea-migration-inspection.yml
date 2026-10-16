@@ -63,16 +63,40 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - run: python3 -B -m unittest discover -s migration-prep -p 'test_*.py' -v
-      - name: Build exact offline finalization review artifact (no host action)
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        id: phase-c-python
+        with:
+          python-version: '3.11'
+      - name: Phase-C synthetic adapter tests (no production runner; no provider)
+        env:
+          XJ_TEST_PYTHON: ${{ steps.phase-c-python.outputs.python-path }}
         shell: bash
         run: |
-          mkdir -m 0700 /tmp/pr99-offline-review
-          python3 -B migration-prep/korea-offline-repair/build_review.py --commit "$(git rev-parse HEAD)" --output /tmp/pr99-offline-review/PR99_OFFLINE_FINALIZE.tar.gz > /tmp/pr99-offline-review/BUILD_RECEIPT.json
-          cat /tmp/pr99-offline-review/BUILD_RECEIPT.json
+          sudo -n -- "$XJ_TEST_PYTHON" -I -B - <<'PY'
+          import sys, unittest
+          sys.path.insert(0, 'migration-prep')
+          suite = unittest.defaultTestLoader.discover('migration-prep/korea/phase_c', pattern='test_*.py')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          print('PHASE_C_TESTS=%d SKIPPED=%d PRODUCTION_ACTIONS=0' % (result.testsRun, len(result.skipped)))
+          raise SystemExit(not result.wasSuccessful() or bool(result.skipped))
+          PY
+      - name: Build exact Phase-C offline adapter review artifact
+        env:
+          XJ_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$XJ_EXPECTED_HEAD"
+          mkdir -m 0700 /tmp/pr99-phase-c-review
+          python -I -B - "$XJ_EXPECTED_HEAD" <<'PY' > /tmp/pr99-phase-c-review/BUILD_RECEIPT.json
+          import json, pathlib, sys
+          sys.path.insert(0, 'migration-prep')
+          from korea.phase_c.artifact import build
+          print(json.dumps(build(pathlib.Path.cwd(), sys.argv[1], '/tmp/pr99-phase-c-review/PR99_PHASE_C_OFFLINE_REVIEW.tar.gz'), sort_keys=True))
+          PY
+          cat /tmp/pr99-phase-c-review/BUILD_RECEIPT.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: pr99-offline-finalize-review
-          path: /tmp/pr99-offline-review/
+          name: pr99-phase-c-offline-review
+          path: /tmp/pr99-phase-c-review/
           if-no-files-found: error
           retention-days: 7
