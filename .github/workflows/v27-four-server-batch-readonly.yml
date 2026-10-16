@@ -475,3 +475,44 @@ jobs:
           print("PR99_CHANNEL_DEPENDENCY_RECEIPT="+json.dumps(value,sort_keys=True))
           
           PY
+
+  pr99-failed-source-set-diagnosis:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_FAILED_SOURCE_SET_DIAGNOSIS_ONCE_6216441589' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 2
+    steps:
+      - name: Read names and traversal errors only; never call failed coordinator
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import hashlib,json,os,stat,time,urllib.request
+          from pathlib import Path
+          assert os.geteuid()==1001 and os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
+          url="https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d/evidence/pr99-current-point/source-identities.json"
+          opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          with opener.open(url,timeout=30) as f: raw=f.read(1000001)
+          assert len(raw)<=1000000 and hashlib.sha256(raw).hexdigest()=="4114048fe0ecf17ed5e4185b0bbc37d114ed485a2340f8cce2418817cc6ae941"
+          expected={r["path"]:r for r in json.loads(raw)["files"]}
+          root=Path("/opt/trading-system")
+          excluded={".git",".venv","venv","node_modules","__pycache__",".pytest_cache","site-packages","runtime","logs","backups","secrets","credentials","config","state","data"}
+          actual=set();errors=[];started=time.monotonic()
+          def error(e):
+              errors.append({"path":os.path.relpath(e.filename,str(root)) if e.filename else "UNKNOWN","errno":e.errno})
+          for current,dirs,files in os.walk(root,followlinks=False,onerror=error):
+              assert time.monotonic()-started<60 and len(actual)<20000
+              dirs[:]=sorted(d for d in dirs if d.lower() not in excluded and not d.startswith(".") and not (Path(current)/d).is_symlink())
+              for leaf in files:
+                  dep=leaf in {"pyproject.toml","setup.cfg","Pipfile","Pipfile.lock","poetry.lock","uv.lock"} or leaf.endswith(".txt") and leaf.startswith(("requirements","constraints"))
+                  if not leaf.startswith(".") and (dep or leaf.endswith((".py",".pyi",".sql",".sh"))):
+                      actual.add(str((Path(current)/leaf).relative_to(root)))
+          value={"schema_version":1,"status":"FAILED_ATTEMPT_SOURCE_SET_DIAGNOSIS_ONLY","host":os.uname().nodename,"uid":os.geteuid(),"epoch":int(time.time()),"delivery_commit":os.environ["GITHUB_SHA"],"approved_count":len(expected),"visible_current_count":len(actual),"visible_added":sorted(actual-set(expected)),"visible_missing":sorted(set(expected)-actual),"walk_errors":errors,"source_file_contents_read":False,"business_database_opened":False,"sudo_calls":0,"service_actions":0,"business_http_requests":0,"public_github_manifest_downloads":1,"production_changes":0,"root_private_stage_read":False}
+          print("PR99_SOURCE_SET_DIAGNOSIS_RECEIPT="+json.dumps(value,sort_keys=True))
+          
+          PY
