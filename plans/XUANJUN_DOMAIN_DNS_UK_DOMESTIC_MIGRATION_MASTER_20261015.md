@@ -414,7 +414,7 @@ Owner询问十节点进展并明确要求继续实际执行。当前节点状态
 | W03 全路由责任清单 | 完成 | 75条规则、11动态职责及109历史URL身份绑定 |
 | W04 最小Nginx候选及审核 | 完成（限定范围） | 精确312efdd3配置制品及独立审核继承；不是DNS批准 |
 | W05 证书/续期/HTTP | 完成（已验收范围） | 国内HTTPS、dry-run、Hook、Timer、HTTP308/ACME；03:40自动检查成功，实际换证未证实且非当前到期必需 |
-| W06 切DNS前整站验收 | 部分完成；日志修复及R4临时遏制已实机执行 | 原静态115及限定动态证据继承；日志补丁已审生产通过；R4一次root安装/四次403成功，两地Runner公开证据已取得，待独审确认实机范围；IP审计/外围动态边界仍未闭环 |
+| W06 切DNS前整站验收 | 部分完成；日志修复及R4临时遏制已实机执行 | 原静态115及限定动态证据继承；日志补丁已审生产通过；R4一次root安装/四次403及两地公开证据已获6206210165限定实机PASS；IP审计/外围动态边界仍未闭环 |
 | W07 网站切换放行 | HOLD | 原独立审核尚未批准DNS，不能自签 |
 | W08 DNS切换 | 未执行 | 管理面当前单条核对/实际变更尚未执行 |
 | W09 公网切换后观察 | 未执行 | 等W08；预发布直连校验不等于公网切换观察 |
@@ -580,3 +580,16 @@ Owner已从原独审窗口独立提供正式动作许可6206046505及完整原�
 两地首页11461字节、SHA2564cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20一致，国内current仍/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage。root安装记录两地GET200/HEAD501、共4次空body负向POST403/TLSverified；这里只消费记录，不重新发POST，不读账号/Token状态或DB。完整数据evidence/pr122-r4-controlled-install/LIVE_INSTALL_AND_RUNNER_EVIDENCE_20261016.json。
 
 R4临时遏制实际执行成功且得到两地非root证据支持，集中请求原独审窗口仅确认本次实机安装/限定403结果；不再重审未变源码、归档或60项模型。完整断开鉴权NOT_IMPLEMENTED，HTTP功能对所有人暂不可用；其余业务写路径未测试不写PASS。W06仍部分完成；IP审计差异/外围依赖及DNS管理面核对独立保留，W07/DNS_RELEASE=HOLD。网站入口及整体服务器迁移尚未完成，东京后台和隧道保留，东京退役HOLD。
+
+
+### 9.27 2026-10-16：R4实机验收关闭，仅收敛IP与DNS管理面
+
+实际读取独审6206210165：LIVE_R4_CONTAINMENT=PASS_WITH_SCOPE_LIMITS；本批R4实际安装及限定四次403验收关闭，禁止重复安装/重启/POST和既有测试。W06仍只剩原有IP/外围动态边界，DNS保持HOLD。服务器完整迁移及东京退役不因网站入口验收推进而完成。
+
+本次只复用旧Job116566967626和116626465013原始日志、已批准312efdd3的tokyo-nginx-source-inventory及代理配置，未重跑服务器探针。另在本地对准确D5源与批准57候选作纯字节/AST对照：R4分支替换不改变log_message、_origin或imports结构；候选摘要与生产已验57一致。未import生产应用或执行测试/网络/业务数据读取。
+
+重要语义澄清：东京Nginx11项动态职责的既有proxy_pass均指127.0.0.1:18080。配置与TCP语义推导下，Portal.client_address是这段loopback连接的对端，并不是HTTP X-Real-IP；迁移后变化的是东京Nginx.remote_addr及其覆盖的X-Real-IP，不能把两层都笼统写成“后台看到国内地址”。此为配置推导，不冒充新的实机抓包。原83模块证据仅观察到日志/Origin和session/form计数，未证明未知云WAF/日志封禁消费方无IP依赖。Owner仍未明确接受临时审计差异，开发方不代为接受。
+
+集中边界/回滚材料evidence/pr122-r4-controlled-install/REMAINING_IP_DNS_DECISION_20261016.json：请求只裁定本次临时入口的具体IP差异及实际受影响的外围策略，不扩大回头审未变源码。Cloudflare原12条导出、proxied:false/TTL字段1及权威A47.245.53.152/TTL300、AAAA权威NODATA继续按历史证据复用；不重索全区导出。真正仍缺切换前当前管理面的zone/单条recordID、A/AAAA枚举、代理/TTL读回和同记录回退绑定。
+
+已检查当前工具及Cloudflare DNS插件目录检索，没有找到可用DNS管理连接（目录检索非穷尽，未推荐无关插件）。GitHub本身不是Cloudflare账户执行通道；不读取凭据或把公共解析当账户快照。下一接入仅需合法Cloudflare管理面读取权限，当前不修改DNS。DNS_RELEASE=HOLD；官网/current、生产配置、桥接/隧道和所有服务本轮未改。

@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "kind": "REMAINING_IP_AND_DNS_SCOPE_DECISION_PACKET_NOT_RELEASE",
+  "r4_live_review": "PR122#6206210165",
+  "r4_live_scope": "CLOSED_PASS_WITH_SCOPE_LIMITS",
+  "unchanged_ranges_reused": [
+    "312efdd3 approved configurations and original exact artifact",
+    "83 local modules / 50 database sources inventory job116626465013",
+    "Nginx source inventory and job116566967626",
+    "Existing OAuth/source/static/HTTPS/logfix/R4 approvals"
+  ],
+  "ip_semantics": [
+    {
+      "layer": "Domestic Nginx edge",
+      "fact": "X-Real-IP and X-Forwarded-For explicitly overwritten with edge $remote_addr; X-Forwarded-Proto=https; fixed apex Host/SNI and verified TLS to Tokyo",
+      "scope": "Reviewed configuration and prior installed-hash evidence, not packet capture"
+    },
+    {
+      "layer": "Tokyo Nginx",
+      "fact": "Overwrites X-Real-IP with its own $remote_addr; lacks observed real_ip trust settings; no XFF-based authorization was proven",
+      "difference": "For domestic-proxied traffic this peer becomes domestic address instead of direct visitor"
+    },
+    {
+      "layer": "Portal TCP client_address",
+      "fact": "All11 dynamic upstream responsibilities end at http://127.0.0.1:18080 in existing Tokyo Nginx inventory; client_address is the HTTP server socket peer, not X-Real-IP",
+      "inference": "For traffic traversing that loopback proxy, the Portal TCP peer remains loopback before/after. This is configuration/TCP inference, not a new live socket/packet observation"
+    },
+    {
+      "layer": "Portal forwarded origin",
+      "fact": "Existing _origin uses X-Forwarded-Proto plus Host; Tokyo fixes https and expected apex host is preserved",
+      "limitation": "Does not establish live POST CSRF/authentication acceptance"
+    },
+    {
+      "layer": "Application rate limit",
+      "fact": "Observed session/form/account/customer counters and max_attempts_per_form, not an observed source-IP limiter",
+      "evidence_job": 116626465013,
+      "limitation": "83-source bounded local scope, not every external library or cloud policy"
+    }
+  ],
+  "r4_does_not_change_ip_functions_or_imports": {
+    "candidate_sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+    "comparison": "STATIC_BYTES_AND_AST_ONLY_NO_PRODUCTION_IMPORT_OR_TEST_RERUN",
+    "functions_unchanged": {
+      "_origin": "6b3061adb8b72542abbce2b561f92290b387f2ff7fa1ca26c6da00c9f98f825d",
+      "log_message": "0249a4c2d5e32c59efa35fc56c1199a15e66e45dd0b870a3b14438e500c708e5"
+    },
+    "imports_shape_sha256_unchanged": "49b5b980880277b7f32e26b45fe691092edc46646b4210f05e081f96a2c02665",
+    "network_requests": 0,
+    "production_mutation": false
+  },
+  "nginx_dynamic_inventory": [
+    {
+      "match": "/p/",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "= /submit/douyin",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "= /submit/tiktok",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "= /integrations/douyin/oauth/callback",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "= /integrations/tiktok/oauth/start",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "= /integrations/tiktok/oauth/callback",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "= /integrations/tiktok/status",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "= /integrations/tiktok/disconnect",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "= /healthz",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    },
+    {
+      "match": "^~ /telegram-webhook/[REDACTED]",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": true
+    },
+    {
+      "match": "= /telegram-canary/status",
+      "proxy": [
+        {
+          "credentials_present": false,
+          "host": "127.0.0.1",
+          "path_present": false,
+          "port": 18080,
+          "scheme": "http"
+        }
+      ],
+      "nested_controls": false
+    }
+  ],
+  "ip_open_items": [
+    "Actual external IP-based authentication/rate limit or automatic log-consumer/ban dependencies not established by available evidence",
+    "Owner has not explicitly accepted temporary Tokyo peer/header/log audit difference",
+    "This packet cannot declare all unknown external systems safe; independent release decision must name any concrete outstanding affected policy"
+  ],
+  "dns": {
+    "domain": "wenwenwenyiyiyi.work",
+    "provider": "Cloudflare",
+    "historical_export_review": "PR122#6184420192",
+    "historical_export_sha256": "531bc71f3d5eff6cb7ad5c7e6aea3912578a8a91ff8ade740ef2e40d2e7eb771",
+    "historical_records": 12,
+    "historical_apex": {
+      "type": "A",
+      "content": "47.245.53.152",
+      "proxied": false,
+      "provider_ttl_field": 1,
+      "authoritative_ttl_seconds": 300
+    },
+    "historical_aaaa": "AUTHORITATIVE_NOERROR_AA_NODATA_PLUS_SOA; not current account record enumeration",
+    "proposed_change": {
+      "record": "apex A content only",
+      "from": "47.245.53.152",
+      "to": "47.101.152.210",
+      "preserve": "Current actual record identity/proxied/ttl and all other11 records; final pre-write exact compare required"
+    },
+    "rollback": {
+      "record": "The same single actual apex A record ID",
+      "restore_content": "47.245.53.152",
+      "restore_proxy_and_ttl": "Exact pre-change management-plane snapshot, not inferred from recursive TTL; no zone reimport",
+      "trigger": "Any approved post-cutover acceptance failure; no replay of business writes"
+    },
+    "management_plane_current": {
+      "access": "NOT_CONNECTED",
+      "zone_id": "NOT_READ",
+      "apex_record_id": "NOT_READ",
+      "A_AAAA_records": "NOT_CURRENTLY_ENUMERATED",
+      "proxied": "NOT_CURRENTLY_READ",
+      "ttl": "NOT_CURRENTLY_READ"
+    },
+    "plugin_discovery": "Cloudflare DNS plugin search found no matching DNS integration; unrelated WordPress result was not suggested. Search is not an exhaustive assertion about every plugin."
+  },
+  "next_bounded_actions": [
+    "Independent reviewer to assess remaining IP evidence and specify acceptable temporary scope plus any concrete required external policy proof, without reopening passed code or tests",
+    "Obtain legitimate Cloudflare management-plane read access and snapshot only apex A/AAAA and exact proxy/TTL/record identity; no duplicate full-zone export requested",
+    "Only after IP disposition and exact DNS management-plane snapshot obtain/consume controlled DNS release decision; current HOLD persists"
+  ],
+  "no_new_server_probe": true,
+  "no_new_http": true,
+  "no_tests_rerun": true,
+  "production_change": false,
+  "dns_release": "HOLD",
+  "tokyo_retirement": "HOLD"
+}
