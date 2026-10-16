@@ -40,6 +40,17 @@ class ProviderTests(CustomerTests):
  def test_unlink_or_revocation_blocks_queued_send(self):
   self.linked();enqueue(self.c,self.owner,'project-a','TELEGRAM','hello');self.c.unlink(self.owner,'project-a','TELEGRAM')
   with self.assertRaises(Denied):drain_message(self.c,Providers({}))
+ def test_web_ai_bound_context_archived_reply_unknown_no_retry(self):
+  from scripts.pr122_customer_providers import ai_reply
+  p=Providers({'web_ai':{'provider':'openai','model_key':'approved-fixture'}})
+  with self.c.tx():m=self.c.message(self.owner,'project-a','hello')
+  contexts=[]
+  def rpc(cfg,context):contexts.append(context);return '这是测试夹具回复。'
+  r=ai_reply(self.c,self.owner,'project-a',m['id'],p,rpc=rpc);self.assertEqual(r['state'],'ANSWERED');self.assertEqual(contexts[0]['customer_id'],'customer-a');self.assertEqual(len(contexts),1)
+  ai_reply(self.c,self.owner,'project-a',m['id'],p,rpc=rpc);self.assertEqual(len(contexts),1)
+  with self.c.tx():m=self.c.message(self.owner,'project-a','second')
+  def fail(*args):raise TimeoutError()
+  self.assertEqual(ai_reply(self.c,self.owner,'project-a',m['id'],p,rpc=fail)['state'],'UNKNOWN');self.assertEqual(ai_reply(self.c,self.owner,'project-a',m['id'],p,rpc=rpc)['state'],'UNKNOWN');self.assertEqual(len(contexts),1)
  def test_same_customer_multiple_projects_keeps_context_separate(self):
   p={**self.p,'id':'project-b'};self.imported(2,[self.p,p]);self.linked();t=self.c.binding_challenge(self.owner,'project-b','TELEGRAM','123')['challenge'];self.c.channel_event('TELEGRAM','bind2','123','/bind '+t);d=self.c.pending_links(self.owner,'project-b')[0];self.c.confirm_link(self.owner,'project-b',d['id']);self.c.channel_event('TELEGRAM','msgA','123','/project project-a A');self.c.channel_event('TELEGRAM','msgB','123','/project project-b B');self.assertEqual(self.c.messages(self.owner,'project-a')[0]['body'],'A');self.assertEqual(self.c.messages(self.owner,'project-b')[0]['body'],'B')
 for name in list(CustomerTests.__dict__):

@@ -184,3 +184,49 @@ class SecretRefMetadata:
                 d=json.loads(read(size))
                 return set(d)=={'project_id','item_id','kind','reference','active','expires_at'} and d['project_id']==project and d['item_id']==item and d['kind']==kind and d['reference']==reference and d['active'] is True and type(d['expires_at']) is int and d['expires_at']>time.time()
         except (OSError,ValueError,Unavailable):return False
+
+def local_ai(config,context):
+    """Provider-neutral host bridge with a pinned approved OpenAI model identity.
+    The host bridge owns provider credentials; customer material secrets are never
+    forwarded. No external model call occurs in tests or when mapping is absent.
+    """
+    import socket,struct
+    if config.get('socket')!='/run/xuanjun-customer-ai/reply.sock' or type(config.get('peer_uid')) is not int or config['peer_uid']<=0 or config.get('provider')!='openai' or not config.get('model_key'):raise Unavailable('APPROVED_AI_MAPPING_REQUIRED')
+    raw=canonical(context)
+    with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as s:
+        s.settimeout(15);s.connect(str(private_path(config['socket'])))
+        _,uid,_=struct.unpack('3i',s.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
+        if uid!=config['peer_uid']:raise Denied('AI_PEER_IDENTITY')
+        s.sendall(struct.pack('!I',len(raw))+raw)
+        def read(n):
+            value=b''
+            while len(value)<n:
+                part=s.recv(n-len(value))
+                if not part:raise Unavailable('AI_TRUNCATED')
+                value+=part
+            return value
+        size=struct.unpack('!I',read(4))[0]
+        if not 1<=size<=64000:raise Denied('AI_RESPONSE_LIMIT')
+        d=json.loads(read(size))
+        if set(d)!={'message_id','request_sha256','provider','model_key','text'} or d['message_id']!=context['message_id'] or d['request_sha256']!=hashlib.sha256(raw).hexdigest() or d['provider']!=config['provider'] or d['model_key']!=config['model_key']:raise Denied('AI_CONTEXT_BINDING')
+        return d['text']
+
+def ai_reply(center,uid,pid,mid,providers,*,rpc=local_ai):
+    import secrets
+    from scripts.pr122_customer_core import safe_text
+    c=providers.config.get('web_ai')
+    if not c:return {'state':'PENDING_PROVIDER'}
+    with center.tx():
+        p,role,_=center.project(uid,pid);source=center.db.execute("SELECT * FROM messages WHERE id=? AND project=? AND user_id=? AND channel='WEB'",(mid,pid,uid)).fetchone()
+        if not source:raise Denied('AI_SOURCE_MESSAGE')
+        old=center.db.execute('SELECT state,result_id FROM ai_jobs WHERE message_id=?',(mid,)).fetchone()
+        if old:return {'state':old[0],'result_id':old[1]}
+        center.db.execute("INSERT INTO ai_jobs VALUES(?,'UNKNOWN',NULL)",(mid,))
+        context={'message_id':mid,'user_id':uid,'project_id':pid,'tenant_id':p['tenant'],'customer_id':p['customer'],'body':center.decrypt(source['payload'],mid).decode()}
+    try:
+        text=safe_text(rpc(c,context),4000)
+        with center.tx():
+            center.project(uid,pid);rid='m_'+secrets.token_hex(16)
+            center.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?,NULL,?)',(rid,pid,uid,'WEB_AI',center.encrypt(text.encode(),rid),'ARCHIVED',center.now()));center.db.execute("UPDATE ai_jobs SET state='ANSWERED',result_id=? WHERE message_id=?",(rid,mid));center.audit(pid,uid,'AI_REPLY_ARCHIVED',rid)
+        return {'state':'ANSWERED','result_id':rid}
+    except Exception:return {'state':'UNKNOWN'}

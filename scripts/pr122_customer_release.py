@@ -71,10 +71,10 @@ def plan(folder):
     import base64
     need(len(base64.b64decode(c['backup_key'],validate=True))==32 and len(base64.b64decode(c['authority_verify_key'],validate=True))>=32,'PROTECTED_KEYS_REQUIRED')
     need(c['backup_key_ref'] and c['active_key'] in c['keys'] and all(len(base64.b64decode(v,validate=True))==32 for v in c['keys'].values()),'DATA_KEY_MAPPING')
-    providers=Providers(runtime['providers']).status();need(all(runtime['providers'].get(k) for k in ('smtp','telegram','feishu','secretref')),'REAL_PROVIDER_CONFIG_REQUIRED')
+    providers=Providers(runtime['providers']).status();need(all(runtime['providers'].get(k) for k in ('smtp','telegram','feishu','secretref','web_ai')),'REAL_PROVIDER_CONFIG_REQUIRED')
     # Source-only tests cannot satisfy actual scan/KMS/provider/authority evidence.
     acceptance=private_config(CONFIG/'TARGET_ACCEPTANCE.json')
-    required=('canonical_identity_mapping','canonical_order_contract_export','canonical_customer_project_mapping','key_backup_recovery','scanner_clean_and_eicar','smtp_verified_account_recovery','telegram_callback_identity','feishu_callback_identity','secretref_metadata_authority')
+    required=('canonical_identity_mapping','canonical_order_contract_export','canonical_customer_project_mapping','key_backup_recovery','scanner_clean_and_eicar','smtp_verified_account_recovery','telegram_callback_identity','feishu_callback_identity','secretref_metadata_authority','web_ai_provider_identity')
     need(set(acceptance)=={'manifest_sha256','evidence'} and acceptance['manifest_sha256']==digest(raw) and set(acceptance['evidence'])==set(required),'TARGET_ACCEPTANCE_BINDING')
     for key in required:
         v=acceptance['evidence'][key];need(type(v) is dict and set(v)=={'sha256','path'} and len(v['sha256'])==64,'TARGET_EVIDENCE_SCHEMA')
@@ -90,7 +90,9 @@ def plan(folder):
 def github(path):
     token=private_path(CONFIG/'github-readonly-token');st=token.stat();need(st.st_uid==0 and not st.st_mode&0o077,'GITHUB_READONLY_CREDENTIAL')
     req=urllib.request.Request('https://api.github.com/repos/'+REPO+'/'+path,headers={'Authorization':'Bearer '+token.read_text().strip(),'Accept':'application/vnd.github+json','User-Agent':'PR122-Customer-Controlled-Release'})
-    with urllib.request.urlopen(req,timeout=15) as r:return json.loads(r.read(2_000_000))
+    from scripts.pr122_customer_providers import NoRedirect
+    with urllib.request.build_opener(NoRedirect()).open(req,timeout=15) as r:
+        raw=r.read(2_000_001);need(len(raw)<=2_000_000,'GITHUB_RESPONSE_LIMIT');return json.loads(raw)
 
 def gate(comment_id,expected_plan,fetch=github):
     c=fetch('issues/comments/'+str(comment_id));need(c['id']==comment_id and c['user']['login']==OWNER and c['issue_url'].endswith('/issues/122') and c['body'].startswith('XUANJUN_CUSTOMER_INSTALL\n'),'APPROVAL_ORIGIN')

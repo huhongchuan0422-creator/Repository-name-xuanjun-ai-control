@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS audit(seq INTEGER PRIMARY KEY,project TEXT NOT NULL,a
 CREATE TABLE IF NOT EXISTS links(channel TEXT NOT NULL,subject_idx TEXT NOT NULL,user_id TEXT NOT NULL,project TEXT NOT NULL,payload BLOB NOT NULL,active INTEGER NOT NULL,PRIMARY KEY(channel,subject_idx,project));
 CREATE TABLE IF NOT EXISTS events(channel TEXT NOT NULL,event_id TEXT NOT NULL,at INTEGER NOT NULL,PRIMARY KEY(channel,event_id));
 CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,project TEXT NOT NULL,user_id TEXT NOT NULL,channel TEXT NOT NULL,payload BLOB NOT NULL,status TEXT NOT NULL,provider_ref TEXT,created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS ai_jobs(message_id TEXT PRIMARY KEY,state TEXT NOT NULL,result_id TEXT);
 CREATE TABLE IF NOT EXISTS outbox(id TEXT PRIMARY KEY,kind TEXT NOT NULL,user_id TEXT NOT NULL,payload BLOB NOT NULL,status TEXT NOT NULL,at INTEGER NOT NULL);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;
@@ -180,6 +181,7 @@ class Center:
             uid,_=self.consume(token,'reset')
             self.db.execute('UPDATE accounts SET salt=?,password=?,epoch=epoch+1 WHERE id=?',(salt,pw,uid))
             self.db.execute('DELETE FROM sessions WHERE user_id=?',(uid,))
+            self.db.execute('UPDATE links SET active=0 WHERE user_id=?',(uid,))
             self.db.execute("UPDATE challenges SET used=1 WHERE user_id=? AND kind IN ('reset','invite','bind')",(uid,))
             self.audit('',uid,'PASSWORD_RESET',uid)
         return {'reset':True}
@@ -260,6 +262,7 @@ class Center:
             if q['category']=='INTERNAL' and role!='REVIEWER': continue
             r=self.db.execute('SELECT * FROM items WHERE project=? AND item=?',(pid,q['id'])).fetchone()
             versions=[{'id':x['id'],'seq':x['seq'],'actor':x['actor'],'kind':x['kind'],'created':x['created'],'expires':x['expires'],'details':json.loads(self.decrypt(x['payload'],x['id']))} for x in self.db.execute('SELECT * FROM versions WHERE project=? AND item=? ORDER BY seq',(pid,q['id']))]
+            versions=[v for v in versions if v['details'].get('category')!='INTERNAL' or role=='REVIEWER']
             latest=versions[-1] if versions else None
             recheck=bool(latest and latest['expires'] and latest['expires']<=self.now())
             result.append({**q,'state':r['state'],'revision':r['seq'],'accepted_revision':r['accepted'],'needs_reverification':recheck,'versions':versions})
@@ -323,14 +326,14 @@ class Center:
                 oid='o_'+secrets.token_hex(16)
                 encrypted=self.encrypt(content,'object:'+pid+':'+oid)
                 secure_write(self.objects/oid,encrypted)
-                payload={'object_id':oid}
+                payload={'object_id':oid,'category':q['category']}
                 self.db.execute('INSERT INTO objects VALUES(?,?,?,?,?,?,?,?)',(oid,version,pid,mime,len(content),digest(content),'CLEAN',self.key_id))
             else:
                 if q['submission_type']!=kind or self.secretref is None: raise Unavailable('DEDICATED_PROVIDER_PENDING')
                 reference=safe_text(content,256)
                 # Trusted host resolver verifies grant provenance & same project; never a client verified flag.
                 if self.secretref(pid,item,kind,reference) is not True: raise Denied('REFERENCE_NOT_VERIFIED')
-                payload={'reference':reference}
+                payload={'reference':reference,'category':q['category']}
             self.db.execute('INSERT INTO versions VALUES(?,?,?,?,?,?,?,?,?)',(version,pid,item,revision+1,uid,'SAVE',self.encrypt(canonical(payload),version),expires,self.now()))
             self.db.execute("UPDATE items SET seq=?,state='PARTIAL' WHERE project=? AND item=?",(revision+1,pid,item)); self.audit(pid,uid,'SAVE',version)
         return {'version':version,'revision':revision+1,'state':'PARTIAL'}
@@ -343,27 +346,29 @@ class Center:
             if type(revision) is not int or revision!=r['seq'] or not state: raise Conflict('VERSION_OR_TRANSITION')
             v=self.db.execute("SELECT * FROM versions WHERE project=? AND item=? AND kind='SAVE' ORDER BY seq DESC LIMIT 1",(pid,item)).fetchone()
             if not v or (v['expires'] and v['expires']<=self.now()): raise Denied('MATERIAL_EXPIRED')
+            if json.loads(self.decrypt(v['payload'],v['id'])).get('category')!=q['category']:raise Denied('MATERIAL_CATEGORY_CHANGED_NEW_VERSION_REQUIRED')
             if action=='submit':
                 if role not in ('OWNER','EDITOR') and not (role=='REVIEWER' and q['category']=='INTERNAL'): raise Denied('SUBMIT_ROLE')
             elif role!='REVIEWER' or v['actor']==uid: raise Denied('INDEPENDENT_REVIEW_REQUIRED')
             if action in ('request_changes','approve'): safe_text(reason,1000)
             version='v_'+secrets.token_hex(16); seq=revision+1
-            self.db.execute('INSERT INTO versions VALUES(?,?,?,?,?,?,?,?,?)',(version,pid,item,seq,uid,action,self.encrypt(canonical({'reason':reason,'source_version':v['id']}),version),v['expires'],self.now()))
+            self.db.execute('INSERT INTO versions VALUES(?,?,?,?,?,?,?,?,?)',(version,pid,item,seq,uid,action,self.encrypt(canonical({'reason':reason,'source_version':v['id'],'category':q['category']}),version),v['expires'],self.now()))
             accepted=seq if state=='ACCEPTED' else r['accepted']
             self.db.execute('UPDATE items SET seq=?,state=?,accepted=? WHERE project=? AND item=?',(seq,state,accepted,pid,item)); self.audit(pid,uid,action.upper(),version)
         return {'state':state,'revision':seq,'accepted_revision':accepted}
     def download(self,uid,pid,oid):
         with self.tx():
-            o=self.db.execute('SELECT o.*,v.item FROM objects o JOIN versions v ON v.id=o.version WHERE o.id=? AND o.project=?',(identifier(oid),pid)).fetchone()
+            o=self.db.execute('SELECT o.*,v.item,v.payload version_payload FROM objects o JOIN versions v ON v.id=o.version WHERE o.id=? AND o.project=?',(identifier(oid),pid)).fetchone()
             if not o: raise Denied('OBJECT_PERMISSION_REQUIRED')
-            self.requirement(uid,pid,o['item'])
+            q,role=self.requirement(uid,pid,o['item'])
+            if json.loads(self.decrypt(o['version_payload'],o['version'])).get('category')=='INTERNAL' and role!='REVIEWER':raise Denied('HISTORICAL_INTERNAL_ONLY')
             if o['scan']!='CLEAN': raise Denied('QUARANTINED')
             raw=self.decrypt(private_path(self.objects/oid).read_bytes(),'object:'+pid+':'+oid)
             if len(raw)!=o['size'] or digest(raw)!=o['sha']: raise Denied('OBJECT_INTEGRITY')
             self.audit(pid,uid,'DOWNLOAD',oid)
         return raw,o['mime']
     def message(self,uid,pid,text,channel='WEB',event=None):
-        self.project(uid,pid); safe_text(text,4000)
+        self.project(uid,pid); self.limit('message:'+uid,20,60); safe_text(text,4000)
         mid='m_'+secrets.token_hex(16)
         self.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?,NULL,?)',(mid,pid,uid,channel,self.encrypt(text.encode(),mid),'ARCHIVED',self.now())); self.audit(pid,uid,'MESSAGE_ARCHIVED',mid)
         return {'id':mid,'status':'ARCHIVED','ai_response':'PENDING_PROVIDER'}

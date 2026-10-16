@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler,HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from scripts.pr122_customer_core import Center,Denied,Conflict,Unavailable,canonical
-from scripts.pr122_customer_providers import Providers,enqueue
+from scripts.pr122_customer_providers import Providers,enqueue,ai_reply
 
 PREFIX='/customer/center/'
 CSP="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -133,7 +133,9 @@ class App:
                 finally:
                     if center:center.db.close()
             def webmessage(self,center,uid,body):
-                with center.tx():return center.message(uid,body['project'],body['body'])
+                with center.tx():result=center.message(uid,body['project'],body['body'])
+                result['ai_response']=ai_reply(center,uid,body['project'],result['id'],app.providers)
+                return result
             def do_GET(self):self.execute()
             def do_HEAD(self):self.execute()
             def do_POST(self):self.execute()
@@ -145,7 +147,7 @@ class App:
 
 def serve(factory,providers,assets):
     # Single-process bounded service serializes permission revocation and outbound
-    # work; each request gets a fresh SQLite connection. Nginx supplies rate limits.
+    # work; each request gets a fresh SQLite connection. application limits authenticated writes and credential attempts.
     import grp,os,socketserver
     path=Path('/run/xuanjun-customer-api/http.sock')
     # Private service-owned directory plus pinned Nginx group prevents another

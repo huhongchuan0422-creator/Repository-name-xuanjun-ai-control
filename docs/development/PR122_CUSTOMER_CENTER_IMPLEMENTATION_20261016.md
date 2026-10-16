@@ -52,3 +52,5 @@ plan输出含实际Nginx include全集和master启动身份、current、配置ha
 规则文档§7逐项保留。源码与隔离测试对应注册/找回/会话、原合同授权/跨项目、分批/并发审核/旧通过版、私有下载/秘密负例、重启、邀请撤销、完整需求字段、供应商签名及UNKNOWN、PC手机、加密备份隔离恢复。Hosted CI仍只能证明隔离测试；真实SMTP邮箱、现场权威数据、真实客户资料、真实三渠道Webhook/送达、KMS灾备、内核隔离、生产TLS/手机及原站回归必须在国内验收，14项生产状态一律NOT_RUN直至现场证据。
 
 服务以专用账号和nginx补充组建立0660 Unix socket，其他本机服务不能抢占TCP端口冒充客户后端；实际Nginx用户必须属于已映射nginx组，否则只读plan HOLD，不临时放宽权限。SIGKILL留下socket时保留现场并停止自动重启成功假象，须受保护核实后恢复，不能盲删socket。
+
+网页AI接线为固定本机Unix网关 /run/xuanjun-customer-ai/reply.sock，校验SO_PEERCRED、完整请求摘要、客户/项目/消息上下文及受保护配置批准的OpenAI model_key。先归档客户消息，网络前持久UNKNOWN；返回后再检查成员权限并归档回复，未知不重试、不假装回答。缺实际网关/身份/模型映射显示待接通，不把国内Qwen运营模型当主客服。测试RPC为夹具，未调用付费模型。

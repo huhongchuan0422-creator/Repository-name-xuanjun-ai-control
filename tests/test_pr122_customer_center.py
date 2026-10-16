@@ -129,6 +129,13 @@ class CustomerTests(unittest.TestCase):
  def test_unknown_price_not_zero_and_requirement_history(self):
   self.accept();self.imported(2,[{**self.p,'requirements':[{**self.q,'id':'new','fees':'UNKNOWN'}]}]);self.assertEqual(self.c.checklist(self.owner,'project-a')['items'][0]['fees'],'UNKNOWN');self.assertEqual(self.c.db.execute('SELECT count(*) FROM project_history').fetchone()[0],2)
   oid=self.c.db.execute('SELECT id FROM objects').fetchone()[0];self.c.download(self.owner,'project-a',oid)
+ def test_historical_internal_acl_survives_requirement_reclassification(self):
+  internal={**self.q,'id':'internal','category':'INTERNAL'};self.imported(2,[{**self.p,'requirements':[internal]}]);self.c.save(self.reviewer,'project-a','internal',0,'DOCUMENT',b'%PDF-internal confidential')
+  oid=self.c.db.execute('SELECT id FROM objects').fetchone()[0];self.imported(3,[{**self.p,'requirements':[{**internal,'category':'MATERIAL'}]}])
+  with self.assertRaises(Denied):self.c.download(self.owner,'project-a',oid)
+  self.assertEqual(self.c.checklist(self.owner,'project-a')['items'][0]['versions'],[])
+  with self.assertRaises(Denied):self.c.transition(self.owner,'project-a','internal',1,'submit')
+  self.c.download(self.reviewer,'project-a',oid)
  def test_expired_material_and_rate_limit_persisted(self):
   s=self.c.save(self.owner,'project-a','license',0,'DOCUMENT',b'%PDF-expiring',self.now+5);self.now+=6
   with self.assertRaises(Denied):self.c.transition(self.owner,'project-a','license',s['revision'],'submit')
