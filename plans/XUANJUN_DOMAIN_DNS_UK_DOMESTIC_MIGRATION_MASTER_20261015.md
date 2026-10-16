@@ -1,7 +1,7 @@
 # 玄钧云汇自有域名、DNS、官网迁移与可视化交付权威规划 V1.0
 **日期：2026-10-15｜工作锚点：Stage5 Issue #76、Draft PR #122｜原审核冻结基线：PR #118 HEAD `71024b22f0d6110f0507dbd8476468313f8846f2`**
 
-> 当前执行状态以第9节（2026-10-15 23:44 Asia/Shanghai）为准。第0—7节含早期采集阶段的历史UNKNOWN，不能据此要求重复导出DNS或重做静态RG1。
+> 当前执行状态以第9节最新编号记录为准。旧节中的“DNS未切换”和历史UNKNOWN仅描述当时状态：主域实际切换已由独审6206608746验收通过，不得据旧表重复操作DNS或重做已通过检查。
 
 ## 0. 权威结论与证据等级
 
@@ -609,3 +609,12 @@ Owner通过自己的Cloudflare管理面报告已保存；编辑截图显示完�
 实际网站主域入口切换已发生且上述技术链路PASS；不再将这几项写成“尚未验证”。但IP审计限定范围决定和正式发布收尾仍未取得，不把事实观察冒充先前独审放行或完整服务器迁移完成。精确账户recordID/切换前snapshot没有取得，当前截图支持A/仅DNS/自动，AAAA权威无记录支持当前服务事实而非账户全枚举；回退目标沿用历史47.245.53.152、同主域A/仅DNS/自动，不执行回退。完整收据evidence/pr122-r4-controlled-install/DNS_POSTSAVE_LIVE_EVIDENCE_20261016.json。
 
 采集器非root，仅上述固定GET/公开DNS/首页哈希；POST、OAuth、业务数据/凭据/root/服务/生产写入全部0。观察job限定准确本次commit，后续提交不自动重复。请求原独审只核本次新现场结果、当前截图/AAAA与回退证据是否足够，以及既有IP材料的剩余限定决定；不重新开发或重审官网/HTTPS/OAuth/R4/原制品。东京后台、隧道、Telegram/Finance保留，S01–S12完整迁移和东京退役未完成。
+
+
+### 9.30 2026-10-16：独审6206608746关闭主域实际切换验收，转入有界IP/后台依赖收尾
+
+已从GitHub原始回执读取DECISION=DNS_CUTOVER_OBSERVED_PASS_WITH_SCOPE_LIMITS；主域入口/HTTPS/静态与health正式增量验收通过。W08已完成，W09的两地公共解析/TLS/首页/health/308及内容保护已通过；W06/W07剩余IP审计裁定、W09观察范围及W10收尾未整体关闭。W01—W05与日志/R4等已过范围全部继承，不重审、不重复运行。POST_CUTOVER_RELEASE_REVIEW=PENDING与已经切换的DNS事实分开；下一动作不得再次修改或回退DNS。
+
+当前仅补两机可见的来源IP外围依赖：同一v27队列、非root、固定systemctl列表/只读show元数据、ps仅comm和固定安全工具目录lstat；不读取ExecStart/Environment、服务配置内容、原始日志、凭据、DB、firewall或云策略，不HTTP/POST、不服务操作。仅以命名范围给出可见安全/日志代理存在性与状态；未知自定义/远端消费方和云策略不能推断不存在。原83本地源码及Nginx/Portal IP路径证据不重做。若发现明确服务依赖则集中列最小核验；无论结果如何，Owner尚未接受的审计差异不由开发方代签。
+
+S01/S02继续沿原共享依赖账本整理现有实际消费者/目标与阻塞，PR99/Finance/英国P2/隧道/WeCom实际迁移本轮不操作。S05保护状态兼容与托管仍NOT_IMPLEMENTED/NOT_RUN，已审SQLite候选不是旧Portal的即插即用替代，不能为“迁完服务器”直接复制启动。东京18080、Telegram、Finance及隧道继续在线，退役HOLD。

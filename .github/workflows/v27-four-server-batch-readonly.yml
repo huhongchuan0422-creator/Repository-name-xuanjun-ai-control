@@ -266,3 +266,87 @@ jobs:
           report['remaining_gates'] = ['IP_AUDIT_SCOPE_RELEASE', 'CURRENT_APEX_AAAA_AND_ACCOUNT_SNAPSHOT', 'POST_CUTOVER_RELEASE_REVIEW', 'FULL_BACKEND_MIGRATION']
           print('PR122_DNS_POSTSAVE_RECEIPT='+json.dumps(report, sort_keys=True))
           PY
+
+  ip-peripheral-metadata:
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            runner: xuanjun-tokyo-readonly
+          - side: domestic
+            runner: xuanjun-domestic-ops
+    runs-on: [self-hosted, Linux, X64, '${{ matrix.runner }}']
+    timeout-minutes: 3
+    steps:
+      - name: Read only bounded IP-security and logging service metadata without config or logs
+        env:
+          XJ_IP_SIDE: ${{ matrix.side }}
+        run: |
+          python3 -I -B - <<'PY'
+          import json, os, re, stat, subprocess, time
+          from pathlib import Path
+          
+          side = os.environ['XJ_IP_SIDE']
+          hosts = {'tokyo': 'iZ6wee8q9z4t03hvqumwfhZ', 'domestic': 'iZvt5t8tlrm8oiZ'}
+          assert os.geteuid() != 0 and os.uname().nodename == hosts[side]
+          pattern = re.compile(r'fail2ban|crowdsec|modsecurity|waf|filebeat|fluent|logstash|promtail|vector|rsyslog|syslog-ng|auditd|aegis|aliyun|hids|ossec|wazuh|secagent', re.I)
+          result = {'schema_version': 1, 'side': side, 'host': hosts[side], 'uid': os.geteuid(),
+                    'observed_epoch': int(time.time()), 'delivery_commit': os.environ['GITHUB_SHA'],
+                    'scope': 'BOUNDED_NAMED_LOCAL_SERVICE_PROCESS_AND_DIRECTORY_METADATA_ONLY',
+                    'root_calls': 0, 'http_requests': 0, 'post_requests': 0, 'production_writes': 0,
+                    'configuration_contents_read': False, 'raw_logs_read': False,
+                    'credentials_or_business_data_read': False, 'commands': {}, 'units': []}
+          
+          def run(label, command):
+              try:
+                  proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                        universal_newlines=True, timeout=12)
+                  result['commands'][label] = {'exit': proc.returncode}
+                  return proc.stdout if proc.returncode == 0 else ''
+              except Exception as error:
+                  result['commands'][label] = {'error': type(error).__name__}
+                  return ''
+          
+          units = set()
+          for label, command in (
+              ('loaded_services', ['systemctl', 'list-units', '--all', '--type=service', '--no-legend', '--no-pager', '--plain']),
+              ('installed_services', ['systemctl', 'list-unit-files', '--type=service', '--no-legend', '--no-pager']),
+          ):
+              for line in run(label, command).splitlines():
+                  fields = line.split()
+                  if fields and fields[0].endswith('.service') and pattern.search(fields[0]):
+                      units.add(fields[0])
+          result['matched_unit_count'] = len(units)
+          result['unit_inventory_truncated'] = len(units) > 30
+          for unit in sorted(units)[:30]:
+              output = run('unit:'+unit, ['systemctl', 'show', unit, '-p', 'Id', '-p', 'LoadState',
+                                        '-p', 'ActiveState', '-p', 'SubState', '-p', 'UnitFileState',
+                                        '-p', 'MainPID', '-p', 'FragmentPath'])
+              allowed = {'Id', 'LoadState', 'ActiveState', 'SubState', 'UnitFileState', 'MainPID', 'FragmentPath'}
+              item = {'requested_unit': unit}
+              item.update({k: v for k, v in (line.split('=', 1) for line in output.splitlines() if '=' in line) if k in allowed})
+              result['units'].append(item)
+          processes = run('process_names', ['ps', '-eo', 'comm='])
+          result['matched_process_names'] = sorted(set(line.strip() for line in processes.splitlines() if pattern.search(line)))[:50]
+          result['directory_metadata'] = []
+          for raw in ('/etc/fail2ban', '/etc/crowdsec', '/etc/modsecurity', '/etc/filebeat',
+                      '/etc/fluent-bit', '/etc/logstash', '/etc/promtail', '/etc/vector', '/etc/rsyslog.d'):
+              item = {'path': raw}
+              try:
+                  info = os.lstat(raw)
+                  item.update(exists=True, uid=info.st_uid, mode=oct(stat.S_IMODE(info.st_mode)),
+                              is_directory=stat.S_ISDIR(info.st_mode), is_symlink=stat.S_ISLNK(info.st_mode))
+              except FileNotFoundError:
+                  item['exists'] = False
+              except PermissionError:
+                  item['visibility'] = 'PERMISSION_DENIED_NOT_ABSENT'
+              result['directory_metadata'].append(item)
+          result['limitations'] = ['No service config, firewall rules, cloud policy, log contents or environment inspected',
+                                  'Unmatched/custom agents and remote log consumers remain unverified',
+                                  'Absent named unit does not prove no IP-dependent policy',
+                                  'Owner IP audit acceptance and independent release decision remain pending']
+          result['status'] = 'READONLY_PERIPHERAL_METADATA_COLLECTED'
+          print('PR122_IP_PERIPHERAL_RECEIPT='+json.dumps(result, sort_keys=True))
+          PY

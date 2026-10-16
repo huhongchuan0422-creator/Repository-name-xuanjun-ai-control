@@ -181,3 +181,19 @@ root permission, DNS/TLS, PR99/P2 or OpenClaw operation was performed in this
 acknowledgement. OpenClaw remains stopped. No whole-server migration completion
 is claimed. The next missing deliverable is the consolidated custody + route +
 isolated runtime acceptance implementation/configuration, not more R1–R3 review.
+
+
+## 2026-10-16 主域切换独审完成：覆盖上表的历史网站入口状态
+
+依据独审PR122#6206608746和Run38839813239，apex实际DNS及HTTPS入口已在国内47.101.152.210，两地首页/health200、HTTP308、Work首页及current保持。国内apex证书、专用续期timer/hook已按主计划§9.13完成相应范围。上表“Domestic只有winctl/IP”“apex等待切换”等历史描述不再代表当前状态；不得重复DNS或网站发布。正式IP审计收尾PENDING，完整后台迁移尚未完成。
+
+| 剩余依赖 | 当前安全保留 | 下一交付（不执行迁移） | 当前阻塞 |
+|---|---|---|---|
+| 混合Portal18080 | 东京原服务继续；R4断开HTTP已正式禁用 | 逐端点继承/状态托管兼容与单一写入权计划 | 交易侧分离、旧会话/SecretRef与已审SQLite候选之间兼容尚未实现 |
+| CRM/CommonBrain | 国内18443及原数据权威保留 | 精确既有runtime/身份/DB权威绑定；仅元数据，不导出业务数据 | 运行数据权威与业务canary尚未独立验收 |
+| 模型桥与执行器 | 东京19443/国内18443链路保持 | 无害推理/受限RPC后继、证书pin及目标归属的既有材料续接 | 最终去东京执行器未获准；不修改隧道 |
+| Telegram/WeCom | 原token/边缘/回调、去重、既有路由保留 | 各服务凭据托管、在途、唯一写入、受控canary和回滚绑定 | 尚未完成渠道专项验收；不发送客户消息或重设webhook |
+| 交易/Finance | 东京数据库与四timer权威维持 | PR99原路径结果同步 | PR122无切换/停timer权限，不另开交易迁移队列 |
+| 东京退役 | 保留主机和回滚资产 | 仅在S01—S11全部依赖关闭后准备最终退役审查 | 以上任一未完成即HOLD |
+
+本记录是对已有依赖的收敛，不表示新增服务或重新开发已审OAuth。安全/日志服务元数据仅作为本次IP边界补证，不读取配置/原始日志/凭据/DB，不作为全部外围安全策略证明。
