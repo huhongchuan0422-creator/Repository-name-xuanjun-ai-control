@@ -26,3 +26,26 @@ Owner长期开发与操作授权已收到，不再反复要求相同授权；机
 客服、交易、P2、东京与DNS不受本准备任务修改。
 
 状态：CUSTOMER_INSTALL=HOLD；REAL_CUSTOMER_DATA=NOT_OPEN。该文档是原任务准备清单，不是完成/发布许可。
+
+
+## 2026-10-17 00:50 北京时间：真实目标机刷新
+沿用已批准无副作用inspect，重跑原冻结只读任务Run38889936740，最新Job117088396598 SUCCESS；执行源码6d1a740f90bb870836f92e452ab288da435b82e6，未运行新代码。root仅调用现有固定inspect；其余为Runner非特权元数据检查。production_mutations=0，CUSTOMER_INSTALL_NOT_CALLED。
+
+实际结果：
+- config.json/runtime.json/INDEPENDENT_REVIEW_TRUST.json/TARGET_ACCEPTANCE.json：四份均ABSENT。
+- xuanjun-customer账户：ABSENT。
+- 系统Python元数据cryptography/cffi/pycparser：均ABSENT；不据此断言其他隔离环境不存在。
+- clamdscan/clamscan：PATH未发现，不冒称已验证所有潜在扫描服务。
+- 既有bridge和网站preview unit仍列出，仅为存在性信息，不表示已验收渠道、密钥或权威映射。
+- OpenSSL3.0.12，systemd-analyze可用。
+
+客户整改新源码60d41e5b063d992d4933f8f77544e2c54fda00ca已获#6220298956源码限定通过，前批证据整改继承#6219911538。Hosted77执行77通过0跳过，真实目标机不是这77项的运行环境，不能混写为生产PASS。Artifact12060037405的40成员/39文件为开发方下载核验，独审完整字节复算尚未完成。
+
+原root通道冻结客户包为feaef687ee296dcd55f094bf240fe843445d5ad7。现有GRANTED不是新包安装许可，不能替换candidate后沿用旧制品身份。新包、通道重绑定、独立公钥登记、准确目标机准备动作及回滚须共同形成精确候选，再送同一审核链；不重新审已关闭的轻量整改源码。
+
+当前可复用：已有固定inspect、受保护安装器/回滚逻辑、加密存储、身份与项目权限、轻量整改、签名交付校验和复验组件。
+当前仍缺：实际canonical身份/合同来源；实际测试/部署签名交付源；完整私有预览渲染器；自动代码整改执行器；受保护生产配置/独审密钥登记；扫描及恢复/渠道真实验收；新准确安装许可。不能把源码组件当作真实自动整改或生产安装。
+
+普通页面整改不得逐条提升为Owner人工；生产独审密钥保管与生产凭据提供是一次性受保护准备，不等同逐页批准。源码writer不能生成自己的独审私钥并自签生产准入，也不能伪造客户/合同权威来源填补缺失。
+
+此更新仅保存真实只读检查点，不是安装方案已完成、安装许可或上线回执。PR122保持Draft，现网保持不变。
