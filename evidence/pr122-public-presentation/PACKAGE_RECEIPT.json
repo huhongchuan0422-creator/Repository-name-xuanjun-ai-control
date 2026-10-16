@@ -1,14 +1,20 @@
 {
-  "candidate_manifest_sha256": "912187f78c02f5058a3f5cc72b0301494425199acef931eeb45ad183e9a438e1",
-  "content_source_commit": "bc4c13ac13b613c5d2c85f93c26e2288b74373b6",
+  "candidate_manifest_sha256": "7bfe8700501eba3754896ef570475524189f788ad7c73d0fbc72997151b72e93",
+  "integration_base_commit": "790937a5c96afcf3b3660e36cf36cfaab2002a72",
   "new_file_count": 92,
   "overlay_file_count": 407,
-  "package_manifest_sha256": "d0f1251e8475888a54a4c24443443042fc2c0c059267450116839b7bea8e15c9",
+  "package_manifest_sha256": "912209f37347867a2263abed35aaca3764d7a820e45295c0ea3ca7063fb60507",
   "production_deployed": false,
   "public_file_count": 1279,
   "publisher_source_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
+  "render_sources": {
+    "demos/xuanjun-site-hub/assets/ecv-quote-ui.js": "8780b2279fdc7947f712f7235e611390399c8a9632d11afef27344f9af1123f3",
+    "scripts/pr122_site_hub_experience.py": "30afce204b6adb731be07cd20fc10840a3821f6eb9f02f569373a218aed5b365",
+    "scripts/pr122_site_hub_public_copy.py": "d96d5c24efcec89b77715c0fb6a7f583a3cfb497b88eb7ba62bd84db3debbee9",
+    "scripts/pr122_site_hub_stage.py": "c14d4904e59baeb1af8dd88e96a4b573cf191da5fb519fc513b1a2df1814f17e"
+  },
   "scope": "PUBLIC_PRESENTATION_ONLY; COMMUNITY_MOBILE_PACKAGE_SEPARATE",
   "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
   "state": "REVIEW_ONLY_NOT_APPROVED",
-  "tar_sha256": "f77a1630673cd79c9bdd56f73c52cc1d453c8d878d53bebaa5b94cbce4017fd3"
+  "tar_sha256": "6d641401eb9212d3a6745f07bdf9b8a845aaaeb9fbf03542a8b63eafc38a4d19"
 }

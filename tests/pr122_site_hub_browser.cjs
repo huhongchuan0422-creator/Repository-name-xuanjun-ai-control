@@ -33,7 +33,7 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
     const icp=page.locator('footer a[href="https://beian.miit.gov.cn/"]');
     assert.equal(await icp.count(),1);assert.equal(await icp.innerText(),'渝ICP备2026024862号');
     await icp.scrollIntoViewIfNeeded();assert.equal(await icp.isVisible(),true);
-    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${width} ${prefix+route} horizontal overflow`);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${width} ${prefix+route} horizontal overflow: ${JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('main *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1).slice(0,6).map(e=>({tag:e.tagName,id:e.id,width:e.getBoundingClientRect().width,text:e.textContent.slice(0,60)}))))}`);
     if(prefix==='en/')assert.doesNotMatch(await page.locator('main').innerText(),/[\u4e00-\u9fff]/);
    }
    checks.push({test:'all_42_content_pages',viewport:width,result:'PASS'});
