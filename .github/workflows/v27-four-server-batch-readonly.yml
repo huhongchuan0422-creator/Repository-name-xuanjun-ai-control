@@ -72,23 +72,44 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  existing-scoped-command-check:
+  capability-offline-verification:
     if: github.event_name == 'push'
-    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
-    timeout-minutes: 2
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Identify existing scoped executable permissions only
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Root filesystem lifecycle in ephemeral hosted runner only
+        run: |
+          sudo -n env PR122_CAPABILITY_SYNTHETIC_TEST=1 python3 -B -m unittest discover -s tests -p test_portal_log_capability.py -v
+      - name: Embedded payload, manifest and actual sudoers syntax
         run: |
           python3 -B - <<'PY'
-          import os,json,re,subprocess
-          assert os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
-          p=subprocess.run(["sudo","-n","-l"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=10)
-          rules=[]
-          for line in p.stdout.splitlines():
-           m=re.match(r"^\s*\(([^)]+)\)\s*(.*)",line)
-           if not m:continue
-           rhs=m.group(2)
-           rules.append({"runas":m.group(1),"nopasswd":"NOPASSWD:" in rhs,"all_token":bool(re.search(r"(?:^|[\s,:])ALL(?:$|[\s,])",rhs)),"executable_paths":re.findall(r"(?<!\S)/[A-Za-z0-9/_.-]+",rhs)})
-          print("PR122_EXISTING_RULES="+json.dumps({"host":os.uname().nodename,"commit":os.environ["GITHUB_SHA"],"exit":p.returncode,"rules":rules,"production_mutation":False,"permission_expansion":False},sort_keys=True))
-          
+          import base64,hashlib,importlib.util,json,subprocess,tempfile
+          from pathlib import Path
+          root=Path("deploy/pr122-portal-log-capability")
+          spec=importlib.util.spec_from_file_location("grant",root/"install_grant.py")
+          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+          data=base64.b64decode(module.PAYLOAD_B64,validate=True)
+          assert data==(root/"portal_log_capability.py").read_bytes()
+          assert hashlib.sha256(data).hexdigest()==module.PAYLOAD_SHA256
+          policy=module.rule_bytes()
+          assert policy.count(b"sha256:")==4 and b"NOPASSWD: ALL" not in policy
+          with tempfile.TemporaryDirectory() as raw:
+              p=Path(raw)/"sudoers";p.write_bytes(policy)
+              subprocess.run(["sudo","-n","visudo","-cf",str(p)],check=True)
+          binding=json.loads((root/"REVIEW_BINDING.json").read_text())
+          for name,digest in binding["files"].items():
+              assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==digest,name
+          print("PR122_CAPABILITY_OFFLINE=PASS tests=20 fixture=SYNTHETIC production_operations=NONE")
           PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-persistent-capability-${{ github.sha }}
+          path: |
+            deploy/pr122-portal-log-capability/
+            tests/test_portal_log_capability.py
+          if-no-files-found: error
+          retention-days: 14
+

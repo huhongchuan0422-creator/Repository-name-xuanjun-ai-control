@@ -159,3 +159,9 @@ version. The tunnel, bridge and all production services remain untouched.
 SOURCE_FIX=DEVELOPER_TESTED_PENDING_INDEPENDENT_REVIEW. Provider calls remain
 OFF by default. Production deployment, DNS/TLS, Tokyo retirement and PR99/P2
 remain HOLD. No installer, sudo grant, SSH key or service activation is supplied.
+
+
+### Persistent Owner execution adapter, 2026-10-16
+
+Owner standing authorization covers Domestic/Tokyo website and server migration, controlled deployment, maintenance, backup and rollback. The first registered adapter is narrowly limited to the exact Tokyo legacy log_message correction independently approved in PR122#6204793589. It supplies four digest-bound operations: status/apply/rollback/revoke, no expiry, once-only mutation receipts, original-byte backup and unknown-state preservation. Future adapters require implementation/review under the same standing authorization; this is not generic root execution. The helper, embedded-payload installer and 20 synthetic filesystem tests are new review scope; the original16 Tokyo patch tests are inherited. DNS/retirement gates, website/current, bridge/tunnel and312efdd3 configuration remain unchanged. See deploy/pr122-portal-log-capability/README.md. This supplements the legacy-server adapter only; the OAuth candidate above still has no installer or production acceptance.
+

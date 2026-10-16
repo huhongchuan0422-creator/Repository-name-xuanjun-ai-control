@@ -435,3 +435,19 @@ Owner询问十节点进展并明确要求继续实际执行。当前节点状态
 继续顺序：同一原PR集中增量复核上述6文件/实际日志；接受后通过既有批准root路径绑定备份、准确原/新哈希及回滚，再执行原子安装/服务重启及目标动态复验。当前会话没有已接入admin/root或DNS管理面，不能从非root测试推断有生产执行权。外围IP依赖、Owner对临时审计差异的明确接受（如采用）、实际动态鉴权和DNS切换门禁依然独立保留。
 
 准确结论：W01—W05完成，正在W06；本轮已从取证推进到最小整改候选、真实Runner针对测试及制品交付。W07—W10未完成。未切DNS，未停止东京，未覆盖Work官网。
+
+
+### 9.15 2026-10-16：最小补丁独审通过，Owner授予长期运维授权
+
+正式独审PR122#6204793589已读取：精确ce211a60源码/制品通过，东京16项为隔离证据；实际生产修复NOT_EXECUTED，DNS及退役HOLD。无需重审未变补丁或网站。
+
+两次非root只读通道核查：2422d6f0 Run38826917515/Job116736405728，原源SHA仍528a3b5b…b5006、服务active、原PID2023577；2ded20f9 Run38827036234/Job116736775569确认githubrunner现有sudo仅固定/usr/local/sbin/xuanjun-migration-inspect-v1，无法应用本次补丁或重启。没有把非root取证当作root验收。
+
+Owner明确要求提供放权步骤，并补充“给你授权长期的，不只是网站迁移，后面还会有服务器迁移”。登记为国内/东京网站与服务器迁移、受控部署、维护、备份及回滚的长期可撤销授权。DNS发布、真实业务写、东京退役等门禁仍独立；不恢复英国P2、不涉及PR99/Finance、不改桥接隧道。
+
+本次新增技术适配器位于deploy/pr122-portal-log-capability：root私有grant/receipt、摘要绑定sudoers、status/apply/rollback/revoke四个固定命令，不设到期；当前只实现东京精确日志补丁，尚不具备国内或任意服务器任务的通用root能力。未来任务沿用Owner长期授权，需扩展并审查具体动作。安装器内嵌准确helper字节，先校验主机/UID/旧源/目录身份和visudo语法，最后发布规则，安装仅status，不自动apply/restart。apply和rollback各一次，异常保留证据，禁止盲重试。
+
+本地20项文件系统/回执生命周期测试PASS；真实原源和synthetic分别验证，当前容器UID映射的测试替代仅在测试模块内。真实visudo解析规则、内嵌payload字节匹配PASS。托管CI仅运行synthetic隔离测试和规则检查，不代表东京root或业务验收。新入口本身属于新增执行机制复核范围，不能用6204793589冒充已独审。原补丁16、OAuth45、配置83、静态115不重跑。
+
+ROOT_CAPABILITY_INSTALL=NOT_EXECUTED；PATCH_PRODUCTION_INSTALL=NOT_EXECUTED；W06仍部分完成；DNS_RELEASE=HOLD；TOKYO_RETIREMENT=HOLD。首次接入需要Owner现有东京admin终端安装固定入口一次，此后现有GitHub Runner可调用已注册命令。生产官网/current与批准312efdd3配置制品未改。
+

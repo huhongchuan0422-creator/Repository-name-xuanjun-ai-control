@@ -128,13 +128,16 @@
           "OAuth-only source candidate excludes trading/database imports and preserves synthetic session, callback, failure and replay tests; no production acceptance is implied",
           "Existing domestic Runner inventory is non-root and does not disclose sudo policy or secret values",
           "R1-R3: process-safe one-time OAuth state, atomic credential/session commits, verified token/account generation activation; actual process races, write faults and SIGKILL/SIGTERM restart tests remain synthetic and require independent review",
-          "Minimal cutover derives all75 Tokyo locations, preserves62 static aliases and11 existing HTTPS backend routes; verified upstream TLS, no sensitive retry, no secret-bearing logs, and real Nginx synthetic integration are required; production remains independently gated"
+          "Minimal cutover derives all75 Tokyo locations, preserves62 static aliases and11 existing HTTPS backend routes; verified upstream TLS, no sensitive retry, no secret-bearing logs, and real Nginx synthetic integration are required; production remains independently gated",
+          "Legacy Portal log-message exact-byte correction and persistent fixed-action root adapter preserve original source, backup and one-shot rollback; isolated tests do not imply production installation or DNS release"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
           "tests/test_pr122_tiktok_integration.mjs",
           "tests/test_pr122_csp_browser.py",
-          "tests/test_pr122_oauth_candidate.py"
+          "tests/test_pr122_oauth_candidate.py",
+          "tests/test_legacy_portal_logging_regression.py",
+          "tests/test_portal_log_capability.py"
         ]
       },
       "reuse": [
@@ -152,7 +155,12 @@
         "scripts/pr122_build_oauth_candidate.py",
         "tests/test_pr122_oauth_candidate.py",
         "deploy/pr122-oauth-candidate/**",
-        "deploy/pr122-minimal-cutover/**"
+        "deploy/pr122-minimal-cutover/**",
+        "scripts/pr122_legacy_portal_log_fix.py",
+        "tests/test_legacy_portal_logging_regression.py",
+        "tests/test_portal_log_capability.py",
+        "deploy/pr122-portal-log-fix/**",
+        "deploy/pr122-portal-log-capability/**"
       ]
     },
     {
@@ -265,3 +273,4 @@
     }
   ]
 }
+
