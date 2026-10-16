@@ -167,6 +167,57 @@ class ChangeTests(unittest.TestCase):
         with self.assertRaises(Exception):self.c.db.execute('DELETE FROM change_authority_history')
 
 
+    def test_small_fix_skips_contract_lookup_and_network(self):
+        from unittest.mock import patch
+        r=self.request()
+        with patch.object(self.service,'_evidence',side_effect=AssertionError('no history lookup')),patch('socket.socket',side_effect=AssertionError('no API')):
+            q=self.service.assess(self.reviewer,'project-a',r['id'],1,'IN_SCOPE_SMALL',10,[],[],'仅调整间距，不改变范围')
+        self.assertEqual(q['state'],'FREE_APPROVED')
+        self.assertEqual(q['totals'],{'cny_minor':0,'usd_minor':0})
+
+    def test_local_credentials_bind_payload_and_chain_without_claiming_onchain(self):
+        r=self.request();self.service.assess(self.reviewer,'project-a',r['id'],1,'IN_SCOPE_SMALL',10,[],[],'小改')
+        events=self.service._events(self.owner,'project-a',r['id'])
+        self.assertEqual(events[1]['credential']['parent_sha256'],events[0]['credential']['sha256'])
+        self.assertFalse(events[0]['credential']['on_chain'])
+        self.assertEqual(events[0]['payload_sha256'],digest(canonical(events[0]['payload'])))
+
+    def delivered(self):
+        import base64
+        from tests.pr122_customer_change_fixture import snapshot
+        r=self.request();self.service.assess(self.reviewer,'project-a',r['id'],1,'IN_SCOPE_SMALL',10,[],[],'免费小改')
+        request_sha=self.service._request_sha(self.service._events(self.owner,'project-a',r['id']))
+        envelope=snapshot(self,revision=2);data=envelope['payload'];entry=data['previews'][0]
+        new_bytes=b'<!doctype html><title>Adjusted private preview</title>';new_sha=digest(new_bytes)
+        entry['manifest']['pages']=[{'path':self.path,'sha256':new_sha}];entry['manifest_sha256']=digest(canonical(entry['manifest']));entry['blobs']={new_sha:base64.b64encode(new_bytes).decode()}
+        delivery={'project':'project-a','case':r['id'],'request_sha256':request_sha,'page':self.path,'before_sha256':self.sha,'after_sha256':new_sha,'summary':'已将按钮移动到底部','test_report_sha256':'c'*64,'deployment_receipt_sha256':'d'*64,'published_at':self.now}
+        data['deliveries']=[delivery]
+        envelope['signature']=hmac.new(self.auth,canonical(data),hashlib.sha256).hexdigest()
+        import_snapshot(self.c,envelope,self.auth)
+        return r,new_sha,envelope
+
+    def test_notice_only_after_signed_delivery_and_customer_exact_version_retest(self):
+        self.assertEqual(self.service.page_updates(self.owner,'project-a',self.path,self.sha)['updates'],[])
+        r,sha,_=self.delivered();item=self.service.page_updates(self.owner,'project-a',self.path,sha)['updates'][0]
+        self.assertEqual(item['state'],'AWAIT_RETEST')
+        with self.assertRaises(Denied):self.service.page_updates(self.other,'project-a',self.path,sha)
+        with self.assertRaises(Denied):self.service.retest(self.owner,'project-a',r['id'],2,self.path,sha,'f'*64,'ACCEPT','通过')
+        self.service.retest(self.owner,'project-a',r['id'],2,self.path,sha,item['delivery_sha256'],'ACCEPT','通过')
+        self.assertEqual(self.service.page_updates(self.owner,'project-a',self.path,sha)['updates'][0]['state'],'RETEST_ACCEPTED')
+        with self.assertRaises(Denied):self.service.page_updates(self.owner,'project-a',self.path,self.sha)
+
+    def test_untrusted_or_wrong_request_delivery_rejected(self):
+        r,sha,envelope=self.delivered();envelope['payload']['revision']=3;envelope['payload']['deliveries'][0]['request_sha256']='f'*64
+        envelope['signature']=hmac.new(self.auth,canonical(envelope['payload']),hashlib.sha256).hexdigest()
+        with self.assertRaises(Denied):import_snapshot(self.c,envelope,self.auth)
+        envelope['payload']['deliveries'][0]['request_sha256']=self.service._request_sha(self.service._events(self.owner,'project-a',r['id']))
+        with self.assertRaises(Denied):import_snapshot(self.c,envelope,self.auth)
+
+    def test_delivery_revocation_hides_notice(self):
+        r,sha,_=self.delivered();seed(self,revision=3)
+        with self.assertRaises(Denied):self.service.page_updates(self.owner,'project-a',self.path,sha)
+
+
 class ChangeHTTPTests(unittest.TestCase):
     def setUp(self):
         self.fixture=HttpTests();self.addCleanup(self.fixture.doCleanups);self.fixture.setUp();seed(self.fixture)

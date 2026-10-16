@@ -4,7 +4,7 @@ import re
 import secrets
 import html
 from scripts.pr122_customer_core import canonical, digest, safe_text, identifier, Denied, Conflict
-from scripts.pr122_customer_change_authority import preview, document
+from scripts.pr122_customer_change_authority import preview, document, load
 
 
 class Changes:
@@ -16,7 +16,15 @@ class Changes:
         self.c.project(uid,project)
         rows=self.c.db.execute('SELECT * FROM change_events WHERE project=? AND case_id=? ORDER BY seq',(project,identifier(case))).fetchall()
         if not rows:raise Denied('CHANGE_NOT_FOUND')
-        return [{**dict(r),'payload':json.loads(self.c.decrypt(r['payload'],r['id']))} for r in rows]
+        result=[];parent='0'*64
+        for r in rows:
+            event={**dict(r),'payload':json.loads(self.c.decrypt(r['payload'],r['id']))}
+            event['payload_sha256']=digest(canonical(event['payload']))
+            proof={k:event[k] for k in ('id','project','case_id','seq','kind','actor','created','payload_sha256')}
+            proof['parent_sha256']=parent;parent=digest(canonical(proof))
+            event['credential']={**proof,'sha256':parent,'anchor_state':'LOCAL_ONLY','on_chain':False}
+            result.append(event)
+        return result
 
     def _append(self, uid, project, case, revision, kind, payload,guard=None):
         with self.c.tx():
@@ -101,7 +109,12 @@ class Changes:
             if type(line) is not dict or set(line)!={'description','cny_minor','usd_minor'}:raise ValueError('QUOTE_LINE')
             safe_text(line['description'],200)
             if any(type(line[k]) is not int or not 0<=line[k]<=1000000000 for k in ('cny_minor','usd_minor')):raise ValueError('DUAL_PRICE_REQUIRED')
-        checked=self._evidence(uid,project,events,category,evidence)
+        # Free fixes need current authorization, never historical contract retrieval.
+        if category in ('PROVIDER_DEFECT','IN_SCOPE_SMALL'):
+            if evidence:raise ValueError('FREE_FIX_DOES_NOT_REQUIRE_CONTRACT_LOOKUP')
+            p,_,_=self.c.project(uid,project);r=events[0]['payload']
+            self._preview(p['owner'],project,r['page'],r['page_sha256']);checked=[]
+        else:checked=self._evidence(uid,project,events,category,evidence)
         cny=sum(x['cny_minor'] for x in lines);usd=sum(x['usd_minor'] for x in lines)
         if category in ('PROVIDER_DEFECT','IN_SCOPE_SMALL') and (cny or usd):raise Denied('INCLUDED_FIX_MUST_BE_FREE')
         if category in ('CLIENT_CHANGE','NEW_SCOPE') and not checked:state='NEEDS_EVIDENCE';lines=[];cny=usd=0
@@ -112,7 +125,9 @@ class Changes:
             state='QUOTED'
         payload={'state':state,'category':category,'estimated_minutes':minutes,'lines':lines,'totals':None if state=='NEEDS_EVIDENCE' else {'cny_minor':cny,'usd_minor':usd},'evidence':checked,'explanation':safe_text(explanation),'automatic_charge':False,'automatic_execution':False}
         def guard():
-            if self._evidence(uid,project,events,category,evidence)!=checked:raise Conflict('AUTHORITY_CHANGED')
+            if category in ('PROVIDER_DEFECT','IN_SCOPE_SMALL'):
+                p,_,_=self.c.project(uid,project);r=events[0]['payload'];self._preview(p['owner'],project,r['page'],r['page_sha256'])
+            elif self._evidence(uid,project,events,category,evidence)!=checked:raise Conflict('AUTHORITY_CHANGED')
         return self._append(uid,project,case,revision,'ASSESSMENT',payload,guard)
 
     def respond(self, uid, project, case, revision, action, reason):
@@ -130,3 +145,23 @@ class Changes:
         self.c.project(uid,project)
         cases=[r[0] for r in self.c.db.execute('SELECT DISTINCT case_id FROM change_events WHERE project=?',(project,))]
         return {'project':project,'cases':[{'id':case,'events':self._events(uid,project,case)} for case in cases]}
+
+    def page_updates(self, uid, project, page, version):
+        self.c.project(uid,project,{'OWNER'});self._preview(uid,project,page,version)
+        result=[]
+        for record in load(self.c).get('deliveries',[]):
+            if record['project']!=project or record['page']!=page or record['after_sha256']!=version:continue
+            events=self._events(uid,project,record['case']);last=events[-1]
+            delivery_sha=digest(canonical(record))
+            confirmed=last['kind']=='RETEST' and last['payload'].get('delivery_sha256')==delivery_sha and last['payload']['state']=='RETEST_ACCEPTED'
+            result.append({**record,'revision':last['seq'],'delivery_sha256':delivery_sha,'state':'RETEST_ACCEPTED' if confirmed else 'AWAIT_RETEST','label':'已按您的建议调整，并已确认通过' if confirmed else '已按您的建议调整，待您复验'})
+        return {'updates':result}
+
+    def retest(self, uid, project, case, revision, page, version, delivery_sha256, action, reason):
+        if action not in ('ACCEPT','FEEDBACK'):raise ValueError('RETEST_ACTION')
+        def current():
+            records=self.page_updates(uid,project,page,version)['updates']
+            match=next((r for r in records if r['case']==case and r['delivery_sha256']==delivery_sha256),None)
+            if not match or match['state']!='AWAIT_RETEST':raise Denied('CURRENT_DELIVERY_REQUIRED')
+        current()
+        return self._append(uid,project,case,revision,'RETEST',{'state':'RETEST_ACCEPTED' if action=='ACCEPT' else 'RETEST_FEEDBACK','delivery_sha256':delivery_sha256,'page':page,'page_sha256':version,'reason':safe_text(reason),'automatic_charge':False},current)

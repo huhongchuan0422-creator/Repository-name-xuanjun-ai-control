@@ -131,6 +131,8 @@ class App:
                             data,mime=center.download(uid,parts[1],parts[2]);return self.reply(200,data,mime)
                         return self.reply(404,{'error':'NOT_FOUND'})
                     operations={
+                        'change_updates':({'project','page','version'},lambda:Changes(center).page_updates(uid,body['project'],body['page'],body['version'])),
+                        'change_retest':({'project','case','revision','page','version','delivery_sha256','action','reason'},lambda:Changes(center).retest(uid,body['project'],body['case'],body['revision'],body['page'],body['version'],body['delivery_sha256'],body['action'],body['reason'])),
                         'change_context':({'project','page','version'},lambda:Changes(center)._preview(uid,body['project'],body['page'],body['version'])),
                         'change_submit':({'project','page','version','text','intent'},lambda:Changes(center).submit(uid,body['project'],body['page'],body['version'],body['text'],body['intent'])),
                         'change_baseline':({'project','page','version','document_id'},lambda:Changes(center).baseline(uid,body['project'],body['page'],body['version'],body['document_id'])),

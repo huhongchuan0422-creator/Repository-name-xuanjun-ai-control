@@ -26,7 +26,7 @@ def import_snapshot(c,envelope,key):
     if type(key) is not bytes or len(key)!=32 or type(envelope) is not dict or set(envelope)!={'payload','signature'}:raise Denied('SOURCE_ENVELOPE')
     d=envelope['payload'];raw=canonical(d)
     if len(raw)>10000000 or type(envelope['signature']) is not str or not hmac.compare_digest(hmac.new(key,raw,hashlib.sha256).hexdigest(),envelope['signature']):raise Denied('SOURCE_SIGNATURE')
-    if set(d)!={'purpose','revision','issued_at','expires','previews','documents'} or d['purpose']!=PURPOSE or type(d['revision']) is not int or d['revision']<1:raise Denied('SOURCE_SCHEMA')
+    if set(d) not in ({'purpose','revision','issued_at','expires','previews','documents'},{'purpose','revision','issued_at','expires','previews','documents','deliveries'}) or d['purpose']!=PURPOSE or type(d['revision']) is not int or d['revision']<1:raise Denied('SOURCE_SCHEMA')
     if any(type(d[k]) is not int for k in ('issued_at','expires')) or not c.now()-300<=d['issued_at']<=c.now() or not c.now()<d['expires']<=c.now()+3600:raise Denied('SOURCE_EXPIRY')
     if type(d['previews']) is not list or type(d['documents']) is not list or len(d['previews'])>100 or len(d['documents'])>1000:raise Denied('SOURCE_SIZE')
     previews=[];documents=[];seen=set()
@@ -66,10 +66,33 @@ def import_snapshot(c,envelope,key):
             if doc['new_order_ref']==original['order_ref']:raise Denied('SEPARATE_NEW_ORDER_REQUIRED')
         elif doc['request_sha256'] is not None or doc['new_order_ref'] is not None:raise Denied('HISTORICAL_DOCUMENT_SCOPE')
         documents.append({**doc,'id':entry['id'],'project_revision':p['revision'],'document_utf8':entry['document_utf8'],'document_sha256':entry['document_sha256'],'version_sha256':entry['version_sha256']})
-    stored={'revision':d['revision'],'expires':d['expires'],'imported_at':c.now(),'previews':previews,'documents':documents,'source_sha256':digest(raw)}
+    deliveries=d.get('deliveries',[])
+    if type(deliveries) is not list or len(deliveries)>1000:raise Denied('DELIVERY_SIZE')
+    delivery_ids=set()
+    for delivery in deliveries:
+        fields={'project','case','request_sha256','page','before_sha256','after_sha256','summary','test_report_sha256','deployment_receipt_sha256','published_at'}
+        if type(delivery) is not dict or set(delivery)!=fields:raise Denied('DELIVERY_SCHEMA')
+        identifier(delivery['case']);safe_text(delivery['summary'],1000)
+        for field in ('request_sha256','before_sha256','after_sha256','test_report_sha256','deployment_receipt_sha256'):sha(delivery[field])
+        if delivery['before_sha256']==delivery['after_sha256'] or type(delivery['published_at']) is not int or not 0<delivery['published_at']<=c.now():raise Denied('DELIVERY_VERSION_OR_TIME')
+        if (delivery['project'],delivery['case']) in delivery_ids:raise Denied('DELIVERY_DUPLICATE')
+        delivery_ids.add((delivery['project'],delivery['case']))
+        if not any(x['project']==delivery['project'] and x['page']==delivery['page'] and x['page_sha256']==delivery['after_sha256'] for x in previews):raise Denied('DELIVERY_NOT_CURRENT_PREVIEW')
+        rows=c.db.execute('SELECT * FROM change_events WHERE project=? AND case_id=? ORDER BY seq',(delivery['project'],delivery['case'])).fetchall()
+        if not rows or rows[0]['kind']!='REQUEST':raise Denied('DELIVERY_REQUEST')
+        first=rows[0];request=json.loads(c.decrypt(first['payload'],first['id']))
+        if delivery['request_sha256']!=digest(canonical({'event_id':first['id'],'payload':request})) or delivery['page']!=request['page'] or delivery['before_sha256']!=request['page_sha256'] or delivery['published_at']<first['created']:raise Denied('DELIVERY_REQUEST_BINDING')
+        # This is an attestation from the protected publication source, not an HTTP assertion.
+        # It must be issued after tests and actual private-preview availability checks.
+        last=rows[-1];state=json.loads(c.decrypt(last['payload'],last['id'])).get('state')
+        if state not in ('FREE_APPROVED','CUSTOMER_CONFIRMED','RETEST_ACCEPTED','RETEST_FEEDBACK'):raise Denied('DELIVERY_NOT_APPROVED')
+    stored={'revision':d['revision'],'expires':d['expires'],'imported_at':c.now(),'previews':previews,'documents':documents,'deliveries':deliveries,'source_sha256':digest(raw)}
     with c.tx():
         if stored['expires']<=c.now():raise Denied('SOURCE_EXPIRY')
         for record in [*previews,*documents]:project_record(c,record['project'],record['project_revision'])
+        for delivery in deliveries:
+            last=c.db.execute('SELECT * FROM change_events WHERE project=? AND case_id=? ORDER BY seq DESC LIMIT 1',(delivery['project'],delivery['case'])).fetchone()
+            if not last or json.loads(c.decrypt(last['payload'],last['id'])).get('state') not in ('FREE_APPROVED','CUSTOMER_CONFIRMED','RETEST_ACCEPTED','RETEST_FEEDBACK'):raise Denied('DELIVERY_APPROVAL_CHANGED')
         row=c.db.execute('SELECT payload FROM change_authority WHERE id=?',('current',)).fetchone()
         if row and json.loads(c.decrypt(row[0],'change-authority'))['revision']>=d['revision']:raise Conflict('SOURCE_REPLAY')
         c.db.execute('INSERT INTO change_authority_history VALUES(?,?)',(d['revision'],c.encrypt(canonical(envelope),'change-authority-source:'+str(d['revision']))))
