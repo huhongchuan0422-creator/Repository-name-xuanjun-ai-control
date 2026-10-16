@@ -501,3 +501,11 @@ PATCH_PRODUCTION_INSTALL=EXECUTED_PASS_TARGETED_HEALTH；W06仍部分完成（�
 
 只改原工作流push job为上述18项隔离测试，不重跑旧日志16/HEAD44/静态115/配置83/OAuth45。已通过生产网站/current与312efdd3配置不改。IP审计差异、外围依赖、DNS当前管理面核对仍须集中关闭，不能承诺未经证实的固定过审或切站时间。
 
+
+### 9.20 2026-10-16：R4暂停写入候选CI及实际制品已齐备
+
+准确候选提交d6eb4d5a941b3969d7bf43dac6053db8a8209b17，tree1b193d3df220cbedb690e8d542ec5e5a8fa99f1d。东京实际Runner Run38830466128 / Job116747832773 SUCCESS；精确checkout d6eb4d5a，使用当前生产源SHA d5ab592a…bbdf0但只提取AST，18/18 PASS、skip0；PR122_R4_CONTAINMENT_RECEIPT=PASS_ISOLATED_CONTAINMENT_ONLY。无生产import、真实disconnect、源安装、重启或DNS。其他四台原作业SKIPPED，不称通过。Feature Compliance Run38830470750 / Job116747846862已读COMPLIANCE_PASS（治理10项）。
+
+实际下载Artifact12016977176 ZIP23440字节并复算SHA256 e3ce083c8a2fd792e83eadde5495a84bbf43e6b2cbb55aa34db2e0b0a9443c5a；ZIP恰好内层TAR+CI_RECEIPT两项。TAR22675字节，SHA25607ce8a15460ea8c280c36c02825fce73b0b947b1dfde9e52452e306e39acf8b4；8项=7份绑定文件+REVIEW_BINDING，7/7哈希匹配，无额外/链接/特殊类型。绑定含builder、18项测试、只改分支patch、README、workflow、governance和开发说明。此为开发方下载复算，不冒充独审。
+
+本轮候选准备已完成并可集中审核；其目标仍是请求**暂停HTTP disconnect能力**的范围裁定，不是正向授权断开已实现。R4_FULL_REMEDIATION=OPEN；CONTAINMENT_SCOPE_ACCEPTANCE=PENDING；PRODUCTION_INSTALL=NOT_EXECUTED。日志已审生产修复、网站/HTTPS/现有current继续保持。待审核方裁定此最小范围及其他既有IP/DNS门禁，不承诺固定切站时间、不直接切DNS。

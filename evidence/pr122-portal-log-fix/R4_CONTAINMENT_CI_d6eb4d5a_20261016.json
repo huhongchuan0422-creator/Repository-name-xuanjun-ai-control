@@ -1,0 +1,21 @@
+{
+  "archive_entries": 8,
+  "bound_files": 7,
+  "candidate_sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+  "commit": "d6eb4d5a941b3969d7bf43dac6053db8a8209b17",
+  "containment_scope_acceptance": "PENDING",
+  "dns_change": false,
+  "full_authenticated_disconnect": "NOT_IMPLEMENTED",
+  "host": "iZ6wee8q9z4t03hvqumwfhZ",
+  "production_imports": false,
+  "real_disconnect": false,
+  "review_tar_sha256": "07ce8a15460ea8c280c36c02825fce73b0b947b1dfde9e52452e306e39acf8b4",
+  "review_tar_size": 22675,
+  "service_restart": false,
+  "skipped": 0,
+  "source_install": false,
+  "source_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+  "status": "PASS_ISOLATED_CONTAINMENT_ONLY",
+  "tests": 18,
+  "uid": 1001
+}
