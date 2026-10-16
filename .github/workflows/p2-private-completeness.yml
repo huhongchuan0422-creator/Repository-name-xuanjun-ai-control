@@ -1,0 +1,173 @@
+name: P2 Private Completeness
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - 'evidence/p2-epoch7-access-repair-20261014/c-private-completeness/**'
+      - 'tests/test_p2_private_completeness_schema.py'
+      - 'tests/test_p2_private_completeness_reader.py'
+      - 'tests/test_p2_private_completeness_verifier.py'
+      - 'governance/features.json'
+      - '.github/workflows/p2-private-completeness.yml'
+permissions:
+  contents: read
+concurrency:
+  group: p2-private-completeness-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  new-offline-synthetic-suites:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: python:3.6.15-bullseye
+            expected: '3.6'
+          - image: python:3.12-bookworm
+            expected: '3.12'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify checkout and fetch official test interpreter
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          PYTHON_IMAGE: ${{ matrix.image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          docker pull "$PYTHON_IMAGE"
+      - name: Run only the three new suites in isolated disposable fixtures
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          EXPECTED_PYTHON: ${{ matrix.expected }}
+          PYTHON_IMAGE: ${{ matrix.image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --tmpfs /work:rw,nosuid,nodev,mode=700 \
+            --tmpfs /tmp:rw,nosuid,nodev,mode=1777 \
+            -e EXPECTED_SHA -e EXPECTED_PYTHON \
+            -e PYTHONDONTWRITEBYTECODE=1 -e HOME=/work/home \
+            -e GIT_CONFIG_NOSYSTEM=1 -e GIT_CONFIG_GLOBAL=/work/gitconfig \
+            -i "$PYTHON_IMAGE" python3 -I -B -S - <<'PYTHON'
+          import hashlib, importlib.util, json, os, pathlib, sys, types
+          assert '.'.join(str(x) for x in sys.version_info[:2]) == os.environ['EXPECTED_PYTHON']
+          os.umask(0o022)
+          pathlib.Path('/work/home').mkdir(mode=0o700)
+          pathlib.Path('/work/gitconfig').write_text('[safe]\n\tdirectory = /source\n[core]\n\thooksPath = /dev/null\n')
+          root = pathlib.Path('/source')
+          head = os.environ['EXPECTED_SHA']
+          loader_path = root / 'tests/test_p2_capability_lifecycle.py'
+          loader_raw = loader_path.read_bytes()
+          assert len(loader_raw) == 62041
+          assert hashlib.sha256(loader_raw).hexdigest() == 'fe6bc60837a2675d09039a1a0f38ad0e04d002152ff18406053fd27a3ddcf668'
+          loader = types.ModuleType('frozen_public_fixture_loader')
+          loader.__file__ = str(loader_path)
+          exec(compile(loader_raw, str(loader_path), 'exec', dont_inherit=True), loader.__dict__)
+          assert loader.git(root, ['rev-parse', 'HEAD']) == head
+          records = loader.checkout_records(root, head)
+          historical_files = loader.fixtures(root, records)
+          work = pathlib.Path('/work/fixture')
+          loader.materialize(work, historical_files)
+          # Fixture definitions and frozen public bytes are reused; no historical
+          # unittest suite, old gate main, production runner or host command runs.
+          candidate = work / 'c-private-completeness-candidate'
+          candidate.mkdir(mode=0o700)
+          prefix = 'evidence/p2-epoch7-access-repair-20261014/c-private-completeness/'
+          names = ('validate_private_completeness.py', 'evidence_schema.py', 'verify_evidence.py',
+                   'test_validate_private_completeness.py', 'test_evidence_schema.py',
+                   'test_verify_evidence.py', 'README.md', 'SOURCE_MANIFEST.json',
+                   'OWNER_COMMAND_TEMPLATE.txt')
+          source_map = {name: prefix + name for name in names}
+          source_map.update({
+              'test_evidence_schema.py': 'tests/test_p2_private_completeness_schema.py',
+              'test_validate_private_completeness.py': 'tests/test_p2_private_completeness_reader.py',
+              'test_verify_evidence.py': 'tests/test_p2_private_completeness_verifier.py'})
+          added = {}
+          for name in names:
+              raw = loader.verified_path(root, head, source_map[name])
+              (candidate / name).write_bytes(raw)
+              added['c-private-completeness-candidate/' + name] = raw
+          manifest = json.loads((candidate / 'SOURCE_MANIFEST.json').read_bytes().decode('ascii'))
+          assert set(manifest) == {'schema', 'files'} and type(manifest['schema']) is int and manifest['schema'] == 1
+          manifest_rows = {row['path']: row for row in manifest['files']}
+          assert len(manifest_rows) == len(manifest['files'])
+          assert set(manifest_rows) == set(names) - {'SOURCE_MANIFEST.json'}
+          for name, row in manifest_rows.items():
+              assert set(row) == {'path', 'bytes', 'sha256'}
+              raw = (candidate / name).read_bytes()
+              assert type(row['bytes']) is int and len(raw) == row['bytes']
+              assert hashlib.sha256(raw).hexdigest() == row['sha256']
+          # The fixed producer fixture also needs three already-public pure
+          # preparation helper definitions. Their final source pins follow below.
+          preparation_prefix = 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/'
+          preparation = work / 'b-resource-aggregate-fix-candidate/preparation-overlay'
+          preparation.mkdir(mode=0o700, parents=True)
+          helper_pins = (
+              ('epoch7_prepare.py', 55833, '18d3c459bc14f4a3c00317c5a407d18178059209830763564dced41d9af945fd'),
+              ('epoch7_prepare_data.py', 13888, '71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1'),
+              ('epoch7_topology_projection.py', 36482, '0e9817a1474dc4e54cf1779c0b4c243cf16e6204cab3a25210a12e41e03d00b6'))
+          for name, size, digest in helper_pins:
+              raw = loader.verified_path(root, head, preparation_prefix + name)
+              assert len(raw) == size and hashlib.sha256(raw).hexdigest() == digest
+              (preparation / name).write_bytes(raw)
+              added['b-resource-aggregate-fix-candidate/preparation-overlay/' + name] = raw
+          os.environ['EPOCH7_FIXED_SEED_TEST_ARCHIVE'] = str(work / loader.SELECTED_ARCHIVE_TARGET)
+          os.environ['EPOCH7_FIXED_SEED_TEST_PREPARATION'] = str(preparation)
+          os.environ['EPOCH7_PRIVATE_COMPLETENESS_ARCHIVE'] = str(work / loader.SUCCESSOR_ARCHIVE_TARGET)
+          expected_files = dict(historical_files, **added)
+          loader.check_materialized(work, expected_files)
+          child_program = """
+          import importlib.util, json, pathlib, sys, unittest
+          path = pathlib.Path(sys.argv[1])
+          expected = int(sys.argv[2])
+          spec = importlib.util.spec_from_file_location(path.stem, str(path))
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          suite = unittest.defaultTestLoader.loadTestsFromModule(module)
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          summary = {'tests': result.testsRun, 'errors': len(result.errors),
+                     'failures': len(result.failures), 'skips': len(result.skipped),
+                     'expected_failures': len(result.expectedFailures),
+                     'unexpected_successes': len(result.unexpectedSuccesses)}
+          print('NEW_SUITE_RESULT=' + json.dumps(summary, sort_keys=True, separators=(',', ':')))
+          assert result.testsRun == expected and result.wasSuccessful()
+          assert all(summary[key] == 0 for key in summary if key != 'tests')
+          """
+          suites = (('test_validate_private_completeness.py', 33),
+                    ('test_evidence_schema.py', 14), ('test_verify_evidence.py', 57))
+          results = []
+          for name, count in suites:
+              argv = [sys.executable, '-I', '-B', '-S', '-c', child_program,
+                      str(candidate / name), str(count)]
+              code, output = loader.run_child(argv, work, 300, file_limit=loader.MAX_ARTIFACT_FILE)
+              sys.stdout.write(output.decode('utf-8', 'strict'))
+              assert code == 0, 'NEW_SUITE_FAILED'
+              lines = [line for line in output.decode('utf-8').splitlines() if line.startswith('NEW_SUITE_RESULT=')]
+              assert len(lines) == 1
+              result = json.loads(lines[0].split('=', 1)[1])
+              assert result == {'tests': count, 'errors': 0, 'failures': 0, 'skips': 0,
+                                'expected_failures': 0, 'unexpected_successes': 0}
+              loader.check_materialized(work, expected_files)
+              results.append({'suite': name, 'tests': count})
+          for name in names:
+              assert loader.verified_path(root, head, source_map[name]) == added['c-private-completeness-candidate/' + name]
+          assert loader.checkout_records(root, head) == records
+          print('P2_PRIVATE_COMPLETENESS_NEW_SUITES=' + json.dumps(
+              {'state': 'PASS', 'python': sys.version.split()[0], 'suites': results,
+               'skips': 0, 'old_suites_run': False, 'network_from_tests': False,
+               'owner_host_read': False, 'production_executed': False,
+               'original_files_unchanged': True}, sort_keys=True))
+          PYTHON
+      - name: Verify original checkout remained unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"

@@ -1,0 +1,45 @@
+{
+  "files": [
+    {
+      "bytes": 159517,
+      "path": "evidence_schema.py",
+      "sha256": "9afafd3a0fd862b21876cf23acf43edb39581105145390d4084d427ace648396"
+    },
+    {
+      "bytes": 60375,
+      "path": "validate_private_completeness.py",
+      "sha256": "de2ef2c1a9bb1bc4e360cfe408dccb65cd1575eb8177d9eb4f145a1f853e7a82"
+    },
+    {
+      "bytes": 26844,
+      "path": "verify_evidence.py",
+      "sha256": "e2ee2855a688956d01ce66367827df6b6f741785437acc30360a298aac4b668f"
+    },
+    {
+      "bytes": 14145,
+      "path": "README.md",
+      "sha256": "2c0a2e77d069ec9287d7ffc8754837944b8c4c81e677fdcd8e41a13998bc05bb"
+    },
+    {
+      "bytes": 49950,
+      "path": "OWNER_COMMAND_TEMPLATE.txt",
+      "sha256": "fe894b9dbcab81080beee2406e31f69a2b56dc0f41683bbf3726f350da2c34a1"
+    },
+    {
+      "bytes": 20128,
+      "path": "test_evidence_schema.py",
+      "sha256": "d7db4531f379222d74615f62821f2b5d460dab1ea88911b3828828cc4d289a0c"
+    },
+    {
+      "bytes": 66370,
+      "path": "test_validate_private_completeness.py",
+      "sha256": "5736f93f78682266fdda6fb2495d3dabfece134440a2baa3d0946b7476dc2ef9"
+    },
+    {
+      "bytes": 27701,
+      "path": "test_verify_evidence.py",
+      "sha256": "133e36cadf163fd26359342fd9ddeecb79e028898b51c5a3e89a91b4d8129e5d"
+    }
+  ],
+  "schema": 1
+}

@@ -81,7 +81,10 @@
           "tests/test_p2_claim_successor.py",
           "tests/test_p2_claim_successor_contract.py",
           "tests/test_p2_capability_lifecycle.py",
-          "tests/test_p2_capability_lifecycle_contract.py"
+          "tests/test_p2_capability_lifecycle_contract.py",
+          "tests/test_p2_private_completeness_schema.py",
+          "tests/test_p2_private_completeness_reader.py",
+          "tests/test_p2_private_completeness_verifier.py"
         ]
       },
       "reuse": [
