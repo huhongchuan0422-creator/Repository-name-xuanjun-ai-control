@@ -577,3 +577,28 @@ jobs:
           result['probe_sha256']=os.environ['XJ_SOURCE_SHA256']
           print('PR99_PHASE_C_SOURCE_CONTRACT_RECEIPT='+json.dumps(result,sort_keys=True))
           PY
+
+  tokyo-phase-c-source-schema:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'PR99_PHASE_C_SOURCE_SCHEMA_ONCE_20261016' && github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 2
+    steps:
+      - name: Read approved table-column declarations from Python AST only
+        env:
+          XJ_DELIVERY_SHA: ${{ github.sha }}
+          XJ_SOURCE_GZIP: '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'
+          XJ_SOURCE_SHA256: 'e3be932bcafc3ddcc089c20207e3d51b21c6c4752d9b405d20acb758d16d2572'
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import base64,gzip,hashlib,json,os
+          raw=gzip.decompress(base64.b64decode(os.environ['XJ_SOURCE_GZIP'],validate=True))
+          assert hashlib.sha256(raw).hexdigest()==os.environ['XJ_SOURCE_SHA256']
+          namespace={'__name__':'fixed_schema_metadata'}
+          exec(compile(raw,'fixed_schema_metadata','exec'),namespace)
+          result=namespace['main']()
+          result['delivery_commit']=os.environ['XJ_DELIVERY_SHA']
+          result['probe_sha256']=os.environ['XJ_SOURCE_SHA256']
+          print('PR99_PHASE_C_SOURCE_SCHEMA_RECEIPT='+json.dumps(result,sort_keys=True))
+          PY
