@@ -20,9 +20,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m unittest tests.test_pr122_showcase tests.test_pr122_showcase_role_generation tests.test_pr122_showcase_sources tests.test_pr122_showcase_trust tests.test_pr122_showcase_protected_build tests.test_pr122_showcase_build_channel tests.test_pr122_showcase_install tests.test_pr122_showcase_poll tests.test_pr122_showcase_promote -v 2>&1 | tee ROLE_GENERATION_TESTS.txt
+          sudo -n "$(command -v python)" - <<'PY' 2>&1 | tee ROLE_GENERATION_TESTS.txt
+          import json, os, unittest
+          from pathlib import Path
+          assert os.geteuid() == 0, 'Hosted disposable root fixture required'
+          names=['tests.test_pr122_showcase','tests.test_pr122_showcase_role_generation','tests.test_pr122_showcase_sources','tests.test_pr122_showcase_trust','tests.test_pr122_showcase_protected_build','tests.test_pr122_showcase_build_channel','tests.test_pr122_showcase_install','tests.test_pr122_showcase_poll','tests.test_pr122_showcase_promote']
+          result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromNames(names))
+          receipt={'total':result.testsRun,'executed':result.testsRun-len(result.skipped),'passed':result.testsRun-len(result.skipped)-len(result.failures)-len(result.errors),'skipped':len(result.skipped),'failures':len(result.failures),'errors':len(result.errors),'scope':'Hosted disposable root fixtures; no domestic execution'}
+          Path('ROLE_GENERATION_COUNTS.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
+          print(json.dumps(receipt,sort_keys=True))
+          raise SystemExit(0 if result.wasSuccessful() and not result.skipped else 1)
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pr122-role-generation-test-evidence
-          path: ROLE_GENERATION_TESTS.txt
+          path: |
+            ROLE_GENERATION_TESTS.txt
+            ROLE_GENERATION_COUNTS.json

@@ -13,7 +13,7 @@ import re
 from urllib.parse import urlsplit
 from scripts.community_saas_modules import catalog as module_catalog
 
-KINDS={'project','page','milestone','acceptance','module','ecology','feature'}
+KINDS={'project','page','milestone','acceptance','module','ecology','feature','feature_acceptance'}
 ID=re.compile(r'[a-z][a-z0-9-]{0,63}')
 SHA=re.compile(r'[0-9a-f]{64}')
 CSP="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
@@ -37,6 +37,7 @@ def validate(item):
         need(type(item.get(key)) is dict and set(item[key])=={'zh','en'} and all(type(v) is str and 0<len(v)<=2000 for v in item[key].values()),'BILINGUAL_COPY_REQUIRED')
     fields={'project':{'state','scenarios','required_milestones'},'page':{'href','role','artifact_sha256','release_artifact_sha256'},'milestone':{'state','evidence_url'},'acceptance':{'project_version','snapshot_sha256','evidence_url','members'},'module':{'module_id','package_sha256','demo_href','requirements'},'ecology':{'initiator_nickname'}}
     fields['feature']={'role','device','milestone_id','page_id','page_version','page_artifact_sha256'}
+    fields['feature_acceptance']={'project_version','snapshot_sha256','members','feature_sha256','evidence_url'}
     required={'kind','id','project_id','version','visibility','title','summary'}|fields[item['kind']]
     optional={'sort_order'} if item['kind'] in ('page','milestone') else set()
     if 'sort_order' in item:need(type(item['sort_order']) is int and 0<=item['sort_order']<=9999,'SORT_ORDER')
@@ -57,7 +58,9 @@ def validate(item):
     if item['kind']=='milestone':
         need(item.get('state') in ('PLANNED','IN_PROGRESS','DONE'),'MILESTONE_STATE')
         need(type(item.get('evidence_url')) is str and item['evidence_url'].startswith('https://github.com/'),'DEVELOPMENT_RECORD_REQUIRED')
-    if item['kind']=='acceptance':
+    if item['kind']=='feature_acceptance':
+        need(type(item.get('feature_sha256')) is str and SHA.fullmatch(item['feature_sha256']),'FEATURE_ACCEPTANCE_IDENTITY')
+    if item['kind'] in ('acceptance','feature_acceptance'):
         need(type(item.get('members')) is list and 0<len(item['members'])<=5000 and all(type(r) is dict and set(r)=={'kind','id','version','object_sha256'} and r['kind'] in ('project','page','milestone') and type(r['object_sha256']) is str and SHA.fullmatch(r['object_sha256']) for r in item['members']),'ACCEPTANCE_MEMBER_REFERENCES')
         need(type(item.get('project_version')) is int and item['project_version']>0 and SHA.fullmatch(item.get('snapshot_sha256','')),'ACCEPTANCE_SNAPSHOT')
         need(type(item.get('evidence_url')) is str and item['evidence_url'].startswith('https://github.com/'),'ACCEPTANCE_EVIDENCE')
@@ -110,9 +113,18 @@ def compile_catalog(items,approvals,prices=None,published_pages=None):
         features=[]
         for feature in (i for i in members if i['kind']=='feature'):
             bound=next((p for p in pages if p['id']==feature['page_id'] and p['role']==feature['role'] and p['version']==feature['page_version'] and p['artifact_sha256']==feature['page_artifact_sha256']),None)
-            if bound and feature['milestone_id'] in done:
-                features.append({**feature,'href':bound['href'],'page_version':bound['version'],'artifact_sha256':bound['artifact_sha256']})
-        projects.append({**project,'state':'ACCEPTED' if accepted else project['state'],'pages':pages,'milestones':milestones,'features':features,
+            feature_digest=sha(canonical({k:v for k,v in feature.items() if k!='review'}))
+            # DONE is progress only. An independently authenticated functional
+            # acceptance must bind this feature and the exact current snapshot.
+            contract=next((i for i in members if i['kind']=='feature_acceptance'
+                           and i['project_version']==project['version']
+                           and i['snapshot_sha256']==snapshot
+                           and i['feature_sha256']==feature_digest
+                           and sorted(map(canonical,i['members']))==sorted(map(canonical,member_refs))),None)
+            if contract and bound and feature['milestone_id'] in done:
+                features.append({**feature,'href':bound['href'],'page_version':bound['version'],'artifact_sha256':bound['artifact_sha256'],'acceptance':contract})
+        feature_contract=any(i['kind']=='feature' and i['project_id']==pid for i in items)
+        projects.append({**project,'state':'ACCEPTED' if accepted else project['state'],'pages':pages,'milestones':milestones,'features':features,'feature_contract':feature_contract,
                          'progress':{'done':len(required&done),'total':len(required),'percent':None},'snapshot_sha256':snapshot,'snapshot_members':member_refs,'acceptance':acceptance if accepted else None})
         for item in members:
             if item['kind']=='ecology':events.append(item)
@@ -139,7 +151,7 @@ def compile_catalog(items,approvals,prices=None,published_pages=None):
         payload={'project':{k:v for k,v in original.items() if k!='review'},'pages':[{k:v for k,v in i.items() if k!='review'} for i in pages],'milestones':[{k:v for k,v in i.items() if k!='review'} for i in milestones]}
         required=set(original['required_milestones']);done={i['id'] for i in milestones if i['state']=='DONE'}
         if original['version']!=event['project_version'] or not pages or not required or not required<=done or sha(canonical(payload))!=event['snapshot_sha256']:continue
-        record={**original,'state':'ACCEPTED','pages':pages,'milestones':milestones,'progress':{'done':len(required),'total':len(required),'percent':None},'snapshot_sha256':event['snapshot_sha256'],'acceptance':event}
+        record={**original,'state':'ACCEPTED','pages':pages,'milestones':milestones,'features':[],'feature_contract':any(i['kind']=='feature' and i['project_id']==original['project_id'] for i in items),'progress':{'done':len(required),'total':len(required),'percent':None},'snapshot_sha256':event['snapshot_sha256'],'acceptance':event}
         previous=cases.get(original['project_id'])
         if previous is None or (record['version'],event['version'])>(previous['version'],previous['acceptance']['version']):cases[original['project_id']]=record
     return {'schema':1,'projects':projects,'cases':list(cases.values()),
@@ -218,7 +230,7 @@ def render(catalog,output,preview=False,project_files=None,shell=None):
         for project,is_case in [(p,False) for p in catalog['projects']]+[(p,True) for p in catalog['cases']]:
             generated=role_views(project,en)
             roles='<div class="grid role-cards">'+''.join('<article class="card"><h3>'+escape(p['title'][language])+'</h3><p>'+escape(p['summary'][language])+'</p><a class="showcase-action" href="'+escape(p['href'],quote=True)+'">'+('Try the demo' if en else '进入体验')+' →</a></article>' for p in project['pages'])+'</div>'
-            if generated:
+            if project.get('feature_contract'):
                 roles='<div class="grid role-cards">'+''.join('<article class="card"><h3>'+escape(v['title'])+'</h3><a href="'+escape(v['href'],quote=True)+'">'+('Enter' if en else '进入体验')+' →</a></article>' for v in generated)+'</div>'
             if not is_case:
                 for view in generated:
