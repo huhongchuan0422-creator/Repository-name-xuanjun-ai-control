@@ -190,8 +190,18 @@ class PurePreparationTests(unittest.TestCase):
         changed=copy.deepcopy(self.private);changed['native_before']+=' '
         with self.assertRaises(ValueError):self.compile(private=changed)
     def test_unbound_source_refuses_before_host_read(self):
-        with mock.patch.object(p,'open_chain',side_effect=AssertionError('host access forbidden')):
+        with mock.patch.multiple(p,NEW_KIT_SHA=None,NEW_ENTRY_SHA=None,NEW_ENTRY_BYTES=None,NEW_SOURCE=None,NEW_TREE=None), \
+             mock.patch.object(p,'open_chain',side_effect=AssertionError('host access forbidden')):
             with self.assertRaisesRegex(p.Hold,'SUCCESSOR_ARTIFACT_UNBOUND'):p.prepare('2099-01-01T00:00:00Z',time.monotonic()+20)
+    def test_exact_published_artifact_bindings_are_complete(self):
+        # Independently measured artifact bytes bound to actual published source.
+        # This checks only the finite source gate, never host execution/approval.
+        expected = {'NEW_KIT_SHA': '91252ba75c38b4a6d12f9b64eb06cb8793fabd97f03646bece97224178c28392', 'NEW_ENTRY_SHA': '21a982161bc4cb8ffd7e67e4b9a8e24bf23916df6d78c3dd43376af3cfb34890', 'NEW_ENTRY_BYTES': 56593, 'NEW_SOURCE': '105996ed06a0bdb5d025914cf08ebd448425f739', 'NEW_TREE': '343d315b3ead6266a626b5875dbdd6c2fa0309af'}
+        self.assertEqual({name:getattr(p,name) for name in expected},expected)
+        p.require_binding()
+        for name in sorted(expected):
+            with self.subTest(name=name),mock.patch.object(p,name,None):
+                with self.assertRaisesRegex(p.Hold,'SUCCESSOR_ARTIFACT_UNBOUND'):p.require_binding()
     def test_missing_expiry_and_malformed_source_refuse(self):
         for expiry in (None,'2099-01-01','2099-01-01T00:00:00+00:00'):
             with self.assertRaises(ValueError):self.compile(expiry=expiry)

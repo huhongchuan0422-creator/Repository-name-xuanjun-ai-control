@@ -1,6 +1,13 @@
 # Fixed capability-lifecycle preparation candidate
 
-Local implementation and synthetic regression only. No production invocation, host inspection, review publication, admission, claim, or recovery phase has been performed. New source commit, source tree, kit manifest, entry SHA256, and entry size remain `None`. `prepare` refuses at that binding gate before any host read. Binding and publication require a separately reviewed immutable artifact; the tool provides no path or pin overrides.
+This separate bound copy selects actual published source `105996ed06a0bdb5d025914cf08ebd448425f739`, tree `343d315b3ead6266a626b5875dbdd6c2fa0309af`. Original unbound preparation source, tests and README remain unchanged. Only five production constant literals differ; tests explicitly retain UNBOUND refusal and check the finite actual binding.
+
+Independent local safe-archive inspection verified 257 files and 256 manifest pins:
+- Archive: 1074448 bytes, SHA256 `bd3708d5887c4dc2b866e9e0acb04da426e71ad88d89c23fe2576b5ed943a2c3`
+- Manifest: 62752 bytes, SHA256 `91252ba75c38b4a6d12f9b64eb06cb8793fabd97f03646bece97224178c28392`
+- Entry: 56593 bytes, SHA256 `21a982161bc4cb8ffd7e67e4b9a8e24bf23916df6d78c3dd43376af3cfb34890`
+
+No host inspection, real expiry, private plan, new exact review, admission, claim or recovery phase was performed by this binding work. Binding identifies bytes and grants no host or execution authority. Dependency publication/delivery binding, explicit owner authorization for host preparation, new independent review and later admission remain separate gates. No path/pin overrides are provided. Historical unbound comments and input-contract labels are retained in production code to preserve the exact five-literal delta; the five values control the binding gate.
 
 ## Actual preparation path
 
@@ -18,7 +25,7 @@ Original files, observation, saved seed/plan, and review packet are never rewrit
 
 The budget is a one-shot alarm plus terminal monotonic check. Errors or interruptions retain every partial output, include confirmed outputs and known created paths, never retry a write, and never delete or adopt partial files. Existing any output refuses the whole publication before writes. A status failure after successful creation carries all output metadata; cleanup uncertainty is reported independently. Absence after an interrupted create cannot prove that no attempt occurred. The tool is preparation only; produced bytes do not grant install or successor admission.
 
-Actual host/source provenance, real fixed 1641-byte predecessor authentication, source publication, new exact review, and execution remain separate gates. The selected target pins remain unbound in this source. Admission expiry is prospective, and cannot be used to suppress independently authorized containment/receipt preservation after a later attempted/admitted transaction.
+Actual host/source provenance, real fixed 1641-byte predecessor authentication, source publication, new exact review, and execution remain separate gates. The selected target pins are finite only in this bound copy; removing any required pin still refuses before host reads. Admission expiry is prospective, and cannot be used to suppress independently authorized containment/receipt preservation after a later attempted/admitted transaction.
 
 ## Focused local verification
 
@@ -28,7 +35,7 @@ The real lifecycle factory, all 107 payloads, 17 resource views, schema-2 loader
 
 Local coverage includes original field preservation, schema-2 roundtrip, proof/source/manifest/expiry propagation, missing expiry/unbound pins, fixed absence requirements, inventory/ancestry drift, real predecessor final rereads, private modes/symlinks, existing-output rejection, first/second-write interruption, failed readback, final output drift, status failure retention, cleanup uncertainty, and one-shot timer cleanup. The broader candidate's Python3.6 limitation remains separately reported; this preparation suite does not repair it by preloading imports or weakening gates.
 
-The focused preparation suite passes all 30 cases on Python 3.12.14 with `-I -B -S` against the updated lifecycle core (local log: `test-lifecycle-python312.log`). No historical test suite was discovered or run. This is source-level local regression evidence; final immutable artifact binding, complete Python 3.6 verification, host provenance, and independent review remain separate gates. Two composed `prepare()` cases exercise the real compiler, private-input descriptor reads, entry-file rereads, three-output publisher, and final output checks; immutable source authentication and host proof are explicitly synthetic boundaries. The post-publication proof-drift case verifies all three outputs remain present and reported.
+The original unbound preparation suite previously passed all 30 cases on Python 3.12.14 with `-I -B -S`; the inherited evidence is retained under ../preparation/. This bound suite contains 31 cases, adding one finite actual-binding case. Only the new binding case and explicit UNBOUND negative are run for this local binding step; the final CI must independently run all 31. No historical test suite is discovered or run. This is source-level local regression evidence; final immutable artifact binding, complete Python 3.6 verification, host provenance, and independent review remain separate gates. Two composed `prepare()` cases exercise the real compiler, private-input descriptor reads, entry-file rereads, three-output publisher, and final output checks; immutable source authentication and host proof are explicitly synthetic boundaries. The post-publication proof-drift case verifies all three outputs remain present and reported.
 
 One isolated Python 3.6.8 suite invocation was attempted with core dumps disabled.
 It exited 1: 19 tests ran and two class setup errors occurred because each original
@@ -54,4 +61,13 @@ Existing cases explicitly reject mutations of the anchor, parent and candidate,
 and a symlinked candidate path. The standalone private-reader case also exercises
 original open_chain/recheck without namespace mapping. The two composed cases still
 verify successful three-output publication and post-publication proof-drift retention.
-No production source changed; case inventory remains 30.
+The namespace fixture correction changed no production source; its original inventory remains 30. This bound copy adds only the finite binding case, for 31 total.
+
+## Binding-only verification
+
+The binding step ran only `test_exact_published_artifact_bindings_are_complete`
+and `test_unbound_source_refuses_before_host_read`: both passed on Python 3.12.14
+with `-I -B -S` in 0.476 seconds (test-binding-python312.log). It does not rerun the original
+30 cases or native Python 3.6; earlier native fixture SIGSEGV remains disclosed
+as UNKNOWN for preparation compiler/hydration composition. Final CI, independent
+review and any host action remain separate gates.
