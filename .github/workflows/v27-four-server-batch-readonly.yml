@@ -525,3 +525,17 @@ jobs:
           path: ${{ runner.temp }}/pr99-runtime-review/
           if-no-files-found: error
           retention-days: 14
+
+  tokyo-fixed-source-writers:
+    if: github.event_name == 'push'
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test static inventory refusal and no source execution
+        run: python3 -B -m unittest discover -s tests -p test_pr122_backend_source_inventory.py -v
+      - name: Read only five hash-bound public Python sources, no state or service operation
+        run: python3 -I -B deploy/pr122-backend-migration/source_inventory.py

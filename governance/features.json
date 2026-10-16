@@ -133,7 +133,8 @@
           "R4 temporary containment candidate disables HTTP disconnect before store/body/audit business state access for every caller; full authenticated disconnect remains NOT_IMPLEMENTED and migration scope acceptance requires independent decision",
           "R4 controlled-install preparation reuses exact root engine and approved guard; fixed one-shot action, source/new-PID gates, proposed empty403 acceptance and explicit backend-offline rollback require independent plan approval; synthetic root filesystem tests are not production acceptance",
           "I1: exact independently received action approval must be separately pinned by Owner root; canonical GitHub commit/tree/code/ZIP facts plus one-attempt durable consumption and distinct outage-consented offline rollback fail closed before state or service mutation; shared GitHub author is not reviewer independence",
-          "后台迁移仅合成验证离线generation、私有有界读取/固定Portal停止检查与显式私有身份校验接口；待机仅health GET及disconnect403，其余拒绝且无业务写；57项测试不是root授权、真实托管传输或生产迁移验收"
+          "后台迁移仅合成验证离线generation、私有有界读取/固定Portal停止检查与显式私有身份校验接口；待机仅health GET及disconnect403，其余拒绝且无业务写；57项测试不是root授权、真实托管传输或生产迁移验收",
+          "Fixed five-source AST inventory requires exact public-code SHA before catalogue, never executes production modules or publishes source literals; unknown identity/permissions never imply absent writer or release authorization"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
@@ -146,7 +147,8 @@
           "tests/test_r4_controlled_install.py",
           "tests/test_r4_install_approval.py",
           "tests/test_pr122_backend_custody.py",
-          "tests/test_pr122_backend_private_adapters.py"
+          "tests/test_pr122_backend_private_adapters.py",
+          "tests/test_pr122_backend_source_inventory.py"
         ]
       },
       "reuse": [
@@ -178,7 +180,8 @@
         "tests/test_r4_install_approval.py",
         "deploy/pr122-backend-migration/**",
         "tests/test_pr122_backend_custody.py",
-        "tests/test_pr122_backend_private_adapters.py"
+        "tests/test_pr122_backend_private_adapters.py",
+        "tests/test_pr122_backend_source_inventory.py"
       ]
     },
     {

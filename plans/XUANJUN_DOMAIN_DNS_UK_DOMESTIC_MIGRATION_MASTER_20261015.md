@@ -689,3 +689,12 @@ PR99下一Phase-B输入沿原632bbe6f：已下载17声明文件逐字节匹配�
 最终7e3123ba的PR-preview Run38844443746/Job116791652325在原83组中82成功、1失败：test_umask_077_sigterm_preserves_unknown_failure_evidence期望HOLD_PARTIAL却读到PREPARE_INTENT。实际源码显示初始atomic_json在内部try前；父进程只等receipt.exists就发SIGTERM，可能打断初始回执fsync/进入受保护extract前。因此原测试没有同步到其声明要中断的blocked extract，不是本次新适配修改了发布器。
 
 只改该测试：合成blocked_extract写私有测试marker后休眠，父进程确认marker+durable receipt后再SIGTERM，原HOLD_PARTIAL/失败信息/残留断言全部保留，不放宽验收。发布器脚本、批准包312efdd3、生产内容/current和全部生产配置字节不修改。本地只跑该受影响测试通过；既有CI按原触发运行，因本次真实失败修正而验证，不人为重审83范围。57项新组和韩国打包job已锁定原提交，后续全部skip。Phase-B准确包和PR99源码不受此次测试修正影响。
+
+
+### 9.38 2026-10-16：PR99 Phase-B正式交接已读；补齐东京实际源码写入边界绑定
+
+已从GitHub原始回执读取PR99#6207421398：准确安装包与Phase-B执行边界已交原独审，尚无执行批准；原PR99仍632bbe6f/Draft、韩国实际安装NOT_RUN、root安装通道未接。此处不重复评论催审、不再要求Owner取源码。原R2/R6/137直接继承，等待新制品/下一执行范围正式裁定。
+
+PR122继续补S05 writer custody的前置边界，新增source_inventory.py：仅东京非root、五个固定公开Python源码路径、有界非链接/身份/读前后检查；仅SHA等于已批准R4入口或Owner已交77源文件归档中的准确模块后作AST词法清单，绝不执行/import生产模块、不输出字面量/源码/原始异常、不读runtime/env/凭据/DB、不HTTP/操作服务。新5项合成测试本地PASS；原队列只跑新5项及一次现场源码清单，旧57/韩国打包/旧现场均锁定原提交不重跑。真实读取结果以原日志为准，不预写PASS。
+
+源代码包PR122_PORTAL_SOURCE_REVIEW.tar.gz实际SHA10b9c11fb8a6e07d9edab449faf9c72f6bb36e65ced79d7d65fbf1b69c28bd23/77Python文件；其旧entry528a不冒充现行57e38，collector按正式R4新entry57e38绑定。静态分析确认旧Portal会话保存与多个运营提交共享同一文件存储，Douyin/TikTok callback均有state消费、SecretRef和lifecycle写入；现有bridge契约禁止携带SecretRef，不能用其作凭据搬迁通道。仅五文件词法清单不证明全仓/全主机所有writer、不证明路由可达或鉴权，all_writer_custody_proven=false始终保持。精确私有传输和root执行尚未实现/准入，不将本批说成已搬数据或可停东京。
