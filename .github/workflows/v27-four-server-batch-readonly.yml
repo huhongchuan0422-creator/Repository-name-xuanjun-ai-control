@@ -1,6 +1,10 @@
 name: V2.7 Four Server Read-Only Batch
 on:
   workflow_dispatch:
+  push:
+    branches: [build/tokyo-korea-migration-prep-20261014]
+    paths:
+      - '.github/workflows/v27-four-server-batch-readonly.yml'
 permissions:
   contents: read
 concurrency:
@@ -8,26 +12,66 @@ concurrency:
   cancel-in-progress: false
 jobs:
   uk:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-uk-dev]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh uk
   tokyo:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh tokyo
   korea:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh korea
   domestic:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh domestic
+  korea-phase-c-fixed-channel-inspect:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_PHASE_C_FIXED_CHANNEL_INSPECT_ONCE_6213125007' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
+    timeout-minutes: 2
+    steps:
+      - name: Invoke installed fixed inspect once without checkout or install
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          test "$(hostname -s)" = iZmj7a5kwr75qc1tul4kf9Z
+          test "$(id -un)" = githubrunner
+          test "$(id -u)" = 1001
+          for p in /usr /usr/local /usr/local/sbin /usr/local/libexec; do
+            test -d "$p" && test ! -L "$p"
+            test "$(stat -c %u "$p")" = 0
+            m=$(stat -c %a "$p")
+            (( (8#$m & 0022) == 0 ))
+          done
+          p=/usr/local/sbin/xuanjun-pr99-phase-c
+          test -f "$p" && test ! -L "$p"
+          test "$(stat -c %u:%a:%h "$p")" = 0:755:1
+          printf '%s  %s\n' 7fc89a85734a84c0ca8787423042bfaa98bd813c579ba71f774cd3a6a2086d76 "$p" | sha256sum -c -
+          p=/usr/local/libexec/xuanjun-pr99-phase-c-channel.py
+          test -f "$p" && test ! -L "$p"
+          test "$(stat -c %u:%a:%h "$p")" = 0:444:1
+          printf '%s  %s\n' a40371227b95a5fe78631b7c9e49c9b089dfeff8cf82175b9e8ca3f04c0c6497 "$p" | sha256sum -c -
+          echo PR99_CHANNEL_RECEIPT_BEGIN
+          /usr/bin/sudo -n /usr/local/sbin/xuanjun-pr99-phase-c inspect
+          echo PR99_CHANNEL_RECEIPT_END
+          echo CHANNEL_INSTALLED_BYTE_CHECK=PASS FIXED_INSPECT=PASS PHASE_C_INSTALL=NOT_CALLED SERVICE_ACTIONS=0

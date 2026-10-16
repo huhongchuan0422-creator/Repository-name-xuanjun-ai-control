@@ -42,3 +42,9 @@ C2若需要root读schema，应先取得仅schema/文件身份的受限许可；�
 
 当前可用通道：GitHub仓库与现有非root Runner。当前缺失：C受限root执行与私有托管/源端数据准入；未声称已接通。
 生产root安装、围栏、服务启动、真实GET、WAL业务导出、Writer及东京停机均未由本记录执行。官网/current/DNS保持原任务边界。
+
+## 2026-10-16 18:15 Owner-root通道安装增量
+
+独审#6213125007关闭原冻结C制品44/44绑定及30/30runtime独立复算缺口，并批准e3da4ae2固定通道单次安装。以上C0旧待补状态已被本节取代；不重审/重打包原制品。
+Owner-root终端回执：FIXED_CHANNEL_READY_NO_PHASE_C_EXECUTION，approval_comment_id=6213125007，phase_c_install_called=false，service_actions=0，retry_allowed=false。这是Owner实机证据，不冒充本窗口直接登录或Runner独立取证。
+受限root通道已报告安装；本轮仅通过原v27-readonly-batch队列调用一次固定inspect，验证已装字节和实际sudo入口/缺失输入。无checkout、不调用install、不读计划正文/锚点正文/凭据/数据库，不修改B、网站、DNS或东京。C1–C3真实绑定与C4准确C安装许可仍待完成，C5–C8未执行。
