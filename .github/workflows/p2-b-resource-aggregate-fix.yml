@@ -9,6 +9,8 @@ on:
       - 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-bound/epoch7_prepare_data.py'
       - 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-bound/epoch7_topology_projection.py'
       - 'evidence/p2-epoch7-access-repair-20261014/b-release-parent-delivery/epoch7_prepare_delivery.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/epoch7_prepare_delivery.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/test_epoch7_prepare_delivery.py'
       - 'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-dc18f73e.tar.gz'
       - 'governance/features.json'
       - 'tests/test_p2_b_resource_aggregate_fix.py'

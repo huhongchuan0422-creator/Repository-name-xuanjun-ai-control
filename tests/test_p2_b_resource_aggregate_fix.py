@@ -3,7 +3,7 @@
 The new 25-case suite exercises hydration, compilation and real C binding/mutation.
 It does not assemble the C production recovery application or admit installation.
 """
-import hashlib,io,json,os,pathlib,re,resource,signal,stat,subprocess,sys,tarfile,tempfile,time,types,unittest
+import ast,hashlib,io,json,os,pathlib,re,resource,signal,stat,subprocess,sys,tarfile,tempfile,time,types,unittest
 FEATURE_ID='P2_RETAINED_RECOVERY'
 MAX_LOG=1048576
 MAX_ARTIFACT_FILE=33554432
@@ -20,8 +20,8 @@ PARENT_ARCHIVE_SIZE=1045651
 PARENT_ARCHIVE_SHA='6553938a56b882e17d13029fa9a06787131bb55a5c55bc1138e2b825277b7307'
 PARENT_MANIFEST_SHA='b33b365ef1fd18458d85bcbbec44d883f3cc33bf859064cbdca6bfc3fad7d571'
 PARENT_KIT_TARGET='kit/epoch7-recovery-candidate-r7-parentfix'
-SUITE_NAMES=('aggregate','diagnostics','observer','builder')
-SUITES=(('aggregate',25),('diagnostics',12),('observer',6),('builder',32))
+SUITE_NAMES=('aggregate','diagnostics','observer','builder','binding','delivery')
+SUITES=(('aggregate',25),('diagnostics',12),('observer',6),('builder',32),('binding',10),('delivery',36))
 DERIVED_TARGETS={}
 REGISTRY_PATH='governance/features.json'
 ARCHIVE_PATH='evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-dc18f73e.tar.gz'
@@ -32,17 +32,23 @@ WORKFLOW_PATH='.github/workflows/p2-b-resource-aggregate-fix.yml'
 GATE_PATH='tests/test_p2_b_resource_aggregate_fix.py'
 CONTRACT_PATH='tests/test_p2_b_resource_aggregate_fix_contract.py'
 PINS_BOUND=True
-WORKFLOW_SIZE=5833
-WORKFLOW_SHA='031a46f40bd1a90f9070c42b5fcc9e130f4039c01c30317a6350b25c5cd073f1'
+WORKFLOW_SIZE=6056
+WORKFLOW_SHA='f291c02a134b5311dafee7c692b8fd7c6d28734ab112ab82ceb9398bf5fe55d2'
 SOURCE_TARGETS={'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-parentfix-dacd45a2.tar.gz': 'fixtures/epoch7-kit-parentfix.tar.gz',
  'evidence/p2-epoch7-access-repair-20261014/b-release-parent-bound/epoch7_prepare.py': 'b-release-parent-fix-candidate/preparation-bound/epoch7_prepare.py',
  'evidence/p2-epoch7-access-repair-20261014/b-release-parent-bound/epoch7_prepare_data.py': 'b-release-parent-fix-candidate/preparation-bound/epoch7_prepare_data.py',
  'evidence/p2-epoch7-access-repair-20261014/b-release-parent-bound/epoch7_topology_projection.py': 'b-release-parent-fix-candidate/preparation-bound/epoch7_topology_projection.py',
  'evidence/p2-epoch7-access-repair-20261014/b-release-parent-delivery/epoch7_prepare_delivery.py': 'b-release-parent-fix-candidate/delivery-candidate/epoch7_prepare_delivery.py',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifact/epoch7-kit-resourcebind.tar.gz': 'b-resource-aggregate-fix-candidate/artifact/epoch7-kit-resourcebind.tar.gz',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifact/recovery-kit-manifest.json': 'b-resource-aggregate-fix-candidate/artifact/recovery-kit-manifest.json',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifact/verification.json': 'b-resource-aggregate-fix-candidate/artifact/verification.json',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/build/OVERLAY_INPUTS.json': 'b-resource-aggregate-fix-candidate/build/OVERLAY_INPUTS.json',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/build/build_resourcebind_kit.py': 'b-resource-aggregate-fix-candidate/build/build_resourcebind_kit.py',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/build/test_build_resourcebind_kit.py': 'b-resource-aggregate-fix-candidate/build/test_build_resourcebind_kit.py',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/OWNER_PREPARATION_TEMPLATE.txt': 'b-resource-aggregate-fix-candidate/delivery-overlay/OWNER_PREPARATION_TEMPLATE.txt',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/epoch7_prepare_delivery.py': 'b-resource-aggregate-fix-candidate/delivery-overlay/epoch7_prepare_delivery.py',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/extract_epoch7_compiler_kit.py': 'b-resource-aggregate-fix-candidate/delivery-overlay/extract_epoch7_compiler_kit.py',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/test_resourcebind_delivery.py': 'b-resource-aggregate-fix-candidate/delivery-overlay/test_resourcebind_delivery.py',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/kit-overlay/epoch7_recovery_entry.py': 'b-resource-aggregate-fix-candidate/kit-overlay/epoch7_recovery_entry.py',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/kit-overlay/helpers/epoch7_host_factory.py': 'b-resource-aggregate-fix-candidate/kit-overlay/helpers/epoch7_host_factory.py',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/kit-overlay/helpers/epoch7_host_observer.py': 'b-resource-aggregate-fix-candidate/kit-overlay/helpers/epoch7_host_observer.py',
@@ -52,9 +58,12 @@ SOURCE_TARGETS={'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/epoch7_prepare.py': 'b-resource-aggregate-fix-candidate/preparation-overlay/epoch7_prepare.py',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/epoch7_prepare_data.py': 'b-resource-aggregate-fix-candidate/preparation-overlay/epoch7_prepare_data.py',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/epoch7_topology_projection.py': 'b-resource-aggregate-fix-candidate/preparation-overlay/epoch7_topology_projection.py',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/test_compiler_binding.py': 'b-resource-aggregate-fix-candidate/preparation-overlay/test_compiler_binding.py',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/tests/resource_aggregate_fixture.py': 'b-resource-aggregate-fix-candidate/tests/resource_aggregate_fixture.py',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/tests/test_failure_labels.py': 'b-resource-aggregate-fix-candidate/tests/test_failure_labels.py',
- 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/tests/test_resource_aggregate_closure.py': 'b-resource-aggregate-fix-candidate/tests/test_resource_aggregate_closure.py'}
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/tests/test_resource_aggregate_closure.py': 'b-resource-aggregate-fix-candidate/tests/test_resource_aggregate_closure.py',
+ 'evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/epoch7_prepare_delivery.py': 'b-release-parent-fix-candidate/delivery-candidate/baseline/epoch7_prepare_delivery.py',
+ 'evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/test_epoch7_prepare_delivery.py': 'b-release-parent-fix-candidate/delivery-candidate/baseline/test_epoch7_prepare_delivery.py'}
 PINS={'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-parentfix-dacd45a2.tar.gz': (1045651,
                                                                                               '6553938a56b882e17d13029fa9a06787131bb55a5c55bc1138e2b825277b7307',
                                                                                               'fixtures/epoch7-kit-parentfix.tar.gz'),
@@ -70,6 +79,15 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-parentfix-
  'evidence/p2-epoch7-access-repair-20261014/b-release-parent-delivery/epoch7_prepare_delivery.py': (39006,
                                                                                                     '8bc04315cbe23ee5338ccdc3341f536b15088550ef0d01e655ed4bb4fbb0f7d9',
                                                                                                     'b-release-parent-fix-candidate/delivery-candidate/epoch7_prepare_delivery.py'),
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifact/epoch7-kit-resourcebind.tar.gz': (1056853,
+                                                                                                                '6244cca1b41037b7c240f71b93f867c5660a770d451c4a5a661b283f61ce819e',
+                                                                                                                'b-resource-aggregate-fix-candidate/artifact/epoch7-kit-resourcebind.tar.gz'),
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifact/recovery-kit-manifest.json': (62561,
+                                                                                                            '6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030',
+                                                                                                            'b-resource-aggregate-fix-candidate/artifact/recovery-kit-manifest.json'),
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifact/verification.json': (1355,
+                                                                                                   '3fbc5b4234983b82b46006abc9e2adaa37591cada09ad694ea3919d9e3132927',
+                                                                                                   'b-resource-aggregate-fix-candidate/artifact/verification.json'),
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/build/OVERLAY_INPUTS.json': (3406,
                                                                                                   'eca79573770c1cedd4f21b06f77a078d996ed6a01532843573ecd6abd818f060',
                                                                                                   'b-resource-aggregate-fix-candidate/build/OVERLAY_INPUTS.json'),
@@ -79,9 +97,18 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-parentfix-
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/build/test_build_resourcebind_kit.py': (20006,
                                                                                                              '2cf5f98352cf38c1bbb42d2c7ca4ee0076dfa3e7fcbc6b40fe0b09e164347203',
                                                                                                              'b-resource-aggregate-fix-candidate/build/test_build_resourcebind_kit.py'),
- 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/epoch7_prepare_delivery.py': (39240,
-                                                                                                                    '062840eb3555b8511357d8af188dbda2658216f78c90f28afe230b35cc5105fc',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/OWNER_PREPARATION_TEMPLATE.txt': (5431,
+                                                                                                                        'dc0b65a70e57ff56b375052bfab2b40a277f5b5a39e8c94c401232dd6092355f',
+                                                                                                                        'b-resource-aggregate-fix-candidate/delivery-overlay/OWNER_PREPARATION_TEMPLATE.txt'),
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/epoch7_prepare_delivery.py': (39288,
+                                                                                                                    'b7d6abfd97734e10b3b4a8b27bf9004baff684110a7acac12e480a315604cac6',
                                                                                                                     'b-resource-aggregate-fix-candidate/delivery-overlay/epoch7_prepare_delivery.py'),
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/extract_epoch7_compiler_kit.py': (10192,
+                                                                                                                        'be71e68b382b5826d44c760ffc8bdb96e71f28613f7b344928c96b95adf10dd9',
+                                                                                                                        'b-resource-aggregate-fix-candidate/delivery-overlay/extract_epoch7_compiler_kit.py'),
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/delivery-overlay/test_resourcebind_delivery.py': (36465,
+                                                                                                                       'c3e95550466af344781e1835e1b77b1ff8edb083159807ef261cceb3e6a3ebaf',
+                                                                                                                       'b-resource-aggregate-fix-candidate/delivery-overlay/test_resourcebind_delivery.py'),
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/kit-overlay/epoch7_recovery_entry.py': (55774,
                                                                                                              '071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5',
                                                                                                              'b-resource-aggregate-fix-candidate/kit-overlay/epoch7_recovery_entry.py'),
@@ -100,8 +127,8 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-parentfix-
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/kit-overlay/tests/live_controls/test_epoch7_observer_binding.py': (5738,
                                                                                                                                         'fde0be3b536c504a8dda2eb4732dd99b2366c7e565b97fdba2e7fec4805515a2',
                                                                                                                                         'b-resource-aggregate-fix-candidate/kit-overlay/tests/live_controls/test_epoch7_observer_binding.py'),
- 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/epoch7_prepare.py': (55709,
-                                                                                                              '0320bf16a5059e3a1b73a120e316b264543f55740779d38df945324d422867dc',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/epoch7_prepare.py': (55833,
+                                                                                                              '18d3c459bc14f4a3c00317c5a407d18178059209830763564dced41d9af945fd',
                                                                                                               'b-resource-aggregate-fix-candidate/preparation-overlay/epoch7_prepare.py'),
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/epoch7_prepare_data.py': (13888,
                                                                                                                    '71be3f9cb6a58c82083c029fad8f6ba2ba524451bc110443ed3423ef7c9364a1',
@@ -109,18 +136,41 @@ PINS={'evidence/p2-epoch7-access-repair-20261014/artifacts/epoch7-kit-parentfix-
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/epoch7_topology_projection.py': (36482,
                                                                                                                           '0e9817a1474dc4e54cf1779c0b4c243cf16e6204cab3a25210a12e41e03d00b6',
                                                                                                                           'b-resource-aggregate-fix-candidate/preparation-overlay/epoch7_topology_projection.py'),
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/preparation-overlay/test_compiler_binding.py': (10179,
+                                                                                                                     '4c78e43b8597642dedb10c1bdb4f8da39e706cf483d20bceabdbc37f699723d8',
+                                                                                                                     'b-resource-aggregate-fix-candidate/preparation-overlay/test_compiler_binding.py'),
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/tests/resource_aggregate_fixture.py': (13753,
                                                                                                             '4e6a35f9c3e297e4fd63d783a46b3ce432bfb5c121e6621dfaee96c3f97307fb',
                                                                                                             'b-resource-aggregate-fix-candidate/tests/resource_aggregate_fixture.py'),
- 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/tests/test_failure_labels.py': (7798,
-                                                                                                     '6c058c258bf1de499781dd326e7be111510984adcbaf7ea24502f634835a1b67',
+ 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/tests/test_failure_labels.py': (7925,
+                                                                                                     '147b19b01fe0654adf48add0c9ac23eb89426f00d43582c0bfbb0d3f9c254b3c',
                                                                                                      'b-resource-aggregate-fix-candidate/tests/test_failure_labels.py'),
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/tests/test_resource_aggregate_closure.py': (25005,
                                                                                                                  'b417b2a9df5972e429151d2edad121c11248ce581067cb70b7a366cf6c9b95a1',
-                                                                                                                 'b-resource-aggregate-fix-candidate/tests/test_resource_aggregate_closure.py')}
+                                                                                                                 'b-resource-aggregate-fix-candidate/tests/test_resource_aggregate_closure.py'),
+ 'evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/epoch7_prepare_delivery.py': (27421,
+                                                                                                        '087df34edd0e2568870ced2c53c9bb0c28ae900d0a4bf7ec8642d8db80a30313',
+                                                                                                        'b-release-parent-fix-candidate/delivery-candidate/baseline/epoch7_prepare_delivery.py'),
+ 'evidence/p2-epoch7-access-repair-20261014/preparation-delivery-r7-fresh/test_epoch7_prepare_delivery.py': (25796,
+                                                                                                             '13f4cb0a85ee6a096a0f0a85026ad34d0f5288154f6ab56014bec52b2d405314',
+                                                                                                             'b-release-parent-fix-candidate/delivery-candidate/baseline/test_epoch7_prepare_delivery.py')}
 PUBLIC_DIRECTORIES=('evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/kit-overlay',
  'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/build')
 
+
+# The successor checkout can advance without redefining the selected compiler.
+COMPILER_SOURCE_COMMIT='ef21ca95331769622c294c65bb60ec7ceed0c392'
+COMPILER_SOURCE_TREE='5a70c5627afe75fcd475c20e71ee9bfb0b6a156d'
+DEPENDENCY_PUBLICATION_COMMIT='170c3fd74eb612f2529d1062e07c83e4263f78b1'
+DEPENDENCY_PUBLICATION_TREE='ef8d15619dcb1b350eb139bbb964716f4f00497a'
+SELECTED_ARCHIVE_PATH=PUBLIC_PREFIX+'artifact/epoch7-kit-resourcebind.tar.gz'
+SELECTED_ARCHIVE_TARGET=CANDIDATE_TARGET+'/artifact/epoch7-kit-resourcebind.tar.gz'
+SELECTED_MANIFEST_PATH=PUBLIC_PREFIX+'artifact/recovery-kit-manifest.json'
+SELECTED_VERIFICATION_PATH=PUBLIC_PREFIX+'artifact/verification.json'
+SELECTED_ARCHIVE_SIZE=1056853
+SELECTED_ARCHIVE_SHA='6244cca1b41037b7c240f71b93f867c5660a770d451c4a5a661b283f61ce819e'
+SELECTED_MANIFEST_SHA='6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030'
+SELECTED_ENTRY_SHA='071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5'
 
 def need(value,label):
     if not value:raise ValueError(label)
@@ -146,6 +196,8 @@ def safe_name(name):
 
 def publication_pins():
     need(PINS_BOUND is True,'RESOURCE_AGGREGATE_CI_PUBLICATION_NOT_BOUND')
+    need(all(type(value) is str and re.fullmatch('[0-9a-f]{40}',value) for value in
+        (DEPENDENCY_PUBLICATION_COMMIT,DEPENDENCY_PUBLICATION_TREE)),'DEPENDENCY_PUBLICATION_NOT_BOUND')
     need(type(SUITES) is tuple and tuple(name for name,count in SUITES)==SUITE_NAMES
          and all(type(count) is int and count>0 for name,count in SUITES),'EXACT_SUITE_COUNTS_NOT_BOUND')
     need(len(set(SOURCE_TARGETS.values()))==len(SOURCE_TARGETS),'EXACT_PUBLIC_TARGETS')
@@ -231,6 +283,28 @@ def parent_archive_files(raw):
     return files
 
 
+def selected_archive_files(raw):
+    need(type(raw) is bytes and len(raw)==SELECTED_ARCHIVE_SIZE and digest(raw)==SELECTED_ARCHIVE_SHA,'SELECTED_ARCHIVE_PIN')
+    files={};prefix='epoch7-recovery-candidate-r7-resourcebind/'
+    with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
+        rows=archive.getmembers();need(len(rows)==298,'SELECTED_ARCHIVE_HEADER_COUNT')
+        for row in rows:
+            if row.isdir():continue
+            need(row.isreg() and row.name.startswith(prefix) and 0<=row.size<=33554432,'SELECTED_ARCHIVE_MEMBER')
+            name=safe_name(row.name[len(prefix):]);need(name not in files,'SELECTED_ARCHIVE_NAME')
+            with archive.extractfile(row) as stream:body=stream.read(row.size+1)
+            need(len(body)==row.size,'SELECTED_ARCHIVE_BYTES');files[name]=body
+    need(len(files)==256,'SELECTED_ARCHIVE_MEMBER_COUNT')
+    need(digest(files['recovery-kit-manifest.json'])==SELECTED_MANIFEST_SHA,'SELECTED_MANIFEST_PIN')
+    manifest=strict_json(files['recovery-kit-manifest.json'])
+    need(len(manifest['files'])==255 and set(files)==set(manifest['files'])|{'recovery-kit-manifest.json'},'EXACT_SELECTED_ARCHIVE_FILES')
+    for name,pin in manifest['files'].items():need(digest(files[name])==pin,'SELECTED_ARCHIVE_SOURCE_PIN')
+    need(manifest['kit_source_commit']==COMPILER_SOURCE_COMMIT and
+        manifest['kit_source_tree']==COMPILER_SOURCE_TREE,'SELECTED_COMPILER_SOURCE')
+    need(digest(files['epoch7_recovery_entry.py'])==SELECTED_ENTRY_SHA,'SELECTED_ENTRY_PIN')
+    return files
+
+
 def fixtures(root,records=None):
     publication_pins()
     def exact(path,size,pin):
@@ -244,6 +318,9 @@ def fixtures(root,records=None):
         size,pin,unused=PINS[source];result[target]=exact(source,size,pin)
     parent=parent_archive_files(result[PARENT_ARCHIVE_TARGET])
     result.update({PARENT_KIT_TARGET+'/'+name:body for name,body in parent.items()})
+    selected=selected_archive_files(result[SELECTED_ARCHIVE_TARGET])
+    need(selected['recovery-kit-manifest.json']==records[SELECTED_MANIFEST_PATH] if records is not None else
+        selected['recovery-kit-manifest.json']==read_pin(root,SELECTED_MANIFEST_PATH,*PINS[SELECTED_MANIFEST_PATH][:2]),'SELECTED_STANDALONE_MANIFEST')
     return result
 
 
@@ -281,13 +358,46 @@ def registry_contract(raw):
          'REGISTRY_REQUIRED_TESTS')
 
 
+def bound_delivery_contract(raw):
+    names={'PINS_BOUND','PUBLICATION_COMMIT','ARCHIVE_COMMIT','ARCHIVE_SHA','ARCHIVE_SIZE',
+           'COMPILER_SOURCE','COMPILER_TREE','COMPILER_MANIFEST_SHA','COMPILER_ENTRY_SHA','COMPILER_CACHE_COUNT'}
+    values={}
+    for node in ast.parse(raw.decode('utf-8')).body:
+        if isinstance(node,ast.Assign) and len(node.targets)==1 and isinstance(node.targets[0],ast.Name):
+            name=node.targets[0].id
+            if name in names:
+                need(name not in values,'DELIVERY_DUPLICATE_CONSTANT')
+                values[name]=ast.literal_eval(node.value)
+    expected={'PINS_BOUND':True,'PUBLICATION_COMMIT':DEPENDENCY_PUBLICATION_COMMIT,
+        'ARCHIVE_COMMIT':DEPENDENCY_PUBLICATION_COMMIT,'ARCHIVE_SHA':SELECTED_ARCHIVE_SHA,
+        'ARCHIVE_SIZE':SELECTED_ARCHIVE_SIZE,'COMPILER_SOURCE':COMPILER_SOURCE_COMMIT,
+        'COMPILER_TREE':COMPILER_SOURCE_TREE,'COMPILER_MANIFEST_SHA':SELECTED_MANIFEST_SHA,
+        'COMPILER_ENTRY_SHA':SELECTED_ENTRY_SHA,'COMPILER_CACHE_COUNT':255}
+    need(json.dumps(values,sort_keys=True)==json.dumps(expected,sort_keys=True),'BOUND_DELIVERY_PUBLICATION_CONTRACT')
+
+
 def checkout_records(root,head):
     paths=set(PINS)|{GATE_PATH,CONTRACT_PATH,WORKFLOW_PATH,REGISTRY_PATH,ARCHIVE_PATH}
-    records={path:verified_path(root,head,path,ARCHIVE_SIZE if path==ARCHIVE_PATH else 1048576) for path in sorted(paths)}
+    records={path:verified_path(root,head,path,ARCHIVE_SIZE if path==ARCHIVE_PATH else max(1048576,PINS[path][0]) if path in PINS else 1048576) for path in sorted(paths)}
     need(pathlib.Path(__file__).read_bytes()==records[GATE_PATH],'CHECKPOINT_NOT_EXACT_HEAD')
     need(len(records[WORKFLOW_PATH])==WORKFLOW_SIZE and digest(records[WORKFLOW_PATH])==WORKFLOW_SHA,'WORKFLOW_PIN')
     registry_contract(records[REGISTRY_PATH])
+    bound_delivery_contract(records[PUBLIC_PREFIX+'delivery-overlay/epoch7_prepare_delivery.py'])
     return records
+
+
+def write_fixture_file(path,name,raw):
+    if len(raw)<=MAX_LOG:
+        with path.open('xb') as stream:stream.write(raw)
+        return
+    need(name==SELECTED_ARCHIVE_TARGET and len(raw)==SELECTED_ARCHIVE_SIZE and
+        digest(raw)==SELECTED_ARCHIVE_SHA,'OVERSIZED_FIXTURE_NOT_SELECTED_ARCHIVE')
+    before=resource.getrlimit(resource.RLIMIT_FSIZE)
+    need(before[1]==resource.RLIM_INFINITY or before[1]>=MAX_ARTIFACT_FILE,'ARTIFACT_STAGING_HARD_BOUND')
+    try:
+        resource.setrlimit(resource.RLIMIT_FSIZE,(MAX_ARTIFACT_FILE,before[1]))
+        with path.open('xb') as stream:stream.write(raw)
+    finally:resource.setrlimit(resource.RLIMIT_FSIZE,before)
 
 
 def materialize(root,files):
@@ -297,7 +407,7 @@ def materialize(root,files):
         safe_name(name)
         need(name in allowed or name.startswith(KIT_TARGET+'/') or name.startswith(PARENT_KIT_TARGET+'/'),'FIXTURE_PATH')
         path=root/name;path.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
-        with path.open('xb') as stream:stream.write(raw)
+        write_fixture_file(path,name,raw)
     (root/KIT_TARGET/'helpers/fixtures').mkdir(mode=0o700,parents=True,exist_ok=True)
     (root/PARENT_KIT_TARGET/'helpers/fixtures').mkdir(mode=0o700,parents=True,exist_ok=True)
     return root
@@ -397,11 +507,14 @@ def aggregate():
         'suite_counts':dict(SUITES),'errors':0,'failures':0,'skips':0,
         'host_NOT_RUN':True,'network_NOT_RUN':True,'privateplan_NOT_RUN':True,
         'fresh_authority_NOT_RUN':True,'production_resume':'NOT_EXECUTED',
-        'preparation_compiler_binding':'UNBOUND','delivery_pins_bound':False,
+        'preparation_compiler_binding':'SELECTED_RESOURCEBIND','delivery_pins_bound':True,
         'c_scope':'HYDRATION_COMPILE_REAL_BINDING_MUTATION_ONLY','c_application_assembly':'NOT_RUN',
         'source_bound_build_verified':True,'manifest_pin_count':255,'artifact_file_count':256,
         'runtime_files_preserved':107,'runtime_package_files_preserved':110,
-        'original_archive_sha256':ARCHIVE_SHA,'parent_archive_sha256':PARENT_ARCHIVE_SHA}
+        'original_archive_sha256':ARCHIVE_SHA,'parent_archive_sha256':PARENT_ARCHIVE_SHA,
+        'selected_archive_sha256':SELECTED_ARCHIVE_SHA,'selected_manifest_sha256':SELECTED_MANIFEST_SHA,
+        'compiler_source_commit':COMPILER_SOURCE_COMMIT,'compiler_source_tree':COMPILER_SOURCE_TREE,
+        'selected_compiler_contents_reproduced':True}
 
 
 def run_suite(root,name):
@@ -414,6 +527,8 @@ def run_suite(root,name):
     os.environ['EPOCH7_RESOURCE_TEST_ENTRY']=str(candidate/'kit-overlay/epoch7_recovery_entry.py')
     os.environ['EPOCH7_RESOURCE_TEST_PREPARATION_ROOT']=str(root/'b-release-parent-fix-candidate/preparation-bound')
     os.environ['RESOURCEBIND_BASELINE_ARCHIVE']=str(root/PARENT_ARCHIVE_TARGET)
+    os.environ['EPOCH7_PREP_TEST_KIT_ROOT']=str(root/KIT_TARGET)
+    os.environ['EPOCH7_COMPILER_TEST_ARCHIVE']=str(root/SELECTED_ARCHIVE_TARGET)
     paths=[candidate/'tests',candidate/'kit-overlay/helpers',kit/'helpers',
            kit/'xuanjun-p2-package/stage1',kit/'xuanjun-p2-package/scripts']
     paths.extend(sorted(p for p in (kit/'tests').iterdir() if p.is_dir()))
@@ -421,7 +536,9 @@ def run_suite(root,name):
     names={'aggregate':[candidate/'tests/test_resource_aggregate_closure.py'],
            'diagnostics':[candidate/'tests/test_failure_labels.py'],
            'observer':[candidate/'kit-overlay/tests/live_controls/test_epoch7_observer_binding.py'],
-           'builder':[candidate/'build/test_build_resourcebind_kit.py']}
+           'builder':[candidate/'build/test_build_resourcebind_kit.py'],
+           'binding':[candidate/'preparation-overlay/test_compiler_binding.py'],
+           'delivery':[candidate/'delivery-overlay/test_resourcebind_delivery.py']}
     suite=unittest.TestSuite()
     for index,path in enumerate(names[name]):
         label='resourcebind_focused_'+name+'_'+str(index);module=types.ModuleType(label)
@@ -451,6 +568,27 @@ def build_exact_source(work,output_dir,head,tree):
     need(value['runtime_files_preserved']==107 and value['runtime_package_files_preserved']==110
          and value['modules_unchanged'] is True and value['host_collection']=='NOT_RUN'
          and value['production_resume_authorized'] is False,'BUILD_SCOPE_MISMATCH')
+    selected=selected_archive_files((work/SELECTED_ARCHIVE_TARGET).read_bytes())
+    need(type(out['archive_bytes']) is int and 0<out['archive_bytes']<=MAX_ARTIFACT_FILE,'REBUILD_ARCHIVE_BOUND')
+    rebuilt={}
+    with tarfile.open(str(archive),mode='r:gz') as stream:
+        members=stream.getmembers();need(len(members)==298,'REBUILD_HEADER_COUNT')
+        for member in members:
+            if member.isdir():continue
+            prefix='epoch7-recovery-candidate-r7-resourcebind/'
+            need(member.isreg() and member.name.startswith(prefix),'REBUILD_MEMBER')
+            name=safe_name(member.name[len(prefix):])
+            need(name in selected and name not in rebuilt and member.size==len(selected[name]),'REBUILD_MEMBER_SCOPE')
+            with stream.extractfile(member) as source:body=source.read(member.size+1)
+            need(body==selected[name],'REBUILD_SELECTED_BYTES');rebuilt[name]=body
+    need(set(rebuilt)==set(selected),'REBUILD_EXACT_SELECTED_FILES')
+    need(out['manifest_sha256']==SELECTED_MANIFEST_SHA,'REBUILD_SELECTED_MANIFEST')
+    # Canonical contents must match across official Python/zlib versions.
+    # The selected public compressed archive is independently pinned above.
+    print('SELECTED_COMPILER_CONTENTS_VERIFIED='+json.dumps({'files':len(rebuilt),
+        'manifest_sha256':SELECTED_MANIFEST_SHA,'selected_archive_sha256':SELECTED_ARCHIVE_SHA,
+        'rebuilt_archive_sha256':out['archive_sha256'],
+        'compressed_bytes_identical':out['archive_sha256']==SELECTED_ARCHIVE_SHA},sort_keys=True))
     print('SOURCE_BOUND_BUILD_VERIFIED='+json.dumps(terminal,sort_keys=True))
 
 
@@ -460,7 +598,8 @@ def worker():
     head=git(root,['rev-parse','--verify','HEAD']);public_inventory(root)
     tree=git(root,['rev-parse','--verify',head+'^{tree}'])
     print('CI_SOURCE_IDENTITIES='+json.dumps({'current_checkout':{'commit':head,'tree':tree},
-        'resourcebind_build_source':{'commit':head,'tree':tree}},sort_keys=True))
+        'resourcebind_build_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE},
+        'dependency_publication':{'commit':DEPENDENCY_PUBLICATION_COMMIT,'tree':DEPENDENCY_PUBLICATION_TREE}},sort_keys=True))
     records=checkout_records(root,head);files=fixtures(root,records)
     clean_import()
     with tempfile.TemporaryDirectory(prefix='p2-resourcebind-public-') as folder:
@@ -472,7 +611,7 @@ def worker():
             print(raw.decode('utf-8','replace'));need(code==0,'PUBLIC_TEST_PROCESS_FAILED')
             terminal(raw,name,wanted)
             check_materialized(work,files)
-        build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)
+        build_exact_source(work,pathlib.Path(folder)/'artifact',COMPILER_SOURCE_COMMIT,COMPILER_SOURCE_TREE)
         check_materialized(work,files)
         public_inventory(root)
         need(git(root,['rev-parse','--verify','HEAD'])==head,'HEAD_CHANGED')

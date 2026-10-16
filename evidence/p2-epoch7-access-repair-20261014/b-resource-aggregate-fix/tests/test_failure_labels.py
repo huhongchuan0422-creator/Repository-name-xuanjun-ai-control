@@ -49,11 +49,10 @@ class DiagnosticTests(unittest.TestCase):
         for error in (ValueError(),ValueError('PROPOSAL_SIZE_BOUND','secret')):
             self.assertIsNone(self.project(error)['failure_label'])
 
-    def test_pending_delivery_overlay_refuses_before_effects(self):
-        self.assertIs(delivery.PINS_BOUND,False)
+    def test_delivery_unbound_gate_refuses_before_effects(self):
         args=['--observation',delivery.OBSERVATION_PATH,'--observation-sha256',delivery.OBSERVATION_SHA256,
               '--topology-review-id','6207642296','--retained-renewal-timer','enable-after-reviewed-checks']
-        with mock.patch.object(delivery,'fetch_sources') as fetch:
+        with mock.patch.object(delivery,'PINS_BOUND',False), mock.patch.object(delivery,'fetch_sources') as fetch:
             with self.assertRaisesRegex(ValueError,'UNBOUND'):delivery.run(args)
             fetch.assert_not_called()
 
@@ -113,7 +112,7 @@ class VersionBoundaryTests(unittest.TestCase):
             self.assertFalse(result['success']);self.assertEqual(result['install_admission'],'NOT_GRANTED')
             self.assertEqual(result['production_resume'],'NOT_EXECUTED');read.assert_called_once()
 
-    def test_new_wrapper_is_unbound_and_old_evidence_pins_are_exact(self):
+    def test_bound_wrapper_and_old_evidence_pins_are_exact(self):
         def constants(raw):
             result={}
             for node in ast.parse(raw.decode()).body:
@@ -125,7 +124,8 @@ class VersionBoundaryTests(unittest.TestCase):
         new=constants((ROOT/'preparation-overlay/epoch7_prepare.py').read_bytes())
         for key in ('KIT_SHA','ENTRY_SHA','OBSERVATION_SHA','EXPECTED_REVIEW_BODY_SHA','SAVED_PROJECTION_MANIFEST_SHA'):
             self.assertEqual(old[key],new[key])
-        self.assertIsNone(new['COMPILER_KIT_SHA']);self.assertIsNone(new['COMPILER_ENTRY_SHA'])
+        self.assertEqual(new['COMPILER_KIT_SHA'],'6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030')
+        self.assertEqual(new['COMPILER_ENTRY_SHA'],'071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5')
 
 
 if __name__=='__main__':unittest.main(verbosity=2)

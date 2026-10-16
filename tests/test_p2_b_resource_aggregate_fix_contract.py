@@ -259,13 +259,13 @@ class AdapterContractTests(unittest.TestCase):
 
     def test_exact_resource_aggregate_counts_and_boundaries(self):
         self.m.publication_pins()
-        self.assertEqual(self.m.SUITES,(('aggregate',25),('diagnostics',12),('observer',6),('builder',32)))
-        result=self.m.aggregate();self.assertEqual(result['tests'],75)
+        self.assertEqual(self.m.SUITES,(('aggregate',25),('diagnostics',12),('observer',6),('builder',32),('binding',10),('delivery',36)))
+        result=self.m.aggregate();self.assertEqual(result['tests'],121)
         self.assertEqual((result['manifest_pin_count'],result['artifact_file_count']),(255,256))
         self.assertEqual(result['c_scope'],'HYDRATION_COMPILE_REAL_BINDING_MUTATION_ONLY')
         self.assertEqual(result['c_application_assembly'],'NOT_RUN')
-        self.assertEqual(result['preparation_compiler_binding'],'UNBOUND')
-        self.assertIs(result['delivery_pins_bound'],False)
+        self.assertEqual(result['preparation_compiler_binding'],'SELECTED_RESOURCEBIND')
+        self.assertIs(result['delivery_pins_bound'],True)
 
     def test_missing_duplicate_boolean_suite_counts_refuse(self):
         original=self.m.SUITES
@@ -275,14 +275,16 @@ class AdapterContractTests(unittest.TestCase):
 
     def test_minimal_public_dependency_closure(self):
         prefix='evidence/p2-epoch7-access-repair-20261014/'
-        self.assertEqual(len(self.m.SOURCE_TARGETS),21)
+        self.assertEqual(len(self.m.SOURCE_TARGETS),30)
         new=[p for p in self.m.SOURCE_TARGETS if p.startswith(self.m.PUBLIC_PREFIX)]
-        self.assertEqual(len(new),16)
+        self.assertEqual(len(new),23)
         for path in new:self.assertEqual(self.m.SOURCE_TARGETS[path],self.m.CANDIDATE_TARGET+'/'+path[len(self.m.PUBLIC_PREFIX):])
         old=set(self.m.SOURCE_TARGETS)-set(new)
         self.assertEqual(old,{prefix+'b-release-parent-bound/'+name for name in
             ('epoch7_prepare.py','epoch7_prepare_data.py','epoch7_topology_projection.py')} |
-            {prefix+'b-release-parent-delivery/epoch7_prepare_delivery.py',self.m.PARENT_ARCHIVE_PATH})
+            {prefix+'b-release-parent-delivery/epoch7_prepare_delivery.py',self.m.PARENT_ARCHIVE_PATH,
+             prefix+'preparation-delivery-r7-fresh/epoch7_prepare_delivery.py',
+             prefix+'preparation-delivery-r7-fresh/test_epoch7_prepare_delivery.py'})
         self.assertEqual(self.m.PINS[self.m.PARENT_ARCHIVE_PATH][:2],(1045651,'6553938a56b882e17d13029fa9a06787131bb55a5c55bc1138e2b825277b7307'))
 
     def test_wrong_parent_archive_never_opens_tar(self):
@@ -323,17 +325,23 @@ class AdapterContractTests(unittest.TestCase):
         source=GATE.read_text();body=source.split('def run_suite(root,name):',1)[1].split('def build_exact_source(',1)[0]
         for expected in ("'aggregate':[candidate/'tests/test_resource_aggregate_closure.py']", "'diagnostics':[candidate/'tests/test_failure_labels.py']", "'observer':[candidate/'kit-overlay/tests/live_controls/test_epoch7_observer_binding.py']", "'builder':[candidate/'build/test_build_resourcebind_kit.py']", "os.environ['EPOCH7_RESOURCE_TEST_PREPARATION_ROOT']", "os.environ['RESOURCEBIND_BASELINE_ARCHIVE']"):
             self.assertIn(expected,body)
-        for excluded in ("'consumer'", "'wrapper'", "'pipeline'", "'affected'", "'delivery'", "'binding'", 'kit.tests('):
+        for excluded in ("'consumer'", "'wrapper'", "'pipeline'", "'affected'", 'kit.tests('):
             self.assertNotIn(excluded,body)
 
-    def test_new_build_is_bound_to_current_checkout_head_and_tree(self):
+    def test_successor_checkout_preserves_selected_compiler_identity(self):
         source=GATE.read_text()
-        self.assertIn("'resourcebind_build_source':{'commit':head,'tree':tree}",source)
-        self.assertIn("build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)",source)
-        self.assertNotIn('COMPILER_SOURCE_COMMIT',source)
+        self.assertEqual(self.m.COMPILER_SOURCE_COMMIT,'ef21ca95331769622c294c65bb60ec7ceed0c392')
+        self.assertEqual(self.m.COMPILER_SOURCE_TREE,'5a70c5627afe75fcd475c20e71ee9bfb0b6a156d')
+        self.assertIn("'current_checkout':{'commit':head,'tree':tree}",source)
+        self.assertIn("'resourcebind_build_source':{'commit':COMPILER_SOURCE_COMMIT,'tree':COMPILER_SOURCE_TREE}",source)
+        self.assertIn("build_exact_source(work,pathlib.Path(folder)/'artifact',COMPILER_SOURCE_COMMIT,COMPILER_SOURCE_TREE)",source)
+        self.assertNotIn("build_exact_source(work,pathlib.Path(folder)/'artifact',head,tree)",source)
         self.assertIn("out['file_count']==256",source);self.assertIn("out['manifest_pin_count']==255",source)
         self.assertIn("value['runtime_package_files_preserved']==110",source)
         self.assertIn("value['production_resume_authorized'] is False",source)
+        self.assertIn("body==selected[name]",source);self.assertIn("set(rebuilt)==set(selected)",source)
+        self.assertIn("out['manifest_sha256']==SELECTED_MANIFEST_SHA",source)
+        self.assertIn("'compressed_bytes_identical':out['archive_sha256']==SELECTED_ARCHIVE_SHA",source)
 
     def test_worker_rechecks_head_records_and_fixture_after_every_suite(self):
         for kind,label in (('head','HEAD_CHANGED'),('records','INPUT_CHANGED_AFTER_TEST')):
@@ -354,8 +362,8 @@ class AdapterContractTests(unittest.TestCase):
                 build=stack.enter_context(mock.patch.object(self.m,'build_exact_source'))
                 stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
                 with self.assertRaisesRegex(ValueError,label):self.m.worker()
-                self.assertEqual(run.call_count,4);self.assertEqual(check.call_count,6)
-                self.assertEqual(build.call_args[0][2:],('a'*40,'c'*40))
+                self.assertEqual(run.call_count,6);self.assertEqual(check.call_count,8)
+                self.assertEqual(build.call_args[0][2:],(self.m.COMPILER_SOURCE_COMMIT,self.m.COMPILER_SOURCE_TREE))
                 self.assertTrue(all(call[2]['new_session'] is False for call in run.mock_calls))
                 for call,(name,unused) in zip(run.call_args_list,self.m.SUITES):
                     self.assertEqual(call[0],([sys.executable,'-I','-B','-S',str(GATE),'--suite',str(HERE/'synthetic-fixture'),name],HERE/'synthetic-fixture',180))
@@ -391,6 +399,76 @@ class AdapterContractTests(unittest.TestCase):
         self.assertEqual(code,0);self.assertEqual(json.loads(raw.decode()),[self.m.MAX_LOG,self.m.MAX_LOG])
 
 
+    def test_dependency_publication_requires_real_well_formed_literals(self):
+        self.m.PINS_BOUND=True
+        for name in ('DEPENDENCY_PUBLICATION_COMMIT','DEPENDENCY_PUBLICATION_TREE'):
+            old=getattr(self.m,name)
+            for value in (None,False,'', 'not-an-object', 'a'*39):
+                setattr(self.m,name,value)
+                with self.subTest(name=name,value=value),self.assertRaisesRegex(ValueError,'DEPENDENCY_PUBLICATION_NOT_BOUND'):
+                    self.m.publication_pins()
+            setattr(self.m,name,old)
+
+    def test_wrong_selected_archive_never_opens_tar(self):
+        with mock.patch.object(self.m.tarfile,'open',side_effect=AssertionError('UNVERIFIED_TAR')):
+            with self.assertRaisesRegex(ValueError,'SELECTED_ARCHIVE_PIN'):self.m.selected_archive_files(b'wrong')
+
+    def test_selected_archive_header_count_is_independent_of_checksum(self):
+        raw=b'synthetic';self.m.SELECTED_ARCHIVE_SIZE=len(raw);self.m.SELECTED_ARCHIVE_SHA=self.m.digest(raw)
+        archive=mock.MagicMock();archive.__enter__.return_value=archive;archive.getmembers.return_value=[]
+        with mock.patch.object(self.m.tarfile,'open',return_value=archive):
+            with self.assertRaisesRegex(ValueError,'SELECTED_ARCHIVE_HEADER_COUNT'):self.m.selected_archive_files(raw)
+
+    def test_bound_delivery_contract_requires_selected_refs_and_strict_types(self):
+        value={'PINS_BOUND':True,'PUBLICATION_COMMIT':self.m.DEPENDENCY_PUBLICATION_COMMIT,
+            'ARCHIVE_COMMIT':self.m.DEPENDENCY_PUBLICATION_COMMIT,'ARCHIVE_SHA':self.m.SELECTED_ARCHIVE_SHA,
+            'ARCHIVE_SIZE':self.m.SELECTED_ARCHIVE_SIZE,'COMPILER_SOURCE':self.m.COMPILER_SOURCE_COMMIT,
+            'COMPILER_TREE':self.m.COMPILER_SOURCE_TREE,'COMPILER_MANIFEST_SHA':self.m.SELECTED_MANIFEST_SHA,
+            'COMPILER_ENTRY_SHA':self.m.SELECTED_ENTRY_SHA,'COMPILER_CACHE_COUNT':255}
+        raw=lambda v:('\n'.join(k+'='+repr(item) for k,item in sorted(v.items()))+'\n').encode()
+        self.m.bound_delivery_contract(raw(value))
+        for key,bad in (('PINS_BOUND',False),('PINS_BOUND',1),('PUBLICATION_COMMIT',None),
+                        ('ARCHIVE_COMMIT','0'*40),('COMPILER_SOURCE','b'*40),
+                        ('COMPILER_TREE','c'*40),('COMPILER_CACHE_COUNT',True)):
+            changed=dict(value);changed[key]=bad
+            with self.subTest(key=key,bad=bad),self.assertRaisesRegex(ValueError,'BOUND_DELIVERY_PUBLICATION_CONTRACT'):
+                self.m.bound_delivery_contract(raw(changed))
+        with self.assertRaisesRegex(ValueError,'DELIVERY_DUPLICATE_CONSTANT'):
+            self.m.bound_delivery_contract(raw(value)+b'PINS_BOUND=True\n')
+
+    def test_oversized_staging_only_accepts_exact_selected_archive(self):
+        raw=b'x'*(self.m.MAX_LOG+1)
+        with tempfile.TemporaryDirectory() as folder:
+            target=pathlib.Path(folder)/'artifact'
+            with mock.patch.object(self.m.resource,'setrlimit') as cap:
+                for name in ('other.py',self.m.SELECTED_ARCHIVE_TARGET):
+                    with self.subTest(name=name),self.assertRaisesRegex(ValueError,'OVERSIZED_FIXTURE_NOT_SELECTED_ARCHIVE'):
+                        self.m.write_fixture_file(target,name,raw)
+                cap.assert_not_called();self.assertFalse(target.exists())
+
+    def test_selected_staging_restores_cap_on_success_and_exclusive_write_failure(self):
+        raw=b'x'*(self.m.MAX_LOG+1);self.m.SELECTED_ARCHIVE_SIZE=len(raw);self.m.SELECTED_ARCHIVE_SHA=self.m.digest(raw)
+        before=(self.m.MAX_LOG,self.m.MAX_ARTIFACT_FILE)
+        with tempfile.TemporaryDirectory() as folder:
+            target=pathlib.Path(folder)/'artifact'
+            for collision in (False,True):
+                with mock.patch.object(self.m.resource,'getrlimit',return_value=before),mock.patch.object(self.m.resource,'setrlimit') as cap:
+                    if collision:
+                        with self.assertRaises(FileExistsError):self.m.write_fixture_file(target,self.m.SELECTED_ARCHIVE_TARGET,raw)
+                    else:self.m.write_fixture_file(target,self.m.SELECTED_ARCHIVE_TARGET,raw)
+                    self.assertEqual(cap.call_args_list,[mock.call(self.m.resource.RLIMIT_FSIZE,(self.m.MAX_ARTIFACT_FILE,before[1])),mock.call(self.m.resource.RLIMIT_FSIZE,before)])
+            self.assertEqual(target.read_bytes(),raw)
+
+    def test_selected_staging_rejects_insufficient_hard_limit_without_write(self):
+        raw=b'x'*(self.m.MAX_LOG+1);self.m.SELECTED_ARCHIVE_SIZE=len(raw);self.m.SELECTED_ARCHIVE_SHA=self.m.digest(raw)
+        with tempfile.TemporaryDirectory() as folder:
+            target=pathlib.Path(folder)/'artifact'
+            with mock.patch.object(self.m.resource,'getrlimit',return_value=(self.m.MAX_LOG,self.m.MAX_LOG)),mock.patch.object(self.m.resource,'setrlimit') as cap:
+                with self.assertRaisesRegex(ValueError,'ARTIFACT_STAGING_HARD_BOUND'):
+                    self.m.write_fixture_file(target,self.m.SELECTED_ARCHIVE_TARGET,raw)
+                cap.assert_not_called();self.assertFalse(target.exists())
+
+
 class GitBoundaryTests(unittest.TestCase):
     def setUp(self):
         self.m=module();self.temp=tempfile.TemporaryDirectory(prefix='git-contract-',dir=str(HERE));self.addCleanup(self.temp.cleanup)
@@ -417,9 +495,9 @@ class GitBoundaryTests(unittest.TestCase):
 
 if __name__=='__main__':
     suite=unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])
-    if suite.countTestCases()!=45:raise ValueError('EXACT_ADAPTER_CONTRACT_COUNT')
+    if suite.countTestCases()!=52:raise ValueError('EXACT_ADAPTER_CONTRACT_COUNT')
     result=unittest.TextTestRunner(verbosity=2).run(suite)
-    ok=result.wasSuccessful() and not result.skipped and result.testsRun==45
+    ok=result.wasSuccessful() and not result.skipped and result.testsRun==52
     print(json.dumps({'schema':1,'state':'PASS' if ok else 'FAIL','tests':result.testsRun,'errors':len(result.errors),
         'failures':len(result.failures),'skips':len(result.skipped),'python':sys.version.split()[0],
         'host_NOT_RUN':True,'network_NOT_RUN':True},sort_keys=True))

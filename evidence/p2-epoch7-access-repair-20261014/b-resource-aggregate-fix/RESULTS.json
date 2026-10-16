@@ -11,20 +11,56 @@
     "error": "PROPOSAL_SIZE_BOUND",
     "result": "EXPECTED_REPRODUCED"
   },
+  "bound_delivery_sha256": "b7d6abfd97734e10b3b4a8b27bf9004baff684110a7acac12e480a315604cac6",
+  "bound_preparation_sha256": "18d3c459bc14f4a3c00317c5a407d18178059209830763564dced41d9af945fd",
   "ci": {
+    "binding": 10,
     "builder_test_compatibility_fix": "REMOVED_TEST_ONLY_PY312_GATE; NATIVE_PY36_PARSER_OR_EXPLICIT_PY36_GRAMMAR; SAME32_TESTS_NO_SKIP",
     "contracts": 45,
     "correction": "FINITE_32MiB_BUILDER_FILE_LIMIT; LOGS_REMAIN_1MiB; ORDINARY_CHILDREN_REMAIN_1MiB",
+    "delivery": 36,
+    "final_contracts": 52,
+    "final_focused_inner": 121,
+    "final_independent_review": "PASS_52_BOUNDARY_CASES_AND_EXACT_SOURCE_BINDINGS",
+    "final_local_counts": {
+      "contracts": 52,
+      "errors": 0,
+      "failures": 0,
+      "focused_inner": 121,
+      "outer": 2,
+      "skips": 0
+    },
+    "final_local_gate": "PASS",
     "fixture": "DISPOSABLE_LOCAL_GIT_ONLY",
     "focused_inner": 75,
     "head_before_after": "MATCH",
-    "hosted": "NOT_RUN",
+    "hosted": "FINAL_BOUND_DELIVERY_NOT_RUN",
     "independent_review": "PASS",
     "initial_failure": "BUILDER_ARCHIVE_EXCEEDED_CI_1MiB_FILE_LIMIT",
     "new_compiler_files": 256,
     "new_compiler_pins": 255,
     "outer_gate": 2,
-    "published_source_identity": "PENDING",
+    "published_source_identity": {
+      "commit": "ef21ca95331769622c294c65bb60ec7ceed0c392",
+      "tree": "5a70c5627afe75fcd475c20e71ee9bfb0b6a156d"
+    },
+    "source_hosted": {
+      "errors": 0,
+      "failures": 0,
+      "gzip_cross_version_byte_equality": false,
+      "manifest_match": true,
+      "result": "SUCCESS",
+      "run_id": 38862332226,
+      "selected_312_archive_matches_local": true,
+      "skips": 0,
+      "source_commit": "ef21ca95331769622c294c65bb60ec7ceed0c392",
+      "tests_per_version": 122,
+      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38862332226",
+      "versions": [
+        "3.6.15",
+        "3.12.15"
+      ]
+    },
     "suite_counts": {
       "aggregate": 25,
       "builder": 32,
@@ -32,7 +68,12 @@
       "observer": 6
     }
   },
-  "compiler_binding": "UNBOUND",
+  "compiler_binding": "BOUND_TO_ACTUAL_EF21_SOURCE_ARTIFACT",
+  "delivery_binding": "ACTUAL_DEPENDENCY_170C3FD",
+  "dependency_publication": {
+    "commit": "170c3fd74eb612f2529d1062e07c83e4263f78b1",
+    "tree": "ef8d15619dcb1b350eb139bbb964716f4f00497a"
+  },
   "directory_long_path_case": {
     "canonical_calls": 8193,
     "entries": 8192,
@@ -43,7 +84,7 @@
   },
   "errors": 0,
   "failures": 0,
-  "independent_scope": "SOURCE_AND_25_PLUS_12_PLUS_6_PLUS_32_PLUS_45_SCOPED_PASS",
+  "independent_scope": "CORE_25_PLUS_12_PLUS_6_PLUS_32_PLUS_45_AND_BINDING10_DELIVERY36_FINAL_CI52_PASS",
   "inputs": {
     "overlay_map_sha256": "eca79573770c1cedd4f21b06f77a078d996ed6a01532843573ecd6abd818f060",
     "parent_archive_sha256": "6553938a56b882e17d13029fa9a06787131bb55a5c55bc1138e2b825277b7307",
@@ -89,8 +130,45 @@
   "python": "3.12.14",
   "python36": "NATIVE_PYTHON3.6.8_COMPILE_ONLY_17_PUBLIC_PYTHON_FILES; NO_MODULE_EXECUTION_OR_RUNTIME_COMPATIBILITY_CLAIM",
   "schema": 1,
+  "selected_artifact": {
+    "actual_host": "NOT_RUN",
+    "archive_bytes": 1056853,
+    "archive_git_blob_sha1": "b588ef4e9333969b02f9322621dd7abe7641f23c",
+    "archive_sha256": "6244cca1b41037b7c240f71b93f867c5660a770d451c4a5a661b283f61ce819e",
+    "cache_pins": 255,
+    "entry_bytes": 55774,
+    "entry_sha256": "071ed5ffc57956269fe8cfdbb9095e40414ded091bae888a3fe76dc9a64d70d5",
+    "files": 256,
+    "hosted": {
+      "errors": 0,
+      "failures": 0,
+      "gzip_cross_version_byte_equality": false,
+      "manifest_match": true,
+      "result": "SUCCESS",
+      "run_id": 38862332226,
+      "selected_312_archive_matches_local": true,
+      "skips": 0,
+      "source_commit": "ef21ca95331769622c294c65bb60ec7ceed0c392",
+      "tests_per_version": 122,
+      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38862332226",
+      "versions": [
+        "3.6.15",
+        "3.12.15"
+      ]
+    },
+    "installation_approval": "NOT_GRANTED",
+    "manifest_bytes": 62561,
+    "manifest_sha256": "6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030",
+    "original_a_evidence_kit_unchanged": true,
+    "runtime_package_files_byte_preserved": 110,
+    "runtime_payloads_byte_preserved": 107,
+    "schema": 1,
+    "selected_compression_runtime": "3.12.14",
+    "source_commit": "ef21ca95331769622c294c65bb60ec7ceed0c392",
+    "source_tree": "5a70c5627afe75fcd475c20e71ee9bfb0b6a156d"
+  },
   "skips": 0,
-  "state": "LOCAL_EXACT_HEAD_CI_PASSED_PENDING_PUBLICATION",
+  "state": "BOUND_DELIVERY_LOCAL_EXACT_HEAD_PASS_PENDING_FINAL_HOSTED",
   "suites": {
     "affected_observer_binding": 6,
     "builder": 32,
