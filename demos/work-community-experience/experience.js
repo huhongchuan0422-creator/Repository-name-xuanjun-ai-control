@@ -1,9 +1,7 @@
 "use strict";
 (()=>{
 const $=id=>document.getElementById(id);
-function mode(wide){$('device').classList.toggle('wide',wide);$('phoneMode').setAttribute('aria-pressed',String(!wide));$('desktopMode').setAttribute('aria-pressed',String(wide));}
-$('phoneMode').addEventListener('click',()=>mode(false));$('desktopMode').addEventListener('click',()=>mode(true));
-document.querySelector('[data-role="consumer"]').setAttribute('aria-current','page');
+// Consumer navigation belongs to the consumer only. Device layout is responsive.
 let ready=false,pending=false,busy=false,created=false,payRequested=false;
 $('reference').value='mobile_'+crypto.randomUUID().replace(/-/g,'');
 function screen(){const target=location.hash.slice(1)||'home';const valid=['home','store','checkout','result','orders'].includes(target)?target:'home';document.querySelectorAll('[data-screen]').forEach(s=>s.hidden=s.dataset.screen!==valid);document.querySelectorAll('.bottom-nav a').forEach(a=>{if(a.hash==='#'+valid)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});}

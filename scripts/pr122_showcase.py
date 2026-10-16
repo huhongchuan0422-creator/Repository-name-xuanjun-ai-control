@@ -13,7 +13,7 @@ import re
 from urllib.parse import urlsplit
 from scripts.community_saas_modules import catalog as module_catalog
 
-KINDS={'project','page','milestone','acceptance','module','ecology'}
+KINDS={'project','page','milestone','acceptance','module','ecology','feature'}
 ID=re.compile(r'[a-z][a-z0-9-]{0,63}')
 SHA=re.compile(r'[0-9a-f]{64}')
 CSP="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
@@ -36,10 +36,17 @@ def validate(item):
     for key in ('title','summary'):
         need(type(item.get(key)) is dict and set(item[key])=={'zh','en'} and all(type(v) is str and 0<len(v)<=2000 for v in item[key].values()),'BILINGUAL_COPY_REQUIRED')
     fields={'project':{'state','scenarios','required_milestones'},'page':{'href','role','artifact_sha256','release_artifact_sha256'},'milestone':{'state','evidence_url'},'acceptance':{'project_version','snapshot_sha256','evidence_url','members'},'module':{'module_id','package_sha256','demo_href','requirements'},'ecology':{'initiator_nickname'}}
+    fields['feature']={'role','device','milestone_id','page_id','page_version','page_artifact_sha256'}
     required={'kind','id','project_id','version','visibility','title','summary'}|fields[item['kind']]
     optional={'sort_order'} if item['kind'] in ('page','milestone') else set()
     if 'sort_order' in item:need(type(item['sort_order']) is int and 0<=item['sort_order']<=9999,'SORT_ORDER')
     need(required<=set(item)<=required|optional,'UNKNOWN_OR_MISSING_FIELDS')
+    if item['kind']=='feature':
+        need(item['role'] in ('consumer','merchant','community','beneficiary','platform','website-admin'),'FEATURE_ROLE')
+        need(item['device'] in ('phone','desktop'),'FEATURE_DEVICE')
+        need(item['role'] not in ('consumer','merchant') or item['device']=='phone','PHONE_FIRST_ROLE')
+        need(all(type(item[k]) is str and ID.fullmatch(item[k]) for k in ('milestone_id','page_id')),'FEATURE_BINDING')
+        need(type(item['page_version']) is int and item['page_version']>0 and type(item['page_artifact_sha256']) is str and SHA.fullmatch(item['page_artifact_sha256']),'FEATURE_PAGE_IDENTITY')
     if item['kind']=='project':
         need(item.get('state') in ('PLANNED','DEVELOPING'),'PROJECT_STATE_REQUIRES_ACCEPTANCE_EVENT')
         need(type(item.get('required_milestones')) is list and len(set(item['required_milestones']))==len(item['required_milestones']) and all(type(v) is str and ID.fullmatch(v) for v in item['required_milestones']),'REQUIRED_MILESTONES')
@@ -100,7 +107,12 @@ def compile_catalog(items,approvals,prices=None,published_pages=None):
         done={m['id'] for m in milestones if m['state']=='DONE'}
         required=set(project['required_milestones'])
         accepted=bool(acceptance and pages and required and required<=done)
-        projects.append({**project,'state':'ACCEPTED' if accepted else project['state'],'pages':pages,'milestones':milestones,
+        features=[]
+        for feature in (i for i in members if i['kind']=='feature'):
+            bound=next((p for p in pages if p['id']==feature['page_id'] and p['role']==feature['role'] and p['version']==feature['page_version'] and p['artifact_sha256']==feature['page_artifact_sha256']),None)
+            if bound and feature['milestone_id'] in done:
+                features.append({**feature,'href':bound['href'],'page_version':bound['version'],'artifact_sha256':bound['artifact_sha256']})
+        projects.append({**project,'state':'ACCEPTED' if accepted else project['state'],'pages':pages,'milestones':milestones,'features':features,
                          'progress':{'done':len(required&done),'total':len(required),'percent':None},'snapshot_sha256':snapshot,'snapshot_members':member_refs,'acceptance':acceptance if accepted else None})
         for item in members:
             if item['kind']=='ecology':events.append(item)
@@ -150,6 +162,29 @@ CSS='''body{margin:0;background:#f5f5f7;color:#1d1d1f;font:17px/1.6 system-ui,sa
 
 CSS += '\n.showcase-main{max-width:1120px;margin:auto;padding:44px 24px 70px}.showcase-main h1{letter-spacing:-.04em;margin:40px 0 22px}.showcase-main h2{font-size:30px;letter-spacing:-.025em;margin:54px 0 24px}.showcase-main h3{font-size:22px;line-height:1.35;margin:18px 0 14px}.showcase-main a{text-decoration:none}.showcase-main a:hover{text-decoration:underline}.showcase-subnav{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:26px;border-bottom:1px solid #dedee4}.showcase-subnav a{padding:8px 14px;border-radius:20px;color:#4a4a50;background:#fff;font-size:14px}.showcase-lead{max-width:760px;font-size:20px;color:#606068}.showcase-tags{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0}.showcase-tags span,.showcase-status{padding:5px 11px;border-radius:20px;background:#e9edf5;font-size:13px;color:#4d5e77}.showcase-progress{color:#6e6e73;margin:26px 0}.showcase-main .card{min-height:0;border:1px solid #e8e8ed;box-shadow:none;margin:0}.showcase-main .card p{color:#606068;margin:12px 0 24px}.showcase-main .showcase-action{display:inline-block;font-weight:600}.showcase-main .role-cards{margin:28px 0 44px}.showcase-main .milestone h3{font-size:20px}.showcase-main .milestone a{font-size:14px}.showcase-main .notice{font-size:14px;color:#6e6e73;margin:26px 0}@media(max-width:600px){.showcase-main{padding:24px 18px 48px}.showcase-main h1{margin:30px 0 18px}.showcase-main h2{font-size:26px}.showcase-lead{font-size:18px}.showcase-main .card{padding:24px}}\n'
 
+def role_views(project,en=False):
+    """Generate role-local screens from independently approved, accepted features.
+
+    No author-provided HTML is invented or executed by this generator. The
+    feature action opens the hash-bound reviewed implementation unchanged.
+    """
+    language='en' if en else 'zh';prefix='en/' if en else '';escape=html.escape
+    labels={'consumer':('消费者','Consumer'),'merchant':('商家','Merchant'),'community':('社区','Community'),'beneficiary':('分账方','Beneficiary'),'platform':('平台运营','Platform operations'),'website-admin':('网站管理','Website administration')}
+    groups={}
+    for feature in project.get('features',[]):
+        groups.setdefault((feature['role'],feature['device']),[]).append(feature)
+    result=[]
+    for (role,device),features in sorted(groups.items()):
+        features=sorted(features,key=lambda f:f['id'])
+        relative=prefix+'projects/'+project['project_id']+'/roles/'+role+'/'+device+'/index.html'
+        title=labels[role][en]
+        nav=''.join('<a href="#feature-'+escape(f['id'],quote=True)+'">'+escape(f['title'][language])+'</a>' for f in features)
+        cards=''.join('<section class="card" id="feature-'+escape(f['id'],quote=True)+'"><h2>'+escape(f['title'][language])+'</h2><p>'+escape(f['summary'][language])+'</p><a href="'+escape(f['href'],quote=True)+'">'+('Open feature' if en else '进入功能')+' →</a></section>' for f in features)
+        body='<header><a href="/showcase/'+prefix+'projects/'+project['project_id']+'/">'+('Back to project' if en else '返回项目')+'</a><p>'+escape(project['title'][language])+'</p><h1>'+title+'</h1></header><nav aria-label="'+('Features' if en else '当前角色功能')+'">'+nav+'</nav><main>'+cards+'</main>'
+        result.append({'relative':relative,'href':'/showcase/'+relative.removesuffix('index.html'),'title':title,'device':device,'body':body})
+    return result
+
+
 def render(catalog,output,preview=False,project_files=None,shell=None):
     output=Path(output);need(not output.exists(),'OUTPUT_ALREADY_EXISTS')
     base=output/'showcase';base.mkdir(parents=True);(base/'assets').mkdir();(base/'assets/showcase.css').write_text(CSS)
@@ -181,7 +216,15 @@ def render(catalog,output,preview=False,project_files=None,shell=None):
             items=catalog['cases'] if key=='cases' else catalog['developing'] if key=='projects' else catalog['projects']
             page(prefix+key+'/index.html',labels[key][en],cards(items,key=='cases'),en)
         for project,is_case in [(p,False) for p in catalog['projects']]+[(p,True) for p in catalog['cases']]:
+            generated=role_views(project,en)
             roles='<div class="grid role-cards">'+''.join('<article class="card"><h3>'+escape(p['title'][language])+'</h3><p>'+escape(p['summary'][language])+'</p><a class="showcase-action" href="'+escape(p['href'],quote=True)+'">'+('Try the demo' if en else '进入体验')+' →</a></article>' for p in project['pages'])+'</div>'
+            if generated:
+                roles='<div class="grid role-cards">'+''.join('<article class="card"><h3>'+escape(v['title'])+'</h3><a href="'+escape(v['href'],quote=True)+'">'+('Enter' if en else '进入体验')+' →</a></article>' for v in generated)+'</div>'
+            if not is_case:
+                for view in generated:
+                    target=base/view['relative'];target.parent.mkdir(parents=True,exist_ok=True)
+                    notice=('<p>送审预览，尚未公开发布 / Review preview</p>' if preview else '')
+                    target.write_text('<!doctype html><html lang="'+('en' if en else 'zh-CN')+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escape(view['title'])+'｜玄钧云汇</title><link rel="stylesheet" href="/showcase/assets/roles.css"></head><body class="'+view['device']+'">'+notice+view['body']+'<footer><a href="https://beian.miit.gov.cn/" rel="noopener noreferrer">渝ICP备2026024862号</a></footer></body></html>')
             milestones=''.join('<article class="card milestone"><span class="showcase-status">'+escape(states[m['state']][en])+'</span><h3>'+escape(m['title'][language])+'</h3><a href="'+escape(m['evidence_url'],quote=True)+'">'+('View record' if en else '查看记录')+' →</a></article>' for m in project['milestones'])
             progress=project['progress'];scenarios='<div class="showcase-tags">'+''.join('<span>'+escape(v[language])+'</span>' for v in project['scenarios'])+'</div>'
             body='<p class="showcase-lead">'+escape(project['summary'][language])+'</p>'+scenarios+'<p class="showcase-progress">'+('Verified milestones: ' if en else '已核验完成：')+str(progress['done'])+' / '+str(progress['total'])+'</p>'+roles+'<h2>'+labels['roadmap'][en]+'</h2><div class="grid">'+milestones+'</div>'
@@ -206,6 +249,7 @@ def render(catalog,output,preview=False,project_files=None,shell=None):
     for name,raw in (project_files or {}).items():
         relative=PurePosixPath(name);need(not relative.is_absolute() and '..' not in relative.parts and relative.parts[0]=='showcase','PROJECT_FILE_PATH')
         target=output/name;need(not target.exists(),'PROJECT_FILE_COLLISION');target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+    (base/'assets/roles.css').write_text('body{margin:0;background:#f5f5f7;color:#1d1d1f;font:16px/1.6 system-ui,sans-serif}header,main,nav,footer{padding:20px;max-width:1120px;margin:auto}body.phone header,body.phone main,body.phone nav,body.phone footer{max-width:440px}h1{font-size:32px;letter-spacing:-.04em}a{color:#0066cc;text-decoration:none}nav{display:flex;gap:12px;overflow:auto}nav a{white-space:nowrap}main{display:grid;gap:16px}.card{background:white;border-radius:22px;padding:24px}h2{font-size:22px}.desktop main{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}a:focus-visible{outline:3px solid #0066cc;outline-offset:4px}@media(max-width:600px){header,main,nav,footer{padding:16px}h1{font-size:28px}}')
     # Never leak review queues, private declarations, costs or unpublished versions.
     public={k:catalog[k] for k in ('schema','projects','cases','developing','planned','modules','ecology')}
     (base/'catalog.json').write_bytes(canonical(public))

@@ -28,7 +28,7 @@ def build(output,stage=None):
                 return match[1]+'="'+urljoin('/'+old,value)+'"'
             html=re.sub(r'(src|href)="([^"]+)"',links,html)
             html=html.replace('</head>','<link rel="stylesheet" href="./role.css"></head>',1)
-            bar='<nav class="device-role-tools" aria-label="角色与设备预览"><a href="./">← 消费者体验</a><a href="merchant.html">商家</a><a href="community.html">社区</a><a href="beneficiary.html">分账方</a><a href="platform.html">平台</a><button data-device="phone" type="button">手机视图</button><button data-device="desktop" type="button">电脑视图</button><p>公开模拟预览；各角色范围以原页面说明为准。商家三家样例尚未与消费者订单联动。社区、分账方和平台为现有原型。</p></nav>'
+            bar='<nav class="device-role-tools" aria-label="项目导航"><a href="/visual/community-payment/">← 返回项目</a><span>模拟体验 · 无真实资金</span></nav>'
             html=html.replace('<body>','<body data-preview-role="'+role+'">'+bar,1)
             html=html.replace('</body>','<script src="./role.js" defer></script></body>',1)
             files[TARGET+role+'.html']=html.encode()

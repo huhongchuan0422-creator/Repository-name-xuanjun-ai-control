@@ -1,0 +1,28 @@
+name: PR122 accepted feature role generation
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - scripts/pr122_showcase.py
+      - tests/test_pr122_showcase_role_generation.py
+      - .github/workflows/pr122-role-generation-review.yml
+permissions:
+  contents: read
+jobs:
+  accepted-feature-generation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Regression and role isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_pr122_showcase tests.test_pr122_showcase_role_generation tests.test_pr122_showcase_sources tests.test_pr122_showcase_trust tests.test_pr122_showcase_protected_build tests.test_pr122_showcase_build_channel tests.test_pr122_showcase_install tests.test_pr122_showcase_poll tests.test_pr122_showcase_promote -v 2>&1 | tee ROLE_GENERATION_TESTS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr122-role-generation-test-evidence
+          path: ROLE_GENERATION_TESTS.txt
