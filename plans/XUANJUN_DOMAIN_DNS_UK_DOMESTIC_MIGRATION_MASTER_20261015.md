@@ -770,3 +770,14 @@ Owner集中只读补验实际返回：PrivateNetwork=yes/typed b true；systemct
 上述真实补证已补入原PR99#6208696010并回读。仅请求原独审签发同19f0e27d/同TAR/同9源码绑定的启动修正单次许可：全新root私有暂存保留旧package/cache不动；核无finalize attempt、旧anchor完整SHA4470...45fadf及旧批准body c0c9...943f5、同device25/inode4716/同旧receipt；旧anchor原字节备份后以新独审ID/正文SHA原子更新，保留原lock/receipt绑定；启动改Python3.11 -I -B -u。原6208552859不复用，不自行延长，许可未到前不交付重试执行命令。新的范围不含unit/transaction/current/runtime写、reload、服务启停、数据库/凭据/币安/Writer/东京停机。源码/制品/185审结继承，不再重审。
 
 当前根因与现场已闭环，服务器配置此前typed D-Bus证据继承；实际收尾仍未完成、空锁仍保留，新启动修正许可NOT_ISSUED/续接NOT_EXECUTED。Phase-C/生产迁移/东京退役HOLD；网站/DNS及Work内容不改。
+
+
+### 9.45 韩国收尾交接的父目录模式误限制已定位，原收尾器仍未启动（2026-10-16 13:35 CST）
+
+新启动许可6208766288已签发/原文核验，但Owner按SHA25f263d4...1ddb3b执行交接入口后，第一项父目录检查报PRIVATE_MODE:/root。属于本窗口新增手工交接的错误：将“新专用暂存必须0700”错套给全局/root父目录。不能以此要求chmod /root，也不能放宽新专用目录/anchor/锁的权限。
+
+准确控制流在旧anchor读取、stage创建、finalizer调用及锁操作前即拒绝；此结论来自Owner输出和精确交接字节，不冒充直接root登录核验。外层/root/pr99-startup-launch-6208766288及下载文件保留，不重跑、不清理。原19f0e27d源码/35ca...ff24原TAR/185审结均未变。
+
+唯一逻辑修正：trusted(STAGE.parent, directory=True, private=True)改为trusted(STAGE.parent, directory=True)，仍要求root所有、非链接、无组/其他写权限；新stage/package/anchor/lock维持严格0700/0600。真实本地文件系统权限检查11项PASS；非root owner夹具chown被环境拒绝，未冒充该测试通过；不是韩国实机验收。此前全量mock trusted的交接模型没有覆盖该问题，证据已纠正。
+
+6208766288明确任何失败后无第二次重试，本窗口不自行复用。已准备同原包/原finalizer的替代启动申请：固定原anchor44701367...45fadf、同dev25/inode4716、同旧receipt、无永久attempt；仅父目录检查修正和新许可字面绑定，旧目录/缓存/日志保留，不重审已通过源码/制品/185。此后仅新明确许可与真实收尾回执可推进。Phase-C/生产迁移/东京退役HOLD，网站/Work/DNS不改。
