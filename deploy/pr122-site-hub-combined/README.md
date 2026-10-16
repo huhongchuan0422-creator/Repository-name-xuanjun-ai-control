@@ -1,7 +1,9 @@
 # PR122 combined host wrapper — REVIEW ONLY / production HOLD
 
-This new wrapper reuses the independently reviewed 447-member artifact and its
-generated publisher byte-for-byte. It does not rebuild pages, replace the
+The wrapper uses the 447-member candidate with the Owner-confirmed ICP footer
+delta recorded in evidence/pr122-site-hub/ICP_DELTA_20261016.json. The runtime
+and generated publisher remain byte-for-byte identical to the reviewed base.
+It does not replace the
 installed publisher, grant Runner sudo, or replace the old website. The manual
 admin root channel is the candidate execution channel; it still needs explicit
 admission for this exact wrapper. The old Portal logfix capability is unrelated.
@@ -14,6 +16,12 @@ AUDIT_PASS_WITH_SCOPE_LIMITS, not production release. Host non-root inspection:
 Run 38848902571 / Job 116805523238 / #6207852348. Owner's root terminal evidence:
 #6207883697 at 2026-10-16 04:09:50 UTC. Root nginx -t passed; current and installed
 publisher remained at the old baseline. /var/backups was absent.
+
+Owner update: the root plan for a0da23f5 passed in #6208308861.
+The new content source 84e9b6b5 adds the exact registration 渝ICP备2026024862号
+with the MIIT link to 356 shared official footers; every other application byte
+is unchanged. The changed artifact and pins require their own exact approval.
+Do not reuse the old transport/inputs or a prior release approval.
 
 New review scope: combined.py, its package builder, HOST_PINS, exact route
 generation, the root-private gate and journal, backup/restore and recovery,
@@ -34,7 +42,7 @@ requires the expected new 2 config sources and no other changes.
 
 Root-owned immutable input directory, with non-writable ancestry:
 
-- PR122_SITE_HUB_REVIEW_ONLY.tar.gz — frozen SHA256 18cd49ff3936895171b889099871e58dd2f1576508c8dc3e4db16a9fd935902e.
+- PR122_SITE_HUB_REVIEW_ONLY.tar.gz — ICP candidate SHA256 dcf96b124cea6170453bdec52e60fc94d157864f342e2d1706801d54568abafb.
 - PR122_TOKYO_WEBROOT_MIGRATION_SOURCE_0363531ee2f8.tar.gz — SHA256 74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63.
 
 No root approval is included. A protected operator must first verify the external
