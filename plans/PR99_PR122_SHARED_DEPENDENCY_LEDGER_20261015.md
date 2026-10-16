@@ -197,3 +197,10 @@ isolated runtime acceptance implementation/configuration, not more R1–R3 revie
 | 东京退役 | 保留主机和回滚资产 | 仅在S01—S11全部依赖关闭后准备最终退役审查 | 以上任一未完成即HOLD |
 
 本记录是对已有依赖的收敛，不表示新增服务或重新开发已审OAuth。安全/日志服务元数据仅作为本次IP边界补证，不读取配置/原始日志/凭据/DB，不作为全部外围安全策略证明。
+
+
+### 2026-10-16：PR99 R2复审关闭，转入原韩国Phase-B安装准备
+
+已回读正式独审PR99#6206991380：准确632bbe6f204a2c9ef778d3c91e425593c079abb1、tree59a48168764e8465e62fd17a55504c29812365b3，R2_TERMINAL_FIX=PASS_WITH_SCOPE_LIMITS，R2同版本重入终态CLOSED，R6原结论继承，Hosted137/137继承。不再重复修复/测试/复审R2。此前本账本和主计划的R2待审表述仅为历史状态。
+
+下一既定节点是原PR99 Korea Phase B自包含候选构建/Manifest绑定，再按精确批准进行独立root离线安装及check：专用身份/venv/release、disabled/inactive unit、IPAddressDeny=any、无Allow、绝不启动Shadow/交易。不把R2源码批准扩大为安装授权。已查原137项Run38670647659无Artifact，不能声称运行制品已交付。Phase C实时只读Shadow另需精确网络许可、只读账户授权、持续闭合WAL快照发布/独立验证及完整验收窗口，目前真实路径未安装；Finance共享DB及四timer权威保持。PR99 Draft/交易迁移HOLD，东京不停止。

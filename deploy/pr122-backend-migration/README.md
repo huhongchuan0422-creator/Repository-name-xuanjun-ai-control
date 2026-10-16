@@ -22,8 +22,10 @@ successor; they are rejected rather than silently dropped or made inaccessible.
 Legacy masked IDs cannot establish exact account identity. An active token
 requires an independently established exact account hash from the trusted
 private fence context AND an explicitly supplied private provider verification
-adapter bound to that access token. This candidate contains no live verification
-adapter. Missing proof fails before target writes. Revoked, disconnected or
+adapter bound to that access token. `PrivateIdentityVerifier` now wraps the
+reviewed clients' user-info interfaces, but creates no clients automatically.
+It requires exact private account anchors and explicitly admitted clients;
+this increment uses only fake clients. Missing proof fails before target writes. Revoked, disconnected or
 expired state remains inactive and retained, without pretending it is connected.
 
 `prepare_generation` writes only a new caller-owned 0700 offline generation,
@@ -35,10 +37,27 @@ the same target refuses retries. Cross-process creation has one winner.
 
 `isolated_runtime.make_isolated_server` runs on loopback with provider calls
 disabled. It requires a private regular READY marker and no failure marker.
-The wrapper preserves the accepted temporary TikTok disconnect denial: fixed403,
+The standby wrapper permits only GET /healthz, refuses other GET/POST with503,
+and preserves the accepted temporary TikTok disconnect denial: fixed403,
 operation_performed=false, before request-body or credential-store access. It does
 not add login or authenticated disconnect. Tests use temporary state and fake
 identity verification; they never read production state or call a provider.
+In particular, /p/douyin cannot create a new OAuth state in standby.
+
+`private_source` is a bounded private reader library, not a privileged entry
+point. Its default fixed-host guard requires root on Tokyo, inactive/dead
+Portal with MainPID0, refused loopback18080 and the exact R4 source bytes. It
+does not stop the service. Selected sessions and the eight OAuth SecretRefs
+are read through checked directory descriptors, with strict owner/mode,
+non-symlink regular-file identity, JSON, size and before/after generation checks.
+Metadata value_path is never used as a read target. Values remain in memory;
+the reader neither prints nor transfers them. Custom roots and fake guards are
+synthetic test seams, not inputs to any installed root capability.
+
+The reader's returned fence deliberately says writer_fenced=false. A stopped
+Portal proves neither exclusive custody nor the absence of other writers;
+normalise rejects this partial fence until a separately approved orchestrator
+establishes the complete writer scope. Do not turn that flag on without proof.
 
 ## Trust and incomplete production integration — explicit blockers
 
@@ -48,11 +67,12 @@ library does not cryptographically authenticate a snapshot or perform root
 admission. Before live use, the accepted I1/Owner-root admission pattern must
 bind the exact new adapter, independent action approval, source/target identities,
 snapshot generation, actual writer drain/fence and protected transport. No live
-reader/transport, root installer, production unit or automatic activation is
-provided here. Do not run this against real data or wire it into a live Runner.
+transport, root installer, production unit or automatic activation is provided
+here. Do not run this reader against real data or wire it into a live Runner.
 
-Neither the real protected snapshot custody adapter nor a live identity verifier
-has been implemented or executed in this increment. Do not report S05 complete
+Private reader and identity interfaces have been implemented, but neither has
+been executed against production data. Protected transport and full writer
+custody/root admission remain unimplemented. Do not report S05 complete
 or treat passing synthetic conversion tests as a production migration permit.
 No secrets, database snapshots, environment files or business exports belong in
 GitHub/chat/CI artifacts. Real data must stay within an explicitly reviewed
@@ -67,7 +87,7 @@ Keep Tokyo and all bridges/callbacks running. PR99 owns trading/Finance migratio
 
 Run only the new group:
 
-    python3 -B -m unittest discover -s tests -p test_pr122_backend_custody.py -v
+    python3 -B -m unittest discover -s tests -p 'test_pr122_backend_*.py' -v
 
 It covers exact state continuity, rejection without writes, process competition,
 hard exit and partial-commit preservation, inactive-account preservation, and a

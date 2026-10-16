@@ -363,11 +363,13 @@ class CustodyTests(unittest.TestCase):
             for method, path, headers, expected in [
                 ('GET','/healthz',{'Host':'wenwenwenyiyiyi.work','X-Forwarded-Proto':'https'},200),
                 ('GET','/integrations/tiktok/oauth/start',{'Host':'wenwenwenyiyiyi.work','X-Forwarded-Proto':'https'},503),
+                ('GET','/p/synthetic',{'Host':'wenwenwenyiyiyi.work','X-Forwarded-Proto':'https'},503),
+                ('POST','/submit/tiktok',{'Host':'wenwenwenyiyiyi.work','X-Forwarded-Proto':'https'},503),
                 ('POST','/integrations/tiktok/disconnect',{'Host':'invalid.example','Origin':'https://invalid.example'},403)]:
                 c = http.client.HTTPConnection(*server.server_address, timeout=3)
                 c.request(method,path,headers=headers);response=c.getresponse();body=response.read();c.close()
                 self.assertEqual(response.status, expected)
-                if method=='POST':self.assertIs(json.loads(body)['operation_performed'], False)
+                if path=='/integrations/tiktok/disconnect':self.assertIs(json.loads(body)['operation_performed'], False)
         finally:
             server.shutdown();server.server_close();thread.join(3)
 

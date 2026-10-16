@@ -133,7 +133,7 @@
           "R4 temporary containment candidate disables HTTP disconnect before store/body/audit business state access for every caller; full authenticated disconnect remains NOT_IMPLEMENTED and migration scope acceptance requires independent decision",
           "R4 controlled-install preparation reuses exact root engine and approved guard; fixed one-shot action, source/new-PID gates, proposed empty403 acceptance and explicit backend-offline rollback require independent plan approval; synthetic root filesystem tests are not production acceptance",
           "I1: exact independently received action approval must be separately pinned by Owner root; canonical GitHub commit/tree/code/ZIP facts plus one-attempt durable consumption and distinct outage-consented offline rollback fail closed before state or service mutation; shared GitHub author is not reviewer independence",
-          "后台迁移增量仅验证私有离线generation转换、会话/一次性state保持、精确账号锚点拒绝、进程竞争/中断保留及loopback隔离；真实快照托管/传输/身份验证适配与生产迁移未实现，不以36项synthetic测试冒充安装许可"
+          "后台迁移仅合成验证离线generation、私有有界读取/固定Portal停止检查与显式私有身份校验接口；待机仅health GET及disconnect403，其余拒绝且无业务写；57项测试不是root授权、真实托管传输或生产迁移验收"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
@@ -145,7 +145,8 @@
           "tests/test_legacy_disconnect_guard.py",
           "tests/test_r4_controlled_install.py",
           "tests/test_r4_install_approval.py",
-          "tests/test_pr122_backend_custody.py"
+          "tests/test_pr122_backend_custody.py",
+          "tests/test_pr122_backend_private_adapters.py"
         ]
       },
       "reuse": [
@@ -176,7 +177,8 @@
         "tests/test_r4_controlled_install.py",
         "tests/test_r4_install_approval.py",
         "deploy/pr122-backend-migration/**",
-        "tests/test_pr122_backend_custody.py"
+        "tests/test_pr122_backend_custody.py",
+        "tests/test_pr122_backend_private_adapters.py"
       ]
     },
     {

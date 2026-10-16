@@ -8,12 +8,18 @@ from pr122_oauth_candidate import http_candidate
 
 
 class MigrationHandler(http_candidate.Handler):
+    def get_route(self):
+        if urllib.parse.urlsplit(self.path).path != '/healthz':
+            self.deny(503, 'STANDBY_RUNTIME_NOT_ACTIVATED')
+            return
+        super().get_route()
+
     def do_POST(self):
         if urllib.parse.urlsplit(self.path).path == '/integrations/tiktok/disconnect':
             self.reply(403, {'status': 'REJECTED', 'operation_performed': False,
                              'reason': 'TIKTOK_DISCONNECT_TEMPORARILY_DISABLED'})
             return
-        super().do_POST()
+        self.deny(503, 'STANDBY_RUNTIME_NOT_ACTIVATED')
 
 
 def make_isolated_server(generation_root, *, port=0):

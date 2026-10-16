@@ -262,8 +262,8 @@ def prepare_generation(parent, snapshot, *, generation, cutover_id, fence,
                    'secretref_count': sum(k.startswith('secret:') for k in main),
                    'oauth_state_counts': {p: len(states[p]) for p in PROVIDERS},
                    'source_changed': False, 'activated': False,
-                   'production_approved': False, 'real_snapshot_custody_implemented': False,
-                   'live_identity_adapter_implemented': False}
+                   'production_approved': False, 'source_fence_verified_by_this_function': False,
+                   'identity_verifier_provenance': 'SUPPLIED_PRIVATE_CALLER_ADAPTER_OR_NONE'}
         private_json(target/'HANDOFF.json', summary)
         if checkpoint:
             checkpoint('BEFORE_READY')

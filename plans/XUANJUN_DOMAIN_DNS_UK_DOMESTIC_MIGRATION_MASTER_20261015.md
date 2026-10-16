@@ -651,3 +651,17 @@ Owner明确要求现在推进服务器迁移。沿PR122/S01—S12继续，不重
 状态转换/隔离运行增量可保留开发证据，完整服务器迁移未完成；本批不是生产可安装包，不逐点请求生产批准。真实legacy reader、主机间受保护托管传输、精确账号验证适配及root安装/激活尚未实现/准入，旧混合会话和非OAuth/Telegram后继也未完成。长期Owner授权不等于非rootRunner有数据权限。当前不要求Owner重复查资料或继续修改DNS，不虚构已读私有数据/已搬数据。S01/S02预检推进、S04/S05部分离线开发推进；S03真实一致备份、S05真实搬迁、S06等实际去依赖及S12仍待完成。
 
 集中开发检查点evidence/pr122-r4-controlled-install/BACKEND_OFFLINE_CI_ARTIFACT_20261016.json。将新36测试job限制本次提交，防止后续重复；不改批准制品312efdd3或7模块。下一独立开发动作为受保护快照读取/托管/执行适配的完整可审核实现；不能只凭当前转换库申请搬迁许可。PR99原R2待审外部依赖另在原PR同步，不复制新队列、不停Finance。东京继续在线、退役HOLD。
+
+
+### 9.34 2026-10-16：私有读取/身份校验接口增量与PR99 R2关闭
+
+新增private_source.py/private_identity.py，继续复用原7模块准确字节。固定东京Portal停止/PID0/18080拒绝/R4源码核验；仅选择会话和8项OAuth SecretRef，目录描述符、非链接身份/0700/0600、重复JSON键/大小/读前后generation核验，值只在内存不输出；身份校验只接收显式私有账号锚点和已准入client，测试仅假client。待机runtime仅GET healthz，其他GET/POST503，disconnect继承403；避免/p页面生成OAuth state。读取器返回writer_fenced=false，未有真实独占写权证明不得转换为true。Portal停止不是全部writer已停止。
+
+新增组本地57/57 PASS，0 skip。当前只是库和合成测试，未读取生产状态/调用真实provider；受保护传输、全部writer托管、I1精确root准入/安装/生产激活仍未实现或未准入，不能称只缺权限或S05已完成。国内Runner沿原队列仅执行新增57项和源制品绑定，结果以准确push原始日志为准。网站文件/current/DNS/桥接/生产服务全部不修改。完成后固定本次CI提交，避免后续重复。
+
+
+### 2026-10-16：PR99 R2复审关闭，转入原韩国Phase-B安装准备
+
+已回读正式独审PR99#6206991380：准确632bbe6f204a2c9ef778d3c91e425593c079abb1、tree59a48168764e8465e62fd17a55504c29812365b3，R2_TERMINAL_FIX=PASS_WITH_SCOPE_LIMITS，R2同版本重入终态CLOSED，R6原结论继承，Hosted137/137继承。不再重复修复/测试/复审R2。此前本账本和主计划的R2待审表述仅为历史状态。
+
+下一既定节点是原PR99 Korea Phase B自包含候选构建/Manifest绑定，再按精确批准进行独立root离线安装及check：专用身份/venv/release、disabled/inactive unit、IPAddressDeny=any、无Allow、绝不启动Shadow/交易。不把R2源码批准扩大为安装授权。已查原137项Run38670647659无Artifact，不能声称运行制品已交付。Phase C实时只读Shadow另需精确网络许可、只读账户授权、持续闭合WAL快照发布/独立验证及完整验收窗口，目前真实路径未安装；Finance共享DB及四timer权威保持。PR99 Draft/交易迁移HOLD，东京不停止。
