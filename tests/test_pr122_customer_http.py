@@ -17,7 +17,7 @@ class HttpTests(CustomerTests):
   super().setUp()
   root=self.root;key=self.key;now=self.now
   def factory():return Center(root,{'v1':key},'v1',clock=lambda:now,mail_ready=True,scanner=lambda b:True)
-  self.server=HTTPServer(('127.0.0.1',0),App(factory,Providers({}),'https://wenwenwenyiyiyi.work','deploy/pr122-customer-center/ui').handler())
+  self.server=HTTPServer(('127.0.0.1',0),App(factory,Providers({}),'https://wenwenwenyiyiyi.work','deploy/pr122-customer-center/ui',source_identity=lambda connection,headers:'fixture-client').handler())
   self.thread=threading.Thread(target=self.server.serve_forever,daemon=True);self.thread.start()
   self.addCleanup(self.finish)
  def finish(self):self.server.shutdown();self.server.server_close();self.thread.join()

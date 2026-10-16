@@ -15,6 +15,7 @@ import time
 import urllib.request
 from pathlib import Path
 from scripts.pr122_customer_core import Denied,canonical,digest,private_path,secure_write
+from scripts.pr122_customer_review import trust_digest
 
 CODE=Path('/usr/local/lib/xuanjun-customer-center')
 CONFIG=Path('/etc/xuanjun-customer-center')
@@ -53,7 +54,10 @@ def inventory():
     return {'files':{p:x['sha256'] for p,x in value['files'].items()},'master':Ops().nginx_identity()}
 
 def private_config(path):
-    private_path(path);s=path.stat();need(s.st_uid==0 and stat.S_ISREG(s.st_mode) and not s.st_mode&0o077,'ROOT_CONFIG_MODE');return json.loads(path.read_bytes())
+    private_path(path)
+    parent=Path(path).parent
+    need(parent.stat().st_uid==0 and not parent.stat().st_mode&0o022,'ROOT_CONFIG_DIRECTORY_REQUIRED')
+    s=path.stat();need(s.st_uid==0 and stat.S_ISREG(s.st_mode) and not s.st_mode&0o077,'ROOT_CONFIG_MODE');return json.loads(path.read_bytes())
 
 def plan(folder):
     need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','HOST_OR_ROOT')
@@ -74,7 +78,7 @@ def plan(folder):
     providers=Providers(runtime['providers']).status();need(all(runtime['providers'].get(k) for k in ('smtp','telegram','feishu','secretref','web_ai')),'REAL_PROVIDER_CONFIG_REQUIRED')
     # Source-only tests cannot satisfy actual scan/KMS/provider/authority evidence.
     acceptance=private_config(CONFIG/'TARGET_ACCEPTANCE.json')
-    required=('canonical_identity_mapping','canonical_order_contract_export','canonical_customer_project_mapping','key_backup_recovery','scanner_clean_and_eicar','smtp_verified_account_recovery','telegram_callback_identity','feishu_callback_identity','secretref_metadata_authority','web_ai_provider_identity')
+    required=('canonical_identity_mapping','canonical_order_contract_export','canonical_customer_project_mapping','key_backup_recovery','scanner_clean_and_eicar','smtp_verified_account_recovery','telegram_callback_identity','feishu_callback_identity','secretref_metadata_authority','web_ai_provider_identity','telegram_token_path_confidentiality')
     need(set(acceptance)=={'manifest_sha256','evidence'} and acceptance['manifest_sha256']==digest(raw) and set(acceptance['evidence'])==set(required),'TARGET_ACCEPTANCE_BINDING')
     for key in required:
         v=acceptance['evidence'][key];need(type(v) is dict and set(v)=={'sha256','path'} and len(v['sha256'])==64,'TARGET_EVIDENCE_SCHEMA')
@@ -82,10 +86,32 @@ def plan(folder):
     import grp
     grp.getgrnam('nginx')
     need(not os.path.lexists('/run/xuanjun-customer-api/http.sock'),'SOCKET_OCCUPIED')
-    nginx=run(['/usr/sbin/nginx','-T']);need(b'/customer/center' not in nginx,'EXISTING_CUSTOMER_LOCATION')
+    nginx=run(['/usr/sbin/nginx','-T'])
+    import re
+    need(not re.search(rb'^\s*(?:real_ip_header|set_real_ip_from|real_ip_recursive)\s',nginx,re.M),'REALIP_CHAIN_REQUIRES_SEPARATE_VERIFIED_MAPPING')
+    need(re.search(rb'^\s*user\s+nginx(?:\s+nginx)?\s*;',nginx,re.M),'PINNED_NGINX_WORKER_USER_REQUIRED')
+    need(b'/customer/center' not in nginx,'EXISTING_CUSTOMER_LOCATION')
     old=private_path(HTTPS).read_bytes();need(old.count(ANCHOR)==1 and INCLUDE not in old,'HTTPS_ANCHOR')
     baseline=inventory();run(['/usr/sbin/nginx','-t'])
-    return {'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
+    nginx_uid=pwd.getpwnam('nginx').pw_uid
+    need(nginx_uid>0,'NON_ROOT_NGINX_WORKER_REQUIRED')
+    trust=private_config(CONFIG/'INDEPENDENT_REVIEW_TRUST.json')
+    tar_sha=archive_binding(folder,manifest,raw)
+    return {'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'telegram_credential_evidence_sha256':acceptance['evidence']['telegram_token_path_confidentiality']['sha256'],'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
+
+def archive_binding(folder,manifest,manifest_raw):
+    import tarfile
+    archive=private_path(Path(folder).parent/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz')
+    raw=archive.read_bytes();need(len(raw)<=10_000_000,'SOURCE_ARCHIVE_SIZE')
+    expected={'customer-center/'+x['path']:x for x in manifest['files']};seen=set()
+    with tarfile.open(archive,mode='r:gz') as t:
+        for m in t:
+            need(m.isfile() and m.name not in seen and not m.name.startswith('/') and '..' not in Path(m.name).parts and m.size<=8_000_000,'SOURCE_ARCHIVE_MEMBER');seen.add(m.name)
+            if m.name=='customer-center/CUSTOMER_MANIFEST.json':need(t.extractfile(m).read()==manifest_raw,'ARCHIVE_MANIFEST')
+            else:
+                need(m.name in expected,'ARCHIVE_EXTRA');x=expected[m.name];need(m.size==x['size'] and digest(t.extractfile(m).read())==x['sha256'],'ARCHIVE_FILE_HASH')
+    need(seen==set(expected)|{'customer-center/CUSTOMER_MANIFEST.json'},'ARCHIVE_INCOMPLETE')
+    return digest(raw)
 
 def github(path):
     token=private_path(CONFIG/'github-readonly-token');st=token.stat();need(st.st_uid==0 and not st.st_mode&0o077,'GITHUB_READONLY_CREDENTIAL')
@@ -98,8 +124,14 @@ def gate(comment_id,expected_plan,fetch=github):
     c=fetch('issues/comments/'+str(comment_id));need(c['id']==comment_id and c['user']['login']==OWNER and c['issue_url'].endswith('/issues/122') and c['body'].startswith('XUANJUN_CUSTOMER_INSTALL\n'),'APPROVAL_ORIGIN')
     a=json.loads(c['body'].split('\n',1)[1]);need(a['decision']=='INSTALL_APPROVED' and a['transaction']==TXN and a['plan_sha256']==digest(canonical(expected_plan)) and a['manifest_sha256']==expected_plan['manifest_sha256'] and a['source_commit']==expected_plan['source_commit'] and a['max_executions']==1 and a['rollback_approved'] is True,'APPROVAL_BINDING')
     need(type(a['issued_unix']) is int and type(a['expires_unix']) is int and a['issued_unix']<=time.time()<a['expires_unix'] and 0<a['expires_unix']-a['issued_unix']<=7200,'APPROVAL_EXPIRY')
-    r=fetch('issues/comments/'+str(a['review_comment_id']));need(r['id']!=comment_id and r['user']['login']==OWNER and r['issue_url'].endswith('/issues/122') and r['body'].startswith('XUANJUN_CUSTOMER_REVIEW\n'),'INDEPENDENT_REVIEW_ORIGIN')
-    v=json.loads(r['body'].split('\n',1)[1]);need(v['decision']=='AUDIT_PASS' and v['reviewer_role']=='INDEPENDENT_AUDITOR' and v['manifest_sha256']==a['manifest_sha256'] and v['source_commit']==a['source_commit'] and v['ci_run_id']==a['ci_run_id'],'INDEPENDENT_REVIEW_BINDING')
+    r=fetch('issues/comments/'+str(a['review_comment_id']))
+    need(r['id']!=comment_id and r['user']['login']==OWNER and r['issue_url'].endswith('/issues/122'),'REVIEW_RECORD_ORIGIN')
+    trust_raw=private_path(CONFIG/'INDEPENDENT_REVIEW_TRUST.json').read_bytes()
+    from scripts.pr122_customer_review import trust_digest
+    need(trust_digest(json.loads(trust_raw))==expected_plan['review_trust_sha256'],'OWNER_REVIEW_TRUST_DRIFT')
+    trust=private_config(CONFIG/'INDEPENDENT_REVIEW_TRUST.json')
+    from scripts.pr122_customer_review import verify
+    verify(r,c,a,expected_plan,trust,fetch)
     ci=fetch('actions/runs/'+str(a['ci_run_id']));need(ci['conclusion']=='success' and ci['head_sha']==a['source_commit'] and ci['path']=='.github/workflows/pr122-customer-center.yml' and ci['event'] in ('push','workflow_dispatch'),'EXACT_CUSTOMER_CI')
     return a
 
@@ -155,6 +187,8 @@ def plan_without_absence(expected):
     # No new effects yet except the release receipt and its root-private backup.
     value=dict(expected);value['nginx']=inventory();value['main_current']=os.readlink(CURRENT);value['previous_https_sha256']=digest(HTTPS.read_bytes())
     for key,path in [('config_sha256',CONFIG/'config.json'),('runtime_config_sha256',CONFIG/'runtime.json'),('target_acceptance_sha256',CONFIG/'TARGET_ACCEPTANCE.json')]:value[key]=digest(path.read_bytes())
+    from scripts.pr122_customer_review import trust_digest
+    value['review_trust_sha256']=trust_digest(private_config(CONFIG/'INDEPENDENT_REVIEW_TRUST.json'))
     return value
 
 def rollback():

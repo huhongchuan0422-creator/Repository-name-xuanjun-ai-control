@@ -48,9 +48,39 @@ class ClamScanner:
         except (OSError,subprocess.TimeoutExpired): return False
         finally: Path(name).unlink(missing_ok=True)
 
+def telegram_send(token,subject,text,*,connect=None):
+    """Token-path protocol isolated to direct validated TLS. No env proxy,
+    redirect, urllib request object, wire debug, TLS key log, raw exception or
+    provider response is allowed to escape this transport boundary.
+    """
+    import http.client,re
+    if type(token) is not str or not re.fullmatch(r'[A-Za-z0-9_:-]{1,256}',token):raise Unavailable('TELEGRAM_CREDENTIAL_INVALID')
+    context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT);context.load_default_certs()
+    context.minimum_version=ssl.TLSVersion.TLSv1_2;context.keylog_filename=None
+    connection=None;result=None
+    try:
+        connection=(connect or http.client.HTTPSConnection)('api.telegram.org',443,timeout=12,context=context)
+        connection.set_debuglevel(0)
+        connection.request('POST','/bot'+token+'/sendMessage',body=canonical({'chat_id':subject,'text':text}),headers={'Content-Type':'application/json'})
+        response=connection.getresponse()
+        if response.status==200:
+            raw=response.read(1_000_001)
+            if len(raw)<=1_000_000:
+                d=json.loads(raw);mid=d.get('result',{}).get('message_id')
+                if d.get('ok') is True and type(mid) is int and mid>0:result={'ok':True,'result':{'message_id':mid}}
+    except Exception:
+        # Do not retain/chains/re-raise the secret-bearing transport exception.
+        pass
+    finally:
+        if connection is not None:
+            try:connection.close()
+            except Exception:pass
+    if result is None:raise Unavailable('TELEGRAM_REQUEST_UNCONFIRMED')
+    return result
+
 class Providers:
-    def __init__(self,config,*,post=post_json,clock=time.time):
-        self.config=config;self.post=post;self.clock=clock
+    def __init__(self,config,*,post=post_json,clock=time.time,telegram_transport=telegram_send):
+        self.config=config;self.post=post;self.clock=clock;self.telegram_transport=telegram_transport
     def status(self):
         # A config is not an actual accepted end-to-end connection.
         return {k:{'state':'CONFIGURED_AWAIT_ACCEPTANCE' if self.config.get(k) else 'PENDING_CONNECTION','accepted':False} for k in ('smtp','telegram','feishu','secretref','web_ai')}
@@ -93,7 +123,7 @@ class Providers:
         if channel=='TELEGRAM':
             c=self.config.get('telegram')
             if not c or not c.get('bot_token'): raise Unavailable('TELEGRAM_PENDING')
-            r=self.post('https://api.telegram.org/bot'+c['bot_token']+'/sendMessage',{'chat_id':subject,'text':text})
+            r=self.telegram_transport(c['bot_token'],subject,text)
             if r.get('ok') is not True or not r.get('result',{}).get('message_id'): raise Unavailable('TELEGRAM_NOT_ACCEPTED')
             return 'ACCEPTED',str(r['result']['message_id']) # API acceptance is not recipient delivery.
         if channel=='FEISHU':

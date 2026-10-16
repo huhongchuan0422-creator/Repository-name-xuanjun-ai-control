@@ -10,7 +10,7 @@ from pathlib import Path
 from scripts.pr122_customer_core import canonical,digest
 ROOT=Path(__file__).resolve().parent.parent
 
-def build(output,commit):
+def build(output,commit,tree):
     if len(commit)!=40 or any(c not in '0123456789abcdef' for c in commit):raise ValueError('EXACT_COMMIT')
     paths={p.relative_to(ROOT).as_posix() for p in (ROOT/'scripts').glob('pr122_customer_*.py')}
     paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'deploy/pr122-customer-center').rglob('*') if p.is_file())
@@ -32,7 +32,7 @@ def build(output,commit):
                 if (dep.startswith('scripts/') or dep.startswith('tests/')) and (ROOT/dep).is_file() and dep not in paths:paths.add(dep);pending.append(dep)
     files={p:(ROOT/p).read_bytes() for p in sorted(paths)}
     files['boot.py']=(ROOT/'deploy/pr122-customer-center/boot.py').read_bytes()
-    manifest={'schema':1,'state':'REVIEW_ONLY_NOT_DEPLOYED','source_commit':commit,'minimum_python':'3.11','cryptography':'46.0.3','files':[{'path':p,'size':len(b),'sha256':digest(b)} for p,b in sorted(files.items())]}
+    manifest={'source_tree':tree,'schema':1,'state':'REVIEW_ONLY_NOT_DEPLOYED','source_commit':commit,'minimum_python':'3.11','cryptography':'46.0.3','files':[{'path':p,'size':len(b),'sha256':digest(b)} for p,b in sorted(files.items())]}
     raw=canonical(manifest);files['CUSTOMER_MANIFEST.json']=raw
     out=Path(output);out.mkdir(parents=True,exist_ok=True);archive=out/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz'
     stream=io.BytesIO()
@@ -47,5 +47,5 @@ def build(output,commit):
     (out/'CUSTOMER_PACKAGE_RECEIPT.json').write_bytes(canonical(receipt));print(json.dumps(receipt));return receipt
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--output',required=True);ap.add_argument('--source-commit',required=True);a=ap.parse_args();build(a.output,a.source_commit)
+    ap=argparse.ArgumentParser();ap.add_argument('--output',required=True);ap.add_argument('--source-commit',required=True);ap.add_argument('--source-tree',required=True);a=ap.parse_args();build(a.output,a.source_commit,a.source_tree)
 if __name__=='__main__':main()

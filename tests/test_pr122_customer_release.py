@@ -14,7 +14,7 @@ class ReleaseTests(unittest.TestCase):
   for name,relative in [('CODE','code'),('CONFIG','config'),('STATE','transactions'),('DATA','data'),('HTTPS','nginx/site.conf'),('SNIPPET','nginx/customer/locations.conf'),('CURRENT','www/current'),('UNIT','units'),('LOCK','lock')]:
    p=b/relative;p.parent.mkdir(exist_ok=True,parents=True);pather=patch.object(r,name,p);pather.start();self.addCleanup(pather.stop)
   r.SNIPPET.parent.rmdir();r.CONFIG.mkdir();r.UNIT.mkdir();r.CURRENT.symlink_to(b/'old-release');r.HTTPS.write_bytes(b'server { '+r.ANCHOR+b' }');r.LOCK.touch()
-  for f in ('config.json','runtime.json','TARGET_ACCEPTANCE.json'):(r.CONFIG/f).write_bytes(b'{}')
+  for f in ('config.json','runtime.json','TARGET_ACCEPTANCE.json','INDEPENDENT_REVIEW_TRUST.json'):(r.CONFIG/f).write_bytes(b'{}');os.chmod(r.CONFIG/f,0o600)
   self.source=b/'source';self.source.mkdir();files={
    'boot.py':b'# reviewed boot',
    'deploy/pr122-customer-center/locations.conf':b'location ^~ /customer/center/ {}',
@@ -23,7 +23,7 @@ class ReleaseTests(unittest.TestCase):
   m={'source_commit':'a'*40,'files':[{'path':p,'size':len(v),'sha256':digest(v)} for p,v in files.items()]};raw=canonical(m)
   for p,v in files.items():q=self.source/p;q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(v)
   (self.source/'CUSTOMER_MANIFEST.json').write_bytes(raw)
-  self.base={'state':'READONLY_PLAN','transaction':r.TXN,'manifest_sha256':digest(raw),'source_commit':'a'*40,'main_current':str(self.b/'old-release'),'previous_https_sha256':digest(r.HTTPS.read_bytes()),'nginx':{'files':{str(r.HTTPS):digest(r.HTTPS.read_bytes())},'master':'fixture-master'},'account_uid':12345,'account_gid':12345,'config_sha256':digest(b'{}'),'runtime_config_sha256':digest(b'{}'),'target_acceptance_sha256':digest(b'{}'),'production_changes':0}
+  self.base={'review_trust_sha256':digest(b'{}'),'state':'READONLY_PLAN','transaction':r.TXN,'manifest_sha256':digest(raw),'source_commit':'a'*40,'main_current':str(self.b/'old-release'),'previous_https_sha256':digest(r.HTTPS.read_bytes()),'nginx':{'files':{str(r.HTTPS):digest(r.HTTPS.read_bytes())},'master':'fixture-master'},'account_uid':12345,'account_gid':12345,'config_sha256':digest(b'{}'),'runtime_config_sha256':digest(b'{}'),'target_acceptance_sha256':digest(b'{}'),'production_changes':0}
   self.approval={'decision':'INSTALL_APPROVED','transaction':r.TXN,'plan_sha256':digest(canonical(self.base)),'manifest_sha256':digest(raw),'source_commit':'a'*40,'max_executions':1,'rollback_approved':True,'issued_unix':int(time.time())-1,'expires_unix':int(time.time())+600,'review_comment_id':5,'ci_run_id':6}
   self.calls=[];self.fail=None
  def fake_run(self,args):
@@ -70,7 +70,8 @@ class ReleaseTests(unittest.TestCase):
   def fetch(path):
    if path=='actions/runs/6':return {'conclusion':'success','head_sha':'a'*40,'path':'.github/workflows/pr122-customer-center.yml','event':'push'}
    cid=int(path.rsplit('/',1)[1]);return {'id':cid,'user':{'login':r.OWNER},'issue_url':'https://api.github.com/repos/x/y/issues/122','body':('XUANJUN_CUSTOMER_INSTALL\n'+json.dumps(self.approval)) if cid==4 else ('XUANJUN_CUSTOMER_REVIEW\n'+json.dumps(review))}
-  self.assertEqual(r.gate(4,self.base,fetch)['ci_run_id'],6);self.approval['expires_unix']=0
+  with self.assertRaises(Denied):r.gate(4,self.base,fetch) # old self-asserted role is never authorization
+  self.approval['expires_unix']=0
   with self.assertRaises(Denied):r.gate(4,self.base,fetch)
   self.approval['expires_unix']=int(time.time())+600;review['manifest_sha256']='f'*64
   with self.assertRaises(Denied):r.gate(4,self.base,fetch)

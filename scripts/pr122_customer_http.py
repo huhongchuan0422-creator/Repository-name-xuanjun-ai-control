@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler,HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from scripts.pr122_customer_core import Center,Denied,Conflict,Unavailable,canonical
+from scripts.pr122_customer_source import reject_untrusted,TrustedNginxSource
 from scripts.pr122_customer_providers import Providers,enqueue,ai_reply
 
 PREFIX='/customer/center/'
@@ -29,9 +30,9 @@ def strict_json(raw):
     return d
 
 class App:
-    def __init__(self,factory,providers,origin,assets):
+    def __init__(self,factory,providers,origin,assets,*,source_identity=reject_untrusted):
         if origin!='https://wenwenwenyiyiyi.work':raise ValueError('PINNED_ORIGIN_REQUIRED')
-        self.factory=factory;self.providers=providers;self.origin=origin;self.assets=Path(assets)
+        self.factory=factory;self.providers=providers;self.origin=origin;self.assets=Path(assets);self.source_identity=source_identity
     def handler(self):
         app=self
         class Handler(BaseHTTPRequestHandler):
@@ -91,7 +92,14 @@ class App:
                         if self.command!='POST':return self.reply(405,{'error':'POST_REQUIRED'})
                         fields,func=public[operation]
                         if set(body)!=fields:raise ValueError('INVALID_FIELDS')
-                        with center.tx():center.limit('local-proxy-source',40,300)
+                        origin=app.source_identity(self.connection,self.headers)
+                        # Per-source and per-source/account quotas are atomic and
+                        # committed before password parsing/authentication failures.
+                        account=body.get('email','challenge-operation')
+                        if type(account) is not str:raise ValueError('INVALID_ACCOUNT')
+                        with center.tx():
+                            center.limit('auth-source:'+origin,40,300)
+                            center.limit('auth-source-account:'+origin+':'+account.casefold(),12,300)
                         result=func(**body) if operation not in ('register','login','request_reset') else func(*[body[k] for k in ('email','password') if k in body])
                         if operation=='login':
                             cookie=COOKIE+'='+result.pop('token')+'; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=3600'
@@ -160,7 +168,7 @@ def serve(factory,providers,assets):
     # Private service-owned directory plus pinned Nginx group prevents another
     # local application impersonating a crashed loopback backend.
     if path.exists() or path.is_symlink():raise RuntimeError('SOCKET_EXISTS_INSPECT_FIRST')
-    server=socketserver.UnixStreamServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets).handler())
+    server=socketserver.UnixStreamServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid)).handler())
     os.chown(path,-1,grp.getgrnam('nginx').gr_gid);os.chmod(path,0o660)
     try:server.serve_forever()
     finally:server.server_close();path.unlink(missing_ok=True)

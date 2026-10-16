@@ -32,11 +32,11 @@ class ProviderTests(CustomerTests):
  def test_outbound_acceptance_not_delivery_and_timeout_no_retry(self):
   self.linked();enqueue(self.c,self.owner,'project-a','TELEGRAM','hello')
   calls=[]
-  def post(url,body,headers=None):calls.append((url,body));return {'ok':True,'result':{'message_id':32}}
-  p=Providers({'telegram':{'bot_token':'fake-fixture-token'}},post=post);self.assertEqual(drain_message(self.c,p)['status'],'ACCEPTED');self.assertEqual(len(calls),1);self.assertFalse(drain_message(self.c,p)['pending'])
+  def post(token,subject,text):calls.append((subject,text));return {'ok':True,'result':{'message_id':32}}
+  p=Providers({'telegram':{'bot_token':'fake-fixture-token'}},telegram_transport=post);self.assertEqual(drain_message(self.c,p)['status'],'ACCEPTED');self.assertEqual(len(calls),1);self.assertFalse(drain_message(self.c,p)['pending'])
   enqueue(self.c,self.owner,'project-a','TELEGRAM','second')
   def fail(*a):raise TimeoutError()
-  p.post=fail;self.assertEqual(drain_message(self.c,p)['status'],'UNKNOWN');self.assertFalse(drain_message(self.c,p)['pending'])
+  p.telegram_transport=fail;self.assertEqual(drain_message(self.c,p)['status'],'UNKNOWN');self.assertFalse(drain_message(self.c,p)['pending'])
  def test_unlink_or_revocation_blocks_queued_send(self):
   self.linked();enqueue(self.c,self.owner,'project-a','TELEGRAM','hello');self.c.unlink(self.owner,'project-a','TELEGRAM')
   with self.assertRaises(Denied):drain_message(self.c,Providers({}))
