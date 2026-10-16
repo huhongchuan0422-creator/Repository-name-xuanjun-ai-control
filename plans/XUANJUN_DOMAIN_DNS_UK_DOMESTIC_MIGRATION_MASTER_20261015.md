@@ -801,3 +801,14 @@ Phase-B兼容离线安装的Owner-root收尾成功，不再把该收尾写成待
 Phase-C已集中映射现有GET transport、secure file输入、WAL handoff严格FIELDS/独立verifier CLI及持续观察账本；完成systemd239兼容候选、凭据原子generation交付、快照整代发布/读者固定、资源与失败终态的准备设计。其真实适配实现尚未完成、完整C制品未构建、root前检/启动后隔离/真实GET/持续Shadow均未执行；不把设计写成开发完成或执行批准。
 
 下一批集中实现/合成数据测试/完整绑定后再一次送审，不按四条链零碎求许可。原Phase-B独审结论继承。Owner当前无须操作；Phase-C未授权，生产迁移/DB及Writer切换/东京退役HOLD，网站/Work/current/DNS和共享服务均不操作。
+
+
+### 9.48 Phase-C已自主取得韩国非root元数据，准备设计据真实主机收敛（2026-10-16）
+
+原PR99最新准备文档7b49512d272cc4f77e223cd0130464d83e036624（仅文档/状态，原B源码不变）。通过原PR122 v27-readonly-batch同一队列的一次Korea Job116839560203 / Run38859895705，精确push71f9e115373bdc56cfe5dbbeeaaaae92b94fa642，已核GitHub原始日志与SUCCESS，未让Owner取资料。其它主机job均skipped，无checkout/sudo/服务动作/provider/凭据/DB读取。
+
+实际metadata：Runner UID1001，候选UID/GID986/nologin；systemd239/Python3.11.13，cgroup v1 memory controller；nftables1.0.4及nf_tables/nf_conntrack，OpenSSL1.1.1k，候选inactive/dead/PID0/PrivateNetwork=yes。候选出站策略优先准备独立nft inet/meta skuid规则，root实际执行能力及启动后隔离仍NOT_VERIFIED/NOT_EXERCISED。
+
+采集v1的iptables/ip6tables版本因resolve后调用multicall别名丢失而UNKNOWN；未加载xt_owner/proc匹配清单缺失不是不支持证明。未来v2已保留绝对alias并通过本地实际symlink回归，未在韩国重跑，旧v1 hash f027131c...32576和原始回执不改。实际metadata保存evidence/pr99-phase-c/KOREA_NONROOT_METADATA_20261016.json，源码/限制/后续断点同目录。
+
+Phase-B正式限定闭环；Phase-C实现/完整制品仍未完成，不把准备文档或软件版本当实机许可/生产通过。接下来集中实现四链路后统一完整送审；本轮不请求零散root许可，不重跑185/安装/修复。Owner当前无操作，Phase-C liveGET/Shadow、DB/Writer切换及东京退役HOLD；网站/Work/current/DNS及其它业务不变。
