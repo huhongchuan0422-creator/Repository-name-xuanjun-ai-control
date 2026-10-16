@@ -809,12 +809,20 @@
     "received_handoff_resolution": {
       "path": "evidence/pr99-service-handoff/handoff-resolution-candidate/resolve_received_handoff.py",
       "action": "PR99_RECEIVED_HANDOFF_RESOLUTION_V1",
-      "status": "PREPARED_LOCAL10_PASS_CI_AND_SCOPE_REVIEW_PENDING",
+      "status": "EXACT_HOSTED_10_PASS_REVIEW_PACKAGE_READY_NOT_EXECUTED",
       "source_inputs": "ALREADY_RECEIVED_S06_AND_R2_VERIFIED_CODE_ONLY",
       "new_production_collection": false,
       "production_executed": false,
       "install_or_cutover_permission": "NOT_REQUESTED_OR_GRANTED",
-      "old_tests": "INHERITED_NOT_RERUN"
+      "old_tests": "INHERITED_NOT_RERUN",
+      "source_commit": "51c23aaa0666f1a056deea5bf70a5bba4b5a23d3",
+      "script_sha256": "10d24ddfea39347930115a4dc57e81b0b41461c10bd71e70b7f7d15afeb3fea4",
+      "binding_sha256": "8ffc6322132d5197e738928aed2aee8488cee8dd0b359c8a00f673633ceaed16",
+      "tar_sha256": "6fbf99fe02de3196b61f219473f2d90a1912f03fa6b12ea328624c4a7cf06427",
+      "run": 38925978297,
+      "job": 117057495984,
+      "artifact_id": 12056701653,
+      "execution_permission": "PENDING_NEW_SCOPE_REVIEW_NOT_OLD_CAPTURE_PERMISSION"
     }
   },
   "current_recovery_point_r2": {
