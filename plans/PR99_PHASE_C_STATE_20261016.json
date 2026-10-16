@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "RUN_PINNED_S07_MATERIAL_CONTINUATION_V2_ON_KOREA_ENTER_TOKYO_ROOT_PASSWORD",
+  "owner_action_now": "RUN_PINNED_DOMESTIC_PRIVATE_MATERIAL_STAGE_ON_KOREA_ENTER_DOMESTIC_ROOT_PASSWORD",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -945,7 +945,7 @@
         "storage_wiring_receipt": "evidence/pr99-service-handoff/s07-runtime-inventory/OWNER_STORAGE_WIRING_20261017.json"
       },
       "private_runtime_material_staging": {
-        "status": "OWNER_EXECUTED_HOLD_REMOTE_SYMLINK_PARENT_PRESERVE_NO_RETRY",
+        "status": "OWNER_ROOT_KOREA_PRELIMINARY_PRIVATE_MATERIALS_RECEIVED_NOT_DOMESTIC_RUNTIME",
         "script": "evidence/pr99-service-handoff/s07-runtime-materials/stage_runtime_materials.py",
         "source_commit": "8f80d0cb60ff68a3bcbbfed6506eda3126cb4761",
         "script_sha256": "0076b30aec052366ac2f7ec6adfa5ff13b9c54f21fa50221c72d9415ddfc6c7f",
@@ -1022,7 +1022,7 @@
           "failure_trace": "remote_pack line114 -> read_file line48 -> need line40; source script confirms file payload-read loop before master-key check or source staging/SQLite backup"
         },
         "continuation_v2": {
-          "status": "PREPARED_NOT_EXECUTED",
+          "status": "OWNER_EXECUTED_S07_PRIVATE_MATERIALS_RECEIVED_PRELIMINARY_PASS",
           "source_commit": "127e4a942d1cbeadb67b545a47758e1e6827c8dd",
           "script": "evidence/pr99-service-handoff/s07-runtime-materials/stage_runtime_materials.py",
           "script_sha256": "137a2acea1924b4c62e43abfe6f8689c64450db868c7a216d759a16779c939b4",
@@ -1040,8 +1040,31 @@
           "all_other_link_rejections_preserved": true,
           "service_actions": 0,
           "domestic_install": false,
-          "final_cutover_snapshot": false
+          "final_cutover_snapshot": false,
+          "owner_receipt": "evidence/pr99-service-handoff/s07-runtime-materials/OWNER_PRIVATE_STAGE_V2_20261017.json",
+          "files": 165,
+          "bytes": 47099890
         }
+      },
+      "domestic_private_material_staging": {
+        "status": "PREPARED_NOT_EXECUTED",
+        "script": "evidence/pr99-service-handoff/s07-domestic-materials/transfer_private_materials.py",
+        "source_commit": "ebfce46c8c67d1e2443566c0c1b3cd4fbe2cb160",
+        "script_sha256": "90b49446307de25820b8190988582a53f05cc093ea97655d567cdf96a275df79",
+        "github_bytes": 11850,
+        "github_byte_readback": true,
+        "local_tests": 7,
+        "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+        "source": "/root/pr99-s07-private-materials-v2",
+        "target": "/var/lib/xuanjun-pr99-s07-private-materials-v1/received",
+        "scope": "COMPRESS_EXISTING_VERIFIED_ARCHIVE_STRICT_DOMESTIC_SSH_FIXED_NEW_ROOT_PRIVATE_DIR_PER_FILE_HASH_AND_SQLITE_INTEGRITY",
+        "source_reacquired": false,
+        "old_material_stage_replayed": false,
+        "active_runtime_replaced": false,
+        "services_installed": false,
+        "service_actions": 0,
+        "production_cutover": false,
+        "final_cutover_snapshot": false
       }
     }
   },
