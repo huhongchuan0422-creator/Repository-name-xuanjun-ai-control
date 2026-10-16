@@ -72,59 +72,78 @@ jobs:
       - run: bash scripts/v27-batch-readonly.sh domestic
 
 
-  tokyo-approved-logfix-execution:
+  logfix-post-install-boundary:
     if: github.event_name == 'push'
-    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [xuanjun-tokyo-readonly, xuanjun-domestic-ops]
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.runner }}"]
     timeout-minutes: 4
     steps:
-      - name: Apply exact approved patch once through installed fixed root capability
+      - name: Verify deployed source and changed HEAD boundaries without business writes
         run: |
           python3 -B - <<'PY'
-          import hashlib,json,os,stat,subprocess,time
+          import hashlib,http.client,json,os,socket,ssl,stat,subprocess
           from pathlib import Path
-          assert os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
-          assert os.geteuid()==1001
-          helper=Path("/usr/local/sbin/xuanjun-pr122-portal-logfix-v1")
-          report={"schema_version":1,"host":os.uname().nodename,"delivery_commit":os.environ["GITHUB_SHA"],"patch_approval":"PR122#6204793589","owner_grant":"OWNER_LONG_TERM_DOMESTIC_TOKYO_MIGRATION","apply_invocations_this_job":0,"dns_change":False,"website_files_changed":False,"bridge_tunnel_changed":False,"tokyo_retirement":False}
-          out=Path(os.environ["RUNNER_TEMP"])/("pr122-root-execution-"+os.environ["GITHUB_RUN_ID"]+".json")
-          def call(mode,seconds):
-              p=subprocess.run(["sudo","-n","--",str(helper),mode],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=seconds)
-              assert len(p.stdout)<65536 and len(p.stderr)<65536,"BOUNDED_OUTPUT_EXCEEDED"
-              try:r=json.loads(p.stdout)
-              except ValueError:r={"status":"UNKNOWN_NO_JSON","exit_code":p.returncode}
-              return p.returncode,r
-          try:
-              for path in (Path("/"),Path("/usr"),Path("/usr/local"),helper.parent):
-                  s=path.lstat()
-                  assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,"HELPER_PARENT_IDENTITY"
-              s=helper.lstat()
-              assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and s.st_nlink==1 and stat.S_IMODE(s.st_mode)==0o755,"HELPER_IDENTITY"
-              digest=hashlib.sha256(helper.read_bytes()).hexdigest()
-              assert digest=="0e61a4cab72a18e94ed8b97c81e035ee023dfe0969c871c50651cf75792cbcbe","HELPER_SHA256_MISMATCH"
-              report["installed_helper_sha256"]=digest
-              rc,before=call("status",15);report["before"]=before
-              assert rc==0 and before["status"]=="READY" and before["apply_started"] is False and before["rollback_started"] is False,"NOT_READY_NO_RETRY"
-              report["apply_invocations_this_job"]=1
-              rc,result=call("apply",180);report["apply_exit"]=rc;report["apply"]=result
-              after_rc,after=call("status",15);report["after"]=after
-              assert rc==0 and after_rc==0 and result["status"]=="LIVE_HEAD_GET_PASS" and after["status"]=="LIVE_HEAD_GET_PASS","HOLD_PRESERVE_EVIDENCE_NO_RETRY"
-              report["status"]="LIVE_PATCH_ACCEPTANCE_PASS"
-          except BaseException as error:
-              report["status"]="HOLD_PRESERVE_EVIDENCE"
-              report["error"]=type(error).__name__
-              report["reason"]=str(error)[:200]
-              try:report["final_status"]=call("status",15)[1]
-              except BaseException:report["final_status"]={"status":"UNKNOWN"}
-          finally:
-              fd=os.open(out,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-              with os.fdopen(fd,"w") as handle:json.dump(report,handle,indent=2,sort_keys=True)
-              print("PR122_ROOT_EXECUTION_RECEIPT="+json.dumps(report,sort_keys=True))
-          raise SystemExit(0 if report["status"]=="LIVE_PATCH_ACCEPTANCE_PASS" else 1)
+          host=os.uname().nodename
+          assert host in ("iZ6wee8q9z4t03hvqumwfhZ","iZvt5t8tlrm8oiZ")
+          domestic=host=="iZvt5t8tlrm8oiZ"
+          ip="47.101.152.210" if domestic else "47.245.53.152"
+          domain="wenwenwenyiyiyi.work"
+          report={"schema_version":1,"host":host,"commit":os.environ["GITHUB_SHA"],"production_mutation":False,"dns_release":"HOLD","dynamic":[],"errors":[],"auth_contract":"NOT_ESTABLISHED_BY_HEAD","actual_business_writes":"NOT_TESTED","oauth_get":"NOT_CALLED"}
+          if not domestic:
+              p=Path("/opt/trading-system/scripts/secure_secrets_portal_server.py");s=p.lstat()
+              digest=hashlib.sha256(p.read_bytes()).hexdigest()
+              report["source"]={"sha256":digest,"uid":s.st_uid,"gid":s.st_gid,"mode":oct(stat.S_IMODE(s.st_mode)),"regular":stat.S_ISREG(s.st_mode),"links":s.st_nlink}
+              assert digest=="d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0" and s.st_uid==1000 and s.st_gid==1000 and stat.S_IMODE(s.st_mode)==0o755 and stat.S_ISREG(s.st_mode) and s.st_nlink==1
+              r=subprocess.run(["systemctl","show","secure-secrets-portal.service","-p","ActiveState","-p","SubState","-p","MainPID","-p","User"],capture_output=True,text=True,timeout=10)
+              assert r.returncode==0
+              props=dict(line.split("=",1) for line in r.stdout.splitlines() if "=" in line);report["service"]=props
+              assert props["ActiveState"]=="active" and props["SubState"]=="running" and props["User"]=="admin" and props["MainPID"] not in ("0","2023577")
+              r=subprocess.run(["sudo","-n","--","/usr/local/sbin/xuanjun-pr122-portal-logfix-v1","status"],capture_output=True,text=True,timeout=15)
+              assert r.returncode==0
+              report["root_capability_status"]=json.loads(r.stdout)
+              assert report["root_capability_status"]["status"]=="LIVE_HEAD_GET_PASS" and report["root_capability_status"]["rollback_started"] is False
+          public=Path("/var/www/"+domain)/("current/public" if domestic else "")
+          home=hashlib.sha256((public/"index.html").read_bytes()).hexdigest();report["home_sha256"]=home
+          assert home=="4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20"
+          if domestic:
+              report["current"]=os.readlink("/var/www/"+domain+"/current")
+              assert report["current"]=="/var/www/"+domain+"/releases/pr122-d8b08ed-recovery-stage"
+          routes=[("/p/","/p/pr122-nonexistent-readonly"),("/submit/douyin","/submit/douyin"),("/submit/tiktok","/submit/tiktok"),("/integrations/douyin/oauth/callback","/integrations/douyin/oauth/callback"),("/integrations/tiktok/oauth/start","/integrations/tiktok/oauth/start"),("/integrations/tiktok/oauth/callback","/integrations/tiktok/oauth/callback"),("/integrations/tiktok/status","/integrations/tiktok/status"),("/integrations/tiktok/disconnect","/integrations/tiktok/disconnect"),("/healthz","/healthz"),("/telegram-webhook/","/telegram-webhook/pr122-nonexistent-readonly"),("/telegram-canary/status","/telegram-canary/status")]
+          ctx=ssl.create_default_context()
+          for responsibility,path in routes:
+              checks=[]
+              expected=405 if responsibility=="/telegram-webhook/" else 501
+              for variant in ("baseline","spoofed_source"):
+                  c=None
+                  try:
+                      raw=socket.create_connection((ip,443),timeout=5);tls=ctx.wrap_socket(raw,server_hostname=domain)
+                      c=http.client.HTTPConnection(domain,timeout=5);c.sock=tls
+                      headers={"Host":domain,"Connection":"close"}
+                      if variant=="spoofed_source":headers.update({"X-Real-IP":"192.0.2.123","X-Forwarded-For":"192.0.2.123","X-Forwarded-Proto":"http","Origin":"https://invalid.example"})
+                      c.request("HEAD",path,headers=headers);r=c.getresponse()
+                      check={"variant":variant,"status":r.status,"tls_verified":True,"location_present":bool(r.getheader("Location")),"set_cookie_present":bool(r.getheader("Set-Cookie"))}
+                      check["matches_method_boundary"]=r.status==expected and not check["location_present"] and not check["set_cookie_present"]
+                      checks.append(check)
+                      if not check["matches_method_boundary"]:report["errors"].append(responsibility+":"+variant)
+                  except Exception as e:
+                      checks.append({"variant":variant,"error":type(e).__name__});report["errors"].append(responsibility+":"+variant)
+                  finally:
+                      if c is not None:c.close()
+              report["dynamic"].append({"responsibility":responsibility,"method":"HEAD","checks":checks,"business_auth":"NOT_TESTED"})
+          report["status"]="POST_FIX_METHOD_BOUNDARY_PASS" if not report["errors"] else "BOUNDARY_HOLD"
+          out=Path(os.environ["RUNNER_TEMP"])/("pr122-postfix-"+os.environ["GITHUB_RUN_ID"]+"-"+host+".json")
+          fd=os.open(out,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,"w") as handle:json.dump(report,handle,indent=2,sort_keys=True)
+          print("PR122_POSTFIX_BOUNDARY_RECEIPT="+json.dumps(report,sort_keys=True))
+          raise SystemExit(0 if not report["errors"] else 1)
           PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pr122-tokyo-root-execution-${{ github.run_id }}
-          path: ${{ runner.temp }}/pr122-root-execution-${{ github.run_id }}.json
+          name: pr122-postfix-boundary-${{ matrix.runner }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr122-postfix-${{ github.run_id }}-*.json
           if-no-files-found: error
           retention-days: 14

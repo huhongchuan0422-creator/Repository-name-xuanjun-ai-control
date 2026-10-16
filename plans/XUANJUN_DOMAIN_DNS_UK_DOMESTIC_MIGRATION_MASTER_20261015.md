@@ -460,3 +460,16 @@ Owner在东京admin终端运行准确4975724d安装器，SHA256 e95d2c08…f1b3a
 本次沿用原v27工作流及同一concurrency组，由东京githubrunner调用已安装摘要绑定helper，不复制新的root脚本、不改权限规则。执行前核验实际host/UID/helper root身份及完整SHA2560e61a4ca…2cbcbe，固定status必须READY才允许调用一次apply；异常不重试、不自动回滚、不改变桥接隧道/DNS/网站/current。准确原源备份、候选替换、仅Portal一次重启及两地GET/HEAD健康检查由固定helper执行。此段记录执行意图，最终以绑定本次job的原始PR122_ROOT_EXECUTION_RECEIPT为准；尚不预报生产PASS。
 
 补丁独审6204793589和Owner长期授权已具备；新增固定入口的集中复核6205089607尚无独立结论，不将20项synthetic或Owner安装成功冒充完整执行机制独审通过。DNS_RELEASE=HOLD、东京退役HOLD继续。
+
+
+### 9.17 2026-10-16 08:23 CST：东京生产最小日志补丁已真实应用
+
+准确执行提交d338fb057b9618f1356ce877c2453f9309423c5f；Run38829135481 / Job116743548144 SUCCESS。已读取原始日志PR122_ROOT_EXECUTION_RECEIPT，不只依赖job绿灯。实际Tokyo root helper哈希0e61a4ca…2cbcbe，执行前READY/apply_started=false。apply本job调用1次，exit0，root回执LIVE_HEAD_GET_PASS；原源528a3b5b…b5006、候选d5ab592a…bbdf0，backup=/var/lib/xuanjun-pr122-portal-logfix-capability/source.before.py。source_replaced_for=apply、restart_attempted_for=apply；rollback_started=false。固定helper只执行一次Portal重启。
+
+实际两地TLS校验后/healthz：东京47.245.53.152 GET200/HEAD501；国内47.101.152.210 GET200/HEAD501。恢复原不支持方法501，旧502错误路径已在真实服务修复。新执行入口本身的独审仍PENDING；不冒充6204793589批准了新机制。
+
+回执Artifact12015874337（988字节）及GitHub元数据digest sha256:604f9fc85bac066d33aef335501ffb937dab92c3116ee792ab5fe0557023e782；此处digest来源为GitHub元数据，未据此冒充独立复算。
+
+立即将原工作流push job中的apply调用移除，改为两地非root部署后核验：新源哈希/owner/mode/新PID、根入口status、Work首页与国内current不变、11项HEAD baseline/spoofed_source。HEAD只证明不支持方法边界，不能替代GET/POST认证；OAuth GET/业务写继续禁用。执行结果另附真实回执，不提前PASS。
+
+PATCH_PRODUCTION_INSTALL=EXECUTED_PASS_TARGETED_HEALTH；W06仍部分完成（动态业务鉴权、IP审计差异及外围策略未闭环）；W07/DNS_RELEASE=HOLD；东京后台继续保留。未改网站内容/current、DNS、桥接隧道、英国P2或Finance。原未执行文字保留为历史，仅此新增事实覆盖补丁状态。
