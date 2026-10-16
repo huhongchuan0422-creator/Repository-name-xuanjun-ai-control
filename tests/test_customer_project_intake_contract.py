@@ -31,3 +31,17 @@ class AdditionalAuthorizationTests(unittest.TestCase):
  def test_truthy_string_rejected(self):
   from scripts.customer_project_intake_contract import transition,IntakeRejected
   with self.assertRaises(IntakeRejected):transition("PARTIAL","submit","false")
+
+class ReviewIdentityRegression(unittest.TestCase):
+ def test_missing_unknown_and_self_submitter_rejected(self):
+  from scripts.customer_project_intake_contract import apply_action, IntakeRejected
+  m={("reviewer","p"):"independent_reviewer",("user","p"):"project_editor"}
+  for candidate in (None,""," ","unknown","reviewer",123):
+   with self.subTest(submitter=candidate):
+    with self.assertRaises(IntakeRejected):
+     apply_action("UNDER_REVIEW","approve","reviewer","p","c","c",m,submitter=candidate,authenticated=True)
+  self.assertEqual(apply_action("UNDER_REVIEW","approve","reviewer","p","c","c",m,submitter="user",authenticated=True),"ACCEPTED")
+ def test_revoked_submitter_rejected(self):
+  from scripts.customer_project_intake_contract import apply_action, IntakeRejected
+  with self.assertRaises(IntakeRejected):
+   apply_action("UNDER_REVIEW","approve","reviewer","p","c","c",{("reviewer","p"):"independent_reviewer"},submitter="user",authenticated=True)
