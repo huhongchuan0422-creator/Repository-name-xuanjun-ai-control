@@ -822,7 +822,14 @@
       "run": 38925978297,
       "job": 117057495984,
       "artifact_id": 12056701653,
-      "execution_permission": "PENDING_NEW_SCOPE_REVIEW_NOT_OLD_CAPTURE_PERMISSION"
+      "execution_permission": "PENDING_NEW_SCOPE_REVIEW_NOT_OLD_CAPTURE_PERMISSION",
+      "review_request": {
+        "comment_id": 6219132029,
+        "read_back": true,
+        "status": "PENDING_CONCENTRATED_NEW_READONLY_SCOPE_REVIEW_NO_SERVER_EXECUTION",
+        "source_commit": "51c23aaa0666f1a056deea5bf70a5bba4b5a23d3",
+        "delivery_commit": "5cb6530b73a57804d667f31147035a987c2d0dc8"
+      }
     }
   },
   "current_recovery_point_r2": {
