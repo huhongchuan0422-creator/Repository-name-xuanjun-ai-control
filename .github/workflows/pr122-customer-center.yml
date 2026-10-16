@@ -31,8 +31,10 @@ jobs:
           sha256sum /tmp/pr122-customer/wheels/* > /tmp/pr122-customer/WHEEL_SHA256SUMS
           python -m pip install --no-index --find-links /tmp/pr122-customer/wheels cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
       - name: Authentication authorization material channels and encrypted restore
+        shell: bash
         run: |
-          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests tests.test_pr122_customer_revision -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
+          set -euo pipefail
+          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests tests.test_pr122_customer_revision tests.test_pr122_customer_changes.ChangeTests -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
           python -m py_compile scripts/pr122_customer_*.py
       - name: Install isolated browser only
         run: |

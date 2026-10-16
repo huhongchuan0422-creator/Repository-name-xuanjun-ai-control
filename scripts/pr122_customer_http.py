@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from scripts.pr122_customer_core import Center,Denied,Conflict,Unavailable,canonical
 from scripts.pr122_customer_source import reject_untrusted,TrustedNginxSource
 from scripts.pr122_customer_providers import Providers,enqueue,ai_reply
+from scripts.pr122_customer_changes import Changes
 
 PREFIX='/customer/center/'
 CSP="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -64,9 +65,9 @@ class App:
                     if u.query or u.fragment or '%' in u.path or '//' in u.path or '..' in u.path or self.headers.get('Host')!='wenwenwenyiyiyi.work':raise Denied('INVALID_REQUEST_TARGET')
                     path=u.path
                     if self.command not in ('GET','HEAD','POST'):return self.reply(405,{'error':'METHOD_NOT_ALLOWED'})
-                    if self.command in ('GET','HEAD') and path in (PREFIX,PREFIX+'app.css',PREFIX+'app.js'):
-                        name={'': 'index.html','app.css':'app.css','app.js':'app.js'}[path[len(PREFIX):]]
-                        raw=(app.assets/name).read_bytes();ctype={'index.html':'text/html; charset=utf-8','app.css':'text/css; charset=utf-8','app.js':'application/javascript; charset=utf-8'}[name]
+                    if self.command in ('GET','HEAD') and path in (PREFIX,PREFIX+'app.css',PREFIX+'app.js',PREFIX+'feedback.js'):
+                        name={'': 'index.html','app.css':'app.css','app.js':'app.js','feedback.js':'feedback.js'}[path[len(PREFIX):]]
+                        raw=(app.assets/name).read_bytes();ctype={'index.html':'text/html; charset=utf-8','app.css':'text/css; charset=utf-8','app.js':'application/javascript; charset=utf-8','feedback.js':'application/javascript; charset=utf-8'}[name]
                         return self.reply(200,raw,ctype)
                     if not path.startswith(PREFIX+'api/') and path not in (PREFIX+'webhooks/telegram',PREFIX+'webhooks/feishu'):return self.reply(404,{'error':'NOT_FOUND'})
                     body={};raw=b''
@@ -123,12 +124,17 @@ class App:
                         parts=operation.split('/')
                         if len(parts)==2 and parts[0]=='checklist':return self.reply(200,center.checklist(uid,parts[1]))
                         if len(parts)==2 and parts[0]=='messages':return self.reply(200,{'messages':center.messages(uid,parts[1])})
+                        if len(parts)==2 and parts[0]=='changes':return self.reply(200,Changes(center).list(uid,parts[1]))
                         if len(parts)==2 and parts[0]=='pending_links':return self.reply(200,{'links':center.pending_links(uid,parts[1])})
                         if len(parts)==3 and parts[0]=='download':
                             if self.headers.get('Range') or self.headers.get('If-None-Match') or self.headers.get('If-Modified-Since'):raise Denied('UNCONDITIONAL_AUTHORIZED_DOWNLOAD_ONLY')
                             data,mime=center.download(uid,parts[1],parts[2]);return self.reply(200,data,mime)
                         return self.reply(404,{'error':'NOT_FOUND'})
                     operations={
+                        'change_submit':({'project','page','version','text'},lambda:Changes(center).submit(uid,body['project'],body['page'],body['version'],body['text'])),
+                        'change_baseline':({'project','page','version','text'},lambda:Changes(center).baseline(uid,body['project'],body['page'],body['version'],body['text'])),
+                        'change_assess':({'project','case','revision','category','minutes','lines','evidence','explanation'},lambda:Changes(center).assess(uid,body['project'],body['case'],body['revision'],body['category'],body['minutes'],body['lines'],body['evidence'],body['explanation'])),
+                        'change_respond':({'project','case','revision','action','reason'},lambda:Changes(center).respond(uid,body['project'],body['case'],body['revision'],body['action'],body['reason'])),
                         'logout':(set(),lambda:center.logout(self.token()) or {'logged_out':True}),
                         'invite':({'project','email','role'},lambda:center.invite(uid,body['project'],body['email'],body['role'])),
                         'accept_invite':({'invitation'},lambda:center.accept_invite(uid,body['invitation'])),
