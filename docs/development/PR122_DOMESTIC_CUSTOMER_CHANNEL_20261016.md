@@ -22,4 +22,6 @@ Owner 在 root 终端手动 --revoke 只删除与本通道准确内容一致的 
 
 ## 4. 验收与边界
 
+初版0575b4c1的Hosted Job虽然SUCCESS，但原始日志实际为17项中1项ERROR（全局visudo -c）；不得引用为17/17。最小修订只调整测试与CI：测试使用真实visudo检查临时完整sudoers及include树，避免依赖Hosted全局策略；另以故意损坏的临时sudoers验证真实非零拒绝。生产脚本仍校验实际全局sudoers，未放宽。工作流显式set -euo pipefail，并实测false管道返回失败；同时要求日志包含Ran 17与单独OK行。旧错误记录保留，最终必须引用新准确CI。
+
 tests/test_pr122_domestic_customer_channel.py 为 root 临时夹具，真实 visudo 与冻结客户归档校验；只在临时 root 目录写夹具，不写实际 sudoers。Hosted 证据不是国内安装证据。准确 CI、通道制品哈希、独审结论及 Owner 执行回执取得前，不提供生产 --grant 命令、不声称授权已落地。后续角色/依赖/配置准备若需要新的特权动作，必须明确注册审核，不能用此通道偷偷扩展。
