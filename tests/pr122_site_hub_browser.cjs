@@ -28,7 +28,7 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
    await page.setViewportSize({width,height:1000});
    for(const prefix of ['','zh-cn/','en/'])for(const route of roots){
     const r=await page.goto(origin+'/'+prefix+route);assert.equal(r.status(),200);
-    assert.equal(await page.locator('.primary-nav .nav-group').count(),3);
+    assert.equal(await page.locator('.primary-nav .nav-group').count(),4);
     assert.equal(await page.locator('main h1').count(),1);
     const icp=page.locator('footer a[href="https://beian.miit.gov.cn/"]');
     assert.equal(await icp.count(),1);assert.equal(await icp.innerText(),'渝ICP备2026024862号');
@@ -63,6 +63,33 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
   await page.locator('.mobile-toggle').click();assert(await page.locator('.primary-nav').isVisible());
   await page.locator('.nav-group').first().locator('button').click();assert(await page.locator('.nav-group').first().locator('.nav-panel').isVisible());
   checks.push({test:'mobile_navigation',result:'PASS'});
+  for(const width of [320,390,780,1180,1440]){
+   await page.setViewportSize({width,height:900});await page.goto(origin+'/');
+   if(width<=1180){
+    const bounds=await page.locator('.brand,.mobile-toggle,.language>button').evaluateAll(nodes=>nodes.filter(e=>e.getBoundingClientRect().width>0).map(e=>{const r=e.getBoundingClientRect();return {top:r.top+r.height/2,left:r.left,right:r.right};}));
+    assert.equal(bounds.length,3);assert(Math.max(...bounds.map(r=>r.top))-Math.min(...bounds.map(r=>r.top))<=2,'Mobile header alignment '+width);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Home overflow '+width);
+    await page.locator('.mobile-toggle').click();
+   }
+   const second=page.locator('.primary-nav .nav-group').nth(1).locator('button');
+   const before=await second.boundingBox();await second.click();await second.click();const after=await second.boundingBox();
+   assert(Math.abs(before.y-after.y)<=1&&Math.abs(before.x-after.x)<=1,'Disclosure moved '+width);
+   assert.equal(await second.getAttribute('aria-expanded'),'false');
+   assert.equal(await page.locator('.primary-nav .nav-group').nth(1).locator('a[href*="/ecosystem/"]').count(),0);
+   assert(await page.locator('#discover-ecosystem a[href="/ecosystem/"]').isVisible());
+  }
+  checks.push({test:'home_entry_hierarchy_header_alignment_disclosure_stationary',widths:[320,390,780,1180,1440],result:'PASS'});
+  await page.goto(origin+'/visual/community-payment/merchant-dashboard/');
+  for(const id of ['grocer','cafe','home']){
+   await page.locator('#merchantSelect').selectOption(id);
+   assert.match(await page.locator('#merchantIdentity').innerText(),/模拟商家/);
+   assert.equal(await page.locator('#orderRows tr').count(),3);
+   assert.equal(await page.locator('#metricOrders').innerText(),'3');
+   assert.equal(await page.locator('#refundId').inputValue(),{'grocer':'DEMO-G101','cafe':'DEMO-C101','home':'DEMO-H101'}[id]);
+  }
+  await page.locator('[data-view="orders"]').click();await page.locator('#orderFilter').fill('不存在');assert(await page.locator('#orderEmpty').isVisible());
+  await page.locator('#merchantSelect').selectOption('grocer');assert.equal(await page.locator('#orderRows tr').count(),3);
+  checks.push({test:'three_explicit_demo_merchants_independent_fixture_views_and_search',result:'PASS'});
   const demo='/visual/community-local-e2e/';
   await page.goto(origin+demo);await page.waitForFunction(()=>document.querySelector('#demoSessionState').textContent.includes('已就绪'));await page.locator('#loadStorefront').click();await page.waitForFunction(()=>document.querySelector('#storefrontName').textContent.includes('Demo Merchant'));
   assert.match(await page.locator('#adAmount').innerText(),/DEMO APPROVED AMOUNT AD/);

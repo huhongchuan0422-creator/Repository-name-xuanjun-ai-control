@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.pr122_site_hub_english import translate_fragment
+from scripts.pr122_site_hub_experience import CSS as EXPERIENCE_CSS, disclosures, home as improve_home
 from scripts.pr122_website_release import write_csp_metadata, Deadline
 
 SOURCE_HASH = '74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63'
@@ -29,10 +30,12 @@ def icp_footer(text):
 
 MENUS = [
     ('solutions', [('产品可视化中心', '/visual/'), ('行业案例', '/visual/catalog/'), ('社区分账演示', '/visual/community-payment/')]),
-    ('capabilities', [('SaaS产品目录', '/marketplace/modules/'), ('功能选配', '/marketplace/modules/'), ('产品与购买', '/marketplace/'), ('共建共享', '/ecosystem/'), ('权益等级与开发折扣', '/ecosystem/tiers/')]),
-    ('custom-ai', [('定制开发服务', '/custom-ai'), ('客户项目中心', '/customer/projects/'), ('项目预览与验收', '/customer/projects/acceptance/'), ('共创项目广场', '/ecosystem/co-create/')]),
+    ('capabilities', [('SaaS产品目录', '/marketplace/modules/'), ('功能选配', '/marketplace/modules/'), ('产品与购买', '/marketplace/')]),
+    ('custom-ai', [('定制开发服务', '/custom-ai'), ('客户项目中心', '/customer/projects/'), ('项目预览与验收', '/customer/projects/acceptance/')]),
+    ('labs', [('共建共享', '/ecosystem/'), ('权益等级与开发折扣', '/ecosystem/tiers/'), ('共创项目广场', '/ecosystem/co-create/'), ('共创收益共享', '/ecosystem/profit-sharing/'), ('权益及专项金额说明', '/ecosystem/ledger/'), ('生态活动', '/ecosystem/activities/'), ('生态治理', '/ecosystem/governance/')]),
 ]
 EN = {'产品可视化中心':'Product visual center', '行业案例':'Industry examples', '社区分账演示':'Community payment demo', 'SaaS产品目录':'SaaS catalog', '功能选配':'Module options', '产品与购买':'Products and purchase', '共建共享':'Co-build and share', '权益等级与开发折扣':'ECV tiers and development discounts', '定制开发服务':'Custom development', '客户项目中心':'Customer projects', '项目预览与验收':'Preview and acceptance', '共创项目广场':'Co-creation projects'}
+EN.update({'共创收益共享':'Co-creation profit sharing','权益及专项金额说明':'Rights and service-credit guidance','生态活动':'Ecosystem activities','生态治理':'Ecosystem governance'})
 CSS = '''/* Verified selectors: live apex and pinned Work V2 source. */
 .primary-nav .nav-group{display:flex;flex-wrap:wrap;column-gap:5px}.primary-nav .nav-group>a{padding-right:0;flex:0 1 auto}.primary-nav .nav-group>button{width:24px;padding:0;text-align:left;flex:none}.primary-nav .nav-panel{flex-basis:100%}
 .xj-hub{padding:36px 0 60px}.xj-hub .hero{display:block;min-height:0;padding:28px;background:#fff;border:1px solid #dce5f1;border-radius:18px;margin:20px 0}.xj-hub .hero h1{font-size:clamp(28px,5vw,48px)}.xj-hub .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px}.xj-hub .card{min-height:0;margin:10px 0;padding:22px}.xj-hub .card h2{font-size:22px}.xj-hub .btn{display:inline-block;padding:10px 16px;background:#2057d4;color:white;border-radius:10px;margin:6px}.xj-hub input{max-width:100%;padding:8px;border:1px solid #abbcd4;border-radius:6px}.xj-hub label{display:block;margin:12px 0}.xj-hub table{display:block;overflow:auto}.xj-hub th,.xj-hub td{padding:10px;text-align:left}.xj-hub a:focus-visible,.xj-hub button:focus-visible,.xj-hub input:focus-visible{outline:3px solid #75a7ff;outline-offset:3px}
@@ -48,17 +51,18 @@ def menu_patch(text):
         link = prefix + '/' + key
         items = ''.join('<a href="%s">%s</a>' % (prefix+url, EN[label] if english else label) for label,url in entries)
         pattern = r'(<div class="nav-group"><a href="'+re.escape(link)+r'">.*?<div class="nav-panel">)(.*?)(</div></div>)'
-        if key != 'custom-ai':
+        if key not in ('custom-ai','labs'):
             text, count = re.subn(pattern, lambda m:m[1]+m[2]+items+m[3], text, count=1, flags=re.S)
         else:
-            pattern = r'<a href="'+re.escape(link)+r'">(Custom &amp; Delivery|Custom & Delivery|定制与交付)</a>'
+            names = '(Custom &amp; Delivery|Custom & Delivery|定制与交付)' if key=='custom-ai' else '(Co-creation|共创生态)'
+            pattern = r'<a href="'+re.escape(link)+r'">'+names+r'</a>'
             def custom(m):
-                label = 'Expand Custom &amp; Delivery menu' if english else '展开定制与交付菜单'
+                label = ('Expand Custom &amp; Delivery menu' if english else '展开定制与交付菜单') if key=='custom-ai' else ('Expand Co-creation menu' if english else '展开共创生态菜单')
                 return '<div class="nav-group">'+m[0]+'<button type="button" aria-expanded="false" aria-label="'+label+'">⌄</button><div class="nav-panel">'+items+'</div></div>'
             text, count = re.subn(pattern, custom, text, count=1)
         if count != 1:
             raise ValueError('UNEXPECTED_NAV_STRUCTURE:'+link)
-    return icp_footer(text.replace('</head>', '<link rel="stylesheet" href="/assets/xuanjun-site-integration.css"></head>', 1))
+    return disclosures(icp_footer(text.replace('</head>', '<link rel="stylesheet" href="/assets/xuanjun-site-integration.css"></head>', 1)))
 
 def build(root, source, output, fixture=None):
     if output.exists():
@@ -104,6 +108,7 @@ def build(root, source, output, fixture=None):
         if patched!=text:p.write_text(patched)
     hub=root/'demos/xuanjun-site-hub'
     extra_styles={}
+    extra_scripts={}
     def externalize_styles(text):
         def tag(match):
             raw=match[0]
@@ -121,7 +126,28 @@ def build(root, source, output, fixture=None):
         relative=p.relative_to(hub)
         if str(relative)=='index.html':continue
         original=p.read_text()
-        original=re.sub(r'<script>(.*?)</script>','<script src="/assets/ecv-quote-ui.js" defer></script>',original,flags=re.S)
+        original=original.replace('静态预览候选 · 非正式报价、支付、活动领取或客户登录','方案与交互演示 · 真实购买、支付、权益领取及客户登录暂未开放')
+        if str(relative)=='visual/community-payment/index.html':
+            original=original.replace('已存在的角色演示源码位于仓库 demos/community-local-e2e。本候选采用独立入口，不复制重写原模块；发布时必须由受控制品将其映射到 /visual/community-local-e2e/。','选择一个角色，体验消费者付款、商家经营及社区协作。全部订单与付款均为模拟，不产生真实资金。')
+            original=original.replace('部署前置：验证六个目标文件与脚本资源均属于同一审核版本，禁止仅发布本入口页造成404。未接真实微信支付或生产分账。','商家工作台提供三家模拟商家的页面样例；原多角色流程使用隔离模拟会话。两类演示数据分别展示，尚未统一。')
+            original=original.replace('href="/visual/community-local-e2e/merchant.html"><h2>商家</h2>','href="/visual/community-payment/merchant-dashboard/"><h2>商家工作台（中文演示）</h2>')
+        # Only the original quote UI is replaced by its reviewed bilingual adapter.
+        # Other page scripts are preserved verbatim and moved to hashed CSP-safe assets.
+        def script(match):
+            if str(relative)=='marketplace/index.html':return '<script src="/assets/ecv-quote-ui.js" defer></script>'
+            raw=match[1];name='hub-script-'+hashlib.sha256(raw.encode()).hexdigest()[:16]+'.js'
+            extra_scripts[name]=raw
+            return '<script src="/assets/'+name+'" defer></script>'
+        original=re.sub(r'<script>(.*?)</script>',script,original,flags=re.S)
+        if str(relative)=='visual/community-payment/merchant-dashboard/index.html':
+            # Preserve this delivered stand-alone SaaS shell; it has its own header.
+            # The Chinese demo is explicitly labelled in localized entry pages.
+            target=public/relative;target.parent.mkdir(parents=True,exist_ok=True)
+            original=externalize_styles(original)
+            original=original.replace('</head>','<link rel="stylesheet" href="/assets/xuanjun-site-integration.css"></head>')
+            original=icp_footer(original.replace('</body>','<footer></footer></body>'))
+            target.write_text(original)
+            continue
         if str(relative)=='marketplace/index.html':
             original=original.replace('<form id="ecvQuote">','<form id="ecvQuote"><label>Service / 服务 <select id="serviceKind"><option value="custom">Custom development / 定制开发</option><option value="ordinary">Ordinary in-house service / 普通自营服务</option></select></label>')
         for locale in ('','zh-cn/','en/'):
@@ -148,7 +174,7 @@ def build(root, source, output, fixture=None):
             text=text.replace('<link rel="stylesheet" href="/assets/xuanjun-hub.css">','<link rel="stylesheet" href="/yunhui.css?v=yunhui-work-v2-20261013"><link rel="stylesheet" href="/assets/xuanjun-site-integration.css">')
             # Localize only hub content links, never assets or the mapped Chinese role demo.
             if locale:
-                text=re.sub(r'(<main\b.*?</main>)',lambda m:re.sub(r'href="/(marketplace|ecosystem|customer|visual)(/[^"#]*)"',lambda n:'href="/'+locale+n[1]+n[2]+'"' if not n[2].startswith('/community-local-e2e/') else n[0],m[0]),text,flags=re.S)
+                    text=re.sub(r'(<main\b.*?</main>)',lambda m:re.sub(r'href="/(marketplace|ecosystem|customer|visual)(/[^"#]*)"',lambda n:'href="/'+locale+n[1]+n[2]+'"' if not n[2].startswith(('/community-local-e2e/','/community-payment/merchant-dashboard/')) else n[0],m[0]),text,flags=re.S)
             text=externalize_styles(text)
             text=text.replace('</body>','<script src="/yunhui.js?v=yunhui-work-v2-20261013" defer></script></body>')
             canonical='https://wenwenwenyiyiyi.work/'+locale+relative.parent.as_posix()+'/'
@@ -186,12 +212,12 @@ def build(root, source, output, fixture=None):
     for p in sorted((root/'demos/legal').glob('*.html')):
         target=public/'visual/legal'/p.name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(p.read_bytes())
     (public/'assets/xuanjun-demo-integration.css').write_text('body{font-family:system-ui,sans-serif;min-width:320px;margin:0;padding:20px;overflow-wrap:anywhere}main{max-width:1100px;margin:auto}input,select,button{max-width:100%;font:inherit;padding:8px;margin:4px}label{display:inline-block;max-width:100%}pre{white-space:pre-wrap;overflow-wrap:anywhere}button:disabled{opacity:.6}a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #75a7ff;outline-offset:3px}')
-    (public/'assets/xuanjun-site-integration.css').write_text(CSS+'\n'+''.join('.'+cls+'{'+value+'}' for cls,value in sorted(extra_styles.items())))
+    for name,raw in extra_scripts.items():(public/'assets'/name).write_text(raw)
+    (public/'assets/xuanjun-site-integration.css').write_text(CSS+'\n'+EXPERIENCE_CSS+'\n'+''.join('.'+cls+'{'+value+'}' for cls,value in sorted(extra_styles.items())))
     for locale in ('','zh-cn/','en/'):
         p=public/(locale+'index.html')
-        text=p.read_text();english=locale=='en/'
-        section='<section data-site-hub="review-candidate"><h2>'+('Co-build and share' if english else '共建共享')+'</h2><p>'+('Explore ECV tiers, development discounts, service credit and co-creation.' if english else '了解生态权益、开发折扣、专项服务抵扣与共创项目。')+'</p><div class="actions"><a class="button" href="/'+locale+'marketplace/">'+('Browse products and services' if english else '浏览产品与服务')+'</a><a class="button secondary" href="/'+locale+'visual/">'+('Explore visual solutions' if english else '体验可视化方案')+'</a><a class="button secondary" href="/'+locale+'ecosystem/">'+('Co-build and share' if english else '进入共建共享')+'</a></div></section>'
-        p.write_text(text.replace('</main>',section+'</main>',1))
+        text=p.read_text()
+        p.write_text(improve_home(text,locale))
     # Reuse the already reviewed CSP implementation, never enable unsafe-inline.
     with Deadline(20) as deadline: csp=write_csp_metadata(public,output,deadline)
     manifest={p.relative_to(public).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in public.rglob('*') if p.is_file()}

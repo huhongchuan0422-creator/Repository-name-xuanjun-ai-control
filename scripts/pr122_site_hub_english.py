@@ -167,6 +167,12 @@ ECV持有量|ECV holdings
 
 TRANSLATIONS = dict(line.split('|', 1) for line in PAIRS.splitlines() if line)
 TRANSLATIONS['定制开发折扣'] = 'Custom development discount'
+TRANSLATIONS.update({
+    '方案与交互演示 · 真实购买、支付、权益领取及客户登录暂未开放':'Solution and interactive demos · Live purchasing, payments, rights claims and customer sign-in are not yet available',
+    '选择一个角色，体验消费者付款、商家经营及社区协作。全部订单与付款均为模拟，不产生真实资金。':'Choose a role to explore consumer payments, merchant operations and community collaboration. Orders and payments are simulated; no real funds move.',
+    '商家工作台提供三家模拟商家的页面样例；原多角色流程使用隔离模拟会话。两类演示数据分别展示，尚未统一。':'The merchant dashboard contains three example merchants. The existing multi-role workflow uses isolated simulation sessions. These datasets are currently separate.',
+    '商家工作台（中文演示）':'Merchant dashboard (Chinese demo)',
+})
 
 def translate_fragment(source):
     """Translate text nodes; fail closed when Chinese wording has no mapping."""

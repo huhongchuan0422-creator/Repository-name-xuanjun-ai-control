@@ -38,13 +38,13 @@ class IntegrationTests(unittest.TestCase):
         result=(r.status,r.getheader('Content-Security-Policy'),r.read());c.close();return result
     def test_42_localized_pages_have_original_navigation_and_no_inline_attributes(self):
         pages=list((ROOT/'demos/xuanjun-site-hub').rglob('*.html'))
-        pages=[p.relative_to(ROOT/'demos/xuanjun-site-hub') for p in pages if p.parent.name!='xuanjun-site-hub']
+        pages=[p.relative_to(ROOT/'demos/xuanjun-site-hub') for p in pages if p.parent.name!='xuanjun-site-hub' and p.parent.name!='merchant-dashboard']
         self.assertEqual(len(pages),14)
         for locale in ('','zh-cn/','en/'):
             for p in pages:
                 text=(self.public/locale/p).read_text()
                 self.assertIn('id="primary-nav"',text)
-                self.assertEqual(text.count('class="nav-group"'),3)
+                self.assertEqual(text.count('class="nav-group"'),4)
                 self.assertNotRegex(text,r'\s(?:style|onclick)=')
                 self.assertNotIn('<script>',text)
                 main=re.search(r'<main\b.*?</main>',text,re.S)[0]
@@ -85,8 +85,34 @@ class IntegrationTests(unittest.TestCase):
             a=Page();a.feed(old);b=Page();b.feed(new)
             self.assertLessEqual(set(a.refs),set(b.refs))
             self.assertEqual(re.search(r'<title>.*?</title>',old)[0],re.search(r'<title>.*?</title>',new)[0])
+            # The Owner authorized a new home hierarchy and hero copy. Original
+            # business detail sections and links remain available in a disclosure.
             oldmain=re.search(r'<main>.*?</main>',old,re.S)[0]
-            self.assertIn(oldmain[:-7],new)
+            oldhero=re.search(r'<section class="hero">.*?</section>',oldmain,re.S)[0]
+            self.assertIn(oldmain.split(oldhero,1)[1][:-7],new)
+            for key in ('products','visual','ecosystem','delivery'):
+                self.assertIn('id="discover-'+key+'"',new)
+            self.assertIn('class="xj-more"',new)
+
+    def test_ecosystem_navigation_is_not_in_the_module_market(self):
+        for locale in ('','en/','zh-cn/'):
+            text=(self.public/locale/'index.html').read_text()
+            market=re.search(r'<div class="nav-group"><a href="/'+locale+r'capabilities">.*?</div></div>',text,re.S)[0]
+            ecosystem=re.search(r'<div class="nav-group"><a href="/'+locale+r'labs">.*?</div></div>',text,re.S)[0]
+            self.assertNotIn('/ecosystem/',market)
+            self.assertIn('/'+locale+'ecosystem/',ecosystem)
+            self.assertIn('/'+locale+'ecosystem/governance/',ecosystem)
+
+    def test_merchant_script_is_preserved_and_externalized(self):
+        page=self.public/'visual/community-payment/merchant-dashboard/index.html'
+        text=page.read_text()
+        self.assertNotIn('ecv-quote-ui.js',text)
+        self.assertNotIn('<script>',text)
+        self.assertNotRegex(text,r'\sstyle=')
+        name=re.search(r'src="(/assets/hub-script-[a-f0-9]+.js)"',text)[1]
+        script=(self.public/name.lstrip('/')).read_text()
+        self.assertIn('selectMerchant()',script)
+        self.assertIn('DEMO-G101',script)
     def test_http_negative_and_real_simulated_order_flow(self):
         self.assertEqual(self.request('/missing-site-hub-page')[0],404)
         self.assertEqual(self.request('/.env')[0],403)
