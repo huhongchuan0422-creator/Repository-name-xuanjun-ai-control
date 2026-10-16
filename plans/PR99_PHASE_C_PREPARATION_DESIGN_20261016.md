@@ -19,19 +19,21 @@
 
 模板中的REPLACE_WITH_*、/run/credentials路径和owner_approved=false均不是可执行配置，不能原样交给Owner启动。原17文件离线release保持冻结；如C需新的runtime，另建内容寻址候选和新manifest，不覆盖B旧release或偷偷更新B事务。
 
-## A. systemd239网络适配候选
+## A. 已取真实元数据后的systemd239网络适配候选
 
-优先评估仅针对专用xuanjun_binance UID的独立IPv4/IPv6 OUTPUT链，应用层仍只GET。此为待核实候选，绝非已证明主机支持：
+原GitHub Run38859895705 / Korea Job116839560203（准确delivery71f9e115373bdc56cfe5dbbeeaaaae92b94fa642）已完成一次非root采集：UID1001、主机正确、无sudo/服务动作/provider/凭据/DB读取。候选专用UID/GID986、非交互shell；候选inactive/dead/PID0、PrivateNetwork=yes；systemd239、Python3.11.13、cgroup v1 memory controller可见；nftables1.0.4、nf_tables及nf_conntrack已加载；OpenSSL1.1.1k。版本和元数据不是root围栏验收。
 
-1. 受控root只读前检确定iptables/ip6tables后端版本、owner/conntrack能力、专用UID、该UID无其他服务/进程、现有chain身份/规则摘要；不modprobe、不更改global sysctl/Tailscale/桥接，不升级kernel/systemd。
-2. 新事务只管理自己的有名chain和OUTPUT中精确uid jump。不得flush/restore全局规则、修改INPUT/FORWARD、替换全局默认policy或碰其他UID。固定非私网/非环回目的IP的TCP443白名单、末尾拒绝；IPv4/IPv6必须同时围住。
-3. 原candidate停止且同UID无其他进程时先安装完整拒绝链，再绑定uid jump，读回精确规则。半成功/后端不支持=HOLD，不启动；不得静默降级为仅应用层限制或仅IPv4。
-4. C单元去除offline PrivateNetwork/AF_UNIX仅能随新获批C候选准确变更。保留去capabilities/NoNewPrivileges/只读code及其他sandbox；出站围栏先通过才允许新C进程启动。旧B单元/事务受保护，不原地手调成C。
-5. 启动后先证明禁止目的地、端口、UDP/未批准IPv6及provider写方法拒绝。实际提供方调用之前要有专门允许的测试地址/方法范围，不能用真实订单路径发POST“做负测”。真实GET必须在凭据和snapshot准入后另纳入同一C许可。
-6. IP轮换/围栏漂移/超时立即暂停该观察窗口；不得自动放宽CIDR、临时放行DNS或换IP重试。临时失效是HOLD，不假报源站问题。
-7. 失败先只停止新C实例并撤销该实例只读交付，保留其出站拒绝规则和证据；不能先删除围栏留下活进程。任何目标不明时保持HOLD。上述停止/撤销边界应由C许可一次包含，不能靠事后临时扩权。
+据此优先适配原生nftables独立inet table/meta skuid986的出站围栏，不依赖systemd的BPF功能。官方手册确认inet同时覆盖IPv4/IPv6、meta skuid按socket UID匹配、不同base chain中accept不跳过后续drop；这些是设计依据，不证明韩国1.0.4的准确规则已加载或实际生效。来源：https://netfilter.org/projects/nftables/manpage.html 。
 
-如UID级方案无法在此主机提供可验证隔离，应停止并集中提出替代；不得启用BPF假设、全局开forwarding或为通过测试解除现有隔离。当前主机是否具有这些能力仍UNKNOWN，需要受控前检，不伪造已可执行网络方案。
+1. 未来受控root前检仍须验证真实UID986无其他业务进程、nft程序/父路径身份、现有全局规则的私有摘要、目标专用table不存在、相关内核表达式及语法；不modprobe、不升级kernel/systemd、不改global sysctl/Tailscale/桥接。
+2. 新事务仅create自己的唯一inet table和output hook chain，不flush ruleset、不改INPUT/FORWARD或别的table/default policy。自身base chain policy accept保持其他UID原规则路径；每条限制必须先匹配UID986，允许准确提供方固定IP的TCP443，最后对UID986其余IPv4/IPv6出口drop。两种族的非批准流量都必须拒绝；不能静默只围IPv4。
+3. 目标table已存在或规则/UID身份漂移一律HOLD，不能重用/覆盖未知对象。C实例停止且同UID无其他进程时，先校验batch再一次加载本事务自有table，读回准确规则/handle/hash；部分或未知结果停止不启动，不对全局ruleset作还原覆盖。
+4. 原B offline unit保持不变。另一个获批C候选才可用新的受控unit和精确内容寻址runtime；其capabilities为空、NoNewPrivileges/code只读等保护维持。只有围栏和凭据/快照准入全通过才允许启动C，不能先解除PrivateNetwork试连。
+5. 在新C许可覆盖的测试范围内验证禁止目的地/端口、UDP和未批准IPv6无法通行；应用层仍只GET。不能用真实订单POST做负测。单靠nft -c、内核模块已加载或systemctl配置文字均不是实际阻断证明。
+6. 出站IP变化、expiry、规则漂移、计数/进程归属不明即HOLD，不扩大CIDR或临时放开DNS，不自动换IP重试。失败先停止且确认新C实例结束、撤销该实例临时只读交付，保留出站拒绝与证据；不得先删除围栏留下活进程。停止/撤销要由本次C方案和许可一次包含。
+7. 不支持时集中提出替代，不启用不生效的BPF假设，不让其他共享服务承担网络配置变化。目前root enforcement、启动后confinement仍NOT_VERIFIED/NOT_EXERCISED。
+
+本采集的iptables/ip6tables版本exit1不能解释为工具不可用：v1探针将可信symlink resolve后的xtables-nft-multi直接执行，丢失了调用别名argv0。因此这两项版本明确UNKNOWN。没有为了补这两项重跑全批；未来v2只修为验证canonical目标后保留绝对调用别名，已用本地真实multicall symlink测试通过，v2未在韩国运行。/proc/net/ip_tables_matches缺失和xt_owner未列出也不能证明编译/模块能力不存在。原始回执和v1来源hash保持不改。
 
 ## B. 凭据托管与交付候选
 

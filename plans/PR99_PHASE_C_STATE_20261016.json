@@ -16,7 +16,17 @@
       "readonly credential custody",
       "WAL collector publisher and independent verifier wiring",
       "continuous observation resources thresholds and admission"
-    ]
+    ],
+    "nonroot_host_metadata": "COLLECTED",
+    "metadata_run": 38859895705,
+    "metadata_job": 116839560203,
+    "metadata_delivery_commit": "71f9e115373bdc56cfe5dbbeeaaaae92b94fa642",
+    "candidate_uid": 986,
+    "cgroup_version": 1,
+    "nft_version": "1.0.4",
+    "preferred_network_candidate": "DEDICATED_NFT_INET_META_SKUID_TABLE_NOT_INSTALLED",
+    "iptables_version": "UNKNOWN_MULTICALL_ARGV0_LIMIT",
+    "root_enforcement": "NOT_VERIFIED"
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
