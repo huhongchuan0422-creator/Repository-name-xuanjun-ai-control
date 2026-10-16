@@ -45,14 +45,20 @@
           "supplement original Root HOLD without broadening symlink trust",
           "package a real GET-only Korea Shadow entry with Writer locked",
           "keep persistent production Launcher and single-Writer phases blocked until independently bound",
-          "preserve protected Korea services and production HOLD"
+          "preserve protected Korea services and production HOLD",
+          "Fixed channel grant is independently hash-approved, permits only inspect/install, and preserves the frozen C handoff's separate action admission."
         ],
         "tests": [
-          "tests/test_tokyo_korea_closeout.py"
+          "tests/test_tokyo_korea_closeout.py",
+          "tests/test_pr99_phase_c_channel.py"
         ]
       },
       "paths": [
-        "tests/test_tokyo_korea_closeout.py"
+        "tests/test_tokyo_korea_closeout.py",
+        "migration-prep/korea/phase_c_channel.py",
+        "migration-prep/korea/grant_phase_c_channel.py",
+        "migration-prep/korea/test_phase_c_channel.py",
+        "tests/test_pr99_phase_c_channel.py"
       ],
       "reuse": [
         "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1 policy",

@@ -67,3 +67,7 @@ Rollback is Korea-first: lock the Korea Writer, revoke its write credential/IP/e
 reconcile every unknown exchange result, restore the last accepted authoritative
 database route, and only then issue a new Tokyo epoch.  Double Writer and stale-copy
 timer resume are forbidden.
+
+### 4 Fixed Phase-C root channel candidate
+
+Owner requested a usable root execution channel. `migration-prep/korea/phase_c_channel.py` accepts only inspect/install; `grant_phase_c_channel.py` authenticates a separate exact independent grant approval before installing two no-wildcard sudoers commands. The frozen e9052b4e handoff and archive remain pinned, with their own private exact C install admission still required. This channel grant never installs C or runs services/nft/GET/DB operations. The new tests are registered through `tests/test_pr99_phase_c_channel.py`; real account/systemd/grant operations are models, Hosted visudo parses only temporary policy files. Root grant and migration remain NOT_EXECUTED until exact approval and Owner-root action. Operational contract: `migration-prep/korea/PHASE_C_CHANNEL.md`.
