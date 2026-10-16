@@ -13,6 +13,7 @@ import multiprocessing
 import contextlib
 import io
 import time
+import tarfile
 from scripts import pr122_domestic_customer_channel as c
 
 
@@ -29,7 +30,7 @@ class ChannelTests(unittest.TestCase):
 
     def test_owner_actions_denied_to_runner(self):
         with patch.dict(os.environ, {'SUDO_UID':'1002'}):
-            for f in (c.grant, c.revoke):
+            for f in (c.grant, c.revoke, c.repair_modes):
                 with self.subTest(action=f.__name__), self.assertRaises(RuntimeError):
                     f()
 
@@ -42,6 +43,7 @@ class ChannelTests(unittest.TestCase):
         self.assertNotIn('ALL)',raw)
         self.assertNotIn('--grant',raw)
         self.assertNotIn('--revoke',raw)
+        self.assertNotIn('--repair-modes',raw)
         for a in c.ACTIONS:self.assertIn(str(c.EXEC)+' '+a,raw)
 
     def test_policy_uid_mismatch(self):
@@ -117,6 +119,18 @@ class ChannelTests(unittest.TestCase):
             source=p/'installer.py';source.write_bytes(Path(c.__file__).read_bytes())
             with patch.multiple(c,BASE=base,EXEC=exe/'channel',POLICY=sudoers/'channel',STAGED_ARCHIVE=staging,__file__=str(source)), patch.object(c.pwd,'getpwnam',return_value=Account()), patch.dict(os.environ,{'SUDO_UID':'1000'}),patch.object(c.subprocess,'run',side_effect=isolated_visudo):
                 self.assertEqual(c.grant()['state'],'GRANTED')
+                self.assertEqual(c.EXEC.stat().st_mode & 0o777,0o755)
+                self.assertEqual(c.POLICY.stat().st_mode & 0o777,0o440)
+                self.assertEqual((base/'channel.py').stat().st_mode & 0o777,0o444)
+                wrapper=c.EXEC.read_bytes()
+                self.assertEqual(wrapper.splitlines()[0],b'#!/bin/sh')
+                self.assertNotIn(b'\\n',wrapper)
+                self.assertTrue(c.POLICY.read_bytes().endswith(b'\n'))
+                invoked=real_run([str(c.EXEC),'inspect'],capture_output=True,text=True,env={'SUDO_UID':'1002'})
+                # The fixture is not the approved domestic host: the wrapper
+                # must actually start Python and fail closed as JSON, not ENOENT.
+                self.assertEqual(invoked.returncode,2)
+                self.assertEqual(json.loads(invoked.stdout)['state'],'HOLD')
                 self.assertEqual(c.validate_bundle(),base/'candidate')
                 with self.assertRaises(RuntimeError):c.grant()
                 extra=base/'candidate'/'unexpected.py';extra.write_bytes(b'raise Exception()')
@@ -179,6 +193,57 @@ class ChannelTests(unittest.TestCase):
                     p.join(timeout=5)
                     self.assertEqual(p.exitcode,0)
             self.assertEqual(sorted(results),['ENTERED','LOCKED','LOCKED','LOCKED'])
+
+    def test_exclusive_exact_modes_under_umask_077(self):
+        old=os.umask(0o077)
+        try:
+            with tempfile.TemporaryDirectory() as t:
+                for mode in (0o444,0o755,0o440,0o600):
+                    p=Path(t)/str(mode);c.exclusive(p,b'fixture',mode)
+                    self.assertEqual(p.stat().st_mode & 0o777,mode)
+        finally:os.umask(old)
+
+    def recovery_fixture(self):
+        # Root-only disposable recreation of the exact observed partial state.
+        t=tempfile.TemporaryDirectory(prefix='pr122-channel-recovery-',dir='/root')
+        self.addCleanup(t.cleanup);p=Path(t.name);base=p/'base';base.mkdir()
+        exe=p/'libexec';exe.mkdir();rules=p/'sudoers';rules.mkdir()
+        raw=Path(os.environ['PR122_FROZEN_TAR']).read_bytes()
+        (base/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').write_bytes(raw)
+        root=base/'candidate';root.mkdir()
+        for name,b in c.files_from_tar(raw).items():
+            dest=root/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b)
+        original=Path(os.environ['PR122_ORIGINAL_CHANNEL_TAR']).read_bytes()
+        self.assertEqual(hashlib.sha256(original).hexdigest(),'c16113c86abd543700c380b7f566d3a95cf4bdf7d3667e7a8a2109263c57d1a3')
+        with tarfile.open(fileobj=io.BytesIO(original),mode='r:gz') as archive:
+            code=archive.extractfile('scripts/pr122_domestic_customer_channel.py').read()
+        self.assertEqual(hashlib.sha256(code).hexdigest(),c.ORIGINAL_CHANNEL_SHA)
+        (base/'channel.py').write_bytes(code);(base/'channel.py').chmod(0o400)
+        (base/'grant-state.json').write_bytes(b'{"state":"PREPARING"}')
+        global_rules=p/'sudoers.global';global_rules.write_text('root ALL=(ALL:ALL) ALL\n@includedir '+str(rules)+'\n');global_rules.chmod(0o440)
+        return base,exe/'channel',rules/'channel',global_rules
+
+    def test_exact_partial_mode_recovery_preserves_original_code(self):
+        base,exe,rules,global_rules=self.recovery_fixture()
+        class Account:pw_uid=1002
+        real_run=c.subprocess.run
+        def run(args,**kwargs):
+            if args==['/usr/sbin/visudo','-c']:args=['/usr/sbin/visudo','-cf',str(global_rules)]
+            return real_run(args,**kwargs)
+        with patch.multiple(c,BASE=base,EXEC=exe,POLICY=rules),patch.object(c.pwd,'getpwnam',return_value=Account()),patch.dict(os.environ,{'SUDO_UID':'1000'}),patch.object(c.subprocess,'run',side_effect=run):
+            exe.write_bytes(c.wrapper_bytes());exe.chmod(0o700)
+            for path in (rules,base/'sudoers.candidate'):path.write_bytes(c.policy('githubrunner'));path.chmod(0o400)
+            self.assertEqual(c.repair_modes()['state'],'GRANTED')
+            self.assertEqual(exe.stat().st_mode&0o777,0o755)
+            self.assertEqual(rules.stat().st_mode&0o777,0o440)
+            self.assertEqual(hashlib.sha256((base/'channel.py').read_bytes()).hexdigest(),c.ORIGINAL_CHANNEL_SHA)
+            with self.assertRaises(RuntimeError):c.repair_modes()
+
+    def test_recovery_foreign_code_denied_before_mode_changes(self):
+        base,exe,rules,global_rules=self.recovery_fixture()
+        (base/'channel.py').chmod(0o600);(base/'channel.py').write_bytes(b'foreign');(base/'channel.py').chmod(0o400)
+        with patch.multiple(c,BASE=base,EXEC=exe,POLICY=rules),patch.dict(os.environ,{'SUDO_UID':'1000'}),self.assertRaises(RuntimeError):c.repair_modes()
+        self.assertEqual((base/'grant-state.json').read_bytes(),b'{"state":"PREPARING"}')
 
 
 if __name__=='__main__':unittest.main()
