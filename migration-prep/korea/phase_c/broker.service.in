@@ -6,7 +6,9 @@ StopWhenUnneeded=yes
 # No Install section: installation must leave this separate candidate disabled.
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
+TimeoutStartSec=15s
 User=xuanjun_binance
 Group=xuanjun_binance_shadow
 WorkingDirectory=@C_RELEASE@/migration-prep

@@ -94,7 +94,8 @@ def collect_generation(source, root, generation_id, config, signer, now_ms):
             hasher.update(block)
     receipt = {"schema_version": 1, "protocol": PROTOCOL,
                "feature_id": config["feature_id"], "account_id": config["account_id"],
-               "database_path": str(final / "business-snapshot.sqlite"),
+               # Sign the receiver's exact path, not the collector staging path.
+               "database_path": str(Path(config["snapshot_root"]) / generation_id / "business-snapshot.sqlite"),
                "database_sha256": hasher.hexdigest(), "snapshot_generation_id": generation_id,
                "captured_at_ms": now_ms, "published_at_ms": now_ms,
                "runtime_manifest_sha256": config["runtime_manifest_sha256"],

@@ -3,6 +3,7 @@ import base64
 import ctypes
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -103,8 +104,11 @@ def strict_json(data):
             require(key not in result, "C_DUPLICATE_JSON_FIELD")
             result[key] = value
         return result
-    return json.loads(data, object_pairs_hook=unique,
-                      parse_constant=lambda _: (_ for _ in ()).throw(ValueError("C_NONFINITE_JSON")))
+    def finite(token):
+        value = float(token)
+        require(math.isfinite(value), "C_NONFINITE_JSON")
+        return value
+    return json.loads(data, object_pairs_hook=unique, parse_float=finite, parse_constant=finite)
 
 
 class DetachedRSA:
@@ -116,7 +120,7 @@ class DetachedRSA:
     def __init__(self, public_key, public_sha256, openssl="/usr/bin/openssl", private_key=None,
                  key_owner=0):
         self.public_key = str(public_key)
-        raw = read_file(public_key, modes=(0o400, 0o600, 0o644))
+        raw = read_file(public_key, modes=(0o400, 0o444, 0o600, 0o644))
         require(digest(raw) == public_sha256, "C_PUBLIC_KEY_PIN")
         self.identity = public_sha256
         self.openssl = str(openssl)

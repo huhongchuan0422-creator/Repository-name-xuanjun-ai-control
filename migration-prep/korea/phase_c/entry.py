@@ -60,6 +60,16 @@ def validate_config(config):
     return config
 
 
+def notify_ready():
+    # systemd239 supports Type=notify. Worker must not race socket.bind/listen.
+    target = os.environ.get("NOTIFY_SOCKET")
+    require(type(target) is str and target and (target.startswith("/") or target.startswith("@")) and
+            len(target) <= 107, "C_NOTIFY_SOCKET_REQUIRED")
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as notification:
+        notification.connect("\x00" + target[1:] if target.startswith("@") else target)
+        require(notification.send(b"READY=1") == 7, "C_NOTIFY_READY_FAILED")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("prepare", "broker", "worker"))
@@ -119,6 +129,7 @@ def main(argv=None):
         os.chmod(socket_path, 0o660)
         listener.listen(1)
         listener.settimeout(1)
+        notify_ready()
         while now() < min(packet["admission"]["expires_at_ms"], config["network_policy"]["expires_at_ms"]):
             try:
                 broker.serve_one(listener)

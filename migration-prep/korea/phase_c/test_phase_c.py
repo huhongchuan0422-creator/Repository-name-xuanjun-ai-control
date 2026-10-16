@@ -290,7 +290,8 @@ class Fixture(unittest.TestCase):
 
     def attestation(self):
         return dict(account_id="account-a",role=credentials.ROLE,secret_ref="SecretRef:READONLY_FIXTURE",
-                    read_only_verified=True,trading_enabled=False,withdrawal_enabled=False,expires_at_ms=NOW+90000)
+                    read_only_verified=True,trading_enabled=False,withdrawal_enabled=False,expires_at_ms=NOW+90000,
+                    pair_sha256=credentials.pair_digest(b"synthetic-key",b"synthetic-secret"))
 
     def test_credential_refusal_before_secret_files_or_pointer(self):
         root=self.case/"credentials";root.mkdir();root.chmod(0o711)
