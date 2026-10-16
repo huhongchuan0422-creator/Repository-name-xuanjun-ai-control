@@ -7,7 +7,7 @@
   "phase_c": {
     "design": "OFFLINE_MECHANISM_CANDIDATE_COMPLETE_REAL_BINDINGS_AND_HOST_ACCEPTANCE_PENDING",
     "adapter_implementation": "PAIR_BOUND_CUSTODY_MTLS_REMOTE_PATH_HANDOFF_OBSERVATION_FENCE_AND_PID1_GUARD_IMPLEMENTED",
-    "review_artifact": "COMPLETE_OFFLINE_MECHANISM_CANDIDATE_DEVELOPER_VERIFIED_PENDING_INDEPENDENT_REVIEW",
+    "review_artifact": "OFFLINE_CANDIDATE_LIMITED_REVIEW_PASS_FULL_INDEPENDENT_TAR_RECALC_PENDING",
     "root_preflight": "NOT_EXECUTED",
     "started_service_confinement": "NOT_EXERCISED",
     "live_get": "NOT_AUTHORIZED_NOT_RUN",
@@ -95,9 +95,9 @@
       "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
       "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
       "developer_download_verified": true,
-      "independent_review": "REQUESTED_AWAITING_ORIGINAL_INDEPENDENT_DECISION"
+      "independent_review": "PASS_WITH_SCOPE_LIMITS_FULL_TAR_MEMBER_RECALC_PENDING"
     },
-    "next_development": "One consolidated review of the complete offline C mechanism candidate; then bind actual private identities/account/source schema/window and obtain exact host permissions before any C installation, fence or observation. Original B is frozen.",
+    "next_development": "Prepare one concrete deployment-admission dossier using the frozen source and artifact. Resolve private identity/account/schema/transport/window bindings and restricted C root channel; obtain independent artifact byte closure and exact action permits before any live side effect. Do not repeat B or unchanged C tests.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -156,12 +156,22 @@
       "comment_id": 6211673847,
       "scope": "ONE_CONSOLIDATED_FULL_OFFLINE_C_SOURCE_ARTIFACT_AND_EXCEPTION_FLOW_REVIEW",
       "production_permission_requested": false,
-      "read_back": true
+      "read_back": true,
+      "decision_comment_id": 6212409290
+    },
+    "offline_independent_review": {
+      "comment_id": 6212409290,
+      "decision": "PASS_WITH_SCOPE_LIMITS",
+      "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
+      "scope": "OFFLINE_SOURCE_CANDIDATE_MECHANISMS_AND_HOSTED_EVIDENCE",
+      "read_back": true,
+      "full_tar_member_recalculation": "NOT_PERFORMED_BY_INDEPENDENT_REVIEWER",
+      "production_authority": false
     }
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NO_OLD_COMMAND_OR_MANUAL_DATA_RETRIEVAL_REQUESTED; C_ROOT_CHANNEL_AND_REAL_PRIVATE_INPUTS_STILL_REQUIRED_BEFORE_HOST_EXECUTION",
+  "owner_action_now": "NO_SERVER_COMMAND_NOW; DO_NOT_RELAY_THE_SAME_REVIEW_AGAIN; FUTURE_TRUSTED_ROOT_AND_PRIVATE_PROVIDER_BINDINGS_REQUIRED",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",

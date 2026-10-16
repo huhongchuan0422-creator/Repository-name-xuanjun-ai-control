@@ -1,6 +1,6 @@
 # PR99 Phase-C：完整离线准备设计及实施清单（2026-10-16）
 
-状态：OFFLINE_MECHANISM_CANDIDATE_READY_FOR_CONSOLIDATED_REVIEW / PRODUCTION_EXECUTION_NOT_AUTHORIZED。
+状态：OFFLINE_REVIEW_PASS_WITH_SCOPE_LIMITS_6212409290 / PRODUCTION_EXECUTION_NOT_AUTHORIZED。
 
 当前准确C源码：e9052b4e9d7de8a3cf27b3ab5282a19d120878b4；Hosted134/134、零跳过，实际制品44绑定/30runtime已由开发方下载复算。四链路适配、停止状态安装、围栏预检、观察编排和PID1失联收尾已实现；真实私有身份/账号/schema/持续刷新部署及全部实机门禁尚未闭环。本文不是安装/启动许可或实机验收，完整当前证据见文末本轮集中候选与PR99_PHASE_C_STATE_20261016.json。下文保留初始设计和阶段历史，未实现的旧状态由文末当前记录取代。沿原PR99推进，不新建分支或任务队列。
 
@@ -127,3 +127,7 @@ Owner当前不需重复取B资料或执行旧命令；未来必须需要其协�
 东京源声明实际Run38871973602/Job116877943391：50源、15表中13声明匹配，algo_order_snapshots与protective_order_snapshots未解析；没有打开DB，不得造空表凑数。韩国Run38874822582/Job116887220927：UID1001、systemd239对四份候选unit纯解析exit0/无诊断，无generators/Root/服务操作；不是实际隔离或watchdog验收。
 
 一次性集中送原独审核整批C源码/闭包/制品和异常边界；原B/R2/R6/185及已通过网站范围继续继承。不申请拆散的安装或启动许可。真实SecretRef/只读权限、签名及mTLS身份/私有端点、权威账号/实际schema/持续刷新、窗口参数和受限root通道尚未绑定，任何生产Root或真实GET均必须另外满足精确执行门禁。C实机未开始，生产迁移/Writer/东京退役继续HOLD。
+
+## 正式离线裁定已消费
+
+独立审核6212409290已回读：准确e9052b4e离线源码/候选机制限定通过，134 Hosted证据认可；完整TAR成员独立复算未完成。此后不再把源码审结写成待审，也不自动升级为安装许可。原B及未变源码/测试继承。下一批现场准入依赖、职责与执行缺口见 plans/PR99_PHASE_C_DEPLOYMENT_ADMISSION_CHECKLIST_20261016.md；真实私有身份、源真值、参数与C受限root通道未绑定，未执行root动作。
