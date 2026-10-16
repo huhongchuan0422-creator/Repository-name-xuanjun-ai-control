@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "RUN_PINNED_S07_PRIVATE_MATERIAL_STAGE_ON_KOREA_ENTER_TOKYO_ROOT_PASSWORD_ONLY_IN_TERMINAL",
+  "owner_action_now": "RUN_BOUNDED_ALL_CANDIDATE_PATH_METADATA_NO_MATERIAL_STAGE_REPLAY",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -945,7 +945,7 @@
         "storage_wiring_receipt": "evidence/pr99-service-handoff/s07-runtime-inventory/OWNER_STORAGE_WIRING_20261017.json"
       },
       "private_runtime_material_staging": {
-        "status": "PREPARED_NOT_EXECUTED",
+        "status": "OWNER_EXECUTED_HOLD_REMOTE_SYMLINK_PARENT_PRESERVE_NO_RETRY",
         "script": "evidence/pr99-service-handoff/s07-runtime-materials/stage_runtime_materials.py",
         "source_commit": "8f80d0cb60ff68a3bcbbfed6506eda3126cb4761",
         "script_sha256": "0076b30aec052366ac2f7ec6adfa5ff13b9c54f21fa50221c72d9415ddfc6c7f",
@@ -970,7 +970,32 @@
         "api_requests": 0,
         "production_cutover": false,
         "private_archive_upload": "FORBIDDEN_DO_NOT_SEND_TO_CHAT_GITHUB_OR_CI",
-        "execution_authority": "OWNER_DIRECT_MIGRATION_6219362469_NOT_REPLAY_OF_R2_OR_S06_PERMIT"
+        "execution_authority": "OWNER_DIRECT_MIGRATION_6219362469_NOT_REPLAY_OF_R2_OR_S06_PERMIT",
+        "owner_failure": {
+          "reported_local_time": "2026-10-17T07:38+08:00",
+          "launch_directory": "/root/pr99-s07-material-launch.Fwej5Q9b",
+          "remote_exception": "SYMLINK_PARENT",
+          "archive_bytes": 0,
+          "receipt_present": false,
+          "private_log_bytes": 224,
+          "evidence_origin": "OWNER_ROOT_TERMINAL_TRANSCRIPT",
+          "source_partial_actions": "UNKNOWN_UNTIL_TRACE_LOCATION_BOUND"
+        },
+        "path_metadata": {
+          "reported_local_time": "2026-10-17T07:44+08:00",
+          "project_root_symlink": false,
+          "unit_fragment_and_parent_symlinks": false,
+          "project_root_uid": 1000,
+          "project_root_gid": 1000,
+          "scope": "ROOT_AND_THREE_UNIT_PATHS_ONLY_DEEPER_PATHS_NOT_PROVEN",
+          "next_script": "evidence/pr99-service-handoff/s07-runtime-materials/inspect_all_candidate_paths.py",
+          "source_commit": "ceb3942afd8db530540ddc485d7eab7c893a9af3",
+          "script_sha256": "a089bfa39d6fee38f866000e80861d384bb2a2352c66eab569f7c796c7efa054",
+          "local_checks": "PARENT_LINK_NESTED_LINK_NO_CONTENT_MISSING_PATH_AND_COMPILE_PASS",
+          "hosted_ci": "NOT_RUN",
+          "host_execution": "NOT_RUN",
+          "symlink_guard_relaxed": false
+        }
       }
     }
   },
