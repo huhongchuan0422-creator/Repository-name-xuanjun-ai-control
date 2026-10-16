@@ -18,33 +18,33 @@ jobs:
         run: |
           test "$(hostname -s)" = iZvt5t8tlrm8oiZ
           test "$(id -u)" = 1002
-          test ! -e /home/githubrunner/pr122-approved-channel-inputs
-          mkdir -m 0700 /home/githubrunner/pr122-approved-channel-inputs
+          test ! -e /home/githubrunner/pr122-channel-modefix-inputs
+          mkdir -m 0700 /home/githubrunner/pr122-channel-modefix-inputs
       - uses: actions/download-artifact@v4
         with:
-          name: pr122-domestic-customer-channel-7e5d42f5a5331dc261074ddd780413d03de9c591
-          run-id: 38886911011
+          name: pr122-domestic-customer-channel-df38bcffba6e5ad9798facad35aed0e6a0fb0fe9
+          run-id: 38888387295
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: /home/githubrunner/pr122-approved-channel-inputs/channel
+          path: /home/githubrunner/pr122-channel-modefix-inputs/channel
       - uses: actions/download-artifact@v4
         with:
           name: pr122-customer-center-feaef687ee296dcd55f094bf240fe843445d5ad7
           run-id: 38883029225
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: /home/githubrunner/pr122-approved-channel-inputs/customer
+          path: /home/githubrunner/pr122-channel-modefix-inputs/customer
       - name: Hash approved inputs without importing or installing any code
         run: |
           /usr/bin/python3 -I -B - <<'PY'
           import hashlib,io,tarfile
           from pathlib import Path
-          root=Path('/home/githubrunner/pr122-approved-channel-inputs')
+          root=Path('/home/githubrunner/pr122-channel-modefix-inputs')
           raw=(root/'channel/PR122_DOMESTIC_CUSTOMER_CHANNEL.tar.gz').read_bytes()
-          assert hashlib.sha256(raw).hexdigest()=='c16113c86abd543700c380b7f566d3a95cf4bdf7d3667e7a8a2109263c57d1a3'
+          assert hashlib.sha256(raw).hexdigest()=='94dd112ac61cd074e979029b934953c3d37a1c0df0673af8df050e39b423473b'
           with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
               members=t.getmembers()
               assert len(members)==5 and len({m.name for m in members})==5 and all(m.isfile() and not m.name.startswith('/') and '..' not in Path(m.name).parts for m in members)
               code=t.extractfile('scripts/pr122_domestic_customer_channel.py').read()
-          assert hashlib.sha256(code).hexdigest()=='0804e33edac6ad07a711456c0c15708266b2ad8a75c4cb3bdc5964a9b79a96bd'
+          assert hashlib.sha256(code).hexdigest()=='d685037af45cd044a6a1bfadfc4dcdf14f36b4bf83cc035e47acec4f653b5d1a'
           (root/'approved-channel.py').write_bytes(code)
           frozen=(root/'customer/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes()
           assert hashlib.sha256(frozen).hexdigest()=='7dd77ef573c338201ddc886b23585422ad4a07ae563a9c6ff92fe5b2f9d97b98'
