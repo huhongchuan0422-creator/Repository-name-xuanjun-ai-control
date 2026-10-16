@@ -23,10 +23,11 @@ def memory_identity(proc, cgroup_root):
 
 
 class CombinedResourceSampler:
-    def __init__(self, broker_pid, proc_root="/proc", cgroup_root="/sys/fs/cgroup", worker_sampler=None):
+    def __init__(self, broker_pid, proc_root="/proc", cgroup_root="/sys/fs/cgroup", worker_sampler=None, peer_uid=986):
         require(type(broker_pid) is int and broker_pid > 0, "C_BROKER_PID")
         self.proc = Path(proc_root) / str(broker_pid)
         self.proc_root, self.cgroup_root = Path(proc_root), Path(cgroup_root)
+        require(peer_uid in (0,986),'C_RESOURCE_PEER_ROLE');self.peer_uid=peer_uid
         self.start = process_start_time(self.proc)
         self.version, self.memory = memory_identity(self.proc, self.cgroup_root)
         worker_version, worker_memory = memory_identity(self.proc_root / "self", self.cgroup_root)
@@ -42,7 +43,7 @@ class CombinedResourceSampler:
         for line in (self.proc / "status").read_text().splitlines():
             if ":" in line:
                 name, value = line.split(":", 1); status[name] = value.split()
-        require(status.get("Uid") == ["986"] * 4 and "VmRSS" in status, "C_BROKER_UID_OR_RSS")
+        require(status.get("Uid") == [str(self.peer_uid)] * 4 and "VmRSS" in status, "C_BROKER_UID_OR_RSS")
         if self.version == "v1":
             peak = _read_integer(self.memory / "memory.max_usage_in_bytes")
             oom = _read_integer(self.memory / "memory.failcnt")
@@ -71,4 +72,11 @@ def live_sampler():
     values = dict(line.split("=", 1) for line in result.stdout.splitlines())
     require(values["ActiveState"] == "active" and values["SubState"] == "running" and
             values["User"] == "xuanjun_binance", "C_BROKER_NOT_ACTIVE")
-    return CombinedResourceSampler(int(values["MainPID"]))
+    broker=CombinedResourceSampler(int(values["MainPID"]))
+    result=subprocess.run(['/usr/bin/systemctl','show','xuanjun-binance-phase-c-controller.service',
+        '-p','MainPID','-p','ActiveState','-p','SubState','-p','User'],stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,text=True,timeout=5,check=True)
+    values=dict(line.split('=',1) for line in result.stdout.splitlines())
+    require(values['ActiveState']=='active' and values['SubState']=='running' and values['User']=='root',
+            'C_SUPERVISOR_NOT_ACTIVE')
+    return CombinedResourceSampler(int(values['MainPID']),worker_sampler=broker,peer_uid=0)

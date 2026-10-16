@@ -2,7 +2,10 @@
 Description=Xuanjun Phase-C read-only reconciliation worker (candidate only)
 Requires=xuanjun-binance-phase-c-broker.service
 BindsTo=xuanjun-binance-phase-c-broker.service
+BindsTo=xuanjun-binance-phase-c-controller.service
 After=xuanjun-binance-phase-c-broker.service
+After=xuanjun-binance-phase-c-controller.service
+Requisite=xuanjun-binance-phase-c-controller.service
 # No Install section; old Phase-B unit/current/transaction remain unchanged.
 
 [Service]

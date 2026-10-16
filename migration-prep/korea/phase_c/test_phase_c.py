@@ -471,6 +471,10 @@ class Fixture(unittest.TestCase):
         self.assertIn("PrivateNetwork=yes",units["worker.service"])
         self.assertIn("RestrictAddressFamilies=AF_UNIX\n",units["worker.service"])
         self.assertIn("Restart=no",units["broker.service"])
+        self.assertIn('WatchdogSec=45s',units['controller.service'])
+        self.assertIn('from korea.phase_c.stop_guard import main',units['controller.service'])
+        self.assertIn('BindsTo=xuanjun-binance-phase-c-controller.service',units['worker.service'])
+        self.assertIn('RuntimeMaxSec=240',units['controller.service'])
         self.assertNotIn("LoadCredential",json.dumps(units))
         self.assertNotIn("IPAddressDeny",json.dumps(units))
         for change in ({"C_RELEASE":"/opt/xuanjun-binance/current"},{"C_CONFIG":"/tmp/x';import os"},
@@ -522,6 +526,21 @@ class Fixture(unittest.TestCase):
         (proc/"123/cgroup").write_text("5:memory:/same\n")
         (proc/"123/stat").write_text("123 (fixture) "+" ".join(["S"]+["0"]*18+["42"]))
         with self.assertRaises(GateError):CombinedResourceSampler(123,proc,cg,worker_sampler=self.resource)
+
+    def test_combined_resources_include_root_controller_separate_cgroup(self):
+        proc=self.case/'three-proc';cg=self.case/'three-cgroup'
+        (proc/'self').mkdir(parents=True);(proc/'self/cgroup').write_text('5:memory:/worker\n')
+        for pid,uid,name,rss,peak,oom in ((123,986,'broker',2048,3145728,0),(124,0,'controller',1024,4194304,1)):
+            p=proc/str(pid);p.mkdir();(p/'cgroup').write_text('5:memory:/'+name+'\n')
+            (p/'stat').write_text(str(pid)+' (synthetic) '+' '.join(['S']+['0']*18+['42']))
+            (p/'status').write_text('Uid: '+' '.join([str(uid)]*4)+'\nVmRSS: '+str(rss)+' kB\n')
+            m=cg/('memory/'+name);m.mkdir(parents=True)
+            (m/'memory.max_usage_in_bytes').write_text(str(peak))
+            (m/'memory.failcnt').write_text(str(oom));(m/'memory.oom_control').write_text('under_oom 0\n')
+        broker_sample=CombinedResourceSampler(123,proc,cg,worker_sampler=self.resource)
+        all_sample=CombinedResourceSampler(124,proc,cg,worker_sampler=broker_sample,peer_uid=0)
+        result=all_sample();self.assertEqual(result['rss_mib'],13)
+        self.assertEqual(result['cgroup_memory_peak_mib'],19);self.assertEqual(result['cgroup_oom'],1)
 
     def test_templates_require_external_admission_and_root_owned_manifest(self):
         from korea.phase_c.entry import load_config

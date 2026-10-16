@@ -16,7 +16,7 @@
 
 RSA签发身份、源端publisher身份和执行授权身份在部署时必须使用分别绑定的公钥/私钥；测试只用临时生成的合成密钥。RSA/SHA256使用OpenSSL的dgst -sign/-verify，兼容接口依据：https://docs.openssl.org/1.1.1/man1/dgst/ 。韩国OpenSSL1.1.1k的真实签名/运行尚未实测，不能把本地/Hosted OpenSSL结果扩大为该主机实测。
 
-## 两个专用进程的边界
+## 专用进程与root监督器边界
 
 原UID986 xuanjun_binance继续作为候选只读网络broker（原B单元保持inactive）。对账worker必须使用**新独立非交互用户**xuanjun_binance_shadow，实际UID/GID尚未分配，不可用admin/Runner/交易身份代替。测试1986只是合成数字，不是已创建账号。
 
@@ -43,14 +43,14 @@ RSA签发身份、源端publisher身份和执行授权身份在部署时必须�
 - `lifecycle.py`在**已经完成并获得精确批准的root网络/托管/源快照预检**之后，监督一个新的只读观察窗口。它不加载nft、不提供网络负向探针伪证明，不投放凭据，不签自己的观察准入，也不导出数据库。缺少真实root网络证据、四项UID×IPv4/IPv6 DROP计数增量、准确表语义摘要、预先交付的整对凭据/匹配签名私钥/新鲜源快照、独立签名准入或root私有精确许可时，服务启动前拒绝。
 - 生命周期许可与停止状态安装许可严格分离；核当前GitHub全文、准入签名、安装回执/plan/runtime/单元实际字节、角色和systemd239 typed属性，永久单次attempt及锁后才更新获准acceptance/admission。新broker改为`Type=notify`，在Unix socket真正listen后发送READY，worker依赖其就绪，避免启动竞态。原B及共享服务不变。
 - 观察中检查撤销标记/私有锚点、定期当前GitHub批准、表语义漂移、B/共享对象及PID变化；失败、SIGTERM/SIGHUP、未知启动都只对新C单元发一次stop，不启动第二轮。只有MainPID0、inactive/failed和UID范围无进程全部成立，才将**本轮临时pair和broker私钥**原子移动至同一`/run`文件系统的0700隔离目录，保留证据及原SecretRef；不跨文件系统rename，不先撤围栏。live-admission在`/etc`原目录原子改名保留。停机未知时不撤销进程仍可能使用的材料，不报告成功。
-- 成功仅在整窗时长、精确PASS样本/不同generation、原窗口资源门禁、停机/临时隔离及准确锁释放之后成立。账号/systemd/nft/时间测试为明确模型；这不是实机网络隔离、真实只读GET或24小时观察。控制器SIGKILL/主机掉电不能保证立即执行finally；候选服务自身RuntimeMaxSec、签名期限和Restart=no限制剩余运行，但独立失联看护和实际断电恢复证据仍须纳入生产准入，不能把此限制隐去。
+- 成功仅在整窗时长、精确PASS样本/不同generation、原窗口资源门禁、停机/临时隔离及准确锁释放之后成立。账号/systemd/nft/时间测试为明确模型；这不是实机网络隔离、真实只读GET或24小时观察。Root观察控制器只能由新的专用controller.service运行，核PID1所报MainPID就是自身、准确root单元及notify socket后才准入；Type=notify/WatchdogSec=45s接收心跳，worker BindsTo/After/Requisite绑定controller。控制器异常退出/SIGKILL/OOM或失联时，PID1负责停止worker，且执行独立ExecStopPost stop_guard核既有已消费许可/准确本轮身份，只对本轮C再做至多一次STOP确认及临时隔离；旧许可证不能用于新START。正常已经停止/隔离时不重复STOP，未知/部分执行保留HOLD，不自动第三次重试。Root自身也在独立128MiB cgroup，资源采样纳入其RSS/peak/OOM，避免漏算监督进程。主机掉电后disabled/static候选不自动启动；systemd239实际watchdog/SIGKILL/OOM/断电及cgroup证明仍未执行，不能把模板或模型扩大为实机通过。
 - `source_schema.py`是下一轮**非root源码声明**探针：只输出既有15表的批准列名匹配和源码hash，不输出SQL/常量，不打开DB或导入生产模块。即使源码声明兼容，也不能当成现有DB schema/账号数据已验证。
 
 `fence.py`补齐与观察控制器分开的、单次准确root准入的围栏执行入口：只为已安装且两UID均空闲的新C候选创建专用inet表；先核准入、B/共享元数据、全局无同名表和nft语法，再仅一次从固定stdin加载已审compile_rules文本。为UID986及新worker各发IPv4/IPv6 loopback TCP负向连接（127.0.0.1/::1:9、无载荷、非provider），必须逐项看到该UID准确DROP规则的内核包计数正增量；仅连接超时/拒绝不算围栏证明。读回表语义摘要，其他stateless全局规则及共享对象不变、两UID重新无进程且准确锁释放后才输出root私有NETWORK_PROOF，其准确hash还须绑定后续独立live批准。已存在表、部分加载/未知、无计数增量、语义/共享漂移全部保留HOLD；不delete/flush或自动重试，不读凭据/业务库或启动服务。测试nft/systemd/UID计数是明确模型，实际韩国内核仍NOT_EXERCISED。nft命令/JSON/UID与counter依据官方文档：https://netfilter.org/projects/nftables/manpage.html 。
 
 东京真实源码探针已完成：原队列Run38871973602、Job116877943391、delivery5830a6e6f69744132fb74b341abb9929ae1632d6；50份源码中13张所需表的声明与既有列契约匹配，algo_order_snapshots及protective_order_snapshots未解析到声明。此结果不是DB缺表证明；实际只读schema/权威状态仍需现场准入后确认。绝不创建空表、编造零订单或用普通订单冒充保护单来凑验收。
 
-当前真实缺口：独立只读SecretRef/提供方权限证明与托管投放；专用传输双端身份及固定私有端点；权威账号/实际schema与持续collector投放；root围栏实机执行及内核负向证据；独立失联看护及实机验证；准确窗口参数、单次许可和可信root执行渠道。围栏加载代码已实现但未在主机执行，失联看护不能冒充已实现。上述适配代码不补造这些值，不申请拆散的生产安装批准。
+当前真实缺口：独立只读SecretRef/提供方权限证明与托管投放；专用传输双端身份及固定私有端点；权威账号/实际schema与持续collector投放；root围栏实机执行及内核负向证据；失联看护的systemd239实机验证；准确窗口参数、单次许可和可信root执行渠道。围栏加载代码已实现但未在主机执行，失联看护已实现但未实机运行。上述适配代码不补造这些值，不申请拆散的生产安装批准。
 
 ## 构建与验证
 
@@ -73,7 +73,7 @@ python3 -I -B -c "import sys,unittest;sys.path.insert(0,'migration-prep');s=unit
 - 原始归档/严格清单/精确commit/controller/具体plan SHA须与独立许可匹配；root私有锚点0700/0600，批准全文哈希、GitHub当前原始正文、准确主机/动作/版本/时效/max1和所有禁止项逐项校验；过期、旧批准、编辑/撤回或GitHub不可达均停止，未创建永久attempt。root锚点本身须由可信root渠道从独立审核取得，开发方不能自行代签。
 - 公钥输入只能来自固定root私有phase-c-public-inputs目录的broker/source/authority.pem三份文件。交接文件、归档和plan也须在root所有且父路径不可被他人写入的位置；不从Runner checkout或world-writable临时路径直接导入代码。实际密钥/托管/传递接线仍未进行。
 - root副作用前核固定B的17文件、manifest/current/unit/transaction和disabled/inactive/PID0、六共享unit元数据、新C全部目标不存在、UID986和新worker身份/进程、三份**不同**公钥的实际hash/RSA有效性。源库、密钥和凭据内容都不读。
-- 一次性私有attempt与独立锁，创建专用非交互worker（仅在准确plan/permit明确允许且UID/GID未冲突时），新内容寻址release/配置/公钥/私有证据目录、三个未启用的单元；只保存候选nft文本，**不加载网络规则**。owner_approved保持false，live-admission文件必须不存在。
+- 一次性私有attempt与独立锁，创建专用非交互worker（仅在准确plan/permit明确允许且UID/GID未冲突时），新内容寻址release/配置/公钥/私有证据目录、四个未启用的单元；只保存候选nft文本，**不加载网络规则**。owner_approved保持false，live-admission文件必须不存在。
 - root创建0755/0711目录时显式处理umask077，整代no-replace发布及fsync，绝不覆盖B。systemd-analyze verify不启用generators；daemon-reload只一次，然后读回实际角色、单元文件与typed D-Bus PrivateNetwork/RestrictAddressFamilies（兼容239的[unprintable]），保持static/disabled、inactive/dead/PID0。
 - 成功必须在准确空锁身份核验并释放后才记PASS；任何中断/未知/部分写入、权限/锁漂移、共享对象变化，保留新旧现场和有界私有失败回执，不自动清理、回滚或重试。不执行服务start/enable/stop、真实GET、凭据操作、数据库操作或东京操作。
 

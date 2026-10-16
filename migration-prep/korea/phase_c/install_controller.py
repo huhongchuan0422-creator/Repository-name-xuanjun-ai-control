@@ -44,6 +44,7 @@ SHARED = ("morelogin-socks5-permanent.service", "xuanjun-novel-factory.service",
           "postgresql.service", "redis.service", "yibi-api.service", "yibi-scheduler.service")
 UNITS = {"broker.service": "xuanjun-binance-phase-c-broker.service",
          "worker.service": "xuanjun-binance-phase-c-worker.service",
+         "controller.service": "xuanjun-binance-phase-c-controller.service",
          "network-verified.target": "xuanjun-phase-c-network-verified.target"}
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"}
 
@@ -152,7 +153,8 @@ class Context:
 
     def verify_manager_profiles(self):
         for role, families in (("broker.service", {"AF_UNIX", "AF_INET", "AF_INET6"}),
-                               ("worker.service", {"AF_UNIX"})):
+                               ("worker.service", {"AF_UNIX"}),
+                               ("controller.service", {"AF_UNIX", "AF_INET", "AF_INET6", "AF_NETLINK"})):
             name = UNITS[role]
             escaped = ''.join(c if c.isalnum() else '_%02x' % ord(c) for c in name)
             obj = "/org/freedesktop/systemd1/unit/" + escaped
@@ -410,8 +412,9 @@ def install(archive, plan_path, ctx=None):
                     state["SubState"] == "dead" and state["MainPID"] == "0" and not state["DropInPaths"] and
                     state["FragmentPath"] == str(ctx.path("/etc/systemd/system") / name), "C_INSTALLED_UNIT_STATE")
             if name.endswith(".service"):
-                require(state["Group"] == "xuanjun_binance_shadow" and
-                        state["User"] == ("xuanjun_binance" if name == UNITS["broker.service"] else "xuanjun_binance_shadow"),
+                require(state["Group"] == ("root" if name==UNITS['controller.service'] else "xuanjun_binance_shadow") and
+                        state["User"] == ("root" if name==UNITS['controller.service'] else
+                                          "xuanjun_binance" if name == UNITS["broker.service"] else "xuanjun_binance_shadow"),
                         "C_MANAGER_SERVICE_IDENTITY")
             enabled = ctx.run(["/usr/bin/systemctl", "is-enabled", name])
             require(enabled.stdout.strip() in ("static", "disabled") and enabled.returncode in (0, 1),

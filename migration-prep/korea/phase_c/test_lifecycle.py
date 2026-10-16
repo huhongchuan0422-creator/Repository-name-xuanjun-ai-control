@@ -23,6 +23,8 @@ from korea.shadow_acceptance import _tested_object
 
 
 class LiveModel(Model, live.Context):
+    def controller_identity(self):self.calls.append('MODELED_PID1_SUPERVISOR_IDENTITY')
+    def pulse(self,ready=False):self.calls.append(('MODELED_SYSTEMD_NOTIFY',ready))
     def __init__(self, root):
         super().__init__(root)
         self.loaded=True;self.created=True;self.started=False;self.stopped=False;self.target=False
@@ -113,8 +115,9 @@ class LifecycleTests(unittest.TestCase):
     def setUp(self):
         self.root=Path(tempfile.mkdtemp(dir=self.home));self.ctx=LiveModel(self.root)
         for path in ('/var/lib','/run','/etc/systemd/system','/etc/xuanjun-binance','/etc/xuanjun-pr99-release',
-                     '/opt/xuanjun-binance/releases','/input'):
+                     '/opt/xuanjun-binance/releases','/input','/run/xuanjun-phase-c-control'):
             self.ctx.path(path).mkdir(parents=True,exist_ok=True)
+        self.ctx.path('/run/xuanjun-phase-c-control').chmod(0o700)
         self.ctx.path('/etc/xuanjun-pr99-release').chmod(0o700)
         self.ctx.path('/etc/xuanjun-pr99-release/phase-c-public-inputs').mkdir(mode=0o700)
         self.plan=self.make_plan();self.cfg=self.plan['runtime_config'];self.baseline()
@@ -160,6 +163,7 @@ class LifecycleTests(unittest.TestCase):
         self.path=self.ctx.path('/input/live-plan.json');security.write_once(self.path,canonical_bytes(self.liveplan))
         self.grant=dict(schema_version=1,decision='APPROVED_WITH_EXACT_PRECONDITIONS',host=live.HOST,action=live.ACTION,
             max_attempts=1,service_start_allowed=True,service_stop_allowed=True,temporary_quarantine_allowed=True,
+            stop_guard_allowed=True,max_stop_requests=2,
             credential_validation_allowed=True,network_changes_allowed=False,database_export_allowed=False,writer_allowed=False,
             source_commit='c'*40,runtime_manifest_sha256=self.cfg['runtime_manifest_sha256'],plan_sha256=security.digest(self.path.read_bytes()),
             controller_sha256=security.digest(files[artifact.PREFIX+'lifecycle.py']),approval_comment_id=1234567,issued_at=NOW-1,expires_at=NOW+3600)

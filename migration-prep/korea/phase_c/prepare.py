@@ -29,10 +29,11 @@ def render_units(values):
             "C_RENDER_DEDICATED_SCOPE")
     root = Path(__file__).parent
     result = {}
-    for name in ("broker.service", "worker.service", "network-verified.target"):
+    for name in ("broker.service", "worker.service", "network-verified.target", "controller.service"):
         data = (root / (name + ".in")).read_text()
         for key, value in values.items():
             data = data.replace("@" + key + "@", str(value))
+        data = data.replace("@CONTROL_RUNTIME_SECONDS@", str(values["RUNTIME_SECONDS"]+120))
         require("@" not in data, "C_RENDER_UNRESOLVED_TOKEN")
         result[name] = data
     return result

@@ -1,0 +1,44 @@
+[Unit]
+Description=Xuanjun Phase-C root readonly observation supervisor
+# No dependencies start business services. Exact root admission is checked first.
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=root
+Group=root
+WorkingDirectory=@C_RELEASE@/migration-prep
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C NOTIFY_SOCKET=${NOTIFY_SOCKET} @PYTHON@ -I -B -c "import sys;sys.path.insert(0,'@C_RELEASE@/migration-prep');from korea.phase_c.lifecycle import main;raise SystemExit(main(['--plan','/etc/xuanjun-pr99-release/phase-c-live-plan.json']))"
+ExecStopPost=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C @PYTHON@ -I -B -c "import sys;sys.path.insert(0,'@C_RELEASE@/migration-prep');from korea.phase_c.stop_guard import main;raise SystemExit(main())"
+WatchdogSec=45s
+TimeoutStartSec=120s
+TimeoutStopSec=35s
+RuntimeMaxSec=@CONTROL_RUNTIME_SECONDS@
+Restart=no
+KillMode=control-group
+UMask=0077
+RuntimeDirectory=xuanjun-phase-c-control
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+PrivateNetwork=no
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER
+AmbientCapabilities=
+ReadOnlyPaths=@C_RELEASE@
+ReadWritePaths=@C_CONFIG_ROOT@ /var/lib/xuanjun-binance-phase-c /run/xuanjun-phase-c-control @C_CREDENTIAL_ROOT@ @C_PRIVATE_KEY_ROOT@
+MemoryAccounting=yes
+MemoryLimit=134217728
+TasksMax=32
+LimitNOFILE=128
+# No Install section: must remain static/inactive until exact one-window permit.

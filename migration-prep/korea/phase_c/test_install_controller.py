@@ -67,6 +67,7 @@ class Model(ctl.Context):
             if new and name.endswith('.service'):
                 rows[name]['Group']='xuanjun_binance_shadow'
                 if name==ctl.UNITS['worker.service']:rows[name]['User']='xuanjun_binance_shadow'
+                if name==ctl.UNITS['controller.service']:rows[name]['User']=rows[name]['Group']='root'
             if self.mutate_shared and self.loaded and name in ctl.SHARED:rows[name]['MainPID']='1234'
         return rows
 
@@ -298,7 +299,9 @@ class InstallTests(unittest.TestCase):
         def run(args):
             if args[-1]=='PrivateNetwork':
                 output='b true' if 'worker' in args[3] else 'b false'
-            else:output='(bas) true 1 "AF_UNIX"' if 'worker' in args[3] else '(bas) true 3 "AF_INET6" "AF_INET" "AF_UNIX"'
+            else:
+                output='(bas) true 1 "AF_UNIX"' if 'worker' in args[3] else '(bas) true 3 "AF_INET6" "AF_INET" "AF_UNIX"'
+                if 'controller' in args[3]:output='(bas) true 4 "AF_NETLINK" "AF_INET6" "AF_INET" "AF_UNIX"'
             return subprocess.CompletedProcess(args,0,output,'')
         with mock.patch.object(ctx,'run',side_effect=run):ctx.verify_manager_profiles()
         with mock.patch.object(ctx,'run',return_value=subprocess.CompletedProcess([],0,'(bas) false 1 "AF_UNIX"','')):
