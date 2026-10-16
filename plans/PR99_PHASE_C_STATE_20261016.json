@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NO_REPEATED_SERVER_COMMANDS; EXACT_CURRENT_POINT_PACKAGE_UNDER_HOSTED_OFFLINE_REVIEW; NO_DB_EXPORT_BEFORE_SEPARATE_APPROVAL",
+  "owner_action_now": "CURRENT_POINT_REVIEW_PACKAGE_COMPLETE; NEXT_EXACT_INDEPENDENT_ONCE_PERMISSION; NO_DB_EXPORT_OR_SERVICE_CUTOVER_YET",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -533,12 +533,33 @@
     "root_cron_read": false
   },
   "current_recovery_point_candidate": {
-    "status": "IMPLEMENTED_LOCAL_TESTS_20_PASS_HOSTED_PENDING",
+    "status": "EXACT_CANDIDATE_AND_20_HOSTED_TESTS_PASS_EXECUTION_PERMISSION_PENDING",
     "action": "PR99_CURRENT_OFFLINE_RECOVERY_POINT_V1",
     "binding_sha256": "1785c311ab9eb0b5e88c43dbb2bb3da8dce3a519635d6ca7b0e2ad9a68161fa1",
     "scope": "SERVER_PINNED_SOURCE_AND_ONE_WAL_AWARE_SQLITE_OFFLINE_POINT_PRIVATE_COPY_ONLY",
     "production_executed": false,
     "permission": "NOT_ISSUED",
-    "root_channel_expanded": false
+    "root_channel_expanded": false,
+    "source_commit": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
+    "hosted_ci": {
+      "run": 38902948852,
+      "job": 116979411354,
+      "python": "3.11.17",
+      "tests": 20,
+      "skipped": 0,
+      "status": "PASS_ORIGINAL_LOG_READ"
+    },
+    "artifact": {
+      "id": 12046927098,
+      "zip_bytes": 60729,
+      "zip_sha256": "715178c10fa783768cfc816033f9f0079fed09d33777c554809f16f71913f011",
+      "zip_hash_origin": "GITHUB_UPLOAD_DIGEST_AND_ORIGINAL_JOB_LOG_NOT_INDEPENDENT_ZIP_DOWNLOAD",
+      "tar_bytes": 60130,
+      "tar_sha256": "41f3c224cbed1d864104bc206d92a32339372a9d0ecfa9108a2da0123803db70",
+      "tar_verification": "LOCAL_ACTUAL_BYTES_REPRODUCE_EXACT_CI_TAR_SHA",
+      "bound_files": 5,
+      "regular_members": 6
+    },
+    "approval_request": "PENDING_POST_CONSOLIDATED_COMMENT"
   }
 }
