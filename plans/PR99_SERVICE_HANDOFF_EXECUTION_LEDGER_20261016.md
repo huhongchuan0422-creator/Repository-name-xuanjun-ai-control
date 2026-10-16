@@ -145,3 +145,8 @@ Owner launch /root/pr99-s07-material-launch.Fwej5Q9b authenticated Tokyo root th
 Owner follow-up metadata excludes /opt/trading-system and /etc/systemd/system/three exact unit fragments/parents as symlinks. Project root UID/GID1000:1000 inode1599295 dev64771. Actual failed deeper source/runtime/config path still UNKNOWN. Do not relax link guard or replay old staging.
 
 New metadata-only diagnostic inspect_all_candidate_paths.py commit ceb3942afd8db530540ddc485d7eab7c893a9af3 SHA256 a089bfa39d6fee38f866000e80861d384bb2a2352c66eab569f7c796c7efa054: reuses pinned79-file source inventory and fixed allowed candidates, bounded parent/runtime-tree metadata and private traceback line/function projection. It does not follow link directories recursively, read business/config/key contents, open DB or take service actions. Local synthetic parent/nested links, missing paths, no-content projection and compilation checks PASS; Hosted and host acceptance not run. GitHub byte readback matches. Source staging failure retained; Tokyo continues.
+
+
+## 2026-10-17 07:46 diagnostic SHA correction
+
+Owner checksum failed before execution/Tokyo connection. Developer had calculated SHA on a local test copy with ONE EXTRA TRAILING NEWLINE. Re-read exact GitHub ceb3942afd8db530540ddc485d7eab7c893a9af3 original:4933 bytes, correct SHA256 `6d68a59982d41dbba710a8735690026a7ba1d9917367e0101c2c97f0dc41755e`. Appending one newline exactly reproduces incorrect prior `a089bfa39d6fee38f866000e80861d384bb2a2352c66eab569f7c796c7efa054`. Code/commit unchanged; previous incorrect digest retained as history. Owner can verify already downloaded /root/pr99-s07-all-paths.aLvfyxbJ/check.py against correct hash before executing. Do not bypass checksum or rerun material staging.
