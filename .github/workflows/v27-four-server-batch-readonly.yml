@@ -343,3 +343,64 @@ jobs:
           print("PR99_CURRENT_SOURCE_IDENTITY_RECEIPT="+json.dumps(r,sort_keys=True))
           
           PY
+
+  pr99-current-offline-point-review:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_CURRENT_POINT_OFFLINE_REVIEW_ONCE_20261016' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: New synthetic current-point tests only (Hosted root, no production host)
+        working-directory: evidence/pr99-current-point
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo "$(command -v python)" -B -m unittest -v test_current_point
+      - name: Bind exact candidate and build source-only review archive
+        working-directory: evidence/pr99-current-point
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PY'
+          import gzip,hashlib,io,json,os,tarfile
+          from pathlib import Path
+          p=Path('.')
+          binding=json.loads((p/'BINDING.json').read_text())
+          expected={'current_point.py','run_current_point.py','source-identities.json','test_current_point.py','README.md'}
+          assert set(binding['files'])==expected
+          for n,h in binding['files'].items():
+              f=p/n
+              assert f.is_file() and not f.is_symlink()
+              assert hashlib.sha256(f.read_bytes()).hexdigest()==h
+          tarpath=Path(os.environ['RUNNER_TEMP'])/'PR99_CURRENT_POINT_REVIEW.tar.gz'
+          with tarpath.open('xb') as raw:
+              with gzip.GzipFile(fileobj=raw,mode='wb',filename='',mtime=0) as gz:
+                  with tarfile.open(fileobj=gz,mode='w',format=tarfile.USTAR_FORMAT) as t:
+                      for n in sorted(expected|{'BINDING.json'}):
+                          data=(p/n).read_bytes()
+                          m=tarfile.TarInfo(n);m.size=len(data);m.mode=0o400;m.mtime=0
+                          t.addfile(m,io.BytesIO(data))
+          r={'status':'OFFLINE_CANDIDATE_TESTED_NOT_PRODUCTION_AUTHORITY','source_commit':os.environ['GITHUB_SHA'],'tests':20,'skipped':0,'binding_sha256':hashlib.sha256((p/'BINDING.json').read_bytes()).hexdigest(),'tar_sha256':hashlib.sha256(tarpath.read_bytes()).hexdigest(),'tar_bytes':tarpath.stat().st_size,'bound_files':5,'regular_members':6,'production_hosts_used':False,'database_exported':False,'server_actions':0}
+          print('PR99_CURRENT_POINT_REVIEW_RECEIPT='+json.dumps(r,sort_keys=True))
+          (tarpath.parent/'PR99_CURRENT_POINT_CI_RECEIPT.json').write_text(json.dumps(r,sort_keys=True,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr99-current-point-review-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/PR99_CURRENT_POINT_REVIEW.tar.gz
+            ${{ runner.temp }}/PR99_CURRENT_POINT_CI_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 14
