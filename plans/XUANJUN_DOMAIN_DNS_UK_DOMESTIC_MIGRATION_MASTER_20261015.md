@@ -600,3 +600,12 @@ R4临时遏制实际执行成功且得到两地非root证据支持，集中请�
 Owner通过自己的Cloudflare管理面报告已保存；编辑截图显示完整apex名称，保存后记录列表截图image(20261016-021723).png显示A/47.101.152.210/仅DNS/TTL自动。这里只确认Owner操作与可见字段，不把截图当公网传播、AAAA枚举或准确recordID证明；旧47.245.53.152仅按既有历史证据保留。开发窗口未修改DNS，也未代签既有IP差异及DNS发布许可。正式DNS_RELEASE仍未获批准；如当前已生效，应按实际已发生的Owner变更记录，不改写为预先批准或迁移全部完成。
 
 原v27同一concurrency队列准备一次国内/东京非root观察，仅公共A/AAAA/DNS答复、主域和国内固定IP的TLS校验GET首页、主域只读healthz GET、HTTP根重定向及本机已批准Work首页/current哈希。禁止OAuth路径、POST、读取凭据/数据库、root调用、源码/配置/服务/DNS变更、自动回滚或重试。原R4公开回执采集限定原执行提交，避免重新采集已通过安装；tokyo旧dispatch作业保留。不是重新审核源码/旧制品/静态115，结果以新job原始PR122_DNS_POSTSAVE_RECEIPT为准。
+
+
+### 9.29 2026-10-16 10:19 CST：主域实际已到国内，两地单次非写观察通过
+
+准确观察提交fe9e1320bd9a9602b061b1e7c0e8dce5aaac95cc，原队列Run38839813239：国内Job116777069808、东京Job116777069985均SUCCESS，已消费两条原始PR122_DNS_POSTSAVE_RECEIPT。两台Cloudflare权威NS从两个实机视角均返回AA/NOERROR/A47.101.152.210/TTL300；AAAA均AA/NOERROR/ANSWER0+SOA（serial2417602619）。两机系统resolver均为国内A，主域真实TLS连接peer均47.101.152.210，证书验证成功；首页200/CSP存在/11461字节/SHA4cdaa871…90f20原值。固定国内IP同样匹配；主域healthz GET200、HTTP根308至同域HTTPS。国内current及两地本机Work首页哈希保持原值。旧R4/UK/Korea/dispatch作业SKIPPED，没有重做已通过部署/测试。
+
+实际网站主域入口切换已发生且上述技术链路PASS；不再将这几项写成“尚未验证”。但IP审计限定范围决定和正式发布收尾仍未取得，不把事实观察冒充先前独审放行或完整服务器迁移完成。精确账户recordID/切换前snapshot没有取得，当前截图支持A/仅DNS/自动，AAAA权威无记录支持当前服务事实而非账户全枚举；回退目标沿用历史47.245.53.152、同主域A/仅DNS/自动，不执行回退。完整收据evidence/pr122-r4-controlled-install/DNS_POSTSAVE_LIVE_EVIDENCE_20261016.json。
+
+采集器非root，仅上述固定GET/公开DNS/首页哈希；POST、OAuth、业务数据/凭据/root/服务/生产写入全部0。观察job限定准确本次commit，后续提交不自动重复。请求原独审只核本次新现场结果、当前截图/AAAA与回退证据是否足够，以及既有IP材料的剩余限定决定；不重新开发或重审官网/HTTPS/OAuth/R4/原制品。东京后台、隧道、Telegram/Finance保留，S01–S12完整迁移和东京退役未完成。

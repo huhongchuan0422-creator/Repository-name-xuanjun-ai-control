@@ -155,7 +155,7 @@ jobs:
           PY
 
   dns-postsave-observation:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.sha == 'fe9e1320bd9a9602b061b1e7c0e8dce5aaac95cc'
     strategy:
       fail-fast: false
       matrix:
