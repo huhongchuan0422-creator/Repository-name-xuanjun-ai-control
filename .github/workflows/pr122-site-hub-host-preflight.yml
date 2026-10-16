@@ -5,44 +5,48 @@ on:
     paths: [.github/workflows/pr122-site-hub-host-preflight.yml]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: pr122-domestic-readonly
   cancel-in-progress: false
 jobs:
-  target-readonly:
+  owner-grant-inputs:
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: Owner authorized customer prerequisite metadata only
+      - name: Check exact host and unprivileged staging identity
+        run: |
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -u)" = 1002
+          test ! -e /home/githubrunner/pr122-approved-channel-inputs
+          mkdir -m 0700 /home/githubrunner/pr122-approved-channel-inputs
+      - uses: actions/download-artifact@v4
+        with:
+          name: pr122-domestic-customer-channel-7e5d42f5a5331dc261074ddd780413d03de9c591
+          run-id: 38886911011
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /home/githubrunner/pr122-approved-channel-inputs/channel
+      - uses: actions/download-artifact@v4
+        with:
+          name: pr122-customer-center-feaef687ee296dcd55f094bf240fe843445d5ad7
+          run-id: 38883029225
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /home/githubrunner/pr122-approved-channel-inputs/customer
+      - name: Hash approved inputs without importing or installing any code
         run: |
           /usr/bin/python3 -I -B - <<'PY'
-          import json, os, pwd, signal, stat, subprocess
+          import hashlib,io,tarfile
           from pathlib import Path
-          signal.alarm(45)
-          if os.uname().nodename != 'iZvt5t8tlrm8oiZ':
-              raise SystemExit('HOLD_WRONG_HOST')
-          report={'schema':1,'action':'CUSTOMER_PREREQUISITE_METADATA_ONLY','uid':os.getuid(),'production_mutations':0,'objects':{},'accounts':{}}
-          for name in ('nginx','xuanjun-customer'):
-              try:
-                  p=pwd.getpwnam(name)
-                  report['accounts'][name]={'uid':p.pw_uid,'gid':p.pw_gid,'shell':p.pw_shell}
-              except KeyError:report['accounts'][name]='ABSENT'
-          for name in ('/etc/xuanjun-customer-center','/etc/xuanjun-customer-center/config.json','/etc/xuanjun-customer-center/runtime.json','/etc/xuanjun-customer-center/INDEPENDENT_REVIEW_TRUST.json','/etc/xuanjun-customer-center/TARGET_ACCEPTANCE.json','/var/lib/xuanjun-customer-preflight','/usr/local/lib/xuanjun-customer-center','/run/xuanjun-customer-api/http.sock'):
-              try:
-                  s=Path(name).lstat()
-                  report['objects'][name]={'mode':oct(stat.S_IMODE(s.st_mode)),'uid':s.st_uid,'gid':s.st_gid,'symlink':stat.S_ISLNK(s.st_mode)}
-              except FileNotFoundError:report['objects'][name]='ABSENT'
-              except PermissionError:report['objects'][name]='PERMISSION_DENIED'
-          report['current']=os.readlink('/var/www/wenwenwenyiyiyi.work/current')
-          report['python']=__import__('sys').version.split()[0]
-          report['machine']=os.uname().machine
-          for key,cmd in (('glibc',['getconf','GNU_LIBC_VERSION']),('sudo_noninteractive_true',['sudo','-n','/usr/bin/true'])):
-              try:
-                  r=subprocess.run(cmd,capture_output=True,text=True,timeout=5,stdin=subprocess.DEVNULL)
-                  report[key]={'exit':r.returncode}
-                  if key=='glibc':report[key]['version']=r.stdout.strip()[:80]
-              except (OSError,subprocess.TimeoutExpired):report[key]={'state':'UNAVAILABLE'}
-          r=subprocess.run(['sudo','-n','-l'],capture_output=True,text=True,timeout=5,stdin=subprocess.DEVNULL)
-          report['sudo_policy']={'exit':r.returncode,'text':(r.stdout+r.stderr)[:12000]}
-          print('PR122_CUSTOMER_HOST_METADATA='+json.dumps(report,sort_keys=True))
+          root=Path('/home/githubrunner/pr122-approved-channel-inputs')
+          raw=(root/'channel/PR122_DOMESTIC_CUSTOMER_CHANNEL.tar.gz').read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='c16113c86abd543700c380b7f566d3a95cf4bdf7d3667e7a8a2109263c57d1a3'
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
+              members=t.getmembers()
+              assert len(members)==5 and len({m.name for m in members})==5 and all(m.isfile() and not m.name.startswith('/') and '..' not in Path(m.name).parts for m in members)
+              code=t.extractfile('scripts/pr122_domestic_customer_channel.py').read()
+          assert hashlib.sha256(code).hexdigest()=='0804e33edac6ad07a711456c0c15708266b2ad8a75c4cb3bdc5964a9b79a96bd'
+          (root/'approved-channel.py').write_bytes(code)
+          frozen=(root/'customer/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes()
+          assert hashlib.sha256(frozen).hexdigest()=='7dd77ef573c338201ddc886b23585422ad4a07ae563a9c6ff92fe5b2f9d97b98'
+          print('OWNER_INPUTS_STAGED=PASS; UID1002; NO_ROOT_OPERATIONS; CHANNEL_GRANT_NOT_CALLED')
           PY
