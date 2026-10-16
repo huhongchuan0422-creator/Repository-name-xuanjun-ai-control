@@ -79,3 +79,15 @@ pr122_customer_runtime.py仅使用stdlib，以非root身份构建全新临时ven
 pr122_customer_channel_binding.py是离线构建器：固定原获审通道源码SHA0804e33e…，AST只更新准确客户包SOURCE/TAR/Manifest及成员数，并新增固定160份vendor文件的root只读权限和精确哈希校验，全部匹配后才允许root加载获审依赖及客户安装器。不会从Runner路径加载Python，也不更改系统Python搜索目录。四个Runner动作仍只有inspect/plan/apply/rollback；生成候选未安装，不增加sudoers动作。每次构建输出channel.py及REBIND_BINDING.json，绑定准确新客户包和vendor闭包。审查时必须核验完整生成代码，而不只审核构建器声明。
 
 该构建器不提供Owner升级执行器，也不触碰旧GRANTED、旧包或sudoers。旧通道仍绑定旧包，新候选必须经过独立审核，并在包含原件备份、激活中断及准确恢复的Owner受保护事务内安装；不能运行新--grant覆盖旧通道。运行账户、生产venv重建、扫描器、私有配置/独审公钥、真实服务映射及相应现场许可尚未完成，不据本候选声称客户中心可以正式安装。
+
+### Owner通道重绑定执行与回滚候选
+
+新增独立stdlib脚本pr122_customer_channel_upgrade.py，仅Owner-root、固定国内主机可调用；不列入Runner的sudo动作。它验证旧GRANTED、原0804通道代码、旧7dd77客户包、旧候选文件全集、wrapper和sudoers字节/权限。新制品仅从固定root私有ZIP输入读取；绑定生成代码、准确客户TAR/Manifest、源码/Tree及160项vendor闭包。
+
+plan不写入；apply须Owner另行登记root600的UPGRADE_TRUST.json，绑定真实PR122准确批准评论全文SHA、独立审核主体及保管证据，审批必须绑定完整plan、新ZIP及代码哈希、升级脚本自身SHA、单次事务和同事务回滚，限时不超过2小时。源码角色字符串或作者workflow不能自行登记该私有锚。批准不足直接HOLD。
+
+升级先保存并复算旧代码、包、候选和grant状态，再暂时把通道标记UPGRADING，分步替换候选/代码/包，核对后恢复GRANTED。稳定锁与当前通道锁并用；完成前任何失败均保留HOLD_PARTIAL且闭锁已开始激活的通道，不能重跑apply。rollback核验原备份及现有对象属于本事务，保留新旧对象，仅恢复原通道；遇到sudoers、wrapper或对象未知漂移拒绝覆盖。没有用户/账户创建、包管理、服务启动、Nginx、网站current、DNS或客户中心安装动作。该事务的BOUND只表示通道重绑定，不表示客户中心上线。
+
+隔离测试覆盖8个中断子阶段BACKUP_VERIFIED/STAGED/FENCED/OLD_MOVED/CANDIDATE_MOVED/CODE_REPLACED/TAR_REPLACED/GRANTED；它们是参数化子案例，不分别虚增unittest数量。真实国内执行仍未获许可。
+
+国内首次独立运行测试Run38938322922的Hosted部分通过，但self-hosted在checkout阶段因github.com网络连接失败，不能计入运行依赖PASS。后续目标job去除checkout，从同一Hosted run精确制品取得stdlib构建器与固定wheel，核对source commit/run/builder SHA后运行，不绕过TLS，不调用root，不把旧job失败抹为成功。
