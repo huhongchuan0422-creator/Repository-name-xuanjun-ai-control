@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "kind": "DESIGN_FIELD_CONTRACT_NOT_EXECUTABLE_NOT_AUTHORIZATION",
+  "canonical_task": "PR17",
+  "status": "OWNER_POLICY_CAPTURED_ACTUAL_ACCOUNT_AND_ORDER_BINDING_PENDING",
+  "unknown_semantics": "UNKNOWN/null/NOT_SPECIFIED never selects an account or supplier or means unlimited spending; explicit CNY10000 all-in per-order and matching-tenant prefunded balance rules remain effective; no invented monthly cap",
+  "required_fields": {
+    "authority": {
+      "authenticated_actor": "UNKNOWN",
+      "actor_role_and_billing_authority": "UNKNOWN",
+      "trusted_authentication_source": "UNKNOWN",
+      "tenant_id": "UNKNOWN",
+      "project_id": "UNKNOWN",
+      "order_or_policy_id": "UNKNOWN",
+      "resource_owner": "UNKNOWN",
+      "purchaser_and_contracting_entity": "UNKNOWN",
+      "payment_account_owner": "UNKNOWN",
+      "authorization_time": null,
+      "expires_at": null,
+      "revocation_version": null,
+      "one_time_or_bounded_standing_scope": "UNKNOWN",
+      "explicit_auto_order_and_payment": "OWNER_REQUESTED_BOUNDED_AUTOMATION_BUSINESS_SCOPE_MANDATORY_PAYMENT_CONFIRMATION_RETAINED_NOT_ACTIVATED",
+      "customer_authority_for_customer_accounts_data_and_deployment": "UNKNOWN"
+    },
+    "supplier_and_item": {
+      "approved_merchant_or_supplier_allowlist": [
+        "Alibaba Cloud"
+      ],
+      "product_sku_and_configuration": "UNKNOWN",
+      "region": "UNKNOWN",
+      "quantity": null,
+      "service_term_and_billing_period": "UNKNOWN",
+      "currency": "CNY",
+      "permitted_substitutions": "NO_OTHER_SUPPLIER"
+    },
+    "spending": {
+      "per_order_total_limit_including_tax_mandatory_fees_setup_storage_bandwidth_and_delivery": 10000,
+      "monthly_cumulative_limit": "NOT_SPECIFIED",
+      "monthly_window_timezone_and_boundary": "NOT_SPECIFIED",
+      "cross_period_or_total_contract_commitment_limit": null,
+      "pending_authorizations_unbilled_commitments_count_toward_limit": true,
+      "confirmed_refund_required_before_budget_release": true,
+      "multi_currency_limits_and_explicit_fx_policy": "NO_NON_CNY_AUTHORITY_WITHOUT_VERIFIED_CNY_TOTAL_OR_EXPLICIT_FX_LIMIT",
+      "atomic_reservation_required": true,
+      "unknown_payment_blocks_duplicate_purchase": true,
+      "variable_usage_cost_risk_accepted_and_enforcement": "UNKNOWN",
+      "anti_order_splitting": "AGGREGATE_SAME_PURCHASE_INTENT_NO_SPLIT_OR_RETRY_RESET",
+      "tenant_prefunding": "ATOMIC_RESERVATION_OF_MATCHING_TENANT_AVAILABLE_PREPAID_FUNDS_REQUIRED",
+      "cross_tenant_or_owner_subsidy": false,
+      "monthly_cap_policy": "NO_INVENTED_CAP_NO_UNLIMITED_CLAIM_TRACK_CUMULATIVE_SPEND",
+      "funds_evidence": "TRUSTED_EXISTING_SETTLED_PAYMENT_RECORDS_VERIFIED_PROVIDER_SIGNATURE_ACCOUNT_TENANT_ORDER_AMOUNT_CURRENCY_EVENT_REPLAY_WINDOW_AND_API_RECONCILIATION; NO_SCREENSHOT_OR_CLIENT_BALANCE_TRUST"
+    },
+    "payment": {
+      "saved_payment_method_nonsecret_reference": "EXISTING_ALIBABA_CLOUD_ACCOUNT_OWNING_UK_SERVER_REAL_UID_ACCOUNT_ID_AND_SAVED_METHOD_VERIFICATION_PENDING",
+      "payer_authority": "OWNER_ACCOUNT_DIRECTION_RECEIVED_ACTUAL_ACCOUNT_BINDING_PENDING",
+      "one_time_subscription_or_metered": "UNKNOWN",
+      "secure_handoff_for_new_highly_sensitive_values": true,
+      "wallet_action_time_approval_if_used": true,
+      "store_raw_credentials_or_card_data": false,
+      "mandatory_payment_confirmation": "RETAINED_THROUGH_SUPPORTED_PAYMENT_APPROVAL_FLOW_NOT_BYPASSED_BY_STANDING_PREAPPROVAL"
+    },
+    "delivery": {
+      "approved_cloud_account_organization_subscription": "UNKNOWN",
+      "tenant_project_and_resource_tags": "UNKNOWN",
+      "destination_region_domain": "UNKNOWN",
+      "authorized_administrator": "UNKNOWN",
+      "existing_credential_reference_or_secure_handoff": "UNKNOWN",
+      "ownership_readback_before_deployment": true,
+      "persistent_access_action_time_confirmation": "REQUIRED_WHEN_CREATING_OR_MATERIALLY_EXPANDING_ACCESS"
+    },
+    "renewal": {
+      "auto_renew": "PER_AUTHENTICATED_CUSTOMER_ORDER_TRUE_OR_FALSE_UNKNOWN_IS_NOT_TRUE",
+      "each_renewal_total_limit": 10000,
+      "monthly_cumulative_limit_reference": "NOT_SPECIFIED_MATCHING_TENANT_PREPAID_FUNDS_ALWAYS_REQUIRED",
+      "allowed_price_change": "UNKNOWN",
+      "frequency": "UNKNOWN",
+      "end_date_or_maximum_renewals": "UNKNOWN",
+      "advance_notice_and_cancellation_deadline": "UNKNOWN",
+      "insufficient_customer_balance": "DISABLE_EXACT_INSTANCE_AUTO_RENEW_VERIFY_READBACK_NOTIFY_CUSTOMER_NO_EARLY_SHUTDOWN_DELETE_OR_SUBSIDY",
+      "reenable_after_top_up": "ONLY_IF_VALID_CUSTOMER_ORDER_CHOICE_AND_CURRENT_POLICY_CONDITIONS_STILL_AUTHORIZE",
+      "provider_debit_window": "VERIFY_PROVIDER_CHARGE_RETRY_DISABLE_CUTOFF_AND_RESERVE_MATCHING_TENANT_FUNDS_BEFORE_EVERY_POSSIBLE_DEBIT; REQUIRED_PAYMENT_CONFIRMATION_RETAINED",
+      "unbounded_or_unverifiable_provider_autopay": "DO_NOT_ENABLE_USE_BOUNDED_AUTHORIZED_CONFIRMED_RENEWAL_ORDER"
+    },
+    "terms_and_restrictions": {
+      "terms_url_and_version_or_hash": "UNKNOWN",
+      "quote_expires_at": null,
+      "cancellation_charges": "UNKNOWN",
+      "refund_return_restrictions": "UNKNOWN",
+      "commitment_period_sla_and_addons": "UNKNOWN",
+      "required_explicit_acceptance_evidence": "UNKNOWN"
+    },
+    "communications_and_data": {
+      "authorized_supplier_and_customer_recipients": "UNKNOWN",
+      "bounded_message_categories": "UNKNOWN",
+      "allowed_data_recipient_and_purpose": "UNKNOWN",
+      "explicit_unreviewed_standing_communication_permission": "UNKNOWN",
+      "captcha_permission_if_needed": "UNKNOWN"
+    },
+    "release": {
+      "customer_approved_deployment_scope": "UNKNOWN",
+      "exact_reviewed_artifact": "UNKNOWN",
+      "target_environment": "UNKNOWN",
+      "backup_rollback_and_maintenance_impact": "UNKNOWN",
+      "existing_special_release_gates": "PRESERVED"
+    }
+  },
+  "deny_rules": [
+    "supplier_not_alibaba_cloud_or_unverified_uk_server_payer_account_or_non_cny_without_explicit_bound_or_all_in_order_above_CNY10000",
+    "customer_scope_without_authenticated_authorized_customer_consent",
+    "cross_tenant_or_wrong_delivery_account",
+    "renewal_execution_or_enablement_when_authenticated_customer_choice_not_true",
+    "matching_tenant_prepaid_funds_unavailable_or_concurrent_reservation_exceeds_funds_or_order_split_evades_cap",
+    "unknown_prior_payment_effect",
+    "revoked_expired_or_materially_changed_authority",
+    "unapproved_recurring_addon_terms_currency_or_recipient_change",
+    "persistent_credential_or_security_change_without_required_action_time_confirmation",
+    "highly_sensitive_values_in_chat_git_logs_or_untrusted_code",
+    "financial_product_or_trading_action_misclassified_as_server_purchase",
+    "required_payment_confirmation_missing",
+    "unverified_customer_funds_or_untrusted_payment_status"
+  ],
+  "owner_policy_evidence": [
+    "2026-10-16: server payments included in automation",
+    "2026-10-16: per transaction within CNY10000",
+    "2026-10-16: Alibaba Cloud only; pay with existing account owning UK server; renew per customer request; customers prefund; insufficient balance changes server auto-renew"
+  ],
+  "payment_activation": "NOT_EXECUTED"
+}
