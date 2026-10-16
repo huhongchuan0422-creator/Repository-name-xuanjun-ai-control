@@ -790,3 +790,14 @@ Owner已按新许可6208995784执行一次c3734464...ba352交接。输出ROOT_AN
 本条来源为Owner既有admin/root终端输出，开发窗口未直接root登录；PRIVATE receipt文件完整SHA未采集不编造，独立实机复核待裁定。对应evidence/pr99-phase-b/OWNER_FINALIZE_SUCCESS_20261016.json已保存完整公开JSON字段。
 
 Phase-B兼容离线安装的Owner-root收尾成功，不再把该收尾写成待执行，也不得重跑修复或旧安装。Phase-C/只读Shadow未获授权未运行；started_service_confinement=NOT_EXERCISED，整体交易后台迁移/Writer切换/东京退役HOLD。沿原PR99阶段矩阵继续准备凭据交付/真实网络围栏/WAL快照发布验证链/观察阈值等方案；现有offline unit只self_check，不伪称Shadow。systemd239旧LoadCredential/BPF限制不能忽略。网站/Work/国内current/DNS不改。
+
+
+### 9.47 Phase-B独立限定验收正式关闭，原PR99转入Phase-C离线准备（2026-10-16）
+
+独立回执6209166651已直接读取：PHASE_B_OFFLINE_FINALIZATION=ACCEPTED_FROM_OWNER_ROOT_RECEIPT，PASS_WITH_SCOPE_LIMITS；原失败证据保留，准确空锁释放认可为Owner报告级别，不扩大为独立root采样。Phase-B不再安装/修复/收尾/重复185测试。
+
+原PR99分支build/tokyo-korea-migration-prep-20261014已CAS推进文档提交659e3bb961d0e7ef532bbf7b85736aedd9415954，增加plans/PR99_PHASE_C_PREPARATION_DESIGN_20261016.md与状态JSON；只设计/状态文档，原源码、原安装release、unit/transaction、manifest、原包字节均不变。未改workflow、未触发第二主机队列，未将公共共享production runner的if:false解除。
+
+Phase-C已集中映射现有GET transport、secure file输入、WAL handoff严格FIELDS/独立verifier CLI及持续观察账本；完成systemd239兼容候选、凭据原子generation交付、快照整代发布/读者固定、资源与失败终态的准备设计。其真实适配实现尚未完成、完整C制品未构建、root前检/启动后隔离/真实GET/持续Shadow均未执行；不把设计写成开发完成或执行批准。
+
+下一批集中实现/合成数据测试/完整绑定后再一次送审，不按四条链零碎求许可。原Phase-B独审结论继承。Owner当前无须操作；Phase-C未授权，生产迁移/DB及Writer切换/东京退役HOLD，网站/Work/current/DNS和共享服务均不操作。
