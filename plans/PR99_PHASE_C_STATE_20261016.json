@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "RUN_PINNED_EXISTING_COPY_RUNTIME_INVENTORY_ON_KOREA_NO_REINSTALL",
+  "owner_action_now": "RUN_STORAGE_WIRING_STATIC_PROJECTION_ON_EXISTING_KOREA_PRIVATE_COPY_NO_APP_IMPORT",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -929,9 +929,19 @@
       "runtime_inventory": {
         "script": "evidence/pr99-service-handoff/s07-runtime-inventory/inspect_received_runtime.py",
         "source_commit": "442a70918965bb39faf9d0cd54aaaae8db0bfde1",
-        "status": "PREPARED_NOT_HOST_EXECUTED",
+        "status": "OWNER_EXECUTED_STATIC_INVENTORY_NOT_RUNTIME_ACCEPTANCE",
         "scope": "STATIC_EXISTING_RECEIVED_COPIES_ENV_NAMES_PATH_CLUES_AND_IO_CALL_SITES_NO_VALUES_OR_NEW_CAPTURE",
-        "local_checks": "VALUE_REDACTION_ENV_SUBSCRIPT_UNIT_NAMES_PATH_REJECTION_COMPILE_PASS_NOT_HOST_ACCEPTANCE"
+        "local_checks": "VALUE_REDACTION_ENV_SUBSCRIPT_UNIT_NAMES_PATH_REJECTION_COMPILE_PASS_NOT_HOST_ACCEPTANCE",
+        "owner_launch_directory": "/root/pr99-s07-runtime-inventory.8no57zD5",
+        "owner_receipt": "evidence/pr99-service-handoff/s07-runtime-inventory/OWNER_RUNTIME_INVENTORY_20261017.json",
+        "observed_service_user_group": "admin:admin",
+        "observed_working_directory": "/opt/trading-system",
+        "credential_store_and_master_key_dependency": "SOURCE_REFERENCE_FOUND_NOT_READ_OR_TRANSFERRED",
+        "state_database_and_config_dependency": "PATH_WIRING_AND_CURRENT_LIVE_DATA_NOT_YET_BOUND",
+        "next_script": "evidence/pr99-service-handoff/s07-runtime-inventory/resolve_storage_contract.py",
+        "next_source_commit": "d25e5a562acea75e793c18a31d8f536fc7f52d35",
+        "next_script_sha256": "cc27913ca76e1cae58008c8c7c5997bba04ceee7950ff3dacec30bcb9f9a78eb",
+        "next_status": "PREPARED_NOT_HOST_EXECUTED"
       }
     }
   },
