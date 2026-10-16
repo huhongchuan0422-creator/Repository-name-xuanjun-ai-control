@@ -97,3 +97,10 @@ Run38913529642，提交69eeefabee15fcacc8b0d5deb0fc287898d56b27；三机三个Jo
 真实已绑定：18080归Portal，18770/18780/18781归三个企业微信入口，18761归韩国小说SSH隧道，19443归provider-neutral-tokyo-tunnel。十个unit均active/running；EnvironmentFiles均未配置不等于没有内联环境或认证。generic provider-neutral-tunnel仍not-found；现有客服Wants指向该名称，接续候选必须准确处理，不能把两名称当别名。东京443 PID可见但不属固定10unit，不能写成端口无主。
 
 下一批集中解决上个工具未识别的Python模块启动、SSH L/R/D关系、VPN启动方式和入口源码静态依赖。使用已接收S06归档和R2 verified/code，源码按原服务器1363清单逐文件核验，不能用GitHub同名源码替代；不重新采集、不读数据库/密钥/EnvironmentFiles、不执行应用，不安装或启停服务。动态资源/私有材料闭包仍不可由AST推断为PASS。原19/7项不重跑，新批只测本解析器。
+
+
+## S07 国内独立安装实际超时（2026-10-17 00:45 Owner回执）
+
+Owner在韩国执行准确ae5e03d9安装器，国内root认证后进入源码落盘及独立环境阶段，最终返回`DOMESTIC_STAGE_HOLD_PRESERVE / DEPENDENCY_STEP_TIMEOUT`，协调端返回`REMOTE_INSTALL_FAILED_OR_UNKNOWN_PRESERVE`。本次是实际私有新目录安装尝试；没有得到依赖安装、安装后源码复核或保护对象前后相等的成功回执，不能认定S07完成。准确终端证据已脱敏保存为`evidence/pr99-service-handoff/s07-domestic-stage/OWNER_INSTALL_TIMEOUT_20261017.json`。
+
+保留国内`/opt/xuanjun-migration-s07`、`/var/lib/xuanjun-pr99-s07-stage-v1`及韩国`/root/pr99-s07-domestic-stage-v1`。原安装器的超时处理会终止自己创建的依赖子进程组，原目录和日志不删除、不重跑原安装器。下一步只读核对具体失败日志分类、已装依赖元数据、源码哈希及当前保护状态，再形成有准确前置条件的依赖续接。下载/网络错误尚未从日志确认，不提前归因。未执行unit安装、服务启动或反代切换；东京继续运行。

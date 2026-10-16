@@ -846,7 +846,7 @@
       "manual_next_action": "ONE_OWNER_MEDIATED_REVIEWED_LOCAL_RESOLUTION_UNDER_EXPLICIT_OWNER_AUTHORIZATION_NOT_MACHINE_SIGNED_PERMIT"
     },
     "domestic_code_environment_install": {
-      "status": "EXACT_HOSTED10_PASS_READY_OWNER_MANUAL_INSTALL_NOT_YET_EXECUTED",
+      "status": "OWNER_ROOT_ATTEMPT_PARTIAL_SOURCE_WRITTEN_DEPENDENCY_TIMEOUT_NOT_ACCEPTED",
       "authority_comment_id": 6219362469,
       "roles": [
         "portal",
@@ -861,7 +861,7 @@
         "root_acceptance": false
       },
       "script_sha256": "745c67d34cf4b0d546aee28c74c11b1586a315a03d970cbebc37508ebc61f8fd",
-      "production_executed": false,
+      "production_executed": true,
       "remaining": [
         "Private runtime data/configuration and dynamic loading closure",
         "Actual units, start, authenticated functional checks and protected proxy switch",
@@ -874,7 +874,12 @@
       "artifact_id": 12059130294,
       "mechanism_tests": 10,
       "execution_authority": "OWNER_EXPLICIT_DIRECT_MIGRATION_6219362469_NO_ADDITIONAL_PERMISSION_REQUESTED",
-      "independent_new_host_pass": false
+      "independent_new_host_pass": false,
+      "production_executed_definition": "Private new-prefix installation attempted; no service deployment/activation/cutover",
+      "owner_failure_receipt": "evidence/pr99-service-handoff/s07-domestic-stage/OWNER_INSTALL_TIMEOUT_20261017.json",
+      "dependencies_complete": false,
+      "protected_after_snapshot_completed": false,
+      "retry_allowed": false
     }
   },
   "current_recovery_point_r2": {
