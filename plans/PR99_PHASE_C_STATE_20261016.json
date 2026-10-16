@@ -98,7 +98,7 @@
       "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
       "independent_byte_review_comment_id": 6213125007
     },
-    "next_development": "Existing historical source and DB are recovered. Both Korea Python3.11 system and existing Phase-B venv lack all 13 declared dependencies. New helper reads Tokyo package metadata only, requires an exact 13-package source profile, installs into a distinct new venv as existing nonroot UID986, freezes ownership, runs pip check and verifies imports in a new loopback-only netns. No existing venv/unit/source deployment, API read/call, service start or Phase-C installation.",
+    "next_development": "Owner-root restored 1374 historical files and prepared separate source-version-pinned Python environment with pip check and offline netns imports. Do not rerun passed recovery/environment install. Current source/data timing, remaining Tokyo service/channel dependencies and activation/retirement are still not accepted. One existing-queue nonroot metadata probe is prepared, no new root authority.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "PREPARED_ONE_MANUAL_ROOT_COMMAND_TO_CAPTURE_TOKYO_PACKAGE_VERSIONS_AND_BUILD_NEW_DORMANT_ENVIRONMENT_NOT_EXECUTED",
+  "owner_action_now": "NONE_NOW_DEVELOPER_READING_EXISTING_RUNNERS_FOR_TARGET_ENVIRONMENT_AND_REMAINING_TOKYO_CHANNEL_METADATA",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -377,11 +377,49 @@
       "production_imports": 0,
       "service_actions": 0,
       "network_requests": 0
+    },
+    "dependency_environment": {
+      "schema_version": 1,
+      "status": "ISOLATED_DEPENDENCY_ENVIRONMENT_PASS",
+      "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT_NOT_INDEPENDENT_LOGIN",
+      "reported_local_time": "2026-10-16T20:02:15+08:00",
+      "api_credentials_read": false,
+      "api_requests": 0,
+      "current_final_snapshot": false,
+      "existing_phase_b_venv_modified": false,
+      "existing_service_state_unchanged": true,
+      "offline_namespace_imports": "PASS",
+      "packages": {
+        "ccxt": "4.5.78",
+        "cryptography": "50.0.1",
+        "loguru": "0.7.3",
+        "numpy": "2.4.6",
+        "pandas": "3.0.5",
+        "pymysql": "1.2.2",
+        "python-dotenv": "1.2.3",
+        "pyyaml": "6.0.3",
+        "redis": "8.1.0",
+        "requests": "2.34.2",
+        "sqlalchemy": "2.0.54",
+        "ta": "0.11.0",
+        "websocket-client": "1.9.2"
+      },
+      "packages_verified": 13,
+      "pip_check": "PASS",
+      "production_code_executed": false,
+      "service_actions": 0,
+      "source_files_deployed": false,
+      "source_interpreter_profile": "/opt/trading-system/venv/bin/python",
+      "source_profile_scope": "DEPENDENCY_METADATA_NOT_PROVEN_WRITER_ENTRYPOINT",
+      "tokyo_retirement": "HOLD",
+      "venv": "/opt/xuanjun-binance-offline-env-20261016/venv",
+      "helper_commit": "c7f16605e2836c15c8d2b1cac9243838634a4fee",
+      "helper_sha256": "e3b820dc7230240308be62b9f9237473738804c345cb892c93f9121860289b13"
     }
   },
   "offline_relocation_blocker": {
-    "kind": "13_DEPENDENCIES_MISSING_NEW_ISOLATED_ENVIRONMENT_PREPARED_NOT_EXECUTED",
-    "detail": "Existing historical source and DB are recovered. Both Korea Python3.11 system and existing Phase-B venv lack all 13 declared dependencies. New helper reads Tokyo package metadata only, requires an exact 13-package source profile, installs into a distinct new venv as existing nonroot UID986, freezes ownership, runs pip check and verifies imports in a new loopback-only netns. No existing venv/unit/source deployment, API read/call, service start or Phase-C installation.",
+    "kind": "HISTORICAL_RECOVERY_AND_DEPENDENCY_ENVIRONMENT_COMPLETE_FULL_SERVICE_AND_CURRENT_DATA_MIGRATION_PENDING",
+    "detail": "Owner-root restored 1374 historical files and prepared separate source-version-pinned Python environment with pip check and offline netns imports. Do not rerun passed recovery/environment install. Current source/data timing, remaining Tokyo service/channel dependencies and activation/retirement are still not accepted. One existing-queue nonroot metadata probe is prepared, no new root authority.",
     "api_is_blocker": false,
     "last_owner_attempt": {
       "schema_version": 1,

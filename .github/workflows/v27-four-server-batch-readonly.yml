@@ -179,3 +179,107 @@ jobs:
           print("PR99_TOKYO_SSH_PUBLIC_HOST_IDENTITY="+json.dumps({"host":os.uname().nodename,"uid":os.geteuid(),"delivery_commit":os.environ["GITHUB_SHA"],"public_host_keys":rows,"private_keys_read":False,"production_changes":0},sort_keys=True))
           
           PY
+
+  offline-environment-and-remaining-channel-metadata:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_OFFLINE_ENV_AND_CHANNEL_METADATA_ONCE_20261016' &&
+      github.run_attempt == 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: korea
+            label: xuanjun-korea-binance
+          - side: tokyo
+            label: xuanjun-tokyo-readonly
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.label }}"]
+    timeout-minutes: 3
+    steps:
+      - name: New environment metadata and remaining Tokyo responsibilities; no checkout or sudo
+        env:
+          XJ_SIDE: ${{ matrix.side }}
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import hashlib,ipaddress,json,os,stat,subprocess,time
+          from pathlib import Path
+          side=os.environ["XJ_SIDE"]
+          hosts={"korea":"iZmj7a5kwr75qc1tul4kf9Z","tokyo":"iZ6wee8q9z4t03hvqumwfhZ"}
+          assert os.geteuid()==1001 and os.uname().nodename==hosts[side]
+          r={"schema_version":1,"host":hosts[side],"side":side,"uid":os.geteuid(),"delivery_commit":os.environ["GITHUB_SHA"],"epoch":int(time.time()),"sudo_calls":0,"database_opened":False,"credentials_read":False,"http_requests":0,"service_actions":0,"production_changes":0}
+          def call(args):
+           p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=20)
+           return p
+          def props(unit):
+           p=call(["systemctl","show",unit,"-p","Id","-p","User","-p","WorkingDirectory","-p","FragmentPath","-p","ActiveState","-p","SubState","-p","MainPID","--no-pager"])
+           return {"exit":p.returncode,"metadata":dict(x.split("=",1) for x in p.stdout.splitlines() if "=" in x)}
+          def port_scopes():
+           p=call(["ss","-H","-lnt"])
+           result=[]
+           for line in p.stdout.splitlines():
+            x=line.split()
+            if len(x)<4:continue
+            raw=x[3]
+            try:host,port=raw.rsplit(":",1);port=int(port)
+            except ValueError:continue
+            if port not in (22,80,443,18080,18443,18761,18770,18780,18781,19443,19444):continue
+            host=host.strip("[]")
+            try:kind="loopback" if ipaddress.ip_address(host).is_loopback else ("wildcard" if ipaddress.ip_address(host).is_unspecified else "bound_address")
+            except ValueError:kind="wildcard" if host=="*" else "unknown"
+            result.append({"port":port,"bind_scope":kind})
+           return {"exit":p.returncode,"listeners":result}
+          r["scoped_listeners"]=port_scopes()
+          if side=="korea":
+           expected={"ccxt":"4.5.78","cryptography":"50.0.1","loguru":"0.7.3","numpy":"2.4.6","pandas":"3.0.5","pymysql":"1.2.2","python-dotenv":"1.2.3","pyyaml":"6.0.3","redis":"8.1.0","requests":"2.34.2","sqlalchemy":"2.0.54","ta":"0.11.0","websocket-client":"1.9.2"}
+           root=Path("/opt/xuanjun-binance-offline-env-20261016")
+           for d in (Path("/opt"),root,root/"venv",root/"venv/bin"):
+            s=d.lstat();assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,"UNTRUSTED_ENVIRONMENT_CHAIN"
+           py=root/"venv/bin/python"
+           s=py.lstat();assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022
+           code="import importlib.metadata as m,json; names="+repr(tuple(expected))+";print(json.dumps({n:m.version(n) for n in names},sort_keys=True))"
+           p=call([str(py),"-I","-B","-c",code]);assert p.returncode==0,"PACKAGE_METADATA_READ_FAILED"
+           actual=json.loads(p.stdout);assert actual==expected,"TARGET_PACKAGES_DRIFTED"
+           r["dependency_environment"]={"status":"13_EXACT_PACKAGE_VERSIONS_READ_BACK","versions":actual,"interpreter_sha256":hashlib.sha256(py.read_bytes()).hexdigest(),"production_imports":0,"third_party_modules_imported":False,"root_private_receipts_read":False}
+           r["existing_phase_b_service"]=props("xuanjun-binance-shadow.service")
+           p=call(["systemctl","is-enabled","xuanjun-binance-shadow.service"]);r["existing_phase_b_enabled"]=p.stdout.strip()
+           info=r["existing_phase_b_service"]["metadata"];assert info.get("ActiveState")=="inactive" and info.get("MainPID")=="0" and r["existing_phase_b_enabled"]=="disabled"
+           r["phase_b_current"]=os.readlink("/opt/xuanjun-binance/current")
+           assert r["phase_b_current"]=="/opt/xuanjun-binance/releases/f887b085508e3ed4"
+           r["status"]="KOREA_NEW_ENV_METADATA_AND_STOPPED_PHASE_B_PASS"
+          else:
+           p=call(["systemctl","list-units","--type=service","--state=running","--no-legend","--plain","--no-pager"])
+           assert p.returncode==0,"SERVICE_LIST_UNREADABLE"
+           names=[line.split()[0] for line in p.stdout.splitlines() if line.split() and line.split()[0].endswith(".service")]
+           r["running_services_count"]=len(names)
+           r["service_list_truncated"]=len(names)>100
+           rows=[]
+           for name in names[:100]:
+            v=props(name);meta=v["metadata"]
+            if meta.get("FragmentPath","").startswith("/etc/systemd/system/") or name in ("nginx.service","sshd.service"):
+             rows.append(v)
+           r["running_custom_and_entry_services"]=rows
+           p=call(["systemctl","list-timers","--all","--no-legend","--no-pager"])
+           timers=[]
+           for line in p.stdout.splitlines():
+            x=line.split()
+            if len(x)>=2 and x[-2].endswith(".timer"):
+             timers.append({"timer":x[-2],"activates":x[-1]})
+           r["loaded_timers"]={"exit":p.returncode,"items":timers}
+           r["portal_entry_identity"]={}
+           path=Path("/opt/trading-system/scripts/secure_secrets_portal_server.py")
+           try:
+            s=path.lstat();assert stat.S_ISREG(s.st_mode) and not s.st_mode&0o022
+            data=path.read_bytes();after=path.lstat();assert (s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns)
+            r["portal_entry_identity"]={"sha256":hashlib.sha256(data).hexdigest(),"bytes":len(data),"uid":s.st_uid}
+           except PermissionError:r["portal_entry_identity"]={"status":"UNKNOWN_PERMISSION_DENIED"}
+           r["root_and_admin_crontabs"]="NOT_READ_NONROOT"
+           r["source_database_and_business_state"]="NOT_READ"
+           r["channel_configuration_and_credentials"]="NOT_READ"
+           r["status"]="TOKYO_REMAINING_DEPENDENCY_METADATA_COLLECTED_NOT_MIGRATED"
+          print("PR99_OFFLINE_ENV_CHANNEL_RECEIPT="+json.dumps(r,sort_keys=True))
+          
+          PY
