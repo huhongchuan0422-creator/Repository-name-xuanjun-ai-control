@@ -72,3 +72,8 @@ S04/S05本次批准范围内的真实离线复制已完成；不等于1363选定
 ## S06 新增实际采样
 
 Run38913529642，提交69eeefabee15fcacc8b0d5deb0fc287898d56b27；三机三个Job全部SUCCESS。完整证据见`evidence/pr99-service-handoff/RUNTIME_METADATA_20261016.json`，下一批边界见`evidence/pr99-service-handoff/S06_PRIVATE_HANDOFF_CONTRACT_20261016.md`。本次确认东京generic provider-neutral-tunnel unit为not-found，不能当作Tokyo命名unit的别名；韩国443归属仍受非root权限限制UNKNOWN，不能盲占。国内site-hub-preview属于其他writer，保护不动。Root/admin cron及其他用户/proc详情仍UNKNOWN，不扩展为root验收。没有服务安装、启动、重启或配置改写。
+
+
+## R2验收关闭，S06新候选已形成
+
+独审#6217422554已认可R2 Owner-root离线复制回执；S04/S05在该限定证据范围通过，禁止再用#6217030577重跑。下一批S06候选准确源码4c9460a215b793259228f9d2e0fbfe5ea50267a1，Hosted Run38916022943/Job117023586355新增19/19 PASS，原历史测试未重跑，全部生产Runner SKIPPED。候选仅10份unit、1份drop-in及私有运行元数据一次加密交接，不读取EnvironmentFile/Token/SecretRef或数据库，不安装或改变服务。unit原件可能内联认证，全部保持root私有，不可宣称凭据内容绝不存在或上传GitHub。新动作PR99_S06_PRIVATE_RUNTIME_CONTRACT_V1需另行准确许可，原R2许可不能代替。完整API/运行秘密、容器/调度闭包及服务接续仍不冒充完成。

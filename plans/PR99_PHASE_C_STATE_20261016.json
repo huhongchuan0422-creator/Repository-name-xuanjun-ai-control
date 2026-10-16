@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NO_R2_RETRY; S06_CANDIDATE_HOSTED_CI_AND_ONE_CONSOLIDATED_REVIEW",
+  "owner_action_now": "S06_CONSOLIDATED_REVIEW_NEW_ONCE_PRIVATE_CONTRACT_PERMISSION; NO_SERVER_COMMAND_YET",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -644,7 +644,7 @@
     },
     "s06_private_candidate": {
       "action": "PR99_S06_PRIVATE_RUNTIME_CONTRACT_V1",
-      "status": "NEW_CANDIDATE_19_LOCAL_TESTS_PASS_HOSTED_AND_REVIEW_PENDING",
+      "status": "HOSTED_19_OF_19_PASS_ARTIFACT_BOUND_PENDING_REVIEW_AND_NEW_ONCE_SCOPE",
       "scope": "TEN_FIXED_UNIT_FILES_ONE_DROPIN_PRIVATE_RUNTIME_METADATA_ONLY_ENCRYPTED_NOT_INSTALL",
       "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
       "permission": "NOT_ISSUED",
@@ -652,7 +652,29 @@
       "environment_files_opened": false,
       "database_opened": false,
       "inline_unit_authentication": "POSSIBLE_PRIVATE_BYTES_NOT_USED_OR_PUBLIC",
-      "root_channel_extended": false
+      "root_channel_extended": false,
+      "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+      "artifact": {
+        "binding_sha256": "3aa0ba32ac314957ca716f5324ab63dbefcef0fd2984015ed2c3a07813937ef5",
+        "bound_files": 3,
+        "new_tests": 19,
+        "production_executed": false,
+        "regular_members": 4,
+        "schema_version": 1,
+        "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
+        "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+        "tar_bytes": 13494,
+        "tar_sha256": "2cc24bf6b7189ba3a6106ec66aa114adf4ff492c8470c66a4679b1718671564a",
+        "run": 38916022943,
+        "job": 117023586355,
+        "job_conclusion": "SUCCESS",
+        "artifact_id": 12051723857,
+        "zip_bytes": 14085,
+        "zip_sha256": "bacc2c4aed891417cd5a47e5d9129b0052b812504fcc011631401b585737734a",
+        "zip_verification": "ACTUAL_GITHUB_JOB_UPLOAD_DIGEST_AND_ARTIFACT_API_NOT_INDEPENDENT_ZIP_DOWNLOAD",
+        "local_tar_reproduction": "BYTE_IDENTICAL_TO_HOSTED_BUILD"
+      },
+      "review_request": "TO_BE_POSTED"
     }
   },
   "current_recovery_point_r2": {
