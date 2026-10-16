@@ -10,6 +10,8 @@ on:
       - 'tests/pr122_site_hub_browser.cjs'
       - 'tests/fixtures/pr122-site-shell/**'
       - 'tests/test_pr122_site_hub_release_delta.py'
+      - 'tests/test_pr122_site_hub_preview.py'
+      - 'deploy/pr122-site-hub-preview/**'
       - 'evidence/pr122-site-hub/PR122_SITE_HUB_REVIEW_ONLY.tar.gz'
       - '.github/workflows/pr122-site-hub-preflight.yml'
 permissions:
@@ -31,7 +33,20 @@ jobs:
       - name: Offline quote and simulated frontend regressions
         run: node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs demos/community-local-e2e/*.test.mjs
       - name: Isolated integrated HTTP and language tests
-        run: python -m unittest tests/test_pr122_site_hub_integration.py -v
+        run: python -m unittest tests.test_pr122_site_hub_integration tests.test_pr122_site_hub_preview -v
+      - name: Validate isolated preview Nginx and service candidates
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y nginx
+          python - <<'PY'
+          import pathlib,subprocess,tempfile
+          root=pathlib.Path.cwd()
+          with tempfile.TemporaryDirectory() as td:
+              config=pathlib.Path(td)/'nginx.conf'
+              config.write_text('pid '+td+'/nginx.pid; error_log '+td+'/error.log; events {} http { access_log off; include '+str(root/'deploy/pr122-site-hub-preview/http-limit.conf')+'; server { listen 127.0.0.1:18794; server_name wenwenwenyiyiyi.work; include '+str(root/'deploy/pr122-site-hub-preview/server-location.conf')+'; } }')
+              subprocess.run(['sudo','nginx','-t','-c',str(config)],check=True)
+          subprocess.run(['systemd-analyze','verify',str(root/'deploy/pr122-site-hub-preview/xuanjun-site-hub-preview.service')],check=True)
+          PY
       - name: Controlled publisher addition delta and existing transaction regressions
         run: |
           python -m unittest tests.test_pr122_site_hub_release_delta.AdditionTests -v
@@ -94,6 +109,10 @@ jobs:
               for entry in manifest['files']:
                   data=bundle.extractfile('pr122-site-hub/'+entry['path']).read()
                   assert len(data)==entry['size'] and hashlib.sha256(data).hexdigest()==entry['sha256']
+                  if entry['path'].startswith('runtime/scripts/'):
+                      assert data==(Path('scripts')/Path(entry['path']).name).read_bytes()
+                  if entry['path'].startswith('runtime-config/'):
+                      assert data==(Path('deploy/pr122-site-hub-preview')/Path(entry['path']).name).read_bytes()
               from scripts.pr122_site_hub_release_delta import publisher_source
               assert bundle.extractfile('pr122-site-hub/bin/pr122_website_release.py').read()==publisher_source()
           shutil.copyfile(archive,'/tmp/pr122-site-hub/'+archive.name)

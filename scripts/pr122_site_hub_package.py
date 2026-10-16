@@ -35,8 +35,12 @@ def package(root,source,output):
         entries={'source-pin.json':canonical(pin),'candidate-manifest.json':canonical(manifest),'bin/pr122_website_release.py':new_code,
                  'PRODUCTION_EXECUTION.lock':b'REVIEW_ONLY. Independent approval and protected execution channel required.\n',
                  'PUBLISHER_PROVENANCE.json':canonical({'base_source_sha256':BASE_SHA256,'candidate_source_sha256':sha(new_code),'change':'Explicit absent-baseline new files; collision rejection; exclusive create; final manifest verification; original installed publisher unchanged'}),
-                 'RELEASE_GATE.json':canonical({'state':'HOLD','production_approved':False,'expected_live_baseline_digest':'a05cf7c23e8ad3a8f63f7af07b68e0219fc79cc4c0c417ded86e2a947054fe09','unresolved':['Independent approval of exact bundle and publisher delta','Protected root installer path admission','Simulation service isolation and public admission','Production browser HTTPS and rollback acceptance'],'simulation_service_included':False})}
+                 'RELEASE_GATE.json':canonical({'state':'HOLD','production_approved':False,'expected_live_baseline_digest':'a05cf7c23e8ad3a8f63f7af07b68e0219fc79cc4c0c417ded86e2a947054fe09','unresolved':['Independent approval of exact bundle, publisher delta and isolated preview runtime','Protected combined host execution path admission','Target-host runtime and Nginx validation','Production browser HTTPS and rollback acceptance'],'simulation_service_included':True,'simulation_service_production_approved':False})}
         entries.update({'overlay/public/'+p:raw for p,raw in changed.items()})
+        runtime=sorted((root/'scripts').glob('community_*.py'))+[root/'scripts/pr122_site_hub_preview.py']
+        entries.update({'runtime/scripts/'+p.name:p.read_bytes() for p in runtime})
+        entries.update({'runtime-config/'+p.name:p.read_bytes() for p in sorted((root/'deploy/pr122-site-hub-preview').glob('*')) if p.is_file()})
+        entries['RUNTIME_MANIFEST.json']=canonical({'scope':'In-memory synthetic preview only','files':[{'path':p,'size':len(raw),'sha256':sha(raw)} for p,raw in sorted(entries.items()) if p.startswith(('runtime/','runtime-config/'))]})
         package_manifest={'schema_version':2,'files':[{'path':p,'size':len(raw),'sha256':sha(raw)} for p,raw in sorted(entries.items())]}
         entries['PACKAGE_MANIFEST.json']=canonical(package_manifest)
         output.mkdir(parents=True)

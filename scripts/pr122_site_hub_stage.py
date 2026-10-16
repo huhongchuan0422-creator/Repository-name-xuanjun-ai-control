@@ -119,6 +119,11 @@ def build(root, source, output, fixture=None):
             if locale=='en/':
                 text=text.replace('Service / 服务','Service').replace('Custom development / 定制开发','Custom development').replace('Ordinary in-house service / 普通自营服务','Ordinary in-house service')
                 text=translate_fragment(text).replace('lang="zh-CN"','lang="en"',1)
+            if str(relative) in ('ecosystem/index.html','ecosystem/tiers/index.html'):
+                rule=('ECV has a fixed total of 20 million units. Lawfully acquired rights remain valid long-term and cannot be transferred or traded. ECV is not a cryptocurrency, equity or fixed-return product. The highest eligible development discount tier applies; tiers do not stack.' if locale=='en/' else '生态权益总量固定2,000万份，合法取得的生态权益长期有效，不转让、不买卖；生态权益不是虚拟货币、股权或固定收益产品。开发折扣按符合条件的最高档计算，各档不叠加。')
+                text=text.replace('</main>','<section class="hero"><p>'+rule+'</p></section></main>',1)
+            if str(relative)=='visual/community-payment/index.html' and locale=='en/':
+                text=text.replace('</main>','<p class="notice">The existing role demo is currently in Chinese and uses synthetic data only.</p></main>',1)
             header=re.sub(r'href="/(?:zh-cn/|en/)?" lang="(zh-CN|en)"',lambda m:'href="/'+('en/' if m[1]=='en' else 'zh-cn/')+relative.parent.as_posix()+'/" lang="'+m[1]+'"',header)
             header=re.sub(r'aria-current="page"','',header)
             current='en/' if locale=='en/' else 'zh-cn/'
@@ -141,12 +146,16 @@ def build(root, source, output, fixture=None):
     (public/'assets').mkdir(exist_ok=True)
     shutil.copyfile(hub/'assets/ecv-quote.js',public/'assets/ecv-quote.js')
     shutil.copyfile(hub/'assets/ecv-quote-ui.js',public/'assets/ecv-quote-ui.js')
+    shutil.copyfile(hub/'assets/community-preview-session.js',public/'assets/community-preview-session.js')
     # Copy only the existing role-demo assets. Their POST service stays loopback-only.
     aliases={'/demo/merchant/app.js':'merchant.js','/demo/platform/app.js':'platform.js'}
     demo_base='/visual/community-local-e2e/'
     for p in sorted((root/'demos/community-local-e2e').glob('*')):
         if not p.is_file() or '.test.' in p.name:continue
         text=p.read_text()
+        if p.suffix in ('.js','.mjs'):
+            text=text.replace('"/demo/','"/_preview/community-api/').replace("'/demo/","'/_preview/community-api/")
+            text=re.sub(r'credentials\s*:\s*["\']omit["\']','credentials:"same-origin"',text)
         if p.suffix=='.html':
             text=re.sub(r'src="(/demo/[^"]+\.js)"',lambda m:'src="'+demo_base+aliases.get(m[1],m[1].removeprefix('/demo/'))+'"',text)
             text=text.replace('href="/demo/"','href="'+demo_base+'"')
@@ -154,6 +163,7 @@ def build(root, source, output, fixture=None):
             text=text.replace('href="../legal/','href="/visual/legal/')
             text=text.replace('</head>','<link rel="stylesheet" href="/assets/xuanjun-demo-integration.css"></head>',1)
             text=text.replace('<body>','<body><nav aria-label="演示导航"><a href="/visual/community-payment/">返回社区演示 / Back to demo roles</a> · <a href="/marketplace/">浏览产品 / Browse products</a></nav>',1)
+            text=text.replace('</body>','<p id="demoSessionState" role="status">正在准备隔离模拟会话。</p><script src="/assets/community-preview-session.js" defer></script></body>',1)
             if p.name=='saas-panel.html':
                 text=text.replace('<body>','<body><p role="status">SaaS身份与报价服务未连接 / SaaS identity and quote service not connected</p>',1)
                 text=re.sub(r'<button\b', '<button disabled aria-disabled="true"', text)

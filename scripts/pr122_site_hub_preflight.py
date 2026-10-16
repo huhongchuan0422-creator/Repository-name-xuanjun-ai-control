@@ -89,7 +89,7 @@ def main():
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     result = inspect(args.root)
-    if result['candidate_file_count'] != 20 or result['html_page_count'] != 15:
+    if result['candidate_file_count'] != 21 or result['html_page_count'] != 15:
         raise SystemExit('HANDOFF_INVENTORY_DRIFT')
     payload = json.dumps(result, ensure_ascii=False, indent=2) + '\n'
     if args.output:

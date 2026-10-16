@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.community_demo_api import serve_local
+from scripts.pr122_site_hub_preview import PreviewServer, PREFIX
 
 def serve(stage, port=0):
     stage=stage.resolve()
@@ -18,22 +18,23 @@ def serve(stage, port=0):
     if manifest.get('production_approved') is not False:raise ValueError('TEST_ONLY')
     public=(stage/'public').resolve()
     policy=json.loads((stage/'release-metadata/inline-csp.json').read_text())['policy']
-    server=serve_local(port=port)
+    server=PreviewServer(port=port,test_mode=True)
     parent=server.RequestHandlerClass
     class Handler(parent):
         def do_GET(self):
+            if self.path==PREFIX+'/session':return super().do_GET()
             expected='127.0.0.1:'+str(self.server.server_port)
-            if self.headers.get('Host')!=expected:return self.send_json(403,{'error':'LOOPBACK_ONLY'})
+            if self.headers.get('Host')!=expected:return self.answer(403,{'error':'LOOPBACK_ONLY'})
             path=unquote(urlsplit(self.path).path)
             if '\\' in path or '\x00' in path or '..' in Path(path).parts:
-                return self.send_json(403,{'error':'PATH_DENIED'})
+                return self.answer(403,{'error':'PATH_DENIED'})
             if any(part.startswith('.') for part in Path(path).parts if part!='/'):
-                return self.send_json(403,{'error':'PATH_DENIED'})
+                return self.answer(403,{'error':'PATH_DENIED'})
             target=public/path.lstrip('/')
             options=[target/'index.html'] if path.endswith('/') else [target,Path(str(target)+'.html'),target/'index.html']
             target=next((p for p in options if p.is_file() and not p.is_symlink()),None)
-            if target is None:return self.send_json(404,{'error':'NOT_FOUND'})
-            if not target.resolve().is_relative_to(public):return self.send_json(403,{'error':'PATH_DENIED'})
+            if target is None:return self.answer(404,{'error':'NOT_FOUND'})
+            if not target.resolve().is_relative_to(public):return self.answer(403,{'error':'PATH_DENIED'})
             raw=target.read_bytes();self.send_response(200)
             self.send_header('Content-Type',mimetypes.guess_type(target)[0] or 'application/octet-stream')
             self.send_header('Content-Length',str(len(raw)))

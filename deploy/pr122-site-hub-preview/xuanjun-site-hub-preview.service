@@ -1,0 +1,29 @@
+[Unit]
+Description=Xuanjun per-visitor synthetic community preview
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/var/lib/xuanjun-site-hub-preview/current
+ExecStart=/usr/bin/python3 -I -B /var/lib/xuanjun-site-hub-preview/current/scripts/pr122_site_hub_preview.py --port 18793
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET
+CapabilityBoundingSet=
+MemoryMax=128M
+TasksMax=16
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

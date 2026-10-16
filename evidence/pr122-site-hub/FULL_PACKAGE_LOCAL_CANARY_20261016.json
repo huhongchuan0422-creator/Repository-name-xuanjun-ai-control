@@ -1,6 +1,6 @@
 {
-  "scope": "Actual 1276-file candidate in disposable local filesystem; not production",
-  "artifact_sha256": "b3f654d3616d6ab18d6b481eae440f0650f597f27cf37e05599a22030c80d3f7",
+  "scope": "Actual 1277-file candidate in disposable local filesystem; not production",
+  "artifact_sha256": "18cd49ff3936895171b889099871e58dd2f1576508c8dc3e4db16a9fd935902e",
   "states": [
     {
       "action": "prepare",

@@ -29,8 +29,13 @@ class IntegrationTests(unittest.TestCase):
     def request(self,path,body=None,headers=None):
         c=http.client.HTTPConnection('127.0.0.1',self.server.server_port,timeout=5)
         data=json.dumps(body) if body is not None else None
-        c.request('POST' if body is not None else 'GET',path,data,headers or ({'Content-Type':'application/json'} if body is not None else {}))
-        r=c.getresponse();result=(r.status,r.getheader('Content-Security-Policy'),r.read());c.close();return result
+        values={'Cookie':getattr(self,'cookie','')}
+        if body is not None:values.update({'Content-Type':'application/json','Origin':'http://127.0.0.1:'+str(self.server.server_port)})
+        values.update(headers or {})
+        c.request('POST' if body is not None else 'GET',path,data,values)
+        r=c.getresponse()
+        if r.getheader('Set-Cookie'):self.cookie=r.getheader('Set-Cookie').split(';',1)[0]
+        result=(r.status,r.getheader('Content-Security-Policy'),r.read());c.close();return result
     def test_42_localized_pages_have_original_navigation_and_no_inline_attributes(self):
         pages=list((ROOT/'demos/xuanjun-site-hub').rglob('*.html'))
         pages=[p.relative_to(ROOT/'demos/xuanjun-site-hub') for p in pages if p.parent.name!='xuanjun-site-hub']
@@ -76,13 +81,14 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(self.request('/missing-site-hub-page')[0],404)
         self.assertEqual(self.request('/.env')[0],403)
         self.assertEqual(self.request('/',headers={'Host':'external.example'})[0],403)
+        self.assertEqual(self.request('/_preview/community-api/session')[0],200)
         scope={'tenant_id':'tenant1','merchant_id':'merchant1','store_id':'store1','reference':'integration_test'}
-        status,_,body=self.request('/demo/orders',{**scope,'amount_minor':120})
+        status,_,body=self.request('/_preview/community-api/orders',{**scope,'amount_minor':120})
         self.assertEqual(status,200);self.assertEqual(json.loads(body)['state'],'PENDING')
-        status,_,body=self.request('/demo/orders/simulate',{**scope,'amount_minor':120,'event_id':'sim_1','target':'SUCCESS','transaction_id':'sim_tx_1'})
+        status,_,body=self.request('/_preview/community-api/orders/simulate',{**scope,'amount_minor':120,'event_id':'sim_1','target':'SUCCESS','transaction_id':'sim_tx_1'})
         self.assertEqual(status,200);self.assertEqual(json.loads(body)['state'],'SUCCESS')
-        status,_,body=self.request('/demo/admin/profile',{'anything':'invalid'})
+        status,_,body=self.request('/_preview/community-api/admin/profile',{'anything':'invalid'})
         self.assertNotEqual(status,200)
-        self.assertEqual(self.request('/demo/orders',scope,{'Content-Type':'application/json','Origin':'https://external.example'})[0],403)
+        self.assertEqual(self.request('/_preview/community-api/orders',scope,{'Content-Type':'application/json','Origin':'https://external.example'})[0],403)
 
 if __name__=='__main__':unittest.main()

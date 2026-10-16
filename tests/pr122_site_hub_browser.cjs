@@ -6,8 +6,7 @@ const {spawn}=require('node:child_process');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const stage=path.resolve(process.env.XJ_HUB_STAGE||'.test-stage');
 const out=path.resolve(process.env.XJ_HUB_REPORT||'.test-browser-report.json');
-const merchantToken='test-only-merchant-'+'m'.repeat(40),platformToken='test-only-platform-'+'p'.repeat(40);
-const server=spawn('python3',['scripts/pr122_site_hub_test_server.py','--stage',stage,'--port','18792'],{env:{...process.env,XJ_STAGE5_DEMO_MERCHANT_TOKEN:merchantToken,XJ_STAGE5_DEMO_PLATFORM_TOKEN:platformToken},stdio:['ignore','pipe','pipe']});
+const server=spawn('python3',['scripts/pr122_site_hub_test_server.py','--stage',stage,'--port','18792'],{env:process.env,stdio:['ignore','pipe','pipe']});
 let serverErrors='';server.stderr.on('data',d=>serverErrors+=d);
 const ready=new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('exit',code=>reject(Error('Server exited '+code+' '+serverErrors)));});
 const origin='http://127.0.0.1:18792';
@@ -62,7 +61,7 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
   await page.locator('.nav-group').first().locator('button').click();assert(await page.locator('.nav-group').first().locator('.nav-panel').isVisible());
   checks.push({test:'mobile_navigation',result:'PASS'});
   const demo='/visual/community-local-e2e/';
-  await page.goto(origin+demo);await page.locator('#loadStorefront').click();await page.waitForFunction(()=>document.querySelector('#storefrontName').textContent.includes('Demo Merchant'));
+  await page.goto(origin+demo);await page.waitForFunction(()=>document.querySelector('#demoSessionState').textContent.includes('已就绪'));await page.locator('#loadStorefront').click();await page.waitForFunction(()=>document.querySelector('#storefrontName').textContent.includes('Demo Merchant'));
   assert.match(await page.locator('#adAmount').innerText(),/DEMO APPROVED AMOUNT AD/);
   assert.equal(await page.locator('#successAd').isVisible(),false);
   await page.locator('#amount').fill('120');await page.locator('#create').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('PENDING'));
@@ -71,10 +70,10 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
   checks.push({test:'consumer_amount_first_ad_simulated_payment_second_ad_refresh',result:'PASS'});
   await page.goto(origin+demo+'merchant.html');await page.locator('#load').click();await page.waitForFunction(()=>document.querySelector('#state').textContent.includes('SUCCESS'));
   assert.equal(await page.locator('#verified').innerText(),'否');
-  await page.locator('#adminCapability').fill(merchantToken);await page.locator('#createAd').click();await page.waitForFunction(()=>document.querySelector('#adminStatus').textContent.startsWith('本地模拟操作完成'));
+  await page.waitForFunction(()=>document.querySelector('#adminCapability').value.length>=32);await page.locator('#createAd').click();await page.waitForFunction(()=>document.querySelector('#adminStatus').textContent.startsWith('本地模拟操作完成'));
   await page.locator('#adVersion').fill('1');await page.locator('#submitAd').click();await page.waitForFunction(()=>document.querySelector('#adminStatus').textContent.includes('REVIEW'));
   await page.goto(origin+demo+'platform.html');await page.locator('#inspect').click();await page.waitForFunction(()=>document.querySelector('#state').textContent.includes('SUCCESS'));
-  await page.locator('#adminCapability').fill(platformToken);await page.locator('#approveCreative').click();await page.waitForFunction(()=>document.querySelector('#adminStatus').textContent.startsWith('本地模拟操作完成'));
+  await page.waitForFunction(()=>document.querySelector('#adminCapability').value.length>=32);await page.locator('#approveCreative').click();await page.waitForFunction(()=>document.querySelector('#adminStatus').textContent.startsWith('本地模拟操作完成'));
   checks.push({test:'merchant_and_platform_read_views_and_fixture_ad_review',result:'PASS'});
   for(const role of ['community','beneficiary']){
    await page.goto(origin+demo+role+'.html');await page.locator('#inspect').click();assert.equal(await page.locator('#tasks li').count(),3);
