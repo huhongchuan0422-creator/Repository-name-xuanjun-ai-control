@@ -1,0 +1,26 @@
+name: Stage1 Telegram Owner Candidate Checks
+on:
+  pull_request:
+    paths:
+      - 'stage1/telegram_owner_transport.py'
+      - 'stage1/test_telegram_owner_transport.py'
+      - 'stage1/uk_owner_callback_core.py'
+      - 'stage1/test_uk_owner_callback_core.py'
+      - 'stage1/telegram_owner_request_registry.py'
+      - 'stage1/test_telegram_owner_request_registry.py'
+      - '.github/workflows/stage1-telegram-owner-checks.yml'
+permissions:
+  contents: read
+jobs:
+  owner-transport-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          set -euo pipefail
+          python -m py_compile stage1/telegram_owner_transport.py stage1/test_telegram_owner_transport.py stage1/uk_owner_callback_core.py stage1/test_uk_owner_callback_core.py
+          cd stage1
+          python -m unittest -v test_telegram_owner_transport test_uk_owner_callback_core test_telegram_owner_request_registry
