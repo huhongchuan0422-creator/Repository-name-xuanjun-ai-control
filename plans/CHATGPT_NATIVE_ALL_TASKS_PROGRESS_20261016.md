@@ -6,28 +6,28 @@
 
 | Issue | 工作范围 | Owner证据 | 代码阶段 | 审核阶段 | 下一动作 |
 |---|---|---|---|---|---|
-| 62 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 63 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 64 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 65 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 66 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 67 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 68 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 69 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 70 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 71 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 78 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 79 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 80 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 81 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 82 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 83 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 84 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 85 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 86 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
-| 87 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | 未逐项核对CI与审核 | 复用代码，查证后关闭 |
+| 62 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 63 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 64 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 65 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 66 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 67 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 68 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 69 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 70 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 71 | Stage5广告/付款离线合同 | CHATGPT_NATIVE（Issue） | PR #73 已合并源码 | Hosted16/16通过；source merged；生产非范围 | 源码已交付，不重复；仅记录集成外部依赖 |
+| 78 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 79 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 80 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 81 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 82 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 83 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 84 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 85 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 86 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
+| 87 | Stage5商家/门店/扫码离线合同 | CHATGPT_NATIVE（Issue） | PR #88 已合并源码 | Hosted20/20通过；独立源码审查限定通过 | 真实业务集成仍OPEN，目标授权前不重写 |
 
-原始交付PR #73与#88均已MERGED；避免重复开发。按每个Issue的验收回执核对，缺陷统一归并后补代码。Issue未关闭不自动代表源码未交付。
+原始交付PR #73与#88均已MERGED。**准确证据更新**：PR73提交92e0f13，Hosted 16/16 PASS，Issue62–71已CLOSED（见PR73评论6162030833）；PR88提交7a1d62e，Hosted20/20 PASS，独立源码修复审查PASS_WITH_SCOPE_LIMITS（评论6162610215），已squash合入main（见6162724673），Issue78–87仍OPEN，因为真正业务集成与目标授权未完成。不得把“开着”重算成20个离线源码未开发。
 
 ## B. Stage5 Phase2 非外部依赖20节点（PR #122 / Issue #76）
 
