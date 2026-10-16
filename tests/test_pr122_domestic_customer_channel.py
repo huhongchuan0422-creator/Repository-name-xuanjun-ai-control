@@ -136,7 +136,9 @@ class ChannelTests(unittest.TestCase):
                 self.assertEqual(c.revoke()['state'],'CHANNEL_REVOKED')
                 self.assertFalse(c.POLICY.exists())
                 self.assertTrue((base/'channel.py').exists())
+                global_rules.chmod(0o600)
                 global_rules.write_text('this is invalid sudoers syntax !!!\n')
+                global_rules.chmod(0o440)
                 with self.assertRaises(c.subprocess.CalledProcessError):
                     c.subprocess.run(['/usr/sbin/visudo','-c'],check=True,stdout=c.subprocess.DEVNULL,stderr=c.subprocess.DEVNULL)
 
