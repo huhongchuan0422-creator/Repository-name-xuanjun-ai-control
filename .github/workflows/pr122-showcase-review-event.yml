@@ -1,0 +1,40 @@
+name: PR122 Showcase Review Event
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+  issues: read
+  actions: write
+jobs:
+  dispatch-reviewed-build:
+    if: github.event.issue.number == 122 && github.event.comment.user.login == 'huhongchuan0422-creator' && startsWith(github.event.comment.body, 'XUANJUN_SHOWCASE_REVIEW')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Bind a review event to the exact current canonical branch before dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request
+          event=json.load(open(os.environ['GITHUB_EVENT_PATH']))
+          comment=event['comment'];body=comment['body']
+          assert body.startswith('XUANJUN_SHOWCASE_REVIEW\n')
+          review=json.loads(body.split('\n',1)[1])
+          assert review['reviewer_role']=='INDEPENDENT_AUDITOR'
+          assert review['decision'] in ('PUBLIC_CONTENT_APPROVED','PUBLIC_CONTENT_REVOKED')
+          repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+          branch='feature/work-pr122-site-hub-integration-20261016'
+          def call(path,data=None):
+              raw=None if data is None else json.dumps(data).encode()
+              request=urllib.request.Request('https://api.github.com/repos/'+repo+'/'+path,data=raw,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(request,timeout=20) as response:
+                  content=response.read();return json.loads(content) if content else None
+          head=call('git/ref/heads/'+branch)['object']['sha']
+          assert head==review['commit'],'Branch moved: obtain review of the new exact head; do not dispatch a different version'
+          run=call('actions/runs/'+str(review['ci_run_id']))
+          assert run['head_sha']==head and run['conclusion']=='success' and run['workflow_id']==386249451
+          call('actions/workflows/pr122-site-hub-preflight.yml/dispatches',{'ref':branch,'inputs':{'showcase_review_ids':str(comment['id'])}})
+          print('REVIEW_EVENT_DISPATCHED; PRODUCTION_CHANGES=0')
+          PY

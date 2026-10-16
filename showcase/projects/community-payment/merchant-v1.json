@@ -1,0 +1,19 @@
+{
+  "kind": "page",
+  "id": "merchant",
+  "project_id": "community-payment",
+  "version": 1,
+  "visibility": "PUBLIC",
+  "title": {
+    "zh": "商家工作台（三个模拟商家）",
+    "en": "Merchant dashboard (three fictional merchants)"
+  },
+  "summary": {
+    "zh": "仅模拟演示，不涉及真实付款。",
+    "en": "Simulation only; no real payment."
+  },
+  "href": "/showcase/projects/community-payment/views/merchant/v1/",
+  "role": "merchant",
+  "artifact_sha256": "308f1eeba57874bab286b5d71bc11de691c4425b5e2a27d02282289e9ce99336",
+  "release_artifact_sha256": "8b70880b359b66a5504b75810ad15a49028993efbc3b6462432a0d4f9d4219ca"
+}

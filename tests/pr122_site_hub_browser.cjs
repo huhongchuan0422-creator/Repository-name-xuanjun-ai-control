@@ -77,6 +77,8 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
    assert.equal(await second.getAttribute('aria-expanded'),'false');
    assert.equal(await page.locator('.primary-nav .nav-group').nth(1).locator('a[href*="/ecosystem/"]').count(),0);
    assert(await page.locator('#discover-ecosystem a[href="/ecosystem/"]').isVisible());
+   assert.equal(await page.locator('#discover-work a').count(),3);
+   assert.equal(await page.locator('#discover-work a[href="/showcase/projects/"]').count(),1);
   }
   checks.push({test:'home_entry_hierarchy_header_alignment_disclosure_stationary',widths:[320,390,780,1180,1440],result:'PASS'});
   await page.goto(origin+'/visual/community-payment/merchant-dashboard/');

@@ -1,9 +1,23 @@
 name: PR122 Site Hub Preflight
 on:
+  workflow_dispatch:
+    inputs:
+      showcase_review_ids:
+        description: 'Approved PR122 content-review comment IDs; blank means preview only'
+        required: false
+        type: string
   push:
     branches: [feature/work-pr122-site-hub-integration-20261016]
     paths:
       - 'demos/xuanjun-site-hub/**'
+      - 'showcase/**'
+      - 'scripts/pr122_showcase*.py'
+      - 'scripts/community_saas_*.py'
+      - 'tests/test_pr122_showcase*.py'
+      - 'tests/pr122_showcase_browser.cjs'
+      - 'tests/pr122_showcase_nginx.py'
+      - '.github/workflows/pr122-showcase-review-event.yml'
+      - 'deploy/pr122-showcase/**'
       - 'demos/community-local-e2e/**'
       - 'scripts/pr122_site_hub_*.py'
       - 'tests/test_pr122_site_hub_integration.py'
@@ -19,6 +33,8 @@ on:
       - 'evidence/pr122-site-hub-experience/**'
 permissions:
   contents: read
+  actions: read
+  issues: read
 jobs:
   static-and-synthetic:
     runs-on: ubuntu-latest
@@ -104,6 +120,39 @@ jobs:
           XJ_HUB_STAGE: /tmp/pr122-site-browser
           XJ_HUB_REPORT: /tmp/pr122-site-hub/BROWSER_REPORT.json
         run: PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright" node tests/pr122_site_hub_browser.cjs
+      - name: Dynamic showcase lifecycle and isolated static publisher
+        run: |
+          python -m unittest tests.test_pr122_showcase tests.test_pr122_showcase_sources -v
+          sudo -n "$(command -v python)" -m unittest tests.test_pr122_showcase_install -v
+          sudo -n env XJ_SHOWCASE_REPORT_DIR=/tmp/pr122-site-hub "$(command -v python)" -m unittest tests.test_pr122_showcase_promote tests.test_pr122_showcase_poll -v
+          python -m scripts.pr122_showcase_build --registry showcase --output /tmp/pr122-showcase-preview --preview
+          python - <<'PYCODE'
+          import json
+          from pathlib import Path
+          from scripts.pr122_showcase import discover,canonical,sha
+          claims=[{'project_id':o['project_id'],'kind':o['kind'],'id':o['id'],'version':o['version'],'object_sha256':sha(canonical(o))} for o in discover(Path('showcase'))]
+          Path('/tmp/pr122-site-hub/SHOWCASE_DECLARATION_CLAIMS.json').write_text(json.dumps(claims,indent=2)+'\n')
+          PYCODE
+          python -m scripts.pr122_showcase_package --public /tmp/pr122-showcase-preview --output /tmp/pr122-site-hub/SHOWCASE_PREVIEW.tar.gz --preview
+          sudo -n "$(command -v python)" -m tests.pr122_showcase_nginx --public /tmp/pr122-showcase-preview --report /tmp/pr122-site-hub/SHOWCASE_NGINX_REPORT.json
+          python -m scripts.pr122_showcase_mechanism_package --output /tmp/pr122-site-hub --source-commit "$GITHUB_SHA"
+          sudo systemd-analyze verify deploy/pr122-showcase/xuanjun-showcase-publish.service deploy/pr122-showcase/xuanjun-showcase-publish.timer
+          XJ_SHOWCASE_PUBLIC=/tmp/pr122-showcase-preview XJ_SHOWCASE_REPORT_DIR=/tmp/pr122-site-hub XJ_HUB_STAGE=/tmp/pr122-site-browser PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright" node tests/pr122_showcase_browser.cjs
+      - name: Build a reviewed publication only after actual content-review events
+        if: github.event_name == 'workflow_dispatch' && inputs.showcase_review_ids != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REQUESTED_REVIEW_IDS: ${{ inputs.showcase_review_ids }}
+        run: |
+          python - <<'PYCODE'
+          import os,subprocess
+          ids=os.environ['REQUESTED_REVIEW_IDS'].split(',')
+          assert ids and all(i.isdigit() for i in ids)
+          command=['python','-m','scripts.pr122_showcase_build','--registry','showcase','--output','/tmp/pr122-showcase-reviewed','--reviewer','huhongchuan0422-creator','--discover-reviews','--published-pages','showcase/published-main-r2.json']
+          for identifier in ids:command+=['--review-comment-id',identifier]
+          subprocess.run(command,check=True)
+          PYCODE
+          python -m scripts.pr122_showcase_package --public /tmp/pr122-showcase-reviewed --output /tmp/pr122-site-hub/SHOWCASE_RELEASE.tar.gz
       - name: Bind receipt to actual checkout
         run: |
           python - <<'PY'
@@ -120,7 +169,7 @@ jobs:
           from pathlib import Path
           receipt=json.loads(Path('evidence/pr122-site-hub/PACKAGE_RECEIPT_20261016.json').read_text())
           archive=Path('evidence/pr122-site-hub/PR122_SITE_HUB_REVIEW_ONLY.tar.gz')
-          assert hashlib.sha256(archive.read_bytes()).hexdigest()==receipt['tar_sha256']
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()==receipt['tar_sha256']=='dcf96b124cea6170453bdec52e60fc94d157864f342e2d1706801d54568abafb'
           with tarfile.open(archive) as bundle:
               members=bundle.getmembers()
               assert len({m.name for m in members})==len(members)
@@ -130,10 +179,9 @@ jobs:
               for entry in manifest['files']:
                   data=bundle.extractfile('pr122-site-hub/'+entry['path']).read()
                   assert len(data)==entry['size'] and hashlib.sha256(data).hexdigest()==entry['sha256']
-                  if entry['path'].startswith('runtime/scripts/'):
-                      assert data==(Path('scripts')/Path(entry['path']).name).read_bytes()
-                  if entry['path'].startswith('runtime-config/'):
-                      assert data==(Path('deploy/pr122-site-hub-preview')/Path(entry['path']).name).read_bytes()
+                  # This archive belongs to the unchanged r2 snapshot; it is
+                  # not evidence that future development code was deployed.
+                  # Its original internal manifest remains fully verified.
               from scripts.pr122_site_hub_release_delta import publisher_source
               assert bundle.extractfile('pr122-site-hub/bin/pr122_website_release.py').read()==publisher_source()
           shutil.copyfile(archive,'/tmp/pr122-site-hub/'+archive.name)

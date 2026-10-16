@@ -29,7 +29,9 @@ def disclosures(text):
 def home(text, locale):
     en = locale == 'en/'
     def t(zh, english): return english if en else zh
-    def link(path): return '/' + locale + path
+    def link(path):
+        if path.startswith('showcase/'):return '/showcase/'+('en/' if en else '')+path.removeprefix('showcase/')
+        return '/' + locale + path
     # Keep the established hero and all original business links, change its two CTAs.
     first = re.search(r'<section class="hero">.*?</section>', text, re.S)
     if first:
@@ -42,16 +44,20 @@ def home(text, locale):
     groups = [
         ('products', t('按需选择，让业务先跑起来。','Choose what your business needs.'), t('选配已有模块，或从一个明确需求开始定制。费用与开放状态在详情中说明。','Choose existing modules or start with a defined custom requirement. Each detail page explains fees and availability.'), [
             ('SaaS 产品与模块','SaaS products and modules','查看用途、依赖和服务方式，选择适合你的功能。','Review functions, dependencies and service options.','marketplace/','浏览产品与服务','Browse products and services'),
-            ('功能选配','Module options','按业务组合模块，分别确认订阅、买断及第三方费用。','Combine modules and confirm subscription, one-time and third-party fees.','marketplace/modules/','查看模块目录','Explore modules'),
+            ('功能选配','Module options','按业务组合模块，分别确认订阅、买断及第三方费用。','Combine modules and confirm subscription, one-time and third-party fees.','showcase/modules/','查看获准上架的模块','Explore admitted modules'),
             ('定制开发','Custom development','先明确需求与验收，再确定开发和持续服务费用。','Agree on scope and acceptance before development and ongoing service fees.','custom-ai','了解定制与交付','Explore custom delivery')]),
         ('visual', t('先体验，再判断是否适合。','Experience the workflow first.'), t('从具体业务场景看功能如何协作。演示中的商家、订单和付款均为模拟。','See how functions work together. Demo merchants, orders and payments are simulated.'), [
             ('产品可视化中心','Product visual center','把业务流程、角色与功能放在一起看。','Explore business workflows, roles and capabilities together.','visual/','体验可视化方案','Explore visual solutions'),
             ('社区分账演示','Community payment demo','从消费者付款到商家、社区和平台，查看多角色协作。','Follow the consumer, merchant, community and platform workflow.','visual/community-payment/','选择角色体验','Explore demo roles'),
             ('行业案例','Industry examples','按场景比较方案，区分概念示例与可交付能力。','Compare scenarios with clear concept and delivery status.','visual/catalog/','查看行业案例','Explore industry examples')]),
+        ('work', t('作品，在持续生长。','Work that keeps evolving.'), t('查看已验收案例、正在开发的项目和有记录的发展路线。公开展示以已审核版本为准。','Explore accepted work, active projects and an evidenced roadmap. Public demonstrations use reviewed versions.'), [
+            ('成熟项目案例','Completed project cases','已经完成并验收的项目，查看实际功能与应用场景。','Explore accepted projects, their capabilities and use cases.','showcase/cases/','查看成熟案例','Explore completed work'),
+            ('正在开发的项目','Projects in development','每个项目独立展示，持续增加已审核的页面和角色。','Each project has its own space for reviewed pages and roles.','showcase/projects/','查看开发中的作品','Explore active projects'),
+            ('产品发展路线','Product roadmap','按真实开发与验收记录查看进展，不使用虚构完成率。','Follow development and acceptance records without invented completion percentages.','showcase/roadmap/','了解产品进展','Explore the roadmap')]),
         ('ecosystem', t('共创生态，让贡献有记录。','Co-create with a clear record of contribution.'), t('了解共建共享、开发优惠与共创规则。权益、专项服务金额和收益资格分别认定。','Explore contributions, development discounts and co-creation rules. Rights, service credit and sharing eligibility are assessed separately.'), [
             ('共建共享','Co-build and share','客户、开发者和合作伙伴，按明确规则参与建设。','Customers, developers and partners contribute under defined rules.','ecosystem/','进入共建共享','Explore the ecosystem'),
             ('权益等级与开发折扣','ECV tiers and development discounts','查看六档折扣，以及普通自营服务90%、折后定制开发50%的专项抵扣上限。','Review six discount tiers and service-credit caps: 90% for eligible in-house services and 50% for discounted custom development.','ecosystem/tiers/','了解权益与折扣','Explore tiers and discounts'),
-            ('共创项目广场','Co-creation projects','浏览项目规则，了解模块复用与合同约定的收益共享。','Explore projects, module reuse and contract-based profit sharing.','ecosystem/co-create/','了解共创项目','Explore co-creation projects')]),
+            ('共创项目广场','Co-creation projects','浏览项目规则，了解模块复用与合同约定的收益共享。','Explore projects, module reuse and contract-based profit sharing.','showcase/ecosystem/','查看共创项目与活动','Explore projects and activities')]),
         ('delivery', t('已有项目，从这里继续。','Continue your existing project.'), t('项目、版本、反馈与验收各有入口。私有项目须验证身份与项目权限，当前页面说明接入条件。','Find project and version acceptance guidance. Private projects require verified identity and project permissions; current pages explain access conditions.'), [
             ('客户项目中心','Customer project center','了解需求、开发、测试与交付记录如何管理。','Understand requirements, development, testing and delivery records.','customer/projects/','查看项目中心说明','View project access guidance'),
             ('预览与验收','Preview and acceptance','了解版本预览、反馈与验收流程。','Understand version previews, feedback and acceptance.','customer/projects/acceptance/','查看验收流程','View acceptance guidance'),

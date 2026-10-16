@@ -1,0 +1,23 @@
+/* Verified selectors: live apex and pinned Work V2 source. */
+.primary-nav .nav-group{display:flex;flex-wrap:wrap;column-gap:5px}.primary-nav .nav-group>a{padding-right:0;flex:0 1 auto}.primary-nav .nav-group>button{width:24px;padding:0;text-align:left;flex:none}.primary-nav .nav-panel{flex-basis:100%}
+.xj-hub{padding:36px 0 60px}.xj-hub .hero{display:block;min-height:0;padding:28px;background:#fff;border:1px solid #dce5f1;border-radius:18px;margin:20px 0}.xj-hub .hero h1{font-size:clamp(28px,5vw,48px)}.xj-hub .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px}.xj-hub .card{min-height:0;margin:10px 0;padding:22px}.xj-hub .card h2{font-size:22px}.xj-hub .btn{display:inline-block;padding:10px 16px;background:#2057d4;color:white;border-radius:10px;margin:6px}.xj-hub input{max-width:100%;padding:8px;border:1px solid #abbcd4;border-radius:6px}.xj-hub label{display:block;margin:12px 0}.xj-hub table{display:block;overflow:auto}.xj-hub th,.xj-hub td{padding:10px;text-align:left}.xj-hub a:focus-visible,.xj-hub button:focus-visible,.xj-hub input:focus-visible{outline:3px solid #75a7ff;outline-offset:3px}
+
+
+/* Keep the disclosure control stationary; rotate only its glyph. */
+.primary-nav .nav-group{flex-wrap:nowrap;column-gap:5px}
+.primary-nav .nav-group>button{display:flex;align-items:center;justify-content:flex-start;min-height:28px;height:28px;line-height:1;transform:none!important}
+.primary-nav .nav-group>button span{display:block;line-height:1;transition:transform .16s ease}
+.primary-nav .nav-group>button[aria-expanded=true] span{transform:rotate(180deg)}
+.primary-nav .nav-panel{max-height:min(65vh,560px);overflow:auto;overscroll-behavior:contain}
+.site-header .nav-group>button:focus-visible{outline-offset:2px}
+.xj-discover{padding:72px 0}.xj-discover>h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.03em;line-height:1.15;margin:0 0 14px}
+.xj-discover>p{max-width:700px;color:var(--muted);font-size:18px;margin:0 0 30px}
+.xj-discover-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.xj-feature{background:#f5f6f8;border:1px solid #e6e9ee;border-radius:24px;padding:32px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.xj-feature h3{font-size:25px;line-height:1.2;letter-spacing:-.02em;margin:0}.xj-feature p{color:var(--muted);margin:0}.xj-feature a{color:#1659bd;font-weight:650;margin-top:auto;padding-top:12px;min-height:44px}
+.xj-feature small{font-size:12px;color:var(--muted)}.xj-discover .actions{align-items:center}
+@media(max-width:1180px){.site-header{grid-template-columns:minmax(0,1fr) auto auto;gap:10px;min-height:76px}.site-header .brand{grid-column:1;grid-row:1;min-width:0}.site-header .mobile-toggle{grid-column:2;grid-row:1}.site-header .header-actions{grid-column:3;grid-row:1;display:flex;justify-self:end}.site-header .header-actions>.button,.site-header .workspace-status{display:none}.site-header .primary-nav{top:100%;max-height:calc(100dvh - 90px);overflow:auto}.primary-nav .nav-group{display:flex;flex-wrap:wrap}.primary-nav .nav-group>a{flex:1}.primary-nav .nav-group>.nav-panel{flex-basis:100%;max-height:none;overflow:visible}.xj-discover-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:780px){.site-header{padding:10px 12px;gap:6px}.site-header .brand{gap:6px}.site-header .brand img{width:34px;height:34px}.site-header .brand b{font-size:15px}.site-header .brand small{display:none}.site-header .mobile-toggle,.site-header .language>button{padding:8px;font-size:13px;min-height:44px;white-space:nowrap}.xj-discover{padding:44px 0}.xj-discover-grid{grid-template-columns:1fr}.xj-feature{padding:26px}.hero .actions{display:flex;flex-wrap:wrap}.hero .actions .button{width:auto}.hero h1{letter-spacing:-.03em}}
+@media(prefers-reduced-motion:reduce){.primary-nav .nav-group>button span{transition:none}}
+
+.xj-inline-493e98eac1ca{border-collapse:collapse;width:100%}.xj-inline-6e19583fd3c2{margin-top:22px}.xj-inline-eee3f850c9f4{margin-top:20px}

@@ -38,7 +38,10 @@ def serve(stage, port=0):
             raw=target.read_bytes();self.send_response(200)
             self.send_header('Content-Type',mimetypes.guess_type(target)[0] or 'application/octet-stream')
             self.send_header('Content-Length',str(len(raw)))
-            self.send_header('Content-Security-Policy',policy)
+            if path.startswith('/showcase/'):
+                from scripts.pr122_showcase import CSP as showcase_policy
+                self.send_header('Content-Security-Policy',showcase_policy)
+            else:self.send_header('Content-Security-Policy',policy)
             self.send_header('Cache-Control','no-store')
             self.send_header('X-Content-Type-Options','nosniff')
             self.end_headers();self.wfile.write(raw)

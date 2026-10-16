@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>商家经营工作台 · 玄钧云汇 DEMO</title>
+<link rel="stylesheet" href="assets/merchant.css"><link rel="stylesheet" href="assets/xuanjun-site-integration.css"></head><body>
+<div class="app"><aside class="side"><div class="brand">玄钧云汇<small>商家经营工作台 · 演示版</small></div>
+<nav class="nav" aria-label="商家功能导航">
+<button data-view="overview" aria-current="page">经营概览</button><button data-view="orders">订单管理</button>
+<button data-view="catalog">商品与服务</button><button data-view="ads">广告管理</button>
+<button data-view="split">分账记录</button><button data-view="refund">退款管理</button><button data-view="settings">门店设置</button>
+</nav><div class="side-note">完全离线演示 · 无真实收款、退款或提现。<p>客户正式经营后台需要可信身份及财务接入。</p></div></aside>
+<div class="shell"><header class="top"><div><h1 id="heading">经营概览</h1><p><span id="merchantIdentity">模拟商家</span></p></div><span class="pill">DEMO · 非真实数据</span></header>
+<main class="content"><div class="linkbar"><a href="/visual/community-payment/">返回社区分账演示</a>　·　<a href="/marketplace/">查看模块市场</a></div>
+<div class="panel"><label for="merchantSelect">选择模拟商家</label> <select id="merchantSelect" class="filter"><option value="grocer">云汇邻里便利店 · 模拟商家</option><option value="cafe">云汇街角咖啡 · 模拟商家</option><option value="home">云汇便民家政 · 模拟商家</option></select><p class="help">以下三家均为虚构模拟商家，商品、订单和金额仅用于体验。</p></div><div class="notice" role="note">当前全部数据为页面内置模拟样例；真实支付渠道状态、银行结算、客户资料、广告投放和共创收益均未连接。此页面不会提交任何真实业务请求。</div>
+<section id="overview" class="section active"><div class="cards">
+<div class="card"><span>当前商家模拟订单</span><strong id="metricOrders">0</strong><small>仅示例数据</small></div>
+<div class="card"><span>模拟完成订单额</span><strong id="metricRevenue">¥0.00</strong><small>不代表实际收款</small></div>
+<div class="card"><span>模拟退款预览</span><strong>¥0.00</strong><small>尚未执行模拟退款</small></div>
+<div class="card"><span>待处理演示事项</span><strong id="metricPending">0</strong><small>模拟待处理订单</small></div></div>
+<div class="twocol"><div class="panel"><h2>模拟商家体验</h2><p id="merchantSummary"></p><p class="help">经营概览由当前商家的下方订单样例计算；取消和待处理订单不计入模拟完成订单额。</p></div><div class="panel"><h2>今日运营提醒</h2><p>广告素材A：模拟审核通过。</p><p>商品「便民套餐」：演示中可见。</p><p>模拟售后请求：仅展示流程，不影响真实账本。</p><button class="btn" data-jump="orders">查看订单</button></div></div></section>
+<section id="orders" class="section"><div class="panel"><h2>订单管理</h2><div class="row"><label>订单检索 <input id="orderFilter" class="filter" placeholder="输入订单号或商品名"></label><button id="clearFilter" class="btn secondary">清除</button></div><p class="help">金额为样例数据，不提供支付凭证或真实渠道确认。</p><table><thead><tr><th>模拟订单号</th><th>商品</th><th>金额</th><th>模拟状态</th><th>下单时间</th></tr></thead><tbody id="orderRows"></tbody></table><p id="orderEmpty" hidden>未找到匹配的模拟订单。</p></div></section>
+<section id="catalog" class="section"><div class="panel"><h2>商品与服务</h2><table><thead><tr><th>商品</th><th>演示价格</th><th>状态</th><th>说明</th></tr></thead><tbody><!-- merchant products --></tbody></table></div></section>
+<section id="ads" class="section"><div class="panel"><h2>广告管理：两个独立广告位</h2><p class="help">广告由商家管理，正式上线须平台审核。模拟广告不可注入第三方托管支付页面。</p><div class="two-ads"><div class="ad"><strong>广告位 A · 消费者输入付款金额时</strong><p>社区精选服务推广</p><span class="good">演示素材：已审核</span></div><div class="ad"><strong>广告位 B · 付款结果页</strong><p>便民服务活动</p><span class="pending">演示素材：待审核</span></div></div><p>广告投放数据仅可由审核通过的素材产生；付款真实性仍需支付渠道权威确认。</p></div></section>
+<section id="split" class="section"><div class="panel"><h2>分账记录（模拟）</h2><p>只展示示例账目，不是实际可提现余额。</p><table><thead><tr><th>模拟订单</th><th>商家份额</th><th>社区份额</th><th>平台份额</th><th>真实结算</th></tr></thead><tbody><!-- merchant splits --></tbody></table><p class="help">模型比例仅用于界面演示，不能冒充正式合同或真实分账结果。</p></div></section>
+<section id="refund" class="section"><div class="panel"><h2>退款预览（不执行退款）</h2><p>此处仅检查页面输入并显示流程说明，不写入订单、Finance或真实退款账本。</p><div class="field"><label for="refundId">模拟订单编号</label><input id="refundId" value="DEMO-1001" maxlength="40"></div><div class="field"><label for="refundAmount">预览退款金额（元）</label><input id="refundAmount" value="10.00" inputmode="decimal"></div><button id="refundPreview" class="btn">预览流程</button><p id="actionResult" role="status"></p></div></section>
+<section id="settings" class="section"><div class="panel"><h2>门店设置</h2><p><span id="settingsName"></span></p><p>模拟门店A</p><p><span id="settingsHours"></span></p><p class="help">真实编辑需要服务端RBAC、租户隔离、审计和可信身份令牌。此演示不开放保存。</p></div></section>
+</main></div></div><script src="assets/hub-script-dc888cd7b15b4e6f.js" defer></script><footer><p class="fineprint" data-site-icp="2026024862"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026024862号</a></p></footer></body></html>

@@ -1,0 +1,17 @@
+{
+  "kind": "milestone",
+  "id": "project-acceptance",
+  "project_id": "community-payment",
+  "version": 1,
+  "visibility": "PUBLIC",
+  "title": {
+    "zh": "完整项目验收",
+    "en": "Complete project acceptance"
+  },
+  "summary": {
+    "zh": "客户界面和完整流程仍需对应开发及验收证据。",
+    "en": "Customer interface and complete workflow evidence remain required."
+  },
+  "state": "PLANNED",
+  "evidence_url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/122"
+}

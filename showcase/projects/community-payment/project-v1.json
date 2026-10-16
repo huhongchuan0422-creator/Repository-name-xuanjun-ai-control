@@ -1,0 +1,38 @@
+{
+  "kind": "project",
+  "id": "community-payment",
+  "project_id": "community-payment",
+  "version": 1,
+  "visibility": "PUBLIC",
+  "title": {
+    "zh": "社区分账应用",
+    "en": "Community payment application"
+  },
+  "summary": {
+    "zh": "面向社区生活服务的多角色应用，当前提供隔离模拟体验；真实支付和正式结算未开放。",
+    "en": "A multi-role community services application with isolated simulation; live payments and settlement are not enabled."
+  },
+  "state": "DEVELOPING",
+  "scenarios": [
+    {
+      "zh": "社区生活服务",
+      "en": "Community services"
+    },
+    {
+      "zh": "商家经营",
+      "en": "Merchant operations"
+    },
+    {
+      "zh": "模拟分账",
+      "en": "Simulated profit sharing"
+    }
+  ],
+  "required_milestones": [
+    "consumer-experience",
+    "merchant-experience",
+    "community-experience",
+    "beneficiary-experience",
+    "platform-experience",
+    "project-acceptance"
+  ]
+}

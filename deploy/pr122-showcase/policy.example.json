@@ -1,0 +1,5 @@
+{
+  "publishers": ["huhongchuan0422-creator"],
+  "reviewers": ["huhongchuan0422-creator"],
+  "github_token_file": "/etc/xuanjun-showcase/github-readonly-token"
+}

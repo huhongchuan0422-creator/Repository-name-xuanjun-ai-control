@@ -1,0 +1,9 @@
+[Unit]
+Description=Check approved PR122 publication events without model usage
+[Timer]
+OnBootSec=120
+OnUnitInactiveSec=300
+RandomizedDelaySec=15
+Unit=xuanjun-showcase-publish.service
+[Install]
+WantedBy=timers.target

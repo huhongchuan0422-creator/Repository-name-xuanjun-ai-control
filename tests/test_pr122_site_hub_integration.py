@@ -90,7 +90,7 @@ class IntegrationTests(unittest.TestCase):
             oldmain=re.search(r'<main>.*?</main>',old,re.S)[0]
             oldhero=re.search(r'<section class="hero">.*?</section>',oldmain,re.S)[0]
             self.assertIn(oldmain.split(oldhero,1)[1][:-7],new)
-            for key in ('products','visual','ecosystem','delivery'):
+            for key in ('products','visual','work','ecosystem','delivery'):
                 self.assertIn('id="discover-'+key+'"',new)
             self.assertIn('class="xj-more"',new)
 

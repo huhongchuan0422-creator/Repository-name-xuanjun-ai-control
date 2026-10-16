@@ -1,0 +1,21 @@
+[Unit]
+Description=Publish approved PR122 static showcase snapshots
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=root
+UMask=0022
+WorkingDirectory=/usr/local/lib/xuanjun-showcase
+ExecStart=/usr/bin/python3 -I -B -c "import hashlib,json,pathlib,runpy,sys; r=pathlib.Path('/usr/local/lib/xuanjun-showcase'); p=json.loads(pathlib.Path('/etc/xuanjun-showcase/policy.json').read_text()); b=(r/'MECHANISM_MANIFEST.json').read_bytes(); assert hashlib.sha256(b).hexdigest()==p['mechanism_manifest_sha256']; m=json.loads(b); assert all(hashlib.sha256((r/f['path']).read_bytes()).hexdigest()==f['sha256'] for f in m['files'] if f['path'].startswith('scripts/')); sys.path.insert(0,str(r)); runpy.run_module('scripts.pr122_showcase_poll',run_name='__main__')"
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/var/lib/xuanjun-showcase
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+TimeoutStartSec=240
+MemoryMax=268435456
+TasksMax=16
