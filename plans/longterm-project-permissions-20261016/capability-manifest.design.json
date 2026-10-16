@@ -121,5 +121,18 @@
   "commercial_addendum": "saas-commercial-addendum.md",
   "server_order_field_contract": "server-order-preapproval.schema.json",
   "payment_activation": "NOT_EXECUTED",
-  "commercial_authority": "ALIBABA_ONLY_CNY10000_ALL_IN_PER_PURCHASE_UK_SERVER_ACCOUNT_BINDING_PENDING_MATCHING_TENANT_PREFUNDING_CUSTOMER_RENEWAL_CHOICE_MANDATORY_PAYMENT_CONFIRMATION_RETAINED"
+  "commercial_authority": "PLATFORM_BACKEND_AUTOMATION_ALIBABA_ONLY_CNY10000_ALL_IN_PER_PURCHASE_UK_SERVER_ACCOUNT_BINDING_PENDING_MATCHING_TENANT_PREFUNDING_CUSTOMER_ORDER_AND_RENEWAL_MANDATE_MERCHANT_API_AUTHORITY_PROVIDER_REQUIRED_AUTHENTICATION_INITIAL_ACTIVATION_GATES",
+  "business_mission": "AUTONOMOUS_PROMOTION_ACQUISITION_AI_CONSULTATION_CRM_ORDER_PAYMENT_MODULE_OR_CUSTOM_DEVELOPMENT_INDEPENDENT_REVIEW_PROCUREMENT_DEPLOYMENT_CUSTOMER_ACCEPTANCE_OPERATIONS_RENEWAL_AFTERSALES_RETENTION",
+  "normal_authorized_business_owner_manual_steps_target": 0,
+  "customer_order_and_acceptance": "AUTHENTIC_CUSTOMER_WORKFLOW_NOT_FORGED_OR_REPLACED",
+  "business_automation_integration_state": "UNKNOWN_NOT_VERIFIED",
+  "reuse_business_foundations": [
+    "existing business documentation sections 8.2.3-8.2.8",
+    "XuanJunAI_ServiceBot",
+    "existing model router",
+    "existing CRM and tenant RBAC",
+    "original canonical task and execution ledger"
+  ],
+  "p2_p3_scope": "EXECUTION_FOUNDATION_NOT_FULL_BUSINESS_AUTOMATION_ACCEPTANCE",
+  "exception_escalation": "BOUNDED_LEGAL_PROVIDER_VERIFICATION_DISPUTES_OUT_OF_SCOPE_RISK_OR_UNKNOWN_EXTERNAL_EFFECTS"
 }

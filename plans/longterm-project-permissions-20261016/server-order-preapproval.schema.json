@@ -19,7 +19,7 @@
       "expires_at": null,
       "revocation_version": null,
       "one_time_or_bounded_standing_scope": "UNKNOWN",
-      "explicit_auto_order_and_payment": "OWNER_REQUESTED_BOUNDED_AUTOMATION_BUSINESS_SCOPE_MANDATORY_PAYMENT_CONFIRMATION_RETAINED_NOT_ACTIVATED",
+      "explicit_auto_order_and_payment": "OWNER_REQUESTED_PLATFORM_BACKEND_AUTOMATION_WITH_VALID_CUSTOMER_ORDER_PREFUNDS_AND_MERCHANT_API_MANDATE_PROVIDER_REQUIRED_AUTHENTICATION_RETAINED_NOT_ACTIVATED",
       "customer_authority_for_customer_accounts_data_and_deployment": "UNKNOWN"
     },
     "supplier_and_item": {
@@ -55,9 +55,12 @@
       "payer_authority": "OWNER_ACCOUNT_DIRECTION_RECEIVED_ACTUAL_ACCOUNT_BINDING_PENDING",
       "one_time_subscription_or_metered": "UNKNOWN",
       "secure_handoff_for_new_highly_sensitive_values": true,
-      "wallet_action_time_approval_if_used": true,
       "store_raw_credentials_or_card_data": false,
-      "mandatory_payment_confirmation": "RETAINED_THROUGH_SUPPORTED_PAYMENT_APPROVAL_FLOW_NOT_BYPASSED_BY_STANDING_PREAPPROVAL"
+      "customer_order_confirmation": "REQUIRED_UNLESS_EXACT_ORDER_COVERED_BY_AUTHENTICATED_BOUNDED_CUSTOMER_STANDING_MANDATE_PRECHARGE_ALONE_NOT_ENOUGH",
+      "merchant_api_debit_mandate": "REQUIRED_VALID_VERIFIED_ACCOUNT_AND_SCOPE",
+      "provider_required_extra_confirmation_or_sca": "SATISFY_WHEN_ACTUALLY_REQUIRED_OTHERWISE_NORMAL_PLATFORM_ORDER_AUTOMATIC",
+      "initial_payment_channel_activation": "EXACT_REVIEW_AND_REQUIRED_ACTION_TIME_CONFIRMATION_BEFORE_PERSISTENT_CREDENTIAL_SETUP_OR_ACTIVATION",
+      "provider_account_payability": "VERIFY_SEPARATELY_FROM_CUSTOMER_PREPAID_BALANCE"
     },
     "delivery": {
       "approved_cloud_account_organization_subscription": "UNKNOWN",
@@ -78,8 +81,8 @@
       "advance_notice_and_cancellation_deadline": "UNKNOWN",
       "insufficient_customer_balance": "DISABLE_EXACT_INSTANCE_AUTO_RENEW_VERIFY_READBACK_NOTIFY_CUSTOMER_NO_EARLY_SHUTDOWN_DELETE_OR_SUBSIDY",
       "reenable_after_top_up": "ONLY_IF_VALID_CUSTOMER_ORDER_CHOICE_AND_CURRENT_POLICY_CONDITIONS_STILL_AUTHORIZE",
-      "provider_debit_window": "VERIFY_PROVIDER_CHARGE_RETRY_DISABLE_CUTOFF_AND_RESERVE_MATCHING_TENANT_FUNDS_BEFORE_EVERY_POSSIBLE_DEBIT; REQUIRED_PAYMENT_CONFIRMATION_RETAINED",
-      "unbounded_or_unverifiable_provider_autopay": "DO_NOT_ENABLE_USE_BOUNDED_AUTHORIZED_CONFIRMED_RENEWAL_ORDER"
+      "provider_debit_window": "VERIFY_PROVIDER_CHARGE_RETRY_DISABLE_CUTOFF_AND_RESERVE_MATCHING_TENANT_FUNDS_BEFORE_EVERY_POSSIBLE_DEBIT_VALID_CUSTOMER_RENEWAL_AND_MERCHANT_API_MANDATES_REQUIRED_PROVIDER_EXTRA_AUTHENTICATION_IF_APPLICABLE",
+      "unbounded_or_unverifiable_provider_autopay": "DO_NOT_ENABLE_USE_BOUNDED_PLATFORM_ORCHESTRATED_RENEWAL_WITH_CUSTOMER_MANDATE_AND_MERCHANT_API_AUTHORITY"
     },
     "terms_and_restrictions": {
       "terms_url_and_version_or_hash": "UNKNOWN",
@@ -116,13 +119,17 @@
     "persistent_credential_or_security_change_without_required_action_time_confirmation",
     "highly_sensitive_values_in_chat_git_logs_or_untrusted_code",
     "financial_product_or_trading_action_misclassified_as_server_purchase",
-    "required_payment_confirmation_missing",
+    "customer_order_confirmation_or_merchant_api_mandate_missing_or_provider_required_authentication_unsatisfied",
     "unverified_customer_funds_or_untrusted_payment_status"
   ],
   "owner_policy_evidence": [
     "2026-10-16: server payments included in automation",
     "2026-10-16: per transaction within CNY10000",
-    "2026-10-16: Alibaba Cloud only; pay with existing account owning UK server; renew per customer request; customers prefund; insufficient balance changes server auto-renew"
+    "2026-10-16: Alibaba Cloud only; pay with existing account owning UK server; renew per customer request; customers prefund; insufficient balance changes server auto-renew",
+    "2026-10-16 clarification: built platform autonomously handles AI reception, customer precharge, confirmed order, server procurement/payment, deployment and launch; not chat assistant per-order payment"
   ],
-  "payment_activation": "NOT_EXECUTED"
+  "payment_activation": "NOT_EXECUTED",
+  "automation_target": "XUANJUN_SAAS_PLATFORM_BACKEND_NOT_CHAT_ASSISTANT_FUTURE_PAYMENTS",
+  "owner_per_normal_platform_order_approval": "NOT_REQUIRED_WITH_VALID_CUSTOMER_ORDER_PREFUNDS_MERCHANT_API_MANDATE_AND_POLICY",
+  "provider_capability_reference": "https://www.alibabacloud.com/help/en/ecs/developer-reference/api-ecs-2014-05-26-runinstances"
 }

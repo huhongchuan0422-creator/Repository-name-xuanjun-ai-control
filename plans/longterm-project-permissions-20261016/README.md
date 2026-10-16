@@ -4,7 +4,9 @@
 
 状态：DESIGN_COMPLETE / IMPLEMENTATION_NOT_STARTED / ACTIVATION_NOT_AUTHORIZED_BY_THIS_PACKAGE。
 
-范围补充：[全平台、自营、客户定制及阿里云服务器采购付款与部署](saas-commercial-addendum.md)，配套字段合同见[订单预授权设计](server-order-preapproval.schema.json)。沿用本包18类能力与同一PR17；已纳入仅阿里云、英国服务器所属付款账户待核实、单次全价≤CNY10,000、客户预存资金和客户选择续费。实际付款保留必要确认，PAYMENT_ACTIVATION=NOT_EXECUTED。
+最终目标：推广获客、AI咨询、客户订单付款、模块/定制交付、部署上线到持续运营维护全链自动化；正常已授权业务的Owner操作步骤为零，客户真实授权/验收与合法例外保留。完整业务验收见补充材料第6节；P2/P3仅为执行基础，不代表全业务完成。
+
+范围补充：[全平台、自营、客户定制及阿里云服务器采购付款与部署](saas-commercial-addendum.md)，配套字段合同见[订单预授权设计](server-order-preapproval.schema.json)。沿用本包18类能力与同一PR17；已纳入仅阿里云、英国服务器所属付款账户待核实、单次全价≤CNY10,000、客户预存资金和客户选择续费。目标是平台后端按有效客户订单、同租户资金和商户/API授权自动采购付款及部署；普通订单不需Owner逐单再批，供应商实际认证要求与首次通道激活门禁保留。PAYMENT_ACTIVATION=NOT_EXECUTED。
 
 这份设计把长期需要的能力一次列齐，供统一实现、独审和一次性精确激活。它不是可执行安装包；没有主机操作、GitHub发布、账号/凭据创建、权限变更或Work/Codex调用。现有四机盘点已经完成，不重复要求Owner执行。
 
