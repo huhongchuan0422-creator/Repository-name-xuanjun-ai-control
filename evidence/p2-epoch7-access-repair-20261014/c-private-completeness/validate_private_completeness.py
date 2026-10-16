@@ -1,5 +1,5 @@
 """One fixed saved-seed validation. Only authenticated pure compilers; no C admission."""
-import ast, base64, builtins, contextlib, datetime, errno, gzip, hashlib, hmac, importlib, io, json, os, re, signal, socket, stat, sys, time, types, zlib
+import ast, base64, builtins, contextlib, datetime, errno, gzip, hashlib, hmac, importlib, io, json, math, os, re, select, signal, socket, stat, sys, time, types, zlib
 HOST='iZd7oeikknn1z21sq6ji6zZ'
 CAND='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520'
 FILES=() # All fixed private inputs are declared once in INPUTS below.
@@ -320,12 +320,143 @@ def encode_evidence(value):
         'uncompressed_sha256':sha(raw),'compressed_bytes':len(compressed),'compressed_sha256':sha(compressed),
         'payload_base64':base64.b64encode(compressed).decode('ascii')})
 
-def emit(raw):
+# Preview is local terminal output, distinct from the bounded transferable stdout.
+MAX_PREVIEW=262144
+MAX_CONFIRMATION=256
+CONFIRM_SECONDS=180
+RECIPIENTS='OWNER_PRIVATE_CHAT_AND_ORIGINAL_TASK5_PRIVATE_REVIEW'
+EXPIRY_UTC='2026-10-16T18:00:00Z'
+EXPIRY_EPOCH=1792173600.0
+SAFE_CODES.update(('PREVIEW_BOUND','PREVIEW_BINDING','CLOCK_INVALID','EVIDENCE_EXPIRED',
+    'TTY_REQUIRED','TTY_PENDING_INPUT','TTY_IO','TTY_EOF','CONFIRMATION_REJECTED',
+    'CONFIRMATION_BOUND','CONFIRMATION_TIMEOUT'))
+
+def transmission_clock():
+    # The earlier monotonic sample makes the UTC mapping conservative.
+    need(EXPECTED_CANDIDATE['admission_expires_at_utc']==EXPIRY_UTC,'PREVIEW_BINDING')
+    mono=time.monotonic();wall=time.time();after=time.monotonic()
+    need(all(type(x) in (int,float) and math.isfinite(x) for x in (mono,wall,after)) and
+         0<=mono<=after,'CLOCK_INVALID')
+    need(wall<EXPIRY_EPOCH,'EVIDENCE_EXPIRED')
+    return (mono,mono+(EXPIRY_EPOCH-wall))
+
+def transmission_remaining(clock):
+    now=time.monotonic();wall=time.time()
+    need(all(type(x) in (int,float) and math.isfinite(x) for x in (now,wall)) and
+         now>=clock[0],'CLOCK_INVALID')
+    need(now<clock[1] and wall<EXPIRY_EPOCH,'EVIDENCE_EXPIRED')
+    return clock[1]-now
+
+def preview_bytes(report,payload):
+    # Report is the already validated privacy projection, never raw Seed/preimages.
+    proof=canonical(report)+b'\n'
+    envelope=json.loads(payload.decode('ascii'))
+    need(envelope['uncompressed_bytes']==len(proof) and
+         envelope['uncompressed_sha256']==sha(proof),'PREVIEW_BINDING')
+    body=json.dumps(report,sort_keys=True,indent=2,ensure_ascii=True,allow_nan=False).encode('ascii')
+    header=(
+        'LOCAL PRIVATE PREVIEW - DO NOT COPY THIS PREVIEW TO A CHAT.\n'
+        'Review ALL actual values below before allowing private transmission.\n'
+        'Recipients: this Owner private conversation and the original Task5 private reviewer ONLY.\n'
+        'No GitHub, public post, other person or other service.\n'
+        'Four saved-file reports and compilation describe the completed collection window.\n'
+        'No reread occurs during this preview; later host freshness is NOT established.\n'
+        'Opaque HMACs do NOT independently authenticate hidden values; no hidden key is exported.\n'
+        'Terminal software may retain this local plaintext preview.\n'
+        'Candidate and transmission cutoff: '+EXPIRY_UTC+'.\n'
+        'Payload SHA256: '+sha(payload)+'\n'
+        'Uncompressed evidence SHA256: '+sha(proof)+'\n'
+        'BEGIN LOCAL PREVIEW\n').encode('ascii')
+    result=header+body+b'\nEND LOCAL PREVIEW - DO NOT COPY\n'
+    need(len(result)<=MAX_PREVIEW,'PREVIEW_BOUND')
+    need(all(b in (10,13) or 32<=b<=126 for b in result),'PREVIEW_BINDING')
+    return result
+
+def confirmation_line(payload):
+    proof_sha=json.loads(payload.decode('ascii'))['uncompressed_sha256']
+    need(type(proof_sha)is str and re.fullmatch('[0-9a-f]{64}',proof_sha),'PREVIEW_BINDING')
+    value=('SEND '+sha(payload)+' EVIDENCE '+proof_sha+' TO '+RECIPIENTS).encode('ascii')+b'\n'
+    need(len(value)<=MAX_CONFIRMATION,'CONFIRMATION_BOUND')
+    return value
+
+def _tty_remaining(clock,end):
+    absolute=transmission_remaining(clock)
+    remaining=min(absolute,end-time.monotonic())
+    need(remaining>0,'CONFIRMATION_TIMEOUT')
+    return remaining
+
+def _tty_write(fd,data,clock,end):
+    offset=0
+    while offset<len(data):
+        timeout=_tty_remaining(clock,end)
+        try:
+            unused,ready,exceptional=select.select([], [fd], [fd], timeout)
+            need(not exceptional,'TTY_IO');need(bool(ready),'CONFIRMATION_TIMEOUT')
+            count=os.write(fd,data[offset:offset+1024])
+        except OSError as error:
+            if error.errno in (errno.EAGAIN,errno.EWOULDBLOCK,errno.EINTR):continue
+            raise Hold('TTY_IO') from None
+        need(type(count)is int and count==min(1024,len(data)-offset),'TTY_IO')
+        offset+=count
+    _tty_remaining(clock,end)
+
+def _tty_no_pending(fd):
+    try:pending,unused,exceptional=select.select([fd],[],[fd],0)
+    except OSError:raise Hold('TTY_IO') from None
+    need(not exceptional,'TTY_IO');need(not pending,'TTY_PENDING_INPUT')
+
+def _tty_read_confirmation(fd,expected,clock,end):
+    chunks=[];total=0
+    while total<=MAX_CONFIRMATION:
+        timeout=_tty_remaining(clock,end)
+        try:
+            ready,unused,exceptional=select.select([fd], [], [fd], timeout)
+            need(not exceptional,'TTY_IO');need(bool(ready),'CONFIRMATION_TIMEOUT')
+            raw=os.read(fd,MAX_CONFIRMATION+1-total)
+        except OSError as error:
+            if error.errno in (errno.EAGAIN,errno.EWOULDBLOCK,errno.EINTR):continue
+            raise Hold('TTY_IO') from None
+        need(bool(raw),'TTY_EOF');chunks.append(raw);total+=len(raw)
+        need(total<=MAX_CONFIRMATION,'CONFIRMATION_BOUND')
+        if b'\n' in raw:
+            actual=b''.join(chunks)
+            need(actual==expected,'CONFIRMATION_REJECTED')
+            _tty_no_pending(fd)
+            _tty_remaining(clock,end);return
+    raise Hold('CONFIRMATION_BOUND')
+
+def confirm_private_transfer(report,payload,clock):
+    duration=min(float(CONFIRM_SECONDS),transmission_remaining(clock))
+    end=time.monotonic()+duration
+    fd=None;primary=None
+    with budget(duration):
+        preview=preview_bytes(report,payload);expected=confirmation_line(payload)
+        try:
+            try:fd=os.open('/dev/tty',os.O_RDWR|os.O_NOFOLLOW|os.O_CLOEXEC|os.O_NONBLOCK)
+            except OSError:raise Hold('TTY_REQUIRED') from None
+            need(stat.S_ISCHR(os.fstat(fd).st_mode) and os.isatty(fd),'TTY_REQUIRED')
+            _tty_no_pending(fd)
+            _tty_write(fd,preview,clock,end)
+            _tty_no_pending(fd)
+            prompt=(b'Only if every displayed value is suitable for the named private recipients,\n'
+                    b'type this exact one-time line. Any other input cancels; no default approval.\n'+
+                    expected+b'Confirmation: ')
+            _tty_write(fd,prompt,clock,end)
+            _tty_read_confirmation(fd,expected,clock,end)
+            _tty_write(fd,b'Confirmation received. Copy ONLY a following P2_PRIVATE_COMPLETENESS_GZIP_BASE64_V1 JSON line. HOLD is not a proof.\n',clock,end)
+        except BaseException as error:primary=error;raise
+        finally:
+            if fd is not None:close_all([fd],primary)
+    transmission_remaining(clock)
+
+def emit(raw,clock=None):
     try:
-        with budget(10):
+        with budget(10 if clock is None else min(10.0,transmission_remaining(clock))):
             offset=0
             while offset<len(raw):
+                if clock is not None:transmission_remaining(clock)
                 written=os.write(1,raw[offset:offset+16384]);need(type(written) is int and 0<written<=min(16384,len(raw)-offset),'SHORT_WRITE');offset+=written
+            if clock is not None:transmission_remaining(clock)
     except BaseException:raise OutputFailed() from None
 
 def safe_error(error):
@@ -338,8 +469,9 @@ def safe_error(error):
     return 'OTHER'
 
 def main(validator_sha256=None,validator_bytes=None):
-    stage='HOST_AND_VERIFIER_IDENTITY';emission_started=False
+    stage='HOST_AND_VERIFIER_IDENTITY';emission_started=False;preview_started=False
     try:
+        clock=transmission_clock()
         with budget(120):
             require_binding()
             need(os.geteuid()==os.getegid()==0 and socket.gethostname()==HOST,'HOST')
@@ -355,12 +487,14 @@ def main(validator_sha256=None,validator_bytes=None):
                 'additional_metadata_reads':['/var/lib/xuanjun-development/generations/1/state.sqlite','/run/xuanjun-development/ledger.sock'],
                 'call_path':list(RUNTIME_CALLS),'cleanup':'COMPLETED'}
             stage='ENCODE_PROOF';raw=encode_evidence(report)
-        stage='EMIT_PROOF';emission_started=True;emit(raw);return 0
+        stage='LOCAL_PREVIEW_AND_CONFIRMATION';preview_started=True
+        confirm_private_transfer(report,raw,clock)
+        stage='EMIT_PROOF';emission_started=True;emit(raw,clock);return 0
     except BaseException as error:
         if emission_started:return 2
         try:emit(encode({'schema':1,'state':'HOLD','stage':stage,'code':safe_error(error),
             'cleanup_unknown':bool(getattr(error,'cleanup_unknown',False)) or safe_error(error) in ('CLEANUP','IMPORT_CLEANUP'),
-            'private_contents_emitted':False,'install_admission':'NOT_GRANTED','production_resume':'NOT_EXECUTED'}))
+            'transferable_payload_emitted':False,'local_preview_may_have_been_displayed':preview_started,'install_admission':'NOT_GRANTED','production_resume':'NOT_EXECUTED'}))
         except BaseException:pass
         return 2
 

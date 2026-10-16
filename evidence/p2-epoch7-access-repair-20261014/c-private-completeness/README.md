@@ -15,6 +15,57 @@ installation, recovery attempt, claim publication or service operation. The
 command template remains unauthorized. A source review and a separate Owner
 permission for one precisely scoped run are required before execution.
 
+## Local actual-value preview and recipient confirmation increment
+
+This candidate adds a local human-readable preview before any transferable proof.
+It is based on the exact reviewed 7d035b760905261f8d047fca4adff34237d9ae3a
+package. This increment still requires source review and a separate one-run Owner
+permission. OWNER_AUTHORIZED remains False. It does not confer Schema 3 or C permission.
+
+The original single 120-second collection/validation/encoding window finishes,
+including all final private-file and kit rereads and descriptor cleanup. The same
+complete report is then rendered as escaped ASCII JSON to the controlling terminal,
+including every actual value that will be transferred: fixed file identities and
+metadata, visible additions, all directory/ACL values, timer, 24-target structure,
+coverage counts, source bindings, and opaque commitments with their limitations.
+No hidden object is recovered for the preview. HMAC keys remain private in memory;
+the preview does not independently verify hidden values.
+
+The full preview is at most 262144 bytes, with a separate fixed short prompt and
+status line. It is local plaintext output in addition to the 98304-byte transferable
+stdout limit. Terminal software, screen sharing or session recording may retain it.
+The tool does not create a local file or change terminal settings. Control characters
+inside values are JSON-escaped; no ANSI terminal commands, pager or subprocess is used.
+There is no truncation: an oversized preview is HOLD without a proof payload.
+
+Only fixed /dev/tty is opened, with no-follow/nonblocking/close-on-exec flags and
+character-device/isatty checks. stdin, pipes and environment values cannot approve.
+Pending complete input lines are rejected before preview, after the entire preview
+and after the one exact confirmation line; no input is flushed or retried. The exact
+line binds both this encoded payload SHA256 and this uncompressed evidence SHA256,
+which include the current in-memory random commitments, plus the fixed recipients:
+this Owner private conversation and the original Task5 private reviewer only.
+A bare yes, wrong line, EOF, preview/confirmation timeout, TTY write failure or TTY cleanup failure emits no
+transferable payload. TTY checks do not establish a human's identity or recipient access.
+
+The complete preview generation, display and confirmation has one nonrenewable
+180-second maximum. The program samples the 2026-10-16T18:00:00Z cutoff at startup
+into a conservative monotonic ceiling, which is never recomputed to extend time.
+Current UTC is also checked. Preview and the final at-most-10-second stdout write
+are both clipped to that absolute ceiling. Confirmation after the candidate cutoff
+cannot authorize output; this tool never extends the candidate expiry. These are
+bounded best-effort deadlines, not a hard-real-time guarantee.
+
+Successful confirmation closes the TTY before writing the exact already encoded
+payload once to stdout. The terminal clearly labels the preview DO NOT COPY and
+instructs the Owner to copy only the following single compressed JSON payload line.
+The stdout envelope and offline verifier protocol are unchanged. The tool cannot
+prevent a human copying extra terminal history. Rejection, timeout and any other
+failure do not reread files, recompile, mint new commitments or produce a second
+payload. Once the confirmed stdout write has begun, an output failure or interruption can leave a partial JSON line; emission is not atomic and is never retried. The report describes the earlier collection window: no current host
+freshness is claimed after human waiting. On failure, the fixed result distinguishes
+no transferable payload from a local preview that may already have been displayed.
+
 ## Three evidence layers
 
 1. The Owner runs the reviewed protected reader on the fixed UK host. It reports
@@ -166,10 +217,10 @@ import ctypes. Interpreter/native-library initialization remains an inherited
 trust boundary; this is not an OS-level zero-side-effect guarantee or sandbox.
 At application level the tool creates no files, acquires no installation locks,
 runs no subprocesses, calls no service or network API, and changes no permissions.
-File access times may change. The only intended output write is stdout.
+File access times may change. Intended output writes are the complete local preview and confirmation prompts on /dev/tty, and the approved proof on stdout. /dev/tty is also read solely for this bounded confirmation.
 
 One-shot alarm plus monotonic terminal checks bound validation/encoding to 120
-seconds and stdout emission to a separate 10 seconds. These are not hard-real-time
+seconds, followed by the separate preview/confirmation window described above, and stdout emission to at most 10 seconds clipped by the same absolute cutoff. These are not hard-real-time
 guarantees. Cleanup preserves a primary failure and reports unknown cleanup
 rather than fabricating success. Output failure never retries the compiler or
 starts a second host operation.

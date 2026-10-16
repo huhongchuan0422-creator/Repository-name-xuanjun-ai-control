@@ -16,6 +16,7 @@ import gzip
 import hashlib
 import importlib
 import importlib.util
+import inspect
 import io
 import json
 import os
@@ -496,13 +497,15 @@ class OutputTests(unittest.TestCase):
     def run_main(self, report=None, error=None, output_error=None, identity=None, real_budget=False):
         identity = identity if identity is not None else ('a' * 64, 40000)
         events = []
-        def output(raw):
+        def output(raw, clock=None):
             events.append(('emit', m.signal.getitimer(signal.ITIMER_REAL)))
             if output_error:
                 raise output_error
         with contextlib.ExitStack() as stack:
             budgets = None if real_budget else stack.enter_context(patch.object(m, 'budget', side_effect=no_budget))
             stack.enter_context(patch.object(m, 'require_binding'))
+            stack.enter_context(patch.object(m, 'transmission_clock', return_value=(100.0, 1100.0)))
+            stack.enter_context(patch.object(m, 'confirm_private_transfer'))
             stack.enter_context(patch.object(m, 'SCHEMA_SHA', 'b' * 64))
             stack.enter_context(patch.object(m.os, 'geteuid', return_value=0))
             stack.enter_context(patch.object(m.os, 'getegid', return_value=0))
@@ -555,7 +558,7 @@ class OutputTests(unittest.TestCase):
                 report = json.loads(raw)
                 self.assertEqual(report['code'], expected)
                 self.assertEqual(report['state'], 'HOLD')
-                self.assertFalse(report['private_contents_emitted'])
+                self.assertFalse(report['transferable_payload_emitted'])
                 self.assertEqual(report['install_admission'], 'NOT_GRANTED')
                 budgets.assert_called_once_with(120)
 
@@ -961,7 +964,9 @@ class PureCompilationTests(unittest.TestCase):
         producer_raw = PATH.read_bytes()
         with fixture.synthetic_pins(), patch.object(m, 'protected_validate', return_value=report), \
              patch.object(m.os, 'geteuid', return_value=0), patch.object(m.os, 'getegid', return_value=0), \
-             patch.object(m.socket, 'gethostname', return_value=m.HOST), patch.object(m, 'emit') as emit:
+             patch.object(m.socket, 'gethostname', return_value=m.HOST), \
+             patch.object(m, 'transmission_clock', return_value=(100.0, 1100.0)), \
+             patch.object(m, 'confirm_private_transfer'), patch.object(m, 'emit') as emit:
             status = m.main(m.sha(producer_raw), len(producer_raw))
             emit.assert_called_once()
             self.assertEqual(status, 0, emit.call_args[0][0][:512])
@@ -1113,6 +1118,574 @@ class PureCompilationTests(unittest.TestCase):
         for attribute, value in changes:
             with self.subTest(attribute=attribute), patch.object(fixture.kit, attribute, value), self.assertRaisesRegex(m.Hold, '^FIXED_COMPILER$'):
                 m.check_kit(fixture.kit)
+
+
+
+# Synthetic local preview/consent tests. No original native fixtures are used.
+def synthetic_report():
+    return {
+        'schema': 1,
+        'kind': 'SYNTHETIC_PREVIEW_ONLY',
+        'nested': {'alpha': [None, False, True, 0, -1, 1.25, 'all values shown'],
+                   'controls': '\x00\x07\x1b[2J\r\n\t\x7f\x85\u202e\u2603'},
+        'first_unique': 'SYNTHETIC_FIRST_PREVIEW_VALUE',
+        'last_unique': 'SYNTHETIC_LAST_PREVIEW_VALUE',
+    }
+
+
+class TerminalHarness:
+    """Never opens a real descriptor or reads stdin, even on a failed test."""
+    def __init__(self, report=None):
+        self.report = synthetic_report() if report is None else report
+        self.payload = m.encode_evidence(self.report)
+        self.clock = (100.0, 1100.0)
+        self.now = 100.0
+        self.wall = m.EXPIRY_EPOCH - 1000.0
+        self.fd = 61
+        self.pending = False
+        self.is_tty = True
+        self.mode = stat.S_IFCHR | 0o600
+        self.open_error = None
+        self.close_error = None
+        self.reads = [m.confirmation_line(self.payload)]
+        self.write_results = []
+        self.select_results = []
+        self.events = []
+        self.writes = []
+        self.closed = False
+
+    def open(self, path, flags):
+        self.events.append(('open', path, flags))
+        if self.open_error is not None:
+            raise self.open_error
+        return self.fd
+
+    def close(self, fd):
+        self.events.append(('close', fd))
+        self.closed = True
+        if self.close_error is not None:
+            raise self.close_error
+
+    def select(self, readers, writers, errors, timeout):
+        self.events.append(('select', tuple(readers), tuple(writers), timeout))
+        if self.select_results:
+            result = self.select_results.pop(0)
+            if isinstance(result, BaseException):
+                raise result
+            return result
+        if timeout == 0:
+            return ([self.fd] if self.pending else [], [], [])
+        return (list(readers), list(writers), [])
+
+    def read(self, fd, count):
+        self.events.append(('read', fd, count))
+        if fd != self.fd:
+            raise AssertionError('stdin or unexpected fd read')
+        result = self.reads.pop(0) if self.reads else b''
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    def write(self, fd, data):
+        self.events.append(('write', fd, len(data)))
+        self.writes.append((fd, data))
+        if fd == 1:
+            if not self.closed:
+                raise AssertionError('stdout payload emitted before tty close')
+            return len(data)
+        if fd != self.fd:
+            raise AssertionError('unexpected output fd')
+        if self.write_results:
+            result = self.write_results.pop(0)
+            if isinstance(result, BaseException):
+                raise result
+            return result
+        return len(data)
+
+    def __enter__(self):
+        self.stack = contextlib.ExitStack()
+        for target, name, options in (
+                (m, 'budget', {'side_effect': no_budget}),
+                (m.time, 'monotonic', {'side_effect': lambda: self.now}),
+                (m.time, 'time', {'side_effect': lambda: self.wall}),
+                (m.os, 'open', {'side_effect': self.open}),
+                (m.os, 'close', {'side_effect': self.close}),
+                (m.os, 'fstat', {'side_effect': lambda fd: types.SimpleNamespace(st_mode=self.mode)}),
+                (m.os, 'isatty', {'side_effect': lambda fd: self.is_tty}),
+                (m.os, 'read', {'side_effect': self.read}),
+                (m.os, 'write', {'side_effect': self.write}),
+                (m.select, 'select', {'side_effect': self.select}),
+                (m.os, 'urandom', {'side_effect': AssertionError('ephemeral key reminted')})):
+            mocked = self.stack.enter_context(patch.object(target, name, **options))
+            setattr(self, name + '_mock', mocked)
+        return self
+
+    def __exit__(self, *args):
+        return self.stack.__exit__(*args)
+
+    def confirm(self):
+        return m.confirm_private_transfer(self.report, self.payload, self.clock)
+
+    def assert_no_payload(self, case):
+        case.assertFalse(any(fd == 1 for fd, unused in self.writes))
+        case.assertFalse(any(event[0] == 'read' and event[1] == 0 for event in self.events))
+
+
+class PreviewContentTests(unittest.TestCase):
+    def test_full_actual_object_and_encoded_evidence_are_identical(self):
+        report = synthetic_report()
+        payload = m.encode_evidence(report)
+        preview = m.preview_bytes(report, payload)
+        shown = preview.split(b'BEGIN LOCAL PREVIEW\n', 1)[1].split(b'\nEND LOCAL PREVIEW', 1)[0]
+        envelope = json.loads(payload.decode('ascii'))
+        evidence = gzip.decompress(base64.b64decode(envelope['payload_base64']))
+        self.assertEqual(json.loads(shown.decode('ascii')), report)
+        self.assertEqual(json.loads(evidence.decode('ascii')), report)
+        self.assertIn(m.sha(payload).encode('ascii'), preview)
+        self.assertIn(envelope['uncompressed_sha256'].encode('ascii'), preview)
+        self.assertIn(b'SYNTHETIC_FIRST_PREVIEW_VALUE', preview)
+        self.assertIn(b'SYNTHETIC_LAST_PREVIEW_VALUE', preview)
+        self.assertEqual(report, synthetic_report())
+
+    def test_actual_control_characters_and_unicode_are_escaped(self):
+        report = synthetic_report()
+        preview = m.preview_bytes(report, m.encode_evidence(report))
+        self.assertTrue(all(byte == 10 or 32 <= byte <= 126 for byte in preview))
+        for escaped in (b'\\u0000', b'\\u0007', b'\\u001b', b'\\r', b'\\n', b'\\t',
+                        b'\\u007f', b'\\u0085', b'\\u202e', b'\\u2603'):
+            self.assertIn(escaped, preview)
+
+    def test_preview_names_fixed_recipients_and_freshness_limitations(self):
+        report = synthetic_report()
+        preview = m.preview_bytes(report, m.encode_evidence(report))
+        for expected in (b'Owner private conversation', b'original Task5 private reviewer ONLY',
+                         b'No GitHub', b'No reread', b'freshness is NOT established',
+                         b'no hidden key is exported', m.EXPIRY_UTC.encode('ascii')):
+            self.assertIn(expected, preview)
+
+    def test_mismatched_report_size_or_digest_refuses(self):
+        report = synthetic_report()
+        payload = m.encode_evidence(report)
+        for field, value in (('uncompressed_bytes', 1), ('uncompressed_sha256', '0' * 64)):
+            envelope = json.loads(payload.decode('ascii'))
+            envelope[field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(m.Hold, '^PREVIEW_BINDING$'):
+                m.preview_bytes(report, m.encode(envelope))
+        changed = copy.deepcopy(report)
+        changed['last_unique'] += '_CHANGED'
+        with self.assertRaisesRegex(m.Hold, '^PREVIEW_BINDING$'):
+            m.preview_bytes(changed, payload)
+
+    def test_preview_bound_is_complete_and_never_truncates(self):
+        report = synthetic_report()
+        payload = m.encode_evidence(report)
+        length = len(m.preview_bytes(report, payload))
+        self.assertEqual(m.MAX_PREVIEW, 262144)
+        with patch.object(m, 'MAX_PREVIEW', length):
+            self.assertEqual(len(m.preview_bytes(report, payload)), length)
+        with patch.object(m, 'MAX_PREVIEW', length - 1):
+            with self.assertRaisesRegex(m.Hold, '^PREVIEW_BOUND$'):
+                m.preview_bytes(report, payload)
+        huge = {'complete_value': 'x' * 262144}
+        with TerminalHarness(huge) as terminal:
+            with self.assertRaisesRegex(m.Hold, '^PREVIEW_BOUND$'):
+                terminal.confirm()
+            terminal.open_mock.assert_not_called()
+            terminal.assert_no_payload(self)
+
+    def test_confirmation_includes_both_exact_digests_and_fixed_recipient_token(self):
+        payload = m.encode_evidence(synthetic_report())
+        envelope = json.loads(payload.decode('ascii'))
+        expected = m.confirmation_line(payload)
+        self.assertTrue(expected.startswith(b'SEND '))
+        self.assertTrue(expected.endswith(b'\n'))
+        self.assertEqual(expected.count(b'\n'), 1)
+        self.assertIn(m.sha(payload).encode('ascii'), expected)
+        self.assertIn(envelope['uncompressed_sha256'].encode('ascii'), expected)
+        self.assertIn(b'OWNER_PRIVATE_CHAT_AND_ORIGINAL_TASK5_PRIVATE_REVIEW', expected)
+        self.assertLessEqual(len(expected), m.MAX_CONFIRMATION)
+
+
+class TransmissionClockTests(unittest.TestCase):
+    def test_startup_mapping_is_once_conservative_and_immutable(self):
+        with patch.object(m.time, 'monotonic', side_effect=[100.0, 101.0]) as mono, \
+             patch.object(m.time, 'time', return_value=m.EXPIRY_EPOCH - 240.0) as wall:
+            clock = m.transmission_clock()
+        self.assertEqual(clock, (100.0, 340.0))
+        self.assertIs(type(clock), tuple)
+        self.assertEqual(mono.call_count, 2)
+        wall.assert_called_once_with()
+        with patch.object(m.time, 'monotonic', return_value=339.0), \
+             patch.object(m.time, 'time', return_value=m.EXPIRY_EPOCH - 10000.0):
+            self.assertEqual(m.transmission_remaining(clock), 1.0)
+        with patch.object(m.time, 'monotonic', return_value=340.0), \
+             patch.object(m.time, 'time', return_value=m.EXPIRY_EPOCH - 10000.0):
+            with self.assertRaisesRegex(m.Hold, '^EVIDENCE_EXPIRED$'):
+                m.transmission_remaining(clock)
+
+    def test_invalid_startup_clocks_refuse(self):
+        cases = [(float('nan'), 101.0, m.EXPIRY_EPOCH - 1),
+                 (100.0, float('inf'), m.EXPIRY_EPOCH - 1),
+                 (-1.0, 1.0, m.EXPIRY_EPOCH - 1),
+                 (101.0, 100.0, m.EXPIRY_EPOCH - 1),
+                 (True, 101.0, m.EXPIRY_EPOCH - 1),
+                 (100.0, 101.0, float('nan')),
+                 (100.0, 101.0, m.EXPIRY_EPOCH)]
+        for first, after, wall in cases:
+            with self.subTest(first=first, after=after, wall=wall), \
+                 patch.object(m.time, 'monotonic', side_effect=[first, after]), \
+                 patch.object(m.time, 'time', return_value=wall):
+                expected = 'EVIDENCE_EXPIRED' if wall == m.EXPIRY_EPOCH else 'CLOCK_INVALID'
+                with self.assertRaisesRegex(m.Hold, '^' + expected + '$'):
+                    m.transmission_clock()
+
+    def test_wall_deadline_and_monotonic_regression_each_refuse(self):
+        for now, wall, code in ((150.0, m.EXPIRY_EPOCH, 'EVIDENCE_EXPIRED'),
+                                (99.0, m.EXPIRY_EPOCH - 500.0, 'CLOCK_INVALID'),
+                                (float('inf'), m.EXPIRY_EPOCH - 500.0, 'CLOCK_INVALID')):
+            with self.subTest(now=now, wall=wall), patch.object(m.time, 'monotonic', return_value=now), \
+                 patch.object(m.time, 'time', return_value=wall):
+                with self.assertRaisesRegex(m.Hold, '^' + code + '$'):
+                    m.transmission_remaining((100.0, 1100.0))
+
+
+class TerminalConsentTests(unittest.TestCase):
+    def test_success_is_tty_only_bounded_and_closes_before_return(self):
+        with TerminalHarness() as terminal:
+            terminal.confirm()
+            terminal.open_mock.assert_called_once_with('/dev/tty',
+                m.os.O_RDWR | m.os.O_NOFOLLOW | m.os.O_CLOEXEC | m.os.O_NONBLOCK)
+            terminal.close_mock.assert_called_once_with(terminal.fd)
+            terminal.budget_mock.assert_called_once_with(180.0)
+            terminal.urandom_mock.assert_not_called()
+            self.assertTrue(terminal.closed)
+            terminal.assert_no_payload(self)
+        transcript = b''.join(raw for fd, raw in terminal.writes)
+        self.assertLessEqual(len(transcript), m.MAX_PREVIEW + 1024)
+        self.assertTrue(all(len(raw) <= 1024 for fd, raw in terminal.writes))
+        self.assertIn(m.preview_bytes(terminal.report, terminal.payload), transcript)
+        self.assertIn(m.confirmation_line(terminal.payload), transcript)
+        for event in terminal.events:
+            if event[0] == 'select':
+                self.assertGreaterEqual(event[3], 0)
+                self.assertLessEqual(event[3], 180)
+
+    def test_missing_or_nonterminal_refuses_without_stdin_fallback(self):
+        for missing, tty, mode in ((True, True, stat.S_IFCHR),
+                                   (False, False, stat.S_IFCHR),
+                                   (False, True, stat.S_IFREG)):
+            with self.subTest(missing=missing, tty=tty, mode=mode), TerminalHarness() as terminal:
+                terminal.open_error = OSError(errno.ENXIO, 'no tty') if missing else None
+                terminal.is_tty = tty
+                terminal.mode = mode
+                with self.assertRaisesRegex(m.Hold, '^TTY_REQUIRED$'):
+                    terminal.confirm()
+                terminal.read_mock.assert_not_called()
+                terminal.write_mock.assert_not_called()
+                self.assertEqual(terminal.close_mock.call_count, 0 if missing else 1)
+                terminal.assert_no_payload(self)
+
+    def test_preexisting_input_even_exact_confirmation_refuses(self):
+        with TerminalHarness() as terminal:
+            terminal.pending = True
+            with self.assertRaisesRegex(m.Hold, '^TTY_PENDING_INPUT$'):
+                terminal.confirm()
+            terminal.read_mock.assert_not_called()
+            terminal.write_mock.assert_not_called()
+            terminal.close_mock.assert_called_once_with(terminal.fd)
+
+    def test_input_queued_during_preview_or_after_exact_line_refuses(self):
+        for pending_check in (2, 3):
+            with self.subTest(pending_check=pending_check), TerminalHarness() as terminal:
+                original_select = terminal.select
+                checks = [0]
+                def selected(readers, writers, errors, timeout):
+                    if timeout == 0:
+                        checks[0] += 1
+                        terminal.pending = checks[0] == pending_check
+                    return original_select(readers, writers, errors, timeout)
+                terminal.select_mock.side_effect = selected
+                with self.assertRaisesRegex(m.Hold, '^TTY_PENDING_INPUT$'):
+                    terminal.confirm()
+                terminal.close_mock.assert_called_once_with(terminal.fd)
+                if pending_check == 2:
+                    terminal.read_mock.assert_not_called()
+                    self.assertNotIn(b'Confirmation: ', b''.join(raw for fd, raw in terminal.writes))
+                terminal.assert_no_payload(self)
+
+    def test_empty_yes_mismatch_multiline_overlong_and_eof_refuse(self):
+        for answer, code in ((b'\n', 'CONFIRMATION_REJECTED'),
+                             (b'yes\n', 'CONFIRMATION_REJECTED'),
+                             (b'SEND ' + b'0' * 64 + b'\n', 'CONFIRMATION_REJECTED'),
+                             (b'yes\nyes\n', 'CONFIRMATION_REJECTED'),
+                             (b'x' * 257, 'CONFIRMATION_BOUND'),
+                             (b'', 'TTY_EOF')):
+            with self.subTest(answer=answer[:16]), TerminalHarness() as terminal:
+                terminal.reads = [answer]
+                with self.assertRaisesRegex(m.Hold, '^' + code + '$'):
+                    terminal.confirm()
+                terminal.close_mock.assert_called_once_with(terminal.fd)
+                terminal.assert_no_payload(self)
+
+    def test_exact_confirmation_with_any_prefix_suffix_or_second_line_refuses(self):
+        with TerminalHarness() as seed:
+            exact = m.confirmation_line(seed.payload)
+        for answer in (b' ' + exact, exact[:-1] + b' \n', exact + b'\n',
+                       exact + b'yes\n', exact.replace(b'OWNER_PRIVATE', b'PUBLIC'),
+                       exact.replace(m.sha(seed.payload).encode('ascii'), b'0' * 64),
+                       exact.replace(json.loads(seed.payload.decode('ascii'))['uncompressed_sha256'].encode('ascii'), b'0' * 64)):
+            with self.subTest(answer=answer[:20]), TerminalHarness() as terminal:
+                terminal.reads = [answer]
+                with self.assertRaisesRegex(m.Hold, '^CONFIRMATION_REJECTED$'):
+                    terminal.confirm()
+                terminal.assert_no_payload(self)
+
+    def test_split_exact_confirmation_is_one_decision_and_not_another_prompt(self):
+        with TerminalHarness() as terminal:
+            exact = m.confirmation_line(terminal.payload)
+            terminal.reads = [exact[:10], exact[10:]]
+            terminal.confirm()
+            self.assertEqual(terminal.read_mock.call_count, 2)
+            transcript = b''.join(raw for fd, raw in terminal.writes)
+            self.assertEqual(transcript.count(b'Confirmation: '), 1)
+
+    def test_terminal_short_or_invalid_write_cancels_without_retry(self):
+        for count in (0, -1, True, 1, 999999):
+            with self.subTest(count=count), TerminalHarness() as terminal:
+                terminal.write_results = [count]
+                with self.assertRaisesRegex(m.Hold, '^TTY_IO$'):
+                    terminal.confirm()
+                terminal.write_mock.assert_called_once()
+                terminal.read_mock.assert_not_called()
+                terminal.close_mock.assert_called_once_with(terminal.fd)
+                terminal.assert_no_payload(self)
+
+    def test_eagain_eintr_retry_only_the_same_io_and_never_recollect(self):
+        with TerminalHarness() as terminal:
+            terminal.write_results = [OSError(errno.EAGAIN, 'again'), OSError(errno.EINTR, 'interrupted')]
+            terminal.reads = [OSError(errno.EINTR, 'interrupted'), OSError(errno.EAGAIN, 'again'),
+                              m.confirmation_line(terminal.payload)]
+            terminal.confirm()
+            self.assertEqual(terminal.writes[0], terminal.writes[1])
+            self.assertEqual(terminal.writes[1], terminal.writes[2])
+            terminal.urandom_mock.assert_not_called()
+            terminal.budget_mock.assert_called_once_with(180.0)
+
+    def test_repeated_eagain_does_not_reset_confirmation_timeout(self):
+        with TerminalHarness() as terminal:
+            attempts = [0]
+            def not_ready(fd, raw):
+                attempts[0] += 1
+                terminal.now += 60.0
+                raise OSError(errno.EAGAIN, 'again')
+            terminal.write_mock.side_effect = not_ready
+            with self.assertRaisesRegex(m.Hold, '^CONFIRMATION_TIMEOUT$'):
+                terminal.confirm()
+            self.assertEqual(attempts[0], 3)
+            terminal.budget_mock.assert_called_once_with(180.0)
+            terminal.read_mock.assert_not_called()
+            terminal.close_mock.assert_called_once_with(terminal.fd)
+
+    def test_unrecoverable_io_and_select_timeout_close_and_refuse(self):
+        for operation in ('read', 'write', 'select_timeout', 'select_exception'):
+            with self.subTest(operation=operation), TerminalHarness() as terminal:
+                if operation == 'read':
+                    terminal.reads = [OSError(errno.EIO, 'secret path')]
+                elif operation == 'write':
+                    terminal.write_results = [OSError(errno.EIO, 'secret path')]
+                elif operation == 'select_timeout':
+                    terminal.select_results = [([], [], []), ([], [], [])]
+                else:
+                    terminal.select_results = [([], [], []), ([], [], [terminal.fd])]
+                code = 'CONFIRMATION_TIMEOUT' if operation == 'select_timeout' else 'TTY_IO'
+                with self.assertRaisesRegex(m.Hold, '^' + code + '$'):
+                    terminal.confirm()
+                terminal.close_mock.assert_called_once_with(terminal.fd)
+                terminal.assert_no_payload(self)
+
+    def test_180_seconds_is_shared_across_preview_prompt_and_read(self):
+        with TerminalHarness() as terminal:
+            original_write = terminal.write
+            def elapsed_write(fd, raw):
+                result = original_write(fd, raw)
+                terminal.now += 90.0
+                return result
+            terminal.write_mock.side_effect = elapsed_write
+            with self.assertRaisesRegex(m.Hold, '^CONFIRMATION_TIMEOUT$'):
+                terminal.confirm()
+            terminal.read_mock.assert_not_called()
+            terminal.budget_mock.assert_called_once_with(180.0)
+            terminal.close_mock.assert_called_once_with(terminal.fd)
+            terminal.assert_no_payload(self)
+
+    def test_preview_construction_consumes_the_same_180_second_budget(self):
+        with TerminalHarness() as terminal:
+            original_preview = m.preview_bytes
+            def slow_preview(report, payload):
+                result = original_preview(report, payload)
+                terminal.now += 180.0
+                return result
+            with patch.object(m, 'preview_bytes', side_effect=slow_preview):
+                with self.assertRaisesRegex(m.Hold, '^CONFIRMATION_TIMEOUT$'):
+                    terminal.confirm()
+            terminal.budget_mock.assert_called_once_with(180.0)
+            terminal.write_mock.assert_not_called()
+            terminal.read_mock.assert_not_called()
+            terminal.assert_no_payload(self)
+
+    def test_confirmation_budget_is_capped_at_immutable_absolute_expiry(self):
+        with TerminalHarness() as terminal:
+            terminal.clock = (100.0, 102.5)
+            terminal.wall = m.EXPIRY_EPOCH - 2.5
+            terminal.confirm()
+            terminal.budget_mock.assert_called_once_with(2.5)
+        with TerminalHarness() as terminal:
+            terminal.clock = (100.0, 102.5)
+            terminal.wall = m.EXPIRY_EPOCH - 10000.0
+            original_write = terminal.write
+            def rollback_does_not_extend(fd, raw):
+                result = original_write(fd, raw)
+                terminal.now = 102.5
+                return result
+            terminal.write_mock.side_effect = rollback_does_not_extend
+            with self.assertRaisesRegex(m.Hold, '^EVIDENCE_EXPIRED$'):
+                terminal.confirm()
+            terminal.budget_mock.assert_called_once_with(2.5)
+            terminal.assert_no_payload(self)
+
+    def test_close_failure_refuses_and_preserves_primary_error(self):
+        with TerminalHarness() as terminal:
+            terminal.close_error = OSError(errno.EIO, 'private detail')
+            with self.assertRaisesRegex(m.Hold, '^CLEANUP$'):
+                terminal.confirm()
+            terminal.assert_no_payload(self)
+        with TerminalHarness() as terminal:
+            terminal.reads = [b'yes\n']
+            terminal.close_error = OSError(errno.EIO, 'private detail')
+            with self.assertRaisesRegex(m.Hold, '^CONFIRMATION_REJECTED$') as raised:
+                terminal.confirm()
+            self.assertTrue(raised.exception.cleanup_unknown)
+            self.assertNotIn('private detail', str(raised.exception))
+            terminal.assert_no_payload(self)
+
+
+class MainConsentCompositionTests(unittest.TestCase):
+    @contextlib.contextmanager
+    def main_scope(self, terminal):
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(patch.object(m, 'require_binding'))
+            stack.enter_context(patch.object(m.os, 'geteuid', return_value=0))
+            stack.enter_context(patch.object(m.os, 'getegid', return_value=0))
+            stack.enter_context(patch.object(m.socket, 'gethostname', return_value=m.HOST))
+            collect = stack.enter_context(patch.object(m, 'protected_validate', return_value=terminal.report))
+            original_encode = m.encode_evidence
+            def encoded(report):
+                terminal.payload = original_encode(report)
+                terminal.reads = [m.confirmation_line(terminal.payload)]
+                return terminal.payload
+            encode = stack.enter_context(patch.object(m, 'encode_evidence', side_effect=encoded))
+            confirm = stack.enter_context(patch.object(m, 'confirm_private_transfer', wraps=m.confirm_private_transfer))
+            emit = stack.enter_context(patch.object(m, 'emit', wraps=m.emit))
+            clock = stack.enter_context(patch.object(m, 'transmission_clock', return_value=terminal.clock))
+            yield collect, encode, confirm, emit, clock
+
+    def test_main_collects_and_encodes_once_and_emits_same_object_after_all_tty_closes(self):
+        with TerminalHarness() as terminal, self.main_scope(terminal) as mocks:
+            collect, encode, confirm, emit, clock = mocks
+            self.assertEqual(m.main('a' * 64, 40000), 0)
+            collect.assert_called_once_with()
+            encode.assert_called_once_with(terminal.report)
+            confirm.assert_called_once_with(terminal.report, terminal.payload, terminal.clock)
+            emit.assert_called_once_with(terminal.payload, terminal.clock)
+            clock.assert_called_once_with()
+            self.assertIs(confirm.call_args[0][1], emit.call_args[0][0])
+            self.assertEqual(terminal.budget_mock.call_args_list, [call(120), call(180.0), call(10.0)])
+            self.assertEqual([event[0] for event in terminal.events].count('close'), 1)
+            close_index = next(i for i, event in enumerate(terminal.events) if event[0] == 'close')
+            stdout_indexes = [i for i, event in enumerate(terminal.events) if event[:2] == ('write', 1)]
+            self.assertTrue(stdout_indexes)
+            self.assertTrue(all(i > close_index for i in stdout_indexes))
+            terminal.urandom_mock.assert_not_called()
+            self.assertEqual(b''.join(raw for fd, raw in terminal.writes if fd == 1), terminal.payload)
+
+    def test_any_gate_failure_outputs_only_safe_hold_and_never_recollects(self):
+        errors = [m.Hold(code) for code in ('TTY_REQUIRED', 'TTY_PENDING_INPUT', 'CONFIRMATION_REJECTED',
+                  'TTY_IO', 'TTY_EOF', 'CONFIRMATION_TIMEOUT', 'PREVIEW_BOUND', 'CLEANUP', 'EVIDENCE_EXPIRED')]
+        errors += [m.Deadline(), KeyboardInterrupt(), RuntimeError('PRIVATE_SENTINEL')]
+        for error in errors:
+            with self.subTest(error=str(error)), TerminalHarness() as terminal, self.main_scope(terminal) as mocks:
+                collect, encode, confirm, emit, clock = mocks
+                confirm.side_effect = error
+                emit.side_effect = None
+                emit._mock_wraps = None
+                self.assertEqual(m.main('a' * 64, 40000), 2)
+                collect.assert_called_once_with()
+                encode.assert_called_once()
+                confirm.assert_called_once()
+                emit.assert_called_once()
+                hold = json.loads(emit.call_args[0][0].decode('ascii'))
+                self.assertEqual(hold['state'], 'HOLD')
+                self.assertFalse(hold['transferable_payload_emitted'])
+                self.assertTrue(hold['local_preview_may_have_been_displayed'])
+                self.assertNotIn('payload_base64', hold)
+                self.assertNotIn(b'PRIVATE_SENTINEL', emit.call_args[0][0])
+
+    def test_payload_output_failure_is_never_retried_or_replaced_with_hold(self):
+        with TerminalHarness() as terminal, self.main_scope(terminal) as mocks:
+            collect, encode, confirm, emit, clock = mocks
+            emit.side_effect = m.OutputFailed()
+            self.assertEqual(m.main('a' * 64, 40000), 2)
+            collect.assert_called_once_with()
+            encode.assert_called_once()
+            confirm.assert_called_once()
+            emit.assert_called_once_with(terminal.payload, terminal.clock)
+
+    def test_payload_output_uses_separate_ten_seconds_capped_by_absolute_expiry(self):
+        with TerminalHarness() as terminal:
+            terminal.closed = True
+            terminal.clock = (100.0, 102.5)
+            m.emit(b'payload', terminal.clock)
+            terminal.budget_mock.assert_called_once_with(2.5)
+        with TerminalHarness() as terminal:
+            terminal.closed = True
+            terminal.now = 1100.0
+            with self.assertRaises(m.OutputFailed):
+                m.emit(b'payload', terminal.clock)
+            terminal.write_mock.assert_not_called()
+        with TerminalHarness() as terminal:
+            terminal.closed = True
+            terminal.wall = m.EXPIRY_EPOCH
+            with self.assertRaises(m.OutputFailed):
+                m.emit(b'payload', terminal.clock)
+            terminal.write_mock.assert_not_called()
+
+    def test_source_main_has_exactly_one_collection_encode_gate_and_success_emit(self):
+        tree = ast.parse(inspect.getsource(m.main))
+        names = [node.func.id for node in ast.walk(tree)
+                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+        for name in ('transmission_clock', 'protected_validate', 'encode_evidence', 'confirm_private_transfer'):
+            self.assertEqual(names.count(name), 1, name)
+        self.assertNotIn('compile_proof', names)
+        self.assertNotIn('hidden_input_commitments', names)
+        source = inspect.getsource(m.main)
+        self.assertLess(source.index('protected_validate()'), source.index('encode_evidence(report)'))
+        self.assertLess(source.index('encode_evidence(report)'), source.index('confirm_private_transfer(report,raw,clock)'))
+        self.assertLess(source.index('confirm_private_transfer(report,raw,clock)'), source.index('emit(raw,clock)'))
+
+
+class FrozenProducerBoundaryTests(unittest.TestCase):
+    def test_collection_compilation_encoding_and_ephemeral_commitments_unchanged(self):
+        expected = {
+            'protected_validate': '4a8f343dfd54821c8b90a66d8c69f013eeabfff704ce1b500a127ec6969ffce4',
+            'compile_proof': '1ae2bf15b45fc74e678f08dff807cbe75d99724d8da42ff629278710803b88b7',
+            'encode_evidence': '8b073b443f429a554230f7ac7a37701b9d6bffc7d14b413927c56d5ef6640d78',
+            'hidden_input_commitments': 'f397cb57408d6c95637ce1b8ba327a8e59faec8e6f7a4b0ef5356c3d2e5435fd',
+        }
+        for name, digest in expected.items():
+            with self.subTest(function=name):
+                source = inspect.getsource(getattr(m, name)).encode('utf-8')
+                self.assertEqual(hashlib.sha256(source).hexdigest(), digest)
+
 
 
 if __name__ == '__main__':
