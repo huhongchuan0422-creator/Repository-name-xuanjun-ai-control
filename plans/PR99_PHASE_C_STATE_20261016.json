@@ -98,7 +98,7 @@
       "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
       "independent_byte_review_comment_id": 6213125007
     },
-    "next_development": "Historical ciphertext and private baseline key are on Korea; complete decrypted archive hash matches approved historical baseline. Do not copy or verify keys again. New selected recovery helper prepared and locally tested, not executed on Korea. Extract only dormant source/dependency files and exact approved trading DB backup into a new root-private directory; no whole-system restoration, API activation, production imports or service actions.",
+    "next_development": "1373 dormant source/dependency files plus exact historical trading backup have been recovered and verified. Dependency installation, runtime entrypoint validation, current data timing and live channel relocation remain unaccepted. No service activation or Tokyo shutdown. Existing Phase-B environment is inspected for reuse rather than rebuilt. API operations remain deferred.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "SELECTIVE_HISTORICAL_SOURCE_DEPENDENCIES_AND_EXACT_DB_RECOVERY_TO_NEW_PRIVATE_DIRECTORY; NO_SERVICE_START",
+  "owner_action_now": "INSPECT_RESTORED_DEPENDENCIES_AND_REUSE_EXISTING_ENVIRONMENT_BEFORE_ANY_PACKAGE_INSTALL",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -330,11 +330,34 @@
     "offsite_target": "/root/xuanjun-offline-baseline-20261016/recovery-baseline.tar.gz.enc",
     "target_key_custody": "PASS_SUPPORTED_BY_OWNER_ROOT_TERMINAL_RECEIPT",
     "target_decrypt_stream_sha256": "PASS",
-    "key_custody_receipt": "evidence/pr99-offline-copy/KEY_CUSTODY_OWNER_RECEIPT_20261016.json"
+    "key_custody_receipt": "evidence/pr99-offline-copy/KEY_CUSTODY_OWNER_RECEIPT_20261016.json",
+    "selected_recovery": {
+      "api_configuration_deployed": false,
+      "current_final_snapshot": false,
+      "database_sha256": "d0bb23c5cede3a66567373b92221b058aa18e07aa510daf0bc02f8f4770bd0a5",
+      "dependency_manifests": 1,
+      "environment_status": "DEPENDENCY_MANIFESTS_ONLY_NOT_INSTALLED",
+      "epoch": 1792151228,
+      "files": 1374,
+      "host": "iZmj7a5kwr75qc1tul4kf9Z",
+      "private_manifest_sha256": "33826e49503926497f03dc529056ab798de1afedd74493bf3ef164f7aa35c132",
+      "production_deployed": false,
+      "production_module_imported": false,
+      "schema_version": 1,
+      "selected_bytes": 66552325,
+      "service_actions": 0,
+      "source_files": 1373,
+      "status": "SELECTED_HISTORICAL_RECOVERY_PASS",
+      "tokyo_retirement": "HOLD",
+      "workdir": "/root/xuanjun-offline-selected-20261016",
+      "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT_NOT_INDEPENDENT_LOGIN",
+      "script_commit": "8d50a4d1c5695413c7d3e68f16b93d44e4e3a671",
+      "script_sha256": "18db4e6b41c548325044b8b30baf7afc39efd4f6b16bc5f73059ccf063f424ec"
+    }
   },
   "offline_relocation_blocker": {
-    "kind": "SELECTIVE_RECOVERY_NOT_YET_EXECUTED_ENVIRONMENT_AND_CURRENT_DATA_PENDING",
-    "detail": "Owner-root key custody and decryption stream passed. Target restore directory not created by this window. Dependency installation/runtime validation and final current-state migration have not been completed.",
+    "kind": "HISTORICAL_FILES_RECOVERED_RUNTIME_AND_CURRENT_STATE_NOT_COMPLETE",
+    "detail": "1373 dormant source/dependency files plus exact historical trading backup have been recovered and verified. Dependency installation, runtime entrypoint validation, current data timing and live channel relocation remain unaccepted. No service activation or Tokyo shutdown.",
     "api_is_blocker": false,
     "last_owner_attempt": {
       "schema_version": 1,
