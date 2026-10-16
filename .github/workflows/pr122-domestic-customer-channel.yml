@@ -27,8 +27,16 @@ jobs:
           path: /tmp/pr122-channel-frozen
       - name: Fixed channel boundaries and real isolated visudo
         run: |
+          set -euo pipefail
           mkdir -p /tmp/pr122-channel-evidence
+          if bash -o pipefail -c 'false | tee /dev/null'; then
+            echo 'PIPEFAIL_GUARD_BROKEN'
+            exit 1
+          fi
+          echo 'PIPEFAIL_FAILURE_PROPAGATION=PASS'
           sudo -n /usr/bin/env PR122_FROZEN_TAR=/tmp/pr122-channel-frozen/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz "$(command -v python)" -B -m unittest tests.test_pr122_domestic_customer_channel -v 2>&1 | tee /tmp/pr122-channel-evidence/CHANNEL_TESTS.log
+          grep -Eq '^Ran 17 tests in ' /tmp/pr122-channel-evidence/CHANNEL_TESTS.log
+          grep -qx 'OK' /tmp/pr122-channel-evidence/CHANNEL_TESTS.log
       - name: Exact channel artifact and immutable customer package
         run: |
           python - <<'PY'
