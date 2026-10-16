@@ -21,7 +21,7 @@ import time
 
 KOREA='iZmj7a5kwr75qc1tul4kf9Z'
 TOKYO='iZ6wee8q9z4t03hvqumwfhZ'
-LOCAL=Path('/root/pr99-s07-private-materials-v1')
+LOCAL=Path('/root/pr99-s07-private-materials-v2')
 HOST_KEY='47.245.53.152 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMfngQ3DTnuC8aP0TZ0fBhcq+8p7Yw0c7VEYKWSpFrtpqWf+shoFTiyrAWj1OlrnoeOlsZq1SS1zOavODbJOnzs=\n'
 ROOT=Path('/opt/trading-system')
 DIRS=('runtime/secure-secrets-portal',
@@ -43,7 +43,7 @@ def need(v,code):
 def sha(b):return hashlib.sha256(b).hexdigest()
 
 
-def read_file(p,limit=64*1024*1024):
+def read_plain_file(p,limit=64*1024*1024):
     for parent in p.parents:
         need(not parent.is_symlink(),'SYMLINK_PARENT')
     fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
@@ -54,6 +54,50 @@ def read_file(p,limit=64*1024*1024):
     c=p.lstat()
     need(len(b)==a.st_size and all(getattr(a,k)==getattr(z,k)==getattr(c,k) for k in ('st_dev','st_ino','st_size','st_mtime_ns','st_ctime_ns')),'SOURCE_CHANGED_DURING_READ')
     return b
+
+
+
+# One observed alias is permitted ONLY for the exact referral JSON, never a tree.
+REFERRAL_ALIAS = Path('/home/admin/.openclaw/workspace')
+REFERRAL_TARGET = Path('/mnt/btrfs-workspace/ws-398ab6')
+REFERRAL_SUFFIX = Path('xuanjun-agent-coordination/CUSTOMER_REFERRAL_CONFIG.json')
+
+def referral_binding():
+    for p in REFERRAL_ALIAS.parents:
+        z=p.lstat()
+        need(stat.S_ISDIR(z.st_mode) and not stat.S_ISLNK(z.st_mode),'REFERRAL_ALIAS_PARENT_CHANGED')
+    a=REFERRAL_ALIAS.lstat()
+    need(stat.S_ISLNK(a.st_mode) and
+         (a.st_dev,a.st_ino,a.st_uid,a.st_gid,stat.S_IMODE(a.st_mode)) ==
+         (64771,654102,1000,1000,0o777),'REFERRAL_LINK_IDENTITY_CHANGED')
+    need(os.readlink(REFERRAL_ALIAS)==str(REFERRAL_TARGET),'REFERRAL_LINK_TEXT_CHANGED')
+    need(REFERRAL_ALIAS.resolve(strict=True)==REFERRAL_TARGET,'REFERRAL_LINK_TARGET_CHANGED')
+    for p in REFERRAL_TARGET.parents:
+        z=p.lstat()
+        need(stat.S_ISDIR(z.st_mode) and not stat.S_ISLNK(z.st_mode),'REFERRAL_TARGET_PARENT_CHANGED')
+    b=REFERRAL_TARGET.lstat()
+    need(stat.S_ISDIR(b.st_mode) and
+         (b.st_dev,b.st_ino,b.st_uid,b.st_gid,stat.S_IMODE(b.st_mode)) ==
+         (37,259,1000,1000,0o755),'REFERRAL_TARGET_IDENTITY_CHANGED')
+    return tuple(getattr(v,k) for v in (a,b) for k in
+                 ('st_dev','st_ino','st_uid','st_gid','st_mode','st_mtime_ns','st_ctime_ns'))
+
+def read_file(p,limit=64*1024*1024):
+    if p == REFERRAL_ALIAS/REFERRAL_SUFFIX:
+        before=referral_binding()
+        data=read_plain_file(REFERRAL_TARGET/REFERRAL_SUFFIX,limit)
+        need(referral_binding()==before,'REFERRAL_BINDING_CHANGED_DURING_READ')
+        return data
+    return read_plain_file(p,limit)
+
+def require_prior_failure():
+    prior=Path('/root/pr99-s07-private-materials-v1')
+    need(json.loads(read_plain_file(prior/'failure.json',20000)) ==
+         {'status':'HOLD_PRESERVE_NO_RETRY'},'PRIOR_FAILURE_RECORD_CHANGED')
+    need(not os.path.lexists(prior/'receipt.json'),'PRIOR_STAGE_ALREADY_SUCCEEDED')
+    need(read_plain_file(prior/'materials.tar',1)==b'','PRIOR_PARTIAL_ARCHIVE_NONEMPTY')
+    log=read_plain_file(prior/'ssh-private.log',10000)
+    need(b'RuntimeError: SYMLINK_PARENT' in log,'PRIOR_FAILURE_CAUSE_CHANGED')
 
 
 def unit_gate(expected):
@@ -115,7 +159,7 @@ def remote_pack(header):
     # Never emit a credential value. Key presence is checked privately.
     env=payload.get('project/runtime/secure-secrets-portal/credential-store.env',b'')
     need(any(line.strip().startswith(b'TRADING_CREDENTIAL_MASTER_KEY=') for line in env.splitlines()),'MASTER_KEY_FILE_BINDING_UNKNOWN')
-    stage=Path(tempfile.mkdtemp(prefix='pr99-s07-private-source-',dir='/root'))
+    stage=Path(tempfile.mkdtemp(prefix='pr99-s07-private-source-v2-',dir='/root'))
     db=stage/'trading.db'
     started=time.monotonic()
     source_db=ROOT/DB
@@ -178,7 +222,7 @@ def verify_archive(path):
 
 def main():
     need(os.geteuid()==0 and os.uname().nodename==KOREA,'KOREA_ROOT_REQUIRED')
-    os.umask(0o077);need(not os.path.lexists(LOCAL),'LOCAL_STAGE_EXISTS_NO_RETRY')
+    os.umask(0o077);require_prior_failure();need(not os.path.lexists(LOCAL),'LOCAL_STAGE_EXISTS_NO_RETRY')
     # Reuse the pinned authenticated helper chain; no application code is imported.
     p=Path('/root/pr99-s07-runtime-inventory.8no57zD5/inspect.py')
     raw=read_file(p,100000)
