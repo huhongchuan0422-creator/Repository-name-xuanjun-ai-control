@@ -75,3 +75,63 @@ jobs:
           /usr/bin/sudo -n /usr/local/sbin/xuanjun-pr99-phase-c inspect
           echo PR99_CHANNEL_RECEIPT_END
           echo CHANNEL_INSTALLED_BYTE_CHECK=PASS FIXED_INSPECT=PASS PHASE_C_INSTALL=NOT_CALLED SERVICE_ACTIONS=0
+
+  phase-c-binding-metadata:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_PHASE_C_BINDING_METADATA_ONCE_20261016' &&
+      github.run_attempt == 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: korea
+            label: xuanjun-korea-binance
+          - side: tokyo
+            label: xuanjun-tokyo-readonly
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.label }}"]
+    timeout-minutes: 2
+    steps:
+      - name: New worker allocation and DNS / source file identity only; no checkout
+        env:
+          XJ_SIDE: ${{ matrix.side }}
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import grp,ipaddress,json,os,pwd,socket,stat,time
+          from pathlib import Path
+          side=os.environ["XJ_SIDE"]
+          hosts={"korea":"iZmj7a5kwr75qc1tul4kf9Z","tokyo":"iZ6wee8q9z4t03hvqumwfhZ"}
+          assert os.geteuid()==1001 and os.uname().nodename==hosts[side]
+          report={"schema_version":1,"host":hosts[side],"side":side,"observed_epoch":int(time.time()),"delivery_commit":os.environ["GITHUB_SHA"],"uid":os.geteuid(),"scope":"NEW_BINDING_METADATA_ONLY","database_opened":False,"credentials_read":False,"http_requests":0,"sudo_calls":0,"service_actions":0,"production_changes":0}
+          def metadata(name):
+              try:
+                  s=Path(name).lstat()
+                  return {"status":"OBSERVED","uid":s.st_uid,"gid":s.st_gid,"mode":oct(stat.S_IMODE(s.st_mode)),"device":s.st_dev,"inode":s.st_ino,"size":s.st_size,"mtime_ns":s.st_mtime_ns,"regular":stat.S_ISREG(s.st_mode),"symlink":stat.S_ISLNK(s.st_mode)}
+              except FileNotFoundError:return {"status":"ABSENT"}
+              except PermissionError:return {"status":"UNKNOWN_PERMISSION_DENIED"}
+          report["new_candidate_paths"]={p:metadata(p) for p in ("/opt/xuanjun-binance-phase-c","/etc/xuanjun-binance-phase-c","/var/lib/xuanjun-binance-phase-c")}
+          if side=="korea":
+              users=pwd.getpwall();groups=grp.getgrall()
+              candidates=list(range(1986,1996))
+              named_users=[u for u in users if u.pw_name=="xuanjun_binance_shadow"]
+              named_groups=[g for g in groups if g.gr_name=="xuanjun_binance_shadow"]
+              report["worker_name"]={"user_present":bool(named_users),"group_present":bool(named_groups),"uid":named_users[0].pw_uid if len(named_users)==1 else None,"gid":named_groups[0].gr_gid if len(named_groups)==1 else None}
+              report["unallocated_uid_gid_candidates"]=[u for u in candidates if not any(v.pw_uid==u for v in users) and not any(v.gr_gid==u for v in groups)]
+              report["broker_identity"]=[{"uid":u.pw_uid,"gid":u.pw_gid,"nologin":u.pw_shell in ("/sbin/nologin","/usr/sbin/nologin")} for u in users if u.pw_name=="xuanjun_binance"]
+              try:
+                  ips=sorted(set(row[4][0] for row in socket.getaddrinfo("fapi.binance.com",443,type=socket.SOCK_STREAM)))
+                  report["binance_dns"]={"status":"RESOLVED_NO_HTTP","host":"fapi.binance.com","public_addresses":[v for v in ips if ipaddress.ip_address(v).is_global],"observed_epoch":int(time.time()),"api_permission_proven":False,"egress_policy_loaded":False}
+              except OSError as e:report["binance_dns"]={"status":"UNKNOWN_DNS_ERROR","error_type":type(e).__name__}
+          else:
+              root="/opt/trading-system/database/data/trading.db"
+              report["source_database_metadata"]={p:metadata(p) for p in (root,root+"-wal",root+"-shm")}
+              report["actual_schema"]="NOT_READ"
+              report["actual_orders_and_protection"]="NOT_READ"
+          report["status"]="BINDING_METADATA_COLLECTED_NOT_INSTALL_OR_LIVE_ACCEPTANCE"
+          print("PR99_C_BINDING_PREFLIGHT_RECEIPT="+json.dumps(report,sort_keys=True))
+          
+          PY

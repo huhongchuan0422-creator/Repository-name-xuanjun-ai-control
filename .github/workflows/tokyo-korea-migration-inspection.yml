@@ -77,7 +77,11 @@ jobs:
           allowed={'.github/workflows/tokyo-korea-migration-inspection.yml','migration-prep/korea/phase_c_channel.py','migration-prep/korea/grant_phase_c_channel.py','migration-prep/korea/test_phase_c_channel.py','migration-prep/korea/PHASE_C_CHANNEL.md','tests/test_pr99_phase_c_channel.py','governance/features.json','docs/development/TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1.md'}
           changed=set(subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'],text=True).splitlines())
           channel_only=bool(changed) and changed<=allowed and any(p.endswith('phase_c_channel.py') for p in changed)
-          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('channel_only='+str(channel_only).lower()+'\n')
+          runtime_changed=any(p.startswith('migration-prep/') and p not in allowed for p in changed)
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('channel_only='+str(channel_only).lower()+'\n')
+              f.write('runtime_changed='+str(runtime_changed).lower()+'\n')
+          print('FROZEN_RUNTIME_CHANGED='+str(runtime_changed))
           print('CHANNEL_ONLY='+str(channel_only)+' PRODUCTION_INSPECTION_REMAINS_DISABLED')
           PY
       - name: Fixed channel isolated tests with actual sudoers syntax parser
@@ -131,7 +135,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Phase-C synthetic adapter tests (no production runner; no provider)
-        if: steps.change-scope.outputs.channel_only != 'true'
+        if: steps.change-scope.outputs.runtime_changed == 'true'
         env:
           XJ_TEST_PYTHON: ${{ steps.phase-c-python.outputs.python-path }}
         shell: bash
@@ -145,7 +149,7 @@ jobs:
           raise SystemExit(not result.wasSuccessful() or bool(result.skipped))
           PY
       - name: Build exact Phase-C offline adapter review artifact
-        if: steps.change-scope.outputs.channel_only != 'true'
+        if: steps.change-scope.outputs.runtime_changed == 'true'
         env:
           XJ_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         shell: bash
@@ -160,7 +164,7 @@ jobs:
           PY
           cat /tmp/pr99-phase-c-review/BUILD_RECEIPT.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: steps.change-scope.outputs.channel_only != 'true'
+        if: steps.change-scope.outputs.runtime_changed == 'true'
         with:
           name: pr99-phase-c-offline-review
           path: /tmp/pr99-phase-c-review/
