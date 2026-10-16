@@ -90,10 +90,20 @@ def restore(backup_file,target,backup_key,keys,active_key):
     finally:c.db.close()
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','import-authority','import-change-authority','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','import-authority','import-change-authority','issue-preview-delivery','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
     if os.geteuid()!=0 and args.action not in ('serve','worker'):raise SystemExit('HOLD: PROTECTED_OPERATOR_REQUIRED')
     if os.uname().nodename!=HOST:raise SystemExit('HOLD: WRONG_HOST')
+    delivery_input=None
+    if args.action=='issue-preview-delivery':
+        path=private_path(args.input)
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+        with os.fdopen(fd,'rb') as stream:
+            import stat
+            st=os.fstat(stream.fileno())
+            if st.st_uid!=0 or not stat.S_ISREG(st.st_mode) or st.st_nlink!=1 or st.st_mode&0o077 or st.st_size>1000000:raise Denied('ROOT_PRIVATE_DELIVERY_INPUT_REQUIRED')
+            delivery_input=json.loads(stream.read(1000001))
     if args.action in ('serve','worker'):
+
         if os.geteuid()==0:raise SystemExit('HOLD: NON_ROOT_RUNTIME_REQUIRED')
         cred=Path(os.environ.get('CREDENTIALS_DIRECTORY','/nonexistent'))/'runtime.json'
         private_path(cred)
@@ -122,6 +132,11 @@ def main():
         elif args.action=='import-change-authority':
             from scripts.pr122_customer_change_authority import import_snapshot
             result=import_snapshot(c,json.loads(private_path(args.input).read_bytes()),base64.b64decode(config['authority_verify_key'],validate=True))
+        elif args.action=='issue-preview-delivery':
+            from scripts.pr122_customer_delivery_source import issue
+            incoming=delivery_input
+            if set(incoming)!={'project','case','serve_id','report'}:raise Denied('DELIVERY_INPUT_FIELDS')
+            result=issue(c,incoming['project'],incoming['case'],incoming['serve_id'],incoming['report'],config['preview_test_trust'],base64.b64decode(config['authority_verify_key'],validate=True))
         elif args.action=='integrity':result=c.check_integrity()
         elif args.action=='backup':result=backup(c,args.output,base64.b64decode(config['backup_key'],validate=True),config['backup_key_ref'])
         else:result=restore(args.input,args.output,base64.b64decode(config['backup_key'],validate=True),c.keys,c.key_id)

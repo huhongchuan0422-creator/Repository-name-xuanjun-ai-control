@@ -49,3 +49,21 @@ import-change-authority是现有受保护operator工具中的新数据导入动�
 未来如启用外部锚定，采用批量根哈希，私有原文、客户身份和密钥不上公开链；所有记录可归属批次验证，不逐页逐条发送区块链交易。锚定与AI模型调用解耦。
 
 当前实际完成：小改评估免历史查询分支、无模型网络调用回归、事件本地哈希凭证、签名交付记录准入、复验接口及页脚提示组件。真实私有预览发布源、自动代码执行器、外部链锚和生产接线仍须完成真实验收；没有将规则登记或组件存在记为上线。
+
+## 2026-10-17：私有预览与交付来源接线候选
+
+新增pr122_customer_preview.py直接从加密、追加的已签来源历史读取实际页面字节，复算SHA，与当前授权项目、当前获审Manifest和当前页面版本核对。GET/HEAD /customer/center/preview/{project}/{page-path-sha}/{page-sha}逐请求鉴权，禁止匿名、跨项目、旧版本、Range及条件缓存。客户中心自动列出该项目实际已接通的页面入口，返回原生页面，不混合角色或套模拟手机外框。页面底部由服务端注入上下文准确的整改与复验组件。
+
+执行页面必须在签名Manifest中额外声明execution_scope=TRUSTED_CUSTOMER_FRONTEND。这是与客户中心app.js同信任级别的应用前端代码，须按可访问本源客户API的完整调用链独审；普通CONTENT公开展示批准、客户上传文档、任意HTML或角色字符串不能授予这个执行范围。旧来源默认CONTENT_ONLY，不自动升级为可执行页面。生产签发者负责只从实际独审通过的应用制品生成此范围。当前生产信任尚未登记，不能靠作者给fixture增加字段就作为生产准入。
+
+资源只能指向同项目当前签名Manifest中列出的准确字节，统一重写为版本化鉴权地址。CSP只允许获审页面的准确内联script/style哈希和本源固定资源；外域、未知资源、内联事件属性、内嵌frame/object及未适配CSS URL/JS网络模块依赖拒绝。普通形式的内联事件、样式属性、网络API或复杂构建资源必须先做项目适配，不能静默回退公开Webroot。当前运行接口只允许客户中心API，社区模拟Runtime或其他项目API须准确审核后接入；本轮不声称所有现有社区动态接口已支持。未适配资源即使导致页面主体200，也不得通过后续assets/CSP/JavaScript签名测试，更不得认定完整交付。
+
+新增preview_serves仅由真实HTTP响应写出成功后在服务端追加，记录登录主体、项目、Manifest、源页面SHA、渲染字节SHA、源码commit和来源revision。客户端无写入接口。HEAD不产生取页凭证；它证明认证HTTP字节已服务，不单独证明生产TLS、真实浏览器视觉或客户验收。
+
+新增pr122_customer_delivery_source.py：受保护operator加载独立保管测试签名公钥、准确获审测试harness哈希白名单和完整通过报告，并关联服务端preview_serves原件。报告绑定唯一请求/页面/前后SHA/Manifest/源码/制品/渲染SHA，测试必须覆盖render、assets、JavaScript、CSP、desktop、mobile、项目隔离、feedback及retest，全部PASS。报告签名主体不得等于源码writer，失效/撤销/未知harness/旧版本/缺少真实取页记录均拒绝。实际取页时间必须不早于报告签发。签名测试报告不等于独立安装许可。
+
+校验通过后才使用受保护canonical来源密钥生成新的完整来源快照deliveries；原测试签名、服务端取页原件和关联证明追加加密保存。复制原快照、递增revision，保留原文及其他项目，不覆盖并行项目。存证与来源激活不是同一数据库事务：先保留证据，再以单调revision准入来源；中断最多留下未生效证据，不会因此显示已完成。结果未知不得盲目重试。
+
+新增issue-preview-delivery是Owner受保护operator命令，不是HTTP接口，也没有加入旧固定root通道或sudoers。输入仅允许root私有普通文件，生产测试私钥不由writer生成，受保护配置preview_test_trust尚待登记。测试中的Ed25519私钥只用于隔离fixture。
+
+本候选不安装服务、不修改Nginx或网站current，不将来源接口代码存在当作国内生产交付。现有固定root包、运行依赖准备与准确安装事务仍需后续受审的升级；生产HOLD不变。此前获审且未改变的身份、存储、轻量整改与费用证据逻辑继续继承。

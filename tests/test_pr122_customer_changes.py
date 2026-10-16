@@ -188,8 +188,8 @@ class ChangeTests(unittest.TestCase):
         r=self.request();self.service.assess(self.reviewer,'project-a',r['id'],1,'IN_SCOPE_SMALL',10,[],[],'免费小改')
         request_sha=self.service._request_sha(self.service._events(self.owner,'project-a',r['id']))
         envelope=snapshot(self,revision=2);data=envelope['payload'];entry=data['previews'][0]
-        new_bytes=b'<!doctype html><title>Adjusted private preview</title>';new_sha=digest(new_bytes)
-        entry['manifest']['pages']=[{'path':self.path,'sha256':new_sha}];entry['manifest_sha256']=digest(canonical(entry['manifest']));entry['blobs']={new_sha:base64.b64encode(new_bytes).decode()}
+        new_bytes=b'<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Adjusted private preview</title><body><h1>Customer role preview</h1></body></html>';new_sha=digest(new_bytes)
+        entry['manifest']['execution_scope']='TRUSTED_CUSTOMER_FRONTEND';entry['manifest']['pages']=[{'path':self.path,'sha256':new_sha}];entry['manifest_sha256']=digest(canonical(entry['manifest']));entry['blobs']={new_sha:base64.b64encode(new_bytes).decode()}
         delivery={'project':'project-a','case':r['id'],'request_sha256':request_sha,'page':self.path,'before_sha256':self.sha,'after_sha256':new_sha,'summary':'已将按钮移动到底部','test_report_sha256':'c'*64,'deployment_receipt_sha256':'d'*64,'published_at':self.now}
         data['deliveries']=[delivery]
         envelope['signature']=hmac.new(self.auth,canonical(data),hashlib.sha256).hexdigest()

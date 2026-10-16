@@ -1,0 +1,41 @@
+name: PR122 customer target metadata only
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths: [.github/workflows/pr122-customer-readiness-metadata.yml]
+permissions:
+  contents: read
+concurrency:
+  group: pr122-domestic-readonly
+  cancel-in-progress: false
+jobs:
+  metadata:
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 2
+    steps:
+      - name: Fixed unprivileged OS and runtime metadata no checkout no sudo
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'PY'
+          import importlib.util,json,os,platform,pwd,grp,shutil,signal,subprocess
+          from pathlib import Path
+          signal.alarm(40)
+          assert os.uname().nodename=='iZvt5t8tlrm8oiZ' and os.getuid()==1002
+          data={'production_mutations':0,'root_called':False,'python':platform.python_version(),'machine':platform.machine(),'libc':platform.libc_ver()}
+          allowed={'ID','ID_LIKE','VERSION_ID','PRETTY_NAME'};values={}
+          for line in Path('/etc/os-release').read_text().splitlines():
+              key,sep,value=line.partition('=')
+              if sep and key in allowed:values[key]=value.strip('"')
+          data['os']=values
+          data['tools']={k:shutil.which(k) for k in ('rpm','dnf','yum','apt-get','dpkg-query','clamdscan','clamscan')}
+          data['venv_module']=importlib.util.find_spec('venv') is not None
+          used_uids={p.pw_uid for p in pwd.getpwall()};used_gids={g.gr_gid for g in grp.getgrall()}
+          data['available_candidate_uid_gid']=next((n for n in range(62622,62650) if n not in used_uids and n not in used_gids),None)
+          data['package_versions']={}
+          if data['tools']['rpm']:
+              for name in ('python3','python3-pip','clamav','clamav-server','clamd'):
+                  r=subprocess.run([data['tools']['rpm'],'-q','--qf','%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n',name],capture_output=True,text=True,timeout=5)
+                  data['package_versions'][name]=r.stdout.strip() if r.returncode==0 else 'NOT_INSTALLED_OR_UNKNOWN'
+          print('CUSTOMER_READINESS_METADATA='+json.dumps(data,sort_keys=True))
+          PY

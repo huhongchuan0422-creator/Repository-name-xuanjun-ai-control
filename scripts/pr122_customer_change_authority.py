@@ -33,8 +33,9 @@ def import_snapshot(c,envelope,key):
     for entry in d['previews']:
         if set(entry)!={'project','project_revision','manifest','manifest_sha256','blobs'}:raise Denied('PREVIEW_SOURCE_SCHEMA')
         p=project_record(c,entry['project'],entry['project_revision']);m=entry['manifest'];sha(entry['manifest_sha256'])
-        if type(m) is not dict or set(m)!={'project','contract_ref','source_commit','artifact_sha256','review_ref','pages'} or digest(canonical(m))!=entry['manifest_sha256']:raise Denied('PREVIEW_MANIFEST_HASH')
+        if type(m) is not dict or set(m) not in ({'project','contract_ref','source_commit','artifact_sha256','review_ref','pages'},{'project','contract_ref','source_commit','artifact_sha256','review_ref','pages','execution_scope'}) or digest(canonical(m))!=entry['manifest_sha256']:raise Denied('PREVIEW_MANIFEST_HASH')
         if m['project']!=p['id'] or m['contract_ref']!=p['authority_ref'] or not re.fullmatch('[0-9a-f]{40}',m['source_commit']) or not re.fullmatch(r'https://github.com/[^\s]+#issuecomment-[0-9]+',m['review_ref']):raise Denied('REVIEWED_PREVIEW_BINDING')
+        if 'execution_scope' in m and m['execution_scope']!='TRUSTED_CUSTOMER_FRONTEND':raise Denied('PREVIEW_EXECUTION_SCOPE')
         sha(m['artifact_sha256'])
         if type(m['pages']) is not list or not 1<=len(m['pages'])<=100 or type(entry['blobs']) is not dict:raise Denied('PREVIEW_PAGE_SET')
         for page in m['pages']:
@@ -44,7 +45,7 @@ def import_snapshot(c,envelope,key):
             seen.add(key_id)
             data=base64.b64decode(entry['blobs'].get(page['sha256'],''),validate=True)
             if len(data)>1000000 or digest(data)!=page['sha256']:raise Denied('PREVIEW_PAGE_BYTES')
-            previews.append({'project':p['id'],'project_revision':p['revision'],'owner':p['owner'],'page':page['path'],'page_sha256':page['sha256'],'manifest_sha256':entry['manifest_sha256'],'artifact_sha256':m['artifact_sha256'],'review_ref':m['review_ref']})
+            previews.append({'project':p['id'],'project_revision':p['revision'],'owner':p['owner'],'page':page['path'],'page_sha256':page['sha256'],'manifest_sha256':entry['manifest_sha256'],'artifact_sha256':m['artifact_sha256'],'review_ref':m['review_ref'],'source_commit':m['source_commit'],'execution_scope':m.get('execution_scope','CONTENT_ONLY')})
     docids=set()
     for entry in d['documents']:
         if set(entry)!={'id','project_revision','document_utf8','document_sha256','version_sha256'}:raise Denied('DOCUMENT_SOURCE_SCHEMA')

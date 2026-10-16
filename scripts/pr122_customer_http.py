@@ -44,10 +44,10 @@ class App:
         class Handler(BaseHTTPRequestHandler):
             protocol_version='HTTP/1.1'
             def log_message(self,*args):pass
-            def reply(self,status,value,ctype='application/json; charset=utf-8',cookie=None):
+            def reply(self,status,value,ctype='application/json; charset=utf-8',cookie=None,csp=CSP):
                 raw=value if type(value) is bytes else canonical(value)
                 self.send_response(status)
-                for k,v in [('Content-Type',ctype),('Content-Length',str(len(raw))),('Cache-Control','no-store, private'),('Pragma','no-cache'),('Content-Security-Policy',CSP),('X-Content-Type-Options','nosniff'),('Referrer-Policy','no-referrer'),('X-Frame-Options','DENY'),('Connection','close')]:self.send_header(k,v)
+                for k,v in [('Content-Type',ctype),('Content-Length',str(len(raw))),('Cache-Control','no-store, private'),('Pragma','no-cache'),('Content-Security-Policy',csp),('X-Content-Type-Options','nosniff'),('Referrer-Policy','no-referrer'),('X-Frame-Options','DENY'),('Connection','close')]:self.send_header(k,v)
                 if cookie:self.send_header('Set-Cookie',cookie)
                 if ctype in ('application/pdf','image/png','image/jpeg'):self.send_header('Content-Disposition','attachment; filename="project-material"')
                 self.end_headers()
@@ -65,11 +65,11 @@ class App:
                     if u.query or u.fragment or '%' in u.path or '//' in u.path or '..' in u.path or self.headers.get('Host')!='wenwenwenyiyiyi.work':raise Denied('INVALID_REQUEST_TARGET')
                     path=u.path
                     if self.command not in ('GET','HEAD','POST'):return self.reply(405,{'error':'METHOD_NOT_ALLOWED'})
-                    if self.command in ('GET','HEAD') and path in (PREFIX,PREFIX+'app.css',PREFIX+'app.js',PREFIX+'feedback.js'):
-                        name={'': 'index.html','app.css':'app.css','app.js':'app.js','feedback.js':'feedback.js'}[path[len(PREFIX):]]
-                        raw=(app.assets/name).read_bytes();ctype={'index.html':'text/html; charset=utf-8','app.css':'text/css; charset=utf-8','app.js':'application/javascript; charset=utf-8','feedback.js':'application/javascript; charset=utf-8'}[name]
+                    if self.command in ('GET','HEAD') and path in (PREFIX,PREFIX+'app.css',PREFIX+'app.js',PREFIX+'feedback.js',PREFIX+'feedback.css'):
+                        name={'': 'index.html','app.css':'app.css','app.js':'app.js','feedback.js':'feedback.js','feedback.css':'feedback.css'}[path[len(PREFIX):]]
+                        raw=(app.assets/name).read_bytes();ctype={'index.html':'text/html; charset=utf-8','app.css':'text/css; charset=utf-8','app.js':'application/javascript; charset=utf-8','feedback.js':'application/javascript; charset=utf-8','feedback.css':'text/css; charset=utf-8'}[name]
                         return self.reply(200,raw,ctype)
-                    if not path.startswith(PREFIX+'api/') and path not in (PREFIX+'webhooks/telegram',PREFIX+'webhooks/feishu'):return self.reply(404,{'error':'NOT_FOUND'})
+                    if not path.startswith((PREFIX+'api/',PREFIX+'preview/')) and path not in (PREFIX+'webhooks/telegram',PREFIX+'webhooks/feishu'):return self.reply(404,{'error':'NOT_FOUND'})
                     body={};raw=b''
                     if self.command=='POST':
                         if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length',[]))!=1:raise ValueError('CONTENT_LENGTH_REQUIRED')
@@ -119,7 +119,21 @@ class App:
                         center.logout(self.token())
                         return self.reply(200,{'logged_out':True},cookie=COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0')
                     uid=center.session(self.token(),self.headers.get('X-CSRF-Token','') if self.command=='POST' else None)
+                    if path.startswith(PREFIX+'preview/'):
+                        from scripts.pr122_customer_preview import render,served
+                        if self.command not in ('GET','HEAD'):return self.reply(405,{'error':'READ_ONLY_PREVIEW'})
+                        parts=path[len(PREFIX+'preview/'):].split('/')
+                        if len(parts)!=3:return self.reply(404,{'error':'PREVIEW_NOT_FOUND'})
+                        project,page_key,version=parts
+                        if self.headers.get('Range') or self.headers.get('If-None-Match') or self.headers.get('If-Modified-Since'):raise Denied('UNCONDITIONAL_PREVIEW_ONLY')
+                        rendered,mime,policy=render(center,uid,project,page_key,version)
+                        self.reply(200,rendered,mime,csp=policy)
+                        if self.command=='GET' and mime.startswith('text/html'):served(center,uid,project,page_key,version,rendered)
+                        return
                     if self.command in ('GET','HEAD'):
+                        if operation.startswith('previews/'):
+                            from scripts.pr122_customer_preview import listing
+                            return self.reply(200,listing(center,uid,operation[len('previews/'):]))
                         if operation=='me':return self.reply(200,{'user_id':uid,'projects':center.projects(uid),'channels':app.providers.status()})
                         parts=operation.split('/')
                         if len(parts)==2 and parts[0]=='checklist':return self.reply(200,center.checklist(uid,parts[1]))
