@@ -20,13 +20,22 @@ def _file(path):
     if not stat.S_ISREG(mode):raise ValueError("SOURCE_DB_MISSING")
     return candidate.resolve(strict=True)
 
+def _reject_symlink_ancestors(path, error):
+    cursor=pathlib.Path(path)
+    while True:
+        if cursor.is_symlink():raise ValueError(error)
+        if cursor==cursor.parent:return
+        cursor=cursor.parent
+
 def backup(source_path, output_path):
     src=_file(source_path)
     requested=pathlib.Path(output_path)
-    if requested.is_symlink() or requested.exists():raise ValueError("BACKUP_PATH_UNSAFE")
+    _reject_symlink_ancestors(requested,"BACKUP_PATH_UNSAFE")
+    if requested.exists():raise ValueError("BACKUP_PATH_UNSAFE")
     dest=requested.resolve()
     if dest==src or dest.exists():raise ValueError("BACKUP_PATH_UNSAFE")
     dest.parent.mkdir(parents=True,exist_ok=True)
+    _reject_symlink_ancestors(requested,"BACKUP_PATH_UNSAFE")
     handle=None
     db=sqlite3.connect(src.as_uri()+"?mode=ro",uri=True)
     try:
@@ -97,11 +106,7 @@ def rollback_preview(backup_path, expected_sha256, target_path):
     """Read-only plan. Never replace a live database automatically."""
     verified=verify_backup(backup_path,expected_sha256)
     requested=pathlib.Path(target_path)
-    cursor=requested
-    while True:
-        if cursor.is_symlink():raise ValueError("ROLLBACK_TARGET_SYMLINK")
-        if cursor==cursor.parent:break
-        cursor=cursor.parent
+    _reject_symlink_ancestors(requested,"ROLLBACK_TARGET_SYMLINK")
     target=requested.resolve()
     saved=_file(backup_path)
     if target==saved:

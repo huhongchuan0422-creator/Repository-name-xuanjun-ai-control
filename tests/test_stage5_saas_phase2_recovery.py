@@ -42,6 +42,14 @@ class RecoveryTests(unittest.TestCase):
     linked.symlink_to(original,target_is_directory=True)
     with self.assertRaisesRegex(ValueError,"ROLLBACK_TARGET_SYMLINK"):
         rollback_preview(self.target,receipt["sha256"],linked/"target.sqlite")
+ def test_14_backup_parent_symlink_is_rejected(self):
+    real=Path(self.temp.name)/"real"
+    real.mkdir()
+    linked=Path(self.temp.name)/"linked"
+    linked.symlink_to(real,target_is_directory=True)
+    with self.assertRaisesRegex(ValueError,"BACKUP_PATH_UNSAFE"):
+        backup(self.source,linked/"copy.sqlite")
+    self.assertFalse((real/"copy.sqlite").exists())
  def test_02_no_in_place_overwrite(self):
     with self.assertRaises(ValueError):backup(self.source,self.source)
  def test_03_no_overwrite_existing_backup(self):
