@@ -624,7 +624,7 @@
       "actual service installation and upstream cutover"
     ],
     "current_point_receipt": "evidence/pr99-current-point-r2/OWNER_EXECUTION_RECEIPT_20261016.json",
-    "next": "LOCAL_RECEIVED_CONTRACT_PROJECTION_AND_S07_S08_CONTROLLED_HANDOFF_CANDIDATES_NOT_RETIREMENT",
+    "next": "S07_S08_CONCENTRATED_RESOLUTION_OF_RECEIVED_SOURCE_ENTRIES_STATIC_DEPENDENCIES_AND_TUNNEL_DIRECTIONS",
     "runtime_metadata": {
       "run": 38913529642,
       "delivery_commit": "69eeefabee15fcacc8b0d5deb0fc287898d56b27",
@@ -643,7 +643,7 @@
     },
     "s06_private_candidate": {
       "action": "PR99_S06_PRIVATE_RUNTIME_CONTRACT_V1",
-      "status": "S06_PRIVATE_RUNTIME_CONTRACT_RECEIVED_PASS_OWNER_ROOT_EXECUTION_REVIEW_PENDING",
+      "status": "S06_CAPTURE_ACCEPTED_6218862352_OWNER_PROJECTION_PASS_NOT_SERVICE_INSTALL",
       "scope": "TEN_FIXED_UNIT_FILES_ONE_DROPIN_PRIVATE_RUNTIME_METADATA_ONLY_ENCRYPTED_NOT_INSTALL",
       "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
       "permission": "REPLACEMENT_6218349901_CONSUMED_SUCCESS_NO_REUSE",
@@ -778,13 +778,24 @@
       "production_service_deployed": false,
       "host_independent_pass": false,
       "production_executed_definition": "Production deployment/activation false; private capture did execute successfully as separately recorded",
-      "execution_acceptance": "PENDING_INDEPENDENT_RECEIPT_REVIEW_NO_SOURCE_REVIEW_OR_REEXECUTION",
+      "execution_acceptance": {
+        "comment_id": 6218862352,
+        "decision": "PASS_WITH_SCOPE_LIMITS",
+        "evidence_class": "OWNER_ROOT_RECEIPT_NOT_INDEPENDENT_PRIVATE_HOST_BYTES",
+        "read_back": true
+      },
       "local_received_projection": {
         "path": "evidence/pr99-service-handoff/s06-candidate/project_received_contract.py",
         "scope": "READ_ALREADY_RECEIVED_COPY_ONLY_NO_NETWORK_WRITES_INSTALL_OR_NEW_CAPTURE",
-        "status": "PREPARED_NOT_EXECUTED_ON_KOREA",
+        "status": "OWNER_EXECUTED_READONLY_PROJECTION_PASS_NOT_INDEPENDENT_PRODUCTION_APPROVAL",
         "local_new_tests": "7_PASS_SYNTHETIC_NOT_HOSTED_OR_HOST_ACCEPTANCE",
-        "old_tests": "INHERITED_NOT_RERUN"
+        "old_tests": "INHERITED_NOT_RERUN",
+        "owner_receipt": "evidence/pr99-service-handoff/s06-candidate/OWNER_PROJECTION_20261016.json"
+      },
+      "execution_review_request": {
+        "comment_id": 6218740070,
+        "decision": "PASS_WITH_SCOPE_LIMITS_6218862352",
+        "read_back": true
       }
     },
     "korea443_owner": {
@@ -794,6 +805,16 @@
       "pid": 996,
       "uid": 0,
       "protect": true
+    },
+    "received_handoff_resolution": {
+      "path": "evidence/pr99-service-handoff/handoff-resolution-candidate/resolve_received_handoff.py",
+      "action": "PR99_RECEIVED_HANDOFF_RESOLUTION_V1",
+      "status": "PREPARED_LOCAL10_PASS_CI_AND_SCOPE_REVIEW_PENDING",
+      "source_inputs": "ALREADY_RECEIVED_S06_AND_R2_VERIFIED_CODE_ONLY",
+      "new_production_collection": false,
+      "production_executed": false,
+      "install_or_cutover_permission": "NOT_REQUESTED_OR_GRANTED",
+      "old_tests": "INHERITED_NOT_RERUN"
     }
   },
   "current_recovery_point_r2": {

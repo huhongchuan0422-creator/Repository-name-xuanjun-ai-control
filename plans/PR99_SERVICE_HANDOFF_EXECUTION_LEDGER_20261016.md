@@ -88,3 +88,12 @@ Run38913529642，提交69eeefabee15fcacc8b0d5deb0fc287898d56b27；三机三个Jo
 韩国443的UNKNOWN已由本次Owner-root采样关闭为MoreLogin gost PID996/UID0；这只解决端口所属者，不等于任何新服务安装可占该端口。19444为sshd PID1283/UID1000，通道端点/认证及最终责任仍需核实。
 
 下一步直接使用已接收材料形成脱敏的运行入口/路径/依赖清单和S07/S08候选，不再采集或重传上述11份配置、不重跑19项测试。已收集配置尚未等于生产迁移：EnvironmentFiles、实际通道身份、容器、root/admin调度、目标目录/账号/端口和回滚仍未闭包；不恢复API、不启动交易、不动Finance或UK/P2。剩余服务落点与受控安装/切换另行准确批准，东京继续运行。
+
+
+## S06已独立限定验收，现成副本投影已成功
+
+独审#6218862352直接接受#6218740070中的Owner-root执行回执，旧S06采集和19项测试继承，不再重做。Owner随后在韩国执行fbbfc6a7投影，返回RECEIVED_CONTRACT_PLANNING_PROJECTION_PASS；实际公开选定字段见`evidence/pr99-service-handoff/s06-candidate/OWNER_PROJECTION_20261016.json`。本投影不是独审批准的新生产安装，不扩大为服务已迁移。
+
+真实已绑定：18080归Portal，18770/18780/18781归三个企业微信入口，18761归韩国小说SSH隧道，19443归provider-neutral-tokyo-tunnel。十个unit均active/running；EnvironmentFiles均未配置不等于没有内联环境或认证。generic provider-neutral-tunnel仍not-found；现有客服Wants指向该名称，接续候选必须准确处理，不能把两名称当别名。东京443 PID可见但不属固定10unit，不能写成端口无主。
+
+下一批集中解决上个工具未识别的Python模块启动、SSH L/R/D关系、VPN启动方式和入口源码静态依赖。使用已接收S06归档和R2 verified/code，源码按原服务器1363清单逐文件核验，不能用GitHub同名源码替代；不重新采集、不读数据库/密钥/EnvironmentFiles、不执行应用，不安装或启停服务。动态资源/私有材料闭包仍不可由AST推断为PASS。原19/7项不重跑，新批只测本解析器。

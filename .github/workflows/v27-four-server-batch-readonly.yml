@@ -812,3 +812,61 @@ jobs:
           path: /tmp/pr99-s06-runtime-review/
           if-no-files-found: error
           retention-days: 7
+
+  pr99-handoff-resolution-offline-review:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_HANDOFF_RESOLUTION_REVIEW_ONCE_20261016' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Ten new resolution tests only; no production host or private input
+        run: |
+          python -I -B - <<'PY'
+          import sys,unittest
+          sys.path.insert(0,'evidence/pr99-service-handoff/handoff-resolution-candidate')
+          r=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromName('test_handoff_resolution'))
+          print('HANDOFF_RESOLUTION_TESTS=%d SKIPPED=%d PRODUCTION_HOST_ACTIONS=0'%(r.testsRun,len(r.skipped)))
+          raise SystemExit(not r.wasSuccessful() or bool(r.skipped) or r.testsRun!=10)
+          PY
+      - name: Bind exact source-only resolution review package
+        env:
+          XJ_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$XJ_EXPECTED_HEAD"
+          python -I -B - <<'PY'
+          import gzip,hashlib,io,json,os,pathlib,tarfile
+          root=pathlib.Path('evidence/pr99-service-handoff/handoff-resolution-candidate')
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          files={p:(root/p).read_bytes() for p in ('resolve_received_handoff.py','test_handoff_resolution.py','RESOLUTION_README.md','RESOLUTION_BINDING.json')}
+          b=json.loads(files['RESOLUTION_BINDING.json'])
+          assert set(b['files'])==set(files)-{'RESOLUTION_BINDING.json'}
+          assert all(sha(files[p])==h for p,h in b['files'].items())
+          buf=io.BytesIO()
+          with tarfile.open(fileobj=buf,mode='w',format=tarfile.USTAR_FORMAT) as t:
+              for p,data in sorted(files.items()):
+                  i=tarfile.TarInfo(p);i.size=len(data);i.uid=i.gid=i.mtime=0;i.mode=0o400;t.addfile(i,io.BytesIO(data))
+          raw=gzip.compress(buf.getvalue(),mtime=0)
+          out=pathlib.Path('/tmp/pr99-handoff-resolution-review');out.mkdir(mode=0o700)
+          (out/'PR99_HANDOFF_RESOLUTION_REVIEW.tar.gz').write_bytes(raw)
+          r=dict(schema_version=1,source_commit=os.environ['XJ_EXPECTED_HEAD'],script_sha256=sha(files['resolve_received_handoff.py']),binding_sha256=sha(files['RESOLUTION_BINDING.json']),tar_sha256=sha(raw),tar_bytes=len(raw),bound_files=3,regular_members=4,new_tests=10,production_executed=False)
+          (out/'BUILD_RECEIPT.json').write_text(json.dumps(r,sort_keys=True)+'\n')
+          print(json.dumps(r,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr99-received-handoff-resolution-review
+          path: /tmp/pr99-handoff-resolution-review/
+          if-no-files-found: error
+          retention-days: 7
