@@ -105,8 +105,13 @@ class ReleaseTest(unittest.TestCase):
 
     def test_umask_077_sigterm_preserves_unknown_failure_evidence(self):
         code="""import importlib.util,sys,time
+from pathlib import Path
 spec=importlib.util.spec_from_file_location('release',sys.argv[1]); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-m.extract_source=lambda *_: time.sleep(30)
+def blocked_extract(*_):
+    base=Path(sys.argv[sys.argv.index('--webroot-base')+1])
+    (base/'.test-extract-entered').write_text('ready')
+    time.sleep(30)
+m.extract_source=blocked_extract
 sys.argv=[sys.argv[1],*sys.argv[2:]]
 raise SystemExit(m.main())
 """
@@ -119,7 +124,9 @@ raise SystemExit(m.main())
                                  preexec_fn=lambda: os.umask(0o077))
         receipt=self.base/"transactions/signal-tx.json"
         until=time.time()+3
-        while time.time()<until and not receipt.exists(): time.sleep(.01)
+        marker=self.base/".test-extract-entered"
+        while time.time()<until and not marker.exists(): time.sleep(.01)
+        self.assertTrue(marker.exists(),"subprocess did not enter blocked extraction")
         self.assertTrue(receipt.exists(),"subprocess did not reach durable PREPARE_INTENT")
         process.terminate(); stdout,stderr=process.communicate(timeout=3)
         self.assertEqual(process.returncode,2,(stdout,stderr))
