@@ -129,7 +129,7 @@ class App:
                         if self.headers.get('Range') or self.headers.get('If-None-Match') or self.headers.get('If-Modified-Since'):raise Denied('UNCONDITIONAL_PREVIEW_ONLY')
                         rendered,mime,policy=render(center,uid,project,page_key,version)
                         self.reply(200,rendered,mime,csp=policy)
-                        if self.command=='GET' and mime.startswith('text/html'):served(center,uid,project,page_key,version,rendered)
+                        if self.command=='GET' and mime.startswith('text/html'):served(center,uid,project,page_key,version,rendered,policy)
                         return
                     if self.command in ('GET','HEAD'):
                         if operation.startswith('previews/'):

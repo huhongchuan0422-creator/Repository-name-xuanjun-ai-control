@@ -106,6 +106,43 @@ jobs:
           path: /tmp/pr122-customer/
           retention-days: 14
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: pr122-customer-center-${{ github.sha }}
+          path: /tmp/pr122-customer-roundtrip
+      - name: Verify downloaded archive and complete source closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,io,json,os,tarfile
+          from pathlib import Path
+          folder=Path('/tmp/pr122-customer-roundtrip')
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          receipt=json.loads((folder/'CUSTOMER_PACKAGE_RECEIPT.json').read_bytes())
+          raw=(folder/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes()
+          assert receipt['source_commit']==os.environ['GITHUB_SHA'] and sha(raw)==receipt['tar_sha256']
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
+              items=archive.getmembers()
+              assert len(items)==receipt['members'] and len({x.name for x in items})==len(items)
+              assert all(x.isfile() and x.name.startswith('customer-center/') and '..' not in Path(x.name).parts for x in items)
+              files={x.name.removeprefix('customer-center/'):archive.extractfile(x).read() for x in items}
+          manifest_raw=files.pop('CUSTOMER_MANIFEST.json')
+          assert sha(manifest_raw)==receipt['manifest_sha256']
+          manifest=json.loads(manifest_raw)
+          assert manifest['source_commit']==os.environ['GITHUB_SHA'] and len(files)==receipt['bound_files']==len(manifest['files'])
+          assert set(files)=={x['path'] for x in manifest['files']}
+          for item in manifest['files']:
+              body=files[item['path']]
+              assert len(body)==item['size'] and sha(body)==item['sha256']
+              source=Path('deploy/pr122-customer-center/boot.py') if item['path']=='boot.py' else Path(item['path'])
+              assert source.read_bytes()==body
+          binding=json.loads((folder/'rebind-candidate/REBIND_BINDING.json').read_bytes())
+          assert (folder/'rebind-candidate/channel.py').read_bytes()==Path('/tmp/pr122-customer/rebind-candidate/channel.py').read_bytes()
+          assert (folder/'runtime-builder.py').read_bytes()==Path('scripts/pr122_customer_runtime.py').read_bytes()
+          print(json.dumps({'downloaded_tar_sha256':sha(raw),'manifest_sha256':sha(manifest_raw),'members':len(items),'bound_files':len(files),'source_closure':'PASS','channel_roundtrip':'PASS','raw_zip_recalculation':'INDEPENDENT_REVIEW_PENDING'},sort_keys=True))
+          PY
+
   isolated-domestic-runtime:
     needs: isolated-customer-center
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]

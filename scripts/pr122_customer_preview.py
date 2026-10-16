@@ -100,22 +100,24 @@ def render(c,uid,project,page_key,version):
     # Server-generated context is outside source code; it is never a client claim.
     body=body.replace('</body>',footer+'</body>',1) if '</body>' in body else body+footer
     def hashes(items):return ' '.join("'sha256-"+base64.b64encode(bytes.fromhex(digest(x.encode()))).decode()+"'" for x in items)
-    csp="default-src 'none'; script-src 'self' "+hashes(parser.scripts)+"; style-src 'self' "+hashes(parser.styles)+"; img-src 'self'; connect-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; worker-src 'none'"
+    scoped='https://wenwenwenyiyiyi.work'+PREFIX+project+'/'
+    csp="default-src 'none'; script-src "+scoped+" https://wenwenwenyiyiyi.work/customer/center/feedback.js "+hashes(parser.scripts)+"; style-src "+scoped+" https://wenwenwenyiyiyi.work/customer/center/feedback.css "+hashes(parser.styles)+"; img-src "+scoped+"; connect-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; worker-src 'none'"
     # Feedback is same-origin API only. Preview code is trusted application code
     # (same privilege as customer app.js), never customer-supplied documents.
     csp=csp.replace("connect-src 'none'","connect-src https://wenwenwenyiyiyi.work/customer/center/api/")
     return body.encode(),TYPES['.html'],csp
 
 
-def served(c,uid,project,page_key,version,rendered):
+def served(c,uid,project,page_key,version,rendered,policy=None):
     """Called after a successful HTTP write, never from a customer POST.
     This proves authenticated bytes served, not browser visual acceptance/TLS.
     """
     import secrets
+    if policy is None:policy=render(c,uid,project,page_key,version)[2]
     with c.tx():
         found,_,_=original(c,uid,project,page_key,version)
         eid='pv_'+secrets.token_hex(16)
-        payload={'project':project,'actor':uid,'project_revision':found['project_revision'],'page':found['page'],'page_sha256':version,'manifest_sha256':found['manifest_sha256'],'artifact_sha256':found['artifact_sha256'],'render_sha256':digest(rendered),'source_commit':found['source_commit'],'authority_revision':load(c)['revision'],'created':c.now(),'evidence':'AUTHENTICATED_HTTP_BYTES_SERVED','browser_acceptance':'NOT_ESTABLISHED','tls_acceptance':'NOT_ESTABLISHED'}
+        payload={'project':project,'actor':uid,'project_revision':found['project_revision'],'page':found['page'],'page_sha256':version,'manifest_sha256':found['manifest_sha256'],'artifact_sha256':found['artifact_sha256'],'render_sha256':digest(rendered),'csp_sha256':digest(policy.encode()),'source_commit':found['source_commit'],'authority_revision':load(c)['revision'],'created':c.now(),'evidence':'AUTHENTICATED_HTTP_BYTES_SERVED','browser_acceptance':'NOT_ESTABLISHED','tls_acceptance':'NOT_ESTABLISHED'}
         c.db.execute('INSERT INTO preview_serves VALUES(?,?,?,?,?,?,?,?)',(eid,project,uid,found['manifest_sha256'],version,payload['render_sha256'],c.encrypt(canonical(payload),eid),c.now()))
         c.audit(project,uid,'PRIVATE_PREVIEW_SERVED',digest(canonical(payload)))
     return {'id':eid,'sha256':digest(canonical(payload))}

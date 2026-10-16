@@ -38,6 +38,7 @@ def issue(c,project,case,serve_id,report,trust,source_key):
     if not owner:raise Denied('PROJECT_NOT_FOUND')
     p,_,_=c.project(owner[0],project,{'OWNER'})
     events=Changes(c)._events(p['owner'],project,case);request=events[0]['payload']
+    if events[0]['actor']!=p['owner'] or request.get('preview',{}).get('contract_ref')!=p['authority_ref']:raise Denied('REQUEST_CONTRACT_BINDING')
     if events[0]['kind']!='REQUEST' or events[-1]['payload']['state'] not in ('FREE_APPROVED','CUSTOMER_CONFIRMED','RETEST_FEEDBACK'):raise Denied('APPROVED_CHANGE_REQUIRED')
     row=c.db.execute('SELECT * FROM preview_serves WHERE id=? AND project=? AND actor=?',(serve_id,project,p['owner'])).fetchone()
     if not row:raise Denied('SERVER_OWNED_DELIVERY_REQUIRED')
@@ -48,7 +49,7 @@ def issue(c,project,case,serve_id,report,trust,source_key):
     if not key or set(key)!={'principal','public_key_b64','state','custody_evidence_sha256','scope','origin'} or key['state']!='ACTIVE' or key['scope']!='PRODUCTION_PRIVATE_PREVIEW' or key['origin']!='https://wenwenwenyiyiyi.work' or key['principal']==trust['source_writer_principal'] or not __import__('re').fullmatch('[0-9a-f]{64}',key['custody_evidence_sha256']):raise Denied('ENROLLED_TEST_SIGNER_REQUIRED')
     try:Ed25519PublicKey.from_public_bytes(base64.b64decode(key['public_key_b64'],validate=True)).verify(base64.b64decode(report['signature'],validate=True),canonical(test))
     except Exception:raise Denied('TEST_REPORT_SIGNATURE') from None
-    fields={'purpose','project','case','request_sha256','page','before_sha256','after_sha256','manifest_sha256','source_commit','artifact_sha256','render_sha256','harness_sha256','checks','issued_at','expires','summary','origin','environment','tls_verified'}
+    fields={'purpose','project','case','request_sha256','page','before_sha256','after_sha256','manifest_sha256','source_commit','artifact_sha256','render_sha256','csp_sha256','harness_sha256','checks','issued_at','expires','summary','origin','environment','tls_verified'}
     if type(test) is not dict or set(test)!=fields or test['purpose']!='PR122_PRIVATE_PREVIEW_TEST_V1':raise Denied('TEST_REPORT_SCHEMA')
     if test['origin']!='https://wenwenwenyiyiyi.work' or test['environment']!='PRODUCTION_PRIVATE_PREVIEW' or test['tls_verified'] is not True:raise Denied('REAL_PRIVATE_HTTPS_REPORT_REQUIRED')
     if test['harness_sha256'] not in trust['allowed_harness_sha256'] or type(test['checks']) is not dict or set(test['checks'])!=REQUIRED or any(v!='PASS' for v in test['checks'].values()):raise Denied('EXACT_TESTS_REQUIRED')
@@ -56,7 +57,7 @@ def issue(c,project,case,serve_id,report,trust,source_key):
     if test['project']!=project or test['case']!=case or test['request_sha256']!=Changes(c)._request_sha(events) or test['page']!=request['page'] or test['before_sha256']!=request['page_sha256']:raise Denied('TEST_REQUEST_BINDING')
     selected=next((r for r in current['previews'] if r['project']==project and r['project_revision']==p['revision'] and r['owner']==p['owner'] and r.get('execution_scope')=='TRUSTED_CUSTOMER_FRONTEND' and r['page']==test['page'] and r['page_sha256']==test['after_sha256']),None)
     if not selected or served['authority_revision']>current['revision'] or served.get('project_revision')!=p['revision'] or served['page']!=test['page'] or served['page_sha256']!=test['after_sha256'] or served['manifest_sha256']!=selected['manifest_sha256']:raise Denied('CURRENT_DEPLOYMENT_REQUIRED')
-    for field in ('manifest_sha256','source_commit','artifact_sha256','render_sha256'):
+    for field in ('manifest_sha256','source_commit','artifact_sha256','render_sha256','csp_sha256'):
         if test[field]!=served[field]:raise Denied('TEST_DEPLOYMENT_BINDING')
     source=c.db.execute('SELECT payload FROM change_authority_history WHERE revision=?',(current['revision'],)).fetchone()
     envelope=json.loads(c.decrypt(source[0],'change-authority-source:'+str(current['revision'])))

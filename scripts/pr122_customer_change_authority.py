@@ -45,7 +45,7 @@ def import_snapshot(c,envelope,key):
             seen.add(key_id)
             data=base64.b64decode(entry['blobs'].get(page['sha256'],''),validate=True)
             if len(data)>1000000 or digest(data)!=page['sha256']:raise Denied('PREVIEW_PAGE_BYTES')
-            previews.append({'project':p['id'],'project_revision':p['revision'],'owner':p['owner'],'page':page['path'],'page_sha256':page['sha256'],'manifest_sha256':entry['manifest_sha256'],'artifact_sha256':m['artifact_sha256'],'review_ref':m['review_ref'],'source_commit':m['source_commit'],'execution_scope':m.get('execution_scope','CONTENT_ONLY')})
+            previews.append({'project':p['id'],'project_revision':p['revision'],'owner':p['owner'],'contract_ref':m['contract_ref'],'page':page['path'],'page_sha256':page['sha256'],'manifest_sha256':entry['manifest_sha256'],'artifact_sha256':m['artifact_sha256'],'review_ref':m['review_ref'],'source_commit':m['source_commit'],'execution_scope':m.get('execution_scope','CONTENT_ONLY')})
     docids=set()
     for entry in d['documents']:
         if set(entry)!={'id','project_revision','document_utf8','document_sha256','version_sha256'}:raise Denied('DOCUMENT_SOURCE_SCHEMA')

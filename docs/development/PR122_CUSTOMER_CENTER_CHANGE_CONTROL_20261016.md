@@ -117,3 +117,8 @@ Root安装plan预检全部测试信任登记的字段、公钥、harness SHA和�
 publisher每次短生命周期启动重新加载Root受保护credential；紧急撤销测试签发钥时，须停socket/timer及正在执行的worker，再更换信任文件，不能仅改磁盘文件就宣称已终止内存中的旧授权。PROCESSING未知任务保持不自动重试。
 
 隔离runtime中的临时Ed25519密钥仅作密码库自检，不输出、不保存、不作为独审、测试报告或生产签发密钥。
+
+
+私有预览CSP只允许该项目版本化鉴权资源前缀及固定feedback组件，不回退整个本源的可变公开script/style/img。服务端取页凭证和签名测试绑定准确CSP SHA，正文不变但策略改变也不能复用旧报告。整改请求另绑定受保护来源中的原contract_ref；同项目换合同不得复用旧请求生成交付，租户/客户/Owner不可变规则继续继承。普通授权revision刷新不等于合同变更。
+
+本地执行环境断开后，开发继续使用GitHub原生提交和Hosted精确CI。追加制品服务下载回读验证TAR/Manifest和生成通道；不将该作者CI验证冒充独审原始ZIP字节复算。

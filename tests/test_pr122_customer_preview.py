@@ -33,7 +33,7 @@ class PreviewTests(unittest.TestCase):
         raw,mime,csp=render(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha)
         self.assertIn(b'data-project-feedback="project-a"',raw);self.assertIn(b'Private project',raw)
         expected=base64.b64encode(hashlib.sha256(b'document.documentElement.dataset.preview="ready";').digest()).decode()
-        self.assertIn("'sha256-"+expected+"'",csp);self.assertIn("base-uri 'none'",csp);self.assertNotIn("unsafe-inline",csp);self.assertTrue(mime.startswith('text/html'))
+        self.assertIn("'sha256-"+expected+"'",csp);self.assertIn("base-uri 'none'",csp);self.assertNotIn("unsafe-inline",csp);self.assertNotIn("script-src 'self'",csp);self.assertTrue(mime.startswith('text/html'))
     def test_content_approval_cannot_authorize_executable_application(self):
         self.revision=2;self.install(scope=False)
         self.assertEqual(listing(self.c,self.owner,'project-a')['pages'],[])
@@ -57,10 +57,10 @@ class PreviewTests(unittest.TestCase):
     def publication(self):
         before=self.sha;service=Changes(self.c);r=service.submit(self.owner,'project-a',self.path,before,'调整标题颜色');service.assess(self.reviewer,'project-a',r['id'],1,'IN_SCOPE_SMALL',10,[],[],'仅改变颜色')
         self.revision=2;self.install(self.body.replace(b'#123',b'#456'))
-        raw,_,_=render(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha);receipt=served(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha,raw)
+        raw,_,policy=render(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha);receipt=served(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha,raw)
         record=load(self.c)['previews'][0];private=Ed25519PrivateKey.generate();public=private.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
         trust={'source_writer_principal':'writer','keys':{'test-key':{'principal':'isolated-test-runner','public_key_b64':base64.b64encode(public).decode(),'state':'ACTIVE','custody_evidence_sha256':'a'*64,'scope':'PRODUCTION_PRIVATE_PREVIEW','origin':'https://wenwenwenyiyiyi.work'}},'allowed_harness_sha256':['b'*64]}
-        payload={'purpose':'PR122_PRIVATE_PREVIEW_TEST_V1','project':'project-a','case':r['id'],'request_sha256':service._request_sha(service._events(self.owner,'project-a',r['id'])),'page':self.path,'before_sha256':before,'after_sha256':self.sha,'manifest_sha256':record['manifest_sha256'],'source_commit':record['source_commit'],'artifact_sha256':record['artifact_sha256'],'render_sha256':digest(raw),'harness_sha256':'b'*64,'checks':{k:'PASS' for k in REQUIRED},'issued_at':self.now,'expires':self.now+300,'summary':'已调整标题颜色','origin':'https://wenwenwenyiyiyi.work','environment':'PRODUCTION_PRIVATE_PREVIEW','tls_verified':True}
+        payload={'purpose':'PR122_PRIVATE_PREVIEW_TEST_V1','project':'project-a','case':r['id'],'request_sha256':service._request_sha(service._events(self.owner,'project-a',r['id'])),'page':self.path,'before_sha256':before,'after_sha256':self.sha,'manifest_sha256':record['manifest_sha256'],'source_commit':record['source_commit'],'artifact_sha256':record['artifact_sha256'],'render_sha256':digest(raw),'csp_sha256':digest(policy.encode()),'harness_sha256':'b'*64,'checks':{k:'PASS' for k in REQUIRED},'issued_at':self.now,'expires':self.now+300,'summary':'已调整标题颜色','origin':'https://wenwenwenyiyiyi.work','environment':'PRODUCTION_PRIVATE_PREVIEW','tls_verified':True}
         report={'payload':payload,'key_id':'test-key','signature':base64.b64encode(private.sign(canonical(payload))).decode()}
         return r,receipt,report,trust,private
     def test_signed_test_and_real_server_receipt_generate_delivery_without_network(self):
@@ -80,7 +80,7 @@ class PreviewTests(unittest.TestCase):
         with self.assertRaises(Denied):issue(self.c,'project-a',r['id'],receipt['id'],report,badtrust,self.auth)
     def test_wrong_deployed_hash_fail_check_and_old_report_rejected(self):
         r,receipt,report,trust,private=self.publication()
-        for key,value in (('render_sha256','f'*64),('request_sha256','f'*64),('expires',self.now-1)):
+        for key,value in (('render_sha256','f'*64),('csp_sha256','f'*64),('request_sha256','f'*64),('expires',self.now-1)):
             bad=copy.deepcopy(report);bad['payload'][key]=value;bad['signature']=base64.b64encode(private.sign(canonical(bad['payload']))).decode()
             with self.assertRaises(Denied):issue(self.c,'project-a',r['id'],receipt['id'],bad,trust,self.auth)
         report['payload']['checks']['mobile']='FAIL';report['signature']=base64.b64encode(private.sign(canonical(report['payload']))).decode()
@@ -93,6 +93,11 @@ class PreviewTests(unittest.TestCase):
             with self.assertRaises(Denied):issue(self.c,'project-a',r['id'],receipt['id'],bad,trust,self.auth)
         trust['keys']['test-key']['scope']='ISOLATED_FIXTURE'
         with self.assertRaises(Denied):issue(self.c,'project-a',r['id'],receipt['id'],report,trust,self.auth)
+
+    def test_contract_reassignment_cannot_reuse_old_request_for_publication(self):
+        r,receipt,report,trust,_=self.publication()
+        self.imported(2,[{**self.p,'contract_ref':'contract-b'}])
+        with self.assertRaisesRegex(Denied,'REQUEST_CONTRACT_BINDING'):issue(self.c,'project-a',r['id'],receipt['id'],report,trust,self.auth)
 
 class PreviewHTTPTests(HttpTests):
     imported=CustomerTests.imported
