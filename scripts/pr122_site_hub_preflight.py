@@ -89,7 +89,10 @@ def main():
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     result = inspect(args.root)
-    if result['candidate_file_count'] != 21 or result['html_page_count'] != 15:
+    # The Owner-approved experience increment adds one standalone merchant page.
+    merchant = 'demos/xuanjun-site-hub/visual/community-payment/merchant-dashboard/index.html'
+    if (result['candidate_file_count'] != 22 or result['html_page_count'] != 16
+            or merchant not in result['files']):
         raise SystemExit('HANDOFF_INVENTORY_DRIFT')
     payload = json.dumps(result, ensure_ascii=False, indent=2) + '\n'
     if args.output:
