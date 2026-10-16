@@ -1,9 +1,9 @@
 {
   "audit_comment": "6206991380",
-  "base_commit": "632bbe6f204a2c9ef778d3c91e425593c079abb1",
-  "base_tree": "59a48168764e8465e62fd17a55504c29812365b3",
+  "base_commit": "94f8e10deed7dbbe876cb170ca0093d0574feeba",
+  "base_tree": "be9acd81d82d37681c9d7573c930cdced159a2a6",
   "binance_called": false,
-  "candidate_content_sha256": "2f191af416d90410e187e671dfe55bfb68b3ec326d7c5d9bad1ce56ec6aceab0",
+  "candidate_content_sha256": "07a06e33399d0ffb51b075c19aaa48f1de210bd33c8ed8f6fa6dfe78a3effc29",
   "canonical_migration_policy_enforced": true,
   "files": [
     {
@@ -260,11 +260,47 @@
       "path": "migration-prep/korea/minimal-runtime-manifest.json",
       "sha256": "4a6c60c4393f088332240932d532c30bc78857479b1aaeae4e10a4a63288e10d",
       "size": 3838
+    },
+    {
+      "path": "migration-prep/test_korea_offline_repair.py",
+      "sha256": "1af88664e3a733eff6dcf046536b4857d918ce48d98e222f069ca7cd22a4a7f9",
+      "size": 16136
+    },
+    {
+      "path": "migration-prep/korea-offline-repair/controlled_repair.py",
+      "sha256": "2d65912eaa405e0fc2a5d3a506f8ec08e6add8c6c4d9cfbac9ccf3a985d4262f",
+      "size": 17240
+    },
+    {
+      "path": "migration-prep/korea-offline-repair/offline.service",
+      "sha256": "824fc0cbe3d879b61ea36b0bd7c45fb8c1e9fb6c463f46ada741ac3f2299899b",
+      "size": 1210
+    },
+    {
+      "path": "migration-prep/korea-offline-repair/installed-runtime-manifest.json",
+      "sha256": "f887b085508e3ed4831dbed22152e35af5e8aba95b85b899b4697c61449917de",
+      "size": 3838
+    },
+    {
+      "path": "migration-prep/korea-offline-repair/approved-runtime-632bbe6f.tar.gz",
+      "sha256": "f7cba56c2c45910901cdbd44056ad7c971a7497ffe67518a4adefb40ef660ba9",
+      "size": 38980
+    },
+    {
+      "path": "migration-prep/korea-offline-repair/build_review.py",
+      "sha256": "9e198f3ab08a8ca8b96292c1cfe134d3aa82e2f226d01c4b0609d515cd197a9a",
+      "size": 2119
+    },
+    {
+      "path": "migration-prep/korea-offline-repair/README.md",
+      "sha256": "ada82da4ba9b727554d213749c6c6c2582165174268637b4579abb5f79aefa20",
+      "size": 8530
     }
   ],
   "host_outcome_comment": "6207782855",
   "host_security_acceptance": "HOLD_UNSUPPORTED_SECURITY_CAPABILITIES",
   "legacy_package_execution_accepted": false,
+  "offline_repair_review": "NEW_COMPLETE_CANDIDATE_NOT_EXECUTED",
   "persistent_production_launcher_proven": false,
   "production_authorized": false,
   "production_dependency_inventory_complete": false,

@@ -37,7 +37,12 @@ FILES = (
     "korea/snapshot_handoff.py",
     "korea/shadow_acceptance.py", "korea/shadow-acceptance.template.json",
     "korea/install-candidate.sh", "korea/check-candidate.sh",
-    "korea/uninstall-candidate.sh", "korea/minimal-runtime-manifest.json"
+    "korea/uninstall-candidate.sh", "korea/minimal-runtime-manifest.json",
+    "test_korea_offline_repair.py",
+    "korea-offline-repair/controlled_repair.py", "korea-offline-repair/offline.service",
+    "korea-offline-repair/installed-runtime-manifest.json",
+    "korea-offline-repair/approved-runtime-632bbe6f.tar.gz",
+    "korea-offline-repair/build_review.py", "korea-offline-repair/README.md"
 )
 
 
@@ -60,8 +65,9 @@ def build(root):
              "audit_comment": "6206991380",
              "host_outcome_comment": "6207782855",
              "host_security_acceptance": "HOLD_UNSUPPORTED_SECURITY_CAPABILITIES",
-             "base_commit": "632bbe6f204a2c9ef778d3c91e425593c079abb1",
-             "base_tree": "59a48168764e8465e62fd17a55504c29812365b3",
+             "offline_repair_review": "NEW_COMPLETE_CANDIDATE_NOT_EXECUTED",
+             "base_commit": "94f8e10deed7dbbe876cb170ca0093d0574feeba",
+             "base_tree": "be9acd81d82d37681c9d7573c930cdced159a2a6",
              "files": files, "production_authorized": False,
              "binance_called": False, "production_deployed": False,
              "self_asserted_receipts_can_pass": False,

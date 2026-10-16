@@ -97,3 +97,18 @@ root_policy_audit.py是只读Root审计候选，不通过Runner自动执行：�
 Owner按独审6207630392执行一次准确632bbe6f安装，事务install-f887b085508e3ed4，SHA256c79182446ab8c2e447cb6942061710fb4a864addb4b9718f967402ef8c30cfe2；disabled/inactive/PID0/锁释放和六命名单元元数据未变均有Owner输出。现场同时出现LoadCredential未知及BPF/cgroup防火墙无效的明确告警，因此不能接受旧检查器末尾的PHASE_B=PASS作隔离通过；当前PHASE_B_SECURITY_ACCEPTANCE=HOLD，Phase-C与东京退役仍HOLD。完整结果见原PR99#6207782855。
 
 本批只修正源码检查器的零退出告警误报并增加首次锁/用户/目标变更之前的能力预检，新17项Shell专项本地通过。真实兼容隔离方案仍需主机能力验证、准确修复计划与独审后才能执行；不覆盖/重装现有现场，不升级全机systemd/kernel或改全局防火墙。新的源码未部署，不重复已关闭R2/R6的独立审核。未变原137测试作为历史基线保留；源变更按既有CI自动验证，不冒充重复的root验收。
+
+
+## Complete old-systemd Phase-B compatibility repair candidate (2026-10-16)
+
+Owner-root reports systemd239/kernel5.10 and a distinct temporary net namespace
+with only lo. A complete, separately admitted repair is in
+[korea-offline-repair/README.md](korea-offline-repair/README.md). It preserves
+original 17 Runtime files, release/current/venv and replaces only the installed
+unit plus the transaction unit hash, using PrivateNetwork=yes/AF_UNIX and only
+the existing no-network self_check. All service starts and Phase-C remain
+forbidden. Exact single-use review+Owner-root admission, backups, partial-failure
+preservation and final manager/disabled/inactive/lock checks are included.
+This is a new review candidate; no repair approval, root anchor or actual
+replacement has been performed. The earlier fresh-install fail-closed guard
+remains separate and has not been deployed. Do not rerun the old installer.

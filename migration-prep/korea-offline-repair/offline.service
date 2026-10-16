@@ -1,0 +1,38 @@
+[Unit]
+Description=Xuanjun Binance Phase-B offline self-check (no network or credentials)
+
+[Service]
+Type=simple
+User=xuanjun_binance
+Group=xuanjun_binance
+WorkingDirectory=/opt/xuanjun-binance/current/migration-prep
+Environment=HTTP_PROXY=
+Environment=HTTPS_PROXY=
+Environment=ALL_PROXY=
+Environment=NO_PROXY=*
+Environment=PYTHONPATH=/opt/xuanjun-binance/current/migration-prep
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/xuanjun-binance/venv/bin/python -B -I -c "import sys;sys.path.insert(0,'/opt/xuanjun-binance/current/migration-prep');from korea.migration_shadow_entry import self_check;assert self_check()['status']=='SELF_CHECK_PASS_NO_NETWORK'"
+Restart=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ReadOnlyPaths=/opt/xuanjun-binance/current /etc/xuanjun-binance
+ReadWritePaths=/var/lib/xuanjun-binance /var/log/xuanjun-binance
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target
