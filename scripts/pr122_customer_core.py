@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS ai_jobs(message_id TEXT PRIMARY KEY,state TEXT NOT NU
 CREATE TABLE IF NOT EXISTS change_events(id TEXT PRIMARY KEY,project TEXT NOT NULL,case_id TEXT NOT NULL,seq INTEGER NOT NULL,kind TEXT NOT NULL,actor TEXT NOT NULL,payload BLOB NOT NULL,created INTEGER NOT NULL,UNIQUE(project,case_id,seq));
 CREATE TABLE IF NOT EXISTS preview_publication_jobs(id TEXT PRIMARY KEY,project TEXT NOT NULL,actor TEXT NOT NULL,state TEXT NOT NULL,payload BLOB NOT NULL,created INTEGER NOT NULL,result BLOB);
 CREATE INDEX IF NOT EXISTS publication_pending ON preview_publication_jobs(state,created,id);
+CREATE TABLE IF NOT EXISTS preview_edit_jobs(id TEXT PRIMARY KEY,project TEXT NOT NULL,actor TEXT NOT NULL,state TEXT NOT NULL,payload BLOB NOT NULL,created INTEGER NOT NULL,result BLOB);
+CREATE INDEX IF NOT EXISTS edit_pending ON preview_edit_jobs(state,created,id);
 CREATE TABLE IF NOT EXISTS preview_delivery_proofs(sha256 TEXT PRIMARY KEY,project TEXT NOT NULL,case_id TEXT NOT NULL,payload BLOB NOT NULL);
 CREATE TRIGGER IF NOT EXISTS preview_delivery_no_update BEFORE UPDATE ON preview_delivery_proofs BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;
 CREATE TRIGGER IF NOT EXISTS preview_delivery_no_delete BEFORE DELETE ON preview_delivery_proofs BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END;

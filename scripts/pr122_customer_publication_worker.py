@@ -16,6 +16,12 @@ from scripts.pr122_customer_delivery_source import issue
 DATA=Path('/var/lib/xuanjun-customer-center')
 NOTIFY='/run/xuanjun-customer-publication/notify.sock'
 
+def notify():
+    try:
+        with socket.socket(socket.AF_UNIX,socket.SOCK_DGRAM) as s:s.settimeout(.2);s.sendto(b'1',NOTIFY)
+        return True
+    except OSError:return False
+
 def enqueue(c,uid,project,case,serve_id,report):
     c.project(uid,project,{'REVIEWER'})
     packet={'project':project,'case':case,'serve_id':serve_id,'report':report};raw=canonical(packet)
@@ -91,5 +97,6 @@ def main_worker():
             st=os.fstat(held.fileno())
             if st.st_uid!=account.pw_uid or not stat.S_ISREG(st.st_mode) or st.st_nlink!=1 or st.st_mode&0o077:raise Denied('PUBLISHER_LOCK_IDENTITY')
             fcntl.flock(held,fcntl.LOCK_EX|fcntl.LOCK_NB)
-            return {**drain(c,config['preview_test_trust'],base64.b64decode(config['authority_sign_key'],validate=True)),'uid':os.geteuid(),'gid':os.getegid(),'effective_nondumpable':True,'providers_loaded':False}
+            from scripts.pr122_customer_edit_jobs import drain as drain_edits
+            return {**drain(c,config['preview_test_trust'],base64.b64decode(config['authority_sign_key'],validate=True)),'edit_candidates':drain_edits(c),'uid':os.geteuid(),'gid':os.getegid(),'effective_nondumpable':True,'providers_loaded':False}
     finally:c.db.close()

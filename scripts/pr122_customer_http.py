@@ -15,6 +15,7 @@ from scripts.pr122_customer_source import reject_untrusted,TrustedNginxSource
 from scripts.pr122_customer_providers import Providers,enqueue,ai_reply
 from scripts.pr122_customer_changes import Changes
 from scripts.pr122_customer_publication_worker import enqueue as enqueue_preview_report,status as publication_status
+from scripts.pr122_customer_edit_jobs import enqueue as enqueue_small_edit
 
 PREFIX='/customer/center/'
 CSP="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -137,6 +138,10 @@ class App:
                             return self.reply(200,listing(center,uid,operation[len('previews/'):]))
                         if operation=='me':return self.reply(200,{'user_id':uid,'projects':center.projects(uid),'channels':app.providers.status()})
                         parts=operation.split('/')
+                        if len(parts)==3 and parts[0]=='edit_candidate':
+                            from scripts.pr122_customer_edit_jobs import get as get_edit
+                            if self.headers.get('Range') or self.headers.get('If-None-Match') or self.headers.get('If-Modified-Since'):raise Denied('UNCONDITIONAL_CANDIDATE_ONLY')
+                            return self.reply(200,get_edit(center,uid,parts[1],parts[2]))
                         if len(parts)==3 and parts[0]=='publication':return self.reply(200,publication_status(center,uid,parts[1],parts[2]))
                         if len(parts)==2 and parts[0]=='checklist':return self.reply(200,center.checklist(uid,parts[1]))
                         if len(parts)==2 and parts[0]=='messages':return self.reply(200,{'messages':center.messages(uid,parts[1])})
@@ -147,6 +152,7 @@ class App:
                             data,mime=center.download(uid,parts[1],parts[2]);return self.reply(200,data,mime)
                         return self.reply(404,{'error':'NOT_FOUND'})
                     operations={
+                        'change_small_edit':({'project','case'},lambda:enqueue_small_edit(center,uid,body['project'],body['case'])),
                         'change_delivery_report':({'project','case','serve_id','report'},lambda:enqueue_preview_report(center,uid,body['project'],body['case'],body['serve_id'],body['report'])),
                         'change_updates':({'project','page','version'},lambda:Changes(center).page_updates(uid,body['project'],body['page'],body['version'])),
                         'change_retest':({'project','case','revision','page','version','delivery_sha256','action','reason'},lambda:Changes(center).retest(uid,body['project'],body['case'],body['revision'],body['page'],body['version'],body['delivery_sha256'],body['action'],body['reason'])),

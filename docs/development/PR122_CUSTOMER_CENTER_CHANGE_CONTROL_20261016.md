@@ -133,3 +133,16 @@ publisher每次短生命周期启动重新加载Root受保护credential；紧急
 本模块是受保护执行流水线可调用的纯候选构建器，没有增加HTTP写接口或任意文件/shell执行。重复同一已授权版本生成同一候选和凭证；修改前后SHA、请求及评估SHA、合同/Manifest/来源绑定完整。候选凭证明确CANDIDATE_ONLY_AWAIT_TEST_REVIEW_AND_PUBLISH，费用为0，on_chain=false；不会提前显示「已调整」、不会签发来源、收费或覆盖生产。后续测试、获审制品及生产签发链仍须接入实际执行调度，不把单元测试当已部署自动改码闭环。自由文本一般代码生成和付费模型额度网关仍未实现。
 
 本地执行环境恢复后，已实际下载此前bf7dbb8源Artifact12065616659并复算原ZIP、TAR、55成员和54项Manifest全部字节匹配；这是开发方复算，不代替独审。原#6221904716送审准确版本继续保留，本增量作为同一集中申请的补充冻结版本，旧生产与root通道不变。
+
+
+### 2026-10-17：错字执行器至受保护测试流水线的真实接线
+
+继承#6226846755已通过的8fe756a执行原语，不修改它。新增持久化preview_edit_jobs、REVIEWER鉴权的POST change_small_edit及GET edit_candidate/{project}/{job}。输入仅项目/原请求ID，不能提交任意代码、路径、命令、替换片段或费用。任务固化请求及评估事件，复用既有Unix通知和30秒timer，由同一受保护worker调用原build_candidate；不新增root/sudo动作，也不要求Owner逐页执行。
+
+候选字节与准确凭证一起加密落库，存储与CANDIDATE_READY状态在同一事务写入。PROCESSING/失败UNKNOWN不自动重跑；同一请求+评估重复入队复用任务。每轮最多4份候选，来源/权限/评估变化即拒绝。REVIEWER下载候选JSON前再次核对当前Owner/合同/原页面/Manifest/评估及原排队主体权限，匿名、客户OWNER、跨项目、Range和条件缓存拒绝。返回的是无执行能力的JSON/base64工件，不给客户公开unsigned HTML预览。
+
+测试新增真实HTTP排队→后台worker调用原语→加密候选→鉴权下载→独立Chromium进程对该准确字节做1440/390测试的完整隔离链。浏览器报告绑定实际候选SHA，测试原脚本仍运行、文字确实变化、无JS异常和横向溢出；报告明确ISOLATED_LOOPBACK_CANDIDATE_NOT_PRODUCTION、tls_verified=false，不生成生产签名。合成fixture内的自动drain仅模拟现有systemd唤醒，不新增生产绕过。
+
+仍须独立审核准确候选、真实生产测试签名与受保护来源激活；此轮未开放候选自动发布，不复用原页面审批代替新版本独审。旧版本字节及凭证保留，不覆盖原签名Manifest。正式激活/回滚仍沿既有许可事务，不在队列中隐式执行。Root安装、生产依赖重建、私有配置及真实客户资料入口HOLD继续有效。此节点完成的是API/队列/worker/工件/隔离浏览器真实调用接线，非生产端到端验收。
+
+候选工件同时包含原签名Manifest及完整同项目资源闭包，每份资源绑定原路径/SHA/字节；仅目标HTML变化，其余保持原准确字节，闭包总量上限2MB。不会要求测试器临时从可变公开路径下载资源。资源或来源变化即拒绝。浏览器fixture因本地缺少Chromium首次无法运行，本地受限容器的既有setuid内核用例PermissionError；不修改/跳过安全测试，转由完整Hosted CI实际执行并如实记录。
