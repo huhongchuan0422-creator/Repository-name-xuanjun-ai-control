@@ -44,6 +44,13 @@ class PublicationTests(unittest.TestCase):
         self.queue(a,receipt,report);self.queue(b,receipt,second);result=drain(self.c,trust,self.auth)
         self.assertEqual(result['done'],2);self.assertEqual(result['held'],0)
         self.assertEqual(len(service.page_updates(self.owner,'project-a',self.path,self.sha)['updates']),2)
+    def test_completed_job_duplicate_returns_done_and_status_is_role_bound(self):
+        from scripts.pr122_customer_publication_worker import status
+        r,receipt,report,trust,_=self.publication();q=self.queue(r,receipt,report);drain(self.c,trust,self.auth)
+        self.assertEqual(self.queue(r,receipt,report)['state'],'DONE')
+        self.assertEqual(status(self.c,self.reviewer,'project-a',q['id'])['state'],'DONE')
+        with self.assertRaises(Denied):status(self.c,self.owner,'project-a',q['id'])
+        with self.assertRaises(Denied):status(self.c,self.other,'project-a',q['id'])
     def test_effective_nondumpable_after_uid_drop_in_disposable_child(self):
         self.assertEqual(os.geteuid(),0,'Hosted root fixture only')
         code='from scripts.pr122_customer_publication_worker import nondumpable;import os;os.setgroups([]);os.setgid(65534);os.setuid(65534);nondumpable();print("NONDUMPABLE_AFTER_DROP=PASS")'

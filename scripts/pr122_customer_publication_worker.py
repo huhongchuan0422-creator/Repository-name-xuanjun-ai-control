@@ -25,11 +25,19 @@ def enqueue(c,uid,project,case,serve_id,report):
         c.project(uid,project,{'REVIEWER'});c.limit('publication:'+uid+':'+project,20,3600)
         c.db.execute('INSERT OR IGNORE INTO preview_publication_jobs VALUES(?,?,?,?,?,?,?)',(key,project,uid,'QUEUED',c.encrypt(raw,key),c.now(),None))
         c.audit(project,uid,'DELIVERY_REPORT_QUEUED',key)
+    state=c.db.execute('SELECT state FROM preview_publication_jobs WHERE id=?',(key,)).fetchone()[0]
     notified=False
     try:
+        if state!='QUEUED':return {'id':key,'state':state,'notification_sent':False,'queue_result_is_not_acceptance':True}
         with socket.socket(socket.AF_UNIX,socket.SOCK_DGRAM) as s:s.settimeout(.2);s.sendto(b'1',NOTIFY);notified=True
     except OSError:pass # Timer drains durable queue if socket is absent/unavailable.
-    return {'id':key,'state':'QUEUED','notification_sent':notified,'delivery_not_yet_approved':True}
+    return {'id':key,'state':state,'notification_sent':notified,'queue_result_is_not_acceptance':True}
+
+def status(c,uid,project,job):
+    c.project(uid,project,{'REVIEWER'})
+    row=c.db.execute('SELECT * FROM preview_publication_jobs WHERE id=? AND project=?',(job,project)).fetchone()
+    if not row:raise Denied('PUBLICATION_JOB_NOT_FOUND')
+    return {'id':row['id'],'state':row['state'],'result':json.loads(c.decrypt(row['result'],'result:'+row['id'])) if row['result'] else None,'queue_result_is_not_acceptance':True}
 
 def drain(c,trust,key):
     done=held=0

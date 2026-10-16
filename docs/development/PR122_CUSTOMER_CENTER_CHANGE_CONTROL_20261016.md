@@ -105,3 +105,15 @@ publisher.service启动时仅从Root systemd credential读取最小publisher.jso
 全局来源revision递增不会误拒其他项目/请求的相同已审页面：以当前项目授权revision、Manifest/源码/制品/页面/渲染哈希和签名测试为准；允许更早来源revision的真实取页记录，但当前撤销/页面改变/权限变化均拒绝。新增双报告顺序处理回归，防止第一个成功发布覆盖或卡住第二个。
 
 尚未完成：生产测试私钥的独立保管与harness登记、真实测试系统自动签名/排队及实际客户预览运行；自由文本自动改代码执行器、生产依赖Root重建、扫描器和真实合同映射。当前完成的是可测试的自动队列/签发链源码，不冒称这些生产接线已启用。下一次集中审核应包括本轮全部实际增量和生成的通道代码，旧通过部分不重审。
+
+### 发布测试环境与状态接口的最终边界
+
+签名测试报告额外绑定准确origin=https://wenwenwenyiyiyi.work、environment=PRODUCTION_PRIVATE_PREVIEW及tls_verified=true；签发公钥登记也必须是该生产私有预览范围及该origin。ISOLATED_FIXTURE、错误域名、未验证TLS或仅用于staging的公钥不得放行。验证器信任的是Owner独立登记、固定harness对应的机器签名证明，不是客户端填的布尔值；生产测试签发程序及真实证据仍未部署，CI中的随机测试签名仅验证拒绝边界，不冒充真实生产报告。
+
+Root安装plan预检全部测试信任登记的字段、公钥、harness SHA和至少一个ACTIVE独立生产测试主体，canonical HMAC严格32字节。Owner通道升级在激活前重新回读准确批准和Root私有锚，撤销、修改或过期均停止。
+
+自动化可按项目REVIEWER权限查询/api/publication/{project}/{job}，重复提交返回已持久化的真实QUEUED/PROCESSING/DONE/HOLD_UNKNOWN状态，不把历史DONE当作客户验收或当前发布批准。普通流程无需Owner逐页查库。
+
+publisher每次短生命周期启动重新加载Root受保护credential；紧急撤销测试签发钥时，须停socket/timer及正在执行的worker，再更换信任文件，不能仅改磁盘文件就宣称已终止内存中的旧授权。PROCESSING未知任务保持不自动重试。
+
+隔离runtime中的临时Ed25519密钥仅作密码库自检，不输出、不保存、不作为独审、测试报告或生产签发密钥。

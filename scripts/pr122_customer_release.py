@@ -88,12 +88,14 @@ def plan(folder):
     need(set(runtime)=={'keys','active_key','providers'},'RUNTIME_CREDENTIAL_MINIMUM')
     need(c['keys']==runtime['keys'] and c['active_key']==runtime['active_key'] and c['providers']==runtime['providers'],'CONFIG_BINDING')
     import base64
-    need(len(base64.b64decode(c['backup_key'],validate=True))==32 and len(base64.b64decode(c['authority_verify_key'],validate=True))>=32,'PROTECTED_KEYS_REQUIRED')
+    need(len(base64.b64decode(c['backup_key'],validate=True))==32 and len(base64.b64decode(c['authority_verify_key'],validate=True))==32,'PROTECTED_KEYS_REQUIRED')
     need(c['backup_key_ref'] and c['active_key'] in c['keys'] and all(len(base64.b64decode(v,validate=True))==32 for v in c['keys'].values()),'DATA_KEY_MAPPING')
     publisher=private_config(CONFIG/'publisher.json')
     need(set(publisher)=={'keys','active_key','authority_sign_key','preview_test_trust'} and publisher['keys']==c['keys'] and publisher['active_key']==c['active_key'] and publisher['authority_sign_key']==c['authority_verify_key'],'PUBLISHER_CONFIG_BINDING')
     test_trust=publisher['preview_test_trust']
     need(type(test_trust) is dict and set(test_trust)=={'source_writer_principal','keys','allowed_harness_sha256'} and bool(test_trust['keys']) and bool(test_trust['allowed_harness_sha256']),'ENROLLED_TEST_PUBLISHER_REQUIRED')
+    from scripts.pr122_customer_delivery_source import validate_test_trust
+    validate_test_trust(test_trust)
     providers=Providers(runtime['providers']).status();need(all(runtime['providers'].get(k) for k in ('smtp','telegram','feishu','secretref','web_ai')),'REAL_PROVIDER_CONFIG_REQUIRED')
     # Source-only tests cannot satisfy actual scan/KMS/provider/authority evidence.
     acceptance=private_config(CONFIG/'TARGET_ACCEPTANCE.json')

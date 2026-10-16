@@ -13,11 +13,27 @@ from scripts.pr122_customer_changes import Changes
 
 REQUIRED={'render','assets','javascript','csp','desktop','mobile','project_isolation','feedback','retest'}
 
+def validate_test_trust(trust):
+    import re
+    if type(trust) is not dict or set(trust)!={'source_writer_principal','keys','allowed_harness_sha256'} or type(trust['source_writer_principal']) is not str or not trust['source_writer_principal']:raise Denied('TEST_TRUST_SCHEMA')
+    if type(trust['keys']) is not dict or not 1<=len(trust['keys'])<=32 or type(trust['allowed_harness_sha256']) is not list or not 1<=len(trust['allowed_harness_sha256'])<=64:raise Denied('TEST_TRUST_BOUNDS')
+    if any(type(x) is not str or not re.fullmatch('[0-9a-f]{64}',x) for x in trust['allowed_harness_sha256']) or len(set(trust['allowed_harness_sha256']))!=len(trust['allowed_harness_sha256']):raise Denied('EXACT_TEST_HARNESS_HASH')
+    active=0
+    for key_id,key in trust['keys'].items():
+        if type(key_id) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,100}',key_id) or type(key) is not dict or set(key)!={'principal','public_key_b64','state','custody_evidence_sha256','scope','origin'}:raise Denied('TEST_KEY_SCHEMA')
+        if type(key['principal']) is not str or not key['principal'] or key['state'] not in ('ACTIVE','DISABLED','REVOKED') or type(key['custody_evidence_sha256']) is not str or not re.fullmatch('[0-9a-f]{64}',key['custody_evidence_sha256']):raise Denied('TEST_KEY_CUSTODY')
+        try:Ed25519PublicKey.from_public_bytes(base64.b64decode(key['public_key_b64'],validate=True))
+        except Exception:raise Denied('TEST_PUBLIC_KEY') from None
+        if key['state']=='ACTIVE' and key['principal']!=trust['source_writer_principal'] and key['scope']=='PRODUCTION_PRIVATE_PREVIEW' and key['origin']=='https://wenwenwenyiyiyi.work':active+=1
+    if not active:raise Denied('ACTIVE_INDEPENDENT_PRODUCTION_TEST_KEY_REQUIRED')
+    return trust
+
 def issue(c,project,case,serve_id,report,trust,source_key):
     """Operator uses independently enrolled test signer and current source key.
     report is a machine test receipt, not independent installation permission.
     """
     if type(source_key) is not bytes or len(source_key)!=32:raise Denied('PROTECTED_SOURCE_KEY_REQUIRED')
+    validate_test_trust(trust)
     current=load(c);owner=c.db.execute('SELECT owner FROM projects WHERE id=?',(project,)).fetchone()
     if not owner:raise Denied('PROJECT_NOT_FOUND')
     p,_,_=c.project(owner[0],project,{'OWNER'})
@@ -29,11 +45,12 @@ def issue(c,project,case,serve_id,report,trust,source_key):
     if type(report) is not dict or set(report)!={'payload','key_id','signature'}:raise Denied('SIGNED_TEST_REPORT_REQUIRED')
     if type(trust) is not dict or set(trust)!={'source_writer_principal','keys','allowed_harness_sha256'}:raise Denied('TEST_SIGNER_TRUST_REQUIRED')
     key=trust['keys'].get(report['key_id']);test=report['payload']
-    if not key or set(key)!={'principal','public_key_b64','state','custody_evidence_sha256'} or key['state']!='ACTIVE' or key['principal']==trust['source_writer_principal'] or not __import__('re').fullmatch('[0-9a-f]{64}',key['custody_evidence_sha256']):raise Denied('ENROLLED_TEST_SIGNER_REQUIRED')
+    if not key or set(key)!={'principal','public_key_b64','state','custody_evidence_sha256','scope','origin'} or key['state']!='ACTIVE' or key['scope']!='PRODUCTION_PRIVATE_PREVIEW' or key['origin']!='https://wenwenwenyiyiyi.work' or key['principal']==trust['source_writer_principal'] or not __import__('re').fullmatch('[0-9a-f]{64}',key['custody_evidence_sha256']):raise Denied('ENROLLED_TEST_SIGNER_REQUIRED')
     try:Ed25519PublicKey.from_public_bytes(base64.b64decode(key['public_key_b64'],validate=True)).verify(base64.b64decode(report['signature'],validate=True),canonical(test))
     except Exception:raise Denied('TEST_REPORT_SIGNATURE') from None
-    fields={'purpose','project','case','request_sha256','page','before_sha256','after_sha256','manifest_sha256','source_commit','artifact_sha256','render_sha256','harness_sha256','checks','issued_at','expires','summary'}
+    fields={'purpose','project','case','request_sha256','page','before_sha256','after_sha256','manifest_sha256','source_commit','artifact_sha256','render_sha256','harness_sha256','checks','issued_at','expires','summary','origin','environment','tls_verified'}
     if type(test) is not dict or set(test)!=fields or test['purpose']!='PR122_PRIVATE_PREVIEW_TEST_V1':raise Denied('TEST_REPORT_SCHEMA')
+    if test['origin']!='https://wenwenwenyiyiyi.work' or test['environment']!='PRODUCTION_PRIVATE_PREVIEW' or test['tls_verified'] is not True:raise Denied('REAL_PRIVATE_HTTPS_REPORT_REQUIRED')
     if test['harness_sha256'] not in trust['allowed_harness_sha256'] or type(test['checks']) is not dict or set(test['checks'])!=REQUIRED or any(v!='PASS' for v in test['checks'].values()):raise Denied('EXACT_TESTS_REQUIRED')
     if any(type(test[k]) is not int for k in ('issued_at','expires')) or not test['issued_at']<=row['created']<=c.now()<test['expires'] or test['expires']-test['issued_at']>86400:raise Denied('TEST_REPORT_EXPIRED_OR_PREDEPLOYMENT')
     if test['project']!=project or test['case']!=case or test['request_sha256']!=Changes(c)._request_sha(events) or test['page']!=request['page'] or test['before_sha256']!=request['page_sha256']:raise Denied('TEST_REQUEST_BINDING')

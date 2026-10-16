@@ -161,6 +161,7 @@ def apply(get=fetch,checkpoint=lambda stage:None):
             r['completed'].append('BACKUP_VERIFIED');receipt(r);checkpoint('BACKUP_VERIFIED')
             tree_write(CONTROL/'new-candidate',files);create(CONTROL/'new-channel.py',code,0o444);create(CONTROL/'new.tar.gz',archive,0o400)
             r['state']='ACTIVATING';receipt(r);checkpoint('STAGED')
+            need(gate(p,get)==approval,'APPROVAL_REVOKED_BEFORE_ACTIVATION')
             need(time.time()<approval['expires_unix'] and snapshot(BASE/'candidate')==p['old']['files'] and sha(read(EXEC))==p['old']['wrapper_sha256'] and sha(read(POLICY))==p['old']['policy_sha256'],'PREACTIVATION_DRIFT_OR_EXPIRY')
             r['activation_started']=True;receipt(r)
             replace(BASE/'grant-state.json',b'{"state":"UPGRADING"}',0o600);checkpoint('FENCED')

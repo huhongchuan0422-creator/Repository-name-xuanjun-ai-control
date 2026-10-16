@@ -14,7 +14,7 @@ from scripts.pr122_customer_core import Center,Denied,Conflict,Unavailable,canon
 from scripts.pr122_customer_source import reject_untrusted,TrustedNginxSource
 from scripts.pr122_customer_providers import Providers,enqueue,ai_reply
 from scripts.pr122_customer_changes import Changes
-from scripts.pr122_customer_publication_worker import enqueue as enqueue_preview_report
+from scripts.pr122_customer_publication_worker import enqueue as enqueue_preview_report,status as publication_status
 
 PREFIX='/customer/center/'
 CSP="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -137,6 +137,7 @@ class App:
                             return self.reply(200,listing(center,uid,operation[len('previews/'):]))
                         if operation=='me':return self.reply(200,{'user_id':uid,'projects':center.projects(uid),'channels':app.providers.status()})
                         parts=operation.split('/')
+                        if len(parts)==3 and parts[0]=='publication':return self.reply(200,publication_status(center,uid,parts[1],parts[2]))
                         if len(parts)==2 and parts[0]=='checklist':return self.reply(200,center.checklist(uid,parts[1]))
                         if len(parts)==2 and parts[0]=='messages':return self.reply(200,{'messages':center.messages(uid,parts[1])})
                         if len(parts)==2 and parts[0]=='changes':return self.reply(200,Changes(center).list(uid,parts[1]))

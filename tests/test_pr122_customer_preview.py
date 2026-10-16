@@ -59,8 +59,8 @@ class PreviewTests(unittest.TestCase):
         self.revision=2;self.install(self.body.replace(b'#123',b'#456'))
         raw,_,_=render(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha);receipt=served(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha,raw)
         record=load(self.c)['previews'][0];private=Ed25519PrivateKey.generate();public=private.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
-        trust={'source_writer_principal':'writer','keys':{'test-key':{'principal':'isolated-test-runner','public_key_b64':base64.b64encode(public).decode(),'state':'ACTIVE','custody_evidence_sha256':'a'*64}},'allowed_harness_sha256':['b'*64]}
-        payload={'purpose':'PR122_PRIVATE_PREVIEW_TEST_V1','project':'project-a','case':r['id'],'request_sha256':service._request_sha(service._events(self.owner,'project-a',r['id'])),'page':self.path,'before_sha256':before,'after_sha256':self.sha,'manifest_sha256':record['manifest_sha256'],'source_commit':record['source_commit'],'artifact_sha256':record['artifact_sha256'],'render_sha256':digest(raw),'harness_sha256':'b'*64,'checks':{k:'PASS' for k in REQUIRED},'issued_at':self.now,'expires':self.now+300,'summary':'已调整标题颜色'}
+        trust={'source_writer_principal':'writer','keys':{'test-key':{'principal':'isolated-test-runner','public_key_b64':base64.b64encode(public).decode(),'state':'ACTIVE','custody_evidence_sha256':'a'*64,'scope':'PRODUCTION_PRIVATE_PREVIEW','origin':'https://wenwenwenyiyiyi.work'}},'allowed_harness_sha256':['b'*64]}
+        payload={'purpose':'PR122_PRIVATE_PREVIEW_TEST_V1','project':'project-a','case':r['id'],'request_sha256':service._request_sha(service._events(self.owner,'project-a',r['id'])),'page':self.path,'before_sha256':before,'after_sha256':self.sha,'manifest_sha256':record['manifest_sha256'],'source_commit':record['source_commit'],'artifact_sha256':record['artifact_sha256'],'render_sha256':digest(raw),'harness_sha256':'b'*64,'checks':{k:'PASS' for k in REQUIRED},'issued_at':self.now,'expires':self.now+300,'summary':'已调整标题颜色','origin':'https://wenwenwenyiyiyi.work','environment':'PRODUCTION_PRIVATE_PREVIEW','tls_verified':True}
         report={'payload':payload,'key_id':'test-key','signature':base64.b64encode(private.sign(canonical(payload))).decode()}
         return r,receipt,report,trust,private
     def test_signed_test_and_real_server_receipt_generate_delivery_without_network(self):
@@ -84,6 +84,14 @@ class PreviewTests(unittest.TestCase):
             bad=copy.deepcopy(report);bad['payload'][key]=value;bad['signature']=base64.b64encode(private.sign(canonical(bad['payload']))).decode()
             with self.assertRaises(Denied):issue(self.c,'project-a',r['id'],receipt['id'],bad,trust,self.auth)
         report['payload']['checks']['mobile']='FAIL';report['signature']=base64.b64encode(private.sign(canonical(report['payload']))).decode()
+        with self.assertRaises(Denied):issue(self.c,'project-a',r['id'],receipt['id'],report,trust,self.auth)
+
+    def test_fixture_scope_wrong_origin_and_unverified_tls_cannot_publish(self):
+        r,receipt,report,trust,private=self.publication()
+        for field,value in (('environment','ISOLATED_FIXTURE'),('origin','http://127.0.0.1'),('tls_verified',False)):
+            bad=copy.deepcopy(report);bad['payload'][field]=value;bad['signature']=base64.b64encode(private.sign(canonical(bad['payload']))).decode()
+            with self.assertRaises(Denied):issue(self.c,'project-a',r['id'],receipt['id'],bad,trust,self.auth)
+        trust['keys']['test-key']['scope']='ISOLATED_FIXTURE'
         with self.assertRaises(Denied):issue(self.c,'project-a',r['id'],receipt['id'],report,trust,self.auth)
 
 class PreviewHTTPTests(HttpTests):
