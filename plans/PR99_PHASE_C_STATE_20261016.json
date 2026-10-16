@@ -170,7 +170,7 @@
       "production_authority": false
     },
     "root_execution_channel": {
-      "status": "OWNER_ROOT_GRANT_PASS_RUNNER_INSPECTION_PENDING",
+      "status": "OWNER_ROOT_GRANT_AND_RUNNER_FIXED_INSPECT_PASS",
       "source_commit": "e3da4ae2f98c75ab0c1ccb9a372cef3e3692c8e4",
       "review_request_comment_id": 6213074164,
       "owner_terminal": "OWNER_REPORTED_KOREA_ROOT_READY_NOT_DIRECTLY_ATTACHED",
@@ -229,13 +229,55 @@
         "retry_allowed": false,
         "service_actions": 0,
         "staging_directory": "/root/pr99-phase-c-channel-e3da4ae2",
-        "runner_channel_verified": false
+        "runner_channel_verified": true
+      },
+      "runner_inspect": {
+        "run": 38886245115,
+        "job": 116924571943,
+        "delivery_commit": "484dd835edcb638008a4e5c433ab7f3f417ed14e",
+        "runner": "xuanjun-korea-binance",
+        "host": "iZmj7a5kwr75qc1tul4kf9Z",
+        "caller_uid": 1001,
+        "installed_dispatcher_and_wrapper_hashes": "PASS",
+        "fixed_sudo_call": "PASS",
+        "receipt": {
+          "credentials_read": false,
+          "database_read": false,
+          "inputs": {
+            "archive": {
+              "present": false
+            },
+            "authority_public_key": {
+              "present": false
+            },
+            "broker_public_key": {
+              "present": false
+            },
+            "handoff": {
+              "present": false
+            },
+            "install_admission": {
+              "present": false
+            },
+            "plan": {
+              "present": false
+            },
+            "source_public_key": {
+              "present": false
+            }
+          },
+          "install_called": false,
+          "status": "CHANNEL_INSPECTION_COMPLETE"
+        },
+        "private_grant_claim_and_sudoers_bytes": "NOT_DIRECTLY_READ_BY_RUNNER",
+        "other_hosts": "SKIPPED",
+        "repeated": false
       }
     }
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NONE_PENDING_ONE_EXISTING_V27_RUNNER_FIXED_INSPECT",
+  "owner_action_now": "NO_REINSTALL; PREPARE_ACTUAL_PRIVATE_BINDINGS_AND_EXACT_PHASE_C_INSTALL_APPROVAL",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
