@@ -1,102 +1,62 @@
-name: PR122 site hub domestic host read-only preflight
+name: PR122 production browser acceptance
 on:
   push:
     branches: [feature/work-pr122-site-hub-integration-20261016]
     paths: [.github/workflows/pr122-site-hub-host-preflight.yml]
 permissions:
   contents: read
-  actions: read
 concurrency:
-  group: pr122-domestic-readonly
+  group: pr122-production-browser-readonly
   cancel-in-progress: false
 jobs:
-  fixed-channel-inspect:
-    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
-    timeout-minutes: 2
+  production-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Approved post-recovery fixed inspect only
-        run: |
-          set -euo pipefail
-          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
-          test "$(id -u)" = 1002
-          echo 'APPROVAL_REFERENCE=PR122#6213703300; ACTION=inspect'
-          sudo -n /usr/local/libexec/xuanjun-customer-channel inspect
-          echo 'FIXED_ROOT_INSPECT_EXIT=0; CUSTOMER_INSTALL_NOT_CALLED'
-
-      - name: Unprivileged runtime and reusable service metadata inventory
-        run: |
-          /usr/bin/python3 -I -B - <<'PY'
-          import importlib.metadata,json,os,pwd,shutil,signal,ssl,subprocess
-          signal.alarm(40)
-          assert os.uname().nodename=='iZvt5t8tlrm8oiZ' and os.getuid()==1002
-          report={'production_mutations':0,'dependency_versions':{},'tools':{},'service_units':[]}
-          for name in ('cryptography','cffi','pycparser'):
-              try:report['dependency_versions'][name]=importlib.metadata.version(name)
-              except importlib.metadata.PackageNotFoundError:report['dependency_versions'][name]='ABSENT'
-          report['openssl']=ssl.OPENSSL_VERSION
-          for name in ('clamdscan','clamscan','systemd-analyze'):
-              report['tools'][name]=shutil.which(name)
-          try:
-              p=pwd.getpwnam('xuanjun-customer')
-              report['customer_account']={'uid':p.pw_uid,'gid':p.pw_gid,'shell':p.pw_shell}
-          except KeyError:report['customer_account']='ABSENT'
-          r=subprocess.run(['/usr/bin/systemctl','list-unit-files','--type=service','--no-legend','--no-pager'],capture_output=True,text=True,timeout=10)
-          if r.returncode==0:
-              for line in r.stdout.splitlines():
-                  name=line.split()[0] if line.split() else ''
-                  if any(word in name.lower() for word in ('xuanjun','domestic','identity','crm','clam','telegram','feishu','bridge','secretref')):
-                      report['service_units'].append(name)
-          else:report['service_inventory']='UNKNOWN'
-          print('CUSTOMER_RUNTIME_METADATA='+json.dumps(report,sort_keys=True))
-          PY
-
-      - name: Verify already staged frozen wheels without installation
-        run: |
-          /usr/bin/python3 -I -B - <<'PY'
-          import hashlib,json
-          from pathlib import Path
-          root=Path('/home/githubrunner/pr122-approved-channel-inputs/customer/wheels')
-          expected={
-          'cffi-2.0.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl':'8941aaadaf67246224cee8c3803777eed332a19d909b47e29c9842ef1e79ac26',
-          'cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl':'10b01676fc208c3e6feeb25a8b83d81767e8059e1fe86e1dc62d10a3018fa926',
-          'pycparser-2.23-py3-none-any.whl':'e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934'}
-          for name,h in expected.items():
-              p=root/name
-              assert not p.is_symlink() and p.is_file() and p.stat().st_size<10000000
-              assert hashlib.sha256(p.read_bytes()).hexdigest()==h
-          print('FROZEN_WHEELS=3_OF_3_HASH_PASS; INSTALL_NOT_CALLED')
-          PY
-
-  stage-approved-static-experience:
-    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
-    timeout-minutes: 5
-    steps:
-      - name: Download exact independently reviewed artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          artifact-ids: '12047517541'
-          run-id: '38904927962'
-          github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/pr122-experience-6216329680
-      - name: Stage hashed package as unprivileged data only
-        env:
-          INPUT_DIR: ${{ runner.temp }}/pr122-experience-6216329680
+          node-version: '22'
+      - name: Install pinned browser
         run: |
-          /usr/bin/python3 -I -B - <<'PY'
-          import hashlib,json,os,stat
-          from pathlib import Path
-          assert os.uname().nodename=='iZvt5t8tlrm8oiZ' and os.getuid()==1002
-          sources=list(Path(os.environ['INPUT_DIR']).rglob('PR122_EXPERIENCE_RELEASE_REVIEW_ONLY.tar.gz'))
-          assert len(sources)==1
-          raw=sources[0].read_bytes()
-          assert hashlib.sha256(raw).hexdigest()=='d1458c593c2c8538742fc7c6c743e4b70ddf7e6f575db5fed0fc38fce7f967f3'
-          destination=Path('/home/githubrunner/pr122-experience-6216329680')
-          destination.mkdir(mode=0o700,exist_ok=False)
-          p=destination/'approved-release.tar.gz'
-          fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
-          with os.fdopen(fd,'wb') as out:
-              out.write(raw);out.flush();os.fsync(out.fileno())
-          print('STAGED_PACKAGE='+str(p))
-          print('PACKAGE_SHA256='+hashlib.sha256(raw).hexdigest())
-          print('ROOT_NOT_CALLED; APPLY_NOT_CALLED; PRODUCTION_CHANGES=0')
-          PY
+          npm install --prefix "$RUNNER_TEMP/pr122-public-browser" --no-save playwright@1.55.0
+          "$RUNNER_TEMP/pr122-public-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Real HTTPS desktop and mobile acceptance
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pr122-public-browser/node_modules/playwright
+          REPORT_DIR: ${{ runner.temp }}/pr122-production-report
+        run: |
+          node <<'JS'
+          const fs=require('node:fs'),assert=require('node:assert/strict');
+          const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
+          const base='https://wenwenwenyiyiyi.work',out=process.env.REPORT_DIR;
+          (async()=>{fs.mkdirSync(out,{recursive:true});const browser=await chromium.launch({headless:true});
+          const report={scope:'Real production HTTPS; no request interception; no root changes',transaction:'pr122-hub-experience-20261016-r2',pages:[],checks:[],failures:[],js_errors:[],asset_failures:[],showcase_links:[]};
+          try{const context=await browser.newContext({ignoreHTTPSErrors:false});const page=await context.newPage();
+          page.on('pageerror',e=>report.js_errors.push(e.message));
+          page.on('console',m=>{if(m.type()==='error'&&/Content Security Policy|Refused to/.test(m.text()))report.js_errors.push(m.text());});
+          page.on('response',r=>{if(r.status()>=400&&/\.(css|js|mjs|png|jpg|webp|svg)(\?|$)/.test(r.url()))report.asset_failures.push({url:r.url(),status:r.status()});});
+          async function check(name,fn){try{await fn();report.checks.push({name,status:'PASS'});}catch(e){report.failures.push({name,error:String(e.message).slice(0,800)});}}
+          const paths=['/','/marketplace/','/marketplace/modules/','/visual/','/visual/catalog/','/visual/community-payment/','/ecosystem/','/ecosystem/tiers/','/ecosystem/co-create/','/ecosystem/profit-sharing/','/ecosystem/ledger/','/ecosystem/activities/','/ecosystem/governance/','/customer/projects/','/customer/projects/acceptance/'];
+          for(const width of [1440,390]){await page.setViewportSize({width,height:900});
+          for(const path of paths){await check(width+' '+path,async()=>{const r=await page.goto(base+path);assert.equal(r.status(),200);assert(await page.locator('h1').count());assert.equal(await page.locator('a[href="https://beian.miit.gov.cn/"]').count(),1);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'horizontal overflow');report.pages.push({width,path,status:r.status(),title:await page.title()});});}
+          await page.goto(base+'/');await page.screenshot({path:out+'/HOME_'+width+'.png',fullPage:true});
+          if(width===390){await check('mobile menu and second dropdown',async()=>{await page.locator('.mobile-toggle').click();assert(await page.locator('#primary-nav').isVisible());const b=page.locator('#primary-nav .nav-group').nth(1).locator('button');const before=await b.boundingBox();await b.click();assert.equal(await b.getAttribute('aria-expanded'),'true');await b.click();assert.equal(await b.getAttribute('aria-expanded'),'false');const after=await b.boundingBox();assert(Math.abs(before.y-after.y)<2,'menu moved vertically');await page.locator('.mobile-toggle').click();});}
+          await check('three merchants '+width,async()=>{await page.goto(base+'/visual/community-payment/merchant-dashboard/');for(const merchant of ['grocer','cafe','home']){await page.locator('#merchantSelect').selectOption(merchant);await page.getByRole('button',{name:'订单管理',exact:true}).click();assert.match(await page.locator('#merchantIdentity').innerText(),/模拟商家/);assert.equal(await page.locator('#orderRows tr').count(),3);}await page.screenshot({path:out+'/MERCHANT_'+width+'.png',fullPage:true});});
+          }
+          await page.setViewportSize({width:1440,height:900});await page.goto(base+'/');
+          await check('original navigation and 5px geometry',async()=>{assert.deepEqual(await page.locator('#primary-nav .nav-group>a').allTextContents(),['解决方案','功能市场','定制与交付','共创生态']);const gaps=await page.locator('#primary-nav .nav-group').evaluateAll(gs=>gs.map(g=>{const a=document.createRange(),b=document.createRange();a.selectNodeContents(g.querySelector('a'));b.selectNodeContents(g.querySelector('button'));return b.getBoundingClientRect().left-a.getBoundingClientRect().right;}));for(const n of gaps)assert(n>=4&&n<=6,'arrow gap '+n);report.arrow_gaps=gaps;});
+          const links=await page.locator('a[href^="/showcase/"]').evaluateAll(xs=>Array.from(new Set(xs.map(x=>x.getAttribute('href')))));
+          for(const href of links){const r=await context.request.get(base+href);report.showcase_links.push({href,status:r.status()});if(r.status()!==200)report.failures.push({name:'homepage dynamic entry',href,status:r.status(),scope:'Dynamic mechanism not installed; cannot claim complete acceptance'});}
+          await check('English and Chinese switching',async()=>{await page.locator('.language>button').click();await page.locator('.language-panel a[lang="en"]').click();await page.waitForURL(base+'/en/');assert.equal(await page.locator('html').getAttribute('lang'),'en');assert.match(await page.locator('h1').innerText(),/AI that fits/);await page.locator('.language>button').click();await page.locator('.language-panel a[lang="zh-CN"]').click();assert.match(await page.locator('h1').innerText(),/AI/);});
+          await check('calculator limits and UNKNOWN',async()=>{await page.goto(base+'/marketplace/');await page.locator('#credit').fill('5000');await page.locator('#ecvQuote button').click();let s=await page.locator('#quoteResult').innerText();assert.match(s,/2400\.00/);assert.match(s,/1200\.00/);await page.locator('#directCost').fill('');await page.locator('#ecvQuote button').click();assert.match(await page.locator('#quoteResult').innerText(),/成本未知，不可结算/);await page.locator('#serviceKind').selectOption('ordinary');await page.locator('#listPrice').fill('100');await page.locator('#credit').fill('100');await page.locator('#ecvQuote button').click();s=await page.locator('#quoteResult').innerText();assert.match(s,/上限90%/);assert.match(s,/预计实付：¥10\.00/);});
+          for(const path of ['/about','/capabilities/customer-communication','/en/about']){await check('legacy '+path,async()=>{const r=await page.goto(base+path);assert.equal(r.status(),200);});}
+          for(const path of ['/pr122-browser-unknown','/customer/private/']){const r=await context.request.get(base+path);report.checks.push({name:'negative '+path,status:r.status()===404?'PASS':'FAIL',http:r.status()});if(r.status()!==404)report.failures.push({path,status:r.status()});}
+          await context.close();
+          }catch(e){report.failures.push({name:'runner',error:String(e.message).slice(0,800)});}finally{await browser.close();report.status=report.failures.length||report.js_errors.length||report.asset_failures.length?'PARTIAL_NOT_ACCEPTED':'PASS';fs.writeFileSync(out+'/PRODUCTION_BROWSER_REPORT.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));if(report.status!=='PASS')process.exitCode=1;}})();
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr122-production-browser-r2
+          path: ${{ runner.temp }}/pr122-production-report
+          retention-days: 14
