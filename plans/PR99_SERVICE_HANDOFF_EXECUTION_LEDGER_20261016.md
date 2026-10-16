@@ -111,3 +111,12 @@ Owner在韩国执行准确ae5e03d9安装器，国内root认证后进入源码落
 2026-10-17 00:52 Owner-root只读输出：79份源码无摘要差异；venv只有pip/setuptools；依赖日志显示官方PyPI实际下载约10–16 KB/s，到900秒仍在下载idna。准确脱敏诊断见`s07-wheel-continuation/OWNER_DIAGNOSIS_20261017.json`。不是源码校验失败，也没有业务包安装成功。
 
 按#6219362469直接迁移授权形成新续接脚本：保留原目录/日志/源码，在韩国下载相同三个准确版本及wheel依赖，整包和逐wheel摘要验证后国内--no-index --require-hashes离线安装。旧安装器不重跑；旧失败不覆盖；新续接单独目录、失败保留。新增本地9项边界测试通过，不冒充Hosted CI或主机PASS。当前新续接未执行；完成后还需实际运行材料、服务及入口接续。东京继续运行。
+
+
+## 2026-10-17 S07 Owner offline dependency continuation and next runtime inventory
+
+Owner terminal reports `DOMESTIC_S07_OFFLINE_DEPENDENCY_CONTINUATION_PASS`; PR99 receipt #6220815091 read back. 79 source hashes, 11 wheel distribution versions, third-party imports and pip check PASS; protected state unchanged during continuation. Original timeout preserved; first offline transport attempt UNKNOWN with empty logs and subsequent absent remote directory/process count0. File stdin/exact archive length patch reused original wheels with manifest/tar hashes; actual root cause not proven. Owner launch `/root/pr99-s07-transfer-fix.h8Mz9ued`. Package SHA256 `9b702576d48883786d051b2f1b49972baf94db3d1e8bf330ee59250a5974efa3`, wheel tar SHA256 `b04409509e43e80aff7fb655cc91b76cff2dad04ea01b8087837ebe7ec4c289a`.
+
+Evidence is Owner-root transcript, not direct host login/independent review. Source+dependencies complete; services, runtime configuration/data, reverse proxy and S08-S10 pending. No service actions, application imports, DB reads or production cutover. Tokyo remains running.
+
+Next tool: `evidence/pr99-service-handoff/s07-runtime-inventory/inspect_received_runtime.py`, source commit `442a70918965bb39faf9d0cd54aaaae8db0bfde1`, SHA256 `295b3e4df882793978042edcb3222c1068c493a9a33e47370ae8558d37095134`. Static inventory of already received private code/three units only; environment variable names, literal path clues and IO/dynamic call sites. No arbitrary environment values/raw unit output, application imports, config/key/database reads, networking, writes or services. Frozen helper/source/archive identities verified. Local synthetic value-redaction, environment/subscript, unit-name, path rejection and compilation checks passed; not Hosted CI or host acceptance. Tool not host executed; static findings cannot prove runtime closure or authorize cutover.
