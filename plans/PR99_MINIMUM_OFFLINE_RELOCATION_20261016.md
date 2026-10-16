@@ -75,3 +75,12 @@ sync -f "$D/recovery-baseline.tar.gz.enc"
 echo "ENCRYPTED_BASELINE_OFFSITE=PASS API_UNTOUCHED=YES SERVICE_ACTIONS=0"
 BASH
 ```
+
+## 2026-10-16 19:35 Owner-root实际进度更新（取代上文未执行状态）
+
+- 既有东京root密码SSH身份认证已通过；原900秒超时保留498,335,744字节。
+- 已执行前缀校验续传：新增822,236,016字节，合计1,320,571,760字节；整包SHA256与历史批准值一致。
+- 最终文件：/root/xuanjun-offline-baseline-20261016/recovery-baseline.tar.gz.enc；终态ENCRYPTED_BASELINE_OFFSITE=PASS。
+- 证据来源是Owner韩国root终端，不冒充本窗口独立登录取证；本轮没有解密、恢复、API操作或服务动作。
+- 不再执行上文初始复制命令，也不重跑续传；旧脚本及失败记录保留。
+- 下一步仅核对基线专用密钥的私有托管，再选择性恢复。密钥内容不得进入GitHub、聊天、命令行参数或公开日志。历史大包禁止整体覆盖目标机；未做实际恢复前不报告服务器迁移完成。
