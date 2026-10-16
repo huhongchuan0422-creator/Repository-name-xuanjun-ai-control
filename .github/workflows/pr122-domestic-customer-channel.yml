@@ -1,0 +1,51 @@
+name: PR122 domestic customer fixed channel isolated review
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - scripts/pr122_domestic_customer_channel.py
+      - tests/test_pr122_domestic_customer_channel.py
+      - docs/development/PR122_DOMESTIC_CUSTOMER_CHANNEL_20261016.md
+      - .github/workflows/pr122-domestic-customer-channel.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  isolated-channel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: pr122-customer-center-feaef687ee296dcd55f094bf240fe843445d5ad7
+          run-id: 38883029225
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/pr122-channel-frozen
+      - name: Fixed channel boundaries and real isolated visudo
+        run: |
+          mkdir -p /tmp/pr122-channel-evidence
+          sudo -n /usr/bin/env PR122_FROZEN_TAR=/tmp/pr122-channel-frozen/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz "$(command -v python)" -B -m unittest tests.test_pr122_domestic_customer_channel -v 2>&1 | tee /tmp/pr122-channel-evidence/CHANNEL_TESTS.log
+      - name: Exact channel artifact and immutable customer package
+        run: |
+          python - <<'PY'
+          import hashlib,io,json,os,pathlib,subprocess,tarfile
+          files=['scripts/pr122_domestic_customer_channel.py','tests/test_pr122_domestic_customer_channel.py','docs/development/PR122_DOMESTIC_CUSTOMER_CHANNEL_20261016.md','.github/workflows/pr122-domestic-customer-channel.yml']
+          records=[{'path':p,'sha256':hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest(),'size':pathlib.Path(p).stat().st_size} for p in files]
+          m={'source_commit':os.environ['GITHUB_SHA'],'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'files':records,'customer_source':'feaef687ee296dcd55f094bf240fe843445d5ad7','domestic_grant':'NOT_EXECUTED','production_install':'HOLD'}
+          out=pathlib.Path('/tmp/pr122-channel-evidence');(out/'CHANNEL_MANIFEST.json').write_text(json.dumps(m,sort_keys=True,indent=2))
+          with tarfile.open(out/'PR122_DOMESTIC_CUSTOMER_CHANNEL.tar.gz','w:gz') as t:
+              for p in files:t.add(p,arcname=p,recursive=False)
+              t.add(out/'CHANNEL_MANIFEST.json',arcname='CHANNEL_MANIFEST.json',recursive=False)
+          package=out/'PR122_DOMESTIC_CUSTOMER_CHANNEL.tar.gz'
+          print('CHANNEL_TAR_SHA256='+hashlib.sha256(package.read_bytes()).hexdigest())
+          print('CHANNEL_SOURCE_SHA256='+records[0]['sha256'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-domestic-customer-channel-${{ github.sha }}
+          path: /tmp/pr122-channel-evidence/
+          retention-days: 14
