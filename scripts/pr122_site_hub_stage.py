@@ -13,6 +13,20 @@ from scripts.pr122_site_hub_english import translate_fragment
 from scripts.pr122_website_release import write_csp_metadata, Deadline
 
 SOURCE_HASH = '74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63'
+ICP_NUMBER = '渝ICP备2026024862号'
+ICP_URL = 'https://beian.miit.gov.cn/'
+
+def icp_footer(text):
+    """Keep the Owner-confirmed registration in the established site footer."""
+    footer=re.search(r'<footer\b.*?</footer>',text,re.S)
+    if footer is None:raise ValueError('OFFICIAL_SITE_FOOTER_MISSING')
+    link='<p class="fineprint" data-site-icp="2026024862"><a href="'+ICP_URL+'" target="_blank" rel="noopener noreferrer">'+ICP_NUMBER+'</a></p>'
+    if 'data-site-icp=' in footer[0]:
+        if footer[0].count(link)!=1:raise ValueError('ICP_FOOTER_DRIFT')
+        return text
+    if ICP_NUMBER in footer[0]:raise ValueError('UNEXPECTED_EXISTING_ICP_MARKUP')
+    return text[:footer.end()-9]+link+text[footer.end()-9:]
+
 MENUS = [
     ('solutions', [('产品可视化中心', '/visual/'), ('行业案例', '/visual/catalog/'), ('社区分账演示', '/visual/community-payment/')]),
     ('capabilities', [('SaaS产品目录', '/marketplace/modules/'), ('功能选配', '/marketplace/modules/'), ('产品与购买', '/marketplace/'), ('共建共享', '/ecosystem/'), ('权益等级与开发折扣', '/ecosystem/tiers/')]),
@@ -44,7 +58,7 @@ def menu_patch(text):
             text, count = re.subn(pattern, custom, text, count=1)
         if count != 1:
             raise ValueError('UNEXPECTED_NAV_STRUCTURE:'+link)
-    return text.replace('</head>', '<link rel="stylesheet" href="/assets/xuanjun-site-integration.css"></head>', 1)
+    return icp_footer(text.replace('</head>', '<link rel="stylesheet" href="/assets/xuanjun-site-integration.css"></head>', 1))
 
 def build(root, source, output, fixture=None):
     if output.exists():

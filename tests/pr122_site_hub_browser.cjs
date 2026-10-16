@@ -30,6 +30,9 @@ const roots=['marketplace/','marketplace/modules/','visual/','visual/catalog/','
     const r=await page.goto(origin+'/'+prefix+route);assert.equal(r.status(),200);
     assert.equal(await page.locator('.primary-nav .nav-group').count(),3);
     assert.equal(await page.locator('main h1').count(),1);
+    const icp=page.locator('footer a[href="https://beian.miit.gov.cn/"]');
+    assert.equal(await icp.count(),1);assert.equal(await icp.innerText(),'渝ICP备2026024862号');
+    await icp.scrollIntoViewIfNeeded();assert.equal(await icp.isVisible(),true);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${width} ${prefix+route} horizontal overflow`);
     if(prefix==='en/')assert.doesNotMatch(await page.locator('main').innerText(),/[\u4e00-\u9fff]/);
    }

@@ -8,7 +8,7 @@ import tempfile
 import threading
 import unittest
 
-from scripts.pr122_site_hub_stage import build
+from scripts.pr122_site_hub_stage import build, icp_footer, ICP_NUMBER, ICP_URL
 from scripts.pr122_site_hub_preflight import Page
 from scripts.pr122_site_hub_test_server import serve
 
@@ -63,6 +63,16 @@ class IntegrationTests(unittest.TestCase):
                     self.assertTrue((self.public/ref.lstrip('/')).is_file(),ref)
                 self.assertNotIn('../visual/',ref)
                 self.assertNotIn('../legal/',ref)
+    def test_official_footer_retains_exact_owner_icp_in_all_locales(self):
+        pages=[p for p in self.public.rglob('*.html') if 'id="primary-nav"' in p.read_text()]
+        self.assertEqual(len(pages),45)
+        for p in pages:
+            text=p.read_text();footer=re.search(r'<footer\b.*?</footer>',text,re.S)[0]
+            self.assertEqual(footer.count(ICP_NUMBER),1,str(p))
+            self.assertIn('href="'+ICP_URL+'"',footer)
+            self.assertIn('rel="noopener noreferrer"',footer)
+            self.assertEqual(icp_footer(text),text)
+        with self.assertRaisesRegex(ValueError,'FOOTER_MISSING'):icp_footer('<html><body></body></html>')
     def test_quote_ui_and_csp_have_no_unsafe_inline(self):
         policy=json.loads((self.stage/'release-metadata/inline-csp.json').read_text())['policy']
         self.assertNotIn('unsafe-inline',policy)
