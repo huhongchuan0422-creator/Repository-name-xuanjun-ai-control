@@ -1,14 +1,14 @@
 {
-  "candidate_manifest_sha256": "ae8cbd17ce76ed348f4ae50658f3d8ca63ddc380d441430ba49824ba9583d233",
+  "candidate_manifest_sha256": "912187f78c02f5058a3f5cc72b0301494425199acef931eeb45ad183e9a438e1",
   "content_source_commit": "bc4c13ac13b613c5d2c85f93c26e2288b74373b6",
   "new_file_count": 92,
   "overlay_file_count": 407,
-  "package_manifest_sha256": "f6ff0058fd885d14dcbcd74efbf9bab04b6bf614904146b74ca489e594406ebf",
+  "package_manifest_sha256": "d0f1251e8475888a54a4c24443443042fc2c0c059267450116839b7bea8e15c9",
   "production_deployed": false,
   "public_file_count": 1279,
   "publisher_source_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
   "scope": "PUBLIC_PRESENTATION_ONLY; COMMUNITY_MOBILE_PACKAGE_SEPARATE",
   "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
   "state": "REVIEW_ONLY_NOT_APPROVED",
-  "tar_sha256": "207970e25d885ef539372189aaa12d8332c243e2ad6a9bcd09caf271996de54e"
+  "tar_sha256": "f77a1630673cd79c9bdd56f73c52cc1d453c8d878d53bebaa5b94cbce4017fd3"
 }
