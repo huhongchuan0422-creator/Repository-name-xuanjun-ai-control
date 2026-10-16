@@ -169,28 +169,28 @@
       "production_authority": false
     },
     "root_execution_channel": {
-      "status": "IMPLEMENTED_TESTED_REVIEW_AND_GRANT_LICENSE_REQUESTED_NOT_INSTALLED",
-      "source_commit": "28057fc19230d6cda093882ca05a2333348d36fe",
-      "review_request_comment_id": 6212869194,
+      "status": "C1_C2_FIXED_HOSTED_22_PASS_PENDING_INDEPENDENT_REREVIEW_AND_GRANT",
+      "source_commit": "e3da4ae2f98c75ab0c1ccb9a372cef3e3692c8e4",
+      "review_request_comment_id": 6213074164,
       "owner_terminal": "OWNER_REPORTED_KOREA_ROOT_READY_NOT_DIRECTLY_ATTACHED",
       "hosted": {
-        "run": 38883187475,
-        "job": 116914573967,
-        "tests": 16,
+        "run": 38884530956,
+        "job": 116918951003,
+        "tests": 22,
         "skipped": 0,
         "python": "3.11.17",
         "status": "PASS"
       },
       "artifact": {
-        "id": 12038128889,
-        "zip_sha256": "375bc867dfd01fd164bd2b2694b3085fc2a0ba17e63a73df23e7a59f687e02ef",
-        "zip_bytes": 20242,
-        "tar_sha256": "9593b73c71aab1eaec254eb682d1ecb004966ba904d19a32d385f951f67baafa",
-        "tar_bytes": 19760,
+        "id": 12039675314,
+        "zip_sha256": "ccd3aa6baf2c1753fa7528c40d5d1f2fa85ed736708a6dc8ab7419a96bcdd3c1",
+        "zip_bytes": 22626,
+        "tar_sha256": "1b95ebc331b31be32551edd5f86feb9051458bacd5d54db51fb0ea2fbf52e6c5",
+        "tar_bytes": 22143,
         "bound_files": 9,
         "entries": 10,
-        "origin": "DEVELOPER_ACTUAL_BYTES_NOT_INDEPENDENT_REVIEW",
-        "local_files_match": true
+        "developer_actual_bytes_verified": true,
+        "installer_sha256": "262f72347b2c6b07c2f2d18b9af8da315849c2fc18b6101faed8f75e9eae13ed"
       },
       "fixed_actions": [
         "inspect",
@@ -198,12 +198,23 @@
       ],
       "grant_executed": false,
       "phase_c_install_authorized": false,
-      "forbidden": "No arbitrary root command, service, nft, credential, DB, Writer or Tokyo action; install separately checks original C exact authority."
+      "forbidden": "No arbitrary root command, service, nft, credential, DB, Writer or Tokyo action; install separately checks original C exact authority.",
+      "previous_source_commit": "28057fc19230d6cda093882ca05a2333348d36fe",
+      "previous_independent_rejection": 6212980863,
+      "owner_root_staging": {
+        "directory": "/root/pr99-phase-c-channel-28057fc1",
+        "old_two_files_hash_verified": true,
+        "evidence_origin": "OWNER_ROOT_TERMINAL_RECEIPT",
+        "install_executed": false,
+        "preserve": true
+      },
+      "approval_author": "GITHUB_ID_332398908_EXACT_LOGIN_TYPE_PLUS_EXPLICIT_OWNER_ROOT_INDEPENDENT_ROLE_TRUST",
+      "source_binding": "EXACT_SEPARATE_OWNER_ROOT_SOURCE_PIN_AND_APPROVED_INSTALLER_BYTES_NO_COMMENT_OR_BRANCH_DEFAULT"
     }
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "KOREA_ROOT_READY_BY_OWNER_REPORT; EXACT_NEW_CHANNEL_REVIEW_AND_SINGLE_GRANT_APPROVAL_PENDING; DO_NOT_EXECUTE_UNAPPROVED_INSTALLER",
+  "owner_action_now": "NO_INSTALL_COMMAND_UNTIL_NEW_CHANNEL_REVIEW_AND_SINGLE_GRANT_APPROVAL; OLD_STAGING_PRESERVED",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
