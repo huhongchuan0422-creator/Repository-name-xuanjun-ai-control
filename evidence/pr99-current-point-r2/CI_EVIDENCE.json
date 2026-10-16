@@ -1,0 +1,66 @@
+{
+  "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+  "action": "PR99_CURRENT_OFFLINE_RECOVERY_POINT_V1",
+  "status": "SEVEN_NEW_TESTS_PASS_PENDING_INCREMENTAL_REVIEW_AND_REPLACEMENT_PERMISSION",
+  "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+  "old_approval_comment_id": 6216441589,
+  "korea_old_failure_sha256": "44f232571ce267f6a5cf9c801b1fba366fd9fa8f4a82d01aa592c249592bd35d",
+  "tokyo_old_failure_sha256": "9c23719696b63b0ca4552eb67ffd99948a62c9cec9af0a4774e4890f8a21565b",
+  "source_selection": "SAME_1363_FILES_INCLUDING436_PREVIOUSLY_APPROVED_BACKUP_FILES",
+  "explicit_historical_subtree_exclusions": [
+    "backup/WEBSITE_WECOM_AND_DUAL_CHANNEL_REFERRAL_COMPLETION_V1_20261008T003826/tokyo-system",
+    "backup/XUANJUN_CUSTOMER_BRAIN_R10_FINAL_AUTHORITY_GAP_REPAIR_V1_20261007T225500",
+    "backup/XUANJUN_WECOM_NOVEL_APP_IDENTITY_SECRET_READY_20261007T1818",
+    "backup/gpt56_timeout_alignment_20261005T0115+0800",
+    "backup/wecom_notification_gate_20261008_pre_audit_fix"
+  ],
+  "hosted": {
+    "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+    "bound_files": 5,
+    "database_exported": false,
+    "new_tests": 7,
+    "original_20": "INHERITED_NOT_REEXECUTED",
+    "production_actions": 0,
+    "production_hosts_used": false,
+    "regular_members": 6,
+    "schema_version": 1,
+    "skipped": 0,
+    "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+    "status": "R2_OFFLINE_INCREMENTAL_REVIEW_ONLY",
+    "tar_bytes": 62791,
+    "tar_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+    "unchanged_functions": {
+      "current_point.py": [
+        "backup_database",
+        "sqlite_check",
+        "stable_bytes",
+        "make_archive",
+        "receive_archive",
+        "prepare",
+        "manifest_rows"
+      ],
+      "run_current_point.py": [
+        "verify_approval",
+        "get_approval",
+        "load_bundle"
+      ]
+    }
+  },
+  "ci_run": 38910423910,
+  "ci_job": 117004563824,
+  "artifact": {
+    "id": 12050610106,
+    "zip_bytes": 63670,
+    "zip_sha256": "e8cd63f89851e243abf6019ce564c1ac98844a1c39634828e605fed6bd829c35",
+    "zip_verification_origin": "GITHUB_ARTIFACT_UPLOAD_DIGEST_AND_JOB_LOG_NOT_INDEPENDENT_ZIP_DOWNLOAD",
+    "tar_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+    "tar_bytes": 62791,
+    "local_tar_byte_reproduction": "MATCH_CI"
+  },
+  "source_workdir": "/root/pr99-current-point-v2",
+  "target_workdir": "/root/pr99-current-point-received-v2",
+  "production_executed": false,
+  "permission": "NOT_ISSUED",
+  "original_20": "INHERITED_NOT_RERUN",
+  "request": "PENDING_POST"
+}
