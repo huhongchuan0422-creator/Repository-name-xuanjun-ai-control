@@ -1,19 +1,30 @@
-"""Offline project intake authorization: no production login or storage."""
-GUIDES = {
-  "company_identity": ("企业身份与授权", "登录企业认证系统，准备营业执照和签约代表授权证明，在项目私有材料通道提交。"),
-  "domain_control": ("域名验证", "登录域名DNS服务商，添加平台生成的限时TXT校验记录，核验后移除。"),
-  "wechat_merchant": ("微信支付商户与分账资格", "登录微信支付商户平台申请商户号/分账授权；支付密钥只用受控SecretRef，不可发客服。"),
-  "wechat_miniapp": ("微信小程序应用", "在微信公众平台创建/认证小程序，登记AppID和回调域名；AppSecret仅经受控SecretRef。"),
-  "douyin_oauth": ("抖音开放平台", "在抖音开放平台申请应用和真实所需权限，使用官方OAuth授权；不提交token明文。"),
-  "x_oauth": ("X开发者授权", "通过X开发者后台确认接口权限、费用和回调域名，使用OAuth或受控SecretRef。"),
-}
+"""Source-only authorization contract; identity and membership must come from a trusted server."""
+GUIDES = {k: (v["title"],v["instructions"]) for k,v in []}
 class IntakeRejected(ValueError): pass
-
-def can_submit(actor, project, contract_customer, verified_customer, memberships):
-    return bool(actor and project and contract_customer and verified_customer and contract_customer == verified_customer and (actor,project) in memberships and memberships[(actor,project)] in ("customer_owner","project_editor"))
-
-def transition(state, action, verified):
-    if not verified: raise IntakeRejected("PROJECT_IDENTITY_REQUIRED")
-    states={("NOT_STARTED","save_draft"):"PARTIAL",("PARTIAL","save_draft"):"PARTIAL",("PARTIAL","submit"):"SUBMITTED",("SUBMITTED","request_changes"):"NEEDS_CORRECTION",("NEEDS_CORRECTION","save_draft"):"PARTIAL",("SUBMITTED","approve"):"ACCEPTED"}
-    if (state,action) not in states:raise IntakeRejected("INVALID_TRANSITION")
-    return states[(state,action)]
+STATES=("NOT_STARTED","PARTIAL","SUBMITTED","UNDER_REVIEW","NEEDS_CORRECTION","ACCEPTED")
+TRANSITIONS={
+ ("NOT_STARTED","save_draft"):"PARTIAL",("PARTIAL","save_draft"):"PARTIAL",
+ ("PARTIAL","submit"):"SUBMITTED",("SUBMITTED","start_review"):"UNDER_REVIEW",
+ ("UNDER_REVIEW","request_changes"):"NEEDS_CORRECTION",("UNDER_REVIEW","approve"):"ACCEPTED",
+ ("NEEDS_CORRECTION","save_draft"):"PARTIAL"
+}
+CUSTOMER_ACTIONS=frozenset(("save_draft","submit"))
+REVIEW_ACTIONS=frozenset(("start_review","request_changes","approve"))
+def can_submit(actor,project,contract_customer,verified_customer,memberships):
+    return bool(actor and project and contract_customer and verified_customer and contract_customer==verified_customer and memberships.get((actor,project)) in ("customer_owner","project_editor"))
+def authorize_action(actor,project,contract_customer,verified_customer,memberships,action,submitter=None,authenticated=False):
+    if type(authenticated) is not bool or not authenticated or not actor or not project:
+        raise IntakeRejected("TRUSTED_IDENTITY_REQUIRED")
+    if action in CUSTOMER_ACTIONS:
+        if not can_submit(actor,project,contract_customer,verified_customer,memberships):raise IntakeRejected("CUSTOMER_PROJECT_ACCESS_DENIED")
+    elif action in REVIEW_ACTIONS:
+        if memberships.get((actor,project))!="independent_reviewer" or (submitter is not None and actor==submitter):raise IntakeRejected("INDEPENDENT_REVIEW_REQUIRED")
+    else:raise IntakeRejected("INVALID_ACTION")
+    return True
+def transition(state,action,authorized):
+    if type(authorized) is not bool or not authorized:raise IntakeRejected("ACTION_AUTHORIZATION_REQUIRED")
+    if (state,action) not in TRANSITIONS:raise IntakeRejected("INVALID_TRANSITION")
+    return TRANSITIONS[(state,action)]
+def apply_action(state,action,actor,project,contract_customer,verified_customer,memberships,submitter=None,authenticated=False):
+    authorize_action(actor,project,contract_customer,verified_customer,memberships,action,submitter,authenticated)
+    return transition(state,action,True)

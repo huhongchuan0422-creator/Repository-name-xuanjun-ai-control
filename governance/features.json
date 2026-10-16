@@ -291,6 +291,46 @@
         "tests/test_contract_anchor_batch.py",
         "tests/test_contract_anchor_cost.py"
       ]
+    },
+    {
+      "feature_id": "CUSTOMER_PROJECT_INTAKE_GUIDES",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/CUSTOMER_PROJECT_INTAKE_AND_PRIVATE_MATERIALS_20261016.md",
+        "section": "客户资料登录、教程和权限"
+      },
+      "development": {
+        "document": "docs/development/CUSTOMER_PROJECT_INTAKE_API_CONTRACT_20261016.md",
+        "section": "权威状态与权限矩阵",
+        "phase": 3
+      },
+      "acceptance": {
+        "criteria": [
+          "role-separated reviewer contract and identical state transitions",
+          "complete customer guides without secret intake",
+          "no production upload or false receipt"
+        ],
+        "tests": [
+          "tests/test_customer_project_intake_contract.py",
+          "tests/test_customer_intake_guides.py",
+          "tests/test_customer_intake_pages.py"
+        ]
+      },
+      "reuse": [
+        "Tenant Customer Project RBAC SecretRef"
+      ],
+      "paths": [
+        "scripts/customer_project_intake_contract.py",
+        "tests/test_customer_project_intake_contract.py",
+        "tests/test_customer_intake_guides.py",
+        "tests/test_customer_intake_pages.py",
+        "demos/customer-intake/project-intake.js",
+        "docs/customer-intake/project-requirements.v1.json",
+        "demos/customer-intake/project.html",
+        "demos/customer-intake/index.html",
+        "docs/development/CUSTOMER_PROJECT_INTAKE_API_CONTRACT_20261016.md",
+        "docs/development/CUSTOMER_PROJECT_INTAKE_AND_PRIVATE_MATERIALS_20261016.md"
+      ]
     }
   ]
 }
