@@ -9,6 +9,10 @@ import unittest
 from unittest.mock import patch
 import zipfile
 import shutil
+import multiprocessing
+import contextlib
+import io
+import time
 from scripts import pr122_domestic_customer_channel as c
 
 
@@ -135,6 +139,31 @@ class ChannelTests(unittest.TestCase):
                 self.assertEqual(json.loads((c.BASE/'grant-state.json').read_text()),{'state':'PREPARING'})
                 with self.assertRaises(RuntimeError):c.grant()
                 with patch.dict(os.environ,{'SUDO_UID':'1002'}),self.assertRaises(RuntimeError):c.dispatch('inspect')
+
+    def test_four_processes_only_one_enters_fixed_action(self):
+        context=multiprocessing.get_context('fork')
+        barrier=context.Barrier(4);queue=context.Queue()
+        with tempfile.TemporaryDirectory(prefix='pr122-channel-lock-',dir='/root') as t:
+            base=Path(t);(base/'channel.py').write_bytes(b'fixture lock')
+            def action(_):
+                time.sleep(0.3)
+                return {'state':'FIXTURE_LOCK_ENTERED'}
+            def worker():
+                barrier.wait(timeout=5)
+                try:
+                    with contextlib.redirect_stdout(io.StringIO()):c.main()
+                    queue.put('ENTERED')
+                except BlockingIOError:queue.put('LOCKED')
+                except BaseException:queue.put('UNEXPECTED')
+            with patch.object(c,'BASE',base),patch.object(c.os,'uname') as uname,patch.object(c,'dispatch',side_effect=action),patch.object(c.sys,'argv',['channel','inspect']):
+                uname.return_value.nodename=c.HOST
+                children=[context.Process(target=worker) for _ in range(4)]
+                for p in children:p.start()
+                results=[queue.get(timeout=8) for _ in children]
+                for p in children:
+                    p.join(timeout=5)
+                    self.assertEqual(p.exitcode,0)
+            self.assertEqual(sorted(results),['ENTERED','LOCKED','LOCKED','LOCKED'])
 
 
 if __name__=='__main__':unittest.main()
