@@ -51,9 +51,9 @@
 
 | 锚点 | 已知事实 | 执行状态 | 下一动作 |
 |---|---|---|---|
-| Issue #19 | 三原生入口接力与回执闭环 | OPEN / 运行验收未整体证明 | 核对PR #35/#47/#50等任务所有权和回执；ChatGPT仅完成自有路径 |
+| Issue #19 | 三原生入口接力与回执闭环 | OPEN / 运行验收未整体证明 | ChatGPT原生入口与独立审核责任；PR50明确DOTS编码归属，PR17/P2由既有执行者管理，避免跨owner写入 |
 | Issue #13 / PR #14–17 | Stage1持久队列与通知/受控运行 | OPEN / 尚未证明整体真实E2E | 复用现有Stage1、Python3.6与隔离门禁；不启动第二writer |
-| PR #58 | Task4/5审核修复与ACK | OPEN DRAFT | 集中检查原源码/独立审核，代码可补则补，不替代Work/P2发布 |
+| PR #58 | Task4/5审核修复与ACK | OPEN DRAFT；Task5历史证据A2条件性可接受、最终PASS未证明（PR58#6197897838） | ChatGPT承担既定独审/裁定；A1/A3–A6及完整拓扑仍需独立证据；不重复313项已过CI，不接管英国生产writer |
 | Issue #18 | 本地embedding | BLOCKED_BY_DEVELOPMENT_LOOP_ACCEPTANCE | 依赖尚未满足，不强行启动 |
 | PR #122 | Stage5 25节点及ChatGPT代码增量 | OPEN DRAFT | 只补非外部范围，集中验收 |
 
@@ -62,3 +62,10 @@
 - CODE_MERGED / SOURCE_CANDIDATE / TEST_PASS / INDEPENDENT_AUDIT_PASS / HOST_ACCEPTED 五层分开，禁止使用“完成”模糊替代。
 - 任何单writer、fence、side-effect未知均为HOLD，不借聊天窗口交接绕过。
 - 后续更新须附commit、CI run、审核回执及有证据的真实状态。30分钟重复错误主动说明；1小时停止旧方案。
+
+## E. 2026-10-16 新验证过的责任和验收
+
+- PR73：准确源HEAD92e0f13，Issue62–71全部 CLOSED，仅离线合同SOURCE_COMPLETE（审核等级不得抬高为生产）；Hosted16/16 PASS。
+- PR88：准确源HEAD7a1d62e，独立源码复审SOURCE_REPAIR_PASS_WITH_SCOPE_LIMITS，Hosted20/20 PASS，Issue78–87保持OPEN，剩余真正业务集成受目标授权/真实商户等依赖影响。
+- PR50：原回执明确DOTS保留源码归属，不属于ChatGPT待编码队列；Work单独负责共享P2集成。
+- PR58：CHATGPT_NATIVE_TASK5的A2只能按“历史保存记录+已审观察器程序保证”分层接受，目前A2_FINAL_PASS=NOT_YET_PROVEN，A1/A3–A6继续HOLD；无权据此激活生产。
