@@ -1,0 +1,47 @@
+name: PR122 community customer mobile experience
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - 'demos/work-community-experience/**'
+      - 'scripts/pr122_community_experience_package.py'
+      - 'tests/community-experience/**'
+      - '.github/workflows/pr122-community-experience.yml'
+permissions:
+  contents: read
+jobs:
+  mobile-experience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build isolated candidate and bind exact dependencies
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/community-report"
+          python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output "$RUNNER_TEMP/community-stage"
+          python -m scripts.pr122_community_experience_package --output "$RUNNER_TEMP/community-report" --stage "$RUNNER_TEMP/community-stage"
+          node --check demos/work-community-experience/experience.js
+          node --check demos/work-community-experience/role.js
+          npm install --prefix "$RUNNER_TEMP/community-browser" --no-save playwright@1.55.0
+          "$RUNNER_TEMP/community-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Existing runtime and real browser mobile flow
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/community-browser/node_modules/playwright
+          TEST_STAGE: ${{ runner.temp }}/community-stage
+          REPORT_DIR: ${{ runner.temp }}/community-report
+        run: |
+          set -euo pipefail
+          node tests/community-experience/browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr122-community-mobile-${{ github.sha }}
+          path: ${{ runner.temp }}/community-report
+          retention-days: 14
