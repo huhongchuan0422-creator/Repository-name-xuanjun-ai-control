@@ -33,11 +33,11 @@ OLD_SOURCE = 'ef21ca95331769622c294c65bb60ec7ceed0c392'
 OLD_TREE = '5a70c5627afe75fcd475c20e71ee9bfb0b6a156d'
 NEW_ROOT = CAND + '/epoch7-recovery-candidate-r7-claim-successor'
 # Publication and a separate source review must establish these; no CLI overrides.
-NEW_KIT_SHA = None
-NEW_ENTRY_SHA = None
-NEW_ENTRY_BYTES = None
-NEW_SOURCE = None
-NEW_TREE = None
+NEW_KIT_SHA = '113085ffe1980a30aae1700df988676d4497be7c21d78192990458a4a16fe1a6'
+NEW_ENTRY_SHA = '788ca6631defa489a1dc9f81c96f507b262e40cf6af05713df71a80843db77df'
+NEW_ENTRY_BYTES = 56593
+NEW_SOURCE = 'f4345dd385de9b87dc821cd26bb42bb9b045d03f'
+NEW_TREE = '235a78f5aafc3e60a50ac29f52a9cf86d5cbb965'
 FILES = (
     ('seed', 'epoch7-resume-inputs-6de7d12246826388.private.json', 769086,
      '6de7d12246826388949723e9238cd464686e6e86847187946837df927c97a550'),

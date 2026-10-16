@@ -1,6 +1,13 @@
 # Fixed successor preparation candidate
 
-Local implementation and synthetic regression only. No production invocation, host inspection, review publication, admission, claim, or recovery phase has been performed. New source commit, source tree, kit manifest, entry SHA256, and entry size remain `None`. `prepare` refuses at that binding gate before any host read. Binding and publication require a separately reviewed immutable artifact; the tool provides no path or pin overrides.
+This separate bound copy selects the published source `f4345dd385de9b87dc821cd26bb42bb9b045d03f`, tree `235a78f5aafc3e60a50ac29f52a9cf86d5cbb965`. The original unbound preparation source, tests, README, and freeze map remain unchanged locally. Only five production-source constant literals differ in this copy; tests explicitly preserve unbound refusal and check the finite actual binding.
+
+Independent local archive inspection verified257 files and256 manifest pins:
+- Archive:1071141 bytes, SHA256 `364a92a4f9a2a59d8c1d0ba8f4945d1c4345ac86da90b087091203c757dab978`
+- Manifest:62752 bytes, SHA256 `113085ffe1980a30aae1700df988676d4497be7c21d78192990458a4a16fe1a6`
+- Entry:56593 bytes, SHA256 `788ca6631defa489a1dc9f81c96f507b262e40cf6af05713df71a80843db77df`
+
+No production invocation, host inspection, new exact review, admission, claim, or recovery phase has been performed by this binding work. Binding identifies bytes; it grants no execution authority. Dependency publication/delivery binding, a new explicit owner scope for host preparation, the later complete successor approval, and execution/admission/runtime verification remain separate gates. The tool provides no path or pin overrides. The frozen source's historical unbound comments and `input-contract` status label are retained; the five explicit constant values determine whether source binding is complete.
 
 ## Actual preparation path
 
@@ -18,7 +25,7 @@ Original files, observation, saved seed/plan, and review packet are never rewrit
 
 The budget is a one-shot alarm plus terminal monotonic check. Errors or interruptions retain every partial output, include confirmed outputs and known created paths, never retry a write, and never delete or adopt partial files. Existing any output refuses the whole publication before writes. A status failure after successful creation carries all output metadata; cleanup uncertainty is reported independently. Absence after an interrupted create cannot prove that no attempt occurred. The tool is preparation only; produced bytes do not grant install or successor admission.
 
-Actual host/source provenance, real fixed 1641-byte predecessor authentication, source publication, new exact review, and execution remain separate gates. The selected target pins remain unbound in this source. Admission expiry is prospective, and cannot be used to suppress independently authorized containment/receipt preservation after a later attempted/admitted transaction.
+Published-source and local artifact identity are now bound as listed above. Actual host provenance, real fixed1641-byte predecessor authentication, dependency publication/delivery binding, new owner authorization, new exact complete review, and execution remain separate gates. The five selected target pins are finite in this bound copy; removing any one still refuses before host reads. Admission expiry is prospective, and cannot be used to suppress independently authorized containment/receipt preservation after a later attempted/admitted transaction.
 
 ## Focused local verification
 
@@ -28,4 +35,4 @@ The real successor factory, all107 payloads, 17 resource views, schema-2 loader 
 
 Local coverage includes original field preservation, schema-2 roundtrip, proof/source/manifest/expiry propagation, missing expiry/unbound pins, fixed absence requirements, inventory/ancestry drift, real predecessor final rereads, private modes/symlinks, existing-output rejection, first/second-write interruption, failed readback, final output drift, status failure retention, cleanup uncertainty, and one-shot timer cleanup. The broader candidate's Python3.6 limitation remains separately reported; this preparation suite does not repair it by preloading imports or weakening gates.
 
-The focused preparation suite currently passes30 cases on Python3.12. Two composed `prepare()` cases exercise the real compiler, private-input descriptor reads, entry-file rereads, three-output publisher, and final output checks; immutable source authentication and host proof are explicitly synthetic boundaries. The post-publication proof-drift case verifies all three outputs remain present and reported.
+The bound preparation suite has31 focused cases: the original30 plus one finite actual-binding check. All31 pass locally under Python3.12 with `-I -B -S` (9.21seconds). This local binding check does not assert a new Python3.6 full-chain run. Two composed `prepare()` cases exercise the real compiler, private-input descriptor reads, entry-file rereads, three-output publisher, and final output checks; immutable source authentication and host proof are explicitly synthetic boundaries. The post-publication proof-drift case verifies all three outputs remain present and reported.
