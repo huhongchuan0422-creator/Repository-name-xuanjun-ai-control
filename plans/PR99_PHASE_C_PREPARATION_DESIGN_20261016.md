@@ -1,6 +1,8 @@
 # PR99 Phase-C：完整离线准备设计及实施清单（2026-10-16）
 
-状态：PREPARATION_DESIGN_RECORDED / EXECUTION_NOT_AUTHORIZED。本文不是运行许可、实现完成声明或实机验收。沿原PR99推进，不新建迁移架构、分支或任务队列。
+状态：OFFLINE_MECHANISM_CANDIDATE_READY_FOR_CONSOLIDATED_REVIEW / PRODUCTION_EXECUTION_NOT_AUTHORIZED。
+
+当前准确C源码：e9052b4e9d7de8a3cf27b3ab5282a19d120878b4；Hosted134/134、零跳过，实际制品44绑定/30runtime已由开发方下载复算。四链路适配、停止状态安装、围栏预检、观察编排和PID1失联收尾已实现；真实私有身份/账号/schema/持续刷新部署及全部实机门禁尚未闭环。本文不是安装/启动许可或实机验收，完整当前证据见文末本轮集中候选与PR99_PHASE_C_STATE_20261016.json。下文保留初始设计和阶段历史，未实现的旧状态由文末当前记录取代。沿原PR99推进，不新建分支或任务队列。
 
 ## 已完成的前置，不再重做
 
@@ -114,3 +116,14 @@ Owner当前不需重复取B资料或执行旧命令；未来必须需要其协�
 实际下载Artifact12032422528并复算：ZIP 8d256daf7b90cf5f565d4587cec1236b9887b5895a08211bbb3e843ac1c699f7；TAR 8200ccb5d86f09cb1d03a449921eddba4ab421e73cee6736a7ce9d951339bacd（82181字节），34普通条目、33/33绑定及25/25runtime hash匹配，本地重建TAR逐字节一致。旧08c7e90c制品保留历史，不将其审核/CI扩大到新安装器。新包是可复核候选，不是独立审核PASS或安装许可。
 
 本批控制器/交接器的离线实现完成；实际只读托管/私有传递绑定与live运行、失败停止/撤销控制器仍待完成，真实C观察未开始。完整C生产执行方案齐全再统一送审，未要求Owner分段批许可或搬运数据。
+
+
+## 本轮集中候选（2026-10-16，取代此前“控制器未实现”的当前状态）
+
+准确源码 `e9052b4e9d7de8a3cf27b3ab5282a19d120878b4`。已完成整对权限承诺托管、固定身份mTLS四文件传递/远端路径签名、停止状态安装、独立root围栏加载及UID×IPv4/IPv6计数验证、只读观察单次编排、PID1 notify/watchdog/BindsTo与独立stop_guard。Root监督器纳入第三份独立cgroup资源计量，公开回执只含安全状态字段。实际执行根权限与真实只读秘密从未由源码/测试自动取得。
+
+精确Hosted Run38874982348/Job116887738948，Python3.11.17，134/134、0 skip；本地134中127通过/7环境skip，未混写。Artifact12035120742实际ZIP下载复算，44绑定/30runtime/45常规条目，ZIP b1ea59d05c8da17ddb037cc4699a75d2b2d5b4f58cf54e7ba0a6e6d2572c43e9，TAR 898263578775de2d0486f2d2c18986192305a8edbe213279c5c4d7b4e35cc520，与本地确定性重建逐字节一致；开发方字节核验不是独审结论。
+
+东京源声明实际Run38871973602/Job116877943391：50源、15表中13声明匹配，algo_order_snapshots与protective_order_snapshots未解析；没有打开DB，不得造空表凑数。韩国Run38874822582/Job116887220927：UID1001、systemd239对四份候选unit纯解析exit0/无诊断，无generators/Root/服务操作；不是实际隔离或watchdog验收。
+
+一次性集中送原独审核整批C源码/闭包/制品和异常边界；原B/R2/R6/185及已通过网站范围继续继承。不申请拆散的安装或启动许可。真实SecretRef/只读权限、签名及mTLS身份/私有端点、权威账号/实际schema/持续刷新、窗口参数和受限root通道尚未绑定，任何生产Root或真实GET均必须另外满足精确执行门禁。C实机未开始，生产迁移/Writer/东京退役继续HOLD。

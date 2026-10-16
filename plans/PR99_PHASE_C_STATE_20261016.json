@@ -5,9 +5,9 @@
   "evidence_origin": "ACCEPTED_OWNER_ROOT_RECEIPT",
   "source_baseline": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
   "phase_c": {
-    "design": "RECORDED",
-    "adapter_implementation": "OFFLINE_ADAPTERS_AND_STOPPED_CANDIDATE_INSTALL_CONTROLLER_IMPLEMENTED",
-    "review_artifact": "ROOT_INSTALL_CANDIDATE_BUILT_DEVELOPER_BYTE_VERIFIED_NOT_APPROVED",
+    "design": "OFFLINE_MECHANISM_CANDIDATE_COMPLETE_REAL_BINDINGS_AND_HOST_ACCEPTANCE_PENDING",
+    "adapter_implementation": "PAIR_BOUND_CUSTODY_MTLS_REMOTE_PATH_HANDOFF_OBSERVATION_FENCE_AND_PID1_GUARD_IMPLEMENTED",
+    "review_artifact": "COMPLETE_OFFLINE_MECHANISM_CANDIDATE_DEVELOPER_VERIFIED_PENDING_INDEPENDENT_REVIEW",
     "root_preflight": "NOT_EXECUTED",
     "started_service_confinement": "NOT_EXERCISED",
     "live_get": "NOT_AUTHORIZED_NOT_RUN",
@@ -28,28 +28,28 @@
     "iptables_version": "UNKNOWN_MULTICALL_ARGV0_LIMIT",
     "root_enforcement": "NOT_VERIFIED",
     "local_tests": {
-      "count": 77,
-      "passed": 70,
+      "count": 134,
+      "passed": 127,
       "skipped": 7,
       "python": "3.12.14",
       "limitations": [
-        "Local user namespace maps UID0 only",
-        "AF_UNIX listener blocked locally",
-        "Account/systemd actions and frozen B contents explicitly synthetic models"
+        "Only UID0 mapped locally",
+        "New AF_UNIX listener denied locally",
+        "Account/systemd/nft/counter/time tests are explicit models"
       ]
     },
     "hosted_tests": {
       "status": "PASS",
-      "tests": 77,
+      "tests": 134,
       "skipped": 0,
       "python": "3.11.17",
-      "run": 38868898561,
-      "job": 116868059787,
-      "exact_checkout": "32801fc886824447aaf51f4afd4a22d7c7b0ce1f"
+      "run": 38874982348,
+      "job": 116887738948,
+      "exact_checkout": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4"
     },
-    "execution_controller": "OFFLINE_INSTALL_IMPLEMENTED_NOT_APPROVED_NOT_RUN_LIVE_OBSERVE_CONTROLLER_PENDING",
+    "execution_controller": "STOPPED_INSTALL_FENCE_PREFLIGHT_LIVE_SUPERVISOR_AND_STOP_GUARD_IMPLEMENTED_NOT_APPROVED_NOT_RUN",
     "independent_network_verifier": "NEW_SEPARATE_GET_BROKER_RSA_SIGNATURE_ADAPTER",
-    "production_bindings": "SOURCE_API_NAMES_AND_DB_STAT_OBSERVED_REAL_SECRETREF_PERMISSION_AND_TRANSFER_SOURCE_SCHEMA_STILL_UNBOUND",
+    "production_bindings": "ACTUAL_READONLY_SECRETREF_ACCOUNT_PERMISSION_TRANSPORT_IDENTITIES_SOURCE_DB_SCHEMA_AND_WINDOW_UNBOUND",
     "root_install_controller": {
       "implemented": true,
       "production_approved": false,
@@ -59,14 +59,16 @@
       "independent_permission": "NOT_REQUESTED",
       "bootstrap": "STDLIB_ONLY_BEFORE_CANDIDATE_IMPORT_WITH_EXACT_PIN",
       "private_authorization": "NEW_C_EXACT_PERMIT_AND_ROOT_ANCHOR_NOT_ISSUED",
-      "source_commit": "32801fc886824447aaf51f4afd4a22d7c7b0ce1f"
+      "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
+      "installed_units": 4
     },
     "previous_artifact": {
-      "id": 12030856104,
-      "zip_sha256": "c95fe723429aa294d30bd72df13b5449ec5be8ea523cc65ea3c316982c212be5",
-      "tar_sha256": "a41487dbb26b2ce353ee238e39e14683f3d119cc91dde79f498b0f81beb98e09",
-      "binding_files": 26,
-      "runtime_files": 22,
+      "id": 12032422528,
+      "zip_sha256": "8d256daf7b90cf5f565d4587cec1236b9887b5895a08211bbb3e843ac1c699f7",
+      "tar_sha256": "8200ccb5d86f09cb1d03a449921eddba4ab421e73cee6736a7ce9d951339bacd",
+      "tar_bytes": 82181,
+      "binding_files": 33,
+      "runtime_files": 25,
       "developer_download_verified": true,
       "independent_review": "NOT_REQUESTED_PENDING_COMPLETE_C_EXECUTION_PACKAGE"
     },
@@ -80,24 +82,84 @@
       "production_module_imported": false
     },
     "artifact": {
-      "id": 12032422528,
-      "zip_sha256": "8d256daf7b90cf5f565d4587cec1236b9887b5895a08211bbb3e843ac1c699f7",
-      "tar_sha256": "8200ccb5d86f09cb1d03a449921eddba4ab421e73cee6736a7ce9d951339bacd",
-      "tar_bytes": 82181,
-      "binding_files": 33,
-      "runtime_files": 25,
+      "id": 12035120742,
+      "zip_sha256": "b1ea59d05c8da17ddb037cc4699a75d2b2d5b4f58cf54e7ba0a6e6d2572c43e9",
+      "tar_sha256": "898263578775de2d0486f2d2c18986192305a8edbe213279c5c4d7b4e35cc520",
+      "zip_bytes": 117881,
+      "tar_bytes": 117314,
+      "bound_files": 44,
+      "runtime_files": 30,
+      "entries": 45,
+      "reproduction": "BYTE_IDENTICAL",
+      "verification_origin": "DEVELOPER_ACTUAL_BYTES_NOT_INDEPENDENT_AUDIT",
+      "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
+      "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
       "developer_download_verified": true,
-      "independent_review": "NOT_REQUESTED_PENDING_COMPLETE_C_EXECUTION_PACKAGE"
+      "independent_review": "CONSOLIDATED_OFFLINE_REVIEW_REQUEST_PENDING"
     },
-    "next_development": "Bind real readonly custody and private snapshot transport, then complete reviewed live observation/start/failure-stop/revoke control; no separate offline-install permission requested"
+    "next_development": "One consolidated review of the complete offline C mechanism candidate; then bind actual private identities/account/source schema/window and obtain exact host permissions before any C installation, fence or observation. Original B is frozen.",
+    "live_controller": {
+      "implemented": true,
+      "pid1_watchdog": true,
+      "exec_stop_post_guard": true,
+      "worker_binds_to_controller": true,
+      "resource_process_cgroups": 3,
+      "production_approved": false,
+      "executed": false
+    },
+    "root_network_preflight": {
+      "implemented": true,
+      "action": "PR99_PHASE_C_DEDICATED_NETWORK_PREFLIGHT_V1",
+      "root_executed": false,
+      "loaded_tables": 0,
+      "kernel_negative_probes": "NOT_EXERCISED",
+      "scope": "ONE_NEW_TABLE_TWO_IDLE_DEDICATED_UIDS_FOUR_LOOPBACK_NO_PAYLOAD_COUNTER_CHECKS"
+    },
+    "private_transport": {
+      "implemented": true,
+      "real_synthetic_mtls_tested": true,
+      "production_endpoint_bound": false,
+      "production_listener_installed": false,
+      "production_bytes_transferred": 0,
+      "source_and_receiver_paths_separate": true,
+      "plaintext_exported_to_github": false
+    },
+    "source_schema": {
+      "run": 38871973602,
+      "job": 116877943391,
+      "delivery_commit": "5830a6e6f69744132fb74b341abb9929ae1632d6",
+      "source_files": 50,
+      "required_tables": 15,
+      "source_compatible_declarations": 13,
+      "unresolved_source_declarations": [
+        "algo_order_snapshots",
+        "protective_order_snapshots"
+      ],
+      "actual_database_opened": false,
+      "claim": "SOURCE_DECLARATIONS_NOT_ACTUAL_DB_SCHEMA"
+    },
+    "systemd239_parse": {
+      "run": 38874822582,
+      "job": 116887220927,
+      "delivery_commit": "d971c17344e3afb00b22fc5125206f3cfda52c2b",
+      "unit_count": 4,
+      "exit": 0,
+      "diagnostics": [],
+      "unit_sha256": "3e1a492c761b1bb074e21d0e5990ea354ce687e971a7390ff1a4da9a3b064107",
+      "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
+      "root": false,
+      "generators_enabled": false,
+      "service_actions": 0,
+      "scope": "PARSER_ONLY_NOT_PID1_RUNTIME_SANDBOX_OR_WATCHDOG"
+    }
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "NONE",
-  "protected_unchanged": [
+  "owner_action_now": "NO_OLD_COMMAND_OR_MANUAL_DATA_RETRIEVAL_REQUESTED; C_ROOT_CHANNEL_AND_REAL_PRIVATE_INPUTS_STILL_REQUIRED_BEFORE_HOST_EXECUTION",
+  "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
+  "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
     "website Work current DNS",
     "Tokyo production and all shared services"
-  ],
-  "note": "Standalone stopped-C installation controller is now implemented but not approved or executed; real observation/start/stop/revoke controller and private bindings remain pending. No extra per-step production approval requested."
+  ]
 }
