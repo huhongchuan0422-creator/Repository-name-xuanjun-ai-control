@@ -527,12 +527,14 @@ PATCH_PRODUCTION_INSTALL=EXECUTED_PASS_TARGETED_HEALTH；W06仍部分完成（�
 
 
 
-### 9.22 2026-10-16：R4安装最终候选20项模型CI与制品齐备
+### 9.22 2026-10-16：6205624143唯一I1授权准入整改候选
 
-最终源码提交22e120d7ddd1bf5d9fb9c09c795eda23f0112675（补足回滚时18080必须ECONNREFUSED）；安装器SHA883d89ef15e3c2ee6535100c71c18f69a6d39bbfce20a2a1aa9dd96f2ca94e45。中间准备快照b725a16f不作为最终送审版本。Run38832348368 / Job116753721734 SUCCESS，原始日志准确checkout22e120d7、Ran20tests/OK。其为GitHub-hosted临时root文件系统/合成源/假服务网络模型；东京/国内/英国/韩国实际作业SKIPPED。不得称生产root预检通过或实际POST已执行。Feature Compliance Run38832353373 / Job116753736881实读COMPLIANCE_PASS（治理10项）。
+已接收独审：原R4源码/完整制品及旧安装制品全字节PASS；只有新root动作准入I1/HIGH继续HOLD。既有长期Owner运维授权不受影响，不自签精确候选发布批准。本增量不动已通过网站/current、312efdd3配置、旧R4分支、root helper或服务器。
 
-实际下载Artifact12018270587：ZIP35772字节，SHA25641b0cf2b935d67dad3b9df979758ae5707e8dc15c65b2463de37525d126665bd；外ZIP2项（TAR+CI收据）。内层TAR34948字节，SHA2564e7015641ea76de7afc250e58553b9f621cb70bae0a7e163bfec4f09b7da1c20；11项=10份绑定+清单，10/10独立于打包步骤重算匹配，无额外/链接/特殊类型。这里是开发方实际下载复算；独立执行者需自行验证，未自签独审PASS。绑定包括完整新安装器/20测试/计划/README、准确未变root引擎与R4builder/18测试、workflow/governance/开发说明。
+新增approval_gate.py并以完整哈希绑定嵌入独立安装器；实际入口在引擎加载/锁创建前，强制读取独立Owner-root0700/0600准入锚点，核验独审评论ID及全文SHA、明确动作/版本/主机/次数/有效期/四次合成负向POST边界，再从canonical GitHub HTTPS核对精确commit/tree、实际root0400安装器字节、REVIEW_BINDING和实际ZIP制品摘要/来源commit。实际源/候选/服务核验后，执行前重查批准正文/本地字节/有效期，用O_EXCL私有持久标记一次性消费，随后才能创建R4状态或改服务。缺失/伪造/旧源码批准/过期/已消费/漂移/错误主机动作均拒绝；异常标记保留，不自动重试。
 
-请原6205371670独立审核窗口集中完成原12016977176制品字节缺口与本12018270587安装计划/制品/安全负向POST及离线回滚影响复核，不重审未变停用源码、日志/HTTPS/网站。受控现场命令在该复核前不执行。长期Owner授权继续有效；当前Runner技术入口仅旧固定动作，不能假称已能安装本R4新源。安装器仅未来Owner-admin固定root调用，后续现有Runner可读取已设计白名单回执，无需Owner手工采资料。
+实际查明开发回执6205597052与独审6205624143共用GitHub user332398908/App1144995，故不声称作者身份可证明窗口独立。信任锚是Owner从原独审窗口独立接收的完整评论摘要，在root侧另行登记；安装器/Runner无生成锚点入口，不把开发评论当批准。这是显式Owner信任边界，不是独立审核人密码签名。ADMISSION.md描述最终审核后交接协议，本轮没有生成真实批准或生产root锚点。
 
-ROOT_INSTALL_PLAN_REVIEW=PENDING；R4_PRODUCTION_CONTAINMENT=NOT_DEPLOYED；PRODUCTION_POST=NOT_EXECUTED；EMERGENCY_STOP_ROLLBACK=NOT_EXECUTED；DNS_RELEASE=HOLD；东京退役HOLD。IP审计差异及DNS当前管理面核对仍待闭环。
+紧急离线回滚需另一份action=rollback-offline精确独审回执及Owner明确接受后台中断的独立root锚点；安装批准不能授权回滚。停Portal/PID0/18080拒绝后恢复旧源并保持停止，不恢复漏洞服务。本地40项I1合成GitHub/临时root测试及20项受影响安装模型PASS；跨进程竞争和部分持久化异常保留均覆盖。原源码18/HEAD44/配置83/OAuth45/静态115不重跑。托管CI与新准确制品结果随后单独绑定，不提前写PASS。
+
+当前I1_INCREMENT_REVIEW=PENDING；ROOT_ADMISSION_PIN=NOT_CREATED；PRODUCTION_INSTALL=NOT_EXECUTED；DNS_RELEASE=HOLD；东京退役HOLD。既有非rootRunner不能登记新root准入，仍需最终独审后实际admin/root交接，不虚构已接入。

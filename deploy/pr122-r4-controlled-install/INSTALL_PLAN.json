@@ -1,6 +1,10 @@
 {
   "action": "PR122_R4_CONTAINMENT_V1",
-  "artifact_full_byte_review": "PENDING",
+  "admission": "Owner-root-pinned independent receipt body + canonical GitHub exact commit/tree/installer/binding/ZIP metadata; 30-second ticket, <=24-hour approval, durable exclusive consumption before state creation",
+  "admission_root_pin": "/etc/xuanjun-pr122-release/install-admission.json",
+  "affected_installation_model_tests": 20,
+  "artifact_full_byte_review": "PRIOR_PACKAGES_PASS_6205624143_I1_INCREMENT_PENDING",
+  "authorization_registry": "/var/lib/xuanjun-pr122-authorizations",
   "automatic_retry": false,
   "automatic_rollback": false,
   "candidate_sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
@@ -8,10 +12,12 @@
   "emergency_rollback": "Explicit Owner-root only; require exact current and backup; stop Portal and verify PID0 and localhost18080 ECONNREFUSED before restoring old code; leave backend offline; causes dynamic-route outage; separate plan acceptance required",
   "existing_helper_sha256": "0e61a4cab72a18e94ed8b97c81e035ee023dfe0969c871c50651cf75792cbcbe",
   "host": "iZ6wee8q9z4t03hvqumwfhZ",
-  "installation_plan_approval": "PENDING",
-  "installer_sha256": "883d89ef15e3c2ee6535100c71c18f69a6d39bbfce20a2a1aa9dd96f2ca94e45",
+  "installation_plan_approval": "PENDING_NEW_EXACT_I1_APPROVAL",
+  "installer_sha256": "ec727883f682aa8ddf47c2e3f5fdfb1d1bac3d20909f627236553d8b0dc7dd28",
   "negative_request_gate": "Exact guarded source + fresh expected service PID + health pass + installation-plan approval; empty synthetic requests only",
+  "new_admission_tests": 40,
   "normal_restarts_max": 1,
+  "offline_rollback_admission": "Separate rollback-offline approval and root pin with explicit owner_confirms_backend_outage=true; installation approval cannot authorize rollback",
   "operations_notice": "After verified installation, all callers including admins cannot use HTTP TikTok disconnect; existing account remains connected; full auth not implemented",
   "owner_authority": "STANDING_DOMESTIC_TOKYO_MIGRATION",
   "production_install": "NOT_EXECUTED",
@@ -22,5 +28,6 @@
   "schema_version": 1,
   "source_scope_approval": "PR122#6205371670",
   "source_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
-  "tokyo_retirement": "HOLD"
+  "tokyo_retirement": "HOLD",
+  "trust_boundary": "SHARED_GITHUB_AUTHOR_APP_CANNOT_PROVE_REVIEWER_INDEPENDENCE; Owner must independently obtain and root-pin exact auditor receipt body digest; installer cannot create pin"
 }

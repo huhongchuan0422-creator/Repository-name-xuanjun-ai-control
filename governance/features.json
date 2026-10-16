@@ -131,7 +131,8 @@
           "Minimal cutover derives all75 Tokyo locations, preserves62 static aliases and11 existing HTTPS backend routes; verified upstream TLS, no sensitive retry, no secret-bearing logs, and real Nginx synthetic integration are required; production remains independently gated",
           "Legacy Portal log-message exact-byte correction and persistent fixed-action root adapter preserve original source, backup and one-shot rollback; isolated tests do not imply production installation or DNS release",
           "R4 temporary containment candidate disables HTTP disconnect before store/body/audit business state access for every caller; full authenticated disconnect remains NOT_IMPLEMENTED and migration scope acceptance requires independent decision",
-          "R4 controlled-install preparation reuses exact root engine and approved guard; fixed one-shot action, source/new-PID gates, proposed empty403 acceptance and explicit backend-offline rollback require independent plan approval; synthetic root filesystem tests are not production acceptance"
+          "R4 controlled-install preparation reuses exact root engine and approved guard; fixed one-shot action, source/new-PID gates, proposed empty403 acceptance and explicit backend-offline rollback require independent plan approval; synthetic root filesystem tests are not production acceptance",
+          "I1: exact independently received action approval must be separately pinned by Owner root; canonical GitHub commit/tree/code/ZIP facts plus one-attempt durable consumption and distinct outage-consented offline rollback fail closed before state or service mutation; shared GitHub author is not reviewer independence"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
@@ -141,7 +142,8 @@
           "tests/test_legacy_portal_logging_regression.py",
           "tests/test_portal_log_capability.py",
           "tests/test_legacy_disconnect_guard.py",
-          "tests/test_r4_controlled_install.py"
+          "tests/test_r4_controlled_install.py",
+          "tests/test_r4_install_approval.py"
         ]
       },
       "reuse": [
@@ -169,7 +171,8 @@
         "tests/test_legacy_disconnect_guard.py",
         "deploy/pr122-r4-disconnect-containment/**",
         "deploy/pr122-r4-controlled-install/**",
-        "tests/test_r4_controlled_install.py"
+        "tests/test_r4_controlled_install.py",
+          "tests/test_r4_install_approval.py"
       ]
     },
     {

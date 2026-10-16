@@ -39,6 +39,19 @@ class InstallTests(unittest.TestCase):
             self.skipTest("Requires isolated root filesystem; not production root")
         self.tmp = tempfile.TemporaryDirectory(prefix="r4-control-test-")
         self.addCleanup(self.tmp.cleanup)
+        # The existing filesystem model isolates admission. Dedicated I1 tests
+        # exercise the actual sealed ticket, canonical metadata and consumption.
+        def fixture_authorization(unused, action):
+            ticket = mock.Mock()
+            old, new = self.engine.SOURCE_SHA256, self.engine.CANDIDATE_SHA256
+            if action == "rollback-offline":
+                old, new = new, old
+            ticket.snapshot.return_value = {"fixture": "SYNTHETIC_ADMISSION_ONLY",
+                "expected_source_sha256": old, "result_source_sha256": new}
+            return ticket
+        authorization = mock.patch.object(INSTALL, "require_authorization", side_effect=fixture_authorization)
+        authorization.start()
+        self.addCleanup(authorization.stop)
         self.base = Path(self.tmp.name)
         self.source = self.base / "app/scripts/portal.py"
         self.source.parent.mkdir(parents=True)

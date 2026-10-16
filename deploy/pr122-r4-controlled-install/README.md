@@ -2,8 +2,8 @@
 
 PR122#6205371670 accepts temporarily disabling TikTok HTTP disconnect. The
 candidate source and its actual-source18 tests are inherited unchanged.
-Full artifact-byte review and this new root installation plan still need
-independent acceptance. Do not execute this script based only on source approval.
+The original source archive and prior installation archive passed full-byte
+review6205624143. The I1 admission increment still requires independent acceptance. Do not execute this script based only on source approval.
 
 ## Fixed implementation and reuse
 
@@ -23,11 +23,15 @@ embedded and hash-checked, not loaded from an admin-writable checkout.
 
 ## Installation sequence
 
-1. Require root, Tokyo host, trusted root directories and exact existing helper.
+1. First require the exact independently issued action approval, separately
+   Owner-root-pinned as specified in ADMISSION.md; verify GitHub bytes/metadata,
+   scope and expiry before engine loading or lock creation. Then require root,
+   Tokyo host, trusted root directories and exact existing helper.
    Acquire nonblocking old-helper lock and a separate fixed R4 execution lock.
 2. Refuse previous R4 state/public receipt; require exact current source d5ab592a,
    candidate57e38fc9, source identity and an active expected Portal service.
-3. Create root0700 R4 state; preserve original source root0400, grant/receipt0600.
+3. Exclusively consume the current exact approval; store its checked proof in
+   the private grant. Then create root0700 R4 state; preserve original source root0400, grant/receipt0600.
    Reuse the engine's once-only apply marker, atomic source replacement and one
    bounded Portal restart. No automatic cleanup, retry or rollback occurs.
 4. Require exact new source and a fresh active admin Portal PID; check actual
@@ -51,7 +55,9 @@ state remain unchanged.
 
 ## Explicit emergency rollback
 
-Never automatic and not a normal acceptance step. --rollback-offline requires
+Never automatic and not a normal acceptance step. A separate exact-action
+approval and Owner root pin explicitly accepting backend outage are mandatory
+(ADMISSION.md). --rollback-offline additionally requires
 the exact guarded current source, exact root0400 old backup and an unused rollback
 marker. Stop ONLY Portal, require MainPID0/inactive (or failed) AND localhost18080 ECONNREFUSED, THEN restore the
 exact previous source. Keep Portal stopped; do not restart vulnerable old code.
@@ -63,7 +69,7 @@ If stop cannot be confirmed, do not restore; preserve current code and evidence.
 
 ## Tests and operations notice
 
-20 tests use a temporary filesystem, a synthetic source, injected service/network
+40 focused I1 admission tests are added;20 affected installation tests use a temporary filesystem, a synthetic source, injected service/network
 actions and the unchanged real transaction-engine code. Hosted root is only an
 ephemeral test identity; local namespaceUID fallback is test-only. No production
 root preflight, install, restart, POST, disconnect or rollback is executed by CI.
