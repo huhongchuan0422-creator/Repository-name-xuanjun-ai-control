@@ -1,0 +1,12 @@
+{
+  "state": "READONLY_CHECKPOINT_NOT_ACTIVATED",
+  "default_branch": "main",
+  "default_head": "f34548c03974319dfb7babb7840a12e3182fdda1",
+  "pr122_head_branch": "feature/stage5-next25-integration-20261015",
+  "pr122_head": "5830a6e6f69744132fb74b341abb9929ae1632d6",
+  "pr122_base": "feature/stage5-merchant-platform-storefront-ui-20261014",
+  "branch_protection_read": "UNKNOWN_GITHUB_INTEGRATION_403",
+  "default_branch_mutations": 0,
+  "new_pr_created": false,
+  "required_action": "After independent approval, install the exact reviewed workflow files through the existing protected GitHub channel; do not alter protections or merge unrelated PR122 history."
+}

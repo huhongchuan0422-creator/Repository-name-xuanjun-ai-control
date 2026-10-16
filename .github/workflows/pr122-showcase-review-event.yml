@@ -8,7 +8,7 @@ permissions:
   actions: write
 jobs:
   dispatch-reviewed-build:
-    if: github.event.issue.number == 122 && github.event.comment.user.login == 'huhongchuan0422-creator' && startsWith(github.event.comment.body, 'XUANJUN_SHOWCASE_REVIEW')
+    if: github.event.issue.number == 122 && github.event.comment.user.login == 'huhongchuan0422-creator' && (startsWith(github.event.comment.body, 'XUANJUN_SHOWCASE_REVIEW') || startsWith(github.event.comment.body, 'XUANJUN_SHOWCASE_BUILD_REQUEST'))
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -20,19 +20,24 @@ jobs:
           import json,os,re,urllib.request,urllib.error
           event=json.load(open(os.environ['GITHUB_EVENT_PATH']))
           comment=event['comment'];body=comment['body']
-          assert body.startswith('XUANJUN_SHOWCASE_REVIEW\n')
-          review=json.loads(body.split('\n',1)[1])
-          assert review['reviewer_role']=='INDEPENDENT_AUDITOR'
-          assert review['decision'] in ('PUBLIC_CONTENT_APPROVED','PUBLIC_CONTENT_REVOKED')
           repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
-          commit=review['commit']
-          assert re.fullmatch(r'[0-9a-f]{40}',commit)
-          tag='pr122-reviewed-'+commit
           def call(path,data=None):
               raw=None if data is None else json.dumps(data).encode()
               request=urllib.request.Request('https://api.github.com/repos/'+repo+'/'+path,data=raw,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
               with urllib.request.urlopen(request,timeout=20) as response:
                   content=response.read();return json.loads(content) if content else None
+          if body.startswith('XUANJUN_SHOWCASE_BUILD_REQUEST\n'):
+              request=json.loads(body.split('\n',1)[1]);identifier=request['review_comment_id']
+              assert type(identifier) is int and identifier>0
+              comment=call('issues/comments/'+str(identifier))
+              assert comment['user']['login']=='huhongchuan0422-creator' and comment['issue_url'].endswith('/issues/122')
+              body=comment['body']
+          assert body.startswith('XUANJUN_SHOWCASE_REVIEW\n')
+          review=json.loads(body.split('\n',1)[1])
+          assert review['reviewer_role']=='INDEPENDENT_AUDITOR'
+          assert review['decision'] in ('PUBLIC_CONTENT_APPROVED','PUBLIC_CONTENT_REVOKED')
+          commit=review['commit'];assert re.fullmatch(r'[0-9a-f]{40}',commit)
+          tag='pr122-reviewed-'+commit
           run=call('actions/runs/'+str(review['ci_run_id']))
           assert run['head_sha']==commit and run['conclusion']=='success' and run['workflow_id']==386249451
           try:
