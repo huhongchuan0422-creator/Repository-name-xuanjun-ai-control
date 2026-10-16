@@ -31,7 +31,7 @@ async function refreshChanges(){
  try{const data=await api('changes/'+encodeURIComponent(project));$('change-list').replaceChildren();
  for(const item of data.cases){const events=item.events;if(events[0].kind!=='REQUEST')continue;
   const card=node('article');card.className='card';const request=events[0].payload,last=events[events.length-1];
-  card.append(node('h3',request.page),node('p',request.request),node('p','页面版本：'+request.page_sha256));
+  card.append(node('h3','页面整改意见'),node('p',request.request));const location=node('details');location.append(node('summary','查看页面与版本记录'),node('p',request.page),node('p',request.page_sha256));card.append(location);
   const labels={REQUESTED:'待评估',NEEDS_EVIDENCE:'待补齐证据',QUOTED:'待客户确认报价',FREE_APPROVED:'评估为免费整改',CUSTOMER_CONFIRMED:'客户已确认',DISPUTED:'客户有异议'};
   card.append(node('p',labels[last.payload.state]||'处理中'));
   const assessment=[...events].reverse().find(e=>e.kind==='ASSESSMENT');
@@ -47,5 +47,4 @@ async function refreshChanges(){
  }if(!$('change-list').children.length)$('change-list').append(node('p','暂无整改意见和费用。'));
  }catch(e){notice(e.message);}
 }
-form('change-request',async d=>{await api('change_submit',{project,...d});$('change-request').reset();notice('整改意见已归档，待工作量及范围评估。');await refreshChanges();});
 start();
