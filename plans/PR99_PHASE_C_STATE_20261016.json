@@ -98,7 +98,7 @@
       "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
       "independent_byte_review_comment_id": 6213125007
     },
-    "next_development": "Ciphertext baseline is fully copied and verified on Korea, supported by Owner-root terminal receipt. Do not recopy or repeat existing tests. Next verify private backup-key custody without printing key values; prepare selected-code/data restoration into a new isolated directory, no wholesale restore or service activation. Existing API setup and live Shadow remain deferred.",
+    "next_development": "Historical ciphertext and private baseline key are on Korea; complete decrypted archive hash matches approved historical baseline. Do not copy or verify keys again. New selected recovery helper prepared and locally tested, not executed on Korea. Extract only dormant source/dependency files and exact approved trading DB backup into a new root-private directory; no whole-system restoration, API activation, production imports or service actions.",
     "live_controller": {
       "implemented": true,
       "pid1_watchdog": true,
@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "PRIVATE_BACKUP_KEY_CUSTODY_METADATA_THEN_SELECTIVE_RESTORE_PREPARATION; NO_MORE_BASELINE_COPY",
+  "owner_action_now": "SELECTIVE_HISTORICAL_SOURCE_DEPENDENCIES_AND_EXACT_DB_RECOVERY_TO_NEW_PRIVATE_DIRECTORY; NO_SERVICE_START",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -327,11 +327,14 @@
     "wholesale_restore_allowed": false,
     "reencryption_or_rebackup_performed": false,
     "offsite_receipt": "evidence/pr99-offline-copy/OFFSITE_BASELINE_OWNER_RECEIPT_20261016.json",
-    "offsite_target": "/root/xuanjun-offline-baseline-20261016/recovery-baseline.tar.gz.enc"
+    "offsite_target": "/root/xuanjun-offline-baseline-20261016/recovery-baseline.tar.gz.enc",
+    "target_key_custody": "PASS_SUPPORTED_BY_OWNER_ROOT_TERMINAL_RECEIPT",
+    "target_decrypt_stream_sha256": "PASS",
+    "key_custody_receipt": "evidence/pr99-offline-copy/KEY_CUSTODY_OWNER_RECEIPT_20261016.json"
   },
   "offline_relocation_blocker": {
-    "kind": "OFFSITE_COPY_COMPLETE_PRIVATE_KEY_CUSTODY_AND_SELECTIVE_RESTORE_PENDING",
-    "detail": "Owner-root transfer completed; sum 498335744+822236016=1320571760 and pinned final SHA passed. Full migration is not complete: target private decryption-key custody and selected recovery are not yet proven; baseline is historical, not current final snapshot.",
+    "kind": "SELECTIVE_RECOVERY_NOT_YET_EXECUTED_ENVIRONMENT_AND_CURRENT_DATA_PENDING",
+    "detail": "Owner-root key custody and decryption stream passed. Target restore directory not created by this window. Dependency installation/runtime validation and final current-state migration have not been completed.",
     "api_is_blocker": false,
     "last_owner_attempt": {
       "schema_version": 1,
