@@ -7,6 +7,8 @@ from scripts.community_wechat_sp_actions import ProviderActions, ProviderActionU
 
 
 class Center:
+    def now(self):
+        return 100
     def tx(self):
         return contextlib.nullcontext()
 
