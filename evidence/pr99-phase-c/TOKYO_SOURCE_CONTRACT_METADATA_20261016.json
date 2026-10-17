@@ -1,0 +1,759 @@
+{
+  "actual_secretref_or_readonly_provider_permission": "NOT_PROVEN",
+  "credentials_read": false,
+  "database_metadata": {
+    "device": 64771,
+    "gid": 1000,
+    "inode": 1601016,
+    "mode": "0o644",
+    "mtime_ns": 1792135506709367600,
+    "size": 46907392,
+    "status": "METADATA_ONLY",
+    "uid": 1000
+  },
+  "database_opened": false,
+  "database_path": "/opt/trading-system/database/data/trading.db",
+  "delivery_commit": "55ef5b94ef66ec9286b9aae9a165b019499a69a7",
+  "files": [
+    {
+      "definitions": [
+        {
+          "kind": "ClassDef",
+          "name": "CredentialError"
+        },
+        {
+          "kind": "ClassDef",
+          "name": "CredentialStore"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.__init__",
+          "parameters": [
+            "self",
+            "repository",
+            "master_key",
+            "key_version"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore._load_master_key",
+          "parameters": [
+            "self",
+            "master_key"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore._encrypt",
+          "parameters": [
+            "self",
+            "plaintext",
+            "aad"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore._decrypt",
+          "parameters": [
+            "self",
+            "ciphertext",
+            "nonce",
+            "aad"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.save_credential",
+          "parameters": [
+            "self",
+            "customer_id",
+            "account_id",
+            "api_key",
+            "api_secret",
+            "credential_id",
+            "exchange",
+            "environment",
+            "status",
+            "trade_permission",
+            "withdraw_permission",
+            "metadata"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.load_credential",
+          "parameters": [
+            "self",
+            "credential_id"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.list_credentials",
+          "parameters": [
+            "self",
+            "account_id",
+            "customer_id",
+            "exchange",
+            "environment",
+            "status"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.disable_credential",
+          "parameters": [
+            "self",
+            "credential_id"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.mark_verified",
+          "parameters": [
+            "self",
+            "credential_id",
+            "status",
+            "verification_state",
+            "permission_state",
+            "verified_time",
+            "metadata"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.merge_metadata",
+          "parameters": [
+            "self",
+            "credential_id",
+            "metadata"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.rotate_credential",
+          "parameters": [
+            "self",
+            "old_credential_id",
+            "customer_id",
+            "account_id",
+            "api_key",
+            "api_secret",
+            "environment",
+            "verifier",
+            "exchange"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.save_legacy_hash",
+          "parameters": [
+            "self",
+            "customer_id",
+            "account_id",
+            "legacy_key_hash"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialStore.rotate_master_key",
+          "parameters": [
+            "self"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "fingerprint_api_key",
+          "parameters": [
+            "api_key"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "redact_api_key",
+          "parameters": [
+            "api_key"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "safe_record",
+          "parameters": [
+            "record"
+          ],
+          "varargs": false
+        }
+      ],
+      "imports": [
+        "base64",
+        "cryptography.hazmat.primitives.ciphers.aead",
+        "database.repositories",
+        "hashlib",
+        "os",
+        "uuid"
+      ],
+      "literal_values_exported": false,
+      "path": "accounts/credential_store.py",
+      "production_module_executed": false,
+      "recognized_role_markers": [
+        "TRADING_CREDENTIAL_MASTER_KEY"
+      ],
+      "semantics_or_role_permission_proven": false,
+      "sha256": "513ae2c21db4ccdf047d02796702941986be09275d9dafd2931fdc5af52e27cd",
+      "status": "SOURCE_CONTRACT_METADATA_COLLECTED"
+    },
+    {
+      "definitions": [
+        {
+          "kind": "FunctionDef",
+          "name": "utc_now",
+          "parameters": [],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_iso",
+          "parameters": [
+            "value"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_hash_token",
+          "parameters": [
+            "token"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_id",
+          "parameters": [
+            "prefix"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "ClassDef",
+          "name": "CredentialSubmissionSession"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialSubmissionSession.sanitized",
+          "parameters": [
+            "self"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "ClassDef",
+          "name": "InMemorySubmissionSessionRepository"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "InMemorySubmissionSessionRepository.__init__",
+          "parameters": [
+            "self"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "InMemorySubmissionSessionRepository.save",
+          "parameters": [
+            "self",
+            "session"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "InMemorySubmissionSessionRepository.get_by_token_hash",
+          "parameters": [
+            "self",
+            "token_hash"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "InMemorySubmissionSessionRepository.get",
+          "parameters": [
+            "self",
+            "submission_id"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "ClassDef",
+          "name": "SensitiveValueRedactor"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SensitiveValueRedactor.__init__",
+          "parameters": [
+            "self",
+            "values"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SensitiveValueRedactor.redact_text",
+          "parameters": [
+            "self",
+            "value"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SensitiveValueRedactor.redact",
+          "parameters": [
+            "self",
+            "value"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "ClassDef",
+          "name": "CredentialIntakeAuditSink"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialIntakeAuditSink.__init__",
+          "parameters": [
+            "self",
+            "redactor"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "CredentialIntakeAuditSink.record",
+          "parameters": [
+            "self",
+            "submission_id",
+            "customer_id",
+            "account_id",
+            "exchange",
+            "credential_role",
+            "operation",
+            "result",
+            "failure_category",
+            "correlation_id",
+            "actor_type",
+            "metadata"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "ClassDef",
+          "name": "FakeExchangeValidationAdapter"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "FakeExchangeValidationAdapter.validate",
+          "parameters": [
+            "self",
+            "exchange",
+            "credential_role",
+            "credential_payload"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "ClassDef",
+          "name": "SecureCredentialIntakeService"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SecureCredentialIntakeService.__init__",
+          "parameters": [
+            "self",
+            "credential_store",
+            "session_repository",
+            "validator",
+            "audit_sink",
+            "token_ttl_seconds"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SecureCredentialIntakeService.create_submission_session",
+          "parameters": [
+            "self",
+            "customer_id",
+            "account_id",
+            "exchange",
+            "credential_role",
+            "correlation_id"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SecureCredentialIntakeService.submit_credentials",
+          "parameters": [
+            "self",
+            "submission_token",
+            "credential_payload",
+            "customer_id",
+            "account_id",
+            "credential_role",
+            "idempotency_key"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SecureCredentialIntakeService._validate_payload_schema",
+          "parameters": [
+            "self",
+            "payload"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SecureCredentialIntakeService._sanitized_success",
+          "parameters": [
+            "self",
+            "session",
+            "record",
+            "credential_role",
+            "validation"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "SecureCredentialIntakeService._reject",
+          "parameters": [
+            "self",
+            "session",
+            "error_category",
+            "redactor",
+            "credential_role",
+            "validation"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "ClassDef",
+          "name": "StatusOnlyOperationsBridge"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "StatusOnlyOperationsBridge.__init__",
+          "parameters": [
+            "self",
+            "credential_repository"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "StatusOnlyOperationsBridge.account_status",
+          "parameters": [
+            "self",
+            "customer_id",
+            "account_id",
+            "exchange"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "StatusOnlyOperationsBridge.crm_payload",
+          "parameters": [
+            "self",
+            "customer_id",
+            "account_id",
+            "exchange"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "StatusOnlyOperationsBridge.ai_payload",
+          "parameters": [
+            "self",
+            "customer_id",
+            "account_id",
+            "exchange"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "StatusOnlyOperationsBridge.openclaw_payload",
+          "parameters": [
+            "self",
+            "customer_id",
+            "account_id",
+            "exchange"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_safe_failure",
+          "parameters": [
+            "record"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "credential_rotation_plan",
+          "parameters": [
+            "old_credential_id",
+            "customer_id",
+            "account_id"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "credential_revocation_request",
+          "parameters": [
+            "credential_id",
+            "customer_id",
+            "account_id"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "secure_browser_contract",
+          "parameters": [],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "trust_boundary_contract",
+          "parameters": [],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "assert_no_sensitive_fields",
+          "parameters": [
+            "payload"
+          ],
+          "varargs": false
+        }
+      ],
+      "imports": [
+        "accounts.credential_store",
+        "dataclasses",
+        "datetime",
+        "dual_api_readiness",
+        "hashlib",
+        "json",
+        "secrets",
+        "time",
+        "uuid"
+      ],
+      "literal_values_exported": false,
+      "path": "trading_execution/secure_credential_intake.py",
+      "production_module_executed": false,
+      "recognized_role_markers": [],
+      "semantics_or_role_permission_proven": false,
+      "sha256": "0b602d99d50816cb1ff85c54823433e49a32413228f87c5e7ddc9278a2b20980",
+      "status": "SOURCE_CONTRACT_METADATA_COLLECTED"
+    },
+    {
+      "definitions": [
+        {
+          "kind": "FunctionDef",
+          "name": "trading_role_metadata",
+          "parameters": [
+            "permission_evidence"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "account_readonly_role_metadata",
+          "parameters": [
+            "permission_evidence"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "finance_collection_readonly_role_metadata",
+          "parameters": [
+            "permission_evidence"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "source_attribution_for_record",
+          "parameters": [
+            "credential_role"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "profit_share_route_status",
+          "parameters": [
+            "records"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "fee_rebate_route_status",
+          "parameters": [
+            "records"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "ClassDef",
+          "name": "DualApiReadinessEvaluator"
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "DualApiReadinessEvaluator.__init__",
+          "parameters": [
+            "self",
+            "credential_repository"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "DualApiReadinessEvaluator.evaluate",
+          "parameters": [
+            "self",
+            "customer_id",
+            "account_id"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "evaluate_dual_api_records",
+          "parameters": [
+            "records"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_evaluate_trading",
+          "parameters": [
+            "record"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_evaluate_readonly",
+          "parameters": [
+            "record"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_active_records_for_role",
+          "parameters": [
+            "records",
+            "role"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_unique",
+          "parameters": [
+            "values"
+          ],
+          "varargs": false
+        },
+        {
+          "kind": "FunctionDef",
+          "name": "_readonly_ip_status",
+          "parameters": [
+            "permission_evidence"
+          ],
+          "varargs": false
+        }
+      ],
+      "imports": [
+        "trading_execution.api_permission_profiles"
+      ],
+      "literal_values_exported": false,
+      "path": "trading_execution/dual_api_readiness.py",
+      "production_module_executed": false,
+      "recognized_role_markers": [
+        "BINANCE_ACCOUNT_READONLY",
+        "BINANCE_TRADING"
+      ],
+      "semantics_or_role_permission_proven": false,
+      "sha256": "a96e3a6df00ff76d826474b3460fd1b42469c9627c3133df4072f8b641852efe",
+      "status": "SOURCE_CONTRACT_METADATA_COLLECTED"
+    },
+    {
+      "definitions": [
+        {
+          "kind": "FunctionDef",
+          "name": "__getattr__",
+          "parameters": [
+            "name"
+          ],
+          "varargs": false
+        }
+      ],
+      "imports": [],
+      "literal_values_exported": false,
+      "path": "database/repositories/__init__.py",
+      "production_module_executed": false,
+      "recognized_role_markers": [],
+      "semantics_or_role_permission_proven": false,
+      "sha256": "ff177d3370bc01c574f1f12085e9c3d86d9931a2e0227b975eb0be1088d98c31",
+      "status": "SOURCE_CONTRACT_METADATA_COLLECTED"
+    }
+  ],
+  "host": "iZ6wee8q9z4t03hvqumwfhZ",
+  "http_calls": 0,
+  "observed_epoch": 1792135576,
+  "probe_sha256": "0b4c7804c3f786fdadc57548c85d48c683530fc1a76bf9d47fe72727a10cb545",
+  "production_changes": 0,
+  "production_modules_imported": 0,
+  "schema_version": 1,
+  "service_actions": 0,
+  "status": "SOURCE_CONTRACT_METADATA_ONLY_NOT_C_ACCEPTANCE",
+  "sudo_calls": 0,
+  "uid": 1001,
+  "evidence_origin": "ACTUAL_TOKYO_NONROOT_RUNNER_LOG",
+  "github_run_id": 38867192724,
+  "github_job_id": 116862631607,
+  "other_host_jobs": "ALL_SKIPPED",
+  "semantic_limit": "AST identifier contract and lstat only; no full source body review, credential record, provider permission or database schema"
+}

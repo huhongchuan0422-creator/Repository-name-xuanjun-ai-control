@@ -1,0 +1,966 @@
+{
+  "approval": false,
+  "dynamic_count": 11,
+  "location_count": 75,
+  "remaining": [
+    "independent full proxy review",
+    "host CA path proof",
+    "certificate issuance/renewal",
+    "required dynamic safe acceptance",
+    "client IP semantic acceptance",
+    "W06 109 URL checks",
+    "W07 release gate",
+    "DNS change"
+  ],
+  "routes": [
+    {
+      "candidate_match": "= /yunhui.css",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /yunhui.css",
+      "try_files": [
+        "/yunhui.css",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /yunhui.js",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /yunhui.js",
+      "try_files": [
+        "/yunhui.js",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /search-index.json",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /search-index.json",
+      "try_files": [
+        "/search-index.json",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /search",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /search",
+      "try_files": [
+        "/search.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /.well-known/acme-challenge/",
+      "handler": "DOMESTIC_ACME_CHALLENGE",
+      "source_match": "^~ /.well-known/acme-challenge/"
+    },
+    {
+      "candidate_match": "/p/",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "/p/",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /submit/douyin",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /submit/douyin",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /submit/tiktok",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /submit/tiktok",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /integrations/douyin/oauth/callback",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /integrations/douyin/oauth/callback",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /integrations/tiktok/oauth/start",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /integrations/tiktok/oauth/start",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /integrations/tiktok/oauth/callback",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /integrations/tiktok/oauth/callback",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /integrations/tiktok/status",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /integrations/tiktok/status",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /integrations/tiktok/disconnect",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /integrations/tiktok/disconnect",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /healthz",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /healthz",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "^~ /telegram-webhook/",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "^~ /telegram-webhook/[REDACTED]",
+      "source_nested_control_retained_at_tokyo": true,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Telegram-Bot-Api-Secret-Token",
+            "REDACTED"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /telegram-canary/status",
+      "handler": "TOKYO_HTTPS_EXISTING_BACKEND",
+      "source_match": "= /telegram-canary/status",
+      "source_nested_control_retained_at_tokyo": false,
+      "source_security": [
+        {
+          "arguments": [
+            "Host",
+            "$host"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Forwarded-Proto",
+            "https"
+          ],
+          "directive": "proxy_set_header"
+        },
+        {
+          "arguments": [
+            "X-Real-IP",
+            "$remote_addr"
+          ],
+          "directive": "proxy_set_header"
+        }
+      ]
+    },
+    {
+      "candidate_match": "= /",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /",
+      "try_files": [
+        "/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /features",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /features",
+      "try_files": [
+        "/features.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /use-cases",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /use-cases",
+      "try_files": [
+        "/use-cases.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /integrations",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /integrations",
+      "try_files": [
+        "/integrations.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /integrations/douyin",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /integrations/douyin",
+      "try_files": [
+        "/integrations/douyin.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /integrations/tiktok",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /integrations/tiktok",
+      "try_files": [
+        "/integrations/tiktok.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /capabilities",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /capabilities",
+      "try_files": [
+        "/capabilities.html",
+        "/capabilities/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /custom-ai/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /custom-ai/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /guides",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /guides",
+      "try_files": [
+        "/guides.html",
+        "/guides/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /guides/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /guides/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /about/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /about/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /custom-ai",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /custom-ai",
+      "try_files": [
+        "/custom-ai.html",
+        "/custom-ai/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /capabilities/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /capabilities/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /solutions",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /solutions",
+      "try_files": [
+        "/solutions.html",
+        "/solutions/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /solutions/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /solutions/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /labs",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /labs",
+      "try_files": [
+        "/labs.html",
+        "/labs/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /labs/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /labs/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /contact",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /contact",
+      "try_files": [
+        "/contact.html",
+        "/contact/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /about",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /about",
+      "try_files": [
+        "/about.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /privacy",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /privacy",
+      "try_files": [
+        "/privacy.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /privacy/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /privacy/",
+      "try_files": [
+        "/privacy.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /terms",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /terms",
+      "try_files": [
+        "/terms.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /terms/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /terms/",
+      "try_files": [
+        "/terms.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok-review",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok-review",
+      "try_files": [
+        "/tiktok-review.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok-review/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok-review/",
+      "try_files": [
+        "/tiktok-review.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok-review/privacy",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok-review/privacy",
+      "try_files": [
+        "/tiktok-review-privacy.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok-review/privacy/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok-review/privacy/",
+      "try_files": [
+        "/tiktok-review-privacy.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok-review/terms",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok-review/terms",
+      "try_files": [
+        "/tiktok-review-terms.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok-review/terms/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok-review/terms/",
+      "try_files": [
+        "/tiktok-review-terms.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok-review/callback",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok-review/callback",
+      "try_files": [
+        "/tiktok-review-callback.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok-review/callback/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok-review/callback/",
+      "try_files": [
+        "/tiktok-review-callback.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktok64gtkWxc679WXcGsU11O6ZoKEkzZeCH0.txt",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktok64gtkWxc679WXcGsU11O6ZoKEkzZeCH0.txt",
+      "try_files": [
+        "/tiktok64gtkWxc679WXcGsU11O6ZoKEkzZeCH0.txt",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+      "try_files": [
+        "/tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktokVSWc6dimWZFJAQltpQZXPC6iku7JY0gj.txt",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktokVSWc6dimWZFJAQltpQZXPC6iku7JY0gj.txt",
+      "try_files": [
+        "/tiktokVSWc6dimWZFJAQltpQZXPC6iku7JY0gj.txt",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /tiktokVSWc6dimWZFJAQltpQZXPC6jku7JY0gi.txt",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /tiktokVSWc6dimWZFJAQltpQZXPC6jku7JY0gi.txt",
+      "try_files": [
+        "/tiktokVSWc6dimWZFJAQltpQZXPC6jku7JY0gi.txt",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /terms/tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /terms/tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+      "try_files": [
+        "/tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /styles.css",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /styles.css",
+      "try_files": [
+        "/styles.css",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /site.js",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /site.js",
+      "try_files": [
+        "/site.js",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /growth-foundation.json",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /growth-foundation.json",
+      "try_files": [
+        "/growth-foundation.json",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /robots.txt",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /robots.txt",
+      "try_files": [
+        "/robots.txt",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /sitemap.xml",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /sitemap.xml",
+      "try_files": [
+        "/sitemap.xml",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /assets/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /assets/",
+      "try_files": [
+        "$uri",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /zh-cn",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /zh-cn",
+      "try_files": [
+        "/zh-cn/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /zh-cn/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /zh-cn/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /en",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /en",
+      "try_files": [
+        "/en/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /en/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /en/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /zh-tw",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /zh-tw",
+      "try_files": [
+        "/zh-tw/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /zh-tw/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /zh-tw/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /ja",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /ja",
+      "try_files": [
+        "/ja/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /ja/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /ja/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /ko",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /ko",
+      "try_files": [
+        "/ko/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /ko/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /ko/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /es",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /es",
+      "try_files": [
+        "/es/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /es/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /es/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /fr",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /fr",
+      "try_files": [
+        "/fr/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /fr/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /fr/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "= /de",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "= /de",
+      "try_files": [
+        "/de/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "^~ /de/",
+      "handler": "DOMESTIC_IMMUTABLE_STATIC",
+      "source_match": "^~ /de/",
+      "try_files": [
+        "$uri",
+        "$uri.html",
+        "$uri/index.html",
+        "=404"
+      ]
+    },
+    {
+      "candidate_match": "/",
+      "handler": "DENY_UNKNOWN_ROUTE_404",
+      "source_match": "/"
+    }
+  ],
+  "schema_version": 1,
+  "source_config_files": {
+    "/etc/nginx/conf.d/wecom.conf": {
+      "bytes": 2933,
+      "sha256": "ca380c772ee923af24f420256c8de6cec3b774791cc9deb5bd7fdba1059931c0"
+    },
+    "/etc/nginx/mime.types": {
+      "bytes": 38661,
+      "sha256": "845b3cf44e3d178299f218f6fffc4067a989d3f88895dc03bd931c7c9e7230c4"
+    },
+    "/etc/nginx/nginx.conf": {
+      "bytes": 16813,
+      "sha256": "80b49c552823e5684ec35abdf23af52e37081620a654124320e0c3a7974242f4"
+    }
+  },
+  "source_inventory_artifact": 11987296370,
+  "source_inventory_commit": "6e747401b170fbd8179ca93e69c16529d73e853a",
+  "source_inventory_job": 116523523247,
+  "source_inventory_run": 38764344743,
+  "status": "CANDIDATE_NOT_INSTALLED",
+  "tokyo_retirement_allowed": false
+}

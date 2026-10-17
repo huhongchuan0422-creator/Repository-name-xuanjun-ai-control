@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "origin": "GITHUB_ACTIONS_ORIGINAL_JOB_LOG",
+  "run_id": 38859895705,
+  "job_id": 116839560203,
+  "workflow": "v27-four-server-batch-readonly.yml",
+  "delivery_commit": "71f9e115373bdc56cfe5dbbeeaaaae92b94fa642",
+  "probe_source_sha256": "f027131c4c0a7f25a7c85b8d46c20f43ed182bb0ca32adef232ed48526632576",
+  "receipt": {
+    "candidate_service": {
+      "ActiveState": "inactive",
+      "DropInPaths": "",
+      "FragmentPath": "/etc/systemd/system/xuanjun-binance-shadow.service",
+      "Group": "xuanjun_binance",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "PrivateNetwork": "yes",
+      "RestrictAddressFamilies": "[unprintable]",
+      "SubState": "dead",
+      "User": "xuanjun_binance"
+    },
+    "candidate_service_query": {
+      "exit": 0
+    },
+    "cgroup_layout": {
+      "memory_controller_listed": true,
+      "runtime_memory_peak_oom_evidence": "NOT_VERIFIED",
+      "v2": false
+    },
+    "credential_reads": 0,
+    "database_reads": 0,
+    "dedicated_identity": {
+      "gid": 986,
+      "interactive_shell": false,
+      "uid": 986
+    },
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "kernel": "5.10.134-19.8.al8.x86_64",
+    "kernel_metadata": {
+      "ip6_tables_matches": {
+        "error": "FileNotFoundError"
+      },
+      "ip_tables_matches": {
+        "error": "FileNotFoundError"
+      }
+    },
+    "kind": "PR99_PHASE_C_NONROOT_METADATA",
+    "loaded_modules_metadata": {
+      "ip6table_filter": false,
+      "iptable_filter": false,
+      "nf_conntrack": true,
+      "nf_tables": true,
+      "xt_conntrack": false,
+      "xt_owner": false
+    },
+    "observed_epoch": 1792131149,
+    "phase_c_authorized": false,
+    "production_mutation": false,
+    "provider_requests": 0,
+    "python": "3.11.13",
+    "root_firewall_enforcement": "NOT_VERIFIED",
+    "root_used": false,
+    "schema_version": 1,
+    "service_actions": 0,
+    "started_service_confinement": "NOT_EXERCISED",
+    "status": "METADATA_COLLECTED_NOT_PHASE_C_ACCEPTANCE",
+    "sudo_calls": 0,
+    "tools": {
+      "busctl": {
+        "path": "/usr/bin/busctl"
+      },
+      "ip": {
+        "exit": 0,
+        "path": "/usr/sbin/ip",
+        "present_trusted": true,
+        "version": "ip utility, iproute2-6.2.0, libbpf 0.6.0"
+      },
+      "ip6tables": {
+        "exit": 1,
+        "path": "/usr/sbin/xtables-nft-multi",
+        "present_trusted": true
+      },
+      "iptables": {
+        "exit": 1,
+        "path": "/usr/sbin/xtables-nft-multi",
+        "present_trusted": true
+      },
+      "nft": {
+        "exit": 0,
+        "path": "/usr/sbin/nft",
+        "present_trusted": true,
+        "version": "nftables v1.0.4 (Lester Gooch #3)"
+      },
+      "openssl": {
+        "exit": 0,
+        "path": "/usr/bin/openssl",
+        "present_trusted": true,
+        "version": "OpenSSL 1.1.1k  FIPS 25 Mar 2021"
+      },
+      "setpriv": {
+        "path": "/usr/bin/setpriv"
+      },
+      "systemctl": {
+        "exit": 0,
+        "path": "/usr/bin/systemctl",
+        "present_trusted": true,
+        "version": "systemd 239 (239-82.0.4.5.al8.5)"
+      },
+      "systemd-analyze": {
+        "path": "/usr/bin/systemd-analyze"
+      },
+      "unshare": {
+        "path": "/usr/bin/unshare"
+      }
+    },
+    "uid": 1001
+  },
+  "limitations": [
+    "Nonroot metadata, not root firewall enforcement or started service confinement",
+    "iptables/ip6tables version unknown: v1 resolved multicall binary lost argv0 alias; exit1 is not incompatibility proof",
+    "Missing proc match list/loaded module is not proof of kernel lack",
+    "No credential permissions, custody, DB or publisher/verifier wiring was read or established",
+    "No reinstall, sudo, service action or provider request; other server jobs skipped"
+  ],
+  "future_collector_v2": "NOT_RUN; alias invocation corrected and locally tested; original v1 evidence unchanged"
+}

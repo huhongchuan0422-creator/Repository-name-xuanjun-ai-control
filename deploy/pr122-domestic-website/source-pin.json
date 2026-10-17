@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "source_archive": "PR122_TOKYO_WEBROOT_MIGRATION_SOURCE_0363531ee2f8.tar.gz",
+  "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
+  "source_archive_size": 7526140,
+  "source_manifest_sha256": "d9157976ae67e89aba90a8de0d2c606ec62268c6b649d9ebe578f6c2619e0d6a",
+  "source_file_count": 1187,
+  "source_total_size": 11090003,
+  "source_version": "0363531ee2f85ae36093a015c020a7609a65b01f",
+  "overlay_baselines": {
+    "assets/tiktok-integration.js": "01f08d5021d6b232f7f67f775c5cecd430e8a2713551cf8cea24277954ba4c0d"
+  }
+}

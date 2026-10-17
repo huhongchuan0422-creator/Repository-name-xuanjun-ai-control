@@ -4,6 +4,10 @@ on:
     branches:
       - feature/chatgpt-community-wechat-sp-offline-20261017
     paths:
+      - 'scripts/community_stage_*.py'
+      - 'tests/test_community_stage_*.py'
+      - 'clients/community-mini/**'
+      - 'demos/community-stage/**'
       - scripts/community_wechat_sp_offline_guard.py
       - scripts/community_wechat_sp_mock_checkout_view.py
       - scripts/community_wechat_sp_split_projection.py
@@ -17,11 +21,33 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Offline standard-library tests only
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install exact browser test runner
         run: |
-          python3 -B -m unittest discover -s tests -p 'test_community_wechat_sp_*.py' -v
+          python -m pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Complete Phase1 and Phase2 source regression
+        run: |
+          set -o pipefail
+          python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
+          python3 -B -m unittest discover -s tests -p 'test_stage5_*.py' -v 2>&1 | tee stage5-tests.log
+          node --test clients/community-mini/client.test.cjs
+          node --test demos/community-local-e2e/*.test.mjs
+          node --test demos/community-payment/demo.test.mjs
+          node --test demos/community-admin/admin.test.mjs
+      - name: Save exact-source test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-phase-integration-evidence
+          path: |
+            community-tests.log
+            stage5-tests.log
+          retention-days: 14

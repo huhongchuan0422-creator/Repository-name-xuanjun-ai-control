@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "kind": "OWNER_ROOT_EXECUTION_HANDOFF_NOT_NEW_REVIEW_CANDIDATE",
+  "approval_comment_id": 6208766288,
+  "approval_body_sha256": "d9b46f880becad6d5887dd4af0819e3081d73ea831becc216db314cf6347253d",
+  "source_commit": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
+  "artifact_sha256": "35caaf41040c734565e68ff0c3a25a40be7304b1d58838596aa73f5acb23ff24",
+  "handoff_sha256": "25f263d4dc2f2ca70d00cb8b1a0ff35bd0af2ce3bacd062a32d8df16fe1ddb3b",
+  "valid_until": "2026-10-16T15:27:14+08:00",
+  "server_execution": "NOT_EXECUTED",
+  "validation": {
+    "approval_original_body_sha256": "PASS",
+    "original_tar_9_bindings": "PASS",
+    "handoff_syntax": "PASS",
+    "handoff_disposable_models": [
+      "success using mocked finalizer child",
+      "changed old anchor rejected before stage",
+      "expired permit rejected before stage",
+      "changed unit rejected before stage"
+    ],
+    "model_scope": "Local Python3.12 with synthetic host identity, anchor and paths; no real root/server/finalizer execution; not repeated185 tests."
+  },
+  "old_anchor_sha256": "44701367ce05fd904429a64dc65900a4d96bbaadc323155983b813a55945fadf",
+  "retained_lock": {
+    "device": 25,
+    "inode": 4716
+  },
+  "max_attempts": 1,
+  "requires_python": [
+    "3.11",
+    "-I",
+    "-B",
+    "-u"
+  ],
+  "phase_c": "HOLD",
+  "tokyo": "UNCHANGED"
+}

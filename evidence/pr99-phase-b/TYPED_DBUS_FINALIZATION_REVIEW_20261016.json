@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source": "OWNER_ROOT_TERMINAL_EVIDENCE_PLUS_DEVELOPER_SOURCE_CI",
+  "prior_repair_approval": 6208184098,
+  "actual_repair_attempts": 1,
+  "actual_repair_status": "HOLD_PRESERVE_EVIDENCE",
+  "actual_error": "MANAGER_NETWORK_PROFILE_NOT_LOADED",
+  "root_cause": "SYSTEMCTL239_COMPOUND_PROPERTY_UNPRINTABLE_NOT_PROFILE_ABSENCE",
+  "actual_manager": {
+    "private_network": true,
+    "address_family_typed": "(bas) true 1 \"AF_UNIX\"",
+    "systemctl_family": "[unprintable]",
+    "active_state": "inactive",
+    "substate": "dead",
+    "main_pid": 0
+  },
+  "actual_files": {
+    "unit_sha256": "824fc0cbe3d879b61ea36b0bd7c45fb8c1e9fb6c463f46ada741ac3f2299899b",
+    "transaction_sha256": "ee81a70bb417e66dbb58bad5a79a776d1e7a0bce35d0e72bf638a2fe0844eb75",
+    "transaction_changed_fields": [
+      "unit_sha256"
+    ],
+    "runtime_files": 17,
+    "mismatches": 0,
+    "current_unchanged": true,
+    "shared_named_unit_metadata_unchanged": true
+  },
+  "retained_lock": {
+    "exists": true,
+    "historical_inode_token_persisted": false,
+    "new_explicit_owner_root_adoption_required": true
+  },
+  "new_candidate": {
+    "commit": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
+    "tree": "db28205e0ff72623db05aa59bb481d42df631815",
+    "review_request": 6208366964,
+    "new_action": "PR99_PHASE_B_OFFLINE_REPAIR_FINALIZE_V1",
+    "unit_write": false,
+    "transaction_write": false,
+    "reload": false,
+    "service_start": false,
+    "execution": "NOT_EXECUTED",
+    "new_approval": "NOT_ISSUED",
+    "new_anchor": "NOT_REGISTERED"
+  },
+  "ci": {
+    "run": 38852538748,
+    "job": 116816737809,
+    "tests_passed": 185,
+    "focused_tests": 44,
+    "new_methods": 18,
+    "host_job_status": "SKIPPED"
+  },
+  "artifact": {
+    "id": 12025343420,
+    "zip_bytes": 65027,
+    "zip_sha256": "96ea3889c120b0d48b5cdb0647ced542b35d60f635964098272c0b64ff17b116",
+    "tar_bytes": 64527,
+    "tar_sha256": "35caaf41040c734565e68ff0c3a25a40be7304b1d58838596aa73f5acb23ff24",
+    "bound_files_passed": 9,
+    "members": 10,
+    "exact_local_reproduction": true
+  },
+  "phase_b": "HOLD_PENDING_FINALIZATION",
+  "started_service_confinement": "NOT_EXERCISED",
+  "phase_c": "NOT_AUTHORIZED",
+  "production_migration": "HOLD",
+  "tokyo_retirement": "HOLD",
+  "website_changed": false,
+  "dns_changed": false
+}

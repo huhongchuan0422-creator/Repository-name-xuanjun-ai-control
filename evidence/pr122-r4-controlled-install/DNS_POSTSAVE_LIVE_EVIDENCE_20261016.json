@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "evidence_commit": "fe9e1320bd9a9602b061b1e7c0e8dce5aaac95cc",
+  "run_id": 38839813239,
+  "jobs": [
+    {
+      "id": 116777069808,
+      "name": "dns-postsave-observation (domestic, xuanjun-domestic-ops)",
+      "conclusion": "success"
+    },
+    {
+      "id": 116777069985,
+      "name": "dns-postsave-observation (tokyo, xuanjun-tokyo-readonly)",
+      "conclusion": "success"
+    }
+  ],
+  "receipts": {
+    "domestic": {
+      "authoritative": [
+        {
+          "exit": 0,
+          "public_dns_reply": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 16008\n;; flags: qr aa rd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1\n;; WARNING: recursion requested but not available\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nwenwenwenyiyiyi.work.\t300\tIN\tA\t47.101.152.210\n\n",
+          "server": "celine.ns.cloudflare.com",
+          "type": "A"
+        },
+        {
+          "exit": 0,
+          "public_dns_reply": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 65149\n;; flags: qr aa rd; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n;; WARNING: recursion requested but not available\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nwenwenwenyiyiyi.work.\t1800\tIN\tSOA\tceline.ns.cloudflare.com. dns.cloudflare.com. 2417602619 10000 2400 604800 1800\n\n",
+          "server": "celine.ns.cloudflare.com",
+          "type": "AAAA"
+        },
+        {
+          "exit": 0,
+          "public_dns_reply": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 39825\n;; flags: qr aa rd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1\n;; WARNING: recursion requested but not available\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nwenwenwenyiyiyi.work.\t300\tIN\tA\t47.101.152.210\n\n",
+          "server": "chris.ns.cloudflare.com",
+          "type": "A"
+        },
+        {
+          "exit": 0,
+          "public_dns_reply": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 58537\n;; flags: qr aa rd; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n;; WARNING: recursion requested but not available\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nwenwenwenyiyiyi.work.\t1800\tIN\tSOA\tceline.ns.cloudflare.com. dns.cloudflare.com. 2417602619 10000 2400 604800 1800\n\n",
+          "server": "chris.ns.cloudflare.com",
+          "type": "AAAA"
+        }
+      ],
+      "current": "/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage",
+      "current_unchanged": true,
+      "delivery_commit": "fe9e1320bd9a9602b061b1e7c0e8dce5aaac95cc",
+      "dns_changes_by_collector": 0,
+      "dns_release_approval": "NOT_ESTABLISHED",
+      "domain_reached_domestic": true,
+      "host": "iZvt5t8tlrm8oiZ",
+      "http": {
+        "location": "https://wenwenwenyiyiyi.work/",
+        "status": 308
+      },
+      "https": [
+        {
+          "address": "wenwenwenyiyiyi.work",
+          "bytes": 11461,
+          "csp_present": true,
+          "method": "GET",
+          "path": "/",
+          "peer": "47.101.152.210",
+          "sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+          "status": 200,
+          "tls_verified": true,
+          "work_home_matches": true
+        },
+        {
+          "address": "47.101.152.210",
+          "bytes": 11461,
+          "csp_present": true,
+          "method": "GET",
+          "path": "/",
+          "peer": "47.101.152.210",
+          "sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+          "status": 200,
+          "tls_verified": true,
+          "work_home_matches": true
+        },
+        {
+          "address": "wenwenwenyiyiyi.work",
+          "bytes": 3,
+          "csp_present": true,
+          "method": "GET",
+          "path": "/healthz",
+          "peer": "47.101.152.210",
+          "status": 200,
+          "tls_verified": true
+        }
+      ],
+      "local_home_sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+      "local_work_home_unchanged": true,
+      "migration_complete": false,
+      "observed_epoch": 1792117160,
+      "owner_reported_dns_saved": true,
+      "post_requests": 0,
+      "production_writes": 0,
+      "remaining_gates": [
+        "IP_AUDIT_SCOPE_RELEASE",
+        "CURRENT_APEX_AAAA_AND_ACCOUNT_SNAPSHOT",
+        "POST_CUTOVER_RELEASE_REVIEW",
+        "FULL_BACKEND_MIGRATION"
+      ],
+      "resolvers": {
+        "A": [
+          "47.101.152.210"
+        ],
+        "AAAA": {
+          "error": -5
+        }
+      },
+      "root_used": false,
+      "schema_version": 1,
+      "service_actions": 0,
+      "side": "domestic",
+      "status": "READONLY_COLLECTION_COMPLETE",
+      "targeted_home_tls_pass": true,
+      "uid": 1002
+    },
+    "tokyo": {
+      "authoritative": [
+        {
+          "exit": 0,
+          "public_dns_reply": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 35548\n;; flags: qr aa rd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1\n;; WARNING: recursion requested but not available\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nwenwenwenyiyiyi.work.\t300\tIN\tA\t47.101.152.210\n\n",
+          "server": "celine.ns.cloudflare.com",
+          "type": "A"
+        },
+        {
+          "exit": 0,
+          "public_dns_reply": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 24516\n;; flags: qr aa rd; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n;; WARNING: recursion requested but not available\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nwenwenwenyiyiyi.work.\t1800\tIN\tSOA\tceline.ns.cloudflare.com. dns.cloudflare.com. 2417602619 10000 2400 604800 1800\n\n",
+          "server": "celine.ns.cloudflare.com",
+          "type": "AAAA"
+        },
+        {
+          "exit": 0,
+          "public_dns_reply": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 18528\n;; flags: qr aa rd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1\n;; WARNING: recursion requested but not available\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nwenwenwenyiyiyi.work.\t300\tIN\tA\t47.101.152.210\n\n",
+          "server": "chris.ns.cloudflare.com",
+          "type": "A"
+        },
+        {
+          "exit": 0,
+          "public_dns_reply": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 32077\n;; flags: qr aa rd; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n;; WARNING: recursion requested but not available\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nwenwenwenyiyiyi.work.\t1800\tIN\tSOA\tceline.ns.cloudflare.com. dns.cloudflare.com. 2417602619 10000 2400 604800 1800\n\n",
+          "server": "chris.ns.cloudflare.com",
+          "type": "AAAA"
+        }
+      ],
+      "delivery_commit": "fe9e1320bd9a9602b061b1e7c0e8dce5aaac95cc",
+      "dns_changes_by_collector": 0,
+      "dns_release_approval": "NOT_ESTABLISHED",
+      "domain_reached_domestic": true,
+      "host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "http": {
+        "location": "https://wenwenwenyiyiyi.work/",
+        "status": 308
+      },
+      "https": [
+        {
+          "address": "wenwenwenyiyiyi.work",
+          "bytes": 11461,
+          "csp_present": true,
+          "method": "GET",
+          "path": "/",
+          "peer": "47.101.152.210",
+          "sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+          "status": 200,
+          "tls_verified": true,
+          "work_home_matches": true
+        },
+        {
+          "address": "47.101.152.210",
+          "bytes": 11461,
+          "csp_present": true,
+          "method": "GET",
+          "path": "/",
+          "peer": "47.101.152.210",
+          "sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+          "status": 200,
+          "tls_verified": true,
+          "work_home_matches": true
+        },
+        {
+          "address": "wenwenwenyiyiyi.work",
+          "bytes": 3,
+          "csp_present": true,
+          "method": "GET",
+          "path": "/healthz",
+          "peer": "47.101.152.210",
+          "status": 200,
+          "tls_verified": true
+        }
+      ],
+      "local_home_sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+      "local_work_home_unchanged": true,
+      "migration_complete": false,
+      "observed_epoch": 1792117160,
+      "owner_reported_dns_saved": true,
+      "post_requests": 0,
+      "production_writes": 0,
+      "remaining_gates": [
+        "IP_AUDIT_SCOPE_RELEASE",
+        "CURRENT_APEX_AAAA_AND_ACCOUNT_SNAPSHOT",
+        "POST_CUTOVER_RELEASE_REVIEW",
+        "FULL_BACKEND_MIGRATION"
+      ],
+      "resolvers": {
+        "A": [
+          "47.101.152.210"
+        ],
+        "AAAA": {
+          "error": -5
+        }
+      },
+      "root_used": false,
+      "schema_version": 1,
+      "service_actions": 0,
+      "side": "tokyo",
+      "status": "READONLY_COLLECTION_COMPLETE",
+      "targeted_home_tls_pass": true,
+      "uid": 1001
+    }
+  },
+  "conclusion": {
+    "apex_a_authoritative": "47.101.152.210",
+    "authoritative_a_ttl": 300,
+    "authoritative_aaaa": "NOERROR_AA_NODATA_BOTH_NAMESERVERS",
+    "domain_live_peer_both_vantages": "47.101.152.210",
+    "https_home_tls": "PASS_BOTH_VANTAGES",
+    "health_get": "200_BOTH_VANTAGES",
+    "http_redirect": "308_BOTH_VANTAGES",
+    "work_home_sha256_unchanged": true,
+    "domestic_current_unchanged": true,
+    "production_mutations_by_collector": 0,
+    "formal_release": "REMAINS_PENDING_IP_SCOPE_AND_REVIEW",
+    "full_server_migration": "NOT_COMPLETE_TOKYO_BACKEND_STILL_REQUIRED"
+  },
+  "limits": [
+    "Owner browser screenshots support current A DNS-only Auto TTL; exact API record ID and presave account snapshot not obtained",
+    "Public authoritative AAAA NODATA is current serving-state evidence, not a full account record enumeration",
+    "No business POST, OAuth GET, root action, service/config/source/DNS write or rollback",
+    "No retrospective assertion of independent prior DNS release approval"
+  ],
+  "review_request": "accept targeted real cutover observation and inherited passed scopes; decide only remaining bounded IP audit and account/rollback evidence adequacy"
+}

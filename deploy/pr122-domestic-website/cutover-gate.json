@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "cutover_state": "HOLD",
+  "rule": "Every dynamic route must be ACCEPTED or explicitly OWNER_APPROVED_REMOVAL before cutover.",
+  "dynamic_routes": [
+    {"path": "/integrations/douyin/oauth/callback", "state": "UNRESOLVED_BACKEND"},
+    {"path": "/integrations/tiktok/oauth/start", "state": "UNRESOLVED_BACKEND"},
+    {"path": "/integrations/tiktok/oauth/callback", "state": "UNRESOLVED_BACKEND"},
+    {"path": "/integrations/tiktok/status", "state": "UNRESOLVED_BACKEND"},
+    {"path": "/integrations/tiktok/disconnect", "state": "UNRESOLVED_BACKEND"},
+    {"path": "/p/", "state": "UNRESOLVED_MANAGEMENT_ROUTE"},
+    {"path": "/submit/", "state": "UNRESOLVED_MANAGEMENT_ROUTE"},
+    {"path": "/healthz", "state": "UNRESOLVED_APEX_HEALTH_ROUTE"},
+    {"path": "/telegram-canary/status", "state": "UNRESOLVED_INDEPENDENT_BUSINESS_ROUTE"},
+    {"path": "/telegram-webhook/", "state": "UNRESOLVED_INDEPENDENT_BUSINESS_ROUTE"}
+  ]
+}

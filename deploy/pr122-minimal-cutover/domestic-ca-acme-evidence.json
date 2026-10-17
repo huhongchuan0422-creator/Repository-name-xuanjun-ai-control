@@ -1,0 +1,35 @@
+{
+  "source_commit": "786675efd09b8fae6cd2452fc9c82bb6804129eb",
+  "run_id": 38765986129,
+  "job_id": 116529173285,
+  "status": "READ_ONLY_EVIDENCE_NOT_CERTIFICATE_ISSUANCE",
+  "acme_root": {
+    "exists": true,
+    "mode": "0o755",
+    "symlink": false,
+    "uid": 0
+  },
+  "bridge_probed": false,
+  "ca_bundles": [
+    {
+      "cert_count": 148,
+      "mode": "0o444",
+      "requested_path": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+      "resolved_path": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+      "sha256": "acd28b791f9f338d288efda11d7f192755d4e89f41f0f7c2999bb4d211779fe5",
+      "uid": 0
+    },
+    {
+      "cert_count": 148,
+      "mode": "0o444",
+      "requested_path": "/etc/pki/tls/certs/ca-bundle.crt",
+      "resolved_path": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+      "sha256": "acd28b791f9f338d288efda11d7f192755d4e89f41f0f7c2999bb4d211779fe5",
+      "uid": 0
+    }
+  ],
+  "host": "iZvt5t8tlrm8oiZ",
+  "production_mutation": false,
+  "sudo_used": false,
+  "user": "githubrunner"
+}
