@@ -1294,5 +1294,15 @@
     "receipt": "evidence/pr99-service-handoff/aliyun-execution/four-host-identity-20261017.json",
     "handoff": "docs/ALIYUN_FOUR_HOST_EXECUTION_HANDOFF_20261017.md",
     "secrets": "ORIGINAL_REPOSITORY_ACTIONS_SECRETS_ONLY_NO_VALUES_EXPORTED"
+  },
+  "s08_runtime_closure": {
+    "status": "REAL_THREE_HOST_READONLY_BATCH_PASS_CLOSURE_PENDING",
+    "run": 38999602793,
+    "job": 117299532997,
+    "source_commit": "ac609bb1ec41667261266056e30312f8f0ae6135",
+    "receipt": "evidence/pr99-service-handoff/s08-runtime-closure/RECEIPT_20261017.json",
+    "service_actions": 0,
+    "production_cutover": false,
+    "next": "RESOLVE_EXACT_SSH_PEERS_CLIENT_ENDPOINTS_NGINX_INCLUDES_AND_SCHEDULE_OWNERS_THEN_CONSOLIDATED_INSTALL_ROLLBACK_CANDIDATE"
   }
 }
