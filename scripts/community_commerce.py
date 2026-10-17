@@ -140,6 +140,15 @@ class Commerce:
         if op in ('refund_apply','refund_application'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).consumer(token,scene,op,p)
+        if op == 'project_submit':
+            # Only an existing version of an original Center requirement may be
+            # submitted. Approval and correction remain with independent reviewers.
+            if (type(p) is not dict or set(p) != {'item','revision'}
+                    or not valid_id(p['item']) or type(p['revision']) is not int
+                    or p['revision'] < 0):
+                raise ValueError('INVALID_PROJECT_REQUIREMENT_SUBMISSION')
+            c.project(uid, project, ('OWNER','EDITOR'))
+            return c.transition(uid, project, p['item'], p['revision'], 'submit')
         if op in ('project_summary', 'project_checklist', 'project_feedback'):
             # Reuse immutable original Center project membership, requirements
             # and archived feedback; never create a parallel project authority.
