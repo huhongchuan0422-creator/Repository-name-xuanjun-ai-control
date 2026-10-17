@@ -62,10 +62,14 @@ def validate(profile,entity,now):
     ubos=subject.get('ubo_info_list')
     if ubos is not None:
         if entity!='ENTERPRISE' or type(ubos) is not list or not 1<=len(ubos)<=4:raise ValueError('INVALID_OFFICIAL_UBO_LIST')
+        identities=set()
         for index,ubo in enumerate(ubos):
             path='subject_info.ubo_info_list.'+str(index)
             required(ubo,('ubo_id_doc_type','ubo_id_doc_copy','ubo_id_doc_name','ubo_id_doc_number','ubo_id_doc_address'),path)
             document(ubo['ubo_id_doc_number'],ubo['ubo_id_doc_type'],path)
+            identity_key=(ubo['ubo_id_doc_type'],ubo['ubo_id_doc_number'].upper())
+            if identity_key in identities:raise ValueError('DUPLICATE_OFFICIAL_UBO_DOCUMENT')
+            identities.add(identity_key)
             if ubo['ubo_id_doc_type']!=PASSPORT:required(ubo,('ubo_id_doc_copy_back',),path)
             period(ubo,'ubo_period_begin','ubo_period_end',path,today)
     if subject.get('finance_institution') is True:
