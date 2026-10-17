@@ -1,13 +1,13 @@
 {
-  "source_commit": "ac58b8405e31e7c30932346b1aa00871c9e23c2a",
-  "source_tree": "9eed1983413e7b1e6ee64310a479063f6136fdd0",
-  "run_id": 39015634929,
+  "source_commit": "2b76515a7abd4567d2c62da4045429147f89eee1",
+  "source_tree": "97b5ee16883e07e32e4574c998602488731c8938",
+  "run_id": 39016295968,
   "hosted": {
-    "job_id": 117347071072,
-    "community_python": 357,
+    "job_id": 117348987654,
+    "community_python": 363,
     "stage5_python": 342,
-    "javascript": 72,
-    "total_test_executions": 771,
+    "javascript": 81,
+    "total_test_executions": 786,
     "status": "SUCCESS",
     "failed": 0,
     "skipped": 0,
@@ -15,10 +15,10 @@
     "cryptography": "50.0.2"
   },
   "domestic_isolated": {
-    "job_id": 117347265702,
+    "job_id": 117349366078,
     "host": "iZvt5t8tlrm8oiZ",
     "uid": 1002,
-    "tests": 164,
+    "tests": 170,
     "status": "PASS",
     "failed": 0,
     "skipped": 0,
@@ -30,29 +30,23 @@
     "provider_network": "SYNTHETIC_FIXTURES",
     "money_operations": false,
     "overlaps_hosted_suites": true,
-    "source_commit": "6ce633123eb21d2a39a0875d02580277d1ca2137",
-    "run_id": 39015592871,
-    "exact_latest_source": false,
-    "scope_note": "Prepay/order-detail functional candidate before explicit nonempty CSRF guard; guard verified in latest Hosted and focused local tests. Not a domestic PASS for latest source."
+    "source_commit": "2b76515a7abd4567d2c62da4045429147f89eee1",
+    "run_id": 39016295968,
+    "exact_latest_source": true,
+    "scope_note": "Exact current functional source; real original SQLite and OS runtime with synthetic provider/account fixtures."
   },
   "source_artifact": {
-    "id": 12093923843,
-    "outer_zip_sha256": "d886ac53d96d64e98d3c6761a84c6a7077a0ef8367357fae4db0e1619f18d60b",
-    "inner_zip_sha256": "28c4f4a4e6b1946bd9e9b5434be798bcb6f019d77c5313a081be51d39954137a",
-    "inner_zip_bytes": 1036719,
-    "manifest_files_verified": 177
+    "id": 12093944653,
+    "outer_zip_sha256": "e2fef9325de6c32a6d183004b014a52997c7ddd631092dfcc7b72aa8c293db4f",
+    "inner_zip_sha256": "aab3b99ecc627b438eaf6a5849aa168da6f6f4f247672925380093220ee1bc18",
+    "inner_zip_bytes": 1064847,
+    "manifest_files_verified": 181
   },
   "domestic_artifact": {
-    "id": 12094452885,
-    "outer_zip_sha256": "dd91d503e8ceadf771b34c67b17af894225341c5c641cc2d74d5f1d447c42443",
+    "id": 12095400856,
+    "outer_zip_sha256": "98098c4a013c97dfedd781502aba23a2ea10a047f423ad2cfdb3acfdbf0986c4",
     "receipt_head_verified": true,
-    "source_commit": "6ce633123eb21d2a39a0875d02580277d1ca2137"
-  },
-  "reused_native_preview": {
-    "run_id": 39006945633,
-    "job_id": 117321450248,
-    "status": "DEVELOPMENT_PREVIEW_UPLOADED",
-    "native_source_changed_since_preview": false
+    "source_commit": "2b76515a7abd4567d2c62da4045429147f89eee1"
   },
   "canonical_external_state": {
     "pr122_latest_checked_comment": 6231037637,
@@ -83,7 +77,7 @@
     "Original production deployment and DB migration/recovery gates; no parallel host writer"
   ],
   "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance",
-  "latest_fix": "Wrote order detail/read history, refund pre-review and split calculator forms; implemented signed partner JSAPI prepay with original Center durable attempt consumption, encrypted result recovery and explicit CSRF requirement. No production payment or HTTP prepay route enabled.",
+  "latest_fix": "Completed native payment/recovery/query buttons and dedicated opt-in HTTP route; dynamic protected merchant bindings derive payer and amount from original encrypted Mini identity and original owned order. Provider query cannot falsely confirm Finance or grant rights.",
   "merchant_onboarding": {
     "applicant_route": "/merchant/join",
     "review_route": "/merchant/review",
@@ -118,7 +112,23 @@
     "production_http_enabled": false,
     "real_provider_orders_created": false,
     "original_center_events_links": true,
-    "consumer_button_integration": "NOT_COMPLETED",
-    "authoritative_payment_confirmation": "EXTERNAL_REQUIRED"
+    "consumer_button_integration": "IMPLEMENTED_OPT_IN_DEFAULT_DISABLED",
+    "authoritative_payment_confirmation": "EXTERNAL_REQUIRED",
+    "mini_payment_integration_tests": 6,
+    "native_payment_flow_tests": 7,
+    "native_payment_session_tests": 2,
+    "original_center_reopen_recovery_verified": true,
+    "dynamic_original_order_binding": true
+  },
+  "native_preview": {
+    "run_id": 39016295968,
+    "job_id": 117349366041,
+    "source_commit": "2b76515a7abd4567d2c62da4045429147f89eee1",
+    "status": "DEVELOPMENT_PREVIEW_UPLOADED",
+    "artifact_id": 12094781639,
+    "outer_zip_sha256": "e9d24b3344a047d92eebe05ec42855725e78f497343c5e6b55c136ff6f9b78fa",
+    "native_source_hashes_verified": 9,
+    "public_release": false,
+    "payment_enabled": false
   }
 }
