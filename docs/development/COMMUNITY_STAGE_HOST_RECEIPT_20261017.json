@@ -1,13 +1,13 @@
 {
-  "source_commit": "b7308fbd2fb97b905ab9e0cff8bf9d5820428ef2",
-  "source_tree": "fd215defe2e5790d91fe1391d505b3d0a98c4bbf",
-  "run_id": 39014733361,
+  "source_commit": "ac58b8405e31e7c30932346b1aa00871c9e23c2a",
+  "source_tree": "9eed1983413e7b1e6ee64310a479063f6136fdd0",
+  "run_id": 39015634929,
   "hosted": {
-    "job_id": 117344353429,
-    "community_python": 350,
+    "job_id": 117347071072,
+    "community_python": 357,
     "stage5_python": 342,
     "javascript": 72,
-    "total_test_executions": 764,
+    "total_test_executions": 771,
     "status": "SUCCESS",
     "failed": 0,
     "skipped": 0,
@@ -15,10 +15,10 @@
     "cryptography": "50.0.2"
   },
   "domestic_isolated": {
-    "job_id": 117344735444,
+    "job_id": 117347265702,
     "host": "iZvt5t8tlrm8oiZ",
     "uid": 1002,
-    "tests": 157,
+    "tests": 164,
     "status": "PASS",
     "failed": 0,
     "skipped": 0,
@@ -29,19 +29,24 @@
     "production_install": "NOT_EXECUTED",
     "provider_network": "SYNTHETIC_FIXTURES",
     "money_operations": false,
-    "overlaps_hosted_suites": true
+    "overlaps_hosted_suites": true,
+    "source_commit": "6ce633123eb21d2a39a0875d02580277d1ca2137",
+    "run_id": 39015592871,
+    "exact_latest_source": false,
+    "scope_note": "Prepay/order-detail functional candidate before explicit nonempty CSRF guard; guard verified in latest Hosted and focused local tests. Not a domestic PASS for latest source."
   },
   "source_artifact": {
-    "id": 12094497779,
-    "outer_zip_sha256": "d4a8cd6c703a71d9be42eec882197753bace75a98176afe1ba8dbb82ea3cfa95",
-    "inner_zip_sha256": "d96c8e91176851cf73cdf10c05f93427a348b14cb1f017196b2e329f2f482f24",
-    "inner_zip_bytes": 1012678,
-    "manifest_files_verified": 175
+    "id": 12093923843,
+    "outer_zip_sha256": "d886ac53d96d64e98d3c6761a84c6a7077a0ef8367357fae4db0e1619f18d60b",
+    "inner_zip_sha256": "28c4f4a4e6b1946bd9e9b5434be798bcb6f019d77c5313a081be51d39954137a",
+    "inner_zip_bytes": 1036719,
+    "manifest_files_verified": 177
   },
   "domestic_artifact": {
-    "id": 12094257174,
-    "outer_zip_sha256": "047499b55a7606740f3141e737f4bdbe4bfb97804d5dcf00eba3852f8611da54",
-    "receipt_head_verified": true
+    "id": 12094452885,
+    "outer_zip_sha256": "dd91d503e8ceadf771b34c67b17af894225341c5c641cc2d74d5f1d447c42443",
+    "receipt_head_verified": true,
+    "source_commit": "6ce633123eb21d2a39a0875d02580277d1ca2137"
   },
   "reused_native_preview": {
     "run_id": 39006945633,
@@ -78,7 +83,7 @@
     "Original production deployment and DB migration/recovery gates; no parallel host writer"
   ],
   "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance",
-  "latest_fix": "Implemented merchant workbench UI on original Center operations: paused-profile read/edit, catalog edit/hide, paged order filtering and CSV export, paged advertising create/review/state controls, original-event reports and reconciliation preview. Original Center cookie/CSRF transport and admission-to-workbench link. No duplicate identity or Finance store.",
+  "latest_fix": "Wrote order detail/read history, refund pre-review and split calculator forms; implemented signed partner JSAPI prepay with original Center durable attempt consumption, encrypted result recovery and explicit CSRF requirement. No production payment or HTTP prepay route enabled.",
   "merchant_onboarding": {
     "applicant_route": "/merchant/join",
     "review_route": "/merchant/review",
@@ -102,9 +107,18 @@
     "route": "/merchant/workbench",
     "production_route_published": false,
     "original_center_required": true,
-    "backend_tests": 3,
+    "backend_tests": 4,
     "real_http_browser_journeys": 1,
     "source_account_project": "SYNTHETIC_FIXTURES",
     "payment_enabled": false
+  },
+  "partner_prepay": {
+    "source_tests": 6,
+    "provider_network": "SYNTHETIC_SIGNED_FIXTURES",
+    "production_http_enabled": false,
+    "real_provider_orders_created": false,
+    "original_center_events_links": true,
+    "consumer_button_integration": "NOT_COMPLETED",
+    "authoritative_payment_confirmation": "EXTERNAL_REQUIRED"
   }
 }
