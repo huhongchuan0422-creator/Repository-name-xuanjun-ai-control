@@ -1,0 +1,67 @@
+name: PR122 exact readonly channel plan guard
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - scripts/pr122_channel_plan_guard.py
+      - tests/test_pr122_channel_plan_guard.py
+      - docs/development/PR122_CHANNEL_PLAN_GUARD_20261017.md
+      - .github/workflows/pr122-channel-plan-guard.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exact read-only negative and positive tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pr122-plan-review
+          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_channel_plan_guard.PlanGuardTests -v 2>&1 | tee /tmp/pr122-plan-review/TESTS.log
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          text=Path('/tmp/pr122-plan-review/TESTS.log').read_text()
+          assert re.search(r'Ran 7 tests in ',text) and re.search(r'^OK$',text,re.M) and not re.search('skipped=|FAILED|ERROR:|FAIL:',text)
+          PY
+      - name: Download exact previously audited ZIP without executing its code
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12082187996/zip > /tmp/pr122-plan-review/REVIEW_ARTIFACT.zip
+      - name: Verify pins and build complete independent guard review bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,io,json,os,shutil,subprocess,tarfile,zipfile
+          from pathlib import Path
+          from scripts import pr122_channel_plan_guard as g
+          out=Path('/tmp/pr122-plan-review');raw=(out/'REVIEW_ARTIFACT.zip').read_bytes()
+          assert g.sha(raw)==g.ZIP_SHA
+          with zipfile.ZipFile(io.BytesIO(raw)) as z:archive=z.read('PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz')
+          assert g.sha(archive)=='2f155a812f87fd8b9fca238d6dcf343591f0f4c561fdb67675d39d700950818b'
+          with tarfile.open(fileobj=io.BytesIO(archive),mode='r:gz') as t:helper=t.extractfile('customer-center/scripts/pr122_customer_channel_upgrade.py').read()
+          assert g.sha(helper)==g.HELPER_SHA
+          (out/'approved-upgrade.py').write_bytes(helper)
+          for source,name in (('scripts/pr122_channel_plan_guard.py','guard.py'),('tests/test_pr122_channel_plan_guard.py','test_plan_guard.py'),('.github/workflows/pr122-channel-plan-guard.yml','workflow.yml'),('docs/development/PR122_CHANNEL_PLAN_GUARD_20261017.md','README.md')):shutil.copyfile(source,out/name)
+          files=[{'path':p.name,'size':p.stat().st_size,'sha256':g.sha(p.read_bytes())} for p in sorted(out.iterdir()) if p.is_file()]
+          manifest={'purpose':'PR122_READONLY_PLAN_GUARD_REVIEW','source_commit':os.environ['GITHUB_SHA'],'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'frozen_runtime_commit':g.SOURCE,'frozen_outer_zip_sha256':g.ZIP_SHA,'upgrade_sha256':g.HELPER_SHA,'tests':{'executed':7,'passed':7,'skipped':0,'failed':0},'domestic_root_execution':'NOT_RUN','permission':'NOT_GRANTED','files':files}
+          (out/'REVIEW_BINDING.json').write_bytes(g.canonical(manifest))
+          print(json.dumps({'guard_sha256':g.sha((out/'guard.py').read_bytes()),'manifest_sha256':g.sha((out/'REVIEW_BINDING.json').read_bytes()),'bound_files':len(files),'frozen_zip_exact':'PASS','production_mutations':0,'root_scope':'Hosted synthetic fixtures only'},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-readonly-plan-guard-${{ github.sha }}
+          path: /tmp/pr122-plan-review/
+          if-no-files-found: error
+          retention-days: 14
