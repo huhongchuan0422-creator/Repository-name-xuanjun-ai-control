@@ -174,7 +174,7 @@ jobs:
           if python -I -B scripts/p2_uk_swas_diagnostic.py "$P2_OPERATION" --attempt "$P2_ATTEMPT" --invoke-id "$P2_INVOKE_ID" > /tmp/P2_SPLIT_PUBLIC_RECEIPT.json 2>/dev/null; then
             cat /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
           else
-            printf '%s\\n' '{"state":"HOLD","redispatch_allowed":false}' > /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+            printf '%s\n' '{"state":"HOLD","redispatch_allowed":false}' > /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
             cat /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
             exit 2
           fi
