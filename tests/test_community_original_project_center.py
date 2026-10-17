@@ -55,7 +55,7 @@ class OriginalProjectCenterJourney(unittest.TestCase):
         self.assertEqual(saved['state'],'PARTIAL')
         submitted=self.consumer('project_submit',dict(item='material1',revision=saved['revision']))
         self.assertEqual(submitted['state'],'SUBMITTED')
-        with self.assertRaises(PermissionError):
+        with self.assertRaises(ValueError):
             self.consumer('project_review',dict(item='material1',revision=submitted['revision'],action='begin_review',reason=''))
         # Reviewer cannot use customer mini identity; independent review is
         # served only through the original Center web session + CSRF.
