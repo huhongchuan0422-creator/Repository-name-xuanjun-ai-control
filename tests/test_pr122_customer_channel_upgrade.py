@@ -1,6 +1,7 @@
 """Real filesystem channel upgrade/rollback in root-owned disposable fixtures.
 Never accesses target paths, sudoers, credentials or services.
 """
+import ast
 import io
 import json
 import os
@@ -11,6 +12,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 from contextlib import ExitStack
+from types import SimpleNamespace
 from scripts import pr122_customer_channel_upgrade as u
 
 
@@ -92,4 +94,47 @@ class UpgradeTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):REAL_GATE(p,get)
 
 REAL_GATE=u.gate
+
+
+
+# Unprivileged source/pin checks; no host execution or artifact verification.
+class FrozenPinTests(unittest.TestCase):
+    def test_exact_audited_zip_pin(self):
+        self.assertEqual(u.FROZEN_ZIP, 'a662b76d6c3fb010e0944dea157ff898040007cd69124d498bec26c7701138d3')
+
+    def test_original_baseline_and_transaction_not_reset(self):
+        self.assertEqual(u.TXN, 'pr122-customer-preview-channel-20261017')
+        self.assertEqual(u.OLD_CODE, '0804e33edac6ad07a711456c0c15708266b2ad8a75c4cb3bdc5964a9b79a96bd')
+        self.assertEqual(u.OLD_TAR, '7dd77ef573c338201ddc886b23585422ad4a07ae563a9c6ff92fe5b2f9d97b98')
+
+    def test_wrong_zip_rejected_before_parse(self):
+        with patch.object(u, 'read', return_value=b'unapproved offline fixture'), patch.object(u.zipfile, 'ZipFile', side_effect=AssertionError('must not parse')):
+            with self.assertRaisesRegex(RuntimeError, 'FROZEN_ZIP_IDENTITY'):
+                u.bundle()
+
+    def test_consumed_transaction_rejected_before_host_reads(self):
+        with patch.object(u, 'owner'), patch.object(u.os.path, 'lexists', return_value=True), patch.object(u, 'read', side_effect=AssertionError('must not read')):
+            with self.assertRaisesRegex(RuntimeError, 'TRANSACTION_EXISTS_DO_NOT_RETRY'):
+                u.plan()
+
+    def test_unprivileged_owner_rejected(self):
+        with patch.object(u.os, 'geteuid', return_value=1000):
+            with self.assertRaisesRegex(RuntimeError, 'OWNER_HOST_REQUIRED'):
+                u.owner()
+
+    def test_same_writer_reviewer_rejected_before_fetch(self):
+        trust={'source_writer_principal':'writer', 'reviewer_principal':'writer', 'custody_evidence_sha256':'e'*64, 'comment_id':5, 'body_sha256':'f'*64}
+        with patch.object(u, 'read', return_value=json.dumps(trust).encode()), patch.object(Path, 'stat', return_value=SimpleNamespace(st_mode=0o100600)):
+            with self.assertRaisesRegex(RuntimeError, 'INDEPENDENT_OWNER_ANCHOR'):
+                u.gate({}, lambda _: self.fail('must not fetch'))
+
+    def test_candidate_code_is_compile_only(self):
+        source=Path(u.__file__).read_text()
+        tree=ast.parse(source)
+        bundle=next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name=='bundle')
+        calls=[n.func.id for n in ast.walk(bundle) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
+        self.assertIn('compile', calls)
+        self.assertNotIn('exec', calls)
+        self.assertNotIn('eval', calls)
+        self.assertNotIn('__import__', calls)
 

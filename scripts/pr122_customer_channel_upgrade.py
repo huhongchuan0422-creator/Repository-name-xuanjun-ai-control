@@ -27,7 +27,7 @@ REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 OLD_CODE='0804e33edac6ad07a711456c0c15708266b2ad8a75c4cb3bdc5964a9b79a96bd'
 OLD_TAR='7dd77ef573c338201ddc886b23585422ad4a07ae563a9c6ff92fe5b2f9d97b98'
 ARCHIVE='PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz'
-FROZEN_ZIP='d03a09d3110cf372d5c6209da4514fffd77f8487c6a36532744e80557ac353d8'
+FROZEN_ZIP='a662b76d6c3fb010e0944dea157ff898040007cd69124d498bec26c7701138d3'
 
 def need(ok,msg):
     if not ok:raise RuntimeError('HOLD:'+msg)
@@ -330,3 +330,4 @@ def main():
 if __name__=='__main__':
     try:main()
     except BaseException:print('{"state":"HOLD","retry_allowed":false,"raw_error_redacted":true}');raise SystemExit(2) from None
+
