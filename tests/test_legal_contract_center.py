@@ -9,9 +9,10 @@ class LegalTests(unittest.TestCase):
     def test_complete_drafts_are_not_signable(self):
         self.assertEqual(len(self.registry['documents']),22);self.assertIs(self.registry['production_enabled'],False)
         for e in self.registry['documents']:
-            self.assertFalse(e['signature_enabled']);self.assertEqual(e['status'],'DRAFT_NOT_FOR_SIGNATURE')
+            self.assertFalse(e['signature_enabled']);self.assertEqual(e['status'],'INTERNAL_ONLY' if e['id']=='custom-sow' else 'DRAFT_NOT_FOR_SIGNATURE')
             raw=(ROOT/e['source']).read_bytes();self.assertEqual(hashlib.sha256(raw).hexdigest(),e['source_sha256'])
-            self.assertIn('待审核草案',raw.decode());self.assertIn('【',raw.decode())
+            if e['status']=='DRAFT_NOT_FOR_SIGNATURE':
+                self.assertIn('待审核草案',raw.decode());self.assertIn('【',raw.decode())
     def test_community_five_and_business_invariants(self):
         ids={e['id'] for e in self.registry['documents']};self.assertTrue({'merchant-onboarding','community-split','community-service','privacy','refund-responsibility'}<=ids)
         def text(key):return (ROOT/'docs/legal/templates'/f'{key}.md').read_text()
@@ -26,7 +27,12 @@ class LegalTests(unittest.TestCase):
         self.assertEqual(first,{p.name:p.read_bytes() for p in (ROOT/'demos/legal').glob('*.html')})
         index=first['index.html'].decode()
         for e in self.registry['documents']:
-            self.assertIn(e['id']+'.html',index);self.assertIn('不开放真实签署',first[e['id']+'.html'].decode())
+            if e['status']=='INTERNAL_ONLY':
+                self.assertNotIn(e['id']+'.html',index)
+                self.assertIn('不供客户签署',first[e['id']+'.html'].decode())
+            else:
+                self.assertIn(e['id']+'.html',index)
+                self.assertIn('不开放真实',first[e['id']+'.html'].decode())
     def test_modified_or_activated_templates_refused(self):
         import shutil
         with tempfile.TemporaryDirectory() as td:

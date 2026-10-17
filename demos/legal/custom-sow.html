@@ -1,16 +1,28 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>定制项目需求范围、报价与验收任务书 · 草案预览</title><style>body{font:16px/1.8 system-ui,sans-serif;max-width:1000px;margin:30px auto;padding:0 20px;color:#20304b}nav a{margin-right:16px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}.notice{border:2px solid #b77700;background:#fff7dd;padding:16px}li{margin:12px 0}a{color:#174c9e}</style></head><body><nav><a href="index.html">协议与合同中心</a></nav><main><h1>定制项目需求范围、报价与验收任务书</h1><p class="notice">草案预览 · 尚未生效 · 不开放真实签署或收款。主体、业务参数及法律审核完成后，另经发布门禁启用。</p><p>版本：2026-10-15-draft.1<br>原文 SHA-256：91b08af5be0d7758628a3b23ab84ae2be595a79ab2c33c048e05d4872bcd1b1e</p><pre># 定制项目需求范围、报价与验收任务书
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>内部需求与报价字段定义（不单独签署）</title><style>body{font:16px/1.8 system-ui,sans-serif;max-width:1000px;margin:30px auto;padding:0 20px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}.notice{padding:16px;border:2px solid #b77700}</style></head><body><a href="index.html">协议与合同中心</a><h1>内部需求与报价字段定义（不单独签署）</h1><p class="notice">内部字段定义，不供客户签署。</p><p>版本：2026-10-17-internal.2 | SHA256：9474bebe5d8b24a837f6b7d710587c1ef295b00e15eb33c321cd0a96611887df</p><pre># 内部字段规范：定制开发合同需求、选购与验收
 
-版本：2026-10-15-draft.1
-状态：DRAFT_NOT_FOR_SIGNATURE
+版本：2026-10-17-internal.2
+状态：INTERNAL_SCHEMA_NOT_FOR_CUSTOMER_SIGNATURE
 
-本文件为待审核草案，不是已经生效的交易条件。签约封面：【运营主体及登记信息】【业务参数与适用地区确认表】。签约前须填写运营主体全称、统一社会信用代码/注册号、地址、有效联系方式、适用业务、费用、期限和争议解决条款；空缺、未审核或与真实产品不一致时，不得进入签署或收款流程。适用强制性法律优先，订单和专项附件不得减损消费者法定权利。重大利害条款须醒目提示并按请求解释；不得预勾选、以浏览代替同意或追溯适用新版本。
+本文件仅供合同中心把结构化数据写入唯一客户合同的第22—28章；不作为单独合同，不生成第二份待签文件、第二条签约流程或独立付款入口。任何具有法律效力的项目条款必须呈现在唯一客户签署的完整合同正文。
 
-合同编号【主合同编号】，任务书编号/版本【版本】，项目【名称】。双方指定的业务确认人、技术负责人和验收人分别为【人员与权限范围】。
-一、需求表。逐行填写模块ID、需求描述、业务角色、租户/数据边界、页面/接口、成功条件、异常条件、验收用例、交付物、优先级及排除项；每项用可复测指标，不以“满意”“智能”作为唯一标准。现有模块复用与新开发分别列明。
-二、环境与依赖。列明开发/测试/生产主机和所有者、网络、域名、证书、第三方账号/资质/API、数据准备、模型/额度、许可证及费用承担。无权或外部未知项列为待满足条件，不承诺已接通。
-三、报价表。每项列官方/第三方成本或计价依据、代办/平台服务费、开发费、部署费、维护费、税费及是否可抵扣；人民币及展示外币的结算、汇率、有效期另列。未核实成本标UNKNOWN，不为形成报价填0。订阅、买断、0元和用量方式可选，但应有明确选项和后续费用。
-四、阶段表。每阶段写开始/结束、依赖、源码/文档/制品、测试、审核、付款条件及负责方。真实支付、生产部署和客户数据写入均须独立审批，不随开发授权自动开通。
-五、权属表。每个成果选择客户专有/客户取得许可/平台通用保留/第三方依赖，写源码是否交付、商业使用/修改范围、SaaS上架权、独占例外及费用。保密信息禁止产品化，客户原始数据不作交换筹码。
-六、验收表。安全、角色隔离、重复提交、超时、重启、回滚、异常状态和业务端到端用例逐项PASS/HOLD/UNKNOWN，记录实际环境、commit、制品、时间、验收人；模拟、CI、实机和生产分别标注。任一核心标准未满足不得写“全部完成”。
-七、双方签署。未填完的任务书只能询价/讨论，不得凭此自动下单或收取不明费用。双方签署后随主合同生效，变更另编号。
-</pre></main></body></html>
+## 身份与版本字段
+project_id、verified_customer_id、contract_id、甲乙方法定主体信息、合法代理权限、地区适用规则、requirements_version、quote_version及合同冻结时间；不足则签约门禁HOLD。
+
+## 功能、架构与验收字段
+feature_id、page_id、功能描述、角色与租户边界、接口与环境、交付物、可复测成功/异常条件、验收用例、排除项、依赖、阶段和风险、来源版本及客户确认记录。
+
+## 选购、财务与预算字段
+item_id、是否必需、客户已有/自购/委托代购/平台合法提供、官方价与有效期、CNY/USD价、支付币种、汇率规则、税费、开发费、代购服务费、部署费、维护费、API费用、订阅/买断/0元选项、首期/续期/按量、成本真实性、退款责任及资源所有权。UNKNOWN不得计为零或生成真实采购单。
+
+## 客户材料、资质与授权字段
+域名、备案、HTTPS、资源及资质清单、API Scope和密钥类型（绝不记录明文秘密）、OAuth/SecretRef安全通道、操作指引、责任主体、预算/操作范围/期限/撤销方式、材料提交状态及失败影响。
+
+## 费用节点、成果和退出字段
+开发费50%首期+50%最终合格验收尾款；首款同时收取本阶段全部已选第三方代购首期本金及约定服务/部署费用。客户自购不重复收费。输出阶段结果、测试及验收证据、IP权属、客户专有数据保护、SaaS合法复用、维护及退出安排。
+
+## 唯一冻结合同证据字段
+pricebook_hash、selection_manifest_hash、authorization_manifest_hash、materials_manifest_hash、acceptance_version、contract_document_hash、签约人身份及权利、主动确认、实际送达和签署证据。浏览、聊天、内部文档、哈希本身均不构成签署、真实付款或上线证明。
+
+## 门禁
+法定主体、真实签署身份、有效授权、完整披露、可靠价格、法律审查、Finance及签署接口未获实证通过前：CONTRACT_SIGN=HOLD、PAYMENT=HOLD、PROCUREMENT=HOLD、DEVELOPMENT_START=HOLD、PRODUCTION=HOLD。
+</pre></body></html>

@@ -148,8 +148,8 @@
     },
     {
       "id": "custom-development",
-      "title": "软件与AI定制开发主合同",
-      "version": "2026-10-15-draft.2",
+      "title": "软件与AI定制开发电子合同（唯一签署文件）",
+      "version": "2026-10-17-draft.5",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "定制客户",
@@ -160,27 +160,27 @@
         "合同中心"
       ],
       "source": "docs/legal/templates/custom-development.md",
-      "source_sha256": "d417c663dffe6011cb979351c1c4a5aa218e955824fd5c31cca781e193ea6a92",
+      "source_sha256": "e33c3c9f441fe67d4c9da9ffc5426d868f69320c3e6e2bb35dcafe1960efc0e3",
       "preview": "demos/legal/custom-development.html",
       "planned_route": "/legal/custom-development/",
       "signature_enabled": false
     },
     {
       "id": "custom-sow",
-      "title": "定制项目需求范围、报价与验收任务书",
-      "version": "2026-10-15-draft.1",
-      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "title": "内部需求与报价字段定义（不单独签署）",
+      "version": "2026-10-17-internal.2",
+      "status": "INTERNAL_ONLY",
       "audience": [
         "客户项目负责人",
         "开发方"
       ],
       "placement": [
-        "定制合同附件A"
+        "内部合同正文生成及字段校验"
       ],
       "source": "docs/legal/templates/custom-sow.md",
-      "source_sha256": "91b08af5be0d7758628a3b23ab84ae2be595a79ab2c33c048e05d4872bcd1b1e",
-      "preview": "demos/legal/custom-sow.html",
-      "planned_route": "/legal/custom-sow/",
+      "source_sha256": "9474bebe5d8b24a837f6b7d710587c1ef295b00e15eb33c321cd0a96611887df",
+      "preview": null,
+      "planned_route": null,
       "signature_enabled": false
     },
     {
@@ -298,7 +298,7 @@
     {
       "id": "service-package-rights",
       "title": "专项服务包、赠送权益与抵扣规则",
-      "version": "2026-10-15-draft.1",
+      "version": "2026-10-17-draft.2",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "服务包购买者",
@@ -309,7 +309,7 @@
         "权益中心"
       ],
       "source": "docs/legal/templates/service-package-rights.md",
-      "source_sha256": "bf2306d87dc51d4f41b91df4463f41a8ab819127b5329076084a04d4c9e243dc",
+      "source_sha256": "eb355377f47853c0239455be30b409819dbf1eb72130a6140ab41bbc9c783a65",
       "preview": "demos/legal/service-package-rights.html",
       "planned_route": "/legal/service-package-rights/",
       "signature_enabled": false
@@ -444,5 +444,12 @@
     "independent_legal_review",
     "owner_release_gate"
   ],
-  "data_rule": "No real identity, customer data, private keys or actual signed contracts in this public repository."
+  "data_rule": "No real identity, customer data, private keys or actual signed contracts in this public repository.",
+  "custom_development_single_document_policy": {
+    "customer_signed_document_id": "custom-development",
+    "customer_signable_document_count": 1,
+    "internal_schema_document_id": "custom-sow",
+    "required_sections": "22-28",
+    "production_enabled": false
+  }
 }
