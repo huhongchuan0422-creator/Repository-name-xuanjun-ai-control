@@ -15,7 +15,7 @@ class DB:
         if sql.startswith("SELECT 1 FROM events"):
             return Row((1,)) if values[0] in self.events else Row(None)
         if sql.startswith("INSERT INTO events"):
-            self.events.add(values[1])
+            self.events.add(values[0])
             return Row(None)
         raise AssertionError(sql)
 
