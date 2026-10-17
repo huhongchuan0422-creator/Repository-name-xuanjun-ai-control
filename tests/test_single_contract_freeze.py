@@ -88,5 +88,24 @@ class FreezeTests(unittest.TestCase):
         self.assertEqual(x["development_start"], "HOLD")
         self.assertNotIn("signature", x)
 
+
+    def test_schema_rejects_credentials_and_unknown_fields(self):
+        for key in ("token","apiKey","privateKey","client_secret","refresh_token","API_KEY","access-token","secretValue"):
+            x=sample();x["features"][0][key]="synthetic-canary"
+            with self.assertRaises(mod.ContractHold):mod.freeze(x)
+            x=sample();x["resources"][0][key]="synthetic-canary"
+            with self.assertRaises(mod.ContractHold):mod.freeze(x)
+        x=sample();x["features"][0]["nested"]={"token":"canary"}
+        with self.assertRaises(mod.ContractHold):mod.freeze(x)
+
+    def test_large_cents_and_decimal_precision(self):
+        import decimal
+        x=sample();x["resources"][0]["third_party_first_cny"]="99999999999999.99"
+        with decimal.localcontext() as ctx:
+            ctx.prec=6
+            with self.assertRaises(mod.ContractHold):mod.freeze(x)
+        x=sample();x["resources"][0]["third_party_first_cny"]="10000000000000000000000000000.01"
+        with self.assertRaises(mod.ContractHold):mod.freeze(x)
+
 if __name__=="__main__":
     unittest.main()
