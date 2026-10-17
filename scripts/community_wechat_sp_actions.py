@@ -97,6 +97,9 @@ class ProviderActions:
                     automatic_retry_allowed=False,provider_reference=saved['provider_reference'])
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:raise ValueError('INVALID_PROVIDER_ACTION_FIELDS')
+        if body['operation'] in ('bill_fetch','bill_rows','bill_reconcile'):
+            from scripts.community_provider_bills import ProviderBills
+            return ProviderBills(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
         if body['operation'] in ('financial_records','reconcile_order','reconciliation_read'):
             from scripts.community_financial_views import FinancialViews
             return FinancialViews(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])

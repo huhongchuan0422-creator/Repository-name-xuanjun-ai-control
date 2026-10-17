@@ -200,7 +200,9 @@
         "scripts/community_registered_admin.py",
         "tests/test_community_stores.py",
         "scripts/community_reports.py",
-        "tests/test_community_reports.py"
+        "tests/test_community_reports.py",
+        "scripts/community_provider_bills.py",
+        "tests/test_community_provider_bills.py"
       ]
     },
     {

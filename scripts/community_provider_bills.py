@@ -1,0 +1,168 @@
+"""Signed bill tickets, bounded private downloads and scoped row reconciliation.
+
+Download bodies have no APIv3 signature: integrity is checked against the hash
+inside the RSA-verified ticket. No download token or customer row is logged.
+Unknown columns stay UNKNOWN; bill matches never grant Finance settlement.
+"""
+import base64
+import csv
+import datetime as dt
+import hashlib
+import io
+import json
+import re
+import secrets
+import urllib.parse
+import urllib.request
+from decimal import Decimal
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from scripts.pr122_customer_core import canonical
+from scripts.community_mini_login import _NoRedirect
+from scripts.community_provider_reference import provider_order_reference
+
+MAX_BYTES=15_000_000
+
+
+def minor(value):
+    value=value.removeprefix('`').strip()
+    if not re.fullmatch(r'[0-9]{1,12}(?:\.[0-9]{1,2})?',value):raise ValueError('INVALID_BILL_AMOUNT')
+    return int(Decimal(value)*100)
+
+
+def parse(raw):
+    if type(raw) is not bytes or len(raw)>MAX_BYTES:raise ValueError('BOUNDED_PROVIDER_BILL_REQUIRED')
+    text=raw.decode('utf-8-sig')
+    if '\x00' in text:raise ValueError('INVALID_BILL_TEXT')
+    rows=csv.reader(io.StringIO(text),strict=True)
+    try:header=[v.removeprefix('`').strip() for v in next(rows)]
+    except StopIteration:raise ValueError('EMPTY_PROVIDER_BILL')
+    if len(set(header))!=len(header) or not 2<=len(header)<=100:raise ValueError('INVALID_BILL_COLUMNS')
+    records=[];summary=False
+    for row in rows:
+        if not row or not any(row):continue
+        if row[0].removeprefix('`').startswith(('总交易单数','总笔数','总交易额','总分账笔数')):summary=True;continue
+        if summary:continue
+        if len(row)!=len(header) or len(records)>=100000:raise ValueError('BILL_ROW_SHAPE_OR_LIMIT')
+        records.append(dict(zip(header,[v.removeprefix('`').strip() for v in row])))
+    return header,records
+
+
+class ProviderBills:
+    def __init__(self,actions):self.actions,self.center=actions,actions.center
+    def _download(self,url):
+        parsed=urllib.parse.urlsplit(url)
+        if (parsed.scheme!='https' or parsed.hostname!='api.mch.weixin.qq.com' or parsed.port not in (None,443)
+                or parsed.username or parsed.password or parsed.fragment
+                or parsed.path not in ('/v3/billdownload/file','/v3/bill/downloadurl')
+                or not parsed.query or len(url)>2048 or any(ord(ch)<33 for ch in url)):
+            raise PermissionError('SIGNED_FIXED_ORIGIN_BILL_URL_REQUIRED')
+        reader=self.actions.reader;target=parsed.path+'?'+parsed.query;now=reader._clock();nonce=secrets.token_hex(16)
+        signature=base64.b64encode(reader._private.sign(('GET\n'+target+'\n'+str(now)+'\n'+nonce+'\n\n').encode(),padding.PKCS1v15(),hashes.SHA256())).decode()
+        authorization='WECHATPAY2-SHA256-RSA2048 mchid="'+reader._mchid+'",nonce_str="'+nonce+'",timestamp="'+str(now)+'",serial_no="'+reader._serial+'",signature="'+signature+'"'
+        req=urllib.request.Request(url,headers={'Authorization':authorization,'Accept':'application/octet-stream'})
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),_NoRedirect())
+        try:
+            with opener.open(req,timeout=10) as response:
+                if response.status!=200:raise ValueError('BILL_DOWNLOAD_NOT_200')
+                raw=response.read(MAX_BYTES+1)
+            if len(raw)>MAX_BYTES:raise ValueError('BILL_DOWNLOAD_TOO_LARGE')
+            return raw
+        except Exception:raise RuntimeError('BILL_DOWNLOAD_UNKNOWN_NO_TOKEN_DISCLOSURE') from None
+    def _read(self,g,kind,date):
+        key=hashlib.sha256(canonical([g['scope'],kind,date])).hexdigest()
+        row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_BILL' AND subject_idx=? AND project=? AND active=1",(key,g['project'])).fetchone()
+        if row is None:raise ValueError('VERIFIED_PROVIDER_BILL_NOT_FOUND')
+        return key,json.loads(self.center.decrypt(row[0],'community-bill:'+key))
+    def dispatch(self,session,csrf,workspace,operation,p):
+        fields={'bill_fetch':{'kind','bill_date'},'bill_rows':{'kind','bill_date','offset'},'bill_reconcile':{'kind','bill_date'}}
+        if operation not in fields or type(p) is not dict or set(p)!=fields[operation] or p['kind'] not in ('TRADE','SPLIT'):raise ValueError('INVALID_PROVIDER_BILL_FIELDS')
+        a,c=self.actions,self.center;g,policy=a._authorize(session,csrf,workspace)
+        if type(p['bill_date']) is not str or not re.fullmatch('[0-9]{4}-[0-9]{2}-[0-9]{2}',p['bill_date']):raise ValueError('INVALID_BILL_DATE')
+        date=dt.date.fromisoformat(p['bill_date']);today=dt.datetime.fromtimestamp(c.now(),dt.timezone(dt.timedelta(hours=8))).date()
+        if not 0<(today-date).days<=90:raise ValueError('BILL_DATE_OUTSIDE_SUPPORTED_HISTORY')
+        with c.tx():c.limit('community-provider-bill:'+g['user_id'],10,60)
+        if operation=='bill_fetch':
+            query=dict(sub_mchid=policy['sub_mchid'],bill_date=p['bill_date'])
+            if p['kind']=='TRADE':query['bill_type']='ALL'
+            target=('/v3/bill/tradebill' if p['kind']=='TRADE' else '/v3/profitsharing/bills')+'?'+urllib.parse.urlencode(query)
+            ticket,ticket_digest=a._call('GET',target)
+            if ticket.get('hash_type')!='SHA1' or type(ticket.get('hash_value')) is not str or not re.fullmatch('[0-9a-fA-F]{40}',ticket['hash_value']) or type(ticket.get('download_url')) is not str:raise ValueError('INVALID_SIGNED_BILL_TICKET')
+            raw=self._download(ticket['download_url'])
+            if hashlib.sha1(raw).hexdigest()!=ticket['hash_value'].lower():raise PermissionError('PROVIDER_BILL_HASH_MISMATCH')
+            if a._authorize(session,csrf,workspace)[1]!=policy:raise PermissionError('BILL_AUTHORIZATION_CHANGED')
+            header,rows=parse(raw);key=hashlib.sha256(canonical([g['scope'],p['kind'],p['bill_date']])).hexdigest()
+            record=dict(scope=g['scope'],sub_mchid=policy['sub_mchid'],kind=p['kind'],bill_date=p['bill_date'],columns=header,rows=rows,
+                body_sha256=hashlib.sha256(raw).hexdigest(),provider_sha1=ticket['hash_value'].lower(),ticket_sha256=ticket_digest,received_at=c.now())
+            with c.tx():
+                previous=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_BILL' AND subject_idx=? AND project=? AND active=1",(key,g['project'])).fetchone()
+                if previous and json.loads(c.decrypt(previous[0],'community-bill:'+key))['body_sha256']!=record['body_sha256']:raise ValueError('IMMUTABLE_PROVIDER_BILL_CHANGED_REVIEW_REQUIRED')
+                if previous is None:c.db.execute("INSERT INTO links VALUES('COMMUNITY_PROVIDER_BILL',?,?,?,?,1)",(key,g['user_id'],g['project'],c.encrypt(canonical(record),'community-bill:'+key)))
+                c.audit(g['project'],g['user_id'],'PROVIDER_BILL_HASH_VERIFIED',record['body_sha256'])
+            return dict(kind=p['kind'],bill_date=p['bill_date'],row_count=len(rows),body_sha256=record['body_sha256'],integrity='SIGNED_TICKET_HASH_VERIFIED',reconciliation='NOT_RUN',finance_status='UNCONFIRMED')
+        key,bill=self._read(g,p['kind'],p['bill_date'])
+        if bill['scope']!=g['scope'] or bill['sub_mchid']!=policy['sub_mchid']:raise PermissionError('BILL_MERCHANT_BINDING_CHANGED')
+        if operation=='bill_rows':
+            offset=p['offset']
+            if type(offset) is not int or not 0<=offset<=100000:raise ValueError('INVALID_BILL_PAGE')
+            # Raw consumer identifiers stay encrypted; page returns only fields
+            # needed by finance reconciliation, never openid/bank/card columns.
+            allowed={'交易时间','商户订单号','微信订单号','商户退款单号','微信退款单号','交易状态','退款状态','订单金额','总金额','退款金额','商户分账单号','分账金额','分账结果'}
+            return dict(records=[{k:v for k,v in row.items() if k in allowed} for row in bill['rows'][offset:offset+50]],has_more=offset+50<len(bill['rows']),next_offset=offset+50 if offset+50<len(bill['rows']) else None)
+        result=self.reconcile(g,bill)
+        with c.tx():
+            event=hashlib.sha256(canonical([key,result])).hexdigest()
+            c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_BILL_RECONCILIATION',?,?,?,?,1)",(event,g['user_id'],g['project'],c.encrypt(canonical(result),'community-bill-reconciliation:'+event)))
+            c.audit(g['project'],g['user_id'],'PROVIDER_BILL_RECONCILED',event)
+        return result
+    def reconcile(self,g,bill):
+        a=self.actions;rows=bill['rows'];columns=set(bill['columns']);exceptions=[];matched=0;seen=set()
+        # Receiver-level split layouts require explicit receiver binding. Never
+        # compare a detail row against an aggregate payout amount.
+        if bill['kind']=='SPLIT' and any('接收' in k for k in columns):
+            return dict(status='UNKNOWN_SCHEMA',body_sha256=bill['body_sha256'],finance_status='UNCONFIRMED')
+        if bill['kind']=='TRADE':
+            amount_column='订单金额' if '订单金额' in columns else '总金额' if '总金额' in columns else None
+            if not {'商户订单号','微信订单号','交易状态'}.issubset(columns) or amount_column is None:
+                return dict(status='UNKNOWN_SCHEMA',body_sha256=bill['body_sha256'],finance_status='UNCONFIRMED')
+            t,m,s=(g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
+            local={provider_order_reference(a.reader._mchid,g['scope'],ref):(ref,amount,tx,state) for ref,amount,tx,state in a.runtime.demo.db.execute('SELECT reference,amount_minor,provider_transaction_id,state FROM orders WHERE tenant_id=? AND merchant_id=? AND store_id=?',(t,m,s))}
+            for index,row in enumerate(rows):
+                row_identity=(row['商户订单号'],row.get('商户退款单号',''))
+                if row_identity in seen:exceptions.append(dict(row=index,reason='DUPLICATE_PROVIDER_ROW'));continue
+                seen.add(row_identity)
+                if row.get('货币种类',row.get('币种','CNY'))!='CNY':exceptions.append(dict(row=index,reason='UNSUPPORTED_BILL_CURRENCY'));continue
+                existing=local.get(row['商户订单号'])
+                if existing is None:exceptions.append(dict(row=index,reason='PROVIDER_ORDER_NOT_IN_THIS_STORE'));continue
+                ref,amount,tx,status=existing
+                try:row_amount=minor(row[amount_column])
+                except ValueError:exceptions.append(dict(row=index,reason='INVALID_BILL_AMOUNT'));continue
+                if row_amount!=amount or row['微信订单号']!=tx:exceptions.append(dict(row=index,reference=ref,reason='PAYMENT_AMOUNT_OR_TRANSACTION_MISMATCH'));continue
+                if row.get('特约商户号') and row['特约商户号']!=bill['sub_mchid']:exceptions.append(dict(row=index,reason='BILL_SUBMERCHANT_MISMATCH'));continue
+                if row['交易状态'] not in ('SUCCESS','REFUND','成功','退款') or status not in ('SUCCESS','REFUNDED'):exceptions.append(dict(row=index,reference=ref,reason='PAYMENT_STATE_MISMATCH'));continue
+                refund=row.get('商户退款单号')
+                if refund and refund not in ('0','无','-'):
+                    action_key=hashlib.sha256(canonical([a.reader._mchid,'REFUND',refund])).hexdigest();action=a._load(action_key)
+                    try:refund_amount=minor(row.get('退款金额',''))
+                    except ValueError:exceptions.append(dict(row=index,reference=ref,reason='INVALID_REFUND_AMOUNT'));continue
+                    if action is None or action.get('scope')!=g['scope'] or action.get('reference')!=ref or action.get('result',{}).get('status')!='SUCCESS' or refund_amount!=action['payload']['amount']['refund']:exceptions.append(dict(row=index,reference=ref,reason='REFUND_NOT_CONFIRMED_OR_AMOUNT_MISMATCH'));continue
+                matched+=1
+        else:
+            # Unknown official format is retained, not coerced into a match.
+            if not {'商户分账单号','分账金额','分账结果'}.issubset(columns):return dict(status='UNKNOWN_SCHEMA',body_sha256=bill['body_sha256'],finance_status='UNCONFIRMED')
+            actions={}
+            for key,payload in self.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_PROVIDER_ACTION' AND project=? AND active=1",(g['project'],)):
+                saved=json.loads(self.center.decrypt(payload,'provider-action:'+key))
+                if saved.get('kind')=='SPLIT' and saved.get('scope')==g['scope']:actions[saved['provider_reference']]=saved
+            for index,row in enumerate(rows):
+                if row['商户分账单号'] in seen:exceptions.append(dict(row=index,reason='DUPLICATE_PROVIDER_ROW'));continue
+                seen.add(row['商户分账单号'])
+                action=actions.get(row['商户分账单号'])
+                if action is None or action.get('result',{}).get('status')!='FINISHED':exceptions.append(dict(row=index,reason='SPLIT_NOT_CONFIRMED'));continue
+                total=sum(r['amount_minor'] for r in action['result']['receivers'] if r['result']=='SUCCESS')
+                try:row_amount=minor(row['分账金额'])
+                except ValueError:exceptions.append(dict(row=index,reason='INVALID_BILL_AMOUNT'));continue
+                if row_amount!=total or row['分账结果'] not in ('SUCCESS','成功','FINISHED'):exceptions.append(dict(row=index,reason='SPLIT_AMOUNT_OR_STATE_MISMATCH'));continue
+                matched+=1
+        return dict(status='EXCEPTION' if exceptions else 'BILL_ROWS_MATCH',matched_rows=matched,total_rows=len(rows),exceptions=exceptions[:200],exceptions_truncated=len(exceptions)>200,
+            body_sha256=bill['body_sha256'],coverage='BILL_ROWS_TO_LOCAL_RECORDS',missing_provider_rows='NOT_ATTESTED_WITHOUT_AUTHORITATIVE_PAYMENT_DATES',finance_status='UNCONFIRMED',funds_retry_authorized=False)

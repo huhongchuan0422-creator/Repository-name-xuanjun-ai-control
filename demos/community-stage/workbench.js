@@ -2,7 +2,7 @@
 (()=>{
  const $=id=>document.getElementById(id);let epoch=0,config=null,busy=false,profileVersion=null,orderCursor=null,orderAfter='',reportCursor=null,reportWindow=null,adCursor=null;
  let financialPage=null;
- const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult','refundApplicationResult','staffResult','storeList','storeResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;financialPage=null;$('financialMore').hidden=true;};
+ const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult','refundApplicationResult','staffResult','storeList','storeResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;financialPage=null;$('financialMore').hidden=true;billPage=null;$('moreBill').hidden=true;};
  const status=message=>{$('notice').textContent=message;};
  window.configureCommunityWorkbench=value=>{
   epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,providerWorkspace:typeof value.providerWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.providerWorkspace)?value.providerWorkspace:null}:null;
@@ -82,5 +82,12 @@
  $('listStores').onclick=()=>action(async t=>{const r=await call('stores',{},t);if(t!==epoch)return;$('storeList').replaceChildren();for(const store of r.stores){const a=document.createElement('article');a.textContent=(store.profile?.name||'尚未创建资料')+' · '+store.workspace;const b=document.createElement('button');b.textContent='编辑资料';b.onclick=()=>{if(busy)return;$('storeWorkspace').value=store.workspace;$('storeName').value=store.profile?.name||'';$('storeDescription').value=store.profile?.description||'';$('storeContact').value=store.profile?.contact||'';$('storeState').value=store.profile?.status||'PAUSED';$('storeVersion').value=store.profile?.version||'';};a.append(b);$('storeList').append(a);}});
  $('storeForm').onsubmit=e=>{e.preventDefault();action(async t=>{const r=await call('store_save',{store_workspace:$('storeWorkspace').value,record:{name:$('storeName').value,description:$('storeDescription').value,contact:$('storeContact').value,status:$('storeState').value},expected_version:$('storeVersion').value?Number($('storeVersion').value):null},t);if(t===epoch){$('storeVersion').value=r.version;$('storeResult').textContent=JSON.stringify(r,null,2);}});};
  $('completeOrder').onclick=()=>action(async t=>{const r=await commerce(t,'order_complete',{reference:$('detailReference').value,expected_revision:Number($('completionRevision').value),note:$('completionNote').value});if(t===epoch)$('completionRevision').value=r.fulfillment_revision;});
+ let billPage=null;
+ function billParams(){return {kind:$('billKind').value,bill_date:$('billDate').value};}
+ $('fetchBill').onclick=()=>action(t=>providerAction(t,'bill_fetch',billParams()));
+ async function billRows(t,params,offset){const r=await providerAction(t,'bill_rows',{...params,offset});if(t!==epoch)return;billPage=r.has_more?{params,offset:r.next_offset}:null;$('moreBill').hidden=!billPage;}
+ $('readBill').onclick=()=>action(t=>billRows(t,billParams(),0));
+ $('moreBill').onclick=()=>action(t=>billPage&&billRows(t,billPage.params,billPage.offset));
+ $('reconcileBill').onclick=()=>action(t=>providerAction(t,'bill_reconcile',billParams()));
  window.configureCommunityWorkbench(null);
 })();
