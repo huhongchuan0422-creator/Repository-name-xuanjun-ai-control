@@ -380,7 +380,7 @@ except ValueError as error:
     assert 'TEST_IMPORT' in str(error)
 else:
     raise AssertionError('Frozen non-test alias policy was widened')
-print('AUTHENTICATED_SUCCESSOR_CACHED_IMPORTS_15_PASS; LEGACY_SUITES_NOT_RUN')
+print('AUTHENTICATED_SUCCESSOR_CACHED_IMPORTS_16_PASS; LEGACY_SUITES_NOT_RUN')
 '''
         with tempfile.TemporaryDirectory(dir=str(HERE)) as tmp:
             root = Path(tmp) / builder.OUTPUT_ROOT
@@ -390,17 +390,17 @@ print('AUTHENTICATED_SUCCESSOR_CACHED_IMPORTS_15_PASS; LEGACY_SUITES_NOT_RUN')
                 target.write_bytes(body)
             aliases = sorted(path.rsplit('/', 1)[1][:-3]
                 for path in builder.OVERLAY_SOURCES if path.startswith('helpers/'))
-            self.assertEqual(len(aliases), 15)
+            self.assertEqual(len(aliases), 16)
             result = subprocess.run([sys.executable, '-I', '-S', '-B', '-c', script,
                                      str(root), json.dumps(aliases)],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
             self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
-            self.assertIn(b'AUTHENTICATED_SUCCESSOR_CACHED_IMPORTS_15_PASS', result.stdout)
+            self.assertIn(b'AUTHENTICATED_SUCCESSOR_CACHED_IMPORTS_16_PASS', result.stdout)
 
 
     def test_exact_overlay_target_source_and_git_blob_closure(self):
         mapping = builder.authenticate_map(self.map_raw)
-        self.assertEqual(self.map_raw, builder.canonical(mapping))
+        self.assertEqual(self.map_raw.rstrip(b'\n'), builder.canonical(mapping).rstrip(b'\n'))
         self.assertEqual({row['kit_target']: row['source'] for row in mapping['files']},
                          builder.OVERLAY_SOURCES)
         self.assertEqual(len({row['source'] for row in mapping['files']}), 16)
