@@ -1,8 +1,5 @@
 name: PR99 S09 domestic code release staging once
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths: ['.github/workflows/aliyun-s09-code-release-stage.yml']
   workflow_dispatch:
 permissions:
   contents: read
