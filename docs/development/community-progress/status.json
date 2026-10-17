@@ -1,8 +1,8 @@
 {
-  "checked_at": "2026-10-17T12:04:48.120033+00:00",
+  "checked_at": "2026-10-17T12:35:51.571717+00:00",
   "branch": "feature/chatgpt-community-wechat-sp-offline-20261017",
-  "head_sha": "167b3b7b69f590bf057da49fc9c90ec8c16085ab",
-  "current_module": "官方分账聚合账单可选原交易与特约商户字段的安全关联（本轮开发，CI待确认）",
+  "head_sha": "6e4f709a20a0b479fadd87d5f51bf2e8c086b931",
+  "current_module": "原 Center社区归属订单→签名支付→官方交易账单→平台经营财务联动与隔离测试",
   "phases": {
     "1": {
       "completed": 0,
@@ -13,16 +13,16 @@
       "remaining": 7
     }
   },
-  "last_code_sha": "8854b0ca438632214213bc6205cadbbedc004725",
-  "last_code_at": "2026-10-17T12:04:17Z",
+  "last_code_sha": "22292e4ee3e8a6c8da22aace6d2480b020de8fa0",
+  "last_code_at": "2026-10-17T12:30:15Z",
   "status": "最近20分钟有代码提交",
   "ci": [
     {
-      "id": 39031088658,
+      "id": 39032779114,
       "name": "Community WeChat SP Offline Gate",
-      "status": "in_progress",
-      "conclusion": null,
-      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39031088658"
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39032779114"
     }
   ],
   "ci_status": "SEE_RUN_RESULTS",
