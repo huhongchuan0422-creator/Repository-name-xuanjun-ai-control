@@ -93,6 +93,8 @@ class Journal(object):
                 raise ContractHold("CANDIDATE_ACCESS_DENIED")
             if obj.get("status") != "UNSIGNED_CANDIDATE_ONLY" or any(obj.get(k) != "HOLD" for k in ("contract_sign","payment","procurement","development_start")):
                 raise ContractHold("CORRUPT_CANDIDATE_STATUS")
+        except ContractHold:
+            raise
         except (ValueError, KeyError, TypeError):
             raise ContractHold("CORRUPT_CANDIDATE")
         return obj
