@@ -116,7 +116,7 @@ class ProviderBills:
             c.audit(g['project'],g['user_id'],'PROVIDER_BILL_RECONCILED',event)
         return result
     def reconcile(self,g,bill):
-        a=self.actions;rows=bill['rows'];columns=set(bill['columns']);exceptions=[];matched=0;seen=set()
+        a=self.actions;rows=bill['rows'];columns=set(bill['columns']);exceptions=[];matched=0;seen=set();missing=[];undated=0;reverse='NOT_APPLICABLE_TO_SPLIT_LAYOUT'
         # Receiver-level split layouts require explicit receiver binding. Never
         # compare a detail row against an aggregate payout amount.
         if bill['kind']=='SPLIT' and any('接收' in k for k in columns):
@@ -147,6 +147,18 @@ class ProviderBills:
                     except ValueError:exceptions.append(dict(row=index,reference=ref,reason='INVALID_REFUND_AMOUNT'));continue
                     if action is None or action.get('scope')!=g['scope'] or action.get('reference')!=ref or action.get('result',{}).get('status')!='SUCCESS' or refund_amount!=action['payload']['amount']['refund']:exceptions.append(dict(row=index,reference=ref,reason='REFUND_NOT_CONFIRMED_OR_AMOUNT_MISMATCH'));continue
                 matched+=1
+            provider_refs={row['商户订单号'] for row in rows}
+            for out_ref,(ref,amount,tx,status) in local.items():
+                if status not in ('SUCCESS','REFUNDED'):continue
+                dates=set()
+                for raw, in a.runtime.demo.db.execute('SELECT evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,s,ref)):
+                    try:value=json.loads(raw)
+                    except (ValueError,TypeError):continue
+                    if type(value) is dict and value.get('source')=='WECHAT_SIGNED_PAYMENT_TIME' and value.get('transaction_id')==tx and type(value.get('paid_at')) is int:
+                        dates.add(dt.datetime.fromtimestamp(value['paid_at'],dt.timezone(dt.timedelta(hours=8))).date().isoformat())
+                if len(dates)!=1:undated+=1;continue
+                if bill['bill_date'] in dates and out_ref not in provider_refs:missing.append(ref)
+            reverse='COMPLETE_FOR_SIGNED_DATED_LOCAL_PAYMENTS' if not undated else 'PARTIAL_UNDATED_LOCAL_PAYMENTS'
         else:
             # Unknown official format is retained, not coerced into a match.
             if not {'商户分账单号','分账金额','分账结果'}.issubset(columns):return dict(status='UNKNOWN_SCHEMA',body_sha256=bill['body_sha256'],finance_status='UNCONFIRMED')
@@ -164,5 +176,5 @@ class ProviderBills:
                 except ValueError:exceptions.append(dict(row=index,reason='INVALID_BILL_AMOUNT'));continue
                 if row_amount!=total or row['分账结果'] not in ('SUCCESS','成功','FINISHED'):exceptions.append(dict(row=index,reason='SPLIT_AMOUNT_OR_STATE_MISMATCH'));continue
                 matched+=1
-        return dict(status='EXCEPTION' if exceptions else 'BILL_ROWS_MATCH',matched_rows=matched,total_rows=len(rows),exceptions=exceptions[:200],exceptions_truncated=len(exceptions)>200,
-            body_sha256=bill['body_sha256'],coverage='BILL_ROWS_TO_LOCAL_RECORDS',missing_provider_rows='NOT_ATTESTED_WITHOUT_AUTHORITATIVE_PAYMENT_DATES',finance_status='UNCONFIRMED',funds_retry_authorized=False)
+        return dict(status='EXCEPTION' if exceptions or missing else 'BILL_ROWS_MATCH',matched_rows=matched,total_rows=len(rows),exceptions=exceptions[:200],exceptions_truncated=len(exceptions)>200,
+            body_sha256=bill['body_sha256'],coverage='BILL_ROWS_TO_LOCAL_RECORDS',missing_provider_rows=missing[:200],missing_rows_truncated=len(missing)>200,reverse_coverage=reverse,undated_local_payments=undated,finance_status='UNCONFIRMED',funds_retry_authorized=False)

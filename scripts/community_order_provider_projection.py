@@ -43,6 +43,8 @@ def project_verified_query(db,identity,reference,expected,observation,at,key_id)
     if target=='SUCCESS' and (type(tx) is not str or not tx.isdigit() or not 1<=len(tx)<=64):raise ValueError('PROVIDER_TRANSACTION_REQUIRED')
     body_hash=observation.get('body_sha256')
     if type(body_hash) is not str or len(body_hash)!=64:raise ValueError('SIGNED_BODY_HASH_REQUIRED')
+    paid_at=observation.get('paid_at')
+    if paid_at is not None and (type(paid_at) is not int or not 0<paid_at<=at+300):raise ValueError('INVALID_SIGNED_PAYMENT_TIME')
     event='wp_'+hashlib.sha256(canonical([expected['sp_mchid'],expected['sub_mchid'],expected['out_trade_no'],target,tx])).hexdigest()[:48]
     evidence=dict(source='WECHAT_SIGNED_PAYMENT_NOTIFICATION' if observation['source']=='SIGNED_PROVIDER_NOTIFICATION' else 'WECHAT_SIGNED_ORDER_QUERY',body_sha256=body_hash,transaction_id=tx,provider_state=provider_state,observed_at=at)
     if db.in_transaction:raise ValueError('EXTERNAL_ORDER_TRANSACTION_DENIED')
@@ -50,6 +52,18 @@ def project_verified_query(db,identity,reference,expected,observation,at,key_id)
     try:
         order=state(db,identity,reference)
         if order['amount_minor']!=expected['amount_minor'] or order['currency']!='CNY':raise PermissionError('ORIGINAL_ORDER_AMOUNT_CHANGED')
+        if target=='SUCCESS' and paid_at is not None and (order['state']=='PENDING' or order['state'] in ('SUCCESS','REFUNDED') and order['provider_transaction_id']==tx):
+            # Separate append-only evidence permits upgrading legacy paid orders
+            # without replacing their original payment or refund events.
+            times=[]
+            for raw, in db.execute('SELECT evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,s,reference)):
+                try:value=json.loads(raw)
+                except (ValueError,TypeError):continue
+                if type(value) is dict and value.get('source')=='WECHAT_SIGNED_PAYMENT_TIME' and value.get('transaction_id')==tx:times.append(value['paid_at'])
+            if times and any(v!=paid_at for v in times):raise ValueError('SIGNED_PAYMENT_TIME_CONFLICT')
+            time_event='wt_'+hashlib.sha256(canonical([identity,reference,tx,paid_at])).hexdigest()[:48]
+            time_evidence=dict(source='WECHAT_SIGNED_PAYMENT_TIME',paid_at=paid_at,transaction_id=tx,body_sha256=body_hash)
+            db.execute('INSERT OR IGNORE INTO order_events VALUES(?,?,?,?,?,?,?,?)',(time_event,t,m,s,reference,order['state'],order['state'],canonical(time_evidence).decode()))
         prior=db.execute('SELECT tenant_id,merchant_id,store_id,reference,to_state FROM order_events WHERE event_id=?',(event,)).fetchone()
         if order['state']=='REFUNDED' and provider_state in ('SUCCESS','REFUND') and provider_evidence(db,identity,reference) is not None and order['provider_transaction_id']==tx:
             db.commit();return dict(changed=False,provider_state=provider_state)

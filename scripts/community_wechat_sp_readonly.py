@@ -88,7 +88,9 @@ class PartnerOrderReader:
             tx=data.get('transaction_id')
             if state in ('SUCCESS','REFUND') and (type(tx) is not str or not re.fullmatch('[0-9]{1,64}',tx)):
                 raise ValueError('TRANSACTION_ID_REQUIRED')
-            return dict(proof,source='SIGNED_PROVIDER_ORDER_QUERY',out_trade_no=expected['out_trade_no'],
+            from scripts.community_wechat_sp_verification import signed_success_time
+            paid_at=signed_success_time(data.get('success_time'),now) if state in ('SUCCESS','REFUND') else None
+            return dict(proof,paid_at=paid_at,source='SIGNED_PROVIDER_ORDER_QUERY',out_trade_no=expected['out_trade_no'],
                         provider_state=state,transaction_id=tx if state in ('SUCCESS','REFUND') else None,
                         amount_minor=amount['total'],currency='CNY',provider_settlement_verified=False,
                         payment='HOLD',refund='HOLD',profitsharing='HOLD')

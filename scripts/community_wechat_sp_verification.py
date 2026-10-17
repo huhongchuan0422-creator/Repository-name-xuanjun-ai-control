@@ -5,6 +5,7 @@ Cryptographic verification alone never attests reconciliation or posts Finance.
 Key material and expected order bindings must come from protected server config.
 """
 import base64
+import datetime as dt
 import hashlib
 import json
 import re
@@ -12,6 +13,16 @@ from cryptography.exceptions import InvalidSignature, InvalidTag
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+
+def signed_success_time(value, now):
+    """Optional signed RFC3339 payment time; never substitute observation time."""
+    if value is None:return None
+    if type(value) is not str or not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|[+-][0-9]{2}:[0-9]{2})',value):raise ValueError('INVALID_SIGNED_PAYMENT_TIME')
+    parsed=dt.datetime.fromisoformat(value.replace('Z','+00:00'))
+    at=int(parsed.timestamp())
+    if at<=0 or at>now+300:raise ValueError('INVALID_SIGNED_PAYMENT_TIME')
+    return at
 
 
 def _json(raw):
@@ -110,6 +121,6 @@ def notification_candidate(headers, raw_body, public_key_pem, expected_key_id,
     tx = payment.get('transaction_id')
     if payment.get('trade_state') != 'SUCCESS' or type(tx) is not str or not re.fullmatch('[0-9]{1,64}', tx):
         raise ValueError('INVALID_TRANSACTION')
-    return dict(verified, event_id=event_id, transaction_id=tx,
+    return dict(verified, event_id=event_id, transaction_id=tx, paid_at=signed_success_time(payment.get('success_time'),now),
                 out_trade_no=expected_order['out_trade_no'], state='SIGNED_NOTIFICATION_CANDIDATE',
                 provider_settlement_verified=False, payment='HOLD', refund='HOLD', profitsharing='HOLD')

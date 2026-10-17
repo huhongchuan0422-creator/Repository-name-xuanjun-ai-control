@@ -5,7 +5,7 @@ This file preserves a recoverable development state, not phase acceptance.
 ## Current repository
 
 Original branch: `feature/chatgpt-community-wechat-sp-offline-20261017`.
-Latest official-applyment source commit before this checkpoint: `7f636e1584138407f932fb8ca7cfa95c03109abf`.
+Latest published source before this checkpoint: `dc2e7ba9e93e580613ffb28fe6063afc30c264d3` (platform lifecycle); official bill source: `0424f69f6d1b4e1b0394188463f2f7737624126e`. Signed payment-time evidence and reverse daily reconciliation accompany this checkpoint commit.
 Original customer Core/Source/Runtime pinned bytes have not been changed. Business extensions use encrypted records in the original Center links/events/audit domain, not new IAM or Finance databases.
 
 ## Actual new source integrations
@@ -28,19 +28,19 @@ Original customer Core/Source/Runtime pinned bytes have not been changed. Busine
 Neither phase is complete. In particular, the following cannot be marked implemented merely because nearby code exists:
 
 1. Official submerchant application transport, private drafts, common domestic identity/bank form, scanned-material media upload, separate internal review, gated submission and signed status synchronization have now been written. Remaining: complete conditional administrator/foreign-identity/beneficial-owner/industry/bank-branch form requirements and final integration. Existing platform merchant onboarding remains separate.
-2. Full merchant multi-store creation/management, merchant enable/pause/disable lifecycle across all entry points, and operational completion/cancellation flows.
-3. Consumer paginated original-owned order history and native order selection have now been written. Remaining: complete native personal-center integration and safe payment-close/cancellation plus inventory-release recovery.
-4. Raw refund callbacks; official daily transaction/refund/profit-sharing bill download, verified ingestion and full bill reconciliation.
-5. Community order/earnings/settlement views linked to admitted payout participants, and platform-wide merchant/community/customer operations dashboard with isolation and pagination.
-6. Final frontend integration and source security review, meaningful new tests for all newly written paths, complete regressions/E2E, actual source CI and one independent review batch.
+2. Original CRM-admitted multi-store business profiles, merchant fulfillment completion and platform ACTIVE/PAUSED/DISABLED lifecycle are implemented. New trading is blocked when suspended; existing status/cancellation/refund recovery remains available. Creating new CRM identities still belongs to original admission authority.
+3. Native personal center, immutable referrals, private notices, original-owned order history, signed payment close and exactly-once stock release are implemented. Final four-role frontend coverage remains development work.
+4. Raw refund callbacks and hash-verified official bill downloading/private ingestion/scoped reconciliation are implemented. Reverse trade reconciliation uses signed payment dates; undated legacy payments are explicit partial coverage. Unsupported receiver-detail split bill schemas remain UNKNOWN and require a verified official format adapter; current aggregate adapter must not be claimed as complete official split-bill support. Finance核销 is separate and requires original admitted authority.
+5. Community attributed order and signed payout/return views, immutable receiver/community rule snapshots, platform admitted-merchant overview and lifecycle are implemented. Broader community/customer operational views and promotion records remain source work.
+6. Final frontend integration and source security review, meaningful tests for remaining newly written paths, complete regressions/E2E, actual current-source CI and concentrated independent phase reviews remain outstanding.
 7. Update original issue/PR acceptance records only after real source evidence and final CI exist.
 
 ## Supervision
 
-PR #125 (supervision only) merged into protected `main` as `8734b82d40ebb9335d47f837144b41237c2badbf` after the required feature-compliance gate passed. Schedule is every ten minutes; actual first scheduled execution has not yet been verified. The watcher reads actual code commits, excludes board/document changes, and marks source inactivity after twenty minutes. Schedule delays are possible. It does not keep an AI coding session running.
+PR #125 (supervision only) merged into protected `main` as `8734b82d40ebb9335d47f837144b41237c2badbf` after the required feature-compliance gate passed. Schedule is every ten minutes; first scheduled execution was verified at 2026-10-17T09:36:44Z (remote board commit bfccf102f2ef4448ee3df2950234a6edd48d62c7). The watcher reads actual code commits, excludes board/document changes, and marks source inactivity after twenty minutes. Schedule delays are possible. It does not keep an AI coding session running.
 
 ## Validation and external dependencies
 
-New source has received targeted Python compilation and JavaScript syntax checks only. No new functional, integration or regression PASS is claimed. Application commits deliberately use `[skip ci]` until source development is complete, as instructed. Old CI receipts remain historical and do not cover these changes.
+Latest Owner instructions allow iterative testing. Source `a9f5aa275fffe2a6291285e45a8e2398b8761151` has actual hosted CI PASS: run 39022398009, job 117366639653, 382 community Python + 342 stage5 Python + 81 JavaScript executions. This receipt does not cover subsequent store/community report/bill/lifecycle changes. Those have targeted new tests (stores 3, reports 2, bills 8, lifecycle 3), plus affected payment/refund/cancellation tests; final current-source CI must still be checked. Optional domestic runtime/SDK/preview jobs were skipped in that passing run and are not attested.
 
 No real merchant onboarding submission, funds operation, deployment, new key generation or production IAM mutation has been performed. Real submerchant and production admission remain external dependencies. Source development gaps above remain development work, not external blockers.

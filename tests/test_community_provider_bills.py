@@ -42,6 +42,37 @@ class BillJourney(unittest.TestCase):
         self.assertEqual(parse(b'a,b\n`x,`y\n')[1],[dict(a='x',b='y')])
         with self.assertRaises(ValueError):parse(b'a,a\nx,y\n')
         with self.assertRaises(ValueError):parse(b'a,b\nx,y,z\n')
+    def test_reverse_reconciliation_uses_signed_payment_date_not_observation_date(self):
+        from scripts.community_order_provider_projection import project_verified_query
+        from scripts.community_demo_bootstrap import DEMO_SCOPE
+        self.fx.basket()
+        g,policy=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
+        expected=dict(sp_mchid=self.fx.reader._mchid,sub_mchid=policy['sub_mchid'],out_trade_no=provider_order_reference(self.fx.reader._mchid,DEMO_SCOPE,'basket'),amount_minor=101,currency='CNY')
+        observation=dict(source='SIGNED_PROVIDER_ORDER_QUERY',signature_key_id=self.fx.reader._kid,out_trade_no=expected['out_trade_no'],amount_minor=101,currency='CNY',provider_state='SUCCESS',transaction_id='123456789',body_sha256='a'*64)
+        db=self.fx.fx.stage.demo.db
+        project_verified_query(db,DEMO_SCOPE,'basket',expected,observation,self.fx.c.now(),self.fx.reader._kid)
+        bill=dict(kind='TRADE',bill_date=self.date,sub_mchid=policy['sub_mchid'],columns=['商户订单号','微信订单号','交易状态','订单金额'],rows=[],body_sha256='b'*64)
+        self.assertEqual(self.bills.reconcile(g,bill)['undated_local_payments'],1)
+        paid_at=int(dt.datetime.fromisoformat(self.date+'T12:00:00+08:00').timestamp())
+        observation['paid_at']=paid_at
+        project_verified_query(db,DEMO_SCOPE,'basket',expected,observation,self.fx.c.now(),self.fx.reader._kid)
+        project_verified_query(db,DEMO_SCOPE,'basket',expected,observation,self.fx.c.now(),self.fx.reader._kid)
+        result=self.bills.reconcile(g,bill)
+        self.assertEqual(result['missing_provider_rows'],['basket']);self.assertEqual(result['status'],'EXCEPTION')
+        self.assertEqual(result['undated_local_payments'],0)
+        observation['paid_at']+=1
+        with self.assertRaises(ValueError):project_verified_query(db,DEMO_SCOPE,'basket',expected,observation,self.fx.c.now(),self.fx.reader._kid)
+        bill['rows']=[dict(zip(bill['columns'],[expected['out_trade_no'],'123456789','SUCCESS','1.01']))]
+        self.assertEqual(self.bills.reconcile(g,bill)['status'],'BILL_ROWS_MATCH')
+        bill['rows']*=2
+        self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'DUPLICATE_PROVIDER_ROW')
+    def test_signed_time_has_timezone_bounds_and_no_clock_substitution(self):
+        from scripts.community_wechat_sp_verification import signed_success_time
+        now=self.fx.c.now()
+        self.assertIsNone(signed_success_time(None,now))
+        self.assertEqual(signed_success_time('2020-01-01T08:00:00+08:00',now),1577836800)
+        for value in ['2020-01-01T00:00:00','2020-02-31T00:00:00Z','2099-01-01T00:00:00Z',0]:
+            with self.assertRaises(ValueError):signed_success_time(value,now)
     def test_receiver_detail_layout_not_treated_as_aggregate_match(self):
         g,_=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
         bill=dict(kind='SPLIT',columns=['商户分账单号','分账金额','分账结果','接收方账号'],rows=[],body_sha256='a'*64)

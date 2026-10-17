@@ -64,7 +64,7 @@ class PaymentNotifications:
         event_key = hashlib.sha256(canonical([reader._mchid, candidate['event_id']])).hexdigest()
         evidence = dict(source='SIGNED_PROVIDER_NOTIFICATION', signature_key_id=reader._kid,
             out_trade_no=out_trade_no, amount_minor=expected['amount_minor'], currency='CNY',
-            provider_state='SUCCESS', transaction_id=candidate['transaction_id'], body_sha256=candidate['body_sha256'])
+            paid_at=candidate.get('paid_at'), provider_state='SUCCESS', transaction_id=candidate['transaction_id'], body_sha256=candidate['body_sha256'])
         # Projection is idempotent across different notifications for the same payment.
         from scripts.community_order_provider_projection import project_verified_query
         project_verified_query(self.payments.identity.runtime.demo.db, binding['scope'], binding['reference'], expected, evidence, now, reader._kid)
