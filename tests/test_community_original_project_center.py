@@ -113,6 +113,18 @@ class OriginalProjectCenterJourney(unittest.TestCase):
             'SELECT COUNT(*) FROM versions WHERE project=?',('project1',)).fetchone()[0]
         self.assertEqual(before,after)
 
+    def test_private_reference_submission_requires_original_host_resolver(self):
+        request=dict(item='material1',revision=0,kind='SECRETREF',
+                     reference='synthetic-reference')
+        with self.assertRaises((PermissionError,ValueError,RuntimeError)):
+            self.consumer('project_save_reference',request)
+        with self.assertRaises(ValueError):
+            self.consumer('project_save_reference',dict(request,verified=True))
+        with self.assertRaises(ValueError):
+            self.consumer('project_save_reference',dict(request,revision=True))
+        with self.assertRaises(ValueError):
+            self.consumer('project_save_reference',dict(request,kind='DOCUMENT'))
+
     def test_invalid_fields_and_revoked_membership_fail_closed(self):
         with self.assertRaises(ValueError):
             self.consumer('project_summary',{'project':'other'})
