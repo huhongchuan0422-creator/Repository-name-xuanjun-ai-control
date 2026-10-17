@@ -1,5 +1,5 @@
 {
-  "current_module": "退款恢复与微信签名终态；消费者成功页广告及原 Center 项目中心接线",
+  "current_module": "原 Center 网页独立审核权限闭环、小程序客户材料提交、已验签成功页广告；后续运营与真实业务链仍待开发",
   "blockers": [
     "暂无真实特约商户，真实交易验收依赖外部条件",
     "尚未完成全部当前源码业务链测试和独立审核",
@@ -87,11 +87,11 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "fbdc0c4db7ea094062d6208eaa7d2c089d3d38cd",
-    "run_id": 39026231276,
-    "job_id": 117377643688,
+    "source": "39dcd47040ab0a520452b282192fdffdb80359d8",
+    "run_id": 39027118436,
+    "job_id": 117380191423,
     "result": "SUCCESS",
-    "scope": "Hosted 431 community and 342 stage tests OK, 2026-10-17; optional mini runtime/SDK/preview SKIPPED",
+    "scope": "Hosted 433/433 community tests, 342/342 stage tests, node suites PASS (34+40+8+7); optional mini-runtime, preview, python runtime, SDK SKIPPED",
     "covers_later_commits": false
   }
 }
