@@ -17,6 +17,13 @@ from scripts.community_provider_transport import request
 SENSITIVE={'contact_name','contact_id_number','mobile_phone','contact_email','id_card_name','id_card_number','id_card_address','id_doc_name','id_doc_number','id_doc_address','account_name','account_number','ubo_id_doc_name','ubo_id_doc_number','ubo_id_doc_address','ubo_address'}
 
 
+def original_submission_intent(current,code,version):
+    """Only persist the response for the exact already-reserved application intent."""
+    return (type(current) is dict and current.get('business_code')==code
+            and current.get('state')=='SUBMISSION_UNKNOWN'
+            and type(version) is int and current.get('version')==version)
+
+
 class WechatApplyment:
     def __init__(self,onboarding,reader,*,submission_enabled=False):
         from scripts.community_merchant_onboarding import MerchantOnboarding
@@ -151,8 +158,7 @@ class WechatApplyment:
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
                 self.onboarding._load(application,uid,True)
                 current=self._read(application)
-                if (current is None or current.get('business_code')!=code
-                        or current.get('state')!='SUBMISSION_UNKNOWN' or current.get('version')!=version):
+                if not original_submission_intent(current,code,version):
                     raise ValueError('APPLYMENT_SUBMISSION_RACE_QUERY_EXISTING_ONLY')
                 current.update(state='SUBMITTED_TO_PROVIDER',applyment_id=str(data['applyment_id']),provider_response_sha256=digest)
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_SUBMITTED',code)
