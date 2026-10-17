@@ -112,6 +112,9 @@ class Commerce:
         uid, project, principal = i._resolve(token, scene)
         identity = self.runtime.bindings[principal]
         c = self.center
+        if op in ('profile_read','profile_update','referral_code','referral_bind','notices','notice_read'):
+            from scripts.community_customer_profile import CustomerProfile
+            return CustomerProfile(identity=i).consumer(token,scene,op,p)
         if op in ('refund_apply','refund_application'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).consumer(token,scene,op,p)

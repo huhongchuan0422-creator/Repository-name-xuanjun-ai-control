@@ -2,7 +2,7 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:""},
+  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:""},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
@@ -31,6 +31,19 @@ Page({
   },
   onUnload() {if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
+  inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
+  async profileAction(e) {
+    if(this.data.pending||!this.session)return;this.setData({pending:true});
+    try{const op=e.currentTarget.dataset.operation;let params={};
+      if(op==='profile_update'){if(this.data.profileVersion===null)throw Error('先读取个人资料');params={nickname:this.data.nickname,contact:this.data.profileContact,expected_version:this.data.profileVersion};}
+      else if(op==='referral_bind')params={code:this.data.referralCode};else if(op==='notices')params={after_id:''};
+      if(!['profile_read','profile_update','referral_code','referral_bind','notices'].includes(op))throw Error('无效操作');
+      const r=await this.session.commerce(this.scene,op,params);
+      if(op==='profile_read'||op==='profile_update')this.setData({profileVersion:r.version,nickname:r.nickname,profileContact:r.contact,userId:r.user_id,projectCustomerId:r.project_customer_id});
+      else if(op==='referral_code')this.setData({referralCode:r.code});else if(op==='notices')this.setData({notices:r.records});
+      this.setData({status:op==='referral_bind'?'推荐关系已绑定':'个人中心已更新'});
+    }catch(error){this.setData({status:error.message});}finally{this.setData({pending:false});}
+  },
   async reloadProducts() {
     if(this.data.pending||!this.session)return;this.setData({pending:true});
     try{const r=await this.session.commerce(this.scene,'products',{});this.setData({products:r.products.map(p=>({...p,quantity:0})),status:'商品价格库存已更新'});}catch(e){this.setData({status:e.message});}finally{this.setData({pending:false});}

@@ -44,7 +44,7 @@ class MerchantWorkbenchBrowser(unittest.TestCase):
                     page.locator('#refundEvent').fill('browser_refund');page.locator('#refundAmount').fill('250');page.locator('#refundConfirm').check();page.locator('#refundForm button').click();expect(page.locator('#refundResult')).to_contain_text('退款预审已记录')
                     page.locator('#splitShares').fill('merchant,9000\nplatform,1000');page.locator('#splitForm button').click();expect(page.locator('#splitResult')).to_contain_text('merchant：900 分');expect(page.locator('#splitResult')).to_contain_text('platform：100 分')
                     with page.expect_download() as downloaded:page.locator('#exportOrders').click()
-                    self.assertEqual(downloaded.value.suggested_filename,'community-simulated-orders-page.csv')
+                    self.assertEqual(downloaded.value.suggested_filename,'community-orders-page.csv')
                     page.locator('#orderStatus').select_option('FAILED');page.locator('#loadOrders').click();expect(page.locator('#orders')).to_be_empty()
                     for width in (360,768,1440):
                         page.set_viewport_size({'width':width,'height':900});self.assertLessEqual(page.evaluate('document.documentElement.scrollWidth'),width)

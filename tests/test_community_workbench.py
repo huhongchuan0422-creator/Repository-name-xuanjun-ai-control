@@ -27,7 +27,7 @@ class Workbench(unittest.TestCase):
         args=dict(limit=2,after_id='',status='PENDING');r=self.call('orders_page',args)
         self.assertEqual([x['reference'] for x in r['orders']],['a','b']);self.assertEqual(r['next_cursor'],'b')
         r=self.call('orders_page',dict(args,after_id='b'));self.assertEqual([x['reference'] for x in r['orders']],['c']);self.assertFalse(r['has_more'])
-        export=self.call('orders_export',args);self.assertEqual(export['row_count'],2);self.assertNotIn('private',export['csv']);self.assertIn('simulation_state',export['csv'])
+        export=self.call('orders_export',args);self.assertEqual(export['row_count'],2);self.assertNotIn('private',export['csv']);self.assertIn('state,simulation_only',export['csv'])
         self.assertEqual(self.call('orders_page',dict(args,status='SUCCESS'))['orders'],[])
         with self.assertRaises(PermissionError):self.call('orders_export',args,'staff')
         with self.assertRaises(PermissionError):self.call('merchant_settings',workspace='staff')

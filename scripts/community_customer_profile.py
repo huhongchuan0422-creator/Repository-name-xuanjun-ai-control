@@ -19,8 +19,12 @@ class CustomerProfile:
     module = {'id': 'XJ-CUSTOMER-PROFILE-001', 'version': '1.0.0', 'author': '玄钧AI实验室',
               'dependencies': ['original-center'], 'description': 'Profiles, opt-in referral binding and private notices'}
 
-    def __init__(self, communities):
-        self.communities, self.center = communities, communities.center
+    def __init__(self, communities=None, *, identity=None):
+        from scripts.community_center_communities import CenterCommunities
+        from scripts.community_mini_center_identity import CenterIdentity
+        if (communities is None)==(identity is None) or communities is not None and type(communities) is not CenterCommunities or identity is not None and type(identity) is not CenterIdentity:raise ValueError('ONE_ORIGINAL_IDENTITY_BOUNDARY_REQUIRED')
+        self.communities,self.identity=communities,identity
+        self.center=communities.center if communities is not None else identity.center
 
     def _read(self, g, kind, key):
         row = self.center.db.execute('SELECT user_id,payload FROM links WHERE channel=? AND subject_idx=? AND project=? AND active=1', (kind, key, g['project'])).fetchone()
@@ -31,7 +35,19 @@ class CustomerProfile:
                   'referral_code': set(), 'referral_bind': {'code'}, 'notices': {'after_id'}, 'notice_read': {'notice_id'}}
         if op not in fields or type(p) is not dict or set(p) != fields[op]:
             raise ValueError('INVALID_CUSTOMER_PROFILE_FIELDS')
+        if self.communities is None:raise PermissionError('WEB_PROFILE_BOUNDARY_REQUIRED')
         g = self.communities.authorize(session, csrf, workspace)
+        return self._run(g,op,p)
+
+    def consumer(self,token,scene,op,p):
+        if self.identity is None:raise PermissionError('MINI_PROFILE_BOUNDARY_REQUIRED')
+        fields={'profile_read':set(),'profile_update':{'nickname','contact','expected_version'},'referral_code':set(),'referral_bind':{'code'},'notices':{'after_id'},'notice_read':{'notice_id'}}
+        if type(op) is not str or op not in fields or type(p) is not dict or set(p)!=fields[op]:raise ValueError('INVALID_CUSTOMER_PROFILE_FIELDS')
+        self.identity._time(self.center.now())
+        uid,project,principal=self.identity._resolve(token,scene)
+        return self._run(dict(user_id=uid,project=project,tenant=principal.tenant_id),op,p)
+
+    def _run(self,g,op,p):
         c, uid = self.center, g['user_id']
         user_key = c.idx('community-profile:' + g['project'] + ':' + uid)
         with c.tx():
