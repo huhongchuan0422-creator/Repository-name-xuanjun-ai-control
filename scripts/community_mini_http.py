@@ -72,12 +72,20 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                         ('Content-Security-Policy',"default-src 'none'")]:self.send_header(k,v)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_GET(self):
-            if onboarding is None and operations is None and saas is None and communities is None:return self.answer(404,{'error':'NOT_FOUND'})
+            if self.path!='/community/health' and onboarding is None and operations is None and saas is None and communities is None:return self.answer(404,{'error':'NOT_FOUND'})
             host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if self.headers.get_all('Host')!=[host]:return self.answer(403,{'error':'ORIGIN_DENIED'})
             if trusted_proxy is not None:
                 try:trusted_proxy(self.connection,self.headers)
                 except Exception:return self.answer(403,{'error':'PROXY_DENIED'})
+            if self.path=='/community/health':
+                center=getattr(getattr(gateway,'identity',None),'center',None)
+                if center is None:return self.answer(503,{'status':'UNAVAILABLE'})
+                try:
+                    maintenance=center.db.execute("SELECT v FROM settings WHERE k='maintenance'").fetchone()[0]!='0'
+                    for db in (gateway.runtime.demo.db,gateway.runtime.demo.merchant_db,gateway.runtime.demo.refund_db):db.execute('SELECT 1').fetchone()
+                except Exception:return self.answer(503,{'status':'UNAVAILABLE'})
+                return self.answer(503 if maintenance else 200,{'status':'MAINTENANCE' if maintenance else 'READY','scope':'PROCESS_AND_DATABASE_CONNECTIVITY','production_acceptance':False})
             assets={'/merchant/join':('onboarding.html','text/html; charset=utf-8'),
                     '/merchant/review':('onboarding.html','text/html; charset=utf-8'),
                     '/merchant/onboarding.js':('onboarding.js','application/javascript; charset=utf-8'),
