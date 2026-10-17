@@ -67,6 +67,16 @@ class ConditionalFields(unittest.TestCase):
         service.center=SimpleNamespace(db=DB())
         with self.assertRaises(PermissionError):service._validate_media(dict(id_doc_copy_back='foreign-media'),'application',dict(materials={}))
 
+class ProviderSubmissionIntentRecovery(unittest.TestCase):
+    def test_exact_reserved_intent_is_required_before_accepting_provider_result(self):
+        from scripts.community_wechat_applyment import original_submission_intent
+        record=dict(business_code='ap_original',state='SUBMISSION_UNKNOWN',version=2)
+        self.assertTrue(original_submission_intent(record,'ap_original',2))
+        for bad in (None,dict(record,business_code='ap_other'),
+                    dict(record,state='CORRECTION'),dict(record,version=3)):
+            self.assertFalse(original_submission_intent(bad,'ap_original',2))
+        self.assertFalse(original_submission_intent(record,'ap_original',True))
+
 class SubmerchantIdentityImmutability(unittest.TestCase):
     def test_signed_query_cannot_reassign_persisted_provider_submerchant(self):
         import contextlib
