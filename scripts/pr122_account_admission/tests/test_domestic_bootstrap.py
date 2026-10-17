@@ -20,6 +20,7 @@ class BootstrapTests(unittest.TestCase):
         for name, value in {'CONTROL': b.BASE / 'readonly-bootstrap-20261017', 'HELPER': b.BASE / 'readonly-admission.py'}.items():
             p = patch.object(b, name, value); p.start(); self.addCleanup(p.stop)
         for path in (b.BASE, b.EXEC.parent, b.POLICY.parent, b.INPUT): path.mkdir(mode=0o700)
+        self.interpreter = patch.object(b, 'interpreter_identity', return_value={'fixture': 'fixed-python'}); self.interpreter.start(); self.addCleanup(self.interpreter.stop)
         self.owner = patch.object(b, 'owner'); self.owner.start(); self.addCleanup(self.owner.stop)
         # /tmp is intentionally not a trusted production ancestor. Fixtures bypass only
         # ancestor checks; mode/hash/transaction/lock/fsync behavior remains real.
@@ -31,8 +32,10 @@ class BootstrapTests(unittest.TestCase):
         self.put(b.BASE / '.upgrade-lock', b'', 0o600)
         self.put(b.EXEC, b.expected_wrapper(), 0o755); self.put(b.POLICY, b.expected_policy(), 0o440)
         helper = b'# fixed fixture helper\n'
+        owner_tool = b'# fixed owner-only fixture tool\n'
+        self.put(b.INPUT / 'domestic_owner.py', owner_tool, 0o400)
         self.put(b.INPUT / 'domestic-readonly-helper.py', helper, 0o400)
-        files = {'domestic-readonly-helper.py': helper, 'wrapper': b.new_wrapper(), 'sudoers': b.new_policy(), 'domestic_bootstrap.py': SOURCE.read_bytes()}
+        files = {'domestic-readonly-helper.py': helper, 'wrapper': b.new_wrapper(), 'sudoers': b.new_policy(), 'domestic_bootstrap.py': SOURCE.read_bytes(), 'domestic_owner.py': owner_tool}
         manifest = {'schema': 1, 'scope': 'DOMESTIC_READONLY_BOOTSTRAP_20261017', 'files': {n: {'sha256': b.sha(v), 'size': len(v)} for n, v in files.items()}}
         self.put(b.INPUT / 'domestic-bootstrap-manifest.json', b.canonical(manifest), 0o400)
     def put(self, path, raw, mode):
@@ -57,6 +60,64 @@ class BootstrapTests(unittest.TestCase):
     def test_manifest_drift(self):
         self.put(b.INPUT / 'domestic-readonly-helper.py', b'changed', 0o400)
         with self.assertRaisesRegex(RuntimeError, 'MANIFEST_BINDING'): b.install()
+    def test_builder_owner_tool_exact_and_deterministic(self):
+        source = SOURCE.parent / 'build_domestic.py'
+        spec = importlib.util.spec_from_file_location('builder_fixture', source)
+        builder = importlib.util.module_from_spec(spec); spec.loader.exec_module(builder)
+        root = Path(self.temp.name) / 'builder'; root.mkdir()
+        (root / 'domestic_bootstrap.py').write_bytes(SOURCE.read_bytes())
+        owner_raw = b'# reviewed owner fixture\n'
+        (root / 'domestic_owner.py').write_bytes(owner_raw)
+        (root / 'domestic_helper.py').write_bytes(b"PAYLOAD_B64='__PAYLOAD_B64__'\nPROBE_B64='__PROBE_B64__'\n")
+        (root / 'approved_account_prepare.py').write_bytes(b'# approved fixture')
+        (root / 'readonly_probe.py').write_bytes(b'# probe fixture')
+        with patch.object(builder, 'ROOT', root):
+            first = builder.build()
+            out = root / 'domestic-install-package'
+            frozen = {p.name: p.read_bytes() for p in out.iterdir() if p.is_file()}
+            self.assertEqual(first, builder.build())
+            self.assertEqual(frozen, {p.name: p.read_bytes() for p in out.iterdir() if p.is_file()})
+        self.assertEqual((out / 'domestic_owner.py').read_bytes(), owner_raw)
+        self.assertEqual(first['files']['domestic_owner.py'], {'sha256': b.sha(owner_raw), 'size': len(owner_raw)})
+    def test_unsupported_python_version_denied(self):
+        self.interpreter.stop()
+        with patch.object(b.sys, 'version_info', (3, 7, 0)):
+            with self.assertRaisesRegex(RuntimeError, 'UNSUPPORTED_PYTHON_API'): b.plan()
+        self.assertFalse(b.CONTROL.exists())
+    def test_missing_python_api_denied(self):
+        self.interpreter.stop()
+        with patch.object(b.fcntl, 'flock', create=True) as flock:
+            del b.fcntl.flock
+            with self.assertRaisesRegex(RuntimeError, 'UNSUPPORTED_PYTHON_API'): b.plan()
+        self.assertFalse(b.CONTROL.exists())
+    def test_alternate_python_denied(self):
+        from types import SimpleNamespace
+        self.interpreter.stop()
+        fake = SimpleNamespace(st_uid=0, st_mode=0o100755, st_nlink=1)
+        with patch.object(Path, 'lstat', return_value=fake), patch.object(Path, 'resolve', side_effect=lambda strict=True: None) as resolve:
+            resolve.side_effect = [Path('/different/python'), Path('/usr/bin/python3')]
+            with self.assertRaisesRegex(RuntimeError, 'ALTERNATE_PYTHON_EXECUTABLE'): b.interpreter_identity()
+    def test_interpreter_drift_blocks_rollback(self):
+        b.install()
+        with patch.object(b, 'interpreter_identity', return_value={'fixture': 'changed-python'}):
+            with self.assertRaisesRegex(RuntimeError, 'STATE_DRIFT'): b.rollback()
+    def test_owner_tool_tamper_denied(self):
+        self.put(b.INPUT / 'domestic_owner.py', b'# tampered owner tool', 0o400)
+        with self.assertRaisesRegex(RuntimeError, 'MANIFEST_BINDING'): b.install()
+        self.assertFalse(b.CONTROL.exists())
+    def test_owner_tool_mode_denied(self):
+        (b.INPUT / 'domestic_owner.py').chmod(0o600)
+        with self.assertRaisesRegex(RuntimeError, 'MODE_DRIFT'): b.install()
+        self.assertFalse(b.CONTROL.exists())
+    def test_owner_tool_missing_denied(self):
+        (b.INPUT / 'domestic_owner.py').unlink()
+        with self.assertRaises(FileNotFoundError): b.install()
+        self.assertFalse(b.CONTROL.exists())
+    def test_owner_tool_not_deployed_to_privileged_action(self):
+        b.install()
+        self.assertFalse((b.BASE / 'domestic_owner.py').exists())
+        self.assertNotIn(b'domestic_owner', b.EXEC.read_bytes())
+        self.assertNotIn(b'domestic_owner', b.POLICY.read_bytes())
     def test_mode_drift(self):
         b.POLICY.chmod(0o666)
         with self.assertRaisesRegex(RuntimeError, 'MODE_DRIFT'): b.install()

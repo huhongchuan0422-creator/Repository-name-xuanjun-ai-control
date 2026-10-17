@@ -210,6 +210,11 @@ class HelperTests(unittest.TestCase):
     def test_grant_json_and_all_deployed_hashes(self):
         values={h.CHANNEL:b'channel',h.HELPER:b'helper',h.WRAPPER:b'wrapper',h.POLICY:b'policy',
                 h.BASE+'/grant-state.json':b'{"state":"GRANTED"}'}
+        control=h.BASE+'/readonly-bootstrap-20261017'
+        values[control+'/VERIFIED.json']=b'{"state":"VERIFIED"}'
+        plan={'scope':'DOMESTIC_READONLY_BOOTSTRAP_20261017','baseline':{'device':1,'inode':2,'code_sha256':h.digest(b'channel'),'grant_sha256':h.digest(values[h.BASE+'/grant-state.json'])}}
+        plan['baseline']['interpreter']={'fixed':'/usr/bin/python3','resolved':'/usr/bin/python3.8','chain':[],'device':1,'inode':123,'mode':493,'size':1000,'sha256':'f'*64,'version':[3,8,0]}
+        values[control+'/plan.json']=json.dumps(plan).encode()
         pin=dict(self.pin)
         for path,field in ((h.HELPER,'helper_sha256'),(h.WRAPPER,'wrapper_sha256'),(h.POLICY,'policy_sha256')):
             pin[field]=h.digest(values[path])
@@ -218,8 +223,22 @@ class HelperTests(unittest.TestCase):
             values[h.BASE+'/grant-state.json']=b'{"state":"UPGRADING"}'
             with self.assertRaisesRegex(ValueError,'CHANNEL_NOT_GRANTED'):h.check_files(pin)
             values[h.BASE+'/grant-state.json']=b'{"state":"GRANTED"}'
+            plan['baseline']['inode']=3
+            values[control+'/plan.json']=json.dumps(plan).encode()
+            with self.assertRaisesRegex(ValueError,'ORIGINAL_INODE_OR_GRANT_DRIFT'):h.check_files(pin)
+            plan['baseline']['inode']=2
+            values[control+'/plan.json']=json.dumps(plan).encode()
             values[h.WRAPPER]=b'changed'
             with self.assertRaisesRegex(ValueError,'DEPLOYED_HASH'):h.check_files(pin)
+
+    def test_rollback_started_blocks_direct_helper(self):
+        with mock.patch.object(h.os.path,'lexists',return_value=True),mock.patch.object(h,'secure_read') as read:
+            with self.assertRaisesRegex(ValueError,'ROLLBACK_STARTED'):h.check_files(self.pin)
+            read.assert_not_called()
+
+    def test_missing_verified_blocks_direct_helper(self):
+        with mock.patch.object(h.os.path,'lexists',return_value=False),mock.patch.object(h,'secure_read',side_effect=FileNotFoundError):
+            with self.assertRaises(FileNotFoundError):h.check_files(self.pin)
 
     def test_single_lock_and_admission_precede_observations(self):
         events=[]

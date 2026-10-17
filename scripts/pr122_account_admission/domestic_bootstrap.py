@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import stat
 import subprocess
+import sys
 
 HOST = 'iZvt5t8tlrm8oiZ'
 BASE = Path('/var/lib/xuanjun-customer-channel')
@@ -82,20 +83,51 @@ def bundle():
     need(stat.S_IMODE(INPUT.stat().st_mode) == 0o700, 'INPUT_MODE')
     manifest = json.loads(read(INPUT / 'domestic-bootstrap-manifest.json', 0o400))
     helper = read(INPUT / 'domestic-readonly-helper.py', 0o400)
+    owner_tool = read(INPUT / 'domestic_owner.py', 0o400)
     need(set(manifest) == {'schema', 'scope', 'files'} and manifest['schema'] == 1 and manifest['scope'] == 'DOMESTIC_READONLY_BOOTSTRAP_20261017', 'MANIFEST_SCOPE')
-    files = {'domestic-readonly-helper.py': helper, 'wrapper': new_wrapper(), 'sudoers': new_policy(), 'domestic_bootstrap.py': read(Path(__file__).absolute())}
+    files = {'domestic-readonly-helper.py': helper, 'wrapper': new_wrapper(), 'sudoers': new_policy(), 'domestic_bootstrap.py': read(Path(__file__).absolute()), 'domestic_owner.py': owner_tool}
     need(manifest['files'] == {n: {'sha256': sha(v), 'size': len(v)} for n, v in files.items()}, 'MANIFEST_BINDING')
     compile(helper, 'fixed-reviewed-helper', 'exec')
+    compile(owner_tool, 'reviewed-owner-tool', 'exec') # Validate syntax only; never execute.
     return helper, manifest
 
+def interpreter_identity():
+    need(sys.version_info >= (3, 8) and all(hasattr(os, name) for name in ('O_NOFOLLOW', 'O_DIRECTORY', 'fsync', 'replace')) and hasattr(fcntl, 'flock'), 'UNSUPPORTED_PYTHON_API')
+    fixed = Path('/usr/bin/python3'); path = fixed; chain = []; seen = set()
+    for _ in range(16):
+        need(str(path) not in seen, 'PYTHON_SYMLINK_LOOP'); seen.add(str(path))
+        secure(path.parent, True)
+        info = path.lstat()
+        need(info.st_uid == 0, 'PYTHON_PATH_OWNER')
+        if not stat.S_ISLNK(info.st_mode): break
+        target = os.readlink(path)
+        chain.append({'path': str(path), 'target': target, 'device': info.st_dev, 'inode': info.st_ino})
+        path = Path(os.path.normpath(str(path.parent / target))) if not os.path.isabs(target) else Path(os.path.normpath(target))
+    else: raise RuntimeError('HOLD:PYTHON_SYMLINK_DEPTH')
+    file_stat(info)
+    need(Path(sys.executable).resolve(strict=True) == path.resolve(strict=True), 'ALTERNATE_PYTHON_EXECUTABLE')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, 'rb') as f:
+        before = os.fstat(f.fileno()); file_stat(before)
+        need(before.st_size <= 32000000, 'PYTHON_BINARY_BOUND')
+        digest = hashlib.sha256(); total = 0
+        while True:
+            chunk = f.read(65536)
+            if not chunk: break
+            total += len(chunk); need(total <= 32000000, 'PYTHON_BINARY_BOUND'); digest.update(chunk)
+        after = os.fstat(f.fileno())
+    current = path.lstat()
+    need((before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) and (current.st_dev, current.st_ino) == (after.st_dev, after.st_ino) and not stat.S_ISLNK(current.st_mode), 'PYTHON_BINARY_DRIFT')
+    return {'fixed': str(fixed), 'resolved': str(path), 'chain': chain, 'device': after.st_dev, 'inode': after.st_ino, 'mode': stat.S_IMODE(after.st_mode), 'size': total, 'sha256': digest.hexdigest(), 'version': list(sys.version_info[:3])}
+
 def baseline():
-    owner(); secure(BASE, True)
+    owner(); interpreter = interpreter_identity(); secure(BASE, True)
     need(stat.S_IMODE(BASE.stat().st_mode) == 0o700, 'BASE_MODE')
     need(sha(read(BASE / 'channel.py', 0o444)) == OLD_CODE, 'ORIGINAL_CODE')
     grant = json.loads(read(BASE / 'grant-state.json', 0o600))
     need(type(grant) is dict and grant.get('state') == 'GRANTED', 'GRANTED_REQUIRED')
     s = (BASE / 'channel.py').stat()
-    return {'device': s.st_dev, 'inode': s.st_ino, 'code_sha256': OLD_CODE, 'grant_sha256': sha(read(BASE / 'grant-state.json'))}
+    return {'interpreter': interpreter, 'device': s.st_dev, 'inode': s.st_ino, 'code_sha256': OLD_CODE, 'grant_sha256': sha(read(BASE / 'grant-state.json'))}
 
 @contextmanager
 def owner_lock(create_allowed=False):

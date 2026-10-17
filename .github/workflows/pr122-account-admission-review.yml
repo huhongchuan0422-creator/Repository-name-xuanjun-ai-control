@@ -26,7 +26,7 @@ jobs:
           root=pathlib.Path('scripts/pr122_account_admission')
           log=pathlib.Path(os.environ['RUNNER_TEMP'])/'ACCOUNT_TESTS.log'
           text=log.read_text(); count=re.findall(r'Ran (\d+) tests in ',text)
-          assert count and int(count[-1])==116 and re.search(r'^OK$',text,re.M)
+          assert count and int(count[-1])==154 and re.search(r'^OK$',text,re.M)
           assert not re.search(r'skipped=|FAILED|ERROR:|FAIL:',text)
           subprocess.run(['git','diff','--exit-code','--','scripts/pr122_account_admission/'],check=True)
           out=pathlib.Path(os.environ['RUNNER_TEMP'])/'account-review';out.mkdir()

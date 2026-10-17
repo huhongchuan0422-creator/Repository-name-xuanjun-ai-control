@@ -161,8 +161,23 @@ def now():
 
 
 def check_files(pin):
-    need(digest(secure_read(CHANNEL, 0o444)[0]) == CHANNEL_SHA, 'CHANNEL_HASH')
-    need(strict_json(secure_read(BASE + '/grant-state.json', 0o600, 16384)[0]).get('state') == 'GRANTED', 'CHANNEL_NOT_GRANTED')
+    control = BASE + '/readonly-bootstrap-20261017'
+    need(not os.path.lexists(control + '/ROLLBACK_INTENT.json') and
+         not os.path.lexists(control + '/ROLLED_BACK.json'), 'ROLLBACK_STARTED')
+    need(strict_json(secure_read(control + '/VERIFIED.json', 0o400, 16384)[0]) == {'state':'VERIFIED'}, 'BOOTSTRAP_NOT_VERIFIED')
+    plan = strict_json(secure_read(control + '/plan.json', 0o400)[0])
+    need(plan.get('scope') == 'DOMESTIC_READONLY_BOOTSTRAP_20261017', 'BOOTSTRAP_SCOPE')
+    channel, inode = secure_read(CHANNEL, 0o444)
+    grant = secure_read(BASE + '/grant-state.json', 0o600, 16384)[0]
+    need(digest(channel) == CHANNEL_SHA, 'CHANNEL_HASH')
+    need(strict_json(grant).get('state') == 'GRANTED', 'CHANNEL_NOT_GRANTED')
+    baseline = plan.get('baseline')
+    required = {'device':inode[0], 'inode':inode[1], 'code_sha256':CHANNEL_SHA, 'grant_sha256':digest(grant)}
+    need(type(baseline) is dict and set(baseline) == set(required) | {'interpreter'} and
+         type(baseline.get('interpreter')) is dict, 'BASELINE_SCHEMA')
+    # Interpreter identity is enrolled and verified by bootstrap; this direct
+    # helper guard verifies canonical channel inode, code and grant continuity.
+    need({key:baseline[key] for key in required} == required, 'ORIGINAL_INODE_OR_GRANT_DRIFT')
     for path, mode, field in ((HELPER, 0o400, 'helper_sha256'), (WRAPPER, 0o755, 'wrapper_sha256'), (POLICY, 0o440, 'policy_sha256')):
         need(digest(secure_read(path, mode)[0]) == pin[field], 'DEPLOYED_HASH')
 
