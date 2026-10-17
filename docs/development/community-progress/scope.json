@@ -91,7 +91,7 @@
     "run_id": 39031100111,
     "job_id": 117391544227,
     "result": "SUCCESS",
-    "scope": "Exact source Hosted regression: receiver-detail guard and trade/split currency ambiguity; optional mini runtime/preview SDK SKIPPED",
+    "scope": "Hosted exact source result success, trade/split currency and unknown receiver-detail guards; mini runtime/SDK/preview skipped",
     "covers_later_commits": false
   }
 }
