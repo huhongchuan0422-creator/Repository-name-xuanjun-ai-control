@@ -1,0 +1,77 @@
+name: WeChat Pay SP APIv3 Read-only Connectivity Probe
+on:
+  push:
+    branches:
+      - probe/chatgpt-wechatpay-readonly-20261017
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  connectivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify secrets presence and perform GET only
+        env:
+          SP_MCHID: ${{ secrets.WECHAT_PAY_SP_MCHID }}
+          SP_API_V3_KEY: ${{ secrets.WECHAT_PAY_SP_API_V3_KEY }}
+          SP_PRIVATE_KEY: ${{ secrets.WECHAT_PAY_SP_PRIVATE_KEY }}
+          SP_CERT_SERIAL: ${{ secrets.WECHAT_PAY_SP_CERT_SERIAL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          python3 - <<'PY'
+          import os,sys
+          fields=['SP_MCHID','SP_API_V3_KEY','SP_PRIVATE_KEY','SP_CERT_SERIAL']
+          missing=[k for k in fields if not os.environ.get(k)]
+          print('CREDENTIALS_PRESENT='+('NO' if missing else 'YES'))
+          if missing:
+              print('MISSING_NAMES='+','.join(missing))
+              sys.exit(2)
+          if not os.environ['SP_MCHID'].isdigit():
+              print('RESULT=INVALID_MCHID_FORMAT');sys.exit(3)
+          if len(os.environ['SP_API_V3_KEY'])!=32:
+              print('RESULT=INVALID_APIV3_KEY_LENGTH');sys.exit(3)
+          PY
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          printf '%s\n' "$SP_PRIVATE_KEY" > "$work/key.pem"
+          if ! openssl pkey -in "$work/key.pem" -noout >/dev/null 2>&1; then
+            echo 'RESULT=PRIVATE_KEY_PARSE_FAILED'
+            exit 4
+          fi
+          python3 - "$work" <<'PY'
+          import os,sys,time,secrets
+          from pathlib import Path
+          target=Path(sys.argv[1])
+          ts=str(int(time.time()))
+          nonce=secrets.token_hex(16)
+          msg='GET\n/v3/certificates\n'+ts+'\n'+nonce+'\n\n'
+          (target/'signature_message').write_bytes(msg.encode('utf8'))
+          (target/'fields').write_text(ts+'\n'+nonce,encoding='ascii')
+          PY
+          signature="$(openssl dgst -sha256 -sign "$work/key.pem" "$work/signature_message" | openssl base64 -A)"
+          timestamp="$(sed -n '1p' "$work/fields")"
+          nonce="$(sed -n '2p' "$work/fields")"
+          auth="WECHATPAY2-SHA256-RSA2048 mchid=\"$SP_MCHID\",nonce_str=\"$nonce\",timestamp=\"$timestamp\",serial_no=\"$SP_CERT_SERIAL\",signature=\"$signature\""
+          status="$(curl --silent --show-error --max-time 25 --connect-timeout 10 --output "$work/response.json" --write-out '%{http_code}' -H "Authorization: $auth" -H "Accept: application/json" -H "User-Agent: Xuanjun-WeChatPay-Readonly-Check/1.0" 'https://api.mch.weixin.qq.com/v3/certificates')"
+          echo "HTTP_STATUS=$status"
+          python3 - "$work/response.json" "$status" <<'PY'
+          import json,sys
+          from pathlib import Path
+          try:
+              obj=json.loads(Path(sys.argv[1]).read_text(encoding='utf8'))
+          except Exception:
+              print('RESPONSE_FORMAT=NON_JSON');sys.exit(5)
+          if sys.argv[2]=='200' and isinstance(obj,dict) and isinstance(obj.get('data'),list):
+              print('RESULT=AUTHENTICATED_READONLY_SUCCESS')
+              print('PLATFORM_CERT_COUNT='+str(len(obj['data'])))
+          else:
+              # Never print the untrusted raw body, nor a token-containing message.
+              code=obj.get('code') if isinstance(obj,dict) else None
+              print('WECHAT_CODE='+code if isinstance(code,str) and code.isascii() and len(code)<70 else 'WECHAT_CODE=UNAVAILABLE')
+              print('RESULT=AUTHENTICATION_NOT_CONFIRMED')
+              sys.exit(6)
+          PY
