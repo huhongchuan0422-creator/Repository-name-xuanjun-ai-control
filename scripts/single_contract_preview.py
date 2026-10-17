@@ -32,10 +32,16 @@ def render(candidate):
         raise ContractHold("FEATURES_REQUIRED")
 
     def plain(value):
-        if not isinstance(value, str) or not value or any(ord(c) < 32 and c not in "\n\t" for c in value):
+        if not isinstance(value, str) or not value or any(ord(ch) < 32 and ch not in "\\n\\t" for ch in value):
             raise ContractHold("INVALID_TEXT")
-        # Escape Markdown delimiters so customer-selected text cannot forge sections.
-        return value.replace("\\", "\\\\").replace("|", "\\|").replace("#", "\\#").replace("<", "&lt;").replace(">", "&gt;")
+        # Every customer-controlled value is flattened to one line. This avoids
+        # Setext/fenced/list/paragraph structures. Escape all Markdown metacharacters.
+        value = value.replace("\\r", " ").replace("\\n", " ").replace("\\t", " ")
+        value = value.replace("\\\\", "\\\\\\\\")
+        for ch in ("\\\\", "`", "*", "_", "{", "}", "[", "]", "(", ")", "#", "+", "-", ".", "!", "|", ">", "~", "="):
+            if ch != "\\\\":
+                value = value.replace(ch, "\\\\" + ch)
+        return value.replace("<", "&lt;").replace(">", "&gt;")
 
     out = [
         "# 软件与AI定制开发电子合同（唯一文件，未签署预览）",
