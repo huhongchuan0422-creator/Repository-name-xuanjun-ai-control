@@ -53,7 +53,7 @@ class FinancialViews:
                         continue
                     from scripts.community_split_returns import SplitReturns
                     records.append(SplitReturns(a).summary(saved))
-                elif saved['scope_hash'] == scope_hash and saved['kind'] == p['kind']:
+                elif type(saved) is dict and saved.get('scope_hash') == scope_hash and saved.get('kind') == p['kind']:
                     record = a._summary(saved)
                     if saved.get('result') is not None:
                         record['result'] = saved['result']
