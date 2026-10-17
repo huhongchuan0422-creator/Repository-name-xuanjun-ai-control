@@ -3,5 +3,8 @@
   "en/index.html": "e25788cb9f566246856bfba2074b84e6e01484fb8dc7e52d463f6216152ef9bd",
   "zh-cn/index.html": "17d0bc08e56f2382b80eb99103ecfcee751c5ddd53ca8d23e5dd80fb2d4b7f02",
   "yunhui.css": "cda5092ff09a5708ed10f26b990c5e6616327dd066ec2af0536e587bd263dd8b",
-  "yunhui.js": "c025c482e7bc910faf20b37b164e342ff038b38b812fc8a7a809094049f66c4f"
+  "yunhui.js": "c025c482e7bc910faf20b37b164e342ff038b38b812fc8a7a809094049f66c4f",
+  "custom-ai/index.html": "2d9752864eb328d7358d877654c5847f96b4bf8b1d9a26b2830221c86c366283",
+  "zh-cn/custom-ai/index.html": "8bc167b08df17446f8d4532de8535c37fdd0c029ef53df7bccf4915fb78d6f80",
+  "en/custom-ai/index.html": "88e377a3a21fe0d8c4bf89a337cef8672b17b4f461cd1c004175a3295d4344d8"
 }

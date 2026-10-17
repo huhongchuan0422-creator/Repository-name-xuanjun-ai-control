@@ -9,7 +9,7 @@ import tarfile
 from pathlib import Path, PurePosixPath
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.pr122_site_hub_public_copy import public_page, legacy_public_wording
+from scripts.pr122_site_hub_public_copy import public_page, legacy_public_wording, reviewed_page_copy, localize_hub_links
 from scripts.pr122_site_hub_english import translate_fragment
 from scripts.pr122_site_hub_experience import CSS as EXPERIENCE_CSS, disclosures, home as improve_home
 from scripts.pr122_website_release import write_csp_metadata, Deadline
@@ -39,7 +39,7 @@ EN = {'产品可视化中心':'Product visual center', '行业案例':'Industry 
 EN.update({'共创收益共享':'Co-creation profit sharing','权益及专项金额说明':'Rights and service-credit guidance','生态活动':'Ecosystem activities','生态治理':'Ecosystem governance'})
 CSS = '''/* Verified selectors: live apex and pinned Work V2 source. */
 .primary-nav .nav-group{display:flex;flex-wrap:wrap;column-gap:5px}.primary-nav .nav-group>a{padding-right:0;flex:0 1 auto}.primary-nav .nav-group>button{width:24px;padding:0;text-align:left;flex:none}.primary-nav .nav-panel{flex-basis:100%}
-.xj-hub{padding:36px 0 60px}.xj-hub .hero{display:block;min-height:0;padding:28px;background:#fff;border:1px solid #dce5f1;border-radius:18px;margin:20px 0}.xj-hub .hero h1{font-size:clamp(28px,5vw,48px)}.xj-hub .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px}.xj-hub .card{min-height:0;margin:10px 0;padding:22px}.xj-hub .card h2{font-size:22px}.xj-hub .btn{display:inline-block;padding:10px 16px;background:#2057d4;color:white;border-radius:10px;margin:6px}.xj-hub{overflow-wrap:anywhere}.xj-hub select,.xj-hub button{max-width:100%;white-space:normal}.xj-hub input,.xj-hub select{width:100%;min-width:0}.xj-hub .btn{max-width:100%;margin:6px 0;white-space:normal}.xj-hub input{max-width:100%;padding:8px;border:1px solid #abbcd4;border-radius:6px}.xj-hub label{display:block;margin:12px 0}.xj-hub table{display:block;overflow:auto}.xj-hub th,.xj-hub td{padding:14px;text-align:left;border-bottom:1px solid #e6e9ee;white-space:normal;overflow-wrap:break-word}.xj-hub caption{text-align:left;font-size:20px;font-weight:650;padding:20px 0 12px}.xj-hub table{width:100%;border-collapse:collapse;margin:22px 0}.xj-hub .hero p{max-width:76ch;line-height:1.8;margin:18px 0}.xj-hub .actions{display:flex;flex-wrap:wrap;gap:8px}.xj-hub a:focus-visible,.xj-hub button:focus-visible,.xj-hub input:focus-visible{outline:3px solid #75a7ff;outline-offset:3px}
+.xj-hub{padding:36px 0 60px}.xj-hub .hero{display:block;min-height:0;padding:28px;background:#fff;border:1px solid #dce5f1;border-radius:18px;margin:20px 0}.xj-hub .hero h1{font-size:clamp(28px,5vw,48px)}.xj-hub .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px}.xj-hub .card{min-height:0;margin:10px 0;padding:22px}.xj-hub .card h2{font-size:22px}.xj-hub .btn{display:inline-block;padding:10px 16px;background:#2057d4;color:white;border-radius:10px;margin:6px}.xj-hub{overflow-wrap:anywhere}.xj-hub select,.xj-hub button{max-width:100%;white-space:normal}.xj-hub input,.xj-hub select{width:100%;min-width:0}.xj-hub .btn{max-width:100%;margin:6px 0;white-space:normal}.xj-hub input{max-width:100%;padding:8px;border:1px solid #abbcd4;border-radius:6px}.xj-hub label{display:block;margin:12px 0}.xj-hub .xj-table-scroll{width:100%;max-width:100%;overflow-x:auto}.xj-hub .xj-table-scroll table{display:table;table-layout:fixed;width:100%;min-width:420px}.xj-hub .xj-table-scroll caption{white-space:normal;overflow-wrap:normal}.xj-hub .xj-table-scroll:focus-visible{outline:3px solid #75a7ff;outline-offset:3px}.xj-hub th,.xj-hub td{padding:14px;text-align:left;border-bottom:1px solid #e6e9ee;white-space:normal;overflow-wrap:break-word}.xj-hub caption{text-align:left;font-size:20px;font-weight:650;padding:20px 0 12px}.xj-hub table{width:100%;border-collapse:collapse;margin:22px 0}.xj-hub .hero p{max-width:76ch;line-height:1.8;margin:18px 0}.xj-hub .actions{display:flex;flex-wrap:wrap;gap:8px}.xj-hub a:focus-visible,.xj-hub button:focus-visible,.xj-hub input:focus-visible{outline:3px solid #75a7ff;outline-offset:3px}
 '''
 
 def menu_patch(text):
@@ -175,8 +175,7 @@ def build(root, source, output, fixture=None):
             text=text.replace('<main>','<main class="xj-hub">',1)
             text=text.replace('<link rel="stylesheet" href="/assets/xuanjun-hub.css">','<link rel="stylesheet" href="/yunhui.css?v=yunhui-work-v2-20261013"><link rel="stylesheet" href="/assets/xuanjun-site-integration.css">')
             # Localize only hub content links, never assets or the mapped Chinese role demo.
-            if locale:
-                    text=re.sub(r'(<main\b.*?</main>)',lambda m:re.sub(r'href="/(marketplace|ecosystem|customer|visual)(/[^"#]*)"',lambda n:'href="/'+locale+n[1]+n[2]+'"' if not n[2].startswith(('/community-local-e2e/','/community-payment/merchant-dashboard/')) else n[0],m[0]),text,flags=re.S)
+            text=localize_hub_links(text,locale)
             text=externalize_styles(text)
             text=text.replace('</body>','<script src="/yunhui.js?v=yunhui-work-v2-20261013" defer></script></body>')
             canonical='https://wenwenwenyiyiyi.work/'+locale+relative.parent.as_posix()+'/'
@@ -220,6 +219,10 @@ def build(root, source, output, fixture=None):
         p=public/(locale+'index.html')
         text=p.read_text()
         p.write_text(improve_home(text,locale))
+    # Route-scoped text fixes run after existing generation, before hashing/CSP.
+    for p in public.rglob('*.html'):
+        text=p.read_text();updated=reviewed_page_copy(text,p.relative_to(public).as_posix())
+        if updated!=text:p.write_text(updated)
     # Reuse the already reviewed CSP implementation, never enable unsafe-inline.
     with Deadline(20) as deadline: csp=write_csp_metadata(public,output,deadline)
     manifest={p.relative_to(public).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in public.rglob('*') if p.is_file()}

@@ -59,6 +59,8 @@ DEMO · 隔离数据|DEMO · Isolated data
 社区|Community
 分账方|Beneficiary
 平台运营|Platform operations
+SaaS模块接入说明|SaaS module integration guidance
+身份与报价服务未连接，交互暂未开放|Identity and quote services are not connected; interaction is not open
 SaaS模块|SaaS modules
 已存在的角色演示源码位于仓库 demos/community-local-e2e。本候选采用独立入口，不复制重写原模块；发布时必须由受控制品将其映射到 /visual/community-local-e2e/。|Role demos reuse the existing community-local-e2e modules. Their version-bound assets must be mapped together with the required simulation service before release.
 部署前置：验证六个目标文件与脚本资源均属于同一审核版本，禁止仅发布本入口页造成404。未接真实微信支付或生产分账。|All six role entry files and scripts must belong to the same approved version. Publishing only this entry page is insufficient. No real WeChat Pay or production profit distribution is connected.
@@ -168,6 +170,11 @@ ECV持有量|ECV holdings
 TRANSLATIONS = dict(line.split('|', 1) for line in PAIRS.splitlines() if line)
 TRANSLATIONS['定制开发折扣'] = 'Custom development discount'
 TRANSLATIONS.update({
+    '正式报价按人民币与美元并列展示；本页模拟仅以人民币（CNY）计算，不提供汇率换算。第三方成本、代购服务费、部署费、维护费独立披露。':'Formal quotations display CNY and USD side by side. This simulator calculates in CNY only and does not convert exchange rates. Third-party costs, procurement service fees, deployment and maintenance are disclosed separately.',
+    '服务费用模拟':'Service fee simulator',
+    '优惠前自营服务费（元） ':'In-house service fee before benefits (CNY) ',
+    '当前持有权益值（点） ':'Current rights-value holdings (points) ',
+    '计算预计实付':'Calculate estimated amount due',
     '方案与交互演示 · 真实购买、支付、权益领取及客户登录暂未开放':'Solution and interactive demos · Live purchasing, payments, rights claims and customer sign-in are not yet available',
     '选择一个角色，体验消费者付款、商家经营及社区协作。全部订单与付款均为模拟，不产生真实资金。':'Choose a role to explore consumer payments, merchant operations and community collaboration. Orders and payments are simulated; no real funds move.',
     '商家工作台提供三家模拟商家的页面样例；原多角色流程使用隔离模拟会话。两类演示数据分别展示，尚未统一。':'The merchant dashboard contains three example merchants. The existing multi-role workflow uses isolated simulation sessions. These datasets are currently separate.',

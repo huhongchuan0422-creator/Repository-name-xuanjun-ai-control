@@ -14,5 +14,6 @@ for(const bad of [-1,NaN,Infinity,1.5])assert.throws(()=>calculateQuote({listPri
 assert.equal(calculateQuote({listPriceCents:Number.MAX_SAFE_INTEGER,ecvUnits:2,creditCents:0}).discountedCents,8106479329266892);
 assert.equal(calculateQuote({listPriceCents:Number.MAX_SAFE_INTEGER,ecvUnits:150,creditCents:Number.MAX_SAFE_INTEGER,kind:'ordinary'}).creditCapCents,8106479329266891);
 assert.equal(calculateQuote({listPriceCents:101,ecvUnits:2,creditCents:999}).cashDueCents,46);
-assert.throws(()=>calculateQuote({listPriceCents:100,ecvUnits:1.5,creditCents:0}),RangeError);
+assert.equal(calculateQuote({listPriceCents:100,ecvUnits:1.5,creditCents:0}).discountPercent,100);
 console.log("ECV_QUOTE_REGRESSION_PASS: 16 assertions/groups (offline only)");
+

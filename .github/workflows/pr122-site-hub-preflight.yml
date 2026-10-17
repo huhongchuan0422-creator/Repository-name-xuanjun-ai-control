@@ -26,6 +26,11 @@ on:
       - 'scripts/pr122_site_hub_*.py'
       - 'tests/test_pr122_site_hub_integration.py'
       - 'tests/pr122_site_hub_browser.cjs'
+      - 'tests/pr122_ecology_browser.cjs'
+      - 'tests/test_pr122_ecology_copy.py'
+      - 'tests/test_pr122_public_copy_audit.py'
+      - 'tests/fixtures/pr122-public-copy-evidence.json'
+      - 'tests/ecv-quote-fractional.test.cjs'
       - 'tests/fixtures/pr122-site-shell/**'
       - 'tests/test_pr122_site_hub_release_delta.py'
       - 'tests/test_pr122_site_hub_preview.py'
@@ -56,9 +61,9 @@ jobs:
       - name: Exact source inventory, not a release gate
         run: python scripts/pr122_site_hub_preflight.py --output /tmp/pr122-site-hub/STATIC_PREFLIGHT.json
       - name: Offline quote and simulated frontend regressions
-        run: node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs demos/community-local-e2e/*.test.mjs
+        run: node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs tests/ecv-quote-fractional.test.cjs demos/community-local-e2e/*.test.mjs
       - name: Isolated integrated HTTP and language tests
-        run: python -m unittest tests.test_pr122_site_hub_integration tests.test_pr122_site_hub_preview -v
+        run: python -m unittest tests.test_pr122_site_hub_integration tests.test_pr122_site_hub_preview tests.test_pr122_ecology_copy tests.test_pr122_public_copy_audit -v
       - name: Validate isolated preview Nginx and service candidates
         run: |
           sudo apt-get update -qq
@@ -127,6 +132,18 @@ jobs:
           XJ_HUB_STAGE: /tmp/pr122-site-browser
           XJ_HUB_REPORT: /tmp/pr122-site-hub/BROWSER_REPORT.json
         run: PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright" node tests/pr122_site_hub_browser.cjs
+      - name: Ecology copy, exact tiers and responsive layout in Hosted Chromium
+        env:
+          XJ_HUB_STAGE: /tmp/pr122-site-browser
+          XJ_ECOLOGY_REPORT: /tmp/pr122-site-hub/ecology
+          REUSE_BROWSER_BASELINE: ${{ steps.browser-baseline.outputs.reuse }}
+        run: |
+          if [ "$REUSE_BROWSER_BASELINE" = "true" ]; then
+            npm install --prefix "$RUNNER_TEMP/pr122-browser" --no-save playwright@1.55.0
+            "$RUNNER_TEMP/pr122-browser/node_modules/.bin/playwright" install --with-deps chromium
+            python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-site-browser
+          fi
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright" node tests/pr122_ecology_browser.cjs
       - name: Dynamic showcase lifecycle and isolated static publisher
         run: |
           python -m unittest tests.test_pr122_showcase tests.test_pr122_showcase_sources -v
@@ -196,6 +213,27 @@ jobs:
           shutil.copyfile('evidence/pr122-site-hub/PACKAGE_RECEIPT_20261016.json','/tmp/pr122-site-hub/PACKAGE_RECEIPT.json')
           print('REVIEW_ARCHIVE_PASS; NO_INSTALL_EXECUTED; SHA256='+receipt['tar_sha256'])
           PY
+      - name: Package exact website correction source for independent review only
+        run: |
+          python - <<'PYCODE'
+          import gzip,hashlib,io,json,os,subprocess,tarfile
+          from pathlib import Path
+          paths=['.github/workflows/pr122-site-hub-preflight.yml', 'demos/legal/service-package-rights.html', 'demos/xuanjun-site-hub/assets/ecv-quote-ui.js', 'demos/xuanjun-site-hub/assets/ecv-quote.js', 'demos/xuanjun-site-hub/assets/ecv-quote.test.cjs', 'demos/xuanjun-site-hub/customer/projects/index.html', 'demos/xuanjun-site-hub/marketplace/index.html', 'demos/xuanjun-site-hub/visual/community-payment/index.html', 'docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md', 'scripts/pr122_site_hub_english.py', 'scripts/pr122_site_hub_public_copy.py', 'scripts/pr122_site_hub_stage.py', 'tests/ecv-quote-fractional.test.cjs', 'tests/fixtures/pr122-public-copy-evidence.json', 'tests/fixtures/pr122-site-shell/PINS.json', 'tests/fixtures/pr122-site-shell/custom-ai/index.html', 'tests/fixtures/pr122-site-shell/en/custom-ai/index.html', 'tests/fixtures/pr122-site-shell/zh-cn/custom-ai/index.html', 'tests/pr122_ecology_browser.cjs', 'tests/test_pr122_ecology_copy.py', 'tests/test_pr122_public_copy_audit.py']
+          files={name:Path(name).read_bytes() for name in paths}
+          manifest={'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'scope':'WEBSITE_CORRECTION_REVIEW_ONLY','production_release':'HOLD','files':[{'path':name,'size':len(raw),'sha256':hashlib.sha256(raw).hexdigest()} for name,raw in sorted(files.items())]}
+          raw_manifest=(json.dumps(manifest,ensure_ascii=False,sort_keys=True,indent=2)+'\n').encode()
+          files['MANIFEST.json']=raw_manifest
+          stream=io.BytesIO()
+          with tarfile.open(fileobj=stream,mode='w') as tar:
+              for name,raw in sorted(files.items()):
+                  member=tarfile.TarInfo(name);member.size=len(raw);member.mode=0o644;member.mtime=0
+                  tar.addfile(member,io.BytesIO(raw))
+          archive=gzip.compress(stream.getvalue(),mtime=0)
+          out=Path('/tmp/pr122-site-hub/website-correction-review');out.mkdir()
+          (out/'WEBSITE_CORRECTION_SOURCE.tar.gz').write_bytes(archive)
+          (out/'MANIFEST.json').write_bytes(raw_manifest)
+          (out/'CHECKSUMS.json').write_text(json.dumps({'tar_sha256':hashlib.sha256(archive).hexdigest(),'manifest_sha256':hashlib.sha256(raw_manifest).hexdigest(),'files':len(paths)},sort_keys=True)+'\n')
+          PYCODE
       - uses: actions/upload-artifact@v4
         with:
           name: pr122-site-hub-preflight-${{ github.sha }}
