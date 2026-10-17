@@ -100,15 +100,25 @@ Page({
   async runPayment(recover) {
     if(this.data.pending||!this.paymentFlow)return;
     this.setData({pending:true,afterAd:'',status:recover?'正在恢复原支付单':'正在准备微信支付'});
-    try {const r=await this.paymentFlow.pay(this.data.reference,recover);this.showPayment(r);}
+    try {const r=await this.paymentFlow.pay(this.data.reference,recover);await this.showPayment(r);}
     catch(e){this.setData({status:e.message+'；请查询原订单，勿重新创建支付单'});}
     finally{this.setData({pending:false});}
   },
-  showPayment(r) {this.setData({amount:String(r.amount_minor),status:r.provider_state==='SUCCESS'?'微信查单已支付；财务尚未核销':r.provider_state+'；财务尚未核销',afterAd:''});},
+  async showPayment(r) {
+    const reference=this.data.reference;
+    this.setData({amount:String(r.amount_minor),status:r.provider_state==='SUCCESS'?'微信查单已支付；财务尚未核销':r.provider_state+'；财务尚未核销',afterAd:''});
+    if(r.provider_state!=='SUCCESS'||!this.data.commerceEnabled||!this.session)return;
+    try {
+      const reply=await this.session.commerce(this.scene,'receipt_ad',{reference});
+      if(this.data.reference!==reference)return;
+      if(reply.payment_success_verified===true&&reply.creative&&typeof reply.creative.title==='string')
+        this.setData({afterAd:reply.creative.title});
+    } catch(_) { /* Advertisement failure never changes payment status. */ }
+  },
   async queryPayment() {
     if(this.data.pending||!this.paymentFlow)return;
     this.setData({pending:true,afterAd:''});
-    try{this.showPayment(await this.paymentFlow.query(this.data.reference));}
+    try{await this.showPayment(await this.paymentFlow.query(this.data.reference));}
     catch(e){this.setData({status:e.message+'；支付结果未知'});}
     finally{this.setData({pending:false});}
   },
