@@ -6,13 +6,13 @@
 
 
 
-检查时间：2026-10-17T10:30:02.724038+00:00
+检查时间：2026-10-17T10:55:21.048253+00:00
 
-当前模块：四端业务接口、模块报价目录及新调用链集成
+当前模块：退款恢复与微信签名终态；消费者成功页广告及原 Center 项目中心接线
 
-最后真实代码提交：1364ac47f587778c6fb67f0e670003038b57c81e
+最后真实代码提交：b904a7a6c3f8a31d499b7917cfe3e2748e65767c
 
-最后真实提交时间：2026-10-17T10:19:16Z
+最后真实提交时间：2026-10-17T10:54:47Z
 
 
 
@@ -30,7 +30,7 @@
 
 
 
-CI：[{"id": 39024446841, "name": "Community WeChat SP Offline Gate", "status": "completed", "conclusion": "success", "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39024446841"}]
+CI：[{"id": 39026695870, "name": "Community WeChat SP Offline Gate", "status": "in_progress", "conclusion": null, "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39026695870"}]
 
 
 
