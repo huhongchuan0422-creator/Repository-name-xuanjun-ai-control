@@ -658,7 +658,11 @@ def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''
         ident=policy['approval_comment_id']
         used=row.get('query_permits',[])
         need(type(used) is list and ident not in used and len(used)<32)
-        row=dict(row,query_permits=used+[ident],state='CLOUD_QUERY_UNKNOWN')
+        import uuid
+        # Distinct trees prevent identical concurrent query commits from both
+        # succeeding as an idempotent update of the same Git ref head.
+        row=dict(row,query_permits=used+[ident],query_claim_nonce=uuid.uuid4().hex,
+                 state='CLOUD_QUERY_UNKNOWN')
         head=journal.write(row,head)
     gate();rpc=rpc_factory();rpc.assume();gate()
     if action=='remote-run':

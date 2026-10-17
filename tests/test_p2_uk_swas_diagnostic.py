@@ -570,6 +570,27 @@ class SplitCloudTests(unittest.TestCase):
         self.assertEqual(self.call('cloud-query','t-real-fixture')['state'],'CLOUD_QUERY_UNKNOWN')
         with self.assertRaises(RuntimeError):self.call('cloud-query','t-real-fixture')
 
+    def test_same_query_two_jobs_single_winner(self):
+        import threading
+        self.call();self.policy=self.make_policy('CLOUD_QUERY','t-real-fixture',2)
+        read=self.journal.read;write=self.journal.write
+        barrier=threading.Barrier(2);lock=threading.Lock();claims=[];results=[]
+        def parallel_read():
+            saved=read();barrier.wait(timeout=2);return saved
+        def atomic_write(value,prior=None):
+            if value.get('state')=='CLOUD_QUERY_UNKNOWN':claims.append(value['query_claim_nonce'])
+            with lock:return write(value,prior)
+        self.journal.read=parallel_read;self.journal.write=atomic_write
+        def worker():
+            try:results.append(self.call('cloud-query','t-real-fixture')['state'])
+            except RuntimeError:results.append('HOLD')
+        threads=[threading.Thread(target=worker) for unused in range(2)]
+        for thread in threads:thread.start()
+        for thread in threads:thread.join(timeout=3)
+        self.assertTrue(all(not thread.is_alive() for thread in threads))
+        self.assertEqual(sorted(results),['HOLD','SPLIT_TRANSPORT_VERIFIED'])
+        self.assertEqual(len(set(claims)),2)
+
     def test_target_unknown_distinct_from_cloud_unknown(self):
         detail={'InvokeId':'t-id','InstanceId':d.receipt.INSTANCE,'InvocationStatus':'Success',
                 'ExitCode':0,'Output':json.dumps({'state':'REMOTE_EXECUTION_UNKNOWN','redispatch_allowed':False})}

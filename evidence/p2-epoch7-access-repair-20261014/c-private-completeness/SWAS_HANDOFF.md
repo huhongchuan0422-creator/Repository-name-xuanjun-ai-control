@@ -312,7 +312,7 @@ just to make its own test pass. Read observation is not a global writer grant.
   an independent HOLD.
 
 ### Evidence scope
-76 local/Hosted-targeted tests include durable cloud-journal fixtures, no-ID and
+77 local/Hosted-targeted tests include durable cloud-journal fixtures, no-ID and
 post-STS failures, cross-job saved-ID query, stale append, query-permit replay,
 credential/event refusal, exact payload encoding, target intent/replay, and real
 original pinned runtime loading that rejects absent activation without creating
@@ -320,3 +320,5 @@ an ACTIVE descriptor. RPC/Git API success cases use adapters/fixtures, not actua
 GitHub journal writes or STS/SWAS. The five original runtime files remain unchanged
 and are not additional files in this six-path manifest. Real target execution,
 actual environment protections, real trust and actual global writer are pending.
+
+Query claims also include a fresh cryptographic nonce in the journal tree: two concurrent consumers of the same permit cannot generate an identical idempotent ref update and both proceed. A losing append remains HOLD.
