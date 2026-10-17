@@ -1363,7 +1363,7 @@
       "automatic_pr_triggers_removed": true,
       "query_run": 39003189371
     },
-    "next": "ORIGINAL_INDEPENDENT_EXACT_STOPPED_TRANSACTION_REVIEW_AND_HOST_ADMISSION; COMPLETE_PERSISTENT_IDENTITY_FINAL_DATA_SINGLE_WRITER_AND_PRODUCTION_ACTIVATION_SEPARATELY",
+    "next": "COMPLETE_REAL_FINAL_DATA_IDENTITY_INPUTS_AND_ORIGINAL_SINGLE_CONSOLIDATED_EXECUTION_ADMISSION; DO_NOT_REPLAY_HELD_LABEL_OR_INFER_PRODUCTION_READY_FROM_CI",
     "production_installed": false,
     "r2": {
       "status": "R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION",
@@ -1422,7 +1422,40 @@
       "services_installed": false,
       "production_cutover": false,
       "final_snapshot": false,
-      "real_signed_auth_and_upstream_acceptance": false
+      "real_signed_auth_and_upstream_acceptance": false,
+      "controlled_entry": {
+        "workflow": ".github/workflows/pr99-controlled-stopped-install.yml",
+        "trigger": "OWNER_ID_332398908_EXACT_HEAD_LABEL_ONLY_NO_PUSH_ROOT",
+        "run": 39005472107,
+        "job": 117316933627,
+        "status": "HELD_BEFORE_CLOUD_INDEPENDENT_HOST_ADMISSION_NOT_ISSUED",
+        "cloud_calls": 0,
+        "host_commands": 0,
+        "source_commit": "d7dcfd0bf82a93b2416a660fd0cf1b53766d804a",
+        "capability": "LABEL_TRIGGER_CONFIRMED_NOT_INSTALLATION"
+      }
+    },
+    "production_start_candidate": {
+      "source_commit": "23b9b42bbfa7655bb38c0c1ebc83f4edadc3efca",
+      "source_sha256": "6ad51228f60690365ee4004c8c05b9c982eb2de70551ac8061142fcb4c93fa32",
+      "code_implemented": true,
+      "host_executed": false,
+      "production_ready": false,
+      "ci_run": 39005621738,
+      "ci_job": 117317379867,
+      "tests": {
+        "stopped_transaction": 9,
+        "production_start_containment": 4,
+        "scope": "FILESYSTEM_AND_MOCKED_SYSTEMCTL_NOT_HOST_PID1"
+      },
+      "requires": [
+        "ORIGINAL_INDEPENDENT_ROOT_ADMISSION",
+        "REAL_FINAL_CHECKPOINT_SOURCE_FENCE_AND_CANONICAL_WRITER_ASSIGNMENT",
+        "PREPARED_DEDICATED_RUNTIME_IDENTITY_AND_PERMISSIONS"
+      ],
+      "site_cutover_implemented": false,
+      "services_started": false,
+      "production_cutover": false
     }
   }
 }
