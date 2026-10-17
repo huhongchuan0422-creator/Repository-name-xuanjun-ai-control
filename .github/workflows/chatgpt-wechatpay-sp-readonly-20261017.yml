@@ -30,11 +30,15 @@ jobs:
           if missing:
               print('MISSING_NAMES='+','.join(missing))
               sys.exit(2)
-          if not os.environ['SP_MCHID'].isdigit():
+          mchid=os.environ['SP_MCHID']
+          if not mchid.strip().isascii() or not mchid.strip().isdigit():
               print('RESULT=INVALID_MCHID_FORMAT');sys.exit(3)
+          if mchid != mchid.strip():
+              print('MCHID_SURROUNDING_WHITESPACE=YES')
           if len(os.environ['SP_API_V3_KEY'])!=32:
               print('RESULT=INVALID_APIV3_KEY_LENGTH');sys.exit(3)
           PY
+          SP_MCHID="$(printf %s "$SP_MCHID" | tr -d '\\r\\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
           python3 - "$work/key.pem" <<'PY'
