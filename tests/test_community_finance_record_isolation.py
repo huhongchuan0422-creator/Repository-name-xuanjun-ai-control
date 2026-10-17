@@ -49,6 +49,15 @@ class FinanceRecordIsolation(unittest.TestCase):
                  params=dict(kind='REFUND',after_id='')))
         self.assertEqual(result['records'],[])
 
+    def test_unreadable_original_order_evidence_fails_reconciliation_closed(self):
+        from scripts.community_financial_views import verified_refund_total
+        class DB:
+            def execute(self, sql, params):
+                return [('not-json',)]
+        scope=dict(tenant_id='tenant1',merchant_id='merchant1',store_id='store1')
+        with self.assertRaisesRegex(ValueError,'UNREADABLE_ORDER_EVIDENCE_RECONCILIATION_DENIED'):
+            verified_refund_total(DB(),scope,'order1')
+
     def test_malformed_return_scope_skipped(self):
         c=self.fx.c
         key='d'*64
