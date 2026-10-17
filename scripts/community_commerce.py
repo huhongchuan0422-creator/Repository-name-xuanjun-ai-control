@@ -140,6 +140,31 @@ class Commerce:
         if op in ('refund_apply','refund_application'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).consumer(token,scene,op,p)
+        if op == 'receipt_ad':
+            # Success creative is optional and requires both original order ownership
+            # and durable signed-provider evidence. A caller's payment flag is ignored.
+            if type(p) is not dict or set(p) != {'reference'} or not valid_id(p['reference']):
+                raise ValueError('INVALID_RECEIPT_AD_FIELDS')
+            i.authorize_order_read(token, scene, p['reference'], now)
+            with c.tx():
+                c.limit('community-receipt-ad:' + uid, 30, 60)
+                owned = self._read(identity, project, 'ORDER', p['reference'])
+                if owned is None or owned['user_id'] != uid:
+                    raise PermissionError('OWNED_BASKET_REQUIRED')
+            from scripts.community_order_provider_projection import provider_evidence
+            order = state(self.runtime.demo.db, identity, p['reference'])
+            if order['state'] != 'SUCCESS' or provider_evidence(self.runtime.demo.db, identity, p['reference']) is None:
+                return dict(creative=None, payment_success_verified=False,
+                            finance_status='UNCONFIRMED')
+            from scripts.community_ad_store import choose
+            from scripts.community_ad_contract import SUCCESS
+            import sqlite3
+            try:
+                creative = choose(self.runtime.demo.ad_db, identity, SUCCESS, now)
+            except sqlite3.DatabaseError:
+                creative = None  # Ads must not block purchase or receipt recovery.
+            return dict(creative=creative, payment_success_verified=True,
+                        finance_status='UNCONFIRMED')
         fields = {'orders': {'after_id'}, 'products': set(), 'purchase': {'reference', 'lines'}, 'purchase_read': {'reference'}}
         if op not in fields or type(p) is not dict or set(p) != fields[op]:
             raise ValueError('INVALID_CONSUMER_COMMERCE_FIELDS')
