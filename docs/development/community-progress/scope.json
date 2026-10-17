@@ -1,5 +1,5 @@
 {
-  "current_module": "官方分账聚合账单可选原交易与特约商户字段的安全关联（本轮开发，CI待确认）",
+  "current_module": "原 Center社区归属订单→签名支付→官方交易账单→平台经营财务联动与隔离测试",
   "blockers": [
     "暂无真实特约商户，真实交易验收依赖外部条件",
     "尚未完成全部当前源码业务链测试和独立审核",
@@ -87,11 +87,11 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "b197323a01e9e83ce780f949f09259c3f120b085",
-    "run_id": 39031805606,
-    "job_id": 117393586376,
+    "source": "f405fb8c01723df5c4e9cfde23df7517f52ef2ce",
+    "run_id": 39032951455,
+    "job_id": 117396938795,
     "result": "SUCCESS",
-    "scope": "Exact Hosted source verified: submerchant submit intent/version invariants and numeric signed refund ledger validation; optional mini preview/runtime/python/SDK skipped",
+    "scope": "Hosted exact source verified: original Center/community signed payment, platform gross/net and hash-verified official trade bill synthetic integration; optional mini SDK/runtime/preview SKIPPED",
     "covers_later_commits": false
   }
 }
