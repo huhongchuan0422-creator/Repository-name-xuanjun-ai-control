@@ -70,3 +70,14 @@ test('customer private-material reference rejects empty and oversized input befo
  assert.equal(req[0].params.reference,'synthetic-ref');
  assert.equal(req[0].params.item,'material1');
 });
+
+test('late reference-save reply cannot overwrite newly selected original requirement',async()=>{
+ const {result}=page();await result.onLoad({scene:'shop1'});
+ result.setData({projectReferenceItem:'material1',projectReferenceRevision:0,
+   projectReferenceKind:'SECRETREF',projectReference:'synthetic-ref'});
+ const pending=result.saveProjectReference();
+ result.setData({projectReferenceItem:'material2',projectReferenceRevision:1,projectReference:'new-ref'});
+ await pending;
+ assert.equal(result.data.projectReferenceItem,'material2');
+ assert.equal(result.data.projectReference,'new-ref');
+});
