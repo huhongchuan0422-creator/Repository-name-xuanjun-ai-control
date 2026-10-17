@@ -1,13 +1,13 @@
 {
-  "source_commit": "217549a26cfc397b24c8260fbe78a82b828dfb3e",
-  "source_tree": "08d13351b0e87c68ff1cc17e875273089d08ac33",
-  "run_id": 39011890078,
+  "source_commit": "82e96aa32864d42d2825112d7efb0362f7d5eafa",
+  "source_tree": "17c34132fdb1db6db9b8acf1b9f20b8261aa1f7d",
+  "run_id": 39012749927,
   "hosted": {
-    "job_id": 117335993437,
-    "community_python": 322,
+    "job_id": 117338554373,
+    "community_python": 337,
     "stage5_python": 342,
     "javascript": 72,
-    "total_test_executions": 736,
+    "total_test_executions": 751,
     "status": "SUCCESS",
     "failed": 0,
     "skipped": 0,
@@ -15,10 +15,10 @@
     "cryptography": "50.0.2"
   },
   "domestic_isolated": {
-    "job_id": 117336362748,
+    "job_id": 117338878013,
     "host": "iZvt5t8tlrm8oiZ",
     "uid": 1002,
-    "tests": 133,
+    "tests": 147,
     "status": "PASS",
     "failed": 0,
     "skipped": 0,
@@ -32,15 +32,15 @@
     "overlaps_hosted_suites": true
   },
   "source_artifact": {
-    "id": 12092804605,
-    "outer_zip_sha256": "07d99c4256054a4ec460c3a6277799df020a6670c41ec0e996127c717ac34db4",
-    "inner_zip_sha256": "396420adecd32047fad8716a468156478880791dd5e10b00711bf860dc088230",
-    "inner_zip_bytes": 937038,
-    "manifest_files_verified": 164
+    "id": 12093199277,
+    "outer_zip_sha256": "e4e28a0c19d581214aa26bbbb37c79e2259cc1dd7de5260557669f910ff43026",
+    "inner_zip_sha256": "2e01278761b1039234cbca056e59fd533fa0ade8a17b3e77ce4a5d98a76eec35",
+    "inner_zip_bytes": 965954,
+    "manifest_files_verified": 166
   },
   "domestic_artifact": {
-    "id": 12093471436,
-    "outer_zip_sha256": "f03d861522cfbe19ea10cefb179015594945fa09e2d4b4f259038c25fec6d5a6",
+    "id": 12093776257,
+    "outer_zip_sha256": "2d4dddc4570673aab6f2fbcf5b658864724db278eea035008d793589ad098c91",
     "receipt_head_verified": true
   },
   "reused_native_preview": {
@@ -50,7 +50,7 @@
     "native_source_changed_since_preview": false
   },
   "canonical_external_state": {
-    "pr122_latest_checked_comment": 6230544008,
+    "pr122_latest_checked_comment": 6231037637,
     "collected_utc": "2026-10-17T06:10:27Z",
     "dedicated_customer_account": "ABSENT_IN_REPORTED_NSS",
     "dedicated_customer_group": "ABSENT_IN_REPORTED_NSS",
@@ -64,7 +64,12 @@
     "metadata_job_id": 117327015123,
     "metadata_sha256": "6992b8547e8b6ed1e478d32e5c54a5f26eb93afe66866ccae0cb40ddcbdd5e7e",
     "metadata_raw_log_digest_recomputed": true,
-    "interpreter_venv": "WORKED_IN_OUR_ISOLATED_BUILD_NOT_A_PRODUCTION_INSTALL"
+    "interpreter_venv": "WORKED_IN_OUR_ISOLATED_BUILD_NOT_A_PRODUCTION_INSTALL",
+    "account_preparation_source_review": "PASS_WITH_SCOPE_LIMITS_OFFLINE_CANDIDATE",
+    "account_created_in_latest_pr122_receipt": false,
+    "customer_center_install": "HOLD_IN_LATEST_PR122_RECEIPT",
+    "latest_pr122_receipt_utc": "2026-10-17T07:08:35Z",
+    "latest_pr122_receipt_is_not_fresh_live_host_metadata": true
   },
   "next_dependencies": [
     "Original Center owner supplies admitted service instance/API, protected KMS and real customer/project/store mapping",
@@ -73,7 +78,7 @@
     "Original production deployment and DB migration/recovery gates; no parallel host writer"
   ],
   "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance",
-  "latest_fix": "Merchant admission UI, encrypted private material intake, conditional checklist, per-material independent review, correction/resubmission and approval; existing Center operator authentication. Original CRM workbench opening and WeChat submerchant approval remain separate.",
+  "latest_fix": "Protected original CRM mapping gates new merchant workbench; durable reserved/opened records, explicit interruption recovery, re-verification and re-opening preserve edited profiles. No account/project/role is created and no funds are enabled.",
   "merchant_onboarding": {
     "applicant_route": "/merchant/join",
     "review_route": "/merchant/review",
@@ -81,11 +86,12 @@
     "ui_hosted_browser": "PASS",
     "business_tests": 15,
     "operator_auth_tests": 12,
-    "browser_journeys": 1,
+    "browser_journeys": 2,
     "candidate_source_only": true,
     "production_route_published": false,
-    "opening_state": "AWAITING_CRM_BINDING",
+    "opening_state": "CONFIGURED_CRM_MAPPING_OPENS_WORKBENCH_IN_SYNTHETIC_TESTS",
     "wechat_submerchant_state": "NOT_VERIFIED",
-    "source_account_project_scanner": "SYNTHETIC_FIXTURES"
+    "source_account_project_scanner": "SYNTHETIC_FIXTURES",
+    "opening_tests": 14
   }
 }
