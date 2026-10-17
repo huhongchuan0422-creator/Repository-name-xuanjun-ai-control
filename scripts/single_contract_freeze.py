@@ -45,10 +45,12 @@ def money(v):
 
 def cents(v):
     n = money(v)
-    return int(n * 100)
+    t = n.as_tuple()
+    coefficient = int("".join(str(i) for i in t.digits))
+    return coefficient * (10 ** (t.exponent + 2))
 
 def as_money(value):
-    return "{:.2f}".format(Decimal(value) / 100)
+    return "{}.{:02d}".format(value // 100, value % 100)
 
 def _verified_id(value):
     if not isinstance(value, str) or not ID.match(value):
@@ -156,7 +158,7 @@ def freeze(snapshot):
         "resources": copy.deepcopy(items),
         "payment_cny": {
             "development_first_50pct": as_money(first_dev),
-            "development_final_after_acceptance_50pct": str(first_dev),
+            "development_final_after_acceptance_50pct": as_money(first_dev),
             "third_party_first_full": as_money(third_party),
             "agreed_services_and_tax_first": as_money(service),
             "first_total": as_money(first_dev + third_party + service)
