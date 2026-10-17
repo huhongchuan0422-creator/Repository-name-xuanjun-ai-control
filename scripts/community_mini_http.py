@@ -12,7 +12,11 @@ from scripts.community_demo_api import _HeaderDeadlineReader
 from scripts.community_mini_login import LoginUnavailable
 
 
-def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None):
+def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None):
+    if saas is not None:
+        from scripts.community_center_saas import CenterSaas
+        if type(saas) is not CenterSaas or saas.runtime is not gateway.runtime or saas.center is not getattr(gateway.identity,'center',None):
+            raise ValueError('SAME_REGISTERED_CUSTOMER_SAAS_REQUIRED')
     if onboarding is not None:
         from scripts.community_merchant_onboarding import MerchantOnboarding
         if type(onboarding) is not MerchantOnboarding or onboarding.center is not getattr(gateway.identity,'center',None):
@@ -48,7 +52,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                         ('Content-Security-Policy',"default-src 'none'")]:self.send_header(k,v)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_GET(self):
-            if onboarding is None and operations is None:return self.answer(404,{'error':'NOT_FOUND'})
+            if onboarding is None and operations is None and saas is None:return self.answer(404,{'error':'NOT_FOUND'})
             host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if self.headers.get_all('Host')!=[host]:return self.answer(403,{'error':'ORIGIN_DENIED'})
             if trusted_proxy is not None:
@@ -63,6 +67,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 assets.update({'/merchant/workbench':('workbench.html','text/html; charset=utf-8'),
                     '/merchant/workbench.js':('workbench.js','application/javascript; charset=utf-8'),
                     '/merchant/workbench.css':('workbench.css','text/css; charset=utf-8')})
+            if saas is not None:
+                assets.update({'/customer/saas':('saas.html','text/html; charset=utf-8'),
+                    '/customer/saas.js':('saas.js','application/javascript; charset=utf-8'),
+                    '/customer/saas.css':('workbench.css','text/css; charset=utf-8')})
             if self.path not in assets:return self.answer(404,{'error':'NOT_FOUND'})
             from pathlib import Path
             name,mime=assets[self.path]
@@ -84,7 +92,8 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
             if self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind') and not (
                     self.path=='/community/operations' and operations is not None) and not (
                     self.path=='/mini/payment' and getattr(gateway,'payments',None) is not None) and not (
-                    self.path=='/merchant/onboarding' and onboarding is not None):
+                    self.path=='/merchant/onboarding' and onboarding is not None) and not (
+                    self.path=='/customer/saas-api' and saas is not None):
                 return self.answer(404,{'error':'NOT_FOUND'})
             if (self.headers.get('Transfer-Encoding') is not None or
                     len(self.headers.get_all('Content-Length',[])) != 1 or
@@ -99,7 +108,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if not 0 < length <= limit:raise ValueError('INVALID_LENGTH')
                 session=self.headers.get('X-Center-Session','')
                 csrf=self.headers.get('X-Center-CSRF','')
-                if self.path in ('/merchant/onboarding','/community/operations'):
+                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api'):
                     cookies=[part.strip().partition('=')[2] for part in self.headers.get('Cookie','').split(';')
                              if part.strip().partition('=')[0]=='__Host-xj_customer']
                     if len(cookies)>1 or cookies and session or csrf and self.headers.get('X-CSRF-Token'):
@@ -109,7 +118,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     # Authenticate before accepting a large private upload body.
                     if session:
                         if not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-                        (onboarding if self.path=='/merchant/onboarding' else operations).center.session(session,csrf)
+                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas}[self.path].center.session(session,csrf)
                     elif length>16384:raise PermissionError('CENTER_SESSION_REQUIRED')
                 remaining=length;chunks=[];deadline=time.monotonic()+1
                 while remaining:
@@ -139,6 +148,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if self.path=='/merchant/onboarding':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=onboarding.dispatch(session,csrf,body)
+                elif self.path=='/customer/saas-api':
+                    if token:raise PermissionError('CENTER_SESSION_REQUIRED')
+                    result=saas.dispatch(session,csrf,body)
                 elif self.path=='/community/operations':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=operations.dispatch(session,csrf,body)
@@ -161,6 +173,6 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
     return Handler
 
 
-def serve(gateway,port=0,*,operations=None,onboarding=None):
+def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None):
     if type(port) is not int or not (port==0 or 1024 <= port <= 65535):raise ValueError('INVALID_PORT')
-    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding))
+    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas))

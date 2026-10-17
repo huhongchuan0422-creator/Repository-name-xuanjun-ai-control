@@ -19,6 +19,7 @@ class MiniApplication:
         self.server=None
         self.operations=None
         self.onboarding=None
+        self.saas=None
         self._socket=None
         self.center=center
         try:
@@ -34,8 +35,15 @@ class MiniApplication:
         """Loopback backend for the admitted HTTPS host; never a public bind."""
         if self.server is not None:
             raise ValueError('ALREADY_LISTENING')
-        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding)
+        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding,saas=self.saas)
         return self.server
+
+    def configure_saas(self,grants):
+        if self.server is not None or self.saas is not None:
+            raise ValueError('SAAS_ALREADY_CONFIGURED_OR_LISTENING')
+        from scripts.community_center_saas import CenterSaas
+        self.saas=CenterSaas(self.center,self.stage.runtime,grants)
+        return self.saas
 
     def configure_payments(self,reader,bindings=None,*,merchants=None):
         """Protected opt-in; original customer orders and verified payer required."""
@@ -105,7 +113,7 @@ class MiniApplication:
         if (parent.st_gid!=nginx_gid or
                 (nginx_uid!=os.geteuid() and parent.st_mode & 0o050 != 0o050)):
             raise PermissionError('NGINX_SOCKET_DIRECTORY_TRAVERSAL_REQUIRED')
-        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding)
+        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas)
         class Server(socketserver.UnixStreamServer):request_queue_size=128
         server=Server(str(path),handler)
         info=path.lstat();self._socket=(path,info.st_dev,info.st_ino)

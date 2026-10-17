@@ -220,3 +220,14 @@ Owner要求通过已有服务器执行小程序预览。mini-preview改用已有
 支持既有冻结订单配置及动态门店配置二选一；merchants按原scene保护配置sp_appid/sub_mchid/description/notify_url/profit_sharing，并固定原project和原tenant/merchant/store。动态订单号由服务商、原门店作用域和原reference确定生成32字符，不接受客户端自报支付单号；金额来自原orders、付款人来自原加密Mini会话，不需逐笔人工配置。网络前后绑定复核；原Center持久attempt防止重发，原links加密结果支持实际数据库重开后恢复。query复用原PartnerOrderReader真实GET签名和响应验签，SUCCESS仅显示微信已支付观察，原模拟订单不会被伪改SUCCESS，Finance未核销、不生成财务凭证、不发放权益。
 
 原生payment.js与checkout页面新增显式“微信支付/恢复原支付单/查询微信结果”。session.payment使用独立/mini/payment及显式enabled响应；UI配置configureService(url,true)仅显示入口，服务端原身份与绑定准入仍不可绕过。默认payments=false保留原开发模式。准备结果迟到/身份或订单变更不调用requestPayment；并发点击拒绝；取消/SDK成功均只查询原订单，不自行认定支付成功；未知不重试prepare。7项新增Node支付流程测试、2项session支付运输检查、6项原Center/SQLite/HTTP集成测试（含动态绑定与实际重开）验证这些新增代码；网络、账号及商户为明确合成fixture，不是现场交易验收。原生源文件已变更，旧预览回执不再当作本版编译证据；新编译/预览终态按准确CI另记。
+
+
+### 第二阶段原客户中心SaaS业务接线（2026-10-17 16:29后）
+
+新增community_center_saas.CenterSaas与/customer/saas页面、/customer/saas-api，MiniApplication.configure_saas显式装配。默认不配置则页面/API关闭。复用原Center账户/会话/CSRF/项目成员与原StageRuntime/OfflineSaas/报价和订单库，不新建IAM、订单或财务库。客户工作台保护映射精确绑定原user_id/project/已注册CUSTOMER Principal，逐次核对原项目OWNER/EDITOR与租户，拒绝权限、Principal或作用域变化；原限流和审计复用。
+
+报价编号服务端生成，固定30分钟报价期限；在原Center.links加密保留报价归属，再调用原报价函数。订单号由原报价/币种/租户确定，先保存原Center归属再调用原订单准备，重复准备只读取同一原订单，部分结果未知不盲目重新创建。客户不能自报租户、用户、quote_id/order_id创建或财务证明，不能读取或认领历史未关联记录。同租户同项目的第二客户也不能读别人的报价、订单、状态和续费计划。本人报价/订单记录50条游标分页，原数据库重开后可恢复。Center元数据和原报价/订单SQLite不是跨库ACID，保留未完成归属记录，不伪造业务成功。
+
+客户页面支持模块目录、方案费用明细、人民币/美元价格、报价、币种选择、订单准备、本人记录和续费查询。未获得原CONFIRMED_EXTERNAL的订单明确显示AWAITING_FINANCE_CONFIRMATION，不生成续费权益。宿主登录/退出/账号切换调用configureCommunitySaas({csrf,workspace})，清空报价、订单、表单、成本字段和旧响应。页面不存令牌、不另建登录。
+
+平台Owner定价同样接原客户中心会话：受保护PLATFORM_OWNER映射还须有原项目OWNER角色，普通客户及仅EDITOR无权创建/批准方案。页面支持多费用组成、CNY/USD售价与成本、一次/月/年/用量周期、月付/年付/买断/免费/优惠/计量/定制及第三方费用支付方；买断/免费不传周期天数。审批与成本凭据继续交原offer审批函数，不伪造生产发布许可。新增5项原Center/SQLite业务测试与1条真实HTTP/Chromium客户+Owner流程验证这些新代码（身份/价格均合成），含同租户第二客户拒绝、重开、过期、原Owner权限、报价→订单→恢复、费用编辑与批准及三尺寸布局。Finance权威消费端仍未在检索的现有源码中找到，不能用测试HMAC或Owner按钮代替实际财务确认。
