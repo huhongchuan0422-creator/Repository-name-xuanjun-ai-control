@@ -266,13 +266,17 @@
           "22份版本化草案及五项社区协议完整、来源/角色/页面映射准确，草案不签署不付款",
           "模板哈希、确定性转义预览、安全失败与阅读链接验证通过",
           "正式主体/费率/渠道/隐私字段补齐、法律审核、真实签约证据及生产门禁独立验收",
-          "自有在线订约离线准入覆盖权限、版本、地区审核及双方意愿；不冒充真实身份或法律有效性"
+          "自有在线订约离线准入覆盖权限、版本、地区审核及双方意愿；不冒充真实身份或法律有效性",
+          "单份合同离线候选冻结、金额整数分、凭据字段白名单、SQLite防REPLACE只追加、幂等读回完整性及纯文本安全转义全部通过负向测试；生产签约支付始终HOLD"
         ],
         "tests": [
           "tests/test_legal_contract_center.py",
           "tests/test_online_contract_candidate.py",
           "tests/test_contract_anchor_batch.py",
-          "tests/test_contract_anchor_cost.py"
+          "tests/test_contract_anchor_cost.py",
+          "tests/test_single_contract_freeze.py",
+          "tests/test_single_contract_journal.py",
+          "tests/test_single_contract_preview.py"
         ],
         "test_scope": "仅离线合同草案和静态阅读入口；不证明签约集成、支付准入或生产法律合规"
       },
@@ -289,7 +293,13 @@
         "tests/test_online_contract_candidate.py",
         "scripts/contract_anchor_batch.py",
         "tests/test_contract_anchor_batch.py",
-        "tests/test_contract_anchor_cost.py"
+        "tests/test_contract_anchor_cost.py",
+        "scripts/single_contract_freeze.py",
+        "scripts/single_contract_journal.py",
+        "scripts/single_contract_preview.py",
+        "tests/test_single_contract_freeze.py",
+        "tests/test_single_contract_journal.py",
+        "tests/test_single_contract_preview.py"
       ]
     },
     {
