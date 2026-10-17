@@ -73,3 +73,45 @@ exact revision and builds a 6-source-file manifest, plus log and manifest in an
 Future actual invocation must record InvokeId and terminal state in original
 PR58/PR17 with only permitted redacted fields. Never call an identity transport
 result private-completeness, installation or production acceptance.
+
+## Authenticated adapter and gated caller increment
+
+The statements above describe the original offline transport baseline. This
+increment adds AuthenticatedRPC and authorized_dispatch, still without live
+CLI or production execution job. The workflow now declares workflow_dispatch
+for the SAME offline test/build job only; it neither creates a callable dispatch
+tool in this session nor authorizes host execution. No cloud Secrets are wired.
+
+AuthenticatedRPC signs fixed HTTPS POST RPC requests, disables redirects and
+environment proxies, permits only STS and UK SWAS endpoints/actions, rejects raw
+API errors, bounds response bytes and per-request timeout, and has a 180-second
+monotonic admission deadline. It does not retry requests. A socket timeout plus
+an admission deadline is not a process-level hard kill guarantee for arbitrary
+slow/drip network behavior; independent wall-clock supervision is still required
+before live admission. Poll query backoff/rate supervision remains external.
+
+The gated caller holds an exclusive no-follow lock, reads only pre-existing
+Root:Root 0400 trust/epoch records and requires exact policy SHA, independently
+anchored approval-body SHA, nonexpired one-use limited purpose, fixed command
+SHA, both installed code hashes, exact attempt/nonce and expected writer epoch.
+The policy pins the exact ledger directory inode as well as code paths. Approval,
+policy and epoch are rechecked inside the held lock and again after STS, before
+RunCommand. A consumed dispatch intent blocks credential acquisition. This does
+not enroll trust, transfer canonical writer, grant installation or replace the
+independent proof of actual policy provenance. Deployment must bind the actual
+canonical global epoch source; an invented local epoch file is not acceptable.
+
+Caller dependencies get_comment and acquire_rpc are injected trusted functions.
+Their authenticated fetch policy, returned GitHub comment identity validation,
+credential custody, target installation and actual durable filesystem are NOT
+provided by a workflow in this increment. There is no claimed full production
+caller closure. A future live entry must be independently reviewed as a complete
+call chain before enabling credentials or execution. Existing TTY and rejected
+private-package constraints remain; no private material export is implemented.
+
+31 local methods pass: original20 plus11 adapter/authentication-gate methods,
+including synthetic signed HTTP requests, exact STS target, credential error
+redaction, deadline refusal, wrong-target refusal, expired/revoked/self-approved
+permission rejection, missing protected policy and lock contention. The full
+Root-policy happy path and cross-process fsync kill matrix are not represented
+as tested. Hosted tests remain fixtures, not UK STS/Root acceptance.
