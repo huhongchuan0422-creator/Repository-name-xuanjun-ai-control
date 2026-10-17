@@ -114,6 +114,9 @@ class WechatApplyment:
                 self.onboarding._load(application,uid,True)
                 current=self._read(application)
                 if current['business_code']!=record['business_code']:raise ValueError('APPLYMENT_CHANGED')
+                if (current.get('provider_state') in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
+                        and current['provider_state']!=data['applyment_state']):
+                    raise ValueError('TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT')
                 current.update(provider_state=data['applyment_state'],provider_response_sha256=digest,provider_observed_at=c.now())
                 if data.get('sub_mchid') is not None:
                     if type(data['sub_mchid']) is not str or not re.fullmatch('[0-9]{6,32}',data['sub_mchid']):raise ValueError('INVALID_PROVIDER_SUBMERCHANT')
