@@ -90,3 +90,16 @@ test('project checklist displays exact original requirement title and instructio
  assert.equal(result.data.projectChecklist[0].submission_type,'SECRETREF');
  assert.match(result.data.projectChecklist[0].instructions,/原项目私有材料要求/);
 });
+
+test('requirement picker locks original reference type and rejects document substitution',async()=>{
+ const {result}=page();await result.onLoad({scene:'shop1'});
+ result.setData({projectChecklist:[{id:'oauth1',revision:2,submission_type:'OAUTH'},
+   {id:'pdf1',revision:1,submission_type:'PRIVATE_DOCUMENT'}]});
+ result.selectProjectRequirement({currentTarget:{dataset:{item:'oauth1',revision:2}}});
+ assert.equal(result.data.projectReferenceKind,'OAUTH');
+ result.selectProjectRequirement({currentTarget:{dataset:{item:'pdf1',revision:1}}});
+ assert.equal(result.data.projectReferenceItem,'oauth1');
+ assert.match(result.data.status,/私有文件上传/);
+ result.selectProjectRequirement({currentTarget:{dataset:{item:'oauth1',revision:1}}});
+ assert.equal(result.data.projectReferenceRevision,2);
+});
