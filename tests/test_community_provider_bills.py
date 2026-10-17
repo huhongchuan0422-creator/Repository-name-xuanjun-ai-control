@@ -115,6 +115,13 @@ class BillJourney(unittest.TestCase):
         result=self.bills.reconcile(g,bill)
         self.assertEqual(result['exceptions'][0]['reason'],'BILL_SUBMERCHANT_MISMATCH')
 
+        bill['columns'].append('币种')
+        bill['rows']=[dict(zip(columns,values),币种='USD')]
+        self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'UNSUPPORTED_BILL_CURRENCY')
+        bill['rows']=[dict(zip(columns,values),币种='')]
+        self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'UNSUPPORTED_BILL_CURRENCY')
+        bill['columns'].remove('币种')
+
         bill['rows']=[dict(zip(columns,values[:3]+['',values[4]]))]
         self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'SPLIT_TRANSACTION_MISMATCH')
         bill['rows']=[dict(zip(columns,values[:4]+['']))]
