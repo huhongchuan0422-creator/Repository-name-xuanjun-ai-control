@@ -1,0 +1,43 @@
+name: Single Contract Offline Candidate CI
+on:
+  push:
+    branches:
+      - feature/chatgpt-native-customer-intake-20261016
+    paths:
+      - 'scripts/single_contract_*.py'
+      - 'tests/test_single_contract_*.py'
+      - 'docs/legal/**'
+      - 'demos/legal/**'
+      - 'governance/features.json'
+      - '.github/workflows/chatgpt-single-contract-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Python standard-library only regressions
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONNOUSERSITE: '1'
+        run: |
+          python3 -I -B -m compileall -q scripts/single_contract_*.py tests/test_single_contract_*.py
+          python3 -B -m unittest discover -s tests -p 'test_single_contract_*.py' -v
+      - name: Contract candidate must stay non-signing
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          registry=json.loads(Path('docs/legal/registry.json').read_text(encoding='utf-8'))
+          assert registry['production_enabled'] is False
+          by_id={x['id']:x for x in registry['documents']}
+          assert by_id['custom-development']['signature_enabled'] is False
+          assert by_id['custom-sow']['signature_enabled'] is False
+          assert by_id['custom-sow']['status']=='INTERNAL_ONLY'
+          print('SIGNING_AND_PAYMENT_GATE_HOLD')
+          PY
