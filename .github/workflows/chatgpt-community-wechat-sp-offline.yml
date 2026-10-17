@@ -6,8 +6,10 @@ on:
     paths:
       - scripts/community_wechat_sp_offline_guard.py
       - scripts/community_wechat_sp_mock_checkout_view.py
+      - scripts/community_wechat_sp_split_projection.py
       - tests/test_community_wechat_sp_offline_guard.py
       - tests/test_community_wechat_sp_mock_checkout_view.py
+      - tests/test_community_wechat_sp_split_projection.py
       - .github/workflows/chatgpt-community-wechat-sp-offline.yml
   workflow_dispatch:
 permissions:
