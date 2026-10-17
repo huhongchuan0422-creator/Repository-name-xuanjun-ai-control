@@ -33,6 +33,23 @@ class Workbench(unittest.TestCase):
         with self.assertRaises(PermissionError):self.call('merchant_settings',workspace='staff')
         for patch in [dict(limit=True),dict(after_id="' OR 1=1"),dict(status='ANY')]:
             with self.assertRaises(ValueError):self.call('orders_page',dict(args,**patch))
+    def test_order_detail_refund_history_and_split_use_original_records(self):
+        rt=self.fx.fx.stage.api;identity=rt.bindings[self.fx.fx.stage.merchant]
+        create_order(rt.demo.db,identity,'detail_order',101)
+        rt.simulate_from_operator(self.fx.fx.stage.owner,'detail_order','paid_event','SUCCESS','fixture_tx')
+        before=self.call('order_detail',dict(reference='detail_order'))
+        self.assertEqual(before['remaining_preview_minor'],101)
+        self.assertEqual(before['events'][0]['to_state'],'SUCCESS')
+        request=dict(reference='detail_order',event_id='refund_request',amount_minor=11)
+        self.call('refund_record',request);self.call('refund_record',request)
+        after=self.call('order_detail',dict(reference='detail_order'))
+        self.assertEqual(after['refund_preview_total_minor'],11)
+        self.assertEqual(len(after['refund_previews']),1)
+        self.assertFalse(after['provider_refund_executed'])
+        split=self.call('split_preview',dict(reference='detail_order',shares_bps={'merchant':9000,'platform':1000}))
+        self.assertEqual(sum(split['allocations_minor'].values()),90)
+        self.assertEqual(self.call('order_detail',dict(reference='detail_order'),workspace='staff')['order']['state'],'SUCCESS')
+        with self.assertRaises(ValueError):self.call('order_detail',dict(reference='private_other_store'))
     def test_browser_cookie_transport_and_ambiguous_credentials(self):
         server=serve(self.fx.fx.gateway,operations=self.fx.operations)
         def request(path,headers=None,body=None):

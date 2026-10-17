@@ -40,3 +40,22 @@ def merchant_settings(db,identity):
     return dict(profile=None if row is None else dict(zip(('name','description','contact','status','version'),row)),
                 items=[dict(zip(('id','name','status','sort','version'),r)) for r in items],
                 simulation_only=True,provider_settlement_verified=False)
+
+
+def order_detail(orders,refunds,identity,reference):
+    """Scoped order history and original refund-preview journal, no money mutation."""
+    from scripts.community_order_store import state
+    if not valid_id(reference):raise ValueError('INVALID_REFERENCE')
+    t,m,s=scope(identity)
+    order=state(orders,identity,reference)
+    events=orders.execute('SELECT event_id,from_state,to_state,evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=? ORDER BY event_id LIMIT 201',(t,m,s,reference)).fetchall()
+    refund_rows=refunds.execute('SELECT event_id,amount_minor,evidence_kind FROM refund_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=? ORDER BY event_id LIMIT 201',(t,m,s,reference)).fetchall()
+    total=refunds.execute('SELECT COALESCE(SUM(amount_minor),0) FROM refund_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,s,reference)).fetchone()[0]
+    if not 0<=total<=order['amount_minor']:raise ValueError('INVALID_REFUND_PREVIEW_TOTAL')
+    return dict(reference=reference,order=order,
+        events=[dict(zip(('event_id','from_state','to_state','evidence_source'),r)) for r in events[:200]],
+        events_truncated=len(events)>200,
+        refund_previews=[dict(zip(('event_id','amount_minor','evidence_kind'),r)) for r in refund_rows[:200]],
+        refund_history_truncated=len(refund_rows)>200,refund_preview_total_minor=total,
+        remaining_preview_minor=order['amount_minor']-total,simulation_only=True,
+        provider_refund_executed=False,provider_split_executed=False)

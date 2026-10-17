@@ -1,7 +1,7 @@
 'use strict';
 (()=>{
  const $=id=>document.getElementById(id);let epoch=0,config=null,busy=false,profileVersion=null,orderCursor=null,orderAfter='',reportCursor=null,reportWindow=null,adCursor=null;
- const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;};
+ const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;};
  const status=message=>{$('notice').textContent=message;};
  window.configureCommunityWorkbench=value=>{
   epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace}:null;
@@ -22,7 +22,7 @@
  const pageParams=after=>({limit:50,after_id:after,status:$('orderStatus').value});
  async function orders(ticket,after=''){
   const params=pageParams(after),result=await call('orders_page',params,ticket);if(ticket!==epoch)return;orderAfter=after;$('orders').replaceChildren();
-  for(const o of result.orders){const tr=document.createElement('tr');for(const k of ['reference','amount_minor','currency','state']){const td=document.createElement('td');td.textContent=String(o[k]);tr.append(td);}$('orders').append(tr);}
+  for(const o of result.orders){const tr=document.createElement('tr');for(const k of ['reference','amount_minor','currency','state']){const td=document.createElement('td');td.textContent=String(o[k]);tr.append(td);}const td=document.createElement('td');td.append(button('查看详情',async n=>{$('detailReference').value=o.reference;await detail(n);}));tr.append(td);$('orders').append(tr);}
   orderCursor=result.next_cursor;$('moreOrders').hidden=!result.has_more;
  }
  $('loadOrders').onclick=()=>action(async t=>{await orders(t);const s=await call('summary',{},t);if(t===epoch)$('summary').textContent='模拟订单总额（分）：'+s.order_total_minor+'；各状态数量：'+JSON.stringify(s.counts);});
@@ -39,6 +39,11 @@
  $('adForm').onsubmit=e=>{e.preventDefault();action(async t=>{await call('ad_create',{record:{id:$('adId').value,title:$('adTitle').value,target_url:$('adUrl').value,slot:$('adSlot').value,starts_at:seconds('adStart'),ends_at:seconds('adEnd'),priority:Number($('adPriority').value)}},t);await ads(t);});};
  async function report(t,after=''){const window=after?reportWindow:{starts_at:seconds('reportStart'),ends_at:seconds('reportEnd')};const r=await call('ad_report',{...window,limit:50,after_id:after},t);if(t!==epoch)return;reportWindow=window;$('report').replaceChildren();for(const c of r.campaigns)article('report',c.id+' · 展示 '+c.impressions+' · 点击 '+c.clicks+' · 点击率 '+(c.click_rate===null?'无展示基数':(c.click_rate*100).toFixed(2)+'%'));reportCursor=r.next_cursor;$('moreReport').hidden=!r.has_more;}
  $('loadReport').onclick=()=>action(t=>report(t));$('moreReport').onclick=()=>action(t=>report(t,reportCursor));
+ async function detail(t){const reference=$('detailReference').value;const r=await call('order_detail',{reference},t);if(t!==epoch||reference!==$('detailReference').value)return;$('orderDetail').textContent=JSON.stringify(r,null,2);$('refundResult').replaceChildren();$('splitResult').replaceChildren();}
+ $('detailForm').onsubmit=e=>{e.preventDefault();action(detail);};
+ $('detailReference').oninput=()=>{$('orderDetail').replaceChildren();$('refundResult').replaceChildren();$('splitResult').replaceChildren();};
+ $('refundForm').onsubmit=e=>{e.preventDefault();action(async t=>{const reference=$('detailReference').value;if(!/^[A-Za-z0-9_-]{1,64}$/.test(reference))throw Error('先输入订单编号');const r=await call('refund_record',{reference,event_id:$('refundEvent').value,amount_minor:Number($('refundAmount').value)},t);if(reference!==$('detailReference').value)return;await detail(t);if(t===epoch&&reference===$('detailReference').value)$('refundResult').textContent='退款预审已记录，未执行微信退款。'+JSON.stringify(r);});};
+ $('splitForm').onsubmit=e=>{e.preventDefault();action(async t=>{const shares=Object.create(null);const lines=$('splitShares').value.trim().split(/\n/);if(lines.length>20)throw Error('接收方过多');for(const line of lines){const parts=line.split(',').map(s=>s.trim());if(parts.length!==2||!parts[0]||Object.hasOwn(shares,parts[0])||!/^\d+$/.test(parts[1]))throw Error('接收方格式错误或重复');shares[parts[0]]=Number(parts[1]);}const reference=$('detailReference').value;const r=await call('split_preview',{reference,shares_bps:shares},t);if(t!==epoch||reference!==$('detailReference').value)return;$('splitResult').replaceChildren();article('splitResult','可分配金额（分）：'+r.allocatable_minor+'；退款预审（分）：'+r.refund_preview_minor);for(const [name,amount] of Object.entries(r.allocations_minor))article('splitResult',name+'：'+amount+' 分');});};
  $('reconcile').onclick=()=>action(async t=>{const r=await call('reconciliation',{},t);if(t===epoch)$('finance').textContent=JSON.stringify(r,null,2);});
  window.configureCommunityWorkbench(null);
 })();

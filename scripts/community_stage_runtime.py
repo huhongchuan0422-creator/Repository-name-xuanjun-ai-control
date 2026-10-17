@@ -48,7 +48,7 @@ class StageRuntime:
             'receipt': {'reference'}, 'orders': set(), 'summary': set(),
             'orders_page': {'limit','after_id','status'},
             'orders_export': {'limit','after_id','status'},
-            'merchant_settings': set(),
+            'merchant_settings': set(), 'order_detail': {'reference'},
             'refund_record': {'reference', 'event_id', 'amount_minor'},
             'refund_preview': {'reference'}, 'split_preview': {'reference', 'shares_bps'},
             'reconciliation': set(), 'ads': set(), 'ads_page': {'limit','after_id'},
@@ -64,6 +64,7 @@ class StageRuntime:
             'orders':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'summary':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'orders_page':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
+            'order_detail':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'orders_export':{'MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'ads':{'MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'},
             'ads_page':{'MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'},
@@ -75,6 +76,9 @@ class StageRuntime:
         }
         if name not in public and principal.role not in permissions.get(name,{'MERCHANT_ADMIN','PLATFORM_OWNER'}):
             raise PermissionError('ADMIN_ROLE_REQUIRED')
+        if name == 'order_detail':
+            from scripts.community_workbench import order_detail
+            return order_detail(self.demo.db,self.demo.refund_db,identity,**params)
         if name in ('orders_page','orders_export'):
             from scripts.community_workbench import orders_page, orders_export
             return (orders_export if name=='orders_export' else orders_page)(self.demo.db,identity,**params)

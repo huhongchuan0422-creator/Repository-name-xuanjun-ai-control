@@ -16,6 +16,7 @@ class MerchantWorkbenchBrowser(unittest.TestCase):
                 fx=fixture.ExistingCenterOperations();fx.setUp()
                 rt=fx.fx.stage.api
                 create_order(rt.demo.db,rt.bindings[fx.fx.stage.merchant],'browser_order',1250)
+                rt.simulate_from_operator(fx.fx.stage.owner,'browser_order','paid_fixture','SUCCESS','browser_fixture_tx')
                 server=serve(fx.fx.gateway,operations=fx.operations);ready.put((server,fx.web));server.serve_forever(poll_interval=.05)
             except BaseException as e:ready.put(e)
             finally:
@@ -39,9 +40,12 @@ class MerchantWorkbenchBrowser(unittest.TestCase):
                     page.locator('#itemId').fill('new_item');page.locator('#itemName').fill('商品编辑');page.locator('#itemForm button').click();expect(page.locator('#items')).to_contain_text('商品编辑')
                     page.locator('#items article').filter(has_text='new_item').get_by_role('button').click();page.locator('#itemStatus').select_option('HIDDEN');page.locator('#itemForm button').click();expect(page.locator('#items')).to_contain_text('HIDDEN')
                     page.locator('#loadOrders').click();expect(page.locator('#orders')).to_contain_text('browser_order')
+                    page.locator('#orders').get_by_role('button',name='查看详情').click();expect(page.locator('#orderDetail')).to_contain_text('browser_order')
+                    page.locator('#refundEvent').fill('browser_refund');page.locator('#refundAmount').fill('250');page.locator('#refundConfirm').check();page.locator('#refundForm button').click();expect(page.locator('#refundResult')).to_contain_text('退款预审已记录')
+                    page.locator('#splitShares').fill('merchant,9000\nplatform,1000');page.locator('#splitForm button').click();expect(page.locator('#splitResult')).to_contain_text('merchant：900 分');expect(page.locator('#splitResult')).to_contain_text('platform：100 分')
                     with page.expect_download() as downloaded:page.locator('#exportOrders').click()
                     self.assertEqual(downloaded.value.suggested_filename,'community-simulated-orders-page.csv')
-                    page.locator('#orderStatus').select_option('SUCCESS');page.locator('#loadOrders').click();expect(page.locator('#orders')).to_be_empty()
+                    page.locator('#orderStatus').select_option('FAILED');page.locator('#loadOrders').click();expect(page.locator('#orders')).to_be_empty()
                     for width in (360,768,1440):
                         page.set_viewport_size({'width':width,'height':900});self.assertLessEqual(page.evaluate('document.documentElement.scrollWidth'),width)
                     page.evaluate('configureCommunityWorkbench(null)');expect(page.locator('#name')).to_have_value('');expect(page.locator('#orders')).to_be_empty()
