@@ -1,8 +1,5 @@
 name: PR99 S09 copied release restart cleanup acceptance
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths: ['.github/workflows/aliyun-s09-release-restart-acceptance.yml']
   workflow_dispatch:
 permissions:
   contents: read
