@@ -1,0 +1,55 @@
+{
+  "evidence_origin": "REAL_SWAS_HOST_EXECUTION_LOG_READ_BACK",
+  "workflow_commit": "67a3573ff55b7d467e6d507dae5cf8fbcfcca0c9",
+  "run_id": 38992581089,
+  "job_id": 117277978082,
+  "korea_invoke_id": "t-kor709ol1r4xvy8",
+  "coordinator_commit": "1b029519886822865847c3c518e6df453ff789d5",
+  "coordinator_sha256": "8bc8d13d9be01e2c695608ee975d30914eab9c7eda5144c8d7cba0051a3fa37a",
+  "helper_commit": "602b3c6e28ea2a9a77d2850d8fde18e5137c27c9",
+  "helper_sha256": "ac6e64a2cf589b14b21bdab643060748862a7a711deb0bc29648632ccc6a7d9f",
+  "observed_result_at_utc": "2026-10-17T01:53:58Z",
+  "app_uid_gid": "65534:65534",
+  "application_processes_stopped": true,
+  "application_root": "COPIED_CHROOT",
+  "bridge_material_files": 2,
+  "bridge_materials": "AUTHENTIC_TOKYO_PRIVATE_COPY_NO_VERIFICATION_BYPASS",
+  "current_tokyo_source_hashes": "PASS_124",
+  "data_source": "PRELIMINARY_165_FILE_COPY_NOT_CANONICAL_WRITER",
+  "dynamic_completeness_proven": false,
+  "final_cutover_snapshot": false,
+  "network_namespace_external_interfaces": 0,
+  "production_cutover": false,
+  "production_service_actions": 0,
+  "protected_state_unchanged": true,
+  "roles": {
+    "contact": {
+      "errors": [],
+      "health_http_status": 200,
+      "loopback_listener": true,
+      "process_alive": true,
+      "returncode": null
+    },
+    "customer_service": {
+      "errors": [],
+      "health_http_status": 200,
+      "loopback_listener": true,
+      "process_alive": true,
+      "returncode": null
+    },
+    "portal": {
+      "errors": [],
+      "health_http_status": 200,
+      "loopback_listener": true,
+      "process_alive": true,
+      "returncode": null
+    }
+  },
+  "runtime_configuration_complete": false,
+  "services_installed": false,
+  "source_files": 124,
+  "status": "ISOLATED_THREE_LISTENERS_PASS_RUNTIME_ACCEPTANCE_PENDING",
+  "supplement_files": 45,
+  "supplement_provenance": "R2_COPY_HASHES_RECHECKED_ON_CURRENT_TOKYO",
+  "temporary_app_process_starts": 3
+}
