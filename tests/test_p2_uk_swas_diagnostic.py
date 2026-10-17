@@ -355,3 +355,56 @@ class EntryProvenanceSupervisorTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class RecoveryCheckpointTests(unittest.TestCase):
+    setUp=TransportTests.setUp
+    rpc=TransportTests.rpc
+    start=TransportTests.start
+    # The inherited transport cases also run against this fixture.
+    def snapshot(self):return d.recovery_snapshot(self.ledger)
+
+    def test_empty_is_not_authority(self):
+        self.assertEqual(self.snapshot()['state'],'NO_DISPATCH_RECORD_NO_AUTHORITY')
+        self.assertFalse(self.snapshot()['redispatch_allowed'])
+        self.assertEqual(self.calls,[])
+
+    def test_restart_saved_invoke_query_only(self):
+        self.start()
+        other=d.Ledger(self.tmp.name)
+        try:r=d.recovery_snapshot(other)
+        finally:other.close()
+        self.assertEqual(r['state'],'QUERY_SAVED_INVOKE_ONLY')
+        self.assertEqual(r['invoke_id'],'t-fixture')
+        self.assertEqual(len(self.calls),1)
+
+    def test_unknown_without_id_never_reruns(self):
+        with self.assertRaises(RuntimeError):
+            d.dispatch_once(self.ledger,'a',self.nonce,self.sha,
+                            lambda *a,**k: (_ for _ in ()).throw(OSError()))
+        self.assertEqual(self.snapshot()['state'],'DISPATCH_UNKNOWN_NO_INVOKE_NO_RETRY')
+        with self.assertRaises(FileExistsError):self.start()
+
+    def test_terminal_verified_no_replay(self):
+        self.start();d.poll_existing(self.ledger,self.rpc)
+        self.assertEqual(self.snapshot()['state'],'TERMINAL_VERIFIED_NO_REPLAY')
+
+    def test_orphan_invoke_rejected(self):
+        self.ledger.create('invoke.json',{'invoke_id':'t-fixture'})
+        with self.assertRaises(RuntimeError):self.snapshot()
+
+    def test_torn_record_rejected(self):
+        Path(self.tmp.name,'dispatch-intent.json').write_text('{')
+        os.chmod(Path(self.tmp.name,'dispatch-intent.json'),0o600)
+        with self.assertRaises(ValueError):self.snapshot()
+
+    def test_cross_host_intent_rejected(self):
+        self.ledger.create('dispatch-intent.json',{'state':'DISPATCH_INTENT',
+            'attempt':'a','nonce':self.nonce,'script_sha256':self.sha,
+            'instance_id':'wrong','region':d.receipt.REGION})
+        with self.assertRaises(RuntimeError):self.snapshot()
+
+    def test_terminal_conflict_rejected(self):
+        self.start();d.poll_existing(self.ledger,self.rpc)
+        self.ledger.create('rejected.json',{'state':'TERMINAL_REJECTED','invoke_id':'t-fixture'})
+        with self.assertRaises(RuntimeError):self.snapshot()

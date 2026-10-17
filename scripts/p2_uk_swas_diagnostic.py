@@ -118,6 +118,61 @@ def dispatch_once(ledger, attempt, nonce, script_sha256, rpc):
         raise RuntimeError('DISPATCH_UNKNOWN_PRESERVE_NO_RETRY') from None
 
 
+def recovery_snapshot(ledger):
+    """Read a stable durable checkpoint. Never dispatch, repair, or acquire keys.
+    Caller must hold the same exclusive lock used for dispatch. Even an empty
+    ledger is not a fresh approval. Corruption/partial writes remain HOLD.
+    """
+    names=('dispatch-intent.json','invoke.json','verified.json','rejected.json')
+    def capture():
+        values={}
+        for name in names:
+            try: values[name]=ledger.read(name)
+            except FileNotFoundError: pass
+        return values
+    data=capture()
+    need(data==capture())
+    result={'redispatch_allowed':False,'p2_accepted':False,
+            'requires_fresh_permission':True}
+    if not data:
+        result['state']='NO_DISPATCH_RECORD_NO_AUTHORITY'
+        return result
+    intent=data.get('dispatch-intent.json')
+    need(type(intent) is dict and set(intent)=={
+        'state','attempt','nonce','script_sha256','instance_id','region'})
+    need(intent['state']=='DISPATCH_INTENT' and receipt.token(intent['attempt'])
+         and receipt.token(intent['nonce']) and intent['instance_id']==receipt.INSTANCE
+         and intent['region']==receipt.REGION and intent['script_sha256']==
+         hashlib.sha256(command(intent['nonce']).encode()).hexdigest())
+    invoke=data.get('invoke.json')
+    if invoke is None:
+        need(set(data)=={'dispatch-intent.json'})
+        result['state']='DISPATCH_UNKNOWN_NO_INVOKE_NO_RETRY'
+        return result
+    need(type(invoke) is dict and set(invoke)=={'invoke_id'}
+         and receipt.token(invoke['invoke_id']))
+    result['invoke_id']=invoke['invoke_id']
+    verified=data.get('verified.json'); rejected=data.get('rejected.json')
+    need(not (verified is not None and rejected is not None))
+    if verified is not None:
+        # Revalidate stored public bytes through the original strict validator.
+        need(type(verified) is dict)
+        body={'hostname':verified.get('hostname'),'uid':verified.get('uid'),
+              'python':verified.get('python'),'nonce':intent['nonce'],
+              'private_inputs_read':verified.get('private_inputs_read')}
+        expected=receipt.validate({'InvokeId':invoke['invoke_id'],
+            'InstanceId':receipt.INSTANCE,'InvocationStatus':'Success',
+            'ExitCode':0,'Output':json.dumps(body)},invoke['invoke_id'],intent['nonce'])
+        need(verified==expected)
+        result['state']='TERMINAL_VERIFIED_NO_REPLAY'
+    elif rejected is not None:
+        need(rejected=={'state':'TERMINAL_REJECTED','invoke_id':invoke['invoke_id']})
+        result['state']='TERMINAL_REJECTED_NO_REPLAY'
+    else:
+        result['state']='QUERY_SAVED_INVOKE_ONLY'
+    return result
+
+
 def poll_existing(ledger, rpc, max_queries=12):
     """Re-query an exact saved InvokeId only; never dispatch from this method."""
     need(type(max_queries) is int and 1 <= max_queries <= 36)
@@ -319,6 +374,10 @@ def authorized_dispatch(ledger, attempt, nonce, trust_path, get_comment,
              and protected_json(writer_epoch_path)[1]==epoch_sha
              and get_comment(trust['approval_comment_id'])==body)
         authorize(body,trust,binding,time.time())
+        # Recovery classification runs under the held lock, before credentials.
+        checkpoint=recovery_snapshot(ledger)
+        need(checkpoint['state']==('QUERY_SAVED_INVOKE_ONLY' if query_only
+                                  else 'NO_DISPATCH_RECORD_NO_AUTHORITY'))
         # No credential access before gates; no RunCommand outside durable intent.
         if query_only:
             prior=ledger.read('dispatch-intent.json')

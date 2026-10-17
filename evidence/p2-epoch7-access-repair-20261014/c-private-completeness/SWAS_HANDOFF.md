@@ -114,3 +114,26 @@ new entry, operation binding and affected call chain are the incremental scope.
 Direct isolated Python execution loads only the adjacent root-protected receipt module, never CWD/PYTHONPATH. A real isolated subprocess negative test verifies missing sibling refuses without importing an injected scripts package. Actual installed CLI happy path still requires authentic protected configuration.
 
 The isolated bootstrap rejects nonregular/oversized/multilink receipt code before reading/importing; a real FIFO subprocess regression proves no blocking read occurs.
+
+
+## 2026-10-17 durable recovery implementation checkpoint
+Migration window receipt PR58#6229032550 establishes manual-only trigger,
+no available dispatch tool, existing step-level Repository Secrets injection,
+and no UK persistent consumption service built by that window. No secret value
+or repeated Owner setup is required.
+
+The transport now classifies persisted dispatch checkpoints under its existing
+lock and before credential access. Empty state grants no authority; an intent
+without InvokeId is consumed UNKNOWN; a saved InvokeId only permits a separately
+authorized query; terminal or contradictory/corrupt records reject replay.
+Recovery is read-only: it never clears records, adopts an unknown object, repairs
+JSON, generates approval, or sends a replacement RunCommand. Reopened directory
+FD tests exercise restart reading of the same persisted bytes.
+
+This implements recovery classification on an already provisioned protected
+filesystem, not a cross-host consumption service. No persistent host path has
+been provisioned. Actions trigger wiring, remote durable admission protocol,
+actual writer epoch and authentic trust enrollment remain incomplete/UNKNOWN.
+No cloud API or UK host was used in these tests. No production permission is
+inferred from this checkpoint. Consolidated independent review waits for the
+complete affected chain; previously accepted unchanged code is inherited.
