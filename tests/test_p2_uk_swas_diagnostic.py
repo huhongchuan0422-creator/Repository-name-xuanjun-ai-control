@@ -711,3 +711,178 @@ class ExistingRuntimeFactoryTests(unittest.TestCase):
                 for name,module in old.items():
                     sys.modules.pop(name,None)
                     if module is not None:sys.modules[name]=module
+
+
+class SitePreparationTests(unittest.TestCase):
+    """Exercise the exact standalone attachment; fixtures are not UK evidence."""
+    def setUp(self):
+        import types
+        doc=Path(__file__).resolve().parents[1]/'evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md'
+        text=doc.read_text()
+        block=text.split('<!-- BEGIN P2_SITE_ENTRY_V1 -->\n```python\n',1)[1].split('```\n<!-- END P2_SITE_ENTRY_V1 -->',1)[0]
+        self.code=block.encode();self.s=types.ModuleType('site_fixture')
+        exec(compile(block,'P2_SITE_ENTRY.py','exec'),self.s.__dict__)
+        self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+        self.addCleanup(self.tmp.cleanup)
+        root=Path(self.tmp.name);root.chmod(0o700);self.root=root
+        lib=root/'libexec';lib.mkdir(mode=0o755)
+        ctrl=root/'control';ctrl.mkdir(mode=0o700);(ctrl/'prepare.lock').touch(mode=0o600)
+        self.s.DEST=lib/'receiver';self.s.CONTROL=ctrl
+        # Frozen transport bytes stay unchanged in the source kit.
+        src=Path(__file__).resolve().parents[1]/'scripts';self.src=root/'source';self.src.mkdir(mode=0o700)
+        (self.src/'transport.py').write_bytes((src/'p2_uk_swas_diagnostic.py').read_bytes())
+        (self.src/'p2_swas_receipt_validator.py').write_bytes((src/'p2_swas_receipt_validator.py').read_bytes())
+        self.attempt='fixture-site-attempt'
+        self.baseline=self.s.preflight()
+        self.baseline.update(hostname=self.s.HOST,uid=0,python=[3,6,8])
+        self.baseline['paths'][str(self.s.DEST)]={'present':False}
+        # Keep the exact known path set, replacing the production receiver.
+        self.s.META_PATHS=tuple(self.s.DEST if str(p)=='/usr/local/libexec/xuanjun-p2-swas' else p for p in self.s.META_PATHS)
+        self.plan={'schema':1,'attempt':self.attempt,'baseline':self.baseline,
+            'source_pins':self.s.SOURCE_PINS,'installation_scope':'RECEIVER_CODE_ONLY_NO_POLICY_OR_RUNTIME'}
+        self.baseline['paths'].pop('/usr/local/libexec/xuanjun-p2-swas',None)
+        self.plan_path=root/'plan.json';self.plan_path.write_bytes(self.s.canon(self.plan));self.plan_path.chmod(0o400)
+        self.auth={'comment_id':123,'body_sha256':'a'*64,'trust_sha256':'b'*64}
+
+    def run_install(self):
+        with patch.object(self.s,'preflight',return_value=self.baseline),patch.object(self.s,'authority',return_value=self.auth):
+            return self.s.prepare('install',self.attempt,self.plan_path,self.src,self.code)
+
+    def test_preflight_no_private_reads_no_network_no_writes(self):
+        with patch.object(self.s,'read',side_effect=AssertionError),patch.object(self.s,'fetch_comment',side_effect=AssertionError),patch.object(self.s,'create',side_effect=AssertionError):
+            result=self.s.preflight()
+        self.assertEqual(result['mutations'],0)
+        self.assertEqual(result['unique_writer'],'UNKNOWN')
+
+    def test_install_real_atomic_publish_exact_bytes(self):
+        r=self.run_install();self.assertEqual(r['state'],'RECEIVER_CODE_INSTALLED')
+        self.s.verify_code(self.s.DEST)
+        self.assertFalse(r['runtime_activated'])
+        self.assertEqual((self.s.DEST/'transport.py').read_bytes(),(self.src/'transport.py').read_bytes())
+
+    def test_installed_attempt_cannot_repeat(self):
+        self.run_install()
+        with self.assertRaises(RuntimeError):self.run_install()
+
+    def test_old_target_not_overwritten(self):
+        self.s.DEST.mkdir();(self.s.DEST/'old').write_text('keep')
+        with self.assertRaises(RuntimeError):self.run_install()
+        self.assertEqual((self.s.DEST/'old').read_text(),'keep')
+
+    def test_input_hash_drift_before_consumption(self):
+        (self.src/'transport.py').write_text('bad')
+        with self.assertRaises(RuntimeError):self.run_install()
+        self.assertFalse((self.s.CONTROL/self.attempt).exists())
+
+    def test_source_symlink_rejected(self):
+        p=self.src/'transport.py';p.unlink();p.symlink_to(self.src/'p2_swas_receipt_validator.py')
+        with self.assertRaises(RuntimeError):self.run_install()
+
+    def test_metadata_drift_rejects_before_stage(self):
+        changed=dict(self.baseline);changed['uid']=1000
+        with patch.object(self.s,'preflight',return_value=changed),patch.object(self.s,'authority',return_value=self.auth):
+            with self.assertRaises(RuntimeError):self.s.prepare('install',self.attempt,self.plan_path,self.src,self.code)
+        self.assertFalse(self.s.DEST.exists())
+
+    def test_fsync_error_consumes_does_not_publish_or_retry(self):
+        with patch.object(self.s,'sync_dir',side_effect=OSError('fixture fsync')):
+            with self.assertRaises(OSError):self.run_install()
+        self.assertTrue((self.s.CONTROL/self.attempt).exists());self.assertFalse(self.s.DEST.exists())
+        with self.assertRaises(RuntimeError):self.run_install()
+
+    def test_rename_noreplace_real_race(self):
+        a=self.root/'a';b=self.root/'b';a.mkdir();b.mkdir()
+        with self.assertRaises(RuntimeError):self.s.rename_new(a,b)
+        self.assertTrue(a.exists());self.assertTrue(b.exists())
+
+    def test_revocation_after_stage_holds(self):
+        with patch.object(self.s,'preflight',return_value=self.baseline),patch.object(self.s,'authority',side_effect=[self.auth,RuntimeError('revoked')]):
+            with self.assertRaises(RuntimeError):self.s.prepare('install',self.attempt,self.plan_path,self.src,self.code)
+        self.assertFalse(self.s.DEST.exists());self.assertTrue((self.s.CONTROL/self.attempt/'staged.json').exists())
+
+    def test_new_rollback_quarantines_preserves_evidence(self):
+        self.run_install()
+        with patch.object(self.s,'authority',return_value=self.auth):
+            r=self.s.prepare('rollback',self.attempt,self.plan_path,'',self.code)
+        self.assertEqual(r['state'],'QUARANTINED_ORIGINAL_ABSENCE_RESTORED')
+        self.assertFalse(self.s.DEST.exists())
+        self.s.verify_code(self.s.DEST.parent/('.p2-quarantine-'+self.attempt))
+        self.assertTrue((self.s.CONTROL/self.attempt/'intent.json').exists())
+
+    def test_unknown_target_blocks_rollback(self):
+        self.run_install();(self.s.DEST/'transport.py').chmod(0o644);(self.s.DEST/'transport.py').write_text('unknown')
+        with patch.object(self.s,'authority',return_value=self.auth):
+            with self.assertRaises(RuntimeError):self.s.prepare('rollback',self.attempt,self.plan_path,'',self.code)
+        self.assertTrue(self.s.DEST.exists())
+
+    def test_interrupted_rollback_cannot_repeat(self):
+        self.run_install()
+        with patch.object(self.s,'authority',return_value=self.auth),patch.object(self.s,'rename_new',side_effect=OSError('cut')):
+            with self.assertRaises(OSError):self.s.prepare('rollback',self.attempt,self.plan_path,'',self.code)
+        with patch.object(self.s,'authority',return_value=self.auth):
+            with self.assertRaises(RuntimeError):self.s.prepare('rollback',self.attempt,self.plan_path,'',self.code)
+        self.assertTrue(self.s.DEST.exists())
+
+    def test_inspect_hashes_only_no_success_inference(self):
+        self.run_install();result=self.s.inspect(self.attempt)
+        self.assertFalse(result['retry_allowed']);self.assertEqual(result['canonical_writer'],'NOT_OBSERVED')
+        self.assertNotIn('approval',json.dumps(result));self.assertEqual(len(result['records']),3)
+
+    def replace_fixture(self,path,raw):
+        path.chmod(0o600);path.write_bytes(raw);path.chmod(0o400)
+
+    def authority_fixture(self):
+        self.s.TRUST=self.root/'TRUST.json'
+        now=int(self.s.time.time())
+        permit={'decision':'SITE_PREPARATION_APPROVED','operation':'install','attempt':self.attempt,
+            'hostname':self.s.HOST,'script_sha256':self.s.sha(self.code),
+            'plan_sha256':self.s.sha(self.plan_path.read_bytes()),'issued_unix':now-1,'expires_unix':now+300,
+            'max_executions':1,'canonical_changes_allowed':False,'cloud_calls_allowed':False}
+        body=b'P2_SITE_ONCE\n'+self.s.canon(permit)
+        trust={'schema':1,'enabled':True,'revoked':False,'reviewer_principal':'fixture-auditor',
+            'source_writer_principal':'fixture-author','custody_evidence_sha256':'d'*64,'comment_id':123,
+            'comment_body_sha256':self.s.sha(body),'operation':'install','attempt':self.attempt,
+            'plan_sha256':permit['plan_sha256'],'script_sha256':permit['script_sha256']}
+        self.s.TRUST.touch(exist_ok=True);self.replace_fixture(self.s.TRUST,self.s.canon(trust))
+        return permit,trust,body
+
+    def test_exact_owner_anchor_and_body_required(self):
+        p,t,b=self.authority_fixture()
+        with patch.object(self.s,'fetch_comment',return_value=b):
+            self.assertEqual(self.s.authority('install',self.attempt,self.plan_path.read_bytes(),self.code)['comment_id'],123)
+        with patch.object(self.s,'fetch_comment',return_value=b+' '.encode()):
+            with self.assertRaises(RuntimeError):self.s.authority('install',self.attempt,self.plan_path.read_bytes(),self.code)
+
+    def test_self_review_expiry_and_cloud_grant_rejected(self):
+        p,t,b=self.authority_fixture()
+        t['reviewer_principal']=t['source_writer_principal'];self.replace_fixture(self.s.TRUST,self.s.canon(t))
+        with patch.object(self.s,'fetch_comment',return_value=b):
+            with self.assertRaises(RuntimeError):self.s.authority('install',self.attempt,self.plan_path.read_bytes(),self.code)
+        p,t,b=self.authority_fixture();p['expires_unix']=p['issued_unix'];b=b'P2_SITE_ONCE\n'+self.s.canon(p)
+        t['comment_body_sha256']=self.s.sha(b);self.replace_fixture(self.s.TRUST,self.s.canon(t))
+        with patch.object(self.s,'fetch_comment',return_value=b):
+            with self.assertRaises(RuntimeError):self.s.authority('install',self.attempt,self.plan_path.read_bytes(),self.code)
+        p,t,b=self.authority_fixture();p['cloud_calls_allowed']=True;b=b'P2_SITE_ONCE\n'+self.s.canon(p)
+        t['comment_body_sha256']=self.s.sha(b);self.replace_fixture(self.s.TRUST,self.s.canon(t))
+        with patch.object(self.s,'fetch_comment',return_value=b):
+            with self.assertRaises(RuntimeError):self.s.authority('install',self.attempt,self.plan_path.read_bytes(),self.code)
+
+    def test_install_each_persistent_checkpoint_failure_preserved(self):
+        # Each subcase has a distinct attempt; never erase/retry a consumed attempt.
+        original=self.s.create
+        for cut in ('intent.json','transport.py','p2_swas_receipt_validator.py','staged.json','installed.json'):
+            with self.subTest(cut=cut):
+                self.attempt='fixture-cut-'+cut.replace('.','-').replace('_','-')
+                self.plan['attempt']=self.attempt;self.replace_fixture(self.plan_path,self.s.canon(self.plan))
+                def fail(p,raw,mode):
+                    if p.name==cut:raise OSError('injected checkpoint')
+                    return original(p,raw,mode)
+                with patch.object(self.s,'create',side_effect=fail):
+                    with self.assertRaises(OSError):self.run_install()
+                self.assertTrue((self.s.CONTROL/self.attempt).exists())
+                with self.assertRaises(RuntimeError):self.run_install()
+                # Isolate next subcase in a different libexec dir, preserving all prior objects.
+                lib=self.root/('lib-'+self.attempt);lib.mkdir(mode=0o755)
+                old=self.s.DEST;self.s.DEST=lib/'receiver'
+                self.s.META_PATHS=tuple(self.s.DEST if p==old else p for p in self.s.META_PATHS)
+                self.baseline['paths'][str(self.s.DEST)]=self.baseline['paths'].pop(str(old))
