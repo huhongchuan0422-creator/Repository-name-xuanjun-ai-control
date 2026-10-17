@@ -2,6 +2,7 @@
 No real payments, site publishing, secrets or external network binding.
 """
 import json
+import os
 import re
 import socket
 import time
@@ -10,9 +11,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from scripts.community_order_store import connect, DDL, create_order, state, simulated_transition
-from scripts.community_merchant_contract import scope
+from scripts.community_merchant_contract import scope, signed_qr, verify_qr, split_amounts
 from scripts.community_storefront_snapshot import storefront_snapshot
 from scripts.community_ad_contract import AMOUNT, SUCCESS
+from scripts.community_local_admin import LocalAdminPolicy, dispatch_local_admin
+from scripts.community_ad_store import list_campaigns
+from scripts.community_refund_preview_store import preview_total, open_refund_store, record_preview
+from scripts.community_finance_preview_extension import dispatch_finance_preview
 
 MAX_BODY = 2048
 READ_TIMEOUT_SECONDS = 1.0
@@ -31,14 +36,98 @@ def _id(value):
 
 class DemoService:
     """Trusted local demo service. This is not a production access boundary."""
-    def __init__(self, db, merchant_db=None, ad_db=None, now=None):
+    def __init__(self, db, merchant_db=None, ad_db=None, now=None, refund_db=None, qr_key=None, admin_policy=None):
         self.db = db
         self.merchant_db = merchant_db
         self.ad_db = ad_db
         self.now = now
+        self.refund_db = refund_db
+        self.qr_key = qr_key
+        self.admin_policy = admin_policy
     def dispatch(self, method, path, data):
         if type(data) is not dict:
             raise ValueError("INVALID_REQUEST")
+        if method == "POST" and path == "/demo/qr/checkout":
+            _object(data, {"tenant_id","merchant_id","store_id",
+                           "context","token","reference","amount_minor"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            context=_id(data["context"])
+            reference=_id(data["reference"])
+            if self.qr_key is None or not verify_qr(
+                  data["token"],identity,context,int(time.time()),self.qr_key):
+                raise ValueError("QR_SIGNATURE_REQUIRED")
+            result=create_order(self.db,identity,reference,data["amount_minor"])
+            return {**result,"simulation_only":True,
+                    "provider_settlement_verified":False}
+        if method == "POST" and path == "/demo/qr/create":
+            _object(data, {"tenant_id","merchant_id","store_id","context"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity);context=_id(data["context"])
+            if self.qr_key is None:
+                raise ValueError("QR_DEMO_NOT_CONFIGURED")
+            # HMAC key is server-owned, never returned to the browser.
+            token=signed_qr(identity,context,int(time.time())+900,self.qr_key)
+            return {"token":token,"simulation_only":True,"provider_payment_started":False}
+        if method == "POST" and path == "/demo/qr/verify":
+            _object(data, {"tenant_id","merchant_id","store_id","context","token"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity);context=_id(data["context"])
+            if self.qr_key is None:
+                raise ValueError("QR_DEMO_NOT_CONFIGURED")
+            return {"valid":verify_qr(data["token"],identity,context,int(time.time()),self.qr_key),
+                    "simulation_only":True,"provider_payment_started":False}
+        if method == "POST" and path == "/demo/ads/list":
+            _object(data, {"tenant_id","merchant_id","store_id"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            if self.ad_db is None:
+                raise ValueError("AD_STORE_UNAVAILABLE")
+            listed=list_campaigns(self.ad_db,identity,limit=50)
+            return {"campaigns":listed["campaigns"],"has_more":listed["has_more"],
+                    "simulation_only":True,"write_permissions":False}
+        if method == "POST" and path == "/demo/refunds/record-preview":
+            _object(data, FIELDS | {"event_id","amount_minor"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            scope(identity)
+            reference=_id(data["reference"])
+            event_id=_id(data["event_id"])
+            if self.refund_db is None:
+                raise ValueError("REFUND_PREVIEW_NOT_CONFIGURED")
+            recorded=record_preview(self.refund_db,self.db,identity,reference,event_id,data["amount_minor"])
+            return {"recorded":recorded["recorded"],
+                    "preview_total_minor":recorded["preview_total_minor"],
+                    "provider_refund_executed":False,"simulation_only":True,
+                    "financial_receipt_issued":False}
+        if method == "POST" and path in ("/demo/reconciliation/preview","/demo/splits/preview","/demo/refunds/preview"):
+            return dispatch_finance_preview(self,method,path,data)
+        if method == "POST" and path == "/demo/orders/summary":
+            _object(data, {"tenant_id","merchant_id","store_id"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            t,m,st=scope(identity)
+            rows=self.db.execute(
+                "SELECT state,COUNT(*),COALESCE(SUM(amount_minor),0) FROM orders "
+                "WHERE tenant_id=? AND merchant_id=? AND store_id=? GROUP BY state",
+                (t,m,st)).fetchall()
+            counts={name:0 for name in ("PENDING","SUCCESS","FAILED","CANCELLED","REFUNDED")}
+            total=0
+            for name,count,amount in rows:
+                counts[name]=count
+                total+=amount
+            return {"counts":counts,"order_total_minor":total,
+                    "simulation_only":True,"provider_settlement_verified":False,
+                    "real_revenue_minor":None}
+        if method == "POST" and path == "/demo/orders/list":
+            _object(data, {"tenant_id","merchant_id","store_id"})
+            identity={k:data[k] for k in ("tenant_id","merchant_id","store_id")}
+            t,m,st=scope(identity)
+            rows=self.db.execute(
+                "SELECT reference,amount_minor,currency,state FROM orders "
+                "WHERE tenant_id=? AND merchant_id=? AND store_id=? "
+                "ORDER BY reference LIMIT 50",(t,m,st)).fetchall()
+            return {"orders":[{"reference":ref,"amount_minor":amount,"currency":currency,
+                               "state":state_name} for ref,amount,currency,state_name in rows],
+                    "simulation_only":True,"provider_settlement_verified":False}
         if method == "POST" and path == "/demo/storefront":
             _object(data, {"tenant_id", "merchant_id", "store_id"})
             identity = {k: data[k] for k in ("tenant_id","merchant_id","store_id")}
@@ -125,7 +214,7 @@ def handler(service):
             if origin is not None and origin != "http://" + expected_host:
                 return self.send_json(403, {"error":"ORIGIN_DENIED"})
             if urlsplit(self.path).query or self.path not in (
-                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront"):
+                "/demo/orders","/demo/orders/state","/demo/orders/simulate","/demo/storefront","/demo/orders/list","/demo/ads/list","/demo/orders/summary","/demo/refunds/preview","/demo/refunds/record-preview","/demo/qr/create","/demo/qr/verify","/demo/splits/preview","/demo/admin/profile","/demo/admin/item","/demo/admin/campaign/create","/demo/admin/campaign/state","/demo/admin/campaign/review","/demo/qr/checkout","/demo/reconciliation/preview"):
                 return self.send_json(404, {"error":"NOT_FOUND"})
             if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
                 return self.send_json(415, {"error":"JSON_REQUIRED"})
@@ -156,11 +245,18 @@ def handler(service):
                     return values
                 data = json.loads(raw,object_pairs_hook=unique_pairs,
                                   parse_constant=lambda _: (_ for _ in ()).throw(ValueError("NONFINITE")))
-                result = service.dispatch("POST",self.path,data)
+                if self.path.startswith("/demo/admin/"):
+                    result = dispatch_local_admin(service,self.path,data,
+                                                 self.headers.get("X-Local-Admin-Capability"))
+                else:
+                    result = service.dispatch("POST",self.path,data)
                 return self.send_json(200,result)
             except (socket.timeout, TimeoutError):
                 self.close_connection = True
                 return self.send_json(408,{"error":"BODY_TIMEOUT"})
+            except PermissionError:
+                self.close_connection = True
+                return self.send_json(403,{"error":"ADMIN_ACCESS_DENIED"})
             except (ValueError,KeyError,TypeError):
                 self.close_connection = True
                 return self.send_json(400,{"error":"INVALID_DEMO_REQUEST"})
@@ -170,7 +266,7 @@ def handler(service):
             expected_host = "127.0.0.1:" + str(self.server.server_address[1])
             if self.headers.get("Host", "") != expected_host:
                 return self.send_json(403,{"error":"LOOPBACK_ONLY"})
-            files={"/demo/":"index.html","/demo/app.js":"app.js","/demo/merchant/":"merchant.html","/demo/merchant/app.js":"merchant.js","/demo/platform/":"platform.html","/demo/platform/app.js":"platform.js"}
+            files={"/demo/":"index.html","/demo/app.js":"app.js","/demo/merchant/":"merchant.html","/demo/merchant/app.js":"merchant.js","/demo/platform/":"platform.html","/demo/platform/app.js":"platform.js","/demo/catalog-read.js":"catalog-read.js","/demo/order-list.js":"order-list.js","/demo/business-overview.js":"business-overview.js","/demo/refund-preview.js":"refund-preview.js","/demo/mini/":"mini.html","/demo/official-h5/":"official-h5.html","/demo/channel-shell.js":"channel-shell.js","/demo/split-preview.js":"split-preview.js","/demo/admin-panel.js":"admin-panel.js","/demo/reconciliation-preview.js":"reconciliation-preview.js"}
             filename=files.get(self.path)
             if filename is None:
                 return self.send_json(404,{"error":"NOT_FOUND"})
@@ -250,13 +346,29 @@ def serve_local(path=":memory:",port=18791,seed_demo=True):
     owned = [db]
     try:
         merchant_db = ad_db = now = None
+        source_refund = open_refund_store()
+        owned.append(source_refund)
+        runtime_refund = sqlite3.connect(":memory:",check_same_thread=False)
+        owned.append(runtime_refund)
+        source_refund.backup(runtime_refund)
+        source_refund.close()
+        owned.remove(source_refund)
+        refund_db = runtime_refund
         if seed_demo:
             from scripts.community_demo_bootstrap import fixture_stores
             merchant_db, ad_db, now = fixture_stores()
             owned.extend((merchant_db, ad_db))
+        merchant_token=os.environ.get("XJ_STAGE5_DEMO_MERCHANT_TOKEN")
+        platform_token=os.environ.get("XJ_STAGE5_DEMO_PLATFORM_TOKEN")
+        if bool(merchant_token)!=bool(platform_token):
+            raise ValueError("INCOMPLETE_LOCAL_ADMIN_CONFIG")
+        admin_policy=None
+        if merchant_token:
+            from scripts.community_demo_bootstrap import DEMO_SCOPE
+            admin_policy=LocalAdminPolicy(merchant_token,platform_token,DEMO_SCOPE)
         # HTTPServer handles requests serially; no thread pool shares the stores.
         return _OwnedLocalDemoHTTPServer(
-            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now),owned)
+            ("127.0.0.1",port),DemoService(db,merchant_db,ad_db,now,refund_db,os.urandom(32),admin_policy),owned)
     except BaseException:
         try:
             _close_all_owned(owned)

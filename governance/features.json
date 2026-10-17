@@ -32,6 +32,60 @@
         "scripts/community_development_watch.py",
         ".github/workflows/community-development-watch.yml"
       ]
+    },
+    {
+      "feature_id": "SAAS_AI_PRICING",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "6.15"
+      },
+      "development": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "12.9",
+        "phase": 3
+      },
+      "acceptance": {
+        "criteria": [
+          "单模块和批量报价的独立版本",
+          "双币价格、成本UNKNOWN及供应商费用隔离",
+          "Owner审批、历史合同价格与租户隔离"
+        ],
+        "tests": [
+          "tests/test_stage5_saas_offer_catalog.py",
+          "tests/test_stage5_saas_order_preparation.py",
+          "tests/test_stage5_saas_offline_handoff.py",
+          "tests/test_stage5_audit_regressions.py"
+        ]
+      },
+      "reuse": [
+        "scripts/community_saas_modules.py",
+        "scripts/community_saas_offer_catalog.py"
+      ],
+      "paths": [
+        "scripts/community_finance_preview_extension.py",
+        "scripts/community_local_admin.py",
+        "scripts/community_saas_cost_pricing.py",
+        "scripts/community_saas_modules.py",
+        "scripts/community_saas_offer_catalog.py",
+        "scripts/community_saas_offers.py",
+        "scripts/community_saas_unit_economics.py",
+        "tests/test_stage5_admin_browser.py",
+        "tests/test_stage5_admin_http.py",
+        "tests/test_stage5_integrated_restart.py",
+        "tests/test_stage5_management_catalog_browser.py",
+        "tests/test_stage5_qr_http.py",
+        "tests/test_stage5_saas_cost_pricing.py",
+        "tests/test_stage5_saas_modules.py",
+        "tests/test_stage5_saas_offer_catalog.py",
+        "tests/test_stage5_saas_unit_economics.py",
+        "scripts/community_saas_order_preparation.py",
+        "tests/test_stage5_saas_order_preparation.py",
+        "scripts/community_saas_offline_handoff.py",
+        "tests/test_stage5_saas_offline_handoff.py",
+        "scripts/community_saas_schema_guard.py",
+        "tests/test_stage5_audit_regressions.py"
+      ]
     }
   ]
 }
