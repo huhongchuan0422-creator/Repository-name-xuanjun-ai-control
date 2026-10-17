@@ -49,7 +49,7 @@ class FinancialViews:
             for key, payload in rows[:50]:
                 saved = json.loads(c.decrypt(payload, ('community-provider-return:' if p['kind']=='RETURN' else 'provider-action:') + key))
                 if p['kind']=='RETURN':
-                    if saved['scope'] != g['scope']:
+                    if type(saved) is not dict or saved.get('scope') != g['scope']:
                         continue
                     from scripts.community_split_returns import SplitReturns
                     records.append(SplitReturns(a).summary(saved))
