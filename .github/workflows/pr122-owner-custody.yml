@@ -1,0 +1,71 @@
+name: PR122 Owner custody preparation entry
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - scripts/pr122_owner_channel_custody.py
+      - tests/test_pr122_owner_channel_custody.py
+      - docs/development/PR122_OWNER_CUSTODY_PREPARATION_20261017.md
+      - .github/workflows/pr122-owner-custody.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download exact previously approved recovery package as data
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pr122-custody-review
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12083624423/zip > /tmp/pr122-custody-review/REVIEW.zip
+          echo '9b59332f3806f215d2022c1510a74840f25cb84beec6a8d20e7026882d15b68d  /tmp/pr122-custody-review/REVIEW.zip' | sha256sum -c -
+      - name: Protected entry and actual package parsing in disposable Root fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env PR122_CUSTODY_REVIEW_ZIP=/tmp/pr122-custody-review/REVIEW.zip "$(command -v python)" -B -m unittest tests.test_pr122_owner_channel_custody.CustodyTests -v 2>&1 | tee /tmp/pr122-custody-review/TESTS.log
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('/tmp/pr122-custody-review/TESTS.log').read_text()
+          assert re.search(r'Ran 12 tests in ',s) and re.search(r'^OK$',s,re.M) and not re.search(r'skipped=|FAILED|ERROR:|FAIL:',s)
+          PY
+      - name: Bind new entry and preserve exact reviewed recovery bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os,shutil,subprocess,tarfile
+          from pathlib import Path
+          from scripts import pr122_owner_channel_custody as c
+          out=Path('/tmp/pr122-custody-review')
+          c.decode((out/'REVIEW.zip').read_bytes())
+          sources=['scripts/pr122_owner_channel_custody.py','tests/test_pr122_owner_channel_custody.py','docs/development/PR122_OWNER_CUSTODY_PREPARATION_20261017.md','.github/workflows/pr122-owner-custody.yml']
+          for n in sources:
+              p=out/n;p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(n,p)
+          files=[{'path':p.relative_to(out).as_posix(),'size':p.stat().st_size,'sha256':c.sha(p.read_bytes())} for p in sorted(out.rglob('*')) if p.is_file()]
+          m={'purpose':'PR122_OWNER_CUSTODY_PREPARE_ENTRY_REVIEW_ONLY','source_commit':os.environ['GITHUB_SHA'],'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'launcher_sha256':c.sha(Path(sources[0]).read_bytes()),'review_zip_sha256':c.ZIP_SHA,'helper_sha256':c.HELPER_SHA,'audit_comment_id':c.AUDIT_ID,'audit_body_sha256':c.AUDIT_SHA,'tests':{'executed':12,'passed':12,'skipped':0},'actual_owner_custody':'NOT_VERIFIED','target_root_execution':'NOT_RUN','permission':'NOT_GRANTED','files':files}
+          (out/'MANIFEST.json').write_bytes(c.canonical(m))
+          tarpath=Path('/tmp/PR122_OWNER_CUSTODY_REVIEW.tar.gz')
+          with tarfile.open(tarpath,'w:gz') as t:
+              for p in sorted(out.rglob('*')):
+                  if p.is_file():t.add(p,arcname='owner-custody/'+p.relative_to(out).as_posix(),recursive=False)
+          print(json.dumps({'launcher_sha256':m['launcher_sha256'],'manifest_sha256':c.sha((out/'MANIFEST.json').read_bytes()),'tar_sha256':c.sha(tarpath.read_bytes()),'bound_files':len(files),'production_changes':0},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-owner-custody-${{ github.sha }}
+          path: |
+            /tmp/PR122_OWNER_CUSTODY_REVIEW.tar.gz
+            /tmp/pr122-custody-review/MANIFEST.json
+          if-no-files-found: error
+          retention-days: 14
