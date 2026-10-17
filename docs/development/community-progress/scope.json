@@ -87,11 +87,11 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "67372f3e8ee03669cf616bfa5e11818a54f3c7ef",
-    "run_id": 39025080532,
-    "job_id": 117374376489,
+    "source": "fbdc0c4db7ea094062d6208eaa7d2c089d3d38cd",
+    "run_id": 39026231276,
+    "job_id": 117377643688,
     "result": "SUCCESS",
-    "scope": "Hosted 422/422 community tests and 342/342 stage tests; mini SDK/runtime/preview skipped",
+    "scope": "Hosted 431 community and 342 stage tests OK, 2026-10-17; optional mini runtime/SDK/preview SKIPPED",
     "covers_later_commits": false
   }
 }
