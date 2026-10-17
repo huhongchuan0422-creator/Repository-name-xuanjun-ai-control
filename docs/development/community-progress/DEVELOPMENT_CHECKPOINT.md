@@ -65,3 +65,14 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Synthetic regression coverage includes `tests/test_community_owned_receipt_ad.py`, `tests/test_community_original_project_center.py`, updated StageRuntime, mini HTTP/browser, JS session and module catalog tests.
 - Actual Hosted run `39025930706` for commit `df2fbf9b0f1aab6dd6b9548528f199e027a4ed5d` succeeded for source suite after simulation-ad browser fix; optional SDK/runtime/preview checks were SKIPPED. A later run `39026032313` failed only the obsolete fixed-count assertion (22 versus 20), corrected in `a30acdde7aa115c611508c54f19274a8ed092410`; do not mark latest HEAD CI PASS until checked.
 - Both stage groups still PARTIAL; original pinned Center Core/Source/Runtime are unchanged; real submerchant, live transactions, authoritative Finance settlement, production admission, public mini release and independent audit remain open.
+
+
+## 2026-10-17 native handoff checkpoint — original independent materials acceptance
+
+- Original Center consumer mini read paths and role-bound operations now include project_summary, project_checklist, project_feedback (archived only), project_submit (requires original submitted material version) and project_review (only original REVIEWER, actions begin_review/request_changes/approve, original Center independent approval + CAS).
+- Mini WXML project page has submission and reviewer/correction controls; client session allowlist only forwards existing auth token, never grants roles.
+- New synthetic test in tests/test_community_original_project_center.py imports an authority-signed synthetic requirement into original Center, persists synthetic SECRETREF through original save, submits via mini, and exercises separate reviewer acceptance, replay rejection. No live customer secret or project enrollment.
+- Provider verified SUCCESS creative remains read-only and separate from original mocked payment success. Node checkout UI verification test was repaired for a Node vm cross-realm object equality artifact in commit 09848ffb71119414617444c1600322c17a4747f1.
+- Source regression checkpoint 382955aefa3fd1ff877ff884e56fdb1c6e298922 had Hosted SUCCESS in run 39026316013 (community 431/431, stage 342/342, Node suites PASS; optional mini runtime/SDK/preview SKIPPED). Later source commits need exact fresh CI verification and are NOT marked accepted.
+- Current resumed source code is on feature/chatgpt-community-wechat-sp-offline-20261017. Work/Codex not used. Pinned original customer Core/Source/Runtime were not touched in resumed commit comparison.
+- Phases 1 and 2 continue PARTIAL; provider receiver-detail bill formats, legitimate public/CRM admission, browser/device coverage, authoritative Finance, real merchant/real money and independent stage approvals remain open.
