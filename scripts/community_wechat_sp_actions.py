@@ -97,6 +97,11 @@ class ProviderActions:
                     automatic_retry_allowed=False,provider_reference=saved['provider_reference'])
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:raise ValueError('INVALID_PROVIDER_ACTION_FIELDS')
+        if body['operation'].startswith('rule_') or body['operation']=='split_by_rule':
+            from scripts.community_split_rules import SplitRules
+            rules=SplitRules(self)
+            if body['operation']=='split_by_rule':return rules.split(session,csrf,body['workspace'],body['params'])
+            return rules.dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
         schemas={'receivers':set(),'refund':{'reference','request_id','amount_minor','reason'},'split':{'reference','request_id','allocations','description','unfreeze_unsplit'},'query_refund':{'reference','request_id'},'query_split':{'reference','request_id'},'status_refund':{'reference','request_id'},'status_split':{'reference','request_id'}}
         op,p=body['operation'],body['params']
         if op not in schemas or set(p)!=schemas[op]:raise ValueError('INVALID_PROVIDER_ACTION_PARAMS')
@@ -135,6 +140,12 @@ class ProviderActions:
             if type(p['amount_minor']) is not int or not 1<=p['amount_minor']<=original['amount_minor'] or type(p['reason']) is not str or not 1<=len(p['reason'])<=80:raise ValueError('INVALID_REFUND_REQUEST')
             payload=dict(sub_mchid=policy['sub_mchid'],out_trade_no=out_trade_no,out_refund_no=provider_ref,reason=p['reason'],notify_url=policy['refund_notify_url'],amount=dict(refund=p['amount_minor'],total=original['amount_minor'],currency='CNY'))
         else:
+            from scripts.community_split_rules import SplitRules
+            snapshot=SplitRules(self)._get(g,'ORDER',p['reference'])
+            if (snapshot is None or not snapshot['eligible'] or snapshot['amount_minor']!=original['amount_minor']
+                    or snapshot['policy_hash']!=policy_hash or snapshot['allocations']!=p['allocations']
+                    or snapshot['description']!=p['description'] or snapshot['unfreeze_unsplit']!=p['unfreeze_unsplit']):
+                raise PermissionError('EXACT_FROZEN_SPLIT_RULE_REQUIRED')
             allocations=p['allocations']
             if not policy['profit_sharing'] or type(allocations) is not dict or not 1<=len(allocations)<=50 or any(type(v) is not int or v<=0 for v in allocations.values()) or any(k not in policy['receivers'] for k in allocations) or sum(allocations.values())>original['amount_minor']*policy['max_total_bps']//10000 or type(p['unfreeze_unsplit']) is not bool or type(p['description']) is not str or not 1<=len(p['description'])<=80:raise ValueError('INVALID_ADMITTED_SPLIT')
             public=serialization.load_pem_public_key(self.reader._public);receivers=[]
