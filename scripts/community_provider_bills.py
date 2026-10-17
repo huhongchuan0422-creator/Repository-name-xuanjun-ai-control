@@ -138,7 +138,7 @@ class ProviderBills:
                 try:row_amount=minor(row[amount_column])
                 except ValueError:exceptions.append(dict(row=index,reason='INVALID_BILL_AMOUNT'));continue
                 if row_amount!=amount or row['微信订单号']!=tx:exceptions.append(dict(row=index,reference=ref,reason='PAYMENT_AMOUNT_OR_TRANSACTION_MISMATCH'));continue
-                if row.get('特约商户号') and row['特约商户号']!=bill['sub_mchid']:exceptions.append(dict(row=index,reason='BILL_SUBMERCHANT_MISMATCH'));continue
+                if '特约商户号' in columns and row['特约商户号']!=bill['sub_mchid']:exceptions.append(dict(row=index,reason='BILL_SUBMERCHANT_MISMATCH'));continue
                 if row['交易状态'] not in ('SUCCESS','REFUND','成功','退款') or status not in ('SUCCESS','REFUNDED'):exceptions.append(dict(row=index,reference=ref,reason='PAYMENT_STATE_MISMATCH'));continue
                 refund=row.get('商户退款单号')
                 if refund and refund not in ('0','无','-'):
