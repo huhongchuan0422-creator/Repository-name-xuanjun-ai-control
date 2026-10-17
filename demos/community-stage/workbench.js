@@ -6,7 +6,7 @@
  const status=message=>{$('notice').textContent=message;};
  window.configureCommunityWorkbench=value=>{
   epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,providerWorkspace:typeof value.providerWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.providerWorkspace)?value.providerWorkspace:null}:null;
-  clear();$('providerActions').hidden=!config?.providerWorkspace;busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!config;status(config?'工作台已连接当前客户中心身份':'请从客户中心登录并打开授权工作台');
+  clear();$('providerActions').hidden=!config?.providerWorkspace;$('billSection').hidden=!config?.providerWorkspace;busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!config;status(config?'工作台已连接当前客户中心身份':'请从客户中心登录并打开授权工作台');
  };
  const call=async(op,params,ticket)=>{
   const auth=config;if(!auth)throw Error('请从客户中心打开工作台');
