@@ -27,6 +27,7 @@ REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 OLD_CODE='0804e33edac6ad07a711456c0c15708266b2ad8a75c4cb3bdc5964a9b79a96bd'
 OLD_TAR='7dd77ef573c338201ddc886b23585422ad4a07ae563a9c6ff92fe5b2f9d97b98'
 ARCHIVE='PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz'
+FROZEN_ZIP='d03a09d3110cf372d5c6209da4514fffd77f8487c6a36532744e80557ac353d8'
 
 def need(ok,msg):
     if not ok:raise RuntimeError('HOLD:'+msg)
@@ -87,7 +88,7 @@ def snapshot(folder):
     return out
 
 def bundle():
-    raw=read(INPUT)
+    raw=read(INPUT);need(sha(raw)==FROZEN_ZIP,'FROZEN_ZIP_IDENTITY')
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         names=z.namelist();need(len(names)==len(set(names)) and len(names)<1000,'ZIP_SET')
         need(all(not n.startswith('/') and '..' not in Path(n).parts and i.file_size<=15000000 for n,i in zip(names,z.infolist())) and sum(i.file_size for i in z.infolist())<=80000000,'ZIP_LIMIT')
@@ -126,7 +127,7 @@ def gate(p,get=fetch):
     need(c['body'].startswith('XUANJUN_CUSTOMER_CHANNEL_REBIND\n'),'APPROVAL_PURPOSE');a=json.loads(c['body'].split('\n',1)[1])
     need(a['decision']=='REBIND_APPROVED' and a['transaction']==TXN and a['plan_sha256']==sha(canonical(p)) and a['new']==p['new'] and a['upgrade_script_sha256']==sha(read(Path(__file__).absolute())) and a['max_executions']==1 and a['rollback_approved'] is True,'EXACT_APPROVAL_BINDING')
     need(type(a['issued_unix']) is int and type(a['expires_unix']) is int and a['issued_unix']<=time.time()<a['expires_unix'] and 0<a['expires_unix']-a['issued_unix']<=7200,'APPROVAL_EXPIRED')
-    return {'id':c['id'],'body_sha256':t['body_sha256'],'expires_unix':a['expires_unix'],'rollback_approved':True}
+    return {'id':c['id'],'body_sha256':t['body_sha256'],'expires_unix':a['expires_unix'],'rollback_approved':True,'trust_sha256':sha(read(TRUST))}
 
 def tree_write(folder,files):
     folder.mkdir(mode=0o700)
@@ -145,74 +146,186 @@ def owner_lock(create_allowed=False):
         fcntl.flock(held,fcntl.LOCK_EX|fcntl.LOCK_NB);fcntl.flock(channel,fcntl.LOCK_EX|fcntl.LOCK_NB)
         yield
 
+# Durable event records are append-only. Receipt is a derived latest view.
+# No forward retry. Interrupted rollback requires fresh recovery authorization.
+def event(r, phase, status):
+    r['phase']=phase; r['step_status']=status
+    folder=CONTROL/'events';folder.mkdir(mode=0o700,exist_ok=True);sync(CONTROL)
+    entries=list(folder.iterdir())
+    need(all(p.name.endswith('.json') for p in entries),'EVENT_DIRECTORY_DRIFT')
+    seq=len(entries)+1
+    create(folder/('%06d.json'%seq),canonical(r),0o400)
+    receipt(r)
+
+def step(r,phase,action,checkpoint):
+    event(r,phase,'INTENT');checkpoint(phase+':INTENT')
+    action();checkpoint(phase+':MUTATED')
+    event(r,phase,'DONE');checkpoint(phase)
+
+def contain(r):
+    # Attempt the fence independently of journal/receipt health. Never mask errors.
+    if r.get('activation_started'):
+        try:replace(BASE/'grant-state.json',b'{"state":"HOLD_UPGRADE"}',0o600)
+        except BaseException:pass
+    r['state']='HOLD_PARTIAL'
+    try:event(r,r.get('phase','PREPARING'),'UNKNOWN')
+    except BaseException:pass
+
+def verify_policy(p):
+    need(sha(read(EXEC))==p['old']['wrapper_sha256'] and
+         sha(read(POLICY))==p['old']['policy_sha256'],'UNRELATED_POLICY_DRIFT')
+
+def verify_old(p,grant=True):
+    verify_policy(p)
+    need(snapshot(BASE/'candidate')==p['old']['files'] and
+         sha(read(BASE/'channel.py'))==p['old']['code_sha256'] and
+         sha(read(BASE/ARCHIVE))==p['old']['tar_sha256'],'OLD_OBJECT_VERIFY')
+    if grant:need(sha(read(BASE/'grant-state.json'))==p['old']['grant_sha256'],'OLD_GRANT_VERIFY')
+
+def backup_verify(p):
+    previous=CONTROL/'previous'
+    need(snapshot(previous/'candidate')==p['old']['files'] and
+         sha(read(previous/'channel.py'))==p['old']['code_sha256'] and
+         sha(read(previous/ARCHIVE))==p['old']['tar_sha256'] and
+         sha(read(previous/'grant-state.json'))==p['old']['grant_sha256'],'BACKUP_VERIFY')
+
 def apply(get=fetch,checkpoint=lambda stage:None):
-    owner();p=plan();approval=gate(p,get)
+    owner();p=plan();approved=gate(p,get)
     with owner_lock(create_allowed=True):
+        # Recheck all inputs and approval while holding both exclusion locks.
+        need(plan()==p and gate(p,get)==approved,'UNDER_LOCK_DRIFT')
         new,files,archive,code=bundle();need(new==p['new'],'STAGING_DRIFT')
-        CONTROL.parent.mkdir(mode=0o700,exist_ok=True);CONTROL.mkdir(mode=0o700);sync(CONTROL.parent)
-        r={'state':'PREPARING','plan':p,'approval':approval,'completed':[]};receipt(r)
+        CONTROL.parent.mkdir(mode=0o700,exist_ok=True);secure(CONTROL.parent,directory=True)
+        # Exclusive persistent directory consumes this transaction even if setup fails.
+        CONTROL.mkdir(mode=0o700)
+        r={'state':'PREPARING','plan':p,'approval':approved,'activation_started':False}
         try:
-            need(plan(ignore_transaction=True)==p,'ACTIVATION_BASELINE_DRIFT')
-            previous=CONTROL/'previous';previous.mkdir(mode=0o700)
-            for name in ('channel.py',ARCHIVE,'grant-state.json'):create(previous/name,read(BASE/name),stat.S_IMODE((BASE/name).stat().st_mode))
-            tree_write(previous/'candidate',{name:read(BASE/'candidate'/name) for name in p['old']['files']})
-            need({name:v['sha256'] for name,v in snapshot(previous/'candidate').items()}=={name:v['sha256'] for name,v in p['old']['files'].items()},'BACKUP_HASH')
-            need(sha(read(previous/'channel.py'))==p['old']['code_sha256'] and sha(read(previous/ARCHIVE))==p['old']['tar_sha256'] and sha(read(previous/'grant-state.json'))==p['old']['grant_sha256'],'BACKUP_OBJECT_HASH')
-            r['completed'].append('BACKUP_VERIFIED');receipt(r);checkpoint('BACKUP_VERIFIED')
-            tree_write(CONTROL/'new-candidate',files);create(CONTROL/'new-channel.py',code,0o444);create(CONTROL/'new.tar.gz',archive,0o400)
-            r['state']='ACTIVATING';receipt(r);checkpoint('STAGED')
-            need(gate(p,get)==approval,'APPROVAL_REVOKED_BEFORE_ACTIVATION')
-            need(time.time()<approval['expires_unix'] and snapshot(BASE/'candidate')==p['old']['files'] and sha(read(EXEC))==p['old']['wrapper_sha256'] and sha(read(POLICY))==p['old']['policy_sha256'],'PREACTIVATION_DRIFT_OR_EXPIRY')
-            r['activation_started']=True;receipt(r)
-            replace(BASE/'grant-state.json',b'{"state":"UPGRADING"}',0o600);checkpoint('FENCED')
-            move(BASE/'candidate',CONTROL/'parked-old-candidate');checkpoint('OLD_MOVED')
-            move(CONTROL/'new-candidate',BASE/'candidate');checkpoint('CANDIDATE_MOVED')
-            replace(BASE/'channel.py',code,0o444);checkpoint('CODE_REPLACED')
-            replace(BASE/ARCHIVE,archive,0o400);checkpoint('TAR_REPLACED')
-            need(snapshot(BASE/'candidate')=={name:{'sha256':sha(raw),'mode':0o400} for name,raw in files.items()} and sha(read(BASE/'channel.py'))==new['binding']['channel_sha256'] and sha(read(BASE/ARCHIVE))==new['binding']['tar_sha256'],'NEW_OBJECTS_VERIFY')
-            replace(BASE/'grant-state.json',b'{"state":"GRANTED"}',0o600);checkpoint('GRANTED')
-            r['state']='BOUND';r['completed'].append('REBIND_VERIFIED');receipt(r)
+            sync(CONTROL.parent)
+            create(CONTROL/'plan.json',canonical(p),0o400)
+            create(CONTROL/'approval.json',canonical(approved),0o400)
+            event(r,'PREPARING','DONE');checkpoint('PREPARING')
+            previous=CONTROL/'previous'
+            def backup():
+                previous.mkdir(mode=0o700);sync(CONTROL)
+                for name in ('channel.py',ARCHIVE,'grant-state.json'):
+                    create(previous/name,read(BASE/name),stat.S_IMODE((BASE/name).stat().st_mode))
+                tree_write(previous/'candidate',{name:read(BASE/'candidate'/name) for name in p['old']['files']})
+                backup_verify(p)
+            step(r,'BACKUP_VERIFIED',backup,checkpoint)
+            def stage():
+                tree_write(CONTROL/'new-candidate',files)
+                create(CONTROL/'new-channel.py',code,0o444)
+                create(CONTROL/'new.tar.gz',archive,0o400)
+            step(r,'STAGED',stage,checkpoint)
+            need(plan(ignore_transaction=True)==p and gate(p,get)==approved,'PREACTIVATION_DRIFT')
+            need(time.time()<approved['expires_unix'],'APPROVAL_EXPIRED')
+            r['state']='ACTIVATING';r['activation_started']=True
+            step(r,'FENCED',lambda:replace(BASE/'grant-state.json',b'{"state":"UPGRADING"}',0o600),checkpoint)
+            step(r,'OLD_MOVED',lambda:move(BASE/'candidate',CONTROL/'parked-old-candidate'),checkpoint)
+            step(r,'CANDIDATE_MOVED',lambda:move(CONTROL/'new-candidate',BASE/'candidate'),checkpoint)
+            step(r,'CODE_REPLACED',lambda:replace(BASE/'channel.py',code,0o444),checkpoint)
+            step(r,'TAR_REPLACED',lambda:replace(BASE/ARCHIVE,archive,0o400),checkpoint)
+            need(snapshot(BASE/'candidate')=={n:{'sha256':sha(b),'mode':0o400} for n,b in files.items()} and
+                 sha(read(BASE/'channel.py'))==new['binding']['channel_sha256'] and
+                 sha(read(BASE/ARCHIVE))==new['binding']['tar_sha256'],'NEW_OBJECTS_VERIFY')
+            verify_policy(p);backup_verify(p)
+            step(r,'GRANTED',lambda:replace(BASE/'grant-state.json',b'{"state":"GRANTED"}',0o600),checkpoint)
+            r['state']='BOUND';event(r,'BOUND','DONE');checkpoint('BOUND')
             return {'state':'BOUND','receipt':str(CONTROL/'receipt.json'),'customer_install':'NOT_CALLED','sudoers_changed':False}
         except BaseException:
-            r['state']='HOLD_PARTIAL'
-            if r.get('activation_started'):
-                try:
-                    if json.loads(read(BASE/'grant-state.json')).get('state') in ('GRANTED','UPGRADING'):
-                        replace(BASE/'grant-state.json',b'{"state":"HOLD_UPGRADE"}',0o600)
-                except BaseException:r['fence']='UNKNOWN'
-            receipt(r);raise
+            contain(r);raise
 
-def rollback_impl():
-    owner();r=json.loads(read(CONTROL/'receipt.json'));need(r['state'] in ('PREPARING','ACTIVATING','HOLD_PARTIAL','BOUND') and r['approval']['rollback_approved'] is True,'ROLLBACK_STATE')
-    previous=CONTROL/'previous';p=r['plan'];new=p['new']['binding']
-    if not r.get('activation_started'):
-        need(sha(read(BASE/'channel.py'))==OLD_CODE and sha(read(BASE/ARCHIVE))==OLD_TAR and sha(read(BASE/'grant-state.json'))==p['old']['grant_sha256'] and snapshot(BASE/'candidate')==p['old']['files'] and sha(read(EXEC))==p['old']['wrapper_sha256'] and sha(read(POLICY))==p['old']['policy_sha256'],'UNMODIFIED_BASELINE_REQUIRED')
-        r['state']='ROLLED_BACK';r['rollback_verified']={'unmodified_old_channel':True,'customer_install_called':False};receipt(r)
+def load_transaction():
+    # A damaged/partial journal is UNKNOWN, never inferred safe or silently rebuilt.
+    p=json.loads(read(CONTROL/'plan.json'));a=json.loads(read(CONTROL/'approval.json'))
+    files=sorted((CONTROL/'events').iterdir())
+    need(files and [x.name for x in files]==['%06d.json'%i for i in range(1,len(files)+1)],'EVENT_SEQUENCE')
+    states=[json.loads(read(x)) for x in files]
+    need(all(x['plan']==p and x['approval']==a for x in states),'EVENT_BINDING')
+    r=states[-1]
+    # Receipt may lag an fsynced event; events are authoritative, not wall clock.
+    need(p['transaction']==TXN and a['rollback_approved'] is True,'TRANSACTION_BINDING')
+    return r
+
+def recovery_gate(r,get=fetch):
+    # Fresh independently anchored decision, bound to the exact interrupted bytes.
+    t=json.loads(read(TRUST));need(stat.S_IMODE(TRUST.stat().st_mode)==0o600,'OWNER_TRUST_MODE')
+    need(set(t)=={'source_writer_principal','reviewer_principal','custody_evidence_sha256','comment_id','body_sha256'} and
+         all(type(t[k]) is str and bool(t[k]) for k in ('source_writer_principal','reviewer_principal')) and
+         type(t['comment_id']) is int and t['source_writer_principal']!=t['reviewer_principal'] and
+         all(type(t[k]) is str and len(t[k])==64 and all(c in '0123456789abcdef' for c in t[k]) for k in ('custody_evidence_sha256','body_sha256')),'RECOVERY_CUSTODY')
+    c=get(t['comment_id']);need(c['id']==t['comment_id'] and c['user']['login']=='huhongchuan0422-creator' and c['issue_url']=='https://api.github.com/repos/'+REPO+'/issues/122' and sha(c['body'].encode())==t['body_sha256'],'RECOVERY_COMMENT')
+    need(c['body'].startswith('XUANJUN_CUSTOMER_CHANNEL_RECOVERY\n'),'RECOVERY_PURPOSE')
+    a=json.loads(c['body'].split('\n',1)[1]);now=time.time()
+    need(a['decision']=='RECOVERY_APPROVED' and a['transaction']==TXN and
+         a['event_sha256']==sha(canonical(r)) and a['plan_sha256']==sha(canonical(r['plan'])) and
+         a['upgrade_script_sha256']==sha(read(Path(__file__).absolute())) and
+         a['max_executions']==1 and type(a['issued_unix']) is int and type(a['expires_unix']) is int and
+         a['issued_unix']<=now<a['expires_unix'] and 0<a['expires_unix']-a['issued_unix']<=7200 and
+         c['id']!=r['approval']['id'],'RECOVERY_SCOPE')
+    use=CONTROL/('recovery-%s.json'%c['id'])
+    create(use,canonical({'comment_id':c['id'],'body_sha256':t['body_sha256'],'event_sha256':a['event_sha256']}),0o400)
+    return {'id':c['id'],'body_sha256':t['body_sha256']}
+
+def rollback_impl(checkpoint=lambda stage:None,recover=False,get=fetch):
+    owner();r=load_transaction();p=r['plan']
+    need(r['state']!='ROLLED_BACK','ALREADY_ROLLED_BACK')
+    started=os.path.lexists(CONTROL/'rollback-started.json')
+    need(not started or recover,'FRESH_RECOVERY_APPROVAL_REQUIRED')
+    need(not recover or started,'NO_INTERRUPTED_ROLLBACK')
+    if recover:r['recovery']=recovery_gate(r,get)
+    else:create(CONTROL/'rollback-started.json',canonical({'plan_sha256':sha(canonical(p)),'approval':r['approval']}),0o400)
+    try:
+        r['state']='ROLLING_BACK'
+        if not r.get('activation_started'):
+            verify_old(p)
+            r['state']='ROLLED_BACK';r['rollback_verified']={'unmodified_old_channel':True,'customer_install_called':False}
+            event(r,'ROLLED_BACK','DONE');return {'state':'ROLLED_BACK','verification':r['rollback_verified']}
+        backup_verify(p);verify_policy(p)
+        previous=CONTROL/'previous';new=p['new']['binding']
+        need(sha(read(BASE/'channel.py')) in (p['old']['code_sha256'],new['channel_sha256']) and
+             sha(read(BASE/ARCHIVE)) in (p['old']['tar_sha256'],new['tar_sha256']),'CURRENT_OBJECT_DRIFT')
+        need(sha(read(CONTROL/'new.tar.gz'))==new['tar_sha256'],'STAGED_ARCHIVE_DRIFT')
+        new_files,_,_=unpack(read(CONTROL/'new.tar.gz'))
+        expected_new={n:{'sha256':sha(b),'mode':0o400} for n,b in new_files.items()}
+        candidate=BASE/'candidate';parked=CONTROL/'parked-rollback-candidate';restored=CONTROL/'restored-candidate'
+        if os.path.lexists(candidate):need(snapshot(candidate) in (p['old']['files'],expected_new),'CURRENT_CANDIDATE_DRIFT')
+        if os.path.lexists(parked):need(snapshot(parked) in (p['old']['files'],expected_new),'PARKED_CANDIDATE_DRIFT')
+        need(json.loads(read(BASE/'grant-state.json')).get('state') in ('GRANTED','UPGRADING','HOLD_UPGRADE'),'CURRENT_GRANT_DRIFT')
+        step(r,'RB_FENCED',lambda:replace(BASE/'grant-state.json',b'{"state":"HOLD_UPGRADE"}',0o600),checkpoint)
+        def prepare_restore():
+            if not os.path.lexists(restored):restored.mkdir(mode=0o700);sync(CONTROL)
+            actual=snapshot(restored)
+            need(set(actual)<=set(p['old']['files']) and all(actual[n]==p['old']['files'][n] for n in actual),'RESTORE_PARTIAL_DRIFT')
+            for n in p['old']['files']:
+                if n not in actual:create(restored/n,read(previous/'candidate'/n),0o400)
+            need(snapshot(restored)==p['old']['files'],'RESTORED_CANDIDATE_VERIFY')
+        # A completed restore move need not be repeated; identity determines the action.
+        old_in_place=os.path.lexists(candidate) and snapshot(candidate)==p['old']['files']
+        if not old_in_place:
+            step(r,'RB_PREPARED',prepare_restore,checkpoint)
+            def park():
+                if os.path.lexists(candidate):
+                    need(not os.path.lexists(parked),'PARK_DESTINATION_DRIFT');move(candidate,parked)
+            step(r,'RB_PARKED',park,checkpoint)
+            step(r,'RB_CANDIDATE',lambda:move(restored,candidate),checkpoint)
+        step(r,'RB_CODE',lambda:replace(BASE/'channel.py',read(previous/'channel.py'),0o444),checkpoint)
+        step(r,'RB_TAR',lambda:replace(BASE/ARCHIVE,read(previous/ARCHIVE),0o400),checkpoint)
+        verify_old(p,grant=False);backup_verify(p)
+        step(r,'RB_GRANTED',lambda:replace(BASE/'grant-state.json',read(previous/'grant-state.json'),0o600),checkpoint)
+        verify_old(p)
+        r['state']='ROLLED_BACK';r['rollback_verified']={'old_code':True,'old_tar':True,'old_candidate':True,'fixed_policy_unchanged':True,'customer_install_called':False}
+        event(r,'ROLLED_BACK','DONE');checkpoint('ROLLED_BACK')
         return {'state':'ROLLED_BACK','verification':r['rollback_verified']}
+    except BaseException:
+        contain(r);raise
 
-    need(sha(read(EXEC))==p['old']['wrapper_sha256'] and sha(read(POLICY))==p['old']['policy_sha256'],'UNRELATED_POLICY_DRIFT')
-    need(sha(read(previous/'channel.py'))==OLD_CODE and sha(read(previous/ARCHIVE))==OLD_TAR and sha(read(previous/'grant-state.json'))==p['old']['grant_sha256'],'BACKUP_IDENTITY')
-    backup=snapshot(previous/'candidate');need({k:v['sha256'] for k,v in backup.items()}=={k:v['sha256'] for k,v in p['old']['files'].items()},'BACKUP_TREE_IDENTITY')
-    need(sha(read(BASE/'channel.py')) in (OLD_CODE,new['channel_sha256']) and sha(read(BASE/ARCHIVE)) in (OLD_TAR,new['tar_sha256']),'CURRENT_CHANNEL_DRIFT')
-    new_files,_,_=unpack(read(CONTROL/'new.tar.gz'))
-    if (BASE/'candidate').exists():
-        actual={k:v['sha256'] for k,v in snapshot(BASE/'candidate').items()}
-        need(actual in ({k:v['sha256'] for k,v in p['old']['files'].items()},{k:sha(v) for k,v in new_files.items()}),'CURRENT_CANDIDATE_DRIFT')
-    need(json.loads(read(BASE/'grant-state.json')).get('state') in ('GRANTED','UPGRADING','HOLD_UPGRADE'),'CURRENT_GRANT_DRIFT')
-    replace(BASE/'grant-state.json',b'{"state":"UPGRADING"}',0o600)
-    if (BASE/'candidate').exists():move(BASE/'candidate',CONTROL/'parked-rollback-candidate')
-    tree_write(CONTROL/'restored-candidate',{k:read(previous/'candidate'/k) for k in p['old']['files']});move(CONTROL/'restored-candidate',BASE/'candidate')
-    replace(BASE/'channel.py',read(previous/'channel.py'),0o444);replace(BASE/ARCHIVE,read(previous/ARCHIVE),0o400);replace(BASE/'grant-state.json',read(previous/'grant-state.json'),0o600)
-    need({k:v['sha256'] for k,v in snapshot(BASE/'candidate').items()}=={k:v['sha256'] for k,v in p['old']['files'].items()},'ROLLBACK_VERIFY')
-    r['state']='ROLLED_BACK';r['rollback_verified']={'old_code':sha(read(BASE/'channel.py'))==OLD_CODE,'old_tar':sha(read(BASE/ARCHIVE))==OLD_TAR,'old_candidate':True,'fixed_policy_unchanged':True,'customer_install_called':False};receipt(r)
-    return {'state':'ROLLED_BACK','verification':r['rollback_verified']}
-
-def rollback():
-    with owner_lock():return rollback_impl()
+def rollback(checkpoint=lambda stage:None,recover=False,get=fetch):
+    with owner_lock():return rollback_impl(checkpoint,recover,get)
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('plan','apply','rollback'));a=ap.parse_args();os.umask(0o077)
-    result=plan() if a.action=='plan' else apply() if a.action=='apply' else rollback()
+    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('plan','apply','rollback','recover-rollback'));a=ap.parse_args();os.umask(0o077)
+    result=plan() if a.action=='plan' else apply() if a.action=='apply' else rollback(recover=a.action=='recover-rollback')
     print(json.dumps(result,sort_keys=True))
 if __name__=='__main__':
     try:main()

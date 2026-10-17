@@ -39,6 +39,7 @@ class UpgradeTests(unittest.TestCase):
         with zipfile.ZipFile(raw,'w') as z:
             z.writestr(u.ARCHIVE,tar);z.writestr('rebind-candidate/channel.py',self.newcode);z.writestr('rebind-candidate/REBIND_BINDING.json',u.canonical(self.binding))
         u.create(u.INPUT,raw.getvalue(),0o400)
+        self.stack.enter_context(patch.object(u,'FROZEN_ZIP',u.sha(raw.getvalue())))
         self.gate=self.stack.enter_context(patch.object(u,'gate',return_value={'id':123,'body_sha256':'d'*64,'rollback_approved':True,'expires_unix':9999999999}))
     def test_actual_upgrade_and_preserved_rollback(self):
         original=u.plan();self.assertFalse(u.CONTROL.exists());result=u.apply();self.assertEqual(result['state'],'BOUND');self.assertEqual(u.read(u.BASE/'channel.py'),self.newcode)

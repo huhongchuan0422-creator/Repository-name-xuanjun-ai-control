@@ -1,0 +1,77 @@
+name: PR122 channel upgrade interruption recovery
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - scripts/pr122_customer_channel_upgrade.py
+      - tests/test_pr122_customer_channel_upgrade.py
+      - tests/test_pr122_channel_upgrade_recovery.py
+      - docs/development/PR122_CHANNEL_UPGRADE_RECOVERY_20261017.md
+      - .github/workflows/pr122-channel-upgrade-recovery.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Root-owned disposable filesystem crash matrix no production paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pr122-recovery-review
+          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_channel_upgrade.UpgradeTests tests.test_pr122_channel_upgrade_recovery.RecoveryTests -v 2>&1 | tee /tmp/pr122-recovery-review/TESTS.log
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('/tmp/pr122-recovery-review/TESTS.log').read_text()
+          assert re.search(r'Ran 20 tests in ',s) and re.search(r'^OK$',s,re.M)
+          assert not re.search(r'skipped=|FAILED|ERROR:|FAIL:',s)
+          assert 'FSYNC_FAILURE_MATRIX apply=152' in s and 'FSYNC_FAILURE_MATRIX rollback=113' in s
+          PY
+      - name: Download existing byte-frozen business ZIP as data only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12082187996/zip > /tmp/pr122-recovery-review/REVIEW_ARTIFACT.zip
+      - name: Package independently reviewable upgrade mechanism
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,os,shutil,subprocess,tarfile
+          from pathlib import Path
+          from scripts import pr122_customer_channel_upgrade as u
+          out=Path('/tmp/pr122-recovery-review')
+          assert u.sha((out/'REVIEW_ARTIFACT.zip').read_bytes())==u.FROZEN_ZIP
+          sources=['scripts/pr122_customer_channel_upgrade.py','tests/test_pr122_customer_channel_upgrade.py','tests/test_pr122_channel_upgrade_recovery.py','docs/development/PR122_CHANNEL_UPGRADE_RECOVERY_20261017.md','.github/workflows/pr122-channel-upgrade-recovery.yml']
+          for name in sources:
+              target=out/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(name,target)
+          items=[{'path':p.relative_to(out).as_posix(),'size':p.stat().st_size,'sha256':u.sha(p.read_bytes())} for p in sorted(out.rglob('*')) if p.is_file()]
+          manifest={'purpose':'PR122_CHANNEL_UPGRADE_RECOVERY_REVIEW_ONLY','source_commit':os.environ['GITHUB_SHA'],'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'frozen_runtime_zip_sha256':u.FROZEN_ZIP,'upgrade_sha256':u.sha(Path(sources[0]).read_bytes()),'tests':{'executed':20,'passed':20,'skipped':0,'forward_hard_exit_subcases':26,'rollback_hard_exit_subcases':21,'forward_fsync_failure_subcases':152,'rollback_fsync_failure_subcases':113},'target_root_execution':'NOT_RUN','target_trust_custody':'NOT_VERIFIED','execution_permission':'NOT_GRANTED','files':items}
+          (out/'REVIEW_MANIFEST.json').write_bytes(u.canonical(manifest))
+          tarpath=Path('/tmp/PR122_CHANNEL_RECOVERY_REVIEW_ONLY.tar.gz')
+          with tarfile.open(tarpath,'w:gz') as tar:
+              for p in sorted(out.rglob('*')):
+                  if p.is_file():tar.add(p,arcname='channel-recovery/'+p.relative_to(out).as_posix(),recursive=False)
+          with tarfile.open(tarpath,'r:gz') as tar:
+              members=tar.getmembers();assert len(members)==8 and all(m.isfile() for m in members)
+              for item in items:
+                  b=tar.extractfile('channel-recovery/'+item['path']).read();assert len(b)==item['size'] and u.sha(b)==item['sha256']
+          print(json.dumps({'upgrade_sha256':manifest['upgrade_sha256'],'manifest_sha256':u.sha((out/'REVIEW_MANIFEST.json').read_bytes()),'tar_sha256':u.sha(tarpath.read_bytes()),'members':len(members),'bound_files':len(items),'tests':manifest['tests'],'production_changes':0},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-channel-recovery-${{ github.sha }}
+          path: |
+            /tmp/PR122_CHANNEL_RECOVERY_REVIEW_ONLY.tar.gz
+            /tmp/pr122-recovery-review/REVIEW_MANIFEST.json
+          if-no-files-found: error
+          retention-days: 14
