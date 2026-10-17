@@ -1457,5 +1457,34 @@
       "services_started": false,
       "production_cutover": false
     }
+  },
+  "migration_execution_handoff": {
+    "status": "ORIGINAL_WORK_WRITER_STOPPED_DOTS_PENDING_ACK",
+    "owner_instruction": "2026-10-17 13:27 CST explicit handoff to dots",
+    "handoff_file": "docs/PR99_SERVER_MIGRATION_DOTS_HANDOFF_20261017.md",
+    "handoff_document_commit": "b52affad1e7575a2e471ead621152eb1f74cf64a",
+    "source_checkpoint_before_handoff": "373419cdfa635005764020beed86e31e123e1c2d",
+    "original_writer": "STOPPED_NO_FURTHER_MIGRATION_CODE_OR_CLOUD_DISPATCH",
+    "successor": "DOTS_PENDING_ACK_IN_ORIGINAL_PR99",
+    "own_inflight_swas": "NONE_KNOWN",
+    "own_unknown_results": "NONE_KNOWN",
+    "local_related_background_processes": 0,
+    "remote_proc_refreshed_for_handoff": false,
+    "last_host_batch": {
+      "run": 39004155870,
+      "job": 117313065796,
+      "invoke_id": "t-sh070a4pjzs5dkw",
+      "status": "SUCCESS_TEMP_PROCESSES_STOPPED"
+    },
+    "last_entry": {
+      "run": 39005472107,
+      "job": 117316933627,
+      "status": "HOLD_BEFORE_CLOUD_CALLS_ZERO"
+    },
+    "production_services_installed": false,
+    "production_cutover": false,
+    "remaining_major_nodes": 6,
+    "existing_readonly_notifications": "KEEP_ENABLED_NOT_A_DEPLOYMENT_WRITER",
+    "note": "Handoff bookkeeping can trigger ordinary CI; that is not an in-flight host migration command."
   }
 }
