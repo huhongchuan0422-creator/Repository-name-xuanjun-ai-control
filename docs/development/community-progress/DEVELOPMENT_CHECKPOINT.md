@@ -127,3 +127,9 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Exact original persisted application intent (business_code, SUBMISSION_UNKNOWN state, version) is now required before storing the response of the once-only real-merchant POST. Source commits e7e04d9ebb83102c1c046f7668fdb8b94d15a7b6 and 63ace04366dc4b6d812ba6175757dee5ed7796cb; regression tests 46385aa871f7efc192dd744ff005d986ce202dc7. Mismatch remains UNKNOWN/QUERY_ONLY and never blind resubmits.
 - Original production submit_enabled gate stays false by default; no merchant profile, financial receipt, or production grant was added. In-flight responses and terminal states are protected without treating synthetic test stubs as live WeChat evidence.
 - Latest exact source CI run https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39031635282; confirm terminal result before stating PASS. Remaining Phase1/2 groups PARTIAL.
+
+## 2026-10-17 Finance observed-refund numeric integrity
+
+- `community_financial_views.py` now rejects invalid signed-refund event amounts (boolean, zero, negative, float or text) before calculating total refund observations, rather than using untrusted arithmetic. Source `19dee4d02e43d3bad2c0819003e4363c9cffbe33`, synthetic regression `b197323a01e9e83ce780f949f09259c3f120b085`; no new Finance ledger or settlement authority.
+- Exact Hosted test run `39031805606` must be checked before marking PASS. Previous original merchant applyment commit `46385aa871f7efc192dd744ff005d986ce202dc7` passed Hosted test run `39031635282` (optional mini jobs skipped).
+- The source tests validate internal record integrity only. Real refund, official split bill acceptance and Finance authority remain independent blocked gates.
