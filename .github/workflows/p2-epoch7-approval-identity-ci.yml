@@ -1,0 +1,67 @@
+name: P2 Epoch7 approval identity isolated verification
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_approval.py
+      - evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_approval.py
+      - .github/workflows/p2-epoch7-approval-identity-ci.yml
+permissions:
+  contents: read
+jobs:
+  approval-identity:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Focused approval provenance regression only
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONDONTWRITEBYTECODE=1
+          MOD="$GITHUB_WORKSPACE/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers"
+          TEST="$GITHUB_WORKSPACE/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_approval.py"
+          PYTHONPATH="$MOD" python -B "$TEST" -v 2>&1 | tee approval-tests.log
+          grep -q 'OK' approval-tests.log
+      - name: Build non-executable scoped evidence overlay and manifest
+        if: matrix.python == '3.11'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,os,pathlib,subprocess,tarfile
+          base=pathlib.Path('evidence/p2-epoch7-access-repair-20261014/recovery-kit-source')
+          paths=[base/'helpers/epoch7_approval.py',base/'tests/approval/test_epoch7_approval.py',
+                 pathlib.Path('.github/workflows/p2-epoch7-approval-identity-ci.yml')]
+          records=[{'path':str(p),'bytes':p.stat().st_size,
+                    'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in paths]
+          meta={'schema':1,'scope':'SOURCE_ONLY_NOT_FROZEN_INSTALL_KIT',
+                'commit':os.environ['GITHUB_SHA'],
+                'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+                'files':records,'private_packet_included':False,
+                'approval_permit_issued':False,'uk_install_executed':False,
+                'test_log_sha256':hashlib.sha256(pathlib.Path('approval-tests.log').read_bytes()).hexdigest()}
+          pathlib.Path('approval-manifest.json').write_text(json.dumps(meta,sort_keys=True,indent=2)+'\n')
+          with tarfile.open('approval-source-overlay.tar.gz','w:gz') as tar:
+              for p in paths:tar.add(str(p),arcname=str(p))
+              tar.add('approval-manifest.json')
+              tar.add('approval-tests.log')
+          print(json.dumps({'overlay_sha256':hashlib.sha256(pathlib.Path('approval-source-overlay.tar.gz').read_bytes()).hexdigest(),
+                            'manifest_sha256':hashlib.sha256(pathlib.Path('approval-manifest.json').read_bytes()).hexdigest()},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: matrix.python == '3.11'
+        with:
+          name: epoch7-approval-source-only-${{ github.sha }}
+          path: |
+            approval-source-overlay.tar.gz
+            approval-manifest.json
+            approval-tests.log
+          if-no-files-found: error
