@@ -104,7 +104,8 @@ class StageRuntime:
             verified = provider_evidence(self.demo.db, identity, params['reference'])
             from scripts.community_order_cancellation import local_cancelled
             local_closed=local_cancelled(self.demo.db,identity,params['reference'])
-            paid = order['state'] == 'SUCCESS'
+            # A synthetic SUCCESS state is never proof for a success-page advertisement.
+            paid = order['state'] == 'SUCCESS' and verified is not None
             return {'order': dict(order, reference=params['reference']),
                     'payment_state': 'CANCELLED_BEFORE_PROVIDER' if local_closed else ('PROVIDER_' + order['state']) if verified else ('MOCK_PAID_SIMULATED' if paid else 'MOCK_' + order['state']),
                     'ads': {AMOUNT: None, SUCCESS: snapshot['ads'][SUCCESS] if paid else None},
