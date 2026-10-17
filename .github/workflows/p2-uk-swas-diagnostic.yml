@@ -1,0 +1,146 @@
+name: P2 UK SWAS offline transport review
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Offline review, or separately approved single UK action'
+        required: true
+        type: choice
+        default: offline
+        options: [offline, remote-run, cloud-query, a5-preflight, a5-query]
+      attempt:
+        description: 'Exact approved transport attempt; no command input'
+        required: false
+        type: string
+      invoke_id:
+        description: 'Saved InvokeId, cloud-query only'
+        required: false
+        type: string
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/p2-uk-swas-diagnostic.yml
+      - scripts/p2_uk_swas_diagnostic.py
+      - scripts/p2_swas_receipt_validator.py
+      - tests/test_p2_uk_swas_diagnostic.py
+      - tests/test_p2_swas_receipt_validator.py
+      - evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Offline tests only; no credentials or host execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n -- "$(command -v python)" -B -m unittest discover -s tests -p 'test_p2_*swas*.py' -v 2>&1 | tee /tmp/P2_UK_SWAS_TESTS.log
+      - name: Bind all six public source paths and test log
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast,hashlib,json,os,subprocess,tarfile
+          from pathlib import Path
+          paths=['.github/workflows/p2-uk-swas-diagnostic.yml','scripts/p2_uk_swas_diagnostic.py','scripts/p2_swas_receipt_validator.py','tests/test_p2_uk_swas_diagnostic.py','tests/test_p2_swas_receipt_validator.py','evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md']
+          for name in paths:
+              if name.endswith('.py'):ast.parse(Path(name).read_text(),feature_version=(3,6))
+          records=[{'path':n,'size':Path(n).stat().st_size,'sha256':hashlib.sha256(Path(n).read_bytes()).hexdigest()} for n in paths]
+          log=Path('/tmp/P2_UK_SWAS_TESTS.log').read_bytes()
+          expected_tests=102
+          assert ('Ran %d tests in ' % expected_tests).encode() in log and b'\nOK\n' in log and b'skipped=' not in log
+          doc=Path(paths[-1]).read_text()
+          script=doc.split('<!-- BEGIN P2_SITE_ENTRY_V1 -->\n```python\n',1)[1].split('```\n<!-- END P2_SITE_ENTRY_V1 -->',1)[0].encode()
+          ast.parse(script.decode(),feature_version=(3,6))
+          site=Path('/tmp/P2_SITE_ENTRY.py');site.write_bytes(script)
+          kit={'schema':1,'scope':'RECEIVER_CODE_PREPARATION_ONLY_NOT_EXECUTION_PERMISSION','source_commit':os.environ['GITHUB_SHA'],'site_entry_sha256':hashlib.sha256(script).hexdigest(),'transport_sha256':records[1]['sha256'],'receipt_sha256':records[2]['sha256'],'production_execution':'NOT_RUN','root_trust_enrollment':'NOT_RUN','canonical_writer':'UNKNOWN'}
+          kit_path=Path('/tmp/SITE_KIT_MANIFEST.json');kit_path.write_text(json.dumps(kit,sort_keys=True,separators=(',',':'))+'\n')
+          generated=[{'path':p.name,'size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in (site,kit_path)]
+          m={'scope':'OFFLINE_UK_TRANSPORT_ONLY_NOT_P2_ACCEPTANCE','commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':records,'generated_files':generated,'tests':expected_tests,'tests_skipped':0,'log_sha256':hashlib.sha256(log).hexdigest(),'root_execution':'NOT_RUN','python36_runtime':'NOT_VERIFIED','private_materials':'NOT_INCLUDED','execution_permission':'NOT_GRANTED'}
+          manifest=Path('/tmp/P2_UK_SWAS_MANIFEST.json');manifest.write_text(json.dumps(m,sort_keys=True,separators=(',',':'))+'\n')
+          with tarfile.open('/tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz','w:gz') as t:
+              for n in paths:t.add(n,arcname='p2-uk-swas/'+n,recursive=False)
+              for p in (site,kit_path):t.add(p,arcname='p2-uk-swas/'+p.name,recursive=False)
+              t.add(manifest,arcname='p2-uk-swas/MANIFEST.json',recursive=False)
+              t.add('/tmp/P2_UK_SWAS_TESTS.log',arcname='p2-uk-swas/TESTS.log',recursive=False)
+          print(json.dumps({'tar_sha256':hashlib.sha256(Path('/tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz').read_bytes()).hexdigest(),'manifest_sha256':hashlib.sha256(manifest.read_bytes()).hexdigest(),'source_files':6,'root_execution':'NOT_RUN'},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-uk-swas-offline-${{ github.sha }}
+          path: |
+            /tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz
+            /tmp/P2_UK_SWAS_MANIFEST.json
+          if-no-files-found: error
+
+  site-python36:
+    name: Site attachment on Python 3.6.15 container, not UK host
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    container: python:3.6.15-bullseye
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact extracted attachment filesystem and negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PYTEST'
+          import sys,unittest
+          sys.path.insert(0,'tests')
+          from test_p2_uk_swas_diagnostic import SitePreparationTests
+          suite=unittest.defaultTestLoader.loadTestsFromTestCase(SitePreparationTests)
+          assert suite.countTestCases()==17
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          assert result.testsRun==17 and not result.skipped and result.wasSuccessful()
+          PYTEST
+
+  protected-uk:
+    name: Explicit protected UK transport
+    needs: [offline, site-python36]
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.operation == 'remote-run' || inputs.operation == 'cloud-query' || inputs.operation == 'a5-preflight' || inputs.operation == 'a5-query') &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor_id == '332398908' &&
+      vars.P2_UK_SPLIT_LIVE_ENABLED == 'true'
+    environment: p2-uk-transport
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    permissions:
+      contents: write
+    concurrency:
+      group: p2-uk-split-transport
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exact manual permit and split transport only
+        shell: bash
+        env:
+          P2_SPLIT_ENABLED: ${{ vars.P2_UK_SPLIT_LIVE_ENABLED }}
+          P2_SPLIT_POLICY: ${{ vars.P2_UK_SPLIT_POLICY }}
+          P2_JOURNAL_TOKEN: ${{ github.token }}
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+          P2_OPERATION: ${{ inputs.operation }}
+          P2_ATTEMPT: ${{ inputs.attempt }}
+          P2_INVOKE_ID: ${{ inputs.invoke_id }}
+        run: |
+          set -euo pipefail
+          python -I -B scripts/p2_uk_swas_diagnostic.py "$P2_OPERATION" --attempt "$P2_ATTEMPT" --invoke-id "$P2_INVOKE_ID" 2>&1 | tee /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2-split-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+          if-no-files-found: ignore
