@@ -34,6 +34,23 @@ Page({
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
   inputProject(e) {this.setData({projectFeedback:e.detail.value});},
+  async submitProjectItem(e) {
+    if(this.data.pending||!this.session)return;
+    const item=e.currentTarget.dataset.item;
+    const revision=Number(e.currentTarget.dataset.revision);
+    if(typeof item!=='string'||!Number.isSafeInteger(revision)||revision<0)return;
+    this.setData({pending:true});
+    try {
+      const result=await this.session.commerce(this.scene,'project_submit',{item,revision});
+      this.setData({status:'资料版本已提交审核：'+result.state});
+      const checklist=await this.session.commerce(this.scene,'project_checklist',{});
+      this.setData({projectChecklist:checklist.items.map(entry=>({
+        id:entry.id,state:entry.state,required:entry.required,revision:entry.revision
+      }))});
+    } catch(error){this.setData({status:error.message});}
+    finally {this.setData({pending:false});}
+  },
+
   async projectAction(e) {
     if(this.data.pending||!this.session)return;
     const op=e.currentTarget.dataset.operation;
@@ -45,7 +62,7 @@ Page({
       if(op==='project_summary')this.setData({projectTitle:r.title,projectRole:r.role,
         projectCustomerId:r.customer_id,projectState:r.checklist_overall});
       else if(op==='project_checklist')this.setData({projectChecklist:r.items.map(item=>({
-        id:item.id,state:item.state,required:item.required}))});
+        id:item.id,state:item.state,required:item.required,revision:item.revision}))});
       else this.setData({projectFeedback:'',status:'项目反馈已归档，尚未确认人工回复：'+r.id});
     } catch(error) {this.setData({status:error.message});}
     finally {this.setData({pending:false});}
