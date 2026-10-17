@@ -73,7 +73,7 @@ class RuntimeJourney(unittest.TestCase):
         observation = dict(source='SIGNED_PROVIDER_ORDER_QUERY',
                            signature_key_id='PUB_KEY_ID_fixture',
                            out_trade_no=ref, amount_minor=101, currency='CNY',
-                           provider_state='SUCCESS', transaction_id='transaction123',
+                           provider_state='SUCCESS', transaction_id='420000000000000001',
                            body_sha256='a'*64)
         project_verified_query(self.o, DEMO_SCOPE, 'order1', expected,
                                observation, self.now, 'PUB_KEY_ID_fixture')
