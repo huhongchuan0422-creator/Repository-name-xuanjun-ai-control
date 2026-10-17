@@ -54,6 +54,27 @@ class BillJourney(unittest.TestCase):
         self.assertNotIn('用户标识',rows[0])
         self.assertNotIn('银行卡号',rows[0])
 
+    def test_scoped_bill_audit_lists_immutable_results_only_for_original_bill(self):
+        from scripts.pr122_customer_core import canonical
+        self.download(b'unknown,columns\\na,b\\n')
+        self.call('bill_fetch')
+        verified=self.call('bill_reconcile')
+        self.assertEqual(verified['status'],'UNKNOWN_SCHEMA')
+        audit=self.call('bill_audit',after_id='')
+        self.assertEqual(len(audit['records']),1)
+        self.assertEqual(audit['records'][0]['result']['status'],'UNKNOWN_SCHEMA')
+        self.assertEqual(audit['finance_status'],'UNCONFIRMED')
+        with self.assertRaises(ValueError):
+            self.call('bill_audit',after_id='../foreign')
+        g,_=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
+        row=self.fx.c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_BILL_RECONCILIATION'").fetchone()
+        ref=row[0]
+        saved=dict(bill_key='foreign',kind='TRADE',bill_date=self.date,
+                   scope=dict(g['scope'],store_id='other'),result=dict(status='BILL_ROWS_MATCH'))
+        self.fx.c.db.execute("UPDATE links SET payload=? WHERE channel='COMMUNITY_BILL_RECONCILIATION' AND subject_idx=?",
+            (self.fx.c.encrypt(canonical(saved),'community-bill-reconciliation:'+ref),ref))
+        self.assertEqual(self.call('bill_audit',after_id='')['records'],[])
+
     def test_hash_mismatch_never_persists(self):
         self.download(b'a,b\nx,y\n');self.bills._download.return_value=b'a,b\nx,z\n'
         with self.assertRaises(PermissionError):self.call('bill_fetch')
