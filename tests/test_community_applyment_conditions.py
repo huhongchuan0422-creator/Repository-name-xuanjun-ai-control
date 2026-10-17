@@ -67,6 +67,37 @@ class ConditionalFields(unittest.TestCase):
         service.center=SimpleNamespace(db=DB())
         with self.assertRaises(PermissionError):service._validate_media(dict(id_doc_copy_back='foreign-media'),'application',dict(materials={}))
 
+class SubmerchantIdentityImmutability(unittest.TestCase):
+    def test_signed_query_cannot_reassign_persisted_provider_submerchant(self):
+        import contextlib
+        from unittest.mock import patch
+        from scripts.community_wechat_applyment import WechatApplyment
+        service=WechatApplyment.__new__(WechatApplyment)
+        service.reader=object()
+        service.center=SimpleNamespace(
+            session=lambda token,csrf:'reviewer1',
+            tx=lambda:contextlib.nullcontext(),limit=lambda *a:None,
+            now=lambda:NOW,audit=lambda *a:None)
+        service.onboarding=SimpleNamespace(_load=lambda application,uid,reviewer:('owner1',{},{}))
+        record=dict(business_code='ap_original',provider_sub_mchid='1234567891',
+                    state='SUBMITTED_TO_PROVIDER',version=2)
+        service._read=lambda application:dict(record)
+        writes=[]
+        service._save=lambda *args:writes.append(args)
+        with patch('scripts.community_wechat_applyment.request',return_value=(
+             dict(business_code='ap_original',applyment_state='APPLYMENT_STATE_FINISHED',
+                  sub_mchid='9999999999'),'a'*64)):
+            with self.assertRaisesRegex(ValueError,'IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT'):
+                service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
+        self.assertEqual(writes,[])
+        with patch('scripts.community_wechat_applyment.request',return_value=(
+             dict(business_code='ap_original',applyment_state='APPLYMENT_STATE_FINISHED',
+                  sub_mchid='1234567891'),'b'*64)):
+            result=service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
+        self.assertEqual(result['provider_sub_mchid'],'1234567891')
+        self.assertEqual(len(writes),1)
+
+
 class PlatformPassportAdmission(unittest.TestCase):
     def test_platform_draft_requires_passport_front_without_invented_back(self):
         import test_community_merchant_onboarding as fixtures
