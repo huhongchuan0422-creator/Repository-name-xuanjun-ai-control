@@ -1,9 +1,5 @@
 name: Alibaba Cloud four-host read-only check
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - '.github/workflows/aliyun-four-host-readonly.yml'
   workflow_dispatch:
 permissions:
   contents: read
