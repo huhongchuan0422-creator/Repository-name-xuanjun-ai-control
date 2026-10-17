@@ -148,8 +148,8 @@
     },
     {
       "id": "custom-development",
-      "title": "软件与AI定制开发主合同",
-      "version": "2026-10-17-draft.3",
+      "title": "软件与AI定制开发电子合同（唯一签署文件）",
+      "version": "2026-10-17-draft.4",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "定制客户",
@@ -160,27 +160,27 @@
         "合同中心"
       ],
       "source": "docs/legal/templates/custom-development.md",
-      "source_sha256": "aecca93493b8f5d78e921ccfd60c2a582653debeec07d65dca571505a90516a4",
+      "source_sha256": "9aaa41589f9f696d7f5026193c1cfcaf268778e806d02af98b4e9c18ae9eca8f",
       "preview": "demos/legal/custom-development.html",
       "planned_route": "/legal/custom-development/",
       "signature_enabled": false
     },
     {
       "id": "custom-sow",
-      "title": "定制项目需求范围、报价与验收任务书",
-      "version": "2026-10-17-draft.2",
-      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "title": "内部需求与报价字段定义（不单独签署）",
+      "version": "2026-10-17-internal.1",
+      "status": "INTERNAL_ONLY",
       "audience": [
         "客户项目负责人",
         "开发方"
       ],
       "placement": [
-        "定制合同附件A"
+        "内部合同正文生成及字段校验"
       ],
       "source": "docs/legal/templates/custom-sow.md",
-      "source_sha256": "5394e26a12413847c32e9778022e16e5595e0762e778f43d9ba1b37675578386",
-      "preview": "demos/legal/custom-sow.html",
-      "planned_route": "/legal/custom-sow/",
+      "source_sha256": "4c8389bae7fde18d359a9475b21d90abf1a63206b7d174383c4fe55753b8581a",
+      "preview": null,
+      "planned_route": null,
       "signature_enabled": false
     },
     {
@@ -444,5 +444,12 @@
     "independent_legal_review",
     "owner_release_gate"
   ],
-  "data_rule": "No real identity, customer data, private keys or actual signed contracts in this public repository."
+  "data_rule": "No real identity, customer data, private keys or actual signed contracts in this public repository.",
+  "custom_development_single_document_policy": {
+    "customer_signed_document_id": "custom-development",
+    "customer_signable_document_count": 1,
+    "internal_schema_document_id": "custom-sow",
+    "required_sections": "22-28",
+    "production_enabled": false
+  }
 }
