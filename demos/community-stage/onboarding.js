@@ -2,11 +2,13 @@
 (() => {
   const $=id=>document.getElementById(id),reviewMode=location.pathname==='/merchant/review';
   const states={DRAFT:'草稿',SUBMITTED:'待审核',IN_REVIEW:'审核中',CORRECTION_REQUIRED:'待补件',REJECTED:'已驳回',APPROVED:'入驻审核通过'};
-  let current=null,catalog=null,csrf='',busy=false,generation=0,cursor=null;
+  let current=null,catalog=null,csrf='',busy=false,generation=0,cursor=null,wechatRecord=null;
+  const wechatControls=new Map();
+  function clearWechat(){wechatRecord=null;for(const e of wechatControls.values())e.value='';$('wechatState').textContent='';$('wechatOpinion').value='';}
   // The existing customer host passes its current CSRF value after login. No
   // second login form, password store or reusable browser token is introduced.
   window.configureCommunityOnboarding=context=>{generation++;busy=false;csrf=typeof context?.csrf==='string'?context.csrf:'';
-    current=null;cursor=null;$('detail').hidden=true;$('openingActions').hidden=true;$('moreApplications').hidden=true;
+    clearWechat();current=null;cursor=null;$('detail').hidden=true;$('openingActions').hidden=true;$('moreApplications').hidden=true;
     for(const id of ['mine','applications','summary','materials','reviewNote','opening','openingWorkspace'])$(id).replaceChildren();
     $('applicationTitle').textContent='入驻申请';$('applicationState').textContent='';
     for(const id of ['legal_name','store_name','address','contact','note'])$(id).value='';setForm(null);$('statusFilter').value='ALL';
@@ -31,7 +33,8 @@
   function draftFields(){return Object.fromEntries(['legal_name','store_name','address','contact'].map(k=>[k,$(k).value]));}
   function setForm(app){for(const [k,v] of Object.entries(app?.fields||{}))if($(k))$(k).value=v;
     $('entity_type').value=app?.entity_type||'ENTERPRISE';$('category').value=app?.category||'GENERAL';$('delegated').checked=app?.delegated||false;}
-  function render(app){current=app;$('detail').hidden=!app;if(!app)return;
+  function render(app){
+    if(current?.application!==app?.application)clearWechat();current=app;$('detail').hidden=!app;if(!app)return;
     $('applicationTitle').textContent=app.fields.store_name||'入驻申请';$('applicationState').textContent=states[app.status]||app.status;
     $('summary').replaceChildren();for(const [label,value] of [['主体名称',app.fields.legal_name],['门店名称',app.fields.store_name],['经营地址',app.fields.address],['联系人',app.fields.contact]]){
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;$('summary').append(dt,dd);}
@@ -48,7 +51,7 @@
     $('openingActions').hidden=!reviewMode||app.status!=='APPROVED'||app.opening_state==='OPENED'||!app.opening_workspaces?.length;
     $('openingWorkspace').replaceChildren();for(const workspace of app.opening_workspaces||[]){const option=document.createElement('option');option.value=workspace;option.textContent=workspace;$('openingWorkspace').append(option);}
     $('materials').replaceChildren();
-    for(const kind of app.required_materials){const description=catalog.materials.find(m=>m.id===kind),record=app.materials[kind];
+    for(const kind of [...new Set([...app.required_materials,'mini_program_screenshot'])]){const description=catalog.materials.find(m=>m.id===kind),record=app.materials[kind];
       const row=document.createElement('div');row.className='material';row.dataset.kind=kind;
       const title=document.createElement('strong');title.textContent=description?.title||kind;row.append(title);
       const state=document.createElement('p');state.textContent=record?`已上传 · ${record.review==='ACCEPTED'?'资料审核通过':record.review==='NEEDS_CORRECTION'?'需要补件':'待核验'}${record.review_note?' · '+record.review_note:''}`:'待上传';row.append(state);
@@ -86,5 +89,24 @@
   $('reloadMine').addEventListener('click',()=>run(list));
   $('statusFilter').addEventListener('change',()=>run(list));$('moreApplications').addEventListener('click',()=>run(()=>list(true)));
   $('openWorkbench').addEventListener('click',()=>run(async()=>{render(await request('open_workbench',{application:current.application,revision:current.revision,workspace:$('openingWorkspace').value}));message('工作台开通状态已更新。');}));
+  const definitions=[
+    ['contact_info.contact_name','超级管理员姓名'],['contact_info.mobile_phone','超级管理员手机'],['contact_info.contact_email','超级管理员邮箱'],
+    ['subject_info.business_license_info.license_number','统一社会信用代码或注册号'],['subject_info.business_license_info.merchant_name','营业执照商户名称'],['subject_info.business_license_info.legal_person','法定代表人或经营者姓名'],['subject_info.business_license_info.license_address','营业执照注册地址'],['subject_info.business_license_info.period_begin','营业执照有效期开始'],['subject_info.business_license_info.period_end','营业执照有效期结束或长期'],
+    ['subject_info.identity_info.id_card_info.id_card_name','经营者或法人证件姓名'],['subject_info.identity_info.id_card_info.id_card_number','经营者或法人身份证号'],['subject_info.identity_info.id_card_info.id_card_address','身份证住址（企业适用）'],['subject_info.identity_info.id_card_info.card_period_begin','身份证有效期开始'],['subject_info.identity_info.id_card_info.card_period_end','身份证有效期结束或长期'],
+    ['business_info.merchant_shortname','商户简称'],['business_info.service_phone','客服电话'],['business_info.sales_info.mini_program_info.mini_program_appid','服务商小程序AppID'],['settlement_info.settlement_id','微信结算规则编号'],['settlement_info.qualification_type','微信结算行业名称'],
+    ['bank_account_info.bank_account_type','账户类型：BANK_ACCOUNT_TYPE_CORPORATE 或 BANK_ACCOUNT_TYPE_PERSONAL'],['bank_account_info.account_name','结算开户名称'],['bank_account_info.account_bank','开户银行'],['bank_account_info.bank_branch_id','支行联行号（银行要求时填写）'],['bank_account_info.bank_name','开户银行全称（银行要求时填写）'],['bank_account_info.account_number','结算银行账号']];
+  for(const [path,title]of definitions){const label=document.createElement('label');label.textContent=title;const input=document.createElement('input');input.autocomplete='off';input.maxLength=512;wechatControls.set(path,input);label.append(input);$('wechatFields').append(label);}
+  const mediaFields={business_license:'subject_info.business_license_info.license_copy',identity_front:'subject_info.identity_info.id_card_info.id_card_copy',identity_back:'subject_info.identity_info.id_card_info.id_card_national',mini_program_screenshot:'business_info.sales_info.mini_program_info.mini_program_pics'};
+  for(const [kind,path]of Object.entries(mediaFields)){const hidden=document.createElement('input');hidden.type='hidden';wechatControls.set(path,hidden);$('wechatFields').append(hidden);const button=document.createElement('button');button.type='button';button.textContent='同步已上传的'+({business_license:'营业执照',identity_front:'身份证人像面',identity_back:'身份证国徽面',mini_program_screenshot:'小程序页面截图'})[kind];button.onclick=()=>run(async()=>{if(!current)throw Error('先打开申请');const r=await request('wechat_media',{application:current.application,kind});hidden.value=r.media_id;message('资料已上传微信；请保存微信资料草稿。');});$('wechatMedia').append(button);}
+  function getPath(o,path){return path.split('.').reduce((v,k)=>v?.[k],o);}
+  function setPath(o,path,value){const parts=path.split('.');let at=o;for(const key of parts.slice(0,-1))at=at[key]??={};at[parts.at(-1)]=value;}
+  function showWechat(r){wechatRecord=r;$('wechatState').textContent=JSON.stringify({version:r.version,state:r.state,provider_state:r.provider_state,applyment_id:r.applyment_id,opinion:r.opinion,audit_detail:r.audit_detail},null,2);for(const [path,e]of wechatControls){const value=getPath(r.profile,path);e.value=Array.isArray(value)?value.join(','):value??'';}}
+  const wechatVersion=()=>{if(!current)throw Error('先打开申请');return wechatRecord?.version||0;};
+  $('wechatRead').onclick=()=>run(async()=>{if(!current)throw Error('先打开申请');showWechat(await request(reviewMode?'wechat_review_read':'wechat_read',{application:current.application}));});
+  $('wechatProfile').onsubmit=e=>{e.preventDefault();run(async()=>{const expected_version=wechatVersion();const profile=wechatRecord?.profile?structuredClone(wechatRecord.profile):{};for(const [path,input]of wechatControls)if(input.value)setPath(profile,path,path.endsWith('_pics')?input.value.split(',').map(s=>s.trim()).filter(Boolean):input.value);setPath(profile,'subject_info.subject_type',current.entity_type==='ENTERPRISE'?'SUBJECT_TYPE_ENTERPRISE':'SUBJECT_TYPE_INDIVIDUAL');setPath(profile,'subject_info.identity_info.id_holder_type','LEGAL');setPath(profile,'subject_info.identity_info.id_doc_type','IDENTIFICATION_TYPE_IDCARD');setPath(profile,'contact_info.contact_type','LEGAL');setPath(profile,'business_info.sales_info.sales_scenes_type',['SALES_SCENES_MINI_PROGRAM']);showWechat(await request('wechat_save',{application:current.application,expected_version,profile}));});};
+  $('wechatSubmitReview').onclick=()=>run(async()=>showWechat(await request('wechat_submit_review',{application:current.application,expected_version:wechatVersion()})));
+  for(const [id,decision]of [['wechatApprove','INTERNAL_APPROVED'],['wechatCorrect','CORRECTION']])$(id).onclick=()=>run(async()=>showWechat(await request('wechat_review',{application:current.application,expected_version:wechatVersion(),decision,opinion:$('wechatOpinion').value})));
+  $('wechatExecute').onclick=()=>run(async()=>showWechat(await request('wechat_execute',{application:current.application,expected_version:wechatVersion()})));
+  $('wechatQuery').onclick=()=>run(async()=>showWechat(await request('wechat_query',{application:current.application})));
   load();
 })();

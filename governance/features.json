@@ -188,7 +188,9 @@
         "scripts/community_refund_requests.py",
         "scripts/community_split_returns.py",
         "scripts/community_financial_views.py",
-        "scripts/community_staff.py"
+        "scripts/community_staff.py",
+        "scripts/community_wechat_applyment.py",
+        "scripts/community_provider_transport.py"
       ]
     },
     {

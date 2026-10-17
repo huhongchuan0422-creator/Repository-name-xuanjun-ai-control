@@ -108,6 +108,13 @@ class MiniApplication:
         if self.onboarding is not None:self.onboarding.operations=self.operations
         return self.operations
 
+    def configure_wechat_applyment(self,reader,*,submission_enabled=False):
+        if self.server is not None or self.onboarding is None or self.onboarding.wechat_applyment is not None:
+            raise ValueError('ORIGINAL_ONBOARDING_REQUIRED_BEFORE_APPLYMENT')
+        from scripts.community_wechat_applyment import WechatApplyment
+        self.onboarding.wechat_applyment=WechatApplyment(self.onboarding,reader,submission_enabled=submission_enabled)
+        return self.onboarding.wechat_applyment
+
     def configure_onboarding(self,reviewers):
         if self.server is not None or self.onboarding is not None:
             raise ValueError('ONBOARDING_ALREADY_CONFIGURED_OR_LISTENING')

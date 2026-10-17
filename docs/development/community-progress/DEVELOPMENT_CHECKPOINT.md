@@ -27,7 +27,7 @@ Original customer Core/Source/Runtime pinned bytes have not been changed. Busine
 
 Neither phase is complete. In particular, the following cannot be marked implemented merely because nearby code exists:
 
-1. Official service-provider submerchant application schema, full private form/material-media upload, provider submission and authoritative application-state synchronization. Existing platform merchant onboarding is separate.
+1. Official submerchant application transport, private drafts, common domestic identity/bank form, scanned-material media upload, separate internal review, gated submission and signed status synchronization have now been written. Remaining: complete conditional administrator/foreign-identity/beneficial-owner/industry/bank-branch form requirements and final integration. Existing platform merchant onboarding remains separate.
 2. Full merchant multi-store creation/management, merchant enable/pause/disable lifecycle across all entry points, and operational completion/cancellation flows.
 3. Consumer paginated order history/personal-center integration and safe payment-close/cancellation plus inventory-release recovery.
 4. Raw refund callbacks; official daily transaction/refund/profit-sharing bill download, verified ingestion and full bill reconciliation.

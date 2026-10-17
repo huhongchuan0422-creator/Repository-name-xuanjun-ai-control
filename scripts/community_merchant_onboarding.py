@@ -18,7 +18,8 @@ MATERIALS={
     'identity_back':'经营者/法定代表人身份证国徽面', 'storefront_photo':'门店门头照片',
     'interior_photo':'门店经营场所照片', 'settlement_proof':'结算账户证明',
     'operator_authorization':'经办人授权书', 'operator_identity':'经办人身份证明',
-    'industry_permit':'行业经营许可（按经营类目）'}
+    'industry_permit':'行业经营许可（按经营类目）',
+    'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）'}
 BASE=('business_license','identity_front','identity_back','storefront_photo','interior_photo','settlement_proof')
 
 
@@ -34,6 +35,7 @@ class MerchantOnboarding:
         if center.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         self.center=center;self.reviewers=dict(reviewers)
         self.operations=None
+        self.wechat_applyment=None
         # Reuse the already developed onboarding business tables in the original
         # Center backup domain. No second account store or review queue exists.
         workflow.initialize(center.db)
@@ -86,6 +88,7 @@ class MerchantOnboarding:
         workspaces=[] if self.operations is None else [name for name,g in self.operations.grants.items()
             if g['user_id']==owner and g['onboarding_required']]
         data=dict(data,fields={k:v for k,v in data['fields'].items() if k!='license_ref'})
+        wechat_record=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
         return dict(data,application=application,entity_type=meta['entity_type'],category=meta['category'],
             delegated=meta['delegated'],required_materials=list(self._required(meta)),
             materials={k:{'uploaded':True,'expires_at':v['expires_at'],
@@ -93,12 +96,15 @@ class MerchantOnboarding:
                 'review_note':meta.get('reviews',{}).get(k,{}).get('note','')} for k,v in meta['materials'].items()},
             opening_state=opening_state(self,application) if data['status']=='APPROVED' else 'NOT_APPROVED',
             opening_workspaces=workspaces,
-            wechat_submerchant_state='NOT_VERIFIED',payment_enabled=False)
+            wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',payment_enabled=False)
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:
             raise ValueError('INVALID_ONBOARDING_REQUEST')
         op,params=body['operation'],body['params'];c=self.center
         if op=='catalog' and params=={}:return self.catalog()
+        if type(op) is str and op.startswith('wechat_'):
+            if self.wechat_applyment is None:raise PermissionError('OFFICIAL_APPLYMENT_NOT_CONFIGURED')
+            return self.wechat_applyment.dispatch(session,csrf,body)
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         uid=c.session(session,csrf)
         schemas={'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
