@@ -218,7 +218,10 @@
         "scripts/community_platform_views.py",
         "tests/test_community_platform_views.py",
         "clients/community-mini/checkout-community.test.cjs",
-        "tests/test_community_module_catalog.py"
+        "tests/test_community_module_catalog.py",
+        "demos/community-stage/workbench.js",
+        "demos/community-stage/workbench.html",
+        "tests/test_community_workbench_browser.py"
       ]
     },
     {
