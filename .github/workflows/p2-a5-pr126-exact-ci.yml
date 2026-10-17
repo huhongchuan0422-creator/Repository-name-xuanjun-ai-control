@@ -15,6 +15,22 @@ jobs:
         with:
           ref: 8543161a78f3f9fbd607fb3bb3a252545258a5f7
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: c8c23711f112558d35ceb8a6a1eea4088e35806a
+          path: inherited-source
+          persist-credentials: false
+      - name: Restore audited existing-runtime test dependency only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 8543161a78f3f9fbd607fb3bb3a252545258a5f7
+          test "$(git -C inherited-source rev-parse HEAD)" = c8c23711f112558d35ceb8a6a1eea4088e35806a
+          test ! -e evidence/p2-epoch7-access-repair-20261014/runtime/stage1
+          test -d inherited-source/evidence/p2-epoch7-access-repair-20261014/runtime/stage1
+          mkdir -p evidence/p2-epoch7-access-repair-20261014/runtime
+          cp -a inherited-source/evidence/p2-epoch7-access-repair-20261014/runtime/stage1 evidence/p2-epoch7-access-repair-20261014/runtime/
+          rm -rf inherited-source
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
