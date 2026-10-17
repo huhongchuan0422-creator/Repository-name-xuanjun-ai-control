@@ -84,6 +84,20 @@ class OriginalProjectCenterJourney(unittest.TestCase):
                     dict(workspace='project1',operation='project_review',
                          params=dict(request,action='skip_validation')))
 
+    def test_center_web_review_requires_csrf_and_current_membership(self):
+        web=self.fx.c.login('two@example.org','FixturePassword123!')
+        payload=dict(workspace='project1',operation='project_review',
+                     params=dict(item='material1',revision=1,action='approve',reason='fixture'))
+        with self.assertRaises(ValueError):
+            self.fx.commerce.dispatch(web['token'],'',payload)
+        with self.assertRaises(PermissionError):
+            self.fx.commerce.dispatch(web['token'],'wrong_csrf',payload)
+        with self.assertRaises(PermissionError):
+            self.fx.commerce.dispatch(web['token'],web['csrf'],
+                                      dict(payload,workspace='other_project'))
+        with self.assertRaises(PermissionError):
+            self.fx.commerce.dispatch(web['token'],web['csrf'],payload)
+
     def test_material_submit_cannot_mint_requirements_or_approve(self):
         before=self.fx.c.db.execute(
             'SELECT COUNT(*) FROM versions WHERE project=?',('project1',)).fetchone()[0]
