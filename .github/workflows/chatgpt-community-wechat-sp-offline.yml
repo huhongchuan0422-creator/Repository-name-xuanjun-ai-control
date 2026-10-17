@@ -5,7 +5,7 @@ on:
       - feature/chatgpt-community-wechat-sp-offline-20261017
     paths:
       - 'scripts/community_*.py'
-      - 'scripts/community_mini_preview.cjs'
+      - 'scripts/community_*.cjs'
       - 'tests/test_community_*.py'
       - 'clients/community-mini/**'
       - 'demos/community-stage/**'
@@ -39,7 +39,7 @@ jobs:
           set -o pipefail
           python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
           python3 -B -m unittest discover -s tests -p 'test_stage5_*.py' -v 2>&1 | tee stage5-tests.log
-          node --test clients/community-mini/*.test.cjs
+          node --test clients/community-mini/*.test.cjs scripts/community_mini_key.test.cjs
           node --test demos/community-local-e2e/*.test.mjs
           node --test demos/community-payment/demo.test.mjs
           node --test demos/community-admin/admin.test.mjs

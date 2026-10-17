@@ -12,7 +12,7 @@ from scripts.community_mini_http import serve
 from scripts.community_saas_phase2 import Principal
 
 class FixtureIdentity(IdentityPort):
-    def __init__(self,principal):self.principal=principal;self.used=set();self.sessions={};self.failures=[]
+    def __init__(self,principal):self.principal=principal;self.used=set();self.sessions={};self.failures=[];self.orders={}
     def reserve_code(self,appid,digest,now):
         if digest in self.used:raise PermissionError('CODE_ALREADY_CONSUMED')
         self.used.add(digest);return digest
@@ -23,6 +23,13 @@ class FixtureIdentity(IdentityPort):
     def resolve(self,token,scene,now):
         if self.sessions.get(token,0)<=now or scene!='shop1':raise PermissionError('INVALID_SESSION_OR_SCENE')
         return self.principal
+    def reserve_order(self,token,scene,reference,amount_minor,now):
+        self.resolve(token,scene,now)
+        if (scene,reference) in self.orders:raise PermissionError('REFERENCE_ALREADY_RESERVED')
+        self.orders[scene,reference]=(token,amount_minor)
+    def authorize_order_read(self,token,scene,reference,now):
+        self.resolve(token,scene,now)
+        if self.orders.get((scene,reference),(None,))[0]!=token:raise PermissionError('CUSTOMER_ORDER_DENIED')
     def revoke(self,token,now):self.sessions.pop(token,None)
 
 class GatewayTests(unittest.TestCase):

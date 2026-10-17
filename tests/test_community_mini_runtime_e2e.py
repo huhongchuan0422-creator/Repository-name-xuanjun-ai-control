@@ -43,6 +43,16 @@ class MiniRuntimeIntegration(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as denied:self.call(token,'community.storefront')
         self.assertEqual(denied.exception.code,403)
         self.assertEqual(self.stage.o.execute('SELECT count(*) FROM orders').fetchone()[0],1)
+    def test_second_customer_same_store_cannot_read_or_claim_order(self):
+        token=self.post('/mini/login',{'code':'oncecode'})['session_token']
+        qr=self.call(token,'community.qr',{'context':'mini'})['token']
+        payload={'context':'mini','token':qr,'reference':'private1','amount_minor':101}
+        self.call(token,'community.checkout',payload)
+        other='t'*32;self.identity.sessions[other]=self.stage.now+100
+        for operation,params in [('community.receipt',{'reference':'private1'}),('community.checkout',payload)]:
+            with self.assertRaises(urllib.error.HTTPError) as denied:self.call(other,operation,params)
+            self.assertEqual(denied.exception.code,403)
+        self.assertEqual(self.stage.o.execute('SELECT count(*) FROM orders').fetchone()[0],1)
     def test_authenticated_consumer_cannot_inject_scope_or_enter_admin(self):
         token=self.post('/mini/login',{'code':'oncecode'})['session_token']
         for operation,params in [('community.storefront',{'tenant_id':'tenant2'}),('community.orders',{})]:

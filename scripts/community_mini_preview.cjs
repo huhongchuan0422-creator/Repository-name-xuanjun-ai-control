@@ -1,5 +1,6 @@
 'use strict';
 // Development preview only: no release, payment or server deployment API.
+const {normalizeUploadKey}=require('./community_mini_key.cjs');
 const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');
 async function main(){
  const destination=process.env.COMMUNITY_PREVIEW_OUTPUT;
@@ -18,10 +19,9 @@ async function main(){
  const save=()=>fs.writeFileSync(path.join(destination,'receipt.json'),JSON.stringify(receipt,null,2));
  if(appid!==config.appid){receipt.status='APPID_BINDING_MISMATCH';save();process.exitCode=2;return;}
  let key=process.env.WECHAT_MINIPROGRAM_PRIVATE_KEY;
- if(!key){receipt.status='UPLOAD_KEY_NOT_AVAILABLE';save();process.exitCode=2;return;}
- key=key.trim().replace(/\\n/g,'\n');
- try{const parsed=crypto.createPrivateKey(key);if(parsed.asymmetricKeyType!=='rsa')throw Error();}
- catch(_){receipt.status='UPLOAD_KEY_PARSE_FAILED';save();process.exitCode=2;return;}
+ if(!key){receipt.status='UPLOAD_KEY_NOT_AVAILABLE';save();console.log('MINI_PREVIEW_STATUS='+receipt.status);process.exitCode=2;return;}
+ try{key=normalizeUploadKey(key);}
+ catch(e){receipt.status=/^UPLOAD_KEY_[A-Z_]+$/.test(e.message)?e.message:'UPLOAD_KEY_PARSE_FAILED';save();console.log('MINI_PREVIEW_STATUS='+receipt.status);process.exitCode=2;return;}
  const ci=require(path.join(process.env.COMMUNITY_MINI_CI_MODULE_ROOT,'node_modules/miniprogram-ci'));
  const log=console.log,error=console.error,warn=console.warn;
  const stdout=process.stdout.write,stderr=process.stderr.write;

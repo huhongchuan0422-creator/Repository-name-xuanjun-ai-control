@@ -122,3 +122,61 @@ class LocalStage:
 
     def __exit__(self, *args):
         self.close()
+
+
+def load_local_policy(filename):
+    """Read process-owner private local capability policy. Never provider secrets."""
+    import json
+    import stat
+    from scripts.community_saas_phase2 import Principal
+    fd = os.open(filename, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1 or info.st_size > 32768):
+            raise ValueError('PRIVATE_POLICY_REQUIRED')
+        with os.fdopen(fd, 'r') as stream:
+            fd = None
+            def pairs(items):
+                result = {}
+                for key,value in items:
+                    if key in result:raise ValueError('DUPLICATE_POLICY_KEY')
+                    result[key] = value
+                return result
+            value = json.load(stream, object_pairs_hook=pairs)
+    finally:
+        if fd is not None:os.close(fd)
+    if type(value) is not dict or set(value) != {'principals'} or type(value['principals']) is not list or not 1 <= len(value['principals']) <= 100:
+        raise ValueError('INVALID_LOCAL_POLICY')
+    tokens, bindings, merchant_scope = {}, {}, None
+    for record in value['principals']:
+        if type(record) is not dict or set(record) != {'token','role','tenant_id','merchant_id','store_id'}:
+            raise ValueError('INVALID_LOCAL_POLICY_RECORD')
+        token = record['token']
+        if type(token) is not str or not token.isascii() or not 32 <= len(token) <= 256 or token in tokens:
+            raise ValueError('INVALID_OR_DUPLICATE_TOKEN')
+        principal = Principal(record['tenant_id'],record['role'])
+        identity = {key:record[key] for key in ('tenant_id','merchant_id','store_id')}
+        from scripts.community_merchant_contract import scope
+        scope(identity)
+        if principal.role == 'MERCHANT_ADMIN':
+            if merchant_scope is not None and merchant_scope != identity:
+                raise ValueError('LOCAL_DEMO_SINGLE_MERCHANT_EDITOR_ONLY')
+            merchant_scope = identity
+        tokens[token], bindings[principal] = principal, identity
+    return tokens, bindings, merchant_scope or next(iter(bindings.values()))
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='Persistent loopback simulation; no live payments or production IAM')
+    parser.add_argument('--state-directory',required=True)
+    parser.add_argument('--policy',required=True,help='Owner-private mode 0600 capability JSON, never a WeChat key file')
+    parser.add_argument('--port',type=int,default=18795)
+    args = parser.parse_args()
+    tokens, bindings, merchant = load_local_policy(args.policy)
+    with LocalStage(args.state_directory,bindings,merchant) as app:
+        server = app.listen(tokens,args.port)
+        print('LOCAL_SIMULATION_ONLY http://127.0.0.1:%s/offline/community-stage' % server.server_port,flush=True)
+        try:server.serve_forever()
+        except KeyboardInterrupt:pass

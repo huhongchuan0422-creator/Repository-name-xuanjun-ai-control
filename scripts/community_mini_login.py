@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 from abc import ABC, abstractmethod
 from scripts.community_saas_phase2 import Principal
+from scripts.community_merchant_contract import payment_amount
 
 APPID = re.compile(r'wx[0-9a-fA-F]{16}\Z')
 CODE = re.compile(r'[A-Za-z0-9_-]{1,256}\Z')
@@ -92,6 +93,16 @@ class IdentityPort(ABC):
     @abstractmethod
     def resolve(self, session_token, scene, now): pass
     @abstractmethod
+    def reserve_order(self, session_token, scene, reference, amount_minor, now):
+        """Atomically bind order to existing customer; preserve unknown attempts.
+
+        Reject an existing reference, a changed amount or another owner. Must
+        check legacy orders too; never claim an unowned historical order.
+        """
+    @abstractmethod
+    def authorize_order_read(self, session_token, scene, reference, now):
+        """Raise unless current customer owns this exact existing order."""
+    @abstractmethod
     def revoke(self, session_token, now): pass
 
 
@@ -138,7 +149,25 @@ class MiniGateway:
         # Mini customer session does not turn into merchant/platform admin.
         if principal.role != 'CUSTOMER':
             raise PermissionError('CONSUMER_SESSION_REQUIRED')
-        return self.runtime.dispatch(principal,body['operation'],body['params'],None)
+        operation, params = body['operation'], body['params']
+        if type(operation) is not str or type(params) is not dict:
+            raise ValueError('INVALID_BUSINESS_REQUEST')
+        if operation == 'community.checkout':
+            if set(params) != {'context','token','reference','amount_minor'}:
+                raise ValueError('INVALID_CHECKOUT_FIELDS')
+            payment_amount(params['amount_minor'],'CNY',params['reference'])
+            # Identity/CRM owns customer-order association. No duplicate order
+            # table is added here; failed/unknown creation keeps reservation.
+            self.identity.reserve_order(token,scene,params['reference'],params['amount_minor'],self.runtime.clock())
+        elif operation == 'community.receipt':
+            if set(params) != {'reference'}:
+                raise ValueError('INVALID_RECEIPT_FIELDS')
+            self.identity.authorize_order_read(token,scene,params['reference'],self.runtime.clock())
+        elif operation not in ('community.storefront','community.qr','catalog','offers','entitlement','capability'):
+            # SaaS order access remains in the existing customer center, whose
+            # customer-level ownership service is not replaced by tenant RBAC.
+            raise PermissionError('MINI_CONSUMER_OPERATION_DENIED')
+        return self.runtime.dispatch(principal,operation,params,None)
 
     def logout(self, token):
         if type(token) is not str or not re.fullmatch('[A-Za-z0-9_-]{32,256}',token):

@@ -66,7 +66,9 @@
           "tests/test_community_wechat_sp_verification.py",
           "tests/test_community_mini_login.py",
           "tests/test_community_mini_runtime_e2e.py",
-          "clients/community-mini/session.test.cjs"
+          "clients/community-mini/session.test.cjs",
+          "tests/test_community_wechat_sp_readonly.py",
+          "scripts/community_mini_key.test.cjs"
         ]
       },
       "reuse": [
@@ -138,7 +140,11 @@
         "tests/test_community_mini_login.py",
         "tests/test_community_mini_runtime_e2e.py",
         "clients/community-mini/session.js",
-        "clients/community-mini/session.test.cjs"
+        "clients/community-mini/session.test.cjs",
+        "scripts/community_wechat_sp_readonly.py",
+        "tests/test_community_wechat_sp_readonly.py",
+        "scripts/community_mini_key.cjs",
+        "scripts/community_mini_key.test.cjs"
       ]
     },
     {
