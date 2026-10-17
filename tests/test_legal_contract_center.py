@@ -9,9 +9,12 @@ class LegalTests(unittest.TestCase):
     def test_complete_drafts_are_not_signable(self):
         self.assertEqual(len(self.registry['documents']),22);self.assertIs(self.registry['production_enabled'],False)
         for e in self.registry['documents']:
-            self.assertFalse(e['signature_enabled']);self.assertEqual(e['status'],'DRAFT_NOT_FOR_SIGNATURE')
+            self.assertFalse(e['signature_enabled']);self.assertIn(e['status'],('DRAFT_NOT_FOR_SIGNATURE','INTERNAL_ONLY'))
             raw=(ROOT/e['source']).read_bytes();self.assertEqual(hashlib.sha256(raw).hexdigest(),e['source_sha256'])
-            self.assertIn('待审核草案',raw.decode());self.assertIn('【',raw.decode())
+            if e['status']=='DRAFT_NOT_FOR_SIGNATURE':
+                self.assertIn('待审核草案',raw.decode());self.assertIn('【',raw.decode())
+            else:
+                self.assertIsNone(e.get('planned_route'));self.assertIsNone(e.get('preview'))
     def test_community_five_and_business_invariants(self):
         ids={e['id'] for e in self.registry['documents']};self.assertTrue({'merchant-onboarding','community-split','community-service','privacy','refund-responsibility'}<=ids)
         def text(key):return (ROOT/'docs/legal/templates'/f'{key}.md').read_text()
@@ -26,7 +29,18 @@ class LegalTests(unittest.TestCase):
         self.assertEqual(first,{p.name:p.read_bytes() for p in (ROOT/'demos/legal').glob('*.html')})
         index=first['index.html'].decode()
         for e in self.registry['documents']:
-            self.assertIn(e['id']+'.html',index);self.assertIn('不开放真实签署',first[e['id']+'.html'].decode())
+            if e['status']=='INTERNAL_ONLY':
+                self.assertNotIn('href="'+e['id']+'.html"',index)
+            else:
+                self.assertIn(e['id']+'.html',index)
+                self.assertIn('不开放真实签署',first[e['id']+'.html'].decode())
+    def test_single_custom_contract_has_no_second_public_route(self):
+        self.assertEqual(self.registry['custom_development_single_document_policy']['customer_signed_document_id'],'custom-development')
+        self.assertEqual(self.registry['custom_development_single_document_policy']['customer_signable_document_count'],1)
+        index=(ROOT/'demos/legal/index.html').read_text(encoding='utf-8')
+        self.assertNotIn('href="custom-sow.html"',index)
+        self.assertIn('href="custom-development.html"',index)
+
     def test_modified_or_activated_templates_refused(self):
         import shutil
         with tempfile.TemporaryDirectory() as td:
