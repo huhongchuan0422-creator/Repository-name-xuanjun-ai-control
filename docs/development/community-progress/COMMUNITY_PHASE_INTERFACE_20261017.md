@@ -28,3 +28,7 @@ Hosted CI requires actual exact-commit test job SUCCESS. Optional mini runtime, 
 
 ## External or unresolved
 Real submerchant and WeChat approval, official split receiver-level bill format, production CRM admission, authoritative original Finance reconciliation, production mini-program publish and actual payment/refund remain BLOCKED or UNKNOWN. Unknown provider layouts stay UNKNOWN_SCHEMA; settlement stays UNCONFIRMED.
+
+## Scoped provider-bill reconciliation audit (candidate)
+
+The original finance-authorized `/community/provider-actions` supports `bill_audit` with `{kind, bill_date, after_id}` after an already ingested signed-ticket/hash-verified bill. It reads only existing original encrypted Center reconciliation records for that project and exact merchant/store scope; returns at most 50 immutable result snapshots and a cursor. It checks each audit row against the existing SHA256 event key and returns `finance_status=UNCONFIRMED`. Historical snapshots lacking original scope metadata are not implicitly trusted or shown. No new money ledger, payout or issuer role.
