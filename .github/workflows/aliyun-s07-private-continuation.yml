@@ -1,0 +1,159 @@
+name: S07 private host isolated continuation
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/aliyun-s07-private-continuation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: aliyun-s07-private-continuation
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: >-
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      ((github.event_name == 'pull_request' &&
+        github.event.pull_request.number == 99 &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.head_ref == 'build/tokyo-korea-migration-prep-20261014') ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Run bounded private host continuation once
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          """Four-host read-only SWAS probe. No command input or automatic dispatch retry."""
+          import base64
+          import concurrent.futures
+          import datetime
+          import hashlib
+          import hmac
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          import uuid
+          from pathlib import Path
+          
+          UK = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
+          KR = 'acs:ram::1691189778575891:role/xuanjun-automation'
+          CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+          HOSTS = (
+              ('uk', UK, 'eu-west-1', '40dfc6a47d5e4363b9da7d0d6ab01cb1', 'iZd7oeikknn1z21sq6ji6zZ'),
+              ('korea', KR, 'ap-northeast-2', '09207081a09a466aa0079b07b5e3e7ca', 'iZmj7a5kwr75qc1tul4kf9Z'),
+              ('domestic', CN, 'cn-shanghai', '3a22c458934142eea89ec6e3bf481a57', 'iZvt5t8tlrm8oiZ'),
+              ('tokyo', CN, 'ap-northeast-1', '68985c531add4e90a131aef703a389e6', 'iZ6wee8q9z4t03hvqumwfhZ'),
+          )
+          
+          
+          class Hold(Exception):
+              pass
+          
+          
+          def safe(value):
+              return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+          
+          
+          def quote(value):
+              return urllib.parse.quote(str(value), safe='~')
+          
+          
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          
+          
+          def rpc(endpoint, version, action, credentials, **params):
+              # Endpoint and action are fixed by this program, never accepted from a task.
+              if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+                  raise Hold('ENDPOINT_REJECTED')
+              key, secret, token = credentials
+              values = dict(params, Action=action, Version=version, Format='JSON',
+                            AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0',
+                            SignatureNonce=uuid.uuid4().hex,
+                            Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+              if token:
+                  values['SecurityToken'] = token
+              canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+              signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+              values['Signature'] = base64.b64encode(signature).decode()
+              request = urllib.request.Request('https://' + endpoint + '/',
+                  data=urllib.parse.urlencode(values).encode(),
+                  headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+              try:
+                  with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+                      raw = response.read(262145)
+              except urllib.error.HTTPError as error:
+                  try:
+                      data = json.loads(error.read(262145))
+                      code = safe(data.get('Code'))
+                  except Exception:
+                      code = 'HTTP_' + str(error.code)
+                  raise Hold(code) from None
+              except Exception:
+                  # Never print a URL/body, key, temporary token, or raw exception.
+                  raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+              if len(raw) > 262144:
+                  raise Hold('RESPONSE_TOO_LARGE')
+              try:
+                  data = json.loads(raw)
+              except Exception:
+                  raise Hold('INVALID_API_RESPONSE') from None
+              if not isinstance(data, dict):
+                  raise Hold('INVALID_API_RESPONSE')
+              if 'Code' in data:
+                  raise Hold(safe(data['Code']))
+              return data
+          
+          
+          def assume(role):
+              master=(os.environ["ALIYUN_ACCESS_KEY_ID"],os.environ["ALIYUN_ACCESS_KEY_SECRET"],"")
+              c=rpc("sts.aliyuncs.com","2015-04-01","AssumeRole",master,RoleArn=role,RoleSessionName="xuanjun-s07-private-host-run",DurationSeconds=3600)["Credentials"]
+              cred=(c["AccessKeyId"],c["AccessKeySecret"],c["SecurityToken"])
+              for v in cred:print("::add-mask::"+v,flush=True)
+              return cred
+          
+          def main():
+              import shlex
+              cn=assume(CN)
+              kr=assume(KR)
+              program="import os,json,urllib.request,hashlib;os.environ['XJ_CN_STS_JSON']="+repr(json.dumps(cn))+";raw=urllib.request.urlopen('https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/1b029519886822865847c3c518e6df453ff789d5/evidence/pr99-service-handoff/aliyun-execution/s07_private_coordinator.py',timeout=30).read(100001);assert hashlib.sha256(raw).hexdigest()=='074ce3433cb7183742fec94965a2dc5e6da95e9fffc4c319b1aa7327c6a406ce';n={'__name__':'host_coordinator'};exec(compile(raw,'host_coordinator.py','exec'),n)"+chr(10)
+              program+="try: n['main']()"+chr(10)+"except BaseException as e:"+chr(10)+" print(json.dumps({'status':'S07_SWAS_CONTINUATION_HOLD','code':n['safe'](str(e)) if isinstance(e,(n['Hold'],RuntimeError)) else type(e).__name__,'private_logs_preserved':True,'retry_allowed':False}));raise SystemExit(2)"+chr(10)
+              command="/usr/bin/python3.11 -I -B -u -c "+shlex.quote(program)
+              endpoint="swas.ap-northeast-2.aliyuncs.com"
+              result=rpc(endpoint,"2020-06-01","RunCommand",kr,RegionId="ap-northeast-2",InstanceId=HOSTS[1][3],
+                 Type="RunShellScript",Name="xuanjun-s07-private-coordinator-once",Timeout=850,WorkingUser="root",WorkingDir="/root",CommandContent=command)
+              invoke=result["InvokeId"]
+              print(json.dumps({"host":"korea","invoke_id":invoke,"status":"PRIVATE_HOST_COORDINATOR_DISPATCHED_ONCE"}),flush=True)
+              deadline=time.monotonic()+1000
+              while time.monotonic()<deadline:
+                  r=rpc(endpoint,"2020-06-01","DescribeInvocationResult",kr,RegionId="ap-northeast-2",InstanceId=HOSTS[1][3],InvokeId=invoke)["InvocationResult"]
+                  if r.get("InvocationStatus") in ("Pending","Running","Stopping"):
+                      print("S07_HOST_PRIVATE_CONTINUATION_PROGRESS",flush=True);time.sleep(15);continue
+                  output=r.get("Output","")
+                  try:row=json.loads(output.splitlines()[-1])
+                  except Exception:row=json.loads(base64.b64decode(output,validate=True).decode().splitlines()[-1])
+                  # Coordinator exposes only this bounded sanitized final receipt to CI.
+                  allowed={"status","code","private_logs_preserved","retry_allowed","app_uid_gid","application_processes_stopped","application_root","data_source","dynamic_completeness_proven","final_cutover_snapshot","network_namespace_external_interfaces","production_cutover","production_service_actions","protected_state_unchanged","roles","runtime_configuration_complete","services_installed","source_files","supplement_files","supplement_provenance","temporary_app_process_starts","current_tokyo_source_hashes","bridge_material_files","bridge_materials","errors"}
+                  clean={k:v for k,v in row.items() if k in allowed}
+                  print(json.dumps(clean,sort_keys=True),flush=True)
+                  if r.get("InvocationStatus")!="Success" or r.get("ExitCode")!=0: return 2
+                  return 0 if clean.get("application_processes_stopped") is True and clean.get("protected_state_unchanged") is True and all(v.get("health_http_status")==200 for v in clean.get("roles",{}).values()) and len(clean.get("roles",{}))==3 else 2
+              raise Hold("COORDINATOR_RESULT_UNKNOWN_PRESERVE_NO_RETRY")
+          try:raise SystemExit(main())
+          except Hold as e:
+              print(json.dumps({"status":"HOLD","code":safe(str(e)),"retry_allowed":False}),flush=True)
+              raise SystemExit(2)
+          PY
