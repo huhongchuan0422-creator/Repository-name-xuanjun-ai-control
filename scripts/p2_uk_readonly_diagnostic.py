@@ -39,49 +39,117 @@ def command_content():
     return COMMAND.decode('utf-8')
 
 def safe_receipt(output, stderr='', exit_code=0):
-    """Reject unknown or sensitive data rather than returning untrusted output.
-
-    stderr is never included in successful or failed public receipts.
-    Caller must not log the raw response before invoking this reducer.
-    """
-    require(type(output) is str and type(stderr) is str and not stderr)
+    """Fail closed: structured metadata only, no raw strings on errors."""
+    require(type(output) is str and type(stderr) is str and stderr == '')
     require(type(exit_code) is int and exit_code == 0)
-    raw = output.encode('utf-8')
-    require(len(raw) <= MAX_OUTPUT_BYTES and raw.endswith(b'\n'))
-    require(b'\r' not in raw and b'\x00' not in raw)
-    rows = output.splitlines()
-    require(rows and rows[0] == 'DIAG_SCHEMA=1' and rows[-1] == 'DIAG_END=COMPLETE')
-    values = []
-    for row in rows:
-        for item in row.split(' '):
-            require(item.count('=') == 1)
-            key, value = item.split('=', 1)
-            require(key in KEYS and len(value) <= 160 and
-                    re.fullmatch(r'[A-Za-z0-9_./:-]*', value) is not None)
-            if key in ('DIAG_SCHEMA','DIAG_END'): require(value == ('1' if key == 'DIAG_SCHEMA' else 'COMPLETE'))
-            elif key == 'TARGET_HOST': require(value == TARGET_HOST)
-            elif key == 'EXEC_UID': require(value == '0')
-            elif key == 'PYTHON_VERSION': require(re.fullmatch(r'3\.6\.[0-9]+', value) is not None)
-            elif key == 'SITE_MODE': require(re.fullmatch(r'[0-7]{3,4}', value) is not None)
-            elif key in ('SITE_UID','SITE_GID','SITE_SIZE','UID','GID','MODE','SIZE','MainPID'): require(value.isdigit())
-            elif key == 'SITE_PATH': require(value == SITE_PATH)
-            elif key == 'UNIT': require(value in UNIT_NAMES)
-            elif key in ('DB_FILE','DB_FILE_ABSENT'): require(value in DB_NAMES)
-            elif key in ('CANONICAL_WRITER','EPOCH','LEASE','FENCE',
-                         'ROOT_TRUST','HISTORICAL_INVOKEID'): require(value == 'UNKNOWN')
-            elif key == 'SITE_SHA256': require(re.fullmatch(r'[0-9a-f]{64}', value) is not None)
-            elif key == 'STOP': raise DiagnosticHold('REMOTE_STOP_NO_RETRY')
-            values.append((key, value))
-    require(sum(k == 'TARGET_HOST' for k,v in values) == 1)
-    require(sum(k == 'EXEC_UID' for k,v in values) == 1)
-    require(sum(k == 'PYTHON_VERSION' for k,v in values) == 1)
-    require(sum(k == 'DIAG_SCHEMA' for k,v in values) == 1 and sum(k == 'DIAG_END' for k,v in values) == 1)
-    require(len(rows) <= 75)
-    require(not any(k == 'STOP' for k,v in values))
-    return {'state':'DIAGNOSTIC_METADATA_ONLY',
-            'command_sha256': COMMAND_SHA256,
-            'output_sha256': hashlib.sha256(raw).hexdigest(),
-            'redispatch_allowed':False,
-            'writer_verified':False,
-            'site_execution_authorized':False,
-            'metadata':values}
+    raw=output.encode('utf-8')
+    require(len(raw) <= MAX_OUTPUT_BYTES and raw.endswith(b'\\n'))
+    require(b'\\r' not in raw and b'\\x00' not in raw)
+    rows=output.splitlines()
+    require(25 <= len(rows) <= 75)
+    pos=0
+    values=[]
+    def take(line):
+        nonlocal pos
+        require(pos<len(rows) and rows[pos]==line)
+        pos+=1
+        values.append(tuple(line.split('=',1)))
+    def key(name, predicate):
+        nonlocal pos
+        require(pos<len(rows))
+        row=rows[pos]
+        require(row.startswith(name+'=') and row.count('=')==1)
+        value=row[len(name)+1:]
+        require(len(value)<=120 and predicate(value))
+        values.append((name,value))
+        pos+=1
+        return value
+    token=lambda x: re.fullmatch(r'[A-Za-z0-9_./:-]{1,120}',x) is not None
+    number=lambda x: re.fullmatch(r'[0-9]{1,16}',x) is not None
+    mode=lambda x: re.fullmatch(r'[0-7]{3,4}',x) is not None
+    take('DIAG_SCHEMA=1')
+    take('TARGET_HOST='+TARGET_HOST)
+    take('EXEC_UID=0')
+    key('PYTHON_VERSION',lambda x: re.fullmatch(r'3\\.6\\.[0-9]{1,3}',x) is not None)
+    key('CGROUP_MOUNT_TYPE',lambda x:x in ('tmpfs','cgroup2fs'))
+    # The fixed awk command prefixes only its first record; following v1
+    # controller rows can contain commas, and name=systemd is legal.
+    require(pos<len(rows) and rows[pos].startswith('CGROUP_PROC_SELF='))
+    controllers=[]
+    while pos<len(rows):
+        line=rows[pos]
+        if pos == 5:
+            require(line.startswith('CGROUP_PROC_SELF='))
+            line=line[len('CGROUP_PROC_SELF='):]
+        elif line.startswith('SITE_PATH='):
+            break
+        require(len(line)<=140 and re.fullmatch(r'[0-9]{1,6}:[A-Za-z0-9_,=.-]*',line) is not None)
+        require(line not in controllers and len(controllers)<6)
+        controllers.append(line)
+        pos+=1
+    require(controllers and (controllers==['0:'] or all(x!='0:' for x in controllers)))
+    values.append(('CGROUP_PROC_SELF_COUNT',str(len(controllers))))
+    take('SITE_PATH='+SITE_PATH)
+    if pos<len(rows) and rows[pos]=='SITE_STATUS=ABSENT':
+        take('SITE_STATUS=ABSENT')
+    else:
+        require(pos<len(rows))
+        line=rows[pos]
+        match=re.fullmatch(r'SITE_UID=([0-9]{1,12}) SITE_GID=([0-9]{1,12}) SITE_MODE=([0-7]{3,4}) SITE_SIZE=([0-9]{1,16})',line)
+        require(match is not None)
+        require(match.group(1)=='0' and match.group(2)=='0')
+        values.extend(zip(('SITE_UID','SITE_GID','SITE_MODE','SITE_SIZE'),match.groups()))
+        pos+=1
+        key('SITE_SHA256',lambda x:re.fullmatch(r'[0-9a-f]{64}',x) is not None)
+    units=set()
+    for unused in range(4):
+        unit=key('UNIT',lambda x:x in UNIT_NAMES)
+        require(unit not in units)
+        units.add(unit)
+        fields={}
+        while pos<len(rows) and rows[pos].split('=',1)[0] in ('LoadState','ActiveState','SubState','MainPID','UnitFileState'):
+            item=rows[pos]
+            require(item.count('=')==1)
+            k,v=item.split('=',1)
+            require(k not in fields)
+            allowed={'LoadState':('loaded','not-found','masked','error','bad-setting'),
+                     'ActiveState':('active','inactive','failed','activating','deactivating','reloading'),
+                     'SubState':('dead','running','exited','failed','start','stop','auto-restart','waiting','condition','listening','mounted'),
+                     'UnitFileState':('enabled','disabled','masked','static','indirect','generated','transient','linked','linked-runtime','enabled-runtime','masked-runtime','bad','alias')}
+            require(number(v) if k=='MainPID' else v in allowed[k])
+            fields[k]=v
+            values.append((k,v))
+            pos+=1
+        require(set(fields)=={'LoadState','ActiveState','SubState','MainPID','UnitFileState'})
+    require(units==UNIT_NAMES)
+    files=set()
+    for unused in range(3):
+        require(pos<len(rows))
+        line=rows[pos]
+        if line.startswith('DB_FILE_ABSENT='):
+            path=key('DB_FILE_ABSENT',lambda x:x in DB_NAMES)
+        else:
+            m=re.fullmatch(r'DB_FILE=(\\S+) UID=([0-9]{1,12}) GID=([0-9]{1,12}) MODE=([0-7]{3,4}) SIZE=([0-9]{1,16})',line)
+            require(m is not None and m.group(1) in DB_NAMES)
+            path=m.group(1)
+            values.append(('DB_FILE',path))
+            pos+=1
+        require(path not in files)
+        files.add(path)
+    require(files==DB_NAMES)
+    for name in ('CANONICAL_WRITER','EPOCH','LEASE','FENCE','ROOT_TRUST','HISTORICAL_INVOKEID'):
+        # Fixed command prints six consecutive lines, not six newlines in one value.
+        if name=='CANONICAL_WRITER':
+            require(pos<len(rows))
+            value=rows[pos]
+            expected='CANONICAL_WRITER=UNKNOWN'
+            require(value==expected)
+            pos+=1;values.append((name,'UNKNOWN'))
+        else:
+            take(name+'=UNKNOWN')
+    take('DIAG_END=COMPLETE')
+    require(pos==len(rows))
+    return {'state':'DIAGNOSTIC_METADATA_ONLY','command_sha256':COMMAND_SHA256,
+            'output_sha256':hashlib.sha256(raw).hexdigest(),
+            'redispatch_allowed':False,'writer_verified':False,
+            'site_execution_authorized':False,'metadata':values}
