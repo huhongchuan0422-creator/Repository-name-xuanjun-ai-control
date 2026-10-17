@@ -101,3 +101,8 @@ class BillJourney(unittest.TestCase):
         bill['rows']=[dict(zip(columns,values[:4]+['9999999999']))]
         result=self.bills.reconcile(g,bill)
         self.assertEqual(result['exceptions'][0]['reason'],'BILL_SUBMERCHANT_MISMATCH')
+
+        bill['rows']=[dict(zip(columns,values[:3]+['',values[4]]))]
+        self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'SPLIT_TRANSACTION_MISMATCH')
+        bill['rows']=[dict(zip(columns,values[:4]+['']))]
+        self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'BILL_SUBMERCHANT_MISMATCH')
