@@ -49,6 +49,18 @@ class UnixMiniProxy(unittest.TestCase):
         self.assertEqual(status,200);self.assertFalse(body['payment_enabled'])
         self.assertEqual(self.fx.center.session(body['result']['session_token']),self.fx.uid1)
         self.assertEqual(source.call_count,1)
+    def test_real_matching_unix_peer_and_source_reach_existing_account(self):
+        # Hosted and the domestic runner are non-root; the test pins their real
+        # UID as the proxy fixture identity and exercises SO_PEERCRED unchanged.
+        self.assertGreater(os.geteuid(),0)
+        self.app.close()
+        self.app=MiniApplication(self.fx.center,self.root/'state',self.fx.stage.api.bindings,
+             self.fx.stage.api.bindings[self.fx.stage.customer],self.fx.scenes,self.fx.identity.appid,'a'*32)
+        self.app.gateway.provider.exchange=Mock(return_value={'appid':self.fx.identity.appid,'openid':'openid1'})
+        self.server=self.app.listen_proxy(self.path,'https://example.test',os.geteuid(),os.getegid())
+        status,body=self.request()
+        self.assertEqual(status,200)
+        self.assertEqual(self.fx.center.session(body['result']['session_token']),self.fx.uid1)
     def test_wrong_host_cross_origin_and_duplicate_origin_never_exchange(self):
         for kwargs in ({'host':'evil.test'},{'origins':('https://evil.test',)},
                        {'origins':('https://example.test','https://example.test')}):

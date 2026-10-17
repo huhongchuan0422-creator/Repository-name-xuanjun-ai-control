@@ -143,3 +143,14 @@ Owner要求通过已有服务器执行小程序预览。mini-preview改用已有
 - MiniApplication.listen_proxy：新增Unix后端入口，复用原pr122_customer_source.TrustedNginxSource的Linux SO_PEERCRED固定Nginx UID与单个来源IP校验。该模块从原b882ea631e6391f1fc8727766ccbaf3c66b519da逐字节复用，SHA256=3e8d531ede69577b72b6ee9089fdc8f481b2f91578f19e0e44d1841c168f3471，纳入依赖锁及源码包；不修改原writer源码。HTTPS Origin/Host固定于宿主配置，拒绝重复Origin；来源登录限流共用原Center auth-source计数。socket目录须既存且受保护，拒绝覆盖，close只移除本实例inode。未创建Nginx路由、运行目录或生产服务。
 - 修复真实换码耗时跨秒时沿用旧clock签发会话的问题：provider返回后重新取服务端时间，失败记录也用当前时钟。新增延迟3秒换码检查。
 - 本地8项Unix测试因环境禁止创建AF_UNIX socket返回EPERM，未记PASS、不跳过、不绕过。提交到Hosted完整CI实测，成功与否以准确提交终态为准。绑定、网络与身份仍为合成客户/微信fixture，不是生产客户登录验收。
+
+
+### 持续接线与国内非root验证准备
+
+准确源码d94b5f7288a29dc1f415522a3cc18c4a33822c0c已取得Hosted Run39008839520 / Job117326787519 SUCCESS：267项community Python、342项stage5 Python和72项JS，共681次测试执行，零失败/跳过。8项Unix测试真实执行成功（其中成功身份为显式source fixture；真实不匹配SO_PEERCRED拒绝已验），本地EPERM不再阻塞Hosted验证。
+
+新增community_provider_notification_http：HTTPS/可信Unix代理后方的原始报文入口，仅识别服务端发票映射生成的固定回调路径；不接收客户自报order/tenant/verified。拒绝重复请求头、Origin、重定向路径、无签名/错金额；正文限1MiB、读取deadline1秒、SQLite锁等待1秒；只有原FINANCE_EVIDENCE持久提交后应答204，失败/未知不应答成功，不产生真实付款/退款/分账或权益。7项实际HTTP+合成签名测试通过。官方来源：https://pay.wechatpay.cn/doc/v3/partner/4012085146（普通支付/小程序支付服务商通知）。
+
+新增Unix正向实际peer检查：Hosted/国内非root测试以当前测试UID作为代理fixture，不改SO_PEERCRED函数；只证明隔离边界与应用组合，不当生产Nginx真实登记。
+
+复用原pr122_customer_runtime.py（b882ea631e6391f1fc8727766ccbaf3c66b519da逐字节，SHA256 3a483ed81eb595309665c3d2b5746e56a50016fb246617000eb326dc5ff2b959）；沿用其已固定3个wheel：cryptography46.0.3、cffi2.0.0、pycparser2.23和各原SHA256。新增[mini-runtime]受控触发的Hosted离线依赖打包及国内Runner非root临时兼容性测试；不覆盖原安装器，不Root、不全局pip、不服务安装。主CI仍使用原cryptography50.0.2/Python3.12；国内是原Python3.11兼容性证据，两者分别记录，不混称生产Runtime准入。新任务终态待取证。

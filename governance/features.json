@@ -73,7 +73,8 @@
           "tests/test_community_mini_application.py",
           "tests/test_community_stage_recovery.py",
           "tests/test_community_saas_provider_evidence.py",
-          "tests/test_community_mini_proxy.py"
+          "tests/test_community_mini_proxy.py",
+          "tests/test_community_provider_notification_http.py"
         ]
       },
       "reuse": [
@@ -161,7 +162,10 @@
         "scripts/community_saas_provider_evidence.py",
         "tests/test_community_saas_provider_evidence.py",
         "scripts/pr122_customer_source.py",
-        "tests/test_community_mini_proxy.py"
+        "tests/test_community_mini_proxy.py",
+        "scripts/community_provider_notification_http.py",
+        "tests/test_community_provider_notification_http.py",
+        "scripts/pr122_customer_runtime.py"
       ]
     },
     {
