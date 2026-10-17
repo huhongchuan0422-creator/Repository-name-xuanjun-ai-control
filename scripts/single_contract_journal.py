@@ -5,6 +5,8 @@ authenticate users: production HTTP must use trusted customer-center identity
 and authorization before calling. It does not change any production database.
 Python 3.6 compatible; no model/API or network dependencies.
 """
+import hashlib
+import hmac
 import json
 import sqlite3
 from contextlib import contextmanager
@@ -74,14 +76,27 @@ class Journal(object):
                 raise
         return candidate
 
-    def read(self, verified_project_id, contract_id, request_id):
+    def read(self, verified_project_id, verified_customer_id, contract_id, request_id):
         with self._connection() as db:
-            row=db.execute("""SELECT candidate_json FROM contract_frozen_candidate
+            row=db.execute("""SELECT candidate_json, candidate_sha FROM contract_frozen_candidate
                 WHERE project_id=? AND contract_id=? AND request_id=?""",
                 (verified_project_id,contract_id,request_id)).fetchone()
         if row is None:
             raise ContractHold("CANDIDATE_NOT_FOUND")
-        obj=json.loads(bytes(row[0]).decode("utf-8"))
-        if obj.get("status")!="UNSIGNED_CANDIDATE_ONLY":
-            raise ContractHold("CORRUPT_CANDIDATE_STATUS")
+        try:
+            obj=json.loads(bytes(row[0]).decode("utf-8"))
+            scope=obj["frozen"]["scope"]
+            current=freeze_from_stored(obj)
+            if not hmac.compare_digest(current, row[1]):
+                raise ContractHold("CORRUPT_CANDIDATE_DIGEST")
+            if scope["project_id"] != verified_project_id or scope["verified_customer_id"] != verified_customer_id or scope["contract_id"] != contract_id:
+                raise ContractHold("CANDIDATE_ACCESS_DENIED")
+            if obj.get("status") != "UNSIGNED_CANDIDATE_ONLY" or any(obj.get(k) != "HOLD" for k in ("contract_sign","payment","procurement","development_start")):
+                raise ContractHold("CORRUPT_CANDIDATE_STATUS")
+        except (ValueError, KeyError, TypeError):
+            raise ContractHold("CORRUPT_CANDIDATE")
         return obj
+
+def freeze_from_stored(obj):
+    """Verify content digest of the stored frozen object, not the wrapper."""
+    return hashlib.sha256(canonical_bytes(obj["frozen"])).hexdigest()
