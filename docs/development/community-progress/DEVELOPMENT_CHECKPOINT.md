@@ -159,3 +159,9 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Most recent verified exact source CI: commit 642f5afb23b15463c76cf591e705c68435f4bc09, GitHub Actions run 39033750602, test job 117399331268 SUCCESS: community 448/448, Stage 342/342, Node 34+40+8+7 pass. Optional runtime/SDK/preview checks SKIPPED. Later changes were only registered documentation/metadata, not source code.
 - Feature registration now includes merchant workbench UI and browser CI paths. Other completed source tests remain reusable. First and second phase original groups (5 and 7) remain PARTIAL until complete requirements trace, official WeChat receiver-detail schema, payment/CRM/Finance external binding and phase-independent review; do not inflate percentage.
 - This is a recoverable stop point for the current tool interaction, not proof that automated AI development will continue after chat ends. Resume by fetching current remote HEAD and tree, verifying single writer, and continuing unsigned external-independent source work; no Work/Codex or Dots reviewer login used.
+
+## 2026-10-17 bill CSV input fail-closed hardening
+
+- Source 68b9e2b25fd0e0817d4babd0f3894341eb2f12ba and 0b3b135a8528e36dfa34146cc5342d642ea76656 reject blank/invalid CSV column headers and malformed UTF-8 without disclosing raw imported customer data in error text. Synthetic parser regressions c9b0c0c1ae438ccc6ba69c88058bd431902d952f and 65acc5fbeee5ed0170bd55d3a39dc83ac994424c.
+- Exact source Hosted run 39037981766 is still awaiting terminal result at checkpoint time; SKIPPED jobs cannot count as PASS.
+- Source scope remains original audited official-ticket/hash validated private bill, not receiver-level merchant official schema acceptance, Finance receipt authority or live funds. Both Phase1/Phase2 remain PARTIAL.
