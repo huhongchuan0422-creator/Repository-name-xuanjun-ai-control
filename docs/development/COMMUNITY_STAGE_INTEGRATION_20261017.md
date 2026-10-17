@@ -90,6 +90,12 @@ community_merchant_opening复用原Center.links/audit及原merchant_profiles，�
 
 审核员可要求已通过申请重新核验；此时原版本立即失去工作台访问。补件与独立审核完成后，必须有同一申请原CORRECTION事件、递增的新批准版本及同一CRM映射，才更新原开通记录并恢复，保留商家已编辑档案；缺失旧档案或绑定变化拒绝。没有跨数据库原子提交声明，保留状态和显式恢复为实际语义。14项原SQLite测试覆盖前后提交中断、新连接恢复、同店重复申请、历史档案抢占、撤权、资料过期、重新核验和恢复；两条真实Chromium/HTTP流程分别验证无CRM映射与已绑定自动开通，并实际调用新商家工作台订单接口。均为合成身份、资料和映射，实际部署/真实CRM交付仍未验收。
 
+### 入驻列表与身份切换补齐
+
+原100条上限报错改为50条/页、服务端固定参数游标、可选状态筛选；申请人列表始终按当前原Center账号约束，审核列表每页重新检查原REVIEWER项目权限。游标只接受已生成申请ID格式，状态固定枚举，拒绝客户端自报owner/任意SQL片段。返回next_cursor供页面“加载更多”使用；列表不是不可变快照，刷新后按最新记录重新读取。3项原数据库测试用61条合成记录覆盖两页、去重、状态筛选、账号隔离和无效输入。
+
+原客户中心宿主须在登录、退出、切换账号时调用configureCommunityOnboarding传递当前CSRF或空值。页面递增会话代次，立即清除私有列表、申请详情、材料、表单及工作台选项；旧请求的响应和错误不能改写新账号视图。上传在读取文件前固定申请/版本/会话代次，读取后再检查；身份变化时不得把旧文件携带新账号凭据上传。2项Chromium客户端测试使用明确的延迟合成transport分别覆盖旧资料响应迟到和文件读取中换号；与原2项真实HTTP/SQLite流程分开记录，不冒充真实跨账号生产验证。新测试纳入原完整CI；分页测试亦纳入国内非root回归，不另开审核。
+
 python -B -m unittest discover -s tests -p 'test_community_*.py'
 python -B -m unittest discover -s tests -p 'test_stage5_*.py'
 node --test clients/community-mini/client.test.cjs demos/community-local-e2e/*.test.mjs demos/community-payment/demo.test.mjs demos/community-admin/admin.test.mjs

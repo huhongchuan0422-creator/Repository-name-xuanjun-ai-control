@@ -8,6 +8,7 @@ import hashlib
 import json
 import secrets
 import shutil
+import re
 from pathlib import Path
 from scripts.pr122_customer_core import Center,canonical,secure_write,private_path,safe_text
 from scripts import community_onboarding_offline as workflow
@@ -103,11 +104,14 @@ class MerchantOnboarding:
         schemas={'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
                  'upload':{'application','revision','kind','content_base64','expires_at'},
                  'submit':{'application','revision'},'review_list':set(),
-                 'review_read':{'application'},'review':{'application','revision','action','note'},
+                 'read':{'application'},'review_read':{'application'},'review':{'application','revision','action','note'},
                  'review_material':{'application','revision','kind','decision','note'},
                  'open_workbench':{'application','revision','workspace'},
                  'download':{'application','kind'}}
-        if type(op) is not str or op not in schemas or set(params)!=schemas[op]:raise ValueError('INVALID_ONBOARDING_FIELDS')
+        listing=type(op) is str and op in ('mine','review_list')
+        if (type(op) is not str or op not in schemas or
+                (not set(params).issubset({'cursor','status'}) if listing else set(params)!=schemas[op])):
+            raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         if op=='open_workbench':
             from scripts.community_merchant_opening import open_workbench
@@ -116,12 +120,21 @@ class MerchantOnboarding:
             return self._view(params['application'],meta,data)
         if op in ('mine','review_list'):
             if op=='review_list':self._reviewer(uid)
-            rows=c.db.execute("SELECT subject_idx FROM links WHERE channel='COMMUNITY_ONBOARDING' AND active=1"+
-                (' AND user_id=?' if op=='mine' else '')+' ORDER BY subject_idx LIMIT 101',(uid,) if op=='mine' else ()).fetchall()
-            if len(rows)>100:raise ValueError('APPLICATION_LIST_REQUIRES_PAGINATION')
-            return {'applications':[self._view(row[0],*self._load(row[0],uid,op=='review_list')[1:]) for row in rows]}
-        if op=='review_read':
-            _,meta,data=self._load(params['application'],uid,True)
+            cursor=params.get('cursor');status=params.get('status','ALL')
+            if cursor is not None and (type(cursor) is not str or not re.fullmatch('ma_[0-9a-f]{32}',cursor)):
+                raise ValueError('INVALID_APPLICATION_CURSOR')
+            if type(status) is not str or status not in workflow._ALLOWED|{'ALL'}:raise ValueError('INVALID_APPLICATION_STATUS')
+            query="SELECT l.subject_idx FROM links l JOIN onboarding o ON o.tenant=l.user_id AND o.application=l.subject_idx WHERE l.channel='COMMUNITY_ONBOARDING' AND l.active=1 AND l.project=l.subject_idx"
+            args=[]
+            if op=='mine':query+=' AND l.user_id=?';args.append(uid)
+            if cursor is not None:query+=' AND l.subject_idx>?';args.append(cursor)
+            if status!='ALL':query+=' AND o.status=?';args.append(status)
+            rows=c.db.execute(query+' ORDER BY l.subject_idx LIMIT 51',args).fetchall()
+            page=rows[:50]
+            return {'applications':[self._view(row[0],*self._load(row[0],uid,op=='review_list')[1:]) for row in page],
+                    'next_cursor':page[-1][0] if len(rows)>50 else None}
+        if op in ('read','review_read'):
+            _,meta,data=self._load(params['application'],uid,op=='review_read')
             return self._view(params['application'],meta,data)
         application=params['application']
         if op=='save' and application is None:
