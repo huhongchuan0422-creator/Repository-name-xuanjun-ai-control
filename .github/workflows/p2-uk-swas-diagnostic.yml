@@ -86,7 +86,7 @@ jobs:
           assert b'\nOK\n' in diag_log and b'skipped=' not in diag_log
           expected_tests=102
           assert ('Ran %d tests in ' % expected_tests).encode() in log and b'\nOK\n' in log and b'skipped=' not in log
-          doc=Path(paths[-1]).read_text()
+          doc=Path('evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md').read_text()
           script=doc.split('<!-- BEGIN P2_SITE_ENTRY_V1 -->\n```python\n',1)[1].split('```\n<!-- END P2_SITE_ENTRY_V1 -->',1)[0].encode()
           ast.parse(script.decode(),feature_version=(3,6))
           site=Path('/tmp/P2_SITE_ENTRY.py');site.write_bytes(script)
