@@ -140,6 +140,18 @@ class Commerce:
         if op in ('refund_apply','refund_application'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).consumer(token,scene,op,p)
+        if op == 'project_review':
+            # Original, independently admitted Center REVIEWER only. The
+            # authoritative version/state machine checks submitter separation.
+            if (type(p) is not dict or set(p) != {'item','revision','action','reason'}
+                    or not valid_id(p['item']) or type(p['revision']) is not int
+                    or p['revision'] < 0 or p['action'] not in
+                    ('begin_review','request_changes','approve')
+                    or type(p['reason']) is not str or len(p['reason']) > 1000):
+                raise ValueError('INVALID_INDEPENDENT_PROJECT_REVIEW')
+            c.project(uid, project, ('REVIEWER',))
+            return c.transition(uid, project, p['item'],
+                                p['revision'], p['action'], p['reason'])
         if op == 'project_submit':
             # Only an existing version of an original Center requirement may be
             # submitted. Approval and correction remain with independent reviewers.
