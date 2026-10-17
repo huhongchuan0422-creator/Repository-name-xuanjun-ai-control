@@ -25,6 +25,24 @@ MODULES = {
  "signed_qr": {"title":"签名扫码入口", "entrypoint":"signed_qr",
    "dependencies":("storefront_catalog",), "capabilities":("qr.demo",)}
 }
+# Source registration does not publish a commercial offer, assign a price,
+# authorize provider operations or alter existing contracts/entitlements.
+MODULES.update({
+ "merchant_admission":{"title":"商家入驻与独立审核","entrypoint":"merchant/join","dependencies":(),"capabilities":("merchant.admission",),"source":"scripts/community_merchant_onboarding.py","classification":"GENERAL"},
+ "customer_profiles":{"title":"客户资料与推荐关系","entrypoint":"community/portal","dependencies":(),"capabilities":("customer.profile",),"source":"scripts/community_customer_profile.py","classification":"GENERAL"},
+ "community_directory":{"title":"社区身份审核与成员关系","entrypoint":"community/portal","dependencies":("customer_profiles",),"capabilities":("community.directory",),"source":"scripts/community_center_communities.py"},
+ "commerce_orders":{"title":"商品定价库存与交易订单","entrypoint":"merchant/workbench","dependencies":("merchant_operations",),"capabilities":("commerce.orders",),"source":"scripts/community_commerce.py","classification":"GENERAL"},
+ "wechat_partner_payments":{"title":"微信服务商支付与签名回调","entrypoint":"mini/payment","dependencies":("commerce_orders",),"capabilities":("provider.payments",),"source":"scripts/community_mini_payments.py","classification":"GENERAL"},
+ "wechat_partner_refunds":{"title":"退款申请审核与微信退款恢复","entrypoint":"merchant/workbench","dependencies":("wechat_partner_payments",),"capabilities":("provider.refunds",),"source":"scripts/community_refund_requests.py","classification":"GENERAL"},
+ "community_rules":{"title":"社区分账规则版本与冻结","entrypoint":"merchant/workbench","dependencies":("community_directory","commerce_orders"),"capabilities":("community.rules",),"source":"scripts/community_split_rules.py"},
+ "wechat_profitsharing":{"title":"微信分账与分账回退","entrypoint":"community/provider-actions","dependencies":("wechat_partner_payments","community_rules"),"capabilities":("provider.profitsharing",),"source":"scripts/community_wechat_sp_actions.py","classification":"GENERAL"},
+ "provider_reconciliation":{"title":"微信官方账单与异常核对","entrypoint":"merchant/workbench","dependencies":("wechat_partner_payments",),"capabilities":("provider.reconciliation",),"source":"scripts/community_provider_bills.py","classification":"GENERAL"},
+ "platform_operations":{"title":"平台商家状态及运营审计","entrypoint":"community/portal","dependencies":("merchant_admission","commerce_orders"),"capabilities":("platform.operations",),"source":"scripts/community_platform_views.py","classification":"GENERAL"},
+ "community_promotion":{"title":"社区推广与去重归属","entrypoint":"community/portal","dependencies":("community_directory",),"capabilities":("community.promotion",),"source":"scripts/community_consumer_communities.py"},
+ "store_staff":{"title":"多门店与员工权限","entrypoint":"merchant/workbench","dependencies":("merchant_operations",),"capabilities":("store.staff",),"source":"scripts/community_staff.py","classification":"GENERAL"},
+ "wechat_applyment":{"title":"微信特约商户进件资料","entrypoint":"merchant/join","dependencies":("merchant_admission",),"capabilities":("provider.applyment",),"source":"scripts/community_wechat_applyment.py","classification":"GENERAL"}
+})
+
 CAPABILITIES = {cap:code for code,item in MODULES.items() for cap in item["capabilities"]}
 SCHEMA = """
 CREATE TABLE module_prices (
@@ -77,7 +95,13 @@ def connect(path=":memory:"):
   raise
 def catalog():
  return [{"id":key,"title":item["title"],"entrypoint":item["entrypoint"],
-          "dependencies":list(item["dependencies"]),"capabilities":list(item["capabilities"])}
+          "dependencies":list(item["dependencies"]),"capabilities":list(item["capabilities"]),
+          "module_number":"XJ-"+key.upper().replace('_','-'),"version":"1.0.0",
+          "author":"玄钧AI实验室","ownership":"GENERAL_MODULE" if item.get("classification")=="GENERAL" else "BUSINESS_MODULE",
+          "co_creator_nickname":None,"description":item["title"],"source":item.get("source"),
+          "commercial_release":"REQUIRES_EXISTING_OFFER_APPROVAL","supported_currencies":["CNY","USD"],
+          "supported_billing":["MONTHLY","YEARLY","BUYOUT","PROMOTION","FREE","METERED","CUSTOM"],
+          "cost_components":["MODULE_FEE","SUPPLIER_COST","AGENCY_FEE","DEPLOYMENT","MAINTENANCE","TAX","PAYMENT_FX","OTHER"]}
           for key,item in sorted(MODULES.items())]
 def set_price(db,module_id,version,cny_minor,usd_minor,period_days,active=True):
  if module_id not in MODULES or any(type(v) is not int for v in (version,cny_minor,usd_minor,period_days)) or version<1 or min(cny_minor,usd_minor)<0 or period_days<1 or type(active) is not bool:

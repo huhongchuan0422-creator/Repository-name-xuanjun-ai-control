@@ -211,7 +211,8 @@
         "tests/test_community_consumer_communities.py",
         "scripts/community_platform_views.py",
         "tests/test_community_platform_views.py",
-        "clients/community-mini/checkout-community.test.cjs"
+        "clients/community-mini/checkout-community.test.cjs",
+        "tests/test_community_module_catalog.py"
       ]
     },
     {

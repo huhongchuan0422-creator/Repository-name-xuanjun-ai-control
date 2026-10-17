@@ -1,9 +1,10 @@
 {
-  "current_module": "特约商户官方进件条件资料、小程序消费记录及剩余端到端接线",
+  "current_module": "四端业务接口、模块报价目录及新调用链集成",
   "blockers": [
     "暂无真实特约商户，真实交易验收依赖外部条件",
-    "本批源码尚未集中测试或独立审核",
-    "官方进件条件字段、关单及库存释放、多门店、官方日账单、社区收益结算与平台总后台仍未完整开发"
+    "尚未完成全部当前源码业务链测试和独立审核",
+    "官方分账账单接收方明细格式仍需可信字段适配；未识别格式保持 UNKNOWN",
+    "真实财务核销需要原财务权威接入；不创建第二账本"
   ],
   "tasks": [
     {
@@ -57,7 +58,7 @@
     {
       "id": "P2-D",
       "phase": 2,
-      "state": "MISSING",
+      "state": "PARTIAL",
       "name": "社区管理"
     },
     {
@@ -83,6 +84,14 @@
     "activation_commit": "8734b82d40ebb9335d47f837144b41237c2badbf",
     "pull_request": 125,
     "schedule": "*/10 * * * *",
-    "first_run": "NOT_YET_VERIFIED"
+    "first_run": "VERIFIED_2026-10-17T09:36:44Z"
+  },
+  "latest_verified_ci": {
+    "source": "d6803ae95178465ce7d8b5f222c77d6358f8a910",
+    "run_id": 39023658199,
+    "job_id": 117370286812,
+    "result": "SUCCESS",
+    "scope": "Hosted source tests; optional SDK/runtime/preview jobs skipped",
+    "covers_later_commits": false
   }
 }
