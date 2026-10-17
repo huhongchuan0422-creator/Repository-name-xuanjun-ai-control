@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-10-17T09:36:44.268087+00:00",
+  "branch": "feature/chatgpt-community-wechat-sp-offline-20261017",
+  "head_sha": "48bf708b45e1947bdb35620f5d7d443792071ce7",
+  "current_module": "特约商户官方进件条件资料、小程序消费记录及剩余端到端接线",
+  "phases": {
+    "1": {
+      "completed": 0,
+      "remaining": 5
+    },
+    "2": {
+      "completed": 0,
+      "remaining": 7
+    }
+  },
+  "last_code_sha": "48bf708b45e1947bdb35620f5d7d443792071ce7",
+  "last_code_at": "2026-10-17T09:29:11Z",
+  "status": "最近20分钟有代码提交",
+  "ci": [],
+  "ci_status": "NOT_RUN_OR_NOT_FOUND",
+  "blockers": [
+    "暂无真实特约商户，真实交易验收依赖外部条件",
+    "本批源码尚未集中测试或独立审核",
+    "官方进件条件字段、关单及库存释放、多门店、官方日账单、社区收益结算与平台总后台仍未完整开发"
+  ],
+  "counts_basis": "Explicit scope ledger, implementation claims only; not independent acceptance.",
+  "schedule_note": "GitHub scheduled runs may be delayed; check checked_at."
+}
