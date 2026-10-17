@@ -1,5 +1,5 @@
 {
-  "current_module": "四端业务接口、模块报价目录及新调用链集成",
+  "current_module": "退款恢复与微信签名终态；消费者成功页广告及原 Center 项目中心接线",
   "blockers": [
     "暂无真实特约商户，真实交易验收依赖外部条件",
     "尚未完成全部当前源码业务链测试和独立审核",
@@ -87,11 +87,11 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "d6803ae95178465ce7d8b5f222c77d6358f8a910",
-    "run_id": 39023658199,
-    "job_id": 117370286812,
+    "source": "67372f3e8ee03669cf616bfa5e11818a54f3c7ef",
+    "run_id": 39025080532,
+    "job_id": 117374376489,
     "result": "SUCCESS",
-    "scope": "Hosted source tests; optional SDK/runtime/preview jobs skipped",
+    "scope": "Hosted 422/422 community tests and 342/342 stage tests; mini SDK/runtime/preview skipped",
     "covers_later_commits": false
   }
 }
