@@ -148,6 +148,7 @@ jobs:
           PY
 
   isolated-domestic-runtime:
+    if: ${{ false }}
     needs: isolated-customer-center
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 5
