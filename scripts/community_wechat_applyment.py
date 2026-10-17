@@ -117,6 +117,8 @@ class WechatApplyment:
                 current.update(provider_state=data['applyment_state'],provider_response_sha256=digest,provider_observed_at=c.now())
                 if data.get('sub_mchid') is not None:
                     if type(data['sub_mchid']) is not str or not re.fullmatch('[0-9]{6,32}',data['sub_mchid']):raise ValueError('INVALID_PROVIDER_SUBMERCHANT')
+                    if current.get('provider_sub_mchid') not in (None,data['sub_mchid']):
+                        raise ValueError('IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT')
                     current['provider_sub_mchid']=data['sub_mchid']
                 current['audit_detail']=data.get('audit_detail',[])
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_QUERIED',digest)
