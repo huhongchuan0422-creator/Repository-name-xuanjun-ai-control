@@ -18,6 +18,28 @@ class PlatformViewJourney(unittest.TestCase):
         self.assertEqual(report['order_counts'],dict(SUCCESS=1));self.assertEqual(report['signed_paid_order_count'],0);self.assertEqual(report['signed_net_payment_minor'],0);self.assertEqual(report['unverified_paid_state_count'],1)
         listing=self.call('platform_orders',dict(after_id=0,status='ALL'))
         self.assertEqual([r['reference'] for r in listing['records']],['basket']);self.assertIsNone(listing['records'][0]['payment_evidence'])
+    def test_platform_overview_refuses_corrupted_original_payment_evidence(self):
+        from scripts.community_order_provider_projection import project_verified_query
+        from scripts.community_provider_reference import provider_order_reference
+        from scripts.community_demo_bootstrap import DEMO_SCOPE
+        self.fx.basket()
+        db=self.fx.fx.stage.demo.db
+        g,policy=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
+        expected=dict(sp_mchid=self.fx.reader._mchid,sub_mchid=policy['sub_mchid'],
+            sp_appid=policy['sp_appid'],
+            out_trade_no=provider_order_reference(self.fx.reader._mchid,DEMO_SCOPE,'basket'),
+            amount_minor=101,currency='CNY')
+        observation=dict(source='SIGNED_PROVIDER_ORDER_QUERY',signature_key_id=self.fx.reader._kid,
+            out_trade_no=expected['out_trade_no'],amount_minor=101,currency='CNY',
+            provider_state='SUCCESS',transaction_id='420000000000000001',body_sha256='a'*64)
+        project_verified_query(db,DEMO_SCOPE,'basket',expected,observation,self.fx.c.now(),self.fx.reader._kid)
+        db.execute("INSERT INTO order_events VALUES(?,?,?,?,?,?,?,?)",
+            ('bad_evidence',DEMO_SCOPE['tenant_id'],DEMO_SCOPE['merchant_id'],
+             DEMO_SCOPE['store_id'],'basket','SUCCESS','SUCCESS','invalid-json'))
+        db.commit()
+        with self.assertRaisesRegex(ValueError,'UNREADABLE_ORDER_EVIDENCE_RECONCILIATION_DENIED'):
+            self.call('platform_overview',{})
+
     def test_project_users_no_credentials_contact_or_global_search(self):
         fx=self.fx.fx
         other,_=fx.account('unrelated@example.org')
