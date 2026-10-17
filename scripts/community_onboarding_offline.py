@@ -67,7 +67,7 @@ def transition(db,tenant,application,actor,role,action,expected_revision,note=""
     if type(expected_revision) is not int or expected_revision<1:raise ValueError("REVISION")
     matrix={"SUBMIT":({"DRAFT"},"SUBMITTED","MERCHANT"),
             "BEGIN_REVIEW":({"SUBMITTED"},"IN_REVIEW","REVIEWER"),
-            "CORRECTION":({"SUBMITTED","IN_REVIEW"},"CORRECTION_REQUIRED","REVIEWER"),
+            "CORRECTION":({"SUBMITTED","IN_REVIEW","APPROVED"},"CORRECTION_REQUIRED","REVIEWER"),
             "REJECT":({"SUBMITTED","IN_REVIEW"},"REJECTED","REVIEWER"),
             "APPROVE":({"SUBMITTED","IN_REVIEW"},"APPROVED","REVIEWER")}
     if action not in matrix:raise ValueError("ACTION")

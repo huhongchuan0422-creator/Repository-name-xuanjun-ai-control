@@ -77,10 +77,18 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |私有上传|PDF/PNG/JPEG每份≤5MB，原扫描器必须明确CLEAN；复用原加密对象与版本记录，客户端不能指定磁盘路径、对象ID、扫描结果或审核主体。资料及申请内容/审核意见加密，列表不返回对象ID。|
 |申请与补件|草稿、提交、审核中、要求补件、修改重提、驳回、通过；CAS版本检查、补件原因、资料过期拒绝提交/通过、保留旧材料版本。|
 |后台审核|保护配置指向原已验证账号与REVIEWER项目角色，每次原会话/CSRF及项目撤权检查；申请人不能自审。每份资料独立通过/补件，整单通过必须每个当前必交材料均已独立核验；更换资料清除旧审核结果。|
-|开通边界|APPROVED仅为业务入驻通过；页面明确AWAITING_CRM_BINDING及微信NOT_VERIFIED。没有凭申请字段自授MERCHANT_ADMIN、生成虚构sub_mchid或开放收款。工作台开通仍需原CRM项目/门店映射。|
+|开通边界|APPROVED为业务入驻通过；没有原CRM映射时显示AWAITING_CRM_BINDING。受保护映射齐全且唯一时自动开通工作台；多个既有映射由审核员选择，不接收客户端自报租户/角色/门店。微信仍为NOT_VERIFIED，不创建sub_mchid或开放收款。|
 |真实接线与回归|同源POST/merchant/onboarding复用原__Host-xj_customer与X-CSRF-Token，亦接受受保护X-Center-*后端接线；先认证大文件请求再读体。原客户中心host将当前CSRF注入configureCommunityOnboarding，无新登录表单或令牌存储。真实Chromium→HTTP→原加密SQLite测试覆盖申请、6资料上传、逐份审核、补件重提、通过及360/768/1440宽度。扫描器/账号/文件为合成fixture，非生产资料验收。|
 
 另补CenterOperations：商家、店员、平台审核与财务只读使用原会话/CSRF及逐次项目权限；保护配置精确绑定原user_id、项目允许角色与已注册Principal/门店。项目成员不自动继承商家或平台角色，撤权、epoch失效及作用域变更拒绝；原限流和审计复用。/community/operations默认关闭，只开放原community.*工作台操作，不接管SaaS/Finance管理。业务库执行与Center审计不声明跨库原子性，未知不自动重试。完整CI及国内回归绑定准确提交后另记录。
+
+### 入驻通过后的工作台开通接线
+
+MiniApplication先configure_onboarding，再configure_operations；新商家原CRM授予的精确账号/项目/已注册Principal映射须带onboarding_required=true。CenterOperations每次使用新商家权限前验证原入驻APPROVED版本、所有当前必交材料的审核与有效期、原项目实时权限及已完成开通记录；申请字段不能授予角色。原已准入商家可保留原受保护映射，不反向认领历史门店。
+
+community_merchant_opening复用原Center.links/audit及原merchant_profiles，不增加第二权限库或任务队列。先独占持久RESERVED记录绑定application/原账号/project/tenant-merchant-store/版本/workspace，再写原商家档案，最后记录OPENED；档案初始PAUSED，微信收款仍关闭。既有无本申请保留记录的商家档案拒绝认领。开通中断/结果未知保持OPENING_PENDING且权限拒绝；审核员显式open_workbench恢复同一记录，不能换申请/作用域、覆盖其他商家或使停用记录复活。已完成重放不覆盖商家之后的编辑。
+
+审核员可要求已通过申请重新核验；此时原版本立即失去工作台访问。补件与独立审核完成后，必须有同一申请原CORRECTION事件、递增的新批准版本及同一CRM映射，才更新原开通记录并恢复，保留商家已编辑档案；缺失旧档案或绑定变化拒绝。没有跨数据库原子提交声明，保留状态和显式恢复为实际语义。14项原SQLite测试覆盖前后提交中断、新连接恢复、同店重复申请、历史档案抢占、撤权、资料过期、重新核验和恢复；两条真实Chromium/HTTP流程分别验证无CRM映射与已绑定自动开通，并实际调用新商家工作台订单接口。均为合成身份、资料和映射，实际部署/真实CRM交付仍未验收。
 
 python -B -m unittest discover -s tests -p 'test_community_*.py'
 python -B -m unittest discover -s tests -p 'test_stage5_*.py'

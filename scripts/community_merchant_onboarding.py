@@ -32,6 +32,7 @@ class MerchantOnboarding:
             raise ValueError('ORIGINAL_REVIEWER_PROJECT_BINDING_REQUIRED')
         if center.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         self.center=center;self.reviewers=dict(reviewers)
+        self.operations=None
         # Reuse the already developed onboarding business tables in the original
         # Center backup domain. No second account store or review queue exists.
         workflow.initialize(center.db)
@@ -79,13 +80,18 @@ class MerchantOnboarding:
                 'object:'+application+':'+material['object_id'])
             if hashlib.sha256(raw).hexdigest()!=material['sha256']:raise PermissionError('PRIVATE_MATERIAL_INTEGRITY')
     def _view(self,application,meta,data):
+        from scripts.community_merchant_opening import opening_state
+        owner=self.center.db.execute("SELECT user_id FROM links WHERE channel='COMMUNITY_ONBOARDING' AND subject_idx=? AND project=?",(application,application)).fetchone()[0]
+        workspaces=[] if self.operations is None else [name for name,g in self.operations.grants.items()
+            if g['user_id']==owner and g['onboarding_required']]
         data=dict(data,fields={k:v for k,v in data['fields'].items() if k!='license_ref'})
         return dict(data,application=application,entity_type=meta['entity_type'],category=meta['category'],
             delegated=meta['delegated'],required_materials=list(self._required(meta)),
             materials={k:{'uploaded':True,'expires_at':v['expires_at'],
                 'review':meta.get('reviews',{}).get(k,{}).get('decision','PENDING'),
                 'review_note':meta.get('reviews',{}).get(k,{}).get('note','')} for k,v in meta['materials'].items()},
-            opening_state='AWAITING_CRM_BINDING' if data['status']=='APPROVED' else 'NOT_APPROVED',
+            opening_state=opening_state(self,application) if data['status']=='APPROVED' else 'NOT_APPROVED',
+            opening_workspaces=workspaces,
             wechat_submerchant_state='NOT_VERIFIED',payment_enabled=False)
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:
@@ -99,9 +105,15 @@ class MerchantOnboarding:
                  'submit':{'application','revision'},'review_list':set(),
                  'review_read':{'application'},'review':{'application','revision','action','note'},
                  'review_material':{'application','revision','kind','decision','note'},
+                 'open_workbench':{'application','revision','workspace'},
                  'download':{'application','kind'}}
         if type(op) is not str or op not in schemas or set(params)!=schemas[op]:raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
+        if op=='open_workbench':
+            from scripts.community_merchant_opening import open_workbench
+            open_workbench(self,self.operations,uid,params['application'],params['workspace'],params['revision'])
+            _,meta,data=self._load(params['application'],uid,True)
+            return self._view(params['application'],meta,data)
         if op in ('mine','review_list'):
             if op=='review_list':self._reviewer(uid)
             rows=c.db.execute("SELECT subject_idx FROM links WHERE channel='COMMUNITY_ONBOARDING' AND active=1"+
@@ -140,6 +152,7 @@ class MerchantOnboarding:
                 for value in fields.values():
                     if type(value) is not str:raise ValueError('INVALID_PROFILE_VALUE')
                     if value:safe_text(value,512)
+                if len(fields['store_name'])>120 or len(fields['contact'])>120:raise ValueError('MERCHANT_PROFILE_FIELD_LIMIT')
                 meta.update(entity_type=params['entity_type'],category=params['category'],delegated=params['delegated'])
                 meta['reviews']={}
                 revision=workflow.save_draft(c.db,uid,application,uid,dict(fields,license_ref='PRIVATE_ONBOARDING_MATERIALS'),params['revision'],
@@ -202,4 +215,9 @@ class MerchantOnboarding:
         except BaseException:
             c.db.rollback();raise
         _,meta,data=self._load(application,uid,op in ('review','review_material'))
+        if op=='review' and params['action']=='APPROVE' and self.operations is not None:
+            targets=[name for name,g in self.operations.grants.items() if g['user_id']==owner and g['onboarding_required']]
+            if len(targets)==1:
+                from scripts.community_merchant_opening import open_workbench
+                open_workbench(self,self.operations,uid,application,targets[0],data['revision'])
         return self._view(application,meta,data)

@@ -29,9 +29,15 @@
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;$('summary').append(dt,dd);}
     $('reviewNote').textContent=app.reviewer_note?'审核说明：'+app.reviewer_note:'';
     const editable=['DRAFT','CORRECTION_REQUIRED'].includes(app.status),reviewable=['SUBMITTED','IN_REVIEW'].includes(app.status);
-    $('submitApplication').hidden=reviewMode||!editable;$('reviewActions').hidden=!reviewMode||!reviewable;
+    $('submitApplication').hidden=reviewMode||!editable;$('reviewActions').hidden=!reviewMode||!reviewable&&app.status!=='APPROVED';
+    document.querySelectorAll('[data-action]').forEach(b=>{b.hidden=app.status==='APPROVED'&&b.dataset.action!=='CORRECTION';
+      if(b.dataset.action==='CORRECTION')b.textContent=app.status==='APPROVED'?'要求重新核验':'要求补件';});
     $('profile').querySelectorAll('input,select,button').forEach(e=>e.disabled=!editable);
-    $('opening').textContent=app.status==='APPROVED'?'平台入驻审核已通过；工作台权限待绑定。微信特约商户进件和收款权限尚未核验。':'';
+    $('opening').textContent=app.status!=='APPROVED'?'':app.opening_state==='OPENED'?'商家工作台已开通；微信特约商户进件和收款权限尚未核验。':
+      app.opening_state==='OPENING_PENDING'?'入驻审核已通过；工作台开通尚未完成，请由平台核对后恢复。':
+      app.opening_state==='ACCESS_SUSPENDED'?'工作台访问已暂停，请联系平台核验资料与项目权限。':'平台入驻审核已通过；工作台权限待绑定。微信特约商户进件和收款权限尚未核验。';
+    $('openingActions').hidden=!reviewMode||app.status!=='APPROVED'||app.opening_state==='OPENED'||!app.opening_workspaces?.length;
+    $('openingWorkspace').replaceChildren();for(const workspace of app.opening_workspaces||[]){const option=document.createElement('option');option.value=workspace;option.textContent=workspace;$('openingWorkspace').append(option);}
     $('materials').replaceChildren();
     for(const kind of app.required_materials){const description=catalog.materials.find(m=>m.id===kind),record=app.materials[kind];
       const row=document.createElement('div');row.className='material';row.dataset.kind=kind;
@@ -66,5 +72,6 @@
     render(await request('review',{application:current.application,revision:current.revision,action:b.dataset.action,note:$('note').value.trim()}));message('审核处理已保存。');})));
   $('reloadQueue').addEventListener('click',()=>run(list));$('queue').hidden=!reviewMode;$('applicant').hidden=reviewMode;$('title').textContent=reviewMode?'商家入驻审核':'申请商家入驻';
   $('reloadMine').addEventListener('click',()=>run(list));
+  $('openWorkbench').addEventListener('click',()=>run(async()=>{render(await request('open_workbench',{application:current.application,revision:current.revision,workspace:$('openingWorkspace').value}));message('工作台开通状态已更新。');}));
   load();
 })();

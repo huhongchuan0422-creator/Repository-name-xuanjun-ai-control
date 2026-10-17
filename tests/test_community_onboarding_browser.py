@@ -8,30 +8,40 @@ import threading
 import unittest
 from playwright.sync_api import sync_playwright,expect
 import test_community_merchant_onboarding as fixture
-from scripts.pr122_customer_core import Center
-from scripts.community_mini_center_identity import CenterIdentity
-from scripts.community_mini_login import MiniGateway
-from scripts.community_merchant_onboarding import MerchantOnboarding,BASE
+from scripts.community_merchant_onboarding import BASE
 from scripts.community_mini_http import serve
+from scripts.community_center_operations import CenterOperations
+from scripts.community_merchant_store import open_store
 
 class OnboardingBrowserJourney(unittest.TestCase):
     def test_apply_upload_correction_resubmit_per_material_review_approve(self):
-        fx=fixture.MerchantAdmissionJourney();fx.setUp();fx.fx.center.db.close()
+        self.journey(False)
+    def test_bound_crm_mapping_automatically_opens_workbench_after_approval(self):
+        self.journey(True)
+    def journey(self,with_opening):
         ready=queue.Queue()
         def host():
-            center=None;server=None
+            server=None;merchant_db=None;fx=None
             try:
-                center=Center(fx.fx.tmp.name,{'testkey':b'k'*32},'testkey',clock=lambda:fx.fx.stage.now,scanner=lambda raw:True)
-                identity=CenterIdentity(center,fx.fx.stage.api,fx.fx.identity.appid,fx.fx.scenes)
-                gateway=MiniGateway(fx.fx.stage.api,identity,fx.fx.provider)
-                service=MerchantOnboarding(center,{fx.fx.uid2:'project1'})
-                server=serve(gateway,onboarding=service);ready.put(server);server.serve_forever(poll_interval=.05)
+                fx=fixture.MerchantAdmissionJourney();fx.setUp()
+                center=fx.fx.center;gateway=fx.fx.gateway;service=fx.service
+                operations=None
+                if with_opening:
+                    merchant_db=open_store(fx.fx.tmp.name+'/browser-new-merchant.sqlite')
+                    fx.fx.stage.demo.merchant_db=merchant_db
+                    operations=CenterOperations(center,fx.fx.stage.api,{'new_merchant':{
+                        'user_id':fx.fx.uid1,'project':'project1','project_roles':['OWNER'],
+                        'principal':fx.fx.stage.merchant,'onboarding_required':True}},onboarding=service)
+                    service.operations=operations
+                server=serve(gateway,onboarding=service,operations=operations);ready.put((server,fx));server.serve_forever(poll_interval=.05)
             except BaseException as error:ready.put(error)
             finally:
                 if server:server.server_close()
-                if center:center.db.close()
-        thread=threading.Thread(target=host,daemon=True);thread.start();server=ready.get(timeout=10)
-        if isinstance(server,BaseException):fx.tearDown();raise server
+                if merchant_db:merchant_db.close()
+                if fx:fx.tearDown()
+        thread=threading.Thread(target=host,daemon=True);thread.start();state=ready.get(timeout=10)
+        if isinstance(state,BaseException):raise state
+        server,fx=state
         try:
             with sync_playwright() as playwright:
                 browser=playwright.chromium.launch(headless=True)
@@ -72,13 +82,20 @@ class OnboardingBrowserJourney(unittest.TestCase):
                         expect(row.locator('p')).to_contain_text('资料审核通过')
                     admin.locator('[data-action=APPROVE]').click();expect(admin.locator('#applicationState')).to_have_text('入驻审核通过')
                     page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('入驻审核通过')
-                    expect(page.locator('#opening')).to_contain_text('工作台权限待绑定')
+                    expect(page.locator('#opening')).to_contain_text('商家工作台已开通' if with_opening else '工作台权限待绑定')
+                    if with_opening:
+                        reply=page.evaluate('''async csrf=>{
+                          const r=await fetch('/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-Center-CSRF':csrf},
+                            body:JSON.stringify({workspace:'new_merchant',operation:'community.orders',params:{}})});
+                          return {status:r.status,body:await r.json()};
+                        }''',fx.applicant['csrf'])
+                        self.assertEqual(reply['status'],200);self.assertEqual(reply['body']['result']['orders'],[])
                     expect(page.locator('#saveDraft')).to_be_disabled()
                     for width in (360,768,1440):
                         page.set_viewport_size({'width':width,'height':900})
                         self.assertTrue(page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
                     self.assertEqual(errors,[])
                 finally:browser.close()
-        finally:server.shutdown();thread.join(5);fx.tearDown()
+        finally:server.shutdown();thread.join(5)
 
 if __name__=='__main__':unittest.main()

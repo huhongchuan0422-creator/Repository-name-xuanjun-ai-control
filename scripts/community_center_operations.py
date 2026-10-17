@@ -13,7 +13,7 @@ from scripts.community_saas_phase2 import Principal
 
 
 class CenterOperations:
-    def __init__(self,center,runtime,grants):
+    def __init__(self,center,runtime,grants,*,onboarding=None):
         if (type(center) is not Center or type(runtime) is not StageRuntime
                 or type(grants) is not dict or not grants):
             raise ValueError('EXISTING_CENTER_AND_REGISTERED_GRANTS_REQUIRED')
@@ -21,10 +21,17 @@ class CenterOperations:
                 'f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4':
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
         self.center,self.runtime=center,runtime
+        self.onboarding=onboarding
+        if onboarding is not None:
+            from scripts.community_merchant_onboarding import MerchantOnboarding
+            if type(onboarding) is not MerchantOnboarding or onboarding.center is not center:
+                raise ValueError('SAME_CENTER_ONBOARDING_REQUIRED')
         self.grants={}
         for name,grant in grants.items():
             if (type(name) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,64}',name)
-                    or type(grant) is not dict or set(grant)!={'user_id','project','project_roles','principal'}
+                    or type(grant) is not dict or set(grant) not in (
+                        {'user_id','project','project_roles','principal'},
+                        {'user_id','project','project_roles','principal','onboarding_required'})
                     or any(type(grant[k]) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,64}',grant[k]) for k in ('user_id','project'))
                     or type(grant['project_roles']) not in (list,tuple) or not grant['project_roles']
                     or any(r not in ('OWNER','EDITOR','REVIEWER') for r in grant['project_roles'])):
@@ -33,8 +40,11 @@ class CenterOperations:
             if (type(p) is not Principal or p not in runtime.bindings or p.role not in
                     ('MERCHANT_ADMIN','STORE_STAFF','PLATFORM_REVIEWER','FINANCE_APPROVER','PLATFORM_OWNER')):
                 raise PermissionError('REGISTERED_OPERATOR_REQUIRED')
+            required=grant.get('onboarding_required',False)
+            if type(required) is not bool or required and (onboarding is None or p.role!='MERCHANT_ADMIN'):
+                raise ValueError('PROTECTED_MERCHANT_ONBOARDING_GATE_REQUIRED')
             self.grants[name]={**grant,'project_roles':tuple(grant['project_roles']),
-                'role':p.role,'tenant':p.tenant_id,'scope':dict(runtime.bindings[p])}
+                'onboarding_required':required,'role':p.role,'tenant':p.tenant_id,'scope':dict(runtime.bindings[p])}
 
     def dispatch(self,session,csrf,body):
         if (type(body) is not dict or set(body)!={'workspace','operation','params'}
@@ -51,6 +61,9 @@ class CenterOperations:
             raise PermissionError('OPERATION_GRANT_CHANGED')
         project,_,_=c.project(uid,grant['project'],grant['project_roles'])
         if project['tenant']!=grant['tenant']:raise PermissionError('PROJECT_TENANT_MISMATCH')
+        if grant['onboarding_required']:
+            from scripts.community_merchant_opening import authorize_workspace
+            authorize_workspace(self.onboarding,self,body['workspace'],uid)
         # This seam only exposes the existing community workbench operations.
         # SaaS and Finance administration retain their original owner boundary.
         if not body['operation'].startswith('community.'):

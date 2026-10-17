@@ -42,7 +42,8 @@ class MiniApplication:
         if self.server is not None or self.operations is not None:
             raise ValueError('OPERATIONS_ALREADY_CONFIGURED_OR_LISTENING')
         from scripts.community_center_operations import CenterOperations
-        self.operations=CenterOperations(self.center,self.stage.runtime,grants)
+        self.operations=CenterOperations(self.center,self.stage.runtime,grants,onboarding=self.onboarding)
+        if self.onboarding is not None:self.onboarding.operations=self.operations
         return self.operations
 
     def configure_onboarding(self,reviewers):
@@ -50,6 +51,7 @@ class MiniApplication:
             raise ValueError('ONBOARDING_ALREADY_CONFIGURED_OR_LISTENING')
         from scripts.community_merchant_onboarding import MerchantOnboarding
         self.onboarding=MerchantOnboarding(self.center,reviewers)
+        if self.operations is not None:self.onboarding.operations=self.operations
         return self.onboarding
 
     def close(self):
