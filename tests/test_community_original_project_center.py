@@ -34,6 +34,10 @@ class OriginalProjectCenterJourney(unittest.TestCase):
         self.assertEqual(receipt['status'],'ARCHIVED')
         self.assertEqual(receipt['ai_response'],'PENDING_PROVIDER')
         archived=self.fx.c.messages(self.fx.fx.uid1,'project1')
+        via_mini=self.consumer('project_messages')
+        self.assertEqual(via_mini['source'],'ORIGINAL_CENTER_ARCHIVE')
+        self.assertFalse(via_mini['provider_reply_verified'])
+        self.assertEqual(via_mini['records'],archived)
         self.assertEqual(archived[-1]['body'],'请核对门店需求版本')
 
     def test_versioned_material_submit_and_independent_review_original_center(self):
