@@ -1,0 +1,76 @@
+name: P2 pinned complete kit publication (offline only)
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/p2-complete-kit-publish.yml
+permissions:
+  contents: read
+concurrency:
+  group: p2-pinned-complete-kit-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Rebuild frozen source 3e8e55fd without UK operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 0077
+          PIN=3e8e55fdbd6543c02ca5e97f843a23533574b347
+          test "$(git cat-file -t "$PIN")" = commit
+          sudo -n test "$(stat -c %u /)" = 0
+          CI_ROOT=$(sudo /usr/bin/mktemp -d /xuanjun-p2-publish.XXXXXXXX)
+          sudo /usr/bin/chown "$(id -u):$(id -g)" "$CI_ROOT"
+          test "$(stat -c %a "$CI_ROOT")" = 700
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+          git -c core.hooksPath=/dev/null clone --no-hardlinks --no-checkout "$GITHUB_WORKSPACE" "$CI_ROOT/repository"
+          git -C "$CI_ROOT/repository" -c core.hooksPath=/dev/null checkout --detach "$PIN"
+          test "$(git -C "$CI_ROOT/repository" rev-parse HEAD)" = "$PIN"
+          mkdir -m 700 "$CI_ROOT/temp"
+          export RUNNER_TEMP="$CI_ROOT/temp" TMPDIR="$CI_ROOT/temp"
+          cd "$CI_ROOT/repository"
+          python -I -B -S evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tools/run_published_kit_ci.py \
+            --repository "$CI_ROOT/repository" \
+            --source-index evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/public-source-index.json \
+            --runtime-dir evidence/p2-epoch7-access-repair-20261014/runtime \
+            --output "$CI_ROOT/temp/result" --expected-head "$PIN"
+          export CI_ROOT
+          python - <<'PY'
+          import json,hashlib,os,shutil
+          from pathlib import Path
+          root=Path(os.environ['CI_ROOT'])
+          out=root/'temp'/'result'
+          summary=json.loads((out/'ci-summary.json').read_text())
+          kit=out/'build-a'/'epoch7-recovery-kit.tar.gz'
+          manifest=out/'build-a'/'recovery-kit-manifest.json'
+          assert summary['success'] is True and summary['reproducible_build'] is True
+          assert summary['kit_source_commit']=='3e8e55fdbd6543c02ca5e97f843a23533574b347'
+          def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+          assert digest(kit)=='f3e23d587aae9bdd864ed420446464b5988fd1fb0b48a2242f346b97320e490b'
+          assert digest(manifest)=='7bbcadea6a1ddb5f86d20564c966da7ff1632325a3976cf1a237380dd8d9e47c'
+          delivery=Path(os.environ['GITHUB_WORKSPACE'])/'p2-published-kit'
+          delivery.mkdir(mode=0o700)
+          for src,target in ((kit,'epoch7-recovery-kit.tar.gz'),(manifest,'recovery-kit-manifest.json'),
+                             (out/'ci-summary.json','ci-summary.json')):
+              shutil.copyfile(src,delivery/target)
+              assert digest(delivery/target)==digest(src)
+          print(json.dumps({'kit_sha256':digest(kit),'manifest_sha256':digest(manifest),
+              'source_commit':summary['kit_source_commit'],'source_tree':summary['kit_source_tree'],
+              'scope':'OFFLINE_ONLY_NO_UK_INSTALL'},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-full-kit-exact-3e8e55fd
+          path: p2-published-kit/
+          if-no-files-found: error
+          retention-days: 30
