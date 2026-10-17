@@ -76,18 +76,39 @@ def safe_receipt(output, stderr='', exit_code=0):
     # controller rows can contain commas, and name=systemd is legal.
     require(pos<len(rows) and rows[pos].startswith('CGROUP_PROC_SELF='))
     controllers=[]
+    hierarchy_ids=set()
+    valid_names=frozenset(('cpu','cpuacct','cpuset','memory','blkio','devices',
+        'freezer','net_cls','net_prio','perf_event','hugetlb','pids','rdma','misc',
+        'io','systemd'))
     while pos<len(rows):
         line=rows[pos]
-        if pos == 5:
+        if not controllers:
             require(line.startswith('CGROUP_PROC_SELF='))
             line=line[len('CGROUP_PROC_SELF='):]
         elif line.startswith('SITE_PATH='):
             break
-        require(len(line)<=140 and re.fullmatch(r'[0-9]{1,6}:[A-Za-z0-9_,=.-]*',line) is not None)
-        require(line not in controllers and len(controllers)<6)
+        require(len(line)<=140)
+        match=re.fullmatch(r'([0-9]{1,6}):([A-Za-z0-9_,=.-]*)',line)
+        require(match is not None)
+        hierarchy=int(match.group(1))
+        names=match.group(2)
+        require(hierarchy not in hierarchy_ids and len(controllers)<6)
+        if hierarchy==0:
+            require(names=='' and not controllers)
+        else:
+            require(names and not any(n=='' for n in names.split(',')))
+            seen=set()
+            for controller in names.split(','):
+                if controller.startswith('name='):
+                    require(controller=='name=systemd')
+                else:
+                    require(controller in valid_names)
+                require(controller not in seen)
+                seen.add(controller)
+        hierarchy_ids.add(hierarchy)
         controllers.append(line)
         pos+=1
-    require(controllers and (controllers==['0:'] or all(x!='0:' for x in controllers)))
+    require(controllers and (controllers==['0:'] or all(not x.startswith('0:') for x in controllers)))
     values.append(('CGROUP_PROC_SELF_COUNT',str(len(controllers))))
     take('SITE_PATH='+SITE_PATH)
     if pos<len(rows) and rows[pos]=='SITE_STATUS=ABSENT':
@@ -132,7 +153,8 @@ def safe_receipt(output, stderr='', exit_code=0):
             m=re.fullmatch(r'DB_FILE=(\\S+) UID=([0-9]{1,12}) GID=([0-9]{1,12}) MODE=([0-7]{3,4}) SIZE=([0-9]{1,16})',line)
             require(m is not None and m.group(1) in DB_NAMES)
             path=m.group(1)
-            values.append(('DB_FILE',path))
+            values.extend((('DB_FILE',path),('UID',m.group(2)),('GID',m.group(3)),
+                           ('MODE',m.group(4)),('SIZE',m.group(5))))
             pos+=1
         require(path not in files)
         files.add(path)
