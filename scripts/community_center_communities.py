@@ -83,6 +83,10 @@ class CenterCommunities:
                 raise ValueError('COMMUNITY_VERSION_CONFLICT')
 
     def dispatch(self, session, csrf, body):
+        if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('platform_overview','platform_orders','platform_customers','platform_audit'):
+            if self.commerce is None:raise PermissionError('ORIGINAL_COMMUNITY_COMMERCE_REQUIRED')
+            from scripts.community_platform_views import PlatformViews
+            return PlatformViews(self).dispatch(session,csrf,body)
         if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('promotion_create','promotions','promotion_state'):
             if self.commerce is None:raise PermissionError('ORIGINAL_COMMUNITY_COMMERCE_REQUIRED')
             from scripts.community_consumer_communities import CommunityPromotions

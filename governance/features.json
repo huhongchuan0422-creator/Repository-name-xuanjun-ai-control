@@ -208,7 +208,10 @@
         "scripts/community_applyment_conditions.py",
         "tests/test_community_applyment_conditions.py",
         "scripts/community_consumer_communities.py",
-        "tests/test_community_consumer_communities.py"
+        "tests/test_community_consumer_communities.py",
+        "scripts/community_platform_views.py",
+        "tests/test_community_platform_views.py",
+        "clients/community-mini/checkout-community.test.cjs"
       ]
     },
     {
