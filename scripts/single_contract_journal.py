@@ -35,6 +35,12 @@ class Journal(object):
               candidate_json BLOB NOT NULL,
               PRIMARY KEY(project_id,contract_id,request_id),
               UNIQUE(project_id,contract_id,candidate_sha))""")
+            db.execute("""CREATE TRIGGER IF NOT EXISTS contract_frozen_no_replace
+              BEFORE INSERT ON contract_frozen_candidate
+              WHEN EXISTS(SELECT 1 FROM contract_frozen_candidate
+                   WHERE (project_id=NEW.project_id AND contract_id=NEW.contract_id AND request_id=NEW.request_id)
+                      OR (project_id=NEW.project_id AND contract_id=NEW.contract_id AND candidate_sha=NEW.candidate_sha))
+              BEGIN SELECT RAISE(ABORT,'APPEND_ONLY_CONFLICT'); END""")
             db.execute("""CREATE TRIGGER IF NOT EXISTS contract_frozen_no_update
               BEFORE UPDATE ON contract_frozen_candidate
               BEGIN SELECT RAISE(ABORT,'APPEND_ONLY'); END""")
@@ -54,12 +60,13 @@ class Journal(object):
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
-                row=db.execute("""SELECT candidate_json FROM contract_frozen_candidate
+                row=db.execute("""SELECT candidate_json,candidate_sha FROM contract_frozen_candidate
                      WHERE project_id=? AND contract_id=? AND request_id=?""",
                      (verified_project_id,scope["contract_id"],request_id)).fetchone()
                 if row is not None:
                     if bytes(row[0]) != payload:
                         raise ContractHold("IDEMPOTENCY_CONFLICT")
+                    _validate_row(row, verified_project_id, verified_customer_id, scope["contract_id"])
                     db.execute("COMMIT")
                     return candidate
                 db.execute("""INSERT INTO contract_frozen_candidate
@@ -83,6 +90,9 @@ class Journal(object):
                 (verified_project_id,contract_id,request_id)).fetchone()
         if row is None:
             raise ContractHold("CANDIDATE_NOT_FOUND")
+        return _validate_row(row, verified_project_id, verified_customer_id, contract_id)
+
+def _validate_row(row, verified_project_id, verified_customer_id, contract_id):
         try:
             obj=json.loads(bytes(row[0]).decode("utf-8"))
             scope=obj["frozen"]["scope"]
