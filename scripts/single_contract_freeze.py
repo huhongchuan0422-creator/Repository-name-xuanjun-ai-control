@@ -39,7 +39,7 @@ def money(v):
     if not n.is_finite() or n < 0 or n.as_tuple().exponent < -2:
         raise ContractHold("INVALID_AMOUNT")
     # Strict currency bound prevents Decimal context precision loss; no silent rounding.
-    if len(n.as_tuple().digits) > 16 or n > Decimal("99999999999999.99"):
+    if n.as_tuple().exponent > 0 or len(n.as_tuple().digits) > 16 or n > Decimal("99999999999999.99"):
         raise ContractHold("AMOUNT_OUT_OF_RANGE")
     return n
 
