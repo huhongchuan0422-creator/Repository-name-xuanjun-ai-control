@@ -41,7 +41,7 @@ MODULES.update({
  "community_promotion":{"title":"社区推广与去重归属","entrypoint":"community/portal","dependencies":("community_directory",),"capabilities":("community.promotion",),"source":"scripts/community_consumer_communities.py"},
  "store_staff":{"title":"多门店与员工权限","entrypoint":"merchant/workbench","dependencies":("merchant_operations",),"capabilities":("store.staff",),"source":"scripts/community_staff.py","classification":"GENERAL"},
  "wechat_applyment":{"title":"微信特约商户进件资料","entrypoint":"merchant/join","dependencies":("merchant_admission",),"capabilities":("provider.applyment",),"source":"scripts/community_wechat_applyment.py","classification":"GENERAL"},
- "original_project_center":{"title":"客户项目清单与整改反馈","entrypoint":"mini/project","dependencies":("customer_profiles",),"capabilities":("customer.project.read","customer.feedback.archive"),"source":"scripts/community_commerce.py","classification":"GENERAL"},
+ "original_project_center":{"title":"客户项目清单与整改反馈","entrypoint":"mini/project","dependencies":("customer_profiles",),"capabilities":("customer.project.read","customer.feedback.archive","customer.feedback.read"),"source":"scripts/community_commerce.py","classification":"GENERAL"},
  "verified_receipt_ad":{"title":"微信已验签成功页广告","entrypoint":"mini/checkout","dependencies":("advertising","wechat_partner_payments"),"capabilities":("ads.verified_receipt.read",),"source":"scripts/community_commerce.py","classification":"GENERAL"}
 })
 
