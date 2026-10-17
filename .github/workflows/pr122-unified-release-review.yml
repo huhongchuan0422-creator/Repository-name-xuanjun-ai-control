@@ -18,6 +18,8 @@ jobs:
   unified-candidate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      PR122_FROZEN_MOBILE_ARTIFACT: /tmp/pr122-reviewed-mobile/COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,6 +28,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Reconstruct historical mobile fixture from its exact reviewed source
+        run: |
+          git fetch --depth=1 origin 790937a5c96afcf3b3660e36cf36cfaab2002a72
+          python - <<'PYCODE'
+          import io,os,subprocess,sys,tarfile,tempfile
+          from pathlib import Path
+          revision='790937a5c96afcf3b3660e36cf36cfaab2002a72'
+          raw=subprocess.check_output(['git','archive',revision])
+          with tempfile.TemporaryDirectory() as folder:
+              with tarfile.open(fileobj=io.BytesIO(raw)) as archive:archive.extractall(folder,filter='data')
+              subprocess.run([sys.executable,str(Path(folder)/'scripts/pr122_community_experience_package.py'),'--output','/tmp/pr122-reviewed-mobile'],cwd=folder,env=dict(os.environ,GITHUB_SHA=revision),check=True)
+          from scripts.pr122_site_hub_unified_package import MOBILE_SHA,sha
+          assert sha(Path(os.environ['PR122_FROZEN_MOBILE_ARTIFACT']).read_bytes())==MOBILE_SHA
+          PYCODE
       - name: Composition and inherited integration regressions
         run: |
           set -euo pipefail
@@ -35,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/pr122-unified-reports
-          GITHUB_SHA=790937a5c96afcf3b3660e36cf36cfaab2002a72 python -m scripts.pr122_community_experience_package --output /tmp/pr122-reviewed-mobile
+          test -f "$PR122_FROZEN_MOBILE_ARTIFACT"
           python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-unified-stage
           python -m scripts.pr122_site_hub_unified_package --static evidence/pr122-public-presentation/PR122_PUBLIC_PRESENTATION_REVIEW_ONLY.tar.gz --mobile /tmp/pr122-reviewed-mobile/COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz --output /tmp/pr122-unified-candidate --stage /tmp/pr122-unified-stage
       - name: Frozen unified wrapper, full release and controlled rollback regression
