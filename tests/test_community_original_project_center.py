@@ -125,6 +125,8 @@ class OriginalProjectCenterJourney(unittest.TestCase):
             self.consumer('project_summary')
         with self.assertRaises(PermissionError):
             self.consumer('project_feedback',{'message':'must fail'})
+        with self.assertRaises(PermissionError):
+            self.consumer('project_messages')
 
 
 if __name__ == '__main__':
