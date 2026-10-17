@@ -32,6 +32,43 @@
         "scripts/community_development_watch.py",
         ".github/workflows/community-development-watch.yml"
       ]
+    },
+    {
+      "feature_id": "P2_A5_UK_METADATA_PREFLIGHT",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/P2_A5_REVIEWED_ENTRY_RELEASE.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/P2_A5_REVIEWED_ENTRY_RELEASE.md",
+        "section": "2",
+        "phase": 2
+      },
+      "acceptance": {
+        "criteria": [
+          "Only audited six A5 files are staged from source c8c23711, byte-identical",
+          "Normal PR/push cannot execute protected UK Root",
+          "Separate exact A5 approval, immutable one-shot journal and saved-ID query required",
+          "UK site readiness and independent environment protections remain HOLD until verified"
+        ],
+        "tests": [
+          "tests/test_p2_uk_swas_diagnostic.py",
+          "tests/test_p2_swas_receipt_validator.py"
+        ]
+      },
+      "reuse": [
+        "Original PR58 independent A5 source review #6232627191",
+        "Original Hosted run 39022987716 and independently hashed Artifact12097472701",
+        "Existing P2 canonical ledger and protected GitHub Actions checks"
+      ],
+      "paths": [
+        "scripts/p2_uk_swas_diagnostic.py",
+        "scripts/p2_swas_receipt_validator.py",
+        "tests/test_p2_uk_swas_diagnostic.py",
+        "tests/test_p2_swas_receipt_validator.py",
+        ".github/workflows/p2-uk-swas-diagnostic.yml"
+      ]
     }
   ]
 }
