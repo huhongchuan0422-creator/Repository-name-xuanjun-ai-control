@@ -1359,10 +1359,67 @@
       "run": 39003103198,
       "job": 117309973655,
       "invoke_id": "t-sh070a371eaocn4",
-      "status": "FAILED_PRESERVED_QUERYING_EXISTING_RESULT_NO_NEW_HOST_COMMAND",
-      "automatic_pr_triggers_removed": true
+      "status": "FAILED_FILE_EXISTS_BEFORE_REPEAT_APP_START_PRESERVED",
+      "automatic_pr_triggers_removed": true,
+      "query_run": 39003189371
     },
-    "next": "COMPLETE_EXECUTABLE_INSTALL_ROLLBACK_AND_PRIVATE_BRIDGE_RUNTIME_BINDING_THEN_ORIGINAL_INDEPENDENT_HOST_ADMISSION",
-    "production_installed": false
+    "next": "ORIGINAL_INDEPENDENT_EXACT_STOPPED_TRANSACTION_REVIEW_AND_HOST_ADMISSION; COMPLETE_PERSISTENT_IDENTITY_FINAL_DATA_SINGLE_WRITER_AND_PRODUCTION_ACTIVATION_SEPARATELY",
+    "production_installed": false,
+    "r2": {
+      "status": "R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION",
+      "target": "/opt/xuanjun-migration-s07/releases/domestic-r2",
+      "completed_at": "2026-10-17T12:52:15+08:00",
+      "source_files": 124,
+      "patched_source_files": 2,
+      "bridge_port_adaptation": {
+        "from": 19443,
+        "to": 18443,
+        "existing_domestic_bridge_modified": false
+      },
+      "code": {
+        "run": 39004046272,
+        "job": 117312742713,
+        "invoke_id": "t-sh070a4jun5nfnk"
+      },
+      "runtime": {
+        "run": 39004107195,
+        "job": 117312919573,
+        "invoke_id": "t-sh070a4mwpu2oe8",
+        "files": 2906,
+        "bytes": 114962378
+      },
+      "copy_acceptance": {
+        "run": 39004155870,
+        "job": 117313065796,
+        "invoke_id": "t-sh070a4pjzs5dkw",
+        "rounds": 2,
+        "health_each_round": [
+          200,
+          200,
+          200
+        ],
+        "invalid_callback_status_each_round": [
+          403,
+          403
+        ],
+        "all_temporary_processes_stopped": true,
+        "protected_state_unchanged": true
+      },
+      "stopped_install_transaction": {
+        "implemented": true,
+        "host_executed": false,
+        "activation_supported": false,
+        "source_sha256": "99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315",
+        "ci_run": 39004183744,
+        "ci_job": 117313146649,
+        "tests_passed": 9,
+        "independent_host_admission": false
+      },
+      "receipt": "evidence/pr99-service-handoff/s09-install-candidate/R2_EXECUTION_RECEIPT_20261017.json",
+      "services_installed": false,
+      "production_cutover": false,
+      "final_snapshot": false,
+      "real_signed_auth_and_upstream_acceptance": false
+    }
   }
 }
