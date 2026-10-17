@@ -84,6 +84,12 @@ class BillJourney(unittest.TestCase):
         with self.assertRaises(PermissionError):self.bills.dispatch(self.fx.web['token'],'','finance','bill_fetch',dict(kind='TRADE',bill_date=self.date))
         self.download(b'unknown,columns\na,b\n');self.call('bill_fetch')
         self.assertEqual(self.call('bill_reconcile')['status'],'UNKNOWN_SCHEMA')
+    def test_csv_header_requires_nonempty_printable_and_unambiguous_names(self):
+        for body in (b',name\na,b\n',b'a, \na,b\n',
+                     b'a,\t\na,b\n',b'a,a\na,b\n'):
+            with self.assertRaises(ValueError):
+                parse(body)
+
     def test_fixed_download_origin_rejects_redirect_targets_before_io(self):
         for url in ['https://evil.invalid/v3/bill/downloadurl?token=x','http://api.mch.weixin.qq.com/v3/bill/downloadurl?token=x','https://api.mch.weixin.qq.com@evil.invalid/v3/bill/downloadurl?token=x','https://api.mch.weixin.qq.com/v3/other?token=x']:
             with self.assertRaises(PermissionError):self.bills._download(url)
