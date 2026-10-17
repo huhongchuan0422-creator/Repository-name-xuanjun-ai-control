@@ -107,7 +107,7 @@ class ProviderBills:
             if type(offset) is not int or not 0<=offset<=100000:raise ValueError('INVALID_BILL_PAGE')
             # Raw consumer identifiers stay encrypted; page returns only fields
             # needed by finance reconciliation, never openid/bank/card columns.
-            allowed={'交易时间','商户订单号','微信订单号','商户退款单号','微信退款单号','交易状态','退款状态','订单金额','总金额','退款金额','商户分账单号','分账金额','分账结果'}
+            allowed={'交易时间','商户订单号','微信订单号','商户退款单号','微信退款单号','交易状态','退款状态','订单金额','总金额','退款金额','商户分账单号','分账金额','分账结果','特约商户号','币种','货币种类'}
             return dict(records=[{k:v for k,v in row.items() if k in allowed} for row in bill['rows'][offset:offset+50]],has_more=offset+50<len(bill['rows']),next_offset=offset+50 if offset+50<len(bill['rows']) else None)
         result=self.reconcile(g,bill)
         with c.tx():
