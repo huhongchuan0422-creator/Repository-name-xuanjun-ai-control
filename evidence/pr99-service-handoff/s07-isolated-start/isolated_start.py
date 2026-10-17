@@ -60,6 +60,9 @@ def launch_command(raw,entry,port):
     else:
         need(tail and tail[0] in (entry,'/opt/trading-system/'+entry),'UNIT_ENTRY_CHANGED')
         invocation=['/opt/trading-system/'+entry];tail=tail[1:]
+    # Owner metadata + pinned portal AST confirm the literal serve subcommand.
+    if entry=='scripts/secure_secrets_portal_server.py' and tail[:1]==['serve']:
+        invocation.append('serve');tail=tail[1:]
     normalized=[]
     while tail:
         token=tail.pop(0)
