@@ -23,7 +23,7 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 
 | 节点 | 源码/集成现状 | 测试证据或下一依赖 |
 |---|---|---|
-|P1-01|服务端Principal绑定既有Tenant/Merchant/Store|runtime跨租户/角色测试；生产Identity仍待接入|
+|P1-01|服务端Principal绑定既有Tenant/Merchant/Store；补齐商家入驻入口、资料与独立审核链|入驻流程拆为下列子项；现场CRM开通绑定待验|
 |P1-02|既有商家目录统一HTTP|新增真实Chromium商家读取|
 |P1-03|原签名场景与金额校验复用|二维码签名→原订单；实体微信扫码预览待验|
 |P1-04|原生小程序工程及请求客户端；国内服务器预览上传成功|Run39006945633、Job117321450248 SUCCESS；真机扫码待验|
@@ -65,6 +65,22 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |P2-25|不调用资金API|服务商认证/真实sub_mchid/产品权限未验|
 
 ## 可复现验证
+
+### P1-01商家入驻补齐（2026-10-17 Owner指出遗漏）
+
+原有community_onboarding_offline只有离线状态函数，不能视为商家入口/资料上传/后台审核已经接通。本轮沿用该原状态机和onboarding/onboarding_events两张业务表，纳入既有Center数据库的备份域；原accounts/sessions/projects/objects/versions/links/audit、加密密钥与扫描器复用，core源码固定字节不改，不新建账号库、材料目录或审核队列。不把申请人伪装成已有签约项目：已经验证的原账号即能申请，正式项目与门店权限仍由原CRM权威绑定。
+
+|子项|实现及边界|
+|---|---|
+|入驻入口|MiniApplication配置onboarding后提供/merchant/join；/merchant/review为审核页，数据另作会话/权限检查。默认不配置则路由关闭。仅候选源码，不代表已发布到官网。|
+|主体与资料|企业/个体工商户；主体名称、门店名称、经营地址、联系信息；执照、经营者/法人证件正反面、门头、经营场所、结算账户证明。委托办理追加授权书及经办人证明；餐饮食品追加行业许可。此为本平台业务清单，不冒充微信官方进件规则。|
+|私有上传|PDF/PNG/JPEG每份≤5MB，原扫描器必须明确CLEAN；复用原加密对象与版本记录，客户端不能指定磁盘路径、对象ID、扫描结果或审核主体。资料及申请内容/审核意见加密，列表不返回对象ID。|
+|申请与补件|草稿、提交、审核中、要求补件、修改重提、驳回、通过；CAS版本检查、补件原因、资料过期拒绝提交/通过、保留旧材料版本。|
+|后台审核|保护配置指向原已验证账号与REVIEWER项目角色，每次原会话/CSRF及项目撤权检查；申请人不能自审。每份资料独立通过/补件，整单通过必须每个当前必交材料均已独立核验；更换资料清除旧审核结果。|
+|开通边界|APPROVED仅为业务入驻通过；页面明确AWAITING_CRM_BINDING及微信NOT_VERIFIED。没有凭申请字段自授MERCHANT_ADMIN、生成虚构sub_mchid或开放收款。工作台开通仍需原CRM项目/门店映射。|
+|真实接线与回归|同源POST/merchant/onboarding复用原__Host-xj_customer与X-CSRF-Token，亦接受受保护X-Center-*后端接线；先认证大文件请求再读体。原客户中心host将当前CSRF注入configureCommunityOnboarding，无新登录表单或令牌存储。真实Chromium→HTTP→原加密SQLite测试覆盖申请、6资料上传、逐份审核、补件重提、通过及360/768/1440宽度。扫描器/账号/文件为合成fixture，非生产资料验收。|
+
+另补CenterOperations：商家、店员、平台审核与财务只读使用原会话/CSRF及逐次项目权限；保护配置精确绑定原user_id、项目允许角色与已注册Principal/门店。项目成员不自动继承商家或平台角色，撤权、epoch失效及作用域变更拒绝；原限流和审计复用。/community/operations默认关闭，只开放原community.*工作台操作，不接管SaaS/Finance管理。业务库执行与Center审计不声明跨库原子性，未知不自动重试。完整CI及国内回归绑定准确提交后另记录。
 
 python -B -m unittest discover -s tests -p 'test_community_*.py'
 python -B -m unittest discover -s tests -p 'test_stage5_*.py'

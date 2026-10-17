@@ -17,6 +17,8 @@ class MiniApplication:
             raise ValueError('EXISTING_CENTER_INSTANCE_REQUIRED')
         self.stage=None
         self.server=None
+        self.operations=None
+        self.onboarding=None
         self._socket=None
         self.center=center
         try:
@@ -32,8 +34,23 @@ class MiniApplication:
         """Loopback backend for the admitted HTTPS host; never a public bind."""
         if self.server is not None:
             raise ValueError('ALREADY_LISTENING')
-        self.server=serve(self.gateway,port)
+        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding)
         return self.server
+
+    def configure_operations(self,grants):
+        """Host-supplied grants for existing Center users; no client role input."""
+        if self.server is not None or self.operations is not None:
+            raise ValueError('OPERATIONS_ALREADY_CONFIGURED_OR_LISTENING')
+        from scripts.community_center_operations import CenterOperations
+        self.operations=CenterOperations(self.center,self.stage.runtime,grants)
+        return self.operations
+
+    def configure_onboarding(self,reviewers):
+        if self.server is not None or self.onboarding is not None:
+            raise ValueError('ONBOARDING_ALREADY_CONFIGURED_OR_LISTENING')
+        from scripts.community_merchant_onboarding import MerchantOnboarding
+        self.onboarding=MerchantOnboarding(self.center,reviewers)
+        return self.onboarding
 
     def close(self):
         if self.server is not None:
@@ -77,7 +94,7 @@ class MiniApplication:
         if (parent.st_gid!=nginx_gid or
                 (nginx_uid!=os.geteuid() and parent.st_mode & 0o050 != 0o050)):
             raise PermissionError('NGINX_SOCKET_DIRECTORY_TRAVERSAL_REQUIRED')
-        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid))
+        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding)
         class Server(socketserver.UnixStreamServer):request_queue_size=128
         server=Server(str(path),handler)
         info=path.lstat();self._socket=(path,info.st_dev,info.st_ino)

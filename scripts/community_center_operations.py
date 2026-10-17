@@ -1,0 +1,67 @@
+"""Existing Center sessions authorize registered community operation grants.
+
+Grants are protected host configuration referencing original account/project
+IDs, not another IAM database. No project member automatically becomes staff,
+merchant administrator, moderator or platform owner. No money API is added.
+"""
+import hashlib
+import re
+from pathlib import Path
+from scripts.pr122_customer_core import Center,canonical
+from scripts.community_stage_runtime import StageRuntime
+from scripts.community_saas_phase2 import Principal
+
+
+class CenterOperations:
+    def __init__(self,center,runtime,grants):
+        if (type(center) is not Center or type(runtime) is not StageRuntime
+                or type(grants) is not dict or not grants):
+            raise ValueError('EXISTING_CENTER_AND_REGISTERED_GRANTS_REQUIRED')
+        if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!=\
+                'f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4':
+            raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
+        self.center,self.runtime=center,runtime
+        self.grants={}
+        for name,grant in grants.items():
+            if (type(name) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,64}',name)
+                    or type(grant) is not dict or set(grant)!={'user_id','project','project_roles','principal'}
+                    or any(type(grant[k]) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,64}',grant[k]) for k in ('user_id','project'))
+                    or type(grant['project_roles']) not in (list,tuple) or not grant['project_roles']
+                    or any(r not in ('OWNER','EDITOR','REVIEWER') for r in grant['project_roles'])):
+                raise ValueError('INVALID_PROTECTED_OPERATION_GRANT')
+            p=grant['principal']
+            if (type(p) is not Principal or p not in runtime.bindings or p.role not in
+                    ('MERCHANT_ADMIN','STORE_STAFF','PLATFORM_REVIEWER','FINANCE_APPROVER','PLATFORM_OWNER')):
+                raise PermissionError('REGISTERED_OPERATOR_REQUIRED')
+            self.grants[name]={**grant,'project_roles':tuple(grant['project_roles']),
+                'role':p.role,'tenant':p.tenant_id,'scope':dict(runtime.bindings[p])}
+
+    def dispatch(self,session,csrf,body):
+        if (type(body) is not dict or set(body)!={'workspace','operation','params'}
+                or type(body['workspace']) is not str or type(body['operation']) is not str
+                or type(body['params']) is not dict):
+            raise ValueError('INVALID_OPERATION_FIELDS')
+        if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
+        c=self.center;uid=c.session(session,csrf)
+        grant=self.grants.get(body['workspace'])
+        if grant is None or grant['user_id']!=uid:raise PermissionError('OPERATION_GRANT_REQUIRED')
+        p=grant['principal']
+        if (p not in self.runtime.bindings or p.role!=grant['role'] or p.tenant_id!=grant['tenant']
+                or self.runtime.bindings[p]!=grant['scope']):
+            raise PermissionError('OPERATION_GRANT_CHANGED')
+        project,_,_=c.project(uid,grant['project'],grant['project_roles'])
+        if project['tenant']!=grant['tenant']:raise PermissionError('PROJECT_TENANT_MISMATCH')
+        # This seam only exposes the existing community workbench operations.
+        # SaaS and Finance administration retain their original owner boundary.
+        if not body['operation'].startswith('community.'):
+            raise PermissionError('COMMUNITY_OPERATION_REQUIRED')
+        request_hash=hashlib.sha256(canonical(body)).hexdigest()
+        with c.tx():
+            c.limit('community-operations:'+uid,60,60)
+            c.audit(grant['project'],uid,'COMMUNITY_OPERATION_ATTEMPT',request_hash)
+        result=self.runtime.dispatch(p,body['operation'],body['params'],None)
+        # Separate original databases are not an atomic transaction. An audit
+        # failure after the business operation is UNKNOWN, never auto-retried.
+        with c.tx():
+            c.audit(grant['project'],uid,'COMMUNITY_OPERATION_COMPLETED',request_hash)
+        return result
