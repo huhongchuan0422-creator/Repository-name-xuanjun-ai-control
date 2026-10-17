@@ -2,11 +2,79 @@ import copy
 from pathlib import Path
 import tempfile
 import unittest
+from html.parser import HTMLParser
 from scripts import pr122_showcase as s
 from tests.test_pr122_showcase import project, page, milestone, obj, approvals, published
+from tests.pr122_showcase_role_fixture import fixture_records, PROJECT, ROLES
+
+
+class Links(HTMLParser):
+    def __init__(self, source):
+        super().__init__()
+        self.links = []
+        self.feed(source)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'a':
+            self.links.append(dict(attrs))
 
 
 class RoleGenerationTests(unittest.TestCase):
+    def test_six_role_fixture_generates_isolated_bilingual_routes(self):
+        items, proof, pages, files = fixture_records()
+        catalog = s.compile_catalog(items, proof, published_pages=pages)
+        self.assertEqual(catalog['projects'][0]['state'], 'DEVELOPING')
+        self.assertEqual(catalog['cases'], [])
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'public'
+            s.render(catalog, out, project_files=files)
+            self.assertEqual(len(list(out.glob('showcase/**/roles/*/*/index.html'))), 12)
+            for role, device in ROLES.items():
+                clean = 'projects/' + PROJECT + '/roles/' + role + '/' + device + '/'
+                for prefix, language in (('', 'zh-CN'), ('en/', 'en')):
+                    text = (out / 'showcase' / prefix / clean / 'index.html').read_text()
+                    links = Links(text).links
+                    switches = [link for link in links if 'lang' in link]
+                    self.assertEqual([(link['lang'], link['href']) for link in switches],
+                                     [('zh-CN', '/showcase/' + clean), ('en', '/showcase/en/' + clean)])
+                    self.assertEqual([link['lang'] for link in switches if link.get('aria-current') == 'page'], [language])
+                    self.assertEqual([link['href'] for link in links if link['href'].startswith('#')],
+                                     ['#feature-' + role + '-feature'])
+                    implementations = [link['href'] for link in links if '/views/' in link['href']]
+                    self.assertEqual(implementations, ['/showcase/projects/' + PROJECT + '/views/' + role + '/v1/'])
+                    self.assertIn('/showcase/' + prefix + 'projects/' + PROJECT + '/', [link['href'] for link in links])
+                    self.assertNotIn('primary-nav', text)
+
+    def test_six_roles_without_functional_acceptance_never_render(self):
+        items, proof, pages, files = fixture_records()
+        items = [i for i in items if i['kind'] != 'feature_acceptance']
+        catalog = s.compile_catalog(items, proof, published_pages=pages)
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'public'
+            s.render(catalog, out, project_files=files)
+            self.assertEqual(list(out.glob('showcase/**/roles/*/*/index.html')), [])
+            self.assertNotIn('/views/', (out / 'showcase/projects' / PROJECT / 'index.html').read_text())
+
+    def test_revoked_role_acceptance_removes_only_that_role(self):
+        items, proof, pages, _ = fixture_records()
+        for role in ROLES:
+            revoked = next(i for i in items if i['kind'] == 'feature_acceptance' and i['id'] == role + '-feature-accepted')
+            filtered = {digest: value for digest, value in proof.items() if digest != s.sha(s.canonical(revoked))}
+            catalog = s.compile_catalog(items, filtered, published_pages=pages)
+            self.assertEqual({f['role'] for f in catalog['projects'][0]['features']}, set(ROLES) - {role})
+            self.assertEqual(len(s.role_views(catalog['projects'][0])), 5)
+
+    def test_ecosystem_links_preserve_language(self):
+        items, proof, pages, _ = fixture_records()
+        catalog = s.compile_catalog(items, proof, published_pages=pages)
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'public'
+            s.render(catalog, out)
+            for prefix in ('', 'en/'):
+                links = Links((out / 'showcase' / prefix / 'ecosystem/index.html').read_text()).links
+                actual = [link['href'] for link in links if link['href'].startswith(('/ecosystem/', '/en/ecosystem/'))]
+                self.assertEqual(actual, ['/' + prefix + 'ecosystem/' + suffix for suffix in ('', 'tiers/', 'ledger/', 'profit-sharing/')])
+
     def records(self):
         view=page();view['role']='consumer'
         feature=obj('feature','checkout-feature',role='consumer',device='phone',milestone_id='checkout',page_id='consumer',page_version=1,page_artifact_sha256=view['artifact_sha256'])

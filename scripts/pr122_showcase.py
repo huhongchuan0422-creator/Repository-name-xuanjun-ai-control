@@ -192,7 +192,9 @@ def role_views(project,en=False):
         title=labels[role][en]
         nav=''.join('<a href="#feature-'+escape(f['id'],quote=True)+'">'+escape(f['title'][language])+'</a>' for f in features)
         cards=''.join('<section class="card" id="feature-'+escape(f['id'],quote=True)+'"><h2>'+escape(f['title'][language])+'</h2><p>'+escape(f['summary'][language])+'</p><a href="'+escape(f['href'],quote=True)+'">'+('Open feature' if en else '进入功能')+' →</a></section>' for f in features)
-        body='<header><a href="/showcase/'+prefix+'projects/'+project['project_id']+'/">'+('Back to project' if en else '返回项目')+'</a><p>'+escape(project['title'][language])+'</p><h1>'+title+'</h1></header><nav aria-label="'+('Features' if en else '当前角色功能')+'">'+nav+'</nav><main>'+cards+'</main>'
+        role_path='projects/'+project['project_id']+'/roles/'+role+'/'+device+'/'
+        languages='<nav aria-label="Language">'+''.join('<a lang="'+lang+'" href="/showcase/'+locale+role_path+'"'+(' aria-current="page"' if active==en else '')+'>'+label+'</a>' for lang,locale,label,active in (('zh-CN','','中文',False),('en','en/','EN',True)))+'</nav>'
+        body='<header><a href="/showcase/'+prefix+'projects/'+project['project_id']+'/">'+('Back to project' if en else '返回项目')+'</a><p>'+escape(project['title'][language])+'</p><h1>'+title+'</h1>'+languages+'</header><nav aria-label="'+('Features' if en else '当前角色功能')+'">'+nav+'</nav><main>'+cards+'</main>'
         result.append({'relative':relative,'href':'/showcase/'+relative.removesuffix('index.html'),'title':title,'device':device,'body':body})
     return result
 
@@ -254,7 +256,8 @@ def render(catalog,output,preview=False,project_files=None,shell=None):
             body='<p class="showcase-lead">'+escape(item['summary'][language])+'</p><p>'+('Dependencies: ' if en else '功能依赖：')+escape(dependencies)+'</p><p><a class="showcase-action" href="'+escape(item['demo_href'],quote=True)+'">'+('Try the demo' if en else '体验功能')+' →</a></p><h2>'+('Pricing options' if en else '价格与付款方式')+'</h2><ul>'+offers+'</ul><h2>'+('Preparation and conditions' if en else '准备材料与适用条件')+'</h2>'+requirements+'<p class="notice">'+('Live purchasing and payments are not enabled.' if en else '真实购买与付款尚未开放。')+'</p>'
             page(prefix+'modules/'+item['module_id']+'/index.html',item['title'][language],body,en)
         page(prefix+'modules/index.html',labels['modules'][en],modules or '<p>'+('No modules have passed listing admission yet.' if en else '模块通过测试、审核和上架准入后自动展示。')+'</p>',en)
-        ecology='<p>'+('Rules and project contributions are separate from ownership of the platform foundation.' if en else '共创项目贡献与平台自研基础模块归属分开登记。')+'</p><nav><a href="/ecosystem/">'+('Rules' if en else '共建共享规则')+'</a><a href="/ecosystem/tiers/">'+('Tiers and discounts' if en else '等级与开发折扣')+'</a><a href="/ecosystem/ledger/">'+('Service credits' if en else '专项金额说明')+'</a><a href="/ecosystem/profit-sharing/">'+('Profit sharing' if en else '共创净利润共享')+'</a></nav>'
+        ecosystem_root='/en/ecosystem/' if en else '/ecosystem/'
+        ecology='<p>'+('Rules and project contributions are separate from ownership of the platform foundation.' if en else '共创项目贡献与平台自研基础模块归属分开登记。')+'</p><nav><a href="'+ecosystem_root+'">'+('Rules' if en else '共建共享规则')+'</a><a href="'+ecosystem_root+'tiers/">'+('Tiers and discounts' if en else '等级与开发折扣')+'</a><a href="'+ecosystem_root+'ledger/">'+('Service credits' if en else '专项金额说明')+'</a><a href="'+ecosystem_root+'profit-sharing/">'+('Profit sharing' if en else '共创净利润共享')+'</a></nav>'
         ecology+=''.join('<article class="card"><h2>'+escape(e['title'][language])+'</h2><p>'+escape(e['summary'][language])+'</p><small>'+('Initiator: ' if en else '共创发起人：')+escape(e['initiator_nickname'])+'</small></article>' for e in catalog['ecology'])
         page(prefix+'ecosystem/index.html',labels['ecosystem'][en],ecology,en)
         page(prefix+'index.html','Explore XuanJun' if en else '探索玄钧云汇',cards(catalog['projects']),en)
