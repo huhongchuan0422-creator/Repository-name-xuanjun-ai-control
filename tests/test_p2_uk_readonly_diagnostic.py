@@ -95,7 +95,7 @@ class ReadOnlyDiagnosticTests(unittest.TestCase):
         self.assertEqual(run.returncode,0)
         self.assertEqual(stderr,b'')
         self.assertEqual(json.loads(stdout),{'state':'HOLD','redispatch_allowed':False})
-        self.assertEqual(stdout.count(b'\\n'),1)
+        self.assertEqual(stdout.count(b'\n'),1)
 
     def test_approval_contract(self):
         self.assertEqual(self.t.OWNER_ID,332398908)
