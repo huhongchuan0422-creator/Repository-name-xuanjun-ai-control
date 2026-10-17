@@ -133,3 +133,9 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - `community_financial_views.py` now rejects invalid signed-refund event amounts (boolean, zero, negative, float or text) before calculating total refund observations, rather than using untrusted arithmetic. Source `19dee4d02e43d3bad2c0819003e4363c9cffbe33`, synthetic regression `b197323a01e9e83ce780f949f09259c3f120b085`; no new Finance ledger or settlement authority.
 - Exact Hosted test run `39031805606` must be checked before marking PASS. Previous original merchant applyment commit `46385aa871f7efc192dd744ff005d986ce202dc7` passed Hosted test run `39031635282` (optional mini jobs skipped).
 - The source tests validate internal record integrity only. Real refund, official split bill acceptance and Finance authority remain independent blocked gates.
+
+## 2026-10-17 finance read isolation continuation
+
+- In-place original financial_records views reject missing/malformed persisted provider records and require both the stored scope hash AND actual stored tenant/merchant/store scope to match the currently authenticated Center finance grant. Source commits ebf0e545d8b699713239b65455aa9df8001ad863, 68474162a22340058a33334acc941da6102e1217, 0ecc9f57128d4f0b51f69c7726492b57c7922bf8.
+- New regression tests tests/test_community_finance_record_isolation.py validate return and split/refund scope exclusion, including a forged matching scope digest with a different stored scope (commit 82a953dfb7140e7054e619efa2862349d259b0b6). No new ledger or grant.
+- Exact Hosted test run 39032389107 is pending as this checkpoint is written. Both phase groups remain PARTIAL. Continue source E2E and official provider bill detail adapter when schema documented.
