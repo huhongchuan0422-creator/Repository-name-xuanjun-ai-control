@@ -49,6 +49,7 @@ class PartnerPrepay:
             self.bindings[reference]=dict(b)
     def __repr__(self):return '<PartnerPrepay protected payment bindings redacted>'
     def _authorize(self,session,csrf,reference):
+        if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         if type(reference) is not str or reference not in self.bindings:raise PermissionError('PAYMENT_BINDING_REQUIRED')
         c=self.center;uid=c.session(session,csrf);b=self.bindings[reference]
         if uid!=b['user_id']:raise PermissionError('PAYMENT_OWNER_REQUIRED')

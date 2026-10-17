@@ -51,7 +51,7 @@ class PrepayFlow(unittest.TestCase):
         self.reader._fetch.assert_called_once()
     def test_wrong_owner_and_csrf_never_reach_provider(self):
         self.reader._fetch=Mock()
-        for web in (self.fx.other,dict(self.fx.web,csrf='wrong')):
+        for web in (self.fx.other,dict(self.fx.web,csrf='wrong'),dict(self.fx.web,csrf=None),dict(self.fx.web,csrf='')):
             with self.assertRaises(PermissionError):self.client.create(web['token'],web['csrf'],'ref1')
         self.reader._fetch.assert_not_called()
     def test_invalid_response_signature_never_persists_payment_parameters(self):
