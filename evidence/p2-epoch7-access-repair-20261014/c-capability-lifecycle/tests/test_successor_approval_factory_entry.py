@@ -108,8 +108,8 @@ def approval_fixture(expires='2099-01-01T00:00:00Z', bind=True):
     calls = []
     def fetch(review_id, expected):
         calls.append((review_id, lock[0]))
-        raw = json.dumps({'id': review_id, 'user': {'id': 332398908,
-            'login': 'huhongchuan0422-creator'},
+        raw = json.dumps({'id': review_id, 'user': {'id': 95597695,
+            'login': '18598789888'},
             'issue_url': 'https://api.github.com/repos/' + base_approval.REPO + '/issues/58',
             'body': bodies[0]}).encode()
         return base_approval.validate(raw, review_id, expected)
