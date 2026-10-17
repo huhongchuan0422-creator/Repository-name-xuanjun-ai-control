@@ -1,0 +1,71 @@
+name: PR126 exact A5 source offline validation (no UK)
+on:
+  push:
+    branches: [ci/p2-a5-pr126-exact-8543161a-20261017]
+    paths: [.github/workflows/p2-a5-pr126-exact-ci.yml]
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 8543161a78f3f9fbd607fb3bb3a252545258a5f7
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exact reviewed PR126 version and 102 offline tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 8543161a78f3f9fbd607fb3bb3a252545258a5f7
+          sudo -n python -B -m unittest discover -s tests -p 'test_p2_*swas*.py' -v 2>&1 | tee /tmp/P2_A5_102.log
+          grep -q 'Ran 102 tests in' /tmp/P2_A5_102.log
+          grep -q '^OK$' /tmp/P2_A5_102.log
+          ! grep -q 'skipped=' /tmp/P2_A5_102.log
+      - name: Bind source SHA and safe offline archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess,tarfile
+          files=['.github/workflows/p2-uk-swas-diagnostic.yml','scripts/p2_uk_swas_diagnostic.py','scripts/p2_swas_receipt_validator.py','tests/test_p2_uk_swas_diagnostic.py','tests/test_p2_swas_receipt_validator.py','evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md','docs/development/P2_A5_REVIEWED_ENTRY_RELEASE.md','governance/features.json']
+          records=[{'path':n,'sha256':hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest(),'size':pathlib.Path(n).stat().st_size} for n in files]
+          m={'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'files':records,'tests':102,'root_execution':'NOT_RUN','site_python36':'SEPARATE_JOB','scope':'OFFLINE_ONLY'}
+          pathlib.Path('/tmp/P2_A5_EXACT_MANIFEST.json').write_text(json.dumps(m,sort_keys=True)+'\n')
+          with tarfile.open('/tmp/P2_A5_EXACT_SOURCE.tar.gz','w:gz') as tar:
+              for name in files:tar.add(name,arcname=name,recursive=False)
+              tar.add('/tmp/P2_A5_EXACT_MANIFEST.json',arcname='MANIFEST.json')
+              tar.add('/tmp/P2_A5_102.log',arcname='TESTS.log')
+          print(json.dumps({'manifest_sha256':hashlib.sha256(pathlib.Path('/tmp/P2_A5_EXACT_MANIFEST.json').read_bytes()).hexdigest(),'tar_sha256':hashlib.sha256(pathlib.Path('/tmp/P2_A5_EXACT_SOURCE.tar.gz').read_bytes()).hexdigest()},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-a5-pr126-exact-8543161a-offline
+          path: |
+            /tmp/P2_A5_EXACT_MANIFEST.json
+            /tmp/P2_A5_EXACT_SOURCE.tar.gz
+          if-no-files-found: error
+  python36:
+    runs-on: ubuntu-22.04
+    container: python:3.6.15-bullseye
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 8543161a78f3f9fbd607fb3bb3a252545258a5f7
+          persist-credentials: false
+      - name: Exact PR126 17 overlapping Python 3.6.15 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PY'
+          import sys,unittest
+          sys.path.insert(0,'tests')
+          from test_p2_uk_swas_diagnostic import SitePreparationTests
+          suite=unittest.defaultTestLoader.loadTestsFromTestCase(SitePreparationTests)
+          assert suite.countTestCases()==17
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          assert result.testsRun==17 and not result.skipped and result.wasSuccessful()
+          PY
