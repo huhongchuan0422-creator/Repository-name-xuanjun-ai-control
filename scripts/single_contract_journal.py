@@ -87,7 +87,7 @@ class Journal(object):
             obj=json.loads(bytes(row[0]).decode("utf-8"))
             scope=obj["frozen"]["scope"]
             current=freeze_from_stored(obj)
-            if not hmac.compare_digest(current, row[1]):
+            if not hmac.compare_digest(current, row[1]) or not hmac.compare_digest(current, obj.get("contract_document_hash", "")):
                 raise ContractHold("CORRUPT_CANDIDATE_DIGEST")
             if scope["project_id"] != verified_project_id or scope["verified_customer_id"] != verified_customer_id or scope["contract_id"] != contract_id:
                 raise ContractHold("CANDIDATE_ACCESS_DENIED")
