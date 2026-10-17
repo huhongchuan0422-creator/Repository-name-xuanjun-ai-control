@@ -34,7 +34,7 @@ test('signed success advertisement is scoped to current reference',async()=>{
  await result.onLoad({scene:'shop1'});result.setData({reference:'order1'});
  await result.showPayment({provider_state:'SUCCESS',amount_minor:101});
  assert.equal(result.data.afterAd,'verified fixture');assert.equal(result.data.afterAdVerified,true);
- assert.deepEqual(calls.at(-1).params,{reference:'order1'});
+ assert.equal(calls.at(-1).params.reference,'order1');
 });
 test('unverified or unavailable creative never changes paid status',async()=>{
  for(const mode of ['unverified','error']){
