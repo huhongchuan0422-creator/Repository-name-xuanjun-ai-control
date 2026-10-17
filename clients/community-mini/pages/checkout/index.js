@@ -46,11 +46,13 @@ Page({
     if(this.data.pending||!this.session||!this.data.projectReferenceItem)return;
     if(typeof this.data.projectReference!=='string'||!this.data.projectReference.trim()||this.data.projectReference.length>256){this.setData({status:'材料引用编号不能为空且不得超过256字符'});return;}
     if(!['SECRETREF','OAUTH','SERVER_CHALLENGE'].includes(this.data.projectReferenceKind))return;
+    const originalItem=this.data.projectReferenceItem,originalRevision=this.data.projectReferenceRevision;
     this.setData({pending:true});
     try{
       const r=await this.session.commerce(this.scene,'project_save_reference',{
         item:this.data.projectReferenceItem,revision:this.data.projectReferenceRevision,
         kind:this.data.projectReferenceKind,reference:this.data.projectReference});
+      if(this.data.projectReferenceItem!==originalItem||this.data.projectReferenceRevision!==originalRevision)return;
       this.setData({projectReference:'',projectReferenceRevision:r.revision,status:'可信材料引用已保存，需单独提交审核'});
       const checklist=await this.session.commerce(this.scene,'project_checklist',{});
       this.setData({projectChecklist:checklist.items.map(v=>({
