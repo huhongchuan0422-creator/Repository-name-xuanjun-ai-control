@@ -57,24 +57,32 @@ class OriginalProjectCenterJourney(unittest.TestCase):
         self.assertEqual(submitted['state'],'SUBMITTED')
         with self.assertRaises(PermissionError):
             self.consumer('project_review',dict(item='material1',revision=submitted['revision'],action='begin_review',reason=''))
-        reviewer=self.fx.fx.token('reviewer2','openid2')
-        review=self.consumer('project_review',dict(item='material1',revision=submitted['revision'],action='begin_review',reason=''),token=reviewer)
+        # Reviewer cannot use customer mini identity; independent review is
+        # served only through the original Center web session + CSRF.
+        reviewer=c.login('two@example.org','FixturePassword123!')
+        def review_on_web(action,revision,reason):
+            return self.fx.commerce.dispatch(reviewer['token'],reviewer['csrf'],
+                dict(workspace='project1',operation='project_review',
+                     params=dict(item='material1',revision=revision,action=action,reason=reason)))
+        review=review_on_web('begin_review',submitted['revision'],'')
         self.assertEqual(review['state'],'IN_REVIEW')
-        approved=self.consumer('project_review',dict(item='material1',revision=review['revision'],action='approve',reason='synthetic acceptance'),token=reviewer)
+        approved=review_on_web('approve',review['revision'],'synthetic acceptance')
         self.assertEqual(approved['state'],'ACCEPTED')
         self.assertEqual(self.consumer('project_checklist')['overall'],'ACCEPTED')
         with self.assertRaises(ValueError):
-            self.consumer('project_review',dict(item='material1',revision=review['revision'],action='approve',reason='replay'),token=reviewer)
+            review_on_web('approve',review['revision'],'replay')
 
     def test_independent_review_never_granted_to_owner_or_editor(self):
         request=dict(item='material1',revision=1,action='approve',reason='checked')
-        with self.assertRaisesRegex(PermissionError,'PROJECT_PERMISSION_REQUIRED'):
-            self.consumer('project_review',request)
-        reviewer_token=self.fx.fx.token('reviewer-code','openid2')
-        with self.assertRaisesRegex(PermissionError,'PROJECT_PERMISSION_REQUIRED'):
-            self.consumer('project_review',request,token=reviewer_token)
-        with self.assertRaises(ValueError):
-            self.consumer('project_review',dict(request,action='skip_validation'))
+        for address in ('one@example.org','two@example.org'):
+            web=self.fx.c.login(address,'FixturePassword123!')
+            with self.assertRaisesRegex(PermissionError,'PROJECT_PERMISSION_REQUIRED'):
+                self.fx.commerce.dispatch(web['token'],web['csrf'],
+                    dict(workspace='project1',operation='project_review',params=request))
+            with self.assertRaises(ValueError):
+                self.fx.commerce.dispatch(web['token'],web['csrf'],
+                    dict(workspace='project1',operation='project_review',
+                         params=dict(request,action='skip_validation')))
 
     def test_material_submit_cannot_mint_requirements_or_approve(self):
         before=self.fx.c.db.execute(
