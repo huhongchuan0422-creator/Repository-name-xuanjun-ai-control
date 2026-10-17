@@ -56,7 +56,7 @@ Page({
       this.setData({projectReference:'',projectReferenceRevision:r.revision,status:'可信材料引用已保存，需单独提交审核'});
       const checklist=await this.session.commerce(this.scene,'project_checklist',{});
       this.setData({projectChecklist:checklist.items.map(v=>({
-        id:v.id,state:v.state,required:v.required,revision:v.revision}))});
+        id:v.id,state:v.state,required:v.required,revision:v.revision,title:v.title,instructions:v.instructions,submission_type:v.submission_type}))});
     }catch(error){this.setData({status:error.message});}
     finally{this.setData({pending:false});}
   },
@@ -72,7 +72,7 @@ Page({
       this.setData({status:'资料版本已提交审核：'+result.state});
       const checklist=await this.session.commerce(this.scene,'project_checklist',{});
       this.setData({projectChecklist:checklist.items.map(entry=>({
-        id:entry.id,state:entry.state,required:entry.required,revision:entry.revision
+        id:entry.id,state:entry.state,required:entry.required,revision:entry.revision,title:entry.title,instructions:entry.instructions,submission_type:entry.submission_type
       }))});
     } catch(error){this.setData({status:error.message});}
     finally {this.setData({pending:false});}
@@ -89,7 +89,7 @@ Page({
       if(op==='project_summary')this.setData({projectTitle:r.title,projectRole:r.role,
         projectCustomerId:r.customer_id,projectState:r.checklist_overall});
       else if(op==='project_checklist')this.setData({projectChecklist:r.items.map(item=>({
-        id:item.id,state:item.state,required:item.required,revision:item.revision}))});
+        id:item.id,state:item.state,required:item.required,revision:item.revision,title:item.title,instructions:item.instructions,submission_type:item.submission_type}))});
       else if(op==='project_messages')this.setData({projectMessages:r.records,status:'读取原项目归档记录；不代表已获得人工回复'});
       else this.setData({projectFeedback:'',status:'项目反馈已归档，尚未确认人工回复：'+r.id});
     } catch(error) {this.setData({status:error.message});}
