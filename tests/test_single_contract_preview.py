@@ -19,6 +19,7 @@ class PreviewTests(unittest.TestCase):
         preview=render(freeze(samples.sample()))
         self.assertEqual(preview["status"], "DRAFT_NOT_FOR_SIGNATURE")
         self.assertFalse(preview["signable"])
+        self.assertEqual(preview["content_type"], "text/plain; charset=utf-8")
         self.assertIn("4150.00",preview["text"])
         self.assertIn("3000.00",preview["text"])
         self.assertIn("CONTRACT_SIGN=HOLD",preview["text"])
@@ -41,7 +42,9 @@ class PreviewTests(unittest.TestCase):
         data["features"][0]["description"]="Example\n# FAKE SIGNED HEADING <script>"
         result=render(freeze(data))["text"]
         self.assertNotIn("\n# FAKE SIGNED HEADING <script>",result)
-        self.assertIn("&lt;script&gt;",result)
+        self.assertIn("<script>",result)
+        self.assertNotIn("&lt;",result)
+        self.assertEqual(render(freeze(data))["content_type"], "text/plain; charset=utf-8")
 
     def test_reject_bad_candidate(self):
         with self.assertRaises(ContractHold):
@@ -58,6 +61,33 @@ class PreviewTests(unittest.TestCase):
         self.assertNotIn("**PAYMENT APPROVED**",text)
         self.assertNotIn("\n------------------\n",text)
         self.assertIn("CONTRACT_SIGN=HOLD",text)
+
+    def test_sc_r4_bare_urls_and_entities(self):
+        x=samples.sample()
+        x["features"][0]["description"]=(
+            "Untrusted URL https://2130706433/ and www.example.com "
+            "<script> &lt;safe&gt; & **literal** `code`")
+        result=render(freeze(x))
+        self.assertEqual(result["content_type"],"text/plain; charset=utf-8")
+        self.assertNotIn("https://2130706433/",result["text"])
+        self.assertIn("https\\u2060://2130706433/",result["text"])
+        self.assertIn("www\\u2060.example.com",result["text"])
+        self.assertIn("<script> &lt;safe&gt; &",result["text"])
+        self.assertNotIn("&lt;script\\&gt;",result["text"])
+
+    def test_sc_r4_structural_text_is_not_markup(self):
+        x=samples.sample()
+        x["features"][0]["description"]=(
+            "[click](https://attacker.invalid/) ![image](http://img.invalid/)\\n"
+            "FAKE SECTION\\n--------------\\n**PAYMENT APPROVED**\\n"
+            "```fake\\n# heading\\n- list item")
+        result=render(freeze(x))
+        self.assertNotIn("https://attacker.invalid/",result["text"])
+        self.assertNotIn("http://img.invalid/",result["text"])
+        self.assertNotIn("\\nFAKE SECTION\\n",result["text"])
+        self.assertNotIn("## ",result["text"])
+        self.assertEqual(result["content_type"],"text/plain; charset=utf-8")
+        self.assertIn("CONTRACT_SIGN=HOLD",result["text"])
 
 if __name__=="__main__":
     unittest.main()
