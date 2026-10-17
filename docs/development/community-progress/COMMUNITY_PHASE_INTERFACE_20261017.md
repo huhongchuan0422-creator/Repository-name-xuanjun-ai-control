@@ -13,6 +13,7 @@ Mini customers are authenticated using the original CenterIdentity, signed mini 
 | project_checklist | empty object | Original Center checklist and versioned requirement states, including original internal-material filtering. |
 | project_feedback | message | Original Center encrypted WEB message archival; ARCHIVED does not mean answered. |
 | project_submit | item, revision | Existing original requirement revision is submitted via original Center.transition(... submit). No reviewer approval or material minting. |
+| project_review | item, revision, action, reason | Only existing Center REVIEWER can begin_review / request_changes / approve. Original material author and reviewer independence, revision CAS and category/expiry guards remain mandatory. |
 
 ## Client behavior
 Native mini checkout displays success creative only on original server-confirmed signed successful payment evidence; a synthetic SUCCESS order retains MOCK_PAID_SIMULATED status without success creative. Ads are optional and failures do not block payment querying. Existing amount slot cannot forge success.
