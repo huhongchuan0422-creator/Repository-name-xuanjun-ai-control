@@ -84,6 +84,11 @@ class BillJourney(unittest.TestCase):
         with self.assertRaises(PermissionError):self.bills.dispatch(self.fx.web['token'],'','finance','bill_fetch',dict(kind='TRADE',bill_date=self.date))
         self.download(b'unknown,columns\na,b\n');self.call('bill_fetch')
         self.assertEqual(self.call('bill_reconcile')['status'],'UNKNOWN_SCHEMA')
+    def test_visual_spoofed_bill_column_name_denied(self):
+        raw='商户订单号,微\\u202e信订单号\\nref,tx\\n'.replace('\\u202e','\u202e').encode('utf-8')
+        with self.assertRaisesRegex(ValueError,'INVALID_BILL_COLUMN_NAME'):
+            parse(raw)
+
     def test_invalid_provider_bill_utf8_is_rejected_without_raw_contents(self):
         for raw in (b'\xff\xfe',b'a,b\n1,\xff\n'):
             with self.assertRaisesRegex(ValueError,'INVALID_BILL_UTF8') as cm:
