@@ -1,0 +1,55 @@
+name: P2 UK SWAS offline transport review
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - .github/workflows/p2-uk-swas-diagnostic.yml
+      - scripts/p2_uk_swas_diagnostic.py
+      - scripts/p2_swas_receipt_validator.py
+      - tests/test_p2_uk_swas_diagnostic.py
+      - tests/test_p2_swas_receipt_validator.py
+      - evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Offline tests only; no credentials or host execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m unittest discover -s tests -p 'test_p2_*swas*.py' -v 2>&1 | tee /tmp/P2_UK_SWAS_TESTS.log
+      - name: Bind all six public source paths and test log
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast,hashlib,json,os,subprocess,tarfile
+          from pathlib import Path
+          paths=['.github/workflows/p2-uk-swas-diagnostic.yml','scripts/p2_uk_swas_diagnostic.py','scripts/p2_swas_receipt_validator.py','tests/test_p2_uk_swas_diagnostic.py','tests/test_p2_swas_receipt_validator.py','evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md']
+          for name in paths:
+              if name.endswith('.py'):ast.parse(Path(name).read_text(),feature_version=(3,6))
+          records=[{'path':n,'size':Path(n).stat().st_size,'sha256':hashlib.sha256(Path(n).read_bytes()).hexdigest()} for n in paths]
+          log=Path('/tmp/P2_UK_SWAS_TESTS.log').read_bytes()
+          assert b'Ran 20 tests in ' in log and b'\nOK\n' in log and b'skipped=' not in log
+          m={'scope':'OFFLINE_UK_TRANSPORT_ONLY_NOT_P2_ACCEPTANCE','commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':records,'tests':20,'tests_skipped':0,'log_sha256':hashlib.sha256(log).hexdigest(),'root_execution':'NOT_RUN','python36_runtime':'NOT_VERIFIED','private_materials':'NOT_INCLUDED','execution_permission':'NOT_GRANTED'}
+          manifest=Path('/tmp/P2_UK_SWAS_MANIFEST.json');manifest.write_text(json.dumps(m,sort_keys=True,separators=(',',':'))+'\n')
+          with tarfile.open('/tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz','w:gz') as t:
+              for n in paths:t.add(n,arcname='p2-uk-swas/'+n,recursive=False)
+              t.add(manifest,arcname='p2-uk-swas/MANIFEST.json',recursive=False)
+              t.add('/tmp/P2_UK_SWAS_TESTS.log',arcname='p2-uk-swas/TESTS.log',recursive=False)
+          print(json.dumps({'tar_sha256':hashlib.sha256(Path('/tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz').read_bytes()).hexdigest(),'manifest_sha256':hashlib.sha256(manifest.read_bytes()).hexdigest(),'source_files':6,'root_execution':'NOT_RUN'},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-uk-swas-offline-${{ github.sha }}
+          path: |
+            /tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz
+            /tmp/P2_UK_SWAS_MANIFEST.json
+          if-no-files-found: error
