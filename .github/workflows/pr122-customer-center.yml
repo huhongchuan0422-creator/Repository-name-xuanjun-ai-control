@@ -47,6 +47,35 @@ jobs:
           Path('/tmp/pr122-customer/CUSTOMER_TEST_COUNTS.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
           print(json.dumps(receipt,sort_keys=True))
           PY
+      - name: Exact 150 evidence privacy identity and restore regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PYTEST' 2>&1 | tee /tmp/pr122-customer/CUSTOMER_EVIDENCE_TESTS.log
+          import json,os,unittest
+          from pathlib import Path
+          names = [
+              'tests.test_pr122_customer_center.CustomerTests',
+              'tests.test_pr122_customer_providers.ProviderTests',
+              'tests.test_pr122_site_hub_identity_integration.IdentityIntegrationTests',
+              'tests.test_pr122_customer_message_evidence.MessageEvidenceTests',
+              'tests.test_pr122_customer_message_evidence.MessageEvidenceHTTPTests',
+              'tests.test_pr122_customer_activity_evidence.ActivityEvidenceTests',
+              'tests.test_pr122_customer_privacy.PrivacyTests',
+              'tests.test_pr122_customer_privacy_http.PrivacyHTTPTests',
+              'tests.test_pr122_customer_context_config.ContextConfigTests',
+              'tests.test_pr122_customer_context_config.PrivacyBackupTests',
+              'tests.test_pr122_customer_changes.ChangeTests',
+          ]
+          suite=unittest.defaultTestLoader.loadTestsFromNames(names)
+          assert suite.countTestCases()==150, 'Frozen evidence regression count changed'
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          receipt={'commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'total':result.testsRun,'executed':result.testsRun-len(result.skipped),'passed':result.testsRun-len(result.skipped)-len(result.errors)-len(result.failures),'skipped':len(result.skipped),'errors':len(result.errors),'failures':len(result.failures),'scope':'ISOLATED_IN_PROCESS_SYNTHETIC_NOT_PRODUCTION'}
+          Path('/tmp/pr122-customer/CUSTOMER_EVIDENCE_TEST_COUNTS.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
+          print(json.dumps(receipt,sort_keys=True))
+          assert result.testsRun==150 and result.wasSuccessful() and not result.skipped and not result.expectedFailures and not result.unexpectedSuccesses
+          PYTEST
+          node tests/pr122_customer_auth_ui.cjs 2>&1 | tee /tmp/pr122-customer/CUSTOMER_AUTH_PRIVACY_DOM_TESTS.log
       - name: Install isolated browser only
         run: |
           npm install --prefix "$RUNNER_TEMP/pr122-customer-browser" --no-save playwright@1.55.0
@@ -179,4 +208,5 @@ jobs:
           path: ${{ runner.temp }}/pr122-customer-runtime-output-${{ github.run_id }}-${{ github.run_attempt }}/RUNTIME_REPORT.json
           if-no-files-found: error
           retention-days: 14
+
 
