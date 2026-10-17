@@ -105,9 +105,9 @@ class ReadOnlyDiagnosticTests(unittest.TestCase):
             for selected in combinations(names,count):
                 output=self.valid()
                 for i,name in enumerate(selected):
-                    output=output.replace('DB_FILE_ABSENT='+name,
-                        'DB_FILE='+name+' UID='+str(1000+i)+' GID='+str(2000+i)+
-                        ' MODE=600 SIZE='+str(8192+i))
+                    output='\n'.join(('DB_FILE='+name+' UID='+str(1000+i)+' GID='+str(2000+i)+
+                        ' MODE=600 SIZE='+str(8192+i)) if line=='DB_FILE_ABSENT='+name else line
+                        for line in output.split('\n'))
                 receipt=self.d.safe_receipt(output)['metadata']
                 for i,name in enumerate(selected):
                     start=receipt.index(('DB_FILE',name))
