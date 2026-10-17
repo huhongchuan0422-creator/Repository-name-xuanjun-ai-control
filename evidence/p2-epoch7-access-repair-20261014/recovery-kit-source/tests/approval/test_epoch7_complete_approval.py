@@ -14,7 +14,7 @@ class CompleteTests(unittest.TestCase):
         def fetcher(review_id,wanted):
             self.calls.append(review_id)
             if self.reject:raise ValueError('fixture rejection')
-            raw=json.dumps({'id':review_id,'user':{'id':332398908,'login':'huhongchuan0422-creator'},
+            raw=json.dumps({'id':review_id,'user':{'id':95597695,'login':'18598789888'},
                 'issue_url':'https://api.github.com/repos/'+base.REPO+'/issues/58','body':self.body}).encode()
             return base.validate(raw,review_id,wanted)
         self.v=s.CompleteApprovalVerifier(self.gate.review_id,self.bodysha,self.ops.install_lock_held,fetcher)
@@ -127,7 +127,7 @@ class CompleteTests(unittest.TestCase):
             gate.review_id = future_id
             def fetcher(review_id, wanted):
                 raw = json.dumps({'id':review_id,
-                    'user':{'id':332398908,'login':'huhongchuan0422-creator'},
+                    'user':{'id':95597695,'login':'18598789888'},
                     'issue_url':'https://api.github.com/repos/'+base.REPO+'/issues/58',
                     'body':body}).encode()
                 return base.validate(raw, review_id, wanted)
