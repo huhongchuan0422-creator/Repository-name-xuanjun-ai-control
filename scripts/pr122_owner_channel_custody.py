@@ -17,7 +17,7 @@ import zipfile
 
 HOST='iZvt5t8tlrm8oiZ'
 REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
-ATTEMPT='pr122-owner-channel-custody-20261017'
+ATTEMPT='pr122-owner-channel-custody-20261017-r2'
 STAGE=Path('/home/githubrunner/pr122-owner-inputs/channel-custody-20261017/REVIEW.zip')
 OUT=Path('/root')/ATTEMPT
 ZIP_SHA='9b59332f3806f215d2022c1510a74840f25cb84beec6a8d20e7026882d15b68d'
@@ -105,7 +105,12 @@ def declaration(tty,audit_body):
     tty.write('独立审核原文如下：\n'+audit_body+'\n')
     values=[]
     for prompt in ('Owner保管主体标识：','源码作者主体标识：','实际独立审核主体标识：','上述独立审核原始证据的SHA256（不得编造）：','输入 '+CONFIRM+' 确认属实：'):
-        tty.write(prompt);tty.flush();line=tty.readline(513);need(line.endswith('\n') and len(line)<=512,'OWNER_INPUT');values.append(line.strip())
+        while True:
+            tty.write(prompt);tty.flush();line=tty.readline(513)
+            need(line.endswith('\n') and len(line)<=512,'OWNER_INPUT_EOF_OR_OVERSIZE')
+            if line.strip():
+                values.append(line.strip());break
+            tty.write('尚未填写，请在此项输入真实内容后回车；Ctrl+C可停止。\n')
     owner,writer,reviewer,proof,confirmation=values
     need(all(x and len(x)<=128 for x in (owner,writer,reviewer)) and writer!=reviewer and digest(proof) and confirmation==CONFIRM,'OWNER_CONFIRMATION')
     return {'owner_principal':owner,'source_writer_principal':writer,'reviewer_principal':reviewer,'external_evidence_sha256':proof,'attestation_kind':'OWNER_PROTECTED_TTY_STATEMENT_NOT_CRYPTOGRAPHIC_INDEPENDENCE_PROOF'}
@@ -119,11 +124,14 @@ def prepare(ident,body_sha,get=fetch,tty=None):
     OUT.mkdir(mode=0o700);sync(OUT.parent)
     write(OUT/'attempt.json',canonical({'attempt':ATTEMPT,'approval_id':ident,'approval_sha256':body_sha,'utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'state':'STARTED_NO_RETRY'}))
     write(OUT/'approval.txt',approved.encode());write(OUT/'audit.txt',audit.encode())
+    phase='INPUT_PACKAGE'
     try:
         helper,runtime=decode(read(STAGE,uid=1002))
-        need(tty is not None,'OWNER_TTY_REQUIRED');attest=declaration(tty,audit)
+        need(tty is not None,'OWNER_TTY_REQUIRED');phase='OWNER_CONFIRMATION';attest=declaration(tty,audit)
+        phase='APPROVAL_RECHECK'
         need(permit(ident,body_sha,get)==approved,'PERMIT_CHANGED')
         need(comment_body(get(AUDIT_ID),AUDIT_ID,AUDIT_SHA)==audit,'AUDIT_CHANGED')
+        phase='PRIVATE_EVIDENCE_SAVE'
         attest.update(host=HOST,uid=os.getuid(),utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),audit_comment_id=AUDIT_ID,audit_body_sha256=AUDIT_SHA)
         write(OUT/'OWNER_CUSTODY.json',canonical(attest))
         write(OUT/'approved-upgrade.py',helper);write(OUT/'REVIEW_ARTIFACT.zip',runtime)
@@ -136,11 +144,17 @@ def prepare(ident,body_sha,get=fetch,tty=None):
         info=OUT.lstat();need(info.st_uid==0 and info.st_gid==0 and stat.S_IMODE(info.st_mode)==0o700,'OUTPUT_DIRECTORY')
         write(OUT/'receipt.json',canonical(receipt));return receipt
     except BaseException:
-        write(OUT/'failure.json',canonical({'state':'HOLD','retry_allowed':False,'channel_changes':0}));raise
+        write(OUT/'failure.json',canonical({'state':'HOLD','phase':phase,'retry_allowed':False,'channel_changes':0}));raise
 
 def open_terminal(path='/dev/tty'):
     # BufferedRandom (open r+) requires seekability; terminals are non-seekable.
-    return io.TextIOWrapper(io.FileIO(path,'r+'),encoding='utf-8',write_through=True)
+    import termios
+    raw=io.FileIO(path,'r+')
+    try:
+        termios.tcflush(raw.fileno(),termios.TCIFLUSH)
+        return io.TextIOWrapper(raw,encoding='utf-8',write_through=True)
+    except BaseException:
+        raw.close();raise
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('action',choices=('prepare',));ap.add_argument('--approval-id',type=int,required=True);ap.add_argument('--approval-body-sha256',required=True);a=ap.parse_args()

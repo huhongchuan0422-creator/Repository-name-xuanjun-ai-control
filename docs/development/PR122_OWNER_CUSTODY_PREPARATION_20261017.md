@@ -26,10 +26,18 @@ prepare成功仍是 CUSTODY_PREPARED_AWAIT_INDEPENDENT_ACCEPTANCE，不是独审
 
 ## 验证
 
-13个Root私有夹具测试：真实包完整解析而不执行、实际Root文件权限、一次占用、TTY限制、同主体拒绝、缺少原始证据/确认拒绝、过期/编辑/范围扩大/换入口、Runner身份、符号链接、持久化失败不覆盖。Hosted fixture声明不是真Owner声明。国内尚未执行，保管链仍NOT_VERIFIED。
+15个Root私有夹具测试：真实包完整解析而不执行、实际Root文件权限、一次占用、TTY限制、同主体拒绝、缺少原始证据/确认拒绝、过期/编辑/范围扩大/换入口、Runner身份、符号链接、持久化失败不覆盖。Hosted fixture声明不是真Owner声明。国内尚未执行，保管链仍NOT_VERIFIED。
 
 本地环境不支持chown至UID1002，相关完整测试交由Hosted真实Root执行，不跳过也不改生产UID检查。非Root暂存传输会在准确许可签发后先完成并跨任务验字节，再给Owner短启动命令，避免再次粘贴数百行。
 
 ## 真实TTY补测修正
 
 原 open(/dev/tty,r+) 在真实非seekable终端触发 UnsupportedOperation，先前模拟TTY未覆盖。改为原始FileIO加TextIOWrapper，保持同一TTY确认规则、Owner身份、权限及全部准入边界。新增真实os.openpty双向读写回归，显式复现旧打开方式失败、新方式成功。未执行国内prepare，旧许可不能用于新源码SHA，须替代准确批准。
+
+## r2空行输入防护与首次失败保留
+
+Owner在6228029998许可下实际进入prepare，回传HOLD/channel_changes=0；五个提示未显示有效填写，具体终端原因为未证实，不能写成已经独立复现该现场。源码可确认旧流程接收空白回答后最后统一拒绝。原 /root/pr122-owner-channel-custody-20261017 及launcher-v2保留，不能删除后重跑。
+
+r2使用独立attempt_id及目录 pr122-owner-channel-custody-20261017-r2；必须新许可。open_terminal在开始前用tcflush清理残留终端输入；各项空白回答仅重提示本项，不进入下一项或默认确认，EOF/超长/中断仍HOLD，不生成声明。新增真实PTY启动残留空行测试与带空行逐项声明测试；前述真实FileIO/PTY测试继续执行。失败私有文件增加阶段枚举，无私有输入或证据原文。
+
+Owner本人仍必须确认真实来源，不能代填主体或编造证据。若原始证据无法确认，应停止，不能用此改动绕过保管链。升级器/包/信任锚/业务组件不变。

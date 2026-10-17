@@ -48,6 +48,24 @@ class CustodyTests(unittest.TestCase):
                 self.assertTrue(received)
         finally:os.close(master);os.close(slave)
 
+    def test_blank_lines_do_not_advance_or_auto_confirm(self):
+        tty=TTY('\n\nOwner\n\nwriter\nreviewer\n\n'+'e'*64+'\n'+c.CONFIRM+'\n')
+        r=self.prepare(tty=tty)
+        self.assertEqual(r['state'],'CUSTODY_PREPARED_AWAIT_INDEPENDENT_ACCEPTANCE')
+        self.assertTrue(any('尚未填写' in p for p in tty.prompts))
+        att=json.loads((c.OUT/'OWNER_CUSTODY.json').read_bytes())
+        self.assertEqual(att['owner_principal'],'Owner')
+        self.assertEqual(att['source_writer_principal'],'writer')
+
+    def test_real_terminal_discards_prelaunch_paste_newlines(self):
+        master,slave=os.openpty()
+        try:
+            os.write(master,b'\n\n\n')
+            with c.open_terminal(os.ttyname(slave)) as tty:
+                os.write(master,b'fresh-owner\n')
+                self.assertEqual(tty.readline(),'fresh-owner\n')
+        finally:os.close(master);os.close(slave)
+
     def test_owner_attestation_saves_exact_inputs_without_channel_install(self):
         r=self.prepare();self.assertEqual(r['state'],'CUSTODY_PREPARED_AWAIT_INDEPENDENT_ACCEPTANCE')
         self.assertFalse(r['trust_installed']);self.assertFalse(r['helper_executed']);self.assertEqual(r['channel_changes'],0)
