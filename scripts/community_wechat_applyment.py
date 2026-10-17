@@ -61,8 +61,9 @@ class WechatApplyment:
             mini=sales.get('mini_program_info',{})
             if type(mini) is not dict or not (mini.get('mini_program_appid') or mini.get('mini_program_sub_appid')):missing.append('business_info.sales_info.mini_program_info.appid')
         if missing:raise ValueError('MISSING_OFFICIAL_FIELDS:'+','.join(missing))
-        # Conditional industry, bank-branch and identity requirements are finally
-        # validated by the actual provider; this local subset is not certification.
+        from scripts.community_applyment_conditions import validate
+        validate(profile,entity,self.center.now())
+        # Current official industry/bank catalogs and provider review remain authoritative.
     def _encrypt(self,value,key=None):
         if type(value) is dict:return {k:self._encrypt(v,k) for k,v in value.items()}
         if type(value) is list:return [self._encrypt(v,key) for v in value]
@@ -83,7 +84,7 @@ class WechatApplyment:
                 for k,v in value.items():walk(v,k)
             elif type(value) is list:
                 for v in value:walk(v,key)
-            elif type(value) is str and (key.endswith(('_copy','_pic','_pics')) or key in ('id_card_national','qualifications','business_authorization_letter','legal_person_commitment','addition_pics','activities_additions')):
+            elif type(value) is str and (key.endswith(('_copy','_copy_back','_pic','_pics')) or key in ('id_card_national','qualifications','business_authorization_letter','legal_person_commitment','addition_pics','activities_additions','web_authorisation')):
                 if value not in admitted:raise PermissionError('CURRENT_ORIGINAL_APPLICATION_MEDIA_REQUIRED')
         walk(profile)
 
@@ -126,6 +127,9 @@ class WechatApplyment:
             if not self.enabled:raise PermissionError('REAL_MERCHANT_SUBMISSION_GATE_CLOSED')
             if record is None or record['state']!='INTERNAL_APPROVED' or platform['status']!='APPROVED':raise PermissionError('SEPARATE_INTERNAL_AND_PLATFORM_APPROVAL_REQUIRED')
             self.onboarding._check_materials(application,meta)
+            self._validate(record['profile'],meta['entity_type'])
+            if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
+            if meta['category']=='FOOD' and not record['profile']['settlement_info'].get('qualifications'):raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
             self._validate_media(record['profile'],application,meta)
             code='ap'+hashlib.sha256(canonical([self.reader._mchid,application,version])).hexdigest()[:30]
             payload=dict(self._encrypt(record['profile']),business_code=code)
@@ -152,7 +156,9 @@ class WechatApplyment:
                 result=dict(version=version+1,state='DRAFT',profile=p['profile'],provider_state='NOT_SUBMITTED')
             elif op=='wechat_submit_review':
                 if record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_DRAFT_REQUIRED')
-                self._validate(record['profile'],meta['entity_type']);result=dict(record,version=version+1,state='PENDING_INTERNAL_REVIEW')
+                self._validate(record['profile'],meta['entity_type'])
+                if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
+                result=dict(record,version=version+1,state='PENDING_INTERNAL_REVIEW')
             else:
                 if uid==owner or record is None or record['state']!='PENDING_INTERNAL_REVIEW' or p['decision'] not in ('INTERNAL_APPROVED','CORRECTION') or type(p['opinion']) is not str or not 1<=len(p['opinion'])<=1000:raise PermissionError('INDEPENDENT_PAYMENT_APPLICATION_REVIEW_REQUIRED')
                 result=dict(record,version=version+1,state=p['decision'],opinion=p['opinion'],reviewer=uid)

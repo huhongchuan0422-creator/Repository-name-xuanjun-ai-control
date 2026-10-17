@@ -14,12 +14,14 @@ from scripts.pr122_customer_core import Center,canonical,secure_write,private_pa
 from scripts import community_onboarding_offline as workflow
 
 MATERIALS={
-    'business_license':'营业执照', 'identity_front':'经营者/法定代表人身份证人像面',
-    'identity_back':'经营者/法定代表人身份证国徽面', 'storefront_photo':'门店门头照片',
+    'business_license':'营业执照', 'identity_front':'经营者/法定代表人证件正面',
+    'identity_back':'经营者/法定代表人证件反面', 'storefront_photo':'门店门头照片',
     'interior_photo':'门店经营场所照片', 'settlement_proof':'结算账户证明',
     'operator_authorization':'经办人授权书', 'operator_identity':'经办人身份证明',
     'industry_permit':'行业经营许可（按经营类目）',
-    'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）'}
+    'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）',
+    'operator_identity_back':'经办人证件反面',
+    **{'ubo_'+str(i)+'_'+side:'受益人'+str(i)+('证件正面' if side=='front' else '证件反面') for i in range(1,5) for side in ('front','back')}}
 BASE=('business_license','identity_front','identity_back','storefront_photo','interior_photo','settlement_proof')
 
 
@@ -70,7 +72,8 @@ class MerchantOnboarding:
         self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_ONBOARDING',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",
             (application,owner,application,self._encode(meta,'onboarding-meta:'+application)))
     def _required(self,meta):
-        return BASE+(('operator_authorization','operator_identity') if meta['delegated'] else ())+(('industry_permit',) if meta['category']=='FOOD' else ())
+        base=tuple(k for k in BASE if k!='identity_back' or meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
+        return base+(('operator_authorization','operator_identity') if meta['delegated'] else ())+(('industry_permit',) if meta['category']=='FOOD' else ())
     def _check_materials(self,application,meta):
         for kind in self._required(meta):
             material=meta['materials'].get(kind)
@@ -89,7 +92,7 @@ class MerchantOnboarding:
             if g['user_id']==owner and g['onboarding_required']]
         data=dict(data,fields={k:v for k,v in data['fields'].items() if k!='license_ref'})
         wechat_record=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
-        return dict(data,application=application,entity_type=meta['entity_type'],category=meta['category'],
+        return dict(data,application=application,entity_type=meta['entity_type'],identity_type=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'),category=meta['category'],
             delegated=meta['delegated'],required_materials=list(self._required(meta)),
             materials={k:{'uploaded':True,'expires_at':v['expires_at'],
                 'review':meta.get('reviews',{}).get(k,{}).get('decision','PENDING'),
@@ -116,7 +119,7 @@ class MerchantOnboarding:
                  'download':{'application','kind'}}
         listing=type(op) is str and op in ('mine','review_list')
         if (type(op) is not str or op not in schemas or
-                (not set(params).issubset({'cursor','status'}) if listing else set(params)!=schemas[op])):
+                (not set(params).issubset({'cursor','status'}) if listing else (set(params) not in (schemas[op], schemas[op]|{'identity_type'}) if op=='save' else set(params)!=schemas[op]))):
             raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         if op=='open_workbench':
@@ -172,6 +175,10 @@ class MerchantOnboarding:
                     if type(value) is not str:raise ValueError('INVALID_PROFILE_VALUE')
                     if value:safe_text(value,512)
                 if len(fields['store_name'])>120 or len(fields['contact'])>120:raise ValueError('MERCHANT_PROFILE_FIELD_LIMIT')
+                from scripts.community_applyment_conditions import DOCS
+                identity_type=params.get('identity_type',meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'))
+                if type(identity_type) is not str or identity_type not in DOCS:raise ValueError('INVALID_IDENTITY_TYPE')
+                meta['identity_type']=identity_type
                 meta.update(entity_type=params['entity_type'],category=params['category'],delegated=params['delegated'])
                 meta['reviews']={}
                 revision=workflow.save_draft(c.db,uid,application,uid,dict(fields,license_ref='PRIVATE_ONBOARDING_MATERIALS'),params['revision'],
