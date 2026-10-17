@@ -4,7 +4,7 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 function page(failProducts=false,receipt=null){
  let definition;const calls=[];
- const session={login:async()=>{},clear:()=>{},transport:async()=>{},payment:async()=>{},commerce:async(scene,operation,params)=>{calls.push({scene,operation,params});if(operation==='products'){if(failProducts)throw Error('暂停交易');return {products:[]};}if(operation==='receipt_ad'){if(typeof receipt==='function')return receipt(scene,params);return {payment_success_verified:false,creative:null};}if(operation==='project_messages')return {records:[{id:'m_fixture',body:'历史反馈',status:'ARCHIVED',channel:'WEB',created:100}]};if(operation==='communities')return {records:[{id:'co_fixture',name:'fixture'}],has_more:false,next_cursor:null};return {community_id:'co_fixture',active:true};}};
+ const session={login:async()=>{},clear:()=>{},transport:async()=>{},payment:async()=>{},commerce:async(scene,operation,params)=>{calls.push({scene,operation,params});if(operation==='products'){if(failProducts)throw Error('暂停交易');return {products:[]};}if(operation==='project_checklist')return {items:[{id:'material1',title:'准备证件',instructions:'根据原项目私有材料要求准备',submission_type:'SECRETREF',state:'PARTIAL',required:true,revision:1}]};if(operation==='receipt_ad'){if(typeof receipt==='function')return receipt(scene,params);return {payment_success_verified:false,creative:null};}if(operation==='project_messages')return {records:[{id:'m_fixture',body:'历史反馈',status:'ARCHIVED',channel:'WEB',created:100}]};if(operation==='communities')return {records:[{id:'co_fixture',name:'fixture'}],has_more:false,next_cursor:null};return {community_id:'co_fixture',active:true};}};
  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:value=>{definition=value;},require:path=>path==='../../client'?{makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})}:path==='../../payment'?{createPaymentFlow:()=>({reset(){}})}:{parseScene:o=>o.scene,createSession:()=>session},getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid',commerce:true,payments:true}}),wx:{}});
  const result={...definition,data:{...definition.data},setData(values){Object.assign(this.data,values);}};
  return {result,calls};
@@ -80,4 +80,13 @@ test('late reference-save reply cannot overwrite newly selected original require
  await pending;
  assert.equal(result.data.projectReferenceItem,'material2');
  assert.equal(result.data.projectReference,'new-ref');
+});
+
+test('project checklist displays exact original requirement title and instructions',async()=>{
+ const {result,calls}=page();await result.onLoad({scene:'shop1'});
+ await result.projectAction({currentTarget:{dataset:{operation:'project_checklist'}}});
+ assert.equal(calls.at(-1).operation,'project_checklist');
+ assert.equal(result.data.projectChecklist[0].title,'准备证件');
+ assert.equal(result.data.projectChecklist[0].submission_type,'SECRETREF');
+ assert.match(result.data.projectChecklist[0].instructions,/原项目私有材料要求/);
 });
