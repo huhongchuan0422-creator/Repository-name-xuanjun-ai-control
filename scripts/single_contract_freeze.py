@@ -9,7 +9,7 @@ import copy
 import hashlib
 import json
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 
 class ContractHold(ValueError):
     pass
@@ -38,7 +38,17 @@ def money(v):
         raise ContractHold("INVALID_AMOUNT")
     if not n.is_finite() or n < 0 or n.as_tuple().exponent < -2:
         raise ContractHold("INVALID_AMOUNT")
+    # Strict currency bound prevents Decimal context precision loss; no silent rounding.
+    if len(n.as_tuple().digits) > 16 or n > Decimal("99999999999999.99"):
+        raise ContractHold("AMOUNT_OUT_OF_RANGE")
     return n
+
+def cents(v):
+    n = money(v)
+    return int(n * 100)
+
+def as_money(value):
+    return "{:.2f}".format(Decimal(value) / 100)
 
 def _verified_id(value):
     if not isinstance(value, str) or not ID.match(value):
@@ -86,8 +96,8 @@ def freeze(snapshot):
     if not isinstance(items, list):
         raise ContractHold("RESOURCES_REQUIRED")
     seen = set()
-    third_party = Decimal("0")
-    service = Decimal("0")
+    third_party = 0
+    service = 0
     for item in items:
         if not isinstance(item, dict):
             raise ContractHold("INVALID_RESOURCE")
@@ -106,42 +116,50 @@ def freeze(snapshot):
         if mode != "AGENT_PURCHASE" and money(item["third_party_first_cny"]) != 0:
             raise ContractHold("DUPLICATE_THIRD_PARTY_COST")
         if mode == "AGENT_PURCHASE":
-            third_party += money(item["third_party_first_cny"])
-        service += sum((money(item[k]) for k in ("procurement_fee_cny",
-                       "deployment_fee_cny", "tax_cny")), Decimal("0"))
+            third_party += cents(item["third_party_first_cny"])
+        service += sum(cents(item[k]) for k in ("procurement_fee_cny",
+                       "deployment_fee_cny", "tax_cny"))
         # Display in both currencies, but do not derive a fictional FX rate.
         for code in ("CNY", "USD"):
             if not isinstance(item.get("display_" + code), str) or not item["display_" + code]:
                 raise ContractHold("DUAL_CURRENCY_REQUIRED")
         if not isinstance(item.get("owner"), str) or not item["owner"].strip():
             raise ContractHold("RESOURCE_OWNERSHIP_REQUIRED")
-    dev = money(snapshot.get("development_fee_cny"))
-    first_dev = (dev / 2).quantize(Decimal("0.01"))
+    dev = cents(snapshot.get("development_fee_cny"))
+    first_dev = dev // 2
     if first_dev * 2 != dev:
         raise ContractHold("ODD_CENT_SPLIT_REQUIRES_AGREEMENT")
-    # Deny nested credential fields as well as top-level ones, before archiving.
-    def reject_secrets(node):
-        if isinstance(node, dict):
-            for key, value in node.items():
-                if re.search(r"(password|private_key|access_token|api_key|secret_value)",
-                             str(key), re.I):
-                    raise ContractHold("RAW_SECRET_FIELD")
-                reject_secrets(value)
-        elif isinstance(node, list):
-            for value in node:
-                reject_secrets(value)
-    reject_secrets(snapshot)
+    # Strict input schemas: unknown fields cannot enter the frozen archive.
+    root_allowed = set(REQUIRED) | {"disclosure_confirmed", "customer_selection_confirmed",
+        "signer_authority_verified", "legal_review_approved", "quote_valid",
+        "development_fee_cny", "features", "resources"}
+    feature_allowed = {"feature_id", "description", "acceptance"}
+    resource_allowed = {"item_id", "mode", "owner", "third_party_first_cny",
+        "procurement_fee_cny", "deployment_fee_cny", "tax_cny", "display_CNY",
+        "display_USD"}
+    if set(snapshot) - root_allowed:
+        raise ContractHold("UNKNOWN_ROOT_FIELD")
+    for feature in features:
+        if set(feature) - feature_allowed:
+            raise ContractHold("UNKNOWN_FEATURE_FIELD")
+    for item in items:
+        if set(item) - resource_allowed:
+            raise ContractHold("UNKNOWN_RESOURCE_FIELD")
+    # Text is not accepted as a credential transport; the caller must perform
+    # separate private-data filtering and send SecretRef only through trusted APIs.
+    if third_party + service + first_dev > 9999999999999999:
+        raise ContractHold("AMOUNT_OUT_OF_RANGE")
     frozen = {
         "schema": "xuanjun.single-contract.offline.v1",
         "scope": {k: snapshot[k] for k in REQUIRED},
         "features": copy.deepcopy(features),
         "resources": copy.deepcopy(items),
         "payment_cny": {
-            "development_first_50pct": str(first_dev),
+            "development_first_50pct": as_money(first_dev),
             "development_final_after_acceptance_50pct": str(first_dev),
-            "third_party_first_full": str(third_party),
-            "agreed_services_and_tax_first": str(service),
-            "first_total": str(first_dev + third_party + service)
+            "third_party_first_full": as_money(third_party),
+            "agreed_services_and_tax_first": as_money(service),
+            "first_total": as_money(first_dev + third_party + service)
         },
         "disclosure_confirmed": True,
         "customer_selection_confirmed": True,
