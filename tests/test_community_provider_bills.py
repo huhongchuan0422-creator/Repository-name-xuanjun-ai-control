@@ -42,6 +42,18 @@ class BillJourney(unittest.TestCase):
         r=self.call('bill_fetch');self.assertEqual(r['integrity'],'SIGNED_TICKET_HASH_VERIFIED')
         self.assertNotIn('用户标识',self.call('bill_rows',offset=0)['records'][0])
         r=self.call('bill_reconcile');self.assertEqual(r['status'],'EXCEPTION');self.assertFalse(r['funds_retry_authorized']);self.assertEqual(r['finance_status'],'UNCONFIRMED')
+    def test_finance_bill_preview_shows_reconciliation_columns_but_never_private_ids(self):
+        g,policy=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
+        raw=('商户订单号,微信订单号,交易状态,订单金额,特约商户号,币种,用户标识,银行卡号\\n'
+             'ref,123456789,SUCCESS,1.00,'+policy['sub_mchid']+',CNY,private-openid,private-card\\n').encode()
+        self.download(raw)
+        self.call('bill_fetch')
+        rows=self.call('bill_rows',offset=0)['records']
+        self.assertEqual(rows[0]['特约商户号'],policy['sub_mchid'])
+        self.assertEqual(rows[0]['币种'],'CNY')
+        self.assertNotIn('用户标识',rows[0])
+        self.assertNotIn('银行卡号',rows[0])
+
     def test_hash_mismatch_never_persists(self):
         self.download(b'a,b\nx,y\n');self.bills._download.return_value=b'a,b\nx,z\n'
         with self.assertRaises(PermissionError):self.call('bill_fetch')
