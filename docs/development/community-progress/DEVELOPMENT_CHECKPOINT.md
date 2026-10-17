@@ -102,3 +102,6 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - UBO identity documents in existing original merchant WeChat applyment are now deduplicated within the same application: 75f1f868dfee6796b671530513ae8ff3d3cbcc4e. Multiple records with the same (document type, case-normalized document number) are rejected before upload/submit; never print the document number in error text.
 - Synthetic regression added in 51ebb6ce72541dcf55d1f9cf814912f6ebff9d5f. No real merchant enrollment performed. Real bank and sector dynamic catalogs remain unverified/external; this test is not live merchant acceptance.
 - CI for this new source version must be checked by exact SHA; prior success for split-bill improvements is not a PASS for applyment.
+
+- Official WeChat partner split-bill API documentation (https://pay.wechatpay.cn/doc/v3/partner/4012761140) says each detail row is an individual split or return and that detail/summary each have their own header. The current aggregate-only adapter is NOT validated for official receiver-level/return layouts: UNKNOWN_SCHEMA remains mandatory. Do not label current synthetic aggregate fixtures as full official reconciliation or Finance settlement.
+- Verified latest source CI: cf01f58e9acefa98f34e1711c963ea9d80c2cbe3, Hosted run 39030394638 test job 117389505111 SUCCESS; optional jobs SKIPPED, not PASS.
