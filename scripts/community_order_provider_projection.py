@@ -51,10 +51,10 @@ def project_verified_query(db,identity,reference,expected,observation,at,key_id)
         order=state(db,identity,reference)
         if order['amount_minor']!=expected['amount_minor'] or order['currency']!='CNY':raise PermissionError('ORIGINAL_ORDER_AMOUNT_CHANGED')
         prior=db.execute('SELECT tenant_id,merchant_id,store_id,reference,to_state FROM order_events WHERE event_id=?',(event,)).fetchone()
-        if prior:
-            if prior!=(t,m,s,reference,target) or order['state']!=target or order['provider_transaction_id']!=tx:raise ValueError('PROVIDER_EVENT_COLLISION')
+        if order['state']=='REFUNDED' and provider_state=='REFUND' and provider_evidence(db,identity,reference) is not None and order['provider_transaction_id']==tx:
             db.commit();return dict(changed=False,provider_state=provider_state)
-        if order['state']=='REFUNDED' and provider_state=='REFUND' and provider_evidence(db,identity,reference) is not None:
+        if prior:
+            if tuple(prior)!=(t,m,s,reference,target) or order['state']!=target or order['provider_transaction_id']!=tx:raise ValueError('PROVIDER_EVENT_COLLISION')
             db.commit();return dict(changed=False,provider_state=provider_state)
         if order['state']!='PENDING':raise PermissionError('ORDER_STATE_REQUIRES_RECONCILIATION')
         changed=db.execute('UPDATE orders SET state=?,provider_transaction_id=? WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=? AND state=\'PENDING\'',(target,tx,t,m,s,reference))
@@ -80,7 +80,7 @@ def project_verified_refund(db,identity,reference,out_refund_no,amount_minor,tot
         prior=db.execute('SELECT tenant_id,merchant_id,store_id,reference,evidence_source FROM order_events WHERE event_id=?',(event,)).fetchone()
         if prior:
             evidence=json.loads(prior[4])
-            if prior[:4]!=(t,m,s,reference) or evidence.get('out_refund_no')!=out_refund_no or evidence.get('refund_minor')!=amount_minor:raise ValueError('VERIFIED_REFUND_EVENT_COLLISION')
+            if tuple(prior[:4])!=(t,m,s,reference) or evidence.get('out_refund_no')!=out_refund_no or evidence.get('refund_minor')!=amount_minor:raise ValueError('VERIFIED_REFUND_EVENT_COLLISION')
             db.commit();return dict(changed=False,order_state=order['state'])
         refunded=0
         for raw, in db.execute('SELECT evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,s,reference)):

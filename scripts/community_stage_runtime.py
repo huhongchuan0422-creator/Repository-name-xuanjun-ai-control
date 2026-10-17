@@ -133,6 +133,9 @@ class StageRuntime:
                 or principal.role != 'PLATFORM_OWNER'):
             raise PermissionError('PLATFORM_OPERATOR_REQUIRED')
         identity = self.bindings[principal]
+        from scripts.community_order_provider_projection import provider_evidence
+        if provider_evidence(self.demo.db, identity, reference) is not None:
+            raise PermissionError('REAL_ORDER_SIMULATION_DENIED')
         order = state(self.demo.db, identity, reference)
         return simulated_transition(self.demo.db, identity, reference, event_id, target,
             {'simulation_only': True, 'scope': identity, 'reference': reference,

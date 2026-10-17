@@ -22,6 +22,7 @@ class MiniApplication:
         self.saas=None
         self.fulfillment=None
         self.provider_actions=None
+        self.communities=None
         self._socket=None
         self.center=center
         try:
@@ -37,8 +38,15 @@ class MiniApplication:
         """Loopback backend for the admitted HTTPS host; never a public bind."""
         if self.server is not None:
             raise ValueError('ALREADY_LISTENING')
-        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions)
+        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,communities=self.communities)
         return self.server
+
+    def configure_communities(self,grants):
+        if self.server is not None or self.communities is not None:
+            raise ValueError('COMMUNITIES_ALREADY_CONFIGURED_OR_LISTENING')
+        from scripts.community_center_communities import CenterCommunities
+        self.communities=CenterCommunities(self.center,grants)
+        return self.communities
 
     def configure_provider_actions(self,reader,bindings):
         if self.server is not None or self.provider_actions is not None or self.operations is None:
@@ -129,7 +137,7 @@ class MiniApplication:
         if (parent.st_gid!=nginx_gid or
                 (nginx_uid!=os.geteuid() and parent.st_mode & 0o050 != 0o050)):
             raise PermissionError('NGINX_SOCKET_DIRECTORY_TRAVERSAL_REQUIRED')
-        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions)
+        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,communities=self.communities)
         class Server(socketserver.UnixStreamServer):request_queue_size=128
         server=Server(str(path),handler)
         info=path.lstat();self._socket=(path,info.st_dev,info.st_ino)

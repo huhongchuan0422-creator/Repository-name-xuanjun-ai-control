@@ -12,7 +12,11 @@ from scripts.community_demo_api import _HeaderDeadlineReader
 from scripts.community_mini_login import LoginUnavailable
 
 
-def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None):
+def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None):
+    if communities is not None:
+        from scripts.community_center_communities import CenterCommunities
+        if type(communities) is not CenterCommunities or communities.center is not getattr(gateway.identity,'center',None):
+            raise ValueError('SAME_CENTER_COMMUNITIES_REQUIRED')
     if provider_actions is not None:
         from scripts.community_wechat_sp_actions import ProviderActions
         if type(provider_actions) is not ProviderActions or provider_actions.runtime is not gateway.runtime or provider_actions.center is not getattr(gateway.identity,'center',None):
@@ -60,7 +64,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                         ('Content-Security-Policy',"default-src 'none'")]:self.send_header(k,v)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_GET(self):
-            if onboarding is None and operations is None and saas is None:return self.answer(404,{'error':'NOT_FOUND'})
+            if onboarding is None and operations is None and saas is None and communities is None:return self.answer(404,{'error':'NOT_FOUND'})
             host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if self.headers.get_all('Host')!=[host]:return self.answer(403,{'error':'ORIGIN_DENIED'})
             if trusted_proxy is not None:
@@ -79,6 +83,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 assets.update({'/customer/saas':('saas.html','text/html; charset=utf-8'),
                     '/customer/saas.js':('saas.js','application/javascript; charset=utf-8'),
                     '/customer/saas.css':('workbench.css','text/css; charset=utf-8')})
+            if communities is not None:
+                assets.update({'/community/portal':('communities.html','text/html; charset=utf-8'),
+                    '/community/portal.js':('communities.js','application/javascript; charset=utf-8'),
+                    '/community/portal.css':('workbench.css','text/css; charset=utf-8')})
             if self.path not in assets:return self.answer(404,{'error':'NOT_FOUND'})
             from pathlib import Path
             name,mime=assets[self.path]
@@ -103,7 +111,8 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     self.path=='/merchant/onboarding' and onboarding is not None) and not (
                     self.path=='/customer/saas-api' and saas is not None) and not (
                     self.path=='/community/fulfillment' and fulfillment is not None) and not (
-                    self.path=='/community/provider-actions' and provider_actions is not None):
+                    self.path=='/community/provider-actions' and provider_actions is not None) and not (
+                    self.path=='/community/directory' and communities is not None):
                 return self.answer(404,{'error':'NOT_FOUND'})
             if (self.headers.get('Transfer-Encoding') is not None or
                     len(self.headers.get_all('Content-Length',[])) != 1 or
@@ -118,7 +127,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if not 0 < length <= limit:raise ValueError('INVALID_LENGTH')
                 session=self.headers.get('X-Center-Session','')
                 csrf=self.headers.get('X-Center-CSRF','')
-                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions'):
+                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions','/community/directory'):
                     cookies=[part.strip().partition('=')[2] for part in self.headers.get('Cookie','').split(';')
                              if part.strip().partition('=')[0]=='__Host-xj_customer']
                     if len(cookies)>1 or cookies and session or csrf and self.headers.get('X-CSRF-Token'):
@@ -128,7 +137,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     # Authenticate before accepting a large private upload body.
                     if session:
                         if not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions}[self.path].center.session(session,csrf)
+                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions,'/community/directory':communities}[self.path].center.session(session,csrf)
                     elif length>16384:raise PermissionError('CENTER_SESSION_REQUIRED')
                 remaining=length;chunks=[];deadline=time.monotonic()+1
                 while remaining:
@@ -158,6 +167,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if self.path=='/merchant/onboarding':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=onboarding.dispatch(session,csrf,body)
+                elif self.path=='/community/directory':
+                    if token:raise PermissionError('CENTER_SESSION_REQUIRED')
+                    result=communities.dispatch(session,csrf,body)
                 elif self.path=='/community/provider-actions':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=provider_actions.dispatch(session,csrf,body)
@@ -190,6 +202,6 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
     return Handler
 
 
-def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None):
+def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None):
     if type(port) is not int or not (port==0 or 1024 <= port <= 65535):raise ValueError('INVALID_PORT')
-    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas,fulfillment=fulfillment,provider_actions=provider_actions))
+    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas,fulfillment=fulfillment,provider_actions=provider_actions,communities=communities))

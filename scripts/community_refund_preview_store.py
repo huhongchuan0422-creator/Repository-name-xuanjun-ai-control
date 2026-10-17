@@ -62,6 +62,9 @@ def record_preview(db,orders,identity,reference,event_id,amount_minor):
         raise ValueError("INVALID_REFUND_ID")
     if type(amount_minor) is not int or not 1<=amount_minor<=100000000:
         raise ValueError("INVALID_REFUND_AMOUNT")
+    from scripts.community_order_provider_projection import provider_evidence
+    if provider_evidence(orders,identity,reference) is not None:
+        raise PermissionError('REAL_ORDER_REQUIRES_PROVIDER_REFUND_WORKFLOW')
     original=state(orders,identity,reference)
     if original["state"]!="SUCCESS" or original["provider_settlement_verified"] is not False:
         raise ValueError("SIMULATED_SUCCESS_REQUIRED")

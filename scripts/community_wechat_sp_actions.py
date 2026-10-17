@@ -148,6 +148,18 @@ class ProviderActions:
         with c.tx():
             if self._load(key) is not None:raise ProviderActionUnknown('CONCURRENT_ACTION_EXISTS_QUERY_ONLY')
             if c.db.execute("SELECT 1 FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_LOCK' AND subject_idx=? AND active=1",(lock,)).fetchone():raise ProviderActionUnknown('PRIOR_ORDER_ACTION_UNKNOWN_QUERY_OR_REVIEW_REQUIRED')
+            budget_row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_BUDGET' AND subject_idx=? AND project=? AND active=1",(lock,g['project'])).fetchone()
+            budget=json.loads(c.decrypt(budget_row[0],'provider-order-budget')) if budget_row else dict(refund_reserved_minor=0,split_action=None)
+            if kind=='SPLIT':
+                if budget['split_action'] is not None:raise PermissionError('ORDER_SPLIT_ALREADY_RESERVED_QUERY_EXISTING_ONLY')
+                if budget['refund_reserved_minor']>0:raise PermissionError('REFUND_IMPACT_REQUIRES_RECONCILIATION_BEFORE_SPLIT')
+                budget['split_action']=key
+            else:
+                if budget['split_action'] is not None:raise PermissionError('SPLIT_RETURN_CONFIRMATION_REQUIRED_BEFORE_REFUND')
+                if budget['refund_reserved_minor']+p['amount_minor']>original['amount_minor']:raise ValueError('REFUND_RESERVED_TOTAL_EXCEEDS_PAYMENT')
+                budget['refund_reserved_minor']+=p['amount_minor']
+            # Unknown/failed actions retain reservations until explicit reconciliation.
+            c.db.execute("INSERT INTO links VALUES('COMMUNITY_PROVIDER_ORDER_BUDGET',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",(lock,g['user_id'],g['project'],c.encrypt(canonical(budget),'provider-order-budget')))
             c.db.execute("INSERT INTO links VALUES('COMMUNITY_PROVIDER_ACTION',?,?,?,?,1)",(key,g['user_id'],g['project'],c.encrypt(canonical(saved),'provider-action:'+key)))
             c.db.execute("INSERT INTO links VALUES('COMMUNITY_PROVIDER_ORDER_LOCK',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET active=1,payload=excluded.payload,user_id=excluded.user_id",(lock,g['user_id'],g['project'],c.encrypt(canonical({'action':key}),'provider-order-lock')))
             c.audit(g['project'],g['user_id'],'PROVIDER_'+kind+'_SUBMITTED',key)
