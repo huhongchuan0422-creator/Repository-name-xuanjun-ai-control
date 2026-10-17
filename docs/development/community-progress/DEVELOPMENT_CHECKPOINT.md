@@ -114,3 +114,10 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 
 - Verified official WeChat partner reference https://pay.wechatpay.cn/doc/v3/partner/4012761140 establishes that split bill detail rows are individual split OR return operations and a separate summary section has its own header, with amount fields denominated in yuan and no failed splits listed. Therefore receiver/return detail must remain UNKNOWN_SCHEMA in the current parser until a faithful source-backed adapter is implemented. Existing aggregate synthetic coverage is not a substitute. This checkpoint does not permit posting, repayment, or Finance settlement.
 - Hosted source regression 293d02af2d09a95c6b41df7cfe1721d08ff53a49 succeeded (run 39031005793; optional mini jobs SKIPPED). More recent strict currency column regressions have separate CI and must be checked at their exact SHA.
+
+## 2026-10-17 continued payment/merchant safety work (next sequence)
+
+- Split bill receiver/detail headers containing 收款 are now held as UNKNOWN_SCHEMA rather than aggregate rows: fd2e474a5b9857868de8798cd20fc67c29b51fac; test 3b73df669ae81dd004ba856ebc636b101656837d.
+- WeChat applyment GET must never replace a previously saved provider_sub_mchid for the same original application; code 3adb2b1e2398bb0d53e8d4589c20cabff93b10ed, isolated regression 15d3193145efae708e0eec26dc358d9e10137805.
+- Running hosted source test for these exact commits, latest run 39031390137. Never imply live WeChat signature tested: the new identity-conflict test stubs provider transport. No production mutation; all original security gates remain unchanged.
+- Next independent work remains detailed official partner bill format adaptation, broad merchant/consumer/platform E2E, and verified CRM/Finance external admission; 5 Phase-1 and 7 Phase-2 large groups are still PARTIAL, not 0% or completed.
