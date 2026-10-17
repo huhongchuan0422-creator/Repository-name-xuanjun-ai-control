@@ -37,7 +37,8 @@ class IntegratedBrowser(unittest.TestCase):
                             app.runtime.simulate_from_operator(owner,'order1','event1','SUCCESS','tx1')
                             page.locator('#receipt').click()
                             expect(page.locator('#state')).to_have_text('MOCK_PAID_SIMULATED（模拟）')
-                            expect(page.locator('#after')).not_to_be_empty()
+                            # Simulated payment must not display a verified-success creative.
+                            expect(page.locator('#after')).to_have_text('')
                             page.locator('#orders').click()
                             expect(page.locator('#state')).to_have_text('请求被拒绝或数据不可用')
                             page.locator('#token').fill('m'*32)
