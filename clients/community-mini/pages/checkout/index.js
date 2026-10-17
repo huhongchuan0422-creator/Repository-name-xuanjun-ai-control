@@ -44,6 +44,8 @@ Page({
   inputProjectReferenceKind(e){const items=['SECRETREF','OAUTH','SERVER_CHALLENGE'];const i=Number(e.detail.value);if(Number.isSafeInteger(i)&&items[i])this.setData({projectReferenceKind:items[i]});},
   async saveProjectReference() {
     if(this.data.pending||!this.session||!this.data.projectReferenceItem)return;
+    if(typeof this.data.projectReference!=='string'||!this.data.projectReference.trim()||this.data.projectReference.length>256){this.setData({status:'材料引用编号不能为空且不得超过256字符'});return;}
+    if(!['SECRETREF','OAUTH','SERVER_CHALLENGE'].includes(this.data.projectReferenceKind))return;
     this.setData({pending:true});
     try{
       const r=await this.session.commerce(this.scene,'project_save_reference',{
