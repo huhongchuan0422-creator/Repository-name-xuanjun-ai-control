@@ -268,7 +268,10 @@ def main():
     resolver=inventory['load_pinned'](inventory['RESOLVER'],inventory['RESOLVER_SHA'])
     projection,collector=resolver['bootstrap']()
     receipt=json.loads(collector['stable_file'](projection['ROOT']/'receipt.json',20000,private=True))
-    units=collector['verify_archive'](collector['stable_file'](projection['ROOT']/'payload.tar.gz',4*1024*1024+65536,private=True),receipt)
+    need(receipt['archive_sha256']==projection['ARCHIVE_SHA'],'S06_ARCHIVE_BINDING')
+    archive=collector['stable_file'](projection['ROOT']/'payload.tar.gz',4*1024*1024+65536,private=True)
+    need(sha(archive)==projection['ARCHIVE_SHA'],'S06_ARCHIVE_CHANGED')
+    units=collector['verify_archive'](archive,receipt)
     commands={}
     for role,(unit,entry,port) in ROLES.items():
         fields=resolver['unit_service'](units['units/'+unit])
