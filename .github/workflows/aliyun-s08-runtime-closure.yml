@@ -1,8 +1,5 @@
 name: PR99 S08 bounded three-host runtime inventory
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths: ['.github/workflows/aliyun-s08-runtime-closure.yml']
   workflow_dispatch:
 permissions:
   contents: read
