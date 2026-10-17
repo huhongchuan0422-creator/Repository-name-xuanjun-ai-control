@@ -165,3 +165,9 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Source 68b9e2b25fd0e0817d4babd0f3894341eb2f12ba and 0b3b135a8528e36dfa34146cc5342d642ea76656 reject blank/invalid CSV column headers and malformed UTF-8 without disclosing raw imported customer data in error text. Synthetic parser regressions c9b0c0c1ae438ccc6ba69c88058bd431902d952f and 65acc5fbeee5ed0170bd55d3a39dc83ac994424c.
 - Exact source Hosted run 39037981766 is still awaiting terminal result at checkpoint time; SKIPPED jobs cannot count as PASS.
 - Source scope remains original audited official-ticket/hash validated private bill, not receiver-level merchant official schema acceptance, Finance receipt authority or live funds. Both Phase1/Phase2 remain PARTIAL.
+
+## 2026-10-17 official bill CSV quote and bidi hardening
+
+- Commit a5ffa285ce58d24bfa8b47acb8c3c57fcb9da040 rejects bidi spoofed provider CSV header controls; regression bec9e879feb1535a3811f95828f26d2a51f1e30b.
+- Commit 5aff11e0448c9fd894ad02d9260ace7852c0bb23 maps malformed quoted provider CSV to redacted INVALID_BILL_CSV without raw private data; regression f15ed47e6f4b49cdd908cd8441ce5249c9b86bd3.
+- Latest CI run 39038222481 is awaiting terminal verdict. Earlier header/UTF8 source run 39037981766 SUCCESS cannot be extrapolated to newer commits. Full official receiver-detail schema, actual merchant admission and Phase1/2 audit remain BLOCKED/PARTIAL.
