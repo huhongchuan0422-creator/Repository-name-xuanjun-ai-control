@@ -11,3 +11,12 @@ test('public key, certificate and opaque data safely rejected',()=>{
   assert.throws(()=>normalizeUploadKey(source),e=>e.message==='UPLOAD_KEY_'+code&&!e.message.includes('secret-opaque-value'));
  }
 });
+
+test('base64 PEM and RSA DER preserve the same public key',()=>{
+ const original=crypto.createPrivateKey(raw);
+ const der=original.export({format:'der',type:'pkcs8'});
+ for(const source of [Buffer.from(raw).toString('base64'),der.toString('base64')]){
+  const normalized=crypto.createPrivateKey(normalizeUploadKey(source));
+  assert.deepEqual(crypto.createPublicKey(original).export({format:'der',type:'spki'}),crypto.createPublicKey(normalized).export({format:'der',type:'spki'}));
+ }
+});

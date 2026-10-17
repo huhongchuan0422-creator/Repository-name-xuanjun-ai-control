@@ -9,7 +9,7 @@ function fixture(transform=x=>x) {
   if(body.operation==='community.qr')result={token:{payload:{},signature:'signed'}};
   else if(body.operation==='community.checkout')result={reference:'order1',state:'PENDING',provider_payment_started:false,provider_settlement_verified:false};
   else result={simulation_only:true,provider_settlement_verified:false,financial_receipt_issued:false,finance_effect:'NONE',
-   order:{reference:'order1',state:'SUCCESS',provider_settlement_verified:false},payment_state:'MOCK_PAID_SIMULATED',ads:{AD_SLOT_PAYMENT_SUCCESS:{title:'模拟广告'}}};
+   order:{reference:'order1',amount_minor:101,currency:'CNY',state:'SUCCESS',provider_settlement_verified:false},payment_state:'MOCK_PAID_SIMULATED',ads:{AD_SLOT_PAYMENT_SUCCESS:{title:'模拟广告'}}};
   return {offline_only:true,result:transform(result)};
  };
  return {client:makeClient(transport),calls};
@@ -40,4 +40,13 @@ test('reset clears receipt and rejects late async checkout',async()=>{
 });
 test('cannot poll before creating an order',async()=>{
  await assert.rejects(fixture().client.receipt(),/CHECKOUT_REQUIRED/);
+});
+
+test('restart recovery reads existing reference without creating another order',async()=>{
+ const {client,calls}=fixture();assert.equal((await client.resume('order1')).order.amount_minor,101);
+ assert.deepEqual(calls.map(x=>x.operation),['community.receipt']);
+});
+test('receipt amount cannot change after checkout snapshot',async()=>{
+ const {client}=fixture(r=>r.order?{...r,order:{...r.order,amount_minor:102}}:r);
+ await client.checkout('101','order1');await assert.rejects(client.receipt(),/UNTRUSTED_RECEIPT/);
 });

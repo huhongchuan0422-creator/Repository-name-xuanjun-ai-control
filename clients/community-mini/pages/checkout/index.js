@@ -39,7 +39,7 @@ Page({
   async refresh() {
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
     this.setData({afterAd:''});
-    try {const r=await this.client.receipt();this.setData({status:r.payment_state+'（模拟，非收款凭证）',
+    try {const r=await this.client.resume(this.data.reference);this.setData({amount:String(r.order.amount_minor),status:r.payment_state+'（模拟，非收款凭证）',
       afterAd:r.ads.AD_SLOT_PAYMENT_SUCCESS ? r.ads.AD_SLOT_PAYMENT_SUCCESS.title : ''});}
     catch(e) {this.setData({status:e.message});}
   }
