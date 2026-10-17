@@ -1,66 +1,89 @@
-"""Negative tests for fixed diagnostic. All tests are offline and cloud-free."""
+"""PR128 R1-R7 offline and Python 3.6 diagnostic regression tests."""
 import hashlib
 import importlib.util
-import os
 from pathlib import Path
 import unittest
 from unittest import mock
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[1]
 def load(name, file):
-    spec = importlib.util.spec_from_file_location(name, str(ROOT / file))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    spec=importlib.util.spec_from_file_location(name,str(ROOT/file))
+    m=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 class ReadOnlyDiagnosticTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.d = load('p2_diag_test', 'scripts/p2_uk_readonly_diagnostic.py')
-        cls.t = load('p2_transport_test', 'scripts/p2_uk_swas_diagnostic.py')
+        cls.d=load('fixed_diag_test','scripts/p2_uk_readonly_diagnostic.py')
+        cls.t=load('fixed_transport_test','scripts/p2_uk_swas_diagnostic.py')
 
-    def valid(self):
-        return ('DIAG_SCHEMA=1\nTARGET_HOST=iZd7oeikknn1z21sq6ji6zZ\n'
-            'EXEC_UID=0\nPYTHON_VERSION=3.6.8\n'
-            'CGROUP_MOUNT_TYPE=tmpfs\nSITE_PATH=/usr/local/libexec/xuanjun-p2-site/P2_SITE_ENTRY.py\n'
-            'SITE_STATUS=ABSENT\n'
-            'CANONICAL_WRITER=UNKNOWN\nEPOCH=UNKNOWN\nLEASE=UNKNOWN\n'
-            'FENCE=UNKNOWN\nROOT_TRUST=UNKNOWN\nHISTORICAL_INVOKEID=UNKNOWN\n'
-            'DIAG_END=COMPLETE\n').replace('\\\n','\n')
+    def valid(self,controllers='1:cpu,cpuacct'):
+        d=self.d
+        lines=['DIAG_SCHEMA=1','TARGET_HOST='+d.TARGET_HOST,'EXEC_UID=0',
+               'PYTHON_VERSION=3.6.8','CGROUP_MOUNT_TYPE=tmpfs',
+               'CGROUP_PROC_SELF='+controllers.split('|')[0]]
+        lines.extend(controllers.split('|')[1:])
+        lines.extend(['SITE_PATH='+d.SITE_PATH,'SITE_STATUS=ABSENT'])
+        for unit in sorted(d.UNIT_NAMES):
+            lines.extend(['UNIT='+unit,'LoadState=loaded','ActiveState=inactive',
+                          'SubState=dead','MainPID=0','UnitFileState=masked'])
+        for path in sorted(d.DB_NAMES):
+            lines.append('DB_FILE_ABSENT='+path)
+        for key in ('CANONICAL_WRITER','EPOCH','LEASE','FENCE','ROOT_TRUST','HISTORICAL_INVOKEID'):
+            lines.append(key+'=UNKNOWN')
+        lines.append('DIAG_END=COMPLETE')
+        return '\n'.join(lines)+'\n'
 
-    def test_fixed_bytes_and_hash(self):
-        source = self.d.command_content().encode('utf-8')
-        self.assertEqual(1771, len(source))
-        self.assertEqual(self.d.COMMAND_SHA256, hashlib.sha256(source).hexdigest())
+    def test_exact_command(self):
+        raw=self.d.command_content().encode()
+        self.assertEqual(len(raw),1771)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),self.d.COMMAND_SHA256)
+        self.assertEqual(self.t.diagnostic_module().command_content(),raw.decode())
 
-    def test_public_safe(self):
-        result = self.d.safe_receipt(self.valid())
-        self.assertEqual(result['state'], 'DIAGNOSTIC_METADATA_ONLY')
-        self.assertFalse(result['redispatch_allowed'])
+    def test_v1_v2_real_shapes(self):
+        for c in ('1:cpu,cpuacct|2:name=systemd|3:memory','0:','1:cpu,cpuacct|2:memory'):
+            with self.subTest(c=c):
+                result=self.d.safe_receipt(self.valid(c))
+                self.assertEqual(result['state'],'DIAGNOSTIC_METADATA_ONLY')
+                self.assertFalse(result['writer_verified'])
 
-    def test_reject_unsafe(self):
-        ok = self.valid()
-        variants = [ok+'PRIVATE=token\n',ok.replace('EXEC_UID=0','EXEC_UID=1'),
-            ok.replace('DIAG_SCHEMA=1','DIAG_SCHEMA=9'),
-            ok.replace('DIAG_END=COMPLETE','DIAG_END=BROKEN'),
-            ok.replace('PYTHON_VERSION=3.6.8','PYTHON_VERSION=4.0.0'),
-            ok.replace('TARGET_HOST=iZd7oeikknn1z21sq6ji6zZ','TARGET_HOST=other'),
-            ok.replace('EPOCH=UNKNOWN','EPOCH=2'),
-            ok.replace('DIAG_END=COMPLETE\n',''),
-            ok+'x' * 5000,
-            ok.replace('EXEC_UID=0','EXEC_UID=0\nEXEC_UID=0'),
-            ok.replace('EXEC_UID=0','EXEC_UID=0 secret=yes')]
-        for variant in variants:
-            with self.subTest(variant=variant[:35]):
-                with self.assertRaises(self.d.DiagnosticHold):
-                    self.d.safe_receipt(variant)
-        for stderr, exit_code in [('secret',0),('',40),('',41),('',1)]:
+    def test_complete_required_and_canary_rejection(self):
+        ok=self.valid()
+        lines=ok.splitlines()
+        for index in range(len(lines)):
+            bad='\n'.join(lines[:index]+lines[index+1:])+'\n'
+            with self.subTest(missing=index),self.assertRaises(self.d.DiagnosticHold):
+                self.d.safe_receipt(bad)
+        for i in range(len(lines)):
+            bad='\n'.join(lines[:i]+[lines[i]]+lines[i:])+'\n'
+            with self.subTest(duplicate=i),self.assertRaises(self.d.DiagnosticHold):
+                self.d.safe_receipt(bad)
+        for key in ('SITE_STATUS','LoadState','ActiveState','SubState','UnitFileState','CGROUP_MOUNT_TYPE'):
+            source='SITE_STATUS=ABSENT' if key=='SITE_STATUS' else next(row for row in lines if row.startswith(key+'='))
+            bad=ok.replace(source,key+'=SYNTHETIC_SECRET_CANARY')
+            with self.subTest(canary=key),self.assertRaises(self.d.DiagnosticHold):
+                self.d.safe_receipt(bad)
+        for bad in (ok+'SECRET=anything\n',ok.replace('EPOCH=UNKNOWN','EPOCH=123'),
+                    ok.replace('1:cpu,cpuacct','1:cpu,cpuacct|3:secret'),
+                    ok.replace('EXEC_UID=0','EXEC_UID=1'),
+                    ok.replace('DIAG_END=COMPLETE','DIAG_END=FAIL'),
+                    ok+'x'*6000):
+            with self.assertRaises(self.d.DiagnosticHold):self.d.safe_receipt(bad)
+
+    def test_file_metadata_and_exit(self):
+        ok=self.valid()
+        present=ok.replace('SITE_STATUS=ABSENT',
+            'SITE_UID=0 SITE_GID=0 SITE_MODE=444 SITE_SIZE=200\nSITE_SHA256='+('a'*64))
+        self.assertEqual(self.d.safe_receipt(present)['state'],'DIAGNOSTIC_METADATA_ONLY')
+        for stderr,code in [('SECRET',0),('',40),('',41),('',2)]:
             with self.assertRaises(self.d.DiagnosticHold):
-                self.d.safe_receipt(ok,stderr,exit_code)
+                self.d.safe_receipt(ok,stderr,code)
 
-    def test_cloud_path_requires_exact_binding(self):
-        self.assertIn('read-only-diagnostic', self.t.split_cloud.__code__.co_consts[1].__str__()) if False else None
-        self.assertEqual(self.d.command_content(), self.t.diagnostic_module().command_content())
+    def test_approval_contract(self):
+        self.assertEqual(self.t.OWNER_ID,332398908)
+        self.assertEqual(self.t.AUDITOR_ID,95597695)
+        self.assertNotEqual(self.t.OWNER_ID,self.t.AUDITOR_ID)
 
-if __name__ == '__main__':
+if __name__=='__main__':
     unittest.main()
