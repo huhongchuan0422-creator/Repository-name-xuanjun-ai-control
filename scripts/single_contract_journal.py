@@ -22,6 +22,7 @@ class Journal(object):
         conn = sqlite3.connect(self.database, timeout=10, isolation_level=None)
         try:
             conn.execute("PRAGMA busy_timeout=10000")
+            conn.create_function("contract_candidate_guard", 5, _insert_guard)
             conn.execute("PRAGMA foreign_keys=ON")
             yield conn
         finally:
@@ -35,6 +36,11 @@ class Journal(object):
               candidate_json BLOB NOT NULL,
               PRIMARY KEY(project_id,contract_id,request_id),
               UNIQUE(project_id,contract_id,candidate_sha))""")
+            db.execute("""CREATE TRIGGER IF NOT EXISTS contract_frozen_insert_guard
+              BEFORE INSERT ON contract_frozen_candidate
+              BEGIN SELECT CASE WHEN contract_candidate_guard(NEW.project_id,
+                NEW.contract_id, NEW.request_id, NEW.candidate_sha,
+                NEW.candidate_json) != 1 THEN RAISE(ABORT,'INVALID_CANDIDATE') END; END""")
             db.execute("""CREATE TRIGGER IF NOT EXISTS contract_frozen_no_replace
               BEFORE INSERT ON contract_frozen_candidate
               WHEN EXISTS(SELECT 1 FROM contract_frozen_candidate
@@ -112,3 +118,26 @@ def _validate_row(row, verified_project_id, verified_customer_id, contract_id):
 def freeze_from_stored(obj):
     """Verify content digest of the stored frozen object, not the wrapper."""
     return hashlib.sha256(canonical_bytes(obj["frozen"])).hexdigest()
+
+def _insert_guard(project, contract, request, candidate_sha, payload):
+    """All inserts require a registered, trusted connection and correct columns."""
+    try:
+        obj = json.loads(bytes(payload).decode("utf-8"))
+        scope = obj["frozen"]["scope"]
+        if not isinstance(request, str) or not request or len(request) > 128:
+            return 0
+        if scope["project_id"] != project or scope["contract_id"] != contract:
+            return 0
+        if not isinstance(candidate_sha, str) or not hmac.compare_digest(
+                candidate_sha, freeze_from_stored(obj)):
+            return 0
+        if obj.get("contract_document_hash") != candidate_sha:
+            return 0
+        if obj.get("status") != "UNSIGNED_CANDIDATE_ONLY":
+            return 0
+        if any(obj.get(k) != "HOLD" for k in (
+                "contract_sign", "payment", "procurement", "development_start")):
+            return 0
+        return 1
+    except (ValueError, TypeError, KeyError, OverflowError):
+        return 0
