@@ -49,5 +49,15 @@ class PreviewTests(unittest.TestCase):
         with self.assertRaises(ContractHold):
             render(None)
 
+
+    def test_markdown_injection_examples_are_literal(self):
+        x=samples.sample()
+        x["features"][0]["description"]="[click](https://attacker.invalid/)\nFAKE LEGAL SECTION\n------------------\n**PAYMENT APPROVED**"
+        text=render(freeze(x))["text"]
+        self.assertNotIn("[click](https://attacker.invalid/)",text)
+        self.assertNotIn("**PAYMENT APPROVED**",text)
+        self.assertNotIn("\n------------------\n",text)
+        self.assertIn("CONTRACT_SIGN=HOLD",text)
+
 if __name__=="__main__":
     unittest.main()
