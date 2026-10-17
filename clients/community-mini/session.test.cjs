@@ -59,7 +59,7 @@ test('owned success ad uses read-only mini commerce route, not payment operation
 test('original customer-project requests retain mini session boundary and no reviewer shortcuts',async()=>{
  const {calls,session}=fixture();await session.login();
  for(const [operation,params] of [['project_summary',{}],['project_checklist',{}],
-   ['project_feedback',{message:'fixture'}],['project_submit',{item:'requirement1',revision:1}]]) {
+   ['project_feedback',{message:'fixture'}],['project_messages',{}],['project_submit',{item:'requirement1',revision:1}]]) {
    await session.commerce('shop1',operation,params);
    const call=calls[calls.length-1];
    assert.equal(call.url,'https://example.org/mini/api');
