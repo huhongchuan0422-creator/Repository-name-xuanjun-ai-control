@@ -57,6 +57,19 @@ class JournalTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractHold,"CORRUPT_CANDIDATE_DIGEST"):
             self.j.read("prj1","cust1","contract1","req1")
 
+    def test_candidate_wrapper_digest_tamper_rejected(self):
+        self.j.submit("prj1","cust1","req1",sample())
+        with sqlite3.connect(self.path) as db:
+            db.execute("DROP TRIGGER contract_frozen_no_update")
+            row = db.execute("SELECT candidate_json FROM contract_frozen_candidate").fetchone()
+            import json
+            candidate = json.loads(bytes(row[0]).decode("utf-8"))
+            candidate["contract_document_hash"] = "0"*64
+            db.execute("UPDATE contract_frozen_candidate SET candidate_json=?",
+                       (json.dumps(candidate,sort_keys=True).encode("utf-8"),))
+        with self.assertRaisesRegex(ContractHold,"CORRUPT_CANDIDATE_DIGEST"):
+            self.j.read("prj1","cust1","contract1","req1")
+
     def test_append_only(self):
         self.j.submit("prj1","cust1","req1",sample())
         with sqlite3.connect(self.path) as db:
