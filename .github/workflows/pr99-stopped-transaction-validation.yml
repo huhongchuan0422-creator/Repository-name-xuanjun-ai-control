@@ -1,0 +1,23 @@
+name: PR99 stopped transaction verification
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'evidence/pr99-service-handoff/s09-install-candidate/stopped_transaction.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/test_stopped_transaction.py'
+      - '.github/workflows/pr99-stopped-transaction-validation.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Exact transaction tests in temporary root-owned filesystem
+        run: |
+          sudo -n python3 evidence/pr99-service-handoff/s09-install-candidate/test_stopped_transaction.py
+          python3 evidence/pr99-service-handoff/s09-install-candidate/stopped_transaction.py manifest
