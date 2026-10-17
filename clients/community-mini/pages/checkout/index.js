@@ -37,8 +37,13 @@ Page({
   selectProjectRequirement(e) {
     if(this.data.pending)return;
     const item=e.currentTarget.dataset.item,revision=Number(e.currentTarget.dataset.revision);
-    if(typeof item==='string'&&Number.isSafeInteger(revision)&&revision>=0)
-      this.setData({projectReferenceItem:item,projectReferenceRevision:revision,projectReference:''});
+    const source=this.data.projectChecklist.find(entry=>entry.id===item);
+    if(!source||!Number.isSafeInteger(revision)||revision!==source.revision)return;
+    if(!['SECRETREF','OAUTH','SERVER_CHALLENGE'].includes(source.submission_type)){
+      this.setData({status:'此材料需要通过原客户中心私有文件上传，不允许用引用编号代替'});return;
+    }
+    this.setData({projectReferenceItem:item,projectReferenceRevision:revision,
+      projectReferenceKind:source.submission_type,projectReference:''});
   },
   inputProjectReference(e){this.setData({projectReference:e.detail.value});},
   inputProjectReferenceKind(e){const items=['SECRETREF','OAUTH','SERVER_CHALLENGE'];const i=Number(e.detail.value);if(Number.isSafeInteger(i)&&items[i])this.setData({projectReferenceKind:items[i]});},
