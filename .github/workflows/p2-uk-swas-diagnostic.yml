@@ -1,5 +1,12 @@
 name: P2 UK SWAS offline transport review
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/p2-uk-swas-diagnostic.yml
+      - scripts/p2_uk_swas_diagnostic.py
+      - scripts/p2_uk_readonly_diagnostic.py
+      - tests/test_p2_uk_readonly_diagnostic.py
   workflow_dispatch:
     inputs:
       operation:
