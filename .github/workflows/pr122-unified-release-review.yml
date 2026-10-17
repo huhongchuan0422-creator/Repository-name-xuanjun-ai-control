@@ -57,7 +57,7 @@ jobs:
       - name: Frozen unified wrapper, full release and controlled rollback regression
         run: |
           set -euo pipefail
-          sudo -n env XJ_COMBINED_SYNTHETIC_FIXTURE=1 "$(command -v python)" -m unittest tests.test_pr122_site_hub_unified_release.UnifiedTransactionTests -v
+          sudo -n env XJ_COMBINED_SYNTHETIC_FIXTURE=1 PR122_FROZEN_MOBILE_ARTIFACT=/tmp/pr122-reviewed-mobile/COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz "$(command -v python)" -m unittest tests.test_pr122_site_hub_unified_release.UnifiedTransactionTests -v
           python -m scripts.pr122_site_hub_unified_distribution --candidate /tmp/pr122-unified-candidate/PR122_UNIFIED_REVIEW_ONLY.tar.gz --output /tmp/pr122-unified-distribution
       - name: Browser and real Nginx test dependencies
         run: |

@@ -7,18 +7,28 @@ from tests import test_pr122_site_hub_experience_release as prior
 from tests.test_pr122_site_hub_combined import synthetic_source_fixture
 from scripts import pr122_site_hub_unified_release as r
 from scripts import pr122_site_hub_unified_package as package
-from scripts import pr122_community_experience_package as mobile
 
 ROOT=Path(__file__).resolve().parents[1]
+def reviewed_mobile_fixture():
+    """Read exact historical bytes; never rebuild them using current sources."""
+    frozen=os.environ.get('PR122_FROZEN_MOBILE_ARTIFACT')
+    if not frozen:
+        raise RuntimeError('PR122_FROZEN_MOBILE_ARTIFACT is required; reconstruct the reviewed 790937a5c96afcf3b3660e36cf36cfaab2002a72 fixture first')
+    data=Path(frozen).read_bytes()
+    if package.sha(data)!=package.MOBILE_SHA:
+        raise AssertionError('FROZEN_MOBILE_HASH_MISMATCH')
+    return data
+
 @unittest.skipUnless(os.geteuid()==0,'Disposable root filesystem required')
 class UnifiedTransactionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        phone=reviewed_mobile_fixture()
         prior.ExperienceTests.setUpClass()
         cls.folder=Path(tempfile.mkdtemp(prefix='pr122-unified-input-',dir='/root'))
         cls.realpins=json.loads(r.PINS.read_bytes())
-        with mock.patch.dict(os.environ,{'GITHUB_SHA':'790937a5c96afcf3b3660e36cf36cfaab2002a72'}):mobile.build(cls.folder/'mobile')
-        package.build(ROOT/'evidence/pr122-public-presentation/PR122_PUBLIC_PRESENTATION_REVIEW_ONLY.tar.gz',cls.folder/'mobile/COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz',cls.folder/'candidate')
+        mobile=cls.folder/'COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz';mobile.write_bytes(phone)
+        package.build(ROOT/'evidence/pr122-public-presentation/PR122_PUBLIC_PRESENTATION_REVIEW_ONLY.tar.gz',mobile,cls.folder/'candidate')
         cls.bundle=cls.folder/'candidate/PR122_UNIFIED_REVIEW_ONLY.tar.gz'
         if os.environ.get('XJ_COMBINED_SYNTHETIC_FIXTURE')=='1' or not (ROOT/'source/PR122_TOKYO_WEBROOT_MIGRATION_SOURCE_0363531ee2f8.tar.gz').exists():
             data=r.entries(cls.bundle.read_bytes(),cls.realpins);folder=cls.folder/'synthetic';folder.mkdir()
