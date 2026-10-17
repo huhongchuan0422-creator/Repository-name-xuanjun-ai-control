@@ -38,6 +38,18 @@ class MerchantWorkbenchBrowser(unittest.TestCase):
                     self.assertTrue(page.locator('#billSection').is_hidden())
                     page.evaluate('(csrf)=>configureCommunityWorkbench({csrf,workspace:"merchant",providerWorkspace:"finance"})',web['csrf'])
                     self.assertFalse(page.locator('#billSection').is_hidden())
+                    calls=[]
+                    def fake_bill(route):
+                        calls.append(route.request.post_data_json)
+                        route.fulfill(status=200,content_type='application/json',
+                            body='{"result":{"records":[],"has_more":false,"finance_status":"UNCONFIRMED"}}')
+                    page.route('**/community/provider-actions',fake_bill)
+                    page.locator('#billDate').fill('2026-10-16')
+                    page.locator('#billAudit').click()
+                    expect(page.locator('#billResult')).to_contain_text('UNCONFIRMED')
+                    self.assertEqual(calls[-1]['operation'],'bill_audit')
+                    self.assertEqual(calls[-1]['params']['after_id'],'')
+                    page.unroute('**/community/provider-actions')
                     page.evaluate('(csrf)=>configureCommunityWorkbench({csrf,workspace:"merchant"})',web['csrf'])
                     self.assertTrue(page.locator('#billSection').is_hidden())
                     page.locator('#loadSettings').click();expect(page.locator('#notice')).to_have_text('操作完成')
