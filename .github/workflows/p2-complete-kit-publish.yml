@@ -46,13 +46,17 @@ jobs:
             --output "$CI_ROOT/temp/result" --expected-head "$PIN"
           export CI_ROOT
           python - <<'PY'
-          import json,hashlib,os,shutil
+          import json,hashlib,os,shutil,tarfile
           from pathlib import Path
           root=Path(os.environ['CI_ROOT'])
           out=root/'temp'/'result'
           summary=json.loads((out/'ci-summary.json').read_text())
           kit=out/'build-a'/'epoch7-recovery-kit.tar.gz'
-          manifest=out/'build-a'/'recovery-kit-manifest.json'
+          manifest=out/'recovery-kit-manifest.json'
+          with tarfile.open(kit,'r:gz') as archive:
+              members=[member for member in archive.getmembers() if member.name.endswith('/recovery-kit-manifest.json')]
+              assert len(members)==1 and members[0].isreg()
+              manifest.write_bytes(archive.extractfile(members[0]).read())
           assert summary['success'] is True and summary['reproducible_build'] is True
           assert summary['kit_source_commit']=='3e8e55fdbd6543c02ca5e97f843a23533574b347'
           def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
