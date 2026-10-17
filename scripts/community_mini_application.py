@@ -56,6 +56,7 @@ class MiniApplication:
         from scripts.community_commerce import Commerce
         self.commerce=Commerce(self.operations,self.identity)
         self.gateway.commerce=self.commerce
+        if self.provider_actions is not None:self.provider_actions.commerce=self.commerce
         return self.commerce
 
     def configure_communities(self,grants):
@@ -70,6 +71,8 @@ class MiniApplication:
             raise ValueError('CONFIGURED_ORIGINAL_FINANCE_OPERATIONS_REQUIRED')
         from scripts.community_wechat_sp_actions import ProviderActions
         self.provider_actions=ProviderActions(self.operations,reader,bindings)
+        self.provider_actions.commerce=self.commerce
+        if getattr(self.gateway,'payments',None) is not None:self.gateway.payments.rule_actions=self.provider_actions
         return self.provider_actions
 
     def configure_fulfillment(self,finance,authority_id,price_bindings,*,reversal_finance=None):
@@ -93,6 +96,7 @@ class MiniApplication:
         from scripts.community_wechat_sp_prepay import PartnerPrepay
         from scripts.community_mini_payments import MiniPayments
         self.gateway.payments=MiniPayments(self.identity,PartnerPrepay(self.center,reader,{} if bindings is None else bindings),merchants=merchants)
+        self.gateway.payments.rule_actions=self.provider_actions
         return self.gateway.payments
 
     def configure_operations(self,grants):

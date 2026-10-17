@@ -67,6 +67,9 @@ class Commerce:
             raise ValueError('INVALID_COMMERCE_FIELDS')
         g = self._operator(session, csrf, body['workspace'])
         op, p = body['operation'], body['params']
+        if type(body['operation']) is str and body['operation'] in ('refund_application_read','refund_decide'):
+            from scripts.community_refund_requests import RefundRequests
+            return RefundRequests(self).review(g,body['operation'],body['params'])
         fields = {'price_set': {'item_id', 'expected_revision', 'unit_minor', 'stock', 'enabled'},
                   'price_read': {'item_id'}, 'order_lines': {'reference'}}
         if type(op) is not str or op not in fields or type(p) is not dict or set(p) != fields[op]:
@@ -109,6 +112,9 @@ class Commerce:
         uid, project, principal = i._resolve(token, scene)
         identity = self.runtime.bindings[principal]
         c = self.center
+        if op in ('refund_apply','refund_application'):
+            from scripts.community_refund_requests import RefundRequests
+            return RefundRequests(self).consumer(token,scene,op,p)
         fields = {'products': set(), 'purchase': {'reference', 'lines'}, 'purchase_read': {'reference'}}
         if op not in fields or type(p) is not dict or set(p) != fields[op]:
             raise ValueError('INVALID_CONSUMER_COMMERCE_FIELDS')

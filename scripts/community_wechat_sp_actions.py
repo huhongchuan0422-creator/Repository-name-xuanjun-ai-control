@@ -97,6 +97,11 @@ class ProviderActions:
                     automatic_retry_allowed=False,provider_reference=saved['provider_reference'])
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:raise ValueError('INVALID_PROVIDER_ACTION_FIELDS')
+        if body['operation'] in ('execute_refund_application','query_refund_application'):
+            commerce=getattr(self,'commerce',None)
+            if commerce is None:raise PermissionError('ORIGINAL_COMMERCE_REQUIRED')
+            from scripts.community_refund_requests import RefundRequests
+            return RefundRequests(commerce).execute(self,session,csrf,body['workspace'],body['operation'],body['params'])
         if body['operation'].startswith('rule_') or body['operation']=='split_by_rule':
             from scripts.community_split_rules import SplitRules
             rules=SplitRules(self)

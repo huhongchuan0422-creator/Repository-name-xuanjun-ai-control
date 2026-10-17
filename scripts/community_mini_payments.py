@@ -73,6 +73,15 @@ class MiniPayments:
             from scripts.pr122_customer_core import canonical
             _,_,principal=self.identity._resolve(token,scene)
             original_scope=self.identity.runtime.bindings[principal]
+            if b['profit_sharing']:
+                actions=getattr(self,'rule_actions',None)
+                if actions is None:raise PermissionError('PROFIT_SHARING_RULE_SERVICE_REQUIRED')
+                policy=actions.bindings.get(tuple(original_scope[k] for k in ('tenant_id','merchant_id','store_id')))
+                grants=[g for g in actions.operations.grants.values() if g['project']==b['project'] and g['scope']==original_scope and g['role'] in ('PLATFORM_OWNER','FINANCE_APPROVER')]
+                if policy is None or not grants or actions.reader._mchid!=self.prepay.reader._mchid or policy['sub_mchid']!=b['sub_mchid'] or policy['sp_appid']!=b['sp_appid']:
+                    raise PermissionError('SAME_ADMITTED_SPLIT_POLICY_REQUIRED')
+                from scripts.community_split_rules import SplitRules
+                with c.tx():SplitRules(actions).freeze_original(grants[0],policy,reference)
             expected=dict(sp_mchid=self.prepay.reader._mchid,sp_appid=b['sp_appid'],sub_mchid=b['sub_mchid'],out_trade_no=b['out_trade_no'],amount_minor=b['amount_minor'],currency='CNY')
             callback_key=c.idx('community-payment-notify:'+self.prepay.reader._mchid+':'+b['out_trade_no'])
             callback_binding=dict(user_id=b['user_id'],project=b['project'],scope=original_scope,reference=reference,expected=expected)

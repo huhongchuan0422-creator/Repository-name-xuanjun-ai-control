@@ -97,32 +97,43 @@ class SplitRules:
                     if result is None:
                         raise ValueError('ORDER_SPLIT_SNAPSHOT_NOT_FOUND')
                 elif result is None:
-                    if order['state'] != 'PENDING':
-                        raise PermissionError('RULE_MUST_BE_FROZEN_BEFORE_PAYMENT_CONFIRMATION')
-                    active = self._get(g, 'ACTIVE', 'current')
-                    if active is None:
-                        raise ValueError('ACTIVE_SPLIT_RULE_REQUIRED')
-                    rule = self._get(g, 'VERSION', active['rule_id'] + ':' + str(active['version']))
-                    if rule['policy_hash'] != self.actions._policy_hash(policy):
-                        raise PermissionError('SPLIT_POLICY_CHANGED_REVIEW_RULE')
-                    # Reuse the original largest-remainder precision rule.
-                    shares=dict(rule['shares_bps'])
-                    shares['_merchant_remainder']=10000-sum(shares.values())
-                    rounded=split_amounts(order['amount_minor'],shares)['shares_minor']
-                    allocations={rid: amount for rid, amount in rounded.items() if rid!='_merchant_remainder' and amount>0}
-                    if sum(allocations.values())>order['amount_minor']*policy['max_total_bps']//10000:
-                        raise ValueError('ROUNDED_SPLIT_EXCEEDS_ADMITTED_PROVIDER_LIMIT')
-                    result = dict(reference=p['reference'], amount_minor=order['amount_minor'], currency='CNY',
-                        rule_id=rule['rule_id'], version=rule['version'], allocations=allocations,
-                        retained_minor=order['amount_minor']-sum(allocations.values()),
-                        policy_hash=rule['policy_hash'], description=rule['description'],
-                        unfreeze_unsplit=rule['unfreeze_unsplit'], frozen_at=c.now(),
-                        eligible=bool(allocations), provider_split_confirmed=False)
-                    result['snapshot_sha256'] = hashlib.sha256(canonical(result)).hexdigest()
-                    self._put(g, 'ORDER', p['reference'], result)
+                    result=self.freeze_original(g,policy,p['reference'])
                 if result['amount_minor'] != order['amount_minor'] or result['currency'] != order['currency']:
                     raise PermissionError('FROZEN_ORDER_AMOUNT_CHANGED')
             c.audit(g['project'], g['user_id'], 'COMMUNITY_' + op.upper(), hashlib.sha256(canonical(p)).hexdigest())
+        return result
+
+    def freeze_original(self,g,policy,reference):
+        c=self.center
+        p={'reference':reference}
+        order=state(self.actions.runtime.demo.db,g['scope'],reference)
+        existing=self._get(g,'ORDER',reference)
+        if existing is not None:
+            if existing['amount_minor']!=order['amount_minor'] or existing['policy_hash']!=self.actions._policy_hash(policy):raise PermissionError('FROZEN_ORDER_POLICY_CHANGED')
+            return existing
+        if order['state'] != 'PENDING':
+            raise PermissionError('RULE_MUST_BE_FROZEN_BEFORE_PAYMENT_CONFIRMATION')
+        active = self._get(g, 'ACTIVE', 'current')
+        if active is None:
+            raise ValueError('ACTIVE_SPLIT_RULE_REQUIRED')
+        rule = self._get(g, 'VERSION', active['rule_id'] + ':' + str(active['version']))
+        if rule['policy_hash'] != self.actions._policy_hash(policy):
+            raise PermissionError('SPLIT_POLICY_CHANGED_REVIEW_RULE')
+        # Reuse the original largest-remainder precision rule.
+        shares=dict(rule['shares_bps'])
+        shares['_merchant_remainder']=10000-sum(shares.values())
+        rounded=split_amounts(order['amount_minor'],shares)['shares_minor']
+        allocations={rid: amount for rid, amount in rounded.items() if rid!='_merchant_remainder' and amount>0}
+        if sum(allocations.values())>order['amount_minor']*policy['max_total_bps']//10000:
+            raise ValueError('ROUNDED_SPLIT_EXCEEDS_ADMITTED_PROVIDER_LIMIT')
+        result = dict(reference=p['reference'], amount_minor=order['amount_minor'], currency='CNY',
+            rule_id=rule['rule_id'], version=rule['version'], allocations=allocations,
+            retained_minor=order['amount_minor']-sum(allocations.values()),
+            policy_hash=rule['policy_hash'], description=rule['description'],
+            unfreeze_unsplit=rule['unfreeze_unsplit'], frozen_at=c.now(),
+            eligible=bool(allocations), provider_split_confirmed=False)
+        result['snapshot_sha256'] = hashlib.sha256(canonical(result)).hexdigest()
+        self._put(g, 'ORDER', p['reference'], result)
         return result
 
     def split(self, session, csrf, workspace, params):

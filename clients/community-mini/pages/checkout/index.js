@@ -2,7 +2,7 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,products:[]},
+  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,products:[],refundApplication:"",refundAmount:"",refundReason:""},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
@@ -31,6 +31,18 @@ Page({
   },
   onUnload() {if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
+  inputRefund(e) {const field=e.currentTarget.dataset.field;if(['refundAmount','refundReason','refundApplication'].includes(field))this.setData({[field]:e.detail.value});},
+  async requestRefund() {
+    if(this.data.pending||!this.session||!this.data.commerceEnabled)return;
+    if(!this.data.refundApplication)this.setData({refundApplication:'ra_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,14)});
+    this.setData({pending:true});
+    try{const r=await this.session.commerce(this.scene,'refund_apply',{reference:this.data.reference,application_id:this.data.refundApplication,amount_minor:Number(this.data.refundAmount),reason:this.data.refundReason});this.setData({status:'退款申请：'+r.status+'；编号 '+r.application_id});}
+    catch(e){this.setData({status:e.message+'；保留原申请编号查询'});}finally{this.setData({pending:false});}
+  },
+  async refundStatus() {
+    if(this.data.pending||!this.session)return;this.setData({pending:true});
+    try{const r=await this.session.commerce(this.scene,'refund_application',{reference:this.data.reference,application_id:this.data.refundApplication});this.setData({status:'退款申请：'+r.status+' '+r.opinion});}catch(e){this.setData({status:e.message});}finally{this.setData({pending:false});}
+  },
   inputAmount(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({amount:e.detail.value,afterAd:''});},
   inputReference(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.detail.value,afterAd:''});},
   async checkout() {
