@@ -185,7 +185,8 @@
         "scripts/community_commerce.py",
         "scripts/community_payment_notifications.py",
         "scripts/community_customer_profile.py",
-        "scripts/community_refund_requests.py"
+        "scripts/community_refund_requests.py",
+        "scripts/community_split_returns.py"
       ]
     },
     {

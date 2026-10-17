@@ -41,7 +41,7 @@ class ProviderActions:
                     or type(record['sub_mchid']) is not str or not re.fullmatch('[0-9]{6,32}',record['sub_mchid'])
                     or record['sub_appid'] is not None and (type(record['sub_appid']) is not str or not re.fullmatch('wx[0-9a-fA-F]{16}',record['sub_appid']))
                     or type(record['profit_sharing']) is not bool or type(record['max_total_bps']) is not int or not 0<=record['max_total_bps']<=10000
-                    or type(record['enabled_operations']) not in (list,tuple) or any(x not in ('REFUND','SPLIT') for x in record['enabled_operations'])
+                    or type(record['enabled_operations']) not in (list,tuple) or any(x not in ('REFUND','SPLIT','RETURN') for x in record['enabled_operations'])
                     or type(record['refund_notify_url']) is not str):raise ValueError('INVALID_PROVIDER_ACTION_POLICY')
             url=urllib.parse.urlsplit(record['refund_notify_url'])
             if url.scheme!='https' or not url.hostname or url.username or url.password or url.query or url.fragment or len(record['refund_notify_url'])>255 or any(ord(ch)<33 for ch in record['refund_notify_url']):raise ValueError('FIXED_REFUND_CALLBACK_REQUIRED')
@@ -97,6 +97,9 @@ class ProviderActions:
                     automatic_retry_allowed=False,provider_reference=saved['provider_reference'])
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:raise ValueError('INVALID_PROVIDER_ACTION_FIELDS')
+        if body['operation'] in ('split_return','query_split_return','status_split_return'):
+            from scripts.community_split_returns import SplitReturns
+            return SplitReturns(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
         if body['operation'] in ('execute_refund_application','query_refund_application'):
             commerce=getattr(self,'commerce',None)
             if commerce is None:raise PermissionError('ORIGINAL_COMMERCE_REQUIRED')
@@ -171,7 +174,9 @@ class ProviderActions:
                 if budget['refund_reserved_minor']>0:raise PermissionError('REFUND_IMPACT_REQUIRES_RECONCILIATION_BEFORE_SPLIT')
                 budget['split_action']=key
             else:
-                if budget['split_action'] is not None:raise PermissionError('SPLIT_RETURN_CONFIRMATION_REQUIRED_BEFORE_REFUND')
+                if budget['split_action'] is not None:
+                    from scripts.community_split_returns import SplitReturns
+                    SplitReturns(self).refund_ready(g,budget)
                 if budget['refund_reserved_minor']+p['amount_minor']>original['amount_minor']:raise ValueError('REFUND_RESERVED_TOTAL_EXCEEDS_PAYMENT')
                 budget['refund_reserved_minor']+=p['amount_minor']
             # Unknown/failed actions retain reservations until explicit reconciliation.

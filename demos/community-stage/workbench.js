@@ -66,5 +66,8 @@
  $('decideRefundApplication').onclick=()=>action(async t=>{const r=await commerce(t,'refund_decide',{application_id:$('refundApplicationId').value,expected_revision:Number($('refundApplicationRevision').value),decision:$('refundApplicationDecision').value,opinion:$('refundApplicationOpinion').value});if(t===epoch){$('refundApplicationRevision').value=r.revision;$('refundApplicationResult').textContent=JSON.stringify(r,null,2);}});
  $('executeRefundApplication').onclick=()=>action(t=>providerAction(t,'execute_refund_application',{application_id:$('refundApplicationId').value}));
  $('queryRefundApplication').onclick=()=>action(t=>providerAction(t,'query_refund_application',{application_id:$('refundApplicationId').value}));
+ $('splitReturnForm').onsubmit=e=>{e.preventDefault();action(t=>providerAction(t,'split_return',{...providerReference(),receiver_id:$('returnReceiver').value,amount_minor:Number($('returnAmount').value),description:$('returnDescription').value}));};
+ $('querySplitReturn').onclick=()=>action(t=>providerAction(t,'query_split_return',providerReference()));
+ $('statusSplitReturn').onclick=()=>action(t=>providerAction(t,'status_split_return',providerReference()));
  window.configureCommunityWorkbench(null);
 })();
