@@ -119,7 +119,7 @@ class ProviderBills:
         a=self.actions;rows=bill['rows'];columns=set(bill['columns']);exceptions=[];matched=0;seen=set();missing=[];undated=0;reverse='NOT_APPLICABLE_TO_SPLIT_LAYOUT'
         # Receiver-level split layouts require explicit receiver binding. Never
         # compare a detail row against an aggregate payout amount.
-        if bill['kind']=='SPLIT' and any('接收' in k for k in columns):
+        if bill['kind']=='SPLIT' and any('接收' in k or '收款方' in k or '分账接收' in k for k in columns):
             return dict(status='UNKNOWN_SCHEMA',body_sha256=bill['body_sha256'],finance_status='UNCONFIRMED')
         if bill['kind']=='TRADE':
             amount_column='订单金额' if '订单金额' in columns else '总金额' if '总金额' in columns else None
