@@ -270,7 +270,8 @@
           "单份合同离线候选冻结、金额整数分、凭据字段白名单、SQLite防REPLACE只追加、幂等读回完整性及纯文本安全转义全部通过负向测试；生产签约支付始终HOLD",
           "跨Customer/Project的证据版本及来源绑定离线适配器必须拒绝错域和过期快照；仅产出UNSIGNED_STAGING_ONLY，不得冒充真实认证、签署或财务接线。",
           "TrustedContractSource服务端来源读取须绑定actor/project/contract与一致性revision，返回前二次核验，撤销或版本失效时HOLD；真实provider未接通不得申请签署或付款。",
-          "离线可信来源读取→合同快照→SQLite只追加账本→text/plain预览一致且四项执行门禁HOLD；撤权时不得产生新冻结记录。"
+          "离线可信来源读取→合同快照→SQLite只追加账本→text/plain预览一致且四项执行门禁HOLD；撤权时不得产生新冻结记录。",
+          "唯一完整合同草案离线渲染必须复用精确SHA绑定的28章法律模板，只允许未签署的纯文本供客户核对；所有未知主体、认证、付款和法律字段继续HOLD。"
         ],
         "tests": [
           "tests/test_legal_contract_center.py",
@@ -282,7 +283,8 @@
           "tests/test_single_contract_preview.py",
           "tests/test_single_contract_provenance_adapter.py",
           "tests/test_single_contract_trusted_source_port.py",
-          "tests/test_single_contract_staging_e2e.py"
+          "tests/test_single_contract_staging_e2e.py",
+          "tests/test_single_contract_full_draft.py"
         ],
         "test_scope": "仅离线合同草案和静态阅读入口；不证明签约集成、支付准入或生产法律合规"
       },
@@ -310,7 +312,9 @@
         "tests/test_single_contract_provenance_adapter.py",
         "scripts/single_contract_trusted_source_port.py",
         "tests/test_single_contract_trusted_source_port.py",
-        "tests/test_single_contract_staging_e2e.py"
+        "tests/test_single_contract_staging_e2e.py",
+        "scripts/single_contract_full_draft.py",
+        "tests/test_single_contract_full_draft.py"
       ]
     },
     {
