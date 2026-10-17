@@ -46,6 +46,9 @@ class ConditionalFields(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'DUPLICATE_OFFICIAL_UBO_DOCUMENT') as err:
             validate(p,'ENTERPRISE',NOW)
         self.assertNotIn(ubo['ubo_id_doc_number'],str(err.exception))
+        p['subject_info']['ubo_info_list'][1]['ubo_id_doc_number']='test-1234'
+        with self.assertRaisesRegex(ValueError,'DUPLICATE_OFFICIAL_UBO_DOCUMENT'):
+            validate(p,'ENTERPRISE',NOW)
         p['subject_info']['ubo_info_list'][1]['ubo_id_doc_number']='TEST-5678'
         validate(p,'ENTERPRISE',NOW)
 
