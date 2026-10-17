@@ -68,7 +68,7 @@ jobs:
           "$RUNNER_TEMP/pr122-browser/node_modules/.bin/playwright" install --with-deps chromium
       - name: All canonical and exact routes in isolated real Nginx
         run: sudo -n "$(command -v python)" -m tests.pr122_site_hub_unified_nginx --candidate /tmp/pr122-unified-candidate/PR122_UNIFIED_REVIEW_ONLY.tar.gz --report /tmp/pr122-unified-reports/NGINX_REPORT.json
-      - name: Integrated public pages and reviewed mobile role flows
+      - name: Current public page tests and exact historical 790937 mobile fixture tests
         env:
           XJ_HUB_STAGE: /tmp/pr122-unified-stage
           XJ_HUB_REPORT: /tmp/pr122-unified-reports/PUBLIC_BROWSER_REPORT.json
@@ -78,11 +78,13 @@ jobs:
           set -euo pipefail
           export PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright"
           node tests/pr122_site_hub_browser.cjs
-          node tests/community-experience/browser.cjs
+          git show 790937a5c96afcf3b3660e36cf36cfaab2002a72:tests/community-experience/browser.cjs > /tmp/pr122-reviewed-mobile-browser.cjs
+          echo '549e9c91c0efc56d606c8b1a9cb8616aad0904d8a7557a325ee247e018ca9e5b  /tmp/pr122-reviewed-mobile-browser.cjs' | sha256sum -c -
+          node /tmp/pr122-reviewed-mobile-browser.cjs
           python - <<'PY'
           import json,os
           from pathlib import Path
-          Path('/tmp/pr122-unified-reports/CI_BINDING.json').write_text(json.dumps({'source_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'production_changes':0,'production_release_approved':False},indent=2)+'\n')
+          Path('/tmp/pr122-unified-reports/CI_BINDING.json').write_text(json.dumps({'source_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'production_changes':0,'production_release_approved':False,'mobile_fixture_and_browser_commit':'790937a5c96afcf3b3660e36cf36cfaab2002a72','mobile_browser_blob':'9abee086b583d12117a81030ef94daea64952274','mobile_browser_sha256':'549e9c91c0efc56d606c8b1a9cb8616aad0904d8a7557a325ee247e018ca9e5b','mobile_scope':'Historical reviewed fixture, not current navigation candidate'},indent=2)+'\n')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
