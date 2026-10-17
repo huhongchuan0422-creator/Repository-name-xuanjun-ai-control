@@ -101,8 +101,20 @@ class RefundRequests:
             else:
                 if consumed is None:
                     raise ValueError('REFUND_NOT_EXECUTED')
-                operation_name = 'query_refund'
+                operation_name = 'resume_refund' if operation == 'execute_refund_application' else 'query_refund'
         request = dict(reference=record['reference'], request_id=record['application_id'])
+        if operation_name == 'resume_refund':
+            # The application reservation and provider intent are separate durable records.
+            # Recover only the original, explicitly approved request; never auto-POST on query.
+            try:
+                actions.dispatch(session, csrf, dict(workspace=workspace,
+                    operation='status_refund', params=request))
+            except ValueError as exc:
+                if str(exc) != 'PROVIDER_ACTION_NOT_FOUND':
+                    raise
+                operation_name = 'refund'
+            else:
+                operation_name = 'query_refund'
         if operation_name == 'refund':
             request.update(amount_minor=record['amount_minor'], reason=record['reason'])
         result = actions.dispatch(session, csrf, dict(workspace=workspace, operation=operation_name, params=request))
@@ -111,7 +123,12 @@ class RefundRequests:
                 current = self.commerce._read(g['scope'], g['project'], 'REFUND_APPLICATION', record['application_id'])
                 if current['status'] not in ('EXECUTION_RESERVED', 'COMPLETED', 'CLOSED'):
                     raise ValueError('REFUND_APPLICATION_EXECUTION_CONFLICT')
-                current = dict(current, status='COMPLETED' if result['status']=='SUCCESS' else 'CLOSED', revision=current['revision']+1)
+                new_status = 'COMPLETED' if result['status']=='SUCCESS' else 'CLOSED'
+                if current['status'] in ('COMPLETED', 'CLOSED'):
+                    if current['status'] != new_status:
+                        raise ValueError('REFUND_APPLICATION_TERMINAL_CONFLICT')
+                    return dict(result, application_id=record['application_id'])
+                current = dict(current, status=new_status, revision=current['revision']+1)
                 self.commerce._save(g['scope'], g['project'], current['user_id'], 'REFUND_APPLICATION', current['application_id'], current, True)
                 notify(c, g['project'], current['user_id'], 'REFUND_RESULT', current['application_id'], '微信退款状态：'+result['status'])
                 c.audit(g['project'], g['user_id'], 'REFUND_APPLICATION_PROVIDER_CONFIRMED', event)
