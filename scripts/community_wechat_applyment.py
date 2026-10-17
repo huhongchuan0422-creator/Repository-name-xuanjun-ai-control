@@ -150,7 +150,11 @@ class WechatApplyment:
             with c.tx():
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
                 self.onboarding._load(application,uid,True)
-                current=self._read(application);current.update(state='SUBMITTED_TO_PROVIDER',applyment_id=str(data['applyment_id']),provider_response_sha256=digest)
+                current=self._read(application)
+                if (current is None or current.get('business_code')!=code
+                        or current.get('state')!='SUBMISSION_UNKNOWN' or current.get('version')!=version):
+                    raise ValueError('APPLYMENT_SUBMISSION_RACE_QUERY_EXISTING_ONLY')
+                current.update(state='SUBMITTED_TO_PROVIDER',applyment_id=str(data['applyment_id']),provider_response_sha256=digest)
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_SUBMITTED',code)
             return current
         with c.tx():
