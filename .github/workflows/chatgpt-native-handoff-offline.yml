@@ -5,7 +5,9 @@ on:
       - feature/chatgpt-native-entry-offline-receipt-20261017
     paths:
       - scripts/chatgpt_native_handoff_observer.py
+      - scripts/chatgpt_feature_inventory_readonly.py
       - tests/test_chatgpt_native_handoff_observer.py
+      - tests/test_chatgpt_feature_inventory_readonly.py
       - .github/workflows/chatgpt-native-handoff-offline.yml
   workflow_dispatch:
 permissions:
@@ -20,6 +22,7 @@ jobs:
           persist-credentials: false
       - name: Verify offline Issue19 observer
         run: |
+          python3 -B -m unittest discover -s tests -p 'test_chatgpt_*_readonly.py' -v
           python3 -B -m unittest discover -s tests -p test_chatgpt_native_handoff_observer.py -v
       - name: Assert no host action or lease mutation
         run: |
