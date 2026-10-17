@@ -44,3 +44,13 @@ test('payment disabled response or identity change cannot release payment parame
  let pending;const wx={login:o=>o.success({code:'once'}),request:o=>{if(o.url.endsWith('/mini/login'))o.success({statusCode:200,data:{payment_enabled:false,result:{session_token:'s'.repeat(32),expires_at:200,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});else pending=o;}};
  const session=createSession(wx,'https://example.org',()=>100);await session.login();let task=session.payment('shop1','prepare','order1');pending.success({statusCode:200,data:{payment_enabled:false,result:{}}});await assert.rejects(task,/NOT_ENABLED/);task=session.payment('shop1','recover','order1');session.clear();pending.success({statusCode:200,data:{payment_enabled:true,result:{package:'prepay_id=fixture'}}});await assert.rejects(task,/STALE_SESSION/);
 });
+
+
+test('owned success ad uses read-only mini commerce route, not payment operations',async()=>{
+ const {calls,session}=fixture();await session.login();
+ const result=await session.commerce('shop1','receipt_ad',{reference:'order1'});
+ assert.equal(result.simulation_only,true);
+ assert.equal(calls[2].url,'https://example.org/mini/api');
+ assert.deepEqual(calls[2].data,{scene:'shop1',operation:'commerce.receipt_ad',params:{reference:'order1'}});
+ await assert.rejects(session.commerce('shop1','release_funds',{}),/INVALID_COMMERCE_REQUEST/);
+});
