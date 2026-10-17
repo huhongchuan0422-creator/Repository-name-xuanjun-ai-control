@@ -64,6 +64,11 @@ class BillJourney(unittest.TestCase):
         with self.assertRaises(ValueError):project_verified_query(db,DEMO_SCOPE,'basket',expected,observation,self.fx.c.now(),self.fx.reader._kid)
         bill['rows']=[dict(zip(bill['columns'],[expected['out_trade_no'],'123456789','SUCCESS','1.01']))]
         self.assertEqual(self.bills.reconcile(g,bill)['status'],'BILL_ROWS_MATCH')
+        bill['columns'].append('特约商户号')
+        bill['rows'][0]['特约商户号']=''
+        self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'BILL_SUBMERCHANT_MISMATCH')
+        bill['rows'][0]['特约商户号']=policy['sub_mchid']
+        self.assertEqual(self.bills.reconcile(g,bill)['status'],'BILL_ROWS_MATCH')
         bill['rows']*=2
         self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'DUPLICATE_PROVIDER_ROW')
     def test_signed_time_has_timezone_bounds_and_no_clock_substitution(self):
