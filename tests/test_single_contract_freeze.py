@@ -74,6 +74,14 @@ class FreezeTests(unittest.TestCase):
         x=sample();x["resources"][0].pop("display_USD")
         with self.assertRaises(mod.ContractHold):mod.freeze(x)
 
+    def test_nested_plaintext_secrets_rejected(self):
+        x=sample()
+        x["resources"][0]["api_key"]="should-not-be-saved"
+        with self.assertRaises(mod.ContractHold):mod.freeze(x)
+        x=sample()
+        x["features"][0]["credentials"]={"private_key":"do-not-archive"}
+        with self.assertRaises(mod.ContractHold):mod.freeze(x)
+
     def test_never_signed_or_paid(self):
         x=mod.freeze(sample())
         self.assertEqual(x["status"], "UNSIGNED_CANDIDATE_ONLY")
