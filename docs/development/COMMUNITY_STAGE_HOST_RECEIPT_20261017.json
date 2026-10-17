@@ -1,13 +1,13 @@
 {
-  "source_commit": "e52b26f37a5f5a910cfb8804d373dc42b2bf771a",
-  "source_tree": "d49985fb4dd0ec3503c75661a04283eb3bc28f22",
-  "run_id": 39010884122,
+  "source_commit": "217549a26cfc397b24c8260fbe78a82b828dfb3e",
+  "source_tree": "08d13351b0e87c68ff1cc17e875273089d08ac33",
+  "run_id": 39011890078,
   "hosted": {
-    "job_id": 117332975914,
-    "community_python": 294,
+    "job_id": 117335993437,
+    "community_python": 322,
     "stage5_python": 342,
     "javascript": 72,
-    "total_test_executions": 708,
+    "total_test_executions": 736,
     "status": "SUCCESS",
     "failed": 0,
     "skipped": 0,
@@ -15,10 +15,10 @@
     "cryptography": "50.0.2"
   },
   "domestic_isolated": {
-    "job_id": 117333201305,
+    "job_id": 117336362748,
     "host": "iZvt5t8tlrm8oiZ",
     "uid": 1002,
-    "tests": 106,
+    "tests": 133,
     "status": "PASS",
     "failed": 0,
     "skipped": 0,
@@ -32,15 +32,15 @@
     "overlaps_hosted_suites": true
   },
   "source_artifact": {
-    "id": 12092693276,
-    "outer_zip_sha256": "128eacc2b57133c12c31af86cc4418b8e806a850ca325cd0c87d87c166d6d940",
-    "inner_zip_sha256": "d0d6b3baf82898fc83fe99197fd850df7c27d1b59b4f671e4ba332ce8ad5a6ee",
-    "inner_zip_bytes": 867751,
-    "manifest_files_verified": 156
+    "id": 12092804605,
+    "outer_zip_sha256": "07d99c4256054a4ec460c3a6277799df020a6670c41ec0e996127c717ac34db4",
+    "inner_zip_sha256": "396420adecd32047fad8716a468156478880791dd5e10b00711bf860dc088230",
+    "inner_zip_bytes": 937038,
+    "manifest_files_verified": 164
   },
   "domestic_artifact": {
-    "id": 12092733275,
-    "outer_zip_sha256": "8bd5a7a4fa11f70b9d87778a0e1b0a885a2bfe6b3fd1648e166f557432527418",
+    "id": 12093471436,
+    "outer_zip_sha256": "f03d861522cfbe19ea10cefb179015594945fa09e2d4b4f259038c25fec6d5a6",
     "receipt_head_verified": true
   },
   "reused_native_preview": {
@@ -73,5 +73,19 @@
     "Original production deployment and DB migration/recovery gates; no parallel host writer"
   ],
   "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance",
-  "latest_fix": "Signed notification and signed single-GET order query cross-check; original pending Finance evidence only, 11 added tests include collision, concurrent reopen and interrupted match recovery. No authoritative Finance confirmation or production acceptance."
+  "latest_fix": "Merchant admission UI, encrypted private material intake, conditional checklist, per-material independent review, correction/resubmission and approval; existing Center operator authentication. Original CRM workbench opening and WeChat submerchant approval remain separate.",
+  "merchant_onboarding": {
+    "applicant_route": "/merchant/join",
+    "review_route": "/merchant/review",
+    "api_route": "/merchant/onboarding",
+    "ui_hosted_browser": "PASS",
+    "business_tests": 15,
+    "operator_auth_tests": 12,
+    "browser_journeys": 1,
+    "candidate_source_only": true,
+    "production_route_published": false,
+    "opening_state": "AWAITING_CRM_BINDING",
+    "wechat_submerchant_state": "NOT_VERIFIED",
+    "source_account_project_scanner": "SYNTHETIC_FIXTURES"
+  }
 }
