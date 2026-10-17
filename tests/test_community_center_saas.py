@@ -26,7 +26,7 @@ class CustomerSaas(unittest.TestCase):
         self.assertEqual(len(self.call('mine',dict(kind='ORDER',after_id=''))['records']),1)
     def test_same_tenant_second_customer_cannot_read_or_claim_quotes_and_orders(self):
         q=self.quote();o=self.call('order_prepare',dict(quote_id=q['quote_id'],currency='USD'))
-        for op,p in [('quote_read',dict(quote_id=q['quote_id'])),('order_prepare',dict(quote_id=q['quote_id'],currency='USD')),('order_read',dict(order_id=o['order_id'])),('order_status',dict(order_id=o['order_id'])),('renewal_plan',dict(order_id=o['order_id'],valid_until=None))]:
+        for op,p in [('quote_read',dict(quote_id=q['quote_id'])),('order_prepare',dict(quote_id=q['quote_id'],currency='USD')),('order_read',dict(order_id=o['order_id'])),('order_status',dict(order_id=o['order_id'])),('renewal_plan',dict(order_id=o['order_id']))]:
             with self.assertRaises(PermissionError):self.call(op,p,True)
         self.assertEqual(self.call('mine',dict(kind='ORDER',after_id=''),True)['records'],[])
         with self.assertRaises(PermissionError):self.call('order_read',dict(order_id='legacy_order'))
@@ -37,11 +37,25 @@ class CustomerSaas(unittest.TestCase):
         with self.assertRaises(PermissionError):self.api.dispatch(self.two['token'],self.two['csrf'],dict(workspace='one',operation='catalog',params={}))
         self.fx.center.db.execute('UPDATE members SET active=0 WHERE user_id=?',(self.fx.uid1,))
         with self.assertRaises(PermissionError):self.call('catalog')
+    def test_renewal_reads_original_entitlement_end_not_client_proposed_expiry(self):
+        from scripts.community_saas_order_preparation import advance
+        q=self.quote();order=self.call('order_prepare',dict(quote_id=q['quote_id'],currency='CNY'));oid=order['order_id'];now=self.fx.stage.now
+        # Explicit offline lifecycle fixture, never a production Finance proof.
+        for index,target in enumerate(('AWAITING_EXTERNAL','CONFIRMATION_UNKNOWN','CONFIRMED_EXTERNAL')):
+            advance(self.fx.stage.s,oid,'tenant1','fixture_step_'+str(index),target,now,proof_ref='offline_proof' if index==2 else None,trusted_finance_attestation=index==2)
+        end=now+86400*60
+        self.fx.stage.q.execute("INSERT INTO module_entitlements VALUES('tenant1','storefront_catalog',?,?,1,'OFFLINE_GRANT')",(now,end));self.fx.stage.q.commit()
+        proposal=self.call('renewal_plan',dict(order_id=oid));self.assertEqual(proposal['proposed_valid_from'],end)
+        self.assertFalse(proposal['entitlement_granted'])
+        with self.assertRaises(ValueError):self.call('renewal_plan',dict(order_id=oid,valid_until=now))
     def test_owner_pricing_requires_protected_owner_grant_and_original_project_owner(self):
         grants=dict(self.grants,owner=dict(user_id=self.fx.uid1,project='project1',principal=self.fx.stage.owner),bad_owner=dict(user_id=self.fx.uid2,project='project1',principal=self.fx.stage.owner))
         api=CenterSaas(self.fx.center,self.fx.stage.api,grants)
         args=dict(offer_id='newsku',version=1,module_id='storefront_catalog',kind='BUYOUT',lines=[dict(type='MODULE_FEE',label='Buyout',cycle='ONCE',quantity=1,cny_minor=100,usd_minor=20,cost_cny_minor=0,cost_usd_minor=0)],term_days=None,tenant_scope=None,supplier_payment='NONE')
         with self.assertRaises(PermissionError):self.call('owner_create_offer',args)
+        with self.assertRaises(PermissionError):self.call('owner_offer_read',dict(offer_id='sku',version=1))
+        full=api.dispatch(self.one['token'],self.one['csrf'],dict(workspace='owner',operation='owner_offer_read',params=dict(offer_id='sku',version=1)))
+        self.assertEqual(full['lines'][0]['cost_cny_minor'],100)
         with self.assertRaises(PermissionError):api.dispatch(self.two['token'],self.two['csrf'],dict(workspace='bad_owner',operation='owner_create_offer',params=args))
         r=api.dispatch(self.one['token'],self.one['csrf'],dict(workspace='owner',operation='owner_create_offer',params=args));self.assertFalse(r['payment_authorized'])
         api.dispatch(self.one['token'],self.one['csrf'],dict(workspace='owner',operation='owner_approve_offer',params=dict(offer_id='newsku',version=1,approval_ref='approval2',cost_evidence_ref='cost2')))

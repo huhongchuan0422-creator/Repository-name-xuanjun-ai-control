@@ -53,9 +53,9 @@ class CenterSaas:
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:
             raise ValueError('INVALID_CUSTOMER_SAAS_REQUEST')
-        fields={'workspace_info':set(),'owner_create_offer':{'offer_id','version','module_id','kind','lines','term_days','tenant_scope','supplier_payment'},'owner_approve_offer':{'offer_id','version','approval_ref','cost_evidence_ref'},'catalog':set(),'offers':{'module_id'},'quote':{'offer_id','version'},'quote_read':{'quote_id'},
+        fields={'owner_offer_read':{'offer_id','version'},'workspace_info':set(),'owner_create_offer':{'offer_id','version','module_id','kind','lines','term_days','tenant_scope','supplier_payment'},'owner_approve_offer':{'offer_id','version','approval_ref','cost_evidence_ref'},'catalog':set(),'offers':{'module_id'},'quote':{'offer_id','version'},'quote_read':{'quote_id'},
                 'order_prepare':{'quote_id','currency'},'order_read':{'order_id'},'order_status':{'order_id'},
-                'renewal_plan':{'order_id','valid_until'},'entitlement':{'module_id'},'capability':{'capability'},
+                'renewal_plan':{'order_id'},'entitlement':{'module_id'},'capability':{'capability'},
                 'mine':{'kind','after_id'}}
         op,p=body['operation'],body['params']
         if op not in fields or set(p)!=fields[op]:raise ValueError('INVALID_CUSTOMER_SAAS_FIELDS')
@@ -65,9 +65,13 @@ class CenterSaas:
             c.audit(g['project'],g['user_id'],'SAAS_CUSTOMER_ATTEMPT',hashlib.sha256(canonical(body)).hexdigest())
         def call(operation,params):return self.runtime.dispatch(g['principal'],operation,params,None)
         if op=='workspace_info':result=dict(role=g['role'],pricing_allowed=g['role']=='PLATFORM_OWNER')
-        elif op in ('owner_create_offer','owner_approve_offer'):
+        elif op in ('owner_offer_read','owner_create_offer','owner_approve_offer'):
             if g['role']!='PLATFORM_OWNER':raise PermissionError('ORIGINAL_PLATFORM_OWNER_REQUIRED')
-            result=call(op,p)
+            if op=='owner_offer_read':
+                if type(p['version']) is not int or p['version']<1:raise ValueError('INVALID_OFFER_VERSION')
+                from scripts.community_saas_offer_catalog import get_offer
+                result=get_offer(self.runtime.saas.quotes,p['offer_id'],p['version'])
+            else:result=call(op,p)
         elif op=='mine':
             kind=p['kind'];after=p['after_id']
             if type(kind) is not str or kind not in ('QUOTE','ORDER') or type(after) is not str or after and not re.fullmatch(('sq_' if kind=='QUOTE' else 'so_')+'[0-9a-f]{32}',after):raise ValueError('INVALID_SAAS_PAGE')
@@ -92,7 +96,11 @@ class CenterSaas:
         elif op=='renewal_plan':
             self._owned(g,'ORDER',p['order_id'])
             lifecycle=call('order_status',dict(order_id=p['order_id']))
-            result=call(op,p) if lifecycle['state']=='CONFIRMED_EXTERNAL' else dict(order_id=p['order_id'],status='AWAITING_FINANCE_CONFIRMATION',payment_confirmed_by_adapter=False,entitlement_granted=False,automatic_renewal_authorized=False)
+            if lifecycle['state']=='CONFIRMED_EXTERNAL':
+                order=call('order_read',dict(order_id=p['order_id']))
+                row=self.runtime.saas.modules.execute('SELECT valid_until FROM module_entitlements WHERE tenant_id=? AND module_id=?',(g['tenant'],order['module_id'])).fetchone()
+                result=call(op,dict(p,valid_until=row[0] if row else None))
+            else:result=dict(order_id=p['order_id'],status='AWAITING_FINANCE_CONFIRMATION',payment_confirmed_by_adapter=False,entitlement_granted=False,automatic_renewal_authorized=False)
         elif op in ('order_read','order_status'):
             self._owned(g,'ORDER',p['order_id']);result=call(op,p)
         else:result=call(op,p)

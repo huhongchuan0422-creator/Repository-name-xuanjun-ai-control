@@ -42,6 +42,7 @@ class SaasCustomerBrowser(unittest.TestCase):
                     owner.locator('#offerId').fill('owner_browser_sku');owner.locator('#offerKind').select_option('BUYOUT');owner.locator('#addPriceLine').click()
                     owner.locator('[data-field=cny_minor]').fill('2000');owner.locator('[data-field=usd_minor]').fill('400');owner.locator('#pricingForm').get_by_role('button',name='保存新版本').click();expect(owner.locator('#pricingResult')).to_contain_text('新版本已保存')
                     owner.locator('#approvalRef').fill('owner_browser_approval');owner.locator('#costEvidenceRef').fill('owner_browser_cost');owner.locator('#approveForm button').click();expect(owner.locator('#pricingResult')).to_contain_text('方案批准结果')
+                    owner.locator('#loadPriceVersion').click();expect(owner.locator('#offerVersion')).to_have_value('2');expect(owner.locator('[data-field=cny_minor]')).to_have_value('2000');expect(owner.locator('#approvalRef')).to_have_value('')
                     owner.evaluate('configureCommunitySaas(null)');expect(owner.locator('#offerId')).to_have_value('');expect(owner.locator('#priceLines')).to_be_empty();owner.close()
                     for width in (360,768,1440):
                         page.set_viewport_size({'width':width,'height':900});self.assertLessEqual(page.evaluate('document.documentElement.scrollWidth'),width)
