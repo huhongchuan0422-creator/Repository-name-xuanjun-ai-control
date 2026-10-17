@@ -23,8 +23,8 @@ import time
 
 KOREA='iZmj7a5kwr75qc1tul4kf9Z'
 DOMESTIC='iZvt5t8tlrm8oiZ'
-LOCAL=Path('/root/pr99-s07-isolated-start-launch-v1')
-ATTEMPT=Path('/var/lib/xuanjun-pr99-s07-isolated-start-v1')
+LOCAL=Path('/root/pr99-s07-isolated-start-launch-v2')
+ATTEMPT=Path('/var/lib/xuanjun-pr99-s07-isolated-start-v2')
 MATERIAL=Path('/var/lib/xuanjun-pr99-s07-private-materials-v1')
 TRANSFER_PATH=Path('/root/pr99-s07-domestic-data-launch.FbAIVIap/transfer.py')
 TRANSFER_SHA='90b49446307de25820b8190988582a53f05cc093ea97655d567cdf96a275df79'
@@ -83,6 +83,29 @@ def put(path,b,mode=0o600):
     with path.open('xb') as f:f.write(b)
     path.chmod(mode)
 
+def public_directory(path):
+    # mkdir's requested mode is masked by the coordinator's private umask.
+    path.mkdir(mode=0o755,exist_ok=True)
+    need(not path.is_symlink() and path.is_dir(),'ISOLATION_DIRECTORY_TYPE')
+    path.chmod(0o755)
+
+def require_preserved_failure(old):
+    previous=Path('/var/lib/xuanjun-pr99-s07-isolated-start-v1')
+    need(previous.is_dir() and not previous.is_symlink(),'PREVIOUS_ATTEMPT_MISSING')
+    failure=json.loads(old['stable'](previous/'failure.json',10000))
+    need(failure=={'status':'HOLD_PRESERVE_NO_RETRY'},'PREVIOUS_FAILURE_CHANGED')
+    need(not os.path.lexists(previous/'receipt.json'),'PREVIOUS_RECEIPT_REQUIRES_REVIEW')
+    before=json.loads(old['stable'](previous/'protected.before.json',4*1024*1024))
+    need(before==old['protected_snapshot'](),'PREVIOUS_PROTECTED_STATE_CHANGED')
+    for p in Path('/proc').iterdir():
+        if not p.name.isdigit() or int(p.name)==os.getpid():continue
+        try:
+            cmd=(p/'cmdline').read_bytes()
+            process_root=os.readlink(p/'root')
+        except FileNotFoundError:continue
+        need(str(previous) not in process_root and str(previous).encode() not in cmd,
+             'PREVIOUS_ISOLATED_PROCESS_PRESENT')
+
 def copy_project(root,sources,data):
     project=root/'opt/trading-system'
     project.mkdir(parents=True,mode=0o700)
@@ -123,7 +146,7 @@ def child(root,commands):
         target=root/name;target.mkdir(mode=0o755,exist_ok=True)
         subprocess.run(['/usr/bin/mount','--bind',str(origin),str(target)],check=True,timeout=10)
         subprocess.run(['/usr/bin/mount','-o','remount,bind,ro,nosuid,nodev',str(target)],check=True,timeout=10)
-    (root/'dev').mkdir(mode=0o755,exist_ok=True)
+    public_directory(root/'dev')
     for name in ('null','urandom'):
         target=root/'dev'/name;target.touch(mode=0o600)
         subprocess.run(['/usr/bin/mount','--bind','/dev/'+name,str(target)],check=True,timeout=10)
@@ -192,6 +215,7 @@ def run_domestic(h):
     old=load(base64.b64decode(h['original'],validate=True),ORIGINAL_SHA)
     transfer=load(base64.b64decode(h['transfer'],validate=True),TRANSFER_SHA)
     source=load(base64.b64decode(h['source_helper'],validate=True),SOURCE_SHA)
+    require_preserved_failure(old)
     need(not os.path.lexists(ATTEMPT),'ISOLATED_ATTEMPT_EXISTS_NO_RETRY')
     r=json.loads(old['stable'](MATERIAL/'receipt.json',100000))
     need(r['status']=='DOMESTIC_S07_PRIVATE_MATERIALS_STAGED_PASS' and r['tar_sha256']==TAR_SHA and r['wire_sha256']==WIRE_SHA,'DOMESTIC_MATERIAL_RECEIPT_CHANGED')
@@ -221,7 +245,7 @@ def run_domestic(h):
         with (ATTEMPT/'namespace-preflight.private.log').open('xb') as f:
             subprocess.run([unshare,'--mount','--net','--pid','--fork','/usr/bin/true'],
                 stdout=f,stderr=f,check=True,timeout=15)
-        root=ATTEMPT/'rootfs';root.mkdir(mode=0o755)
+        root=ATTEMPT/'rootfs';public_directory(root)
         copy_project(root,sources,data)
         shutil.copytree(old['BASE']/'venv',root/'venv',symlinks=True)
         for current,dirs,files in os.walk(root/'venv',followlinks=False):
@@ -229,7 +253,7 @@ def run_domestic(h):
             for name in files:
                 p=Path(current)/name
                 if not p.is_symlink():p.chmod(0o555 if p.stat().st_mode&0o111 else 0o444)
-        for n in ('tmp','etc','usr','lib','lib64'):(root/n).mkdir(mode=0o755,exist_ok=True)
+        for n in ('tmp','etc','usr','lib','lib64'):public_directory(root/n)
         (root/'tmp').chmod(0o1777)
         put(root/'etc/passwd',b'root:x:0:0:root:/root:/bin/false\nnobody:x:65534:65534:nobody:/nonexistent:/bin/false\n',0o444)
         put(root/'etc/group',b'root:x:0:\nnobody:x:65534:\n',0o444)
