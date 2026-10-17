@@ -18,8 +18,11 @@ def verified_refund_total(db, identity, reference):
     refunded=0
     for raw, in db.execute('SELECT evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,s,reference)):
         try: event=json.loads(raw)
-        except (ValueError,TypeError):continue
-        if type(event) is dict and event.get('source')=='WECHAT_SIGNED_REFUND_RESULT':
+        except (ValueError,TypeError):
+            raise ValueError('UNREADABLE_ORDER_EVIDENCE_RECONCILIATION_DENIED') from None
+        if type(event) is not dict:
+            raise ValueError('UNREADABLE_ORDER_EVIDENCE_RECONCILIATION_DENIED')
+        if event.get('source')=='WECHAT_SIGNED_REFUND_RESULT':
             amount=event.get('refund_minor')
             if type(amount) is not int or amount<=0:
                 raise ValueError('INVALID_SIGNED_REFUND_LEDGER_AMOUNT')
