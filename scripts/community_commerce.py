@@ -54,6 +54,9 @@ class Commerce:
         return g
 
     def _catalog_item(self, identity, item_id, public=True):
+        if public:
+            from scripts.community_platform_merchants import assert_trading
+            assert_trading(self.center,identity)
         t, m, s = scope(identity)
         merchant = self.runtime.demo.merchant_db
         profile = merchant.execute('SELECT status FROM merchant_profiles WHERE tenant_id=? AND merchant_id=? AND store_id=?', (t, m, s)).fetchone()

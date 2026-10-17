@@ -202,7 +202,9 @@
         "scripts/community_reports.py",
         "tests/test_community_reports.py",
         "scripts/community_provider_bills.py",
-        "tests/test_community_provider_bills.py"
+        "tests/test_community_provider_bills.py",
+        "scripts/community_platform_merchants.py",
+        "tests/test_community_platform_merchants.py"
       ]
     },
     {

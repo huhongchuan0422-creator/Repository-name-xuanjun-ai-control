@@ -64,7 +64,13 @@ class MiniPayments:
             raise ValueError('INVALID_MINI_PAYMENT_REQUEST')
         scene,reference=body['scene'],body['reference']
         b=self._authorize(token,scene,reference)
-        authorize=lambda:self._authorize(token,scene,reference)
+        def authorize():
+            binding=self._authorize(token,scene,reference)
+            if body['operation']=='prepare':
+                from scripts.community_platform_merchants import assert_trading
+                _,_,principal=self.identity._resolve(token,scene)
+                assert_trading(self.identity.center,self.identity.runtime.bindings[principal])
+            return binding
         c=self.identity.center
         with c.tx():c.limit('community-payment:'+b['user_id'],20,60)
         if body['operation']=='query':
@@ -82,6 +88,8 @@ class MiniPayments:
             from scripts.pr122_customer_core import canonical
             _,_,principal=self.identity._resolve(token,scene)
             original_scope=self.identity.runtime.bindings[principal]
+            from scripts.community_platform_merchants import assert_trading
+            assert_trading(c,original_scope)
             if b['profit_sharing']:
                 actions=getattr(self,'rule_actions',None)
                 if actions is None:raise PermissionError('PROFIT_SHARING_RULE_SERVICE_REQUIRED')

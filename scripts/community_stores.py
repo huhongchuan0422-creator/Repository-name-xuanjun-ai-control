@@ -10,7 +10,7 @@ class Stores:
         c=self.center;uid=c.session(session,csrf);g=self.operations.grants.get(workspace)
         if g is None or g['user_id']!=uid or g['role']!='MERCHANT_ADMIN':raise PermissionError('ORIGINAL_MERCHANT_ADMIN_REQUIRED')
         principal=g['principal']
-        if principal.role!=g['role'] or self.operations.runtime.bindings.get(principal)!=g['scope']:raise PermissionError('MERCHANT_GRANT_CHANGED')
+        if principal.tenant_id!=g['tenant'] or principal.role!=g['role'] or self.operations.runtime.bindings.get(principal)!=g['scope']:raise PermissionError('MERCHANT_GRANT_CHANGED')
         project,_,_=c.project(uid,g['project'],g['project_roles'])
         if project['tenant']!=g['tenant']:raise PermissionError('MERCHANT_TENANT_DENIED')
         if g['onboarding_required']:
@@ -28,7 +28,7 @@ class Stores:
                 records.append(dict(workspace=name,store_id=target['scope']['store_id'],profile=None if row is None else dict(zip(('name','description','contact','status','version'),row))))
             return dict(stores=records)
         target=admitted.get(p['store_workspace']) if type(p['store_workspace']) is str else None
-        if target is None or self.operations.runtime.bindings.get(target['principal'])!=target['scope']:raise PermissionError('ORIGINAL_CRM_ADMITTED_STORE_REQUIRED')
+        if target is None or target['principal'].role!=target['role'] or target['principal'].tenant_id!=target['tenant'] or self.operations.runtime.bindings.get(target['principal'])!=target['scope']:raise PermissionError('ORIGINAL_CRM_ADMITTED_STORE_REQUIRED')
         # Creating a business profile does not mint a tenant, merchant, Principal,
         # contract or payment identity. Those stay with original CRM admission.
         if target['onboarding_required'] and p['store_workspace']!=workspace:
