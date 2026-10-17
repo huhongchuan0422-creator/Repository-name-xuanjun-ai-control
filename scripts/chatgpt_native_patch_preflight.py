@@ -33,7 +33,8 @@ def _path(value):
     if any(part in ("", ".", "..") for part in value.split("/")):
         raise NativePatchHold("UNSAFE_PATH")
     low=value.lower()
-    if any(low.startswith(x) or low.endswith(x) for x in _FORBIDDEN):
+    parts=low.split("/")
+    if any(low.startswith(x) or low.endswith(x) for x in _FORBIDDEN) or any(p in (".git", ".env", "secrets", "credentials", "id_rsa", "authorized_keys") for p in parts) or (len(parts)>1 and parts[0]==".github" and parts[1]=="workflows"):
         raise NativePatchHold("PROTECTED_PATH")
     return value
 
