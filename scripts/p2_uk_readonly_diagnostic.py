@@ -53,21 +53,22 @@ def safe_receipt(output, stderr='', exit_code=0):
     require(rows and rows[0] == 'DIAG_SCHEMA=1' and rows[-1] == 'DIAG_END=COMPLETE')
     values = []
     for row in rows:
-        require(row.count('=') == 1)
-        key, value = row.split('=', 1)
-        require(key in KEYS and len(value) <= 160 and
-                re.fullmatch(r'[A-Za-z0-9_./:-]*', value) is not None)
-        if key == 'TARGET_HOST': require(value == TARGET_HOST)
-        elif key == 'EXEC_UID': require(value == '0')
-        elif key == 'PYTHON_VERSION': require(value == '3.6.8')
-        elif key == 'SITE_PATH': require(value == SITE_PATH)
-        elif key == 'UNIT': require(value in UNIT_NAMES)
-        elif key in ('DB_FILE','DB_FILE_ABSENT'): require(value in DB_NAMES)
-        elif key in ('CANONICAL_WRITER','EPOCH','LEASE','FENCE',
-                     'ROOT_TRUST','HISTORICAL_INVOKEID'): require(value == 'UNKNOWN')
-        elif key == 'SITE_SHA256': require(re.fullmatch(r'[0-9a-f]{64}', value) is not None)
-        elif key == 'STOP': raise DiagnosticHold('REMOTE_STOP_NO_RETRY')
-        values.append((key, value))
+        for item in row.split(' '):
+            require(item.count('=') == 1)
+            key, value = item.split('=', 1)
+            require(key in KEYS and len(value) <= 160 and
+                    re.fullmatch(r'[A-Za-z0-9_./:-]*', value) is not None)
+            if key == 'TARGET_HOST': require(value == TARGET_HOST)
+            elif key == 'EXEC_UID': require(value == '0')
+            elif key == 'PYTHON_VERSION': require(re.fullmatch(r'3\\.6\\.[0-9]+', value) is not None)
+            elif key == 'SITE_PATH': require(value == SITE_PATH)
+            elif key == 'UNIT': require(value in UNIT_NAMES)
+            elif key in ('DB_FILE','DB_FILE_ABSENT'): require(value in DB_NAMES)
+            elif key in ('CANONICAL_WRITER','EPOCH','LEASE','FENCE',
+                         'ROOT_TRUST','HISTORICAL_INVOKEID'): require(value == 'UNKNOWN')
+            elif key == 'SITE_SHA256': require(re.fullmatch(r'[0-9a-f]{64}', value) is not None)
+            elif key == 'STOP': raise DiagnosticHold('REMOTE_STOP_NO_RETRY')
+            values.append((key, value))
     require(sum(k == 'TARGET_HOST' for k,v in values) == 1)
     require(sum(k == 'EXEC_UID' for k,v in values) == 1)
     require(sum(k == 'PYTHON_VERSION' for k,v in values) == 1)
