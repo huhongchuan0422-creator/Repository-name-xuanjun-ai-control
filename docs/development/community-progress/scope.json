@@ -87,11 +87,11 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "88ba947ed958315fc576a441f9029a1cace73963",
-    "run_id": 39030062012,
-    "job_id": 117388556512,
+    "source": "51ebb6ce72541dcf55d1f9cf814912f6ebff9d5f",
+    "run_id": 39030295592,
+    "job_id": 117389227021,
     "result": "SUCCESS",
-    "scope": "Exact Hosted test success for split-bill bound identifier source and regression; optional mini preview/runtime/python-runtime/SDK SKIPPED",
+    "scope": "Exact Hosted source test success: trade/split statement and original merchant UBO distinct identity check; optional mini runtime/SDK/preview SKIPPED",
     "covers_later_commits": false
   }
 }
