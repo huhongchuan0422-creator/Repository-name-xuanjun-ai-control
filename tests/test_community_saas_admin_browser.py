@@ -63,7 +63,7 @@ class SaasAdminBrowser(unittest.TestCase):
         try:
             with sync_playwright() as playwright:
                 executable = next((shutil.which(name) for name in
-                    ('chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable')
+                    ('google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser')
                     if shutil.which(name)), None)
                 options = dict(headless=True, chromium_sandbox=True)
                 if executable:
