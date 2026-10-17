@@ -171,6 +171,12 @@ class ProviderBills:
                 seen.add(row['商户分账单号'])
                 action=actions.get(row['商户分账单号'])
                 if action is None or action.get('result',{}).get('status')!='FINISHED':exceptions.append(dict(row=index,reason='SPLIT_NOT_CONFIRMED'));continue
+                # Optional official identifiers must agree with the bound, signed intent.
+                # Never silently accept a split row belonging to another payment or submerchant.
+                if row.get('特约商户号') and row['特约商户号']!=bill['sub_mchid']:
+                    exceptions.append(dict(row=index,reason='BILL_SUBMERCHANT_MISMATCH'));continue
+                if row.get('微信订单号') and row['微信订单号']!=action.get('transaction_id'):
+                    exceptions.append(dict(row=index,reason='SPLIT_TRANSACTION_MISMATCH'));continue
                 total=sum(r['amount_minor'] for r in action['result']['receivers'] if r['result']=='SUCCESS')
                 try:row_amount=minor(row['分账金额'])
                 except ValueError:exceptions.append(dict(row=index,reason='INVALID_BILL_AMOUNT'));continue
