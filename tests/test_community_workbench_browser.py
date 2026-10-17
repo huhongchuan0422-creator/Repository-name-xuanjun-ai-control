@@ -35,6 +35,7 @@ class MerchantWorkbenchBrowser(unittest.TestCase):
                     page.evaluate('(csrf)=>configureCommunityWorkbench({csrf,workspace:"merchant"})',web['csrf'])
                     self.assertTrue(page.locator('#billAudit').count()==1)
                     self.assertTrue(page.locator('#billResult').count()==1)
+                    self.assertTrue(page.locator('#billSection').is_hidden())
                     page.locator('#loadSettings').click();expect(page.locator('#notice')).to_have_text('操作完成')
                     page.locator('#name').fill('实际工作台编辑测试');page.locator('#profileStatus').select_option('PAUSED')
                     page.locator('#profileForm button').click();expect(page.locator('#notice')).to_have_text('操作完成')
