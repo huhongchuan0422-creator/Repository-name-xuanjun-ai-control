@@ -129,7 +129,7 @@ jobs:
               import shlex
               cn=assume(CN)
               kr=assume(KR)
-              program="import os,json,urllib.request,hashlib;os.environ['XJ_CN_STS_JSON']="+repr(json.dumps(cn))+";raw=urllib.request.urlopen('https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/1b029519886822865847c3c518e6df453ff789d5/evidence/pr99-service-handoff/aliyun-execution/s07_private_coordinator.py',timeout=30).read(100001);assert hashlib.sha256(raw).hexdigest()=='074ce3433cb7183742fec94965a2dc5e6da95e9fffc4c319b1aa7327c6a406ce';n={'__name__':'host_coordinator'};exec(compile(raw,'host_coordinator.py','exec'),n)"+chr(10)
+              program="import os,json,urllib.request,hashlib;os.environ['XJ_CN_STS_JSON']="+repr(json.dumps(cn))+";raw=urllib.request.urlopen('https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/1b029519886822865847c3c518e6df453ff789d5/evidence/pr99-service-handoff/aliyun-execution/s07_private_coordinator.py',timeout=30).read(100001);assert hashlib.sha256(raw).hexdigest()=='8bc8d13d9be01e2c695608ee975d30914eab9c7eda5144c8d7cba0051a3fa37a';n={'__name__':'host_coordinator'};exec(compile(raw,'host_coordinator.py','exec'),n)"+chr(10)
               program+="try: n['main']()"+chr(10)+"except BaseException as e:"+chr(10)+" print(json.dumps({'status':'S07_SWAS_CONTINUATION_HOLD','code':n['safe'](str(e)) if isinstance(e,(n['Hold'],RuntimeError)) else type(e).__name__,'private_logs_preserved':True,'retry_allowed':False}));raise SystemExit(2)"+chr(10)
               command="/usr/bin/python3.11 -I -B -u -c "+shlex.quote(program)
               endpoint="swas.ap-northeast-2.aliyuncs.com"
