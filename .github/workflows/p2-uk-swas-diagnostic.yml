@@ -79,9 +79,30 @@ jobs:
             /tmp/P2_UK_SWAS_MANIFEST.json
           if-no-files-found: error
 
+  site-python36:
+    name: Site attachment on Python 3.6.15 container, not UK host
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    container: python:3.6.15-bullseye
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact extracted attachment filesystem and negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PYTEST'
+          import sys,unittest
+          sys.path.insert(0,'tests')
+          from test_p2_uk_swas_diagnostic import SitePreparationTests
+          suite=unittest.defaultTestLoader.loadTestsFromTestCase(SitePreparationTests)
+          assert suite.countTestCases()==17
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          assert result.testsRun==17 and not result.skipped and result.wasSuccessful()
+          PYTEST
+
   protected-uk:
     name: Explicit protected UK transport
-    needs: offline
+    needs: [offline, site-python36]
     if: >-
       github.event_name == 'workflow_dispatch' &&
       (inputs.operation == 'remote-run' || inputs.operation == 'cloud-query') &&
