@@ -12,6 +12,7 @@ Mini customers are authenticated using the original CenterIdentity, signed mini 
 | project_summary | empty object | Original Center project title, member role, project CRM customer ID, requirement revision and checklist overall. |
 | project_checklist | empty object | Original Center checklist and versioned requirement states, including original internal-material filtering. |
 | project_feedback | message | Original Center encrypted WEB message archival; ARCHIVED does not mean answered. |
+| project_messages | empty object | Reads original Center bounded archived project conversation after current project authorization. Message ARCHIVED and provider_reply_verified=false must not be presented as answered. |
 | project_submit | item, revision | Existing original requirement revision is submitted via original Center.transition(... submit). No reviewer approval or material minting. |
 | project_review (web only, /community/commerce) | workspace = original project ID; params: item, revision, action, reason | Only original Center web session + CSRF and original project REVIEWER can begin_review / request_changes / approve. Mini bearer sessions cannot invoke this operation. Original material author/reviewer separation and revision/category/expiry guards are mandatory. |
 
