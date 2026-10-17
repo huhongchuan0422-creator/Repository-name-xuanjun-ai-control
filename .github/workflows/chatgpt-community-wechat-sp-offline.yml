@@ -56,10 +56,33 @@ jobs:
             community-stage-source.zip
           retention-days: 14
 
+  mini-sdk:
+    if: contains(github.event.head_commit.message, '[mini-preview]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Prepare official preview SDK without application credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/community-mini-ci" --no-audit --no-fund miniprogram-ci@2.1.31
+          mkdir "$RUNNER_TEMP/community-mini-sdk-bundle"
+          tar -czf "$RUNNER_TEMP/community-mini-sdk-bundle/sdk.tar.gz" -C "$RUNNER_TEMP/community-mini-ci" node_modules
+          cd "$RUNNER_TEMP/community-mini-sdk-bundle"
+          sha256sum sdk.tar.gz > sdk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-sdk-runtime
+          path: ${{ runner.temp }}/community-mini-sdk-bundle/
+          retention-days: 1
+
   # Fixed domestic egress: retain the existing WeChat upload IP allowlist.
   mini-preview:
     if: contains(github.event.head_commit.message, '[mini-preview]')
-    needs: test
+    needs: [test, mini-sdk]
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12
     steps:
@@ -70,21 +93,32 @@ jobs:
           test "$(hostname -s)" = iZvt5t8tlrm8oiZ
           test "$(id -un)" = githubrunner
           test "$(id -u)" -ne 0
+          node_bin="$(dirname "$(dirname "$RUNNER_TEMP")")/externals/node20/bin/node"
+          test -x "$node_bin"
+          "$node_bin" --version
+          printf 'COMMUNITY_NODE_BINARY=%s\n' "$node_bin" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '20'
-      - name: Install official pinned preview SDK without application credentials
-        run: npm install --prefix "$RUNNER_TEMP/community-mini-ci" --no-audit --no-fund miniprogram-ci@2.1.31
+          name: community-mini-sdk-runtime
+          path: ${{ runner.temp }}/community-mini-sdk-bundle
+      - name: Verify and unpack credential-free SDK into task temporary directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/community-mini-sdk-bundle"
+          sha256sum -c sdk.sha256
+          mkdir -p "$RUNNER_TEMP/community-mini-ci"
+          tar --no-same-owner -xzf sdk.tar.gz -C "$RUNNER_TEMP/community-mini-ci"
       - name: Preview development code using existing upload secret
         env:
           WECHAT_MINIPROGRAM_APPID: ${{ secrets.WECHAT_MINIPROGRAM_APPID }}
           WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
           COMMUNITY_MINI_CI_MODULE_ROOT: ${{ runner.temp }}/community-mini-ci
           COMMUNITY_PREVIEW_OUTPUT: ${{ runner.temp }}/community-mini-preview
-        run: node scripts/community_mini_preview.cjs
+        run: '"$COMMUNITY_NODE_BINARY" scripts/community_mini_preview.cjs'
       - name: Preserve sanitized preview receipt
         if: always()
         uses: actions/upload-artifact@v4
