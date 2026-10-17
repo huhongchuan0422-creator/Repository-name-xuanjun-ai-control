@@ -84,6 +84,12 @@ class BillJourney(unittest.TestCase):
         with self.assertRaises(PermissionError):self.bills.dispatch(self.fx.web['token'],'','finance','bill_fetch',dict(kind='TRADE',bill_date=self.date))
         self.download(b'unknown,columns\na,b\n');self.call('bill_fetch')
         self.assertEqual(self.call('bill_reconcile')['status'],'UNKNOWN_SCHEMA')
+    def test_invalid_provider_bill_utf8_is_rejected_without_raw_contents(self):
+        for raw in (b'\xff\xfe',b'a,b\n1,\xff\n'):
+            with self.assertRaisesRegex(ValueError,'INVALID_BILL_UTF8') as cm:
+                parse(raw)
+            self.assertNotIn(repr(raw),str(cm.exception))
+
     def test_csv_header_requires_nonempty_printable_and_unambiguous_names(self):
         for body in (b',name\na,b\n',b'a, \na,b\n',
                      b'a,\t\na,b\n',b'a,a\na,b\n'):
