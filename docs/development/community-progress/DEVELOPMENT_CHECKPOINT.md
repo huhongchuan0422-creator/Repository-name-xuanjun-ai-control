@@ -171,3 +171,9 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Commit a5ffa285ce58d24bfa8b47acb8c3c57fcb9da040 rejects bidi spoofed provider CSV header controls; regression bec9e879feb1535a3811f95828f26d2a51f1e30b.
 - Commit 5aff11e0448c9fd894ad02d9260ace7852c0bb23 maps malformed quoted provider CSV to redacted INVALID_BILL_CSV without raw private data; regression f15ed47e6f4b49cdd908cd8441ce5249c9b86bd3.
 - Latest CI run 39038222481 is awaiting terminal verdict. Earlier header/UTF8 source run 39037981766 SUCCESS cannot be extrapolated to newer commits. Full official receiver-detail schema, actual merchant admission and Phase1/2 audit remain BLOCKED/PARTIAL.
+
+## 2026-10-17 original Center project archived feedback history integration
+
+- Original Center mini consumer project_messages read added in scripts/community_commerce.py commit 760f80df27e2da5efacbebbddbe5b34b5943c63e, session allowlist 83dd65cac7468bbc37ee70b4d205de84f64e41f6, checkout UI commits 39a39a28803c5205c0284f7a47b7c8f2d7e76a4a and 42509b521a5f33d6a57764261d9ee189dc4f8be9. Reuses Core.messages original project permissions and encrypted message storage; archived is NOT provider replied.
+- Python owner/revocation tests 982a84b59fdfb7911387c03c432fad672a25f6f2 and 3cfc1d6f1257c508bab5dde93d78ca4919873ae0, Mini JS tests 75775dbda92955accb618b85a9ebd5f87f697494 and 9e234b738fc746690914ec492a3d193fc57651ee. Latest CI run 39038548019 pending final verdict. No new IAM, payment, or production writes.
+- Phase 1 and 2 overall status remains PARTIAL. This module is not equivalent to full project evidence upload, final customer acceptance, or independent review of all remaining stages.
