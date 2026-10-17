@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           /usr/bin/python3 -I -B - <<'PY'
-          import importlib.util,json,os,platform,pwd,grp,shutil,signal,subprocess
+          import importlib.util,json,os,platform,pwd,grp,shutil,signal,stat,subprocess,time
           from pathlib import Path
           signal.alarm(40)
           assert os.uname().nodename=='iZvt5t8tlrm8oiZ' and os.getuid()==1002
@@ -32,6 +32,23 @@ jobs:
           data['venv_module']=importlib.util.find_spec('venv') is not None
           used_uids={p.pw_uid for p in pwd.getpwall()};used_gids={g.gr_gid for g in grp.getgrall()}
           data['available_candidate_uid_gid']=next((n for n in range(62622,62650) if n not in used_uids and n not in used_gids),None)
+          data['observed_utc']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+          data['probe_commit']=os.environ['GITHUB_SHA']
+          try:
+              account=pwd.getpwnam('xuanjun-customer')
+              data['customer_account']={'state':'PRESENT','uid':account.pw_uid,'gid':account.pw_gid,'shell':account.pw_shell}
+          except KeyError:data['customer_account']={'state':'ABSENT'}
+          data['fixed_objects']={}
+          for name in ('/etc/xuanjun-customer-center','/etc/xuanjun-customer-center/config.json','/etc/xuanjun-customer-center/runtime.json','/etc/xuanjun-customer-center/INDEPENDENT_REVIEW_TRUST.json','/etc/xuanjun-customer-center/TARGET_ACCEPTANCE.json','/etc/xuanjun-customer-center/publisher.json','/usr/local/lib/xuanjun-customer-runtime/venv/bin/python','/usr/local/lib/xuanjun-customer-center','/run/xuanjun-customer-api/http.sock','/var/lib/xuanjun-customer-channel/grant-state.json'):
+              try:
+                  info=os.lstat(name)
+                  data['fixed_objects'][name]={'state':'PRESENT_METADATA_ONLY','uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode)),'symlink':stat.S_ISLNK(info.st_mode)}
+              except FileNotFoundError:data['fixed_objects'][name]={'state':'ABSENT'}
+              except PermissionError:data['fixed_objects'][name]={'state':'UNREADABLE_NOT_ABSENT'}
+          try:data['website_current']=os.readlink('/var/www/wenwenwenyiyiyi.work/current')
+          except OSError:data['website_current']='UNKNOWN'
+          data['private_contents_read']=False
+          data['root_state_verified']=False
           data['package_versions']={}
           if data['tools']['rpm']:
               for name in ('python3','python3-pip','clamav','clamav-server','clamd'):
