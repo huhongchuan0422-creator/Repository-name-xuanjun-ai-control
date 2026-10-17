@@ -1,1 +1,19 @@
-{"appid":"wx1d5f8873eaea5392","projectname":"community-split-offline","compileType":"miniprogram","miniprogramRoot":"./","setting":{"es6":true,"minified":true}}
+{
+  "appid": "wx1d5f8873eaea5392",
+  "projectname": "community-split-offline",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "setting": {
+    "es6": true,
+    "minified": true,
+    "es7": true
+  },
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "suffix",
+        "value": ".test.cjs"
+      }
+    ]
+  }
+}

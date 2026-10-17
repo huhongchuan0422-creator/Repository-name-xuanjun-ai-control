@@ -4,8 +4,9 @@ on:
     branches:
       - feature/chatgpt-community-wechat-sp-offline-20261017
     paths:
-      - 'scripts/community_stage_*.py'
-      - 'tests/test_community_stage_*.py'
+      - 'scripts/community_*.py'
+      - 'scripts/community_mini_preview.cjs'
+      - 'tests/test_community_*.py'
       - 'clients/community-mini/**'
       - 'demos/community-stage/**'
       - scripts/community_wechat_sp_offline_guard.py
@@ -38,7 +39,7 @@ jobs:
           set -o pipefail
           python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
           python3 -B -m unittest discover -s tests -p 'test_stage5_*.py' -v 2>&1 | tee stage5-tests.log
-          node --test clients/community-mini/client.test.cjs
+          node --test clients/community-mini/*.test.cjs
           node --test demos/community-local-e2e/*.test.mjs
           node --test demos/community-payment/demo.test.mjs
           node --test demos/community-admin/admin.test.mjs
@@ -54,3 +55,32 @@ jobs:
             stage5-tests.log
             community-stage-source.zip
           retention-days: 14
+
+  mini-preview:
+    if: contains(github.event.head_commit.message, '[mini-preview]')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install official pinned preview SDK without application credentials
+        run: npm install --prefix "$RUNNER_TEMP/community-mini-ci" --no-audit --no-fund miniprogram-ci@2.1.31
+      - name: Preview development code using existing upload secret
+        env:
+          WECHAT_MINIPROGRAM_APPID: ${{ secrets.WECHAT_MINIPROGRAM_APPID }}
+          WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
+          COMMUNITY_MINI_CI_MODULE_ROOT: ${{ runner.temp }}/community-mini-ci
+          COMMUNITY_PREVIEW_OUTPUT: ${{ runner.temp }}/community-mini-preview
+        run: node scripts/community_mini_preview.cjs
+      - name: Preserve sanitized preview receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-development-preview
+          path: ${{ runner.temp }}/community-mini-preview/
+          retention-days: 7
