@@ -96,3 +96,9 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Both phases remain PARTIAL; next work includes official receiver-detail format with authoritative documentation, merchant admission conditions, public consumer/CRM admission, broader cross-role E2E and audit.
 
 - Follow-up safety commits 7e929d5ccf2eb83c723b30adf4a8bf8e27a52be6 and 88ba947ed958315fc576a441f9029a1cace73963 now reject even BLANK supplied split transaction/submerchant columns and add regressions. Latest exact source test run 39030062012; status must be independently fetched, no PASS claimed at writing. Phase large groups remain PARTIAL.
+
+## 2026-10-17 conditional merchant-application hardening
+
+- UBO identity documents in existing original merchant WeChat applyment are now deduplicated within the same application: 75f1f868dfee6796b671530513ae8ff3d3cbcc4e. Multiple records with the same (document type, case-normalized document number) are rejected before upload/submit; never print the document number in error text.
+- Synthetic regression added in 51ebb6ce72541dcf55d1f9cf814912f6ebff9d5f. No real merchant enrollment performed. Real bank and sector dynamic catalogs remain unverified/external; this test is not live merchant acceptance.
+- CI for this new source version must be checked by exact SHA; prior success for split-bill improvements is not a PASS for applyment.
