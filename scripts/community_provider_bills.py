@@ -32,7 +32,8 @@ def minor(value):
 
 def parse(raw):
     if type(raw) is not bytes or len(raw)>MAX_BYTES:raise ValueError('BOUNDED_PROVIDER_BILL_REQUIRED')
-    text=raw.decode('utf-8-sig')
+    try:text=raw.decode('utf-8-sig')
+    except UnicodeDecodeError:raise ValueError('INVALID_BILL_UTF8') from None
     if '\x00' in text:raise ValueError('INVALID_BILL_TEXT')
     rows=csv.reader(io.StringIO(text),strict=True)
     try:header=[v.removeprefix('`').strip() for v in next(rows)]
