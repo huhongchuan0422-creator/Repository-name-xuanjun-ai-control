@@ -732,6 +732,10 @@ class SitePreparationTests(unittest.TestCase):
         src=Path(__file__).resolve().parents[1]/'scripts';self.src=root/'source';self.src.mkdir(mode=0o700)
         (self.src/'transport.py').write_bytes((src/'p2_uk_swas_diagnostic.py').read_bytes())
         (self.src/'p2_swas_receipt_validator.py').write_bytes((src/'p2_swas_receipt_validator.py').read_bytes())
+        # Fixture uses this commit's transport bytes, while the reviewed site-kit
+        # production SOURCE_PINS remain frozen. Never relax the site's SHA check.
+        self.s.SOURCE_PINS=dict(self.s.SOURCE_PINS,
+            **{'transport.py':hashlib.sha256((self.src/'transport.py').read_bytes()).hexdigest()})
         self.attempt='fixture-site-attempt'
         self.baseline=self.s.preflight()
         self.baseline.update(hostname=self.s.HOST,uid=0,python=[3,6,8])
