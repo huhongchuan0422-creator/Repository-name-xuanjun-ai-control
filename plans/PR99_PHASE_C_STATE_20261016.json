@@ -287,7 +287,7 @@
   },
   "production_migration": "HOLD",
   "tokyo_retirement": "HOLD",
-  "owner_action_now": "RUN_PINNED_TEMPORARY_COPIED_ROOT_ISOLATED_START_ON_KOREA_ENTER_DOMESTIC_ROOT_PASSWORD",
+  "owner_action_now": "NONE_FOR_SERVER_PASSWORD_OR_COMMAND_COPY",
   "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
   "protected_not_modified_by_this_run": [
     "Phase-B installed17 files and unit transaction",
@@ -1073,7 +1073,7 @@
         "wire_sha256": "7b0c1dbde63482c10d02ff51081fd1cdee0d3f1c17b1fbd75ffe3b111e40ab4f"
       },
       "isolated_start": {
-        "status": "OWNER_V3_CONTACT_HEALTH200_PORTAL_CUSTOMER_SERVICE_MISSING_BRIDGE_PIN",
+        "status": "V4_THREE_ISOLATED_HEALTH200_PASS_RUNTIME_ACCEPTANCE_PENDING",
         "script": "evidence/pr99-service-handoff/s07-isolated-start/isolated_start.py",
         "source_commit": "bc0f6627d5593e7b3035d26e1c792c24c97bdcfc",
         "script_sha256": "4185dd98491d16d3c7f8c76eae9bcc9aeb515f0a5cbfbfa2a58f313224e5cda2",
@@ -1082,8 +1082,8 @@
         "local_checks": 13,
         "local_check_scope": "STATIC_COMMAND_COPY_MODE_CHECKS; CHROOT_UID_TRANSITION_SKIPPED_ENVIRONMENT_DENIED",
         "hosted_ci": "NOT_RUN_NOT_CLAIMED",
-        "host_execution": "OWNER_V3_PARTIAL_ISOLATED_RESULT_NOT_ACCEPTANCE",
-        "attempt": "/var/lib/xuanjun-pr99-s07-isolated-start-v3",
+        "host_execution": "REAL_SWAS_ROOT_THREE_APPS_ISOLATED_PASS",
+        "attempt": "/var/lib/xuanjun-pr99-s07-isolated-start-v4",
         "scope": "COPY79_SOURCE_165_MATERIAL_AND_VENV_NEW_CHROOT_NEW_MOUNT_NET_PID_NAMESPACE_LOW_UID_TEMP_THREE_APP_LAUNCH_THEN_STOP",
         "application_uid_gid": "65534:65534",
         "network": "REQUIRE_ONLY_LO_INTERFACE_NO_EXTERNAL_INTERFACE",
@@ -1102,7 +1102,7 @@
         "protected_state_unchanged": true,
         "missing_module": null,
         "source_closure_complete": false,
-        "next": "OWNER_AUTHENTIC_BRIDGE_MATERIALS_CURRENT124_HASH_CHECK_AND_V4_ISOLATED_VALIDATION",
+        "next": "PREPARE_CONSOLIDATED_RUNTIME_ACCEPTANCE_AND_FINAL_HANDOFF_PLAN_NO_PRODUCTION_CUTOVER",
         "closure_inventory": {
           "script": "evidence/pr99-service-handoff/s07-source-closure/inspect_closure.py",
           "source_commit": "4968b9a7a4780cb8169d58adb37841c38439a1c9",
@@ -1130,18 +1130,32 @@
         },
         "missing_file": "/opt/trading-system/runtime/v8-domestic-operations/internal-bridge/domestic_bridge_cert.sha256",
         "bridge_continuation": {
-          "status": "PREPARED_OWNER_EXECUTION_PENDING",
-          "script": "evidence/pr99-service-handoff/s07-source-closure/bridge_isolated_start.py",
-          "source_commit": "2363eed13fb99df6f9f80701a8c52eae5243bc21",
-          "sha256": "9cfbdae945c7cf0e9c36866d8a9de8e3f8b42ec30994fd162c5764994da5ea98",
+          "status": "EXECUTED_REAL_HOST_PASS_WITH_SCOPE_LIMITS",
+          "script": "evidence/pr99-service-handoff/s07-source-closure/bridge_directory_fixed.py",
+          "source_commit": "602b3c6e28ea2a9a77d2850d8fde18e5137c27c9",
+          "sha256": "ac6e64a2cf589b14b21bdab643060748862a7a711deb0bc29648632ccc6a7d9f",
           "attempt": "/var/lib/xuanjun-pr99-s07-isolated-start-v4",
           "authentic_material_scope": "AST_DEFAULTS_EXACT_TOP_LEVEL_BRIDGE_FILES_MAX8_64K_EACH_NO_RECURSION_NO_CERT_BYPASS",
-          "current_tokyo_source_hashes": "RECHECK124_BEFORE_COLLECTION_PENDING",
+          "current_tokyo_source_hashes": "PASS_124",
           "local_tests_run": 24,
           "local_passed": 23,
           "local_skipped": 1,
           "hosted_ci": "NOT_RUN_NOT_CLAIMED",
-          "production_service_actions": 0
+          "production_service_actions": 0,
+          "bridge_material_files": 2,
+          "transport": "KOREA_TO_TOKYO_AND_DOMESTIC_SWAS_PRIVATE_HOST_TO_HOST_NO_CI_MATERIAL",
+          "run": 38992581089,
+          "job": 117277978082,
+          "korea_invoke_id": "t-kor709ol1r4xvy8",
+          "application_processes_stopped": true,
+          "protected_state_unchanged": true,
+          "three_health_http_status": [
+            200,
+            200,
+            200
+          ],
+          "receipt": "evidence/pr99-service-handoff/aliyun-execution/s07-isolated-v4-20261017.json",
+          "attempt_consumed_no_replay": true
         }
       }
     }
@@ -1272,5 +1286,13 @@
       "read_back": true,
       "decision": "PASS_WITH_SCOPE_LIMITS_6217422554"
     }
+  },
+  "four_host_ram_execution": {
+    "status": "REAL_FOUR_HOST_ROOT_IDENTITY_PASS",
+    "run": 38991455661,
+    "job": 117275780078,
+    "receipt": "evidence/pr99-service-handoff/aliyun-execution/four-host-identity-20261017.json",
+    "handoff": "docs/ALIYUN_FOUR_HOST_EXECUTION_HANDOFF_20261017.md",
+    "secrets": "ORIGINAL_REPOSITORY_ACTIONS_SECRETS_ONLY_NO_VALUES_EXPORTED"
   }
 }
