@@ -7,6 +7,12 @@ on:
       - scripts/pr122_community_experience_package.py
       - demos/xuanjun-site-hub/**
       - demos/work-community-experience/**
+      - docs/legal/**
+      - demos/legal/**
+      - scripts/build_legal_previews.py
+      - tests/test_legal_contract_center.py
+      - tests/test_legal_static_alignment.py
+      - tests/test_single_contract_consistency.py
       - tests/test_pr122_ecology_copy.py
       - tests/test_pr122_public_copy_audit.py
       - tests/test_pr122_role_navigation.py
@@ -38,6 +44,14 @@ jobs:
           python -m unittest tests.test_pr122_ecology_copy tests.test_pr122_public_copy_audit tests.test_pr122_role_navigation tests.test_pr122_navigation_stage -v
           node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs tests/ecv-quote-fractional.test.cjs
           node tests/pr122_role_navigation.cjs
+      - name: Legal draft alignment, 16 offline checks and clean regeneration
+        run: |
+          set -euo pipefail
+          python scripts/build_legal_previews.py
+          git diff --exit-code -- demos/legal
+          test -z "$(git ls-files --others --exclude-standard -- demos/legal)"
+          python -m unittest tests.test_legal_contract_center tests.test_legal_static_alignment tests.test_single_contract_consistency -v
+          git diff --exit-code -- demos/legal
       - name: Reproduce the pinned historical mobile package without changing release pins
         run: |
           git fetch --depth=1 origin 790937a5c96afcf3b3660e36cf36cfaab2002a72
@@ -61,7 +75,7 @@ jobs:
           python - <<'PYCODE'
           import gzip,hashlib,io,json,os,subprocess,tarfile
           from pathlib import Path
-          paths=['.github/workflows/pr122-website-copy-navigation-review.yml', 'demos/legal/service-package-rights.html', 'demos/work-community-experience/role.js', 'demos/xuanjun-site-hub/assets/ecv-quote-ui.js', 'demos/xuanjun-site-hub/assets/ecv-quote.js', 'demos/xuanjun-site-hub/assets/ecv-quote.test.cjs', 'demos/xuanjun-site-hub/customer/projects/index.html', 'demos/xuanjun-site-hub/marketplace/index.html', 'demos/xuanjun-site-hub/visual/community-payment/index.html', 'docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md', 'scripts/pr122_community_experience_package.py', 'scripts/pr122_site_hub_english.py', 'scripts/pr122_site_hub_public_copy.py', 'scripts/pr122_site_hub_stage.py', 'scripts/pr122_site_hub_unified_package.py', 'tests/ecv-quote-fractional.test.cjs', 'tests/fixtures/pr122-public-copy-evidence.json', 'tests/fixtures/pr122-site-shell/PINS.json', 'tests/fixtures/pr122-site-shell/custom-ai/index.html', 'tests/fixtures/pr122-site-shell/en/custom-ai/index.html', 'tests/fixtures/pr122-site-shell/zh-cn/custom-ai/index.html', 'tests/pr122_ecology_browser.cjs', 'tests/pr122_role_navigation.cjs', 'tests/pr122_role_navigation_browser.cjs', 'tests/test_pr122_ecology_copy.py', 'tests/test_pr122_navigation_stage.py', 'tests/test_pr122_public_copy_audit.py', 'tests/test_pr122_role_navigation.py', 'tests/test_pr122_site_hub_unified_package.py']
+          paths=['.github/workflows/pr122-website-copy-navigation-review.yml', 'demos/legal/service-package-rights.html', 'demos/work-community-experience/role.js', 'demos/xuanjun-site-hub/assets/ecv-quote-ui.js', 'demos/xuanjun-site-hub/assets/ecv-quote.js', 'demos/xuanjun-site-hub/assets/ecv-quote.test.cjs', 'demos/xuanjun-site-hub/customer/projects/index.html', 'demos/xuanjun-site-hub/marketplace/index.html', 'demos/xuanjun-site-hub/visual/community-payment/index.html', 'docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md', 'scripts/pr122_community_experience_package.py', 'scripts/pr122_site_hub_english.py', 'scripts/pr122_site_hub_public_copy.py', 'scripts/pr122_site_hub_stage.py', 'scripts/pr122_site_hub_unified_package.py', 'tests/ecv-quote-fractional.test.cjs', 'tests/fixtures/pr122-public-copy-evidence.json', 'tests/fixtures/pr122-site-shell/PINS.json', 'tests/fixtures/pr122-site-shell/custom-ai/index.html', 'tests/fixtures/pr122-site-shell/en/custom-ai/index.html', 'tests/fixtures/pr122-site-shell/zh-cn/custom-ai/index.html', 'tests/pr122_ecology_browser.cjs', 'tests/pr122_role_navigation.cjs', 'tests/pr122_role_navigation_browser.cjs', 'tests/test_pr122_ecology_copy.py', 'tests/test_pr122_navigation_stage.py', 'tests/test_pr122_public_copy_audit.py', 'tests/test_pr122_role_navigation.py', 'tests/test_pr122_site_hub_unified_package.py', 'demos/legal/custom-development.html', 'demos/legal/custom-sow.html', 'demos/legal/index.html', 'docs/legal/registry.json', 'docs/legal/templates/custom-development.md', 'docs/legal/templates/custom-sow.md', 'docs/legal/templates/service-package-rights.md', 'scripts/build_legal_previews.py', 'tests/test_legal_contract_center.py', 'tests/test_legal_static_alignment.py', 'tests/test_single_contract_consistency.py']
           files={name:Path(name).read_bytes() for name in paths}
           manifest={'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'scope':'CURRENT_WEBSITE_SYNTHETIC_REVIEW_ONLY','production_release':'HOLD','target_host_commands':'NOT_EXECUTED','files':[{'path':name,'size':len(raw),'sha256':hashlib.sha256(raw).hexdigest()} for name,raw in sorted(files.items())]}
           raw=(json.dumps(manifest,ensure_ascii=False,sort_keys=True,indent=2)+'\n').encode();files['SOURCE_MANIFEST.json']=raw
