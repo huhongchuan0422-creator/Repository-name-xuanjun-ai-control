@@ -121,3 +121,9 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - WeChat applyment GET must never replace a previously saved provider_sub_mchid for the same original application; code 3adb2b1e2398bb0d53e8d4589c20cabff93b10ed, isolated regression 15d3193145efae708e0eec26dc358d9e10137805.
 - Running hosted source test for these exact commits, latest run 39031390137. Never imply live WeChat signature tested: the new identity-conflict test stubs provider transport. No production mutation; all original security gates remain unchanged.
 - Next independent work remains detailed official partner bill format adaptation, broad merchant/consumer/platform E2E, and verified CRM/Finance external admission; 5 Phase-1 and 7 Phase-2 large groups are still PARTIAL, not 0% or completed.
+
+## 2026-10-17 WeChat submerchant post-submit recovery increment
+
+- Exact original persisted application intent (business_code, SUBMISSION_UNKNOWN state, version) is now required before storing the response of the once-only real-merchant POST. Source commits e7e04d9ebb83102c1c046f7668fdb8b94d15a7b6 and 63ace04366dc4b6d812ba6175757dee5ed7796cb; regression tests 46385aa871f7efc192dd744ff005d986ce202dc7. Mismatch remains UNKNOWN/QUERY_ONLY and never blind resubmits.
+- Original production submit_enabled gate stays false by default; no merchant profile, financial receipt, or production grant was added. In-flight responses and terminal states are protected without treating synthetic test stubs as live WeChat evidence.
+- Latest exact source CI run https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39031635282; confirm terminal result before stating PASS. Remaining Phase1/2 groups PARTIAL.
