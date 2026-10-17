@@ -4,7 +4,7 @@ Not an execution permit. This module never dispatches a cloud request.
 import hashlib
 import re
 
-COMMAND = "#!/bin/bash\nset -euo pipefail\nexport LC_ALL=C\nexport PYTHONDONTWRITEBYTECODE=1\nprintf 'DIAG_SCHEMA=1\\n'\nprintf 'TARGET_HOST='; /bin/hostname -s\nif [ \"$(/bin/hostname -s)\" != 'iZd7oeikknn1z21sq6ji6zZ' ]; then printf 'STOP=HOST_MISMATCH\\n'; exit 40; fi\nprintf 'EXEC_UID='; /usr/bin/id -u\nprintf 'PYTHON_VERSION='; /usr/bin/python3 -I -B -c 'import sys; print(\"%d.%d.%d\" % sys.version_info[:3])'\nprintf 'CGROUP_MOUNT_TYPE='; /usr/bin/stat -fc '%T' /sys/fs/cgroup\nprintf 'CGROUP_PROC_SELF='; /usr/bin/awk -F: 'NR<=6 {print $1 \":\" $2}' /proc/self/cgroup\nsite='/usr/local/libexec/xuanjun-p2-site/P2_SITE_ENTRY.py'\nprintf 'SITE_PATH=%s\\n' \"$site\"\nif [ -L \"$site\" ]; then printf 'STOP=SITE_SYMLINK\\n'; exit 41; fi\nif [ -f \"$site\" ]; then\n  /usr/bin/stat -c 'SITE_UID=%u SITE_GID=%g SITE_MODE=%a SITE_SIZE=%s' -- \"$site\"\n  /usr/bin/sha256sum -- \"$site\" | /usr/bin/awk '{print \"SITE_SHA256=\" $1}'\nelse\n  printf 'SITE_STATUS=ABSENT\\n'\nfi\nfor unit in xuanjun-stage1-minimal.service openclaw.service xuanjun-owner-callback.service xuanjun-owner-dashboard.service; do\n  printf 'UNIT=%s\\n' \"$unit\"\n  /bin/systemctl show --no-pager --property=LoadState,ActiveState,SubState,MainPID,UnitFileState -- \"$unit\" | /usr/bin/grep -E '^(LoadState|ActiveState|SubState|MainPID|UnitFileState)=' || true\ndone\nfor path in /home/xuanjun_dev/uk-stage1-minimal/state.sqlite /home/xuanjun_dev/uk-stage1-minimal/state.sqlite-wal /home/xuanjun_dev/uk-stage1-minimal/state.sqlite-shm; do\n  if [ -e \"$path\" ]; then\n    /usr/bin/stat -c 'DB_FILE=%n UID=%u GID=%g MODE=%a SIZE=%s' -- \"$path\"\n  else\n    printf 'DB_FILE_ABSENT=%s\\n' \"$path\"\n  fi\ndone\nprintf 'CANONICAL_WRITER=UNKNOWN\\nEPOCH=UNKNOWN\\nLEASE=UNKNOWN\\nFENCE=UNKNOWN\\nROOT_TRUST=UNKNOWN\\nHISTORICAL_INVOKEID=UNKNOWN\\n'\nprintf 'DIAG_END=COMPLETE\\n'\n".encode('utf-8')
+COMMAND = "#!/bin/bash\nset -euo pipefail\nexport LC_ALL=C\nexport PYTHONDONTWRITEBYTECODE=1\nprintf 'DIAG_SCHEMA=1\n'\nprintf 'TARGET_HOST='; /bin/hostname -s\nif [ \"$(/bin/hostname -s)\" != 'iZd7oeikknn1z21sq6ji6zZ' ]; then printf 'STOP=HOST_MISMATCH\n'; exit 40; fi\nprintf 'EXEC_UID='; /usr/bin/id -u\nprintf 'PYTHON_VERSION='; /usr/bin/python3 -I -B -c 'import sys; print(\"%d.%d.%d\" % sys.version_info[:3])'\nprintf 'CGROUP_MOUNT_TYPE='; /usr/bin/stat -fc '%T' /sys/fs/cgroup\nprintf 'CGROUP_PROC_SELF='; /usr/bin/awk -F: 'NR<=6 {print $1 \":\" $2}' /proc/self/cgroup\nsite='/usr/local/libexec/xuanjun-p2-site/P2_SITE_ENTRY.py'\nprintf 'SITE_PATH=%s\n' \"$site\"\nif [ -L \"$site\" ]; then printf 'STOP=SITE_SYMLINK\n'; exit 41; fi\nif [ -f \"$site\" ]; then\n  /usr/bin/stat -c 'SITE_UID=%u SITE_GID=%g SITE_MODE=%a SITE_SIZE=%s' -- \"$site\"\n  /usr/bin/sha256sum -- \"$site\" | /usr/bin/awk '{print \"SITE_SHA256=\" $1}'\nelse\n  printf 'SITE_STATUS=ABSENT\n'\nfi\nfor unit in xuanjun-stage1-minimal.service openclaw.service xuanjun-owner-callback.service xuanjun-owner-dashboard.service; do\n  printf 'UNIT=%s\n' \"$unit\"\n  /bin/systemctl show --no-pager --property=LoadState,ActiveState,SubState,MainPID,UnitFileState -- \"$unit\" | /usr/bin/grep -E '^(LoadState|ActiveState|SubState|MainPID|UnitFileState)=' || true\ndone\nfor path in /home/xuanjun_dev/uk-stage1-minimal/state.sqlite /home/xuanjun_dev/uk-stage1-minimal/state.sqlite-wal /home/xuanjun_dev/uk-stage1-minimal/state.sqlite-shm; do\n  if [ -e \"$path\" ]; then\n    /usr/bin/stat -c 'DB_FILE=%n UID=%u GID=%g MODE=%a SIZE=%s' -- \"$path\"\n  else\n    printf 'DB_FILE_ABSENT=%s\n' \"$path\"\n  fi\ndone\nprintf 'CANONICAL_WRITER=UNKNOWN\nEPOCH=UNKNOWN\nLEASE=UNKNOWN\nFENCE=UNKNOWN\nROOT_TRUST=UNKNOWN\nHISTORICAL_INVOKEID=UNKNOWN\n'\nprintf 'DIAG_END=COMPLETE\n'\n".encode('utf-8')
 COMMAND_SHA256 = '523f3ba132b94efec8bf81980d9db96e083e4779628a29b6540a8bcee67d2794'
 TARGET_HOST = 'iZd7oeikknn1z21sq6ji6zZ'
 TARGET_REGION = 'eu-west-1'
@@ -43,8 +43,8 @@ def safe_receipt(output, stderr='', exit_code=0):
     require(type(output) is str and type(stderr) is str and stderr == '')
     require(type(exit_code) is int and exit_code == 0)
     raw=output.encode('utf-8')
-    require(len(raw) <= MAX_OUTPUT_BYTES and raw.endswith(b'\\n'))
-    require(b'\\r' not in raw and b'\\x00' not in raw)
+    require(len(raw) <= MAX_OUTPUT_BYTES and raw.endswith(b'\n'))
+    require(b'\r' not in raw and b'\x00' not in raw)
     rows=output.splitlines()
     require(25 <= len(rows) <= 75)
     pos=0
@@ -70,7 +70,7 @@ def safe_receipt(output, stderr='', exit_code=0):
     take('DIAG_SCHEMA=1')
     take('TARGET_HOST='+TARGET_HOST)
     take('EXEC_UID=0')
-    key('PYTHON_VERSION',lambda x: re.fullmatch(r'3\\.6\\.[0-9]{1,3}',x) is not None)
+    key('PYTHON_VERSION',lambda x: re.fullmatch(r'3\.6\.[0-9]{1,3}',x) is not None)
     key('CGROUP_MOUNT_TYPE',lambda x:x in ('tmpfs','cgroup2fs'))
     # The fixed awk command prefixes only its first record; following v1
     # controller rows can contain commas, and name=systemd is legal.
