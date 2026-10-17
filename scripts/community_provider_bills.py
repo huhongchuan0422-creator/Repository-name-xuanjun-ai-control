@@ -110,6 +110,9 @@ class ProviderBills:
             records=[]
             for ref,payload in rows[:50]:
                 saved=json.loads(c.decrypt(payload,'community-bill-reconciliation:'+ref))
+                if type(saved) is dict and 'bill_key' in saved and 'result' in saved:
+                    digest=hashlib.sha256(canonical([saved['bill_key'],saved['result']])).hexdigest()
+                    if digest!=ref:raise ValueError('BILL_AUDIT_INTEGRITY_CHANGED')
                 if (type(saved) is dict and saved.get('bill_key')==key
                         and saved.get('kind')==p['kind'] and saved.get('bill_date')==p['bill_date']
                         and saved.get('scope')==g['scope']):
