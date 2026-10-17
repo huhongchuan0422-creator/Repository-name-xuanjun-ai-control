@@ -82,7 +82,8 @@
           "tests/test_community_provider_notification_http.py",
           "tests/test_community_stage_roles.py",
           "tests/test_community_refund_execution_recovery.py",
-          "tests/test_community_provider_terminal_binding.py"
+          "tests/test_community_provider_terminal_binding.py",
+          "tests/test_community_owned_receipt_ad.py"
         ]
       },
       "reuse": [
