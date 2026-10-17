@@ -33,6 +33,8 @@ class MerchantWorkbenchBrowser(unittest.TestCase):
                     page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
                     page.goto('http://127.0.0.1:'+str(server.server_port)+'/merchant/workbench')
                     page.evaluate('(csrf)=>configureCommunityWorkbench({csrf,workspace:"merchant"})',web['csrf'])
+                    self.assertTrue(page.locator('#billAudit').count()==1)
+                    self.assertTrue(page.locator('#billResult').count()==1)
                     page.locator('#loadSettings').click();expect(page.locator('#notice')).to_have_text('操作完成')
                     page.locator('#name').fill('实际工作台编辑测试');page.locator('#profileStatus').select_option('PAUSED')
                     page.locator('#profileForm button').click();expect(page.locator('#notice')).to_have_text('操作完成')
