@@ -1,13 +1,13 @@
 {
-  "source_commit": "749f3f7724b0f7c878607629ef4d0f07439d21d6",
-  "source_tree": "1663b067d5780e1c65222b97d6028910dd404f9c",
-  "run_id": 39010490183,
+  "source_commit": "e52b26f37a5f5a910cfb8804d373dc42b2bf771a",
+  "source_tree": "d49985fb4dd0ec3503c75661a04283eb3bc28f22",
+  "run_id": 39010884122,
   "hosted": {
-    "job_id": 117331807351,
-    "community_python": 283,
+    "job_id": 117332975914,
+    "community_python": 294,
     "stage5_python": 342,
     "javascript": 72,
-    "total_test_executions": 697,
+    "total_test_executions": 708,
     "status": "SUCCESS",
     "failed": 0,
     "skipped": 0,
@@ -15,10 +15,10 @@
     "cryptography": "50.0.2"
   },
   "domestic_isolated": {
-    "job_id": 117332090776,
+    "job_id": 117333201305,
     "host": "iZvt5t8tlrm8oiZ",
     "uid": 1002,
-    "tests": 95,
+    "tests": 106,
     "status": "PASS",
     "failed": 0,
     "skipped": 0,
@@ -32,15 +32,15 @@
     "overlaps_hosted_suites": true
   },
   "source_artifact": {
-    "id": 12092038898,
-    "outer_zip_sha256": "f636c89cf71cf9a4037810b9600dae2c358536184b45dd5d16a19e02352ca5ce",
-    "inner_zip_sha256": "59e88a3c094cd87597a1bc693bec293c0973b3a82be9470bcc2688efccac39f8",
-    "inner_zip_bytes": 854126,
-    "manifest_files_verified": 154
+    "id": 12092693276,
+    "outer_zip_sha256": "128eacc2b57133c12c31af86cc4418b8e806a850ca325cd0c87d87c166d6d940",
+    "inner_zip_sha256": "d0d6b3baf82898fc83fe99197fd850df7c27d1b59b4f671e4ba332ce8ad5a6ee",
+    "inner_zip_bytes": 867751,
+    "manifest_files_verified": 156
   },
   "domestic_artifact": {
-    "id": 12092427516,
-    "outer_zip_sha256": "88cb61a1d1bedfd0bbf85fc229e47bad0c0b997a73f4bf30f48b5b7cf7202891",
+    "id": 12092733275,
+    "outer_zip_sha256": "8bd5a7a4fa11f70b9d87778a0e1b0a885a2bfe6b3fd1648e166f557432527418",
     "receipt_head_verified": true
   },
   "reused_native_preview": {
@@ -73,5 +73,5 @@
     "Original production deployment and DB migration/recovery gates; no parallel host writer"
   ],
   "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance",
-  "latest_fix": "Inactive COMMUNITY_ORDER binding denies receipt immediately and after Center reopen; reservation remains unavailable to another customer."
+  "latest_fix": "Signed notification and signed single-GET order query cross-check; original pending Finance evidence only, 11 added tests include collision, concurrent reopen and interrupted match recovery. No authoritative Finance confirmation or production acceptance."
 }
