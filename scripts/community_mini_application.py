@@ -23,6 +23,8 @@ class MiniApplication:
         self.fulfillment=None
         self.provider_actions=None
         self.communities=None
+        self.commerce=None
+        self.notifications=None
         self._socket=None
         self.center=center
         try:
@@ -38,8 +40,23 @@ class MiniApplication:
         """Loopback backend for the admitted HTTPS host; never a public bind."""
         if self.server is not None:
             raise ValueError('ALREADY_LISTENING')
-        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,communities=self.communities)
+        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,communities=self.communities,commerce=self.commerce,notifications=self.notifications)
         return self.server
+
+    def configure_payment_notifications(self,api_v3_key,path='/wechat/community/notify'):
+        if self.server is not None or self.notifications is not None or getattr(self.gateway,'payments',None) is None:
+            raise ValueError('ORIGINAL_PAYMENTS_REQUIRED_BEFORE_NOTIFICATIONS')
+        from scripts.community_payment_notifications import PaymentNotifications
+        self.notifications=PaymentNotifications(self.gateway.payments,api_v3_key,path)
+        return self.notifications
+
+    def configure_commerce(self):
+        if self.server is not None or self.commerce is not None or self.operations is None:
+            raise ValueError('ORIGINAL_OPERATIONS_REQUIRED_BEFORE_COMMERCE')
+        from scripts.community_commerce import Commerce
+        self.commerce=Commerce(self.operations,self.identity)
+        self.gateway.commerce=self.commerce
+        return self.commerce
 
     def configure_communities(self,grants):
         if self.server is not None or self.communities is not None:
@@ -137,7 +154,7 @@ class MiniApplication:
         if (parent.st_gid!=nginx_gid or
                 (nginx_uid!=os.geteuid() and parent.st_mode & 0o050 != 0o050)):
             raise PermissionError('NGINX_SOCKET_DIRECTORY_TRAVERSAL_REQUIRED')
-        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,communities=self.communities)
+        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,communities=self.communities,commerce=self.commerce,notifications=self.notifications)
         class Server(socketserver.UnixStreamServer):request_queue_size=128
         server=Server(str(path),handler)
         info=path.lstat();self._socket=(path,info.st_dev,info.st_ino)

@@ -188,7 +188,13 @@ class MiniGateway:
         operation, params = body['operation'], body['params']
         if type(operation) is not str or type(params) is not dict:
             raise ValueError('INVALID_BUSINESS_REQUEST')
+        if operation.startswith('commerce.'):
+            commerce=getattr(self,'commerce',None)
+            if commerce is None:raise PermissionError('COMMERCE_NOT_CONFIGURED')
+            return commerce.consumer(token,scene,operation[len('commerce.'):],params)
         if operation == 'community.checkout':
+            if getattr(self,'commerce',None) is not None:
+                raise PermissionError('SERVER_PRICED_BASKET_REQUIRED')
             if set(params) != {'context','token','reference','amount_minor'}:
                 raise ValueError('INVALID_CHECKOUT_FIELDS')
             payment_amount(params['amount_minor'],'CNY',params['reference'])

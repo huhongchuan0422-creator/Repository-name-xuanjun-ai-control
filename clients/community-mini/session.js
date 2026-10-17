@@ -44,6 +44,15 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       // Business remains explicitly simulated even when WeChat login is real.
       return {offline_only:true,result:reply.result};
     },
+    async commerce(scene, operation, params) {
+      if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
+      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||!['products','purchase','purchase_read'].includes(operation))throw Error('INVALID_COMMERCE_REQUEST');
+      const version=generation;
+      const reply=await request('/mini/api',{scene,operation:'commerce.'+operation,params},token);
+      if(version!==generation)throw Error('STALE_SESSION');
+      if(!reply||!reply.result||reply.payment_enabled!==false)throw Error('UNTRUSTED_COMMERCE_REPLY');
+      return reply.result;
+    },
     async payment(scene, operation, reference) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
       if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||

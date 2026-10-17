@@ -70,6 +70,17 @@ class MiniPayments:
             _,_,principal=self.identity._resolve(token,scene)
             if state(self.identity.runtime.demo.db,self.identity.runtime.bindings[principal],reference)['state']!='PENDING':raise PermissionError('PAYMENT_ALREADY_TERMINAL_QUERY_ONLY')
         if body['operation']=='prepare':
+            from scripts.pr122_customer_core import canonical
+            _,_,principal=self.identity._resolve(token,scene)
+            original_scope=self.identity.runtime.bindings[principal]
+            expected=dict(sp_mchid=self.prepay.reader._mchid,sp_appid=b['sp_appid'],sub_mchid=b['sub_mchid'],out_trade_no=b['out_trade_no'],amount_minor=b['amount_minor'],currency='CNY')
+            callback_key=c.idx('community-payment-notify:'+self.prepay.reader._mchid+':'+b['out_trade_no'])
+            callback_binding=dict(user_id=b['user_id'],project=b['project'],scope=original_scope,reference=reference,expected=expected)
+            with c.tx():
+                old=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PAYMENT_BINDING' AND subject_idx=? AND active=1",(callback_key,)).fetchone()
+                if old:
+                    if json.loads(c.decrypt(old[0],'community-payment-binding:'+callback_key))!=callback_binding:raise PermissionError('PAYMENT_CALLBACK_BINDING_COLLISION')
+                else:c.db.execute("INSERT INTO links VALUES('COMMUNITY_PAYMENT_BINDING',?,?,?,?,1)",(callback_key,b['user_id'],b['project'],c.encrypt(canonical(callback_binding),'community-payment-binding:'+callback_key)))
             result=self.prepay._create_authorized(b,authorize)
         elif body['operation']=='recover':
             result=self.prepay._existing_authorized(b,authorize)

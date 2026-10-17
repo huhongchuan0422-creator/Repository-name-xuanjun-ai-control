@@ -181,7 +181,9 @@
         "scripts/community_center_communities.py",
         "scripts/community_split_rules.py",
         "demos/community-stage/communities.html",
-        "demos/community-stage/communities.js"
+        "demos/community-stage/communities.js",
+        "scripts/community_commerce.py",
+        "scripts/community_payment_notifications.py"
       ]
     },
     {

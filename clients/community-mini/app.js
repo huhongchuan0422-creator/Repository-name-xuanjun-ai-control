@@ -7,9 +7,9 @@ App({
         typeof token !== 'string' || token.length < 32) throw Error('LOCAL_CONFIG_REQUIRED');
     this.globalData = {baseUrl, token, mode: 'OFFLINE'};
   },
-  configureService(baseUrl, payments=false) {
+  configureService(baseUrl, payments=false, commerce=false) {
     if (!/^https:\/\/[A-Za-z0-9.-]+$/.test(baseUrl)) throw Error('HTTPS_BACKEND_REQUIRED');
-    if(typeof payments!=='boolean')throw Error('INVALID_PAYMENT_CONFIGURATION');
-    this.globalData = {baseUrl, token: '', mode: 'WECHAT_LOGIN', payments};
+    if(typeof payments!=='boolean'||typeof commerce!=='boolean')throw Error('INVALID_PAYMENT_CONFIGURATION');
+    this.globalData = {baseUrl, token: '', mode: 'WECHAT_LOGIN', payments, commerce};
   }
 });

@@ -12,7 +12,15 @@ from scripts.community_demo_api import _HeaderDeadlineReader
 from scripts.community_mini_login import LoginUnavailable
 
 
-def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None):
+def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None,commerce=None,notifications=None):
+    if notifications is not None:
+        from scripts.community_payment_notifications import PaymentNotifications
+        if type(notifications) is not PaymentNotifications or notifications.payments is not getattr(gateway,'payments',None):
+            raise ValueError('SAME_ORIGINAL_PAYMENT_NOTIFICATIONS_REQUIRED')
+    if commerce is not None:
+        from scripts.community_commerce import Commerce
+        if type(commerce) is not Commerce or commerce.identity is not gateway.identity:
+            raise ValueError('SAME_ORIGINAL_COMMERCE_REQUIRED')
     if communities is not None:
         from scripts.community_center_communities import CenterCommunities
         if type(communities) is not CenterCommunities or communities.center is not getattr(gateway.identity,'center',None):
@@ -112,7 +120,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     self.path=='/customer/saas-api' and saas is not None) and not (
                     self.path=='/community/fulfillment' and fulfillment is not None) and not (
                     self.path=='/community/provider-actions' and provider_actions is not None) and not (
-                    self.path=='/community/directory' and communities is not None):
+                    self.path=='/community/directory' and communities is not None) and not (
+                    self.path=='/community/commerce' and commerce is not None) and not (
+                    notifications is not None and self.path==notifications.path):
                 return self.answer(404,{'error':'NOT_FOUND'})
             if (self.headers.get('Transfer-Encoding') is not None or
                     len(self.headers.get_all('Content-Length',[])) != 1 or
@@ -123,11 +133,11 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 return self.answer(415,{'error':'JSON_REQUIRED'})
             try:
                 length=int(self.headers.get('Content-Length','-1'))
-                limit=7_000_000 if self.path=='/merchant/onboarding' else 16384
+                limit=7_000_000 if self.path=='/merchant/onboarding' else 1048576 if notifications is not None and self.path==notifications.path else 16384
                 if not 0 < length <= limit:raise ValueError('INVALID_LENGTH')
                 session=self.headers.get('X-Center-Session','')
                 csrf=self.headers.get('X-Center-CSRF','')
-                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions','/community/directory'):
+                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions','/community/directory','/community/commerce'):
                     cookies=[part.strip().partition('=')[2] for part in self.headers.get('Cookie','').split(';')
                              if part.strip().partition('=')[0]=='__Host-xj_customer']
                     if len(cookies)>1 or cookies and session or csrf and self.headers.get('X-CSRF-Token'):
@@ -137,7 +147,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     # Authenticate before accepting a large private upload body.
                     if session:
                         if not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions,'/community/directory':communities}[self.path].center.session(session,csrf)
+                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions,'/community/directory':communities,'/community/commerce':commerce}[self.path].center.session(session,csrf)
                     elif length>16384:raise PermissionError('CENTER_SESSION_REQUIRED')
                 remaining=length;chunks=[];deadline=time.monotonic()+1
                 while remaining:
@@ -147,6 +157,16 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     part=self.rfile.read1(remaining)
                     if not part:raise ValueError('TRUNCATED_BODY')
                     chunks.append(part);remaining-=len(part)
+                if notifications is not None and self.path==notifications.path:
+                    if self.headers.get_all('Origin',[]) or self.headers.get('Cookie') or self.headers.get('X-Community-Session') or session or csrf:
+                        raise PermissionError('PROVIDER_NOTIFICATION_ONLY')
+                    if self.headers.get('Content-Type','').split(';')[0].strip().lower()!='application/json':raise ValueError('JSON_NOTIFICATION_REQUIRED')
+                    headers={}
+                    for name,value in self.headers.items():
+                        if name.lower() in headers:raise ValueError('DUPLICATE_PROVIDER_HEADER')
+                        headers[name.lower()]=value
+                    notifications.receive(headers,b''.join(chunks))
+                    return self.answer(200,{'code':'SUCCESS','message':'成功'})
                 def pairs(items):
                     result={}
                     for k,v in items:
@@ -167,6 +187,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if self.path=='/merchant/onboarding':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=onboarding.dispatch(session,csrf,body)
+                elif self.path=='/community/commerce':
+                    if token:raise PermissionError('CENTER_SESSION_REQUIRED')
+                    result=commerce.dispatch(session,csrf,body)
                 elif self.path=='/community/directory':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=communities.dispatch(session,csrf,body)
@@ -202,6 +225,6 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
     return Handler
 
 
-def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None):
+def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None,commerce=None,notifications=None):
     if type(port) is not int or not (port==0 or 1024 <= port <= 65535):raise ValueError('INVALID_PORT')
-    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas,fulfillment=fulfillment,provider_actions=provider_actions,communities=communities))
+    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas,fulfillment=fulfillment,provider_actions=provider_actions,communities=communities,commerce=commerce,notifications=notifications))

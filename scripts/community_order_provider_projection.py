@@ -20,7 +20,7 @@ def provider_evidence(db,identity,reference):
     for target,raw in db.execute('SELECT to_state,evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=? ORDER BY rowid',(t,m,s,reference)):
         try:value=json.loads(raw)
         except (ValueError,TypeError):continue
-        if (type(value) is dict and value.get('source') in ('WECHAT_SIGNED_ORDER_QUERY','WECHAT_SIGNED_REFUND_RESULT')
+        if (type(value) is dict and value.get('source') in ('WECHAT_SIGNED_ORDER_QUERY','WECHAT_SIGNED_PAYMENT_NOTIFICATION','WECHAT_SIGNED_REFUND_RESULT')
                 and target==row[0] and value.get('transaction_id')==row[1]
                 and type(value.get('body_sha256')) is str and len(value['body_sha256'])==64):evidence=value
     return evidence
@@ -31,7 +31,7 @@ def project_verified_query(db,identity,reference,expected,observation,at,key_id)
     t,m,s=scope(identity)
     if not valid_id(reference) or type(at) is not int or at<0:raise ValueError('INVALID_PROVIDER_PROJECTION')
     if (type(expected) is not dict or type(observation) is not dict
-            or observation.get('source')!='SIGNED_PROVIDER_ORDER_QUERY'
+            or observation.get('source') not in ('SIGNED_PROVIDER_ORDER_QUERY','SIGNED_PROVIDER_NOTIFICATION')
             or observation.get('signature_key_id')!=key_id
             or observation.get('out_trade_no')!=expected['out_trade_no']
             or observation.get('amount_minor')!=expected['amount_minor'] or observation.get('currency')!='CNY'):
@@ -44,14 +44,14 @@ def project_verified_query(db,identity,reference,expected,observation,at,key_id)
     body_hash=observation.get('body_sha256')
     if type(body_hash) is not str or len(body_hash)!=64:raise ValueError('SIGNED_BODY_HASH_REQUIRED')
     event='wp_'+hashlib.sha256(canonical([expected['sp_mchid'],expected['sub_mchid'],expected['out_trade_no'],target,tx])).hexdigest()[:48]
-    evidence=dict(source='WECHAT_SIGNED_ORDER_QUERY',body_sha256=body_hash,transaction_id=tx,provider_state=provider_state,observed_at=at)
+    evidence=dict(source='WECHAT_SIGNED_PAYMENT_NOTIFICATION' if observation['source']=='SIGNED_PROVIDER_NOTIFICATION' else 'WECHAT_SIGNED_ORDER_QUERY',body_sha256=body_hash,transaction_id=tx,provider_state=provider_state,observed_at=at)
     if db.in_transaction:raise ValueError('EXTERNAL_ORDER_TRANSACTION_DENIED')
     db.execute('BEGIN IMMEDIATE')
     try:
         order=state(db,identity,reference)
         if order['amount_minor']!=expected['amount_minor'] or order['currency']!='CNY':raise PermissionError('ORIGINAL_ORDER_AMOUNT_CHANGED')
         prior=db.execute('SELECT tenant_id,merchant_id,store_id,reference,to_state FROM order_events WHERE event_id=?',(event,)).fetchone()
-        if order['state']=='REFUNDED' and provider_state=='REFUND' and provider_evidence(db,identity,reference) is not None and order['provider_transaction_id']==tx:
+        if order['state']=='REFUNDED' and provider_state in ('SUCCESS','REFUND') and provider_evidence(db,identity,reference) is not None and order['provider_transaction_id']==tx:
             db.commit();return dict(changed=False,provider_state=provider_state)
         if prior:
             if tuple(prior)!=(t,m,s,reference,target) or order['state']!=target or order['provider_transaction_id']!=tx:raise ValueError('PROVIDER_EVENT_COLLISION')

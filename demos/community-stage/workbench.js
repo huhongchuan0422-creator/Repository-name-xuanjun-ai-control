@@ -1,7 +1,7 @@
 'use strict';
 (()=>{
  const $=id=>document.getElementById(id);let epoch=0,config=null,busy=false,profileVersion=null,orderCursor=null,orderAfter='',reportCursor=null,reportWindow=null,adCursor=null;
- const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;};
+ const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;};
  const status=message=>{$('notice').textContent=message;};
  window.configureCommunityWorkbench=value=>{
   epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,providerWorkspace:typeof value.providerWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.providerWorkspace)?value.providerWorkspace:null}:null;
@@ -59,5 +59,8 @@
  $('freezeRule').onclick=()=>action(t=>providerAction(t,'rule_freeze',{reference:$('providerOrder').value}));
  $('snapshotRule').onclick=()=>action(t=>providerAction(t,'rule_snapshot',{reference:$('providerOrder').value}));
  $('executeRule').onclick=()=>action(t=>providerAction(t,'split_by_rule',providerReference()));
+ async function commerce(t,operation,params){const auth=config;if(!auth)throw Error('客户中心登录已失效');const response=await fetch('/community/commerce',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':auth.csrf},body:JSON.stringify({workspace:auth.workspace,operation,params})});const data=await response.json();if(t!==epoch)throw Error('身份已变化');if(!response.ok)throw Error('价格保存未确认，请读取最新版本后核对');$('priceResult').textContent=JSON.stringify(data.result,null,2);return data.result;}
+ $('priceForm').onsubmit=e=>{e.preventDefault();action(async t=>{const r=await commerce(t,'price_set',{item_id:$('priceItem').value,expected_revision:Number($('priceRevision').value),unit_minor:Number($('priceUnit').value),stock:Number($('priceStock').value),enabled:$('priceEnabled').checked});if(t===epoch)$('priceRevision').value=r.revision;});};
+ $('readPrice').onclick=()=>action(async t=>{const r=await commerce(t,'price_read',{item_id:$('priceItem').value});if(t!==epoch)return;$('priceRevision').value=r?.revision||0;if(r){$('priceUnit').value=r.unit_minor;$('priceStock').value=r.stock;$('priceEnabled').checked=r.enabled;}});
  window.configureCommunityWorkbench(null);
 })();

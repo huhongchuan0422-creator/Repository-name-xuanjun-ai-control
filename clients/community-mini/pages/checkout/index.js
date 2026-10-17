@@ -2,14 +2,16 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false},
+  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,products:[]},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
       if (config.mode !== 'OFFLINE') {
         const scene = parseScene(options);
+        this.scene=scene;
         this.session = createSession(wx,config.baseUrl);
         await this.session.login();
+        if(config.commerce===true){const listing=await this.session.commerce(scene,'products',{});this.setData({commerceEnabled:true,products:listing.products.map(p=>({...p,quantity:0}))});}
         this.client = makeClient(body => this.session.transport(scene,body));
         if(config.payments===true){this.paymentFlow=createPaymentFlow(wx,(op,reference)=>this.session.payment(scene,op,reference));this.setData({paymentsEnabled:true,status:'请创建订单，或输入原订单号查询微信结果'});}
       } else {
@@ -28,15 +30,16 @@ Page({
     } catch(e) {this.setData({status:e.message});}
   },
   onUnload() {if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
+  quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputAmount(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({amount:e.detail.value,afterAd:''});},
   inputReference(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.detail.value,afterAd:''});},
   async checkout() {
     if (this.data.pending) return;
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
     this.setData({pending:true,afterAd:'',status:this.data.paymentsEnabled?'正在创建订单':'正在创建模拟订单'});
-    try {await this.client.checkout(this.data.amount,this.data.reference);this.setData({status:this.data.paymentsEnabled?'订单已建立，请点击微信支付':'模拟待支付；不发起微信扣款'});}
+    try {if(this.data.commerceEnabled){const lines=this.data.products.filter(p=>p.quantity>0).map(p=>({item_id:p.item_id,revision:p.revision,quantity:p.quantity}));const r=await this.session.commerce(this.scene,'purchase',{reference:this.data.reference,lines});this.setData({amount:String(r.amount_minor)});}else await this.client.checkout(this.data.amount,this.data.reference);this.setData({status:this.data.paymentsEnabled?'订单已建立，请点击微信支付':'模拟待支付；不发起微信扣款'});}
     catch(e) {this.setData({status:e.message});}
-    finally {this.setData({pending:false,paymentsEnabled:false});}
+    finally {this.setData({pending:false});}
   },
   async pay() {return this.runPayment(false);},
   async recoverPayment() {return this.runPayment(true);},
@@ -58,7 +61,7 @@ Page({
   async refresh() {
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
     this.setData({afterAd:''});
-    try {const r=await this.client.resume(this.data.reference);this.setData({amount:String(r.order.amount_minor),status:r.payment_state+'（模拟，非收款凭证）',
+    try {if(this.data.commerceEnabled){const r=await this.session.commerce(this.scene,'purchase_read',{reference:this.data.reference});this.setData({amount:String(r.amount_minor),status:r.order.state+'；金额来自服务端商品快照'});return;}const r=await this.client.resume(this.data.reference);this.setData({amount:String(r.order.amount_minor),status:r.payment_state+'（模拟，非收款凭证）',
       afterAd:r.ads.AD_SLOT_PAYMENT_SUCCESS ? r.ads.AD_SLOT_PAYMENT_SUCCESS.title : ''});}
     catch(e) {this.setData({status:e.message});}
   }
