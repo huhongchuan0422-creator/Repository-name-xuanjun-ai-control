@@ -94,3 +94,5 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Unknown receiver-detail official layouts continue to be UNKNOWN_SCHEMA, not coerced into financial matches. No automatic Finance confirmation and no live money call.
 - Actual Hosted CI for new source version must be resolved before PASS; review run https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39030004104. Older passing runs do not prove these changes.
 - Both phases remain PARTIAL; next work includes official receiver-detail format with authoritative documentation, merchant admission conditions, public consumer/CRM admission, broader cross-role E2E and audit.
+
+- Follow-up safety commits 7e929d5ccf2eb83c723b30adf4a8bf8e27a52be6 and 88ba947ed958315fc576a441f9029a1cace73963 now reject even BLANK supplied split transaction/submerchant columns and add regressions. Latest exact source test run 39030062012; status must be independently fetched, no PASS claimed at writing. Phase large groups remain PARTIAL.
