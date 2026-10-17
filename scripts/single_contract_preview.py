@@ -32,15 +32,15 @@ def render(candidate):
         raise ContractHold("FEATURES_REQUIRED")
 
     def plain(value):
-        if not isinstance(value, str) or not value or any(ord(ch) < 32 and ch not in "\\n\\t" for ch in value):
+        if not isinstance(value, str) or not value:
             raise ContractHold("INVALID_TEXT")
-        # Every customer-controlled value is flattened to one line. This avoids
-        # Setext/fenced/list/paragraph structures. Escape all Markdown metacharacters.
-        value = value.replace("\\r", " ").replace("\\n", " ").replace("\\t", " ")
-        value = value.replace("\\\\", "\\\\\\\\")
-        for ch in ("\\\\", "`", "*", "_", "{", "}", "[", "]", "(", ")", "#", "+", "-", ".", "!", "|", ">", "~", "="):
-            if ch != "\\\\":
-                value = value.replace(ch, "\\\\" + ch)
+        if any(ord(ch) < 32 and ch not in ("\n", "\t") for ch in value):
+            raise ContractHold("INVALID_TEXT")
+        value = " ".join(value.splitlines()).replace("\t", " ")
+        # Escape Markdown meta syntax in customer-controlled spans.
+        value = value.replace("\\", "\\\\")
+        for ch in ("`", "*", "_", "{", "}", "[", "]", "(", ")", "#", "+", "-", ".", "!", "|", ">", "~", "="):
+            value = value.replace(ch, "\\" + ch)
         return value.replace("<", "&lt;").replace(">", "&gt;")
 
     out = [
