@@ -86,3 +86,11 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Synthetic positive integration test now creates authority-signed original Center requirement, host-verified synthetic SECRETREF, submits through mini as original owner, then reviews/approves via second original Center authenticated web session and CSRF; false/replayed approvals denied.
 - Source version 39dcd47040ab0a520452b282192fdffdb80359d8 and subsequent reviewer endpoint docs/Node tests require latest Hosted CI. Do not reuse earlier SUCCESS as PASS for these new revisions.
 - No real customer secret, merchant admission, Finance settlement, paid order, independent phase audit or deployment was performed.
+
+## 2026-10-17 split-bill identifier guard (ChatGPT development)
+
+- Development account: huhongchuan0422-creator; Dots independent reviewer account 18598789888 was not used.
+- Source commits: bbf9576b59b4fdf66257e5c91cdc60efbdc05280 (verify any optional split bill submerchant and payment transaction identifiers against original signed ProviderActions intent), 39aa89798a93ce45bd8e651ed4e7cffc86a6441a (synthetic positive and wrong-merchant/wrong-transaction regression).
+- Unknown receiver-detail official layouts continue to be UNKNOWN_SCHEMA, not coerced into financial matches. No automatic Finance confirmation and no live money call.
+- Actual Hosted CI for new source version must be resolved before PASS; review run https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39030004104. Older passing runs do not prove these changes.
+- Both phases remain PARTIAL; next work includes official receiver-detail format with authoritative documentation, merchant admission conditions, public consumer/CRM admission, broader cross-role E2E and audit.
