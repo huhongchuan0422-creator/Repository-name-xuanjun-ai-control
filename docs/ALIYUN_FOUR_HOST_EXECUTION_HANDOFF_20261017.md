@@ -24,7 +24,7 @@ Owner：胡洪川。2026-10-17 09:40 CST 完成真实验收，沿用既有长期
 工作流 .github/workflows/aliyun-four-host-readonly.yml；准确提交17d86427670671b65280c5d22ee952c0e178a85e。
 实际 https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38991455661/attempts/2 ，job117275780078 SUCCESS。原始日志已读。证据 evidence/pr99-service-handoff/aliyun-execution/four-host-identity-20261017.json。
 
-有同仓库 GitHub 写入及 Actions 日志/运行权限的 ChatGPT、Dots 可复用代码和 secrets 引用，通过原任务下发已授权命令。聊天文本本身不提供会话工具或账号连接；新窗口先核验自身 GitHub 工具可用，不能仅凭此文声称已登录主机。当前无需本地 SSH、也不应索取 root 密码。四机身份工作流的 PR 触发限定同仓库 PR99 和该 head 分支；其 workflow_dispatch 尚不代表任意新分支或主分支已经注册该入口。修改工作流会触发 PR 检查；不为触发另建重复任务。
+有同仓库 GitHub 写入及 Actions 日志/运行权限的 ChatGPT、Dots 可复用代码和 secrets 引用，通过原任务下发已授权命令。聊天文本本身不提供会话工具或账号连接；新窗口先核验自身 GitHub 工具可用，不能仅凭此文声称已登录主机。当前无需本地 SSH、也不应索取 root 密码。本批三个工作流已移除自动PR触发，保留 workflow_dispatch 声明；不保证尚未进入默认分支的工作流已在默认分支注册。无 dispatch 工具的窗口须在原任务内实现准确绑定的新工作流/触发入口，不应把无法触发解释为RAM授权不足。只读身份检查可复用既有verify job重跑；迁移v4单次尝试已成功消耗，禁止重跑该修改性任务。没有通用任意命令服务，后续业务动作需要准确脚本和主机绑定。
 
 ## 执行及边界
 
@@ -32,4 +32,6 @@ Owner：胡洪川。2026-10-17 09:40 CST 完成真实验收，沿用既有长期
 
 长期授权范围内的常规检查、修复、测试和已放行部署自主执行，无需再向 Owner 请求相同权限。生产准入仍按原任务：不得绕过独立审核或准确制品许可，不得启动第二writer，不得解除旧mask让测试通过；DNS/生产入口切换、币安交易与Writer转移、东京退役仍继承原HOLD，直到各自既有条件满足。RAM root能力不等于这些条件已满足。
 
-PR99当前断点：国内v3 contact健康200，portal/customer_service缺 authentic internal-bridge domestic_bridge_cert.sha256；v4桥接材料/当前124源码哈希核对/复制品隔离启动脚本已准备，尚未执行。新SWAS迁移只读预检 .github/workflows/aliyun-s07-preflight.yml，准确提交b61a3940c56fb4bd1eff21c1258732a5e83d055d。英国P2与本次迁移分别由各原执行方负责，不启动并行写入。
+PR99当前断点：2026-10-17 09:54 CST 国内v4三应用复制品隔离启动限定通过。portal/contact/customer_service 均HTTP200、loopback listener、测试时存活、errors[]；全部临时应用进程随后停止；protected状态未变；东京124源码哈希PASS，真实桥接文件2个在服务器之间私有传输。成功run38992581089/job117277978082，Korea InvokeId t-kor709ol1r4xvy8。工作流执行提交67a3573ff55b7d467e6d507dae5cf8fbcfcca0c9；准确helper602b3c6e28ea2a9a77d2850d8fde18e5137c27c9，SHAac6e64a2cf589b14b21bdab643060748862a7a711deb0bc29648632ccc6a7d9f；coordinator1b029519886822865847c3c518e6df453ff789d5，SHA8bc8d13d9be01e2c695608ee975d30914eab9c7eda5144c8d7cba0051a3fa37a。receipt evidence/pr99-service-handoff/aliyun-execution/s07-isolated-v4-20261017.json。
+
+仍未完成：真实业务链路验收、完整运行配置、最终快照、持久服务安装、入口切换及东京退役；国内副本不是canonical writer。v4、Korea /root/pr99-s07-swas-transport-v1、各peer /root/pr99-s07-swas-input-v1均保留且禁止重放。旧状态不能覆盖新的PASS。下一步在原PR99集中准备运行验收及最终交接方案；英国P2由其原执行方负责，不启动并行writer。
