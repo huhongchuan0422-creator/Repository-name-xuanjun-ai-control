@@ -56,7 +56,7 @@ class BillJourney(unittest.TestCase):
 
     def test_scoped_bill_audit_lists_immutable_results_only_for_original_bill(self):
         from scripts.pr122_customer_core import canonical
-        self.download(b'unknown,columns\\na,b\\n')
+        self.download(b'unknown,columns\na,b\n')
         self.call('bill_fetch')
         verified=self.call('bill_reconcile')
         self.assertEqual(verified['status'],'UNKNOWN_SCHEMA')
@@ -73,7 +73,8 @@ class BillJourney(unittest.TestCase):
                    scope=dict(g['scope'],store_id='other'),result=dict(status='BILL_ROWS_MATCH'))
         self.fx.c.db.execute("UPDATE links SET payload=? WHERE channel='COMMUNITY_BILL_RECONCILIATION' AND subject_idx=?",
             (self.fx.c.encrypt(canonical(saved),'community-bill-reconciliation:'+ref),ref))
-        self.assertEqual(self.call('bill_audit',after_id='')['records'],[])
+        with self.assertRaisesRegex(ValueError,'BILL_AUDIT_INTEGRITY_CHANGED'):
+            self.call('bill_audit',after_id='')
 
     def test_hash_mismatch_never_persists(self):
         self.download(b'a,b\nx,y\n');self.bills._download.return_value=b'a,b\nx,z\n'
