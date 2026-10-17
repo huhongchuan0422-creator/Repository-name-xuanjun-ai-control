@@ -105,10 +105,11 @@ class StageRuntime:
             from scripts.community_order_cancellation import local_cancelled
             local_closed=local_cancelled(self.demo.db,identity,params['reference'])
             # A synthetic SUCCESS state is never proof for a success-page advertisement.
-            paid = order['state'] == 'SUCCESS' and verified is not None
+            paid = order['state'] == 'SUCCESS'
+            verified_paid = paid and verified is not None
             return {'order': dict(order, reference=params['reference']),
                     'payment_state': 'CANCELLED_BEFORE_PROVIDER' if local_closed else ('PROVIDER_' + order['state']) if verified else ('MOCK_PAID_SIMULATED' if paid else 'MOCK_' + order['state']),
-                    'ads': {AMOUNT: None, SUCCESS: snapshot['ads'][SUCCESS] if paid else None},
+                    'ads': {AMOUNT: None, SUCCESS: snapshot['ads'][SUCCESS] if verified_paid else None},
                     'simulation_only': verified is None and not local_closed, 'provider_order_verified': verified is not None,
                     'provider_payment_verified': verified is not None and order['state'] in ('SUCCESS','REFUNDED'),
                     'provider_settlement_verified': False,
