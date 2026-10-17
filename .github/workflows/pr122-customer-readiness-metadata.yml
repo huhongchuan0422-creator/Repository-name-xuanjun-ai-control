@@ -1,4 +1,4 @@
-name: PR122 customer target metadata only
+name: PR122 approved one-shot runtime metadata
 on:
   push:
     branches: [feature/work-pr122-site-hub-integration-20261016]
@@ -10,49 +10,39 @@ concurrency:
   cancel-in-progress: false
 jobs:
   metadata:
+    if: >-
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.event_name == 'push' &&
+      github.event.forced == false &&
+      github.event.deleted == false &&
+      github.event.head_commit.id == github.sha &&
+      github.ref == 'refs/heads/feature/work-pr122-site-hub-integration-20261016' &&
+      github.event.before == 'b882ea631e6391f1fc8727766ccbaf3c66b519da' &&
+      github.event.head_commit.message == 'PR122 metadata inventory approval 6230479636 one-shot' &&
+      github.run_attempt == 1
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 2
     steps:
-      - name: Fixed unprivileged OS and runtime metadata no checkout no sudo
+      - name: Exact approved collector nonroot temporary files only
         shell: bash
         run: |
           set -euo pipefail
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -u)" = 1002
           /usr/bin/python3 -I -B - <<'PY'
-          import importlib.util,json,os,platform,pwd,grp,shutil,signal,stat,subprocess,time
+          import base64,hashlib,json,os,subprocess,sys,tempfile
           from pathlib import Path
-          signal.alarm(40)
-          assert os.uname().nodename=='iZvt5t8tlrm8oiZ' and os.getuid()==1002
-          data={'production_mutations':0,'root_called':False,'python':platform.python_version(),'machine':platform.machine(),'libc':platform.libc_ver()}
-          allowed={'ID','ID_LIKE','VERSION_ID','PRETTY_NAME'};values={}
-          for line in Path('/etc/os-release').read_text().splitlines():
-              key,sep,value=line.partition('=')
-              if sep and key in allowed:values[key]=value.strip('"')
-          data['os']=values
-          data['tools']={k:shutil.which(k) for k in ('rpm','dnf','yum','apt-get','dpkg-query','clamdscan','clamscan')}
-          data['venv_module']=importlib.util.find_spec('venv') is not None
-          used_uids={p.pw_uid for p in pwd.getpwall()};used_gids={g.gr_gid for g in grp.getgrall()}
-          data['available_candidate_uid_gid']=next((n for n in range(62622,62650) if n not in used_uids and n not in used_gids),None)
-          data['observed_utc']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
-          data['probe_commit']=os.environ['GITHUB_SHA']
-          try:
-              account=pwd.getpwnam('xuanjun-customer')
-              data['customer_account']={'state':'PRESENT','uid':account.pw_uid,'gid':account.pw_gid,'shell':account.pw_shell}
-          except KeyError:data['customer_account']={'state':'ABSENT'}
-          data['fixed_objects']={}
-          for name in ('/etc/xuanjun-customer-center','/etc/xuanjun-customer-center/config.json','/etc/xuanjun-customer-center/runtime.json','/etc/xuanjun-customer-center/INDEPENDENT_REVIEW_TRUST.json','/etc/xuanjun-customer-center/TARGET_ACCEPTANCE.json','/etc/xuanjun-customer-center/publisher.json','/usr/local/lib/xuanjun-customer-runtime/venv/bin/python','/usr/local/lib/xuanjun-customer-center','/run/xuanjun-customer-api/http.sock','/var/lib/xuanjun-customer-channel/grant-state.json'):
-              try:
-                  info=os.lstat(name)
-                  data['fixed_objects'][name]={'state':'PRESENT_METADATA_ONLY','uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode)),'symlink':stat.S_ISLNK(info.st_mode)}
-              except FileNotFoundError:data['fixed_objects'][name]={'state':'ABSENT'}
-              except PermissionError:data['fixed_objects'][name]={'state':'UNREADABLE_NOT_ABSENT'}
-          try:data['website_current']=os.readlink('/var/www/wenwenwenyiyiyi.work/current')
-          except OSError:data['website_current']='UNKNOWN'
-          data['private_contents_read']=False
-          data['root_state_verified']=False
-          data['package_versions']={}
-          if data['tools']['rpm']:
-              for name in ('python3','python3-pip','clamav','clamav-server','clamd'):
-                  r=subprocess.run([data['tools']['rpm'],'-q','--qf','%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n',name],capture_output=True,text=True,timeout=5)
-                  data['package_versions'][name]=r.stdout.strip() if r.returncode==0 else 'NOT_INSTALLED_OR_UNKNOWN'
-          print('CUSTOMER_READINESS_METADATA='+json.dumps(data,sort_keys=True))
+          assert os.uname().nodename == 'iZvt5t8tlrm8oiZ'
+          assert os.getuid() == os.geteuid() == 1002
+          assert sys.executable == '/usr/bin/python3' and sys.version_info[:2] == (3,11)
+          assert sys.flags.isolated and sys.dont_write_bytecode
+          raw=base64.b64decode('IiIiRml4ZWQgZG9tZXN0aWMgbWV0YWRhdGEtb25seSBjb2xsZWN0b3I7IHN0ZG91dCBvbmx5LCBuZXZlciBhbiBpbnN0YWxsZXIuCgpObyBwcml2YXRlIGNvbmZpZ3VyYXRpb24gb3IgZmlsZSBjb250ZW50cyBhcmUgcmVhZC4gTm8gc3VicHJvY2Vzcy9uZXR3b3JrIGNhbGxzLApwYWNrYWdlIGltcG9ydHMsIHJ1bnRpbWUgaW1wb3J0cywgZGlyZWN0b3J5IGVudW1lcmF0aW9uLCBvciBtdXRhdGlvbnMgYXJlIG1hZGUuClJ1biBvbmx5IHVuZGVyIGEgc2VwYXJhdGVseSBhcHByb3ZlZCBleGFjdCByZWFkLW9ubHkgZXhlY3V0aW9uIHNjb3BlLgoiIiIKaW1wb3J0IGdycAppbXBvcnQgaGFzaGxpYgppbXBvcnQganNvbgppbXBvcnQgb3MKaW1wb3J0IHB3ZAppbXBvcnQgc3RhdAppbXBvcnQgc3lzCgpIT1NUID0gJ2ladnQ1dDh0bHJtOG9pWicKSURFTlRJVFkgPSAneHVhbmp1bi1jdXN0b21lcicKUEFUSFMgPSAoCiAgICAnLycsICcvdXNyJywgJy91c3IvbG9jYWwnLCAnL3Vzci9sb2NhbC9saWInLAogICAgJy91c3IvbG9jYWwvbGliL3h1YW5qdW4tY3VzdG9tZXItcnVudGltZScsCiAgICAnL3Vzci9sb2NhbC9saWIveHVhbmp1bi1jdXN0b21lci1ydW50aW1lL3ZlbnYnLAogICAgJy91c3IvbG9jYWwvbGliL3h1YW5qdW4tY3VzdG9tZXItcnVudGltZS92ZW52L2JpbicsCiAgICAnL3Vzci9sb2NhbC9saWIveHVhbmp1bi1jdXN0b21lci1ydW50aW1lL3ZlbnYvYmluL3B5dGhvbicsCiAgICAnL3Vzci9sb2NhbC9saWIveHVhbmp1bi1jdXN0b21lci1ydW50aW1lL3ZlbnYvcHl2ZW52LmNmZycsCiAgICAnL3Vzci9iaW4nLCAnL3Vzci9iaW4vcHl0aG9uMycsICcvdXNyL2Jpbi9weXRob24zLjExJywKICAgICcvdXNyL2xpYicsICcvdXNyL2xpYi9weXRob24zLjExJywgJy91c3IvbGliL3B5dGhvbjMuMTEvdmVudicsCiAgICAnL3Vzci9saWIvcHl0aG9uMy4xMS92ZW52L19faW5pdF9fLnB5JywKICAgICcvYmluJywgJy9zYmluJywgJy91c3Ivc2JpbicsICcvYmluL2ZhbHNlJywKICAgICcvc2Jpbi9ub2xvZ2luJywgJy91c3Ivc2Jpbi9ub2xvZ2luJywKKQoKCmNsYXNzIERlbmllZChWYWx1ZUVycm9yKToKICAgIHBhc3MKCgpkZWYgY2Fub25pY2FsKHZhbHVlKToKICAgIHJldHVybiBqc29uLmR1bXBzKHZhbHVlLCBzb3J0X2tleXM9VHJ1ZSwgc2VwYXJhdG9ycz0oJywnLCAnOicpLCBhbGxvd19uYW49RmFsc2UpLmVuY29kZSgpCgoKZGVmIGVycm9yX3N0YXRlKGVycm9yKToKICAgICMgTm8gZXJyb3IgdGV4dDogaXQgY2FuIGNvbnRhaW4gYXJiaXRyYXJ5IGRhdGEgZnJvbSBleHRlcm5hbCBOU1MgcHJvdmlkZXJzLgogICAgcmV0dXJuIHsnc3RhdGUnOiAnVU5LTk9XTicsICdyZWFzb24nOiAnUEVSTUlTU0lPTl9ERU5JRUQnIGlmCiAgICAgICAgICAgIGlzaW5zdGFuY2UoZXJyb3IsIFBlcm1pc3Npb25FcnJvcikgZWxzZSAnTE9PS1VQX0ZBSUxFRCd9CgoKZGVmIHBhdGhfbWV0YWRhdGEocGF0aCk6CiAgICBpZiBwYXRoIG5vdCBpbiBQQVRIUzoKICAgICAgICByYWlzZSBEZW5pZWQoJ0ZJWEVEX1BBVEhTX09OTFknKQogICAgdHJ5OgogICAgICAgIGluZm8gPSBvcy5sc3RhdChwYXRoKQogICAgZXhjZXB0IEZpbGVOb3RGb3VuZEVycm9yOgogICAgICAgIHJldHVybiB7J3N0YXRlJzogJ0FCU0VOVCd9CiAgICBleGNlcHQgT1NFcnJvciBhcyBlcnJvcjoKICAgICAgICByZXR1cm4gZXJyb3Jfc3RhdGUoZXJyb3IpCiAgICBraW5kID0gKCdkaXJlY3RvcnknIGlmIHN0YXQuU19JU0RJUihpbmZvLnN0X21vZGUpIGVsc2UKICAgICAgICAgICAgJ3JlZ3VsYXInIGlmIHN0YXQuU19JU1JFRyhpbmZvLnN0X21vZGUpIGVsc2UKICAgICAgICAgICAgJ3N5bWxpbmsnIGlmIHN0YXQuU19JU0xOSyhpbmZvLnN0X21vZGUpIGVsc2UgJ290aGVyJykKICAgIHJlc3VsdCA9IHsnc3RhdGUnOiAnUFJFU0VOVCcsICd0eXBlJzoga2luZCwgJ3VpZCc6IGluZm8uc3RfdWlkLAogICAgICAgICAgICAgICdnaWQnOiBpbmZvLnN0X2dpZCwgJ21vZGUnOiBzdGF0LlNfSU1PREUoaW5mby5zdF9tb2RlKSwKICAgICAgICAgICAgICAnbmxpbmsnOiBpbmZvLnN0X25saW5rfQogICAgaWYga2luZCA9PSAnc3ltbGluayc6CiAgICAgICAgdHJ5OgogICAgICAgICAgICAjIFJlYWQgbGluayB0ZXh0IG9ubHkuIE5ldmVyIHJlc29sdmUgb3IgaW5zcGVjdCBhbiBhcmJpdHJhcnkgdGFyZ2V0LgogICAgICAgICAgICB0YXJnZXQgPSBvcy5yZWFkbGluayhwYXRoKQogICAgICAgICAgICAjIE9ubHkga25vd24gQUJJL3N5c3RlbSBhbGlhc2VzIGFyZSB1c2VmdWw7IHVua25vd24gbGluayBzdHJpbmdzIGFyZQogICAgICAgICAgICAjIHdpdGhoZWxkIHRvIGF2b2lkIGRpc2Nsb3NpbmcgYSBwYXRoIG91dHNpZGUgdGhlIGJvdW5kZWQgcmVhZCBzY29wZS4KICAgICAgICAgICAgYWxsb3dlZCA9IHsncHl0aG9uMy4xMScsICcvdXNyL2Jpbi9weXRob24zLjExJywgJ3Vzci9iaW4nLCAndXNyL3NiaW4nLAogICAgICAgICAgICAgICAgICAgICAgICcvdXNyL2JpbicsICcvdXNyL3NiaW4nfQogICAgICAgICAgICByZXN1bHRbJ2xpbmtfdGFyZ2V0J10gPSB0YXJnZXQgaWYgdGFyZ2V0IGluIGFsbG93ZWQgZWxzZSAnT1RIRVJfTk9UX0RJU0NMT1NFRCcKICAgICAgICBleGNlcHQgT1NFcnJvciBhcyBlcnJvcjoKICAgICAgICAgICAgcmVzdWx0WydsaW5rJ10gPSBlcnJvcl9zdGF0ZShlcnJvcikKICAgIHJldHVybiByZXN1bHQKCgpkZWYgYWNjb3VudF9tZXRhZGF0YSgpOgogICAgdHJ5OgogICAgICAgIHJvdyA9IHB3ZC5nZXRwd25hbShJREVOVElUWSkKICAgIGV4Y2VwdCBLZXlFcnJvcjoKICAgICAgICByZXR1cm4geydzdGF0ZSc6ICdBQlNFTlQnfQogICAgZXhjZXB0IE9TRXJyb3IgYXMgZXJyb3I6CiAgICAgICAgcmV0dXJuIGVycm9yX3N0YXRlKGVycm9yKQogICAgcmV0dXJuIHsnc3RhdGUnOiAnUFJFU0VOVCcsICd1aWQnOiByb3cucHdfdWlkLCAnZ2lkJzogcm93LnB3X2dpZCwKICAgICAgICAgICAgJ3NoZWxsJzogcm93LnB3X3NoZWxsIGlmIHJvdy5wd19zaGVsbCBpbgogICAgICAgICAgICAoJy9zYmluL25vbG9naW4nLCAnL3Vzci9zYmluL25vbG9naW4nLCAnL2Jpbi9mYWxzZScpIGVsc2UgJ09USEVSX05PVF9ESVNDTE9TRUQnfQoKCmRlZiBncm91cF9tZXRhZGF0YSgpOgogICAgdHJ5OgogICAgICAgIHJvdyA9IGdycC5nZXRncm5hbShJREVOVElUWSkKICAgIGV4Y2VwdCBLZXlFcnJvcjoKICAgICAgICByZXR1cm4geydzdGF0ZSc6ICdBQlNFTlQnfQogICAgZXhjZXB0IE9TRXJyb3IgYXMgZXJyb3I6CiAgICAgICAgcmV0dXJuIGVycm9yX3N0YXRlKGVycm9yKQogICAgIyBEbyBub3QgZXhwb3J0IHRoZSBtZW1iZXIgbGlzdCBvciBwYXNzd29yZCBmaWVsZC4KICAgIHJldHVybiB7J3N0YXRlJzogJ1BSRVNFTlQnLCAnZ2lkJzogcm93LmdyX2dpZH0KCgpkZWYgY29sbGVjdCgpOgogICAgaG9zdCA9IG9zLnVuYW1lKCkKICAgIGlmIGhvc3Qubm9kZW5hbWUgIT0gSE9TVDoKICAgICAgICByYWlzZSBEZW5pZWQoJ0ZJWEVEX0RPTUVTVElDX0hPU1RfUkVRVUlSRUQnKQogICAgaWYgc3lzLmV4ZWN1dGFibGUgIT0gJy91c3IvYmluL3B5dGhvbjMnIG9yIHN5cy52ZXJzaW9uX2luZm9bOjJdICE9ICgzLCAxMSk6CiAgICAgICAgcmFpc2UgRGVuaWVkKCdGSVhFRF9TWVNURU1fUFlUSE9OXzNfMTFfUkVRVUlSRUQnKQogICAgaWYgbm90IHN5cy5mbGFncy5pc29sYXRlZCBvciBub3Qgc3lzLmRvbnRfd3JpdGVfYnl0ZWNvZGU6CiAgICAgICAgcmFpc2UgRGVuaWVkKCdJU09MQVRFRF9OT19CWVRFQ09ERV9SRVFVSVJFRCcpCiAgICAjIGxzdGF0IG9uIGEgY2hpbGQgd291bGQgZm9sbG93IGEgc3ltbGluayBpbiBpdHMgcGFyZW50LiBEbyBub3QgdHJhdmVyc2UKICAgICMgbm9uLWRpcmVjdG9yeSwgdW5rbm93biBvciBmb3JlaWduIGFsaWFzZXMuIEtub3duIC9iaW4gYW5kIC9zYmluIGFsaWFzZXMgYXJlCiAgICAjIHN0aWxsIHJlcG9ydGVkLCBidXQgdGhlaXIgY2hpbGRyZW4gYXJlIGJsb2NrZWQgdG8ga2VlcCB0aGlzIHN0cmljdGx5IGxzdGF0LgogICAgcGF0aHMgPSB7fQogICAgZm9yIHBhdGggaW4gUEFUSFM6CiAgICAgICAgcGFyZW50ID0gcGF0aC5yc3BsaXQoJy8nLCAxKVswXSBvciAnLycKICAgICAgICBpZiBwYXRoICE9ICcvJyBhbmQgcGFyZW50IGluIHBhdGhzIGFuZCBwYXRoc1twYXJlbnRdLmdldCgndHlwZScpICE9ICdkaXJlY3RvcnknOgogICAgICAgICAgICBwYXRoc1twYXRoXSA9IHsnc3RhdGUnOiAnVU5LTk9XTicsICdyZWFzb24nOiAnUEFSRU5UX05PVF9WRVJJRklFRF9ESVJFQ1RPUlknfQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIHBhdGhzW3BhdGhdID0gcGF0aF9tZXRhZGF0YShwYXRoKQogICAgcmVzdWx0ID0gewogICAgICAgICdzdGF0ZSc6ICdSRUFET05MWV9NRVRBREFUQV9DT0xMRUNURURfTk9UX0lOU1RBTExfQVBQUk9WQUwnLAogICAgICAgICdob3N0JzogaG9zdC5ub2RlbmFtZSwKICAgICAgICAnb2JzZXJ2ZXInOiB7J3VpZCc6IG9zLmdldHVpZCgpLCAnZXVpZCc6IG9zLmdldGV1aWQoKX0sCiAgICAgICAgJ3BsYXRmb3JtJzogeydtYWNoaW5lJzogaG9zdC5tYWNoaW5lLCAnbGliYyc6ICdOT1RfQ09MTEVDVEVEJ30sCiAgICAgICAgJ3B5dGhvbic6IHsnaW52b2tlZF9wYXRoJzogc3lzLmV4ZWN1dGFibGUsCiAgICAgICAgICAgICAgICAgICAndmVyc2lvbic6ICcuJy5qb2luKHN0cih4KSBmb3IgeCBpbiBzeXMudmVyc2lvbl9pbmZvWzozXSksCiAgICAgICAgICAgICAgICAgICAnYmluYXJ5X3NoYTI1Nic6ICdOT1RfUkVBRCcsCiAgICAgICAgICAgICAgICAgICAndmVudl9mdW5jdGlvbmFsX3Rlc3QnOiAnTk9UX1JVTid9LAogICAgICAgICdhY2NvdW50JzogYWNjb3VudF9tZXRhZGF0YSgpLCAnZ3JvdXAnOiBncm91cF9tZXRhZGF0YSgpLCAncGF0aHMnOiBwYXRocywKICAgICAgICAnZmlsZV9jb250ZW50c19yZWFkJzogRmFsc2UsICdwcm9kdWN0aW9uX2NoYW5nZXMnOiAwLAogICAgICAgICdleGVjdXRpb25fYXV0aG9yaXplZCc6IEZhbHNlLCAncHJvZHVjdGlvbl9yZWxlYXNlJzogJ0hPTEQnLAogICAgICAgICdsaW1pdHMnOiBbJ05TUyBsb29rdXBzIGZvbGxvdyBob3N0IGNvbmZpZ3VyYXRpb247IHRoaXMgc2NyaXB0IG1ha2VzIG5vIG5ldHdvcmsgY2FsbHMuJywKICAgICAgICAgICAgICAgICAgICdOU1MgYWJzZW5jZSBpcyBhIGxvb2t1cCByZXN1bHQsIG5vdCBhIGxvY2tlZCBhY2NvdW50LWNyZWF0aW9uIGd1YXJhbnRlZS4nLAogICAgICAgICAgICAgICAgICAgJ01ldGFkYXRhIGlzIG5vdCBhIHNuYXBzaG90IGFuZCBtdXN0IGJlIHJlY2hlY2tlZCB1bmRlciB0aGUgb3JpZ2luYWwgbXV0YXRpb24gYm91bmRhcnkuJywKICAgICAgICAgICAgICAgICAgICdObyBiaW5hcnksIHdoZWVsIG9yIHJ1bnRpbWUtY2xvc3VyZSBoYXNoZXM7IG5vIHB5dmVudi5jZmcgY29udGVudHMgb3IgbGliYyB2ZXJpZmljYXRpb24uJywKICAgICAgICAgICAgICAgICAgICdObyBzY2FubmVyLCBwcm90ZWN0ZWQgY29uZmlncywgY3JlZGVudGlhbHMsIGN1c3RvbWVyIGRhdGEgb3IgcHJvZHVjdGlvbiBzZXJ2aWNlIHJlYWRzLiddCiAgICB9CiAgICByZXN1bHRbJ21ldGFkYXRhX3NoYTI1NiddID0gaGFzaGxpYi5zaGEyNTYoY2Fub25pY2FsKHJlc3VsdCkpLmhleGRpZ2VzdCgpCiAgICByZXR1cm4gcmVzdWx0CgoKZGVmIG1haW4oKToKICAgIGlmIGxlbihzeXMuYXJndikgIT0gMToKICAgICAgICByYWlzZSBEZW5pZWQoJ05PX0FSR1VNRU5UU19BTExPV0VEJykKICAgIHByaW50KGNhbm9uaWNhbChjb2xsZWN0KCkpLmRlY29kZSgpKQoKCmlmIF9fbmFtZV9fID09ICdfX21haW5fXyc6CiAgICB0cnk6CiAgICAgICAgbWFpbigpCiAgICBleGNlcHQgKERlbmllZCwgT1NFcnJvcik6CiAgICAgICAgcHJpbnQoJ3sic3RhdGUiOiJIT0xEIiwicmVhc29uIjoiQ09MTEVDVE9SX1BSRUNPTkRJVElPTl9PUl9MT09LVVBfRkFJTEVEIiwicHJvZHVjdGlvbl9jaGFuZ2VzIjowfScpCiAgICAgICAgcmFpc2UgU3lzdGVtRXhpdCgyKSBmcm9tIE5vbmUK', validate=True)
+          assert hashlib.sha256(raw).hexdigest() == '1f8b8c7c623dd59cf99dba2acfcab5709e2f19f7c2465e6b7739eac3cce92833'
+          with tempfile.TemporaryDirectory(prefix='pr122-metadata-6230479636-',dir=os.environ['RUNNER_TEMP']) as folder:
+              target=Path(folder)/'collector.py'
+              target.write_bytes(raw)
+              print('APPROVAL=6230479636; COLLECTOR_SHA256=1f8b8c7c623dd59cf99dba2acfcab5709e2f19f7c2465e6b7739eac3cce92833; ROOT_CALLED=false',flush=True)
+              print(json.dumps({'source_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'approval_request':'6230479636'},sort_keys=True),flush=True)
+              result=subprocess.run(['/usr/bin/python3','-I','-B',str(target)],check=False,timeout=40)
+              raise SystemExit(result.returncode)
           PY
