@@ -257,3 +257,13 @@ Exact current evidence: evidence/pr99-service-handoff/s09-install-candidate/R2_E
 New r2 acceptance run39004155870/job117313065796/Invoke t-sh070a4pjzs5dkw SUCCESS at12:52:15 CST: two rounds × three health200; contact/customer_service correct callback paths each403 for invalid signature; all temporary app processes stopped/listeners removed; protected unchanged. No external namespace interface or business API call. Live signed-success/upstream auth NOT proven; data still preliminary. All cloud source triggers frozen after first exact dispatch.
 
 New stopped_transaction.py exactSHA99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315, tested checkoute0d68c9e2d5db42967017a8f6f8f81224f437208; run39004183744/job117313146649 SUCCESS,9tests. Actual filesystem conflict/failure preservation tests with mocked systemctl; not host PID1 or independent acceptance. Code implements only install-stopped / rollback-stopped of quarantined r2 units, requires separate exact root-held admission, no production activation. No service installed by this code yet. Full review packet STOPPED_TRANSACTION_REVIEW.md. Six major nodes remain; next exact independent host admission cannot be self-issued. No Owner password/reauthorization needed. No persistent migration worker running after these completed batches.
+
+
+## 2026-10-17 13:16 CST — 执行入口与生产启动源码增量（未生产部署）
+
+- 已实证当前原生GitHub工具可以通过Owner标签触发受保护PR工作流，纠正此前“没有任何可触发入口”的过度结论。入口只接收Owner332398908、PR99固定分支、准确HEAD标签，不由普通push执行Root；只限国内停止安装，不等于任意生产执行通道。
+- 真实run39005472107/job117316933627：13:13:35 CST返回INDEPENDENT_HOST_ADMISSION_NOT_ISSUED_NO_CLOUD_CALL，发生在任何STS/SWAS前；云调用0、主机命令0。不是RAM或Secrets故障，不重发此已观测批。
+- production_start.py新增最终检查点专用启动候选（final-v1，禁止r1/r2初步数据）、专用身份及准确字节准入、三服务监督启动/健康、失败仅停自有服务并保留数据、不复活原writer、不切入口。源SHA6ad51228f60690365ee4004c8c05b9c982eb2de70551ac8061142fcb4c93fa32；该候选未接通生产执行动作、未实机运行、并非完整生产准备PASS。
+- 准确checkout23b9b42bbfa7655bb38c0c1ebc83f4edadc3efca，run39005621738/job117317379867 SUCCESS；原停止事务9项+新启动围堵4项均通过。属于临时文件及模拟systemctl检查，不是PID1或业务验收。
+- 真正仍缺：原准确独立主机准入、真实最终检查点/原writer停止及唯一writer归属、专用运行身份与文件权限、完整生产触发/鉴权和站点切换接线。源码作者不制造这些真实输入，不把源码或入口测试记作迁移节点完成。
+- 本轮无新的生产服务安装/启动/切换，仍剩6大节点，当前无后台部署writer。PR99三应用124源码/2906运行文件不是PR122网站/客户中心发布包；不得替换dots网站writer或混用网站安装范围。已通过未变内容继承，后续只对完整新增执行链集中验收。
