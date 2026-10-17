@@ -163,7 +163,8 @@ class Commerce:
                     price = self._read(identity, project, 'PRODUCT', line['item_id'])
                     if price is None or not price['enabled'] or price['revision'] != line['revision'] or price['stock'] < line['quantity']:
                         raise ValueError('PRODUCT_PRICE_CHANGED_OR_OUT_OF_STOCK')
-                    price = dict(price, stock=price['stock']-line['quantity'])
+                    price = dict(price, stock=price['stock']-line['quantity'],revision=price['revision']+1,updated_at=c.now())
+                    self._save(identity,project,uid,'PRICE_VERSION',line['item_id']+':'+str(price['revision']),price)
                     subtotal = price['unit_minor'] * line['quantity']
                     total += subtotal
                     resolved.append(dict(line, name=item[0], unit_minor=price['unit_minor'], subtotal_minor=subtotal))

@@ -53,8 +53,14 @@ class CenterOperations:
             raise ValueError('INVALID_OPERATION_FIELDS')
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         c=self.center;uid=c.session(session,csrf)
+        from scripts.community_staff import Staff
+        if body['operation'].startswith('community.staff_'):
+            return Staff(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
         grant=self.grants.get(body['workspace'])
+        if grant is None:grant=Staff(self).resolve(body['workspace'],uid)
         if grant is None or grant['user_id']!=uid:raise PermissionError('OPERATION_GRANT_REQUIRED')
+        if 'allowed_operations' in grant and body['operation'] not in grant['allowed_operations']:
+            raise PermissionError('STAFF_OPERATION_DENIED')
         p=grant['principal']
         if (p not in self.runtime.bindings or p.role!=grant['role'] or p.tenant_id!=grant['tenant']
                 or self.runtime.bindings[p]!=grant['scope']):

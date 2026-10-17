@@ -19,7 +19,7 @@ def orders_page(db,identity,limit,after_id,status):
     for r in rows[:limit]:
         record=dict(zip(('reference','amount_minor','currency','state'),r))
         verified=provider_evidence(db,identity,r[0]) is not None
-        record.update(simulation_only=not verified,provider_payment_verified=verified)
+        record.update(simulation_only=not verified,provider_order_verified=verified,provider_payment_verified=verified and record['state'] in ('SUCCESS','REFUNDED'))
         records.append(record)
     return dict(orders=records,
                 has_more=len(rows)>limit,next_cursor=rows[limit-1][0] if len(rows)>limit else None,
@@ -66,5 +66,28 @@ def order_detail(orders,refunds,identity,reference):
         refund_history_truncated=len(refund_rows)>200,refund_preview_total_minor=total,
         remaining_preview_minor=order['amount_minor']-total,
         simulation_only=provider_evidence(orders,identity,reference) is None,
-        provider_payment_verified=provider_evidence(orders,identity,reference) is not None,
+        provider_order_verified=provider_evidence(orders,identity,reference) is not None,
+        provider_payment_verified=provider_evidence(orders,identity,reference) is not None and order['state'] in ('SUCCESS','REFUNDED'),
         provider_refund_executed=False,provider_split_executed=False)
+
+
+def order_summary(db,identity):
+    """Original order totals, with signed provider observations kept distinct."""
+    t,m,s=scope(identity)
+    counts={name:0 for name in ('PENDING','SUCCESS','FAILED','CANCELLED','REFUNDED')}
+    verified_counts=dict(counts)
+    total=verified_paid=verified_refunds=0
+    import json
+    for ref,amount,status in db.execute('SELECT reference,amount_minor,state FROM orders WHERE tenant_id=? AND merchant_id=? AND store_id=?',(t,m,s)):
+        counts[status]+=1;total+=amount
+        if provider_evidence(db,identity,ref) is not None:
+            verified_counts[status]+=1
+            if status in ('SUCCESS','REFUNDED'):verified_paid+=amount
+    for raw, in db.execute('SELECT evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=?',(t,m,s)):
+        try:event=json.loads(raw)
+        except (ValueError,TypeError):continue
+        if type(event) is dict and event.get('source')=='WECHAT_SIGNED_REFUND_RESULT':verified_refunds+=event['refund_minor']
+    return dict(counts=counts,order_total_minor=total,provider_verified_counts=verified_counts,
+        provider_paid_observations_minor=verified_paid,provider_refund_observations_minor=verified_refunds,
+        provider_net_observations_minor=verified_paid-verified_refunds,
+        simulation_only=not any(verified_counts.values()),provider_settlement_verified=False,real_revenue_minor=None)

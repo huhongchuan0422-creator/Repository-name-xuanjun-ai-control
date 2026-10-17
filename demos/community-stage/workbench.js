@@ -1,7 +1,8 @@
 'use strict';
 (()=>{
  const $=id=>document.getElementById(id);let epoch=0,config=null,busy=false,profileVersion=null,orderCursor=null,orderAfter='',reportCursor=null,reportWindow=null,adCursor=null;
- const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult','refundApplicationResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;};
+ let financialPage=null;
+ const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult','refundApplicationResult','staffResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;financialPage=null;$('financialMore').hidden=true;};
  const status=message=>{$('notice').textContent=message;};
  window.configureCommunityWorkbench=value=>{
   epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,providerWorkspace:typeof value.providerWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.providerWorkspace)?value.providerWorkspace:null}:null;
@@ -69,5 +70,14 @@
  $('splitReturnForm').onsubmit=e=>{e.preventDefault();action(t=>providerAction(t,'split_return',{...providerReference(),receiver_id:$('returnReceiver').value,amount_minor:Number($('returnAmount').value),description:$('returnDescription').value}));};
  $('querySplitReturn').onclick=()=>action(t=>providerAction(t,'query_split_return',providerReference()));
  $('statusSplitReturn').onclick=()=>action(t=>providerAction(t,'status_split_return',providerReference()));
+ $('staffInviteForm').onsubmit=e=>{e.preventDefault();action(async t=>{const r=await call('staff_invite',{email:$('staffEmail').value,project_role:$('staffProjectRole').value},t);if(t===epoch)$('staffResult').textContent=JSON.stringify(r,null,2);});};
+ $('staffGrantForm').onsubmit=e=>{e.preventDefault();action(async t=>{const operations=[];if($('staffOrders').checked)operations.push('community.orders','community.orders_page','community.order_detail');if($('staffSummary').checked)operations.push('community.summary');if($('staffSettings').checked)operations.push('community.merchant_settings');const r=await call('staff_grant',{user_id:$('staffUser').value,operations},t);if(t===epoch)$('staffResult').textContent=JSON.stringify(r,null,2);});};
+ $('staffList').onclick=()=>action(async t=>{const r=await call('staff_list',{after_id:''},t);if(t===epoch)$('staffResult').textContent=JSON.stringify(r,null,2);});
+ $('staffRemove').onclick=()=>action(async t=>{const r=await call('staff_remove',{workspace:$('staffWorkspace').value},t);if(t===epoch)$('staffResult').textContent=JSON.stringify(r,null,2);});
+ async function fundsPage(t,kind,after_id=''){const r=await providerAction(t,'financial_records',{kind,after_id});if(t!==epoch)return;financialPage=r.has_more?{kind,after_id:r.next_cursor}:null;$('financialMore').hidden=!financialPage;}
+ $('financialRecords').onclick=()=>action(t=>fundsPage(t,$('financialKind').value));
+ $('financialMore').onclick=()=>action(t=>financialPage&&fundsPage(t,financialPage.kind,financialPage.after_id));
+ $('reconcileOrder').onclick=()=>action(t=>providerAction(t,'reconcile_order',{reference:$('providerOrder').value}));
+ $('readReconciliation').onclick=()=>action(t=>providerAction(t,'reconciliation_read',{reference:$('providerOrder').value}));
  window.configureCommunityWorkbench(null);
 })();

@@ -186,7 +186,9 @@
         "scripts/community_payment_notifications.py",
         "scripts/community_customer_profile.py",
         "scripts/community_refund_requests.py",
-        "scripts/community_split_returns.py"
+        "scripts/community_split_returns.py",
+        "scripts/community_financial_views.py",
+        "scripts/community_staff.py"
       ]
     },
     {

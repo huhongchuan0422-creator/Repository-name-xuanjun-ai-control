@@ -76,6 +76,12 @@ class StageRuntime:
         }
         if name not in public and principal.role not in permissions.get(name,{'MERCHANT_ADMIN','PLATFORM_OWNER'}):
             raise PermissionError('ADMIN_ROLE_REQUIRED')
+        if name == 'summary':
+            from scripts.community_workbench import order_summary
+            return order_summary(self.demo.db,identity)
+        if name == 'orders':
+            from scripts.community_workbench import orders_page
+            return orders_page(self.demo.db,identity,50,'','ALL')
         if name == 'order_detail':
             from scripts.community_workbench import order_detail
             return order_detail(self.demo.db,self.demo.refund_db,identity,**params)
@@ -100,7 +106,8 @@ class StageRuntime:
             return {'order': dict(order, reference=params['reference']),
                     'payment_state': ('PROVIDER_' + order['state']) if verified else ('MOCK_PAID_SIMULATED' if paid else 'MOCK_' + order['state']),
                     'ads': {AMOUNT: None, SUCCESS: snapshot['ads'][SUCCESS] if paid else None},
-                    'simulation_only': verified is None, 'provider_payment_verified': verified is not None,
+                    'simulation_only': verified is None, 'provider_order_verified': verified is not None,
+                    'provider_payment_verified': verified is not None and order['state'] in ('SUCCESS','REFUNDED'),
                     'provider_settlement_verified': False,
                     'financial_receipt_issued': False, 'finance_effect': 'NONE'}
         admin_routes = {'profile': '/demo/admin/profile', 'item': '/demo/admin/item',
