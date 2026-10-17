@@ -2,7 +2,7 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectCustomerId:"",projectChecklist:[],projectFeedback:"",projectState:""},
+  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectFeedback:"",projectState:""},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
