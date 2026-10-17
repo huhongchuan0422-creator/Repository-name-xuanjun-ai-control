@@ -1,4 +1,4 @@
-import io,json,os,tarfile,tempfile,unittest
+import io,json,os,subprocess,sys,tarfile,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 from scripts import pr122_community_experience_package as mobile
@@ -8,9 +8,25 @@ class UnifiedTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.t=tempfile.TemporaryDirectory();cls.folder=Path(cls.t.name)
-        with patch.dict(os.environ,{'GITHUB_SHA':'790937a5c96afcf3b3660e36cf36cfaab2002a72'}):mobile.build(cls.folder/'mobile')
+        # Historical release reproducibility must use the historical generator,
+        # never current review-candidate sources or altered release pins.
+        frozen=os.environ.get('PR122_FROZEN_MOBILE_ARTIFACT')
+        if frozen:
+            cls.phone=Path(frozen).read_bytes()
+        else:
+            revision='790937a5c96afcf3b3660e36cf36cfaab2002a72'
+            checkout=cls.folder/'historical';checkout.mkdir()
+            try:
+                raw=subprocess.check_output(['git','archive',revision],cwd=u.ROOT,stderr=subprocess.PIPE)
+            except subprocess.CalledProcessError as error:
+                raise RuntimeError('Historical mobile fixture unavailable: provide PR122_FROZEN_MOBILE_ARTIFACT (SHA256 '+u.MOBILE_SHA+') or make commit '+revision+' available in the local checkout. No production access is required.') from error
+            with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
+                archive.extractall(checkout,filter='data')
+            env=dict(os.environ,GITHUB_SHA=revision)
+            subprocess.run([sys.executable,str(checkout/'scripts/pr122_community_experience_package.py'),'--output',str(cls.folder/'mobile')],cwd=checkout,env=env,check=True,capture_output=True)
+            cls.phone=(cls.folder/'mobile/COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz').read_bytes()
+        if u.sha(cls.phone)!=u.MOBILE_SHA:raise AssertionError('FROZEN_MOBILE_HASH_MISMATCH')
         cls.static=(u.ROOT/'evidence/pr122-public-presentation/PR122_PUBLIC_PRESENTATION_REVIEW_ONLY.tar.gz').read_bytes()
-        cls.phone=(cls.folder/'mobile/COMMUNITY_EXPERIENCE_REVIEW_ONLY.tar.gz').read_bytes()
         cls.files=u.compose(cls.static,cls.phone)
     @classmethod
     def tearDownClass(cls):cls.t.cleanup()
@@ -54,3 +70,4 @@ class UnifiedTests(unittest.TestCase):
         self.assertEqual(package_sha:=u.sha(u.archive(self.files)),pins['static_artifact_sha256'])
         self.assertEqual(release.routes(self.files),u.routes(self.files))
         self.assertEqual(release.smoke_routes(self.files),u.smoke_routes(self.files))
+

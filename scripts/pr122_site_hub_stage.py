@@ -65,7 +65,34 @@ def menu_patch(text):
             raise ValueError('UNEXPECTED_NAV_STRUCTURE:'+link)
     return disclosures(icp_footer(text.replace('</head>', '<link rel="stylesheet" href="/assets/xuanjun-site-integration.css"></head>', 1)))
 
-def build(root, source, output, fixture=None):
+def integrate_mobile_navigation(root, public):
+    """Add the exact preview files before this build's final CSP and hash pass."""
+    from scripts.pr122_community_experience_package import collect_mobile_files, TARGET
+    from scripts.pr122_site_hub_unified_package import derive_entry_navigation
+    files,provenance=collect_mobile_files(root,derive_navigation=True)
+    allowed={TARGET+n for n in ('index.html','merchant.html','community.html','beneficiary.html','platform.html','experience.css','experience.js','role.css','role.js')}
+    if set(files)!=allowed:raise ValueError('NAVIGATION_FILE_SET')
+    declared={r['path']:r for r in provenance['files']}
+    if len(provenance['files'])!=9 or set(declared)!=allowed:raise ValueError('NAVIGATION_MANIFEST_SET')
+    for name,data in files.items():
+        if (public/name).exists():raise ValueError('NAVIGATION_NO_OVERWRITE:'+name)
+        if len(data)!=declared[name]['size'] or hashlib.sha256(data).hexdigest()!=declared[name]['sha256']:raise ValueError('NAVIGATION_FILE_HASH')
+    dependencies=provenance['dependencies']
+    if len(dependencies)!=1 or dependencies[0]['path']!='visual/community-local-e2e/app.js':raise ValueError('NAVIGATION_DEPENDENCY_SET')
+    if hashlib.sha256((public/dependencies[0]['path']).read_bytes()).hexdigest()!=dependencies[0]['sha256']:raise ValueError('NAVIGATION_DEPENDENCY_HASH')
+    entries={}
+    for locale in ('','zh-cn/','en/'):
+        path=public/(locale+'visual/community-payment/index.html')
+        entries[path]=derive_entry_navigation(path.read_text(),locale)
+    # All inputs and destinations validated before the first output mutation.
+    for name,data in files.items():
+        target=public/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
+    for path,text in entries.items():path.write_text(text)
+    provenance=dict(provenance)
+    provenance['integration_mechanisms']=[{'path':'scripts/'+name,'sha256':hashlib.sha256((Path(__file__).parent/name).read_bytes()).hexdigest()} for name in ('pr122_site_hub_stage.py','pr122_site_hub_unified_package.py')]
+    return provenance
+
+def build(root, source, output, fixture=None, derive_navigation=False):
     if output.exists():
         raise ValueError('OUTPUT_ALREADY_EXISTS')
     if fixture is None and hashlib.sha256(source.read_bytes()).hexdigest() != SOURCE_HASH:
@@ -223,14 +250,16 @@ def build(root, source, output, fixture=None):
     for p in public.rglob('*.html'):
         text=p.read_text();updated=reviewed_page_copy(text,p.relative_to(public).as_posix())
         if updated!=text:p.write_text(updated)
+    navigation=integrate_mobile_navigation(root,public) if derive_navigation else None
     # Reuse the already reviewed CSP implementation, never enable unsafe-inline.
     with Deadline(20) as deadline: csp=write_csp_metadata(public,output,deadline)
     manifest={p.relative_to(public).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in public.rglob('*') if p.is_file()}
     result={'status':'HOSTED_BROWSER_FIXTURE_ONLY' if fixture else 'ISOLATED_INTEGRATION_CANDIDATE','production_approved':False,'source_archive_sha256':None if fixture else SOURCE_HASH,'base_files':len(old),'final_files':len(manifest),'changed_existing':[k for k,h in old.items() if manifest[k]!=h],'added':[k for k in manifest if k not in old],'files':manifest,'csp':csp,'release_blockers':['Production simulation service isolation and admission pending','Browser acceptance pending','Live current baseline reconciliation pending','Independent review and controlled installer approval pending']}
+    if navigation is not None:result['navigation_derivation']=navigation
     (output/'MANIFEST.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({k:v for k,v in result.items() if k!='files'},ensure_ascii=False))
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--source-archive',type=Path);p.add_argument('--browser-fixture',type=Path);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--source-archive',type=Path);p.add_argument('--browser-fixture',type=Path);p.add_argument('--output',type=Path,required=True);p.add_argument('--derive-navigation',action='store_true');a=p.parse_args()
     if bool(a.source_archive)==bool(a.browser_fixture):p.error('Choose exactly one pinned full archive or browser fixture')
-    build(Path(__file__).resolve().parents[1],a.source_archive,a.output,a.browser_fixture)
+    build(Path(__file__).resolve().parents[1],a.source_archive,a.output,a.browser_fixture,a.derive_navigation)

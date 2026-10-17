@@ -1,0 +1,88 @@
+name: PR122 Website Copy and Navigation Hosted Review Only
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - scripts/pr122_site_hub_*.py
+      - scripts/pr122_community_experience_package.py
+      - demos/xuanjun-site-hub/**
+      - demos/work-community-experience/**
+      - tests/test_pr122_ecology_copy.py
+      - tests/test_pr122_public_copy_audit.py
+      - tests/test_pr122_role_navigation.py
+      - tests/test_pr122_navigation_stage.py
+      - tests/test_pr122_site_hub_unified_package.py
+      - tests/pr122_*browser.cjs
+      - tests/pr122_role_navigation.cjs
+      - tests/ecv-quote-fractional.test.cjs
+      - tests/fixtures/pr122-site-shell/**
+      - tests/fixtures/pr122-public-copy-evidence.json
+      - .github/workflows/pr122-website-copy-navigation-review.yml
+permissions:
+  contents: read
+jobs:
+  hosted-review-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Source and simulated regressions without target host access
+        run: |
+          mkdir -p /tmp/pr122-website-review
+          python -m unittest tests.test_pr122_ecology_copy tests.test_pr122_public_copy_audit tests.test_pr122_role_navigation tests.test_pr122_navigation_stage -v
+          node --test demos/xuanjun-site-hub/assets/ecv-quote.test.cjs tests/ecv-quote-fractional.test.cjs
+          node tests/pr122_role_navigation.cjs
+      - name: Reproduce the pinned historical mobile package without changing release pins
+        run: |
+          git fetch --depth=1 origin 790937a5c96afcf3b3660e36cf36cfaab2002a72
+          python -m unittest tests.test_pr122_site_hub_unified_package -v
+      - name: Install pinned Hosted browser dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pr122-copy-browser" --no-save playwright@1.55.0
+          "$RUNNER_TEMP/pr122-copy-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Build current synthetic website with opt-in navigation before CSP and manifest
+        run: python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-current-website --derive-navigation
+      - name: Exercise real Chromium copy, responsive layout and role navigation
+        env:
+          XJ_HUB_STAGE: /tmp/pr122-current-website
+          XJ_ECOLOGY_REPORT: /tmp/pr122-website-review/ecology
+          XJ_ROLE_NAV_REPORT: /tmp/pr122-website-review/role-navigation
+        run: |
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-copy-browser/node_modules/playwright" node tests/pr122_ecology_browser.cjs
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-copy-browser/node_modules/playwright" node tests/pr122_role_navigation_browser.cjs
+      - name: Bind exact source and current synthetic preview; no production permission
+        run: |
+          python - <<'PYCODE'
+          import gzip,hashlib,io,json,os,subprocess,tarfile
+          from pathlib import Path
+          paths=['.github/workflows/pr122-website-copy-navigation-review.yml', 'demos/legal/service-package-rights.html', 'demos/work-community-experience/role.js', 'demos/xuanjun-site-hub/assets/ecv-quote-ui.js', 'demos/xuanjun-site-hub/assets/ecv-quote.js', 'demos/xuanjun-site-hub/assets/ecv-quote.test.cjs', 'demos/xuanjun-site-hub/customer/projects/index.html', 'demos/xuanjun-site-hub/marketplace/index.html', 'demos/xuanjun-site-hub/visual/community-payment/index.html', 'docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md', 'scripts/pr122_community_experience_package.py', 'scripts/pr122_site_hub_english.py', 'scripts/pr122_site_hub_public_copy.py', 'scripts/pr122_site_hub_stage.py', 'scripts/pr122_site_hub_unified_package.py', 'tests/ecv-quote-fractional.test.cjs', 'tests/fixtures/pr122-public-copy-evidence.json', 'tests/fixtures/pr122-site-shell/PINS.json', 'tests/fixtures/pr122-site-shell/custom-ai/index.html', 'tests/fixtures/pr122-site-shell/en/custom-ai/index.html', 'tests/fixtures/pr122-site-shell/zh-cn/custom-ai/index.html', 'tests/pr122_ecology_browser.cjs', 'tests/pr122_role_navigation.cjs', 'tests/pr122_role_navigation_browser.cjs', 'tests/test_pr122_ecology_copy.py', 'tests/test_pr122_navigation_stage.py', 'tests/test_pr122_public_copy_audit.py', 'tests/test_pr122_role_navigation.py', 'tests/test_pr122_site_hub_unified_package.py']
+          files={name:Path(name).read_bytes() for name in paths}
+          manifest={'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'scope':'CURRENT_WEBSITE_SYNTHETIC_REVIEW_ONLY','production_release':'HOLD','target_host_commands':'NOT_EXECUTED','files':[{'path':name,'size':len(raw),'sha256':hashlib.sha256(raw).hexdigest()} for name,raw in sorted(files.items())]}
+          raw=(json.dumps(manifest,ensure_ascii=False,sort_keys=True,indent=2)+'\n').encode();files['SOURCE_MANIFEST.json']=raw
+          buffer=io.BytesIO()
+          with tarfile.open(fileobj=buffer,mode='w') as archive:
+              for name,data in sorted(files.items()):
+                  member=tarfile.TarInfo(name);member.size=len(data);member.mode=0o644;member.mtime=0;archive.addfile(member,io.BytesIO(data))
+          packed=gzip.compress(buffer.getvalue(),mtime=0)
+          out=Path('/tmp/pr122-website-review');(out/'SOURCE_REVIEW.tar.gz').write_bytes(packed);(out/'SOURCE_MANIFEST.json').write_bytes(raw)
+          (out/'SOURCE_CHECKSUMS.json').write_text(json.dumps({'tar_sha256':hashlib.sha256(packed).hexdigest(),'manifest_sha256':hashlib.sha256(raw).hexdigest(),'files':len(paths)},sort_keys=True)+'\n')
+          stage=Path('/tmp/pr122-current-website');binding=json.loads((stage/'MANIFEST.json').read_text())
+          assert binding['status']=='HOSTED_BROWSER_FIXTURE_ONLY' and binding['production_approved'] is False
+          with tarfile.open(out/'CURRENT_WEBSITE_HOSTED_FIXTURE_PREVIEW.tar.gz','w:gz') as archive:
+              for file in sorted(stage.rglob('*')):
+                  if file.is_file():
+                      assert not file.is_symlink();archive.add(file,arcname=file.relative_to(stage),recursive=False)
+          (out/'CURRENT_WEBSITE_MANIFEST.json').write_bytes((stage/'MANIFEST.json').read_bytes())
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr122-website-copy-navigation-${{ github.sha }}
+          path: /tmp/pr122-website-review/
+          retention-days: 14
