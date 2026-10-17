@@ -1,13 +1,13 @@
 {
-  "source_commit": "e561434c36de8d5f18103c42552fe755e0c2869e",
-  "source_tree": "5ac698d73b640ea771080025cde9742db932a87d",
-  "run_id": 39013469873,
+  "source_commit": "b7308fbd2fb97b905ab9e0cff8bf9d5820428ef2",
+  "source_tree": "fd215defe2e5790d91fe1391d505b3d0a98c4bbf",
+  "run_id": 39014733361,
   "hosted": {
-    "job_id": 117340662923,
-    "community_python": 342,
+    "job_id": 117344353429,
+    "community_python": 350,
     "stage5_python": 342,
     "javascript": 72,
-    "total_test_executions": 756,
+    "total_test_executions": 764,
     "status": "SUCCESS",
     "failed": 0,
     "skipped": 0,
@@ -15,10 +15,10 @@
     "cryptography": "50.0.2"
   },
   "domestic_isolated": {
-    "job_id": 117340971877,
+    "job_id": 117344735444,
     "host": "iZvt5t8tlrm8oiZ",
     "uid": 1002,
-    "tests": 150,
+    "tests": 157,
     "status": "PASS",
     "failed": 0,
     "skipped": 0,
@@ -32,15 +32,15 @@
     "overlaps_hosted_suites": true
   },
   "source_artifact": {
-    "id": 12093698116,
-    "outer_zip_sha256": "8d30d34c70d379a7b9fade39b2d1ff9b66010a33ea0fd8b32be9ed25e5c2a1e8",
-    "inner_zip_sha256": "fd60a1215439c428f3545f2bbffb608a997ecd5d82e70fd49771c701a4542635",
-    "inner_zip_bytes": 979796,
-    "manifest_files_verified": 168
+    "id": 12094497779,
+    "outer_zip_sha256": "d4a8cd6c703a71d9be42eec882197753bace75a98176afe1ba8dbb82ea3cfa95",
+    "inner_zip_sha256": "d96c8e91176851cf73cdf10c05f93427a348b14cb1f017196b2e329f2f482f24",
+    "inner_zip_bytes": 1012678,
+    "manifest_files_verified": 175
   },
   "domestic_artifact": {
-    "id": 12094270494,
-    "outer_zip_sha256": "b15a16626829a22ed6cf1d5ec4403f86b3a64a9623a6833c618978296129fb02",
+    "id": 12094257174,
+    "outer_zip_sha256": "047499b55a7606740f3141e737f4bdbe4bfb97804d5dcf00eba3852f8611da54",
     "receipt_head_verified": true
   },
   "reused_native_preview": {
@@ -78,7 +78,7 @@
     "Original production deployment and DB migration/recovery gates; no parallel host writer"
   ],
   "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance",
-  "latest_fix": "Bounded status-filtered admission cursor pagination and current-owner reads; account-generation isolation rejects stale private replies and old file preparation after account switch. No duplicate identity or Finance store.",
+  "latest_fix": "Implemented merchant workbench UI on original Center operations: paused-profile read/edit, catalog edit/hide, paged order filtering and CSV export, paged advertising create/review/state controls, original-event reports and reconciliation preview. Original Center cookie/CSRF transport and admission-to-workbench link. No duplicate identity or Finance store.",
   "merchant_onboarding": {
     "applicant_route": "/merchant/join",
     "review_route": "/merchant/review",
@@ -97,5 +97,14 @@
     "client_epoch_browser_tests": 2,
     "client_epoch_network": "DELIBERATELY_DELAYED_SYNTHETIC_TRANSPORT",
     "real_http_browser_journeys": 2
+  },
+  "merchant_workbench": {
+    "route": "/merchant/workbench",
+    "production_route_published": false,
+    "original_center_required": true,
+    "backend_tests": 3,
+    "real_http_browser_journeys": 1,
+    "source_account_project": "SYNTHETIC_FIXTURES",
+    "payment_enabled": false
   }
 }
