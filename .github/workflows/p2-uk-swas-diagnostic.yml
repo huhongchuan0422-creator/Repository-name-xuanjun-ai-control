@@ -7,7 +7,7 @@ on:
         required: true
         type: choice
         default: offline
-        options: [offline, remote-run, cloud-query, a5-preflight, a5-query]
+        options: [offline, remote-run, cloud-query, a5-preflight, a5-query, read-only-diagnostic, read-only-diagnostic-query]
       attempt:
         description: 'Exact approved transport attempt; no command input'
         required: false
@@ -24,6 +24,8 @@ on:
       - scripts/p2_swas_receipt_validator.py
       - tests/test_p2_uk_swas_diagnostic.py
       - tests/test_p2_swas_receipt_validator.py
+      - tests/test_p2_uk_readonly_diagnostic.py
+      - scripts/p2_uk_readonly_diagnostic.py
       - evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md
 permissions:
   contents: read
@@ -41,6 +43,11 @@ jobs:
         run: |
           set -euo pipefail
           sudo -n -- "$(command -v python)" -B -m unittest discover -s tests -p 'test_p2_*swas*.py' -v 2>&1 | tee /tmp/P2_UK_SWAS_TESTS.log
+      - name: Offline pinned diagnostic negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n -- "$(command -v python)" -B -m unittest discover -s tests -p 'test_p2_uk_readonly_diagnostic.py' -v
       - name: Bind all six public source paths and test log
         shell: bash
         run: |
@@ -86,6 +93,11 @@ jobs:
     container: python:3.6.15-bullseye
     steps:
       - uses: actions/checkout@v4
+      - name: Python 3.6 diagnostic negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m unittest discover -s tests -p 'test_p2_uk_readonly_diagnostic.py' -v
       - name: Exact extracted attachment filesystem and negative tests
         shell: bash
         run: |
@@ -105,7 +117,7 @@ jobs:
     needs: [offline, site-python36]
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      (inputs.operation == 'remote-run' || inputs.operation == 'cloud-query' || inputs.operation == 'a5-preflight' || inputs.operation == 'a5-query') &&
+      (inputs.operation == 'remote-run' || inputs.operation == 'cloud-query' || inputs.operation == 'a5-preflight' || inputs.operation == 'a5-query' || inputs.operation == 'read-only-diagnostic' || inputs.operation == 'read-only-diagnostic-query') &&
       github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
       github.actor_id == '332398908' &&
       vars.P2_UK_SPLIT_LIVE_ENABLED == 'true'
@@ -137,7 +149,13 @@ jobs:
           P2_INVOKE_ID: ${{ inputs.invoke_id }}
         run: |
           set -euo pipefail
-          python -I -B scripts/p2_uk_swas_diagnostic.py "$P2_OPERATION" --attempt "$P2_ATTEMPT" --invoke-id "$P2_INVOKE_ID" 2>&1 | tee /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+          if python -I -B scripts/p2_uk_swas_diagnostic.py "$P2_OPERATION" --attempt "$P2_ATTEMPT" --invoke-id "$P2_INVOKE_ID" > /tmp/P2_SPLIT_PUBLIC_RECEIPT.json 2>/dev/null; then
+            cat /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+          else
+            printf '%s\\n' '{"state":"HOLD","redispatch_allowed":false}' > /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+            cat /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+            exit 2
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
