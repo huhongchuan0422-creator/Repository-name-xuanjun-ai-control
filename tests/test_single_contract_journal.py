@@ -27,7 +27,7 @@ class JournalTests(unittest.TestCase):
     def test_idempotency_and_read(self):
         a=self.j.submit("prj1","cust1","req1",sample())
         self.assertEqual(a,self.j.submit("prj1","cust1","req1",sample()))
-        self.assertEqual(a,self.j.read("prj1","contract1","req1"))
+        self.assertEqual(a,self.j.read("prj1","cust1","contract1","req1"))
         self.assertEqual(a["payment"],"HOLD")
     def test_conflicting_request_rejected(self):
         self.j.submit("prj1","cust1","req1",sample())
@@ -42,7 +42,21 @@ class JournalTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractHold,"IDENTITY_SCOPE_MISMATCH"):
             self.j.submit("prj1","other","req1",sample())
         with self.assertRaisesRegex(ContractHold,"CANDIDATE_NOT_FOUND"):
-            self.j.read("otherproject","contract1","req1")
+            self.j.read("otherproject","cust1","contract1","req1")
+    def test_same_project_different_customer_denied(self):
+        self.j.submit("prj1","cust1","req1",sample())
+        with self.assertRaisesRegex(ContractHold,"CANDIDATE_ACCESS_DENIED"):
+            self.j.read("prj1","othercustomer","contract1","req1")
+
+    def test_corrupt_blob_detected_without_signature_or_payment(self):
+        self.j.submit("prj1","cust1","req1",sample())
+        # Simulate privileged filesystem tampering after removing local triggers.
+        with sqlite3.connect(self.path) as db:
+            db.execute("DROP TRIGGER contract_frozen_no_update")
+            db.execute("UPDATE contract_frozen_candidate SET candidate_sha=?",("f"*64,))
+        with self.assertRaisesRegex(ContractHold,"CORRUPT_CANDIDATE_DIGEST"):
+            self.j.read("prj1","cust1","contract1","req1")
+
     def test_append_only(self):
         self.j.submit("prj1","cust1","req1",sample())
         with sqlite3.connect(self.path) as db:
