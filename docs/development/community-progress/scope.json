@@ -87,11 +87,11 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "cf01f58e9acefa98f34e1711c963ea9d80c2cbe3",
-    "run_id": 39030394638,
-    "job_id": 117389505111,
+    "source": "167b3b7b69f590bf057da49fc9c90ec8c16085ab",
+    "run_id": 39031100111,
+    "job_id": 117391544227,
     "result": "SUCCESS",
-    "scope": "Hosted exact source success after case-insensitive synthetic UBO duplicate rejection; mini preview/runtime/python/SDK SKIPPED",
+    "scope": "Exact source Hosted regression: receiver-detail guard and trade/split currency ambiguity; optional mini runtime/preview SDK SKIPPED",
     "covers_later_commits": false
   }
 }
