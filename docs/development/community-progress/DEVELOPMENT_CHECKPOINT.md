@@ -206,3 +206,44 @@ merchant, money, host configuration, DNS, real customer material or release acti
 was performed. Both phases remain unaccepted until complete scope reconciliation
 and an independent reviewer other than the author examines the exact resulting
 version. dot must not independently approve code authored in this continuation.
+
+## 2026-10-17 continued source closure — current checked evidence
+
+- `41b1e15591385a7defc99e5056cc4a52c25b8c2e` / Hosted `39052972787`:
+  original project-scoped SaaS administration and conditional operator/UBO
+  private materials, SUCCESS (community 503, Stage5 342, mini/key 119).
+  Prior `a77fca9a` run `39052648329` failed browser startup; the test now selects
+  the supported installed Chrome without disabling its sandbox. That failed run
+  is not retrospectively relabeled successful.
+- `afea4b4b019f6d9df1b10e3e91717d300e21371b` / Hosted `39053909362`:
+  original STORE fields/media mappings and private notification pagination/read,
+  SUCCESS (community 505, Stage5 342, mini/key 161).
+- `cfe57478dc28f684fd94ce85219bb035f9c2f107` / Hosted `39054661610`:
+  original scoped refund directory/current-application recovery, frozen order
+  snapshots and fulfillment revision views, SUCCESS (community 519, Stage5 342,
+  mini/key 203). Directory scanning is bounded to 1,000 original mixed rows per
+  request; sparse pages retain a progressing cursor. No new refund queue or
+  automatic financial action was introduced.
+- `a5f5596aac8004d17480b29aefc43504a297e27d` / Hosted `39055784782`,
+  job `117463354443`, SUCCESS (community 527, Stage5 342, mini/key 203, other
+  Node groups 40/8/7): original staff-directory pagination with exact permission
+  selection and original community lifecycle filters. Actual browser staff and
+  existing workbench/portal journeys are included. Optional runtime/preview/SDK
+  jobs remain SKIPPED. Source package SHA256:
+  `5eaa9fc590f7171290f33fa991e3a4f19f1e7e0263a8db15118e581fe00b00a6`.
+
+The accompanying Finance integration test closes a previously untested source
+boundary: actual MiniApplication.configure_fulfillment, signed grant/reversal
+receipt verification, durable SQLite reservations, entitlement commit and reopen
+recovery. Its 23 local cases and adjacent regressions passed with ephemeral test
+keys and synthetic signed receipts only. No genuine Finance authority, money,
+merchant or entitlement was accessed. Exact-commit Hosted evidence is still
+required for this newly added test file; previous counts do not include it.
+
+Remaining boundaries are explicit: official mini-program compilation/device
+validation is not established by Node VM tests; receiver-detail split/return bill
+formats need verified primary schema evidence; production scanner/CRM/Finance/
+merchant admission and live transactions remain external. The community's three
+locked Center pins have not been silently replaced with the website branch's
+15c263e6 changes, so cross-branch production integration is not claimed. Final
+phase acceptance and independent review are not granted by these source checks.
