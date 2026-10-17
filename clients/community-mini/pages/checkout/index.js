@@ -2,9 +2,11 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
+  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
   async onLoad(options) {
     this._pageUnloaded=false;
+    this._noticeContext=null;this._noticeRequest=null;
+    this.setData({notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:''});
     const lifecycle=this._pageGeneration=(this._pageGeneration||0)+1;
     const current=()=>!this._pageUnloaded&&this._pageGeneration===lifecycle;
     try {
@@ -34,7 +36,7 @@ Page({
       .catch(e=>{if(current())this.setData({status:e.message});});
     } catch(e) {if(current())this.setData({status:e.message});}
   },
-  onUnload() {this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
+  onUnload() {this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
   inputProject(e) {this.setData({projectFeedback:e.detail.value});},
@@ -165,20 +167,89 @@ Page({
         id:item.id,state:item.state,required:item.required,revision:item.revision,title:item.title,instructions:item.instructions,submission_type:item.submission_type}))});
       else if(op==='project_messages')this.setData({projectMessages:r.records,status:'读取原项目归档记录；不代表已获得人工回复'});
       else this.setData({projectFeedback:'',status:'项目反馈已归档，尚未确认人工回复：'+r.id});
+      if(op==='project_summary'&&this._noticeContext)this.prepareNoticeContext();
     } catch(error) {if(this.projectRequestCurrent(request))this.setData({status:error.message});}
     finally {if(this.projectRequestCurrent(request)){this._projectRequest=null;this.setData({pending:false});}}
   },
+  noticeContextCurrent(context) {
+    return !!context&&!this._pageUnloaded&&context.generation===this._pageGeneration&&
+      context.session===this.session&&context.scene===this.scene&&
+      context.user===this.data.userId&&context.customer===this.data.projectCustomerId&&
+      (typeof context.session.getGeneration!=='function'||context.session.getGeneration()===context.sessionGeneration);
+  },
+  prepareNoticeContext() {
+    if(!this.noticeContextCurrent(this._noticeContext)){
+      this._noticeRequest=null;
+      this._noticeContext={generation:this._pageGeneration,session:this.session,scene:this.scene,
+        user:this.data.userId,customer:this.data.projectCustomerId,
+        sessionGeneration:typeof this.session.getGeneration==='function'?this.session.getGeneration():undefined};
+      this.setData({notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:''});
+    }
+    return this._noticeContext;
+  },
+  noticeRequestCurrent(request) {
+    return this._noticeRequest===request&&this.noticeContextCurrent(request.context);
+  },
+  async loadNotices(e) {
+    if(this._pageUnloaded||!this.session||this.data.pending)return;
+    const context=this.prepareNoticeContext();
+    if(this.data.noticePending)return;
+    const more=e&&e.currentTarget&&e.currentTarget.dataset.more==='true';
+    if(more&&(!this.data.noticesLoaded||!this.data.noticesMore||!this.data.noticeCursor))return;
+    const after=more?this.data.noticeCursor:'';
+    const request={context};this._noticeRequest=request;this.setData({noticePending:true,noticeStatus:''});
+    try {
+      const r=await context.session.commerce(context.scene,'notices',{after_id:after});
+      if(!this.noticeRequestCurrent(request))return;
+      if(!r||!Array.isArray(r.records)||r.records.length>50||typeof r.has_more!=='boolean'||
+         r.records.some(record=>!record||typeof record.id!=='string'||!/^[0-9a-f]{64}$/.test(record.id)||
+           typeof record.message!=='string'||typeof record.read!=='boolean')||
+         (r.has_more?(!r.records.length||typeof r.next_cursor!=='string'||!/^[0-9a-f]{64}$/.test(r.next_cursor)||r.next_cursor<=after):r.next_cursor!==null))
+        throw Error('通知列表返回无效，请重试');
+      const records=new Map((more?this.data.notices:[]).map(record=>[record.id,record]));
+      for(const record of r.records){const prior=records.get(record.id);records.set(record.id,{...record,read:record.read||!!(prior&&prior.read)});}
+      this.setData({notices:Array.from(records.values()),noticeCursor:r.next_cursor,
+        noticesMore:r.has_more,noticesLoaded:true});
+    } catch(error) {if(this.noticeRequestCurrent(request))this.setData({noticeStatus:error.message});}
+    finally {if(this.noticeRequestCurrent(request)){this._noticeRequest=null;this.setData({noticePending:false});}}
+  },
+  async markNoticeRead(e) {
+    if(this._pageUnloaded||!this.session||this.data.pending)return;
+    const context=this.prepareNoticeContext();
+    if(this.data.noticePending)return;
+    const id=e.currentTarget.dataset.id;
+    const record=this.data.notices.find(notice=>notice.id===id);
+    if(typeof id!=='string'||!/^[0-9a-f]{64}$/.test(id)||!record||record.read)return;
+    const request={context};this._noticeRequest=request;this.setData({noticePending:true,noticeStatus:''});
+    try {
+      const r=await context.session.commerce(context.scene,'notice_read',{notice_id:id});
+      if(!this.noticeRequestCurrent(request))return;
+      if(!r||r.id!==id||r.read!==true)throw Error('通知已读状态未确认，请重试或刷新通知');
+      this.setData({notices:this.data.notices.map(notice=>notice.id===id?{...notice,read:true}:notice)});
+    } catch(error) {if(this.noticeRequestCurrent(request))this.setData({noticeStatus:error.message});}
+    finally {if(this.noticeRequestCurrent(request)){this._noticeRequest=null;this.setData({noticePending:false});}}
+  },
   async profileAction(e) {
-    if(this.data.pending||!this.session)return;this.setData({pending:true});
+    if(e.currentTarget.dataset.operation==='notices')return this.loadNotices(e);
+    if(this._pageUnloaded||this.data.pending||!this.session)return;
+    const context={...this.prepareNoticeContext()};this._profileRequest=context;
+    const current=()=>this._profileRequest===context&&this.noticeContextCurrent(context);
+    this.setData({pending:true});
     try{const op=e.currentTarget.dataset.operation;let params={};
       if(op==='profile_update'){if(this.data.profileVersion===null)throw Error('先读取个人资料');params={nickname:this.data.nickname,contact:this.data.profileContact,expected_version:this.data.profileVersion};}
-      else if(op==='referral_bind')params={code:this.data.referralCode};else if(op==='notices')params={after_id:''};
-      if(!['profile_read','profile_update','referral_code','referral_bind','notices'].includes(op))throw Error('无效操作');
-      const r=await this.session.commerce(this.scene,op,params);
-      if(op==='profile_read'||op==='profile_update')this.setData({profileVersion:r.version,nickname:r.nickname,profileContact:r.contact,userId:r.user_id,projectCustomerId:r.project_customer_id});
-      else if(op==='referral_code')this.setData({referralCode:r.code});else if(op==='notices')this.setData({notices:r.records});
+      else if(op==='referral_bind')params={code:this.data.referralCode};
+      if(!['profile_read','profile_update','referral_code','referral_bind'].includes(op))throw Error('无效操作');
+      const r=await context.session.commerce(context.scene,op,params);
+      if(!current())return;
+      if(op==='profile_read'||op==='profile_update'){
+        context.user=r.user_id;context.customer=r.project_customer_id;
+        this.setData({profileVersion:r.version,nickname:r.nickname,profileContact:r.contact,userId:r.user_id,projectCustomerId:r.project_customer_id});
+        this.prepareNoticeContext();
+      }
+      else if(op==='referral_code')this.setData({referralCode:r.code});
       this.setData({status:op==='referral_bind'?'推荐关系已绑定':'个人中心已更新'});
-    }catch(error){this.setData({status:error.message});}finally{this.setData({pending:false});}
+    }catch(error){if(current())this.setData({status:error.message});}
+    finally{if(this._profileRequest===context&&!this._pageUnloaded&&this._pageGeneration===context.generation){this._profileRequest=null;this.setData({pending:false});}}
   },
   inputCommunity(e) {const field=e.currentTarget.dataset.field;if(['communityId','promotionCode'].includes(field))this.setData({[field]:e.detail.value});},
   async communityAction(e) {
