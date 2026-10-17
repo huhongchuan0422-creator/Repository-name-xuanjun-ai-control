@@ -17,7 +17,8 @@
         "criteria": [
           "positive registry and negative omissions detected",
           "normal PR has stable feature-compliance check",
-          "main protection is only enabled after safe bootstrap"
+          "main protection is only enabled after safe bootstrap",
+          "community development observer excludes documentation commits and marks 20-minute source inactivity"
         ],
         "tests": [
           "tests/test_feature_compliance_check.py"
@@ -26,6 +27,10 @@
       "reuse": [
         "GitHub Actions",
         "standard-library Python"
+      ],
+      "paths": [
+        "scripts/community_development_watch.py",
+        ".github/workflows/community-development-watch.yml"
       ]
     }
   ]
