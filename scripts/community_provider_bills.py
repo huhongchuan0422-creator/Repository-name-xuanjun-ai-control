@@ -75,7 +75,7 @@ class ProviderBills:
         if row is None:raise ValueError('VERIFIED_PROVIDER_BILL_NOT_FOUND')
         return key,json.loads(self.center.decrypt(row[0],'community-bill:'+key))
     def dispatch(self,session,csrf,workspace,operation,p):
-        fields={'bill_fetch':{'kind','bill_date'},'bill_rows':{'kind','bill_date','offset'},'bill_reconcile':{'kind','bill_date'}}
+        fields={'bill_fetch':{'kind','bill_date'},'bill_rows':{'kind','bill_date','offset'},'bill_reconcile':{'kind','bill_date'},'bill_audit':{'kind','bill_date','after_id'}}
         if operation not in fields or type(p) is not dict or set(p)!=fields[operation] or p['kind'] not in ('TRADE','SPLIT'):raise ValueError('INVALID_PROVIDER_BILL_FIELDS')
         a,c=self.actions,self.center;g,policy=a._authorize(session,csrf,workspace)
         if type(p['bill_date']) is not str or not re.fullmatch('[0-9]{4}-[0-9]{2}-[0-9]{2}',p['bill_date']):raise ValueError('INVALID_BILL_DATE')
@@ -102,6 +102,21 @@ class ProviderBills:
             return dict(kind=p['kind'],bill_date=p['bill_date'],row_count=len(rows),body_sha256=record['body_sha256'],integrity='SIGNED_TICKET_HASH_VERIFIED',reconciliation='NOT_RUN',finance_status='UNCONFIRMED')
         key,bill=self._read(g,p['kind'],p['bill_date'])
         if bill['scope']!=g['scope'] or bill['sub_mchid']!=policy['sub_mchid']:raise PermissionError('BILL_MERCHANT_BINDING_CHANGED')
+        if operation=='bill_audit':
+            after=p['after_id']
+            if type(after) is not str or (after and not re.fullmatch('[0-9a-f]{64}',after)):
+                raise ValueError('INVALID_BILL_AUDIT_CURSOR')
+            rows=c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_BILL_RECONCILIATION' AND project=? AND active=1 AND subject_idx>? ORDER BY subject_idx LIMIT 51",(g['project'],after)).fetchall()
+            records=[]
+            for ref,payload in rows[:50]:
+                saved=json.loads(c.decrypt(payload,'community-bill-reconciliation:'+ref))
+                if (type(saved) is dict and saved.get('bill_key')==key
+                        and saved.get('kind')==p['kind'] and saved.get('bill_date')==p['bill_date']
+                        and saved.get('scope')==g['scope']):
+                    records.append(dict(id=ref,result=saved['result']))
+            return dict(records=records,has_more=len(rows)>50,
+                        next_cursor=rows[49][0] if len(rows)>50 else None,
+                        coverage='EXACT_SCOPE_BILL_AUDIT_ONLY',finance_status='UNCONFIRMED')
         if operation=='bill_rows':
             offset=p['offset']
             if type(offset) is not int or not 0<=offset<=100000:raise ValueError('INVALID_BILL_PAGE')
@@ -112,7 +127,7 @@ class ProviderBills:
         result=self.reconcile(g,bill)
         with c.tx():
             event=hashlib.sha256(canonical([key,result])).hexdigest()
-            c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_BILL_RECONCILIATION',?,?,?,?,1)",(event,g['user_id'],g['project'],c.encrypt(canonical(result),'community-bill-reconciliation:'+event)))
+            c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_BILL_RECONCILIATION',?,?,?,?,1)",(event,g['user_id'],g['project'],c.encrypt(canonical(dict(bill_key=key,kind=p['kind'],bill_date=p['bill_date'],scope=g['scope'],result=result)),'community-bill-reconciliation:'+event)))
             c.audit(g['project'],g['user_id'],'PROVIDER_BILL_RECONCILED',event)
         return result
     def reconcile(self,g,bill):
