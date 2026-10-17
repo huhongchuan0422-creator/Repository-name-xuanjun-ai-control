@@ -34,17 +34,15 @@ def render(candidate):
     def plain(value):
         if not isinstance(value, str) or not value:
             raise ContractHold("INVALID_TEXT")
-        if any(ord(ch) < 32 and ch not in ("\\n", "\\t") for ch in value):
+        if any(ord(ch) < 32 and ch not in ("\n", "\t") for ch in value):
             raise ContractHold("INVALID_TEXT")
-        # Flatten untrusted text: a customer cannot introduce new contract rows.
-        value = " ".join(value.splitlines()).replace("\\t", " ")
-        # Prevent autolink in permissive downstream renderers, even if a caller
-        # accidentally ignores content_type=text/plain. WORD JOINER is invisible
-        # and affects URL syntax only, not amounts, HTML entities or punctuation.
-        value = re.sub(r"(?i)\\b(https?)(://)", lambda m:
-                       m.group(1) + "\\u2060" + m.group(2), value)
-        value = re.sub(r"(?i)\\b(www)(\\.)", lambda m:
-                       m.group(1) + "\\u2060" + m.group(2), value)
+        value = " ".join(value.splitlines()).replace("\t", " ")
+        # Enforced consumer contract: text/plain; protect even against GFM
+        # autolinks by splitting URL schemes invisibly with WORD JOINER.
+        value = re.sub(r"(?i)\b(https?)(://)", lambda m:
+                       m.group(1) + "\u2060" + m.group(2), value)
+        value = re.sub(r"(?i)\b(www)(\.)", lambda m:
+                       m.group(1) + "\u2060" + m.group(2), value)
         return value
 
     out = [
