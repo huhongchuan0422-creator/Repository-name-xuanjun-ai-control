@@ -13,6 +13,8 @@ class Changes:
     def _request_sha(self,events):return digest(canonical({'event_id':events[0]['id'],'payload':events[0]['payload']}))
 
     def _events(self, uid, project, case):
+        if not self.c.db.in_transaction:
+            with self.c.tx():return self._events(uid,project,case)
         self.c.project(uid,project)
         rows=self.c.db.execute('SELECT * FROM change_events WHERE project=? AND case_id=? ORDER BY seq',(project,identifier(case))).fetchall()
         if not rows:raise Denied('CHANGE_NOT_FOUND')
@@ -24,6 +26,7 @@ class Changes:
             proof['parent_sha256']=parent;parent=digest(canonical(proof))
             event['credential']={**proof,'sha256':parent,'anchor_state':'LOCAL_ONLY','on_chain':False}
             result.append(event)
+        self.c.audit(project,uid,'CHANGE_HISTORY_READ',case)
         return result
 
     def _append(self, uid, project, case, revision, kind, payload,guard=None):

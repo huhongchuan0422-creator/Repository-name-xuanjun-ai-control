@@ -18,11 +18,40 @@ HOST='iZvt5t8tlrm8oiZ'
 ROOT=Path('/var/lib/xuanjun-customer-center')
 CONFIG=Path('/etc/xuanjun-customer-center/config.json')
 
+RUNTIME_CONTEXT_DEPTH = {'message_evidence_context':2, 'privacy_policy_context':1, 'privacy_processing_context':3}
+
+def validate_runtime_contexts(config, runtime):
+    """Bind optional noncredential context maps to the protected operator input."""
+    from scripts.pr122_customer_core import valid_id
+    from scripts.pr122_customer_evidence import CONTEXT_FIELDS
+    from scripts.pr122_customer_privacy import POLICY_FIELDS
+    fields={'message_evidence_context':set(CONTEXT_FIELDS), 'privacy_policy_context':set(POLICY_FIELDS),
+            'privacy_processing_context':{'requester_id','project_id','tenant_id','customer_id','request_id','revision','status','status_ref','actor_ref','occurred_at','outcome_ref'}}
+    required={'keys','active_key','providers'}
+    if type(runtime) is not dict or not required <= set(runtime) or set(runtime)-required-set(RUNTIME_CONTEXT_DEPTH):
+        raise Denied('RUNTIME_CREDENTIAL_MINIMUM')
+    def mapping(value, depth, allowed, integer_fields):
+        if type(value) is not dict:raise Denied('RUNTIME_CONTEXT_MAPPING')
+        if depth:
+            for key,child in value.items():
+                if not valid_id(key):raise Denied('RUNTIME_CONTEXT_ID')
+                mapping(child,depth-1,allowed,integer_fields)
+        elif set(value)-allowed or any(type(v) not in ((int,) if k in integer_fields else (str,type(None))) for k,v in value.items()):
+            raise Denied('RUNTIME_CONTEXT_FIELDS')
+    for key,depth in RUNTIME_CONTEXT_DEPTH.items():
+        protected=config.get(key,{})
+        supplied=runtime.get(key,{})
+        integer_fields={'revision','occurred_at'} if key=='privacy_processing_context' else set()
+        mapping(protected,depth,fields[key],integer_fields);mapping(supplied,depth,fields[key],integer_fields)
+        if canonical(protected)!=canonical(supplied):raise Denied('RUNTIME_CONTEXT_BINDING')
+    return True
+
+
 def factory(config):
     scan=Path('/run/xuanjun-customer-scan')
     if scan.exists() and scan.stat().st_uid==os.geteuid():os.chmod(scan,0o700)
     keys={k:base64.b64decode(v,validate=True) for k,v in config['keys'].items()}
-    return Center(ROOT,keys,config['active_key'],mail_ready=bool(config.get('providers',{}).get('smtp')),scanner=ClamScanner(),secretref=SecretRefMetadata(config['providers']['secretref']['socket'],config['providers']['secretref']['peer_uid']) if config.get('providers',{}).get('secretref') else None)
+    return Center(ROOT,keys,config['active_key'],mail_ready=bool(config.get('providers',{}).get('smtp')),scanner=ClamScanner(),secretref=SecretRefMetadata(config['providers']['secretref']['socket'],config['providers']['secretref']['peer_uid']) if config.get('providers',{}).get('secretref') else None,evidence_context=lambda uid,pid:config.get('message_evidence_context',{}).get(pid,{}).get(uid,{}),privacy_policy_context=lambda uid,pid:config.get('privacy_policy_context',{}).get(pid,{}),privacy_processing_context=lambda uid,pid,rid:config.get('privacy_processing_context',{}).get(pid,{}).get(uid,{}).get(rid,{}))
 
 def backup(center,output,backup_key,key_ref):
     if type(backup_key) is not bytes or len(backup_key)!=32 or not key_ref:raise Denied('SEPARATE_BACKUP_KEY_REQUIRED')
@@ -84,7 +113,10 @@ def restore(backup_file,target,backup_key,keys,active_key):
         with c.tx():
             c.db.execute("UPDATE settings SET v='1' WHERE k='maintenance'")
             c.db.execute('UPDATE accounts SET epoch=epoch+1');c.db.execute('DELETE FROM sessions');c.db.execute('UPDATE members SET active=0');c.db.execute('UPDATE links SET active=0');c.db.execute('UPDATE challenges SET used=1')
-            c.db.execute("UPDATE messages SET status='UNKNOWN' WHERE status='PENDING'");c.db.execute("UPDATE outbox SET status='UNKNOWN' WHERE status='PENDING'")
+            for message in c.db.execute("SELECT id,project FROM messages WHERE status='PENDING' ORDER BY created,id").fetchall():
+                c.db.execute("UPDATE messages SET status='UNKNOWN' WHERE id=?",(message['id'],))
+                c.audit(message['project'],'operator','OUTBOUND_RESTORE_UNKNOWN',message['id'])
+            c.db.execute("UPDATE outbox SET status='UNKNOWN' WHERE status='PENDING'")
             c.audit('','operator','ISOLATED_RESTORE',digest(raw))
         return {**check,'restored':'ISOLATED_MAINTENANCE','fresh_authority_required':True,'old_sessions_invalid':True,'old_grants_invalid':True}
     finally:c.db.close()

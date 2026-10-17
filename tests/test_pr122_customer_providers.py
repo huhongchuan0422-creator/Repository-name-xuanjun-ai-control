@@ -57,7 +57,7 @@ class ProviderTests(CustomerTests):
   # Snapshot every non-chat table, including authority and publication queues.
   # There is no financial ledger in this service; this checks its local boundary.
   names=[r[0] for r in self.c.db.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
-  return {name:[tuple(r) for r in self.c.db.execute('SELECT * FROM "'+name+'" ORDER BY rowid')] for name in names if name not in ('messages','ai_jobs','audit','rate_limits')}
+  return {name:[tuple(r) for r in self.c.db.execute('SELECT * FROM "'+name+'" ORDER BY rowid')] for name in names if name not in ('messages','message_evidence','ai_jobs','audit','rate_limits')}
  def test_ai_hostile_financial_admin_tool_and_publication_text_is_only_encrypted_chat(self):
   from scripts.pr122_customer_providers import ai_reply
   from unittest.mock import patch

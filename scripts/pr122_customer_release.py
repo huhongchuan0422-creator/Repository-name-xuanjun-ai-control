@@ -85,7 +85,8 @@ def plan(folder):
     from scripts.pr122_customer_core import Center
     from scripts.pr122_customer_providers import Providers
     c=private_config(CONFIG/'config.json');runtime=private_config(CONFIG/'runtime.json')
-    need(set(runtime)=={'keys','active_key','providers'},'RUNTIME_CREDENTIAL_MINIMUM')
+    from scripts.pr122_customer_ops import validate_runtime_contexts
+    validate_runtime_contexts(c,runtime)
     need(c['keys']==runtime['keys'] and c['active_key']==runtime['active_key'] and c['providers']==runtime['providers'],'CONFIG_BINDING')
     import base64
     need(len(base64.b64decode(c['backup_key'],validate=True))==32 and len(base64.b64decode(c['authority_verify_key'],validate=True))==32,'PROTECTED_KEYS_REQUIRED')
@@ -260,3 +261,4 @@ def main():
     result=plan(a.source) if a.action=='plan' else apply(a.source,a.approval) if a.action=='apply' else rollback()
     print(json.dumps(result,ensure_ascii=False))
 if __name__=='__main__':main()
+

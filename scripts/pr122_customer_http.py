@@ -46,11 +46,12 @@ class App:
         class Handler(BaseHTTPRequestHandler):
             protocol_version='HTTP/1.1'
             def log_message(self,*args):pass
-            def reply(self,status,value,ctype='application/json; charset=utf-8',cookie=None,csp=CSP):
+            def reply(self,status,value,ctype='application/json; charset=utf-8',cookie=None,csp=CSP,attachment=False):
                 raw=value if type(value) is bytes else canonical(value)
                 self.send_response(status)
                 for k,v in [('Content-Type',ctype),('Content-Length',str(len(raw))),('Cache-Control','no-store, private'),('Pragma','no-cache'),('Content-Security-Policy',csp),('X-Content-Type-Options','nosniff'),('Referrer-Policy','no-referrer'),('X-Frame-Options','DENY'),('Connection','close')]:self.send_header(k,v)
                 if cookie:self.send_header('Set-Cookie',cookie)
+                if attachment:self.send_header('Content-Disposition','attachment; filename="project-message-evidence.json"')
                 if ctype in ('application/pdf','image/png','image/jpeg'):self.send_header('Content-Disposition','attachment; filename="project-material"')
                 self.end_headers()
                 if self.command!='HEAD':self.wfile.write(raw)
@@ -88,11 +89,12 @@ class App:
                         if self.command!='POST':return self.reply(405,{'error':'POST_REQUIRED'})
                         if len(raw)>65536:return self.reply(413,{'error':'EVENT_TOO_LARGE'})
                         if path.endswith('/telegram'):
-                            event,subject,text=app.providers.telegram(self.headers,raw);result=center.channel_event('TELEGRAM',event,subject,text)
+                            value=app.providers.telegram(self.headers,raw)
+                            event,subject,text=value;result=center.channel_event('TELEGRAM',event,subject,text,provider_occurred_at=getattr(value,'occurred_at',None))
                         else:
                             value=app.providers.feishu(self.headers,raw)
                             if type(value) is dict:return self.reply(200,value)
-                            event,subject,text=value;result=center.channel_event('FEISHU',event,subject,text)
+                            event,subject,text=value;result=center.channel_event('FEISHU',event,subject,text,provider_occurred_at=getattr(value,'occurred_at',None))
                         return self.reply(200,{'ok':True}) # Never return identity or stored confirmation tokens to provider.
                     operation=path[len(PREFIX+'api/'):]
                     public={'register':({'email','password'},center.register),'verify':({'token','password'},center.verify),'login':({'email','password'},center.login),'request_reset':({'email'},center.request_reset),'reset':({'token','password'},center.reset)}
@@ -144,6 +146,13 @@ class App:
                             return self.reply(200,get_edit(center,uid,parts[1],parts[2]))
                         if len(parts)==3 and parts[0]=='publication':return self.reply(200,publication_status(center,uid,parts[1],parts[2]))
                         if len(parts)==2 and parts[0]=='checklist':return self.reply(200,center.checklist(uid,parts[1]))
+                        if len(parts)==2 and parts[0]=='privacy':
+                            from scripts.pr122_customer_privacy import status as privacy_status
+                            return self.reply(200,privacy_status(center,uid,parts[1]))
+                        if len(parts)==2 and parts[0]=='evidence':
+                            from scripts.pr122_customer_evidence import export_project
+                            if self.headers.get('Range') or self.headers.get('If-None-Match') or self.headers.get('If-Modified-Since'):raise Denied('UNCONDITIONAL_EVIDENCE_ONLY')
+                            return self.reply(200,export_project(center,uid,parts[1]),attachment=True)
                         if len(parts)==2 and parts[0]=='messages':return self.reply(200,{'messages':center.messages(uid,parts[1])})
                         if len(parts)==2 and parts[0]=='changes':return self.reply(200,Changes(center).list(uid,parts[1]))
                         if len(parts)==2 and parts[0]=='pending_links':return self.reply(200,{'links':center.pending_links(uid,parts[1])})
@@ -151,7 +160,10 @@ class App:
                             if self.headers.get('Range') or self.headers.get('If-None-Match') or self.headers.get('If-Modified-Since'):raise Denied('UNCONDITIONAL_AUTHORIZED_DOWNLOAD_ONLY')
                             data,mime=center.download(uid,parts[1],parts[2]);return self.reply(200,data,mime)
                         return self.reply(404,{'error':'NOT_FOUND'})
+                    from scripts.pr122_customer_privacy import acknowledge as privacy_ack,submit_request as privacy_request
                     operations={
+                        'privacy_acknowledge':({'project','policy_ref','notice_sha256','decision','idempotency_key'},lambda:privacy_ack(center,uid,body['project'],body['policy_ref'],body['notice_sha256'],body['decision'],idempotency_key=body['idempotency_key'])),
+                        'privacy_request':({'project','kind','text','idempotency_key','request_id','expected_revision'},lambda:privacy_request(center,uid,body['project'],body['kind'],body['text'],idempotency_key=body['idempotency_key'],request_id=body['request_id'],expected_revision=body['expected_revision'])),
                         'change_small_edit':({'project','case'},lambda:enqueue_small_edit(center,uid,body['project'],body['case'])),
                         'change_delivery_report':({'project','case','serve_id','report'},lambda:enqueue_preview_report(center,uid,body['project'],body['case'],body['serve_id'],body['report'])),
                         'change_updates':({'project','page','version'},lambda:Changes(center).page_updates(uid,body['project'],body['page'],body['version'])),

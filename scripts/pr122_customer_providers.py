@@ -78,6 +78,11 @@ def telegram_send(token,subject,text,*,connect=None):
     if result is None:raise Unavailable('TELEGRAM_REQUEST_UNCONFIRMED')
     return result
 
+class VerifiedEvent(tuple):
+    """Preserve existing three-value unpacking while retaining verified time."""
+    def __new__(cls,event,subject,text,occurred_at):
+        value=super().__new__(cls,(event,subject,text));value.occurred_at=occurred_at;return value
+
 class Providers:
     def __init__(self,config,*,post=post_json,clock=time.time,telegram_transport=telegram_send):
         self.config=config;self.post=post;self.clock=clock;self.telegram_transport=telegram_transport
@@ -93,7 +98,7 @@ class Providers:
         if type(d.get('update_id')) is not int or sender.get('is_bot') is not False or chat.get('type')!='private' or type(sender.get('id')) is not int or sender['id']!=chat.get('id'): raise Denied('PRIVATE_PROVIDER_IDENTITY_REQUIRED')
         if type(m.get('date')) is not int or abs(self.clock()-m['date'])>300: raise Denied('PROVIDER_EVENT_EXPIRED')
         if set(m).intersection({'document','photo','video','audio','voice'}): raise Denied('PRIVATE_PORTAL_UPLOAD_ONLY')
-        return str(d['update_id']),str(sender['id']),m.get('text','')
+        return VerifiedEvent(str(d['update_id']),str(sender['id']),m.get('text',''),m['date'])
     def feishu(self,headers,raw):
         c=self.config.get('feishu')
         if not c or not c.get('encrypt_key') or not c.get('verification_token') or not c.get('app_id'): raise Unavailable('FEISHU_PENDING')
@@ -118,7 +123,7 @@ class Providers:
         if m.get('chat_type')!='p2p' or m.get('message_type')!='text' or sender.get('sender_type')!='user': raise Denied('PRIVATE_TEXT_ONLY')
         subject=sender.get('sender_id',{}).get('open_id')
         if not subject or not h.get('event_id'): raise Denied('FEISHU_IDENTITY_REQUIRED')
-        return h['event_id'],subject,json.loads(m['content']).get('text','')
+        return VerifiedEvent(h['event_id'],subject,json.loads(m['content']).get('text',''),int(h['create_time'])//1000)
     def send(self,channel,subject,text,event_id):
         if channel=='TELEGRAM':
             c=self.config.get('telegram')
@@ -162,22 +167,27 @@ def enqueue(center,uid,pid,channel,text):
     from scripts.pr122_customer_core import safe_text
     if channel not in ('TELEGRAM','FEISHU'):raise ValueError('CHANNEL')
     with center.tx():
-        center.project(uid,pid);safe_text(text)
+        from scripts.pr122_customer_evidence import authorized_records
+        authorized_records(center,uid,pid);safe_text(text)
         link=center.db.execute('SELECT * FROM links WHERE user_id=? AND project=? AND channel=? AND active=1',(uid,pid,channel)).fetchone()
         if not link:raise Denied('LINK_REQUIRED')
         import secrets
         mid='m_'+secrets.token_hex(16)
         center.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?,NULL,?)',(mid,pid,uid,channel,center.encrypt(text.encode(),mid),'PENDING',center.now()));center.audit(pid,uid,'OUTBOUND_PENDING',mid)
+        from scripts.pr122_customer_evidence import append
+        append(center,mid)
         return {'id':mid,'status':'PENDING'}
 
 def drain_message(center,providers):
     r=center.db.execute("SELECT * FROM messages WHERE status='PENDING' ORDER BY created LIMIT 1").fetchone()
     if not r:return {'pending':False}
     with center.tx():
-        center.project(r['user_id'],r['project'])
+        from scripts.pr122_customer_evidence import authorized_records
+        authorized_records(center,r['user_id'],r['project'])
         link=center.db.execute('SELECT * FROM links WHERE user_id=? AND project=? AND channel=? AND active=1',(r['user_id'],r['project'],r['channel'])).fetchone()
         if not link:raise Denied('LINK_REVOKED')
         if center.db.execute("UPDATE messages SET status='UNKNOWN' WHERE id=? AND status='PENDING'",(r['id'],)).rowcount!=1:return {'claimed':False}
+        center.audit(r['project'],r['user_id'],'OUTBOUND_ATTEMPT_UNKNOWN',r['id'])
     try:
         subject=center.decrypt(link['payload'],'link').decode();text=center.decrypt(r['payload'],r['id']).decode()
         status,ref=providers.send(r['channel'],subject,text,r['id'])
@@ -247,7 +257,8 @@ def ai_reply(center,uid,pid,mid,providers,*,rpc=local_ai):
     c=providers.config.get('web_ai')
     if not c:return {'state':'PENDING_PROVIDER'}
     with center.tx():
-        p,role,_=center.project(uid,pid);source=center.db.execute("SELECT * FROM messages WHERE id=? AND project=? AND user_id=? AND channel='WEB'",(mid,pid,uid)).fetchone()
+        from scripts.pr122_customer_evidence import authorized_records
+        p,_,_=authorized_records(center,uid,pid);source=center.db.execute("SELECT * FROM messages WHERE id=? AND project=? AND user_id=? AND channel='WEB'",(mid,pid,uid)).fetchone()
         if not source:raise Denied('AI_SOURCE_MESSAGE')
         old=center.db.execute('SELECT state,result_id FROM ai_jobs WHERE message_id=?',(mid,)).fetchone()
         if old:return {'state':old[0],'result_id':old[1]}
@@ -256,7 +267,9 @@ def ai_reply(center,uid,pid,mid,providers,*,rpc=local_ai):
     try:
         text=safe_text(rpc(c,context),4000)
         with center.tx():
-            center.project(uid,pid);rid='m_'+secrets.token_hex(16)
+            authorized_records(center,uid,pid);rid='m_'+secrets.token_hex(16)
             center.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?,NULL,?)',(rid,pid,uid,'WEB_AI',center.encrypt(text.encode(),rid),'ARCHIVED',center.now()));center.db.execute("UPDATE ai_jobs SET state='ANSWERED',result_id=? WHERE message_id=?",(rid,mid));center.audit(pid,uid,'AI_REPLY_ARCHIVED',rid)
+            from scripts.pr122_customer_evidence import append
+            append(center,rid,related_message_id=mid)
         return {'state':'ANSWERED','result_id':rid}
     except Exception:return {'state':'UNKNOWN'}
