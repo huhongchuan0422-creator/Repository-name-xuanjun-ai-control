@@ -149,7 +149,7 @@
     {
       "id": "custom-development",
       "title": "软件与AI定制开发电子合同（唯一签署文件）",
-      "version": "2026-10-17-draft.4",
+      "version": "2026-10-17-draft.5",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "定制客户",
@@ -160,7 +160,7 @@
         "合同中心"
       ],
       "source": "docs/legal/templates/custom-development.md",
-      "source_sha256": "9aaa41589f9f696d7f5026193c1cfcaf268778e806d02af98b4e9c18ae9eca8f",
+      "source_sha256": "e33c3c9f441fe67d4c9da9ffc5426d868f69320c3e6e2bb35dcafe1960efc0e3",
       "preview": "demos/legal/custom-development.html",
       "planned_route": "/legal/custom-development/",
       "signature_enabled": false
@@ -168,7 +168,7 @@
     {
       "id": "custom-sow",
       "title": "内部需求与报价字段定义（不单独签署）",
-      "version": "2026-10-17-internal.1",
+      "version": "2026-10-17-internal.2",
       "status": "INTERNAL_ONLY",
       "audience": [
         "客户项目负责人",
@@ -178,7 +178,7 @@
         "内部合同正文生成及字段校验"
       ],
       "source": "docs/legal/templates/custom-sow.md",
-      "source_sha256": "4c8389bae7fde18d359a9475b21d90abf1a63206b7d174383c4fe55753b8581a",
+      "source_sha256": "9474bebe5d8b24a837f6b7d710587c1ef295b00e15eb33c321cd0a96611887df",
       "preview": null,
       "planned_route": null,
       "signature_enabled": false
