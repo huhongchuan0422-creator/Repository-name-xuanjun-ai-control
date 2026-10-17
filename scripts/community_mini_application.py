@@ -55,6 +55,7 @@ class MiniApplication:
             raise ValueError('ORIGINAL_OPERATIONS_REQUIRED_BEFORE_COMMERCE')
         from scripts.community_commerce import Commerce
         self.commerce=Commerce(self.operations,self.identity)
+        if self.communities is not None:self.communities.commerce=self.commerce
         self.gateway.commerce=self.commerce
         if getattr(self.gateway,'payments',None) is not None:self.gateway.payments.commerce=self.commerce
         if self.provider_actions is not None:self.provider_actions.commerce=self.commerce
@@ -65,6 +66,8 @@ class MiniApplication:
             raise ValueError('COMMUNITIES_ALREADY_CONFIGURED_OR_LISTENING')
         from scripts.community_center_communities import CenterCommunities
         self.communities=CenterCommunities(self.center,grants)
+        self.communities.commerce=self.commerce
+        self.communities.provider_actions=self.provider_actions
         return self.communities
 
     def configure_provider_actions(self,reader,bindings):
@@ -73,6 +76,7 @@ class MiniApplication:
         from scripts.community_wechat_sp_actions import ProviderActions
         self.provider_actions=ProviderActions(self.operations,reader,bindings)
         self.provider_actions.commerce=self.commerce
+        if self.communities is not None:self.communities.provider_actions=self.provider_actions
         if getattr(self.gateway,'payments',None) is not None:self.gateway.payments.rule_actions=self.provider_actions
         return self.provider_actions
 

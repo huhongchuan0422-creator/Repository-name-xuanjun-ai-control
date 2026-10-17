@@ -63,6 +63,8 @@ class SplitRules:
                 result = dict(rule_id=p['rule_id'], version=p['version'], shares_bps=shares,
                     description=p['description'], unfreeze_unsplit=p['unfreeze_unsplit'],
                     policy_hash=self.actions._policy_hash(policy), created_at=c.now(), author=g['user_id'])
+                from scripts.community_reports import receiver_communities
+                result['receiver_communities']=receiver_communities(c,g['scope'],g['project'],shares)
                 prior = self._get(g, 'VERSION', ref)
                 if prior is not None:
                     if any(prior[k] != result[k] for k in ('rule_id', 'version', 'shares_bps', 'description', 'unfreeze_unsplit', 'policy_hash')):
@@ -129,7 +131,7 @@ class SplitRules:
         result = dict(reference=p['reference'], amount_minor=order['amount_minor'], currency='CNY',
             rule_id=rule['rule_id'], version=rule['version'], allocations=allocations,
             retained_minor=order['amount_minor']-sum(allocations.values()),
-            policy_hash=rule['policy_hash'], description=rule['description'],
+            policy_hash=rule['policy_hash'], receiver_communities=rule.get('receiver_communities',{}), description=rule['description'],
             unfreeze_unsplit=rule['unfreeze_unsplit'], frozen_at=c.now(),
             eligible=bool(allocations), provider_split_confirmed=False)
         result['snapshot_sha256'] = hashlib.sha256(canonical(result)).hexdigest()

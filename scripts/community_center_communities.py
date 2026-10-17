@@ -27,6 +27,7 @@ class CenterCommunities:
     def __init__(self, center, grants):
         if type(center) is not Center or type(grants) is not dict or not grants:
             raise ValueError('ORIGINAL_CENTER_AND_PROTECTED_GRANTS_REQUIRED')
+        self.commerce=None;self.provider_actions=None
         self.center = center
         self.grants = {}
         for name, grant in grants.items():
@@ -82,6 +83,10 @@ class CenterCommunities:
                 raise ValueError('COMMUNITY_VERSION_CONFLICT')
 
     def dispatch(self, session, csrf, body):
+        if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('community_orders','community_earnings','community_receiver_bind'):
+            if self.commerce is None:raise PermissionError('ORIGINAL_COMMUNITY_COMMERCE_REQUIRED')
+            from scripts.community_reports import CommunityReports
+            return CommunityReports(self,self.commerce,self.provider_actions).dispatch(session,csrf,body)
         if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('profile_read','profile_update','referral_code','referral_bind','notices','notice_read'):
             from scripts.community_customer_profile import CustomerProfile
             return CustomerProfile(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])

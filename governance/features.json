@@ -198,7 +198,9 @@
         "tests/test_community_customer_profile_native.py",
         "scripts/community_stores.py",
         "scripts/community_registered_admin.py",
-        "tests/test_community_stores.py"
+        "tests/test_community_stores.py",
+        "scripts/community_reports.py",
+        "tests/test_community_reports.py"
       ]
     },
     {
