@@ -55,7 +55,16 @@ class StageRuntime:
         if name not in fields or set(params) != fields[name]:
             raise ValueError('INVALID_COMMUNITY_FIELDS')
         public = {'storefront', 'qr', 'checkout', 'receipt'}
-        if name not in public and principal.role not in ('MERCHANT_ADMIN', 'PLATFORM_OWNER'):
+        permissions={
+            'orders':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
+            'summary':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
+            'ads':{'MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'},
+            'ad_review':{'PLATFORM_REVIEWER','PLATFORM_OWNER'},
+            'refund_preview':{'MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
+            'split_preview':{'MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
+            'reconciliation':{'MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
+        }
+        if name not in public and principal.role not in permissions.get(name,{'MERCHANT_ADMIN','PLATFORM_OWNER'}):
             raise PermissionError('ADMIN_ROLE_REQUIRED')
         if name == 'receipt':
             order = state(self.demo.db, identity, params['reference'])
@@ -73,7 +82,8 @@ class StageRuntime:
                         'ad_review': '/demo/admin/campaign/review'}
         if name in admin_routes:
             required = 'PLATFORM_OWNER' if name == 'ad_review' else 'MERCHANT_ADMIN'
-            if principal.role != required:
+            allowed = {'PLATFORM_OWNER','PLATFORM_REVIEWER'} if name=='ad_review' else {'MERCHANT_ADMIN'}
+            if principal.role not in allowed:
                 raise PermissionError('ROLE_REQUIRED')
             policy = self.demo.admin_policy
             if policy is None:

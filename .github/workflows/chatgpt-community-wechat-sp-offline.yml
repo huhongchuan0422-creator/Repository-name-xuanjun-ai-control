@@ -21,6 +21,8 @@ permissions:
   contents: read
 jobs:
   test:
+    outputs:
+      source_sha256: ${{ steps.source_package.outputs.sha256 }}
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
@@ -44,7 +46,15 @@ jobs:
           node --test demos/community-payment/demo.test.mjs
           node --test demos/community-admin/admin.test.mjs
       - name: Build deterministic offline source package
-        run: python scripts/community_stage_package.py --output community-stage-source.zip
+        id: source_package
+        run: |
+          python scripts/community_stage_package.py --output community-stage-source.zip
+          python - <<'DIGEST'
+          import hashlib,os
+          from pathlib import Path
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('sha256='+hashlib.sha256(Path('community-stage-source.zip').read_bytes()).hexdigest()+'\n')
+          DIGEST
       - name: Save exact-source test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -99,14 +109,52 @@ jobs:
           set -euo pipefail
           test "$(hostname -s)" = iZvt5t8tlrm8oiZ
           test "$(id -u)" = 1002
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          persist-credentials: false
+          name: community-phase-integration-evidence
+          path: ${{ runner.temp }}/community-mini-source-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify exact CI source digest and every manifest file without git checkout
+        env:
+          COMMUNITY_EXPECTED_SOURCE_SHA256: ${{ needs.test.outputs.source_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'SOURCE'
+          import hashlib,io,json,os,re,stat,zipfile
+          from pathlib import Path
+          temp=Path(os.environ['RUNNER_TEMP'])
+          suffix=os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          raw=(temp/('community-mini-source-input-'+suffix)/'community-stage-source.zip').read_bytes()
+          expected=os.environ['COMMUNITY_EXPECTED_SOURCE_SHA256']
+          assert re.fullmatch('[0-9a-f]{64}',expected) and hashlib.sha256(raw).hexdigest()==expected
+          archive=zipfile.ZipFile(io.BytesIO(raw));items=archive.infolist()
+          assert len(items)<2000 and len(items)==len({i.filename for i in items})
+          assert sum(i.file_size for i in items)<10000000
+          manifest=json.loads(archive.read('MANIFEST.json'))
+          assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
+          assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
+          assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
+          files={}
+          for item in items:
+              path=Path(item.filename)
+              assert not path.is_absolute() and '..' not in path.parts and chr(92) not in item.filename
+              assert stat.S_ISREG(item.external_attr >> 16)
+              data=archive.read(item)
+              if item.filename!='MANIFEST.json':assert hashlib.sha256(data).hexdigest()==manifest['files'][item.filename]
+              files[item.filename]=data
+          root=temp/('community-mini-source-'+suffix);root.mkdir(mode=0o700)
+          for name,data in files.items():
+              path=root/name;path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+              with path.open('xb') as out:out.write(data)
+              path.chmod(0o600)
+          print('EXACT_CI_SOURCE_MANIFEST=PASS; FILES='+str(len(manifest['files'])))
+          SOURCE
       - uses: actions/download-artifact@v4
         with:
           name: community-mini-python-wheels
           path: ${{ runner.temp }}/community-mini-wheels
       - name: Reuse original temporary runtime builder and run community integration
+        working-directory: ${{ runner.temp }}/community-mini-source-${{ github.run_id }}-${{ github.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
@@ -123,6 +171,7 @@ jobs:
           sys.path[:0]=[str(Path.cwd()),str(Path.cwd()/'tests')]
           patterns=['test_community_mini*.py','test_community_saas_provider_evidence.py',
                     'test_community_provider_notification_http.py','test_community_stage_recovery.py',
+                    'test_community_stage_roles.py',
                     'test_community_wechat_sp_verification.py','test_community_wechat_sp_readonly.py']
           suite=unittest.TestSuite()
           for pattern in patterns:suite.addTests(unittest.defaultTestLoader.discover('tests',pattern=pattern))

@@ -154,3 +154,12 @@ Owner要求通过已有服务器执行小程序预览。mini-preview改用已有
 新增Unix正向实际peer检查：Hosted/国内非root测试以当前测试UID作为代理fixture，不改SO_PEERCRED函数；只证明隔离边界与应用组合，不当生产Nginx真实登记。
 
 复用原pr122_customer_runtime.py（b882ea631e6391f1fc8727766ccbaf3c66b519da逐字节，SHA256 3a483ed81eb595309665c3d2b5746e56a50016fb246617000eb326dc5ff2b959）；沿用其已固定3个wheel：cryptography46.0.3、cffi2.0.0、pycparser2.23和各原SHA256。新增[mini-runtime]受控触发的Hosted离线依赖打包及国内Runner非root临时兼容性测试；不覆盖原安装器，不Root、不全局pip、不服务安装。主CI仍使用原cryptography50.0.2/Python3.12；国内是原Python3.11兼容性证据，两者分别记录，不混称生产Runtime准入。新任务终态待取证。
+
+
+### 角色分工及源码制品传递修复
+
+新增服务端注册STORE_STAFF、PLATFORM_REVIEWER、FINANCE_APPROVER：员工仅绑定门店订单/汇总；审核员可广告审核但不能编辑商家或访问财务；财务角色仅读取原退款/分账/对账预览，不能记录退款或执行资金。社区角色不继承SaaS客户/Owner接口权限，客户端不能提交role或复制Principal冒充注册对象。6项专项检查通过。以上仍为受控服务端角色投影，现场账号授权必须来自原Identity/CRM，未开客户端角色选择入口。
+
+8c9b3f9e3108ed870b2285fb625079b1813d47e8的Hosted完整回归已通过；国内Run39009126611仍在checkout阶段，尚未开始应用测试，不记实机PASS。为避免重复依赖国内git下载，替代任务直接下载同Run完整CI产生的源码制品，使用needs.test输出的独立源码ZIP SHA256及Manifest逐文件验证、拒绝重复/非普通文件/路径穿越/过大闭包，再在新RUNNER_TEMP目录运行。原pin的三个wheel继续独立核验，未绕过校验或改为公网pip安装。等待旧任务上传/应用执行终态后再触发新任务，避免并行host writer。
+
+宿主集成所需公开契约：MiniApplication由既有Center宿主注入原Center实例及受保护场景/门店映射，listen_proxy使用现有Nginx Unix peer身份和已准入HTTPS域名；/mini/login、/mini/api、/mini/logout、/mini/bind保留原请求字段与会话/CSRF保护。签名SaaS通知通过SaasProviderEvidence与notification_path/make_handler进入原FINANCE_EVIDENCE，不调用独立Finance余额写入。该Python实例组合不是跨主机Identity RPC的替代；若最终项目容器与Center分离，必须由原客户中心提供受保护的统一服务接口后实现IdentityPort，不能挂载/复制原账号库来假装接通。

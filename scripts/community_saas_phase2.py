@@ -26,7 +26,8 @@ class Principal:
     """Identity supplied by trusted server policy, never from client JSON."""
     def __init__(self,tenant_id,role):
         self.tenant_id=_id(tenant_id)
-        if type(role) is not str or role not in ("CUSTOMER","MERCHANT_ADMIN","PLATFORM_OWNER"):
+        if type(role) is not str or role not in ("CUSTOMER","MERCHANT_ADMIN","PLATFORM_OWNER",
+                                                "STORE_STAFF","PLATFORM_REVIEWER","FINANCE_APPROVER"):
             raise ValueError("INVALID_ROLE")
         self.role=role
 
@@ -49,6 +50,8 @@ class OfflineSaas:
     def dispatch(self,principal,operation,params,now):
         if type(principal) is not Principal:
             raise PermissionError("TRUSTED_PRINCIPAL_REQUIRED")
+        if principal.role not in ('CUSTOMER','MERCHANT_ADMIN','PLATFORM_OWNER'):
+            raise PermissionError('SAAS_ROLE_REQUIRED')
         _time(now)
         if type(params) is not dict:
             raise ValueError("INVALID_REQUEST")
