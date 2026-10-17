@@ -31,11 +31,12 @@ def make_handler(gateway):
             if (self.headers.get_all('Host') != [host] or
                     self.headers.get('Origin') not in (None,'http://'+host)):
                 return self.answer(403,{'error':'ORIGIN_DENIED'})
-            if self.path not in ('/mini/login','/mini/api','/mini/logout'):
+            if self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind'):
                 return self.answer(404,{'error':'NOT_FOUND'})
             if (self.headers.get('Transfer-Encoding') is not None or
                     len(self.headers.get_all('Content-Length',[])) != 1 or
-                    len(self.headers.get_all('X-Community-Session',[])) > 1):
+                    any(len(self.headers.get_all(h,[])) > 1 for h in
+                        ('X-Community-Session','X-Center-Session','X-Center-CSRF'))):
                 return self.answer(400,{'error':'AMBIGUOUS_HEADERS'})
             if self.headers.get('Content-Type','').split(';')[0].lower() != 'application/json':
                 return self.answer(415,{'error':'JSON_REQUIRED'})
@@ -63,7 +64,11 @@ def make_handler(gateway):
                 body=json.loads(b''.join(chunks),object_pairs_hook=pairs,parse_float=finite,
                                 parse_constant=lambda _:(_ for _ in ()).throw(ValueError('NONFINITE')))
                 token=self.headers.get('X-Community-Session','')
-                if self.path=='/mini/login':result=gateway.login(body)
+                if self.path=='/mini/bind':
+                    if token:raise PermissionError('CENTER_SESSION_REQUIRED')
+                    result=gateway.bind(self.headers.get('X-Center-Session',''),
+                                        self.headers.get('X-Center-CSRF',''),body)
+                elif self.path=='/mini/login':result=gateway.login(body)
                 elif self.path=='/mini/logout':
                     if body!={} or type(body) is not dict:raise ValueError('INVALID_BODY')
                     result=gateway.logout(token)

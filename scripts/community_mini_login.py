@@ -112,6 +112,37 @@ class MiniGateway:
             raise ValueError('TRUSTED_PROVIDER_AND_IDENTITY_REQUIRED')
         self.runtime, self.identity, self.provider = runtime, identity, provider
 
+    def bind(self,web_session,csrf,body):
+        """Link an existing verified Center account using a real provider code.
+
+        This is a protected Center operation, never openid self-assertion or
+        customer registration. The same durable code reservation is shared
+        with login, including unknown results and restarts.
+        """
+        if type(body) is not dict or set(body)!={'code'}:
+            raise ValueError('INVALID_BINDING_FIELDS')
+        code=body['code']
+        if type(code) is not str or not CODE.fullmatch(code):
+            raise ValueError('INVALID_LOGIN_CODE')
+        authorize=getattr(self.identity,'authorize_binding',None)
+        bind=getattr(self.identity,'bind_existing_account',None)
+        if not callable(authorize) or not callable(bind):
+            raise PermissionError('CENTER_BINDING_UNAVAILABLE')
+        now=self.runtime.clock()
+        authorize(web_session,csrf,now)
+        attempt=self.identity.reserve_code(self.provider.appid,hashlib.sha256(code.encode()).hexdigest(),now)
+        try:
+            result=self.provider.exchange(code)
+            if type(result) is not dict or set(result)!={'appid','openid'} or result['appid']!=self.provider.appid:
+                raise LoginUnavailable('PROVIDER_BINDING_MISMATCH')
+            # Recheck expiry/revocation after the external request.
+            authorize(web_session,csrf,self.runtime.clock(),consume_limit=False)
+            return bind(web_session,result['appid'],result['openid'])
+        except Exception:
+            try:self.identity.abandon_attempt(attempt,'BINDING_RESULT_UNKNOWN_OR_REJECTED',self.runtime.clock())
+            except Exception:pass
+            raise LoginUnavailable('BINDING_RESULT_UNKNOWN_OR_REJECTED') from None
+
     def login(self, body):
         if type(body) is not dict or set(body) != {'code'}:
             raise ValueError('INVALID_LOGIN_FIELDS')

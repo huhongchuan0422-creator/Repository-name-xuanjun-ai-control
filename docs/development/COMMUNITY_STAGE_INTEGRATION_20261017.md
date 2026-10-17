@@ -24,7 +24,7 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |P1-01|服务端Principal绑定既有Tenant/Merchant/Store|runtime跨租户/角色测试；生产Identity仍待接入|
 |P1-02|既有商家目录统一HTTP|新增真实Chromium商家读取|
 |P1-03|原签名场景与金额校验复用|二维码签名→原订单；实体微信扫码预览待验|
-|P1-04|新增原生小程序工程及请求客户端|6项Node测试；微信上传/预览未验|
+|P1-04|原生小程序工程及请求客户端；国内服务器预览上传成功|Run39006945633、Job117321450248 SUCCESS；真机扫码待验|
 |P1-05|OWNER_DEFERRED：公众号暂缓|2026-10-17 Owner明确不作为本轮完成条件|
 |P1-06|原持久订单状态机复用|重新打开后原订单/事件保留|
 |P1-07|统一loopback HTTP|真实HTTP及Chromium，不公开服务|
@@ -35,12 +35,12 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |P1-12|原退款/分账/对账预览复用|101=退款11+分配90；实际结算UNKNOWN|
 |P1-13|五视图共用同一订单端到端|新增Chromium测试；非微信设备E2E|
 |P1-14|进程锁、重开、权限异常|新持久host与既有恢复回归|
-|P1-15|扩大原专用CI为整阶段回归|精确HEAD CI待终态，不送断点审|
+|P1-15|原专用CI执行整阶段回归|Run39006945633成功；后续代码需绑定新CI，不送断点审|
 |P2-01|原报价API接入统一HTTP|既有Phase2全量回归|
 |P2-02|原SaaS订单API接入统一HTTP|不替代消费者收款订单|
 |P2-03|原权益只读API复用|不发放正式权益|
 |P2-04|原后台审核API复用|权限/任务状态回归|
-|P2-05|统一服务端Principal演示身份|生产登录/真实身份绑定仍缺|
+|P2-05|既有Center账号、会话、项目权限；新增受保护微信code绑定HTTP|原Center实例组合测试；现场账号/KMS/HTTPS接入待验|
 |P2-06|原SaaS市场页面保留|原Chromium市场测试|
 |P2-07|原CNY/USD多方案报价复用|既有价格及脱敏回归|
 |P2-08|原客户订单中心复用|原浏览器报价→订单测试|
@@ -55,11 +55,11 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |P2-17|原跨库审计复用|没有跨文件原子提交声明|
 |P2-18|原WAL/中断恢复+新运行时重开|真实主机故障注入未验|
 |P2-19|原并发幂等+本批单进程锁|并发、重复退款与重复事件回归|
-|P2-20|原backup/verify_backup复用|原SHA与恢复校验回归|
+|P2-20|原备份复用；新增六业务库维护态快照和新目录恢复|7项真实SQLite检查通过；现有Center备份仍由原系统负责|
 |P2-21|原package保留；新增确定性源码ZIP含运行时/页面/小程序/测试和逐文件Manifest|源码包逐字节校验；不构成生产安装包|
 |P2-22|原服务端令牌配置复用|本批内存令牌；生产Secrets未接|
 |P2-23|原health/rollback_preview复用|真实安装/回滚HOLD|
-|P2-24|新增小程序工程，H5共用API|微信实际上传、扫码、登录、公众号OAuth未验|
+|P2-24|小程序工程、微信真实预览上传通过|扫码/现场登录待验；公众号OAuth按Owner暂缓|
 |P2-25|不调用资金API|服务商认证/真实sub_mchid/产品权限未验|
 
 ## 可复现验证
@@ -122,3 +122,15 @@ community_mini_http.py新增本机login/api/logout运输；严格Host/Origin/重
 Owner要求通过已有服务器执行小程序预览。mini-preview改用已有xuanjun-domestic-ops Runner，加载凭据前核对主机iZvt5t8tlrm8oiZ、账号githubrunner且非root。保留既有代码上传IP白名单；未更换私钥。此次调整仅涉及预览任务执行位置，不安装或启动网站服务。旧云端预览Run39003533437仍在途，新服务器上传尚未启动；需要旧任务终态后再触发带[mini-preview]标记的提交。Runner在线、Node兼容性、实际公网出口及微信接收结果均待实测，不能记为已通过。
 
 国内实测Run39006124038：源码测试成功，主机及githubrunner非root校验成功，checkout成功；setup-node步骤持续无终态，微信上传尚未开始。替代路径准备：云端无凭据安装固定版本SDK并打包带SHA256的临时制品，国内Runner使用自带Node20执行，仅在原预览步骤读取上传Secret。不更改系统Node、不使用root、不更改现有服务。新路径运行结果待实测。
+
+
+## 2026-10-17 继续完成阶段调用链（以本节覆盖前述旧状态）
+
+- 微信代码上传已真实验证成功：HEAD0a12a197e8edd0c3bd3b2036d913da116ccbee2d，Run39006945633，微信回执DEVELOPMENT_PREVIEW_UPLOADED；不再列为阻塞。源码测试/SDK制品/国内预览三个job均成功。记录见Issue76评论6230293495。未关闭白名单，未更换私钥。
+- 新增community_mini_application.MiniApplication组合入口：注入既有Center实例/KMS与服务端门店和场景映射，复用原六库运行时、现有CenterIdentity和真实code2session客户端，仅监听loopback，Center生命周期由原宿主负责。无新增账号库、种子账户或自动导入客户权限。
+- /mini/bind仅接受一次性微信code；X-Center-Session和X-Center-CSRF必须通过原Center会话、CSRF、维护状态及原持久限流。外部交换前持久消费code，返回后复查会话，拒绝另一账号抢占微信身份。响应不包含openid、AppSecret、微信session_key或Center凭据；超时保留消耗状态。该入口供既有Center受保护适配层调用，尚未接入现场网页路由。
+- 新增9项真实Center SQLite及HTTP组合检查，涵盖绑定后同账号登录、CSRF/匿名拒绝、撤销竞态、身份抢占、限流、失败重启、组合入口重开及原Center生命周期。微信网络为合成fixture，不能称真实用户登录通过。
+
+完整阶段仍需的外部条件一次列明：既有Center现场实例与KMS接线、有效客户/项目/门店授权、已部署且登记的小程序HTTPS后端域名及微信真机login code、合法sub_mchid与可信微信支付公钥/公钥ID、权威Finance消费接口与真实对账证据、生产DB迁移基线和安装/回滚准入。没有可用的现有Finance服务实现，禁止新建第二套账本补空缺，也禁止凭支付通知候选或测试HMAC发放正式权益。生产安装和真实资金保持原门禁。Owner要求完成两阶段后统一独审，当前不发断点审核申请。
+
+六库恢复组合已补齐community_stage_recovery：仅允许既有Center维护态、未启动listener、无未提交业务事务时生成六库SQLite快照；独立保留Manifest SHA256；恢复先验证全部文件并检查SQLite完整性/外键，仅创建新目录，不覆盖既有路径。拒绝符号链接和硬链接；故障仅清理本次新建目录。不宣称跨库ACID，Center本身沿用原负责人备份。7项专项测试成功。完整本地回归：249项community Python、342项stage5 Python、72项JS全部成功，共663次测试执行，非独立审核/生产验收。

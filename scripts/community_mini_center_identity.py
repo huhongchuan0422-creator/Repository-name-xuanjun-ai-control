@@ -37,6 +37,16 @@ class CenterIdentity(IdentityPort):
     def _subject(self,appid,openid):
         if appid!=self.appid or type(openid) is not str or not 1<=len(openid)<=128:raise PermissionError('PROVIDER_SUBJECT_REQUIRED')
         return self.center.idx('wechat-mini:'+appid+':'+openid)
+    def authorize_binding(self,web_session,csrf,now,consume_limit=True):
+        """Reuse the current Center session and CSRF before any provider IO."""
+        self._time(now)
+        if type(csrf) is not str or not csrf:
+            raise PermissionError('CENTER_CSRF_REQUIRED')
+        uid=self.center.session(web_session,csrf)
+        if consume_limit:
+            with self.center.tx():
+                self.center.limit('wechat-bind:'+uid,5,900)
+        return uid
     def _resolve(self,token,scene):
         binding=self.scenes.get(scene)
         if binding is None:raise PermissionError('SCENE_NOT_REGISTERED')
