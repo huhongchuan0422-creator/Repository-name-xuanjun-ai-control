@@ -1,0 +1,46 @@
+name: PR122 Read-only Account Admission Review Only
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - 'scripts/pr122_account_admission/**'
+      - '.github/workflows/pr122-account-admission-review.yml'
+permissions:
+  contents: read
+jobs:
+  mocked-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mocked account operation tests no target calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/pr122_account_admission/build_candidate.py
+          git diff --exit-code -- scripts/pr122_account_admission/
+          python3 -m unittest discover -s scripts/pr122_account_admission/tests -v 2>&1 | tee "$RUNNER_TEMP/ACCOUNT_TESTS.log"
+          python3 - <<'PY'
+          import re,os,pathlib,hashlib,json,subprocess,tarfile
+          root=pathlib.Path('scripts/pr122_account_admission')
+          log=pathlib.Path(os.environ['RUNNER_TEMP'])/'ACCOUNT_TESTS.log'
+          text=log.read_text(); count=re.findall(r'Ran (\d+) tests in ',text)
+          assert count and int(count[-1])==20 and re.search(r'^OK$',text,re.M)
+          assert not re.search(r'skipped=|FAILED|ERROR:|FAIL:',text)
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'account-review';out.mkdir()
+          files=sorted(p for p in root.rglob('*') if p.is_file() and '__pycache__' not in p.parts and not p.name.endswith('.pyc'))
+          manifest={'source_commit':os.environ['GITHUB_SHA'],'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'scope':'SOURCE_AND_MOCK_TESTS_ONLY_NO_HOST_EXECUTION','test_count':int(count[-1]),'files':[{ 'path':str(p.relative_to(root)), 'size':p.stat().st_size, 'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in files]}
+          (out/'MANIFEST.json').write_text(json.dumps(manifest,sort_keys=True,indent=2)+'\n')
+          (out/'ACCOUNT_TESTS.log').write_bytes(log.read_bytes())
+          archive=out/'ACCOUNT_REVIEW_ONLY.tar.gz'
+          with tarfile.open(archive,'w:gz') as tar:
+              for p in files:tar.add(p,arcname=str(p.relative_to(root)),recursive=False)
+              tar.add(out/'MANIFEST.json',arcname='MANIFEST.json')
+              tar.add(out/'ACCOUNT_TESTS.log',arcname='ACCOUNT_TESTS.log')
+          print(json.dumps({'commit':os.environ['GITHUB_SHA'],'tests':int(count[-1]),'archive_sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'production_execution':'NOT_EXECUTED'},sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-account-admission-review-only
+          path: ${{ runner.temp }}/account-review/
+          retention-days: 14

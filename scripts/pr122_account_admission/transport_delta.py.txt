@@ -1,0 +1,128 @@
+def command(payload, nonce):
+    need(hashlib.sha256(payload).hexdigest() == PAYLOAD_SHA, 'BUNDLE_HASH')
+    need(re.fullmatch('[0-9a-f]{32}',nonce) is not None, 'NONCE')
+    code = '''import base64,contextlib,hashlib,io,json,sys,zlib
+p=zlib.decompress(base64.b64decode(%r,validate=True))
+assert hashlib.sha256(p).hexdigest()==%r
+try:
+ with contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+  b=json.loads(p)
+  caller=b['caller'].encode('utf-8')
+  assert hashlib.sha256(caller).hexdigest()==%r
+  n={'__name__':'fixed_readonly_caller'}
+  exec(compile(caller,'fixed-readonly-caller','exec'),n)
+  result=n['run'](n['load_approved'](b['approved'].encode('utf-8')))
+ print(json.dumps({'hostname':%r,'nonce':%r,'payload_sha256':%r,'result':result},sort_keys=True))
+except BaseException:
+ print('{"state":"HOLD","retry_allowed":false}')
+ sys.exit(2)
+''' % (base64.b64encode(zlib.compress(payload,9)).decode(),PAYLOAD_SHA,CALLER_SHA,HOST,nonce,PAYLOAD_SHA)
+    import shlex
+    return '#!/bin/sh\nset -eu\nPYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -B -c '+shlex.quote(code)+'\n'
+
+def validate(detail, invoke, nonce):
+    need(detail.get('InstanceId') == INSTANCE and detail.get('InvokeId') == invoke,'RESULT_IDENTITY')
+    need(detail.get('InvocationStatus') == 'Success' and type(detail.get('ExitCode')) is int and detail['ExitCode']==0,'REMOTE_NOT_SUCCESS')
+    output=detail.get('Output');need(isinstance(output,str) and len(output)<32768,'OUTPUT_SIZE')
+    try: data=json.loads(output)
+    except Exception:
+        try:data=json.loads(base64.b64decode(output,validate=True))
+        except Exception:raise Hold('OUTPUT_SCHEMA') from None
+    need(isinstance(data,dict) and set(data)=={'hostname','nonce','payload_sha256','result'},'OUTPUT_SCHEMA')
+    need(data['hostname']==HOST and data['nonce']==nonce and data['payload_sha256']==PAYLOAD_SHA,'OUTPUT_BINDING')
+    r=data['result']
+    # Schema validation is fixed and local; source bytes are hash-bound.
+    validate_result(r)
+    return r
+
+def validate_result(r):
+    expected={'schema','state','hostname','account','uid','euid','approved_payload_sha256','mutations','creation_authorized','global_writer_exclusion','target_package_identity','target_mail_subid_semantics','password_status','sudo_privileges','sts_identity','registered_trigger','observed_at_utc','account_absence','group_absence','paths','fixture_preconditions_satisfied','receipt','tools','hooks','platform','channel_identity','canonical_lock','absence_snapshot_stable'}
+    need(isinstance(r,dict) and set(r)==expected,'PROBE_SCHEMA')
+    need(r['state']=='READONLY_OBSERVED_ACCOUNT_CREATION_HOLD' and r['hostname']==HOST and r['account']=='xuanjun-customer','PROBE_IDENTITY')
+    need(r['approved_payload_sha256']=='885b850864465a554d99adbdfb4b4d4e33abf5dc52e7dcf84f27597c247c0818','APPROVED_HASH')
+    need(all(type(r[k]) is int and r[k]==0 for k in ('uid','euid','mutations')) and type(r['schema']) is int and r['schema']==1 and r['creation_authorized'] is False,'PROBE_NO_MUTATION')
+    need(all(r[k]=='UNKNOWN' for k in ('global_writer_exclusion','sts_identity','registered_trigger')),'UNKNOWN_BOUNDARIES')
+    need(r['target_mail_subid_semantics'] in ('UNKNOWN','INFERRED_DOCUMENTED_SYSTEM_ACCOUNT_NO_F_NOT_EXPERIMENTALLY_TESTED'),'SEMANTICS_SCHEMA')
+    package=r['target_package_identity']
+    need(isinstance(package,dict),'PACKAGE_SCHEMA')
+    if package.get('state')=='UNKNOWN':need(set(package)=={'state'},'PACKAGE_SCHEMA')
+    else:
+        need(set(package)=={'state','name','version','release','arch','digest_algorithm','recorded_sha256','actual_digest_matches'} and package.get('state')=='OBSERVED','PACKAGE_SCHEMA')
+        need(all(isinstance(package[k],str) and re.fullmatch(r'[A-Za-z0-9_.+~:-]{1,100}',package[k]) for k in ('name','version','release','arch')) and package['digest_algorithm']=='SHA256' and isinstance(package['recorded_sha256'],str) and re.fullmatch('[0-9a-f]{64}',package['recorded_sha256']) is not None and type(package['actual_digest_matches']) is bool,'PACKAGE_TYPES')
+    if r['target_mail_subid_semantics']!='UNKNOWN':need(package.get('name')=='shadow-utils' and package.get('actual_digest_matches') is True and r['platform'].get('fixed_useradd_flags_supported') is True,'INFERENCE_BASIS')
+    need(r['password_status']==r['sudo_privileges']=='NOT_QUERIED','PRIVATE_POSTCHECK_DENIED')
+    need(all(type(r[k]) is bool for k in ('fixture_preconditions_satisfied','absence_snapshot_stable')),'BOOLEAN_SCHEMA')
+    need(all(r[k] in ('ABSENT','PRESENT','UNKNOWN') for k in ('account_absence','group_absence')),'ABSENCE_SCHEMA')
+    try: observed=datetime.datetime.fromisoformat(r['observed_at_utc']);need(observed.utcoffset()==datetime.timedelta(0),'TIMEZONE')
+    except Exception:raise Hold('TIME_SCHEMA') from None
+    def metadata(m,extended=True):
+        need(isinstance(m,dict),'METADATA_SCHEMA')
+        if m.get('state') in ('ABSENT','UNKNOWN'):need(set(m)=={'state'},'METADATA_SCHEMA');return
+        fields={'state','uid','gid','mode','nlink'} | ({'dev','ino'} if extended else set())
+        need(set(m)==fields and m.get('state')=='PRESENT' and all(type(m[k]) is int and m[k]>=0 for k in fields-{'state'}),'METADATA_SCHEMA')
+    def identity(m):
+        need(isinstance(m,dict),'IDENTITY_SCHEMA')
+        if m.get('state')=='UNKNOWN':need(set(m)=={'state'},'IDENTITY_SCHEMA');return
+        need(set(m)=={'state','sha256','size','dev','ino'} and m['state']=='OBSERVED' and isinstance(m['sha256'],str) and re.fullmatch('[0-9a-f]{64}',m['sha256']) is not None and all(type(m[k]) is int and m[k]>=0 for k in ('size','dev','ino')) and m['size']<=16777216,'IDENTITY_SCHEMA')
+    paths={'/','/usr','/usr/sbin','/etc','/usr/sbin/useradd','/usr/sbin/nologin','/nonexistent','/home','/home/xuanjun-customer','/var','/var/mail','/var/mail/xuanjun-customer','/var/spool','/var/spool/mail','/var/spool/mail/xuanjun-customer'}
+    need(isinstance(r['paths'],dict) and set(r['paths'])<=paths and {'/','/usr','/usr/sbin','/etc','/usr/sbin/useradd','/usr/sbin/nologin','/nonexistent','/home/xuanjun-customer','/var/mail/xuanjun-customer','/var/spool/mail/xuanjun-customer'}<=set(r['paths']),'PATH_SCHEMA')
+    for m in r['paths'].values():metadata(m,False)
+    metadata(r['receipt'])
+    need(isinstance(r['tools'],dict) and set(r['tools'])=={'/usr/sbin/useradd','/usr/sbin/nologin','/usr/bin/passwd','/usr/bin/sudo'},'TOOLS_SCHEMA')
+    for m in r['tools'].values():
+        need(isinstance(m,dict) and set(m)=={'metadata','identity'},'TOOL_SCHEMA');metadata(m['metadata']);identity(m['identity'])
+    need(isinstance(r['hooks'],dict) and set(r['hooks'])=={'/etc/shadow-maint/useradd-pre.d','/etc/shadow-maint/useradd-post.d','/etc/useradd.d'},'HOOK_SCHEMA')
+    for m in r['hooks'].values():metadata(m)
+    p=r['platform'];bools={'fixed_useradd_flags_supported','no_account_creation_hooks','no_supplementary_group_defaults','ranges_ordered'};ranges={'uid_min','uid_max','gid_min','gid_max'}
+    need(isinstance(p,dict) and set(p)==bools|ranges,'PLATFORM_SCHEMA')
+    need(all(type(p[k]) is bool or p[k]=='UNKNOWN' for k in bools) and all(type(p[k]) is int and p[k]>0 or p[k]=='UNKNOWN' for k in ranges),'PLATFORM_TYPES')
+    identity(r['channel_identity']);lock=r['canonical_lock']
+    need(isinstance(lock,dict) and set(lock)=={'acquired_at_observation','metadata','named_inode_stable'} and lock['acquired_at_observation'] is True and type(lock['named_inode_stable']) is bool,'LOCK_SCHEMA');metadata(lock['metadata'])
+
+def workflow_identity():
+    # Runtime comparison avoids a self-referential constant inside workflow bytes.
+    actual_sha=os.environ.get('GITHUB_WORKFLOW_SHA','')
+    need(os.environ.get('GITHUB_WORKFLOW_REF')==EXPECTED_WORKFLOW_REF and re.fullmatch('[0-9a-f]{40}',actual_sha) is not None,'EXECUTABLE_WORKFLOW_REF')
+    event=json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+    current=github('/repos/'+REPO+'/pulls/122')
+    need(current['state']=='open' and current['mergeable'] is True and current['merge_commit_sha']==actual_sha,'CURRENT_MERGE_WORKFLOW_DRIFT')
+    need(current['head']['sha']==row['head_sha']==event['pull_request']['head']['sha'] and current['head']['ref']==BRANCH and current['head']['repo']['full_name']==REPO,'CURRENT_HEAD_DRIFT')
+    need(current['base']['ref']==BASE and current['base']['sha']==event['pull_request']['base']['sha'],'CURRENT_BASE_DRIFT')
+    return actual_sha
+
+def main():
+    try:
+        # Neither cloud nor GitHub can be called before both disarm gates pass.
+        need(EXECUTION_ADMISSION,'MISSING_EXACT_TASK5_READONLY_ADMISSION')
+        payload=gate()
+        workflow_sha=workflow_identity()
+        master=(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''),'')
+        need(all(master[:2]),'MISSING_EXISTING_SECRETS')
+        session='xuanjun-readonly-'+uuid.uuid4().hex[:16]
+        data=rpc('sts.aliyuncs.com','2015-04-01','AssumeRole',master,RoleArn=ROLE,RoleSessionName=session,DurationSeconds=900)
+        arn=data.get('AssumedRoleUser',{}).get('Arn')
+        need(arn=='acs:ram::1384884686754410:assumed-role/xuanjun-automation/'+session,'STS_IDENTITY_UNKNOWN')
+        c=data['Credentials'];credentials=(c['AccessKeyId'],c['AccessKeySecret'],c['SecurityToken'])
+        need(all(isinstance(v,str) and v and '\n' not in v and '\r' not in v for v in credentials),'STS_SCHEMA')
+        nonce=uuid.uuid4().hex;script=command(payload,nonce)
+        need(len(base64.b64encode(script.encode()))<=16384,'COMMAND_SIZE_LIMIT')
+        need(datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat(EXPIRES),'EXPIRED_BEFORE_RUN')
+        row.update(stage='READONLY_INTENT_NO_RETRY',sts_role_arn=ROLE,sts_assumed_role_arn=arn,nonce=nonce,caller_sha256=CALLER_SHA,expiry=EXPIRES,workflow_ref=EXPECTED_WORKFLOW_REF,workflow_sha=workflow_sha)
+        persist();print(json.dumps(row,sort_keys=True),flush=True)
+        result=rpc(ENDPOINT,'2020-06-01','RunCommand',credentials,CommandContent=script,RegionId=REGION,Type='RunShellScript',InstanceId=INSTANCE,WorkingUser='root',WorkingDir='/root',Timeout=90,Name='xuanjun-account-readonly-admission-once-20261017')
+        invoke=result.get('InvokeId');need(isinstance(invoke,str) and re.fullmatch(r'[A-Za-z0-9_-]{1,180}',invoke),'DISPATCH_RESULT_UNKNOWN_NO_RETRY')
+        row.update(invoke_id=invoke,stage='READONLY_DISPATCHED_NO_RETRY');persist();print(json.dumps(row,sort_keys=True),flush=True)
+        deadline=time.monotonic()+180
+        while time.monotonic()<deadline:
+            result=rpc(ENDPOINT,'2020-06-01','DescribeInvocationResult',credentials,RegionId=REGION,InstanceId=INSTANCE,InvokeId=invoke)
+            detail=result.get('InvocationResult');need(isinstance(detail,dict),'QUERY_SCHEMA')
+            need(detail.get('InstanceId')==INSTANCE and detail.get('InvokeId')==invoke,'QUERY_IDENTITY')
+            if detail.get('InvocationStatus') in ('Pending','Running','Stopping'):time.sleep(5);continue
+            observed=validate(detail,invoke,nonce)
+            row.update(status='READONLY_OBSERVED',stage='ACCOUNT_CREATION_HOLD',observations=observed);persist();print(json.dumps(row,sort_keys=True),flush=True);return 0
+        raise Hold('POLL_TIMEOUT_HOLD_NO_RETRY')
+    except Hold as exc:row.update(status='HOLD',reason=str(exc))
+    except BaseException:row.update(status='HOLD',reason='UNKNOWN_PRESERVE_NO_RETRY')
+    # Runner-only evidence artifact; never a new host receipt or authorization ledger.
+    persist();print(json.dumps(row,sort_keys=True),flush=True);return 2
+if __name__=='__main__':raise SystemExit(main())
