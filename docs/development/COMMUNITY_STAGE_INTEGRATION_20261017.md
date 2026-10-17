@@ -17,6 +17,8 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 
 ## 40节点追踪
 
+2026-10-17续接：community_saas_reconciliation.reconcile将既有通知RSA/AES验证与PartnerOrderReader单次签名GET查单交叉核对，要求同商户、服务端冻结订单/金额/币种及同SUCCESS交易号。网络前后复核绑定，网络期间不占写锁；查单后重新检查通知时效。原通知事件碰撞检查继续复用；通知候选与查单匹配证据分别保存为原saas_review_tasks中的FINANCE_EVIDENCE，独立确定ID与原created_at/已终结状态保留。第二次提交失败只保留候选，明确再次调用可完成，不自动重试。11项本地真实RSA/AES/SQLite测试含并发新连接、重开和中断恢复；网络报文为合成fixture。新增测试纳入Hosted与国内隔离回归，准确新CI终态另记。该接线仅补齐P2-11至13的核对证据，不是权威Finance确认、真实结算或生产验收，未开放HTTP或资金操作。
+
 责任：ChatGPT负责本批独立接线；既有模块归属及独审结果不变。以下是源码证据状态，不是审核PASS。
 
 | 节点 | 源码/集成现状 | 测试证据或下一依赖 |
