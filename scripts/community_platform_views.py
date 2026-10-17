@@ -56,13 +56,8 @@ class PlatformViews:
                 evidence=provider_evidence(db,dict(tenant_id=t,merchant_id=m,store_id=s),ref)
                 if evidence is not None and status in ('SUCCESS','REFUNDED') and currency=='CNY':
                     verified_count+=1;verified_minor+=amount
-                    refunded=0
-                    for raw, in db.execute('SELECT evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,s,ref)):
-                        try:event=json.loads(raw)
-                        except (ValueError,TypeError):continue
-                        if type(event) is dict and event.get('source')=='WECHAT_SIGNED_REFUND_RESULT':
-                            if type(event.get('refund_minor')) is not int or event['refund_minor']<=0:raise ValueError('INVALID_VERIFIED_REFUND_HISTORY')
-                            refunded+=event['refund_minor']
+                    from scripts.community_financial_views import verified_refund_total
+                    refunded=verified_refund_total(db,dict(tenant_id=t,merchant_id=m,store_id=s),ref)
                     if refunded>amount:raise ValueError('REFUND_TOTAL_EXCEEDS_PAYMENT')
                     verified_refunds+=refunded
                 elif status in ('SUCCESS','REFUNDED'):unverified_terminal+=1
