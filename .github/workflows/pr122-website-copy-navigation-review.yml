@@ -67,7 +67,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-copy-browser/node_modules/playwright" node tests/pr122_site_hub_auth_browser.cjs | tee /tmp/pr122-website-review/CUSTOMER_AUTH_UI_BROWSER_REPORT.json
+          test -x /opt/google/chrome/chrome
+          /opt/google/chrome/chrome --version | tee /tmp/pr122-website-review/CUSTOMER_AUTH_BROWSER_VERSION.txt
+          XJ_CHROMIUM_EXECUTABLE=/opt/google/chrome/chrome PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-copy-browser/node_modules/playwright" node tests/pr122_site_hub_auth_browser.cjs | tee /tmp/pr122-website-review/CUSTOMER_AUTH_UI_BROWSER_REPORT.json
       - name: Build current synthetic website with opt-in navigation before CSP and manifest
         run: python scripts/pr122_site_hub_stage.py --browser-fixture tests/fixtures/pr122-site-shell --output /tmp/pr122-current-website --derive-navigation
       - name: Exercise real Chromium copy, responsive layout and role navigation
