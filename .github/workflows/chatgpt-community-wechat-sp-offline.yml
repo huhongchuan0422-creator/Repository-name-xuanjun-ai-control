@@ -42,6 +42,8 @@ jobs:
           node --test demos/community-local-e2e/*.test.mjs
           node --test demos/community-payment/demo.test.mjs
           node --test demos/community-admin/admin.test.mjs
+      - name: Build deterministic offline source package
+        run: python scripts/community_stage_package.py --output community-stage-source.zip
       - name: Save exact-source test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -50,4 +52,5 @@ jobs:
           path: |
             community-tests.log
             stage5-tests.log
+            community-stage-source.zip
           retention-days: 14
