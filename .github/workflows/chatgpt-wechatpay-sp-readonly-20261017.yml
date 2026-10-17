@@ -37,7 +37,23 @@ jobs:
           PY
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
-          printf '%s\n' "$SP_PRIVATE_KEY" > "$work/key.pem"
+          python3 - "$work/key.pem" <<'PY'
+          import os,sys
+          from pathlib import Path
+          raw=os.environ['SP_PRIVATE_KEY'].strip()
+          if raw.startswith('"') and raw.endswith('"'):
+              raw=raw[1:-1]
+          if '\\n' in raw and '\n' not in raw:
+              raw=raw.replace('\\n','\n')
+              print('KEY_NEWLINE_NORMALIZED=YES')
+          else:
+              print('KEY_NEWLINE_NORMALIZED=NO')
+          kinds=('-----BEGIN PRIVATE KEY-----','-----BEGIN RSA PRIVATE KEY-----',
+                 '-----BEGIN ENCRYPTED PRIVATE KEY-----','-----BEGIN EC PRIVATE KEY-----')
+          print('KEY_HAS_PEM_HEADER='+('YES' if raw.startswith(kinds) else 'NO'))
+          print('KEY_LOOKS_CERTIFICATE='+('YES' if raw.startswith('-----BEGIN CERTIFICATE-----') else 'NO'))
+          Path(sys.argv[1]).write_text(raw+'\n',encoding='utf8')
+          PY
           if ! openssl pkey -in "$work/key.pem" -noout >/dev/null 2>&1; then
             echo 'RESULT=PRIVATE_KEY_PARSE_FAILED'
             exit 4
