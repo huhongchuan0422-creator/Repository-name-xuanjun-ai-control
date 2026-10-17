@@ -21,7 +21,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_additive_server.py"
     },
     "helpers/epoch7_approval.py": {
-      "sha256": "cdd5f74df796c3b858720f9173973df3d0dd45ed1b7cef50b2cc861bdf4d70ac",
+      "sha256": "0587f0e1f81e7f70ab098a13b1e0a3b47cad40344e4237128716953f2ad34f55",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_approval.py"
     },
     "helpers/epoch7_bindings.py": {
@@ -209,7 +209,7 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/access_plan/test_exact_access_plan.py"
     },
     "tests/approval/test_epoch7_approval.py": {
-      "sha256": "7126672b9cc8046a784c2a49c50c9c14c5869dfcbc359674088efda757e6295f",
+      "sha256": "8b06abfb31b2bcb882c08e13756f6eac456f9fdeb1ebc384e7e8f37420ee544a",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_approval.py"
     },
     "tests/approval/test_epoch7_bounded_fetch.py": {
