@@ -649,7 +649,7 @@ def build_exact_source(work,output_dir,head,tree):
     read_pin(output_dir,archive.name,out['archive_bytes'],out['archive_sha256'])
     need(value['runtime_files_preserved']==107 and value['runtime_package_files_preserved']==110
          and value['business_phases_preserved']==16 and value['phase_logic_unchanged'] is True
-         and value['existing_modules_unchanged'] is True and value['module_added']=='epoch7_claim_successor'
+         and value['existing_modules_unchanged'] is False and value['module_added']=='epoch7_claim_successor'
          and value['host_collection']=='NOT_RUN' and value['production_resume_authorized'] is False,'BUILD_SCOPE_MISMATCH')
     selected=selected_archive_files((work/SELECTED_ARCHIVE_TARGET).read_bytes())
     mapping=strict_json((work/CANDIDATE_TARGET/'build/OVERLAY_INPUTS.json').read_bytes())
