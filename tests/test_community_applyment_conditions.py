@@ -96,6 +96,15 @@ class SubmerchantIdentityImmutability(unittest.TestCase):
             result=service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
         self.assertEqual(result['provider_sub_mchid'],'1234567891')
         self.assertEqual(len(writes),1)
+        # A previously completed application must not be rewritten to an earlier state.
+        record['provider_state']='APPLYMENT_STATE_FINISHED'
+        writes.clear()
+        with patch('scripts.community_wechat_applyment.request',return_value=(
+             dict(business_code='ap_original',applyment_state='APPLYMENT_STATE_AUDITING',
+                  sub_mchid='1234567891'),'c'*64)):
+            with self.assertRaisesRegex(ValueError,'TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT'):
+                service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
+        self.assertEqual(writes,[])
 
 
 class PlatformPassportAdmission(unittest.TestCase):
