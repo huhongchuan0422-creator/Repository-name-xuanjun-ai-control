@@ -44,3 +44,13 @@
 旧12:21、r1复制品回执保留为历史。当前上述实机批均已结束，没有后台生产迁移writer，剩余仍为6个大节点。无需Owner重新授权、提供密码或复制代码。下一执行条件是原独审对准确停止安装事务及主机准入的决定；持久身份、完整运行配置、最终数据/单Writer和生产激活仍须完成。
 
 [本轮真实回执](../../evidence/pr99-service-handoff/s09-install-candidate/R2_EXECUTION_RECEIPT_20261017.json)；[准确事务与测试包](../../evidence/pr99-service-handoff/s09-install-candidate/STOPPED_TRANSACTION_REVIEW.md)。
+
+
+## 2026-10-17 13:16 CST — 执行入口与生产启动源码增量（未生产部署）
+
+- 已实证当前原生GitHub工具可以通过Owner标签触发受保护PR工作流，纠正此前“没有任何可触发入口”的过度结论。入口只接收Owner332398908、PR99固定分支、准确HEAD标签，不由普通push执行Root；只限国内停止安装，不等于任意生产执行通道。
+- 真实run39005472107/job117316933627：13:13:35 CST返回INDEPENDENT_HOST_ADMISSION_NOT_ISSUED_NO_CLOUD_CALL，发生在任何STS/SWAS前；云调用0、主机命令0。不是RAM或Secrets故障，不重发此已观测批。
+- production_start.py新增最终检查点专用启动候选（final-v1，禁止r1/r2初步数据）、专用身份及准确字节准入、三服务监督启动/健康、失败仅停自有服务并保留数据、不复活原writer、不切入口。源SHA6ad51228f60690365ee4004c8c05b9c982eb2de70551ac8061142fcb4c93fa32；该候选未接通生产执行动作、未实机运行、并非完整生产准备PASS。
+- 准确checkout23b9b42bbfa7655bb38c0c1ebc83f4edadc3efca，run39005621738/job117317379867 SUCCESS；原停止事务9项+新启动围堵4项均通过。属于临时文件及模拟systemctl检查，不是PID1或业务验收。
+- 真正仍缺：原准确独立主机准入、真实最终检查点/原writer停止及唯一writer归属、专用运行身份与文件权限、完整生产触发/鉴权和站点切换接线。源码作者不制造这些真实输入，不把源码或入口测试记作迁移节点完成。
+- 本轮无新的生产服务安装/启动/切换，仍剩6大节点，当前无后台部署writer。PR99三应用124源码/2906运行文件不是PR122网站/客户中心发布包；不得替换dots网站writer或混用网站安装范围。已通过未变内容继承，后续只对完整新增执行链集中验收。
