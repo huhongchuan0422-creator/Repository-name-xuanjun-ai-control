@@ -18,6 +18,7 @@ class UnixMiniProxy(unittest.TestCase):
     def setUp(self):
         self.fx=center_fixture.ExistingCenterComposition('test_core_bytes_are_identical_to_pinned_original');self.fx.setUp()
         self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name)
+        self.root.chmod(0o750)
         self.app=MiniApplication(self.fx.center,self.root/'state',self.fx.stage.api.bindings,
              self.fx.stage.api.bindings[self.fx.stage.customer],self.fx.scenes,self.fx.identity.appid,'a'*32)
         self.app.gateway.provider.exchange=Mock(return_value={'appid':self.fx.identity.appid,'openid':'openid1'})
@@ -77,6 +78,12 @@ class UnixMiniProxy(unittest.TestCase):
         self.app.close();self.assertEqual(self.path.read_text(),'preserve')
     def test_active_socket_cannot_be_replaced_by_second_listener(self):
         with self.assertRaises(ValueError):self.app.listen_proxy(self.path,'https://example.test',65534,os.getegid())
+    def test_proxy_directory_must_allow_pinned_nginx_group_traversal(self):
+        with MiniApplication(self.fx.center,self.root/'other-state',self.fx.stage.api.bindings,
+                self.fx.stage.api.bindings[self.fx.stage.customer],self.fx.scenes,self.fx.identity.appid,'a'*32) as other:
+            self.root.chmod(0o700)
+            with self.assertRaises(PermissionError):other.listen_proxy(self.root/'other.sock','https://example.test',65534,os.getegid())
+            self.assertFalse((self.root/'other.sock').exists())
     def test_proxy_requires_pinned_class_and_https_config(self):
         for origin,peer in [('http://example.test',TrustedNginxSource(65534)),
                             ('https://example.test',lambda *_:'192.0.2.1')]:

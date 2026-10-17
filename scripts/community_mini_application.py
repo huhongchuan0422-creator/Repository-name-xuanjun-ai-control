@@ -68,11 +68,15 @@ class MiniApplication:
         from scripts.pr122_customer_source import TrustedNginxSource
         from scripts.community_mini_http import make_handler
         if self.server is not None:raise ValueError('ALREADY_LISTENING')
+        if os.geteuid()==0:raise PermissionError('NONROOT_PROXY_APPLICATION_REQUIRED')
         path=private_path(Path(socket_path).absolute())
         parent=path.parent.stat()
         if parent.st_uid!=os.geteuid() or parent.st_mode & 0o022 or path.exists():
             raise PermissionError('PRIVATE_SOCKET_DIRECTORY_REQUIRED')
         if type(nginx_gid) is not int or nginx_gid<0:raise ValueError('PINNED_NGINX_GROUP_REQUIRED')
+        if (parent.st_gid!=nginx_gid or
+                (nginx_uid!=os.geteuid() and parent.st_mode & 0o050 != 0o050)):
+            raise PermissionError('NGINX_SOCKET_DIRECTORY_TRAVERSAL_REQUIRED')
         handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid))
         class Server(socketserver.UnixStreamServer):request_queue_size=128
         server=Server(str(path),handler)
