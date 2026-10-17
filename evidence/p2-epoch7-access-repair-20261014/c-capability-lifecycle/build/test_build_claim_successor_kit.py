@@ -67,7 +67,7 @@ class BuildClaimSuccessorTests(unittest.TestCase):
         self.assertEqual(len(self.baseline), 256)
         self.assertEqual(builder.sha(self.baseline[builder.MANIFEST]), builder.MANIFEST_SHA256)
         mapping = builder.authenticate_map(self.map_raw)
-        self.assertEqual(len(mapping['files']), 15)
+        self.assertEqual(len(mapping['files']), 16)
         self.assertEqual(mapping['baseline_archive_sha256'], builder.ARCHIVE_SHA256)
         self.assertEqual(len(self.archive), 1056853)
         self.assertEqual(builder.ARCHIVE_SHA256,
@@ -114,7 +114,7 @@ class BuildClaimSuccessorTests(unittest.TestCase):
         self.assertFalse(self.metadata['production_resume_authorized'])
         self.assertEqual(self.metadata['output']['source_commit'], '0' * 40)
         self.assertEqual(self.metadata['baseline']['source_commit'], self.old_manifest['kit_source_commit'])
-        self.assertEqual(len(self.metadata['unchanged_files']), 241)
+        self.assertEqual(len(self.metadata['unchanged_files']), 240)
         self.assertEqual(self.metadata['output']['files'], {name: builder.sha(raw) for name, raw in self.files.items()})
 
     def test_byte_determinism(self):
@@ -259,7 +259,7 @@ class BuildClaimSuccessorTests(unittest.TestCase):
             epoch7_claim_successor=target))
         self.assertEqual(len(self.manifest['modules']), 111)
         self.assertEqual(self.metadata['module_added'], 'epoch7_claim_successor')
-        self.assertTrue(self.metadata['existing_modules_unchanged'])
+        self.assertFalse(self.metadata['existing_modules_unchanged'])
         self.assertEqual(self.metadata['test_suite_imports_added'], {})
         self.assertTrue(self.metadata['test_suites_unchanged'])
         self.assertEqual(self.metadata['new_test_execution'],
@@ -403,7 +403,7 @@ print('AUTHENTICATED_SUCCESSOR_CACHED_IMPORTS_14_PASS; LEGACY_SUITES_NOT_RUN')
         self.assertEqual(self.map_raw, builder.canonical(mapping))
         self.assertEqual({row['kit_target']: row['source'] for row in mapping['files']},
                          builder.OVERLAY_SOURCES)
-        self.assertEqual(len({row['source'] for row in mapping['files']}), 15)
+        self.assertEqual(len({row['source'] for row in mapping['files']}), 16)
         for row in mapping['files']:
             body = self.sources[row['source']]
             blob = hashlib.sha1(('blob %d\0' % len(body)).encode('ascii') + body).hexdigest()
@@ -413,7 +413,7 @@ print('AUTHENTICATED_SUCCESSOR_CACHED_IMPORTS_14_PASS; LEGACY_SUITES_NOT_RUN')
                              builder.NEW_FILES else builder.sha(self.baseline[row['kit_target']]))
         self.assertEqual(self.metadata['overlays'], mapping['files'])
         self.assertEqual(self.metadata['added_files'], ['helpers/epoch7_claim_successor.py'])
-        self.assertEqual(len(self.metadata['modified_files']), 15)
+        self.assertEqual(len(self.metadata['modified_files']), 16)
 
     def test_all_legacy_tests_and_suite_policy_remain_byte_identical(self):
         inherited = {name for name in self.baseline if name.startswith('tests/')}
