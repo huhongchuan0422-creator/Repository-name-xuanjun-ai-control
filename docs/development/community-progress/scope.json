@@ -87,11 +87,11 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "39dcd47040ab0a520452b282192fdffdb80359d8",
-    "run_id": 39027118436,
-    "job_id": 117380191423,
+    "source": "88ba947ed958315fc576a441f9029a1cace73963",
+    "run_id": 39030062012,
+    "job_id": 117388556512,
     "result": "SUCCESS",
-    "scope": "Hosted 433/433 community tests, 342/342 stage tests, node suites PASS (34+40+8+7); optional mini-runtime, preview, python runtime, SDK SKIPPED",
+    "scope": "Exact Hosted test success for split-bill bound identifier source and regression; optional mini preview/runtime/python-runtime/SDK SKIPPED",
     "covers_later_commits": false
   }
 }
