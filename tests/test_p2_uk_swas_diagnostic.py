@@ -471,3 +471,222 @@ class RemoteIdentityProtocolTests(unittest.TestCase):
             return dict(self.obs)
         self.broker.observation=change
         with self.assertRaises(RuntimeError):self.run_request()
+
+
+class SplitCloudTests(unittest.TestCase):
+    # Reuse only setup, not inherited test methods.
+    def setUp(self):
+        RemoteIdentityProtocolTests.setUp(self)
+        self.rows={};self.head=0;self.calls=[];self.fail_run=False;self.no_id=False
+        parent=self
+        class Journal:
+            def read(obj):
+                return None if not parent.rows else (str(parent.head),json.loads(json.dumps(parent.rows)))
+            def write(obj,value,prior=None):
+                if prior is None and parent.rows:raise RuntimeError('CONFLICT')
+                if prior is not None and prior!=str(parent.head):raise RuntimeError('CAS')
+                parent.head+=1;parent.rows=json.loads(json.dumps(value));return str(parent.head)
+        class RPC:
+            def assume(obj):parent.calls.append('STS')
+            def __call__(obj,endpoint,action,**kw):
+                parent.calls.append(action)
+                if action=='RunCommand':
+                    if parent.fail_run:raise OSError('PRIVATE_ERROR')
+                    return {} if parent.no_id else {'InvokeId':'t-real-fixture'}
+                body={'hostname':d.receipt.HOST,'uid':0,'python':[3,6,8],
+                      'nonce':parent.request['nonce'],'private_inputs_read':False}
+                result={'state':'REMOTE_IDENTITY_COMPLETE','request_sha256':
+                    hashlib.sha256(d.canonical(parent.request)).hexdigest(),'receipt':body,'redispatch_allowed':False}
+                return {'InvocationResult':{'InvokeId':kw['InvokeId'],'InstanceId':d.receipt.INSTANCE,
+                    'InvocationStatus':'Success','ExitCode':0,'Output':json.dumps(result)}}
+        self.journal=Journal();self.rpc=RPC();self.factory=lambda:self.rpc
+        self.policy=self.make_policy('REMOTE_RUN','',1)
+
+    def make_policy(self,operation,invoke,ident):
+        binding={'operation':operation,'attempt':self.request['attempt'],
+            'request_sha256':hashlib.sha256(d.canonical(self.request)).hexdigest(),
+            'command_sha256':hashlib.sha256(d.remote_command(self.request).encode()).hexdigest(),
+            'source_commit':'a'*40,'invoke_id':invoke,'target_config_sha256':'d'*64,
+            'host':d.receipt.HOST,'instance_id':d.receipt.INSTANCE,'region':d.receipt.REGION,'role':d.ROLE}
+        permit={'decision':'UK_SPLIT_APPROVED','binding':binding,'issued_unix':90,
+                'expires_unix':200,'max_executions':1,'install_allowed':False,'private_inputs_allowed':False}
+        self.body='P2_UK_SPLIT_ONCE\n'+json.dumps(permit)
+        return dict(binding=binding,request=self.request,enabled=True,revoked=False,
+            reviewer_principal='independent',source_writer_principal='writer',
+            custody_evidence_sha256='b'*64,approval_comment_id=ident,
+            approval_body_sha256=hashlib.sha256(self.body.encode()).hexdigest())
+
+    def call(self,action='remote-run',invoke=''):
+        return d.split_cloud(self.policy,self.journal,self.factory,lambda ident:self.body,
+                             lambda:100,action,invoke)
+
+    def test_cloud_intent_precedes_credentials(self):
+        def factory():
+            self.assertEqual(self.rows['state'],'CLOUD_DISPATCH_INTENT')
+            return self.rpc
+        self.factory=factory
+        self.assertEqual(self.call()['state'],'CLOUD_DISPATCHED_AWAIT_SEPARATE_QUERY')
+        self.assertEqual(self.calls,['STS','RunCommand'])
+
+    def test_cloud_run_consumed_on_exception(self):
+        self.fail_run=True
+        with self.assertRaisesRegex(RuntimeError,'CLOUD_DISPATCH_UNKNOWN'):self.call()
+        self.assertEqual(self.rows['state'],'CLOUD_DISPATCH_INTENT')
+        with self.assertRaises(RuntimeError):self.call()
+        self.assertEqual(self.calls.count('RunCommand'),1)
+
+    def test_missing_invoke_is_permanent_unknown(self):
+        self.no_id=True
+        with self.assertRaises(RuntimeError):self.call()
+        self.assertEqual(self.rows['invoke_id'],'')
+        self.policy=self.make_policy('CLOUD_QUERY','t-guess',2)
+        with self.assertRaises(RuntimeError):self.call('cloud-query','t-guess')
+        self.assertEqual(self.calls.count('RunCommand'),1)
+
+    def test_cross_job_query_and_no_redispatch(self):
+        self.call();self.calls=[]
+        self.policy=self.make_policy('CLOUD_QUERY','t-real-fixture',2)
+        result=self.call('cloud-query','t-real-fixture')
+        self.assertEqual(result['state'],'SPLIT_TRANSPORT_VERIFIED')
+        self.assertEqual(self.calls,['STS','DescribeInvocationResult'])
+        with self.assertRaises(RuntimeError):self.call('cloud-query','t-real-fixture')
+
+    def test_fresh_query_can_reconcile_after_run_request_expiry(self):
+        self.request['expires_unix']=101
+        self.policy=self.make_policy('REMOTE_RUN','',1)
+        self.call()
+        self.policy=self.make_policy('CLOUD_QUERY','t-real-fixture',2)
+        result=d.split_cloud(self.policy,self.journal,self.factory,lambda ident:self.body,
+                             lambda:110,'cloud-query','t-real-fixture')
+        self.assertEqual(result['state'],'SPLIT_TRANSPORT_VERIFIED')
+
+    def test_query_unknown_consumes_own_permission(self):
+        self.call();self.policy=self.make_policy('CLOUD_QUERY','t-real-fixture',2)
+        rpc=self.rpc
+        def pending(endpoint,action,**kw):
+            return {'InvocationResult':{'InvokeId':kw['InvokeId'],'InstanceId':d.receipt.INSTANCE,
+                                        'InvocationStatus':'Running'}}
+        rpc.__class__.__call__=lambda obj,*a,**k:pending(*a,**k)
+        self.assertEqual(self.call('cloud-query','t-real-fixture')['state'],'CLOUD_QUERY_UNKNOWN')
+        with self.assertRaises(RuntimeError):self.call('cloud-query','t-real-fixture')
+
+    def test_target_unknown_distinct_from_cloud_unknown(self):
+        detail={'InvokeId':'t-id','InstanceId':d.receipt.INSTANCE,'InvocationStatus':'Success',
+                'ExitCode':0,'Output':json.dumps({'state':'REMOTE_EXECUTION_UNKNOWN','redispatch_allowed':False})}
+        self.assertEqual(d.validate_split_output(detail,'t-id',self.request)['state'],'TARGET_EXECUTION_UNKNOWN')
+
+    def test_approval_rejects_self_review_before_claim(self):
+        self.policy['reviewer_principal']='writer'
+        with self.assertRaises(RuntimeError):self.call()
+        self.assertEqual(self.rows,{})
+        self.assertEqual(self.calls,[])
+
+    def test_post_sts_revocation_stops_cloud(self):
+        def assume():
+            self.calls.append('STS');self.policy['revoked']=True
+        self.rpc.assume=assume
+        with self.assertRaises(RuntimeError):self.call()
+        self.assertEqual(self.calls,['STS'])
+        self.assertEqual(self.rows['state'],'CLOUD_DISPATCH_INTENT')
+
+    def test_remote_command_is_fixed_and_payload_is_data(self):
+        import base64
+        request=dict(self.request,task_id="'; touch /bad; '")
+        command=d.remote_command(request)
+        self.assertNotIn('touch /bad',command)
+        self.assertIn(d.REMOTE_ENTRY+' receive-identity',command)
+        encoded=command.split("printf '%s' '",1)[1].split("'",1)[0]
+        self.assertEqual(json.loads(base64.b64decode(encoded)),request)
+
+    def test_actions_push_event_cannot_read_policy_or_keys(self):
+        with patch.dict(os.environ,{'GITHUB_EVENT_NAME':'push'},clear=True):
+            with self.assertRaises(RuntimeError):d.actions_entry('remote-run','a')
+
+    def test_actions_rerun_is_rejected(self):
+        with patch.dict(os.environ,{'GITHUB_EVENT_NAME':'workflow_dispatch','P2_SPLIT_ENABLED':'true',
+                       'GITHUB_REPOSITORY':d.REPOSITORY,'GITHUB_RUN_ATTEMPT':'2'},clear=True):
+            with self.assertRaises(RuntimeError):d.actions_entry('remote-run','a')
+
+
+
+class GitJournalProtocolTests(unittest.TestCase):
+    def setUp(self):
+        import base64
+        self.objects={};self.refs={};self.counter=0
+        owner=self
+        class Journal(d.GitJournal):
+            def api(obj,method,path,value=None,missing=False):
+                def add(v):
+                    owner.counter+=1;key=('%040x'%owner.counter);owner.objects[key]=v;return {'sha':key}
+                if method=='POST' and path=='/git/trees':
+                    raw=value['tree'][0]['content'].encode()
+                    blob=add({'encoding':'base64','size':len(raw),'content':base64.b64encode(raw).decode()})
+                    return add({'tree':[dict(path='state.json',mode='100644',type='blob',sha=blob['sha'])]})
+                if method=='POST' and path=='/git/commits':
+                    return add(dict(tree={'sha':value['tree']},parents=value['parents']))
+                if method=='POST' and path=='/git/refs':
+                    key=value['ref'][5:]
+                    if key in owner.refs:raise RuntimeError('CONFLICT')
+                    owner.refs[key]=value['sha'];return {}
+                if method=='PATCH':
+                    key=path[len('/git/refs/'):]
+                    if owner.refs[key] not in owner.objects[value['sha']]['parents']:raise RuntimeError('CAS')
+                    if value['force'] is not False:raise RuntimeError('FORCE')
+                    owner.refs[key]=value['sha'];return {}
+                if path.startswith('/git/ref/'):
+                    key=path[len('/git/ref/'):]
+                    if key not in owner.refs:
+                        if missing:return None
+                        raise KeyError(key)
+                    return {'object':{'sha':owner.refs[key]}}
+                return owner.objects[path.rsplit('/',1)[1]]
+        self.Journal=Journal;self.j=Journal('SYNTHETIC_TOKEN','attempt')
+
+    def test_ref_claim_persists_between_instances(self):
+        sha=self.j.write({'state':'INTENT'})
+        self.assertEqual(self.Journal('SYNTHETIC_TOKEN','attempt').read(),(sha,{'state':'INTENT'}))
+
+    def test_second_claim_rejected(self):
+        self.j.write({'state':'INTENT'})
+        with self.assertRaises(RuntimeError):self.j.write({'state':'OTHER'})
+
+    def test_stale_append_is_not_fast_forward(self):
+        head=self.j.write({'state':'INTENT'})
+        self.j.write({'state':'DISPATCHED'},head)
+        with self.assertRaises(RuntimeError):self.j.write({'state':'WRONG'},head)
+        self.assertEqual(self.j.read()[1]['state'],'DISPATCHED')
+
+    def test_branch_escape_rejected(self):
+        with self.assertRaises(RuntimeError):self.Journal('token','../../main')
+
+    def test_authenticated_api_redacts_failure(self):
+        import urllib.error
+        class Opener:
+            def open(obj,req,timeout):
+                raise urllib.error.URLError('SYNTHETIC_SECRET_MUST_NOT_ESCAPE')
+        j=d.GitJournal('SYNTHETIC_TOKEN','attempt',opener=Opener())
+        with self.assertRaises(RuntimeError) as error:j.read()
+        self.assertNotIn('SYNTHETIC_SECRET',str(error.exception))
+
+
+class ExistingRuntimeFactoryTests(unittest.TestCase):
+    def test_original_pinned_runtime_missing_activation_holds(self):
+        import sys
+        base=Path(__file__).resolve().parents[1]/'evidence/p2-epoch7-access-repair-20261014/runtime/stage1'
+        with tempfile.TemporaryDirectory(dir='/root',prefix='p2-original-read-fixture-') as folder:
+            root=Path(folder);os.chmod(root,0o700);pins={}
+            for name in d.RUNTIME_MODULES:
+                raw=(base/(name+'.py')).read_bytes();p=root/(name+'.py');p.write_bytes(raw);p.chmod(0o400)
+                pins[name]={'path':str(p),'sha256':hashlib.sha256(raw).hexdigest()}
+            policy={'runtime_files':pins,'activation_paths':{
+                'descriptor':str(root/'descriptor.json'),'epoch_journal':str(root/'epochs.jsonl'),
+                'lock':str(root/'activation.lock')}}
+            old={name:sys.modules.pop(name,None) for name in d.RUNTIME_MODULES}
+            try:
+                with self.assertRaises((FileNotFoundError,RuntimeError)):
+                    d.remote_factory(policy)
+                self.assertFalse((root/'descriptor.json').exists())
+            finally:
+                for name,module in old.items():
+                    sys.modules.pop(name,None)
+                    if module is not None:sys.modules[name]=module

@@ -1,6 +1,7 @@
-"""UK-only transport library: no CLI/credentials/dispatch workflow is enabled.
-A future separately approved caller supplies rpc and a durable protected ledger.
-The fixed command never reads Seed/Plan/Packet or imports a P2 application.
+"""UK-only transport candidates. Live execution requires external enrollment.
+Cloud credentials stay Actions; the installed UK receiver consumes only pinned
+identity requests and existing authenticated activation/ledger observation.
+No Seed/Plan/Packet, worker launch or activation change is permitted.
 """
 import hashlib
 import json
@@ -8,18 +9,41 @@ import os
 from pathlib import Path
 import re
 import stat
+import sys
 if __name__ == '__main__':
     # Isolated Python entry loads only the adjacent protected installed module,
     # never a scripts package from CWD or PYTHONPATH.
     try:
         import importlib.util
         target=Path(__file__).absolute().parent/'p2_swas_receipt_validator.py'
-        for node in (target,)+tuple(target.parents):
-            meta=node.lstat()
-            if meta.st_uid!=0 or stat.S_ISLNK(meta.st_mode) or meta.st_mode & 0o022:
-                raise RuntimeError('UNPROTECTED_CODE')
-            if node==target and not (stat.S_ISREG(meta.st_mode) and meta.st_nlink==1 and meta.st_size<=32768):
-                raise RuntimeError('INVALID_CODE_FILE')
+        actions_mode=len(sys.argv)>1 and sys.argv[1] in ('remote-run','cloud-query')
+        if actions_mode:
+            if (os.environ.get('GITHUB_EVENT_NAME')!='workflow_dispatch'
+                    or os.environ.get('P2_SPLIT_ENABLED')!='true'):
+                raise RuntimeError('MANUAL_EVENT_REQUIRED')
+            raw_policy=os.environ.get('P2_SPLIT_POLICY','')
+            if len(raw_policy.encode())>32768:raise RuntimeError('POLICY_BOUND')
+            def exact_pairs(items):
+                result={}
+                for k,v in items:
+                    if k in result:raise RuntimeError('DUPLICATE_POLICY_KEY')
+                    result[k]=v
+                return result
+            policy=json.loads(raw_policy,object_pairs_hook=exact_pairs)
+            pins=policy['binding']['code_sha256']
+        for code in (target,Path(__file__).absolute()):
+            for node in (code,)+tuple(code.parents):
+                meta=node.lstat()
+                owners=(0,os.geteuid()) if actions_mode else (0,)
+                if meta.st_uid not in owners or stat.S_ISLNK(meta.st_mode) or meta.st_mode & 0o022:
+                    raise RuntimeError('UNPROTECTED_CODE')
+                limit=32768 if code==target else 1048576
+                if node==code and not (stat.S_ISREG(meta.st_mode) and meta.st_nlink==1 and meta.st_size<=limit):
+                    raise RuntimeError('INVALID_CODE_FILE')
+        if actions_mode:
+            if (hashlib.sha256(Path(__file__).read_bytes()).hexdigest()!=pins['transport']
+                    or hashlib.sha256(target.read_bytes()).hexdigest()!=pins['receipt']):
+                raise RuntimeError('SOURCE_PINS_MISMATCH')
         spec=importlib.util.spec_from_file_location('p2_fixed_receipt',str(target))
         receipt=importlib.util.module_from_spec(spec)
         spec.loader.exec_module(receipt)
@@ -343,7 +367,10 @@ def consume_remote_identity(ledger, request, expected, activation, broker,
                 need(type(observation.get(k)) is type(active[k]) and observation[k]==active[k])
             after=activation.read(require_active=True)
             need(before==after)
-            return clock
+            finished=now()
+            need(type(finished) in (int,float) and math.isfinite(finished)
+                 and finished<request['expires_unix'] and finished<expiry)
+            return finished
         gate()
         # Never return a cached success under stale/revoked authority.
         try: consumed=ledger.read('remote-intent.json')
@@ -377,6 +404,321 @@ def consume_remote_identity(ledger, request, expected, activation, broker,
                 'receipt':body,'redispatch_allowed':False}
     finally:
         os.close(fd)
+
+
+# Split transport v1: public data travels through SWAS; credentials stay Actions.
+REMOTE_ENTRY = '/usr/local/libexec/xuanjun-p2-swas/transport.py'
+RUNTIME_MODULES = ('activation_control', 'ledger_read_projection',
+                   'ledger_read_transport', 'ledger_read_client', 'ledger_server_identity')
+
+
+def split_authorize(policy, binding, body, now):
+    import math
+    need(type(now) in (int,float) and math.isfinite(now))
+    need(policy['enabled'] is True and policy['revoked'] is False
+         and all(type(policy[k]) is str and 1<=len(policy[k])<=256
+                 for k in ('reviewer_principal','source_writer_principal'))
+         and policy['reviewer_principal'] != policy['source_writer_principal']
+         and all(type(policy[k]) is str and re.fullmatch('[0-9a-f]{64}',policy[k])
+                 for k in ('custody_evidence_sha256','approval_body_sha256'))
+         and type(body) is str and len(body.encode())<=16384
+         and hashlib.sha256(body.encode()).hexdigest()==policy['approval_body_sha256'])
+    need(body.startswith('P2_UK_SPLIT_ONCE\n'))
+    permit=json.loads(body.split('\n',1)[1],object_pairs_hook=receipt.unique)
+    need(set(permit)=={'decision','binding','issued_unix','expires_unix',
+                      'max_executions','install_allowed','private_inputs_allowed'})
+    need(permit['decision']=='UK_SPLIT_APPROVED' and permit['binding']==binding
+         and type(permit['max_executions']) is int and permit['max_executions']==1
+         and permit['install_allowed'] is False and permit['private_inputs_allowed'] is False
+         and type(permit['issued_unix']) is int and type(permit['expires_unix']) is int
+         and permit['issued_unix']<=now<permit['expires_unix']
+         and 0<permit['expires_unix']-permit['issued_unix']<=7200)
+    return True
+
+
+def remote_command(request):
+    import base64
+    raw=canonical(request)
+    need(len(raw)<=8192)
+    encoded=base64.b64encode(raw).decode('ascii')
+    # No caller-controlled shell words, path or Python code. stdin is JSON data.
+    return ("#!/bin/sh\nset -eu\nprintf '%s' '"+encoded+"' | base64 -d | "
+            '/usr/bin/python3 -I -B '+REMOTE_ENTRY+' receive-identity\n')
+
+
+def protected_code(path, digest):
+    path=Path(path)
+    need(path.is_absolute() and type(digest) is str and re.fullmatch('[0-9a-f]{64}',digest))
+    for node in (path,)+tuple(path.parents):
+        s=node.lstat()
+        need(s.st_uid==0 and not stat.S_ISLNK(s.st_mode) and not s.st_mode & 0o022)
+        if node!=path:need(stat.S_ISDIR(s.st_mode))
+    fd=os.open(str(path),os.O_RDONLY|os.O_NOFOLLOW)
+    with os.fdopen(fd,'rb') as stream:
+        before=os.fstat(stream.fileno())
+        need(stat.S_ISREG(before.st_mode) and before.st_nlink==1 and before.st_size<=1048576)
+        raw=stream.read(1048577);after=os.fstat(stream.fileno())
+        need((before.st_dev,before.st_ino,before.st_mtime_ns,before.st_size)==
+             (after.st_dev,after.st_ino,after.st_mtime_ns,after.st_size))
+    need(hashlib.sha256(raw).hexdigest()==digest)
+    return raw
+
+
+def remote_factory(policy):
+    """Load only five pinned existing read/activation modules, no broker start."""
+    import importlib.util
+    import sys
+    pins=policy['runtime_files']
+    need(type(pins) is dict and set(pins)==set(RUNTIME_MODULES))
+    data={}
+    for name in RUNTIME_MODULES:
+        need(set(pins[name])=={'path','sha256'})
+        data[name]=protected_code(pins[name]['path'],pins[name]['sha256'])
+    # Fail if a preloaded module could bypass the pinned closure.
+    need(not any(name in sys.modules for name in RUNTIME_MODULES))
+    for name in RUNTIME_MODULES:
+        module=importlib.util.module_from_spec(importlib.util.spec_from_loader(name,loader=None))
+        module.__file__=pins[name]['path']
+        sys.modules[name]=module
+        try:exec(compile(data[name],pins[name]['path'],'exec'),module.__dict__)
+        except BaseException:
+            sys.modules.pop(name,None)
+            raise
+    cfg=policy['activation_paths']
+    need(set(cfg)=={'descriptor','epoch_journal','lock'})
+    activation=sys.modules['activation_control'].ActivationStore(
+        cfg['descriptor'],cfg['epoch_journal'],cfg['lock'])
+    # Do not load/activate socket units or create an ACTIVE descriptor.
+    activation.read(require_active=True)
+    verifier=sys.modules['ledger_server_identity'].load_server_verifier(activation=activation)
+    transport=sys.modules['ledger_read_transport'].AuthenticatedLedgerReadTransport(verifier)
+    broker=sys.modules['ledger_read_client'].BrokerObservationClient(activation,transport)
+    return activation,broker
+
+
+def receive_identity(request, policy_path=None):
+    """Installed UK entry. Caller cannot supply paths, policy, keys or code."""
+    import time
+    need(os.getuid()==os.geteuid()==0 and os.uname().nodename==receipt.HOST)
+    path=Path(policy_path) if policy_path is not None else CONTROL/'REMOTE_POLICY.json'
+    policy,policy_sha=protected_json(path)
+    need(type(request) is dict and request==policy['request'])
+    need(set(policy['target_code'])=={'transport','receipt'})
+    for name,module in (('transport',Path(__file__).absolute()),('receipt',Path(receipt.__file__).absolute())):
+        item=policy['target_code'][name]
+        need(item['path']==str(module) and
+             item['sha256']==policy['binding']['code_sha256'][name])
+        protected_code(module,item['sha256'])
+    binding=policy['binding']
+    target_config={k:policy[k] for k in ('request','target_code','runtime_files','activation_paths','ledger_path')}
+    need(binding['target_config_sha256']==hashlib.sha256(canonical(target_config)).hexdigest())
+    need(binding['operation']=='REMOTE_RUN'
+         and binding['request_sha256']==hashlib.sha256(canonical(request)).hexdigest()
+         and binding['command_sha256']==hashlib.sha256(remote_command(request).encode()).hexdigest())
+    def check(req,digest):
+        need(req==policy['request'] and digest==binding['request_sha256'])
+        need(protected_json(path)[1]==policy_sha)
+        body=fetch_approval(policy['approval_comment_id'])
+        split_authorize(policy,binding,body,time.time())
+        need(protected_json(path)[1]==policy_sha)
+        # Revalidate executed bytes and runtime closure immediately before effects.
+        for item in list(policy['target_code'].values())+list(policy['runtime_files'].values()):
+            protected_code(item['path'],item['sha256'])
+        return True
+    check(request,binding['request_sha256'])
+    activation,broker=remote_factory(policy)
+    folder=Path(policy['ledger_path'])
+    need(folder.is_absolute())
+    for node in (folder,)+tuple(folder.parents):
+        s=node.lstat()
+        need(stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not stat.S_ISLNK(s.st_mode)
+             and not s.st_mode & 0o022)
+    ledger=Ledger(folder)
+    try:
+        actual=folder.stat();held=os.fstat(ledger.fd)
+        need((actual.st_dev,actual.st_ino)==(held.st_dev,held.st_ino))
+        return consume_remote_identity(ledger,request,policy['request'],activation,broker,check,time.time)
+    finally:ledger.close()
+
+
+class GitJournal:
+    """Transport metadata only on dedicated refs, not a second task registry.
+
+    POST ref is the atomic one-use claim. Force=false plus one-parent commits
+    makes concurrent appends reject non-fast-forward, never silently overwrite.
+    Admin deletion/history rewriting is outside the trust model; target's
+    protected durable intent is a separate barrier. No secret/request body stored.
+    """
+    def __init__(self,token,attempt,opener=None):
+        import urllib.request
+        need(receipt.token(attempt) and type(token) is str and bool(token))
+        self.token=token;self.ref='heads/p2-transport-journal/'+attempt
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self,*a,**k):return None
+        self.opener=opener or urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+
+    def api(self,method,path,value=None,missing=False):
+        import urllib.request
+        import urllib.error
+        need(path.startswith('/git/'))
+        req=urllib.request.Request('https://api.github.com/repos/'+REPOSITORY+path,
+            data=None if value is None else canonical(value),method=method,
+            headers={'Authorization':'Bearer '+self.token,'Accept':'application/vnd.github+json',
+                     'Content-Type':'application/json','User-Agent':'P2-Split-Journal'})
+        try:
+            with self.opener.open(req,timeout=15) as response:raw=response.read(65537)
+            need(len(raw)<=65536)
+            return json.loads(raw,object_pairs_hook=receipt.unique)
+        except urllib.error.HTTPError as e:
+            if missing and e.code==404:return None
+            raise RuntimeError('JOURNAL_API_UNKNOWN_NO_RETRY') from None
+        except Exception:raise RuntimeError('JOURNAL_API_UNKNOWN_NO_RETRY') from None
+
+    def read(self):
+        ref=self.api('GET','/git/ref/'+self.ref,missing=True)
+        if ref is None:return None
+        sha=ref['object']['sha']
+        commit=self.api('GET','/git/commits/'+sha)
+        tree=self.api('GET','/git/trees/'+commit['tree']['sha'])
+        need(len(tree['tree'])==1 and tree['tree'][0]['path']=='state.json'
+             and tree['tree'][0]['mode']=='100644' and tree['tree'][0]['type']=='blob')
+        blob=self.api('GET','/git/blobs/'+tree['tree'][0]['sha'])
+        import base64
+        need(blob['encoding']=='base64' and blob['size']<=8192)
+        value=json.loads(base64.b64decode(blob['content']),object_pairs_hook=receipt.unique)
+        return sha,value
+
+    def write(self,value,prior=None):
+        need(len(canonical(value))<=8192)
+        tree=self.api('POST','/git/trees',{'tree':[{'path':'state.json','mode':'100644',
+             'type':'blob','content':canonical(value).decode()}]})
+        commit=self.api('POST','/git/commits',{'message':'P2 transport metadata checkpoint',
+             'tree':tree['sha'],'parents':[] if prior is None else [prior]})
+        if prior is None:
+            self.api('POST','/git/refs',{'ref':'refs/'+self.ref,'sha':commit['sha']})
+        else:
+            self.api('PATCH','/git/refs/'+self.ref,{'sha':commit['sha'],'force':False})
+        saved=self.read()
+        need(saved==(commit['sha'],value))
+        return commit['sha']
+
+
+def validate_split_output(detail,invoke,request):
+    need(detail.get('InvokeId')==invoke and detail.get('InstanceId')==receipt.INSTANCE
+         and detail.get('InvocationStatus')=='Success' and type(detail.get('ExitCode')) is int
+         and detail['ExitCode']==0)
+    raw=detail.get('Output')
+    need(type(raw) is str and len(raw.encode())<=8192)
+    data=json.loads(raw,object_pairs_hook=receipt.unique)
+    if data=={'state':'REMOTE_EXECUTION_UNKNOWN','redispatch_allowed':False}:
+        return {'state':'TARGET_EXECUTION_UNKNOWN','redispatch_allowed':False}
+    need(type(data) is dict and set(data)=={'state','request_sha256','receipt','redispatch_allowed'}
+         and data['state'] in ('REMOTE_IDENTITY_COMPLETE','REMOTE_RESULT_REPLAY')
+         and data['redispatch_allowed'] is False
+         and data['request_sha256']==hashlib.sha256(canonical(request)).hexdigest())
+    public=receipt.validate({'InvokeId':invoke,'InstanceId':receipt.INSTANCE,
+        'InvocationStatus':'Success','ExitCode':0,'Output':json.dumps(data['receipt'])},
+        invoke,request['nonce'])
+    return {'state':'SPLIT_TRANSPORT_VERIFIED','receipt':public,'redispatch_allowed':False}
+
+
+def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''):
+    """Explicit one-shot RUN or fresh-permit QUERY, backed by durable Git ref."""
+    need(action in ('remote-run','cloud-query'))
+    request=policy['request'];binding=policy['binding']
+    need(type(request['expires_unix']) in (int,float))
+    if action=='remote-run':need(now()<request['expires_unix'])
+    script=remote_command(request)
+    need(binding['host']==receipt.HOST and binding['instance_id']==receipt.INSTANCE
+         and binding['region']==receipt.REGION and binding['role']==ROLE
+         and type(binding['target_config_sha256']) is str
+         and re.fullmatch('[0-9a-f]{64}',binding['target_config_sha256']))
+    need(binding['operation']==('REMOTE_RUN' if action=='remote-run' else 'CLOUD_QUERY')
+         and binding['attempt']==request['attempt']
+         and binding['request_sha256']==hashlib.sha256(canonical(request)).hexdigest()
+         and binding['command_sha256']==hashlib.sha256(script.encode()).hexdigest()
+         and binding['invoke_id']==invoke_id)
+    def gate():
+        return split_authorize(policy,binding,read_approval(policy['approval_comment_id']),now())
+    gate()
+    saved=journal.read()
+    public={'attempt':request['attempt'],'request_sha256':binding['request_sha256'],
+            'command_sha256':binding['command_sha256'],'source_commit':binding['source_commit'],
+            'target_config_sha256':binding['target_config_sha256']}
+    if action=='remote-run':
+        need(saved is None and not invoke_id)
+        row=dict(public,state='CLOUD_DISPATCH_INTENT',invoke_id='')
+        head=journal.write(row)
+        # Any later failure permanently consumes RUN, even before STS.
+    else:
+        need(saved is not None and receipt.token(invoke_id))
+        head,row=saved
+        need(all(row.get(k)==v for k,v in public.items()) and row.get('invoke_id')==invoke_id
+             and row.get('state') in ('CLOUD_DISPATCHED','CLOUD_QUERY_UNKNOWN'))
+        ident=policy['approval_comment_id']
+        used=row.get('query_permits',[])
+        need(type(used) is list and ident not in used and len(used)<32)
+        row=dict(row,query_permits=used+[ident],state='CLOUD_QUERY_UNKNOWN')
+        head=journal.write(row,head)
+    gate();rpc=rpc_factory();rpc.assume();gate()
+    if action=='remote-run':
+        try:
+            response=rpc(ENDPOINT,'RunCommand',RegionId=receipt.REGION,InstanceId=receipt.INSTANCE,
+                CommandContent=script,Type='RunShellScript',WorkingUser='root',WorkingDir='/root',
+                Timeout=60,Name='p2-uk-reviewed-split-identity')
+            invoke_id=response.get('InvokeId');need(receipt.token(invoke_id))
+            row=dict(row,state='CLOUD_DISPATCHED',invoke_id=invoke_id)
+            head=journal.write(row,head)
+        except BaseException:
+            # INTENT may be the last durable state. No missing-ID reconstruction.
+            raise RuntimeError('CLOUD_DISPATCH_UNKNOWN_NO_RETRY') from None
+        return {'state':'CLOUD_DISPATCHED_AWAIT_SEPARATE_QUERY','invoke_id':invoke_id,
+                'redispatch_allowed':False}
+    try:
+        gate()
+        response=rpc(ENDPOINT,'DescribeInvocationResult',RegionId=receipt.REGION,
+                     InstanceId=receipt.INSTANCE,InvokeId=invoke_id)
+        detail=response.get('InvocationResult',{})
+        need(detail.get('InvokeId')==invoke_id and detail.get('InstanceId')==receipt.INSTANCE)
+        if detail.get('InvocationStatus') in ('Pending','Running','Stopping'):
+            return {'state':'CLOUD_QUERY_UNKNOWN','invoke_id':invoke_id,'redispatch_allowed':False}
+        if detail.get('InvocationStatus')!='Success' or detail.get('ExitCode')!=0:
+            result={'state':'TARGET_REJECTED_OR_FAILED','redispatch_allowed':False}
+        else:result=validate_split_output(detail,invoke_id,request)
+        gate()
+        journal.write(dict(row,state=result['state']),head)
+        return result
+    except BaseException:
+        raise RuntimeError('CLOUD_QUERY_UNKNOWN_QUERY_SAVED_ID_ONLY') from None
+
+
+def actions_entry(action,attempt,invoke_id=''):
+    """Real manual Actions adapter; protected environment registration external."""
+    import time
+    need(os.environ.get('GITHUB_EVENT_NAME')=='workflow_dispatch'
+         and os.environ.get('P2_SPLIT_ENABLED')=='true'
+         and os.environ.get('GITHUB_REPOSITORY')==REPOSITORY
+         and os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+         and os.environ.get('GITHUB_ACTOR_ID')==str(OWNER_ID))
+    raw=os.environ.get('P2_SPLIT_POLICY','')
+    need(len(raw.encode())<=32768)
+    policy=json.loads(raw,object_pairs_hook=receipt.unique)
+    binding=policy['binding']
+    need(binding['source_commit']==os.environ.get('GITHUB_SHA')
+         and re.fullmatch('[0-9a-f]{40}',binding['source_commit'])
+         and policy['request']['attempt']==attempt and receipt.token(attempt)
+         and os.environ.get('GITHUB_REF')==policy['workflow_ref'])
+    for name,path in (('transport',__file__),('receipt',receipt.__file__)):
+        need(hashlib.sha256(Path(path).read_bytes()).hexdigest()==binding['code_sha256'][name])
+    workflow=Path('.github/workflows/p2-uk-swas-diagnostic.yml')
+    need(hashlib.sha256(workflow.read_bytes()).hexdigest()==binding['workflow_sha256'])
+    # Approval and exact source pins checked before reading the cloud key values.
+    split_authorize(policy,binding,fetch_approval(policy['approval_comment_id']),time.time())
+    journal=GitJournal(os.environ.get('P2_JOURNAL_TOKEN',''),attempt)
+    def acquire():
+        return AuthenticatedRPC(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),
+                                os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''))
+    return split_cloud(policy,journal,acquire,fetch_approval,time.time,action,invoke_id)
 
 
 def protected_json(path):
@@ -606,9 +948,22 @@ def supervise(action, seconds=240, operation=protected_entry):
 if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser()
-    parser.add_argument('action',choices=('run-once','query-existing'))
+    parser.add_argument('action',choices=('run-once','query-existing','receive-identity','remote-run','cloud-query'))
+    parser.add_argument('--attempt',default='')
+    parser.add_argument('--invoke-id',default='')
     args=parser.parse_args()
-    try:raise SystemExit(supervise(args.action))
+    try:
+        if args.action=='receive-identity':
+            import sys
+            raw=sys.stdin.buffer.read(8193)
+            need(len(raw)<=8192)
+            request=json.loads(raw,object_pairs_hook=receipt.unique)
+            raise SystemExit(supervise('run-once',operation=lambda unused:receive_identity(request)))
+        elif args.action in ('remote-run','cloud-query'):
+            raise SystemExit(supervise('run-once',operation=lambda unused:
+                actions_entry(args.action,args.attempt,args.invoke_id)))
+        else:raise SystemExit(supervise(args.action))
+        print(json.dumps(result,sort_keys=True),flush=True)
     except Exception:
         print('{"state":"HOLD","redispatch_allowed":false}',flush=True)
         raise SystemExit(2) from None

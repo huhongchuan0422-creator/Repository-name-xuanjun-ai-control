@@ -1,6 +1,21 @@
 name: P2 UK SWAS offline transport review
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Offline review, or separately approved single UK action'
+        required: true
+        type: choice
+        default: offline
+        options: [offline, remote-run, cloud-query]
+      attempt:
+        description: 'Exact approved transport attempt; no command input'
+        required: false
+        type: string
+      invoke_id:
+        description: 'Saved InvokeId, cloud-query only'
+        required: false
+        type: string
   push:
     branches: [repair/p2-chatgpt-clean-review-20261013]
     paths:
@@ -38,7 +53,7 @@ jobs:
               if name.endswith('.py'):ast.parse(Path(name).read_text(),feature_version=(3,6))
           records=[{'path':n,'size':Path(n).stat().st_size,'sha256':hashlib.sha256(Path(n).read_bytes()).hexdigest()} for n in paths]
           log=Path('/tmp/P2_UK_SWAS_TESTS.log').read_bytes()
-          expected_tests=58
+          expected_tests=76
           assert ('Ran %d tests in ' % expected_tests).encode() in log and b'\nOK\n' in log and b'skipped=' not in log
           m={'scope':'OFFLINE_UK_TRANSPORT_ONLY_NOT_P2_ACCEPTANCE','commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':records,'tests':expected_tests,'tests_skipped':0,'log_sha256':hashlib.sha256(log).hexdigest(),'root_execution':'NOT_RUN','python36_runtime':'NOT_VERIFIED','private_materials':'NOT_INCLUDED','execution_permission':'NOT_GRANTED'}
           manifest=Path('/tmp/P2_UK_SWAS_MANIFEST.json');manifest.write_text(json.dumps(m,sort_keys=True,separators=(',',':'))+'\n')
@@ -55,3 +70,48 @@ jobs:
             /tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz
             /tmp/P2_UK_SWAS_MANIFEST.json
           if-no-files-found: error
+
+  protected-uk:
+    name: Explicit protected UK transport
+    needs: offline
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.operation != 'offline' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor_id == '332398908' &&
+      vars.P2_UK_SPLIT_LIVE_ENABLED == 'true'
+    environment: p2-uk-transport
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    permissions:
+      contents: write
+    concurrency:
+      group: p2-uk-split-transport
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exact manual permit and split transport only
+        shell: bash
+        env:
+          P2_SPLIT_ENABLED: ${{ vars.P2_UK_SPLIT_LIVE_ENABLED }}
+          P2_SPLIT_POLICY: ${{ vars.P2_UK_SPLIT_POLICY }}
+          P2_JOURNAL_TOKEN: ${{ github.token }}
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+          P2_OPERATION: ${{ inputs.operation }}
+          P2_ATTEMPT: ${{ inputs.attempt }}
+          P2_INVOKE_ID: ${{ inputs.invoke_id }}
+        run: |
+          set -euo pipefail
+          python -I -B scripts/p2_uk_swas_diagnostic.py "$P2_OPERATION" --attempt "$P2_ATTEMPT" --invoke-id "$P2_INVOKE_ID" 2>&1 | tee /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2-split-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/P2_SPLIT_PUBLIC_RECEIPT.json
+          if-no-files-found: ignore
