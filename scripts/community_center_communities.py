@@ -108,11 +108,12 @@ class CenterCommunities:
                   'review': {'community_id', 'expected_version', 'decision', 'opinion'},
                   'status': {'community_id'}, 'list': {'after_id', 'status'},
                   'join': {'community_id', 'kind'}, 'leave': {'community_id', 'kind'},
-                  'members': {'community_id', 'after_id'}, 'mine': set()}
+                  'members': {'community_id', 'after_id'}, 'mine': {'after_id'}}
         if type(body) is not dict or set(body) != {'workspace', 'operation', 'params'}:
             raise ValueError('INVALID_COMMUNITY_REQUEST')
         op, p = body['operation'], body['params']
-        if type(op) is not str or op not in fields or type(p) is not dict or set(p) != fields[op]:
+        if (type(op) is not str or op not in fields or type(p) is not dict
+                or (set(p) != fields[op] and not (op == 'mine' and not p))):
             raise ValueError('INVALID_COMMUNITY_FIELDS')
         g = self.authorize(session, csrf, body['workspace'])
         c = self.center

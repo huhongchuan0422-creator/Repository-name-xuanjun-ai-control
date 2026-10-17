@@ -1,7 +1,7 @@
 'use strict';
 (()=>{
- const $=id=>document.getElementById(id);let auth=null,epoch=0,current=null,page=null,busy=false,profileVersion=null,platformPage=null;
- window.configureCommunityPortal=context=>{epoch++;auth=null;current=null;page=null;busy=false;profileVersion=null;for(const id of ['name','description','contact','reference','opinion','nickname','customerContact','referralInput','receiverWorkspace','receiverId','receiverVersion','platformMerchantWorkspace','platformMerchantVersion','platformMerchantReason','promotionScene','promotionTitle','promotionExpiry','promotionCode','promotionVersion'])$(id).value='';platformPage=null;$('morePlatformView').hidden=true;$('platformViewResult').textContent='';$('records').replaceChildren();$('result').textContent='';$('customerResult').textContent='';$('more').hidden=true;if(context&&typeof context.csrf==='string'&&context.csrf&&typeof context.workspace==='string'&&context.workspace)auth={csrf:context.csrf,workspace:context.workspace};$('message').textContent=auth?'已连接原客户中心身份。':'请从客户中心进入已授权社区工作区。';};
+ const $=id=>document.getElementById(id);let auth=null,epoch=0,current=null,page=null,busy=false,profileVersion=null,platformPage=null,merchantPage=null;
+ window.configureCommunityPortal=context=>{epoch++;auth=null;current=null;page=null;busy=false;profileVersion=null;for(const id of ['name','description','contact','reference','opinion','nickname','customerContact','referralInput','receiverWorkspace','receiverId','receiverVersion','platformMerchantWorkspace','platformMerchantVersion','platformMerchantReason','promotionScene','promotionTitle','promotionExpiry','promotionCode','promotionVersion'])$(id).value='';platformPage=null;merchantPage=null;$('merchantRecords').replaceChildren();$('merchantResult').textContent='';$('moreMerchants').hidden=true;$('moreMerchants').disabled=false;$('platformMerchants').disabled=false;$('platformMerchantState').value='ACTIVE';$('morePlatformView').hidden=true;$('platformViewResult').textContent='';$('records').replaceChildren();$('result').textContent='';$('customerResult').textContent='';$('more').hidden=true;if(context&&typeof context.csrf==='string'&&context.csrf&&typeof context.workspace==='string'&&context.workspace)auth={csrf:context.csrf,workspace:context.workspace};$('message').textContent=auth?'已连接原客户中心身份。':'请从客户中心进入已授权社区工作区。';};
  async function call(op,params,t){if(!auth)throw Error('需要客户中心登录');const identity=auth;const response=await fetch('/community/directory',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':identity.csrf},body:JSON.stringify({workspace:identity.workspace,operation:op,params})});const body=await response.json();if(t!==epoch)throw Error('身份已变化');if(!response.ok)throw Error(body.error||'操作未确认，请先查询状态');return body.result;}
  async function action(fn){if(busy)return;const t=epoch;busy=true;try{await fn(t);if(t===epoch)$('message').textContent='操作完成';}catch(e){if(t===epoch)$('message').textContent=e.message;}finally{if(t===epoch)busy=false;}}
  function render(r){$('result').textContent=JSON.stringify(r,null,2);if(r.id){current=r;$('reference').value=r.id;$('name').value=r.name||'';$('description').value=r.description||'';$('contact').value=r.contact||'';}}
@@ -23,7 +23,26 @@
  $('communityOrders').onclick=()=>action(t=>list(t,'community_orders',{community_id:id(),after_id:''}));
  $('communityEarnings').onclick=()=>action(t=>list(t,'community_earnings',{community_id:id(),after_id:''}));
  $('bindReceiver').onclick=()=>action(async t=>{const r=await call('community_receiver_bind',{community_id:id(),provider_workspace:$('receiverWorkspace').value,receiver_id:$('receiverId').value,expected_version:Number($('receiverVersion').value)},t);if(t===epoch){$('receiverVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);}});
- $('platformMerchants').onclick=()=>action(async t=>{const r=await call('platform_merchants',{after_workspace:''},t);if(t===epoch)$('result').textContent=JSON.stringify(r,null,2);});
+ async function merchants(t,afterWorkspace=''){
+  if(!afterWorkspace){merchantPage=null;$('merchantRecords').replaceChildren();$('merchantResult').textContent='';$('moreMerchants').hidden=true;}
+  $('platformMerchants').disabled=true;$('moreMerchants').disabled=true;
+  try{
+   const r=await call('platform_merchants',{after_workspace:afterWorkspace},t);if(t!==epoch)return;
+   const rows=[];
+   for(const item of r.records){
+    const line=document.createElement('article'),select=document.createElement('button');
+    line.textContent=(item.name||item.workspace)+' · '+item.workspace+' · 平台状态 '+item.lifecycle.status+' · 门店状态 '+item.store_status+' · 版本 '+item.lifecycle.version;
+    select.textContent='选择商家';select.onclick=()=>{if(busy||t!==epoch)return;$('platformMerchantWorkspace').value=item.workspace;$('platformMerchantVersion').value=item.lifecycle.version;$('platformMerchantState').value=item.lifecycle.status;$('platformMerchantReason').value=item.lifecycle.reason||'';};
+    line.append(select);rows.push(line);
+   }
+   $('merchantRecords').replaceChildren(...rows);
+   $('merchantResult').textContent=r.records.length?JSON.stringify(r,null,2):'暂无已准入商家';
+   merchantPage=r.has_more&&typeof r.next_cursor==='string'&&r.next_cursor>afterWorkspace?r.next_cursor:null;
+   $('moreMerchants').hidden=!merchantPage;
+  }finally{if(t===epoch){$('platformMerchants').disabled=false;$('moreMerchants').disabled=false;}}
+ }
+ $('platformMerchants').onclick=()=>action(t=>merchants(t));
+ $('moreMerchants').onclick=()=>action(t=>merchantPage&&merchants(t,merchantPage));
  $('saveMerchantState').onclick=()=>action(async t=>{const r=await call('platform_merchant_state',{merchant_workspace:$('platformMerchantWorkspace').value,status:$('platformMerchantState').value,expected_version:Number($('platformMerchantVersion').value),reason:$('platformMerchantReason').value},t);if(t===epoch){$('platformMerchantVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);}});
  $('createPromotion').onclick=()=>action(async t=>{const r=await call('promotion_create',{community_id:id(),scene:$('promotionScene').value,title:$('promotionTitle').value,expires_at:Math.floor(new Date($('promotionExpiry').value).getTime()/1000)},t);if(t===epoch){$('promotionCode').value=r.id;$('promotionVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);}});
  $('listPromotions').onclick=()=>action(t=>list(t,'promotions',{community_id:id(),after_id:''}));
