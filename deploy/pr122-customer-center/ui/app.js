@@ -1,20 +1,37 @@
 'use strict';
-const base='/customer/center/api/';let csrf=sessionStorage.getItem('xj_csrf')||'',project='',role='';
+const base='/customer/center/api/';let csrf=sessionStorage.getItem('xj_csrf')||'',project='',role='',viewGeneration=0;
 const statusLabels={ARCHIVED:'已归档',PENDING:'待发送',ACCEPTED:'渠道已受理',UNKNOWN:'结果待确认',FAILED:'发送失败'};
 const channelLabels={WEB:'网页项目沟通',WEB_AI:'网页AI客服',TELEGRAM:'Telegram客服',FEISHU:'飞书客服'};
 const $=id=>document.getElementById(id),states={NOT_STARTED:'未开始',PARTIAL:'部分提交',SUBMITTED:'已提交',IN_REVIEW:'审核中',NEEDS_CORRECTION:'需要补正',ACCEPTED:'已通过'};
 function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function notice(text){$('notice').textContent=text;}
-async function api(op,body){const r=await fetch(base+op,{credentials:'same-origin',method:body?'POST':'GET',headers:body?{'Content-Type':'application/json','X-CSRF-Token':csrf}:{},body:body?JSON.stringify(body):undefined,cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'请求未完成');return d;}
-function form(id,fn){$(id).addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;if(button)button.disabled=true;try{await fn(Object.fromEntries(new FormData(e.target)));}catch(err){notice(err.message);}finally{if(button)button.disabled=false;}});}
-async function start(){try{const d=await api('me');$('auth').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;$('projects').replaceChildren();for(const p of d.projects){const b=node('button',p.title);b.addEventListener('click',()=>openProject(p));$('projects').append(b);}if(!d.projects.length)$('projects').append(node('p','尚无已授权项目。请联系项目负责人核实合同关系，或登录接受专属邀请。'));$('channel-status').replaceChildren(...['web_ai','telegram','feishu'].map(k=>{const v=d.channels[k];const name={web_ai:'网页AI客服',telegram:'Telegram客服',feishu:'飞书客服'}[k];return node('p',name+'：'+(v.state==='PENDING_CONNECTION'?'待接通':'已配置，待验收'));}));}catch{$('auth').hidden=false;$('workspace').hidden=true;$('logout').hidden=true;}}
+async function api(op,body){const generation=viewGeneration,authOperation=['login','register','verify','request_reset','reset','logout'].includes(op);const r=await fetch(base+op,{credentials:'same-origin',method:body?'POST':'GET',headers:body?{'Content-Type':'application/json','X-CSRF-Token':csrf}:{},body:body?JSON.stringify(body):undefined,cache:'no-store'});const d=await r.json();if(!authOperation&&generation!==viewGeneration){const error=new Error('页面状态已更新，请重新打开项目。');error.stale=true;throw error;}if(!r.ok){const error=new Error(d.error||'请求未完成');error.status=r.status;if((r.status===401||r.status===403)&&op!=='me'&&!authOperation)clearProject(false);throw error;}return d;}
+function form(id,fn){$(id).addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;if(button?.disabled)return;if(button)button.disabled=true;try{await fn(Object.fromEntries(new FormData(e.target)));}catch(err){notice(err.message);}finally{if(button)button.disabled=false;}});}
+function clearProject(clearNavigation=true){
+ viewGeneration++;project='';role='';$('project').hidden=true;
+ for(const id of ['project-title','overall','materials','messages','pending-links','change-list','bind-help','invite-result'])$(id).replaceChildren();
+ if(clearNavigation){$('projects').replaceChildren();$('channel-status').replaceChildren();}
+ $('private-previews')?.replaceChildren();
+ for(const id of ['message','bind','invite','revoke','accept'])$(id).reset();
+}
+function clearSession(){csrf='';sessionStorage.removeItem('xj_csrf');clearProject();$('auth').hidden=false;$('workspace').hidden=true;$('logout').hidden=true;}
+async function start(){
+ clearProject();const generation=viewGeneration;$('workspace').hidden=true;
+ try{const d=await api('me');$('auth').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;for(const p of d.projects){const b=node('button',p.title);b.addEventListener('click',()=>openProject(p));$('projects').append(b);}if(!d.projects.length)$('projects').append(node('p','尚无已授权项目。请联系项目负责人核实合同关系，或登录接受专属邀请。'));$('channel-status').replaceChildren(...['web_ai','telegram','feishu'].map(k=>{const v=d.channels[k];const name={web_ai:'网页AI客服',telegram:'Telegram客服',feishu:'飞书客服'}[k];return node('p',name+'：'+(v.state==='PENDING_CONNECTION'?'待接通':'已配置，待验收'));}));
+ }catch(error){
+  if(error.stale||generation!==viewGeneration)return;
+  if(error.status===401||error.status===403){clearSession();}
+  else{$('auth').hidden=false;$('logout').hidden=!csrf;notice('暂时无法确认登录状态，请刷新重试。'+error.message);}
+ }
+}
+async function authAction(id,valid,fn){const button=$(id);if(button.disabled||!valid())return;button.disabled=true;try{await fn();}catch(error){notice(error.message);}finally{button.disabled=false;}}
 form('login',async d=>{const r=await api('login',d);csrf=r.csrf;sessionStorage.setItem('xj_csrf',csrf);$('login').elements.password.value='';notice('已登录');await start();});
-$('register').addEventListener('click',async()=>{try{await api('register',Object.fromEntries(new FormData($('login'))));notice('请查看验证邮箱。邮箱服务未接通时不会开放注册。');}catch(e){notice(e.message);}});
-$('reset-request').addEventListener('click',async()=>{try{await api('request_reset',{email:$('login').elements.email.value});notice('请查看验证邮箱。');}catch(e){notice(e.message);}});
+$('register').addEventListener('click',()=>authAction('register',()=>$('login').reportValidity(),async()=>{await api('register',Object.fromEntries(new FormData($('login'))));$('login').elements.password.value='';notice('请查看验证邮箱。邮箱服务未接通时不会开放注册。');}));
+$('reset-request').addEventListener('click',()=>authAction('reset-request',()=>$('login').elements.email.reportValidity(),async()=>{await api('request_reset',{email:$('login').elements.email.value});notice('如该邮箱已注册，请查看重置邮件。');}));
 form('verification',async d=>{await api('verify',d);notice('邮箱已验证，请登录。');$('verification').reset();});
-form('reset',async d=>{await api('reset',d);sessionStorage.removeItem('xj_csrf');csrf='';$('reset').reset();notice('密码已重置，旧会话已撤销。');await start();});
-$('logout').addEventListener('click',async()=>{try{await api('logout',{});sessionStorage.removeItem('xj_csrf');csrf='';project='';window.location.reload();}catch(e){notice(e.message);}});
-async function openProject(p){project=p.id;role=p.role;$('project').hidden=false;$('project-title').textContent=p.title;$('members').hidden=role!=='OWNER';await refresh();await refreshChanges();await refreshPreviews();}
+form('reset',async d=>{await api('reset',d);clearSession();$('reset').reset();notice('密码已重置，旧会话已撤销。');await start();});
+$('logout').addEventListener('click',()=>authAction('logout',()=>true,async()=>{await api('logout',{});clearSession();window.location.reload();}));
+async function openProject(p){clearProject(false);const generation=viewGeneration;project=p.id;role=p.role;$('project').hidden=false;$('project-title').textContent=p.title;$('members').hidden=role!=='OWNER';await refresh();if(generation!==viewGeneration)return;await refreshChanges();if(generation!==viewGeneration)return;await refreshPreviews();}
 async function refresh(){try{const d=await api('checklist/'+encodeURIComponent(project));$('overall').textContent='整体状态：'+states[d.overall]+' · 清单版本 '+d.requirements_revision;$('materials').replaceChildren();for(const item of d.items)renderItem(item);const m=await api('messages/'+encodeURIComponent(project));$('messages').replaceChildren(...m.messages.map(x=>node('p',(channelLabels[x.channel]||'项目沟通')+' · '+(statusLabels[x.status]||'待确认')+'\n'+x.body)));const pending=await api('pending_links/'+encodeURIComponent(project));$('pending-links').replaceChildren(...pending.links.map(x=>{const div=node('div');div.append(node('p','确认绑定 '+x.channel+'：'+x.subject));const b=node('button','确认这是我的渠道账号');b.onclick=async()=>{try{await api('confirm_link',{project,challenge_id:x.id});notice('绑定已确认');await refresh();}catch(e){notice(e.message);}};div.append(b);return div;}));}catch(e){notice(e.message);}}
 function renderItem(item){const card=node('article');card.className='card';card.append(node('h3',item.title),node('p',states[item.state]+(item.needs_reverification?' · 已到期，需复核':'')),node('p',item.purpose));const details=node('details'),summary=node('summary','准备方法与审核历史');details.append(summary);for(const [key,label] of Object.entries({identity_requirements:'身份与资质',instructions:'操作指引',minimum_permissions:'最小权限',fees:'费用',verified_at:'核验日期',valid_until:'有效期'}))details.append(node('p',label+'：'+(typeof item[key]==='object'?JSON.stringify(item[key]):String(item[key]??'待核实'))));if(item.official_url){const a=node('a','前往官方申请入口');a.href=item.official_url;a.target='_blank';a.rel='noopener noreferrer';details.append(a);}for(const v of item.versions){details.append(node('p','版本 '+v.seq+' · '+v.kind+(v.details.reason?' · '+v.details.reason:'')));if(v.details.object_id){const a=node('a','下载此版本材料');a.href=base+'download/'+encodeURIComponent(project)+'/'+encodeURIComponent(v.details.object_id);details.append(a);}}card.append(details);
  const editable=['OWNER','EDITOR'].includes(role)&&!['SUBMITTED','IN_REVIEW'].includes(item.state);
@@ -49,9 +66,10 @@ async function refreshChanges(){
  }if(!$('change-list').children.length)$('change-list').append(node('p','暂无整改意见和费用。'));
  }catch(e){notice(e.message);}
 }
+window.addEventListener('pageshow',event=>{if(event.persisted)start();});
 start();
 
 async function refreshPreviews(){
  let section=$('private-previews');if(!section){section=node('section');section.id='private-previews';$('project').prepend(section);}section.replaceChildren(node('h3','项目预览与验收'));if(role!=='OWNER'){section.append(node('p','当前角色没有客户验收权限。'));return;}
- try{const d=await api('previews/'+encodeURIComponent(project));for(const page of d.pages){const a=node('a','查看 '+page.path);a.href=page.url;const row=node('p');row.append(a);section.append(row);}if(!d.pages.length)section.append(node('p','尚无已审核、已接入的私有预览版本。'));}catch{section.append(node('p','私有预览尚未接通，请勿在公共演示提交私有资料。'));}
+ try{const d=await api('previews/'+encodeURIComponent(project));for(const page of d.pages){const a=node('a','查看 '+page.path);a.href=page.url;const row=node('p');row.append(a);section.append(row);}if(!d.pages.length)section.append(node('p','尚无已审核、已接入的私有预览版本。'));}catch(error){if(error.stale)return;section.append(node('p','私有预览尚未接通，请勿在公共演示提交私有资料。'));}
 }
