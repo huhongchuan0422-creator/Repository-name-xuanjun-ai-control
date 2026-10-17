@@ -55,7 +55,8 @@ class OriginalProjectCenterJourney(unittest.TestCase):
         c.secretref=lambda project_id,item,kind,reference: (
             project_id=='project1' and item=='material1' and kind=='SECRETREF'
             and reference=='synthetic-reference')
-        saved=c.save(self.fx.fx.uid1,'project1','material1',0,'SECRETREF','synthetic-reference')
+        saved=self.consumer('project_save_reference',dict(item='material1',revision=0,
+                           kind='SECRETREF',reference='synthetic-reference'))
         self.assertEqual(saved['state'],'PARTIAL')
         submitted=self.consumer('project_submit',dict(item='material1',revision=saved['revision']))
         self.assertEqual(submitted['state'],'SUBMITTED')
