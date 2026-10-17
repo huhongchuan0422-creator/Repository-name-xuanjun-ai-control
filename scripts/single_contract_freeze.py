@@ -118,10 +118,18 @@ def freeze(snapshot):
     first_dev = (dev / 2).quantize(Decimal("0.01"))
     if first_dev * 2 != dev:
         raise ContractHold("ODD_CENT_SPLIT_REQUIRES_AGREEMENT")
-    # Preserve agreed narrative data but never credentials; reject probable secret fields.
-    if any(re.search(r"(password|private_key|access_token|api_key|secret_value)",
-                     str(k), re.I) for k in snapshot.keys()):
-        raise ContractHold("RAW_SECRET_FIELD")
+    # Deny nested credential fields as well as top-level ones, before archiving.
+    def reject_secrets(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if re.search(r"(password|private_key|access_token|api_key|secret_value)",
+                             str(key), re.I):
+                    raise ContractHold("RAW_SECRET_FIELD")
+                reject_secrets(value)
+        elif isinstance(node, list):
+            for value in node:
+                reject_secrets(value)
+    reject_secrets(snapshot)
     frozen = {
         "schema": "xuanjun.single-contract.offline.v1",
         "scope": {k: snapshot[k] for k in REQUIRED},
