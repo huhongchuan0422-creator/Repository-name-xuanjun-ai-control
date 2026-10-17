@@ -49,7 +49,8 @@ class RuntimeJourney(unittest.TestCase):
         self.api.simulate_from_operator(self.owner, 'order1', 'event1', 'SUCCESS', 'tx1')
         receipt = self.call('receipt', {'reference':'order1'})
         self.assertEqual(receipt['payment_state'], 'MOCK_PAID_SIMULATED')
-        self.assertIsNotNone(receipt['ads']['AD_SLOT_PAYMENT_SUCCESS'])
+        self.assertIsNone(receipt['ads']['AD_SLOT_PAYMENT_SUCCESS'])
+        self.assertFalse(receipt['provider_payment_verified'])
         self.assertFalse(receipt['financial_receipt_issued'])
         p = {'reference':'order1','event_id':'refund1','amount_minor':11}
         self.call('refund_record', p, self.merchant)
