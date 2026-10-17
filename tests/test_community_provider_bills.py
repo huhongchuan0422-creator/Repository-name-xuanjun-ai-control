@@ -85,7 +85,7 @@ class BillJourney(unittest.TestCase):
         self.download(b'unknown,columns\na,b\n');self.call('bill_fetch')
         self.assertEqual(self.call('bill_reconcile')['status'],'UNKNOWN_SCHEMA')
     def test_visual_spoofed_bill_column_name_denied(self):
-        raw='商户订单号,微\\u202e信订单号\\nref,tx\\n'.replace('\\u202e','\u202e').encode('utf-8')
+        raw=('商户订单号,微' + chr(0x202e) + '信订单号\nref,tx\n').encode('utf-8')
         with self.assertRaisesRegex(ValueError,'INVALID_BILL_COLUMN_NAME'):
             parse(raw)
 
