@@ -25,7 +25,7 @@ class BoundedFetchTests(unittest.TestCase):
         self.url = ('https://api.github.com/repos/' + s.REPO +
                     '/issues/comments/' + str(self.review_id))
         self.raw = json.dumps({'id': self.review_id,
-            'user': {'id': 332398908, 'login': 'huhongchuan0422-creator'},
+            'user': {'id': 95597695, 'login': '18598789888'},
             'issue_url': 'https://api.github.com/repos/' + s.REPO + '/issues/58',
             'body': s.MARKER + json.dumps(self.wanted)}).encode()
         self.children = []
