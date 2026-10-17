@@ -6,13 +6,13 @@
 
 
 
-检查时间：2026-10-17T09:36:44.268087+00:00
+检查时间：2026-10-17T10:01:29.557276+00:00
 
 当前模块：特约商户官方进件条件资料、小程序消费记录及剩余端到端接线
 
-最后真实代码提交：48bf708b45e1947bdb35620f5d7d443792071ce7
+最后真实代码提交：dc2e7ba9e93e580613ffb28fe6063afc30c264d3
 
-最后真实提交时间：2026-10-17T09:29:11Z
+最后真实提交时间：2026-10-17T10:01:18Z
 
 
 
@@ -30,7 +30,7 @@
 
 
 
-CI：[]
+CI：[{"id": 39023311950, "name": "Community WeChat SP Offline Gate", "status": "in_progress", "conclusion": null, "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39023311950"}]
 
 
 
