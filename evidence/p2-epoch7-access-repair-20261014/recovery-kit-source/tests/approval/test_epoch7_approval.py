@@ -3,13 +3,21 @@ import epoch7_approval as s
 class Tests(unittest.TestCase):
  def setUp(self):
   self.wanted=s.expected('a'*64,'b'*64,'c'*64,'d'*64);self.id=7000000000
-  self.comment={'id':self.id,'user':{'id':332398908,'login':'huhongchuan0422-creator'},
+  self.comment={'id':self.id,'user':{'id':95597695,'login':'18598789888'},
     'issue_url':'https://api.github.com/repos/'+s.REPO+'/issues/58','body':s.MARKER+json.dumps(self.wanted)}
  def run_check(self):return s.validate(json.dumps(self.comment).encode(),self.id,self.wanted)
  def test_exact(self):self.assertEqual(self.run_check()['approval'],self.wanted)
  def test_consumed(self):
   for i in s.CONSUMED:
    with self.assertRaises(ValueError):s.validate(b'{}',i,self.wanted)
+ def test_developer_author_rejected(self):
+  self.comment['user']={'id':332398908,'login':'huhongchuan0422-creator'}
+  with self.assertRaisesRegex(ValueError,'APPROVAL_AUTHOR'):self.run_check()
+ def test_author_id_login_crosspair_rejected(self):
+  for user in ({'id':332398908,'login':'18598789888'},
+               {'id':95597695,'login':'huhongchuan0422-creator'}):
+   self.comment['user']=user
+   with self.assertRaisesRegex(ValueError,'APPROVAL_AUTHOR'):self.run_check()
  def test_wrong_author(self):
   self.comment['user']['id']=123
   with self.assertRaises(ValueError):self.run_check()
