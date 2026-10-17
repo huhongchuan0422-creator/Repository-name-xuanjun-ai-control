@@ -2,7 +2,7 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectFeedback:"",projectReviewReason:"",projectState:""},
+  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectFeedback:"",projectState:""},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
@@ -33,25 +33,7 @@ Page({
   onUnload() {if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
-  inputProject(e) {const field=e.currentTarget.dataset.field;this.setData({[field==='review'?'projectReviewReason':'projectFeedback']:e.detail.value});},
-  async reviewProjectItem(e) {
-    if(this.data.pending||!this.session||this.data.projectRole!=='REVIEWER')return;
-    const item=e.currentTarget.dataset.item;
-    const revision=Number(e.currentTarget.dataset.revision);
-    const action=e.currentTarget.dataset.action;
-    if(typeof item!=='string'||!Number.isSafeInteger(revision)||revision<0||
-       !['begin_review','request_changes','approve'].includes(action))return;
-    this.setData({pending:true});
-    try {
-      const r=await this.session.commerce(this.scene,'project_review',{
-        item,revision,action,reason:action==='begin_review'?'':this.data.projectReviewReason});
-      this.setData({status:'材料审核状态：'+r.state});
-      const checklist=await this.session.commerce(this.scene,'project_checklist',{});
-      this.setData({projectChecklist:checklist.items.map(v=>({
-        id:v.id,state:v.state,required:v.required,revision:v.revision}))});
-    }catch(error){this.setData({status:error.message});}
-    finally{this.setData({pending:false});}
-  },
+  inputProject(e) {this.setData({projectFeedback:e.detail.value});},
   async submitProjectItem(e) {
     if(this.data.pending||!this.session)return;
     const item=e.currentTarget.dataset.item;
