@@ -1,0 +1,159 @@
+name: S07 migration read-only preflight
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/aliyun-s07-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: aliyun-s07-preflight
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: >-
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      ((github.event_name == 'pull_request' &&
+        github.event.pull_request.number == 99 &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.head_ref == 'build/tokyo-korea-migration-prep-20261014') ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Verify existing S07 migration prerequisites
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          """Four-host read-only SWAS probe. No command input or automatic dispatch retry."""
+          import base64
+          import concurrent.futures
+          import datetime
+          import hashlib
+          import hmac
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          import uuid
+          from pathlib import Path
+          
+          UK = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
+          KR = 'acs:ram::1691189778575891:role/xuanjun-automation'
+          CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+          HOSTS = (
+              ('uk', UK, 'eu-west-1', '40dfc6a47d5e4363b9da7d0d6ab01cb1', 'iZd7oeikknn1z21sq6ji6zZ'),
+              ('korea', KR, 'ap-northeast-2', '09207081a09a466aa0079b07b5e3e7ca', 'iZmj7a5kwr75qc1tul4kf9Z'),
+              ('domestic', CN, 'cn-shanghai', '3a22c458934142eea89ec6e3bf481a57', 'iZvt5t8tlrm8oiZ'),
+              ('tokyo', CN, 'ap-northeast-1', '68985c531add4e90a131aef703a389e6', 'iZ6wee8q9z4t03hvqumwfhZ'),
+          )
+          
+          
+          class Hold(Exception):
+              pass
+          
+          
+          def safe(value):
+              return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+          
+          
+          def quote(value):
+              return urllib.parse.quote(str(value), safe='~')
+          
+          
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          
+          
+          def rpc(endpoint, version, action, credentials, **params):
+              # Endpoint and action are fixed by this program, never accepted from a task.
+              if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+                  raise Hold('ENDPOINT_REJECTED')
+              key, secret, token = credentials
+              values = dict(params, Action=action, Version=version, Format='JSON',
+                            AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0',
+                            SignatureNonce=uuid.uuid4().hex,
+                            Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+              if token:
+                  values['SecurityToken'] = token
+              canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+              signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+              values['Signature'] = base64.b64encode(signature).decode()
+              request = urllib.request.Request('https://' + endpoint + '/',
+                  data=urllib.parse.urlencode(values).encode(),
+                  headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+              try:
+                  with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+                      raw = response.read(262145)
+              except urllib.error.HTTPError as error:
+                  try:
+                      data = json.loads(error.read(262145))
+                      code = safe(data.get('Code'))
+                  except Exception:
+                      code = 'HTTP_' + str(error.code)
+                  raise Hold(code) from None
+              except Exception:
+                  # Never print a URL/body, key, temporary token, or raw exception.
+                  raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+              if len(raw) > 262144:
+                  raise Hold('RESPONSE_TOO_LARGE')
+              try:
+                  data = json.loads(raw)
+              except Exception:
+                  raise Hold('INVALID_API_RESPONSE') from None
+              if not isinstance(data, dict):
+                  raise Hold('INVALID_API_RESPONSE')
+              if 'Code' in data:
+                  raise Hold(safe(data['Code']))
+              return data
+          
+          
+          COMMANDS = {"korea":"import urllib.request,hashlib,json,os\nassert os.geteuid()==0 and os.uname().nodename==\"iZmj7a5kwr75qc1tul4kf9Z\"\nraw=urllib.request.urlopen('https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/2363eed13fb99df6f9f80701a8c52eae5243bc21/evidence/pr99-service-handoff/s07-source-closure/bridge_isolated_start.py',timeout=30).read(100001)\nassert hashlib.sha256(raw).hexdigest()==\"9cfbdae945c7cf0e9c36866d8a9de8e3f8b42ec30994fd162c5764994da5ea98\"\nn={\"__name__\":\"preflight_only\"}\nexec(compile(raw,\"frozen_bridge.py\",\"exec\"),n)\nexec('tr=TRANSFER_PATH.read_bytes();transfer=load(tr,TRANSFER_SHA)\\nmaterial_path=Path(\\'/root/pr99-s07-material-v2-launch.mgOIzkS1/stage.py\\')\\nsr=material_path.read_bytes();source=load(sr,SOURCE_SHA)\\noriginal=source[\\'read_plain_file\\'](Path(\\'/root/pr99-s07-install-launch.a5NZU99H/install.py\\'),100000)\\nold=load(original,ORIGINAL_SHA)\\np=Path(\\'/root/pr99-s07-runtime-inventory.8no57zD5/inspect.py\\')\\ninventory=load(source[\\'read_plain_file\\'](p,100000),\\'295b3e4df882793978042edcb3222c1068c493a9a33e47370ae8558d37095134\\')\\nresolver=inventory[\\'load_pinned\\'](inventory[\\'RESOLVER\\'],inventory[\\'RESOLVER_SHA\\'])\\nprojection,collector=resolver[\\'bootstrap\\']()\\nreceipt=json.loads(collector[\\'stable_file\\'](projection[\\'ROOT\\']/\\'receipt.json\\',20000,private=True))\\nneed(receipt[\\'archive_sha256\\']==projection[\\'ARCHIVE_SHA\\'],\\'S06_ARCHIVE_BINDING\\')\\narchive=collector[\\'stable_file\\'](projection[\\'ROOT\\']/\\'payload.tar.gz\\',4*1024*1024+65536,private=True)\\nneed(sha(archive)==projection[\\'ARCHIVE_SHA\\'],\\'S06_ARCHIVE_CHANGED\\')\\nunits=collector[\\'verify_archive\\'](archive,receipt)\\ncommands={}\\nfor role,(unit,entry,port) in ROLES.items():\\n    fields=resolver[\\'unit_service\\'](units[\\'units/\\'+unit])\\n    need(len(fields.get(\\'ExecStart\\',[]))==1,\\'UNIT_START_COUNT\\')\\n    commands[role]=launch_command(fields[\\'ExecStart\\'][0],entry,port)\\npackage=old[\\'stable\\'](old[\\'LOCAL_ATTEMPT\\']/\\'package.json\\',64*1024*1024)\\nplan,files=old[\\'unpack\\'](package,sha(package))\\nneed(sha(package)==\\'9b702576d48883786d051b2f1b49972baf94db3d1e8bf330ee59250a5974efa3\\',\\'PACKAGE_CHANGED\\')\\nextra=collect_supplement(source[\\'read_plain_file\\'],files)\\npaths=bridge_paths(dict(files,**extra))\\nprint(json.dumps({\"status\":\"S07_KOREA_STATIC_PREFLIGHT_PASS\",\"host\":os.uname().nodename,\"source_files\":len(files)+len(extra),\"bridge_paths\":paths,\"v4_attempt_exists\":LOCAL.exists(),\"bridge_stage_exists\":BRIDGE_LOCAL.exists(),\"service_actions\":0},sort_keys=True))',n)\n","tokyo":"import os,json,stat\nfrom pathlib import Path\nassert os.geteuid()==0 and os.uname().nodename==\"iZ6wee8q9z4t03hvqumwfhZ\"\np=Path(\"/opt/trading-system/runtime/v8-domestic-operations/internal-bridge\")\nrows=[]\nfor f in sorted(p.iterdir()):\n s=f.lstat()\n if len(rows)>=40: raise RuntimeError(\"BRIDGE_METADATA_LIMIT\")\n rows.append({\"name\":f.name,\"bytes\":s.st_size,\"regular\":stat.S_ISREG(s.st_mode),\"symlink\":stat.S_ISLNK(s.st_mode),\"uid\":s.st_uid,\"gid\":s.st_gid,\"mode\":oct(stat.S_IMODE(s.st_mode))})\nprint(json.dumps({\"status\":\"S07_TOKYO_BRIDGE_METADATA\",\"files\":rows,\"business_file_contents_read\":False,\"service_actions\":0}))","domestic":"import os,json\nfrom pathlib import Path\nassert os.geteuid()==0 and os.uname().nodename==\"iZvt5t8tlrm8oiZ\"\np=Path(\"/var/lib/xuanjun-pr99-s07-isolated-start-v3/receipt.json\")\nr=json.loads(p.read_bytes())\nprint(json.dumps({\"status\":\"S07_DOMESTIC_RECEIPT_CHECK\",\"previous_status\":r.get(\"status\"),\"roles\":r.get(\"roles\"),\"application_processes_stopped\":r.get(\"application_processes_stopped\"),\"protected_state_unchanged\":r.get(\"protected_state_unchanged\"),\"v4_attempt_exists\":Path(\"/var/lib/xuanjun-pr99-s07-isolated-start-v4\").exists(),\"service_actions\":0}))"}
+          def execute(host):
+              name, role, region, instance, expected = host
+              row = {"host":name,"status":"HOLD","stage":"ASSUME_ROLE"}
+              try:
+                  master=(os.environ["ALIYUN_ACCESS_KEY_ID"],os.environ["ALIYUN_ACCESS_KEY_SECRET"],"")
+                  c=rpc("sts.aliyuncs.com","2015-04-01","AssumeRole",master,RoleArn=role,RoleSessionName="xuanjun-s07-preflight",DurationSeconds=900)["Credentials"]
+                  credentials=(c["AccessKeyId"],c["AccessKeySecret"],c["SecurityToken"])
+                  for v in credentials: print("::add-mask::"+v,flush=True)
+                  import shlex
+                  wrapper="try:"+chr(10)+"".join(" "+line+chr(10) for line in COMMANDS[name].splitlines())
+                  wrapper += "except Exception as e:"+chr(10)+" import re,json;d=str(e);print(json.dumps({'status':'HOLD','error_type':type(e).__name__,'code':d if re.fullmatch(r'[A-Z0-9_]{1,160}',d) else 'PRIVATE_DETAIL_WITHHELD'}));raise SystemExit(2)"+chr(10)
+                  command="/usr/bin/python3.11 -I -B -u -c "+shlex.quote(wrapper)
+                  endpoint="swas."+region+".aliyuncs.com"
+                  row["stage"]="DISPATCH_ONCE"
+                  invoke=rpc(endpoint,"2020-06-01","RunCommand",credentials,RegionId=region,InstanceId=instance,Type="RunShellScript",Name="xuanjun-s07-readonly-preflight",Timeout=90,WorkingUser="root",WorkingDir="/root",CommandContent=command)["InvokeId"]
+                  row["invoke_id"]=invoke
+                  row["stage"]="QUERY_RESULT"
+                  deadline=time.monotonic()+180
+                  while time.monotonic()<deadline:
+                      result=rpc(endpoint,"2020-06-01","DescribeInvocationResult",credentials,RegionId=region,InstanceId=instance,InvokeId=invoke)["InvocationResult"]
+                      if result.get("InvocationStatus") in ("Pending","Running","Stopping"):
+                          time.sleep(5);continue
+                      output=result.get("Output","")
+                      try: data=json.loads(output)
+                      except Exception: data=json.loads(base64.b64decode(output,validate=True))
+                      row["result"]=data
+                      row["status"]="PASS" if result.get("InvocationStatus")=="Success" and result.get("ExitCode")==0 else "HOLD"
+                      return row
+                  raise Hold("REMOTE_RESULT_UNKNOWN_NO_RETRY")
+              except Exception as e:
+                  row["error_code"]=safe(str(e)) if isinstance(e,Hold) else type(e).__name__
+                  return row
+          
+          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+              rows=list(pool.map(execute,[h for h in HOSTS if h[0] in COMMANDS]))
+          print(json.dumps({"status":"S07_READONLY_PREFLIGHT_RESULTS","hosts":rows},sort_keys=True),flush=True)
+          raise SystemExit(0 if all(r["status"]=="PASS" for r in rows) else 2)
+          PY
