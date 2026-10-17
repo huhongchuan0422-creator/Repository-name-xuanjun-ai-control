@@ -140,6 +140,26 @@ class Commerce:
         if op in ('refund_apply','refund_application'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).consumer(token,scene,op,p)
+        if op in ('project_summary', 'project_checklist', 'project_feedback'):
+            # Reuse immutable original Center project membership, requirements
+            # and archived feedback; never create a parallel project authority.
+            expected = {'message'} if op == 'project_feedback' else set()
+            if type(p) is not dict or set(p) != expected:
+                raise ValueError('INVALID_PROJECT_CENTER_FIELDS')
+            source, role, details = c.project(uid, project)
+            if op == 'project_summary':
+                checklist = c.checklist(uid, project)
+                return dict(project_id=project, title=details['title'], role=role,
+                            customer_id=source['customer'],
+                            requirements_revision=source['revision'],
+                            checklist_overall=checklist['overall'])
+            if op == 'project_checklist':
+                return c.checklist(uid, project)
+            # Core persists to original encrypted messaging and audit trail.
+            # ARCHIVED is not evidence of a human or provider response.
+            if type(p['message']) is not str:
+                raise ValueError('INVALID_PROJECT_FEEDBACK')
+            return c.message(uid, project, p['message'], 'WEB')
         if op == 'receipt_ad':
             # Success creative is optional and requires both original order ownership
             # and durable signed-provider evidence. A caller's payment flag is ignored.
