@@ -1,8 +1,5 @@
 name: PR99 S09 query existing failed invocation only
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths: ['.github/workflows/aliyun-s09-existing-result-query.yml']
   workflow_dispatch:
 permissions:
   contents: read
