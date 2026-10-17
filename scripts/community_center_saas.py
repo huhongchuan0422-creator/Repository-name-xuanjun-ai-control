@@ -70,6 +70,8 @@ class CenterSaas:
                 'order_prepare':{'quote_id','currency'},'order_read':{'order_id'},'order_status':{'order_id'},
                 'renewal_plan':{'order_id'},'entitlement':{'module_id'},'capability':{'capability'},
                 'mine':{'kind','after_id'}}
+        from scripts.community_center_saas_admin import FIELDS as ADMIN_FIELDS
+        fields.update(ADMIN_FIELDS)
         op,p=body['operation'],body['params']
         if op not in fields or set(p)!=fields[op]:raise ValueError('INVALID_CUSTOMER_SAAS_FIELDS')
         g=self._authorize(session,csrf,body['workspace']);c=self.center;now=c.now()
@@ -77,7 +79,10 @@ class CenterSaas:
             c.limit('community-saas:'+g['user_id'],60,60)
             c.audit(g['project'],g['user_id'],'SAAS_CUSTOMER_ATTEMPT',hashlib.sha256(canonical(body)).hexdigest())
         def call(operation,params):return self.runtime.dispatch(g['principal'],operation,params,None)
-        if op=='workspace_info':result=dict(role=g['role'],pricing_allowed=g['role']=='PLATFORM_OWNER')
+        if op in ADMIN_FIELDS:
+            from scripts.community_center_saas_admin import dispatch as admin_dispatch
+            result=admin_dispatch(self,g,op,p)
+        elif op=='workspace_info':result=dict(role=g['role'],pricing_allowed=g['role']=='PLATFORM_OWNER')
         elif op in ('owner_offer_read','owner_create_offer','owner_approve_offer'):
             if g['role']!='PLATFORM_OWNER':raise PermissionError('ORIGINAL_PLATFORM_OWNER_REQUIRED')
             if op=='owner_offer_read':

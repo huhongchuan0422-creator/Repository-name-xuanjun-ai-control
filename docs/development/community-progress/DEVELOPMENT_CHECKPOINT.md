@@ -177,3 +177,32 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Original Center mini consumer project_messages read added in scripts/community_commerce.py commit 760f80df27e2da5efacbebbddbe5b34b5943c63e, session allowlist 83dd65cac7468bbc37ee70b4d205de84f64e41f6, checkout UI commits 39a39a28803c5205c0284f7a47b7c8f2d7e76a4a and 42509b521a5f33d6a57764261d9ee189dc4f8be9. Reuses Core.messages original project permissions and encrypted message storage; archived is NOT provider replied.
 - Python owner/revocation tests 982a84b59fdfb7911387c03c432fad672a25f6f2 and 3cfc1d6f1257c508bab5dde93d78ca4919873ae0, Mini JS tests 75775dbda92955accb618b85a9ebd5f87f697494 and 9e234b738fc746690914ec492a3d193fc57651ee. Latest CI run 39038548019 pending final verdict. No new IAM, payment, or production writes.
 - Phase 1 and 2 overall status remains PARTIAL. This module is not equivalent to full project evidence upload, final customer acceptance, or independent review of all remaining stages.
+
+## 2026-10-17 dot continuation — actual source and Hosted receipts
+
+The previous application writer handed off. The observed successor commits before
+this continuation were supervision-only README/status updates; those bot changes
+were preserved with non-force expected-head updates. This continuation uses the
+original development account and branch, not the independent review identity.
+
+- `41c5029e1f48ce2c00d512a80ad4c49364661cdd`: original owned-community
+  pagination plus platform merchant paging/identity-safe UI. Hosted run
+  `39051456724`, job `117450728166`, SUCCESS; community 471 and Stage5 342
+  tests passed, including the new real-Chromium pagination cases.
+- `04e99d334dd6c3e7c4036cf166f7b68d588062f1`: original encrypted project
+  document upload, mini asynchronous/session ownership, independent reviewer
+  material portal, and complete offline review-package test dependencies.
+  Hosted run `39052024843`, job `117452376693`, SUCCESS; community 484,
+  Stage5 342, mini/key Node 119, and other Node groups 40/8/7 passed.
+  The actual browser reviewer journey passed. Optional SDK/runtime/preview jobs
+  were SKIPPED, not accepted. Source-package SHA256:
+  `684f5b7cc17ac37830648816e66e1d162b5b03b984c027c5d2221819024dfe8d`.
+
+Local Unix-socket proxy and browser execution were environment-blocked; the
+corresponding Hosted results above provide the actual CI evidence, not a fabricated
+local PASS. HTTP/SQLite/file tests used only synthetic records and temporary files.
+All three original Core/Source/Runtime pins remained byte-identical. No production
+merchant, money, host configuration, DNS, real customer material or release action
+was performed. Both phases remain unaccepted until complete scope reconciliation
+and an independent reviewer other than the author examines the exact resulting
+version. dot must not independently approve code authored in this continuation.

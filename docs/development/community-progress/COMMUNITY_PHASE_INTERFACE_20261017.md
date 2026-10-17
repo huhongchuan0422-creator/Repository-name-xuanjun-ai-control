@@ -64,3 +64,19 @@ Node tests are source-level evidence; Hosted CI for the exact new commit must be
 checked separately. Scanner deployment, production CRM admission, real customer
 acceptance, money operations and production release remain external/unapproved.
 This closes an implementation gap, not either entire phase or independent review.
+
+## Original project-scoped SaaS administration candidate
+
+The existing `/customer/saas-api` now exposes five original-rule operations for the
+admitted PLATFORM_OWNER backed by current original project OWNER membership:
+`owner_admin_snapshot`, `owner_review_open`, `owner_review_close`,
+`owner_refund_reversal_plan`, and `owner_diagnostics`. Tenant-wide original snapshots
+are filtered through the original encrypted COMMUNITY_SAAS_ORDER project links;
+unlinked historical records and foreign-project identifiers are not admitted.
+Existing review transition/idempotency rules are reused. Refund output is only a
+preflight report, not a refund, entitlement revocation or revenue reversal.
+Diagnostics can HOLD and expose the original global-orphan safety boolean, but do
+not repair, resend, reconcile or grant release authority. The existing SaaS page
+provides an explicitly labeled review queue, decisions, preflight and diagnostics;
+identity changes clear private data and reject stale responses. New local tests are
+candidate source evidence; exact-commit Hosted and independent review remain separate.

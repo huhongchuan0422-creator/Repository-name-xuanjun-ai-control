@@ -1,8 +1,8 @@
 'use strict';
 (()=>{
- const $=id=>document.getElementById(id);let auth=null,epoch=0,busy=false,quoteId=null,orderId=null,kind='ORDER',cursor=null;
- const clear=()=>{for(const id of ['modules','offers','selected','quote','order','renewalResult','records','priceLines','pricingResult','fulfillmentResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('termDays').disabled=false;$('pricing').hidden=true;$('fulfillment').hidden=true;quoteId=orderId=cursor=null;$('more').hidden=true;$('currency').value='CNY';};
- window.configureCommunitySaas=value=>{epoch++;auth=value&&typeof value.csrf==='string'&&value.csrf&&typeof value.workspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,fulfillmentWorkspace:typeof value.fulfillmentWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.fulfillmentWorkspace)?value.fulfillmentWorkspace:null}:null;clear();busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!auth;$('notice').textContent=auth?'已连接当前客户中心项目':'请从客户中心打开已授权的项目';if(auth)action(async t=>{const info=await call('workspace_info',{},t);if(t===epoch){$('pricing').hidden=!info.pricing_allowed;$('fulfillment').hidden=!info.pricing_allowed||!auth.fulfillmentWorkspace;}});};
+ const $=id=>document.getElementById(id);let auth=null,epoch=0,busy=false,quoteId=null,orderId=null,kind='ORDER',cursor=null,adminAllowed=false;
+ const clear=()=>{for(const id of ['modules','offers','selected','quote','order','renewalResult','records','priceLines','pricingResult','fulfillmentResult','adminOrders','adminReviews','adminResult','refundPlan','diagnosticResult'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('termDays').disabled=false;$('pricing').hidden=true;$('saasAdmin').hidden=true;adminAllowed=false;$('fulfillment').hidden=true;quoteId=orderId=cursor=null;$('more').hidden=true;$('currency').value='CNY';};
+ window.configureCommunitySaas=value=>{epoch++;auth=value&&typeof value.csrf==='string'&&value.csrf&&typeof value.workspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,fulfillmentWorkspace:typeof value.fulfillmentWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.fulfillmentWorkspace)?value.fulfillmentWorkspace:null}:null;clear();busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!auth;$('notice').textContent=auth?'已连接当前客户中心项目':'请从客户中心打开已授权的项目';if(auth)action(async t=>{const info=await call('workspace_info',{},t);if(t===epoch){adminAllowed=info.role==='PLATFORM_OWNER'&&info.pricing_allowed===true;$('saasAdmin').hidden=!adminAllowed;$('pricing').hidden=!info.pricing_allowed;$('fulfillment').hidden=!info.pricing_allowed||!auth.fulfillmentWorkspace;}});};
  const call=async(operation,params,ticket)=>{const context=auth;if(!context)throw Error('请先登录客户中心');const response=await fetch('/customer/saas-api',{method:'POST',credentials:'same-origin',redirect:'error',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':context.csrf},body:JSON.stringify({workspace:context.workspace,operation,params})});if(ticket!==epoch)throw Error('身份已变化');const data=await response.json();if(ticket!==epoch)throw Error('身份已变化');if(!response.ok)throw Error(response.status===403?'当前账号或项目无权访问':'操作未完成，请从我的记录核对结果后再操作');return data.result;};
  const action=async fn=>{if(!auth||busy)return;busy=true;const ticket=epoch;for(const b of document.querySelectorAll('button'))b.disabled=true;try{await fn(ticket);if(ticket===epoch)$('notice').textContent='操作完成';}catch(e){if(ticket===epoch)$('notice').textContent=e.message;}finally{if(ticket===epoch){busy=false;for(const b of document.querySelectorAll('button'))b.disabled=false;}}};
  const button=(text,fn)=>{const b=document.createElement('button');b.textContent=text;b.onclick=()=>action(fn);return b;};
@@ -28,5 +28,34 @@
  $('fulfillmentRequirements').onclick=()=>action(t=>fulfillment(t,'requirements',{order_id:$('fulfillmentOrder').value}));
  $('reverseFulfillment').onclick=()=>action(async t=>{let proof;try{proof=JSON.parse($('financeReceipt').value);}catch(_){throw Error('财务冲正回执格式无效');}await fulfillment(t,'reverse',{order_id:$('fulfillmentOrder').value,proof});});
  $('fulfillmentStatus').onclick=()=>action(t=>fulfillment(t,'status',{order_id:$('fulfillmentOrder').value}));
+
+ const adminAction=fn=>action(async t=>{if(!adminAllowed)throw Error('当前账号无管理权限');try{await fn(t);}catch(error){if(t===epoch&&$('adminResult').textContent.startsWith('提交中'))$('adminResult').textContent='结果未确认，请先刷新队列核对原待办；不要重复提交。';throw error;}});
+ const adminCall=async(operation,params,t)=>{if(t!==epoch)throw Error('身份已变化');if(!adminAllowed)throw Error('当前账号无管理权限');return call(operation,params,t);};
+ async function adminSnapshot(t){
+  if(t!==epoch)return;
+  $('adminOrders').replaceChildren();$('adminReviews').replaceChildren();
+  const r=await adminCall('owner_admin_snapshot',{},t);if(t!==epoch)return;
+  for(const order of r.orders||[]){const a=article('adminOrders',order.order_id+' · '+order.state+' · '+order.currency);a.append(button('选择原订单',async n=>{if(n!==epoch||!adminAllowed)return;$('reviewOrderId').value=order.order_id;$('refundOrderId').value=order.order_id;$('refundPlan').replaceChildren();}));}
+  for(const task of r.review_tasks||[]){const a=article('adminReviews',task.task_id+' · '+task.order_id+' · '+task.kind+' · '+task.state+' · '+task.reason);if(task.state==='PENDING')a.append(button('选择待办',async n=>{if(n===epoch&&adminAllowed){$('closeTaskId').value=task.task_id;$('closeEventId').value='';}}));}
+ }
+ $('adminReload').onclick=()=>adminAction(t=>adminSnapshot(t));
+ $('reviewOpenForm').onsubmit=e=>{e.preventDefault();adminAction(async t=>{
+  $('adminResult').textContent='提交中；结果不明时先刷新队列核对，不要重复提交。';
+  const r=await adminCall('owner_review_open',{task_id:$('reviewTaskId').value,order_id:$('reviewOrderId').value,kind:$('reviewKind').value,reason:$('reviewReason').value},t);
+  if(t===epoch)$('adminResult').textContent='人工复核待办：'+JSON.stringify(r);await adminSnapshot(t);
+ });};
+ $('reviewCloseForm').onsubmit=e=>{e.preventDefault();adminAction(async t=>{
+  $('adminResult').textContent='提交中；结果不明时先刷新队列核对，不要重复提交。';
+  const r=await adminCall('owner_review_close',{task_id:$('closeTaskId').value,event_id:$('closeEventId').value,state:$('closeState').value},t);
+  if(t===epoch)$('adminResult').textContent='待办记录结果：'+JSON.stringify(r)+'；不代表付款、退款或权益处理。';await adminSnapshot(t);
+ });};
+ $('refundPlanForm').onsubmit=e=>{e.preventDefault();adminAction(async t=>{
+  $('refundPlan').replaceChildren();const r=await adminCall('owner_refund_reversal_plan',{order_id:$('refundOrderId').value,reason:$('refundReason').value},t);
+  if(t===epoch)$('refundPlan').textContent='仅退款／冲正预审，未执行退款、权益撤销或收入冲正。\n'+JSON.stringify(r,null,2);
+ });};
+ $('adminDiagnostics').onclick=()=>adminAction(async t=>{
+  $('diagnosticResult').replaceChildren();const r=await adminCall('owner_diagnostics',{},t);
+  if(t===epoch)$('diagnosticResult').textContent='只读离线诊断；未自动修复、重发付款或授权生产发布。\n'+JSON.stringify(r,null,2);
+ });
  window.configureCommunitySaas(null);
 })();
