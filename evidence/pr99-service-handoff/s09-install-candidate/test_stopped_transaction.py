@@ -18,10 +18,10 @@ class TransactionTests(unittest.TestCase):
         self.state = self.base/'state'; self.state.mkdir(mode=0o700)
         self.before = {n:'LoadState=not-found\n' for n in tx.ORIGINAL}
         self.permit = {'nonce':'test_nonce_1234567890'}
-        self.accepted = {'status':'COPIED_RELEASE_RESTART_CLEANUP_PASS_NOT_PRODUCTION', 'application_processes_stopped':True}
+        self.accepted = {'status':'R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION', 'application_processes_stopped':True}
         self.original_read = tx.read_regular
         def read(path,*args,**kwargs):
-            if str(path).endswith('restart-acceptance-v1/receipt.json'):
+            if str(path).endswith('callback-restart-acceptance-v1/receipt.json'):
                 return json.dumps(self.accepted).encode()
             return self.original_read(path,*args,**kwargs)
         for name,value in [('snapshot',lambda:self.before),('stopped',lambda n:True),('systemctl',lambda *args:''),('read_regular',read)]:
