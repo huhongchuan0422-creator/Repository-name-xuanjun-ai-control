@@ -1,9 +1,5 @@
 name: S07 migration read-only preflight
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - '.github/workflows/aliyun-s07-preflight.yml'
   workflow_dispatch:
 permissions:
   contents: read
