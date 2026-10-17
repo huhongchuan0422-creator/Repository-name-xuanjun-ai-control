@@ -18,6 +18,8 @@ if __name__ == '__main__':
             meta=node.lstat()
             if meta.st_uid!=0 or stat.S_ISLNK(meta.st_mode) or meta.st_mode & 0o022:
                 raise RuntimeError('UNPROTECTED_CODE')
+            if node==target and not (stat.S_ISREG(meta.st_mode) and meta.st_nlink==1 and meta.st_size<=32768):
+                raise RuntimeError('INVALID_CODE_FILE')
         spec=importlib.util.spec_from_file_location('p2_fixed_receipt',str(target))
         receipt=importlib.util.module_from_spec(spec)
         spec.loader.exec_module(receipt)

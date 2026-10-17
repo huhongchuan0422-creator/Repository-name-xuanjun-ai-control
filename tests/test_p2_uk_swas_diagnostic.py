@@ -286,6 +286,16 @@ class ProtectedEntryTests(unittest.TestCase):
         self.assertFalse(marker.exists())
         self.assertNotIn(b'Traceback',result.stderr)
 
+    def test_isolated_cli_rejects_fifo_before_read(self):
+        import subprocess
+        import sys
+        fifo=self.root/'p2_swas_receipt_validator.py'
+        os.mkfifo(str(fifo),0o400)
+        result=subprocess.run([sys.executable,'-I','-B',self.m.__file__,'run-once'],
+                              stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=3)
+        self.assertEqual(result.returncode,2)
+        self.assertNotIn(b'Traceback',result.stderr)
+
     def test_credential_mode_refused_before_sts(self):
         (self.control/'CREDENTIALS.json').chmod(0o644)
         with self.assertRaises(RuntimeError):self.m.protected_entry('run-once')

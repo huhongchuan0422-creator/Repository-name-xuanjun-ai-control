@@ -96,8 +96,8 @@ TTY/dual SHA requirements cannot be emulated or silently waived.
 
 ## Evidence
 
-41 local methods pass: original20 transport/receipt, previous11 adapter/gate,
-new7 real-Root temporary-file entry tests and3 provenance/fork-supervisor tests.
+42 local methods pass: original20 transport/receipt, previous11 adapter/gate,
+new8 real-Root temporary-file entry tests and3 provenance/fork-supervisor tests.
 The real-Root fixture imports exact source copies under a temporary /root tree,
 validates actual modes/hashes and exercises dispatch then separately authorized
 query with synthetic RPC. Tests cover epoch, source, ledger and credential drift,
@@ -112,3 +112,5 @@ installation is implied. Prior accepted source is not needlessly re-reviewed;
 new entry, operation binding and affected call chain are the incremental scope.
 
 Direct isolated Python execution loads only the adjacent root-protected receipt module, never CWD/PYTHONPATH. A real isolated subprocess negative test verifies missing sibling refuses without importing an injected scripts package. Actual installed CLI happy path still requires authentic protected configuration.
+
+The isolated bootstrap rejects nonregular/oversized/multilink receipt code before reading/importing; a real FIFO subprocess regression proves no blocking read occurs.
