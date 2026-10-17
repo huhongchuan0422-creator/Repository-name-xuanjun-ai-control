@@ -329,14 +329,14 @@ class ProtectedEntryTests(unittest.TestCase):
 
 class EntryProvenanceSupervisorTests(unittest.TestCase):
     def test_exact_comment_metadata(self):
-        value={'id':123,'user':{'id':d.OWNER_ID,'login':d.OWNER_LOGIN},
+        value={'id':123,'user':{'id':d.AUDITOR_ID,'login':d.AUDITOR_LOGIN},
                'issue_url':'https://api.github.com/repos/'+d.REPOSITORY+'/issues/58','body':'fixture'}
         class Opener:
             def open(self,req,timeout):
                 self.request=req;return AdapterGateTests.Response(json.dumps(value).encode())
         opener=Opener();self.assertEqual(d.fetch_approval(123,opener),'fixture')
         self.assertTrue(opener.request.full_url.startswith('https://api.github.com/repos/'+d.REPOSITORY+'/'))
-        for k,v in (('id',124),('issue_url','https://evil.invalid/'),('user',{'id':999,'login':d.OWNER_LOGIN})):
+        for k,v in (('id',124),('issue_url','https://evil.invalid/'),('user',{'id':999,'login':d.AUDITOR_LOGIN}),('user',{'id':d.OWNER_ID,'login':d.OWNER_LOGIN})):
             old=value[k];value[k]=v
             with self.subTest(k=k),self.assertRaises(RuntimeError):d.fetch_approval(123,opener)
             value[k]=old
