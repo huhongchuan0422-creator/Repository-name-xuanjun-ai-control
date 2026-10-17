@@ -22,11 +22,11 @@ OUTPUT_ROOT = 'epoch7-recovery-candidate-r7-claim-lifecycle'
 ARCHIVE_SIZE = 1056853
 ARCHIVE_SHA256 = '6244cca1b41037b7c240f71b93f867c5660a770d451c4a5a661b283f61ce819e'
 MANIFEST_SHA256 = '6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030'
-OVERLAY_MAP_SHA256 = 'da06828800dcf97abffd41e89981d68777790f54eaa82eb5a06069356c551f32'
+OVERLAY_MAP_SHA256 = '1cc4936490742024f06055f91788394116749751c00b1b69172ba1da79413a60'
 MANIFEST = 'recovery-kit-manifest.json'
 RUNTIME = 'xuanjun-p2-package/'
 NEW_FILES = {'helpers/epoch7_claim_successor.py'}
-OVERLAY_SOURCES = {'epoch7_recovery_entry.py': 'kit-overlay/epoch7_recovery_entry.py', 'helpers/epoch7_claim_successor.py': 'kit-overlay/helpers/epoch7_claim_successor.py', 'helpers/epoch7_complete_approval.py': 'kit-overlay/helpers/epoch7_complete_approval.py', 'helpers/epoch7_delta.py': 'kit-overlay/helpers/epoch7_delta.py', 'helpers/epoch7_host_containment.py': 'kit-overlay/helpers/epoch7_host_containment.py', 'helpers/epoch7_host_factory.py': 'kit-overlay/helpers/epoch7_host_factory.py', 'helpers/epoch7_host_observer.py': 'kit-overlay/helpers/epoch7_host_observer.py', 'helpers/epoch7_host_phases.py': 'kit-overlay/helpers/epoch7_host_phases.py', 'helpers/epoch7_injected_recovery.py': 'kit-overlay/helpers/epoch7_injected_recovery.py', 'helpers/epoch7_live_controls.py': 'kit-overlay/helpers/epoch7_live_controls.py', 'helpers/epoch7_pre_active_guards.py': 'kit-overlay/helpers/epoch7_pre_active_guards.py', 'helpers/epoch7_protected_fs.py': 'kit-overlay/helpers/epoch7_protected_fs.py', 'helpers/epoch7_recovery_sequence.py': 'kit-overlay/helpers/epoch7_recovery_sequence.py', 'helpers/epoch7_resource_plan.py': 'kit-overlay/helpers/epoch7_resource_plan.py', 'helpers/epoch7_snapshot.py': 'kit-overlay/helpers/epoch7_snapshot.py'}
+OVERLAY_SOURCES = {'epoch7_recovery_entry.py': 'kit-overlay/epoch7_recovery_entry.py', 'helpers/epoch7_claim_successor.py': 'kit-overlay/helpers/epoch7_claim_successor.py', 'helpers/epoch7_approval.py': 'kit-overlay/helpers/epoch7_approval.py', 'helpers/epoch7_complete_approval.py': 'kit-overlay/helpers/epoch7_complete_approval.py', 'helpers/epoch7_delta.py': 'kit-overlay/helpers/epoch7_delta.py', 'helpers/epoch7_host_containment.py': 'kit-overlay/helpers/epoch7_host_containment.py', 'helpers/epoch7_host_factory.py': 'kit-overlay/helpers/epoch7_host_factory.py', 'helpers/epoch7_host_observer.py': 'kit-overlay/helpers/epoch7_host_observer.py', 'helpers/epoch7_host_phases.py': 'kit-overlay/helpers/epoch7_host_phases.py', 'helpers/epoch7_injected_recovery.py': 'kit-overlay/helpers/epoch7_injected_recovery.py', 'helpers/epoch7_live_controls.py': 'kit-overlay/helpers/epoch7_live_controls.py', 'helpers/epoch7_pre_active_guards.py': 'kit-overlay/helpers/epoch7_pre_active_guards.py', 'helpers/epoch7_protected_fs.py': 'kit-overlay/helpers/epoch7_protected_fs.py', 'helpers/epoch7_recovery_sequence.py': 'kit-overlay/helpers/epoch7_recovery_sequence.py', 'helpers/epoch7_resource_plan.py': 'kit-overlay/helpers/epoch7_resource_plan.py', 'helpers/epoch7_snapshot.py': 'kit-overlay/helpers/epoch7_snapshot.py'}
 
 
 def need(condition, message):
@@ -127,7 +127,7 @@ def authenticate_map(raw):
          mapping['baseline_archive_sha256'] == ARCHIVE_SHA256,
          'OVERLAY_MAP_SCOPE')
     rows = mapping['files']
-    need(type(rows) is list and len(rows) == 15, 'OVERLAY_ROW_COUNT')
+    need(type(rows) is list and len(rows) == 16, 'OVERLAY_ROW_COUNT')
     need({row['kit_target'] for row in rows} == set(OVERLAY_SOURCES), 'OVERLAY_TARGET_CLOSURE')
     for row in rows:
         target, source = relative(row['kit_target']), relative(row['source'])
@@ -330,7 +330,7 @@ def compile_artifact(archive_raw, map_raw, sources, source_commit, source_tree,
         'overlays': mapping['files'], 'modified_files': modified, 'added_files': sorted(NEW_FILES),
         'unchanged_files': sorted(name for name in old_files if files[name] == old_files[name]),
         'runtime_files_preserved': 107, 'runtime_package_files_preserved': len(runtime_names),
-        'existing_modules_unchanged': True, 'module_added': 'epoch7_claim_successor',
+        'existing_modules_unchanged': False, 'module_added': 'epoch7_claim_successor',
         'business_phases_preserved': 16, 'phase_logic_unchanged': True,
         'test_suites_unchanged': True,
         'new_test_execution': 'EXPLICIT_AUTHENTICATED_CI_HARNESS_NOT_VERIFIEDKIT_TESTS',
