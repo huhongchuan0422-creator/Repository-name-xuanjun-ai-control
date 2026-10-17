@@ -50,9 +50,9 @@ class IntegratedPlatformLedgerReadJourney(unittest.TestCase):
         order=self.fx.call('community_orders',dict(community_id=self.fx.cid,after_id=''))
         self.assertEqual([v['reference'] for v in order['records']],['basket'])
         self.assertNotIn('user_id',order['records'][0])
-        rows=('商户订单号,微信订单号,交易状态,订单金额,特约商户号,币种\\n'
+        rows=('商户订单号,微信订单号,交易状态,订单金额,特约商户号,币种\n'
               +trade+',420000000000001234,SUCCESS,1.01,'
-              +policy['sub_mchid']+',CNY\\n').encode()
+              +policy['sub_mchid']+',CNY\n').encode()
         bills=ProviderBills(self.fx.actions)
         bills._download=Mock(return_value=rows)
         self.fx.actions._call=Mock(return_value=(
