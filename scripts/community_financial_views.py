@@ -12,6 +12,21 @@ from scripts.community_provider_reference import provider_order_reference
 from scripts.community_order_provider_projection import project_verified_query, provider_evidence
 
 
+def verified_refund_total(db, identity, reference):
+    """Validate original append-only signed refund observations before summing."""
+    t,m,s=(identity[k] for k in ('tenant_id','merchant_id','store_id'))
+    refunded=0
+    for raw, in db.execute('SELECT evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,s,reference)):
+        try: event=json.loads(raw)
+        except (ValueError,TypeError):continue
+        if type(event) is dict and event.get('source')=='WECHAT_SIGNED_REFUND_RESULT':
+            amount=event.get('refund_minor')
+            if type(amount) is not int or amount<=0:
+                raise ValueError('INVALID_SIGNED_REFUND_LEDGER_AMOUNT')
+            refunded+=amount
+    return refunded
+
+
 class FinancialViews:
     def __init__(self, actions):
         self.actions, self.center = actions, actions.center
@@ -67,15 +82,7 @@ class FinancialViews:
             raise ValueError('ORDER_CHANGED_DURING_RECONCILIATION')
         project_verified_query(a.runtime.demo.db, g['scope'], p['reference'], expected, observation, c.now(), a.reader._kid)
         order = state(a.runtime.demo.db, g['scope'], p['reference'])
-        refunded = 0
-        t, m, s = (g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
-        for raw, in a.runtime.demo.db.execute('SELECT evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?', (t,m,s,p['reference'])):
-            try:
-                event = json.loads(raw)
-            except (ValueError, TypeError):
-                continue
-            if type(event) is dict and event.get('source') == 'WECHAT_SIGNED_REFUND_RESULT':
-                refunded += event['refund_minor']
+        refunded=verified_refund_total(a.runtime.demo.db,g['scope'],p['reference'])
         lock = c.idx('provider-order-action:' + a.reader._mchid + ':' + expected['out_trade_no'])
         locked = c.db.execute("SELECT 1 FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_LOCK' AND subject_idx=? AND active=1", (lock,)).fetchone() is not None
         anomalies = []
