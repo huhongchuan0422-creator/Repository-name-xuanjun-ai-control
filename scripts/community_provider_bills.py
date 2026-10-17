@@ -38,15 +38,18 @@ def parse(raw):
     rows=csv.reader(io.StringIO(text),strict=True)
     try:header=[v.removeprefix('`').strip() for v in next(rows)]
     except StopIteration:raise ValueError('EMPTY_PROVIDER_BILL')
+    except csv.Error:raise ValueError('INVALID_BILL_CSV') from None
     if len(set(header))!=len(header) or not 2<=len(header)<=100:raise ValueError('INVALID_BILL_COLUMNS')
     if any(not v or any(ord(ch)<32 or 0x202a<=ord(ch)<=0x202e or 0x2066<=ord(ch)<=0x2069 for ch in v) for v in header):raise ValueError('INVALID_BILL_COLUMN_NAME')
     records=[];summary=False
-    for row in rows:
-        if not row or not any(row):continue
-        if row[0].removeprefix('`').startswith(('总交易单数','总笔数','总交易额','总分账笔数')):summary=True;continue
-        if summary:continue
-        if len(row)!=len(header) or len(records)>=100000:raise ValueError('BILL_ROW_SHAPE_OR_LIMIT')
-        records.append(dict(zip(header,[v.removeprefix('`').strip() for v in row])))
+    try:
+        for row in rows:
+            if not row or not any(row):continue
+            if row[0].removeprefix('`').startswith(('总交易单数','总笔数','总交易额','总分账笔数')):summary=True;continue
+            if summary:continue
+            if len(row)!=len(header) or len(records)>=100000:raise ValueError('BILL_ROW_SHAPE_OR_LIMIT')
+            records.append(dict(zip(header,[v.removeprefix('`').strip() for v in row])))
+    except csv.Error:raise ValueError('INVALID_BILL_CSV') from None
     return header,records
 
 
