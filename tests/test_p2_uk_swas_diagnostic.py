@@ -408,3 +408,66 @@ class RecoveryCheckpointTests(unittest.TestCase):
         self.start();d.poll_existing(self.ledger,self.rpc)
         self.ledger.create('rejected.json',{'state':'TERMINAL_REJECTED','invoke_id':'t-fixture'})
         with self.assertRaises(RuntimeError):self.snapshot()
+
+
+class RemoteIdentityProtocolTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        os.chmod(self.tmp.name,0o700)
+        self.ledger=d.Ledger(self.tmp.name);self.addCleanup(self.ledger.close)
+        self.active={'ledger_uuid':'uuid','generation':1,'epoch':7,'instance':'instance',
+                     'db_path':'/canonical/state.sqlite','ledger_socket':'/run/ledger.sock'}
+        self.request={'schema':1,'operation':'UK_READONLY_IDENTITY','attempt':'attempt',
+            'nonce':'nonce','task_id':'task','lease_owner':'writer','fence':3,
+            'activation':dict(self.active),'expires_unix':200,'approval_sha256':'a'*64}
+        self.obs=dict(self.active,task_id='task',state='RUNNING',lease_owner='writer',
+                      lease_until=150,fence=3,checkpoint={})
+        self.store=type('Store',(),{'read':lambda obj,require_active:dict(self.active,state='ACTIVE')})()
+        self.broker=type('Broker',(),{'observation':lambda obj,task:dict(self.obs)})()
+        self.approval=lambda request,digest:True
+        self.p1=patch.object(d.os,'uname',return_value=type('Host',(),{'nodename':d.receipt.HOST})())
+        self.p1.start();self.addCleanup(self.p1.stop)
+        self.p2=patch('sys.version_info',(3,6,8));self.p2.start();self.addCleanup(self.p2.stop)
+
+    def run_request(self,request=None):
+        return d.consume_remote_identity(self.ledger,request or self.request,self.request,
+            self.store,self.broker,self.approval,lambda:100)
+
+    def test_first_consumption_and_restart_replay(self):
+        self.assertEqual(self.run_request()['state'],'REMOTE_IDENTITY_COMPLETE')
+        self.assertEqual(self.run_request()['state'],'REMOTE_RESULT_REPLAY')
+        self.assertFalse(self.run_request()['redispatch_allowed'])
+
+    def test_unactivated_mechanism_holds_without_intent(self):
+        def inactive(require_active):raise RuntimeError('NOT_ACTIVE')
+        self.store.read=inactive
+        with self.assertRaises(RuntimeError):self.run_request()
+        with self.assertRaises(FileNotFoundError):self.ledger.read('remote-intent.json')
+
+    def test_client_cannot_select_new_task(self):
+        with self.assertRaises(RuntimeError):self.run_request(dict(self.request,task_id='other'))
+
+    def test_stale_writer_denied(self):
+        self.obs['lease_owner']='other'
+        with self.assertRaises(RuntimeError):self.run_request()
+
+    def test_expired_lease_denied(self):
+        self.obs['lease_until']=99
+        with self.assertRaises(RuntimeError):self.run_request()
+
+    def test_revoked_approval_denies_replay(self):
+        self.run_request();self.approval=lambda *args:False
+        with self.assertRaises(RuntimeError):self.run_request()
+
+    def test_partial_execution_is_not_reexecuted(self):
+        digest=hashlib.sha256(d.canonical(self.request)).hexdigest()
+        self.ledger.create('remote-intent.json',{'request_sha256':digest,'state':'REMOTE_IDENTITY_INTENT'})
+        self.assertEqual(self.run_request()['state'],'REMOTE_EXECUTION_UNKNOWN')
+        with self.assertRaises(FileNotFoundError):self.ledger.read('remote-result.json')
+
+    def test_activation_changes_during_observation(self):
+        def change(task):
+            self.active['epoch']=8
+            return dict(self.obs)
+        self.broker.observation=change
+        with self.assertRaises(RuntimeError):self.run_request()

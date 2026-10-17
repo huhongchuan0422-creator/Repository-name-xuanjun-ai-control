@@ -137,3 +137,28 @@ actual writer epoch and authentic trust enrollment remain incomplete/UNKNOWN.
 No cloud API or UK host was used in these tests. No production permission is
 inferred from this checkpoint. Consolidated independent review waits for the
 complete affected chain; previously accepted unchanged code is inherited.
+
+## Split-environment identity receiver candidate
+`consume_remote_identity` implements the UK-side identity-only protocol without
+cloud credentials. Actions must submit an exact request already bound by a
+protected target policy; the target requires its existing ActivationStore and
+BrokerObservationClient, plus the protected approval verifier. The receiver
+reads ACTIVE before and after BROKER_OBSERVATION and binds the original task,
+lease owner/unexpired lease, Fence, generation/epoch/instance/ledger UUID and
+canonical paths. It never grants a lease or starts the original mechanism.
+Inactive activation is HOLD, including for the initial identity test.
+
+An existing protected persistent ledger records remote-intent before identity
+measurement and remote-result after rechecking gates. Missing result is UNKNOWN,
+not permission to rerun. A repeated exact request can only replay validated
+stored bytes under still-valid authority. These files track transport receipt
+consumption only; they are not another canonical task/writer registry. Local
+lock and read-only observation do not grant global writer exclusivity.
+
+This is a callable candidate API, not an installed factory or remotely enabled
+CLI. Target provisioning, protected request/approval adapter, authenticated
+Actions-to-target envelope, cloud receipt binding and actual event trigger are
+still incomplete. The existing run-once CLI remains the co-located candidate;
+it has not silently switched to this protocol. No arbitrary remote command or
+application code is executed by the new receiver. All eight new tests use
+injected activation/observation/approval fixtures; they are not UK evidence.

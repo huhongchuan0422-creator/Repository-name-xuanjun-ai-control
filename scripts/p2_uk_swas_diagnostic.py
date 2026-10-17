@@ -284,6 +284,101 @@ class AuthenticatedRPC:
         return self.request(endpoint, action, **params)
 
 
+
+def consume_remote_identity(ledger, request, expected, activation, broker,
+                            check_approval, now):
+    """UK half of a split caller. No cloud keys, DB writes or worker start.
+
+    activation/broker are the existing ActivationStore/BrokerObservationClient;
+    expected and check_approval come from the protected installed entry, never
+    the Actions payload. This API is not itself an installed/authorized entry.
+    The durable directory is provisioned separately; no mkdir or enrollment.
+    """
+    import fcntl
+    import math
+    import sys
+    need(type(request) is dict and type(expected) is dict and request==expected)
+    keys={'schema','operation','attempt','nonce','task_id','lease_owner',
+          'fence','activation','expires_unix','approval_sha256'}
+    need(set(request)==keys and type(request['schema']) is int and request['schema']==1
+         and request['operation']=='UK_READONLY_IDENTITY'
+         and all(receipt.token(request[k]) for k in ('attempt','nonce'))
+         and type(request['task_id']) is str and 1<=len(request['task_id'])<=256
+         and '\x00' not in request['task_id']
+         and type(request['lease_owner']) is str and bool(request['lease_owner'])
+         and type(request['fence']) is int and request['fence']>=0
+         and type(request['approval_sha256']) is str
+         and re.fullmatch('[0-9a-f]{64}',request['approval_sha256']) is not None
+         and type(request['expires_unix']) in (int,float)
+         and math.isfinite(request['expires_unix']))
+    active=request['activation']
+    active_keys={'ledger_uuid','generation','epoch','instance','db_path','ledger_socket'}
+    need(type(active) is dict and set(active)==active_keys)
+    digest=hashlib.sha256(canonical(request)).hexdigest()
+    fd=os.open('remote.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=ledger.fd)
+    try:
+        info=os.fstat(fd)
+        need(stat.S_ISREG(info.st_mode) and info.st_nlink==1
+             and info.st_uid==os.geteuid() and stat.S_IMODE(info.st_mode)==0o600)
+        fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        def gate():
+            clock=now()
+            need(type(clock) in (int,float) and math.isfinite(clock)
+                 and clock<request['expires_unix'])
+            # Approval checker must bind the full exact request, source and scope.
+            need(check_approval(request,digest) is True)
+            before=activation.read(require_active=True)
+            need(before.get('state')=='ACTIVE'
+                 and all(type(before.get(k)) is type(active[k]) and before[k]==active[k]
+                         for k in active_keys))
+            observation=broker.observation(request['task_id'])
+            need(type(observation) is dict and observation.get('task_id')==request['task_id']
+                 and observation.get('lease_owner')==request['lease_owner']
+                 and type(observation.get('fence')) is int
+                 and observation['fence']==request['fence']
+                 and observation.get('state')=='RUNNING')
+            expiry=observation.get('lease_until')
+            need(type(expiry) in (int,float) and math.isfinite(expiry) and expiry>clock)
+            for k in ('ledger_uuid','generation','epoch','instance','db_path'):
+                need(type(observation.get(k)) is type(active[k]) and observation[k]==active[k])
+            after=activation.read(require_active=True)
+            need(before==after)
+            return clock
+        gate()
+        # Never return a cached success under stale/revoked authority.
+        try: consumed=ledger.read('remote-intent.json')
+        except FileNotFoundError: consumed=None
+        if consumed is not None:
+            need(consumed=={'request_sha256':digest,'state':'REMOTE_IDENTITY_INTENT'})
+            try: result=ledger.read('remote-result.json')
+            except FileNotFoundError:
+                return {'state':'REMOTE_EXECUTION_UNKNOWN','redispatch_allowed':False}
+            need(type(result) is dict and set(result)=={'request_sha256','receipt'}
+                 and result['request_sha256']==digest)
+            detail={'InvokeId':'local_identity','InstanceId':receipt.INSTANCE,
+                    'InvocationStatus':'Success','ExitCode':0,
+                    'Output':json.dumps(result['receipt'])}
+            receipt.validate(detail,'local_identity',request['nonce'])
+            gate()
+            return {'state':'REMOTE_RESULT_REPLAY','request_sha256':digest,
+                    'receipt':result['receipt'],'redispatch_allowed':False}
+        ledger.create('remote-intent.json',{'request_sha256':digest,
+                      'state':'REMOTE_IDENTITY_INTENT'})
+        gate()
+        body={'hostname':os.uname().nodename,'uid':os.geteuid(),
+              'python':list(sys.version_info[:3]),'nonce':request['nonce'],
+              'private_inputs_read':False}
+        receipt.validate({'InvokeId':'local_identity','InstanceId':receipt.INSTANCE,
+            'InvocationStatus':'Success','ExitCode':0,'Output':json.dumps(body)},
+            'local_identity',request['nonce'])
+        gate()
+        ledger.create('remote-result.json',{'request_sha256':digest,'receipt':body})
+        return {'state':'REMOTE_IDENTITY_COMPLETE','request_sha256':digest,
+                'receipt':body,'redispatch_allowed':False}
+    finally:
+        os.close(fd)
+
+
 def protected_json(path):
     """Read pre-enrolled Root policy; never register or modify a trust anchor."""
     path=Path(path)
