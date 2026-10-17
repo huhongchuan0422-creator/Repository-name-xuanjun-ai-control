@@ -16,6 +16,7 @@ class ModulePackaging(unittest.TestCase):
         self.assertEqual(by_id['wechat_partner_payments']['ownership'],'GENERAL_MODULE')
         self.assertEqual(by_id['community_rules']['ownership'],'BUSINESS_MODULE')
         self.assertEqual(by_id['original_project_center']['ownership'],'GENERAL_MODULE')
+        self.assertIn('customer.feedback.read',by_id['original_project_center']['capabilities'])
         self.assertIn('wechat_partner_payments',by_id['verified_receipt_ad']['dependencies'])
         self.assertIn('advertising',by_id['verified_receipt_ad']['dependencies'])
     def test_new_module_has_no_invented_price_and_reuses_itemized_dual_currency_quote(self):
