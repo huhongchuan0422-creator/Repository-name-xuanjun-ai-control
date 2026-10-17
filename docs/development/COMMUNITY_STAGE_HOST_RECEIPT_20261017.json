@@ -1,13 +1,13 @@
 {
-  "source_commit": "82e96aa32864d42d2825112d7efb0362f7d5eafa",
-  "source_tree": "17c34132fdb1db6db9b8acf1b9f20b8261aa1f7d",
-  "run_id": 39012749927,
+  "source_commit": "e561434c36de8d5f18103c42552fe755e0c2869e",
+  "source_tree": "5ac698d73b640ea771080025cde9742db932a87d",
+  "run_id": 39013469873,
   "hosted": {
-    "job_id": 117338554373,
-    "community_python": 337,
+    "job_id": 117340662923,
+    "community_python": 342,
     "stage5_python": 342,
     "javascript": 72,
-    "total_test_executions": 751,
+    "total_test_executions": 756,
     "status": "SUCCESS",
     "failed": 0,
     "skipped": 0,
@@ -15,10 +15,10 @@
     "cryptography": "50.0.2"
   },
   "domestic_isolated": {
-    "job_id": 117338878013,
+    "job_id": 117340971877,
     "host": "iZvt5t8tlrm8oiZ",
     "uid": 1002,
-    "tests": 147,
+    "tests": 150,
     "status": "PASS",
     "failed": 0,
     "skipped": 0,
@@ -32,15 +32,15 @@
     "overlaps_hosted_suites": true
   },
   "source_artifact": {
-    "id": 12093199277,
-    "outer_zip_sha256": "e4e28a0c19d581214aa26bbbb37c79e2259cc1dd7de5260557669f910ff43026",
-    "inner_zip_sha256": "2e01278761b1039234cbca056e59fd533fa0ade8a17b3e77ce4a5d98a76eec35",
-    "inner_zip_bytes": 965954,
-    "manifest_files_verified": 166
+    "id": 12093698116,
+    "outer_zip_sha256": "8d30d34c70d379a7b9fade39b2d1ff9b66010a33ea0fd8b32be9ed25e5c2a1e8",
+    "inner_zip_sha256": "fd60a1215439c428f3545f2bbffb608a997ecd5d82e70fd49771c701a4542635",
+    "inner_zip_bytes": 979796,
+    "manifest_files_verified": 168
   },
   "domestic_artifact": {
-    "id": 12093776257,
-    "outer_zip_sha256": "2d4dddc4570673aab6f2fbcf5b658864724db278eea035008d793589ad098c91",
+    "id": 12094270494,
+    "outer_zip_sha256": "b15a16626829a22ed6cf1d5ec4403f86b3a64a9623a6833c618978296129fb02",
     "receipt_head_verified": true
   },
   "reused_native_preview": {
@@ -78,7 +78,7 @@
     "Original production deployment and DB migration/recovery gates; no parallel host writer"
   ],
   "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance",
-  "latest_fix": "Protected original CRM mapping gates new merchant workbench; durable reserved/opened records, explicit interruption recovery, re-verification and re-opening preserve edited profiles. No account/project/role is created and no funds are enabled.",
+  "latest_fix": "Bounded status-filtered admission cursor pagination and current-owner reads; account-generation isolation rejects stale private replies and old file preparation after account switch. No duplicate identity or Finance store.",
   "merchant_onboarding": {
     "applicant_route": "/merchant/join",
     "review_route": "/merchant/review",
@@ -92,6 +92,10 @@
     "opening_state": "CONFIGURED_CRM_MAPPING_OPENS_WORKBENCH_IN_SYNTHETIC_TESTS",
     "wechat_submerchant_state": "NOT_VERIFIED",
     "source_account_project_scanner": "SYNTHETIC_FIXTURES",
-    "opening_tests": 14
+    "opening_tests": 14,
+    "pagination_tests": 3,
+    "client_epoch_browser_tests": 2,
+    "client_epoch_network": "DELIBERATELY_DELAYED_SYNTHETIC_TRANSPORT",
+    "real_http_browser_journeys": 2
   }
 }
