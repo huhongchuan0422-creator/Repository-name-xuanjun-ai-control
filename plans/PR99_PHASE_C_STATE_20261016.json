@@ -1102,14 +1102,31 @@
         "protected_state_unchanged": true,
         "missing_module": "database.repositories.audit_repository",
         "source_closure_complete": false,
-        "next": "BATCH_CONSERVATIVE_LAZY_IMPORT_CLOSURE_ON_EXISTING_KOREA_R2_COPY",
+        "next": "OWNER_BATCH45_SUPPLEMENT_NEW_V3_ISOLATED_START_WITH_INLINE_ERRORS",
         "closure_inventory": {
           "script": "evidence/pr99-service-handoff/s07-source-closure/inspect_closure.py",
           "source_commit": "4968b9a7a4780cb8169d58adb37841c38439a1c9",
           "sha256": "123944897f92198e9460f65887a525784751e91f9b0f5aaf8e0e6269b70da84f",
           "local_tests": 6,
+          "status": "OWNER_EXECUTED_125_CANDIDATES_46_ADDED_DYNAMIC_COMPLETENESS_NOT_PROVEN",
+          "service_actions": 0,
+          "candidate_files": 125,
+          "added_files": 46
+        },
+        "batch_continuation": {
           "status": "PREPARED_OWNER_EXECUTION_PENDING",
-          "service_actions": 0
+          "source_commit": "bc0f6627d5593e7b3035d26e1c792c24c97bdcfc",
+          "script": "evidence/pr99-service-handoff/s07-source-closure/batch_isolated_start.py",
+          "sha256": "4185dd98491d16d3c7f8c76eae9bcc9aeb515f0a5cbfbfa2a58f313224e5cda2",
+          "supplement_files": 45,
+          "copied_source_files": 124,
+          "excluded": "EMPTY_TOP_LEVEL_signal/__init__.py_TO_AVOID_STDLIB_SHADOW",
+          "target": "/var/lib/xuanjun-pr99-s07-isolated-start-v3",
+          "local_tests_run": 19,
+          "local_passed": 18,
+          "local_skipped": 1,
+          "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+          "production_service_actions": 0
         }
       }
     }
