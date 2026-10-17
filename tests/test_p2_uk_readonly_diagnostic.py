@@ -81,6 +81,22 @@ class ReadOnlyDiagnosticTests(unittest.TestCase):
             with self.assertRaises(self.d.DiagnosticHold):
                 self.d.safe_receipt(ok,stderr,code)
 
+    def test_workflow_failure_json_no_stderr_leak(self):
+        import json
+        import subprocess
+        workflow=(ROOT/'.github/workflows/p2-uk-swas-diagnostic.yml').read_text()
+        entries=[line.strip() for line in workflow.splitlines()
+                 if line.strip().startswith("printf '%s") and 'redispatch_allowed' in line]
+        self.assertEqual(len(entries),1)
+        safe=entries[0].split(' > /tmp/',1)[0]
+        run=subprocess.Popen(['/bin/bash','-c',safe],stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        stdout,stderr=run.communicate(timeout=4)
+        self.assertEqual(run.returncode,0)
+        self.assertEqual(stderr,b'')
+        self.assertEqual(json.loads(stdout),{'state':'HOLD','redispatch_allowed':False})
+        self.assertEqual(stdout.count(b'\\n'),1)
+
     def test_approval_contract(self):
         self.assertEqual(self.t.OWNER_ID,332398908)
         self.assertEqual(self.t.AUDITOR_ID,95597695)
