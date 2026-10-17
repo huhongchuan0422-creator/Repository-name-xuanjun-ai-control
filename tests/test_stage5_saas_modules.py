@@ -13,7 +13,8 @@ class SaasModuleTests(unittest.TestCase):
  def test_module_market_separate_free_shell_and_bilingual_prices(self):
   self.prices()
   data=offers(self.db)
-  self.assertEqual(len(data),20)
+  self.assertEqual(len(data),len(MODULES))
+  self.assertEqual(len(data),22)  # 20 original modules plus two registered reusable modules
   for row in data:
    self.assertGreaterEqual(len(row["capabilities"]),1)
    self.assertEqual(row["offer"]["cny_minor"],19900)
