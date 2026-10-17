@@ -33,6 +33,16 @@ class OriginalProjectCenterJourney(unittest.TestCase):
         archived=self.fx.c.messages(self.fx.fx.uid1,'project1')
         self.assertEqual(archived[-1]['body'],'请核对门店需求版本')
 
+    def test_independent_review_never_granted_to_owner_or_editor(self):
+        request=dict(item='material1',revision=1,action='approve',reason='checked')
+        with self.assertRaisesRegex(PermissionError,'PROJECT_PERMISSION_REQUIRED'):
+            self.consumer('project_review',request)
+        reviewer_token=self.fx.fx.token('reviewer-code','openid2')
+        with self.assertRaisesRegex(PermissionError,'PROJECT_PERMISSION_REQUIRED'):
+            self.consumer('project_review',request,token=reviewer_token)
+        with self.assertRaises(ValueError):
+            self.consumer('project_review',dict(request,action='skip_validation'))
+
     def test_material_submit_cannot_mint_requirements_or_approve(self):
         before=self.fx.c.db.execute(
             'SELECT COUNT(*) FROM versions WHERE project=?',('project1',)).fetchone()[0]
