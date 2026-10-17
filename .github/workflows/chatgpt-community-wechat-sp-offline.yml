@@ -59,9 +59,16 @@ jobs:
   mini-preview:
     if: contains(github.event.head_commit.message, '[mini-preview]')
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12
     steps:
+      - name: Verify existing domestic upload runner before loading credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -un)" = githubrunner
+          test "$(id -u)" -ne 0
       - uses: actions/checkout@v4
         with:
           persist-credentials: false

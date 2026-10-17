@@ -115,3 +115,8 @@ community_mini_http.py新增本机login/api/logout运输；严格Host/Origin/重
 12项新增组合测试真正调用原账户注册/验证/登录、签名项目准入、原SQLite会话/权限/审计和持久重开，验证同门店第二客户拒绝、原退出/解绑/成员撤销立即生效、code和未知订单reservation持久。账号/邮箱、邮件送达、CRM签名和微信交换仍使用明确合成数据；这是实SQLite/原源码集成，不是生产用户或微信设备验收。
 
 第三次开发预览Run39003533437/job117311443454仍为UPLOAD_KEY_NOT_PEM（2026-10-17 12:43:38北京时间）。已覆盖标准PEM、JSON引号、转义换行、base64 PEM和有效RSA DER；现有GitHub Secret没有成为可解析的RSA上传私钥。停止自动重复此路径，不使用假key，不覆盖Secret；已有AppID/服务商配置保留。完整代码回归与原生预览失败分别登记，不合并为PASS，不送审。
+
+
+## 2026-10-17 国内固定出口上传调整
+
+Owner要求通过已有服务器执行小程序预览。mini-preview改用已有xuanjun-domestic-ops Runner，加载凭据前核对主机iZvt5t8tlrm8oiZ、账号githubrunner且非root。保留既有代码上传IP白名单；未更换私钥。此次调整仅涉及预览任务执行位置，不安装或启动网站服务。旧云端预览Run39003533437仍在途，新服务器上传尚未启动；需要旧任务终态后再触发带[mini-preview]标记的提交。Runner在线、Node兼容性、实际公网出口及微信接收结果均待实测，不能记为已通过。
