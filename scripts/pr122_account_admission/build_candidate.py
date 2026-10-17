@@ -31,6 +31,7 @@ for n in tree.body:
     if isinstance(n,ast.ClassDef):pieces.append(ast.get_source_segment(source,n))
 pieces += [f'PAYLOAD_SHA = {sha!r}',f'PAYLOAD_Z64 = {base64.b64encode(zlib.compress(bundle,9)).decode()!r}',f'CALLER_SHA = {hashlib.sha256(caller).hexdigest()!r}',"EXECUTION_ADMISSION = False", "EXPECTED_WORKFLOW_REF = REPO + '/' + WORKFLOW_PATH + '@refs/pull/122/merge'", "row = {'schema':1,'status':'HOLD','stage':'GATE','retry_allowed':False,'purpose':'READONLY_ADMISSION','payload_sha256':PAYLOAD_SHA}"]
 pieces += [ast.get_source_segment(source,n) for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in functions]
+pieces.append((HERE/'permit_gate.py').read_text())
 pieces.append((HERE/'transport_delta.py.txt').read_text())
 transport='\n\n'.join(pieces)+'\n'
 (HERE/'readonly_transport.py').write_text(transport)
@@ -46,6 +47,12 @@ suffix="""          PY
           retention-days: 90
           overwrite: false
 """
-(HERE/'readonly-transport-candidate.yml').write_text(prefix+''.join('          '+line+'\n' for line in transport.splitlines())+suffix)
+# Admission step has no Alibaba credentials. Cloud step cannot run until the
+# protected durable reservation succeeds; it independently rechecks/claims it.
+inline=''.join('          '+line+'\n' for line in transport.splitlines())
+first=prefix.replace('      - name: Fixed reviewed read-only admission transport', '      - name: Verify and consume protected independent permit\n        id: admission').replace('          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}\n','').replace('          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}\n','').replace('        env:\n','        env:\n          ADMISSION_PHASE: ADMIT\n')
+second=prefix[prefix.index('      - name: Fixed reviewed read-only admission transport'):].replace('      - name: Fixed reviewed read-only admission transport','      - name: Execute admitted fixed read-only transport\n        if: ${{ steps.admission.outputs.ready == \'true\' }}').replace('        env:\n','        env:\n          ADMISSION_PHASE: EXECUTE\n')
+(HERE/'readonly-transport-candidate.yml').write_text(first+inline+'          PY\n'+second+inline+suffix)
+
 (HERE/'bundle.json').write_bytes(bundle)
 print(json.dumps({'bundle_sha256':sha,'caller_sha256':hashlib.sha256(caller).hexdigest(),'approved_bytes':len(raw)},sort_keys=True))

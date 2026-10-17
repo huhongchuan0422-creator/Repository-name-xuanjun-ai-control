@@ -1,3 +1,7 @@
+# Current repair checkpoint: machine-verified permit, execution still HOLD
+
+This local revision supersedes the old external-label-only activation proposal below. A new fixed permit_gate.py verifies an independently Owner-root pinned exact formal approval before cloud credential access and uses the original authorization registry consumption contract. The protected source is NOT present or verified on Hosted; no trust file/registry is provisioned. The original historical R4 source location is retained as a fail-closed restriction, not permission to use that host. See the PERMIT_GATE_REVIEW.md for the complete patch review and real integration dependency. All workflow kill switches stay false. Existing readonly payload/caller/bundle bytes are unchanged. Offline verification now totals 53 tests (original20 + new33); no new Hosted run or host execution is claimed.
+
 # PR #122 fixed read-only admission probe: disabled local candidate
 
 Prepared 2026-10-17 UTC. **ROOT_ACCOUNT_CREATION_HOLD remains unchanged.** This package is a local review deliverable, not execution admission, publication, a registered workflow, or target evidence. No GitHub write, cloud request, live host probe, account mutation, receipt reservation, or new credentials occurred while preparing it.

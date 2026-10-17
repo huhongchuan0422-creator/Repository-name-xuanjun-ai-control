@@ -94,11 +94,29 @@ def main():
     try:
         # Neither cloud nor GitHub can be called before both disarm gates pass.
         need(EXECUTION_ADMISSION,'MISSING_EXACT_TASK5_READONLY_ADMISSION')
+        need(ARMED,'DISABLED_PENDING_INDEPENDENT_REVIEW')
+        permit=ReadonlyPermit(github)
+        proof=permit.validate()
+        global EXPIRES
+        EXPIRES=datetime.datetime.fromtimestamp(proof['expires_unix'],datetime.timezone.utc).isoformat()
         payload=gate()
         workflow_sha=workflow_identity()
+        phase=os.environ.get('ADMISSION_PHASE','')
+        need(phase in ('ADMIT','EXECUTE'),'FIXED_PHASE')
+        if phase=='ADMIT':
+            evidence=permit.reserve()
+            row.update(stage='PERMIT_CONSUMED_BEFORE_CREDENTIALS',permit=evidence)
+            persist()
+            with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as output:
+                output.write('ready=true\n')
+            return 0
+        evidence=permit.claim_dispatch()
+        row.update(permit=evidence)
+        permit.owned()  # Exact external approval and expiry before reading cloud credentials.
         master=(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''),'')
         need(all(master[:2]),'MISSING_EXISTING_SECRETS')
         session='xuanjun-readonly-'+uuid.uuid4().hex[:16]
+        permit.owned()
         data=rpc('sts.aliyuncs.com','2015-04-01','AssumeRole',master,RoleArn=ROLE,RoleSessionName=session,DurationSeconds=900)
         arn=data.get('AssumedRoleUser',{}).get('Arn')
         need(arn=='acs:ram::1384884686754410:assumed-role/xuanjun-automation/'+session,'STS_IDENTITY_UNKNOWN')
@@ -109,11 +127,14 @@ def main():
         need(datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat(EXPIRES),'EXPIRED_BEFORE_RUN')
         row.update(stage='READONLY_INTENT_NO_RETRY',sts_role_arn=ROLE,sts_assumed_role_arn=arn,nonce=nonce,caller_sha256=CALLER_SHA,expiry=EXPIRES,workflow_ref=EXPECTED_WORKFLOW_REF,workflow_sha=workflow_sha)
         persist();print(json.dumps(row,sort_keys=True),flush=True)
+        permit.owned()
         result=rpc(ENDPOINT,'2020-06-01','RunCommand',credentials,CommandContent=script,RegionId=REGION,Type='RunShellScript',InstanceId=INSTANCE,WorkingUser='root',WorkingDir='/root',Timeout=90,Name='xuanjun-account-readonly-admission-once-20261017')
         invoke=result.get('InvokeId');need(isinstance(invoke,str) and re.fullmatch(r'[A-Za-z0-9_-]{1,180}',invoke),'DISPATCH_RESULT_UNKNOWN_NO_RETRY')
         row.update(invoke_id=invoke,stage='READONLY_DISPATCHED_NO_RETRY');persist();print(json.dumps(row,sort_keys=True),flush=True)
+        permit.bind_invoke(invoke)
         deadline=time.monotonic()+180
         while time.monotonic()<deadline:
+            permit.query(invoke)
             result=rpc(ENDPOINT,'2020-06-01','DescribeInvocationResult',credentials,RegionId=REGION,InstanceId=INSTANCE,InvokeId=invoke)
             detail=result.get('InvocationResult');need(isinstance(detail,dict),'QUERY_SCHEMA')
             need(detail.get('InstanceId')==INSTANCE and detail.get('InvokeId')==invoke,'QUERY_IDENTITY')
