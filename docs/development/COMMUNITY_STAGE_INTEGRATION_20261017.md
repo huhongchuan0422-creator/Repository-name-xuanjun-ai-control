@@ -47,7 +47,7 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |P2-09|原续费计划及页面复用|真实确认Finance外部依赖|
 |P2-10|原Owner定价编辑审批复用|真实Owner认证未验|
 |P2-11|原Finance证据需求接口|权威Finance verifier未连接|
-|P2-12|支付凭证真实验签|服务商公钥/公钥ID与真实绑定待核|
+|P2-12|支付凭证真实验签|新增原始报文RSA验签与AES-GCM解密源码；真实公钥/公钥ID与绑定待核|
 |P2-13|原订单事件/Quote哈希关联复用|真实结算事件外部依赖|
 |P2-14|原权益intent保持只读|真实财务确认及grant权限待验|
 |P2-15|原退款冲正预审复用|真实退款/冲正保持HOLD|
@@ -75,3 +75,9 @@ Playwright固定1.55.0并安装Chromium；缺少浏览器不允许标完整PASS�
 PHASE1_FULL_ACCEPTANCE=NO；PHASE2_FULL_ACCEPTANCE=NO。微信开发者工具实际编译、上传与预览并没有执行；原生页面没有实现微信登录或真实二维码scene解析，不得把浏览器模拟当成小程序验收。真实Identity、微信服务商验签与Finance接线、旧生产DB迁移及生产安装包仍缺。独立审核只在完整阶段候选和全部证据齐备后集中提出。本批不是完整阶段交付，也不是新的审核申请。
 
 新增community_stage_package.py生成确定性离线源码ZIP，原生工程/全部community与stage5源码和测试/页面纳入Manifest逐文件SHA256；明确不可安装、资金与部署HOLD。归档不包含环境凭据、数据库或证书。
+
+## 服务商验签离线实现
+
+community_wechat_sp_verification.py对原始响应/通知字节进行RSA-SHA256验签，绑定配置的PUB_KEY_ID与300秒窗口，再AES-256-GCM解密。严格匹配服务端特约商户、服务商、小程序、订单号、CNY整数分金额。11项测试使用现场生成的合成RSA密钥，不读取GitHub Secrets或真实商户材料。重复通知仅返回候选摘要，不能据此授权重复处理；必须复用原有持久订单事件去重与查单对账，不另建回调队列。函数未暴露HTTP，不写Finance，不将密码学通过当结算通过。
+
+协议来源：https://pay.wechatpay.cn/doc/v3/partner/4019605946 与 https://pay.wechatpay.cn/doc/v3/partner/4012081673 。新增验证依赖cryptography==50.0.2，CI Python3.12；英国现有Python3.6.8不能据此视为依赖兼容已验收，目标独立容器运行时仍需发布前验证。真实响应/回调验签、商户证书配对及查单均未执行。

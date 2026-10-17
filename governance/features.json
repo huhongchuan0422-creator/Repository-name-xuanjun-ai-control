@@ -62,7 +62,8 @@
           "tests/test_community_stage_local.py",
           "tests/test_community_stage_browser.py",
           "clients/community-mini/client.test.cjs",
-          "tests/test_community_stage_package.py"
+          "tests/test_community_stage_package.py",
+          "tests/test_community_wechat_sp_verification.py"
         ]
       },
       "reuse": [
@@ -125,7 +126,9 @@
         "clients/community-mini/pages/checkout/index.wxml",
         "clients/community-mini/project.config.json",
         "scripts/community_stage_package.py",
-        "tests/test_community_stage_package.py"
+        "tests/test_community_stage_package.py",
+        "scripts/community_wechat_sp_verification.py",
+        "tests/test_community_wechat_sp_verification.py"
       ]
     },
     {
