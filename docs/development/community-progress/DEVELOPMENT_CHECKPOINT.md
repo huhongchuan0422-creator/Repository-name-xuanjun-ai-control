@@ -76,3 +76,13 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 - Source regression checkpoint 382955aefa3fd1ff877ff884e56fdb1c6e298922 had Hosted SUCCESS in run 39026316013 (community 431/431, stage 342/342, Node suites PASS; optional mini runtime/SDK/preview SKIPPED). Later source commits need exact fresh CI verification and are NOT marked accepted.
 - Current resumed source code is on feature/chatgpt-community-wechat-sp-offline-20261017. Work/Codex not used. Pinned original customer Core/Source/Runtime were not touched in resumed commit comparison.
 - Phases 1 and 2 continue PARTIAL; provider receiver-detail bill formats, legitimate public/CRM admission, browser/device coverage, authoritative Finance, real merchant/real money and independent stage approvals remain open.
+
+
+## 2026-10-17 reviewer boundary correction — keep mini customer-only
+
+- Hosted run 39026794773 discovered a real reviewer admission mismatch: original CenterIdentity mini _resolve admits OWNER/EDITOR only. REVIEWER cannot use mini credentials, by design; weakening that shared grant was rejected.
+- Corrected source at a7f9d682c9f43ea6db4583d48d037f905f199694: original commerce web /community/commerce action project_review is reachable only with original Center web session, exact CSRF, valid project ID, original Center project REVIEWER membership and exact revision/action fields; business role flags from client are not accepted. Original Center.transition still enforces separate material author and reviewer.
+- Removed inaccessible mini reviewer operation/UI; mini retains only original customer project_summary/project_checklist/project_feedback/project_submit. WXML closure and Node allowlist revised. This is a permission-preserving correction, not a route workaround.
+- Synthetic positive integration test now creates authority-signed original Center requirement, host-verified synthetic SECRETREF, submits through mini as original owner, then reviews/approves via second original Center authenticated web session and CSRF; false/replayed approvals denied.
+- Source version 39dcd47040ab0a520452b282192fdffdb80359d8 and subsequent reviewer endpoint docs/Node tests require latest Hosted CI. Do not reuse earlier SUCCESS as PASS for these new revisions.
+- No real customer secret, merchant admission, Finance settlement, paid order, independent phase audit or deployment was performed.
