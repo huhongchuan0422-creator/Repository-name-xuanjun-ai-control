@@ -1,9 +1,5 @@
 name: S07 private host isolated continuation
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - '.github/workflows/aliyun-s07-private-continuation.yml'
   workflow_dispatch:
 permissions:
   contents: read
