@@ -21,3 +21,11 @@ Owner已配置微信小程序上传密钥、服务商商户号、商户API私钥
 4. 先隔离CI+独立审核，生产变更和真实交易需要现有发布门禁。
 
 以上不涉及实际支付或现场部署。
+
+## 二期：小程序双广告位离线支付页面投影
+
+- `scripts/community_wechat_sp_mock_checkout_view.py` 提供只读视图函数，依赖原 `community_wechat_sp_offline_guard` 验证金额、商户绑定版本、两广告槽及CNY分金额；只接已有订单ID，不增加订单/Finance表。
+- 小程序付款前广告可显示；付款后广告只在明确的 `MOCK_PAID_SIMULATED` 本地模拟状态显示，失败/取消/等待不显示。两广告均不可证明微信支付成功。
+- 拒绝跨tenant/store读视图与客户端自报真实 `SUCCESS/PAID`；所有输出 `payment_verified=False, finance_effect=NONE, provider_payment=HOLD, profitsharing=HOLD`。
+- `tests/test_community_wechat_sp_mock_checkout_view.py` 新增8项离线回归，与原10项合计18项。精确源HEAD `6ef7704009064cded7919b5cea7c27faa52727d9` CI #39001031043 / Job117303789308 原始日志 `Ran 18 tests ... OK`，Actions success；该证据仅覆盖离线源候选，不是微信真实小程序浏览器/支付签名/结算验收。
+- 仍沿用Issue76/PR122和现有业务模块，不接触Work现任writer路径、不改原代码。生产与真实资金全部HOLD。下一阶段交既有集成owner接入现有小程序页面和订单读模型，之后集中独审。
