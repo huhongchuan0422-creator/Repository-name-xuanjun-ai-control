@@ -30,7 +30,31 @@ def minor(value):
     return int(Decimal(value)*100)
 
 
-def parse(raw):
+# Official layout evidence (retrieved 2026-10-17):
+# https://pay.wechatpay.cn/doc/v3/partner/4012075366 links 分账账单.xlsx,
+# SHA256 4091e88e5c39a30b781b76f6c733e4fa495c61f7ec4e397c6117cbc4a7de89ff.
+# https://pay.wechatpay.cn/doc/v3/partner/4012761140 documents CSV detail
+# backtick prefixes, a separate summary header, and SHA1 of uncompressed bytes.
+# This is a local evidence/layout revision, not a claimed provider version.
+# The sample has no receiver type or timezone; return-detail join semantics
+# are unverified. Recognition MUST NOT establish receiver/aggregate matches.
+SPLIT_SCHEMA='WECHAT_PROFITSHARING_SAMPLE_20261017_V1'
+SPLIT_COLUMNS=('分账时间','分账发起方','分账方','微信订单号','微信分账/回退单号',
+    '分账明细单号','商户分账/回退单号','订单金额','分账接收方','金额','业务类型','处理状态','分账描述','备注')
+SPLIT_SUMMARY_COLUMNS=('总条数','分账成功出资金','分账失败已转回分账方','解冻资金给分账方','分账回退资金')
+SPLIT_TYPES={'分出','解冻','逾期解冻','分账回退'}
+
+
+def _split_summary(row, count):
+    if len(row)!=5 or not re.fullmatch(r'[0-9]{1,6}(?:\.0{1,2})?',row[0]):
+        raise ValueError('INVALID_SPLIT_BILL_SUMMARY')
+    if Decimal(row[0])!=count:raise ValueError('SPLIT_BILL_SUMMARY_COUNT_MISMATCH')
+    try:
+        for value in row[1:]:minor(value)
+    except ValueError:raise ValueError('INVALID_SPLIT_BILL_SUMMARY') from None
+
+
+def parse_document(raw):
     if type(raw) is not bytes or len(raw)>MAX_BYTES:raise ValueError('BOUNDED_PROVIDER_BILL_REQUIRED')
     try:text=raw.decode('utf-8-sig')
     except UnicodeDecodeError:raise ValueError('INVALID_BILL_UTF8') from None
@@ -41,16 +65,49 @@ def parse(raw):
     except csv.Error:raise ValueError('INVALID_BILL_CSV') from None
     if len(set(header))!=len(header) or not 2<=len(header)<=100:raise ValueError('INVALID_BILL_COLUMNS')
     if any(not v or any(ord(ch)<32 or 0x202a<=ord(ch)<=0x202e or 0x2066<=ord(ch)<=0x2069 for ch in v) for v in header):raise ValueError('INVALID_BILL_COLUMN_NAME')
-    records=[];summary=False
+    records=[];summary=False;split_summary=None;summary_values=None
+    exact_split=tuple(header)==SPLIT_COLUMNS;known_values=True
     try:
-        for row in rows:
-            if not row or not any(row):continue
-            if row[0].removeprefix('`').startswith(('总交易单数','总笔数','总交易额','总分账笔数')):summary=True;continue
+        for raw_row in rows:
+            if not raw_row or not any(raw_row):continue
+            row=[v.removeprefix('`').strip() for v in raw_row]
+            if split_summary is not None:
+                if summary_values is not None:raise ValueError('UNEXPECTED_SPLIT_BILL_TRAILER')
+                _split_summary(row,len(records));summary_values=row;continue
+            if row[0]=='总条数':
+                if tuple(row)!=SPLIT_SUMMARY_COLUMNS:raise ValueError('INVALID_SPLIT_BILL_SUMMARY_HEADER')
+                split_summary=row;continue
+            if exact_split and row[0].startswith(('总交易单数','总笔数','总交易额','总分账笔数')):
+                raise ValueError('INVALID_SPLIT_BILL_SUMMARY_HEADER')
+            if row[0].startswith(('总交易单数','总笔数','总交易额','总分账笔数')):summary=True;continue
             if summary:continue
             if len(row)!=len(header) or len(records)>=100000:raise ValueError('BILL_ROW_SHAPE_OR_LIMIT')
-            records.append(dict(zip(header,[v.removeprefix('`').strip() for v in row])))
+            if exact_split:
+                if not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}',row[0]):
+                    raise ValueError('INVALID_SPLIT_BILL_TIME')
+                try:dt.datetime.strptime(row[0],'%Y-%m-%d %H:%M:%S')
+                except ValueError:raise ValueError('INVALID_SPLIT_BILL_TIME') from None
+                minor(row[7]);minor(row[9])
+                if any(not row[i] for i in range(1,7)) or not row[8]:
+                    raise ValueError('INVALID_SPLIT_BILL_DETAIL')
+                # Preserve unfamiliar business/status values without guessing.
+                known_values=known_values and row[10] in SPLIT_TYPES and row[11]=='成功'
+            records.append(dict(zip(header,row)))
     except csv.Error:raise ValueError('INVALID_BILL_CSV') from None
+    if (exact_split or split_summary is not None) and summary_values is None:
+        raise ValueError('MISSING_SPLIT_BILL_SUMMARY')
+    metadata=None
+    if exact_split and known_values:
+        metadata=dict(id=SPLIT_SCHEMA,summary_count=len(records),amount_unit='YUAN',
+                      timezone='UNSPECIFIED',receiver_type='UNSPECIFIED',
+                      detail_join='UNVERIFIED',summary_shape='VALIDATED')
+    return header,records,metadata
+
+
+def parse(raw):
+    header,records,_=parse_document(raw)
     return header,records
+
 
 
 class ProviderBills:
@@ -96,9 +153,9 @@ class ProviderBills:
             raw=self._download(ticket['download_url'])
             if hashlib.sha1(raw).hexdigest()!=ticket['hash_value'].lower():raise PermissionError('PROVIDER_BILL_HASH_MISMATCH')
             if a._authorize(session,csrf,workspace)[1]!=policy:raise PermissionError('BILL_AUTHORIZATION_CHANGED')
-            header,rows=parse(raw);key=hashlib.sha256(canonical([g['scope'],p['kind'],p['bill_date']])).hexdigest()
+            header,rows,schema=parse_document(raw);key=hashlib.sha256(canonical([g['scope'],p['kind'],p['bill_date']])).hexdigest()
             record=dict(scope=g['scope'],sub_mchid=policy['sub_mchid'],kind=p['kind'],bill_date=p['bill_date'],columns=header,rows=rows,
-                body_sha256=hashlib.sha256(raw).hexdigest(),provider_sha1=ticket['hash_value'].lower(),ticket_sha256=ticket_digest,received_at=c.now())
+                schema=schema,body_sha256=hashlib.sha256(raw).hexdigest(),provider_sha1=ticket['hash_value'].lower(),ticket_sha256=ticket_digest,received_at=c.now())
             with c.tx():
                 previous=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_BILL' AND subject_idx=? AND project=? AND active=1",(key,g['project'])).fetchone()
                 if previous and json.loads(c.decrypt(previous[0],'community-bill:'+key))['body_sha256']!=record['body_sha256']:raise ValueError('IMMUTABLE_PROVIDER_BILL_CHANGED_REVIEW_REQUIRED')
@@ -140,6 +197,13 @@ class ProviderBills:
         return result
     def reconcile(self,g,bill):
         a=self.actions;rows=bill['rows'];columns=set(bill['columns']);exceptions=[];matched=0;seen=set();missing=[];undated=0;reverse='NOT_APPLICABLE_TO_SPLIT_LAYOUT'
+        if (bill['kind']=='SPLIT' and tuple(bill['columns'])==SPLIT_COLUMNS
+                and type(bill.get('schema')) is dict
+                and bill['schema'].get('id')==SPLIT_SCHEMA):
+            return dict(status='SCHEMA_RECOGNIZED_RECONCILIATION_PENDING',
+                schema=dict(bill['schema']),total_rows=len(rows),body_sha256=bill['body_sha256'],
+                pending_evidence=['RECEIVER_TYPE_AND_BINDING','RETURN_DETAIL_JOIN','BILL_TIMEZONE'],
+                finance_status='UNCONFIRMED',funds_retry_authorized=False)
         # Receiver-level split layouts require explicit receiver binding. Never
         # compare a detail row against an aggregate payout amount.
         if bill['kind']=='SPLIT' and any('接收' in k or '收款' in k for k in columns):

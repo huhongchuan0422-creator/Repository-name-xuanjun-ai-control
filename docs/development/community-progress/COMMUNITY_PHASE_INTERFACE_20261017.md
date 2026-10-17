@@ -80,3 +80,26 @@ not repair, resend, reconcile or grant release authority. The existing SaaS page
 provides an explicitly labeled review queue, decisions, preflight and diagnostics;
 identity changes clear private data and reject stale responses. New local tests are
 candidate source evidence; exact-commit Hosted and independent review remain separate.
+
+## Official split bill sample-compatible recognition (not settlement)
+
+The original signed-ticket/hash-verified bill path recognizes the exact 14-column
+layout and five-column summary in the official partner download page's illustrative
+workbook: https://pay.wechatpay.cn/doc/v3/partner/4012075366 . The workbook SHA256 is
+4091e88e5c39a30b781b76f6c733e4fa495c61f7ec4e397c6117cbc4a7de89ff.
+Current API semantics: https://pay.wechatpay.cn/doc/v3/partner/4012761140 .
+
+Strict CSV/row/summary count and numeric-shape validation no longer mistakes the
+`总条数` summary for a detail row. This is a locally named evidence/layout revision,
+not an asserted provider schema version. Exact recognized rows return
+SCHEMA_RECOGNIZED_RECONCILIATION_PENDING. Receiver type, timestamp timezone and
+return/detail joins are not inferred from identifier shape or aggregate amounts.
+Unknown variants remain UNKNOWN_SCHEMA. Receiver identifiers remain in the
+original encrypted record and are not exposed by paged/audit summaries. Semantic
+monetary reconciliation and Finance settlement are deliberately not asserted.
+
+Official mini compilation also remains separate: inspection of the exact official
+miniprogram-ci 2.1.31 npm package established that standard CIProject requires a
+private key and obtains signed project attributes from servicewechat.com during
+compilation. Node VM and browser tests do not constitute official WXML compilation.
+No preview/upload marker, credentials or self-hosted job was enabled for this work.
