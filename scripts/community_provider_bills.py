@@ -131,7 +131,7 @@ class ProviderBills:
                 row_identity=(row['商户订单号'],row.get('商户退款单号',''))
                 if row_identity in seen:exceptions.append(dict(row=index,reason='DUPLICATE_PROVIDER_ROW'));continue
                 seen.add(row_identity)
-                if row.get('货币种类',row.get('币种','CNY'))!='CNY':exceptions.append(dict(row=index,reason='UNSUPPORTED_BILL_CURRENCY'));continue
+                if any(row.get(field)!='CNY' for field in ('货币种类','币种') if field in columns):exceptions.append(dict(row=index,reason='UNSUPPORTED_BILL_CURRENCY'));continue
                 existing=local.get(row['商户订单号'])
                 if existing is None:exceptions.append(dict(row=index,reason='PROVIDER_ORDER_NOT_IN_THIS_STORE'));continue
                 ref,amount,tx,status=existing
@@ -169,7 +169,7 @@ class ProviderBills:
             for index,row in enumerate(rows):
                 if row['商户分账单号'] in seen:exceptions.append(dict(row=index,reason='DUPLICATE_PROVIDER_ROW'));continue
                 seen.add(row['商户分账单号'])
-                if row.get('货币种类',row.get('币种','CNY'))!='CNY':
+                if any(row.get(field)!='CNY' for field in ('货币种类','币种') if field in columns):
                     exceptions.append(dict(row=index,reason='UNSUPPORTED_BILL_CURRENCY'));continue
                 action=actions.get(row['商户分账单号'])
                 if action is None or action.get('result',{}).get('status')!='FINISHED':exceptions.append(dict(row=index,reason='SPLIT_NOT_CONFIRMED'));continue
