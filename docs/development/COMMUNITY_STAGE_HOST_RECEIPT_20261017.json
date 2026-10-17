@@ -1,13 +1,13 @@
 {
-  "source_commit": "95840ff99d9267054aad25929a890dc4dabde05d",
-  "source_tree": "371f299eaad9dcd534903cb9b519bbaa4898c644",
-  "run_id": 39009563789,
+  "source_commit": "749f3f7724b0f7c878607629ef4d0f07439d21d6",
+  "source_tree": "1663b067d5780e1c65222b97d6028910dd404f9c",
+  "run_id": 39010490183,
   "hosted": {
-    "job_id": 117328945177,
-    "community_python": 282,
+    "job_id": 117331807351,
+    "community_python": 283,
     "stage5_python": 342,
     "javascript": 72,
-    "total_test_executions": 696,
+    "total_test_executions": 697,
     "status": "SUCCESS",
     "failed": 0,
     "skipped": 0,
@@ -15,10 +15,10 @@
     "cryptography": "50.0.2"
   },
   "domestic_isolated": {
-    "job_id": 117329232769,
+    "job_id": 117332090776,
     "host": "iZvt5t8tlrm8oiZ",
     "uid": 1002,
-    "tests": 94,
+    "tests": 95,
     "status": "PASS",
     "failed": 0,
     "skipped": 0,
@@ -32,15 +32,15 @@
     "overlaps_hosted_suites": true
   },
   "source_artifact": {
-    "id": 12091957731,
-    "outer_zip_sha256": "9f97320e2f6422a23b11761bbb51f7fb280801376b5fce586505a2aa7e2f2d21",
-    "inner_zip_sha256": "3359b0cebf57cecf8ba23740b22f822e69c0cb019d259046357162df5208bdf8",
-    "inner_zip_bytes": 853402,
+    "id": 12092038898,
+    "outer_zip_sha256": "f636c89cf71cf9a4037810b9600dae2c358536184b45dd5d16a19e02352ca5ce",
+    "inner_zip_sha256": "59e88a3c094cd87597a1bc693bec293c0973b3a82be9470bcc2688efccac39f8",
+    "inner_zip_bytes": 854126,
     "manifest_files_verified": 154
   },
   "domestic_artifact": {
-    "id": 12092332384,
-    "outer_zip_sha256": "28706a5651a9a6c99c47bea12ab2585539b10b86a1632aa7f65351ee83ae0cb6",
+    "id": 12092427516,
+    "outer_zip_sha256": "88cb61a1d1bedfd0bbf85fc229e47bad0c0b997a73f4bf30f48b5b7cf7202891",
     "receipt_head_verified": true
   },
   "reused_native_preview": {
@@ -72,5 +72,6 @@
     "Real submerchant binding, trusted WeChat public key/id, authoritative Finance reconciliation/consumer interface",
     "Original production deployment and DB migration/recovery gates; no parallel host writer"
   ],
-  "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance"
+  "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance",
+  "latest_fix": "Inactive COMMUNITY_ORDER binding denies receipt immediately and after Center reopen; reservation remains unavailable to another customer."
 }
