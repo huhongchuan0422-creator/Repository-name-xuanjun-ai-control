@@ -143,7 +143,7 @@ jobs:
                           time.sleep(5);continue
                       output=result.get("Output","")
                       try: data=json.loads(output.splitlines()[-1])
-                      except Exception: data=json.loads(base64.b64decode(output,validate=True))
+                      except Exception: data=json.loads(base64.b64decode(output,validate=True).decode().splitlines()[-1])
                       row["result"]=data
                       row["status"]="PASS" if result.get("InvocationStatus")=="Success" and result.get("ExitCode")==0 else "HOLD"
                       return row
