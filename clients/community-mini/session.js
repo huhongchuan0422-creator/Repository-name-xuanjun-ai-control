@@ -46,7 +46,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     },
     async commerce(scene, operation, params) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
-      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||!['communities','community_mine','community_join','community_leave','promotion_redeem','profile_read','profile_update','referral_code','referral_bind','notices','notice_read','orders','products','purchase','purchase_read','receipt_ad','project_summary','project_checklist','project_feedback','project_messages','project_save_reference','project_submit','refund_apply','refund_application'].includes(operation))throw Error('INVALID_COMMERCE_REQUEST');
+      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||!['communities','community_mine','community_join','community_leave','promotion_redeem','profile_read','profile_update','referral_code','referral_bind','notices','notice_read','orders','products','purchase','purchase_read','receipt_ad','project_summary','project_checklist','project_feedback','project_messages','project_save_reference','project_submit','refund_apply','refund_application','refund_current'].includes(operation))throw Error('INVALID_COMMERCE_REQUEST');
       const version=generation;
       const reply=await request('/mini/api',{scene,operation:'commerce.'+operation,params},token);
       if(version!==generation)throw Error('STALE_SESSION');

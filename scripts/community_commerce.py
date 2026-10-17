@@ -98,6 +98,9 @@ class Commerce:
             return c.transition(uid,project,p['item'],p['revision'],p['action'],p['reason'])
         g = self._operator(session, csrf, body['workspace'])
         op, p = body['operation'], body['params']
+        if op == 'refund_applications':
+            from scripts.community_refund_requests import RefundRequests
+            return RefundRequests(self).directory(g,p)
         if type(body['operation']) is str and body['operation'] in ('refund_application_read','refund_decide'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).review(g,body['operation'],body['params'])
@@ -165,7 +168,7 @@ class Commerce:
         if op in ('profile_read','profile_update','referral_code','referral_bind','notices','notice_read'):
             from scripts.community_customer_profile import CustomerProfile
             return CustomerProfile(identity=i).consumer(token,scene,op,p)
-        if op in ('refund_apply','refund_application'):
+        if op in ('refund_apply','refund_application','refund_current'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).consumer(token,scene,op,p)
         if op == 'project_save_reference':
