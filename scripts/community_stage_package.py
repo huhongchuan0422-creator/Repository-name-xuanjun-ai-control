@@ -16,6 +16,7 @@ def build(root):
                 'clients/community-mini/pages/checkout/*',
                 'docs/development/COMMUNITY_STAGE_INTEGRATION_20261017.md',
                 'scripts/pr122_customer_core.py',
+                'scripts/pr122_customer_source.py',
                 'docs/development/COMMUNITY_PINNED_DEPENDENCIES_20261017.json')
     paths = sorted({p for pattern in patterns for p in root.glob(pattern) if p.is_file()})
     files = {}

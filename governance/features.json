@@ -71,7 +71,9 @@
           "scripts/community_mini_key.test.cjs",
           "tests/test_community_mini_center_identity.py",
           "tests/test_community_mini_application.py",
-          "tests/test_community_stage_recovery.py"
+          "tests/test_community_stage_recovery.py",
+          "tests/test_community_saas_provider_evidence.py",
+          "tests/test_community_mini_proxy.py"
         ]
       },
       "reuse": [
@@ -155,7 +157,11 @@
         "scripts/community_mini_application.py",
         "scripts/community_stage_recovery.py",
         "tests/test_community_mini_application.py",
-        "tests/test_community_stage_recovery.py"
+        "tests/test_community_stage_recovery.py",
+        "scripts/community_saas_provider_evidence.py",
+        "tests/test_community_saas_provider_evidence.py",
+        "scripts/pr122_customer_source.py",
+        "tests/test_community_mini_proxy.py"
       ]
     },
     {

@@ -47,6 +47,13 @@ class CenterIdentity(IdentityPort):
             with self.center.tx():
                 self.center.limit('wechat-bind:'+uid,5,900)
         return uid
+    def limit_login_source(self,source,now):
+        self._time(now)
+        if type(source) is not str or not source.isascii() or not 1<=len(source)<=128:
+            raise PermissionError('TRUSTED_SOURCE_REQUIRED')
+        with self.center.tx():
+            # Share the original Center HTTP source quota, not a second counter.
+            self.center.limit('auth-source:'+source,40,300)
     def _resolve(self,token,scene):
         binding=self.scenes.get(scene)
         if binding is None:raise PermissionError('SCENE_NOT_REGISTERED')

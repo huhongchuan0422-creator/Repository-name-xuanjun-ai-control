@@ -51,6 +51,14 @@ class AdmittedMiniApplication(unittest.TestCase):
     def test_existing_provider_subject_cannot_be_taken_over(self):
         self.fx.provider.exchange.return_value={'appid':self.fx.identity.appid,'openid':'openid2'}
         with self.assertRaises(LoginUnavailable):self.bind()
+    def test_real_exchange_duration_uses_current_clock_for_session_issue(self):
+        def exchange(code):
+            self.fx.stage.now+=3
+            return {'appid':self.fx.identity.appid,'openid':'openid1'}
+        self.fx.provider.exchange.side_effect=exchange
+        result=self.fx.gateway.login({'code':'delayed_provider_code'})
+        self.assertEqual(result['expires_at'],self.fx.stage.now+3600)
+        self.assertEqual(self.fx.center.session(result['session_token']),self.fx.uid1)
     def test_binding_rate_limit_is_original_persistent_center_limit(self):
         for i in range(5):self.bind('code_'+str(i))
         self.fx.provider.exchange.reset_mock()

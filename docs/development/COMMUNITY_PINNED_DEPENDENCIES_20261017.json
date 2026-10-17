@@ -6,6 +6,13 @@
       "source_branch": "feature/work-pr122-site-hub-integration-20261016",
       "sha256": "f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4",
       "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+    },
+    {
+      "path": "scripts/pr122_customer_source.py",
+      "source_commit": "b882ea631e6391f1fc8727766ccbaf3c66b519da",
+      "source_branch": "feature/work-pr122-site-hub-integration-20261016",
+      "sha256": "3e8d531ede69577b72b6ee9089fdc8f481b2f91578f19e0e44d1841c168f3471",
+      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
     }
   ]
 }

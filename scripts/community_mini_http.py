@@ -12,7 +12,19 @@ from scripts.community_demo_api import _HeaderDeadlineReader
 from scripts.community_mini_login import LoginUnavailable
 
 
-def make_handler(gateway):
+def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None):
+    if proxy_origin is not None:
+        import hashlib
+        import re
+        from pathlib import Path
+        from scripts import pr122_customer_source
+        if (type(proxy_origin) is not str or not re.fullmatch(r'https://[A-Za-z0-9.-]+',proxy_origin)
+                or type(trusted_proxy) is not pr122_customer_source.TrustedNginxSource
+                or hashlib.sha256(Path(pr122_customer_source.__file__).read_bytes()).hexdigest()!=
+                '3e8d531ede69577b72b6ee9089fdc8f481b2f91578f19e0e44d1841c168f3471'):
+            raise ValueError('PINNED_HTTPS_PROXY_REQUIRED')
+    elif trusted_proxy is not None:
+        raise ValueError('PROXY_ORIGIN_REQUIRED')
     class Handler(BaseHTTPRequestHandler):
         server_version='CommunityMiniCandidate'
         sys_version=''
@@ -27,10 +39,14 @@ def make_handler(gateway):
                         ('Content-Security-Policy',"default-src 'none'")]:self.send_header(k,v)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_POST(self):
-            host='127.0.0.1:'+str(self.server.server_port)
+            host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if (self.headers.get_all('Host') != [host] or
-                    self.headers.get('Origin') not in (None,'http://'+host)):
+                    self.headers.get_all('Origin',[]) not in ([],[proxy_origin or 'http://'+host])):
                 return self.answer(403,{'error':'ORIGIN_DENIED'})
+            if trusted_proxy is not None:
+                try:proxy_source=trusted_proxy(self.connection,self.headers)
+                except PermissionError:return self.answer(403,{'error':'PROXY_DENIED'})
+                except Exception:return self.answer(503,{'error':'PROXY_UNAVAILABLE'})
             if self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind'):
                 return self.answer(404,{'error':'NOT_FOUND'})
             if (self.headers.get('Transfer-Encoding') is not None or
@@ -68,7 +84,8 @@ def make_handler(gateway):
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=gateway.bind(self.headers.get('X-Center-Session',''),
                                         self.headers.get('X-Center-CSRF',''),body)
-                elif self.path=='/mini/login':result=gateway.login(body)
+                elif self.path=='/mini/login':
+                    result=gateway.login(body,source=proxy_source) if trusted_proxy is not None else gateway.login(body)
                 elif self.path=='/mini/logout':
                     if body!={} or type(body) is not dict:raise ValueError('INVALID_BODY')
                     result=gateway.logout(token)

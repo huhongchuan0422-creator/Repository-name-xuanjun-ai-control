@@ -143,19 +143,24 @@ class MiniGateway:
             except Exception:pass
             raise LoginUnavailable('BINDING_RESULT_UNKNOWN_OR_REJECTED') from None
 
-    def login(self, body):
+    def login(self, body, *, source=None):
         if type(body) is not dict or set(body) != {'code'}:
             raise ValueError('INVALID_LOGIN_FIELDS')
         code = body['code']
         if type(code) is not str or not CODE.fullmatch(code):
             raise ValueError('INVALID_LOGIN_CODE')
         now = self.runtime.clock()
+        if source is not None:
+            limit=getattr(self.identity,'limit_login_source',None)
+            if not callable(limit):raise PermissionError('TRUSTED_SOURCE_LIMIT_REQUIRED')
+            limit(source,now)
         attempt = self.identity.reserve_code(self.provider.appid, hashlib.sha256(code.encode()).hexdigest(), now)
         try:
             result = self.provider.exchange(code)
             if (type(result) is not dict or set(result) != {'appid','openid'}
                     or result['appid'] != self.provider.appid):
                 raise LoginUnavailable('PROVIDER_BINDING_MISMATCH')
+            now = self.runtime.clock()
             issued = self.identity.issue_session(attempt,result['appid'],result['openid'],now)
             if (type(issued) is not dict or set(issued) != {'session_token','expires_at'}
                     or type(issued['session_token']) is not str or not re.fullmatch('[A-Za-z0-9_-]{32,256}',issued['session_token'])
@@ -163,7 +168,7 @@ class MiniGateway:
                 raise LoginUnavailable('IDENTITY_SESSION_INVALID')
             return dict(issued, provider='WECHAT_MINIPROGRAM', payment_enabled=False)
         except Exception:
-            try:self.identity.abandon_attempt(attempt,'LOGIN_RESULT_UNKNOWN_OR_REJECTED',now)
+            try:self.identity.abandon_attempt(attempt,'LOGIN_RESULT_UNKNOWN_OR_REJECTED',self.runtime.clock())
             except Exception:pass
             raise LoginUnavailable('LOGIN_RESULT_UNKNOWN_OR_REJECTED') from None
 
