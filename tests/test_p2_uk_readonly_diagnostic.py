@@ -20,13 +20,13 @@ class ReadOnlyDiagnosticTests(unittest.TestCase):
         cls.t = load('p2_transport_test', 'scripts/p2_uk_swas_diagnostic.py')
 
     def valid(self):
-        return ('DIAG_SCHEMA=1\\nTARGET_HOST=iZd7oeikknn1z21sq6ji6zZ\\n'
-            'EXEC_UID=0\\nPYTHON_VERSION=3.6.8\\n'
-            'CGROUP_MOUNT_TYPE=tmpfs\\nSITE_PATH=/usr/local/libexec/xuanjun-p2-site/P2_SITE_ENTRY.py\\n'
-            'SITE_STATUS=ABSENT\\n'
-            'CANONICAL_WRITER=UNKNOWN\\nEPOCH=UNKNOWN\\nLEASE=UNKNOWN\\n'
-            'FENCE=UNKNOWN\\nROOT_TRUST=UNKNOWN\\nHISTORICAL_INVOKEID=UNKNOWN\\n'
-            'DIAG_END=COMPLETE\\n').replace('\\\\n','\\n')
+        return ('DIAG_SCHEMA=1\nTARGET_HOST=iZd7oeikknn1z21sq6ji6zZ\n'
+            'EXEC_UID=0\nPYTHON_VERSION=3.6.8\n'
+            'CGROUP_MOUNT_TYPE=tmpfs\nSITE_PATH=/usr/local/libexec/xuanjun-p2-site/P2_SITE_ENTRY.py\n'
+            'SITE_STATUS=ABSENT\n'
+            'CANONICAL_WRITER=UNKNOWN\nEPOCH=UNKNOWN\nLEASE=UNKNOWN\n'
+            'FENCE=UNKNOWN\nROOT_TRUST=UNKNOWN\nHISTORICAL_INVOKEID=UNKNOWN\n'
+            'DIAG_END=COMPLETE\n').replace('\\\n','\n')
 
     def test_fixed_bytes_and_hash(self):
         source = self.d.command_content().encode('utf-8')
@@ -40,15 +40,15 @@ class ReadOnlyDiagnosticTests(unittest.TestCase):
 
     def test_reject_unsafe(self):
         ok = self.valid()
-        variants = [ok+'PRIVATE=token\\n',ok.replace('EXEC_UID=0','EXEC_UID=1'),
+        variants = [ok+'PRIVATE=token\n',ok.replace('EXEC_UID=0','EXEC_UID=1'),
             ok.replace('DIAG_SCHEMA=1','DIAG_SCHEMA=9'),
             ok.replace('DIAG_END=COMPLETE','DIAG_END=BROKEN'),
             ok.replace('PYTHON_VERSION=3.6.8','PYTHON_VERSION=4.0.0'),
             ok.replace('TARGET_HOST=iZd7oeikknn1z21sq6ji6zZ','TARGET_HOST=other'),
             ok.replace('EPOCH=UNKNOWN','EPOCH=2'),
-            ok.replace('DIAG_END=COMPLETE\\n',''),
+            ok.replace('DIAG_END=COMPLETE\n',''),
             ok+'x' * 5000,
-            ok.replace('EXEC_UID=0','EXEC_UID=0\\nEXEC_UID=0'),
+            ok.replace('EXEC_UID=0','EXEC_UID=0\nEXEC_UID=0'),
             ok.replace('EXEC_UID=0','EXEC_UID=0 secret=yes')]
         for variant in variants:
             with self.subTest(variant=variant[:35]):
