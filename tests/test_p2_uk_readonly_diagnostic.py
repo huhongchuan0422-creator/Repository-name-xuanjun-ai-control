@@ -1,5 +1,6 @@
 """PR128 R1-R7 offline and Python 3.6 diagnostic regression tests."""
 import hashlib
+import uuid  # Import before inherited os.uname fixture replacement.
 import importlib.util
 from pathlib import Path
 import unittest
