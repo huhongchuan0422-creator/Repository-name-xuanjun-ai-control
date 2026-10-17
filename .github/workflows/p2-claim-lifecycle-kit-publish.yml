@@ -1,0 +1,73 @@
+name: P2 exact claim lifecycle kit publish offline
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - '.github/workflows/p2-claim-lifecycle-kit-publish.yml'
+permissions:
+  contents: read
+jobs:
+  publish-lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build frozen Claim-Lifecycle candidate; no private input or UK execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 0077
+          PIN=7116e1a0cf28336520305c8c5a89f4c5995eb3ca
+          TREE=4b9a5f9c5e6439ac17a368f988c4d4d1b500662d
+          ROOT=evidence/p2-epoch7-access-repair-20261014
+          test "$(git rev-parse "$PIN^{tree}")" = "$TREE"
+          mkdir -m 700 claim-lifecycle-published
+          python "$ROOT/c-capability-lifecycle/build/build_claim_successor_kit.py" \
+            --archive "$ROOT/b-resource-aggregate-fix/artifact/epoch7-kit-resourcebind.tar.gz" \
+            --candidate-root "$ROOT/c-capability-lifecycle" \
+            --overlay-map "$ROOT/c-capability-lifecycle/build/OVERLAY_INPUTS.json" \
+            --source-commit "$PIN" --source-tree "$TREE" \
+            --output claim-lifecycle-published/epoch7-claim-lifecycle-kit.tar.gz \
+            --metadata claim-lifecycle-published/build-result.json
+          python - <<'PY'
+          import hashlib,json,tarfile,pathlib
+          out=pathlib.Path('claim-lifecycle-published')
+          kit=out/'epoch7-claim-lifecycle-kit.tar.gz'
+          result=json.loads((out/'build-result.json').read_text())
+          with tarfile.open(kit,'r:gz') as tar:
+              rows={m.name.rsplit('/',1)[-1]:m for m in tar.getmembers() if m.isreg()}
+              m=rows['recovery-kit-manifest.json']
+              raw=tar.extractfile(m).read()
+              manifest=json.loads(raw.decode())
+              names=[x.name for x in tar.getmembers()]
+              assert any(x.endswith('/helpers/epoch7_claim_successor.py') for x in names)
+              assert any(x.endswith('/helpers/epoch7_approval.py') for x in names)
+              entry=tar.extractfile(next(x for x in tar.getmembers() if x.name.endswith('/epoch7_recovery_entry.py'))).read()
+              assert b'successor_resume' in entry
+              assert result['business_phases_preserved']==16
+              assert result['output']['source_commit']=='7116e1a0cf28336520305c8c5a89f4c5995eb3ca'
+              assert hashlib.sha256(raw).hexdigest()==result['output']['manifest_sha256']
+              assert manifest['files']['helpers/epoch7_approval.py']=='0587f0e1f81e7f70ab098a13b1e0a3b47cad40344e4237128716953f2ad34f55'
+              assert manifest['files']['helpers/epoch7_claim_successor.py']=='583120b8692ba84a44a94dbf7a3927a8042465d535c8ce9e3ccc5eea0063122a'
+          (out/'recovery-kit-manifest.json').write_bytes(raw)
+          sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+          assert sha(kit)==result['output']['archive_sha256']
+          summary={'source_commit':result['output']['source_commit'],'source_tree':result['output']['source_tree'],
+                   'kit_sha256':sha(kit),'manifest_sha256':sha(out/'recovery-kit-manifest.json'),
+                   'claim_module':True,'successor_entry':True,'business_phases':16,
+                   'scope':'OFFLINE_CANDIDATE_NOT_INSTALL_AUTHORIZATION'}
+          (out/'publication.json').write_text(json.dumps(summary,sort_keys=True,indent=2)+'\n')
+          print(json.dumps(summary,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-correct-claim-lifecycle-kit
+          path: claim-lifecycle-published/
+          retention-days: 30
+          if-no-files-found: error
