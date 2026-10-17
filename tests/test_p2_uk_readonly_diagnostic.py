@@ -97,6 +97,40 @@ class ReadOnlyDiagnosticTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout),{'state':'HOLD','redispatch_allowed':False})
         self.assertEqual(stdout.count(b'\n'),1)
 
+
+    def test_database_existing_combinations_and_metadata(self):
+        from itertools import combinations
+        names=sorted(self.d.DB_NAMES)
+        for count in range(1,4):
+            for selected in combinations(names,count):
+                output=self.valid()
+                for i,name in enumerate(selected):
+                    output=output.replace('DB_FILE_ABSENT='+name,
+                        'DB_FILE='+name+' UID='+str(1000+i)+' GID='+str(2000+i)+
+                        ' MODE=600 SIZE='+str(8192+i))
+                receipt=self.d.safe_receipt(output)['metadata']
+                for i,name in enumerate(selected):
+                    start=receipt.index(('DB_FILE',name))
+                    self.assertEqual(receipt[start+1:start+5],
+                        [('UID',str(1000+i)),('GID',str(2000+i)),
+                         ('MODE','600'),('SIZE',str(8192+i))])
+                for invalid in ('UID=x','GID=x','MODE=999','SIZE=x','DB_FILE=/tmp/evil'):
+                    bad=output.replace('UID=1000',invalid) if invalid!='DB_FILE=/tmp/evil' else output.replace('DB_FILE='+selected[0],invalid)
+                    if bad!=output:
+                        with self.assertRaises(self.d.DiagnosticHold):
+                            self.d.safe_receipt(bad)
+                with self.assertRaises(self.d.DiagnosticHold):
+                    self.d.safe_receipt(output.replace('MODE=600','MODE=888'))
+
+    def test_cgroup_adversarial_hierarchy(self):
+        for bad in ('1:secret===value','1:cpu|1:memory','1:cpu,',
+                    '1:,cpu','1:cpu,,memory','1:name=unknown',
+                    '1:cpu,cpu','1:arbitrary','0:cpu','1:cpu|0:',
+                    '1:cpu|2:memory|1:pids','1:cpu|2:memory|3:arbitrary'):
+            with self.subTest(value=bad):
+                with self.assertRaises(self.d.DiagnosticHold):
+                    self.d.safe_receipt(self.valid(bad))
+
     def test_approval_contract(self):
         self.assertEqual(self.t.OWNER_ID,332398908)
         self.assertEqual(self.t.AUDITOR_ID,95597695)
