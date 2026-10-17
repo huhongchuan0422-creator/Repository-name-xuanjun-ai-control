@@ -44,3 +44,14 @@ PR #125 (supervision only) merged into protected `main` as `8734b82d40ebb9335d47
 Latest Owner instructions allow iterative testing. Source `a9f5aa275fffe2a6291285e45a8e2398b8761151` has actual hosted CI PASS: run 39022398009, job 117366639653, 382 community Python + 342 stage5 Python + 81 JavaScript executions. This receipt does not cover subsequent store/community report/bill/lifecycle changes. Those have targeted new tests (stores 3, reports 2, bills 8, lifecycle 3), plus affected payment/refund/cancellation tests; final current-source CI must still be checked. Optional domestic runtime/SDK/preview jobs were skipped in that passing run and are not attested.
 
 No real merchant onboarding submission, funds operation, deployment, new key generation or production IAM mutation has been performed. Real submerchant and production admission remain external dependencies. Source development gaps above remain development work, not external blockers.
+
+
+## 2026-10-17 controlled handoff continuation — refund-provider recovery
+
+- Exact source branch: `feature/chatgpt-community-wechat-sp-offline-20261017`. No Work/Codex calls. No production deployment, live funds, special merchant enrollment or extra ledger.
+- Refund application execution: same approved application can recover a consumed reservation with no ProviderAction intent; the explicit query path cannot initiate a POST. Existing durable ProviderAction intent is queried only. Terminal application statuses cannot flip or increment revision on same result.
+- Provider response validation: signed refund response must bind to original transaction ID, and FINISHED receiver results cannot be rewritten on later queries.
+- Added synthetic focused regressions: `tests/test_community_refund_execution_recovery.py` and `tests/test_community_provider_terminal_binding.py`.
+- Previous source HEAD `1364ac47f587778c6fb67f0e670003038b57c81e` has GitHub Hosted test SUCCESS (run `39024446841`); mini-SDK/runtime/preview checks SKIPPED, not PASS.
+- Subsequent regression test run `39024920270` failed 1/419 due to an inaccurate test-double query for nonexistent provider intent, not a verified production provider failure. The double was corrected in `67372f3e8ee03669cf616bfa5e11818a54f3c7ef`. Current exact regression CI must still be checked at its latest commit before PASS can be stated.
+- Other first/second-phase groups remain PARTIAL. Original three-file customer Core/Source/Runtime pins remain unchanged. External merchant approval, real WeChat transactions, authoritative Finance settlement and live mini-program release remain gated.
