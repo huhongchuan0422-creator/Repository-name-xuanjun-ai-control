@@ -16,16 +16,20 @@ def build(root):
         key=entry['id']
         if key in seen or not key or any(c not in 'abcdefghijklmnopqrstuvwxyz-' for c in key):raise ValueError('INVALID_DOCUMENT_ID')
         seen.add(key)
-        if entry['status']!='DRAFT_NOT_FOR_SIGNATURE' or entry['signature_enabled'] is not False:raise ValueError('SIGNATURE_NOT_AUTHORIZED')
+        if entry['status'] not in ('DRAFT_NOT_FOR_SIGNATURE','INTERNAL_ONLY') or entry['signature_enabled'] is not False:raise ValueError('SIGNATURE_NOT_AUTHORIZED')
         source=(root/entry['source']).resolve()
         if not source.is_relative_to(root/'docs/legal/templates') or not source.is_file():raise ValueError('INVALID_TEMPLATE_PATH')
         data=source.read_bytes()
         if hashlib.sha256(data).hexdigest()!=entry['source_sha256']:raise ValueError('TEMPLATE_HASH_MISMATCH')
+        if entry['status']=='INTERNAL_ONLY':
+            if entry.get('planned_route') is not None or entry.get('preview') is not None:
+                raise ValueError('INTERNAL_DOCUMENT_HAS_PUBLIC_ROUTE')
+            continue
         title=html.escape(entry['title']);version=html.escape(entry['version']);sha=entry['source_sha256']
         page='<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'+title+' · 草案预览</title><style>'+STYLE+'</style></head><body><nav><a href="index.html">协议与合同中心</a></nav><main><h1>'+title+'</h1><p class="notice">草案预览 · 尚未生效 · 不开放真实签署或收款。主体、业务参数及法律审核完成后，另经发布门禁启用。</p><p>版本：'+version+'<br>原文 SHA-256：'+sha+'</p><pre>'+html.escape(data.decode())+'</pre></main></body></html>\n'
         (dest/(key+'.html')).write_text(page)
         links.append('<li><a href="'+key+'.html">'+title+'</a> — '+html.escape('、'.join(entry['audience']))+'</li>')
-    index='<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>玄钧云汇 · 协议与合同中心（草案）</title><style>'+STYLE+'</style></head><body><main><h1>玄钧云汇协议与合同中心</h1><p class="notice">22份草案供阅读与审查，不构成已生效合同或已上线业务。请勿在演示页面提交真实证件、签名或客户秘密。</p><ul>'+''.join(links)+'</ul><p>定制客户采用主合同＋需求报价任务书＋数据/保密附件＋变更及验收单；正式签署与条款接受记录尚未接线。</p></main></body></html>\n'
+    index='<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>玄钧云汇 · 协议与合同中心（草案）</title><style>'+STYLE+'</style></head><body><main><h1>玄钧云汇协议与合同中心</h1><p class="notice">可公开阅读的草案供审查，不构成已生效合同或已上线业务。请勿在演示页面提交真实证件、签名或客户秘密。</p><ul>'+''.join(links)+'</ul><p>定制开发客户最终只签署一份包含需求、报价、授权和验收内容的完整合同；当前仅为草案，签署与收款尚未开通。</p></main></body></html>\n'
     (dest/'index.html').write_text(index)
     return len(seen)
 if __name__=='__main__':
