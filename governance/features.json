@@ -268,7 +268,8 @@
           "正式主体/费率/渠道/隐私字段补齐、法律审核、真实签约证据及生产门禁独立验收",
           "自有在线订约离线准入覆盖权限、版本、地区审核及双方意愿；不冒充真实身份或法律有效性",
           "单份合同离线候选冻结、金额整数分、凭据字段白名单、SQLite防REPLACE只追加、幂等读回完整性及纯文本安全转义全部通过负向测试；生产签约支付始终HOLD",
-          "跨Customer/Project的证据版本及来源绑定离线适配器必须拒绝错域和过期快照；仅产出UNSIGNED_STAGING_ONLY，不得冒充真实认证、签署或财务接线。"
+          "跨Customer/Project的证据版本及来源绑定离线适配器必须拒绝错域和过期快照；仅产出UNSIGNED_STAGING_ONLY，不得冒充真实认证、签署或财务接线。",
+          "TrustedContractSource服务端来源读取须绑定actor/project/contract与一致性revision，返回前二次核验，撤销或版本失效时HOLD；真实provider未接通不得申请签署或付款。"
         ],
         "tests": [
           "tests/test_legal_contract_center.py",
@@ -278,7 +279,8 @@
           "tests/test_single_contract_freeze.py",
           "tests/test_single_contract_journal.py",
           "tests/test_single_contract_preview.py",
-          "tests/test_single_contract_provenance_adapter.py"
+          "tests/test_single_contract_provenance_adapter.py",
+          "tests/test_single_contract_trusted_source_port.py"
         ],
         "test_scope": "仅离线合同草案和静态阅读入口；不证明签约集成、支付准入或生产法律合规"
       },
@@ -303,7 +305,9 @@
         "tests/test_single_contract_journal.py",
         "tests/test_single_contract_preview.py",
         "scripts/single_contract_provenance_adapter.py",
-        "tests/test_single_contract_provenance_adapter.py"
+        "tests/test_single_contract_provenance_adapter.py",
+        "scripts/single_contract_trusted_source_port.py",
+        "tests/test_single_contract_trusted_source_port.py"
       ]
     },
     {
