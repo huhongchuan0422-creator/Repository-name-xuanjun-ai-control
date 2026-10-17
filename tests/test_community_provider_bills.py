@@ -83,6 +83,14 @@ class BillJourney(unittest.TestCase):
         bill=dict(kind='SPLIT',columns=['商户分账单号','分账金额','分账结果','接收方账号'],rows=[],body_sha256='a'*64)
         self.assertEqual(self.bills.reconcile(g,bill)['status'],'UNKNOWN_SCHEMA')
 
+    def test_receiver_account_variants_never_become_aggregate_matches(self):
+        g,_=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
+        for column in ('收款方账号','分账接收方账号','接收方账号'):
+            bill=dict(kind='SPLIT',columns=['商户分账单号','分账金额','分账结果',column],
+                rows=[{'商户分账单号':'unknown','分账金额':'1.00','分账结果':'SUCCESS',column:'private'}],
+                body_sha256='a'*64)
+            self.assertEqual(self.bills.reconcile(g,bill)['status'],'UNKNOWN_SCHEMA')
+
     def test_split_bill_optional_signed_identifiers_must_match_original_intent(self):
         from scripts.pr122_customer_core import canonical
         from scripts.community_demo_bootstrap import DEMO_SCOPE
