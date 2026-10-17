@@ -23,6 +23,37 @@ class IsolatedTests(unittest.TestCase):
    ('ai_service/wecom_customer_contact_service.py','serve',18781)):
    with self.assertRaises(RuntimeError):
     N['launch_command']('/usr/bin/python3 /opt/trading-system/'+entry+' '+tail,entry,port)
+ def test_public_directories_override_private_umask(self):
+  import stat
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d)/'root'
+   mask=os.umask(0o077)
+   try:
+    N['public_directory'](root)
+    for name in ('etc','dev','venv'):
+     N['public_directory'](root/name)
+   finally:os.umask(mask)
+   for p in (root,root/'etc',root/'dev',root/'venv'):
+    self.assertEqual(stat.S_IMODE(p.stat().st_mode),0o755)
+   (root/'etc'/'hosts').write_text('127.0.0.1 localhost')
+   (root/'etc'/'hosts').chmod(0o444)
+ def test_chroot_uid65534_read(self):
+  if os.geteuid()!=0:self.skipTest('root required')
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d)/'root';N['public_directory'](root)
+   for name in ('etc','dev','venv'):N['public_directory'](root/name)
+   (root/'etc'/'hosts').write_text('127.0.0.1 localhost');(root/'etc'/'hosts').chmod(0o444)
+   import subprocess,sys
+   code="import os;os.chroot("+repr(str(root))+");os.chdir('/');os.setgroups([]);os.setgid(65534);os.setuid(65534);assert open('/etc/hosts').read()=='127.0.0.1 localhost';assert os.access('/dev',os.X_OK);assert os.access('/venv',os.X_OK)"
+   result=subprocess.run([sys.executable,'-I','-B','-c',code],capture_output=True,text=True,timeout=10)
+   if result.returncode and 'Operation not permitted' in result.stderr:
+    self.skipTest('runtime disallows chroot or uid/gid transition; host validation pending')
+   self.assertEqual(result.returncode,0,result.stderr)
+ def test_public_directory_rejects_symlink(self):
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d);(root/'real').mkdir();(root/'link').symlink_to(root/'real')
+   with self.assertRaisesRegex(RuntimeError,'DIRECTORY_TYPE'):
+    N['public_directory'](root/'link')
  def test_shell_and_unknown_entry_rejected(self):
   for cmd in ('/bin/sh -c something','/usr/bin/python3 /tmp/other.py'):
    with self.assertRaises(RuntimeError):N['launch_command'](cmd,'scripts/secure_secrets_portal_server.py',18080)
