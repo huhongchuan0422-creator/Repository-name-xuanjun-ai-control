@@ -23,7 +23,7 @@ MAX_TOTAL_INDICES = 17 * 15 * MAX_ROWS
 
 # Exact authenticated private Packet identity, not a proof-supplied allowlist.
 PACKET_SIZE = 29665
-PACKET_SHA256 = '2bf597ef911cba70b5c94559ee36d8f90c2a339a3de1bfd2d8f58547900b8dec'
+PACKET_SHA256 = '2d9e0df65f4fd28ef2a8ac506f9b0c4d91269c12dfc840f3ddcdf0f83764331f'
 PACKET_INVENTORY_COUNT = 47
 PACKET_DIRECTORY_COUNT = 9
 

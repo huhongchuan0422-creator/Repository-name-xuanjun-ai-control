@@ -731,5 +731,30 @@ class ExactPathScopeTests(unittest.TestCase):
             path_scope=self.scope)['hidden_commitments_independently_verified'])
 
 
+class FreshBindingRegressionTests(unittest.TestCase):
+    def test_fresh_packet_and_four_file_bindings_are_consistent(self):
+        import importlib.util
+        def load(name):
+            spec = importlib.util.spec_from_file_location('fresh_binding_' + name, str(HERE / (name + '.py')))
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+        producer = load('validate_private_completeness')
+        verifier = load('verify_evidence')
+        self.assertEqual(schema.PACKET_SHA256, '2d9e0df65f4fd28ef2a8ac506f9b0c4d91269c12dfc840f3ddcdf0f83764331f')
+        self.assertEqual(schema.PACKET_SIZE, 29665)
+        self.assertEqual((schema.PACKET_INVENTORY_COUNT, schema.PACKET_DIRECTORY_COUNT), (47, 9))
+        self.assertEqual(producer.EXPECTED_CANDIDATE, verifier.EXPECTED_CANDIDATE)
+        self.assertEqual(producer.EXPECTED_CANDIDATE['packet_sha256'], schema.PACKET_SHA256)
+        self.assertEqual(producer.EXPECTED_CANDIDATE['body_sha256'], '0ca1a548c49e9dbcb64bc3b9aa558283852e711b113dbdcfc771d576582847c4')
+        self.assertEqual(producer.BODY_BYTES, 7968)
+        self.assertEqual(producer.EXPIRY_UTC, '2026-10-17T16:00:00Z')
+        self.assertEqual(producer.EXPIRY_EPOCH, 1792252800.0)
+        self.assertEqual(verifier.NEW_SEED_SHA256, '57f46aa89f4af77b6e66167ae84875b5c54ee3bdf48c4b28c702a1f7855f94b5')
+        self.assertEqual(verifier.NEW_SEED_BYTES, 770702)
+        self.assertEqual(tuple(producer.INPUTS), tuple(tuple(row) for row in verifier.EXPECTED_FILES))
+        self.assertEqual(producer.load_schema().__dict__['PACKET_SHA256'], schema.PACKET_SHA256)
+
+
 if __name__ == '__main__':
     unittest.main()

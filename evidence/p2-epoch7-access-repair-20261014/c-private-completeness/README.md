@@ -1,3 +1,32 @@
+# Fresh candidate binding, 2026-10-17
+
+This local-only increment starts from the accepted pathscope source at commit
+00e5961d72bd4c6e5d0fba4bf4dcc4bf3178b66d. It changes only fixed candidate
+identities, expiry and dependent source bindings; pathscope, protected-read,
+compiler, privacy, preview, confirmation and verifier algorithms are unchanged.
+No publication, protected evidence run, Schema 3 approval or C is authorized.
+OWNER_AUTHORIZED remains False in the command template.
+
+The new exact Plan and Packet were privately received and fully hash-verified.
+The Seed identity and byte count originate from the Owner preparation receipt
+and are cross-bound to the new Packet; no actual Seed is available locally.
+The receipt reported successful preparation, but the pasted preparation command
+omitted five base64 characters. Exact command provenance remains UNKNOWN; this
+package does not repair the transcript or claim remote attestation.
+
+The unsigned canonical review body is 7968 bytes (without trailing newline),
+SHA256 0ca1a548c49e9dbcb64bc3b9aa558283852e711b113dbdcfc771d576582847c4.
+The new Packet authenticates 47 transaction inventory rows and 9 directory rows;
+those private names/rows are not copied into this public source or its fixtures.
+The new expiry is 2026-10-17T16:00:00Z. All previous one-run permissions remain
+consumed or limited to their own actions. This source needs a fresh exact review
+and new explicit permission before its protected evidence command can run.
+
+Below, historical algorithm descriptions are retained with current binding values.
+Previous candidate reviews apply only to unchanged source scope, not these fresh
+identities or any host action. The first new regression checks producer/schema/
+verifier binding consistency with only public descriptors and synthetic fixtures.
+
 # Fixed saved-input completeness evidence
 
 ## Important: narrowed independent recomputation scope
@@ -53,7 +82,7 @@ Unknown shapes still HOLD without a payload. There is no automatic retry.
 
 The template remains unauthorized. The prior one-run permission is consumed;
 new source review and a new explicit Owner permission would be required. The
-existing 2026-10-16T18:00:00Z bound is unchanged and is not renewed by this repair.
+existing 2026-10-17T16:00:00Z bound is unchanged and is not renewed by this repair.
 The retained original package is commit835c691fcc137a28369964253aca5add5b011ff5.
 
 ## Local actual-value preview and recipient confirmation increment
@@ -90,7 +119,7 @@ A bare yes, wrong line, EOF, preview/confirmation timeout, TTY write failure or 
 transferable payload. TTY checks do not establish a human's identity or recipient access.
 
 The complete preview generation, display and confirmation has one nonrenewable
-180-second maximum. The program samples the 2026-10-16T18:00:00Z cutoff at startup
+180-second maximum. The program samples the 2026-10-17T16:00:00Z cutoff at startup
 into a conservative monotonic ceiling, which is never recomputed to extend time.
 Current UTC is also checked. Preview and the final at-most-10-second stdout write
 are both clipped to that absolute ceiling. Confirmation after the candidate cutoff
@@ -131,10 +160,10 @@ complete-install candidate directory, in this order:
 
 | Role | Filename | Bytes | SHA-256 |
 |---|---|---:|---|
-| New Seed | epoch7-lifecycle-resume-inputs-d7eabd4c0716bd23.private.json | 770702 | d7eabd4c0716bd23c35a210c0ace8493b8a9f23237d1df1eeef231fdda8d16f0 |
+| New Seed | epoch7-lifecycle-resume-inputs-57f46aa89f4af77b.private.json | 770702 | 57f46aa89f4af77b6e66167ae84875b5c54ee3bdf48c4b28c702a1f7855f94b5 |
 | Historical Seed | epoch7-resume-inputs-6de7d12246826388.private.json | 769086 | 6de7d12246826388949723e9238cd464686e6e86847187946837df927c97a550 |
-| Plan | epoch7-lifecycle-approved-plan-5b3a34222dc634d9.private.json | 140648 | 5b3a34222dc634d95b4e070105de9afb3dc24b5c53f7b6497bc61d392887fb01 |
-| Packet | epoch7-lifecycle-review-packet-2bf597ef911cba70.private.json | 29665 | 2bf597ef911cba70b5c94559ee36d8f90c2a339a3de1bfd2d8f58547900b8dec |
+| Plan | epoch7-lifecycle-approved-plan-2ac961e8765e82e6.private.json | 140648 | 2ac961e8765e82e6b6fca18f2c3be0f299a71898ad5a8f95109c44420c4a1f15 |
+| Packet | epoch7-lifecycle-review-packet-2d9e0df65f4fd28e.private.json | 29665 | 2d9e0df65f4fd28ef2a8ac506f9b0c4d91269c12dfc840f3ddcdf0f83764331f |
 
 The directory is `/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520`.
 The reader requires root:root, regular files, mode 0600, link count 1, no extended
@@ -171,8 +200,8 @@ It contains 257 files; the original 107 runtime payloads and 16 business phases
 are unchanged. This tool does not amend the kit or its approval parser.
 
 The unsigned body in the actual Packet is 7968 canonical bytes, SHA-256
-`35c6fd49a18845542c01c65b0f870cef1626b841e2daba138a687e4137d4a1f5`,
-with proposed admission expiry `2026-10-16T18:00:00Z`. Its approval ID and approval
+`0ca1a548c49e9dbcb64bc3b9aa558283852e711b113dbdcfc771d576582847c4`,
+with proposed admission expiry `2026-10-17T16:00:00Z`. Its approval ID and approval
 body-hash result fields are null. A candidate `decision` field is not a signed
 approval. This evidence tool neither refreshes that expiry nor grants C admission.
 

@@ -34,15 +34,15 @@ SOURCE_COMMIT = '105996ed06a0bdb5d025914cf08ebd448425f739'
 SOURCE_TREE = '343d315b3ead6266a626b5875dbdd6c2fa0309af'
 MANIFEST_SHA256 = '91252ba75c38b4a6d12f9b64eb06cb8793fabd97f03646bece97224178c28392'
 PLAN_BYTES = 140648
-PLAN_SHA256 = '5b3a34222dc634d95b4e070105de9afb3dc24b5c53f7b6497bc61d392887fb01'
+PLAN_SHA256 = '2ac961e8765e82e6b6fca18f2c3be0f299a71898ad5a8f95109c44420c4a1f15'
 PACKET_BYTES = 29665
-PACKET_SHA256 = '2bf597ef911cba70b5c94559ee36d8f90c2a339a3de1bfd2d8f58547900b8dec'
+PACKET_SHA256 = '2d9e0df65f4fd28ef2a8ac506f9b0c4d91269c12dfc840f3ddcdf0f83764331f'
 BODY_BYTES = 7968
-BODY_SHA256 = '35c6fd49a18845542c01c65b0f870cef1626b841e2daba138a687e4137d4a1f5'
+BODY_SHA256 = '0ca1a548c49e9dbcb64bc3b9aa558283852e711b113dbdcfc771d576582847c4'
 OLD_SEED_BYTES = 769086
 OLD_SEED_SHA256 = '6de7d12246826388949723e9238cd464686e6e86847187946837df927c97a550'
 NEW_SEED_BYTES = 770702
-NEW_SEED_SHA256 = 'd7eabd4c0716bd23c35a210c0ace8493b8a9f23237d1df1eeef231fdda8d16f0'
+NEW_SEED_SHA256 = '57f46aa89f4af77b6e66167ae84875b5c54ee3bdf48c4b28c702a1f7855f94b5'
 
 
 class Hold(ValueError):
@@ -309,13 +309,13 @@ EXPECTED_COMPILER = {'cache_files': 256,
  'runtime_payloads': 107,
  'source_commit': '105996ed06a0bdb5d025914cf08ebd448425f739',
  'source_tree': '343d315b3ead6266a626b5875dbdd6c2fa0309af'}
-EXPECTED_CANDIDATE = {'admission_expires_at_utc': '2026-10-16T18:00:00Z',
+EXPECTED_CANDIDATE = {'admission_expires_at_utc': '2026-10-17T16:00:00Z',
  'body_bytes': 7968,
- 'body_sha256': '35c6fd49a18845542c01c65b0f870cef1626b841e2daba138a687e4137d4a1f5',
+ 'body_sha256': '0ca1a548c49e9dbcb64bc3b9aa558283852e711b113dbdcfc771d576582847c4',
  'formal_approval': 'NOT_ISSUED',
  'install_admission': 'NOT_GRANTED',
- 'packet_sha256': '2bf597ef911cba70b5c94559ee36d8f90c2a339a3de1bfd2d8f58547900b8dec',
- 'plan_sha256': '5b3a34222dc634d95b4e070105de9afb3dc24b5c53f7b6497bc61d392887fb01'}
+ 'packet_sha256': '2d9e0df65f4fd28ef2a8ac506f9b0c4d91269c12dfc840f3ddcdf0f83764331f',
+ 'plan_sha256': '2ac961e8765e82e6b6fca18f2c3be0f299a71898ad5a8f95109c44420c4a1f15'}
 EXPECTED_CHECKS = {'body_exact_match': True,
  'factory_state': 'COMPILED_NOT_ADMITTED',
  'input_root_recomputed_onsite': True,
@@ -339,21 +339,21 @@ EXPECTED_LIMITATIONS = ['OWNER_TERMINAL_REPORT_NOT_REMOTE_ATTESTATION',
  'NO_C_DRIVER_ASSEMBLY_OR_EXECUTION',
  'ATIME_POSSIBLE_NOT_MEASURED']
 EXPECTED_FILES = [['new_seed',
-  'epoch7-lifecycle-resume-inputs-d7eabd4c0716bd23.private.json',
+  'epoch7-lifecycle-resume-inputs-57f46aa89f4af77b.private.json',
   770702,
-  'd7eabd4c0716bd23c35a210c0ace8493b8a9f23237d1df1eeef231fdda8d16f0'],
+  '57f46aa89f4af77b6e66167ae84875b5c54ee3bdf48c4b28c702a1f7855f94b5'],
  ['old_seed',
   'epoch7-resume-inputs-6de7d12246826388.private.json',
   769086,
   '6de7d12246826388949723e9238cd464686e6e86847187946837df927c97a550'],
  ['plan',
-  'epoch7-lifecycle-approved-plan-5b3a34222dc634d9.private.json',
+  'epoch7-lifecycle-approved-plan-2ac961e8765e82e6.private.json',
   140648,
-  '5b3a34222dc634d95b4e070105de9afb3dc24b5c53f7b6497bc61d392887fb01'],
+  '2ac961e8765e82e6b6fca18f2c3be0f299a71898ad5a8f95109c44420c4a1f15'],
  ['packet',
-  'epoch7-lifecycle-review-packet-2bf597ef911cba70.private.json',
+  'epoch7-lifecycle-review-packet-2d9e0df65f4fd28e.private.json',
   29665,
-  '2bf597ef911cba70b5c94559ee36d8f90c2a339a3de1bfd2d8f58547900b8dec']]
+  '2d9e0df65f4fd28ef2a8ac506f9b0c4d91269c12dfc840f3ddcdf0f83764331f']]
 FILE_ROW_KEYS = ['role', 'name', 'bytes', 'sha256', 'metadata', 'reread_match', 'authority']
 FILE_METADATA_KEYS = ['dev', 'ino', 'uid', 'gid', 'mode', 'nlink', 'size', 'mtime_ns', 'ctime_ns']
 INPUT_FIELD_NAMES = ['acceptance_access_rows',
