@@ -33,6 +33,17 @@ class OriginalProjectCenterJourney(unittest.TestCase):
         archived=self.fx.c.messages(self.fx.fx.uid1,'project1')
         self.assertEqual(archived[-1]['body'],'请核对门店需求版本')
 
+    def test_material_submit_cannot_mint_requirements_or_approve(self):
+        before=self.fx.c.db.execute(
+            'SELECT COUNT(*) FROM versions WHERE project=?',('project1',)).fetchone()[0]
+        with self.assertRaises(ValueError):
+            self.consumer('project_submit',{'item':'x','revision':0,'action':'approve'})
+        with self.assertRaises((PermissionError,ValueError)):
+            self.consumer('project_submit',{'item':'nonexistent','revision':0})
+        after=self.fx.c.db.execute(
+            'SELECT COUNT(*) FROM versions WHERE project=?',('project1',)).fetchone()[0]
+        self.assertEqual(before,after)
+
     def test_invalid_fields_and_revoked_membership_fail_closed(self):
         with self.assertRaises(ValueError):
             self.consumer('project_summary',{'project':'other'})
