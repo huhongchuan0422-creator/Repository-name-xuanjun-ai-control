@@ -1,0 +1,243 @@
+# LOCAL DISABLED CANDIDATE. New file only on original PR #122 head; not published.
+# Both literal gates must remain false until independent review and explicit approval.
+name: Alibaba Cloud account preparation once 20261017
+run-name: ${{ github.event.label.name }}
+on:
+  pull_request:
+    types: [labeled]
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+concurrency:
+  group: xuanjun-domestic-account-prepare-once-20261017
+  cancel-in-progress: false
+jobs:
+  prepare-account-once:
+    if: >-
+      ${{ false &&
+          github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+          github.event_name == 'pull_request' && github.event.action == 'labeled' &&
+          github.event.pull_request.number == 122 &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.head.ref == 'feature/stage5-next25-integration-20261015' &&
+          github.event.pull_request.base.ref == 'feature/stage5-merchant-platform-storefront-ui-20261014' &&
+          github.actor == 'huhongchuan0422-creator' &&
+          github.triggering_actor == 'huhongchuan0422-creator' &&
+          github.run_attempt == 1 &&
+          github.event.label.name == format('xuanjun-account-prepare-once-20261017-{0}', github.event.pull_request.head.sha) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Fixed reviewed account-only transport
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY'
+          """DISABLED LOCAL REVIEW CANDIDATE. Never execute while preparing/reviewing."""
+          import base64, datetime, hashlib, hmac, json, os, re, time, urllib.error, urllib.parse, urllib.request, uuid, zlib
+          from pathlib import Path
+          ARMED = False
+          EXPIRES = '1970-01-01T00:00:00+00:00'  # Set a short reviewed expiry immediately before publication.
+          REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+          ACTOR = 'huhongchuan0422-creator'
+          BRANCH = 'feature/stage5-next25-integration-20261015'
+          BASE = 'feature/stage5-merchant-platform-storefront-ui-20261014'
+          WORKFLOW_PATH = '.github/workflows/aliyun-account-prepare-once-20261017.yml'
+          PREFIX = 'xuanjun-account-prepare-once-20261017-'
+          ROLE = 'acs:ram::1384884686754410:role/xuanjun-automation'
+          REGION = 'cn-shanghai'
+          INSTANCE = '3a22c458934142eea89ec6e3bf481a57'
+          HOST = 'iZvt5t8tlrm8oiZ'
+          ENDPOINT = 'swas.cn-shanghai.aliyuncs.com'
+          PAYLOAD_SHA = '885b850864465a554d99adbdfb4b4d4e33abf5dc52e7dcf84f27597c247c0818'
+          PAYLOAD_Z64 = 'eNq9O2lz2ziy3/UrON6qR3LGkq8kk3hWu0+RaFsVWfSKco7xuli0CMkcU6QeSfnYbP77djcAErwcz+y+daUiEkA3Go1Gn+CfNCfzIt8L44hpCbsP2APzuwtoCnwvY9rGewpjz+9p01hjj2yxzYI40vxtEkQrbZOwjZd42NTr7Ozs2MtlGAAeb7GIt1HWjaPwSfNZGqwi7d4LEWOcACp7rnmRHKUtEkYoBH7vJmS9DkxnO3tTx9lLtzebJF6wNNU839tkLEl3tYhlD3Fyt4vAPouywAuBes+HrjjR1oCFMMYbxslLe51BGGrxTcqSe96ieQnT0u1mEwbM126eNE9beGHIEqDNB2RrL4i0y+l8dunMrZFcRhBttllKq+0E602cZNpvaRzJ5xQm7pzZzlzra3rw6332Onubhcn6bRz8qncGw6ENGLHvcetFv22j7mKbZvGaJXrHsS9nQ8sd2ufnYxriHfivvTc+Y0cHR6/95aF/dHR0yN69Wfx8eLj/7oAdLg+X/jv/nd65mNkXtmON3MHs9COAGvreNk320psgggdgge/ru5reTej/S/r/nP6n9r0INv8xSDNgJLWm1JqjiOIwXgURdXU3XpoC6wnwB/hPrMnsjMYzazi3Z2PL4SRIJCVk9MKyhW52rM/W8HI+eD+RAE0016kwO4P3jjWduxeD+ZmArCxg7xZYuldjMfbce8ke7GzY3ptu4jhsGWN2zseOM56euuPpxeWcz259HgznruCDa19Ys8F8bE/d4WBqT8fDwcSdzwZTBwZh6/vxdAQIcDrg1el4Cv321HKdM3vuWh/HI2sKUoBrcwfTEYjD1Lk8v+AIbZBGQIOwMxhqfYItd+aO63waOO4ne/bhZGJ/chHFfDz/QvCcuIvBl4k9GLlnA+cMoecgKNbcvXSA1tEIuocfBqcW0jaYfSkjcC4vLuwZnAD3ZDI4dRToi8lgfmLPzt2RdTK4nAAdZ7b9wXHh0HLIL3BwzgGbC8s/tVTQ88F44joXtj0Rc7yHUQ7M61onJyBFNOvMAlbbU3XGgePAMkfuxB5+kNMShovZ+ONgDisAlNZg6sJxmA/PrOEHhD4BTGcEg0cEhQc4PLPtecFmhB9PLODBhT0ZD7+4BEwkjy5nKKPuCdB8OQNAa2iNL/i0Uxte58AyOIFze2hPQEI6ixCOiDZiEegVYwYaLlgzK0nixDzuaPCHJ6jT8dlSW8SgbxaZuwwes23CDKHfxDhUqKhAg+g3GAQ6SnT/okUxqKOltw0zLQzumQbKJ2RrEH6pR+EogI4iLJcpW25DLY1DBrgy0uLJIkhBtSdxugHMiAF1p3bDbr37APTnQ5Ddaut4cZf2NOtxwTakMAkdKk1QudsF0APIgHJ4CL0bFqa/SI2+t0ri7UZL4odUM4JoEW59shZCc6QmYiFsEbsHfcseUXcyMDLz2yDV4B9aCCAvXmrwb5mw9DYC/b+reRtoBUuCSh7EDBiIK4djD709yTS+buSvB+o+WjAD9bpgKv5lyVPxgn/Yb+SKTLYyWrn2gT3R7pVBEgY7Fmk610V6FSjnWjPU5fTD1P40LcBkBwp9jg/WjVvc177qt3Ga6cdSAnr4CqK5DXylEd6gjZUbGW8VO4MdgidywIplm4fIW5swivatecwqEWM2Xnabwpiv374RkUvYCmwDMdVUE/CTpuj3ggvgL4CcwpoQppekYH0zbisOzKv9a9xYeMuHB0uO/Ic+NpNlNqIY7Ky3ZAbnz5Ug6RrJNDh+INQPEpDtOHnqz5MtM83qRpRAr/D3mjiNFpzB+vI9+lYWlRjOc7Rlne9hWrMM2Jd5kom7tBCzxjPVmJXYlKWSS2mWBBtkktnL+WVeHXcPruts1QvewdEKlujb9NvZhZhqvMoxcDrBrQE6iaIyE8WkP/G9+YmGlAbA7uFmSULK0Ph3A3rnrgoi0CIkzFuhuo6jvgEI3rYFJB0lHN9hk8TXzqXfKQG4xHxOUJusXeiEVuATcJPRgpSzpaTYQP0CEfIIhziFUYiggl6ZXqqfXLcAEhA/lyuRldq0oqZ17LOiDd+gMYIg4K5opVe+IKEdT4KQTePsBFSSX9GtdZqEhi0haFCvdcCCl8Q5vrnxg7qRJx7wXzBPCGuQBhGgQPUnBi8yE9USroaODJ/AJJ0kGVajgzBLvF70ZBjZ04ZQEpI700Q7x2U8o4N2h9JuEN8FryV/c5aaqhqrTYRjYcdhiisOd10SImxG5CCaYtBKvu0XipWQ/I928NastR29fvtKtCILeo47dkDjG9hNUp3zlYt1PmhmnYpBFFnh1Hw9NPkBtd6A022Iid68Mk2+Z5vQiwwetDG/cItmtCSI4ICBUbcIG0UAS2AauBYRMfbhFtysJ23p3ccJjRLuVtpDZ4GkCmUQ1e3VdYsoSBqEPBS7IDvQdnyTwLKRywvZbhIXDAwLUD5rD3waFvmGfjL+DO4pDgGf8m+XYEpHulmXoBLuihjBYmX31d01zrjfIFrkIZREqULJzBpwv5w74+OPwluukEWY2RPHLR2M3ItQ0Fc5AkD89IijXdbpZWJgbA9idJYYJlgYvXDfBS3cBb8YjGeCKtLCsBvlPeC6eRf2yGzZYRpR216J7esfcnbELKR5CJNwUUAJq1qoAaP5HE9AszmDE8u1Z67QceQ+HHMb/HIno4UJZSKF9qMebtrqWvAF+6hXN65CbV19n9mTEcaYUwiPJ19IcGX+yfW22W2cBP9gaJBIA6JnmsQQl1D/4taLVgzd1H3oEM4zHq2SKyw8fmhL422yYC6EE+sgc9HHY4+Zi+krGFZKzPB5NnHKfNdLVvcgfxC255sPw0MIvoxSRobcZtjsOPIDIm/pBSEqIBjNuYSaPkhhH1ZusUieapIYy4kHRJmw/9uCDPkuUJPlyMk3x6PucnOtT+3pr9bMdj+N52fjqfvRmo1PxlYenhex+SYJ1l7y5MooQGEPZsl4gCn7cZqra2LumkEAy0KarJqJoV5K8JW2Kr1lYUjjm5JMMlB0QwhBCQ4dLqLDj2F6LyK25Pseh3ewa6swvvFCYEYYLJ74wiFIvxyN56Cx+PLuwe9YMTFEERKJCZM+LuV/mmje3iBX4QcY60LEGC/UEd9oR8ADo66HEiiIa7yG2HzhYsI0SNw4cX2GgWsOze0d33xm/AiiBULx4493D/gktEHiYdguEgt0Po7l+S9yTTIPxWVSyTgpZ8ns5KknzIpg2ECprzC4qeW8usimiIV74re3ecoTmTIX8jIEMiusZI27h/uHbw72D37WRUKEuA4HD03uJi0s/hCagLtMA/Hq4jFFnyHP7v5CyYpuxlJyA3ZFXmGb8sRudsu04WQsEiIgS6mSTaGILvEWqAc1zIdwxxyUJpjB0bnVW/s9bQy29QEcDp7uWHgg5cHCCwkfCuke+B0+hszCYBB1mLtBt4Z5UZ772OOyB3o1XYRxCkqAMutechMAEclTh8eYtL49xEW5UAi9mbb2AB3l1sH1BSqWSbwGgcmwO+R56SIFgr+UxQEu9pBCl04lKBijtPXNnkw1L4VbUQrJS27ZVYtyq8RqDdIrxQi86JPJ+PRsrhfTwBwZmLA1mnJYg3x11blSQw1muDaklCztkyvSyO4y9Fapi0qM0kx6+aRjO5Cb8o4oxhNeHHCYRTQL8XVlucK9jeM7ypRzNeXmaos9QpS+CLIcX017uiJ9l4ohrbrJfM5YC5YoVprcRNkuPETpIKIOLbxBya5aYqRdx+T5XtiuoQ06BbWLo5fTBblDiLpyzfU5PXqPIqyRrSvRWiEA1kl+bnkV4DFWPV054Ao6r7U/g6/bkBtoX00lO61XBZzjzpdxrf2l2gq0X5cIyVdXHiwX+v3zMJ5+HEzGo2dow6MAwooHD4xIAAYTTJ5UPkZFLZvtGU95iJtO+ksPdMsieLb9uaMtY4JnjjW6lbLvRbMWxQhwb6qTca4t8Gx+l2kgmbJlCBZgboHHNUfnWeb6mxeSbCO3pHUqLiAFYy8TUFGUwXqDNWqbFn0+qRpBeaDVJDfwli3uDLMpC6dqDkofV0Kd55grqyl5vNFCFeWJQN5RCeMkPFSgeHNXKxpWFICWs3BYHgYwOvsAQKcdTzqaUmpcVRqNpkMKagBe8KfhsJpVuJUKt6rCrapwOf1ojyH06feVNZW9Z+qUFYUqODcBxAQcRgurDEG/mfeWXeraQO5Ji5H1WmlteJMnT9BXYplYCikAuPkomw6j5qBLR5/qBlnFvhaN0ram+Uvhzptmo9CSWPxOGX3+4PxbumBUhE8t6Bvyly0Y9JZYlCde1YwrT7W2BRfExdyBwHBGH1lTMcF/KDb6Vq1vvfdS1lLj+oMMBquBxdzvKJhnnMhWBNxTnsIp6ugn5MBjQkCznTw5rg14PiFa7YkMIjrvv+TlSQrK/KZbL7q8+CFyBhAAyZblIspC+bJKNk3XReK0Q8Shpw+gmmi+gFc5ZPPgly6XyOf8VgyPnCIGDInvyrns+E5JF9c5ZzslV04XSdcUlpvwXFBbrpzySn2iU6kpEA1UsQpSPPZxiLGsWaSjgoytufMJfAWH2xCT/EhAvNCSlnLcVMOIU1G+QHjFT0tdoA76Ce0PvFiGDllOcz6UKKM03H+n2KHyjZNJCXJBMWXHi8lEPl7MU+TjS/lzZVKh1NUJKY+uZOyV0Zi4f7N/aJbSbMgpvtlY+Hc32xs49Zj3WgYrQykoKaIgdtHn+wGhdyQ2D97gqI0wsaD9k79N7RN7MrE/mUocmvaWPkEtSZndoG2CgFrJRkbLmCNf0mYve0tQSVFsKJaB9hEH4urS4B9M+7N2cHSw//Nhraq17OHSDNHb80Ej+Qx8kWzZfVuW9MJxcjOsQijrzyWa2z0ysGhfUefmt5OwgSxi7tQIthXHQ8h2cw2xIuSV8/T/JicS7NweWWUwXOurd0e72uHrVwdomMWVFts5Lu5WuG4QgWVxjZSFS+XI4ivdT+Br2qKvZJi9CDDjY3kcHTV6YlvuNcaUfoYXwyTRghdGbxUhUKbhdRXOCoEUGxW0wCmzPLGIoXDKooAmr0JgJRiv0izWDMwCCMCDX1yTkCPpQkR1JKj54rIEzw5hf3WY3GuTs/N/C+PRE49rL/JWLMm5XU7h4BJKhd+yrMJ6y0keZe2V8/xHz3RjUHnDQMmDTkRETO6mItS7yuH2K/4eUW9wDCiJPrvf1YrXIIrJSzU47nxE8YojyijJAPeWyDpSOvydro5Zn2FZyvv0fRn0CfPZBYPQhwkri4WlYAaP4VLENqp7nO+cSOYZWCwo18SwBa+8vFC1lKdvVl0CpXKHCWS7CbA+Mr9sVHgWGNTSQDijmR9EfaVrZH2cXk4m1BNvM7XrYnxhUTtLkno73oZDgKN9GIPBS184siy673/VsURVKgwcS0YgUyaD6Sn2Dull6A4mE/76raIewHCIixw9TqCZWwpSFOV+INRstyTy+oXc0ZacRU0PNm1QfVtfDECCUQwH1m3cYtNQqUlRa7v+20UYvapJFUQ9vuIFXSQoKU0ahIoJ5lIBOHNr1jU/OZh5xVsoGFTiCwp7gQt9QtlqAH3pE0S5a04rEt7lwTS9R3GXVwe6FBvz9cBTF0wqf+OhcPmSshpWypxrUc6VfildWie/tOYM0WXlPYqmYZXLVN7BQpDUqBxKwtOnH3lT60/yZpu4xVWLcnFww8WogOhUMGH8gqhqQ3N5RxhSklzE8RXVi7hHJVdfRyB7rgQE3l2ix4M60WpRWfAmvfX8+KGL1+UzKW5Y4+n58q53yxDMMRRjRHPPb0gIg66lCCHkN1uNiuVrsG7tt7VKbEPe8Hpt4apBNJEAsKGKTimzLRN0w3OKnfH1dGZfXjiuNR28byAfITE/owIeNxOEQ1s3DFnkKlLcKq5iTH74TfWeYKpeVqmegNIU/2FJ58xukvbapcqcH3pfR7IQrIwPGLWL2aFtlYy+XjslVc5yJpjVu4wp3prBWkKfI5brkPcvd3T5uKPvVJQoYuYoeJ6NC4Sqa4UxwaSr8Wx5qk/vu1pjiarPK+ENVaqip7lQJfrbalUq4vZyVb9tnQTZlkUSuEWWtg9KwMh1ju58cdzL8cg9H0/1a1OM8h7bRg0+06hVK65TBdeqFddpjutZ5y19ihZVbfMyd1ne5fk9/jN5xzjjUhHOFzqfPJZvKwx9P2CoVvSLm9ZquGTWQokXxriC6PUdalbOtFev3rYHZQhZ7iTG1GarYWjJO/Ip82SjMx/QJy1KllHhYguOgom7FM6x38PLMhsrsSwi47allcDvl6VelKx+ScK1MVx85pI4HPlSLlDb08SSftL0HqY79ZZgE0HF6fk0U08PLUC+WJ+Hk+op2tWO3r4qsDalmB5qGSb8Q3J6/na9UTKB9Puie2KNOfhvEFpWIk+IOrfpbcUEFse7IbNVyDgPzgtxrBUWuRxW4kkSJGxDASx/D/iM+AmjVIoeynVLJSQoaKKSg89TyZWw59mIRI1vu/x7wjD/JFFWy0qF+Oa4pPGjmiKP0wr7Q187aISl4kAOyjPsSdEiAp9yRAnSXY4gq1FQzQ8CW8s/5EJfELZC0wlHj6ULb5PXRuieq7zrIEQNP7UCQSDGa3FUAUSBJai//73319o3RVS8I3b0ltswXHsQXhqSlF1am8lT0sSFIsytlZUrWy0OCJhZ+twLS75KoixfDvYXWTGjvs14/LbpMyIjQmUUFKdRUOj6YSqybNu0JSoVHmIBxn2hAqwiZXmigKM3tb/I0Eq0YHRVK/OKrgPq0ieK6svLn1X71hRU0WXDIoCiS4d/PDKiT/H6rcn+kqNfD0wUuovn3EGgO0eUP+YO+HH+LRcuJ9edcBgMITG9zQPms02TVo7p74C+T0jVkEvUh6VYqCqn4QsWqsgfa8oE2FJ8IleaOK/uKM28wlO9Aku/vVUisRWVe6WPg1JWooQSDKZy1VXpoKZnrtWuBFZiDyVH8hOEiRQqJclPybETh6/Z+rrx6ix/qFToj3l5sCI8jVcNmgc2f2Btmo2l/7bZ2r/Ffnbu736kbZbuGhwXQlu/dnAs5UxcwMUUhZqqLZnVK73b9WDLnvTrUjVNvbVqO2jVA6yPoMy4LqkB10XErivCflnDfUrrn22BCEK0krspqUEkwdAepWwPjjGwSQHchVg1FR83dr5fmud49a875O3sHO9gCXhnd6fk0uwcL8mjUbQWrxs7lJmzHuGAH6oF9X8B4HVyiQ=='
+          RECEIPT = Path('account-prepare-receipt.json')
+          row = {'schema': 1, 'status': 'HOLD', 'stage': 'GATE', 'retry_allowed': False,
+                 'account': 'xuanjun-customer', 'hostname': HOST, 'region': REGION,
+                 'instance_id': INSTANCE, 'payload_sha256': PAYLOAD_SHA}
+          class Hold(Exception): pass
+          def need(ok, code):
+              if not ok: raise Hold(code)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl): return None
+          def persist():
+              # Fixed nonsecret status fields only. fsync before remote mutation and before polling.
+              with open(RECEIPT, 'w', encoding='utf-8') as out:
+                  json.dump(row, out, sort_keys=True); out.write('\n'); out.flush(); os.fsync(out.fileno())
+              fd = os.open('.', os.O_RDONLY | os.O_DIRECTORY)
+              try: os.fsync(fd)
+              finally: os.close(fd)
+          def github(path):
+              need(path.startswith('/repos/' + REPO + '/'), 'GITHUB_ENDPOINT')
+              req = urllib.request.Request('https://api.github.com' + path, headers={
+                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28'})
+              try:
+                  with urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect()).open(req, timeout=20) as response:
+                      raw = response.read(4000001)
+                  need(len(raw) <= 4000000, 'GITHUB_RESPONSE_SIZE')
+                  result = json.loads(raw)
+                  need(isinstance(result, dict), 'GITHUB_RESPONSE_SCHEMA')
+                  return result
+              except Exception: raise Hold('GITHUB_GATE_UNKNOWN') from None
+          def gate():
+              need(ARMED, 'DISABLED_PENDING_INDEPENDENT_REVIEW')
+              expiry = datetime.datetime.fromisoformat(EXPIRES)
+              now = datetime.datetime.now(datetime.timezone.utc)
+              need(now < expiry <= now + datetime.timedelta(minutes=30), 'EXPIRED_OR_INVALID_WINDOW')
+              event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+              pr = event['pull_request']; head = pr['head']['sha']; label = event['label']['name']
+              need(os.environ['GITHUB_EVENT_NAME'] == 'pull_request' and event['action'] == 'labeled', 'EVENT')
+              need(os.environ['GITHUB_REPOSITORY'] == REPO and event['repository']['full_name'] == REPO, 'REPOSITORY')
+              need(os.environ['GITHUB_ACTOR'] == ACTOR and os.environ['GITHUB_TRIGGERING_ACTOR'] == ACTOR and event['sender']['login'] == ACTOR, 'ACTOR')
+              need(os.environ['GITHUB_RUN_ATTEMPT'] == '1', 'RERUN_DENIED')
+              need(pr['number'] == 122 and pr['state'] == 'open', 'PR')
+              need(pr['head']['repo']['full_name'] == REPO and pr['head']['ref'] == BRANCH and pr['base']['ref'] == BASE, 'BRANCH')
+              need(re.fullmatch('[0-9a-f]{40}', head) and label == PREFIX + head, 'EXACT_SHA_LABEL')
+              current = github('/repos/' + REPO + '/pulls/122')
+              need(current['head']['sha'] == head and current['head']['ref'] == BRANCH and current['head']['repo']['full_name'] == REPO and current['state'] == 'open' and current['base']['ref'] == BASE, 'PR_DRIFT')
+              need(any(x['name'] == label for x in current['labels']), 'LABEL_REMOVED')
+              need(current.get('mergeable') is True, 'PR_NOT_CLEAN')
+              run_id = int(os.environ['GITHUB_RUN_ID'])
+              run = github('/repos/' + REPO + '/actions/runs/' + str(run_id))
+              need(run['event'] == 'pull_request' and run['run_attempt'] == 1 and run['path'] == WORKFLOW_PATH and run['display_title'] == label and run['actor']['login'] == ACTOR and run['head_branch'] == BRANCH, 'RUN_IDENTITY')
+              workflow = run['workflow_id']; count = 0; seen_current = False
+              for page in range(1, 101):
+                  data = github('/repos/' + REPO + '/actions/workflows/' + str(workflow) + '/runs?per_page=100&page=' + str(page))
+                  runs = data['workflow_runs']; need(isinstance(runs, list), 'HISTORY_SCHEMA')
+                  count += len(runs)
+                  for prior in runs:
+                      if prior['id'] == run_id: seen_current = True; continue
+                      # Stronger than exact-label matching: any other matching head blocks too,
+                      # including failed, cancelled and skipped runs. Never delete history to rearm.
+                      if prior['head_sha'] == head or prior['display_title'] == label:
+                          raise Hold('OTHER_ONE_SHOT_RUN_NO_RETRY')
+                  if len(runs) < 100:
+                      need(count == data['total_count'] and seen_current, 'INCOMPLETE_HISTORY')
+                      break
+              else: raise Hold('HISTORY_LIMIT_FAIL_CLOSED')
+              row.update(head_sha=head, label=label, github_run_id=run_id)
+              payload = zlib.decompress(base64.b64decode(PAYLOAD_Z64, validate=True))
+              need(hashlib.sha256(payload).hexdigest() == PAYLOAD_SHA, 'PAYLOAD_HASH')
+              return payload
+          
+          def quote(value): return urllib.parse.quote(str(value), safe='~')
+          def rpc(endpoint, version, action, credentials, **params):
+              need((endpoint, version, action) in {
+                  ('sts.aliyuncs.com', '2015-04-01', 'AssumeRole'),
+                  (ENDPOINT, '2020-06-01', 'RunCommand'),
+                  (ENDPOINT, '2020-06-01', 'DescribeInvocationResult')}, 'RPC_ENDPOINT_ACTION')
+              key, secret, token = credentials
+              values = dict(params, Action=action, Version=version, Format='JSON', AccessKeyId=key,
+                  SignatureMethod='HMAC-SHA1', SignatureVersion='1.0', SignatureNonce=uuid.uuid4().hex,
+                  Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+              if token: values['SecurityToken'] = token
+              canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+              sig = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+              values['Signature'] = base64.b64encode(sig).decode()
+              req = urllib.request.Request('https://' + endpoint + '/', data=urllib.parse.urlencode(values).encode(),
+                  headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+              try:
+                  with urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect()).open(req, timeout=20) as response: raw = response.read(262145)
+                  need(len(raw) <= 262144, 'RPC_RESPONSE_SIZE')
+                  data = json.loads(raw)
+                  need(isinstance(data, dict) and 'Code' not in data, 'RPC_REJECTED')
+                  return data
+              except Exception: raise Hold('RPC_RESULT_UNKNOWN_NO_RETRY') from None
+          
+          def command(payload, nonce):
+              # Fixed reviewed embedded source only, no checkout, downloads or command inputs.
+              code = '''import base64,contextlib,hashlib,io,json,os,sys,zlib
+          p=zlib.decompress(base64.b64decode(%r,validate=True))
+          assert hashlib.sha256(p).hexdigest()==%r
+          assert os.uname().nodename==%r and os.getuid()==os.geteuid()==0
+          ns={'__name__':'reviewed_account_payload'}
+          try:
+           with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            exec(compile(p,'reviewed-account-payload','exec'),ns)
+            result=ns['main'](['--apply'])
+           print(json.dumps({'hostname':os.uname().nodename,'nonce':%r,'payload_sha256':%r,'result':result},sort_keys=True))
+          except BaseException:
+           print('{"state":"HOLD","retry_allowed":false}')
+           sys.exit(2)
+          ''' % (base64.b64encode(zlib.compress(payload,9)).decode(), PAYLOAD_SHA, HOST, nonce, PAYLOAD_SHA)
+              import shlex
+              return '#!/bin/sh\nset -eu\nPYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -B -c ' + shlex.quote(code) + '\n'
+          
+          def validate(detail, invoke, nonce):
+              need(detail.get('InstanceId') == INSTANCE and detail.get('InvokeId') == invoke, 'RESULT_IDENTITY')
+              need(detail.get('InvocationStatus') == 'Success' and type(detail.get('ExitCode')) is int and detail['ExitCode'] == 0, 'REMOTE_NOT_SUCCESS')
+              output = detail.get('Output'); need(isinstance(output, str) and len(output) < 8192, 'OUTPUT_SIZE')
+              try: data = json.loads(output)
+              except Exception:
+                  try: data = json.loads(base64.b64decode(output, validate=True))
+                  except Exception: raise Hold('OUTPUT_SCHEMA') from None
+              need(isinstance(data, dict) and set(data) == {'hostname','nonce','payload_sha256','result'}, 'OUTPUT_SCHEMA')
+              need(data['hostname'] == HOST and data['nonce'] == nonce and data['payload_sha256'] == PAYLOAD_SHA, 'OUTPUT_BINDING')
+              r = data['result']
+              need(isinstance(r, dict) and set(r) == {'state','account','uid','gid','retry_allowed','sudo_privileges','polkit_global_policy','privilege_policy_changes'}, 'ACCOUNT_SCHEMA')
+              need(r['state'] == 'ACCOUNT_CREATED_VERIFIED' and r['account'] == 'xuanjun-customer' and r['retry_allowed'] is False and r['sudo_privileges'] == 'DENIED' and r['polkit_global_policy'] == 'NOT_AUDITED' and r['privilege_policy_changes'] is False, 'ACCOUNT_RESULT')
+              need(all(type(r[k]) is int and 0 < r[k] < 65534 for k in ('uid','gid')), 'ACCOUNT_IDS')
+              return r
+          
+          def main():
+              try:
+                  persist(); payload = gate()
+                  master = (os.environ.get('ALIYUN_ACCESS_KEY_ID',''), os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''), '')
+                  need(all(master[:2]), 'MISSING_EXISTING_SECRETS')
+                  row['stage'] = 'ASSUME_EXISTING_ROLE'; persist()
+                  data = rpc('sts.aliyuncs.com','2015-04-01','AssumeRole',master,RoleArn=ROLE,
+                      RoleSessionName='xuanjun-account-' + uuid.uuid4().hex[:16],DurationSeconds=900)
+                  c = data['Credentials']; credentials = (c['AccessKeyId'],c['AccessKeySecret'],c['SecurityToken'])
+                  need(all(isinstance(v,str) and v and '\n' not in v and '\r' not in v for v in credentials), 'STS_SCHEMA')
+                  # No credential output, not even masking directives.
+                  nonce = uuid.uuid4().hex
+                  script = command(payload, nonce)
+                  need(len(base64.b64encode(script.encode('utf-8'))) <= 16384, 'COMMAND_SIZE_LIMIT')
+                  need(datetime.datetime.now(datetime.timezone.utc) < datetime.datetime.fromisoformat(EXPIRES), 'EXPIRED_BEFORE_RUN')
+                  row.update(stage='INTENT_BEFORE_RUN_NO_RETRY'); persist()
+                  print(json.dumps(row, sort_keys=True), flush=True)
+                  result = rpc(ENDPOINT,'2020-06-01','RunCommand',credentials,CommandContent=script,RegionId=REGION,
+                      Type='RunShellScript',InstanceId=INSTANCE,WorkingUser='root',WorkingDir='/root',Timeout=90,
+                      Name='xuanjun-account-prepare-once-20261017')
+                  invoke = result.get('InvokeId')
+                  need(isinstance(invoke,str) and re.fullmatch(r'[A-Za-z0-9_-]{1,180}',invoke), 'DISPATCH_RESULT_UNKNOWN_NO_RETRY')
+                  row.update(invoke_id=invoke,stage='DISPATCHED_NO_RETRY')
+                  print(json.dumps({'invoke_id':invoke,'stage':row['stage']}, sort_keys=True), flush=True)
+                  persist()  # Durable receipt BEFORE any result polling.
+                  deadline = time.monotonic() + 180
+                  while time.monotonic() < deadline:
+                      result = rpc(ENDPOINT,'2020-06-01','DescribeInvocationResult',credentials,
+                          RegionId=REGION,InstanceId=INSTANCE,InvokeId=invoke)
+                      detail = result.get('InvocationResult'); need(isinstance(detail,dict), 'QUERY_SCHEMA')
+                      need(detail.get('InstanceId') == INSTANCE and detail.get('InvokeId') == invoke, 'QUERY_IDENTITY')
+                      if detail.get('InvocationStatus') in ('Pending','Running','Stopping'):
+                          time.sleep(5); continue
+                      account = validate(detail,invoke,nonce)
+                      row.update(status='PASS',stage='ACCOUNT_CREATED_VERIFIED',account_result=account); persist()
+                      print(json.dumps(row,sort_keys=True),flush=True)
+                      return 0
+                  raise Hold('POLL_TIMEOUT_HOLD_NO_RETRY')
+              except Hold as exc:
+                  row.update(status='HOLD',reason=str(exc))
+              except BaseException:
+                  row.update(status='HOLD',reason='UNKNOWN_PRESERVE_NO_RETRY')
+              persist(); print(json.dumps(row,sort_keys=True),flush=True)
+              return 2
+          if __name__ == '__main__': raise SystemExit(main())
+          PY
+      - name: Preserve nonsecret intent and invocation receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: account-prepare-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: account-prepare-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
