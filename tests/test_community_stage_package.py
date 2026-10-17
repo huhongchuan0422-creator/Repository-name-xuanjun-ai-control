@@ -20,6 +20,11 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(raw).hexdigest(),expected)
                 self.assertEqual(raw,(root/name).read_bytes())
             self.assertEqual(manifest['production_payment'],'HOLD')
+            for name in ('tests/test_community_portal_pagination.mjs',
+                         'tests/community_project_review_dom.cjs',
+                         'scripts/community_project_materials.py',
+                         'demos/community-stage/project-review.js'):
+                self.assertIn(name, manifest['files'])
             self.assertFalse(any(name.endswith(('.pem','.sqlite','.env')) for name in archive.namelist()))
 
 if __name__=='__main__':unittest.main()

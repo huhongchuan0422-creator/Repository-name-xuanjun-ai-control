@@ -33,3 +33,34 @@ Real submerchant and WeChat approval, official split receiver-level bill format,
 ## Scoped provider-bill reconciliation audit (candidate)
 
 The original finance-authorized `/community/provider-actions` supports `bill_audit` with `{kind, bill_date, after_id}` after an already ingested signed-ticket/hash-verified bill. It reads only existing original encrypted Center reconciliation records for that project and exact merchant/store scope; returns at most 50 immutable result snapshots and a cursor. It checks each audit row against the existing SHA256 event key and returns `finance_status=UNCONFIRMED`. Historical snapshots lacking original scope metadata are not implicitly trusted or shown. No new money ledger, payout or issuer role.
+
+## 2026-10-17 project-material closure candidate
+
+The existing original Center remains the sole authority and encrypted material store.
+`POST /mini/project-materials` accepts only `item`, `revision`, `filename`, and
+`content_base64` with the original mini session and scene headers. Current account,
+project and tenant authorization is checked before reading the upload body and again
+before the original save. Only declared PRIVATE_DOCUMENT requirements are accepted;
+PDF/PNG/JPEG are bounded to 5,000,000 decoded bytes. The admitted host must supply the
+original scanner; unavailable or non-clean results never become accepted materials.
+Saving returns PARTIAL; the existing project_submit remains a separate operation.
+
+The mini page binds file selection, reading, upload, checklist and submission to the
+same page, session generation, scene, requirement and revision. Identity changes,
+unload and stale responses cannot populate a new request or send old files with a
+new session. Tests use synthetic files, not customer documents or live providers.
+
+`/community/project-review` provides the original reviewer with a project checklist,
+version-bound begin_review/request_changes/approve actions and private document
+retrieval. `POST /community/project-materials` supports only checklist and download
+under the original Center web session, CSRF and current REVIEWER membership; mini
+bearer sessions cannot approve. The page clears actionable stale state after an
+uncertain mutation and requires a refresh rather than replaying it.
+
+The review package now includes Node DOM regression helpers as well as Python tests,
+mini tests, new portal assets and the material adapter. The three pinned Center
+Core/Source/Runtime files are unchanged. Local HTTP/SQLite/encryption journeys and
+Node tests are source-level evidence; Hosted CI for the exact new commit must be
+checked separately. Scanner deployment, production CRM admission, real customer
+acceptance, money operations and production release remain external/unapproved.
+This closes an implementation gap, not either entire phase or independent review.

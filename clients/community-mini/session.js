@@ -10,9 +10,9 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
   if (!/^https:\/\/[A-Za-z0-9.-]+(?::443)?$/.test(baseUrl) &&
       !/^http:\/\/127\.0\.0\.1:[0-9]{4,5}$/.test(baseUrl))throw Error('TRUSTED_BACKEND_REQUIRED');
   let token=null,expires=0,generation=0;
-  const request=(path,data,credential)=>new Promise((resolve,reject)=>{
+  const request=(path,data,credential,scene)=>new Promise((resolve,reject)=>{
     wx.request({url:baseUrl+path,method:'POST',data,timeout:5000,
-      header:{'content-type':'application/json',...(credential?{'X-Community-Session':credential}:{})},
+      header:{'content-type':'application/json',...(credential?{'X-Community-Session':credential}:{}),...(scene?{'X-Community-Scene':scene}:{})},
       success:r=>r.statusCode===200?resolve(r.data):reject(Error('SERVICE_REQUEST_REJECTED')),
       fail:()=>reject(Error('SERVICE_RESULT_UNKNOWN'))});
   });
@@ -52,6 +52,46 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       if(version!==generation)throw Error('STALE_SESSION');
       if(!reply||!reply.result||reply.payment_enabled!==false)throw Error('UNTRUSTED_COMMERCE_REPLY');
       return reply.result;
+    },
+    getGeneration() {return generation;},
+    async projectDocument(scene, params, expectedGeneration=generation) {
+      if(expectedGeneration!==generation)throw Error('STALE_SESSION');
+      if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
+      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||
+         !params||Object.keys(params).sort().join(',')!=='content_base64,filename,item,revision'||
+         typeof params.item!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(params.item)||
+         !Number.isSafeInteger(params.revision)||params.revision<0||
+         typeof params.filename!=='string'||params.filename.length<1||params.filename.length>180||
+         params.filename.trim()!==params.filename||/[\\/:\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/.test(params.filename)||
+         !/\.(pdf|png|jpe?g)$/i.test(params.filename))throw Error('INVALID_PROJECT_DOCUMENT');
+      const content=params.content_base64;
+      if(typeof content!=='string'||!content.length||content.length>6666668||content.length%4!==0||
+         !/^[A-Za-z0-9+/]+={0,2}$/.test(content))throw Error('INVALID_PROJECT_DOCUMENT');
+      const padding=content.endsWith('==')?2:content.endsWith('=')?1:0;
+      const size=content.length/4*3-padding;
+      const last='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.indexOf(content[content.length-padding-1]);
+      if(size<1||size>5000000||(padding===2&&(last&15)!==0)||(padding===1&&(last&3)!==0))throw Error('INVALID_PROJECT_DOCUMENT');
+      // File names alone do not establish type; the server still owns scanning and final validation.
+      let magic='',bits=0,value=0;
+      const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      for(const character of content.slice(0,12)){
+        if(character==='=')break;
+        value=(value<<6)|alphabet.indexOf(character);bits+=6;
+        if(bits>=8){bits-=8;magic+=String.fromCharCode((value>>bits)&255);}
+      }
+      const extension=magic.startsWith('%PDF-')?/\.pdf$/i:
+        magic.startsWith('\x89PNG\r\n\x1a\n')?/\.png$/i:magic.startsWith('\xff\xd8\xff')?/\.jpe?g$/i:null;
+      if(!extension||!extension.test(params.filename))throw Error('INVALID_PROJECT_DOCUMENT');
+      const version=generation;
+      const reply=await request('/mini/project-materials',params,token,scene);
+      if(version!==generation)throw Error('STALE_SESSION');
+      const result=reply&&reply.result;
+      if(!reply||reply.payment_enabled!==false||!result||
+         Object.keys(result).sort().join(',')!=='revision,state,version'||
+         typeof result.version!=='string'||!/^v_[0-9a-f]{32}$/.test(result.version)||
+         !Number.isSafeInteger(result.revision)||result.revision!==params.revision+1||
+         result.state!=='PARTIAL')throw Error('UNTRUSTED_PROJECT_DOCUMENT_REPLY');
+      return result;
     },
     async payment(scene, operation, reference) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');

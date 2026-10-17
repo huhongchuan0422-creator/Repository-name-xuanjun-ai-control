@@ -19,6 +19,18 @@ class Commerce:
         self.operations, self.identity = operations, identity
         self.center, self.runtime = identity.center, identity.runtime
 
+    def project_document_authorize(self, token, scene):
+        from scripts.community_project_materials import ProjectMaterials
+        return ProjectMaterials(self).authorize_upload(token, scene)
+
+    def project_document_upload(self, token, scene, body):
+        from scripts.community_project_materials import ProjectMaterials
+        return ProjectMaterials(self).upload(token, scene, body)
+
+    def project_material_review(self, session, csrf, body):
+        from scripts.community_project_materials import ProjectMaterials
+        return ProjectMaterials(self).reviewer(session, csrf, body)
+
     def _key(self, identity, kind, ref):
         return hashlib.sha256(canonical([identity, kind, ref])).hexdigest()
 

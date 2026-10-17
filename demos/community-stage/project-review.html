@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>项目材料独立审核</title><link rel="stylesheet" href="/community/project-review.css"></head>
+<body><main><header><h1>项目材料独立审核</h1><p>使用客户中心原有审核员身份。每次审核绑定当前项目、材料与版本；请先核对材料，再作出审核决定。</p></header>
+<p id="reviewNotice" role="status" aria-live="polite">请从客户中心打开已授权的项目</p><p id="reviewProject"></p><button id="reviewReload" type="button" disabled>刷新审核清单</button>
+<section><h2>材料清单</h2><div id="reviewItems"></div></section>
+<section id="reviewDetail" hidden><h2>当前材料</h2><p id="reviewSelected"></p><p id="reviewInstructions"></p><div id="reviewVersions"></div>
+<form id="reviewForm"><label for="reviewReason">审核意见（批准或退回时必填）</label><textarea id="reviewReason" maxlength="1000" rows="4"></textarea><button id="reviewBegin" type="button">开始审核</button><button id="reviewChanges" type="button">退回补正</button><button id="reviewApprove" type="button">批准当前版本</button></form></section>
+</main><script src="/community/project-review.js" defer></script></body></html>

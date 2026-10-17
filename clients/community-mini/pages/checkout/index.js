@@ -4,6 +4,9 @@ const {parseScene,createSession} = require('../../session');
 Page({
   data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
   async onLoad(options) {
+    this._pageUnloaded=false;
+    const lifecycle=this._pageGeneration=(this._pageGeneration||0)+1;
+    const current=()=>!this._pageUnloaded&&this._pageGeneration===lifecycle;
     try {
       const config = getApp().globalData;
       if (config.mode !== 'OFFLINE') {
@@ -12,7 +15,8 @@ Page({
         if(typeof options.promotion==='string'&&/^cp_[0-9a-f]{32}$/.test(options.promotion))this.setData({promotionCode:options.promotion});
         this.session = createSession(wx,config.baseUrl);
         await this.session.login();
-        if(config.commerce===true){this.setData({commerceEnabled:true});try{const listing=await this.session.commerce(scene,'products',{});this.setData({products:listing.products.map(p=>({...p,quantity:0}))});}catch(error){this.setData({products:[],status:error.message+'；已有订单可继续查询和申请售后'});}}
+        if(!current())return;
+        if(config.commerce===true){this.setData({commerceEnabled:true});try{const listing=await this.session.commerce(scene,'products',{});if(!current())return;this.setData({products:listing.products.map(p=>({...p,quantity:0}))});}catch(error){if(!current())return;this.setData({products:[],status:error.message+'；已有订单可继续查询和申请售后'});}}
         this.client = makeClient(body => this.session.transport(scene,body));
         if(config.payments===true){this.paymentFlow=createPaymentFlow(wx,(op,reference)=>this.session.payment(scene,op,reference));this.setData({paymentsEnabled:true,status:'请创建订单，或输入原订单号查询微信结果'});}
       } else {
@@ -25,12 +29,12 @@ Page({
         fail:reject});
     }));
       }
-    this.client.storefront().then(s=>this.setData({merchant:s.merchant.name,
+    this.client.storefront().then(s=>current()&&this.setData({merchant:s.merchant.name,
       beforeAd:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.title : ''}))
-      .catch(e=>this.setData({status:e.message}));
-    } catch(e) {this.setData({status:e.message});}
+      .catch(e=>{if(current())this.setData({status:e.message});});
+    } catch(e) {if(current())this.setData({status:e.message});}
   },
-  onUnload() {if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
+  onUnload() {this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
   inputProject(e) {this.setData({projectFeedback:e.detail.value});},
@@ -42,63 +46,127 @@ Page({
     if(!['SECRETREF','OAUTH','SERVER_CHALLENGE'].includes(source.submission_type)){
       this.setData({status:'此材料需要通过原客户中心私有文件上传，不允许用引用编号代替'});return;
     }
+    this._projectRequest=null;
     this.setData({projectReferenceItem:item,projectReferenceRevision:revision,
       projectReferenceKind:source.submission_type,projectReference:''});
   },
   inputProjectReference(e){this.setData({projectReference:e.detail.value});},
   inputProjectReferenceKind(e){const items=['SECRETREF','OAUTH','SERVER_CHALLENGE'];const i=Number(e.detail.value);if(Number.isSafeInteger(i)&&items[i])this.setData({projectReferenceKind:items[i]});},
+  beginProjectRequest() {
+    const request={generation:this._pageGeneration,session:this.session,scene:this.scene,
+      sessionGeneration:typeof this.session.getGeneration==='function'?this.session.getGeneration():undefined,
+      customer:this.data.projectCustomerId,item:this.data.projectReferenceItem,
+      revision:this.data.projectReferenceRevision};
+    this._projectRequest=request;
+    this.setData({pending:true});
+    return request;
+  },
+  projectRequestCurrent(request) {
+    return !this._pageUnloaded&&this._projectRequest===request&&
+      this._pageGeneration===request.generation&&this.session===request.session&&
+      (typeof request.session.getGeneration!=='function'||request.session.getGeneration()===request.sessionGeneration)&&
+      this.scene===request.scene&&this.data.projectCustomerId===request.customer&&
+      this.data.projectReferenceItem===request.item&&this.data.projectReferenceRevision===request.revision;
+  },
   async saveProjectReference() {
-    if(this.data.pending||!this.session||!this.data.projectReferenceItem)return;
+    if(this._pageUnloaded||this.data.pending||!this.session||!this.data.projectReferenceItem)return;
     if(typeof this.data.projectReference!=='string'||!this.data.projectReference.trim()||this.data.projectReference.length>256){this.setData({status:'材料引用编号不能为空且不得超过256字符'});return;}
     if(!['SECRETREF','OAUTH','SERVER_CHALLENGE'].includes(this.data.projectReferenceKind))return;
-    const originalItem=this.data.projectReferenceItem,originalRevision=this.data.projectReferenceRevision;
-    this.setData({pending:true});
+    const request=this.beginProjectRequest();
     try{
-      const r=await this.session.commerce(this.scene,'project_save_reference',{
+      const r=await request.session.commerce(request.scene,'project_save_reference',{
         item:this.data.projectReferenceItem,revision:this.data.projectReferenceRevision,
         kind:this.data.projectReferenceKind,reference:this.data.projectReference});
-      if(this.data.projectReferenceItem!==originalItem||this.data.projectReferenceRevision!==originalRevision)return;
+      if(!this.projectRequestCurrent(request))return;
+      request.revision=r.revision;
       this.setData({projectReference:'',projectReferenceRevision:r.revision,status:'可信材料引用已保存，需单独提交审核'});
-      const checklist=await this.session.commerce(this.scene,'project_checklist',{});
+      const checklist=await request.session.commerce(request.scene,'project_checklist',{});
+      if(!this.projectRequestCurrent(request))return;
       this.setData({projectChecklist:checklist.items.map(v=>({
         id:v.id,state:v.state,required:v.required,revision:v.revision,title:v.title,instructions:v.instructions,submission_type:v.submission_type}))});
-    }catch(error){this.setData({status:error.message});}
-    finally{this.setData({pending:false});}
+    }catch(error){if(this.projectRequestCurrent(request))this.setData({status:error.message});}
+    finally{if(this.projectRequestCurrent(request)){this._projectRequest=null;this.setData({pending:false});}}
+  },
+
+  async uploadProjectDocument(e) {
+    if(this._pageUnloaded||this.data.pending||!this.session)return;
+    const item=e.currentTarget.dataset.item,revision=Number(e.currentTarget.dataset.revision);
+    const source=this.data.projectChecklist.find(entry=>entry.id===item);
+    if(!source||source.submission_type!=='PRIVATE_DOCUMENT'||!Number.isSafeInteger(revision)||revision<0||revision!==source.revision)return;
+    this.setData({projectReferenceItem:item,projectReferenceRevision:revision,
+      projectReferenceKind:'PRIVATE_DOCUMENT',projectReference:''});
+    const request=this.beginProjectRequest();
+    let uploading=false;
+    try {
+      const selected=await new Promise((resolve,reject)=>wx.chooseMessageFile({
+        count:1,type:'file',extension:['pdf','png','jpg','jpeg'],success:resolve,
+        fail:error=>reject(Error(error&&typeof error.errMsg==='string'&&/cancel/i.test(error.errMsg)?'DOCUMENT_PICK_CANCELLED':'DOCUMENT_PICK_FAILED'))
+      }));
+      if(!this.projectRequestCurrent(request))return;
+      const file=selected&&selected.tempFiles&&selected.tempFiles.length===1?selected.tempFiles[0]:null;
+      if(!file||typeof file.name!=='string'||!file.name||file.name.length>180||
+         !/\.(pdf|png|jpe?g)$/i.test(file.name)||typeof file.path!=='string'||!file.path||
+         !Number.isSafeInteger(file.size)||file.size<1||file.size>5000000)throw Error('仅支持不超过5MB的PDF、PNG或JPEG文件');
+      const read=await new Promise((resolve,reject)=>wx.getFileSystemManager().readFile({
+        filePath:file.path,encoding:'base64',success:resolve,fail:()=>reject(Error('文件读取失败，请重新选择'))
+      }));
+      if(!this.projectRequestCurrent(request))return;
+      uploading=true;
+      const result=await request.session.projectDocument(request.scene,{
+        item,revision,filename:file.name,content_base64:read.data
+      },request.sessionGeneration);
+      if(!this.projectRequestCurrent(request))return;
+      request.revision=result.revision;
+      this.setData({projectReferenceRevision:result.revision,
+        projectChecklist:this.data.projectChecklist.map(entry=>entry.id===item?{...entry,revision:result.revision,state:result.state}:entry),
+        status:'私有材料版本已保存，需单独提交审核'});
+    } catch(error) {
+      if(this.projectRequestCurrent(request))this.setData({status:error.message==='DOCUMENT_PICK_CANCELLED'?'已取消选择文件':
+        error.message==='INVALID_PROJECT_DOCUMENT'?'文件名称、格式或内容无效，请重新选择PDF、PNG或JPEG文件':
+        error.message==='SESSION_EXPIRED'?'登录已过期，请重新登录后重新选择文件':
+        uploading?'上传结果未确认；请先刷新资料清单核对当前版本，不要重复上传':error.message});
+    } finally {
+      if(this.projectRequestCurrent(request)){this._projectRequest=null;this.setData({pending:false});}
+    }
   },
 
   async submitProjectItem(e) {
-    if(this.data.pending||!this.session)return;
+    if(this._pageUnloaded||this.data.pending||!this.session)return;
     const item=e.currentTarget.dataset.item;
     const revision=Number(e.currentTarget.dataset.revision);
     if(typeof item!=='string'||!Number.isSafeInteger(revision)||revision<0)return;
-    this.setData({pending:true});
+    const request=this.beginProjectRequest();
     try {
-      const result=await this.session.commerce(this.scene,'project_submit',{item,revision});
+      const result=await request.session.commerce(request.scene,'project_submit',{item,revision});
+      if(!this.projectRequestCurrent(request))return;
       this.setData({status:'资料版本已提交审核：'+result.state});
-      const checklist=await this.session.commerce(this.scene,'project_checklist',{});
+      const checklist=await request.session.commerce(request.scene,'project_checklist',{});
+      if(!this.projectRequestCurrent(request))return;
       this.setData({projectChecklist:checklist.items.map(entry=>({
         id:entry.id,state:entry.state,required:entry.required,revision:entry.revision,title:entry.title,instructions:entry.instructions,submission_type:entry.submission_type
       }))});
-    } catch(error){this.setData({status:error.message});}
-    finally {this.setData({pending:false});}
+    } catch(error){if(this.projectRequestCurrent(request))this.setData({status:error.message});}
+    finally {if(this.projectRequestCurrent(request)){this._projectRequest=null;this.setData({pending:false});}}
   },
 
   async projectAction(e) {
-    if(this.data.pending||!this.session)return;
+    if(this._pageUnloaded||this.data.pending||!this.session)return;
     const op=e.currentTarget.dataset.operation;
     if(!['project_summary','project_checklist','project_feedback','project_messages'].includes(op))return;
-    this.setData({pending:true});
+    const request=this.beginProjectRequest();
     try {
       const params=op==='project_feedback'?{message:this.data.projectFeedback}:{};
-      const r=await this.session.commerce(this.scene,op,params);
+      const r=await request.session.commerce(request.scene,op,params);
+      if(!this.projectRequestCurrent(request))return;
+      if(op==='project_summary')request.customer=r.customer_id;
       if(op==='project_summary')this.setData({projectTitle:r.title,projectRole:r.role,
         projectCustomerId:r.customer_id,projectState:r.checklist_overall});
       else if(op==='project_checklist')this.setData({projectChecklist:r.items.map(item=>({
         id:item.id,state:item.state,required:item.required,revision:item.revision,title:item.title,instructions:item.instructions,submission_type:item.submission_type}))});
       else if(op==='project_messages')this.setData({projectMessages:r.records,status:'读取原项目归档记录；不代表已获得人工回复'});
       else this.setData({projectFeedback:'',status:'项目反馈已归档，尚未确认人工回复：'+r.id});
-    } catch(error) {this.setData({status:error.message});}
-    finally {this.setData({pending:false});}
+    } catch(error) {if(this.projectRequestCurrent(request))this.setData({status:error.message});}
+    finally {if(this.projectRequestCurrent(request)){this._projectRequest=null;this.setData({pending:false});}}
   },
   async profileAction(e) {
     if(this.data.pending||!this.session)return;this.setData({pending:true});

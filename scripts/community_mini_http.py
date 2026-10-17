@@ -72,7 +72,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                         ('Content-Security-Policy',"default-src 'none'")]:self.send_header(k,v)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_GET(self):
-            if self.path!='/community/health' and onboarding is None and operations is None and saas is None and communities is None:return self.answer(404,{'error':'NOT_FOUND'})
+            if self.path!='/community/health' and onboarding is None and operations is None and saas is None and communities is None and commerce is None:return self.answer(404,{'error':'NOT_FOUND'})
             host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if self.headers.get_all('Host')!=[host]:return self.answer(403,{'error':'ORIGIN_DENIED'})
             if trusted_proxy is not None:
@@ -103,6 +103,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 assets.update({'/community/portal':('communities.html','text/html; charset=utf-8'),
                     '/community/portal.js':('communities.js','application/javascript; charset=utf-8'),
                     '/community/portal.css':('workbench.css','text/css; charset=utf-8')})
+            if commerce is not None:
+                assets.update({'/community/project-review':('project-review.html','text/html; charset=utf-8'),
+                    '/community/project-review.js':('project-review.js','application/javascript; charset=utf-8'),
+                    '/community/project-review.css':('workbench.css','text/css; charset=utf-8')})
             if self.path not in assets:return self.answer(404,{'error':'NOT_FOUND'})
             from pathlib import Path
             name,mime=assets[self.path]
@@ -130,22 +134,33 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     self.path=='/community/provider-actions' and provider_actions is not None) and not (
                     self.path=='/community/directory' and communities is not None) and not (
                     self.path=='/community/commerce' and commerce is not None) and not (
+                    self.path in ('/mini/project-materials','/community/project-materials') and commerce is not None) and not (
                     notifications is not None and self.path==notifications.path):
                 return self.answer(404,{'error':'NOT_FOUND'})
             if (self.headers.get('Transfer-Encoding') is not None or
                     len(self.headers.get_all('Content-Length',[])) != 1 or
                     any(len(self.headers.get_all(h,[])) > 1 for h in
-                        ('X-Community-Session','X-Center-Session','X-Center-CSRF','Cookie','X-CSRF-Token'))):
+                        ('X-Community-Session','X-Community-Scene','X-Center-Session','X-Center-CSRF','Cookie','X-CSRF-Token'))):
                 return self.answer(400,{'error':'AMBIGUOUS_HEADERS'})
             if self.headers.get('Content-Type','').split(';')[0].lower() != 'application/json':
                 return self.answer(415,{'error':'JSON_REQUIRED'})
             try:
                 length=int(self.headers.get('Content-Length','-1'))
                 limit=7_000_000 if self.path=='/merchant/onboarding' else 1048576 if notifications is not None and self.path==notifications.path else 16384
+                if self.path=='/mini/project-materials':
+                    from scripts.community_project_materials import MAX_UPLOAD_BODY
+                    limit=MAX_UPLOAD_BODY
                 if not 0 < length <= limit:raise ValueError('INVALID_LENGTH')
                 session=self.headers.get('X-Center-Session','')
                 csrf=self.headers.get('X-Center-CSRF','')
-                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions','/community/directory','/community/commerce'):
+                if self.path=='/mini/project-materials':
+                    if session or csrf or self.headers.get('Cookie') or self.headers.get('X-CSRF-Token'):
+                        raise PermissionError('MINI_BEARER_SESSION_REQUIRED')
+                    # Authentication and current project authorization precede
+                    # reading any private file bytes, including small uploads.
+                    commerce.project_document_authorize(self.headers.get('X-Community-Session',''),
+                                                        self.headers.get('X-Community-Scene',''))
+                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions','/community/directory','/community/commerce','/community/project-materials'):
                     cookies=[part.strip().partition('=')[2] for part in self.headers.get('Cookie','').split(';')
                              if part.strip().partition('=')[0]=='__Host-xj_customer']
                     if len(cookies)>1 or cookies and session or csrf and self.headers.get('X-CSRF-Token'):
@@ -155,7 +170,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     # Authenticate before accepting a large private upload body.
                     if session:
                         if not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions,'/community/directory':communities,'/community/commerce':commerce}[self.path].center.session(session,csrf)
+                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions,'/community/directory':communities,'/community/commerce':commerce,'/community/project-materials':commerce}[self.path].center.session(session,csrf)
                     elif length>16384:raise PermissionError('CENTER_SESSION_REQUIRED')
                 remaining=length;chunks=[];deadline=time.monotonic()+1
                 while remaining:
@@ -188,6 +203,13 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 body=json.loads(b''.join(chunks),object_pairs_hook=pairs,parse_float=finite,
                                 parse_constant=lambda _:(_ for _ in ()).throw(ValueError('NONFINITE')))
                 token=self.headers.get('X-Community-Session','')
+                if self.path=='/mini/project-materials':
+                    result=commerce.project_document_upload(token,self.headers.get('X-Community-Scene',''),body)
+                    return self.answer(200,{'result':result,'payment_enabled':False})
+                if self.path=='/community/project-materials':
+                    if token:raise PermissionError('CENTER_SESSION_REQUIRED')
+                    result=commerce.project_material_review(session,csrf,body)
+                    return self.answer(200,{'result':result,'payment_enabled':False})
                 if self.path=='/mini/payment':
                     if session or csrf or self.headers.get('Cookie') or self.headers.get('X-CSRF-Token'):raise PermissionError('MINI_BEARER_SESSION_REQUIRED')
                     result=gateway.payments.dispatch(token,body)

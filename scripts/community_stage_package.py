@@ -9,6 +9,7 @@ from pathlib import Path
 def build(root):
     root = Path(root)
     patterns = ('scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
+                'tests/test_community_*.mjs', 'tests/community_*.cjs',
                 'tests/test_stage5_*.py', 'demos/community-local-e2e/*',
                 'demos/community-stage/*', 'demos/community-payment/*',
                 'demos/community-admin/*', 'clients/community-mini/*.js',
