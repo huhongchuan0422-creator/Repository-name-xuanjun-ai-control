@@ -3,6 +3,9 @@ on:
   push:
     branches: [feature/work-pr122-site-hub-integration-20261016]
     paths:
+      - scripts/pr122_remote_custody_prepare.py
+      - tests/test_pr122_remote_custody_prepare.py
+      - docs/development/PR122_REMOTE_CUSTODY_EVIDENCE_20261017.md
       - scripts/pr122_owner_custody_envelope.py
       - tests/test_pr122_owner_custody_envelope.py
       - .github/workflows/pr122-custody-envelope.yml
@@ -22,11 +25,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -B -m unittest tests.test_pr122_owner_custody_envelope -v 2>&1 | tee TESTS.log
+          python -B -m unittest tests.test_pr122_owner_custody_envelope tests.test_pr122_remote_custody_prepare -v 2>&1 | tee TESTS.log
       - uses: actions/upload-artifact@v4
         with:
           name: pr122-custody-envelope-${{ github.sha }}
           path: |
+            scripts/pr122_remote_custody_prepare.py
+            scripts/pr122_owner_channel_custody.py
+            tests/test_pr122_remote_custody_prepare.py
+            docs/development/PR122_REMOTE_CUSTODY_EVIDENCE_20261017.md
+            .github/workflows/pr122-custody-envelope.yml
             scripts/pr122_owner_custody_envelope.py
             tests/test_pr122_owner_custody_envelope.py
             TESTS.log
