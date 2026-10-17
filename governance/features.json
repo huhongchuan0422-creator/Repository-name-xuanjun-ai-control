@@ -85,7 +85,8 @@
           "tests/test_community_provider_terminal_binding.py",
           "tests/test_community_owned_receipt_ad.py",
           "tests/test_community_original_project_center.py",
-          "tests/test_community_finance_record_isolation.py"
+          "tests/test_community_finance_record_isolation.py",
+          "tests/test_community_integrated_platform_bill_journey.py"
         ]
       },
       "reuse": [
