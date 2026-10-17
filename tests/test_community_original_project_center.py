@@ -1,5 +1,8 @@
 """Mini customer project center reuses the existing immutable Center operations."""
 import unittest
+import hashlib
+import hmac
+from scripts.pr122_customer_core import canonical
 import test_community_reports as fixtures
 
 
@@ -32,6 +35,36 @@ class OriginalProjectCenterJourney(unittest.TestCase):
         self.assertEqual(receipt['ai_response'],'PENDING_PROVIDER')
         archived=self.fx.c.messages(self.fx.fx.uid1,'project1')
         self.assertEqual(archived[-1]['body'],'请核对门店需求版本')
+
+    def test_versioned_material_submit_and_independent_review_original_center(self):
+        c=self.fx.c
+        _,_,details=c.project(self.fx.fx.uid1,'project1')
+        material=dict(id='material1',title='Fixture material',purpose='fixture material submission',
+                      required=True,identity_requirements=[],official_url='https://example.org',
+                      instructions='Only synthetic reference; never real customer secrets',
+                      minimum_permissions=[],fees=[],verified_at=c.now(),formats=[],
+                      valid_until=c.now()+3600,submission_type='SECRETREF',category='MATERIAL')
+        project=dict(details,requirements=[material],reviewer_emails=['two@example.org'])
+        payload=dict(revision=2,expires=c.now()+3600,projects=[project])
+        key=b'a'*32
+        c.import_authority(dict(payload=payload,signature=hmac.new(key,canonical(payload),hashlib.sha256).hexdigest()),key)
+        c.secretref=lambda project_id,item,kind,reference: (
+            project_id=='project1' and item=='material1' and kind=='SECRETREF'
+            and reference=='synthetic-reference')
+        saved=c.save(self.fx.fx.uid1,'project1','material1',0,'SECRETREF','synthetic-reference')
+        self.assertEqual(saved['state'],'PARTIAL')
+        submitted=self.consumer('project_submit',dict(item='material1',revision=saved['revision']))
+        self.assertEqual(submitted['state'],'SUBMITTED')
+        with self.assertRaises(PermissionError):
+            self.consumer('project_review',dict(item='material1',revision=submitted['revision'],action='begin_review',reason=''))
+        reviewer=self.fx.fx.token('reviewer2','openid2')
+        review=self.consumer('project_review',dict(item='material1',revision=submitted['revision'],action='begin_review',reason=''),token=reviewer)
+        self.assertEqual(review['state'],'IN_REVIEW')
+        approved=self.consumer('project_review',dict(item='material1',revision=review['revision'],action='approve',reason='synthetic acceptance'),token=reviewer)
+        self.assertEqual(approved['state'],'ACCEPTED')
+        self.assertEqual(self.consumer('project_checklist')['overall'],'ACCEPTED')
+        with self.assertRaises(ValueError):
+            self.consumer('project_review',dict(item='material1',revision=review['revision'],action='approve',reason='replay'),token=reviewer)
 
     def test_independent_review_never_granted_to_owner_or_editor(self):
         request=dict(item='material1',revision=1,action='approve',reason='checked')
