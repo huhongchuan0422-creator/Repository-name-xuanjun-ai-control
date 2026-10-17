@@ -1,4 +1,4 @@
-name: PR99 stopped transaction verification
+name: PR99 offline transaction verification
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -7,6 +7,10 @@ on:
       - 'evidence/pr99-service-handoff/s09-install-candidate/test_stopped_transaction.py'
       - 'evidence/pr99-service-handoff/s09-install-candidate/production_start.py'
       - 'evidence/pr99-service-handoff/s09-install-candidate/test_production_start.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/migration_transaction.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/final_materials.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/test_migration_transaction.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/test_final_materials.py'
       - '.github/workflows/pr99-stopped-transaction-validation.yml'
 permissions:
   contents: read
@@ -19,8 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Exact transaction tests in temporary root-owned filesystem
+      - name: Offline transactions and temporary filesystem negative tests
         run: |
-          sudo -n python3 evidence/pr99-service-handoff/s09-install-candidate/test_stopped_transaction.py
-          sudo -n python3 evidence/pr99-service-handoff/s09-install-candidate/test_production_start.py
+          python3 -B -m unittest discover -s evidence/pr99-service-handoff/s09-install-candidate -p 'test_*.py' -v
           python3 evidence/pr99-service-handoff/s09-install-candidate/stopped_transaction.py manifest

@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import os
+from types import SimpleNamespace
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,6 +21,15 @@ class TransactionTests(unittest.TestCase):
         self.before = {n:'LoadState=not-found\n' for n in tx.ORIGINAL}
         self.permit = {'nonce':'test_nonce_1234567890'}
         self.accepted = {'status':'R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION', 'application_processes_stopped':True}
+        # Temp fixtures model uid-0 host ownership; production checks stay intact.
+        original_fstat = os.fstat
+        def fixture_fstat(fd):
+            value = original_fstat(fd)
+            fields = {name: getattr(value, name) for name in dir(value) if name.startswith('st_')}
+            fields['st_uid'] = 0
+            return SimpleNamespace(**fields)
+        ownership = patch.object(tx.os, 'fstat', fixture_fstat)
+        ownership.start(); self.addCleanup(ownership.stop)
         self.original_read = tx.read_regular
         def read(path,*args,**kwargs):
             if str(path).endswith('callback-restart-acceptance-v1/receipt.json'):
