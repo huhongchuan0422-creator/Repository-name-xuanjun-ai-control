@@ -36,6 +36,19 @@ class ConditionalFields(unittest.TestCase):
         self.assertNotIn('secret-invalid',str(error.exception))
         p['subject_info']['ubo_info_list']=[copy.deepcopy(ubo)]*5
         with self.assertRaisesRegex(ValueError,'UBO_LIST'):validate(p,'ENTERPRISE',NOW)
+    def test_duplicate_ubo_documents_fail_closed_without_leaking_private_number(self):
+        p=profile()
+        ubo=dict(ubo_id_doc_type='IDENTIFICATION_TYPE_OVERSEA_PASSPORT',
+            ubo_id_doc_copy='media-front',ubo_id_doc_name='Synthetic',
+            ubo_id_doc_number='TEST-1234',ubo_id_doc_address='Fixture',
+            ubo_period_begin='2020-01-01',ubo_period_end='2030-01-01')
+        p['subject_info']['ubo_info_list']=[copy.deepcopy(ubo),copy.deepcopy(ubo)]
+        with self.assertRaisesRegex(ValueError,'DUPLICATE_OFFICIAL_UBO_DOCUMENT') as err:
+            validate(p,'ENTERPRISE',NOW)
+        self.assertNotIn(ubo['ubo_id_doc_number'],str(err.exception))
+        p['subject_info']['ubo_info_list'][1]['ubo_id_doc_number']='TEST-5678'
+        validate(p,'ENTERPRISE',NOW)
+
     def test_expired_period_other_bank_store_scenes_and_activity_rates(self):
         for path,value in [('expiry','2021-01-01'),('bank','其他银行'),('scene','SALES_SCENES_MP'),('activity','fixture')]:
             p=profile()
