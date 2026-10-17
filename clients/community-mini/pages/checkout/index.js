@@ -2,7 +2,7 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:""},
+  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:""},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
@@ -67,7 +67,7 @@ Page({
     const more=e?.currentTarget?.dataset?.more==='true';
     try{const r=await this.session.commerce(this.scene,'orders',{after_id:more?this.data.orderCursor||'':''});this.setData({orders:r.records,orderCursor:r.next_cursor,ordersMore:r.has_more});}catch(error){this.setData({status:error.message});}finally{this.setData({pending:false});}
   },
-  selectOrder(e) {if(this.data.pending)return;if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.currentTarget.dataset.reference,refundApplication:'',afterAd:''});},
+  selectOrder(e) {if(this.data.pending)return;if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.currentTarget.dataset.reference,refundApplication:'',afterAd:'',afterAdVerified:false});},
   inputRefund(e) {const field=e.currentTarget.dataset.field;if(['refundAmount','refundReason','refundApplication'].includes(field))this.setData({[field]:e.detail.value});},
   async requestRefund() {
     if(this.data.pending||!this.session||!this.data.commerceEnabled)return;
@@ -80,18 +80,18 @@ Page({
     if(this.data.pending||!this.session)return;this.setData({pending:true});
     try{const r=await this.session.commerce(this.scene,'refund_application',{reference:this.data.reference,application_id:this.data.refundApplication});this.setData({status:'退款申请：'+r.status+' '+r.opinion});}catch(e){this.setData({status:e.message});}finally{this.setData({pending:false});}
   },
-  inputAmount(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({amount:e.detail.value,afterAd:''});},
-  inputReference(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.detail.value,afterAd:''});},
+  inputAmount(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({amount:e.detail.value,afterAd:'',afterAdVerified:false});},
+  inputReference(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.detail.value,afterAd:'',afterAdVerified:false});},
   async checkout() {
     if (this.data.pending) return;
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
-    this.setData({pending:true,afterAd:'',status:this.data.paymentsEnabled?'正在创建订单':'正在创建模拟订单'});
+    this.setData({pending:true,afterAd:'',afterAdVerified:false,status:this.data.paymentsEnabled?'正在创建订单':'正在创建模拟订单'});
     try {if(this.data.commerceEnabled){const lines=this.data.products.filter(p=>p.quantity>0).map(p=>({item_id:p.item_id,revision:p.revision,quantity:p.quantity}));const r=await this.session.commerce(this.scene,'purchase',{reference:this.data.reference,lines});this.setData({amount:String(r.amount_minor)});}else await this.client.checkout(this.data.amount,this.data.reference);this.setData({status:this.data.paymentsEnabled?'订单已建立，请点击微信支付':'模拟待支付；不发起微信扣款'});}
     catch(e) {this.setData({status:e.message});}
     finally {this.setData({pending:false});}
   },
   async cancelOrder() {
-    if(this.data.pending||!this.session)return;this.setData({pending:true,afterAd:''});
+    if(this.data.pending||!this.session)return;this.setData({pending:true,afterAd:'',afterAdVerified:false});
     try{const r=await this.session.payment(this.scene,'cancel',this.data.reference);if(this.paymentFlow)this.paymentFlow.reset();this.setData({status:r.order_state==='CANCELLED'?'订单已取消，库存已恢复或可按原订单恢复处理':r.order_state+'；以服务端确认状态为准'});}
     catch(e){this.setData({status:e.message+'；请查询原订单，不要重新提交资金操作'});}finally{this.setData({pending:false});}
   },
@@ -99,32 +99,32 @@ Page({
   async recoverPayment() {return this.runPayment(true);},
   async runPayment(recover) {
     if(this.data.pending||!this.paymentFlow)return;
-    this.setData({pending:true,afterAd:'',status:recover?'正在恢复原支付单':'正在准备微信支付'});
+    this.setData({pending:true,afterAd:'',afterAdVerified:false,status:recover?'正在恢复原支付单':'正在准备微信支付'});
     try {const r=await this.paymentFlow.pay(this.data.reference,recover);await this.showPayment(r);}
     catch(e){this.setData({status:e.message+'；请查询原订单，勿重新创建支付单'});}
     finally{this.setData({pending:false});}
   },
   async showPayment(r) {
     const reference=this.data.reference;
-    this.setData({amount:String(r.amount_minor),status:r.provider_state==='SUCCESS'?'微信查单已支付；财务尚未核销':r.provider_state+'；财务尚未核销',afterAd:''});
+    this.setData({amount:String(r.amount_minor),status:r.provider_state==='SUCCESS'?'微信查单已支付；财务尚未核销':r.provider_state+'；财务尚未核销',afterAd:'',afterAdVerified:false});
     if(r.provider_state!=='SUCCESS'||!this.data.commerceEnabled||!this.session)return;
     try {
       const reply=await this.session.commerce(this.scene,'receipt_ad',{reference});
       if(this.data.reference!==reference)return;
       if(reply.payment_success_verified===true&&reply.creative&&typeof reply.creative.title==='string')
-        this.setData({afterAd:reply.creative.title});
+        this.setData({afterAd:reply.creative.title,afterAdVerified:true});
     } catch(_) { /* Advertisement failure never changes payment status. */ }
   },
   async queryPayment() {
     if(this.data.pending||!this.paymentFlow)return;
-    this.setData({pending:true,afterAd:''});
+    this.setData({pending:true,afterAd:'',afterAdVerified:false});
     try{await this.showPayment(await this.paymentFlow.query(this.data.reference));}
     catch(e){this.setData({status:e.message+'；支付结果未知'});}
     finally{this.setData({pending:false});}
   },
   async refresh() {
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
-    this.setData({afterAd:''});
+    this.setData({afterAd:'',afterAdVerified:false});
     try {if(this.data.commerceEnabled){const r=await this.session.commerce(this.scene,'purchase_read',{reference:this.data.reference});this.setData({amount:String(r.amount_minor),status:r.order.state+'；金额来自服务端商品快照'});return;}const r=await this.client.resume(this.data.reference);this.setData({amount:String(r.order.amount_minor),status:r.payment_state+'（模拟，非收款凭证）',
       afterAd:r.ads.AD_SLOT_PAYMENT_SUCCESS ? r.ads.AD_SLOT_PAYMENT_SUCCESS.title : ''});}
     catch(e) {this.setData({status:e.message});}
