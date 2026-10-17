@@ -737,6 +737,8 @@ def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''
         need(detail.get('InvokeId')==invoke_id and detail.get('InstanceId')==receipt.INSTANCE)
         if detail.get('InvocationStatus') in ('Pending','Running','Stopping'):
             return {'state':'CLOUD_QUERY_UNKNOWN','invoke_id':invoke_id,'redispatch_allowed':False}
+        if detail.get('InvocationStatus') not in ('Success','Failed','Cancelled','Canceled','Stopped'):
+            return {'state':'CLOUD_QUERY_UNKNOWN','invoke_id':invoke_id,'redispatch_allowed':False}
         if detail.get('InvocationStatus')!='Success' or detail.get('ExitCode')!=0:
             result={'state':'TARGET_REJECTED_OR_FAILED','redispatch_allowed':False}
         else:result=({'state':'DIAGNOSTIC_VERIFIED','receipt':diag_module.safe_receipt(detail.get('Output',''),'',detail.get('ExitCode')),'redispatch_allowed':False} if diag else (a5_validate(detail,invoke_id) if a5 else validate_split_output(detail,invoke_id,request)))
@@ -768,12 +770,12 @@ def actions_entry(action,attempt,invoke_id=''):
     workflow=Path('.github/workflows/p2-uk-swas-diagnostic.yml')
     need(hashlib.sha256(workflow.read_bytes()).hexdigest()==binding['workflow_sha256'])
     # Approval and exact source pins checked before reading the cloud key values.
-    split_authorize(policy,binding,fetch_approval(policy['approval_comment_id']),time.time())
+    split_authorize(policy,binding,fetch_approval(policy['approval_comment_id'],diagnostic=action.startswith('read-only-diagnostic')),time.time())
     journal=GitJournal(os.environ.get('P2_JOURNAL_TOKEN',''),attempt)
     def acquire():
         return AuthenticatedRPC(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),
                                 os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''))
-    return split_cloud(policy,journal,acquire,fetch_approval,time.time,action,invoke_id)
+    return split_cloud(policy,journal,acquire,(lambda ident:fetch_approval(ident,diagnostic=action.startswith('read-only-diagnostic'))),time.time,action,invoke_id)
 
 
 def protected_json(path):
@@ -908,7 +910,7 @@ AUDITOR_ID = 95597695
 AUDITOR_LOGIN = '18598789888'
 
 
-def fetch_approval(ident, opener=None):
+def fetch_approval(ident, opener=None, diagnostic=False):
     """Public approval GET with fixed origin/repository/PR and author identity.
     Independent authority still comes from the separately protected body hash.
     """
@@ -924,8 +926,8 @@ def fetch_approval(ident, opener=None):
         with client.open(request,timeout=10) as response:raw=response.read(32769)
         need(len(raw)<=32768)
         data=json.loads(raw,object_pairs_hook=receipt.unique)
-        need(data['id']==ident and data['user']['id']==AUDITOR_ID
-             and data['user']['login']==AUDITOR_LOGIN
+        need(data['id']==ident and data['user']['id']==(AUDITOR_ID if diagnostic else OWNER_ID)
+             and data['user']['login']==(AUDITOR_LOGIN if diagnostic else OWNER_LOGIN)
              and data['issue_url']=='https://api.github.com/repos/'+REPOSITORY+'/issues/58')
         body=data['body'];need(type(body) is str and len(body.encode())<=16384)
         return body
