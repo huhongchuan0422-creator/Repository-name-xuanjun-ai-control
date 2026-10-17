@@ -26,6 +26,10 @@ prepare成功仍是 CUSTODY_PREPARED_AWAIT_INDEPENDENT_ACCEPTANCE，不是独审
 
 ## 验证
 
-12个Root私有夹具测试：真实包完整解析而不执行、实际Root文件权限、一次占用、TTY限制、同主体拒绝、缺少原始证据/确认拒绝、过期/编辑/范围扩大/换入口、Runner身份、符号链接、持久化失败不覆盖。Hosted fixture声明不是真Owner声明。国内尚未执行，保管链仍NOT_VERIFIED。
+13个Root私有夹具测试：真实包完整解析而不执行、实际Root文件权限、一次占用、TTY限制、同主体拒绝、缺少原始证据/确认拒绝、过期/编辑/范围扩大/换入口、Runner身份、符号链接、持久化失败不覆盖。Hosted fixture声明不是真Owner声明。国内尚未执行，保管链仍NOT_VERIFIED。
 
 本地环境不支持chown至UID1002，相关完整测试交由Hosted真实Root执行，不跳过也不改生产UID检查。非Root暂存传输会在准确许可签发后先完成并跨任务验字节，再给Owner短启动命令，避免再次粘贴数百行。
+
+## 真实TTY补测修正
+
+原 open(/dev/tty,r+) 在真实非seekable终端触发 UnsupportedOperation，先前模拟TTY未覆盖。改为原始FileIO加TextIOWrapper，保持同一TTY确认规则、Owner身份、权限及全部准入边界。新增真实os.openpty双向读写回归，显式复现旧打开方式失败、新方式成功。未执行国内prepare，旧许可不能用于新源码SHA，须替代准确批准。

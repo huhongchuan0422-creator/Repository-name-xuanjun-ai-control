@@ -37,7 +37,7 @@ jobs:
           import re
           from pathlib import Path
           s=Path('/tmp/pr122-custody-review/TESTS.log').read_text()
-          assert re.search(r'Ran 12 tests in ',s) and re.search(r'^OK$',s,re.M) and not re.search(r'skipped=|FAILED|ERROR:|FAIL:',s)
+          assert re.search(r'Ran 13 tests in ',s) and re.search(r'^OK$',s,re.M) and not re.search(r'skipped=|FAILED|ERROR:|FAIL:',s)
           PY
       - name: Bind new entry and preserve exact reviewed recovery bytes
         shell: bash
@@ -53,7 +53,7 @@ jobs:
           for n in sources:
               p=out/n;p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(n,p)
           files=[{'path':p.relative_to(out).as_posix(),'size':p.stat().st_size,'sha256':c.sha(p.read_bytes())} for p in sorted(out.rglob('*')) if p.is_file()]
-          m={'purpose':'PR122_OWNER_CUSTODY_PREPARE_ENTRY_REVIEW_ONLY','source_commit':os.environ['GITHUB_SHA'],'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'launcher_sha256':c.sha(Path(sources[0]).read_bytes()),'review_zip_sha256':c.ZIP_SHA,'helper_sha256':c.HELPER_SHA,'audit_comment_id':c.AUDIT_ID,'audit_body_sha256':c.AUDIT_SHA,'tests':{'executed':12,'passed':12,'skipped':0},'actual_owner_custody':'NOT_VERIFIED','target_root_execution':'NOT_RUN','permission':'NOT_GRANTED','files':files}
+          m={'purpose':'PR122_OWNER_CUSTODY_PREPARE_ENTRY_REVIEW_ONLY','source_commit':os.environ['GITHUB_SHA'],'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'launcher_sha256':c.sha(Path(sources[0]).read_bytes()),'review_zip_sha256':c.ZIP_SHA,'helper_sha256':c.HELPER_SHA,'audit_comment_id':c.AUDIT_ID,'audit_body_sha256':c.AUDIT_SHA,'tests':{'executed':13,'passed':13,'skipped':0},'actual_owner_custody':'NOT_VERIFIED','target_root_execution':'NOT_RUN','permission':'NOT_GRANTED','files':files}
           (out/'MANIFEST.json').write_bytes(c.canonical(m))
           tarpath=Path('/tmp/PR122_OWNER_CUSTODY_REVIEW.tar.gz')
           with tarfile.open(tarpath,'w:gz') as t:

@@ -138,9 +138,13 @@ def prepare(ident,body_sha,get=fetch,tty=None):
     except BaseException:
         write(OUT/'failure.json',canonical({'state':'HOLD','retry_allowed':False,'channel_changes':0}));raise
 
+def open_terminal(path='/dev/tty'):
+    # BufferedRandom (open r+) requires seekability; terminals are non-seekable.
+    return io.TextIOWrapper(io.FileIO(path,'r+'),encoding='utf-8',write_through=True)
+
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('action',choices=('prepare',));ap.add_argument('--approval-id',type=int,required=True);ap.add_argument('--approval-body-sha256',required=True);a=ap.parse_args()
-    with open('/dev/tty','r+',encoding='utf-8') as tty:r=prepare(a.approval_id,a.approval_body_sha256,tty=tty)
+    with open_terminal() as tty:r=prepare(a.approval_id,a.approval_body_sha256,tty=tty)
     print(json.dumps(r,sort_keys=True))
 if __name__=='__main__':
     try:main()

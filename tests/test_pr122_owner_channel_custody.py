@@ -33,6 +33,21 @@ class CustodyTests(unittest.TestCase):
     def comment(self,n,b):return {'id':n,'user':{'login':'huhongchuan0422-creator'},'issue_url':'https://api.github.com/repos/'+c.REPO+'/issues/122','body':b}
     def tty(self,writer='writer',reviewer='reviewer',proof='e'*64,confirm=None):return TTY('Owner\n'+writer+'\n'+reviewer+'\n'+proof+'\n'+(confirm or c.CONFIRM)+'\n')
     def prepare(self,tty=None,get=None):return c.prepare(self.ident,self.digest,get=get or self.comments.__getitem__,tty=tty or self.tty())
+    def test_real_nonseekable_pseudoterminal_roundtrip(self):
+        master,slave=os.openpty()
+        try:
+            path=os.ttyname(slave)
+            with self.assertRaises(io.UnsupportedOperation):
+                open(path,'r+',encoding='utf-8')
+            with c.open_terminal(path) as tty:
+                self.assertTrue(tty.isatty())
+                os.write(master,b'owner-confirmation\n')
+                self.assertEqual(tty.readline(),'owner-confirmation\n')
+                tty.write('prompt-ok\n');tty.flush()
+                received=os.read(master,4096)
+                self.assertTrue(received)
+        finally:os.close(master);os.close(slave)
+
     def test_owner_attestation_saves_exact_inputs_without_channel_install(self):
         r=self.prepare();self.assertEqual(r['state'],'CUSTODY_PREPARED_AWAIT_INDEPENDENT_ACCEPTANCE')
         self.assertFalse(r['trust_installed']);self.assertFalse(r['helper_executed']);self.assertEqual(r['channel_changes'],0)
