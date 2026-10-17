@@ -85,5 +85,43 @@ class ReadOnlyDiagnosticTests(unittest.TestCase):
         self.assertEqual(self.t.AUDITOR_ID,95597695)
         self.assertNotEqual(self.t.OWNER_ID,self.t.AUDITOR_ID)
 
+
+    def test_cloud_timeout_saved_id_and_no_replay(self):
+        import json
+        legacy=load('p2_legacy_tests_fixture','tests/test_p2_uk_swas_diagnostic.py')
+        case=legacy.SplitCloudTests('test_cloud_intent_precedes_credentials')
+        case.setUp()
+        case.request['purpose']='READ_ONLY_DIAGNOSTIC_ONLY'
+        def permit(operation,invoke,ident):
+            case.policy=case.make_policy(operation,invoke,ident)
+            binding=case.policy['binding']
+            binding['command_sha256']=self.d.COMMAND_SHA256
+            data=json.loads(case.body.split(chr(10),1)[1])
+            data['decision']='READ_ONLY_DIAGNOSTIC_APPROVED'
+            data['binding']=binding
+            case.body='P2_UK_SPLIT_ONCE'+chr(10)+json.dumps(data)
+            case.policy['approval_body_sha256']=hashlib.sha256(case.body.encode()).hexdigest()
+        permit('READ_ONLY_DIAGNOSTIC','',1)
+        self.assertEqual(case.call('read-only-diagnostic')['state'],'CLOUD_DISPATCHED_AWAIT_SEPARATE_QUERY')
+        self.assertEqual(case.calls.count('RunCommand'),1)
+        with self.assertRaises(RuntimeError):case.call('read-only-diagnostic')
+        permit('READ_ONLY_DIAGNOSTIC_QUERY','t-real-fixture',2)
+        results=['Timeout','Success']
+        def query(obj,endpoint,action,**kwargs):
+            case.calls.append(action)
+            self.assertEqual(action,'DescribeInvocationResult')
+            self.assertEqual(kwargs['InvokeId'],'t-real-fixture')
+            return {'InvocationResult':{'InvokeId':kwargs['InvokeId'],
+                'InstanceId':self.t.receipt.INSTANCE,'InvocationStatus':results.pop(0),
+                'ExitCode':0,'Output':self.valid()}}
+        case.rpc.__class__.__call__=query
+        self.assertEqual(case.call('read-only-diagnostic-query','t-real-fixture')['state'],'CLOUD_QUERY_UNKNOWN')
+        self.assertEqual(case.rows['state'],'CLOUD_QUERY_UNKNOWN')
+        with self.assertRaises(RuntimeError):case.call('read-only-diagnostic-query','t-real-fixture')
+        permit('READ_ONLY_DIAGNOSTIC_QUERY','t-real-fixture',3)
+        self.assertEqual(case.call('read-only-diagnostic-query','t-real-fixture')['state'],'DIAGNOSTIC_VERIFIED')
+        self.assertEqual(case.calls.count('RunCommand'),1)
+        self.assertEqual(case.calls.count('DescribeInvocationResult'),2)
+
 if __name__=='__main__':
     unittest.main()
