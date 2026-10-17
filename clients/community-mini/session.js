@@ -56,7 +56,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     async payment(scene, operation, reference) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
       if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||
-         !['prepare','recover','query'].includes(operation)||typeof reference!=='string'||
+         !['prepare','recover','query','cancel'].includes(operation)||typeof reference!=='string'||
          !/^[A-Za-z0-9_-]{1,64}$/.test(reference))throw Error('INVALID_PAYMENT_REQUEST');
       const version=generation;
       const reply=await request('/mini/payment',{scene,operation,reference},token);

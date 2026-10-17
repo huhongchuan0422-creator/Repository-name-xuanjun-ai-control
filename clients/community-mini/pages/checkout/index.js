@@ -63,6 +63,11 @@ Page({
     catch(e) {this.setData({status:e.message});}
     finally {this.setData({pending:false});}
   },
+  async cancelOrder() {
+    if(this.data.pending||!this.session)return;this.setData({pending:true,afterAd:''});
+    try{const r=await this.session.payment(this.scene,'cancel',this.data.reference);if(this.paymentFlow)this.paymentFlow.reset();this.setData({status:r.order_state==='CANCELLED'?'订单已取消，库存已恢复或可按原订单恢复处理':r.order_state+'；以服务端确认状态为准'});}
+    catch(e){this.setData({status:e.message+'；请查询原订单，不要重新提交资金操作'});}finally{this.setData({pending:false});}
+  },
   async pay() {return this.runPayment(false);},
   async recoverPayment() {return this.runPayment(true);},
   async runPayment(recover) {

@@ -192,7 +192,9 @@
         "scripts/community_wechat_applyment.py",
         "scripts/community_provider_transport.py",
         "scripts/community_refund_notifications.py",
-        "tests/test_community_refund_notifications.py"
+        "tests/test_community_refund_notifications.py",
+        "scripts/community_order_cancellation.py",
+        "tests/test_community_order_cancellation.py"
       ]
     },
     {

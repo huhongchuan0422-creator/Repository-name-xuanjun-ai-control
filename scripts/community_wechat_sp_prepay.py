@@ -68,6 +68,7 @@ class PartnerPrepay:
         binding_hash=hashlib.sha256(canonical(b)).hexdigest()
         # Consume before network, in original durable Center. Unknown is never resent.
         with c.tx():
+            if c.db.execute("SELECT 1 FROM links WHERE channel='COMMUNITY_ORDER_CLOSE' AND subject_idx=? AND active=1",(key,)).fetchone():raise PermissionError('ORDER_CLOSING_OR_CANCELLED')
             if c.db.execute("SELECT 1 FROM events WHERE channel='COMMUNITY_PREPAY_ATTEMPT' AND event_id=?",(key,)).fetchone():
                 raise PrepayUnknown('PREPAY_ALREADY_ATTEMPTED_QUERY_EXISTING_ONLY')
             c.db.execute("INSERT INTO events VALUES('COMMUNITY_PREPAY_ATTEMPT',?,?)",(key,now))

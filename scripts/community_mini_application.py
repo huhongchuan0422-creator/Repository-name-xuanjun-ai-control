@@ -56,6 +56,7 @@ class MiniApplication:
         from scripts.community_commerce import Commerce
         self.commerce=Commerce(self.operations,self.identity)
         self.gateway.commerce=self.commerce
+        if getattr(self.gateway,'payments',None) is not None:self.gateway.payments.commerce=self.commerce
         if self.provider_actions is not None:self.provider_actions.commerce=self.commerce
         return self.commerce
 
@@ -97,6 +98,7 @@ class MiniApplication:
         from scripts.community_mini_payments import MiniPayments
         self.gateway.payments=MiniPayments(self.identity,PartnerPrepay(self.center,reader,{} if bindings is None else bindings),merchants=merchants)
         self.gateway.payments.rule_actions=self.provider_actions
+        self.gateway.payments.commerce=self.commerce
         return self.gateway.payments
 
     def configure_operations(self,grants):

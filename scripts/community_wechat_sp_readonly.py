@@ -47,7 +47,7 @@ class PartnerOrderReader:
     def _fetch(self,request):
         opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),_NoRedirect())
         with opener.open(request,timeout=5) as response:
-            if response.status!=200:raise ReadOnlyUnknown('PROVIDER_QUERY_NOT_200')
+            if response.status!=200 and not (response.status==204 and getattr(request,'_community_expect_empty',False)):raise ReadOnlyUnknown('PROVIDER_QUERY_NOT_200')
             headers={};seen=set()
             for key,value in response.headers.items():
                 if key.lower() in seen:raise ReadOnlyUnknown('DUPLICATE_PROVIDER_HEADER')

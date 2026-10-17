@@ -220,3 +220,24 @@ class Commerce:
             raise PermissionError('ORIGINAL_BASKET_ORDER_MISMATCH')
         i.authorize_order_read(token, scene, reference, c.now())
         return dict(record, order=state(self.runtime.demo.db, identity, reference))
+
+    def release_cancelled(self,identity,project,uid,reference):
+        from scripts.community_order_cancellation import local_cancelled
+        from scripts.community_order_provider_projection import provider_evidence
+        order=state(self.runtime.demo.db,identity,reference)
+        if order['state']!='CANCELLED' or not (local_cancelled(self.runtime.demo.db,identity,reference) or provider_evidence(self.runtime.demo.db,identity,reference) is not None):raise PermissionError('CONFIRMED_CANCELLATION_REQUIRED')
+        c=self.center
+        with c.tx():
+            record=self._read(identity,project,'ORDER',reference)
+            if record is None:return
+            if record['user_id']!=uid:raise PermissionError('ORIGINAL_BASKET_OWNER_REQUIRED')
+            if record.get('stock_released'):return
+            for line in record['lines']:
+                price=self._read(identity,project,'PRODUCT',line['item_id'])
+                if price is None:raise ValueError('ORIGINAL_PRODUCT_INVENTORY_REQUIRED')
+                updated=dict(price,stock=price['stock']+line['quantity'],revision=price['revision']+1,updated_at=c.now())
+                if updated['stock']>100000000:raise ValueError('INVENTORY_RESTORE_OVERFLOW')
+                self._save(identity,project,uid,'PRICE_VERSION',line['item_id']+':'+str(updated['revision']),updated)
+                self._save(identity,project,uid,'PRODUCT',line['item_id'],updated,True)
+            self._save(identity,project,uid,'ORDER',reference,dict(record,stock_released=True),True)
+            c.audit(project,uid,'CANCELLED_ORDER_STOCK_RELEASED',reference)

@@ -33,7 +33,8 @@ class MiniPayments:
         scope=i.runtime.bindings[principal]
         order=state(i.runtime.demo.db,scope,reference)
         from scripts.community_order_provider_projection import provider_evidence
-        if order['currency']!='CNY' or order['state']!='PENDING' and provider_evidence(i.runtime.demo.db,scope,reference) is None:
+        from scripts.community_order_cancellation import local_cancelled
+        if order['currency']!='CNY' or order['state']!='PENDING' and provider_evidence(i.runtime.demo.db,scope,reference) is None and not (order['state']=='CANCELLED' and local_cancelled(i.runtime.demo.db,scope,reference)):
             raise PermissionError('ORIGINAL_PENDING_ORDER_BINDING_REQUIRED')
         key=c.idx('wechat-session:'+token)
         meta=c.db.execute("SELECT payload FROM links WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=? AND user_id=? AND project=? AND active=1",(key,uid,pid)).fetchone()
@@ -59,13 +60,21 @@ class MiniPayments:
     def dispatch(self,token,body):
         if (type(body) is not dict or set(body)!={'scene','operation','reference'}
                 or any(type(body[k]) is not str for k in body)
-                or body['operation'] not in ('prepare','recover','query')):
+                or body['operation'] not in ('prepare','recover','query','cancel')):
             raise ValueError('INVALID_MINI_PAYMENT_REQUEST')
         scene,reference=body['scene'],body['reference']
         b=self._authorize(token,scene,reference)
         authorize=lambda:self._authorize(token,scene,reference)
         c=self.identity.center
         with c.tx():c.limit('community-payment:'+b['user_id'],20,60)
+        if body['operation']=='query':
+            from scripts.community_order_cancellation import local_cancelled
+            _,_,principal=self.identity._resolve(token,scene)
+            if local_cancelled(self.identity.runtime.demo.db,self.identity.runtime.bindings[principal],reference):
+                return dict(reference=reference,provider_state='NOT_CREATED',order_state='CANCELLED',amount_minor=b['amount_minor'],currency='CNY',provider_signature_verified=False,provider_settlement_verified=False,finance_status='UNCONFIRMED',financial_receipt_issued=False,entitlement_granted=False)
+        if body['operation']=='cancel':
+            from scripts.community_order_cancellation import OrderCancellation
+            return OrderCancellation(self).cancel(token,scene,reference)
         if body['operation'] in ('prepare','recover'):
             _,_,principal=self.identity._resolve(token,scene)
             if state(self.identity.runtime.demo.db,self.identity.runtime.bindings[principal],reference)['state']!='PENDING':raise PermissionError('PAYMENT_ALREADY_TERMINAL_QUERY_ONLY')
