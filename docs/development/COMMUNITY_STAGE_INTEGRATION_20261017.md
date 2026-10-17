@@ -211,3 +211,12 @@ Owner要求通过已有服务器执行小程序预览。mini-preview改用已有
 新增order_detail原库读模型与工作台订单详情入口，显示原状态事件、原退款预审记录、剩余可预审金额及截断标志。商家页面可提交原refund_record并读取持久结果，重复请求编号仍由原日志幂等处理；结果未知不能换编号盲目再提交。分账表单接原split_preview，20个以内接收方编号/基点，原服务端校验总比例与余数分配，按原订单扣除退款预审计算。仅预审与方案计算，不称实际退款/实际分账。新增真实HTTP/Chromium流程操作退款250/1250后，分配余款1000为900/100；合成付款事件，非真实资金。
 
 新增community_wechat_sp_prepay.PartnerPrepay：实现普通服务商JSAPI小程序预支付POST、请求RSA签名、微信响应原始字节验签、prepay_id校验与小程序调起支付RSA参数签名。协议来源https://pay.wechatpay.cn/doc/v3/partner/4012759974。保护配置冻结原账号/项目、服务商小程序、特约商户、订单号、CNY整数分、用户sp_openid、HTTPS通知地址与分账标识；公开请求不能自报这些字段。复用原PartnerOrderReader密钥加载及固定HTTPS/禁代理/禁重定向/超时传输。复用原Center会话/CSRF和项目实时权限；网络前原events持久消费服务商订单号，网络后再次检查账号/项目/冻结绑定；结果加密保存在原links，不建第二订单或Finance账本。未知不重发；existing只读取已验签持久结果并重签客户端参数，不调用网络。已消费但无持久成功结果返回UNKNOWN，需要原查单与后续人工/权威协调，不自动重下单。客户端参数只表示等待用户确认，不能当作已支付或发放权益。6项新增真实RSA/SQLite测试使用合成提供商报文，不读取现场Secrets；源码接线未注册HTTP、未在生产启用、未向微信实际下单。消费者原订单权威映射、原生按钮接线与Finance确认仍需完成后才能关闭真实支付门禁。
+
+
+### 消费者付款按钮及动态原订单接线（2026-10-17 16:04后）
+
+新增community_mini_payments.MiniPayments，MiniApplication.configure_payments为受保护宿主显式配置入口。/mini/payment默认404；启用后仅接受原小程序Bearer会话，拒绝Cookie/Center凭据混用及客户端商户/金额字段；prepare、recover、query每次复核原客户订单归属、PENDING状态、整数分、当前原Center项目权限及实际微信付款身份。原session加密metadata保存可信换码得到的openid，客户端不返回openid/session_key；原有旧会话仍能访问原只读接口，但动态支付须重新可信登录取得加密付款身份。
+
+支持既有冻结订单配置及动态门店配置二选一；merchants按原scene保护配置sp_appid/sub_mchid/description/notify_url/profit_sharing，并固定原project和原tenant/merchant/store。动态订单号由服务商、原门店作用域和原reference确定生成32字符，不接受客户端自报支付单号；金额来自原orders、付款人来自原加密Mini会话，不需逐笔人工配置。网络前后绑定复核；原Center持久attempt防止重发，原links加密结果支持实际数据库重开后恢复。query复用原PartnerOrderReader真实GET签名和响应验签，SUCCESS仅显示微信已支付观察，原模拟订单不会被伪改SUCCESS，Finance未核销、不生成财务凭证、不发放权益。
+
+原生payment.js与checkout页面新增显式“微信支付/恢复原支付单/查询微信结果”。session.payment使用独立/mini/payment及显式enabled响应；UI配置configureService(url,true)仅显示入口，服务端原身份与绑定准入仍不可绕过。默认payments=false保留原开发模式。准备结果迟到/身份或订单变更不调用requestPayment；并发点击拒绝；取消/SDK成功均只查询原订单，不自行认定支付成功；未知不重试prepare。7项新增Node支付流程测试、2项session支付运输检查、6项原Center/SQLite/HTTP集成测试（含动态绑定与实际重开）验证这些新增代码；网络、账号及商户为明确合成fixture，不是现场交易验收。原生源文件已变更，旧预览回执不再当作本版编译证据；新编译/预览终态按准确CI另记。

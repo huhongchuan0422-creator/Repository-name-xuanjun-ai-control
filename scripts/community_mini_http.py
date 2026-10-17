@@ -83,6 +83,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 except Exception:return self.answer(503,{'error':'PROXY_UNAVAILABLE'})
             if self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind') and not (
                     self.path=='/community/operations' and operations is not None) and not (
+                    self.path=='/mini/payment' and getattr(gateway,'payments',None) is not None) and not (
                     self.path=='/merchant/onboarding' and onboarding is not None):
                 return self.answer(404,{'error':'NOT_FOUND'})
             if (self.headers.get('Transfer-Encoding') is not None or
@@ -131,6 +132,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 body=json.loads(b''.join(chunks),object_pairs_hook=pairs,parse_float=finite,
                                 parse_constant=lambda _:(_ for _ in ()).throw(ValueError('NONFINITE')))
                 token=self.headers.get('X-Community-Session','')
+                if self.path=='/mini/payment':
+                    if session or csrf or self.headers.get('Cookie') or self.headers.get('X-CSRF-Token'):raise PermissionError('MINI_BEARER_SESSION_REQUIRED')
+                    result=gateway.payments.dispatch(token,body)
+                    return self.answer(200,{'result':result,'payment_enabled':True})
                 if self.path=='/merchant/onboarding':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=onboarding.dispatch(session,csrf,body)

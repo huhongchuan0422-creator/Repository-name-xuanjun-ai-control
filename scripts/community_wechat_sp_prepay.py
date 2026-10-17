@@ -22,7 +22,7 @@ class PrepayUnknown(RuntimeError):pass
 
 class PartnerPrepay:
     def __init__(self,center,reader,bindings):
-        if type(center) is not Center or not isinstance(reader,PartnerOrderReader) or type(bindings) is not dict or not bindings:
+        if type(center) is not Center or not isinstance(reader,PartnerOrderReader) or type(bindings) is not dict:
             raise ValueError('EXISTING_CENTER_AND_PROTECTED_PAYMENT_BINDINGS_REQUIRED')
         self.center,self.reader=center,reader
         self.bindings={}
@@ -59,7 +59,10 @@ class PartnerPrepay:
     def _sign(self,message):
         return base64.b64encode(self.reader._private.sign(message,padding.PKCS1v15(),hashes.SHA256())).decode()
     def create(self,session,csrf,reference):
-        b=self._authorize(session,csrf,reference);c=self.center;r=self.reader;key=self._identity(b)
+        b=self._authorize(session,csrf,reference)
+        return self._create_authorized(b,lambda:self._authorize(session,csrf,reference))
+    def _create_authorized(self,b,reauthorize):
+        c=self.center;r=self.reader;key=self._identity(b)
         now=r._clock()
         if type(now) is not int or not 0<=now<=253402300799:raise ValueError('INVALID_SERVER_CLOCK')
         binding_hash=hashlib.sha256(canonical(b)).hexdigest()
@@ -84,16 +87,20 @@ class PartnerPrepay:
             if type(data) is not dict or type(data.get('prepay_id')) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,128}',data['prepay_id']):
                 raise ValueError('INVALID_PREPAY_RESPONSE')
             # Re-check live account and project after provider IO; do not issue a client token after revocation.
-            if self._authorize(session,csrf,reference)!=b:raise PermissionError('PAYMENT_BINDING_CHANGED')
+            if reauthorize()!=b:raise PermissionError('PAYMENT_BINDING_CHANGED')
             payload={'binding_sha256':binding_hash,'prepay_id':data['prepay_id'],'appid':b['sp_appid']}
             with c.tx():
                 c.db.execute("INSERT INTO links VALUES('COMMUNITY_PREPAY_RESULT',?,?,?,?,1)",
                     (key,b['user_id'],b['project'],c.encrypt(canonical(payload),'community-prepay')))
                 c.audit(b['project'],b['user_id'],'COMMUNITY_PREPAY_READY',key)
-            return self.existing(session,csrf,reference)
+            return self._existing_authorized(b,reauthorize)
         except Exception:raise PrepayUnknown('PREPAY_RESULT_UNKNOWN_QUERY_EXISTING_ONLY') from None
     def existing(self,session,csrf,reference):
-        b=self._authorize(session,csrf,reference);c=self.center;r=self.reader;key=self._identity(b)
+        b=self._authorize(session,csrf,reference)
+        return self._existing_authorized(b,lambda:self._authorize(session,csrf,reference))
+    def _existing_authorized(self,b,reauthorize):
+        if reauthorize()!=b:raise PermissionError('PAYMENT_BINDING_CHANGED')
+        c=self.center;r=self.reader;key=self._identity(b)
         row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PREPAY_RESULT' AND subject_idx=? AND user_id=? AND project=? AND active=1",(key,b['user_id'],b['project'])).fetchone()
         if row is None:raise PrepayUnknown('NO_VERIFIED_PREPAY_RESULT_DO_NOT_RESEND')
         data=json.loads(c.decrypt(row[0],'community-prepay'))

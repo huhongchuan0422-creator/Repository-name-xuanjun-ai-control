@@ -44,6 +44,17 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       // Business remains explicitly simulated even when WeChat login is real.
       return {offline_only:true,result:reply.result};
     },
+    async payment(scene, operation, reference) {
+      if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
+      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||
+         !['prepare','recover','query'].includes(operation)||typeof reference!=='string'||
+         !/^[A-Za-z0-9_-]{1,64}$/.test(reference))throw Error('INVALID_PAYMENT_REQUEST');
+      const version=generation;
+      const reply=await request('/mini/payment',{scene,operation,reference},token);
+      if(version!==generation)throw Error('STALE_SESSION');
+      if(reply.payment_enabled!==true||!reply.result)throw Error('PAYMENT_NOT_ENABLED');
+      return reply.result;
+    },
     async logout() {
       const old=token;generation++;token=null;expires=0;
       if(old)await request('/mini/logout',{},old);

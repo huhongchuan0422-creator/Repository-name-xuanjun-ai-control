@@ -120,7 +120,7 @@ class CenterIdentity(IdentityPort):
             c.db.execute('INSERT INTO sessions VALUES(?,?,?,?,?)',(digest(token.encode()),uid,account[1],digest(csrf.encode()),expires))
             session_key=c.idx('wechat-session:'+token)
             for row in c.db.execute("SELECT project FROM links WHERE channel='WECHAT_MINI' AND subject_idx=? AND user_id=? AND active=1",(subject,uid)).fetchall():
-                payload=c.encrypt(canonical({'subject_idx':subject}),'wechat-mini-session')
+                payload=c.encrypt(canonical({'subject_idx':subject,'openid':openid}),'wechat-mini-session')
                 c.db.execute("INSERT INTO links VALUES('WECHAT_MINI_SESSION',?,?,?,?,1)",(session_key,uid,row[0],payload))
             c.audit('',uid,'WECHAT_MINI_LOGIN',attempt)
         return {'session_token':token,'expires_at':expires}

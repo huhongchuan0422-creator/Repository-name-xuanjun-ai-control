@@ -37,6 +37,15 @@ class MiniApplication:
         self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding)
         return self.server
 
+    def configure_payments(self,reader,bindings=None,*,merchants=None):
+        """Protected opt-in; original customer orders and verified payer required."""
+        if self.server is not None or getattr(self.gateway,'payments',None) is not None:
+            raise ValueError('PAYMENTS_ALREADY_CONFIGURED_OR_LISTENING')
+        from scripts.community_wechat_sp_prepay import PartnerPrepay
+        from scripts.community_mini_payments import MiniPayments
+        self.gateway.payments=MiniPayments(self.identity,PartnerPrepay(self.center,reader,{} if bindings is None else bindings),merchants=merchants)
+        return self.gateway.payments
+
     def configure_operations(self,grants):
         """Host-supplied grants for existing Center users; no client role input."""
         if self.server is not None or self.operations is not None:
