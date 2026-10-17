@@ -1,0 +1,2018 @@
+{
+  "schema": 1,
+  "status": "S08_READONLY_CLOSURE_COLLECTED_NOT_INSTALL_ACCEPTANCE",
+  "source_commit": "ac609bb1ec41667261266056e30312f8f0ae6135",
+  "helper_commit": "00f676597117a40f0f8860c24f9e171f35cd64b3",
+  "helper_sha256": "640709ef99543a24238f624cdfb452004444ed84ca349342e57e2cdba6190c59",
+  "run": 38999602793,
+  "job": 117299532997,
+  "hosts": [
+    {
+      "host": "korea",
+      "instance_id": "09207081a09a466aa0079b07b5e3e7ca",
+      "invocation_status": "Success",
+      "invoke_id": "t-kor709y7ta4t81s",
+      "receipt": {
+        "attempt_nonce": "59dacacdce9b4a58a472a1a702465531",
+        "business_api_requests": 0,
+        "client_refs": [],
+        "collected_at_utc": "2026-10-17T03:39:16.566521+00:00",
+        "containers": [],
+        "cron": [
+          {
+            "bytes": 451,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 3,
+            "path": "/etc/crontab",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "59e73f3778332c2270a16544dd1333725bf9d01213119b6d50e05bdd5db31cba",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 108,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 1,
+            "path": "/etc/cron.d/raid-check",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "956a26928fc240bc49ea9c6ddacf775193998a1c10ef00b858f0c7d51bb6f10a",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 128,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 4,
+            "path": "/etc/cron.d/0hourly",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "ad03f0fdb025e5b5a1c7f83cce837bb3ef8acfc8276efec6a17d39ec5a34756e",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 191,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 2,
+            "path": "/etc/cron.d/update-motd",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "db1058131c77d6d877b6263970820f07691274d18cfacfeb25d762f9819cd867",
+            "symlink": false,
+            "uid": 0
+          }
+        ],
+        "database_opened": false,
+        "host": "korea",
+        "hostname": "iZmj7a5kwr75qc1tul4kf9Z",
+        "listeners": [
+          {
+            "local": "127.0.0.1:19444",
+            "processes": [
+              {
+                "name": "sshd",
+                "pid": 1283
+              }
+            ]
+          },
+          {
+            "local": "*:443",
+            "processes": [
+              {
+                "name": "gost",
+                "pid": 996
+              }
+            ]
+          }
+        ],
+        "nginx": [],
+        "running_service_names": [
+          "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-korea-binance.service",
+          "aegis.service",
+          "aliyun.service",
+          "atd.service",
+          "chronyd.service",
+          "cloud-mail-adapter.service",
+          "cloudmonitor.service",
+          "crond.service",
+          "dbus.service",
+          "getty@tty1.service",
+          "gssproxy.service",
+          "loongcollectord.service",
+          "morelogin-socks5-permanent.service",
+          "NetworkManager.service",
+          "polkit.service",
+          "postgresql.service",
+          "redis.service",
+          "rngd.service",
+          "rpcbind.service",
+          "rsyslog.service",
+          "rtkit-daemon.service",
+          "serial-getty@ttyS0.service",
+          "sshd.service",
+          "systemd-journald.service",
+          "systemd-logind.service",
+          "systemd-udevd.service",
+          "tailscaled.service",
+          "tuned.service",
+          "upower.service",
+          "user@1000.service",
+          "xuanjun-novel-factory.service",
+          "yibi-api.service",
+          "yibi-scheduler.service"
+        ],
+        "secret_values_disclosed": false,
+        "service_actions": 0,
+        "status": "S08_ROOT_READONLY_RUNTIME_CLOSURE",
+        "uid": 0,
+        "units": [
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "xuanjun-wecom-novel-ingress.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "provider-neutral-tunnel.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "provider-neutral-tokyo-tunnel.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "provider-neutral-domestic-bridge.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "domestic-model-rpc-tunnel.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "korea-novel-model-rpc-tunnel.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "restricted-rpc-openai-shim.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "tokyo-restricted-model-executor.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "xj-tokyo-vpn.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "LoadState": "not-found",
+            "SubState": "dead",
+            "unit": "finance-collection-sync.timer"
+          },
+          {
+            "ActiveState": "inactive",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "LoadState": "not-found",
+            "SubState": "dead",
+            "unit": "owner-commercial-ledger-sync.timer"
+          },
+          {
+            "ActiveState": "inactive",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "LoadState": "not-found",
+            "SubState": "dead",
+            "unit": "billing-operations-weekly-settlement.timer"
+          },
+          {
+            "ActiveState": "inactive",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "LoadState": "not-found",
+            "SubState": "dead",
+            "unit": "billing-operations-weekly-final-invoice.timer"
+          }
+        ]
+      },
+      "service_actions": 0,
+      "status": "PASS"
+    },
+    {
+      "host": "domestic",
+      "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+      "invocation_status": "Success",
+      "invoke_id": "t-sh0709y7tzf19mo",
+      "receipt": {
+        "attempt_nonce": "ecfe08092c2b478cb40187b28553c1a1",
+        "business_api_requests": 0,
+        "client_refs": [
+          {
+            "literal_ip_addresses": [
+              "127.0.0.1"
+            ],
+            "sha256": "83904b6994db02b2702563eaaace50399caaf968864bd7f0ea355b4350462150",
+            "source": "ai_service/telegram_customer_service_canary.py"
+          },
+          {
+            "literal_ip_addresses": [
+              "127.0.0.1",
+              "::1"
+            ],
+            "sha256": "aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402",
+            "source": "ai_service/wecom_customer_service.py"
+          }
+        ],
+        "collected_at_utc": "2026-10-17T03:39:17.556194+00:00",
+        "containers": [
+          {
+            "image": "searxng/searxng:latest",
+            "name": "searxng",
+            "ports": ""
+          }
+        ],
+        "cron": [
+          {
+            "bytes": 451,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 3,
+            "path": "/etc/crontab",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "59e73f3778332c2270a16544dd1333725bf9d01213119b6d50e05bdd5db31cba",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 191,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 2,
+            "path": "/etc/cron.d/update-motd",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "db1058131c77d6d877b6263970820f07691274d18cfacfeb25d762f9819cd867",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 128,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 4,
+            "path": "/etc/cron.d/0hourly",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "ad03f0fdb025e5b5a1c7f83cce837bb3ef8acfc8276efec6a17d39ec5a34756e",
+            "symlink": false,
+            "uid": 0
+          }
+        ],
+        "database_opened": false,
+        "host": "domestic",
+        "hostname": "iZvt5t8tlrm8oiZ",
+        "listeners": [
+          {
+            "local": "0.0.0.0:443",
+            "processes": [
+              {
+                "name": "nginx",
+                "pid": 281275
+              },
+              {
+                "name": "nginx",
+                "pid": 281274
+              },
+              {
+                "name": "nginx",
+                "pid": 85106
+              }
+            ]
+          },
+          {
+            "local": "127.0.0.1:18443",
+            "processes": [
+              {
+                "name": "python",
+                "pid": 188767
+              }
+            ]
+          },
+          {
+            "local": "127.0.0.1:19444",
+            "processes": [
+              {
+                "name": "sshd",
+                "pid": 182707
+              }
+            ]
+          },
+          {
+            "local": "[::]:443",
+            "processes": [
+              {
+                "name": "nginx",
+                "pid": 281275
+              },
+              {
+                "name": "nginx",
+                "pid": 281274
+              },
+              {
+                "name": "nginx",
+                "pid": 85106
+              }
+            ]
+          }
+        ],
+        "nginx": [
+          {
+            "bytes": 2305,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/nginx.conf",
+            "regular": true,
+            "routes": [
+              {
+                "directive": "include",
+                "value": "/usr/share/nginx/modules/*.conf"
+              },
+              {
+                "directive": "include",
+                "value": "/etc/nginx/mime.types"
+              },
+              {
+                "directive": "include",
+                "value": "/etc/nginx/conf.d/*.conf"
+              },
+              {
+                "directive": "listen",
+                "value": "80"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:80"
+              },
+              {
+                "directive": "server_name",
+                "value": "_"
+              },
+              {
+                "directive": "root",
+                "value": "/usr/share/nginx/html"
+              },
+              {
+                "directive": "include",
+                "value": "/etc/nginx/default.d/*.conf"
+              }
+            ],
+            "sha256": "8dcb91c45cde2792cecbd5367678bb595c23db1d979879cec74196dad0f71071",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 4219,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/conf.d/winctl.windows-interaction.conf",
+            "regular": true,
+            "routes": [
+              {
+                "directive": "listen",
+                "value": "80"
+              },
+              {
+                "directive": "server_name",
+                "value": "winctl.wenwenwenyiyiyi.work"
+              },
+              {
+                "directive": "root",
+                "value": "/var/www/letsencrypt"
+              },
+              {
+                "directive": "listen",
+                "value": "443 ssl http2"
+              },
+              {
+                "directive": "server_name",
+                "value": "winctl.wenwenwenyiyiyi.work"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              }
+            ],
+            "sha256": "e089825a7bc21edcdbe4ee911923f996f9e7fedae87ca979a225558f4a24d7d1",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 188,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/conf.d/pr122-00-logformat.conf",
+            "regular": true,
+            "routes": [],
+            "sha256": "ec79d13b7b4e3586088cdff794f7538a9ff13fc8aa0a9018f913f7b39bbc1a1e",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 819,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/conf.d/pr122-apex-https.conf",
+            "regular": true,
+            "routes": [
+              {
+                "directive": "listen",
+                "value": "443 ssl"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:443 ssl"
+              },
+              {
+                "directive": "server_name",
+                "value": "wenwenwenyiyiyi.work"
+              },
+              {
+                "directive": "root",
+                "value": "/var/www/wenwenwenyiyiyi.work/current/public"
+              },
+              {
+                "directive": "include",
+                "value": "/etc/nginx/pr122-site-hub/locations.conf"
+              },
+              {
+                "directive": "include",
+                "value": "/etc/nginx/pr122-minimal-cutover/apex.locations.conf"
+              }
+            ],
+            "sha256": "b1337493bc6d6c3692bf9d3124cffdffcc380262b7c84ecdc65da70d5a0a958e",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 439,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/conf.d/pr122-apex-http.conf",
+            "regular": true,
+            "routes": [
+              {
+                "directive": "listen",
+                "value": "80"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:80"
+              },
+              {
+                "directive": "server_name",
+                "value": "wenwenwenyiyiyi.work"
+              },
+              {
+                "directive": "root",
+                "value": "/var/www/letsencrypt"
+              }
+            ],
+            "sha256": "e36fcc4f0d34f088c2030b915421442086fed4e7dfa19758107fd780e4902071",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 163,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/conf.d/pr122-site-hub-limit.conf",
+            "regular": true,
+            "routes": [],
+            "sha256": "64c0b735311ec2660f552d645d419c3670b32986cddf916a56c59ce22ce6a770",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 3378,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/conf.d/winctl.windows-interaction-ip.conf",
+            "regular": true,
+            "routes": [
+              {
+                "directive": "listen",
+                "value": "443 ssl http2 default_server"
+              },
+              {
+                "directive": "server_name",
+                "value": "47.101.152.210"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18444,
+                "scheme": "http"
+              }
+            ],
+            "sha256": "bd3cb5931aabcab5855e72c3509ecc44d7a5d603b14830592b1448ae6f0e185d",
+            "symlink": false,
+            "uid": 0
+          }
+        ],
+        "running_service_names": [
+          "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-domestic-ops.service",
+          "aliyun.service",
+          "anolisa-telemetry.service",
+          "auditd.service",
+          "chronyd.service",
+          "containerd.service",
+          "crond.service",
+          "dbus-broker.service",
+          "docker.service",
+          "getty@tty1.service",
+          "gssproxy.service",
+          "NetworkManager.service",
+          "nginx.service",
+          "polkit.service",
+          "provider-neutral-domestic-bridge.service",
+          "rngd.service",
+          "rsyslog.service",
+          "serial-getty@ttyS0.service",
+          "sshd.service",
+          "systemd-homed.service",
+          "systemd-journald.service",
+          "systemd-logind.service",
+          "systemd-udevd.service",
+          "systemd-userdbd.service",
+          "user@1000.service",
+          "windows-interaction-http.service",
+          "ws-ckpt.service",
+          "xuanjun-site-hub-preview.service"
+        ],
+        "secret_values_disclosed": false,
+        "service_actions": 0,
+        "status": "S08_ROOT_READONLY_RUNTIME_CLOSURE",
+        "uid": 0,
+        "units": [
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "xuanjun-wecom-novel-ingress.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "provider-neutral-tunnel.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "provider-neutral-tokyo-tunnel.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "network-online.target",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/provider-neutral-domestic-bridge.service",
+            "Group": "openclaw_ops",
+            "LoadState": "loaded",
+            "MainPID": "188767",
+            "Requires": "",
+            "SubState": "running",
+            "User": "openclaw_ops",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "/home/openclaw_ops/v8-domestic-operations/runtime/internal-bridge",
+            "command_projection": [
+              {
+                "executable": "/usr/bin/env",
+                "forwards": [],
+                "token_count": 19
+              }
+            ],
+            "environment_names": [
+              "CUSTOMER_REFERRAL_CONFIG_PATH"
+            ],
+            "fragment": {
+              "bytes": 2772,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/provider-neutral-domestic-bridge.service",
+              "regular": true,
+              "sha256": "b7f98c47dd4f216c95b88f116ff04ad3cea9ccbadae494638d3c0d651616f2c4",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "provider-neutral-domestic-bridge.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "domestic-model-rpc-tunnel.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "korea-novel-model-rpc-tunnel.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "restricted-rpc-openai-shim.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "tokyo-restricted-model-executor.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "xj-tokyo-vpn.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "LoadState": "not-found",
+            "SubState": "dead",
+            "unit": "finance-collection-sync.timer"
+          },
+          {
+            "ActiveState": "inactive",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "LoadState": "not-found",
+            "SubState": "dead",
+            "unit": "owner-commercial-ledger-sync.timer"
+          },
+          {
+            "ActiveState": "inactive",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "LoadState": "not-found",
+            "SubState": "dead",
+            "unit": "billing-operations-weekly-settlement.timer"
+          },
+          {
+            "ActiveState": "inactive",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "LoadState": "not-found",
+            "SubState": "dead",
+            "unit": "billing-operations-weekly-final-invoice.timer"
+          }
+        ]
+      },
+      "service_actions": 0,
+      "status": "PASS"
+    },
+    {
+      "host": "tokyo",
+      "instance_id": "68985c531add4e90a131aef703a389e6",
+      "invocation_status": "Success",
+      "invoke_id": "t-jpn709y7txckxs0",
+      "receipt": {
+        "attempt_nonce": "bf8cbe29927442589389337f44d5574e",
+        "business_api_requests": 0,
+        "client_refs": [
+          {
+            "literal_ip_addresses": [
+              "127.0.0.1"
+            ],
+            "sha256": "83904b6994db02b2702563eaaace50399caaf968864bd7f0ea355b4350462150",
+            "source": "ai_service/telegram_customer_service_canary.py"
+          },
+          {
+            "literal_ip_addresses": [
+              "127.0.0.1",
+              "::1"
+            ],
+            "sha256": "aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402",
+            "source": "ai_service/wecom_customer_service.py"
+          }
+        ],
+        "collected_at_utc": "2026-10-17T03:39:17.165568+00:00",
+        "containers": [
+          {
+            "image": "tailscale/tailscale",
+            "name": "xj-tokyo-personal-exit",
+            "ports": ""
+          },
+          {
+            "image": "cloudflare/cloudflared:latest",
+            "name": "objective_turing",
+            "ports": ""
+          },
+          {
+            "image": "cloudflare/cloudflared:latest",
+            "name": "relaxed_jemison",
+            "ports": ""
+          },
+          {
+            "image": "cloudflare/cloudflared:latest",
+            "name": "sharp_bell",
+            "ports": ""
+          },
+          {
+            "image": "searxng/searxng:latest",
+            "name": "searxng",
+            "ports": ""
+          }
+        ],
+        "cron": [
+          {
+            "bytes": 451,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 3,
+            "path": "/etc/crontab",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "59e73f3778332c2270a16544dd1333725bf9d01213119b6d50e05bdd5db31cba",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 128,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 4,
+            "path": "/etc/cron.d/0hourly",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "ad03f0fdb025e5b5a1c7f83cce837bb3ef8acfc8276efec6a17d39ec5a34756e",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 191,
+            "command_values_disclosed": false,
+            "gid": 0,
+            "mode": "0o644",
+            "noncomment_lines": 2,
+            "path": "/etc/cron.d/update-motd",
+            "project_script_paths": [],
+            "regular": true,
+            "sha256": "db1058131c77d6d877b6263970820f07691274d18cfacfeb25d762f9819cd867",
+            "symlink": false,
+            "uid": 0
+          }
+        ],
+        "database_opened": false,
+        "host": "tokyo",
+        "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+        "listeners": [
+          {
+            "local": "127.0.0.1:18761",
+            "processes": [
+              {
+                "name": "ssh",
+                "pid": 2071744
+              }
+            ]
+          },
+          {
+            "local": "127.0.0.1:18781",
+            "processes": [
+              {
+                "name": "python",
+                "pid": 1903204
+              }
+            ]
+          },
+          {
+            "local": "127.0.0.1:18780",
+            "processes": [
+              {
+                "name": "python",
+                "pid": 1875349
+              }
+            ]
+          },
+          {
+            "local": "127.0.0.1:18770",
+            "processes": [
+              {
+                "name": "python",
+                "pid": 1775967
+              }
+            ]
+          },
+          {
+            "local": "127.0.0.1:19443",
+            "processes": [
+              {
+                "name": "ssh",
+                "pid": 1622804
+              }
+            ]
+          },
+          {
+            "local": "127.0.0.1:18080",
+            "processes": [
+              {
+                "name": "python",
+                "pid": 3082952
+              }
+            ]
+          },
+          {
+            "local": "0.0.0.0:443",
+            "processes": [
+              {
+                "name": "nginx",
+                "pid": 3096690
+              },
+              {
+                "name": "nginx",
+                "pid": 3096689
+              },
+              {
+                "name": "nginx",
+                "pid": 3096688
+              },
+              {
+                "name": "nginx",
+                "pid": 3096687
+              },
+              {
+                "name": "nginx",
+                "pid": 512590
+              }
+            ]
+          },
+          {
+            "local": "[::]:443",
+            "processes": [
+              {
+                "name": "nginx",
+                "pid": 3096690
+              },
+              {
+                "name": "nginx",
+                "pid": 3096689
+              },
+              {
+                "name": "nginx",
+                "pid": 3096688
+              },
+              {
+                "name": "nginx",
+                "pid": 3096687
+              },
+              {
+                "name": "nginx",
+                "pid": 512590
+              }
+            ]
+          }
+        ],
+        "nginx": [
+          {
+            "bytes": 16870,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/nginx.conf",
+            "regular": true,
+            "routes": [
+              {
+                "directive": "include",
+                "value": "/usr/share/nginx/modules/*.conf"
+              },
+              {
+                "directive": "include",
+                "value": "/etc/nginx/mime.types"
+              },
+              {
+                "directive": "listen",
+                "value": "80 default_server"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:80 default_server"
+              },
+              {
+                "directive": "server_name",
+                "value": "_"
+              },
+              {
+                "directive": "root",
+                "value": "/var/www/letsencrypt"
+              },
+              {
+                "directive": "listen",
+                "value": "443 ssl default_server"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:443 ssl default_server"
+              },
+              {
+                "directive": "server_name",
+                "value": "47.245.53.152"
+              },
+              {
+                "directive": "root",
+                "value": "/var/www/letsencrypt"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18080,
+                "scheme": "http"
+              },
+              {
+                "directive": "listen",
+                "value": "443 ssl"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:443 ssl"
+              }
+            ],
+            "sha256": "d7cf6b60d85b5a6b36df7437a26249d643bc756b4f6ac31fa1521ef1487dcef3",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 2933,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/conf.d/wecom.conf",
+            "regular": true,
+            "routes": [
+              {
+                "directive": "listen",
+                "value": "80"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:80"
+              },
+              {
+                "directive": "server_name",
+                "value": "wecom.wenwenwenyiyiyi.work"
+              },
+              {
+                "directive": "root",
+                "value": "/var/www/letsencrypt"
+              },
+              {
+                "directive": "listen",
+                "value": "443 ssl"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:443 ssl"
+              },
+              {
+                "directive": "server_name",
+                "value": "wecom.wenwenwenyiyiyi.work"
+              },
+              {
+                "directive": "root",
+                "value": "/var/www/wecom-domain"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18761,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18770,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18770,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18780,
+                "scheme": "http"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "127.0.0.1",
+                "port": 18781,
+                "scheme": "http"
+              }
+            ],
+            "sha256": "ca380c772ee923af24f420256c8de6cec3b774791cc9deb5bd7fdba1059931c0",
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "bytes": 557,
+            "gid": 0,
+            "mode": "0o644",
+            "path": "/etc/nginx/conf.d/pr122-apex-acme-http.conf",
+            "regular": true,
+            "routes": [
+              {
+                "directive": "listen",
+                "value": "80"
+              },
+              {
+                "directive": "listen",
+                "value": "[::]:80"
+              },
+              {
+                "directive": "server_name",
+                "value": "wenwenwenyiyiyi.work"
+              },
+              {
+                "directive": "proxy_pass",
+                "host": "47.101.152.210",
+                "port": 80,
+                "scheme": "http"
+              }
+            ],
+            "sha256": "190f7180599e238c7e12eda144340f23cb76a30c0b98398bd474e4abe0d27383",
+            "symlink": false,
+            "uid": 0
+          }
+        ],
+        "running_service_names": [
+          "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-tokyo-readonly.service",
+          "agentsight.service",
+          "aliyun.service",
+          "auditd.service",
+          "chronyd.service",
+          "containerd.service",
+          "crond.service",
+          "dbus-broker.service",
+          "docker.service",
+          "domestic-model-rpc-tunnel.service",
+          "getty@tty1.service",
+          "gssproxy.service",
+          "korea-novel-model-rpc-tunnel.service",
+          "NetworkManager.service",
+          "nginx.service",
+          "polkit.service",
+          "provider-neutral-tokyo-tunnel.service",
+          "restricted-rpc-openai-shim.service",
+          "rngd.service",
+          "rsyslog.service",
+          "secure-secrets-portal.service",
+          "serial-getty@ttyS0.service",
+          "sshd.service",
+          "systemd-homed.service",
+          "systemd-journald.service",
+          "systemd-logind.service",
+          "systemd-udevd.service",
+          "systemd-userdbd.service",
+          "tokyo-restricted-model-executor.service",
+          "user@1000.service",
+          "ws-ckpt.service",
+          "xj-tokyo-vpn.service",
+          "xuanjun-wecom-customer-contact.service",
+          "xuanjun-wecom-customer-service.service",
+          "xuanjun-wecom-novel-ingress.service"
+        ],
+        "secret_values_disclosed": false,
+        "service_actions": 0,
+        "status": "S08_ROOT_READONLY_RUNTIME_CLOSURE",
+        "uid": 0,
+        "units": [
+          {
+            "ActiveState": "active",
+            "After": "network-online.target",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/secure-secrets-portal.service",
+            "Group": "admin",
+            "LoadState": "loaded",
+            "MainPID": "3082952",
+            "Requires": "",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "/opt/trading-system",
+            "command_projection": [
+              {
+                "entry_paths": [
+                  "/opt/trading-system/scripts/secure_secrets_portal_server.py"
+                ],
+                "executable": "/opt/trading-system/venv/bin/python",
+                "forwards": [],
+                "token_count": 7
+              }
+            ],
+            "environment_names": [
+              "PYTHONPATH"
+            ],
+            "fragment": {
+              "bytes": 579,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/secure-secrets-portal.service",
+              "regular": true,
+              "sha256": "3023bd5152e1bc26f35cea3ee1cf8196a67c69a736faad7ecf53887882dad0a7",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "network-online.target secure-secrets-portal.service",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-customer-contact.service",
+            "Group": "admin",
+            "LoadState": "loaded",
+            "MainPID": "1903204",
+            "Requires": "",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "/opt/trading-system",
+            "command_projection": [
+              {
+                "executable": "/opt/trading-system/venv/bin/python",
+                "forwards": [],
+                "module": "ai_service.wecom_customer_contact_service",
+                "token_count": 3
+              }
+            ],
+            "environment_names": [
+              "PYTHONPATH"
+            ],
+            "fragment": {
+              "bytes": 592,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/xuanjun-wecom-customer-contact.service",
+              "regular": true,
+              "sha256": "f855698347cc734112d6abd102773eb1a39444a332a90a503f8a4f746ecec5aa",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "provider-neutral-tunnel.service secure-secrets-portal.service network-online.target",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-customer-service.service",
+            "Group": "admin",
+            "LoadState": "loaded",
+            "MainPID": "1875349",
+            "Requires": "",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "provider-neutral-tunnel.service network-online.target",
+            "WorkingDirectory": "/opt/trading-system",
+            "command_projection": [
+              {
+                "executable": "/opt/trading-system/venv/bin/python",
+                "forwards": [],
+                "module": "ai_service.wecom_customer_service",
+                "token_count": 3
+              }
+            ],
+            "environment_names": [
+              "PYTHONPATH"
+            ],
+            "fragment": {
+              "bytes": 658,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/xuanjun-wecom-customer-service.service",
+              "regular": true,
+              "sha256": "53669b3e6e5646f22b512df5e9dd14feef0796fcd0ac4cb336161c83aa876791",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "korea-novel-model-rpc-tunnel.service network-online.target",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-novel-ingress.service",
+            "Group": "admin",
+            "LoadState": "loaded",
+            "MainPID": "1775967",
+            "Requires": "",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target korea-novel-model-rpc-tunnel.service",
+            "WorkingDirectory": "/opt/trading-system",
+            "command_projection": [
+              {
+                "executable": "/opt/trading-system/venv/bin/python",
+                "forwards": [],
+                "token_count": 2
+              }
+            ],
+            "environment_names": [
+              "PYTHONDONTWRITEBYTECODE",
+              "PYTHONPATH",
+              "WECOM_NOVEL_CALLBACK_PATH",
+              "WECOM_NOVEL_INGRESS_HOST",
+              "WECOM_NOVEL_INGRESS_PORT"
+            ],
+            "fragment": {
+              "bytes": 908,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/xuanjun-wecom-novel-ingress.service",
+              "regular": true,
+              "sha256": "0474dc967087e0ef0eeea2dd7b0b00a51caedec443dd0c6534f8b83aabe68b91",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "xuanjun-wecom-novel-ingress.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "provider-neutral-tunnel.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "network-online.target",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/provider-neutral-tokyo-tunnel.service",
+            "Group": "admin",
+            "LoadState": "loaded",
+            "MainPID": "1622804",
+            "Requires": "",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "/home/admin",
+            "command_projection": [
+              {
+                "executable": "/usr/bin/ssh",
+                "forwards": [
+                  {
+                    "binding": "127.0.0.1:19443:127.0.0.1:18443",
+                    "flag": "-L"
+                  }
+                ],
+                "token_count": 43
+              }
+            ],
+            "environment_names": [],
+            "fragment": {
+              "bytes": 1155,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/provider-neutral-tokyo-tunnel.service",
+              "regular": true,
+              "sha256": "c83f148d878be3b448d22455c01250e91bd903904608a3e919c899758e23125e",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "provider-neutral-tokyo-tunnel.service"
+          },
+          {
+            "ActiveState": "inactive",
+            "After": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "Requires": "",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": "",
+            "unit": "provider-neutral-domestic-bridge.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "network-online.target tokyo-restricted-model-executor.service",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/domestic-model-rpc-tunnel.service",
+            "Group": "admin",
+            "LoadState": "loaded",
+            "MainPID": "1823162",
+            "Requires": "tokyo-restricted-model-executor.service",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "/home/admin",
+            "command_projection": [
+              {
+                "executable": "/usr/bin/ssh",
+                "forwards": [
+                  {
+                    "binding": "127.0.0.1:19444:127.0.0.1:20443",
+                    "flag": "-R"
+                  }
+                ],
+                "token_count": 43
+              }
+            ],
+            "environment_names": [],
+            "fragment": {
+              "bytes": 1248,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/domestic-model-rpc-tunnel.service",
+              "regular": true,
+              "sha256": "b3b73107f768c6b52b160591ec1e12a28b69c9fbea3b99a41249a9212fc71d0d",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "domestic-model-rpc-tunnel.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "network-online.target tokyo-restricted-model-executor.service",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/korea-novel-model-rpc-tunnel.service",
+            "Group": "admin",
+            "LoadState": "loaded",
+            "MainPID": "2071744",
+            "Requires": "",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "",
+            "command_projection": [
+              {
+                "executable": "/usr/bin/ssh",
+                "forwards": [
+                  {
+                    "binding": "127.0.0.1:18761:127.0.0.1:18760",
+                    "flag": "-L"
+                  },
+                  {
+                    "binding": "127.0.0.1:19444:127.0.0.1:20443",
+                    "flag": "-R"
+                  }
+                ],
+                "token_count": 43
+              }
+            ],
+            "environment_names": [],
+            "fragment": {
+              "bytes": 846,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/korea-novel-model-rpc-tunnel.service",
+              "regular": true,
+              "sha256": "814e49d8f72ef711dedae71b86b26f69972baf4e0dc732df678fb52f2777340d",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "korea-novel-model-rpc-tunnel.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "network-online.target",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/restricted-rpc-openai-shim.service",
+            "Group": "",
+            "LoadState": "loaded",
+            "MainPID": "1222508",
+            "Requires": "",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "/opt/trading-system",
+            "command_projection": [
+              {
+                "entry_paths": [
+                  "/opt/trading-system/deploy/bin/run_restricted_rpc_openai_shim_candidate.py"
+                ],
+                "executable": "/opt/trading-system/venv/bin/python",
+                "forwards": [],
+                "token_count": 9
+              }
+            ],
+            "environment_names": [
+              "MODEL_PROVIDER_RPC_CERT_SHA256_FILE",
+              "MODEL_PROVIDER_RPC_HOST",
+              "MODEL_PROVIDER_RPC_PORT",
+              "MODEL_PROVIDER_RPC_SECRET_DIR",
+              "MODEL_PROVIDER_RPC_SECRET_FILE",
+              "MODEL_PROVIDER_TRANSPORT",
+              "PYTHONPATH",
+              "PYTHONUNBUFFERED"
+            ],
+            "fragment": {
+              "bytes": 1289,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/restricted-rpc-openai-shim.service",
+              "regular": true,
+              "sha256": "1500671e8059d87053f9bedc749d579c357339278fe8cac3e0d3241130841cac",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "restricted-rpc-openai-shim.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "network-online.target",
+            "DropInPaths": "/etc/systemd/system/tokyo-restricted-model-executor.service.d/provider-health-alert.conf",
+            "FragmentPath": "/etc/systemd/system/tokyo-restricted-model-executor.service",
+            "Group": "admin",
+            "LoadState": "loaded",
+            "MainPID": "1823159",
+            "Requires": "",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "/opt/trading-system",
+            "command_projection": [
+              {
+                "entry_paths": [
+                  "/opt/trading-system/ai_service/internal_provider_neutral_bridge.py"
+                ],
+                "executable": "/opt/trading-system/venv/bin/python",
+                "forwards": [],
+                "token_count": 18
+              }
+            ],
+            "environment_names": [
+              "PYTHONPATH"
+            ],
+            "fragment": {
+              "bytes": 1481,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/tokyo-restricted-model-executor.service",
+              "regular": true,
+              "sha256": "dcd0bb3cb454322dca7385f82fa4152819523b4e08db73e6a9bd26e571a87a81",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "tokyo-restricted-model-executor.service"
+          },
+          {
+            "ActiveState": "active",
+            "After": "docker.service network-online.target",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xj-tokyo-vpn.service",
+            "Group": "",
+            "LoadState": "loaded",
+            "MainPID": "2075604",
+            "Requires": "docker.service",
+            "SubState": "running",
+            "User": "",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "",
+            "command_projection": [
+              {
+                "executable": "/usr/local/sbin/xj-tokyo-vpn-guard",
+                "forwards": [],
+                "token_count": 1
+              }
+            ],
+            "environment_names": [],
+            "fragment": {
+              "bytes": 407,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/xj-tokyo-vpn.service",
+              "regular": true,
+              "sha256": "662323e718b3559a03533c634662b75d3c8a8e1f7619d023a92b6e7c17848ba6",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "xj-tokyo-vpn.service"
+          },
+          {
+            "ActiveState": "active",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/finance-collection-sync.timer",
+            "LoadState": "loaded",
+            "SubState": "waiting",
+            "command_projection": [],
+            "environment_names": [],
+            "fragment": {
+              "bytes": 338,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/finance-collection-sync.timer",
+              "regular": true,
+              "sha256": "814f423856f2be44fb967dd6644df9ce85e91c2d99095f32d53c31f81e710a65",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "finance-collection-sync.timer"
+          },
+          {
+            "ActiveState": "active",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/owner-commercial-ledger-sync.timer",
+            "LoadState": "loaded",
+            "SubState": "waiting",
+            "command_projection": [],
+            "environment_names": [],
+            "fragment": {
+              "bytes": 230,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/owner-commercial-ledger-sync.timer",
+              "regular": true,
+              "sha256": "a9764a3a234309e4c0dcd4f40ff140cb30b944b56b5f89c6f562ea86ae2fa2c8",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "owner-commercial-ledger-sync.timer"
+          },
+          {
+            "ActiveState": "active",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/billing-operations-weekly-settlement.timer",
+            "LoadState": "loaded",
+            "SubState": "waiting",
+            "command_projection": [],
+            "environment_names": [],
+            "fragment": {
+              "bytes": 242,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/billing-operations-weekly-settlement.timer",
+              "regular": true,
+              "sha256": "ebe6db972641bb6dffe069ee64b7d0ae665f53fca15318d61b7aaf1e10d5f746",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "billing-operations-weekly-settlement.timer"
+          },
+          {
+            "ActiveState": "active",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/billing-operations-weekly-final-invoice.timer",
+            "LoadState": "loaded",
+            "SubState": "waiting",
+            "command_projection": [],
+            "environment_names": [],
+            "fragment": {
+              "bytes": 248,
+              "gid": 0,
+              "mode": "0o644",
+              "path": "/etc/systemd/system/billing-operations-weekly-final-invoice.timer",
+              "regular": true,
+              "sha256": "c1c2eab13ab5cf0958ae85286566419dd77159ff8b41febb9678fe615e2a2f93",
+              "symlink": false,
+              "uid": 0
+            },
+            "unit": "billing-operations-weekly-final-invoice.timer"
+          }
+        ]
+      },
+      "service_actions": 0,
+      "status": "PASS"
+    }
+  ],
+  "service_actions": 0,
+  "production_cutover": false,
+  "limitations": [
+    "selected16units_not_exhaustive_host",
+    "bounded_nginx_projection_not_full_route_mapping",
+    "cron_absence_not_explicit_in_v1",
+    "container_ps_not_dependency_acceptance",
+    "no_application_or_database_or_business_api_execution"
+  ]
+}

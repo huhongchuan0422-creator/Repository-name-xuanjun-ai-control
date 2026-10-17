@@ -1,0 +1,81 @@
+{
+  "actual_repair_attempt": {
+    "address_families_dbus": "(bas) true 1 \"AF_UNIX\"",
+    "approval": 6208184098,
+    "attempts": 1,
+    "current_unchanged": true,
+    "error": "MANAGER_NETWORK_PROFILE_NOT_LOADED",
+    "lock_retained": true,
+    "private_network_dbus": "b true",
+    "root_cause": "VERIFIER_TEXT_RENDERING_ASSUMPTION",
+    "runtime_17_mismatches": 0,
+    "shared_named_unit_metadata_unchanged": true,
+    "source": "OWNER_TERMINAL",
+    "started_service_confinement": "NOT_EXERCISED",
+    "status": "HOLD_PRESERVE_EVIDENCE",
+    "systemctl_address_families": "[unprintable]",
+    "transaction_sha256": "ee81a70bb417e66dbb58bad5a79a776d1e7a0bce35d0e72bf638a2fe0844eb75",
+    "unit_hash_only_transaction_delta": true,
+    "unit_sha256": "824fc0cbe3d879b61ea36b0bd7c45fb8c1e9fb6c463f46ada741ac3f2299899b"
+  },
+  "complete_repair_candidate": {
+    "actual_repair": "NOT_EXECUTED",
+    "af_unix_only": true,
+    "entrypoint": "ORIGINAL_NO_NETWORK_SELF_CHECK_ONLY",
+    "independent_repair_approval": "NOT_ISSUED",
+    "original_runtime_files_preserved": 17,
+    "path": "migration-prep/korea-offline-repair/README.md",
+    "phase_c": "NOT_AUTHORIZED",
+    "private_network": true,
+    "root_anchor": "NOT_REGISTERED",
+    "scope": "UNIT_AND_TRANSACTION_UNIT_HASH_ONLY"
+  },
+  "finalization_candidate": {
+    "action": "PR99_PHASE_B_OFFLINE_REPAIR_FINALIZE_V1",
+    "daemon_reload": false,
+    "execution": "NOT_EXECUTED",
+    "historical_lock_inode_persisted": false,
+    "new_approval_required": true,
+    "new_private_anchor_required": true,
+    "scope": "READ_ONLY_POSTFLIGHT_PLUS_EXPLICITLY_ADOPTED_EMPTY_LOCK_RELEASE_AND_LINKED_RECEIPT",
+    "transaction_rewrite": false,
+    "unit_rewrite": false
+  },
+  "independent_recovery_review": "WAIT_COMPLETE_RECOVERY_SCOPE_NOT_PIECEWISE",
+  "install_commit": "REPORTED_PASS",
+  "install_lock": "REPORTED_RELEASED",
+  "installer_invocations": 1,
+  "named_shared_unit_metadata": "REPORTED_UNCHANGED",
+  "namespace_support": "NOT_VERIFIED_ON_REAL_ROOT_HOST",
+  "new_local_shell_tests": 17,
+  "new_source_scope": "FAIL_CLOSED_DIAGNOSTICS_NOT_A_COMPATIBLE_REPAIR",
+  "owner_receipt": true,
+  "owner_root_netns_capability": {
+    "distinct_namespace": true,
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "interfaces": [
+      "lo"
+    ],
+    "kernel": "5.10.134-19.8.al8.x86_64",
+    "source": "OWNER_TERMINAL_OUTPUT",
+    "started_systemd_service_test": false,
+    "systemd": "239 (239-82.0.4.5.al8.5)",
+    "unshare_net_exit": 0
+  },
+  "phase_c": "NOT_AUTHORIZED",
+  "private_logs": "/root/pr99-phaseb-632bbe6f",
+  "root_retry_allowed": false,
+  "root_session_directly_controlled_by_this_window": false,
+  "schema_version": 1,
+  "scope_approval": 6207630392,
+  "security_acceptance": "HOLD",
+  "service": "REPORTED_DISABLED_INACTIVE_PID0",
+  "source_commit_installed": "632bbe6f204a2c9ef778d3c91e425593c079abb1",
+  "source_repair_deployed": false,
+  "tokyo_retirement": "HOLD",
+  "transaction_sha256": "c79182446ab8c2e447cb6942061710fb4a864addb4b9718f967402ef8c30cfe2",
+  "warnings": [
+    "UNKNOWN_LOADCREDENTIAL_LVALUE",
+    "BPF_CGROUP_FIREWALL_UNSUPPORTED_PROCEEDING_WITHOUT_FIREWALLING"
+  ]
+}

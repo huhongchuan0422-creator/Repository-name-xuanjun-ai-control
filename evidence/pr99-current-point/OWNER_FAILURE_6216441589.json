@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "origin": "OWNER_KOREA_ROOT_TERMINAL_NOT_DIRECT_LOGIN",
+  "status": "HOLD_PRESERVE_EVIDENCE",
+  "local_workdir": "/root/pr99-current-point-received-v1",
+  "package": "/root/pr99-current-point-package-c6ba6ac8",
+  "approval_comment_id": 6216441589,
+  "failed_step": "REMOTE_PREPARE_SSH_RETURNED_NONZERO",
+  "public_reason": "SSH_STEP_FAILED",
+  "remote_state": "INSPECT_BEFORE_ANY_NEW_AUTHORITY",
+  "source_failure_receipt": "NOT_YET_READ",
+  "real_database_copy": "NOT_PROVEN",
+  "retry_allowed": false,
+  "coordinator_diagnostic_gap": "SSH STDERR CAPTURED_IN_MEMORY_BUT_NOT_PERSISTED_ON_NONZERO",
+  "reported_owner_host": "iZmj7a5kwr75qc1tul4kf9Z",
+  "root_identity": "OWNER_REPORTED_UID0",
+  "package_staging": "FROZEN_PACKAGE_STAGED_ONLY",
+  "ssh_authentication": "OWNER_OUTPUT_SUPPORTS_PASS",
+  "approval_verification": "OWNER_OUTPUT_SUPPORTS_PASS",
+  "phase_b_service_actions": "NOT_REQUESTED_BY_CANDIDATE",
+  "tokyo_retirement": "HOLD"
+}

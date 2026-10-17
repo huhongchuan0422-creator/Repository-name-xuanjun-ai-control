@@ -1,0 +1,45 @@
+[Unit]
+Description=Xuanjun Binance Korea isolated shadow candidate
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xuanjun_binance
+Group=xuanjun_binance
+WorkingDirectory=/opt/xuanjun-binance/current/migration-prep
+EnvironmentFile=/etc/xuanjun-binance/shadow.env
+Environment=HTTP_PROXY=
+Environment=HTTPS_PROXY=
+Environment=ALL_PROXY=
+Environment=NO_PROXY=*
+Environment=PYTHONPATH=/opt/xuanjun-binance/current/migration-prep
+Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=binance_api_key:/etc/xuanjun-binance/secretref/BINANCE_ACCOUNT_READONLY_API_KEY
+LoadCredential=binance_api_secret:/etc/xuanjun-binance/secretref/BINANCE_ACCOUNT_READONLY_API_SECRET
+ExecStart=/opt/xuanjun-binance/venv/bin/python -m korea.migration_shadow_entry --continuous --config /etc/xuanjun-binance/shadow.json --acceptance-config /etc/xuanjun-binance/shadow-acceptance.json
+Restart=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ReadOnlyPaths=/opt/xuanjun-binance/current /etc/xuanjun-binance
+ReadWritePaths=/var/lib/xuanjun-binance /var/log/xuanjun-binance
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+# The installation candidate is deliberately deny-all. A separately reviewed,
+# root-owned Phase-C drop-in must add exact pinned addresses before any live GET.
+CapabilityBoundingSet=
+AmbientCapabilities=
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

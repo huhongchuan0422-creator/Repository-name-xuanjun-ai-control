@@ -1,0 +1,49 @@
+name: PR99 install candidate offline validation
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths: ['.github/workflows/pr99-install-candidate-validation.yml']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Verify pinned evidence candidate without cloud credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import copy, hashlib, io, json, tarfile, urllib.request
+          R="https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/"
+          def get(ref,path):
+           with urllib.request.urlopen(R+ref+"/"+path,timeout=30) as r:return r.read(262145)
+          s=get("a28802769f44a874488e1326f95ba9af8d4f068f","evidence/pr99-service-handoff/s09-install-candidate/build_candidate.py")
+          assert hashlib.sha256(s).hexdigest()=="3734e7a4748961a0bfae8ce778d038724538be74acbee182496f0591650ef961"
+          n={"__name__":"checks"};exec(compile(s,"candidate.py","exec"),n)
+          p="evidence/pr99-service-handoff/s08-runtime-closure/"
+          r=json.loads(get("d1704c32ce025d156b1e1a44bae95581bb4294d1",p+"RECEIPT_20261017.json"))
+          e=json.loads(get("d1704c32ce025d156b1e1a44bae95581bb4294d1",p+"ENDPOINT_RECEIPT_20261017.json"))
+          f=n["compile_candidate"](r,e);raw=n["archive"](f)
+          assert n["archive"](f)==raw
+          assert hashlib.sha256(raw).hexdigest()=="32fe75c61f2d6d7cec0c31990f34d13f57a0db7fe313cd39e9a848aed964ed22"
+          for change,expected in ((lambda x:x.update(run=0),"EVIDENCE_RUN_BINDING"),(lambda x:x["hosts"][0].update(status="HOLD"),"INVOKE_NOT_SUCCESS")):
+           x=copy.deepcopy(r);change(x)
+           try:n["compile_candidate"](x,e);raise AssertionError("unsafe evidence accepted")
+           except ValueError as err:assert str(err)==expected
+          x=copy.deepcopy(r);d=next(h for h in x["hosts"] if h["host"]=="domestic")
+          next(u for u in d["receipt"]["units"] if u["unit"]=="secure-secrets-portal.service")["LoadState"]="loaded"
+          try:n["compile_candidate"](x,e);raise AssertionError("owned service accepted")
+          except ValueError as err:assert str(err)=="DOMESTIC_UNIT_ALREADY_OWNED"
+          x=copy.deepcopy(r);next(h for h in x["hosts"] if h["host"]=="domestic")["receipt"]["listeners"].append({"local":"127.0.0.1:18080"})
+          try:n["compile_candidate"](x,e);raise AssertionError("occupied port accepted")
+          except ValueError as err:assert str(err)=="PLANNED_PORT_OCCUPIED"
+          with tarfile.open(fileobj=io.BytesIO(raw)) as t:
+           assert len(t.getmembers())==5 and all(m.isfile() and m.uid==0 and m.mode==0o600 for m in t)
+          manifest=json.loads(f["MANIFEST.json"])
+          for path,digest in manifest["files"].items():assert hashlib.sha256(f[path]).hexdigest()==digest
+          for path,data in f.items():
+           if path.endswith(".template"):assert "[Install]" not in data.decode() and "Restart=no" in data.decode()
+          print(json.dumps({"status":"CANDIDATE_BUILD_AND_NEGATIVE_GATES_PASS","files":5,"tar_sha256":hashlib.sha256(raw).hexdigest(),"service_actions":0,"production_acceptance":False}))
+          PY

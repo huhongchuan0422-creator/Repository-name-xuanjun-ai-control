@@ -1,0 +1,378 @@
+{
+  "schema_version": 1,
+  "run": 38898164991,
+  "exact_delivery_commit": "129633f7aaff9c68f73a8adec7b12ab37437a698",
+  "tokyo_job": 116963568932,
+  "korea_job": 116963569222,
+  "job_conclusions": {
+    "tokyo": "SUCCESS",
+    "korea": "SUCCESS"
+  },
+  "receipts": {
+    "tokyo": {
+      "channel_configuration_and_credentials": "NOT_READ",
+      "credentials_read": false,
+      "database_opened": false,
+      "delivery_commit": "129633f7aaff9c68f73a8adec7b12ab37437a698",
+      "epoch": 1792152357,
+      "host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "http_requests": 0,
+      "loaded_timers": {
+        "exit": 0,
+        "items": [
+          {
+            "activates": "finance-collection-sync.service",
+            "timer": "finance-collection-sync.timer"
+          },
+          {
+            "activates": "dnf-makecache.service",
+            "timer": "dnf-makecache.timer"
+          },
+          {
+            "activates": "logrotate.service",
+            "timer": "logrotate.timer"
+          },
+          {
+            "activates": "secure-secrets-certbot-renew.service",
+            "timer": "secure-secrets-certbot-renew.timer"
+          },
+          {
+            "activates": "owner-commercial-ledger-sync.service",
+            "timer": "owner-commercial-ledger-sync.timer"
+          },
+          {
+            "activates": "systemd-tmpfiles-clean.service",
+            "timer": "systemd-tmpfiles-clean.timer"
+          },
+          {
+            "activates": "billing-operations-weekly-settlement.service",
+            "timer": "billing-operations-weekly-settlement.timer"
+          },
+          {
+            "activates": "fstrim.service",
+            "timer": "fstrim.timer"
+          },
+          {
+            "activates": "billing-operations-weekly-final-invoice.service",
+            "timer": "billing-operations-weekly-final-invoice.timer"
+          }
+        ]
+      },
+      "portal_entry_identity": {
+        "bytes": 85197,
+        "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+        "uid": 1000
+      },
+      "production_changes": 0,
+      "root_and_admin_crontabs": "NOT_READ_NONROOT",
+      "running_custom_and_entry_services": [
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-tokyo-readonly.service",
+            "Id": "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-tokyo-readonly.service",
+            "MainPID": "2203697",
+            "SubState": "running",
+            "User": "githubrunner",
+            "WorkingDirectory": "/home/githubrunner/actions-runner"
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/aliyun.service",
+            "Id": "aliyun.service",
+            "MainPID": "2493174",
+            "SubState": "running",
+            "User": "",
+            "WorkingDirectory": ""
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/domestic-model-rpc-tunnel.service",
+            "Id": "domestic-model-rpc-tunnel.service",
+            "MainPID": "1823162",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": "/home/admin"
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/korea-novel-model-rpc-tunnel.service",
+            "Id": "korea-novel-model-rpc-tunnel.service",
+            "MainPID": "2071744",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": ""
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/usr/lib/systemd/system/nginx.service",
+            "Id": "nginx.service",
+            "MainPID": "512590",
+            "SubState": "running",
+            "User": "",
+            "WorkingDirectory": ""
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/provider-neutral-tokyo-tunnel.service",
+            "Id": "provider-neutral-tokyo-tunnel.service",
+            "MainPID": "1622804",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": "/home/admin"
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/restricted-rpc-openai-shim.service",
+            "Id": "restricted-rpc-openai-shim.service",
+            "MainPID": "1222508",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": "/opt/trading-system"
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/secure-secrets-portal.service",
+            "Id": "secure-secrets-portal.service",
+            "MainPID": "3082952",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": "/opt/trading-system"
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/usr/lib/systemd/system/sshd.service",
+            "Id": "sshd.service",
+            "MainPID": "1080",
+            "SubState": "running",
+            "User": "",
+            "WorkingDirectory": ""
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/tokyo-restricted-model-executor.service",
+            "Id": "tokyo-restricted-model-executor.service",
+            "MainPID": "1823159",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": "/opt/trading-system"
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/xj-tokyo-vpn.service",
+            "Id": "xj-tokyo-vpn.service",
+            "MainPID": "2075604",
+            "SubState": "running",
+            "User": "",
+            "WorkingDirectory": ""
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-customer-contact.service",
+            "Id": "xuanjun-wecom-customer-contact.service",
+            "MainPID": "1903204",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": "/opt/trading-system"
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-customer-service.service",
+            "Id": "xuanjun-wecom-customer-service.service",
+            "MainPID": "1875349",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": "/opt/trading-system"
+          }
+        },
+        {
+          "exit": 0,
+          "metadata": {
+            "ActiveState": "active",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-novel-ingress.service",
+            "Id": "xuanjun-wecom-novel-ingress.service",
+            "MainPID": "1775967",
+            "SubState": "running",
+            "User": "admin",
+            "WorkingDirectory": "/opt/trading-system"
+          }
+        }
+      ],
+      "running_services_count": 35,
+      "schema_version": 1,
+      "scoped_listeners": {
+        "exit": 0,
+        "listeners": [
+          {
+            "bind_scope": "loopback",
+            "port": 18761
+          },
+          {
+            "bind_scope": "loopback",
+            "port": 18781
+          },
+          {
+            "bind_scope": "loopback",
+            "port": 18780
+          },
+          {
+            "bind_scope": "loopback",
+            "port": 18770
+          },
+          {
+            "bind_scope": "loopback",
+            "port": 19443
+          },
+          {
+            "bind_scope": "loopback",
+            "port": 18080
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 80
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 22
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 443
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 80
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 22
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 443
+          }
+        ]
+      },
+      "service_actions": 0,
+      "service_list_truncated": false,
+      "side": "tokyo",
+      "source_database_and_business_state": "NOT_READ",
+      "status": "TOKYO_REMAINING_DEPENDENCY_METADATA_COLLECTED_NOT_MIGRATED",
+      "sudo_calls": 0,
+      "uid": 1001
+    },
+    "korea": {
+      "credentials_read": false,
+      "database_opened": false,
+      "delivery_commit": "129633f7aaff9c68f73a8adec7b12ab37437a698",
+      "dependency_environment": {
+        "interpreter_sha256": "0cc04ecbaaeeea7edcf67089e5bf4935fd372d9f4a8aca9b66e48b39a90bc108",
+        "production_imports": 0,
+        "root_private_receipts_read": false,
+        "status": "13_EXACT_PACKAGE_VERSIONS_READ_BACK",
+        "third_party_modules_imported": false,
+        "versions": {
+          "ccxt": "4.5.78",
+          "cryptography": "50.0.1",
+          "loguru": "0.7.3",
+          "numpy": "2.4.6",
+          "pandas": "3.0.5",
+          "pymysql": "1.2.2",
+          "python-dotenv": "1.2.3",
+          "pyyaml": "6.0.3",
+          "redis": "8.1.0",
+          "requests": "2.34.2",
+          "sqlalchemy": "2.0.54",
+          "ta": "0.11.0",
+          "websocket-client": "1.9.2"
+        }
+      },
+      "epoch": 1792152357,
+      "existing_phase_b_enabled": "disabled",
+      "existing_phase_b_service": {
+        "exit": 0,
+        "metadata": {
+          "ActiveState": "inactive",
+          "FragmentPath": "/etc/systemd/system/xuanjun-binance-shadow.service",
+          "Id": "xuanjun-binance-shadow.service",
+          "MainPID": "0",
+          "SubState": "dead",
+          "User": "xuanjun_binance",
+          "WorkingDirectory": "/opt/xuanjun-binance/current/migration-prep"
+        }
+      },
+      "host": "iZmj7a5kwr75qc1tul4kf9Z",
+      "http_requests": 0,
+      "phase_b_current": "/opt/xuanjun-binance/releases/f887b085508e3ed4",
+      "production_changes": 0,
+      "schema_version": 1,
+      "scoped_listeners": {
+        "exit": 0,
+        "listeners": [
+          {
+            "bind_scope": "loopback",
+            "port": 19444
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 22
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 22
+          },
+          {
+            "bind_scope": "wildcard",
+            "port": 443
+          }
+        ]
+      },
+      "service_actions": 0,
+      "side": "korea",
+      "status": "KOREA_NEW_ENV_METADATA_AND_STOPPED_PHASE_B_PASS",
+      "sudo_calls": 0,
+      "uid": 1001
+    }
+  },
+  "root_private_receipts_independently_read": false,
+  "historical_recovery_claim_origin": "OWNER_ROOT_TERMINAL_RECEIPTS",
+  "new_production_mutations": 0,
+  "source_or_historical_tests_repeated": false
+}

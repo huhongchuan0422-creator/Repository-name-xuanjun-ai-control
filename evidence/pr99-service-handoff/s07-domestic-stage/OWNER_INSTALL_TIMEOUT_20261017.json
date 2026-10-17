@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "evidence_origin": "OWNER_KOREA_SUDO_ROOT_TERMINAL_TRANSCRIPT_NOT_ASSISTANT_HOST_LOGIN",
+  "reported_local_time": "2026-10-17T00:45+08:00",
+  "source_commit": "ae5e03d9452132de5884f11392ab95eea9d47e3f",
+  "script_sha256": "745c67d34cf4b0d546aee28c74c11b1586a315a03d970cbebc37508ebc61f8fd",
+  "launch_directory": "/root/pr99-s07-install-launch.a5NZU99H",
+  "coordinator_host": "iZmj7a5kwr75qc1tul4kf9Z",
+  "target_host": "iZvt5t8tlrm8oiZ",
+  "status": "DOMESTIC_STAGE_HOLD_PRESERVE",
+  "reason": "DEPENDENCY_STEP_TIMEOUT",
+  "coordinator_reason": "REMOTE_INSTALL_FAILED_OR_UNKNOWN_PRESERVE",
+  "source_write_stage_reached": true,
+  "source_files_rehashed_after_install": false,
+  "dependencies_complete": false,
+  "service_install_called": false,
+  "service_actions_in_fixed_script": 0,
+  "proxy_switch_called": false,
+  "protected_after_snapshot_completed": false,
+  "production_cutover": false,
+  "retry_allowed": false,
+  "preserve_paths": [
+    "/opt/xuanjun-migration-s07",
+    "/var/lib/xuanjun-pr99-s07-stage-v1",
+    "/root/pr99-s07-domestic-stage-v1"
+  ],
+  "next": "Read private dependency/venv log classifications, installed package metadata and source hashes; diagnose before a new, separately recorded bounded continuation. Do not rerun initial installer or delete/rename existing evidence.",
+  "tokyo_retirement": "HOLD"
+}

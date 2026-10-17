@@ -1,0 +1,21 @@
+{
+  "architecture": "x86_64",
+  "business_requests": 0,
+  "candidate_base": "ABSENT",
+  "free_bytes": 14198571008,
+  "host": "iZvt5t8tlrm8oiZ",
+  "private_key_reads": 0,
+  "protected_service_metadata": {
+    "exit": 0,
+    "text": "MainPID=85106\nId=nginx.service\nLoadState=loaded\nActiveState=active\nSubState=running\n\nMainPID=188767\nId=provider-neutral-domestic-bridge.service\nLoadState=loaded\nActiveState=active\nSubState=running\n\nMainPID=269238\nId=xuanjun-site-hub-preview.service\nLoadState=loaded\nActiveState=active\nSubState=running\n\nMainPID=0\nId=secure-secrets-portal.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\n\nMainPID=0\nId=xuanjun-wecom-customer-contact.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\n\nMainPID=0\nId=xuanjun-wecom-customer-service.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\n"
+  },
+  "python": "3.11.6",
+  "python_path": "/usr/bin/python3",
+  "schema_version": 1,
+  "service_actions": 0,
+  "ssh_fingerprint": "SHA256:Ht+DtZVEhDhqZh7TkOOC7MsRkqQ6JXkHbl1GGhNjQ1g",
+  "ssh_public_host_key": "47.101.152.210 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBF1HeuGyjt1sqB50tPRqy3bhKqukn2ztSk+RlcQix2J+sLAPplEMnmjG2lGQQS49KV1qNjO1itysOwlJFezlEOM=",
+  "status": "DOMESTIC_INSTALL_TARGET_PREFLIGHT",
+  "sudo_calls": 0,
+  "uid": 1002
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "evidence_origin": "OWNER_KOREA_SUDO_ROOT_TERMINAL_TRANSCRIPT_NOT_ASSISTANT_INDEPENDENT_PRIVATE_HOST_READ",
+  "reported_local_time": "2026-10-16T23:14:11+08:00 (message context, not host timestamp)",
+  "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+  "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
+  "launcher_commit": "78e2ccf991630a888f46d6cee5409fefe6ba14f0",
+  "launcher_sha256": "3675969fd831e8dec0afa3f30db5cf5953fa35ca48dea9832e56c73b0e0bf6c3",
+  "approval_comment_id": 6218349901,
+  "approval_body_sha256": "37c365385bada2ecfd8c0d2bc6f5eec8591b2c59ec5d09dde8917f9bd31b54bf",
+  "source_root_preflight": "PASS_SOURCE_STAGE_ABSENT",
+  "old_failure_preservation": "OLD_FAILURE_ATOMICALLY_PRESERVED_REPORTED",
+  "old_failure_directory": "/root/pr99-s06-runtime-received-v1.auth-failed-6217834919",
+  "private_receiver_directory": "/root/pr99-s06-runtime-received-v1",
+  "host_independent_pass": false,
+  "receipt": {
+    "approval_comment_id": 6218349901,
+    "archive_sha256": "ec11ca6f579beb681adfd739bfeca5b836a22812676fd86a298340913c5243fd",
+    "business_api_requests": 0,
+    "cipher_sha256": "d9bb83a859e0bfc307890539aa22ed872d9ab51c63db79a63f1e5cbeaa683e06",
+    "complete_service_config_closure": false,
+    "credentials_used": false,
+    "database_opened": false,
+    "dropin_files": 1,
+    "environment_files_opened": false,
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "korea_listener_metadata": [
+      {
+        "endpoint": "127.0.0.1:19444", "owner_observed": true, "pids": ["1283"], "port": 19444,
+        "visible_process_metadata": [{"cwd": "/", "exe": "/usr/sbin/sshd", "pid": "1283", "systemd_units": [], "uid": 1000}]
+      },
+      {
+        "endpoint": "*:443", "owner_observed": true, "pids": ["996"], "port": 443,
+        "visible_process_metadata": [{"cwd": "/", "exe": "/opt/opnana-proxy/bin/gost-3.3.0/gost", "pid": "996", "systemd_units": ["morelogin-socks5-permanent.service"], "uid": 0}]
+      }
+    ],
+    "private_credentials_absence_proven": false,
+    "private_metadata_files": 1,
+    "production_deployed": false,
+    "retry_allowed": false,
+    "runtime_secrets_transferred_from_environment_files": false,
+    "service_actions": 0,
+    "status": "S06_PRIVATE_RUNTIME_CONTRACT_RECEIVED_PASS",
+    "tokyo_retirement": "HOLD",
+    "unit_bytes_may_contain_inline_authentication": true,
+    "unit_files": 10
+  },
+  "scope": "FIXED_PRIVATE_CONTRACT_CAPTURE_AND_RECEIPT_ONLY_NOT_SERVICE_CUTOVER",
+  "private_unit_bytes_key_password_environment_and_argv_published": false,
+  "old_and_replacement_permissions_consumed_no_reuse": true
+}

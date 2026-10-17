@@ -1,0 +1,1490 @@
+{
+  "schema_version": 1,
+  "phase_b": "PASS_WITH_SCOPE_LIMITS",
+  "independent_acceptance_comment_id": 6209166651,
+  "evidence_origin": "ACCEPTED_OWNER_ROOT_RECEIPT",
+  "source_baseline": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
+  "phase_c": {
+    "design": "OFFLINE_MECHANISM_CANDIDATE_COMPLETE_REAL_BINDINGS_AND_HOST_ACCEPTANCE_PENDING",
+    "adapter_implementation": "PAIR_BOUND_CUSTODY_MTLS_REMOTE_PATH_HANDOFF_OBSERVATION_FENCE_AND_PID1_GUARD_IMPLEMENTED",
+    "review_artifact": "INDEPENDENT_BYTES_PASS_SOURCE_PASS_WITH_SCOPE_LIMITS",
+    "root_preflight": "NOT_EXECUTED",
+    "started_service_confinement": "NOT_EXERCISED",
+    "live_get": "DEFERRED_BY_OWNER_NOT_RUN",
+    "required_streams": [
+      "systemd239-compatible enforced egress",
+      "readonly credential custody",
+      "WAL collector publisher and independent verifier wiring",
+      "continuous observation resources thresholds and admission"
+    ],
+    "nonroot_host_metadata": "COLLECTED",
+    "metadata_run": 38859895705,
+    "metadata_job": 116839560203,
+    "metadata_delivery_commit": "71f9e115373bdc56cfe5dbbeeaaaae92b94fa642",
+    "candidate_uid": 986,
+    "cgroup_version": 1,
+    "nft_version": "1.0.4",
+    "preferred_network_candidate": "DEDICATED_NFT_INET_META_SKUID_TABLE_NOT_INSTALLED",
+    "iptables_version": "UNKNOWN_MULTICALL_ARGV0_LIMIT",
+    "root_enforcement": "NOT_VERIFIED",
+    "local_tests": {
+      "count": 134,
+      "passed": 127,
+      "skipped": 7,
+      "python": "3.12.14",
+      "limitations": [
+        "Only UID0 mapped locally",
+        "New AF_UNIX listener denied locally",
+        "Account/systemd/nft/counter/time tests are explicit models"
+      ]
+    },
+    "hosted_tests": {
+      "status": "PASS",
+      "tests": 134,
+      "skipped": 0,
+      "python": "3.11.17",
+      "run": 38874982348,
+      "job": 116887738948,
+      "exact_checkout": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4"
+    },
+    "execution_controller": "STOPPED_INSTALL_FENCE_PREFLIGHT_LIVE_SUPERVISOR_AND_STOP_GUARD_IMPLEMENTED_NOT_APPROVED_NOT_RUN",
+    "independent_network_verifier": "NEW_SEPARATE_GET_BROKER_RSA_SIGNATURE_ADAPTER",
+    "production_bindings": "DEFERRED_FOR_OFFLINE_RELOCATION_NOT_WAIVED_FOR_FUTURE_ACTIVATION",
+    "root_install_controller": {
+      "implemented": true,
+      "production_approved": false,
+      "executed": false,
+      "scope": "NEW_STOPPED_C_CANDIDATE_NO_NETWORK_NO_CREDENTIALS_NO_DB",
+      "action": "PR99_PHASE_C_OFFLINE_CANDIDATE_INSTALL_V1",
+      "independent_permission": "NOT_REQUESTED",
+      "bootstrap": "STDLIB_ONLY_BEFORE_CANDIDATE_IMPORT_WITH_EXACT_PIN",
+      "private_authorization": "NEW_C_EXACT_PERMIT_AND_ROOT_ANCHOR_NOT_ISSUED",
+      "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
+      "installed_units": 4
+    },
+    "previous_artifact": {
+      "id": 12032422528,
+      "zip_sha256": "8d256daf7b90cf5f565d4587cec1236b9887b5895a08211bbb3e843ac1c699f7",
+      "tar_sha256": "8200ccb5d86f09cb1d03a449921eddba4ab421e73cee6736a7ce9d951339bacd",
+      "tar_bytes": 82181,
+      "binding_files": 33,
+      "runtime_files": 25,
+      "developer_download_verified": true,
+      "independent_review": "NOT_REQUESTED_PENDING_COMPLETE_C_EXECUTION_PACKAGE"
+    },
+    "tokyo_source_contracts": {
+      "run": 38867192724,
+      "job": 116862631607,
+      "delivery_commit": "55ef5b94ef66ec9286b9aae9a165b019499a69a7",
+      "files_observed": 4,
+      "actual_secretref_readonly_permission": "NOT_PROVEN",
+      "database_opened": false,
+      "production_module_imported": false
+    },
+    "artifact": {
+      "id": 12035120742,
+      "zip_sha256": "b1ea59d05c8da17ddb037cc4699a75d2b2d5b4f58cf54e7ba0a6e6d2572c43e9",
+      "tar_sha256": "898263578775de2d0486f2d2c18986192305a8edbe213279c5c4d7b4e35cc520",
+      "zip_bytes": 117881,
+      "tar_bytes": 117314,
+      "bound_files": 44,
+      "runtime_files": 30,
+      "entries": 45,
+      "reproduction": "BYTE_IDENTICAL",
+      "verification_origin": "DEVELOPER_ACTUAL_BYTES_NOT_INDEPENDENT_AUDIT",
+      "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
+      "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
+      "developer_download_verified": true,
+      "independent_review": "PASS_44_BOUND_FILES_30_RUNTIME_FILES",
+      "independent_byte_review_comment_id": 6213125007
+    },
+    "next_development": "Prepare exact current offline recovery point under original PR99; API deferred. Existing B/C source and accepted history/env reused. No C install or production activation authority inferred.",
+    "live_controller": {
+      "implemented": true,
+      "pid1_watchdog": true,
+      "exec_stop_post_guard": true,
+      "worker_binds_to_controller": true,
+      "resource_process_cgroups": 3,
+      "production_approved": false,
+      "executed": false
+    },
+    "root_network_preflight": {
+      "implemented": true,
+      "action": "PR99_PHASE_C_DEDICATED_NETWORK_PREFLIGHT_V1",
+      "root_executed": false,
+      "loaded_tables": 0,
+      "kernel_negative_probes": "NOT_EXERCISED",
+      "scope": "ONE_NEW_TABLE_TWO_IDLE_DEDICATED_UIDS_FOUR_LOOPBACK_NO_PAYLOAD_COUNTER_CHECKS"
+    },
+    "private_transport": {
+      "implemented": true,
+      "real_synthetic_mtls_tested": true,
+      "production_endpoint_bound": false,
+      "production_listener_installed": false,
+      "production_bytes_transferred": 0,
+      "source_and_receiver_paths_separate": true,
+      "plaintext_exported_to_github": false
+    },
+    "source_schema": {
+      "run": 38871973602,
+      "job": 116877943391,
+      "delivery_commit": "5830a6e6f69744132fb74b341abb9929ae1632d6",
+      "source_files": 50,
+      "required_tables": 15,
+      "source_compatible_declarations": 13,
+      "unresolved_source_declarations": [
+        "algo_order_snapshots",
+        "protective_order_snapshots"
+      ],
+      "actual_database_opened": false,
+      "claim": "SOURCE_DECLARATIONS_NOT_ACTUAL_DB_SCHEMA"
+    },
+    "systemd239_parse": {
+      "run": 38874822582,
+      "job": 116887220927,
+      "delivery_commit": "d971c17344e3afb00b22fc5125206f3cfda52c2b",
+      "unit_count": 4,
+      "exit": 0,
+      "diagnostics": [],
+      "unit_sha256": "3e1a492c761b1bb074e21d0e5990ea354ce687e971a7390ff1a4da9a3b064107",
+      "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
+      "root": false,
+      "generators_enabled": false,
+      "service_actions": 0,
+      "scope": "PARSER_ONLY_NOT_PID1_RUNTIME_SANDBOX_OR_WATCHDOG"
+    },
+    "review_request": {
+      "comment_id": 6211673847,
+      "scope": "ONE_CONSOLIDATED_FULL_OFFLINE_C_SOURCE_ARTIFACT_AND_EXCEPTION_FLOW_REVIEW",
+      "production_permission_requested": false,
+      "read_back": true,
+      "decision_comment_id": 6212409290
+    },
+    "offline_independent_review": {
+      "comment_id": 6212409290,
+      "decision": "PASS_WITH_SCOPE_LIMITS",
+      "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
+      "scope": "OFFLINE_SOURCE_CANDIDATE_MECHANISMS_AND_HOSTED_EVIDENCE",
+      "read_back": true,
+      "full_tar_member_recalculation": "PASS_REPORTED_IN_INDEPENDENT_REVIEW_6213125007",
+      "production_authority": false
+    },
+    "root_execution_channel": {
+      "status": "OWNER_ROOT_GRANT_AND_RUNNER_FIXED_INSPECT_PASS",
+      "source_commit": "e3da4ae2f98c75ab0c1ccb9a372cef3e3692c8e4",
+      "review_request_comment_id": 6213074164,
+      "owner_terminal": "OWNER_REPORTED_KOREA_ROOT_READY_NOT_DIRECTLY_ATTACHED",
+      "hosted": {
+        "run": 38884530956,
+        "job": 116918951003,
+        "tests": 22,
+        "skipped": 0,
+        "python": "3.11.17",
+        "status": "PASS"
+      },
+      "artifact": {
+        "id": 12039675314,
+        "zip_sha256": "ccd3aa6baf2c1753fa7528c40d5d1f2fa85ed736708a6dc8ab7419a96bcdd3c1",
+        "zip_bytes": 22626,
+        "tar_sha256": "1b95ebc331b31be32551edd5f86feb9051458bacd5d54db51fb0ea2fbf52e6c5",
+        "tar_bytes": 22143,
+        "bound_files": 9,
+        "entries": 10,
+        "developer_actual_bytes_verified": true,
+        "installer_sha256": "262f72347b2c6b07c2f2d18b9af8da315849c2fc18b6101faed8f75e9eae13ed",
+        "independent_byte_review": "PASS_9_BOUND_FILES_10_REGULAR_MEMBERS"
+      },
+      "fixed_actions": [
+        "inspect",
+        "install"
+      ],
+      "grant_executed": true,
+      "phase_c_install_authorized": false,
+      "forbidden": "No arbitrary root command, service, nft, credential, DB, Writer or Tokyo action; install separately checks original C exact authority.",
+      "previous_source_commit": "28057fc19230d6cda093882ca05a2333348d36fe",
+      "previous_independent_rejection": 6212980863,
+      "owner_root_staging": {
+        "directory": "/root/pr99-phase-c-channel-28057fc1",
+        "old_two_files_hash_verified": true,
+        "evidence_origin": "OWNER_ROOT_TERMINAL_RECEIPT",
+        "install_executed": false,
+        "preserve": true
+      },
+      "approval_author": "GITHUB_ID_332398908_EXACT_LOGIN_TYPE_PLUS_EXPLICIT_OWNER_ROOT_INDEPENDENT_ROLE_TRUST",
+      "source_binding": "EXACT_SEPARATE_OWNER_ROOT_SOURCE_PIN_AND_APPROVED_INSTALLER_BYTES_NO_COMMENT_OR_BRANCH_DEFAULT",
+      "approval": {
+        "comment_id": 6213125007,
+        "body_sha256": "80715fa338cb1b02b3e1e4ee8df61d12c135eb2235bf446c0a68ad6eb5a6dfd0",
+        "issued_at": 1792145160,
+        "expires_at": 1792152360,
+        "scope": "FIXED_CHANNEL_GRANT_ONLY",
+        "max_attempts": 1
+      },
+      "owner_root_execution": {
+        "evidence_origin": "OWNER_ROOT_TERMINAL_RECEIPT_NOT_DIRECT_HOST_LOGIN",
+        "reported_local_time": "2026-10-16T18:15:42+08:00",
+        "status": "FIXED_CHANNEL_READY_NO_PHASE_C_EXECUTION",
+        "approval_comment_id": 6213125007,
+        "phase_c_install_called": false,
+        "retry_allowed": false,
+        "service_actions": 0,
+        "staging_directory": "/root/pr99-phase-c-channel-e3da4ae2",
+        "runner_channel_verified": true
+      },
+      "runner_inspect": {
+        "run": 38886245115,
+        "job": 116924571943,
+        "delivery_commit": "484dd835edcb638008a4e5c433ab7f3f417ed14e",
+        "runner": "xuanjun-korea-binance",
+        "host": "iZmj7a5kwr75qc1tul4kf9Z",
+        "caller_uid": 1001,
+        "installed_dispatcher_and_wrapper_hashes": "PASS",
+        "fixed_sudo_call": "PASS",
+        "receipt": {
+          "credentials_read": false,
+          "database_read": false,
+          "inputs": {
+            "archive": {
+              "present": false
+            },
+            "authority_public_key": {
+              "present": false
+            },
+            "broker_public_key": {
+              "present": false
+            },
+            "handoff": {
+              "present": false
+            },
+            "install_admission": {
+              "present": false
+            },
+            "plan": {
+              "present": false
+            },
+            "source_public_key": {
+              "present": false
+            }
+          },
+          "install_called": false,
+          "status": "CHANNEL_INSPECTION_COMPLETE"
+        },
+        "private_grant_claim_and_sudoers_bytes": "NOT_DIRECTLY_READ_BY_RUNNER",
+        "other_hosts": "SKIPPED",
+        "repeated": false
+      }
+    },
+    "binding_preflight": {
+      "run": 38886874470,
+      "korea_job": 116926645339,
+      "tokyo_job": 116926645389,
+      "receipt_file": "evidence/pr99-phase-c/BINDING_METADATA_20261016.json",
+      "worker_uid_gid_1986": "UNALLOCATED_AT_SAMPLE_NOT_CREATED",
+      "binance_dns": "RESOLVED_NO_HTTP_NOT_API_ACCEPTANCE",
+      "database_opened": false,
+      "credentials_read": false
+    }
+  },
+  "production_migration": "HOLD",
+  "tokyo_retirement": "HOLD",
+  "owner_action_now": "NONE_FOR_SERVER_PASSWORD_OR_COMMAND_COPY",
+  "note": "Current C mechanisms and artifacts are reviewable; no production license or root authority is inferred. Candidate helpers do not themselves provision real SecretRef permissions, mTLS identities/endpoint or source business-state truth.",
+  "protected_not_modified_by_this_run": [
+    "Phase-B installed17 files and unit transaction",
+    "website Work current DNS",
+    "Tokyo production and all shared services"
+  ],
+  "owner_scope_update": {
+    "local_date": "2026-10-16",
+    "decision": "MINIMUM_OFFLINE_SERVER_RELOCATION_API_DEFERRED_KEEP_EXISTING_CHANNELS",
+    "origin": "OWNER_EXPLICIT_CURRENT_CONVERSATION",
+    "existing_api": "DO_NOT_INSPECT_DECRYPT_RECONFIGURE_PROVISION_OR_USE; EXISTING_ENCRYPTED_BASELINE_MAY_BE_PRESERVED_AS_CIPHERTEXT_ONLY",
+    "api_recreation": "LATER_OWNER_TASK",
+    "preserve": [
+      "Existing fixed root execution channel",
+      "Existing bridge and tunnel settings and connectivity",
+      "Passed Phase-B install and Phase-C artifacts"
+    ],
+    "do_not_add": [
+      "New API provisioning",
+      "New signing identities solely to perform offline relocation",
+      "Readonly Shadow as a prerequisite to copying stopped files"
+    ],
+    "production_activation_authorized": false
+  },
+  "active_next_stage": "S06_SERVICE_RUNTIME_CONTRACT_AND_PRIVATE_CHANNEL_HANDOFF",
+  "existing_recovery_baseline": {
+    "acceptance_comment_id": 6166680343,
+    "owner_receipt_comment_id": 6166635563,
+    "host": "iZ6wee8q9z4t03hvqumwfhZ",
+    "path": "/root/xj-recovery-package.DZWI6n/recovery-baseline.tar.gz.enc",
+    "bytes": 1320571760,
+    "sha256": "ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093",
+    "scope": "HISTORICAL_OWNER_ROOT_ENCRYPTED_BASELINE_NOT_CURRENT_FINAL_SNAPSHOT",
+    "code_and_db_restore": "HISTORICALLY_REPORTED_PRIVATE_PASS_NOT_REPLAYED",
+    "offhost_tokyo_baseline_copy_on_korea": "PASS_SUPPORTED_BY_OWNER_ROOT_TERMINAL_RECEIPT",
+    "contains_broader_original_scope": true,
+    "wholesale_restore_allowed": false,
+    "reencryption_or_rebackup_performed": false,
+    "offsite_receipt": "evidence/pr99-offline-copy/OFFSITE_BASELINE_OWNER_RECEIPT_20261016.json",
+    "offsite_target": "/root/xuanjun-offline-baseline-20261016/recovery-baseline.tar.gz.enc",
+    "target_key_custody": "PASS_SUPPORTED_BY_OWNER_ROOT_TERMINAL_RECEIPT",
+    "target_decrypt_stream_sha256": "PASS",
+    "key_custody_receipt": "evidence/pr99-offline-copy/KEY_CUSTODY_OWNER_RECEIPT_20261016.json",
+    "selected_recovery": {
+      "api_configuration_deployed": false,
+      "current_final_snapshot": false,
+      "database_sha256": "d0bb23c5cede3a66567373b92221b058aa18e07aa510daf0bc02f8f4770bd0a5",
+      "dependency_manifests": 1,
+      "environment_status": "DEPENDENCY_MANIFESTS_ONLY_NOT_INSTALLED",
+      "epoch": 1792151228,
+      "files": 1374,
+      "host": "iZmj7a5kwr75qc1tul4kf9Z",
+      "private_manifest_sha256": "33826e49503926497f03dc529056ab798de1afedd74493bf3ef164f7aa35c132",
+      "production_deployed": false,
+      "production_module_imported": false,
+      "schema_version": 1,
+      "selected_bytes": 66552325,
+      "service_actions": 0,
+      "source_files": 1373,
+      "status": "SELECTED_HISTORICAL_RECOVERY_PASS",
+      "tokyo_retirement": "HOLD",
+      "workdir": "/root/xuanjun-offline-selected-20261016",
+      "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT_NOT_INDEPENDENT_LOGIN",
+      "script_commit": "8d50a4d1c5695413c7d3e68f16b93d44e4e3a671",
+      "script_sha256": "18db4e6b41c548325044b8b30baf7afc39efd4f6b16bc5f73059ccf063f424ec"
+    },
+    "environment_inspection": {
+      "status": "RESTORED_REQUIREMENTS_AND_EXISTING_ENV_INSPECTED",
+      "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT",
+      "requirements": [
+        "numpy",
+        "pandas",
+        "requests",
+        "websocket-client",
+        "python-dotenv",
+        "pyyaml",
+        "sqlalchemy",
+        "pymysql",
+        "redis",
+        "cryptography",
+        "ccxt",
+        "ta",
+        "loguru"
+      ],
+      "all_13_missing_in_system_and_existing_phase_b": true,
+      "packages_installed": 0,
+      "production_imports": 0,
+      "service_actions": 0,
+      "network_requests": 0
+    },
+    "dependency_environment": {
+      "schema_version": 1,
+      "status": "ISOLATED_DEPENDENCY_ENVIRONMENT_PASS",
+      "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT_NOT_INDEPENDENT_LOGIN",
+      "reported_local_time": "2026-10-16T20:02:15+08:00",
+      "api_credentials_read": false,
+      "api_requests": 0,
+      "current_final_snapshot": false,
+      "existing_phase_b_venv_modified": false,
+      "existing_service_state_unchanged": true,
+      "offline_namespace_imports": "PASS",
+      "packages": {
+        "ccxt": "4.5.78",
+        "cryptography": "50.0.1",
+        "loguru": "0.7.3",
+        "numpy": "2.4.6",
+        "pandas": "3.0.5",
+        "pymysql": "1.2.2",
+        "python-dotenv": "1.2.3",
+        "pyyaml": "6.0.3",
+        "redis": "8.1.0",
+        "requests": "2.34.2",
+        "sqlalchemy": "2.0.54",
+        "ta": "0.11.0",
+        "websocket-client": "1.9.2"
+      },
+      "packages_verified": 13,
+      "pip_check": "PASS",
+      "production_code_executed": false,
+      "service_actions": 0,
+      "source_files_deployed": false,
+      "source_interpreter_profile": "/opt/trading-system/venv/bin/python",
+      "source_profile_scope": "DEPENDENCY_METADATA_NOT_PROVEN_WRITER_ENTRYPOINT",
+      "tokyo_retirement": "HOLD",
+      "venv": "/opt/xuanjun-binance-offline-env-20261016/venv",
+      "helper_commit": "c7f16605e2836c15c8d2b1cac9243838634a4fee",
+      "helper_sha256": "e3b820dc7230240308be62b9f9237473738804c345cb892c93f9121860289b13"
+    },
+    "post_recovery_runner_verification": {
+      "run": 38898164991,
+      "korea_job": 116963569222,
+      "tokyo_job": 116963568932,
+      "delivery_commit": "129633f7aaff9c68f73a8adec7b12ab37437a698",
+      "status": "BOTH_JOBS_SUCCESS",
+      "target_dependency_versions": "13_EXACT_MATCH",
+      "existing_phase_b_service": "DISABLED_INACTIVE_PID0_CURRENT_UNCHANGED",
+      "root_private_receipts_read": false
+    },
+    "independent_consolidated_acceptance": {
+      "comment_id": 6215371855,
+      "decision": "PASS_WITH_SCOPE_LIMITS",
+      "evidence_commit": "306acd666c466f564cb2349b3d68eface5460187",
+      "offsite_cipher": "PASS_OWNER_ROOT_NOT_INDEPENDENT_PRIVATE_BYTES",
+      "key_custody": "PASS_OWNER_ROOT",
+      "historical_restore": "PASS_OWNER_ROOT",
+      "dependency_environment": "PASS_OWNER_ROOT_WITH_RUNNER_METADATA_CORROBORATION",
+      "korea_runner": "PASS",
+      "tokyo_runner": "PASS",
+      "current_trading_snapshot": "NOT_PROVEN",
+      "full_service_migration": "NOT_COMPLETE",
+      "read_back": true
+    }
+  },
+  "offline_relocation_blocker": {
+    "kind": "CURRENT_POINT_RECEIVED_REMAINING_SERVICE_RUNTIME_AND_CHANNEL_HANDOFF",
+    "detail": "R2 current selected source and WAL-aware SQLite recovery point succeeded in Owner-root transcript under6217030577. This closes real offline copy execution, not final Writer consistency or full service migration. Prepare private service/runtime contracts, remaining channel responsibilities and final handoff; old API deferred. Preserve all successful and failed evidence.",
+    "api_is_blocker": false,
+    "last_owner_attempt": {
+      "schema_version": 1,
+      "evidence_origin": "OWNER_KOREA_SUDO_ROOT_TERMINAL_TRANSCRIPT_NOT_INDEPENDENT_HOST_LOGIN",
+      "reported_local_date": "2026-10-16",
+      "reported_local_time_window": "22:04-22:05 Asia/Shanghai (terminal login and message context; no precise execution timestamp claimed)",
+      "launch_directory": "/root/pr99-copy-r2-approved.DriMeUBj",
+      "source_host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "target_workdir": "/root/pr99-current-point-received-v2",
+      "source_workdir": "/root/pr99-current-point-v2",
+      "approval_body_sha256": "1103a7a7a053ae862abefcb4c056812b572bbd79d74139f082cecf5777b4b7f3",
+      "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+      "approved_artifact_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+      "terminal_receipt": {
+        "api_requests": 0,
+        "approval_comment_id": 6217030577,
+        "cipher_sha256": "2ac42b9e69c69260c99387b2e1ae339dd2e80b3f01c1984858e458e6c8872d32",
+        "current_final_trading_snapshot": false,
+        "database_integrity_check": "PASS",
+        "database_sha256": "6d451dfdc4714ca9bc704d719dcb47b02ec1e2ce243f886bfb2578a27fbca232",
+        "host": "iZmj7a5kwr75qc1tul4kf9Z",
+        "production_deployed": false,
+        "retry_allowed": false,
+        "service_actions": 0,
+        "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+        "source_files": 1363,
+        "source_manifest_matched": true,
+        "status": "CURRENT_OFFLINE_POINT_RECEIVED_PASS",
+        "tokyo_retirement": "HOLD"
+      },
+      "limits": [
+        "Owner-root transcript; reviewer has not read private original bytes",
+        "selected original1363 includes436 historical backup files; not full server filesystem",
+        "live Writer not frozen; not final trading cutover point",
+        "no service installation/start/cutover or Finance/DNS operation",
+        "single-use approval consumed; do not replay successful export"
+      ],
+      "next": "S06 current service/runtime contract and private channel handoff; preserve R4 live Portal and all shared services."
+    },
+    "verified_tokyo_public_host_identity": {
+      "run": 38888460739,
+      "job": 116931876479,
+      "delivery_commit": "3ac74d53280722a505b617aa690439fa0ec95ff3",
+      "ecdsa_fingerprint": "SHA256:hxqnfjlczczDNLsJlY+x9OrBF5guN+x62gJF2RHIw7w",
+      "scope": "ROOT_OWNED_PUBLIC_KEY_BYTES_ONLY_NO_PRIVATE_KEYS",
+      "temporary_known_hosts_command": "OWNER_EXECUTED_PINNED_HOST_CHECK_SUCCEEDED",
+      "authentication": "TOKYO_ROOT_PASSWORD_AUTHENTICATION_SUCCEEDED_IN_OWNER_TERMINAL"
+    }
+  },
+  "remaining_tokyo_responsibilities": {
+    "evidence_run": 38898164991,
+    "metadata_only": true,
+    "portal": {
+      "unit": "secure-secrets-portal.service",
+      "pid": 3082952,
+      "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+      "migration": "NOT_EXECUTED",
+      "historical_portal_must_not_replace_live_r4_containment": true
+    },
+    "rpc_and_tunnel_units": [
+      "domestic-model-rpc-tunnel.service",
+      "korea-novel-model-rpc-tunnel.service",
+      "provider-neutral-tokyo-tunnel.service",
+      "restricted-rpc-openai-shim.service",
+      "tokyo-restricted-model-executor.service",
+      "xj-tokyo-vpn.service"
+    ],
+    "legacy_channel_units": [
+      "xuanjun-wecom-customer-contact.service",
+      "xuanjun-wecom-customer-service.service",
+      "xuanjun-wecom-novel-ingress.service"
+    ],
+    "finance_timer_units": [
+      "finance-collection-sync.timer",
+      "owner-commercial-ledger-sync.timer",
+      "billing-operations-weekly-settlement.timer",
+      "billing-operations-weekly-final-invoice.timer"
+    ],
+    "finance_operations": "NOT_AUTHORIZED_BY_THIS_OFFLINE_PREPARATION_NO_CHANGES",
+    "root_crontabs": "NOT_READ_NONROOT",
+    "actual_database": "NOT_OPENED_BY_RUNNER",
+    "private_channel_config": "NOT_READ",
+    "all_services_changed": 0
+  },
+  "current_source_inventory": {
+    "run": 38900814302,
+    "job": 116972320673,
+    "delivery_commit": "f717c07e8c8290424ffec4b23edc40ed8566f8c0",
+    "status": "SUCCESS_NONROOT_CURRENT_SOURCE_AND_DB_METADATA_ONLY",
+    "file_count": 1363,
+    "bytes": 19350718,
+    "source_aggregate_sha256": "7e9859b04806aba717cbd7414d2aff52c041d810c78d5be902168898ae8300de",
+    "source_git_head": "UNKNOWN_GIT_IDENTITY",
+    "source_manifest": "evidence/pr99-offline-copy/CURRENT_SOURCE_IDENTITIES_20261016.json",
+    "source_tree_collection_atomic": false,
+    "database_opened": false,
+    "wal_bytes_read": false,
+    "credentials_read": false,
+    "root_cron_read": false
+  },
+  "current_recovery_point_candidate": {
+    "status": "EXACT_CANDIDATE_AND_20_HOSTED_TESTS_PASS_EXECUTION_PERMISSION_PENDING",
+    "action": "PR99_CURRENT_OFFLINE_RECOVERY_POINT_V1",
+    "binding_sha256": "1785c311ab9eb0b5e88c43dbb2bb3da8dce3a519635d6ca7b0e2ad9a68161fa1",
+    "scope": "SERVER_PINNED_SOURCE_AND_ONE_WAL_AWARE_SQLITE_OFFLINE_POINT_PRIVATE_COPY_ONLY",
+    "production_executed": "OWNER_REPORTED_ONE_ATTEMPT_FAILED_UNKNOWN_REMOTE_PROGRESS",
+    "permission": {
+      "status": "ATTEMPT_STARTED_FAILED_NO_RETRY",
+      "comment_id": 6216441589,
+      "body_sha256": "390e8e7fdeec17b001162e0c2f4b0ce7c6ad0f2a6a7257a7cf5693e7af4ce306",
+      "issued_at": 1792156935,
+      "expires_at": 1792200135,
+      "max_attempts": 1,
+      "body_and_machine_contract_verified": true
+    },
+    "root_channel_expanded": false,
+    "source_commit": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
+    "hosted_ci": {
+      "run": 38902948852,
+      "job": 116979411354,
+      "python": "3.11.17",
+      "tests": 20,
+      "skipped": 0,
+      "status": "PASS_ORIGINAL_LOG_READ"
+    },
+    "artifact": {
+      "id": 12046927098,
+      "zip_bytes": 60729,
+      "zip_sha256": "715178c10fa783768cfc816033f9f0079fed09d33777c554809f16f71913f011",
+      "zip_hash_origin": "GITHUB_UPLOAD_DIGEST_AND_ORIGINAL_JOB_LOG_NOT_INDEPENDENT_ZIP_DOWNLOAD",
+      "tar_bytes": 60130,
+      "tar_sha256": "41f3c224cbed1d864104bc206d92a32339372a9d0ecfa9108a2da0123803db70",
+      "tar_verification": "LOCAL_ACTUAL_BYTES_REPRODUCE_EXACT_CI_TAR_SHA",
+      "bound_files": 5,
+      "regular_members": 6
+    },
+    "approval_request": {
+      "comment_id": 6215860038,
+      "read_back": true,
+      "decision": "PASS_WITH_EXACT_PRECONDITIONS",
+      "exact_candidate": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
+      "evidence_commit": "9fbd573852eea301268575c750cda1f2f904321d"
+    },
+    "execution": {
+      "origin": "OWNER_KOREA_ROOT_TERMINAL_NOT_DIRECT_LOGIN",
+      "status": "HOLD_PRESERVE_EVIDENCE",
+      "local_workdir": "/root/pr99-current-point-received-v1",
+      "package": "/root/pr99-current-point-package-c6ba6ac8",
+      "approval_comment_id": 6216441589,
+      "failed_step": "REMOTE_PREPARE_SSH_RETURNED_NONZERO",
+      "public_reason": "SSH_STEP_FAILED",
+      "remote_state": "INSPECT_BEFORE_ANY_NEW_AUTHORITY",
+      "source_failure_receipt": "OWNER_ROOT_SHA_VERIFIED_IN_REPORTED_READOUT",
+      "real_database_copy": "NO_COPY_AT_REPORTED_SOURCE_FAILURE_SAMPLE",
+      "retry_allowed": false,
+      "coordinator_diagnostic_gap": "SSH STDERR CAPTURED_IN_MEMORY_BUT_NOT_PERSISTED_ON_NONZERO",
+      "root_reason": "SOURCE_FILE_SET_DRIFT"
+    }
+  },
+  "service_handoff": {
+    "status": "S07_NEW_PRIVATE_CODE_ENV_INSTALL_PREPARED_ACTUAL_SERVICE_CUTOVER_PENDING",
+    "run": 38904470291,
+    "source_commit": "e4dfdf03a246fd911a226d911970854d2606328e",
+    "jobs": {
+      "domestic": 116984492029,
+      "tokyo": 116984492318,
+      "korea": 116984492559
+    },
+    "evidence": "evidence/pr99-offline-copy/THREE_HOST_CHANNEL_DEPENDENCIES_20261016.json",
+    "plan": "plans/PR99_SERVICE_HANDOFF_EXECUTION_LEDGER_20261016.md",
+    "production_actions": 0,
+    "current_point_permission": "APPROVED_6217030577_CONSUMED_SUCCESS_OWNER_ROOT",
+    "domestic_same_named_portal_and_wecom_units": "NOT_FOUND_AT_SAMPLE",
+    "tokyo_finance_timers": "4_ACTIVE_NOT_CHANGED",
+    "unresolved": [
+      "provider-neutral-tunnel exact unit vs similarly named Tokyo tunnel",
+      "private current channel configs, root/admin cron, user services and containers",
+      "actual service installation and upstream cutover"
+    ],
+    "current_point_receipt": "evidence/pr99-current-point-r2/OWNER_EXECUTION_RECEIPT_20261016.json",
+    "next": "S07_S08_CONCENTRATED_RESOLUTION_OF_RECEIVED_SOURCE_ENTRIES_STATIC_DEPENDENCIES_AND_TUNNEL_DIRECTIONS",
+    "runtime_metadata": {
+      "run": 38913529642,
+      "delivery_commit": "69eeefabee15fcacc8b0d5deb0fc287898d56b27",
+      "jobs": {
+        "domestic": 117015069212,
+        "korea": 117015069611,
+        "tokyo": 117015069721
+      },
+      "status": "THREE_SUCCESS_NONROOT_METADATA_NOT_INSTALL",
+      "evidence": "evidence/pr99-service-handoff/RUNTIME_METADATA_20261016.json",
+      "next_contract": "evidence/pr99-service-handoff/S06_PRIVATE_HANDOFF_CONTRACT_20261016.md",
+      "tunnel_generic_unit": "NOT_FOUND_AT_TOKYO",
+      "korea443_owner": "RESOLVED_BY_LATER_OWNER_ROOT_S06_RECEIPT_MORELOGIN_GOST_PID996",
+      "root_admin_scheduling": "UNKNOWN_PRIVATE_CONTENTS_NOT_READ",
+      "protect_other_writer": "DOMESTIC_XUANJUN_SITE_HUB_PREVIEW_ACTIVE"
+    },
+    "s06_private_candidate": {
+      "action": "PR99_S06_PRIVATE_RUNTIME_CONTRACT_V1",
+      "status": "S06_CAPTURE_ACCEPTED_6218862352_OWNER_PROJECTION_PASS_NOT_SERVICE_INSTALL",
+      "scope": "TEN_FIXED_UNIT_FILES_ONE_DROPIN_PRIVATE_RUNTIME_METADATA_ONLY_ENCRYPTED_NOT_INSTALL",
+      "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
+      "permission": "REPLACEMENT_6218349901_CONSUMED_SUCCESS_NO_REUSE",
+      "production_executed": false,
+      "environment_files_opened": false,
+      "database_opened": false,
+      "inline_unit_authentication": "POSSIBLE_PRIVATE_BYTES_NOT_USED_OR_PUBLIC",
+      "root_channel_extended": false,
+      "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+      "artifact": {
+        "binding_sha256": "3aa0ba32ac314957ca716f5324ab63dbefcef0fd2984015ed2c3a07813937ef5",
+        "bound_files": 3,
+        "new_tests": 19,
+        "production_executed": false,
+        "regular_members": 4,
+        "schema_version": 1,
+        "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
+        "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+        "tar_bytes": 13494,
+        "tar_sha256": "2cc24bf6b7189ba3a6106ec66aa114adf4ff492c8470c66a4679b1718671564a",
+        "run": 38916022943,
+        "job": 117023586355,
+        "job_conclusion": "SUCCESS",
+        "artifact_id": 12051723857,
+        "zip_bytes": 14085,
+        "zip_sha256": "bacc2c4aed891417cd5a47e5d9129b0052b812504fcc011631401b585737734a",
+        "zip_verification": "ACTUAL_GITHUB_JOB_UPLOAD_DIGEST_AND_ARTIFACT_API_NOT_INDEPENDENT_ZIP_DOWNLOAD",
+        "local_tar_reproduction": "BYTE_IDENTICAL_TO_HOSTED_BUILD"
+      },
+      "review_request": {
+        "comment_id": 6217723972,
+        "read_back": true,
+        "scope": "ONE_CONSOLIDATED_NEW_PRIVATE_UNIT_CONTRACT_EXPORT_REVIEW_AND_NEW_ONCE_PERMISSION",
+        "decision": "APPROVED_6217834919_ORIGINAL_AND_6218349901_REPLACEMENT",
+        "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+        "delivery_commit": "76f231cc253c5589041c38a778595a5d720fdad0"
+      },
+      "approval": {
+        "comment_id": 6217834919,
+        "body_sha256": "52100208da889d70920942d137420a79037f7aa44bd70bc7778198bb11b7bb6c",
+        "issued_at": 1792161373,
+        "expires_at": 1792182973,
+        "max_attempts": 1,
+        "status": "ATTEMPTED_AUTH_PREFLIGHT_FAILED_CONSUMED_NO_REUSE"
+      },
+      "owner_failed_execution": {
+        "schema_version": 1,
+        "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_REDACTED_NO_SECRET_VALUES",
+        "reported_local_time": "2026-10-16T22:51+08:00",
+        "approval_comment_id": 6217834919,
+        "source_commit": "4c9460a215b793259228f9d2e0fbfe5ea50267a1",
+        "script_sha256": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
+        "status": "HOLD_PRESERVE_EVIDENCE",
+        "first_failed_stage": "INITIAL_SSH_LOGIN_IDENTITY_PREFLIGHT",
+        "ssh_exit": 255,
+        "korea_failure_sha256": "9f48d4a2e1940af1c426d09cf044cc294b6ebb5e295420075b26d20317dbd362",
+        "failure_reason": "CalledProcessError",
+        "later_invocations": [
+          {
+            "launch_directory": "/root/pr99-s06-approved.pJSsKySO",
+            "reason": "FileExistsError_TARGET_MKDIR"
+          },
+          {
+            "launch_directory": "/root/pr99-s06-approved.66ER1spv",
+            "reason": "FileExistsError_TARGET_MKDIR"
+          }
+        ],
+        "local_target": "/root/pr99-s06-runtime-received-v1",
+        "source_workdir": "/root/pr99-s06-runtime-contract-v1",
+        "capture_function_reached_in_reported_invocations": false,
+        "source_stage_absence_independently_verified": false,
+        "unit_configuration_capture_success": false,
+        "private_transfer_success": false,
+        "service_actions": 0,
+        "retry_allowed_under_old_permission": false,
+        "owner_requested_reexecution": true,
+        "secret_values_omitted": true
+      },
+      "replacement_permission_request": {
+        "comment_id": 6218181967,
+        "read_back": true,
+        "status": "APPROVED_WITH_EXACT_PRECONDITIONS_6218349901",
+        "scope": "SAME_FROZEN_VERSION_EXACT_FAILED_AUTH_HANDOFF_NEW_ONCE_PERMISSION"
+      },
+      "login_preflight": {
+        "schema_version": 1,
+        "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_WITH_REMOTE_FIXED_HOSTKEY_READONLY_SSH_NOT_ASSISTANT_ROOT_LOGIN",
+        "reported_local_time_window": "2026-10-16 22:57 Asia/Shanghai (message context, not independently host-timestamped)",
+        "old_approval_comment_id": 6217834919,
+        "old_local_failure_sha256": "9f48d4a2e1940af1c426d09cf044cc294b6ebb5e295420075b26d20317dbd362",
+        "old_local_failure_status": "HOLD_PRESERVE_EVIDENCE",
+        "old_local_failure_reason": "CalledProcessError",
+        "old_failure_hash_unchanged": true,
+        "tokyo_login_identity_test": "PASS",
+        "source_host": "iZ6wee8q9z4t03hvqumwfhZ",
+        "source_root_uid_test": "PASS",
+        "source_workdir": "/root/pr99-s06-runtime-contract-v1",
+        "source_workdir_lexical_existence": "ABSENT_SUPPORTED_BY_OWNER_ROOT_TEST_E_AND_TEST_L",
+        "host_key_check": "STRICT_PINNED_ECDSA_USING_PREVIOUS_PRIVATE_KNOWN_HOSTS",
+        "authentication_secret_values_published": false,
+        "ssh_new_keys_installed": false,
+        "unit_content_read": false,
+        "capture_invoked": false,
+        "service_actions": 0,
+        "production_changes": 0,
+        "remaining_restart_preconditions": [
+          "New independent replacement permission ID/body SHA/expiry",
+          "Before atomic failed-stage rename: revalidate old approval.json, private identity, no unexpected capture progress, no active old coordinator, fresh Tokyo source absence",
+          "Preserve old local stage by exact authorized new name, no overwrite/delete",
+          "Execute original frozen script under new single-use approval once"
+        ]
+      },
+      "replacement_approval": {
+        "comment_id": 6218349901,
+        "body_sha256": "37c365385bada2ecfd8c0d2bc6f5eec8591b2c59ec5d09dde8917f9bd31b54bf",
+        "issued_at": 1792162996,
+        "expires_at": 1792184596,
+        "max_attempts": 1,
+        "scope": "EXACT_FAILED_LOCAL_STAGE_ATOMIC_PRESERVATION_THEN_ORIGINAL_SCRIPT_ONE_RUN",
+        "status": "CONSUMED_SUCCESS_OWNER_ROOT_NO_REUSE"
+      },
+      "restart_launcher": {
+        "path": "evidence/pr99-service-handoff/s06-candidate/restart-6218349901.py",
+        "sha256": "3675969fd831e8dec0afa3f30db5cf5953fa35ca48dea9832e56c73b0e0bf6c3",
+        "original_capture_script_changed": false,
+        "old_tests": "INHERITED_NOT_RERUN",
+        "local_launcher_checks": "SOURCE_HASH_OLD_FAILURE_SHA_PROGRESS_REJECTION_EXCLUSIVE_NOREPLACE_RENAME_PRESERVED_INODE_BYTES_REPLAY_REFUSAL; SYNTHETIC_LOCAL_ONLY",
+        "production_executed": true
+      },
+      "owner_success_receipt": "evidence/pr99-service-handoff/s06-candidate/OWNER_SUCCESS_20261016.json",
+      "private_capture_executed": true,
+      "production_service_deployed": false,
+      "host_independent_pass": false,
+      "production_executed_definition": "Production deployment/activation false; private capture did execute successfully as separately recorded",
+      "execution_acceptance": {
+        "comment_id": 6218862352,
+        "decision": "PASS_WITH_SCOPE_LIMITS",
+        "evidence_class": "OWNER_ROOT_RECEIPT_NOT_INDEPENDENT_PRIVATE_HOST_BYTES",
+        "read_back": true
+      },
+      "local_received_projection": {
+        "path": "evidence/pr99-service-handoff/s06-candidate/project_received_contract.py",
+        "scope": "READ_ALREADY_RECEIVED_COPY_ONLY_NO_NETWORK_WRITES_INSTALL_OR_NEW_CAPTURE",
+        "status": "OWNER_EXECUTED_READONLY_PROJECTION_PASS_NOT_INDEPENDENT_PRODUCTION_APPROVAL",
+        "local_new_tests": "7_PASS_SYNTHETIC_NOT_HOSTED_OR_HOST_ACCEPTANCE",
+        "old_tests": "INHERITED_NOT_RERUN",
+        "owner_receipt": "evidence/pr99-service-handoff/s06-candidate/OWNER_PROJECTION_20261016.json"
+      },
+      "execution_review_request": {
+        "comment_id": 6218740070,
+        "decision": "PASS_WITH_SCOPE_LIMITS_6218862352",
+        "read_back": true
+      }
+    },
+    "korea443_owner": {
+      "evidence_origin": "OWNER_ROOT_RECEIPT",
+      "unit": "morelogin-socks5-permanent.service",
+      "exe": "/opt/opnana-proxy/bin/gost-3.3.0/gost",
+      "pid": 996,
+      "uid": 0,
+      "protect": true
+    },
+    "received_handoff_resolution": {
+      "path": "evidence/pr99-service-handoff/handoff-resolution-candidate/resolve_received_handoff.py",
+      "action": "PR99_RECEIVED_HANDOFF_RESOLUTION_V1",
+      "status": "OWNER_EXECUTED_RECEIVED_HANDOFF_RESOLUTION_PASS_NOT_SERVICE_CUTOVER",
+      "source_inputs": "ALREADY_RECEIVED_S06_AND_R2_VERIFIED_CODE_ONLY",
+      "new_production_collection": false,
+      "production_executed": false,
+      "install_or_cutover_permission": "NOT_REQUESTED_OR_GRANTED",
+      "old_tests": "INHERITED_NOT_RERUN",
+      "source_commit": "51c23aaa0666f1a056deea5bf70a5bba4b5a23d3",
+      "script_sha256": "10d24ddfea39347930115a4dc57e81b0b41461c10bd71e70b7f7d15afeb3fea4",
+      "binding_sha256": "8ffc6322132d5197e738928aed2aee8488cee8dd0b359c8a00f673633ceaed16",
+      "tar_sha256": "6fbf99fe02de3196b61f219473f2d90a1912f03fa6b12ea328624c4a7cf06427",
+      "run": 38925978297,
+      "job": 117057495984,
+      "artifact_id": 12056701653,
+      "execution_permission": "OWNER_EXPLICIT_MANUAL_OBSERVATIONAL_AUTHORIZATION_6219362469_NOT_OLD_S06_PERMIT",
+      "review_request": {
+        "comment_id": 6219132029,
+        "read_back": true,
+        "status": "SOURCE_PASS_WITH_SCOPE_LIMITS_6219285784",
+        "source_commit": "51c23aaa0666f1a056deea5bf70a5bba4b5a23d3",
+        "delivery_commit": "5cb6530b73a57804d667f31147035a987c2d0dc8"
+      },
+      "independent_source_review": {
+        "comment_id": 6219285784,
+        "decision": "PASS_WITH_SCOPE_LIMITS",
+        "read_back": true,
+        "scope": "SOURCE_ONLY_MANUAL_OWNER_OBSERVATION_ALLOWED_IF_EXPLICITLY_AUTHORIZED"
+      },
+      "owner_receipt": "evidence/pr99-service-handoff/s07-domestic-stage/OWNER_RESOLUTION_20261017.json"
+    },
+    "owner_direct_migration_authorization": {
+      "comment_id": 6219362469,
+      "read_back": true,
+      "scope": "S07_S10_CONTROLLED_DIRECT_MIGRATION_PRESERVE_SHARED_SERVICES_NO_EARLY_TOKYO_RETIREMENT",
+      "root_channel_limit": "EXISTING_RUNNER_CHANNEL_ONLY_FIXED_PHASE_C_ACTIONS_NOT_ARBITRARY_S07_S08_INSTALL",
+      "manual_next_action": "ONE_OWNER_MEDIATED_REVIEWED_LOCAL_RESOLUTION_UNDER_EXPLICIT_OWNER_AUTHORIZATION_NOT_MACHINE_SIGNED_PERMIT"
+    },
+    "domestic_code_environment_install": {
+      "status": "OWNER_ROOT_SOURCE_AND_DEPENDENCIES_COMPLETE_RUNTIME_SERVICE_CUTOVER_PENDING",
+      "authority_comment_id": 6219362469,
+      "roles": [
+        "portal",
+        "wecom-contact",
+        "wecom-service"
+      ],
+      "scope": "NEW_PRIVATE_PREFIX_SOURCE_AND_VENV_NO_UNIT_OR_SERVICE_OR_PROXY_ACTION",
+      "target_preflight": {
+        "run": 38929243716,
+        "job": 117068662907,
+        "uid": 1002,
+        "root_acceptance": false
+      },
+      "script_sha256": "745c67d34cf4b0d546aee28c74c11b1586a315a03d970cbebc37508ebc61f8fd",
+      "production_executed": true,
+      "remaining": [
+        "Private runtime data/configuration and dynamic loading closure",
+        "Actual units, start, authenticated functional checks and protected proxy switch",
+        "Novel missing source and VPN guard/container/channel identity",
+        "S09 final state/scheduling; S10 separate retirement acceptance"
+      ],
+      "source_commit": "ae5e03d9452132de5884f11392ab95eea9d47e3f",
+      "run": 38930522163,
+      "job": 117073018686,
+      "artifact_id": 12059130294,
+      "mechanism_tests": 10,
+      "execution_authority": "OWNER_EXPLICIT_DIRECT_MIGRATION_6219362469_NO_ADDITIONAL_PERMISSION_REQUESTED",
+      "independent_new_host_pass": false,
+      "production_executed_definition": "Private new-prefix installation attempted; no service deployment/activation/cutover",
+      "owner_failure_receipt": "evidence/pr99-service-handoff/s07-domestic-stage/OWNER_INSTALL_TIMEOUT_20261017.json",
+      "dependencies_complete": true,
+      "protected_after_snapshot_completed": false,
+      "retry_allowed": false,
+      "owner_diagnosis": {
+        "reported_local_time": "2026-10-17T00:52+08:00",
+        "evidence_origin": "OWNER_ROOT_READONLY_DOMESTIC_SSH_TRANSCRIPT",
+        "source_files": 79,
+        "source_mismatches": [],
+        "installed_packages": {
+          "pip": "23.3.1",
+          "setuptools": "68.0.0"
+        },
+        "dependency_install_completed": false,
+        "observed_download_kbytes_per_second": "10.7–16.1",
+        "cause": "OFFICIAL_PYPI_WHEEL_DOWNLOAD_STILL_IN_PROGRESS_AT_900_SECOND_TIMEOUT",
+        "log_bytes": 3431,
+        "venv_log_bytes": 0,
+        "service_actions": 0
+      },
+      "dependency_continuation": {
+        "status": "DOMESTIC_S07_OFFLINE_DEPENDENCY_CONTINUATION_PASS_OWNER_REPORTED",
+        "script": "evidence/pr99-service-handoff/s07-wheel-continuation/continue_dependencies.py",
+        "script_sha256": "577d2e9a69186d6010dba2904e486de6617c657141e03d60eefb7975cb39a848",
+        "new_local_tests": 9,
+        "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+        "scope": "KOREA_OFFICIAL_PYPI_DOWNLOAD_HASHED_WHEELS_DOMESTIC_EXISTING_VENV_NO_INDEX_CONTINUATION",
+        "old_install_replayed": false,
+        "original_source_rewritten": false,
+        "service_actions": 0,
+        "production_executed": true,
+        "authority_comment_id": 6219362469,
+        "evidence_origin": "OWNER_ROOT_TERMINAL_TRANSCRIPT_NOT_DIRECT_HOST_LOGIN_OR_INDEPENDENT_AUDIT",
+        "receipt_comment_id": 6220815091,
+        "first_attempt": "REMOTE_RESULT_UNKNOWN_PRESERVE_LOGS_EMPTY_REMOTE_DIRECTORY_ABSENT_PROCESS_COUNT_ZERO",
+        "executed_patch": "FILE_STDIN_EXACT_TAR_LENGTH_REUSE_HASH_VERIFIED_CACHED_WHEELS_NEW_KOREA_V2_DIRECTORY",
+        "owner_launch_directory": "/root/pr99-s07-transfer-fix.h8Mz9ued",
+        "package_sha256": "9b702576d48883786d051b2f1b49972baf94db3d1e8bf330ee59250a5974efa3",
+        "wheel_tar_sha256": "b04409509e43e80aff7fb655cc91b76cff2dad04ea01b8087837ebe7ec4c289a",
+        "source_files": 79,
+        "source_hashes": "PASS",
+        "pip_check": "PASS",
+        "dependency_imports": "PASS",
+        "protected_state_unchanged_during_continuation": true,
+        "original_failure_preserved": true,
+        "services_installed": false,
+        "production_cutover": false,
+        "runtime_configuration_ready": false,
+        "root_cause": "NOT_PROVEN"
+      },
+      "runtime_inventory": {
+        "script": "evidence/pr99-service-handoff/s07-runtime-inventory/inspect_received_runtime.py",
+        "source_commit": "442a70918965bb39faf9d0cd54aaaae8db0bfde1",
+        "status": "OWNER_EXECUTED_STATIC_INVENTORY_NOT_RUNTIME_ACCEPTANCE",
+        "scope": "STATIC_EXISTING_RECEIVED_COPIES_ENV_NAMES_PATH_CLUES_AND_IO_CALL_SITES_NO_VALUES_OR_NEW_CAPTURE",
+        "local_checks": "VALUE_REDACTION_ENV_SUBSCRIPT_UNIT_NAMES_PATH_REJECTION_COMPILE_PASS_NOT_HOST_ACCEPTANCE",
+        "owner_launch_directory": "/root/pr99-s07-runtime-inventory.8no57zD5",
+        "owner_receipt": "evidence/pr99-service-handoff/s07-runtime-inventory/OWNER_RUNTIME_INVENTORY_20261017.json",
+        "observed_service_user_group": "admin:admin",
+        "observed_working_directory": "/opt/trading-system",
+        "credential_store_and_master_key_dependency": "SOURCE_REFERENCE_FOUND_NOT_READ_OR_TRANSFERRED",
+        "state_database_and_config_dependency": "PATH_WIRING_AND_CURRENT_LIVE_DATA_NOT_YET_BOUND",
+        "next_script": "evidence/pr99-service-handoff/s07-runtime-inventory/resolve_storage_contract.py",
+        "next_source_commit": "d25e5a562acea75e793c18a31d8f536fc7f52d35",
+        "next_script_sha256": "cc27913ca76e1cae58008c8c7c5997bba04ceee7950ff3dacec30bcb9f9a78eb",
+        "next_status": "OWNER_EXECUTED_S07_STORAGE_WIRING_STATIC_PROJECTION_NOT_HOST_RUNTIME_ACCEPTANCE",
+        "storage_wiring_receipt": "evidence/pr99-service-handoff/s07-runtime-inventory/OWNER_STORAGE_WIRING_20261017.json"
+      },
+      "private_runtime_material_staging": {
+        "status": "OWNER_ROOT_KOREA_PRELIMINARY_PRIVATE_MATERIALS_RECEIVED_NOT_DOMESTIC_RUNTIME",
+        "script": "evidence/pr99-service-handoff/s07-runtime-materials/stage_runtime_materials.py",
+        "source_commit": "8f80d0cb60ff68a3bcbbfed6506eda3126cb4761",
+        "script_sha256": "0076b30aec052366ac2f7ec6adfa5ff13b9c54f21fa50221c72d9415ddfc6c7f",
+        "local_tests": 7,
+        "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+        "scope": "BOUNDED_TOKYO_S07_RUNTIME_CONFIG_CREDENTIAL_AND_PRELIMINARY_SQLITE_BACKUP_TO_KOREA_PRIVATE_STAGING_ONLY",
+        "source_code_and_unit_current_hash_gates": true,
+        "unit_overrides": "UNKNOWN_STORAGE_ARGUMENTS_OR_DROPINS_REJECT",
+        "allowed_runtime_trees": [
+          "runtime/secure-secrets-portal",
+          "runtime/v8-domestic-operations/operations-secretref-store",
+          "runtime/v8-domestic-operations/wecom-customer-contact",
+          "runtime/v8-domestic-operations/wecom-customer-service"
+        ],
+        "data": "database/data/trading.db VIA_SQLITE_BACKUP_NOT_COPY_WAL",
+        "optional_exact_files": "knowledge/data/production_knowledge_v1.json; config/model_provider_rate_cards.json; two known exact referral config JSON files",
+        "source_services_stopped": false,
+        "source_writer_frozen": false,
+        "final_cutover_snapshot": false,
+        "domestic_install": false,
+        "service_actions": 0,
+        "api_requests": 0,
+        "production_cutover": false,
+        "private_archive_upload": "FORBIDDEN_DO_NOT_SEND_TO_CHAT_GITHUB_OR_CI",
+        "execution_authority": "OWNER_DIRECT_MIGRATION_6219362469_NOT_REPLAY_OF_R2_OR_S06_PERMIT",
+        "owner_failure": {
+          "reported_local_time": "2026-10-17T07:38+08:00",
+          "launch_directory": "/root/pr99-s07-material-launch.Fwej5Q9b",
+          "remote_exception": "SYMLINK_PARENT",
+          "archive_bytes": 0,
+          "receipt_present": false,
+          "private_log_bytes": 224,
+          "evidence_origin": "OWNER_ROOT_TERMINAL_TRANSCRIPT",
+          "source_partial_actions": "UNKNOWN_UNTIL_TRACE_LOCATION_BOUND"
+        },
+        "path_metadata": {
+          "reported_local_time": "2026-10-17T07:44+08:00",
+          "project_root_symlink": false,
+          "unit_fragment_and_parent_symlinks": false,
+          "project_root_uid": 1000,
+          "project_root_gid": 1000,
+          "scope": "ROOT_AND_THREE_UNIT_PATHS_ONLY_DEEPER_PATHS_NOT_PROVEN",
+          "next_script": "evidence/pr99-service-handoff/s07-runtime-materials/inspect_all_candidate_paths.py",
+          "source_commit": "ceb3942afd8db530540ddc485d7eab7c893a9af3",
+          "script_sha256": "6d68a59982d41dbba710a8735690026a7ba1d9917367e0101c2c97f0dc41755e",
+          "local_checks": "PARENT_LINK_NESTED_LINK_NO_CONTENT_MISSING_PATH_AND_COMPILE_PASS",
+          "hosted_ci": "NOT_RUN",
+          "host_execution": "OWNER_EXECUTED_S07_BOUNDED_PATH_METADATA_COMPLETE",
+          "symlink_guard_relaxed": false,
+          "hash_correction": {
+            "incorrect_previous_sha256": "a089bfa39d6fee38f866000e80861d384bb2a2352c66eab569f7c796c7efa054",
+            "cause": "LOCAL_TEST_HEREDOC_ADDED_ONE_EXTRA_TRAILING_NEWLINE_TO_GITHUB_BYTES",
+            "github_bytes": 4933,
+            "github_original_re_read": true,
+            "owner_old_check": "FAILED_BEFORE_EXECUTION_NO_TOKYO_CONNECTION",
+            "script_source_changed": false
+          },
+          "actual_link": {
+            "path": "/home/admin/.openclaw/workspace",
+            "target": "/mnt/btrfs-workspace/ws-398ab6",
+            "link_device": 64771,
+            "link_inode": 654102,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": "0o777",
+            "target_device": 37,
+            "target_inode": 259,
+            "target_mode": "0o755",
+            "target_uid": 1000,
+            "target_gid": 1000
+          },
+          "owner_observed_metadata_entries": 293,
+          "missing_optional_root": "/home/openclaw_ops",
+          "failure_trace": "remote_pack line114 -> read_file line48 -> need line40; source script confirms file payload-read loop before master-key check or source staging/SQLite backup"
+        },
+        "continuation_v2": {
+          "status": "OWNER_EXECUTED_S07_PRIVATE_MATERIALS_RECEIVED_PRELIMINARY_PASS",
+          "source_commit": "127e4a942d1cbeadb67b545a47758e1e6827c8dd",
+          "script": "evidence/pr99-service-handoff/s07-runtime-materials/stage_runtime_materials.py",
+          "script_sha256": "137a2acea1924b4c62e43abfe6f8689c64450db868c7a216d759a16779c939b4",
+          "github_bytes": 16917,
+          "github_byte_readback": true,
+          "local_tests": 14,
+          "new_tests": 7,
+          "affected_previous_tests": 7,
+          "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+          "local_stage": "/root/pr99-s07-private-materials-v2",
+          "prior_stage_preserved": true,
+          "preconditions": "v1 exact failure JSON; missing success receipt; zero-byte prior tar; SYMLINK_PARENT in private log",
+          "alias_exception_scope": "ONE_EXACT_REFERRAL_JSON_ONLY_NOT_RECURSIVE_OPENCLAW_OR_GLOBAL_SYMLINK_ALLOW",
+          "actual_alias_and_target_identities_bound": true,
+          "all_other_link_rejections_preserved": true,
+          "service_actions": 0,
+          "domestic_install": false,
+          "final_cutover_snapshot": false,
+          "owner_receipt": "evidence/pr99-service-handoff/s07-runtime-materials/OWNER_PRIVATE_STAGE_V2_20261017.json",
+          "files": 165,
+          "bytes": 47099890
+        }
+      },
+      "domestic_private_material_staging": {
+        "status": "OWNER_EXECUTED_DOMESTIC_S07_PRIVATE_MATERIALS_STAGED_PASS",
+        "script": "evidence/pr99-service-handoff/s07-domestic-materials/transfer_private_materials.py",
+        "source_commit": "ebfce46c8c67d1e2443566c0c1b3cd4fbe2cb160",
+        "script_sha256": "90b49446307de25820b8190988582a53f05cc093ea97655d567cdf96a275df79",
+        "github_bytes": 11850,
+        "github_byte_readback": true,
+        "local_tests": 7,
+        "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+        "source": "/root/pr99-s07-private-materials-v2",
+        "target": "/var/lib/xuanjun-pr99-s07-private-materials-v1/received",
+        "scope": "COMPRESS_EXISTING_VERIFIED_ARCHIVE_STRICT_DOMESTIC_SSH_FIXED_NEW_ROOT_PRIVATE_DIR_PER_FILE_HASH_AND_SQLITE_INTEGRITY",
+        "source_reacquired": false,
+        "old_material_stage_replayed": false,
+        "active_runtime_replaced": false,
+        "services_installed": false,
+        "service_actions": 0,
+        "production_cutover": false,
+        "final_cutover_snapshot": false,
+        "owner_receipt": "evidence/pr99-service-handoff/s07-domestic-materials/OWNER_DOMESTIC_MATERIALS_20261017.json",
+        "receipt_comment_id": 6226942036,
+        "files": 165,
+        "bytes": 47099890,
+        "tar_sha256": "dee6e24933f6a9b14c12ea0b838099093c40e53dda447360080d382793bc8c8c",
+        "wire_sha256": "7b0c1dbde63482c10d02ff51081fd1cdee0d3f1c17b1fbd75ffe3b111e40ab4f"
+      },
+      "isolated_start": {
+        "status": "V4_THREE_ISOLATED_HEALTH200_PASS_RUNTIME_ACCEPTANCE_PENDING",
+        "script": "evidence/pr99-service-handoff/s07-isolated-start/isolated_start.py",
+        "source_commit": "bc0f6627d5593e7b3035d26e1c792c24c97bdcfc",
+        "script_sha256": "4185dd98491d16d3c7f8c76eae9bcc9aeb515f0a5cbfbfa2a58f313224e5cda2",
+        "github_bytes": 20529,
+        "byte_readback": true,
+        "local_checks": 13,
+        "local_check_scope": "STATIC_COMMAND_COPY_MODE_CHECKS; CHROOT_UID_TRANSITION_SKIPPED_ENVIRONMENT_DENIED",
+        "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+        "host_execution": "REAL_SWAS_ROOT_THREE_APPS_ISOLATED_PASS",
+        "attempt": "/var/lib/xuanjun-pr99-s07-isolated-start-v4",
+        "scope": "COPY79_SOURCE_165_MATERIAL_AND_VENV_NEW_CHROOT_NEW_MOUNT_NET_PID_NAMESPACE_LOW_UID_TEMP_THREE_APP_LAUNCH_THEN_STOP",
+        "application_uid_gid": "65534:65534",
+        "network": "REQUIRE_ONLY_LO_INTERFACE_NO_EXTERNAL_INTERFACE",
+        "filesystem": "COPIED_ROOT_AND_VENV_SYSTEM_LIBS_READONLY_PRIVATE_NAMESPACE",
+        "command_admission": "EXACT_PORTAL_SERVE_AND_MODULE_ENTRIES_HOST_PORT_ONLY",
+        "checks": "PROCESS_ALIVE_LOOPBACK_LISTENER_HEALTHZ_STATUS_SEPARATELY_NOT_FULL_AUTH_OR_RUNTIME_ACCEPTANCE",
+        "timeout": "25s startup,75s namespace; kill PID namespace on timeout",
+        "production_service_actions": 0,
+        "services_installed": false,
+        "production_cutover": false,
+        "final_cutover_snapshot": false,
+        "local_passed": 12,
+        "local_skipped": 1,
+        "temporary_app_process_starts": 3,
+        "application_processes_stopped": true,
+        "protected_state_unchanged": true,
+        "missing_module": null,
+        "source_closure_complete": false,
+        "next": "PREPARE_CONSOLIDATED_RUNTIME_ACCEPTANCE_AND_FINAL_HANDOFF_PLAN_NO_PRODUCTION_CUTOVER",
+        "closure_inventory": {
+          "script": "evidence/pr99-service-handoff/s07-source-closure/inspect_closure.py",
+          "source_commit": "4968b9a7a4780cb8169d58adb37841c38439a1c9",
+          "sha256": "123944897f92198e9460f65887a525784751e91f9b0f5aaf8e0e6269b70da84f",
+          "local_tests": 6,
+          "status": "OWNER_EXECUTED_125_CANDIDATES_46_ADDED_DYNAMIC_COMPLETENESS_NOT_PROVEN",
+          "service_actions": 0,
+          "candidate_files": 125,
+          "added_files": 46
+        },
+        "batch_continuation": {
+          "status": "OWNER_V3_EXECUTED_PARTIAL_CONTACT_HEALTH200_OTHER_TWO_ERRNO2",
+          "source_commit": "bc0f6627d5593e7b3035d26e1c792c24c97bdcfc",
+          "script": "evidence/pr99-service-handoff/s07-source-closure/batch_isolated_start.py",
+          "sha256": "4185dd98491d16d3c7f8c76eae9bcc9aeb515f0a5cbfbfa2a58f313224e5cda2",
+          "supplement_files": 45,
+          "copied_source_files": 124,
+          "excluded": "EMPTY_TOP_LEVEL_signal/__init__.py_TO_AVOID_STDLIB_SHADOW",
+          "target": "/var/lib/xuanjun-pr99-s07-isolated-start-v3",
+          "local_tests_run": 19,
+          "local_passed": 18,
+          "local_skipped": 1,
+          "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+          "production_service_actions": 0
+        },
+        "missing_file": "/opt/trading-system/runtime/v8-domestic-operations/internal-bridge/domestic_bridge_cert.sha256",
+        "bridge_continuation": {
+          "status": "EXECUTED_REAL_HOST_PASS_WITH_SCOPE_LIMITS",
+          "script": "evidence/pr99-service-handoff/s07-source-closure/bridge_directory_fixed.py",
+          "source_commit": "602b3c6e28ea2a9a77d2850d8fde18e5137c27c9",
+          "sha256": "ac6e64a2cf589b14b21bdab643060748862a7a711deb0bc29648632ccc6a7d9f",
+          "attempt": "/var/lib/xuanjun-pr99-s07-isolated-start-v4",
+          "authentic_material_scope": "AST_DEFAULTS_EXACT_TOP_LEVEL_BRIDGE_FILES_MAX8_64K_EACH_NO_RECURSION_NO_CERT_BYPASS",
+          "current_tokyo_source_hashes": "PASS_124",
+          "local_tests_run": 24,
+          "local_passed": 23,
+          "local_skipped": 1,
+          "hosted_ci": "NOT_RUN_NOT_CLAIMED",
+          "production_service_actions": 0,
+          "bridge_material_files": 2,
+          "transport": "KOREA_TO_TOKYO_AND_DOMESTIC_SWAS_PRIVATE_HOST_TO_HOST_NO_CI_MATERIAL",
+          "run": 38992581089,
+          "job": 117277978082,
+          "korea_invoke_id": "t-kor709ol1r4xvy8",
+          "application_processes_stopped": true,
+          "protected_state_unchanged": true,
+          "three_health_http_status": [
+            200,
+            200,
+            200
+          ],
+          "receipt": "evidence/pr99-service-handoff/aliyun-execution/s07-isolated-v4-20261017.json",
+          "attempt_consumed_no_replay": true
+        }
+      }
+    }
+  },
+  "current_recovery_point_r2": {
+    "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+    "action": "PR99_CURRENT_OFFLINE_RECOVERY_POINT_V1",
+    "status": "CURRENT_OFFLINE_POINT_RECEIVED_PASS_OWNER_ROOT_REPORTED",
+    "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+    "old_approval_comment_id": 6216441589,
+    "korea_old_failure_sha256": "44f232571ce267f6a5cf9c801b1fba366fd9fa8f4a82d01aa592c249592bd35d",
+    "tokyo_old_failure_sha256": "9c23719696b63b0ca4552eb67ffd99948a62c9cec9af0a4774e4890f8a21565b",
+    "source_selection": "SAME_1363_FILES_INCLUDING436_PREVIOUSLY_APPROVED_BACKUP_FILES",
+    "explicit_historical_subtree_exclusions": [
+      "backup/WEBSITE_WECOM_AND_DUAL_CHANNEL_REFERRAL_COMPLETION_V1_20261008T003826/tokyo-system",
+      "backup/XUANJUN_CUSTOMER_BRAIN_R10_FINAL_AUTHORITY_GAP_REPAIR_V1_20261007T225500",
+      "backup/XUANJUN_WECOM_NOVEL_APP_IDENTITY_SECRET_READY_20261007T1818",
+      "backup/gpt56_timeout_alignment_20261005T0115+0800",
+      "backup/wecom_notification_gate_20261008_pre_audit_fix"
+    ],
+    "hosted": {
+      "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+      "bound_files": 5,
+      "database_exported": false,
+      "new_tests": 7,
+      "original_20": "INHERITED_NOT_REEXECUTED",
+      "production_actions": 0,
+      "production_hosts_used": false,
+      "regular_members": 6,
+      "schema_version": 1,
+      "skipped": 0,
+      "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+      "status": "R2_OFFLINE_INCREMENTAL_REVIEW_ONLY",
+      "tar_bytes": 62791,
+      "tar_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+      "unchanged_functions": {
+        "current_point.py": [
+          "backup_database",
+          "sqlite_check",
+          "stable_bytes",
+          "make_archive",
+          "receive_archive",
+          "prepare",
+          "manifest_rows"
+        ],
+        "run_current_point.py": [
+          "verify_approval",
+          "get_approval",
+          "load_bundle"
+        ]
+      }
+    },
+    "ci_run": 38910423910,
+    "ci_job": 117004563824,
+    "artifact": {
+      "id": 12050610106,
+      "zip_bytes": 63670,
+      "zip_sha256": "e8cd63f89851e243abf6019ce564c1ac98844a1c39634828e605fed6bd829c35",
+      "zip_verification_origin": "GITHUB_ARTIFACT_UPLOAD_DIGEST_AND_JOB_LOG_NOT_INDEPENDENT_ZIP_DOWNLOAD",
+      "tar_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+      "tar_bytes": 62791,
+      "local_tar_byte_reproduction": "MATCH_CI"
+    },
+    "source_workdir": "/root/pr99-current-point-v2",
+    "target_workdir": "/root/pr99-current-point-received-v2",
+    "production_executed": true,
+    "permission": "APPROVED_6217030577_CONSUMED_SUCCESS_NO_REPLAY",
+    "original_20": "INHERITED_NOT_RERUN",
+    "request": {
+      "comment_id": 6216916733,
+      "read_back": true,
+      "decision": "PASS_WITH_EXACT_PRECONDITIONS_6217030577",
+      "scope": "SEVEN_CASE_INCREMENTAL_SOURCE_VISIBILITY_LOGGING_AND_NEW_ONCE_RECOVERY_PERMISSION"
+    },
+    "approval": {
+      "comment_id": 6217030577,
+      "body_sha256": "1103a7a7a053ae862abefcb4c056812b572bbd79d74139f082cecf5777b4b7f3",
+      "issued_at": 1792158839,
+      "expires_at": 1792180439,
+      "max_attempts": 1
+    },
+    "owner_execution": {
+      "schema_version": 1,
+      "evidence_origin": "OWNER_KOREA_SUDO_ROOT_TERMINAL_TRANSCRIPT_NOT_INDEPENDENT_HOST_LOGIN",
+      "reported_local_date": "2026-10-16",
+      "reported_local_time_window": "22:04-22:05 Asia/Shanghai (terminal login and message context; no precise execution timestamp claimed)",
+      "launch_directory": "/root/pr99-copy-r2-approved.DriMeUBj",
+      "source_host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "target_workdir": "/root/pr99-current-point-received-v2",
+      "source_workdir": "/root/pr99-current-point-v2",
+      "approval_body_sha256": "1103a7a7a053ae862abefcb4c056812b572bbd79d74139f082cecf5777b4b7f3",
+      "binding_sha256": "1fa5930f178538ed34fffaa0badbf71cef71af401822af7ea7b165e8f15003b1",
+      "approved_artifact_sha256": "78bcb2427a14dc95f2821cdb0ad5f62d5307a35bdd365530b34c178b98da1b2e",
+      "terminal_receipt": {
+        "api_requests": 0,
+        "approval_comment_id": 6217030577,
+        "cipher_sha256": "2ac42b9e69c69260c99387b2e1ae339dd2e80b3f01c1984858e458e6c8872d32",
+        "current_final_trading_snapshot": false,
+        "database_integrity_check": "PASS",
+        "database_sha256": "6d451dfdc4714ca9bc704d719dcb47b02ec1e2ce243f886bfb2578a27fbca232",
+        "host": "iZmj7a5kwr75qc1tul4kf9Z",
+        "production_deployed": false,
+        "retry_allowed": false,
+        "service_actions": 0,
+        "source_commit": "f9aa210686b1107faab71d418b0bd2707fe37de3",
+        "source_files": 1363,
+        "source_manifest_matched": true,
+        "status": "CURRENT_OFFLINE_POINT_RECEIVED_PASS",
+        "tokyo_retirement": "HOLD"
+      },
+      "limits": [
+        "Owner-root transcript; reviewer has not read private original bytes",
+        "selected original1363 includes436 historical backup files; not full server filesystem",
+        "live Writer not frozen; not final trading cutover point",
+        "no service installation/start/cutover or Finance/DNS operation",
+        "single-use approval consumed; do not replay successful export"
+      ],
+      "next": "S06 current service/runtime contract and private channel handoff; preserve R4 live Portal and all shared services."
+    },
+    "independent_execution_acceptance": {
+      "comment_id": 6217422554,
+      "decision": "PASS_WITH_SCOPE_LIMITS",
+      "evidence_class": "OWNER_ROOT_RECEIPT_NOT_INDEPENDENT_PRIVATE_BYTES",
+      "read_back": true
+    },
+    "execution_review_request": {
+      "comment_id": 6217284394,
+      "read_back": true,
+      "decision": "PASS_WITH_SCOPE_LIMITS_6217422554"
+    }
+  },
+  "four_host_ram_execution": {
+    "status": "REAL_FOUR_HOST_ROOT_IDENTITY_PASS",
+    "run": 38991455661,
+    "job": 117275780078,
+    "receipt": "evidence/pr99-service-handoff/aliyun-execution/four-host-identity-20261017.json",
+    "handoff": "docs/ALIYUN_FOUR_HOST_EXECUTION_HANDOFF_20261017.md",
+    "secrets": "ORIGINAL_REPOSITORY_ACTIONS_SECRETS_ONLY_NO_VALUES_EXPORTED"
+  },
+  "s08_runtime_closure": {
+    "status": "REAL_THREE_HOST_READONLY_BATCH_PASS_CLOSURE_PENDING",
+    "run": 38999602793,
+    "job": 117299532997,
+    "source_commit": "ac609bb1ec41667261266056e30312f8f0ae6135",
+    "receipt": "evidence/pr99-service-handoff/s08-runtime-closure/RECEIPT_20261017.json",
+    "service_actions": 0,
+    "production_cutover": false,
+    "next": "RESOLVE_EXACT_SSH_PEERS_CLIENT_ENDPOINTS_NGINX_INCLUDES_AND_SCHEDULE_OWNERS_THEN_CONSOLIDATED_INSTALL_ROLLBACK_CANDIDATE"
+  },
+  "domestic_versioned_release": {
+    "schema": 1,
+    "status": "DOMESTIC_RELEASE_STAGED_NOT_PRODUCTION_INSTALLED",
+    "code": {
+      "run": 39001447378,
+      "job": 117305049170,
+      "invoke_id": "t-sh070a0uibttwqo",
+      "source_commit": "d3ee85415959b6db07aab8302a2679c67e062627",
+      "source_files": 124,
+      "completed_at": "2026-10-17T12:08:52+08:00",
+      "helper_sha256": "3778c9c96fd478c58d509be05d76b52f41da1ebd3c203beefe67c69a740e7915"
+    },
+    "runtime": {
+      "run": 39002237032,
+      "job": 117307415381,
+      "invoke_id": "t-sh070a1ykb562o0",
+      "source_commit": "739f889438d1a1c2914858e35393ccda6bde1bb7",
+      "files": 2906,
+      "bytes": 114962378,
+      "links": 4,
+      "completed_at": "2026-10-17T12:21:27+08:00",
+      "helper_sha256": "a7bc6636cf629047d777951e6399bce47997f0063cb3aa17aa0d0ce99d0c0041",
+      "copy_hashes": "PASS"
+    },
+    "target": "/opt/xuanjun-migration-s07/releases/domestic-r1",
+    "protected_state_unchanged": true,
+    "service_actions": 0,
+    "services_installed": false,
+    "production_cutover": false,
+    "final_cutover_snapshot": false,
+    "effective_production_env_verified": false,
+    "business_api_requests": 0,
+    "database_opened": false,
+    "attempts_consumed_no_replay": true,
+    "remaining_major_nodes": 6,
+    "restart_acceptance": {
+      "run": 39003075282,
+      "job": 117309891067,
+      "invoke_id": "t-sh070a35kmwvu2o",
+      "status": "COPIED_RELEASE_RESTART_CLEANUP_PASS_NOT_PRODUCTION",
+      "rounds": 2,
+      "three_health_each_round": [
+        200,
+        200,
+        200
+      ],
+      "all_temporary_processes_stopped": true,
+      "protected_state_unchanged": true,
+      "auth_acceptance": "NOT_PROVEN_404_ONLY"
+    },
+    "duplicate_trigger": {
+      "run": 39003103198,
+      "job": 117309973655,
+      "invoke_id": "t-sh070a371eaocn4",
+      "status": "FAILED_FILE_EXISTS_BEFORE_REPEAT_APP_START_PRESERVED",
+      "automatic_pr_triggers_removed": true,
+      "query_run": 39003189371
+    },
+    "next": "COMPLETE_REAL_FINAL_DATA_IDENTITY_INPUTS_AND_ORIGINAL_SINGLE_CONSOLIDATED_EXECUTION_ADMISSION; DO_NOT_REPLAY_HELD_LABEL_OR_INFER_PRODUCTION_READY_FROM_CI",
+    "production_installed": false,
+    "r2": {
+      "status": "R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION",
+      "target": "/opt/xuanjun-migration-s07/releases/domestic-r2",
+      "completed_at": "2026-10-17T12:52:15+08:00",
+      "source_files": 124,
+      "patched_source_files": 2,
+      "bridge_port_adaptation": {
+        "from": 19443,
+        "to": 18443,
+        "existing_domestic_bridge_modified": false
+      },
+      "code": {
+        "run": 39004046272,
+        "job": 117312742713,
+        "invoke_id": "t-sh070a4jun5nfnk"
+      },
+      "runtime": {
+        "run": 39004107195,
+        "job": 117312919573,
+        "invoke_id": "t-sh070a4mwpu2oe8",
+        "files": 2906,
+        "bytes": 114962378
+      },
+      "copy_acceptance": {
+        "run": 39004155870,
+        "job": 117313065796,
+        "invoke_id": "t-sh070a4pjzs5dkw",
+        "rounds": 2,
+        "health_each_round": [
+          200,
+          200,
+          200
+        ],
+        "invalid_callback_status_each_round": [
+          403,
+          403
+        ],
+        "all_temporary_processes_stopped": true,
+        "protected_state_unchanged": true
+      },
+      "stopped_install_transaction": {
+        "implemented": true,
+        "host_executed": false,
+        "activation_supported": false,
+        "source_sha256": "99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315",
+        "ci_run": 39004183744,
+        "ci_job": 117313146649,
+        "tests_passed": 9,
+        "independent_host_admission": false,
+        "review_request_comment_id": 6229861598,
+        "review_request_read_back": true,
+        "review_decision": "PENDING_NOT_SELF_APPROVED"
+      },
+      "receipt": "evidence/pr99-service-handoff/s09-install-candidate/R2_EXECUTION_RECEIPT_20261017.json",
+      "services_installed": false,
+      "production_cutover": false,
+      "final_snapshot": false,
+      "real_signed_auth_and_upstream_acceptance": false,
+      "controlled_entry": {
+        "workflow": ".github/workflows/pr99-controlled-stopped-install.yml",
+        "trigger": "OWNER_ID_332398908_EXACT_HEAD_LABEL_ONLY_NO_PUSH_ROOT",
+        "run": 39005472107,
+        "job": 117316933627,
+        "status": "HELD_BEFORE_CLOUD_INDEPENDENT_HOST_ADMISSION_NOT_ISSUED",
+        "cloud_calls": 0,
+        "host_commands": 0,
+        "source_commit": "d7dcfd0bf82a93b2416a660fd0cf1b53766d804a",
+        "capability": "LABEL_TRIGGER_CONFIRMED_NOT_INSTALLATION"
+      }
+    },
+    "production_start_candidate": {
+      "source_commit": "23b9b42bbfa7655bb38c0c1ebc83f4edadc3efca",
+      "source_sha256": "6ad51228f60690365ee4004c8c05b9c982eb2de70551ac8061142fcb4c93fa32",
+      "code_implemented": true,
+      "host_executed": false,
+      "production_ready": false,
+      "ci_run": 39005621738,
+      "ci_job": 117317379867,
+      "tests": {
+        "stopped_transaction": 9,
+        "production_start_containment": 4,
+        "scope": "FILESYSTEM_AND_MOCKED_SYSTEMCTL_NOT_HOST_PID1"
+      },
+      "requires": [
+        "ORIGINAL_INDEPENDENT_ROOT_ADMISSION",
+        "REAL_FINAL_CHECKPOINT_SOURCE_FENCE_AND_CANONICAL_WRITER_ASSIGNMENT",
+        "PREPARED_DEDICATED_RUNTIME_IDENTITY_AND_PERMISSIONS"
+      ],
+      "site_cutover_implemented": false,
+      "services_started": false,
+      "production_cutover": false
+    }
+  },
+  "migration_execution_handoff": {
+    "status": "ORIGINAL_WORK_WRITER_STOPPED_DOTS_PENDING_ACK",
+    "owner_instruction": "2026-10-17 13:27 CST explicit handoff to dots",
+    "handoff_file": "docs/PR99_SERVER_MIGRATION_DOTS_HANDOFF_20261017.md",
+    "handoff_document_commit": "b52affad1e7575a2e471ead621152eb1f74cf64a",
+    "source_checkpoint_before_handoff": "373419cdfa635005764020beed86e31e123e1c2d",
+    "original_writer": "STOPPED_NO_FURTHER_MIGRATION_CODE_OR_CLOUD_DISPATCH",
+    "successor": "DOTS_PENDING_ACK_IN_ORIGINAL_PR99",
+    "own_inflight_swas": "NONE_KNOWN",
+    "own_unknown_results": "NONE_KNOWN",
+    "local_related_background_processes": 0,
+    "remote_proc_refreshed_for_handoff": false,
+    "last_host_batch": {
+      "run": 39004155870,
+      "job": 117313065796,
+      "invoke_id": "t-sh070a4pjzs5dkw",
+      "status": "SUCCESS_TEMP_PROCESSES_STOPPED"
+    },
+    "last_entry": {
+      "run": 39005472107,
+      "job": 117316933627,
+      "status": "HOLD_BEFORE_CLOUD_CALLS_ZERO"
+    },
+    "production_services_installed": false,
+    "production_cutover": false,
+    "remaining_major_nodes": 6,
+    "existing_readonly_notifications": "KEEP_ENABLED_NOT_A_DEPLOYMENT_WRITER",
+    "note": "Handoff bookkeeping can trigger ordinary CI; that is not an in-flight host migration command."
+  }
+}
