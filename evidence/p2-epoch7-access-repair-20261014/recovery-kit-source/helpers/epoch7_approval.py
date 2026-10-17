@@ -41,8 +41,8 @@ def validate(raw,review_id,wanted):
  value=decode(raw.decode('utf-8','strict'))
  need(isinstance(value,dict) and isinstance(value.get('user'),dict),'APPROVAL_RESPONSE_SCHEMA')
  need(type(value.get('id')) is int and value['id']==review_id and
-      value.get('user',{}).get('id')==332398908 and
-      value.get('user',{}).get('login')=='huhongchuan0422-creator','APPROVAL_AUTHOR')
+      value.get('user',{}).get('id')==95597695 and
+      value.get('user',{}).get('login')=='18598789888','APPROVAL_AUTHOR')
  need(value.get('issue_url')=='https://api.github.com/repos/'+REPO+'/issues/58','APPROVAL_DESTINATION')
  body=value.get('body');need(isinstance(body,str) and body.startswith(MARKER),'APPROVAL_MARKER')
  parsed=decode(body[len(MARKER):])
