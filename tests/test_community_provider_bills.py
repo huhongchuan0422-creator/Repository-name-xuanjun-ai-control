@@ -77,3 +77,27 @@ class BillJourney(unittest.TestCase):
         g,_=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
         bill=dict(kind='SPLIT',columns=['商户分账单号','分账金额','分账结果','接收方账号'],rows=[],body_sha256='a'*64)
         self.assertEqual(self.bills.reconcile(g,bill)['status'],'UNKNOWN_SCHEMA')
+
+    def test_split_bill_optional_signed_identifiers_must_match_original_intent(self):
+        from scripts.pr122_customer_core import canonical
+        from scripts.community_demo_bootstrap import DEMO_SCOPE
+        g,policy=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
+        action=dict(kind='SPLIT',scope=DEMO_SCOPE,reference='basket',provider_reference='ps_bill_fixture',
+                    transaction_id='420000000000001234',result=dict(status='FINISHED',
+                    receivers=[dict(receiver_id='comm',amount_minor=10,result='SUCCESS')]))
+        key='f'*64
+        with self.fx.c.tx():
+            self.fx.c.db.execute("INSERT INTO links VALUES('COMMUNITY_PROVIDER_ACTION',?,?,?,?,1)",
+                (key,self.fx.fx.uid1,'project1',self.fx.c.encrypt(canonical(action),'provider-action:'+key)))
+        columns=['商户分账单号','分账金额','分账结果','微信订单号','特约商户号']
+        values=['ps_bill_fixture','0.10','SUCCESS','420000000000001234',policy['sub_mchid']]
+        bill=dict(kind='SPLIT',columns=columns,rows=[dict(zip(columns,values))],
+                  sub_mchid=policy['sub_mchid'],body_sha256='d'*64)
+        self.assertEqual(self.bills.reconcile(g,bill)['status'],'BILL_ROWS_MATCH')
+        bill['rows']=[dict(zip(columns,values[:3]+['999999999999999999',values[4]]))]
+        result=self.bills.reconcile(g,bill)
+        self.assertEqual(result['status'],'EXCEPTION')
+        self.assertEqual(result['exceptions'][0]['reason'],'SPLIT_TRANSACTION_MISMATCH')
+        bill['rows']=[dict(zip(columns,values[:4]+['9999999999']))]
+        result=self.bills.reconcile(g,bill)
+        self.assertEqual(result['exceptions'][0]['reason'],'BILL_SUBMERCHANT_MISMATCH')
