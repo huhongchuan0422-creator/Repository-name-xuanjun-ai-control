@@ -195,7 +195,10 @@
         "tests/test_community_refund_notifications.py",
         "scripts/community_order_cancellation.py",
         "tests/test_community_order_cancellation.py",
-        "tests/test_community_customer_profile_native.py"
+        "tests/test_community_customer_profile_native.py",
+        "scripts/community_stores.py",
+        "scripts/community_registered_admin.py",
+        "tests/test_community_stores.py"
       ]
     },
     {

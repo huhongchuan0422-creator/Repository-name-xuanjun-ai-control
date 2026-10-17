@@ -54,6 +54,9 @@ class CenterOperations:
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         c=self.center;uid=c.session(session,csrf)
         from scripts.community_staff import Staff
+        if body['operation'] in ('community.stores','community.store_save'):
+            from scripts.community_stores import Stores
+            return Stores(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
         if body['operation'].startswith('community.staff_'):
             return Staff(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
         grant=self.grants.get(body['workspace'])
@@ -78,7 +81,10 @@ class CenterOperations:
         with c.tx():
             c.limit('community-operations:'+uid,60,60)
             c.audit(grant['project'],uid,'COMMUNITY_OPERATION_ATTEMPT',request_hash)
-        result=self.runtime.dispatch(p,body['operation'],body['params'],None)
+        if body['operation'] in ('community.profile','community.item','community.ad_create','community.ad_state','community.ad_review'):
+            from scripts.community_registered_admin import dispatch
+            result=dispatch(self.runtime.demo,grant['scope'],grant['role'],uid,body['operation'],body['params'],self.center.now())
+        else:result=self.runtime.dispatch(p,body['operation'],body['params'],None)
         # Separate original databases are not an atomic transaction. An audit
         # failure after the business operation is UNKNOWN, never auto-retried.
         with c.tx():

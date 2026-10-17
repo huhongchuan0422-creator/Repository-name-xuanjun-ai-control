@@ -70,6 +70,22 @@ class Commerce:
         if type(body['operation']) is str and body['operation'] in ('refund_application_read','refund_decide'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).review(g,body['operation'],body['params'])
+        if op=='order_complete':
+            from scripts.community_order_provider_projection import provider_evidence
+            if type(p) is not dict or set(p)!={'reference','expected_revision','note'} or not valid_id(p['reference']) or type(p['note']) is not str or len(p['note'])>500:raise ValueError('INVALID_ORDER_COMPLETION')
+            with self.center.tx():
+                record=self._read(g['scope'],g['project'],'ORDER',p['reference'])
+                if record is None:raise ValueError('ORIGINAL_BASKET_ORDER_REQUIRED')
+                original=state(self.runtime.demo.db,g['scope'],p['reference'])
+                if original['state']!='SUCCESS' or provider_evidence(self.runtime.demo.db,g['scope'],p['reference']) is None:raise PermissionError('TRUSTED_PAID_ORDER_REQUIRED')
+                revision=record.get('fulfillment_revision',0)
+                if type(p['expected_revision']) is not int or p['expected_revision']!=revision or record.get('fulfillment_state')=='COMPLETED':raise ValueError('ORDER_COMPLETION_VERSION_CONFLICT')
+                result=dict(record,fulfillment_revision=revision+1,fulfillment_state='COMPLETED',completed_at=self.center.now(),completion_note=p['note'])
+                self._save(g['scope'],g['project'],record['user_id'],'ORDER',p['reference'],result,True)
+                from scripts.community_customer_profile import notify
+                notify(self.center,g['project'],record['user_id'],'ORDER_COMPLETED',p['reference'],'商家已完成订单 '+p['reference'])
+                self.center.audit(g['project'],g['user_id'],'COMMUNITY_ORDER_COMPLETED',p['reference'])
+            return result
         fields = {'price_set': {'item_id', 'expected_revision', 'unit_minor', 'stock', 'enabled'},
                   'price_read': {'item_id'}, 'order_lines': {'reference'}}
         if type(op) is not str or op not in fields or type(p) is not dict or set(p) != fields[op]:
