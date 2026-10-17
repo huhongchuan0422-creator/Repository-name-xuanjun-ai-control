@@ -130,7 +130,7 @@ def poll_existing(ledger, rpc, max_queries=12):
             ledger.create('verified.json', public)
             return public
         except RuntimeError:
-            raise
+            raise RuntimeError('QUERY_HOLD_REQUERY_SAVED_INVOKE_ONLY') from None
         except Exception:
             raise RuntimeError('QUERY_UNKNOWN_REQUERY_SAVED_INVOKE_ONLY') from None
     return {'state': 'QUERY_LIMIT_UNKNOWN', 'invoke_id': invoke, 'redispatch_allowed': False}

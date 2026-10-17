@@ -97,9 +97,10 @@ class TransportTests(unittest.TestCase):
 
     def test_query_network_failure_keeps_saved_invoke(self):
         self.start()
-        def fail(*a,**kw):raise OSError('PRIVATE')
-        with self.assertRaises(RuntimeError) as c:d.poll_existing(self.ledger,fail)
-        self.assertNotIn('PRIVATE',str(c.exception))
+        for error in (OSError('PRIVATE'),RuntimeError('PRIVATE')):
+            def fail(*a,**kw):raise error
+            with self.assertRaises(RuntimeError) as c:d.poll_existing(self.ledger,fail)
+            self.assertNotIn('PRIVATE',str(c.exception))
         d.poll_existing(self.ledger,self.rpc)
         self.assertEqual(sum(x[1]=='RunCommand' for x in self.calls),1)
 
