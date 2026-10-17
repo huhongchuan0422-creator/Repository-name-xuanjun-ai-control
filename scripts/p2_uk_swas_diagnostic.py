@@ -31,7 +31,7 @@ if __name__ == '__main__':
                 return result
             policy=json.loads(raw_policy,object_pairs_hook=exact_pairs)
             pins=policy['binding']['code_sha256']
-        for code in (target,Path(__file__).absolute()):
+        for code in (target,Path(__file__).absolute()) + ((Path(__file__).absolute().parent/'p2_uk_readonly_diagnostic.py',) if actions_mode and sys.argv[1].startswith('read-only-diagnostic') else ()):
             for node in (code,)+tuple(code.parents):
                 meta=node.lstat()
                 owners=(0,os.geteuid()) if actions_mode else (0,)
@@ -42,7 +42,9 @@ if __name__ == '__main__':
                     raise RuntimeError('INVALID_CODE_FILE')
         if actions_mode:
             if (hashlib.sha256(Path(__file__).read_bytes()).hexdigest()!=pins['transport']
-                    or hashlib.sha256(target.read_bytes()).hexdigest()!=pins['receipt']):
+                    or hashlib.sha256(target.read_bytes()).hexdigest()!=pins['receipt']
+                    or (sys.argv[1].startswith('read-only-diagnostic') and
+                        hashlib.sha256((Path(__file__).absolute().parent/'p2_uk_readonly_diagnostic.py').read_bytes()).hexdigest()!=pins['diagnostic'])):
                 raise RuntimeError('SOURCE_PINS_MISMATCH')
         spec=importlib.util.spec_from_file_location('p2_fixed_receipt',str(target))
         receipt=importlib.util.module_from_spec(spec)
@@ -761,7 +763,7 @@ def actions_entry(action,attempt,invoke_id=''):
          and re.fullmatch('[0-9a-f]{40}',binding['source_commit'])
          and policy['request']['attempt']==attempt and receipt.token(attempt)
          and os.environ.get('GITHUB_REF')==policy['workflow_ref'])
-    for name,path in (('transport',__file__),('receipt',receipt.__file__)):
+    for name,path in ((('transport',__file__),('receipt',receipt.__file__),('diagnostic',str(Path(__file__).absolute().parent/'p2_uk_readonly_diagnostic.py'))) if action.startswith('read-only-diagnostic') else (('transport',__file__),('receipt',receipt.__file__))):
         need(hashlib.sha256(Path(path).read_bytes()).hexdigest()==binding['code_sha256'][name])
     workflow=Path('.github/workflows/p2-uk-swas-diagnostic.yml')
     need(hashlib.sha256(workflow.read_bytes()).hexdigest()==binding['workflow_sha256'])
@@ -902,6 +904,8 @@ CONTROL = Path('/etc/xuanjun-p2-swas')
 REPOSITORY = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 OWNER_LOGIN = 'huhongchuan0422-creator'
 OWNER_ID = 332398908
+AUDITOR_ID = 95597695
+AUDITOR_LOGIN = '18598789888'
 
 
 def fetch_approval(ident, opener=None):
@@ -920,8 +924,8 @@ def fetch_approval(ident, opener=None):
         with client.open(request,timeout=10) as response:raw=response.read(32769)
         need(len(raw)<=32768)
         data=json.loads(raw,object_pairs_hook=receipt.unique)
-        need(data['id']==ident and data['user']['id']==OWNER_ID
-             and data['user']['login']==OWNER_LOGIN
+        need(data['id']==ident and data['user']['id']==AUDITOR_ID
+             and data['user']['login']==AUDITOR_LOGIN
              and data['issue_url']=='https://api.github.com/repos/'+REPOSITORY+'/issues/58')
         body=data['body'];need(type(body) is str and len(body.encode())<=16384)
         return body
