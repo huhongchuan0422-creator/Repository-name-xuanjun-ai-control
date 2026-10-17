@@ -156,6 +156,18 @@ class Commerce:
         if op in ('refund_apply','refund_application'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).consumer(token,scene,op,p)
+        if op == 'project_save_reference':
+            # Reuse original Center requirement version and host-side provider
+            # verification; a mini-supplied string is never proof of a secret.
+            if (type(p) is not dict or set(p) != {'item','revision','kind','reference'}
+                    or not valid_id(p['item']) or type(p['revision']) is not int
+                    or p['revision'] < 0 or p['kind'] not in
+                    ('SECRETREF','OAUTH','SERVER_CHALLENGE')
+                    or type(p['reference']) is not str):
+                raise ValueError('INVALID_PROJECT_REFERENCE_SAVE')
+            c.project(uid, project, ('OWNER','EDITOR'))
+            return c.save(uid, project, p['item'], p['revision'],
+                          p['kind'], p['reference'])
         if op == 'project_submit':
             # Only an existing version of an original Center requirement may be
             # submitted. Approval and correction remain with independent reviewers.
