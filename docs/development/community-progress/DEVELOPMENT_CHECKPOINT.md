@@ -105,3 +105,9 @@ No real merchant onboarding submission, funds operation, deployment, new key gen
 
 - Official WeChat partner split-bill API documentation (https://pay.wechatpay.cn/doc/v3/partner/4012761140) says each detail row is an individual split or return and that detail/summary each have their own header. The current aggregate-only adapter is NOT validated for official receiver-level/return layouts: UNKNOWN_SCHEMA remains mandatory. Do not label current synthetic aggregate fixtures as full official reconciliation or Finance settlement.
 - Verified latest source CI: cf01f58e9acefa98f34e1711c963ea9d80c2cbe3, Hosted run 39030394638 test job 117389505111 SUCCESS; optional jobs SKIPPED, not PASS.
+
+## 2026-10-17 later split/trade bill parser hardening
+
+- Receiver-detail variants containing 接收 / 收款方 are not coerced into supported summary schemas, code 7a7258e8b49198f7216714a4a7748637f2ef25fd; synthetic table header tests 293d02af2d09a95c6b41df7cfe1721d08ff53a49.
+- Both split and trade bill currency columns are strictly checked, including blank, foreign and conflicting dual-column entries. Latest source commit 8854b0ca438632214213bc6205cadbbedc004725; regression commit 167b3b7b69f590bf057da49fc9c90ec8c16085ab.
+- These are partial trust-boundary fixes, not certified official receiver-detail schema or Finance reconciliation. Phase-one/phase-two task groups remain PARTIAL. Current Hosted source run 39031100111 is pending outcome at writing; do not mark PASS without exact SHA confirmation. Next independent development nodes: authoritative bill receiver row mapping; provider applyment dynamic conditions; four-role browser E2E and customer project flow.
