@@ -70,6 +70,15 @@ class JournalTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractHold,"CORRUPT_CANDIDATE_DIGEST"):
             self.j.read("prj1","cust1","contract1","req1")
 
+    def test_direct_insert_requires_trusted_guard_and_scope_binding(self):
+        from single_contract_freeze import canonical_bytes, freeze
+        good=freeze(sample())
+        with sqlite3.connect(self.path) as db:
+            with self.assertRaises(sqlite3.DatabaseError):
+                db.execute("INSERT INTO contract_frozen_candidate VALUES (?,?,?,?,?)",
+                    ("prj1","contract1","raw1",good["contract_document_hash"],canonical_bytes(good)))
+        self.assertEqual(good,self.j.submit("prj1","cust1","req1",sample()))
+
     def test_append_only(self):
         self.j.submit("prj1","cust1","req1",sample())
         with sqlite3.connect(self.path) as db:
