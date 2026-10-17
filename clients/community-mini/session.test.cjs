@@ -71,11 +71,8 @@ test('original customer-project requests retain mini session boundary and no rev
 });
 
 
-test('mini client offers review route only as server-authorized request',async()=>{
- const {calls,session}=fixture();await session.login();
- const params={item:'material1',revision:2,action:'begin_review',reason:''};
- await session.commerce('shop1','project_review',params);
- assert.equal(calls.at(-1).data.operation,'commerce.project_review');
- assert.equal(calls.at(-1).header['X-Community-Session'],'s'.repeat(32));
- await assert.rejects(session.commerce('shop1','project_override',{item:'material1'}),/INVALID_COMMERCE_REQUEST/);
+test('mini reviewer bypass cannot use a customer mini bearer session',async()=>{
+ const {session}=fixture();await session.login();
+ await assert.rejects(session.commerce('shop1','project_review',
+   {item:'material1',revision:2,action:'approve',reason:'forged'}),/INVALID_COMMERCE_REQUEST/);
 });
