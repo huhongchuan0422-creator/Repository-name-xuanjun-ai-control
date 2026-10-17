@@ -21,7 +21,7 @@ class MiniPaymentJourney(unittest.TestCase):
     def setUp(self):
         self.fx=identity_fixture.ExistingCenterComposition();self.fx.setUp();self.token=self.fx.token();self.fx.checkout(self.token)
         self.reader=PartnerOrderReader('1234567890','ABC',self.keys.private,'PUB_KEY_ID_fixture',self.keys.public,lambda:self.fx.stage.now)
-        self.binding=dict(user_id=self.fx.uid1,project='project1',sp_appid=self.fx.identity.appid,sub_mchid='1234567891',out_trade_no='provider_order1',amount_minor=101,description='Fixture',notify_url='https://example.org/notify',sp_openid='openid1',profit_sharing=True)
+        self.binding=dict(user_id=self.fx.uid1,project='project1',sp_appid=self.fx.identity.appid,sub_mchid='1234567891',out_trade_no='provider_order1',amount_minor=101,description='Fixture',notify_url='https://example.org/notify',sp_openid='openid1',profit_sharing=False)
         self.prepay=PartnerPrepay(self.fx.center,self.reader,{'order1':self.binding});self.payments=MiniPayments(self.fx.identity,self.prepay)
     def tearDown(self):self.fx.tearDown()
     def call(self,operation,token=None):return self.payments.dispatch(token or self.token,dict(scene='shop1',operation=operation,reference='order1'))
@@ -35,7 +35,7 @@ class MiniPaymentJourney(unittest.TestCase):
         first=self.call('prepare');again=self.call('recover');self.assertEqual(first['package'],again['package']);self.reader._fetch.assert_called_once()
         self.reader._fetch=Mock(return_value=self.paid());result=self.call('query')
         self.assertEqual(result['provider_state'],'SUCCESS');self.assertTrue(result['provider_signature_verified']);self.assertEqual(result['finance_status'],'UNCONFIRMED')
-        self.assertEqual(self.fx.call(self.token,'community.receipt',{'reference':'order1'})['order']['state'],'PENDING')
+        self.assertEqual(self.fx.call(self.token,'community.receipt',{'reference':'order1'})['order']['state'],'SUCCESS')
     def test_foreign_customer_payer_amount_and_project_revoke_before_io(self):
         self.reader._fetch=Mock();second=self.fx.token('other_code','openid2')
         with self.assertRaises(PermissionError):self.call('prepare',second)

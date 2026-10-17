@@ -166,7 +166,7 @@ class ProviderActions:
                 receivers.append(r)
             payload=dict(sub_mchid=policy['sub_mchid'],appid=policy['sp_appid'],transaction_id=paid['transaction_id'],out_order_no=provider_ref,receivers=receivers,unfreeze_unsplit=p['unfreeze_unsplit'])
             if policy['sub_appid'] is not None:payload['sub_appid']=policy['sub_appid']
-        saved=dict(kind=kind,reference=p['reference'],request_id=p['request_id'],provider_reference=provider_ref,scope_hash=scope_hash,policy_hash=policy_hash,request_hash=hashlib.sha256(canonical(p)).hexdigest(),payload=payload,transaction_id=paid['transaction_id'],at=c.now())
+        saved=dict(scope=dict(g['scope']),project=g['project'],actor_user_id=g['user_id'],kind=kind,reference=p['reference'],request_id=p['request_id'],provider_reference=provider_ref,scope_hash=scope_hash,policy_hash=policy_hash,request_hash=hashlib.sha256(canonical(p)).hexdigest(),payload=payload,transaction_id=paid['transaction_id'],at=c.now())
         with c.tx():
             if self._load(key) is not None:raise ProviderActionUnknown('CONCURRENT_ACTION_EXISTS_QUERY_ONLY')
             if c.db.execute("SELECT 1 FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_LOCK' AND subject_idx=? AND active=1",(lock,)).fetchone():raise ProviderActionUnknown('PRIOR_ORDER_ACTION_UNKNOWN_QUERY_OR_REVIEW_REQUIRED')

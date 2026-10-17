@@ -29,6 +29,11 @@ class PaymentNotifications:
         now = self.center.now()
         verify_signed_body(headers, raw, reader._public, reader._kid, now)
         event = _json(raw)
+        if event.get('event_type') in ('REFUND.SUCCESS','REFUND.CLOSED','REFUND.ABNORMAL'):
+            actions=getattr(self.payments,'rule_actions',None)
+            if actions is None:raise PermissionError('ORIGINAL_REFUND_ACTIONS_REQUIRED')
+            from scripts.community_refund_notifications import RefundNotifications
+            return RefundNotifications(actions,self._api).receive(headers,raw)
         resource = event.get('resource')
         if type(resource) is not dict or resource.get('algorithm') != 'AEAD_AES_256_GCM':
             raise ValueError('INVALID_ENCRYPTED_RESOURCE')
