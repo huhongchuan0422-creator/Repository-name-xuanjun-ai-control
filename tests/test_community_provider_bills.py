@@ -44,8 +44,8 @@ class BillJourney(unittest.TestCase):
         r=self.call('bill_reconcile');self.assertEqual(r['status'],'EXCEPTION');self.assertFalse(r['funds_retry_authorized']);self.assertEqual(r['finance_status'],'UNCONFIRMED')
     def test_finance_bill_preview_shows_reconciliation_columns_but_never_private_ids(self):
         g,policy=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
-        raw=('商户订单号,微信订单号,交易状态,订单金额,特约商户号,币种,用户标识,银行卡号\\n'
-             'ref,123456789,SUCCESS,1.00,'+policy['sub_mchid']+',CNY,private-openid,private-card\\n').encode()
+        raw=('商户订单号,微信订单号,交易状态,订单金额,特约商户号,币种,用户标识,银行卡号\n'
+             'ref,123456789,SUCCESS,1.00,'+policy['sub_mchid']+',CNY,private-openid,private-card\n').encode()
         self.download(raw)
         self.call('bill_fetch')
         rows=self.call('bill_rows',offset=0)['records']
