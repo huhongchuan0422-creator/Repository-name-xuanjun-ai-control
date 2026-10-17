@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "status": "R2_PREPARATION_AND_CALLBACK_RESTART_PASS_NOT_PRODUCTION",
+  "code": {
+    "run": 39004046272,
+    "job": 117312742713,
+    "source_commit": "abd844683327d35b34b497af71023e8accc174b0",
+    "helper_sha256": "bb54946c5b2b068180af79bca0efca51ec68c132a05bd01acfb2fa21ea108da2",
+    "hosts": [
+      {
+        "host": "domestic",
+        "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+        "invocation_status": "Success",
+        "invoke_id": "t-sh070a4jun5nfnk",
+        "receipt": {
+          "attempt_nonce": "40b45819e84749fabeed2b44d486a778",
+          "business_api_requests": 0,
+          "database_opened": false,
+          "effective_live_bridge_auth_verified": false,
+          "hostname": "iZvt5t8tlrm8oiZ",
+          "patches": [
+            {
+              "after_sha256": "07e5b1ba8536ece13ebcd024d448fd99eb93159f7f3217d16b042f95434c2d6b",
+              "before_sha256": "83904b6994db02b2702563eaaace50399caaf968864bd7f0ea355b4350462150",
+              "changed_calls": 1,
+              "from_port": 19443,
+              "source": "ai_service/telegram_customer_service_canary.py",
+              "to_port": 18443
+            },
+            {
+              "after_sha256": "701c5026b08ef13e38d30cc8b6da26649968262e733f3631cae9d60d59f87c6e",
+              "before_sha256": "aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402",
+              "changed_calls": 1,
+              "from_port": 19443,
+              "source": "ai_service/wecom_customer_service.py",
+              "to_port": 18443
+            }
+          ],
+          "production_cutover": false,
+          "protected_state_unchanged": true,
+          "retry_allowed": false,
+          "runtime_materials_copied": false,
+          "service_actions": 0,
+          "services_installed": false,
+          "source_files": 124,
+          "source_provenance": "R1_EXACT_124_WITH_TWO_EXPLICIT_DOMESTIC_BRIDGE_PORT_ADAPTATIONS_NOT_FRESH_TOKYO",
+          "status": "DOMESTIC_R2_CODE_BRIDGE_PORT_ADAPTED_NOT_ACTIVE",
+          "uid": 0
+        },
+        "service_actions": 0,
+        "status": "PASS"
+      }
+    ]
+  },
+  "runtime": {
+    "run": 39004107195,
+    "job": 117312919573,
+    "source_commit": "4a25631b95bca43f61cdd76c5eee36497ad6a69b",
+    "helper_sha256": "5b3d73850c588bdb0cc95ee5616b351603350dc572dd9959960e06c23119e4b7",
+    "hosts": [
+      {
+        "host": "domestic",
+        "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+        "invocation_status": "Success",
+        "invoke_id": "t-sh070a4mwpu2oe8",
+        "receipt": {
+          "attempt_nonce": "5cebb42786584c7480515bba964b2ab6",
+          "business_api_requests": 0,
+          "bytes": 114962378,
+          "copy_hashes": "PASS",
+          "database_opened": false,
+          "effective_production_env_verified": false,
+          "files": 2906,
+          "final_cutover_snapshot": false,
+          "hostname": "iZvt5t8tlrm8oiZ",
+          "links": 4,
+          "production_cutover": false,
+          "protected_state_unchanged": true,
+          "retry_allowed": false,
+          "service_actions": 0,
+          "services_installed": false,
+          "source_files": 124,
+          "status": "R2_RUNTIME_CANDIDATE_COPIED_NOT_ACTIVE",
+          "uid": 0
+        },
+        "service_actions": 0,
+        "status": "PASS"
+      }
+    ]
+  },
+  "acceptance": {
+    "run": 39004155870,
+    "job": 117313065796,
+    "source_commit": "7f430ffc02be07a916f84ccb2fb5614c385defc4",
+    "helper_sha256": "55d1e59a1fa271eb134427cf3b4c4f1372316baba7e69d9b27a1ab0edef0af68",
+    "hosts": [
+      {
+        "host": "domestic",
+        "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+        "invocation_status": "Success",
+        "invoke_id": "t-sh070a4pjzs5dkw",
+        "receipt": {
+          "application_processes_stopped": true,
+          "attempt_nonce": "2d3d4b6b39094aae9aa098ff35fe86ef",
+          "business_api_requests": 0,
+          "callback_rejections_do_not_prove_signed_success_or_upstream_auth": true,
+          "final_cutover_snapshot": false,
+          "hostname": "iZvt5t8tlrm8oiZ",
+          "production_cutover": false,
+          "protected_state_unchanged": true,
+          "restart_health_pass": true,
+          "rounds": [
+            {
+              "all_processes_stopped": true,
+              "listeners_removed": true,
+              "roles": {
+                "contact": {
+                  "alive": true,
+                  "health": 200,
+                  "invalid_auth_status": 403
+                },
+                "customer_service": {
+                  "alive": true,
+                  "health": 200,
+                  "invalid_auth_status": 403
+                },
+                "portal": {
+                  "alive": true,
+                  "health": 200,
+                  "invalid_auth_status": null
+                }
+              },
+              "round": 1
+            },
+            {
+              "all_processes_stopped": true,
+              "listeners_removed": true,
+              "roles": {
+                "contact": {
+                  "alive": true,
+                  "health": 200,
+                  "invalid_auth_status": 403
+                },
+                "customer_service": {
+                  "alive": true,
+                  "health": 200,
+                  "invalid_auth_status": 403
+                },
+                "portal": {
+                  "alive": true,
+                  "health": 200,
+                  "invalid_auth_status": null
+                }
+              },
+              "round": 2
+            }
+          ],
+          "service_actions": 0,
+          "services_installed": false,
+          "status": "R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION",
+          "uid": 0
+        },
+        "service_actions": 0,
+        "status": "PASS"
+      }
+    ]
+  },
+  "transport_source_contract": {
+    "run": 39003973982,
+    "job": 117312529855,
+    "source_commit": "45eaab7a9cde42f700f0c9544dcb07aeb94fddf1",
+    "invoke_id": "t-sh070a4g47hdm2o",
+    "source_client_origin": "127.0.0.1:19443",
+    "domestic_bridge_observed": "127.0.0.1:18443",
+    "effective_live_bridge_auth_verified": false
+  },
+  "remaining_major_nodes": 6,
+  "production_services_installed": false,
+  "production_cutover": false,
+  "final_snapshot": false,
+  "background_migration_writer_running": false,
+  "tokyo_retirement": "HOLD",
+  "notes": [
+    "New r2, not a replay of consumed v4/r1 attempts",
+    "All own cloud workflows frozen after exact dispatch",
+    "124 staged sources, two explicit port changes; remaining122 byte-identical to r1",
+    "Copied invalid callbacks403 do not prove signed-success or live upstream authentication",
+    "Quarantine stopped-unit transaction is implemented and tested, not host-executed or independently admitted"
+  ]
+}
