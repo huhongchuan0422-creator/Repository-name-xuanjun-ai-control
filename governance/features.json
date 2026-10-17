@@ -183,7 +183,8 @@
         "demos/community-stage/communities.html",
         "demos/community-stage/communities.js",
         "scripts/community_commerce.py",
-        "scripts/community_payment_notifications.py"
+        "scripts/community_payment_notifications.py",
+        "scripts/community_customer_profile.py"
       ]
     },
     {

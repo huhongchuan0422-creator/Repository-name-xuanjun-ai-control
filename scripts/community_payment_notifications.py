@@ -71,5 +71,7 @@ class PaymentNotifications:
                     raise ValueError('PAYMENT_NOTIFICATION_EVENT_COLLISION')
             else:
                 self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_PAYMENT_CALLBACK',?,?,?,?,1)", (event_key, binding['user_id'], binding['project'], self.center.encrypt(canonical(value), 'community-payment-callback:' + event_key)))
+            from scripts.community_customer_profile import notify
+            notify(self.center,binding['project'],binding['user_id'],'PAYMENT_CONFIRMED',binding['reference'],'微信支付已确认；订单 '+binding['reference'])
             self.center.audit(binding['project'], binding['user_id'], 'COMMUNITY_PAYMENT_CALLBACK_CONFIRMED', event_key)
         return dict(accepted=True, finance_status='UNCONFIRMED')

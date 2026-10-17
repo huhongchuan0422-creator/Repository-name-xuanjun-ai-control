@@ -82,6 +82,9 @@ class CenterCommunities:
                 raise ValueError('COMMUNITY_VERSION_CONFLICT')
 
     def dispatch(self, session, csrf, body):
+        if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('profile_read','profile_update','referral_code','referral_bind','notices','notice_read'):
+            from scripts.community_customer_profile import CustomerProfile
+            return CustomerProfile(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
         fields = {'register': {'name', 'description', 'contact'},
                   'update': {'community_id', 'expected_version', 'name', 'description', 'contact'},
                   'submit': {'community_id', 'expected_version'},
@@ -156,6 +159,9 @@ class CenterCommunities:
                         else:
                             result.update(name=text(p['name'], 120), description=text(p['description'], 2000, False), contact=text(p['contact'], 200))
                     self.write(g, result, record)
+                    if op=='review':
+                        from scripts.community_customer_profile import notify
+                        notify(c,g['project'],record['owner'],'COMMUNITY_REVIEW',record['id']+':'+str(result['version']),result['state']+'：'+result['opinion'])
                 elif op in ('join', 'leave'):
                     if p['kind'] not in ('CUSTOMER', 'MERCHANT') or g['role'] != {'CUSTOMER': 'CUSTOMER', 'MERCHANT': 'MERCHANT_ADMIN'}[p['kind']]:
                         raise PermissionError('COMMUNITY_RELATION_ROLE_DENIED')

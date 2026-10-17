@@ -39,7 +39,7 @@ def main():
     age = (now - dt.datetime.fromisoformat(last_at.replace('Z', '+00:00'))).total_seconds() if last_at else None
     runs = api('/actions/runs?branch=' + quote(BRANCH, safe='') + '&per_page=30')['workflow_runs']
     current_runs = [{'id': r['id'], 'name': r['name'], 'status': r['status'], 'conclusion': r['conclusion'],
-                     'url': r['html_url']} for r in runs if r['head_sha'] == head['sha']]
+                     'url': r['html_url']} for r in runs if latest is not None and r['head_sha'] == latest['sha']]
     tasks = ledger['tasks']
     phases = {str(p): {'completed': sum(t['phase'] == p and t['state'] == 'IMPLEMENTED' for t in tasks),
                        'remaining': sum(t['phase'] == p and t['state'] != 'IMPLEMENTED' for t in tasks)} for p in (1, 2)}
@@ -47,7 +47,7 @@ def main():
         'current_module': ledger['current_module'], 'phases': phases,
         'last_code_sha': latest['sha'] if latest else None, 'last_code_at': last_at,
         'status': 'UNKNOWN' if age is None else '无提交进展' if age >= 1200 else '最近20分钟有代码提交',
-        'ci': current_runs, 'blockers': ledger['blockers'],
+        'ci': current_runs, 'ci_status': 'NOT_RUN_OR_NOT_FOUND' if not current_runs else 'SEE_RUN_RESULTS', 'blockers': ledger['blockers'],
         'counts_basis': 'Explicit scope ledger, implementation claims only; not independent acceptance.',
         'schedule_note': 'GitHub scheduled runs may be delayed; check checked_at.'}
     (ROOT / 'status.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')

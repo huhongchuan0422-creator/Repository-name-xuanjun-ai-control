@@ -172,7 +172,18 @@ class Commerce:
                     raise PermissionError('LEGACY_ORDER_CANNOT_BE_CLAIMED')
                 ownership = dict(scope=identity, reference=reference, amount_minor=total)
                 c.db.execute("INSERT INTO links VALUES('COMMUNITY_ORDER',?,?,?,?,1)", (ownership_key, uid, project, c.encrypt(canonical(ownership), 'community-order:' + ownership_key)))
-                record = dict(reference=reference, user_id=uid, lines=resolved, amount_minor=total,
+                community_key=hashlib.sha256(canonical([identity['tenant_id'],'CUSTOMER:'+uid])).hexdigest()
+                relation=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_RELATION_V1' AND subject_idx=? AND project=? AND user_id=? AND active=1",(community_key,project,uid)).fetchone()
+                community_id=None
+                if relation is not None:
+                    joined=json.loads(c.decrypt(relation[0],'community-relation:'+community_key))
+                    directory_key=hashlib.sha256(canonical([identity['tenant_id'],joined['community_id']])).hexdigest()
+                    directory=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_DIRECTORY_V1' AND subject_idx=? AND project=? AND active=1",(directory_key,project)).fetchone()
+                    if directory is not None and json.loads(c.decrypt(directory[0],'community-directory:'+directory_key))['state']=='APPROVED':community_id=joined['community_id']
+                profile_key=c.idx('community-profile:'+project+':'+uid)
+                referrer=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_CUSTOMER_REFERRER' AND subject_idx=? AND project=? AND user_id=? AND active=1",(profile_key,project,uid)).fetchone()
+                referrer_id=json.loads(c.decrypt(referrer[0],'COMMUNITY_CUSTOMER_REFERRER:'+profile_key))['referrer_user_id'] if referrer else None
+                record = dict(reference=reference, user_id=uid, scope=dict(identity), community_id=community_id,referrer_user_id=referrer_id, lines=resolved, amount_minor=total,
                     currency='CNY', request_hash=request_hash, stock_reserved=True, created_at=now)
                 self._save(identity, project, uid, 'ORDER', reference, record)
                 c.audit(project, uid, 'COMMUNITY_BASKET_RESERVED', request_hash)
