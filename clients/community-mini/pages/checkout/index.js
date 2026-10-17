@@ -2,7 +2,7 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:""},
+  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectCustomerId:"",projectChecklist:[],projectFeedback:"",projectState:""},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
@@ -33,6 +33,23 @@ Page({
   onUnload() {if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
+  inputProject(e) {this.setData({projectFeedback:e.detail.value});},
+  async projectAction(e) {
+    if(this.data.pending||!this.session)return;
+    const op=e.currentTarget.dataset.operation;
+    if(!['project_summary','project_checklist','project_feedback'].includes(op))return;
+    this.setData({pending:true});
+    try {
+      const params=op==='project_feedback'?{message:this.data.projectFeedback}:{};
+      const r=await this.session.commerce(this.scene,op,params);
+      if(op==='project_summary')this.setData({projectTitle:r.title,projectRole:r.role,
+        projectCustomerId:r.customer_id,projectState:r.checklist_overall});
+      else if(op==='project_checklist')this.setData({projectChecklist:r.items.map(item=>({
+        id:item.id,state:item.state,required:item.required}))});
+      else this.setData({projectFeedback:'',status:'项目反馈已归档，尚未确认人工回复：'+r.id});
+    } catch(error) {this.setData({status:error.message});}
+    finally {this.setData({pending:false});}
+  },
   async profileAction(e) {
     if(this.data.pending||!this.session)return;this.setData({pending:true});
     try{const op=e.currentTarget.dataset.operation;let params={};
