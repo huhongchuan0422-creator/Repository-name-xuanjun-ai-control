@@ -210,6 +210,7 @@ class ProviderActions:
         if saved['kind']=='REFUND':
             amount=data.get('amount')
             if (data.get('out_refund_no')!=saved['provider_reference'] or data.get('out_trade_no')!=payload['out_trade_no']
+                    or data.get('transaction_id')!=saved['transaction_id']
                     or type(amount) is not dict or type(amount.get('total')) is not int or type(amount.get('refund')) is not int
                     or amount.get('total')!=payload['amount']['total'] or amount.get('refund')!=payload['amount']['refund']
                     or amount.get('currency')!='CNY' or data.get('status') not in ('SUCCESS','CLOSED','PROCESSING','ABNORMAL')):
@@ -235,7 +236,7 @@ class ProviderActions:
             persisted=self._load(key)
             if persisted is None or persisted['request_hash']!=saved['request_hash']:raise PermissionError('PROVIDER_INTENT_CHANGED')
             previous=persisted.get('result')
-            if previous and previous['status'] in ('SUCCESS','CLOSED','FINISHED') and previous['status']!=result['status']:raise ProviderActionUnknown('TERMINAL_PROVIDER_RESULT_CONFLICT')
+            if previous and previous['status'] in ('SUCCESS','CLOSED','FINISHED') and previous!=result:raise ProviderActionUnknown('TERMINAL_PROVIDER_RESULT_CONFLICT')
             persisted['result']=result;persisted['response_sha256']=digest;persisted['observed_at']=self.center.now();self._save(key,persisted)
             if terminal:
                 row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_LOCK' AND subject_idx=? AND active=1",(lock,)).fetchone()
