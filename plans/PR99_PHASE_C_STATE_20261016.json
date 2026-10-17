@@ -1413,7 +1413,10 @@
         "ci_run": 39004183744,
         "ci_job": 117313146649,
         "tests_passed": 9,
-        "independent_host_admission": false
+        "independent_host_admission": false,
+        "review_request_comment_id": 6229861598,
+        "review_request_read_back": true,
+        "review_decision": "PENDING_NOT_SELF_APPROVED"
       },
       "receipt": "evidence/pr99-service-handoff/s09-install-candidate/R2_EXECUTION_RECEIPT_20261017.json",
       "services_installed": false,
