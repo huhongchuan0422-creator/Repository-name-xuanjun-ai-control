@@ -38,6 +38,7 @@ def parse(raw):
     try:header=[v.removeprefix('`').strip() for v in next(rows)]
     except StopIteration:raise ValueError('EMPTY_PROVIDER_BILL')
     if len(set(header))!=len(header) or not 2<=len(header)<=100:raise ValueError('INVALID_BILL_COLUMNS')
+    if any(not v or any(ord(ch)<32 for ch in v) for v in header):raise ValueError('INVALID_BILL_COLUMN_NAME')
     records=[];summary=False
     for row in rows:
         if not row or not any(row):continue
