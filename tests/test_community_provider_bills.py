@@ -120,6 +120,10 @@ class BillJourney(unittest.TestCase):
         self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'UNSUPPORTED_BILL_CURRENCY')
         bill['rows']=[dict(zip(columns,values),币种='')]
         self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'UNSUPPORTED_BILL_CURRENCY')
+        bill['columns'].append('货币种类')
+        bill['rows']=[dict(zip(columns,values),币种='CNY',货币种类='USD')]
+        self.assertEqual(self.bills.reconcile(g,bill)['exceptions'][0]['reason'],'UNSUPPORTED_BILL_CURRENCY')
+        bill['columns'].remove('货币种类')
         bill['columns'].remove('币种')
 
         bill['rows']=[dict(zip(columns,values[:3]+['',values[4]]))]
