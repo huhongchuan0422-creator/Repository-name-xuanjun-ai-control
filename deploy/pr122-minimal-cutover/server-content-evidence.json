@@ -1,0 +1,99 @@
+{
+  "comparison": {
+    "added": [],
+    "changed": [
+      "assets/tiktok-integration.js"
+    ],
+    "missing": [],
+    "unchanged": 1186
+  },
+  "domestic": {
+    "errors": [],
+    "host": "iZvt5t8tlrm8oiZ",
+    "packages": [],
+    "production_mutation": false,
+    "search_exit": 1,
+    "search_permission_denied_count": 252,
+    "sites": [
+      {
+        "path": "/var/www/wenwenwenyiyiyi.work",
+        "resolved": "/var/www/wenwenwenyiyiyi.work",
+        "status": "NO_INDEX"
+      },
+      {
+        "path": "/var/www/wenwenwenyiyiyi.work/current/public",
+        "resolved": "/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage/public",
+        "selected": {
+          "assets/tiktok-integration.js": "6fa38b952b70862e5a835ae79e4eedfe4b3d0323a8d819bbfb7ef81bddd8aa67",
+          "index.html": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+          "yunhui.css": "cda5092ff09a5708ed10f26b990c5e6616327dd066ec2af0536e587bd263dd8b",
+          "yunhui.js": "c025c482e7bc910faf20b37b164e342ff038b38b812fc8a7a809094049f66c4f"
+        },
+        "status": "READ_COMPLETE",
+        "web_bytes": 11090700,
+        "web_files": 1187,
+        "web_manifest_sha256": "acfe561ef7ddabc775f6c2ba4c6d8d9559690c2f1ca4d7f551ea1621d5384df7"
+      }
+    ],
+    "uid": 1002
+  },
+  "domestic_job_id": 116543507998,
+  "full_per_file_manifest_location": "GitHub Actions original job logs",
+  "run_id": 38770145783,
+  "tokyo": {
+    "errors": [],
+    "host": "iZ6wee8q9z4t03hvqumwfhZ",
+    "packages": [
+      {
+        "mtime_epoch": 1791891221.550306,
+        "path": "/tmp/website-public-copy-review.patch",
+        "sha256": "bd3bacc7dc95761c981ed12e6df04483be125e831694735316e6a54ace63b7af",
+        "size": 59677
+      },
+      {
+        "mtime_epoch": 1791891652.6990707,
+        "path": "/tmp/xuanjun-website-copy-update-20261013 (1).tar.gz",
+        "sha256": "733751a5505add8b42d1dcde697865f01f7e3e004f62e6cbebbd1d72c9c8a2cc",
+        "size": 70201
+      },
+      {
+        "mtime_epoch": 1791891698.164733,
+        "path": "/tmp/xuanjun-website-copy-update-20261013.tar.gz",
+        "sha256": "733751a5505add8b42d1dcde697865f01f7e3e004f62e6cbebbd1d72c9c8a2cc",
+        "size": 70201
+      },
+      {
+        "mtime_epoch": 1791893168.6104794,
+        "path": "/tmp/xuanjun-website-language-guard-20261013.tar.gz",
+        "sha256": "b4ec4abf57e95c6bf460632f798471d717078c89e6be5102526c70bd47a2212f",
+        "size": 238359
+      }
+    ],
+    "production_mutation": false,
+    "search_exit": 1,
+    "search_permission_denied_count": 269,
+    "sites": [
+      {
+        "path": "/var/www/wenwenwenyiyiyi.work",
+        "resolved": "/var/www/wenwenwenyiyiyi.work",
+        "selected": {
+          "assets/tiktok-integration.js": "01f08d5021d6b232f7f67f775c5cecd430e8a2713551cf8cea24277954ba4c0d",
+          "index.html": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+          "yunhui.css": "cda5092ff09a5708ed10f26b990c5e6616327dd066ec2af0536e587bd263dd8b",
+          "yunhui.js": "c025c482e7bc910faf20b37b164e342ff038b38b812fc8a7a809094049f66c4f"
+        },
+        "status": "READ_COMPLETE",
+        "web_bytes": 11090003,
+        "web_files": 1187,
+        "web_manifest_sha256": "d253e48e46497b4ca1d388106c19bed934e6c51b6bd2429dbede612977612f09"
+      },
+      {
+        "path": "/var/www/wenwenwenyiyiyi.work/current/public",
+        "resolved": "/var/www/wenwenwenyiyiyi.work/current/public",
+        "status": "ABSENT_OR_NOT_ACCESSIBLE"
+      }
+    ],
+    "uid": 1001
+  },
+  "tokyo_job_id": 116543508444
+}

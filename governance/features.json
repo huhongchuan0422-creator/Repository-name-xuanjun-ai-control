@@ -50,7 +50,14 @@
           "tests/test_stage5_saas_offer_catalog.py",
           "tests/test_stage5_saas_order_preparation.py",
           "tests/test_stage5_saas_offline_handoff.py",
-          "tests/test_stage5_audit_regressions.py"
+          "tests/test_stage5_audit_regressions.py",
+          "tests/test_stage5_saas_phase2.py",
+          "tests/test_stage5_saas_phase2_http.py",
+          "tests/test_stage5_saas_phase2_package.py",
+          "tests/test_stage5_saas_phase2_recovery.py",
+          "tests/test_stage5_saas_phase2_browser.py",
+          "tests/test_stage5_visual_feedback_identity.py",
+          "tests/test_stage5_saas_phase2_backup_path.py"
         ]
       },
       "reuse": [
@@ -79,7 +86,210 @@
         "scripts/community_saas_offline_handoff.py",
         "tests/test_stage5_saas_offline_handoff.py",
         "scripts/community_saas_schema_guard.py",
-        "tests/test_stage5_audit_regressions.py"
+        "tests/test_stage5_audit_regressions.py",
+        "scripts/community_saas_phase2.py",
+        "tests/test_stage5_saas_phase2.py",
+        "demos/community-local-e2e/saas-panel.html",
+        "demos/community-local-e2e/saas-panel.mjs",
+        "demos/community-local-e2e/saas-panel.test.mjs",
+        "scripts/community_saas_phase2_http.py",
+        "tests/test_stage5_saas_phase2_http.py",
+        "scripts/community_saas_phase2_package.py",
+        "tests/test_stage5_saas_phase2_package.py",
+        "scripts/community_saas_phase2_recovery.py",
+        "tests/test_stage5_saas_phase2_recovery.py",
+        "tests/test_stage5_saas_phase2_browser.py",
+        "scripts/community_visual_feedback_identity.py",
+        "tests/test_stage5_visual_feedback_identity.py",
+        "demos/visual/community-payment/index.html",
+        "plans/COMMUNITY_VISUAL_OMNICHANNEL_ASSET_AND_DEPLOYMENT_20261015.md",
+        "tests/test_stage5_saas_phase2_backup_path.py"
+      ]
+    },
+    {
+      "feature_id": "PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/PR122_DOMESTIC_WEBSITE_OFFLINE_CANDIDATE_20261015.md",
+        "section": "2",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "TikTok network and parse failures never render a connected state",
+          "delta bundle remains bound to the immutable 1187-file source archive",
+          "prepare activate check rollback and unknown states fail closed",
+          "Domestic apex candidate preserves the existing winctl boundary",
+          "generated CSP hashes preserve inline language layout and interaction in real Chromium",
+          "OAuth-only source candidate excludes trading/database imports and preserves synthetic session, callback, failure and replay tests; no production acceptance is implied",
+          "Existing domestic Runner inventory is non-root and does not disclose sudo policy or secret values",
+          "R1-R3: process-safe one-time OAuth state, atomic credential/session commits, verified token/account generation activation; actual process races, write faults and SIGKILL/SIGTERM restart tests remain synthetic and require independent review",
+          "Minimal cutover derives all75 Tokyo locations, preserves62 static aliases and11 existing HTTPS backend routes; verified upstream TLS, no sensitive retry, no secret-bearing logs, and real Nginx synthetic integration are required; production remains independently gated",
+          "Legacy Portal log-message exact-byte correction and persistent fixed-action root adapter preserve original source, backup and one-shot rollback; isolated tests do not imply production installation or DNS release",
+          "R4 temporary containment candidate disables HTTP disconnect before store/body/audit business state access for every caller; full authenticated disconnect remains NOT_IMPLEMENTED and migration scope acceptance requires independent decision",
+          "R4 controlled-install preparation reuses exact root engine and approved guard; fixed one-shot action, source/new-PID gates, proposed empty403 acceptance and explicit backend-offline rollback require independent plan approval; synthetic root filesystem tests are not production acceptance",
+          "I1: exact independently received action approval must be separately pinned by Owner root; canonical GitHub commit/tree/code/ZIP facts plus one-attempt durable consumption and distinct outage-consented offline rollback fail closed before state or service mutation; shared GitHub author is not reviewer independence",
+          "后台迁移仅合成验证离线generation、私有有界读取/固定Portal停止检查与显式私有身份校验接口；待机仅health GET及disconnect403，其余拒绝且无业务写；57项测试不是root授权、真实托管传输或生产迁移验收",
+          "Fixed five-source AST inventory requires exact public-code SHA before catalogue, never executes production modules or publishes source literals; unknown identity/permissions never imply absent writer or release authorization"
+        ],
+        "tests": [
+          "tests/test_pr122_website_release.py",
+          "tests/test_pr122_tiktok_integration.mjs",
+          "tests/test_pr122_csp_browser.py",
+          "tests/test_pr122_oauth_candidate.py",
+          "tests/test_legacy_portal_logging_regression.py",
+          "tests/test_portal_log_capability.py",
+          "tests/test_legacy_disconnect_guard.py",
+          "tests/test_r4_controlled_install.py",
+          "tests/test_r4_install_approval.py",
+          "tests/test_pr122_backend_custody.py",
+          "tests/test_pr122_backend_private_adapters.py",
+          "tests/test_pr122_backend_source_inventory.py"
+        ]
+      },
+      "reuse": [
+        "PR122 immutable Tokyo source archive and manifest",
+        "existing Domestic root-managed /var/www and Certbot patterns",
+        "existing PR99 transaction and unknown-state safety principles"
+      ],
+      "paths": [
+        "scripts/pr122_build_website_candidate.py",
+        "scripts/pr122_website_release.py",
+        "tests/test_pr122_website_release.py",
+        "tests/test_pr122_tiktok_integration.mjs",
+        "tests/test_pr122_csp_browser.py",
+        "scripts/pr122_domestic_channel_inventory.py",
+        "scripts/pr122_build_oauth_candidate.py",
+        "tests/test_pr122_oauth_candidate.py",
+        "deploy/pr122-oauth-candidate/**",
+        "deploy/pr122-minimal-cutover/**",
+        "scripts/pr122_legacy_portal_log_fix.py",
+        "tests/test_legacy_portal_logging_regression.py",
+        "tests/test_portal_log_capability.py",
+        "deploy/pr122-portal-log-fix/**",
+        "deploy/pr122-portal-log-capability/**",
+        "scripts/pr122_legacy_disconnect_guard.py",
+        "tests/test_legacy_disconnect_guard.py",
+        "deploy/pr122-r4-disconnect-containment/**",
+        "deploy/pr122-r4-controlled-install/**",
+        "tests/test_r4_controlled_install.py",
+        "tests/test_r4_install_approval.py",
+        "deploy/pr122-backend-migration/**",
+        "tests/test_pr122_backend_custody.py",
+        "tests/test_pr122_backend_private_adapters.py",
+        "tests/test_pr122_backend_source_inventory.py"
+      ]
+    },
+    {
+      "feature_id": "ECOSYSTEM_SERVICE_PACKAGE_WEB3_RECORDS",
+      "status": "PLANNED",
+      "design": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "7.7"
+      },
+      "development": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "12.10",
+        "phase": 2
+      },
+      "acceptance": {
+        "criteria": [
+          "2000万ECV总量与分池守恒；普通来源每份500元一次性金额，购包赠ECV不附带金额；使用不再赠、用完不恢复",
+          "服务包10元起多份购买、按批准SKU叠加；购包一次赠送，使用/核销不再赠送",
+          "交易/推荐/权益全量事件签名账本、outbox、批次锚定及独立包含证明，敏感原文不上公开链",
+          "真实专项测试、支付/链回执及费用/隐私/生产验收未完成前不得宣称上线"
+        ],
+        "tests": [
+          "tests/test_stage5_saas_phase2.py",
+          "tests/test_stage5_visual_feedback_identity.py"
+        ],
+        "test_scope": "Existing shared order/identity baseline only; dedicated service-package/ECV/Web3 tests must be added before implementation acceptance; NOT_IMPLEMENTED"
+      },
+      "reuse": [
+        "Finance/Billing and versioned Offer/PriceBook",
+        "Referral and tenant/customer/project Identity",
+        "Contribution/Provenance/Credential and append-only audit"
+      ],
+      "paths": []
+    },
+    {
+      "feature_id": "BUSINESS_ONBOARDING",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "18.5"
+      },
+      "development": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "18.2",
+        "phase": 5,
+        "node": "5.2"
+      },
+      "acceptance": {
+        "criteria": [
+          "离线草稿保存、必填校验、提交、补正重提、拒绝及批准状态迁移",
+          "租户范围读取、角色限制及版本冲突拒绝；非法和终止状态转换拒绝",
+          "事件摘要哈希链关联；完整商家/审核员可视化及真实准入按18.5独立验收，MERCHANT_ONBOARDING_VISUAL_GATE保持HOLD"
+        ],
+        "tests": [
+          "tests/test_stage5_onboarding_offline.py"
+        ],
+        "test_scope": "Offline SQLite state-machine regression only; caller-supplied tenant/actor/role is not authenticated identity. Six tests do not establish concurrent multi-connection atomicity, restart recovery, attachment security, browser E2E or production approval. MERCHANT_ONBOARDING_VISUAL_GATE=HOLD."
+      },
+      "reuse": [
+        "既有BUSINESS_ONBOARDING与APPROVAL_WORKFLOW模块及18.2节点5.2，不新建任务队列",
+        "SQLite及标准库hashlib；后续接入既有服务端Identity/tenant和统一审计"
+      ],
+      "paths": [
+        "scripts/community_onboarding_offline.py",
+        "tests/test_stage5_onboarding_offline.py"
+      ]
+    },
+    {
+      "feature_id": "LEGAL_CONTRACT_CENTER",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/LEGAL_CONTRACT_CENTER_20261015.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/LEGAL_CONTRACT_CENTER_20261015.md",
+        "section": "2",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "22份版本化草案及五项社区协议完整、来源/角色/页面映射准确，草案不签署不付款",
+          "模板哈希、确定性转义预览、安全失败与阅读链接验证通过",
+          "正式主体/费率/渠道/隐私字段补齐、法律审核、真实签约证据及生产门禁独立验收",
+          "自有在线订约离线准入覆盖权限、版本、地区审核及双方意愿；不冒充真实身份或法律有效性"
+        ],
+        "tests": [
+          "tests/test_legal_contract_center.py",
+          "tests/test_online_contract_candidate.py",
+          "tests/test_contract_anchor_batch.py",
+          "tests/test_contract_anchor_cost.py"
+        ],
+        "test_scope": "仅离线合同草案和静态阅读入口；不证明签约集成、支付准入或生产法律合规"
+      },
+      "reuse": [
+        "复用BUSINESS_ONBOARDING、Approval、Finance/PriceBook、退款补偿及统一身份/审计",
+        "复用原PR122页面，不改RG1源包或发布器，不新建CRM或支付平台"
+      ],
+      "paths": [
+        "scripts/build_legal_previews.py",
+        "tests/test_legal_contract_center.py",
+        "docs/legal/**",
+        "demos/legal/**",
+        "scripts/online_contract_candidate.py",
+        "tests/test_online_contract_candidate.py",
+        "scripts/contract_anchor_batch.py",
+        "tests/test_contract_anchor_batch.py",
+        "tests/test_contract_anchor_cost.py"
       ]
     }
   ]

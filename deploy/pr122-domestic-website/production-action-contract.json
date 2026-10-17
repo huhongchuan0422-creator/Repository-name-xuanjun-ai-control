@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "execution_state": "NOT_AUTHORIZED",
+  "atomic_scope": ["content_pointer", "domestic_nginx_apex_files", "tokyo_acme_forward_location", "apex_tls_lineage", "apex_renew_units"],
+  "protected_objects": ["existing winctl server block", "existing winctl certificate", "certbot-openclaw-ip-renew.timer", "all non-apex services"],
+  "exact_candidate_targets": [
+    {"source": "bin/pr122_website_release.py", "host": "Domestic", "target": "/usr/local/libexec/pr122_website_release.py", "action": "install root-owned 0755 only after exact Release Gate"},
+    {"source": "generated release-metadata/inline-csp.conf", "host": "Domestic", "target": "/var/www/wenwenwenyiyiyi.work/current/release-metadata/inline-csp.conf", "action": "receipt-bound generated include consumed by the HTTPS server block"},
+    {"source": "nginx/tokyo-apex-acme-forward.locations.conf", "host": "Tokyo", "target": "/etc/nginx/pr122-xuanjun-apex/tokyo-apex-acme-forward.locations.conf", "action": "separate include only"},
+    {"source": "nginx/pr122-dynamic-hold.locations.conf", "host": "Domestic", "target": "/etc/nginx/pr122-xuanjun-apex/pr122-dynamic-hold.locations.conf", "action": "fail-closed dynamic-route include"},
+    {"source": "nginx/xuanjun-apex-http-bootstrap.conf", "host": "Domestic", "target": "/etc/nginx/conf.d/xuanjun-apex-http-bootstrap.conf", "action": "new exact apex server block"},
+    {"source": "nginx/xuanjun-apex-http-redirect.conf", "host": "Domestic", "target": "/etc/nginx/conf.d/xuanjun-apex-http-bootstrap.conf", "action": "replace bootstrap at same path only after certificate proof and backup"},
+    {"source": "nginx/xuanjun-apex-https.conf", "host": "Domestic", "target": "/etc/nginx/conf.d/xuanjun-apex-https.conf", "action": "new exact apex server block"},
+    {"source": "systemd/xuanjun-apex-cert-renew.service", "host": "Domestic", "target": "/etc/systemd/system/xuanjun-apex-cert-renew.service", "action": "new unit only"},
+    {"source": "systemd/xuanjun-apex-cert-renew.timer", "host": "Domestic", "target": "/etc/systemd/system/xuanjun-apex-cert-renew.timer", "action": "new unit only"}
+  ],
+  "acme_contract": {
+    "challenge": "HTTP-01 forwarded by Tokyo only for /.well-known/acme-challenge/",
+    "domestic_binary": "/usr/local/bin/certbot",
+    "proven_version": "5.8.0",
+    "account_and_certificate_state": "/etc/letsencrypt",
+    "work_state": "/var/lib/letsencrypt",
+    "logs": "/var/log/letsencrypt",
+    "secret_rule": "No account secret or credential is stored in this package.",
+    "uninstall": "Disable/remove only the two new apex unit names after an exact backup; preserve certbot-openclaw-ip-renew.timer and all winctl lineage.",
+    "renewal_rollback": "Restore the exact backed-up apex unit/file state, daemon-reload, nginx -t, and reload only under the same Gate."
+  },
+  "preconditions": ["independent exact-package review", "cutover-gate ACCEPTED", "Tokyo and Domestic root Release Gates", "nginx -T conflict proof", "certificate SAN and renewal dry-run proof"],
+  "backup_before_write": ["/usr/local/libexec/pr122_website_release.py", "/etc/nginx exact target files and included dynamic-hold/CSP association", "/etc/systemd/system exact apex units", "/etc/letsencrypt apex lineage metadata", "current content pointer and transaction receipts"],
+  "rollback_order": ["restore content pointer", "restore Domestic apex nginx files", "restore apex renewal units", "restore Tokyo ACME location", "nginx -t then separately authorized reload"],
+  "unknown_rule": "Stop, preserve receipts and all objects; never delete or retry an object whose transaction ownership is not proven."
+}

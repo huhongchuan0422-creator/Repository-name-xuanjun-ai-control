@@ -219,4 +219,13 @@ class BatchBusinessGuards(PrepareOrderTests):
  def test_28_unapproved_auto_renewal_false(self):
     self.confirmed()
     self.assertFalse(renewal_intent(self.orders,"ordA","tenantA",100,200)["automatic_renewal_authorized"])
+ def test_29_renewal_rejects_unsafe_timestamp_without_grant(self):
+    self.confirmed()
+    with self.assertRaisesRegex(ValueError,"INVALID_ENTITLEMENT_START"):
+        renewal_intent(self.orders,"ordA","tenantA",9007199254740992)
+    self.assertFalse(entitled(self.quotes,"tenantA","storefront_catalog",25))
+ def test_30_renewal_rejects_term_time_overflow(self):
+    self.confirmed()
+    with self.assertRaisesRegex(ValueError,"TERM_OR_LICENSE_REVIEW_REQUIRED"):
+        renewal_intent(self.orders,"ordA","tenantA",9007199254740990)
 if __name__=="__main__":unittest.main()

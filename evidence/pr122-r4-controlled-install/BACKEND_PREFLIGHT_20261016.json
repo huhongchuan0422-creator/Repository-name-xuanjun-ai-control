@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "commit": "84ed1a9b890e38d646739f6f1066adbed5b53d3a",
+  "run_id": 38841122656,
+  "jobs": [
+    {
+      "id": 116781192005,
+      "name": "backend-migration-preflight (domestic, xuanjun-domestic-ops)",
+      "conclusion": "success"
+    },
+    {
+      "id": 116781192331,
+      "name": "backend-migration-preflight (tokyo, xuanjun-tokyo-readonly)",
+      "conclusion": "success"
+    }
+  ],
+  "tokyo": {
+    "command_exit": {
+      "domestic-model-rpc-tunnel.service": 0,
+      "korea-novel-model-rpc-tunnel.service": 0,
+      "listeners": 0,
+      "provider-neutral-tokyo-tunnel.service": 0,
+      "provider-neutral-tunnel.service": 0,
+      "secure-secrets-portal.service": 0,
+      "services": 0,
+      "xuanjun-wecom-customer-contact.service": 0,
+      "xuanjun-wecom-customer-service.service": 0,
+      "xuanjun-wecom-novel-ingress.service": 0
+    },
+    "cpu_count": 4,
+    "delivery_commit": "84ed1a9b890e38d646739f6f1066adbed5b53d3a",
+    "disk_free_bytes": 28786864128,
+    "file_contents_read": false,
+    "host": "iZ6wee8q9z4t03hvqumwfhZ",
+    "http_requests": 0,
+    "limitations": [
+      "Counts are metadata, not consistent snapshots or account/credential inventory",
+      "Permission denied means unknown, never empty; no state/secret/DB/config contents read",
+      "No service start/stop, migration, provider calls, bridge change or authority transfer"
+    ],
+    "listeners": [
+      "127.0.0.1:18761",
+      "127.0.0.1:18781",
+      "127.0.0.1:18780",
+      "127.0.0.1:18770",
+      "127.0.0.1:19443",
+      "127.0.0.1:18080"
+    ],
+    "observed_epoch": 1792118071,
+    "paths": [
+      {
+        "enumeration": "PERMISSION_DENIED",
+        "exists": true,
+        "gid": 1000,
+        "is_directory": true,
+        "is_symlink": false,
+        "mode": "0o700",
+        "path": "/opt/trading-system/runtime/secure-secrets-portal",
+        "uid": 1000
+      },
+      {
+        "path": "/opt/trading-system/runtime/secure-secrets-portal/sessions",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "path": "/opt/trading-system/runtime/secure-secrets-portal/tiktok-oauth-state",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "path": "/opt/trading-system/runtime/secure-secrets-portal/douyin-oauth-state",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "path": "/opt/trading-system/runtime/secure-secrets-portal/tiktok-token-state",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "path": "/opt/trading-system/runtime/secure-secrets-portal/douyin-token-state",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "path": "/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "path": "/opt/trading-system/runtime/v8-domestic-operations/telegram-customer-service-canary",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      }
+    ],
+    "production_writes": 0,
+    "python_version": [
+      3,
+      11,
+      6
+    ],
+    "root_calls": 0,
+    "schema_version": 1,
+    "services": [
+      {
+        "ActiveState": "active",
+        "FragmentPath": "/etc/systemd/system/domestic-model-rpc-tunnel.service",
+        "Id": "domestic-model-rpc-tunnel.service",
+        "MainPID": "1823162",
+        "SubState": "running",
+        "User": "admin",
+        "WorkingDirectory": "/home/admin"
+      },
+      {
+        "ActiveState": "active",
+        "FragmentPath": "/etc/systemd/system/korea-novel-model-rpc-tunnel.service",
+        "Id": "korea-novel-model-rpc-tunnel.service",
+        "MainPID": "2071744",
+        "SubState": "running",
+        "User": "admin",
+        "WorkingDirectory": ""
+      },
+      {
+        "ActiveState": "active",
+        "FragmentPath": "/etc/systemd/system/provider-neutral-tokyo-tunnel.service",
+        "Id": "provider-neutral-tokyo-tunnel.service",
+        "MainPID": "1622804",
+        "SubState": "running",
+        "User": "admin",
+        "WorkingDirectory": "/home/admin"
+      },
+      {
+        "ActiveState": "inactive",
+        "FragmentPath": "",
+        "Id": "provider-neutral-tunnel.service",
+        "MainPID": "0",
+        "SubState": "dead",
+        "User": "",
+        "WorkingDirectory": ""
+      },
+      {
+        "ActiveState": "active",
+        "FragmentPath": "/etc/systemd/system/secure-secrets-portal.service",
+        "Id": "secure-secrets-portal.service",
+        "MainPID": "3082952",
+        "SubState": "running",
+        "User": "admin",
+        "WorkingDirectory": "/opt/trading-system"
+      },
+      {
+        "ActiveState": "active",
+        "FragmentPath": "/etc/systemd/system/xuanjun-wecom-customer-contact.service",
+        "Id": "xuanjun-wecom-customer-contact.service",
+        "MainPID": "1903204",
+        "SubState": "running",
+        "User": "admin",
+        "WorkingDirectory": "/opt/trading-system"
+      },
+      {
+        "ActiveState": "active",
+        "FragmentPath": "/etc/systemd/system/xuanjun-wecom-customer-service.service",
+        "Id": "xuanjun-wecom-customer-service.service",
+        "MainPID": "1875349",
+        "SubState": "running",
+        "User": "admin",
+        "WorkingDirectory": "/opt/trading-system"
+      },
+      {
+        "ActiveState": "active",
+        "FragmentPath": "/etc/systemd/system/xuanjun-wecom-novel-ingress.service",
+        "Id": "xuanjun-wecom-novel-ingress.service",
+        "MainPID": "1775967",
+        "SubState": "running",
+        "User": "admin",
+        "WorkingDirectory": "/opt/trading-system"
+      }
+    ],
+    "side": "tokyo",
+    "status": "NONROOT_BACKEND_METADATA_COLLECTED",
+    "uid": 1001
+  },
+  "domestic": {
+    "command_exit": {
+      "listeners": 0,
+      "provider-neutral-domestic-bridge.service": 0,
+      "services": 0
+    },
+    "cpu_count": 2,
+    "delivery_commit": "84ed1a9b890e38d646739f6f1066adbed5b53d3a",
+    "disk_free_bytes": 14405496832,
+    "file_contents_read": false,
+    "host": "iZvt5t8tlrm8oiZ",
+    "http_requests": 0,
+    "limitations": [
+      "Counts are metadata, not consistent snapshots or account/credential inventory",
+      "Permission denied means unknown, never empty; no state/secret/DB/config contents read",
+      "No service start/stop, migration, provider calls, bridge change or authority transfer"
+    ],
+    "listeners": [
+      "127.0.0.1:18443"
+    ],
+    "observed_epoch": 1792118071,
+    "paths": [
+      {
+        "path": "/home/openclaw_ops/v8-domestic-operations",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "path": "/home/openclaw_ops/v8-domestic-operations/runtime",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "path": "/home/openclaw_ops/v8-domestic-operations/runtime/internal-bridge",
+        "visibility": "PERMISSION_DENIED_NOT_ABSENT"
+      },
+      {
+        "exists": false,
+        "path": "/opt/trading-system/runtime/secure-secrets-portal"
+      },
+      {
+        "exists": false,
+        "path": "/var/lib/xuanjun-operations-portal"
+      }
+    ],
+    "production_writes": 0,
+    "python_version": [
+      3,
+      11,
+      6
+    ],
+    "root_calls": 0,
+    "schema_version": 1,
+    "services": [
+      {
+        "ActiveState": "active",
+        "FragmentPath": "/etc/systemd/system/provider-neutral-domestic-bridge.service",
+        "Id": "provider-neutral-domestic-bridge.service",
+        "MainPID": "188767",
+        "SubState": "running",
+        "User": "openclaw_ops",
+        "WorkingDirectory": "/home/openclaw_ops/v8-domestic-operations/runtime/internal-bridge"
+      }
+    ],
+    "side": "domestic",
+    "status": "NONROOT_BACKEND_METADATA_COLLECTED",
+    "uid": 1002
+  },
+  "inferences": {
+    "python": "Both3.11.6 compatible with approved candidate",
+    "target_port": "18880 not observed occupied in bounded ss snapshot",
+    "legacy_state": "Protected state contents/cardinality remain UNKNOWN because Runner PermissionDenied",
+    "production_data_moved": false,
+    "existing_fixed_root_helper": "Already-consumed Tokyo logfix only; cannot read/copy protected state or install successor",
+    "pr99_r2": "Pending independent review #6182995760 at632bbe6f"
+  }
+}

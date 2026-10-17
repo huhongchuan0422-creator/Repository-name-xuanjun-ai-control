@@ -53,7 +53,7 @@ def prepare(db,quote_db,order_id,tenant_id,quote_id,currency,now):
     if not breakdown or any(group.get(key) is None for group in breakdown.values()):
         raise ValueError("UNKNOWN_QUOTE_AMOUNT")
     totals={cycle:group[key] for cycle,group in breakdown.items()}
-    if any(type(v) is not int or v<0 for v in totals.values()):
+    if any(type(v) is not int or not 0<=v<=9007199254740991 for v in totals.values()):
         raise ValueError("INVALID_QUOTE_AMOUNT")
     if not q.get("offer_governed") or not q.get("approval_ref") or not q.get("cost_evidence_ref"):
         raise ValueError("OFFER_APPROVAL_REQUIRED")
@@ -237,7 +237,7 @@ def entitlement_intent(db,order_id,tenant_id,start_at):
     The legacy module grant requires module_prices.price_version and a trusted
     payment callback: offer_version must never be silently treated as one.
     """
-    if type(start_at) is not int or start_at<0:
+    if type(start_at) is not int or not 0<=start_at<=9007199254740991:
         raise ValueError("INVALID_ENTITLEMENT_START")
     view=status(db,order_id,tenant_id)
     if view["state"]!="CONFIRMED_EXTERNAL":
@@ -246,7 +246,7 @@ def entitlement_intent(db,order_id,tenant_id,start_at):
     order=read(db,order_id,tenant_id)
     q=order["quote_snapshot"]
     term=q.get("term_days")
-    if type(term) is not int or term<1:
+    if type(term) is not int or term<1 or term>36500 or start_at+term*86400>9007199254740991:
         raise ValueError("TERM_OR_LICENSE_REVIEW_REQUIRED")
     return {"tenant_id":tenant_id,"order_id":order_id,
             "module_id":order["module_id"],"offer_id":order["offer_id"],

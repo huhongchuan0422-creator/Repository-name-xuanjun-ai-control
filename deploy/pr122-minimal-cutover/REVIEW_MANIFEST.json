@@ -1,0 +1,23 @@
+{
+  "files": {
+    "README.md": "840e1f37bde6e0ff59d1409b6b5d60f358cedeeb72ab01736245f4a2ff2f0008",
+    "RELEASE_SEQUENCE.md": "11a6622dba1548eb09be892a09ca8aa1fa618cc7d23c84fa666e1adb8cbfb425",
+    "apex-https.conf": "e50dc3123a827de331cb81236d15420b05c50cd7283b932ca6e64bb7c4a5ac25",
+    "apex.locations.conf": "42e9af3573135e6b8ef08905d1a5628051fb5fd2df014be8f8ce914aa353ccd1",
+    "domestic-apex-http-bootstrap.conf": "2785edc26a0292a6e68e240f40bdda717caa5697314146070f84fe3eac19d727",
+    "domestic-apex-http-final.conf": "e36fcc4f0d34f088c2030b915421442086fed4e7dfa19758107fd780e4902071",
+    "domestic-ca-acme-evidence.json": "b94f269b610e000a81fdb5eb3df054f5cb1473ae9ea5a92e62c3a319c61e787b",
+    "http-support.conf": "ec79d13b7b4e3586088cdff794f7538a9ff13fc8aa0a9018f913f7b39bbc1a1e",
+    "route-responsibility.json": "5681761a88f8663915331cb325dd327c3638c52d4b8ae89618ef0d91733bcdf3",
+    "server-content-evidence.json": "8a925228b76a68ec835fe32189b16062b734a318de259e19d7a06800d04c14bb",
+    "static-security.conf": "a54d27fe31c70ac644ed0cffbbec16cdeb6687fcc881e403c2fef27ff67d67ea",
+    "tokyo-apex-http-acme.conf": "190f7180599e238c7e12eda144340f23cb76a30c0b98398bd474e4abe0d27383",
+    "tokyo-nginx-source-inventory.json": "6ede1f5dbdb45e3f2107dd3951d06ee1feccf9388f5fe7fca3dbcbb99921fe2c",
+    "tokyo-proxy-settings.conf": "307930ba9ea726a34a7c0365d8a7446cd2967c8331682e0b9a52ac60e3936201"
+  },
+  "inherits_oauth_exact_commit": "d584cd60b31bf09ee45f27a73ad227bcd0e1110f",
+  "inherits_static_rg1": true,
+  "production_approved": false,
+  "schema_version": 1,
+  "status": "REVIEW_CANDIDATE_NO_INSTALLER"
+}

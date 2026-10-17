@@ -1,0 +1,470 @@
+{
+  "schema_version": 1,
+  "origin": "ACTUAL_TOKYO_NONROOT_RUNNER_LOG",
+  "run": 38871973602,
+  "job": 116877943391,
+  "receipt": {
+    "credentials_read": false,
+    "database_opened": false,
+    "delivery_commit": "5830a6e6f69744132fb74b341abb9929ae1632d6",
+    "evidence_scope": "SOURCE_DECLARATIONS_ONLY_NOT_ACTUAL_DB_SCHEMA",
+    "files": [
+      {
+        "ast_parse": "PASS",
+        "path": "database/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/commercial_schema.py",
+        "sha256": "0adc3d11bff08375e7811a72abf370867e04d60c4d23912fda1b474efabaf2e0"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/connection.py",
+        "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/create_database.py",
+        "sha256": "32bc366d2498de197c3f11f9279e5a7432c911aa0900179aa031dab73ac0bb4a"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/init_db.py",
+        "sha256": "1bef9e02cbf0c916d2dfd093721f3c37639ca58dd485c5b01a4eb2e4622633c2"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/__init__.py",
+        "sha256": "c746aeb61cde0be2d9c88855b3b9b95263ee0ff84a13528173ff0d0f09939ee8"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/account_anomaly_events.py",
+        "sha256": "1f2bf80ec12669e9c16e109d17c3ef8dbcd758418813c9cfa0fe55d48f27c54d"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/audit_events.py",
+        "sha256": "760a3a754b1950fdfff825c1e12f5a5d90bdfa408a5ee2607fd8a754bc2db979"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/base.py",
+        "sha256": "ba865de6a0f2545bebef4aab753823a6b32f9390db728a2d07b3341436ff8871"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/credential_records.py",
+        "sha256": "dd065152c3a6471f3be9f52536e2cd93e6dc1c716585f177b7f3b02bb38a7d06"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/crm_customer_mappings.py",
+        "sha256": "fe5c277e51e96b85d8ca31b4fa3cf70b67e8bb8c904408f901a72ee302683f3e"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/customer_operations_v8.py",
+        "sha256": "6f7f513ab88dce9292fcdf8e15cca5676fbf14978baca4b3fa034392a5f8fc75"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/exchange_readiness_v5.py",
+        "sha256": "ad6a3d296a3c0a40efa25812a978ef7807ec117e44bb680f95e087a6fb2423ce"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/execution_requests.py",
+        "sha256": "d317539a2a104e32e1781e3157d1ad1e0bb4e8ff38e6164dd1727c1069110116"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/health_checks.py",
+        "sha256": "401bc04ccea46f71389a7b5b8ddacd19e9bd68d919d8d234af344d877b30082c"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/idempotency_records.py",
+        "sha256": "c8edf8a28d7dd812450ae7699076fdc9d94759fc3f00c48c268697410509d8b5"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/market_data.py",
+        "sha256": "d94600e2cecf5a647a8c31b119dc12e4eb57bb75491f495d2a9fd2bca0395b8d"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/operations_v7.py",
+        "sha256": "06bfafccb8e31416e019f2dbd55357c3b54284f287c917ec9ac5146da510a7df"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/orders.py",
+        "sha256": "7a8b79d5d6e881ad3de964263511d650b5178dc75b36fb82610215187031c1f2"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/outbound_events.py",
+        "sha256": "6bd324ccf33057238c45704d425618c6ba3129975cf17aecab5268fd6d1c0001"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/positions.py",
+        "sha256": "7be8ab06cd4a1ebc1aa77b1c7014f686a84db86f151ce42adf2fb6c2a3a1bb04"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/recovery_items.py",
+        "sha256": "3823441407ca1b27b237c9d8fb77f546c0872f9d21ae1b6bb9f01b6bc5de1244"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/referral_partner.py",
+        "sha256": "eae4102528895161aab531609273f1ead2ecc085e8e69245824fb64c2c1f7be5"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/risk_events.py",
+        "sha256": "5fda854896eabee426e9d7a0ec36aac9fcd104af574dba6601c4ae4eb26fd23a"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/signals.py",
+        "sha256": "9635affb609c992abae29bdf9ed7f97bc570ed5cd9999aab3b4345ff279a13ce"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/trading_execution_v4.py",
+        "sha256": "c5de63dfdfdbe0f9c2cc9a5c557c6e51518dc30d237443ab1c7fc8dd8c6298ed"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/trading_integration_snapshots.py",
+        "sha256": "215a5685cddebce16df604bdcfb9471fbc254053d6ac0c24ea485f915a601bda"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/verification_results.py",
+        "sha256": "2c0ac138615f230517e3ba9f2de0325220178cf115fe793c4460e448cf777b19"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/models/windows_interaction.py",
+        "sha256": "c4ab0ee6c6404ff3ffb93498d894960854f265fdb9d2435261fd0f29d809b2c6"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/__init__.py",
+        "sha256": "ff177d3370bc01c574f1f12085e9c3d86d9931a2e0227b975eb0be1088d98c31"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/anomaly_repository.py",
+        "sha256": "cf2299fa7d83d11a6fa3026436761b34bc359cb8f64bf680e056a0bb7d2edd83"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/audit_repository.py",
+        "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/credential_repository.py",
+        "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/crm_mapping_repository.py",
+        "sha256": "03c36b817602d86905ca29d7af73d516257cf16692da4863ca13789074f69fdc"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/customer_repository.py",
+        "sha256": "7968dc4b5b4455f90c61f6515469eaf7aabd44cdf5b2f4400e1b1d725f91878b"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/exchange_readiness_repository.py",
+        "sha256": "4f2b28bcbbdd24aa24ea6eafc8b1790f554e63de372923b9663e746af9225df5"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/execution_request_repository.py",
+        "sha256": "57124ba963bb262653afca94e377f0a65848f9596a6fa9b12b18dd362554b3bd"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/execution_request_uow.py",
+        "sha256": "fc2f84164b0e24f6349e6bd287ad0ff8cd3ff05af558e68cb1517660768b2a93"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/health_repository.py",
+        "sha256": "ba243632b3501c9f1e9451de8b28db4fc3fbe258f7cd4ce5f6898af45cd232e2"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/idempotency_repository.py",
+        "sha256": "ec918b4986ba060494cea5fc90aa73ef4198b9174596eccae45970e2954225fe"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/json_utils.py",
+        "sha256": "196f01fb53f289c446c6de4e9196a2264356e4a246e2ffe8a4fadb4b67d308ab"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/operations_repository.py",
+        "sha256": "66cfaba926edb788ff08482103dafa51fb50578d9fa336ce87473b8aaedde700"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/outbound_repository.py",
+        "sha256": "7fadc03f35ba3e40f0fb131797597c168001c693db5addee9bc5b42446df6d6e"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/recovery_repository.py",
+        "sha256": "a2ce3679568dbc07d4676c20cd4190f59cbee6130911a8755c4892f6ce615b24"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/referral_partner_repository.py",
+        "sha256": "7445f12792a4bed3ad88bf13f58430dae4e71e037c9a4d77f1cb040b0a3cc510"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/time.py",
+        "sha256": "447a1a91d7cf28bc475640f13354f7182a282506c4a8a9d817c40f4ef3c575ce"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/trading_execution_repository.py",
+        "sha256": "ffb13d6db3ae54d1f765cf6920161cc6f081be15e16d51ee72d4e722f4cbc21d"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/trading_integration_repository.py",
+        "sha256": "a50594a6c417ab5699a7a0a6549e294c1b15f33d5b99a1e5e6b7c0f1f78ee311"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/verification_repository.py",
+        "sha256": "73554cbc705db251e17c678410398bfed5d5619722432cfcf75ffd6f6bbb5b0e"
+      },
+      {
+        "ast_parse": "PASS",
+        "path": "database/repositories/windows_interaction_repository.py",
+        "sha256": "e45051fd6beadd89ece247e6229ea2eb64df9fbaafa4f91e61f1e43f577c0df9"
+      }
+    ],
+    "host": "iZ6wee8q9z4t03hvqumwfhZ",
+    "probe_sha256": "e3be932bcafc3ddcc089c20207e3d51b21c6c4752d9b405d20acb758d16d2572",
+    "production_imports": false,
+    "required_contracts": {
+      "account_anomaly_events": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "anomaly_type",
+          "event_id",
+          "id",
+          "new_positions_locked",
+          "state"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "account_capabilities": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "environment",
+          "id",
+          "position_mode",
+          "status",
+          "verified_time"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "account_snapshots": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "created_time",
+          "id",
+          "payload_json",
+          "snapshot_id"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "algo_order_snapshots": {
+        "contract": "UNRESOLVED_NOT_LIVE_SCHEMA_PROOF",
+        "required_columns_observed": [],
+        "source_declarations": 0,
+        "unresolved_columns": [
+          "account_id",
+          "algo_id",
+          "created_time",
+          "id",
+          "payload_json",
+          "snapshot_id",
+          "status",
+          "symbol"
+        ]
+      },
+      "audit_events": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "entity_id",
+          "entity_type",
+          "event_id",
+          "id"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "execution_attempts": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "attempt_id",
+          "error_type",
+          "http_method",
+          "id",
+          "status"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "execution_requests": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "id",
+          "intent",
+          "request_id",
+          "status"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "health_checks": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "check_id",
+          "component",
+          "id",
+          "status"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "kill_switch_state": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "enabled",
+          "id",
+          "reason",
+          "switch_name"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "order_snapshots": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "created_time",
+          "id",
+          "order_id",
+          "payload_json",
+          "snapshot_id",
+          "status",
+          "symbol"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "position_snapshots": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "created_time",
+          "id",
+          "payload_json",
+          "quantity",
+          "side",
+          "snapshot_id",
+          "symbol"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "protective_order_snapshots": {
+        "contract": "UNRESOLVED_NOT_LIVE_SCHEMA_PROOF",
+        "required_columns_observed": [],
+        "source_declarations": 0,
+        "unresolved_columns": [
+          "account_id",
+          "algo_id",
+          "created_time",
+          "id",
+          "payload_json",
+          "snapshot_id",
+          "status",
+          "symbol"
+        ]
+      },
+      "recovery_items": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "action",
+          "id",
+          "recovery_id",
+          "state"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "sync_runs": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "id",
+          "status",
+          "symbol",
+          "sync_run_id"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      },
+      "trade_snapshots": {
+        "contract": "SOURCE_COMPATIBLE_DECLARATION",
+        "required_columns_observed": [
+          "account_id",
+          "created_time",
+          "id",
+          "order_id",
+          "payload_json",
+          "snapshot_id",
+          "symbol",
+          "trade_id"
+        ],
+        "source_declarations": 1,
+        "unresolved_columns": []
+      }
+    },
+    "uid": 1001
+  },
+  "limits": [
+    "No production imports, credentials or live DB opened",
+    "Unresolved source declarations are not proof of missing live tables",
+    "Cannot replace missing algo/protective state with empty tables or ordinary orders"
+  ]
+}

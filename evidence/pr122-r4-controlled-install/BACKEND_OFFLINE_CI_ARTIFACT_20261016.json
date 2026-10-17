@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "scope": "S04_S05_S06_OFFLINE_CONVERSION_INCREMENT_NOT_FULL_MIGRATION",
+  "source_commit": "dbcca8877905879046dc4ecea1089ebcc360cdb7",
+  "run_id": 38842201027,
+  "job_id": 116784611308,
+  "original_log_verified": {
+    "checkout": true,
+    "ran_tests": 36,
+    "ok": true,
+    "skipped": 0
+  },
+  "ci_receipt": {
+    "archive_bytes": 49117,
+    "archive_sha256": "5693e1a06802d19098c77b7f46a9ccaabc158852b97482c342674501a2f6c14f",
+    "bound_files": 15,
+    "commit": "dbcca8877905879046dc4ecea1089ebcc360cdb7",
+    "host": "iZvt5t8tlrm8oiZ",
+    "production_changes": 0,
+    "real_state_read": false,
+    "schema_version": 1,
+    "skipped": 0,
+    "status": "OFFLINE_CONVERSION_TESTS_PASS_NOT_PRODUCTION_MIGRATION",
+    "tests": 36,
+    "uid": 1002,
+    "unchanged_approved_modules": 7
+  },
+  "artifact": {
+    "id": 12021334458,
+    "zip_sha256": "69e505c030a8168d26bbf2afc231960db2c79ba81b3b32fdfdbd00944d0c8f84",
+    "tar_sha256": "5693e1a06802d19098c77b7f46a9ccaabc158852b97482c342674501a2f6c14f",
+    "archive_entries": 16,
+    "bound_files": 15,
+    "actual_bytes_downloaded_and_verified_by_developer": true,
+    "independent_review": "NOT_REQUESTED_YET_FULL_EXECUTION_SCOPE_INCOMPLETE"
+  },
+  "preflight": {
+    "commit": "84ed1a9b890e38d646739f6f1066adbed5b53d3a",
+    "run_id": 38841122656,
+    "tokyo_job": 116781192331,
+    "domestic_job": 116781192005
+  },
+  "production_migration": {
+    "real_data_read": false,
+    "data_moved": false,
+    "source_writer_fenced": false,
+    "production_installed": false,
+    "services_restarted": false,
+    "website_changed": false,
+    "dns_changed": false,
+    "bridge_changed": false
+  },
+  "remaining": {
+    "private_legacy_reader": "NOT_IMPLEMENTED_OR_ADMITTED",
+    "host_to_host_protected_transfer": "NOT_CONNECTED_OR_IMPLEMENTED",
+    "exact_account_verification_adapter": "NOT_IMPLEMENTED; callback interface only, default rejects",
+    "root_install_activation": "NOT_IMPLEMENTED_OR_APPROVED",
+    "mixed_sessions_non_oauth_successors": "INCOMPLETE",
+    "telegram_wecom": "NOT_MIGRATED",
+    "model_executor": "TOKYO_DEPENDENCY_REMAINS",
+    "pr99": "R2 independent rereview pending #6182995760; no PR99 production action"
+  },
+  "authority": {
+    "owner_long_term_consent": "VALID_REUSED",
+    "existing_fixed_root_helper": "Previously consumed exact logfix only; not general data/installation capability",
+    "nonroot_directory_visibility": "PermissionDenied; cannot claim state empty"
+  },
+  "no_partial_production_approval_request": true,
+  "all_ci_status_metadata": [
+    {
+      "id": 38842205527,
+      "name": "Three native development entry receipt",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842205509,
+      "name": "Control Plane Validation",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842205421,
+      "name": "Feature Compliance Gate",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842205499,
+      "name": "Legal Contract Drafts Candidate",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842205416,
+      "name": "Stage5 Local Stack E2E",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842205470,
+      "name": "PR122 Domestic Website Offline Candidate",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842205422,
+      "name": "Stage5 Current Main Source Gate",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842205434,
+      "name": "Stage5 Full Local Integration Gate",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842203223,
+      "name": "Reviewed native probe execution",
+      "status": "completed",
+      "conclusion": "skipped",
+      "event": "pull_request_target",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842201027,
+      "name": "V2.7 Four Server Read-Only Batch",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "push",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    },
+    {
+      "id": 38842201049,
+      "name": "PR122 Domestic Website Offline Candidate",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "push",
+      "head_sha": "dbcca8877905879046dc4ecea1089ebcc360cdb7"
+    }
+  ]
+}

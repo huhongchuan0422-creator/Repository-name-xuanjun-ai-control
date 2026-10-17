@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "source_commit": "bf9373ab6ba2d02dbb7cb5e421cc74632d2cc794",
+  "source_tree": "53f089df4e6def0803fbf40467c223ea334609b9",
+  "review_request_comment": 6208118622,
+  "pr99_original_approval": 6207630392,
+  "original_approval_reused_for_new_action": false,
+  "root_netns_evidence": {
+    "source": "OWNER_TERMINAL",
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "kernel": "5.10.134-19.8.al8.x86_64",
+    "systemd": "239 (239-82.0.4.5.al8.5)",
+    "exit": 0,
+    "distinct_namespace": true,
+    "interfaces": [
+      "lo"
+    ],
+    "started_service_confinement": "NOT_EXERCISED"
+  },
+  "ci": {
+    "run": 38850683705,
+    "job": 116810987462,
+    "exact_checkout": true,
+    "tests_passed": 167,
+    "new_tests": 26,
+    "host_job": 116810988506,
+    "host_job_status": "SKIPPED"
+  },
+  "artifact": {
+    "id": 12025121935,
+    "zip_bytes": 58286,
+    "zip_sha256": "23a781efbe2a53a62acec5f786407f20b5b10f617388f17a4d976dee3e84c731",
+    "tar_bytes": 57787,
+    "tar_sha256": "4c351cdd87a4997c91d311b0345e6dd78192886f4aa657932d549c51af1f016b",
+    "binding_pass": 7,
+    "members": 8,
+    "local_exact_reproduction": true
+  },
+  "repair_approval": "NOT_ISSUED",
+  "root_anchor": "NOT_REGISTERED",
+  "repair_execution": "NOT_EXECUTED",
+  "phase_b_security_acceptance": "HOLD_PENDING_APPROVED_REPAIR",
+  "phase_c": "NOT_AUTHORIZED",
+  "production_migration": "HOLD",
+  "tokyo_retirement": "HOLD",
+  "website_changed": false,
+  "dns_changed": false
+}

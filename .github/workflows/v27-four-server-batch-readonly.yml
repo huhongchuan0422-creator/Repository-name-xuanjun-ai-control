@@ -1,6 +1,10 @@
 name: V2.7 Four Server Read-Only Batch
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/stage5-next25-integration-20261015]
+    paths:
+      - '.github/workflows/v27-four-server-batch-readonly.yml'
 permissions:
   contents: read
 concurrency:
@@ -8,26 +12,627 @@ concurrency:
   cancel-in-progress: false
 jobs:
   uk:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-uk-dev]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh uk
   tokyo:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
-    timeout-minutes: 6
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
       - run: bash scripts/v27-batch-readonly.sh tokyo
+        if: github.event_name == 'workflow_dispatch'
+      - name: PR122 bounded public Nginx source inventory (no sudo or key reads)
+        if: github.event_name == 'push'
+        env:
+          XJ_PR122_SOURCE: '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'
+        run: |
+          python3 -B - <<'PYCODE'
+          import base64,gzip,hashlib,json,os,subprocess,sys
+          from pathlib import Path
+          data=gzip.decompress(base64.b64decode(os.environ['XJ_PR122_SOURCE'],validate=True))
+          assert len(data)<50000 and hashlib.sha256(data).hexdigest()=='605b225f280bbbffcce6c041ed7483d9acd598ca4905f874fae2e3dc1a272bf5'
+          env=dict(os.environ);env.pop('XJ_PR122_SOURCE',None);env['XJ_PR122_NGINX_READONLY']='1'
+          result=subprocess.run([sys.executable,'-B','-c',data.decode()],env=env,capture_output=True,text=True,timeout=25)
+          try: report=json.loads(result.stdout)
+          except Exception: report={'status':'INVENTORY_HOLD','reason':'NO_VALID_JSON_RECEIPT','production_mutation':False}
+          report['delivery_commit']=os.environ['GITHUB_SHA']
+          report['inventory_source_sha256']='605b225f280bbbffcce6c041ed7483d9acd598ca4905f874fae2e3dc1a272bf5'
+          out=Path(os.environ['RUNNER_TEMP'])/'pr122-tokyo-nginx-inventory.json'
+          fd=os.open(out,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+          with os.fdopen(fd,'w') as handle:json.dump(report,handle,indent=2,sort_keys=True)
+          print(json.dumps(report,indent=2,sort_keys=True))
+          raise SystemExit(result.returncode)
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event_name == 'push'
+        with:
+          name: pr122-tokyo-nginx-${{ github.sha }}
+          path: ${{ runner.temp }}/pr122-tokyo-nginx-inventory.json
+          if-no-files-found: error
+          retention-days: 14
   korea:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'PR99_PHASE_C_NONROOT_METADATA_ONCE_20261016')
     runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
       - run: bash scripts/v27-batch-readonly.sh korea
+        if: github.event_name == 'workflow_dispatch'
+      - name: PR99 Phase-C nonroot version and candidate metadata only
+        if: github.event_name == 'push'
+        env:
+          XJ_PHASE_C_METADATA_SOURCE: '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'
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY_PHASE_C_METADATA'
+          import base64,gzip,hashlib,os
+          data=gzip.decompress(base64.b64decode(os.environ['XJ_PHASE_C_METADATA_SOURCE'],validate=True))
+          assert len(data)<12000 and hashlib.sha256(data).hexdigest()=='f027131c4c0a7f25a7c85b8d46c20f43ed182bb0ca32adef232ed48526632576'
+          exec(compile(data.decode(),'phase_c_host_metadata.py','exec'),{'__name__':'__main__'})
+          PY_PHASE_C_METADATA
   domestic:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh domestic
+
+
+  r4-postinstall-evidence:
+    if: github.event_name == 'push' && github.sha == '2f644ece195b6001d3dc67cfe135b2b7ee48ea18'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            runner: xuanjun-tokyo-readonly
+          - side: domestic
+            runner: xuanjun-domestic-ops
+    runs-on: [self-hosted, Linux, X64, '${{ matrix.runner }}']
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Read existing public receipt, source, service and Work protection only
+        env:
+          XJ_R4_SIDE: ${{ matrix.side }}
+        run: |
+          python3 -I -B - <<'PY'
+          import hashlib,json,os,stat,subprocess
+          from pathlib import Path
+          
+          side=os.environ["XJ_R4_SIDE"]
+          hosts={"tokyo":"iZ6wee8q9z4t03hvqumwfhZ","domestic":"iZvt5t8tlrm8oiZ"}
+          assert os.geteuid()!=0 and os.uname().nodename==hosts[side],"NONROOT_APPROVED_HOST_REQUIRED"
+          old="d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0"
+          new="57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1"
+          home="4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20"
+          def read_regular(path,limit,uid=None,mode=None):
+              fd=os.open(str(path),os.O_RDONLY|os.O_NOFOLLOW)
+              with os.fdopen(fd,"rb") as handle:
+                  info=os.fstat(handle.fileno())
+                  assert stat.S_ISREG(info.st_mode) and info.st_nlink==1,"REGULAR_SINGLE_LINK_REQUIRED"
+                  if uid is not None:assert info.st_uid==uid,"FILE_OWNER_CHANGED"
+                  if mode is not None:assert stat.S_IMODE(info.st_mode)==mode,"FILE_MODE_CHANGED"
+                  data=handle.read(limit+1);assert len(data)<=limit,"BOUNDED_READ_REQUIRED"
+              return data,{"uid":info.st_uid,"gid":info.st_gid,"mode":oct(stat.S_IMODE(info.st_mode)),"size":info.st_size,"sha256":hashlib.sha256(data).hexdigest()}
+          report={"schema_version":1,"status":"READONLY_EVIDENCE_PENDING","side":side,
+              "host":os.uname().nodename,"uid":os.geteuid(),"delivery_commit":os.environ["GITHUB_SHA"],
+              "approved_install_candidate":"b4b8ed3fa7dc9435e4959da11dfc335b04385100",
+              "install_action_approval":6206046505,"collector_used_root":False,
+              "collector_post_requests":0,"collector_http_requests":0,"collector_service_actions":0,
+              "collector_production_writes":False,"dns_change":False}
+          if side=="tokyo":
+              data,identity=read_regular(Path("/var/lib/xuanjun-pr122-r4-containment-receipt.json"),65536,0,0o644)
+              receipt=json.loads(data)
+              assert receipt["status"]=="LIVE_R4_CONTAINMENT_PASS" and receipt["host"]==hosts[side]
+              assert receipt["source_sha256"]==old and receipt["candidate_sha256"]==new
+              assert receipt["apply_started"] is True and receipt["offline_rollback_started"] is False
+              assert receipt["dns_change"] is False and receipt["website_files_changed"] is False and receipt["error"] is None
+              assert receipt["tiktok_http_disconnect"]=="TEMPORARILY_DISABLED" and receipt["authenticated_disconnect"]=="NOT_IMPLEMENTED"
+              expected=[(a,m,s,None) for a in ("47.245.53.152","47.101.152.210") for m,s in (("GET",200),("HEAD",501))]
+              expected += [(a,"POST",403,v) for a in ("47.245.53.152","47.101.152.210") for v in ("empty","synthetic_untrusted_headers")]
+              actual=[(c["address"],c["method"],c["status"],c.get("variant")) for c in receipt["checks"]]
+              assert actual==expected,"ROOT_RECEIPT_CHECKS_CHANGED"
+              assert all(c["synthetic_empty_request"] is True and c["tls_verified"] is True for c in receipt["checks"] if c["method"]=="POST")
+              assert receipt["service_before"]["MainPID"]=="3075458" and receipt["service_after"]["MainPID"]=="3082952"
+              run=subprocess.run(["systemctl","show","secure-secrets-portal.service","-p","MainPID","-p","User","-p","ActiveState","-p","SubState","-p","WorkingDirectory"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,check=True,timeout=10)
+              service=dict(x.split("=",1) for x in run.stdout.splitlines() if "=" in x)
+              assert service==receipt["service_after"],"CURRENT_SERVICE_DIFFERS_FROM_ROOT_RECEIPT"
+              source_data,source_info=read_regular(Path("/opt/trading-system/scripts/secure_secrets_portal_server.py"),200000,1000,0o755)
+              assert source_info["sha256"]==new,"CURRENT_SOURCE_CHANGED"
+              assert service["ActiveState"]=="active" and service["SubState"]=="running" and service["User"]=="admin" and service["WorkingDirectory"]=="/opt/trading-system"
+              report.update(public_root_receipt=receipt,public_receipt_identity=identity,current_source=source_info,current_service=service,
+                  private_root_anchor_backup_consumption="NOT_READ_BY_NONROOT_COLLECTOR")
+              homepage=Path("/var/www/wenwenwenyiyiyi.work/index.html")
+          else:
+              current=Path("/var/www/wenwenwenyiyiyi.work/current")
+              expected="/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage"
+              assert current.is_symlink() and os.readlink(str(current))==expected,"DOMESTIC_CURRENT_CHANGED"
+              report["domestic_current"]=expected
+              homepage=current/"public/index.html"
+          unused,identity=read_regular(homepage,2000000)
+          assert identity["sha256"]==home,"WORK_HOMEPAGE_CHANGED"
+          report["homepage"]=identity
+          report["status"]="NONROOT_POSTINSTALL_EVIDENCE_PASS"
+          print("PR122_R4_POSTINSTALL_RECEIPT="+json.dumps(report,sort_keys=True))
+          PY
+
+  dns-postsave-observation:
+    if: github.event_name == 'push' && github.sha == 'fe9e1320bd9a9602b061b1e7c0e8dce5aaac95cc'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            runner: xuanjun-tokyo-readonly
+          - side: domestic
+            runner: xuanjun-domestic-ops
+    runs-on: [self-hosted, Linux, X64, '${{ matrix.runner }}']
+    timeout-minutes: 3
+    steps:
+      - name: Observe Owner-saved apex DNS and unchanged Work homepage without writes
+        env:
+          XJ_DNS_SIDE: ${{ matrix.side }}
+        run: |
+          python3 -I -B - <<'PY'
+          import hashlib, http.client, json, os, shutil, socket, ssl, subprocess, time
+          from pathlib import Path
+          
+          side = os.environ['XJ_DNS_SIDE']
+          hosts = {'tokyo': 'iZ6wee8q9z4t03hvqumwfhZ', 'domestic': 'iZvt5t8tlrm8oiZ'}
+          assert os.geteuid() != 0 and os.uname().nodename == hosts[side]
+          domain = 'wenwenwenyiyiyi.work'
+          expected = '4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20'
+          report = {'schema_version': 1, 'side': side, 'host': os.uname().nodename,
+                    'uid': os.geteuid(), 'observed_epoch': int(time.time()),
+                    'delivery_commit': os.environ['GITHUB_SHA'],
+                    'owner_reported_dns_saved': True, 'dns_release_approval': 'NOT_ESTABLISHED',
+                    'production_writes': 0, 'post_requests': 0, 'service_actions': 0,
+                    'root_used': False, 'dns_changes_by_collector': 0}
+          report['resolvers'] = {}
+          for label, family in [('A', socket.AF_INET), ('AAAA', socket.AF_INET6)]:
+              try:
+                  report['resolvers'][label] = sorted(set(x[4][0] for x in socket.getaddrinfo(domain, 443, family, socket.SOCK_STREAM)))
+              except socket.gaierror as error:
+                  report['resolvers'][label] = {'error': error.errno}
+          report['authoritative'] = []
+          dig = shutil.which('dig')
+          if dig:
+              for server in ('celine.ns.cloudflare.com', 'chris.ns.cloudflare.com'):
+                  for kind in ('A', 'AAAA'):
+                      try:
+                          r = subprocess.run([dig, '+time=3', '+tries=1', '@'+server, domain, kind,
+                                              '+noall', '+answer', '+authority', '+comments'],
+                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                             universal_newlines=True, timeout=7)
+                          report['authoritative'].append({'server': server, 'type': kind,
+                              'exit': r.returncode, 'public_dns_reply': r.stdout[:5000]})
+                      except Exception as error:
+                          report['authoritative'].append({'server': server, 'type': kind, 'error': type(error).__name__})
+          else:
+              report['authoritative_note'] = 'DIG_NOT_AVAILABLE; resolver answer is not a management-plane snapshot'
+          
+          def get_https(address, path, check_home=False):
+              result = {'address': address, 'method': 'GET', 'path': path}
+              try:
+                  with socket.create_connection((address, 443), timeout=10) as raw:
+                      with ssl.create_default_context().wrap_socket(raw, server_hostname=domain) as tls:
+                          result['peer'] = tls.getpeername()[0]
+                          result['tls_verified'] = True
+                          c = http.client.HTTPConnection(domain, timeout=10)
+                          c.sock = tls
+                          c.request('GET', path, headers={'Host': domain, 'Connection': 'close'})
+                          r = c.getresponse()
+                          body = r.read(2000001)
+                          result.update(status=r.status, bytes=len(body),
+                                        csp_present=bool(r.getheader('Content-Security-Policy')))
+                          if check_home:
+                              result['sha256'] = hashlib.sha256(body).hexdigest()
+                              result['work_home_matches'] = len(body) <= 2000000 and result['sha256'] == expected
+                          c.close()
+              except Exception as error:
+                  result['error'] = type(error).__name__
+              return result
+          
+          report['https'] = [get_https(domain, '/', True),
+                             get_https('47.101.152.210', '/', True),
+                             get_https(domain, '/healthz')]
+          try:
+              c = http.client.HTTPConnection(domain, 80, timeout=10)
+              c.request('GET', '/', headers={'Host': domain, 'Connection': 'close'})
+              r = c.getresponse()
+              report['http'] = {'status': r.status, 'location': r.getheader('Location')}
+              r.read(1024)
+              c.close()
+          except Exception as error:
+              report['http'] = {'error': type(error).__name__}
+          
+          try:
+              if side == 'domestic':
+                  current = Path('/var/www/'+domain+'/current')
+                  report['current'] = os.readlink(str(current))
+                  report['current_unchanged'] = report['current'] == '/var/www/'+domain+'/releases/pr122-d8b08ed-recovery-stage'
+                  homepage = current/'public/index.html'
+              else:
+                  homepage = Path('/var/www/'+domain+'/index.html')
+              data = homepage.read_bytes()
+              report['local_home_sha256'] = hashlib.sha256(data).hexdigest()
+              report['local_work_home_unchanged'] = report['local_home_sha256'] == expected
+          except Exception as error:
+              report['local_protection_error'] = type(error).__name__
+          
+          main = report['https'][0]
+          report['domain_reached_domestic'] = main.get('peer') == '47.101.152.210'
+          report['targeted_home_tls_pass'] = all(x.get('status') == 200 and x.get('tls_verified') and x.get('work_home_matches') for x in report['https'][:2])
+          report['status'] = 'READONLY_COLLECTION_COMPLETE'
+          report['migration_complete'] = False
+          report['remaining_gates'] = ['IP_AUDIT_SCOPE_RELEASE', 'CURRENT_APEX_AAAA_AND_ACCOUNT_SNAPSHOT', 'POST_CUTOVER_RELEASE_REVIEW', 'FULL_BACKEND_MIGRATION']
+          print('PR122_DNS_POSTSAVE_RECEIPT='+json.dumps(report, sort_keys=True))
+          PY
+
+  ip-peripheral-metadata:
+    if: github.event_name == 'push' && github.sha == 'de30ac366cd907e6b8337c4c7eba74d146254e8d'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            runner: xuanjun-tokyo-readonly
+          - side: domestic
+            runner: xuanjun-domestic-ops
+    runs-on: [self-hosted, Linux, X64, '${{ matrix.runner }}']
+    timeout-minutes: 3
+    steps:
+      - name: Read only bounded IP-security and logging service metadata without config or logs
+        env:
+          XJ_IP_SIDE: ${{ matrix.side }}
+        run: |
+          python3 -I -B - <<'PY'
+          import json, os, re, stat, subprocess, time
+          from pathlib import Path
+          
+          side = os.environ['XJ_IP_SIDE']
+          hosts = {'tokyo': 'iZ6wee8q9z4t03hvqumwfhZ', 'domestic': 'iZvt5t8tlrm8oiZ'}
+          assert os.geteuid() != 0 and os.uname().nodename == hosts[side]
+          pattern = re.compile(r'fail2ban|crowdsec|modsecurity|waf|filebeat|fluent|logstash|promtail|vector|rsyslog|syslog-ng|auditd|aegis|aliyun|hids|ossec|wazuh|secagent', re.I)
+          result = {'schema_version': 1, 'side': side, 'host': hosts[side], 'uid': os.geteuid(),
+                    'observed_epoch': int(time.time()), 'delivery_commit': os.environ['GITHUB_SHA'],
+                    'scope': 'BOUNDED_NAMED_LOCAL_SERVICE_PROCESS_AND_DIRECTORY_METADATA_ONLY',
+                    'root_calls': 0, 'http_requests': 0, 'post_requests': 0, 'production_writes': 0,
+                    'configuration_contents_read': False, 'raw_logs_read': False,
+                    'credentials_or_business_data_read': False, 'commands': {}, 'units': []}
+          
+          def run(label, command):
+              try:
+                  proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                        universal_newlines=True, timeout=12)
+                  result['commands'][label] = {'exit': proc.returncode}
+                  return proc.stdout if proc.returncode == 0 else ''
+              except Exception as error:
+                  result['commands'][label] = {'error': type(error).__name__}
+                  return ''
+          
+          units = set()
+          for label, command in (
+              ('loaded_services', ['systemctl', 'list-units', '--all', '--type=service', '--no-legend', '--no-pager', '--plain']),
+              ('installed_services', ['systemctl', 'list-unit-files', '--type=service', '--no-legend', '--no-pager']),
+          ):
+              for line in run(label, command).splitlines():
+                  fields = line.split()
+                  if fields and fields[0].endswith('.service') and pattern.search(fields[0]):
+                      units.add(fields[0])
+          result['matched_unit_count'] = len(units)
+          result['unit_inventory_truncated'] = len(units) > 30
+          for unit in sorted(units)[:30]:
+              output = run('unit:'+unit, ['systemctl', 'show', unit, '-p', 'Id', '-p', 'LoadState',
+                                        '-p', 'ActiveState', '-p', 'SubState', '-p', 'UnitFileState',
+                                        '-p', 'MainPID', '-p', 'FragmentPath'])
+              allowed = {'Id', 'LoadState', 'ActiveState', 'SubState', 'UnitFileState', 'MainPID', 'FragmentPath'}
+              item = {'requested_unit': unit}
+              item.update({k: v for k, v in (line.split('=', 1) for line in output.splitlines() if '=' in line) if k in allowed})
+              result['units'].append(item)
+          processes = run('process_names', ['ps', '-eo', 'comm='])
+          result['matched_process_names'] = sorted(set(line.strip() for line in processes.splitlines() if pattern.search(line)))[:50]
+          result['directory_metadata'] = []
+          for raw in ('/etc/fail2ban', '/etc/crowdsec', '/etc/modsecurity', '/etc/filebeat',
+                      '/etc/fluent-bit', '/etc/logstash', '/etc/promtail', '/etc/vector', '/etc/rsyslog.d'):
+              item = {'path': raw}
+              try:
+                  info = os.lstat(raw)
+                  item.update(exists=True, uid=info.st_uid, mode=oct(stat.S_IMODE(info.st_mode)),
+                              is_directory=stat.S_ISDIR(info.st_mode), is_symlink=stat.S_ISLNK(info.st_mode))
+              except FileNotFoundError:
+                  item['exists'] = False
+              except PermissionError:
+                  item['visibility'] = 'PERMISSION_DENIED_NOT_ABSENT'
+              result['directory_metadata'].append(item)
+          result['limitations'] = ['No service config, firewall rules, cloud policy, log contents or environment inspected',
+                                  'Unmatched/custom agents and remote log consumers remain unverified',
+                                  'Absent named unit does not prove no IP-dependent policy',
+                                  'Owner IP audit acceptance and independent release decision remain pending']
+          result['status'] = 'READONLY_PERIPHERAL_METADATA_COLLECTED'
+          print('PR122_IP_PERIPHERAL_RECEIPT='+json.dumps(result, sort_keys=True))
+          PY
+
+  backend-migration-preflight:
+    if: github.event_name == 'push' && github.sha == '84ed1a9b890e38d646739f6f1066adbed5b53d3a'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            runner: xuanjun-tokyo-readonly
+          - side: domestic
+            runner: xuanjun-domestic-ops
+    runs-on: [self-hosted, Linux, X64, '${{ matrix.runner }}']
+    timeout-minutes: 3
+    steps:
+      - name: Bounded backend host readiness and directory metadata only
+        env:
+          XJ_BACKEND_SIDE: ${{ matrix.side }}
+        run: |
+          python3 -I -B - <<'PY'
+          import collections, json, os, re, shutil, socket, stat, subprocess, sys, time
+          from pathlib import Path
+          side=os.environ['XJ_BACKEND_SIDE']
+          hosts={'tokyo':'iZ6wee8q9z4t03hvqumwfhZ','domestic':'iZvt5t8tlrm8oiZ'}
+          assert os.geteuid()!=0 and os.uname().nodename==hosts[side]
+          r={'schema_version':1,'side':side,'host':hosts[side],'uid':os.geteuid(),
+             'delivery_commit':os.environ['GITHUB_SHA'],'observed_epoch':int(time.time()),
+             'production_writes':0,'root_calls':0,'http_requests':0,'file_contents_read':False,
+             'python_version':list(sys.version_info[:3]),'cpu_count':os.cpu_count(),
+             'disk_free_bytes':shutil.disk_usage('/var/tmp').free,'services':[],'paths':[]}
+          def command(label,args):
+           try:
+            p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=12)
+            r.setdefault('command_exit',{})[label]=p.returncode
+            return p.stdout if p.returncode==0 else ''
+           except Exception as e:r.setdefault('command_errors',{})[label]=type(e).__name__;return ''
+          listed=command('services',['systemctl','list-units','--all','--type=service','--plain','--no-legend','--no-pager'])
+          names={line.split()[0] for line in listed.splitlines() if line.split() and re.search(r'secure-secrets-portal|provider-neutral|telegram|wecom|novel.*tunnel|model-rpc',line.split()[0])}
+          for unit in sorted(names)[:40]:
+           text=command(unit,['systemctl','show',unit,'-p','Id','-p','ActiveState','-p','SubState','-p','MainPID','-p','User','-p','WorkingDirectory','-p','FragmentPath'])
+           r['services'].append(dict(x.split('=',1) for x in text.splitlines() if '=' in x))
+          ports={18080,18081,18443,19443,18761,18770,18780,18781,18880}
+          lines=command('listeners',['ss','-H','-lnt']).splitlines()
+          r['listeners']=[x.split()[3] for x in lines if len(x.split())>=4 and any(x.split()[3].endswith(':'+str(port)) for port in ports)]
+          paths=(['/opt/trading-system/runtime/secure-secrets-portal',
+           '/opt/trading-system/runtime/secure-secrets-portal/sessions',
+           '/opt/trading-system/runtime/secure-secrets-portal/tiktok-oauth-state',
+           '/opt/trading-system/runtime/secure-secrets-portal/douyin-oauth-state',
+           '/opt/trading-system/runtime/secure-secrets-portal/tiktok-token-state',
+           '/opt/trading-system/runtime/secure-secrets-portal/douyin-token-state',
+           '/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store',
+           '/opt/trading-system/runtime/v8-domestic-operations/telegram-customer-service-canary'] if side=='tokyo' else
+           ['/home/openclaw_ops/v8-domestic-operations',
+           '/home/openclaw_ops/v8-domestic-operations/runtime',
+           '/home/openclaw_ops/v8-domestic-operations/runtime/internal-bridge',
+           '/opt/trading-system/runtime/secure-secrets-portal','/var/lib/xuanjun-operations-portal'])
+          for raw in paths:
+           item={'path':raw}
+           try:
+            info=os.lstat(raw);item.update(exists=True,uid=info.st_uid,gid=info.st_gid,mode=oct(stat.S_IMODE(info.st_mode)),is_directory=stat.S_ISDIR(info.st_mode),is_symlink=stat.S_ISLNK(info.st_mode))
+            if stat.S_ISDIR(info.st_mode):
+             try:
+              count=0;extensions=collections.Counter()
+              with os.scandir(raw) as entries:
+               for entry in entries:
+                count+=1
+                if count>2000:item['enumeration']='BOUNDED_TRUNCATED';break
+                suffix=Path(entry.name).suffix
+                extensions[suffix if suffix in ('.json','.sqlite3','.secret','.env','.jsonl') else 'other']+=1
+              item['entry_count']=min(count,2000);item['extension_counts']=dict(extensions)
+             except PermissionError:item['enumeration']='PERMISSION_DENIED'
+           except FileNotFoundError:item['exists']=False
+           except PermissionError:item['visibility']='PERMISSION_DENIED_NOT_ABSENT'
+           r['paths'].append(item)
+          r['limitations']=['Counts are metadata, not consistent snapshots or account/credential inventory',
+           'Permission denied means unknown, never empty; no state/secret/DB/config contents read',
+           'No service start/stop, migration, provider calls, bridge change or authority transfer']
+          r['status']='NONROOT_BACKEND_METADATA_COLLECTED'
+          print('PR122_BACKEND_PREFLIGHT_RECEIPT='+json.dumps(r,sort_keys=True))
+          PY
+
+  backend-custody-offline:
+    if: github.event_name == 'push' && github.sha == 'fa2a474f7c37a3dac4bc1d4278ff611ff94fb081'
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Only new conversion and temporary loopback tests, no production state
+        run: python3 -B -m unittest discover -s tests -p 'test_pr122_backend_*.py' -v
+      - name: Bind source-only review increment and unchanged approved base
+        run: |
+          python3 -B - <<'PY'
+          import gzip,hashlib,io,json,os,subprocess,tarfile
+          from pathlib import Path
+          root=Path.cwd()
+          base=Path('deploy/pr122-oauth-candidate')
+          manifest=json.loads((base/'MANIFEST.json').read_text())
+          for name,digest in manifest['files'].items():
+              assert hashlib.sha256((base/name).read_bytes()).hexdigest()==digest,'APPROVED_BASE_MODULE_CHANGED'
+          paths=[str(base/name) for name in manifest['files']]
+          paths += [str(base/'MANIFEST.json'),'deploy/pr122-backend-migration/custody.py','deploy/pr122-backend-migration/isolated_runtime.py','deploy/pr122-backend-migration/README.md','deploy/pr122-backend-migration/private_source.py','deploy/pr122-backend-migration/private_identity.py','tests/test_pr122_backend_private_adapters.py','tests/test_pr122_backend_custody.py','governance/features.json','.github/workflows/v27-four-server-batch-readonly.yml','evidence/pr122-r4-controlled-install/BACKEND_PREFLIGHT_20261016.json']
+          files={name:(root/name).read_bytes() for name in paths}
+          assert all(len(data)<1000000 for data in files.values())
+          binding={'schema_version':1,'commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':{name:hashlib.sha256(data).hexdigest() for name,data in files.items()},'scope':'OFFLINE_CONVERSION_AND_ISOLATED_SYNTHETIC_RUNTIME_ONLY','production_approved':False,'private_reader_library_implemented':True,'protected_transport_implemented':False,'real_state_read':False,'tests':57,'unchanged_approved_modules':7}
+          files['REVIEW_BINDING.json']=(json.dumps(binding,indent=2,sort_keys=True)+'\n').encode()
+          stream=io.BytesIO()
+          with gzip.GzipFile(fileobj=stream,mode='wb',mtime=0,filename='') as compressed:
+              with tarfile.open(fileobj=compressed,mode='w') as archive:
+                  for name,data in sorted(files.items()):
+                      info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o400;info.mtime=0
+                      archive.addfile(info,io.BytesIO(data))
+          output=Path(os.environ['RUNNER_TEMP'])/'pr122-backend-offline-review'
+          output.mkdir(mode=0o700)
+          package=stream.getvalue()
+          (output/'PR122_BACKEND_OFFLINE_REVIEW.tar.gz').write_bytes(package)
+          receipt={'schema_version':1,'commit':os.environ['GITHUB_SHA'],'host':os.uname().nodename,'uid':os.geteuid(),'tests':57,'skipped':0,'unchanged_approved_modules':7,'archive_sha256':hashlib.sha256(package).hexdigest(),'archive_bytes':len(package),'bound_files':len(binding['files']),'production_changes':0,'real_state_read':False,'status':'OFFLINE_CONVERSION_TESTS_PASS_NOT_PRODUCTION_MIGRATION'}
+          (output/'CI_RECEIPT.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          print('PR122_BACKEND_OFFLINE_RECEIPT='+json.dumps(receipt,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-backend-offline-${{ github.sha }}
+          path: ${{ runner.temp }}/pr122-backend-offline-review/
+          if-no-files-found: error
+          retention-days: 14
+
+  korea-runtime-package:
+    if: github.event_name == 'push' && github.sha == '1a7e9cb60a995d1a5b4e46518a4253d805bfe063'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 632bbe6f204a2c9ef778d3c91e425593c079abb1
+          persist-credentials: false
+      - name: Build exact previously reviewed Korea runtime without server or network operations
+        run: |
+          test "$(git rev-parse HEAD)" = 632bbe6f204a2c9ef778d3c91e425593c079abb1
+          export PYTHONPATH="$GITHUB_WORKSPACE/migration-prep"
+          python3 -B -m korea.build_runtime_candidate "$RUNNER_TEMP/pr99-runtime-candidate"
+          python3 -I "$RUNNER_TEMP/pr99-runtime-candidate/migration-prep/korea/validate_runtime_candidate.py" "$RUNNER_TEMP/pr99-runtime-candidate" --expected-manifest-sha256 f887b085508e3ed4831dbed22152e35af5e8aba95b85b899b4697c61449917de
+      - name: Archive source only with exact commit and manifest receipt
+        run: |
+          python3 -B - <<'PY'
+          import gzip,hashlib,io,json,os,subprocess,tarfile
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'pr99-runtime-candidate'
+          manifest=json.loads((root/'minimal-runtime-manifest.json').read_text())
+          files={item['path']:(root/item['path']).read_bytes() for item in manifest['files']}
+          files['minimal-runtime-manifest.json']=(root/'minimal-runtime-manifest.json').read_bytes()
+          assert len(files)==18
+          for item in manifest['files']:
+              assert hashlib.sha256(files[item['path']]).hexdigest()==item['sha256']
+          buffer=io.BytesIO()
+          with gzip.GzipFile(fileobj=buffer,mode='wb',mtime=0,filename='') as compressed:
+              with tarfile.open(fileobj=compressed,mode='w') as archive:
+                  for name,data in sorted(files.items()):
+                      info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o755 if name.endswith('.sh') else 0o644;info.mtime=0
+                      if name=='minimal-runtime-manifest.json':info.mode=0o600
+                      archive.addfile(info,io.BytesIO(data))
+          out=Path(os.environ['RUNNER_TEMP'])/'pr99-runtime-review';out.mkdir(mode=0o700)
+          data=buffer.getvalue()
+          (out/'PR99_KOREA_RUNTIME_632bbe6f.tar.gz').write_bytes(data)
+          receipt={'schema_version':1,'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'workflow_commit':os.environ['GITHUB_SHA'],'manifest_sha256':hashlib.sha256(files['minimal-runtime-manifest.json']).hexdigest(),'archive_sha256':hashlib.sha256(data).hexdigest(),'archive_bytes':len(data),'regular_entries':18,'bound_source_files':17,'runtime_validation':'RUNTIME_CANDIDATE_INPUT_PASS','production_authorized':False,'server_install':False,'service_started':False,'binance_called':False,'original137_tests_rerun':False}
+          (out/'BUILD_RECEIPT.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          print('PR99_RUNTIME_PACKAGE_RECEIPT='+json.dumps(receipt,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr99-korea-runtime-632bbe6f
+          path: ${{ runner.temp }}/pr99-runtime-review/
+          if-no-files-found: error
+          retention-days: 14
+
+  tokyo-fixed-source-writers:
+    if: github.event_name == 'push' && github.sha == '35b49881bb7ca8674c4a2dbb266b3eef859c4d5f'
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test static inventory refusal and no source execution
+        run: python3 -B -m unittest discover -s tests -p test_pr122_backend_source_inventory.py -v
+      - name: Read only five hash-bound public Python sources, no state or service operation
+        run: python3 -I -B deploy/pr122-backend-migration/source_inventory.py
+
+  tokyo-phase-c-source-contracts:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'PR99_PHASE_C_SOURCE_CONTRACTS_ONCE_20261016' && github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 2
+    steps:
+      - name: Read fixed Python source interfaces and database stat only
+        env:
+          XJ_DELIVERY_SHA: ${{ github.sha }}
+          XJ_SOURCE_GZIP: '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'
+          XJ_SOURCE_SHA256: '0b4c7804c3f786fdadc57548c85d48c683530fc1a76bf9d47fe72727a10cb545'
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import base64,gzip,hashlib,json,os
+          raw=gzip.decompress(base64.b64decode(os.environ['XJ_SOURCE_GZIP'],validate=True))
+          assert hashlib.sha256(raw).hexdigest()==os.environ['XJ_SOURCE_SHA256']
+          namespace={'__name__':'fixed_contract_metadata'}
+          exec(compile(raw,'fixed_contract_metadata','exec'),namespace)
+          result=namespace['collect']()
+          result['delivery_commit']=os.environ['XJ_DELIVERY_SHA']
+          result['probe_sha256']=os.environ['XJ_SOURCE_SHA256']
+          print('PR99_PHASE_C_SOURCE_CONTRACT_RECEIPT='+json.dumps(result,sort_keys=True))
+          PY
+
+  tokyo-phase-c-source-schema:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'PR99_PHASE_C_SOURCE_SCHEMA_ONCE_20261016' && github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 2
+    steps:
+      - name: Read approved table-column declarations from Python AST only
+        env:
+          XJ_DELIVERY_SHA: ${{ github.sha }}
+          XJ_SOURCE_GZIP: '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'
+          XJ_SOURCE_SHA256: 'e3be932bcafc3ddcc089c20207e3d51b21c6c4752d9b405d20acb758d16d2572'
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import base64,gzip,hashlib,json,os
+          raw=gzip.decompress(base64.b64decode(os.environ['XJ_SOURCE_GZIP'],validate=True))
+          assert hashlib.sha256(raw).hexdigest()==os.environ['XJ_SOURCE_SHA256']
+          namespace={'__name__':'fixed_schema_metadata'}
+          exec(compile(raw,'fixed_schema_metadata','exec'),namespace)
+          result=namespace['main']()
+          result['delivery_commit']=os.environ['XJ_DELIVERY_SHA']
+          result['probe_sha256']=os.environ['XJ_SOURCE_SHA256']
+          print('PR99_PHASE_C_SOURCE_SCHEMA_RECEIPT='+json.dumps(result,sort_keys=True))
+          PY
+
+  korea-phase-c-systemd239-parse:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'PR99_PHASE_C_SYSTEMD239_PARSE_ONCE_20261016' && github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
+    timeout-minutes: 2
+    steps:
+      - name: Parse four public candidate unit files only (no generators or PID1 reload)
+        env:
+          XJ_DELIVERY_SHA: ${{ github.sha }}
+          XJ_UNIT_GZIP: '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'
+          XJ_UNIT_SHA256: '3e1a492c761b1bb074e21d0e5990ea354ce687e971a7390ff1a4da9a3b064107'
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import base64,gzip,hashlib,json,os,subprocess,tempfile
+          from pathlib import Path
+          assert os.uname().nodename=='iZmj7a5kwr75qc1tul4kf9Z' and os.geteuid()==1001
+          raw=gzip.decompress(base64.b64decode(os.environ['XJ_UNIT_GZIP'],validate=True))
+          assert len(raw)<=32768 and hashlib.sha256(raw).hexdigest()==os.environ['XJ_UNIT_SHA256']
+          files=json.loads(raw)
+          expected={'xuanjun-binance-phase-c-broker.service','xuanjun-binance-phase-c-worker.service','xuanjun-binance-phase-c-controller.service','xuanjun-phase-c-network-verified.target'}
+          assert set(files)==expected
+          os.umask(0o077)
+          work=Path(tempfile.mkdtemp(prefix='pr99-c-unit-parse-',dir=os.environ['RUNNER_TEMP']))
+          for name,data in files.items():
+              with (work/name).open('x') as f:f.write(data)
+          env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C','SYSTEMD_LOG_LEVEL':'warning','SYSTEMD_COLORS':'0'}
+          r=subprocess.run(['/usr/bin/systemd-analyze','verify',*[str(work/n) for n in sorted(files)]],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env,timeout=25)
+          version=subprocess.check_output(['/usr/bin/systemctl','--version'],text=True,timeout=5).splitlines()[0]
+          result=dict(host=os.uname().nodename,uid=os.geteuid(),systemd=version,unit_count=len(files),unit_sha256=os.environ['XJ_UNIT_SHA256'],delivery_commit=os.environ['XJ_DELIVERY_SHA'],exit=r.returncode,diagnostics=(r.stdout+r.stderr)[:6000].splitlines(),scope='CANDIDATE_UNIT_PARSE_ONLY_NOT_PID1_OR_SANDBOX_PROOF',root=False,service_actions=0,generators_enabled=False,temporary_directory=str(work))
+          print('PR99_PHASE_C_SYSTEMD239_PARSE_RECEIPT='+json.dumps(result,sort_keys=True))
+          raise SystemExit(r.returncode!=0)
+          PY
