@@ -8,7 +8,24 @@ import os
 from pathlib import Path
 import re
 import stat
-from scripts import p2_swas_receipt_validator as receipt
+if __name__ == '__main__':
+    # Isolated Python entry loads only the adjacent protected installed module,
+    # never a scripts package from CWD or PYTHONPATH.
+    try:
+        import importlib.util
+        target=Path(__file__).absolute().parent/'p2_swas_receipt_validator.py'
+        for node in (target,)+tuple(target.parents):
+            meta=node.lstat()
+            if meta.st_uid!=0 or stat.S_ISLNK(meta.st_mode) or meta.st_mode & 0o022:
+                raise RuntimeError('UNPROTECTED_CODE')
+        spec=importlib.util.spec_from_file_location('p2_fixed_receipt',str(target))
+        receipt=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(receipt)
+    except BaseException:
+        print('{"state":"HOLD","redispatch_allowed":false}',flush=True)
+        raise SystemExit(2) from None
+else:
+    from scripts import p2_swas_receipt_validator as receipt
 
 ROLE = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
 ENDPOINT = 'swas.eu-west-1.aliyuncs.com'
@@ -251,7 +268,7 @@ def authorize(body, trust, binding, now):
 
 
 def authorized_dispatch(ledger, attempt, nonce, trust_path, get_comment,
-                        acquire_rpc, writer_epoch_path):
+                        acquire_rpc, writer_epoch_path, query_only=False):
     """Gated caller candidate; get_comment and acquire_rpc are trusted adapters.
     A pre-existing Root policy supplies the only allowed files/epoch/approval.
     No GitHub trigger, enrollment or global writer transfer is performed here.
@@ -286,7 +303,9 @@ def authorized_dispatch(ledger, attempt, nonce, trust_path, get_comment,
         need(set(hashes)=={'transport','receipt'}
              and Path(trust['code_paths']['transport'])==Path(__file__).absolute()
              and Path(trust['code_paths']['receipt'])==Path(receipt.__file__).absolute())
-        binding={'attempt':attempt,'nonce':nonce,'host':receipt.HOST,
+        need(type(query_only) is bool)
+        binding={'operation':'QUERY_EXISTING' if query_only else 'RUN_COMMAND',
+                 'attempt':attempt,'nonce':nonce,'host':receipt.HOST,
                  'instance_id':receipt.INSTANCE,'region':receipt.REGION,'role':ROLE,
                  'script_sha256':hashlib.sha256(command(nonce).encode()).hexdigest(),
                  'code_sha256':hashes,'writer_epoch_sha256':epoch_sha}
@@ -299,20 +318,141 @@ def authorized_dispatch(ledger, attempt, nonce, trust_path, get_comment,
              and get_comment(trust['approval_comment_id'])==body)
         authorize(body,trust,binding,time.time())
         # No credential access before gates; no RunCommand outside durable intent.
-        try:
-            ledger.read('dispatch-intent.json')
-        except FileNotFoundError:
-            pass
+        if query_only:
+            prior=ledger.read('dispatch-intent.json')
+            need(prior['attempt']==attempt and prior['nonce']==nonce)
+            need(receipt.token(ledger.read('invoke.json')['invoke_id']))
+            ident=trust['approval_comment_id']
+            need(type(ident) is int and ident>0)
+            ledger.create('query-permit-'+str(ident)+'.json',{'state':'QUERY_PERMIT_CONSUMED'})
         else:
-            raise RuntimeError('ATTEMPT_ALREADY_CONSUMED')
+            try:
+                ledger.read('dispatch-intent.json')
+            except FileNotFoundError:
+                pass
+            else:
+                raise RuntimeError('ATTEMPT_ALREADY_CONSUMED')
         rpc=acquire_rpc()
         rpc.assume()
         need(protected_json(trust_path)[1]==trust_sha
              and protected_json(writer_epoch_path)[1]==epoch_sha
              and get_comment(trust['approval_comment_id'])==body)
         authorize(body,trust,binding,time.time())
+        if query_only:
+            return poll_existing(ledger,rpc)
         return dispatch_once(ledger,attempt,nonce,binding['script_sha256'],rpc)
     except Exception:
         raise RuntimeError('AUTHORIZED_CALLER_HOLD_NO_BLIND_RETRY') from None
     finally:
         os.close(fd)
+
+
+CONTROL = Path('/etc/xuanjun-p2-swas')
+REPOSITORY = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+OWNER_LOGIN = 'huhongchuan0422-creator'
+OWNER_ID = 332398908
+
+
+def fetch_approval(ident, opener=None):
+    """Public approval GET with fixed origin/repository/PR and author identity.
+    Independent authority still comes from the separately protected body hash.
+    """
+    import urllib.request
+    need(type(ident) is int and ident > 0)
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self,*args,**kwargs):return None
+    client=opener or urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+    request=urllib.request.Request('https://api.github.com/repos/'+REPOSITORY+
+                                  '/issues/comments/'+str(ident),
+                                  headers={'Accept':'application/vnd.github+json','User-Agent':'P2-UK-Protected-Caller'})
+    try:
+        with client.open(request,timeout=10) as response:raw=response.read(32769)
+        need(len(raw)<=32768)
+        data=json.loads(raw,object_pairs_hook=receipt.unique)
+        need(data['id']==ident and data['user']['id']==OWNER_ID
+             and data['user']['login']==OWNER_LOGIN
+             and data['issue_url']=='https://api.github.com/repos/'+REPOSITORY+'/issues/58')
+        body=data['body'];need(type(body) is str and len(body.encode())<=16384)
+        return body
+    except Exception:
+        raise RuntimeError('APPROVAL_PROVENANCE_HOLD') from None
+
+
+def protected_entry(action):
+    """Root-installed fixed entry: no arbitrary file, command or host arguments.
+    It never creates trust, epoch, credentials or the attempt directory.
+    """
+    need(os.getuid()==os.geteuid()==0 and action in ('run-once','query-existing'))
+    trust_path=CONTROL/'TRUST.json'
+    epoch_path=CONTROL/'WRITER_EPOCH.json'
+    trust,unused=protected_json(trust_path)
+    binding=trust['binding']
+    need(binding['operation']==('RUN_COMMAND' if action=='run-once' else 'QUERY_EXISTING'))
+    folder=Path(trust['ledger_path'])
+    need(folder.is_absolute())
+    def acquire():
+        values,unused=protected_json(CONTROL/'CREDENTIALS.json')
+        need(set(values)=={'AccessKeyId','AccessKeySecret'})
+        return AuthenticatedRPC(values['AccessKeyId'],values['AccessKeySecret'])
+    ledger=Ledger(folder)
+    try:
+        return authorized_dispatch(ledger,binding['attempt'],binding['nonce'],
+                                   trust_path,fetch_approval,acquire,epoch_path,
+                                   query_only=action=='query-existing')
+    finally:ledger.close()
+
+
+def supervise(action, seconds=240, operation=protected_entry):
+    """Linux process deadline; interruption never authorizes a resubmission.
+    Child emits at most one whitelisted receipt or generic failure. Private
+    response bodies, policy and credentials are never printed.
+    """
+    import signal
+    import time
+    need(action in ('run-once','query-existing') and type(seconds) is int
+         and 1<=seconds<=240)
+    pid=os.fork()
+    if pid==0:
+        try:
+            os.setsid()
+            result=operation(action)
+            print(json.dumps(result,sort_keys=True),flush=True)
+            os._exit(0)
+        except BaseException:
+            print('{"state":"HOLD","redispatch_allowed":false}',flush=True)
+            os._exit(2)
+    deadline=time.monotonic()+seconds
+    try:
+        while True:
+            done,status=os.waitpid(pid,os.WNOHANG)
+            if done:
+                return 0 if os.WIFEXITED(status) and os.WEXITSTATUS(status)==0 else 2
+            if time.monotonic()>=deadline:
+                # Kill the exact child even if it has not completed setsid yet.
+                try:os.killpg(pid,signal.SIGKILL)
+                except ProcessLookupError:pass
+                try:os.kill(pid,signal.SIGKILL)
+                except ProcessLookupError:pass
+                os.waitpid(pid,0)
+                print('{"state":"SUPERVISOR_TIMEOUT_UNKNOWN","redispatch_allowed":false}',flush=True)
+                return 2
+            time.sleep(0.05)
+    except BaseException:
+        try:os.killpg(pid,signal.SIGKILL)
+        except ProcessLookupError:pass
+        try:os.kill(pid,signal.SIGKILL)
+        except ProcessLookupError:pass
+        try:os.waitpid(pid,0)
+        except ChildProcessError:pass
+        raise
+
+
+if __name__=='__main__':
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('action',choices=('run-once','query-existing'))
+    args=parser.parse_args()
+    try:raise SystemExit(supervise(args.action))
+    except Exception:
+        print('{"state":"HOLD","redispatch_allowed":false}',flush=True)
+        raise SystemExit(2) from None

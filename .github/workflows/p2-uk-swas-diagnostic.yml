@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -B -m unittest discover -s tests -p 'test_p2_*swas*.py' -v 2>&1 | tee /tmp/P2_UK_SWAS_TESTS.log
+          sudo -n -- "$(command -v python)" -B -m unittest discover -s tests -p 'test_p2_*swas*.py' -v 2>&1 | tee /tmp/P2_UK_SWAS_TESTS.log
       - name: Bind all six public source paths and test log
         shell: bash
         run: |
@@ -38,8 +38,8 @@ jobs:
               if name.endswith('.py'):ast.parse(Path(name).read_text(),feature_version=(3,6))
           records=[{'path':n,'size':Path(n).stat().st_size,'sha256':hashlib.sha256(Path(n).read_bytes()).hexdigest()} for n in paths]
           log=Path('/tmp/P2_UK_SWAS_TESTS.log').read_bytes()
-          assert b'Ran 31 tests in ' in log and b'\nOK\n' in log and b'skipped=' not in log
-          m={'scope':'OFFLINE_UK_TRANSPORT_ONLY_NOT_P2_ACCEPTANCE','commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':records,'tests':31,'tests_skipped':0,'log_sha256':hashlib.sha256(log).hexdigest(),'root_execution':'NOT_RUN','python36_runtime':'NOT_VERIFIED','private_materials':'NOT_INCLUDED','execution_permission':'NOT_GRANTED'}
+          assert b'Ran 41 tests in ' in log and b'\nOK\n' in log and b'skipped=' not in log
+          m={'scope':'OFFLINE_UK_TRANSPORT_ONLY_NOT_P2_ACCEPTANCE','commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':records,'tests':41,'tests_skipped':0,'log_sha256':hashlib.sha256(log).hexdigest(),'root_execution':'NOT_RUN','python36_runtime':'NOT_VERIFIED','private_materials':'NOT_INCLUDED','execution_permission':'NOT_GRANTED'}
           manifest=Path('/tmp/P2_UK_SWAS_MANIFEST.json');manifest.write_text(json.dumps(m,sort_keys=True,separators=(',',':'))+'\n')
           with tarfile.open('/tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz','w:gz') as t:
               for n in paths:t.add(n,arcname='p2-uk-swas/'+n,recursive=False)

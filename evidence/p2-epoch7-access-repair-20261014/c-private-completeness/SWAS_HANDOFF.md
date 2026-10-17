@@ -1,117 +1,114 @@
-# P2 Work six-path transport handoff
+# P2 Work UK transport handoff — protected caller candidate
 
-Owner/dots delegation: PR58#6228357313 and exclusive stop confirmation
-PR58#6228383533. Eight existing paths remain with the original writer.
-Base commit: 8f1fb29ebec1fa65dd4c04d1ca606860eb162de3.
+Delegation: PR58#6228357313 and exclusive stop confirmation#6228383533.
+Only the six delegated new paths are changed. Eight existing paths, private
+completeness implementation, original unpublished diagnostics and P2 writer
+remain with the original execution owner. Prior accepted unchanged algorithms
+inherit their exact audit versions; new caller changes require incremental review.
 
-## Implemented offline scope
+## Scope
 
-The six new paths implement an injectable UK-only transport library and strict
-public receipt validator. This is not the original blocked diagnostic package,
-and does not contain or encode it. The only command is a fixed stdlib identity
-statement, no application imports or reads of private files. Its unique nonce
-and exact script SHA are bound before submission. Accepted response cannot
-contain extra fields/private evidence. Public results explicitly retain
-p2_accepted=false. This does not replace actual private-completeness evidence.
+The only remote command is a fixed stdlib identity statement; it cannot read
+Seed/history Seed/Plan/Packet, import P2 applications or install services. Target:
+eu-west-1 / 40dfc6a47d5e4363b9da7d0d6ab01cb1 / iZd7oeikknn1z21sq6ji6zZ,
+role acs:ram::1107191612880779:role/xuanjun-ai-esc. Public success explicitly
+carries p2_accepted=false and private_inputs_read=false. It proves transport
+identity only, never private completeness, Schema3 or installation acceptance.
+The blocked original private diagnostic package is not included or re-encoded.
 
-Target is only eu-west-1 / 40dfc6a47d5e4363b9da7d0d6ab01cb1 /
-iZd7oeikknn1z21sq6ji6zZ, role
-acs:ram::1107191612880779:role/xuanjun-ai-esc. No other host tuple exists.
-Reference transport is the existing fixed identity workflow at
-4ee0216dc2ebfe3bedfc553783345ddc181d5606; it is unchanged and never replayed.
+## Fixed protected entry
 
-A caller-provided persistent protected directory is held by fd, must be 0700
-and owned by its execution uid. Records are immutable O_EXCL/NOFOLLOW 0600,
-fsync file and directory before continuing. dispatch-intent.json consumes the
-attempt BEFORE RunCommand; invoke.json is saved after a valid InvokeId response.
-Unknown response or failure before saving InvokeId leaves intent consumed and
-requires separate investigation, never automatic RunCommand retry. Existing
-InvokeId may only be queried; no code path in polling issues RunCommand.
-Terminal accepted/rejected records prevent ordinary re-poll. Query limit or
-transport uncertainty never becomes PASS. Failed receipt persistence also
-keeps the exclusive attempt; it is not permission to dispatch again.
+The module now has only two CLI actions, run-once and query-existing. No command,
+host, credential, policy path or script path can be supplied as CLI input.
+Execution requires real/effective uid0 and pre-existing protected files:
+/etc/xuanjun-p2-swas/TRUST.json, WRITER_EPOCH.json and CREDENTIALS.json.
+All are Root:Root 0400, regular single-link bounded files, no writable or linked
+ancestors. No code enrolls trust, generates real credentials, creates the ledger
+or transfers canonical writer. The key file contains only AccessKeyId and
+AccessKeySecret; it is read only after policy gates. No key text is logged.
+This path is an explicit prerequisite, not a claim these files currently exist.
 
-## Important external conditions
+TRUST binds a separately verified exact approval-body SHA and independent
+reviewer/source identities, approval comment ID, exact canonical binding,
+writer-epoch SHA, code paths and the one persistent ledger path. The actual
+canonical epoch provenance must be established by the original P2 writer;
+an invented local EXCLUSIVE record is not authoritative. Root ownership and
+matching strings cannot themselves prove independent custody. That remains
+external evidence, not a developer-generated fixture or permission.
 
-This library deliberately has no live CLI and no authenticated RPC adapter.
-The workflow is offline test/build only: no Secrets references, STS requests,
-SWAS invocation, workflow_dispatch, repository_dispatch or machine operation.
-It is NOT a usable production entry or a substitute for explicit trigger tools.
-Adding a remote adapter/trigger requires a separate reviewed caller with exact
-one-use permission, source hashes, host binding and durable process ownership.
-The directory must be unique per approved attempt, protected from substitution
-by its parent custody, and on a proven durable filesystem. Reusing another path
-must not be used to bypass the one-attempt intent. The library itself cannot
-prove global unique writer or enforce a business approval from arbitrary Python
-callers; those are mandatory caller and execution-gate checks.
+Binding includes operation RUN_COMMAND or QUERY_EXISTING, attempt, nonce,
+UK target/role, exact command SHA, both installed source hashes and epoch SHA.
+Only separately issued P2_UK_TRANSPORT_ONCE approval with exact binding,
+UK_TRANSPORT_APPROVED, <=2h integer validity, max_attempts=1 and false private
+read/install permissions is accepted. GitHub fetch checks the fixed API origin,
+repository, PR58 issue URL, comment ID and numerical author ID/login, disables
+redirect/proxy and bounds output. GitHub author identity is supplemental; the
+protected independent body-hash registration provides approval authority.
 
-poll_existing uses bounded query count; a future authenticated adapter must
-set request timeouts and backoff/rate policy. This code does not claim wall-clock
-termination for an arbitrary injected rpc function. Unknown outcomes retain
-state and do not automatically re-dispatch. Full process kill/restart, filesystem
-failure matrix, root provenance and live API response semantics remain target
-acceptance items, not claims inferred from these unit tests.
+A local exclusive flock covers policy, epoch, installed code and approval checks,
+STS and dispatch. Policy/epoch/comment are rechecked after STS. Ledger inode is
+bound to its approved root-owned path. A consumed dispatch intent refuses new
+credentials or RunCommand. A new QUERY_EXISTING permit is explicitly operation
+bound, requires the exact saved attempt/nonce/InvokeId and consumes an immutable
+query-permit-{comment ID} marker. Reusing it is rejected. Poll never dispatches.
+Fresh permission is necessary after an uncertain consumed query; deleting or
+changing ledger paths to bypass consumption is prohibited.
 
-## Privacy and production restrictions
+## Persistence, network and process bounds
 
-Seed/history Seed/Plan/Packet remain in the original protected UK directories.
-Do not publish originals, raw remote output, client exceptions, tokens, signed
-URLs or private receipts into GitHub/logs/artifacts. No recipient/transfer
-protocol is implemented; recipient authentication stays UNKNOWN and transfer
-is prohibited until reviewed. TTY preview and dual SHA confirmations are not
-emulated. The blocked original package is not republished by this writer.
+The held private directory fd and immutable O_EXCL/NOFOLLOW 0600 records fsync
+file and directory. dispatch-intent is durable before RunCommand; InvokeId is
+saved before querying. Unknown submission or failure before saving InvokeId
+keeps intent consumed; it cannot be blindly resubmitted. Accepted/rejected
+terminal receipts remain immutable. Public output/error schema never includes
+raw API bodies, private material, URLs with credentials or client exceptions.
 
-Existing reviewed runtime, Schema3 and install controls inherit unchanged.
+AuthenticatedRPC uses fixed HTTPS POST endpoints, HMAC signatures, bounded
+response and request timeouts, a monotonic admission deadline and no retries.
+A supervisor forks the actual entry into a process group, waits <=240 seconds,
+and kills/reaps that child/group on timeout or interruption. Pending cloud work
+may outlive the local controller: timeout is UNKNOWN, never proof cancellation.
+Saved InvokeId is queried under a new exact query permit; missing ID requires
+separate investigation. The supervisor does not automatically restart anything.
+
+Polling remains bounded by query count and the supervisor; live API backoff/rate
+policy, actual durable filesystem and complete interruption matrix still require
+target acceptance. Kernel uninterruptible I/O is not claimed to be cancellable
+by a userspace timeout. No production interruption guarantees are inferred from
+one hosted fork timeout test.
+
+## Trigger and private delivery boundaries
+
+The GitHub workflow has push and workflow_dispatch for OFFLINE TEST/BUILD ONLY.
+It has contents:read, no Secrets references and no host call. Hosted sudo is
+used solely for disposable /root test fixtures, never UK access. This declaration
+neither adds a dispatch tool to the chat session nor enables production execution.
+Actual platform trigger capability remains unavailable here. No old probe rerun
+or push-triggered live action substitutes for a fresh exact permission.
+
+The protected caller must be installed at pinned root-owned source paths by a
+separately approved mechanism, supplied with authentic policy/epoch/credentials,
+and connected to an approved event source before any real call. None of these
+has been installed by this source change. The current transport boundary does
+not solve private Seed/Plan/Packet delivery. Originals stay in UK protected
+storage, authenticated private recipient remains unverified, and the original
+TTY/dual SHA requirements cannot be emulated or silently waived.
+
+## Evidence
+
+41 local methods pass: original20 transport/receipt, previous11 adapter/gate,
+new7 real-Root temporary-file entry tests and3 provenance/fork-supervisor tests.
+The real-Root fixture imports exact source copies under a temporary /root tree,
+validates actual modes/hashes and exercises dispatch then separately authorized
+query with synthetic RPC. Tests cover epoch, source, ledger and credential drift,
+post-STS approval changes, duplicate request and query consumption. A real fork
+is killed on timeout. Synthetic network responses and keys are not UK evidence.
+Hosted CI separately runs this exact code; Python3.6 AST is not 3.6.8 runtime.
+Manifest binds all six source paths and test log in an eight-member TAR.
+
 P2_RELEASE=HOLD; SCHEMA3_APPROVAL=NO; C_INSTALL_AUTHORIZATION=NO.
+No real UK STS/SWAS call, live InvokeId, private-data transfer or production
+installation is implied. Prior accepted source is not needlessly re-reviewed;
+new entry, operation binding and affected call chain are the incremental scope.
 
-## Validation
-
-20 local methods passed: 8 receipt methods and 12 transport methods. Adapter
-responses and temporary ledgers are fixtures, not STS or Root proof. CI tests
-exact revision and builds a 6-source-file manifest, plus log and manifest in an
-8-member TAR. 3.6 AST syntax check does not prove Python3.6 runtime compatibility.
-Future actual invocation must record InvokeId and terminal state in original
-PR58/PR17 with only permitted redacted fields. Never call an identity transport
-result private-completeness, installation or production acceptance.
-
-## Authenticated adapter and gated caller increment
-
-The statements above describe the original offline transport baseline. This
-increment adds AuthenticatedRPC and authorized_dispatch, still without live
-CLI or production execution job. The workflow now declares workflow_dispatch
-for the SAME offline test/build job only; it neither creates a callable dispatch
-tool in this session nor authorizes host execution. No cloud Secrets are wired.
-
-AuthenticatedRPC signs fixed HTTPS POST RPC requests, disables redirects and
-environment proxies, permits only STS and UK SWAS endpoints/actions, rejects raw
-API errors, bounds response bytes and per-request timeout, and has a 180-second
-monotonic admission deadline. It does not retry requests. A socket timeout plus
-an admission deadline is not a process-level hard kill guarantee for arbitrary
-slow/drip network behavior; independent wall-clock supervision is still required
-before live admission. Poll query backoff/rate supervision remains external.
-
-The gated caller holds an exclusive no-follow lock, reads only pre-existing
-Root:Root 0400 trust/epoch records and requires exact policy SHA, independently
-anchored approval-body SHA, nonexpired one-use limited purpose, fixed command
-SHA, both installed code hashes, exact attempt/nonce and expected writer epoch.
-The policy pins the exact ledger directory inode as well as code paths. Approval,
-policy and epoch are rechecked inside the held lock and again after STS, before
-RunCommand. A consumed dispatch intent blocks credential acquisition. This does
-not enroll trust, transfer canonical writer, grant installation or replace the
-independent proof of actual policy provenance. Deployment must bind the actual
-canonical global epoch source; an invented local epoch file is not acceptable.
-
-Caller dependencies get_comment and acquire_rpc are injected trusted functions.
-Their authenticated fetch policy, returned GitHub comment identity validation,
-credential custody, target installation and actual durable filesystem are NOT
-provided by a workflow in this increment. There is no claimed full production
-caller closure. A future live entry must be independently reviewed as a complete
-call chain before enabling credentials or execution. Existing TTY and rejected
-private-package constraints remain; no private material export is implemented.
-
-31 local methods pass: original20 plus11 adapter/authentication-gate methods,
-including synthetic signed HTTP requests, exact STS target, credential error
-redaction, deadline refusal, wrong-target refusal, expired/revoked/self-approved
-permission rejection, missing protected policy and lock contention. The full
-Root-policy happy path and cross-process fsync kill matrix are not represented
-as tested. Hosted tests remain fixtures, not UK STS/Root acceptance.
+Direct isolated Python execution loads only the adjacent root-protected receipt module, never CWD/PYTHONPATH. A real isolated subprocess negative test verifies missing sibling refuses without importing an injected scripts package. Actual installed CLI happy path still requires authentic protected configuration.

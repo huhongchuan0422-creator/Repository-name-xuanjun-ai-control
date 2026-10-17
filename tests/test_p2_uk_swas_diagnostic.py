@@ -207,4 +207,141 @@ class AdapterGateTests(unittest.TestCase):
                     d.authorized_dispatch(ledger,'fixture','fixture',Path('/missing'),lambda n:'',lambda:None,Path('/missing'))
             finally:os.close(fd);ledger.close()
 
+
+
+class ProtectedEntryTests(unittest.TestCase):
+    def setUp(self):
+        import importlib.util
+        self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+        self.tmp=tempfile.TemporaryDirectory(prefix='p2-offline-root-fixture-',dir='/root')
+        self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name);os.chmod(str(self.root),0o700)
+        self.control=self.root/'control';self.control.mkdir(mode=0o700)
+        self.folder=self.root/'attempt';self.folder.mkdir(mode=0o700)
+        def load(name,source):
+            target=self.root/(name+'.py');target.write_bytes(Path(source).read_bytes());target.chmod(0o400)
+            spec=importlib.util.spec_from_file_location(name,str(target));module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
+        self.m=load('transport_fixture',d.__file__)
+        self.m.receipt=load('receipt_fixture',d.receipt.__file__)
+        self.m.CONTROL=self.control
+        self.calls=[];outer=self
+        class RPC:
+            def __init__(self,key,secret):outer.calls.append(('credentials',key,secret))
+            def assume(self):outer.calls.append(('assume',))
+            def __call__(self,endpoint,action,**kw):
+                outer.calls.append((action,kw))
+                if action=='RunCommand':return {'InvokeId':'t-fixture'}
+                b=dict(hostname=d.receipt.HOST,uid=0,python=[3,6,8],nonce='fixture_nonce',private_inputs_read=False)
+                return {'InvocationResult':dict(InvokeId='t-fixture',InstanceId=d.receipt.INSTANCE,InvocationStatus='Success',ExitCode=0,Output=json.dumps(b))}
+        self.m.AuthenticatedRPC=RPC
+        self.save('WRITER_EPOCH.json',{'state':'EXCLUSIVE','writer':'fixture-writer'})
+        self.save('CREDENTIALS.json',{'AccessKeyId':'fixture-key','AccessKeySecret':'fixture-secret'})
+        self.configure('RUN_COMMAND',100)
+        self.m.fetch_approval=lambda ident:self.body
+
+    def save(self,name,value):
+        p=self.control/name
+        if p.exists():p.chmod(0o600)
+        p.write_bytes(d.canonical(value));p.chmod(0o400)
+
+    def configure(self,operation,ident):
+        import time
+        now=int(time.time())
+        epoch_sha=hashlib.sha256((self.control/'WRITER_EPOCH.json').read_bytes()).hexdigest()
+        binding=dict(operation=operation,attempt='fixture_attempt',nonce='fixture_nonce',host=d.receipt.HOST,
+                     instance_id=d.receipt.INSTANCE,region=d.receipt.REGION,role=d.ROLE,
+                     script_sha256=hashlib.sha256(d.command('fixture_nonce').encode()).hexdigest(),
+                     code_sha256={'transport':hashlib.sha256(Path(self.m.__file__).read_bytes()).hexdigest(),
+                                  'receipt':hashlib.sha256(Path(self.m.receipt.__file__).read_bytes()).hexdigest()},
+                     writer_epoch_sha256=epoch_sha)
+        p=dict(decision='UK_TRANSPORT_APPROVED',binding=binding,issued_unix=now-1,expires_unix=now+60,
+               max_attempts=1,private_inputs_allowed=False,install_allowed=False)
+        self.body='P2_UK_TRANSPORT_ONCE\n'+json.dumps(p)
+        trust=dict(enabled=True,revoked=False,reviewer_principal='fixture-reviewer',source_writer_principal='fixture-writer',
+                   custody_evidence_sha256='f'*64,approval_body_sha256=hashlib.sha256(self.body.encode()).hexdigest(),
+                   approval_comment_id=ident,writer_epoch_sha256=epoch_sha,binding=binding,
+                   ledger_path=str(self.folder),code_paths={'transport':self.m.__file__,'receipt':self.m.receipt.__file__})
+        self.save('TRUST.json',trust)
+
+    def test_real_root_files_to_dispatch_and_separate_query(self):
+        r=self.m.protected_entry('run-once');self.assertEqual(r['invoke_id'],'t-fixture')
+        with self.assertRaises(RuntimeError):self.m.protected_entry('run-once')
+        self.configure('QUERY_EXISTING',101)
+        r=self.m.protected_entry('query-existing');self.assertEqual(r['state'],'TRANSPORT_VERIFIED')
+        self.assertFalse(r['p2_accepted'])
+        self.assertEqual(sum(c[0]=='RunCommand' for c in self.calls),1)
+        with self.assertRaises(RuntimeError):self.m.protected_entry('query-existing')
+        self.assertEqual(sum(c[0]=='assume' for c in self.calls),2)
+
+    def test_isolated_cli_rejects_missing_sibling_without_pythonpath_import(self):
+        import subprocess
+        import sys
+        evil=self.root/'evil';(evil/'scripts').mkdir(parents=True)
+        marker=self.root/'injected'
+        (evil/'scripts'/'__init__.py').write_text('open('+repr(str(marker))+',"w").write("bad")')
+        result=subprocess.run([sys.executable,'-I','-B',self.m.__file__,'run-once'],
+                              cwd=str(evil),env={'PATH':'/usr/bin:/bin','PYTHONPATH':str(evil)},
+                              stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=5)
+        self.assertEqual(result.returncode,2)
+        self.assertFalse(marker.exists())
+        self.assertNotIn(b'Traceback',result.stderr)
+
+    def test_credential_mode_refused_before_sts(self):
+        (self.control/'CREDENTIALS.json').chmod(0o644)
+        with self.assertRaises(RuntimeError):self.m.protected_entry('run-once')
+        self.assertEqual(self.calls,[])
+        self.assertFalse((self.folder/'dispatch-intent.json').exists())
+
+    def test_epoch_drift_stops_before_credentials(self):
+        self.save('WRITER_EPOCH.json',{'state':'EXCLUSIVE','writer':'other'})
+        with self.assertRaises(RuntimeError):self.m.protected_entry('run-once')
+        self.assertEqual(self.calls,[])
+
+    def test_source_byte_drift_stops(self):
+        p=Path(self.m.__file__);p.chmod(0o600);p.write_bytes(p.read_bytes()+b'\n# fixture drift\n');p.chmod(0o400)
+        with self.assertRaises(RuntimeError):self.m.protected_entry('run-once')
+        self.assertEqual(self.calls,[])
+
+    def test_ledger_substitution_stops(self):
+        moved=self.root/'moved';self.folder.rename(moved);self.folder.symlink_to(moved,target_is_directory=True)
+        with self.assertRaises((RuntimeError,OSError)):self.m.protected_entry('run-once')
+        self.assertEqual(self.calls,[])
+
+    def test_approval_changed_after_sts_stops_before_command(self):
+        original=self.m.AuthenticatedRPC;outer=self
+        class Changed(original):
+            def assume(self):
+                super().assume();outer.body+=' '
+        self.m.AuthenticatedRPC=Changed
+        with self.assertRaises(RuntimeError):self.m.protected_entry('run-once')
+        self.assertEqual(sum(c[0]=='RunCommand' for c in self.calls),0)
+
+
+class EntryProvenanceSupervisorTests(unittest.TestCase):
+    def test_exact_comment_metadata(self):
+        value={'id':123,'user':{'id':d.OWNER_ID,'login':d.OWNER_LOGIN},
+               'issue_url':'https://api.github.com/repos/'+d.REPOSITORY+'/issues/58','body':'fixture'}
+        class Opener:
+            def open(self,req,timeout):
+                self.request=req;return AdapterGateTests.Response(json.dumps(value).encode())
+        opener=Opener();self.assertEqual(d.fetch_approval(123,opener),'fixture')
+        self.assertTrue(opener.request.full_url.startswith('https://api.github.com/repos/'+d.REPOSITORY+'/'))
+        for k,v in (('id',124),('issue_url','https://evil.invalid/'),('user',{'id':999,'login':d.OWNER_LOGIN})):
+            old=value[k];value[k]=v
+            with self.subTest(k=k),self.assertRaises(RuntimeError):d.fetch_approval(123,opener)
+            value[k]=old
+
+    def test_child_success_and_failure_exit(self):
+        self.assertEqual(d.supervise('run-once',2,operation=lambda action:{'state':'fixture'}),0)
+        def fail(action):raise RuntimeError('PRIVATE')
+        self.assertEqual(d.supervise('run-once',2,operation=fail),2)
+
+    def test_real_fork_timeout_no_new_dispatch(self):
+        import time
+        def hang(action):time.sleep(10)
+        started=time.monotonic()
+        self.assertEqual(d.supervise('run-once',1,operation=hang),2)
+        self.assertLess(time.monotonic()-started,4)
+
+
 if __name__=='__main__':unittest.main()
