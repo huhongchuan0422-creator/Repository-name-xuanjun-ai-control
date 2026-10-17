@@ -12,7 +12,15 @@ from scripts.community_demo_api import _HeaderDeadlineReader
 from scripts.community_mini_login import LoginUnavailable
 
 
-def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None):
+def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None):
+    if provider_actions is not None:
+        from scripts.community_wechat_sp_actions import ProviderActions
+        if type(provider_actions) is not ProviderActions or provider_actions.runtime is not gateway.runtime or provider_actions.center is not getattr(gateway.identity,'center',None):
+            raise ValueError('SAME_REGISTERED_PROVIDER_ACTIONS_REQUIRED')
+    if fulfillment is not None:
+        from scripts.community_saas_fulfillment import SaasFulfillment
+        if type(fulfillment) is not SaasFulfillment or fulfillment.runtime is not gateway.runtime or fulfillment.center is not getattr(gateway.identity,'center',None):
+            raise ValueError('SAME_REGISTERED_FULFILLMENT_REQUIRED')
     if saas is not None:
         from scripts.community_center_saas import CenterSaas
         if type(saas) is not CenterSaas or saas.runtime is not gateway.runtime or saas.center is not getattr(gateway.identity,'center',None):
@@ -93,7 +101,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     self.path=='/community/operations' and operations is not None) and not (
                     self.path=='/mini/payment' and getattr(gateway,'payments',None) is not None) and not (
                     self.path=='/merchant/onboarding' and onboarding is not None) and not (
-                    self.path=='/customer/saas-api' and saas is not None):
+                    self.path=='/customer/saas-api' and saas is not None) and not (
+                    self.path=='/community/fulfillment' and fulfillment is not None) and not (
+                    self.path=='/community/provider-actions' and provider_actions is not None):
                 return self.answer(404,{'error':'NOT_FOUND'})
             if (self.headers.get('Transfer-Encoding') is not None or
                     len(self.headers.get_all('Content-Length',[])) != 1 or
@@ -108,7 +118,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if not 0 < length <= limit:raise ValueError('INVALID_LENGTH')
                 session=self.headers.get('X-Center-Session','')
                 csrf=self.headers.get('X-Center-CSRF','')
-                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api'):
+                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions'):
                     cookies=[part.strip().partition('=')[2] for part in self.headers.get('Cookie','').split(';')
                              if part.strip().partition('=')[0]=='__Host-xj_customer']
                     if len(cookies)>1 or cookies and session or csrf and self.headers.get('X-CSRF-Token'):
@@ -118,7 +128,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     # Authenticate before accepting a large private upload body.
                     if session:
                         if not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas}[self.path].center.session(session,csrf)
+                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions}[self.path].center.session(session,csrf)
                     elif length>16384:raise PermissionError('CENTER_SESSION_REQUIRED')
                 remaining=length;chunks=[];deadline=time.monotonic()+1
                 while remaining:
@@ -148,6 +158,13 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if self.path=='/merchant/onboarding':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=onboarding.dispatch(session,csrf,body)
+                elif self.path=='/community/provider-actions':
+                    if token:raise PermissionError('CENTER_SESSION_REQUIRED')
+                    result=provider_actions.dispatch(session,csrf,body)
+                    return self.answer(200,{'result':result,'provider_actions_enabled':True})
+                elif self.path=='/community/fulfillment':
+                    if token:raise PermissionError('CENTER_SESSION_REQUIRED')
+                    result=fulfillment.dispatch(session,csrf,body)
                 elif self.path=='/customer/saas-api':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=saas.dispatch(session,csrf,body)
@@ -173,6 +190,6 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
     return Handler
 
 
-def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None):
+def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None):
     if type(port) is not int or not (port==0 or 1024 <= port <= 65535):raise ValueError('INVALID_PORT')
-    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas))
+    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas,fulfillment=fulfillment,provider_actions=provider_actions))

@@ -1,0 +1,18 @@
+{
+  "current_module": "真实支付结果落库、退款分账执行、原SaaS权益履约集成",
+  "blockers": ["监督定时任务须进入默认分支才会激活；当前不能声称已定时运行", "尚无真实特约商户，真实资金交易验收待外部条件", "本批新代码尚未集中测试或独立审核"],
+  "tasks": [
+    {"id":"P1-A","phase":1,"state":"PARTIAL","name":"原身份体系及用户资料关联"},
+    {"id":"P1-B","phase":1,"state":"PARTIAL","name":"商家入驻及微信进件资料"},
+    {"id":"P1-C","phase":1,"state":"PARTIAL","name":"平台审核及特约商户状态同步"},
+    {"id":"P1-D","phase":1,"state":"PARTIAL","name":"商家工作台门店员工商品"},
+    {"id":"P1-E","phase":1,"state":"PARTIAL","name":"平台基础管理通知隔离"},
+    {"id":"P2-A","phase":2,"state":"PARTIAL","name":"消费者交易及归属"},
+    {"id":"P2-B","phase":2,"state":"PARTIAL","name":"定价订单及账务查询"},
+    {"id":"P2-C","phase":2,"state":"PARTIAL","name":"真实微信支付退款与对账"},
+    {"id":"P2-D","phase":2,"state":"MISSING","name":"社区管理"},
+    {"id":"P2-E","phase":2,"state":"PARTIAL","name":"版本化分账规则执行恢复"},
+    {"id":"P2-F","phase":2,"state":"PARTIAL","name":"运营财务后台"},
+    {"id":"P2-G","phase":2,"state":"PARTIAL","name":"完整业务链集成"}
+  ]
+}

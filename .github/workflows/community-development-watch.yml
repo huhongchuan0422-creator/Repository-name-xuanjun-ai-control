@@ -1,0 +1,33 @@
+name: Community independent development watch
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: community-development-watch
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: feature/chatgpt-community-wechat-sp-offline-20261017
+          fetch-depth: 1
+      - name: Observe actual source commits and CI
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/community_development_watch.py
+      - name: Publish online board without altering application source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/development/community-progress/README.md docs/development/community-progress/status.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'docs: independent community development observation [skip ci]'
+            git push origin HEAD:feature/chatgpt-community-wechat-sp-offline-20261017
+          fi

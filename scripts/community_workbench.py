@@ -2,6 +2,7 @@
 import csv
 import io
 from scripts.community_merchant_contract import scope,valid_id
+from scripts.community_order_provider_projection import provider_evidence
 
 
 def orders_page(db,identity,limit,after_id,status):
@@ -14,23 +15,29 @@ def orders_page(db,identity,limit,after_id,status):
     args=[t,m,s,after_id]
     if status!='ALL':sql+=' AND state=?';args.append(status)
     rows=db.execute(sql+' ORDER BY reference LIMIT ?',(*args,limit+1)).fetchall()
-    return dict(orders=[dict(zip(('reference','amount_minor','currency','state'),r)) for r in rows[:limit]],
+    records=[]
+    for r in rows[:limit]:
+        record=dict(zip(('reference','amount_minor','currency','state'),r))
+        verified=provider_evidence(db,identity,r[0]) is not None
+        record.update(simulation_only=not verified,provider_payment_verified=verified)
+        records.append(record)
+    return dict(orders=records,
                 has_more=len(rows)>limit,next_cursor=rows[limit-1][0] if len(rows)>limit else None,
-                simulation_only=True,provider_settlement_verified=False)
+                simulation_only=all(r['simulation_only'] for r in records),provider_settlement_verified=False)
 
 
 def orders_export(db,identity,limit,after_id,status):
     result=orders_page(db,identity,limit,after_id,status)
     out=io.StringIO(newline='');writer=csv.writer(out)
-    writer.writerow(('reference','amount_minor','currency','simulation_state','provider_settlement_verified'))
+    writer.writerow(('reference','amount_minor','currency','state','simulation_only','provider_settlement_verified'))
     for row in result['orders']:
         def cell(value):
             value=str(value)
             return "'"+value if value.lstrip().startswith(('=','+','-','@','\t','\r')) else value
-        writer.writerow([cell(row[k]) for k in ('reference','amount_minor','currency','state')]+['false'])
-    return dict(csv=out.getvalue(),filename='community-simulated-orders-page.csv',
+        writer.writerow([cell(row[k]) for k in ('reference','amount_minor','currency','state')]+[str(row['simulation_only']).lower(),'false'])
+    return dict(csv=out.getvalue(),filename='community-orders-page.csv',
                 has_more=result['has_more'],next_cursor=result['next_cursor'],
-                row_count=len(result['orders']),simulation_only=True,provider_settlement_verified=False)
+                row_count=len(result['orders']),simulation_only=result['simulation_only'],provider_settlement_verified=False)
 
 
 def merchant_settings(db,identity):
@@ -57,5 +64,7 @@ def order_detail(orders,refunds,identity,reference):
         events_truncated=len(events)>200,
         refund_previews=[dict(zip(('event_id','amount_minor','evidence_kind'),r)) for r in refund_rows[:200]],
         refund_history_truncated=len(refund_rows)>200,refund_preview_total_minor=total,
-        remaining_preview_minor=order['amount_minor']-total,simulation_only=True,
+        remaining_preview_minor=order['amount_minor']-total,
+        simulation_only=provider_evidence(orders,identity,reference) is None,
+        provider_payment_verified=provider_evidence(orders,identity,reference) is not None,
         provider_refund_executed=False,provider_split_executed=False)

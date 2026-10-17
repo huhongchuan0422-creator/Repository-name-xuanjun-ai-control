@@ -94,11 +94,14 @@ class StageRuntime:
             order = state(self.demo.db, identity, params['reference'])
             snapshot = storefront_snapshot(self.demo.merchant_db, self.demo.ad_db, identity, now)
             # State is read from the original durable order store, never a body field.
+            from scripts.community_order_provider_projection import provider_evidence
+            verified = provider_evidence(self.demo.db, identity, params['reference'])
             paid = order['state'] == 'SUCCESS'
             return {'order': dict(order, reference=params['reference']),
-                    'payment_state': 'MOCK_PAID_SIMULATED' if paid else 'MOCK_' + order['state'],
+                    'payment_state': ('PROVIDER_' + order['state']) if verified else ('MOCK_PAID_SIMULATED' if paid else 'MOCK_' + order['state']),
                     'ads': {AMOUNT: None, SUCCESS: snapshot['ads'][SUCCESS] if paid else None},
-                    'simulation_only': True, 'provider_settlement_verified': False,
+                    'simulation_only': verified is None, 'provider_payment_verified': verified is not None,
+                    'provider_settlement_verified': False,
                     'financial_receipt_issued': False, 'finance_effect': 'NONE'}
         admin_routes = {'profile': '/demo/admin/profile', 'item': '/demo/admin/item',
                         'ad_create': '/demo/admin/campaign/create',

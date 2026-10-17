@@ -32,7 +32,8 @@ class MiniPayments:
         uid,pid,principal=i._resolve(token,scene)
         scope=i.runtime.bindings[principal]
         order=state(i.runtime.demo.db,scope,reference)
-        if order['state']!='PENDING' or order['currency']!='CNY':
+        from scripts.community_order_provider_projection import provider_evidence
+        if order['currency']!='CNY' or order['state']!='PENDING' and provider_evidence(i.runtime.demo.db,scope,reference) is None:
             raise PermissionError('ORIGINAL_PENDING_ORDER_BINDING_REQUIRED')
         key=c.idx('wechat-session:'+token)
         meta=c.db.execute("SELECT payload FROM links WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=? AND user_id=? AND project=? AND active=1",(key,uid,pid)).fetchone()
@@ -46,8 +47,8 @@ class MiniPayments:
             openid=session.get('openid')
             if type(openid) is not str or i._subject(i.appid,openid)!=session['subject_idx']:
                 raise PermissionError('FRESH_VERIFIED_MINI_LOGIN_REQUIRED')
-            order_key=hashlib.sha256(canonical(dict(sp_mchid=self.prepay.reader._mchid,scope=scope,reference=reference))).hexdigest()
-            b=dict(merchant['record'],user_id=uid,project=pid,out_trade_no='cm'+order_key[:30],amount_minor=order['amount_minor'],sp_openid=openid)
+            from scripts.community_provider_reference import provider_order_reference
+            b=dict(merchant['record'],user_id=uid,project=pid,out_trade_no=provider_order_reference(self.prepay.reader._mchid,scope,reference),amount_minor=order['amount_minor'],sp_openid=openid)
         else:
             b=self.prepay.bindings.get(reference)
         if b is None or b['user_id']!=uid or b['project']!=pid or b['sp_appid']!=i.appid or order['amount_minor']!=b['amount_minor']:
@@ -65,14 +66,21 @@ class MiniPayments:
         authorize=lambda:self._authorize(token,scene,reference)
         c=self.identity.center
         with c.tx():c.limit('community-payment:'+b['user_id'],20,60)
+        if body['operation'] in ('prepare','recover'):
+            _,_,principal=self.identity._resolve(token,scene)
+            if state(self.identity.runtime.demo.db,self.identity.runtime.bindings[principal],reference)['state']!='PENDING':raise PermissionError('PAYMENT_ALREADY_TERMINAL_QUERY_ONLY')
         if body['operation']=='prepare':
             result=self.prepay._create_authorized(b,authorize)
         elif body['operation']=='recover':
             result=self.prepay._existing_authorized(b,authorize)
         else:
             reader=self.prepay.reader
-            result=reader.read_order(dict(sp_mchid=reader._mchid,**{k:b[k] for k in ('sub_mchid','sp_appid','out_trade_no','amount_minor')},currency='CNY'))
+            expected=dict(sp_mchid=reader._mchid,**{k:b[k] for k in ('sub_mchid','sp_appid','out_trade_no','amount_minor')},currency='CNY')
+            result=reader.read_order(expected)
             if authorize()!=b:raise PermissionError('PAYMENT_BINDING_CHANGED')
+            from scripts.community_order_provider_projection import project_verified_query
+            _,_,principal=self.identity._resolve(token,scene)
+            project_verified_query(self.identity.runtime.demo.db,self.identity.runtime.bindings[principal],reference,expected,result,c.now(),reader._kid)
             with c.tx():c.audit(b['project'],b['user_id'],'COMMUNITY_PAYMENT_QUERIED',hashlib.sha256(json.dumps(result,sort_keys=True).encode()).hexdigest())
             # A signed SUCCESS observation is not authoritative Finance settlement.
             result=dict(reference=reference,provider_state=result['provider_state'],amount_minor=b['amount_minor'],currency='CNY',

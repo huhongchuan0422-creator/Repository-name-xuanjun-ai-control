@@ -50,6 +50,19 @@ class CenterSaas:
         with c.tx():
             c.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',('COMMUNITY_SAAS_'+kind,reference,g['user_id'],g['project'],c.encrypt(canonical(dict(data,tenant_id=g['tenant'])),'community-saas:'+reference)))
             c.audit(g['project'],g['user_id'],'SAAS_'+kind+'_RESERVED',reference)
+    def _fulfillment_view(self,g,order_id):
+        key=hashlib.sha256(canonical([g['tenant'],order_id])).hexdigest()
+        row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_SAAS_FULFILLMENT' AND subject_idx=? AND active=1",(key,)).fetchone()
+        if row is None:return None
+        saved=json.loads(self.center.decrypt(row[0],'saas-fulfillment:'+key))
+        order=self.runtime.saas.dispatch(g['principal'],'order_read',{'order_id':order_id},self.center.now())
+        if saved['binding']['tenant']!=g['tenant'] or saved['binding']['order_id']!=order_id or saved['binding']['module']!=order['module_id'] or saved['binding']['quote_sha256']!=order['quote_sha256']:
+            raise PermissionError('FULFILLMENT_ORDER_BINDING_MISMATCH')
+        from scripts.community_saas_modules import entitled
+        return dict(state=saved['state'],entitlement_issued_for_order=saved['state']=='COMPLETED',
+                    module_currently_active=entitled(self.runtime.saas.modules,g['tenant'],order['module_id'],self.center.now()),
+                    valid_from=saved['start'],valid_until=saved['until'])
+
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:
             raise ValueError('INVALID_CUSTOMER_SAAS_REQUEST')
@@ -96,13 +109,18 @@ class CenterSaas:
         elif op=='renewal_plan':
             self._owned(g,'ORDER',p['order_id'])
             lifecycle=call('order_status',dict(order_id=p['order_id']))
-            if lifecycle['state']=='CONFIRMED_EXTERNAL':
+            fulfillment=self._fulfillment_view(g,p['order_id'])
+            if fulfillment and fulfillment['state'] in ('REVERSAL_RESERVED','REVERSED'):
+                result=dict(order_id=p['order_id'],status=fulfillment['state'],entitlement_granted=False,automatic_renewal_authorized=False)
+            elif lifecycle['state']=='CONFIRMED_EXTERNAL':
                 order=call('order_read',dict(order_id=p['order_id']))
                 row=self.runtime.saas.modules.execute('SELECT valid_until FROM module_entitlements WHERE tenant_id=? AND module_id=?',(g['tenant'],order['module_id'])).fetchone()
                 result=call(op,dict(p,valid_until=row[0] if row else None))
             else:result=dict(order_id=p['order_id'],status='AWAITING_FINANCE_CONFIRMATION',payment_confirmed_by_adapter=False,entitlement_granted=False,automatic_renewal_authorized=False)
         elif op in ('order_read','order_status'):
             self._owned(g,'ORDER',p['order_id']);result=call(op,p)
+            fulfillment=self._fulfillment_view(g,p['order_id'])
+            if fulfillment is not None:result=dict(result,fulfillment=fulfillment)
         else:result=call(op,p)
         self._authorize(session,csrf,body['workspace'])
         with c.tx():c.audit(g['project'],g['user_id'],'SAAS_CUSTOMER_COMPLETED',hashlib.sha256(canonical(body)).hexdigest())
