@@ -5,6 +5,8 @@ on:
     paths:
       - 'evidence/pr99-service-handoff/s09-install-candidate/stopped_transaction.py'
       - 'evidence/pr99-service-handoff/s09-install-candidate/test_stopped_transaction.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/production_start.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/test_production_start.py'
       - '.github/workflows/pr99-stopped-transaction-validation.yml'
 permissions:
   contents: read
@@ -20,4 +22,5 @@ jobs:
       - name: Exact transaction tests in temporary root-owned filesystem
         run: |
           sudo -n python3 evidence/pr99-service-handoff/s09-install-candidate/test_stopped_transaction.py
+          sudo -n python3 evidence/pr99-service-handoff/s09-install-candidate/test_production_start.py
           python3 evidence/pr99-service-handoff/s09-install-candidate/stopped_transaction.py manifest
