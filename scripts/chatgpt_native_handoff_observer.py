@@ -45,7 +45,7 @@ def project(record, now_epoch):
     if record["entry"] not in _ENTRIES or record["state"] not in _STATES:
         raise HandoffHold("INVALID_ENTRY_OR_STATE")
     for k in ("writer_stopped", "lease_expired", "effects_reconciled", "next_owner_ack"):
-        if record[k] not in (True, False, None):
+        if record[k] is not True and record[k] is not False and record[k] is not None:
             raise HandoffHold("INVALID_EVIDENCE_TYPE")
     for k in ("last_real_progress_at", "progress_deadline_at"):
         if record[k] is not None and (type(record[k]) is not int or record[k] < 0):
