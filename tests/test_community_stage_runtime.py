@@ -62,6 +62,26 @@ class RuntimeJourney(unittest.TestCase):
         self.assertEqual(len(self.call('orders', principal=self.merchant)['orders']),1)
         self.assertTrue(self.api.dispatch(self.customer,'catalog',{},0)['framework_free'])
         self.assertFalse(self.api.dispatch(self.customer,'entitlement',{'module_id':'advertising'},0)['active'])
+    def test_success_placement_requires_provider_projection(self):
+        from scripts.community_order_provider_projection import project_verified_query
+        from scripts.community_provider_reference import provider_order_reference
+        self.checkout()
+        ref = provider_order_reference('1234567890', DEMO_SCOPE, 'order1')
+        expected = dict(sp_mchid='1234567890', sub_mchid='1234567891',
+                        sp_appid='wx1234567890abcdef', out_trade_no=ref,
+                        amount_minor=101, currency='CNY')
+        observation = dict(source='SIGNED_PROVIDER_ORDER_QUERY',
+                           signature_key_id='PUB_KEY_ID_fixture',
+                           out_trade_no=ref, amount_minor=101, currency='CNY',
+                           provider_state='SUCCESS', transaction_id='transaction123',
+                           body_sha256='a'*64)
+        project_verified_query(self.o, DEMO_SCOPE, 'order1', expected,
+                               observation, self.now, 'PUB_KEY_ID_fixture')
+        receipt = self.call('receipt', {'reference':'order1'})
+        self.assertTrue(receipt['provider_payment_verified'])
+        self.assertIsNotNone(receipt['ads']['AD_SLOT_PAYMENT_SUCCESS'])
+        self.assertFalse(receipt['financial_receipt_issued'])
+
     def test_scope_injection_and_forged_payment_rejected(self):
         for op, body in [('storefront', {'tenant_id':'tenant2'}), ('receipt', {'reference':'order1','paid':True}), ('simulate', {})]:
             with self.assertRaises(ValueError): self.call(op,body)
