@@ -150,7 +150,7 @@ def safe_receipt(output, stderr='', exit_code=0):
         if line.startswith('DB_FILE_ABSENT='):
             path=key('DB_FILE_ABSENT',lambda x:x in DB_NAMES)
         else:
-            m=re.fullmatch(r'DB_FILE=(\\S+) UID=([0-9]{1,12}) GID=([0-9]{1,12}) MODE=([0-7]{3,4}) SIZE=([0-9]{1,16})',line)
+            m=re.fullmatch(r'DB_FILE=(\S+) UID=([0-9]{1,12}) GID=([0-9]{1,12}) MODE=([0-7]{3,4}) SIZE=([0-9]{1,16})',line)
             require(m is not None and m.group(1) in DB_NAMES)
             path=m.group(1)
             values.extend((('DB_FILE',path),('UID',m.group(2)),('GID',m.group(3)),
