@@ -53,3 +53,20 @@ test('project feedback archive read uses current mini session and remains archiv
  assert.equal(result.data.projectMessages[0].status,'ARCHIVED');
  assert.match(result.data.status,/不代表已获得人工回复/);
 });
+
+
+test('customer private-material reference rejects empty and oversized input before sending',async()=>{
+ const {result,calls}=page();await result.onLoad({scene:'shop1'});
+ result.setData({projectReferenceItem:'material1',projectReferenceRevision:0,projectReferenceKind:'SECRETREF',projectReference:''});
+ await result.saveProjectReference();
+ assert.equal(calls.filter(c=>c.operation==='project_save_reference').length,0);
+ result.setData({projectReference:'x'.repeat(257)});
+ await result.saveProjectReference();
+ assert.equal(calls.filter(c=>c.operation==='project_save_reference').length,0);
+ result.setData({projectReference:'synthetic-ref'});
+ await result.saveProjectReference();
+ const req=calls.filter(c=>c.operation==='project_save_reference');
+ assert.equal(req.length,1);
+ assert.equal(req[0].params.reference,'synthetic-ref');
+ assert.equal(req[0].params.item,'material1');
+});
