@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 HOST = 'iZvt5t8tlrm8oiZ'
-RELEASE = '/opt/xuanjun-migration-s07/releases/domestic-r1'
+RELEASE = '/opt/xuanjun-migration-s07/releases/domestic-r2'
 STATE = '/var/lib/xuanjun-pr99-s09-stopped-install-v1'
 ADMISSION = '/etc/xuanjun-pr99/s09-stopped-install.admission.json'
 NAMES = tuple('xuanjun-pr99-domestic-' + r + '.service' for r in ('portal', 'contact', 'customer-service'))
@@ -82,7 +82,7 @@ def unit_bytes():
         # Quarantine is mandatory. These units cannot reach the real bridge.
         result[name] = ('''[Unit]
 Description=PR99 quarantined domestic candidate
-ConditionPathExists={release}/restart-acceptance-v1/receipt.json
+ConditionPathExists={release}/callback-restart-acceptance-v1/receipt.json
 
 [Service]
 Type=simple
@@ -169,8 +169,8 @@ def install(units_dir, state, permit, permit_hash):
     for name in NAMES:
         require(not os.path.lexists(units_dir / name), 'TARGET_UNIT_PRESENT')
         require(stopped(name), 'TARGET_NOT_STOPPED')
-    receipt = json.loads(read_regular(Path(RELEASE) / 'restart-acceptance-v1/receipt.json', private=True))
-    require(receipt['status'] == 'COPIED_RELEASE_RESTART_CLEANUP_PASS_NOT_PRODUCTION' and receipt['application_processes_stopped'] is True, 'COPY_ACCEPTANCE_MISSING')
+    receipt = json.loads(read_regular(Path(RELEASE) / 'callback-restart-acceptance-v1/receipt.json', private=True))
+    require(receipt['status'] == 'R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION' and receipt['application_processes_stopped'] is True, 'COPY_ACCEPTANCE_MISSING')
     write_exclusive(state / 'before.json', encode(before))
     write_exclusive(state / 'intent.json', encode({'permit_sha256': permit_hash, 'nonce': permit['nonce'], 'manifest': manifest()}))
     created = []
