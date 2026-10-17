@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo -n -- "$(command -v python)" -B -m unittest discover -s tests -p 'test_p2_uk_readonly_diagnostic.py' -v
+          sudo -n -- "$(command -v python)" -B -m unittest discover -s tests -p 'test_p2_uk_readonly_diagnostic.py' -v 2>&1 | tee /tmp/P2_DIAGNOSTIC_TESTS.log
       - name: Bind all six public source paths and test log
         shell: bash
         run: |
@@ -77,11 +77,13 @@ jobs:
           python - <<'PY'
           import ast,hashlib,json,os,subprocess,tarfile
           from pathlib import Path
-          paths=['.github/workflows/p2-uk-swas-diagnostic.yml','scripts/p2_uk_swas_diagnostic.py','scripts/p2_swas_receipt_validator.py','tests/test_p2_uk_swas_diagnostic.py','tests/test_p2_swas_receipt_validator.py','evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md']
+          paths=['.github/workflows/p2-uk-swas-diagnostic.yml','scripts/p2_uk_swas_diagnostic.py','scripts/p2_swas_receipt_validator.py','tests/test_p2_uk_swas_diagnostic.py','tests/test_p2_swas_receipt_validator.py','evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md','scripts/p2_uk_readonly_diagnostic.py','tests/test_p2_uk_readonly_diagnostic.py','docs/development/P2_UK_READONLY_DIAGNOSTIC_20261017.md']
           for name in paths:
               if name.endswith('.py'):ast.parse(Path(name).read_text(),feature_version=(3,6))
           records=[{'path':n,'size':Path(n).stat().st_size,'sha256':hashlib.sha256(Path(n).read_bytes()).hexdigest()} for n in paths]
           log=Path('/tmp/P2_UK_SWAS_TESTS.log').read_bytes()
+          diag_log=Path('/tmp/P2_DIAGNOSTIC_TESTS.log').read_bytes()
+          assert b'\nOK\n' in diag_log and b'skipped=' not in diag_log
           expected_tests=102
           assert ('Ran %d tests in ' % expected_tests).encode() in log and b'\nOK\n' in log and b'skipped=' not in log
           doc=Path(paths[-1]).read_text()
@@ -91,14 +93,15 @@ jobs:
           kit={'schema':1,'scope':'RECEIVER_CODE_PREPARATION_ONLY_NOT_EXECUTION_PERMISSION','source_commit':os.environ['GITHUB_SHA'],'site_entry_sha256':hashlib.sha256(script).hexdigest(),'transport_sha256':records[1]['sha256'],'receipt_sha256':records[2]['sha256'],'production_execution':'NOT_RUN','root_trust_enrollment':'NOT_RUN','canonical_writer':'UNKNOWN'}
           kit_path=Path('/tmp/SITE_KIT_MANIFEST.json');kit_path.write_text(json.dumps(kit,sort_keys=True,separators=(',',':'))+'\n')
           generated=[{'path':p.name,'size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in (site,kit_path)]
-          m={'scope':'OFFLINE_UK_TRANSPORT_ONLY_NOT_P2_ACCEPTANCE','commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':records,'generated_files':generated,'tests':expected_tests,'tests_skipped':0,'log_sha256':hashlib.sha256(log).hexdigest(),'root_execution':'NOT_RUN','python36_runtime':'NOT_VERIFIED','private_materials':'NOT_INCLUDED','execution_permission':'NOT_GRANTED'}
+          m={'scope':'OFFLINE_UK_TRANSPORT_ONLY_NOT_P2_ACCEPTANCE','commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'files':records,'generated_files':generated,'tests':expected_tests,'tests_skipped':0,'log_sha256':hashlib.sha256(log).hexdigest(),'diagnostic_log_sha256':hashlib.sha256(diag_log).hexdigest(),'root_execution':'NOT_RUN','python36_runtime':'NOT_VERIFIED','private_materials':'NOT_INCLUDED','execution_permission':'NOT_GRANTED'}
           manifest=Path('/tmp/P2_UK_SWAS_MANIFEST.json');manifest.write_text(json.dumps(m,sort_keys=True,separators=(',',':'))+'\n')
           with tarfile.open('/tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz','w:gz') as t:
               for n in paths:t.add(n,arcname='p2-uk-swas/'+n,recursive=False)
               for p in (site,kit_path):t.add(p,arcname='p2-uk-swas/'+p.name,recursive=False)
               t.add(manifest,arcname='p2-uk-swas/MANIFEST.json',recursive=False)
               t.add('/tmp/P2_UK_SWAS_TESTS.log',arcname='p2-uk-swas/TESTS.log',recursive=False)
-          print(json.dumps({'tar_sha256':hashlib.sha256(Path('/tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz').read_bytes()).hexdigest(),'manifest_sha256':hashlib.sha256(manifest.read_bytes()).hexdigest(),'source_files':6,'root_execution':'NOT_RUN'},sort_keys=True))
+              t.add('/tmp/P2_DIAGNOSTIC_TESTS.log',arcname='p2-uk-swas/DIAGNOSTIC_TESTS.log',recursive=False)
+          print(json.dumps({'tar_sha256':hashlib.sha256(Path('/tmp/P2_UK_SWAS_OFFLINE_REVIEW.tar.gz').read_bytes()).hexdigest(),'manifest_sha256':hashlib.sha256(manifest.read_bytes()).hexdigest(),'source_files':len(paths),'root_execution':'NOT_RUN'},sort_keys=True))
           PY
       - uses: actions/upload-artifact@v4
         with:
