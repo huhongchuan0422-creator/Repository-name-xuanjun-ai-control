@@ -16,7 +16,7 @@ if __name__ == '__main__':
     try:
         import importlib.util
         target=Path(__file__).absolute().parent/'p2_swas_receipt_validator.py'
-        actions_mode=len(sys.argv)>1 and sys.argv[1] in ('remote-run','cloud-query','a5-preflight','a5-query')
+        actions_mode=len(sys.argv)>1 and sys.argv[1] in ('remote-run','cloud-query','a5-preflight','a5-query','read-only-diagnostic','read-only-diagnostic-query')
         if actions_mode:
             if (os.environ.get('GITHUB_EVENT_NAME')!='workflow_dispatch'
                     or os.environ.get('P2_SPLIT_ENABLED')!='true'):
@@ -31,7 +31,7 @@ if __name__ == '__main__':
                 return result
             policy=json.loads(raw_policy,object_pairs_hook=exact_pairs)
             pins=policy['binding']['code_sha256']
-        for code in (target,Path(__file__).absolute()):
+        for code in (target,Path(__file__).absolute()) + ((Path(__file__).absolute().parent/'p2_uk_readonly_diagnostic.py',) if actions_mode and sys.argv[1].startswith('read-only-diagnostic') else ()):
             for node in (code,)+tuple(code.parents):
                 meta=node.lstat()
                 owners=(0,os.geteuid()) if actions_mode else (0,)
@@ -42,7 +42,9 @@ if __name__ == '__main__':
                     raise RuntimeError('INVALID_CODE_FILE')
         if actions_mode:
             if (hashlib.sha256(Path(__file__).read_bytes()).hexdigest()!=pins['transport']
-                    or hashlib.sha256(target.read_bytes()).hexdigest()!=pins['receipt']):
+                    or hashlib.sha256(target.read_bytes()).hexdigest()!=pins['receipt']
+                    or (sys.argv[1].startswith('read-only-diagnostic') and
+                        hashlib.sha256((Path(__file__).absolute().parent/'p2_uk_readonly_diagnostic.py').read_bytes()).hexdigest()!=pins['diagnostic'])):
                 raise RuntimeError('SOURCE_PINS_MISMATCH')
         spec=importlib.util.spec_from_file_location('p2_fixed_receipt',str(target))
         receipt=importlib.util.module_from_spec(spec)
@@ -55,6 +57,16 @@ else:
 
 ROLE = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
 ENDPOINT = 'swas.eu-west-1.aliyuncs.com'
+
+
+def diagnostic_module():
+    import importlib.util
+    path=Path(__file__).absolute().parent/'p2_uk_readonly_diagnostic.py'
+    spec=importlib.util.spec_from_file_location('p2_diagnostic_fixed',str(path))
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 
 
 def canonical(value):
@@ -427,7 +439,7 @@ def split_authorize(policy, binding, body, now):
     permit=json.loads(body.split('\n',1)[1],object_pairs_hook=receipt.unique)
     need(set(permit)=={'decision','binding','issued_unix','expires_unix',
                       'max_executions','install_allowed','private_inputs_allowed'})
-    need(permit['decision']==('A5_PREFLIGHT_APPROVED' if binding.get('operation') in ('A5_PREFLIGHT','A5_QUERY') else 'UK_SPLIT_APPROVED') and permit['binding']==binding
+    need(permit['decision']==('A5_PREFLIGHT_APPROVED' if binding.get('operation') in ('A5_PREFLIGHT','A5_QUERY') else ('READ_ONLY_DIAGNOSTIC_APPROVED' if binding.get('operation') in ('READ_ONLY_DIAGNOSTIC','READ_ONLY_DIAGNOSTIC_QUERY') else 'UK_SPLIT_APPROVED')) and permit['binding']==binding
          and type(permit['max_executions']) is int and permit['max_executions']==1
          and permit['install_allowed'] is False and permit['private_inputs_allowed'] is False
          and type(permit['issued_unix']) is int and type(permit['expires_unix']) is int
@@ -657,19 +669,22 @@ def validate_split_output(detail,invoke,request):
 
 def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''):
     """Explicit one-shot RUN or fresh-permit QUERY, backed by durable Git ref."""
-    need(action in ('remote-run','cloud-query','a5-preflight','a5-query'))
+    need(action in ('remote-run','cloud-query','a5-preflight','a5-query','read-only-diagnostic','read-only-diagnostic-query'))
     request=policy['request'];binding=policy['binding']
     a5=action.startswith('a5-')
+    diag=action.startswith('read-only-diagnostic')
+    if diag:need(request.get('purpose')=='READ_ONLY_DIAGNOSTIC_ONLY')
     if a5:need(request.get('purpose')=='A5_METADATA_PREFLIGHT_ONLY')
-    else:need(request.get('purpose')!='A5_METADATA_PREFLIGHT_ONLY')
+    elif not diag:need(request.get('purpose') not in ('A5_METADATA_PREFLIGHT_ONLY','READ_ONLY_DIAGNOSTIC_ONLY'))
     need(type(request['expires_unix']) in (int,float))
-    if action in ('remote-run','a5-preflight'):need(now()<request['expires_unix'])
-    script=a5_command(request) if a5 else remote_command(request)
+    if action in ('remote-run','a5-preflight','read-only-diagnostic'):need(now()<request['expires_unix'])
+    diag_module=diagnostic_module() if diag else None
+    script=diag_module.command_content() if diag else (a5_command(request) if a5 else remote_command(request))
     need(binding['host']==receipt.HOST and binding['instance_id']==receipt.INSTANCE
          and binding['region']==receipt.REGION and binding['role']==ROLE
          and type(binding['target_config_sha256']) is str
          and re.fullmatch('[0-9a-f]{64}',binding['target_config_sha256']))
-    need(binding['operation']==({'remote-run':'REMOTE_RUN','cloud-query':'CLOUD_QUERY','a5-preflight':'A5_PREFLIGHT','a5-query':'A5_QUERY'}[action])
+    need(binding['operation']==({'remote-run':'REMOTE_RUN','cloud-query':'CLOUD_QUERY','a5-preflight':'A5_PREFLIGHT','a5-query':'A5_QUERY','read-only-diagnostic':'READ_ONLY_DIAGNOSTIC','read-only-diagnostic-query':'READ_ONLY_DIAGNOSTIC_QUERY'}[action])
          and binding['attempt']==request['attempt']
          and binding['request_sha256']==hashlib.sha256(canonical(request)).hexdigest()
          and binding['command_sha256']==hashlib.sha256(script.encode()).hexdigest()
@@ -681,7 +696,7 @@ def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''
     public={'attempt':request['attempt'],'request_sha256':binding['request_sha256'],
             'command_sha256':binding['command_sha256'],'source_commit':binding['source_commit'],
             'target_config_sha256':binding['target_config_sha256']}
-    if action in ('remote-run','a5-preflight'):
+    if action in ('remote-run','a5-preflight','read-only-diagnostic'):
         need(saved is None and not invoke_id)
         row=dict(public,state='CLOUD_DISPATCH_INTENT',invoke_id='')
         head=journal.write(row)
@@ -701,7 +716,7 @@ def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''
                  state='CLOUD_QUERY_UNKNOWN')
         head=journal.write(row,head)
     gate();rpc=rpc_factory();rpc.assume();gate()
-    if action in ('remote-run','a5-preflight'):
+    if action in ('remote-run','a5-preflight','read-only-diagnostic'):
         try:
             response=rpc(ENDPOINT,'RunCommand',RegionId=receipt.REGION,InstanceId=receipt.INSTANCE,
                 CommandContent=script,Type='RunShellScript',WorkingUser='root',WorkingDir='/root',
@@ -722,9 +737,11 @@ def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''
         need(detail.get('InvokeId')==invoke_id and detail.get('InstanceId')==receipt.INSTANCE)
         if detail.get('InvocationStatus') in ('Pending','Running','Stopping'):
             return {'state':'CLOUD_QUERY_UNKNOWN','invoke_id':invoke_id,'redispatch_allowed':False}
+        if detail.get('InvocationStatus') not in ('Success','Failed','Cancelled','Canceled','Stopped'):
+            return {'state':'CLOUD_QUERY_UNKNOWN','invoke_id':invoke_id,'redispatch_allowed':False}
         if detail.get('InvocationStatus')!='Success' or detail.get('ExitCode')!=0:
             result={'state':'TARGET_REJECTED_OR_FAILED','redispatch_allowed':False}
-        else:result=a5_validate(detail,invoke_id) if a5 else validate_split_output(detail,invoke_id,request)
+        else:result=({'state':'DIAGNOSTIC_VERIFIED','receipt':diag_module.safe_receipt(detail.get('Output',''),'',detail.get('ExitCode')),'redispatch_allowed':False} if diag else (a5_validate(detail,invoke_id) if a5 else validate_split_output(detail,invoke_id,request)))
         gate()
         journal.write(dict(row,state=result['state']),head)
         return result
@@ -748,17 +765,17 @@ def actions_entry(action,attempt,invoke_id=''):
          and re.fullmatch('[0-9a-f]{40}',binding['source_commit'])
          and policy['request']['attempt']==attempt and receipt.token(attempt)
          and os.environ.get('GITHUB_REF')==policy['workflow_ref'])
-    for name,path in (('transport',__file__),('receipt',receipt.__file__)):
+    for name,path in ((('transport',__file__),('receipt',receipt.__file__),('diagnostic',str(Path(__file__).absolute().parent/'p2_uk_readonly_diagnostic.py'))) if action.startswith('read-only-diagnostic') else (('transport',__file__),('receipt',receipt.__file__))):
         need(hashlib.sha256(Path(path).read_bytes()).hexdigest()==binding['code_sha256'][name])
     workflow=Path('.github/workflows/p2-uk-swas-diagnostic.yml')
     need(hashlib.sha256(workflow.read_bytes()).hexdigest()==binding['workflow_sha256'])
     # Approval and exact source pins checked before reading the cloud key values.
-    split_authorize(policy,binding,fetch_approval(policy['approval_comment_id']),time.time())
+    split_authorize(policy,binding,fetch_approval(policy['approval_comment_id'],diagnostic=action.startswith('read-only-diagnostic')),time.time())
     journal=GitJournal(os.environ.get('P2_JOURNAL_TOKEN',''),attempt)
     def acquire():
         return AuthenticatedRPC(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),
                                 os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''))
-    return split_cloud(policy,journal,acquire,fetch_approval,time.time,action,invoke_id)
+    return split_cloud(policy,journal,acquire,(lambda ident:fetch_approval(ident,diagnostic=action.startswith('read-only-diagnostic'))),time.time,action,invoke_id)
 
 
 def protected_json(path):
@@ -889,9 +906,11 @@ CONTROL = Path('/etc/xuanjun-p2-swas')
 REPOSITORY = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 OWNER_LOGIN = 'huhongchuan0422-creator'
 OWNER_ID = 332398908
+AUDITOR_ID = 95597695
+AUDITOR_LOGIN = '18598789888'
 
 
-def fetch_approval(ident, opener=None):
+def fetch_approval(ident, opener=None, diagnostic=False):
     """Public approval GET with fixed origin/repository/PR and author identity.
     Independent authority still comes from the separately protected body hash.
     """
@@ -907,8 +926,8 @@ def fetch_approval(ident, opener=None):
         with client.open(request,timeout=10) as response:raw=response.read(32769)
         need(len(raw)<=32768)
         data=json.loads(raw,object_pairs_hook=receipt.unique)
-        need(data['id']==ident and data['user']['id']==OWNER_ID
-             and data['user']['login']==OWNER_LOGIN
+        need(data['id']==ident and data['user']['id']==(AUDITOR_ID if diagnostic else OWNER_ID)
+             and data['user']['login']==(AUDITOR_LOGIN if diagnostic else OWNER_LOGIN)
              and data['issue_url']=='https://api.github.com/repos/'+REPOSITORY+'/issues/58')
         body=data['body'];need(type(body) is str and len(body.encode())<=16384)
         return body
@@ -988,7 +1007,7 @@ def supervise(action, seconds=240, operation=protected_entry):
 if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser()
-    parser.add_argument('action',choices=('run-once','query-existing','receive-identity','remote-run','cloud-query','a5-preflight','a5-query'))
+    parser.add_argument('action',choices=('run-once','query-existing','receive-identity','remote-run','cloud-query','a5-preflight','a5-query','read-only-diagnostic','read-only-diagnostic-query'))
     parser.add_argument('--attempt',default='')
     parser.add_argument('--invoke-id',default='')
     args=parser.parse_args()
@@ -999,7 +1018,7 @@ if __name__=='__main__':
             need(len(raw)<=8192)
             request=json.loads(raw,object_pairs_hook=receipt.unique)
             raise SystemExit(supervise('run-once',operation=lambda unused:receive_identity(request)))
-        elif args.action in ('remote-run','cloud-query','a5-preflight','a5-query'):
+        elif args.action in ('remote-run','cloud-query','a5-preflight','a5-query','read-only-diagnostic','read-only-diagnostic-query'):
             raise SystemExit(supervise('run-once',operation=lambda unused:
                 actions_entry(args.action,args.attempt,args.invoke_id)))
         else:raise SystemExit(supervise(args.action))

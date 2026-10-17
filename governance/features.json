@@ -69,6 +69,40 @@
         "tests/test_p2_swas_receipt_validator.py",
         ".github/workflows/p2-uk-swas-diagnostic.yml"
       ]
+    },
+    {
+      "feature_id": "P2_UK_READONLY_DIAGNOSTIC_PHASE1",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/P2_UK_READONLY_DIAGNOSTIC_20261017.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/P2_UK_READONLY_DIAGNOSTIC_20261017.md",
+        "section": "2",
+        "phase": 2
+      },
+      "acceptance": {
+        "criteria": [
+          "Exactly 1771 UTF-8 bytes and approved SHA, no user-supplied shell",
+          "Only protected/manual approved read-only discovery and one-use journal intent",
+          "Strict output metadata allowlist, no raw stderr or secrets in Actions artifact",
+          "No cloud/UK execution without independent single-use permission",
+          "Python 3.6 tests and Hosted CI pass"
+        ],
+        "tests": [
+          "tests/test_p2_uk_readonly_diagnostic.py",
+          "tests/test_p2_uk_swas_diagnostic.py"
+        ]
+      },
+      "reuse": [
+        "PR17/58 static A5 approval only for unchanged bytes",
+        "P2 existing protected journal and cloud adapter"
+      ],
+      "paths": [
+        "scripts/p2_uk_readonly_diagnostic.py",
+        "tests/test_p2_uk_readonly_diagnostic.py"
+      ]
     }
   ]
 }
