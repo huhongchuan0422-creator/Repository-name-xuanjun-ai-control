@@ -399,7 +399,7 @@ class AdapterContractTests(unittest.TestCase):
         for path in new:self.assertEqual(self.m.SOURCE_TARGETS[path],self.m.CANDIDATE_TARGET+'/'+path[len(self.m.PUBLIC_PREFIX):])
         overlays={p for p in new if p.startswith(self.m.PUBLIC_PREFIX+'kit-overlay/')}
         focused={p for p in new if p.startswith(self.m.PUBLIC_PREFIX+'tests/')}
-        self.assertEqual(len(overlays),15);self.assertEqual(len(focused),8)
+        self.assertEqual(len(overlays),16);self.assertEqual(len(focused),8)
         self.assertTrue(all(p.endswith('.py') and '__pycache__' not in p for p in overlays|focused))
         self.assertEqual(self.m.KIT_TARGET,self.m.CANDIDATE_TARGET+'/baseline')
         self.assertEqual(self.m.PINS[self.m.SELECTED_ARCHIVE_PATH][:2],(1056853,'6244cca1b41037b7c240f71b93f867c5660a770d451c4a5a661b283f61ce819e'))
