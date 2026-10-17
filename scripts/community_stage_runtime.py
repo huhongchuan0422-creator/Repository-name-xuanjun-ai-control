@@ -11,6 +11,7 @@ from scripts.community_order_store import state, simulated_transition
 from scripts.community_storefront_snapshot import storefront_snapshot
 from scripts.community_ad_contract import AMOUNT, SUCCESS
 from scripts.community_local_admin import dispatch_local_admin
+from scripts.community_ad_store import metric_report
 
 
 class StageRuntime:
@@ -48,6 +49,7 @@ class StageRuntime:
             'refund_record': {'reference', 'event_id', 'amount_minor'},
             'refund_preview': {'reference'}, 'split_preview': {'reference', 'shares_bps'},
             'reconciliation': set(), 'ads': set(),
+            'ad_report': {'starts_at', 'ends_at', 'limit', 'after_id'},
             'profile': {'record', 'expected_version'}, 'item': {'item'},
             'ad_create': {'record'}, 'ad_state': {'campaign_id', 'state', 'expected_version'},
             'ad_review': {'campaign_id', 'approved', 'expected_version'},
@@ -59,6 +61,7 @@ class StageRuntime:
             'orders':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'summary':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'ads':{'MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'},
+            'ad_report':{'MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'},
             'ad_review':{'PLATFORM_REVIEWER','PLATFORM_OWNER'},
             'refund_preview':{'MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'split_preview':{'MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
@@ -66,6 +69,8 @@ class StageRuntime:
         }
         if name not in public and principal.role not in permissions.get(name,{'MERCHANT_ADMIN','PLATFORM_OWNER'}):
             raise PermissionError('ADMIN_ROLE_REQUIRED')
+        if name == 'ad_report':
+            return metric_report(self.demo.ad_db, identity, **params)
         if name == 'receipt':
             order = state(self.demo.db, identity, params['reference'])
             snapshot = storefront_snapshot(self.demo.merchant_db, self.demo.ad_db, identity, now)

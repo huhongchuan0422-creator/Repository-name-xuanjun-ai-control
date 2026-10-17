@@ -171,7 +171,7 @@ jobs:
           sys.path[:0]=[str(Path.cwd()),str(Path.cwd()/'tests')]
           patterns=['test_community_mini*.py','test_community_center_operations.py','test_community_merchant_onboarding.py','test_community_merchant_opening.py','test_community_onboarding_pagination.py','test_community_saas_provider_evidence.py','test_community_saas_reconciliation.py',
                     'test_community_provider_notification_http.py','test_community_stage_recovery.py',
-                    'test_community_stage_roles.py',
+                    'test_community_stage_roles.py', 'test_community_ad_report.py',
                     'test_community_wechat_sp_verification.py','test_community_wechat_sp_readonly.py']
           suite=unittest.TestSuite()
           for pattern in patterns:suite.addTests(unittest.defaultTestLoader.discover('tests',pattern=pattern))
