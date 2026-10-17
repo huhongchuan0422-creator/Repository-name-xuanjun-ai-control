@@ -46,7 +46,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     },
     async commerce(scene, operation, params) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
-      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||!['products','purchase','purchase_read','refund_apply','refund_application'].includes(operation))throw Error('INVALID_COMMERCE_REQUEST');
+      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||!['orders','products','purchase','purchase_read','refund_apply','refund_application'].includes(operation))throw Error('INVALID_COMMERCE_REQUEST');
       const version=generation;
       const reply=await request('/mini/api',{scene,operation:'commerce.'+operation,params},token);
       if(version!==generation)throw Error('STALE_SESSION');

@@ -5,7 +5,7 @@ This file preserves a recoverable development state, not phase acceptance.
 ## Current repository
 
 Original branch: `feature/chatgpt-community-wechat-sp-offline-20261017`.
-Latest application-source commit before this checkpoint: `a91c1583930e7796e09bbb85a40a60794bea870d`.
+Latest official-applyment source commit before this checkpoint: `7f636e1584138407f932fb8ca7cfa95c03109abf`.
 Original customer Core/Source/Runtime pinned bytes have not been changed. Business extensions use encrypted records in the original Center links/events/audit domain, not new IAM or Finance databases.
 
 ## Actual new source integrations
@@ -29,7 +29,7 @@ Neither phase is complete. In particular, the following cannot be marked impleme
 
 1. Official submerchant application transport, private drafts, common domestic identity/bank form, scanned-material media upload, separate internal review, gated submission and signed status synchronization have now been written. Remaining: complete conditional administrator/foreign-identity/beneficial-owner/industry/bank-branch form requirements and final integration. Existing platform merchant onboarding remains separate.
 2. Full merchant multi-store creation/management, merchant enable/pause/disable lifecycle across all entry points, and operational completion/cancellation flows.
-3. Consumer paginated order history/personal-center integration and safe payment-close/cancellation plus inventory-release recovery.
+3. Consumer paginated original-owned order history and native order selection have now been written. Remaining: complete native personal-center integration and safe payment-close/cancellation plus inventory-release recovery.
 4. Raw refund callbacks; official daily transaction/refund/profit-sharing bill download, verified ingestion and full bill reconciliation.
 5. Community order/earnings/settlement views linked to admitted payout participants, and platform-wide merchant/community/customer operations dashboard with isolation and pagination.
 6. Final frontend integration and source security review, meaningful new tests for all newly written paths, complete regressions/E2E, actual source CI and one independent review batch.

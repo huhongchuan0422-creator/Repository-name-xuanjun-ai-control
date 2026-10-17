@@ -2,7 +2,7 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,products:[],refundApplication:"",refundAmount:"",refundReason:""},
+  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:""},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
@@ -31,6 +31,16 @@ Page({
   },
   onUnload() {if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
+  async reloadProducts() {
+    if(this.data.pending||!this.session)return;this.setData({pending:true});
+    try{const r=await this.session.commerce(this.scene,'products',{});this.setData({products:r.products.map(p=>({...p,quantity:0})),status:'商品价格库存已更新'});}catch(e){this.setData({status:e.message});}finally{this.setData({pending:false});}
+  },
+  async loadOrders(e) {
+    if(this.data.pending||!this.session)return;this.setData({pending:true});
+    const more=e?.currentTarget?.dataset?.more==='true';
+    try{const r=await this.session.commerce(this.scene,'orders',{after_id:more?this.data.orderCursor||'':''});this.setData({orders:r.records,orderCursor:r.next_cursor,ordersMore:r.has_more});}catch(error){this.setData({status:error.message});}finally{this.setData({pending:false});}
+  },
+  selectOrder(e) {if(this.data.pending)return;if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.currentTarget.dataset.reference,refundApplication:'',afterAd:''});},
   inputRefund(e) {const field=e.currentTarget.dataset.field;if(['refundAmount','refundReason','refundApplication'].includes(field))this.setData({[field]:e.detail.value});},
   async requestRefund() {
     if(this.data.pending||!this.session||!this.data.commerceEnabled)return;

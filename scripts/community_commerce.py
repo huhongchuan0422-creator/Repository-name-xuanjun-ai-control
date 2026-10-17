@@ -115,9 +115,25 @@ class Commerce:
         if op in ('refund_apply','refund_application'):
             from scripts.community_refund_requests import RefundRequests
             return RefundRequests(self).consumer(token,scene,op,p)
-        fields = {'products': set(), 'purchase': {'reference', 'lines'}, 'purchase_read': {'reference'}}
+        fields = {'orders': {'after_id'}, 'products': set(), 'purchase': {'reference', 'lines'}, 'purchase_read': {'reference'}}
         if op not in fields or type(p) is not dict or set(p) != fields[op]:
             raise ValueError('INVALID_CONSUMER_COMMERCE_FIELDS')
+        if op=='orders':
+            after=p['after_id']
+            import re
+            if type(after) is not str or after and not re.fullmatch('[0-9a-f]{64}',after):raise ValueError('INVALID_CUSTOMER_ORDER_CURSOR')
+            rows=c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_ORDER' AND user_id=? AND project=? AND active=1 AND subject_idx>? ORDER BY subject_idx LIMIT 51",(uid,project,after)).fetchall()
+            records=[]
+            for key,payload in rows[:50]:
+                owned=json.loads(c.decrypt(payload,'community-order:'+key))
+                if owned['scope']!=identity:continue
+                try:order=state(self.runtime.demo.db,identity,owned['reference'])
+                except ValueError as exc:
+                    if str(exc)!='ORDER_NOT_FOUND':raise
+                    order=dict(state='CREATION_UNKNOWN_RECOVER_SAME_REFERENCE',amount_minor=owned['amount_minor'],currency='CNY',provider_settlement_verified=False)
+                basket=self._read(identity,project,'ORDER',owned['reference'])
+                records.append(dict(reference=owned['reference'],order=order,lines=basket['lines'] if basket else None,community_id=basket.get('community_id') if basket else None))
+            return dict(records=records,has_more=len(rows)>50,next_cursor=rows[49][0] if len(rows)>50 else None)
         if op == 'products':
             t, m, s = scope(identity)
             items = self.runtime.demo.merchant_db.execute('SELECT item_id FROM catalog_items WHERE tenant_id=? AND merchant_id=? AND store_id=? AND status=\'ACTIVE\' ORDER BY sort_order,item_id LIMIT 100', (t, m, s)).fetchall()
