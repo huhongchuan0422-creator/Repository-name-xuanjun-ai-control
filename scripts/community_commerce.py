@@ -131,6 +131,9 @@ class Commerce:
         uid, project, principal = i._resolve(token, scene)
         identity = self.runtime.bindings[principal]
         c = self.center
+        if op in ('communities','community_mine','community_join','community_leave','promotion_redeem'):
+            from scripts.community_consumer_communities import ConsumerCommunities
+            return ConsumerCommunities(self).consumer(token,scene,op,p)
         if op in ('profile_read','profile_update','referral_code','referral_bind','notices','notice_read'):
             from scripts.community_customer_profile import CustomerProfile
             return CustomerProfile(identity=i).consumer(token,scene,op,p)

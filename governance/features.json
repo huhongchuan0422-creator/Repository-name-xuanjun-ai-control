@@ -206,7 +206,9 @@
         "scripts/community_platform_merchants.py",
         "tests/test_community_platform_merchants.py",
         "scripts/community_applyment_conditions.py",
-        "tests/test_community_applyment_conditions.py"
+        "tests/test_community_applyment_conditions.py",
+        "scripts/community_consumer_communities.py",
+        "tests/test_community_consumer_communities.py"
       ]
     },
     {

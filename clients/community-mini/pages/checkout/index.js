@@ -2,16 +2,17 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:""},
+  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'', status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],products:[],orders:[],orderCursor:null,ordersMore:false,refundApplication:"",refundAmount:"",refundReason:""},
   async onLoad(options) {
     try {
       const config = getApp().globalData;
       if (config.mode !== 'OFFLINE') {
         const scene = parseScene(options);
         this.scene=scene;
+        if(typeof options.promotion==='string'&&/^cp_[0-9a-f]{32}$/.test(options.promotion))this.setData({promotionCode:options.promotion});
         this.session = createSession(wx,config.baseUrl);
         await this.session.login();
-        if(config.commerce===true){const listing=await this.session.commerce(scene,'products',{});this.setData({commerceEnabled:true,products:listing.products.map(p=>({...p,quantity:0}))});}
+        if(config.commerce===true){this.setData({commerceEnabled:true});try{const listing=await this.session.commerce(scene,'products',{});this.setData({products:listing.products.map(p=>({...p,quantity:0}))});}catch(error){this.setData({products:[],status:error.message+'；已有订单可继续查询和申请售后'});}}
         this.client = makeClient(body => this.session.transport(scene,body));
         if(config.payments===true){this.paymentFlow=createPaymentFlow(wx,(op,reference)=>this.session.payment(scene,op,reference));this.setData({paymentsEnabled:true,status:'请创建订单，或输入原订单号查询微信结果'});}
       } else {
@@ -42,6 +43,19 @@ Page({
       if(op==='profile_read'||op==='profile_update')this.setData({profileVersion:r.version,nickname:r.nickname,profileContact:r.contact,userId:r.user_id,projectCustomerId:r.project_customer_id});
       else if(op==='referral_code')this.setData({referralCode:r.code});else if(op==='notices')this.setData({notices:r.records});
       this.setData({status:op==='referral_bind'?'推荐关系已绑定':'个人中心已更新'});
+    }catch(error){this.setData({status:error.message});}finally{this.setData({pending:false});}
+  },
+  inputCommunity(e) {const field=e.currentTarget.dataset.field;if(['communityId','promotionCode'].includes(field))this.setData({[field]:e.detail.value});},
+  async communityAction(e) {
+    if(this.data.pending||!this.session)return;this.setData({pending:true});
+    try{const op=e.currentTarget.dataset.operation;let params={};
+      if(op==='communities')params={after_id:e.currentTarget.dataset.more==='true'?this.data.communityCursor||'':''};
+      else if(op==='community_join'||op==='community_leave')params={community_id:e.currentTarget.dataset.id||this.data.communityId};
+      else if(op==='promotion_redeem')params={code:this.data.promotionCode};
+      if(!['communities','community_mine','community_join','community_leave','promotion_redeem'].includes(op))throw Error('无效社区操作');
+      const r=await this.session.commerce(this.scene,op,params);
+      if(op==='communities')this.setData({communities:r.records,communityCursor:r.next_cursor,communitiesMore:r.has_more});
+      else this.setData({communityId:r.active?r.community_id:'',status:r.active?'社区关系已确认':'当前未加入社区'});
     }catch(error){this.setData({status:error.message});}finally{this.setData({pending:false});}
   },
   async reloadProducts() {
