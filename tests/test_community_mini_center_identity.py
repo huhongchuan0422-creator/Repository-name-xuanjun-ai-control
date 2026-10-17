@@ -82,6 +82,17 @@ class ExistingCenterComposition(unittest.TestCase):
         second=self.token('code2','openid2')
         with self.assertRaises(PermissionError):self.call(second,'community.receipt',{'reference':'order1'})
         self.assertEqual(self.call(first,'community.receipt',{'reference':'order1'})['order']['amount_minor'],101)
+    def test_revoked_order_binding_denies_read_and_cannot_be_reclaimed_after_restart(self):
+        token=self.token();self.checkout(token)
+        self.center.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_ORDER'")
+        with self.assertRaises(PermissionError):
+            self.call(token,'community.receipt',{'reference':'order1'})
+        self.reopen()
+        with self.assertRaises(PermissionError):
+            self.call(token,'community.receipt',{'reference':'order1'})
+        second=self.token('second_code','openid2')
+        with self.assertRaises(PermissionError):self.checkout(second)
+        self.assertEqual(self.stage.o.execute('SELECT count(*) FROM orders').fetchone()[0],1)
     def test_real_membership_revocation_takes_effect_immediately(self):
         token=self.token();self.center.db.execute("UPDATE members SET active=0 WHERE user_id=?",(self.uid1,))
         with self.assertRaises(PermissionError):self.call(token,'community.storefront')

@@ -151,7 +151,7 @@ class CenterIdentity(IdentityPort):
     def authorize_order_read(self,token,scene,reference,now):
         self._time(now);c=self.center
         uid,pid,principal=self._resolve(token,scene);key,identity=self._order_key(principal,reference)
-        record=c.db.execute("SELECT user_id,project,payload FROM links WHERE channel='COMMUNITY_ORDER' AND subject_idx=?",(key,)).fetchone()
+        record=c.db.execute("SELECT user_id,project,payload FROM links WHERE channel='COMMUNITY_ORDER' AND subject_idx=? AND active=1",(key,)).fetchone()
         if record is None or record['user_id']!=uid or record['project']!=pid:raise PermissionError('CUSTOMER_ORDER_DENIED')
         payload=json.loads(c.decrypt(record['payload'],'community-order:'+key))
         from scripts.community_order_store import state
