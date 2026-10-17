@@ -73,6 +73,8 @@ class Actions:
             self.provider_exists = True
             return {'status': self.terminal or 'PROCESSING'}
         if op == 'query_refund':
+            if not self.provider_exists:
+                raise ValueError('PROVIDER_ACTION_NOT_FOUND')
             return {'status': self.terminal or 'PROCESSING'}
         raise AssertionError(op)
 
