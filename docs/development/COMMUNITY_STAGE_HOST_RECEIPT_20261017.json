@@ -1,0 +1,76 @@
+{
+  "source_commit": "95840ff99d9267054aad25929a890dc4dabde05d",
+  "source_tree": "371f299eaad9dcd534903cb9b519bbaa4898c644",
+  "run_id": 39009563789,
+  "hosted": {
+    "job_id": 117328945177,
+    "community_python": 282,
+    "stage5_python": 342,
+    "javascript": 72,
+    "total_test_executions": 696,
+    "status": "SUCCESS",
+    "failed": 0,
+    "skipped": 0,
+    "python": "3.12",
+    "cryptography": "50.0.2"
+  },
+  "domestic_isolated": {
+    "job_id": 117329232769,
+    "host": "iZvt5t8tlrm8oiZ",
+    "uid": 1002,
+    "tests": 94,
+    "status": "PASS",
+    "failed": 0,
+    "skipped": 0,
+    "python": "3.11.6",
+    "cryptography": "46.0.3",
+    "root_called": false,
+    "global_package_changes": 0,
+    "production_install": "NOT_EXECUTED",
+    "provider_network": "SYNTHETIC_FIXTURES",
+    "money_operations": false,
+    "overlaps_hosted_suites": true
+  },
+  "source_artifact": {
+    "id": 12091957731,
+    "outer_zip_sha256": "9f97320e2f6422a23b11761bbb51f7fb280801376b5fce586505a2aa7e2f2d21",
+    "inner_zip_sha256": "3359b0cebf57cecf8ba23740b22f822e69c0cb019d259046357162df5208bdf8",
+    "inner_zip_bytes": 853402,
+    "manifest_files_verified": 154
+  },
+  "domestic_artifact": {
+    "id": 12092332384,
+    "outer_zip_sha256": "28706a5651a9a6c99c47bea12ab2585539b10b86a1632aa7f65351ee83ae0cb6",
+    "receipt_head_verified": true
+  },
+  "reused_native_preview": {
+    "run_id": 39006945633,
+    "job_id": 117321450248,
+    "status": "DEVELOPMENT_PREVIEW_UPLOADED",
+    "native_source_changed_since_preview": false
+  },
+  "canonical_external_state": {
+    "pr122_latest_checked_comment": 6230544008,
+    "collected_utc": "2026-10-17T06:10:27Z",
+    "dedicated_customer_account": "ABSENT_IN_REPORTED_NSS",
+    "dedicated_customer_group": "ABSENT_IN_REPORTED_NSS",
+    "production_customer_runtime": "ABSENT_IN_REPORTED_METADATA",
+    "installed_customer_center": "NOT_VERIFIED",
+    "finance_service": "NOT_FOUND_IN_INSPECTED_SOURCE",
+    "phase1_full_acceptance": false,
+    "phase2_full_acceptance": false,
+    "stage_review_requested": false,
+    "official_account": "OWNER_DEFERRED",
+    "metadata_job_id": 117327015123,
+    "metadata_sha256": "6992b8547e8b6ed1e478d32e5c54a5f26eb93afe66866ccae0cb40ddcbdd5e7e",
+    "metadata_raw_log_digest_recomputed": true,
+    "interpreter_venv": "WORKED_IN_OUR_ISOLATED_BUILD_NOT_A_PRODUCTION_INSTALL"
+  },
+  "next_dependencies": [
+    "Original Center owner supplies admitted service instance/API, protected KMS and real customer/project/store mapping",
+    "Admitted HTTPS mini backend, registered domain and true device login",
+    "Real submerchant binding, trusted WeChat public key/id, authoritative Finance reconciliation/consumer interface",
+    "Original production deployment and DB migration/recovery gates; no parallel host writer"
+  ],
+  "scope": "Development and isolated runtime evidence only; not independent audit or production acceptance"
+}
