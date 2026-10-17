@@ -4,7 +4,7 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 function page(failProducts=false,receipt=null){
  let definition;const calls=[];
- const session={login:async()=>{},clear:()=>{},transport:async()=>{},payment:async()=>{},commerce:async(scene,operation,params)=>{calls.push({scene,operation,params});if(operation==='products'){if(failProducts)throw Error('暂停交易');return {products:[]};}if(operation==='receipt_ad'){if(typeof receipt==='function')return receipt(scene,params);return {payment_success_verified:false,creative:null};}if(operation==='communities')return {records:[{id:'co_fixture',name:'fixture'}],has_more:false,next_cursor:null};return {community_id:'co_fixture',active:true};}};
+ const session={login:async()=>{},clear:()=>{},transport:async()=>{},payment:async()=>{},commerce:async(scene,operation,params)=>{calls.push({scene,operation,params});if(operation==='products'){if(failProducts)throw Error('暂停交易');return {products:[]};}if(operation==='receipt_ad'){if(typeof receipt==='function')return receipt(scene,params);return {payment_success_verified:false,creative:null};}if(operation==='project_messages')return {records:[{id:'m_fixture',body:'历史反馈',status:'ARCHIVED',channel:'WEB',created:100}]};if(operation==='communities')return {records:[{id:'co_fixture',name:'fixture'}],has_more:false,next_cursor:null};return {community_id:'co_fixture',active:true};}};
  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:value=>{definition=value;},require:path=>path==='../../client'?{makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})}:path==='../../payment'?{createPaymentFlow:()=>({reset(){}})}:{parseScene:o=>o.scene,createSession:()=>session},getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid',commerce:true,payments:true}}),wx:{}});
  const result={...definition,data:{...definition.data},setData(values){Object.assign(this.data,values);}};
  return {result,calls};
@@ -44,4 +44,12 @@ test('unverified or unavailable creative never changes paid status',async()=>{
   assert.equal(result.data.afterAd,'');assert.equal(result.data.afterAdVerified,false);
   assert.match(result.data.status,/微信查单已支付/);
  }
+});
+
+test('project feedback archive read uses current mini session and remains archived',async()=>{
+ const {result,calls}=page();await result.onLoad({scene:'shop1'});
+ await result.projectAction({currentTarget:{dataset:{operation:'project_messages'}}});
+ assert.equal(calls.at(-1).operation,'project_messages');
+ assert.equal(result.data.projectMessages[0].status,'ARCHIVED');
+ assert.match(result.data.status,/不代表已获得人工回复/);
 });
