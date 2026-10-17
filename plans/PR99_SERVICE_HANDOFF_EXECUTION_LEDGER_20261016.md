@@ -237,3 +237,14 @@ Actual run38999602793/job117299532997 SUCCESS, source ac609bb1ec41667261266056e3
 Confirmed local forwards Tokyo19443→peer18443; reverse peer19444→Tokyo20443; novel local18761→peer18760 plus reverse19444→Tokyo20443. Exact peers and configuration overrides still require gap closure; never infer final connectivity from these bindings. Tokyo cloudflared3 plus tailscale container remain dependencies, not migrated merely by listing. Domestic PR122 apex/current and winctl18444 belong existing work and are protected. V1 projection truncates nginx directive lists and does not explicitly report missing cron spools; not whole-host completeness. No runtime installation/cutover acceptance.
 
 Automatic trigger removed after terminal completion in e17c91b18152b2e76e58e50ec6c8ebbc900e5942. Original v4 stays consumed. Next bounded endpoint/explicit root-admin spool/container-network/nginx-include metadata workflow source45cb158340ca11e26e9601a816afc06ad3c7c044; run39000291289 created and queued when recorded, no completion claim. Helper0b715b1434aeaf059c9bc45ecd5aa78336d97b66 SHAac3225a71c32c597f789a7ff0f096ddffd25cdecd551d845f7d81ae0bb71a50c. No UK/P2 host commands or Finance actions.
+
+
+## 国内独立版本落盘、重启及触发衔接修复（2026-10-17）
+
+源码run39001447378/job117305049170/Invoke t-sh070a0uibttwqo：124源码落盘。运行副本run39002237032/job117307415381/Invoke t-sh070a1ykb562o0：2906文件114962378字节4链接，逐文件核验PASS；目标/opt/xuanjun-migration-s07/releases/domestic-r1。原165初步数据不是final checkpoint。
+
+run39003075282/job117309891067/Invoke t-sh070a35kmwvu2o：新版本复制品三应用连续两轮HTTP200；每轮临时进程全停、监听全清、protected未变。contact/customer_service错误请求404，不属于完整鉴权通过。结构化回执evidence/pr99-service-handoff/s09-install-candidate/RESTART_ACCEPTANCE_20261017.json；持久服务未安装、入口未切换。
+
+发现自身提交同时触发通知回合，以及PR路径过滤按累计diff造成重复workflow。已取消通知的commit_updates，保留PR99评论/审核与enabled；实际主机批workflow均已移除PR自动触发。重触发run39003103198/job117309973655/Invoke t-sh070a371eaocn4真实Failed，随后仅DescribeInvocationResult查询run39003189371/job117310223603确认FileExistsError/HOLD。对应源码在既有restart-acceptance-v1独占mkdir前无应用启动；不能覆盖既有尝试。没有重发该主机命令。
+
+当前没有本窗口仍在运行的迁移主机命令，不能宣称常驻后台执行。旧5文件候选仍NOT_INSTALLABLE；实际下一工作是完成持久运行身份、桥接实际地址及写入集合绑定、可执行安装/启动/回滚事务并取得原准确独立主机准入。六个生产大节点仍未关闭；英国模型替代端由原P2负责，东京20443、四Finance timers及VPN/Cloudflare职责未接续前不得退役。用户授权已具备，不要求Owner重新贴命令/凭据；不得把尚未完成的安装代码包装成权限不足。
