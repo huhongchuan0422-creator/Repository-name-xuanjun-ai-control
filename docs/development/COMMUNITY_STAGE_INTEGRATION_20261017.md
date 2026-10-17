@@ -104,7 +104,7 @@ Playwright固定1.55.0并安装Chromium；缺少浏览器不允许标完整PASS�
 
 ## 尚不能关闭的阶段门禁
 
-PHASE1_FULL_ACCEPTANCE=NO；PHASE2_FULL_ACCEPTANCE=NO。微信开发者工具实际编译、上传与预览并没有执行；真实Identity实现和现场验证尚未取得，不得把浏览器模拟当成小程序验收。真实Identity、微信服务商验签与Finance接线、旧生产DB迁移及生产安装包仍缺。独立审核只在完整阶段候选和全部证据齐备后集中提出。本批不是完整阶段交付，也不是新的审核申请。
+PHASE1_FULL_ACCEPTANCE=NO；PHASE2_FULL_ACCEPTANCE=NO。小程序开发预览已上传成功；原Center Identity源码组合已实现，现场实例与微信真机登录仍未验收。权威Finance消费端、旧生产DB迁移及生产安装准入仍缺。独立审核只在完整阶段候选和全部证据齐备后集中提出。本批不是完整阶段交付，也不是新的审核申请。
 
 新增community_stage_package.py生成确定性离线源码ZIP，原生工程/全部community与stage5源码和测试/页面纳入Manifest逐文件SHA256；明确不可安装、资金与部署HOLD。归档不包含环境凭据、数据库或证书。
 
@@ -197,3 +197,10 @@ Owner要求通过已有服务器执行小程序预览。mini-preview改用已有
 宿主集成所需公开契约：MiniApplication由既有Center宿主注入原Center实例及受保护场景/门店映射，listen_proxy使用现有Nginx Unix peer身份和已准入HTTPS域名；/mini/login、/mini/api、/mini/logout、/mini/bind保留原请求字段与会话/CSRF保护。签名SaaS通知通过SaasProviderEvidence与notification_path/make_handler进入原FINANCE_EVIDENCE，不调用独立Finance余额写入。该Python实例组合不是跨主机Identity RPC的替代；若最终项目容器与Center分离，必须由原客户中心提供受保护的统一服务接口后实现IdentityPort，不能挂载/复制原账号库来假装接通。
 
 旧国内Job117327880511现已FAILED，停止于checkout，应用测试未运行；新任务可在其退出后启动。补齐Unix宿主实际权限约束：必须非root应用用户，socket父目录group必须为配置的Nginx group，跨UID代理时须具备组遍历/读取权限，拒绝0700目录造成假就绪。新增拒绝缺少代理组遍历权限检查；CI与国内均使用非root身份实测。
+
+
+### 商家工作台功能开发（2026-10-17 15:40后）
+
+新增/merchant/workbench及独立workbench.html/css/js，使用原客户中心会话Cookie和X-CSRF-Token，宿主调用configureCommunityWorkbench({csrf,workspace})注入已授权工作台名称。没有角色选择器、演示业务数据或第二登录系统。默认不配置CenterOperations则路由关闭；登录/退出/切换账号须由宿主重新配置，立即清除资料和旧响应。页面复用原CenterOperations的逐次项目权限、入驻准入、限流和审计。
+
+已新增订单分页及状态筛选、当前筛选页CSV导出（整数分、模拟状态与未验结算标志、表格公式转义），员工可查订单但不能导出。门店设置读模型允许已开通的PAUSED门店读取并以原version保存资料，不再依赖仅供公开展示的ACTIVE接口。商品编辑与上下架复用原catalog_items；广告草稿创建、版本化状态变更、平台独立审核、有效时间与事件报表接原广告库；商家不可用页面按钮越过服务端平台权限。报表按门店、半开时间区间及游标分页，只统计原已记录事件，零展示点击率返回null，不代表独立访客或收入。对账仅原模拟预览，不发起资金操作。页面无生产权限授予，现场客户中心host接入与真实商户验收仍待交付。

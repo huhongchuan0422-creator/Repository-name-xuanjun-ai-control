@@ -44,6 +44,7 @@
     $('opening').textContent=app.status!=='APPROVED'?'':app.opening_state==='OPENED'?'商家工作台已开通；微信特约商户进件和收款权限尚未核验。':
       app.opening_state==='OPENING_PENDING'?'入驻审核已通过；工作台开通尚未完成，请由平台核对后恢复。':
       app.opening_state==='ACCESS_SUSPENDED'?'工作台访问已暂停，请联系平台核验资料与项目权限。':'平台入驻审核已通过；工作台权限待绑定。微信特约商户进件和收款权限尚未核验。';
+    if(app.opening_state==='OPENED'){const link=document.createElement('a');link.href='/merchant/workbench';link.textContent='进入商家工作台';$('opening').append(document.createTextNode(' '),link);}
     $('openingActions').hidden=!reviewMode||app.status!=='APPROVED'||app.opening_state==='OPENED'||!app.opening_workspaces?.length;
     $('openingWorkspace').replaceChildren();for(const workspace of app.opening_workspaces||[]){const option=document.createElement('option');option.value=workspace;option.textContent=workspace;$('openingWorkspace').append(option);}
     $('materials').replaceChildren();

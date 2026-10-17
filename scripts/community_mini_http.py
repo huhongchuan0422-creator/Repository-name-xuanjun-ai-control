@@ -48,7 +48,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                         ('Content-Security-Policy',"default-src 'none'")]:self.send_header(k,v)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_GET(self):
-            if onboarding is None:return self.answer(404,{'error':'NOT_FOUND'})
+            if onboarding is None and operations is None:return self.answer(404,{'error':'NOT_FOUND'})
             host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if self.headers.get_all('Host')!=[host]:return self.answer(403,{'error':'ORIGIN_DENIED'})
             if trusted_proxy is not None:
@@ -58,6 +58,11 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     '/merchant/review':('onboarding.html','text/html; charset=utf-8'),
                     '/merchant/onboarding.js':('onboarding.js','application/javascript; charset=utf-8'),
                     '/merchant/onboarding.css':('onboarding.css','text/css; charset=utf-8')}
+            if onboarding is None:assets={}
+            if operations is not None:
+                assets.update({'/merchant/workbench':('workbench.html','text/html; charset=utf-8'),
+                    '/merchant/workbench.js':('workbench.js','application/javascript; charset=utf-8'),
+                    '/merchant/workbench.css':('workbench.css','text/css; charset=utf-8')})
             if self.path not in assets:return self.answer(404,{'error':'NOT_FOUND'})
             from pathlib import Path
             name,mime=assets[self.path]
@@ -93,7 +98,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if not 0 < length <= limit:raise ValueError('INVALID_LENGTH')
                 session=self.headers.get('X-Center-Session','')
                 csrf=self.headers.get('X-Center-CSRF','')
-                if self.path=='/merchant/onboarding':
+                if self.path in ('/merchant/onboarding','/community/operations'):
                     cookies=[part.strip().partition('=')[2] for part in self.headers.get('Cookie','').split(';')
                              if part.strip().partition('=')[0]=='__Host-xj_customer']
                     if len(cookies)>1 or cookies and session or csrf and self.headers.get('X-CSRF-Token'):
@@ -103,7 +108,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     # Authenticate before accepting a large private upload body.
                     if session:
                         if not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-                        onboarding.center.session(session,csrf)
+                        (onboarding if self.path=='/merchant/onboarding' else operations).center.session(session,csrf)
                     elif length>16384:raise PermissionError('CENTER_SESSION_REQUIRED')
                 remaining=length;chunks=[];deadline=time.monotonic()+1
                 while remaining:
@@ -131,8 +136,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     result=onboarding.dispatch(session,csrf,body)
                 elif self.path=='/community/operations':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
-                    result=operations.dispatch(self.headers.get('X-Center-Session',''),
-                                               self.headers.get('X-Center-CSRF',''),body)
+                    result=operations.dispatch(session,csrf,body)
                 elif self.path=='/mini/bind':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=gateway.bind(self.headers.get('X-Center-Session',''),

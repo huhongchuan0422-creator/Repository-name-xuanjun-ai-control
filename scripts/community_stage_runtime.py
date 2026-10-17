@@ -46,9 +46,12 @@ class StageRuntime:
             'storefront': set(), 'qr': {'context'},
             'checkout': {'context', 'token', 'reference', 'amount_minor'},
             'receipt': {'reference'}, 'orders': set(), 'summary': set(),
+            'orders_page': {'limit','after_id','status'},
+            'orders_export': {'limit','after_id','status'},
+            'merchant_settings': set(),
             'refund_record': {'reference', 'event_id', 'amount_minor'},
             'refund_preview': {'reference'}, 'split_preview': {'reference', 'shares_bps'},
-            'reconciliation': set(), 'ads': set(),
+            'reconciliation': set(), 'ads': set(), 'ads_page': {'limit','after_id'},
             'ad_report': {'starts_at', 'ends_at', 'limit', 'after_id'},
             'profile': {'record', 'expected_version'}, 'item': {'item'},
             'ad_create': {'record'}, 'ad_state': {'campaign_id', 'state', 'expected_version'},
@@ -60,7 +63,10 @@ class StageRuntime:
         permissions={
             'orders':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'summary':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
+            'orders_page':{'STORE_STAFF','MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
+            'orders_export':{'MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
             'ads':{'MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'},
+            'ads_page':{'MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'},
             'ad_report':{'MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'},
             'ad_review':{'PLATFORM_REVIEWER','PLATFORM_OWNER'},
             'refund_preview':{'MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'},
@@ -69,6 +75,15 @@ class StageRuntime:
         }
         if name not in public and principal.role not in permissions.get(name,{'MERCHANT_ADMIN','PLATFORM_OWNER'}):
             raise PermissionError('ADMIN_ROLE_REQUIRED')
+        if name in ('orders_page','orders_export'):
+            from scripts.community_workbench import orders_page, orders_export
+            return (orders_export if name=='orders_export' else orders_page)(self.demo.db,identity,**params)
+        if name == 'merchant_settings':
+            from scripts.community_workbench import merchant_settings
+            return merchant_settings(self.demo.merchant_db,identity)
+        if name == 'ads_page':
+            from scripts.community_ad_store import list_campaigns
+            return list_campaigns(self.demo.ad_db,identity,**params)
         if name == 'ad_report':
             return metric_report(self.demo.ad_db, identity, **params)
         if name == 'receipt':
