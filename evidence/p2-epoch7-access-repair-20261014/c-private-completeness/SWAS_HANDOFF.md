@@ -730,3 +730,7 @@ if __name__ == '__main__':
         raise SystemExit(2) from None
 ```
 <!-- END P2_SITE_ENTRY_V1 -->
+
+
+## A5 isolated preflight source candidate
+A5-preflight is independent from REMOTE_RUN. Exact reviewed site entry bytes SHA256=92413e219578fe3fd55a72c00ce8236817354216cc45b4af40577a27104a84e0 must already be at /usr/local/libexec/xuanjun-p2-site/P2_SITE_ENTRY.py by a separately approved protected custodian; absent or changed file means HOLD, not bootstrap. The new action is manual/protected only and uses separately approved A5_PREFLIGHT_APPROVED one-use permit; journal intent precedes cloud dispatch; a5-query requires an independent fresh permit and saved InvokeId, never reruns. Real environment/journal protection, delivery, Owner trust, global writer proof and dispatch operator remain independent gates. Hosted tests cannot prove UK installation.

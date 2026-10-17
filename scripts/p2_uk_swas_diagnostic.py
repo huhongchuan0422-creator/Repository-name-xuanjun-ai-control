@@ -16,7 +16,7 @@ if __name__ == '__main__':
     try:
         import importlib.util
         target=Path(__file__).absolute().parent/'p2_swas_receipt_validator.py'
-        actions_mode=len(sys.argv)>1 and sys.argv[1] in ('remote-run','cloud-query')
+        actions_mode=len(sys.argv)>1 and sys.argv[1] in ('remote-run','cloud-query','a5-preflight','a5-query')
         if actions_mode:
             if (os.environ.get('GITHUB_EVENT_NAME')!='workflow_dispatch'
                     or os.environ.get('P2_SPLIT_ENABLED')!='true'):
@@ -427,7 +427,7 @@ def split_authorize(policy, binding, body, now):
     permit=json.loads(body.split('\n',1)[1],object_pairs_hook=receipt.unique)
     need(set(permit)=={'decision','binding','issued_unix','expires_unix',
                       'max_executions','install_allowed','private_inputs_allowed'})
-    need(permit['decision']=='UK_SPLIT_APPROVED' and permit['binding']==binding
+    need(permit['decision']==('A5_PREFLIGHT_APPROVED' if binding.get('operation') in ('A5_PREFLIGHT','A5_QUERY') else 'UK_SPLIT_APPROVED') and permit['binding']==binding
          and type(permit['max_executions']) is int and permit['max_executions']==1
          and permit['install_allowed'] is False and permit['private_inputs_allowed'] is False
          and type(permit['issued_unix']) is int and type(permit['expires_unix']) is int
@@ -435,6 +435,39 @@ def split_authorize(policy, binding, body, now):
          and 0<permit['expires_unix']-permit['issued_unix']<=7200)
     return True
 
+
+A5_SCRIPT = '/usr/local/libexec/xuanjun-p2-site/P2_SITE_ENTRY.py'
+A5_SHA = '92413e219578fe3fd55a72c00ce8236817354216cc45b4af40577a27104a84e0'
+
+def a5_command(request):
+    need(request.get('purpose')=='A5_METADATA_PREFLIGHT_ONLY' and
+         receipt.token(request.get('attempt')) and receipt.token(request.get('nonce')))
+    # The externally custodied script must already be present, exact and immutable.
+    return ("#!/bin/sh\nset -eu\n"
+            "printf '%s  %s\n' '"+A5_SHA+"' '"+A5_SCRIPT+"' | sha256sum -c - >/dev/null\n"
+            "exec /usr/bin/python3 -I -B "+A5_SCRIPT+" preflight\n")
+
+def a5_validate(detail, invoke):
+    need(detail.get('InvokeId')==invoke and detail.get('InstanceId')==receipt.INSTANCE
+         and detail.get('InvocationStatus')=='Success' and type(detail.get('ExitCode')) is int
+         and detail['ExitCode']==0)
+    raw=detail.get('Output')
+    need(type(raw) is str and len(raw.encode())<=8192)
+    o=json.loads(raw,object_pairs_hook=receipt.unique)
+    need(type(o) is dict and set(o)=={'schema','hostname','uid','python','paths','state',
+         'mutations','activation','unique_writer','private_materials_read','install_authorized'}
+         and type(o['schema']) is int and o['schema']==1
+         and o['hostname']==receipt.HOST and type(o['uid']) is int and o['uid']==0
+         and type(o['python']) is list and len(o['python'])==3
+         and all(type(v) is int for v in o['python']) and o['python'][:2]==[3,6]
+         and type(o['paths']) is dict and len(o['paths'])<=32
+         and o['state']=='METADATA_ONLY_NOT_WRITER_OR_TRUST_VERIFICATION'
+         and type(o['mutations']) is int and o['mutations']==0
+         and o['activation']=='NOT_OBSERVED' and o['unique_writer']=='UNKNOWN'
+         and o['private_materials_read'] is False and o['install_authorized'] is False)
+    return {'state':'A5_METADATA_PREFLIGHT_VERIFIED','invoke_id':invoke,
+            'redispatch_allowed':False,'private_inputs_read':False,
+            'writer_verified':False,'install_authorized':False}
 
 def remote_command(request):
     import base64
@@ -624,16 +657,19 @@ def validate_split_output(detail,invoke,request):
 
 def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''):
     """Explicit one-shot RUN or fresh-permit QUERY, backed by durable Git ref."""
-    need(action in ('remote-run','cloud-query'))
+    need(action in ('remote-run','cloud-query','a5-preflight','a5-query'))
     request=policy['request'];binding=policy['binding']
+    a5=action.startswith('a5-')
+    if a5:need(request.get('purpose')=='A5_METADATA_PREFLIGHT_ONLY')
+    else:need(request.get('purpose')!='A5_METADATA_PREFLIGHT_ONLY')
     need(type(request['expires_unix']) in (int,float))
-    if action=='remote-run':need(now()<request['expires_unix'])
-    script=remote_command(request)
+    if action in ('remote-run','a5-preflight'):need(now()<request['expires_unix'])
+    script=a5_command(request) if a5 else remote_command(request)
     need(binding['host']==receipt.HOST and binding['instance_id']==receipt.INSTANCE
          and binding['region']==receipt.REGION and binding['role']==ROLE
          and type(binding['target_config_sha256']) is str
          and re.fullmatch('[0-9a-f]{64}',binding['target_config_sha256']))
-    need(binding['operation']==('REMOTE_RUN' if action=='remote-run' else 'CLOUD_QUERY')
+    need(binding['operation']==({'remote-run':'REMOTE_RUN','cloud-query':'CLOUD_QUERY','a5-preflight':'A5_PREFLIGHT','a5-query':'A5_QUERY'}[action])
          and binding['attempt']==request['attempt']
          and binding['request_sha256']==hashlib.sha256(canonical(request)).hexdigest()
          and binding['command_sha256']==hashlib.sha256(script.encode()).hexdigest()
@@ -645,7 +681,7 @@ def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''
     public={'attempt':request['attempt'],'request_sha256':binding['request_sha256'],
             'command_sha256':binding['command_sha256'],'source_commit':binding['source_commit'],
             'target_config_sha256':binding['target_config_sha256']}
-    if action=='remote-run':
+    if action in ('remote-run','a5-preflight'):
         need(saved is None and not invoke_id)
         row=dict(public,state='CLOUD_DISPATCH_INTENT',invoke_id='')
         head=journal.write(row)
@@ -665,7 +701,7 @@ def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''
                  state='CLOUD_QUERY_UNKNOWN')
         head=journal.write(row,head)
     gate();rpc=rpc_factory();rpc.assume();gate()
-    if action=='remote-run':
+    if action in ('remote-run','a5-preflight'):
         try:
             response=rpc(ENDPOINT,'RunCommand',RegionId=receipt.REGION,InstanceId=receipt.INSTANCE,
                 CommandContent=script,Type='RunShellScript',WorkingUser='root',WorkingDir='/root',
@@ -688,7 +724,7 @@ def split_cloud(policy,journal,rpc_factory,read_approval,now,action,invoke_id=''
             return {'state':'CLOUD_QUERY_UNKNOWN','invoke_id':invoke_id,'redispatch_allowed':False}
         if detail.get('InvocationStatus')!='Success' or detail.get('ExitCode')!=0:
             result={'state':'TARGET_REJECTED_OR_FAILED','redispatch_allowed':False}
-        else:result=validate_split_output(detail,invoke_id,request)
+        else:result=a5_validate(detail,invoke_id) if a5 else validate_split_output(detail,invoke_id,request)
         gate()
         journal.write(dict(row,state=result['state']),head)
         return result
@@ -952,7 +988,7 @@ def supervise(action, seconds=240, operation=protected_entry):
 if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser()
-    parser.add_argument('action',choices=('run-once','query-existing','receive-identity','remote-run','cloud-query'))
+    parser.add_argument('action',choices=('run-once','query-existing','receive-identity','remote-run','cloud-query','a5-preflight','a5-query'))
     parser.add_argument('--attempt',default='')
     parser.add_argument('--invoke-id',default='')
     args=parser.parse_args()
@@ -963,7 +999,7 @@ if __name__=='__main__':
             need(len(raw)<=8192)
             request=json.loads(raw,object_pairs_hook=receipt.unique)
             raise SystemExit(supervise('run-once',operation=lambda unused:receive_identity(request)))
-        elif args.action in ('remote-run','cloud-query'):
+        elif args.action in ('remote-run','cloud-query','a5-preflight','a5-query'):
             raise SystemExit(supervise('run-once',operation=lambda unused:
                 actions_entry(args.action,args.attempt,args.invoke_id)))
         else:raise SystemExit(supervise(args.action))

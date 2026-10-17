@@ -886,3 +886,35 @@ class SitePreparationTests(unittest.TestCase):
                 old=self.s.DEST;self.s.DEST=lib/'receiver'
                 self.s.META_PATHS=tuple(self.s.DEST if p==old else p for p in self.s.META_PATHS)
                 self.baseline['paths'][str(self.s.DEST)]=self.baseline['paths'].pop(str(old))
+
+
+class A5Tests(unittest.TestCase):
+    def setUp(self):
+        self.request={'purpose':'A5_METADATA_PREFLIGHT_ONLY','attempt':'a5-test-attempt','nonce':'nonce_a5'}
+        self.row=dict(schema=1,hostname=d.receipt.HOST,uid=0,python=[3,6,8],paths={},
+                      state='METADATA_ONLY_NOT_WRITER_OR_TRUST_VERIFICATION',mutations=0,
+                      activation='NOT_OBSERVED',unique_writer='UNKNOWN',
+                      private_materials_read=False,install_authorized=False)
+        self.detail=dict(InvokeId='t-a5',InstanceId=d.receipt.INSTANCE,
+                         InvocationStatus='Success',ExitCode=0,Output=json.dumps(self.row))
+    def test_command_fixed(self):
+        self.assertEqual(d.a5_command(self.request),d.a5_command(dict(self.request)))
+        self.assertIn(d.A5_SHA,d.a5_command(self.request))
+        self.assertNotIn('receive-identity',d.a5_command(self.request))
+    def test_purpose_rejected(self):
+        with self.assertRaises(RuntimeError):d.a5_command(dict(self.request,purpose='REMOTE_RUN'))
+    def test_attempt_rejected(self):
+        with self.assertRaises(RuntimeError):d.a5_command(dict(self.request,attempt='../bad'))
+    def test_receipt_valid_no_writer(self):
+        self.assertFalse(d.a5_validate(self.detail,'t-a5')['writer_verified'])
+    def test_receipt_mutation_rejected(self):
+        with self.assertRaises(RuntimeError):
+            d.a5_validate(dict(self.detail,Output=json.dumps(dict(self.row,mutations=1))),'t-a5')
+    def test_receipt_unsafe_target_rejected(self):
+        with self.assertRaises(RuntimeError):d.a5_validate(dict(self.detail,InstanceId='bad'),'t-a5')
+    def test_receipt_fake_root_rejected(self):
+        with self.assertRaises(RuntimeError):
+            d.a5_validate(dict(self.detail,Output=json.dumps(dict(self.row,uid=True))),'t-a5')
+    def test_receipt_extra_fields_rejected(self):
+        with self.assertRaises(RuntimeError):
+            d.a5_validate(dict(self.detail,Output=json.dumps(dict(self.row,extra='bad'))),'t-a5')
