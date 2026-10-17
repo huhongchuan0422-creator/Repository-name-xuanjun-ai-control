@@ -83,5 +83,31 @@ class JournalTests(unittest.TestCase):
         with sqlite3.connect(self.path) as db:
             self.assertEqual(0,db.execute("SELECT count(*) FROM contract_frozen_candidate").fetchone()[0])
 
+
+    def test_replace_paths_rejected_and_old_row_preserved(self):
+        from single_contract_freeze import canonical_bytes, freeze
+        self.j.submit("prj1","cust1","req1",sample())
+        data=sample();data["quote_version"]="q2"
+        changed=freeze(data)
+        old=self.j.read("prj1","cust1","contract1","req1")
+        for verb,request,payload in [
+            ("INSERT OR REPLACE","req1",changed),
+            ("REPLACE INTO","req1",changed),
+            ("INSERT OR REPLACE","req2",old),
+            ("REPLACE INTO","req2",old)]:
+            with sqlite3.connect(self.path) as db:
+                with self.assertRaises(sqlite3.DatabaseError):
+                    db.execute(verb+" contract_frozen_candidate (project_id,contract_id,request_id,candidate_sha,candidate_json) VALUES (?,?,?,?,?)",
+                        ("prj1","contract1",request,payload["contract_document_hash"],canonical_bytes(payload)))
+            self.assertEqual(old,self.j.read("prj1","cust1","contract1","req1"))
+
+    def test_corrupted_digest_replay_is_rejected(self):
+        self.j.submit("prj1","cust1","req1",sample())
+        with sqlite3.connect(self.path) as db:
+            db.execute("DROP TRIGGER contract_frozen_no_update")
+            db.execute("UPDATE contract_frozen_candidate SET candidate_sha=?",("0"*64,))
+        with self.assertRaisesRegex(ContractHold,"CORRUPT_CANDIDATE_DIGEST"):
+            self.j.submit("prj1","cust1","req1",sample())
+
 if __name__=="__main__":
     unittest.main()
