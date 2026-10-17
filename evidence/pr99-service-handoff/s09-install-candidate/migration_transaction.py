@@ -54,7 +54,7 @@ def exact_keys(value, keys, code):
 def source_manifest():
     base = Path(__file__).parent
     return {name: hashlib.sha256((base / name).read_bytes()).hexdigest()
-            for name in ('migration_transaction.py', 'production_start.py', 'stopped_transaction.py', 'final_materials.py')}
+            for name in ('migration_transaction.py', 'production_start.py', 'stopped_transaction.py', 'final_materials.py', 'production_transport.py')}
 
 
 def validate_plan(plan, expected_digest, now):
@@ -75,7 +75,7 @@ def validate_plan(plan, expected_digest, now):
             plan['independent_review_comment_id'] > 0, 'REVIEW_REQUIRED')
     require(plan['steps'] == list(STEPS), 'EXACT_STEP_ORDER')
     hashes = plan['source_hashes']
-    exact_keys(hashes, ('migration_transaction.py', 'production_start.py', 'stopped_transaction.py', 'final_materials.py'), 'SOURCE_SET')
+    exact_keys(hashes, ('migration_transaction.py', 'production_start.py', 'stopped_transaction.py', 'final_materials.py', 'production_transport.py'), 'SOURCE_SET')
     require(all(type(v) is str and SHA.fullmatch(v) for v in hashes.values()), 'SOURCE_DIGEST')
     bindings = plan['bindings']
     exact_keys(bindings, ('writer_inventory', 'protected_inventory', 'final_manifest_contract',

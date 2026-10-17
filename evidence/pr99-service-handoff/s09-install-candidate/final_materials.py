@@ -165,3 +165,69 @@ def restore_owned_route(route, state):
     sync_directory(route.parent)
     require(read_regular(route) == old, 'ROLLBACK_POSTCHECK_UNKNOWN')
     return {'status': 'FILE_RESTORED_RELOAD_AND_HTTPS_PENDING', 'source_writer_resumed': False}
+
+
+def snapshot_sqlite_fenced(source, destination, verify_fence, expected_schema_sha256,
+                           clock=None):
+    """WAL-aware backup of a *copied*, externally fenced SQLite file set.
+
+    Reuses the S07 stage_runtime_materials SQLite backup/integrity mechanism, but
+    never connects SQLite to the original source. Only captured copies are opened.
+    This cannot establish the source fence or choose the authoritative database.
+    Private copies, partial database and failures are retained without replay.
+    """
+    import sqlite3
+    import time
+    clock = clock or time.monotonic
+    source, destination = Path(source), Path(destination)
+    require(source.is_absolute() and destination.is_absolute() and '..' not in source.parts and
+            '..' not in destination.parts, 'ABSOLUTE_CANONICAL_PATH')
+    require(source != destination and destination not in source.parents and source not in destination.parents,
+            'SOURCE_DESTINATION_OVERLAP')
+    proof = verify_fence()
+    require(type(proof) is str and len(proof) == 64 and all(c in '0123456789abcdef' for c in proof),
+            'FENCE_PROOF_REQUIRED')
+    require(type(expected_schema_sha256) is str and len(expected_schema_sha256) == 64 and
+            all(c in '0123456789abcdef' for c in expected_schema_sha256), 'SCHEMA_BINDING_REQUIRED')
+    wal = source.with_name(source.name + '-wal')
+    source_files = [source] + ([wal] if os.path.lexists(wal) else [])
+    copied = {p.name: read_regular(p) for p in source_files}
+    require(sum(map(len, copied.values())) <= 536870912, 'SQLITE_SET_BOUND')
+    for p in (destination.parent, *destination.parent.parents):
+        require(not p.is_symlink(), 'DESTINATION_SYMLINK')
+    destination.mkdir(mode=0o700); sync_directory(destination.parent)
+    capture = destination / 'captured'; capture.mkdir(mode=0o700)
+    for p in source_files:
+        suffix = '-wal' if p == wal else ''
+        write_bytes(capture / ('source.db' + suffix), copied[p.name], 0o600)
+    target = destination / 'final.db'
+    # Exclusive creation consumes the output before SQLite opens it.
+    write_bytes(target, b'', 0o600)
+    started = clock()
+    src = sqlite3.connect((capture / 'source.db').as_uri() + '?mode=ro', uri=True, timeout=5)
+    dst = sqlite3.connect(str(target), timeout=5)
+    def progress(status, remaining, total):
+        require(clock() - started < 90, 'SQLITE_BACKUP_TIMEOUT')
+    try:
+        src.backup(dst, pages=128, progress=progress, sleep=0.05)
+        require(dst.execute('PRAGMA integrity_check').fetchall() == [('ok',)], 'SQLITE_INTEGRITY')
+        schema = dst.execute("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").fetchall()
+        require(sha(encode(schema)) == expected_schema_sha256, 'SQLITE_SCHEMA_MISMATCH')
+    finally:
+        dst.close(); src.close()
+    require(verify_fence() == proof, 'FENCE_CHANGED_PRESERVE')
+    after_files = [source] + ([wal] if os.path.lexists(wal) else [])
+    require(after_files == source_files and
+            all(read_regular(p) == copied[p.name] for p in source_files), 'SOURCE_CHANGED_PRESERVE')
+    raw = read_regular(target)
+    target.chmod(0o400)
+    fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+    try: os.fsync(fd)
+    finally: os.close(fd)
+    sync_directory(destination)
+    receipt = {'class': 'FINAL_FENCED_SQLITE_CANDIDATE', 'fence_proof_sha256': proof,
+               'sha256': sha(raw), 'bytes': len(raw), 'schema_sha256': expected_schema_sha256,
+               'integrity': 'PASS', 'source_wal_captured': wal in source_files,
+               'source_database_opened': False}
+    exclusive(destination / 'sqlite-checkpoint.receipt.json', receipt)
+    return receipt

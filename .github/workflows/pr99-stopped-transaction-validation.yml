@@ -11,6 +11,12 @@ on:
       - 'evidence/pr99-service-handoff/s09-install-candidate/final_materials.py'
       - 'evidence/pr99-service-handoff/s09-install-candidate/test_migration_transaction.py'
       - 'evidence/pr99-service-handoff/s09-install-candidate/test_final_materials.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/production_transport.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/test_production_transport.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/test_production_durable.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/test_final_sqlite.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/test_final_admission.py'
+      - 'evidence/pr99-service-handoff/aliyun-execution/s07_private_coordinator.py'
       - '.github/workflows/pr99-stopped-transaction-validation.yml'
 permissions:
   contents: read

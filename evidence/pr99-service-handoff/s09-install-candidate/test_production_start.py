@@ -21,7 +21,8 @@ class StartTests(unittest.TestCase):
  def test_start_failure_preserves_data_and_stops_owned(self):
   with tempfile.TemporaryDirectory() as d:
    state=Path(d)/'state';p={'unit_hashes':{'x.service':m.sha(b'owned')},'source_writer_fence_receipt_sha256':'a'*64,'expires_at':99999999999}
-   with patch.object(m,'STATE',state),patch.object(m,'admit',lambda:(p,{'x.service':b'owned'})),patch.object(m,'stopped',lambda n:True),patch.object(m,'health',lambda port:None),patch.object(m,'read',lambda p:b'permit'),patch.object(m,'create',lambda p,b,mode=0o600:None),patch.object(m,'ctl',side_effect=RuntimeError('injected')),patch.object(m,'rollback_owned',return_value={'status':'OWNED_APPS_STOPPED_DATA_PRESERVED'}) as rollback,patch.object(m.os.path,'lexists',lambda p:False):
+   with patch.object(m,'STATE',state),patch.object(m,'admit',lambda:(p,{'x.service':b'owned'})),patch.object(m,'stopped',lambda n:True),patch.object(m,'health',lambda port:None),patch.object(m,'read',lambda p:b'permit'),patch.object(m,'create',lambda p,b,mode=0o600:None),patch.object(m,'ctl',side_effect=m.KnownEffectFailure('injected')),patch.object(m,'rollback_owned',return_value={'status':'OWNED_APPS_STOPPED_DATA_PRESERVED'}) as rollback,patch.object(m.os.path,'lexists',lambda p:False):
     with self.assertRaisesRegex(RuntimeError,'injected'):m.start()
-    rollback.assert_called_once_with({'x.service':b'owned'})
+    self.assertEqual(rollback.call_args.args,({'x.service':b'owned'},))
+    self.assertTrue(callable(rollback.call_args.kwargs['effect']))
 if __name__=='__main__':unittest.main()
