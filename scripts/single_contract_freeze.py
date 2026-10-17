@@ -5,6 +5,7 @@ principal and verify document/quote provenance before invoking. This module neve
 executes payment, deploys, signs, or handles raw secrets. Python 3.6 compatible.
 """
 from __future__ import unicode_literals
+import copy
 import hashlib
 import json
 import re
@@ -133,8 +134,8 @@ def freeze(snapshot):
     frozen = {
         "schema": "xuanjun.single-contract.offline.v1",
         "scope": {k: snapshot[k] for k in REQUIRED},
-        "features": features,
-        "resources": items,
+        "features": copy.deepcopy(features),
+        "resources": copy.deepcopy(items),
         "payment_cny": {
             "development_first_50pct": str(first_dev),
             "development_final_after_acceptance_50pct": str(first_dev),
