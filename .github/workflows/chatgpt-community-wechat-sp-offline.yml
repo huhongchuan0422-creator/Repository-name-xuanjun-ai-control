@@ -5,7 +5,9 @@ on:
       - feature/chatgpt-community-wechat-sp-offline-20261017
     paths:
       - scripts/community_wechat_sp_offline_guard.py
+      - scripts/community_wechat_sp_mock_checkout_view.py
       - tests/test_community_wechat_sp_offline_guard.py
+      - tests/test_community_wechat_sp_mock_checkout_view.py
       - .github/workflows/chatgpt-community-wechat-sp-offline.yml
   workflow_dispatch:
 permissions:
@@ -20,4 +22,4 @@ jobs:
           persist-credentials: false
       - name: Offline standard-library tests only
         run: |
-          python3 -B -m unittest discover -s tests -p 'test_community_wechat_sp_offline_guard.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_community_wechat_sp_*.py' -v
