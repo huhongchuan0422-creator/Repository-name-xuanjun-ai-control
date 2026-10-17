@@ -7,6 +7,24 @@ import test_community_reports as fixtures
 from scripts.community_provider_bills import ProviderBills,minor,parse
 from scripts.community_provider_reference import provider_order_reference
 
+class FinanceRefundEvidenceValidation(unittest.TestCase):
+    def test_refund_total_rejects_boolean_negative_and_string_amounts(self):
+        from scripts.community_financial_views import verified_refund_total
+        from scripts.pr122_customer_core import canonical
+        class DB:
+            def __init__(self,event):self.event=event
+            def execute(self,sql,args):
+                return [(canonical(self.event).decode(),)]
+        identity=dict(tenant_id='tenant1',merchant_id='merchant1',store_id='store1')
+        for amount in (True,-1,0,'100',1.0):
+            db=DB(dict(source='WECHAT_SIGNED_REFUND_RESULT',refund_minor=amount))
+            with self.assertRaisesRegex(ValueError,'INVALID_SIGNED_REFUND_LEDGER_AMOUNT'):
+                verified_refund_total(db,identity,'order1')
+        self.assertEqual(verified_refund_total(DB(dict(source='WECHAT_SIGNED_REFUND_RESULT',
+                         refund_minor=20)),identity,'order1'),20)
+        self.assertEqual(verified_refund_total(DB(dict(source='OTHER',refund_minor=-10)),
+                         identity,'order1'),0)
+
 class BillJourney(unittest.TestCase):
     @classmethod
     def setUpClass(cls):fixtures.CommunityReportJourney.setUpClass()
