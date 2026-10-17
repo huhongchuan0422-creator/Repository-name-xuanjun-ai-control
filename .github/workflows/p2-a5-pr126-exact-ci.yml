@@ -1,5 +1,7 @@
 name: PR126 exact A5 source offline validation (no UK)
 on:
+  pull_request:
+    branches: [release/p2-a5-reviewed-entry-20261017]
   push:
     branches: [ci/p2-a5-pr126-exact-8543161a-20261017]
     paths: [.github/workflows/p2-a5-pr126-exact-ci.yml]
