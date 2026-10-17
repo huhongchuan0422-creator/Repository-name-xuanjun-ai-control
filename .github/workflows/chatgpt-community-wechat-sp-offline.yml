@@ -1,0 +1,23 @@
+name: Community WeChat SP Offline Gate
+on:
+  push:
+    branches:
+      - feature/chatgpt-community-wechat-sp-offline-20261017
+    paths:
+      - scripts/community_wechat_sp_offline_guard.py
+      - tests/test_community_wechat_sp_offline_guard.py
+      - .github/workflows/chatgpt-community-wechat-sp-offline.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Offline standard-library tests only
+        run: |
+          python3 -B -m unittest discover -s tests -p 'test_community_wechat_sp_offline_guard.py' -v
