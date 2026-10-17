@@ -1,0 +1,11 @@
+{
+  "dependencies": [
+    {
+      "path": "scripts/pr122_customer_core.py",
+      "source_commit": "bc9404216f2eb69dabf7754950a966238e758596",
+      "source_branch": "feature/work-pr122-site-hub-integration-20261016",
+      "sha256": "f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4",
+      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+    }
+  ]
+}

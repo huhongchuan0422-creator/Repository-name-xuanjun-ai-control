@@ -68,7 +68,8 @@
           "tests/test_community_mini_runtime_e2e.py",
           "clients/community-mini/session.test.cjs",
           "tests/test_community_wechat_sp_readonly.py",
-          "scripts/community_mini_key.test.cjs"
+          "scripts/community_mini_key.test.cjs",
+          "tests/test_community_mini_center_identity.py"
         ]
       },
       "reuse": [
@@ -144,7 +145,11 @@
         "scripts/community_wechat_sp_readonly.py",
         "tests/test_community_wechat_sp_readonly.py",
         "scripts/community_mini_key.cjs",
-        "scripts/community_mini_key.test.cjs"
+        "scripts/community_mini_key.test.cjs",
+        "scripts/community_mini_center_identity.py",
+        "scripts/pr122_customer_core.py",
+        "tests/test_community_mini_center_identity.py",
+        "docs/development/COMMUNITY_PINNED_DEPENDENCIES_20261017.json"
       ]
     },
     {

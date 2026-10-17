@@ -14,7 +14,9 @@ def build(root):
                 'demos/community-admin/*', 'clients/community-mini/*.js',
                 'clients/community-mini/*.json', 'clients/community-mini/*.cjs',
                 'clients/community-mini/pages/checkout/*',
-                'docs/development/COMMUNITY_STAGE_INTEGRATION_20261017.md')
+                'docs/development/COMMUNITY_STAGE_INTEGRATION_20261017.md',
+                'scripts/pr122_customer_core.py',
+                'docs/development/COMMUNITY_PINNED_DEPENDENCIES_20261017.json')
     paths = sorted({p for pattern in patterns for p in root.glob(pattern) if p.is_file()})
     files = {}
     for path in paths:

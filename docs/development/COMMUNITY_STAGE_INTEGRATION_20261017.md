@@ -103,3 +103,15 @@ community_mini_http.py新增本机login/api/logout运输；严格Host/Origin/重
 原生小程序新增显式恢复查询：重开页面后凭订单编号只查询既有订单，由Identity客户归属门禁控制，不会重新下单或触发资金操作。回填服务端原金额；同一已创建订单的金额快照变更被拒绝。该路径补齐客户端中断恢复，不代替生产Identity实现。
 
 第二次预览Run39003355408/job117310920432原始日志明确UPLOAD_KEY_NOT_PEM：既有Secret存在，但其值不是可解析的PEM；JSON引号/转义换行兼容后仍未到微信上传端。追加仅在确认为RSA私钥时接受base64编码的PEM/DER；对应测试确认归一化前后公钥相同，不改变密钥、不打印原文。若仍非私钥将停止该错误路径，不用假密钥或自动改写Secret。
+
+## 现有客户中心真实源码复用接线（本轮后续进展，取代此前“未找到实现”的依赖判断）
+
+在既有Work分支feature/work-pr122-site-hub-integration-20261016中定位实际客户中心源码。精确来源bc9404216f2eb69dabf7754950a966238e758596的scripts/pr122_customer_core.py原始SHA256=f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4；本分支逐字节复用该文件，未修改上游/Work分支和该文件字节，来源锁文件COMMUNITY_PINNED_DEPENDENCIES_20261017.json纳入源码包。不能以“旧模块在别处分支中”直接判断实现不存在。
+
+新增community_mini_center_identity.py真正实现IdentityPort，使用原Center数据库的accounts/sessions/links/events/audit/project/members，不新建任何表或用户数据库。mini session使用原sessions散列令牌、epoch和有效期；每次请求重查原项目成员角色、租户及当前provider绑定。原网页退出、项目撤权、微信解绑立即使mini访问失效；仅既有已验证账户可绑定，不创建管理员或新用户。protected Python绑定入口只接受既有网页会话和经可信微信交换取得的subject，不存在公开自报openid绑定接口。
+
+登录code先在原events原子消费，成功session/metadata在同一Center事务内写入；未知/失败消费记录跨重启保留。订单归属在原links加独立命名空间保留，原orders仍是唯一业务订单；创建前拒绝重用/历史未归属订单，收据比较真实uid、项目和原金额。Center事务与订单SQLite不是跨库原子事务，保留未知reservation并拒绝盲目重发，不假装已解决跨库金融提交。
+
+12项新增组合测试真正调用原账户注册/验证/登录、签名项目准入、原SQLite会话/权限/审计和持久重开，验证同门店第二客户拒绝、原退出/解绑/成员撤销立即生效、code和未知订单reservation持久。账号/邮箱、邮件送达、CRM签名和微信交换仍使用明确合成数据；这是实SQLite/原源码集成，不是生产用户或微信设备验收。
+
+第三次开发预览Run39003533437/job117311443454仍为UPLOAD_KEY_NOT_PEM（2026-10-17 12:43:38北京时间）。已覆盖标准PEM、JSON引号、转义换行、base64 PEM和有效RSA DER；现有GitHub Secret没有成为可解析的RSA上传私钥。停止自动重复此路径，不使用假key，不覆盖Secret；已有AppID/服务商配置保留。完整代码回归与原生预览失败分别登记，不合并为PASS，不送审。
