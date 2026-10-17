@@ -87,11 +87,11 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "51ebb6ce72541dcf55d1f9cf814912f6ebff9d5f",
-    "run_id": 39030295592,
-    "job_id": 117389227021,
+    "source": "cf01f58e9acefa98f34e1711c963ea9d80c2cbe3",
+    "run_id": 39030394638,
+    "job_id": 117389505111,
     "result": "SUCCESS",
-    "scope": "Exact Hosted source test success: trade/split statement and original merchant UBO distinct identity check; optional mini runtime/SDK/preview SKIPPED",
+    "scope": "Hosted exact source success after case-insensitive synthetic UBO duplicate rejection; mini preview/runtime/python/SDK SKIPPED",
     "covers_later_commits": false
   }
 }
