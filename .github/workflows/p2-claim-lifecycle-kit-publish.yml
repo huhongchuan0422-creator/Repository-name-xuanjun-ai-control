@@ -23,8 +23,8 @@ jobs:
         run: |
           set -euo pipefail
           umask 0077
-          PIN=7116e1a0cf28336520305c8c5a89f4c5995eb3ca
-          TREE=4b9a5f9c5e6439ac17a368f988c4d4d1b500662d
+          PIN=0bd83e6fb418ae04d4351b1de7eaf11a0325dd80
+          TREE=5d790e58f9f644985fdf063dfc1466eb9b28e66f
           ROOT=evidence/p2-epoch7-access-repair-20261014
           test "$(git rev-parse "$PIN^{tree}")" = "$TREE"
           mkdir -m 700 claim-lifecycle-published
@@ -51,7 +51,7 @@ jobs:
               entry=tar.extractfile(next(x for x in tar.getmembers() if x.name.endswith('/epoch7_recovery_entry.py'))).read()
               assert b'successor_resume' in entry
               assert result['business_phases_preserved']==16
-              assert result['output']['source_commit']=='7116e1a0cf28336520305c8c5a89f4c5995eb3ca'
+              assert result['output']['source_commit']=='0bd83e6fb418ae04d4351b1de7eaf11a0325dd80'
               assert hashlib.sha256(raw).hexdigest()==result['output']['manifest_sha256']
               assert manifest['files']['helpers/epoch7_approval.py']=='0587f0e1f81e7f70ab098a13b1e0a3b47cad40344e4237128716953f2ad34f55'
               assert manifest['files']['helpers/epoch7_claim_successor.py']=='583120b8692ba84a44a94dbf7a3927a8042465d535c8ce9e3ccc5eea0063122a'
