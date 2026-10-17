@@ -213,11 +213,11 @@
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_approval.py"
     },
     "tests/approval/test_epoch7_bounded_fetch.py": {
-      "sha256": "8c7b157ef839fceb52c9fdd7ab69e8308f45722f5372fbc2204c094a247134a8",
+      "sha256": "6ca129d61801102437807a80d9a53af79d2593c2ac8ddd20ccb833daede9ba0d",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_bounded_fetch.py"
     },
     "tests/approval/test_epoch7_complete_approval.py": {
-      "sha256": "3900a89acd5f9834c8345fb5ab01020d1e2f02ad5bab12900ceb5c8c7382049e",
+      "sha256": "332dad6c72fabf2a00ecbbd3199e7882898f7931f4759c0fce006eb8cd665fbe",
       "source": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_complete_approval.py"
     },
     "tests/command/test_epoch7_command_runner.py": {
