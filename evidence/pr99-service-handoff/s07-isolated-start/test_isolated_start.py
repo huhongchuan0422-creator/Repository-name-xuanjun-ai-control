@@ -10,6 +10,19 @@ class IsolatedTests(unittest.TestCase):
  def test_exact_script_command(self):
   got=N['launch_command']('/usr/bin/python3 scripts/secure_secrets_portal_server.py','scripts/secure_secrets_portal_server.py',18080)
   self.assertEqual(got[-1],'/opt/trading-system/scripts/secure_secrets_portal_server.py')
+ def test_observed_portal_serve_and_remote_revalidation(self):
+  entry='scripts/secure_secrets_portal_server.py'
+  got=N['launch_command']('/usr/bin/python3 /opt/trading-system/'+entry+' serve --host 127.0.0.1 --port 18080',entry,18080)
+  self.assertEqual(got,['/venv/bin/python','-B','-u','/opt/trading-system/'+entry,'serve','--host','127.0.0.1','--port','18080'])
+  import shlex
+  self.assertEqual(N['launch_command']('/usr/bin/python3 '+shlex.join(got[3:]),entry,18080),got)
+ def test_subcommand_scope_rejected(self):
+  for entry,tail,port in (
+   ('scripts/secure_secrets_portal_server.py','reset',18080),
+   ('scripts/secure_secrets_portal_server.py','serve serve',18080),
+   ('ai_service/wecom_customer_contact_service.py','serve',18781)):
+   with self.assertRaises(RuntimeError):
+    N['launch_command']('/usr/bin/python3 /opt/trading-system/'+entry+' '+tail,entry,port)
  def test_shell_and_unknown_entry_rejected(self):
   for cmd in ('/bin/sh -c something','/usr/bin/python3 /tmp/other.py'):
    with self.assertRaises(RuntimeError):N['launch_command'](cmd,'scripts/secure_secrets_portal_server.py',18080)
