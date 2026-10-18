@@ -494,3 +494,18 @@ CODE_COMMIT=ca609d47a9182436a8d47c59170869cf73002f7f；CODE_TREE=1ea6bb60c2cc829
 这批现场命令均已终态，无本窗口后台迁移任务，无生产Writer领取或切换。东京、国内桥接/Windows/Nginx保留，英国P2不在范围。现有通知已调整为取得实际迁移就绪证据再通知，普通源码/测试/文档更新不重复提醒；未新建自动化。
 
 完整证据：evidence/pr99-service-handoff/aliyun-execution/FINAL_HANDOFF_DELIVERY_20261019.json。
+
+
+## 2026-10-19 07:39 CST｜内核写入隔离/恢复实测通过，检查点容量缺陷已修复并安装v2
+
+新增原生能力实测：[run39177051953](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39177051953)/job117821838248，Invoke t-jpn70ghaiey7abk，07:34:29 CST，Success。固定东京root，在与项目根相同设备64771的独立46字节测试文件/目录上，真实FS_IOC不可变标志阻止已持有可写fd的pwrite、文件删除及目录新增；恢复原标志后写入成功，测试文件精确清理。没有操作生产数据标志、停止服务、领取生产Writer、执行原M99或创建第二控制器。该结果只关闭此文件系统内核原语能力验证，不等于原应用已排空/生产Fence已建立。
+
+发现并修复真实接线缺陷：生产端HeldProof支持2MiB检查点，旧Owner启动入口却以200000字节上限重复读取检查点，完整大清单会被拒绝。新入口每份证明只读一次，Fence/assignment限制16384，checkpoint限制2097152；哈希、数据集合、Writer/Fence和原状态/锁检查保留。CODE_COMMIT=50c02a0cd6336b4606a0296f927f0a298c8835db，TREE=47baa5ff3844e3225cf74e790464e6556e26e1f5。
+
+[CI39177322168](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39177322168)，Python3.11/job117822567488、3.12/job117822567666各21/21 PASS，完整日志已读。新增4项：3000文件的有效大检查点通过，超2MiB/错误哈希/数据成员变化拒绝。原17项受影响回归保留，其他113项源码未变继承原准确版本CI；未重新实现WAL、Writer或原账本。普通临时文件测试，非M99或实机生产启动。
+
+**修复已实际安装**：[run39177361574](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39177361574)/job117822706353，三个Invoke t-sh070gho12o2dc0、t-sh070ghombph7nk、t-sh070ghp84skav4均Success，07:39:10 CST取得终态回执。版本目录/opt/xuanjun-migration-s07/bin/owner-start-v2/owner_production_start.py，34243字节/SHA256 5f4cf2f5be4646054f8dc0a13fc1b7862f5e95ff7b7a6b39ba1e63faa00183b8，0400，完整字节与定义核验。旧版及原生产STATE、停止候选、原锁均保留；此新路径只是程序版本，不建立第二Writer/epoch/Journal。没有启动程序、传输生产数据或修改路由，protected未变。
+
+仍不标记迁移就绪：完整实际配置/权威数据/全部写入来源、原持久控制器fd/guard与真实入口封闭/排空、实际源查询/完整传输接收及canonical assignment尚未完成；原40文件受限发布/M99路径没有重试或变更环境绕过。Owner取消独审/许可等待继续有效，未重新增加Owner审核流程。本批4个主机命令均终态，无后台生产迁移任务；东京及国内桥接/Windows/Nginx保留，UK P2不在范围。
+
+完整证据：evidence/pr99-service-handoff/aliyun-execution/NATIVE_FENCE_CAPACITY_DELIVERY_20261019.json。
