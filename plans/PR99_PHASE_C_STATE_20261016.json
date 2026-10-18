@@ -1691,5 +1691,64 @@
     "production_services_installed": false,
     "production_cutover": false,
     "remaining_major_nodes": 6
+  },
+  "explicit_node_bindings_20261018": {
+    "schema": 1,
+    "status": "EXPLICIT_SOURCE_BINDINGS_AND_SYNTHETIC_CI_PASS_NOT_PRODUCTION_INTEGRATION_ACCEPTANCE",
+    "source_commit": "d5bc04c6e03d558b122341120f37d038dba87155",
+    "source_tree": "16208b878596af1ebfdb1444d9add99ca5991567",
+    "ci_run": 39129030692,
+    "completed_at": "2026-10-18T20:51:30+08:00",
+    "jobs": [
+      {
+        "python": "3.11",
+        "job": 117680179245,
+        "tests": 41,
+        "skipped": 0,
+        "conclusion": "success",
+        "artifact": 12137780040
+      },
+      {
+        "python": "3.12",
+        "job": 117680178875,
+        "tests": 41,
+        "skipped": 0,
+        "conclusion": "success",
+        "artifact": 12137785062
+      }
+    ],
+    "source_zip": {
+      "sha256": "276f17a2c8d39ae048815b1bd7228a3bc86be3fe330e509faf7b914654418ba7",
+      "bytes": 27602,
+      "members": 9,
+      "reproduction": "LOCAL_EXACT_COMMIT_TREE_MATCHES_BOTH_HOSTED_RECEIPTS",
+      "outer_actions_artifact_sha256": "f1ddfa032051f57dd1a137678d4d3bdba97cb12c4b030c5714e7f4f6a6b7751e"
+    },
+    "increment": {
+      "new_tests": 18,
+      "wal_finalizer": "BYTES_TO_ORIGINAL_EXCLUSIVE_HELD_FD_AND_ORIGINAL_RECEIPT_SCHEMA",
+      "snapshot_seam": "REQUIRES_ORIGINAL_ADMITTED_PATHGUARD_NO_FALLBACK_OR_NEW_GUARD",
+      "query_seam": "ORIGINAL_TRANSPORT_VALIDATORS_AND_RECORD_NAMES_HELD_DIRFD_NO_DISPATCH",
+      "restart_test": "SEPARATE_PYTHON_PROCESS_SAME_SYNTHETIC_TEMPORARY_STORE_NOT_HOST_DURABILITY",
+      "special_file_records": "NONBLOCK_FIFO_REJECTION",
+      "native_wal_vfs": "UNCHANGED_FROM_9a737e24"
+    },
+    "dependencies": {
+      "production_transport_sha256": "625fa7adf78e545ffa99c84329b3929fb6a7ee907eaebe6f122fa9261c140b16",
+      "production_start_sha256": "d645edc0013af34804626315a6ddce1b47b870c012b6b632131c320ed4c20688",
+      "original_40_file_candidate": "UNCHANGED_NOT_REPUBLISHED",
+      "original_final_material_adapter_and_PathGuard": "NOT_PUBLISHED_IN_CURRENT_BRANCH_HTTP404_READ_CONFIRMED",
+      "production_controller_trusted_fd_binding": "NOT_ADMITTED_OR_INSTALLED",
+      "M99_dynamic": "NOT_RUN_NOT_RETRIED_NORMAL_CLEARANCE_REQUIRED",
+      "authoritative_writers_fence_drain": "NOT_COMPLETE"
+    },
+    "host_commands": 0,
+    "cloud_calls": 0,
+    "automatic_root_jobs": "SKIPPED",
+    "independent_review": "REQUESTED_NOT_GRANTED",
+    "production_migration_started": false,
+    "production_services_installed": false,
+    "production_cutover": false,
+    "remaining_major_nodes": 6
   }
 }

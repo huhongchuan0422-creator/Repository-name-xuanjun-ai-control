@@ -316,3 +316,17 @@ N2：丢失InvokeId时，限DescribeCommandInvocations按完整命令hash/operat
 真实Hosted CI [39127878159](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39127878159)：Python3.11/job117676731028、Python3.12/job117676730889，各23/23 PASS，0跳过，原始日志已读。两份内层源码ZIP均17694字节/7成员/SHA256 38e7dc884c381478e682c7f502f1bc7e497b64ad67528c8e11d8a5dbdc8e89ae；本地按准确Commit/Tree重建一致。Artifact12136772337/12136514874；外层Actions压缩包摘要分别保留，不混同内层源码ZIP。
 
 源码/测试节点已形成可复用检查点，独审/生产部署/实机验收仍待完成，不提前冻结关闭。完整数据/所有写入来源/强制Fence/排空和生产接线仍是原执行方实现责任，非Owner权限不足。M99正常放行是独立外部缺项，其他独立开发不因此重做/停掉。六个生产大节点未关闭；本增量云/主机调用0，东京、国内桥接及Windows现网未操作。
+
+
+## 2026-10-18 20:51 CST — 两个节点的显式接线源码及双Python 41项CI
+
+准确代码Commit d5bc04c6e03d558b122341120f37d038dba87155，Tree16208b878596af1ebfdb1444d9add99ca5991567。新增node_bindings.py及18项集成测试；原native WAL VFS未变。原40文件候选、原生产transport/start字节均未修改/重发。
+
+- WAL：原PathGuard协议→已捕获main/WAL字节→官方内存VFS→原独占持有fd→原FINAL_FENCED_SQLITE_CANDIDATE回执；保留原始捕获，检查fence、期限及source drift，失败不产完成回执。没有另建guard、全局monkeypatch或pathname SQLite fallback。
+- UNKNOWN：ReconciledQueryTransport包装原已发布DomesticStartTransport，发现InvokeId后只查询结果，沿用原回执校验和文件名，通过原目录fd持久化；dispatch恒HOLD。新增普通跨进程测试读取同一临时原记录，不调用RPC、不重发命令。该临时记录不冒充受信现场持久控制器。
+- Hosted真实CI [39129030692](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39129030692)，Python3.11/job117680179245、Python3.12/job117680178875，各41/41 PASS，0跳过；日志已读，20:51:30 CST完成。源码ZIP27602字节/9成员，SHA256 276f17a2c8d39ae048815b1bd7228a3bc86be3fe330e509faf7b914654418ba7；本地按准确Commit/Tree重建与两份CI一致。Artifact12137780040/12137785062，外层Actions摘要另存。
+- 集成测试的FixtureIO明确仅为普通路径合成夹具；未执行原PathGuard、目录祖先替换、M99反例、bwrap或现场操作。M99限制未解除，不据41项CI宣称动态路径安全PASS。
+- 当前分支原final_material_adapter.py及material_paths.py读取404，完整原适配器仍只在未发布候选中。因此新增的是显式源码接线，不是完整生产捕获/控制器已激活。原候选正常发布、M99放行、原受信目录绑定及实机验收仍待完成；未换接口或环境重发被拒候选。
+- 完整权威数据/全部写入来源、唯一Writer、强制Fence/排空、持久控制器和其余生产接线仍由原执行方负责完成，不归咎Owner RAM授权。正式许可未签发、六个生产大节点未关闭。本轮云/主机调用0；自动Root现场job为SKIPPED，无后台迁移writer；东京、国内桥接、Windows现网未操作。
+
+详细回执：evidence/pr99-service-handoff/wal-memory-vfs/INTEGRATION_DELIVERY_20261018.json。新增代码与测试集中送原独审，未变已通过范围继承，未自签独立PASS。
