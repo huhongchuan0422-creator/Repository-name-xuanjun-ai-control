@@ -232,6 +232,72 @@ def rollback():
         record('ROLLED_BACK')
         return {'state': 'ROLLED_BACK', 'evidence_retained': True, 'helper_retained_if_installed': True}
 
+def restore_for_workflow(coordinator):
+    """Exact old policy restoration under a NEW explicit whole-workflow grant.
+
+    Old CLI/rollback remains one-shot. Caller must enter from the protected Owner
+    workflow, holding only its website lock, never from a channel-locked command.
+    We acquire original upgrade then channel locks, both nonblocking, and retain
+    every original receipt/helper. This is not business or application rollback.
+    """
+    def guard():
+        from scripts.pr122_customer_workflow import POLICY as WORKFLOW_POLICY
+        need(coordinator.approval.get('attempt_policy')==WORKFLOW_POLICY,'WHOLE_WORKFLOW_PERMISSION_REQUIRED')
+        coordinator.authority();coordinator.assert_active();coordinator.verify_inputs('POLICY_RESTORE')
+        need(coordinator.data['intent'] is not None and coordinator.data['intent']['stage']=='POLICY_RESTORE',
+             'POLICY_STAGE_NOT_ACTIVE')
+        need('RECONCILE_POLICY' in coordinator.stage_contract('POLICY_RESTORE')['recovery_actions'],
+             'POLICY_RESTORATION_NOT_APPROVED')
+    guard();owner()
+    with owner_lock():
+        guard();p,helper=transaction()
+        inputs=coordinator.ops.input('POLICY_RESTORE')
+        need(type(inputs) is dict and set(inputs)=={'transaction','plan_sha256','old_wrapper_sha256','old_policy_sha256'}
+             and inputs['transaction']==CONTROL.name and inputs['plan_sha256']==sha(read(CONTROL/'plan.json',0o400))
+             and inputs['old_wrapper_sha256']==sha(read(CONTROL/'old-wrapper',0o400))
+             and inputs['old_policy_sha256']==sha(read(CONTROL/'old-sudoers',0o400)), 'POLICY_RESTORE_EXACT_BACKUPS')
+        need(read(EXEC,0o755) in (expected_wrapper(),new_wrapper())
+             and read(POLICY,0o440) in (expected_policy(),new_policy()), 'UNKNOWN_WRAPPER_POLICY')
+        if os.path.lexists(HELPER):need(read(HELPER,0o400)==helper,'UNKNOWN_HELPER')
+        for path in (EXEC,POLICY):
+            need(not os.path.lexists(path.parent/('.'+path.name+'.readonly-bootstrap-pending')),
+                 'PARTIAL_STAGING_REQUIRES_REVIEW')
+        for phase in ('ROLLBACK_INTENT','ROLLED_BACK'):
+            if os.path.lexists(CONTROL/(phase+'.json')):
+                need(read(CONTROL/(phase+'.json'),0o400)==canonical({'state':phase}),'POLICY_RECEIPT_DRIFT')
+        helper_present=os.path.lexists(HELPER)
+        def recheck():
+            current_plan,current_helper=transaction()
+            need(current_plan==p and current_helper==helper,'RESTORE_BACKUP_CHANGED')
+            need(os.path.lexists(HELPER)==helper_present,'RESTORE_HELPER_CHANGED')
+            if helper_present:need(read(HELPER,0o400)==helper,'RESTORE_HELPER_CHANGED')
+            need(sha(read(CONTROL/'plan.json',0o400))==inputs['plan_sha256'],'RESTORE_PLAN_CHANGED')
+        complete=(read(POLICY,0o440)==expected_policy() and read(EXEC,0o755)==expected_wrapper())
+        if os.path.lexists(CONTROL/'ROLLED_BACK.json'):
+            need(complete and baseline()==p['baseline'],'COMPLETED_POLICY_DRIFT')
+            return {'state':'ROLLED_BACK','already_complete':True,'evidence_retained':True}
+        policy_check(CONTROL/'old-sudoers');guard()
+        if not os.path.lexists(CONTROL/'ROLLBACK_INTENT.json'):record('ROLLBACK_INTENT')
+        coordinator.record_stage('POLICY_RESTORE','POLICY_RESTORE_INTENT',{'plan_sha256':inputs['plan_sha256']})
+        try:
+            # Reconcile each exact owned byte sequence; successful writes skip.
+            guard();recheck()
+            current=read(POLICY,0o440);need(current in (expected_policy(),new_policy()),'POLICY_CHANGED_BEFORE_RESTORE')
+            if current!=expected_policy():replace(POLICY,expected_policy(),0o440)
+            guard();recheck()
+            current=read(EXEC,0o755);need(current in (expected_wrapper(),new_wrapper()),'WRAPPER_CHANGED_BEFORE_RESTORE')
+            if current!=expected_wrapper():replace(EXEC,expected_wrapper(),0o755)
+            need(baseline()==p['baseline'] and read(POLICY,0o440)==expected_policy()
+                 and read(EXEC,0o755)==expected_wrapper(),'RESTORE_VERIFY')
+            guard();record('ROLLED_BACK')
+            result={'state':'ROLLED_BACK','already_complete':False,'evidence_retained':True}
+            coordinator.record_stage('POLICY_RESTORE','POLICY_RESTORE_VERIFIED',result)
+            return result
+        except BaseException:
+            coordinator.record_stage('POLICY_RESTORE','POLICY_RESTORE_UNKNOWN',{'evidence_retained':True})
+            raise
+
+
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('action', choices=('plan', 'install', 'verify', 'rollback')); args = parser.parse_args()
     owner(); print(canonical(globals()[args.action]()).decode())
