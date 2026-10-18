@@ -415,3 +415,30 @@ Staff管理前复验原商家Principal/tenant/runtime binding。
 第二批冻结前本地Mini/Key275项通过；原进件共享传输回归794项中767项通过、
 27项仍为已定位环境错误，最终两项重放专项加入后进件56项全部通过。
 最终完整准确提交回执待对应Hosted CI核验，不继承第一批SHA为本批PASS。
+
+### 第二批准确 Hosted 回执与最终交叉复核
+
+第二批 `bd9a84ea5bea4189cfe6174daa333560af372159`，tree
+`2efcbb31e1977dedf5adff551280daacdb36caf9`，21路径远端逐blob回读一致。
+Run https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39153661204
+于2026-10-19 02:24:52北京时间完成SUCCESS：798 community、342 Stage5、275 Mini/Key、
+40/8/7其余Node，共1470项执行通过；源码ZIP SHA256
+`3fbdc604d992304d50e3c5e8c853dd00b5b6c5c1fea40ee43952018cd4f4d4e2`与本地一致。
+四项现场mini任务均SKIPPED。此回执不覆盖其后源码修复。
+
+最终交叉复核另外发现跨申请进件ACK归属与健康检查依赖覆盖两处缺陷，继续修复，
+不能因1470测试通过就关闭全部源码审核。`/community/health`是真实HTTP入口，
+补齐原Center及已组合业务库连接检查；它只声明连接可用，不声明生产业务验收。
+
+原交付缺项进一步限定：原Center已有证据表升级，P2-16缺的是社区六业务库旧版本
+转换、校验和失败回退合同。完整远端树中的既有R4部署器固定Tokyo Portal单文件，
+国内官网部署器仅内容指针/nginx/TLS，backend-migration仅OAuth库；它们不消费社区
+MiniApplication/六库制品，不能作为P2-21/23已完成的证据。须复用既有发布体系并取得
+社区宿主启动、服务切换、原Center及六库配套恢复契约后完成社区适配，不另造权限链。
+
+第三批修复沿原Center同一写事务核对所有进件记录（包括inactive与历史ID/签名）归属。
+首次提交冻结服务商域；已知ACK签名不能转用于其他申请，服务商域内applyment_id不能
+跨application/business_code重复认领。旧缺域记录不当作其他服务商跳过；旧申请先由
+可信同business_code查询补足域证据，不能仅凭当前本地配置重提。冲突保持UNKNOWN，
+不自动补发。未曾观察过且POST ACK不回显business_code的响应，单靠签名时间不能
+证明请求归属，仍需官方受保护请求/响应通道；没有宣称签名协议提供它未包含的字段。

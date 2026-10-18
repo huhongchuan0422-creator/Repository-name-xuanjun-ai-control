@@ -5,8 +5,10 @@ verified transport boundary is replaced; no provider request leaves this test.
 """
 import base64
 import contextlib
+import concurrent.futures
 import copy
 import hashlib
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -147,6 +149,167 @@ class RejectionRecovery(unittest.TestCase):
         return dict(dict(business_code=self.read()['business_code'],
                          applyment_id=int(self.read().get('applyment_id', '123456789')),
                          applyment_state=state, audit_detail=[]), **extra)
+
+    def second_approved_application(self):
+        self.platform=self.fx.review(self.fx.complete(), 'APPROVE')
+        self.application=self.platform['application']
+        for kind,media_id in (('business_license','media-license'),
+                              ('identity_front','media-front'),('identity_back','media-back')):
+            with self.response(dict(media_id=media_id)):
+                self.call('wechat_media',kind=kind)
+        return self.approve()
+
+    def signed_initial_submission(self):
+        approved=self.approve()
+        wire=self.signed_wire(dict(applyment_id=123456789))
+        with self.wire_response(wire):
+            record=self.call('wechat_execute',expected_version=approved['version'])
+        return self.application,record,wire
+
+    def assert_foreign_ack_rejected(self,wire,approved):
+        with self.wire_response(wire) as fetch:
+            with self.assertRaisesRegex(ValueError,'^PROVIDER_APPLYMENT_OWNERSHIP_CONFLICT$'):
+                self.call('wechat_execute',expected_version=approved['version'])
+            self.assertEqual(fetch.call_count,1)
+            with self.assertRaises(PermissionError):
+                self.call('wechat_execute',expected_version=approved['version'])
+            self.assertEqual(fetch.call_count,1)
+        self.assertEqual(self.read()['state'],'SUBMISSION_UNKNOWN')
+        self.assertNotIn('applyment_id',self.read())
+        self.assertEqual(len(self.attempts()),2)
+
+    def test_two_applications_cannot_claim_the_same_actual_signed_ack(self):
+        first_application,first,wire=self.signed_initial_submission()
+        approved=self.second_approved_application()
+        self.assert_foreign_ack_rejected(wire,approved)
+        self.assertNotEqual(self.read()['business_code'],first['business_code'])
+        self.assertEqual(self.service._read(first_application),first)
+
+    def test_fresh_signature_cannot_reassign_another_application_id(self):
+        first_application,first,_=self.signed_initial_submission()
+        approved=self.second_approved_application()
+        self.assert_foreign_ack_rejected(self.signed_wire(dict(applyment_id=123456789)),approved)
+        self.assertEqual(self.service._read(first_application),first)
+
+    def test_distinct_application_ids_remain_available_for_separate_applications(self):
+        first_application,first,_=self.signed_initial_submission()
+        approved=self.second_approved_application()
+        with self.wire_response(self.signed_wire(dict(applyment_id=222222222))):
+            second=self.call('wechat_execute',expected_version=approved['version'])
+        self.assertEqual(second['state'],'SUBMITTED_TO_PROVIDER')
+        self.assertEqual(second['provider_sp_mchid'],self.reader._mchid)
+        self.assertEqual(self.service._read(first_application),first)
+
+    def test_unknown_query_cannot_claim_another_applications_known_id(self):
+        first_application,first,_=self.signed_initial_submission()
+        self.second_approved_application()
+        with self.assertRaises(TimeoutError):self.execute(error=TimeoutError('Synthetic unknown'))
+        unknown=self.read()
+        with self.wire_response(self.signed_wire(self.query_data())):
+            with self.assertRaisesRegex(ValueError,'^PROVIDER_APPLYMENT_OWNERSHIP_CONFLICT$'):
+                self.call('wechat_query')
+        self.assertEqual(self.read(),unknown)
+        self.assertEqual(self.service._read(first_application),first)
+
+    def test_legacy_unknown_domain_and_inactive_record_still_own_original_id(self):
+        first_application,first,_=self.signed_initial_submission()
+        legacy=dict(first);legacy.pop('provider_sp_mchid')
+        self.replace_record(legacy)
+        with self.center.tx():
+            self.center.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=?",(first_application,))
+        approved=self.second_approved_application()
+        self.assert_foreign_ack_rejected(self.signed_wire(dict(applyment_id=123456789)),approved)
+
+    def test_known_signature_cannot_migrate_to_a_different_service_merchant(self):
+        _,_,wire=self.signed_initial_submission()
+        approved=self.second_approved_application()
+        self.reader._mchid='1900000999'
+        self.assert_foreign_ack_rejected(wire,approved)
+
+    def test_service_merchant_change_rejected_before_query_network(self):
+        _,first,_=self.signed_initial_submission()
+        self.reader._mchid='1900000999'
+        self.provider.reset_mock()
+        with self.assertRaisesRegex(PermissionError,'^PROVIDER_APPLICATION_SERVICE_MERCHANT_CHANGED$'):
+            self.call('wechat_query')
+        self.provider.assert_not_called();self.assertEqual(self.read(),first)
+
+    def test_legacy_correction_requires_bound_query_before_another_post(self):
+        self.submitted();self.query()
+        legacy=self.read();legacy.pop('provider_sp_mchid');self.replace_record(legacy)
+        approved=self.approve();self.provider.reset_mock()
+        with self.assertRaisesRegex(PermissionError,'^PROVIDER_APPLICATION_DOMAIN_UNCONFIRMED_QUERY_REQUIRED$'):
+            self.call('wechat_execute',expected_version=approved['version'])
+        self.provider.assert_not_called()
+        with self.wire_response(self.signed_wire(self.query_data())):
+            bound=self.call('wechat_query')
+        self.assertEqual(bound['provider_sp_mchid'],self.reader._mchid)
+        self.assertEqual(self.execute()['state'],'SUBMITTED_TO_PROVIDER')
+
+    def test_corrupt_historical_ciphertext_cannot_be_skipped_for_a_new_ack(self):
+        first_application,_,_=self.signed_initial_submission()
+        approved=self.second_approved_application()
+        with self.center.tx():
+            self.center.db.execute("UPDATE links SET payload=? WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=?",(b'corrupt-private-ciphertext',first_application))
+        with self.wire_response(self.signed_wire(dict(applyment_id=222222222))):
+            with self.assertRaisesRegex(ValueError,'^PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED$') as error:
+                self.call('wechat_execute',expected_version=approved['version'])
+        self.assertNotIn(first_application,str(error.exception))
+        self.assertEqual(self.read()['state'],'SUBMISSION_UNKNOWN')
+
+    def test_misbound_historical_receipt_cannot_reassign_original_business_code(self):
+        _,first,_=self.signed_initial_submission()
+        first['submission_receipts'][0]['business_code']='ap_other_original_code'
+        self.replace_record(first)
+        approved=self.second_approved_application()
+        with self.wire_response(self.signed_wire(dict(applyment_id=222222222))):
+            with self.assertRaisesRegex(ValueError,'^PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED$'):
+                self.call('wechat_execute',expected_version=approved['version'])
+        self.assertEqual(self.read()['state'],'SUBMISSION_UNKNOWN')
+
+    def test_cross_application_ownership_survives_original_database_reopen(self):
+        _,_,wire=self.signed_initial_submission()
+        approved=self.second_approved_application()
+        self.fx.fx.reopen();self.center=self.fx.fx.center
+        self.fx.service=MerchantOnboarding(self.center,{self.fx.fx.uid2:'project1'})
+        self.service=WechatApplyment(self.fx.service,self.reader,submission_enabled=True)
+        self.fx.service.wechat_applyment=self.service
+        self.assert_foreign_ack_rejected(wire,approved)
+
+    def test_concurrent_connections_can_assign_signed_ack_to_only_one_application(self):
+        from scripts.pr122_customer_core import Center
+        first=self.approve();first_application=self.application
+        second=self.second_approved_application();second_application=self.application
+        wire=self.signed_wire(dict(applyment_id=123456789));barrier=threading.Barrier(2)
+        now=self.center.now();previous=self.provider.side_effect
+        self.provider.side_effect=verified_transport
+        def submit(application,version):
+            center=Center(self.fx.fx.tmp.name,{'testkey':b'k'*32},'testkey',clock=lambda:now,mail_ready=True)
+            try:
+                onboarding=MerchantOnboarding(center,{self.fx.fx.uid2:'project1'})
+                reader=PartnerOrderReader.__new__(PartnerOrderReader)
+                reader._mchid=self.reader._mchid;reader._public=self.public;reader._private=self.private
+                reader._serial='SYNTHETIC_SERIAL';reader._kid='PUB_KEY_ID_SYNTHETIC';reader._clock=lambda:now
+                def fetch(request):
+                    barrier.wait(timeout=10)
+                    return wire
+                reader._fetch=fetch
+                service=WechatApplyment(onboarding,reader,submission_enabled=True)
+                try:
+                    return service.dispatch(self.fx.reviewer['token'],self.fx.reviewer['csrf'],
+                        dict(operation='wechat_execute',params=dict(application=application,expected_version=version)))['state']
+                except ValueError as error:return str(error)
+            finally:center.db.close()
+        try:
+            with patch('urllib.request.urlopen',side_effect=AssertionError('Network forbidden')):
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                    futures=[pool.submit(submit,first_application,first['version']),pool.submit(submit,second_application,second['version'])]
+                    results=[future.result(timeout=20) for future in futures]
+        finally:self.provider.side_effect=previous
+        self.assertCountEqual(results,['SUBMITTED_TO_PROVIDER','PROVIDER_APPLYMENT_OWNERSHIP_CONFLICT'])
+        self.assertCountEqual([self.service._read(application)['state'] for application in (first_application,second_application)],
+                              ['SUBMITTED_TO_PROVIDER','SUBMISSION_UNKNOWN'])
+        self.assertEqual(len(self.attempts()),2)
 
     def test_full_same_code_correction_independent_review_and_finish(self):
         first = self.submitted()

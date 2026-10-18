@@ -13,6 +13,10 @@ from scripts.community_mini_login import LoginUnavailable
 
 
 def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None,commerce=None,notifications=None):
+    # Remember admitted dependencies so a lost SaaS backend cannot silently
+    # turn a previously full composition into a healthy community-only one.
+    saas_required=(getattr(getattr(gateway,'runtime',None),'saas',None) is not None
+                   or saas is not None or fulfillment is not None)
     if notifications is not None:
         from scripts.community_payment_notifications import PaymentNotifications
         if type(notifications) is not PaymentNotifications or notifications.payments is not getattr(gateway,'payments',None):
@@ -83,7 +87,16 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if center is None:return self.answer(503,{'status':'UNAVAILABLE'})
                 try:
                     maintenance=center.db.execute("SELECT v FROM settings WHERE k='maintenance'").fetchone()[0]!='0'
-                    for db in (gateway.runtime.demo.db,gateway.runtime.demo.merchant_db,gateway.runtime.demo.refund_db):db.execute('SELECT 1').fetchone()
+                    runtime=gateway.runtime
+                    databases=[runtime.demo.db,runtime.demo.merchant_db,
+                               runtime.demo.ad_db,runtime.demo.refund_db]
+                    backend=getattr(runtime,'saas',None)
+                    if saas_required or backend is not None:
+                        databases.extend((backend.quotes,backend.orders,backend.modules))
+                    # Quotes and modules normally share one original store;
+                    # independently composed stores must both be checked too.
+                    for db in {id(db):db for db in databases}.values():
+                        db.execute('SELECT 1').fetchone()
                 except Exception:return self.answer(503,{'status':'UNAVAILABLE'})
                 return self.answer(503 if maintenance else 200,{'status':'MAINTENANCE' if maintenance else 'READY','scope':'PROCESS_AND_DATABASE_CONNECTIVITY','production_acceptance':False})
             assets={'/merchant/join':('onboarding.html','text/html; charset=utf-8'),

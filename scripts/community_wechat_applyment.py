@@ -56,6 +56,41 @@ def submission_boundary(record):
         record.get('submission_recovery_receipt',{}).get('signed_at',-1))
 
 
+def provider_response_claims(record):
+    """Read current and historical claims, including pre-domain legacy records."""
+    if type(record) is not dict:raise ValueError('PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED')
+    ids=set();signatures=set()
+    def identity(value):
+        if value is None:return
+        if type(value) is not str or not re.fullmatch('[1-9][0-9]{0,18}',value) or int(value)>=2**63:
+            raise ValueError('PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED')
+        ids.add(value)
+    def signature(value):
+        if value is None:return
+        if type(value) is not str or not re.fullmatch('[0-9a-f]{64}',value):
+            raise ValueError('PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED')
+        signatures.add(value)
+    identity(record.get('applyment_id'))
+    for field,consume in (('provider_applyment_history',identity),('provider_query_signatures',signature)):
+        values=record.get(field,[])
+        if type(values) is not list:raise ValueError('PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED')
+        for value in values:consume(value)
+    for field in ('provider_query_signature_sha256','submission_response_signature_sha256'):
+        signature(record.get(field))
+    receipts=[]
+    for field in ('submission_receipts','consumed_rejections'):
+        values=record.get(field,[])
+        if type(values) is not list:raise ValueError('PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED')
+        receipts.extend(values)
+    receipts.extend(record[field] for field in ('correction_receipt','submission_recovery_receipt') if field in record)
+    for receipt in receipts:
+        if type(receipt) is not dict:raise ValueError('PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED')
+        if 'business_code' in receipt and receipt['business_code']!=record.get('business_code'):
+            raise ValueError('PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED')
+        identity(receipt.get('applyment_id'));signature(receipt.get('signature_sha256'))
+    return ids,signatures
+
+
 def original_submission_intent(current,code,version):
     """Only persist the response for the exact already-reserved application intent."""
     return (type(current) is dict and current.get('business_code')==code
@@ -75,6 +110,45 @@ class WechatApplyment:
         return None if row is None else json.loads(self.center.decrypt(row[0],'wechat-applyment:'+application))
     def _save(self,application,owner,record):
         self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_WECHAT_APPLYMENT',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",(application,owner,application,self.center.encrypt(canonical(record),'wechat-applyment:'+application)))
+    def _provider_domain(self,record,*,submission=False):
+        merchant=self.reader._mchid
+        if type(merchant) is not str or not re.fullmatch('[0-9]{6,32}',merchant):
+            raise ValueError('PROTECTED_PROVIDER_MERCHANT_REQUIRED')
+        bound=record.get('provider_sp_mchid')
+        if bound is not None and bound!=merchant:
+            raise PermissionError('PROVIDER_APPLICATION_SERVICE_MERCHANT_CHANGED')
+        if submission and record.get('business_code') and bound is None:
+            raise PermissionError('PROVIDER_APPLICATION_DOMAIN_UNCONFIRMED_QUERY_REQUIRED')
+        return merchant
+    def _check_response_owner(self,application,code,merchant,applyment_id,verified):
+        # BEGIN IMMEDIATE serializes the check and the following original-record
+        # save across all applications/connections. No separate account or ledger.
+        c=self.center
+        if not c.db.in_transaction:raise ValueError('ORIGINAL_CENTER_TRANSACTION_REQUIRED')
+        if self.reader._mchid!=merchant:
+            raise PermissionError('PROVIDER_APPLICATION_SERVICE_MERCHANT_CHANGED')
+        rows=c.db.execute("SELECT subject_idx,project,payload FROM links WHERE channel='COMMUNITY_WECHAT_APPLYMENT'")
+        for row in rows:
+            try:
+                if row['subject_idx']!=row['project']:raise ValueError()
+                other=json.loads(c.decrypt(row['payload'],'wechat-applyment:'+row['subject_idx']))
+                ids,signatures=provider_response_claims(other)
+                domain=other.get('provider_sp_mchid')
+                if domain is not None and (type(domain) is not str or not re.fullmatch('[0-9]{6,32}',domain)):
+                    raise ValueError()
+                other_code=other.get('business_code')
+                if (ids or signatures) and (type(other_code) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,64}',other_code)):
+                    raise ValueError()
+            except Exception:
+                # Do not leak another application's identity or ciphertext.
+                raise ValueError('PROVIDER_APPLICATION_OWNERSHIP_UNCONFIRMED') from None
+            # A known raw signed response cannot migrate even across providers.
+            # IDs are scoped to the merchant; an unknown legacy domain is never
+            # treated as proof that a matching ID belongs to another merchant.
+            collision=(verified['signature_sha256'] in signatures
+                or domain in (None,merchant) and applyment_id in ids)
+            if collision and (row['subject_idx']!=application or other_code!=code):
+                raise ValueError('PROVIDER_APPLYMENT_OWNERSHIP_CONFLICT')
     def _validate(self,profile,entity):
         required={'contact_info','subject_info','business_info','settlement_info','bank_account_info'}
         if type(profile) is not dict or not required.issubset(profile) or set(profile)-required-{'addition_info'} or any(type(profile[k]) is not dict for k in profile):raise ValueError('OFFICIAL_APPLYMENT_SECTIONS_REQUIRED')
@@ -151,6 +225,7 @@ class WechatApplyment:
         if op in ('wechat_read','wechat_review_read'):return record or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')
         if op=='wechat_query':
             if record is None or not record.get('business_code'):raise ValueError('PROVIDER_APPLICATION_NOT_SUBMITTED')
+            merchant=self._provider_domain(record)
             data,digest,verified=request(self.reader,'GET','/v3/applyment4sub/applyment/business_code/'+record['business_code'],include_verification=True)
             verified=signed_response_context(verified)
             if data.get('business_code')!=record['business_code'] or type(data.get('applyment_state')) is not str:raise ValueError('PROVIDER_APPLYMENT_BINDING_MISMATCH')
@@ -216,6 +291,8 @@ class WechatApplyment:
                             applyment_id=applyment_id,
                             signature_sha256=verified['signature_sha256'],signed_at=verified['signed_at'],
                             response_sha256=digest,observed_at=c.now()))
+                self._check_response_owner(application,record['business_code'],merchant,applyment_id,verified)
+                current['provider_sp_mchid']=merchant
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_QUERIED',digest)
             return current
         version=record['version'] if record else 0
@@ -223,12 +300,13 @@ class WechatApplyment:
         if op=='wechat_execute':
             if not self.enabled:raise PermissionError('REAL_MERCHANT_SUBMISSION_GATE_CLOSED')
             if record is None or record['state']!='INTERNAL_APPROVED' or platform['status']!='APPROVED':raise PermissionError('SEPARATE_INTERNAL_AND_PLATFORM_APPROVAL_REQUIRED')
+            merchant=self._provider_domain(record,submission=True)
             self.onboarding._check_materials(application,meta)
             self._validate(record['profile'],meta['entity_type'])
             if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
             if meta['category']=='FOOD' and not record['profile']['settlement_info'].get('qualifications'):raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
             self._validate_media(record['profile'],application,meta)
-            code=record.get('business_code') or 'ap'+hashlib.sha256(canonical([self.reader._mchid,application,version])).hexdigest()[:30]
+            code=record.get('business_code') or 'ap'+hashlib.sha256(canonical([merchant,application,version])).hexdigest()[:30]
             correction=record.get('correction_receipt')
             if record.get('business_code') and (record.get('provider_state')!='APPLYMENT_STATE_REJECTED'
                     or type(correction) is not dict
@@ -252,7 +330,7 @@ class WechatApplyment:
                 if c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_APPLYMENT_ATTEMPT' AND event_id=?",(attempt,)).fetchone():raise PermissionError('QUERY_EXISTING_APPLICATION_ONLY')
                 c.db.execute("INSERT INTO events VALUES('WECHAT_APPLYMENT_ATTEMPT',?,?)",(attempt,c.now()))
                 current.update(state='SUBMISSION_UNKNOWN',business_code=code,
-                    replacement_submission=bool(correction),submission_started_at=c.now())
+                    replacement_submission=bool(correction),submission_started_at=c.now(),provider_sp_mchid=merchant)
                 if correction:
                     current['consumed_rejections']=[*current.get('consumed_rejections',[]),
                         dict(correction,submission_version=version)]
@@ -283,6 +361,7 @@ class WechatApplyment:
                     raise ValueError('STALE_PROVIDER_APPLYMENT_SUBMISSION_RESPONSE')
                 if current.get('applyment_id') not in (None,record.get('applyment_id'),applyment_id):
                     raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
+                self._check_response_owner(application,code,merchant,applyment_id,verified)
                 current.update(state='SUBMITTED_TO_PROVIDER',applyment_id=applyment_id,provider_response_sha256=digest,
                     submission_response_signed_at=verified['signed_at'],
                     submission_response_signature_sha256=verified['signature_sha256'])

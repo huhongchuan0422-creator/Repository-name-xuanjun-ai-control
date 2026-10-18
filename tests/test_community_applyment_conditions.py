@@ -79,42 +79,36 @@ class ProviderSubmissionIntentRecovery(unittest.TestCase):
 
 class SubmerchantIdentityImmutability(unittest.TestCase):
     def test_signed_query_cannot_reassign_persisted_provider_submerchant(self):
-        import contextlib
         from unittest.mock import patch
-        from scripts.community_wechat_applyment import WechatApplyment
-        service=WechatApplyment.__new__(WechatApplyment)
-        service.reader=object()
-        service.center=SimpleNamespace(
-            session=lambda token,csrf:'reviewer1',
-            tx=lambda:contextlib.nullcontext(),limit=lambda *a:None,
-            now=lambda:NOW,audit=lambda *a:None)
-        service.onboarding=SimpleNamespace(_load=lambda application,uid,reviewer:('owner1',{},{}))
-        record=dict(business_code='ap_original',provider_sub_mchid='1234567891',applyment_id='123456789',
-                    state='SUBMITTED_TO_PROVIDER',version=2)
-        service._read=lambda application:dict(record)
-        writes=[]
-        service._save=lambda *args:writes.append(args)
-        with patch('scripts.community_wechat_applyment.request',return_value=(
-             dict(business_code='ap_original',applyment_id=123456789,applyment_state='APPLYMENT_STATE_FINISHED',
-                  sub_mchid='9999999999'),'a'*64,dict(signed_at=NOW,signature_sha256='a'*64))):
-            with self.assertRaisesRegex(ValueError,'IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT'):
-                service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
-        self.assertEqual(writes,[])
-        with patch('scripts.community_wechat_applyment.request',return_value=(
-             dict(business_code='ap_original',applyment_id=123456789,applyment_state='APPLYMENT_STATE_FINISHED',
-                  sub_mchid='1234567891'),'b'*64,dict(signed_at=NOW,signature_sha256='b'*64))):
-            result=service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
-        self.assertEqual(result['provider_sub_mchid'],'1234567891')
-        self.assertEqual(len(writes),1)
-        # A previously completed application must not be rewritten to an earlier state.
-        record['provider_state']='APPLYMENT_STATE_FINISHED'
-        writes.clear()
-        with patch('scripts.community_wechat_applyment.request',return_value=(
-             dict(business_code='ap_original',applyment_id=123456789,applyment_state='APPLYMENT_STATE_AUDITING',
-                  sub_mchid='1234567891'),'c'*64,dict(signed_at=NOW,signature_sha256='c'*64))):
-            with self.assertRaisesRegex(ValueError,'TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT'):
-                service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
-        self.assertEqual(writes,[])
+        import test_community_applyment_rejection_recovery as fixtures
+        fixtures.RejectionRecovery.setUpClass()
+        fx=fixtures.RejectionRecovery();fx.setUp();self.addCleanup(fx.doCleanups)
+        fx.submitted()
+        record=fx.read();record['provider_sub_mchid']='1234567891';fx.replace_record(record)
+        service=fx.service;original_save=service._save;writes=[]
+        def save(*args):
+            writes.append(args);return original_save(*args)
+        with patch.object(service,'_save',side_effect=save):
+            with fx.wire_response(fx.signed_wire(fx.query_data(
+                    'APPLYMENT_STATE_FINISHED',sub_mchid='9999999999'))):
+                with self.assertRaisesRegex(ValueError,'IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT'):
+                    fx.call('wechat_query')
+            self.assertEqual(writes,[])
+            self.assertEqual(fx.read(),record)
+            with fx.wire_response(fx.signed_wire(fx.query_data(
+                    'APPLYMENT_STATE_FINISHED',sub_mchid='1234567891'))):
+                result=fx.call('wechat_query')
+            self.assertEqual(result['provider_sub_mchid'],'1234567891')
+            self.assertEqual(len(writes),1)
+            # A previously completed application cannot be rewritten backwards.
+            writes.clear()
+            with fx.wire_response(fx.signed_wire(fx.query_data(
+                    'APPLYMENT_STATE_AUDITING',sub_mchid='1234567891'))):
+                with self.assertRaisesRegex(ValueError,'TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT'):
+                    fx.call('wechat_query')
+            self.assertEqual(writes,[])
+            self.assertEqual(fx.read(),result)
+
 
 
 class PlatformPassportAdmission(unittest.TestCase):
