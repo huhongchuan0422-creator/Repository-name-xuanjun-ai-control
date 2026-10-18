@@ -124,3 +124,21 @@ R1实际并发回归另定位UnixStreamServer默认监听队列5不足以吸收8
 账号创建原模块已存在，不重新实现。受保护 root runtime 重建候选属于原准备流程的单独前置条件；客户 `plan/apply` 仍要求账号和 runtime 已经就绪。本增量没有把未核实准备权限、调用者、stdlib/native 闭包或现场证据偷偷接入安装许可。独立审核、有效 Owner 信任/许可、真实环境对账、原 14 项 HTTPS/客户验收仍待完成；离线源码和测试通过不能替代这些外部验收。
 
 本次最终本地结果：69 个唯一 unittest 全部通过、0 跳过，其中原 release/V1 33 项、新 V2 33 项、独立 fence/锁回归 3 项。新增崩溃边界覆盖创建意图已落盘但目标不存在、创建已发生但 ownership 未落盘（拒绝收养）、已记录 WRITING inode 后中断重启，以及文件/账本 fsync 故障。Hosted V2 步骤严格核对 36 项新增用例；最终真实提交 CI 和下载制品仍待运行。
+
+## 2026-10-18：原网站全链统一许可协调增量（非生产候选）
+
+原 `pr122_customer_release.workflow_apply` 内部入口接固定顺序 PROBE → ACCOUNT → RUNTIME → POLICY_RESTORE → CHANNEL_REBIND → CUSTOMER_APPLY。默认固定适配器读取原 CONFIG 下 `WHOLE_WORKFLOW_INPUTS.json`；它只是由原许可逐阶段 SHA256 绑定的数据，不是授权、信任登记或新特权 CLI。原 Owner gate、独立审核、有效期、源码/manifest 和 Hosted CI 校验仍必须通过。V1/V2 许可不会升级为 V3。
+
+新许可显式选择 `CONTROLLED_WHOLE_WEBSITE_V3`，绑定六阶段输入、实现、可继承回执及允许的固定恢复动作，总次数 1–5。原固定 TXN 的同一 attempts 文件保存总额度与逐阶段 intent、成功检查点、原因码、对账证据和恢复记录；换文件、重启、换许可不能刷新已用事务。每次实际尝试共享同一持久 fence；阶段能力绑定具体尝试及未完成 intent，完成或失去 fence 后不得继续写。成功阶段经可信验证后跳过，全部成功停止，第五次失败停止并汇总。UNKNOWN/冲突先 HOLD，只有原有效许可允许且同版本可信证据证明 COMPLETE 或 SAFE_TO_RETRY 才继续，不能把未知写入当作未执行。
+
+实际复用原账号 create_once、原 runtime protected_rebuild、bootstrap 原策略恢复、channel 原固定 writer 和 customer 原 Journal；customer 不另开 Attempts 或内层重试。锁顺序为原网站锁，然后子步骤原 upgrade/channel 非阻塞锁；不允许从已持有子锁的旧 channel apply 反向调用本入口。历史成功只读 probe 必须精确 pin 并继承；不制造第二个 probe writer。账号已有一次性未知 intent 不删除重开，runtime 已有未知部分目录和通道未知部分变更保持 HOLD。精确旧策略恢复仅限新许可明确列出的备份/计划/固定 wrapper 与 sudoers，允许可信已恢复/部分恢复对账；不授权业务回滚。
+
+通道新入口把最终 ZIP SHA256 从统一许可的 artifact_zip_sha256 和阶段输入双重绑定，并校验内部 source commit、manifest、tar、channel binding；旧 CLI 的冻结 pin 保持原样。最终真实 pin 必须在这批源码 Hosted 制品产生后填写，不把此前 apply-only 制品当作全链最终包。打包器补齐嵌套原账号模块 import closure。
+
+本地验证全部为临时目录/依赖 mock，不运行主机账号创建、服务或安全设置变更。新增测试覆盖共享五次额度、重启/并发/fence、成功阶段继承、UNKNOWN 对账、精确策略部分恢复、通道许可绑定、runtime 账户/closure 绑定及借用原 customer 检查点。最终唯一测试计数见冻结交付清单与 Hosted 日志；本地 root-only 原 UpgradeTests 未执行，不能据此宣称现场验收完成。
+
+剩余真实依赖：原受保护调用方接入/授权、新整批 Owner 许可和独立审核、最新 Hosted 制品及准确 ZIP/binding、现场只读 probe 和原账号/策略/通道证据、审核后的完整 stdlib/native/生成 venv closure、准确 wheel 目录及账户身份绑定。缺失或漂移一律拒绝。源码后续修复可以离线完成和测试，但新源码不得用旧许可部署。本增量未执行服务器操作，未证明生产安装、DNS 或业务验收。
+
+V3 独立审核签名额外强制包含 workflow_contract_sha256，并逐字匹配批准的六阶段输入/恢复范围；旧 apply 范围签名不能用于全链，V1/V2 既有签名格式保持不变。
+
+本批最终本地合并专项：195 个唯一测试，195 通过，0 跳过/错误/失败（九个全链模块，不重复计入此前 V2 的69项）。其中真实 Coordinator + OriginalOperations + StageLease 使用临时同一总账，mock 原 writer，验证 runtime 第一次无副作用失败后同许可第二次成功、probe/账号成功不重跑、customer 无内层 Attempts。另两项验证 runtime intent 后失去 fence 不 mkdir、venv 后许可失效不写 vendor 文件。此结果不替代 Hosted 或现场测试。

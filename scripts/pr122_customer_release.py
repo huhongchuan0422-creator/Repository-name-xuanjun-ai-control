@@ -179,6 +179,29 @@ def runtime_check(expected_uid):
     need('NoNewPrivs:\t1' in status and int(status.split('CapEff:')[1].split()[0],16)==0,'RUNTIME_PRIVILEGES')
     need(os.readlink(proc/'ns/mnt')!=os.readlink('/proc/1/ns/mnt'),'SEPARATE_MOUNT_NAMESPACE')
 
+def workflow_apply(folder,comment,expected_plan,operations=None):
+    """Original release authority/lock entry for an explicitly approved full scope.
+
+    Internal callable only. No new root command or runtime permission is exposed.
+    Target-specific adapters must be reviewed and supplied by the original
+    protected caller; absent adapters never fall back to the partial installer.
+    """
+    from scripts.pr122_customer_workflow import Coordinator, validate_contract
+    need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','HOST_OR_ROOT')
+    import fcntl
+    fd=os.open(private_path(LOCK),os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'w') as held:
+        fcntl.flock(held,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        approval=gate(comment,expected_plan)
+        validate_contract(expected_plan,approval)
+        if operations is None:
+            from scripts.pr122_customer_workflow_operations import OriginalOperations
+            operations=OriginalOperations(sys.modules[__name__],folder,expected_plan,
+                                          private_config(CONFIG/'WHOLE_WORKFLOW_INPUTS.json'))
+        return Coordinator(sys.modules[__name__],folder,comment,expected_plan,
+                           approval,operations,held.fileno()).run()
+
+
 def apply(folder,comment):
     # Lock original website/Nginx mutation boundary, shared with showcase install.
     import fcntl
@@ -190,6 +213,7 @@ def apply(folder,comment):
             # Only a newly admitted V2 transaction can enter this branch.
             return resume.apply_locked(sys.modules[__name__],folder,comment,lock_fd=stream.fileno())
         observed=plan(folder);approval=gate(comment,observed)
+        need(approval.get('attempt_policy')!='CONTROLLED_WHOLE_WEBSITE_V3','WHOLE_WORKFLOW_ENTRY_REQUIRED')
         if approval.get('attempt_policy')==resume.POLICY:
             return resume.apply_locked(sys.modules[__name__],folder,comment,observed,approval,lock_fd=stream.fileno())
         attempts=Attempts(STATE,TXN,approval,comment,observed,atomic_json,CONFIG)

@@ -26,11 +26,17 @@ def verify(comment,approval_comment,approval,plan,trust,fetch):
     need(type(key) is dict and set(key)=={'public_key_b64','principal','status','custody_evidence_sha256'} and key['status']=='ACTIVE' and key['principal']!=trust['source_writer_principal'] and key['custody_evidence_sha256']==anchor['custody_evidence_sha256'],'INDEPENDENT_ENROLLED_KEY_REQUIRED')
     payload=envelope['payload']
     expected_fields={'decision','reviewer_principal','source_writer_principal','source_commit','source_tree','manifest_sha256','artifact_zip_sha256','artifact_tar_sha256','artifact_id','ci_run_id','scope_sha256','findings','issued_unix','expires_unix'}
+    whole=approval.get('attempt_policy')=='CONTROLLED_WHOLE_WEBSITE_V3'
+    if whole:expected_fields.add('workflow_contract_sha256')
     need(type(payload) is dict and set(payload)==expected_fields,'REVIEW_PAYLOAD_SCHEMA')
     try:
         pub=base64.b64decode(key['public_key_b64'],validate=True);signature=base64.b64decode(envelope['signature'],validate=True)
         Ed25519PublicKey.from_public_bytes(pub).verify(signature,canonical(payload))
     except Exception:raise Denied('HOLD:INDEPENDENT_REVIEW_SIGNATURE') from None
+    if whole:
+        need(type(plan.get('workflow_contract')) is dict and
+             payload['workflow_contract_sha256']==approval.get('workflow_contract_sha256')==
+             digest(canonical(plan['workflow_contract'])),'EXACT_INDEPENDENT_WORKFLOW_SCOPE')
     need(payload['decision']=='AUDIT_PASS' and payload['reviewer_principal']==key['principal'] and payload['source_writer_principal']==trust['source_writer_principal'],'INDEPENDENT_REVIEW_DECISION')
     need(type(payload['issued_unix']) is int and type(payload['expires_unix']) is int and payload['issued_unix']<=time.time()<payload['expires_unix'] and 0<payload['expires_unix']-payload['issued_unix']<=7*86400,'INDEPENDENT_REVIEW_EXPIRED')
     for name in ('source_commit','source_tree','manifest_sha256','artifact_tar_sha256','scope_sha256'):

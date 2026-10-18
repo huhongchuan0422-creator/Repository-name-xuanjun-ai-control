@@ -76,11 +76,20 @@ def validate_policy(approval):
 
 
 class Journal:
-    def __init__(self, release, receipt, attempts, files, raw):
+    def __init__(self, release, receipt, attempts, files, raw, workflow_lease=None):
         self.r, self.receipt, self.attempts = release, receipt, attempts
         self.txn = release.STATE / release.TXN
         self.path = self.txn / 'receipt.json'
-        self.actions = validate_policy(receipt['approval'])
+        self.workflow_lease=workflow_lease
+        if workflow_lease is None:self.actions=validate_policy(receipt['approval'])
+        else:
+            from scripts.pr122_customer_workflow import POLICY as WORKFLOW_POLICY
+            workflow_lease.assert_fence()
+            need(receipt['approval']==workflow_lease.approval and receipt['approval']['attempt_policy']==WORKFLOW_POLICY,
+                 'V2_BORROWED_WORKFLOW_PERMISSION')
+            actions=set(workflow_lease.stage_contract('CUSTOMER_APPLY')['recovery_actions'])
+            if 'RECONCILE_CUSTOMER' in actions:actions.add('RECONCILE_OWNED_CHECKPOINTS')
+            self.actions=frozenset(actions & ACTIONS)
         self.payloads = {str(release.CODE / p): b for p, b in files.items()}
         self.payloads[str(release.CODE / 'CUSTOMER_MANIFEST.json')] = raw
         self.payloads[str(release.SNIPPET)] = files['deploy/pr122-customer-center/locations.conf']
@@ -94,6 +103,7 @@ class Journal:
             need(receipt['expected_files'].get(p) == {'sha256': digest(b), 'size': len(b), 'mode': self.modes[p]}, 'V2_PAYLOAD_BINDING')
 
     def save(self):
+        if self.workflow_lease is not None:self.workflow_lease.assert_active()
         self.assert_lock()
         if self.attempts is not None:self.attempts.assert_fence()
         # Backup bytes are transient and are never serialized in JSON.
@@ -162,7 +172,8 @@ class Journal:
         if absent_create:self.receipt['intent']=None
 
     def assert_lock(self):
-        assert_lock(self.r)
+        if self.workflow_lease is None:assert_lock(self.r)
+        else:self.workflow_lease.assert_fence()
 
     def guard(self):
         self.assert_lock()

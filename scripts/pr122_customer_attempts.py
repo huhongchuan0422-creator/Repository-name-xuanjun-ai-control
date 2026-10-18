@@ -48,7 +48,7 @@ def read_private(path):
 def validate_approval(approval):
     count = approval.get('max_executions')
     need(type(count) is int and 1 <= count <= 5, 'ATTEMPT_LIMIT')
-    need(count == 1 or approval.get('attempt_policy') in (POLICY,'CONTROLLED_INSTALL_RESUME_V2'), 'EXPLICIT_NEW_ATTEMPT_POLICY')
+    need(count == 1 or approval.get('attempt_policy') in (POLICY,'CONTROLLED_INSTALL_RESUME_V2','CONTROLLED_WHOLE_WEBSITE_V3'), 'EXPLICIT_NEW_ATTEMPT_POLICY')
     if approval.get('attempt_policy') == 'CONTROLLED_INSTALL_RESUME_V2':
         from scripts.pr122_customer_resume import validate_policy
         validate_policy(approval)

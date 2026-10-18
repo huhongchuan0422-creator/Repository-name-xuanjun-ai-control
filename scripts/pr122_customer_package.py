@@ -27,7 +27,7 @@ def build(output,commit,tree):
             if isinstance(node,ast.Import):names=[x.name for x in node.names]
             if isinstance(node,ast.ImportFrom) and node.module:
                 names=[node.module]
-                if node.module in ('scripts','tests'):names +=[node.module+'.'+x.name for x in node.names]
+                if node.module.split('.')[0] in ('scripts','tests'):names +=[node.module+'.'+x.name for x in node.names]
             for mod in names:
                 dep=mod.replace('.','/')+'.py'
                 if (dep.startswith('scripts/') or dep.startswith('tests/')) and (ROOT/dep).is_file() and dep not in paths:paths.add(dep);pending.append(dep)

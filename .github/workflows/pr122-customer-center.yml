@@ -103,6 +103,10 @@ jobs:
           assert not re.search(r'skipped=|FAILED|ERROR:|FAIL:',text)
           Path('/tmp/pr122-customer/CUSTOMER_ATTEMPT_COUNTS.json').write_text(json.dumps({'source_commit':os.environ['GITHUB_SHA'],'unique_cases':33,'passed':33,'scope':'SYNTHETIC_NONROOT_FIXTURES_NOT_SERVER_EXECUTION','production':'NOT_RUN'},sort_keys=True)+'\n')
           PYATTEMPTS
+      - name: Whole website fixed-stage isolated regression
+        run: |
+          set -euo pipefail
+          python -B -m unittest tests.test_pr122_customer_workflow tests.test_pr122_customer_workflow_review tests.test_pr122_customer_preparation_bridges tests.test_pr122_customer_policy_restore tests.test_pr122_customer_channel_workflow tests.test_pr122_customer_workflow_apply tests.test_pr122_customer_workflow_operations tests.test_pr122_customer_protected_runtime tests.test_pr122_customer_workflow_signature -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_WHOLE_WORKFLOW_TESTS.log
       - name: Install isolated browser only
         run: |
           npm install --prefix "$RUNNER_TEMP/pr122-customer-browser" --no-save playwright@1.55.0

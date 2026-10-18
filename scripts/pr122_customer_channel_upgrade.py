@@ -87,8 +87,10 @@ def snapshot(folder):
             p=Path(root)/name;out[p.relative_to(folder).as_posix()]={'sha256':sha(read(p)),'mode':stat.S_IMODE(p.stat().st_mode)}
     return out
 
-def bundle():
-    raw=read(INPUT);need(sha(raw)==FROZEN_ZIP,'FROZEN_ZIP_IDENTITY')
+def bundle(expected_zip_sha256=None):
+    pin=FROZEN_ZIP if expected_zip_sha256 is None else expected_zip_sha256
+    need(type(pin) is str and len(pin)==64 and all(c in '0123456789abcdef' for c in pin),'ZIP_PIN_REQUIRED')
+    raw=read(INPUT);need(sha(raw)==pin,'FROZEN_ZIP_IDENTITY')
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         names=z.namelist();need(len(names)==len(set(names)) and len(names)<1000,'ZIP_SET')
         need(all(not n.startswith('/') and '..' not in Path(n).parts and i.file_size<=15000000 for n,i in zip(names,z.infolist())) and sum(i.file_size for i in z.infolist())<=80000000,'ZIP_LIMIT')
@@ -101,7 +103,7 @@ def bundle():
 
 def expected_wrapper():return ('#!/bin/sh\nset -eu\n[ "$#" -eq 1 ] || exit 2\nexec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C SUDO_UID="${SUDO_UID-}" /usr/bin/python3 -I -B '+str(BASE/'channel.py')+' "$1"\n').encode()
 def expected_policy():return ('githubrunner ALL=(root) NOPASSWD: '+', '.join(str(EXEC)+' '+x for x in ('inspect','plan','apply','rollback'))+'\n').encode()
-def plan(ignore_transaction=False):
+def plan(ignore_transaction=False,expected_zip_sha256=None):
     owner();need(ignore_transaction or not os.path.lexists(CONTROL),'TRANSACTION_EXISTS_DO_NOT_RETRY')
     need(json.loads(read(BASE/'grant-state.json'))=={'state':'GRANTED'},'ORIGINAL_GRANTED_REQUIRED')
     need(sha(read(BASE/'channel.py'))==OLD_CODE and sha(read(BASE/ARCHIVE))==OLD_TAR,'ORIGINAL_CHANNEL_BASELINE')
@@ -109,7 +111,7 @@ def plan(ignore_transaction=False):
     old,_,_=unpack(read(BASE/ARCHIVE));actual=snapshot(BASE/'candidate')
     need(set(actual)==set(old) and all(actual[p]['sha256']==sha(b) and actual[p]['mode']==0o400 for p,b in old.items()),'OLD_CANDIDATE_DRIFT')
     need(read(EXEC)==expected_wrapper() and read(POLICY)==expected_policy(),'UNCHANGED_FIXED_POLICY')
-    new,_,_,_=bundle()
+    new,_,_,_=bundle(expected_zip_sha256)
     return {'transaction':TXN,'new':new,'old':{'files':actual,'code_sha256':OLD_CODE,'tar_sha256':OLD_TAR,'wrapper_sha256':sha(read(EXEC)),'policy_sha256':sha(read(POLICY)),'grant_sha256':sha(read(BASE/'grant-state.json'))},'production_service_changes':0,'customer_install':'NOT_CALLED'}
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -189,12 +191,56 @@ def backup_verify(p):
          sha(read(previous/ARCHIVE))==p['old']['tar_sha256'] and
          sha(read(previous/'grant-state.json'))==p['old']['grant_sha256'],'BACKUP_VERIFY')
 
-def apply(get=fetch,checkpoint=lambda stage:None):
-    owner();p=plan();approved=gate(p,get)
+def _workflow_authority(lease,p):
+    from scripts.pr122_customer_workflow import POLICY as WORKFLOW_POLICY
+    lease.assert_active();lease.authority();lease.verify_inputs('CHANNEL_REBIND')
+    need(lease.approval.get('attempt_policy')==WORKFLOW_POLICY,'WHOLE_WORKFLOW_PERMISSION_REQUIRED')
+    inputs=lease.ops.input('CHANNEL_REBIND')
+    need(type(inputs) is dict and set(inputs)=={'plan_sha256','zip_sha256'}
+         and inputs['plan_sha256']==sha(canonical(p)) and inputs['zip_sha256']==p['new']['zip_sha256']
+         and inputs['zip_sha256']==lease.approval.get('artifact_zip_sha256')
+         and p['new']['binding']['source_commit']==lease.plan['source_commit']
+         and p['new']['binding']['manifest_sha256']==lease.plan['manifest_sha256'],
+         'WORKFLOW_CHANNEL_EXACT_INPUTS')
+    need(sha(read(Path(__file__).absolute()))==lease.stage_contract('CHANNEL_REBIND')['implementation_sha256'],
+         'WORKFLOW_CHANNEL_IMPLEMENTATION')
+    # This grants only the fixed forward rebind stage. It cannot be used by the
+    # old rollback/recovery CLI as a new rollback permission.
+    return {'workflow_policy':WORKFLOW_POLICY,'workflow_approval_sha256':sha(canonical(lease.approval)),
+            'expires_unix':lease.approval['expires_unix'],'rollback_approved':False}
+
+
+def apply_for_workflow(lease,checkpoint=lambda stage:None):
+    return apply(checkpoint=checkpoint,workflow_lease=lease)
+
+
+def apply(get=fetch,checkpoint=lambda stage:None,workflow_lease=None):
+    owner()
+    pin=None
+    if workflow_lease is not None:
+        workflow_lease.assert_active();workflow_lease.authority();workflow_lease.verify_inputs('CHANNEL_REBIND')
+        pin=workflow_lease.ops.input('CHANNEL_REBIND')['zip_sha256']
+    read_plan=(lambda ignore=False:plan(ignore_transaction=ignore,expected_zip_sha256=pin)) if workflow_lease is not None else (lambda ignore=False:plan(ignore_transaction=ignore))
+    p=read_plan()
+    authorize=(lambda value:_workflow_authority(workflow_lease,value)) if workflow_lease is not None else (lambda value:gate(value,get))
+    approved=authorize(p)
+    original_checkpoint=checkpoint
+    def checkpoint(stage):
+        if workflow_lease is not None:
+            workflow_lease.assert_active();workflow_lease.authority()
+        original_checkpoint(stage)
+        if workflow_lease is not None:
+            workflow_lease.assert_active();workflow_lease.authority()
+    def perform(r,phase,action,callback):
+        if workflow_lease is not None:
+            workflow_lease.assert_active();workflow_lease.authority()
+        return step(r,phase,action,callback)
     with owner_lock(create_allowed=True):
         # Recheck all inputs and approval while holding both exclusion locks.
-        need(plan()==p and gate(p,get)==approved,'UNDER_LOCK_DRIFT')
-        new,files,archive,code=bundle();need(new==p['new'],'STAGING_DRIFT')
+        need(read_plan()==p and authorize(p)==approved,'UNDER_LOCK_DRIFT')
+        new,files,archive,code=bundle(pin);need(new==p['new'],'STAGING_DRIFT')
+        if workflow_lease is not None:
+            workflow_lease.assert_active();workflow_lease.authority()
         CONTROL.parent.mkdir(mode=0o700,exist_ok=True);secure(CONTROL.parent,directory=True)
         # Exclusive persistent directory consumes this transaction even if setup fails.
         CONTROL.mkdir(mode=0o700)
@@ -211,28 +257,29 @@ def apply(get=fetch,checkpoint=lambda stage:None):
                     create(previous/name,read(BASE/name),stat.S_IMODE((BASE/name).stat().st_mode))
                 tree_write(previous/'candidate',{name:read(BASE/'candidate'/name) for name in p['old']['files']})
                 backup_verify(p)
-            step(r,'BACKUP_VERIFIED',backup,checkpoint)
+            perform(r,'BACKUP_VERIFIED',backup,checkpoint)
             def stage():
                 tree_write(CONTROL/'new-candidate',files)
                 create(CONTROL/'new-channel.py',code,0o444)
                 create(CONTROL/'new.tar.gz',archive,0o400)
-            step(r,'STAGED',stage,checkpoint)
-            need(plan(ignore_transaction=True)==p and gate(p,get)==approved,'PREACTIVATION_DRIFT')
+            perform(r,'STAGED',stage,checkpoint)
+            need(read_plan(True)==p and authorize(p)==approved,'PREACTIVATION_DRIFT')
             need(time.time()<approved['expires_unix'],'APPROVAL_EXPIRED')
             r['state']='ACTIVATING';r['activation_started']=True
-            step(r,'FENCED',lambda:replace(BASE/'grant-state.json',b'{"state":"UPGRADING"}',0o600),checkpoint)
-            step(r,'OLD_MOVED',lambda:move(BASE/'candidate',CONTROL/'parked-old-candidate'),checkpoint)
-            step(r,'CANDIDATE_MOVED',lambda:move(CONTROL/'new-candidate',BASE/'candidate'),checkpoint)
-            step(r,'CODE_REPLACED',lambda:replace(BASE/'channel.py',code,0o444),checkpoint)
-            step(r,'TAR_REPLACED',lambda:replace(BASE/ARCHIVE,archive,0o400),checkpoint)
+            perform(r,'FENCED',lambda:replace(BASE/'grant-state.json',b'{"state":"UPGRADING"}',0o600),checkpoint)
+            perform(r,'OLD_MOVED',lambda:move(BASE/'candidate',CONTROL/'parked-old-candidate'),checkpoint)
+            perform(r,'CANDIDATE_MOVED',lambda:move(CONTROL/'new-candidate',BASE/'candidate'),checkpoint)
+            perform(r,'CODE_REPLACED',lambda:replace(BASE/'channel.py',code,0o444),checkpoint)
+            perform(r,'TAR_REPLACED',lambda:replace(BASE/ARCHIVE,archive,0o400),checkpoint)
             need(snapshot(BASE/'candidate')=={n:{'sha256':sha(b),'mode':0o400} for n,b in files.items()} and
                  sha(read(BASE/'channel.py'))==new['binding']['channel_sha256'] and
                  sha(read(BASE/ARCHIVE))==new['binding']['tar_sha256'],'NEW_OBJECTS_VERIFY')
             verify_policy(p);backup_verify(p)
-            step(r,'GRANTED',lambda:replace(BASE/'grant-state.json',b'{"state":"GRANTED"}',0o600),checkpoint)
+            perform(r,'GRANTED',lambda:replace(BASE/'grant-state.json',b'{"state":"GRANTED"}',0o600),checkpoint)
             r['state']='BOUND';event(r,'BOUND','DONE');checkpoint('BOUND')
             return {'state':'BOUND','receipt':str(CONTROL/'receipt.json'),'customer_install':'NOT_CALLED','sudoers_changed':False}
         except BaseException:
+            if workflow_lease is not None:workflow_lease.assert_active()
             contain(r);raise
 
 def load_transaction():
