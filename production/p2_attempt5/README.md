@@ -55,3 +55,19 @@ entry.py的serve/run均新增强制registry-root、registry-id、registry-record
 
 本轮新增28项登记/查询、并发、重启进程、正式CLI、幂等、部分失败保留、来源绑定、SHA/父链/权限/链接拒绝及不触碰DB/Grant/私钥/adapter测试。受影响Hosted验收为111项/环境=新增28+原装配27+Issuer25+Authority21+Receipt10；25份核心文件仍与f4f逐字相同，不重跑951项，不重审已通过未变部分。登记本身不需要从未知事务创建新账本，也不要求Owner再跑D1。
 当前本地命令执行器不可用（exec-server缺失），未反复尝试或扩权；源码使用既有GitHub开发连接提交，测试与制品由隔离Hosted闭环。现场登记部署仍NOT_EXECUTED；正式登记/安装许可及独立审核以原PR58有效记录为准。
+
+
+## PR58#6250074905：R1/R2集中修复
+
+准确失败基准2b1d0318。本轮仅修改登记校验、提交协议及其回归；25份核心、951项及83项装配限定结论直接继承，不重新运行或审核。
+
+R1：对Issuer施加非空/非UNKNOWN/ASCII标识格式限制；public_der_sha256、adapter_sha256、command_sha256必须是64位小写十六进制字符串；数据库、adapter、key、socket、Ledger路径必须是无控制字符/NULL/反斜杠、规范绝对路径。source.subject必须是准确字段集合的字典且与已验证配置逐项一致；来源ID、principal和相关配置类型明确验证。query严格固定输出字段，摘要输出再次验证标量格式；无效/旧来源在register/query/require_binding均拒绝，不输出私有对象或路径。
+
+R2：完整文件及SHA不再代表提交成功。登记根新增固定.registration.lock和独立.registry-commits.sqlite3，仅保存registration_id、record SHA和文件device/inode，不含Grant、Attempt、额度、Lease或任何生产业务表；它不是AuthorityStore，不打开配置指向的生产数据库。禁止AuthorityStore路径位于登记根，以免混用。元数据索引只在受控登记写入时O_EXCL创建，旧/异常/缺schema或有未决journal的索引保持HOLD，不自动重建或恢复。
+同一登记根的register持独占非阻塞flock，query/load/require_binding仅以O_RDONLY打开锁并持共享非阻塞锁；进行中的登记及并发注册保持HOLD。写新记录并完成文件fsync和目录fsync以后，才以SQLite synchronous=FULL/DELETE journal原子提交索引行，作为最终发布点；提交之后没有额外可能失败的应用层fsync。只读mode=ro/query_only连接必须读到绑定准确SHA及inode的已提交行，才接受记录。
+任一文件/目录fsync失败、写入中止或在发布前进程退出，原输出保留但无提交行。重复register不能补写/自动承认失败记录，重启也不能转VERIFIED或ALREADY_REGISTERED；query不能写文件补救。已经成功提交的记录才幂等返回ALREADY_REGISTERED。已提交索引而数据文件丢失也不能直接重建。遗留异常须按同一正式许可认可的明确恢复流程处理，不删除旧输出后重跑。
+登记metadata表由SQLite处理自身最终同步/原子发布；独立索引不能代替真实Writer/Fence、可信生产状态或安装许可。查询仍不显式写文件/建索引/创建锁，不调用fsync，不打开AuthorityStore、Grant或业务SQLite；系统文件读取可能更新atime。
+
+新增22项反例，原28项不删除不跳过，共50项登记受影响验收/环境。覆盖审核给出的完全相同合成反例、摘要非字符串/长度/字符、UNKNOWN及错误路径、来源冒认、输出白名单；真实文件/目录fsync EIO、写完但未提交时并发查询和注册、进程被终止后重启/重试、部分输出、防覆盖和只读查询字节不变。
+正式entry.py的serve与run均通过真实隔离子进程验证：使用准确SHA的实际entry/assembly/registry代码及独立合成Manifest，注入完整但fsync失败的登记；两入口均在创建Provider/Issuer和加载安装loader之前拒绝REGISTRATION_NOT_COMMITTED。loader只设合成拒绝tripwire，未执行英国操作、生产适配器或安装。该负向正式入口测试不冒充完整生产serve/run正向链验收。
+此前111项CI/制品历史保留，不改判原审核失败；本轮只跑50项受影响登记回归，83项和951项有效证据继承。全部代码与metadata提交协议待Dots本次增量复审；英国未部署，INSTALL_PERMIT=NOT_ISSUED，P2_RELEASE=HOLD。

@@ -35,11 +35,7 @@ def main():
     for name in added:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     groups = []
-    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_assembly.py', 27),
-             (str(ROOT / 'tests/p2_production_assembly'), 'test_registry.py', 28),
-             (str(ROOT / PREFIX), 'test_issuer_service.py', 25),
-             (str(ROOT / PREFIX), 'test_authority_store.py', 21),
-             (str(ROOT / PREFIX), 'test_receipt_provider.py', 10)]
+    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_registry.py', 50)]
     for index, (directory, pattern, count) in enumerate(cases):
         script = ('import sys,unittest;sys.path.insert(0,%r);'
                   'suite=unittest.defaultTestLoader.discover(%r,pattern=%r);'
@@ -66,6 +62,9 @@ def main():
                 'trusted_config_entry': 'production/p2_attempt5/registry_cli.py',
                 'registry_default_root': '/etc/xuanjun-p2/registry',
                 'registry_deployment': 'NOT_EXECUTED',
+                'inherited_assembly_ci_run': 39122271093,
+                'inherited_assembly_tests_per_python': 83,
+                'registry_review_fix': 'PR58_6250074905_R1_R2',
                 'host_effects': 'SYNTHETIC_TEST_ONLY', 'installation': 'NOT_EXECUTED',
                 'permit': 'NOT_ISSUED', 'release': 'HOLD'}
     raw = (json.dumps(manifest, sort_keys=True, indent=2) + '\n').encode()
