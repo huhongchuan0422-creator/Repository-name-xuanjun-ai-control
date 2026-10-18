@@ -31,7 +31,7 @@ from authority_store import AuthorityStore
 from issuer_service import IssuerService
 from permit_cycle import policy
 from test_authority_store import grant
-from test_receipt_provider import ProviderTests
+import test_receipt_provider as provider_fixtures
 
 
 def owner_body(g,p,approved=None):
@@ -111,11 +111,11 @@ class OwnerAuthorizationTests(unittest.TestCase):
 
 class OwnerServiceTests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):ProviderTests.setUpClass.__func__(cls)
+    def setUpClass(cls):provider_fixtures.ProviderTests.setUpClass.__func__(cls)
     @classmethod
     def tearDownClass(cls):cls.tmp.cleanup()
     def setUp(self):
-        self.folder=tempfile.TemporaryDirectory();os.chmod(self.folder.name,0o700)
+        self.folder=tempfile.TemporaryDirectory(dir='/root');os.chmod(self.folder.name,0o700)
         self.addCleanup(self.folder.cleanup)
         self.g=grant()
         self.principal={'actor_id':self.g['actor_id'],'host':self.g['target_host'],'writer_id':'owner-fixture'}
