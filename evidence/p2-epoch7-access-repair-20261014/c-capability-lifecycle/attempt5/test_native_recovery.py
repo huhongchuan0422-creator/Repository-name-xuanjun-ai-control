@@ -495,6 +495,12 @@ def native_suite(env):
             self.assertEqual((report['status'],report['used']),('SUCCEEDED',1))
         def test_cycle_five_failures_exhausted_full_report(self):
             self.admission_failures(9)
+            previous=self.change
+            def change(request,result):
+                previous(request,result)
+                if request['operation']=='diagnose_attempt' and len(self.ledger.snapshot()['attempts'])==5:
+                    result['configuration_actions']=['must-not-execute-after-quota-exhausted']
+            self.change=change
             report=self.cycle().run('d'*64)
             self.assertEqual((report['status'],report['used']),('EXHAUSTED',5))
             self.assertTrue(all(a['state']=='FAILED_NO_WRITE' for a in report['ledger']['attempts']))

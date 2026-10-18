@@ -106,7 +106,9 @@ class PermitCycle(object):
              result.get('recovery') in ('NO_WRITE','NATIVE_CAS'),'DIAGNOSIS_HOLD')
         # Native recovery independently verifies the complete host transaction,
         # backup/checkpoint and actual effects again; diagnosis is not a waiver.
-        actions=result.get('configuration_actions',[])
+        # At the fifth failure only reconcile/retain evidence. There is no
+        # next attempt to prepare, so do not apply retry configuration changes.
+        actions=(result.get('configuration_actions',[]) if len(native.ledger.snapshot()['attempts'])<5 else [])
         need(type(actions) is list and len(actions)==len(set(actions)),'CONFIG_PLAN')
         approved={a['id']:a for a in self.policy['configuration_actions']}
         for action_id in actions:
