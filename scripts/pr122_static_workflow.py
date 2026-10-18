@@ -33,14 +33,14 @@ class StaticCoordinator(Coordinator):
         validate_permission(self.plan,self.approval)
     def authority(self):
         validate_permission(self.plan,self.approval)
-        # release.gate must revalidate original Owner anchors + independent
-        # Ed25519 review for this profile; super also checks source and lock.
+        # Every stage revalidates the exact selected authority, including live
+        # comment revocation. The parent also checks source and the shared lock.
         super().authority()
 
 class StaticAuthority:
     """Internal authority adapter. Paths are fixed by original static control.
     Never accepts a fetcher, operations object, command, stage list or key from
-    JSON. The protected Owner trust remains the existing customer trust store.
+    JSON. Absent an explicit new mode, the original Ed25519 route is unchanged.
     """
     def __init__(self,transaction,folder):
         from scripts import pr122_site_hub_unified_release as original
@@ -53,6 +53,8 @@ class StaticAuthority:
         self.TXN=transaction.id
         self.LOCK=original.c.CONTROL/'transaction.lock'
         self.atomic_json=customer.atomic_json
+        self.authorization_mode=None
+        self._dual_plan=None
     def source(self,folder):
         from scripts.pr122_customer_core import private_path
         import json
@@ -66,6 +68,12 @@ class StaticAuthority:
             n=row['path'];need(type(n) is str and n and not n.startswith('/') and '\\' not in n and all(x not in ('','.','..') for x in n.split('/')),'STATIC_SOURCE_PATH')
             b=private_path(root/n).read_bytes();need(len(b)==row['size'] and digest(b)==row['sha256'],'STATIC_SOURCE_HASH');files[n]=b
         required={'scripts/pr122_customer_workflow.py','scripts/pr122_static_workflow.py','scripts/pr122_static_operations.py','scripts/pr122_customer_review.py','scripts/pr122_site_hub_unified_release.py','scripts/pr122_site_hub_combined.py','scripts/pr122_site_hub_host_preflight.py'}
+        if self.authorization_mode=='STATIC_GITHUB_DUAL_APPROVAL':
+            from scripts.pr122_static_github_approval import strict_json
+            m=strict_json(raw)
+            required.add('scripts/pr122_static_github_approval.py')
+            need(digest(canonical(m['files']))==self._dual_plan['scope_sha256'],
+                 'STATIC_SOURCE_SCOPE_DRIFT')
         need(len(files)==len(m['files']) and required<=set(files),'STATIC_SOURCE_CLOSURE')
         # Imported trusted implementation must be the exact source being signed.
         for name in required:
@@ -80,15 +88,39 @@ class StaticAuthority:
                 need(name in files and loaded.read_bytes()==files[name],'STATIC_IMPORTED_CLOSURE')
         return m,raw,files
     def gate(self,comment_id,plan):
+        need(type(plan) is dict,'STATIC_PLAN_OBJECT')
+        mode=plan.get('authorization_mode')
+        # Only absence selects legacy authority. Null/unknown modes do not.
+        need('authorization_mode' not in plan or mode=='STATIC_GITHUB_DUAL_APPROVAL',
+             'STATIC_AUTHORIZATION_MODE')
+        if mode=='STATIC_GITHUB_DUAL_APPROVAL':
+            from scripts.pr122_customer_core import Denied
+            import re
+            try:
+                return self._gate(comment_id,plan)
+            except Exception as error:
+                # Never leak API response, token, path or foreign exception text.
+                if isinstance(error,Denied) and re.fullmatch(r'HOLD:[A-Z0-9_:]+',str(error)):
+                    raise Denied(str(error)) from None
+                raise Denied('HOLD:STATIC_GITHUB_GATE_UNAVAILABLE') from None
+        return self._gate(comment_id,plan)
+    def _gate(self,comment_id,plan):
         import json,time
         from scripts import pr122_customer_release as customer
-        from scripts.pr122_customer_review import verify,trust_digest
         from scripts import pr122_site_hub_unified_release as original
         pins_raw=original.c.read(original.PINS)
         need(digest(pins_raw)==plan['host_pins_sha256'] and json.loads(pins_raw)==self.tx.pins,'STATIC_HOST_PINS_DRIFT')
         need(self.tx.pins.get('package_schema')=='FULL_STATIC_REVIEW_V1' and self.tx.pins['static_artifact_sha256']==plan['artifact_tar_sha256'],'STATIC_ARTIFACT_PLAN_BINDING')
         baseline={name:self.tx.pins[name] for name in ('previous_release','previous_receipt_sha256','previous_manifest_sha256','nginx')}
         need(digest(canonical(baseline))==plan['static_baseline_sha256'],'STATIC_BASELINE_PLAN_BINDING')
+        if plan.get('authorization_mode')=='STATIC_GITHUB_DUAL_APPROVAL':
+            from scripts import pr122_static_github_approval as dual
+            import copy
+            approval=dual.gate(comment_id,plan,self.TXN)
+            self.authorization_mode=dual.MODE
+            self._dual_plan=copy.deepcopy(plan)
+            return approval
+        from scripts.pr122_customer_review import verify,trust_digest
         c=customer.github('issues/comments/'+str(comment_id))
         need(c['id']==comment_id and c['user']['login']==customer.OWNER and c['issue_url'].endswith('/issues/122') and c['body'].startswith('XUANJUN_STATIC_INSTALL_V1\n'),'STATIC_APPROVAL_ORIGIN')
         a=json.loads(c['body'].split('\n',1)[1]);validate_permission(plan,a)

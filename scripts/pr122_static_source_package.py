@@ -5,7 +5,7 @@ trust stores, receipts, credentials or configuration.
 """
 import argparse,gzip,hashlib,io,json,os,re,tarfile
 from pathlib import Path
-MODULES=('community_merchant_contract','pr122_customer_attempts','pr122_customer_change_authority','pr122_customer_changes','pr122_customer_core','pr122_customer_delivery_source','pr122_customer_edit_jobs','pr122_customer_http','pr122_customer_preview','pr122_customer_profile','pr122_customer_providers','pr122_customer_publication_worker','pr122_customer_release','pr122_customer_review','pr122_customer_small_edit','pr122_customer_source','pr122_customer_workflow','pr122_site_hub_combined','pr122_site_hub_host_preflight','pr122_site_hub_unified_release','pr122_static_operations','pr122_static_workflow')
+MODULES=('community_merchant_contract','pr122_customer_attempts','pr122_customer_change_authority','pr122_customer_changes','pr122_customer_core','pr122_customer_delivery_source','pr122_customer_edit_jobs','pr122_customer_http','pr122_customer_preview','pr122_customer_profile','pr122_customer_providers','pr122_customer_publication_worker','pr122_customer_release','pr122_customer_review','pr122_customer_small_edit','pr122_customer_source','pr122_customer_workflow','pr122_site_hub_combined','pr122_site_hub_host_preflight','pr122_site_hub_unified_release','pr122_static_github_approval','pr122_static_operations','pr122_static_workflow')
 def build(root,commit):
  if type(commit) is not str or re.fullmatch('[0-9a-f]{40}',commit) is None:raise ValueError('EXACT_SOURCE_COMMIT_REQUIRED')
  root=Path(root);files={}
