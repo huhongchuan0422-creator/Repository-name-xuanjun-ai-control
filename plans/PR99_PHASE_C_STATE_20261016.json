@@ -1623,5 +1623,73 @@
       "python36_error": "ModuleNotFoundError: No module named 'test_p2_uk_swas_diagnostic'",
       "claim": "NOT_ALL_REPOSITORY_CHECKS_GREEN"
     }
+  },
+  "independent_function_nodes_20261018": {
+    "schema": 1,
+    "status": "TWO_INDEPENDENT_SOURCE_NODES_IMPLEMENTED_HOSTED_PASS_NOT_PRODUCTION_ACCEPTANCE",
+    "commit": "9a737e2487a536dffd92d07e01ca0310e7366297",
+    "tree": "c97cd5805399d3cffe6175b629da40cd5834d0f7",
+    "run": 39127878159,
+    "completed_at": "2026-10-18T20:35:06+08:00",
+    "jobs": [
+      {
+        "python": "3.11",
+        "job": 117676731028,
+        "tests": 23,
+        "conclusion": "success",
+        "artifact_id": 12136772337,
+        "outer_artifact_sha256": "22be0acfbfbab99169d08b9c9ae00beceb5f1a32f4b3a9ebc8ceacf1eff54ba7"
+      },
+      {
+        "python": "3.12",
+        "job": 117676730889,
+        "tests": 23,
+        "conclusion": "success",
+        "artifact_id": 12136514874,
+        "outer_artifact_sha256": "4346f2f8fdcac25ba172534d7c6b2b797c5395528a56e2c6ca666c7cb65f8840"
+      }
+    ],
+    "source_zip": {
+      "sha256": "38e7dc884c381478e682c7f502f1bc7e497b64ad67528c8e11d8a5dbdc8e89ae",
+      "bytes": 17694,
+      "members": 7,
+      "local_reconstruction": "BYTE_IDENTICAL_TO_BOTH_HOSTED_LOG_RECEIPTS",
+      "sqlite_runtime": "3.45.1"
+    },
+    "nodes": {
+      "N1_WAL_RECOVERY": {
+        "implementation": "OFFICIAL_SQLITE_BYTES_ONLY_MEMORY_VFS",
+        "synthetic_tests": 13,
+        "nonempty_committed_WAL_rows": "PASS_SYNTHETIC",
+        "corrupt_truncated_or_uncommitted_tail": "HOLD_NOT_OLD_MAIN_SUCCESS",
+        "checkpoint_scope": "DISPOSABLE_HEAP_COPIES_ONLY_NO_ORIGINAL_FILE_OPEN",
+        "original_main_and_WAL": "UNCHANGED_BYTES",
+        "M99_dynamic": "NOT_RUN_NOT_WAIVED",
+        "production_capture_adapter_integration": "NOT_INSTALLED_NOT_REBOUND",
+        "target_runtime_acceptance": "NOT_RUN",
+        "independent_review": "REQUESTED_NOT_GRANTED",
+        "frozen_closed": false
+      },
+      "N2_LOST_INVOKE": {
+        "implementation": "READONLY_EXACT_FULL_COMMAND_BINDING_AND_ORIGINAL_RECORD_PERSISTENCE",
+        "synthetic_tests": 10,
+        "original_record": "cloud-start.invocation.json",
+        "ledger_roots_created": 0,
+        "RunCommand_calls": 0,
+        "ambiguity_or_zero": "HOLD_UNKNOWN_NO_REPLAY",
+        "live_rpc_acceptance": "NOT_RUN",
+        "persistent_host_controller_binding": "NOT_SUPPLIED",
+        "independent_review": "REQUESTED_NOT_GRANTED",
+        "frozen_closed": false
+      }
+    },
+    "original_40_file_candidate_sha256": "6a71eea095cc7da2e61ce634cfb477f173b54befc2162816cebd17e4fb86658c",
+    "original_candidate_republished": false,
+    "original_restricted_tests_retried": false,
+    "cloud_calls": 0,
+    "host_commands": 0,
+    "production_services_installed": false,
+    "production_cutover": false,
+    "remaining_major_nodes": 6
   }
 }

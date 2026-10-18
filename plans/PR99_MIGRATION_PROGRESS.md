@@ -90,3 +90,16 @@ Owner已授权dots接手，dots在原PR99核对最新HEAD和本文后确认单wr
 新增云命令3，全部终态成功；数据库打开0、服务动作0、业务请求0、生产切换0。准确标签已消费，禁止重加/重跑。原40文件M99修复未重发、受限动态测试和bwrap入口未重试；非空WAL能力及获准环境仍HOLD。新增代码/元数据链CI通过，未改P2的run39125912200失败保留，不能宣称全仓CI绿。
 
 集中材料：evidence/pr99-service-handoff/aliyun-execution/WRITER_AND_ACCEPTANCE_DELTA_20261018.md。正式最多5次迁移Attempt许可未签发，未把本次3次只读取证计为生产Attempt。6个生产节点仍未关闭，本批无后台迁移命令，东京保留。
+
+
+## 2026-10-18 20:35 CST — 非空WAL与丢失InvokeId两个独立源码节点
+
+准确Commit9a737e2487a536dffd92d07e01ca0310e7366297，Treec97cd5805399d3cffe6175b629da40cd5834d0f7；只新增wal-memory-vfs目录及无云密钥的专用CI。原40文件候选保持原字节，未重发被拒候选、未重试M99动态反例/bwrap、未改隔离环境。
+
+N1：官方SQLite原生API通过限域内存VFS读取主库/WAL字节，WAL索引也只在堆中；官方恢复、堆副本checkpoint、backup、完整性/schema核验、serialize。无路径/SQL输入，不打开原生产数据库或捕获文件，不擅自checkpoint生产库。13项合成数据测试涵盖仅WAL存在的已提交行、不同page size、截断/坏校验和/未提交尾部HOLD、时间/fence回调错误及多线程独立调用。不是M99动态验收或实机最终快照PASS，未接入/替换原生产捕获适配器。
+
+N2：丢失InvokeId时，限DescribeCommandInvocations按完整命令hash/operation、固定实例和作用域做全分页精确匹配；0条UNKNOWN、多条/冲突HOLD，永不重发RunCommand。基于调用者原准入dirfd和命名空间校验，独占补写原cloud-start.invocation.json；不创建第二控制器根/账本/Writer。10项测试含分页、重启复用、完整内容绑定和部分记录保留。实际云查询及持久现场控制器接线仍未验收。
+
+真实Hosted CI [39127878159](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39127878159)：Python3.11/job117676731028、Python3.12/job117676730889，各23/23 PASS，0跳过，原始日志已读。两份内层源码ZIP均17694字节/7成员/SHA256 38e7dc884c381478e682c7f502f1bc7e497b64ad67528c8e11d8a5dbdc8e89ae；本地按准确Commit/Tree重建一致。Artifact12136772337/12136514874；外层Actions压缩包摘要分别保留，不混同内层源码ZIP。
+
+源码/测试节点已形成可复用检查点，独审/生产部署/实机验收仍待完成，不提前冻结关闭。完整数据/所有写入来源/强制Fence/排空和生产接线仍是原执行方实现责任，非Owner权限不足。M99正常放行是独立外部缺项，其他独立开发不因此重做/停掉。六个生产大节点未关闭；本增量云/主机调用0，东京、国内桥接及Windows现网未操作。
