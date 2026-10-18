@@ -314,7 +314,7 @@ def native_suite(env):
                 os.chmod(root,0o700)
                 target=Path(root)/'settings.json';target.write_bytes(b'{"retry":1}');os.chmod(str(target),0o600)
                 new=b'{"retry":2}'
-                action={'id':'retry-limit','before_sha256':sha(target.read_bytes()),'after_sha256':sha(new),
+                action={'id':'retry-limit','target':str(target),'before_sha256':sha(target.read_bytes()),'after_sha256':sha(new),
                         'payload_sha256':sha(new),'checkpoint_sha256':'a'*64}
                 approved=policy();approved['configuration_actions']=[action]
                 config=ApprovedConfiguration(root,{'retry-limit':('settings.json',new)},lambda:self.native.fence(self.ledger.snapshot()['attempts'][-1]['id'],'CONFIG_CAS'),lambda:'a'*64)

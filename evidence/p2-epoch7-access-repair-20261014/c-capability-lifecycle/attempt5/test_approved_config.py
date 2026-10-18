@@ -14,7 +14,7 @@ class ConfigTests(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory(prefix='config5-',dir='/');os.chmod(self.tmp.name,0o700)
         self.path=Path(self.tmp.name)/'settings.json';self.old=b'{"limit":1}';self.new=b'{"limit":2}'
         self.path.write_bytes(self.old);os.chmod(str(self.path),0o600)
-        self.action={'id':'limit','before_sha256':sha(self.old),'after_sha256':sha(self.new),
+        self.action={'id':'limit','target':str(self.path),'before_sha256':sha(self.old),'after_sha256':sha(self.new),
                      'payload_sha256':sha(self.new),'checkpoint_sha256':'a'*64}
         self.count=0;self.fail=False
         def fence():

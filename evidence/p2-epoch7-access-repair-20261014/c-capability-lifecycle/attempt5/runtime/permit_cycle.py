@@ -23,11 +23,13 @@ def policy(value=None):
     need(type(actions) is list and len(actions)<=16,'CONFIG_SCOPE_BOUND')
     ids=[]
     for action in actions:
-        need(type(action) is dict and set(action)=={'id','before_sha256','after_sha256','payload_sha256','checkpoint_sha256'},'CONFIG_SCOPE')
+        need(type(action) is dict and set(action)=={'id','target','before_sha256','after_sha256','payload_sha256','checkpoint_sha256'},'CONFIG_SCOPE')
         need(type(action['id']) is str and 0<len(action['id'])<=64,'CONFIG_ID')
         for key in ('before_sha256','after_sha256','payload_sha256','checkpoint_sha256'):
             import re
             need(type(action[key]) is str and re.fullmatch('[0-9a-f]{64}',action[key]),'CONFIG_HASH')
+        need(type(action['target']) is str and os.path.isabs(action['target']) and
+             os.path.normpath(action['target'])==action['target'] and action['target'].endswith('.json'),'CONFIG_EXACT_TARGET')
         ids.append(action['id'])
     need(len(set(ids))==len(ids),'DUPLICATE_CONFIG_SCOPE')
     return result

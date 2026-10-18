@@ -23,6 +23,9 @@ class NativeRecovery(object):
         if fixture_mode:
             need(ledger.grant['target_host']=='TEST_ONLY' and provider.issuer=='TEST_ONLY', 'FIXTURE_CANNOT_AUTHORIZE_HOST')
         else:
+            need(all(a['target'].startswith('/var/lib/xuanjun-attempt5/config/') and
+                     '/' not in a['target'][len('/var/lib/xuanjun-attempt5/config/'):]
+                     for a in self.cycle_policy['configuration_actions']),'DEDICATED_CONFIG_SCOPE_REQUIRED')
             from epoch7_live_controls import FiniteLiveControls
             from epoch7_host_containment import HostContainment
             need(isinstance(driver.controls,FiniteLiveControls) and

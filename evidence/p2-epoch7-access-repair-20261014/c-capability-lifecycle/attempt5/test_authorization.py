@@ -47,6 +47,6 @@ class AuthorizationTests(unittest.TestCase):
         self.assertEqual(self.validate()['cycle_policy_sha256'],a.digest(self.wanted['permit_cycle']))
     def test_unapproved_configuration_scope_cannot_be_added_after_review(self):
         value=dict(self.wanted['permit_cycle'])
-        value['configuration_actions']=[{'id':'repair','before_sha256':'a'*64,'after_sha256':'b'*64,'payload_sha256':'b'*64,'checkpoint_sha256':'c'*64}]
+        value['configuration_actions']=[{'id':'repair','target':'/var/lib/xuanjun-attempt5/config/repair.json','before_sha256':'a'*64,'after_sha256':'b'*64,'payload_sha256':'b'*64,'checkpoint_sha256':'c'*64}]
         with self.assertRaises(Hold):a.validate(json.dumps(self.value).encode(),9000000001,self.g,self.p,value)
 if __name__=='__main__':unittest.main()

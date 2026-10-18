@@ -22,6 +22,7 @@ class ApprovedConfiguration(object):
             need(stat.S_ISDIR(info.st_mode) and not info.st_mode&0o022,'CONFIG_ANCESTRY')
         info=os.lstat(directory)
         need(info.st_uid==os.geteuid() and stat.S_IMODE(info.st_mode)==0o700,'CONFIG_OWNER')
+        self.directory=directory
         self.fd=os.open(directory,os.O_DIRECTORY|os.O_RDONLY|os.O_NOFOLLOW)
         self.actions=dict(actions);self.fence=fence;self.checkpoint=checkpoint
     def close(self):os.close(self.fd)
@@ -47,6 +48,7 @@ class ApprovedConfiguration(object):
     def apply(self,action):
         need(action['id'] in self.actions,'UNAPPROVED_CONFIG')
         name,payload=self.actions[action['id']]
+        need(action.get('target')==os.path.join(self.directory,name),'CONFIG_TARGET_BINDING')
         need(type(name) is str and name.endswith('.json') and '/' not in name and not name.startswith('.'),'CONFIG_DATA_ONLY')
         need(type(payload) is bytes and len(payload)<=65536 and sha(payload)==action['payload_sha256'] and
              sha(payload)==action['after_sha256'],'CONFIG_PAYLOAD_BINDING')

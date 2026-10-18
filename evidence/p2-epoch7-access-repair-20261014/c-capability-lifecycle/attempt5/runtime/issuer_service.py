@@ -83,6 +83,12 @@ class IssuerService(object):
                     if observed.get('source_identity')!=identity:
                         self.store.stop_cycle(grant,'SOURCE_CHANGE_NEW_PERMIT',token)
                     need(observed.get('source_identity')==identity and observed.get('status')=='UNCHANGED','SOURCE_CHANGE_NEW_PERMIT')
+                if operation=='apply_approved_configuration':
+                    action=payload['action']
+                    need(observed.get('status')=='COMMITTED' and observed.get('action')==action and
+                         receipt['checkpoint_sha256']==action['checkpoint_sha256'] and
+                         observed.get('backup_sha256')==action['before_sha256'] and
+                         observed.get('after_sha256')==action['after_sha256'],'CONFIG_RECEIPT_UNKNOWN')
                 if operation=='diagnose_attempt':
                     identity={k:grant[k] for k in ('source_commit','source_tree','kit_sha256','manifest_sha256')}
                     if observed.get('source_identity')!=identity:
