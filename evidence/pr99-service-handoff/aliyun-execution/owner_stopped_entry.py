@@ -56,6 +56,40 @@ def frozen_library():
     return ns
 
 
+def repair_acceptance_permission(ns):
+    # Correct a terminal, known input-mode failure, not an unknown invocation.
+    # No existing partial install may be replayed or overwritten.
+    state=Path(ns['STATE'])
+    need(not os.path.lexists(state),'ORIGINAL_STATE_PRESENT_QUERY_ONLY')
+    units=Path('/etc/systemd/system')
+    need(all(not os.path.lexists(units/u) and ns['stopped'](u) for u in ns['NAMES']),
+         'CORRECTION_TARGET_CONFLICT')
+    path=Path(ns['RELEASE'])/'callback-restart-acceptance-v1/receipt.json'
+    for parent in reversed(path.parents):
+        s=parent.lstat()
+        need(stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,'ACCEPTANCE_PARENT_IDENTITY')
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
+    try:
+        before=os.fstat(fd)
+        mode=stat.S_IMODE(before.st_mode)
+        need(stat.S_ISREG(before.st_mode) and before.st_uid==0 and before.st_nlink==1 and mode in (0o600,0o644),
+             'ACCEPTANCE_MODE_REPAIR_SCOPE')
+        raw=os.read(fd,100001);need(len(raw)<=100000,'ACCEPTANCE_BOUND')
+        value=json.loads(raw)
+        need(value.get('status')=='R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION' and
+             value.get('application_processes_stopped')is True,'ACCEPTANCE_STATUS')
+        same=lambda a,b:(a.st_dev,a.st_ino,a.st_size,a.st_mtime_ns)==(b.st_dev,b.st_ino,b.st_size,b.st_mtime_ns)
+        need(same(before,os.fstat(fd)),'ACCEPTANCE_CHANGED')
+        if mode!=0o600:os.fchmod(fd,0o600);os.fsync(fd)
+        after=os.fstat(fd)
+        need(same(before,after) and stat.S_IMODE(after.st_mode)==0o600 and
+             ns['read_regular'](path,private=True)==raw,'ACCEPTANCE_REPAIR_IDENTITY')
+        return {'earlier_terminal_invoke_id':'t-sh070fgsorn44cg','earlier_error':'PRIVATE_INPUT_MODE',
+                'previous_mode':mode,'final_mode':0o600,'permission_tightened':mode!=0o600,
+                'bytes_unchanged':True,'original_install_state_absent_before_correction':True}
+    finally:os.close(fd)
+
+
 def owner_install(ns,nonce):
     state=Path(ns['STATE']);units=Path('/etc/systemd/system')
     # No new transaction root or Writer: reuse the original exact state/lock.
@@ -106,11 +140,12 @@ def owner_install(ns,nonce):
 def observe(expected,nonce):
     need(os.geteuid()==0 and os.uname().nodename==expected=='iZvt5t8tlrm8oiZ','FIXED_DOMESTIC_ROOT')
     ns=frozen_library();before=ns['snapshot']()
+    correction=repair_acceptance_permission(ns)
     result=owner_install(ns,nonce)
     after=ns['snapshot']()
     need(before==after,'PROTECTED_STATE_CHANGED_NO_FURTHER_ACTION')
     return {'scope':'PR99_OWNER_ORIGINAL_STOPPED_INSTALL_ONLY','hostname':expected,'nonce':nonce,
-            'observed_at':datetime.datetime.utcnow().isoformat()+'Z','installation':result,
+            'observed_at':datetime.datetime.utcnow().isoformat()+'Z','installation':result,'acceptance_permission':correction,
             'protected_state_unchanged':True,'production_started':False,'migration_complete':False}
 
 

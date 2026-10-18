@@ -10,10 +10,14 @@ contract='''def validate_observation(d,expected,nonce):
     def need(ok):
         if not ok:raise ValueError('STOPPED_INSTALL_CONTRACT')
     def fields(x,keys):need(type(x)is dict and set(x)==set(keys.split()))
-    fields(d,'scope hostname nonce observed_at installation protected_state_unchanged production_started migration_complete')
+    fields(d,'scope hostname nonce observed_at installation acceptance_permission protected_state_unchanged production_started migration_complete')
     need(d['scope']=='PR99_OWNER_ORIGINAL_STOPPED_INSTALL_ONLY' and d['hostname']==expected and d['nonce']==nonce)
     need(type(d['observed_at'])is str and re.fullmatch('[0-9T:.Z-]{19,40}',d['observed_at']))
     for k in ('protected_state_unchanged','production_started','migration_complete'):need(d[k]is (k=='protected_state_unchanged'))
+    c=d['acceptance_permission'];fields(c,'earlier_terminal_invoke_id earlier_error previous_mode final_mode permission_tightened bytes_unchanged original_install_state_absent_before_correction')
+    need(c['earlier_terminal_invoke_id']=='t-sh070fgsorn44cg' and c['earlier_error']=='PRIVATE_INPUT_MODE')
+    need(type(c['previous_mode'])is int and c['previous_mode']in (384,420) and c['final_mode']==384)
+    need(c['permission_tightened']is (c['previous_mode']!=384) and c['bytes_unchanged']is True and c['original_install_state_absent_before_correction']is True)
     a=d['installation'];fields(a,'status installed_units created_this_invocation original_state_reused starts enables data_restored route_changed unit_sha256')
     need(a['status']=='QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION' and type(a['created_this_invocation'])is bool and a['original_state_reused']is True)
     need(type(a['installed_units'])is int and a['installed_units']==3)
@@ -83,6 +87,7 @@ test='''def self_test():
         assert not list(units.iterdir()) and len(operations)==1
     receipt={'scope':'PR99_OWNER_ORIGINAL_STOPPED_INSTALL_ONLY','hostname':HOSTS[0][4],'nonce':'a'*32,'observed_at':'2026-10-19T00:00:00Z',
       'installation':{'status':'QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION','installed_units':3,'created_this_invocation':True,'original_state_reused':True,'starts':0,'enables':0,'data_restored':False,'route_changed':False,'unit_sha256':manifest['unit_hashes']},
+      'acceptance_permission':{'earlier_terminal_invoke_id':'t-sh070fgsorn44cg','earlier_error':'PRIVATE_INPUT_MODE','previous_mode':420,'final_mode':384,'permission_tightened':True,'bytes_unchanged':True,'original_install_state_absent_before_correction':True},
       'protected_state_unchanged':True,'production_started':False,'migration_complete':False}
     assert decode_receipt(json.dumps(receipt),HOSTS[0][4],'a'*32)==receipt
     assert decode_receipt(base64.b64encode(json.dumps(receipt).encode()).decode(),HOSTS[0][4],'a'*32)==receipt
