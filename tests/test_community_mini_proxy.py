@@ -16,7 +16,7 @@ from scripts.pr122_customer_source import TrustedNginxSource
 
 class UnixMiniProxy(unittest.TestCase):
     def setUp(self):
-        self.fx=center_fixture.ExistingCenterComposition('test_core_bytes_are_identical_to_pinned_original');self.fx.setUp()
+        self.fx=center_fixture.ExistingCenterComposition('test_core_bytes_are_identical_to_explicit_website_pin');self.fx.setUp()
         self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name)
         self.root.chmod(0o750)
         self.app=MiniApplication(self.fx.center,self.root/'state',self.fx.stage.api.bindings,

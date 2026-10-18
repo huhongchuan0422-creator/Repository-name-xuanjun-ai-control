@@ -13,7 +13,7 @@ from scripts.community_mini_login import LoginUnavailable
 
 class AdmittedMiniApplication(unittest.TestCase):
     def setUp(self):
-        self.fixture=center_fixture.ExistingCenterComposition('test_core_bytes_are_identical_to_pinned_original')
+        self.fixture=center_fixture.ExistingCenterComposition('test_core_bytes_are_identical_to_explicit_website_pin')
         self.fixture.setUp()
         self.fx=self.fixture
         self.web=self.fx.center.login('one@example.org','FixturePassword123!')

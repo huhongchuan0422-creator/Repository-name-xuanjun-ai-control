@@ -12,7 +12,7 @@ from scripts.community_order_store import create_order,state
 
 class CompleteStoreRecovery(unittest.TestCase):
     def setUp(self):
-        self.fx=center_fixture.ExistingCenterComposition('test_core_bytes_are_identical_to_pinned_original');self.fx.setUp()
+        self.fx=center_fixture.ExistingCenterComposition('test_core_bytes_are_identical_to_explicit_website_pin');self.fx.setUp()
         self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name)
         self.app=self.open(self.root/'state')
         self.scope=self.fx.stage.api.bindings[self.fx.stage.customer]
