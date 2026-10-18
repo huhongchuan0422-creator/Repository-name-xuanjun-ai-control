@@ -24,6 +24,7 @@ class NativeRecovery(object):
             from epoch7_host_containment import HostContainment
             need(isinstance(driver.controls,FiniteLiveControls) and
                  isinstance(driver.containment,HostContainment),'CONCRETE_NATIVE_COMPOSITION_REQUIRED')
+            need(ledger.grant['recovery_entry']=='native_recovery.NativeRecovery','VERSIONED_RECOVERY_ENTRY_REQUIRED')
             from authorization import authenticate
             self.approval=authenticate(approval_review_id,ledger.grant,provider)
         self.s, self.driver, self.ledger, self.provider = sequence, driver, ledger, provider

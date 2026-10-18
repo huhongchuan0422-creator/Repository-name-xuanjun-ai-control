@@ -15,7 +15,9 @@ def expected(grant,provider):
     body=dict(grant);body.pop('approval_body_sha256')
     key={'modulus_hex':format(provider.modulus,'x'),'exponent':provider.exponent}
     return {'schema':1,'decision':DECISION,'grant':body,'issuer':provider.issuer,
-            'provider_key_sha256':digest(key)}
+            'provider_key_sha256':digest(key),
+            'retry_policy':'INDEPENDENT_NO_WRITE_OR_NATIVE_CAS_SAFE_CHECKPOINT_ONLY_NO_REPLAY_V1',
+            'effect_scope':'INHERITED_107_PAYLOADS_16_PHASES_NO_TLS_ISSUANCE'}
 
 def validate(raw,review_id,grant,provider):
     # The inherited parser rejects duplicate keys and NaN/Infinity.

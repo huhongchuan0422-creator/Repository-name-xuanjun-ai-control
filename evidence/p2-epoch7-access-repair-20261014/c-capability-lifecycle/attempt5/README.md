@@ -85,3 +85,8 @@ independent account 18598789888 / 95597695, PR58 destination, exact raw body SHA
 new five-attempt decision/marker, full grant and issuer RSA public-key fingerprint.
 No injected fetcher exists on the production path. Old single-use bodies and
 developer-authored comments cannot authorize it. No such permit is issued here.
+
+The exact new approval body explicitly states the fixed no-replay retry policy
+and inherited 107-payload/16-phase/no-TLS-issuance effect scope. Production grants
+must name `native_recovery.NativeRecovery` as the recovery entry; legacy entries
+cannot be substituted. One approval binds all five attempts and the issuer key.

@@ -19,7 +19,10 @@ class AuthorizationTests(unittest.TestCase):
         self.value={'id':9000000001,'user':{'id':95597695,'login':'18598789888'},
                     'issue_url':'https://api.github.com/repos/'+a.REPO+'/issues/58','body':self.body}
     def validate(self):return a.validate(json.dumps(self.value).encode(),9000000001,self.g,self.p)
-    def test_exact_new_body_binds_key_grant(self):self.assertEqual(self.validate()['approval_body_sha256'],self.g['approval_body_sha256'])
+    def test_exact_new_body_binds_key_grant(self):
+        self.assertEqual(self.validate()['approval_body_sha256'],self.g['approval_body_sha256'])
+        self.assertEqual(self.wanted['retry_policy'],'INDEPENDENT_NO_WRITE_OR_NATIVE_CAS_SAFE_CHECKPOINT_ONLY_NO_REPLAY_V1')
+        self.assertEqual(self.wanted['effect_scope'],'INHERITED_107_PAYLOADS_16_PHASES_NO_TLS_ISSUANCE')
     def test_developer_cannot_issue_permit(self):
         self.value['user']={'id':332398908,'login':'huhongchuan0422-creator'}
         with self.assertRaises(Hold):self.validate()
