@@ -1,0 +1,340 @@
+"""Owner-direct original stopped installer, fixed domestic target, no activation or automatic retry."""
+import base64
+import concurrent.futures
+import datetime
+import hashlib
+import hmac
+import json
+import os
+import re
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+
+UK = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
+KR = 'acs:ram::1691189778575891:role/xuanjun-automation'
+CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+HOSTS=(('domestic',CN,'cn-shanghai','3a22c458934142eea89ec6e3bf481a57','iZvt5t8tlrm8oiZ'),)
+
+
+class Hold(Exception):
+    pass
+
+
+def safe(value):
+    return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+
+
+def quote(value):
+    return urllib.parse.quote(str(value), safe='~')
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def rpc(endpoint, version, action, credentials, **params):
+    # Endpoint and action are fixed by this program, never accepted from a task.
+    if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+        raise Hold('ENDPOINT_REJECTED')
+    key, secret, token = credentials
+    values = dict(params, Action=action, Version=version, Format='JSON',
+                  AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0',
+                  SignatureNonce=uuid.uuid4().hex,
+                  Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+    if token:
+        values['SecurityToken'] = token
+    canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+    signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+    values['Signature'] = base64.b64encode(signature).decode()
+    request = urllib.request.Request('https://' + endpoint + '/',
+        data=urllib.parse.urlencode(values).encode(),
+        headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+            raw = response.read(262145)
+    except urllib.error.HTTPError as error:
+        try:
+            data = json.loads(error.read(262145))
+            code = safe(data.get('Code'))
+        except Exception:
+            code = 'HTTP_' + str(error.code)
+        raise Hold(code) from None
+    except Exception:
+        # Never print a URL/body, key, temporary token, or raw exception.
+        raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+    if len(raw) > 262144:
+        raise Hold('RESPONSE_TOO_LARGE')
+    try:
+        data = json.loads(raw)
+    except Exception:
+        raise Hold('INVALID_API_RESPONSE') from None
+    if not isinstance(data, dict):
+        raise Hold('INVALID_API_RESPONSE')
+    if 'Code' in data:
+        raise Hold(safe(data['Code']))
+    return data
+
+
+# This recovery does not import, publish or run the M99-R1 repair candidate.
+# Only this exact Owner-direct stopped-install scope is authorized. Historical attempts are never replayed.
+import zlib
+
+HOST_PROGRAM='FROZEN_SOURCE=\'"""PR99 exact-byte, stopped-unit installation and conflict-safe rollback.\\nNo start/enable/restart, route edit, data restore, user creation or cloud call.\\nHost execution requires a separate root-held, independently issued admission.\\n"""\\nimport argparse\\nimport fcntl\\nimport hashlib\\nimport json\\nimport os\\nimport re\\nimport stat\\nimport subprocess\\nimport time\\nfrom pathlib import Path\\n\\nHOST = \\\'iZvt5t8tlrm8oiZ\\\'\\nRELEASE = \\\'/opt/xuanjun-migration-s07/releases/domestic-r2\\\'\\nSTATE = \\\'/var/lib/xuanjun-pr99-s09-stopped-install-v1\\\'\\nADMISSION = \\\'/etc/xuanjun-pr99/s09-stopped-install.admission.json\\\'\\nNAMES = tuple(\\\'xuanjun-pr99-domestic-\\\' + r + \\\'.service\\\' for r in (\\\'portal\\\', \\\'contact\\\', \\\'customer-service\\\'))\\nORIGINAL = (\\\'secure-secrets-portal.service\\\', \\\'xuanjun-wecom-customer-contact.service\\\', \\\'xuanjun-wecom-customer-service.service\\\')\\nPROTECTED = ORIGINAL + (\\\'provider-neutral-domestic-bridge.service\\\', \\\'winctl.service\\\', \\\'nginx.service\\\')\\n\\n\\ndef require(ok, code):\\n    if not ok:\\n        raise RuntimeError(code)\\n\\n\\ndef digest(data):\\n    return hashlib.sha256(data).hexdigest()\\n\\n\\ndef encode(value):\\n    return (json.dumps(value, sort_keys=True, indent=2) + \\\'\\\\n\\\').encode()\\n\\n\\ndef read_regular(path, limit=100000, private=False):\\n    path = Path(path)\\n    for parent in reversed(path.parents):\\n        require(not parent.is_symlink(), \\\'SYMLINK_PARENT\\\')\\n    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)\\n    try:\\n        before = os.fstat(fd)\\n        require(stat.S_ISREG(before.st_mode) and before.st_uid == 0 and before.st_nlink == 1, \\\'FILE_IDENTITY\\\')\\n        require(not before.st_mode & 0o022, \\\'WRITABLE_INPUT\\\')\\n        if private:\\n            require(not before.st_mode & 0o077, \\\'PRIVATE_INPUT_MODE\\\')\\n        data = os.read(fd, limit + 1)\\n        after = os.fstat(fd)\\n        identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)\\n        require(len(data) <= limit and identity(before) == identity(after), \\\'INPUT_CHANGED_OR_OVERSIZE\\\')\\n        return data\\n    finally:\\n        os.close(fd)\\n\\n\\ndef write_exclusive(path, data, mode=0o600):\\n    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)\\n    try:\\n        with os.fdopen(fd, \\\'wb\\\', closefd=False) as stream:\\n            stream.write(data)\\n            stream.flush()\\n            os.fsync(fd)\\n    finally:\\n        os.close(fd)\\n    directory = os.open(Path(path).parent, os.O_RDONLY | os.O_DIRECTORY)\\n    try:\\n        os.fsync(directory)\\n    finally:\\n        os.close(directory)\\n\\n\\ndef unit_bytes():\\n    commands = (\\n        \\\'scripts/secure_secrets_portal_server.py serve --host 127.0.0.1 --port 18080\\\',\\n        \\\'-m ai_service.wecom_customer_contact_service\\\',\\n        \\\'-m ai_service.wecom_customer_service\\\',\\n    )\\n    result = {}\\n    for name, command in zip(NAMES, commands):\\n        # Quarantine is mandatory. These units cannot reach the real bridge.\\n        result[name] = (\\\'\\\'\\\'[Unit]\\nDescription=PR99 quarantined domestic candidate\\nConditionPathExists={release}/callback-restart-acceptance-v1/receipt.json\\n\\n[Service]\\nType=simple\\nUser=65534\\nGroup=65534\\nRootDirectory={release}/rootfs\\nWorkingDirectory=/opt/trading-system\\nExecStart=/venv/bin/python {command}\\nEnvironment=PYTHONPATH=/opt/trading-system PYTHONDONTWRITEBYTECODE=1\\nEnvironment=WECOM_CONTACT_HOST=127.0.0.1 WECOM_CONTACT_PORT=18781\\nEnvironment=WECOM_KF_HOST=127.0.0.1 WECOM_KF_PORT=18780\\nBindReadOnlyPaths=/usr /lib /lib64\\nPrivateDevices=yes\\nPrivateNetwork=yes\\nPrivateTmp=yes\\nProtectSystem=strict\\nReadWritePaths=/opt/trading-system/runtime /home /tmp\\nNoNewPrivileges=yes\\nCapabilityBoundingSet=\\nRestrictSUIDSGID=yes\\nUMask=0077\\nRestart=no\\nTimeoutStopSec=15\\nKillMode=control-group\\nStandardOutput=null\\nStandardError=null\\n\\\'\\\'\\\'.format(release=RELEASE, command=command)).encode()\\n    return result\\n\\n\\ndef manifest():\\n    return {\\\'schema\\\': 1, \\\'action\\\': \\\'INSTALL_STOPPED_QUARANTINE_ONLY\\\', \\\'host\\\': HOST,\\n            \\\'release\\\': RELEASE, \\\'unit_hashes\\\': {n: digest(b) for n, b in unit_bytes().items()},\\n            \\\'activation_supported\\\': False, \\\'production_cutover\\\': False}\\n\\n\\ndef systemctl(*args):\\n    result = subprocess.run([\\\'/usr/bin/systemctl\\\', *args], capture_output=True, timeout=20)\\n    require(result.returncode == 0, \\\'SYSTEMCTL_FAILED_PRESERVE\\\')\\n    return result.stdout.decode()\\n\\n\\ndef snapshot():\\n    result = {u: systemctl(\\\'show\\\', u, \\\'--property=LoadState,ActiveState,SubState,MainPID,FragmentPath\\\', \\\'--no-pager\\\') for u in PROTECTED}\\n    for name in (\\\'/var/www/wenwenwenyiyiyi.work/current\\\', \\\'/opt/trading-system\\\'):\\n        p = Path(name)\\n        if p.is_symlink():\\n            result[name] = {\\\'link\\\': os.readlink(p)}\\n        elif p.exists():\\n            s = p.stat()\\n            result[name] = {\\\'dev\\\': s.st_dev, \\\'ino\\\': s.st_ino, \\\'mode\\\': s.st_mode, \\\'uid\\\': s.st_uid, \\\'gid\\\': s.st_gid}\\n        else:\\n            result[name] = None\\n    return result\\n\\n\\ndef stopped(name):\\n    value = systemctl(\\\'show\\\', name, \\\'--property=ActiveState,MainPID\\\', \\\'--no-pager\\\')\\n    fields = dict(line.split(\\\'=\\\', 1) for line in value.splitlines() if \\\'=\\\' in line)\\n    return fields.get(\\\'MainPID\\\') == \\\'0\\\' and fields.get(\\\'ActiveState\\\') in (\\\'inactive\\\', \\\'failed\\\')\\n\\n\\ndef admission(action, source):\\n    raw = read_regular(ADMISSION, private=True)\\n    permit = json.loads(raw)\\n    require(permit[\\\'schema\\\'] == 1 and permit[\\\'host\\\'] == HOST, \\\'ADMISSION_HOST\\\')\\n    require(permit[\\\'action\\\'] == action and permit[\\\'source_sha256\\\'] == digest(source), \\\'ADMISSION_ACTION_SOURCE\\\')\\n    require(permit[\\\'manifest_sha256\\\'] == digest(encode(manifest())), \\\'ADMISSION_MANIFEST\\\')\\n    now = int(time.time())\\n    require(type(permit[\\\'issued_at\\\']) is int and type(permit[\\\'expires_at\\\']) is int, \\\'ADMISSION_TIME_TYPE\\\')\\n    require(permit[\\\'issued_at\\\'] <= now < permit[\\\'expires_at\\\'] <= permit[\\\'issued_at\\\'] + 7200, \\\'ADMISSION_EXPIRED\\\')\\n    require(re.fullmatch(r\\\'[a-zA-Z0-9_-]{16,80}\\\', permit[\\\'nonce\\\']) is not None, \\\'ADMISSION_NONCE\\\')\\n    require(type(permit[\\\'independent_review_comment_id\\\']) is int and permit[\\\'independent_review_comment_id\\\'] > 0, \\\'INDEPENDENT_REVIEW_REFERENCE\\\')\\n    # A local file is not itself independent review evidence. Its provisioning\\n    # through the original reviewed authority is a separate mandatory host gate.\\n    return permit, digest(raw)\\n\\n\\ndef install(units_dir, state, permit, permit_hash):\\n    units = unit_bytes()\\n    before = snapshot()\\n    for original in ORIGINAL:\\n        require(\\\'LoadState=not-found\\\' in before[original], \\\'ORIGINAL_UNIT_PRESENT\\\')\\n    for name in NAMES:\\n        require(not os.path.lexists(units_dir / name), \\\'TARGET_UNIT_PRESENT\\\')\\n        require(stopped(name), \\\'TARGET_NOT_STOPPED\\\')\\n    receipt = json.loads(read_regular(Path(RELEASE) / \\\'callback-restart-acceptance-v1/receipt.json\\\', private=True))\\n    require(receipt[\\\'status\\\'] == \\\'R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION\\\' and receipt[\\\'application_processes_stopped\\\'] is True, \\\'COPY_ACCEPTANCE_MISSING\\\')\\n    write_exclusive(state / \\\'before.json\\\', encode(before))\\n    write_exclusive(state / \\\'intent.json\\\', encode({\\\'permit_sha256\\\': permit_hash, \\\'nonce\\\': permit[\\\'nonce\\\'], \\\'manifest\\\': manifest()}))\\n    created = []\\n    try:\\n        for name, data in units.items():\\n            write_exclusive(units_dir / name, data, 0o644)\\n            created.append(name)\\n            write_exclusive(state / (name + \\\'.created\\\'), encode({\\\'sha256\\\': digest(data)}))\\n        systemctl(\\\'daemon-reload\\\')\\n        require(all(stopped(n) for n in NAMES), \\\'UNIT_NOT_STOPPED\\\')\\n        require(snapshot() == before, \\\'PROTECTED_CHANGED\\\')\\n        write_exclusive(state / \\\'receipt.json\\\', encode({\\\'status\\\': \\\'QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION\\\', \\\'manifest\\\': manifest(), \\\'protected_state_unchanged\\\': True, \\\'starts\\\': 0, \\\'enables\\\': 0}))\\n    except BaseException:\\n        # Never delete an unrecognised or running unit, even after partial failure.\\n        write_exclusive(state / \\\'failure.json\\\', encode({\\\'status\\\': \\\'HOLD_PRESERVE\\\', \\\'created\\\': created}))\\n        raise\\n\\n\\ndef rollback(units_dir, state, permit, permit_hash):\\n    intent = json.loads(read_regular(state / \\\'intent.json\\\', private=True))\\n    require(intent[\\\'manifest\\\'] == manifest(), \\\'ROLLBACK_MANIFEST\\\')\\n    require(not (state / \\\'rollback.intent.json\\\').exists(), \\\'ROLLBACK_ALREADY_CONSUMED\\\')\\n    before = snapshot()\\n    targets = []\\n    for name, data in unit_bytes().items():\\n        p = units_dir / name\\n        if os.path.lexists(p):\\n            require(read_regular(p) == data and stopped(name), \\\'ROLLBACK_CONFLICT_OR_RUNNING\\\')\\n            # Only units whose transaction intent predates creation may be removed.\\n            marker = json.loads(read_regular(state / (name + \\\'.created\\\'), private=True))\\n            require(marker[\\\'sha256\\\'] == digest(data), \\\'ROLLBACK_OWNERSHIP\\\')\\n            targets.append(name)\\n    write_exclusive(state / \\\'rollback.intent.json\\\', encode({\\\'nonce\\\': permit[\\\'nonce\\\'], \\\'permit_sha256\\\': permit_hash, \\\'targets\\\': targets}))\\n    for name in targets:\\n        require(read_regular(units_dir / name) == unit_bytes()[name] and stopped(name), \\\'ROLLBACK_CHANGED\\\')\\n        (units_dir / name).unlink()\\n    systemctl(\\\'daemon-reload\\\')\\n    require(snapshot() == before, \\\'PROTECTED_CHANGED\\\')\\n    write_exclusive(state / \\\'rollback.receipt.json\\\', encode({\\\'status\\\': \\\'OWNED_STOPPED_UNITS_REMOVED\\\', \\\'removed\\\': targets, \\\'production_cutover\\\': False}))\\n\\n\\ndef main():\\n    parser = argparse.ArgumentParser()\\n    parser.add_argument(\\\'action\\\', choices=(\\\'manifest\\\', \\\'install-stopped\\\', \\\'rollback-stopped\\\'))\\n    args = parser.parse_args()\\n    if args.action == \\\'manifest\\\':\\n        print(encode(manifest()).decode(), end=\\\'\\\')\\n        return\\n    require(os.geteuid() == 0 and os.uname().nodename == HOST, \\\'HOST_ROOT\\\')\\n    os.umask(0o077)\\n    source = read_regular(Path(__file__), 100000)\\n    permit, permit_hash = admission(args.action, source)\\n    state = Path(STATE)\\n    if args.action == \\\'install-stopped\\\':\\n        state.mkdir(mode=0o700)  # one attempt; never replay or merge state\\n    require(stat.S_IMODE(state.lstat().st_mode) == 0o700 and state.lstat().st_uid == 0 and not state.is_symlink(), \\\'STATE_IDENTITY\\\')\\n    lock = os.open(state / \\\'lock\\\', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)\\n    try:\\n        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)\\n        if args.action == \\\'install-stopped\\\':\\n            install(Path(\\\'/etc/systemd/system\\\'), state, permit, permit_hash)\\n        else:\\n            rollback(Path(\\\'/etc/systemd/system\\\'), state, permit, permit_hash)\\n    finally:\\n        os.close(lock)\\n\\n\\nif __name__ == \\\'__main__\\\':\\n    main()\\n\'\n"""Normal Owner-direct entry for the published stopped/quarantine installer.\n\nOwner removed the independent-review/permit wait. This explicit entry uses the\nsame original STATE, lock, unit bytes, copied acceptance and rollback ownership.\nIt never invents an independent approval or touches the restricted M99 repair.\nOnly install-stopped is supported; no start, enable, data or route operations.\n"""\nimport datetime\nimport fcntl\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport stat\nimport subprocess\n\n\ndef fixed_systemctl(*args):\n    need(args==(\'daemon-reload\',) or (len(args)==4 and args[0]==\'show\' and\n         args[1] in (\'secure-secrets-portal.service\',\'xuanjun-wecom-customer-contact.service\',\n         \'xuanjun-wecom-customer-service.service\',\'provider-neutral-domestic-bridge.service\',\n         \'winctl.service\',\'windows-interaction-http.service\',\'nginx.service\',\n         \'xuanjun-pr99-domestic-portal.service\',\'xuanjun-pr99-domestic-contact.service\',\n         \'xuanjun-pr99-domestic-customer-service.service\') and args[2] in\n         (\'--property=LoadState,ActiveState,SubState,MainPID,FragmentPath\',\'--property=ActiveState,MainPID\') and\n         args[3]==\'--no-pager\'),\'FIXED_SERVICE_OPERATION\')\n    p=subprocess.run([\'/usr/bin/systemctl\',*args],capture_output=True,timeout=20,\n                     env={\'PATH\':\'/usr/sbin:/usr/bin:/sbin:/bin\',\'LANG\':\'C\'})\n    need(len(p.stdout)<=8192,\'UNIT_OUTPUT_BOUND\')\n    value=p.stdout.decode(\'utf-8\',\'strict\')\n    if args==(\'daemon-reload\',):need(p.returncode==0,\'DAEMON_RELOAD_FAILED_PRESERVE\')\n    else:\n        fields=dict(line.split(\'=\',1) for line in value.splitlines() if \'=\' in line)\n        expected=set(args[2].split(\'=\',1)[1].split(\',\'))\n        need(set(fields)==expected and fields.get(\'MainPID\',\'\').isdigit(),\'UNIT_STATE_UNKNOWN\')\n        # systemctl show returns 1 for a missing unit; accept only its complete,\n        # inactive zero-PID result. All other native failures remain failures.\n        need(p.returncode==0 or (p.returncode==1 and fields.get(\'ActiveState\')==\'inactive\' and\n             fields.get(\'MainPID\')==\'0\' and fields.get(\'LoadState\',\'not-found\')==\'not-found\'),\n             \'SYSTEMCTL_SHOW_FAILED\')\n    return value\n\n\ndef need(ok,code):\n    if not ok:raise RuntimeError(code)\n\n\ndef frozen_library():\n    raw=FROZEN_SOURCE.encode()\n    need(hashlib.sha256(raw).hexdigest()==\'99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315\',\'PUBLISHED_INSTALLER_SOURCE_DRIFT\')\n    ns={\'__name__\':\'published_stopped_functions\',\'__file__\':\'<hash-pinned-published-stopped-functions>\'}\n    exec(compile(raw,\'published_stopped_functions\',\'exec\'),ns)\n    # Correct the protected Windows unit name using already verified live data.\n    ns[\'PROTECTED\']=tuple(sorted(set(ns[\'PROTECTED\'])|{\'windows-interaction-http.service\'}))\n    ns[\'systemctl\']=fixed_systemctl\n    return ns\n\n\ndef owner_install(ns,nonce):\n    state=Path(ns[\'STATE\']);units=Path(\'/etc/systemd/system\')\n    # No new transaction root or Writer: reuse the original exact state/lock.\n    # An earlier partial/unknown attempt is preserved and cannot be replayed.\n    for p in reversed(state.parents):\n        s=p.lstat();need(stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,\'ORIGINAL_STATE_PARENT\')\n    exists=os.path.lexists(state)\n    if exists:\n        s=state.lstat();need(stat.S_ISDIR(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700,\'ORIGINAL_STATE_IDENTITY\')\n        need((state/\'receipt.json\').is_file() and not (state/\'receipt.json\').is_symlink(),\'ORIGINAL_INSTALL_STATE_PENDING_NO_REPLAY\')\n        lock=os.open(state/\'lock\',os.O_RDWR|os.O_NOFOLLOW|os.O_CLOEXEC)\n    else:\n        # All read-only eligibility checks precede creating the original claim.\n        before=ns[\'snapshot\']()\n        need(all(\'LoadState=not-found\' in before[u] for u in ns[\'ORIGINAL\']),\'ORIGINAL_UNIT_PRESENT\')\n        need(all(not os.path.lexists(units/u) and ns[\'stopped\'](u) for u in ns[\'NAMES\']),\'TARGET_UNIT_PRESENT_OR_RUNNING\')\n        receipt=json.loads(ns[\'read_regular\'](Path(ns[\'RELEASE\'])/\'callback-restart-acceptance-v1/receipt.json\',private=True))\n        need(receipt.get(\'status\')==\'R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION\' and\n             receipt.get(\'application_processes_stopped\') is True,\'COPY_ACCEPTANCE_MISSING\')\n        state.mkdir(mode=0o700)\n        lock=os.open(state/\'lock\',os.O_RDWR|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW|os.O_CLOEXEC,0o600)\n    try:\n        s=os.fstat(lock);need(stat.S_ISREG(s.st_mode) and s.st_uid==0 and s.st_nlink==1 and stat.S_IMODE(s.st_mode)==0o600,\'ORIGINAL_LOCK_IDENTITY\')\n        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)\n        if not exists:\n            # This records Owner authorization, not a fabricated reviewer permit.\n            owner={\'mode\':\'OWNER_DIRECT\',\'owner_instruction\':\'2026-10-19T00:29:13+08:00\',\n              \'action\':\'INSTALL_STOPPED_QUARANTINE_ONLY\',\'invocation_nonce\':nonce,\n              \'published_installer_sha256\':hashlib.sha256(FROZEN_SOURCE.encode()).hexdigest(),\n              \'manifest\':ns[\'manifest\']()}\n            ns[\'write_exclusive\'](state/\'owner-direct.authorization.json\',ns[\'encode\'](owner))\n            ns[\'install\'](units,state,{\'nonce\':nonce},ns[\'digest\'](ns[\'encode\'](owner)))\n        saved=json.loads(ns[\'read_regular\'](state/\'receipt.json\',private=True))\n        need(saved.get(\'status\')==\'QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION\' and\n             saved.get(\'manifest\')==ns[\'manifest\']() and saved.get(\'starts\')==0 and saved.get(\'enables\')==0,\n             \'ORIGINAL_INSTALL_RECEIPT_BINDING\')\n        for name,data in ns[\'unit_bytes\']().items():\n            need(ns[\'read_regular\'](units/name)==data and ns[\'stopped\'](name),\'INSTALLED_UNIT_DRIFT_OR_RUNNING\')\n            marker=json.loads(ns[\'read_regular\'](state/(name+\'.created\'),private=True))\n            need(marker.get(\'sha256\')==ns[\'digest\'](data),\'INSTALLED_UNIT_ORIGINAL_OWNERSHIP\')\n        return {\'status\':\'QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION\',\'installed_units\':len(ns[\'NAMES\']),\n                \'created_this_invocation\':not exists,\'original_state_reused\':True,\n                \'starts\':0,\'enables\':0,\'data_restored\':False,\'route_changed\':False,\n                \'unit_sha256\':{n:ns[\'digest\'](b) for n,b in ns[\'unit_bytes\']().items()}}\n    finally:os.close(lock)\n\n\ndef observe(expected,nonce):\n    need(os.geteuid()==0 and os.uname().nodename==expected==\'iZvt5t8tlrm8oiZ\',\'FIXED_DOMESTIC_ROOT\')\n    ns=frozen_library();before=ns[\'snapshot\']()\n    result=owner_install(ns,nonce)\n    after=ns[\'snapshot\']()\n    need(before==after,\'PROTECTED_STATE_CHANGED_NO_FURTHER_ACTION\')\n    return {\'scope\':\'PR99_OWNER_ORIGINAL_STOPPED_INSTALL_ONLY\',\'hostname\':expected,\'nonce\':nonce,\n            \'observed_at\':datetime.datetime.utcnow().isoformat()+\'Z\',\'installation\':result,\n            \'protected_state_unchanged\':True,\'production_started\':False,\'migration_complete\':False}\n\n\nif __name__==\'__main__\':\n    try:print(json.dumps(observe(EXPECTED,NONCE),sort_keys=True),flush=True)\n    except BaseException as error:\n        import re\n        code=str(error)\n        print(json.dumps({\'status\':\'OWNER_STOPPED_INSTALL_HOLD\',\'error_type\':type(error).__name__,\n          \'code\':code if re.fullmatch(\'[A-Z0-9_]{1,160}\',code) else \'PRIVATE_DETAIL_WITHHELD\',\'retry_allowed\':False}),flush=True)\n        raise SystemExit(2)\n'
+ACTIVE = ('Pending','Running','Stopping')
+TERMINAL = frozenset(('Invalid','Aborted','Success','Failed','Error','Timeout','Cancelled','Terminated'))
+ID = re.compile(r'[A-Za-z0-9_-]{1,180}')
+ALLOWED_ACTIONS = {'AssumeRole','DescribeCommandInvocations','RunCommand','DescribeInvocationResult'}
+original_rpc = rpc
+
+
+def bounded_rpc(endpoint, version, action, credentials, **params):
+    if action not in ALLOWED_ACTIONS:
+        raise Hold('RPC_ACTION_REJECTED')
+    return original_rpc(endpoint, version, action, credentials, **params)
+
+
+def project_invocations(data, instance, status):
+    if type(data) is not dict or type(data.get('TotalCount')) is not int or data['TotalCount'] < 0:
+        raise Hold('INVOCATION_LIST_SCHEMA')
+    entries = data.get('CommandInvocations')
+    if type(entries) is not list or len(entries) > 50:
+        raise Hold('INVOCATION_LIST_SCHEMA')
+    projected=[]
+    for item in entries:
+        if type(item) is not dict or type(item.get('InvokeId')) is not str or not ID.fullmatch(item['InvokeId']):
+            raise Hold('INVOCATION_ID_REJECTED')
+        peers=item.get('InvokeInstances')
+        if type(peers) is not list:
+            raise Hold('INVOCATION_PEERS_SCHEMA')
+        selected=[p for p in peers if type(p) is dict and p.get('InstanceId') == instance]
+        if len(selected)!=1:
+            raise Hold('INVOCATION_TARGET_NOT_PROVEN')
+        actual=selected[0].get('InvocationStatus')
+        if actual not in ACTIVE and actual not in TERMINAL:
+            raise Hold('INVOCATION_STATUS_UNKNOWN')
+        # Never retain CommandContent, Output, ErrorInfo, Parameters or any other raw fields.
+        projected.append({'invoke_id':item['InvokeId'],'status':actual})
+    return data['TotalCount'],projected
+
+
+def active_invocations(host, credentials, call=bounded_rpc):
+    name,role,region,instance,expected=host
+    endpoint='swas.'+region+'.aliyuncs.com'
+    rows=[]
+    for status in ACTIVE:
+        expected_total=None
+        for page in range(1,6):
+            response=call(endpoint,'2020-06-01','DescribeCommandInvocations',credentials,
+                RegionId=region,InstanceId=instance,InvocationStatus=status,
+                PageNumber=page,PageSize=50)
+            total,items=project_invocations(response,instance,status)
+            if expected_total is not None and total!=expected_total:
+                raise Hold('INVOCATION_LIST_CHANGED_RECHECK_REQUIRED')
+            expected_total=total
+            rows.extend(items)
+            if page*50>=total:break
+            if not items:raise Hold('INVOCATION_PAGINATION_INCOMPLETE')
+        else:
+            raise Hold('INVOCATION_PAGINATION_BOUND_HOLD')
+    # This is an observed API list, not a fence or exclusive Writer assignment.
+    return sorted({r['invoke_id']:r for r in rows}.values(),key=lambda x:x['invoke_id'])
+
+
+def shell_for(expected,nonce):
+    program='EXPECTED='+repr(expected)+'\nNONCE='+repr(nonce)+'\n'+HOST_PROGRAM
+    payload=base64.b64encode(zlib.compress(program.encode(),9)).decode()
+    digest=hashlib.sha256(program.encode()).hexdigest()
+    bootstrap="import base64,zlib,hashlib; b=zlib.decompress(base64.b64decode("+repr(payload)+")); assert hashlib.sha256(b).hexdigest()=="+repr(digest)+"; exec(compile(b,'<pr99-owner-stopped-install>','exec'))"
+    shell="#!/bin/sh\nset -eu\n/usr/bin/python3.11 -I -B - <<'PR99_READONLY'\n"+bootstrap+"\nPR99_READONLY\n"
+    if len(shell.encode())>11000:raise Hold('COMMAND_LENGTH')
+    return shell
+
+
+"""Strict public metadata boundary for the fixed observer, not an admission."""
+"""Public projection boundary: technical names/counts/hashes only, never authority."""
+"""Public projection boundary: technical names/counts/hashes only, never authority."""
+def validate_observation(d,expected,nonce):
+    def need(ok):
+        if not ok:raise ValueError('STOPPED_INSTALL_CONTRACT')
+    def fields(x,keys):need(type(x)is dict and set(x)==set(keys.split()))
+    fields(d,'scope hostname nonce observed_at installation protected_state_unchanged production_started migration_complete')
+    need(d['scope']=='PR99_OWNER_ORIGINAL_STOPPED_INSTALL_ONLY' and d['hostname']==expected and d['nonce']==nonce)
+    need(type(d['observed_at'])is str and re.fullmatch('[0-9T:.Z-]{19,40}',d['observed_at']))
+    for k in ('protected_state_unchanged','production_started','migration_complete'):need(d[k]is (k=='protected_state_unchanged'))
+    a=d['installation'];fields(a,'status installed_units created_this_invocation original_state_reused starts enables data_restored route_changed unit_sha256')
+    need(a['status']=='QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION' and type(a['created_this_invocation'])is bool and a['original_state_reused']is True)
+    need(type(a['installed_units'])is int and a['installed_units']==3)
+    for k in ('starts','enables'):need(type(a[k])is int and a[k]==0)
+    for k in ('data_restored','route_changed'):need(a[k]is False)
+    n={'__name__':'contract_only'};exec(compile(HOST_PROGRAM,'fixed_stopped_program','exec'),n)
+    need(a['unit_sha256']==n['frozen_library']()['manifest']()['unit_hashes'])
+    return d
+
+def decode_receipt(output,expected,nonce):
+    try:
+        if type(output)is not str or len(output.encode())>=16000:raise ValueError()
+        try:d=json.loads(output)
+        except ValueError:d=json.loads(base64.b64decode(output,validate=True))
+        return validate_observation(d,expected,nonce)
+    except Exception:raise Hold('STOPPED_INSTALL_OUTPUT_REJECTED') from None
+
+
+
+
+def probe_current(host,master):
+    name,role,region,instance,expected=host
+    row={'host':name,'instance_id':instance,'status':'HOLD','host_commands':0,'run_command_attempted':False,'service_actions':0,
+         'authoritative_writer':'UNKNOWN','enforced_fence':'UNKNOWN'}
+    try:
+        c=bounded_rpc('sts.aliyuncs.com','2015-04-01','AssumeRole',master,
+            RoleArn=role,RoleSessionName='pr99-resume-'+uuid.uuid4().hex[:16],DurationSeconds=900)['Credentials']
+        credentials=(c['AccessKeyId'],c['AccessKeySecret'],c['SecurityToken'])
+        if not all(type(v) is str and v and '\r' not in v and '\n' not in v for v in credentials):
+            raise Hold('CREDENTIAL_RESPONSE_INVALID')
+        for value in credentials:print('::add-mask::'+value,flush=True)
+        row['sts']='PASS_CURRENT'
+        row['nonterminal_invocations']=active_invocations(host,credentials)
+        row['cloud_query']='PASS_CURRENT_OBSERVATION_NOT_FENCE'
+        if any(x['status'] in ACTIVE for x in row['nonterminal_invocations']):
+            raise Hold('EXISTING_INFLIGHT_PRESERVED_NO_NEW_HOST_COMMAND')
+        nonce=uuid.uuid4().hex
+        shell=shell_for(expected,nonce)
+        # Local job claim stops repeat dispatch in this process; no production state is created.
+        # A lost InvokeId remains UNKNOWN. Workflow reruns are rejected before credentials.
+        claim=Path('pr99-owner-stopped-'+name+'.once')
+        with claim.open('x') as f:
+            f.write(json.dumps({'host':name,'nonce':nonce,'state':'ORIGINAL_STOPPED_INSTALL_INTENT'}))
+            f.flush();os.fsync(f.fileno())
+        row.update(run_command_attempted=True,host_commands='UNKNOWN_UNTIL_TERMINAL_RECEIPT')
+        out=bounded_rpc('swas.'+region+'.aliyuncs.com','2020-06-01','RunCommand',credentials,
+            RegionId=region,InstanceId=instance,Type='RunShellScript',
+            WorkingUser='root',WorkingDir='/root',Timeout=55,
+            Name='pr99-owner-stopped-v1',CommandContent=shell)
+        invoke=out.get('InvokeId')
+        if type(invoke) is not str or not ID.fullmatch(invoke):
+            raise Hold('DISPATCH_RESULT_UNKNOWN_NO_RETRY')
+        row.update(invoke_id=invoke)
+        print('PR99_OWNER_STOPPED_INVOKE='+json.dumps({'host':name,'invoke_id':invoke}),flush=True)
+        deadline=time.monotonic()+100
+        while time.monotonic()<deadline:
+            response=bounded_rpc('swas.'+region+'.aliyuncs.com','2020-06-01','DescribeInvocationResult',credentials,
+                RegionId=region,InstanceId=instance,InvokeId=invoke)
+            detail=response.get('InvocationResult')
+            if type(detail) is not dict or detail.get('InstanceId')!=instance or detail.get('InvokeId')!=invoke:
+                raise Hold('RESULT_IDENTITY_UNKNOWN_NO_RETRY')
+            state=detail.get('InvocationStatus')
+            if state in ACTIVE:time.sleep(5);continue
+            row['invocation_status']=safe(state)
+            if state!='Success' or detail.get('ExitCode')!=0:
+                row['exit_code']=detail.get('ExitCode')
+                raw=detail.get('Output','')
+                try:
+                    try:failed=json.loads(raw)
+                    except ValueError:failed=json.loads(base64.b64decode(raw,validate=True))
+                    if set(failed)=={'status','error_type','code','retry_allowed'} and failed['status']=='OWNER_STOPPED_INSTALL_HOLD' and failed['retry_allowed']is False:
+                        row['host_error_code']=safe(failed['code']);row['host_error_type']=safe(failed['error_type'])
+                except Exception:pass
+                raise Hold('STOPPED_INSTALL_FAILED_NO_RETRY')
+            row['receipt']=decode_receipt(detail.get('Output'),expected,nonce)
+            if row['receipt']['protected_state_unchanged'] is not True:raise Hold('PROTECTED_STATE_CHANGED_NO_FURTHER_ACTION')
+            row['host_commands']=1
+            row['status']='OWNER_STOPPED_INSTALL_COMPLETE_NOT_PRODUCTION'
+            return row
+        raise Hold('STOPPED_INSTALL_RESULT_UNKNOWN_NO_RETRY')
+    except Hold as e:row['error_code']=safe(str(e))
+    except Exception:row['error_code']='UNEXPECTED_UNKNOWN_NO_RETRY'
+    return row
+
+
+def self_test():
+    import tempfile
+    from types import SimpleNamespace as NS
+    from unittest.mock import patch
+    n={'__name__':'stopped_fixture'};exec(compile(HOST_PROGRAM,'fixed_stopped_program','exec'),n)
+    lib=n['frozen_library']();manifest=lib['manifest']()
+    assert manifest['activation_supported']is False and manifest['production_cutover']is False
+    assert lib['STATE']=='/var/lib/xuanjun-pr99-s09-stopped-install-v1'
+    assert 'windows-interaction-http.service' in lib['PROTECTED']
+    calls=[]
+    def show(args,**kwargs):
+        calls.append(args)
+        return NS(returncode=1,stdout=b'LoadState=not-found\nActiveState=inactive\nSubState=dead\nMainPID=0\nFragmentPath=\n')
+    with patch.object(n['subprocess'],'run',show):
+        assert 'LoadState=not-found' in n['fixed_systemctl']('show','winctl.service','--property=LoadState,ActiveState,SubState,MainPID,FragmentPath','--no-pager')
+        for op in ('start','enable','stop','restart'):
+            try:n['fixed_systemctl'](op,'nginx.service')
+            except RuntimeError:pass
+            else:raise AssertionError('UNAUTHORIZED_SERVICE_OPERATION')
+    assert len(calls)==1
+    # Execute the original installer against actual temporary files. Native
+    # service control is replaced with a recording stub, never called in CI.
+    with tempfile.TemporaryDirectory() as tmp:
+        root=Path(tmp);units=root/'units';state=root/'state';release=root/'release'
+        for p in (units,state,release):p.mkdir()
+        acceptance=release/'callback-restart-acceptance-v1';acceptance.mkdir()
+        (acceptance/'receipt.json').write_text(json.dumps({'status':'R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION','application_processes_stopped':True}))
+        lib['RELEASE']=str(release)
+        snap={u:'LoadState=not-found\n' for u in lib['ORIGINAL']}
+        lib['snapshot']=lambda:dict(snap);lib['stopped']=lambda name:True
+        lib['read_regular']=lambda path,**kw:Path(path).read_bytes()
+        operations=[];lib['systemctl']=lambda *a:operations.append(a) or ''
+        lib['install'](units,state,{'nonce':'a'*32},'b'*64)
+        assert operations==[('daemon-reload',)]
+        saved=json.loads((state/'receipt.json').read_text())
+        assert saved['starts']==saved['enables']==0
+        assert saved['status']=='QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION'
+        assert all((units/name).read_bytes()==data for name,data in lib['unit_bytes']().items())
+        preserved={p.name:p.read_bytes() for p in units.iterdir()}
+        try:lib['install'](units,state,{'nonce':'c'*32},'d'*64)
+        except RuntimeError as e:assert str(e)=='TARGET_UNIT_PRESENT'
+        else:raise AssertionError('CONFLICT_REPLAY_ACCEPTED')
+        assert preserved=={p.name:p.read_bytes() for p in units.iterdir()} and len(operations)==1
+        # Missing prior acceptance refuses before writing target units.
+        (acceptance/'receipt.json').write_text('{}')
+        for p in units.iterdir():p.unlink()
+        try:lib['install'](units,state,{'nonce':'e'*32},'f'*64)
+        except (RuntimeError,KeyError):pass
+        else:raise AssertionError('MISSING_ACCEPTANCE_ACCEPTED')
+        assert not list(units.iterdir()) and len(operations)==1
+    receipt={'scope':'PR99_OWNER_ORIGINAL_STOPPED_INSTALL_ONLY','hostname':HOSTS[0][4],'nonce':'a'*32,'observed_at':'2026-10-19T00:00:00Z',
+      'installation':{'status':'QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION','installed_units':3,'created_this_invocation':True,'original_state_reused':True,'starts':0,'enables':0,'data_restored':False,'route_changed':False,'unit_sha256':manifest['unit_hashes']},
+      'protected_state_unchanged':True,'production_started':False,'migration_complete':False}
+    assert decode_receipt(json.dumps(receipt),HOSTS[0][4],'a'*32)==receipt
+    assert decode_receipt(base64.b64encode(json.dumps(receipt).encode()).decode(),HOSTS[0][4],'a'*32)==receipt
+    for change in (lambda x:x.update(production_started=True),lambda x:x.update(private='TOKEN'),lambda x:x['installation'].update(starts=1),lambda x:x['installation']['unit_sha256'].update({'extra':'a'*64})):
+        bad=json.loads(json.dumps(receipt));change(bad)
+        try:decode_receipt(json.dumps(bad),HOSTS[0][4],'a'*32)
+        except Hold:pass
+        else:raise AssertionError('OVERSCOPE_OR_DRIFT_ACCEPTED')
+    assert len(shell_for(HOSTS[0][4],'a'*32).encode())<16000
+    print('PR99_OWNER_STOPPED_EXACT_BYTES_CONFLICT_ACCEPTANCE_NO_ACTIVATION_PASS_NO_CLOUD',flush=True)
+
+def main():
+    if os.environ.get('PR99_MODE')=='SELF_TEST':
+        self_test();return 0
+    if os.environ.get('GITHUB_RUN_ATTEMPT')!='1':
+        raise Hold('WORKFLOW_RERUN_FORBIDDEN')
+    head=os.environ.get('PR99_HEAD','')
+    if not re.fullmatch('[0-9a-f]{40}',head) or os.environ.get('PR99_LABEL')!='pr99-owner-stopped-'+head[:12]:
+        raise Hold('EXACT_OWNER_STOPPED_LABEL_REQUIRED')
+    master=(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''),'')
+    if not all(master[:2]):raise Hold('MISSING_ORIGINAL_REPOSITORY_SECRETS')
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        rows=list(pool.map(lambda host:probe_current(host,master),HOSTS))
+    receipt={'status':'OWNER_STOPPED_INSTALL_BATCH_NOT_PRODUCTION','hosts':rows,
+        'production_service_actions':0,'production_cutover':False,'authoritative_writer':'UNKNOWN',
+        'enforced_fence':'UNKNOWN','migration_started':False}
+    print('PR99_OWNER_STOPPED_RECEIPT='+json.dumps(receipt,sort_keys=True),flush=True)
+    return 0 if all(r['status']=='OWNER_STOPPED_INSTALL_COMPLETE_NOT_PRODUCTION' for r in rows) else 2
+
+
+if __name__=='__main__':
+    try:raise SystemExit(main())
+    except Hold as error:
+        print('PR99_OWNER_STOPPED_HOLD='+safe(str(error)),flush=True)
+        raise SystemExit(2)
