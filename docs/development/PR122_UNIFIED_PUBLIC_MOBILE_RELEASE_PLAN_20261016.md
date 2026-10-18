@@ -104,3 +104,23 @@ The API allowance is not a reservation of shared outbound-IP quota. HTTP errors,
 Static standard-library execution no longer imports cryptography merely to load unused customer encryption/signature helpers: AESGCM, Ed25519 and Feishu cipher imports occur at their actual operations. Those actual operations still fail closed without their dependency; customer runtime validation, login requirements and cryptographic behavior are not relaxed. Public-mode tests must block all cryptography imports in a fresh process while exercising the actual source/authority path, and retain original authenticated/Ed25519/customer regressions.
 
 A new process, including a recovery process, must pass the full 54-request admission budget again. The 13-call allowance is not a promise that a restart can proceed with only 13 remaining requests. Insufficient quota holds before effects; a later start is permitted only while the exact permission remains valid and all original recovery checks pass. No attempt count is reset.
+
+
+### 2026-10-18：既有阿里云控制能力与官网接线边界（Owner要求永久写入原开发记录）
+
+已存在的正常云执行链是 GitHub Actions → 仓库既有 Secrets 引用 → STS AssumeRole → SWAS RunCommand → DescribeInvocationResult。该通道不依赖 Owner 电脑在线；电脑离线、云浏览器未登录或当前工具没有 workflow_dispatch，均不能单独推出 RAM/SWAS 不可用。每次判断前必须先读取原入口、精确分支/动作门禁以及实际运行 job/step 的结果；工作流总体 SUCCESS 可能只代表 validate 成功、云 job 被 SKIPPED。
+
+可继承证据：
+- 原交接文：[ALIYUN_FOUR_HOST_EXECUTION_HANDOFF_20261017.md](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/18fe5456087472b75182ccf014b1e60ca356e7d7/docs/ALIYUN_FOUR_HOST_EXECUTION_HANDOFF_20261017.md) 位于原 PR99 已有分支；固定核查版本为 18fe5456087472b75182ccf014b1e60ca356e7d7，不能因本网站分支没有该文件就否认原通道。
+- 历史四机成功执行：[run 38991455661 attempt 2 / job 117275780078](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/38991455661/attempts/2)。已核实真正的“Verify four fixed hosts through STS and SWAS”步骤成功；此历史事实不等于当前官网已部署。
+- 原入口为 PR99 分支上的 .github/workflows/aliyun-four-host-readonly.yml（固定只读 workflow_dispatch），另有准确 Owner 数字身份、PR99 HEAD 和动作标签绑定的受控任务。既有工具可对获准 PR 添加准确标签，正常触发能力并非只有 rerun；具体标签必须匹配相应已审任务，不能借用 PR99 标签安装官网。
+- 原 secrets 名称 ALIYUN_ACCESS_KEY_ID / ALIYUN_ACCESS_KEY_SECRET 由受信 Actions 环境读取。不得读取或公开其值，不重新配置 RAM、不创建凭据、不向 Owner 索要新 Token，也不把原四机权限扩大为任意命令权限。
+
+官网当前状态与开发要求：
+1. PR122 的 73454b6f 产品控制器与制品已有代码/Hosted 证据；该提交并没有新的 SWAS 官网完整交付/安装适配。旧 PR122 staging 仅是固定历史单次包的非 root 保管动作，不能当作当前安装入口。
+2. 原 PR99 helper/事务/标签仅适用其准确任务，不更改 PR99、不重放已成功会话、不把云投递重试算成产品五次额度。未知 RunCommand 结果须按原投递标识只读对账，不得因重跑工作流或移除/重贴标签再次盲发。
+3. 优先核对已存在输入与原私有交付路径。缺失准确 source、artifact、HostPins、plan、真实批准或受保护配置必须诚实 HOLD；不能发布一个只有 invoke、没有完整 inputs 却声称可上线的空壳。
+4. 本轮先准备 DOMESTIC_STAGING_READONLY：仅固定国内目标及两处有历史证据的根内固定文件名元数据和摘要；普通 push/评论只允许代码测试。完整 helper 字节、HEAD、范围和云参数需要准确核定后才可显式触发。它不是安装动作，也不是生产验收。
+5. 官网正式安装仍须原产品入口执行准确实时批准、固定版本/输入、五小时、最多五次持久账本、锁/Fence 与恢复检查。云控制能力不替代这些门禁；当前不得宣称新官网云通道已部署或现场已验证。
+
+本节记录原云控制能力及当前缺口，不触发云任务，不签发执行许可，不公开私有 HostPins、现场原文或凭据。
