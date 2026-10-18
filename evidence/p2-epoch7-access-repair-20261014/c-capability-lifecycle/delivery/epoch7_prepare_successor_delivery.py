@@ -3,7 +3,7 @@
 import argparse,ast,base64,zlib,contextlib,errno,hashlib,json,os,re,signal,socket,stat,sys,time,types,urllib.request
 
 PINS_BOUND=True
-PUBLICATION_COMMIT='e2df38160e635af96dcfd63a1b75cf64671e4935'
+PUBLICATION_COMMIT='6f6133c1b18f203adcc43f57daaee2d23227c86d'
 RAW_PREFIX='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/'
 PUBLIC_PREFIX='evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/'
 CAND='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520'
@@ -13,10 +13,10 @@ HOST='iZd7oeikknn1z21sq6ji6zZ'
 SOURCES={'epoch7_prepare_successor.py': ('beb2e93dcda4c913fdb671092312d3d3faa2b1fa4c2b75f07f4f4113334c2532', 37390)}
 
 COMPILER_ROOT=CAND+'/epoch7-recovery-candidate-r7-claim-lifecycle'
-ARCHIVE_COMMIT='e2df38160e635af96dcfd63a1b75cf64671e4935'
-ARCHIVE_PATH='evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/artifact/epoch7-kit-claim-lifecycle.tar.gz'
-ARCHIVE_SHA='bd3708d5887c4dc2b866e9e0acb04da426e71ad88d89c23fe2576b5ed943a2c3'
-ARCHIVE_SIZE=1074448
+ARCHIVE_COMMIT='6f6133c1b18f203adcc43f57daaee2d23227c86d'
+ARCHIVE_PATH='evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/published-v2/epoch7-kit-claim-lifecycle-0bd83e6f.tar.gz'
+ARCHIVE_SHA='42d6d98f0fb1b1436f348a4ab70b2a9d91dd02e1ad085f49ecb2eb5c096d4465'
+ARCHIVE_SIZE=1074536
 COMPILER_MANIFEST_SHA='1fd0056e449b0abe1075937dbb60968edd620d560b31c36892a6b89ae7ff7a83'
 COMPILER_ENTRY_SHA='21a982161bc4cb8ffd7e67e4b9a8e24bf23916df6d78c3dd43376af3cfb34890'
 COMPILER_SOURCE='0bd83e6fb418ae04d4351b1de7eaf11a0325dd80'
