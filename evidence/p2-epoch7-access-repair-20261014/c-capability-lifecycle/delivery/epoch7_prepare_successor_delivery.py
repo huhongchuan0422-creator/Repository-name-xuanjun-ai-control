@@ -3,16 +3,20 @@
 import argparse,ast,base64,zlib,contextlib,errno,hashlib,json,os,re,signal,socket,stat,sys,time,types,urllib.request
 
 PINS_BOUND=True
-PUBLICATION_COMMIT='6f6133c1b18f203adcc43f57daaee2d23227c86d'
+PUBLICATION_COMMIT='6e719dd8f43f2a43c41c6437d91ca29fa2b9cef8'
 RAW_PREFIX='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/'
 PUBLIC_PREFIX='evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/'
 CAND='/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520'
-PREP_ROOT=CAND+'/epoch7-preparation-candidate-r7-claim-lifecycle'
+PREP_LEAF='epoch7-preparation-candidate-r7-claim-lifecycle-v2-0bd83e6f'
+PREP_ROOT=CAND+'/'+PREP_LEAF
 KIT_ROOT=CAND+'/epoch7-recovery-candidate-r7-resourcebind'
 HOST='iZd7oeikknn1z21sq6ji6zZ'
-SOURCES={'epoch7_prepare_successor.py': ('beb2e93dcda4c913fdb671092312d3d3faa2b1fa4c2b75f07f4f4113334c2532', 37390)}
+SOURCES={'epoch7_prepare_successor.py': ('0bb8c3bd12aa6f0c1f0a99102aa6cff99375a8225c8dc6ba144c0042a664d6ba', 37771)}
 
-COMPILER_ROOT=CAND+'/epoch7-recovery-candidate-r7-claim-lifecycle'
+COMPILER_PARENT_LEAF='epoch7-v2-0bd83e6f'
+COMPILER_PARENT=CAND+'/'+COMPILER_PARENT_LEAF
+COMPILER_LEAF='epoch7-recovery-candidate-r7-claim-lifecycle'
+COMPILER_ROOT=COMPILER_PARENT+'/'+COMPILER_LEAF
 ARCHIVE_COMMIT='6f6133c1b18f203adcc43f57daaee2d23227c86d'
 ARCHIVE_PATH='evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/published-v2/epoch7-kit-claim-lifecycle-0bd83e6f.tar.gz'
 ARCHIVE_SHA='42d6d98f0fb1b1436f348a4ab70b2a9d91dd02e1ad085f49ecb2eb5c096d4465'
@@ -193,17 +197,33 @@ def stage_compiler(raw,extractor,entry,files,end):
     try:
         entered=True
         with extractor.ProtectedDirectory(CAND,((0,0),)) as tree:
-            try:os.stat('epoch7-recovery-candidate-r7-claim-lifecycle',dir_fd=tree.fd,follow_symlinks=False)
-            except FileNotFoundError:present=False
-            else:present=True
+            authority(tree.fd)
+            try:os.mkdir(COMPILER_PARENT_LEAF,0o700,dir_fd=tree.fd);new=True
+            except FileExistsError:new=False
+            fd=os.open(COMPILER_PARENT_LEAF,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC,dir_fd=tree.fd)
+            primary=None
+            try:
+                before=authority(fd,0o700)
+                need(stamp(os.stat(COMPILER_PARENT_LEAF,dir_fd=tree.fd,follow_symlinks=False))==before,'PATH_RACE')
+                # An empty retained parent is a partial attempt, never repaired.
+                need(names(fd,1)==(() if new else (COMPILER_LEAF,)),'INVENTORY')
+                if new:os.fsync(tree.fd)
+                tree.check();check(end)
+                present=not new
+                state='VERIFY_EXISTING_FAILED' if present else 'EXTRACTION_ATTEMPTED_NOT_VERIFIED'
+                if not present:
+                    extractor.extract(raw,COMPILER_ROOT,ARCHIVE_SHA,COMPILER_ENTRY_SHA,COMPILER_MANIFEST_SHA)
+                check(end);verify_compiler(entry,files,end)
+                after=authority(fd,0o700)
+                need((after[:5]==before[:5] and after[5]==before[5]+1) if new else after==before,'PATH_RACE')
+                need(names(fd,1)==(COMPILER_LEAF,) and
+                     stamp(os.stat(COMPILER_PARENT_LEAF,dir_fd=tree.fd,follow_symlinks=False))==after,'PATH_RACE')
+                os.fsync(fd)
+                tree.check()
+            except BaseException as error:primary=error;raise
+            finally:close_all([fd],primary)
             tree.check()
         entered=False;check(end)
-        state='VERIFY_EXISTING_FAILED' if present else 'EXTRACTION_ATTEMPTED_NOT_VERIFIED'
-        if not present:
-            entered=True
-            extractor.extract(raw,COMPILER_ROOT,ARCHIVE_SHA,COMPILER_ENTRY_SHA,COMPILER_MANIFEST_SHA)
-            entered=False;check(end)
-        verify_compiler(entry,files,end)
         return compiler_summary('VERIFIED_EXISTING' if present else 'EXTRACTED_AND_VERIFIED')
     except BaseException as error:
         if entered or state=='EXTRACTION_ATTEMPTED_NOT_VERIFIED':error.delivery_cleanup_failed=True
@@ -258,7 +278,7 @@ def stage(cache,end,allow_create=True):
     held=[];created=[];primary=None;result=None
     try:
         rows=parent_walk(held,end);parent=rows[-1][0];parent_before=rows[-1][4];before_names=names(parent,1024)
-        need(authority(parent)==parent_before,'PATH_RACE');leaf='epoch7-preparation-candidate-r7-claim-lifecycle'
+        need(authority(parent)==parent_before,'PATH_RACE');leaf=PREP_LEAF
         try:before=os.stat(leaf,dir_fd=parent,follow_symlinks=False)
         except FileNotFoundError:
             need(allow_create is True,'DIRECTORY')

@@ -1,5 +1,9 @@
 # Local capability-lifecycle delivery candidate
 
+Current exact-source R1-R4 candidate: see [R14_INTEGRATION.md](R14_INTEGRATION.md).
+The older publication/path/testing notes below are historical records and do not
+authorize the new version. Production remains HOLD.
+
 Status: exact immutable dependencies BOUND / HOST EXECUTION NOT_AUTHORIZED.
 
 Production paths are fixed sibling roots under the existing candidate parent:

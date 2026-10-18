@@ -5,6 +5,9 @@ on:
     paths:
       - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/epoch7_prepare_successor.py'
       - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/epoch7_prepare_successor_delivery.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/test_r14_delivery.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/run_r14_ci.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/render_memory_launcher.py'
       - '.github/workflows/p2-claim-lifecycle-v2-ci.yml'
 permissions:
   contents: read
@@ -112,3 +115,7 @@ jobs:
           assert d['install_admission']=='NOT_GRANTED'
           print('PREPARER_DELIVERY_NO_EFFECT_INPUT_CONTRACT_PASS')
           PY
+      - name: R1-R4 real download to prepare isolated integration
+        run: |
+          set -euo pipefail
+          python3 -I -B -S evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/run_r14_ci.py
