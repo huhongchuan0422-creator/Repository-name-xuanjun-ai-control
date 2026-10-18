@@ -158,3 +158,18 @@ Owner确认另一核验窗口停止后，本原执行窗口继续同一PR99/分�
 本增量2个新只读主机调用已终态；无数据库打开/服务启停/业务请求/生产写入。此前源码/调度4个主机调用及3次0主机命令查询按原回执继承。完整数据/全部Writer/Fence/排空、受信持久捕获控制器、原候选正常发布与M99动态、正式迁移许可及生产验收仍缺，6大节点不关闭；本窗口未领取现场Writer，没有后台迁移任务。
 
 回执：evidence/pr99-service-handoff/aliyun-execution/RUNTIME_DATA_BINDING_OBSERVATION_20261018.json。
+
+
+### 2026-10-18 22:07 CST｜数据库参数追踪与实际存储路径新增证据
+
+Owner21:47指令后继续原任务。源码dd84570b→55e13ab3→5b65f8e3→f17d79836d51e75d9ad1428756629ee2218b7cc1，最新Tree50266966ec254b2c61794b83adbfac57345ab3c3。新增有限AST表达式解析与存储调用追踪，不导入业务源码，不执行SQL/业务构造器。普通解析测试14→18项、严格白名单拒绝及字面量脱敏Hosted通过；不是原M99目录替换动态反例。
+
+真实现场均Success：run39133483528/job117693235818/Invoke t-jpn70f1f5xrkzk0；run39133710438/job117693883274/t-jpn70f1p4i6d2ww；run39134112999/job117695045265/t-jpn70f26m8rbhfk；run39134555244/job117696334458/t-jpn70f2pr9vi6tc。所有完整日志已读。本批4个新只读命令已终态，未重加旧标签或重跑旧job。
+
+前两次调用虽然主机成功，database_url解析仍UNRESOLVED，完整保留，不作数据验收。调用处证明所追踪数据库工厂使用database_url变量；三个入口未发现直接调用本次所选工厂，门户有环境加载逻辑。不能由初始进程环境无TRADING_DATABASE_URL推出无数据库或数据默认值已确认。
+
+存储追踪读取6个相关模块，核对3个入口准确SHA，取得17个源码引用运行路径及metadata：门户状态、OperationsSecretRef values/metadata/audit、两类客服、Telegram canary和桥接配置等。17个引用路径存在不等于17份最终迁移数据；凭据、token、env、业务内容均未读取。database/repositories.py导出入口未解析，以及accounts CredentialStore、Douyin/TikTok存储依赖和构造器keyword路径绑定仍未覆盖；源码字面量路径不是完整运行时配置，不提前关闭权威数据节点。国内保留服务和东京均未启停/覆盖。
+
+Hosted验证：39133422979/job117693036912、39133671326/job117693752919、39134049933/job117694853284、39134466847/job117696053242。原WAL/InvokeId d5bc04c6未改，41/41历史通过直接继承。本批原40文件未重发，M99受限入口未执行，正常解除依据仍缺；完整Writer/Fence/安全排空、持久控制器实机接线及正式许可未完成。生产安装/数据库打开/业务请求/切换均0，六大节点未关闭。本窗口未领取生产Writer，无后台生产迁移作业。
+
+完整回执：evidence/pr99-service-handoff/aliyun-execution/DATABASE_AND_STORAGE_TRACE_20261018.json。

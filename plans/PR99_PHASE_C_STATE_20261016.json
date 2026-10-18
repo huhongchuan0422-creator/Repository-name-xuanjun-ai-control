@@ -3885,5 +3885,76 @@
     "tokyo_effective_data": "UNRESOLVED_SOURCE_DEFAULT_DOTENV_OR_RUNTIME_SETTINGS_NOT_EVALUATED",
     "independent_review": "REQUESTED_NOT_PASS",
     "migration_permit": "NOT_ISSUED"
+  },
+  "database_and_storage_trace_20261018": {
+    "status": "STORAGE_PATH_REFERENCES_OBSERVED_EFFECTIVE_AUTHORITY_AND_WRITER_FENCE_HOLD",
+    "code_commit": "f17d79836d51e75d9ad1428756629ee2218b7cc1",
+    "code_tree": "50266966ec254b2c61794b83adbfac57345ab3c3",
+    "latest_observed_at": "2026-10-18T14:07:31.191723Z",
+    "storage_sources": 6,
+    "source_literal_runtime_locations": 17,
+    "locations_are_source_references_not_canonical_data_assignment": true,
+    "readonly_host_commands": 4,
+    "all_invocations_terminal": true,
+    "production_migration_started": false,
+    "production_cutover": false,
+    "remaining_major_nodes": 6,
+    "open_implementation_gaps": [
+      "Resolve database.repositories package export instead of missing database/repositories.py",
+      "Complete accounts CredentialStore and Douyin/TikTok store dependencies/keyword path binding",
+      "Bind source defaults to actual CLI/config/runtime state and complete authoritative data catalogue",
+      "Cover all writers and schedules; implement enforceable fence/drain and original durable controller host binding"
+    ],
+    "external_admission": {
+      "original_40_candidate_release": "ORIGINAL_REFUSAL_RAW_AND_NORMAL_RELEASE_BASIS_STILL_UNKNOWN_NOT_RETRIED",
+      "M99_dynamic": "NOT_RUN_NO_RESTRICTED_ENTRY_RETRY",
+      "independent_review": "INCREMENT_REQUESTED_NOT_PASS",
+      "migration_permit": "NOT_ISSUED"
+    },
+    "evidence_path": "evidence/pr99-service-handoff/aliyun-execution/DATABASE_AND_STORAGE_TRACE_20261018.json",
+    "host_runs": [
+      {
+        "run": 39133483528,
+        "job": 117693235818,
+        "invoke_id": "t-jpn70f1f5xrkzk0",
+        "result": "HOST_SUCCESS_DATABASE_URL_UNRESOLVED"
+      },
+      {
+        "run": 39133710438,
+        "job": 117693883274,
+        "invoke_id": "t-jpn70f1p4i6d2ww",
+        "result": "HOST_SUCCESS_DATABASE_URL_UNRESOLVED_PRESERVED"
+      },
+      {
+        "run": 39134112999,
+        "job": 117695045265,
+        "invoke_id": "t-jpn70f26m8rbhfk",
+        "result": "FIXED_CALLER_TRACE_ACCEPTED_NOT_COMPLETE_DATAFLOW"
+      },
+      {
+        "run": 39134555244,
+        "job": 117696334458,
+        "invoke_id": "t-jpn70f2pr9vi6tc",
+        "result": "SOURCE_STORAGE_MAP_METADATA_ACCEPTED_NOT_EFFECTIVE_CONFIG"
+      }
+    ],
+    "validation_runs": [
+      {
+        "run": 39133422979,
+        "job": 117693036912
+      },
+      {
+        "run": 39133671326,
+        "job": 117693752919
+      },
+      {
+        "run": 39134049933,
+        "job": 117694853284
+      },
+      {
+        "run": 39134466847,
+        "job": 117696053242
+      }
+    ]
   }
 }
