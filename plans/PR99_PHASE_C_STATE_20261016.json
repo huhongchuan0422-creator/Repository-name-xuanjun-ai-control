@@ -1753,7 +1753,7 @@
   },
   "source_scheduler_inventory_20261018": {
     "schema": 1,
-    "status": "SCHEDULER_METADATA_ACCEPTED_SOURCE_RECEIPT_STILL_UNKNOWN_NEW_COMPACT_FIX_NOT_DISPATCHED",
+    "status": "BOUNDED_SOURCE_AND_SCHEDULER_METADATA_ACCEPTED_NOT_AUTHORITY",
     "scheduler": {
       "commit": "c9a022848c4cb53e5bfa6cef1017c181476cd857",
       "tree": "13113dc792a43e1fc28f3d038135e5f5c580502f",
@@ -2005,9 +2005,9 @@
         }
       }
     ],
-    "readonly_host_commands": 3,
+    "readonly_host_commands": 4,
     "error_query_host_commands": 0,
-    "source_inventory_accepted": false,
+    "source_inventory_accepted": true,
     "source_writer_authority": "UNKNOWN",
     "enforced_fence": "UNKNOWN",
     "production_service_actions": 0,
@@ -2015,6 +2015,1638 @@
     "production_cutover": false,
     "remaining_major_nodes": 6,
     "M99_dynamic": "NOT_RUN_NOT_RETRIED",
-    "original_40_file_candidate": "UNCHANGED_NOT_REPUBLISHED"
+    "original_40_file_candidate": "UNCHANGED_NOT_REPUBLISHED",
+    "query_only_recovery_calls": 3,
+    "source": {
+      "code_commit": "783fd30502932f24f3971df985c5c44b834e3ad0",
+      "code_tree": "076b6272125bf1a4fad05a334008e688fce8f452",
+      "run_id": 39131088206,
+      "job_id": 117686249811,
+      "invoke_id": "t-jpn70eyimb7p0xs",
+      "host_status": "Success",
+      "initial_receiver_status": "SOURCE_COMPACT_CONTRACT_REJECTED",
+      "receiver_cause": "HOST_SOURCE_ONLY_VS_RECEIVER_SOURCE_COMPACT_SCOPE_MISMATCH",
+      "recovery_code_commit": "37bd947595c9042a1a411b8833bb734412e5fcea",
+      "recovery_code_tree": "c3e36d1ed4a18eb0378e609b122589706c17d7e8",
+      "validation_run_id": 39131509867,
+      "validation_job_id": 117687469281,
+      "query_run_id": 39131540878,
+      "query_job_id": 117687580596,
+      "recovery": {
+        "database_opened": false,
+        "exit_code": 0,
+        "host_commands": 0,
+        "instance_id": "68985c531add4e90a131aef703a389e6",
+        "invoke_id": "t-jpn70eyimb7p0xs",
+        "nonce_binding": "EXACT_CLOUD_INSTANCE_AND_INVOKE_ID_LOCAL_CLAIM_NOT_RECOVERED",
+        "observed_at": "2026-10-18T13:26:31.344317+00:00",
+        "production_cutover": false,
+        "receipt": {
+          "authoritative_writer": "UNKNOWN",
+          "business_requests": 0,
+          "business_source_imports": 0,
+          "canonical_data_assigned": false,
+          "database_opened": false,
+          "enforced_fence": "UNKNOWN",
+          "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+          "limitations": [
+            "STATIC_CANDIDATES_NOT_PROVEN_WRITERS",
+            "DYNAMIC_PATHS_AND_IDLE_WRITERS_NOT_RESOLVED",
+            "EXCLUDED_LINKS_AND_OTHER_NAMESPACES_NOT_COVERED",
+            "NO_DRAIN_OR_FENCE_PERFORMED"
+          ],
+          "nonce": "f6953c421f124b1a8098c9bee0114bd4",
+          "observed_at": "2026-10-18T13:20:27.331008Z",
+          "scheduler_evidence": "INHERIT_T_JPN70EXLHV86XA8_NO_RESCAN",
+          "scope": "PR99_SOURCE_ONLY_STATIC_CANDIDATES_NOT_AUTHORITY",
+          "service_actions": 0,
+          "source": {
+            "bytes": 8894117,
+            "candidate_files_total": 247,
+            "candidates": [
+              {
+                "calls": {
+                  "DB_FACTORY": 7,
+                  "FILE_WRITE": 4,
+                  "MUTATION_CALL": 14
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-customer-contact-bind-r12/scripts/wecom_verified_binding_gate.py",
+                "sha256": "1c9b1caf7a2be3c185f3506f7e787f94dc0e7bed0e9b462e5cf5298291f0a9d8"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 7,
+                  "FILE_WRITE": 4,
+                  "MUTATION_CALL": 14
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "scripts/wecom_verified_binding_gate.py",
+                "sha256": "1c9b1caf7a2be3c185f3506f7e787f94dc0e7bed0e9b462e5cf5298291f0a9d8"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 5,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 10
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "scripts/batch6_production_canary.py",
+                "sha256": "dbab1a151329973667ba26670e367a69379587baae2713dbe679652a4a0edf22"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-625-r4/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-627-r5/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r6/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r7/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-634-r8/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-654-r8/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9-final/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix1/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix2/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-customer-contact-bind-r12/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 4,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-dual-channel-referral-r11/app/ai_service/domestic_runtime_closure.py",
+                "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-614-r1/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-616-r2/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-620-r3/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-625-r4/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-627-r5/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r6/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r7/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-634-r8/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-654-r8/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9-final/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix1/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix2/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-customer-contact-bind-r12/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-dual-channel-referral-r11/app/database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 3,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "database/connection.py",
+                "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 1,
+                  "FILE_WRITE": 7,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [
+                  "TRADING_DATABASE_URL"
+                ],
+                "environment_keys_total": 1,
+                "path": "scripts/wecom_customer_contact_notification_gate.py",
+                "sha256": "5a57219cc273cc35acf7eaea544dfc02393d814a964a0e2b3ee46f0b64ab1f1e"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 1,
+                  "FILE_WRITE": 5,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "TRADING_CREDENTIAL_MASTER_KEY"
+                ],
+                "environment_keys_total": 1,
+                "path": "trading_execution/production_activation.py",
+                "sha256": "d68221751be31c888490d8e4b0c8ada31637825cdf686a4eabeedc6991488c9d"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 1,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "market/websocket.py",
+                "sha256": "b8a3acae6cf8718701c24c4b4ac393612692b71cd1d28adb52f53ccf26af31d1"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 1,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 0
+                },
+                "environment_keys": [
+                  "FINANCE_API_VERIFIED"
+                ],
+                "environment_keys_total": 1,
+                "path": "scripts/billing_operations_cli.py",
+                "sha256": "0ffbd05b7ee1006f9f3c6cad82cae89d5e65da2f024ee2cf51a03e3682586405"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 1,
+                  "MUTATION_CALL": 39
+                },
+                "environment_keys": [
+                  "ACTUAL_INVOICE_SENT_AT",
+                  "SECTION_A",
+                  "SECTION_B"
+                ],
+                "environment_keys_total": 3,
+                "path": "database/repositories/trading_integration_repository.py",
+                "sha256": "a50594a6c417ab5699a7a0a6549e294c1b15f33d5b99a1e5e6b7c0f1f78ee311"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 5,
+                  "MUTATION_CALL": 22
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "ai_service/customer_context_core.py",
+                "sha256": "bd54cfe8b38e7a8430594372da9e3dc0babc172164d0747bba8f7ffafc34cb50"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 5,
+                  "MUTATION_CALL": 19
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix1/app/ai_service/customer_context_core.py",
+                "sha256": "fce3abc2d385d60d2550231e6f46c8c349c797736d43a2aedbbdf6d73ab80c55"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 5,
+                  "MUTATION_CALL": 19
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix2/app/ai_service/customer_context_core.py",
+                "sha256": "fce3abc2d385d60d2550231e6f46c8c349c797736d43a2aedbbdf6d73ab80c55"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 5,
+                  "MUTATION_CALL": 19
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10/app/ai_service/customer_context_core.py",
+                "sha256": "fce3abc2d385d60d2550231e6f46c8c349c797736d43a2aedbbdf6d73ab80c55"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 5,
+                  "MUTATION_CALL": 19
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-customer-contact-bind-r12/app/ai_service/customer_context_core.py",
+                "sha256": "ecb0f6049c89bd76613ee49a3e49ecd3b12fdbc17c15e6091d3f3134ebb7574c"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 5,
+                  "MUTATION_CALL": 19
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-dual-channel-referral-r11/app/ai_service/customer_context_core.py",
+                "sha256": "ecb0f6049c89bd76613ee49a3e49ecd3b12fdbc17c15e6091d3f3134ebb7574c"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 13
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-customer-contact-bind-r12/app/database/repositories/referral_partner_repository.py",
+                "sha256": "7445f12792a4bed3ad88bf13f58430dae4e71e037c9a4d77f1cb040b0a3cc510"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 13
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-dual-channel-referral-r11/app/database/repositories/referral_partner_repository.py",
+                "sha256": "7445f12792a4bed3ad88bf13f58430dae4e71e037c9a4d77f1cb040b0a3cc510"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 13
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "database/repositories/referral_partner_repository.py",
+                "sha256": "7445f12792a4bed3ad88bf13f58430dae4e71e037c9a4d77f1cb040b0a3cc510"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 1,
+                  "MUTATION_CALL": 12
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-customer-contact-bind-r12/app/database/repositories/customer_repository.py",
+                "sha256": "7968dc4b5b4455f90c61f6515469eaf7aabd44cdf5b2f4400e1b1d725f91878b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 1,
+                  "MUTATION_CALL": 12
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "database/repositories/customer_repository.py",
+                "sha256": "7968dc4b5b4455f90c61f6515469eaf7aabd44cdf5b2f4400e1b1d725f91878b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 10
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "database/repositories/exchange_readiness_repository.py",
+                "sha256": "4f2b28bcbbdd24aa24ea6eafc8b1790f554e63de372923b9663e746af9225df5"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 9
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix1/app/database/repositories/customer_repository.py",
+                "sha256": "b41e797104441dd49f07e843112f489f272798caaafed60f40226a99dc648d20"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 9
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix2/app/database/repositories/customer_repository.py",
+                "sha256": "b41e797104441dd49f07e843112f489f272798caaafed60f40226a99dc648d20"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 9
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10/app/database/repositories/customer_repository.py",
+                "sha256": "b41e797104441dd49f07e843112f489f272798caaafed60f40226a99dc648d20"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 9
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-dual-channel-referral-r11/app/database/repositories/customer_repository.py",
+                "sha256": "b41e797104441dd49f07e843112f489f272798caaafed60f40226a99dc648d20"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 8
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "database/repositories/trading_execution_repository.py",
+                "sha256": "ffb13d6db3ae54d1f765cf6920161cc6f081be15e16d51ee72d4e722f4cbc21d"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 8
+                },
+                "environment_keys": [
+                  "WINDOWS_INTERACTION_STATE_DB"
+                ],
+                "environment_keys_total": 1,
+                "path": "database/repositories/windows_interaction_repository.py",
+                "sha256": "e45051fd6beadd89ece247e6229ea2eb64df9fbaafa4f91e61f1e43f577c0df9"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-614-r1/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-616-r2/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-620-r3/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-625-r4/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-627-r5/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r6/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r7/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-634-r8/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-654-r8/app/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9-final/app/database/repositories/customer_repository.py",
+                "sha256": "757de2139c4d86442aae3b7627b9ced38e6eded1d2f78e7add541897dc780308"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9/app/database/repositories/customer_repository.py",
+                "sha256": "757de2139c4d86442aae3b7627b9ced38e6eded1d2f78e7add541897dc780308"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/v8_domestic_operations_dry_run_20260925/payload/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/v8_domestic_operations_dry_run_20260925/payload/database/repositories/operations_repository.py",
+                "sha256": "66cfaba926edb788ff08482103dafa51fb50578d9fa336ce87473b8aaedde700"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/v8_domestic_operations_dry_run_v0_1_20260925/payload/database/repositories/customer_repository.py",
+                "sha256": "32e86fb27be7248fce6b95c3a22b0c3534a02b05ccc34af9ebf312f9fd72548b"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/v8_domestic_operations_dry_run_v0_1_20260925/payload/database/repositories/operations_repository.py",
+                "sha256": "66cfaba926edb788ff08482103dafa51fb50578d9fa336ce87473b8aaedde700"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 6
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "database/repositories/operations_repository.py",
+                "sha256": "66cfaba926edb788ff08482103dafa51fb50578d9fa336ce87473b8aaedde700"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 5
+                },
+                "environment_keys": [
+                  "MODEL_PROVIDER_CALLED",
+                  "PROVIDER_NEUTRAL_RESPONSE_CREATED"
+                ],
+                "environment_keys_total": 2,
+                "path": "ai_service/telegram_customer_service_canary.py",
+                "sha256": "83904b6994db02b2702563eaaace50399caaf968864bd7f0ea355b4350462150"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 5
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "database/repositories/execution_request_uow.py",
+                "sha256": "fc2f84164b0e24f6349e6bd287ad0ff8cd3ff05af558e68cb1517660768b2a93"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 4
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "trading_execution/credential_readiness.py",
+                "sha256": "2153798077a539dfc923263e935f763fb33c958322d30369cf62ae51beb60b87"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 7,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE"
+                ],
+                "environment_keys_total": 1,
+                "path": "ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "9a7703b0ecac1dbd614668ffa1aa88e265989513a3babb05333b3fd2226daff1"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-614-r1/app/ai_service/customer_context_core.py",
+                "sha256": "df4952f9fc33fbbcfefcf2246aee8584d17bfc6ecc51ac1b56a90aadb45647e0"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-614-r1/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "824f6c6f2be4c621a62f84837dd7e7ee690b4d3e60561e8080f5bc10673174e5"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-616-r2/app/ai_service/customer_context_core.py",
+                "sha256": "df4952f9fc33fbbcfefcf2246aee8584d17bfc6ecc51ac1b56a90aadb45647e0"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-616-r2/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "49216cf4398c1778b6a25f2059dd07cc48bdb0de656cd2622d2ac97f46fe7593"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-620-r3/app/ai_service/customer_context_core.py",
+                "sha256": "df4952f9fc33fbbcfefcf2246aee8584d17bfc6ecc51ac1b56a90aadb45647e0"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-620-r3/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "edaaa99da90fad03f20acf455e4c4037ed7bb9456ae2f09024bf9e87aa14a411"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-625-r4/app/ai_service/customer_context_core.py",
+                "sha256": "df4952f9fc33fbbcfefcf2246aee8584d17bfc6ecc51ac1b56a90aadb45647e0"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-625-r4/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "edaaa99da90fad03f20acf455e4c4037ed7bb9456ae2f09024bf9e87aa14a411"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-627-r5/app/ai_service/customer_context_core.py",
+                "sha256": "df4952f9fc33fbbcfefcf2246aee8584d17bfc6ecc51ac1b56a90aadb45647e0"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-627-r5/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "17be3769ce86c36c0a5e7e185fe27379fc71c5efe56a7eced22916503265c0b2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r6/app/ai_service/customer_context_core.py",
+                "sha256": "df4952f9fc33fbbcfefcf2246aee8584d17bfc6ecc51ac1b56a90aadb45647e0"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r6/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "a23f5ff13d1a5361e1f8aecd73197a650ae483b6a7707a179ac2e908665254b3"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r7/app/ai_service/customer_context_core.py",
+                "sha256": "df4952f9fc33fbbcfefcf2246aee8584d17bfc6ecc51ac1b56a90aadb45647e0"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r7/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "a23f5ff13d1a5361e1f8aecd73197a650ae483b6a7707a179ac2e908665254b3"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-634-r8/app/ai_service/customer_context_core.py",
+                "sha256": "24a0edfa15978147c09c849b4229d9be7c37e3bc274a7da60bca3e4a49b08e9c"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-634-r8/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "a23f5ff13d1a5361e1f8aecd73197a650ae483b6a7707a179ac2e908665254b3"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-654-r8/app/ai_service/customer_context_core.py",
+                "sha256": "24a0edfa15978147c09c849b4229d9be7c37e3bc274a7da60bca3e4a49b08e9c"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-654-r8/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "183450f032160d7f987f12e6dec4628100d841129d560f28e42bfc1aff26e9e2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9-final/app/ai_service/customer_context_core.py",
+                "sha256": "4f4c4dbad6e63c684ffb28ac49a6340667069ac8f4a0cf5bd29eac30b9c3ec03"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9-final/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "90a373c6f9d445481bdf630d68c9319056c4eae012379d80aabc02972403e30e"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 3,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9/app/ai_service/customer_context_core.py",
+                "sha256": "4f4c4dbad6e63c684ffb28ac49a6340667069ac8f4a0cf5bd29eac30b9c3ec03"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 6,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                  "TOKYO_OPERATIONS_SECRET_ROOT"
+                ],
+                "environment_keys_total": 2,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-telegram-admission-r9/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "183450f032160d7f987f12e6dec4628100d841129d560f28e42bfc1aff26e9e2"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 7,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix1/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "bb5622af50e2e9a89f4667dad44e01083bd0097743800d9a31b1b1d8a7013668"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 7,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10-rpcfix2/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "9a7703b0ecac1dbd614668ffa1aa88e265989513a3babb05333b3fd2226daff1"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 7,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261007-customer-brain-r10/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "05bed146f37c32362430293e646c693149ca010da826b1659217b4b783cd8789"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 7,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-customer-contact-bind-r12/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "9a7703b0ecac1dbd614668ffa1aa88e265989513a3babb05333b3fd2226daff1"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 7,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [
+                  "DOMESTIC_BRIDGE_CUSTOMER_STATE"
+                ],
+                "environment_keys_total": 1,
+                "path": "artifacts/domestic-real-ai-runtime-20261008-dual-channel-referral-r11/app/ai_service/internal_provider_neutral_bridge.py",
+                "sha256": "9a7703b0ecac1dbd614668ffa1aa88e265989513a3babb05333b3fd2226daff1"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "database/commercial_schema.py",
+                "sha256": "0adc3d11bff08375e7811a72abf370867e04d60c4d23912fda1b474efabaf2e0"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "market/collector.py",
+                "sha256": "f6fd711523d0fff60f12d60adf89e9517cbd2a55d110ef455f683f9ac62670e3"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "signal/service.py",
+                "sha256": "2983e177833773c7f5160b0f6c6f33e78812887951b9c378ecc1f42e835ffbbb"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 2
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "trading_execution/loss_fuse.py",
+                "sha256": "094cdeba9c22c90d44fc8cb492751d1e00982984497b3e1a70bbf3a7c457755e"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 2,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "MODEL_PROVIDER_RATE_CARD_PATH"
+                ],
+                "environment_keys_total": 1,
+                "path": "ai_service/common_brain.py",
+                "sha256": "ee91818e9b2a45434137f2350d37d2d171f5b4009cc4daef81ead1b4fda0867a"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [
+                  "REAL_PLATFORM_ENABLED"
+                ],
+                "environment_keys_total": 1,
+                "path": "ai_service/domestic_offline_fake_smoke.py",
+                "sha256": "ac7caf4fd42570763f49e4ef08f3300990f680a4167805314f844eeef16b8d08"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "ai_service/operations_orchestrator.py",
+                "sha256": "671b9ede19c71ab7c33450189dd2727ca830850d1bacc31c3b3bd1307194f199"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-614-r1/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-614-r1/app/database/repositories/credential_repository.py",
+                "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-616-r2/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-616-r2/app/database/repositories/credential_repository.py",
+                "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-620-r3/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260925-620-r3/app/database/repositories/credential_repository.py",
+                "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-625-r4/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-625-r4/app/database/repositories/credential_repository.py",
+                "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-627-r5/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-627-r5/app/database/repositories/credential_repository.py",
+                "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r6/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r6/app/database/repositories/credential_repository.py",
+                "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r7/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-628-r7/app/database/repositories/credential_repository.py",
+                "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-634-r8/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-634-r8/app/database/repositories/credential_repository.py",
+                "sha256": "8e133d4b07b0d6698befb2f0c9c98963a2d1156f58fa9e2c2a0fe4879bbf9104"
+              },
+              {
+                "calls": {
+                  "DB_FACTORY": 0,
+                  "FILE_WRITE": 0,
+                  "MUTATION_CALL": 1
+                },
+                "environment_keys": [],
+                "environment_keys_total": 0,
+                "path": "artifacts/domestic-real-ai-runtime-20260926-654-r8/app/database/repositories/audit_repository.py",
+                "sha256": "f777007abda3df14d07f76abea0339788936e7cb0544cc8c180df146d071bfa6"
+              }
+            ],
+            "excluded_links": 0,
+            "files": 831,
+            "manifest_sha256": "83f345c9a4a0ea3fda8aebe59b7c70768bbb5862ce2a57774b0d8b5d554675ed",
+            "omitted_candidate_files": 119,
+            "parse_errors": []
+          }
+        },
+        "retry_allowed": false,
+        "scope": "ORIGINAL_COMPACT_SOURCE_RECEIPT_RECOVERY_QUERY_ONLY",
+        "service_actions": 0,
+        "status": "Success"
+      }
+    },
+    "coverage": {
+      "files": 831,
+      "bytes": 8894117,
+      "manifest_sha256": "83f345c9a4a0ea3fda8aebe59b7c70768bbb5862ce2a57774b0d8b5d554675ed",
+      "candidate_files_total": 247,
+      "returned_candidate_rows": 128,
+      "omitted_candidate_files": 119,
+      "returned_artifact_rows": 101,
+      "distinct_returned_hashes": 46,
+      "parse_errors": [],
+      "excluded_links": 0,
+      "complete_write_source_coverage": false,
+      "actual_data_paths_resolved": false,
+      "static_call_names_are_not_write_proof": true,
+      "environment_key_candidates_not_proven_runtime_environment": true
+    },
+    "remaining_implementation": [
+      "Complete authoritative data paths, SQLite/WAL/SHM identities and effective settings",
+      "All actual/idle/shared writers, timer/cron/drop-in/other-namespace coverage",
+      "Real enforced fence and safe drain that preserve domestic bridge/Windows/unrelated Tokyo duties",
+      "Original admitted durable controller fd and capture chain host integration",
+      "Original restricted candidate normal publication/M99 dynamic clearance and acceptance",
+      "Incremental independent review and exact formal migration permit before installation/cutover"
+    ],
+    "original_release_error_lookup": {
+      "original_error_found": false,
+      "source": "Personal Context search of prior tool history returned secondary summaries only",
+      "normal_release_basis_found": false,
+      "retry_performed": false,
+      "cross_account_or_environment_workaround": false
+    }
   }
 }

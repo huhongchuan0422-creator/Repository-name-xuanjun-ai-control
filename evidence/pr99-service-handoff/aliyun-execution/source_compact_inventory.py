@@ -207,7 +207,7 @@ def validate_original_shape(d, expected, nonce):
 
 def validate_observation(d,expected,nonce):
     assert type(d)is dict and set(d)==set('hostname nonce observed_at scope source scheduler_evidence business_source_imports database_opened service_actions business_requests canonical_data_assigned authoritative_writer enforced_fence limitations'.split())
-    assert d['scope']=='PR99_SOURCE_COMPACT_STATIC_CANDIDATES_NOT_AUTHORITY'
+    assert d['scope']=='PR99_SOURCE_ONLY_STATIC_CANDIDATES_NOT_AUTHORITY'
     assert d['scheduler_evidence']=='INHERIT_T_JPN70EXLHV86XA8_NO_RESCAN'
     x=dict(d);del x['scheduler_evidence']
     x['scope']='PR99_SOURCE_AND_SCHEDULER_INVENTORY_NOT_AUTHORITY'
@@ -297,7 +297,7 @@ def self_test():
         raw=json.dumps(value,sort_keys=True,separators=(',',':')).encode()
         return json.dumps({'encoding':'PR99_ZLIB_BASE64_V1','bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'payload':base64.b64encode(zlib.compress(raw,9)).decode()})
     valid={'hostname': 'test', 'nonce': 'nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn', 'observed_at': '2026-10-18T12:00:00Z', 'scope': 'PR99_SOURCE_AND_SCHEDULER_INVENTORY_NOT_AUTHORITY', 'source': {'files': 3, 'bytes': 10, 'manifest_sha256': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'candidate_files_total': 1, 'omitted_candidate_files': 0, 'candidates': [{'path': 'database/session.py', 'sha256': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'calls': {'DB_FACTORY': 1, 'FILE_WRITE': 0, 'MUTATION_CALL': 0}, 'environment_keys': ['DATABASE_URL'], 'environment_keys_total': 1}], 'parse_errors': [], 'excluded_links': 0}, 'schedulers': {'regular_fragments_read': 5, 'excluded_symlinks': 2, 'candidates': [{'root_slot': 0, 'name': 'xuanjun-example.service', 'sha256': 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', 'bytes': 30, 'matching_lines': 1}]}, 'business_source_imports': 0, 'database_opened': False, 'service_actions': 0, 'business_requests': 0, 'canonical_data_assigned': False, 'authoritative_writer': 'UNKNOWN', 'enforced_fence': 'UNKNOWN', 'limitations': ['STATIC_CANDIDATES_NOT_PROVEN_WRITERS', 'DYNAMIC_PATHS_AND_IDLE_WRITERS_NOT_RESOLVED', 'EXCLUDED_LINKS_AND_OTHER_NAMESPACES_NOT_COVERED', 'NO_DRAIN_OR_FENCE_PERFORMED']}
-    valid.pop('schedulers');valid['scope']='PR99_SOURCE_COMPACT_STATIC_CANDIDATES_NOT_AUTHORITY'
+    valid.pop('schedulers');valid['scope']='PR99_SOURCE_ONLY_STATIC_CANDIDATES_NOT_AUTHORITY'
     valid['scheduler_evidence']='INHERIT_T_JPN70EXLHV86XA8_NO_RESCAN'
     assert decode_receipt(wire(valid),'test','n'*32)==valid
     assert decode_receipt(base64.b64encode(wire(valid).encode()).decode(),'test','n'*32)==valid
@@ -321,6 +321,12 @@ def self_test():
         try:decode_receipt(wire(bad),'test','n'*32)
         except Hold:pass
         else:raise AssertionError('INVALID_DATA_INVENTORY_ACCEPTED')
+    # Regression derives scope from the actual embedded host program.
+    import ast
+    observe_node=next(node for node in ast.parse(HOST_PROGRAM).body if isinstance(node,ast.FunctionDef) and node.name=='observe')
+    host_scope=next(v.value for node in ast.walk(observe_node) if isinstance(node,ast.Dict)
+        for k,v in zip(node.keys,node.values) if isinstance(k,ast.Constant) and k.value=='scope')
+    assert host_scope==valid['scope']
     n={'__name__':'source_ast_only'};exec(compile(HOST_PROGRAM,'fixed-source-data','exec'),n)
     raw=b"import os\nSECRET='DO_NOT_DISCLOSE'\ne=create_engine(os.getenv('DATABASE_URL','PRIVATE_DEFAULT'))\np.write_text('PRIVATE_DATA')\ns.commit()\nopen('PRIVATE_PATH','ab')\n"
     counts,keys=n['analyze'](raw)

@@ -349,3 +349,14 @@ Owner确认另一核验窗口停止后，本原执行窗口继续同一PR99/分�
 
 本轮3次新只读主机调用：1失败、1调度成功、1源码主机成功但回执UNKNOWN；两次错误/元数据查询均未发主机命令。数据库打开0、服务动作0、生产切换0。完整权威数据/全部Writer/Fence/排空、原候选正常发布、M99动态、正式许可及生产实机验收未关闭，六个生产大节点仍未关闭。受限M99和bwrap入口未重试，东京、国内桥接/Windows服务保留。无后台迁移Writer。
 完整证据：evidence/pr99-service-handoff/aliyun-execution/SOURCE_SCHEDULER_OBSERVATION_20261018.json。
+
+
+### 2026-10-18 21:26 CST｜原源码调用回执恢复，静态覆盖边界已落盘
+
+东京压缩源码调用 run39131088206/job117686249811，Invoke t-jpn70eyimb7p0xs 主机Success；初始接收失败原因为HOST发送SOURCE_ONLY、接收端期待SOURCE_COMPACT的标识不一致。本执行窗口已修复查询端，未重发该主机命令。准确查询代码37bd947595c9042a1a411b8833bb734412e5fcea，Tree c3e36d1ed4a18eb0378e609b122589706c17d7e8；Hosted验证run39131509867/job117687469281通过13项元数据拒绝、6项封装拒绝、标识及只查动作边界。只查恢复run39131540878/job117687580596 SUCCESS，2026-10-18 21:26:31 CST；固定原Instance/Invoke绑定，未恢复原本地claim nonce，不冒充该独立绑定。
+
+已接收静态清单：831份Python源码、8894117字节、247份调用候选，返回128行，119行未展开；其中101行为artifacts目录副本，不能全部当作现网Writer。源码清单摘要83f345c9a4a0ea3fda8aebe59b7c70768bbb5862ce2a57774b0d8b5d554675ed，无解析错误。此前265份普通调度定义/17相关候选的已接收证据继承，不重扫。调用名称、字典get的键名和历史副本不是实际写入或环境证明；完整数据路径、全部Writer、动态/闲置/共享/其他namespace覆盖仍未证明。
+
+本轮累计4个只读主机命令，均终态；3次失败/结果查询均0主机命令。完整旧失败、截断结果及后续标识错误保留，不重加旧标签；本次静态回执接受不关闭权威数据或Fence节点。东京、国内桥接和Windows未操作，数据库打开0，生产安装/启停/切换0，无本窗口后台迁移Writer。原40文件候选未重发，M99 NOT_RUN，正常发布解除依据仍缺；个人上下文检索也未找到原始拒绝工具结果，二手转述不作为解除依据。6个生产大节点仍未关闭。
+
+完整回执：evidence/pr99-service-handoff/aliyun-execution/SOURCE_SCHEDULER_OBSERVATION_20261018.json。
