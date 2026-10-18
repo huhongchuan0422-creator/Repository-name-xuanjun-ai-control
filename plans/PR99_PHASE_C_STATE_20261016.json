@@ -1468,7 +1468,7 @@
     "source_checkpoint_before_handoff": "373419cdfa635005764020beed86e31e123e1c2d",
     "original_writer": "ORIGINAL_WINDOW_RESUMED_READONLY_CHANNEL_WORK_ONLY_NO_PRODUCTION_WRITER_CLAIM",
     "successor": "NO_FURTHER_HANDOFF_REQUESTED",
-    "own_inflight_swas": "ALL_FOUR_RECOVERY_INVOCATIONS_TERMINAL_SUCCESS",
+    "own_inflight_swas": "ALL_THREE_NEW_WRITER_OBSERVATION_INVOCATIONS_TERMINAL_SUCCESS",
     "own_unknown_results": "NONE_IN_THIS_RECOVERY_BATCH",
     "local_related_background_processes": 0,
     "remote_proc_refreshed_for_handoff": true,
@@ -1519,11 +1519,11 @@
     },
     "receiver_confirmation_comment_id": 6249117307,
     "last_readonly_batch": {
-      "run": 39124426535,
-      "job": 117666481531,
-      "source_commit": "4ebfb67d7fcf7178045938a740e3696e1675120d",
-      "status": "FOUR_HOST_SUCCESS_NO_SERVICE_ACTIONS",
-      "completed_at": "2026-10-18T19:44:26+08:00"
+      "run": 39125963077,
+      "job": 117671048852,
+      "source_commit": "a729a946a9211addd321b9347f3f375053e2b98f",
+      "status": "EXACT_DOMESTIC_OWNER_BINDING_SUCCESS_NO_SERVICE_ACTIONS",
+      "completed_at": "2026-10-18T20:07:19+08:00"
     },
     "current_global_writer": "UNKNOWN",
     "current_fence": "UNKNOWN"
@@ -1557,5 +1557,71 @@
     "production_migration_started": false,
     "restricted_M99_dynamic_test": "NOT_RUN_NO_DENIAL_BYPASS",
     "nonempty_WAL_acceptance": "HOLD"
+  },
+  "writer_runtime_observation_20261018": {
+    "status": "SOURCE_AND_DOMESTIC_WRITER_METADATA_OBSERVED_NO_MIGRATION",
+    "source_observation": {
+      "commit": "ea2666f07806c70afc282e9fc7b194bff1eb4219",
+      "tree": "39943f1d46df2e9510d259234ff183f61033c9c9",
+      "run": 39125713466,
+      "job": 117670301461,
+      "domestic_invoke": "t-sh070ero6pz7zsw",
+      "tokyo_invoke": "t-jpn70ero6ast62o",
+      "receipt": "evidence/pr99-service-handoff/aliyun-execution/writer-observation-receipt-20261018.json"
+    },
+    "domestic_owner_binding": {
+      "commit": "a729a946a9211addd321b9347f3f375053e2b98f",
+      "tree": "1a38c2cde0ddc7646320d5bd8dad3be13785f231",
+      "run": 39125963077,
+      "job": 117671048852,
+      "invoke": "t-sh070erzr1zgwzk",
+      "observed_at": "2026-10-18T20:07:19+08:00",
+      "receipt": "evidence/pr99-service-handoff/aliyun-execution/writer-owner-binding-receipt-20261018.json"
+    },
+    "existing_domestic_dependencies": [
+      {
+        "unit": "windows-interaction-http.service",
+        "pid": 90354,
+        "start_ticks": 91354061,
+        "descriptor_class": "DATABASE_FILENAME_SUFFIX_NOT_CONTENT_VERIFICATION",
+        "disposition": "PRESERVE_NOT_SOURCE_DRAIN_TARGET"
+      },
+      {
+        "unit": "provider-neutral-domestic-bridge.service",
+        "pid": 188767,
+        "start_ticks": 178248493,
+        "descriptor_class": "DATABASE_FILENAME_SUFFIX_NOT_CONTENT_VERIFICATION",
+        "disposition": "PRESERVE_NOT_SOURCE_DRAIN_TARGET"
+      }
+    ],
+    "tokyo_three_units": "ACTIVE_NOT_STOPPED_TWO_PROCESS_SAMPLES_NOT_FENCE_PROOF",
+    "current_authoritative_writer": "UNKNOWN",
+    "current_enforced_fence": "UNKNOWN",
+    "inflight_drained": false,
+    "M99_R1_dynamic_acceptance": "NOT_RUN_RESTRICTED_TEST_NOT_RETRIED",
+    "nonempty_WAL": "HOLD_NO_APPROVED_ACCEPTANCE_ENVIRONMENT_CONFIRMED",
+    "source_release": "NEW_METADATA_SOURCE_ONLY_ORIGINAL_40_FILE_REPAIR_NOT_REPUBLISHED",
+    "production_permit": "NOT_ISSUED_MAX_FIVE_ATTEMPT_ADMISSION_NOT_CLAIMED",
+    "new_host_commands": 3,
+    "production_service_actions": 0,
+    "database_opened": false,
+    "business_requests": 0,
+    "own_invocations": "ALL_THREE_SUCCESS_TERMINAL_NO_REPLAY",
+    "remaining_major_nodes": 6,
+    "production_migration_started": false,
+    "readonly_test_evidence": {
+      "descriptor_contract_rejections": 13,
+      "owner_contract_rejections": 6,
+      "source_validation_run": 39125683098,
+      "source_validation_job": 117670184382,
+      "owner_validation_run": 39125912196,
+      "owner_validation_job": 117670878570
+    },
+    "unrelated_ci_failure": {
+      "run": 39125912200,
+      "scope": "P2_UNCHANGED_BY_THIS_DELTA",
+      "python36_error": "ModuleNotFoundError: No module named 'test_p2_uk_swas_diagnostic'",
+      "claim": "NOT_ALL_REPOSITORY_CHECKS_GREEN"
+    }
   }
 }

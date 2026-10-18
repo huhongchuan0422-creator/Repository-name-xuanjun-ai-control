@@ -1,6 +1,6 @@
 # 服务器迁移完成进度
 
-最后通道/只读实机成果：2026-10-18 19:44:26 Asia/Shanghai；最后三应用复制品隔离验收仍为2026-10-17 12:52:15。**生产迁移尚未完成，剩余6个大节点。** 文件落盘不算服务接续；此表沿用原PR99任务，不另建队列。
+最后写入句柄归属实机成果：2026-10-18 20:07:19 Asia/Shanghai；最后三应用复制品隔离验收仍为2026-10-17 12:52:15。**生产迁移尚未完成，剩余6个大节点。** 文件落盘不算服务接续；此表沿用原PR99任务，不另建队列。
 
 ## 已完成的实机准备
 
@@ -74,3 +74,19 @@ Owner已授权dots接手，dots在原PR99核对最新HEAD和本文后确认单wr
 - 原接收确认#6249117307保持有效，不再请求Owner提供原执行者或窗口链接。此前“当前没有可用执行通道”的表述在本只读范围内由上述新实机证据替代；不推断M99修复发布或生产许可已恢复。
 - 本次准确新标签 `pr99-readonly-recover-4ebfb67d7fcf` 已消费；旧停止安装任务run39124426646为SKIPPED。不得重新添加标签或重跑现场job；只读批已结束，无本批后台命令。
 - 回执：`evidence/pr99-service-handoff/aliyun-execution/channel-recovery-20261018.json`。动态验收、非空WAL、完整生产接线、准确修复Commit/CI/原独审及正式迁移许可仍未完成；六个生产大节点不因此关闭。东京继续保留，原通知保持启用。
+
+
+## 2026-10-18 20:07 CST — 新增源码与真实写入句柄归属取证
+
+原分支接续，未重跑四机恢复批。新源码 ea2666f07806c70afc282e9fc7b194bff1eb4219 / Tree39943f1d46df2e9510d259234ff183f61033c9c9：固定东京、国内运行目录的两轮有界/proc采样，记录PID/starttime、可写FD与共享可写映射、脱敏cgroup和调度入口元数据；不读取环境、业务文件正文或数据库。13项假回执/秘密字段拒绝用例及描述符分类测试Hosted成功，run39125683098/job117670184382。真实取证run39125713466/job117670301461，两机Success：国内t-sh070ero6pz7zsw，东京t-jpn70ero6ast62o。
+
+后续仅针对新发现的两个现存国内PID及已观察starttime固定归属，源码a729a946a9211addd321b9347f3f375053e2b98f / Tree1a38c2cde0ddc7646320d5bd8dad3be13785f231；6项拒绝用例Hosted成功，run39125912196/job117670878570。实机run39125963077/job117671048852/Invoke t-sh070erzr1zgwzk Success，20:07:19 CST：
+- PID90354/start91354061→windows-interaction-http.service；1个.db类文件可写FD。
+- PID188767/start178248493→provider-neutral-domestic-bridge.service；同一inode上2个.db类文件可写FD。
+此为文件名后缀及内核元数据，不是打开数据库后的SQLite格式或业务归属证明。两服务是应保留的国内既有职责，不能随东京三应用一起停止。
+
+东京3应用仍active，采样时未持有所选运行根FD不代表已排空、没有空闲/定时Writer；cron正文及其他挂载命名空间未核验。当前权威Writer、强制Fence仍UNKNOWN。观察不签发fence或canonical assignment。
+
+新增云命令3，全部终态成功；数据库打开0、服务动作0、业务请求0、生产切换0。准确标签已消费，禁止重加/重跑。原40文件M99修复未重发、受限动态测试和bwrap入口未重试；非空WAL能力及获准环境仍HOLD。新增代码/元数据链CI通过，未改P2的run39125912200失败保留，不能宣称全仓CI绿。
+
+集中材料：evidence/pr99-service-handoff/aliyun-execution/WRITER_AND_ACCEPTANCE_DELTA_20261018.md。正式最多5次迁移Attempt许可未签发，未把本次3次只读取证计为生产Attempt。6个生产节点仍未关闭，本批无后台迁移命令，东京保留。
