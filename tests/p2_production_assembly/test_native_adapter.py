@@ -36,7 +36,7 @@ registry = module('adapter_test_registry', PROD / 'registry.py')
 from authority_store import AuthorityStore
 from receipt_provider import ReceiptProvider, Hold
 from test_authority_store import grant
-from test_registry import RegistryTests
+import test_registry as registry_tests
 
 
 def observer_process(directory, public_pin, ready, stop, mode):
@@ -327,7 +327,7 @@ class NativeAdapterTests(unittest.TestCase):
         self.g.update(source_commit='e'*40, source_tree='d'*40,
             manifest_sha256=manifest_pin, recovery_entry='native_recovery.NativeRecovery')
         # Use original registry fixture helper, not a different gate or mock.
-        self.fixture = RegistryTests(methodName='test_formal_cli_register_then_independent_process_query')
+        self.fixture = registry_tests.RegistryTests(methodName='test_formal_cli_register_then_independent_process_query')
         self.fixture.setUp()
         self.addCleanup(self.fixture.tearDown)
         cfg = dict(self.fixture.config, principal=self.cfg['principal'], grant=self.g,
