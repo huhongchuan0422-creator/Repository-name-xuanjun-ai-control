@@ -148,3 +148,34 @@ invocation retains the persistent Attempt and quota.
 Affected acceptance adds 20 native authorization/projection and actual
 ExistingInstallLock lifecycle regressions. Host IO remains isolated test data;
 these tests do not establish UK deployment or full native installation acceptance.
+
+
+## Owner授权执行模式（PR17 #6251948311 / #6251975165）
+
+停止把Dots逐次审批作为开发或安全重试前置。新增显式版本协议
+P2_ATTEMPT5_OWNER_AUTHORIZATION_V1，固定Owner GitHub数字ID332398908及
+huhongchuan0422-creator，记录必须位于本仓库PR17。原PR58独审协议保留，
+旧正文不会因开发账户身份而被接受为Owner协议；旧单次许可也不升级。
+正式NativeRecovery仍调用authorization.authenticate，经原隔离、限时、无代理
+HTTPS worker取得原始GitHub记录；没有本地verified布尔、环境变量或跳过开关。
+Owner正文必须绑定expected(...,owner=True)生成的准确Grant（去掉正文自摘要）、
+Issuer、公钥摘要、源码/Kit/部署Manifest、主机/执行身份、到期时间、五次策略
+和允许配置范围。该函数只生成规范待确认内容，不签发、不登记Grant。
+泛化流程决定不能被伪装成准确生产Grant，也没有由此填入生产事实。
+
+同一Owner授权ID和正文SHA贯穿最多5次Attempt；额度、签名回执、Registry、
+唯一Writer、Lease/Fence/Epoch及UNKNOWN对账语义不变。新增源码版本需要准确
+新版本绑定，但不再依赖独审账户逐次批准。公开任务不得存放私钥/私有配置。
+
+原Artifact12139163718及原Attempt5 Kit保留为历史基线；它们不包含新授权代码。
+本次构建另一个准确Commit/Tree的runtime Kit，257份legacy载荷逐字节继承；
+仅runtime/authorization.py为核心受影响变化，其余24份核心文件保持f4f原字节。
+新装配Manifest使用runtime_source_commit/runtime_source_tree绑定新Kit，保留
+reviewed_core_commit/tree作为历史基线；inherited_manifest_sha256绑定实际导入
+的新runtime Kit内部Manifest。不能把新代码配旧Kit然后声称Owner模式已部署。
+受影响CI增加Owner身份/伪造拒绝、正式Kit导入、真实RSA服务/共享SQLite额度、
+冲突/UNKNOWN/重启/成功及第五次停止，保留旧9项授权拒绝断言及原141项。
+
+当前没有英国SSH会话、实际AuthorityStore配置或生产签名绑定；这些仍非已验证
+事实。本次不会初始化生产库、注册Grant、生成生产密钥或创建第二Writer。
+完整安装命令必须使用真实参数，不能通过占位符或模拟数据生成所谓最终SHA。

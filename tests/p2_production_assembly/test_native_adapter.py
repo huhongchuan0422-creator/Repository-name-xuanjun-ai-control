@@ -291,9 +291,9 @@ class NativeAdapterTests(unittest.TestCase):
     def make_formal_release(self):
         # Existing full frozen Kit, unchanged source identity, no new payload.
         builder = module('frozen_kit_builder', CORE / 'build_kit.py')
-        raw, kit_manifest = builder.build(
-            'f4f74fdd0b6aa49e046debabf81e438b17ff20b5',
-            '2c2e3c09cbda31df30e0d269b580348c55e6de87')
+        git = lambda ref: subprocess.check_output(['git','-c','safe.directory=*',
+            'rev-parse',ref],cwd=str(ROOT)).decode().strip()
+        raw, kit_manifest = builder.build(git('HEAD'),git('HEAD^{tree}'))
         kit = self.directory / 'kit'
         with tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz') as archive:
             for item in archive.getmembers():
