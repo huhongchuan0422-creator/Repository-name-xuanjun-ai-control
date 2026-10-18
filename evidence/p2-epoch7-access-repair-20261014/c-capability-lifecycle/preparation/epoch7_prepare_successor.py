@@ -31,7 +31,7 @@ OLD_ENTRY_BYTES = 55774
 OLD_KIT_SHA = '6c269db1e20d3cab9877eaa6bde2240ad8a7ffaca3e183fd1180011a4e244030'
 OLD_SOURCE = 'ef21ca95331769622c294c65bb60ec7ceed0c392'
 OLD_TREE = '5a70c5627afe75fcd475c20e71ee9bfb0b6a156d'
-NEW_ROOT = CAND + '/epoch7-recovery-candidate-r7-claim-lifecycle'
+NEW_ROOT = CAND + '/epoch7-v2-0bd83e6f/epoch7-recovery-candidate-r7-claim-lifecycle'
 # Publication and a separate source review must establish these; no CLI overrides.
 NEW_KIT_SHA = '1fd0056e449b0abe1075937dbb60968edd620d560b31c36892a6b89ae7ff7a83'
 NEW_ENTRY_SHA = '21a982161bc4cb8ffd7e67e4b9a8e24bf23916df6d78c3dd43376af3cfb34890'
@@ -232,12 +232,17 @@ def parent_inventory(fd):
 def bootstrap(rows, held, parent, successor):
     root, size, pin = ((NEW_ROOT, NEW_ENTRY_BYTES, NEW_ENTRY_SHA) if successor else
                       (OLD_ROOT, OLD_ENTRY_BYTES, OLD_ENTRY_SHA))
-    leaf = os.path.basename(root)
-    fd = os.open(leaf, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
-    held.append(fd)
-    before = directory(fd)
-    need(stamp(os.stat(leaf, dir_fd=parent, follow_symlinks=False)) == before, 'PATH_IDENTITY')
-    rows.append((parent, leaf, fd, before))
+    # Walk every fixed descendant relative to the already authenticated CAND fd.
+    # Never collapse the version parent to basename(root), or follow a symlink.
+    need(root.startswith(CAND + '/'), 'KIT_ROOT_SCOPE')
+    parts = root[len(CAND) + 1:].split('/')
+    need(all(part not in ('', '.', '..') for part in parts), 'KIT_ROOT_SCOPE')
+    for leaf in parts:
+        fd = os.open(leaf, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
+        held.append(fd)
+        before = directory(fd)
+        need(stamp(os.stat(leaf, dir_fd=parent, follow_symlinks=False)) == before, 'PATH_IDENTITY')
+        rows.append((parent, leaf, fd, before)); parent = fd
     raw, metadata = read_exact(fd, 'epoch7_recovery_entry.py', size, pin, private=False)
     module = types.ModuleType('successor_preparation_entry' if successor else 'original_preparation_entry')
     module.__file__ = root + '/epoch7_recovery_entry.py'
