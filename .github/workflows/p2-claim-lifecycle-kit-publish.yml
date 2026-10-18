@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/p2-claim-lifecycle-kit-publish.yml'
 permissions:
-  contents: read
+  contents: write
 jobs:
   publish-lifecycle:
     runs-on: ubuntu-24.04
@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -71,3 +71,18 @@ jobs:
           path: claim-lifecycle-published/
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publish immutable reviewed archive on original development branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          P=evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/published-v2
+          mkdir -p "$P"
+          test ! -e "$P/epoch7-kit-claim-lifecycle-0bd83e6f.tar.gz"
+          cp claim-lifecycle-published/epoch7-claim-lifecycle-kit.tar.gz "$P/epoch7-kit-claim-lifecycle-0bd83e6f.tar.gz"
+          test "$(sha256sum "$P/epoch7-kit-claim-lifecycle-0bd83e6f.tar.gz" | cut -d' ' -f1)" = 42d6d98f0fb1b1436f348a4ab70b2a9d91dd02e1ad085f49ecb2eb5c096d4465
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$P/epoch7-kit-claim-lifecycle-0bd83e6f.tar.gz"
+          git commit -m "Publish exact immutable approved Claim-Lifecycle V2 archive"
+          git push origin HEAD:repair/p2-chatgpt-clean-review-20261013
