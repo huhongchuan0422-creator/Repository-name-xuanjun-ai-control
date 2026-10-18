@@ -124,3 +124,21 @@ Retain one bounded private incomplete-case result before post-result stop/budget
 Execution order: exact-source local reproduction; helper/driver and all evidence-consumer fixes in one scoped candidate; dual-version tests; immutable sibling r6 source/index with unchanged runtime; exact Hosted whole-kit gate; immutable artifact verification; receipt-bound observation and finite-probe attempt; then complete independent review and separate controlled recovery. Preserve prior r5 artifacts and receipts and do not replay completed permissions or UID fixture.
 
 Evidence boundaries: local3.6 and3.12 real AF_UNIX socketpair construction/kernel negatives execute; local fresh-listener creation is EPERM-blocked and must be recorded as skipped, never PASS. Hosted real listener/unnamed-client accept/send/receive/SO_PEERCRED regression is mandatory and cannot skip. Hosted3.11 does not prove full positive3.6 listening; that remains an actual UK probe requirement. Required suites, errors, skipped tests and original failed receipts must remain visible. No production approval is implied by this correction.
+
+## 14. Owner installation-attempt policy (2026-10-18)
+
+Canonical cross-project rule: [开发执行与反馈强制规则：安装器默认最多5次受控尝试](../DEVELOPMENT_EXECUTION_AND_FEEDBACK_RULES_20261012.md).
+
+Future installers, versioned installation plans and newly reviewed grants default to at most five controlled attempts within the exact approved scope. Each attempt has a unique ID, durable ordinal and complete log. Only a proven no-write failure or independently verified safe recovery checkpoint can permit a next attempt under the grant's retry conditions; completed steps are skipped using retained checkpoints and fingerprints. Success or exhaustion ends the grant. Partial writes, UNKNOWN, concurrent ownership/fence conflicts or an unproven recovery point require HOLD and reconciliation, never blind redispatch.
+
+Development windows implement and test the mechanism. Work independently verifies actual implementation, including restart accounting, the five-attempt ceiling, no replay of successful steps, safety stops and evidence retention. One review binds version/Kit/Manifest, host, executor, UTC validity, attempt budget, retry predicates and recovery entrypoint. Unchanged approved evidence is inherited; changed code/scope receives affected-scope review.
+
+Existing one-attempt installers require real code and recovery/state migration plus incremental review; changing grant wording or an integer is insufficient. Consumed/expired/sealed grants stay closed and platform/production controls remain mandatory.
+
+P2 task remains PR17; independent review remains PR58. The original Epoch7 frozen single-successor implementation, UK files and old grants are preserved. This documentation does not change the current R1-R4 candidate's execution policy or authorize an installation.
+
+P2_INSTALL_RETRY_POLICY=ONE_ATTEMPT_FROZEN
+FIVE_ATTEMPT_DEFAULT_POLICY=RECORDED
+FIVE_ATTEMPT_IMPLEMENTATION=NOT_IMPLEMENTED
+WORK_INDEPENDENT_VERIFICATION=NOT_RUN
+P2_RELEASE=HOLD
