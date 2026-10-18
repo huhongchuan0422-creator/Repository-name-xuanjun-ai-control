@@ -32,7 +32,7 @@ def main():
     for name in added:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     groups = []
-    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_assembly.py', 22),
+    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_assembly.py', 27),
              (str(ROOT / PREFIX), 'test_issuer_service.py', 25),
              (str(ROOT / PREFIX), 'test_authority_store.py', 21),
              (str(ROOT / PREFIX), 'test_receipt_provider.py', 10)]

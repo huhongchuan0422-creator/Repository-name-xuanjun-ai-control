@@ -1,6 +1,7 @@
 """Real Linux sockets/processes/RSA/SQLite; synthetic host effects, never UK."""
 import hashlib
 import importlib.util
+import json
 import multiprocessing
 import os
 from pathlib import Path
@@ -297,6 +298,58 @@ class AssemblyTests(unittest.TestCase):
             assembly.native_cycle(lambda: None, self.directory, self.g,
                 self.directory + '/issuer.sock', 2 ** 2047 + 1, 'TEST_ONLY',
                 1, {}, {})
+
+    def release_fixture(self):
+        folder = Path(self.directory) / 'production/p2_attempt5'
+        folder.mkdir(parents=True)
+        (folder / 'entry.py').write_bytes(b'# TEST_ONLY entry\n')
+        (folder / 'assembly.py').write_bytes(b'# TEST_ONLY assembly\n')
+        files = {str(p.relative_to(self.directory)): hashlib.sha256(p.read_bytes()).hexdigest()
+                 for p in folder.iterdir()}
+        self.release = {'source_commit': self.g['source_commit'],
+                        'source_tree': self.g['source_tree'],
+                        'inherited_manifest_sha256': 'f' * 64, 'files': files}
+        self.release_file = self.directory + '/MANIFEST.json'
+        raw = json.dumps(self.release, sort_keys=True).encode()
+        Path(self.release_file).write_bytes(raw)
+        self.release_sha = hashlib.sha256(raw).hexdigest()
+        self.g['manifest_sha256'] = self.release_sha
+        self.entry_file = str(folder / 'entry.py')
+        self.assembly_sha = files['production/p2_attempt5/assembly.py']
+
+    def release_identity(self):
+        return assembly.release_identity(self.release_file, self.release_sha,
+            self.g, self.entry_file, self.assembly_sha, 'f' * 64)
+
+    def test_new_release_exact_grant_and_source(self):
+        self.release_fixture()
+        identity, unused = self.release_identity()
+        self.assertEqual(identity['manifest_sha256'], self.release_sha)
+        self.assertEqual(identity['source_commit'], self.g['source_commit'])
+
+    def test_old_core_grant_cannot_authorize_new_glue(self):
+        self.release_fixture()
+        self.g['source_commit'] = '9' * 40
+        with self.assertRaises(RuntimeError):
+            self.release_identity()
+
+    def test_old_manifest_grant_cannot_authorize_new_glue(self):
+        self.release_fixture()
+        self.g['manifest_sha256'] = '9' * 64
+        with self.assertRaises(RuntimeError):
+            self.release_identity()
+
+    def test_modified_assembly_rejected_by_release_closure(self):
+        self.release_fixture()
+        Path(self.directory + '/production/p2_attempt5/assembly.py').write_bytes(b'# modified\n')
+        with self.assertRaises(RuntimeError):
+            self.release_identity()
+
+    def test_relocated_entry_cannot_escape_release_layout(self):
+        self.release_fixture()
+        self.entry_file = self.directory + '/other.py'
+        with self.assertRaises(RuntimeError):
+            self.release_identity()
 
 
 if __name__ == '__main__':

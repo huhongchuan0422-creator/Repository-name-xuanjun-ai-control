@@ -315,3 +315,46 @@ def native_cycle(driver_factory, ledger_directory, grant, socket_path,
                               fixture_mode=False, approval_review_id=review_id,
                               cycle_policy=approved_policy)
     return PermitCycle(factory, approved_policy)
+
+
+def release_identity(manifest_path, manifest_sha256, grant, entry_file,
+                     assembly_sha256, inherited_manifest_sha256):
+    """Bind new executable glue and exact closure to the new Grant."""
+    fd = protected_file(manifest_path)
+    try:
+        raw = os.read(fd, 262145)
+    finally:
+        os.close(fd)
+    require(len(raw) <= 262144 and hashlib.sha256(raw).hexdigest() ==
+            manifest_sha256 == grant['manifest_sha256'],
+            'ASSEMBLY_MANIFEST_GRANT_PIN')
+    manifest = json.loads(raw.decode('utf-8'))
+    identity = {k: manifest[k] for k in ('source_commit', 'source_tree')}
+    identity['manifest_sha256'] = manifest_sha256
+    require(all(identity[k] == grant[k] for k in identity),
+            'NEW_ASSEMBLY_SOURCE_GRANT_BINDING')
+    require(manifest['inherited_manifest_sha256'] == inherited_manifest_sha256,
+            'INHERITED_KIT_PIN')
+    # The new Grant binds the complete assembly version, not just the unchanged
+    # inner Kit's historical identity. Old Grants cannot authorize new glue.
+    release_root = os.path.dirname(manifest_path)
+    require(entry_file == release_root +
+            '/production/p2_attempt5/entry.py', 'ASSEMBLY_RELEASE_LAYOUT')
+    require(type(manifest['files']) is dict and len(manifest['files']) <= 1024,
+            'ASSEMBLY_CLOSURE')
+    for name, pin in manifest['files'].items():
+        require(type(name) is str and not name.startswith('/') and
+                all(p not in ('', '.', '..') for p in name.split('/')),
+                'ASSEMBLY_RELATIVE_PATH')
+        fd = protected_file(release_root + '/' + name)
+        try:
+            body = os.read(fd, 1048577)
+        finally:
+            os.close(fd)
+        require(len(body) <= 1048576 and hashlib.sha256(body).hexdigest() == pin,
+                'ASSEMBLY_FILE_SHA')
+    require(manifest['files'].get('production/p2_attempt5/assembly.py') ==
+            assembly_sha256 and
+            'production/p2_attempt5/entry.py' in manifest['files'],
+            'ASSEMBLY_ENTRY_CLOSURE')
+    return identity, manifest

@@ -22,7 +22,7 @@
 
 ## 运行与恢复边界
 
-首次部署仍需一份准确安装许可覆盖配置、服务、前置目录、原16阶段激活和最多5次Attempt。配置SHA必须由独立批准记录提供，不能现场自行计算后宣称批准。entry.py和assembly.py也必须由受信执行通道校验准确SHA后启动；--assembly-sha256在导入前强制核验模块。serve只打开已注册、未过期且未停止的Grant数据库；不签发许可。run仍由NativeRecovery认证原独立审核ID/批准正文SHA、源码与策略，同Grant可安全续接。
+首次部署仍需一份准确安装许可覆盖配置、服务、前置目录、原16阶段激活和最多5次Attempt。配置SHA必须由独立批准记录提供，不能现场自行计算后宣称批准。entry.py和assembly.py也必须由受信执行通道校验准确SHA后启动；--assembly-sha256在导入前强制核验模块。新Grant必须绑定增量包的新Source Commit/Tree及新Manifest SHA；entry核验整个增量文件闭包并仅把原f4f Kit作为独立历史依赖导入，不能用旧f4f Grant授权新增胶水。--assembly-manifest及其SHA显式绑定新版本，旧Kit内Manifest字节不改。serve只打开已注册、未过期且未停止的Grant数据库；不签发许可。run仍由NativeRecovery认证原独立审核ID/批准正文SHA、源码与策略，同Grant可安全续接。
 
 不会自动重发RPC。提交后签名/回复失败返回HOLD，已有PermitCycle负责以原Attempt绑定可信查询/收敛。进程正常退出仅删除其自己inode的socket，持久数据库/锁/额度/回执不删；崩溃遗留socket拒绝覆盖，需原许可范围内确认进程/事务后安全恢复，不能直接unlink重试。共享库的flock仅附加本地进程排他，不代替真实跨主机Writer证明。服务退出/重启不初始化历史；成功及5次耗尽由原核心终止。
 
@@ -30,6 +30,6 @@ SQLite父链保护不放宽；不chmod/chown旧业务目录，不打开旧业务
 
 ## 验证与交付
 
-新增22项真实Unix socket/跨进程/签名/SQLite集成与反例，配合25项Issuer、21项AuthorityStore、10项ReceiptProvider受影响回归，总计78项/环境。主机副作用明确为SYNTHETIC_TEST_ONLY；不代表英国生产验收。当地运行环境拒绝AF_UNIX socket创建（EPERM），未申请提升或换通道绕过；完整动态测试由隔离Hosted Linux容器完成。原951项不重跑。verify.py逐字比较全部Attempt5核心源码与f4f74fdd，输出精确Commit/Tree、文件SHA、日志、Manifest及独立装配包；继承Kit和Manifest SHA固定记录。
+新增27项真实Unix socket/跨进程/签名/SQLite集成与反例，配合25项Issuer、21项AuthorityStore、10项ReceiptProvider受影响回归，总计83项/环境。主机副作用明确为SYNTHETIC_TEST_ONLY；不代表英国生产验收。当地运行环境拒绝AF_UNIX socket创建（EPERM），未申请提升或换通道绕过；完整动态测试由隔离Hosted Linux容器完成。原951项不重跑。verify.py逐字比较全部Attempt5核心源码与f4f74fdd，输出精确Commit/Tree、文件SHA、日志、Manifest及独立装配包；继承Kit和Manifest SHA固定记录。
 
 本次增量尚待独立审核。INSTALLATION=NOT_EXECUTED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。

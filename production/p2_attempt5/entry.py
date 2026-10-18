@@ -14,7 +14,8 @@ import stat
 _parser = argparse.ArgumentParser()
 _parser.add_argument('operation', choices=('serve', 'run'))
 for _option in ('kit-root', 'loader-sha256', 'manifest-sha256', 'config',
-                'config-sha256', 'assembly-sha256'):
+                'config-sha256', 'assembly-sha256', 'assembly-manifest',
+                'assembly-manifest-sha256'):
     _parser.add_argument('--' + _option, required=True)
 _args = _parser.parse_args()
 if (os.geteuid() != 0 or not sys.flags.isolated or not sys.flags.no_site or
@@ -85,12 +86,15 @@ def main():
             'ISOLATED_INTERPRETER')
     args = _args
     cfg = configuration(args.config, args.config_sha256)
+    identity, manifest = _assembly.release_identity(
+        args.assembly_manifest, args.assembly_manifest_sha256, cfg['grant'],
+        os.path.abspath(__file__), args.assembly_sha256, args.manifest_sha256)
     loader = pinned_module(args.kit_root + '/attempt5/runtime/versioned_entry.py',
                            args.loader_sha256)
-    with loader.imports(args.kit_root, args.manifest_sha256) as identity:
-        require(all(identity[k] == cfg['grant'][k] for k in
-                    ('source_commit', 'source_tree', 'manifest_sha256')),
-                'KIT_GRANT_BINDING')
+    with loader.imports(args.kit_root, args.manifest_sha256) as inherited:
+        require(inherited['source_commit'] == manifest['reviewed_core_commit'] and
+                inherited['source_tree'] == manifest['reviewed_core_tree'],
+                'INHERITED_CORE_SOURCE')
         adapter = pinned_module(cfg['adapter_path'], cfg['adapter_sha256'])
         if args.operation == 'run':
             cycle = native_cycle(lambda: adapter.build_driver(cfg),
