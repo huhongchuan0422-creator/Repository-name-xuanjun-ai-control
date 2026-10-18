@@ -144,3 +144,19 @@ verification, native CAS continuation and isolated acceptance are maintained at
 No old single-use permit is expanded or revived. Dots remains the independent
 reviewer; developer tests cannot self-approve production. Real UK evidence and
 installation authorization stay separate; all production actions remain HOLD.
+
+## 2026-10-18 Owner最终规则：ONE_PERMIT_MAX_5_ATTEMPTS（优先于此前歧义文字）
+
+适用于玄钧云汇今后所有项目的安装器、安装方案及正式执行许可。**Dots一次完整审核签发一份准确版本许可，该许可最多授权5次Attempt；不是5张许可。** 第2至第5次在原许可、UTC有效期和批准操作范围内，经可信失败诊断、事务副作用对账和安全恢复点验证后自行受控继续，不需要每次重新审核或重新签发。成功立即停止；5次全部失败停止并保存全部日志/事务/证据。下一轮必须修复、仅复审受影响变更并获得**另一份新许可**，旧许可/额度不复活。
+
+允许原许可**明确列出的**自动日志诊断、真实事务读回与副作用核对、配置参数调整、受控恢复、幂等检查点续接、下一次Attempt及完整持久审计。不得自行修改安装器/协调器/其他生产源码并以原许可执行未经审核的新版本；源码/效应范围/版本变化应停止旧轮、保存证据、修复测试和增量复审后换新许可。
+
+每个Attempt唯一ID与单调序号；同一Permit/Grant共用防重启/进程/崩溃/重编号重置的权威持久配额；成功终止剩余额度，耗尽停止。唯一Writer、Lease/Fence、在途Run/Job/InvokeId和原生事务状态需在每次执行前验证，已确认完成的阶段仅通过可信持久检查点幂等恢复，不重复执行已确认的副作用。
+
+UNKNOWN、尚未对账的部分写入、Writer/Lease/Fence冲突、账本与回执不一致、未知检查点、许可过期或版本不匹配均先HOLD，禁止盲重派。**HOLD不意味着许可自动作废**；若原许可内的可信对账在有效期内消除风险并证明达到批准的安全恢复条件，可以继续同一Permit的剩余额度，无需Dots再次签发。过期、超范围、改动源码或不能可信对账则不得继续。
+
+首次批准正文必须一次绑定：Source Commit/Tree、Kit/Manifest及SHA、目标主机/执行者、UTC有效期、MAX_ATTEMPTS=5、额度消费/Attempt编号与共享持久Grant、允许自动诊断/配置调整的枚举范围、恢复入口/原生阶段检查点/幂等条件、Writer/Lease/Fence与事务排他、异常HOLD与重新取证规则、成功及耗尽终态、下一轮许可边界。
+
+**P2专项执行**：Work对Commit `c52704c2a919fdb47bbe062ebc9f6084c2a6c7b5`及其确切版本复核是否同一签发许可下5次自主安全重试；重点检查issuer/grant注册与消费、持久额度、自动诊断、安全恢复、获准配置修正、跨进程/重启、UNKNOWN解除HOLD后的续接及任何逐次审签要求。仅修改受影响代码并补双Python CI；Dots在PR58一次性增量独审，R1–R4与未变16阶段直接继承。工作流CI Run 39109634935和每环境875项为Owner报告，不能替代独立审核/英国现场验证。窗口1不再开发。旧单次许可仍是单次，不得文字扩大为5次。
+
+目标不变：ONE_PERMIT=MAX_5_ATTEMPTS; SAFE_RETRY_WITHIN_PERMIT=ALLOWED; REVIEW_PER_RETRY=NOT_REQUIRED; APPROVED_CONFIG_ADJUSTMENT=ALLOWED; UNREVIEWED_SOURCE_CHANGE=FORBIDDEN; UNKNOWN=HOLD_AND_RECONCILE; SUCCESS=STOP; FIVE_ATTEMPTS_EXHAUSTED=STOP; NEXT_ROUND=NEW_PERMIT; INSTALL_PERMIT=NOT_ISSUED; P2_RELEASE=HOLD。
