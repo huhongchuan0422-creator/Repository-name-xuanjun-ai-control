@@ -310,7 +310,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual([n for stage, n in self.ops.executed if stage == 'CUSTOMER_APPLY'], [1, 2, 3, 4, 5])
         self.assertEqual([stage for stage, _ in self.ops.executed if stage != 'CUSTOMER_APPLY'], list(workflow.STAGES[:-1]))
         before, executed = self.ledger_path().read_bytes(), list(self.ops.executed)
-        with self.patches(), self.assertRaisesRegex(Denied, 'FINISHED'):
+        with self.patches(), self.assertRaisesRegex(Denied, 'EXHAUSTED'):
             self.apply()
         self.assertEqual(self.ledger_path().read_bytes(), before)
         self.assertEqual(self.ops.executed, executed)
@@ -580,7 +580,8 @@ class WorkflowTests(unittest.TestCase):
         before = self.ledger_path().read_bytes()
         with self.patches(), self.assertRaises(workflow.WorkflowStopped):
             self.apply()
-        self.assertEqual(self.ledger_path().read_bytes(), before)
+        expected=json.loads(before);expected['state']='HOLD'
+        self.assertEqual(self.ledger(),expected)  # Only terminal bookkeeping changes, no new effect.
         self.ops.proof_status = 'COMPLETE'
         with self.patches():
             result = self.apply()

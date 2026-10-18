@@ -178,3 +178,14 @@ c69c5841 Hosted 原客户测试在 /bind 输入上被 USE_OAUTH_OR_SECRETREF 拒
 安装仅配置center服务、邮件delivery服务与timer，不安装/启动publisher及publication socket/timer。限定worker只发认证邮件；业务CLI在factory/DB前拒绝。原integrity/backup/restore-isolated保留；隔离恢复仍进入maintenance并需fresh authority，不能称无需新授权即可恢复登录。仅借用原受控客户apply阶段，没有新生产许可。
 
 本地新增57项专项（22发布/签名/申请/安装checkpoint、27HTTP、8ops）与既有回归；DOM harness补最小/me模式。原entry fixture增加第16个固定profile模块字节绑定。本地相关376个唯一测试全部通过、0 skip，DOM harness通过。首次误将Hosted以sudo运行的旧ReviewTests纳入非root本地组，产生1个既有root-owner fixture错误，保留日志；未修改或放宽生产root校验，最终376组按非root适用范围执行。Hosted须运行原测试与新增专项并重建新制品。包闭包本地结构100成员/99绑定；本地模拟source ID不是可部署新pin。新提交/Hosted制品/完整许可、现场runtime/config/SMTP/保管与真实验收仍待完成。
+
+
+## 2026-10-18 W5-R1：耗尽额度与可信只读对账分离
+
+响应原独立审核 #6249284834，仅修整轮协调器的耗尽处理，不修改已通过登录profile、旧probe、许可范围或现有业务。原实现第5次异常直接EXHAUSTED并在重启时拒绝对账；离线故障注入已复现并保留基线失败。
+
+同一原许可、版本、锁和fence仍有效时，第5次失败或重启可走原只读reconcile。全部六阶段均有可信完成证明才写原账本SUCCESS；可信证明明确未完成且额度耗尽则EXHAUSTED；UNKNOWN或对账异常保留HOLD和证据。只允许原账本完成状态收敛，不新增Attempt、stage效果、修复动作或配置写入；第6次效果始终禁止。成功记录继续封存；过期许可、锁替换/fence冲突不得继续写账本。
+
+新增21项故障测试：19项原协调器边界，2项实际临时CUSTOMER_APPLY子回执连接原OriginalOperations.reconcile/child.reconcile/Journal只读验证，覆盖最后真实成功回执丢失返回及KeyboardInterrupt后重启。确认累计仍5次、服务命令不重放；另覆盖UNKNOWN、SAFE_TO_RETRY但未完成、对账异常、expiry/lock/fence及readonly lease拒写。旧39项协调器回归保留，2项旧预期改为允许耗尽后只读重入和UNKNOWN仅状态转HOLD。新增测试追加原已登记模块，Hosted既有whole-workflow步骤自动发现，无新增包成员或派生生成源码。
+
+本地受影响336个唯一测试通过、0 skip；准确记录与新制品绑定以本增量冻结证据/Hosted为准。旧663983制品不能代替修改后新包；本修复不签发生产许可，不补造真实登录验收或现场证据。

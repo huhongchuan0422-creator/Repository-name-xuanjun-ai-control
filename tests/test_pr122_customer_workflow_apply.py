@@ -335,3 +335,78 @@ class CustomerWorkflowApplyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+from tests import test_pr122_customer_workflow as coordinator_fixtures
+
+class ExhaustedRealChildReceiptTests(unittest.TestCase):
+    """Actual temp child files/Journal + original adapter, no host commands."""
+    inventory=CustomerWorkflowApplyTests.inventory
+    patches=CustomerWorkflowApplyTests.patches
+    fake_run=CustomerWorkflowApplyTests.fake_run
+    receipt=CustomerWorkflowApplyTests.receipt
+    def setUp(self):
+        CustomerWorkflowApplyTests.setUp(self)
+        self.lease.ledger_path.unlink()  # Discard the fixture-only stub, use real coordinator below.
+        self.static=copy.deepcopy(self.base)
+        self.lost_return=RuntimeError
+        self.reconciled=[]
+        fixture=self
+        class Ops(coordinator_fixtures.OfflineOperations):
+            def __init__(self):
+                super().__init__()
+                self.inputs['CUSTOMER_APPLY']={'static_plan':{k:v for k,v in fixture.static.items() if k not in child.DYNAMIC_FIELDS}}
+                self.implementations['CUSTOMER_APPLY']=Path(release.__file__).read_bytes()
+            def attach(self,c):
+                self.coordinator=c
+                self.original=operations.OriginalOperations(release,fixture.source,fixture.base,{'schema':1,'stages':self.inputs})
+                self.original.attach(c)
+            def account_identity(self):
+                return {'uid':fixture.static['account_uid'],'gid':fixture.static['account_gid'],
+                        'receipt_sha256':self.receipts['ACCOUNT']['receipt_sha256']}
+            def execute(self,stage,lease):
+                lease.assert_active();self.executed.append((stage,lease.active['number']))
+                if stage=='PROBE' and lease.active['number']<5:raise RuntimeError('known readonly failure')
+                if stage=='CUSTOMER_APPLY':
+                    child.execute(lease,release,fixture.source)
+                    assert fixture.receipt()['state']==resume.SUCCESS
+                    raise fixture.lost_return('child success durable, caller return lost')
+                return copy.deepcopy(self.receipts[stage])
+            def verify(self,stage,checkpoint):
+                if stage=='CUSTOMER_APPLY':return self.original.verify(stage,checkpoint)
+                return super().verify(stage,checkpoint)
+            def reconcile(self,stage,intent,checkpoint,lease):
+                fixture.reconciled.append(stage)
+                if stage=='CUSTOMER_APPLY':
+                    assert lease._readonly
+                    return self.original.reconcile(stage,intent,checkpoint,lease)
+                return self.proof(stage,'SAFE_TO_RETRY')
+        self.ops=Ops()
+        self.base['workflow_contract']={'schema':1,'stages':[{'stage':stage,
+            'input_sha256':digest(canonical(self.ops.input(stage))),
+            'implementation_sha256':digest(self.ops.implementation(stage)),
+            'adopt_receipt_sha256':None,'recovery_actions':sorted(workflow.RECOVERY[stage])} for stage in workflow.STAGES]}
+        self.approval.update(workflow_contract_sha256=digest(canonical(self.base['workflow_contract'])),
+                             plan_sha256=digest(canonical(self.base)))
+        self.held.close()
+        for adapter in (patch.object(workflow,'protected_directory',lambda p:None),
+                        patch.object(workflow,'read_private',lambda p:json.loads(Path(p).read_bytes()))):
+            adapter.start();self.addCleanup(adapter.stop)
+    def apply_real(self):
+        with self.patches(),patch.object(release,'plan',return_value=copy.deepcopy(self.static)):
+            return release.workflow_apply(self.source,4,self.base,self.ops)
+    def assert_final(self):
+        data=json.loads((release.STATE/(release.TXN+'.attempts.json')).read_bytes())
+        self.assertEqual(data['state'],'SUCCESS');self.assertEqual(len(data['attempts']),5)
+        self.assertEqual(self.receipt()['state'],resume.SUCCESS)
+        self.assertEqual([x for x in self.ops.executed if x[0]=='CUSTOMER_APPLY'],[('CUSTOMER_APPLY',5)])
+        self.assertEqual(self.calls.count(['/usr/bin/systemctl','start',release.UNITS[0]]),1)
+        self.assertIn('CUSTOMER_APPLY',self.reconciled)
+    def test_fifth_actual_child_success_receipt_lost_return_converges_without_effect_retry(self):
+        self.assertEqual(self.apply_real()['state'],'SUCCESS');self.assert_final()
+    def test_fifth_actual_child_success_interrupt_then_restart_only_reconciles(self):
+        self.lost_return=KeyboardInterrupt
+        with self.assertRaises(KeyboardInterrupt):self.apply_real()
+        before=list(self.calls);executed=list(self.ops.executed)
+        self.assertEqual(self.apply_real()['state'],'SUCCESS')
+        self.assertEqual(self.calls,before);self.assertEqual(self.ops.executed,executed)
+        self.assert_final()

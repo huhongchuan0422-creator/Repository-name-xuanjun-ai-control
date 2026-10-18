@@ -190,7 +190,7 @@ class Coordinator:
                 previous=digest(canonical(row))
             need(set(data['checkpoints']) <= set(STAGES), 'WORKFLOW_CHECKPOINT_SCOPE')
             self.data=data; self.snapshot=canonical(data)
-            need(data['state'] not in ('SUCCESS','EXHAUSTED'), 'WORKFLOW_FINISHED')
+            need(data['state'] != 'SUCCESS', 'WORKFLOW_FINISHED')
         else:
             # Never create a second budget around a consumed original transaction.
             need(not os.path.lexists(self.r.STATE/self.r.TXN),'WORKFLOW_LEGACY_TRANSACTION_SEALED')
@@ -284,16 +284,36 @@ class Coordinator:
                 'failures':copy.deepcopy(self.data['failures']),'recoveries':copy.deepcopy(self.data['recoveries']),
                 'target_acceptance':'NOT_VERIFIED'}
 
+    def settle_readonly(self):
+        """Budget exhaustion blocks effects, not authenticated completion proof.
+
+        Only original reconciliation capabilities and the original ledger are
+        used. No attempt or stage execution is admitted by this method.
+        """
+        self.authority();self.assert_fence()
+        try:
+            known=self.recover()
+            if known and self.data['intent'] is None and set(self.data['checkpoints'])==set(STAGES):
+                self.authority();self.assert_fence();self.inherit_or_verify()
+                self.data['attempts'][-1].update(state='SUCCESS',ended_unix=int(time.time()),completion_reconciled=True)
+                state='SUCCESS'
+            elif not known:state='HOLD'
+            else:state='EXHAUSTED' if len(self.data['attempts'])>=self.approval['max_executions'] else 'READY'
+        except Exception:
+            # Never overwrite a newer fence or write under expired authority.
+            self.authority();self.assert_fence()
+            self.data['state']='HOLD';self.save()
+            raise
+        self.authority();self.assert_fence()
+        self.data['state']=state;self.save()
+        return state
+
     def run(self):
         self.load();self.inherit_or_verify()
         if self.data['attempts']:
-            if not self.recover():raise WorkflowStopped(self.summary())
-            if self.data['intent'] is None and set(self.data['checkpoints'])==set(STAGES):
-                # All effects already have trusted completion proofs. Finishing
-                # their interrupted receipt must not consume another attempt.
-                self.authority();self.assert_fence();self.inherit_or_verify()
-                self.data['attempts'][-1].update(state='SUCCESS',ended_unix=int(time.time()),completion_reconciled=True)
-                self.data['state']='SUCCESS';self.save();return self.summary()
+            state=self.settle_readonly()
+            if state=='SUCCESS':return self.summary()
+            if state in ('HOLD','EXHAUSTED'):raise WorkflowStopped(self.summary())
             # A crash without an effect intent happened between complete stages.
             last=self.data['attempts'][-1]
             if last['state']=='STARTED_UNKNOWN':
@@ -334,8 +354,10 @@ class Coordinator:
                     failure['cause_code']=label[5:]
                 self.data['failures'].append(failure)
                 row.update(state='FAILED_HOLD',ended_unix=int(time.time()))
-                self.data['state']='EXHAUSTED' if number>=self.approval['max_executions'] else 'HOLD'
+                self.data['state']='HOLD'
                 self.save();self.active=None
                 if isinstance(error,(KeyboardInterrupt,SystemExit)):raise
-                if self.data['state']=='EXHAUSTED' or not self.recover():raise WorkflowStopped(self.summary()) from None
+                state=self.settle_readonly()
+                if state=='SUCCESS':return self.summary()
+                if state in ('HOLD','EXHAUSTED'):raise WorkflowStopped(self.summary()) from None
                 self.inherit_or_verify()
