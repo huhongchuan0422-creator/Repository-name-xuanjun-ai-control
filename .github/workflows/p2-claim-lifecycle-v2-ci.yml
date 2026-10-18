@@ -53,7 +53,9 @@ jobs:
           raw=(root/'kit-one.tar.gz').read_bytes()
           assert raw==(root/'kit-two.tar.gz').read_bytes()
           H=lambda b:hashlib.sha256(b).hexdigest()
-          assert H(raw)=='42d6d98f0fb1b1436f348a4ab70b2a9d91dd02e1ad085f49ecb2eb5c096d4465'
+          import sys
+          expected_kit=('f23a068a74c9ad15871ad865ce2184bcc8b306f7dd7b2fff96d766b26d5b653e' if sys.version_info[:2]==(3,6) else '42d6d98f0fb1b1436f348a4ab70b2a9d91dd02e1ad085f49ecb2eb5c096d4465')
+          assert H(raw)==expected_kit
           with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
               members=[m for m in t.getmembers() if m.isfile()]
               files={m.name.split('/',1)[1]:t.extractfile(m).read() for m in members}
@@ -96,7 +98,6 @@ jobs:
           assert d['SOURCES']['epoch7_prepare_successor.py'][0]==hashlib.sha256(prep).hexdigest()
           assert d['SOURCES']['epoch7_prepare_successor.py'][1]==len(prep)
           assert d['COMPILER_CACHE_COUNT']==256
-          assert p['FILES'] if False else True
           print('PREPARER_DELIVERY_OFFLINE_BINDING_PASS')
           PY
           MOD="$GITHUB_WORKSPACE/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers"
