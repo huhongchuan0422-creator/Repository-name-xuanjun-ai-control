@@ -4309,5 +4309,190 @@
       "tokyo_domestic_bridge_windows_preserved": true
     },
     "owner_password_or_ram_reauthorization_required": false
+  },
+  "application_ingress_component_20261019": {
+    "schema": 1,
+    "status": "APPLICATION_INTAKE_COMPONENT_86_TESTS_PASS_NOT_DEPLOYED",
+    "code_commit": "5c671a774a4b52ae3974b902a6c850d31b6ad533",
+    "code_tree": "7d561d8385857217d12efd7d98d5c27cca341842",
+    "affected_paths": [
+      "evidence/pr99-service-handoff/runtime-controller/ingress_gate.py",
+      "evidence/pr99-service-handoff/runtime-controller/test_ingress_gate.py",
+      "evidence/pr99-service-handoff/runtime-controller/existing_fd_controller.py",
+      "evidence/pr99-service-handoff/runtime-controller/package_candidate.py",
+      "evidence/pr99-service-handoff/runtime-controller/README.md"
+    ],
+    "ci": {
+      "run": 39143742970,
+      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39143742970",
+      "jobs": [
+        {
+          "python": "3.11",
+          "job": 117723264458,
+          "tests": 86,
+          "result": "PASS",
+          "artifact": 12142766892
+        },
+        {
+          "python": "3.12",
+          "job": 117723264662,
+          "tests": 86,
+          "result": "PASS",
+          "artifact": 12142423617
+        }
+      ],
+      "new_tests": 21,
+      "affected_prior_tests": 65,
+      "logs_read": true,
+      "completed_at_utc": "2026-10-18T16:10:15Z",
+      "local_total": 86
+    },
+    "artifact": {
+      "archive_bytes": 122644,
+      "archive_members": 14,
+      "archive_sha256": "4cc00db693756c1707a26766af6ed917f87d6d8ecf07580fcf1426a46bb7939e",
+      "code_commit": "5c671a774a4b52ae3974b902a6c850d31b6ad533",
+      "code_tree": "7d561d8385857217d12efd7d98d5c27cca341842",
+      "hosted_run_id": "39143742970",
+      "m99_dynamic": "NOT_RUN",
+      "ordinary_tests": 86,
+      "production_actions": 0,
+      "scope": "REVIEW_CANDIDATE_NOT_PRODUCTION_ADMITTED",
+      "source_sha256": {
+        "README.md": "7b10e9419f11f93a4806db3252970ad44a6f5b50dd6bee0e6f70add105a209b5",
+        "capture_session.py": "7f66b8c715b38904c3ef2236fe7c65057a601bf1c824fcd97beb0809564b3a52",
+        "catalogue_binding.py": "3d154721abcec42878b69338864d23be74a48e6812b336b89fd8a335262ae15e",
+        "dependency-pins.json": "1d380ed144e19066e203cfc5da2817a893d8f26702ce5bb4880f6c9092196b51",
+        "existing_fd_controller.py": "6d84d9c307a59b0b0130c0a0e54fd22239c56c8128b9661c9d93f03e204f8bd7",
+        "held_proof.py": "4752c379ada3d02a8633a2e218b028e69cb61c3a94f2f4dc2d27151e1749adb2",
+        "ingress_gate.py": "14514d40bee4d4bf560b4b32e1cf5df7cf72c0ff3105c55eee969a01b6f1f6c8",
+        "package_candidate.py": "5b4632075e60a9768bdda9fa7a99fa0475b98f46e01c80c9749b9825f08e2378",
+        "source_fence.py": "ad598dcdf19d5a01141d49d780b101332e5fa0296b886658d68f6ca234261dd8",
+        "stage_history.py": "21d43b33c19943044826c935c94feaae9fb93a0c6c53affdd1445716d2adb8db",
+        "test_capture_session.py": "6f339a55e9bd018750efa2fe46ac0a685b06daadf95abe02812c46f3374be355",
+        "test_ingress_gate.py": "20143bf37bbd2802ac88e0a329ae0f50eea2eecd71942302bf7ffe7976521e33",
+        "test_runtime_controller.py": "ca20f5b637eaf67daf6896f30e2250ba4cc424ef39d6f045855dcd56fb72b93d"
+      },
+      "unchanged_original_dependencies": {
+        "../wal-memory-vfs/lost_invoke_reconciliation.py": "36a3602dffcb7933113e97a3682dc1a986d3fb1c37afa8bb87c56d19d122d596",
+        "../wal-memory-vfs/node_bindings.py": "1486e066795b60a640e6281021dcf166c56ce0bfb9982f15c1d633c93c4c92f5",
+        "../wal-memory-vfs/sqlite_wal_vfs.py": "9c08d6ef9cc41b7a4fc4807285db29320dac1612c2bec0c75434e68431c8210c",
+        "../wal-memory-vfs/test_sqlite_wal_vfs.py": "41ded1a85984df5f8ff07679939b5ffa5ab6707648b72d725a3792664a66eb85",
+        "final_materials.py": "1d87911f8bb43dde5f9865a98e07abba05faf0862b940c726cc6c64a2de7605b",
+        "migration_transaction.py": "d0dcf9ed435fadad7ea01f176662707b7d9f06a99658a38b323f09bd7cc51d83",
+        "production_start.py": "d645edc0013af34804626315a6ddce1b47b870c012b6b632131c320ed4c20688",
+        "production_transport.py": "625fa7adf78e545ffa99c84329b3929fb6a7ee907eaebe6f122fa9261c140b16",
+        "stopped_transaction.py": "99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315"
+      }
+    },
+    "outer_actions_artifacts": [
+      {
+        "id": 12142766892,
+        "name": "pr99-runtime-controller-3.11",
+        "size_in_bytes": 35975,
+        "url": "https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12142766892",
+        "archive_download_url": "https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12142766892/zip",
+        "expired": false,
+        "created_at": "2026-10-18T16:10:14Z",
+        "expires_at": "2026-11-17T16:10:13Z",
+        "updated_at": "2026-10-18T16:10:14Z",
+        "digest": "sha256:0e9fa14a49f0adb153235a795c3b3c7bab1adb488c213271217d62fb08f778c4",
+        "workflow_run": {
+          "id": 39143742970,
+          "repository_id": 1413132159,
+          "head_repository_id": 1413132159,
+          "head_branch": "build/tokyo-korea-migration-prep-20261014",
+          "head_sha": "5c671a774a4b52ae3974b902a6c850d31b6ad533"
+        }
+      },
+      {
+        "id": 12142423617,
+        "name": "pr99-runtime-controller-3.12",
+        "size_in_bytes": 35975,
+        "url": "https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12142423617",
+        "archive_download_url": "https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12142423617/zip",
+        "expired": false,
+        "created_at": "2026-10-18T16:10:15Z",
+        "expires_at": "2026-11-17T16:10:14Z",
+        "updated_at": "2026-10-18T16:10:15Z",
+        "digest": "sha256:deeb85ca4725a960810a886d03dc49ae0c45180c4ade658992880c4ee5bd5d1b",
+        "workflow_run": {
+          "id": 39143742970,
+          "repository_id": 1413132159,
+          "head_repository_id": 1413132159,
+          "head_branch": "build/tokyo-korea-migration-prep-20261014",
+          "head_sha": "5c671a774a4b52ae3974b902a6c850d31b6ad533"
+        }
+      }
+    ],
+    "implemented": [
+      "实际有界任务队列/同步事务跟踪、同一互斥区内封闭新入口、已接任务继续完成、有界等待",
+      "原预持有一次性fd保存封闭记录，原fd独占借用；无新迁移Writer/epoch/Journal/文件创建",
+      "异常与提交后准入丢失保存UNKNOWN，原任务ID映射、终态只查对账、同ID不重复接收，绝不重放handler",
+      "原封闭记录绑定内核进程身份及gate实例；同进程重建/真实新进程恢复均UNKNOWN，不能凭空队列报DRAINED"
+    ],
+    "not_implemented_or_proven": [
+      "原三应用尚未接入该组件；未安装控制端点",
+      "原来源覆盖/启动对账/远程汇集可信输入仍由现有准入提供，此组件不签发SourceFence所需全局证明",
+      "不是持久任务队列、M99、真实排空/Fence/捕获链现场验收或正式迁移许可"
+    ],
+    "blockers": [
+      {
+        "id": "B1",
+        "name": "完整有效配置、权威数据与全部写入来源",
+        "status": "NOT_CLOSED",
+        "owner": "PR99_EXECUTOR",
+        "remaining": "实际配置/数据及闲置、手动、调度、共享来源的完整现场绑定与覆盖证据"
+      },
+      {
+        "id": "B2",
+        "name": "真实入口封闭与排空接入",
+        "status": "COMPONENT_SOURCE_COMPLETE_NOT_DEPLOYED_NOT_CLOSED",
+        "owner": "PR99_EXECUTOR",
+        "remaining": "将三个原应用的同步事务/异步队列和其他origin接到新组件；原可信通道汇集核验，不把单进程观察作全局排空"
+      },
+      {
+        "id": "B3",
+        "name": "原控制器、原guard及捕获链实机验收",
+        "status": "NOT_RUN_NOT_CLOSED",
+        "owner": "PR99_EXECUTOR_WITH_ORIGINAL_ADMISSION",
+        "remaining": "原持有fd、真实内核Fence、完整捕获/重启/恢复验收及原可信输入"
+      },
+      {
+        "id": "B4",
+        "name": "原候选正常发布与M99放行",
+        "status": "BLOCKED_NOT_CLOSED",
+        "owner": "ORIGINAL_RESTRICTION_PLATFORM",
+        "remaining": "原拒绝完整回执/正常解除依据与获准M99方法；原始错误NOT_FOUND，不重试受限入口或换环境规避"
+      },
+      {
+        "id": "B5",
+        "name": "独立增量审核与正式许可",
+        "status": "NOT_ISSUED_NOT_CLOSED",
+        "owner": "ORIGINAL_INDEPENDENT_REVIEWER",
+        "remaining": "未变审核继承，准确新增源码/CI/制品与全部现场条件集中核定，作者不自签"
+      },
+      {
+        "id": "B6",
+        "name": "原范围正式迁移、切换与业务/恢复验收",
+        "status": "NOT_STARTED_NOT_CLOSED",
+        "owner": "UNIQUE_ORIGINAL_WRITER_AFTER_ADMISSION",
+        "remaining": "接收/核对/canonical Writer assignment/安装启动/安全切换与最终验收；本组件不完成这些阶段"
+      }
+    ],
+    "production": {
+      "host_commands_this_delta": 0,
+      "service_actions": 0,
+      "database_opened": false,
+      "writer_acquired": false,
+      "migration_started": false,
+      "cutover": false,
+      "background_migration_task": false,
+      "remaining_major_nodes": 6,
+      "tokyo_domestic_bridge_windows_preserved": true
+    },
+    "original_40_file_candidate": "NOT_MODIFIED_NOT_REPUBLISHED",
+    "m99_dynamic": "NOT_RUN_NOT_RETRIED",
+    "owner_password_or_ram_reauthorization_required": false
   }
 }

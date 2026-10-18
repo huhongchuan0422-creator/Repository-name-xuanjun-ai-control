@@ -231,3 +231,16 @@ Hosted [39142171346](https://github.com/huhongchuan0422-creator/Repository-name-
 **本执行窗口自己的现场部分尚未全部完成，并非仅余审核签发**：完整有效配置/权威数据/全部写入源、真实入口封闭与排空实现、原准入fd/guard控制器及Fence/捕获链实机验收仍缺；后续传输/核对/Writer assignment/安装切换亦未由本候选完成。现有东京STS/SWAS只读通道实际可用，不要求Owner再配RAM。原40文件拒绝原文及正常发布解除未取得，M99未运行/不重试，作者不自签独审或迁移许可。当前没有后台迁移任务；生产Writer/数据库打开/服务启停/迁移切换均0，东京和国内桥接/Windows保留，6个生产大节点未关闭。
 
 完整证据：evidence/pr99-service-handoff/aliyun-execution/SEALED_DRAIN_DELIVERY_20261018.json；现场回执：CONFIG_FLOW_RECEIPT_20261018.json。
+
+
+## 2026-10-19 00:10 CST｜实际应用入口封闭/排空组件新增源码
+
+CODE_COMMIT=5c671a774a4b52ae3974b902a6c850d31b6ad533；CODE_TREE=7d561d8385857217d12efd7d98d5c27cca341842。新增ingress_gate.py/test_ingress_gate.py，原extension manifest绑定新增模块，制品与说明更新；原65项受影响用例回归，加21项新测试，总86。
+
+ApplicationIngressGate实际管理有界普通队列和同步事务：接收时绑定原任务ID，封闭新入口与登记任务在同一互斥区；封闭后原已接任务可继续完成，等待最多60秒。异常/处理器返回后准入丢失均保留UNKNOWN，终态对账不再次调用handler；原ID不重复接收。向原预持有一次性fd保存封闭记录，部分写入/变更不覆盖；该fd独占借用不新建迁移锁/Writer/epoch/Journal/路径。内核PID/start_ticks/boot摘要与gate实例绑定，原封闭记录跨同进程重建及真实新进程只报UNKNOWN_PRIOR_PROCESS，空队列不能冒充已排空；缺真实启动对账证明也不能认证。
+
+真实Hosted [39143742970](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39143742970)，Python3.11/job117723264458、3.12/job117723264662各86/86 PASS；完整日志已读。内层ZIP122644字节、14成员，SHA256=4cc00db693756c1707a26766af6ed917f87d6d8ecf07580fcf1426a46bb7939e，两CI与本地准确Commit/Tree重建一致。Artifacts12142766892/12142423617，外层Actions摘要另列。新增测试实际使用普通queue/thread/fd/flock及真实子进程，并非M99/现网服务测试。原未变WAL与原40文件未改/未重发，受限入口不重试。
+
+**仅组件源码完成，现场第二类阻塞不关闭**：尚未将原三个应用的全部同步写入/异步队列和其他origin接到该组件，没有安装新端点或把单进程观察伪装成全局可信排空。完整数据/全部来源、原guard/controller/fd/捕获链实机验收、原候选正常发布与M99、独审许可、正式迁移验收共6类仍未闭合，详细责任与缺项见证据blockers。现网接线并非只等独审。
+
+本批主机命令/数据库打开/服务启停/生产Writer/迁移切换均0；无本窗口后台迁移任务。东京、国内桥接/Windows保留，不要求Owner重配RAM、贴代码/密码或再找执行窗口。源码增量供原独审，不自签许可。完整证据：evidence/pr99-service-handoff/aliyun-execution/APPLICATION_INGRESS_DELIVERY_20261019.json。
