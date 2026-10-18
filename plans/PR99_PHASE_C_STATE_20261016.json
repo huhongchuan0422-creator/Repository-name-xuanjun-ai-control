@@ -4497,7 +4497,7 @@
   },
   "owner_direct_execution_20261019": {
     "schema_version": 1,
-    "observed_through": "2026-10-19T00:56:23+08:00",
+    "observed_through": "2026-10-19T01:41:39+08:00",
     "scope": "PR99_ORIGINAL_DOMESTIC_EXECUTION_NOT_COMPLETED_MIGRATION",
     "owner_instruction": {
       "at": "2026-10-19T00:29:13+08:00",
@@ -4787,9 +4787,137 @@
         "full_logs_read": true,
         "test_scope": "ORDINARY_TEMPORARY_FILES_AND_MOCK_NATIVE_SERVICE_CALLS_NOT_M99_NOT_PRODUCTION"
       },
-      "installed_on_host": false,
+      "installed_on_host": true,
       "host_start_inputs_created": false,
-      "executed_on_host": false
+      "executed_on_host": false,
+      "installation": {
+        "code_commit": "b979c1943fb90b2d291c948388066a6bec93f890",
+        "code_tree": "3c75a23a0c43fed395a027ffaa0318fe82b167fb",
+        "source_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40",
+        "bytes": 34425,
+        "run_id": 39150685559,
+        "job_id": 117743595644,
+        "status": "SUCCESS_INERT_PROGRAM_INSTALLED_NOT_STARTED",
+        "receipt": {
+          "authoritative_writer": "UNKNOWN",
+          "enforced_fence": "UNKNOWN",
+          "hosts": [
+            {
+              "all_parts_complete": true,
+              "host": "domestic",
+              "parts": [
+                {
+                  "authoritative_writer": "UNKNOWN",
+                  "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+                  "enforced_fence": "UNKNOWN",
+                  "host": "domestic",
+                  "host_commands": 1,
+                  "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+                  "invocation_status": "Success",
+                  "invoke_id": "t-sh070flru0exclc",
+                  "nonterminal_invocations": [],
+                  "part": 0,
+                  "receipt": {
+                    "final_installed": false,
+                    "hostname": "iZvt5t8tlrm8oiZ",
+                    "nonce": "ee6e66d613df41b89ca117a02ef0b918",
+                    "part": 0,
+                    "prefix_bytes": 11500,
+                    "prefix_sha256": "24e52f5a2d73ffe28aa1e04c40f8c4def68d9e323fa95c63972b1b3ebcf999d4",
+                    "production_started": false,
+                    "protected_state_unchanged": true,
+                    "route_changed": false,
+                    "scope": "PR99_INLINE_OWNER_HELPER_ONLY",
+                    "service_actions": 0,
+                    "source_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40"
+                  },
+                  "run_command_attempted": true,
+                  "service_actions": 0,
+                  "status": "OWNER_START_HELPER_STAGED_NOT_STARTED",
+                  "sts": "PASS_CURRENT"
+                },
+                {
+                  "authoritative_writer": "UNKNOWN",
+                  "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+                  "enforced_fence": "UNKNOWN",
+                  "host": "domestic",
+                  "host_commands": 1,
+                  "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+                  "invocation_status": "Success",
+                  "invoke_id": "t-sh070flsgsglce8",
+                  "nonterminal_invocations": [],
+                  "part": 1,
+                  "receipt": {
+                    "final_installed": false,
+                    "hostname": "iZvt5t8tlrm8oiZ",
+                    "nonce": "f3c7c7eac55e42f8aeb184dfc3e540a1",
+                    "part": 1,
+                    "prefix_bytes": 23000,
+                    "prefix_sha256": "37cbf26174360f58d0b4a5b0fce4580ccf92f8056b24600cb3b915fa69c6725c",
+                    "production_started": false,
+                    "protected_state_unchanged": true,
+                    "route_changed": false,
+                    "scope": "PR99_INLINE_OWNER_HELPER_ONLY",
+                    "service_actions": 0,
+                    "source_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40"
+                  },
+                  "run_command_attempted": true,
+                  "service_actions": 0,
+                  "status": "OWNER_START_HELPER_STAGED_NOT_STARTED",
+                  "sts": "PASS_CURRENT"
+                },
+                {
+                  "authoritative_writer": "UNKNOWN",
+                  "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+                  "enforced_fence": "UNKNOWN",
+                  "host": "domestic",
+                  "host_commands": 1,
+                  "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+                  "invocation_status": "Success",
+                  "invoke_id": "t-sh070flt3leq3uo",
+                  "nonterminal_invocations": [],
+                  "part": 2,
+                  "receipt": {
+                    "final_installed": true,
+                    "hostname": "iZvt5t8tlrm8oiZ",
+                    "nonce": "e5c4a8f70b404be3b4308f8d99430ee8",
+                    "part": 2,
+                    "prefix_bytes": 34425,
+                    "prefix_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40",
+                    "production_started": false,
+                    "protected_state_unchanged": true,
+                    "route_changed": false,
+                    "scope": "PR99_INLINE_OWNER_HELPER_ONLY",
+                    "service_actions": 0,
+                    "source_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40"
+                  },
+                  "run_command_attempted": true,
+                  "service_actions": 0,
+                  "status": "OWNER_START_HELPER_STAGED_NOT_STARTED",
+                  "sts": "PASS_CURRENT"
+                }
+              ],
+              "production_started": false,
+              "route_changed": false,
+              "writer_acquired": false
+            }
+          ],
+          "migration_started": false,
+          "production_cutover": false,
+          "production_service_actions": 0,
+          "status": "OWNER_START_CODE_STAGE_BATCH_NOT_PRODUCTION"
+        },
+        "effects": {
+          "native_commands": 3,
+          "program_installed": true,
+          "program_mode": "0400",
+          "production_writer_acquired": false,
+          "production_data_transferred": false,
+          "starts": 0,
+          "route_changes": 0,
+          "protected_unchanged": true
+        }
+      }
     },
     "remaining_technical_work": [
       {
@@ -4832,5 +4960,297 @@
       "host_command_jobs_terminal": true,
       "tokyo_domestic_bridge_windows_preserved": true
     }
+  },
+  "final_handoff_integration_20261019": {
+    "schema_version": 1,
+    "scope": "PR99_FINAL_RECONCILIATION_AND_ORIGINAL_WRITER_ASSIGNMENT_CODE_NOT_READY",
+    "owner_direct_authority": {
+      "instruction_at": "2026-10-19T00:29:13+08:00",
+      "independent_review_wait": false,
+      "formal_permit_wait": false,
+      "technical_integrity_not_waived": true
+    },
+    "code_commit": "ca609d47a9182436a8d47c59170869cf73002f7f",
+    "code_tree": "1ea6bb60c2cc829d8ec9647464f066646b340da5",
+    "code_changes": [
+      "Original source read-only query verifies original Fence/capture contract and durable journal bindings across distinct hosts",
+      "Final target manifest reconciles complete held file descriptors, WAL outputs, static inputs, ownership, modes and link set",
+      "Original Writer authority CAS and query interface; UNKNOWN assignment never reissues CAS or synthesizes missing local proof",
+      "Explicit Owner plan contract reuses original Journal and protocols without reviewer ID",
+      "Bounded 2 MiB snapshot proof capacity for real manifests; default 16 KiB retained"
+    ],
+    "ci": {
+      "run_id": 39149998909,
+      "jobs": [
+        {
+          "python": "3.11",
+          "job_id": 117741497185,
+          "tests": 113,
+          "passed": 113
+        },
+        {
+          "python": "3.12",
+          "job_id": 117741497425,
+          "tests": 113,
+          "passed": 113
+        }
+      ],
+      "result": "SUCCESS",
+      "full_logs_read": true,
+      "skipped": 0,
+      "scope": "ORDINARY_FILES_AND_REAL_SQLITE_WAL_RECOVERY_WITH_FIXTURE_NATIVE_FENCE_WRITER_AUTHORITY_NOT_M99_NOT_HOST_ACCEPTANCE",
+      "earlier_failed_run": {
+        "run_id": 39149747623,
+        "error": "Two direct-call fixtures omitted source_manifest patch required by new INTENT checks",
+        "fixed_in": "ca609d47a9182436a8d47c59170869cf73002f7f",
+        "production_checks_relaxed": false
+      }
+    },
+    "artifact": {
+      "archive_bytes": 165444,
+      "archive_members": 17,
+      "archive_sha256": "2fe9c9e96e5a18bffc08aa3ec761e93b19548873de36c5203fc09537cb9cbcdf",
+      "code_commit": "ca609d47a9182436a8d47c59170869cf73002f7f",
+      "code_tree": "1ea6bb60c2cc829d8ec9647464f066646b340da5",
+      "hosted_run_id": "39149998909",
+      "m99_dynamic": "NOT_RUN",
+      "ordinary_tests": 113,
+      "production_actions": 0,
+      "scope": "REVIEW_CANDIDATE_NOT_PRODUCTION_ADMITTED",
+      "source_sha256": {
+        "README.md": "ab8bfb9d7b7fb0514b5cb3dcbf5701f21129f219023cfd7ea7a49b41408ba8a5",
+        "capture_session.py": "5a700a2c9a371be6cea34913335d8e667ee1ac5dc2b8558bcece7d04b4e05642",
+        "catalogue_binding.py": "3d154721abcec42878b69338864d23be74a48e6812b336b89fd8a335262ae15e",
+        "dependency-pins.json": "1d380ed144e19066e203cfc5da2817a893d8f26702ce5bb4880f6c9092196b51",
+        "existing_fd_controller.py": "3e6a84d9ee1690dfcf1a952f1b32a9a525f59f870ef21e2116d2017fec406aea",
+        "final_handoff.py": "1b7c49b0225a3f90832ef964012490901f3ff7e5c1c7efc83c72819982ab0eff",
+        "held_proof.py": "a7da5309104f3540011921a99b36c5d4c767569b30a72c7f4f8e20b674f3f9a2",
+        "ingress_gate.py": "14514d40bee4d4bf560b4b32e1cf5df7cf72c0ff3105c55eee969a01b6f1f6c8",
+        "owner_contract.py": "325b23d246eb18509a7d7de5494d47108d680ea0ce6f54bf45bce690ea1ec5ee",
+        "package_candidate.py": "862898be24120d9f517a3eade1432499c786027eb71f78cdc2b91e80d745be7f",
+        "source_fence.py": "ad598dcdf19d5a01141d49d780b101332e5fa0296b886658d68f6ca234261dd8",
+        "stage_history.py": "21d43b33c19943044826c935c94feaae9fb93a0c6c53affdd1445716d2adb8db",
+        "test_capture_session.py": "0bd0eb739cd1e134e5c55134f0787431b7bfb32591a95e8c111e2d42ddf9917a",
+        "test_final_handoff.py": "ffaf31f609e32f5c5af2aa8362531e75ff8cf090a2950680a8ba3ae25bad4310",
+        "test_ingress_gate.py": "20143bf37bbd2802ac88e0a329ae0f50eea2eecd71942302bf7ffe7976521e33",
+        "test_runtime_controller.py": "ca20f5b637eaf67daf6896f30e2250ba4cc424ef39d6f045855dcd56fb72b93d"
+      },
+      "unchanged_original_dependencies": {
+        "../wal-memory-vfs/lost_invoke_reconciliation.py": "36a3602dffcb7933113e97a3682dc1a986d3fb1c37afa8bb87c56d19d122d596",
+        "../wal-memory-vfs/node_bindings.py": "1486e066795b60a640e6281021dcf166c56ce0bfb9982f15c1d633c93c4c92f5",
+        "../wal-memory-vfs/sqlite_wal_vfs.py": "9c08d6ef9cc41b7a4fc4807285db29320dac1612c2bec0c75434e68431c8210c",
+        "../wal-memory-vfs/test_sqlite_wal_vfs.py": "41ded1a85984df5f8ff07679939b5ffa5ab6707648b72d725a3792664a66eb85",
+        "final_materials.py": "1d87911f8bb43dde5f9865a98e07abba05faf0862b940c726cc6c64a2de7605b",
+        "migration_transaction.py": "d0dcf9ed435fadad7ea01f176662707b7d9f06a99658a38b323f09bd7cc51d83",
+        "production_start.py": "d645edc0013af34804626315a6ddce1b47b870c012b6b632131c320ed4c20688",
+        "production_transport.py": "625fa7adf78e545ffa99c84329b3929fb6a7ee907eaebe6f122fa9261c140b16",
+        "stopped_transaction.py": "99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315"
+      },
+      "local_exact_version_rebuild_matches_both_ci_logs": true,
+      "actions_artifacts": [
+        {
+          "id": 12144852807,
+          "python": "3.11",
+          "outer_digest": "sha256:8febd568d2a3b83de8c907720ddcd55d9309bed5af7a2c71e21b9b89d8c6a2ce"
+        },
+        {
+          "id": 12144533637,
+          "python": "3.12",
+          "outer_digest": "sha256:ac677c3711cfb33ab840f5acdbf0d9d963a3a3f5b4036e74dd1f481c567ff1bb"
+        }
+      ]
+    },
+    "helper_stage_initial_failure": {
+      "run_id": 39150037603,
+      "job_id": 117741639911,
+      "invoke_id": "t-sh070fl01lqes5c",
+      "status": "Failed",
+      "original_label_not_reapplied": true,
+      "query": {
+        "run_id": 39150467881,
+        "job_id": 117742925892,
+        "receipt": {
+          "database_opened": false,
+          "error_projection": [
+            {
+              "code": "PRIVATE_DETAIL_WITHHELD",
+              "exception": "URLError",
+              "status": "OWNER_START_STAGE_HOLD"
+            }
+          ],
+          "exit_code": 2,
+          "host_commands": 0,
+          "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+          "invoke_id": "t-sh070fl01lqes5c",
+          "json_complete": false,
+          "observed_at": "2026-10-18T17:38:05.666555+00:00",
+          "output_bytes": 164,
+          "output_sha256": "a6c07d6c737896ee91638ae5e59861f4a63ac9d83ed012445ce00a571d6a9d8c",
+          "production_cutover": false,
+          "retry_allowed": false,
+          "scope": "ORIGINAL_OWNER_STAGE_RESULT_QUERY_ONLY",
+          "service_actions": 0,
+          "status": "Failed"
+        }
+      },
+      "finding": "URLError occurred while downloading source before first filesystem or service action; complete URL detail was not emitted; no inferred network-policy/security denial",
+      "repair": "Same original account/STS/SWAS channel; three bounded sequential source parts under original command size limit; no arbitrary host download or failed-Invoke replay"
+    },
+    "helper_stage_repair": {
+      "code_commit": "b979c1943fb90b2d291c948388066a6bec93f890",
+      "code_tree": "3c75a23a0c43fed395a027ffaa0318fe82b167fb",
+      "source_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40",
+      "bytes": 34425,
+      "run_id": 39150685559,
+      "job_id": 117743595644,
+      "status": "SUCCESS_INERT_PROGRAM_INSTALLED_NOT_STARTED",
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "enforced_fence": "UNKNOWN",
+        "hosts": [
+          {
+            "all_parts_complete": true,
+            "host": "domestic",
+            "parts": [
+              {
+                "authoritative_writer": "UNKNOWN",
+                "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+                "enforced_fence": "UNKNOWN",
+                "host": "domestic",
+                "host_commands": 1,
+                "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+                "invocation_status": "Success",
+                "invoke_id": "t-sh070flru0exclc",
+                "nonterminal_invocations": [],
+                "part": 0,
+                "receipt": {
+                  "final_installed": false,
+                  "hostname": "iZvt5t8tlrm8oiZ",
+                  "nonce": "ee6e66d613df41b89ca117a02ef0b918",
+                  "part": 0,
+                  "prefix_bytes": 11500,
+                  "prefix_sha256": "24e52f5a2d73ffe28aa1e04c40f8c4def68d9e323fa95c63972b1b3ebcf999d4",
+                  "production_started": false,
+                  "protected_state_unchanged": true,
+                  "route_changed": false,
+                  "scope": "PR99_INLINE_OWNER_HELPER_ONLY",
+                  "service_actions": 0,
+                  "source_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40"
+                },
+                "run_command_attempted": true,
+                "service_actions": 0,
+                "status": "OWNER_START_HELPER_STAGED_NOT_STARTED",
+                "sts": "PASS_CURRENT"
+              },
+              {
+                "authoritative_writer": "UNKNOWN",
+                "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+                "enforced_fence": "UNKNOWN",
+                "host": "domestic",
+                "host_commands": 1,
+                "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+                "invocation_status": "Success",
+                "invoke_id": "t-sh070flsgsglce8",
+                "nonterminal_invocations": [],
+                "part": 1,
+                "receipt": {
+                  "final_installed": false,
+                  "hostname": "iZvt5t8tlrm8oiZ",
+                  "nonce": "f3c7c7eac55e42f8aeb184dfc3e540a1",
+                  "part": 1,
+                  "prefix_bytes": 23000,
+                  "prefix_sha256": "37cbf26174360f58d0b4a5b0fce4580ccf92f8056b24600cb3b915fa69c6725c",
+                  "production_started": false,
+                  "protected_state_unchanged": true,
+                  "route_changed": false,
+                  "scope": "PR99_INLINE_OWNER_HELPER_ONLY",
+                  "service_actions": 0,
+                  "source_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40"
+                },
+                "run_command_attempted": true,
+                "service_actions": 0,
+                "status": "OWNER_START_HELPER_STAGED_NOT_STARTED",
+                "sts": "PASS_CURRENT"
+              },
+              {
+                "authoritative_writer": "UNKNOWN",
+                "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+                "enforced_fence": "UNKNOWN",
+                "host": "domestic",
+                "host_commands": 1,
+                "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+                "invocation_status": "Success",
+                "invoke_id": "t-sh070flt3leq3uo",
+                "nonterminal_invocations": [],
+                "part": 2,
+                "receipt": {
+                  "final_installed": true,
+                  "hostname": "iZvt5t8tlrm8oiZ",
+                  "nonce": "e5c4a8f70b404be3b4308f8d99430ee8",
+                  "part": 2,
+                  "prefix_bytes": 34425,
+                  "prefix_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40",
+                  "production_started": false,
+                  "protected_state_unchanged": true,
+                  "route_changed": false,
+                  "scope": "PR99_INLINE_OWNER_HELPER_ONLY",
+                  "service_actions": 0,
+                  "source_sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40"
+                },
+                "run_command_attempted": true,
+                "service_actions": 0,
+                "status": "OWNER_START_HELPER_STAGED_NOT_STARTED",
+                "sts": "PASS_CURRENT"
+              }
+            ],
+            "production_started": false,
+            "route_changed": false,
+            "writer_acquired": false
+          }
+        ],
+        "migration_started": false,
+        "production_cutover": false,
+        "production_service_actions": 0,
+        "status": "OWNER_START_CODE_STAGE_BATCH_NOT_PRODUCTION"
+      },
+      "effects": {
+        "native_commands": 3,
+        "program_installed": true,
+        "program_mode": "0400",
+        "production_writer_acquired": false,
+        "production_data_transferred": false,
+        "starts": 0,
+        "route_changes": 0,
+        "protected_unchanged": true
+      }
+    },
+    "remaining_technical_work": [
+      "Instantiate actual effective configuration and authoritative complete data catalogue/all write origins",
+      "Wire original persistent controller/fds/guard with actual ingress closure, drain and kernel Fence",
+      "Authenticate actual source query, transport complete final captured data and reconcile held target descriptors",
+      "Obtain actual canonical Writer CAS result and durable final checkpoint then execute Owner start inputs",
+      "Production business/auth/upstream/route/restore acceptance"
+    ],
+    "original_restricted_candidate": {
+      "republished": false,
+      "m99": "NOT_RUN",
+      "original_publish_refusal_raw": "NOT_FOUND",
+      "restricted_entry_retried": false
+    },
+    "ready_for_actual_migration": false,
+    "migration_complete": false,
+    "production_started": false,
+    "production_cutover": false,
+    "production_writer_acquired": false,
+    "notification": {
+      "existing_readiness_task_updated": true,
+      "new_task_created": false,
+      "persistent_enabled": true,
+      "ordinary_code_test_doc_updates_suppressed": true
+    },
+    "note": "New interfaces and passing fixtures do not supply original native authority or certify source inventory. No new production Writer, epoch or Journal is created.",
+    "observed_through": "2026-10-19T01:41:39+08:00",
+    "production_host_jobs_terminal": true,
+    "background_migration_task": false
   }
 }

@@ -477,3 +477,20 @@ ApplicationIngressGate实际管理有界普通队列和同步事务：接收时�
 三个现场命令批均已终态；当前无本窗口后台迁移任务、没有领取生产数据Writer或执行切换。东京、国内桥接、Windows、Nginx保留。英国P2不在本批范围。无需重配RAM、贴密码/密钥或重新交接。
 
 完整回执：evidence/pr99-service-handoff/aliyun-execution/OWNER_DIRECT_INSTALL_DELIVERY_20261019.json。
+
+
+## 2026-10-19 01:41 CST｜最终核对/原Writer接线113项通过，启动程序实机安装完成
+
+CODE_COMMIT=ca609d47a9182436a8d47c59170869cf73002f7f；CODE_TREE=1ea6bb60c2cc829d8ec9647464f066646b340da5。新增final_handoff.py与owner_contract.py：源侧原Fence/捕获证明通过原只读查询绑定，目标完整fd集合核对后生成真实最终检查点；Writer交接必须调用原权威CAS/查询，不因本地字典或文件存在判为完成。原INTENT、原Journal、同epoch及UNKNOWN只查不重发保留。明确Owner直接授权，不恢复独审/许可等待，不伪造reviewer ID。捕获证明容量在显式2MiB界内扩展，默认16KiB保留。
+
+[Hosted CI39149998909](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39149998909)，Python3.11/job117741497185、3.12/job117741497425各113/113 PASS、0跳过，完整日志已读。内层ZIP165444字节/17成员/SHA256 2fe9c9e96e5a18bffc08aa3ec761e93b19548873de36c5203fc09537cb9cbcdf，两CI日志与本地准确版本重建一致；Artifact12144852807、12144533637。首次113项run39149747623中2项直接调用fixture未补source_manifest patch，已只修测试夹具；生产源检查未放宽。原始失败保留。该测试使用真实普通fd/WAL恢复；native Fence/Writer权威仍fixture，不是实机验收/M99。
+
+新增真实现场结果：国内/opt/xuanjun-migration-s07/bin/owner_production_start.py已安装为0400，34425字节，SHA256 7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40，与原17项已通过启动源码完全一致。[run39150685559](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39150685559)/job117743595644，三个顺序Invoke t-sh070flru0exclc、t-sh070flsgsglce8、t-sh070flt3leq3uo均Success；最终完整字节和定义编译核对，服务动作/生产Writer/生产数据传输/路由均0，protected未变。它是未启动程序安装，不能等同生产服务运行。
+
+保留先前安装失败：run39150037603/job117741639911/Invoke t-sh070fl01lqes5c为Failed。只查原调用的run39150467881/job117742925892确认exit2/URLError，发生于下载源码阶段、在文件写入之前；原输出未包含完整URL错误细节，不猜测为平台授权拒绝。正常修复仍用原账号/STS/SWAS，以3个小于原11000字节上限的精确载荷顺序传输，乱序/已用阶段/部分写入冲突均保留，未移除重加旧label或重放失败Invoke；未接触原受限40文件候选。
+
+**尚未达到可以连续执行真实迁移的技术条件**：实际有效配置→完整权威数据与全部写入来源、原持久控制器/fd/guard与真实入口排空/内核Fence接线、真实源查询及完整私有传输/目标接收、实际checkpoint/canonical Writer assignment、生产启动及业务/鉴权/上游/切换/恢复验收仍待完成。新增接口和合成fixture未实例化这些native权威，不把它们标记PASS。原40文件发布原拒绝仍NOT_FOUND，M99未运行/未重试；不新增Owner审核许可等待。
+
+这批现场命令均已终态，无本窗口后台迁移任务，无生产Writer领取或切换。东京、国内桥接/Windows/Nginx保留，英国P2不在范围。现有通知已调整为取得实际迁移就绪证据再通知，普通源码/测试/文档更新不重复提醒；未新建自动化。
+
+完整证据：evidence/pr99-service-handoff/aliyun-execution/FINAL_HANDOFF_DELIVERY_20261019.json。
