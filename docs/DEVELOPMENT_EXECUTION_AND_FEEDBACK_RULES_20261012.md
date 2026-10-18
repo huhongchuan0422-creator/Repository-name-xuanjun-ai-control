@@ -133,3 +133,14 @@ Owner明确要求启用“超时告警 → 唤醒执行者 → 实际开始 → 
 Work独立验收至少覆盖：首次成功即停、未写入失败后受控下一次、安全检查点恢复且不重复成功步骤、最多5次耗尽、有效期与版本/主机/身份变化、进程崩溃及重启对账、重复Attempt、并行冲突、部分写入与UNKNOWN停止、备份和失败证据保留。记录真实Commit、CI Run/Job及制品SHA；未验收不得标为已支持5次。
 
 原任务登记沿用各项目既有PR/任务账本；P2沿用PR17/PR58，不建立第二Writer或重复任务。P2当前冻结Epoch7仍是单次机制；五次机制代码改造与Work独立验收均为待完成，不解封当前生产HOLD。
+
+
+### P2 implementation handoff (2026-10-18)
+
+Work is the sole remaining Attempt5 developer after window1 STOPPED. The
+versioned source, durable quota/Lease/Fence service, authenticated receipt
+verification, native CAS continuation and isolated acceptance are maintained at
+`evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/attempt5`.
+No old single-use permit is expanded or revived. Dots remains the independent
+reviewer; developer tests cannot self-approve production. Real UK evidence and
+installation authorization stay separate; all production actions remain HOLD.

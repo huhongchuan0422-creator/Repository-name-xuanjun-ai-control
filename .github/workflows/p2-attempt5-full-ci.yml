@@ -1,0 +1,62 @@
+name: P2 Attempt5 Versioned Full Acceptance
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/**'
+      - 'evidence/p2-epoch7-access-repair-20261014/b-resource-aggregate-fix/artifact/**'
+      - '.github/workflows/p2-attempt5-full-ci.yml'
+      - 'tests/test_p2_capability_lifecycle*.py'
+permissions:
+  contents: read
+jobs:
+  versioned-full:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: python:3.6.15-bullseye
+            expected: '3.6.15'
+            label: '3.6'
+          - image: python:3.12-bookworm
+            expected: '3.12'
+            label: '3.12'
+    container:
+      image: ${{ matrix.image }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Exact native interpreter and event checkout
+        env:
+          EXPECTED_PYTHON: ${{ matrix.expected }}
+        run: |
+          set -euo pipefail
+          python3 -I -B -S - <<'PY'
+          import ctypes,os,subprocess,sys
+          expected=os.environ['EXPECTED_PYTHON']
+          actual='.'.join(map(str,sys.version_info[:len(expected.split('.'))]))
+          assert actual==expected
+          assert ctypes.CDLL(None).getpid()==os.getpid()
+          head=subprocess.check_output(['git','-c','safe.directory=*','rev-parse','HEAD']).decode().strip()
+          assert head==os.environ['GITHUB_SHA']
+          print('EXACT_INTERPRETER_AND_HEAD='+actual+' '+head)
+          PY
+      - name: Complete versioned source, dependencies and acceptance suites
+        run: |
+          set -euo pipefail
+          python3 -I -B -S evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/full-ci-attempt5/verify_full.py --output "$GITHUB_WORKSPACE/.versioned-full-results"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-attempt5-full-python-${{ matrix.label }}
+          path: |
+            .versioned-full-results/FULL_RESULT.json
+            .versioned-full-results/full-evidence.tar.gz
+            .versioned-full-results/full-evidence.tar.gz.sha256
+          if-no-files-found: error

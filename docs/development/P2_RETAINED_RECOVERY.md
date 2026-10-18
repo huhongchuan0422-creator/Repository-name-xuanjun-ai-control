@@ -142,3 +142,22 @@ FIVE_ATTEMPT_DEFAULT_POLICY=RECORDED
 FIVE_ATTEMPT_IMPLEMENTATION=NOT_IMPLEMENTED
 WORK_INDEPENDENT_VERIFICATION=NOT_RUN
 P2_RELEASE=HOLD
+
+
+## Attempt5 Work sole-writer handoff — 2026-10-18
+
+Window1 STOPPED; Work continues PR17 from b88aab7e. Original recovered six
+source/test files were byte-preserved and imported by cc397828. New code is
+versioned under c-capability-lifecycle/attempt5; README lists the exact runtime
+entry, Ledger/AuthorityStore/issuer-service/receipt-provider composition, native
+CAS recovery and minimum external read-only proof pack. The original single-use
+successor, existing frozen Kit, Prepare and 16-stage business bytes remain intact.
+
+New full-ci-attempt5 gate binds current exact Commit/Tree and all source inputs,
+runs all 775 inherited complete tests plus 85 Attempt5 tests, and rebuilds the
+separate Kit/manifest deterministically. Test Providers, keys, Run/Job/Invoke IDs
+and host effects are explicit isolated fixtures, never production proof.
+Hosted and independent review terminal evidence must be reported from actual
+runs; this source document does not predeclare PASS. Production Writer/Fence,
+real host transaction/backup/readback composition and exact new permit remain
+external admission dependencies. INSTALL_PERMIT=NOT_ISSUED; P2_RELEASE=HOLD.
