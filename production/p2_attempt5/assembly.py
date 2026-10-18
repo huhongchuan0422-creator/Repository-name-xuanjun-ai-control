@@ -323,6 +323,8 @@ def native_cycle(driver_factory, ledger_directory, grant, socket_path,
                               provider, source_identity=source_identity,
                               fixture_mode=False, approval_review_id=review_id,
                               cycle_policy=approved_policy)
+    if observer_session is not None:
+        return observer_session.permit_cycle(factory, approved_policy)
     return PermitCycle(factory, approved_policy)
 
 

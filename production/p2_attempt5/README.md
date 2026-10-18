@@ -125,3 +125,26 @@ Observer回复使用独立真实OpenSSLSigner，最多20秒且不超过上下文
 本次新增服务端测试的事实源明确SYNTHETIC_ONLY：真实文件、签名、socket、共享SQLite与正式serve运行，但测试替身不进入生产模块。生产attach要求原生具体类型，完整真实Driver/资源扫描正向和英国16阶段安装不能由协议fixture代替。schema=2正式run实际验证缺受信上下文时在创建Attempt前拒绝。原schema=1正式run接线和所有已审边界继承；新增服务端不宣称已有英国可信上下文或真实安装PASS。
 
 交窗口4同一集中清单：原plan/seed/probe和内外事务/备份checkpoint、唯一AuthorityStore/Writer/Lease/Fence、真实Run/Job/InvokeId与进程生命周期、受信上下文签发者公钥及签名原件、Observer独立Signer/固定socket、准确schema2私有binding/配置/来源/目录与完整Manifest。若现场已有可信Observer，schema1优先复用；否则仅在完整正式许可中启用本新增schema2服务。禁止将测试签发者/事实源部署英国、创建第二Writer、初始化新共享库或复活旧额度。原已通过部分不重审、不重跑D1或旧Prepare。UK_DEPLOYMENT=NOT_EXECUTED；PRODUCTION_NATIVE_RUN_POSITIVE=NOT_VERIFIED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
+
+
+### Observer recovery corrections (PR58 #6250972400)
+
+Fresh Drivers authenticate the original locked review and immutable ClaimAuthority
+binding before reading outer/inner transactions. Finite checkpoint projection
+must match that fresh verified authorization/cache and the exact Claim binding;
+projection always restores the original in-memory fields, including on failure.
+No pre-active gate.check(), journal rewrite, phase execution or synthetic approval
+is used to unlock recovery.
+
+Schema2 uses ObserverPermitCycle for recovery scope coordination. Diagnosis and
+each approved configuration operation have separate single-use native lock scopes.
+Before configuration or reconciliation the existing factory constructs and
+reauthenticates a complete fresh Driver against the same Grant, review, ledger and
+Attempt. NativeRecovery owns reconciliation's lock; Observer borrows that held
+object without releasing it. No entered flag reset, alternate lock path or second
+Writer is introduced. UNKNOWN/timeouts stop before reconciliation; the next
+invocation retains the persistent Attempt and quota.
+
+Affected acceptance adds 20 native authorization/projection and actual
+ExistingInstallLock lifecycle regressions. Host IO remains isolated test data;
+these tests do not establish UK deployment or full native installation acceptance.

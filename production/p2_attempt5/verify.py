@@ -35,11 +35,12 @@ def main():
              'tests/p2_production_assembly/test_native_adapter.py',
              'production/p2_attempt5/observer_server.py',
              'tests/p2_production_assembly/test_observer_server.py',
+             'tests/p2_production_assembly/test_observer_recovery.py',
              '.github/workflows/p2-production-assembly.yml']
     for name in added:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     groups = []
-    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_observer_server.py', 23),
+    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_observer_recovery.py', 20),(str(ROOT / 'tests/p2_production_assembly'), 'test_observer_server.py', 23),
              (str(ROOT / 'tests/p2_production_assembly'), 'test_assembly.py', 27),
              (str(ROOT / 'tests/p2_production_assembly'), 'test_native_adapter.py', 21),
              (str(ROOT / 'tests/p2_production_assembly'), 'test_registry.py', 50)]
@@ -50,6 +51,8 @@ def main():
                   'r=unittest.TextTestRunner(verbosity=2).run(suite);'
                   'assert r.wasSuccessful() and not r.skipped and r.testsRun==%d' %
                   (directory, directory, pattern, count))
+        if pattern == 'test_observer_recovery.py':
+            script = 'import runpy;runpy.run_path(%r,run_name="__main__")' % str(Path(directory)/pattern)
         result = subprocess.run([sys.executable, '-I', '-B', '-S', '-c', script],
                                 cwd=str(ROOT), stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, timeout=240)
@@ -57,6 +60,10 @@ def main():
         log.write_bytes(result.stdout)
         print(result.stdout.decode('utf-8'), flush=True)
         assert result.returncode == 0, 'AFFECTED_ACCEPTANCE_FAILED:' + pattern
+        if pattern == 'test_observer_recovery.py':
+            import re
+            summary = re.findall(r'Ran (\d+) tests? in ', result.stdout.decode('utf-8'))
+            assert summary == [str(count)] and b'\\nskipped=' not in result.stdout, 'RECOVERY_TEST_COUNT'
         groups.append({'group': pattern, 'tests': count,
                        'log_sha256': hashlib.sha256(result.stdout).hexdigest()})
     manifest = {'schema': 1, 'source_commit': head, 'source_tree': tree,

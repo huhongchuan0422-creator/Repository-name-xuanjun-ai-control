@@ -50,7 +50,16 @@ class NativeReader(object):
         commands = copy.deepcopy(runtime.successful_commands)
         try:
             # Only in-memory finite data, never native journal CAS or SKIP.
+            authority = driver.journal_io.authority
+            authority.receipt()
+            verified = driver.gate.verifier.verify_exact(
+                driver.gate.review_id, copy.deepcopy(driver.gate.expected))
+            need(state['objects']['gate']['values']['authorization'] == verified and
+                 state['objects']['verifier']['values']['cached'] ==
+                 driver.gate.verifier.cached, 'RECOVERY_REVIEW_PROVENANCE')
             native_state.restore(driver, state, completed)
+            need(driver.gate.journal_binding() == authority.binding,
+                 'PROJECTED_CLAIM_BINDING')
             import epoch7_protected_fs as fs
             path = fs.TRANSACTION + '/runtime-boot.json'
             if completed:
@@ -117,6 +126,7 @@ class NativeReader(object):
     def journals(self):
         import epoch7_recovery_sequence as sequence
         driver = self.session.driver
+        driver.journal_io.authority.receipt()
         outer = driver.journal_io.journal_exists(sequence.OUTER_NAME)
         inner = driver.retained_io.journal_exists(driver.inner.name)
         if not outer:
@@ -124,10 +134,19 @@ class NativeReader(object):
             return None, None, None
         need(inner, 'MISSING_INNER')
         record = driver.journal_io.read_journal(sequence.OUTER_NAME)
+        sequence.retained.BoundJournal._validate_record(record)
         value = driver.journal_io.authority.validate_outer(record['data'])
         inner_record = driver.retained_io.read_journal(driver.inner.name)
         inside = sequence.retained.BoundJournal._validate_record(inner_record)
-        need(inside['binding'] == driver.gate.journal_binding(), 'INNER_BINDING')
+        # Fresh Drivers deliberately have no gate.authorization. Authenticate
+        # immutable Claim/review bindings before projecting persisted finite data.
+        authority = driver.journal_io.authority
+        authority.receipt()
+        need(authority.verifier is driver.gate.verifier and
+             authority.context == driver.context, 'CLAIM_AUTHORITY')
+        need(inside.get('schema') == 1 and inside.get('name') == driver.inner.name and
+             inside.get('transaction_id') == sequence.retained.d.TX and
+             inside.get('binding') == authority.binding, 'INNER_BINDING')
         state = value['state']
         need(state.get('admission') == 'ADMITTED' and
              type(state.get('completed')) is list and
@@ -411,6 +430,9 @@ class ObserverSession(object):
                 return True
         return False
 
+    def permit_cycle(self, factory, approved_policy):
+        return ObserverPermitCycle(factory, approved_policy)
+
     def attach(self, driver):
         from epoch7_recovery_sequence import InjectedDriver
         from epoch7_live_controls import FiniteLiveControls
@@ -602,3 +624,56 @@ class ObserverSession(object):
         if self.lock is not None:
             os.close(self.lock)
             self.lock = None
+
+
+from permit_cycle import PermitCycle
+
+
+class ObserverPermitCycle(PermitCycle):
+    """Reauthenticate full Drivers between separate recovery lock scopes.
+
+    No lock flags are reset. NativeRecovery owns its entire reconcile lock scope;
+    Observer borrows it there. Persistent Grant, Attempt and quota do not change.
+    """
+    def recover(self,attempt,command_sha):
+        native=self.native
+        native.confirm_admission(attempt,command_sha)
+        if native.converge_committed(attempt):return True
+        row=native.ledger.snapshot()['attempts'][-1]
+        if not any(e['kind']=='execution_intent' for e in row['events']):
+            need(row['state']=='INTENT_RECORDED' and
+                 not native.driver.journal_io.journal_exists(native.s.OUTER_NAME) and
+                 not native.driver.retained_io.journal_exists(native.driver.inner.name),'UNSTARTED_ATTEMPT_NATIVE_CONFLICT')
+            native.run(attempt)
+            return True
+        if native.driver.journal_io.journal_exists(native.s.OUTER_NAME):
+            record=native.driver.journal_io.read_journal(native.s.OUTER_NAME)
+            state=native.s.retained.BoundJournal._validate_record(record)['state']
+            if state.get('completed')==list(native.s.PHASES) and state.get('stage')==native.s.PHASES[-1]+'_COMPLETE':
+                native.reconcile(attempt)
+                return True
+        result=self.checked(attempt,'diagnose_attempt',{'ledger_sha256':digest(native.ledger.snapshot())})
+        need(result.get('source_identity')=={k:self.grant[k] for k in ('source_commit','source_tree','kit_sha256','manifest_sha256')},'SOURCE_CHANGE_NEW_PERMIT')
+        need(result.get('status')=='DIAGNOSED' and result.get('transaction_consistent') is True and
+             result.get('recovery') in ('NO_WRITE','NATIVE_CAS'),'DIAGNOSIS_HOLD')
+        # Native recovery independently verifies the complete host transaction,
+        # backup/checkpoint and actual effects again; diagnosis is not a waiver.
+        # At the fifth failure only reconcile/retain evidence. There is no
+        # next attempt to prepare, so do not apply retry configuration changes.
+        actions=(result.get('configuration_actions',[]) if len(native.ledger.snapshot()['attempts'])<5 else [])
+        need(type(actions) is list and len(actions)==len(set(actions)),'CONFIG_PLAN')
+        approved={a['id']:a for a in self.policy['configuration_actions']}
+        for action_id in actions:
+            self.fresh()
+            need(action_id in approved,'UNAPPROVED_CONFIG')
+            response=self.checked(attempt,'apply_approved_configuration',{'action':approved[action_id]})
+            need(response.get('status')=='COMMITTED' and response.get('action')==approved[action_id] and
+                 response.get('backup_sha256')==approved[action_id]['before_sha256'] and
+                 response.get('after_sha256')==approved[action_id]['after_sha256'], 'CONFIG_UNKNOWN_HOLD')
+        # Separate scopes require unused single-use lock objects. The factory
+        # reauthenticates the complete Driver with the same Grant and ledger.
+        native=self.fresh()
+        if result['recovery']=='NO_WRITE':native.reconcile_unadmitted(attempt)
+        else:native.reconcile(attempt)
+        return True
+
