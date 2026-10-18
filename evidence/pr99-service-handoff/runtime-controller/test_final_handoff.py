@@ -11,7 +11,9 @@ import catalogue_binding as c
 import existing_fd_controller as f
 import final_handoff as h
 import migration_transaction as original
+import owner_contract
 from test_capture_session import CaptureFixture
+from test_runtime_controller import OriginalJournalFixture
 
 
 class HandoffTests(CaptureFixture,unittest.TestCase):
@@ -32,6 +34,8 @@ class HandoffTests(CaptureFixture,unittest.TestCase):
         self.journal.path.rmdir()
         self.plan['bindings']['runtime_identity']=c.digest(self.handoff['identity'])
         self.plan['bindings']['final_manifest_contract']=c.digest(self.config)
+        self.plan.pop('independent_review_comment_id')
+        self.plan['owner_authority']=copy.deepcopy(owner_contract.OWNER_AUTHORITY)
         self.plan_digest=original.digest(self.plan)
         self.journal=original.Journal(self.root,'fixture-original');self.journal.claim(self.plan,self.plan_digest)
         self.txn_fd=os.open(self.journal.path,os.O_RDONLY|os.O_DIRECTORY)
@@ -39,6 +43,7 @@ class HandoffTests(CaptureFixture,unittest.TestCase):
             transaction_identity=[os.fstat(self.txn_fd).st_dev,os.fstat(self.txn_fd).st_ino],
             lock_identity=[os.fstat(self.journal.lock.fileno()).st_dev,os.fstat(self.journal.lock.fileno()).st_ino],
             extension_manifest_sha256=original.digest(f.extension_manifest()))
+        self.owner_contract_active=True
         self.controller=self.make_controller();req=original.request(self.plan,'inspect_protected',self.plan_digest)
         with patch.object(original,'source_manifest',return_value=self.plan['source_hashes']):first=self.controller.perform(req,self.dispatch,self.query)
         self.fence_req=original.request(self.plan,'fence_source',original.digest(first))
@@ -79,6 +84,11 @@ class HandoffTests(CaptureFixture,unittest.TestCase):
                 if p.is_symlink():links[rel]=os.readlink(p)
                 elif p.is_file():files.append(rel)
         return {'files':sorted(files),'links':links}
+
+    def make_controller(self):
+        if not getattr(self,'owner_contract_active',False):return super().make_controller()
+        return f.ExistingFdController(self.journal,owner_contract,self.root_fd,self.txn_fd,self.binding,
+            lambda mode,b:self.allowed and b==self.binding,lambda:self.paths_valid,self.history)
 
     def check_target(self,config,identities):
         if not self.target_valid:return False
@@ -131,6 +141,8 @@ class HandoffTests(CaptureFixture,unittest.TestCase):
         super().tearDown()
 
     def test_nonempty_wal_to_reconciled_checkpoint_to_original_assignment(self):
+        self.assertIs(self.controller.m,owner_contract)
+        self.assertNotIn('independent_review_comment_id',self.plan)
         self.reconciled();result=self.perform(self.assign_req)
         checkpoint=json.loads(os.pread(self.checkpoint_fd,2097153,0));assignment=json.loads(os.pread(self.assignment_fd,16385,0))
         self.assertEqual(checkpoint['class'],'FINAL_CANONICAL_CHECKPOINT')
@@ -196,6 +208,8 @@ class HandoffTests(CaptureFixture,unittest.TestCase):
         self.receiver=self.receiver_build()
         with self.assertRaises(f.ControllerHold):self.perform(self.assign_req)
         self.assertEqual(self.assignment_calls,1);self.assertEqual(os.fstat(self.assignment_fd).st_size,0)
+        with self.assertRaises(h.HandoffHold):self.receiver._assign(self.assign_req)
+        self.assertEqual(self.assignment_calls,1)
 
     def test_unverified_assignment_ack_is_not_authority(self):
         self.reconciled();self.receiver.verify=lambda *a:False
@@ -256,3 +270,33 @@ class HandoffTests(CaptureFixture,unittest.TestCase):
         self.source_view.query=wrong;self.source_view.verify=lambda *a:True
         with self.assertRaises(f.ControllerHold):self.reconciled()
         self.assertEqual(os.fstat(self.checkpoint_fd).st_size,0)
+
+
+class OwnerContractTests(OriginalJournalFixture,unittest.TestCase):
+    def owner_plan(self):
+        plan=copy.deepcopy(self.plan);plan.pop('independent_review_comment_id')
+        plan['owner_authority']=copy.deepcopy(owner_contract.OWNER_AUTHORITY)
+        return plan
+
+    def test_owner_direct_plan_without_review_id(self):
+        p=self.owner_plan();self.assertIs(owner_contract.Journal,original.Journal)
+        self.assertEqual(owner_contract.validate_plan(p,original.digest(p),original.time.time()),p)
+
+    def test_reviewer_field_does_not_create_owner_authority(self):
+        with self.assertRaises(original.Hold):owner_contract.validate_plan(self.plan,original.digest(self.plan),original.time.time())
+
+    def test_wrong_owner_scope_rejected(self):
+        p=self.owner_plan();p['owner_authority']['scope']='UK_P2'
+        with self.assertRaises(original.Hold):owner_contract.validate_plan(p,original.digest(p),original.time.time())
+
+    def test_preliminary_release_rejected(self):
+        p=self.owner_plan();p['release']='/opt/xuanjun-migration-s07/releases/domestic-r2'
+        with self.assertRaises(original.Hold):owner_contract.validate_plan(p,original.digest(p),original.time.time())
+
+    def test_expired_plan_still_rejected(self):
+        p=self.owner_plan()
+        with self.assertRaises(original.Hold):owner_contract.validate_plan(p,original.digest(p),p['expires_at'])
+
+    def test_boolean_issue_time_is_not_timestamp(self):
+        p=self.owner_plan();p['issued_at']=True
+        with self.assertRaises(original.Hold):owner_contract.validate_plan(p,original.digest(p),original.time.time())

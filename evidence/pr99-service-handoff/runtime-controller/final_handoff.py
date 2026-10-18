@@ -214,7 +214,9 @@ class FinalHandoff:
         return checkpoint,all_files,fence_raw
 
     def _reconcile(self,request,query_only=False):
+        self._active_request(request,query_only)
         checkpoint,_,_=self._received()
+        self._active_request(request,query_only)
         stored=self.checkpoint(checkpoint,query_only=query_only)
         return self._receipt(request,digest(stored))
 
@@ -230,10 +232,12 @@ class FinalHandoff:
           'plan_digest':self.c.binding['plan_digest'],'source_fence_sha256':file_sha(fence_raw)},checkpoint,all_files
 
     def _assign(self,request,query_only=False):
+        self._active_request(request,query_only)
         binding,checkpoint,all_files=self._assignment_input()
         if query_only:proof=self.query_assignment(request,binding)
         else:
             self.c._bound('dispatch')
+            self._active_request(request,False)
             proof=self.assign(request,binding)
         # The actual original assignment authority must verify its durable CAS
         # result. A locally constructed document/boolean is not a Writer grant.
@@ -250,6 +254,18 @@ class FinalHandoff:
     def _receipt(self,request,evidence):
         return {'request_digest':self.c.m.digest(request),'operation_id':request['operation_id'],
           'stage':request['stage'],'status':'SUCCEEDED','evidence':evidence}
+
+    def _active_request(self,request,query_only):
+        self.c._bound('query' if query_only else 'dispatch')
+        claim,events,_=self.c.load();plan=claim['plan']
+        need(request==self.c.m.request(plan,request.get('stage'),request.get('previous_receipt')) and
+             request.get('stage')in ('reconcile_final','assign_writer'),'HANDOFF_REQUEST_BINDING')
+        intents=[e for e in events if e.get('type')=='INTENT' and e['request']['operation_id']==request['operation_id']]
+        need(len(intents)==1 and intents[0]['request']==request,'DURABLE_HANDOFF_INTENT_REQUIRED')
+        if not query_only:
+            need(events[-1]==intents[0],'HANDOFF_ALREADY_CONSUMED_QUERY_ONLY')
+            self.c.m.validate_plan(plan,self.c.binding['plan_digest'],time.time())
+            need(self.c.m.source_manifest()==plan['source_hashes'],'ORIGINAL_SOURCE_DRIFT')
 
     def perform(self,request):
         self._config()
