@@ -342,7 +342,7 @@ class NativeAdapterTests(unittest.TestCase):
             adapter_path=str(code / 'native_adapter.py'),
             adapter_sha256=files['production/p2_attempt5/native_adapter.py'],
             ledger_directory=str(self.directory / 'ledger'))
-        Path(cfg['ledger_directory']).mkdir(mode=0o700)
+        Path(cfg['ledger_directory']).mkdir(mode=0o700, exist_ok=True)
         self.fixture.rebind_config(cfg)
         self.fixture.register()
         store = AuthorityStore(cfg['database'], initialize=True)
