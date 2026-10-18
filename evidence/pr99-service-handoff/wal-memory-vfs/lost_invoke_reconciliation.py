@@ -131,7 +131,8 @@ def bind_missing_invoke(directory_fd, assert_directory_binding, rpc, credentials
     require(stat.S_ISDIR(st.st_mode) and st.st_uid == os.geteuid() and
             stat.S_IMODE(st.st_mode) == 0o700, 'ORIGINAL_CONTROLLER_DIRECTORY')
     assert_directory_binding()
-    fd = os.open('cloud-start.intent.json', os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+    fd = os.open('cloud-start.intent.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                 dir_fd=directory_fd)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         intent = _read(fd); validate_intent(intent)
@@ -143,7 +144,9 @@ def bind_missing_invoke(directory_fd, assert_directory_binding, rpc, credentials
                     'ORIGINAL_INTENT_NAME_DRIFT')
         current_binding()
         def existing():
-            try: f = os.open('cloud-start.invocation.json', os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+            try: f = os.open('cloud-start.invocation.json',
+                             os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                             dir_fd=directory_fd)
             except FileNotFoundError: return None
             try: r = _read(f)
             finally: os.close(f)

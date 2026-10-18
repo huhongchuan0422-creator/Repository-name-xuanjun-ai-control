@@ -4,6 +4,8 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'evidence/pr99-service-handoff/wal-memory-vfs/**'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/production_transport.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/production_start.py'
       - '.github/workflows/pr99-wal-reconciliation-validation.yml'
 permissions:
   contents: read

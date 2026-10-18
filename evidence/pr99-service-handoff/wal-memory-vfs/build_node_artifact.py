@@ -8,15 +8,23 @@ import subprocess
 import zipfile
 
 FILES = ('README.md', 'build_node_artifact.py', 'lost_invoke_reconciliation.py',
-         'sqlite_wal_vfs.py', 'test_lost_invoke_reconciliation.py', 'test_sqlite_wal_vfs.py')
+         'sqlite_wal_vfs.py', 'test_lost_invoke_reconciliation.py', 'test_sqlite_wal_vfs.py',
+         'node_bindings.py', 'test_node_bindings.py')
+EXISTING = {
+    'production_transport.py': '625fa7adf78e545ffa99c84329b3929fb6a7ee907eaebe6f122fa9261c140b16',
+    'production_start.py': 'd645edc0013af34804626315a6ddce1b47b870c012b6b632131c320ed4c20688',
+}
 
 
 def build(root, output, commit, tree):
     assert re.fullmatch('[0-9a-f]{40}', commit) and re.fullmatch('[0-9a-f]{40}', tree)
     root, output = Path(root), Path(output)
     files = {name: (root/name).read_bytes() for name in FILES}
+    for name, expected in EXISTING.items():
+        assert hashlib.sha256((root.parent/'s09-install-candidate'/name).read_bytes()).hexdigest() == expected
     manifest = {'schema': 1, 'source_commit': commit, 'source_tree': tree,
         'files': {name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()},
+        'required_existing_source': EXISTING,
         'production_entry': False, 'M99_dynamic_acceptance': 'NOT_RUN'}
     files['MANIFEST.json'] = (json.dumps(manifest, sort_keys=True, indent=2)+'\n').encode()
     with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as z:
