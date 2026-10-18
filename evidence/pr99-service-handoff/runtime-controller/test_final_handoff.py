@@ -192,7 +192,8 @@ class HandoffTests(CaptureFixture,unittest.TestCase):
 
     def test_crash_after_durable_assignment_queries_without_cas_replay(self):
         self.reconciled();self.controller._append({'type':'INTENT','request':self.assign_req})
-        direct=self.receiver._assign(self.assign_req)
+        with patch.object(original,'source_manifest',return_value=self.plan['source_hashes']):
+            direct=self.receiver._assign(self.assign_req)
         self.receiver=self.receiver_build()
         self.receiver.assign=lambda *a:(_ for _ in ()).throw(AssertionError('CAS_REPLAY'))
         result=self.perform(self.assign_req)
@@ -218,7 +219,8 @@ class HandoffTests(CaptureFixture,unittest.TestCase):
 
     def test_reconcile_pending_intent_reads_existing_proof_only(self):
         self.controller._append({'type':'INTENT','request':self.reconcile_req})
-        direct=self.receiver._reconcile(self.reconcile_req)
+        with patch.object(original,'source_manifest',return_value=self.plan['source_hashes']):
+            direct=self.receiver._reconcile(self.reconcile_req)
         before=os.pread(self.checkpoint_fd,2097153,0)
         result=self.perform(self.reconcile_req)
         self.assertEqual(result,direct);self.assertEqual(os.pread(self.checkpoint_fd,2097153,0),before)
