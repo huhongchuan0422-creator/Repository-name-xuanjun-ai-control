@@ -16,21 +16,38 @@ HERE = Path(__file__).resolve().parent
 SPEC = importlib.util.spec_from_file_location('fixed_readonly', HERE / 'pr122_domestic_staging_readonly.py')
 mod = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(mod)
+PRODUCTION_OWNER = mod._owner
+
+
+def fixture_owner(path, fixture_root, fixture_uid, ancestor_uids):
+    """Project expected UIDs for this fixture, never relax the protected check."""
+    path = Path(path)
+    if path == fixture_root or fixture_root in path.parents:
+        return fixture_uid
+    # Ancestors are captured once before the fixture runs. Unknown paths fail.
+    return ancestor_uids[str(path)]
 
 
 class FixedReadonlyTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        # /tmp is normally 1777 and must remain forbidden by production policy.
+        # Use the checkout tree; preserve real ancestor modes and ownership.
+        fixture_uid = os.geteuid()
+        root_uid = os.stat('/').st_uid
+        self.temp = tempfile.TemporaryDirectory(dir=HERE)
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.a = self.root / 'root-evidence'
         self.b = self.root / 'runner-evidence'
         self.a.mkdir(); self.b.mkdir()
+        ancestor_uids = {str(path): path.stat().st_uid for path in self.root.parents}
         self.addCleanup(patch.stopall)
         patch.object(mod, 'ROOTS', (str(self.a), str(self.b))).start()
-        patch.object(mod, 'ROOT_UID', os.geteuid()).start()
-        patch.object(mod, 'RUNNER_UID', os.geteuid()).start()
+        patch.object(mod, 'ROOT_UID', root_uid).start()
+        patch.object(mod, 'RUNNER_UID', fixture_uid).start()
         patch.object(mod, 'RUNNER_HOME', str(self.b)).start()
+        patch.object(mod, '_owner', side_effect=lambda path, _root:
+                     fixture_owner(path, self.root, fixture_uid, ancestor_uids)).start()
         patch.object(mod.os, 'geteuid', return_value=0).start()
         patch.object(mod.os, 'uname', return_value=SimpleNamespace(nodename=mod.HOST)).start()
 
@@ -176,11 +193,35 @@ class FixedReadonlyTests(unittest.TestCase):
 
     def test_uid1002_allowance_only_fixed_runner_subtree(self):
         with patch.object(mod, 'ROOTS', ('/root/pr122-unified-release-4ryrkhl9', '/home/githubrunner/pr122-unified-release-6218264390')), patch.object(mod, 'ROOT_UID', 0), patch.object(mod, 'RUNNER_UID', 1002), patch.object(mod, 'RUNNER_HOME', '/home/githubrunner'):
-            self.assertEqual(mod._owner('/home', mod.ROOTS[1]), 0)
-            self.assertEqual(mod._owner('/home/githubrunner', mod.ROOTS[1]), 1002)
-            self.assertEqual(mod._owner('/home/githubrunner/known', mod.ROOTS[1]), 1002)
-            self.assertEqual(mod._owner('/home/githubrunner-other', mod.ROOTS[1]), 0)
-            self.assertEqual(mod._owner('/root', mod.ROOTS[0]), 0)
+            self.assertEqual(PRODUCTION_OWNER('/home', mod.ROOTS[1]), 0)
+            self.assertEqual(PRODUCTION_OWNER('/home/githubrunner', mod.ROOTS[1]), 1002)
+            self.assertEqual(PRODUCTION_OWNER('/home/githubrunner/known', mod.ROOTS[1]), 1002)
+            self.assertEqual(PRODUCTION_OWNER('/home/githubrunner-other', mod.ROOTS[1]), 0)
+            self.assertEqual(PRODUCTION_OWNER('/root', mod.ROOTS[0]), 0)
+
+    def test_hosted_nonroot_fixture_projection_regression(self):
+        root = Path('/home/runner/work/tests/fixture')
+        ancestors = {'/': 0, '/home': 0, '/home/runner': 1001,
+                     '/home/runner/work': 1001, '/home/runner/work/tests': 1001}
+        root_info = SimpleNamespace(st_uid=0, st_mode=stat.S_IFDIR | 0o755)
+        fixture_info = SimpleNamespace(st_uid=1001, st_mode=stat.S_IFREG | 0o600)
+        # Deterministically reproduce the failed Hosted assumption without sudo.
+        with self.assertRaisesRegex(mod.Hold, 'OWNER_OR_MODE'):
+            mod._protected(root_info, 1001)
+        self.assertEqual(fixture_owner('/', root, 1001, ancestors), 0)
+        self.assertEqual(fixture_owner('/home/runner', root, 1001, ancestors), 1001)
+        self.assertEqual(fixture_owner(root / 'file', root, 1001, ancestors), 1001)
+        mod._protected(root_info, fixture_owner('/', root, 1001, ancestors))
+        mod._protected(fixture_info, fixture_owner(root / 'file', root, 1001, ancestors))
+        with self.assertRaises(KeyError):
+            fixture_owner('/outside-fixture', root, 1001, ancestors)
+        with self.assertRaises(KeyError):
+            fixture_owner(str(root) + '-sibling/file', root, 1001, ancestors)
+        # Fixture projection never ignores a wrong owner or writable mode.
+        with self.assertRaisesRegex(mod.Hold, 'OWNER_OR_MODE'):
+            mod._protected(SimpleNamespace(st_uid=1002, st_mode=stat.S_IFREG | 0o600), 1001)
+        with self.assertRaisesRegex(mod.Hold, 'OWNER_OR_MODE'):
+            mod._protected(SimpleNamespace(st_uid=1001, st_mode=stat.S_IFREG | 0o666), 1001)
 
     def test_file_disappearing_between_stat_and_open_is_hold(self):
         p = self.a / 'file'; p.write_bytes(b'1234')

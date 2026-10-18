@@ -4,10 +4,12 @@ An uninterrupted run_number sequence is mandatory. Deleted/missing history,
 pagination truncation, expired artifacts, or ambiguous provenance fail closed.
 Artifact redirect requests never carry the GitHub Authorization header.
 """
+import base64
 import hashlib
 import io
 import json
 import re
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -16,7 +18,10 @@ import zipfile
 REPOSITORY = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 REPOSITORY_ID = 1413132159
 OWNER_ID = 332398908
-BRANCH = 'feature/work-pr122-site-hub-integration-20261016'
+BRANCH = 'feature/stage5-next25-integration-20261015'
+SOURCE_BRANCH = 'feature/work-pr122-site-hub-integration-20261016'
+SOURCE_PLACEHOLDER = '__READONLY_SOURCE_HEAD_40_HEX__'
+TEMPLATE_PATH = Path(__file__).parent / 'pr122-staging-readonly.yml'
 WORKFLOW_PATH = '.github/workflows/pr122-staging-readonly.yml'
 DISPATCH_JOB = 'domestic-staging-readonly-cloud'
 QUERY_JOB = 'domestic-staging-readonly-query'
@@ -208,6 +213,30 @@ def validate_event(event, env, mode):
     return head, int(run_id)
 
 
+def source_admission(api, head, env):
+    """Bind source to the literal workflow at the already-authorized PR HEAD."""
+    source = env.get('READONLY_SOURCE_HEAD', '')
+    require(type(source) is str and SHA40.fullmatch(source), 'SOURCE_HEAD_REQUIRED')
+    reference = api.get('/git/ref/heads/' + SOURCE_BRANCH)
+    require(reference.get('ref') == 'refs/heads/' + SOURCE_BRANCH
+            and reference.get('object', {}).get('type') == 'commit'
+            and reference.get('object', {}).get('sha') == source, 'SOURCE_BRANCH_MOVED')
+    template = TEMPLATE_PATH.read_bytes()
+    require(0 < len(template) <= 20000 and template.count(SOURCE_PLACEHOLDER.encode()) == 4,
+            'SOURCE_TEMPLATE_SHAPE')
+    actual = api.get('/contents/' + WORKFLOW_PATH + '?ref=' + head)
+    require(actual.get('type') == 'file' and actual.get('path') == WORKFLOW_PATH
+            and actual.get('encoding') == 'base64' and type(actual.get('content')) is str
+            and len(actual['content']) <= 30000, 'EVENT_WORKFLOW_SOURCE_SHAPE')
+    try:
+        raw = base64.b64decode(''.join(actual['content'].split()), validate=True)
+    except Exception:
+        raise Hold('EVENT_WORKFLOW_ENCODING') from None
+    expected = template.replace(SOURCE_PLACEHOLDER.encode(), source.encode())
+    require(raw == expected, 'EVENT_WORKFLOW_SOURCE_BINDING')
+    return source
+
+
 def live_admission(api, event, env, mode):
     head, run_id = validate_event(event, env, mode)
     pr = api.get('/pulls/122')
@@ -220,6 +249,7 @@ def live_admission(api, event, env, mode):
     run = api.run(run_id)
     run_binding(run, run_id, head)
     require(run.get('run_attempt') == 1, 'RERUN_NOT_ADMITTED')
+    source = source_admission(api, head, env)
     runs = api.runs(run['workflow_id'])
     require(runs and len({r.get('run_number') for r in runs}) == len(runs)
             and all(type(r.get('run_number')) is int and r['run_number'] > 0 for r in runs),
@@ -259,4 +289,5 @@ def live_admission(api, event, env, mode):
         run_binding(consumed[0], consumed[0]['id'], head)
         require(consumed[0].get('run_attempt') == 1, 'QUERY_SOURCE_RERUN_AMBIGUOUS')
     return {'head_sha': head, 'run_id': run_id, 'workflow_id': run['workflow_id'],
+            'readonly_source_head': source,
             'source_run_id': consumed[0]['id'] if consumed else run_id}

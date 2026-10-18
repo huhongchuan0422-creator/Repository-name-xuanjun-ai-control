@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shlex
 import stat
+import subprocess
 import sys
 import time
 import uuid
@@ -43,9 +44,10 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
-def fixed_command(head, nonce):
+def fixed_command(head, nonce, source):
     require(type(head) is str and SHA40.fullmatch(head)
-            and type(nonce) is str and SHA.fullmatch(nonce), 'COMMAND_IDENTITY')
+            and type(nonce) is str and SHA.fullmatch(nonce)
+            and type(source) is str and SHA40.fullmatch(source), 'COMMAND_IDENTITY')
     require(type(HELPER_BYTES) is bytes and 0 < len(HELPER_BYTES) <= 100000
             and type(HELPER_SHA256) is str and SHA.fullmatch(HELPER_SHA256)
             and digest(HELPER_BYTES) == HELPER_SHA256, 'HELPER_NOT_FROZEN')
@@ -59,6 +61,7 @@ def fixed_command(head, nonce):
         "exec(compile(b,'pr122_frozen_readonly.py','exec'),n)\n"
         "r=n['collect']()\n"
         "out={'schema':1,'scope':" + repr(SCOPE) + ",'head_sha':" + repr(head)
+        + ",'readonly_source_head':" + repr(source)
         + ",'nonce':" + repr(nonce) + ",'helper_sha256':" + repr(HELPER_SHA256)
         + ",'hostname':os.uname().nodename,'uid':os.geteuid(),'receipt':r}\n"
         "s=json.dumps(out,sort_keys=True,separators=(',',':'))\n"
@@ -77,10 +80,11 @@ def fixed_command(head, nonce):
 
 
 def intent_for(admission, nonce):
-    command = fixed_command(admission['head_sha'], nonce)
+    command = fixed_command(admission['head_sha'], nonce, admission['readonly_source_head'])
     return {'schema': 1, 'scope': SCOPE, 'repository': REPOSITORY,
             'repository_id': REPOSITORY_ID, 'branch': BRANCH,
             'head_sha': admission['head_sha'], 'run_id': admission['run_id'],
+            'readonly_source_head': admission['readonly_source_head'],
             'workflow_id': admission['workflow_id'], 'nonce': nonce,
             'helper_sha256': HELPER_SHA256, 'command_sha256': digest(command.encode()),
             'region': REGION, 'instance_id': INSTANCE, 'hostname': HOST,
@@ -185,7 +189,7 @@ class FixedCloud:
                          RegionId=REGION, InstanceId=INSTANCE, Type='RunShellScript',
                          WorkingUser='root', WorkingDir='/root', Timeout=120,
                          Name='pr122-domestic-staging-readonly',
-                         CommandContent=fixed_command(intent['head_sha'], intent['nonce']))
+                         CommandContent=fixed_command(intent['head_sha'], intent['nonce'], intent['readonly_source_head']))
 
     def query(self, invoke):
         require(type(invoke) is str and INVOKE.fullmatch(invoke), 'INVOKE_ID_SCHEMA')
@@ -201,6 +205,7 @@ def dispatch_once(api, event, env, cloud, artifact_id):
     # Intent has been uploaded and independently re-downloaded before even STS.
     record = {'schema': 1, 'scope': SCOPE, 'intent_sha256': digest(encoded(intent)),
               'head_sha': intent['head_sha'], 'run_id': intent['run_id'],
+              'readonly_source_head': intent['readonly_source_head'],
               'instance_id': INSTANCE, 'command_sha256': intent['command_sha256'],
               'status': 'UNKNOWN_NO_INVOKE_NO_REPLAY', 'invoke_id': None}
     local_write('dispatch.json', record)
@@ -219,6 +224,7 @@ def dispatch_once(api, event, env, cloud, artifact_id):
 def validate_dispatch(record, intent):
     expected = {'schema': 1, 'scope': SCOPE, 'intent_sha256': digest(encoded(intent)),
                 'head_sha': intent['head_sha'], 'run_id': intent['run_id'],
+                'readonly_source_head': intent['readonly_source_head'],
                 'instance_id': INSTANCE, 'command_sha256': intent['command_sha256'],
                 'status': 'DISPATCHED_QUERY_ONLY', 'invoke_id': record.get('invoke_id')}
     require(type(record) is dict and record == expected
@@ -274,9 +280,10 @@ def validated_output(output, intent):
         except Exception:
             raise Hold('OUTPUT_SCHEMA') from None
     require(type(value) is dict and set(value) == {'schema', 'scope', 'head_sha', 'nonce',
-            'helper_sha256', 'hostname', 'uid', 'receipt'} and type(value['schema']) is int
+            'readonly_source_head', 'helper_sha256', 'hostname', 'uid', 'receipt'} and type(value['schema']) is int
             and value['schema'] == 1 and value['scope'] == SCOPE
             and value['head_sha'] == intent['head_sha'] and value['nonce'] == intent['nonce']
+            and value['readonly_source_head'] == intent['readonly_source_head']
             and value['helper_sha256'] == intent['helper_sha256'] and value['hostname'] == HOST
             and type(value['uid']) is int and value['uid'] == 0, 'OUTPUT_BINDING')
     return validate_receipt(value['receipt'])
@@ -289,17 +296,23 @@ def query_only(cloud, intent, record, clock=time.monotonic, sleep=time.sleep):
         try:
             response = cloud.query(invoke)
             result = response.get('InvocationResult', {})
-            require(result.get('InstanceId') == INSTANCE and result.get('InvokeId') == invoke,
-                    'QUERY_IDENTITY')
+            require(type(result) is dict, 'QUERY_SCHEMA')
+            # Original SWAS responses can omit identity while Pending/Running.
+            # Present conflicts always fail; terminal output requires both IDs.
+            for key, expected in (('InstanceId', INSTANCE), ('InvokeId', invoke)):
+                require(key not in result or result[key] == expected, 'QUERY_IDENTITY')
             state = result.get('InvocationStatus')
             if state in ('Pending', 'Running', 'Stopping'):
                 sleep(5)
                 continue
+            require(result.get('InstanceId') == INSTANCE and result.get('InvokeId') == invoke,
+                    'QUERY_TERMINAL_IDENTITY')
             require(state == 'Success' and type(result.get('ExitCode')) is int
                     and result['ExitCode'] == 0, 'REMOTE_TERMINAL_NOT_SUCCESS')
             receipt = validated_output(result.get('Output'), intent)
             return {'schema': 1, 'scope': SCOPE, 'status': receipt['state'],
                     'head_sha': intent['head_sha'], 'invoke_id': invoke,
+                    'readonly_source_head': intent['readonly_source_head'],
                     'command_sha256': intent['command_sha256'], 'receipt': receipt,
                     'retry_allowed': False, 'deployment_performed': False}
         except Exception:
@@ -307,9 +320,32 @@ def query_only(cloud, intent, record, clock=time.monotonic, sleep=time.sleep):
     raise Hold('QUERY_PENDING_PRESERVE_NO_REPLAY')
 
 
+def verify_source_checkout(env, git_run=subprocess.run):
+    """No network: verify the pinned checkout used to execute these modules."""
+    source = env.get('READONLY_SOURCE_HEAD', '')
+    require(type(source) is str and SHA40.fullmatch(source), 'SOURCE_HEAD_REQUIRED')
+    workspace = Path(env.get('GITHUB_WORKSPACE', '')).resolve()
+    expected = workspace / 'evidence/pr122-static-cloud-readonly/fixed_runner.py'
+    require(Path(__file__).resolve() == expected and Path.cwd().resolve() == workspace,
+            'SOURCE_CHECKOUT_PATH')
+    try:
+        result = git_run(['git', 'rev-parse', 'HEAD'], cwd=workspace, capture_output=True,
+                         timeout=10, check=False)
+        require(result.returncode == 0 and result.stdout.decode().strip() == source,
+                'SOURCE_CHECKOUT_HEAD')
+        clean = git_run(['git', 'diff', '--exit-code', 'HEAD', '--'], cwd=workspace,
+                        capture_output=True, timeout=10, check=False)
+        require(clean.returncode == 0, 'SOURCE_CHECKOUT_DIRTY')
+    except Hold:
+        raise
+    except Exception:
+        raise Hold('SOURCE_CHECKOUT_UNVERIFIED') from None
+
+
 def workflow_main(mode, env=None):
     env = dict(os.environ if env is None else env)
     require(mode in ('prepare-dispatch', 'dispatch-once', 'query-current', 'query-previous'), 'CLI_MODE')
+    verify_source_checkout(env)
     raw = Path(env['GITHUB_EVENT_PATH']).read_bytes()
     require(len(raw) <= 1024 * 1024, 'EVENT_SIZE')
     event = strict_json(raw)

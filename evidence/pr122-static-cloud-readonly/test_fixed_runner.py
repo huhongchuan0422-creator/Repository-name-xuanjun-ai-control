@@ -19,6 +19,7 @@ import github_evidence as ge
 import fixed_runner as fr
 
 HEAD = 'a' * 40
+SOURCE = 'c' * 40
 NONCE = 'b' * 64
 
 
@@ -37,16 +38,19 @@ def job(run_id=1, state='skipped'):
 
 
 def fixture(mode='dispatch'):
-    pr = {'number': 122, 'state': 'open',
+    # Actual GET /pulls/122 shape recorded by the parent: draft PR, historical
+    # storefront base, and the real next25 head, not the separate website branch.
+    pr = {'number': 122, 'state': 'open', 'draft': True,
           'head': {'sha': HEAD, 'ref': ge.BRANCH, 'repo': {'id': ge.REPOSITORY_ID}},
-          'base': {'repo': {'id': ge.REPOSITORY_ID}}}
+          'base': {'ref': 'feature/stage5-merchant-platform-storefront-ui-20261014',
+                   'repo': {'id': ge.REPOSITORY_ID}}}
     prefix = 'pr122-staging-readonly-' if mode == 'dispatch' else 'pr122-staging-readonly-query-'
     event = {'action': 'labeled', 'number': 122, 'pull_request': pr,
              'repository': {'id': ge.REPOSITORY_ID, 'full_name': ge.REPOSITORY},
              'sender': {'id': ge.OWNER_ID}, 'label': {'name': prefix + HEAD}}
     env = {'GITHUB_EVENT_NAME': 'pull_request', 'GITHUB_REPOSITORY': ge.REPOSITORY,
            'GITHUB_REPOSITORY_ID': str(ge.REPOSITORY_ID), 'GITHUB_ACTOR_ID': str(ge.OWNER_ID),
-           'GITHUB_RUN_ATTEMPT': '1', 'GITHUB_RUN_ID': '2'}
+           'GITHUB_RUN_ATTEMPT': '1', 'GITHUB_RUN_ID': '2', 'READONLY_SOURCE_HEAD': SOURCE}
     return event, env
 
 
@@ -58,10 +62,19 @@ class FakeGitHub:
         self.job_rows = {1: [job()]}
         self.artifact = None
         self.reads = []
+        self.source_head = SOURCE
+        self.workflow_raw = ge.TEMPLATE_PATH.read_bytes().replace(ge.SOURCE_PLACEHOLDER.encode(), SOURCE.encode())
 
     def get(self, path):
-        assert path == '/pulls/122'
-        return copy.deepcopy(self.event['pull_request'])
+        if path == '/pulls/122':
+            return copy.deepcopy(self.event['pull_request'])
+        if path == '/git/ref/heads/' + ge.SOURCE_BRANCH:
+            return {'ref': 'refs/heads/' + ge.SOURCE_BRANCH,
+                    'object': {'type': 'commit', 'sha': self.source_head}}
+        if path == '/contents/' + ge.WORKFLOW_PATH + '?ref=' + HEAD:
+            return {'type': 'file', 'path': ge.WORKFLOW_PATH, 'encoding': 'base64',
+                    'content': base64.b64encode(self.workflow_raw).decode()}
+        raise AssertionError(path)
 
     def run(self, run_id):
         assert run_id == 2
@@ -91,6 +104,52 @@ class OfflineCase(unittest.TestCase):
 
 
 class AdmissionTests(OfflineCase):
+    def test_actual_draft_pr122_api_shape_admitted(self):
+        api = FakeGitHub()
+        self.assertEqual(ge.BRANCH, 'feature/stage5-next25-integration-20261015')
+        self.assertTrue(api.event['pull_request']['draft'])
+        self.assertEqual(api.get('/pulls/122')['base']['ref'],
+                         'feature/stage5-merchant-platform-storefront-ui-20261014')
+        self.assertEqual(ge.live_admission(api, api.event, api.env, 'dispatch')['head_sha'], HEAD)
+
+    def test_old_website_workbranch_rejected_in_event_and_api(self):
+        old = 'feature/work-pr122-site-hub-integration-20261016'
+        event, env = fixture()
+        event['pull_request']['head']['ref'] = old
+        with self.assertRaisesRegex(ge.Hold, 'EVENT_NOT_EXACT'):
+            ge.validate_event(event, env, 'dispatch')
+        api = FakeGitHub(); event = copy.deepcopy(api.event)
+        api.event['pull_request']['head']['ref'] = old
+        with self.assertRaisesRegex(ge.Hold, 'CURRENT_PR_HEAD_CHANGED'):
+            ge.live_admission(api, event, api.env, 'dispatch')
+
+    def test_dual_heads_bound_independently(self):
+        api = FakeGitHub()
+        result = ge.live_admission(api, api.event, api.env, 'dispatch')
+        self.assertEqual(result['head_sha'], HEAD)
+        self.assertEqual(result['readonly_source_head'], SOURCE)
+        self.assertNotEqual(HEAD, SOURCE)
+
+    def test_source_branch_move_rejected(self):
+        api = FakeGitHub(); api.source_head = 'd' * 40
+        with self.assertRaisesRegex(ge.Hold, 'SOURCE_BRANCH_MOVED'):
+            ge.live_admission(api, api.event, api.env, 'dispatch')
+
+    def test_event_workflow_must_equal_exact_substituted_template(self):
+        for changed in ('foreign', 'free_input', 'wrong_sha'):
+            api = FakeGitHub()
+            if changed == 'foreign': api.workflow_raw += b'\n# unreviewed change\n'
+            elif changed == 'free_input': api.workflow_raw = api.workflow_raw.replace(SOURCE.encode(), b'${{ inputs.source }}')
+            else: api.workflow_raw = api.workflow_raw.replace(SOURCE.encode(), b'd' * 40)
+            with self.assertRaisesRegex(ge.Hold, 'EVENT_WORKFLOW_SOURCE_BINDING'):
+                ge.live_admission(api, api.event, api.env, 'dispatch')
+
+    def test_missing_or_placeholder_source_rejected(self):
+        for source in ('', ge.SOURCE_PLACEHOLDER, SOURCE[:12]):
+            api = FakeGitHub(); api.env['READONLY_SOURCE_HEAD'] = source
+            with self.assertRaisesRegex(ge.Hold, 'SOURCE_HEAD_REQUIRED'):
+                ge.live_admission(api, api.event, api.env, 'dispatch')
+
     def test_skipped_with_real_nonnull_started_at_allows_first_dispatch(self):
         api = FakeGitHub()
         result = ge.live_admission(api, api.event, api.env, 'dispatch')
@@ -275,17 +334,19 @@ class RunnerTests(OfflineCase):
     def record(self):
         return {'schema': 1, 'scope': fr.SCOPE, 'intent_sha256': fr.digest(ge.encoded(self.intent)),
                 'head_sha': HEAD, 'run_id': 2, 'instance_id': fr.INSTANCE,
+                'readonly_source_head': SOURCE,
                 'command_sha256': self.intent['command_sha256'],
                 'status': 'DISPATCHED_QUERY_ONLY', 'invoke_id': 't-sh_mock-1'}
 
     def output(self):
         return {'schema': 1, 'scope': fr.SCOPE, 'head_sha': HEAD, 'nonce': NONCE,
+                'readonly_source_head': SOURCE,
                 'helper_sha256': fr.HELPER_SHA256, 'hostname': fr.HOST, 'uid': 0,
                 'receipt': self.receipt()}
 
     def test_frozen_exact_helper_command_budget_and_compile_only(self):
         self.assertEqual(fr.digest(fr.HELPER_BYTES), fr.HELPER_SHA256)
-        shell = fr.fixed_command(HEAD, NONCE)
+        shell = fr.fixed_command(HEAD, NONCE, SOURCE)
         self.assertLessEqual(len(base64.b64encode(shell.encode())), 16384)
         args = shlex.split(shell.split('\n', 2)[2])
         compile(args[-1], 'fixed_wrapper.py', 'exec')  # Never execute host reads.
@@ -297,7 +358,7 @@ class RunnerTests(OfflineCase):
     def test_size_guard_rejects_oversized_helper(self):
         source = os.urandom(50000)
         with mock.patch.object(fr, 'HELPER_BYTES', source), mock.patch.object(fr, 'HELPER_SHA256', fr.digest(source)), self.assertRaisesRegex(ge.Hold, 'WIRE_TOO_LARGE'):
-            fr.fixed_command(HEAD, NONCE)
+            fr.fixed_command(HEAD, NONCE, SOURCE)
 
     def test_dispatch_requires_readback_before_cloud(self):
         fr.local_write('intent.json', self.intent)
@@ -349,7 +410,8 @@ class RunnerTests(OfflineCase):
 
     def test_wrong_nonce_host_uid_scope_and_unknown_field_rejected(self):
         for key, value in [('nonce', '0' * 64), ('hostname', 'other'), ('uid', True),
-                           ('scope', 'OTHER'), ('head_sha', '0' * 40), ('helper_sha256', '0' * 64), ('secret', 'x')]:
+                           ('scope', 'OTHER'), ('head_sha', '0' * 40), ('readonly_source_head', HEAD),
+                           ('helper_sha256', '0' * 64), ('secret', 'x')]:
             out = self.output(); out[key] = value
             with self.assertRaises(ge.Hold): fr.validated_output(json.dumps(out), self.intent)
 
@@ -377,7 +439,8 @@ class RunnerTests(OfflineCase):
 
     def test_query_command_instance_and_invoke_provenance(self):
         for key, value in [('command_sha256', '0' * 64), ('instance_id', 'other'),
-                           ('intent_sha256', '0' * 64), ('invoke_id', None), ('run_id', 1)]:
+                           ('intent_sha256', '0' * 64), ('readonly_source_head', HEAD),
+                           ('invoke_id', None), ('run_id', 1)]:
             record = self.record(); record[key] = value
             cloud = mock.Mock()
             with self.assertRaises(ge.Hold): fr.query_only(cloud, self.intent, record)
@@ -389,6 +452,23 @@ class RunnerTests(OfflineCase):
         with self.assertRaisesRegex(ge.Hold, 'PENDING_PRESERVE'):
             fr.query_only(cloud, self.intent, self.record(), clock=mock.Mock(side_effect=[0, 1, 181]), sleep=lambda _: None)
         cloud.query.assert_called_once(); cloud.dispatch.assert_not_called()
+
+    def test_original_pending_shape_may_omit_ids_but_terminal_must_bind(self):
+        cloud = mock.Mock()
+        terminal = {'InstanceId': fr.INSTANCE, 'InvokeId': 't-sh_mock-1',
+                    'InvocationStatus': 'Success', 'ExitCode': 0, 'Output': json.dumps(self.output())}
+        cloud.query.side_effect = [{'InvocationResult': {'InvocationStatus': 'Pending'}},
+                                  {'InvocationResult': terminal}]
+        result = fr.query_only(cloud, self.intent, self.record(), sleep=lambda _: None)
+        self.assertEqual(result['status'], 'OBSERVATION_COMPLETE')
+        self.assertEqual(cloud.query.call_count, 2)
+        cloud.dispatch.assert_not_called()
+        for wrong in ({'InvocationStatus': 'Running', 'InstanceId': 'wrong'},
+                      {'InvocationStatus': 'Success', 'ExitCode': 0, 'Output': json.dumps(self.output())}):
+            cloud = mock.Mock(); cloud.query.return_value = {'InvocationResult': wrong}
+            with self.assertRaises(ge.Hold):
+                fr.query_only(cloud, self.intent, self.record(), sleep=lambda _: None)
+            cloud.query.assert_called_once(); cloud.dispatch.assert_not_called()
 
     def test_remote_hold_is_never_pass(self):
         output = self.output(); receipt = output['receipt']; receipt['state'] = 'HOLD'
@@ -429,10 +509,35 @@ class RunnerTests(OfflineCase):
         self.assertIn('cancel-in-progress: false', text)
         self.assertIn("github.actor_id == '332398908'", text)
         self.assertIn("github.repository_id == '1413132159'", text)
+        self.assertIn('branches: [feature/stage5-next25-integration-20261015]', text)
+        self.assertEqual(text.count("github.event.pull_request.head.ref == 'feature/stage5-next25-integration-20261015'"), 2)
+        self.assertNotIn('feature/work-pr122-site-hub-integration-20261016', text)
         self.assertNotIn('workflow_dispatch:', text)
         self.assertNotIn('self-hosted', text)
         self.assertLess(text.index('Persist intent before STS'), text.index('dispatch exactly once'))
         self.assertIn('overwrite: false', text)
+        self.assertEqual(text.count(ge.SOURCE_PLACEHOLDER), 4)
+        substituted = text.replace(ge.SOURCE_PLACEHOLDER, SOURCE)
+        self.assertEqual(substituted.count("ref: '" + SOURCE + "'"), 3)
+        source_workflow = (Path(__file__).parent / 'pr122-staging-readonly-source-tests.yml').read_text()
+        self.assertIn('branches: [feature/work-pr122-site-hub-integration-20261016]', source_workflow)
+        self.assertNotIn('secrets.', source_workflow)
+        self.assertNotIn('RunCommand', source_workflow)
+        self.assertNotIn('pull_request:', source_workflow)
+
+    def test_checkout_provenance_checks_pinned_git_head_and_clean_tree(self):
+        workspace = Path(self.temp.name)
+        env = {'GITHUB_WORKSPACE': str(workspace), 'READONLY_SOURCE_HEAD': SOURCE}
+        filename = str(workspace / 'evidence/pr122-static-cloud-readonly/fixed_runner.py')
+        good = mock.Mock(returncode=0, stdout=(SOURCE + '\n').encode())
+        with mock.patch.object(fr, '__file__', filename), mock.patch.object(Path, 'cwd', return_value=workspace):
+            runner = mock.Mock(side_effect=[good, mock.Mock(returncode=0)])
+            fr.verify_source_checkout(env, runner)
+            self.assertEqual(runner.call_args_list[0].args[0], ['git', 'rev-parse', 'HEAD'])
+            for results in ([mock.Mock(returncode=0, stdout=(HEAD + '\n').encode())],
+                            [good, mock.Mock(returncode=1)]):
+                with self.assertRaises(ge.Hold):
+                    fr.verify_source_checkout(env, mock.Mock(side_effect=results))
 
 
 if __name__ == '__main__':

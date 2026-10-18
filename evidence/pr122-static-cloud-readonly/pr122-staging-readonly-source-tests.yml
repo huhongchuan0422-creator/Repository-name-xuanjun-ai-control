@@ -1,0 +1,17 @@
+name: PR122 read-only source mock tests
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+permissions:
+  contents: read
+jobs:
+  hosted_tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Pure mock tests only; no cloud secrets or cloud steps
+        run: python3 -m unittest discover -s evidence/pr122-static-cloud-readonly -p 'test_*.py' -v

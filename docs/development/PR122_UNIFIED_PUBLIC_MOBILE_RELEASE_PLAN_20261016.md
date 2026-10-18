@@ -124,3 +124,11 @@ A new process, including a recovery process, must pass the full 54-request admis
 5. 官网正式安装仍须原产品入口执行准确实时批准、固定版本/输入、五小时、最多五次持久账本、锁/Fence 与恢复检查。云控制能力不替代这些门禁；当前不得宣称新官网云通道已部署或现场已验证。
 
 本节记录原云控制能力及当前缺口，不触发云任务，不签发执行许可，不公开私有 HostPins、现场原文或凭据。
+
+### PR122 事件分支与网站源码分支必须分别绑定
+
+原 PR122 当前真实事件分支是 `feature/stage5-next25-integration-20261015`，其基线 head 为 `3beb5db669ec0004a4d3ef278f5519e0100e4403`；网站已获准开发分支是 `feature/work-pr122-site-hub-integration-20261016`。两者不是同一 ref。不得把网站工作提交称为原 PR122 的真实 head，或假设在工作分支新增 pull_request 工作流即可由 PR122 标签触发。
+
+本次只读取证接线采用两个明确绑定：真实 PR 分支仅安装固定工作流，PR_EVENT_HEAD 用于原 PR122 事件、Owner准确标签及当前 PR 的核验；READONLY_SOURCE_HEAD 是工作流正文固定的完整40位已检源码提交，用于 checkout 只读适配器与 helper。持久意图和后续查询同时绑定两者，不能混用 GitHub run.head_sha 与 checkout 源码 SHA。普通分支 push 仍仅运行本地模拟/Hosted 测试；实际云动作须真实 PR 上的准确事件和全部固定门禁成立。
+
+原官网产品 `73454b6f973e073067de7afb7580c1ac709ede2f` 的技术审核与制品证据按其准确版本继承，不能由这次只读取证接线改称新产品版本或安装许可。不合并整网站工作分支、不修改原PR的base/head关系，不创建第二个产品任务。首次109a只读接线的 Hosted 39147246174 失败记录保留：runner 36项通过；helper fixture把 Hosted 非root UID错误映射到根祖先，已仅修测试投影，生产 helper 的保护不放宽。该工作提交不具备真实PR事件触发条件，禁止以其标签试跑。
