@@ -36,9 +36,16 @@ REPO=OWNER+'/Repository-name-xuanjun-ai-control'
 
 def need(ok,msg):
     if not ok:raise Denied('HOLD:'+msg)
+class CommandFailure(Denied):
+    def __init__(self,args,returncode=None,stderr=b'',result_unknown=False):
+        super().__init__('HOLD:COMMAND:'+args[0])
+        self.returncode=returncode;self.stderr_sha256=digest(stderr);self.result_unknown=result_unknown
+
 def run(args):
-    p=subprocess.run(args,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=45)
-    need(p.returncode==0,'COMMAND:'+args[0]);return p.stdout
+    try:p=subprocess.run(args,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=45)
+    except subprocess.TimeoutExpired:raise CommandFailure(args,result_unknown=True) from None
+    if p.returncode!=0:raise CommandFailure(args,p.returncode,p.stderr)
+    return p.stdout
 
 def source(source):
     source=private_path(source);raw=(source/'CUSTOMER_MANIFEST.json').read_bytes();manifest=json.loads(raw);files={}
@@ -178,7 +185,13 @@ def apply(folder,comment):
     lock=private_path(LOCK);fd=os.open(lock,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'w') as stream:
         fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        from scripts import pr122_customer_resume as resume
+        if os.path.lexists(STATE/TXN):
+            # Only a newly admitted V2 transaction can enter this branch.
+            return resume.apply_locked(sys.modules[__name__],folder,comment,lock_fd=stream.fileno())
         observed=plan(folder);approval=gate(comment,observed)
+        if approval.get('attempt_policy')==resume.POLICY:
+            return resume.apply_locked(sys.modules[__name__],folder,comment,observed,approval,lock_fd=stream.fileno())
         attempts=Attempts(STATE,TXN,approval,comment,observed,atomic_json,CONFIG)
         try:
             manifest,raw,files=source(folder)
@@ -270,7 +283,10 @@ def _rollback_locked():
 def main():
     os.umask(0o022)
     ap=argparse.ArgumentParser();ap.add_argument('action',choices=('plan','apply','rollback'));ap.add_argument('--source');ap.add_argument('--approval',type=int);a=ap.parse_args()
-    result=plan(a.source) if a.action=='plan' else apply(a.source,a.approval) if a.action=='apply' else rollback()
+    from scripts.pr122_customer_resume import Stopped
+    try:result=plan(a.source) if a.action=='plan' else apply(a.source,a.approval) if a.action=='apply' else rollback()
+    except Stopped as error:
+        print(json.dumps(error.report,ensure_ascii=False));raise SystemExit(2) from None
     print(json.dumps(result,ensure_ascii=False))
 if __name__=='__main__':main()
 

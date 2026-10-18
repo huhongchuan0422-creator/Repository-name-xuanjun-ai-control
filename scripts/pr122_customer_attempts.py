@@ -1,6 +1,6 @@
 """Original customer install transaction's durable admission ledger.
 No command runner or retry loop. Caller must hold the original transaction lock.
-Only proven pre-activation failures can be considered on a later manual call.
+V1 admits only proven pre-activation failures. V2 requires bound checkpoint evidence.
 """
 import json
 import os
@@ -48,12 +48,15 @@ def read_private(path):
 def validate_approval(approval):
     count = approval.get('max_executions')
     need(type(count) is int and 1 <= count <= 5, 'ATTEMPT_LIMIT')
-    need(count == 1 or approval.get('attempt_policy') == POLICY, 'EXPLICIT_NEW_ATTEMPT_POLICY')
+    need(count == 1 or approval.get('attempt_policy') in (POLICY,'CONTROLLED_INSTALL_RESUME_V2'), 'EXPLICIT_NEW_ATTEMPT_POLICY')
+    if approval.get('attempt_policy') == 'CONTROLLED_INSTALL_RESUME_V2':
+        from scripts.pr122_customer_resume import validate_policy
+        validate_policy(approval)
     return count
 
 
 class Attempts:
-    def __init__(self, state, transaction, approval, comment, plan, save, config):
+    def __init__(self, state, transaction, approval, comment, plan, save, config, resume_receipt=None):
         self.state, self.transaction = Path(state), transaction
         self.path = self.state / (transaction + '.attempts.json')
         self.approval, self.save, self.config = approval, save, Path(config)
@@ -67,7 +70,13 @@ class Attempts:
              and approval['issued_unix'] <= time.time() < approval['expires_unix'], 'ATTEMPT_EXPIRY')
         # Any old transaction, including successful/rolled-back or unknown state,
         # remains sealed. No legacy permit is revived by the new ledger.
-        need(not os.path.lexists(self.state / transaction), 'EXISTING_TRANSACTION_SEALED')
+        v2=approval.get('attempt_policy')=='CONTROLLED_INSTALL_RESUME_V2'
+        if os.path.lexists(self.state / transaction):
+            need(v2 and type(resume_receipt) is dict and resume_receipt.get('schema')==2
+                 and resume_receipt.get('policy')==approval['attempt_policy']
+                 and resume_receipt.get('state')=='RECOVERABLE_FAILURE'
+                 and resume_receipt.get('approval')==approval and resume_receipt.get('plan')==plan,
+                 'EXISTING_TRANSACTION_SEALED')
         if self.state.exists():
             protected_directory(self.state)
         else:
@@ -89,25 +98,33 @@ class Attempts:
                 parent = digest(canonical(row))
             need(len(rows) < self.limit, 'ATTEMPT_EXHAUSTED')
             last = rows[-1]
-            need(last.get('state') == 'SAFE_PREACTIVATION_FAILURE'
-                 and last.get('error') in SAFE_ERRORS, 'ATTEMPT_UNRESOLVED_OR_FINISHED')
-            evidence = read_private(self.config / 'INSTALL_RETRY_EVIDENCE.json')
-            expected = {'schema', 'previous_attempt_sha256', 'binding_sha256',
-                        'diagnosis', 'recovery', 'no_install_effects', 'checked_unix'}
-            need(set(evidence) == expected and type(evidence['schema']) is int and evidence['schema'] == 1
-                 and evidence['previous_attempt_sha256'] == parent
-                 and evidence['binding_sha256'] == digest(canonical(self.binding))
-                 and evidence['no_install_effects'] is True, 'RETRY_EVIDENCE_BINDING')
-            need(type(evidence['checked_unix']) is int and last['ended_unix'] <= evidence['checked_unix']
-                 <= time.time() < approval['expires_unix'], 'RETRY_EVIDENCE_TIME')
-            for key in ('diagnosis', 'recovery'):
-                need(type(evidence[key]) is str and 1 <= len(evidence[key]) <= 2000,
-                     'RETRY_DIAGNOSIS_AND_RECOVERY_REQUIRED')
-            diagnosis_sha = digest(evidence['diagnosis'].encode())
-            need(all(row.get('diagnosis_sha256') != diagnosis_sha for row in rows),
-                 'REPEATED_ROOT_CAUSE_HOLD')
-            self.diagnosis_sha = diagnosis_sha
-            self.recovery_sha = digest(canonical(evidence))
+            if v2:
+                need(type(resume_receipt) is dict and last.get('state')=='RECOVERABLE_INSTALL_FAILURE'
+                     and resume_receipt.get('attempt_number')==len(rows)
+                     and resume_receipt.get('failures',[])
+                     and last.get('details')==resume_receipt['failures'][-1], 'V2_RECOVERY_RECEIPT_BINDING')
+                need(last['details'].get('repair_action') in approval['recovery_actions'], 'V2_REPAIR_NOT_PERMITTED')
+                self.recovery_sha=digest(canonical(last['details']));self.diagnosis_sha=digest(canonical(last['details']['evidence']))
+            else:
+                need(last.get('state') == 'SAFE_PREACTIVATION_FAILURE'
+                     and last.get('error') in SAFE_ERRORS, 'ATTEMPT_UNRESOLVED_OR_FINISHED')
+                evidence = read_private(self.config / 'INSTALL_RETRY_EVIDENCE.json')
+                expected = {'schema', 'previous_attempt_sha256', 'binding_sha256',
+                            'diagnosis', 'recovery', 'no_install_effects', 'checked_unix'}
+                need(set(evidence) == expected and type(evidence['schema']) is int and evidence['schema'] == 1
+                     and evidence['previous_attempt_sha256'] == parent
+                     and evidence['binding_sha256'] == digest(canonical(self.binding))
+                     and evidence['no_install_effects'] is True, 'RETRY_EVIDENCE_BINDING')
+                need(type(evidence['checked_unix']) is int and last['ended_unix'] <= evidence['checked_unix']
+                     <= time.time() < approval['expires_unix'], 'RETRY_EVIDENCE_TIME')
+                for key in ('diagnosis', 'recovery'):
+                    need(type(evidence[key]) is str and 1 <= len(evidence[key]) <= 2000,
+                         'RETRY_DIAGNOSIS_AND_RECOVERY_REQUIRED')
+                diagnosis_sha = digest(evidence['diagnosis'].encode())
+                need(all(row.get('diagnosis_sha256') != diagnosis_sha for row in rows),
+                     'REPEATED_ROOT_CAUSE_HOLD')
+                self.diagnosis_sha = diagnosis_sha
+                self.recovery_sha = digest(canonical(evidence))
         else:
             self.data = {'schema': 1, 'binding': self.binding, 'attempts': []}
             self.recovery_sha = None
@@ -118,6 +135,9 @@ class Attempts:
                     'recovery_evidence_sha256': self.recovery_sha,
                     'diagnosis_sha256': self.diagnosis_sha,
                     'started_unix': int(time.time()), 'state': 'STARTED_UNKNOWN'}
+        if v2:
+            self.row['lease']={'fence':number,'expires_unix':approval['expires_unix'],
+                               'binding_sha256':digest(canonical(self.binding))}
         self.data['attempts'].append(self.row)
         # Persist consumption before source recheck, backup, or installation.
         if number == 1:
@@ -128,10 +148,29 @@ class Attempts:
         else:
             self.save(self.path, self.data)
 
-    def finish(self, state, error=None):
+    def assert_fence(self):
+        current=read_private(self.path)
+        need(current==self.data and current['attempts'][-1]==self.row
+             and self.row['state']=='STARTED_UNKNOWN', 'ATTEMPT_FENCE_LOST')
+    def assert_active(self):
+        self.assert_fence()
+        need(self.approval['issued_unix'] <= time.time() < self.approval['expires_unix'], 'ATTEMPT_LEASE_EXPIRED')
+        if self.approval.get('attempt_policy')=='CONTROLLED_INSTALL_RESUME_V2':
+            need(self.row.get('lease')=={'fence':self.row['number'],
+                 'expires_unix':self.approval['expires_unix'],
+                 'binding_sha256':digest(canonical(self.binding))}, 'ATTEMPT_LEASE_BINDING')
+
+    def finish(self, state, error=None, details=None):
+        self.assert_fence()
         need(self.row['state'] == 'STARTED_UNKNOWN', 'ATTEMPT_ALREADY_FINISHED')
         need(state in {'SAFE_PREACTIVATION_FAILURE', 'HOLD_UNKNOWN_OR_PARTIAL',
-                       'HTTPS_SMOKE_PASS_AWAIT_14_REAL_ACCEPTANCE'}, 'ATTEMPT_STATE')
+                       'HTTPS_SMOKE_PASS_AWAIT_14_REAL_ACCEPTANCE','RECOVERABLE_INSTALL_FAILURE'}, 'ATTEMPT_STATE')
+        if state=='RECOVERABLE_INSTALL_FAILURE':
+            need(self.approval.get('attempt_policy')=='CONTROLLED_INSTALL_RESUME_V2' and type(details) is dict
+                 and details.get('repair_action') in self.approval['recovery_actions'], 'V2_FAILURE_SCOPE')
+        if details is not None:
+            need(type(details) is dict and len(canonical(details))<=8192,'FAILURE_EVIDENCE_BOUND')
+            self.row['details']=details
         if state == 'SAFE_PREACTIVATION_FAILURE':
             need(error in SAFE_ERRORS, 'UNCLASSIFIED_FAILURE')
         self.row.update(state=state, ended_unix=int(time.time()))

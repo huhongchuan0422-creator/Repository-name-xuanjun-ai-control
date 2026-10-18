@@ -76,6 +76,19 @@ jobs:
           assert result.testsRun==150 and result.wasSuccessful() and not result.skipped and not result.expectedFailures and not result.unexpectedSuccesses
           PYTEST
           node tests/pr122_customer_auth_ui.cjs 2>&1 | tee /tmp/pr122-customer/CUSTOMER_AUTH_PRIVACY_DOM_TESTS.log
+      - name: V2 checkpoint recovery isolated regression
+        run: |
+          set -euo pipefail
+          python -B -m unittest tests.test_pr122_customer_resume tests.test_pr122_customer_resume_review -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_RESUME_TESTS.log
+          python - <<'PYCOUNT'
+          import json,os,re
+          from pathlib import Path
+          text=Path('/tmp/pr122-customer/CUSTOMER_RESUME_TESTS.log').read_text()
+          counts=re.findall(r'^Ran (\d+) tests? in ',text,re.M)
+          assert counts and int(counts[-1])==36 and re.search(r'^OK$',text,re.M)
+          assert not re.search(r'\b(skipped|expected failures|unexpected successes)\b',text,re.I)
+          Path('/tmp/pr122-customer/CUSTOMER_RESUME_COUNTS.json').write_text(json.dumps({'source_commit':os.environ['GITHUB_SHA'],'unique_cases':int(counts[-1]),'passed':int(counts[-1]),'scope':'SYNTHETIC_NONROOT_FIXTURES_NOT_SERVER_EXECUTION','production':'NOT_RUN'},sort_keys=True)+'\n')
+          PYCOUNT
       - name: Controlled attempts isolated non-root regression
         shell: bash
         run: |
@@ -179,7 +192,7 @@ jobs:
           manifest=json.loads(manifest_raw)
           assert manifest['source_commit']==os.environ['GITHUB_SHA'] and len(files)==receipt['bound_files']==len(manifest['files'])
           assert set(files)=={x['path'] for x in manifest['files']}
-          assert {'scripts/pr122_customer_attempts.py','tests/test_pr122_customer_attempts.py'} <= set(files)
+          assert {'scripts/pr122_customer_attempts.py','tests/test_pr122_customer_attempts.py','scripts/pr122_customer_resume.py','tests/test_pr122_customer_resume.py','tests/test_pr122_customer_resume_review.py'} <= set(files)
           for item in manifest['files']:
               body=files[item['path']]
               assert len(body)==item['size'] and sha(body)==item['sha256']
