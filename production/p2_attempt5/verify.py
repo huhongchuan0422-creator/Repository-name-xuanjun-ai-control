@@ -33,11 +33,15 @@ def main():
              'tests/p2_production_assembly/test_assembly.py',
              'production/p2_attempt5/native_adapter.py',
              'tests/p2_production_assembly/test_native_adapter.py',
+             'production/p2_attempt5/observer_server.py',
+             'tests/p2_production_assembly/test_observer_server.py',
              '.github/workflows/p2-production-assembly.yml']
     for name in added:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     groups = []
-    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_native_adapter.py', 21),
+    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_observer_server.py', 23),
+             (str(ROOT / 'tests/p2_production_assembly'), 'test_assembly.py', 27),
+             (str(ROOT / 'tests/p2_production_assembly'), 'test_native_adapter.py', 21),
              (str(ROOT / 'tests/p2_production_assembly'), 'test_registry.py', 50)]
     for index, (directory, pattern, count) in enumerate(cases):
         script = ('import sys,unittest;sys.path.insert(0,%r);'
@@ -68,7 +72,9 @@ def main():
                 'inherited_assembly_ci_run': 39122271093,
                 'inherited_assembly_tests_per_python': 83,
                 'registry_review_fix': 'CLOSED_PR58_6250317194',
-                'adapter_scope': 'PUBLIC_KEY_NATIVE_FACTORY_LIVE_SIGNED_OBSERVER_CLIENT',
+                'adapter_scope': 'PUBLIC_KEY_NATIVE_FACTORY_CLIENT_AND_FENCED_OBSERVER_SERVER',
+                'observer_server': 'SOURCE_IMPLEMENTED_NOT_DEPLOYED',
+                'observer_fact_source': 'INHERITED_NATIVE_OBSERVER_UK_NOT_VERIFIED',
                 'native_run_positive': 'NOT_VERIFIED_NO_PERMIT_OR_PRIVATE_INPUTS',
                 'host_effects': 'SYNTHETIC_TEST_ONLY', 'installation': 'NOT_EXECUTED',
                 'permit': 'NOT_ISSUED', 'release': 'HOLD'}

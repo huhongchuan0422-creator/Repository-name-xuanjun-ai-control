@@ -120,16 +120,35 @@ def main():
             adapter.bind_deployment(cfg, binding_raw, manifest['files'][binding_relative],
                                     args.kit_root, _assembly)
         if args.operation == 'run':
-            cycle = native_cycle(lambda: adapter.build_driver(cfg),
-                                 cfg['ledger_directory'], cfg['grant'],
-                                 cfg['socket'], adapter.public_modulus(cfg),
-                                 cfg['issuer'], cfg['review_id'], identity,
-                                 cfg['cycle_policy'])
-            result = cycle.run(cfg['command_sha256'])
-            # Full private report is durably emitted by PermitCycle. No secrets,
-            # raw host receipts or local paths are printed into public logs.
-            print(json.dumps({'status': result['status']}))
-            return 0 if result['status'] == 'SUCCEEDED' else 2
+            session = None
+            try:
+                if (callable(getattr(adapter, 'observer_spec', None)) and
+                        adapter.observer_spec(cfg) is not None):
+                    observer_code = pinned_module(_here + '/observer_server.py',
+                        manifest['files']['production/p2_attempt5/observer_server.py'])
+                    def source_check():
+                        fresh = configuration(args.config, args.config_sha256)
+                        if fresh != cfg or registry.require_binding(
+                                args.registry_root, args.registry_id,
+                                args.registry_record_sha256, args.config,
+                                args.config_sha256) != cfg:
+                            return False
+                        checked, unused = _assembly.release_identity(
+                            args.assembly_manifest, args.assembly_manifest_sha256, cfg['grant'],
+                            os.path.abspath(__file__), args.assembly_sha256, args.manifest_sha256)
+                        return checked == identity
+                    session = adapter.build_observer_session(cfg, observer_code, source_check)
+                cycle = native_cycle(lambda: adapter.build_driver(cfg),
+                                     cfg['ledger_directory'], cfg['grant'],
+                                     cfg['socket'], adapter.public_modulus(cfg),
+                                     cfg['issuer'], cfg['review_id'], identity,
+                                     cfg['cycle_policy'], observer_session=session)
+                result = cycle.run(cfg['command_sha256'])
+                print(json.dumps({'status': result['status']}))
+                return 0 if result['status'] == 'SUCCEEDED' else 2
+            finally:
+                if session is not None:
+                    session.close()
         signer = OpenSSLSigner(cfg['key'], cfg['public_der_sha256'])
         server = None
         try:

@@ -92,7 +92,7 @@ entry.py在Registry核验、完整Kit载入后对提供bind_deployment的适配�
 3. 新Grant绑定的完整部署Manifest（含私有binding摘要）、准确独立目录、唯一AuthorityStore历史及Signer/Writer/Fence/未决Run/Job/InvokeId证明；UNKNOWN不得由此客户端升级PASS。
 无这些现场证据，完整NativeRecovery正向run及真实生产接线仍NOT_VERIFIED。英国修改/安装/激活/回滚NOT_EXECUTED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
 
-## README恢复及Observer复用核查（回应PR58#6250500768）
+## 5fe83f9a历史README恢复及Observer复用核查（回应PR58#6250500768）
 
 已从726f6802的准确README恢复全部仍有效的装配、运行、登记、权限、持久提交、socket遗留、五次额度和失败恢复说明，保留911176aa新增适配器章节；同时更正已实现接口和既有审核状态。文档中的历史测试数量均属于对应准确版本，不替代当前71项或真实生产验收。
 
@@ -103,3 +103,25 @@ entry.py在Registry核验、完整Kit载入后对提供bind_deployment的适配�
 英国现场是否另有可复用的Observer实现，仍NOT_VERIFIED；仓库未交付独立服务端，不等于证明英国没有服务。当前尚无可用的受信现场配置/原始私有输入，无法确定真实接口和读回权限边界。需窗口4在既有六类证据中一次性返回：实际Observer源码/协议/固定受保护端点/执行身份与公钥信任来源；若没有，提供可信不存在/未部署结论和原生观察上下文的合法接入方式；同时复用原plan/seed/probe/备份checkpoint与当前Writer/Fence、未决Run/Job/InvokeId。不重跑D1，不索取私钥，不进行扫描或初始化。收到这些事实后才能复用/适配实际服务端或补确实缺失的实现，不能预置一个模拟Provider声称闭环。
 
 本次README恢复不改变可执行代码，不声称已经新增Observer服务端、完成正式run正向或具备安装许可。公开制品和Hosted合成主机测试不能冒充英国现场证据。UK_CHANGES=NOT_EXECUTED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
+
+
+## Observer生产服务端增量（接续PR58#6250596157）
+
+observer_server.py现提供ObserverSession/NativeReader及真实root Unix socket/RSA回执服务，不再只有客户端。它运行于原run协调器同一进程，不创建另一个安装Writer；正式serve仍是原唯一Issuer服务。原扫描器、16阶段及核心25文件不修改。
+
+binding schema=1完全继承原外部Observer模式；新schema=2显式增加observer_service，必须纳入准确新Grant绑定Manifest。其严格字段为socket、key、public_der_sha256、issuer、attestor_public_key(path/sha256)、context_directory、configuration_payloads(action_id到path/sha256)。Observer socket/issuer与客户端一致，Observer公钥DER必须与客户端固定PEM一致且不同于Issuer私钥对应DER；新模块observer_server.py必须在完整Manifest且准确SHA载入。schema=2不是旧许可自动升级。
+
+可信运行上下文不是程序自发放的许可。原受信执行者在获准的上下文根root/0700内，以O_EXCL/root0600保存独立签名的writer-<pid>-<start_ticks>.json；路径由实际PID及/proc/self/stat启动ticks有限构造，不扫描目录。签名来源公钥由新Manifest固定，body准确字段：schema、hostname、principal、grant_sha256、source_identity(Grant的source_commit/source_tree/kit_sha256/manifest_sha256)、writer_pid、writer_start_ticks、lease_epoch、fence、run_id、job_id、invoke_id、issued_utc、expires_utc、backup(path/sha256)、checkpoint(path/sha256)。仅body/signature两字段。上下文数据在许可后由受信执行者签名、不是Manifest自包含摘要，避免Grant/Manifest/运行态自哈希循环；每次重新读回签名、真实文件及有效期。生产代码不生成上下文、密钥、Run/Job/InvokeId、Grant或共享库。签名可信来源尚未在英国证明时HOLD。
+
+每次请求从既有唯一AuthorityStore以mode=ro/query_only核准确Grant正文/摘要、当前writer、固定epoch/fence、未过期Lease、原Attempt及ordinal、source-stop状态；不调用lease/register/初始化，不重置额度。数据库身份固定，替换、失效、冲突和UNKNOWN拒绝。每个活跃host操作绑定实际ReceiptProvider发给Issuer的原Grant/Attempt/operation/payload；独立Observer请求须新nonce并与该在途操作准确一致，非在途或并发查询HOLD。run在等待Issuer回执时才允许Observer读回；transport异常也等待已接纳查询终止，不在查询仍运行时释放绑定或继续Writer。
+
+读回复用实际InjectedDriver、FiniteLiveControls、Epoch7HostObserver及ClaimAuthority，拒绝非原生组合。保留原Claim/审核/持锁验证；只读线程每次receipt附加共享账本Fence校验，并调用原始Claim receipt。Writer线程仍走原NativeRecovery执行Fence。只读查询不调用要求*_INTENT的authority.phase，也不重开COMPLETE阶段的执行权限；以原资源/进程校验、完整17检查点和前后读一致性证明当前状态。恢复投影只临时恢复原native_state允许的内存数据，结束复原，不保存journal、不传SKIP。runtime-boot真实受保护回执补充成功命令读回；字段/上下文漂移、部分输出或缺失证明全部HOLD。
+
+服务端覆盖准确初次授权、未写入对账、已完成阶段、终态SUCCESS、原生INTENT与安全checkpoint对账、源码绑定及诊断。无journal时要求真实原preflight；有journal时核内外绑定、顺序和准确SHA并重新观察当前完整检查点。INTENT仅当完整after点及pending observation成立才COMMITTED；没有pending时须完整before点成立才NO_WRITE；after检查失败不会降格猜测NO_WRITE。提交安全对账要求原共享库SIGNED_RECEIPT审计中的准确proof匹配，不接受客户端自报证明。源码变更和不可信状态拒绝。
+已批准配置动作使用原ApprovedConfiguration CAS/备份/检查点和幂等逻辑；动作必须在同Grant cycle_policy且有固定payload引用、准确专属目录/目标与实际checkpoint；闭合Attempt及越权拒绝。当前诊断默认不臆造修复动作，未给出明确允许动作即不执行配置修改。
+
+Observer回复使用独立真实OpenSSLSigner，最多20秒且不超过上下文/Grant有效期；准确请求/nonce与真实上下文Run/Job/InvokeId、备份/检查点及结果摘要绑定。完整私有回执在现有Ledger目录O_EXCL写入并fsync文件及目录后才返回。签名/写入/fsync失败返回HOLD，保留输出，不按完整字节假定已成功发布；重复nonce不覆盖旧证据。已有socket/链接拒绝；正常关闭只删除自己的socket inode，崩溃遗留仍HOLD，不自动清除。服务不消费Attempt，成功及5次耗尽仍由原PermitCycle/AuthorityStore终止，重启不重置。
+
+本次新增服务端测试的事实源明确SYNTHETIC_ONLY：真实文件、签名、socket、共享SQLite与正式serve运行，但测试替身不进入生产模块。生产attach要求原生具体类型，完整真实Driver/资源扫描正向和英国16阶段安装不能由协议fixture代替。schema=2正式run实际验证缺受信上下文时在创建Attempt前拒绝。原schema=1正式run接线和所有已审边界继承；新增服务端不宣称已有英国可信上下文或真实安装PASS。
+
+交窗口4同一集中清单：原plan/seed/probe和内外事务/备份checkpoint、唯一AuthorityStore/Writer/Lease/Fence、真实Run/Job/InvokeId与进程生命周期、受信上下文签发者公钥及签名原件、Observer独立Signer/固定socket、准确schema2私有binding/配置/来源/目录与完整Manifest。若现场已有可信Observer，schema1优先复用；否则仅在完整正式许可中启用本新增schema2服务。禁止将测试签发者/事实源部署英国、创建第二Writer、初始化新共享库或复活旧额度。原已通过部分不重审、不重跑D1或旧Prepare。UK_DEPLOYMENT=NOT_EXECUTED；PRODUCTION_NATIVE_RUN_POSITIVE=NOT_VERIFIED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。

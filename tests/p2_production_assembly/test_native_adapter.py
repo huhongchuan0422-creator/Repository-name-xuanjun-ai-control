@@ -310,7 +310,10 @@ class NativeAdapterTests(unittest.TestCase):
         release = self.directory / 'release'
         code = release / 'production/p2_attempt5'
         code.mkdir(parents=True)
-        for name in ('entry.py','assembly.py','registry.py','native_adapter.py'):
+        names = ['entry.py','assembly.py','registry.py','native_adapter.py']
+        if self.binding.get('schema') == 2:
+            names.append('observer_server.py')
+        for name in names:
             shutil.copyfile(str(PROD / name), str(code / name))
         sidecar = code / 'native_adapter.py.binding.json'
         sidecar.write_bytes(self.adapter.canonical(self.binding))

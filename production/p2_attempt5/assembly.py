@@ -290,7 +290,7 @@ class ProductionIssuer(object):
 
 
 def native_cycle(driver_factory, ledger_directory, grant, socket_path,
-                 modulus, issuer, review_id, source_identity, approved_policy):
+                 modulus, issuer, review_id, source_identity, approved_policy, observer_session=None):
     """Assemble real core objects; NativeRecovery enforces concrete Driver
     and independent PR58 approval. No fixture switch or approval injection.
     Call run(command_sha) on the result only under the exact installation permit.
@@ -308,7 +308,16 @@ def native_cycle(driver_factory, ledger_directory, grant, socket_path,
     require(grant['target_host'] == os.uname().nodename and
             grant['target_host'] != 'TEST_ONLY' and issuer != 'TEST_ONLY',
             'LIVE_HOST_BINDING')
-    provider = ReceiptProvider(UnixTransport(socket_path), modulus, 65537, issuer)
+    transport = UnixTransport(socket_path)
+    if observer_session is not None:
+        class ObservedTransport(object):
+            def __call__(self, request):
+                with observer_session.request(request):
+                    return transport(request)
+        channel = ObservedTransport()
+    else:
+        channel = transport
+    provider = ReceiptProvider(channel, modulus, 65537, issuer)
     def factory():
         return NativeRecovery(driver_factory(), Ledger(ledger_directory, grant),
                               provider, source_identity=source_identity,

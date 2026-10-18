@@ -21,6 +21,7 @@ FIELDS = {'schema', 'hostname', 'principal', 'issuer',
           'legacy_manifest_sha256', 'approved_plan', 'private_seed',
           'legacy_review_id', 'legacy_approval_body_sha256'}
 _context = None
+_observer_session = None
 
 
 def need(value, code):
@@ -136,8 +137,10 @@ def bind_deployment(cfg, raw, expected_sha256, kit_root, loader):
     need(type(raw) is bytes and hashlib.sha256(raw).hexdigest() ==
          pin(expected_sha256), 'DEPLOYMENT_BINDING_SHA')
     value = decode(raw)
-    need(type(value) is dict and set(value) == FIELDS and
-         type(value['schema']) is int and value['schema'] == 1, 'BINDING_FIELDS')
+    need(type(value) is dict and type(value.get('schema')) is int and
+         ((value['schema'] == 1 and set(value) == FIELDS) or
+          (value['schema'] == 2 and set(value) == FIELDS | {'observer_service'})),
+         'BINDING_FIELDS')
     need(value['hostname'] == os.uname().nodename == cfg['principal']['host'] ==
          cfg['grant']['target_host'] and value['principal'] == cfg['principal'] and
          value['issuer'] == cfg['issuer'], 'BINDING_SCOPE')
@@ -153,6 +156,31 @@ def bind_deployment(cfg, raw, expected_sha256, kit_root, loader):
     path(value['receipt_socket'])
     path(kit_root)
     need(callable(getattr(loader, 'pinned_module', None)), 'PINNED_MODULE_LOADER')
+    if value['schema'] == 2:
+        spec = value['observer_service']
+        need(type(spec) is dict and set(spec) == {
+            'socket','key','public_der_sha256','issuer','attestor_public_key',
+            'context_directory','configuration_payloads'}, 'OBSERVER_SPEC_FIELDS')
+        for name in ('socket','key','context_directory'):
+            path(spec[name])
+        pin(spec['public_der_sha256'])
+        reference(spec['attestor_public_key'])
+        need(spec['socket'] == value['receipt_socket'] and
+             spec['issuer'] == value['receipt_issuer'] and
+             spec['public_der_sha256'] != cfg['public_der_sha256'], 'OBSERVER_TRUST_BINDING')
+        unused_modulus, observer_der = public_key(value['receipt_public_key'])
+        need(observer_der == spec['public_der_sha256'], 'OBSERVER_KEY_PIN')
+        fd = protected(spec['context_directory'], directory=True)
+        try:
+            need(stat.S_IMODE(os.fstat(fd).st_mode) == 0o700, 'CONTEXT_DIRECTORY')
+        finally:
+            os.close(fd)
+        need(type(spec['configuration_payloads']) is dict and
+             set(spec['configuration_payloads']) <=
+             {action['id'] for action in cfg['cycle_policy']['configuration_actions']},
+             'OBSERVER_CONFIG_SCOPE')
+        for ref in spec['configuration_payloads'].values():
+            reference(ref)
     _context = (copy.deepcopy(cfg), value, kit_root, loader)
 
 
@@ -203,6 +231,8 @@ def build_driver(cfg):
     driver = factory.assemble_host_driver(plan_raw, inputs, value['legacy_review_id'],
                                          value['legacy_approval_body_sha256'])
     need(isinstance(driver, sequence.InjectedDriver), 'CONCRETE_DRIVER_REQUIRED')
+    if _observer_session is not None:
+        _observer_session.attach(driver)
     return driver
 
 
@@ -268,3 +298,19 @@ class SignedHostReadback(object):
 def build_host_readback(cfg):
     value, unused_root, unused_loader = bound(cfg)
     return SignedHostReadback(cfg, value)
+
+
+def observer_spec(cfg):
+    value, unused_root, unused_loader = bound(cfg)
+    return copy.deepcopy(value.get('observer_service'))
+
+
+def build_observer_session(cfg, module, source_check):
+    global _observer_session
+    value, unused_root, assembly = bound(cfg)
+    need(value['schema'] == 2 and _observer_session is None, 'OBSERVER_SESSION_SCOPE')
+    import types
+    api = types.SimpleNamespace(decode=decode,read=read,reference=reference,
+                                public_key=public_key,protected=protected)
+    _observer_session = module.ObserverSession(api,assembly,cfg,value['observer_service'],source_check)
+    return _observer_session
