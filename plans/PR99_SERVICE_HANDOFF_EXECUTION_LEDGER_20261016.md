@@ -401,3 +401,18 @@ CODE_COMMIT=138eda930f64eee29cf8f4868336bb4106aa9a76；CODE_TREE=af65402f2887401
 仍由本执行窗口负责：完整有效配置/权威数据与其他状态目录、闲置/调度/共享Writer覆盖、实际强制Fence/排空、原持久fd控制器和完整捕获链的实机绑定。现有GitHub新源码写入和STS/SWAS只读均真实可用，不要求Owner重配RAM或找另一个执行方。原受限40文件发布原始拒绝/正常解除依据仍缺；已知bwrap EPERM不是已证明的发布拒绝原文，二者不混同。M99不重试、不换环境/接口规避；需原限制平台提供正常验收放行，尚未提交平台支持工单。源码增量交原独审，作者不代签许可。
 
 正式迁移许可未签发；6个生产大节点仍未关闭，生产迁移/切换尚未启动，没有本批后台生产迁移任务。东京、国内桥接和Windows保留。完整回执：evidence/pr99-service-handoff/aliyun-execution/STORAGE_BINDING_REPAIR_20261018.json。
+
+
+## 2026-10-18 23:13 CST｜有效数据关联与原持有fd控制器新增源码
+
+CODE_COMMIT=210bcf02eb53ace39420c6b3eb5d2bcda3c711ac；CODE_TREE=50ef767de1c980ab0b4e68c9c813b2238d004027。本次10文件仅新增runtime-controller源码/测试/文档及无云密钥的CI，未改原40文件、原生产入口/transport或已通过WAL恢复节点。
+
+新增：三应用有效配置→数据对象→Writer/激活源的显式关联校验；完整成员/共享保留冲突检查；借用原Journal/原锁/目录fd的持久控制器；阶段/前序回执严格校验；已有INTENT和UNKNOWN只查询、不重发/自动继续；原持有输出fd的Fence证明保存；固定systemd/cgroup/内核标志接口。原完整准入、真实排空证明和原PathGuard缺少任一即HOLD，不另建Writer/epoch/路径Guard，不自签授权，不提供东京解冻/恢复入口。
+
+Hosted [39139479365](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39139479365)：Python3.11/job117710747116、3.12/job117710747444，各45/45 PASS、0跳过，日志已读。含跨进程原账本锁/已有INTENT查询恢复、跳步/错误前序/撤销准入拒绝、部分记录保留及Linux接口mock。45为去掉继承重复用例后的独立数量；不是45项M99或实机测试。内层ZIP66090字节/10成员/SHA256 39539b35e1b0d443bfab12a0a8cadde9eda38bbff2c766b16570ac4a76fdf613；本地重建一致。Artifact12140468584/12141490347，外层Actions摘要与内层源码ZIP分列保存。原5依赖逐字节SHA固定，原WAL41项通过直接继承。
+
+**Owner指定的前两项实机门禁仍未关闭**：数据关联代码已有，但完整现场有效配置、权威数据与全部闲置/手动/调度/共享Writer覆盖尚缺；原控制器接线和Fence代码已有，但尚无获准环境中的真实原fd/排空源/内核Fence/完整捕获链验收。普通fixture授权与路径回调不冒充受信现场签发。以上仍由本原执行窗口负责，不要求Owner重配RAM或再找执行方。
+
+原受限40文件拒绝原文/正常发布解除仍缺，M99 NOT_RUN；不重试或换账户/API/环境规避。新源码仅集中送原独审，正式迁移许可未签发，未自签PASS。当前inspection及recover-readonly现场job均SKIPPED，本增量云/主机命令0、服务动作0、生产Writer0、生产迁移/切换0，无后台迁移作业。东京、国内桥接和Windows保留，6个生产大节点未关闭。
+
+完整回执：evidence/pr99-service-handoff/runtime-controller/DELIVERY_20261018.json。

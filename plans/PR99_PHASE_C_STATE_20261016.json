@@ -4027,5 +4027,85 @@
     },
     "evidence_path": "evidence/pr99-service-handoff/aliyun-execution/STORAGE_BINDING_REPAIR_20261018.json",
     "owner_password_or_ram_reauthorization_required": false
+  },
+  "runtime_controller_delta_20261018": {
+    "status": "NEW_SOURCE_45_TESTS_PER_PYTHON_PASS_FIRST_TWO_LIVE_GATES_NOT_CLOSED",
+    "code_commit": "210bcf02eb53ace39420c6b3eb5d2bcda3c711ac",
+    "code_tree": "50ef767de1c980ab0b4e68c9c813b2238d004027",
+    "ci": {
+      "run": 39139479365,
+      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39139479365",
+      "jobs": [
+        {
+          "python": "3.11",
+          "job": 117710747116,
+          "tests": 45,
+          "result": "PASS",
+          "artifact": 12140468584
+        },
+        {
+          "python": "3.12",
+          "job": 117710747444,
+          "tests": 45,
+          "result": "PASS",
+          "artifact": 12141490347
+        }
+      ],
+      "logs_read": true,
+      "duplicate_inherited_tests_removed": true,
+      "completed_at_utc": "2026-10-18T15:13:17Z"
+    },
+    "artifact": {
+      "sha256": "39539b35e1b0d443bfab12a0a8cadde9eda38bbff2c766b16570ac4a76fdf613",
+      "bytes": 66090,
+      "members": 10,
+      "artifacts": [
+        12140468584,
+        12141490347
+      ]
+    },
+    "new_code": [
+      "Verified effective configuration records explicitly bind data objects and writer/activator edges; recursive membership and retained shared conflicts are checked",
+      "ExistingFdController borrows original Journal/lock/dirfds; no new claim/lock/Writer/epoch or alternative PathGuard; exact extension source digest also required",
+      "Original INTENT is query-only after restart; strict stage/previous receipt chain; UNKNOWN cannot trigger replay or automatic continuation",
+      "New independent pure stage-history validator for published original format, not a copy or release of restricted candidate history",
+      "LinuxFenceBackend fixed systemd/cgroup and immutable flag interfaces; independent real drain required before any stop; no fallback or unfreeze",
+      "HeldProof writes only original pre-held exclusive output descriptor; partial results preserved; query cannot invent proof"
+    ],
+    "unresolved_first_two": [
+      {
+        "node": "Actual effective configuration to complete authoritative data catalogue and every writer/activator",
+        "status": "NOT_CLOSED",
+        "remaining": "Supply actual complete role configurations, data identities/children, idle/manual/scheduled/shared write-source edges and original verifiable coverage records; current code validates such records but does not manufacture them",
+        "responsibility": "ORIGINAL_PR99_EXECUTOR"
+      },
+      {
+        "node": "Unique Writer, enforced Fence, drain and durable original controller host integration",
+        "status": "NOT_CLOSED",
+        "remaining": "Admit original guard/controller and exact extension source; connect actual source drain and existing output/dirfds; validate in approved environment, including failure/restart and capture chain; fixture callbacks cannot be production authority",
+        "responsibility": "ORIGINAL_PR99_EXECUTOR_WITH_ORIGINAL_ADMISSION_AND_INDEPENDENT_REVIEW"
+      }
+    ],
+    "external_dependencies": {
+      "restricted_40_file_publish_raw_error": "NOT_FOUND_NO_RETRY",
+      "normal_release_basis": "NOT_OBTAINED",
+      "m99_dynamic": "NOT_RUN",
+      "known_isolation_error": "bwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted",
+      "normal_route": "Original restriction platform recovery/normal admission, then original independent incremental review; no account/API/environment workaround",
+      "support_request_sent": false,
+      "formal_migration_permit": "NOT_ISSUED"
+    },
+    "production": {
+      "host_commands_this_delta": 0,
+      "service_actions": 0,
+      "production_writer_acquired": false,
+      "migration_started": false,
+      "cutover": false,
+      "background_migration_tasks": false,
+      "tokyo_domestic_bridge_windows_preserved": true,
+      "remaining_major_nodes": 6
+    },
+    "evidence_path": "evidence/pr99-service-handoff/runtime-controller/DELIVERY_20261018.json",
+    "checkpoint_at_utc": "2026-10-18T15:14:47Z"
   }
 }
