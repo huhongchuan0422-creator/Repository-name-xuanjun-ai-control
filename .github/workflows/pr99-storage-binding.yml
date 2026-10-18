@@ -189,7 +189,7 @@ jobs:
           """Public projection boundary: technical names/counts/hashes only, never authority."""
           def validate_observation(d,expected,nonce):
               def need(ok):
-                  if not ok:raise ValueError('STORAGE_MAP_CONTRACT')
+                  if not ok:raise ValueError('STORAGE_MAP_CONTRACT_LINE_'+str(__import__('sys')._getframe(1).f_lineno))
               def fields(v,keys):need(type(v)is dict and set(v)==set(keys.split()))
               def integer(v):need(type(v)is int and 0<=v<2**64)
               def rel(v):need(type(v)is str and re.fullmatch('[A-Za-z0-9_./-]{1,240}',v) and '..' not in v.split('/'))
@@ -240,7 +240,7 @@ jobs:
                           elif key=='path_assignments':
                               fields(v,'owner line attribute value');name(v['owner']);integer(v['line']);name(v['attribute']);binding(v['value'])
                           elif key=='storage_operations':
-                              fields(v,'owner line name arguments');name(v['owner']);integer(v['line']);name(v['name']);need(type(v['arguments'])is list and len(v['arguments'])<=3)
+                              fields(v,'owner line name arguments');name(v['owner']);integer(v['line']);need(v['name'] in ('.read_text','.read_bytes','.write_text','.write_bytes','.replace','.unlink','.mkdir') or (type(v['name'])is str and re.fullmatch('[A-Za-z_][A-Za-z0-9_.]{0,180}',v['name'])));need(type(v['arguments'])is list and len(v['arguments'])<=3)
                               for x in v['arguments']:binding(x)
                           else:
                               fields(v,'line option default');integer(v['line']);need(type(v['option'])is str and re.fullmatch('--[a-z][a-z-]{0,50}',v['option']));binding(v['default'])
@@ -344,6 +344,13 @@ jobs:
               def wire(value):
                   raw=json.dumps(value).encode();return json.dumps({'encoding':'PR99_STORAGE_ZLIB_BASE64_V1','bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'payload':base64.b64encode(zlib.compress(raw)).decode()})
               assert decode_receipt(wire(d),HOSTS[0][4],'a'*32)==d
+              d['sources'][0]['binding_details']['storage_operations']=[{'owner':'MODULE','line':1,'name':'.read_text','arguments':[]}]
+              assert decode_receipt(wire(d),HOSTS[0][4],'a'*32)==d
+              d['sources'][0]['binding_details']['storage_operations'][0]['name']='.PRIVATE_UNKNOWN'
+              try:decode_receipt(wire(d),HOSTS[0][4],'a'*32)
+              except Hold:pass
+              else:raise AssertionError('DYNAMIC_RECEIVER_NOT_BOUNDED')
+              d['sources'][0]['binding_details']['storage_operations']=[]
               for mutate in (lambda x:x.update(private='SECRET'),lambda x:x.update(enforced_fence='PASS'),lambda x:x.update(service_actions=True),lambda x:x['sources'][0].update(source='SECRET'),lambda x:x['sources'][0].update(sha256='0'*64),lambda x:x.update(private_values_disclosed=True)):
                   bad=json.loads(json.dumps(d));mutate(bad)
                   try:decode_receipt(wire(bad),HOSTS[0][4],'a'*32)
@@ -567,7 +574,7 @@ jobs:
           """Public projection boundary: technical names/counts/hashes only, never authority."""
           def validate_observation(d,expected,nonce):
               def need(ok):
-                  if not ok:raise ValueError('STORAGE_MAP_CONTRACT')
+                  if not ok:raise ValueError('STORAGE_MAP_CONTRACT_LINE_'+str(__import__('sys')._getframe(1).f_lineno))
               def fields(v,keys):need(type(v)is dict and set(v)==set(keys.split()))
               def integer(v):need(type(v)is int and 0<=v<2**64)
               def rel(v):need(type(v)is str and re.fullmatch('[A-Za-z0-9_./-]{1,240}',v) and '..' not in v.split('/'))
@@ -618,7 +625,7 @@ jobs:
                           elif key=='path_assignments':
                               fields(v,'owner line attribute value');name(v['owner']);integer(v['line']);name(v['attribute']);binding(v['value'])
                           elif key=='storage_operations':
-                              fields(v,'owner line name arguments');name(v['owner']);integer(v['line']);name(v['name']);need(type(v['arguments'])is list and len(v['arguments'])<=3)
+                              fields(v,'owner line name arguments');name(v['owner']);integer(v['line']);need(v['name'] in ('.read_text','.read_bytes','.write_text','.write_bytes','.replace','.unlink','.mkdir') or (type(v['name'])is str and re.fullmatch('[A-Za-z_][A-Za-z0-9_.]{0,180}',v['name'])));need(type(v['arguments'])is list and len(v['arguments'])<=3)
                               for x in v['arguments']:binding(x)
                           else:
                               fields(v,'line option default');integer(v['line']);need(type(v['option'])is str and re.fullmatch('--[a-z][a-z-]{0,50}',v['option']));binding(v['default'])
@@ -722,6 +729,13 @@ jobs:
               def wire(value):
                   raw=json.dumps(value).encode();return json.dumps({'encoding':'PR99_STORAGE_ZLIB_BASE64_V1','bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'payload':base64.b64encode(zlib.compress(raw)).decode()})
               assert decode_receipt(wire(d),HOSTS[0][4],'a'*32)==d
+              d['sources'][0]['binding_details']['storage_operations']=[{'owner':'MODULE','line':1,'name':'.read_text','arguments':[]}]
+              assert decode_receipt(wire(d),HOSTS[0][4],'a'*32)==d
+              d['sources'][0]['binding_details']['storage_operations'][0]['name']='.PRIVATE_UNKNOWN'
+              try:decode_receipt(wire(d),HOSTS[0][4],'a'*32)
+              except Hold:pass
+              else:raise AssertionError('DYNAMIC_RECEIVER_NOT_BOUNDED')
+              d['sources'][0]['binding_details']['storage_operations']=[]
               for mutate in (lambda x:x.update(private='SECRET'),lambda x:x.update(enforced_fence='PASS'),lambda x:x.update(service_actions=True),lambda x:x['sources'][0].update(source='SECRET'),lambda x:x['sources'][0].update(sha256='0'*64),lambda x:x.update(private_values_disclosed=True)):
                   bad=json.loads(json.dumps(d));mutate(bad)
                   try:decode_receipt(wire(bad),HOSTS[0][4],'a'*32)
