@@ -4,8 +4,16 @@ Only the protected static configuration and the fixed repository's live API
 responses establish identities. Comment text never selects an account, URL,
 fetcher, trust file or algorithm. Anchors are excluded from the configuration
 digest to avoid the plan -> Owner body -> anchor -> plan hash cycle.
+
+Explicit PUBLIC_GITHUB binds a fixed comments page and startup/restart metadata
+checks in protected config, plan, and both approvals. Its 54-request process
+allowance is distinct from the durable five-attempt execution ledger. Observed
+rate headroom is checked fail-closed, but cannot reserve GitHub shared-IP quota.
 """
 import json
+import copy
+import os
+import urllib.request
 import re
 import time
 
@@ -32,6 +40,11 @@ COMMON_FIELDS = frozenset({'authorization_mode', 'transaction', 'plan_sha256',
     'artifact_tar_sha256', 'artifact_zip_sha256', 'artifact_id', 'ci_run_id',
     'scope_sha256', 'static_baseline_sha256', 'host_pins_sha256',
     'permit_window_seconds', 'max_executions', 'issued_unix', 'expires_unix'})
+PUBLIC_MODE = 'PUBLIC_GITHUB'
+TRANSPORT_FIELD = 'github_transport'
+TRANSPORT_FIELDS = frozenset({'mode', 'comments_page', 'per_page', 'metadata_policy', 'request_budget'})
+_PUBLIC_CONTEXTS = {}
+
 OWNER_FIELDS = COMMON_FIELDS | {'decision', 'rollback_approved',
     'review_comment_id', 'review_body_sha256'}
 REVIEW_FIELDS = COMMON_FIELDS | {'decision', 'owner_id', 'reviewer_id',
@@ -85,10 +98,27 @@ def strict_json(raw):
         raise _Hold('HOLD:STATIC_GITHUB_JSON_INVALID') from None
 
 
+def _transport(value):
+    _need(type(value) is dict and set(value) == TRANSPORT_FIELDS, 'TRANSPORT_SCHEMA')
+    _need(value['mode'] == PUBLIC_MODE and value['metadata_policy'] == 'PROCESS_START_AND_RESTART'
+          and type(value['comments_page']) is int and 1 <= value['comments_page'] <= 10000
+          and type(value['per_page']) is int and value['per_page'] == 100
+          and type(value['request_budget']) is int and value['request_budget'] == 54,
+          'TRANSPORT_CONTRACT')
+    return value
+
+
+def _public(obj):
+    return type(obj) is dict and TRANSPORT_FIELD in obj
+
+
 def _config(trust):
-    _need(type(trust) is dict and set(trust) == CONFIG_FIELDS
+    extra = {TRANSPORT_FIELD} if _public(trust) else set()
+    _need(type(trust) is dict and set(trust) == CONFIG_FIELDS | extra
           and type(trust['schema']) is int and trust['schema'] == 1
           and trust['authorization_mode'] == MODE, 'CONFIG_SCHEMA')
+    if extra:
+        _transport(trust[TRANSPORT_FIELD])
     for name, expected in (('repository_id', REPOSITORY_ID), ('owner_id', OWNER_ID),
                            ('reviewer_id', REVIEWER_ID), ('source_writer_id', OWNER_ID)):
         _need(_integer(trust[name]) and trust[name] == expected, 'CONFIG_IDENTITY')
@@ -145,12 +175,19 @@ def _repository(value, *, owner=False):
 def _verify(comment, approval_comment, approval, plan, trust, fetch):
     _config(trust)
     _need(type(plan) is dict and plan.get('authorization_mode') == MODE, 'EXPLICIT_MODE')
-    _need(type(approval) is dict and set(approval) == OWNER_FIELDS, 'OWNER_SCHEMA')
+    extra = {TRANSPORT_FIELD} if _public(trust) else set()
+    _need(_public(plan) == bool(extra), 'TRANSPORT_PLAN_BINDING')
+    _need(type(approval) is dict and set(approval) == OWNER_FIELDS | extra, 'OWNER_SCHEMA')
     _need(_integer(approval.get('review_comment_id')), 'REVIEW_COMMENT_ID')
     owner_body = _comment(approval_comment, approval_comment.get('id'), OWNER_ID, OWNER_PREFIX)
     _need(owner_body == approval, 'OWNER_BODY_BINDING')
     payload = _comment(comment, approval['review_comment_id'], REVIEWER_ID, REVIEW_PREFIX)
-    _need(set(payload) == REVIEW_FIELDS, 'REVIEW_SCHEMA')
+    _need(set(payload) == REVIEW_FIELDS | extra, 'REVIEW_SCHEMA')
+    if extra:
+        expected = _transport(trust[TRANSPORT_FIELD])
+        _need(all(type(obj.get(TRANSPORT_FIELD)) is dict
+                  and canonical(obj[TRANSPORT_FIELD]) == canonical(expected)
+                  for obj in (plan, approval, payload)), 'TRANSPORT_EXACT_BINDING')
     _need(comment['id'] != approval_comment['id'], 'DISTINCT_COMMENTS')
     transaction = approval['transaction']
     _need(type(transaction) is str and re.fullmatch(r'pr122-[a-z0-9-]{1,90}', transaction)
@@ -196,7 +233,9 @@ def _verify(comment, approval_comment, approval, plan, trust, fetch):
               and bool(finding['evidence_sha256'])
               and all(_hash(value) for value in finding['evidence_sha256']), 'FINDINGS_CLOSED')
     _need(plan['static_baseline_sha256'] in findings['R3']['evidence_sha256'], 'BASELINE_EVIDENCE')
-    # Always live; no cached approval, successful earlier request or error fallback.
+    # Authenticated mode is always live. Explicit PUBLIC_GITHUB mode rechecks
+    # metadata at process start/restart and live dual comments at every gate.
+    # Artifacts and CI metadata are NOT treated as immutable authority.
     # The existing bounded GitHub client appends '/' before a relative path.
     # Repository-root '' would yield an unsupported trailing-slash endpoint.
     # The same live CI response authenticates repository ID/name/owner below.
@@ -243,6 +282,9 @@ def gate(comment_id, plan, transaction):
         # Do not first perform an unbounded stat-then-read through private_config.
         trust = read_private(path)
         _config(trust)
+        if _public(trust):
+            return _public_gate(comment_id, plan, transaction, trust)
+        _need(not _public(plan), 'TRANSPORT_PLAN_BINDING')
         owner = customer.github('issues/comments/' + str(comment_id))
         approval = _comment(owner, comment_id, OWNER_ID, OWNER_PREFIX)
         _need(set(approval) == OWNER_FIELDS and approval['transaction'] == transaction
@@ -254,3 +296,125 @@ def gate(comment_id, plan, transaction):
         raise Denied(str(error)) from None
     except Exception:
         raise Denied('HOLD:STATIC_GITHUB_AUTHORITY_UNAVAILABLE') from None
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise _Hold('HOLD:STATIC_GITHUB_PUBLIC_REDIRECT')
+
+
+def _context_key(plan):
+    return (os.getpid(), digest(canonical(plan)))
+
+
+def public_budget_context(plan):
+    """Read-only snapshot; contains no credentials, URLs, or comment bodies."""
+    context = _PUBLIC_CONTEXTS.get(_context_key(plan))
+    _need(context is not None and not context['failed'], 'PUBLIC_CONTEXT_REQUIRED')
+    return {name: context[name] for name in ('requests_used', 'remaining', 'reserved_remaining', 'last_status', 'reset_unix')}
+
+
+def require_public_budget(plan, calls_needed):
+    """Phase pre-write check. Caller must bound all remaining authority GETs.
+
+    No waiting for rate-limit reset and no budget refresh from another process.
+    Each resumed process must establish its own fresh initial metadata check.
+    """
+    _need(type(calls_needed) is int and calls_needed >= 0, 'PUBLIC_PHASE_BUDGET')
+    snapshot = public_budget_context(plan)
+    _need(snapshot['remaining'] >= calls_needed
+          and snapshot['reserved_remaining'] >= calls_needed, 'PUBLIC_PHASE_BUDGET')
+    return snapshot
+
+
+def _public_get(relative, context):
+    """Only the four prebound anonymous endpoint paths are admissible."""
+    _need(relative in context['allowed'], 'PUBLIC_URL_SCOPE')
+    _need(not context['failed'] and context['reserved_remaining'] > 0, 'PUBLIC_REQUEST_BUDGET')
+    if context['remaining'] is not None:
+        _need(context['remaining'] >= context['reserved_remaining'], 'PUBLIC_RATE_BUDGET')
+    context['requests_used'] += 1
+    context['reserved_remaining'] -= 1
+    try:
+        # Explicit no-proxy opener: no credential readers, cookies, environment
+        # auth, retries, redirect following, pagination, or Link processing.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+        request = urllib.request.Request('https://api.github.com/repos/' + REPOSITORY + '/' + relative,
+            headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'pr122-static-public-authority',
+                     'X-GitHub-Api-Version': '2022-11-28'})
+        with opener.open(request, timeout=15) as response:
+            context['last_status'] = response.status
+            _need(response.status == 200, 'PUBLIC_HTTP_STATUS')
+            remaining = response.headers.get('X-RateLimit-Remaining')
+            _need(type(remaining) is str and re.fullmatch(r'[0-9]{1,6}', remaining) is not None,
+                  'PUBLIC_RATE_HEADER')
+            reset = response.headers.get('X-RateLimit-Reset')
+            _need(type(reset) is str and re.fullmatch(r'[0-9]{1,12}', reset) is not None
+                  and int(reset) > 0, 'PUBLIC_RESET_HEADER')
+            context['reset_unix'] = int(reset)
+            context['remaining'] = int(remaining)
+            _need(context['remaining'] >= context['reserved_remaining'], 'PUBLIC_RATE_BUDGET')
+            raw = response.read(2_000_001)
+            _need(len(raw) <= 2_000_000, 'PUBLIC_RESPONSE_BOUND')
+        if relative == context['comments_path']:
+            # strict_json handles duplicate keys and nonfinite numbers recursively.
+            value = strict_json(b'{"comments":' + raw + b'}')['comments']
+            _need(type(value) is list and len(value) <= 100, 'PUBLIC_COMMENTS_SCHEMA')
+            return value
+        return strict_json(raw)
+    except Exception:
+        # An uncertain/error request never becomes a successful cache entry or
+        # switches to the authenticated client. Restart requires new live checks.
+        context['failed'] = True
+        raise
+
+
+def _public_gate(comment_id, plan, transaction, trust):
+    transport = _transport(trust[TRANSPORT_FIELD])
+    _need(type(plan.get(TRANSPORT_FIELD)) is dict
+          and canonical(plan[TRANSPORT_FIELD]) == canonical(transport), 'TRANSPORT_PLAN_BINDING')
+    _need(plan.get('transaction') == transaction, 'TRANSACTION')
+    anchor = trust['install_anchors'].get(transaction)
+    _need(type(anchor) is dict and anchor['install_comment_id'] == comment_id, 'IMMUTABLE_COMMENT_ANCHORS')
+    # Scope is validated before constructing any URL, even before first approval.
+    _need(_hash(plan.get('source_commit'), 40) and _integer(plan.get('artifact_id'))
+          and _integer(plan.get('ci_run_id')), 'PUBLIC_PLAN_IDENTITIES')
+    comments_path = 'issues/122/comments?per_page=100&page=' + str(transport['comments_page'])
+    paths = ('git/commits/' + plan['source_commit'],
+             'actions/artifacts/' + str(plan['artifact_id']),
+             'actions/runs/' + str(plan['ci_run_id']))
+    key = _context_key(plan)
+    binding = digest(canonical({'trust': trust_digest(trust), 'anchor': anchor}))
+    context = _PUBLIC_CONTEXTS.get(key)
+    if context is None:
+        context = {'requests_used': 0, 'remaining': None,
+                   'reserved_remaining': transport['request_budget'], 'failed': False,
+                   'comments_path': comments_path, 'allowed': frozenset((comments_path,) + paths),
+                   'binding': binding, 'metadata': None, 'last_status': None, 'reset_unix': None}
+        _PUBLIC_CONTEXTS[key] = context
+    _need(context['binding'] == binding and not context['failed'], 'PUBLIC_CONTEXT_DRIFT')
+    try:
+        comments = _public_get(comments_path, context)
+        owner_matches = [row for row in comments if type(row) is dict and row.get('id') == comment_id]
+        review_matches = [row for row in comments if type(row) is dict
+                          and row.get('id') == anchor['review_comment_id']]
+        _need(len(owner_matches) == len(review_matches) == 1, 'PUBLIC_EXACT_COMMENTS_PAGE')
+        owner, review = owner_matches[0], review_matches[0]
+        approval = _comment(owner, comment_id, OWNER_ID, OWNER_PREFIX)
+        metadata = context['metadata']
+        pending = {}
+        def fetch(relative):
+            _need(relative in paths, 'PUBLIC_METADATA_SCOPE')
+            if metadata is not None:
+                return copy.deepcopy(metadata[relative])
+            value = _public_get(relative, context)
+            pending[relative] = copy.deepcopy(value)
+            return value
+        _verify(review, owner, approval, plan, trust, fetch)
+        if metadata is None:
+            _need(set(pending) == set(paths), 'PUBLIC_METADATA_COMPLETE')
+            context['metadata'] = pending
+        return approval
+    except Exception:
+        context['failed'] = True
+        raise

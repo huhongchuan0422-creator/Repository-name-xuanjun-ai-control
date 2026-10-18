@@ -5,7 +5,6 @@ No key generation/enrollment/signing function exists in production code.
 """
 import base64
 import time
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from scripts.pr122_customer_core import Denied,canonical,digest
 
 def need(ok,msg):
@@ -36,6 +35,7 @@ def verify(comment,approval_comment,approval,plan,trust,fetch):
     if 'permit_window_seconds' in plan or 'permit_window_seconds' in approval:expected_fields.add('permit_window_seconds')
     need(type(payload) is dict and set(payload)==expected_fields,'REVIEW_PAYLOAD_SCHEMA')
     try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
         pub=base64.b64decode(key['public_key_b64'],validate=True);signature=base64.b64decode(envelope['signature'],validate=True)
         Ed25519PublicKey.from_public_bytes(pub).verify(signature,canonical(payload))
     except Exception:raise Denied('HOLD:INDEPENDENT_REVIEW_SIGNATURE') from None

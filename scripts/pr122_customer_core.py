@@ -14,7 +14,6 @@ import secrets
 import sqlite3
 import time
 from pathlib import Path
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from scripts.community_merchant_contract import valid_id
 
 class Denied(PermissionError): pass
@@ -121,9 +120,11 @@ class Center:
     def now(self): return int(self.clock())
     def idx(self,value): return hmac.new(self.keys[self.index_key],value.encode(),hashlib.sha256).hexdigest()
     def encrypt(self,value,aad):
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
         nonce=secrets.token_bytes(12)
         return canonical({'key':self.key_id,'data':base64.b64encode(nonce+AESGCM(self.keys[self.key_id]).encrypt(nonce,value,aad.encode())).decode()})
     def decrypt(self,value,aad):
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
         d=json.loads(value); raw=base64.b64decode(d['data'],validate=True)
         return AESGCM(self.keys[d['key']]).decrypt(raw[:12],raw[12:],aad.encode())
     @contextlib.contextmanager

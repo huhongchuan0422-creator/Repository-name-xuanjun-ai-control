@@ -204,11 +204,20 @@ class OriginalStaticOperations:
                           'preflight': digest(self.c.read(self.c.PREFLIGHT_PATH)),
                           'publisher': self.t.pins['publisher_sha256']})
 
-    def _bound(self, stage, lease=None):
+    def _public_transport(self):
+        # Only the already validated explicit static authority can consolidate
+        # duplicate no-effect checks. Legacy and login behavior stay unchanged.
+        return (getattr(getattr(self.coordinator, "r", None), "authorization_mode", None) == "STATIC_GITHUB_DUAL_APPROVAL"
+                and self.plan.get("github_transport", {}).get("mode") == "PUBLIC_GITHUB")
+
+    def _bound(self, stage, lease=None, *, online=True):
         self._stage(stage)
         need(self.coordinator is not None, 'STATIC_COORDINATOR_REQUIRED')
         if lease is not None:
-            lease.assert_fence(); lease.authority(); lease.verify_inputs(stage)
+            lease.assert_fence()
+            if online: lease.authority()
+            else: lease.assert_active()
+            lease.verify_inputs(stage)
         need(self.expected_input(stage) == self.inputs[stage], 'STATIC_INPUT_DRIFT')
         self.t.bind_inputs()
 
@@ -435,9 +444,9 @@ class OriginalStaticOperations:
     def _initialize(self, lease):
         t, c = self.t, self.c
         need(self._fresh_absent(), 'STATIC_EXISTING_TRANSACTION_NO_TAKEOVER')
-        self._admit(lease)
+        self._admit(lease, online=not self._public_transport())
         files = self._original_action('baseline', lease)
-        self._admit(lease)
+        self._admit(lease, public_calls_needed=46)
         need(self._fresh_absent(), 'STATIC_INITIALIZATION_COLLISION')
         guarded = self._effect_helpers(lease)
         guarded.mkdir(t.folder, 0o700)
@@ -508,8 +517,17 @@ class OriginalStaticOperations:
         guarded.atomic(self.t.receipt, completed); self.t.data = completed
         return result
 
-    def _admit(self, lease):
-        lease.authority(); lease.assert_active()
+    def _admit(self, lease, *, online=True, public_calls_needed=None):
+        if online: lease.authority()
+        else: lease.assert_fence()
+        lease.assert_active()
+        if online and self._public_transport():
+            from scripts.pr122_static_github_approval import require_public_budget
+            # Exact success-path suffix plus 13 read-only failure-convergence
+            # calls. This is a local bound, not a reservation of shared IP quota.
+            suffix = (45, 42, 39, 36, 33, 30, 24, 21, 18, 15)
+            needed = suffix[self._stage(lease._stage)] if public_calls_needed is None else public_calls_needed
+            require_public_budget(self.plan, needed)
         remaining = self.coordinator.approval['expires_unix'] - time.time()
         need(remaining >= PHASE_ADMISSION_SECONDS, 'STATIC_PHASE_AUTHORIZATION_WINDOW')
         now = time.monotonic()
@@ -526,7 +544,9 @@ class OriginalStaticOperations:
         self._runtime(self.t.data)
 
     def execute(self, stage, lease):
-        self._bound(stage, lease); self._admit(lease)
+        public = self._public_transport()
+        self._bound(stage, lease, online=not public)
+        self._admit(lease, online=not public)
         t, c = self.t, self.c
         files = None
         if stage == 'BACKUP_VERIFIED' and not os.path.lexists(t.folder):

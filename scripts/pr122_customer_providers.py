@@ -15,8 +15,6 @@ import time
 import urllib.request
 from email.message import EmailMessage
 from pathlib import Path
-from cryptography.hazmat.primitives.ciphers import Cipher,algorithms,modes
-from cryptography.hazmat.primitives import padding
 from scripts.pr122_customer_core import Denied,Unavailable,canonical,private_path
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -111,6 +109,8 @@ class Providers:
         ciphertext=base64.b64decode(outer['encrypt'],validate=True)
         if len(ciphertext)<32 or len(ciphertext)%16: raise Denied('FEISHU_CIPHERTEXT')
         key=hashlib.sha256(c['encrypt_key'].encode()).digest()
+        from cryptography.hazmat.primitives.ciphers import Cipher,algorithms,modes
+        from cryptography.hazmat.primitives import padding
         decryptor=Cipher(algorithms.AES(key),modes.CBC(ciphertext[:16])).decryptor()
         padded=decryptor.update(ciphertext[16:])+decryptor.finalize()
         unpad=padding.PKCS7(128).unpadder(); d=json.loads(unpad.update(padded)+unpad.finalize())
