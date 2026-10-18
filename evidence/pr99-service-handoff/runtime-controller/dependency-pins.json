@@ -1,4 +1,8 @@
 {
+  "../wal-memory-vfs/lost_invoke_reconciliation.py": "36a3602dffcb7933113e97a3682dc1a986d3fb1c37afa8bb87c56d19d122d596",
+  "../wal-memory-vfs/node_bindings.py": "1486e066795b60a640e6281021dcf166c56ce0bfb9982f15c1d633c93c4c92f5",
+  "../wal-memory-vfs/sqlite_wal_vfs.py": "9c08d6ef9cc41b7a4fc4807285db29320dac1612c2bec0c75434e68431c8210c",
+  "../wal-memory-vfs/test_sqlite_wal_vfs.py": "41ded1a85984df5f8ff07679939b5ffa5ab6707648b72d725a3792664a66eb85",
   "final_materials.py": "1d87911f8bb43dde5f9865a98e07abba05faf0862b940c726cc6c64a2de7605b",
   "migration_transaction.py": "d0dcf9ed435fadad7ea01f176662707b7d9f06a99658a38b323f09bd7cc51d83",
   "production_start.py": "d645edc0013af34804626315a6ddce1b47b870c012b6b632131c320ed4c20688",

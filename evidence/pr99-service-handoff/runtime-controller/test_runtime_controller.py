@@ -346,11 +346,19 @@ class ProofTests(OriginalJournalFixture,unittest.TestCase):
 
 class KernelInterfaceTests(unittest.TestCase):
     def setUp(self):
+        from types import SimpleNamespace
+        for target,value in (('geteuid',0),('uname',SimpleNamespace(nodename=c.SOURCE_HOST))):
+            p=patch.object(s.os,target,return_value=value);p.start();self.addCleanup(p.stop)
         class GuardFixture:
             def check(self):return True
             def file_fd(self,path):raise AssertionError('no actual data fd')
             def directory_fd(self,path):raise AssertionError('no actual data directory')
         self.backend=s.LinuxFenceBackend(GuardFixture(),{},lambda:True)
+
+    def test_wrong_host_cannot_reach_syscall(self):
+        from types import SimpleNamespace
+        with patch.object(s.os,'uname',return_value=SimpleNamespace(nodename='wrong-host')),patch.object(s.subprocess,'run',side_effect=AssertionError('host effect')):
+            with self.assertRaises(s.FenceHold):self.backend.mask('secure-secrets-portal.service')
 
     def test_fixed_systemctl_arguments(self):
         with patch.object(s.subprocess,'run',return_value=subprocess.CompletedProcess([],0,b'',b'')) as call:

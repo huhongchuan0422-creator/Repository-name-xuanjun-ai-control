@@ -5,6 +5,9 @@ on:
     paths:
       - 'evidence/pr99-service-handoff/runtime-controller/**'
       - '.github/workflows/pr99-runtime-controller.yml'
+      - 'evidence/pr99-service-handoff/wal-memory-vfs/node_bindings.py'
+      - 'evidence/pr99-service-handoff/wal-memory-vfs/sqlite_wal_vfs.py'
+      - 'evidence/pr99-service-handoff/wal-memory-vfs/lost_invoke_reconciliation.py'
 permissions:
   contents: read
 concurrency:
@@ -34,7 +37,7 @@ jobs:
       - name: Ordinary temporary journal tests, no production operations
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-          PYTHONPATH: evidence/pr99-service-handoff/runtime-controller:evidence/pr99-service-handoff/s09-install-candidate
+          PYTHONPATH: evidence/pr99-service-handoff/runtime-controller:evidence/pr99-service-handoff/s09-install-candidate:evidence/pr99-service-handoff/wal-memory-vfs
         run: python -B -m unittest discover -s evidence/pr99-service-handoff/runtime-controller -p 'test_*.py' -v
       - name: Bind exact commit, tree, unchanged dependencies and candidate artifact
         shell: bash

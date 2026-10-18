@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 
-from catalogue_binding import bind_catalogue, digest
+from catalogue_binding import bind_catalogue, digest, SOURCE_HOST
 
 IMMUTABLE = 0x10
 GETFLAGS = (2 << 30) | (struct.calcsize('l') << 16) | (ord('f') << 8) | 1
@@ -51,6 +51,7 @@ class LinuxFenceBackend:
         self.bound = binding_check
 
     def _bound(self):
+        need(os.geteuid()==0 and os.uname().nodename==SOURCE_HOST, 'SOURCE_HOST_ROOT_REQUIRED')
         need(self.bound() is True and self.guard.check() is True, 'ORIGINAL_FENCE_BINDING_REQUIRED')
 
     def _ctl(self, action, unit):
@@ -210,6 +211,8 @@ class SourceFence:
         # A stage result binds evidence; it is not a free-standing signed final
         # proof. The original independent receipt publisher must persist/sign it.
         proof = {'action':'PR99_SOURCE_WRITER_FENCE_V1','source_host':self.catalogue['host'],
+            'transaction_id':self.controller.binding['transaction_id'],'plan_digest':self.controller.binding['plan_digest'],
+            'operation_id':request['operation_id'],
             'writer_inventory_sha256':self.inventory,'writer_epoch':self.controller.binding['epoch'],
             'writers_stopped':True,'inflight_drained':True,'unresolved_shared_writers':[],
             'kernel_fence':'IMMUTABLE_EVERY_COMPLETE_DATA_OBJECT','observed_at':int(time.time()),

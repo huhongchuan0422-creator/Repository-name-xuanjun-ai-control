@@ -11,11 +11,20 @@
 
 ## 测试边界
 
-45项普通临时目录/状态夹具/系统接口mock测试，不运行原PathGuard或M99目录替换反例，不执行systemctl或真实不可变标志ioctl，不打开生产数据库。跨进程测试重新取得同一原账本锁并只查询既有INTENT。fixture的授权/路径/排空回调不是现场可信签发方。
+57项普通临时目录/状态夹具/系统接口mock测试，不运行原PathGuard或M99目录替换反例，不执行systemctl或真实不可变标志ioctl，不打开生产数据库。跨进程测试重新取得同一原账本锁并只查询既有INTENT。fixture的授权/路径/排空回调不是现场可信签发方。
 
 ## 尚未解除的两项实机缺口
 
 1. 尚无完整有效配置到权威数据的现场签认清单；全部闲置、手动、调度、共享写入源覆盖尚未证明。本候选验证清单但不伪造/采集出不存在的授权覆盖证明。
 2. 尚未在获准环境接入原受信控制器、原PathGuard及真实排空源，也没有内核Fence、非空WAL完整捕获、实机恢复与独审证据。原发布拒绝原文/正常解除及M99获准动态入口仍属独立依赖。
 
-这些现场条件没有被45项普通测试关闭。不得把新代码存在理解为已领取生产Writer、已Fence、已安装或可停止东京。后续原独审应准确绑定本新增源码、原未变依赖、完整现场清单和最多5次正式Attempt许可；未取得前不触发生产。
+这些现场条件没有被57项普通测试关闭。不得把新代码存在理解为已领取生产Writer、已Fence、已安装或可停止东京。后续原独审应准确绑定本新增源码、原未变依赖、完整现场清单和最多5次正式Attempt许可；未取得前不触发生产。
+
+
+## 本次接线入口
+
+`capture_session.CaptureSession.perform(request)` 将原ExistingFdController的INTENT/RESULT链、真实排空依赖、SourceFence与HeldProof、已发布node_bindings的非空WAL输出连在一起。final_snapshot只能使用原账本中成功的Fence回执，并重新核对当前Fence与原证明；捕获输入合同绑定到原plan，避免预先要求尚未生成的Fence哈希。原已通过WAL算法未改。
+
+SQLITE工作项明确绑定MAIN/WAL/SHM成员与schema，普通FILE工作项使用原guard创建的独占fd；全部COPY_FENCED文件必须归入工作项，缺项/重复/交叉源目标均拒绝。源guard、原持有证明fd、cgroup绑定、排空证据均是原受信现场提供的依赖，不使用fixture代替。内核Fence只允许固定东京root身份。既有INTENT进入查询时仅核对已有输出/原始捕获/证明，不重跑SQLite、不新建捕获输出、不重设Fence；不完整状态保持UNKNOWN。
+
+新增12项测试（含固定源主机接口拒绝）使总数57；受影响45项也重新验证。新增调用链测试真实使用已发布的SQLite内存VFS，非空WAL内17行提交能恢复到候选输出，同时复制普通状态文件，并测试部分输出、输入/代码/准入变化与只查恢复。这些仍是普通合成夹具，不是生产数据或M99。当前只接通fence_source、final_snapshot；不宣称其后的传输、canonical assignment、安装与切换已落地，也不输出FINAL_CANONICAL_CHECKPOINT。
