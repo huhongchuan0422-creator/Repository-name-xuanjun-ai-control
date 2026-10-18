@@ -1,0 +1,42 @@
+name: P2 Owner delivery preparation acceptance
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - delivery/p2-owner-6041/**
+      - .github/workflows/p2-owner-delivery.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preparation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: python:3.6.15-bullseye
+            version: 3.6.15
+          - image: python:3.12.15-bookworm
+            version: 3.12.15
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Actual pinned artifact verification and isolated staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_PYTHON: ${{ matrix.version }}
+        run: |
+          python -I -B -S -c 'import os,platform;assert platform.python_version()==os.environ["EXPECTED_PYTHON"]'
+          python -I -B -S delivery/p2-owner-6041/test_prepare.py
+          python -I -B -S delivery/p2-owner-6041/verify.py delivery-results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-owner-delivery-${{ matrix.version }}
+          path: delivery-results/
+          if-no-files-found: error
+          overwrite: false
