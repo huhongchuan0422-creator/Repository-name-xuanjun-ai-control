@@ -129,3 +129,37 @@ class AuthorityStore(object):
             if outcome=='SUCCESS':self.db.execute('UPDATE grants SET terminal=1 WHERE id=?',(grant['grant_id'],))
             self.audit(grant['grant_id'],'RECONCILE',{'attempt':attempt,'outcome':outcome,'proof':proof_sha})
         return self.transaction(action)
+
+    def register_cycle(self, grant, approved_policy, approval):
+        """Administrative registration only after independent authorization.
+
+        The authenticated approval body pins this policy. Never register from
+        an untrusted request or infer five attempts from an old single permit.
+        """
+        from permit_cycle import policy
+        value=policy(approved_policy)
+        need(approval.get('grant_sha256')==digest(grant) and
+             approval.get('approval_body_sha256')==grant['approval_body_sha256'] and
+             approval.get('cycle_policy_sha256')==digest(value),'CYCLE_APPROVAL_REQUIRED')
+        def action():
+            self._grant(grant)
+            self.db.execute('CREATE TABLE IF NOT EXISTS cycles(grant_id TEXT PRIMARY KEY,policy TEXT NOT NULL,review INTEGER NOT NULL,stopped INTEGER NOT NULL DEFAULT 0)')
+            self.db.execute('INSERT INTO cycles VALUES(?,?,?,0)',(grant['grant_id'],canonical(value).decode(),approval['review_id']))
+            self.audit(grant['grant_id'],'REGISTER_CYCLE',{'policy':value,'approval':approval})
+        return self.transaction(action)
+
+    def cycle(self,grant,payload):
+        try:row=self.db.execute('SELECT policy,review,stopped FROM cycles WHERE grant_id=?',(grant['grant_id'],)).fetchone()
+        except sqlite3.OperationalError:row=None
+        need(row is not None and not row[2],'CYCLE_NOT_APPROVED_OR_STOPPED')
+        value=json.loads(row[0])
+        need(payload.get('policy_sha256')==digest(value) and payload.get('review_id')==row[1] and
+             payload.get('approval_body_sha256')==grant['approval_body_sha256'],'CYCLE_APPROVAL_BINDING')
+        return value
+
+    def stop_cycle(self,grant,reason,token):
+        def action():
+            self._fence(grant,token)
+            self.db.execute('UPDATE cycles SET stopped=1 WHERE grant_id=?',(grant['grant_id'],))
+            self.audit(grant['grant_id'],'CYCLE_STOP',{'reason':reason})
+        return self.transaction(action)

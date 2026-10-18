@@ -16,6 +16,7 @@ sys.path[:0]=[str(HERE/'runtime'),str(HERE/'original'),str(HERE)]
 from attempt_ledger import Ledger
 from receipt_provider import ReceiptProvider, Hold, canonical, digest
 from native_recovery import NativeRecovery
+from permit_cycle import PermitCycle
 from test_receipt_provider import ProviderTests
 from test_authority_store import grant
 
@@ -38,6 +39,11 @@ def native_suite(env):
             result={'grant_id':self.ledger.grant['grant_id'],'attempt_id':request['attempt_id']}
             if operation=='verify_fence':result.update(status='HELD',exclusive=True,writer='fixture',lease_epoch=1,fence=1)
             elif operation=='consume_attempt':result.update(status='CONSUMED',ordinal=payload['ordinal'],max_attempts=5)
+            elif operation in ('verify_cycle_binding','diagnose_attempt','apply_approved_configuration'):
+                result.update(binding=payload,source_identity={k:self.ledger.grant[k] for k in ('source_commit','source_tree','kit_sha256','manifest_sha256')})
+                if operation=='verify_cycle_binding':result.update(status='UNCHANGED')
+                elif operation=='diagnose_attempt':result.update(status='DIAGNOSED',transaction_consistent=True,recovery='NATIVE_CAS' if s.OUTER_NAME in self.rig.records else 'NO_WRITE',configuration_actions=[])
+                else:raise AssertionError('No configured action adapter')
             elif operation=='authorize_first_admission':result.update(status='AUTHORIZED',policy='P2_ATTEMPT5_V1',context_sha256=payload['context_sha256'])
             elif operation=='authenticate_native_recovery':
                 state=json.loads(self.rig.records[s.OUTER_NAME]['data'].decode())['state']
@@ -171,6 +177,45 @@ def native_suite(env):
                 self.assertEqual(len([x for x in self.rig.events if x.startswith('phase:')]),16)
                 with self.assertRaises(Hold):self.begin()
             finally:store.close()
+        def test_full_service_autonomous_one_permit_fifth_success(self):
+            from authority_store import AuthorityStore
+            from issuer_service import IssuerService
+            store=AuthorityStore(str(Path(self.folder.name)/'trusted-fixture-service.db'),initialize=True,clock=lambda:100)
+            try:
+                store.register(self.ledger.grant)
+                from permit_cycle import policy
+                approved=policy()
+                store.register_cycle(self.ledger.grant,approved,{'grant_sha256':digest(self.ledger.grant),
+                    'approval_body_sha256':self.ledger.grant['approval_body_sha256'],
+                    'cycle_policy_sha256':digest(approved),'review_id':9000000001})
+                self.admission_failures(4)
+                original=self.transport
+                def host_readback(g,aid,operation,payload):
+                    request={'schema':1,'grant_sha256':digest(g),'attempt_id':aid,
+                             'operation':operation,'nonce':'0'*32,'payload':payload}
+                    result=original(request)['body']['result']
+                    return {'grant_sha256':digest(g),'attempt_id':aid,'operation':operation,
+                            'payload_sha256':digest(payload),'run_id':'TEST_RUN','job_id':'TEST_JOB',
+                            'invoke_id':'TEST_INVOKE','backup_sha256':'a'*64,
+                            'checkpoint_sha256':'b'*64,'log_sha256':'c'*64,'result':result}
+                signer=lambda raw:subprocess.check_output(['openssl','dgst','-sha256','-sign',self.key],input=raw)
+                service=IssuerService(store,host_readback,signer,'TEST_ONLY')
+                principal={'actor_id':self.ledger.grant['actor_id'],'host':'TEST_ONLY','writer_id':'isolated-service-writer'}
+                self.provider=ReceiptProvider(lambda request:service.handle(request,principal),
+                                              self.modulus,65537,'TEST_ONLY',clock=lambda:101)
+                self.native=NativeRecovery(self.rig.driver,self.ledger,self.provider,
+                    {k:self.ledger.grant[k] for k in ('source_commit','source_tree','manifest_sha256')},fixture_mode=True)
+                def factory():
+                    self.restart_native()
+                    self.native.approval_review_id=9000000001
+                    return self.native
+                report=PermitCycle(factory).run('d'*64)
+                self.assertEqual((report['status'],report['used']),('SUCCEEDED',5))
+                self.assertEqual(store.db.execute('SELECT consumed,terminal FROM grants').fetchone(),(5,1))
+                self.assertEqual(len([x for x in self.rig.events if x.startswith('phase:')]),16)
+                self.assertEqual(store.db.execute('SELECT count(*) FROM cycles').fetchone()[0],1)
+                self.assertEqual(len(list(Path(self.folder.name).glob('cycle-report-*.json'))),1)
+            finally:store.close()
         def test_proven_no_native_write_allows_controlled_retry(self):
             first=self.begin()
             self.assertEqual(self.native.reconcile_unadmitted(first),'FAILED_NO_WRITE')
@@ -241,6 +286,121 @@ def native_suite(env):
             self.change=change
             with self.assertRaises(Hold):self.native.run(aid)
             self.assertFalse(any(x.startswith('phase:') for x in self.rig.events))
+        def cycle(self):
+            def factory():
+                self.restart_native()
+                return self.native
+            return PermitCycle(factory)
+        def admission_failures(self,count):
+            seen=[0]
+            def change(request,result):
+                if request['operation']=='authorize_first_admission':
+                    seen[0]+=1
+                    if seen[0]<=count:result['status']='DENIED'
+            self.change=change
+            return seen
+        def test_cycle_four_failures_then_fifth_success_one_grant(self):
+            seen=self.admission_failures(4)
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('SUCCEEDED',5))
+            self.assertEqual(seen[0],5)
+            self.assertEqual(len(set(a['id'] for a in report['ledger']['attempts'])),5)
+            self.assertEqual(report['approval_body_sha256'],self.ledger.grant['approval_body_sha256'])
+            self.assertEqual(self.rig.events.count('phase:'+s.PHASES[0]),1)
+        def test_cycle_approved_configuration_automatically_applied_with_backup(self):
+            from approved_config import ApprovedConfiguration,sha
+            from permit_cycle import policy
+            with tempfile.TemporaryDirectory(prefix='cycle-config-',dir='/') as root:
+                os.chmod(root,0o700)
+                target=Path(root)/'settings.json';target.write_bytes(b'{"retry":1}');os.chmod(str(target),0o600)
+                new=b'{"retry":2}'
+                action={'id':'retry-limit','before_sha256':sha(target.read_bytes()),'after_sha256':sha(new),
+                        'payload_sha256':sha(new),'checkpoint_sha256':'a'*64}
+                approved=policy();approved['configuration_actions']=[action]
+                config=ApprovedConfiguration(root,{'retry-limit':('settings.json',new)},lambda:self.native.fence(self.ledger.snapshot()['attempts'][-1]['id'],'CONFIG_CAS'))
+                failures=[0]
+                def change(request,result):
+                    if request['operation']=='authorize_first_admission':
+                        failures[0]+=1
+                        if failures[0]==1:result['status']='DENIED'
+                    if request['operation']=='diagnose_attempt':result['configuration_actions']=['retry-limit']
+                    if request['operation']=='apply_approved_configuration':result.update(config.apply(request['payload']['action']))
+                self.change=change
+                original=self.transport
+                # The fixture transport's default denies config operations;
+                # route this exact approved action through the real CAS helper.
+                def transport(request):
+                    if request['operation']=='apply_approved_configuration':
+                        result={'grant_id':self.ledger.grant['grant_id'],'attempt_id':request['attempt_id'],'binding':request['payload']}
+                        result.update(config.apply(request['payload']['action']))
+                        body={'schema':1,'issuer':'TEST_ONLY','request_sha256':digest(request),'issued_utc':100,'expires_utc':130,'result':result}
+                        signature=subprocess.check_output(['openssl','dgst','-sha256','-sign',self.key],input=canonical(body))
+                        return {'body':body,'signature':base64.b64encode(signature).decode()}
+                    return original(request)
+                self.provider=ReceiptProvider(transport,self.modulus,65537,'TEST_ONLY',clock=lambda:101)
+                def factory():
+                    self.restart_native()
+                    self.native=NativeRecovery(self.rig.driver,self.ledger,self.provider,
+                        {k:self.ledger.grant[k] for k in ('source_commit','source_tree','manifest_sha256')},fixture_mode=True,cycle_policy=approved)
+                    return self.native
+                try:
+                    report=PermitCycle(factory,approved).run('d'*64)
+                    self.assertEqual((report['status'],report['used']),('SUCCEEDED',2))
+                    self.assertEqual(target.read_bytes(),new)
+                    self.assertEqual(len(list(Path(root).glob('backup-*.json'))),1)
+                finally:config.close()
+        def test_cycle_first_success_stops(self):
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('SUCCEEDED',1))
+        def test_cycle_five_failures_exhausted_full_report(self):
+            self.admission_failures(9)
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('EXHAUSTED',5))
+            self.assertTrue(all(a['state']=='FAILED_NO_WRITE' for a in report['ledger']['attempts']))
+        def test_cycle_restart_does_not_reset_exhausted_quota(self):
+            self.admission_failures(9)
+            self.cycle().run('d'*64)
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('EXHAUSTED',5))
+        def test_cycle_unknown_holds_same_permit_then_recovers(self):
+            def change(request,result):
+                if request['operation'] in ('authorize_first_admission','diagnose_attempt'):result['status']='UNKNOWN'
+            self.change=change
+            first=self.cycle().run('d'*64)
+            self.assertEqual((first['status'],first['used']),('HOLD',1))
+            self.change=lambda request,result:None
+            second=self.cycle().run('d'*64)
+            self.assertEqual((second['status'],second['used']),('SUCCEEDED',2))
+            self.assertEqual(first['approval_body_sha256'],second['approval_body_sha256'])
+        def test_cycle_source_change_before_claim_holds(self):
+            self.change=lambda request,result:result.update(status='CHANGED') if request['operation']=='verify_cycle_binding' else None
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('HOLD',0))
+        def test_cycle_unapproved_configuration_holds(self):
+            def change(request,result):
+                if request['operation']=='authorize_first_admission':result['status']='DENIED'
+                if request['operation']=='diagnose_attempt':result['configuration_actions']=['not-approved']
+            self.change=change
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('HOLD',1))
+        def test_cycle_fence_loss_never_claims(self):
+            self.change=lambda request,result:result.update(status='LOST') if request['operation']=='verify_fence' else None
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('HOLD',0))
+        def test_cycle_pending_native_effect_recovered_without_replay(self):
+            seen=[0]
+            def change(request,result):
+                if request['operation']=='verify_phase_commit':
+                    seen[0]+=1
+                    if seen[0]==1:result['status']='UNKNOWN'
+            self.change=change
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('SUCCEEDED',2))
+            self.assertEqual(self.rig.events.count('phase:'+s.PHASES[0]),1)
+        def test_cycle_existing_success_replay_consumes_nothing(self):
+            self.cycle().run('d'*64)
+            report=self.cycle().run('d'*64)
+            self.assertEqual((report['status'],report['used']),('SUCCEEDED',1))
     return unittest.defaultTestLoader.loadTestsFromTestCase(NativeTests)
 
 def run(candidate):

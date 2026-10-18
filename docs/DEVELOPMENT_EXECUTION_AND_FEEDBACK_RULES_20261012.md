@@ -145,6 +145,8 @@ No old single-use permit is expanded or revived. Dots remains the independent
 reviewer; developer tests cannot self-approve production. Real UK evidence and
 installation authorization stay separate; all production actions remain HOLD.
 
+
+
 ## 2026-10-18 Owner最终规则：ONE_PERMIT_MAX_5_ATTEMPTS（优先于此前歧义文字）
 
 适用于玄钧云汇今后所有项目的安装器、安装方案及正式执行许可。**Dots一次完整审核签发一份准确版本许可，该许可最多授权5次Attempt；不是5张许可。** 第2至第5次在原许可、UTC有效期和批准操作范围内，经可信失败诊断、事务副作用对账和安全恢复点验证后自行受控继续，不需要每次重新审核或重新签发。成功立即停止；5次全部失败停止并保存全部日志/事务/证据。下一轮必须修复、仅复审受影响变更并获得**另一份新许可**，旧许可/额度不复活。
@@ -160,3 +162,19 @@ UNKNOWN、尚未对账的部分写入、Writer/Lease/Fence冲突、账本与回�
 **P2专项执行**：Work对Commit `c52704c2a919fdb47bbe062ebc9f6084c2a6c7b5`及其确切版本复核是否同一签发许可下5次自主安全重试；重点检查issuer/grant注册与消费、持久额度、自动诊断、安全恢复、获准配置修正、跨进程/重启、UNKNOWN解除HOLD后的续接及任何逐次审签要求。仅修改受影响代码并补双Python CI；Dots在PR58一次性增量独审，R1–R4与未变16阶段直接继承。工作流CI Run 39109634935和每环境875项为Owner报告，不能替代独立审核/英国现场验证。窗口1不再开发。旧单次许可仍是单次，不得文字扩大为5次。
 
 目标不变：ONE_PERMIT=MAX_5_ATTEMPTS; SAFE_RETRY_WITHIN_PERMIT=ALLOWED; REVIEW_PER_RETRY=NOT_REQUIRED; APPROVED_CONFIG_ADJUSTMENT=ALLOWED; UNREVIEWED_SOURCE_CHANGE=FORBIDDEN; UNKNOWN=HOLD_AND_RECONCILE; SUCCESS=STOP; FIVE_ATTEMPTS_EXHAUSTED=STOP; NEXT_ROUND=NEW_PERMIT; INSTALL_PERMIT=NOT_ISSUED; P2_RELEASE=HOLD。
+
+## Owner最终规则：ONE_PERMIT_MAX_5_ATTEMPTS（2026-10-18）
+
+适用于玄钧云汇今后所有新安装器、安装方案和执行许可。一次独立审核签发一份许可；同一Grant最多5次受控Attempt，不得拆成5份许可，不得逐次要求Dots新审核。首次批准必须绑定准确Source Commit/Tree、Kit/Manifest及SHA、目标主机、执行身份、UTC有效期、持久额度规则、诊断与配置范围、安全恢复入口、检查点和幂等条件、Writer及Lease/Fence、UNKNOWN/部分写入停止条件以及成功/耗尽/下一轮规则。
+
+失败自动进入可信诊断、事务对账、已批准配置调整、原生CAS恢复和幂等续接；满足原许可条件才继续下一次。成功立即终止，剩余额度失效；5次失败停止并保留集中失败报告。HOLD不自动废除许可，但UNKNOWN、未确认部分写入、事务回执不一致、Writer/Fence冲突、无法确认检查点、过期或错版本时禁止继续。原许可允许的可信对账证明安全后，可使用同一许可剩余额度，不需要重新签发。
+
+源码变化停止原周期；保留日志和检查点，修复并测试后，仅审核受影响变化，再签发下一轮新许可。不得在旧许可下修改生产源码并安装未经审核的新版本。已消费或过期的旧许可不恢复，旧单次Successor许可不自动解释为五次。
+
+### P2本次实际实现与边界
+
+`attempt5/runtime/permit_cycle.py`提供自动循环入口（接收构造真实NativeRecovery的factory），同一review ID/批准正文SHA和Grant贯穿全周期；原Ledger与AuthorityStore持久消费最多5次。失败必须取得签名诊断及真实事务证明，调用原NativeRecovery/CAS恢复，不重跑整个安装命令、不SKIP已成功阶段。私有Ledger目录保留内容寻址的完整终态/失败报告。
+
+首次批准正文现包含完整permit_cycle策略；AuthorityStore由受信管理员在独立认证后register_cycle，服务按策略SHA、review ID、批准正文SHA核验每个周期请求。IssuerService对代码身份变化持久停止原周期，普通UNKNOWN保持可对账HOLD。`approved_config.py`仅执行管理员预映射的、首次许可逐项批准的专用JSON配置CAS，校验before/after/payload/checkpoint SHA，O_EXCL保留原始备份和意图、fsync、Fence、写后校验；不接收任意路径/命令，不允许源代码调整。部分输出保留，需先可信对账，不能盲重试。
+
+生产集成需原受信通道提供真实Writer身份、Lease/Fence和事务/备份/检查点回执；测试中的TEST_ONLY host facts和签名钥匙仅为隔离测试，绝不作为英国生产验收。未修改英国冻结文件，未运行旧Prepare、安装、激活或回滚。原R1–R4、未变16阶段及257文件旧Kit继承原结果。INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。

@@ -63,4 +63,42 @@ class ServiceTests(unittest.TestCase):
     def test_no_unsigned_or_unclaimed_admission(self):
         with self.assertRaises(Hold):self.provider.request(self.g,'not_consumed','authorize_first_admission')
         self.assertEqual(self.store.db.execute('SELECT count(*) FROM attempts').fetchone()[0],0)
+    def cycle_registration(self):
+        from permit_cycle import policy
+        value=policy()
+        self.store.register_cycle(self.g,value,{'grant_sha256':digest(self.g),
+            'approval_body_sha256':self.g['approval_body_sha256'],'cycle_policy_sha256':digest(value),'review_id':9000000001})
+        return {'policy_sha256':digest(value),'review_id':9000000001,'approval_body_sha256':self.g['approval_body_sha256']}
+    def cycle_host(self,receipt):
+        receipt['result'].update(status='UNCHANGED',binding=self.cycle_payload,
+            source_identity={k:self.g[k] for k in ('source_commit','source_tree','kit_sha256','manifest_sha256')})
+    def test_cycle_same_review_policy_service_binding(self):
+        self.cycle_payload=self.cycle_registration();self.change=self.cycle_host
+        result=self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)
+        self.assertEqual(result['status'],'UNCHANGED')
+    def test_cycle_registration_requires_authenticated_policy_hash(self):
+        from permit_cycle import policy
+        with self.assertRaises(Hold):self.store.register_cycle(self.g,policy(),{})
+    def test_cycle_cannot_change_approval_per_retry(self):
+        self.cycle_payload=self.cycle_registration();self.change=self.cycle_host
+        self.cycle_payload['review_id']+=1
+        with self.assertRaises(Hold):self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)
+    def test_cycle_source_change_permanently_stops_original_round(self):
+        self.cycle_payload=self.cycle_registration()
+        def changed(receipt):
+            self.cycle_host(receipt);receipt['result']['source_identity']['source_commit']='f'*40
+        self.change=changed
+        with self.assertRaises(Hold):self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)
+        self.change=self.cycle_host
+        with self.assertRaises(Hold):self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)
+        self.assertEqual(self.store.db.execute('SELECT stopped FROM cycles').fetchone()[0],1)
+    def test_cycle_configuration_not_in_first_scope_denied(self):
+        payload=self.cycle_registration();self.consume();payload['action']={'id':'unapproved'}
+        with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','apply_approved_configuration',payload)
+    def test_cycle_unknown_holds_without_revoking_permit(self):
+        self.cycle_payload=self.cycle_registration()
+        self.change=lambda receipt:receipt['result'].update(status='UNKNOWN')
+        with self.assertRaises(Hold):self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)
+        self.change=self.cycle_host
+        self.assertEqual(self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)['status'],'UNCHANGED')
 if __name__=='__main__':unittest.main()

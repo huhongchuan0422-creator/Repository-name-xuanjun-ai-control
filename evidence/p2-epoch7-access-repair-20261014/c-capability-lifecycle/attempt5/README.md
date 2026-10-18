@@ -90,3 +90,20 @@ The exact new approval body explicitly states the fixed no-replay retry policy
 and inherited 107-payload/16-phase/no-TLS-issuance effect scope. Production grants
 must name `native_recovery.NativeRecovery` as the recovery entry; legacy entries
 cannot be substituted. One approval binds all five attempts and the issuer key.
+
+
+## Owner最终规则：ONE_PERMIT_MAX_5_ATTEMPTS（2026-10-18）
+
+适用于玄钧云汇今后所有新安装器、安装方案和执行许可。一次独立审核签发一份许可；同一Grant最多5次受控Attempt，不得拆成5份许可，不得逐次要求Dots新审核。首次批准必须绑定准确Source Commit/Tree、Kit/Manifest及SHA、目标主机、执行身份、UTC有效期、持久额度规则、诊断与配置范围、安全恢复入口、检查点和幂等条件、Writer及Lease/Fence、UNKNOWN/部分写入停止条件以及成功/耗尽/下一轮规则。
+
+失败自动进入可信诊断、事务对账、已批准配置调整、原生CAS恢复和幂等续接；满足原许可条件才继续下一次。成功立即终止，剩余额度失效；5次失败停止并保留集中失败报告。HOLD不自动废除许可，但UNKNOWN、未确认部分写入、事务回执不一致、Writer/Fence冲突、无法确认检查点、过期或错版本时禁止继续。原许可允许的可信对账证明安全后，可使用同一许可剩余额度，不需要重新签发。
+
+源码变化停止原周期；保留日志和检查点，修复并测试后，仅审核受影响变化，再签发下一轮新许可。不得在旧许可下修改生产源码并安装未经审核的新版本。已消费或过期的旧许可不恢复，旧单次Successor许可不自动解释为五次。
+
+### P2本次实际实现与边界
+
+`attempt5/runtime/permit_cycle.py`提供自动循环入口（接收构造真实NativeRecovery的factory），同一review ID/批准正文SHA和Grant贯穿全周期；原Ledger与AuthorityStore持久消费最多5次。失败必须取得签名诊断及真实事务证明，调用原NativeRecovery/CAS恢复，不重跑整个安装命令、不SKIP已成功阶段。私有Ledger目录保留内容寻址的完整终态/失败报告。
+
+首次批准正文现包含完整permit_cycle策略；AuthorityStore由受信管理员在独立认证后register_cycle，服务按策略SHA、review ID、批准正文SHA核验每个周期请求。IssuerService对代码身份变化持久停止原周期，普通UNKNOWN保持可对账HOLD。`approved_config.py`仅执行管理员预映射的、首次许可逐项批准的专用JSON配置CAS，校验before/after/payload/checkpoint SHA，O_EXCL保留原始备份和意图、fsync、Fence、写后校验；不接收任意路径/命令，不允许源代码调整。部分输出保留，需先可信对账，不能盲重试。
+
+生产集成需原受信通道提供真实Writer身份、Lease/Fence和事务/备份/检查点回执；测试中的TEST_ONLY host facts和签名钥匙仅为隔离测试，绝不作为英国生产验收。未修改英国冻结文件，未运行旧Prepare、安装、激活或回滚。原R1–R4、未变16阶段及257文件旧Kit继承原结果。INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。

@@ -12,7 +12,8 @@ from authority_store import AuthorityStore
 
 HOST_OPERATIONS=frozenset(('authorize_first_admission','authenticate_native_recovery',
     'verify_completed_phase','verify_phase_commit','reconcile_native_intent',
-    'commit_safe_reconciliation','reconcile_unadmitted','verify_terminal'))
+    'commit_safe_reconciliation','reconcile_unadmitted','verify_terminal',
+    'verify_cycle_binding','diagnose_attempt','apply_approved_configuration'))
 
 class IssuerService(object):
     def __init__(self, store, host_readback, signer, issuer):
@@ -62,13 +63,31 @@ class IssuerService(object):
             need(operation in HOST_OPERATIONS,'UNREVIEWED_OPERATION')
             row=self.store.db.execute('SELECT ordinal,state FROM attempts WHERE id=? AND grant_id=?',
                                      (attempt,grant['grant_id'])).fetchone()
-            need(row is not None,'UNCLAIMED_ATTEMPT')
+            need(row is not None or (operation=='verify_cycle_binding' and attempt=='CANDIDATE'),'UNCLAIMED_ATTEMPT')
+            cycle_operation=operation in ('verify_cycle_binding','diagnose_attempt','apply_approved_configuration')
+            if cycle_operation:
+                approved=self.store.cycle(grant,payload)
+                if operation=='apply_approved_configuration':
+                    need(payload.get('action') in approved['configuration_actions'],'UNAPPROVED_CONFIG')
+                    need(row is not None and row[1]=='UNKNOWN','CONFIG_AFTER_RECONCILIATION_FORBIDDEN')
             receipt=self._host(grant,attempt,operation,payload)
             observed=receipt['result']
             need(observed.get('status') not in (None,'UNKNOWN'),'HOST_UNKNOWN')
             # Recheck the exact lease after host readback. An expired/stolen
             # lease cannot sign an admission, recovery or terminal response.
             self.store.transaction(lambda:self.store._fence(grant,token))
+            if cycle_operation:
+                need(observed.get('binding')==payload,'CYCLE_HOST_BINDING')
+                if operation=='verify_cycle_binding':
+                    identity={k:grant[k] for k in ('source_commit','source_tree','kit_sha256','manifest_sha256')}
+                    if observed.get('source_identity')!=identity:
+                        self.store.stop_cycle(grant,'SOURCE_CHANGE_NEW_PERMIT',token)
+                    need(observed.get('source_identity')==identity and observed.get('status')=='UNCHANGED','SOURCE_CHANGE_NEW_PERMIT')
+                if operation=='diagnose_attempt':
+                    identity={k:grant[k] for k in ('source_commit','source_tree','kit_sha256','manifest_sha256')}
+                    if observed.get('source_identity')!=identity:
+                        self.store.stop_cycle(grant,'SOURCE_CHANGE_NEW_PERMIT',token)
+                    need(observed.get('source_identity')==identity,'SOURCE_CHANGE_NEW_PERMIT')
             if operation in ('commit_safe_reconciliation','reconcile_unadmitted','verify_terminal'):
                 proof=observed.get('proof')
                 need(type(proof) is dict and proof.get('outcome')==

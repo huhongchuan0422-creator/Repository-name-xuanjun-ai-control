@@ -41,4 +41,12 @@ class AuthorizationTests(unittest.TestCase):
         with self.assertRaises(Hold):self.validate()
     def test_missing_approval_never_fetches(self):
         with self.assertRaises(Hold):a.authenticate(None,self.g,self.p)
+    def test_single_approval_explicitly_binds_whole_autonomous_cycle(self):
+        self.assertEqual(self.wanted['permit_cycle']['mode'],'ONE_PERMIT_MAX_5_ATTEMPTS')
+        self.assertFalse(self.wanted['permit_cycle']['new_approval_per_retry'])
+        self.assertEqual(self.validate()['cycle_policy_sha256'],a.digest(self.wanted['permit_cycle']))
+    def test_unapproved_configuration_scope_cannot_be_added_after_review(self):
+        value=dict(self.wanted['permit_cycle'])
+        value['configuration_actions']=[{'id':'repair','before_sha256':'a'*64,'after_sha256':'b'*64,'payload_sha256':'b'*64,'checkpoint_sha256':'c'*64}]
+        with self.assertRaises(Hold):a.validate(json.dumps(self.value).encode(),9000000001,self.g,self.p,value)
 if __name__=='__main__':unittest.main()
