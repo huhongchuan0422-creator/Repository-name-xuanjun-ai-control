@@ -26,6 +26,16 @@ class ReleaseTests(unittest.TestCase):
   self.base={'review_trust_sha256':digest(b'{}'),'state':'READONLY_PLAN','transaction':r.TXN,'manifest_sha256':digest(raw),'source_commit':'a'*40,'main_current':str(self.b/'old-release'),'previous_https_sha256':digest(r.HTTPS.read_bytes()),'nginx':{'files':{str(r.HTTPS):digest(r.HTTPS.read_bytes())},'master':'fixture-master'},'account_uid':12345,'account_gid':12345,'config_sha256':digest(b'{}'),'runtime_config_sha256':digest(b'{}'),'target_acceptance_sha256':digest(b'{}'),'production_changes':0}
   self.approval={'decision':'INSTALL_APPROVED','transaction':r.TXN,'plan_sha256':digest(canonical(self.base)),'manifest_sha256':digest(raw),'source_commit':'a'*40,'max_executions':1,'rollback_approved':True,'issued_unix':int(time.time())-1,'expires_unix':int(time.time())+600,'review_comment_id':5,'ci_run_id':6}
   self.calls=[];self.fail=None
+  private_config_fixture=patch.object(r,'private_config',lambda path:json.loads(Path(path).read_bytes()))
+  private_config_fixture.start();self.addCleanup(private_config_fixture.stop)
+  # Explicit fixture adaptation: files belong to this sandbox UID, not root.
+  from scripts import pr122_customer_attempts as attempts
+  self.real_read=attempts.read_private
+  self.fs_guard=patch.object(attempts,'protected_directory',lambda path:None)
+  self.fs_guard.start();self.addCleanup(self.fs_guard.stop)
+  def fixture_read(path):return json.loads(Path(path).read_bytes())
+  self.read_guard=patch.object(attempts,'read_private',fixture_read)
+  self.read_guard.start();self.addCleanup(self.read_guard.stop)
  def fake_run(self,args):
   self.calls.append(args)
   if self.fail and self.fail(args):raise Denied('SIMULATED_INTERRUPTION')

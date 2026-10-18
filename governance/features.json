@@ -133,7 +133,8 @@
           "R4 temporary containment candidate disables HTTP disconnect before store/body/audit business state access for every caller; full authenticated disconnect remains NOT_IMPLEMENTED and migration scope acceptance requires independent decision",
           "R4 controlled-install preparation reuses exact root engine and approved guard; fixed one-shot action, source/new-PID gates, proposed empty403 acceptance and explicit backend-offline rollback require independent plan approval; synthetic root filesystem tests are not production acceptance",
           "I1: exact independently received action approval must be separately pinned by Owner root; canonical GitHub commit/tree/code/ZIP facts plus one-attempt durable consumption and distinct outage-consented offline rollback fail closed before state or service mutation; shared GitHub author is not reviewer independence",
-          "PR122 customer channel: exact four root-owned commands only; immutable feaef687 customer bundle and original signed install gate remain mandatory; Owner manual grant after independent channel review, no production grant implied by isolated tests"
+          "PR122 customer channel: exact four root-owned commands only; immutable feaef687 customer bundle and original signed install gate remain mandatory; Owner manual grant after independent channel review, no production grant implied by isolated tests",
+          "客户原安装器仅新明确许可支持最多五次持久化受控准入；旧单次不扩权、UNKNOWN/部分执行与成功不重放，限安装副作用前且有准确诊断恢复证据的人工再尝试；详见客户中心实施文档2026-10-18增量。"
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
@@ -145,13 +146,15 @@
           "tests/test_legacy_disconnect_guard.py",
           "tests/test_r4_controlled_install.py",
           "tests/test_r4_install_approval.py",
-          "tests/test_pr122_domestic_customer_channel.py"
+          "tests/test_pr122_domestic_customer_channel.py",
+          "tests/test_pr122_customer_attempts.py"
         ]
       },
       "reuse": [
         "PR122 immutable Tokyo source archive and manifest",
         "existing Domestic root-managed /var/www and Certbot patterns",
-        "existing PR99 transaction and unknown-state safety principles"
+        "existing PR99 transaction and unknown-state safety principles",
+        "复用 scripts/pr122_customer_release.py 原 apply、网站共享锁及固定事务；docs/development/PR122_CUSTOMER_CENTER_IMPLEMENTATION_20261016.md 记录候选边界，不新增任务或生产执行通道。"
       ],
       "paths": [
         "scripts/pr122_build_website_candidate.py",
@@ -176,7 +179,9 @@
         "tests/test_r4_controlled_install.py",
         "tests/test_r4_install_approval.py",
         "scripts/pr122_domestic_customer_channel.py",
-        "tests/test_pr122_domestic_customer_channel.py"
+        "tests/test_pr122_domestic_customer_channel.py",
+        "scripts/pr122_customer_attempts.py",
+        "tests/test_pr122_customer_attempts.py"
       ]
     },
     {

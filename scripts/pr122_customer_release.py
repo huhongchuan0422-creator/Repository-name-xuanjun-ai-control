@@ -15,6 +15,7 @@ import time
 import urllib.request
 from pathlib import Path
 from scripts.pr122_customer_core import Denied,canonical,digest,private_path,secure_write
+from scripts.pr122_customer_attempts import Attempts, SAFE_ERRORS, validate_approval
 from scripts.pr122_customer_review import trust_digest
 
 CODE=Path('/usr/local/lib/xuanjun-customer-center')
@@ -144,7 +145,7 @@ def github(path):
 
 def gate(comment_id,expected_plan,fetch=github):
     c=fetch('issues/comments/'+str(comment_id));need(c['id']==comment_id and c['user']['login']==OWNER and c['issue_url'].endswith('/issues/122') and c['body'].startswith('XUANJUN_CUSTOMER_INSTALL\n'),'APPROVAL_ORIGIN')
-    a=json.loads(c['body'].split('\n',1)[1]);need(a['decision']=='INSTALL_APPROVED' and a['transaction']==TXN and a['plan_sha256']==digest(canonical(expected_plan)) and a['manifest_sha256']==expected_plan['manifest_sha256'] and a['source_commit']==expected_plan['source_commit'] and a['max_executions']==1 and a['rollback_approved'] is True,'APPROVAL_BINDING')
+    a=json.loads(c['body'].split('\n',1)[1]);need(a['decision']=='INSTALL_APPROVED' and a['transaction']==TXN and a['plan_sha256']==digest(canonical(expected_plan)) and a['manifest_sha256']==expected_plan['manifest_sha256'] and a['source_commit']==expected_plan['source_commit'] and validate_approval(a)>=1 and a['rollback_approved'] is True,'APPROVAL_BINDING')
     need(type(a['issued_unix']) is int and type(a['expires_unix']) is int and a['issued_unix']<=time.time()<a['expires_unix'] and 0<a['expires_unix']-a['issued_unix']<=7200,'APPROVAL_EXPIRY')
     r=fetch('issues/comments/'+str(a['review_comment_id']))
     need(r['id']!=comment_id and r['user']['login']==OWNER and r['issue_url'].endswith('/issues/122'),'REVIEW_RECORD_ORIGIN')
@@ -177,9 +178,20 @@ def apply(folder,comment):
     lock=private_path(LOCK);fd=os.open(lock,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'w') as stream:
         fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        observed=plan(folder);approval=gate(comment,observed);manifest,raw,files=source(folder)
-        STATE.mkdir(mode=0o700,exist_ok=True);txn=STATE/TXN;txn.mkdir(mode=0o700)
-        receipt={'state':'INSTALLING','approval_comment':comment,'approval':approval,'plan':observed,'owned':{},'completed':[],'intent':None}
+        observed=plan(folder);approval=gate(comment,observed)
+        attempts=Attempts(STATE,TXN,approval,comment,observed,atomic_json,CONFIG)
+        try:
+            manifest,raw,files=source(folder)
+            need(plan_without_absence(observed)==observed,'ACTIVATION_DRIFT')
+            gate(comment,observed)
+        except BaseException as error:
+            safe=isinstance(error,Denied) and str(error) in SAFE_ERRORS
+            attempts.finish('SAFE_PREACTIVATION_FAILURE' if safe else 'HOLD_UNKNOWN_OR_PARTIAL', str(error) if safe else type(error).__name__)
+            raise
+        # From this point any interruption is unknown/partial and never retried.
+        # The durable STARTED_UNKNOWN ledger also fences process death here.
+        txn=STATE/TXN;txn.mkdir(mode=0o700)
+        receipt={'state':'INSTALLING','attempt_id':attempts.row['attempt_id'],'attempt_number':attempts.row['number'],'approval_comment':comment,'approval':approval,'plan':observed,'owned':{},'completed':[],'intent':None}
         def save():atomic_json(txn/'receipt.json',receipt)
         save();old=HTTPS.read_bytes();secure_write(txn/'https.before',old)
         try:
@@ -207,9 +219,9 @@ def apply(folder,comment):
             run(['/usr/sbin/nginx','-t']);run(['/usr/bin/systemctl','reload','nginx']);run(['/usr/bin/systemctl','enable','--now',UNITS[2],UNITS[4],UNITS[5]])
             data=run(['/usr/bin/curl','--noproxy','*','--resolve','wenwenwenyiyiyi.work:443:127.0.0.1','--fail','--silent','--show-error','--max-time','15','https://wenwenwenyiyiyi.work/customer/center/'])
             need(digest(data)==digest(files['deploy/pr122-customer-center/ui/index.html']),'REAL_HTTPS_HTML')
-            receipt['state']='HTTPS_SMOKE_PASS_AWAIT_14_REAL_ACCEPTANCE';receipt['completed'].append('HTTPS_SMOKE');save();return receipt
+            receipt['state']='HTTPS_SMOKE_PASS_AWAIT_14_REAL_ACCEPTANCE';receipt['completed'].append('HTTPS_SMOKE');save();attempts.finish(receipt['state']);return receipt
         except BaseException:
-            receipt['state']='HOLD_PARTIAL';save();raise
+            receipt['state']='HOLD_PARTIAL';save();attempts.finish('HOLD_UNKNOWN_OR_PARTIAL');raise
 
 def plan_without_absence(expected):
     # No new effects yet except the release receipt and its root-private backup.

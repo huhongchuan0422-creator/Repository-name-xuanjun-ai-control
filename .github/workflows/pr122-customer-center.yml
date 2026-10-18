@@ -76,6 +76,20 @@ jobs:
           assert result.testsRun==150 and result.wasSuccessful() and not result.skipped and not result.expectedFailures and not result.unexpectedSuccesses
           PYTEST
           node tests/pr122_customer_auth_ui.cjs 2>&1 | tee /tmp/pr122-customer/CUSTOMER_AUTH_PRIVACY_DOM_TESTS.log
+      - name: Controlled attempts isolated non-root regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m unittest tests.test_pr122_customer_release tests.test_pr122_customer_attempts -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_ATTEMPT_TESTS.log
+          python - <<'PYATTEMPTS'
+          import json,os,re
+          from pathlib import Path
+          text=Path('/tmp/pr122-customer/CUSTOMER_ATTEMPT_TESTS.log').read_text()
+          counts=re.findall(r'Ran (\d+) tests in ',text)
+          assert counts and int(counts[-1])==33 and re.search(r'^OK$',text,re.M)
+          assert not re.search(r'skipped=|FAILED|ERROR:|FAIL:',text)
+          Path('/tmp/pr122-customer/CUSTOMER_ATTEMPT_COUNTS.json').write_text(json.dumps({'source_commit':os.environ['GITHUB_SHA'],'unique_cases':33,'passed':33,'scope':'SYNTHETIC_NONROOT_FIXTURES_NOT_SERVER_EXECUTION','production':'NOT_RUN'},sort_keys=True)+'\n')
+          PYATTEMPTS
       - name: Install isolated browser only
         run: |
           npm install --prefix "$RUNNER_TEMP/pr122-customer-browser" --no-save playwright@1.55.0
@@ -165,6 +179,7 @@ jobs:
           manifest=json.loads(manifest_raw)
           assert manifest['source_commit']==os.environ['GITHUB_SHA'] and len(files)==receipt['bound_files']==len(manifest['files'])
           assert set(files)=={x['path'] for x in manifest['files']}
+          assert {'scripts/pr122_customer_attempts.py','tests/test_pr122_customer_attempts.py'} <= set(files)
           for item in manifest['files']:
               body=files[item['path']]
               assert len(body)==item['size'] and sha(body)==item['sha256']
