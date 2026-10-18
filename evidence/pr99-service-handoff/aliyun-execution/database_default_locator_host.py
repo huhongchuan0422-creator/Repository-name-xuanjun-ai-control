@@ -30,7 +30,26 @@ class Defaults:
         if isinstance(node,ast.Attribute):return self.fullname(node.value)+'.'+node.attr
         return ''
 
+    def defaults(self,function,scope):
+        positional=function.args.posonlyargs+function.args.args
+        for arg in positional:scope[arg.arg]=Unresolved
+        for arg,node in zip(positional[len(positional)-len(function.args.defaults):],function.args.defaults):
+            try:scope[arg.arg]=self.value(node,scope)
+            except Exception:scope[arg.arg]=Unresolved
+        for arg,node in zip(function.args.kwonlyargs,function.args.kw_defaults):
+            try:scope[arg.arg]=self.value(node,scope)
+            except Exception:scope[arg.arg]=Unresolved
+        return scope
+
     def assign(self,node,scope):
+        if isinstance(node,ast.If):
+            try:
+                condition=self.value(node.test,scope)
+                if type(condition)is not bool:raise Unresolved()
+                for statement in (node.body if condition else node.orelse):self.assign(statement,scope)
+            except (Unresolved,ValueError,TypeError,IndexError,KeyError,AttributeError):
+                for child in ast.walk(node):
+                    if isinstance(child,ast.Name) and isinstance(child.ctx,ast.Store):scope[child.id]=Unresolved
         if isinstance(node,(ast.Assign,ast.AnnAssign)):
             targets=node.targets if isinstance(node,ast.Assign) else [node.target]
             try:value=self.value(node.value,scope)
@@ -45,6 +64,12 @@ class Defaults:
             v=scope.get(n.id,Unresolved)
             if v is Unresolved:raise Unresolved()
             return v
+        if isinstance(n,ast.Compare) and len(n.ops)==len(n.comparators)==1:
+            a=self.value(n.left,scope);b=self.value(n.comparators[0],scope)
+            if isinstance(n.ops[0],ast.Is) and (a is None or b is None):return a is b
+            if isinstance(n.ops[0],ast.IsNot) and (a is None or b is None):return a is not b
+            raise Unresolved()
+        if isinstance(n,ast.UnaryOp) and isinstance(n.op,ast.Not):return not self.value(n.operand,scope)
         if isinstance(n,ast.BinOp):
             a=self.value(n.left,scope);b=self.value(n.right,scope)
             if isinstance(n.op,ast.Div) and isinstance(a,PurePosixPath) and type(b)is str:return a/b
@@ -106,6 +131,7 @@ class Defaults:
         rows=[]
         for block in [self.tree]+list(self.functions.values()):
             scope=dict(self.globals)
+            if isinstance(block,ast.FunctionDef):self.defaults(block,scope)
             for node in block.body:
                 self.assign(node,scope)
                 # Only direct statement expressions; no pretending to resolve arbitrary control flow.
@@ -231,6 +257,12 @@ def observe(expected,nonce):
             expressions.append({'line':n.lineno,'expression':shape(n.args[0]) if n.args else {'kind':'NO_POSITIONAL_ARGUMENT'}})
     assert len(expressions)<=16
     assert len(json.dumps(expressions))<12000
+    resolution_nodes=[]
+    for node in ast.walk(tree):
+        selected=(isinstance(node,(ast.Assign,ast.AnnAssign)) and any(isinstance(x,ast.Name) and x.id=='database_url' and isinstance(x.ctx,ast.Store) for x in ast.walk(node))) or isinstance(node,ast.Return)
+        if selected and len(resolution_nodes)<12:
+            candidate={'line':node.lineno,'expression':shape(node)}
+            if len(json.dumps(resolution_nodes+[candidate]))<8000:resolution_nodes.append(candidate)
     contexts=[]
     for role,pid,ticks in IDENTITIES:
         row={'role':role,'pid':pid,'start_ticks':ticks,'status':'UNKNOWN','factories':[]}
@@ -249,7 +281,7 @@ def observe(expected,nonce):
         except Exception:row['factories']=[];row['status']='PROCESS_OR_DEFAULT_RESOLUTION_UNKNOWN'
         contexts.append(row)
     assert all(re.fullmatch('[A-Za-z_][A-Za-z0-9_.]{0,180}',x) for x in imported)
-    return {'scope':'PR99_PINNED_SOURCE_DEFAULT_DATABASE_CANDIDATES_NOT_EFFECTIVE_CONFIG','hostname':expected,'nonce':nonce,'observed_at':datetime.datetime.utcnow().isoformat()+'Z','source_sha256':digest,'imports':sorted(set(imported)),'factory_expressions':expressions,'contexts':contexts,'private_values_disclosed':False,'database_opened':False,'service_actions':0,'business_requests':0,'business_source_imports':0,'authoritative_writer':'UNKNOWN','enforced_fence':'UNKNOWN','limitations':['SOURCE_DEFAULT_NOT_EFFECTIVE_RUNTIME_CONFIG','ENV_ABSENCE_ASSUMED_ONLY_TO_CALCULATE_DEFAULT_NOT_CURRENT_ENV_PROOF','ANCESTOR_BINDING_NOT_PRODUCTION_PATHGUARD','ALL_WRITERS_AND_FENCE_NOT_PROVEN']}
+    return {'scope':'PR99_PINNED_SOURCE_DEFAULT_DATABASE_CANDIDATES_NOT_EFFECTIVE_CONFIG','hostname':expected,'nonce':nonce,'observed_at':datetime.datetime.utcnow().isoformat()+'Z','source_sha256':digest,'imports':sorted(set(imported)),'factory_expressions':expressions,'resolution_nodes':resolution_nodes,'contexts':contexts,'private_values_disclosed':False,'database_opened':False,'service_actions':0,'business_requests':0,'business_source_imports':0,'authoritative_writer':'UNKNOWN','enforced_fence':'UNKNOWN','limitations':['SOURCE_DEFAULT_NOT_EFFECTIVE_RUNTIME_CONFIG','ENV_ABSENCE_ASSUMED_ONLY_TO_CALCULATE_DEFAULT_NOT_CURRENT_ENV_PROOF','ANCESTOR_BINDING_NOT_PRODUCTION_PATHGUARD','ALL_WRITERS_AND_FENCE_NOT_PROVEN']}
 
 if __name__=='__main__':
     print(json.dumps(observe(EXPECTED,NONCE),sort_keys=True),flush=True)

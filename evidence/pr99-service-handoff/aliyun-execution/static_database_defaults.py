@@ -30,7 +30,26 @@ class Defaults:
         if isinstance(node,ast.Attribute):return self.fullname(node.value)+'.'+node.attr
         return ''
 
+    def defaults(self,function,scope):
+        positional=function.args.posonlyargs+function.args.args
+        for arg in positional:scope[arg.arg]=Unresolved
+        for arg,node in zip(positional[len(positional)-len(function.args.defaults):],function.args.defaults):
+            try:scope[arg.arg]=self.value(node,scope)
+            except Exception:scope[arg.arg]=Unresolved
+        for arg,node in zip(function.args.kwonlyargs,function.args.kw_defaults):
+            try:scope[arg.arg]=self.value(node,scope)
+            except Exception:scope[arg.arg]=Unresolved
+        return scope
+
     def assign(self,node,scope):
+        if isinstance(node,ast.If):
+            try:
+                condition=self.value(node.test,scope)
+                if type(condition)is not bool:raise Unresolved()
+                for statement in (node.body if condition else node.orelse):self.assign(statement,scope)
+            except (Unresolved,ValueError,TypeError,IndexError,KeyError,AttributeError):
+                for child in ast.walk(node):
+                    if isinstance(child,ast.Name) and isinstance(child.ctx,ast.Store):scope[child.id]=Unresolved
         if isinstance(node,(ast.Assign,ast.AnnAssign)):
             targets=node.targets if isinstance(node,ast.Assign) else [node.target]
             try:value=self.value(node.value,scope)
@@ -45,6 +64,12 @@ class Defaults:
             v=scope.get(n.id,Unresolved)
             if v is Unresolved:raise Unresolved()
             return v
+        if isinstance(n,ast.Compare) and len(n.ops)==len(n.comparators)==1:
+            a=self.value(n.left,scope);b=self.value(n.comparators[0],scope)
+            if isinstance(n.ops[0],ast.Is) and (a is None or b is None):return a is b
+            if isinstance(n.ops[0],ast.IsNot) and (a is None or b is None):return a is not b
+            raise Unresolved()
+        if isinstance(n,ast.UnaryOp) and isinstance(n.op,ast.Not):return not self.value(n.operand,scope)
         if isinstance(n,ast.BinOp):
             a=self.value(n.left,scope);b=self.value(n.right,scope)
             if isinstance(n.op,ast.Div) and isinstance(a,PurePosixPath) and type(b)is str:return a/b
@@ -106,6 +131,7 @@ class Defaults:
         rows=[]
         for block in [self.tree]+list(self.functions.values()):
             scope=dict(self.globals)
+            if isinstance(block,ast.FunctionDef):self.defaults(block,scope)
             for node in block.body:
                 self.assign(node,scope)
                 # Only direct statement expressions; no pretending to resolve arbitrary control flow.

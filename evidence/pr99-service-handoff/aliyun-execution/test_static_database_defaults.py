@@ -26,4 +26,10 @@ class DefaultTests(unittest.TestCase):
     def test_nested_function_rejected(self):self.assertEqual(self.values('from sqlalchemy import create_engine\ndef url():\n if True:return "sqlite:///a.db"\ne=create_engine(url())'),[(4,None)])
     def test_arbitrary_attribute_rejected(self):self.assertEqual(self.values('from sqlalchemy import create_engine\ne=create_engine("x".__class__)'),[(2,None)])
 
+
+    def test_optional_parameter_or_default(self):self.assertEqual(self.values('from sqlalchemy import create_engine\ndef engine(database_url=None):\n database_url=database_url or "sqlite:///a.db"\n return create_engine(database_url)'),[(4,'sqlite:///a.db')])
+    def test_optional_parameter_if_none(self):self.assertEqual(self.values('from sqlalchemy import create_engine\ndef engine(database_url=None):\n if database_url is None:database_url="sqlite:///a.db"\n return create_engine(database_url)'),[(4,'sqlite:///a.db')])
+    def test_unknown_parameter_stays_unresolved(self):self.assertEqual(self.values('from sqlalchemy import create_engine\ndef engine(database_url):\n if database_url is None:database_url="sqlite:///a.db"\n return create_engine(database_url)'),[(4,None)])
+    def test_keyword_default(self):self.assertEqual(self.values('from sqlalchemy import create_engine\ndef engine(*,database_url="sqlite:///a.db"):\n return create_engine(database_url)'),[(3,'sqlite:///a.db')])
+
 if __name__=='__main__':unittest.main()
