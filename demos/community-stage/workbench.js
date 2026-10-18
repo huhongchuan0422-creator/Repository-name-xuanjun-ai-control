@@ -1,7 +1,7 @@
 'use strict';
 (()=>{
  const $=id=>document.getElementById(id);let epoch=0,config=null,busy=false,profileVersion=null,orderCursor=null,orderAfter='',reportCursor=null,reportWindow=null,adCursor=null,itemCursor=null;
- let financialPage=null,refundPage=null,refundSelection=0,detailSelection=0,staffPage=null;
+ let financialPage=null,refundPage=null,refundSelection=0,detailSelection=0,staffPage=null,activeAction=null;
  const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult','refundApplicationResult','staffResult','storeList','storeResult','billResult','refundApplications','orderLines','staffRecords'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;clearStaffSelection();staffPage=null;$('moreStaff').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;itemCursor=null;$('moreItems').hidden=true;financialPage=null;$('financialMore').hidden=true;billPage=null;billAuditPage=null;refundPage=null;clearRefundSelection();clearOrderLines();$('refundApplicationDecision').value='APPROVED';detailSelection++;$('moreRefundApplications').hidden=true;$('moreBill').hidden=true;$('moreBillAudit').hidden=true;};
  const status=message=>{$('notice').textContent=message;};
  window.configureCommunityWorkbench=value=>{
@@ -16,8 +16,8 @@
   if(!response.ok)throw Error(response.status===403?'当前账号无此权限，或入驻需重新核验':'操作失败或结果未知，请刷新确认后再操作');
   return data.result;
  };
- const action=async fn=>{if(busy||!config)return;busy=true;const ticket=epoch;for(const b of document.querySelectorAll('button'))b.disabled=true;
-  try{await fn(ticket);if(ticket===epoch)status('操作完成');}catch(e){if(ticket===epoch)status(e.message);}finally{if(ticket===epoch){busy=false;for(const b of document.querySelectorAll('button'))b.disabled=false;}}};
+ const action=async(fn,context=null)=>{if(busy||!config)return;busy=true;const ticket=epoch,task={context};activeAction=task;for(const b of document.querySelectorAll('button'))b.disabled=true;
+  try{await fn(ticket);if(ticket===epoch&&activeAction===task)status('操作完成');}catch(e){if(ticket===epoch&&activeAction===task)status(e.message);}finally{if(ticket===epoch&&activeAction===task){activeAction=null;busy=false;for(const b of document.querySelectorAll('button'))b.disabled=false;}}};
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>action(fn));return b;};
  const article=(id,text)=>{const a=document.createElement('article');a.textContent=text;$(id).append(a);return a;};
  const pageParams=after=>({limit:50,after_id:after,status:$('orderStatus').value});
@@ -47,7 +47,7 @@
  $('refundForm').onsubmit=e=>{e.preventDefault();action(async t=>{const reference=$('detailReference').value;if(!/^[A-Za-z0-9_-]{1,64}$/.test(reference))throw Error('先输入订单编号');const r=await call('refund_record',{reference,event_id:$('refundEvent').value,amount_minor:Number($('refundAmount').value)},t);if(reference!==$('detailReference').value)return;await detail(t);if(t===epoch&&reference===$('detailReference').value)$('refundResult').textContent='退款预审已记录，未执行微信退款。'+JSON.stringify(r);});};
  $('splitForm').onsubmit=e=>{e.preventDefault();action(async t=>{const shares=Object.create(null);const lines=$('splitShares').value.trim().split(/\n/);if(lines.length>20)throw Error('接收方过多');for(const line of lines){const parts=line.split(',').map(s=>s.trim());if(parts.length!==2||!parts[0]||Object.hasOwn(shares,parts[0])||!/^\d+$/.test(parts[1]))throw Error('接收方格式错误或重复');shares[parts[0]]=Number(parts[1]);}const reference=$('detailReference').value;const r=await call('split_preview',{reference,shares_bps:shares},t);if(t!==epoch||reference!==$('detailReference').value)return;$('splitResult').replaceChildren();article('splitResult','可分配金额（分）：'+r.allocatable_minor+'；退款预审（分）：'+r.refund_preview_minor);for(const [name,amount] of Object.entries(r.allocations_minor))article('splitResult',name+'：'+amount+' 分');});};
  $('reconcile').onclick=()=>action(async t=>{const r=await call('reconciliation',{},t);if(t===epoch)$('finance').textContent=JSON.stringify(r,null,2);});
- async function providerAction(t,operation,params){const context=config;if(!context?.providerWorkspace)throw Error('当前账号未配置财务处理工作台');const response=await fetch('/community/provider-actions',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':context.csrf},body:JSON.stringify({workspace:context.providerWorkspace,operation,params})});if(t!==epoch)throw Error('身份已变化');const data=await response.json();if(t!==epoch)throw Error('身份已变化');if(!response.ok)throw Error('请求未确认，请保留原申请编号并查询，不要重复提交');$('providerActionResult').textContent=JSON.stringify(data.result,null,2);return data.result;}
+ async function providerAction(t,operation,params,current=()=>true){if(t!==epoch||!current())throw Error('当前选择已变化');const context=config;if(!context?.providerWorkspace)throw Error('当前账号未配置财务处理工作台');const response=await fetch('/community/provider-actions',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':context.csrf},body:JSON.stringify({workspace:context.providerWorkspace,operation,params})});if(t!==epoch||!current())throw Error('当前选择已变化');const data=await response.json();if(t!==epoch||!current())throw Error('当前选择已变化');if(!response.ok)throw Error('请求未确认，请保留原申请编号并查询，不要重复提交');if(!operation.startsWith('bill_'))$('providerActionResult').textContent=JSON.stringify(data.result,null,2);return data.result;}
  const providerReference=()=>({reference:$('providerOrder').value,request_id:$('providerRequest').value});
  $('newProviderRequest').onclick=()=>{if(busy)return;$('providerRequest').value='pa_'+crypto.randomUUID().replaceAll('-','');$('providerActionResult').replaceChildren();};
  $('providerRefundForm').onsubmit=e=>{e.preventDefault();action(t=>providerAction(t,'refund',{...providerReference(),amount_minor:Number($('providerRefundAmount').value),reason:$('providerRefundReason').value}));};
@@ -126,30 +126,44 @@
  }
  $('readOrderLines').onclick=()=>action(t=>{const selection=++detailSelection;clearOrderLines();return orderLines(t,$('detailReference').value,selection);});
  $('completeOrder').onclick=()=>action(async t=>{const reference=$('detailReference').value,selection=detailSelection;if($('completionRevision').value==='')throw Error('先读取原篮子商品快照和履约修订号');const r=await commerce(t,'order_complete',{reference,expected_revision:Number($('completionRevision').value),note:$('completionNote').value});if(t===epoch&&selection===detailSelection&&reference===$('detailReference').value){$('completionRevision').value=r.fulfillment_revision;await orderLines(t,reference,selection);}});
- let billPage=null,billAuditPage=null;
+ let billPage=null,billAuditPage=null,billSelection=0;
  function billParams(){return {kind:$('billKind').value,bill_date:$('billDate').value};}
- async function billAction(t,operation,params){
-  const result=await providerAction(t,operation,params);
-  if(t===epoch)$('billResult').textContent=JSON.stringify(result,null,2);
+ let billSelectionKey=JSON.stringify(billParams());
+ function billChanged(){
+  const key=JSON.stringify(billParams());if(key===billSelectionKey)return;
+  billSelectionKey=key;billSelection++;billPage=null;billAuditPage=null;
+  $('billResult').replaceChildren();$('moreBill').hidden=true;$('moreBillAudit').hidden=true;
+  // Changing a bill selection may release only its read request, never an
+  // unrelated funds action. Its late completion cannot unlock a newer action.
+  if(activeAction?.context==='bill'){activeAction=null;busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!config;}
+  if(config&&!activeAction)status('账单选择已变化，请重新读取或核对');
+ }
+ for(const id of ['billKind','billDate']){$(id).oninput=billChanged;$(id).onchange=billChanged;}
+ const billCurrent=(t,selection,params)=>t===epoch&&selection===billSelection&&params.kind===$('billKind').value&&params.bill_date===$('billDate').value;
+ const billRun=fn=>{billChanged();return action(t=>fn(t,billSelection),'bill');};
+ async function billAction(t,operation,params,selection){
+  const current=()=>billCurrent(t,selection,params);
+  const result=await providerAction(t,operation,params,current);
+  if(current())$('billResult').textContent=JSON.stringify(result,null,2);
   return result;
  }
- $('fetchBill').onclick=()=>action(t=>billAction(t,'bill_fetch',billParams()));
- async function billRows(t,params,offset){
-  const result=await billAction(t,'bill_rows',{...params,offset});
-  if(t!==epoch)return;
+ $('fetchBill').onclick=()=>billRun((t,s)=>billAction(t,'bill_fetch',billParams(),s));
+ async function billRows(t,params,offset,selection){
+  const result=await billAction(t,'bill_rows',{...params,offset},selection);
+  if(!billCurrent(t,selection,params))return;
   billPage=result.has_more?{params,offset:result.next_offset}:null;
   $('moreBill').hidden=!billPage;
  }
- $('readBill').onclick=()=>action(t=>billRows(t,billParams(),0));
- $('moreBill').onclick=()=>action(t=>billPage&&billRows(t,billPage.params,billPage.offset));
- $('reconcileBill').onclick=()=>action(t=>billAction(t,'bill_reconcile',billParams()));
- async function billAudit(t,params,after_id=''){
-  const result=await billAction(t,'bill_audit',{...params,after_id});
-  if(t!==epoch)return;
+ $('readBill').onclick=()=>billRun((t,s)=>billRows(t,billParams(),0,s));
+ $('moreBill').onclick=()=>billRun((t,s)=>billPage&&billRows(t,billPage.params,billPage.offset,s));
+ $('reconcileBill').onclick=()=>billRun((t,s)=>billAction(t,'bill_reconcile',billParams(),s));
+ async function billAudit(t,params,after_id='',selection){
+  const result=await billAction(t,'bill_audit',{...params,after_id},selection);
+  if(!billCurrent(t,selection,params))return;
   billAuditPage=result.has_more?{params,after_id:result.next_cursor}:null;
   $('moreBillAudit').hidden=!billAuditPage;
  }
- $('billAudit').onclick=()=>action(t=>billAudit(t,billParams()));
- $('moreBillAudit').onclick=()=>action(t=>billAuditPage&&billAudit(t,billAuditPage.params,billAuditPage.after_id));
+ $('billAudit').onclick=()=>billRun((t,s)=>billAudit(t,billParams(),'',s));
+ $('moreBillAudit').onclick=()=>billRun((t,s)=>billAuditPage&&billAudit(t,billAuditPage.params,billAuditPage.after_id,s));
  window.configureCommunityWorkbench(null);
 })();

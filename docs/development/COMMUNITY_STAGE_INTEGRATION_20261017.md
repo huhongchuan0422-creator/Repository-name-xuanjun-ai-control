@@ -493,3 +493,12 @@ https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/ac
 社区live激活仍须原controller提供社区release目标scope、lease/fence/epoch与ACK绑定
 接口，才能复用原执行权，不得另起docker writer冒充既有通道。本轮离线发布不声称
 已经补齐这个跨系统接口。
+
+### 账单选择上下文补修（2026-10-19）
+
+第四批后继续检查发现工作台日期/账单类型选择未隔离旧请求和分页。这是已有界面
+行为缺陷，不依赖提供商账单语义合同。修复绑定选择代次与kind/bill_date，选择变化
+清除两类分页及旧展示，迟到成功/失败不得污染当前选择；仅取消过期账单界面的
+等待状态，旧请求收尾不得解锁新请求，改日期不得解锁未完成的资金操作。Node DOM回归覆盖读取、下载、核对、审计分页、
+类型/日期切换、身份切换及错误恢复。准确提交Hosted终态另登记原Issue76；本段
+不继承旧CI为本次PASS，不改变任何对账语义、权限或生产状态。
