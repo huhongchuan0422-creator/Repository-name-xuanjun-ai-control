@@ -34,8 +34,8 @@ class IngressTests(unittest.TestCase):
         self.gate=None;gc.collect();os.close(self.fd);self.temp.cleanup()
 
     def test_seal_rejects_new_jobs_but_finishes_accepted_queue(self):
-        self.gate.submit('accepted');self.assertEqual(self.gate.seal()['status'],'WAITING')
-        with self.assertRaises(g.IngressHold):self.gate.submit('late')
+        self.gate.submit('job', 'accepted');self.assertEqual(self.gate.seal()['status'],'WAITING')
+        with self.assertRaises(g.IngressHold):self.gate.submit('job', 'late')
         seen=[];self.gate.process_one(lambda item:seen.append(item))
         self.assertEqual(seen,['accepted']);self.assertEqual(self.gate.query()['status'],'DRAINED')
 
@@ -43,7 +43,7 @@ class IngressTests(unittest.TestCase):
         entered=threading.Event();release=threading.Event();errors=[]
         def work():entered.set();release.wait(5)
         def run():
-            try:self.gate.run_sync(work)
+            try:self.gate.run_sync('sync',work)
             except BaseException as e:errors.append(type(e).__name__)
         thread=threading.Thread(target=run);thread.start();self.assertTrue(entered.wait(2))
         try:
@@ -56,7 +56,7 @@ class IngressTests(unittest.TestCase):
     def test_concurrent_seal_and_submit_cannot_accept_after_seal_returns(self):
         self.gate.seal();accepted=[];rejected=[]
         def put():
-            try:self.gate.submit('never');accepted.append(True)
+            try:self.gate.submit('job', 'never');accepted.append(True)
             except g.IngressHold:rejected.append(True)
         threads=[threading.Thread(target=put) for _ in range(8)]
         for t in threads:t.start()
@@ -65,7 +65,7 @@ class IngressTests(unittest.TestCase):
         self.assertEqual(self.gate.query()['status'],'DRAINED')
 
     def test_queued_exception_is_unknown_and_not_retried(self):
-        token=self.gate.submit('payload');self.gate.seal();calls=[]
+        token=self.gate.submit('job', 'payload');self.gate.seal();calls=[]
         def fail(item):calls.append(item);raise TimeoutError('original-result-unknown')
         with self.assertRaises(TimeoutError):self.gate.process_one(fail)
         self.assertEqual(self.gate.wait_drained(0)['status'],'UNKNOWN')
@@ -76,7 +76,7 @@ class IngressTests(unittest.TestCase):
         self.assertEqual(value['status'],'DRAINED');self.assertEqual(calls,['payload'])
 
     def test_sync_exception_requires_original_terminal_accounting(self):
-        with self.assertRaises(OSError):self.gate.run_sync(lambda:(_ for _ in ()).throw(OSError()))
+        with self.assertRaises(OSError):self.gate.run_sync('sync',lambda:(_ for _ in ()).throw(OSError()))
         self.gate.seal();self.assertEqual(self.gate.query()['unknown'],1)
         token=next(iter(self.gate.tickets))
         with self.assertRaises(g.IngressHold):
@@ -84,11 +84,11 @@ class IngressTests(unittest.TestCase):
         self.assertEqual(self.gate.reconcile_unknown(token,lambda *a:{'outcome':'ABORTED_WITH_NO_EFFECT','proof_sha256':'d'*64})['status'],'DRAINED')
 
     def test_recreated_object_same_pid_is_not_an_empty_success(self):
-        self.gate.submit('lost-after-crash');self.gate.seal();raw=os.pread(self.fd,16385,0)
+        self.gate.submit('job', 'lost-after-crash');self.gate.seal();raw=os.pread(self.fd,16385,0)
         self.gate=None;gc.collect();self.gate=self.build()
         self.assertEqual(self.gate.query()['status'],'UNKNOWN_PRIOR_PROCESS')
         self.assertIsNone(self.gate.query()['pending'])
-        with self.assertRaises(g.IngressHold):self.gate.submit('replay')
+        with self.assertRaises(g.IngressHold):self.gate.submit('job', 'replay')
         self.assertEqual(os.pread(self.fd,16385,0),raw)
 
     def test_second_live_instance_cannot_borrow_same_original_fd(self):
@@ -100,7 +100,7 @@ class IngressTests(unittest.TestCase):
         self.assertEqual(result.returncode,0)
 
     def test_real_new_process_preserves_seal_and_reports_unknown(self):
-        self.gate.submit('not-replayed');self.gate.seal();raw=os.pread(self.fd,16385,0)
+        self.gate.submit('job', 'not-replayed');self.gate.seal();raw=os.pread(self.fd,16385,0)
         self.gate=None;gc.collect();os.close(self.fd)
         code='''import sys,os,json
 sys.path.insert(0,sys.argv[1])
@@ -121,7 +121,7 @@ os.close(fd)
     def test_partial_seal_is_closed_and_preserved(self):
         os.pwrite(self.fd,b'{',0)
         with self.assertRaises(g.IngressHold):self.gate.query()
-        with self.assertRaises(g.IngressHold):self.gate.submit('late')
+        with self.assertRaises(g.IngressHold):self.gate.submit('job', 'late')
         self.assertEqual(os.pread(self.fd,100,0),b'{')
 
     def test_short_seal_write_cannot_reopen_or_retry(self):
@@ -131,7 +131,7 @@ os.close(fd)
             with self.assertRaises(g.IngressHold):self.gate.seal()
         raw=os.pread(self.fd,16385,0)
         with self.assertRaises(g.IngressHold):self.gate.seal()
-        with self.assertRaises(g.IngressHold):self.gate.submit('late')
+        with self.assertRaises(g.IngressHold):self.gate.submit('job', 'late')
         self.assertEqual(os.pread(self.fd,16385,0),raw)
 
     def test_missing_bootstrap_cannot_certify_even_empty_queue(self):
@@ -157,12 +157,12 @@ os.close(fd)
 
     def test_grant_lost_after_sync_handler_keeps_unknown_outcome(self):
         def work():self.admitted=False
-        with self.assertRaises(g.IngressHold):self.gate.run_sync(work)
+        with self.assertRaises(g.IngressHold):self.gate.run_sync('sync',work)
         self.admitted=True;self.gate.seal()
         self.assertEqual(self.gate.query()['status'],'UNKNOWN')
 
     def test_grant_lost_after_queued_handler_keeps_unknown_without_replay(self):
-        self.gate.submit('accepted');self.gate.seal()
+        self.gate.submit('job', 'accepted');self.gate.seal()
         def work(item):self.admitted=False
         with self.assertRaises(g.IngressHold):self.gate.process_one(work)
         self.admitted=True
@@ -172,20 +172,27 @@ os.close(fd)
     def test_forked_or_changed_process_cannot_use_parent_gate(self):
         foreign={**self.gate.process,'pid':self.gate.process['pid']+1}
         with patch.object(g,'runtime_identity',return_value=foreign):
-            with self.assertRaises(g.IngressHold):self.gate.submit('late')
+            with self.assertRaises(g.IngressHold):self.gate.submit('job', 'late')
             with self.assertRaises(g.IngressHold):self.gate.seal()
         self.assertEqual(os.fstat(self.fd).st_size,0)
 
     def test_capacity_is_bounded_without_losing_accepted_work(self):
-        for _ in range(4):self.gate.submit('accepted')
-        with self.assertRaises(g.IngressHold):self.gate.submit('overflow')
+        for i in range(4):self.gate.submit('job'+str(i), 'accepted')
+        with self.assertRaises(g.IngressHold):self.gate.submit('job', 'overflow')
         self.assertEqual(self.gate.seal()['pending'],4)
 
     def test_wait_is_bounded(self):
-        self.gate.submit('accepted');self.gate.seal()
+        self.gate.submit('job', 'accepted');self.gate.seal()
         for value in (-1,61,True):
             with self.assertRaises(g.IngressHold):self.gate.wait_drained(value)
         self.assertEqual(self.gate.wait_drained(0)['status'],'WAITING')
+
+    def test_original_job_id_maps_unknown_and_rejects_duplicate_completed_job(self):
+        self.assertEqual(self.gate.submit('known-original-job','payload'),'known-original-job')
+        with self.assertRaises(g.IngressHold):self.gate.submit('known-original-job','duplicate')
+        seen=[];self.gate.process_one(lambda item:seen.append(item))
+        with self.assertRaises(g.IngressHold):self.gate.submit('known-original-job','replay')
+        self.assertEqual(seen,['payload'])
 
 
 if __name__=='__main__':unittest.main()

@@ -59,7 +59,7 @@ class ApplicationIngressGate:
         self.fd=original_seal_fd;self.authorize=verify_original_binding;self.check_fd=check_original_fd
         self.bootstrap=verify_bootstrap;self.bootstrap_sha=bootstrap_sha256
         self.mutex=threading.Condition(threading.RLock());self.jobs=queue.Queue(capacity)
-        self.tickets={};self.capacity=capacity;self.sealed=False;self.broken=False
+        self.tickets={};self.seen=set();self.capacity=capacity;self.sealed=False;self.broken=False
         self.record=None;self.prior_runtime=False
         self.identity=self._bound('query')
         # Only borrow the original one-use descriptor. No new lock file or
@@ -125,20 +125,23 @@ class ApplicationIngressGate:
             raise IngressHold('FOREIGN_OR_PARTIAL_SEAL_PRESERVE') from None
         self.record=record;self.prior_runtime=identity!=self.runtime
 
-    def _new(self, kind):
+    def _new(self, kind, token):
         self._bound('work');self._refresh()
         need(not self.sealed and not self.broken,'INTAKE_SEALED_NO_NEW_JOB')
         need(len(self.tickets)<self.capacity,'INGRESS_CAPACITY')
-        token=uuid.uuid4().hex;self.tickets[token]=kind
+        need(type(token)is str and re.fullmatch('[A-Za-z0-9_-]{1,100}',token),'ORIGINAL_JOB_ID_REQUIRED')
+        need(token not in self.seen,'ORIGINAL_JOB_ALREADY_ACCEPTED_NO_REPLAY')
+        need(len(self.seen)<65536,'ORIGINAL_JOB_HISTORY_BOUND')
+        self.tickets[token]=kind;self.seen.add(token)
         return token
 
-    def submit(self, payload):
+    def submit(self, original_job_id, payload):
         """Accept before enqueue; no payloads or errors are written to evidence."""
         with self.mutex:
-            token=self._new('QUEUED')
+            token=self._new('QUEUED',original_job_id)
             try:self.jobs.put_nowait((token,payload))
             except queue.Full:
-                del self.tickets[token];raise IngressHold('INGRESS_CAPACITY') from None
+                del self.tickets[token];self.seen.remove(token);raise IngressHold('INGRESS_CAPACITY') from None
             except BaseException:
                 self.tickets[token]='UNKNOWN';self.mutex.notify_all();raise
             return token
@@ -163,14 +166,14 @@ class ApplicationIngressGate:
             finally:self.mutex.notify_all()
         return result
 
-    def run_sync(self, handler, *args, **kwargs):
+    def run_sync(self, original_job_id, handler, *args, **kwargs):
         """Cover synchronous writes until the application's handler returns.
 
         The handler must return ONLY after its transaction is committed/rolled
         back and no detached writer remains. Authority must verify that wiring.
         """
         need(callable(handler),'JOB_HANDLER_REQUIRED')
-        with self.mutex:token=self._new('ACTIVE_SYNC')
+        with self.mutex:token=self._new('ACTIVE_SYNC',original_job_id)
         try:result=handler(*args,**kwargs)
         except BaseException:
             with self.mutex:self.tickets[token]='UNKNOWN_SYNC';self.mutex.notify_all()

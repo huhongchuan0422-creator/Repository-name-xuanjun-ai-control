@@ -21,7 +21,7 @@ def package(commit, tree, run_id, dependency_root, destination):
         raise ValueError('UNCHANGED_ORIGINAL_DEPENDENCY_DRIFT')
     manifest={'code_commit':commit,'code_tree':tree,'hosted_run_id':run_id,'scope':'REVIEW_CANDIDATE_NOT_PRODUCTION_ADMITTED',
         'source_sha256':{n:hashlib.sha256(b).hexdigest() for n,b in members.items()},'unchanged_original_dependencies':pins,
-        'ordinary_tests':85,'m99_dynamic':'NOT_RUN','production_actions':0}
+        'ordinary_tests':86,'m99_dynamic':'NOT_RUN','production_actions':0}
     members['candidate-manifest.json']=(json.dumps(manifest,sort_keys=True,indent=2)+'\n').encode()
     destination=Path(destination)
     with zipfile.ZipFile(destination,'x',compression=zipfile.ZIP_STORED) as archive:
