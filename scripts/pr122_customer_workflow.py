@@ -32,20 +32,20 @@ def hex64(value):
     return type(value) is str and len(value) == 64 and all(c in '0123456789abcdef' for c in value)
 
 
-def validate_contract(plan, approval):
+def validate_contract(plan, approval, *, stages=STAGES, recovery=RECOVERY, policy=POLICY):
     contract = plan.get('workflow_contract')
     need(type(contract) is dict and set(contract) == {'schema', 'stages'} and contract['schema'] == 1,
          'WORKFLOW_CONTRACT')
-    need(type(contract['stages']) is list and len(contract['stages']) == len(STAGES), 'WORKFLOW_FIXED_STAGES')
-    for name, row in zip(STAGES, contract['stages']):
+    need(type(contract['stages']) is list and len(contract['stages']) == len(stages), 'WORKFLOW_FIXED_STAGES')
+    for name, row in zip(stages, contract['stages']):
         need(type(row) is dict and set(row) == {'stage', 'input_sha256', 'implementation_sha256',
              'adopt_receipt_sha256', 'recovery_actions'} and row['stage'] == name, 'WORKFLOW_STAGE_SCHEMA')
         need(hex64(row['input_sha256']) and hex64(row['implementation_sha256']), 'WORKFLOW_EXACT_INPUTS')
         need(row['adopt_receipt_sha256'] is None or hex64(row['adopt_receipt_sha256']), 'WORKFLOW_ADOPTION_PIN')
         actions = row['recovery_actions']
         need(type(actions) is list and all(type(x) is str for x in actions)
-             and len(set(actions)) == len(actions) and set(actions) <= RECOVERY[name], 'WORKFLOW_RECOVERY_SCOPE')
-    need(approval.get('attempt_policy') == POLICY and approval.get('workflow_contract_sha256') == digest(canonical(contract))
+             and len(set(actions)) == len(actions) and set(actions) <= recovery[name], 'WORKFLOW_RECOVERY_SCOPE')
+    need(approval.get('attempt_policy') == policy and approval.get('workflow_contract_sha256') == digest(canonical(contract))
          and type(approval.get('max_executions')) is int and 1 <= approval['max_executions'] <= 5,
          'WORKFLOW_EXPLICIT_NEW_PERMISSION')
     return contract
@@ -111,6 +111,14 @@ class StageLease:
 
 
 class Coordinator:
+    STAGES = STAGES
+    RECOVERY = RECOVERY
+    POLICY = POLICY
+    PHASES = {
+        "ACCOUNT": {"ACCOUNT_CREATE_INTENT", "ACCOUNT_VERIFIED", "ACCOUNT_UNKNOWN_PRESERVE"},
+        "RUNTIME": {"RUNTIME_CREATE_INTENT", "RUNTIME_VERIFIED", "RUNTIME_UNKNOWN_PRESERVE"},
+        "POLICY_RESTORE": {"POLICY_RESTORE_INTENT", "POLICY_RESTORE_VERIFIED", "POLICY_RESTORE_UNKNOWN"},
+    }
     """One total lease covers all remaining stages, never one lease per child.
 
     operations methods are fixed: input(stage), implementation(stage),
@@ -122,7 +130,7 @@ class Coordinator:
     def __init__(self, release, folder, comment, plan, approval, operations, lock_fd):
         self.r, self.folder, self.comment = release, folder, comment
         self.plan, self.approval, self.ops = copy.deepcopy(plan), copy.deepcopy(approval), operations
-        self.contract = validate_contract(self.plan, self.approval)
+        self.contract = validate_contract(self.plan, self.approval, stages=self.STAGES, recovery=self.RECOVERY, policy=self.POLICY)
         self.lock_fd = lock_fd
         self.path = release.STATE / (release.TXN + '.attempts.json')
         self.binding = {'transaction':release.TXN, 'approval_comment':comment,
@@ -177,7 +185,7 @@ class Coordinator:
         if os.path.lexists(self.path):
             data=read_private(self.path)
             need(type(data) is dict and set(data)=={'schema','policy','binding','state','attempts','checkpoints','intent','failures','recoveries','stage_records'}
-                 and data['schema']==3 and data['policy']==POLICY and data['binding']==self.binding, 'WORKFLOW_LEGACY_OR_CHANGED_SCOPE_SEALED')
+                 and data['schema']==3 and data['policy']==self.POLICY and data['binding']==self.binding, 'WORKFLOW_LEGACY_OR_CHANGED_SCOPE_SEALED')
             need(type(data['attempts']) is list and 1 <= len(data['attempts']) <= self.approval['max_executions'], 'WORKFLOW_HISTORY')
             previous=None
             for number,row in enumerate(data['attempts'],1):
@@ -188,7 +196,7 @@ class Coordinator:
                      and row.get('lease')=={'fence':number,'expires_unix':self.approval['expires_unix'],
                           'binding_sha256':digest(canonical(self.binding))}, 'WORKFLOW_ATTEMPT_CHAIN')
                 previous=digest(canonical(row))
-            need(set(data['checkpoints']) <= set(STAGES), 'WORKFLOW_CHECKPOINT_SCOPE')
+            need(set(data['checkpoints']) <= set(self.STAGES), 'WORKFLOW_CHECKPOINT_SCOPE')
             self.data=data; self.snapshot=canonical(data)
             need(data['state'] != 'SUCCESS', 'WORKFLOW_FINISHED')
         else:
@@ -200,11 +208,11 @@ class Coordinator:
                 fd=os.open(self.r.STATE.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
                 try:os.fsync(fd)
                 finally:os.close(fd)
-            self.data={'schema':3,'policy':POLICY,'binding':self.binding,'state':'READY',
+            self.data={'schema':3,'policy':self.POLICY,'binding':self.binding,'state':'READY',
                        'attempts':[],'checkpoints':{},'intent':None,'failures':[],'recoveries':[],'stage_records':[]}
 
     def stage_contract(self, stage):
-        return self.contract['stages'][STAGES.index(stage)]
+        return self.contract['stages'][self.STAGES.index(stage)]
 
     def verify_inputs(self, stage):
         row=self.stage_contract(stage)
@@ -225,7 +233,7 @@ class Coordinator:
     def inherit_or_verify(self):
         # No writer/attempt is needed to adopt an explicitly pinned successful
         # probe or child receipt; fresh live proof is still required.
-        for stage in STAGES:
+        for stage in self.STAGES:
             self.verify_inputs(stage)
             old=self.data['checkpoints'].get(stage)
             if old is not None:self.verified_checkpoint(stage,old);continue
@@ -239,7 +247,7 @@ class Coordinator:
         intent=self.data['intent']
         if intent is None:return True
         need(type(intent) is dict and set(intent)=={'stage','attempt','input_sha256'}
-             and intent.get('stage') in STAGES and type(intent.get('attempt')) is int
+             and intent.get('stage') in self.STAGES and type(intent.get('attempt')) is int
              and intent['attempt']==self.data['attempts'][-1]['number']
              and intent['input_sha256']==self.stage_contract(intent['stage'])['input_sha256'], 'WORKFLOW_INTENT_SCOPE')
         stage=intent['stage'];self.verify_inputs(stage)
@@ -253,8 +261,11 @@ class Coordinator:
              and proof['status'] in ('SAFE_TO_RETRY','COMPLETE','UNKNOWN') and hex64(proof['evidence_sha256']), 'WORKFLOW_RECONCILE_PROOF')
         if proof['status']=='UNKNOWN':return False
         need(proof['action'] in self.stage_contract(stage)['recovery_actions'], 'WORKFLOW_RECOVERY_NOT_APPROVED')
-        if proof['status']=='COMPLETE':self.data['checkpoints'][stage]=self.verified_checkpoint(stage,proof['checkpoint'])
+        verified=None
+        if proof['status']=='COMPLETE':verified=self.verified_checkpoint(stage,proof['checkpoint'])
         else:need(proof['checkpoint'] is None,'WORKFLOW_RETRY_CHECKPOINT')
+        self.authority();self.assert_fence()
+        if verified is not None:self.data['checkpoints'][stage]=verified
         self.data['recoveries'].append({'attempt':intent['attempt'],'stage':stage,**proof})
         self.data['intent']=None
         last=self.data['attempts'][-1]
@@ -267,11 +278,9 @@ class Coordinator:
     def record_stage(self, stage, phase, metadata):
         """Durable child evidence inside the same total-budget ledger."""
         self.assert_active()
-        need(stage in STAGES and self.data['intent'] is not None
+        need(stage in self.STAGES and self.data['intent'] is not None
              and self.data['intent']['stage']==stage, 'WORKFLOW_CHILD_STAGE')
-        allowed={'ACCOUNT':{'ACCOUNT_CREATE_INTENT','ACCOUNT_VERIFIED','ACCOUNT_UNKNOWN_PRESERVE'},
-                 'RUNTIME':{'RUNTIME_CREATE_INTENT','RUNTIME_VERIFIED','RUNTIME_UNKNOWN_PRESERVE'},
-                 'POLICY_RESTORE':{'POLICY_RESTORE_INTENT','POLICY_RESTORE_VERIFIED','POLICY_RESTORE_UNKNOWN'}}
+        allowed=self.PHASES
         need(phase in allowed.get(stage,set()) and type(metadata) is dict
              and len(canonical(metadata))<=8192,'WORKFLOW_CHILD_EVENT_SCOPE')
         self.data['stage_records'].append({'attempt':self.active['number'],'stage':stage,
@@ -293,7 +302,7 @@ class Coordinator:
         self.authority();self.assert_fence()
         try:
             known=self.recover()
-            if known and self.data['intent'] is None and set(self.data['checkpoints'])==set(STAGES):
+            if known and self.data['intent'] is None and set(self.data['checkpoints'])==set(self.STAGES):
                 self.authority();self.assert_fence();self.inherit_or_verify()
                 self.data['attempts'][-1].update(state='SUCCESS',ended_unix=int(time.time()),completion_reconciled=True)
                 state='SUCCESS'
@@ -330,7 +339,7 @@ class Coordinator:
             rows.append(row);self.active=row;self.data['state']='RUNNING';self.save(initial=self.snapshot is None)
             stage=None
             try:
-                for stage in STAGES:
+                for stage in self.STAGES:
                     self.assert_active();self.verify_inputs(stage)
                     if stage in self.data['checkpoints']:
                         self.verified_checkpoint(stage,self.data['checkpoints'][stage]);continue
@@ -339,7 +348,9 @@ class Coordinator:
                     lease=StageLease(self,row,digest(canonical(self.data['intent'])),stage)
                     value=self.ops.execute(stage,lease)
                     self.assert_active()
-                    self.data['checkpoints'][stage]=self.verified_checkpoint(stage,value)
+                    verified=self.verified_checkpoint(stage,value)
+                    self.assert_active()
+                    self.data['checkpoints'][stage]=verified
                     self.data['intent']=None;self.save()
                 self.authority();self.assert_active()
                 row.update(state='SUCCESS',ended_unix=int(time.time()));self.data['state']='SUCCESS';self.save()

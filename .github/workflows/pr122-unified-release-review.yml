@@ -3,6 +3,10 @@ on:
   push:
     branches: [feature/work-pr122-site-hub-integration-20261016]
     paths:
+      - 'scripts/pr122_static_*.py'
+      - 'scripts/pr122_customer_workflow.py'
+      - 'scripts/pr122_customer_review.py'
+      - 'tests/test_pr122_static_*.py'
       - 'scripts/pr122_site_hub_unified_package.py'
       - 'scripts/pr122_site_hub_unified_release.py'
       - 'scripts/pr122_site_hub_unified_distribution.py'
@@ -28,6 +32,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Static controlled profile and inherited ledger regressions
+        run: |
+          set -euo pipefail
+          python -m pip install cryptography==46.0.3
+          python -B -m unittest tests.test_pr122_static_package_schema tests.test_pr122_static_workflow tests.test_pr122_static_signature tests.test_pr122_static_operations tests.test_pr122_static_source_gate tests.test_pr122_static_source_package tests.test_pr122_customer_workflow tests.test_pr122_customer_workflow_apply tests.test_pr122_customer_workflow_review tests.test_pr122_customer_workflow_signature tests.test_pr122_customer_login_release -v
+      - name: Package exact controlled static source closure
+        run: python -B -m scripts.pr122_static_source_package --output /tmp/pr122-static-controlled-source
       - name: Reconstruct historical mobile fixture from its exact reviewed source
         run: |
           git fetch --depth=1 origin 790937a5c96afcf3b3660e36cf36cfaab2002a72
@@ -94,4 +105,6 @@ jobs:
             /tmp/pr122-unified-reports/
             /tmp/pr122-unified-candidate/
             /tmp/pr122-unified-distribution/
+            /tmp/pr122-static-controlled-source/
           retention-days: 14
+

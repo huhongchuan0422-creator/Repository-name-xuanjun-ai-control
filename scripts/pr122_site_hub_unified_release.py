@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """PR122 static UI delta over deployed r2. No Runtime install/stop or DNS operations; combines approved public and phone UI.
 
-Requires a new independent review and a new one-use release decision. Failed apply
-is never resumed; inspect and use this transaction's explicit rollback command.
+Legacy apply requires its exact one-use decision and never auto-resumes.
+The separate controlled-apply entry requires a new signed static profile, exact
+source closure and fixed five-attempt Coordinator; no old decision is extended.
 """
 import argparse
 import fcntl
@@ -12,6 +13,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 from pathlib import Path
 import signal
 import stat
@@ -19,6 +21,8 @@ import sys
 import tarfile
 import time
 
+# Frozen helper imports must never create bytecode during read-only recovery.
+sys.dont_write_bytecode=True
 HERE=Path(__file__).resolve()
 ROOT=HERE.parents[1]
 PINS=ROOT/'deploy/pr122-site-hub-unified/HOST_PINS.json'
@@ -37,18 +41,41 @@ c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
 
 def entries(raw,pins):
     need(digest(raw)==pins['static_artifact_sha256'],'STATIC_PACKAGE_HASH')
+    schema=pins.get('package_schema','LEGACY_UNIFIED_V1')
+    need(schema in ('LEGACY_UNIFIED_V1','FULL_STATIC_REVIEW_V1'),'PACKAGE_SCHEMA')
+    full=schema=='FULL_STATIC_REVIEW_V1'
+    count=460 if full else 459
     with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
         members=archive.getmembers()
-        need(len(members)==459 and len({m.name for m in members})==459,'ARCHIVE_MEMBERS')
+        need(len(members)==count and len({m.name for m in members})==count,'ARCHIVE_MEMBERS')
         need(all(m.isfile() and m.name.startswith('pr122-site-hub/') and '..' not in Path(m.name).parts and m.size<=8000000 for m in members),'ARCHIVE_PATH_TYPE')
-        result={m.name.removeprefix('pr122-site-hub/'):archive.extractfile(m).read() for m in members}
+        names=[m.name.removeprefix('pr122-site-hub/') for m in members]
+        need(all(name and not name.startswith('/') and '\\' not in name and
+                 all(part not in ('','.','..') for part in name.split('/'))
+                 for name in names),'ARCHIVE_CANONICAL_PATH')
+        need(len({Path(name).as_posix() for name in names})==count,'ARCHIVE_NORMALIZED_DUPLICATE')
+        result={name:archive.extractfile(m).read() for name,m in zip(names,members)}
     need(digest(result['PACKAGE_MANIFEST.json'])==pins['package_manifest_sha256'],'PACKAGE_MANIFEST_HASH')
     rows=json.loads(result['PACKAGE_MANIFEST.json'])['files']
-    need(len(rows)==458 and len({r['path'] for r in rows})==458 and {r['path'] for r in rows}==set(result)-{'PACKAGE_MANIFEST.json'},'MANIFEST_MEMBERS')
+    need(len(rows)==count-1 and len({r['path'] for r in rows})==count-1 and {r['path'] for r in rows}==set(result)-{'PACKAGE_MANIFEST.json'},'MANIFEST_MEMBERS')
     for row in rows:
         raw=result[row['path']];need(len(raw)==row['size'] and digest(raw)==row['sha256'],'MANIFEST_FILE:'+row['path'])
     need(digest(result['candidate-manifest.json'])==pins['candidate_manifest_sha256'],'CANDIDATE_HASH')
-    need(digest(result['COMPOSITION_MANIFEST.json'])==pins['composition_manifest_sha256'],'COMPOSITION_HASH')
+    if full:
+        need('COMPOSITION_MANIFEST.json' not in result,'MIXED_PACKAGE_SCHEMA')
+        for name,key in (('FULL_SOURCE_STAGE_MANIFEST.json','full_stage_manifest_sha256'),('BUILD_PROVENANCE.json','build_provenance_sha256')):
+            need(digest(result[name])==pins[key],'FULL_STATIC_BINDING:'+name)
+        stage=json.loads(result['FULL_SOURCE_STAGE_MANIFEST.json'])
+        provenance=json.loads(result['BUILD_PROVENANCE.json'])
+        need(stage.get('status')=='ISOLATED_INTEGRATION_CANDIDATE' and stage.get('production_approved') is False,'FULL_STATIC_SCOPE')
+        need(provenance.get('scope')=='FULL_PINNED_SOURCE_REVIEW_CANDIDATE' and provenance.get('production_approved') is False,'BUILD_SCOPE')
+        need(stage.get('source_archive_sha256')==pins['source_archive_sha256']==provenance.get('source_archive_sha256'),'FULL_SOURCE_BINDING')
+        need(provenance.get('stage_manifest_sha256')==pins['full_stage_manifest_sha256'],'BUILD_STAGE_BINDING')
+        candidate=json.loads(result['candidate-manifest.json'])['files']
+        need(len(candidate)==1288 and len({r['path'] for r in candidate})==1288,'FULL_CANDIDATE_SET')
+        need(stage.get('final_files')==1288 and stage.get('files')=={r['path']:r['sha256'] for r in candidate},'FULL_STAGE_FILE_BINDING')
+    else:
+        need(digest(result['COMPOSITION_MANIFEST.json'])==pins['composition_manifest_sha256'],'COMPOSITION_HASH')
     need(digest(result['bin/pr122_website_release.py'])==pins['publisher_sha256'],'PUBLISHER_HASH')
     need(len(json.loads(result['candidate-manifest.json'])['files'])==1288,'PUBLIC_COUNT')
     return result
@@ -106,6 +133,13 @@ def gate(value,pins):
     need(type(start) is int and type(end) is int and start<=time.time()<end and 0<end-start<=7200,'GATE_EXPIRED')
 
 
+def baseline_receipt_state(pins,state):
+    historical='HTTPS_SMOKE_PASS_AWAIT_BROWSER'
+    if pins.get('package_schema')!='FULL_STATIC_REVIEW_V1':return state==historical
+    expected=pins.get('previous_receipt_state',historical)
+    return expected in (historical,'STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER') and state==expected
+
+
 class Transaction(c.Transaction):
     def __init__(self,inputs,ops=None,pins=None):
         pins=pins or json.loads(c.read(PINS))
@@ -136,9 +170,12 @@ class Transaction(c.Transaction):
         need(c.RUNTIME.joinpath('current').is_symlink() and os.readlink(c.RUNTIME/'current')==str(c.RUNTIME/c.RELEASE),'RUNTIME_LINK_DRIFT')
         return self.ops.sandbox()
     def baseline(self):
-        previous=c.CONTROL/'transactions/pr122-hub-experience-20261016-r2/receipt.json'
+        full=self.pins.get('package_schema')=='FULL_STATIC_REVIEW_V1'
+        previous_id=self.pins.get('previous_transaction_id') if full else 'pr122-hub-experience-20261016-r2'
+        need(type(previous_id) is str and re.fullmatch(r'pr122-[a-z0-9-]{1,90}',previous_id) is not None,'BASELINE_TRANSACTION_ID')
+        previous=c.CONTROL/'transactions'/previous_id/'receipt.json'
         raw=c.read(previous);need(digest(raw)==self.pins['previous_receipt_sha256'],'R2_RECEIPT_DRIFT')
-        need(json.loads(raw)['state']=='HTTPS_SMOKE_PASS_AWAIT_BROWSER','R2_STATE_DRIFT')
+        need(baseline_receipt_state(self.pins,json.loads(raw)['state']),'R2_STATE_DRIFT')
         need(os.readlink(c.BASE/'current')==self.pins['previous_release'],'CURRENT_DRIFT')
         need(digest(c.read(c.INSTALLED_PUBLISHER))==self.pins['installed_publisher_sha256'],'INSTALLED_PUBLISHER_DRIFT')
         self.inventory(self.pins['nginx']);self.nginx_identity=self.ops.nginx_identity();self.ops.nginx_test()
@@ -146,7 +183,8 @@ class Transaction(c.Transaction):
         old_manifest=c.read(self.inputs/'R2_CANDIDATE_MANIFEST.json')
         need(digest(old_manifest)==self.pins['previous_manifest_sha256'],'R2_MANIFEST_HASH')
         expected={r['path']:{'size':r['size'],'sha256':r['sha256']} for r in json.loads(old_manifest)['files']}
-        files=self.snapshot();need(len(files)==1279 and files==expected,'R2_PUBLIC_DRIFT');return files
+        files=self.snapshot();count=self.pins.get('previous_file_count') if full else 1279
+        need(type(count) is int and 1<=count<=10000 and len(expected)==count and len(files)==count and files==expected,'R2_PUBLIC_DRIFT');return files
     def backup(self,files):
         directory=self.folder/'backup';c.mkdir(directory,0o700);configs={}
         for i,(name,expected) in enumerate(sorted(self.pins['nginx'].items())):
@@ -163,7 +201,7 @@ class Transaction(c.Transaction):
                 member=tarfile.TarInfo(name);member.size=len(raw);member.mode=0o644;archive.addfile(member,io.BytesIO(raw))
         c.write(directory/'previous-static.tar.gz',stream.getvalue(),0o600)
         with tarfile.open(fileobj=io.BytesIO(c.read(directory/'previous-static.tar.gz'))) as archive:
-            members=archive.getmembers();need(len(members)==1281 and {m.name for m in members}==set(data),'BACKUP_MEMBERS')
+            members=archive.getmembers();need(len(members)==len(files)+2 and {m.name for m in members}==set(data),'BACKUP_MEMBERS')
             for m in members:need(m.isfile() and archive.extractfile(m).read()==data[m.name],'BACKUP_VERIFY')
         self.data.update(backup={'nginx':configs,'static_sha256':digest(stream.getvalue()),'static_files':files,'archive_verified':True},previous_link=self.pins['previous_release'])
     def before_activation(self):
@@ -229,12 +267,64 @@ class Transaction(c.Transaction):
         c.atomic(self.receipt,self.data);return self.data
 
 
+def verify_static_source_before_import(root,pins):
+    """Authenticate the protected Python closure before importing new modules.
+    The deployment preparer supplies this reviewed manifest; never generated on
+    the target. Its hash is part of the separately signed host-pins binding.
+    """
+    need(not os.path.lexists(root/'scripts.py'),'STATIC_SOURCE_ROOT_SHADOW')
+    raw=c.read(root/'STATIC_SOURCE_MANIFEST.json')
+    need(digest(raw)==pins.get('static_source_manifest_sha256'),'STATIC_SOURCE_MANIFEST_PIN')
+    manifest=json.loads(raw)
+    need(type(manifest) is dict and set(manifest)=={'schema','source_commit','files'} and manifest['schema']==1,'STATIC_SOURCE_MANIFEST_SCHEMA')
+    need(type(manifest['source_commit']) is str and re.fullmatch('[0-9a-f]{40}',manifest['source_commit']) is not None,'STATIC_SOURCE_COMMIT')
+    rows=manifest['files'];need(type(rows) is list and 1<=len(rows)<=1000,'STATIC_SOURCE_ROWS')
+    paths=set()
+    for row in rows:
+        need(type(row) is dict and set(row)=={'path','size','sha256'},'STATIC_SOURCE_ROW')
+        name=row['path']
+        need(type(name) is str and re.fullmatch(r'scripts/[A-Za-z0-9_]+\.py',name) is not None and name not in paths,'STATIC_SOURCE_PATH')
+        paths.add(name);data=c.read(root/name)
+        need(type(row['size']) is int and len(data)==row['size'] and digest(data)==row['sha256'],'STATIC_SOURCE_BYTES')
+    scripts=root/'scripts';c.trusted(scripts,True)
+    actual=set()
+    for path in scripts.iterdir():
+        need(path.is_file() and path.suffix=='.py','STATIC_SOURCE_UNREVIEWED_ENTRY')
+        c.trusted(path);actual.add('scripts/'+path.name)
+    need(actual==paths and 'scripts/pr122_site_hub_unified_release.py' in paths,'STATIC_SOURCE_COMPLETE_INVENTORY')
+    return manifest
+
+
+def bind_static_source_package(root):
+    """Install a fixed package search path without importing any package code.
+    Isolated entry has not imported scripts yet. Refuse a preexisting binding;
+    neither root/scripts.py nor a regular package elsewhere can win resolution.
+    """
+    import types
+    from importlib.machinery import ModuleSpec
+    need('scripts' not in sys.modules,'STATIC_PREEXISTING_PACKAGE')
+    package=types.ModuleType('scripts')
+    package.__package__='scripts'
+    package.__path__=[str(root/'scripts')]
+    package.__spec__=ModuleSpec('scripts',loader=None,is_package=True)
+    package.__spec__.submodule_search_locations=package.__path__
+    sys.modules['scripts']=package
+
+
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=('apply','rollback','status'));parser.add_argument('--inputs',type=Path,required=True);parser.add_argument('--approval',type=Path)
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=('apply','rollback','status','controlled-apply'));parser.add_argument('--inputs',type=Path,required=True);parser.add_argument('--approval',type=Path)
     args=parser.parse_args();need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','FIXED_HOST_ROOT_REQUIRED')
     os.umask(0o022)
     for path in (HERE,PINS,HELPER):c.trusted(path)
-    tx=Transaction(args.inputs)
+    if args.command=='controlled-apply':
+        need(sys.flags.isolated and sys.dont_write_bytecode,'STATIC_ISOLATED_INVOCATION')
+        c.trusted(ROOT,True)
+        verify_static_source_before_import(ROOT,json.loads(c.read(PINS)))
+        bind_static_source_package(ROOT)
+        from scripts import pr122_site_hub_unified_release as canonical_release
+        need(canonical_release.HERE.read_bytes()==HERE.read_bytes(),'STATIC_CANONICAL_WRAPPER')
+        tx=canonical_release.Transaction(args.inputs)
+    else:tx=Transaction(args.inputs)
     if args.command=='status':print(json.dumps(tx.load_receipt()));return
     # Same lock as r1/r2 prevents concurrent controller operations.
     lock=c.CONTROL/'transaction.lock';c.trusted(lock);fd=os.open(lock,os.O_RDWR|os.O_NOFOLLOW)
@@ -242,7 +332,14 @@ def main():
         fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
         signal.signal(signal.SIGTERM,lambda *_:(_ for _ in ()).throw(RuntimeError('INTERRUPTED_INSPECT_REQUIRED')))
         if args.command=='apply':need(args.approval is not None,'APPROVAL_REQUIRED')
-        result=tx.apply(args.approval) if args.command=='apply' else tx.rollback()
+        if args.command=='controlled-apply':
+            from scripts.pr122_customer_attempts import read_private
+            from scripts.pr122_static_workflow import controlled_apply
+            request=read_private(args.inputs/'STATIC_WORKFLOW_REQUEST.json')
+            need(type(request) is dict and set(request)=={'approval_comment_id','plan'} and type(request['approval_comment_id']) is int and request['approval_comment_id']>0,'STATIC_REQUEST_SCHEMA')
+            result=controlled_apply(tx,ROOT,request['approval_comment_id'],request['plan'],fd)
+        else:
+            result=tx.apply(args.approval) if args.command=='apply' else tx.rollback()
         print(json.dumps({'state':result['state'],'receipt':str(tx.receipt),'production_browser':result.get('production_browser','NOT_RUN')}))
     finally:os.close(fd)
 
@@ -250,3 +347,4 @@ if __name__=='__main__':
     try:main()
     except (RuntimeError,OSError,ValueError,KeyError) as error:
         print(json.dumps({'state':'HOLD','reason':str(error)}),file=sys.stderr);sys.exit(2)
+

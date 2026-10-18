@@ -26,11 +26,13 @@ def verify(comment,approval_comment,approval,plan,trust,fetch):
     need(type(key) is dict and set(key)=={'public_key_b64','principal','status','custody_evidence_sha256'} and key['status']=='ACTIVE' and key['principal']!=trust['source_writer_principal'] and key['custody_evidence_sha256']==anchor['custody_evidence_sha256'],'INDEPENDENT_ENROLLED_KEY_REQUIRED')
     payload=envelope['payload']
     expected_fields={'decision','reviewer_principal','source_writer_principal','source_commit','source_tree','manifest_sha256','artifact_zip_sha256','artifact_tar_sha256','artifact_id','ci_run_id','scope_sha256','findings','issued_unix','expires_unix'}
-    whole=approval.get('attempt_policy')=='CONTROLLED_WHOLE_WEBSITE_V3'
+    static=approval.get('attempt_policy')=='CONTROLLED_STATIC_WEBSITE_V1'
+    whole=approval.get('attempt_policy')=='CONTROLLED_WHOLE_WEBSITE_V3' or static
     if whole:expected_fields.add('workflow_contract_sha256')
     from scripts import pr122_customer_profile as deployment
-    login_only=deployment.is_login(plan)
+    login_only=False if static else deployment.is_login(plan)
     if login_only:expected_fields.update({'deployment_profile','login_acceptance_sha256'})
+    if static:expected_fields.update({'deployment_profile','static_baseline_sha256','host_pins_sha256'})
     if 'permit_window_seconds' in plan or 'permit_window_seconds' in approval:expected_fields.add('permit_window_seconds')
     need(type(payload) is dict and set(payload)==expected_fields,'REVIEW_PAYLOAD_SCHEMA')
     try:
@@ -45,6 +47,10 @@ def verify(comment,approval_comment,approval,plan,trust,fetch):
         need(whole and payload['deployment_profile']==approval.get('deployment_profile')==deployment.LOGIN_ONLY
              and payload['login_acceptance_sha256']==approval.get('login_acceptance_sha256')==plan['login_acceptance_sha256'],
              'EXACT_INDEPENDENT_LOGIN_SCOPE')
+    if static:
+        need(not login_only and payload['deployment_profile']==approval.get('deployment_profile')==plan.get('deployment_profile')=='OFFICIAL_STATIC_ONLY_V1','EXACT_INDEPENDENT_STATIC_SCOPE')
+        for name in ('static_baseline_sha256','host_pins_sha256'):
+            need(payload[name]==approval.get(name)==plan.get(name),'EXACT_INDEPENDENT_STATIC_BINDING:'+name)
     if 'permit_window_seconds' in expected_fields:
         need(type(payload['permit_window_seconds']) is int and payload['permit_window_seconds']==approval.get('permit_window_seconds')==plan.get('permit_window_seconds')==deployment.WINDOW_SECONDS,'SIGNED_FIVE_HOUR_WINDOW')
     need(payload['decision']=='AUDIT_PASS' and payload['reviewer_principal']==key['principal'] and payload['source_writer_principal']==trust['source_writer_principal'],'INDEPENDENT_REVIEW_DECISION')
@@ -59,6 +65,8 @@ def verify(comment,approval_comment,approval,plan,trust,fetch):
         need(all(type(x) is str and len(x)==64 and all(c in '0123456789abcdef' for c in x) for x in finding['evidence_sha256']),'FINDING_EVIDENCE_REQUIRED')
     if login_only:
         need(plan['login_acceptance_sha256'] in findings['R3']['evidence_sha256'],'LOGIN_TARGET_EVIDENCE_REQUIRED')
+    elif static:
+        need(plan['static_baseline_sha256'] in findings['R3']['evidence_sha256'],'STATIC_BASELINE_EVIDENCE_REQUIRED')
     else:need(plan['telegram_credential_evidence_sha256'] in findings['R3']['evidence_sha256'],'TELEGRAM_TARGET_EVIDENCE_REQUIRED')
     commit=fetch('git/commits/'+payload['source_commit']);need(commit['sha']==payload['source_commit'] and commit['tree']['sha']==payload['source_tree'],'IMMUTABLE_GIT_TREE')
     artifact=fetch('actions/artifacts/'+str(payload['artifact_id']))

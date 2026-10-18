@@ -58,3 +58,20 @@ Owner终端只读回执已归档 evidence/pr122-unified-release/OWNER_ROOT_READO
 新操作类型必须使用新单次许可；原PR122_STATIC_EXPERIENCE和PR122_COMBINED_WEBSITE不能放行。组合制品中的PENDING_ROOT_RECEIPT是先前组合构建时的历史状态；本次发布权威绑定以准确Host Pins及Owner归档证据为准，不更写旧组合包制造相同哈希假象。
 
 发布包装依赖完整旧源包SHA74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63，仅从原Owner受保护目录复用，不上传私有原始源包。包装不包含许可文件，也不自动部署。
+
+
+## 2026-10-18：官网静态独立节点与五次受控续接候选
+
+本节为新源码候选，未签发执行许可。以上单次许可、1279历史基线和旧事务记录保持原义，不能因新增代码自动扩大旧许可。
+
+执行原则继承原记录PR122 #6249926385及治理文档提交9261a14591f8ec253dfbab2d49e38b5c5671ba6c。本节只说明官网静态独立节点实现，不另建规则，不绑定注册登录或SMTP，也不改变P2。
+
+静态新profile为OFFICIAL_STATIC_ONLY_V1 / CONTROLLED_STATIC_WEBSITE_V1。复用原Coordinator单一持久账本、最多5次、原transaction.lock、Lease/Fence、已成功阶段检查点。新许可必须准确签名绑定18000秒窗口、源码闭包、静态内容包、当前受保护Host Pins及旧站证据；成功即终止，额度耗尽停止，源码变化须新轮许可。UNKNOWN先HOLD，只有原许可范围内可信只读对账满足安全条件才续接。
+
+完整静态内容仍复用已审核1d02版本1288文件包，不重写其内容。FULL_STATIC_REVIEW_V1显式读取460成员/459绑定；旧格式默认459/458不自动升级。旧站数量从新Host Pins的previous_file_count严格读取；不能把历史1279或目标1288当当前实机观测。路径规范、成员类型、完整Manifest、逐字节哈希均保持强校验。
+
+新的控制器源码另以固定22模块、23成员的REVIEW_ONLY源包交付。STATIC_SOURCE_MANIFEST绑定准确源码提交；其哈希须进入新受保护Host Pins。隔离入口先核验完整源码闭包，再预绑定固定scripts包路径，拒绝影子模块、外部同名包及未绑定缓存。此包不含私有配置、信任库、许可、用户资料或1288静态网页内容。
+
+静态HTTP验收范围仅GET、内容哈希、安全响应头及404。原preview synthetic POST和业务E2E不在本静态profile中运行，业务验收保持PENDING；不能将静态HTTP通过表述为客户流程或生产浏览器验收。
+
+仍需按最终精确候选的本地测试、独立增量审核、新Hosted结果和真实制品绑定分别记录。现场基线、运行时闭包、受保护交付、签名许可及实机浏览器验收未取得者均UNKNOWN，不以本地测试代替。
