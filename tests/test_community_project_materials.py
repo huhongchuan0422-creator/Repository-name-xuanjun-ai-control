@@ -234,9 +234,9 @@ class ProjectMaterialJourney(unittest.TestCase):
         self.c.db.execute("UPDATE objects SET scan='CLEAN',sha=? WHERE id=?",('0'*64,oid))
         with self.assertRaisesRegex(PermissionError,'OBJECT_INTEGRITY'):self.review('download',{'object_id':oid})
 
-    def test_original_core_source_pin_is_unchanged(self):
+    def test_core_source_is_explicit_website_pin_and_transport_is_unchanged(self):
         root=Path(__file__).resolve().parents[1]/'scripts'
-        expected={'pr122_customer_core.py':'f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4',
+        expected={'pr122_customer_core.py':'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0',
                   'pr122_customer_source.py':'3e8d531ede69577b72b6ee9089fdc8f481b2f91578f19e0e44d1841c168f3471',
                   'pr122_customer_runtime.py':'3a483ed81eb595309665c3d2b5746e56a50016fb246617000eb326dc5ff2b959'}
         for name, sha in expected.items(): self.assertEqual(hashlib.sha256((root/name).read_bytes()).hexdigest(),sha)

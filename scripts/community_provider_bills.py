@@ -45,6 +45,67 @@ SPLIT_SUMMARY_COLUMNS=('总条数','分账成功出资金','分账失败已转�
 SPLIT_TYPES={'分出','解冻','逾期解冻','分账回退'}
 
 
+# Verified response-field contracts (ordinary service provider, not ecommerce/brand):
+# https://pay.wechatpay.cn/doc/v3/partner/4012466850 (split query)
+# https://pay.wechatpay.cn/doc/v3/partner/4012466858 (return query)
+# Bill amounts are yuan: https://pay.wechatpay.cn/doc/v3/partner/4012761140.
+# Query timestamps carry RFC3339 offsets; the CSV sample does not. Never apply
+# that offset to a naive bill timestamp or assert date/reverse completeness.
+BILL_EVIDENCE_VERSION='SIGNED_PROFITSHARING_DETAIL_V1'
+
+
+def _evidence_id(value):
+    return type(value) is str and 1<=len(value)<=64 and all(33<=ord(c)<=126 for c in value)
+
+
+def _evidence_time(value):
+    if type(value) is not str or not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})',value):return False
+    try:return dt.datetime.fromisoformat(value.replace('Z','+00:00')).utcoffset() is not None
+    except ValueError:return False
+
+
+def signed_bill_evidence(data,digest,kind):
+    """Called ONLY after original RSA verification and frozen-intent validation.
+
+    This is private supplemental evidence, not a replacement public action result.
+    Older responses missing fields remain usable by original workflows, but cannot
+    be promoted into exact-detail bill matches. No replay or network occurs here.
+    """
+    if kind=='SPLIT':
+        if data.get('state')!='FINISHED':return None
+        fields=('sub_mchid','transaction_id','out_order_no','order_id')
+        if any(k not in data for k in fields):return None
+        if any(not _evidence_id(data[k]) for k in fields):raise ValueError('INVALID_SIGNED_BILL_DETAIL_EVIDENCE')
+        details=[];seen=set()
+        for r in data.get('receivers',[]):
+            if any(k not in r for k in ('detail_id','finish_time')):return None
+            if (not _evidence_id(r['detail_id']) or not _evidence_time(r['finish_time'])
+                    or r['detail_id'] in seen):raise ValueError('INVALID_SIGNED_BILL_DETAIL_EVIDENCE')
+            seen.add(r['detail_id'])
+            details.append({k:r[k] for k in ('type','account','amount','result','detail_id','finish_time')})
+        if not details:return None
+        result={k:data[k] for k in fields};result['receivers']=sorted(details,key=lambda r:r['detail_id'])
+    elif kind=='RETURN':
+        if data.get('result')!='SUCCESS':return None
+        fields=('sub_mchid','out_order_no','order_id','out_return_no','return_id','return_mchid')
+        if any(k not in data for k in fields) or 'finish_time' not in data:return None
+        if any(not _evidence_id(data[k]) for k in fields) or not _evidence_time(data['finish_time']):
+            raise ValueError('INVALID_SIGNED_BILL_DETAIL_EVIDENCE')
+        result={k:data[k] for k in fields};result.update(amount=data['amount'],finish_time=data['finish_time'])
+    else:raise ValueError('INVALID_BILL_EVIDENCE_KIND')
+    if type(digest) is not str or not re.fullmatch('[0-9a-f]{64}',digest):raise ValueError('INVALID_SIGNED_BILL_EVIDENCE_DIGEST')
+    return dict(version=BILL_EVIDENCE_VERSION,kind=kind,body_sha256=digest,details=result)
+
+
+def retain_bill_evidence(saved,evidence):
+    if evidence is None:return
+    previous=saved.get('bill_evidence')
+    if previous is not None and any(previous.get(k)!=evidence[k] for k in ('version','kind','details')):
+        raise ValueError('TERMINAL_BILL_EVIDENCE_CONFLICT')
+    # Keep first complete terminal evidence and its matching signed-body digest.
+    if previous is None:saved['bill_evidence']=evidence
+
+
 def _split_summary(row, count):
     if len(row)!=5 or not re.fullmatch(r'[0-9]{1,6}(?:\.0{1,2})?',row[0]):
         raise ValueError('INVALID_SPLIT_BILL_SUMMARY')
@@ -195,15 +256,77 @@ class ProviderBills:
             c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_BILL_RECONCILIATION',?,?,?,?,1)",(event,g['user_id'],g['project'],c.encrypt(canonical(dict(bill_key=key,kind=p['kind'],bill_date=p['bill_date'],scope=g['scope'],result=result)),'community-bill-reconciliation:'+event)))
             c.audit(g['project'],g['user_id'],'PROVIDER_BILL_RECONCILED',event)
         return result
+    def _reconcile_split_details(self,g,bill):
+        # Only ordinary successful split rows have a fully documented detail join.
+        # Return APIs expose return_id but no bill detail_id. Unfreeze/return rows
+        # remain explicit unknowns; no aggregate or identifier-shape inference.
+        local={}
+        for key,payload in self.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_PROVIDER_ACTION' AND project=? AND active=1",(g['project'],)):
+            saved=json.loads(self.center.decrypt(payload,'provider-action:'+key))
+            expected_key=hashlib.sha256(canonical([self.actions.reader._mchid,'SPLIT',saved.get('provider_reference')])).hexdigest()
+            if (key==expected_key and saved.get('kind')=='SPLIT' and saved.get('scope')==g['scope']
+                    and saved.get('project')==g['project']):
+                local.setdefault(saved.get('provider_reference'),[]).append(saved)
+        matched=0;exceptions=[];unknown=[];seen=set()
+        for index,row in enumerate(bill['rows']):
+            def issue(reason):exceptions.append(dict(row=index,reason=reason))
+            def unresolved(reason):unknown.append(dict(row=index,reason=reason))
+            if row['业务类型']!='分出':
+                unresolved('RETURN_DETAIL_JOIN_UNVERIFIED' if row['业务类型']=='分账回退' else 'UNFREEZE_DETAIL_JOIN_UNVERIFIED');continue
+            if row['分账发起方']!=self.actions.reader._mchid or row['分账方']!=bill['sub_mchid']:
+                issue('BILL_MERCHANT_BINDING_MISMATCH');continue
+            identity=row['分账明细单号']
+            if identity in seen:issue('DUPLICATE_PROVIDER_DETAIL');continue
+            seen.add(identity)
+            candidates=local.get(row['商户分账/回退单号'],[])
+            if len(candidates)!=1:
+                unresolved('LOCAL_SPLIT_EVIDENCE_MISSING_OR_AMBIGUOUS');continue
+            action=candidates[0];evidence=action.get('bill_evidence')
+            if (action.get('result',{}).get('status')!='FINISHED' or type(evidence) is not dict
+                    or evidence.get('version')!=BILL_EVIDENCE_VERSION or evidence.get('kind')!='SPLIT'):
+                unresolved('SIGNED_DETAIL_EVIDENCE_REQUIRED');continue
+            detail=evidence['details'];payload=action['payload']
+            if (detail['sub_mchid']!=bill['sub_mchid'] or payload.get('sub_mchid')!=bill['sub_mchid']
+                    or detail['transaction_id']!=row['微信订单号'] or action['transaction_id']!=row['微信订单号']
+                    or payload.get('transaction_id')!=row['微信订单号']
+                    or payload.get('out_order_no')!=row['商户分账/回退单号']
+                    or detail['order_id']!=row['微信分账/回退单号']
+                    or detail['out_order_no']!=row['商户分账/回退单号']):
+                issue('SPLIT_PROVIDER_IDENTITY_MISMATCH');continue
+            receivers=[r for r in detail['receivers'] if r['detail_id']==identity]
+            if len(receivers)!=1:issue('SPLIT_DETAIL_ID_MISMATCH');continue
+            receiver=receivers[0]
+            intents=[r for r in payload['receivers'] if r['type']==receiver['type'] and r['account']==receiver['account']]
+            if len(intents)!=1:
+                unresolved('FROZEN_RECEIVER_BINDING_AMBIGUOUS');continue
+            if (receiver['account']!=row['分账接收方'] or receiver['amount']!=minor(row['金额'])
+                    or intents[0]['amount']!=receiver['amount'] or receiver['result']!='SUCCESS'
+                    or row['处理状态']!='成功'):
+                issue('SPLIT_RECEIVER_AMOUNT_OR_STATE_MISMATCH');continue
+            t,m,st=(g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
+            order=self.actions.runtime.demo.db.execute('SELECT amount_minor,provider_transaction_id FROM orders WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?',(t,m,st,action['reference'])).fetchone()
+            if order is None:unresolved('ORIGINAL_PAYMENT_EVIDENCE_REQUIRED');continue
+            if order[0]!=minor(row['订单金额']) or order[1]!=row['微信订单号']:
+                issue('SPLIT_ORIGINAL_PAYMENT_MISMATCH');continue
+            matched+=1
+        status=('EXCEPTION' if exceptions else 'DETAIL_FIELDS_MATCH_RECONCILIATION_PENDING' if matched and not unknown
+                else 'PARTIAL_DETAIL_FIELDS_MATCH_RECONCILIATION_PENDING' if matched
+                else 'SCHEMA_RECOGNIZED_RECONCILIATION_PENDING')
+        return dict(status=status,schema=dict(bill['schema']),matched_detail_rows=matched,total_rows=len(bill['rows']),
+                    exceptions=exceptions[:200],exceptions_truncated=len(exceptions)>200,
+                    unknown_rows=unknown[:200],unknown_rows_truncated=len(unknown)>200,
+                    body_sha256=bill['body_sha256'],coverage='SPLIT_DETAIL_IDENTITIES_AND_AMOUNTS_ONLY',
+                    time_coverage='UNKNOWN_BILL_TIMEZONE',reverse_coverage='NOT_ESTABLISHED',
+                    summary_amounts='NOT_RECONCILED',pending_evidence=['BILL_TIMEZONE','SUMMARY_AMOUNT_SEMANTICS']+
+                        sorted({r['reason'] for r in unknown}),
+                    finance_status='UNCONFIRMED',funds_retry_authorized=False)
+
     def reconcile(self,g,bill):
         a=self.actions;rows=bill['rows'];columns=set(bill['columns']);exceptions=[];matched=0;seen=set();missing=[];undated=0;reverse='NOT_APPLICABLE_TO_SPLIT_LAYOUT'
         if (bill['kind']=='SPLIT' and tuple(bill['columns'])==SPLIT_COLUMNS
                 and type(bill.get('schema')) is dict
                 and bill['schema'].get('id')==SPLIT_SCHEMA):
-            return dict(status='SCHEMA_RECOGNIZED_RECONCILIATION_PENDING',
-                schema=dict(bill['schema']),total_rows=len(rows),body_sha256=bill['body_sha256'],
-                pending_evidence=['RECEIVER_TYPE_AND_BINDING','RETURN_DETAIL_JOIN','BILL_TIMEZONE'],
-                finance_status='UNCONFIRMED',funds_retry_authorized=False)
+            return self._reconcile_split_details(g,bill)
         # Receiver-level split layouts require explicit receiver binding. Never
         # compare a detail row against an aggregate payout amount.
         if bill['kind']=='SPLIT' and any('接收' in k or '收款' in k for k in columns):

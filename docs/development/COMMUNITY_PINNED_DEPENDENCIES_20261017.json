@@ -2,24 +2,78 @@
   "dependencies": [
     {
       "path": "scripts/pr122_customer_core.py",
-      "source_commit": "bc9404216f2eb69dabf7754950a966238e758596",
+      "source_commit": "15c263e65f42cce18828a81bfc261e48c94636c7",
       "source_branch": "feature/work-pr122-site-hub-integration-20261016",
-      "sha256": "f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4",
-      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+      "sha256": "cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0",
+      "source_blob_sha": "c53260a8251540c2e4019cef12b098b79340762c",
+      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION",
+      "previous_pin": {
+        "path": "scripts/pr122_customer_core.py",
+        "source_commit": "bc9404216f2eb69dabf7754950a966238e758596",
+        "source_branch": "feature/work-pr122-site-hub-integration-20261016",
+        "sha256": "f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4",
+        "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+      }
     },
     {
       "path": "scripts/pr122_customer_source.py",
-      "source_commit": "b882ea631e6391f1fc8727766ccbaf3c66b519da",
+      "source_commit": "15c263e65f42cce18828a81bfc261e48c94636c7",
       "source_branch": "feature/work-pr122-site-hub-integration-20261016",
       "sha256": "3e8d531ede69577b72b6ee9089fdc8f481b2f91578f19e0e44d1841c168f3471",
-      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+      "source_blob_sha": "e8a690342c5a5b16a7005549713907fd902408f9",
+      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION",
+      "previous_pin": {
+        "path": "scripts/pr122_customer_source.py",
+        "source_commit": "b882ea631e6391f1fc8727766ccbaf3c66b519da",
+        "source_branch": "feature/work-pr122-site-hub-integration-20261016",
+        "sha256": "3e8d531ede69577b72b6ee9089fdc8f481b2f91578f19e0e44d1841c168f3471",
+        "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+      }
     },
     {
       "path": "scripts/pr122_customer_runtime.py",
-      "source_commit": "b882ea631e6391f1fc8727766ccbaf3c66b519da",
+      "source_commit": "15c263e65f42cce18828a81bfc261e48c94636c7",
       "source_branch": "feature/work-pr122-site-hub-integration-20261016",
       "sha256": "3a483ed81eb595309665c3d2b5746e56a50016fb246617000eb326dc5ff2b959",
+      "source_blob_sha": "788fa186e500f7374279b49cb05c7572fbc8b6cb",
+      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION",
+      "previous_pin": {
+        "path": "scripts/pr122_customer_runtime.py",
+        "source_commit": "b882ea631e6391f1fc8727766ccbaf3c66b519da",
+        "source_branch": "feature/work-pr122-site-hub-integration-20261016",
+        "sha256": "3a483ed81eb595309665c3d2b5746e56a50016fb246617000eb326dc5ff2b959",
+        "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+      }
+    },
+    {
+      "path": "scripts/pr122_customer_evidence.py",
+      "source_commit": "15c263e65f42cce18828a81bfc261e48c94636c7",
+      "source_branch": "feature/work-pr122-site-hub-integration-20261016",
+      "sha256": "e4cfa96df6e1c340c2d3f75a2a64b75edcb1e664ed4663ccec3e1f2ca582a3dd",
+      "source_blob_sha": "3dea8f4614f91491e673667610df44f12eed546d",
+      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+    },
+    {
+      "path": "scripts/pr122_customer_activity_evidence.py",
+      "source_commit": "15c263e65f42cce18828a81bfc261e48c94636c7",
+      "source_branch": "feature/work-pr122-site-hub-integration-20261016",
+      "sha256": "2c7b740c569a3feaaeaaccbe0a53f23cd09f116d4881e7edee8449b6a841fe12",
+      "source_blob_sha": "b8dc5676966e85840e5f4e169c0691bef25721bd",
+      "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
+    },
+    {
+      "path": "scripts/pr122_customer_privacy.py",
+      "source_commit": "15c263e65f42cce18828a81bfc261e48c94636c7",
+      "source_branch": "feature/work-pr122-site-hub-integration-20261016",
+      "sha256": "99ba0b6810ab6eca07fbbdcc5e921970d783e49262c93102632f1d44417acad4",
+      "source_blob_sha": "468ee82734e13238f054f58444449b9e2330ca0e",
       "mode": "BYTE_IDENTICAL_REUSE_NO_UPSTREAM_MODIFICATION"
     }
-  ]
+  ],
+  "integration": {
+    "target_commit": "15c263e65f42cce18828a81bfc261e48c94636c7",
+    "scope": "OFFLINE_SOURCE_ONLY_NO_DEPLOYMENT",
+    "previous_core_sha256": "f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4",
+    "source_runtime_byte_unchanged": true
+  }
 }

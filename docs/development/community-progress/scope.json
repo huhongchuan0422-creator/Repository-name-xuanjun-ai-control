@@ -1,10 +1,11 @@
 {
-  "current_module": "原官方账单核对历史安全存取 + 商家财务工作台可视化 + 财务身份门禁",
+  "current_module": "最终候选需求交叉追踪与外部接线证据核对（阶段仍为PARTIAL）",
   "blockers": [
-    "暂无真实特约商户，真实交易验收依赖外部条件",
-    "尚未完成全部当前源码业务链测试和独立审核",
-    "官方分账账单接收方明细格式仍需可信字段适配；未识别格式保持 UNKNOWN",
-    "真实财务核销需要原财务权威接入；不创建第二账本"
+    "当前候选版本的真实商户、产品权限和接线验收回执待核实；不据缺少回执判断账号未配置",
+    "最终源码、12组/40叶多对多追踪与准确版本CI需统一后集中独立审核；基线回执不覆盖后续提交",
+    "官方样本账单布局识别与真实接收方/回退明细语义对账分别验收；未知变体保持UNKNOWN_SCHEMA",
+    "权威Finance签发与原CRM/扫描器/密钥运行时/HTTPS的当前版本接线待责任方提供验收证据；不创建第二账本",
+    "当前候选官方小程序编译与真机验收待核实；四个可选mini任务SKIPPED不等于PASS"
   ],
   "tasks": [
     {
@@ -87,11 +88,118 @@
     "first_run": "VERIFIED_2026-10-17T09:36:44Z"
   },
   "latest_verified_ci": {
-    "source": "642f5afb23b15463c76cf591e705c68435f4bc09",
-    "run_id": 39033750602,
-    "job_id": 117399331268,
+    "source": "d9dda1bf",
+    "source_reference": "VERIFIED_BASELINE_SHORT_SHA",
+    "run_id": 39058998739,
+    "job_id": 117472902513,
     "result": "SUCCESS",
-    "scope": "Hosted exact-source 448 community / 342 Stage tests and Node suites 34+40+8+7 passed; optional mini runtime/python/sdk/preview skipped; finance bill audit UI browser transport smoke",
+    "scope": "Verified baseline: 565 community / 342 Stage5 / 258 Node tests passed; optional mini-python-runtime, mini-runtime, mini-sdk and mini-preview SKIPPED. Not official compilation, device acceptance, production wiring or independent phase approval.",
     "covers_later_commits": false
+  },
+  "requirements_crosswalk": {
+    "kind": "DESCRIPTIVE_MANY_TO_MANY_NOT_ACCEPTANCE",
+    "source": "docs/development/COMMUNITY_STAGE_INTEGRATION_20261017.md#12组与40叶交叉索引",
+    "note": "沿用原组与原叶编号，仅按当前描述定位共同源码及验收依赖；不是权威一一分解，不增加要求或证明每组覆盖完整。社区专属生命周期和通知/员工细目没有独立40叶编号，不以近似映射代替原12组验收。P1-05为OWNER_DEFERRED，不阻塞本轮。",
+    "groups": {
+      "P1-A": [
+        "P1-01",
+        "P2-05",
+        "P2-22"
+      ],
+      "P1-B": [
+        "P1-01",
+        "P1-09",
+        "P2-05",
+        "P2-25"
+      ],
+      "P1-C": [
+        "P1-01",
+        "P1-10",
+        "P2-04",
+        "P2-25"
+      ],
+      "P1-D": [
+        "P1-02",
+        "P1-09"
+      ],
+      "P1-E": [
+        "P1-10",
+        "P1-14",
+        "P2-04",
+        "P2-05"
+      ],
+      "P2-A": [
+        "P1-03",
+        "P1-04",
+        "P1-06",
+        "P1-08",
+        "P1-11",
+        "P2-05",
+        "P2-12",
+        "P2-24"
+      ],
+      "P2-B": [
+        "P2-01",
+        "P2-02",
+        "P2-03",
+        "P2-06",
+        "P2-07",
+        "P2-08",
+        "P2-09",
+        "P2-10",
+        "P2-11",
+        "P2-13",
+        "P2-14"
+      ],
+      "P2-C": [
+        "P1-12",
+        "P2-11",
+        "P2-12",
+        "P2-13",
+        "P2-15",
+        "P2-25"
+      ],
+      "P2-D": [
+        "P1-02",
+        "P1-09",
+        "P1-10",
+        "P2-05"
+      ],
+      "P2-E": [
+        "P1-12",
+        "P2-13",
+        "P2-15",
+        "P2-17",
+        "P2-18",
+        "P2-19",
+        "P2-25"
+      ],
+      "P2-F": [
+        "P1-10",
+        "P1-12",
+        "P2-04",
+        "P2-10",
+        "P2-11",
+        "P2-13",
+        "P2-15",
+        "P2-17"
+      ],
+      "P2-G": [
+        "P1-05",
+        "P1-07",
+        "P1-13",
+        "P1-14",
+        "P1-15",
+        "P2-16",
+        "P2-17",
+        "P2-18",
+        "P2-19",
+        "P2-20",
+        "P2-21",
+        "P2-22",
+        "P2-23",
+        "P2-24"
+      ]
+    }
   }
 }

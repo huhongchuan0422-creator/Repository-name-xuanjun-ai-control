@@ -106,12 +106,15 @@ class SplitReturns:
                 or type(data.get('amount')) is not int or data['amount'] != expected['amount']
                 or data.get('result') not in ('PROCESSING', 'SUCCESS', 'FAILED')):
             raise ValueError('SIGNED_SPLIT_RETURN_BINDING_MISMATCH')
+        from scripts.community_provider_bills import signed_bill_evidence, retain_bill_evidence
+        bill_evidence = signed_bill_evidence(data, digest, 'RETURN')
         with c.tx():
             current = self._read(key)
             if current is None or current['request_hash'] != saved['request_hash']:
                 raise PermissionError('RETURN_INTENT_CHANGED')
             if current.get('result') in ('SUCCESS', 'FAILED') and current['result'] != data['result']:
                 raise ValueError('TERMINAL_SPLIT_RETURN_CONFLICT')
+            retain_bill_evidence(current, bill_evidence)
             current.update(result=data['result'], response_sha256=digest, observed_at=c.now())
             c.db.execute("UPDATE links SET payload=? WHERE channel='COMMUNITY_PROVIDER_RETURN' AND subject_idx=? AND active=1", (c.encrypt(canonical(current), 'community-provider-return:' + key), key))
             if data['result'] in ('SUCCESS', 'FAILED'):

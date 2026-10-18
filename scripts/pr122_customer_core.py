@@ -90,13 +90,16 @@ CREATE TRIGGER IF NOT EXISTS versions_no_delete BEFORE DELETE ON versions BEGIN 
 '''
 
 class Center:
-    def __init__(self, root, keys, active_key, *, clock=time.time, mail_ready=False, scanner=None, secretref=None):
+    def __init__(self, root, keys, active_key, *, clock=time.time, mail_ready=False, scanner=None, secretref=None, evidence_context=None, privacy_policy_context=None, privacy_processing_context=None):
         self.root=private_path(root); self.root.mkdir(mode=0o700,parents=True,exist_ok=True)
         if self.root.stat().st_mode & 0o077: raise Denied('PRIVATE_ROOT_MODE')
         self.objects=self.root/'objects'; self.objects.mkdir(mode=0o700,exist_ok=True)
         self.keys={identifier(k):v for k,v in keys.items()}
         if any(type(v) is not bytes or len(v)!=32 for v in self.keys.values()) or active_key not in keys: raise ValueError('KMS_KEYS_REQUIRED')
         self.key_id=active_key; self.clock=clock; self.mail_ready=mail_ready; self.scanner=scanner; self.secretref=secretref
+        self.activity_ready=False
+        self.privacy_policy_context=privacy_policy_context;self.privacy_processing_context=privacy_processing_context
+        self.evidence_context=evidence_context
         dbp=self.root/'center.sqlite'; private_path(dbp)
         self.db=sqlite3.connect(dbp,isolation_level=None,timeout=15)
         os.chmod(dbp,0o600); self.db.row_factory=sqlite3.Row
@@ -106,6 +109,15 @@ class Center:
         self.db.execute("INSERT OR IGNORE INTO settings VALUES('index_key',?)",(self.key_id,))
         self.index_key=self.db.execute("SELECT v FROM settings WHERE k='index_key'").fetchone()[0]
         if self.index_key not in keys: raise Unavailable('INDEX_KEY_RESTORE_REQUIRED')
+        from scripts.pr122_customer_evidence import install
+        try:
+            install(self)
+            from scripts.pr122_customer_activity_evidence import install as install_activity
+            install_activity(self);self.activity_ready=True
+            from scripts.pr122_customer_privacy import install as install_privacy
+            install_privacy(self)
+        except Exception:
+            self.db.close();raise
     def now(self): return int(self.clock())
     def idx(self,value): return hmac.new(self.keys[self.index_key],value.encode(),hashlib.sha256).hexdigest()
     def encrypt(self,value,aad):
@@ -124,6 +136,9 @@ class Center:
         parent=prev[0] if prev else '0'*64; at=self.now()
         sha=digest(canonical([project,actor,event,obj,at,parent]))
         self.db.execute('INSERT INTO audit(project,actor,event,object_id,at,parent,sha) VALUES(?,?,?,?,?,?,?)',(project,actor,event,obj,at,parent,sha))
+        if self.activity_ready:
+            from scripts.pr122_customer_activity_evidence import capture_audit
+            capture_audit(self,project,event,obj)
     def limit(self,scope,limit=8,seconds=900):
         k=self.idx(scope); now=self.now(); row=self.db.execute('SELECT window,n FROM rate_limits WHERE k=?',(k,)).fetchone()
         start,n=(row[0],row[1]) if row and now-row[0]<seconds else (now,0)
@@ -265,6 +280,9 @@ class Center:
         p=self.db.execute('SELECT * FROM projects WHERE id=? AND active=1',(identifier(pid),)).fetchone()
         m=self.db.execute('SELECT role FROM members WHERE project=? AND user_id=? AND active=1',(pid,uid)).fetchone()
         if not p or p['expires']<=self.now() or not m or (roles and m[0] not in roles): raise Denied('PROJECT_PERMISSION_REQUIRED')
+        if self.activity_ready:
+            from scripts.pr122_customer_activity_evidence import guard_subject
+            guard_subject(self,p)
         return p,m[0],json.loads(self.decrypt(p['payload'],'project:'+pid))
     def requirement(self,uid,pid,item,roles=None):
         p,role,data=self.project(uid,pid,roles)
@@ -283,6 +301,8 @@ class Center:
             except Denied: pass
         return result
     def checklist(self,uid,pid):
+        if not self.db.in_transaction:
+            with self.tx():return self.checklist(uid,pid)
         p,role,d=self.project(uid,pid); result=[]
         for q in d['requirements']:
             if q['category']=='INTERNAL' and role!='REVIEWER': continue
@@ -294,6 +314,7 @@ class Center:
             result.append({**q,'state':r['state'],'revision':r['seq'],'accepted_revision':r['accepted'],'needs_reverification':recheck,'versions':versions})
         states=[x['state'] for x in result if x['required']]
         overall='ACCEPTED' if states and all(s=='ACCEPTED' for s in states) and not any(x['needs_reverification'] for x in result if x['required']) else 'PARTIAL' if any(s!='NOT_STARTED' for s in states) else 'NOT_STARTED'
+        self.audit(pid,uid,'MATERIAL_HISTORY_READ',str(len(result)))
         return {'project':pid,'items':result,'overall':overall,'requirements_revision':p['revision']}
     def invite(self,uid,pid,target_email,role):
         with self.tx():
@@ -393,20 +414,31 @@ class Center:
             if len(raw)!=o['size'] or digest(raw)!=o['sha']: raise Denied('OBJECT_INTEGRITY')
             self.audit(pid,uid,'DOWNLOAD',oid)
         return raw,o['mime']
-    def message(self,uid,pid,text,channel='WEB',event=None):
-        self.project(uid,pid); self.limit('message:'+uid,20,60); safe_text(text,4000)
+    def message(self,uid,pid,text,channel='WEB',event=None,*,provider_occurred_at=None):
+        if not self.db.in_transaction:
+            with self.tx():return self.message(uid,pid,text,channel,event,provider_occurred_at=provider_occurred_at)
+        from scripts.pr122_customer_evidence import authorized_records
+        authorized_records(self,uid,pid)
+        self.limit('message:'+uid,20,60); safe_text(text,4000)
         mid='m_'+secrets.token_hex(16)
         self.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?,NULL,?)',(mid,pid,uid,channel,self.encrypt(text.encode(),mid),'ARCHIVED',self.now())); self.audit(pid,uid,'MESSAGE_ARCHIVED',mid)
+        from scripts.pr122_customer_evidence import append
+        append(self,mid,event=event,provider_occurred_at=provider_occurred_at)
         return {'id':mid,'status':'ARCHIVED','ai_response':'PENDING_PROVIDER'}
     def messages(self,uid,pid):
-        self.project(uid,pid)
-        return [{'id':r['id'],'channel':r['channel'],'body':self.decrypt(r['payload'],r['id']).decode(),'status':r['status'],'created':r['created']} for r in self.db.execute('SELECT * FROM messages WHERE project=? ORDER BY created,id LIMIT 200',(pid,))]
+        if not self.db.in_transaction:
+            with self.tx():return self.messages(uid,pid)
+        from scripts.pr122_customer_evidence import authorized_records
+        _,records,heads=authorized_records(self,uid,pid)
+        self.audit(pid,uid,'MESSAGES_READ',heads.get(pid,'0'*64))
+        records.sort(key=lambda r:(r['evidence']['server_received_at'],r['evidence']['message_id']))
+        return [{'id':r['evidence']['message_id'],'channel':r['evidence']['source_channel'],'body':r['body'],'status':r['delivery_status'],'created':r['evidence']['server_received_at']} for r in records[:200]]
     def binding_challenge(self,uid,pid,channel,subject):
         if channel not in ('TELEGRAM','FEISHU') or type(subject) is not str or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}',subject): raise ValueError('INVALID_CHANNEL_SUBJECT')
         with self.tx():
             self.project(uid,pid); self.limit('bind:'+uid,8); token=self.challenge('bind',uid,{'project':pid,'channel':channel,'subject':subject},300); self.audit(pid,uid,'BIND_CHALLENGE',channel)
         return {'challenge':token,'expires_in':300,'state':'AWAIT_PROVIDER_AND_WEB_CONFIRMATION'}
-    def channel_event(self,channel,event_id,subject,text,*,now=None):
+    def channel_event(self,channel,event_id,subject,text,*,now=None,provider_occurred_at=None):
         """Only called after actual provider adapter verification, never public JSON directly."""
         identifier(event_id); safe_text(text,4000)
         with self.tx():
@@ -424,7 +456,7 @@ class Center:
                 if len(parts)!=3: raise ValueError('PROJECT_AND_MESSAGE_REQUIRED')
                 pid=identifier(parts[1]); r=self.db.execute('SELECT user_id FROM links WHERE channel=? AND subject_idx=? AND project=? AND active=1',(channel,self.idx(subject),pid)).fetchone()
                 if not r: raise Denied('CHANNEL_LINK_REQUIRED')
-                result=self.message(r[0],pid,parts[2],channel,event_id)
+                result=self.message(r[0],pid,parts[2],channel,event_id,provider_occurred_at=provider_occurred_at)
             else: raise Denied('EXPLICIT_PROJECT_CONTEXT_REQUIRED')
             self.db.execute('INSERT INTO events VALUES(?,?,?)',(channel,event_id,self.now()))
         return result
@@ -454,6 +486,12 @@ class Center:
             self.db.execute("UPDATE challenges SET used=1 WHERE user_id=? AND kind IN ('bind','confirm_link')",(uid,)); self.audit(pid,uid,'UNLINK',channel)
         return {'unlinked':True}
     def check_integrity(self):
+        from scripts.pr122_customer_evidence import verify
+        verify(self)
+        from scripts.pr122_customer_activity_evidence import verify as verify_activity
+        verify_activity(self)
+        from scripts.pr122_customer_privacy import verify as verify_privacy
+        verify_privacy(self)
         if self.db.execute('PRAGMA integrity_check').fetchone()[0]!='ok': raise Denied('DB_INTEGRITY')
         parent='0'*64
         for r in self.db.execute('SELECT * FROM audit ORDER BY seq'):

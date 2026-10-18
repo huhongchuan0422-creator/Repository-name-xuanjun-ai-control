@@ -16,8 +16,12 @@ def build(root):
                 'clients/community-mini/*.json', 'clients/community-mini/*.cjs',
                 'clients/community-mini/pages/checkout/*',
                 'docs/development/COMMUNITY_STAGE_INTEGRATION_20261017.md',
+                'docs/development/COMMUNITY_CENTER_EXACT_INTEGRATION_20261018.md',
                 'scripts/pr122_customer_core.py',
                 'scripts/pr122_customer_source.py',
+                'scripts/pr122_customer_evidence.py',
+                'scripts/pr122_customer_activity_evidence.py',
+                'scripts/pr122_customer_privacy.py',
                 'scripts/pr122_customer_runtime.py',
                 'docs/development/COMMUNITY_PINNED_DEPENDENCIES_20261017.json')
     paths = sorted({p for pattern in patterns for p in root.glob(pattern) if p.is_file()})
@@ -27,7 +31,10 @@ def build(root):
             raise ValueError('PACKAGE_SYMLINK_DENIED')
         files[path.relative_to(root).as_posix()] = path.read_bytes()
     required = {'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
-                'scripts/community_stage_package.py', 'clients/community-mini/app.json'}
+                'scripts/community_stage_package.py', 'clients/community-mini/app.json',
+                'scripts/pr122_customer_core.py', 'scripts/pr122_customer_source.py',
+                'scripts/pr122_customer_runtime.py', 'scripts/pr122_customer_evidence.py',
+                'scripts/pr122_customer_activity_evidence.py', 'scripts/pr122_customer_privacy.py'}
     if not required.issubset(files):
         raise ValueError('REQUIRED_SOURCE_MISSING')
     manifest = {'format': 1, 'purpose':'OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE',

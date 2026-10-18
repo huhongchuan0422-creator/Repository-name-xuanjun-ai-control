@@ -232,11 +232,14 @@ class ProviderActions:
             if observed and sorted(observed)!=expected or data['state']=='FINISHED' and sorted(observed)!=expected:raise ValueError('RECEIVER_ALLOCATION_MISMATCH')
             if data['state']=='FINISHED' and any(r['result']=='PENDING' for r in results):raise ValueError('FINISHED_SPLIT_HAS_PENDING_RECEIVERS')
             result=dict(status=data['state'],receivers=results,receiver_results_pending=not receivers);terminal=data['state']=='FINISHED'
+        from scripts.community_provider_bills import signed_bill_evidence,retain_bill_evidence
+        bill_evidence=signed_bill_evidence(data,digest,'SPLIT') if saved['kind']=='SPLIT' else None
         with self.center.tx():
             persisted=self._load(key)
             if persisted is None or persisted['request_hash']!=saved['request_hash']:raise PermissionError('PROVIDER_INTENT_CHANGED')
             previous=persisted.get('result')
             if previous and previous['status'] in ('SUCCESS','CLOSED','FINISHED') and previous!=result:raise ProviderActionUnknown('TERMINAL_PROVIDER_RESULT_CONFLICT')
+            retain_bill_evidence(persisted,bill_evidence)
             persisted['result']=result;persisted['response_sha256']=digest;persisted['observed_at']=self.center.now();self._save(key,persisted)
             if terminal:
                 row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_LOCK' AND subject_idx=? AND active=1",(lock,)).fetchone()

@@ -7,13 +7,21 @@
 PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffebd6254c0116ae8023efcc2ae714fc5a275560。
 在ChatGPT原分支吸收原PR122基线；不修改PR118/PR122分支引用，不启动对方工作区writer。旧模块保留准确原始字节，新接线仅新增独立路径。governance/features.json只追加既有SAAS_AI_PRICING登记。
 
-## 本批实际代码
+## 初始批次实际代码（历史记录）
 
 - community_stage_runtime.py：原Phase1 DemoService和Phase2 OfflineSaas统一dispatch；Principal及门店绑定从服务端配置取得，客户端不能指定租户/角色/支付成功；所有广告及报价时间使用服务端时钟。
 - community_stage_local.py：复用原orders/merchant/ad/refund/module/SaaS-order数据库格式，持久打开并验证；原组件的独立文件仍保留，不虚称跨库原子事务。私有目录、数据库符号链接拒绝、排他进程锁、失败释放句柄；不自动seed、不迁移生产数据。
 - /offline/community-stage：商家展示、小程序流程、H5流程、商家与平台读视图、SaaS目录/订单/恢复共用同一HTTP服务。旧SaaS编辑、审核页面仍在/offline/saas-panel。
 - clients/community-mini：真实微信开发者工具项目结构，既有AppID；wx.request对接同一服务的模拟订单与两个广告位。令牌仅内存，不保存密钥，不调用requestPayment。开发配置仅本机HTTP，不是微信发布工程验收。
 - 原订单SUCCESS只生成MOCK_PAID_SIMULATED结果；成功广告必须读取原订单持久状态且经过原广告审批/有效期筛选。模拟结算操作仅Python测试操作员hook，禁止HTTP调用。没有真钱效果或Finance入账。
+
+## 当前证据口径（2026-10-18）
+
+已核验基线为 `d9dda1bf`（短SHA）、Hosted Run `39058998739` / Job `117472902513` SUCCESS：565项community、342项Stage5、258项Node测试。该回执只覆盖该基线；后续源码必须绑定新的确切CI，不得沿用基线PASS。`mini-python-runtime`、`mini-runtime`、`mini-sdk`、`mini-preview`均SKIPPED，不是官方编译、真机、生产接线或独立审核PASS。
+
+本文件按时间保留研发历史。历史段落中的“尚无消费端”“未接线”“不调用requestPayment”等只描述当时状态，不覆盖下列当前源码索引；旧预览回执也不覆盖已修改的小程序源文件。缺少当前现场回执不等于账号、商户或凭据不存在。第一、二阶段仍PARTIAL，P1-05仍OWNER_DEFERRED，不作为本轮完成条件。
+
+当前已有 `community_mini_application.py` 的原Center组合与受保护配置入口；`community_mini_center_identity.py`、`community_center_operations.py`、`community_merchant_opening.py`复用既有身份/项目/开通记录。`community_saas_finance_authority.py`提供权威公钥配置下的确认/冲正验签，`community_saas_fulfillment.py`提供原库兑现/恢复接线；`tests/test_community_saas_finance_integration.py`是合成签名与原SQLite组合证据，不是真实Finance签发或权益验收。支付、退款、分账适配源码已存在，未授权的现场资金调用仍HOLD。
 
 ## 40节点追踪
 
@@ -26,10 +34,10 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |P1-01|服务端Principal绑定既有Tenant/Merchant/Store；补齐商家入驻入口、资料与独立审核链|入驻流程拆为下列子项；现场CRM开通绑定待验|
 |P1-02|既有商家目录统一HTTP|新增真实Chromium商家读取|
 |P1-03|原签名场景与金额校验复用|二维码签名→原订单；实体微信扫码预览待验|
-|P1-04|原生小程序工程及请求客户端；国内服务器预览上传成功|Run39006945633、Job117321450248 SUCCESS；真机扫码待验|
+|P1-04|原生小程序工程及请求客户端；历史开发预览上传成功|旧Run39006945633不覆盖当前源码；本候选官方编译/预览及真机待验|
 |P1-05|OWNER_DEFERRED：公众号暂缓|2026-10-17 Owner明确不作为本轮完成条件|
 |P1-06|原持久订单状态机复用|重新打开后原订单/事件保留|
-|P1-07|统一loopback HTTP|真实HTTP及Chromium，不公开服务|
+|P1-07|统一loopback HTTP及受保护Unix代理候选|HTTP/Chromium源码测试；实际HTTPS宿主接线待验|
 |P1-08|原生小程序客户端及H5客户端|金额/旧响应/伪成功拒绝|
 |P1-09|原商家编辑/订单/广告复用|服务端角色和门店绑定|
 |P1-10|原平台审核/审计复用|商家不可调用平台审核|
@@ -37,10 +45,10 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |P1-12|原退款/分账/对账预览复用|101=退款11+分配90；实际结算UNKNOWN|
 |P1-13|五视图共用同一订单端到端|新增Chromium测试；非微信设备E2E|
 |P1-14|进程锁、重开、权限异常|新持久host与既有恢复回归|
-|P1-15|原专用CI执行整阶段回归|Run39006945633成功；后续代码需绑定新CI，不送断点审|
+|P1-15|原专用CI执行整阶段源码回归|当前已核验基线见上；后续提交另核CI，不送断点审|
 |P2-01|原报价API接入统一HTTP|既有Phase2全量回归|
 |P2-02|原SaaS订单API接入统一HTTP|不替代消费者收款订单|
-|P2-03|原权益只读API复用|不发放正式权益|
+|P2-03|原权益读取及受保护兑现接口复用|合成Finance签名测试；未验收真实正式权益发放|
 |P2-04|原后台审核API复用|权限/任务状态回归|
 |P2-05|既有Center账号、会话、项目权限；新增受保护微信code绑定HTTP|原Center实例组合测试；现场账号/KMS/HTTPS接入待验|
 |P2-06|原SaaS市场页面保留|原Chromium市场测试|
@@ -48,21 +56,55 @@ PR118准确基线71024b22f0d6110f0507dbd8476468313f8846f2；PR122准确基线ffe
 |P2-08|原客户订单中心复用|原浏览器报价→订单测试|
 |P2-09|原续费计划及页面复用|真实确认Finance外部依赖|
 |P2-10|原Owner定价编辑审批复用|真实Owner认证未验|
-|P2-11|原Finance证据需求接口|权威Finance verifier未连接|
+|P2-11|原证据接口及SignedFinanceAuthority确认/冲正验签源码|原财务权威签发方、信任公钥与tenant范围的现场接线待验|
 |P2-12|支付凭证真实验签|新增原始报文RSA验签与AES-GCM解密源码；真实公钥/公钥ID与绑定待核|
 |P2-13|原订单事件/Quote哈希关联复用|真实结算事件外部依赖|
-|P2-14|原权益intent保持只读|真实财务确认及grant权限待验|
-|P2-15|原退款冲正预审复用|真实退款/冲正保持HOLD|
+|P2-14|原权益intent及SaasFulfillment原库兑现/恢复接线|合成签名、持久预留与重开测试；真实财务确认及grant权限待验|
+|P2-15|原退款预审、提供商操作与独立Finance冲正验签接线|原库恢复测试；真实退款/冲正保持HOLD|
 |P2-16|原精确schema验证复用|旧生产DB迁移源与授权待提供|
 |P2-17|原跨库审计复用|没有跨文件原子提交声明|
 |P2-18|原WAL/中断恢复+新运行时重开|真实主机故障注入未验|
 |P2-19|原并发幂等+本批单进程锁|并发、重复退款与重复事件回归|
-|P2-20|原备份复用；新增六业务库维护态快照和新目录恢复|7项真实SQLite检查通过；现有Center备份仍由原系统负责|
+|P2-20|原备份复用；六业务库维护态快照和新目录恢复|SQLite源码回归不等于主机灾备验收；Center及原密钥恢复由既有宿主负责|
 |P2-21|原package保留；新增确定性源码ZIP含运行时/页面/小程序/测试和逐文件Manifest|源码包逐字节校验；不构成生产安装包|
-|P2-22|原服务端令牌配置复用|本批内存令牌；生产Secrets未接|
+|P2-22|原服务端受保护配置与内存令牌复用|当前候选宿主注入与密钥恢复证据待验；不推断已有Secrets不存在|
 |P2-23|原health/rollback_preview复用|真实安装/回滚HOLD|
-|P2-24|小程序工程、微信真实预览上传通过|扫码/现场登录待验；公众号OAuth按Owner暂缓|
-|P2-25|不调用资金API|服务商认证/真实sub_mchid/产品权限未验|
+|P2-24|小程序工程与历史开发预览回执保留|本候选编译/扫码/现场登录待验；公众号OAuth按Owner暂缓|
+|P2-25|已有显式启用的提供商支付/退款/分账适配源码|当前候选商户绑定/产品权限/授权真实交易验收待核；本次不调用资金API|
+
+## 12组与40叶交叉索引
+
+此表沿用 `community-progress/scope.json` 的原12组及上表原40叶，是按描述和共同代码/验收依赖建立的多对多导航，不是新的权威需求树，也不是一一对应或完成证明。P1/P2前缀分别保留各原清单的编号语境，跨阶段关联不改原分组。原12组中的社区生命周期、员工细粒度权限及通知等细目没有单独的40叶编号；下列近似关联不能替代这些原组的独立验收。共享工程门禁聚合在P2-G，并同样约束其他组；不能据此重复计算完成率。
+
+| 原组 | 关联原叶（多对多） | 阶段验收状态 |
+|---|---|---|
+|P1-A 原身份体系及用户资料关联|P1-01、P2-05、P2-22|PARTIAL|
+|P1-B 商家入驻及微信进件资料|P1-01、P1-09、P2-05、P2-25|PARTIAL|
+|P1-C 平台审核及特约商户状态同步|P1-01、P1-10、P2-04、P2-25|PARTIAL|
+|P1-D 商家工作台门店员工商品|P1-02、P1-09|PARTIAL|
+|P1-E 平台基础管理通知隔离|P1-10、P1-14、P2-04、P2-05|PARTIAL|
+|P2-A 消费者交易及归属|P1-03、P1-04、P1-06、P1-08、P1-11、P2-05、P2-12、P2-24|PARTIAL|
+|P2-B 定价订单及账务查询|P2-01、P2-02、P2-03、P2-06、P2-07、P2-08、P2-09、P2-10、P2-11、P2-13、P2-14|PARTIAL|
+|P2-C 真实微信支付退款与对账|P1-12、P2-11、P2-12、P2-13、P2-15、P2-25|PARTIAL|
+|P2-D 社区管理|P1-02、P1-09、P1-10、P2-05|PARTIAL|
+|P2-E 版本化分账规则执行恢复|P1-12、P2-13、P2-15、P2-17、P2-18、P2-19、P2-25|PARTIAL|
+|P2-F 运营财务后台|P1-10、P1-12、P2-04、P2-10、P2-11、P2-13、P2-15、P2-17|PARTIAL|
+|P2-G 完整业务链集成|P1-05、P1-07、P1-13、P1-14、P1-15、P2-16、P2-17、P2-18、P2-19、P2-20、P2-21、P2-22、P2-23、P2-24|PARTIAL|
+
+P1-05只作为历史范围索引，状态为OWNER_DEFERRED，不是本轮阻塞。所有40叶均有导航关联，但“被索引”不代表源码/现场/审核均完成；原组仍全部PARTIAL。
+
+## 当前候选的一次性外部接线验收材料
+
+只需要既有责任方提供脱敏配置引用和同版本验收结果，不要求复制秘密、新建账号/账本或推断既有配置缺失：
+
+- 小程序发布/运维负责人：官方编译/开发预览 `receipt.json`、相同客户端source_hashes与真机扫码/登录/查询恢复结果。既有工作流的 `[mini-preview]` 会触发国内self-hosted预览并使用原Secrets；本次未触发，历史回执不能代替当前验收。
+- 原Center/CRM负责人：与 `COMMUNITY_PINNED_DEPENDENCIES_20261017.json` 相容的宿主版本，现有verified账号/项目/租户/客户/合同订单引用及实时角色；scene与Principal、门店、onboarding_required映射。原 `Center.import_authority` 签名快照接线与撤权应在目标宿主验证，不新建第二IAM/CRM。
+- 原安全/客户中心运维：现有active_key与历史index_key可用、恢复结果；原scanner对合规材料明确返回True、未知/失败拒绝的回执。接口见 `pr122_customer_core.py` 与 `community_project_materials.py`；只交key ID/状态，不交密钥或真实私有资料。
+- 部署负责人：`MiniApplication.listen_proxy` 对应的固定HTTPS origin、TLS路由、非root运行、Unix socket与Nginx UID/GID/可信peer边界回执，以及微信请求域名与回调可达性。loopback测试不构成生产部署。
+- 微信服务商负责人：现有sp_mchid/sp_appid/sub_mchid可信绑定、产品权限、公钥ID/可信来源与商户证书配对状态；固定回调、分账接收方/比例限额/enabled_operations政策。契约见 `community_wechat_sp_readonly.py`、`community_mini_payments.py`、`community_wechat_sp_actions.py`；秘密继续由原受保护宿主注入，真实资金执行另需许可。
+- 原Finance负责人：authority_id、签名key_id/公钥与tenant范围、原系统签发的确认/冲正契约及旧价版本/perpetual映射。契约见 `community_saas_finance_authority.py` 与 `community_saas_fulfillment.py`；合成签名测试不代替真实权威签发，微信验签不代替Finance核销。
+
+验收顺序：冻结最终源码与依赖→对应SHA完整Hosted与源码包核验→上述无资金接线/撤权/资料/恢复验收→同客户端hash官方编译和真机→最终候选集中独立审核。真实发布及小额支付/退款/分账只在另有明确执行许可和权威Finance核对条件后进行。本材料不授予发布、资金或持久权限扩展许可。
 
 ## 可复现验证
 

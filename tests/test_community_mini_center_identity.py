@@ -16,7 +16,7 @@ from scripts.community_mini_login import MiniGateway,WechatCodeClient,LoginUnava
 from scripts.community_order_store import create_order
 from scripts.community_demo_bootstrap import DEMO_SCOPE
 
-PINNED_CORE_SHA256='f9a736fa954bcc3fbdf2eea317bb0b71559864126c940ac6738a4bc9e4a87bd4'
+PINNED_CORE_SHA256='cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
 class ExistingCenterComposition(unittest.TestCase):
     def setUp(self):
         self.stage=stage_fixture.RuntimeJourney();self.stage.setUp();self.tmp=tempfile.TemporaryDirectory()
@@ -56,7 +56,7 @@ class ExistingCenterComposition(unittest.TestCase):
     def checkout(self,token,reference='order1'):
         qr=self.call(token,'community.qr',{'context':'mini'})['token']
         return self.call(token,'community.checkout',{'context':'mini','token':qr,'reference':reference,'amount_minor':101})
-    def test_core_bytes_are_identical_to_pinned_original(self):
+    def test_core_bytes_are_identical_to_explicit_website_pin(self):
         path=Path(__file__).resolve().parents[1]/'scripts/pr122_customer_core.py'
         self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),PINNED_CORE_SHA256)
     def test_real_account_session_and_scene_use_original_schema(self):
