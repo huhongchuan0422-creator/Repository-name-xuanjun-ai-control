@@ -8,6 +8,8 @@ import copy
 import hashlib
 import importlib.util
 import json
+import io
+import tarfile
 import os
 from pathlib import Path
 import subprocess
@@ -308,4 +310,20 @@ if __name__=='__main__':
         str(CANDIDATE/'tests/test_successor_transactions.py'))
     original=importlib.util.module_from_spec(original_spec)
     original_spec.loader.exec_module(original)
-    sys.exit(original.run_isolated(extra_suite_factory=suite,include_existing=False))
+    # Use the same pinned, unchanged legacy Kit as the formal adapter fixtures.
+    frozen=CANDIDATE/'published-v2/epoch7-kit-claim-lifecycle-0bd83e6f.tar.gz'
+    raw=frozen.read_bytes()
+    assert hashlib.sha256(raw).hexdigest()=='42d6d98f0fb1b1436f348a4ab70b2a9d91dd02e1ad085f49ecb2eb5c096d4465'
+    with tempfile.TemporaryDirectory() as directory:
+        baseline=Path(directory)/'baseline'
+        with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
+            for item in archive.getmembers():
+                if item.isdir():continue
+                assert item.isfile() and '/' in item.name
+                relative=item.name.split('/',1)[1]
+                assert not relative.startswith('/') and '..' not in relative.split('/')
+                destination=baseline/relative
+                destination.parent.mkdir(parents=True,exist_ok=True)
+                destination.write_bytes(archive.extractfile(item).read())
+        original.BASELINE=baseline
+        sys.exit(original.run_isolated(extra_suite_factory=suite,include_existing=False))
