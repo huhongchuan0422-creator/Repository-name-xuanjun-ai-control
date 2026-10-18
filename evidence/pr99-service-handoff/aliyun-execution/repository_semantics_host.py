@@ -15,18 +15,23 @@ import stat
 import zlib
 
 TARGETS=(
- ('database/repositories.py', ('CredentialRepository',)),
+ ('database/repositories/__init__.py', ()),
+ ('database/repositories/credential_repository.py', ('CredentialRepository',)),
  ('accounts/credential_store.py', ('CredentialStore',)),
  ('ai_service/secure_secrets_portal.py', ('OperationsSecretRefStore','FileBackedSubmissionSessionRepository','SecureSecretsPortalService')),
  ('ai_service/wecom_customer_service.py', ('WeComCustomerServiceIngress',)),
  ('ai_service/wecom_customer_contact_service.py', ('WeComCustomerContactIngress',)),
  ('ai_service/telegram_customer_service_canary.py', ('TelegramCustomerServiceCanary',)),
  ('database/connection.py', ()),
+ ('douyin/open_api_foundation.py', ('DouyinOAuthStateStore','DouyinTokenLifecycleStore')),
+ ('tiktok/open_api_foundation.py', ('TikTokOAuthStateStore','TikTokTokenLifecycleStore')),
+ ('scripts/secure_secrets_portal_server.py', ('PortalHandler',)),
 )
 PINS={
  'ai_service/wecom_customer_service.py':'aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402',
  'ai_service/wecom_customer_contact_service.py':'c95ca9ec711d05d64489ed927cae770157954b46661411b5f762f193ba711571',
  'database/connection.py':'58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece',
+ 'scripts/secure_secrets_portal_server.py':'57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1',
 }
 SAFE_CONSTANTS=('PRIVATE_LITERAL_WITHHELD',)
 
@@ -58,14 +63,14 @@ def excerpt(raw,classes):
         elif not isinstance(node,(ast.Import,ast.ImportFrom,ast.Assign,ast.AnnAssign,ast.FunctionDef,ast.AsyncFunctionDef)):
             continue
         selected.append(node)
-    if set(found)!=set(classes):raise RuntimeError('REQUESTED_CLASS_NOT_FOUND')
     clean=RemoveLiterals().visit(copy.deepcopy(ast.Module(body=selected,type_ignores=[])))
     code=ast.unparse(ast.fix_missing_locations(clean))
     # Removing docstrings can empty an otherwise valid class/function body.
     # Parsing here catches such transformations before any evidence is emitted.
     ast.parse(code)
     if len(code.encode())>170000 or len(definitions)>160:raise RuntimeError('STORAGE_SOURCE_BOUND')
-    return {'definitions':definitions,'selected_classes':list(classes),'redacted_syntax':code}
+    return {'definitions':definitions,'selected_classes':found,
+      'missing_classes':sorted(set(classes)-set(found)),'redacted_syntax':code}
 
 def read_source(root,path):
     parent=os.dup(root)
@@ -92,9 +97,14 @@ def observe(expected,nonce):
     rows=[]
     try:
         for path,classes in TARGETS:
-            raw=read_source(root,path);pin=sha(raw)
+            try:raw=read_source(root,path)
+            except FileNotFoundError:
+                rows.append({'path':path,'source_state':'MISSING','sha256':None,'definitions':[],
+                  'selected_classes':[],'missing_classes':sorted(classes),'redacted_syntax':''})
+                continue
+            pin=sha(raw)
             if path in PINS and pin!=PINS[path]:raise RuntimeError('PINNED_SOURCE_DRIFT')
-            rows.append({'path':path,'sha256':pin,**excerpt(raw,classes)})
+            rows.append({'path':path,'source_state':'PRESENT','sha256':pin,**excerpt(raw,classes)})
     finally:os.close(root)
     return {'scope':'PR99_STORAGE_IMPLEMENTATIONS_NOT_RUNTIME_ATTESTATION','hostname':expected,'nonce':nonce,
       'observed_at':datetime.datetime.utcnow().isoformat()+'Z','sources':rows,
