@@ -69,13 +69,22 @@ class CenterSaas:
         from scripts.community_saas_offer_catalog import read_quote
         reservation=self._owned(g,'QUOTE',quote_id)
         snapshot=read_quote(self.runtime.saas.quotes,quote_id,g['tenant'])
-        if (type(reservation.get('created_at')) is not int or type(reservation.get('version')) is not int
+        created=reservation.get('created_at');quoted=snapshot.get('created_at')
+        if (type(created) is not int or type(quoted) is not int or type(reservation.get('version')) is not int
                 or reservation.get('quote_id')!=quote_id or snapshot.get('tenant_id')!=g['tenant']
                 or snapshot.get('offer_id')!=reservation.get('offer_id')
                 or snapshot.get('version')!=reservation.get('version')
-                or snapshot.get('created_at')!=reservation.get('created_at')
-                or snapshot.get('expires_at')!=reservation.get('created_at',-1800)+1800
-                or 'source_sha256' in reservation and self._quote_source_hash(snapshot)!=reservation['source_sha256']):
+                or snapshot.get('expires_at')!=created+1800):
+            raise PermissionError('ORIGINAL_QUOTE_RESERVATION_CHANGED')
+        if 'source_sha256' in reservation:
+            # Fingerprinted reservations fix the exact original creation time.
+            invalid=quoted!=created or self._quote_source_hash(snapshot)!=reservation['source_sha256']
+        else:
+            # Legacy dispatch sampled its own clock after the Center commit.
+            # Accept that original window without extending its fixed expiry;
+            # missing legacy quotes still cannot be recreated without a source.
+            invalid=not created<=quoted<created+1800
+        if invalid:
             raise PermissionError('ORIGINAL_QUOTE_RESERVATION_CHANGED')
         return reservation,snapshot
 

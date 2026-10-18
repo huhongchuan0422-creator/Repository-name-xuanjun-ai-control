@@ -2,6 +2,7 @@
 import concurrent.futures
 import copy
 import hashlib
+import hmac
 import threading
 import unittest
 from unittest.mock import Mock,patch
@@ -331,6 +332,64 @@ class CancelledStockRecovery(unittest.TestCase):
         self.assertNotEqual(self.fx.uid1,self.finance_web['user_id']);self.assert_released()
         audit=self.fx.center.db.execute("SELECT actor FROM audit WHERE event='CANCELLED_ORDER_STOCK_RELEASED'").fetchone()
         self.assertEqual(audit[0],self.fx.uid1)
+
+    def assert_financial_identity_change_denied(self,change):
+        self.configure_finance()
+        response=self.signed('CLOSED')
+        _,policy=self.actions._authorize(self.finance_web['token'],self.finance_web['csrf'],'finance')
+        def changed_during_signed_query(request):
+            change()
+            # The changed identity remains valid through the real Center
+            # session, membership and protected grant, with an equal policy.
+            self.assertEqual(self.actions._authorize(self.finance_web['token'],
+                self.finance_web['csrf'],'finance')[1],policy)
+            return response
+        self.p.reader._fetch=Mock(side_effect=changed_during_signed_query)
+        with patch.object(self.commerce,'release_cancelled',wraps=self.commerce.release_cancelled) as restore:
+            with self.assertRaisesRegex(PermissionError,'RECONCILIATION_AUTHORIZATION_CHANGED'):
+                self.reconcile()
+            restore.assert_not_called()
+        self.p.reader._fetch.assert_called_once()
+        self.assertEqual(state(self.fx.stage.o,DEMO_SCOPE,'basket')['state'],'PENDING')
+        self.assertEqual(self.fx.stage.o.execute("SELECT count(*) FROM order_events WHERE reference='basket'").fetchone()[0],0)
+        self.assert_reserved()
+        self.assertEqual(self.fx.center.db.execute("SELECT count(*) FROM links WHERE channel IN ('COMMUNITY_ORDER_RECONCILIATION','COMMUNITY_RECONCILIATION_HISTORY')").fetchone()[0],0)
+        self.assertEqual(self.fx.center.db.execute("SELECT count(*) FROM audit WHERE event='COMMUNITY_ORDER_RECONCILED'").fetchone()[0],0)
+
+    def change_financial_scope(self,in_place):
+        grant=self.actions.operations.grants['finance']
+        identity=dict(grant['scope'],store_id='other-store')
+        original=tuple(grant['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
+        self.actions.runtime.bindings[grant['principal']]=dict(identity)
+        self.actions.bindings[tuple(identity[k] for k in ('tenant_id','merchant_id','store_id'))]=self.actions.bindings[original]
+        if in_place:grant['scope'].update(identity)
+        else:self.actions.operations.grants['finance']=dict(grant,scope=identity)
+
+    def test_financial_signed_closed_rejects_replaced_scope_before_projection(self):
+        self.assert_financial_identity_change_denied(lambda:self.change_financial_scope(False))
+
+    def test_financial_signed_closed_rejects_in_place_scope_before_projection(self):
+        self.assert_financial_identity_change_denied(lambda:self.change_financial_scope(True))
+
+    def test_financial_signed_closed_rejects_project_change_before_projection(self):
+        original=self.fx.center.project(self.fx.uid1,'project1',('OWNER',))[2]
+        payload=dict(revision=2,expires=self.fx.center.now()+10000,
+                     projects=[original,dict(original,id='project2')])
+        key=b'a'*32
+        self.fx.center.import_authority(dict(payload=payload,signature=hmac.new(
+            key,canonical(payload),hashlib.sha256).hexdigest()),key)
+        self.fx.center.db.execute("INSERT INTO members VALUES('project2',?,'EDITOR',1)",(self.fx.uid2,))
+        def change():self.actions.operations.grants['finance']['project']='project2'
+        self.assert_financial_identity_change_denied(change)
+
+    def test_financial_signed_closed_rejects_user_change_before_projection(self):
+        def change():
+            uid=self.fx.uid1
+            epoch=self.fx.center.db.execute('SELECT epoch FROM accounts WHERE id=?',(uid,)).fetchone()[0]
+            self.fx.center.db.execute('UPDATE sessions SET user_id=?,epoch=? WHERE token=?',
+                (uid,epoch,hashlib.sha256(self.finance_web['token'].encode()).hexdigest()))
+            self.actions.operations.grants['finance'].update(user_id=uid,project_roles=('OWNER','EDITOR'))
+        self.assert_financial_identity_change_denied(change)
 
     def test_financial_revoked_projection_interruption_recovers_on_reconcile(self):
         self.configure_finance();self.p.reader._fetch=Mock(return_value=self.signed('REVOKED'))

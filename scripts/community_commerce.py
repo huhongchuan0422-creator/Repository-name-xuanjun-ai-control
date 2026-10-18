@@ -192,7 +192,10 @@ class Commerce:
                 raise ValueError('INVALID_PROJECT_REQUIREMENT_SUBMISSION')
             c.project(uid, project, ('OWNER','EDITOR'))
             return c.transition(uid, project, p['item'], p['revision'], 'submit')
-        if op in ('project_summary', 'project_checklist', 'project_feedback', 'project_messages'):
+        if op == 'project_messages':
+            from scripts.community_project_messages import read_page
+            return read_page(c, uid, project, p)
+        if op in ('project_summary', 'project_checklist', 'project_feedback'):
             # Reuse immutable original Center project membership, requirements
             # and archived feedback; never create a parallel project authority.
             expected = {'message'} if op == 'project_feedback' else set()
@@ -207,10 +210,6 @@ class Commerce:
                             checklist_overall=checklist['overall'])
             if op == 'project_checklist':
                 return c.checklist(uid, project)
-            if op == 'project_messages':
-                # Bounded original Center archived conversation. No new message store.
-                return dict(records=c.messages(uid,project),source='ORIGINAL_CENTER_ARCHIVE',
-                            provider_reply_verified=False)
             # Core persists to original encrypted messaging and audit trail.
             # ARCHIVED is not evidence of a human or provider response.
             if type(p['message']) is not str:

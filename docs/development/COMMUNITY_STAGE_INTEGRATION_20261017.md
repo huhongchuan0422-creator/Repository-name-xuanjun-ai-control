@@ -377,3 +377,41 @@ P2-21/P2-23当前制品明确为OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE；
 与原基线相同的Unix socket权限及Chromium/Playwright运行环境问题，不能写成全量PASS；
 Stage5本地316项中310项通过、6项浏览器环境错误。冻结后新增专项另行通过，
 最终完整结论以本提交准确SHA Hosted CI为准。不会因本地环境错误删测或降级安全边界。
+
+### 第一批准确 Hosted 回执与随后增量
+
+第一批提交 `f1325961bb9945c375a723087077184971edcfbe`，tree
+`4754e74af22a016f4cb295d8468a3fbbfbaa936b`；44个文件，远端逐blob回读一致。
+Hosted Run https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39152437043
+于2026-10-19 02:07北京时间完成SUCCESS：744项community、342项Stage5、238项Mini/Key、
+40/8/7项其余Node，共1379项执行通过。包括本地受环境限制的Unix socket与Chromium测试。
+确定性源码包SHA256为`8c3ea3874ec1b955fd8639f3901ebe5071531fce0da649ae87c47dc73972ccfd`，
+与本地冻结包一致。六个原Center源码依赖仍逐字节符合原pin。
+这份回执不覆盖后续修复，也不代表外部正式独审、真机、安装或Finance验收。
+
+随后交叉复核正在补齐：旧合法跨秒报价兼容、财务查单后授权身份变化、
+同business_code旧applyment_id拒绝回包、损坏/缺失分账快照不可静默计零，
+以及原项目反馈第201条以后的授权分页。未把第一批CI通过当作这些新差异通过。
+
+### 第二批增量候选
+
+项目反馈沿用原Center消息库、authorized_records全链来源及隐私授权校验，
+增加(created,id)键分页；201条反馈可全部读出，保留原10,000条安全上限。
+小程序加载更多、会话切换清理和原证据未知拒读均覆盖，不改pinned core。
+
+财务查单返回后冻结并复核原scope/project/user，变更时不投影订单、不释放库存。
+旧无指纹报价仅允许原预留到原固定到期之间的合法创建时间；新指纹报价仍严格原时刻和摘要。
+收益视图对损坏action、缺失/失效冻结快照及服务缺失明确拒绝，不能静默返回零；
+Staff管理前复验原商家Principal/tenant/runtime binding。
+
+进件查询绑定business_code及applyment_id，记录已验签时间/签名指纹和已消耗凭证。
+提交ACK按官方仅applyment_id响应schema核验，查询或错误回包不能冒充成功ACK；
+同秒合法响应及允许时钟偏差正常处理，不把本地墙钟当提供商业务代际。
+未知覆盖提交出现可信新applyment_id时可以恢复；同ID旧拒绝或仅状态变化不足证明新代际，
+保持UNKNOWN并禁止盲目再发，必须由权威提供商补足该次提交结果。
+合同：https://pay.wechatpay.cn/doc/v3/partner/4012719997 。
+此边界不影响正常已确认ACK后的再次审核拒绝/补正流程。
+
+第二批冻结前本地Mini/Key275项通过；原进件共享传输回归794项中767项通过、
+27项仍为已定位环境错误，最终两项重放专项加入后进件56项全部通过。
+最终完整准确提交回执待对应Hosted CI核验，不继承第一批SHA为本批PASS。

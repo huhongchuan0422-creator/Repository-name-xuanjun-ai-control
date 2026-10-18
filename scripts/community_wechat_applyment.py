@@ -17,6 +17,45 @@ from scripts.community_provider_transport import request
 SENSITIVE={'contact_name','contact_id_number','mobile_phone','contact_email','id_card_name','id_card_number','id_card_address','id_doc_name','id_doc_number','id_doc_address','account_name','account_number','ubo_id_doc_name','ubo_id_doc_number','ubo_id_doc_address','ubo_address'}
 
 
+def provider_applyment_id(data):
+    # The official query/submit contracts use a required JSON integer (int64),
+    # not a decimal string or a JSON boolean. Keep the persisted representation.
+    value=data.get('applyment_id')
+    if type(value) is not int or not 0<value<2**63:
+        raise ValueError('INVALID_OFFICIAL_APPLYMENT_ID')
+    return str(value)
+
+
+def signed_response_context(value):
+    if (type(value) is not dict or type(value.get('signed_at')) is not int
+            or value['signed_at']<0 or type(value.get('signature_sha256')) is not str
+            or not re.fullmatch('[0-9a-f]{64}',value['signature_sha256'])):
+        raise ValueError('VERIFIED_PROVIDER_RESPONSE_CONTEXT_REQUIRED')
+    return value
+
+
+def consumed_rejection_signatures(record):
+    return {receipt['signature_sha256'] for receipt in record.get('consumed_rejections',[])}
+
+
+def used_provider_signatures(record):
+    return (consumed_rejection_signatures(record)
+        |{receipt['signature_sha256'] for receipt in record.get('submission_receipts',[])}
+        |set(record.get('provider_query_signatures',[]))
+        |{record.get('provider_query_signature_sha256'),record.get('submission_response_signature_sha256')})
+
+
+def known_applyment_ids(record):
+    return set(record.get('provider_applyment_history',[]))|({record['applyment_id']} if record.get('applyment_id') else set())
+
+
+def submission_boundary(record):
+    # Compare provider-signed times with provider-signed times. The local wall
+    # clock remains audit context, never proof of a provider business generation.
+    return max(record.get('submission_response_signed_at',-1),
+        record.get('submission_recovery_receipt',{}).get('signed_at',-1))
+
+
 def original_submission_intent(current,code,version):
     """Only persist the response for the exact already-reserved application intent."""
     return (type(current) is dict and current.get('business_code')==code
@@ -112,8 +151,16 @@ class WechatApplyment:
         if op in ('wechat_read','wechat_review_read'):return record or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')
         if op=='wechat_query':
             if record is None or not record.get('business_code'):raise ValueError('PROVIDER_APPLICATION_NOT_SUBMITTED')
-            data,digest=request(self.reader,'GET','/v3/applyment4sub/applyment/business_code/'+record['business_code'])
+            data,digest,verified=request(self.reader,'GET','/v3/applyment4sub/applyment/business_code/'+record['business_code'],include_verification=True)
+            verified=signed_response_context(verified)
             if data.get('business_code')!=record['business_code'] or type(data.get('applyment_state')) is not str:raise ValueError('PROVIDER_APPLYMENT_BINDING_MISMATCH')
+            applyment_id=provider_applyment_id(data)
+            recovered_generation=(record['state']=='SUBMISSION_UNKNOWN'
+                and record.get('replacement_submission',False)
+                and record.get('applyment_id') is not None
+                and applyment_id not in known_applyment_ids(record))
+            if record.get('applyment_id') not in (None,applyment_id):
+                if not recovered_generation:raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
             allowed=('APPLYMENT_STATE_EDITTING','APPLYMENT_STATE_AUDITING','APPLYMENT_STATE_REJECTED','APPLYMENT_STATE_TO_BE_CONFIRMED','APPLYMENT_STATE_TO_BE_SIGNED','APPLYMENT_STATE_SIGNING','APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
             if data['applyment_state'] not in allowed:raise ValueError('UNKNOWN_PROVIDER_APPLICATION_STATE')
             with c.tx():
@@ -124,7 +171,29 @@ class WechatApplyment:
                 if (current.get('provider_state') in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
                         and current['provider_state']!=data['applyment_state']):
                     raise ValueError('TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT')
-                current.update(provider_state=data['applyment_state'],provider_response_sha256=digest,provider_observed_at=c.now())
+                # Same business_code (and often the same applyment_id) survives
+                # correction. A pre-submission signed rejection is not evidence
+                # about the new revision, even inside the signature time window.
+                boundary=submission_boundary(current)
+                prior=current.get('provider_query_signed_at')
+                if ((verified['signed_at']<=boundary)
+                        or (prior is not None and verified['signed_at']<prior)
+                        or (prior==verified['signed_at'] and current.get('provider_state')!=data['applyment_state'])
+                        or verified['signature_sha256'] in consumed_rejection_signatures(current)):
+                    raise ValueError('STALE_PROVIDER_APPLYMENT_RESPONSE')
+                current.update(applyment_id=applyment_id,provider_state=data['applyment_state'],provider_response_sha256=digest,provider_observed_at=c.now())
+                current['provider_applyment_history']=sorted(known_applyment_ids(record)|{applyment_id})
+                current.update(provider_query_signed_at=verified['signed_at'],
+                    provider_query_signature_sha256=verified['signature_sha256'])
+                current['provider_query_signatures']=sorted(
+                    set(current.get('provider_query_signatures',[]))|{verified['signature_sha256']})
+                if recovered_generation:
+                    # A previously unseen provider identity, explicitly returned
+                    # for this business_code, distinguishes the new application.
+                    # Same-ID status changes alone cannot recover an unknown POST.
+                    current.update(state='SUBMITTED_TO_PROVIDER',submission_recovery_receipt=dict(
+                        business_code=record['business_code'],applyment_id=applyment_id,
+                        response_sha256=digest,**verified))
                 if data.get('sub_mchid') is not None:
                     if type(data['sub_mchid']) is not str or not re.fullmatch('[0-9]{6,32}',data['sub_mchid']):raise ValueError('INVALID_PROVIDER_SUBMERCHANT')
                     if current.get('provider_sub_mchid') not in (None,data['sub_mchid']):
@@ -135,12 +204,17 @@ class WechatApplyment:
                 # the SAME business_code. Only a current signed query opens this
                 # path. A timed-out replacement may still expose the preceding
                 # rejection, so that observation cannot authorize another POST.
+                submitted_with_boundary=(current['state']=='SUBMITTED_TO_PROVIDER'
+                    and (not current.get('replacement_submission',False)
+                         or submission_boundary(current)>=0))
                 if (data['applyment_state']=='APPLYMENT_STATE_REJECTED'
-                        and (current['state']=='SUBMITTED_TO_PROVIDER'
+                        and (submitted_with_boundary
                              or current['state']=='SUBMISSION_UNKNOWN'
                              and not current.get('replacement_submission',False))):
                     current.update(state='CORRECTION',version=current['version']+1,
                         correction_receipt=dict(business_code=record['business_code'],
+                            applyment_id=applyment_id,
+                            signature_sha256=verified['signature_sha256'],signed_at=verified['signed_at'],
                             response_sha256=digest,observed_at=c.now()))
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_QUERIED',digest)
             return current
@@ -159,6 +233,10 @@ class WechatApplyment:
             if record.get('business_code') and (record.get('provider_state')!='APPLYMENT_STATE_REJECTED'
                     or type(correction) is not dict
                     or correction.get('business_code')!=code
+                    or correction.get('applyment_id')!=record.get('applyment_id')
+                    or type(correction.get('signed_at')) is not int
+                    or not re.fullmatch('[0-9a-f]{64}',str(correction.get('signature_sha256','')))
+                    or correction.get('signature_sha256') in consumed_rejection_signatures(record)
                     or not re.fullmatch('[0-9a-f]{64}',str(correction.get('response_sha256','')))):
                 raise PermissionError('SIGNED_PROVIDER_REJECTION_REQUIRED')
             # Initial legacy attempts keep their original key; corrected revisions
@@ -174,18 +252,44 @@ class WechatApplyment:
                 if c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_APPLYMENT_ATTEMPT' AND event_id=?",(attempt,)).fetchone():raise PermissionError('QUERY_EXISTING_APPLICATION_ONLY')
                 c.db.execute("INSERT INTO events VALUES('WECHAT_APPLYMENT_ATTEMPT',?,?)",(attempt,c.now()))
                 current.update(state='SUBMISSION_UNKNOWN',business_code=code,
-                    replacement_submission=bool(correction))
+                    replacement_submission=bool(correction),submission_started_at=c.now())
+                if correction:
+                    current['consumed_rejections']=[*current.get('consumed_rejections',[]),
+                        dict(correction,submission_version=version)]
                 current.pop('correction_receipt',None);self._save(application,owner,current)
                 c.audit(application,uid,'WECHAT_APPLYMENT_SUBMISSION_ATTEMPT',code)
-            data,digest=request(self.reader,'POST','/v3/applyment4sub/applyment/',payload)
-            if type(data.get('applyment_id')) is not int or data['applyment_id']<=0:raise ValueError('INVALID_OFFICIAL_APPLYMENT_ID')
+            data,digest,verified=request(self.reader,'POST','/v3/applyment4sub/applyment/',payload,include_verification=True)
+            verified=signed_response_context(verified)
+            # The submit response contains only applyment_id. A signed GET
+            # response or error is not a submission ACK, even though it may also
+            # carry that field. Verify response semantics as well as signatures.
+            if set(data)!={'applyment_id'}:
+                raise ValueError('INVALID_OFFICIAL_APPLYMENT_SUBMISSION_RESPONSE')
+            applyment_id=provider_applyment_id(data)
+            previous_signatures=used_provider_signatures(record)
+            if correction:previous_signatures.add(correction['signature_sha256'])
+            if (verified['signed_at']<max(correction['signed_at'] if correction else -1,
+                    submission_boundary(record)) or verified['signature_sha256'] in previous_signatures):
+                raise ValueError('STALE_PROVIDER_APPLYMENT_SUBMISSION_RESPONSE')
+            if applyment_id!=record.get('applyment_id') and applyment_id in known_applyment_ids(record):
+                raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
             with c.tx():
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
                 self.onboarding._load(application,uid,True)
                 current=self._read(application)
                 if not original_submission_intent(current,code,version):
                     raise ValueError('APPLYMENT_SUBMISSION_RACE_QUERY_EXISTING_ONLY')
-                current.update(state='SUBMITTED_TO_PROVIDER',applyment_id=str(data['applyment_id']),provider_response_sha256=digest)
+                if verified['signature_sha256'] in used_provider_signatures(current):
+                    raise ValueError('STALE_PROVIDER_APPLYMENT_SUBMISSION_RESPONSE')
+                if current.get('applyment_id') not in (None,record.get('applyment_id'),applyment_id):
+                    raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
+                current.update(state='SUBMITTED_TO_PROVIDER',applyment_id=applyment_id,provider_response_sha256=digest,
+                    submission_response_signed_at=verified['signed_at'],
+                    submission_response_signature_sha256=verified['signature_sha256'])
+                current['provider_applyment_history']=sorted(known_applyment_ids(current)|known_applyment_ids(record))
+                current['submission_receipts']=[*current.get('submission_receipts',[]),
+                    dict(business_code=code,applyment_id=applyment_id,response_sha256=digest,
+                         submission_version=version,**verified)]
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_SUBMITTED',code)
             return current
         with c.tx():

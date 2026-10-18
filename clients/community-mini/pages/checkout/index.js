@@ -2,9 +2,10 @@ const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 Page({
-  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
+  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
   async onLoad(options) {
-    this._pageUnloaded=false;this._productRequest=null;
+    this._pageUnloaded=false;this._productRequest=null;this._projectMessagesContext=null;
+    this.setData({projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:''});
     this.setData({products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:''});
     this.resetOrderDetails();
     this._noticeContext=null;this._noticeRequest=null;
@@ -59,7 +60,7 @@ Page({
   beginProjectRequest() {
     const request={generation:this._pageGeneration,session:this.session,scene:this.scene,
       sessionGeneration:typeof this.session.getGeneration==='function'?this.session.getGeneration():undefined,
-      customer:this.data.projectCustomerId,item:this.data.projectReferenceItem,
+      customer:this.data.projectCustomerId,user:this.data.userId,item:this.data.projectReferenceItem,
       revision:this.data.projectReferenceRevision};
     this._projectRequest=request;
     this.setData({pending:true});
@@ -69,7 +70,7 @@ Page({
     return !this._pageUnloaded&&this._projectRequest===request&&
       this._pageGeneration===request.generation&&this.session===request.session&&
       (typeof request.session.getGeneration!=='function'||request.session.getGeneration()===request.sessionGeneration)&&
-      this.scene===request.scene&&this.data.projectCustomerId===request.customer&&
+      this.scene===request.scene&&this.data.projectCustomerId===request.customer&&this.data.userId===request.user&&
       this.data.projectReferenceItem===request.item&&this.data.projectReferenceRevision===request.revision;
   },
   async saveProjectReference() {
@@ -157,9 +158,16 @@ Page({
     if(this._pageUnloaded||this.data.pending||!this.session)return;
     const op=e.currentTarget.dataset.operation;
     if(!['project_summary','project_checklist','project_feedback','project_messages'].includes(op))return;
+    const more=op==='project_messages'&&e.currentTarget.dataset.more==='true';
+    if(op==='project_messages'){
+      this.prepareProjectMessagesContext();
+      if(more&&(!this.data.projectMessagesLoaded||!this.data.projectMessagesMore||!this.data.projectMessagesCursor))return;
+    }
+    const after=more?this.data.projectMessagesCursor:'';
     const request=this.beginProjectRequest();
     try {
-      const params=op==='project_feedback'?{message:this.data.projectFeedback}:{};
+      const params=op==='project_feedback'?{message:this.data.projectFeedback}:
+        op==='project_messages'?{after_id:after}:{};
       const r=await request.session.commerce(request.scene,op,params);
       if(!this.projectRequestCurrent(request))return;
       if(op==='project_summary')request.customer=r.customer_id;
@@ -167,11 +175,54 @@ Page({
         projectCustomerId:r.customer_id,projectState:r.checklist_overall});
       else if(op==='project_checklist')this.setData({projectChecklist:r.items.map(item=>({
         id:item.id,state:item.state,required:item.required,revision:item.revision,title:item.title,instructions:item.instructions,submission_type:item.submission_type}))});
-      else if(op==='project_messages')this.setData({projectMessages:r.records,status:'读取原项目归档记录；不代表已获得人工回复'});
+      else if(op==='project_messages'){
+        const records=this.projectMessagePage(r,after);
+        const merged=new Map((more?this.data.projectMessages:[]).map(record=>[record.id,record]));
+        for(const record of records)merged.set(record.id,record);
+        this.setData({projectMessages:Array.from(merged.values()),projectMessagesCursor:r.next_cursor,
+          projectMessagesMore:r.has_more,projectMessagesLoaded:true,status:'读取原项目归档记录；不代表已获得人工回复',projectMessagesStatus:'读取原项目归档记录；不代表已获得人工回复'});
+      }
       else this.setData({projectFeedback:'',status:'项目反馈已归档，尚未确认人工回复：'+r.id});
       if(op==='project_summary'&&this._noticeContext)this.prepareNoticeContext();
-    } catch(error) {if(this.projectRequestCurrent(request))this.setData({status:error.message});}
+      if(op==='project_summary'&&this._projectMessagesContext)this.prepareProjectMessagesContext();
+    } catch(error) {if(this.projectRequestCurrent(request))this.setData(op==='project_messages'?{projectMessagesStatus:error.message}:{status:error.message});}
     finally {if(this.projectRequestCurrent(request)){this._projectRequest=null;this.setData({pending:false});}}
+  },
+  prepareProjectMessagesContext() {
+    if(!this.noticeContextCurrent(this._projectMessagesContext)){
+      this._projectMessagesContext={generation:this._pageGeneration,session:this.session,scene:this.scene,
+        user:this.data.userId,customer:this.data.projectCustomerId,
+        sessionGeneration:typeof this.session.getGeneration==='function'?this.session.getGeneration():undefined};
+      this.setData({projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,
+        projectMessagesLoaded:false,projectMessagesStatus:''});
+    }
+    return this._projectMessagesContext;
+  },
+  projectMessagePage(result,after) {
+    const invalid=()=>{throw Error('项目反馈列表返回无效，请重试');};
+    const key=record=>[record.created,record.id];
+    const greater=(a,b)=>a[0]>b[0]||(a[0]===b[0]&&a[1]>b[1]);
+    if(!result||result.source!=='ORIGINAL_CENTER_ARCHIVE'||result.provider_reply_verified!==false||
+      !Array.isArray(result.records)||result.records.length>50||typeof result.has_more!=='boolean')invalid();
+    let previous=null;
+    if(after){
+      try{previous=JSON.parse(after);}catch(_){invalid();}
+      if(!Array.isArray(previous)||previous.length!==2||!Number.isSafeInteger(previous[0])||
+        typeof previous[1]!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(previous[1]))invalid();
+    }
+    const ids=new Set(),records=[];
+    for(const record of result.records){
+      if(!record||typeof record.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(record.id)||ids.has(record.id)||
+        !Number.isSafeInteger(record.created)||typeof record.channel!=='string'||typeof record.body!=='string'||
+        typeof record.status!=='string'||(previous&&!greater(key(record),previous)))invalid();
+      ids.add(record.id);previous=key(record);
+      // Keep precisely the original customer projection, never evidence/raw fields.
+      records.push({id:record.id,channel:record.channel,body:record.body,status:record.status,created:record.created});
+    }
+    if(result.has_more){
+      if(records.length!==50||typeof result.next_cursor!=='string'||result.next_cursor!==JSON.stringify(previous))invalid();
+    }else if(result.next_cursor!==null)invalid();
+    return records;
   },
   noticeContextCurrent(context) {
     return !!context&&!this._pageUnloaded&&context.generation===this._pageGeneration&&
@@ -247,6 +298,7 @@ Page({
         context.user=r.user_id;context.customer=r.project_customer_id;
         this.setData({profileVersion:r.version,nickname:r.nickname,profileContact:r.contact,userId:r.user_id,projectCustomerId:r.project_customer_id});
         this.prepareNoticeContext();
+        if(this._projectMessagesContext)this.prepareProjectMessagesContext();
       }
       else if(op==='referral_code')this.setData({referralCode:r.code});
       this.setData({status:op==='referral_bind'?'推荐关系已绑定':'个人中心已更新'});

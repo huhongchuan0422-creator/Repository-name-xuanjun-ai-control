@@ -5,7 +5,7 @@ import re
 from scripts.pr122_customer_core import canonical
 from scripts.community_order_store import state
 from scripts.community_order_provider_projection import provider_evidence
-from scripts.community_merchant_contract import scope, valid_id
+from scripts.community_merchant_contract import scope as validate_scope, valid_id
 from scripts.community_provider_reference import provider_order_reference
 
 
@@ -37,7 +37,7 @@ class CommunityReports:
     def _earnings(self,g,community,key,value,snapshot):
         """Read only original, consistently bound split/return observations."""
         c=self.center;identity=value['scope'];mchid=self.actions.reader._mchid
-        try:scope(identity)
+        try:validate_scope(identity)
         except ValueError:earnings_conflict()
         if (value.get('project')!=g['project'] or not valid_id(value.get('reference'))
                 or not valid_id(value.get('request_id'))
@@ -153,8 +153,14 @@ class CommunityReports:
         records=[];gross=returned=0
         for key,payload in rows[:50]:
             value=json.loads(c.decrypt(payload,('community-commerce:' if op=='community_orders' else 'provider-action:')+key))
-            if type(value) is not dict:continue
+            if type(value) is not dict:
+                if op=='community_earnings':earnings_conflict()
+                raise ValueError('COMMUNITY_ORDER_INTEGRITY_CONFLICT')
             identity=value.get('scope')
+            if op=='community_earnings':
+                if value.get('kind') not in ('SPLIT','REFUND'):earnings_conflict()
+                try:validate_scope(identity)
+                except ValueError:earnings_conflict()
             if type(identity) is not dict or identity.get('tenant_id')!=g['tenant']:continue
             if op=='community_orders':
                 if value.get('community_id')!=community['id'] or type(value.get('lines')) is not list:continue
@@ -172,10 +178,13 @@ class CommunityReports:
                     if not 0<=refunded<=original['amount_minor']:raise ValueError('COMMUNITY_ORDER_REFUND_TOTAL_CONFLICT')
                     returned+=refunded
             else:
-                if value.get('kind')!='SPLIT' or self.actions is None:continue
+                if value.get('kind')!='SPLIT':continue
+                if self.actions is None:raise PermissionError('COMMUNITY_EARNINGS_PROVIDER_UNAVAILABLE')
                 snapshot_key=hashlib.sha256(canonical([identity,'ORDER',value['reference']])).hexdigest()
                 snapshot_row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_SPLIT_RULES_V1' AND subject_idx=? AND project=? AND active=1",(snapshot_key,g['project'])).fetchone()
-                if snapshot_row is None:continue
+                # A provider split requires its original frozen attribution.
+                # Missing evidence cannot become an apparently valid zero.
+                if snapshot_row is None:earnings_conflict()
                 snapshot=json.loads(c.decrypt(snapshot_row[0],'community-split-rule:'+snapshot_key))
                 for record in self._earnings(g,community,key,value,snapshot):
                     records.append(record);gross+=record['received_minor'];returned+=record['returned_minor']

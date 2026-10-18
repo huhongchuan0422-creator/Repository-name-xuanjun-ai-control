@@ -69,6 +69,76 @@ class SaasReservationRecovery(unittest.TestCase):
         saved=json.loads(c.decrypt(raw,'community-saas:'+reference)); saved.update(patches)
         with c.tx():c.db.execute('UPDATE links SET payload=? WHERE channel=? AND subject_idx=?',(c.encrypt(canonical(saved),'community-saas:'+reference),'COMMUNITY_SAAS_'+kind,reference))
 
+    def legacy_quote(self):
+        # Reproduce the old Center path: commit an unfingerprinted reservation,
+        # cross a real server-clock tick, then let StageRuntime timestamp the
+        # persisted quote. No quote or order snapshot is fabricated here.
+        g=self.base.api._authorize(self.base.one['token'],self.base.one['csrf'],'one')
+        qid='sq_'+'a'*32;created=self.fx.center.now()
+        self.base.api._reserve(g,'QUOTE',qid,dict(quote_id=qid,offer_id='sku',version=1,created_at=created))
+        self.fx.stage.now+=1
+        return self.fx.stage.api.dispatch(g['principal'],'quote',dict(quote_id=qid,offer_id='sku',version=1,expires_at=created+1800),None)
+
+    def change_quote_snapshot(self,qid,patches):
+        # Offline corruption injection in a disposable database only. Restore
+        # the exact immutable trigger before the application reads the row.
+        db=self.fx.stage.q
+        trigger=db.execute("SELECT sql FROM sqlite_master WHERE name='saas_quote_no_update'").fetchone()[0]
+        snapshot=json.loads(db.execute('SELECT snapshot FROM saas_quotes WHERE quote_id=?',(qid,)).fetchone()[0])
+        snapshot.update(patches)
+        with db:
+            db.execute('DROP TRIGGER saas_quote_no_update')
+            db.execute('UPDATE saas_quotes SET snapshot=? WHERE quote_id=?',(canonical(snapshot).decode(),qid))
+            db.execute(trigger)
+
+    def test_legacy_cross_second_quote_read_recover_and_prepare_after_reopen(self):
+        quote=self.legacy_quote();qid=quote['quote_id']
+        reserved=self.call('mine',dict(kind='QUOTE',after_id=''))['records'][0]
+        self.assertNotIn('source_sha256',reserved)
+        self.assertEqual(quote['created_at'],reserved['created_at']+1)
+        self.reopen()
+        read=self.call('quote_read',dict(quote_id=qid));recovered=self.call('quote_recover',dict(quote_id=qid))
+        self.assertEqual(read,recovered);self.assertEqual(recovered,quote)
+        order=self.call('order_prepare',dict(quote_id=qid,currency='CNY'))
+        self.assertEqual(order['amounts_by_cycle_minor'],{'MONTH':1000})
+        self.assertEqual(self.fx.stage.q.execute('SELECT count(*) FROM saas_quotes').fetchone()[0],1)
+        self.assertEqual(self.fx.stage.s.execute('SELECT count(*) FROM saas_order_preparations').fetchone()[0],1)
+
+    def test_legacy_cross_second_quote_recovers_committed_legacy_order_after_expiry(self):
+        quote=self.legacy_quote();qid=quote['quote_id'];g=self.base.api.grants['one']
+        oid='so_'+hashlib.sha256(canonical([g['tenant'],qid,'CNY'])).hexdigest()[:32]
+        self.base.api._reserve(g,'ORDER',oid,dict(order_id=oid,quote_id=qid,currency='CNY',created_at=self.fx.center.now()))
+        old=self.fx.stage.api.dispatch(g['principal'],'order_prepare',dict(order_id=oid,quote_id=qid,currency='CNY'),None)
+        self.reopen();self.fx.stage.now+=1801
+        original=self.fx.stage.api.dispatch
+        def reader(principal,op,p,now):
+            self.assertNotEqual(op,'order_prepare');return original(principal,op,p,now)
+        with patch.object(self.fx.stage.api,'dispatch',side_effect=reader):
+            result=self.call('order_prepare',dict(quote_id=qid,currency='CNY'))
+        self.assertEqual(result,old)
+
+    def test_legacy_quote_still_rejects_changed_binding_or_invalid_creation_window(self):
+        quote=self.legacy_quote();qid=quote['quote_id'];created=quote['created_at']-1
+        for field,value in (('tenant_id','tenant2'),('offer_id','other'),('version',2),
+                            ('created_at',created-1),('created_at',created+1800),
+                            ('created_at',True),('expires_at',created+1801)):
+            self.change_quote_snapshot(qid,{field:value})
+            for op,params in (('quote_read',dict(quote_id=qid)),('quote_recover',dict(quote_id=qid)),
+                              ('order_prepare',dict(quote_id=qid,currency='CNY'))):
+                with self.subTest(field=field,value=value,operation=op):
+                    with self.assertRaisesRegex(PermissionError,'ORIGINAL_QUOTE_RESERVATION_CHANGED'):
+                        self.call(op,params)
+            self.change_quote_snapshot(qid,{field:quote[field]})
+        self.assertEqual(self.fx.stage.s.execute('SELECT count(*) FROM saas_order_preparations').fetchone()[0],0)
+
+    def test_fingerprinted_quote_still_requires_exact_original_creation_time(self):
+        quote=self.quote();qid=quote['quote_id']
+        self.change_quote_snapshot(qid,{'created_at':quote['created_at']+1})
+        for op,params in (('quote_read',dict(quote_id=qid)),('quote_recover',dict(quote_id=qid)),
+                          ('order_prepare',dict(quote_id=qid,currency='CNY'))):
+            with self.assertRaisesRegex(PermissionError,'ORIGINAL_QUOTE_RESERVATION_CHANGED'):self.call(op,params)
+        self.assertEqual(self.fx.stage.s.execute('SELECT count(*) FROM saas_order_preparations').fetchone()[0],0)
+
     def test_order_interruption_reopen_same_id_and_repeat_create_exactly_once(self):
         args,row=self.reserve_order();self.assertEqual(self.fx.stage.s.execute('SELECT count(*) FROM saas_order_preparations').fetchone()[0],0)
         self.reopen();self.fx.stage.now+=5

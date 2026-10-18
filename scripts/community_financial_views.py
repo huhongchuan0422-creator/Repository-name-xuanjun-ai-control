@@ -40,6 +40,9 @@ class FinancialViews:
         if operation not in fields or type(params) is not dict or set(params) != fields[operation]:
             raise ValueError('INVALID_FINANCIAL_VIEW_FIELDS')
         g, policy = self.actions._authorize(session, csrf, workspace)
+        # A host grant can change in place while the signed query is in flight.
+        # Reconciliation must retain the original actor, project and store.
+        g = dict(g, scope=dict(g['scope']))
         c, a, p = self.center, self.actions, params
         with c.tx():c.limit('community-financial-requests:'+g['user_id'],30,60)
         if operation == 'financial_records':
@@ -80,7 +83,10 @@ class FinancialViews:
         expected = dict(sp_mchid=a.reader._mchid, sub_mchid=policy['sub_mchid'], sp_appid=policy['sp_appid'],
             out_trade_no=provider_order_reference(a.reader._mchid, g['scope'], p['reference']), amount_minor=original['amount_minor'], currency='CNY')
         observation = a.reader.read_order(expected)
-        if a._authorize(session, csrf, workspace)[1] != policy:
+        current, current_policy = a._authorize(session, csrf, workspace)
+        if any(current[k] != g[k] for k in ('scope', 'project', 'user_id')):
+            raise PermissionError('RECONCILIATION_AUTHORIZATION_CHANGED')
+        if current_policy != policy:
             raise PermissionError('RECONCILIATION_POLICY_CHANGED')
         if state(a.runtime.demo.db, g['scope'], p['reference']) != original:
             raise ValueError('ORDER_CHANGED_DURING_RECONCILIATION')

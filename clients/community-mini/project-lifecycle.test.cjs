@@ -47,7 +47,7 @@ const operations={
 };
 const results={save:{revision:2},submit:{state:'SUBMITTED'},feedback:{id:'feedback1'},
   summary:{title:'Current project',role:'CUSTOMER',customer_id:'customer2',checklist_overall:'PARTIAL'},
-  checklist:{items:[{id:'fresh',revision:3,title:'Fresh requirement'}]},messages:{records:[{id:'message1'}]}};
+  checklist:{items:[{id:'fresh',revision:3,title:'Fresh requirement'}]},messages:{records:[{id:'message1',created:1,channel:'WEB',status:'ARCHIVED',body:'fixture'}],has_more:false,next_cursor:null,source:'ORIGINAL_CENTER_ARCHIVE',provider_reply_verified:false}};
 function switchSelection(p){
   // Simulate navigation releasing the old pending UI before selecting a new requirement.
   p.setData({pending:false});

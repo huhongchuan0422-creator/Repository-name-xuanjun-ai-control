@@ -89,20 +89,20 @@ class SubmerchantIdentityImmutability(unittest.TestCase):
             tx=lambda:contextlib.nullcontext(),limit=lambda *a:None,
             now=lambda:NOW,audit=lambda *a:None)
         service.onboarding=SimpleNamespace(_load=lambda application,uid,reviewer:('owner1',{},{}))
-        record=dict(business_code='ap_original',provider_sub_mchid='1234567891',
+        record=dict(business_code='ap_original',provider_sub_mchid='1234567891',applyment_id='123456789',
                     state='SUBMITTED_TO_PROVIDER',version=2)
         service._read=lambda application:dict(record)
         writes=[]
         service._save=lambda *args:writes.append(args)
         with patch('scripts.community_wechat_applyment.request',return_value=(
-             dict(business_code='ap_original',applyment_state='APPLYMENT_STATE_FINISHED',
-                  sub_mchid='9999999999'),'a'*64)):
+             dict(business_code='ap_original',applyment_id=123456789,applyment_state='APPLYMENT_STATE_FINISHED',
+                  sub_mchid='9999999999'),'a'*64,dict(signed_at=NOW,signature_sha256='a'*64))):
             with self.assertRaisesRegex(ValueError,'IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT'):
                 service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
         self.assertEqual(writes,[])
         with patch('scripts.community_wechat_applyment.request',return_value=(
-             dict(business_code='ap_original',applyment_state='APPLYMENT_STATE_FINISHED',
-                  sub_mchid='1234567891'),'b'*64)):
+             dict(business_code='ap_original',applyment_id=123456789,applyment_state='APPLYMENT_STATE_FINISHED',
+                  sub_mchid='1234567891'),'b'*64,dict(signed_at=NOW,signature_sha256='b'*64))):
             result=service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
         self.assertEqual(result['provider_sub_mchid'],'1234567891')
         self.assertEqual(len(writes),1)
@@ -110,8 +110,8 @@ class SubmerchantIdentityImmutability(unittest.TestCase):
         record['provider_state']='APPLYMENT_STATE_FINISHED'
         writes.clear()
         with patch('scripts.community_wechat_applyment.request',return_value=(
-             dict(business_code='ap_original',applyment_state='APPLYMENT_STATE_AUDITING',
-                  sub_mchid='1234567891'),'c'*64)):
+             dict(business_code='ap_original',applyment_id=123456789,applyment_state='APPLYMENT_STATE_AUDITING',
+                  sub_mchid='1234567891'),'c'*64,dict(signed_at=NOW,signature_sha256='c'*64))):
             with self.assertRaisesRegex(ValueError,'TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT'):
                 service.dispatch('session','csrf',dict(operation='wechat_query',params=dict(application='apply1')))
         self.assertEqual(writes,[])
