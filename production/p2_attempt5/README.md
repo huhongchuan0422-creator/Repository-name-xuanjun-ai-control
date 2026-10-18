@@ -1,4 +1,76 @@
-undefined
+# P2生产装配增量
+
+接续PR17/PR58。唯一开发Writer为Work；窗口1已停止，窗口4负责现场。
+继承f4f74fdd核心、951项及Dots#6248479254，不重跑D1/Prepare，不用旧安装工作流。
+
+## 能力分层
+
+已实现未部署：既有IssuerService、AuthorityStore、NativeRecovery、PermitCycle；新增assembly.py提供真实RSA/OpenSSL文件描述符签名、公钥DER SHA信任钉扎、Linux Unix socket/SO_PEERCRED双向root身份认证、固定principal及Grant绑定、唯一Issuer进程锁、既有共享数据库打开、NativeRecovery/PermitCycle装配。entry.py提供明确serve/run启动入口，严格隔离解释器、逐父链无链接/保护校验、独立SHA固定的配置/loader/装配模块/现场适配器。原核心和Kit字节均不修改，增量包另行绑定。
+
+三个适配器接口的当前实现：911176aa的native_adapter.py已提供build_host_readback(config)、build_driver(config)、public_modulus(config)，在PR58#6250500768获组件限定通过。其中host_readback是独立签名Observer客户端，build_driver接原具体工厂，public_modulus核真实公钥；完整生产读回与正向16阶段run尚未验证，不得用测试host函数替代。没有适配器文件及独立批准SHA即拒绝启动，不自动生成、猜测或接受布尔verified标志。适配器变更须集中增量审核，原核心不重复审核。
+
+现场UNKNOWN：Issuer/公钥来源及现有私钥路径、主机实际执行身份、Writer/Lease/Fence/Epoch、唯一共享库与历史、Run/Job/InvokeId和原事务/备份checkpoint；UNKNOWN不等于源码缺陷。root是本地Unix通道信任边界，不声称跨主机认证；本实现适用于同主机独立受保护Issuer，远端部署必须用原受信通道并另核准确身份绑定。
+
+## 与窗口4六类取证唯一对齐
+
+1. 执行身份/唯一Writer→固定root本地身份、principal.host/actor_id/writer_id；原生阶段锁及服务端Fence照旧。
+2. Issuer/Signer/Transport→已部署入口/源码SHA、独立信任的RSA公钥DER SHA和模数、认证通道；禁止传私钥/token到公开任务。
+3. 共享AuthorityStore/Ledger→准确现存数据库/账本路径、owner/mode、保全及备份；服务不初始化数据库、不注册Grant、不恢复额度。配置的Grant必须已在该唯一服务库独立注册；不得复制服务数据库开第二Writer。
+4. 原事务及16阶段→host_readback逐操作按IssuerService原schema认证真实Run/Job/InvokeId、payload/Grant/Attempt绑定与副作用；build_driver装配原FiniteLiveControls/HostContainment/持久journals，NativeRecovery继续强制检查并认证PR58，不提供fixture开关。
+5. 备份/检查点→真实backup/checkpoint/log SHA及恢复条件；缺失/部分写入/UNKNOWN拒绝推进，不删状态、不SKIP。
+6. 新版本目录/运行入口→独立Kit根、增量装配代码根及SHA、root保护路径、配置与日志/账本在Kit外；不得修改旧冻结文件或旧三件套。
+
+## 运行与恢复边界
+
+首次部署仍需一份准确安装许可覆盖配置、服务、前置目录、原16阶段激活和最多5次Attempt。配置SHA必须由独立批准记录提供，不能现场自行计算后宣称批准。entry.py和assembly.py也必须由受信执行通道校验准确SHA后启动；--assembly-sha256在导入前强制核验模块。新Grant必须绑定增量包的新Source Commit/Tree及新Manifest SHA；entry核验整个增量文件闭包并仅把原f4f Kit作为独立历史依赖导入，不能用旧f4f Grant授权新增胶水。--assembly-manifest及其SHA显式绑定新版本，旧Kit内Manifest字节不改。serve只打开已注册、未过期且未停止的Grant数据库；不签发许可。run仍由NativeRecovery认证原独立审核ID/批准正文SHA、源码与策略，同Grant可安全续接。
+
+不会自动重发RPC。提交后签名/回复失败返回HOLD，已有PermitCycle负责以原Attempt绑定可信查询/收敛。进程正常退出仅删除其自己inode的socket，持久数据库/锁/额度/回执不删；崩溃遗留socket拒绝覆盖，需原许可范围内确认进程/事务后安全恢复，不能直接unlink重试。共享库的flock仅附加本地进程排他，不代替真实跨主机Writer证明。服务退出/重启不初始化历史；成功及5次耗尽由原核心终止。
+
+SQLite父链保护不放宽；不chmod/chown旧业务目录，不打开旧业务DB，不能把旧state.sqlite当作AuthorityStore。新数据库首次创建及独立Grant注册是受信管理员的部署前置，代码不自行补空历史。
+
+## 验证与交付
+
+新增27项真实Unix socket/跨进程/签名/SQLite集成与反例，配合25项Issuer、21项AuthorityStore、10项ReceiptProvider受影响回归，总计83项/环境。主机副作用明确为SYNTHETIC_TEST_ONLY；不代表英国生产验收。当地运行环境拒绝AF_UNIX socket创建（EPERM），未申请提升或换通道绕过；完整动态测试由隔离Hosted Linux容器完成。原951项不重跑。verify.py逐字比较全部Attempt5核心源码与f4f74fdd，输出精确Commit/Tree、文件SHA、日志、Manifest及独立装配包；继承Kit和Manifest SHA固定记录。
+
+原装配组件已在PR58#6249409006限定通过，Registry R1/R2已在#6250317194关闭，适配器组件已在#6250500768限定通过；这些历史审核不重开。INSTALLATION=NOT_EXECUTED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
+
+
+## 生产配置登记与只读查询（本轮新增）
+
+核查结论：此前entry.configuration仅能从调用者已知的准确路径/SHA读取配置；仓库交付没有生产配置登记索引或只读查询命令。英国现场是否另有入口仍UNKNOWN，不能由仓库缺失推断现场不存在。此处新增原架构内的root管理登记层，不替换Issuer/AuthorityStore，不改已审核心。
+
+正式入口：production/p2_attempt5/registry_cli.py，严格-I -B -S。
+操作register/query；两者都必须显式给出registration-id、record-sha256、assembly-sha256、registry-code-sha256；register另需binding-file。
+规范登记根为/etc/xuanjun-p2/registry（代码约定路径，尚未部署，不声称现场存在）。也允许许可固定另一个完整registry-root，不发现、不遍历、不猜路径。根目录须事先按获准部署步骤建立root/0700；代码不创建根目录。
+
+register以O_EXCL/root0600写准确SHA固定的registration-id.json，完成文件与目录fsync后，经独立.registry-commits.sqlite3的FULL事务提交发布；同根固定.registry-registration.lock提供跨进程排他。只有准确已提交行匹配SHA及文件身份时，同ID同内容才可幂等确认；冲突、链接、部分输出或未提交完整输出HOLD并保留。不会覆写旧配置/登记文件、创建共享库、注册Grant、获取Writer或Lease；未知生产事务仍保持未知，不以登记代替对账。
+query以受保护O_RDONLY+O_NOFOLLOW打开现有锁/记录/固定来源，并用mode=ro/query_only读取现有专用提交索引；必须确认提交行匹配后才接受记录；不创建文件/锁/数据库、不执行adapter、不读私钥，不网络查找，不改变Quota。输出只有登记ID及各项摘要，不输出私有路径、配置正文或source_id正文。正常文件读取可能产生系统atime，不宣称零系统元数据变化。
+
+登记记录严格schema=1、registration_id、hostname、config(path/sha256)、sources四项（issuer/adapter/authority_store/writer_fence，每项固定path/sha256）。record-sha256即规范JSON UTF8 LF完整字节摘要；拒绝重复键、非有限数、路径穿越和大于64KiB。
+配置仍沿用既有严格字段结构。四份来源文件均要求root/0600、受保护无链接父链、固定SHA，严格schema/kind/hostname/source_id/subject；subject必须与配置中的Issuer+公钥DER摘要、adapter路径/SHA、AuthorityStore路径、完整principal分别一致，UNKNOWN或缺少来源不得登记。
+source_id是受信root管理员保存的来源索引，并非由程序新签发的审批或跨主机证明。登记验证的是“受保护来源文件与配置准确绑定”，不是独立证明来源声明真实。可信原件、登记写入权限及准确摘要必须由同一受控部署/审批范围提供。query的authority_live_state/writer_fence_live_state始终UNKNOWN、installation_permission=NOT_INFERRED，不能据此放行安装。
+
+entry.py的serve/run均新增强制registry-root、registry-id、registry-record-sha256参数，在创建Issuer、Provider、Ledger或Driver前，按新装配Manifest的文件SHA载入registry模块并核验该登记及所有来源，要求实际config路径/SHA/解析值完全一致；缺登记、旧登记、来源漂移、换配置即HOLD，无自动登记或兼容绕过开关。旧配置和旧Grant不被修改/复活；仍由原NativeRecovery认证安装许可与实际Writer/Fence/事务。
+登记与生产适配器不是同一个能力：三个适配器已有911176aa源码及组件审核；实际Observer服务端、私有输入和可信现场绑定仍缺证据，不能据此宣称完整serve/run生产链闭合。
+
+历史2b1d版本新增28项登记/查询、并发、重启进程、正式CLI、幂等、部分失败保留、来源绑定、SHA/父链/权限/链接拒绝及不触碰DB/Grant/私钥/adapter测试。该历史版本Hosted验收为111项/环境=新增28+原装配27+Issuer25+Authority21+Receipt10；其后发现R1/R2，不能以该旧CI替代726f修复验收；25份核心文件仍与f4f逐字相同，不重跑951项，不重审已通过未变部分。登记本身不需要从未知事务创建新账本，也不要求Owner再跑D1。
+当前本地命令执行器不可用（exec-server缺失），未反复尝试或扩权；源码使用既有GitHub开发连接提交，测试与制品由隔离Hosted闭环。现场登记部署仍NOT_EXECUTED；正式登记/安装许可及独立审核以原PR58有效记录为准。
+
+
+## PR58#6250074905：R1/R2集中修复
+
+准确失败基准2b1d0318。本轮仅修改登记校验、提交协议及其回归；25份核心、951项及83项装配限定结论直接继承，不重新运行或审核。
+
+R1：对Issuer施加非空/非UNKNOWN/ASCII标识格式限制；public_der_sha256、adapter_sha256、command_sha256必须是64位小写十六进制字符串；数据库、adapter、key、socket、Ledger路径必须是无控制字符/NULL/反斜杠、规范绝对路径。source.subject必须是准确字段集合的字典且与已验证配置逐项一致；来源ID、principal和相关配置类型明确验证。query严格固定输出字段，摘要输出再次验证标量格式；无效/旧来源在register/query/require_binding均拒绝，不输出私有对象或路径。
+
+R2：完整文件及SHA不再代表提交成功。登记根新增固定.registry-registration.lock和独立.registry-commits.sqlite3，仅保存registration_id、record SHA和文件device/inode，不含Grant、Attempt、额度、Lease或任何生产业务表；它不是AuthorityStore，不打开配置指向的生产数据库。禁止AuthorityStore路径位于登记根，以免混用。元数据索引只在受控登记写入时O_EXCL创建，旧/异常/缺schema或有未决journal的索引保持HOLD，不自动重建或恢复。
+同一登记根的register持独占非阻塞flock，query/load/require_binding仅以O_RDONLY打开锁并持共享非阻塞锁；进行中的登记及并发注册保持HOLD。写新记录并完成文件fsync和目录fsync以后，才以SQLite synchronous=FULL/DELETE journal原子提交索引行，作为最终发布点；提交之后没有额外可能失败的应用层fsync。只读mode=ro/query_only连接必须读到绑定准确SHA及inode的已提交行，才接受记录。
+任一文件/目录fsync失败、写入中止或在发布前进程退出，原输出保留但无提交行。重复register不能补写/自动承认失败记录，重启也不能转VERIFIED或ALREADY_REGISTERED；query不能写文件补救。已经成功提交的记录才幂等返回ALREADY_REGISTERED。已提交索引而数据文件丢失也不能直接重建。遗留异常须按同一正式许可认可的明确恢复流程处理，不删除旧输出后重跑。
+登记metadata表由SQLite处理自身最终同步/原子发布；独立索引不能代替真实Writer/Fence、可信生产状态或安装许可。查询仍不显式写文件/建索引/创建锁，不调用fsync，不打开AuthorityStore、Grant或业务SQLite；系统文件读取可能更新atime。
+
+新增22项反例，原28项不删除不跳过，共50项登记受影响验收/环境。覆盖审核给出的完全相同合成反例、摘要非字符串/长度/字符、UNKNOWN及错误路径、来源冒认、输出白名单；真实文件/目录fsync EIO、写完但未提交时并发查询和注册、进程被终止后重启/重试、部分输出、防覆盖和只读查询字节不变。
+正式entry.py的serve与run均通过真实隔离子进程验证：使用准确SHA的实际entry/assembly/registry代码及独立合成Manifest，注入完整但fsync失败的登记；两入口均在创建Provider/Issuer和加载安装loader之前拒绝REGISTRATION_NOT_COMMITTED。loader只设合成拒绝tripwire，未执行英国操作、生产适配器或安装。该负向正式入口测试不冒充完整生产serve/run正向链验收。
+此前111项CI/制品历史保留，不改判原审核失败；本轮只跑50项受影响登记回归，83项和951项有效证据继承。Registry代码与metadata提交协议已由Dots在PR58#6250317194对726f准确版本复审关闭；英国未部署，INSTALL_PERMIT=NOT_ISSUED，P2_RELEASE=HOLD。
 
 ## 生产适配器增量：native_adapter.py
 
@@ -19,3 +91,15 @@ entry.py在Registry核验、完整Kit载入后对提供bind_deployment的适配�
 2. 原已生成approved_plan/private_seed准确路径/SHA、legacy Kit Manifest SHA、原完整审核ID及正文SHA、原探针回执及原事务/备份/checkpoint可信来源；只复用，禁止重跑D1或Prepare。
 3. 新Grant绑定的完整部署Manifest（含私有binding摘要）、准确独立目录、唯一AuthorityStore历史及Signer/Writer/Fence/未决Run/Job/InvokeId证明；UNKNOWN不得由此客户端升级PASS。
 无这些现场证据，完整NativeRecovery正向run及真实生产接线仍NOT_VERIFIED。英国修改/安装/激活/回滚NOT_EXECUTED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
+
+## README恢复及Observer复用核查（回应PR58#6250500768）
+
+已从726f6802的准确README恢复全部仍有效的装配、运行、登记、权限、持久提交、socket遗留、五次额度和失败恢复说明，保留911176aa新增适配器章节；同时更正已实现接口和既有审核状态。文档中的历史测试数量均属于对应准确版本，不替代当前71项或真实生产验收。
+
+仓库核查范围：准确911176aa完整Git树，production/p2_attempt5全部生产入口/适配器，原helpers/epoch7_host_observer.py与epoch7_live_controls.py，以及Attempt5的IssuerService/NativeRecovery调用链。发现既有Epoch7HostObserver的真实Linux进程/cgroup、资源、TLS和服务回执读回能力，可作为后续服务端复用基础；没有在这些源码中发现实现新nonce/签名协议的独立生产Observer服务端。tests中的observer_process明确是合成测试，不能用于生产。
+
+必须保留的原生依赖：FiniteLiveControls._boundary/_resources需要同一ClaimAuthority、准确原plan/17资源检查点、实际安装锁、owner_pid、真实服务/命令回执及有限读取预算；Epoch7HostObserver不能脱离这些依赖直接放进另一个进程，再将自报布尔值或只读到的journal改称真实副作用验证。独立签名不自动证明数据源正确。服务端需使用原受信执行者的真实上下文与可信读回授权，不能靠另起一个Writer或放宽Claim/锁检查获得。
+
+英国现场是否另有可复用的Observer实现，仍NOT_VERIFIED；仓库未交付独立服务端，不等于证明英国没有服务。当前尚无可用的受信现场配置/原始私有输入，无法确定真实接口和读回权限边界。需窗口4在既有六类证据中一次性返回：实际Observer源码/协议/固定受保护端点/执行身份与公钥信任来源；若没有，提供可信不存在/未部署结论和原生观察上下文的合法接入方式；同时复用原plan/seed/probe/备份checkpoint与当前Writer/Fence、未决Run/Job/InvokeId。不重跑D1，不索取私钥，不进行扫描或初始化。收到这些事实后才能复用/适配实际服务端或补确实缺失的实现，不能预置一个模拟Provider声称闭环。
+
+本次README恢复不改变可执行代码，不声称已经新增Observer服务端、完成正式run正向或具备安装许可。公开制品和Hosted合成主机测试不能冒充英国现场证据。UK_CHANGES=NOT_EXECUTED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
