@@ -3956,5 +3956,76 @@
         "job": 117696053242
       }
     ]
+  },
+  "storage_binding_repair_20261018": {
+    "status": "SOURCE_BINDING_DEFECTS_FIXED_HOST_METADATA_OBSERVED_PRODUCTION_GATES_HOLD",
+    "code_commit": "138eda930f64eee29cf8f4868336bb4106aa9a76",
+    "code_tree": "af65402f2887401b069fc09aa80572578f7c425d",
+    "last_actual_host_observation": "2026-10-18T14:38:38.351708Z",
+    "latest_ci": {
+      "run": 39137183207,
+      "job": 117703977165,
+      "new_source_tests": 19,
+      "inherited_expression_tests": 18,
+      "result": "PASS"
+    },
+    "source_sources_observed": 12,
+    "runtime_locations": 21,
+    "storage_detail_rows_omitted": 31,
+    "database_candidate": {
+      "host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "device": 64771,
+      "inode": 1601016,
+      "bytes": 46907392,
+      "uid": 1000,
+      "is_source_default_not_effective_config": true,
+      "wal_shm_journal": "MISSING_AT_SAMPLE_NOT_PROOF_OF_CHECKPOINT"
+    },
+    "handle_sample": {
+      "processes": 201,
+      "fds": 1991,
+      "races": 1,
+      "owners": 0,
+      "idle_or_future_writers_proven": false
+    },
+    "open_implementation": [
+      "Actual effective runtime configuration to complete authoritative catalogue; source-default candidate is not final assignment",
+      "Unfold 31 omitted source detail rows as needed and bind all persisted state/dependencies without recopying accepted material",
+      "Idle/scheduled/shared writer coverage; enforceable unique Writer/Fence and safe drain",
+      "Original admitted durable held-fd controller and full capture-chain host integration"
+    ],
+    "external_admission": {
+      "original_restricted_40_file_publication": {
+        "candidate": "95d131de6bbac1e998b81f42e2801d6a68f0eec9",
+        "raw_original_error": "NOT_FOUND",
+        "normal_release_basis": "NOT_OBTAINED",
+        "normal_github_new_source_writes": "ACTUALLY_SUCCESSFUL_NOT_A_GLOBAL_WRITE_BAN",
+        "specific_refusal_platform": "UNKNOWN_WITHOUT_ORIGINAL_RAW"
+      },
+      "M99": {
+        "status": "NOT_RUN",
+        "known_bwrap_error": "bwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted",
+        "exit": 1,
+        "known_bwrap_error_is_not_proven_original_publication_error": true,
+        "normal_route": "Original restriction platform must recover original refusal and approve a normal M99 test method; no account/API/environment workaround",
+        "retried": false
+      },
+      "independent_review": "INCREMENT_REQUESTED_NOT_SELF_SIGNED",
+      "formal_migration_permit": "NOT_ISSUED",
+      "support_request_sent": false
+    },
+    "production": {
+      "migration_started": false,
+      "service_actions": 0,
+      "database_opened": false,
+      "business_requests": 0,
+      "cutover": false,
+      "remaining_major_nodes": 6,
+      "background_migration_tasks": false,
+      "production_writer_acquired": false,
+      "tokyo_and_domestic_bridge_and_windows_preserved": true
+    },
+    "evidence_path": "evidence/pr99-service-handoff/aliyun-execution/STORAGE_BINDING_REPAIR_20261018.json",
+    "owner_password_or_ram_reauthorization_required": false
   }
 }

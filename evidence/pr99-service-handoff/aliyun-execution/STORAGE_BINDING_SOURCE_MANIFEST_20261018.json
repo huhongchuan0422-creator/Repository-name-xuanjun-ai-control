@@ -1,0 +1,72 @@
+{
+  "scope": "EXACT_READONLY_SOURCE_SET_NOT_PRODUCTION_PACKAGE",
+  "code_commit": "138eda930f64eee29cf8f4868336bb4106aa9a76",
+  "code_tree": "af65402f2887401b069fc09aa80572578f7c425d",
+  "files": [
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/storage_source_analysis.py",
+      "bytes": 8512,
+      "sha256": "9c766911aefd3956e1ddc70e6b911cb5bb523b5120b5d1b3aa6a430b385fe31f"
+    },
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/test_storage_source_analysis.py",
+      "bytes": 6707,
+      "sha256": "8fafc368b29b17149fe9d62c380d72f83b0a3e9cdf529ac08610579bbc9c76f6"
+    },
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/app_storage_binding_host.py",
+      "bytes": 25430,
+      "sha256": "2d0c1024e5fa492eab2eaff36ce1aba20b2da7e5189d6806dea3cc3529eb09f1"
+    },
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/app_storage_binding.py",
+      "bytes": 59879,
+      "sha256": "9870c65f9c9f2902bd5ba90701e7d43fb6a82ffd6b13e208dc6398485e3efd73"
+    },
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/storage_binding_query.py",
+      "bytes": 16202,
+      "sha256": "9e85773e2e038c8013120c1634deb43fcc016339ee14490a6c295e16fe551fe9"
+    },
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/credential_database_bindings_host.py",
+      "bytes": 19846,
+      "sha256": "2ebb30ee7596eeb8774d2d958e17c3d9ba6f142a83390be575f0a1e9a555a369"
+    },
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/credential_database_bindings.py",
+      "bytes": 45447,
+      "sha256": "25ce2e518c90e0289338734633ac143b9ca0e44b8bf32fafb8a208badef154a8"
+    },
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/credential_writer_host.py",
+      "bytes": 6008,
+      "sha256": "a9387031fa3b77da9c2157336f7f7794d1b07e1b2913950c3005882df94fc67e"
+    },
+    {
+      "path": "evidence/pr99-service-handoff/aliyun-execution/credential_writer_probe.py",
+      "bytes": 36044,
+      "sha256": "3737d46eca78b5aa25378afee254d1af4596dff5b8e7f5a7b4212200cd68ce83"
+    },
+    {
+      "path": ".github/workflows/pr99-storage-binding.yml",
+      "bytes": 128979,
+      "sha256": "ed1f7947e260fcee619ba93bdf163ba94f8789ec6977c1f9c27cc95b952181ee"
+    },
+    {
+      "path": ".github/workflows/pr99-binding-query.yml",
+      "bytes": 38901,
+      "sha256": "366d6e465afdec344629742f3bf3f542fd106afc3a1c5ed0ee38bba8b87c8f3f"
+    },
+    {
+      "path": ".github/workflows/pr99-credential-db.yml",
+      "bytes": 99554,
+      "sha256": "b5054afad69b2adf5c7b507f7ef74dd5e91cf491b365f839ea27e69293f05267"
+    },
+    {
+      "path": ".github/workflows/pr99-credential-writer.yml",
+      "bytes": 80138,
+      "sha256": "5661b716a9f23d2e380438e1f78707e746389a7687502c25cdeef939854f5baa"
+    }
+  ]
+}

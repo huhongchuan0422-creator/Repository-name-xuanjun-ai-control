@@ -386,3 +386,18 @@ Owner21:47指令后继续原任务。源码dd84570b→55e13ab3→5b65f8e3→f17d
 Hosted验证：39133422979/job117693036912、39133671326/job117693752919、39134049933/job117694853284、39134466847/job117696053242。原WAL/InvokeId d5bc04c6未改，41/41历史通过直接继承。本批原40文件未重发，M99受限入口未执行，正常解除依据仍缺；完整Writer/Fence/安全排空、持久控制器实机接线及正式许可未完成。生产安装/数据库打开/业务请求/切换均0，六大节点未关闭。本窗口未领取生产Writer，无后台生产迁移作业。
 
 完整回执：evidence/pr99-service-handoff/aliyun-execution/DATABASE_AND_STORAGE_TRACE_20261018.json。
+
+
+## 2026-10-18 22:45 CST｜原执行窗口存储绑定修复与数据库候选观察
+
+CODE_COMMIT=138eda930f64eee29cf8f4868336bb4106aa9a76；CODE_TREE=af65402f2887401b069fc09aa80572578f7c425d。
+
+已修复包目录/函数内导入遗漏、构造器关键字与路径参数链、条件/循环/self字段的UNKNOWN保守传播，以及同模块数据库工厂调用遗漏；不执行业务源码。最终Hosted run39137183207/job117703977165：19项新增+18项继承表达式测试、6项拒绝检查及回执/命令边界PASS。原WAL/InvokeId 41/41未变通过继承。13文件精确SHA清单见STORAGE_BINDING_SOURCE_MANIFEST_20261018.json；这是只读源码集绑定，不是生产安装包。
+
+真实新增现场：run39135913524/job117700287011，t-jpn70f4bywoar5s主机Success、接收端误拒绝未解析receiver的.read_text/.replace等方法名；保留失败。修复后只查原Invoke，run39136149304/job117700977671恢复12模块、21路径metadata，未重跑主机；有31行存储细节因输出边界未展开。原本地nonce claim未恢复，不声称独立nonce核对，绑定原云InstanceId/InvokeId。
+
+凭据库已追到database.connection.SessionLocal。run39136502136/job117701988723、t-jpn70f50rrw71mo Success：源码默认候选MAIN dev64771/inode1601016/46907392字节/uid1000；WAL/SHM采样缺失。源默认不冒充有效运行配置或最终数据选择。run39136896590/job117703141520、t-jpn70f5houiw35s Success，22:38:38北京时间：201进程/1991描述符、1次句柄变化，未见匹配fd/共享可写映射。不能据空样本推断无闲置/定时Writer、已Fence或可复制。数据库内容未打开、生产服务无操作。
+
+仍由本执行窗口负责：完整有效配置/权威数据与其他状态目录、闲置/调度/共享Writer覆盖、实际强制Fence/排空、原持久fd控制器和完整捕获链的实机绑定。现有GitHub新源码写入和STS/SWAS只读均真实可用，不要求Owner重配RAM或找另一个执行方。原受限40文件发布原始拒绝/正常解除依据仍缺；已知bwrap EPERM不是已证明的发布拒绝原文，二者不混同。M99不重试、不换环境/接口规避；需原限制平台提供正常验收放行，尚未提交平台支持工单。源码增量交原独审，作者不代签许可。
+
+正式迁移许可未签发；6个生产大节点仍未关闭，生产迁移/切换尚未启动，没有本批后台生产迁移任务。东京、国内桥接和Windows保留。完整回执：evidence/pr99-service-handoff/aliyun-execution/STORAGE_BINDING_REPAIR_20261018.json。
