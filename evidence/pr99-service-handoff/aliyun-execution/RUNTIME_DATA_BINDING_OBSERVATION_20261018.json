@@ -1,0 +1,237 @@
+{
+  "schema": 1,
+  "status": "FIXED_INITIAL_ENVIRONMENT_METADATA_ACCEPTED_TOKYO_EFFECTIVE_DATA_UNRESOLVED",
+  "code_commit": "59ab9bf543d76904f1c6d8090fa6dec3d0171a5c",
+  "code_tree": "53189eec2fcf6b77a2a906f412ddf4bc89e6d70d",
+  "validation": {
+    "run_id": 39131976179,
+    "job_id": 117688820982,
+    "result": "SUCCESS",
+    "tests": "5 path cases, 9 schema/privacy/false authority rejections, plain and legacy encoding"
+  },
+  "host": {
+    "run_id": 39132016839,
+    "job_id": 117688962517,
+    "result": "SUCCESS",
+    "receipt": {
+      "authoritative_writer": "UNKNOWN",
+      "enforced_fence": "UNKNOWN",
+      "hosts": [
+        {
+          "authoritative_writer": "UNKNOWN",
+          "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+          "enforced_fence": "UNKNOWN",
+          "host": "tokyo",
+          "host_commands": 1,
+          "instance_id": "68985c531add4e90a131aef703a389e6",
+          "invocation_status": "Success",
+          "invoke_id": "t-jpn70ezn4z8m03k",
+          "nonterminal_invocations": [],
+          "receipt": {
+            "authoritative_writer": "UNKNOWN",
+            "business_requests": 0,
+            "business_source_imports": 0,
+            "database_opened": false,
+            "enforced_fence": "UNKNOWN",
+            "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+            "limitations": [
+              "INITIAL_ENV_ONLY_NOT_RUNTIME_OR_DEFAULT_CONFIG",
+              "NO_DATABASE_FORMAT_OR_AUTHORITY_PROOF",
+              "ANCESTOR_LINKS_NOT_ADMITTED_PATHGUARD",
+              "IDLE_OTHER_AND_SCHEDULED_WRITERS_NOT_PROVEN",
+              "NO_FENCE_DRAIN_OR_STOP"
+            ],
+            "nonce": "afea586a23564fac8fb52a57d7360204",
+            "observed_at": "2026-10-18T13:33:04.308143Z",
+            "private_environment_values_disclosed": false,
+            "scope": "PR99_INITIAL_PROCESS_ENV_DATA_METADATA_NOT_AUTHORITY",
+            "service_actions": 0,
+            "units": [
+              {
+                "data": [],
+                "environment_key": "TRADING_DATABASE_URL",
+                "pid": 3082952,
+                "start_ticks": 248360883,
+                "status": "INITIAL_ENVIRONMENT_KEY_NOT_SET_UNKNOWN",
+                "unit": "secure-secrets-portal.service"
+              },
+              {
+                "data": [],
+                "environment_key": "TRADING_DATABASE_URL",
+                "pid": 1903204,
+                "start_ticks": 179522510,
+                "status": "INITIAL_ENVIRONMENT_KEY_NOT_SET_UNKNOWN",
+                "unit": "xuanjun-wecom-customer-contact.service"
+              },
+              {
+                "data": [],
+                "environment_key": "TRADING_DATABASE_URL",
+                "pid": 1875349,
+                "start_ticks": 178615731,
+                "status": "INITIAL_ENVIRONMENT_KEY_NOT_SET_UNKNOWN",
+                "unit": "xuanjun-wecom-customer-service.service"
+              }
+            ]
+          },
+          "run_command_attempted": true,
+          "service_actions": 0,
+          "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+          "sts": "PASS_CURRENT"
+        },
+        {
+          "authoritative_writer": "UNKNOWN",
+          "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+          "enforced_fence": "UNKNOWN",
+          "host": "domestic",
+          "host_commands": 1,
+          "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+          "invocation_status": "Success",
+          "invoke_id": "t-sh070ezngkvod8g",
+          "nonterminal_invocations": [],
+          "receipt": {
+            "authoritative_writer": "UNKNOWN",
+            "business_requests": 0,
+            "business_source_imports": 0,
+            "database_opened": false,
+            "enforced_fence": "UNKNOWN",
+            "hostname": "iZvt5t8tlrm8oiZ",
+            "limitations": [
+              "INITIAL_ENV_ONLY_NOT_RUNTIME_OR_DEFAULT_CONFIG",
+              "NO_DATABASE_FORMAT_OR_AUTHORITY_PROOF",
+              "ANCESTOR_LINKS_NOT_ADMITTED_PATHGUARD",
+              "IDLE_OTHER_AND_SCHEDULED_WRITERS_NOT_PROVEN",
+              "NO_FENCE_DRAIN_OR_STOP"
+            ],
+            "nonce": "b5cff04e08bf4780ba1f0a8eb28ba5eb",
+            "observed_at": "2026-10-18T13:33:10.466718Z",
+            "private_environment_values_disclosed": false,
+            "scope": "PR99_INITIAL_PROCESS_ENV_DATA_METADATA_NOT_AUTHORITY",
+            "service_actions": 0,
+            "units": [
+              {
+                "data": [
+                  {
+                    "metadata": {
+                      "bytes": 259497984,
+                      "device": 64771,
+                      "gid": 1001,
+                      "inode": 1845988,
+                      "mode": 384,
+                      "nlink": 1,
+                      "state": "REGULAR_METADATA_CANDIDATE",
+                      "uid": 1001
+                    },
+                    "part": "MAIN"
+                  },
+                  {
+                    "metadata": {
+                      "state": "MISSING"
+                    },
+                    "part": "WAL"
+                  },
+                  {
+                    "metadata": {
+                      "state": "MISSING"
+                    },
+                    "part": "SHM"
+                  }
+                ],
+                "environment_key": "WINDOWS_INTERACTION_STATE_DB",
+                "pid": 90354,
+                "start_ticks": 91354061,
+                "status": "FILE_CANDIDATE",
+                "unit": "windows-interaction-http.service"
+              },
+              {
+                "data": [
+                  {
+                    "metadata": {
+                      "bytes": 991,
+                      "device": 64771,
+                      "gid": 1001,
+                      "inode": 835654,
+                      "mode": 384,
+                      "nlink": 1,
+                      "state": "REGULAR_METADATA_CANDIDATE",
+                      "uid": 1001
+                    },
+                    "part": "MAIN"
+                  },
+                  {
+                    "metadata": {
+                      "state": "MISSING"
+                    },
+                    "part": "WAL"
+                  },
+                  {
+                    "metadata": {
+                      "state": "MISSING"
+                    },
+                    "part": "SHM"
+                  }
+                ],
+                "environment_key": "DOMESTIC_BRIDGE_CUSTOMER_STATE",
+                "pid": 188767,
+                "start_ticks": 178248493,
+                "status": "FILE_CANDIDATE",
+                "unit": "provider-neutral-domestic-bridge.service"
+              }
+            ]
+          },
+          "run_command_attempted": true,
+          "service_actions": 0,
+          "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+          "sts": "PASS_CURRENT"
+        }
+      ],
+      "migration_started": false,
+      "production_actions": 0,
+      "production_cutover": false,
+      "status": "WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION"
+    }
+  },
+  "readonly_host_commands": 2,
+  "production_installation": false,
+  "production_service_actions": 0,
+  "production_migration_started": false,
+  "production_cutover": false,
+  "writer_acquired": false,
+  "remaining_major_nodes": 6,
+  "protected_data_identities": [
+    {
+      "host": "domestic",
+      "unit": "windows-interaction-http.service",
+      "source": "INITIAL_PROCESS_ENVIRONMENT_CANDIDATE_NOT_DATABASE_FORMAT_PROOF",
+      "metadata": {
+        "bytes": 259497984,
+        "device": 64771,
+        "gid": 1001,
+        "inode": 1845988,
+        "mode": 384,
+        "nlink": 1,
+        "state": "REGULAR_METADATA_CANDIDATE",
+        "uid": 1001
+      },
+      "handling": "PRESERVE_IN_PLACE_NOT_A_MIGRATION_DATA_SELECTION"
+    },
+    {
+      "host": "domestic",
+      "unit": "provider-neutral-domestic-bridge.service",
+      "source": "INITIAL_PROCESS_ENVIRONMENT_CANDIDATE_NOT_DATABASE_FORMAT_PROOF",
+      "metadata": {
+        "bytes": 991,
+        "device": 64771,
+        "gid": 1001,
+        "inode": 835654,
+        "mode": 384,
+        "nlink": 1,
+        "state": "REGULAR_METADATA_CANDIDATE",
+        "uid": 1001
+      },
+      "handling": "PRESERVE_IN_PLACE_NOT_A_MIGRATION_DATA_SELECTION"
+    }
+  ],
+  "tokyo_effective_data": "UNRESOLVED_SOURCE_DEFAULT_DOTENV_OR_RUNTIME_SETTINGS_NOT_EVALUATED",
+  "independent_review": "REQUESTED_NOT_PASS",
+  "migration_permit": "NOT_ISSUED"
+}

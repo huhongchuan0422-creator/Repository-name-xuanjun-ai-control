@@ -360,3 +360,14 @@ Owner确认另一核验窗口停止后，本原执行窗口继续同一PR99/分�
 本轮累计4个只读主机命令，均终态；3次失败/结果查询均0主机命令。完整旧失败、截断结果及后续标识错误保留，不重加旧标签；本次静态回执接受不关闭权威数据或Fence节点。东京、国内桥接和Windows未操作，数据库打开0，生产安装/启停/切换0，无本窗口后台迁移Writer。原40文件候选未重发，M99 NOT_RUN，正常发布解除依据仍缺；个人上下文检索也未找到原始拒绝工具结果，二手转述不作为解除依据。6个生产大节点仍未关闭。
 
 完整回执：evidence/pr99-service-handoff/aliyun-execution/SOURCE_SCHEDULER_OBSERVATION_20261018.json。
+
+
+### 2026-10-18 21:33 CST｜运行进程配置与数据身份关联新证据
+
+准确代码59ab9bf543d76904f1c6d8090fa6dec3d0171a5c，Tree53189eec2fcf6b77a2a906f412ddf4bc89e6d70d。固定范围为东京原3应用和国内Windows/桥接2保留服务，只读初始进程环境中的指定键，内部解析后仅输出文件metadata，不输出值/路径/完整URL。不是原PathGuard替代品，不执行M99反例。Hosted CI run39131976179/job117688820982通过5个路径用例、9个隐私/假准入拒绝及两种传输编码；原压缩程序实际嵌入HOST scope回归也通过run39131976140/job117688820540，未重发原源码扫描。
+
+真实执行run39132016839/job117688962517 SUCCESS：东京Invoke t-jpn70ezn4z8m03k、国内Invoke t-sh070ezngkvod8g，均Success。东京三应用初始进程环境没有TRADING_DATABASE_URL，不能据此确认最终库；默认值、dotenv或运行时配置仍须解析，不把UNKNOWN作通过。国内Windows PID90354关联device64771/inode1845988/uid1001/259497984字节常规文件；桥接PID188767关联device64771/inode835654/uid1001/991字节常规文件。两者关联的MAIN身份不同；这不排除其他共享文件/Writer，也不证明文件格式为SQLite。均保留原位，不纳入迁移选择；Windows所关联文件大小还超过现有64MiB捕获上限，不擅自扩大上限或尝试捕获。所选配置路径在采样时未见对应-wal/-shm，不证明全局无WAL。
+
+本增量2个新只读主机调用已终态；无数据库打开/服务启停/业务请求/生产写入。此前源码/调度4个主机调用及3次0主机命令查询按原回执继承。完整数据/全部Writer/Fence/排空、受信持久捕获控制器、原候选正常发布与M99动态、正式迁移许可及生产验收仍缺，6大节点不关闭；本窗口未领取现场Writer，没有后台迁移任务。
+
+回执：evidence/pr99-service-handoff/aliyun-execution/RUNTIME_DATA_BINDING_OBSERVATION_20261018.json。
