@@ -159,17 +159,36 @@ class SourceFence:
         self.publish = publish_original_proof
         self.objects = [o for o in self.catalogue['objects'] if o['classification']=='COPY_FENCED']
         writers = {w for obj in self.objects for w in obj['writers']}
+        self.sealed_origins = sorted(writers)
+        self.drain_binding = None
         self.units = sorted({o['unit'] for o in self.catalogue['origins'] if o['id'] in writers and o['unit'] is not None})
         need(self.units and all(not RETAINED.search(unit) for unit in self.units), 'RETAINED_WRITER_CONFLICT')
 
     def _drained(self):
         self.controller._bound('query')
         proof = self.drain(self.inventory,self.controller.binding['epoch'])
-        need(type(proof) is dict and set(proof)=={'inventory_sha256','epoch','pending','unknown','proof_sha256'} and
+        need(type(proof) is dict and set(proof)=={'source_host','transaction_id','plan_digest',
+             'inventory_sha256','epoch','admission_sealed','sealed_origins','issued_at','expires_at',
+             'pending','unknown','proof_sha256'} and
+             proof['source_host']==SOURCE_HOST and
+             proof['transaction_id']==self.controller.binding['transaction_id'] and
+             proof['plan_digest']==self.controller.binding['plan_digest'] and
              proof['inventory_sha256']==self.inventory and proof['epoch']==self.controller.binding['epoch'] and
+             proof['admission_sealed'] is True and proof['sealed_origins']==self.sealed_origins and
              type(proof['pending']) is type(proof['unknown']) is int and proof['pending']==proof['unknown']==0 and
              type(proof['proof_sha256']) is str and re.fullmatch('[0-9a-f]{64}',proof['proof_sha256']),
              'TRUSTED_DRAIN_NOT_PROVEN')
+        claim,_,_=self.controller.load()
+        now=time.time()
+        need(type(proof['issued_at']) is type(proof['expires_at']) is int and
+             claim['plan']['issued_at']<=proof['issued_at']<=now<proof['expires_at']<=claim['plan']['expires_at'],
+             'DRAIN_SEAL_EXPIRED_OR_OUTSIDE_ORIGINAL_PLAN')
+        # A sample of an empty queue is not an ingress seal. The original drain
+        # authority must revalidate the SAME persistent seal on every call.
+        # A changed/renewed record never silently continues a partially run stage.
+        binding=digest(proof)
+        need(self.drain_binding in (None,binding),'DRAIN_SEAL_CHANGED_PRESERVE')
+        self.drain_binding=binding
         return proof['proof_sha256']
 
     def _complete(self):
@@ -192,10 +211,13 @@ class SourceFence:
         # cannot substitute for it. No stop is attempted if it is unknown.
         self._drained()
         for unit in self.units:
+            self._drained()
             self.backend.mask(unit)
         for unit in self.units:
+            self._drained()
             self.backend.stop(unit)
         need(all(self.backend.stopped_and_masked(unit) for unit in self.units), 'SOURCE_CONTROL_GROUP_NOT_EMPTY')
+        self._drained()
         by_id = {obj['id']:obj for obj in self.catalogue['objects']}
         # Validate complete membership before mutating any source data flags.
         for obj in self.objects:
@@ -203,6 +225,7 @@ class SourceFence:
                 need(self.backend.exact_directory(obj,[by_id[n] for n in obj['children']]),'SOURCE_MEMBERSHIP_DRIFT')
         for obj in sorted(self.objects,key=lambda o:(o['kind']=='DIRECTORY',-len(Path(o['path']).parts))):
             self.controller._bound('dispatch')
+            self._drained()
             self.backend.freeze(obj)
         need(self._complete(), 'SOURCE_FENCE_UNPROVEN_PRESERVE')
         return self._receipt(request)

@@ -40,6 +40,17 @@ def approved_records(value):
     return lambda kind,digest:(kind,digest) in approved
 
 
+def sealed_drain(controller, origins, pending=0):
+    """Synthetic seal registry response, never a live queue/ingress operation."""
+    plan=controller.load()[0]['plan']
+    return {'source_host':c.SOURCE_HOST,'transaction_id':controller.binding['transaction_id'],
+            'plan_digest':controller.binding['plan_digest'],
+            'inventory_sha256':controller.binding['writer_inventory_sha256'],
+            'epoch':controller.binding['epoch'],'admission_sealed':True,'sealed_origins':sorted(origins),
+            'issued_at':plan['issued_at'],'expires_at':plan['expires_at'],
+            'pending':pending,'unknown':0,'proof_sha256':'d'*64}
+
+
 class CatalogueTests(unittest.TestCase):
     def valid(self,value):
         return c.bind_catalogue(value,c.digest(value),approved_records(value))
@@ -267,7 +278,7 @@ class FixtureBackend:
 class FenceTests(OriginalJournalFixture, unittest.TestCase):
     def setUp(self):
         super().setUp();self.backend=FixtureBackend();self.stored=None
-        self.drain={'inventory_sha256':self.inventory,'epoch':7,'pending':0,'unknown':0,'proof_sha256':'d'*64}
+        self.drain=sealed_drain(self.controller,['portal'])
         self.provider=s.SourceFence(self.controller,self.cat,self.inventory,approved_records(self.cat),self.backend,
             lambda inv,epoch:copy.deepcopy(self.drain),self.publish)
         self.fence_req=original.request(self.plan,'fence_source',self.plan_digest)
@@ -285,6 +296,51 @@ class FenceTests(OriginalJournalFixture, unittest.TestCase):
         self.drain['unknown']=1
         with self.assertRaises(s.FenceHold):self.provider.dispatch(self.fence_req)
         self.assertEqual(self.backend.calls,[])
+
+    def test_empty_queue_without_ingress_seal_has_no_effect(self):
+        self.drain['admission_sealed']=False
+        with self.assertRaises(s.FenceHold):self.provider.dispatch(self.fence_req)
+        self.assertEqual(self.backend.calls,[])
+
+    def test_drain_from_different_transaction_has_no_effect(self):
+        self.drain['transaction_id']='foreign'
+        with self.assertRaises(s.FenceHold):self.provider.dispatch(self.fence_req)
+        self.assertEqual(self.backend.calls,[])
+
+    def test_drain_from_different_plan_has_no_effect(self):
+        self.drain['plan_digest']='0'*64
+        with self.assertRaises(s.FenceHold):self.provider.dispatch(self.fence_req)
+        self.assertEqual(self.backend.calls,[])
+
+    def test_unsealed_origin_has_no_effect(self):
+        self.drain['sealed_origins']=[]
+        with self.assertRaises(s.FenceHold):self.provider.dispatch(self.fence_req)
+        self.assertEqual(self.backend.calls,[])
+
+    def test_expired_seal_has_no_effect(self):
+        self.drain['expires_at']=self.drain['issued_at']
+        with self.assertRaises(s.FenceHold):self.provider.dispatch(self.fence_req)
+        self.assertEqual(self.backend.calls,[])
+
+    def test_future_seal_has_no_effect(self):
+        self.drain['issued_at']=self.drain['expires_at']
+        with self.assertRaises(s.FenceHold):self.provider.dispatch(self.fence_req)
+        self.assertEqual(self.backend.calls,[])
+
+    def test_seal_lost_after_mask_does_not_stop_or_freeze(self):
+        mask=self.backend.mask
+        def lose(unit):
+            mask(unit);self.drain['admission_sealed']=False
+        self.backend.mask=lose
+        with self.assertRaises(s.FenceHold):self.provider.dispatch(self.fence_req)
+        self.assertEqual(self.backend.calls,[('mask','secure-secrets-portal.service')])
+        self.assertIsNone(self.stored)
+
+    def test_changed_seal_is_preserved_without_repeat_effect(self):
+        first=self.provider.dispatch(self.fence_req);calls=list(self.backend.calls)
+        self.drain['proof_sha256']='e'*64
+        with self.assertRaises(s.FenceHold):self.provider.query(self.fence_req)
+        self.assertEqual(calls,self.backend.calls);self.assertEqual(first['evidence'],c.digest(self.stored))
 
     def test_partial_kernel_fence_query_does_not_reapply(self):
         self.backend.partial=True

@@ -12,7 +12,7 @@ import capture_session as session
 import catalogue_binding as c
 import existing_fd_controller as f
 import migration_transaction as original
-from test_runtime_controller import OriginalJournalFixture,FixtureBackend,approved_records
+from test_runtime_controller import OriginalJournalFixture,FixtureBackend,approved_records,sealed_drain
 from test_sqlite_wal_vfs import fixture,restored_rows
 
 
@@ -85,7 +85,7 @@ class SessionTests(OriginalJournalFixture,unittest.TestCase):
     def build(self,config=None):
         with patch.object(session,'LinuxFenceBackend',return_value=self.backend):
             return session.CaptureSession(self.controller,self.cat,approved_records(self.cat),self.io,{},lambda:True,
-                lambda inv,e:{'inventory_sha256':inv,'epoch':e,'pending':self.pending,'unknown':0,'proof_sha256':'d'*64},
+                lambda inv,e:sealed_drain(self.controller,['portal'],self.pending),
                 self.proof_fd,lambda:True,self.capture_fd,lambda:True,self.config if config is None else config)
 
     def tearDown(self):

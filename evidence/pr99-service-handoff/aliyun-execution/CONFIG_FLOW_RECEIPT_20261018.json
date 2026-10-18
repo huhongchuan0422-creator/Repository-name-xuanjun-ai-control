@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "code_commit": "dfd69b2400f43c473815f5df4c3c21809ca05ba6",
+  "code_tree": "5ecc686aff96a398a545fba2215e0f2f422f2c4d",
+  "run_id": 39141834572,
+  "job_id": 117717694949,
+  "run_url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39141834572",
+  "authoritative_writer": "UNKNOWN",
+  "enforced_fence": "UNKNOWN",
+  "hosts": [
+    {
+      "authoritative_writer": "UNKNOWN",
+      "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+      "enforced_fence": "UNKNOWN",
+      "host": "tokyo",
+      "host_commands": 1,
+      "instance_id": "68985c531add4e90a131aef703a389e6",
+      "invocation_status": "Success",
+      "invoke_id": "t-jpn70fbdpsmzw8w",
+      "nonterminal_invocations": [],
+      "receipt": {
+        "business_imports": 0,
+        "database_opened": false,
+        "effective_runtime_configuration_proven": false,
+        "environment_read": false,
+        "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+        "nonce": "788c414601b24bb7923d7739200a044a",
+        "observed_at": "2026-10-18T15:44:39.745464Z",
+        "raw_private_literals_disclosed": false,
+        "scope": "PR99_REDACTED_STARTUP_CONFIGURATION_FLOW_NOT_RUNTIME_ATTESTATION",
+        "service_actions": 0,
+        "sources": [
+          {
+            "functions": [
+              {
+                "line": 95,
+                "name": "ensure_private_dir"
+              },
+              {
+                "line": 101,
+                "name": "load_local_credential_env"
+              },
+              {
+                "line": 113,
+                "name": "build_service"
+              },
+              {
+                "line": 146,
+                "name": "build_telegram_canary"
+              },
+              {
+                "line": 150,
+                "name": "_html_escape"
+              },
+              {
+                "line": 156,
+                "name": "render_siliconflow_page"
+              },
+              {
+                "line": 222,
+                "name": "render_wecom_page"
+              },
+              {
+                "line": 285,
+                "name": "render_wecom_customer_service_page"
+              },
+              {
+                "line": 319,
+                "name": "render_wecom_customer_contact_page"
+              },
+              {
+                "line": 355,
+                "name": "render_wecom_novel_page"
+              },
+              {
+                "line": 388,
+                "name": "render_wecom_novel_callback_page"
+              },
+              {
+                "line": 418,
+                "name": "render_wecom_novel_identity_page"
+              },
+              {
+                "line": 449,
+                "name": "render_telegram_page"
+              },
+              {
+                "line": 511,
+                "name": "render_domestic_gateway_remote_auth_page"
+              },
+              {
+                "line": 579,
+                "name": "render_feishu_customer_app_secret_page"
+              },
+              {
+                "line": 638,
+                "name": "render_finance_collection_page"
+              },
+              {
+                "line": 704,
+                "name": "render_douyin_page"
+              },
+              {
+                "line": 771,
+                "name": "render_tiktok_page"
+              },
+              {
+                "line": 840,
+                "name": "_record_douyin_callback_audit"
+              },
+              {
+                "line": 858,
+                "name": "_finish_douyin_callback"
+              },
+              {
+                "line": 863,
+                "name": "handle_douyin_oauth_callback"
+              },
+              {
+                "line": 975,
+                "name": "_record_tiktok_audit"
+              },
+              {
+                "line": 993,
+                "name": "_finish_tiktok"
+              },
+              {
+                "line": 998,
+                "name": "_tiktok_existing_binding_payload"
+              },
+              {
+                "line": 1018,
+                "name": "handle_tiktok_oauth_start"
+              },
+              {
+                "line": 1047,
+                "name": "handle_tiktok_oauth_callback"
+              },
+              {
+                "line": 1175,
+                "name": "tiktok_connection_status"
+              },
+              {
+                "line": 1196,
+                "name": "tiktok_callback_redirect_location"
+              },
+              {
+                "line": 1673,
+                "name": "serve"
+              },
+              {
+                "line": 1680,
+                "name": "arm_telegram_canary"
+              },
+              {
+                "line": 1685,
+                "name": "arm_telegram_controlled_rollout"
+              },
+              {
+                "line": 1693,
+                "name": "allow_telegram_controlled_chat"
+              },
+              {
+                "line": 1698,
+                "name": "create_session"
+              },
+              {
+                "line": 1789,
+                "name": "main"
+              }
+            ],
+            "path": "scripts/secure_secrets_portal_server.py",
+            "redacted_syntax": "import argparse\nimport json\nimport os\nimport sys\nimport urllib.parse\nfrom http import HTTPStatus\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\nfrom pathlib import Path\nROOT = Path(__file__).resolve().parents[1]\nfrom ai_service.secure_secrets_portal import DOMESTIC_GATEWAY_REMOTE_AUTH_REF, DOUYIN_ACCESS_TOKEN_REF, DOUYIN_CLIENT_KEY_REF, DOUYIN_CLIENT_SECRET_REF, DOUYIN_REFRESH_TOKEN_REF, DEFAULT_BASE_URL, DEFAULT_MODEL, FEISHU_CUSTOMER_APP_SECRET_REF, FileBackedSubmissionSessionRepository, OperationsSecretRefStore, SecureSecretsPortalService, TIKTOK_ACCESS_TOKEN_REF, TIKTOK_CLIENT_KEY_REF, TIKTOK_CLIENT_SECRET_REF, TIKTOK_REFRESH_TOKEN_REF, secure_headers\nfrom douyin.open_api_foundation import DOUYIN_USER_INFO_URL, TEST_ACCOUNT_WHITELIST_SCOPE, DouyinOAuthStateStore, DouyinOpenApiClient, DouyinTokenLifecycleStore, parse_token_response, sanitize_user_info_response\nfrom tiktok.open_api_foundation import MINIMUM_READONLY_SCOPES as TIKTOK_MINIMUM_READONLY_SCOPES, TIKTOK_USER_INFO_URL, TikTokOAuthStateStore, TikTokOpenApiClient, TikTokTokenLifecycleStore, build_authorization_url as build_tiktok_authorization_url, fingerprint as tiktok_fingerprint, parse_token_response as parse_tiktok_token_response, sanitize_user_info_response as sanitize_tiktok_user_info_response\nfrom accounts.credential_store import CredentialStore\nfrom database.repositories import CredentialRepository\nfrom ai_service.telegram_customer_service_canary import TelegramCustomerServiceCanary\nfrom trading_execution.dual_api_readiness import ROLE_FINANCE_COLLECTION_READONLY\nFINANCE_COLLECTION_ACCOUNT_REFERENCE = 'PRIVATE_LITERAL_WITHHELD'\nfrom trading_execution.secure_credential_intake import CredentialIntakeAuditSink, SecureCredentialIntakeService, SensitiveValueRedactor, StatusOnlyOperationsBridge\nDEFAULT_STATE_ROOT = Path('/opt/trading-system/runtime/secure-secrets-portal')\nDEFAULT_CREDENTIAL_ENV_FILE = DEFAULT_STATE_ROOT / 'credential-store.env'\nDEFAULT_HOST = 'PRIVATE_LITERAL_WITHHELD'\nDEFAULT_PORT = 'PRIVATE_LITERAL_WITHHELD'\nDOUYIN_REDIRECT_PATH = 'PRIVATE_LITERAL_WITHHELD'\nTIKTOK_REDIRECT_PATH = 'PRIVATE_LITERAL_WITHHELD'\nTIKTOK_OAUTH_START_PATH = 'PRIVATE_LITERAL_WITHHELD'\nTIKTOK_STATUS_PATH = 'PRIVATE_LITERAL_WITHHELD'\nTIKTOK_DISCONNECT_PATH = 'PRIVATE_LITERAL_WITHHELD'\nTIKTOK_URL_PROPERTY_VERIFICATION_FILENAME = 'PRIVATE_LITERAL_WITHHELD'\nTIKTOK_URL_PROPERTY_VERIFICATION_BODY = 'PRIVATE_LITERAL_WITHHELD'\nTIKTOK_URL_PROPERTY_VERIFICATION_FILES = {TIKTOK_URL_PROPERTY_VERIFICATION_FILENAME: TIKTOK_URL_PROPERTY_VERIFICATION_BODY, 'PRIVATE_LITERAL_WITHHELD': 'PRIVATE_LITERAL_WITHHELD'}\nTIKTOK_APP_ICON_PATH = DEFAULT_STATE_ROOT / 'PRIVATE_LITERAL_WITHHELD' / 'PRIVATE_LITERAL_WITHHELD'\n\ndef load_local_credential_env():\n    if os.getenv('PRIVATE_LITERAL_WITHHELD') or not DEFAULT_CREDENTIAL_ENV_FILE.exists():\n        return\n    for line in DEFAULT_CREDENTIAL_ENV_FILE.read_text(encoding='utf-8').splitlines():\n        if not line or line.lstrip().startswith('#') or '=' not in line:\n            continue\n        key, value = line.split('=', 1)\n        if key == 'PRIVATE_LITERAL_WITHHELD' and value:\n            os.environ[key] = value\n            return\n\ndef build_service(state_root):\n    load_local_credential_env()\n    state_root = ensure_private_dir(Path(state_root))\n    session_repo = FileBackedSubmissionSessionRepository(state_root / 'PRIVATE_LITERAL_WITHHELD')\n    credential_repository = CredentialRepository()\n    operations_store = OperationsSecretRefStore(Path('/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store'))\n    credential_intake = None\n    try:\n        credential_intake = SecureCredentialIntakeService(credential_store=CredentialStore(repository=credential_repository), session_repository=FileBackedSubmissionSessionRepository(state_root / 'PRIVATE_LITERAL_WITHHELD'), audit_sink=CredentialIntakeAuditSink(SensitiveValueRedactor()), token_ttl_seconds='PRIVATE_LITERAL_WITHHELD')\n    except Exception:\n        credential_intake = None\n    return SecureSecretsPortalService(credential_intake=credential_intake, credential_status_bridge=StatusOnlyOperationsBridge(credential_repository), operations_store=operations_store, session_repository=session_repo, ttl_seconds='PRIVATE_LITERAL_WITHHELD', max_attempts_per_form='PRIVATE_LITERAL_WITHHELD')\n\ndef build_telegram_canary():\n    return TelegramCustomerServiceCanary()\n\ndef serve(args):\n    server = ThreadingHTTPServer((args.host, args.port), PortalHandler)\n    server.portal_service = build_service(args.state_root)\n    server.telegram_canary = build_telegram_canary()\n    server.serve_forever()\n\ndef create_session(args):\n    service = build_service(args.state_root)\n    form = args.form\n    session = service.create_session(args.customer_id, args.account_id, args.origin, allowed_forms=(form,))\n    url = args.origin.rstrip('PRIVATE_LITERAL_WITHHELD') + 'PRIVATE_LITERAL_WITHHELD' + session['PRIVATE_LITERAL_WITHHELD']\n    print(json.dumps({'PRIVATE_LITERAL_WITHHELD': 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD': url, 'PRIVATE_LITERAL_WITHHELD': session['PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': session['PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': session['PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': {'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'], 'PRIVATE_LITERAL_WITHHELD': ['PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD']}[form]}, ensure_ascii=True, sort_keys=True, indent=2))\n\ndef main():\n    parser = argparse.ArgumentParser()\n    parser.add_argument('PRIVATE_LITERAL_WITHHELD', default=str(DEFAULT_STATE_ROOT))\n    sub = parser.add_subparsers(dest='PRIVATE_LITERAL_WITHHELD', required=True)\n    serve_parser = sub.add_parser('serve')\n    serve_parser.add_argument('--host', default=DEFAULT_HOST)\n    serve_parser.add_argument('--port', type=int, default=DEFAULT_PORT)\n    serve_parser.set_defaults(func=serve)\n    create_parser = sub.add_parser('PRIVATE_LITERAL_WITHHELD')\n    create_parser.add_argument('PRIVATE_LITERAL_WITHHELD', required=True)\n    create_parser.add_argument('PRIVATE_LITERAL_WITHHELD', default='PRIVATE_LITERAL_WITHHELD')\n    create_parser.add_argument('PRIVATE_LITERAL_WITHHELD', default='PRIVATE_LITERAL_WITHHELD')\n    create_parser.add_argument('PRIVATE_LITERAL_WITHHELD', choices=('PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'), default='PRIVATE_LITERAL_WITHHELD')\n    create_parser.set_defaults(func=create_session)\n    arm_parser = sub.add_parser('PRIVATE_LITERAL_WITHHELD')\n    arm_parser.add_argument('PRIVATE_LITERAL_WITHHELD', required=True)\n    arm_parser.set_defaults(func=arm_telegram_canary)\n    rollout_parser = sub.add_parser('PRIVATE_LITERAL_WITHHELD')\n    rollout_parser.add_argument('PRIVATE_LITERAL_WITHHELD', required=True)\n    rollout_parser.add_argument('PRIVATE_LITERAL_WITHHELD')\n    rollout_parser.set_defaults(func=arm_telegram_controlled_rollout)\n    allow_chat_parser = sub.add_parser('PRIVATE_LITERAL_WITHHELD')\n    allow_chat_parser.add_argument('PRIVATE_LITERAL_WITHHELD', required=True)\n    allow_chat_parser.set_defaults(func=allow_telegram_controlled_chat)\n    args = parser.parse_args()\n    args.func(args)",
+            "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1"
+          },
+          {
+            "functions": [
+              {
+                "line": 49,
+                "name": "utc_now"
+              },
+              {
+                "line": 169,
+                "name": "_hash"
+              },
+              {
+                "line": 248,
+                "name": "serve"
+              }
+            ],
+            "path": "ai_service/wecom_customer_contact_service.py",
+            "redacted_syntax": "import hashlib\nimport json\nimport os\nimport re\nimport threading\nimport urllib.parse\nfrom datetime import datetime, timezone\nfrom http import HTTPStatus\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\nfrom pathlib import Path\nfrom ai_service.secure_secrets_portal import OperationsSecretRefStore\nfrom ai_service.wecom_customer_service import WeComCallbackCrypto, _parse_xml\nWECOM_CONTACT_CORP_ID_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_CONTACT_SECRET_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_CONTACT_CALLBACK_TOKEN_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_CONTACT_ENCODING_AES_KEY_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_CONTACT_MEMBER_USERID_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_CONTACT_REFS = (WECOM_CONTACT_CORP_ID_REF, WECOM_CONTACT_SECRET_REF, WECOM_CONTACT_CALLBACK_TOKEN_REF, WECOM_CONTACT_ENCODING_AES_KEY_REF, WECOM_CONTACT_MEMBER_USERID_REF)\nDEFAULT_SECRET_ROOT = Path('/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store')\nDEFAULT_RUNTIME_ROOT = Path('/opt/trading-system/runtime/v8-domestic-operations/wecom-customer-contact')\nDEFAULT_CALLBACK_PATH = 'PRIVATE_LITERAL_WITHHELD'\nSAFE_STATE = re.compile('PRIVATE_LITERAL_WITHHELD')\n\ndef serve(host='PRIVATE_LITERAL_WITHHELD', port='PRIVATE_LITERAL_WITHHELD'):\n    if host not in {'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'}:\n        raise RuntimeError('PRIVATE_LITERAL_WITHHELD')\n    Server((host, port), WeComCustomerContactIngress()).serve_forever()",
+            "sha256": "c95ca9ec711d05d64489ed927cae770157954b46661411b5f762f193ba711571"
+          },
+          {
+            "functions": [
+              {
+                "line": 73,
+                "name": "_atomic_json"
+              },
+              {
+                "line": 88,
+                "name": "_parse_xml"
+              },
+              {
+                "line": 95,
+                "name": "_referral_code"
+              },
+              {
+                "line": 498,
+                "name": "serve"
+              }
+            ],
+            "path": "ai_service/wecom_customer_service.py",
+            "redacted_syntax": "from __future__ import annotations\nimport base64\nimport hashlib\nimport json\nimport os\nimport queue\nimport re\nimport secrets\nimport struct\nimport tempfile\nimport threading\nimport time\nimport urllib.parse\nimport urllib.request\nimport uuid\nimport xml.etree.ElementTree as ET\nfrom datetime import datetime, timezone\nfrom http import HTTPStatus\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\nfrom pathlib import Path\nfrom cryptography.hazmat.primitives import padding\nfrom cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes\nfrom .internal_provider_neutral_bridge import BridgeSecretProvider, ProviderNeutralBridgeClient, make_bridge_envelope, make_message_payload\nfrom .secure_secrets_portal import OperationsSecretRefStore\nWECOM_KF_CORP_ID_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_KF_SECRET_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_KF_OPEN_KFID_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_KF_CALLBACK_TOKEN_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_KF_ENCODING_AES_KEY_REF = 'PRIVATE_LITERAL_WITHHELD'\nWECOM_KF_REFS = (WECOM_KF_CORP_ID_REF, WECOM_KF_SECRET_REF, WECOM_KF_OPEN_KFID_REF, WECOM_KF_CALLBACK_TOKEN_REF, WECOM_KF_ENCODING_AES_KEY_REF)\nWECOM_KF_CALLBACK_REFS = (WECOM_KF_CORP_ID_REF, WECOM_KF_CALLBACK_TOKEN_REF, WECOM_KF_ENCODING_AES_KEY_REF)\nDEFAULT_SECRET_ROOT = Path('/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store')\nDEFAULT_RUNTIME_ROOT = Path('/opt/trading-system/runtime/v8-domestic-operations/wecom-customer-service')\nDEFAULT_CALLBACK_PATH = 'PRIVATE_LITERAL_WITHHELD'\nDEFAULT_BRIDGE_ROOT = Path('PRIVATE_LITERAL_WITHHELD')\nSAFE_REFERRAL_PATTERN = re.compile('PRIVATE_LITERAL_WITHHELD')\n\ndef serve(host='PRIVATE_LITERAL_WITHHELD', port='PRIVATE_LITERAL_WITHHELD'):\n    if host not in {'PRIVATE_LITERAL_WITHHELD', 'PRIVATE_LITERAL_WITHHELD'}:\n        raise RuntimeError('PRIVATE_LITERAL_WITHHELD')\n    ingress = WeComCustomerServiceIngress()\n\n    def worker():\n        while True:\n            try:\n                ingress.worker_once()\n            except queue.Empty:\n                continue\n            except Exception as exc:\n                ingress._audit('PRIVATE_LITERAL_WITHHELD', exc.__class__.__name__, {})\n                time.sleep(1)\n    threading.Thread(target=worker, daemon=True).start()\n    Server((host, port), ingress).serve_forever()",
+            "sha256": "aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402"
+          },
+          {
+            "functions": [
+              {
+                "line": 20,
+                "name": "create_db_engine"
+              },
+              {
+                "line": 41,
+                "name": "create_session_factory"
+              },
+              {
+                "line": 56,
+                "name": "session_scope"
+              }
+            ],
+            "path": "database/connection.py",
+            "redacted_syntax": "import os\nfrom contextlib import contextmanager\nfrom pathlib import Path\nfrom sqlalchemy import create_engine\nfrom sqlalchemy.orm import sessionmaker\nPROJECT_ROOT = Path(__file__).resolve().parents[1]\nDEFAULT_DATABASE_URL = 'PRIVATE_LITERAL_WITHHELD' + str(PROJECT_ROOT / 'PRIVATE_LITERAL_WITHHELD' / 'PRIVATE_LITERAL_WITHHELD' / 'PRIVATE_LITERAL_WITHHELD')\nDATABASE_URL = os.getenv('TRADING_DATABASE_URL', DEFAULT_DATABASE_URL)\n\ndef create_db_engine(database_url):\n    engine = create_engine(database_url, pool_pre_ping=True)\n    return engine\nengine = create_db_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)\n\ndef create_session_factory(database_url=None):\n    db_engine = create_db_engine(database_url or DATABASE_URL)\n    return sessionmaker(bind=db_engine, autoflush=False, autocommit=False)",
+            "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+          }
+        ]
+      },
+      "run_command_attempted": true,
+      "service_actions": 0,
+      "status": "CONFIG_FLOW_OBSERVED_NOT_EFFECTIVE_ATTESTATION",
+      "sts": "PASS_CURRENT"
+    }
+  ],
+  "migration_started": false,
+  "production_actions": 0,
+  "production_cutover": false,
+  "status": "CONFIG_FLOW_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION",
+  "analysis": {
+    "confirmed": "Module-level database imports/engine and SessionLocal binding precede portal build_service/load_local_credential_env call.",
+    "not_confirmed": [
+      "Exact environment key in credential-store.env was redacted and is not inferred.",
+      "Current effective in-memory configuration, complete data/writer/activator membership and original drain mechanism remain unproven."
+    ],
+    "production_gate": "HOLD"
+  }
+}
