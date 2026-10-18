@@ -416,3 +416,18 @@ Hosted [39139479365](https://github.com/huhongchuan0422-creator/Repository-name-
 原受限40文件拒绝原文/正常发布解除仍缺，M99 NOT_RUN；不重试或换账户/API/环境规避。新源码仅集中送原独审，正式迁移许可未签发，未自签PASS。当前inspection及recover-readonly现场job均SKIPPED，本增量云/主机命令0、服务动作0、生产Writer0、生产迁移/切换0，无后台迁移作业。东京、国内桥接和Windows保留，6个生产大节点未关闭。
 
 完整回执：evidence/pr99-service-handoff/runtime-controller/DELIVERY_20261018.json。
+
+
+## 2026-10-18 23:30 CST｜原账本—排空/Fence—WAL/普通文件捕获接线增量
+
+CODE_COMMIT=d50e272b1dbfbd0a460efb76f372e0ac69073593；CODE_TREE=1020429488d2ca4b82eff0f148c5ac21634e3d32。9个受影响路径，新增capture_session.py与11项普通联动测试，另增加固定东京root拒绝测试，总57项；原45项受影响测试同批回归，未重复原未变41项WAL算法整套。
+
+CaptureSession.perform只接fence_source/final_snapshot：先原INTENT落盘，再接真实排空依赖、SourceFence、原持有fd证明与原guard上的已发布WAL恢复/普通文件捕获；现有INTENT只核对已有输出，未知不重发、不重跑SQLite、不重设Fence。捕获合同绑定输入与完整COPY_FENCED文件集合；从原账本成功Fence RESULT读取实际hash，避免预先绑定未来尚不存在的Fence摘要。Fence证明新增事务/plan/operation绑定，Linux后端强制固定东京root。源主库/WAL原始捕获保留，不checkpoint生产库；缺guard或准入不走pathname fallback。
+
+真实Hosted [39140766515](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39140766515)，Python3.11/job117714545568、3.12/job117714545348各57/57 PASS、0跳过，原始日志已读。合成非空WAL中17行提交恢复到候选结果，普通状态文件同时捕获；部分输出、代码/合同/准入变化及未记RESULT时的只查恢复均覆盖。该合成测试使用真实已发布SQLite内存VFS；路径/授权/排空/内核状态仍为普通fixture，不是原PathGuard、M99或现场接受。
+
+内层源码ZIP90673字节/12成员/SHA256 9cf2fed279747a6c84af8a22bd513a4d5d26d33f99e99b446160d8b9025bf9eb；两Python日志和本地准确版本重建一致。Artifacts12140784219、12141776616，外层Actions摘要单列。原5源码依赖及4份原WAL/测试依赖固定SHA；未改WAL算法、未重发原40文件。
+
+本轮可独立完成的两阶段源码接线已形成送审检查点；**完整实际有效配置/全部Writer清单仍未获证，原fd/guard/真实排空及内核Fence/捕获链的实机验收仍未执行**。不能将源码联动完成视为两项实机门禁已关闭。获准环境、原受限候选正常发布/M99及独审许可仍缺，未绕过限制。后续传输/核对/正式Writer assignment/安装/切换/业务与恢复验收不由本两阶段接口宣称完成。
+
+增量送原独审，未变结论继承，作者不自签PASS或正式许可。当前inspection/recover-readonly现场job均SKIPPED；本增量新主机命令0、生产Writer0、服务动作0、迁移/切换0，无后台迁移任务。东京及国内桥接/Windows保留，6个生产大节点仍未关闭。完整回执见evidence/pr99-service-handoff/aliyun-execution/CAPTURE_SESSION_DELIVERY_20261018.json。

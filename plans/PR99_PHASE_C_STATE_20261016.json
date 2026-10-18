@@ -4107,5 +4107,65 @@
     },
     "evidence_path": "evidence/pr99-service-handoff/runtime-controller/DELIVERY_20261018.json",
     "checkpoint_at_utc": "2026-10-18T15:14:47Z"
+  },
+  "capture_session_integration_20261018": {
+    "status": "OPT_IN_SOURCE_CHAIN_57_TESTS_PASS_LIVE_GATES_NOT_CLOSED",
+    "code_commit": "d50e272b1dbfbd0a460efb76f372e0ac69073593",
+    "code_tree": "1020429488d2ca4b82eff0f148c5ac21634e3d32",
+    "ci": {
+      "run": 39140766515,
+      "jobs": [
+        {
+          "python": "3.11",
+          "job": 117714545568,
+          "tests": 57,
+          "status": "PASS",
+          "artifact": 12140784219
+        },
+        {
+          "python": "3.12",
+          "job": 117714545348,
+          "tests": 57,
+          "status": "PASS",
+          "artifact": 12141776616
+        }
+      ],
+      "logs_read": true,
+      "completed_at_utc": "2026-10-18T15:30:37Z",
+      "new_tests": 12,
+      "affected_prior_tests": 45
+    },
+    "artifact": {
+      "bytes": 90673,
+      "members": 12,
+      "sha256": "9cf2fed279747a6c84af8a22bd513a4d5d26d33f99e99b446160d8b9025bf9eb",
+      "artifact_ids": [
+        12140784219,
+        12141776616
+      ]
+    },
+    "remaining_live_conditions": [
+      "Complete actual effective application configuration, authoritative data and every manual/idle/scheduled/shared writer/activator coverage remain unproven",
+      "Original independently admitted guard/controller/fds and genuine queue drain must be supplied; source code callbacks/fixture booleans do not establish trust",
+      "Normal release of original restricted candidate and approved M99 dynamic method remain missing; raw refusal still NOT_FOUND, no retry/workaround",
+      "Actual kernel fence and full capture-chain host/restart acceptance not run",
+      "Receive/reconcile/canonical writer assignment/install/cutover and final business/restore acceptance are not implemented or proven by this two-stage session; original formal gates remain"
+    ],
+    "review": {
+      "incremental_source_review": "REQUESTED_NOT_SELF_SIGNED",
+      "formal_migration_permit": "NOT_ISSUED",
+      "owner_additional_ram_or_password_required": false
+    },
+    "production": {
+      "host_commands": 0,
+      "service_actions": 0,
+      "writer_acquired": false,
+      "migration_started": false,
+      "cutover": false,
+      "background_task": false,
+      "remaining_major_nodes": 6,
+      "tokyo_domestic_bridge_windows_preserved": true
+    },
+    "evidence_path": "evidence/pr99-service-handoff/aliyun-execution/CAPTURE_SESSION_DELIVERY_20261018.json"
   }
 }
