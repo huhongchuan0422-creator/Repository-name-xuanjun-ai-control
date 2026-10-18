@@ -3,6 +3,7 @@ No implicit authority, phase SKIP, legacy successor reuse, or UK commands.
 """
 import hashlib
 import json
+import re
 
 class Hold(RuntimeError):
     pass
@@ -57,25 +58,32 @@ class NativeAttemptCoordinator(object):
         completed = r['completed']
         check(type(completed) is list and completed ==
               list(self.phases[:len(completed)]), 'NATIVE_PHASE_ORDER')
-        check(r['status'] in ('NOT_DISPATCHED','RUNNING','RECONCILED','SUCCEEDED'),
+        check(type(r['status']) is str and r['status'] in ('NOT_DISPATCHED','RUNNING','RECONCILED','SUCCEEDED'),
               'UNKNOWN')
         return r
 
     def claim(self, command_sha):
         b = self._provider()
         check(b.acquire_fence(self.ledger.grant) is True, 'FENCE_UNKNOWN')
+        # Ledger claim remains durable even if a later call is interrupted.
         attempt = self.ledger.claim()
         # Interruption after claim consumes capacity; never resets quota.
         self.ledger.intent(attempt, command_sha)
         return attempt
 
     def advance(self, attempt):
+        # No execution until a trusted native host backend has been installed;
+        # returned booleans are not sufficient as signatures or CAS evidence.
         self._fence(attempt, 'START')
         snapshot = self.ledger.snapshot()
         check(snapshot['attempts'] and snapshot['attempts'][-1]['id'] == attempt
               and snapshot['attempts'][-1]['state'] == 'INTENT_RECORDED',
               'INTENT_REQUIRED')
         completed = self._receipt(attempt)['completed']
+        # Native recovery must be proven by a trusted host-side state machine.
+        # The current provider contract does not expose an authenticated
+        # generation/CAS proof. Therefore never execute host side effects yet.
+        check(False, 'HOST_NATIVE_TRANSITION_NOT_CONNECTED')
         pins = {p['name']:p['sha256'] for p in snapshot['completed']}
         # Previously completed effects are verified by native readback.
         # They are never executed with a special SKIP command.
@@ -92,7 +100,26 @@ class NativeAttemptCoordinator(object):
             check(type(outcome) is dict and set(outcome) ==
                   {'status','checkpoint_sha256'} and outcome['status'] == 'COMMITTED'
                   and type(outcome['checkpoint_sha256']) is str
-                  and len(outcome['checkpoint_sha256']) == 64,
+                  and re.match(r'^[0-9a-f]{64}
+                  'TRANSITION_UNKNOWN')
+            self._fence(attempt, 'AFTER_'+phase)
+            check(self._receipt(attempt)['completed'] == completed+[phase],
+                  'COMMIT_READBACK_UNKNOWN')
+            check(self.backend.reconcile_phase(self.ledger.grant, attempt,
+                  phase, outcome['checkpoint_sha256'], 'COMMIT') is True,
+                  'EFFECT_UNVERIFIED')
+            self.ledger.checkpoint(attempt, phase, outcome['checkpoint_sha256'])
+            completed = completed+[phase]
+        return tuple(completed)
+
+    def finish(self, attempt, proof):
+        self._fence(attempt, 'FINISH')
+        r = self._receipt(attempt)
+        check(r['status'] == 'SUCCEEDED' and r['completed'] == list(self.phases),
+              'TERMINAL_UNKNOWN')
+        return self.ledger.reconcile(attempt, proof, lambda value:
+            self.backend.reconcile_terminal(self.ledger.grant, attempt, value) is True)
+, outcome['checkpoint_sha256']) is not None,
                   'TRANSITION_UNKNOWN')
             self._fence(attempt, 'AFTER_'+phase)
             check(self._receipt(attempt)['completed'] == completed+[phase],
