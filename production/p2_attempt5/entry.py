@@ -103,6 +103,22 @@ def main():
                 inherited['source_tree'] == manifest['reviewed_core_tree'],
                 'INHERITED_CORE_SOURCE')
         adapter = pinned_module(cfg['adapter_path'], cfg['adapter_sha256'])
+        if callable(getattr(adapter, 'bind_deployment', None)):
+            release_root = os.path.dirname(args.assembly_manifest)
+            adapter_relative = os.path.relpath(cfg['adapter_path'], release_root)
+            binding_relative = adapter_relative + '.binding.json'
+            require(not adapter_relative.startswith('../') and
+                    manifest['files'].get(adapter_relative) == cfg['adapter_sha256'] and
+                    binding_relative in manifest['files'],
+                    'NATIVE_ADAPTER_BINDING_CLOSURE')
+            binding_fd = protected_file(release_root + '/' + binding_relative, private=True)
+            try:
+                binding_raw = os.read(binding_fd, 262145)
+            finally:
+                os.close(binding_fd)
+            require(len(binding_raw) <= 262144, 'NATIVE_BINDING_BOUND')
+            adapter.bind_deployment(cfg, binding_raw, manifest['files'][binding_relative],
+                                    args.kit_root, _assembly)
         if args.operation == 'run':
             cycle = native_cycle(lambda: adapter.build_driver(cfg),
                                  cfg['ledger_directory'], cfg['grant'],

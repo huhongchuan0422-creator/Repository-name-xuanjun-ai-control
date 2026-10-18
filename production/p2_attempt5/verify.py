@@ -31,11 +31,14 @@ def main():
              'production/p2_attempt5/registry.py', 'production/p2_attempt5/registry_cli.py',
              'tests/p2_production_assembly/test_registry.py',
              'tests/p2_production_assembly/test_assembly.py',
+             'production/p2_attempt5/native_adapter.py',
+             'tests/p2_production_assembly/test_native_adapter.py',
              '.github/workflows/p2-production-assembly.yml']
     for name in added:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     groups = []
-    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_registry.py', 50)]
+    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_native_adapter.py', 21),
+             (str(ROOT / 'tests/p2_production_assembly'), 'test_registry.py', 50)]
     for index, (directory, pattern, count) in enumerate(cases):
         script = ('import sys,unittest;sys.path.insert(0,%r);'
                   'suite=unittest.defaultTestLoader.discover(%r,pattern=%r);'
@@ -64,7 +67,9 @@ def main():
                 'registry_deployment': 'NOT_EXECUTED',
                 'inherited_assembly_ci_run': 39122271093,
                 'inherited_assembly_tests_per_python': 83,
-                'registry_review_fix': 'PR58_6250074905_R1_R2',
+                'registry_review_fix': 'CLOSED_PR58_6250317194',
+                'adapter_scope': 'PUBLIC_KEY_NATIVE_FACTORY_LIVE_SIGNED_OBSERVER_CLIENT',
+                'native_run_positive': 'NOT_VERIFIED_NO_PERMIT_OR_PRIVATE_INPUTS',
                 'host_effects': 'SYNTHETIC_TEST_ONLY', 'installation': 'NOT_EXECUTED',
                 'permit': 'NOT_ISSUED', 'release': 'HOLD'}
     raw = (json.dumps(manifest, sort_keys=True, indent=2) + '\n').encode()
