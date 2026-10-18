@@ -351,9 +351,13 @@ def analyze_source(raw, filename, Defaults, shape):
                 # branch's assignment into the enclosing execution flow.
                 for child in ast.iter_child_nodes(statement):
                     if isinstance(child, ast.stmt):
-                        unknown = {key: None for key in scope}
+                        unknown = {key: object() for key in scope}
                         walk([child], unknown, owner)
-                engine.assign(statement, scope)
+                # Do not retain an earlier known value after unsupported control
+                # flow could have changed it. Unknown is never Python None.
+                for child in ast.walk(statement):
+                    if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
+                        scope[child.id] = object()
                 continue
             engine.assign(statement, scope)
             if isinstance(statement, (ast.Assign, ast.AnnAssign)):

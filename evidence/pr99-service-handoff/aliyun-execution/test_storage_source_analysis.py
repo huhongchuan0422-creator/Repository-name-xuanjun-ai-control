@@ -64,6 +64,18 @@ class StorageAnalysisTests(unittest.TestCase):
         for value in ('/opt/trading-system/runtime/../secret', '/opt/trading-system/runtime/./a', '/etc/shadow', '/opt/trading-system/runtime/token?secret=x'):
             self.assertIsNone(subject.runtime_path(value))
 
+    def test_conditional_unknown_is_not_absent(self):
+        result = self.analyze('def factory(path):\n if condition:\n  return CredentialStore(path=path or "/opt/trading-system/runtime/fallback.json")')
+        self.assertIsNone(result['constructors'][0]['keywords'][0]['value']['source_runtime_path'])
+
+    def test_loop_does_not_retain_stale_path(self):
+        result = self.analyze('path="/opt/trading-system/runtime/old.json"\nfor path in unknown:\n pass\nx=CredentialStore(path=path)')
+        self.assertIsNone(result['constructors'][0]['keywords'][0]['value']['source_runtime_path'])
+
+    def test_unknown_kwargs_expansion_is_explicit(self):
+        result = self.analyze('x=CredentialStore(**configuration)')
+        self.assertEqual(result['constructors'][0]['keywords'][0]['name'], 'EXPANSION_UNRESOLVED')
+
 
 if __name__ == '__main__':
     host = runpy.run_path(str(Path(__file__).with_name('app_storage_map_host.py')), run_name='test_definitions')
