@@ -442,3 +442,54 @@ MiniApplication/六库制品，不能作为P2-21/23已完成的证据。须复�
 可信同business_code查询补足域证据，不能仅凭当前本地配置重提。冲突保持UNKNOWN，
 不自动补发。未曾观察过且POST ACK不回显business_code的响应，单靠签名时间不能
 证明请求归属，仍需官方受保护请求/响应通道；没有宣称签名协议提供它未包含的字段。
+
+### 第三批准确回执及最终责任核对补充
+
+第三批 `9e92c6d090dab69b91324b348277f00bc1d5ae64`，tree
+`68d660171b7b62b8e582552b2e9d19fd8d24cb25`；Run
+https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39154788419
+于2026-10-19 02:39:53北京时间完成SUCCESS：824 community、342 Stage5、275 Mini/Key、
+40/8/7其余Node，共1496项执行通过。源码ZIP SHA256
+`5b8bd154e5660cd62283aac53b25b2c6e8e28ec67c22250f6a6d5a23c1ff1ccf`与本地一致。
+三批55个不同路径，现场mini四项SKIPPED。这不是全量代码或生产交付关闭。
+
+责任核对纠正前文过宽的外部依赖描述：缺少实机不妨碍已知历史schema转换、账本候选
+盘点及离线发布适配。原英国部署位置已有明确Owner决定，见
+`plans/STAGE5_WECHAT_MERCHANT_STACK_REUSE_AND_SERVER_GATE_20261014.md`最终决定段；
+国内3.11.6隔离验证不能改变该宿主约定。以下继续作为第四批增量实施，不继承第三批CI。
+
+1. 账单：同一Center SQLite事务盘点原ACTION/RETURN（含inactive）、冻结加密清单及
+   audit锚点；明确统计缺证、损坏绑定、非终态及成功候选。反向候选不能冒充该账单日
+   缺行，完整SPLIT日请求仍明确拒绝。原store授权外或未知账单行仅返回安全常量，
+   不泄露其他store交易号、订单、金额；读账单和写审计前后重验授权身份/解密权限。
+2. 六库：`community_stage_migration.py`支持原Git历史精确DDL指纹，离线旧备份SHA及
+   文件集验证、受限内存升级、原非空行/rowid/sequence逐类型守恒，合法旧冻结报价和
+   历史审批继续继承。未知schema、缺失原治理/订单报价证据、bool/float金额类型混淆
+   拒绝，不填猜测值。仅生成全新私有目标，源备份不写；故障/中断无完成标记。
+   原Center备份恢复仍由原Center管理方负责，不另建IAM。
+3. 发布：`community_release_candidate.py`复用原英国隔离容器与MiniApplication约定，
+   校验确定性ZIP、六个Center pin及SBOM；离线真实写入source+六库generation，校验原
+   Center配套备份，组合真实应用并检查HTTP维护态，再原子选择同一源码/数据代次。
+   原代次配套回退、崩溃意图诊断和显式对账恢复有实际离线实现；持久化错误HOLD，
+   不自动重放，不把恢复后的提交观察说成原调用收到成功回执。候选容器保持停止、
+   network_mode:none，不构成生产启用脚本或已安装证明。
+
+剩余最小合同与责任：
+- 提供商CSV合同仍缺账单日归属/跨日终态、分账时间对应事件、summary各类计数/符号/
+  金额公式、return/manual/expired-unfreeze列映射。官方样例及现有API未给出完整定义；
+  由支付合同负责人取得提供商权威定义，不能以真实账单样本代替完整合同。
+- 原账单是sub_mchid整商户范围，现Finance授权是store范围。整商户聚合的授权和覆盖
+  范围须沿原权限设计明确；这是项目设计/授权范围问题，不是等待微信新增接口。
+- 已识别Git历史六库不再笼统外阻。仅未知现场DDL或原历史缺失治理/报价证据需要对应
+  现有系统负责人提供精确原记录，迁移不发明价目、审批或历史数据。
+- 原Center必须可按现有构造同进程注入英国MiniApplication；若实际跨机，须原Center
+  提供IdentityPort/服务鉴权合同，不能复制IAM或猜共享DB。image digest、运行身份、
+  域名、资源配额及SecretRef是生产绑定值，不阻止本轮离线代码完成；现场切换、
+  原Center恢复与真实业务验收仍未执行。
+
+现有 `deploy/TASK_SUPERVISOR_RUNTIME.md`、`scripts/task_supervisor_runtime_entry.py`、
+`canonical/PROJECT_STATE.md`的英国机械入口仅SCAN_COMPLETED_PROVIDER_NOT_ADMITTED，
+不dispatch、不载入任意命令/插件；其release verifier固定task_supervisor三文件。
+社区live激活仍须原controller提供社区release目标scope、lease/fence/epoch与ACK绑定
+接口，才能复用原执行权，不得另起docker writer冒充既有通道。本轮离线发布不声称
+已经补齐这个跨系统接口。

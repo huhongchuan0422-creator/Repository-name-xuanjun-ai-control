@@ -243,8 +243,14 @@ class ProviderBills:
         return key,json.loads(self.center.decrypt(row[0],'community-bill:'+key))
     def dispatch(self,session,csrf,workspace,operation,p):
         fields={'bill_fetch':{'kind','bill_date'},'bill_rows':{'kind','bill_date','offset'},'bill_reconcile':{'kind','bill_date'},'bill_audit':{'kind','bill_date','after_id'}}
-        if operation not in fields or type(p) is not dict or set(p)!=fields[operation] or p['kind'] not in ('TRADE','SPLIT'):raise ValueError('INVALID_PROVIDER_BILL_FIELDS')
+        if operation not in fields or type(p) is not dict:raise ValueError('INVALID_PROVIDER_BILL_FIELDS')
+        allowed=fields[operation]
+        if (set(p)!=allowed and not (operation=='bill_reconcile' and set(p)==allowed|{'require_complete'})
+                or p.get('kind') not in ('TRADE','SPLIT')
+                or 'require_complete' in p and (p['kind']!='SPLIT' or type(p['require_complete']) is not bool)):
+            raise ValueError('INVALID_PROVIDER_BILL_FIELDS')
         a,c=self.actions,self.center;g,policy=a._authorize(session,csrf,workspace)
+        g=dict(g,scope=dict(g['scope']))
         if type(p['bill_date']) is not str or not re.fullmatch('[0-9]{4}-[0-9]{2}-[0-9]{2}',p['bill_date']):raise ValueError('INVALID_BILL_DATE')
         date=dt.date.fromisoformat(p['bill_date']);today=dt.datetime.fromtimestamp(c.now(),dt.timezone(dt.timedelta(hours=8))).date()
         if not 0<(today-date).days<=90:raise ValueError('BILL_DATE_OUTSIDE_SUPPORTED_HISTORY')
@@ -274,21 +280,31 @@ class ProviderBills:
             return dict(kind=p['kind'],bill_date=p['bill_date'],row_count=len(rows),body_sha256=record['body_sha256'],integrity='SIGNED_TICKET_HASH_VERIFIED',reconciliation='NOT_RUN',finance_status='UNCONFIRMED')
         key,bill=self._read(g,p['kind'],p['bill_date'])
         if bill['scope']!=g['scope'] or bill['sub_mchid']!=policy['sub_mchid']:raise PermissionError('BILL_MERCHANT_BINDING_CHANGED')
+        # An explicit full-day request is rejected even for an empty or exactly
+        # matching bill. Local enumeration cannot supply missing provider rules.
+        if p.get('require_complete'):raise ValueError('COMPLETE_SPLIT_BILL_RECONCILIATION_UNAVAILABLE')
         if operation=='bill_audit':
             after=p['after_id']
             if type(after) is not str or (after and not re.fullmatch('[0-9a-f]{64}',after)):
                 raise ValueError('INVALID_BILL_AUDIT_CURSOR')
-            rows=c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_BILL_RECONCILIATION' AND project=? AND active=1 AND subject_idx>? ORDER BY subject_idx LIMIT 51",(g['project'],after)).fetchall()
-            records=[]
-            for ref,payload in rows[:50]:
-                saved=json.loads(c.decrypt(payload,'community-bill-reconciliation:'+ref))
-                if type(saved) is dict and 'bill_key' in saved and 'result' in saved:
-                    digest=hashlib.sha256(canonical([saved['bill_key'],saved['result']])).hexdigest()
-                    if digest!=ref:raise ValueError('BILL_AUDIT_INTEGRITY_CHANGED')
-                if (type(saved) is dict and saved.get('bill_key')==key
-                        and saved.get('kind')==p['kind'] and saved.get('bill_date')==p['bill_date']
-                        and saved.get('scope')==g['scope']):
-                    records.append(dict(id=ref,result=saved['result']))
+            with c.tx():
+                current,current_policy=a._authorize(session,csrf,workspace)
+                if (any(current[k]!=g[k] for k in ('scope','project','user_id'))
+                        or current_policy!=policy):raise PermissionError('BILL_AUTHORIZATION_CHANGED')
+                rows=c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_BILL_RECONCILIATION' AND project=? AND active=1 AND subject_idx>? ORDER BY subject_idx LIMIT 51",(g['project'],after)).fetchall()
+                records=[]
+                for ref,payload in rows[:50]:
+                    saved=json.loads(c.decrypt(payload,'community-bill-reconciliation:'+ref))
+                    if type(saved) is dict and 'bill_key' in saved and 'result' in saved:
+                        digest=hashlib.sha256(canonical([saved['bill_key'],saved['result']])).hexdigest()
+                        if digest!=ref:raise ValueError('BILL_AUDIT_INTEGRITY_CHANGED')
+                    if (type(saved) is dict and saved.get('bill_key')==key
+                            and saved.get('kind')==p['kind'] and saved.get('bill_date')==p['bill_date']
+                            and saved.get('scope')==g['scope']):
+                        records.append(dict(id=ref,result=saved['result']))
+                current,current_policy=a._authorize(session,csrf,workspace)
+                if (any(current[k]!=g[k] for k in ('scope','project','user_id'))
+                        or current_policy!=policy):raise PermissionError('BILL_AUTHORIZATION_CHANGED')
             return dict(records=records,has_more=len(rows)>50,
                         next_cursor=rows[49][0] if len(rows)>50 else None,
                         coverage='EXACT_SCOPE_BILL_AUDIT_ONLY',finance_status='UNCONFIRMED')
@@ -298,24 +314,164 @@ class ProviderBills:
             # Raw consumer identifiers stay encrypted; page returns only fields
             # needed by finance reconciliation, never openid/bank/card columns.
             allowed={'交易时间','商户订单号','微信订单号','商户退款单号','微信退款单号','交易状态','退款状态','订单金额','总金额','退款金额','商户分账单号','分账金额','分账结果','特约商户号','币种','货币种类'}
-            return dict(records=[{k:v for k,v in row.items() if k in allowed} for row in bill['rows'][offset:offset+50]],has_more=offset+50<len(bill['rows']),next_offset=offset+50 if offset+50<len(bill['rows']) else None)
-        result=self.reconcile(g,bill)
+            # Provider tickets are submerchant-wide, whereas grants are scoped
+            # to a store. A field allowlist alone cannot establish row ownership.
+            with c.tx():
+                current,current_policy=a._authorize(session,csrf,workspace)
+                if (any(current[k]!=g[k] for k in ('scope','project','user_id'))
+                        or current_policy!=policy):raise PermissionError('BILL_AUTHORIZATION_CHANGED')
+                records=[];unattributed=0
+                t,m,s=(g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
+                owned={provider_order_reference(a.reader._mchid,g['scope'],ref):tx
+                    for ref,tx in a.runtime.demo.db.execute('SELECT reference,provider_transaction_id FROM orders WHERE tenant_id=? AND merchant_id=? AND store_id=?',(t,m,s))}
+                for row in bill['rows'][offset:offset+50]:
+                    if bill['kind']=='TRADE':
+                        tx=owned.get(row.get('商户订单号'))
+                        proven=bool(tx) and row.get('微信订单号')==tx
+                        refund=row.get('商户退款单号')
+                        if proven and refund and refund not in ('0','无','-'):
+                            action=a._load(hashlib.sha256(canonical([a.reader._mchid,'REFUND',refund])).hexdigest())
+                            proven=(type(action) is dict and action.get('scope')==g['scope'] and action.get('project')==g['project']
+                                and action.get('payload',{}).get('out_trade_no')==row['商户订单号'])
+                    else:
+                        ref=row.get('商户分账/回退单号',row.get('商户分账单号'))
+                        action=a._load(hashlib.sha256(canonical([a.reader._mchid,'SPLIT',ref])).hexdigest()) if ref else None
+                        proven=(type(action) is dict and action.get('kind')=='SPLIT' and action.get('scope')==g['scope']
+                            and action.get('project')==g['project'] and action.get('payload',{}).get('sub_mchid')==bill['sub_mchid']
+                            and row.get('业务类型','分出')=='分出'
+                            and ('微信订单号' not in row or row['微信订单号']==action.get('transaction_id')))
+                    if proven:
+                        records.append({k:v for k,v in row.items() if k in allowed})
+                    else:
+                        unattributed+=1
+                        # Preserve page positions, but expose only already-known
+                        # merchant/currency constants for unproven rows.
+                        records.append({k:v for k,v in row.items()
+                            if k=='特约商户号' and v==policy['sub_mchid'] or k in ('币种','货币种类') and v=='CNY'})
+                current,current_policy=a._authorize(session,csrf,workspace)
+                if (any(current[k]!=g[k] for k in ('scope','project','user_id'))
+                        or current_policy!=policy):raise PermissionError('BILL_AUTHORIZATION_CHANGED')
+            return dict(records=records,has_more=offset+50<len(bill['rows']),next_offset=offset+50 if offset+50<len(bill['rows']) else None,
+                unattributed_rows_redacted=unattributed,coverage='CURRENT_SCOPE_PROVEN_ROWS_ONLY')
         with c.tx():
+            current,current_policy=a._authorize(session,csrf,workspace)
+            if (any(current[k]!=g[k] for k in ('scope','project','user_id'))
+                    or current_policy!=policy):raise PermissionError('BILL_AUTHORIZATION_CHANGED')
+            result=self.reconcile(g,bill)
+            current,current_policy=a._authorize(session,csrf,workspace)
+            if (any(current[k]!=g[k] for k in ('scope','project','user_id'))
+                    or current_policy!=policy):raise PermissionError('BILL_AUTHORIZATION_CHANGED')
             event=hashlib.sha256(canonical([key,result])).hexdigest()
             c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_BILL_RECONCILIATION',?,?,?,?,1)",(event,g['user_id'],g['project'],c.encrypt(canonical(dict(bill_key=key,kind=p['kind'],bill_date=p['bill_date'],scope=g['scope'],result=result)),'community-bill-reconciliation:'+event)))
             c.audit(g['project'],g['user_id'],'PROVIDER_BILL_RECONCILED',event)
         return result
+    def _split_local_inventory(self,g,bill):
+        """Capture all local split/return records, not a provider business day.
+
+        Both channels and the original audit anchor are read in one SQLite
+        transaction. The encrypted immutable manifest makes the digest auditable
+        after live records change. This proves local enumeration at capture only:
+        it cannot cover external initiators, automatic expiry, or bill-date rules.
+        """
+        c=self.center
+        if not c.db.in_transaction:
+            with c.tx():return self._split_local_inventory(g,bill)
+        captured_at=c.now()
+        anchor=c.db.execute('SELECT seq,sha FROM audit WHERE project=? ORDER BY seq DESC LIMIT 1',(g['project'],)).fetchone()
+        watermark=dict(seq=anchor[0],sha256=anchor[1]) if anchor else dict(seq=0,sha256='0'*64)
+        records=[];local={};candidates=[]
+        counts={name:0 for name in ('split_records','return_records','inactive_records','invalid_binding_records',
+            'split_terminal_records','split_nonterminal_records','split_missing_evidence_records',
+            'split_terminal_missing_evidence_records','split_invalid_evidence_records',
+            'return_terminal_records','return_nonterminal_records','return_missing_evidence_records',
+            'return_terminal_missing_evidence_records','return_invalid_evidence_records',
+            'successful_split_details','closed_split_details','successful_return_records','failed_return_records')}
+        source=c.db.execute("SELECT channel,subject_idx,payload,active FROM links WHERE project=? AND channel IN ('COMMUNITY_PROVIDER_ACTION','COMMUNITY_PROVIDER_RETURN') ORDER BY channel,subject_idx",(g['project'],))
+        for channel,key,encrypted,active in source:
+            aad=('provider-action:' if channel=='COMMUNITY_PROVIDER_ACTION' else 'community-provider-return:')+key
+            saved=json.loads(c.decrypt(encrypted,aad))
+            if type(saved) is not dict:raise ValueError('INVALID_LOCAL_BILL_INVENTORY_RECORD')
+            scope=saved.get('scope')
+            if (type(scope) is not dict or set(scope)!={'tenant_id','merchant_id','store_id'}
+                    or any(type(v) is not str or not 1<=len(v)<=128 for v in scope.values())):
+                raise ValueError('UNCLASSIFIABLE_LOCAL_BILL_INVENTORY_SCOPE')
+            if saved.get('scope')!=g['scope']:continue
+            if channel=='COMMUNITY_PROVIDER_ACTION' and saved.get('kind')=='REFUND':continue
+            kind='SPLIT' if channel=='COMMUNITY_PROVIDER_ACTION' else 'RETURN'
+            records.append(dict(channel=channel,key=key,active=active,record=saved))
+            counts['split_records' if kind=='SPLIT' else 'return_records']+=1
+            if active!=1:counts['inactive_records']+=1
+            payload=saved.get('payload',{})
+            ref=saved.get('provider_reference') if kind=='SPLIT' else payload.get('out_return_no') if type(payload) is dict else None
+            expected=hashlib.sha256(canonical([self.actions.reader._mchid,kind,ref])).hexdigest()
+            if (not _evidence_id(ref) or key!=expected or saved.get('project')!=g['project']
+                    or type(payload) is not dict or payload.get('sub_mchid')!=bill['sub_mchid']
+                    or kind=='SPLIT' and (saved.get('kind')!='SPLIT' or 'result' in saved and type(saved['result']) is not dict)):
+                counts['invalid_binding_records']+=1;continue
+            forward=dict(saved)
+            if active==1 and kind=='SPLIT':local.setdefault(ref,[]).append(forward)
+            prefix='split' if kind=='SPLIT' else 'return'
+            result=saved.get('result',{}) if kind=='SPLIT' else saved.get('result')
+            status=result.get('status') if type(result) is dict else result
+            terminal=status=='FINISHED' if kind=='SPLIT' else status in ('SUCCESS','FAILED')
+            counts[prefix+('_terminal_records' if terminal else '_nonterminal_records')]+=1
+            if kind=='RETURN' and status in ('SUCCESS','FAILED'):
+                counts['successful_return_records' if status=='SUCCESS' else 'failed_return_records']+=1
+            evidence=saved.get('bill_evidence')
+            if evidence is None:
+                counts[prefix+'_missing_evidence_records']+=1
+                if terminal:counts[prefix+'_terminal_missing_evidence_records']+=1
+                continue
+            try:
+                if (type(evidence) is not dict or evidence.get('version')!=BILL_EVIDENCE_VERSION
+                        or evidence.get('kind')!=kind or not terminal):raise ValueError()
+                detail=evidence['details']
+                data=dict(detail,**({'state':'FINISHED'} if kind=='SPLIT' else {'result':'SUCCESS'}))
+                if signed_bill_evidence(data,evidence['body_sha256'],kind)!=evidence:raise ValueError()
+                fields=('sub_mchid','out_order_no','transaction_id') if kind=='SPLIT' else ('sub_mchid','out_order_no','out_return_no','return_mchid','amount')
+                if any(detail[k]!=payload.get(k) for k in fields):raise ValueError()
+                if kind=='RETURN':
+                    if (status!='SUCCESS' or type(detail['amount']) is not int or detail['amount']<=0
+                            or type(payload['amount']) is not int or payload['amount']<=0):raise ValueError()
+                    continue  # The CSV return join is not established by this API.
+                if detail['transaction_id']!=saved.get('transaction_id') or detail['out_order_no']!=ref:raise ValueError()
+                receivers=detail['receivers']
+                intended=sorted((r['type'],r['account'],r['amount']) for r in payload['receivers'])
+                observed=sorted((r['type'],r['account'],r['amount']) for r in receivers)
+                if (observed!=intended
+                        or any(type(r['amount']) is not int or r['amount']<=0 or r['type'] not in ('MERCHANT_ID','PERSONAL_OPENID')
+                               or type(r['account']) is not str or not r['account'] for r in receivers+payload['receivers'])
+                        or any(r['result'] not in ('SUCCESS','CLOSED') for r in receivers)):raise ValueError()
+                for receiver in receivers:
+                    counts['successful_split_details' if receiver['result']=='SUCCESS' else 'closed_split_details']+=1
+                    if active==1 and receiver['result']=='SUCCESS':
+                        identity=(ref,detail['order_id'],detail['transaction_id'],receiver['detail_id'])
+                        candidates.append((identity,c.idx('bill-inventory-detail:'+canonical([g['scope'],key,receiver['detail_id']]).decode())))
+            except (ValueError,TypeError,KeyError,AttributeError):
+                counts[prefix+'_invalid_evidence_records']+=1
+                forward['_bill_inventory_evidence_invalid']=True
+        manifest=dict(version='LOCAL_SPLIT_RETURN_SNAPSHOT_V1',scope=g['scope'],project=g['project'],
+                      captured_at=captured_at,audit_watermark=watermark,records=records)
+        digest=hashlib.sha256(canonical(manifest)).hexdigest()
+        c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_BILL_LOCAL_SNAPSHOT',?,?,?,?,1)",
+            (digest,g['user_id'],g['project'],c.encrypt(canonical(manifest),'community-bill-local-snapshot:'+digest)))
+        bill_ids={(r['商户分账/回退单号'],r['微信分账/回退单号'],r['微信订单号'],r['分账明细单号'])
+                  for r in bill['rows'] if r['业务类型']=='分出'}
+        absent=sorted(token for identity,token in candidates if identity not in bill_ids)
+        return local,dict(coverage='ALL_PERSISTED_SCOPE_SPLIT_RETURN_RECORDS_AT_CAPTURE',
+            snapshot_sha256=digest,captured_at=captured_at,audit_watermark=watermark,
+            cutoff_basis='LOCAL_SQLITE_SNAPSHOT_NOT_PROVIDER_BUSINESS_DATE',counts=counts,
+            runtime_order_database='NOT_INCLUDED_IN_LOCAL_SNAPSHOT',
+            provider_population_completeness='NOT_ESTABLISHED',bill_date_membership='NOT_ASSIGNED',
+            reverse_candidates=dict(coverage='SUCCESSFUL_ACTIVE_LOCAL_SPLIT_DETAILS_WITHOUT_DATE_FILTER',
+                absent_from_selected_bill_count=len(absent),opaque_detail_tokens=absent[:200],
+                truncated=len(absent)>200,establishes_missing_bill_rows=False),
+            complete_reconciliation_available=False)
     def _reconcile_split_details(self,g,bill):
         # Only ordinary successful split rows have a fully documented detail join.
         # Return APIs expose return_id but no bill detail_id. Unfreeze/return rows
         # remain explicit unknowns; no aggregate or identifier-shape inference.
-        local={}
-        for key,payload in self.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_PROVIDER_ACTION' AND project=? AND active=1",(g['project'],)):
-            saved=json.loads(self.center.decrypt(payload,'provider-action:'+key))
-            expected_key=hashlib.sha256(canonical([self.actions.reader._mchid,'SPLIT',saved.get('provider_reference')])).hexdigest()
-            if (key==expected_key and saved.get('kind')=='SPLIT' and saved.get('scope')==g['scope']
-                    and saved.get('project')==g['project']):
-                local.setdefault(saved.get('provider_reference'),[]).append(saved)
+        local,inventory=self._split_local_inventory(g,bill)
         matched=0;exceptions=[];unknown=[];seen=set()
         for index,row in enumerate(bill['rows']):
             def issue(reason):exceptions.append(dict(row=index,reason=reason))
@@ -331,6 +487,8 @@ class ProviderBills:
             if len(candidates)!=1:
                 unresolved('LOCAL_SPLIT_EVIDENCE_MISSING_OR_AMBIGUOUS');continue
             action=candidates[0];evidence=action.get('bill_evidence')
+            if action.get('_bill_inventory_evidence_invalid'):
+                unresolved('INVALID_LOCAL_SIGNED_DETAIL_EVIDENCE');continue
             if (action.get('result',{}).get('status')!='FINISHED' or type(evidence) is not dict
                     or evidence.get('version')!=BILL_EVIDENCE_VERSION or evidence.get('kind')!='SPLIT'):
                 unresolved('SIGNED_DETAIL_EVIDENCE_REQUIRED');continue
@@ -361,17 +519,21 @@ class ProviderBills:
         status=('EXCEPTION' if exceptions else 'DETAIL_FIELDS_MATCH_RECONCILIATION_PENDING' if matched and not unknown
                 else 'PARTIAL_DETAIL_FIELDS_MATCH_RECONCILIATION_PENDING' if matched
                 else 'SCHEMA_RECOGNIZED_RECONCILIATION_PENDING')
+        local_incomplete=any(value for name,value in inventory['counts'].items()
+            if any(word in name for word in ('inactive','invalid','missing','nonterminal')))
         return dict(status=status,schema=dict(bill['schema']),matched_detail_rows=matched,total_rows=len(bill['rows']),
                     exceptions=exceptions[:200],exceptions_truncated=len(exceptions)>200,
                     unknown_rows=unknown[:200],unknown_rows_truncated=len(unknown)>200,
                     body_sha256=bill['body_sha256'],coverage='SPLIT_DETAIL_IDENTITIES_AND_AMOUNTS_ONLY',
                     time_coverage='UNKNOWN_BILL_TIMEZONE',reverse_coverage='NOT_ESTABLISHED',
+                    local_inventory=inventory,
                     summary_amounts='NOT_RECONCILED',
                     sample_arithmetic=sample_summary_diagnostic(bill),
                     summary_evidence=('PROVIDER_REPORTED_VALUES_RETAINED' if bill.get('reported_summary') is not None
                                       else 'LEGACY_SUMMARY_VALUES_NOT_RETAINED'),
                     pending_evidence=['BILL_TIMEZONE','SUMMARY_AMOUNT_SEMANTICS',
-                                      'BILL_DATE_MEMBERSHIP_RULE','LOCAL_POPULATION_COMPLETENESS']+
+                                      'BILL_DATE_MEMBERSHIP_RULE','PROVIDER_POPULATION_COMPLETENESS']+
+                        (['LOCAL_SIGNED_DETAIL_EVIDENCE_COMPLETENESS'] if local_incomplete else [])+
                         sorted({r['reason'] for r in unknown}),
                     finance_status='UNCONFIRMED',funds_retry_authorized=False)
 
