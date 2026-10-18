@@ -15,7 +15,7 @@ from pathlib import Path
 
 def extension_manifest():
     base=Path(__file__).parent
-    names=("catalogue_binding.py","existing_fd_controller.py","source_fence.py","held_proof.py","stage_history.py","capture_session.py")
+    names=("catalogue_binding.py","existing_fd_controller.py","source_fence.py","held_proof.py","stage_history.py","capture_session.py","ingress_gate.py")
     return {n:hashlib.sha256((base/n).read_bytes()).hexdigest() for n in names}
 
 
