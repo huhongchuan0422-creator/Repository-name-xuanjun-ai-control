@@ -154,3 +154,14 @@ workflow-request 只读本地候选源码与显式 observations JSON，验证 by
 仍需的现场证据分开列明：受保护启动 Python/cryptography 身份，Owner 独立 custody 和完整范围签名/安装批准，真实只读 probe 成功回执，目标 stdlib/native/生成 venv closure，真实 config/runtime/publisher 与12项验收，当前 policy/channel/static plan。已有 wheel/source 和 N1/E1 可按准确证据复用，不要求重跑成功步骤。此处执行入口代码已接线；缺少真实证据时不会生成可执行的假命令。
 
 本批本地验证：62项新增入口/申请专项全通过；与原V1/V2及全链回归合并为326个唯一测试，326通过，0错误/失败/跳过。固定15模块逐项漂移、FIFO非阻塞拒绝、保护父链、四项root身份、锁内ZIP/archive/input不匹配不进入Coordinator均有否定用例。合成包结构检查95成员/94绑定，包含新增模块和测试；该局部结构检查不是新提交制品pin，最终准确绑定等待新Hosted产物。
+
+
+## 2026-10-18：Hosted 39116357918 暴露的绑定 token 随机碰撞
+
+c69c5841 Hosted 原客户测试在 /bind 输入上被 USE_OAUTH_OR_SECRETREF 拒绝。已用准确基线与确定性合法43字符 token 重现：token_urlsafe(32) 可随机产生 sk- 后接12字母数字的子串，与原安全扫描规则碰撞。这不是仅修测试的随机种子问题。
+
+只将 kind=bind 的生成编码改为 token_hex(32)：保持256位随机性，输出64字符且符合原consume的128上限；其他验证/重置/邀请/确认挑战及session生成不变。safe_text 安全正则、文本入口、哈希保存、TTL、作用域、一次性消费和Web二次确认全部保持。未知真实secret仍拒绝；旧正常URL-safe绑定token仍可消费，旧碰撞token仍拒绝并需重新发起原绑定挑战，不放宽安全检测。
+
+新增确定性回归覆盖碰撞生成、真实secret形态拒绝、subject/channel作用域、expiry、一次性与event幂等、旧普通token兼容、其它challenge编码及未知hex拒绝；原Hosted失败记录保留，修复必须新提交/新CI，不盲重跑旧head。
+
+本批已确认本地10项新增确定性回归与原Customer21项合计31项全部通过；包结构96成员/95绑定，包含新测试，生产未运行。最终Hosted结果另行登记。
