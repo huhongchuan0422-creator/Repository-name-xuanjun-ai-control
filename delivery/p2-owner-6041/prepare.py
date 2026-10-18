@@ -61,10 +61,12 @@ def read_bound(stream,maximum):
 def timeout(signum,frame):raise Hold('NETWORK_TIMEOUT')
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):return None
-def download():
+def download(artifact_api=False):
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
-    endpoint='https://api.github.com/repos/'+REPO+'/actions/artifacts/'+str(ARTIFACT)+'/zip'
-    token=os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
+    endpoint=('https://api.github.com/repos/'+REPO+'/actions/artifacts/'+str(ARTIFACT)+'/zip'
+        if artifact_api else 'https://github.com/'+REPO+
+        '/releases/download/p2-owner-6041-preparation/p2-12142409951.zip')
+    token=(os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')) if artifact_api else None
     headers={'User-Agent':'xuanjun-p2-pinned-delivery','Accept':'application/vnd.github+json'}
     if token:headers['Authorization']='Bearer '+token
     old=signal.signal(signal.SIGALRM,timeout);signal.alarm(90)
@@ -78,7 +80,8 @@ def download():
             parsed=urllib.parse.urlsplit(target);host=parsed.hostname or ''
             need(parsed.scheme=='https' and parsed.port in (None,443) and
                  not parsed.username and not parsed.password and len(target)<=16384 and
-                 (host.endswith('.blob.core.windows.net') or host.endswith('.actions.githubusercontent.com')),
+                 (host.endswith('.blob.core.windows.net') or host.endswith('.actions.githubusercontent.com') or
+                  host=='release-assets.githubusercontent.com'),
                  'DOWNLOAD_REDIRECT_REJECTED')
             # Never forward the GitHub token to artifact blob storage.
             response=opener.open(urllib.request.Request(target,

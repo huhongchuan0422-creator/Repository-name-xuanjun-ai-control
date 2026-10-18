@@ -40,3 +40,18 @@ jobs:
           path: delivery-results/
           if-no-files-found: error
           overwrite: false
+  publish-pinned-public-source:
+    needs: preparation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Publish verified existing ZIP and verify anonymous Owner download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I -B -S delivery/p2-owner-6041/publish.py

@@ -19,7 +19,7 @@ delivery=importlib.util.module_from_spec(spec);spec.loader.exec_module(delivery)
 class DeliveryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.raw=delivery.download()
+        cls.raw=delivery.download(artifact_api=True)
         cls.rows,cls.bundle,cls.kit=delivery.verify(cls.raw)
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(dir='/root')
