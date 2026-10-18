@@ -1,0 +1,225 @@
+import base64
+import concurrent.futures
+import datetime
+import hashlib
+import hmac
+import json
+import os
+import re
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+HOSTS = (('tokyo', CN, 'ap-northeast-1', '68985c531add4e90a131aef703a389e6', 'iZ6wee8q9z4t03hvqumwfhZ'),)
+
+class Hold(Exception):
+    pass
+
+def safe(value):
+    return value if isinstance(value, str) and re.fullmatch('[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+
+def quote(value):
+    return urllib.parse.quote(str(value), safe='~')
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+def rpc(endpoint, version, action, credentials, **params):
+    if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+        raise Hold('ENDPOINT_REJECTED')
+    if action not in ('AssumeRole','DescribeInvocationResult'):
+        raise Hold('QUERY_ONLY_ACTION_REJECTED')
+    if action=='DescribeInvocationResult' and params!={'RegionId':'ap-northeast-1','InstanceId':INSTANCE,'InvokeId':INVOKE}:
+        raise Hold('QUERY_SCOPE_REJECTED')
+    key, secret, token = credentials
+    values = dict(params, Action=action, Version=version, Format='JSON', AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0', SignatureNonce=uuid.uuid4().hex, Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+    if token:
+        values['SecurityToken'] = token
+    canonical = '&'.join((quote(k) + '=' + quote(v) for k, v in sorted(values.items())))
+    signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+    values['Signature'] = base64.b64encode(signature).decode()
+    request = urllib.request.Request('https://' + endpoint + '/', data=urllib.parse.urlencode(values).encode(), headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+            raw = response.read(262145)
+    except urllib.error.HTTPError as error:
+        try:
+            data = json.loads(error.read(262145))
+            code = safe(data.get('Code'))
+        except Exception:
+            code = 'HTTP_' + str(error.code)
+        raise Hold(code) from None
+    except Exception:
+        raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+    if len(raw) > 262144:
+        raise Hold('RESPONSE_TOO_LARGE')
+    try:
+        data = json.loads(raw)
+    except Exception:
+        raise Hold('INVALID_API_RESPONSE') from None
+    if not isinstance(data, dict):
+        raise Hold('INVALID_API_RESPONSE')
+    if 'Code' in data:
+        raise Hold(safe(data['Code']))
+    return data
+import zlib
+
+INVOKE='t-jpn70f4bywoar5s'
+INSTANCE='68985c531add4e90a131aef703a389e6'
+EXPECTED='iZ6wee8q9z4t03hvqumwfhZ'
+def validate_observation(d,expected,nonce):
+    def need(ok):
+        if not ok:raise ValueError('STORAGE_MAP_CONTRACT_LINE_'+str(__import__('sys')._getframe(1).f_lineno))
+    def fields(v,keys):need(type(v)is dict and set(v)==set(keys.split()))
+    def integer(v):need(type(v)is int and 0<=v<2**64)
+    def rel(v):need(type(v)is str and re.fullmatch('[A-Za-z0-9_./-]{1,240}',v) and '..' not in v.split('/'))
+    def name(v):need(type(v)is str and re.fullmatch('[A-Za-z_][A-Za-z0-9_.]{0,180}',v))
+    fields(d,'scope hostname nonce observed_at sources locations missing_source_paths omitted_candidates private_values_disclosed database_opened service_actions business_requests business_source_imports authoritative_writer enforced_fence limitations')
+    need(d['scope']=='PR99_STORAGE_BINDINGS_SOURCE_ONLY_NOT_EFFECTIVE_CONFIG' and d['hostname']==expected and d['nonce']==nonce)
+    need(type(d['observed_at'])is str and re.fullmatch('[0-9T:.Z-]{19,40}',d['observed_at']))
+    need(d['private_values_disclosed']is False and d['database_opened']is False and d['authoritative_writer']==d['enforced_fence']=='UNKNOWN')
+    for key in ('service_actions','business_requests','business_source_imports'):need(type(d[key])is int and d[key]==0)
+    need(d['limitations']==['SOURCE_LITERAL_PATHS_NOT_EFFECTIVE_RUNTIME_CONFIG','MAX_24_SELECTED_STORAGE_MODULES_NOT_FULL_IMPORT_GRAPH','METADATA_ONLY_NO_DATA_CONTENT_OR_SQLITE_FORMAT_PROOF','NO_WRITER_FENCE_DRAIN_OR_STOP'])
+    def expression(value,depth=0):
+        need(type(value)is dict and depth<=7 and set(value)<=set(('kind','name','children','literal_type')))
+        need(type(value.get('kind'))is str and re.fullmatch('[A-Za-z_]{1,80}',value['kind']))
+        if 'name' in value:need(type(value['name'])is str and re.fullmatch('[A-Za-z_][A-Za-z0-9_]{0,100}',value['name']))
+        if 'literal_type' in value:need(value['literal_type'] in ('str','int','float','bool','NoneType','bytes','complex','ellipsis'))
+        if 'children' in value:
+            need(type(value['children'])is list and len(value['children'])<=8)
+            for child in value['children']:expression(child,depth+1)
+
+
+    need(type(d['sources'])is list and 3<=len(d['sources'])<=24)
+    expectedpins={'scripts/secure_secrets_portal_server.py':'57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1','ai_service/wecom_customer_contact_service.py':'c95ca9ec711d05d64489ed927cae770157954b46661411b5f762f193ba711571','ai_service/wecom_customer_service.py':'aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402'}
+    seen=set()
+    for m in d['sources']:
+        fields(m,'path sha256 project_imports storage_constructors runtime_references binding_details');rel(m['path']);need(m['path'] not in seen);seen.add(m['path'])
+        need(type(m['sha256'])is str and re.fullmatch('[0-9a-f]{64}',m['sha256']))
+        if m['path'] in expectedpins:need(m['sha256']==expectedpins[m['path']])
+        need(type(m['project_imports'])is list and len(m['project_imports'])<=120)
+        for v in m['project_imports']:name(v)
+        need(type(m['storage_constructors'])is list and len(m['storage_constructors'])<=20 and len(json.dumps(m['storage_constructors']))<10000)
+        for c in m['storage_constructors']:
+            fields(c,'line name arguments');integer(c['line']);name(c['name']);need(type(c['arguments'])is list and len(c['arguments'])<=3)
+            for v in c['arguments']:expression(v)
+        details=m['binding_details'];fields(details,'constructors path_assignments storage_operations cli_defaults')
+        need(len(json.dumps(details))<=6500)
+        def binding(v):
+            fields(v,'shape source_runtime_path');expression(v['shape'])
+            p=v['source_runtime_path']
+            need(p is None or (type(p)is str and len(p)<=400 and re.fullmatch('/opt/trading-system/runtime/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+',p) and not any(x in ('.','..') for x in p.split('/'))))
+        for key,limit in (('constructors',30),('path_assignments',40),('storage_operations',60),('cli_defaults',30)):
+            need(type(details[key])is list and len(details[key])<=limit)
+            for v in details[key]:
+                if key=='constructors':
+                    fields(v,'owner line name arguments keywords');name(v['owner']);integer(v['line']);name(v['name']);need(type(v['arguments'])is list and len(v['arguments'])<=6)
+                    for x in v['arguments']:binding(x)
+                    need(type(v['keywords'])is list and len(v['keywords'])<=12)
+                    for x in v['keywords']:fields(x,'name value');name(x['name']);binding(x['value'])
+                elif key=='path_assignments':
+                    fields(v,'owner line attribute value');name(v['owner']);integer(v['line']);name(v['attribute']);binding(v['value'])
+                elif key=='storage_operations':
+                    fields(v,'owner line name arguments');name(v['owner']);integer(v['line']);need(v['name'] in ('.read_text','.read_bytes','.write_text','.write_bytes','.replace','.unlink','.mkdir') or (type(v['name'])is str and re.fullmatch('[A-Za-z_][A-Za-z0-9_.]{0,180}',v['name'])));need(type(v['arguments'])is list and len(v['arguments'])<=3)
+                    for x in v['arguments']:binding(x)
+                else:
+                    fields(v,'line option default');integer(v['line']);need(type(v['option'])is str and re.fullmatch('--[a-z][a-z-]{0,50}',v['option']));binding(v['default'])
+        need(type(m['runtime_references'])is list and len(m['runtime_references'])<=200)
+        for r in m['runtime_references']:
+            fields(r,'line symbol slot');integer(r['line']);name(r['symbol']);integer(r['slot']);need(r['slot']<len(d['locations']))
+    need(set(expectedpins)<=seen)
+    need(type(d['locations'])is list and len(d['locations'])<=32)
+    for i,r in enumerate(d['locations']):
+        fields(r,'slot source_literal_path metadata');need(type(r['slot'])is int and r['slot']==i)
+        need(type(r['source_literal_path'])is str and r['source_literal_path'].startswith('/opt/trading-system/runtime/') and re.fullmatch('/[A-Za-z0-9_./-]{1,400}',r['source_literal_path']) and '..' not in r['source_literal_path'].split('/'))
+        m=r['metadata'];need(type(m)is dict and m.get('state') in ('MISSING','UNREADABLE','DIRECTORY','REGULAR','SYMLINK','OTHER'))
+        fields(m,'state' if m['state'] in ('MISSING','UNREADABLE') else 'state device inode uid gid mode bytes')
+        for key in m:
+            if key!='state':integer(m[key])
+    integer(d['omitted_candidates']);need(type(d['missing_source_paths'])is list and len(d['missing_source_paths'])<=24)
+    for p in d['missing_source_paths']:rel(p)
+    return d
+
+def decode_receipt(output,expected,nonce):
+    try:
+        if type(output)is not str or len(output.encode())>=32768:raise ValueError()
+        try:envelope=output.encode();wire=json.loads(envelope)
+        except ValueError:envelope=base64.b64decode(output,validate=True);wire=json.loads(envelope)
+        assert len(envelope)<23000 and type(wire)is dict and set(wire)=={'encoding','bytes','sha256','payload'}
+        assert wire['encoding']=='PR99_STORAGE_ZLIB_BASE64_V1' and type(wire['bytes'])is int and 0<wire['bytes']<=180000
+        assert type(wire['sha256'])is str and re.fullmatch('[0-9a-f]{64}',wire['sha256'])
+        packed=base64.b64decode(wire['payload'],validate=True);decoder=zlib.decompressobj();raw=decoder.decompress(packed,180001)
+        assert decoder.eof and not decoder.unconsumed_tail and not decoder.unused_data
+        assert len(raw)==wire['bytes'] and hashlib.sha256(raw).hexdigest()==wire['sha256']
+        value=json.loads(raw)
+        observed=value.get('nonce') if type(value)is dict else None
+        assert type(observed)is str and re.fullmatch('[0-9a-f]{32}',observed)
+        return validate_observation(value,expected,observed if nonce is None else nonce)
+    except Exception as error:
+        code=str(error)
+        raise Hold(code if re.fullmatch('STORAGE_MAP_CONTRACT_LINE_[0-9]+',code) else 'BINDING_WIRE_REJECTED') from None
+
+ENTRY_PINS=(('scripts/secure_secrets_portal_server.py', '57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1'), ('ai_service/wecom_customer_contact_service.py', 'c95ca9ec711d05d64489ed927cae770157954b46661411b5f762f193ba711571'), ('ai_service/wecom_customer_service.py', 'aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402'))
+
+def self_test():
+    d={'scope':'PR99_STORAGE_BINDINGS_SOURCE_ONLY_NOT_EFFECTIVE_CONFIG','hostname':HOSTS[0][4],'nonce':'a'*32,'observed_at':'2026-10-18T13:00:00Z','sources':[{'path':p,'sha256':h,'project_imports':[],'storage_constructors':[],'runtime_references':[],'binding_details':{'constructors':[],'path_assignments':[],'storage_operations':[],'cli_defaults':[]}} for p,h in ENTRY_PINS],'locations':[],'missing_source_paths':[],'omitted_candidates':0,'private_values_disclosed':False,'database_opened':False,'service_actions':0,'business_requests':0,'business_source_imports':0,'authoritative_writer':'UNKNOWN','enforced_fence':'UNKNOWN','limitations':['SOURCE_LITERAL_PATHS_NOT_EFFECTIVE_RUNTIME_CONFIG','MAX_24_SELECTED_STORAGE_MODULES_NOT_FULL_IMPORT_GRAPH','METADATA_ONLY_NO_DATA_CONTENT_OR_SQLITE_FORMAT_PROOF','NO_WRITER_FENCE_DRAIN_OR_STOP']}
+    def wire(value):
+        raw=json.dumps(value).encode();return json.dumps({'encoding':'PR99_STORAGE_ZLIB_BASE64_V1','bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'payload':base64.b64encode(zlib.compress(raw)).decode()})
+    assert decode_receipt(wire(d),HOSTS[0][4],'a'*32)==d
+    for mutate in (lambda x:x.update(private='SECRET'),lambda x:x.update(enforced_fence='PASS'),lambda x:x.update(service_actions=True),lambda x:x['sources'][0].update(source='SECRET'),lambda x:x['sources'][0].update(sha256='0'*64),lambda x:x.update(private_values_disclosed=True)):
+        bad=json.loads(json.dumps(d));mutate(bad)
+        try:decode_receipt(wire(bad),HOSTS[0][4],'a'*32)
+        except Hold:pass
+        else:raise AssertionError('PRIVATE_OR_FALSE_AUTHORITY_ACCEPTED')
+    d['sources'][0]['binding_details']['storage_operations']=[{'owner':'MODULE','line':1,'name':'.read_text','arguments':[]}]
+    assert decode_receipt(wire(d),EXPECTED,None)==d
+    d['sources'][0]['binding_details']['storage_operations'][0]['name']='.PRIVATE_UNKNOWN'
+    try:decode_receipt(wire(d),EXPECTED,None)
+    except Hold:pass
+    else:raise AssertionError('UNKNOWN_DYNAMIC_METHOD_ACCEPTED')
+    for action in ('RunCommand','INVALID_ACTION'):
+        try:rpc('sts.aliyuncs.com','2015-04-01',action,('x','y',''))
+        except Hold as e:assert str(e)=='QUERY_ONLY_ACTION_REJECTED'
+        else:raise AssertionError('MUTATION_ALLOWED')
+    print('PR99_BINDING_QUERY_6_REJECTIONS_DYNAMIC_RECEIVER_AND_NO_DISPATCH_PASS',flush=True)
+def main():
+    if os.environ.get('PR99_MODE') == 'SELF_TEST':
+        self_test()
+        return
+    if os.environ.get('GITHUB_RUN_ATTEMPT') != '1':
+        raise Hold('RERUN_FORBIDDEN')
+    head = os.environ.get('PR99_HEAD', '')
+    if not re.fullmatch('[0-9a-f]{40}', head) or os.environ.get('PR99_LABEL') != 'pr99-binding-query-' + head[:12]:
+        raise Hold('EXACT_QUERY_LABEL_REQUIRED')
+    master = (os.environ.get('ALIYUN_ACCESS_KEY_ID', ''), os.environ.get('ALIYUN_ACCESS_KEY_SECRET', ''), '')
+    if not all(master[:2]):
+        raise Hold('MISSING_ORIGINAL_REPOSITORY_SECRETS')
+    value = rpc('sts.aliyuncs.com', '2015-04-01', 'AssumeRole', master, RoleArn=CN, RoleSessionName='pr99-error-' + uuid.uuid4().hex[:16], DurationSeconds=900)['Credentials']
+    credentials = (value['AccessKeyId'], value['AccessKeySecret'], value['SecurityToken'])
+    if not all((type(v) is str and v and ('\n' not in v) and ('\r' not in v) for v in credentials)):
+        raise Hold('CREDENTIAL_RESPONSE_INVALID')
+    for v in credentials:
+        print('::add-mask::' + v, flush=True)
+    data = rpc('swas.ap-northeast-1.aliyuncs.com', '2020-06-01', 'DescribeInvocationResult', credentials, RegionId='ap-northeast-1', InstanceId=INSTANCE, InvokeId=INVOKE)
+    detail = data.get('InvocationResult', {})
+    if type(detail) is not dict or detail.get('InstanceId') != INSTANCE or detail.get('InvokeId') != INVOKE:
+        raise Hold('ORIGINAL_RESULT_IDENTITY_UNKNOWN')
+    status = detail.get('InvocationStatus')
+    if status!='Success' or type(detail.get('ExitCode'))is not int or detail['ExitCode']!=0:
+        raise Hold('ORIGINAL_COMPACT_RESULT_NOT_SUCCESS')
+    value=decode_receipt(detail.get('Output'),EXPECTED,None)
+    receipt={'scope':'ORIGINAL_STORAGE_BINDING_RECEIPT_RECOVERY_QUERY_ONLY','invoke_id':INVOKE,'instance_id':INSTANCE,
+        'status':status,'exit_code':0,'receipt':value,'host_commands':0,'service_actions':0,'database_opened':False,
+        'retry_allowed':False,'production_cutover':False,'nonce_binding':'EXACT_CLOUD_INSTANCE_AND_INVOKE_ID_LOCAL_CLAIM_NOT_RECOVERED',
+        'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    print('PR99_BINDING_RECEIPT_RECOVERED='+json.dumps(receipt,sort_keys=True),flush=True)
+
+if __name__=='__main__':
+    try:main()
+    except Hold as error:
+        print('PR99_FAILURE_QUERY_HOLD='+safe(str(error)),flush=True);raise SystemExit(2)
