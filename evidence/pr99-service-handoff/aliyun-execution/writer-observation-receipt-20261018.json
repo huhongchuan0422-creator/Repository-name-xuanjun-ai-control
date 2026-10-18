@@ -1,0 +1,525 @@
+{
+  "authoritative_writer": "UNKNOWN",
+  "enforced_fence": "UNKNOWN",
+  "hosts": [
+    {
+      "authoritative_writer": "UNKNOWN",
+      "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+      "enforced_fence": "UNKNOWN",
+      "host": "domestic",
+      "host_commands": 1,
+      "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+      "invocation_status": "Success",
+      "invoke_id": "t-sh070ero6pz7zsw",
+      "nonterminal_invocations": [],
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "business_requests": 0,
+        "database_opened": false,
+        "enforced_fence": "UNKNOWN",
+        "hostname": "iZvt5t8tlrm8oiZ",
+        "inflight_drained": false,
+        "limitations": [
+          "IDLE_WRITERS_NOT_EXCLUDED",
+          "SCHEDULER_CONTENTS_NOT_READ",
+          "OTHER_MOUNT_NAMESPACES_NOT_PROVEN",
+          "NO_STOP_OR_DRAIN_PERFORMED"
+        ],
+        "nonce": "942bb13a96ed47b6abbcf3932367fd7b",
+        "observed_at": "2026-10-18T12:03:43.433699Z",
+        "roots": [
+          {
+            "present": false,
+            "root": "portal"
+          },
+          {
+            "present": false,
+            "root": "operations"
+          },
+          {
+            "present": false,
+            "root": "database"
+          },
+          {
+            "present": false,
+            "root": "workspace"
+          },
+          {
+            "device": 64771,
+            "inode": 835411,
+            "present": true,
+            "root": "external_operations"
+          }
+        ],
+        "samples": [
+          {
+            "counts": {
+              "fds": 1146,
+              "pid_identity_changed": 0,
+              "processes": 156,
+              "unreadable": 0,
+              "vanished": 0
+            },
+            "processes": [
+              {
+                "cgroup_sha256": "37399666e640ead2e645e1b33ffc3a076c6a54862d5e9fa33f366bc54d92ed77",
+                "handles": [
+                  {
+                    "deleted": false,
+                    "device": 64771,
+                    "fd": 3,
+                    "inode": 1845988,
+                    "roots": [
+                      "external_operations"
+                    ],
+                    "writable": true
+                  }
+                ],
+                "pid": 90354,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 91354061,
+                "tags": [],
+                "uid": 1001
+              },
+              {
+                "cgroup_sha256": "16579ddb74d76f7c9472b8b4f227b1d4f8d364c9d11e98964a4231829bdc4a06",
+                "handles": [
+                  {
+                    "deleted": false,
+                    "device": 64771,
+                    "fd": 5,
+                    "inode": 837402,
+                    "roots": [
+                      "external_operations"
+                    ],
+                    "writable": true
+                  },
+                  {
+                    "deleted": false,
+                    "device": 64771,
+                    "fd": 6,
+                    "inode": 837402,
+                    "roots": [
+                      "external_operations"
+                    ],
+                    "writable": true
+                  }
+                ],
+                "pid": 188767,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 178248493,
+                "tags": [],
+                "uid": 1001
+              }
+            ]
+          },
+          {
+            "counts": {
+              "fds": 1146,
+              "pid_identity_changed": 0,
+              "processes": 156,
+              "unreadable": 0,
+              "vanished": 0
+            },
+            "processes": [
+              {
+                "cgroup_sha256": "37399666e640ead2e645e1b33ffc3a076c6a54862d5e9fa33f366bc54d92ed77",
+                "handles": [
+                  {
+                    "deleted": false,
+                    "device": 64771,
+                    "fd": 3,
+                    "inode": 1845988,
+                    "roots": [
+                      "external_operations"
+                    ],
+                    "writable": true
+                  }
+                ],
+                "pid": 90354,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 91354061,
+                "tags": [],
+                "uid": 1001
+              },
+              {
+                "cgroup_sha256": "16579ddb74d76f7c9472b8b4f227b1d4f8d364c9d11e98964a4231829bdc4a06",
+                "handles": [
+                  {
+                    "deleted": false,
+                    "device": 64771,
+                    "fd": 5,
+                    "inode": 837402,
+                    "roots": [
+                      "external_operations"
+                    ],
+                    "writable": true
+                  },
+                  {
+                    "deleted": false,
+                    "device": 64771,
+                    "fd": 6,
+                    "inode": 837402,
+                    "roots": [
+                      "external_operations"
+                    ],
+                    "writable": true
+                  }
+                ],
+                "pid": 188767,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 178248493,
+                "tags": [],
+                "uid": 1001
+              }
+            ]
+          }
+        ],
+        "scheduler_metadata": [
+          {
+            "mode": 420,
+            "present": true,
+            "size": 451,
+            "slot": 0,
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "mode": 493,
+            "present": true,
+            "size": 4096,
+            "slot": 1,
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "mode": 448,
+            "present": true,
+            "size": 4096,
+            "slot": 2,
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "present": false,
+            "slot": 3
+          }
+        ],
+        "scope": "PR99_OPEN_HANDLE_OBSERVATION_NOT_AUTHORITY_OR_FENCE",
+        "service_actions": 0,
+        "uid": 0,
+        "units": [
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-portal.service"
+          },
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-contact.service"
+          },
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-customer-service.service"
+          }
+        ]
+      },
+      "run_command_attempted": true,
+      "service_actions": 0,
+      "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+      "sts": "PASS_CURRENT"
+    },
+    {
+      "authoritative_writer": "UNKNOWN",
+      "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+      "enforced_fence": "UNKNOWN",
+      "host": "tokyo",
+      "host_commands": 1,
+      "instance_id": "68985c531add4e90a131aef703a389e6",
+      "invocation_status": "Success",
+      "invoke_id": "t-jpn70ero6ast62o",
+      "nonterminal_invocations": [],
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "business_requests": 0,
+        "database_opened": false,
+        "enforced_fence": "UNKNOWN",
+        "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+        "inflight_drained": false,
+        "limitations": [
+          "IDLE_WRITERS_NOT_EXCLUDED",
+          "SCHEDULER_CONTENTS_NOT_READ",
+          "OTHER_MOUNT_NAMESPACES_NOT_PROVEN",
+          "NO_STOP_OR_DRAIN_PERFORMED"
+        ],
+        "nonce": "233a901da54b422f9b9ff853841837dd",
+        "observed_at": "2026-10-18T12:03:43.112657Z",
+        "roots": [
+          {
+            "device": 64771,
+            "inode": 1713243,
+            "present": true,
+            "root": "portal"
+          },
+          {
+            "device": 64771,
+            "inode": 1709766,
+            "present": true,
+            "root": "operations"
+          },
+          {
+            "device": 64771,
+            "inode": 1601008,
+            "present": true,
+            "root": "database"
+          },
+          {
+            "device": 37,
+            "inode": 5801,
+            "present": true,
+            "root": "workspace"
+          },
+          {
+            "present": false,
+            "root": "external_operations"
+          }
+        ],
+        "samples": [
+          {
+            "counts": {
+              "fds": 1833,
+              "pid_identity_changed": 0,
+              "processes": 200,
+              "unreadable": 0,
+              "vanished": 0
+            },
+            "processes": [
+              {
+                "cgroup_sha256": "cf9216e9dcb38d5576c92c1251033b38d5d9d7b43fcfbb2e36464a3c3bd6c275",
+                "handles": [],
+                "pid": 1875349,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 178615731,
+                "tags": [
+                  2
+                ],
+                "uid": 1000
+              },
+              {
+                "cgroup_sha256": "7a0974e6f19459ae0f2c734387b74669eced873ce5995bd078691b1d6c3239b5",
+                "handles": [],
+                "pid": 1903204,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 179522510,
+                "tags": [
+                  1
+                ],
+                "uid": 1000
+              },
+              {
+                "cgroup_sha256": "45b7c218d9922b6056ac7e88d63c49f15c2c2a014f642f45a8ad12e4c15863f6",
+                "handles": [],
+                "pid": 3082952,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 248360883,
+                "tags": [
+                  0
+                ],
+                "uid": 1000
+              }
+            ]
+          },
+          {
+            "counts": {
+              "fds": 1833,
+              "pid_identity_changed": 0,
+              "processes": 200,
+              "unreadable": 0,
+              "vanished": 0
+            },
+            "processes": [
+              {
+                "cgroup_sha256": "cf9216e9dcb38d5576c92c1251033b38d5d9d7b43fcfbb2e36464a3c3bd6c275",
+                "handles": [],
+                "pid": 1875349,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 178615731,
+                "tags": [
+                  2
+                ],
+                "uid": 1000
+              },
+              {
+                "cgroup_sha256": "7a0974e6f19459ae0f2c734387b74669eced873ce5995bd078691b1d6c3239b5",
+                "handles": [],
+                "pid": 1903204,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 179522510,
+                "tags": [
+                  1
+                ],
+                "uid": 1000
+              },
+              {
+                "cgroup_sha256": "45b7c218d9922b6056ac7e88d63c49f15c2c2a014f642f45a8ad12e4c15863f6",
+                "handles": [],
+                "pid": 3082952,
+                "ppid": 1,
+                "shared_writable_mappings": [],
+                "start_ticks": 248360883,
+                "tags": [
+                  0
+                ],
+                "uid": 1000
+              }
+            ]
+          }
+        ],
+        "scheduler_metadata": [
+          {
+            "mode": 420,
+            "present": true,
+            "size": 451,
+            "slot": 0,
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "mode": 493,
+            "present": true,
+            "size": 4096,
+            "slot": 1,
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "mode": 448,
+            "present": true,
+            "size": 4096,
+            "slot": 2,
+            "symlink": false,
+            "uid": 0
+          },
+          {
+            "present": false,
+            "slot": 3
+          }
+        ],
+        "scope": "PR99_OPEN_HANDLE_OBSERVATION_NOT_AUTHORITY_OR_FENCE",
+        "service_actions": 0,
+        "uid": 0,
+        "units": [
+          {
+            "active": "active",
+            "cgroup_sha256": "ec4dba70c1d151c7114d535cb41100e1403a44f0fd868fdec600f5dda2fe26d1",
+            "load": "loaded",
+            "pid": 3082952,
+            "returncode": 0,
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "active": "active",
+            "cgroup_sha256": "61e4b8bb04e9b4f61d17add9530a0b1dfac8fdd867fa4f28eaa7cab4bff3d6c1",
+            "load": "loaded",
+            "pid": 1903204,
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "active": "active",
+            "cgroup_sha256": "f8eebc1d3d209cecefc6374951aa224faceb187b218c418e8b9bc4de5ae53f64",
+            "load": "loaded",
+            "pid": 1875349,
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-portal.service"
+          },
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-contact.service"
+          },
+          {
+            "active": "inactive",
+            "cgroup_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "load": "not-found",
+            "pid": 0,
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-customer-service.service"
+          }
+        ]
+      },
+      "run_command_attempted": true,
+      "service_actions": 0,
+      "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+      "sts": "PASS_CURRENT"
+    }
+  ],
+  "migration_started": false,
+  "production_actions": 0,
+  "production_cutover": false,
+  "status": "WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION",
+  "evidence": {
+    "source_commit": "ea2666f07806c70afc282e9fc7b194bff1eb4219",
+    "tree": "39943f1d46df2e9510d259234ff183f61033c9c9",
+    "run": 39125713466,
+    "job": 117670301461,
+    "validation_run": 39125683098,
+    "validation_job": 117670184382,
+    "scope": "READONLY_WRITER_METADATA_NO_FENCE_OR_DRAIN"
+  }
+}
