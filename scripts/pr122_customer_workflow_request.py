@@ -2,6 +2,7 @@
 This module never grants permission, emits signatures, or emits execution commands.
 """
 import copy
+from scripts import pr122_customer_profile as deployment
 import json
 import os
 import stat
@@ -26,6 +27,15 @@ ARTIFACT_FIELDS={'source_commit','source_tree','manifest_sha256','artifact_tar_s
  'artifact_zip_sha256','artifact_id','ci_run_id'}
 RUNTIME_FIELDS={'schema','host','source_commit','runtime_module_sha256','wheel_directory',
  'interpreter_sha256','stdlib_trees','native_files','abi','expected_venv_tree','account_uid','account_gid'}
+
+
+def static_fields(value):
+    fields=set(STATIC_FIELDS)
+    if deployment.is_login(value):
+        fields-={'publisher_config_sha256','telegram_credential_evidence_sha256'}
+        fields|={'deployment_profile','permit_window_seconds','login_acceptance_sha256'}
+    elif 'permit_window_seconds' in value:fields.add('permit_window_seconds')
+    return fields
 
 
 def strict_json(raw):
@@ -82,11 +92,11 @@ def validate_inputs(plan,inputs,manifest,raw):
     from scripts.pr122_customer_release import TXN
     from scripts.pr122_account_admission import approved_account_prepare as account
     from scripts import pr122_customer_runtime as runtime
-    need(type(plan) is dict and set(plan)==STATIC_FIELDS|{'workflow_contract'},'REQUEST_PLAN_SCHEMA')
+    need(type(plan) is dict and set(plan)==static_fields(plan)|{'workflow_contract'},'REQUEST_PLAN_SCHEMA')
     static={k:v for k,v in plan.items() if k!='workflow_contract'}
     need(plan['transaction']==TXN and plan['state']=='READONLY_PLAN'
          and type(plan['production_changes']) is int and plan['production_changes']==0,'REQUEST_FIXED_PLAN')
-    for key in STATIC_FIELDS:
+    for key in static_fields(plan):
         if key.endswith('_sha256'):need(hex64(plan[key]),'REQUEST_PLAN_HASH')
     need(plan['source_commit']==manifest['source_commit'] and plan['source_tree']==manifest['source_tree']
          and digest(raw)==plan['manifest_sha256'] and digest(canonical(manifest['files']))==plan['scope_sha256'],
@@ -96,6 +106,7 @@ def validate_inputs(plan,inputs,manifest,raw):
     need(type(plan['main_current']) is str and plan['main_current'] and type(plan['nginx']) is dict
          and set(plan['nginx'])=={'master','files'} and type(plan['nginx']['files']) is dict
          and bool(plan['nginx']['files']) and all(type(p) is str and p.startswith('/') and hex64(v) for p,v in plan['nginx']['files'].items()),'REQUEST_LIVE_STATIC_PLAN')
+    if 'permit_window_seconds' in plan:need(type(plan['permit_window_seconds']) is int and plan['permit_window_seconds']==deployment.WINDOW_SECONDS,'REQUEST_FIVE_HOUR_WINDOW')
     files=source_index(manifest,raw)
     need(type(inputs) is dict and set(inputs)=={'schema','stages'} and type(inputs['schema']) is int
          and inputs['schema']==1 and type(inputs['stages']) is dict and set(inputs['stages'])==set(STAGES),'REQUEST_INPUTS_SCHEMA')
@@ -186,6 +197,10 @@ def make_request(manifest,raw,observations):
                 'FRESH_TRUSTED_PROBE_RECEIPT','TARGET_RUNTIME_SOURCE_AND_VENV_CLOSURE',
                 'PROTECTED_CONFIG_RUNTIME_PUBLISHER_AND_12_ACCEPTANCE_RECORDS','LIVE_POLICY_CHANNEL_STATIC_PLAN'],
             'successful_history':'N1_AND_E1_RETAINED_NOT_REEXECUTED'}
+    if type(observations.get('static_plan')) is dict and deployment.is_login(observations['static_plan']):
+        result['required_external_acceptance']=[x for x in result['required_external_acceptance'] if x!='PROTECTED_CONFIG_RUNTIME_PUBLISHER_AND_12_ACCEPTANCE_RECORDS']+['PROTECTED_LOGIN_CONFIG_SMTP_AND_FOUR_LOGIN_ACCEPTANCE_RECORDS']
+        result['deployment_profile']=deployment.LOGIN_ONLY
+        result['permit_window_seconds_requested']=deployment.WINDOW_SECONDS
     if missing:return result
     static=copy.deepcopy(observations['static_plan']);inputs=copy.deepcopy(observations['inputs'])
     adoption=observations['adopt_receipts'];actions=observations['recovery_actions'];artifact=observations['artifact']
@@ -194,7 +209,7 @@ def make_request(manifest,raw,observations):
     for name in STAGES:
         if inputs['stages'][name] is None:missing.append('inputs.stages.'+name)
     if missing:return result
-    need(type(static) is dict and set(static)==STATIC_FIELDS,'REQUEST_STATIC_PLAN_FIELDS')
+    need(type(static) is dict and set(static)==static_fields(static),'REQUEST_STATIC_PLAN_FIELDS')
     contract={'schema':1,'stages':[{'stage':name,'input_sha256':digest(canonical(inputs['stages'][name])),
               'implementation_sha256':files[IMPLEMENTATIONS[name]]['sha256'],
               'adopt_receipt_sha256':adoption[name],'recovery_actions':copy.deepcopy(actions[name])} for name in STAGES]}

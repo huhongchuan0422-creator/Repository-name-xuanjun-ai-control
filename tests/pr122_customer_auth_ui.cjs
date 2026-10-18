@@ -105,6 +105,20 @@ function fixture(){
  await f.run("openProject({id:'orphan-project',title:'New Project',role:'OWNER'})");
  assert.equal(f.dom.project.hidden,true);assert.equal(f.dom.messages.children.length,0);assert.equal(f.dom.materials.children.length,0);
  assert.ok(!f.dom.messages.textContent.includes('unknown-origin private history'));
+ // Minimal login-only /me shows account readiness without fake projects or
+ // business fetches. Even old event handlers cannot enqueue business requests.
+ f.reply(200,{user_id:'login-only-user',account_status:'VERIFIED'});
+ before=f.requests.length;await f.run('start()');
+ assert.equal(f.requests.length,before+1);assert.equal(f.dom.workspace.hidden,true);
+ assert.equal(f.dom.auth.hidden,true);assert.equal(f.dom.logout.hidden,false);
+ assert.match(f.dom.notice.textContent,/账号已就绪/);assert.equal(f.dom.projects.children.length,0);
+ assert.equal(f.dom['channel-status'].children.length,0);assert.equal(f.run('loginOnly'),true);
+ before=f.requests.length;
+ await assert.rejects(f.run("api('messages/old-project')"),/仅开放账号注册与登录/);
+ await assert.rejects(f.run("api('accept_invite',{invitation:'old'})"),/仅开放账号注册与登录/);
+ await f.run('refresh()');assert.equal(f.requests.length,before);
+ f.reply(200,f.me);await f.run('start()');assert.equal(f.run('loginOnly'),false);
+ assert.equal(f.dom.workspace.hidden,false);assert.equal(f.dom.projects.children.length,1);
  console.log('PASS: session expiry, private DOM/draft clearing, 503/network distinction, recovery, register/reset validation, duplicate click guard, logout failure/success, bfcache revalidation, delayed private response isolation, project switching/revocation, scoped evidence download clearing, privacy notice/no-autoack, stable request retries, stale privacy response isolation and revocation');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 

@@ -1,11 +1,11 @@
 'use strict';
-const base='/customer/center/api/';let csrf=sessionStorage.getItem('xj_csrf')||'',project='',role='',viewGeneration=0;
+const base='/customer/center/api/';let csrf=sessionStorage.getItem('xj_csrf')||'',project='',role='',viewGeneration=0,loginOnly=false;
 const statusLabels={ARCHIVED:'已归档',PENDING:'待发送',ACCEPTED:'渠道已受理',UNKNOWN:'结果待确认',FAILED:'发送失败'};
 const channelLabels={WEB:'网页项目沟通',WEB_AI:'网页AI客服',TELEGRAM:'Telegram客服',FEISHU:'飞书客服'};
 const $=id=>document.getElementById(id),states={NOT_STARTED:'未开始',PARTIAL:'部分提交',SUBMITTED:'已提交',IN_REVIEW:'审核中',NEEDS_CORRECTION:'需要补正',ACCEPTED:'已通过'};
 function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function notice(text){$('notice').textContent=text;}
-async function api(op,body){const generation=viewGeneration,authOperation=['login','register','verify','request_reset','reset','logout'].includes(op);const r=await fetch(base+op,{credentials:'same-origin',method:body?'POST':'GET',headers:body?{'Content-Type':'application/json','X-CSRF-Token':csrf}:{},body:body?JSON.stringify(body):undefined,cache:'no-store'});const d=await r.json();if(!authOperation&&generation!==viewGeneration){const error=new Error('页面状态已更新，请重新打开项目。');error.stale=true;throw error;}if(!r.ok){const error=new Error(d.error||'请求未完成');error.status=r.status;if((r.status===401||r.status===403)&&op!=='me'&&!authOperation)clearProject(false);throw error;}return d;}
+async function api(op,body){const generation=viewGeneration,authOperation=['login','register','verify','request_reset','reset','logout'].includes(op);if(loginOnly&&!authOperation&&op!=='me')throw new Error('当前仅开放账号注册与登录。');const r=await fetch(base+op,{credentials:'same-origin',method:body?'POST':'GET',headers:body?{'Content-Type':'application/json','X-CSRF-Token':csrf}:{},body:body?JSON.stringify(body):undefined,cache:'no-store'});const d=await r.json();if(!authOperation&&generation!==viewGeneration){const error=new Error('页面状态已更新，请重新打开项目。');error.stale=true;throw error;}if(!r.ok){const error=new Error(d.error||'请求未完成');error.status=r.status;if((r.status===401||r.status===403)&&op!=='me'&&!authOperation)clearProject(false);throw error;}return d;}
 function form(id,fn){$(id).addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;if(button?.disabled)return;if(button)button.disabled=true;try{await fn(Object.fromEntries(new FormData(e.target)));}catch(err){notice(err.message);}finally{if(button)button.disabled=false;}});}
 function clearProject(clearNavigation=true){
  viewGeneration++;project='';role='';$('project').hidden=true;
@@ -14,10 +14,10 @@ function clearProject(clearNavigation=true){
  $('private-previews')?.replaceChildren();$('privacy-tools')?.replaceChildren();
  for(const id of ['message','bind','invite','revoke','accept'])$(id).reset();
 }
-function clearSession(){csrf='';sessionStorage.removeItem('xj_csrf');clearProject();$('auth').hidden=false;$('workspace').hidden=true;$('logout').hidden=true;}
+function clearSession(){loginOnly=false;csrf='';sessionStorage.removeItem('xj_csrf');clearProject();$('auth').hidden=false;$('workspace').hidden=true;$('logout').hidden=true;}
 async function start(){
  clearProject();const generation=viewGeneration;$('workspace').hidden=true;
- try{const d=await api('me');$('auth').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;for(const p of d.projects){const b=node('button',p.title);b.addEventListener('click',()=>openProject(p));$('projects').append(b);}if(!d.projects.length)$('projects').append(node('p','尚无已授权项目。请联系项目负责人核实合同关系，或登录接受专属邀请。'));$('channel-status').replaceChildren(...['web_ai','telegram','feishu'].map(k=>{const v=d.channels[k];const name={web_ai:'网页AI客服',telegram:'Telegram客服',feishu:'飞书客服'}[k];return node('p',name+'：'+(v.state==='PENDING_CONNECTION'?'待接通':'已配置，待验收'));}));
+ try{const d=await api('me');if(d.account_status==='VERIFIED'&&!Object.hasOwn(d,'projects')){loginOnly=true;$('auth').hidden=true;$('workspace').hidden=true;$('logout').hidden=false;notice('账号已就绪。当前仅开放注册、登录与账号恢复。');return;}loginOnly=false;$('auth').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;for(const p of d.projects){const b=node('button',p.title);b.addEventListener('click',()=>openProject(p));$('projects').append(b);}if(!d.projects.length)$('projects').append(node('p','尚无已授权项目。请联系项目负责人核实合同关系，或登录接受专属邀请。'));$('channel-status').replaceChildren(...['web_ai','telegram','feishu'].map(k=>{const v=d.channels[k];const name={web_ai:'网页AI客服',telegram:'Telegram客服',feishu:'飞书客服'}[k];return node('p',name+'：'+(v.state==='PENDING_CONNECTION'?'待接通':'已配置，待验收'));}));
  }catch(error){
   if(error.stale||generation!==viewGeneration)return;
   if(error.status===401||error.status===403){clearSession();}

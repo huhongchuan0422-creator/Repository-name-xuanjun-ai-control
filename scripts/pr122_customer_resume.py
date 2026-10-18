@@ -2,6 +2,7 @@
 No CLI, command input, independent permit, alternate ledger or generic repair.
 """
 import errno
+from scripts import pr122_customer_profile as deployment
 import os
 import stat
 import time
@@ -93,7 +94,7 @@ class Journal:
         self.payloads = {str(release.CODE / p): b for p, b in files.items()}
         self.payloads[str(release.CODE / 'CUSTOMER_MANIFEST.json')] = raw
         self.payloads[str(release.SNIPPET)] = files['deploy/pr122-customer-center/locations.conf']
-        for unit in release.UNITS:
+        for unit in deployment.units(receipt['plan'],release.UNITS):
             self.payloads[str(release.UNIT / unit)] = files['deploy/pr122-customer-center/' + unit]
         self.payloads[str(self.txn / 'https.before')] = receipt['_backup_bytes']
         self.modes = {p: 0o644 for p in self.payloads}
@@ -307,16 +308,17 @@ def execute_steps(j,files):
         if path!=str(j.txn/'https.before'):j.file(Path(path))
     receipt['activation_started']=True;j.save()
     j.effect('DAEMON_RELOAD',lambda:r.run(['/usr/bin/systemctl','daemon-reload']))
-    j.readonly('UNIT_VERIFY',lambda:r.run(['/usr/bin/systemd-analyze','verify',*[str(r.UNIT/u) for u in r.UNITS]]))
+    j.readonly('UNIT_VERIFY',lambda:r.run(['/usr/bin/systemd-analyze','verify',*[str(r.UNIT/u) for u in deployment.units(receipt['plan'],r.UNITS)]]))
     j.effect('START_RUNTIME',lambda:r.run(['/usr/bin/systemctl','start',r.UNITS[0]]))
     j.readonly('RUNTIME_CHECK',lambda:r.runtime_check(receipt['plan']['account_uid']))
-    def publisher_identity():
-        for prop,expected in (('FragmentPath',str(r.UNIT/r.UNITS[3])),('DropInPaths','')):
-            need(r.run(['/usr/bin/systemctl','show',r.UNITS[3],'-p',prop,'--value']).decode().strip()==expected,'PUBLISHER_LOADED_UNIT_IDENTITY')
-    j.readonly('PUBLISHER_IDENTITY',publisher_identity)
-    j.effect('START_PUBLISHER',lambda:r.run(['/usr/bin/systemctl','start',r.UNITS[3]]))
-    def publisher_result():need(r.run(['/usr/bin/systemctl','show',r.UNITS[3],'-p','Result','--value']).decode().strip()=='success','PUBLISHER_REAL_START_FAILED')
-    j.readonly('PUBLISHER_RESULT',publisher_result)
+    if not deployment.is_login(receipt['plan']):
+        def publisher_identity():
+            for prop,expected in (('FragmentPath',str(r.UNIT/r.UNITS[3])),('DropInPaths','')):
+                need(r.run(['/usr/bin/systemctl','show',r.UNITS[3],'-p',prop,'--value']).decode().strip()==expected,'PUBLISHER_LOADED_UNIT_IDENTITY')
+        j.readonly('PUBLISHER_IDENTITY',publisher_identity)
+        j.effect('START_PUBLISHER',lambda:r.run(['/usr/bin/systemctl','start',r.UNITS[3]]))
+        def publisher_result():need(r.run(['/usr/bin/systemctl','show',r.UNITS[3],'-p','Result','--value']).decode().strip()=='success','PUBLISHER_REAL_START_FAILED')
+        j.readonly('PUBLISHER_RESULT',publisher_result)
     need(time.time()<receipt['approval']['expires_unix'],'APPROVAL_EXPIRED_BEFORE_NGINX');context(r,receipt)
     def nginx_write():
         old=receipt['_backup_bytes'];new=old.replace(r.ANCHOR,r.INCLUDE+r.ANCHOR)
@@ -329,12 +331,13 @@ def execute_steps(j,files):
     j.effect('NGINX_WRITE',nginx_write)
     j.readonly('NGINX_TEST',lambda:r.run(['/usr/sbin/nginx','-t']))
     j.effect('NGINX_RELOAD',lambda:r.run(['/usr/bin/systemctl','reload','nginx']))
-    j.effect('TRIGGERS_ENABLE',lambda:r.run(['/usr/bin/systemctl','enable','--now',r.UNITS[2],r.UNITS[4],r.UNITS[5]]))
+    j.effect('TRIGGERS_ENABLE',lambda:r.run(['/usr/bin/systemctl','enable','--now',*deployment.triggers(receipt['plan'],r.UNITS)]))
     def smoke():
         data=r.run(['/usr/bin/curl','--noproxy','*','--resolve','wenwenwenyiyiyi.work:443:127.0.0.1','--fail','--silent','--show-error','--max-time','15','https://wenwenwenyiyiyi.work/customer/center/'])
         need(digest(data)==digest(files['deploy/pr122-customer-center/ui/index.html']),'REAL_HTTPS_HTML')
     j.readonly('HTTPS_SMOKE',smoke)
-    receipt['completed']=['CODE_DIRECTORY','RUNTIME_STARTED','PUBLISHER_ROOT_TO_NONROOT_VERIFIED','NGINX_INSTALLED','HTTPS_SMOKE']
+    receipt['completed']=['CODE_DIRECTORY','RUNTIME_STARTED','NGINX_INSTALLED','HTTPS_SMOKE']
+    if not deployment.is_login(receipt['plan']):receipt['completed'].insert(2,'PUBLISHER_ROOT_TO_NONROOT_VERIFIED')
 
 
 def report(receipt,state):

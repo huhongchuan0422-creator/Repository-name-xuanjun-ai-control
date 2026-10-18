@@ -135,7 +135,8 @@
           "I1: exact independently received action approval must be separately pinned by Owner root; canonical GitHub commit/tree/code/ZIP facts plus one-attempt durable consumption and distinct outage-consented offline rollback fail closed before state or service mutation; shared GitHub author is not reviewer independence",
           "PR122 customer channel: exact four root-owned commands only; immutable feaef687 customer bundle and original signed install gate remain mandatory; Owner manual grant after independent channel review, no production grant implied by isolated tests",
           "客户原安装器仅新明确许可支持最多五次持久化受控准入；旧单次不扩权、UNKNOWN/部分执行与成功不重放，限安装副作用前且有准确诊断恢复证据的人工再尝试；详见客户中心实施文档2026-10-18增量。",
-          "客户安装 V2：同一明确许可最多五次持久化实际尝试；共享锁及逐次 lease/fence，固定自有文件恢复和只读复核；HOLD 仅凭原许可内可信 checkpoint 对账恢复，不重跑成功副作用，不扩展 V1 许可。专项离线测试与独立审核不代替现场验收。"
+          "客户安装 V2：同一明确许可最多五次持久化实际尝试；共享锁及逐次 lease/fence，固定自有文件恢复和只读复核；HOLD 仅凭原许可内可信 checkpoint 对账恢复，不重跑成功副作用，不扩展 V1 许可。专项离线测试与独立审核不代替现场验收。",
+          "Explicit independently signed OFFICIAL_LOGIN_ONLY_V1 preserves auth security and real SMTP/backup/runtime evidence while server-denying business routes and publication; a separately signed exact18000-second window reuses the original total five-attempt ledger without extending legacy permits."
         ],
         "tests": [
           "tests/test_pr122_website_release.py",
@@ -161,7 +162,10 @@
           "tests/test_pr122_customer_protected_runtime.py",
           "tests/test_pr122_customer_workflow_signature.py",
           "tests/test_pr122_customer_workflow_request.py",
-          "tests/test_pr122_customer_bind_tokens.py"
+          "tests/test_pr122_customer_bind_tokens.py",
+          "tests/test_pr122_customer_login_profile.py",
+          "tests/test_pr122_customer_login_release.py",
+          "tests/test_pr122_customer_login_ops_review.py"
         ]
       },
       "reuse": [
@@ -216,7 +220,11 @@
         "scripts/pr122_customer_workflow_request.py",
         "tests/test_pr122_customer_workflow_request.py",
         "scripts/pr122_customer_core.py",
-        "tests/test_pr122_customer_bind_tokens.py"
+        "tests/test_pr122_customer_bind_tokens.py",
+        "scripts/pr122_customer_profile.py",
+        "tests/test_pr122_customer_login_profile.py",
+        "tests/test_pr122_customer_login_release.py",
+        "tests/test_pr122_customer_login_ops_review.py"
       ]
     },
     {

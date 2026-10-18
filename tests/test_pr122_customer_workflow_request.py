@@ -36,7 +36,7 @@ def fixture():
             'pr122_customer_workflow_operations.py', 'pr122_customer_preparation.py',
             'pr122_customer_runtime_stage.py', 'pr122_customer_workflow_apply.py',
             'pr122_customer_resume.py', 'pr122_customer_attempts.py',
-            'pr122_customer_review.py')}
+            'pr122_customer_review.py', 'pr122_customer_profile.py')}
     files = {name: (root / name).read_bytes() for name in sorted(names)}
     manifest = {'source_commit': 'a' * 40, 'source_tree': 'b' * 40,
                 'files': [{'path': name, 'size': len(raw), 'sha256': digest(raw)}
@@ -482,7 +482,7 @@ class OriginalEntryTests(OfflineCase):
         self.apply.assert_called_once_with('/offline/source', 123, self.plan)
         self.assertNotIn('operations', self.apply.call_args.kwargs)
         self.protected.assert_called_once_with(Path('/offline/source'))
-        self.assertEqual(self.module_reader.call_count, 15)
+        self.assertEqual(self.module_reader.call_count, 16)
         for observed in self.module_reader.call_args_list:
             self.assertEqual(observed.kwargs, {'protected': True, 'code': True})
         self.legacy.assert_not_called()

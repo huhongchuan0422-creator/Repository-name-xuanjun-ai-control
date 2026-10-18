@@ -17,6 +17,7 @@ from pathlib import Path
 from scripts.pr122_customer_core import Denied,canonical,digest,private_path,secure_write
 from scripts.pr122_customer_attempts import Attempts, SAFE_ERRORS, validate_approval
 from scripts.pr122_customer_review import trust_digest
+from scripts import pr122_customer_profile as deployment
 
 CODE=Path('/usr/local/lib/xuanjun-customer-center')
 CONFIG=Path('/etc/xuanjun-customer-center')
@@ -99,16 +100,20 @@ def plan(folder):
     import base64
     need(len(base64.b64decode(c['backup_key'],validate=True))==32 and len(base64.b64decode(c['authority_verify_key'],validate=True))==32,'PROTECTED_KEYS_REQUIRED')
     need(c['backup_key_ref'] and c['active_key'] in c['keys'] and all(len(base64.b64decode(v,validate=True))==32 for v in c['keys'].values()),'DATA_KEY_MAPPING')
-    publisher=private_config(CONFIG/'publisher.json')
-    need(set(publisher)=={'keys','active_key','authority_sign_key','preview_test_trust'} and publisher['keys']==c['keys'] and publisher['active_key']==c['active_key'] and publisher['authority_sign_key']==c['authority_verify_key'],'PUBLISHER_CONFIG_BINDING')
-    test_trust=publisher['preview_test_trust']
-    need(type(test_trust) is dict and set(test_trust)=={'source_writer_principal','keys','allowed_harness_sha256'} and bool(test_trust['keys']) and bool(test_trust['allowed_harness_sha256']),'ENROLLED_TEST_PUBLISHER_REQUIRED')
-    from scripts.pr122_customer_delivery_source import validate_test_trust
-    validate_test_trust(test_trust)
-    providers=Providers(runtime['providers']).status();need(all(runtime['providers'].get(k) for k in ('smtp','telegram','feishu','secretref','web_ai')),'REAL_PROVIDER_CONFIG_REQUIRED')
+    selected=deployment.validate_pair(c,runtime)
+    login_only=selected==deployment.LOGIN_ONLY
+    if not login_only:
+        publisher=private_config(CONFIG/'publisher.json')
+        need(set(publisher)=={'keys','active_key','authority_sign_key','preview_test_trust'} and publisher['keys']==c['keys'] and publisher['active_key']==c['active_key'] and publisher['authority_sign_key']==c['authority_verify_key'],'PUBLISHER_CONFIG_BINDING')
+        test_trust=publisher['preview_test_trust']
+        need(type(test_trust) is dict and set(test_trust)=={'source_writer_principal','keys','allowed_harness_sha256'} and bool(test_trust['keys']) and bool(test_trust['allowed_harness_sha256']),'ENROLLED_TEST_PUBLISHER_REQUIRED')
+        from scripts.pr122_customer_delivery_source import validate_test_trust
+        validate_test_trust(test_trust)
+        providers=Providers(runtime['providers']).status();need(all(runtime['providers'].get(k) for k in ('smtp','telegram','feishu','secretref','web_ai')),'REAL_PROVIDER_CONFIG_REQUIRED')
     # Source-only tests cannot satisfy actual scan/KMS/provider/authority evidence.
     acceptance=private_config(CONFIG/'TARGET_ACCEPTANCE.json')
     required=('canonical_identity_mapping','canonical_order_contract_export','canonical_customer_project_mapping','key_backup_recovery','scanner_clean_and_eicar','smtp_verified_account_recovery','telegram_callback_identity','feishu_callback_identity','secretref_metadata_authority','web_ai_provider_identity','telegram_token_path_confidentiality','preview_test_signer_custody')
+    if login_only:required=deployment.LOGIN_ACCEPTANCE
     need(set(acceptance)=={'manifest_sha256','evidence'} and acceptance['manifest_sha256']==digest(raw) and set(acceptance['evidence'])==set(required),'TARGET_ACCEPTANCE_BINDING')
     for key in required:
         v=acceptance['evidence'][key];need(type(v) is dict and set(v)=={'sha256','path'} and len(v['sha256'])==64,'TARGET_EVIDENCE_SCHEMA')
@@ -127,7 +132,17 @@ def plan(folder):
     need(nginx_uid>0,'NON_ROOT_NGINX_WORKER_REQUIRED')
     trust=private_config(CONFIG/'INDEPENDENT_REVIEW_TRUST.json')
     tar_sha=archive_binding(folder,manifest,raw)
-    return {'publisher_config_sha256':digest((CONFIG/'publisher.json').read_bytes()),'isolated_python':runtime_identity,'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'telegram_credential_evidence_sha256':acceptance['evidence']['telegram_token_path_confidentiality']['sha256'],'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
+    result={'isolated_python':runtime_identity,'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
+    if login_only:
+        result.update(deployment_profile=deployment.LOGIN_ONLY,permit_window_seconds=deployment.WINDOW_SECONDS,
+                      login_acceptance_sha256=digest(canonical(acceptance['evidence'])))
+    else:
+        result.update(publisher_config_sha256=digest((CONFIG/'publisher.json').read_bytes()),
+                      telegram_credential_evidence_sha256=acceptance['evidence']['telegram_token_path_confidentiality']['sha256'])
+    if 'permit_window_seconds' in c:
+        need(type(c['permit_window_seconds']) is int and c['permit_window_seconds']==deployment.WINDOW_SECONDS,'CONFIG_FIVE_HOUR_WINDOW')
+        result['permit_window_seconds']=c['permit_window_seconds']
+    return result
 
 def archive_binding(folder,manifest,manifest_raw):
     import tarfile
@@ -153,7 +168,7 @@ def github(path):
 def gate(comment_id,expected_plan,fetch=github):
     c=fetch('issues/comments/'+str(comment_id));need(c['id']==comment_id and c['user']['login']==OWNER and c['issue_url'].endswith('/issues/122') and c['body'].startswith('XUANJUN_CUSTOMER_INSTALL\n'),'APPROVAL_ORIGIN')
     a=json.loads(c['body'].split('\n',1)[1]);need(a['decision']=='INSTALL_APPROVED' and a['transaction']==TXN and a['plan_sha256']==digest(canonical(expected_plan)) and a['manifest_sha256']==expected_plan['manifest_sha256'] and a['source_commit']==expected_plan['source_commit'] and validate_approval(a)>=1 and a['rollback_approved'] is True,'APPROVAL_BINDING')
-    need(type(a['issued_unix']) is int and type(a['expires_unix']) is int and a['issued_unix']<=time.time()<a['expires_unix'] and 0<a['expires_unix']-a['issued_unix']<=7200,'APPROVAL_EXPIRY')
+    deployment.validate_window(a,expected_plan,time.time())
     r=fetch('issues/comments/'+str(a['review_comment_id']))
     need(r['id']!=comment_id and r['user']['login']==OWNER and r['issue_url'].endswith('/issues/122'),'REVIEW_RECORD_ORIGIN')
     trust_raw=private_path(CONFIG/'INDEPENDENT_REVIEW_TRUST.json').read_bytes()
@@ -234,7 +249,7 @@ def workflow_entry(folder,comment):
     from scripts import pr122_customer_attempts as attempts
     from scripts import pr122_customer_review as review
     for module in (sys.modules[__name__],request,coordinator,operations,preparation,runtime_stage,customer,resume,attempts,review,
-                   operations.runtime,operations.channel,operations.account,operations.bootstrap,operations.probe):
+                   operations.runtime,operations.channel,operations.account,operations.bootstrap,operations.probe,deployment):
         name=module.__name__.replace('.','/')+'.py'
         if module is sys.modules[__name__]:name='scripts/pr122_customer_release.py'
         need(name in files and request.read_bytes(module.__file__,protected=True,code=True)==files[name],
@@ -263,7 +278,7 @@ def apply(folder,comment):
         if os.path.lexists(STATE/TXN):
             # Only a newly admitted V2 transaction can enter this branch.
             return resume.apply_locked(sys.modules[__name__],folder,comment,lock_fd=stream.fileno())
-        observed=plan(folder);approval=gate(comment,observed)
+        observed=plan(folder);need(not deployment.is_login(observed),'LOGIN_WHOLE_WORKFLOW_ENTRY_REQUIRED');approval=gate(comment,observed)
         need(approval.get('attempt_policy')!='CONTROLLED_WHOLE_WEBSITE_V3','WHOLE_WORKFLOW_ENTRY_REQUIRED')
         if approval.get('attempt_policy')==resume.POLICY:
             return resume.apply_locked(sys.modules[__name__],folder,comment,observed,approval,lock_fd=stream.fileno())

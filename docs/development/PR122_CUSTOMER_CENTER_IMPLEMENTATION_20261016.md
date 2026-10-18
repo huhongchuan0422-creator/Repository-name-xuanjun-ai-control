@@ -165,3 +165,16 @@ c69c5841 Hosted 原客户测试在 /bind 输入上被 USE_OAUTH_OR_SECRETREF 拒
 新增确定性回归覆盖碰撞生成、真实secret形态拒绝、subject/channel作用域、expiry、一次性与event幂等、旧普通token兼容、其它challenge编码及未知hex拒绝；原Hosted失败记录保留，修复必须新提交/新CI，不盲重跑旧head。
 
 本批已确认本地10项新增确定性回归与原Customer21项合计31项全部通过；包结构96成员/95绑定，包含新测试，生产未运行。最终Hosted结果另行登记。
+
+
+## 2026-10-18 官方登录限定部署增量（待独立审核与新制品）
+
+新增明确 `OFFICIAL_LOGIN_ONLY_V1`，默认/旧配置仍 `FULL`，完整模式原五 provider、publisher 与12项 TARGET_ACCEPTANCE 门禁保持。官网静态文件和导航不改。限定模式仅提供注册、邮箱激活、登录、找回/重置、退出及最小本人状态 `/me`；业务API、callbacks、预览、项目/邀请/上传/消息/发布/AI在服务端读取请求体和创建数据对象前拒绝。UI只显示账号已就绪，不显示假项目或已验收业务。
+
+限定配置与 runtime 的 deployment_profile 和 SMTP 配置必须一致，仅允许 SMTP provider。密码/邮箱归属校验、一次性challenge、会话撤销、CSRF/安全cookie、可信Nginx来源、限流、加密密钥与独立审核保管均保留。真实前置为受保护配置、非root身份和隔离runtime、备份材料、真实SMTP；TARGET_ACCEPTANCE精确四项：canonical_identity_mapping、key_backup_recovery、smtp_verified_account_recovery、login_session_security。配置/证据缺失不由fixture或CI替代。
+
+计划和独立Ed25519审核payload新增绑定 deployment_profile、login_acceptance_sha256、permit_window_seconds；限定模式精确18000秒，Owner许可必须同值且 max_executions=5、仍用既有 CONTROLLED_WHOLE_WEBSITE_V3。FULL若明确申请新18000秒窗口亦须在受保护config、计划、Owner许可及独立签名中逐一绑定；无该字段的旧许可仍上限7200秒。复用原交易、共享持久额度、锁/fence、已完成checkpoint、失败对账和成功终止，不增加V4/第二账本。旧已安装单次probe与其1800秒许可不被扩展，PROBE仍要求已有真实成功回执。
+
+安装仅配置center服务、邮件delivery服务与timer，不安装/启动publisher及publication socket/timer。限定worker只发认证邮件；业务CLI在factory/DB前拒绝。原integrity/backup/restore-isolated保留；隔离恢复仍进入maintenance并需fresh authority，不能称无需新授权即可恢复登录。仅借用原受控客户apply阶段，没有新生产许可。
+
+本地新增57项专项（22发布/签名/申请/安装checkpoint、27HTTP、8ops）与既有回归；DOM harness补最小/me模式。原entry fixture增加第16个固定profile模块字节绑定。本地相关376个唯一测试全部通过、0 skip，DOM harness通过。首次误将Hosted以sudo运行的旧ReviewTests纳入非root本地组，产生1个既有root-owner fixture错误，保留日志；未修改或放宽生产root校验，最终376组按非root适用范围执行。Hosted须运行原测试与新增专项并重建新制品。包闭包本地结构100成员/99绑定；本地模拟source ID不是可部署新pin。新提交/Hosted制品/完整许可、现场runtime/config/SMTP/保管与真实验收仍待完成。

@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from scripts.pr122_customer_core import Center,Denied,canonical,digest,private_path,secure_write
 from scripts.pr122_customer_providers import Providers,ClamScanner,SecretRefMetadata,load_config,drain_mail,drain_message
+from scripts.pr122_customer_profile import FULL,LOGIN_ONLY,profile,validate_pair
 
 HOST='iZvt5t8tlrm8oiZ'
 ROOT=Path('/var/lib/xuanjun-customer-center')
@@ -28,8 +29,11 @@ def validate_runtime_contexts(config, runtime):
     fields={'message_evidence_context':set(CONTEXT_FIELDS), 'privacy_policy_context':set(POLICY_FIELDS),
             'privacy_processing_context':{'requester_id','project_id','tenant_id','customer_id','request_id','revision','status','status_ref','actor_ref','occurred_at','outcome_ref'}}
     required={'keys','active_key','providers'}
-    if type(runtime) is not dict or not required <= set(runtime) or set(runtime)-required-set(RUNTIME_CONTEXT_DEPTH):
+    if type(runtime) is not dict or not required <= set(runtime) or set(runtime)-required-set(RUNTIME_CONTEXT_DEPTH)-{'deployment_profile'}:
         raise Denied('RUNTIME_CREDENTIAL_MINIMUM')
+    selected=validate_pair(config,runtime)
+    if selected==LOGIN_ONLY and canonical(config['providers'])!=canonical(runtime['providers']):
+        raise Denied('RUNTIME_PROVIDER_BINDING')
     def mapping(value, depth, allowed, integer_fields):
         if type(value) is not dict:raise Denied('RUNTIME_CONTEXT_MAPPING')
         if depth:
@@ -48,10 +52,12 @@ def validate_runtime_contexts(config, runtime):
 
 
 def factory(config):
+    selected=profile(config)
+    validate_pair(config,config)
     scan=Path('/run/xuanjun-customer-scan')
-    if scan.exists() and scan.stat().st_uid==os.geteuid():os.chmod(scan,0o700)
+    if selected==FULL and scan.exists() and scan.stat().st_uid==os.geteuid():os.chmod(scan,0o700)
     keys={k:base64.b64decode(v,validate=True) for k,v in config['keys'].items()}
-    return Center(ROOT,keys,config['active_key'],mail_ready=bool(config.get('providers',{}).get('smtp')),scanner=ClamScanner(),secretref=SecretRefMetadata(config['providers']['secretref']['socket'],config['providers']['secretref']['peer_uid']) if config.get('providers',{}).get('secretref') else None,evidence_context=lambda uid,pid:config.get('message_evidence_context',{}).get(pid,{}).get(uid,{}),privacy_policy_context=lambda uid,pid:config.get('privacy_policy_context',{}).get(pid,{}),privacy_processing_context=lambda uid,pid,rid:config.get('privacy_processing_context',{}).get(pid,{}).get(uid,{}).get(rid,{}))
+    return Center(ROOT,keys,config['active_key'],mail_ready=bool(config.get('providers',{}).get('smtp')),scanner=ClamScanner() if selected==FULL else None,secretref=SecretRefMetadata(config['providers']['secretref']['socket'],config['providers']['secretref']['peer_uid']) if selected==FULL and config.get('providers',{}).get('secretref') else None,evidence_context=(lambda uid,pid:config.get('message_evidence_context',{}).get(pid,{}).get(uid,{})) if selected==FULL else None,privacy_policy_context=(lambda uid,pid:config.get('privacy_policy_context',{}).get(pid,{})) if selected==FULL else None,privacy_processing_context=(lambda uid,pid,rid:config.get('privacy_processing_context',{}).get(pid,{}).get(uid,{}).get(rid,{})) if selected==FULL else None)
 
 def backup(center,output,backup_key,key_ref):
     if type(backup_key) is not bytes or len(backup_key)!=32 or not key_ref:raise Denied('SEPARATE_BACKUP_KEY_REQUIRED')
@@ -125,6 +131,14 @@ def main():
     ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','publisher','import-authority','import-change-authority','issue-preview-delivery','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
     if os.geteuid()!=0 and args.action not in ('serve','worker'):raise SystemExit('HOLD: PROTECTED_OPERATOR_REQUIRED')
     if os.uname().nodename!=HOST:raise SystemExit('HOLD: WRONG_HOST')
+    config=None
+    if args.action not in ('serve','worker'):
+        # Read the protected scope before publisher import, input-file reads,
+        # privilege changes, factory construction or any database access.
+        config=load_config(CONFIG)
+        selected=profile(config);validate_pair(config,config)
+        if selected==LOGIN_ONLY and args.action not in ('integrity','backup','restore-isolated'):
+            raise Denied('LOGIN_ONLY_OPERATOR_SCOPE')
     if args.action=='publisher':
         from scripts.pr122_customer_publication_worker import main_worker
         print(json.dumps(main_worker(),sort_keys=True));return
@@ -145,8 +159,8 @@ def main():
         st=cred.stat()
         if st.st_uid!=os.geteuid() or st.st_mode&0o077:raise SystemExit('HOLD: SYSTEMD_CREDENTIAL_REQUIRED')
         config=json.loads(cred.read_bytes())
+        validate_runtime_contexts(config,config)
     else:
-        config=load_config(CONFIG)
         # Protected root admission, then perform data I/O as the one runtime
         # identity so WAL/object ownership cannot drift after operator backup.
         import pwd
@@ -154,12 +168,14 @@ def main():
         if account.pw_uid<=0:raise SystemExit('HOLD: NON_ROOT_ACCOUNT_REQUIRED')
         os.umask(0o077);os.setgroups([]);os.setgid(account.pw_gid);os.setuid(account.pw_uid)
     c=factory(config)
+    selected=profile(config)
     try:
         if args.action=='serve':
             from scripts.pr122_customer_http import serve
-            c.db.close();serve(lambda:factory(config),Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui');return
+            c.db.close();serve(lambda:factory(config),Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui',deployment_profile=selected);return
         if args.action=='worker':
-            p=Providers(config.get('providers',{}));result={'mail':drain_mail(c,p,'https://wenwenwenyiyiyi.work'),'message':drain_message(c,p)}
+            p=Providers(config.get('providers',{}));result={'mail':drain_mail(c,p,'https://wenwenwenyiyiyi.work')}
+            if selected==FULL:result['message']=drain_message(c,p)
         elif args.action=='import-authority':
             result=c.import_authority(json.loads(private_path(args.input).read_bytes()),base64.b64decode(config['authority_verify_key'],validate=True))
             # Resume is a separate reviewed operator decision after restore; CLI

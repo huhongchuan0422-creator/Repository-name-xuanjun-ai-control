@@ -2,6 +2,7 @@
 No nested Attempts construction, extra permit, alternate budget or retry loop.
 """
 import errno
+from scripts import pr122_customer_profile as deployment
 import os
 from pathlib import Path
 from scripts import pr122_customer_resume as resume
@@ -107,7 +108,7 @@ def execute(lease,release,folder):
         payloads={str(release.CODE/p):b for p,b in files.items()}
         payloads[str(release.CODE/'CUSTOMER_MANIFEST.json')]=raw
         payloads[str(release.SNIPPET)]=files['deploy/pr122-customer-center/locations.conf']
-        for unit in release.UNITS:payloads[str(release.UNIT/unit)]=files['deploy/pr122-customer-center/'+unit]
+        for unit in deployment.units(observed,release.UNITS):payloads[str(release.UNIT/unit)]=files['deploy/pr122-customer-center/'+unit]
         payloads[str(txn/'https.before')]=old
         receipt={'schema':3,'policy':POLICY,'state':'INSTALLING','approval':lease.approval,'plan':observed,
                  'owned':{},'completed':[],'intent':None,'directories':{},'files':{},'checkpoints':{},

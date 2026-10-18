@@ -16,6 +16,7 @@ from scripts.pr122_customer_providers import Providers,enqueue,ai_reply
 from scripts.pr122_customer_changes import Changes
 from scripts.pr122_customer_publication_worker import enqueue as enqueue_preview_report,status as publication_status
 from scripts.pr122_customer_edit_jobs import enqueue as enqueue_small_edit
+from scripts.pr122_customer_profile import FULL,LOGIN_ONLY,profile
 
 PREFIX='/customer/center/'
 CSP="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -38,8 +39,9 @@ class CustomerUnixServer(socketserver.UnixStreamServer):
     request_queue_size=128
 
 class App:
-    def __init__(self,factory,providers,origin,assets,*,source_identity=reject_untrusted):
+    def __init__(self,factory,providers,origin,assets,*,source_identity=reject_untrusted,deployment_profile=FULL):
         if origin!='https://wenwenwenyiyiyi.work':raise ValueError('PINNED_ORIGIN_REQUIRED')
+        self.deployment_profile=profile({'deployment_profile':deployment_profile})
         self.factory=factory;self.providers=providers;self.origin=origin;self.assets=Path(assets);self.source_identity=source_identity
     def handler(self):
         app=self
@@ -72,6 +74,13 @@ class App:
                         name={'': 'index.html','app.css':'app.css','app.js':'app.js','feedback.js':'feedback.js','feedback.css':'feedback.css'}[path[len(PREFIX):]]
                         raw=(app.assets/name).read_bytes();ctype={'index.html':'text/html; charset=utf-8','app.css':'text/css; charset=utf-8','app.js':'application/javascript; charset=utf-8','feedback.js':'application/javascript; charset=utf-8','feedback.css':'text/css; charset=utf-8'}[name]
                         return self.reply(200,raw,ctype)
+                    if app.deployment_profile==LOGIN_ONLY:
+                        # This is an allowlist before body reads, factory/DB access,
+                        # business reads, preview rendering and provider callbacks.
+                        auth_paths={PREFIX+'api/'+name for name in ('register','verify','login','request_reset','reset','logout')}
+                        allowed=(self.command=='POST' and path in auth_paths) or (
+                            self.command in ('GET','HEAD') and path==PREFIX+'api/me')
+                        if not allowed:raise Denied('LOGIN_ONLY_AUTH_SCOPE')
                     if not path.startswith((PREFIX+'api/',PREFIX+'preview/')) and path not in (PREFIX+'webhooks/telegram',PREFIX+'webhooks/feishu'):return self.reply(404,{'error':'NOT_FOUND'})
                     body={};raw=b''
                     if self.command=='POST':
@@ -123,6 +132,10 @@ class App:
                         center.logout(self.token())
                         return self.reply(200,{'logged_out':True},cookie=COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0')
                     uid=center.session(self.token(),self.headers.get('X-CSRF-Token','') if self.command=='POST' else None)
+                    if app.deployment_profile==LOGIN_ONLY:
+                        # session() already verifies the account and current epoch.
+                        # No project enumeration or provider status is exposed.
+                        return self.reply(200,{'user_id':uid,'account_status':'VERIFIED'})
                     if path.startswith(PREFIX+'preview/'):
                         from scripts.pr122_customer_preview import render,served
                         if self.command not in ('GET','HEAD'):return self.reply(405,{'error':'READ_ONLY_PREVIEW'})
@@ -210,7 +223,7 @@ class App:
             def do_PATCH(self):self.execute()
         return Handler
 
-def serve(factory,providers,assets):
+def serve(factory,providers,assets,*,deployment_profile=FULL):
     # Single-process bounded service serializes permission revocation and outbound
     # work; each request gets a fresh SQLite connection. application limits authenticated writes and credential attempts.
     import grp,os,socketserver
@@ -218,7 +231,7 @@ def serve(factory,providers,assets):
     # Private service-owned directory plus pinned Nginx group prevents another
     # local application impersonating a crashed loopback backend.
     if path.exists() or path.is_symlink():raise RuntimeError('SOCKET_EXISTS_INSPECT_FIRST')
-    server=CustomerUnixServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid)).handler())
+    server=CustomerUnixServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid),deployment_profile=deployment_profile).handler())
     os.chown(path,-1,grp.getgrnam('nginx').gr_gid);os.chmod(path,0o660)
     try:server.serve_forever()
     finally:server.server_close();path.unlink(missing_ok=True)
