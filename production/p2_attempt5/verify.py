@@ -39,9 +39,9 @@ def main():
     for index, (directory, pattern, count) in enumerate(cases):
         script = ('import sys,unittest;sys.path.insert(0,%r);'
                   'suite=unittest.defaultTestLoader.discover(%r,pattern=%r);'
-                  'assert suite.countTestCases()==%d;'
+                  'print("DISCOVERED_TESTS=",suite.countTestCases(),flush=True);'
                   'r=unittest.TextTestRunner(verbosity=2).run(suite);'
-                  'assert r.wasSuccessful() and not r.skipped' %
+                  'assert r.wasSuccessful() and not r.skipped and r.testsRun==%d' %
                   (directory, directory, pattern, count))
         result = subprocess.run([sys.executable, '-I', '-B', '-S', '-c', script],
                                 cwd=str(ROOT), stdout=subprocess.PIPE,
