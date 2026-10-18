@@ -1,0 +1,128 @@
+name: PR122 fixed domestic staging read-only
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+# One workflow/action family per exact source HEAD. A later queued label must
+# inspect the earlier finished cloud job, not take a second clean-run path.
+concurrency:
+  group: pr122-staging-readonly-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  hosted_tests:
+    name: hosted-readonly-candidate-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Pure mock tests without cloud credentials
+        run: python3 -m unittest discover -s evidence/pr122-static-cloud-readonly -p 'test_*.py' -v
+
+  cloud_readonly:
+    name: domestic-staging-readonly-cloud
+    needs: hosted_tests
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'labeled' &&
+      github.run_attempt == 1 && github.actor_id == '332398908' &&
+      github.repository_id == '1413132159' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.event.sender.id == 332398908 && github.event.pull_request.number == 122 &&
+      github.event.pull_request.head.repo.id == 1413132159 &&
+      github.event.pull_request.head.ref == 'feature/work-pr122-site-hub-integration-20261016' &&
+      github.event.label.name == format('pr122-staging-readonly-{0}', github.event.pull_request.head.sha)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify current HEAD and complete history; prepare fixed intent
+        run: python3 evidence/pr122-static-cloud-readonly/fixed_runner.py prepare-dispatch
+      - name: Persist intent before STS or SWAS
+        id: intent
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr122-readonly-intent-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}
+          path: pr122-readonly-state/intent.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+      - name: Read back intent, repeat history admission, dispatch exactly once
+        env:
+          INTENT_ARTIFACT_ID: ${{ steps.intent.outputs.artifact-id }}
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+        run: python3 evidence/pr122-static-cloud-readonly/fixed_runner.py dispatch-once
+      - name: Persist InvokeId or unknown outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr122-readonly-dispatch-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}
+          path: pr122-readonly-state/dispatch.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+      - name: Query only the persisted invocation and validate bounded receipt
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+        run: python3 evidence/pr122-static-cloud-readonly/fixed_runner.py query-current
+      - name: Preserve sanitized result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr122-readonly-result-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}
+          path: pr122-readonly-state/result.json
+          if-no-files-found: warn
+          retention-days: 90
+          overwrite: false
+
+  query_readonly:
+    name: domestic-staging-readonly-query
+    needs: hosted_tests
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'labeled' &&
+      github.run_attempt == 1 && github.actor_id == '332398908' &&
+      github.repository_id == '1413132159' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.event.sender.id == 332398908 && github.event.pull_request.number == 122 &&
+      github.event.pull_request.head.repo.id == 1413132159 &&
+      github.event.pull_request.head.ref == 'feature/work-pr122-site-hub-integration-20261016' &&
+      github.event.label.name == format('pr122-staging-readonly-query-{0}', github.event.pull_request.head.sha)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Recover exact prior InvokeId from verified artifacts; query only
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+        run: python3 evidence/pr122-static-cloud-readonly/fixed_runner.py query-previous
+      - name: Preserve sanitized query result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr122-readonly-query-result-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}
+          path: pr122-readonly-state/result.json
+          if-no-files-found: warn
+          retention-days: 90
+          overwrite: false
