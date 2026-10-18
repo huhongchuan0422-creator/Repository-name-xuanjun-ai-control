@@ -457,3 +457,23 @@ ApplicationIngressGate实际管理有界普通队列和同步事务：接收时�
 **仅组件源码完成，现场第二类阻塞不关闭**：尚未将原三个应用的全部同步写入/异步队列和其他origin接到该组件，没有安装新端点或把单进程观察伪装成全局可信排空。完整数据/全部来源、原guard/controller/fd/捕获链实机验收、原候选正常发布与M99、独审许可、正式迁移验收共6类仍未闭合，详细责任与缺项见证据blockers。现网接线并非只等独审。
 
 本批主机命令/数据库打开/服务启停/生产Writer/迁移切换均0；无本窗口后台迁移任务。东京、国内桥接/Windows保留，不要求Owner重配RAM、贴代码/密码或再找执行窗口。源码增量供原独审，不自签许可。完整证据：evidence/pr99-service-handoff/aliyun-execution/APPLICATION_INGRESS_DELIVERY_20261019.json。
+
+
+## 2026-10-19 00:56 CST｜Owner直接执行：账户及三个停止候选单元已实机安装
+
+本节覆盖早期“等待独审/正式许可”的当前状态：Owner于00:29明确取消这两项等待，并于00:49再次确认。本窗口直接接续执行，不要求Owner逐项批准。真实技术条件和实际平台拒绝仍按原错误处理；不将UNKNOWN判为通过。
+
+已完成现场动作：
+- 国内专用账户xuanjun-s07已创建，UID992/GID991，无登录shell、未建home。[run39145761696](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39145761696)，job117729165434，Invoke t-sh070fg0jfiifpc，00:36:36 CST。
+- 三个原新名候选unit已安装，保持停止；同一原安装STATE和lock，原R2准确字节和真实验收回执。[run39146617633](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39146617633)，job117731669674，Invoke t-sh070fh0ruuncao，00:47:54 CST。新增unit3、daemon-reload1、start/enable均0、数据库和路由动作0，protected未变。
+- 首次安装run39146426810/job117731113279/Invoke t-sh070fgsorn44cg真实失败PRIVATE_INPUT_MODE，完整脱敏回执保留。纠正批先确认原安装STATE不存在、目标unit不存在且停止，再将原R2验收回执0644收紧为0600；相同字节和身份。没有删除重加旧label、重放UNKNOWN或伪造成功。
+
+新增正式启动入口源码：CODE_COMMIT=370cc24a4b8c07dc0100ff2c89f9dd6e53a0c243；CODE_TREE=43b4e036b08276ae37758850bd4b7eca4a37cea7。owner-start/owner_production_start.py明确使用Owner直接授权，不要求reviewer ID或新许可；保留真实最终文件/Fence/checkpoint/canonical Writer assignment校验。借用同一原停止安装锁，原精确停止候选安全退役后才创建正式unit；原生产STATE和UNKNOWN不重发语义保留。
+
+[Hosted CI39147242803](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39147242803)：Python3.11/job117733460568、3.12/job117733460335各17/17 PASS，0跳过；完整日志及Commit/Tree/源码SHA已核对。包含普通临时文件上完整启动核心调用链与未知native启动结果保留测试。原生systemctl均为mock，不是实机生产启动/M99。新正式入口尚未落到主机或执行。
+
+**生产迁移仍未完成**：实际有效配置/权威数据及所有相关写入来源仍需完成；真实入口排空、原控制器/fd、内核Fence、完整最终捕获/接收/核对尚未实机完成；最终checkpoint与canonical assignment没有生成，不能拿R2初步数据作生产库；业务/鉴权/上游/切换/恢复验收未执行。这些是本执行方未完成的技术工作，不是Owner授权、独审或许可等待。原40文件未重发，M99未运行，原发布拒绝原文仍NOT_FOUND；本批独立Owner源码已正常发布，不声称GitHub全局不可写。
+
+三个现场命令批均已终态；当前无本窗口后台迁移任务、没有领取生产数据Writer或执行切换。东京、国内桥接、Windows、Nginx保留。英国P2不在本批范围。无需重配RAM、贴密码/密钥或重新交接。
+
+完整回执：evidence/pr99-service-handoff/aliyun-execution/OWNER_DIRECT_INSTALL_DELIVERY_20261019.json。
