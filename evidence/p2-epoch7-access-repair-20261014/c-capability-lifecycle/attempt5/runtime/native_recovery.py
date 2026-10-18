@@ -6,6 +6,9 @@ Admission/recovery must come from the independent signed receipt provider.
 There is deliberately no default production transport or key.
 """
 import copy
+import os
+import stat
+from receipt_provider import canonical
 from receipt_provider import ReceiptProvider, Hold, need, digest
 import native_state
 
@@ -70,21 +73,106 @@ class NativeRecovery(object):
             return original(*args,**kwargs)
         authority.receipt=guarded_receipt
 
+    def _durable_binding(self,name,value):
+        raw=canonical(value);path=os.path.join(self.ledger.directory,name)
+        try:fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
+        except FileExistsError:
+            fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+            try:
+                info=os.fstat(fd)
+                need(stat.S_ISREG(info.st_mode) and info.st_nlink==1 and info.st_uid==os.geteuid() and
+                     stat.S_IMODE(info.st_mode)==0o600,'PERSISTED_ADMISSION_AUTHORITY')
+                need(os.read(fd,len(raw)+1)==raw,'PERSISTED_ADMISSION_CONFLICT')
+            finally:os.close(fd)
+        else:
+            try:
+                view=memoryview(raw)
+                while view:
+                    count=os.write(fd,view);need(count>0,'ADMISSION_WRITE');view=view[count:]
+                os.fsync(fd)
+            finally:os.close(fd)
+            fd=os.open(self.ledger.directory,os.O_DIRECTORY|os.O_RDONLY|os.O_NOFOLLOW)
+            try:os.fsync(fd)
+            finally:os.close(fd)
+        return value
+
+    def bind_command(self,command_sha):
+        from attempt_ledger import HEX64
+        need(type(command_sha) is str and HEX64.fullmatch(command_sha),'COMMAND_BINDING')
+        self.ledger._fresh()
+        return self._durable_binding('attempt5-command.json',{'grant_sha256':digest(self.ledger.grant),'command_sha256':command_sha})
+
+    def _admission_payload(self,attempt,command_sha):
+        import json
+        snapshot=self.ledger.snapshot();row=snapshot['attempts'][-1]
+        need(row['id']==attempt,'ADMISSION_ATTEMPT')
+        name='admission-'+digest({'attempt_id':attempt})+'.json'
+        path=os.path.join(self.ledger.directory,name)
+        if os.path.lexists(path):
+            fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+            try:
+                raw=os.read(fd,4097);need(len(raw)<=4096,'ADMISSION_BOUND')
+                payload=json.loads(raw.decode('utf-8'))
+            finally:os.close(fd)
+            need(type(payload) is dict and set(payload)=={'ordinal','command_sha256','ledger_sha256'} and
+                 payload['ordinal']==row['ordinal'] and payload['command_sha256']==command_sha,'ADMISSION_LOCAL_BINDING')
+            return self._durable_binding(name,payload)
+        need(row['state']=='INTENT_RECORDED' and not any(e['kind']=='execution_intent' for e in row['events']),'ADMISSION_HISTORY_MISSING')
+        return self._durable_binding(name,{'ordinal':row['ordinal'],'command_sha256':command_sha,'ledger_sha256':digest(snapshot)})
+
+    def confirm_admission(self,attempt,command_sha):
+        self.bind_command(command_sha)
+        snapshot=self.ledger.snapshot();row=snapshot['attempts'][-1]
+        need(row['id']==attempt,'ADMISSION_ATTEMPT')
+        if row['state']=='CLAIMED':
+            self.fence('CANDIDATE','CONFIRM_CLAIM')
+            self.ledger.intent(attempt,command_sha)
+            row=self.ledger.snapshot()['attempts'][-1]
+        intents=[e for e in row['events'] if e['kind']=='intent']
+        need(len(intents)==1 and intents[0]['sha256']==command_sha,'ADMISSION_COMMAND_CONFLICT')
+        payload=self._admission_payload(attempt,command_sha)
+        observed=self.proof(attempt,'query_attempt_consumption',payload)
+        need(observed.get('binding')==payload and observed.get('status') in ('ABSENT','CONSUMED') and
+             observed.get('ordinal')==row['ordinal'] and observed.get('max_attempts')==5,'CONSUMPTION_QUERY_UNKNOWN')
+        if observed['status']=='ABSENT':
+            need(row['state']=='INTENT_RECORDED' and not any(e['kind']=='execution_intent' for e in row['events']),'MISSING_SHARED_EXECUTION_HISTORY')
+            self.fence('CANDIDATE','CONFIRM_CONSUME')
+            observed=self.proof(attempt,'consume_attempt',payload)
+            need(observed.get('status')=='CONSUMED' and observed.get('ordinal')==row['ordinal'] and
+                 observed.get('max_attempts')==5,'GLOBAL_QUOTA_UNKNOWN')
+        return observed
+
     def begin(self, command_sha):
-        # Global authority must atomically consume the same ordinal before any
-        # native admission. An interrupted local claim remains consumed/HOLD.
-        self.fence('CANDIDATE', 'CLAIM')
-        attempt = self.ledger.claim()
-        self.ledger.intent(attempt, command_sha)
-        snapshot = self.ledger.snapshot()
-        proof = self.proof(attempt, 'consume_attempt',
-                           {'ordinal': len(snapshot['attempts']),
-                            'command_sha256': command_sha,
-                            'ledger_sha256': digest(snapshot)})
-        need(proof.get('status') == 'CONSUMED' and
-             proof.get('ordinal') == len(snapshot['attempts']) and
-             proof.get('max_attempts') == 5, 'GLOBAL_QUOTA_UNKNOWN')
+        self.bind_command(command_sha)
+        self.fence('CANDIDATE','CLAIM')
+        attempt=self.ledger.claim()
+        self.ledger.intent(attempt,command_sha)
+        self.confirm_admission(attempt,command_sha)
         return attempt
+
+    def converge_committed(self,attempt):
+        response=self.proof(attempt,'read_committed_outcome',{})
+        need(response.get('binding')=={} and response.get('status') in ('UNRESOLVED','COMMITTED_OUTCOME'),'COMMITTED_QUERY_UNKNOWN')
+        committed=response.get('committed')
+        if response['status']=='UNRESOLVED':
+            need(committed is None,'COMMITTED_QUERY_CONFLICT')
+            return False
+        need(type(committed) is dict,'COMMITTED_QUERY_PROOF')
+        if committed.get('outcome')=='NO_WRITE':
+            with self.driver.controls.install_lock():
+                self.fence(attempt,'RECONCILE_UNADMITTED')
+                need(not self.driver.journal_io.journal_exists(self.s.OUTER_NAME) and
+                     not self.driver.retained_io.journal_exists(self.driver.inner.name),'COMMITTED_NO_WRITE_NATIVE_CONFLICT')
+                payload=committed.get('payload',{})
+                need(committed.get('operation')=='reconcile_unadmitted' and payload.get('outer_absent') is True and
+                     payload.get('inner_absent') is True,'COMMITTED_NO_WRITE_BINDING')
+                proof=committed['result']['proof']
+                need(proof.get('outcome')=='NO_WRITE','COMMITTED_NO_WRITE_PROOF')
+                self.ledger.reconcile(attempt,proof,lambda value:value==proof)
+        else:
+            need(committed.get('outcome') in ('SAFE_CHECKPOINT','SUCCESS'),'COMMITTED_OUTCOME_CONFLICT')
+            self.reconcile(attempt)
+        return True
 
     def _initialize(self, attempt):
         driver, s = self.driver, self.s
@@ -292,6 +380,13 @@ class NativeRecovery(object):
         need(snapshot['attempts'] and snapshot['attempts'][-1]['id'] == attempt and
              snapshot['attempts'][-1]['state'] == 'INTENT_RECORDED', 'DURABLE_INTENT_REQUIRED')
         need(not driver.started, 'DRIVER_ALREADY_USED')
+        def execution_intent(local):
+            row=local['attempts'][-1]
+            need(row['id']==attempt and row['state']=='INTENT_RECORDED','EXECUTION_INTENT_BINDING')
+            need(not any(e['kind']=='execution_intent' for e in row['events']),'EXECUTION_ALREADY_STARTED')
+            row['events'].append({'kind':'execution_intent','at':int(self.ledger.clock())})
+            return None,True
+        self.ledger._guard(execution_intent)
         driver.started = True
         lock = driver.controls.install_lock()
         with lock:

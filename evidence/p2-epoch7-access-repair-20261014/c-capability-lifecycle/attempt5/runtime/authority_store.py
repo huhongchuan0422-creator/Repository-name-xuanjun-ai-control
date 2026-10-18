@@ -100,12 +100,13 @@ class AuthorityStore(object):
              (token['writer'],token['lease_epoch'],token['fence'],token['expiry'])==
              (row[4],row[5],row[6],row[7]) and self.clock()<row[7], 'LEASE_LOST')
         return row
-    def consume(self, grant, attempt, ordinal, operation_sha, token):
+    def consume(self, grant, attempt, ordinal, operation_sha, token, admission_payload=None):
         from attempt_ledger import HEX64
         need(type(attempt) is str and bool(attempt) and type(ordinal) is int and 1<=ordinal<=5 and
              type(operation_sha) is str and HEX64.fullmatch(operation_sha), 'ATTEMPT_REQUEST')
         def action():
             row=self._fence(grant,token);need(not row[3],'TERMINAL')
+            if admission_payload is not None:self._admission_binding(grant,attempt,admission_payload,create=True)
             prior=self.db.execute('SELECT grant_id,ordinal,operation FROM attempts WHERE id=?',(attempt,)).fetchall()
             if prior:
                 need(prior==[(grant['grant_id'],ordinal,operation_sha)],'ATTEMPT_CONFLICT')
@@ -186,3 +187,37 @@ class AuthorityStore(object):
         value=json.loads(receipt[0])
         need(value['outcome']==row[0] and digest(value['result']['proof'])==row[1],'COMMITTED_RECEIPT_CONFLICT')
         return value
+
+    def _validate_admission_payload(self,payload):
+        from attempt_ledger import HEX64
+        need(type(payload) is dict and set(payload)=={'ordinal','command_sha256','ledger_sha256'} and
+             type(payload['ordinal']) is int and 1<=payload['ordinal']<=5 and
+             all(type(payload[k]) is str and HEX64.fullmatch(payload[k]) for k in ('command_sha256','ledger_sha256')),'ADMISSION_REQUEST_BINDING')
+
+    def _admission_binding(self,grant,attempt,payload,create=False):
+        self._validate_admission_payload(payload)
+        table=self.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='admission_bindings'").fetchone()
+        if table is None:
+            need(create,'ADMISSION_BINDING_MISSING')
+            self.db.execute('CREATE TABLE admission_bindings(attempt_id TEXT PRIMARY KEY,grant_id TEXT NOT NULL,body TEXT NOT NULL)')
+        row=self.db.execute('SELECT grant_id,body FROM admission_bindings WHERE attempt_id=?',(attempt,)).fetchone()
+        value=canonical(payload).decode()
+        if row is None:
+            need(create,'ADMISSION_BINDING_MISSING')
+            self.db.execute('INSERT INTO admission_bindings VALUES(?,?,?)',(attempt,grant['grant_id'],value))
+        else:need(row==(grant['grant_id'],value),'ADMISSION_BINDING_CONFLICT')
+
+    def consumption(self,grant,attempt,payload):
+        """Authenticated transactional read; ABSENT is not inferred on timeout."""
+        self._validate_admission_payload(payload)
+        def action():
+            current=self._grant(grant)
+            row=self.db.execute('SELECT grant_id,ordinal,operation,state FROM attempts WHERE id=?',(attempt,)).fetchone()
+            if row is None:
+                need(type(payload) is dict and set(payload)=={'ordinal','command_sha256','ledger_sha256'},'ADMISSION_REQUEST_BINDING')
+                need(payload['ordinal']==current[2]+1 and not current[3],'ADMISSION_ORDINAL_CONFLICT')
+                return {'status':'ABSENT','ordinal':payload['ordinal'],'max_attempts':5}
+            need(row[:3]==(grant['grant_id'],payload.get('ordinal'),payload.get('command_sha256')),'ADMISSION_CONFLICT')
+            self._admission_binding(grant,attempt,payload)
+            return {'status':'CONSUMED','ordinal':row[1],'max_attempts':5,'state':row[3]}
+        return self.transaction(action)

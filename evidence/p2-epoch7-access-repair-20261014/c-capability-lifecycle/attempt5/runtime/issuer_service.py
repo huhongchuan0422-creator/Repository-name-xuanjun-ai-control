@@ -49,10 +49,12 @@ class IssuerService(object):
         attempt,operation,payload=request['attempt_id'],request['operation'],request['payload']
         # Revalidate/renew the same canonical writer lease for every request.
         # Actual phase effects still use the original independent install lock.
-        token=(None if operation=='read_committed_outcome' else self.store.lease(grant,principal['writer_id']))
+        token=(None if operation in ('read_committed_outcome','query_attempt_consumption') else self.store.lease(grant,principal['writer_id']))
         receipt=None
         result={'grant_id':grant['grant_id'],'attempt_id':attempt}
-        if operation=='read_committed_outcome':
+        if operation=='query_attempt_consumption':
+            result.update(self.store.consumption(grant,attempt,payload));result['binding']=payload
+        elif operation=='read_committed_outcome':
             committed=self.store.committed(grant,attempt)
             result.update(status='UNRESOLVED' if committed is None else 'COMMITTED_OUTCOME',
                           binding=payload,committed=committed)
@@ -66,7 +68,7 @@ class IssuerService(object):
                           lease_epoch=token['lease_epoch'],fence=token['fence'])
         elif operation=='consume_attempt':
             need(set(payload)=={'ordinal','command_sha256','ledger_sha256'},'CONSUME_BINDING')
-            ordinal=self.store.consume(grant,attempt,payload['ordinal'],payload['command_sha256'],token)
+            ordinal=self.store.consume(grant,attempt,payload['ordinal'],payload['command_sha256'],token,admission_payload=payload)
             result.update(status='CONSUMED',ordinal=ordinal,max_attempts=5)
         else:
             need(operation in HOST_OPERATIONS,'UNREVIEWED_OPERATION')

@@ -30,6 +30,7 @@ def native_suite(env):
         def setUp(self):
             self.folder=tempfile.TemporaryDirectory();os.chmod(self.folder.name,0o700)
             self.ledger=Ledger(self.folder.name,grant(),clock=lambda:100)
+            self.fixture_consumed={}
             self.rig=Rig();self.change=lambda request,result:None
             self.provider=ReceiptProvider(self.transport,self.modulus,65537,'TEST_ONLY',clock=lambda:101)
             self.native=NativeRecovery(self.rig.driver,self.ledger,self.provider,{k:self.ledger.grant[k] for k in ('source_commit','source_tree','manifest_sha256')},fixture_mode=True)
@@ -38,7 +39,13 @@ def native_suite(env):
             operation=request['operation'];payload=request['payload']
             result={'grant_id':self.ledger.grant['grant_id'],'attempt_id':request['attempt_id']}
             if operation=='verify_fence':result.update(status='HELD',exclusive=True,writer='fixture',lease_epoch=1,fence=1)
-            elif operation=='consume_attempt':result.update(status='CONSUMED',ordinal=payload['ordinal'],max_attempts=5)
+            elif operation=='query_attempt_consumption':
+                stored=self.fixture_consumed.get(request['attempt_id'])
+                if stored is not None:assert stored==payload
+                result.update(status='CONSUMED' if stored else 'ABSENT',binding=payload,ordinal=payload['ordinal'],max_attempts=5)
+            elif operation=='consume_attempt':
+                self.fixture_consumed[request['attempt_id']]=copy.deepcopy(payload)
+                result.update(status='CONSUMED',ordinal=payload['ordinal'],max_attempts=5)
             elif operation in ('verify_cycle_binding','diagnose_attempt','apply_approved_configuration'):
                 result.update(binding=payload,source_identity={k:self.ledger.grant[k] for k in ('source_commit','source_tree','kit_sha256','manifest_sha256')})
                 if operation=='verify_cycle_binding':result.update(status='UNCHANGED')
@@ -418,6 +425,182 @@ def native_suite(env):
                 self.assertEqual(len(report['ledger']['completed']),16)
                 self.assertEqual(len([e for e in self.rig.events if e.startswith('phase:')]),16)
             finally:store.close()
+        def gap_service(self):
+            from permit_cycle import policy
+            store,service=self.connect_real_service()
+            approved=policy();review=9000000001
+            store.register_cycle(self.ledger.grant,approved,{'grant_sha256':digest(self.ledger.grant),
+                'approval_body_sha256':self.ledger.grant['approval_body_sha256'],
+                'cycle_policy_sha256':digest(approved),'review_id':review})
+            def factory():
+                self.restart_native();self.native.approval_review_id=review
+                return self.native
+            return store,service,factory
+        def gap_restart(self,store,service,factory,cross_process):
+            from authority_store import AuthorityStore
+            path=store.path;store.close()
+            output=Path(self.folder.name)/'child-cycle-result.json'
+            if cross_process:
+                pid=os.fork()
+                if pid==0:
+                    try:
+                        service.store=AuthorityStore(path,clock=lambda:100)
+                        old=self.rig
+                        self.rig=Rig(proof=copy.deepcopy(old.proof))
+                        self.rig.records=copy.deepcopy(old.records)
+                        self.rig.events=list(old.events);self.rig.old_inner=old.old_inner
+                        report=PermitCycle(factory).run('d'*64)
+                        output.write_bytes(canonical({'report':report,'events':self.rig.events}))
+                        service.store.close();os._exit(0)
+                    except BaseException:
+                        import traceback
+                        output.write_text(traceback.format_exc());os._exit(1)
+                unused,status=os.waitpid(pid,0)
+                self.assertEqual(status,0,output.read_text() if output.exists() else 'child failed')
+                result=json.loads(output.read_text())
+            else:
+                service.store=AuthorityStore(path,clock=lambda:100)
+                result={'report':PermitCycle(factory).run('d'*64),'events':self.rig.events}
+                service.store.close()
+            check=AuthorityStore(path,clock=lambda:100)
+            try:
+                result['shared']=check.db.execute('SELECT consumed,terminal FROM grants').fetchone()
+                result['shared_ids']=[r[0] for r in check.db.execute('SELECT id FROM attempts ORDER BY ordinal')]
+            finally:check.close()
+            return result
+        def case_gap_committed(self,outcome,failure):
+            store,service,factory=self.gap_service();control={'active':False,'enabled':True}
+            operations={'NO_WRITE':'reconcile_unadmitted','SAFE_CHECKPOINT':'commit_safe_reconciliation','SUCCESS':'verify_terminal'}
+            target=operations[outcome];original_transport=self.provider.transport
+            signer,audit=service.signer,store.audit
+            counters={'admission':0,'phase':0}
+            def change(request,result):
+                op=request['operation']
+                if op=='authorize_first_admission':
+                    counters['admission']+=1
+                    if outcome=='NO_WRITE' and counters['admission']==1:result['status']='DENIED'
+                if op=='verify_phase_commit':
+                    counters['phase']+=1
+                    if outcome=='SAFE_CHECKPOINT' and counters['phase']==1:result['status']='UNKNOWN'
+            self.change=change
+            def signed(raw):
+                value=json.loads(raw)
+                proof=value['result'].get('proof',{})
+                if control['enabled'] and failure=='signature' and proof.get('outcome')==outcome and value['result'].get('status')==('SUCCESS' if outcome=='SUCCESS' else 'RECONCILED'):control['active']=True
+                if control['active']:raise IOError('TEST_ONLY unavailable signer')
+                return signer(raw)
+            def audited(gid,event,body):
+                if control['enabled'] and failure=='audit' and event=='SIGNED_RECEIPT' and body['operation']==target:control['active']=True
+                if control['active']:raise IOError('TEST_ONLY audit interruption')
+                return audit(gid,event,body)
+            def transport(request):
+                if control['active']:raise IOError('TEST_ONLY channel unavailable')
+                result=original_transport(request)
+                if control['enabled'] and failure=='reply' and request['operation']==target:
+                    control['active']=True;raise IOError('TEST_ONLY response lost after commit')
+                return result
+            service.signer=signed;store.audit=audited
+            self.provider=ReceiptProvider(transport,self.modulus,65537,'TEST_ONLY',clock=lambda:101)
+            try:
+                first=PermitCycle(factory).run('d'*64)
+                self.assertEqual((first['status'],first['used']),('HOLD',1))
+                aid=first['ledger']['attempts'][0]['id']
+                self.assertEqual(store.db.execute('SELECT state FROM attempts').fetchone()[0],outcome)
+                control.update(active=False,enabled=False)
+                result=self.gap_restart(store,service,factory,True)
+                report=result['report'];used=1 if outcome=='SUCCESS' else 2
+                self.assertEqual((report['status'],report['used']),('SUCCEEDED',used))
+                self.assertEqual(result['shared'],(used,1))
+                self.assertEqual(report['ledger']['attempts'][0]['id'],aid)
+                self.assertEqual(result['shared_ids'],[a['id'] for a in report['ledger']['attempts']])
+                self.assertEqual(len([e for e in result['events'] if e.startswith('phase:')]),16)
+                self.assertEqual(result['events'].count('phase:'+s.PHASES[0]),1)
+                self.assertEqual(report['review_id'],9000000001)
+                self.assertEqual(report['approval_body_sha256'],first['approval_body_sha256'])
+                self.assertEqual(len(report['ledger']['completed']),16)
+            finally:store.close()
+        def case_gap_admission(self,window,cross_process=True,negative=None):
+            store,service,factory=self.gap_service();control={'failed':False,'offline':False,'enabled':True}
+            original_transport=self.provider.transport
+            original_signer,original_audit=service.signer,store.audit
+            def signer(raw):
+                if control['enabled'] and window=='consume_signature' and not control['failed'] and json.loads(raw)['result'].get('status')=='CONSUMED':
+                    control['failed']=True;raise IOError('TEST_ONLY consume committed before signature')
+                return original_signer(raw)
+            def audit(gid,event,body):
+                if control['enabled'] and window=='consume_audit' and not control['failed'] and event=='SIGNED_RECEIPT' and body['operation']=='consume_attempt':
+                    control['failed']=True;raise IOError('TEST_ONLY consume committed before signed audit')
+                return original_audit(gid,event,body)
+            service.signer=signer;store.audit=audit
+            original_claim,original_intent,original_checkpoint=Ledger.claim,Ledger.intent,Ledger.checkpoint
+            def claim(ledger):
+                result=original_claim(ledger)
+                if control['enabled'] and window=='claim' and not control['failed']:
+                    control['failed']=True;raise IOError('TEST_ONLY after durable claim')
+                return result
+            def intent(ledger,*args):
+                result=original_intent(ledger,*args)
+                if control['enabled'] and window=='intent' and not control['failed']:
+                    control['failed']=True;raise IOError('TEST_ONLY after durable intent')
+                return result
+            def checkpoint(ledger,*args):
+                if control['enabled'] and window=='checkpoint' and not control['failed']:
+                    control.update(failed=True,offline=True);raise IOError('TEST_ONLY COMPLETE before local checkpoint')
+                return original_checkpoint(ledger,*args)
+            def transport(request):
+                if control['offline']:raise IOError('TEST_ONLY transport UNKNOWN')
+                if control['enabled'] and request['operation']=='query_attempt_consumption' and window=='query_unknown':
+                    control['failed']=True;raise IOError('TEST_ONLY query UNKNOWN')
+                if control['enabled'] and request['operation']=='consume_attempt' and not control['failed']:
+                    if window=='before_consume':
+                        control['failed']=True;raise IOError('TEST_ONLY before consume arrival')
+                    if window=='after_consume':
+                        result=original_transport(request);control['failed']=True
+                        raise IOError('TEST_ONLY after durable consumption')
+                return original_transport(request)
+            Ledger.claim,Ledger.intent,Ledger.checkpoint=claim,intent,checkpoint
+            self.provider=ReceiptProvider(transport,self.modulus,65537,'TEST_ONLY',clock=lambda:101)
+            try:
+                first=PermitCycle(factory).run('d'*64)
+                self.assertEqual((first['status'],first['used']),('HOLD',1))
+                aid=first['ledger']['attempts'][0]['id']
+                shared=store.db.execute('SELECT consumed FROM grants').fetchone()[0]
+                self.assertEqual(shared,1 if window in ('after_consume','consume_signature','consume_audit','checkpoint') else 0)
+                Ledger.claim,Ledger.intent,Ledger.checkpoint=original_claim,original_intent,original_checkpoint
+                if window=='query_unknown':
+                    again=PermitCycle(factory).run('d'*64)
+                    self.assertEqual((again['status'],again['used']),('HOLD',1))
+                    self.assertEqual(store.db.execute('SELECT consumed FROM grants').fetchone()[0],0)
+                control.update(enabled=False,offline=False)
+                if negative=='command':
+                    conflict=PermitCycle(factory).run('e'*64)
+                    self.assertEqual((conflict['status'],conflict['used']),('HOLD',1))
+                    self.assertEqual(store.db.execute('SELECT consumed FROM grants').fetchone()[0],shared)
+                if negative=='binding':
+                    self.provider.request(self.ledger.grant,aid,'consume_attempt',{'ordinal':1,'command_sha256':'d'*64,'ledger_sha256':'f'*64})
+                    conflict=PermitCycle(factory).run('d'*64)
+                    self.assertEqual((conflict['status'],conflict['used']),('HOLD',1))
+                    self.assertEqual(self.rig.events.count('phase:'+s.PHASES[0]),0)
+                    return
+                result=self.gap_restart(store,service,factory,cross_process)
+                report=result['report'];used=2 if window=='checkpoint' else 1
+                self.assertEqual((report['status'],report['used']),('SUCCEEDED',used))
+                self.assertEqual(result['shared'],(used,1))
+                self.assertEqual(result['shared_ids'],[a['id'] for a in report['ledger']['attempts']])
+                self.assertEqual(report['ledger']['attempts'][0]['id'],aid)
+                self.assertEqual(len([e for e in result['events'] if e.startswith('phase:')]),16)
+                self.assertEqual(report['review_id'],9000000001)
+            finally:
+                Ledger.claim,Ledger.intent,Ledger.checkpoint=original_claim,original_intent,original_checkpoint
+                store.close()
+        def test_gap_unknown_consumption_query_holds_then_same_attempt_recovers(self):
+            self.case_gap_admission('query_unknown')
+        def test_gap_command_binding_conflict_holds_without_spending(self):
+            self.case_gap_admission('before_consume',negative='command')
+        def test_gap_shared_request_binding_conflict_holds(self):
+            self.case_gap_admission('before_consume',negative='binding')
+        def test_gap_intermediate_complete_checkpoint_resumes_via_cycle_after_process_restart(self):
+            self.case_gap_admission('checkpoint')
         def cycle(self):
             def factory():
                 self.restart_native()
@@ -548,6 +731,18 @@ def native_suite(env):
             self.cycle().run('d'*64)
             report=self.cycle().run('d'*64)
             self.assertEqual((report['status'],report['used']),('SUCCEEDED',1))
+    # Each matrix cell is a separately named full automatic-entry regression.
+    for outcome in ('NO_WRITE','SAFE_CHECKPOINT','SUCCESS'):
+        for failure in ('signature','audit','reply'):
+            def case(self,outcome=outcome,failure=failure):self.case_gap_committed(outcome,failure)
+            setattr(NativeTests,'test_gap_committed_'+outcome.lower()+'_'+failure+'_cross_process',case)
+    for window in ('claim','intent','before_consume','after_consume'):
+        for cross_process in (False,True):
+            def case(self,window=window,cross_process=cross_process):self.case_gap_admission(window,cross_process)
+            setattr(NativeTests,'test_gap_admission_'+window+('_cross_process' if cross_process else '_same_process'),case)
+    for window in ('consume_signature','consume_audit'):
+        def case(self,window=window):self.case_gap_admission(window,True)
+        setattr(NativeTests,'test_gap_admission_'+window+'_cross_process',case)
     return unittest.defaultTestLoader.loadTestsFromTestCase(NativeTests)
 
 def run(candidate):

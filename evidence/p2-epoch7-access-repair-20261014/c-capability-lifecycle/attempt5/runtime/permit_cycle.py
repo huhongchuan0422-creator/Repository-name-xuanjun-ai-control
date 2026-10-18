@@ -92,8 +92,17 @@ class PermitCycle(object):
         need(result.get('binding')==binding,'CYCLE_RECEIPT_BINDING')
         return result
 
-    def recover(self,attempt):
+    def recover(self,attempt,command_sha):
         native=self.native
+        native.confirm_admission(attempt,command_sha)
+        if native.converge_committed(attempt):return True
+        row=native.ledger.snapshot()['attempts'][-1]
+        if not any(e['kind']=='execution_intent' for e in row['events']):
+            need(row['state']=='INTENT_RECORDED' and
+                 not native.driver.journal_io.journal_exists(native.s.OUTER_NAME) and
+                 not native.driver.retained_io.journal_exists(native.driver.inner.name),'UNSTARTED_ATTEMPT_NATIVE_CONFLICT')
+            native.run(attempt)
+            return True
         if native.driver.journal_io.journal_exists(native.s.OUTER_NAME):
             record=native.driver.journal_io.read_journal(native.s.OUTER_NAME)
             state=native.s.retained.BoundJournal._validate_record(record)['state']
@@ -133,11 +142,12 @@ class PermitCycle(object):
             try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
             except BlockingIOError:raise Hold('CONCURRENT_CYCLE')
             try:
+                self.native.bind_command(command_sha)
                 while True:
                     rows=self.native.ledger.snapshot()['attempts']
                     if rows and rows[-1]['state']=='SUCCEEDED':return self.report('SUCCEEDED')
                     if rows and rows[-1]['state'] not in ('FAILED_NO_WRITE','SAFE_RECONCILED'):
-                        self.recover(rows[-1]['id'])
+                        self.recover(rows[-1]['id'],command_sha)
                         self.fresh()
                         continue
                     if len(rows)>=5:return self.report('EXHAUSTED')
@@ -150,7 +160,7 @@ class PermitCycle(object):
                     except Exception:
                         # No blind replay: independent reconciliation must
                         # succeed before the next persistent quota consumption.
-                        self.fresh();self.recover(attempt);self.fresh()
+                        self.fresh();self.recover(attempt,command_sha);self.fresh()
             except Exception:
                 return self.report('HOLD')
         finally:os.close(fd)

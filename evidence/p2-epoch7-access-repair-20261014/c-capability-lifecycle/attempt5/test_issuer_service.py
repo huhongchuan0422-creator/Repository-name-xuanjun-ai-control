@@ -151,4 +151,37 @@ class ServiceTests(unittest.TestCase):
         self.consume();self.change=self.reconciliation_receipt
         self.provider.request(self.g,'attempt1','reconcile_unadmitted',{})
         self.assertEqual(self.provider.request(self.g,'attempt1','verify_fence',{'step':'RECONCILE_UNADMITTED'})['status'],'HELD')
+    def admission_payload(self):return {'ordinal':1,'command_sha256':'a'*64,'ledger_sha256':'b'*64}
+    def test_consumption_query_absent_does_not_consume_or_lease(self):
+        result=self.provider.request(self.g,'attempt1','query_attempt_consumption',self.admission_payload())
+        self.assertEqual((result['status'],result['ordinal']),('ABSENT',1))
+        self.assertEqual(self.store.db.execute('SELECT consumed,writer FROM grants').fetchone(),(0,None))
+    def test_consumption_query_pins_exact_original_payload(self):
+        self.consume()
+        result=self.provider.request(self.g,'attempt1','query_attempt_consumption',self.admission_payload())
+        self.assertEqual(result['status'],'CONSUMED')
+        payload=self.admission_payload();payload['ledger_sha256']='e'*64
+        with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','query_attempt_consumption',payload)
+        with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','consume_attempt',payload)
+        self.assertEqual(self.store.db.execute('SELECT consumed FROM grants').fetchone()[0],1)
+    def test_consumption_query_cannot_replace_attempt_id_or_ordinal(self):
+        self.consume()
+        with self.assertRaises(Hold):self.provider.request(self.g,'replacement','query_attempt_consumption',self.admission_payload())
+        payload=self.admission_payload();payload['ordinal']=2
+        with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','query_attempt_consumption',payload)
+    def test_terminal_consumption_query_read_only_and_fresh_nonce(self):
+        self.consume();self.change=self.reconciliation_receipt
+        self.provider.request(self.g,'attempt1','verify_terminal',{'outer_sha256':'d'*64})
+        leases=self.store.db.execute("SELECT count(*) FROM audit WHERE event='LEASE'").fetchone()[0]
+        for unused in range(2):
+            result=self.provider.request(self.g,'attempt1','query_attempt_consumption',self.admission_payload())
+            self.assertEqual((result['status'],result['state']),('CONSUMED','SUCCESS'))
+        self.assertEqual(self.store.db.execute("SELECT count(*) FROM audit WHERE event='LEASE'").fetchone()[0],leases)
+        import json
+        bodies=[json.loads(r[0])['signed_body'] for r in self.store.db.execute("SELECT body FROM audit WHERE event='SIGNED_RECEIPT' ORDER BY id DESC LIMIT 2")]
+        self.assertNotEqual(bodies[0]['request_sha256'],bodies[1]['request_sha256'])
+    def test_consumption_query_wrong_actor_or_host_rejected(self):
+        self.principal['host']='OTHER'
+        with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','query_attempt_consumption',self.admission_payload())
+        self.assertEqual(self.store.db.execute('SELECT consumed FROM grants').fetchone()[0],0)
 if __name__=='__main__':unittest.main()

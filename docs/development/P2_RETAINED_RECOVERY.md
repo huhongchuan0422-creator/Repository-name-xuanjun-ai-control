@@ -190,3 +190,16 @@ c527原版本已正确复用同一人工Grant；逐次签名服务回执不是�
 - 隔离故障注入覆盖native COMPLETE提交后中断、本地checkpoint写失败、服务结果提交后签名失败、签名审计失败、丢失响应、服务重启、新nonce取回和冲突证明拒绝；完整测试包含原875项。
 
 这些均是离线实现和Hosted验证；真实英国Writer、共享数据库、Lease/Fence、签名发行方、可信通道以及Run/Job/InvokeId、实际副作用和备份checkpoint仍需原受信只读取证。未实施生产操作，未签发安装许可。
+
+
+### Attempt5最后两项自动衔接修复（2026-10-18，PR58 #6248256615）
+
+准确基准ac25994a1a569ffb56615cf68aaf899092186026。独审已关闭底层A1/A2/B1/B2与制品绑定，本轮只修正式自动入口的两处衔接，不重开R1–R4、旧载荷或16阶段。
+
+1. PermitCycle恢复时先认证查询原Attempt消费和已提交结果。NO_WRITE确认本机原生claim仍不存在后收敛本地Ledger；SAFE_CHECKPOINT通过原生认证、完整checkpoint及逐阶段可信读回收敛；SUCCESS只读取回原终态、不取执行Lease。只有结果确属未决时才进入诊断/配置/安全恢复，已关闭Attempt的执行Fence拒绝断言原样保留。
+2. NativeRecovery在claim前持久固定Grant和完整命令SHA；claim/intent使用原唯一Attempt ID和ordinal，首次消费的ordinal/command_sha256/ledger_sha256语义请求保存在受保护O_EXCL+fsync文件中。IssuerService的query_attempt_consumption只读查询以新nonce和完整request digest签名，明确ABSENT或已消费的准确绑定；超时/UNKNOWN绝不推断未消费。共享SQLite在同一消费事务保存该语义绑定，重复确认不重复消费，不同请求绑定冲突HOLD。
+3. claim后、intent后、consume前或提交后签名/审计/回包中断可从同一PermitCycle入口恢复原Attempt。持久execution_intent在进入原生执行前落盘；仅认证消费且从未开始执行、两层原生claim均不存在时才继续同一原Attempt。已有执行意图则先可信对账，不把旧命令整条盲重跑。缺历史、错命令、错请求绑定、未知查询或Fence冲突继续HOLD。
+4. 新回归通过真实Service/SQLite/RSA ReceiptProvider与原生协调器联合故障注入，跨进程关闭重开共享数据库和本地Ledger，重新初始化原生组件，保留原持久journal事实。不会跨PID复用一次性capability封印，不清空或放宽历史安全断言；host事实和阶段副作用仍显式TEST_ONLY。所有新增恢复案例只调用正式PermitCycle.run，不用测试手工调用reconcile代替自动恢复。
+5. 原923项断言全部保留；新增23项原生自动闭环、5项服务绑定/只读查询回归，总计951项。覆盖NO_WRITE、SAFE_CHECKPOINT、任意COMPLETE及SUCCESS提交后签名/审计/回包失败与进程重启；也覆盖claim/intent/消费窗口、命令/请求冲突和UNKNOWN查询，以及原有最多5次、成功停止、耗尽、越权配置、源码变化、并发和Fence拒绝。
+
+本轮仅离线源码与Hosted验收；正式独审结论另登记。INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。未修改英国冻结文件，未重跑旧Prepare，未执行安装、激活或回滚。真实英国Writer、Lease/Fence、issuer/受信通道、共享历史、Run/Job/InvokeId和原生副作用/备份checkpoint仍需原受信只读取证。
