@@ -431,3 +431,16 @@ CaptureSession.perform只接fence_source/final_snapshot：先原INTENT落盘，�
 本轮可独立完成的两阶段源码接线已形成送审检查点；**完整实际有效配置/全部Writer清单仍未获证，原fd/guard/真实排空及内核Fence/捕获链的实机验收仍未执行**。不能将源码联动完成视为两项实机门禁已关闭。获准环境、原受限候选正常发布/M99及独审许可仍缺，未绕过限制。后续传输/核对/正式Writer assignment/安装/切换/业务与恢复验收不由本两阶段接口宣称完成。
 
 增量送原独审，未变结论继承，作者不自签PASS或正式许可。当前inspection/recover-readonly现场job均SKIPPED；本增量新主机命令0、生产Writer0、服务动作0、迁移/切换0，无后台迁移任务。东京及国内桥接/Windows保留，6个生产大节点仍未关闭。完整回执见evidence/pr99-service-handoff/aliyun-execution/CAPTURE_SESSION_DELIVERY_20261018.json。
+
+
+## 2026-10-18 23:49 CST｜入口封闭与排空证明绑定修复、启动顺序现场回执
+
+CODE_COMMIT=861dd13691705a4752a4f9140bfd5d098c4da660；CODE_TREE=5d24397215c8c8a7ff0d8174e6c6e594a7c1c55c。修正空队列采样不能替代持续封闭的缺口：原真实排空源必须确认入口已封闭、精确全部相关写入/激活来源、原事务/plan/inventory/epoch及原plan内有效期；每个mask/stop/freeze前重验同一封闭记录。记录过期、丢失、来源缺项、跨事务/plan或变化均HOLD，部分效果保留，查询不重放。新增8项反例，原57项受影响回归，共65项。该源码没有实现或部署现网入口封闭接口，mock响应不等于现场排空。
+
+Hosted [39142171346](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39142171346)，Python3.11/job117718654654、3.12/job117718654994各65/65 PASS。完整日志已读；内层ZIP95596字节、12成员，SHA256 bdfe88be3f2fe960be5a95b59f32bdebb92ff149fcab41d00f0694b443a16e2e，与本地准确Commit/Tree重建一致。Artifact12141757554/12142031196，外层Actions摘要分列保存。不是M99/实机验收。
+
+另取得缺失的固定启动源码控制流：[39141834572](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39141834572)/job117717694949，Invoke t-jpn70fbdpsmzw8w Success，2026-10-18 23:44:39 CST。4文件SHA与既有源码pin一致，返回脱敏语法，不导入业务、不读环境/数据库；确认数据库模块级engine/SessionLocal绑定发生在门户build_service/load_local_credential_env调用之前。凭据文件具体键已脱敏，不推测该键；这一顺序观察仍不是当前进程有效配置或权威数据签认。只发本次新范围1个只读命令并已终态，未重发旧标签/Invoke。
+
+**本执行窗口自己的现场部分尚未全部完成，并非仅余审核签发**：完整有效配置/权威数据/全部写入源、真实入口封闭与排空实现、原准入fd/guard控制器及Fence/捕获链实机验收仍缺；后续传输/核对/Writer assignment/安装切换亦未由本候选完成。现有东京STS/SWAS只读通道实际可用，不要求Owner再配RAM。原40文件拒绝原文及正常发布解除未取得，M99未运行/不重试，作者不自签独审或迁移许可。当前没有后台迁移任务；生产Writer/数据库打开/服务启停/迁移切换均0，东京和国内桥接/Windows保留，6个生产大节点未关闭。
+
+完整证据：evidence/pr99-service-handoff/aliyun-execution/SEALED_DRAIN_DELIVERY_20261018.json；现场回执：CONFIG_FLOW_RECEIPT_20261018.json。
