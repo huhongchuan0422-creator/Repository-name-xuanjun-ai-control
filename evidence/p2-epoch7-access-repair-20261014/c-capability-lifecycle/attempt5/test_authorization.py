@@ -1,0 +1,41 @@
+"""Synthetic API-body negatives; never a production approval or live fetch."""
+import hashlib
+import json
+from pathlib import Path
+import sys
+import types
+import unittest
+HERE=Path(__file__).resolve().parent
+sys.path[:0]=[str(HERE/'runtime'),str(HERE.parent/'kit-overlay/helpers'),str(HERE)]
+import authorization as a
+from receipt_provider import Hold,canonical
+from test_authority_store import grant
+class AuthorizationTests(unittest.TestCase):
+    def setUp(self):
+        self.g=grant();self.p=types.SimpleNamespace(modulus=(1<<2047)+1,exponent=65537,issuer='TEST_ONLY')
+        self.wanted=a.expected(self.g,self.p)
+        self.body=a.MARKER+canonical(self.wanted).decode()
+        self.g['approval_body_sha256']=hashlib.sha256(self.body.encode()).hexdigest()
+        self.value={'id':9000000001,'user':{'id':95597695,'login':'18598789888'},
+                    'issue_url':'https://api.github.com/repos/'+a.REPO+'/issues/58','body':self.body}
+    def validate(self):return a.validate(json.dumps(self.value).encode(),9000000001,self.g,self.p)
+    def test_exact_new_body_binds_key_grant(self):self.assertEqual(self.validate()['approval_body_sha256'],self.g['approval_body_sha256'])
+    def test_developer_cannot_issue_permit(self):
+        self.value['user']={'id':332398908,'login':'huhongchuan0422-creator'}
+        with self.assertRaises(Hold):self.validate()
+    def test_wrong_pr(self):
+        self.value['issue_url']='https://api.github.com/repos/'+a.REPO+'/issues/17'
+        with self.assertRaises(Hold):self.validate()
+    def test_unapproved_key_cannot_authenticate_itself(self):
+        self.p.modulus+=2
+        with self.assertRaises(Hold):self.validate()
+    def test_changed_grant_scope(self):
+        self.g['target_host']='OTHER'
+        with self.assertRaises(Hold):self.validate()
+    def test_old_single_use_marker_refused(self):
+        self.value['body']='CHATGPT_NATIVE_TASK5_EXACT_EPOCH7_RECOVERY_ACCEPTANCE\n'+canonical(self.wanted).decode()
+        self.g['approval_body_sha256']=hashlib.sha256(self.value['body'].encode()).hexdigest()
+        with self.assertRaises(Hold):self.validate()
+    def test_missing_approval_never_fetches(self):
+        with self.assertRaises(Hold):a.authenticate(None,self.g,self.p)
+if __name__=='__main__':unittest.main()

@@ -10,7 +10,7 @@ from receipt_provider import ReceiptProvider, Hold, need, digest
 import native_state
 
 class NativeRecovery(object):
-    def __init__(self, driver, ledger, provider, source_identity=None, fixture_mode=False):
+    def __init__(self, driver, ledger, provider, source_identity=None, fixture_mode=False, approval_review_id=None):
         import epoch7_recovery_sequence as sequence
         from attempt_ledger import Ledger
         need(isinstance(driver, sequence.InjectedDriver) and isinstance(ledger, Ledger), 'NATIVE_DEPENDENCIES')
@@ -24,6 +24,8 @@ class NativeRecovery(object):
             from epoch7_host_containment import HostContainment
             need(isinstance(driver.controls,FiniteLiveControls) and
                  isinstance(driver.containment,HostContainment),'CONCRETE_NATIVE_COMPOSITION_REQUIRED')
+            from authorization import authenticate
+            self.approval=authenticate(approval_review_id,ledger.grant,provider)
         self.s, self.driver, self.ledger, self.provider = sequence, driver, ledger, provider
         self.journal = None
 

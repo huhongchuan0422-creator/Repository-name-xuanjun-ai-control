@@ -37,8 +37,8 @@ composition and exact host/provider binding. Kit production_ready=false.
 ## Test boundaries
 
 29 original + 19 real SQLite/multiprocess + 10 real RSA/nonce + 21 native
-admission/CAS/recovery + 7 issuer service + 6 actual Kit tests extend the 775
-complete versioned tests to 867 per Python environment. Native tests
+admission/CAS/recovery + 7 issuer service + 6 actual Kit + 7 new authority tests extend the 775
+complete versioned tests to 874 per Python environment. Native tests
 reuse the unchanged transaction Rig: real gate, capability, native journals,
 control loop and signing verification, with explicit synthetic private approval,
 predecessor/host facts and phase effects. They are not a production Provider,
@@ -78,3 +78,10 @@ native CAS. Missing partial component state stays HOLD. The actual native
 ClaimAuthority receipt guard also rechecks the new grant/lease during effect IO.
 Concrete production composition is required by default; TEST_ONLY fixtures cannot
 authorize the UK host. No obsolete single-use admission is re-opened.
+
+Production NativeRecovery additionally requires a fresh PR58 review ID. The
+new authorization module reuses the unchanged bounded HTTPS transport and checks
+independent account 18598789888 / 95597695, PR58 destination, exact raw body SHA,
+new five-attempt decision/marker, full grant and issuer RSA public-key fingerprint.
+No injected fetcher exists on the production path. Old single-use bodies and
+developer-authored comments cannot authorize it. No such permit is issued here.
