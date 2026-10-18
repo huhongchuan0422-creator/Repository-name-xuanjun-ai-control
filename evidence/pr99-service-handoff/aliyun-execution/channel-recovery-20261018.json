@@ -1,0 +1,483 @@
+{
+  "authoritative_writer": "UNKNOWN",
+  "enforced_fence": "UNKNOWN",
+  "hosts": [
+    {
+      "authoritative_writer": "UNKNOWN",
+      "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+      "enforced_fence": "UNKNOWN",
+      "host": "uk",
+      "host_commands": 1,
+      "instance_id": "40dfc6a47d5e4363b9da7d0d6ab01cb1",
+      "invocation_status": "Success",
+      "invoke_id": "t-gbr70epxx2hnnk0",
+      "nonterminal_invocations": [],
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "business_requests": 0,
+        "database_opened": false,
+        "enforced_fence": "UNKNOWN",
+        "fixed_path_metadata": [
+          {
+            "exists": false,
+            "path": "/etc/xuanjun-pr99/s09-production-start.admission.json"
+          },
+          {
+            "exists": false,
+            "path": "/var/lib/xuanjun-pr99-s09-production-start-v1"
+          },
+          {
+            "exists": false,
+            "path": "/opt/xuanjun-migration-s07/releases/domestic-final-v1"
+          }
+        ],
+        "hostname": "iZd7oeikknn1z21sq6ji6zZ",
+        "nonce": "adeb4ac2597c406da3f620f09534fa3c",
+        "observed_at": "2026-10-18T11:44:20.055366Z",
+        "related_processes": [],
+        "scope": "FIXED_PR99_METADATA_ONLY_NOT_GLOBAL_WRITER_PROOF",
+        "service_actions": 0,
+        "uid": 0,
+        "units": [
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-portal.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-contact.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-customer-service.service"
+          }
+        ]
+      },
+      "run_command_attempted": true,
+      "service_actions": 0,
+      "status": "CURRENT_READONLY_CHANNEL_PASS_NOT_MIGRATION_OR_WRITER_ADMISSION",
+      "sts": "PASS_CURRENT"
+    },
+    {
+      "authoritative_writer": "UNKNOWN",
+      "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+      "enforced_fence": "UNKNOWN",
+      "host": "korea",
+      "host_commands": 1,
+      "instance_id": "09207081a09a466aa0079b07b5e3e7ca",
+      "invocation_status": "Success",
+      "invoke_id": "t-kor70epxx0fg8hs",
+      "nonterminal_invocations": [],
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "business_requests": 0,
+        "database_opened": false,
+        "enforced_fence": "UNKNOWN",
+        "fixed_path_metadata": [
+          {
+            "exists": false,
+            "path": "/etc/xuanjun-pr99/s09-production-start.admission.json"
+          },
+          {
+            "exists": false,
+            "path": "/var/lib/xuanjun-pr99-s09-production-start-v1"
+          },
+          {
+            "exists": false,
+            "path": "/opt/xuanjun-migration-s07/releases/domestic-final-v1"
+          }
+        ],
+        "hostname": "iZmj7a5kwr75qc1tul4kf9Z",
+        "nonce": "494be48e4fa74d7fa3fb3affb52117b6",
+        "observed_at": "2026-10-18T11:44:19.685091Z",
+        "related_processes": [],
+        "scope": "FIXED_PR99_METADATA_ONLY_NOT_GLOBAL_WRITER_PROOF",
+        "service_actions": 0,
+        "uid": 0,
+        "units": [
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-portal.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-contact.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-customer-service.service"
+          }
+        ]
+      },
+      "run_command_attempted": true,
+      "service_actions": 0,
+      "status": "CURRENT_READONLY_CHANNEL_PASS_NOT_MIGRATION_OR_WRITER_ADMISSION",
+      "sts": "PASS_CURRENT"
+    },
+    {
+      "authoritative_writer": "UNKNOWN",
+      "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+      "enforced_fence": "UNKNOWN",
+      "host": "domestic",
+      "host_commands": 1,
+      "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+      "invocation_status": "Success",
+      "invoke_id": "t-sh070epxy88f0u8",
+      "nonterminal_invocations": [],
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "business_requests": 0,
+        "database_opened": false,
+        "enforced_fence": "UNKNOWN",
+        "fixed_path_metadata": [
+          {
+            "exists": false,
+            "path": "/etc/xuanjun-pr99/s09-production-start.admission.json"
+          },
+          {
+            "exists": false,
+            "path": "/var/lib/xuanjun-pr99-s09-production-start-v1"
+          },
+          {
+            "exists": false,
+            "path": "/opt/xuanjun-migration-s07/releases/domestic-final-v1"
+          }
+        ],
+        "hostname": "iZvt5t8tlrm8oiZ",
+        "nonce": "fc65e8a35d9649479830b3fa8ce075dc",
+        "observed_at": "2026-10-18T11:44:20.449186Z",
+        "related_processes": [],
+        "scope": "FIXED_PR99_METADATA_ONLY_NOT_GLOBAL_WRITER_PROOF",
+        "service_actions": 0,
+        "uid": 0,
+        "units": [
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-portal.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-contact.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-customer-service.service"
+          }
+        ]
+      },
+      "run_command_attempted": true,
+      "service_actions": 0,
+      "status": "CURRENT_READONLY_CHANNEL_PASS_NOT_MIGRATION_OR_WRITER_ADMISSION",
+      "sts": "PASS_CURRENT"
+    },
+    {
+      "authoritative_writer": "UNKNOWN",
+      "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+      "enforced_fence": "UNKNOWN",
+      "host": "tokyo",
+      "host_commands": 1,
+      "instance_id": "68985c531add4e90a131aef703a389e6",
+      "invocation_status": "Success",
+      "invoke_id": "t-jpn70epxxoto7pc",
+      "nonterminal_invocations": [],
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "business_requests": 0,
+        "database_opened": false,
+        "enforced_fence": "UNKNOWN",
+        "fixed_path_metadata": [
+          {
+            "exists": false,
+            "path": "/etc/xuanjun-pr99/s09-production-start.admission.json"
+          },
+          {
+            "exists": false,
+            "path": "/var/lib/xuanjun-pr99-s09-production-start-v1"
+          },
+          {
+            "exists": false,
+            "path": "/opt/xuanjun-migration-s07/releases/domestic-final-v1"
+          }
+        ],
+        "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+        "nonce": "4e35f18802994977959344fe39413538",
+        "observed_at": "2026-10-18T11:44:20.114623Z",
+        "related_processes": [
+          {
+            "matches": [
+              "/opt/trading-system"
+            ],
+            "pid": 1222508
+          },
+          {
+            "matches": [
+              "/opt/trading-system"
+            ],
+            "pid": 1775967
+          },
+          {
+            "matches": [
+              "/opt/trading-system"
+            ],
+            "pid": 1823159
+          },
+          {
+            "matches": [
+              "/opt/trading-system"
+            ],
+            "pid": 1823167
+          },
+          {
+            "matches": [
+              "/opt/trading-system"
+            ],
+            "pid": 1875349
+          },
+          {
+            "matches": [
+              "/opt/trading-system"
+            ],
+            "pid": 1903204
+          },
+          {
+            "matches": [
+              "/opt/trading-system"
+            ],
+            "pid": 3082952
+          }
+        ],
+        "scope": "FIXED_PR99_METADATA_ONLY_NOT_GLOBAL_WRITER_PROOF",
+        "service_actions": 0,
+        "uid": 0,
+        "units": [
+          {
+            "fields": {
+              "ActiveState": "active",
+              "LoadState": "loaded",
+              "MainPID": 3082952,
+              "SubState": "running"
+            },
+            "returncode": 0,
+            "unit": "secure-secrets-portal.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "active",
+              "LoadState": "loaded",
+              "MainPID": 1903204,
+              "SubState": "running"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-contact.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "active",
+              "LoadState": "loaded",
+              "MainPID": 1875349,
+              "SubState": "running"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-wecom-customer-service.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-portal.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-contact.service"
+          },
+          {
+            "fields": {
+              "ActiveState": "inactive",
+              "LoadState": "not-found",
+              "MainPID": 0,
+              "SubState": "dead"
+            },
+            "returncode": 0,
+            "unit": "xuanjun-pr99-domestic-customer-service.service"
+          }
+        ]
+      },
+      "run_command_attempted": true,
+      "service_actions": 0,
+      "status": "CURRENT_READONLY_CHANNEL_PASS_NOT_MIGRATION_OR_WRITER_ADMISSION",
+      "sts": "PASS_CURRENT"
+    }
+  ],
+  "migration_started": false,
+  "production_actions": 0,
+  "production_cutover": false,
+  "status": "READONLY_CHANNEL_OBSERVED_NOT_MIGRATION_ADMISSION",
+  "evidence": {
+    "source_commit": "4ebfb67d7fcf7178045938a740e3696e1675120d",
+    "tree": "ccf4dcba0d99c8cd5f4603ed0f83b8f0addd51b4",
+    "run": 39124426535,
+    "job": 117666481531,
+    "hosted_validation_job": 117666462961,
+    "workflow": ".github/workflows/pr99-current-readonly-recovery.yml",
+    "workflow_sha256": "7559ef25277c4c4b076333bd76597065fa5dc7a116faf8d4069fce5b20fbda18",
+    "program_sha256": "12b1646d75abd14b7f44526545b29b0401b6682733660962196c01ffebaa2a54",
+    "completed_at": "2026-10-18T19:44:26+08:00",
+    "label": "pr99-readonly-recover-4ebfb67d7fcf",
+    "attempt_consumed_no_replay": true,
+    "original_repair_candidate_40_files": "UNCHANGED_NOT_EXECUTED_OR_PUBLISHED"
+  }
+}

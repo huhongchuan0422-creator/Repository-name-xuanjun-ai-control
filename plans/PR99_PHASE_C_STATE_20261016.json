@@ -1293,7 +1293,9 @@
     "job": 117275780078,
     "receipt": "evidence/pr99-service-handoff/aliyun-execution/four-host-identity-20261017.json",
     "handoff": "docs/ALIYUN_FOUR_HOST_EXECUTION_HANDOFF_20261017.md",
-    "secrets": "ORIGINAL_REPOSITORY_ACTIONS_SECRETS_ONLY_NO_VALUES_EXPORTED"
+    "secrets": "ORIGINAL_REPOSITORY_ACTIONS_SECRETS_ONLY_NO_VALUES_EXPORTED",
+    "latest_current_verification": "evidence/pr99-service-handoff/aliyun-execution/channel-recovery-20261018.json",
+    "current_status": "CURRENT_FOUR_HOST_ROOT_READONLY_PASS_20261018T194426_CST"
   },
   "s08_runtime_closure": {
     "status": "REAL_THREE_HOST_READONLY_BATCH_PASS_CLOSURE_PENDING",
@@ -1459,17 +1461,17 @@
     }
   },
   "migration_execution_handoff": {
-    "status": "ORIGINAL_WORK_WRITER_STOPPED_DOTS_PENDING_ACK",
+    "status": "ORIGINAL_WINDOW_RECEIVED_READONLY_CHANNEL_RESTORED_HOST_WRITER_UNCLAIMED",
     "owner_instruction": "2026-10-17 13:27 CST explicit handoff to dots",
     "handoff_file": "docs/PR99_SERVER_MIGRATION_DOTS_HANDOFF_20261017.md",
     "handoff_document_commit": "b52affad1e7575a2e471ead621152eb1f74cf64a",
     "source_checkpoint_before_handoff": "373419cdfa635005764020beed86e31e123e1c2d",
-    "original_writer": "STOPPED_NO_FURTHER_MIGRATION_CODE_OR_CLOUD_DISPATCH",
-    "successor": "DOTS_PENDING_ACK_IN_ORIGINAL_PR99",
-    "own_inflight_swas": "NONE_KNOWN",
-    "own_unknown_results": "NONE_KNOWN",
+    "original_writer": "ORIGINAL_WINDOW_RESUMED_READONLY_CHANNEL_WORK_ONLY_NO_PRODUCTION_WRITER_CLAIM",
+    "successor": "NO_FURTHER_HANDOFF_REQUESTED",
+    "own_inflight_swas": "ALL_FOUR_RECOVERY_INVOCATIONS_TERMINAL_SUCCESS",
+    "own_unknown_results": "NONE_IN_THIS_RECOVERY_BATCH",
     "local_related_background_processes": 0,
-    "remote_proc_refreshed_for_handoff": false,
+    "remote_proc_refreshed_for_handoff": true,
     "last_host_batch": {
       "run": 39004155870,
       "job": 117313065796,
@@ -1485,6 +1487,75 @@
     "production_cutover": false,
     "remaining_major_nodes": 6,
     "existing_readonly_notifications": "KEEP_ENABLED_NOT_A_DEPLOYMENT_WRITER",
-    "note": "Handoff bookkeeping can trigger ordinary CI; that is not an in-flight host migration command."
+    "note": "Original receiver restored a new fixed read-only scope under Owner instruction; no prior consumed attempt replay, no production Writer claim. Historical stop retained above.",
+    "previous_20261017_handoff": {
+      "status": "ORIGINAL_WORK_WRITER_STOPPED_DOTS_PENDING_ACK",
+      "owner_instruction": "2026-10-17 13:27 CST explicit handoff to dots",
+      "handoff_file": "docs/PR99_SERVER_MIGRATION_DOTS_HANDOFF_20261017.md",
+      "handoff_document_commit": "b52affad1e7575a2e471ead621152eb1f74cf64a",
+      "source_checkpoint_before_handoff": "373419cdfa635005764020beed86e31e123e1c2d",
+      "original_writer": "STOPPED_NO_FURTHER_MIGRATION_CODE_OR_CLOUD_DISPATCH",
+      "successor": "DOTS_PENDING_ACK_IN_ORIGINAL_PR99",
+      "own_inflight_swas": "NONE_KNOWN",
+      "own_unknown_results": "NONE_KNOWN",
+      "local_related_background_processes": 0,
+      "remote_proc_refreshed_for_handoff": false,
+      "last_host_batch": {
+        "run": 39004155870,
+        "job": 117313065796,
+        "invoke_id": "t-sh070a4pjzs5dkw",
+        "status": "SUCCESS_TEMP_PROCESSES_STOPPED"
+      },
+      "last_entry": {
+        "run": 39005472107,
+        "job": 117316933627,
+        "status": "HOLD_BEFORE_CLOUD_CALLS_ZERO"
+      },
+      "production_services_installed": false,
+      "production_cutover": false,
+      "remaining_major_nodes": 6,
+      "existing_readonly_notifications": "KEEP_ENABLED_NOT_A_DEPLOYMENT_WRITER",
+      "note": "Handoff bookkeeping can trigger ordinary CI; that is not an in-flight host migration command."
+    },
+    "receiver_confirmation_comment_id": 6249117307,
+    "last_readonly_batch": {
+      "run": 39124426535,
+      "job": 117666481531,
+      "source_commit": "4ebfb67d7fcf7178045938a740e3696e1675120d",
+      "status": "FOUR_HOST_SUCCESS_NO_SERVICE_ACTIONS",
+      "completed_at": "2026-10-18T19:44:26+08:00"
+    },
+    "current_global_writer": "UNKNOWN",
+    "current_fence": "UNKNOWN"
+  },
+  "execution_channel_recovery_20261018": {
+    "status": "CURRENT_FOUR_HOST_READONLY_ROOT_PASS_NOT_PRODUCTION_ADMISSION",
+    "source_commit": "4ebfb67d7fcf7178045938a740e3696e1675120d",
+    "tree": "ccf4dcba0d99c8cd5f4603ed0f83b8f0addd51b4",
+    "run": 39124426535,
+    "job": 117666481531,
+    "hosted_validation_job": 117666462961,
+    "workflow": ".github/workflows/pr99-current-readonly-recovery.yml",
+    "workflow_sha256": "7559ef25277c4c4b076333bd76597065fa5dc7a116faf8d4069fce5b20fbda18",
+    "program_sha256": "12b1646d75abd14b7f44526545b29b0401b6682733660962196c01ffebaa2a54",
+    "completed_at": "2026-10-18T19:44:26+08:00",
+    "label": "pr99-readonly-recover-4ebfb67d7fcf",
+    "attempt_consumed_no_replay": true,
+    "original_repair_candidate_40_files": "UNCHANGED_NOT_EXECUTED_OR_PUBLISHED",
+    "receipt": "evidence/pr99-service-handoff/aliyun-execution/channel-recovery-20261018.json",
+    "host_commands": 4,
+    "production_service_actions": 0,
+    "business_api_requests": 0,
+    "database_opened": false,
+    "current_cloud_nonterminal_query": "NO_PENDING_RUNNING_STOPPING_RETURNED_AT_OBSERVATION",
+    "current_authoritative_writer": "UNKNOWN_NOT_PROVEN_BY_PROCESS_OR_UNIT_METADATA",
+    "current_enforced_fence": "UNKNOWN",
+    "domestic_candidate_units": "THREE_NOT_FOUND_MAINPID_ZERO",
+    "tokyo_original_units": "THREE_LOADED_ACTIVE_RUNNING",
+    "final_release_and_start_admission": "NOT_FOUND_AT_FIXED_PATHS",
+    "new_host_writer_claimed": false,
+    "production_migration_started": false,
+    "restricted_M99_dynamic_test": "NOT_RUN_NO_DENIAL_BYPASS",
+    "nonempty_WAL_acceptance": "HOLD"
   }
 }

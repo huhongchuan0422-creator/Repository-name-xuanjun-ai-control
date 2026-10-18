@@ -274,3 +274,16 @@ New stopped_transaction.py exactSHA99225aacc11cae6dc9d190015c95c9883e13d8e2691da
 完整交接：docs/PR99_SERVER_MIGRATION_DOTS_HANDOFF_20261017.md（文档提交b52affad1e7575a2e471ead621152eb1f74cf64a）。原分支保留，源码/私有日志/失败批不清理、不重置。本窗口本次归档回读后停止迁移代码、标签触发、云命令及部署。当前无本窗口已知在途/未知SWAS调用，无本地相关后台进程；未重发Root探针。最后主机r2验收已结束并清理，最后标签入口在任何云调用前HOLD。常规文档CI若自动启动不算后台部署writer。
 
 Owner已授权dots接手，dots在原PR99核对最新HEAD和本文后确认单writer；接手确认前状态DOTS_PENDING_ACK，不虚构已自动接件。生产仍未安装/切换、剩余6大节点；完整入口、源码成熟度、准确run/Invoke、真实输入缺口、私有目录、跨PR边界及禁止重放批次见交接全文。PR99与PR122网站包不得混用；原通知任务只读并保持启用，不是迁移执行者。此次提交仅交接登记，没有新的主机操作。
+
+
+## 2026-10-18 19:44 CST — 原执行窗口恢复当前四机只读通道
+
+- 实际源码 Commit `4ebfb67d7fcf7178045938a740e3696e1675120d`，Tree `ccf4dcba0d99c8cd5f4603ed0f83b8f0addd51b4`。仅新增 `.github/workflows/pr99-current-readonly-recovery.yml`；原40文件修复候选未修改、未发布、未执行。本次不重放受限目录动态测试或WAL隔离检查。
+- 原仓库Secrets→STS→SWAS当前实际成功4/4，root/hostname/nonce及实例绑定通过。新run [39124426535](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39124426535)，校验job117666462961、现场job117666481531均SUCCESS，原始日志已读。完成时间2026-10-18T19:44:26+08:00。
+- 英国 Invoke `t-gbr70epxx2hnnk0`、韩国 `t-kor70epxx0fg8hs`、国内 `t-sh070epxy88f0u8`、东京 `t-jpn70epxxoto7pc` 全部Success。四次都是固定只读元数据命令，数据库打开0、业务请求0、服务动作0；不建立新的现场Writer。
+- 查询各固定实例Pending/Running/Stopping状态时均返回空；这只是查询时观察，不是全局排他或fence证明。原事务/丢响应语义不因本次通道成功自动关闭。
+- 东京三个原应用unit均loaded/active/running；国内三个新名迁移unit均not-found/inactive/MainPID0。准确final-v1、生产启动私有admission和生产启动STATE固定路径不存在。没有执行启停、安装、切换或东京退役。
+- 当前唯一Writer及强制Fence仍UNKNOWN：所选进程/单元元数据不能代替权威写入者清单、epoch、排空和fence回执。新入口只恢复准确只读能力，不是生产准入。
+- 原接收确认#6249117307保持有效，不再请求Owner提供原执行者或窗口链接。此前“当前没有可用执行通道”的表述在本只读范围内由上述新实机证据替代；不推断M99修复发布或生产许可已恢复。
+- 本次准确新标签 `pr99-readonly-recover-4ebfb67d7fcf` 已消费；旧停止安装任务run39124426646为SKIPPED。不得重新添加标签或重跑现场job；只读批已结束，无本批后台命令。
+- 回执：`evidence/pr99-service-handoff/aliyun-execution/channel-recovery-20261018.json`。动态验收、非空WAL、完整生产接线、准确修复Commit/CI/原独审及正式迁移许可仍未完成；六个生产大节点不因此关闭。东京继续保留，原通知保持启用。
