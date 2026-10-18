@@ -115,7 +115,7 @@ def _split_summary(row, count):
     except ValueError:raise ValueError('INVALID_SPLIT_BILL_SUMMARY') from None
 
 
-def parse_document(raw):
+def _parse_document(raw):
     if type(raw) is not bytes or len(raw)>MAX_BYTES:raise ValueError('BOUNDED_PROVIDER_BILL_REQUIRED')
     try:text=raw.decode('utf-8-sig')
     except UnicodeDecodeError:raise ValueError('INVALID_BILL_UTF8') from None
@@ -162,7 +162,15 @@ def parse_document(raw):
         metadata=dict(id=SPLIT_SCHEMA,summary_count=len(records),amount_unit='YUAN',
                       timezone='UNSPECIFIED',receiver_type='UNSPECIFIED',
                       detail_join='UNVERIFIED',summary_shape='VALIDATED')
-    return header,records,metadata
+    # Retain the provider-reported summary separately from public schema metadata.
+    # Column names/sample arithmetic do not establish classification semantics.
+    reported_summary=(dict(zip(SPLIT_SUMMARY_COLUMNS,summary_values))
+                      if exact_split and summary_values is not None else None)
+    return header,records,metadata,reported_summary
+
+
+def parse_document(raw):
+    return _parse_document(raw)[:3]
 
 
 def parse(raw):
@@ -214,9 +222,9 @@ class ProviderBills:
             raw=self._download(ticket['download_url'])
             if hashlib.sha1(raw).hexdigest()!=ticket['hash_value'].lower():raise PermissionError('PROVIDER_BILL_HASH_MISMATCH')
             if a._authorize(session,csrf,workspace)[1]!=policy:raise PermissionError('BILL_AUTHORIZATION_CHANGED')
-            header,rows,schema=parse_document(raw);key=hashlib.sha256(canonical([g['scope'],p['kind'],p['bill_date']])).hexdigest()
+            header,rows,schema,reported_summary=_parse_document(raw);key=hashlib.sha256(canonical([g['scope'],p['kind'],p['bill_date']])).hexdigest()
             record=dict(scope=g['scope'],sub_mchid=policy['sub_mchid'],kind=p['kind'],bill_date=p['bill_date'],columns=header,rows=rows,
-                schema=schema,body_sha256=hashlib.sha256(raw).hexdigest(),provider_sha1=ticket['hash_value'].lower(),ticket_sha256=ticket_digest,received_at=c.now())
+                schema=schema,reported_summary=reported_summary,body_sha256=hashlib.sha256(raw).hexdigest(),provider_sha1=ticket['hash_value'].lower(),ticket_sha256=ticket_digest,received_at=c.now())
             with c.tx():
                 previous=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_BILL' AND subject_idx=? AND project=? AND active=1",(key,g['project'])).fetchone()
                 if previous and json.loads(c.decrypt(previous[0],'community-bill:'+key))['body_sha256']!=record['body_sha256']:raise ValueError('IMMUTABLE_PROVIDER_BILL_CHANGED_REVIEW_REQUIRED')
@@ -317,7 +325,11 @@ class ProviderBills:
                     unknown_rows=unknown[:200],unknown_rows_truncated=len(unknown)>200,
                     body_sha256=bill['body_sha256'],coverage='SPLIT_DETAIL_IDENTITIES_AND_AMOUNTS_ONLY',
                     time_coverage='UNKNOWN_BILL_TIMEZONE',reverse_coverage='NOT_ESTABLISHED',
-                    summary_amounts='NOT_RECONCILED',pending_evidence=['BILL_TIMEZONE','SUMMARY_AMOUNT_SEMANTICS']+
+                    summary_amounts='NOT_RECONCILED',
+                    summary_evidence=('PROVIDER_REPORTED_VALUES_RETAINED' if bill.get('reported_summary') is not None
+                                      else 'LEGACY_SUMMARY_VALUES_NOT_RETAINED'),
+                    pending_evidence=['BILL_TIMEZONE','SUMMARY_AMOUNT_SEMANTICS',
+                                      'BILL_DATE_MEMBERSHIP_RULE','LOCAL_POPULATION_COMPLETENESS']+
                         sorted({r['reason'] for r in unknown}),
                     finance_status='UNCONFIRMED',funds_retry_authorized=False)
 

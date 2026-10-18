@@ -136,6 +136,23 @@ class OfficialSchemaSignedJourney(unittest.TestCase):
         public=[receipt,result,self.call('bill_rows',offset=0),self.call('bill_audit',after_id='')]
         self.assertNotIn('private-synthetic-receiver',json.dumps(public))
         self.assertEqual(before,list(self.fx.fx.stage.demo.db.iterdump()))
+    def test_summary_retained_privately_without_inventing_amount_reconciliation(self):
+        # Intentionally not the sample arithmetic: no documented classification
+        # formula authorizes rejecting or promoting these provider-reported sums.
+        raw=self.raw_bill(summary=['4','9.91','2.03','8.07','7.09'])
+        self.signed_download(raw);self.call('bill_fetch')
+        g,_=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
+        _,saved=self.bills._read(g,'SPLIT',self.date)
+        self.assertEqual(saved['reported_summary'],dict(zip(SPLIT_SUMMARY_COLUMNS,['4','9.91','2.03','8.07','7.09'])))
+        result=self.call('bill_reconcile')
+        self.assertEqual(result['summary_evidence'],'PROVIDER_REPORTED_VALUES_RETAINED')
+        self.assertEqual(result['summary_amounts'],'NOT_RECONCILED')
+        self.assertEqual(result['reverse_coverage'],'NOT_ESTABLISHED')
+        self.assertNotIn('reported_summary',result)
+        self.assertNotIn('9.91',json.dumps(result))
+        del saved['reported_summary']
+        self.assertEqual(self.bills.reconcile(g,saved)['summary_evidence'],'LEGACY_SUMMARY_VALUES_NOT_RETAINED')
+
     def test_offline_download_uses_signed_get_and_exact_uncompressed_bytes(self):
         raw=self.raw_bill();self.signed_download(raw)
         # Exercise the actual bounded downloader with an in-memory HTTP double.
