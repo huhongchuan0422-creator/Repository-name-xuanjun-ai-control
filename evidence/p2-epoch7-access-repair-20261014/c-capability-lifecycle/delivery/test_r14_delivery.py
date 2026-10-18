@@ -298,4 +298,13 @@ class LauncherTests(unittest.TestCase):
             opener.return_value.open.return_value=response
             with self.assertRaisesRegex(ValueError,'DELIVERY_PIN'):exec(compile(body,'<rendered-memory-command>','exec'),{})
 
-if __name__=='__main__':unittest.main()
+if __name__=='__main__':
+    program=unittest.main(exit=False)
+    result=program.result
+    terminal={'schema':1,'tests':result.testsRun,'errors':len(result.errors),
+              'failures':len(result.failures),'skips':len(result.skipped),
+              'production_resume':'NOT_EXECUTED','install_admission':'NOT_GRANTED'}
+    good=result.wasSuccessful() and result.testsRun==17 and not result.skipped
+    terminal['state']='PASS' if good else 'HOLD'
+    print('R14_E2E_TERMINAL='+json.dumps(terminal,sort_keys=True))
+    sys.exit(0 if good else 1)

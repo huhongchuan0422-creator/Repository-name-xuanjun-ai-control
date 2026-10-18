@@ -8,6 +8,7 @@ on:
       - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/test_r14_delivery.py'
       - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/run_r14_ci.py'
       - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/render_memory_launcher.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/package_r14_evidence.py'
       - '.github/workflows/p2-claim-lifecycle-v2-ci.yml'
 permissions:
   contents: read
@@ -118,4 +119,13 @@ jobs:
       - name: R1-R4 real download to prepare isolated integration
         run: |
           set -euo pipefail
-          python3 -I -B -S evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/run_r14_ci.py
+          mkdir -p .r14-ci
+          python3 -I -B -S evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/run_r14_ci.py 2>&1 | tee .r14-ci/e2e.log
+          python3 -I -B -S evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/package_r14_evidence.py --test-log .r14-ci/e2e.log --output .r14-ci/delivery-evidence.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-delivery-r14-python-${{ matrix.expected }}
+          path: |
+            .r14-ci/delivery-evidence.tar.gz
+            .r14-ci/delivery-evidence.tar.gz.sha256
+          if-no-files-found: error

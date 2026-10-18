@@ -45,6 +45,14 @@ Fault cases inject system-call failures rather than replacing the orchestrator.
 Historical fixed-version suites and assertions are unchanged. They describe their
 own immutable versions, not this new candidate. Their previous source/binding
 assertions must not be rewritten into new-version assertions.
+The v2 workflow rebuilds and checks the current source and executes the current
+integration on both requested Python versions. The original capability workflow
+and its fixed-version assertions remain unchanged. That historical aggregate
+currently fails its fixed source allowlist on this changed candidate. A separate
+check at historical `0bd83e6f` ran all 325 focused tests successfully, but its outer
+rebuild check still failed `REBUILD_SELECTED_SUCCESSOR_BYTES`; that historical
+outer failure must not be reported as success or suppressed. Its versioned gate
+needs separate accurate rebinding while preserving the original assertion record.
 
 The changed preparer is published at
 `6e719dd8f43f2a43c41c6437d91ca29fa2b9cef8` and PUBLICATION_COMMIT is bound
