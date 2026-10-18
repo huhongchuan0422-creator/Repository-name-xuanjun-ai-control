@@ -100,26 +100,7 @@ class NativeAttemptCoordinator(object):
             check(type(outcome) is dict and set(outcome) ==
                   {'status','checkpoint_sha256'} and outcome['status'] == 'COMMITTED'
                   and type(outcome['checkpoint_sha256']) is str
-                  and re.match(r'^[0-9a-f]{64}
-                  'TRANSITION_UNKNOWN')
-            self._fence(attempt, 'AFTER_'+phase)
-            check(self._receipt(attempt)['completed'] == completed+[phase],
-                  'COMMIT_READBACK_UNKNOWN')
-            check(self.backend.reconcile_phase(self.ledger.grant, attempt,
-                  phase, outcome['checkpoint_sha256'], 'COMMIT') is True,
-                  'EFFECT_UNVERIFIED')
-            self.ledger.checkpoint(attempt, phase, outcome['checkpoint_sha256'])
-            completed = completed+[phase]
-        return tuple(completed)
-
-    def finish(self, attempt, proof):
-        self._fence(attempt, 'FINISH')
-        r = self._receipt(attempt)
-        check(r['status'] == 'SUCCEEDED' and r['completed'] == list(self.phases),
-              'TERMINAL_UNKNOWN')
-        return self.ledger.reconcile(attempt, proof, lambda value:
-            self.backend.reconcile_terminal(self.ledger.grant, attempt, value) is True)
-, outcome['checkpoint_sha256']) is not None,
+                  and re.fullmatch(r'[0-9a-f]{64}', outcome['checkpoint_sha256']) is not None,
                   'TRANSITION_UNKNOWN')
             self._fence(attempt, 'AFTER_'+phase)
             check(self._receipt(attempt)['completed'] == completed+[phase],
