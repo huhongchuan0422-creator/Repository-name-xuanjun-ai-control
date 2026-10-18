@@ -30,8 +30,8 @@ Existing approval6170703284 is consumed. Current production remains HOLD. No dep
 - Test exact Python 3.6.8 compatibility; distinguish fixtures, local process tests, shared CI, UK isolated tests, host preflight and production acceptance. Skips are not PASS.
 - Test admitted context binds actual approval ID/body while the preapproval contract is independent of the not-yet-created comment ID.
 - Existing tests include evidence/p2-epoch7-access-repair-20261014/preflight-ack/test_service_preflight_ack.py and test_exact_access_plan.py. tests/test_p2_retained_recovery_governance.py executes the existing15 ACL planner cases; it does not claim full recovery-kit coverage.
-- Source checkpoint d03e7226 has shared runs38743941972/38743941911/38743941329 SUCCESS; native probe38743938016 SKIPPED. These do not certify all recovery helpers or production.
-- Runtime-only checkpoint 1238a03f has independent raw-log readback for runtime CI 38614873783 (74/74,107 source hashes) and Feature Compliance Gate 38614874281 (7 checker cases,COMPLIANCE_PASS). Prior failed runs are retained as history.
+- Source checkpoint d03e7226 has shared runs38753941972/38753941911/38753941329 SUCCESS; native probe38753938016 SKIPPED. These do not certify all recovery helpers or production.
+- Runtime-only checkpoint 1238a03f has independent raw-log readback for runtime CI 38614873783 (74/74,107 source hashes) and Feature Compliance Gate 38614875281 (7 checker cases,COMPLIANCE_PASS). Prior failed runs are retained as history.
 - tests/test_p2_full_kit_checkpoint.py invokes the exact-checkout published kit generator, validates Git blob/SHA provenance, builds two identical archives, authenticates extraction, and requires all mandatory offline suites plus separate bootstrap/resume/tool tests without skipped required cases. tests/test_p2_full_kit_wrapper_contract.py checks the wrapper using explicitly synthetic results. The prior frozen helper source 3b87d10b66ae791086cdb05a554ad44ed0f4ad90 passed full-kit CI38644002796:1704 mandatory tests and157 bootstrap tests, zero skips. That result applies only to its exact bytes; the present continuation requires a new exact-commit full-kit result.
 - Source profiles cover only the finite reviewed OpenClaw Gateway/relay/native bridge and nginx startup families. Installed source mismatch, unknown children or missing positive capability proof cause HOLD. No business-module or complete vendor-distribution audit is implied.
 - Local Node SQLite diagnosis uses builtins and in-memory data only; it does not start OpenClaw or invoke a model. Its result cannot substitute for the required exact UK executable and execution identity proof.
@@ -71,7 +71,7 @@ Tests cover the recorded19-unit selected-property projection (not original CLI s
 
 ## 8. Bound r3 diagnostic delivery gate
 
-The r3 helper source460a53e0f702fb416811e785a6ef8d6c39b2d003 passed exact full-kit CI38747450098:2012 mandatory cases plus173 bootstrap cases, zero skips. Its immutable archive is published at02822b674a7c8a0c9c395cbf5664b3d24bff2516, SHA256 c56a11e78914d567f91a94118d676d49f65775161b3c46b16583ece1403c1d85,1015797 bytes. Binary GitHub readback matches. This evidence does not grant installation admission.
+The r3 helper source460a53e0f702fb416811e785a6ef8d6c39b2d003 passed exact full-kit CI38757450098:2012 mandatory cases plus173 bootstrap cases, zero skips. Its immutable archive is published at02822b674a7c8a0c9c395cbf5664b3d24bff2516, SHA256 c56a11e78914d567f91a94118d676d49f65775161b3c46b16583ece1403c1d85,1015797 bytes. Binary GitHub readback matches. This evidence does not grant installation admission.
 
 The separate owner-diagnostic-r3 wrapper binds that source/tree/archive/manifest/extractor/entry and only the existing approved prerequisite, observation and scoped isolated probe. tests/test_p2_owner_diagnostic_r3.py requires the actual archived cached import closure and exact UK case selection without executing that case in hosted CI, plus36 mocked boundaries and exact checkout/blob verification. The historical r2 gate remains executable against its explicitly preserved extractor. No historical approval or old staged directory is reused for new code. Fresh actual Owner output, private plan binding and consolidated independent review remain required.
 
@@ -154,7 +154,7 @@ CAS recovery and minimum external read-only proof pack. The original single-use
 successor, existing frozen Kit, Prepare and 16-stage business bytes remain intact.
 
 New full-ci-attempt5 gate binds current exact Commit/Tree and all source inputs,
-runs all 775 inherited complete tests plus 99 Attempt5 tests, and rebuilds the
+runs all 775 inherited complete tests plus 100 Attempt5 tests, and rebuilds the
 separate Kit/manifest deterministically. Test Providers, keys, Run/Job/Invoke IDs
 and host effects are explicit isolated fixtures, never production proof.
 Hosted and independent review terminal evidence must be reported from actual

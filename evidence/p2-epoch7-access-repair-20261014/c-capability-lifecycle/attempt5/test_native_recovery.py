@@ -138,6 +138,39 @@ def native_suite(env):
             self.change=change
             with self.assertRaises(Hold):self.native.reconcile(aid)
             with self.assertRaises(ValueError):self.ledger.claim()
+        def test_full_service_ledger_native_chain_five_attempts(self):
+            from authority_store import AuthorityStore
+            from issuer_service import IssuerService
+            store=AuthorityStore(str(Path(self.folder.name)/'trusted-fixture-service.db'),initialize=True,clock=lambda:100)
+            try:
+                store.register(self.ledger.grant)
+                original=self.transport
+                def host_readback(g,aid,operation,payload):
+                    request={'schema':1,'grant_sha256':digest(g),'attempt_id':aid,
+                             'operation':operation,'nonce':'0'*32,'payload':payload}
+                    result=original(request)['body']['result']
+                    return {'grant_sha256':digest(g),'attempt_id':aid,'operation':operation,
+                            'payload_sha256':digest(payload),'run_id':'TEST_RUN','job_id':'TEST_JOB',
+                            'invoke_id':'TEST_INVOKE','backup_sha256':'a'*64,
+                            'checkpoint_sha256':'b'*64,'log_sha256':'c'*64,'result':result}
+                signer=lambda raw:subprocess.check_output(['openssl','dgst','-sha256','-sign',self.key],input=raw)
+                service=IssuerService(store,host_readback,signer,'TEST_ONLY')
+                principal={'actor_id':self.ledger.grant['actor_id'],'host':'TEST_ONLY','writer_id':'isolated-service-writer'}
+                self.provider=ReceiptProvider(lambda request:service.handle(request,principal),
+                                              self.modulus,65537,'TEST_ONLY',clock=lambda:101)
+                self.native=NativeRecovery(self.rig.driver,self.ledger,self.provider,
+                    {k:self.ledger.grant[k] for k in ('source_commit','source_tree','manifest_sha256')},fixture_mode=True)
+                ids=[]
+                for ordinal in range(1,5):
+                    aid=self.begin();ids.append(aid)
+                    self.assertEqual(self.native.reconcile_unadmitted(aid),'FAILED_NO_WRITE')
+                fifth=self.begin();ids.append(fifth)
+                self.assertEqual(self.native.run(fifth),'SUCCEEDED')
+                self.assertEqual(len(set(ids)),5)
+                self.assertEqual(store.db.execute('SELECT consumed,terminal FROM grants').fetchone(),(5,1))
+                self.assertEqual(len([x for x in self.rig.events if x.startswith('phase:')]),16)
+                with self.assertRaises(Hold):self.begin()
+            finally:store.close()
         def test_proven_no_native_write_allows_controlled_retry(self):
             first=self.begin()
             self.assertEqual(self.native.reconcile_unadmitted(first),'FAILED_NO_WRITE')
