@@ -1,0 +1,14 @@
+{
+  "M99_dynamic": "NOT_RUN",
+  "files": {
+    ".github/workflows/pr99-scheduler-only.yml": "e3a7a2e1f0ff5990d514905460f1ea1b35a4221940d51be3e43efdd6bd0aedbd",
+    "evidence/pr99-service-handoff/aliyun-execution/scheduler_only_contract.py": "59ab9c242ed9633e6ffa803eef2cd343b6f0092a107de7c8d829839e9915542f",
+    "evidence/pr99-service-handoff/aliyun-execution/scheduler_only_host.py": "6cfd0370b097c16b5a6cc524957d6eb75d85b933467a7da64633b9edd7c01d40",
+    "evidence/pr99-service-handoff/aliyun-execution/scheduler_only_inventory.py": "068bc7fc67634db27b4f17def5df989e29fcad88685f78b6c2d795784a61fcf2"
+  },
+  "original_failed_invoke": "t-jpn70ewzbz4t62o",
+  "original_failure": "SCHEDULER_NAME_BOUND",
+  "scope": "ONLY_AFFECTED_SCHEDULER_PHASE_NO_SOURCE_RESCAN",
+  "service_actions": 0,
+  "source_inventory": "NOT_RETURNED_NOT_CLAIMED"
+}
