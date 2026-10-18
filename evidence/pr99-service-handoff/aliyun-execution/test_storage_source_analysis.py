@@ -76,6 +76,22 @@ class StorageAnalysisTests(unittest.TestCase):
         result = self.analyze('x=CredentialStore(**configuration)')
         self.assertEqual(result['constructors'][0]['keywords'][0]['name'], 'EXPANSION_UNRESOLVED')
 
+    def test_path_of_known_path(self):
+        result = self.analyze('from pathlib import Path\nROOT=Path("/opt/trading-system/runtime/store")\nclass Store:\n def __init__(self,root=ROOT):\n  self.root=Path(root)')
+        self.assertEqual(result['path_assignments'][0]['value']['source_runtime_path'], '/opt/trading-system/runtime/store')
+
+    def test_constructor_path_chain_and_none_fallback(self):
+        result = self.analyze('from pathlib import Path\nROOT=Path("/opt/trading-system/runtime/store")\nclass Store:\n def __init__(self,root=None):\n  self.root=Path(root) if root else ROOT\n  self.audit_file=self.root / "audit.jsonl"')
+        self.assertEqual(result['path_assignments'][1]['value']['source_runtime_path'], '/opt/trading-system/runtime/store/audit.jsonl')
+
+    def test_unknown_constructor_condition_stays_unknown(self):
+        result = self.analyze('from pathlib import Path\nclass Store:\n def __init__(self,root):\n  self.root=Path(root) if root else Path("/opt/trading-system/runtime/default")\n  self.audit_file=self.root / "audit.jsonl"')
+        self.assertTrue(all(row['value']['source_runtime_path'] is None for row in result['path_assignments']))
+
+    def test_conditional_self_assignment_invalidates_stale_path(self):
+        result = self.analyze('from pathlib import Path\nclass Store:\n def __init__(self):\n  self.root=Path("/opt/trading-system/runtime/old")\n  if unknown:\n   self.root=unresolved\n  self.audit_file=self.root / "audit.jsonl"')
+        self.assertIsNone(result['path_assignments'][-1]['value']['source_runtime_path'])
+
 
 if __name__ == '__main__':
     host = runpy.run_path(str(Path(__file__).with_name('app_storage_map_host.py')), run_name='test_definitions')

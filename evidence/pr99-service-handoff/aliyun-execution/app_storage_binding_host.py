@@ -150,58 +150,9 @@ class Defaults:
         return sorted(unique.items())
 
 import datetime,hashlib,json,re,stat,urllib.parse,base64,zlib
-def bounded_read(path, limit):
-    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
-    try:
-        raw = b''
-        while len(raw) <= limit:
-            chunk = os.read(fd, min(65536, limit + 1 - len(raw)))
-            if not chunk:
-                break
-            raw += chunk
-        if len(raw) > limit:
-            raise ValueError('INPUT_BOUND')
-        return raw
-    finally:
-        os.close(fd)
 
-def start_ticks(pid):
-    raw = bounded_read('/proc/' + str(pid) + '/stat', 8192)
-    return int(raw[raw.rfind(b')') + 2:].split()[19])
 
-def locate(value, kind, cwd):
-    if type(value) is not str or not value or '\x00' in value:
-        return ('UNRESOLVED', None)
-    if kind == 'URL':
-        m = re.match('^sqlite(?:\\+pysqlite)?:///', value)
-        if not m:
-            return ('NON_SQLITE_OR_UNSUPPORTED_URL', None)
-        value = value[m.end():]
-        if '?' in value or '#' in value or value.startswith('file:'):
-            return ('URI_OPTIONS_UNRESOLVED', None)
-        value = urllib.parse.unquote(value)
-        if not value or value == ':memory:':
-            return ('NON_FILE_SQLITE', None)
-    if not value.startswith('/'):
-        if not cwd.startswith('/'):
-            return ('RELATIVE_CWD_UNRESOLVED', None)
-        value = os.path.join(cwd, value)
-    if '\x00' in value:
-        return ('UNRESOLVED', None)
-    return ('FILE_CANDIDATE', os.path.normpath(value))
 
-def descriptor(path):
-    try:
-        s = os.lstat(path)
-    except FileNotFoundError:
-        return {'state': 'MISSING'}
-    except OSError:
-        return {'state': 'METADATA_UNREADABLE'}
-    if stat.S_ISLNK(s.st_mode):
-        return {'state': 'SYMLINK_UNRESOLVED'}
-    if not stat.S_ISREG(s.st_mode):
-        return {'state': 'NOT_REGULAR'}
-    return {'state': 'REGULAR_METADATA_CANDIDATE', 'device': s.st_dev, 'inode': s.st_ino, 'uid': s.st_uid, 'gid': s.st_gid, 'mode': stat.S_IMODE(s.st_mode), 'bytes': s.st_size, 'nlink': s.st_nlink}
 
 def read_at(directory, name, limit):
     fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=directory)
@@ -317,6 +268,15 @@ def analyze_source(raw, filename, Defaults, shape):
         def value(self, node, scope):
             if isinstance(node, ast.Call) and self.fullname(node.func) in ('os.getenv', 'os.environ.get'):
                 raise ValueError('ENVIRONMENT_NOT_SOURCE_DEFAULT')
+            if isinstance(node, ast.Call) and self.fullname(node.func) == 'pathlib.Path' and len(node.args) == 1 and not node.keywords:
+                value = self.value(node.args[0], scope)
+                if isinstance(value, PurePosixPath):
+                    return value
+            if isinstance(node, ast.IfExp):
+                condition = self.value(node.test, scope)
+                if type(condition) not in (str,int,bool,type(None)) and not isinstance(condition,PurePosixPath):
+                    raise ValueError('CONDITIONAL_UNKNOWN')
+                return self.value(node.body if condition else node.orelse, scope)
             return super().value(node, scope)
 
     engine = StrictDefaults(raw, '/opt/trading-system/' + filename, '/opt/trading-system')
@@ -341,6 +301,8 @@ def analyze_source(raw, filename, Defaults, shape):
             if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 local = dict(engine.globals)
                 engine.defaults(statement, local)
+                if statement.name == '__init__' and statement.args.args and statement.args.args[0].arg == 'self':
+                    local['self'] = {}
                 walk(statement.body, local, owner + '.' + statement.name)
                 continue
             if isinstance(statement, ast.ClassDef):
@@ -358,6 +320,8 @@ def analyze_source(raw, filename, Defaults, shape):
                 for child in ast.walk(statement):
                     if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
                         scope[child.id] = object()
+                    if isinstance(child,ast.Attribute) and isinstance(child.ctx,ast.Store) and isinstance(child.value,ast.Name) and child.value.id=='self' and isinstance(scope.get('self'),dict):
+                        scope['self'][child.attr] = object()
                 continue
             engine.assign(statement, scope)
             if isinstance(statement, (ast.Assign, ast.AnnAssign)):
@@ -365,6 +329,11 @@ def analyze_source(raw, filename, Defaults, shape):
                 for target in targets:
                     if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self' and re.search(r'path|root|file|dir|db', target.attr, re.I):
                         assignments.append({'owner': owner, 'line': statement.lineno, 'attribute': target.attr, 'value': expression(statement.value, scope)})
+                        if isinstance(scope.get('self'),dict):
+                            try:
+                                scope['self'][target.attr] = engine.value(statement.value,scope)
+                            except Exception:
+                                scope['self'][target.attr] = object()
             for node in ast.walk(statement):
                 if not isinstance(node, ast.Call):
                     continue
