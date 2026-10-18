@@ -142,4 +142,13 @@ class ServiceTests(unittest.TestCase):
             self.reconciliation_receipt(receipt);receipt['result']['proof']['evidence_sha256']='f'*64
         self.change=changed
         with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','reconcile_unadmitted',{})
+    def test_reconciled_attempt_cannot_replay_execution_fence(self):
+        self.consume();self.change=self.reconciliation_receipt
+        self.provider.request(self.g,'attempt1','reconcile_unadmitted',{})
+        for step in ('START','BEFORE_stage_exact_release','NATIVE_EFFECT'):
+            with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','verify_fence',{'step':step})
+    def test_reconciled_attempt_read_only_recovery_fence_allowed(self):
+        self.consume();self.change=self.reconciliation_receipt
+        self.provider.request(self.g,'attempt1','reconcile_unadmitted',{})
+        self.assertEqual(self.provider.request(self.g,'attempt1','verify_fence',{'step':'RECONCILE_UNADMITTED'})['status'],'HELD')
 if __name__=='__main__':unittest.main()

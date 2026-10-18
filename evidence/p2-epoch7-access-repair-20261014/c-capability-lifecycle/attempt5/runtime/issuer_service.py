@@ -57,6 +57,11 @@ class IssuerService(object):
             result.update(status='UNRESOLVED' if committed is None else 'COMMITTED_OUTCOME',
                           binding=payload,committed=committed)
         elif operation=='verify_fence':
+            if attempt!='CANDIDATE':
+                row=self.store.db.execute('SELECT state FROM attempts WHERE id=? AND grant_id=?',(attempt,grant['grant_id'])).fetchone()
+                need(row is not None,'UNCLAIMED_ATTEMPT')
+                need(row[0]=='UNKNOWN' or (row[0] in ('NO_WRITE','SAFE_CHECKPOINT') and
+                     payload.get('step') in ('RECOVER_COMPLETE','RECONCILE','RECONCILE_UNADMITTED')),'CLOSED_ATTEMPT_EXECUTION')
             result.update(status='HELD',exclusive=True,writer=token['writer'],
                           lease_epoch=token['lease_epoch'],fence=token['fence'])
         elif operation=='consume_attempt':
