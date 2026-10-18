@@ -31,7 +31,7 @@ def native_suite(env):
             self.ledger=Ledger(self.folder.name,grant(),clock=lambda:100)
             self.rig=Rig();self.change=lambda request,result:None
             self.provider=ReceiptProvider(self.transport,self.modulus,65537,'TEST_ONLY',clock=lambda:101)
-            self.native=NativeRecovery(self.rig.driver,self.ledger,self.provider,{k:self.ledger.grant[k] for k in ('source_commit','source_tree','manifest_sha256')})
+            self.native=NativeRecovery(self.rig.driver,self.ledger,self.provider,{k:self.ledger.grant[k] for k in ('source_commit','source_tree','manifest_sha256')},fixture_mode=True)
         def tearDown(self):self.folder.cleanup()
         def transport(self,request):
             operation=request['operation'];payload=request['payload']
@@ -45,6 +45,7 @@ def native_suite(env):
             elif operation in ('verify_phase_commit','verify_completed_phase'):result.update(status='VERIFIED',checkpoint_sha256=payload['checkpoint_sha256'])
             elif operation=='reconcile_native_intent':
                 result.update(status='COMMITTED',binding=payload,observation=s.observation(self.rig.driver.context,payload['phase'],env['h'](payload['phase'])),proof={'outcome':'SAFE_CHECKPOINT','evidence_sha256':'a'*64,'checkpoint_sha256':'b'*64,'log_sha256':'c'*64})
+            elif operation=='reconcile_unadmitted':result.update(status='RECONCILED',binding=payload,proof={'outcome':'NO_WRITE','evidence_sha256':'a'*64,'checkpoint_sha256':'b'*64,'log_sha256':'c'*64})
             elif operation=='commit_safe_reconciliation':result.update(status='RECONCILED',proof=payload['proof'])
             elif operation=='verify_terminal':result.update(status='SUCCESS',proof={'outcome':'SUCCESS','evidence_sha256':'a'*64,'checkpoint_sha256':'b'*64,'log_sha256':'c'*64})
             else:raise AssertionError(operation)
@@ -112,7 +113,7 @@ def native_suite(env):
                                  old.handlers,old.containment,old.diagnostics,old.payloads,old.identity_payloads)
             new.phase=self.rig.phase;self.rig.driver=new
             self.ledger=Ledger(self.folder.name,grant(),clock=lambda:100)
-            self.native=NativeRecovery(new,self.ledger,self.provider,{k:self.ledger.grant[k] for k in ('source_commit','source_tree','manifest_sha256')})
+            self.native=NativeRecovery(new,self.ledger,self.provider,{k:self.ledger.grant[k] for k in ('source_commit','source_tree','manifest_sha256')},fixture_mode=True)
         def fail_after_first_effect(self):
             aid=self.begin()
             def change(request,result):
@@ -137,6 +138,56 @@ def native_suite(env):
             self.change=change
             with self.assertRaises(Hold):self.native.reconcile(aid)
             with self.assertRaises(ValueError):self.ledger.claim()
+        def test_proven_no_native_write_allows_controlled_retry(self):
+            first=self.begin()
+            self.assertEqual(self.native.reconcile_unadmitted(first),'FAILED_NO_WRITE')
+            second=self.begin();self.assertNotEqual(first,second)
+            self.assertEqual(self.native.run(second),'SUCCEEDED')
+            self.assertEqual(len(self.ledger.snapshot()['attempts']),2)
+        def test_unadmitted_unknown_cannot_retry(self):
+            first=self.begin()
+            def change(request,result):
+                if request['operation']=='reconcile_unadmitted':result['status']='UNKNOWN'
+            self.change=change
+            with self.assertRaises(Hold):self.native.reconcile_unadmitted(first)
+            with self.assertRaises(ValueError):self.ledger.claim()
+        def test_existing_partial_claim_cannot_be_no_write(self):
+            first=self.fail_after_first_effect()
+            with self.assertRaises(Hold):self.native.reconcile_unadmitted(first)
+            with self.assertRaises(ValueError):self.ledger.claim()
+        def test_tampered_component_authority_never_restored(self):
+            aid=self.fail_after_first_effect();self.restart_native();self.native.reconcile(aid)
+            record=self.rig.records[s.OUTER_NAME]
+            value=json.loads(record['data'].decode())
+            value['state']['component_checkpoint']['objects']['gate']['values']['authorization']['binding']['schema']=999
+            record['data']=s.packed(value)
+            self.restart_native();second=self.begin()
+            with self.assertRaises(Hold):self.native.run(second)
+            self.assertEqual(self.rig.events.count('phase:'+s.PHASES[0]),1)
+        def test_real_finite_cursor_survives_native_reconciliation(self):
+            from epoch7_live_controls import FiniteLiveControls
+            controls=FiniteLiveControls.__new__(FiniteLiveControls)
+            original=self.rig.controls
+            controls.lock=self.rig.lock;controls.next_index=0;controls.open_phase=None;controls.phase_deadline=None
+            controls.verify_outer_review=original.verify_outer_review
+            controls._begin_guard=original._begin_guard
+            controls.observer=original.observer
+            def preflight(context):
+                controls._begin_guard(False)
+                return s.observation(context,'preflight',env['h']('cursor fixture preflight'))
+            controls.preflight=preflight
+            controls._boundary=lambda context,phase,boundary,index:s.observation(context,boundary+':'+phase,env['h'](phase))
+            self.rig.controls=controls;self.rig.driver.controls=controls
+            aid=self.fail_after_first_effect()
+            self.assertEqual(controls.next_index,1)
+            self.restart_native()
+            self.native.reconcile(aid)
+            # Recreate the native process cursor, then restore from persisted
+            # component state. Actual before/after methods enforce phase order.
+            controls.next_index=0;controls.open_phase=None
+            self.restart_native();second=self.begin();self.native.run(second)
+            self.assertEqual(controls.next_index,16)
+            self.assertEqual(self.rig.events.count('phase:'+s.PHASES[0]),1)
         def test_checkpoint_drift_blocks_recovery(self):
             aid=self.fail_after_first_effect();self.restart_native();self.native.reconcile(aid)
             self.restart_native();second=self.begin()

@@ -36,9 +36,9 @@ composition and exact host/provider binding. Kit production_ready=false.
 
 ## Test boundaries
 
-29 original + 18 real SQLite/multiprocess + 10 real RSA/nonce + 16 native
+29 original + 18 real SQLite/multiprocess + 10 real RSA/nonce + 21 native
 admission/CAS/recovery + 6 issuer service + 6 actual Kit tests extend the 775
-complete versioned tests to 860 per Python environment. Native tests
+complete versioned tests to 865 per Python environment. Native tests
 reuse the unchanged transaction Rig: real gate, capability, native journals,
 control loop and signing verification, with explicit synthetic private approval,
 predecessor/host facts and phase effects. They are not a production Provider,
@@ -67,3 +67,14 @@ Through the original trusted channel only, administrators/host authority provide
 No new UK collection command is authorized by this list. Missing evidence stays
 UNKNOWN; no UK Root, Prepare, install, activate or rollback is run. Offline code
 and tests do not issue a permit. P2_RELEASE=HOLD; INSTALL_PERMIT=NOT_ISSUED.
+
+Native checkpoints also persist the finite component state: actual control cursor,
+gate target/generation/identity observations, original review provenance, native
+authority binding, diagnostic ordinal, Core activation/staged-parent and runtime/
+legacy/acceptance data. No plan, policy, callback or code is restored from data.
+A whole-phase return is durably recorded as pending component state before
+independent commit readback; only a matching signed proof promotes it through
+native CAS. Missing partial component state stays HOLD. The actual native
+ClaimAuthority receipt guard also rechecks the new grant/lease during effect IO.
+Concrete production composition is required by default; TEST_ONLY fixtures cannot
+authorize the UK host. No obsolete single-use admission is re-opened.

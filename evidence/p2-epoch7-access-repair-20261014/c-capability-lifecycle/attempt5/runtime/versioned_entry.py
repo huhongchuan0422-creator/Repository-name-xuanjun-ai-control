@@ -18,6 +18,7 @@ MODULES={'attempt_ledger':'attempt5/original/attempt_ledger.py',
          'receipt_provider':'attempt5/runtime/receipt_provider.py',
          'authority_store':'attempt5/runtime/authority_store.py',
          'issuer_service':'attempt5/runtime/issuer_service.py',
+         'native_state':'attempt5/runtime/native_state.py',
          'native_recovery':'attempt5/runtime/native_recovery.py'}
 def need(ok, code):
     if not ok:raise ValueError('P2_ATTEMPT5_KIT_'+code)

@@ -12,7 +12,7 @@ from authority_store import AuthorityStore
 
 HOST_OPERATIONS=frozenset(('authorize_first_admission','authenticate_native_recovery',
     'verify_completed_phase','verify_phase_commit','reconcile_native_intent',
-    'commit_safe_reconciliation','verify_terminal'))
+    'commit_safe_reconciliation','reconcile_unadmitted','verify_terminal'))
 
 class IssuerService(object):
     def __init__(self, store, host_readback, signer, issuer):
@@ -68,10 +68,11 @@ class IssuerService(object):
             # Recheck the exact lease after host readback. An expired/stolen
             # lease cannot sign an admission, recovery or terminal response.
             self.store.transaction(lambda:self.store._fence(grant,token))
-            if operation in ('commit_safe_reconciliation','verify_terminal'):
+            if operation in ('commit_safe_reconciliation','reconcile_unadmitted','verify_terminal'):
                 proof=observed.get('proof')
                 need(type(proof) is dict and proof.get('outcome')==
-                     ('SUCCESS' if operation=='verify_terminal' else 'SAFE_CHECKPOINT'), 'TERMINAL_PROOF')
+                     ('SUCCESS' if operation=='verify_terminal' else
+                      'NO_WRITE' if operation=='reconcile_unadmitted' else 'SAFE_CHECKPOINT'), 'TERMINAL_PROOF')
                 self.store.reconcile(grant,attempt,proof['outcome'],digest(proof),token,
                                      lambda *unused:True)
             result.update(observed)

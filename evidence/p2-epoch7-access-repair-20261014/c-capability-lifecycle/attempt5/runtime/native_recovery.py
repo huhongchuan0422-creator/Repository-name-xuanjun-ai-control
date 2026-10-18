@@ -7,15 +7,23 @@ There is deliberately no default production transport or key.
 """
 import copy
 from receipt_provider import ReceiptProvider, Hold, need, digest
+import native_state
 
 class NativeRecovery(object):
-    def __init__(self, driver, ledger, provider, source_identity=None):
+    def __init__(self, driver, ledger, provider, source_identity=None, fixture_mode=False):
         import epoch7_recovery_sequence as sequence
         from attempt_ledger import Ledger
         need(isinstance(driver, sequence.InjectedDriver) and isinstance(ledger, Ledger), 'NATIVE_DEPENDENCIES')
         need(isinstance(provider, ReceiptProvider), 'AUTHENTICATED_PROVIDER_REQUIRED')
         need(type(source_identity) is dict and all(source_identity.get(key) == ledger.grant[key]
              for key in ('source_commit','source_tree','manifest_sha256')), 'EXACT_VERSION_BINDING')
+        if fixture_mode:
+            need(ledger.grant['target_host']=='TEST_ONLY' and provider.issuer=='TEST_ONLY', 'FIXTURE_CANNOT_AUTHORIZE_HOST')
+        else:
+            from epoch7_live_controls import FiniteLiveControls
+            from epoch7_host_containment import HostContainment
+            need(isinstance(driver.controls,FiniteLiveControls) and
+                 isinstance(driver.containment,HostContainment),'CONCRETE_NATIVE_COMPOSITION_REQUIRED')
         self.s, self.driver, self.ledger, self.provider = sequence, driver, ledger, provider
         self.journal = None
 
@@ -37,6 +45,21 @@ class NativeRecovery(object):
             need(self.token == token, 'FENCE_CHANGED')
         self.token = token
         return proof
+
+    def _guard_native_effects(self, attempt):
+        # All concrete original effect IO/commands pass ClaimAuthority.receipt
+        # through authority.phase/effect_check. Bind the *new* lease/grant at
+        # that native guard as well as at phase boundaries. No long phase can
+        # continue commands under an expired new five-attempt authorization.
+        authority=getattr(self.driver.journal_io,'authority',None)
+        if authority is None:
+            return  # Explicit TEST_ONLY Rig has no concrete host authority.
+        original=getattr(authority,'_attempt5_original_receipt',authority.receipt)
+        authority._attempt5_original_receipt=original
+        def guarded_receipt(*args,**kwargs):
+            self.fence(attempt,'NATIVE_EFFECT')
+            return original(*args,**kwargs)
+        authority.receipt=guarded_receipt
 
     def begin(self, command_sha):
         # Global authority must atomically consume the same ordinal before any
@@ -61,7 +84,9 @@ class NativeRecovery(object):
         need(proof.get('status') == 'AUTHORIZED' and
              proof.get('policy') == 'P2_ATTEMPT5_V1' and
              proof.get('context_sha256') == driver.context['context_sha256'], 'FIRST_ADMISSION_UNKNOWN')
-        need(len(self.ledger.snapshot()['attempts']) == 1, 'MISSING_NATIVE_HISTORY')
+        prior=self.ledger.snapshot()['attempts'][:-1]
+        need(all(row['state']=='FAILED_NO_WRITE' for row in prior), 'MISSING_NATIVE_HISTORY')
+        need(driver.retained_io.journal_exists(driver.inner.name) is False,'PARTIAL_NATIVE_CLAIM')
         s.check_observation(driver.controls.verify_outer_review(copy.deepcopy(driver.context)),
                             driver.context, 'verify_outer_review')
         # The original native capability is prepared/claimed exactly once.
@@ -75,6 +100,7 @@ class NativeRecovery(object):
                  'production_acceptance': 'PENDING', 'prepare_evidence': evidence}
         s.successor.commit_successor(driver, prepared, self.journal, state)
         state.update(stage='ADMITTED', admission='ADMITTED', receipt_status='OBSERVED')
+        state['component_checkpoint']=native_state.capture(driver, [])
         self.journal.save(state)
         return state
 
@@ -85,9 +111,7 @@ class NativeRecovery(object):
         five-attempt grant authorizes continuation of these exact records.
         """
         driver, s = self.driver, self.s
-        driver.gate.check()
-        self.journal = s.OuterJournal(driver.journal_io, driver.context, driver.gate.journal_binding())
-        record = self.journal._read()
+        record = driver.journal_io.read_journal(s.OUTER_NAME)
         value = s.retained.BoundJournal._validate_record(record)
         state = value['state']
         need(type(state) is dict and state.get('admission') == 'ADMITTED', 'NATIVE_ADMISSION')
@@ -95,8 +119,7 @@ class NativeRecovery(object):
         need(type(done) is list and done == list(s.PHASES[:len(done)]), 'NATIVE_PHASE_ORDER')
         inner = driver.retained_io.read_journal(driver.inner.name)
         inner_value = s.retained.BoundJournal._validate_record(inner)
-        need(inner_value.get('name') == driver.inner.name and
-             s.d.same(inner_value.get('binding'), driver.gate.journal_binding()), 'INNER_BINDING')
+        need(inner_value.get('name') == driver.inner.name, 'INNER_BINDING')
         payload = {'outer_sha256': s.sha(record['data']), 'inner_sha256': s.sha(inner['data']),
                    'context_sha256': driver.context['context_sha256'], 'completed': done,
                    'ledger_sha256': digest(self.ledger.snapshot())}
@@ -121,9 +144,28 @@ class NativeRecovery(object):
                  readback.get('checkpoint_sha256') == fingerprint, 'EFFECT_UNVERIFIED')
             if phase not in pins:
                 self.ledger.checkpoint(attempt, phase, fingerprint)
+        native_state.restore(driver, state.get('component_checkpoint'), done)
+        self.journal = s.OuterJournal(driver.journal_io, driver.context, driver.gate.journal_binding())
+        need(self.journal._read()==record and inner_value.get('binding')==driver.gate.journal_binding(), 'RESTORED_NATIVE_BINDING')
+        driver.gate.verifier._bound()
         self.journal.last = copy.deepcopy(record)
         driver.inner.last, driver.inner.state = copy.deepcopy(inner), copy.deepcopy(inner_value['state'])
         return copy.deepcopy(state)
+
+    def reconcile_unadmitted(self, attempt):
+        """Explicit no-write retry after a failed claim/admission, never reset."""
+        driver,s=self.driver,self.s
+        with driver.controls.install_lock():
+            self.fence(attempt,'RECONCILE_UNADMITTED')
+            need(driver.journal_io.journal_exists(s.OUTER_NAME) is False and
+                 driver.retained_io.journal_exists(driver.inner.name) is False,'PARTIAL_NATIVE_CLAIM')
+            binding={'outer_absent':True,'inner_absent':True,
+                     'ledger_sha256':digest(self.ledger.snapshot())}
+            response=self.proof(attempt,'reconcile_unadmitted',binding)
+            need(response.get('status')=='RECONCILED' and response.get('binding')==binding and
+                 type(response.get('proof')) is dict and response['proof'].get('outcome')=='NO_WRITE',
+                 'NO_WRITE_UNPROVEN')
+            return self.ledger.reconcile(attempt,response['proof'],lambda value:value==response['proof'])
 
     def reconcile(self, attempt):
         """Resolve exactly one durable uncertain phase through native CAS.
@@ -136,9 +178,8 @@ class NativeRecovery(object):
         driver, s = self.driver, self.s
         with driver.controls.install_lock():
             self.fence(attempt, 'RECONCILE')
-            driver.gate.check()
-            journal = s.OuterJournal(driver.journal_io, driver.context, driver.gate.journal_binding())
-            record = journal._read()
+            self._guard_native_effects(attempt)
+            record = driver.journal_io.read_journal(s.OUTER_NAME)
             state = s.retained.BoundJournal._validate_record(record)['state']
             done = state.get('completed')
             need(type(done) is list and done == list(s.PHASES[:len(done)]), 'NATIVE_PHASE_ORDER')
@@ -150,14 +191,20 @@ class NativeRecovery(object):
             need(proof.get('binding') == binding and proof.get('status') in ('NO_WRITE','COMMITTED') and
                  type(proof.get('proof')) is dict and
                  proof['proof'].get('outcome') == 'SAFE_CHECKPOINT', 'RECOVERY_UNVERIFIED')
+            checkpoint=(state.get('pending_components') if proof['status']=='COMMITTED' else state.get('component_checkpoint'))
+            restored_done=done+[phase] if proof['status']=='COMMITTED' else done
+            native_state.restore(driver,checkpoint,restored_done)
+            journal=s.OuterJournal(driver.journal_io,driver.context,driver.gate.journal_binding())
+            need(journal._read()==record,'RECOVERY_NATIVE_BINDING')
             journal.last = copy.deepcopy(record)
             if proof['status'] == 'COMMITTED':
                 evidence = s.check_observation(proof.get('observation'), driver.context, phase)
-                s.check_observation(driver.controls.after_phase(copy.deepcopy(driver.context), phase,
-                                    copy.deepcopy(evidence)), driver.context, 'after:' + phase)
+                need(state.get('pending_observation')==evidence,'NATIVE_PENDING_EFFECT_MISMATCH')
                 self.fence(attempt, 'RECOVERY_COMMIT')
                 state['phase_evidence'][phase] = evidence
                 state['completed'].append(phase)
+            state['component_checkpoint']=checkpoint
+            state.pop('pending_components',None);state.pop('pending_observation',None)
             state['stage'] = state['completed'][-1] + '_COMPLETE' if state['completed'] else 'ADMITTED'
             state.setdefault('attempt5_recoveries', []).append(
                 {'attempt': attempt, 'intent_sha256': binding['outer_sha256'],
@@ -181,6 +228,7 @@ class NativeRecovery(object):
         lock = driver.controls.install_lock()
         with lock:
             self.fence(attempt, 'START')
+            self._guard_native_effects(attempt)
             driver.check_binding()
             state = (self._adopt(attempt) if driver.journal_io.journal_exists(s.OUTER_NAME)
                      else self._initialize(attempt))
@@ -197,6 +245,9 @@ class NativeRecovery(object):
                     need(driver.diagnostics.scope_failure is None, 'BOUNDED_COMMAND_FAILED')
                     s.check_observation(driver.controls.after_phase(copy.deepcopy(driver.context), phase,
                                         copy.deepcopy(evidence)), driver.context, 'after:' + phase)
+                    state['pending_components']=native_state.capture(driver,state['completed']+[phase])
+                    state['pending_observation']=evidence
+                    self.journal.save(state)
                     self.fence(attempt, 'AFTER_' + phase)
                     fingerprint = digest(evidence)
                     proof = self.proof(attempt, 'verify_phase_commit',
@@ -206,6 +257,8 @@ class NativeRecovery(object):
                     state['phase_evidence'][phase] = evidence
                     state['completed'].append(phase)
                     state['stage'] = phase + '_COMPLETE'
+                    state['component_checkpoint']=state.pop('pending_components')
+                    state.pop('pending_observation')
                     self.journal.save(state)
                     self.ledger.checkpoint(attempt, phase, fingerprint)
                 self.fence(attempt, 'FINISH')
