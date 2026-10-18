@@ -178,3 +178,15 @@ UNKNOWN、尚未对账的部分写入、Writer/Lease/Fence冲突、账本与回�
 首次批准正文现包含完整permit_cycle策略；AuthorityStore由受信管理员在独立认证后register_cycle，服务按策略SHA、review ID、批准正文SHA核验每个周期请求。IssuerService对代码身份变化持久停止原周期，普通UNKNOWN保持可对账HOLD。`approved_config.py`仅执行管理员预映射的、首次许可逐项批准的专用JSON配置CAS，校验before/after/payload/checkpoint SHA，O_EXCL保留原始备份和意图、fsync、Fence、写后校验；不接收任意路径/命令，不允许源代码调整。部分输出保留，需先可信对账，不能盲重试。
 
 生产集成需原受信通道提供真实Writer身份、Lease/Fence和事务/备份/检查点回执；测试中的TEST_ONLY host facts和签名钥匙仅为隔离测试，绝不作为英国生产验收。未修改英国冻结文件，未运行旧Prepare、安装、激活或回滚。原R1–R4、未变16阶段及257文件旧Kit继承原结果。INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
+
+## 2026-10-18 Owner长期最高执行规则（覆盖此前冲突流程）
+
+**适用所有现有及未来项目**：Binance、官网/客户中心、SaaS/模块市场、社区分账/微信支付、AI客服/视频/定制、四机运维、控制中心/OpenClaw/P2。核心流程：**ONE_AUTHORIZATION → CONTINUOUS_EXECUTION → AUTOMATIC_RECOVERY → ONE_ACCEPTANCE**。执行方在已授权任务范围内持续开发、测试、修复、集成、文档、CI和必要已批准部署；普通错误自行处理，不逐节点暂停等待Owner。原已审且准确版本、范围、证据未变的内容直接继承；独审只集中检查新增或受影响调用链。一次列齐缺陷、修复标准、复测与最终交付；不得删减必需CI、改判历史审查或将模拟/Hosted当生产验收。
+
+**安装默认ONE_PERMIT_MAX_5_ATTEMPTS**：一份正式许可覆盖最多5次受控尝试，成功立即停止；5次耗尽停止并保存证据；安全对账、经批准参数调整、原生幂等恢复、剩余额度续试均无需逐次重审。UNKNOWN、部分写入未确认、并发Writer/Lease/Fence冲突或状态与回执不一致时HOLD；可信对账解除且原许可仍有效时才可恢复。源代码变更、超范围或有效期结束须停止旧许可、受影响增量审核并取得下一轮新许可。不得重置持久额度/重放旧授权。各项目既有生产门禁仍有效。
+
+**唯一Writer与职责**：每项目一名真实Writer/执行协调负责人；Work按具体任务开发或独审、不得自审；Dots监督与依权限增量审核签发；OpenClaw/可信执行器处理获准机械操作；Owner仅负责确需本人决策与动作。跨窗口只交原任务检查点，不新建重复任务、Writer或事务。SSH/RAM/Actions/Runner已有授权优先复用；新增高敏权限、不可逆或资金风险、明确安全拒绝须尊重原门禁。
+
+**通知与错误门槛**：不逐节点通知Owner，仅在整体/重要验收完成、真实外部阻塞、需要新增决策/权限、重大安全风险或触发停止门槛时报告。相同错误30分钟应切换技术方案，1小时未解决停止无效路径并集中说明阻塞与替代方案。日常进度以原PR/Actions/看板的真实证据记录，不用计划和汇报代替工作。
+
+**统一交付**：准确Commit/Tree、修改文件SHA、Hosted CI Run/Job及终态、Kit/Manifest和版本Pins、真实部署/回执及恢复、独立审核与最终验收。未执行标NOT_EXECUTED，无法证明标UNKNOWN；已审未变结果继承。各项目原任务继续：P2 PR17/PR58、网站PR122和其他原项目登记，不新建任务。P2当前历史951项CI、原Kit、D1 HOLD由项目责任方准确核实并复用，不得把Owner提供的总数当本次重新独验。P2及支付生产许可状态不会因本规则自动变PASS。
