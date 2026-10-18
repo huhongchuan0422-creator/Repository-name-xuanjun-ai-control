@@ -395,13 +395,9 @@ class RegistryTests(unittest.TestCase):
             'authority_live_state','writer_fence_live_state','installation_permission','release'})
         for name in ('record_sha256','config_sha256','issuer_public_der_sha256','adapter_sha256'):
             self.assertIs(type(value[name]), str)
-            self.assertRegex(value[name], r'^[0-9a-f]{64}
-    unittest.main()
-)
+            self.assertRegex(value[name], r'^[0-9a-f]{64}$')
         for pin in value['sources'].values():
-            self.assertRegex(pin, r'^[0-9a-f]{64}
-    unittest.main()
-)
+            self.assertRegex(pin, r'^[0-9a-f]{64}$')
         self.assertNotIn('/private/', json.dumps(value))
         self.assertNotIn(str(self.base), json.dumps(value))
 
