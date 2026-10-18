@@ -63,6 +63,9 @@ def main():
                 'inherited_manifest_sha256': '41771b95c95b960cc643f06b1b3c622a880ed64a385d2f122322605b8abf106c',
                 'files': files, 'groups': groups, 'tests': sum(g['tests'] for g in groups),
                 'python': sys.version, 'production_binding': 'UNKNOWN',
+                'trusted_config_entry': 'production/p2_attempt5/registry_cli.py',
+                'registry_default_root': '/etc/xuanjun-p2/registry',
+                'registry_deployment': 'NOT_EXECUTED',
                 'host_effects': 'SYNTHETIC_TEST_ONLY', 'installation': 'NOT_EXECUTED',
                 'permit': 'NOT_ISSUED', 'release': 'HOLD'}
     raw = (json.dumps(manifest, sort_keys=True, indent=2) + '\n').encode()
@@ -77,6 +80,11 @@ def main():
     (output / 'SHA256SUMS').write_text(
         hashlib.sha256(raw).hexdigest() + '  MANIFEST.json\n' +
         hashlib.sha256(bundle.read_bytes()).hexdigest() + '  production-assembly.tar.gz\n')
+    print('ARTIFACT_BINDING=' + json.dumps({
+        'source_commit': head, 'source_tree': tree, 'files': files,
+        'manifest_sha256': hashlib.sha256(raw).hexdigest(),
+        'bundle_sha256': hashlib.sha256(bundle.read_bytes()).hexdigest(),
+        'tests': manifest['tests'], 'groups': groups}, sort_keys=True), flush=True)
     print('AFFECTED_ACCEPTANCE=PASS TESTS=' + str(manifest['tests']), flush=True)
 
 
