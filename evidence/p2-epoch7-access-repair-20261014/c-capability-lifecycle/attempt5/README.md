@@ -36,9 +36,9 @@ composition and exact host/provider binding. Kit production_ready=false.
 
 ## Test boundaries
 
-29 original + 18 real SQLite/multiprocess + 10 real RSA/nonce + 21 native
-admission/CAS/recovery + 6 issuer service + 6 actual Kit tests extend the 775
-complete versioned tests to 865 per Python environment. Native tests
+29 original + 19 real SQLite/multiprocess + 10 real RSA/nonce + 21 native
+admission/CAS/recovery + 7 issuer service + 6 actual Kit tests extend the 775
+complete versioned tests to 867 per Python environment. Native tests
 reuse the unchanged transaction Rig: real gate, capability, native journals,
 control loop and signing verification, with explicit synthetic private approval,
 predecessor/host facts and phase effects. They are not a production Provider,

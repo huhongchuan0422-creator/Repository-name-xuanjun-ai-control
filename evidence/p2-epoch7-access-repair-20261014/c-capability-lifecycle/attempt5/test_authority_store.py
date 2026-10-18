@@ -84,6 +84,10 @@ class StoreTests(unittest.TestCase):
         os.chmod(self.path,0o644)
         with self.assertRaises(Hold):AuthorityStore(self.path)
         os.chmod(self.path,0o600)
+    def test_same_approval_cannot_mint_fresh_quota(self):
+        duplicate=dict(self.g);duplicate['grant_id']='different_grant_id'
+        with self.assertRaises(sqlite3.IntegrityError):self.store.register(duplicate)
+        self.assertEqual(self.store.db.execute('SELECT count(*) FROM grants').fetchone()[0],1)
     def test_source_binding_change_refused(self):
         changed=dict(self.g);changed['source_commit']='f'*40
         with self.assertRaises(Hold):self.store.lease(changed,'writer')

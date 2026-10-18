@@ -43,6 +43,13 @@ class ServiceTests(unittest.TestCase):
     def test_rpc_retry_idempotent_consumption(self):
         self.consume();self.consume()
         self.assertEqual(self.store.db.execute('SELECT consumed FROM grants').fetchone()[0],1)
+    def test_private_audit_retains_actual_transaction_binding(self):
+        self.consume();self.provider.request(self.g,'attempt1','authorize_first_admission')
+        import json
+        rows=self.store.db.execute("SELECT body FROM audit WHERE event='SIGNED_RECEIPT' ORDER BY id").fetchall()
+        receipt=json.loads(rows[-1][0])['host_receipt']
+        self.assertEqual((receipt['run_id'],receipt['job_id'],receipt['invoke_id']),('TEST_RUN','TEST_JOB','TEST_INVOKE'))
+        self.assertEqual(receipt['backup_sha256'],'a'*64)
     def test_wrong_authenticated_principal_refused(self):
         self.principal['host']='OTHER'
         with self.assertRaises(Hold):self.consume()

@@ -49,6 +49,7 @@ class IssuerService(object):
         # Revalidate/renew the same canonical writer lease for every request.
         # Actual phase effects still use the original independent install lock.
         token=self.store.lease(grant,principal['writer_id'])
+        receipt=None
         result={'grant_id':grant['grant_id'],'attempt_id':attempt}
         if operation=='verify_fence':
             result.update(status='HELD',exclusive=True,writer=token['writer'],
@@ -80,9 +81,11 @@ class IssuerService(object):
         now=int(self.store.clock())
         body={'schema':1,'issuer':self.issuer,'request_sha256':digest(request),
               'issued_utc':now,'expires_utc':min(now+30,grant['expires_utc']),'result':result}
+        need(len(canonical(body))<=262144,'SIGNED_RESPONSE_BOUND')
         signature=self.signer(canonical(body))
         need(type(signature) is bytes and 256<=len(signature)<=512,'SIGNER_NOT_CONNECTED')
         # Service audit must commit before a signed response is returned.
         self.store.transaction(lambda:self.store.audit(grant['grant_id'],'SIGNED_RECEIPT',
-                              {'attempt':attempt,'operation':operation,'body_sha256':digest(body)}))
+                              {'attempt':attempt,'operation':operation,'body_sha256':digest(body),
+                               'signed_body':body,'host_receipt':receipt}))
         return {'body':body,'signature':base64.b64encode(signature).decode('ascii')}

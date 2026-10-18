@@ -32,7 +32,7 @@ class AuthorityStore(object):
         if initialize:
             self.db.executescript('''
             BEGIN IMMEDIATE;
-            CREATE TABLE grants(id TEXT PRIMARY KEY,binding TEXT NOT NULL,body TEXT NOT NULL,
+            CREATE TABLE grants(id TEXT PRIMARY KEY,binding TEXT NOT NULL,body TEXT NOT NULL,approval TEXT NOT NULL UNIQUE,
                 consumed INTEGER NOT NULL DEFAULT 0,terminal INTEGER NOT NULL DEFAULT 0,
                 writer TEXT,epoch INTEGER NOT NULL DEFAULT 0,fence INTEGER NOT NULL DEFAULT 0,
                 expiry INTEGER NOT NULL DEFAULT 0);
@@ -67,8 +67,8 @@ class AuthorityStore(object):
         from attempt_ledger import _valid_grant
         _valid_grant(grant)
         def action():
-            self.db.execute('INSERT INTO grants(id,binding,body) VALUES(?,?,?)',
-                (grant['grant_id'],digest(grant),canonical(grant).decode('utf-8')))
+            self.db.execute('INSERT INTO grants(id,binding,body,approval) VALUES(?,?,?,?)',
+                (grant['grant_id'],digest(grant),canonical(grant).decode('utf-8'),grant['approval_body_sha256']))
             self.audit(grant['grant_id'],'REGISTER',{'binding':digest(grant)})
         return self.transaction(action)
     def _grant(self, grant):
