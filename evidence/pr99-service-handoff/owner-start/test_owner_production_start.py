@@ -134,4 +134,58 @@ class OwnerStartTests(unittest.TestCase):
  def test_unknown_start_preserves_state_without_compensating_replay(self):self.run_start_fixture(unknown=True)
 
 
+class CheckpointCapacityTests(unittest.TestCase):
+ def materials(self):
+  now=1000000
+  files={'opt/trading-system/runtime/ordinary-state-'+str(i).zfill(5)+'.json':'a'*64 for i in range(3000)}
+  fence={'action':'PR99_SOURCE_WRITER_FENCE_V1','source_host':'iZ6wee8q9z4t03hvqumwfhZ',
+    'writer_inventory_sha256':'b'*64,'writer_epoch':1,'writers_stopped':True,'inflight_drained':True,
+    'unresolved_shared_writers':[],'observed_at':now-10}
+  rawf=m.canonical(fence)
+  checkpoint={'class':'FINAL_CANONICAL_CHECKPOINT','source_fence_sha256':m.sha(rawf),'files':files,
+    'database_integrity':'PASS','database_schema_sha256':'c'*64,'captured_at':now-1}
+  rawc=m.canonical(checkpoint)
+  assignment={'action':'PR99_CANONICAL_WRITER_ASSIGNMENT_V1','target_host':m.HOST,'release':str(m.RELEASE),
+    'checkpoint_sha256':m.sha(rawc),'writer_inventory_sha256':'b'*64,'writer_epoch':1,
+    'target_identity':'xuanjun-s07','source_writer_resumed':False,'scope':list(m.UNITS)}
+  rawa=m.canonical(assignment)
+  p={'source_writer_fence_receipt_sha256':m.sha(rawf),'final_checkpoint_receipt_sha256':m.sha(rawc),
+    'canonical_writer_assignment_sha256':m.sha(rawa),'writer_inventory_sha256':'b'*64,'writer_epoch':1,
+    'final_data_file_hashes':files,'file_hashes':files,'database_schema_sha256':'c'*64}
+  return now,p,{'source-writer-fence.receipt.json':rawf,'final-checkpoint.receipt.json':rawc,'canonical-writer-assignment.json':rawa}
+ def run_files(self,p,materials,now):
+  # Real files and strict byte limits; path ownership is fixture-only.
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d)
+   for name,raw in materials.items():(root/name).write_bytes(raw)
+   calls=[]
+   def bounded(path,limit):
+    raw=Path(path).read_bytes();calls.append(Path(path).name)
+    if len(raw)>limit:raise RuntimeError('FILE_TYPE_SIZE')
+    return raw
+   with patch.object(m,'RELEASE',root),patch.object(m,'read',side_effect=bounded):
+    # Keep assignment binding in this ordinary temporary fixture.
+    assignment=json.loads(materials['canonical-writer-assignment.json'])
+    assignment['release']=str(root);raw=m.canonical(assignment)
+    (root/'canonical-writer-assignment.json').write_bytes(raw)
+    p=copy.deepcopy(p);p['canonical_writer_assignment_sha256']=m.sha(raw)
+    result=m.load_final_receipts(p,now)
+   self.assertEqual(len(calls),3);self.assertEqual(len(set(calls)),3)
+   return result
+ def test_complete_3000_file_checkpoint_larger_than_old_limit(self):
+  now,p,materials=self.materials()
+  self.assertGreater(len(materials['final-checkpoint.receipt.json']),200000)
+  self.assertLess(len(materials['final-checkpoint.receipt.json']),2097152)
+  self.assertTrue(self.run_files(p,materials,now))
+ def test_oversized_checkpoint_retained_not_truncated(self):
+  now,p,materials=self.materials();materials['final-checkpoint.receipt.json']=b'x'*2097153
+  with self.assertRaisesRegex(RuntimeError,'FILE_TYPE_SIZE'):self.run_files(p,materials,now)
+ def test_large_checkpoint_wrong_hash_still_rejected(self):
+  now,p,materials=self.materials();p['final_checkpoint_receipt_sha256']='0'*64
+  with self.assertRaisesRegex(RuntimeError,'FINAL_CHECKPOINT_PROOF'):self.run_files(p,materials,now)
+ def test_large_checkpoint_wrong_data_membership_still_rejected(self):
+  now,p,materials=self.materials();p['final_data_file_hashes'].pop(next(iter(p['final_data_file_hashes'])))
+  with self.assertRaisesRegex(RuntimeError,'FINAL_CHECKPOINT_SEMANTICS'):self.run_files(p,materials,now)
+
+
 if __name__=='__main__':unittest.main()

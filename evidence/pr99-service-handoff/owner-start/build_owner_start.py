@@ -9,7 +9,7 @@ from pathlib import Path
 
 BASE=Path(__file__).parent
 published=BASE.parent/'s09-install-candidate'
-if not published.is_dir():published=BASE.parent/'published-controller'
+if not all((published/n).is_file() for n in ('production_start.py','stopped_transaction.py')):published=BASE.parent/'published-controller'
 source=(published/'production_start.py').read_text()
 stopped=(published/'stopped_transaction.py').read_text()
 assert hashlib.sha256(source.encode()).hexdigest()=='d645edc0013af34804626315a6ddce1b47b870c012b6b632131c320ed4c20688'
@@ -113,6 +113,10 @@ if __name__=='__main__':
  print(json.dumps(result,sort_keys=True))
 '''
 source+='\nFROZEN_STOPPED='+repr(stopped)+'\n'+helpers
+compile(source,'owner_production_start.py','exec')
+capacity={'__name__':'capacity_build_definitions'}
+exec(compile((BASE/'apply_checkpoint_capacity.py').read_text(),'capacity_build','exec'),capacity)
+source=capacity['repair'](source)
 compile(source,'owner_production_start.py','exec')
 (BASE/'owner_production_start.py').write_text(source)
 print('OWNER_START_BUILD_COMPLETE source_sha256='+hashlib.sha256(source.encode()).hexdigest())

@@ -116,6 +116,15 @@ def validate_final_receipts(p,fence_raw,checkpoint_raw,assignment_raw,now):
          and assignment.get('scope')==list(UNITS),'WRITER_ASSIGNMENT_SEMANTICS')
  return True
 
+
+def load_final_receipts(p,now):
+ # Read each exact proof once; match the source HeldProof capacities.
+ # Large complete manifests are allowed; truncation and drift remain HOLD.
+ fence=read(RELEASE/'source-writer-fence.receipt.json',16384)
+ checkpoint=read(RELEASE/'final-checkpoint.receipt.json',2097152)
+ assignment=read(RELEASE/'canonical-writer-assignment.json',16384)
+ return validate_final_receipts(p,fence,checkpoint,assignment,now)
+
 def admit():
  require(os.geteuid()==0 and os.uname().nodename==HOST,'HOST_ROOT')
  require(stat.S_IMODE(INPUTS.lstat().st_mode)==0o600,'PRIVATE_ADMISSION')
@@ -124,12 +133,7 @@ def admit():
  require(type(p['issued_at']) is int and type(p['expires_at']) is int and p['issued_at']<=now<p['expires_at']<=p['issued_at']+7200,'ADMISSION_EXPIRED')
  validate_owner_authority(p)
  require(p['release']==str(RELEASE) and p['checkpoint_class']=='FINAL_CANONICAL_CHECKPOINT','NO_PRELIMINARY_DATA')
- require(p['source_writer_fence_receipt_sha256']==sha(read(RELEASE/'source-writer-fence.receipt.json',200000)),'SOURCE_FENCE_PROOF')
- require(p['final_checkpoint_receipt_sha256']==sha(read(RELEASE/'final-checkpoint.receipt.json',200000)),'FINAL_CHECKPOINT_PROOF')
- require(p['canonical_writer_assignment_sha256']==sha(read(RELEASE/'canonical-writer-assignment.json',200000)),'WRITER_ASSIGNMENT_PROOF')
- validate_final_receipts(p,read(RELEASE/'source-writer-fence.receipt.json',200000),
-                         read(RELEASE/'final-checkpoint.receipt.json',200000),
-                         read(RELEASE/'canonical-writer-assignment.json',200000),now)
+ load_final_receipts(p,now)
  # Owner removed the review/permit wait; the remaining inputs bind actual data and effects.
  # This controller never creates those receipts or treats fixture flags as proof.
  account=pwd.getpwnam('xuanjun-s07');group=grp.getgrnam('xuanjun-s07');require(account.pw_uid==p['uid'] and account.pw_gid==group.gr_gid==p['gid'] and p['uid'] not in (0,65534),'PREPARED_DEDICATED_IDENTITY')
