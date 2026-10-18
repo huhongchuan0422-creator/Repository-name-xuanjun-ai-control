@@ -159,7 +159,8 @@
           "tests/test_pr122_customer_workflow_apply.py",
           "tests/test_pr122_customer_workflow_operations.py",
           "tests/test_pr122_customer_protected_runtime.py",
-          "tests/test_pr122_customer_workflow_signature.py"
+          "tests/test_pr122_customer_workflow_signature.py",
+          "tests/test_pr122_customer_workflow_request.py"
         ]
       },
       "reuse": [
@@ -210,7 +211,9 @@
         "tests/test_pr122_customer_workflow_apply.py",
         "tests/test_pr122_customer_workflow_operations.py",
         "tests/test_pr122_customer_protected_runtime.py",
-        "tests/test_pr122_customer_workflow_signature.py"
+        "tests/test_pr122_customer_workflow_signature.py",
+        "scripts/pr122_customer_workflow_request.py",
+        "tests/test_pr122_customer_workflow_request.py"
       ]
     },
     {

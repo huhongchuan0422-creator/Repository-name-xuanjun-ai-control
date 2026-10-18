@@ -107,6 +107,10 @@ jobs:
         run: |
           set -euo pipefail
           python -B -m unittest tests.test_pr122_customer_workflow tests.test_pr122_customer_workflow_review tests.test_pr122_customer_preparation_bridges tests.test_pr122_customer_policy_restore tests.test_pr122_customer_channel_workflow tests.test_pr122_customer_workflow_apply tests.test_pr122_customer_workflow_operations tests.test_pr122_customer_protected_runtime tests.test_pr122_customer_workflow_signature -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_WHOLE_WORKFLOW_TESTS.log
+      - name: Protected workflow entry and non-executable review request
+        run: |
+          set -euo pipefail
+          python -B -m unittest tests.test_pr122_customer_workflow_request -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_WORKFLOW_ENTRY_TESTS.log
       - name: Install isolated browser only
         run: |
           npm install --prefix "$RUNNER_TEMP/pr122-customer-browser" --no-save playwright@1.55.0

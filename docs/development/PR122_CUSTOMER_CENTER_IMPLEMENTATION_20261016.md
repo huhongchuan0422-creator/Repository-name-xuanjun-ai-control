@@ -142,3 +142,15 @@ R1实际并发回归另定位UnixStreamServer默认监听队列5不足以吸收8
 V3 独立审核签名额外强制包含 workflow_contract_sha256，并逐字匹配批准的六阶段输入/恢复范围；旧 apply 范围签名不能用于全链，V1/V2 既有签名格式保持不变。
 
 本批最终本地合并专项：195 个唯一测试，195 通过，0 跳过/错误/失败（九个全链模块，不重复计入此前 V2 的69项）。其中真实 Coordinator + OriginalOperations + StageLease 使用临时同一总账，mock 原 writer，验证 runtime 第一次无副作用失败后同许可第二次成功、probe/账号成功不重跑、customer 无内层 Attempts。另两项验证 runtime intent 后失去 fence 不 mkdir、venv 后许可失效不写 vendor 文件。此结果不替代 Hosted 或现场测试。
+
+## 2026-10-18：原入口与不可执行审阅申请
+
+在原 release.main 中补齐固定 workflow-apply / workflow-request 分支；不新增账号、策略、通道或安装 writer。workflow-apply 只读取原 CONFIG 内 WHOLE_WORKFLOW_PLAN.json / WHOLE_WORKFLOW_INPUTS.json，不接受 operations、module、command、自定义账本或配置路径。必须直接 root 身份（uid/euid/gid/egid 均0，SUDO_UID 仅空或0）、原固定主机、root 保护的源码目录和逐字绑定的固定执行模块。JSON 要求 root0600、父链不可非root写、regular 单链接稳定文件、O_NOFOLLOW/O_NONBLOCK、大小和重复键限制。原 sudoers、wrapper、通道命令列表不变，不扩大 githubrunner 权限。
+
+入口验证六阶段输入、静态客户计划、完整 runtime closure 格式与源码；原 workflow_apply 在共享锁内重新读取并核验输入、源 archive、独立签名与 Owner 许可的准确 ZIP，再由原协调器花费同一持久额度。账户或策略动作不能先于制品绑定失败。入口新增源码仍必须经新一轮审核、Hosted 新制品和新准确绑定；e03/7e50 原制品或旧许可不授权该新增入口。
+
+workflow-request 只读本地候选源码与显式 observations JSON，验证 bytes/manifest 后构造六阶段待审 plan、输入摘要与制品关系。缺真实值显示 NOT_EXECUTABLE 与 missing_inputs；即使数据完整仍是 NOT_EXECUTABLE / NOT_GRANTED，不产生签名、批准 comment、nonce 或安装命令，不写入受保护配置或外部服务。模板允许 runtime 的 UID/GID 为 null，仅代表随后从 ACCOUNT 成功检查点派生，绝不预填猜测身份。PROBE 必须继承精确成功回执，不自动 enroll/execute；N1/E1 历史成功保留。
+
+仍需的现场证据分开列明：受保护启动 Python/cryptography 身份，Owner 独立 custody 和完整范围签名/安装批准，真实只读 probe 成功回执，目标 stdlib/native/生成 venv closure，真实 config/runtime/publisher 与12项验收，当前 policy/channel/static plan。已有 wheel/source 和 N1/E1 可按准确证据复用，不要求重跑成功步骤。此处执行入口代码已接线；缺少真实证据时不会生成可执行的假命令。
+
+本批本地验证：62项新增入口/申请专项全通过；与原V1/V2及全链回归合并为326个唯一测试，326通过，0错误/失败/跳过。固定15模块逐项漂移、FIFO非阻塞拒绝、保护父链、四项root身份、锁内ZIP/archive/input不匹配不进入Coordinator均有否定用例。合成包结构检查95成员/94绑定，包含新增模块和测试；该局部结构检查不是新提交制品pin，最终准确绑定等待新Hosted产物。

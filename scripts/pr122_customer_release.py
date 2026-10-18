@@ -196,10 +196,61 @@ def workflow_apply(folder,comment,expected_plan,operations=None):
         validate_contract(expected_plan,approval)
         if operations is None:
             from scripts.pr122_customer_workflow_operations import OriginalOperations
-            operations=OriginalOperations(sys.modules[__name__],folder,expected_plan,
-                                          private_config(CONFIG/'WHOLE_WORKFLOW_INPUTS.json'))
+            from scripts import pr122_customer_workflow_request as request
+            inputs=request.read_json(CONFIG/'WHOLE_WORKFLOW_INPUTS.json',protected=True)
+            manifest,raw,_=source(folder)
+            request.validate_inputs(expected_plan,inputs,manifest,raw)
+            need(inputs['stages']['CHANNEL_REBIND']['zip_sha256']==approval.get('artifact_zip_sha256'),
+                 'WORKFLOW_ENTRY_ARTIFACT_BINDING')
+            need(archive_binding(folder,manifest,raw)==expected_plan['artifact_tar_sha256'],
+                 'WORKFLOW_ENTRY_ARCHIVE_BINDING')
+            operations=OriginalOperations(sys.modules[__name__],folder,expected_plan,inputs)
         return Coordinator(sys.modules[__name__],folder,comment,expected_plan,
                            approval,operations,held.fileno()).run()
+
+
+def workflow_entry(folder,comment):
+    """Fixed original CLI adapter. Root-private data cannot supply executable adapters."""
+    from scripts import pr122_customer_workflow_request as request
+    need(type(comment) is int and comment>0 and type(folder) is str and bool(folder),'WORKFLOW_ENTRY_ARGUMENTS')
+    need(os.getuid()==os.geteuid()==os.getgid()==os.getegid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ'
+         and os.environ.get('SUDO_UID') in (None,'0'),'WORKFLOW_DIRECT_OWNER_REQUIRED')
+    from scripts.pr122_customer_attempts import protected_directory
+    protected_directory(Path(folder))
+    plan_value=request.read_json(CONFIG/'WHOLE_WORKFLOW_PLAN.json',protected=True)
+    inputs=request.read_json(CONFIG/'WHOLE_WORKFLOW_INPUTS.json',protected=True)
+    manifest,raw,files=source(folder)
+    request.validate_inputs(plan_value,inputs,manifest,raw)
+    need(archive_binding(folder,manifest,raw)==plan_value['artifact_tar_sha256'],
+         'WORKFLOW_ENTRY_ARCHIVE_BINDING')
+    # Bind this new entry and its fixed coordinator/adapter dependencies to the
+    # exact reviewed source, in addition to each existing stage implementation.
+    from scripts import pr122_customer_workflow as coordinator
+    from scripts import pr122_customer_workflow_operations as operations
+    from scripts import pr122_customer_preparation as preparation
+    from scripts import pr122_customer_runtime_stage as runtime_stage
+    from scripts import pr122_customer_workflow_apply as customer
+    from scripts import pr122_customer_resume as resume
+    from scripts import pr122_customer_attempts as attempts
+    from scripts import pr122_customer_review as review
+    for module in (sys.modules[__name__],request,coordinator,operations,preparation,runtime_stage,customer,resume,attempts,review,
+                   operations.runtime,operations.channel,operations.account,operations.bootstrap,operations.probe):
+        name=module.__name__.replace('.','/')+'.py'
+        if module is sys.modules[__name__]:name='scripts/pr122_customer_release.py'
+        need(name in files and request.read_bytes(module.__file__,protected=True,code=True)==files[name],
+             'WORKFLOW_ENTRY_SOURCE_DRIFT')
+    # No caller-supplied operations/commands/modules reach the execution route.
+    # Original workflow_apply reopens the protected inputs and rechecks their
+    # signed hashes under its original shared lock before admitting any attempt.
+    return workflow_apply(folder,comment,plan_value)
+
+
+def workflow_request(folder,observations):
+    """Non-executable local review document; no root reads, locks or mutations."""
+    from scripts import pr122_customer_workflow_request as request
+    manifest,raw=request.read_review_source(folder)
+    value={} if observations is None else request.read_json(observations)
+    return request.make_request(manifest,raw,value)
 
 
 def apply(folder,comment):
@@ -306,11 +357,23 @@ def _rollback_locked():
 
 def main():
     os.umask(0o022)
-    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('plan','apply','rollback'));ap.add_argument('--source');ap.add_argument('--approval',type=int);a=ap.parse_args()
+    ap=argparse.ArgumentParser()
+    ap.add_argument('action',choices=('plan','apply','rollback','workflow-apply','workflow-request'))
+    ap.add_argument('--source');ap.add_argument('--approval',type=int);ap.add_argument('--observations')
+    a=ap.parse_args()
+    if a.action in ('workflow-apply','workflow-request') and not a.source:ap.error('--source is required')
+    if a.action=='workflow-apply' and (a.approval is None or a.approval<=0):ap.error('--approval must be positive')
+    if a.action!='workflow-request' and a.observations is not None:ap.error('--observations is review-only')
+    if a.action=='workflow-request' and a.approval is not None:ap.error('a request cannot carry approval')
     from scripts.pr122_customer_resume import Stopped
-    try:result=plan(a.source) if a.action=='plan' else apply(a.source,a.approval) if a.action=='apply' else rollback()
+    from scripts.pr122_customer_workflow import WorkflowStopped
+    try:
+        if a.action=='workflow-apply':result=workflow_entry(a.source,a.approval)
+        elif a.action=='workflow-request':result=workflow_request(a.source,a.observations)
+        else:result=plan(a.source) if a.action=='plan' else apply(a.source,a.approval) if a.action=='apply' else rollback()
     except Stopped as error:
         print(json.dumps(error.report,ensure_ascii=False));raise SystemExit(2) from None
+    except WorkflowStopped as error:
+        print(json.dumps(error.summary,ensure_ascii=False));raise SystemExit(2) from None
     print(json.dumps(result,ensure_ascii=False))
 if __name__=='__main__':main()
-
