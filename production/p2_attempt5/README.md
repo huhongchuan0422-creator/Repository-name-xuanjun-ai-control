@@ -33,3 +33,25 @@ SQLite父链保护不放宽；不chmod/chown旧业务目录，不打开旧业务
 新增27项真实Unix socket/跨进程/签名/SQLite集成与反例，配合25项Issuer、21项AuthorityStore、10项ReceiptProvider受影响回归，总计83项/环境。主机副作用明确为SYNTHETIC_TEST_ONLY；不代表英国生产验收。当地运行环境拒绝AF_UNIX socket创建（EPERM），未申请提升或换通道绕过；完整动态测试由隔离Hosted Linux容器完成。原951项不重跑。verify.py逐字比较全部Attempt5核心源码与f4f74fdd，输出精确Commit/Tree、文件SHA、日志、Manifest及独立装配包；继承Kit和Manifest SHA固定记录。
 
 本次增量尚待独立审核。INSTALLATION=NOT_EXECUTED；INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
+
+
+## 生产配置登记与只读查询（本轮新增）
+
+核查结论：此前entry.configuration仅能从调用者已知的准确路径/SHA读取配置；仓库交付没有生产配置登记索引或只读查询命令。英国现场是否另有入口仍UNKNOWN，不能由仓库缺失推断现场不存在。此处新增原架构内的root管理登记层，不替换Issuer/AuthorityStore，不改已审核心。
+
+正式入口：production/p2_attempt5/registry_cli.py，严格-I -B -S。
+操作register/query；两者都必须显式给出registration-id、record-sha256、assembly-sha256、registry-code-sha256；register另需binding-file。
+规范登记根为/etc/xuanjun-p2/registry（代码约定路径，尚未部署，不声称现场存在）。也允许许可固定另一个完整registry-root，不发现、不遍历、不猜路径。根目录须事先按获准部署步骤建立root/0700；代码不创建根目录。
+
+register仅以O_EXCL/root0600写一个内容寻址SHA固定的registration-id.json，逐段写入/fsync文件与目录；同ID同内容可幂等确认但不重写；冲突、链接或部分输出HOLD并保留。不会覆写旧配置/登记文件、创建共享库、注册Grant、获取Writer或Lease；未知生产事务仍保持未知，不以登记代替对账。
+query只用受保护O_RDONLY+O_NOFOLLOW读取准确记录及其固定来源文件；不创建文件/锁/数据库、不执行adapter、不读私钥，不网络查找，不改变Quota。输出只有登记ID及各项摘要，不输出私有路径、配置正文或source_id正文。正常文件读取可能产生系统atime，不宣称零系统元数据变化。
+
+登记记录严格schema=1、registration_id、hostname、config(path/sha256)、sources四项（issuer/adapter/authority_store/writer_fence，每项固定path/sha256）。record-sha256即规范JSON UTF8 LF完整字节摘要；拒绝重复键、非有限数、路径穿越和大于64KiB。
+配置仍沿用既有严格字段结构。四份来源文件均要求root/0600、受保护无链接父链、固定SHA，严格schema/kind/hostname/source_id/subject；subject必须与配置中的Issuer+公钥DER摘要、adapter路径/SHA、AuthorityStore路径、完整principal分别一致，UNKNOWN或缺少来源不得登记。
+source_id是受信root管理员保存的来源索引，并非由程序新签发的审批或跨主机证明。登记验证的是“受保护来源文件与配置准确绑定”，不是独立证明来源声明真实。可信原件、登记写入权限及准确摘要必须由同一受控部署/审批范围提供。query的authority_live_state/writer_fence_live_state始终UNKNOWN、installation_permission=NOT_INFERRED，不能据此放行安装。
+
+entry.py的serve/run均新增强制registry-root、registry-id、registry-record-sha256参数，在创建Issuer、Provider、Ledger或Driver前，按新装配Manifest的文件SHA载入registry模块并核验该登记及所有来源，要求实际config路径/SHA/解析值完全一致；缺登记、旧登记、来源漂移、换配置即HOLD，无自动登记或兼容绕过开关。旧配置和旧Grant不被修改/复活；仍由原NativeRecovery认证安装许可与实际Writer/Fence/事务。
+登记与新生产适配器不是同一个能力：build_driver/build_host_readback/public_modulus仍需实际源码与可信现场绑定，本次不冒称已经闭合完整serve/run生产链。
+
+本轮新增28项登记/查询、并发、重启进程、正式CLI、幂等、部分失败保留、来源绑定、SHA/父链/权限/链接拒绝及不触碰DB/Grant/私钥/adapter测试。受影响Hosted验收为111项/环境=新增28+原装配27+Issuer25+Authority21+Receipt10；25份核心文件仍与f4f逐字相同，不重跑951项，不重审已通过未变部分。登记本身不需要从未知事务创建新账本，也不要求Owner再跑D1。
+当前本地命令执行器不可用（exec-server缺失），未反复尝试或扩权；源码使用既有GitHub开发连接提交，测试与制品由隔离Hosted闭环。现场登记部署仍NOT_EXECUTED；正式登记/安装许可及独立审核以原PR58有效记录为准。

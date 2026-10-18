@@ -18,6 +18,7 @@ def main():
     def git(*args):
         return subprocess.check_output(['git', '-c', 'safe.directory=*'] + list(args), cwd=str(ROOT))
     head = git('rev-parse', 'HEAD').decode().strip()
+    assert head == os.environ.get('GITHUB_SHA', head), 'EXACT_CI_HEAD'
     tree = git('rev-parse', 'HEAD^{tree}').decode().strip()
     paths = git('ls-tree', '-r', '--name-only', BASE, '--', PREFIX).decode().splitlines()
     files = {}
@@ -27,12 +28,15 @@ def main():
         files[name] = hashlib.sha256(raw).hexdigest()
     added = ['production/p2_attempt5/assembly.py', 'production/p2_attempt5/entry.py',
              'production/p2_attempt5/verify.py', 'production/p2_attempt5/README.md',
+             'production/p2_attempt5/registry.py', 'production/p2_attempt5/registry_cli.py',
+             'tests/p2_production_assembly/test_registry.py',
              'tests/p2_production_assembly/test_assembly.py',
              '.github/workflows/p2-production-assembly.yml']
     for name in added:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     groups = []
     cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_assembly.py', 27),
+             (str(ROOT / 'tests/p2_production_assembly'), 'test_registry.py', 28),
              (str(ROOT / PREFIX), 'test_issuer_service.py', 25),
              (str(ROOT / PREFIX), 'test_authority_store.py', 21),
              (str(ROOT / PREFIX), 'test_receipt_provider.py', 10)]
