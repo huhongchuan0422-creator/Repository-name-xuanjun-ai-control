@@ -48,6 +48,17 @@ function fixture(){
  assert.equal(f.dom['project-title'].textContent,'Project B');assert.match(f.dom.overall.textContent,/版本 2$/);assert.equal(f.run('project'),'B');
  const exported=f.dom.messages.children.find(x=>x.download==='project-message-evidence.json');assert.ok(exported);assert.equal(exported.href,'/customer/center/api/evidence/B');
  f.run("csrf='still-valid'");f.storage.set('xj_csrf','still-valid');f.dom.materials.append(new Element());f.reply(403,{error:'project revoked'});await f.run('refresh()');assert.equal(f.dom.project.hidden,true);assert.equal(f.dom.materials.children.length,0);assert.equal(f.storage.get('xj_csrf'),'still-valid');assert.equal(f.dom.messages.children.length,0);
+ // A stale project response must not replace a newer failed-session notice.
+ for(const operation of ['refresh()', 'refreshChanges()']){
+  f.run("project='old-project';role='OWNER'");let releaseOld;
+  f.responses.push(()=>new Promise(resolve=>releaseOld=()=>resolve({ok:true,status:200,json:async()=>({overall:'ACCEPTED',requirements_revision:99,items:[],cases:[]})})));
+  const oldRequest=f.run(operation);await tick();
+  f.reply(503,{error:'maintenance'});await f.run('start()');
+  const currentNotice=f.dom.notice.textContent;assert.match(currentNotice,/暂时无法确认登录状态/);
+  releaseOld();await oldRequest;
+  assert.equal(f.dom.notice.textContent,currentNotice,'stale '+operation+' replaced the current session error');
+  assert.equal(f.dom.workspace.hidden,true);assert.equal(f.dom.materials.children.length,0);
+ }
  // Privacy UI uses readable protected notices, scoped requests and stable retry keys.
  f.dom['privacy-tools']=new Element();f.run("project='B';role='OWNER'");
  const unknownPrivacy={policy:{},receipts:[],processing:[]};f.reply(200,unknownPrivacy);await f.run('openPrivacy()');
@@ -96,4 +107,5 @@ function fixture(){
  assert.ok(!f.dom.messages.textContent.includes('unknown-origin private history'));
  console.log('PASS: session expiry, private DOM/draft clearing, 503/network distinction, recovery, register/reset validation, duplicate click guard, logout failure/success, bfcache revalidation, delayed private response isolation, project switching/revocation, scoped evidence download clearing, privacy notice/no-autoack, stable request retries, stale privacy response isolation and revocation');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
 
