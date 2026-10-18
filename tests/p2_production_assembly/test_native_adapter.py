@@ -36,6 +36,7 @@ registry = module('adapter_test_registry', PROD / 'registry.py')
 from authority_store import AuthorityStore
 from receipt_provider import ReceiptProvider, Hold
 from test_authority_store import grant
+from permit_cycle import policy as cycle_policy
 import test_registry as registry_tests
 
 
@@ -331,6 +332,7 @@ class NativeAdapterTests(unittest.TestCase):
         self.fixture.setUp()
         self.addCleanup(self.fixture.tearDown)
         cfg = dict(self.fixture.config, principal=self.cfg['principal'], grant=self.g,
+            cycle_policy=cycle_policy(),
             issuer=self.cfg['issuer'], key=str(self.directory / 'key.pem'),
             public_der_sha256=self.public_pin,
             socket=str(self.directory / 'issuer.sock'), database=str(self.directory / 'authority.sqlite'),
