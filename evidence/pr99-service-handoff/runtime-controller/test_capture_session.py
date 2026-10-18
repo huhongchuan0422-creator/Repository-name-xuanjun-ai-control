@@ -41,7 +41,7 @@ class FixtureIO:
         finally:os.close(fd)
 
 
-class SessionTests(OriginalJournalFixture,unittest.TestCase):
+class CaptureFixture(OriginalJournalFixture):
     def setUp(self):
         super().setUp()
         self.files=tempfile.TemporaryDirectory();self.fs=Path(self.files.name)
@@ -101,6 +101,8 @@ class SessionTests(OriginalJournalFixture,unittest.TestCase):
         with patch.object(original,'source_manifest',return_value=self.plan['source_hashes']):
             return self.session.perform(self.snapshot_req)
 
+
+class SessionTests(CaptureFixture,unittest.TestCase):
     def test_original_journal_drain_fence_nonempty_wal_and_receipt_chain(self):
         self.fence();result=self.capture()
         self.assertEqual(result['status'],'SUCCEEDED')

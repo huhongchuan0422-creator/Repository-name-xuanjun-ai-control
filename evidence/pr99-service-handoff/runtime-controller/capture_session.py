@@ -43,7 +43,7 @@ class CaptureSession:
         self.config_digest=digest(self.config)
         self._config()
         self.fence_output=HeldProof(fence_output_fd,controller,check_fence_output)
-        self.snapshot_output=HeldProof(snapshot_output_fd,controller,check_snapshot_output)
+        self.snapshot_output=HeldProof(snapshot_output_fd,controller,check_snapshot_output,limit=2097152)
         self.provider=SourceFence(controller,catalogue,controller.binding['writer_inventory_sha256'],verify_catalogue,
             LinuxFenceBackend(original_guard,cgroup_bindings,check_backend_binding),verify_real_drain,self.fence_output)
         self.objects={o['id']:o for o in self.provider.catalogue['objects']}
@@ -81,7 +81,8 @@ class CaptureSession:
     def _config(self):
         self.controller._bound('query')
         need(digest(self.config)==self.config_digest,'CAPTURE_CONFIG_DRIFT')
-        need(type(self.config)is dict and set(self.config)=={'schema','writer_inventory_sha256','epoch','wal_sources','jobs'}, 'CAPTURE_CONFIG_SCHEMA')
+        keys={'schema','writer_inventory_sha256','epoch','wal_sources','jobs'}
+        need(type(self.config)is dict and set(self.config) in (keys,keys|{'handoff'}), 'CAPTURE_CONFIG_SCHEMA')
         need(type(self.config['schema'])is int and self.config['schema']==1 and self.config['epoch']==self.controller.binding['epoch'] and
              self.config['writer_inventory_sha256']==self.controller.binding['writer_inventory_sha256'], 'CAPTURE_WRITER_BINDING')
         claim,_,_=self.controller.load()

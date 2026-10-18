@@ -17,15 +17,20 @@ class ProofHold(RuntimeError):
 
 
 class HeldProof:
-    def __init__(self, fd, controller, check_original_output):
+    def __init__(self, fd, controller, check_original_output, limit=16384):
         if type(fd) is not int or not callable(check_original_output):
             raise ProofHold('ORIGINAL_PROOF_OUTPUT_REQUIRED')
         self.fd = fd
         self.controller = controller
         self.check = check_original_output
+        if type(limit) is not int or not 1024 <= limit <= 2097152:
+            raise ProofHold('PROOF_SIZE_BOUND')
+        self.limit = limit
         self.identity = self._bound('query')
 
     def _bound(self, mode):
+        if type(self.limit) is not int or not 1024 <= self.limit <= 2097152:
+            raise ProofHold('PROOF_SIZE_BOUND')
         self.controller._bound(mode)
         if self.check() is not True:
             raise ProofHold('ORIGINAL_PROOF_PATH_BINDING_REQUIRED')
@@ -33,7 +38,7 @@ class HeldProof:
         flags = fcntl.fcntl(self.fd, fcntl.F_GETFL)
         identity = (fs.st_dev, fs.st_ino)
         if not (stat.S_ISREG(fs.st_mode) and fs.st_nlink == 1 and fs.st_uid == os.geteuid()
-                and stat.S_IMODE(fs.st_mode) == 0o600 and fs.st_size <= 16384
+                and stat.S_IMODE(fs.st_mode) == 0o600 and fs.st_size <= self.limit
                 and flags & os.O_ACCMODE == os.O_RDWR and not flags & os.O_APPEND
                 and getattr(self, 'identity', identity) == identity):
             raise ProofHold('ORIGINAL_PROOF_FD_IDENTITY')
@@ -41,7 +46,7 @@ class HeldProof:
 
     def __call__(self, proof, query_only=False):
         self._bound('query' if query_only else 'record')
-        raw = os.pread(self.fd, 16385, 0)
+        raw = os.pread(self.fd, self.limit+1, 0)
         if raw:
             before = os.fstat(self.fd)
             try:
@@ -60,12 +65,12 @@ class HeldProof:
         if query_only:
             raise ProofHold('MISSING_PROOF_QUERY_CANNOT_CREATE')
         raw = encode(proof)
-        if len(raw) > 16384 or os.fstat(self.fd).st_size != 0:
+        if len(raw) > self.limit or os.fstat(self.fd).st_size != 0:
             raise ProofHold('PROOF_OUTPUT_NOT_EMPTY')
         # One write attempt only. A short write is preserved as UNKNOWN.
         written = os.pwrite(self.fd, raw, 0)
         os.fsync(self.fd)
         self._bound('record')
-        if written != len(raw) or os.pread(self.fd,16385,0) != raw:
+        if written != len(raw) or os.pread(self.fd,self.limit+1,0) != raw:
             raise ProofHold('PARTIAL_PROOF_PRESERVE_NO_RETRY')
         return json.loads(raw)
