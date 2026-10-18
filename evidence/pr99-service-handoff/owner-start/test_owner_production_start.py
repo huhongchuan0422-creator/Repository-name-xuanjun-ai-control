@@ -96,6 +96,42 @@ class OwnerStartTests(unittest.TestCase):
    uname.return_value.nodename=m.HOST
    with self.assertRaisesRegex(RuntimeError,'FINAL_INPUTS_MISSING'):m.start()
    native.assert_not_called()
+ def run_start_fixture(self,unknown=False):
+  import time
+  from contextlib import ExitStack
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d);n,oldstate,units,oldops=self.fixture(root);state=root/'production-state'
+   p=self.inputs();p.update(unit_hashes={name:m.sha(b) for name,b in m.units('xuanjun-s07').items()},source_writer_fence_receipt_sha256='a'*64,expires_at=int(time.time())+3600)
+   active=set();native=[]
+   def ctl(*args):
+    native.append(args)
+    if args[0]=='start':
+     if unknown and len(active)==1:raise TimeoutError('native-result-unknown')
+     active.add(args[1])
+    return ''
+   with ExitStack() as stack:
+    replacements={'SYSTEMD':units,'STATE':state,'stopped_library':lambda:n,'stopped':lambda name:name not in active,
+     'admit':lambda:(p,m.units('xuanjun-s07')),'ports_available':lambda:True,'ctl':ctl,
+     'verify_units':lambda payload:None,'supervised':lambda name:name in active,
+     'health':lambda port:200 if len(active)==3 else None,
+     'read':lambda path,*a,**k:b'fixed-owner-start-inputs' if path==m.INPUTS else Path(path).read_bytes()}
+    for key,value in replacements.items():stack.enter_context(patch.object(m,key,value))
+    if unknown:
+     with self.assertRaises(m.EffectUnknown):m._start()
+     self.assertEqual(len(active),1)
+     failure=json.loads((state/'failure.json').read_text())
+     self.assertEqual(failure['status'],'EFFECT_UNKNOWN_QUERY_ONLY_NO_REPLAY')
+     self.assertFalse(any(a[0]=='stop' for a in native))
+    else:
+     r=m._start();self.assertEqual(r['status'],'THREE_APPS_STARTED_NO_TRAFFIC_CUTOVER')
+     self.assertEqual(len(active),3);self.assertFalse(r['production_cutover'])
+    records=[json.loads(p.read_text()) for p in sorted(state.glob('effect-*.intent.json'))]
+    self.assertEqual(records[0],{'operation':'retire-stopped-candidate'})
+    self.assertEqual(oldops,[('daemon-reload',)])
+    self.assertTrue((oldstate/'rollback.receipt.json').is_file())
+    self.assertEqual({p.name:p.read_bytes() for p in units.iterdir()},m.units('xuanjun-s07'))
+ def test_start_core_retires_exact_candidate_before_production_creation(self):self.run_start_fixture()
+ def test_unknown_start_preserves_state_without_compensating_replay(self):self.run_start_fixture(unknown=True)
 
 
 if __name__=='__main__':unittest.main()
