@@ -74,10 +74,14 @@ class MiniPayments:
         c=self.identity.center
         with c.tx():c.limit('community-payment:'+b['user_id'],20,60)
         if body['operation']=='query':
-            from scripts.community_order_cancellation import local_cancelled
-            _,_,principal=self.identity._resolve(token,scene)
-            if local_cancelled(self.identity.runtime.demo.db,self.identity.runtime.bindings[principal],reference):
-                return dict(reference=reference,provider_state='NOT_CREATED',order_state='CANCELLED',amount_minor=b['amount_minor'],currency='CNY',provider_signature_verified=False,provider_settlement_verified=False,finance_status='UNCONFIRMED',financial_receipt_issued=False,entitlement_granted=False)
+            from scripts.community_order_cancellation import cancelled_observation
+            uid,project,principal=self.identity._resolve(token,scene)
+            original_scope=self.identity.runtime.bindings[principal]
+            terminal=cancelled_observation(self.identity.runtime.demo.db,original_scope,reference)
+            if terminal is not None:
+                commerce=getattr(self,'commerce',None)
+                if commerce is not None:commerce.release_cancelled(original_scope,project,uid,reference)
+                return dict(reference=reference,provider_state=terminal[0],order_state='CANCELLED',amount_minor=b['amount_minor'],currency='CNY',provider_signature_verified=terminal[1],provider_settlement_verified=False,finance_status='UNCONFIRMED',financial_receipt_issued=False,entitlement_granted=False)
         if body['operation']=='cancel':
             from scripts.community_order_cancellation import OrderCancellation
             return OrderCancellation(self).cancel(token,scene,reference)
@@ -116,8 +120,12 @@ class MiniPayments:
             result=reader.read_order(expected)
             if authorize()!=b:raise PermissionError('PAYMENT_BINDING_CHANGED')
             from scripts.community_order_provider_projection import project_verified_query
-            _,_,principal=self.identity._resolve(token,scene)
-            project_verified_query(self.identity.runtime.demo.db,self.identity.runtime.bindings[principal],reference,expected,result,c.now(),reader._kid)
+            uid,project,principal=self.identity._resolve(token,scene)
+            original_scope=self.identity.runtime.bindings[principal]
+            project_verified_query(self.identity.runtime.demo.db,original_scope,reference,expected,result,c.now(),reader._kid)
+            if result['provider_state'] in ('CLOSED','REVOKED'):
+                commerce=getattr(self,'commerce',None)
+                if commerce is not None:commerce.release_cancelled(original_scope,project,uid,reference)
             with c.tx():c.audit(b['project'],b['user_id'],'COMMUNITY_PAYMENT_QUERIED',hashlib.sha256(json.dumps(result,sort_keys=True).encode()).hexdigest())
             # A signed SUCCESS observation is not authoritative Finance settlement.
             result=dict(reference=reference,provider_state=result['provider_state'],amount_minor=b['amount_minor'],currency='CNY',

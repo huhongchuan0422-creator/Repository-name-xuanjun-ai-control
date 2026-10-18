@@ -65,6 +65,20 @@ test('server denial is not treated as empty successful directory',async()=>{
  const f=setup([{error:'COMMUNITY_REVIEWER_REQUIRED'}]);await f.click('listDirectory');assert.equal(f.elements.message.textContent,'COMMUNITY_REVIEWER_REQUIRED');assert.equal(f.elements.more.hidden,true);
 });
 
+test('unavailable merchant mappings and partial totals are explicit without editable private rows',async()=>{
+ const incomplete={records:[],has_more:true,next_cursor:'revoked_050',coverage_complete:false,
+  unavailable_mapping_count:61,unavailable_mappings:[{workspace:'revoked_001',status:'UNAVAILABLE'}]};
+ const f=setup([{result:incomplete},{result:{coverage_complete:false,totals_scope:'ACCESSIBLE_STORE_SUBTOTAL',signed_gross_payment_minor:101}}]);
+ await f.click('platformMerchants');
+ assert.match(f.elements.merchantResult.textContent,/覆盖不完整/);
+ assert.match(f.elements.merchantRecords.children[0].textContent,/不可用/);
+ assert.equal(f.elements.merchantRecords.children[0].children.length,0);
+ assert.equal(f.elements.moreMerchants.hidden,false);
+ f.elements.platformView.value='platform_overview';await f.click('readPlatformView');
+ assert.match(f.elements.platformViewResult.textContent,/可访问门店小计/);
+ assert.match(f.elements.platformViewResult.textContent,/不能作为完整总额/);
+});
+
 test('submit, save and membership late results cannot restore cleared community context',async()=>{
  for(const operation of ['submit','update','register','join','leave']){
   for(const failed of [false,true]){

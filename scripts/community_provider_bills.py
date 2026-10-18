@@ -169,6 +169,42 @@ def _parse_document(raw):
     return header,records,metadata,reported_summary
 
 
+def sample_summary_diagnostic(bill):
+    """Compare arithmetic illustrated by the pinned official sample only.
+
+    This is not a provider classification contract: failed-return, posting-date
+    and signed-detail population semantics remain unresolved. Never expose raw
+    provider summary amounts or turn this diagnostic into Finance authority.
+    """
+    result=dict(coverage='PINNED_SAMPLE_ARITHMETIC_ONLY',
+                establishes_reconciliation=False, differing_columns=[])
+    reported=bill.get('reported_summary')
+    if reported is None:
+        return dict(result,status='UNAVAILABLE_LEGACY_SUMMARY')
+    schema=bill.get('schema')
+    if (type(reported) is not dict or set(reported)!=set(SPLIT_SUMMARY_COLUMNS)
+            or type(schema) is not dict or schema.get('id')!=SPLIT_SCHEMA):
+        return dict(result,status='UNKNOWN_SCHEMA')
+    totals={SPLIT_SUMMARY_COLUMNS[i]:0 for i in (1,3,4)}
+    categories={'分出':SPLIT_SUMMARY_COLUMNS[1],
+                '解冻':SPLIT_SUMMARY_COLUMNS[3],
+                '逾期解冻':SPLIT_SUMMARY_COLUMNS[3],
+                '分账回退':SPLIT_SUMMARY_COLUMNS[4]}
+    try:
+        for row in bill['rows']:
+            if row.get('处理状态')!='成功' or row.get('业务类型') not in categories:
+                return dict(result,status='UNKNOWN_BUSINESS_OR_STATE')
+            totals[categories[row['业务类型']]]+=minor(row['金额'])
+        failed=minor(reported[SPLIT_SUMMARY_COLUMNS[2]])
+        result['differing_columns']=[name for name,total in totals.items()
+                                    if minor(reported[name])!=total]
+    except (TypeError,ValueError,KeyError,AttributeError):
+        return dict(result,status='INVALID_RETAINED_SUMMARY')
+    result['failed_return_semantics']=('UNSPECIFIED_NONZERO' if failed else 'ZERO_IN_REPORTED_SAMPLE')
+    return dict(result,status='DIFFERENT_FROM_SAMPLE_ARITHMETIC' if result['differing_columns']
+                else 'SAMPLE_ARITHMETIC_EQUAL_UNVERIFIED_SEMANTICS')
+
+
 def parse_document(raw):
     return _parse_document(raw)[:3]
 
@@ -214,6 +250,9 @@ class ProviderBills:
         if not 0<(today-date).days<=90:raise ValueError('BILL_DATE_OUTSIDE_SUPPORTED_HISTORY')
         with c.tx():c.limit('community-provider-bill:'+g['user_id'],10,60)
         if operation=='bill_fetch':
+            # Host grants may be replaced or mutated during provider I/O. Keep
+            # the original identity independent of the live configuration.
+            g=dict(g,scope=dict(g['scope']))
             query=dict(sub_mchid=policy['sub_mchid'],bill_date=p['bill_date'])
             if p['kind']=='TRADE':query['bill_type']='ALL'
             target=('/v3/bill/tradebill' if p['kind']=='TRADE' else '/v3/profitsharing/bills')+'?'+urllib.parse.urlencode(query)
@@ -221,7 +260,9 @@ class ProviderBills:
             if ticket.get('hash_type')!='SHA1' or type(ticket.get('hash_value')) is not str or not re.fullmatch('[0-9a-fA-F]{40}',ticket['hash_value']) or type(ticket.get('download_url')) is not str:raise ValueError('INVALID_SIGNED_BILL_TICKET')
             raw=self._download(ticket['download_url'])
             if hashlib.sha1(raw).hexdigest()!=ticket['hash_value'].lower():raise PermissionError('PROVIDER_BILL_HASH_MISMATCH')
-            if a._authorize(session,csrf,workspace)[1]!=policy:raise PermissionError('BILL_AUTHORIZATION_CHANGED')
+            current,current_policy=a._authorize(session,csrf,workspace)
+            if (any(current[k]!=g[k] for k in ('scope','project','user_id'))
+                    or current_policy!=policy):raise PermissionError('BILL_AUTHORIZATION_CHANGED')
             header,rows,schema,reported_summary=_parse_document(raw);key=hashlib.sha256(canonical([g['scope'],p['kind'],p['bill_date']])).hexdigest()
             record=dict(scope=g['scope'],sub_mchid=policy['sub_mchid'],kind=p['kind'],bill_date=p['bill_date'],columns=header,rows=rows,
                 schema=schema,reported_summary=reported_summary,body_sha256=hashlib.sha256(raw).hexdigest(),provider_sha1=ticket['hash_value'].lower(),ticket_sha256=ticket_digest,received_at=c.now())
@@ -326,6 +367,7 @@ class ProviderBills:
                     body_sha256=bill['body_sha256'],coverage='SPLIT_DETAIL_IDENTITIES_AND_AMOUNTS_ONLY',
                     time_coverage='UNKNOWN_BILL_TIMEZONE',reverse_coverage='NOT_ESTABLISHED',
                     summary_amounts='NOT_RECONCILED',
+                    sample_arithmetic=sample_summary_diagnostic(bill),
                     summary_evidence=('PROVIDER_REPORTED_VALUES_RETAINED' if bill.get('reported_summary') is not None
                                       else 'LEGACY_SUMMARY_VALUES_NOT_RETAINED'),
                     pending_evidence=['BILL_TIMEZONE','SUMMARY_AMOUNT_SEMANTICS',

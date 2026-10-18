@@ -100,15 +100,21 @@ class PartnerPrepay:
         b=self._authorize(session,csrf,reference)
         return self._existing_authorized(b,lambda:self._authorize(session,csrf,reference))
     def _existing_authorized(self,b,reauthorize):
-        if reauthorize()!=b:raise PermissionError('PAYMENT_BINDING_CHANGED')
         c=self.center;r=self.reader;key=self._identity(b)
-        row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PREPAY_RESULT' AND subject_idx=? AND user_id=? AND project=? AND active=1",(key,b['user_id'],b['project'])).fetchone()
-        if row is None:raise PrepayUnknown('NO_VERIFIED_PREPAY_RESULT_DO_NOT_RESEND')
-        data=json.loads(c.decrypt(row[0],'community-prepay'))
-        if data['binding_sha256']!=hashlib.sha256(canonical(b)).hexdigest():raise PermissionError('PAYMENT_BINDING_CHANGED')
-        now=r._clock()
-        if type(now) is not int or not 0<=now<=253402300799:raise ValueError('INVALID_SERVER_CLOCK')
-        timestamp=str(now);nonce=secrets.token_hex(16);package='prepay_id='+data['prepay_id']
-        signature=self._sign((b['sp_appid']+'\n'+timestamp+'\n'+nonce+'\n'+package+'\n').encode())
-        return dict(timeStamp=timestamp,nonceStr=nonce,package=package,signType='RSA',paySign=signature,
-                    payment_status='AWAITING_PAYER_CONFIRMATION',provider_settlement_verified=False)
+        # Serialize client-signature issuance with the original close intent.
+        # A timed-out close may leave PENDING locally, but it must never make
+        # an old prepay result payable again. Only query/cancel may recover it.
+        with c.tx():
+            if reauthorize()!=b:raise PermissionError('PAYMENT_BINDING_CHANGED')
+            if c.db.execute("SELECT 1 FROM links WHERE channel='COMMUNITY_ORDER_CLOSE' AND subject_idx=? AND active=1",(key,)).fetchone():
+                raise PermissionError('ORDER_CLOSING_OR_CANCELLED')
+            row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PREPAY_RESULT' AND subject_idx=? AND user_id=? AND project=? AND active=1",(key,b['user_id'],b['project'])).fetchone()
+            if row is None:raise PrepayUnknown('NO_VERIFIED_PREPAY_RESULT_DO_NOT_RESEND')
+            data=json.loads(c.decrypt(row[0],'community-prepay'))
+            if data['binding_sha256']!=hashlib.sha256(canonical(b)).hexdigest():raise PermissionError('PAYMENT_BINDING_CHANGED')
+            now=r._clock()
+            if type(now) is not int or not 0<=now<=253402300799:raise ValueError('INVALID_SERVER_CLOCK')
+            timestamp=str(now);nonce=secrets.token_hex(16);package='prepay_id='+data['prepay_id']
+            signature=self._sign((b['sp_appid']+'\n'+timestamp+'\n'+nonce+'\n'+package+'\n').encode())
+            return dict(timeStamp=timestamp,nonceStr=nonce,package=package,signType='RSA',paySign=signature,
+                        payment_status='AWAITING_PAYER_CONFIRMATION',provider_settlement_verified=False)

@@ -81,7 +81,15 @@ class CenterOperations:
         with c.tx():
             c.limit('community-operations:'+uid,60,60)
             c.audit(grant['project'],uid,'COMMUNITY_OPERATION_ATTEMPT',request_hash)
-        if body['operation'] in ('community.profile','community.item','community.ad_create','community.ad_state','community.ad_review'):
+        if body['operation']=='community.merchant_settings' and 'allowed_operations' in grant:
+            # An original, live Staff grant explicitly delegates this read.
+            # Static STORE_STAFF principals keep the runtime's existing denial;
+            # no merchant role or edit permission is borrowed for this path.
+            if set(body['params']) not in (set(), {'after_id'}):
+                raise ValueError('INVALID_COMMUNITY_FIELDS')
+            from scripts.community_workbench import merchant_settings
+            result=merchant_settings(self.runtime.demo.merchant_db,grant['scope'],**body['params'])
+        elif body['operation'] in ('community.profile','community.item','community.ad_create','community.ad_state','community.ad_review'):
             from scripts.community_registered_admin import dispatch
             result=dispatch(self.runtime.demo,grant['scope'],grant['role'],uid,body['operation'],body['params'],self.center.now())
         else:result=self.runtime.dispatch(p,body['operation'],body['params'],None)

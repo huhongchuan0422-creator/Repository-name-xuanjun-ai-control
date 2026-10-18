@@ -40,12 +40,15 @@ def orders_export(db,identity,limit,after_id,status):
                 row_count=len(result['orders']),simulation_only=result['simulation_only'],provider_settlement_verified=False)
 
 
-def merchant_settings(db,identity):
+def merchant_settings(db,identity,after_id=''):
     t,m,s=scope(identity)
+    if type(after_id) is not str or after_id and not valid_id(after_id):
+        raise ValueError('INVALID_CATALOG_CURSOR')
     row=db.execute('SELECT name,description,contact,status,version FROM merchant_profiles WHERE tenant_id=? AND merchant_id=? AND store_id=?',(t,m,s)).fetchone()
-    items=db.execute('SELECT item_id,name,status,sort_order,version FROM catalog_items WHERE tenant_id=? AND merchant_id=? AND store_id=? ORDER BY item_id LIMIT 200',(t,m,s)).fetchall()
+    items=db.execute('SELECT item_id,name,status,sort_order,version FROM catalog_items WHERE tenant_id=? AND merchant_id=? AND store_id=? AND item_id>? ORDER BY item_id LIMIT 201',(t,m,s,after_id)).fetchall()
     return dict(profile=None if row is None else dict(zip(('name','description','contact','status','version'),row)),
-                items=[dict(zip(('id','name','status','sort','version'),r)) for r in items],
+                items=[dict(zip(('id','name','status','sort','version'),r)) for r in items[:200]],
+                has_more=len(items)>200,next_cursor=items[199][0] if len(items)>200 else None,
                 simulation_only=True,provider_settlement_verified=False)
 
 

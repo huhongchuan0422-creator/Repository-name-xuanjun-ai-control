@@ -3,7 +3,7 @@ import hashlib
 import json
 from scripts.pr122_customer_core import canonical
 from scripts.community_order_store import state
-from scripts.community_order_provider_projection import project_verified_query
+from scripts.community_order_provider_projection import project_verified_query,provider_evidence
 
 
 def local_cancelled(db,identity,reference):
@@ -13,6 +13,19 @@ def local_cancelled(db,identity,reference):
         except (ValueError,TypeError):continue
         if type(evidence) is dict and evidence.get('source')=='LOCAL_CANCEL_BEFORE_PROVIDER':return True
     return False
+
+
+def cancelled_observation(db,identity,reference):
+    """Recover only an original, durably evidenced cancellation terminal."""
+    order=state(db,identity,reference)
+    if order['state']!='CANCELLED' or order['provider_transaction_id'] is not None:return None
+    evidence=provider_evidence(db,identity,reference)
+    if (evidence is not None and evidence.get('source') in
+            ('WECHAT_SIGNED_ORDER_QUERY','WECHAT_SIGNED_PAYMENT_NOTIFICATION')
+            and evidence.get('provider_state') in ('CLOSED','REVOKED')):
+        return evidence['provider_state'],True
+    if local_cancelled(db,identity,reference):return 'NOT_CREATED',False
+    return None
 
 
 class OrderCancellation:
@@ -36,7 +49,13 @@ class OrderCancellation:
                 saved=dict(binding_hash=binding_hash,provider_attempted=attempted,reference=reference,state='CLOSE_RESERVED')
                 c.db.execute("INSERT INTO links VALUES('COMMUNITY_ORDER_CLOSE',?,?,?,?,1)",(key,uid,project,c.encrypt(canonical(saved),'community-close:'+key)))
                 c.audit(project,uid,'COMMUNITY_ORDER_CLOSE_RESERVED',key);first=True
-        if not saved['provider_attempted']:
+        terminal=cancelled_observation(db,identity,reference)
+        if terminal is not None:
+            # Query can commit CANCELLED before stock recovery or before this
+            # process ever recorded PREPAY_ATTEMPT. Never POST/GET again merely
+            # to repair that already-proven terminal state.
+            provider_state,verified=terminal
+        elif not saved['provider_attempted']:
             event='lc_'+hashlib.sha256(canonical([identity,reference])).hexdigest()[:48]
             if db.in_transaction:raise ValueError('EXTERNAL_ORDER_TRANSACTION_DENIED')
             db.execute('BEGIN IMMEDIATE')
@@ -46,10 +65,10 @@ class OrderCancellation:
                     t,m,s=(identity[k] for k in ('tenant_id','merchant_id','store_id'))
                     db.execute("UPDATE orders SET state='CANCELLED' WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=? AND state='PENDING'",(t,m,s,reference))
                     db.execute('INSERT INTO order_events VALUES(?,?,?,?,?,?,?,?)',(event,t,m,s,reference,'PENDING','CANCELLED',canonical(dict(source='LOCAL_CANCEL_BEFORE_PROVIDER',close_intent=key)).decode()))
-                elif original['state']!='CANCELLED' or not local_cancelled(db,identity,reference):raise PermissionError('CLOSE_STATE_CONFLICT')
+                elif cancelled_observation(db,identity,reference) is None:raise PermissionError('CLOSE_STATE_CONFLICT')
                 db.commit()
             except BaseException:db.rollback();raise
-            provider_state='NOT_CREATED';verified=False
+            provider_state,verified=cancelled_observation(db,identity,reference)
         else:
             # A close ACK is never treated as payment-state evidence. Even a
             # timeout leads to signed query; an existing intent never POSTs again.

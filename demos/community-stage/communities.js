@@ -41,8 +41,9 @@
     select.textContent='选择商家';select.onclick=()=>{if(busy||t!==epoch)return;$('platformMerchantWorkspace').value=item.workspace;$('platformMerchantVersion').value=item.lifecycle.version;$('platformMerchantState').value=item.lifecycle.status;$('platformMerchantReason').value=item.lifecycle.reason||'';};
     line.append(select);rows.push(line);
    }
+   for(const item of r.unavailable_mappings||[]){const line=document.createElement('article');line.textContent=item.workspace+' · 原商家权限或映射不可用，未读取其门店及订单';rows.push(line);}
    $('merchantRecords').replaceChildren(...rows);
-   $('merchantResult').textContent=r.records.length?JSON.stringify(r,null,2):'暂无已准入商家';
+   $('merchantResult').textContent=r.coverage_complete===false?'商家覆盖不完整，共有 '+r.unavailable_mapping_count+' 个原映射不可用；当前记录不代表全部商家。\n'+JSON.stringify(r,null,2):r.records.length?JSON.stringify(r,null,2):'暂无已准入商家';
    merchantPage=r.has_more&&typeof r.next_cursor==='string'&&r.next_cursor>afterWorkspace?r.next_cursor:null;
    $('moreMerchants').hidden=!merchantPage;
   }finally{if(t===epoch){$('platformMerchants').disabled=false;$('moreMerchants').disabled=false;}}
@@ -53,7 +54,7 @@
  $('createPromotion').onclick=()=>action(async t=>{const r=await call('promotion_create',{community_id:id(),scene:$('promotionScene').value,title:$('promotionTitle').value,expires_at:Math.floor(new Date($('promotionExpiry').value).getTime()/1000)},t);if(t===epoch){$('promotionCode').value=r.id;$('promotionVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);}});
  $('listPromotions').onclick=()=>action(t=>list(t,'promotions',{community_id:id(),after_id:''}));
  $('savePromotionState').onclick=()=>action(async t=>{const r=await call('promotion_state',{community_id:id(),code:$('promotionCode').value,expected_version:Number($('promotionVersion').value),status:$('promotionState').value},t);if(t===epoch){$('promotionVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);}});
- async function platformView(t,operation,params){const r=await call(operation,params,t);if(t!==epoch)return;$('platformViewResult').textContent=JSON.stringify(r,null,2);platformPage=r.has_more?{operation,params:{...params,after_id:r.next_cursor}}:null;$('morePlatformView').hidden=!platformPage;}
+ async function platformView(t,operation,params){const r=await call(operation,params,t);if(t!==epoch)return;$('platformViewResult').textContent=(r.coverage_complete===false?'部分商家权限或映射不可用；以下仅为可访问门店小计，不能作为完整总额。\n':'')+JSON.stringify(r,null,2);platformPage=r.has_more?{operation,params:{...params,after_id:r.next_cursor}}:null;$('morePlatformView').hidden=!platformPage;}
  $('readPlatformView').onclick=()=>action(t=>{const op=$('platformView').value;const params=op==='platform_overview'?{}:op==='platform_orders'?{after_id:0,status:$('platformOrderStatus').value}:{after_id:op==='platform_audit'?0:''};return platformView(t,op,params);});
  $('morePlatformView').onclick=()=>action(t=>platformPage&&platformView(t,platformPage.operation,platformPage.params));
  window.configureCommunityPortal(null);

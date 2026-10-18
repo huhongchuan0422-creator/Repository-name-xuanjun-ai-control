@@ -20,13 +20,20 @@ def assert_trading(center,identity):
 class PlatformMerchants:
     module=dict(id='XJ-PLATFORM-MERCHANT-001',version='1.0.0',author='玄钧AI实验室',dependencies=['original-center','community-commerce'],description='Scoped merchant lifecycle and operations overview')
     def __init__(self,directory):self.directory=directory;self.center=directory.center;self.operations=directory.commerce.operations
-    def _targets(self,g):
+    def _targets(self,g,unavailable=None):
         targets={}
-        for name,target in self.operations.grants.items():
+        for name,target in sorted(self.operations.grants.items()):
             principal=target['principal']
             if target['project']!=g['project'] or target['tenant']!=g['tenant'] or target['role']!='MERCHANT_ADMIN':continue
-            if principal.role!=target['role'] or principal.tenant_id!=g['tenant'] or self.operations.runtime.bindings.get(principal)!=target['scope']:raise PermissionError('ORIGINAL_MERCHANT_MAPPING_CHANGED')
-            self.center.project(target['user_id'],target['project'],target['project_roles'])
+            try:
+                if principal.role!=target['role'] or principal.tenant_id!=g['tenant'] or self.operations.runtime.bindings.get(principal)!=target['scope']:raise PermissionError('ORIGINAL_MERCHANT_MAPPING_CHANGED')
+                self.center.project(target['user_id'],target['project'],target['project_roles'])
+            except PermissionError:
+                if unavailable is None:raise
+                # Only identify the already configured project workspace. Never
+                # return its inaccessible user's profile, scope or order data.
+                unavailable.append(dict(workspace=name,status='UNAVAILABLE'))
+                continue
             targets[name]=target
         return targets
     def _read(self,g,identity):
@@ -42,18 +49,24 @@ class PlatformMerchants:
         if op not in fields or type(p) is not dict or set(p)!=fields[op]:raise ValueError('INVALID_PLATFORM_MERCHANT_FIELDS')
         g=self.directory.authorize(session,csrf,body['workspace']);c=self.center
         if g['role'] not in ('PLATFORM_OWNER','PLATFORM_REVIEWER'):raise PermissionError('PLATFORM_MERCHANT_OPERATOR_REQUIRED')
-        targets=self._targets(g)
+        unavailable=[]
+        targets=self._targets(g,unavailable)
         with c.tx():
             c.limit('community-platform-merchants:'+g['user_id'],30,60)
             if op=='platform_merchants':
                 if type(p['after_workspace']) is not str or len(p['after_workspace'])>64:raise ValueError('INVALID_MERCHANT_CURSOR')
-                names=[name for name in sorted(targets) if name>p['after_workspace']][:51];records=[]
+                unavailable_by_name={item['workspace']:item for item in unavailable}
+                names=[name for name in sorted(set(targets)|set(unavailable_by_name)) if name>p['after_workspace']][:51];records=[]
                 for name in names[:50]:
+                    if name not in targets:continue
                     target=targets[name];identity=target['scope'];t,m,s=(identity[k] for k in ('tenant_id','merchant_id','store_id'))
                     profile=self.operations.runtime.demo.merchant_db.execute('SELECT name,status FROM merchant_profiles WHERE tenant_id=? AND merchant_id=? AND store_id=?',(t,m,s)).fetchone()
                     counts=dict(self.operations.runtime.demo.db.execute('SELECT state,COUNT(*) FROM orders WHERE tenant_id=? AND merchant_id=? AND store_id=? GROUP BY state',(t,m,s)))
                     records.append(dict(workspace=name,scope=identity,name=profile[0] if profile else '',store_status=profile[1] if profile else 'NOT_CREATED',lifecycle=self._read(g,identity),order_counts=counts,finance_status='UNCONFIRMED'))
-                return dict(records=records,has_more=len(names)>50,next_cursor=names[49] if len(names)>50 else None,coverage='ORIGINAL_PROJECT_ADMITTED_MERCHANTS')
+                return dict(records=records,has_more=len(names)>50,next_cursor=names[49] if len(names)>50 else None,
+                    coverage='ORIGINAL_PROJECT_ADMITTED_MERCHANTS',coverage_complete=not unavailable,
+                    unavailable_mapping_count=len(unavailable),
+                    unavailable_mappings=[unavailable_by_name[name] for name in names[:50] if name in unavailable_by_name])
             if g['role']!='PLATFORM_OWNER':raise PermissionError('PLATFORM_OWNER_REQUIRED_FOR_MERCHANT_STATE')
             target=targets.get(p['merchant_workspace']) if type(p['merchant_workspace']) is str else None
             if target is None:raise PermissionError('ORIGINAL_PROJECT_MERCHANT_REQUIRED')

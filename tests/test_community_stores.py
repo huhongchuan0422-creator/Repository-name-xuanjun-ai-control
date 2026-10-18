@@ -35,3 +35,25 @@ class StoresJourney(unittest.TestCase):
         self.fx.center.db.execute('UPDATE members SET active=0 WHERE user_id=?',(self.fx.uid1,))
         with self.assertRaises(PermissionError):self.save()
         with self.assertRaises(PermissionError):self.call('item',dict(item=dict(id='bad',name='bad',status='ACTIVE',sort=0)),workspace='second')
+
+    def test_entry_editor_cannot_borrow_target_owner_role_for_store_creation_or_listing(self):
+        self.ops.grants['first']['project_roles']=('EDITOR',)
+        self.fx.center.db.execute("UPDATE members SET role='EDITOR' WHERE user_id=?",(self.fx.uid1,))
+        self.assertEqual([s['workspace'] for s in self.call('stores')['stores']],['first'])
+        with self.assertRaisesRegex(PermissionError,'PROJECT_PERMISSION_REQUIRED'):self.save()
+        self.assertIsNone(self.fx.stage.m.execute("SELECT 1 FROM merchant_profiles WHERE store_id='store2'").fetchone())
+
+    def test_target_role_downgrade_denies_existing_profile_update_without_hiding_allowed_store(self):
+        self.save()
+        self.ops.grants['first']['project_roles']=('OWNER','EDITOR')
+        self.fx.center.db.execute("UPDATE members SET role='EDITOR' WHERE user_id=?",(self.fx.uid1,))
+        with self.assertRaisesRegex(PermissionError,'PROJECT_PERMISSION_REQUIRED'):self.save(1)
+        self.assertEqual(self.fx.stage.m.execute("SELECT version FROM merchant_profiles WHERE store_id='store2'").fetchone()[0],1)
+        self.assertEqual([s['workspace'] for s in self.call('stores')['stores']],['first'])
+        self.fx.center.db.execute("UPDATE members SET role='OWNER' WHERE user_id=?",(self.fx.uid1,))
+        self.assertEqual(self.save(1)['version'],2)
+
+    def test_changed_target_binding_is_excluded_from_list_and_cannot_be_written(self):
+        self.fx.stage.api.bindings[self.second]=dict(DEMO_SCOPE,store_id='changed')
+        self.assertNotIn('second',[s['workspace'] for s in self.call('stores')['stores']])
+        with self.assertRaises(PermissionError):self.save()

@@ -120,7 +120,7 @@ class WechatApplyment:
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
                 self.onboarding._load(application,uid,True)
                 current=self._read(application)
-                if current['business_code']!=record['business_code']:raise ValueError('APPLYMENT_CHANGED')
+                if current!=record:raise ValueError('APPLYMENT_CHANGED')
                 if (current.get('provider_state') in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
                         and current['provider_state']!=data['applyment_state']):
                     raise ValueError('TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT')
@@ -131,6 +131,17 @@ class WechatApplyment:
                         raise ValueError('IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT')
                     current['provider_sub_mchid']=data['sub_mchid']
                 current['audit_detail']=data.get('audit_detail',[])
+                # Official 4012697168: a rejected application is corrected using
+                # the SAME business_code. Only a current signed query opens this
+                # path. A timed-out replacement may still expose the preceding
+                # rejection, so that observation cannot authorize another POST.
+                if (data['applyment_state']=='APPLYMENT_STATE_REJECTED'
+                        and (current['state']=='SUBMITTED_TO_PROVIDER'
+                             or current['state']=='SUBMISSION_UNKNOWN'
+                             and not current.get('replacement_submission',False))):
+                    current.update(state='CORRECTION',version=current['version']+1,
+                        correction_receipt=dict(business_code=record['business_code'],
+                            response_sha256=digest,observed_at=c.now()))
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_QUERIED',digest)
             return current
         version=record['version'] if record else 0
@@ -143,14 +154,28 @@ class WechatApplyment:
             if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
             if meta['category']=='FOOD' and not record['profile']['settlement_info'].get('qualifications'):raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
             self._validate_media(record['profile'],application,meta)
-            code='ap'+hashlib.sha256(canonical([self.reader._mchid,application,version])).hexdigest()[:30]
+            code=record.get('business_code') or 'ap'+hashlib.sha256(canonical([self.reader._mchid,application,version])).hexdigest()[:30]
+            correction=record.get('correction_receipt')
+            if record.get('business_code') and (record.get('provider_state')!='APPLYMENT_STATE_REJECTED'
+                    or type(correction) is not dict
+                    or correction.get('business_code')!=code
+                    or not re.fullmatch('[0-9a-f]{64}',str(correction.get('response_sha256','')))):
+                raise PermissionError('SIGNED_PROVIDER_REJECTION_REQUIRED')
+            # Initial legacy attempts keep their original key; corrected revisions
+            # have their own consumed intent, retaining the original provider ID.
+            attempt=code if not correction else code+':revision:'+str(version)
             payload=dict(self._encrypt(record['profile']),business_code=code)
             with c.tx():
+                if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
+                current_owner,current_meta,current_platform=self.onboarding._load(application,uid,True)
+                if (current_owner,current_meta,current_platform)!=(owner,meta,platform):raise ValueError('WECHAT_APPLYMENT_CHANGED')
                 current=self._read(application)
                 if current!=record:raise ValueError('WECHAT_APPLYMENT_CHANGED')
-                if c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_APPLYMENT_ATTEMPT' AND event_id=?",(code,)).fetchone():raise PermissionError('QUERY_EXISTING_APPLICATION_ONLY')
-                c.db.execute("INSERT INTO events VALUES('WECHAT_APPLYMENT_ATTEMPT',?,?)",(code,c.now()))
-                current.update(state='SUBMISSION_UNKNOWN',business_code=code);self._save(application,owner,current)
+                if c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_APPLYMENT_ATTEMPT' AND event_id=?",(attempt,)).fetchone():raise PermissionError('QUERY_EXISTING_APPLICATION_ONLY')
+                c.db.execute("INSERT INTO events VALUES('WECHAT_APPLYMENT_ATTEMPT',?,?)",(attempt,c.now()))
+                current.update(state='SUBMISSION_UNKNOWN',business_code=code,
+                    replacement_submission=bool(correction))
+                current.pop('correction_receipt',None);self._save(application,owner,current)
                 c.audit(application,uid,'WECHAT_APPLYMENT_SUBMISSION_ATTEMPT',code)
             data,digest=request(self.reader,'POST','/v3/applyment4sub/applyment/',payload)
             if type(data.get('applyment_id')) is not int or data['applyment_id']<=0:raise ValueError('INVALID_OFFICIAL_APPLYMENT_ID')
@@ -168,7 +193,8 @@ class WechatApplyment:
             if op=='wechat_save':
                 if record and record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_APPLICATION_EDIT_DENIED')
                 if type(p['profile']) is not dict or len(canonical(p['profile']))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
-                result=dict(version=version+1,state='DRAFT',profile=p['profile'],provider_state='NOT_SUBMITTED')
+                result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'])
+                if not record:result['provider_state']='NOT_SUBMITTED'
             elif op=='wechat_submit_review':
                 if record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_DRAFT_REQUIRED')
                 self._validate(record['profile'],meta['entity_type'])

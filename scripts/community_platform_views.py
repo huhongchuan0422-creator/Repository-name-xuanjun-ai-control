@@ -16,10 +16,14 @@ class PlatformViews:
         g=self.directory.authorize(session,csrf,body['workspace'])
         if g['role'] not in ('PLATFORM_OWNER','PLATFORM_REVIEWER'):raise PermissionError('PLATFORM_READ_PERMISSION_REQUIRED')
         c=self.center;ops=self.directory.commerce.operations
-        targets=PlatformMerchants(self.directory)._targets(g)
-        identities={tuple(v['scope'][k] for k in ('tenant_id','merchant_id','store_id')) for v in targets.values()}
-        where=' OR '.join('(tenant_id=? AND merchant_id=? AND store_id=?)' for _ in identities) or '0'
-        args=tuple(x for identity in sorted(identities) for x in identity)
+        unavailable=[]
+        # Customer membership and project audit do not depend on a merchant's
+        # separate access grant. Store-based views report incomplete coverage.
+        if op in ('platform_overview','platform_orders'):
+            targets=PlatformMerchants(self.directory)._targets(g,unavailable)
+            identities={tuple(v['scope'][k] for k in ('tenant_id','merchant_id','store_id')) for v in targets.values()}
+            where=' OR '.join('(tenant_id=? AND merchant_id=? AND store_id=?)' for _ in identities) or '0'
+            args=tuple(x for identity in sorted(identities) for x in identity)
         db=ops.runtime.demo.db
         with c.tx():c.limit('community-platform-view:'+g['user_id'],30,60)
         if op=='platform_orders':
@@ -62,5 +66,9 @@ class PlatformViews:
                     verified_refunds+=refunded
                 elif status in ('SUCCESS','REFUNDED'):unverified_terminal+=1
             result=dict(admitted_store_count=len(identities),order_counts=order_counts,signed_paid_order_count=verified_count,signed_gross_payment_minor=verified_minor,signed_refund_minor=verified_refunds,signed_net_payment_minor=verified_minor-verified_refunds,unverified_paid_state_count=unverified_terminal,currency='CNY',amount_basis='GROSS_ORIGINAL_PAYMENTS_BEFORE_REFUNDS',finance_status='UNCONFIRMED',coverage='ORIGINAL_PROJECT_ADMITTED_STORES')
+        if op in ('platform_overview','platform_orders'):
+            result.update(coverage_complete=not unavailable,unavailable_mapping_count=len(unavailable),
+                unavailable_mappings=unavailable[:50],unavailable_mappings_truncated=len(unavailable)>50,
+                totals_scope='ACCESSIBLE_STORE_SUBTOTAL' if unavailable else 'ALL_CURRENT_ADMITTED_STORES')
         with c.tx():c.audit(g['project'],g['user_id'],op.upper(),'SCOPED_READ')
         return result

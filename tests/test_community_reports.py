@@ -1,6 +1,11 @@
 """Community attribution and payout read models use immutable original snapshots."""
+import base64
 import hashlib
+import json
 import unittest
+from unittest.mock import Mock
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 import test_community_mini_center_identity as fixtures
 import test_community_wechat_sp_readonly as keys
 from scripts.pr122_customer_core import canonical
@@ -12,6 +17,7 @@ from scripts.community_wechat_sp_actions import ProviderActions
 from scripts.community_split_rules import SplitRules
 from scripts.community_order_provider_projection import project_verified_query
 from scripts.community_demo_bootstrap import DEMO_SCOPE
+from scripts.community_provider_reference import provider_order_reference
 
 class CommunityReportJourney(unittest.TestCase):
     @classmethod
@@ -41,6 +47,27 @@ class CommunityReportJourney(unittest.TestCase):
         self.call('join',dict(community_id=self.cid,kind='CUSTOMER'),workspace='customer')
         self.commerce.dispatch(self.web['token'],self.web['csrf'],dict(workspace='merchant',operation='price_set',params=dict(item_id='sample_item',expected_revision=0,unit_minor=101,stock=3,enabled=True)))
         return self.commerce.consumer(self.token,'shop1','purchase',dict(reference='basket',lines=[dict(item_id='sample_item',quantity=1,revision=1)]))
+    def signed_response(self,data):
+        raw=canonical(data);now=str(self.c.now());nonce='report-fixture'
+        signature=keys.SignedOrderQuery.provider.sign((now+'\n'+nonce+'\n').encode()+raw+b'\n',padding.PKCS1v15(),hashes.SHA256())
+        return {'Wechatpay-Serial':'PUB_KEY_ID_fixture','Wechatpay-Timestamp':now,
+            'Wechatpay-Nonce':nonce,'Wechatpay-Signature':base64.b64encode(signature).decode()},raw
+    def complete_split(self):
+        # Populate the real executor's action, original-order budget and signature
+        # evidence instead of a partial manually injected report-only action.
+        def provider(request):
+            if request.method=='GET' and '/v3/pay/partner/transactions/' in request.full_url:
+                return self.signed_response(dict(sp_mchid=self.reader._mchid,sub_mchid='1234567891',
+                    sp_appid=self.fx.identity.appid,out_trade_no=provider_order_reference(self.reader._mchid,DEMO_SCOPE,'basket'),
+                    amount=dict(total=101,currency='CNY'),trade_state='SUCCESS',transaction_id='123456789'))
+            if request.method=='POST' and request.full_url.endswith('/v3/profitsharing/orders'):
+                payload=json.loads(request.data)
+                return self.signed_response(dict(sub_mchid=payload['sub_mchid'],out_order_no=payload['out_order_no'],
+                    transaction_id=payload['transaction_id'],state='FINISHED',receivers=[
+                        dict(type=r['type'],account=r['account'],amount=r['amount'],result='SUCCESS') for r in payload['receivers']]))
+            raise AssertionError('Unexpected synthetic provider request')
+        self.reader._fetch=Mock(side_effect=provider)
+        return self.finance('split_by_rule',dict(reference='basket',request_id='split1'))
     def test_order_attribution_is_frozen_and_report_denies_foreign_community_admin(self):
         self.basket();self.call('leave',dict(community_id=self.cid,kind='CUSTOMER'),workspace='customer')
         records=self.call('community_orders',dict(community_id=self.cid,after_id=''))['records']
@@ -57,7 +84,6 @@ class CommunityReportJourney(unittest.TestCase):
         key=hashlib.sha256(canonical([DEMO_SCOPE,'comm'])).hexdigest()
         with self.c.tx():self.c.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_RECEIVER_BINDING' AND subject_idx=?",(key,))
         self.assertEqual(self.finance('rule_snapshot',dict(reference='basket'))['receiver_communities']['comm']['community_id'],self.cid)
-        action=dict(kind='SPLIT',scope=DEMO_SCOPE,reference='basket',request_id='split1',result=dict(status='FINISHED',receivers=[dict(receiver_id='comm',amount_minor=10,result='SUCCESS')]))
-        with self.c.tx():self.c.db.execute("INSERT INTO links VALUES('COMMUNITY_PROVIDER_ACTION',?,?,?,?,1)",('a'*64,self.fx.uid1,'project1',self.c.encrypt(canonical(action),'provider-action:'+'a'*64)))
+        self.complete_split()
         report=self.call('community_earnings',dict(community_id=self.cid,after_id=''))
         self.assertEqual((report['page_gross_minor'],report['page_net_minor']),(10,10));self.assertEqual(report['finance_status'],'UNCONFIRMED')

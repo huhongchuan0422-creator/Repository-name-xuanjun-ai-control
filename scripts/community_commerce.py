@@ -241,8 +241,8 @@ class Commerce:
                 creative = None  # Ads must not block purchase or receipt recovery.
             return dict(creative=creative, payment_success_verified=True,
                         finance_status='UNCONFIRMED')
-        fields = {'orders': {'after_id'}, 'products': set(), 'purchase': {'reference', 'lines'}, 'purchase_read': {'reference'}}
-        if op not in fields or type(p) is not dict or set(p) != fields[op]:
+        fields = {'orders': {'after_id'}, 'products': set(), 'purchase': {'reference', 'lines'}, 'purchase_read': {'reference'}, 'purchase_recover': {'reference'}}
+        if op not in fields or type(p) is not dict or (set(p) != fields[op] and not (op == 'products' and set(p) == {'after_id'})):
             raise ValueError('INVALID_CONSUMER_COMMERCE_FIELDS')
         if op=='orders':
             after=p['after_id']
@@ -262,17 +262,42 @@ class Commerce:
             return dict(records=records,has_more=len(rows)>50,next_cursor=rows[49][0] if len(rows)>50 else None)
         if op == 'products':
             t, m, s = scope(identity)
-            items = self.runtime.demo.merchant_db.execute('SELECT item_id FROM catalog_items WHERE tenant_id=? AND merchant_id=? AND store_id=? AND status=\'ACTIVE\' ORDER BY sort_order,item_id LIMIT 100', (t, m, s)).fetchall()
+            # Keep the original sort order and first-page API. The cursor is a
+            # validated keyset, never SQL or authority over another store.
+            after = p.get('after_id', '')
+            if type(after) is not str or len(after) > 160:
+                raise ValueError('INVALID_PRODUCT_CURSOR')
+            params = [t, m, s]
+            sql = "SELECT item_id,sort_order FROM catalog_items WHERE tenant_id=? AND merchant_id=? AND store_id=? AND status='ACTIVE'"
+            if after:
+                try:
+                    cursor = json.loads(after)
+                except (ValueError, TypeError):
+                    raise ValueError('INVALID_PRODUCT_CURSOR') from None
+                if (type(cursor) is not list or len(cursor) != 2
+                        or type(cursor[0]) is not int or not -(2**63) <= cursor[0] < 2**63
+                        or not valid_id(cursor[1])):
+                    raise ValueError('INVALID_PRODUCT_CURSOR')
+                sql += ' AND (sort_order>? OR (sort_order=? AND item_id>?))'
+                params.extend((cursor[0], cursor[0], cursor[1]))
+            items = self.runtime.demo.merchant_db.execute(sql + ' ORDER BY sort_order,item_id LIMIT 101', params).fetchall()
             result = []
-            for item_id, in items:
+            for item_id, _ in items[:100]:
                 item = self._catalog_item(identity, item_id)
                 price = self._read(identity, project, 'PRODUCT', item_id)
                 if price and price['enabled']:
                     result.append(dict(item_id=item_id, name=item[0], unit_minor=price['unit_minor'], currency='CNY', revision=price['revision'], available=price['stock'] > 0))
-            return dict(products=result)
+            # Disabled/unpriced items still advance the bounded scan cursor.
+            # This is a live directory, not an immutable inventory snapshot.
+            return dict(products=result, has_more=len(items) > 100,
+                        next_cursor=json.dumps([items[99][1], items[99][0]], separators=(',', ':')) if len(items) > 100 else None)
         reference = p['reference']
         if not valid_id(reference):
             raise ValueError('INVALID_ORDER_REFERENCE')
+        if op == 'purchase_recover':
+            # Recovery uses only the original, owned reservation. The current
+            # catalog and client-supplied quantities never reprice this order.
+            return self._complete_reserved_purchase(token, scene, reference, uid, project, identity)
         if op == 'purchase_read':
             i.authorize_order_read(token, scene, reference, now)
             record = self._read(identity, project, 'ORDER', reference)
@@ -336,34 +361,162 @@ class Commerce:
                     currency='CNY', request_hash=request_hash, stock_reserved=True, created_at=now)
                 self._save(identity, project, uid, 'ORDER', reference, record)
                 c.audit(project, uid, 'COMMUNITY_BASKET_RESERVED', request_hash)
-        # Cross-store recovery: never compensate blindly or allocate a new reference.
-        i._resolve(token, scene)
-        t, m, s = scope(identity)
-        existing = self.runtime.demo.db.execute('SELECT amount_minor,currency FROM orders WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?', (t, m, s, reference)).fetchone()
-        if existing is None:
-            create_order(self.runtime.demo.db, identity, reference, record['amount_minor'])
-        elif tuple(existing) != (record['amount_minor'], 'CNY'):
-            raise PermissionError('ORIGINAL_BASKET_ORDER_MISMATCH')
-        i.authorize_order_read(token, scene, reference, c.now())
-        return dict(record, order=state(self.runtime.demo.db, identity, reference))
+        return self._complete_reserved_purchase(token, scene, reference, uid, project, identity)
+
+    def _complete_reserved_purchase(self, token, scene, reference, uid, project, identity):
+        """Finish the exact durable reservation without reserving any more stock.
+
+        Center's write lock keeps live authorization/ownership stable until the
+        original order is committed. The original order lock serializes first
+        creation across connections. This is not a cross-database transaction:
+        either commit may fail, and explicit recovery always uses the same ID.
+        """
+        c, i, db = self.center, self.identity, self.runtime.demo.db
+        if db.in_transaction:
+            raise ValueError('EXTERNAL_ORDER_TRANSACTION_DENIED')
+        with c.tx():
+            def authorize():
+                i._time(c.now())
+                actual_uid, actual_project, principal = i._resolve(token, scene)
+                if ((actual_uid, actual_project) != (uid, project)
+                        or self.runtime.bindings[principal] != identity):
+                    raise PermissionError('ORIGINAL_BASKET_IDENTITY_CHANGED')
+                return principal
+            principal = authorize()
+            c.limit('community-purchase-recovery:' + uid, 30, 60)
+            key = self._key(identity, 'ORDER', reference)
+            row = c.db.execute("SELECT user_id,payload FROM links WHERE channel='COMMUNITY_COMMERCE_V1' AND subject_idx=? AND project=? AND active=1", (key, project)).fetchone()
+            if row is None or row[0] != uid:
+                raise PermissionError('OWNED_BASKET_RESERVATION_REQUIRED')
+            record = json.loads(c.decrypt(row[1], 'community-commerce:' + key))
+            if (type(record) is not dict or record.get('user_id') != uid
+                    or record.get('scope') != identity or record.get('reference') != reference
+                    or record.get('currency') != 'CNY' or record.get('stock_reserved') is not True
+                    or type(record.get('stock_released', False)) is not bool
+                    or type(record.get('lines')) is not list or not 1 <= len(record['lines']) <= 50):
+                raise PermissionError('ORIGINAL_BASKET_RESERVATION_REQUIRED')
+            payment_amount(record.get('amount_minor'), 'CNY', reference)
+            requested, ids, total = [], set(), 0
+            for line in record['lines']:
+                if (type(line) is not dict or set(line) != {'item_id','quantity','revision','name','unit_minor','subtotal_minor'}
+                        or not valid_id(line['item_id']) or line['item_id'] in ids
+                        or type(line['quantity']) is not int or not 1 <= line['quantity'] <= 10000
+                        or type(line['revision']) is not int or line['revision'] < 1
+                        or type(line['name']) is not str or not line['name']
+                        or type(line['unit_minor']) is not int or not 1 <= line['unit_minor'] <= 100000000
+                        or type(line['subtotal_minor']) is not int
+                        or line['subtotal_minor'] != line['quantity'] * line['unit_minor']):
+                    raise PermissionError('ORIGINAL_FROZEN_BASKET_REQUIRED')
+                ids.add(line['item_id'])
+                total += line['subtotal_minor']
+                requested.append({k: line[k] for k in ('item_id','quantity','revision')})
+            request_hash = hashlib.sha256(canonical(sorted(requested, key=lambda line: line['item_id']))).hexdigest()
+            if total != record['amount_minor'] or record.get('request_hash') != request_hash:
+                raise PermissionError('ORIGINAL_FROZEN_BASKET_MISMATCH')
+            ownership_key, _ = i._order_key(principal, reference)
+            owners = c.db.execute("SELECT user_id,project,payload FROM links WHERE channel='COMMUNITY_ORDER' AND subject_idx=? AND active=1", (ownership_key,)).fetchall()
+            if (len(owners) != 1 or tuple(owners[0][:2]) != (uid, project)
+                    or json.loads(c.decrypt(owners[0][2], 'community-order:' + ownership_key))
+                    != dict(scope=identity, reference=reference, amount_minor=record['amount_minor'])):
+                raise PermissionError('ORIGINAL_BASKET_OWNER_REQUIRED')
+            t, m, s = scope(identity)
+            db.execute('BEGIN IMMEDIATE')
+            try:
+                # Acquiring the other SQLite lock may have waited past expiry.
+                authorize()
+                existing = db.execute('SELECT amount_minor,currency FROM orders WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=?', (t, m, s, reference)).fetchone()
+                if existing is None:
+                    if record.get('stock_released') is True or record.get('fulfillment_state') == 'COMPLETED':
+                        raise PermissionError('TERMINAL_BASKET_ORDER_MISSING')
+                    create_order(db, identity, reference, record['amount_minor'])
+                elif tuple(existing) != (record['amount_minor'], 'CNY'):
+                    raise PermissionError('ORIGINAL_BASKET_ORDER_MISMATCH')
+                else:
+                    db.commit()
+            except BaseException:
+                db.rollback()
+                raise
+            i.authorize_order_read(token, scene, reference, c.now())
+            c.audit(project, uid, 'COMMUNITY_BASKET_ORDER_RECOVERED', reference)
+            return dict(record, order=state(db, identity, reference))
 
     def release_cancelled(self,identity,project,uid,reference):
-        from scripts.community_order_cancellation import local_cancelled
-        from scripts.community_order_provider_projection import provider_evidence
-        order=state(self.runtime.demo.db,identity,reference)
-        if order['state']!='CANCELLED' or not (local_cancelled(self.runtime.demo.db,identity,reference) or provider_evidence(self.runtime.demo.db,identity,reference) is not None):raise PermissionError('CONFIRMED_CANCELLATION_REQUIRED')
+        from scripts.community_order_cancellation import cancelled_observation
         c=self.center
         with c.tx():
+            if cancelled_observation(self.runtime.demo.db,identity,reference) is None:
+                raise PermissionError('CONFIRMED_CANCELLATION_REQUIRED')
+            order=state(self.runtime.demo.db,identity,reference)
+            ownership_key=c.idx('community-order:'+canonical([identity,reference]).decode())
+            ownership=c.db.execute("SELECT user_id,project,payload FROM links WHERE channel='COMMUNITY_ORDER' AND subject_idx=? AND active=1",(ownership_key,)).fetchone()
+            if (ownership is None or ownership['user_id']!=uid or ownership['project']!=project
+                    or json.loads(c.decrypt(ownership['payload'],'community-order:'+ownership_key))
+                    !=dict(scope=identity,reference=reference,amount_minor=order['amount_minor'])):
+                raise PermissionError('ORIGINAL_BASKET_OWNER_REQUIRED')
             record=self._read(identity,project,'ORDER',reference)
+            # Original amount-only orders never reserved product stock.
             if record is None:return
-            if record['user_id']!=uid:raise PermissionError('ORIGINAL_BASKET_OWNER_REQUIRED')
-            if record.get('stock_released'):return
+            basket_owner=c.db.execute("SELECT user_id FROM links WHERE channel='COMMUNITY_COMMERCE_V1' AND subject_idx=? AND project=? AND active=1",(self._key(identity,'ORDER',reference),project)).fetchone()
+            if (type(record) is not dict or record.get('user_id')!=uid or basket_owner is None or basket_owner[0]!=uid
+                    or record.get('scope')!=identity or record.get('reference')!=reference
+                    or type(record.get('amount_minor')) is not int or record['amount_minor']!=order['amount_minor']
+                    or record.get('currency')!='CNY'):
+                raise PermissionError('ORIGINAL_BASKET_BINDING_REQUIRED')
+            if (record.get('stock_reserved') is not True
+                    or type(record.get('stock_released',False)) is not bool
+                    or type(record.get('lines')) is not list or not 1<=len(record['lines'])<=50):
+                raise PermissionError('ORIGINAL_STOCK_RESERVATION_REQUIRED')
+
+            def checked_price(price,item_id,revision=None):
+                if (type(price) is not dict or price.get('item_id')!=item_id or price.get('currency')!='CNY'
+                        or type(price.get('revision')) is not int or price['revision']<1
+                        or revision is not None and price['revision']!=revision
+                        or type(price.get('stock')) is not int or not 0<=price['stock']<=100000000
+                        or type(price.get('unit_minor')) is not int or not 1<=price['unit_minor']<=100000000
+                        or type(price.get('enabled')) is not bool
+                        or type(price.get('updated_at')) is not int or price['updated_at']<0):
+                    raise ValueError('ORIGINAL_PRODUCT_VERSION_REQUIRED')
+                return price
+
+            requested=[];ids=set();total=0
             for line in record['lines']:
-                price=self._read(identity,project,'PRODUCT',line['item_id'])
-                if price is None:raise ValueError('ORIGINAL_PRODUCT_INVENTORY_REQUIRED')
+                if (type(line) is not dict or set(line)!={'item_id','quantity','revision','name','unit_minor','subtotal_minor'}
+                        or not valid_id(line['item_id']) or line['item_id'] in ids
+                        or type(line['quantity']) is not int or not 1<=line['quantity']<=10000
+                        or type(line['revision']) is not int or line['revision']<1
+                        or type(line['name']) is not str or not line['name']
+                        or type(line['unit_minor']) is not int or not 1<=line['unit_minor']<=100000000
+                        or type(line['subtotal_minor']) is not int
+                        or line['subtotal_minor']!=line['unit_minor']*line['quantity']):
+                    raise PermissionError('ORIGINAL_FROZEN_BASKET_REQUIRED')
+                item_id,revision=line['item_id'],line['revision']
+                ids.add(item_id);total+=line['subtotal_minor']
+                requested.append({k:line[k] for k in ('item_id','quantity','revision')})
+                before=checked_price(self._read(identity,project,'PRICE_VERSION',item_id+':'+str(revision)),item_id,revision)
+                reserved=checked_price(self._read(identity,project,'PRICE_VERSION',item_id+':'+str(revision+1)),item_id,revision+1)
+                if (not before['enabled'] or before['unit_minor']!=line['unit_minor']
+                        or before['stock']<line['quantity']
+                        or dict(before,stock=before['stock']-line['quantity'],revision=revision+1,updated_at=reserved['updated_at'])!=reserved):
+                    raise PermissionError('ORIGINAL_STOCK_RESERVATION_MISMATCH')
+            request_hash=hashlib.sha256(canonical(sorted(requested,key=lambda line:line['item_id']))).hexdigest()
+            if total!=record['amount_minor'] or record.get('request_hash')!=request_hash:
+                raise PermissionError('ORIGINAL_FROZEN_BASKET_MISMATCH')
+            if record.get('stock_released') is True:return
+            # Once released, only the immutable reservation is relevant; later
+            # catalogue edits must never turn a successful recovery into a retry.
+            updates=[]
+            for line in record['lines']:
+                item_id=line['item_id']
+                self._catalog_item(identity,item_id,False)
+                price=checked_price(self._read(identity,project,'PRODUCT',item_id),item_id)
+                if (price['revision']<line['revision']+1
+                        or self._read(identity,project,'PRICE_VERSION',item_id+':'+str(price['revision']))!=price):
+                    raise ValueError('ORIGINAL_PRODUCT_VERSION_CONFLICT')
                 updated=dict(price,stock=price['stock']+line['quantity'],revision=price['revision']+1,updated_at=c.now())
+                updates.append((item_id,updated))
+            for item_id,updated in updates:
                 if updated['stock']>100000000:raise ValueError('INVENTORY_RESTORE_OVERFLOW')
-                self._save(identity,project,uid,'PRICE_VERSION',line['item_id']+':'+str(updated['revision']),updated)
-                self._save(identity,project,uid,'PRODUCT',line['item_id'],updated,True)
+                self._save(identity,project,uid,'PRICE_VERSION',item_id+':'+str(updated['revision']),updated)
+                self._save(identity,project,uid,'PRODUCT',item_id,updated,True)
             self._save(identity,project,uid,'ORDER',reference,dict(record,stock_released=True),True)
             c.audit(project,uid,'CANCELLED_ORDER_STOCK_RELEASED',reference)

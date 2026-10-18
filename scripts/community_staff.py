@@ -26,6 +26,10 @@ class Staff:
         parent = self.operations.grants.get(saved['parent_workspace'])
         if parent is None or parent['role'] != 'MERCHANT_ADMIN' or parent['scope'] != saved['scope'] or parent['project'] != row['project'] or parent['user_id'] != saved['delegated_by']:
             raise PermissionError('STAFF_PARENT_GRANT_CHANGED')
+        principal = parent['principal']
+        if (principal.role != parent['role'] or principal.tenant_id != parent['tenant']
+                or self.operations.runtime.bindings.get(principal) != parent['scope']):
+            raise PermissionError('STAFF_PARENT_GRANT_CHANGED')
         self.center.project(parent['user_id'], row['project'], ('OWNER',))
         if parent['onboarding_required']:
             from scripts.community_merchant_opening import authorize_workspace

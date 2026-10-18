@@ -5,6 +5,9 @@ import test_community_reports as fixtures
 import test_community_mini_payments as payments
 from scripts.community_platform_merchants import assert_trading,merchant_key
 from scripts.pr122_customer_core import canonical
+from scripts.community_saas_phase2 import Principal
+from scripts.community_center_operations import CenterOperations
+from scripts.community_demo_bootstrap import DEMO_SCOPE
 
 class PlatformMerchantJourney(unittest.TestCase):
     @classmethod
@@ -27,6 +30,42 @@ class PlatformMerchantJourney(unittest.TestCase):
         report=self.call('platform_merchants',dict(after_workspace=''))
         self.assertEqual([r['workspace'] for r in report['records']],['merchant']);self.assertNotIn('contact',report['records'][0])
         with self.assertRaises(PermissionError):self.call('platform_merchant_state',dict(merchant_workspace='foreign',status='DISABLED',expected_version=0,reason='denied'))
+
+    def revoked_mapping(self,workspace='revoked'):
+        principal=Principal('tenant1','MERCHANT_ADMIN')
+        self.fx.fx.stage.api.bindings[principal]=dict(DEMO_SCOPE,store_id='private-revoked-store')
+        grant=dict(user_id=self.fx.fx.uid2,project='project1',project_roles=['EDITOR'],principal=principal)
+        self.fx.ops.grants[workspace]=CenterOperations(self.fx.c,self.fx.fx.stage.api,{workspace:grant}).grants[workspace]
+        self.fx.c.db.execute('UPDATE members SET active=0 WHERE user_id=?',(self.fx.fx.uid2,))
+        return self.fx.ops.grants[workspace]
+
+    def test_revoked_merchant_does_not_block_live_platform_owner_or_leak_private_scope(self):
+        self.revoked_mapping()
+        listing=self.call('platform_merchants',dict(after_workspace=''))
+        self.assertEqual([r['workspace'] for r in listing['records']],['merchant'])
+        self.assertIs(listing['coverage_complete'],False)
+        self.assertEqual(listing['unavailable_mapping_count'],1)
+        self.assertEqual(listing['unavailable_mappings'],[dict(workspace='revoked',status='UNAVAILABLE')])
+        self.assertNotIn('private-revoked-store',str(listing))
+        self.assertNotIn(self.fx.fx.uid2,str(listing))
+        self.assertEqual(self.state('PAUSED',0)['status'],'PAUSED')
+        with self.assertRaises(PermissionError):self.call('platform_merchant_state',dict(merchant_workspace='revoked',status='ACTIVE',expected_version=0,reason='cannot restore revoked grant'))
+
+    def test_unavailable_mapping_pages_advance_even_when_no_accessible_merchant_on_page(self):
+        grant=self.revoked_mapping('a_dead_000')
+        for index in range(1,61):self.fx.ops.grants['a_dead_'+str(index).zfill(3)]=dict(grant)
+        first=self.call('platform_merchants',dict(after_workspace=''))
+        self.assertEqual(first['records'],[]);self.assertEqual(len(first['unavailable_mappings']),50)
+        self.assertIs(first['has_more'],True);self.assertEqual(first['next_cursor'],'a_dead_049')
+        second=self.call('platform_merchants',dict(after_workspace=first['next_cursor']))
+        self.assertEqual([r['workspace'] for r in second['records']],['merchant'])
+        self.assertEqual(len(second['unavailable_mappings']),11);self.assertIs(second['has_more'],False)
+        self.assertIs(second['coverage_complete'],False);self.assertEqual(second['unavailable_mapping_count'],61)
+
+    def test_platform_owner_revocation_still_denies_every_merchant_view(self):
+        self.revoked_mapping()
+        self.fx.c.db.execute('UPDATE members SET active=0 WHERE user_id=?',(self.fx.fx.uid1,))
+        with self.assertRaises(PermissionError):self.call('platform_merchants',dict(after_workspace=''))
 
 class SuspendedPaymentJourney(unittest.TestCase):
     @classmethod

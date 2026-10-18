@@ -54,3 +54,38 @@ class PlatformViewJourney(unittest.TestCase):
         self.assertTrue(any(r['event']=='PLATFORM_OVERVIEW' for r in logs['records']))
         for op,p in [('platform_audit',dict(after_id=True)),('platform_orders',dict(after_id=-1,status='ALL')),('platform_customers',dict(after_id='../other'))]:
             with self.assertRaises(ValueError):self.call(op,p)
+
+    def test_unrelated_revoked_merchant_does_not_block_project_members_and_audit(self):
+        from unittest.mock import patch
+        from scripts.community_platform_merchants import PlatformMerchants
+        with patch.object(PlatformMerchants,'_targets',side_effect=AssertionError('UNRELATED_MERCHANT_LOOKUP')):
+            customers=self.call('platform_customers',dict(after_id=''))
+            self.assertEqual(len(customers['records']),2)
+            audit=self.call('platform_audit',dict(after_id=0))
+            self.assertTrue(audit['records'])
+
+    def test_incomplete_store_coverage_is_explicit_and_never_leaks_revoked_orders(self):
+        from scripts.community_saas_phase2 import Principal
+        from scripts.community_center_operations import CenterOperations
+        from scripts.community_demo_bootstrap import DEMO_SCOPE
+        self.fx.basket()
+        identity=dict(DEMO_SCOPE,store_id='revoked-private-store')
+        principal=Principal('tenant1','MERCHANT_ADMIN');self.fx.fx.stage.api.bindings[principal]=identity
+        grant=dict(user_id=self.fx.fx.uid2,project='project1',project_roles=['EDITOR'],principal=principal)
+        self.fx.ops.grants['revoked']=CenterOperations(self.fx.c,self.fx.fx.stage.api,{'revoked':grant}).grants['revoked']
+        create_order(self.fx.fx.stage.demo.db,identity,'revoked-private-order',777)
+        self.fx.c.db.execute('UPDATE members SET active=0 WHERE user_id=?',(self.fx.fx.uid2,))
+        customers=self.call('platform_customers',dict(after_id=''))
+        revoked=next(row for row in customers['records'] if row['user_id']==self.fx.fx.uid2)
+        self.assertIs(revoked['membership_active'],False)
+        self.assertTrue(self.call('platform_audit',dict(after_id=0))['records'])
+        for op,p in [('platform_overview',{}),('platform_orders',dict(after_id=0,status='ALL'))]:
+            result=self.call(op,p)
+            self.assertIs(result['coverage_complete'],False)
+            self.assertEqual(result['totals_scope'],'ACCESSIBLE_STORE_SUBTOTAL')
+            self.assertEqual(result['unavailable_mapping_count'],1)
+            self.assertEqual(result['unavailable_mappings'],[dict(workspace='revoked',status='UNAVAILABLE')])
+            self.assertNotIn('revoked-private-store',str(result));self.assertNotIn('revoked-private-order',str(result))
+        self.fx.c.db.execute('UPDATE members SET active=0 WHERE user_id=?',(self.fx.fx.uid1,))
+        for op,p in [('platform_customers',dict(after_id='')),('platform_audit',dict(after_id=0)),('platform_overview',{})]:
+            with self.assertRaises(PermissionError):self.call(op,p)

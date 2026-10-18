@@ -14,7 +14,20 @@
  $('prepare').onclick=()=>action(async t=>{if(!quoteId)throw Error('先生成或打开报价');const r=await call('order_prepare',{quote_id:quoteId,currency:$('currency').value},t);if(t!==epoch)return;orderId=r.order_id;$('order').textContent=JSON.stringify(r,null,2);});
  $('readOrder').onclick=()=>action(async t=>{if(!orderId)throw Error('先打开订单');const r=await call('order_status',{order_id:orderId},t);if(t===epoch)$('order').textContent=JSON.stringify(r,null,2);});
  $('renewal').onclick=()=>action(async t=>{if(!orderId)throw Error('先打开订单');const r=await call('renewal_plan',{order_id:orderId},t);if(t===epoch)$('renewalResult').textContent=JSON.stringify(r,null,2);});
- async function mine(t,after=''){const r=await call('mine',{kind,after_id:after},t);if(t!==epoch)return;$('records').replaceChildren();for(const row of r.records){const a=article('records',row.reference+(row.currency?' · '+row.currency:''));a.append(button('打开',async n=>{const value=await call(kind==='QUOTE'?'quote_read':'order_read',kind==='QUOTE'?{quote_id:row.reference}:{order_id:row.reference},n);if(n!==epoch)return;if(kind==='QUOTE')renderQuote(value);else{orderId=value.order_id;quoteId=null;$('quote').replaceChildren();$('selected').replaceChildren();$('renewalResult').replaceChildren();$('order').textContent=JSON.stringify(value,null,2);}}));}cursor=r.next_cursor;$('more').hidden=!r.has_more;}
+ async function mine(t,after=''){
+  const recordKind=kind,r=await call('mine',{kind:recordKind,after_id:after},t);if(t!==epoch)return;$('records').replaceChildren();
+  for(const row of r.records){
+   const a=article('records',row.reference+(row.currency?' · '+row.currency:''));
+   const show=value=>{if(recordKind==='QUOTE')renderQuote(value);else{orderId=value.order_id;quoteId=null;$('quote').replaceChildren();$('selected').replaceChildren();$('renewalResult').replaceChildren();$('order').textContent=JSON.stringify(value,null,2);}};
+   a.append(button('打开',async n=>{const value=await call(recordKind==='QUOTE'?'quote_read':'order_read',recordKind==='QUOTE'?{quote_id:row.reference}:{order_id:row.reference},n);if(n===epoch)show(value);}));
+   a.append(button(recordKind==='QUOTE'?'恢复原报价':'恢复原订单',async n=>{
+    const operation=recordKind==='QUOTE'?'quote_recover':'order_prepare';
+    const params=recordKind==='QUOTE'?{quote_id:row.reference}:{quote_id:row.quote_id,currency:row.currency};
+    const value=await call(operation,params,n);if(n!==epoch)return;show(value);
+   }));
+  }
+  cursor=r.next_cursor;$('more').hidden=!r.has_more;
+ }
  $('myQuotes').onclick=()=>action(t=>{kind='QUOTE';return mine(t);});$('myOrders').onclick=()=>action(t=>{kind='ORDER';return mine(t);});$('more').onclick=()=>action(t=>mine(t,cursor));
  const select=values=>{const e=document.createElement('select');for(const value of values){const o=document.createElement('option');o.value=o.textContent=value;e.append(o);}return e;};
  const input=(type,value)=>{const e=document.createElement('input');e.type=type;e.value=value;e.required=true;if(type==='number'){e.min='0';e.step='1';}return e;};

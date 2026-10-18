@@ -85,6 +85,18 @@ class FinancialViews:
         if state(a.runtime.demo.db, g['scope'], p['reference']) != original:
             raise ValueError('ORDER_CHANGED_DURING_RECONCILIATION')
         project_verified_query(a.runtime.demo.db, g['scope'], p['reference'], expected, observation, c.now(), a.reader._kid)
+        if observation['provider_state'] in ('CLOSED','REVOKED'):
+            commerce=getattr(a,'commerce',None)
+            if commerce is not None:
+                if commerce.center is not c or commerce.runtime is not a.runtime:
+                    raise PermissionError('SAME_ORIGINAL_COMMERCE_REQUIRED')
+                basket=commerce._read(g['scope'],g['project'],'ORDER',p['reference'])
+                if basket is not None:
+                    if type(basket) is not dict or not valid_id(basket.get('user_id')):
+                        raise PermissionError('ORIGINAL_BASKET_OWNER_REQUIRED')
+                    # The finance operator is not the buyer. Recovery rechecks
+                    # the original ownership and frozen reservation atomically.
+                    commerce.release_cancelled(g['scope'],g['project'],basket['user_id'],p['reference'])
         order = state(a.runtime.demo.db, g['scope'], p['reference'])
         refunded=verified_refund_total(a.runtime.demo.db,g['scope'],p['reference'])
         lock = c.idx('provider-order-action:' + a.reader._mchid + ':' + expected['out_trade_no'])

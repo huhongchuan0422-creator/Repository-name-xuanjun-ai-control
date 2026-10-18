@@ -1,6 +1,7 @@
 """Synthetic bill integrity and scoped reconciliation; no live provider calls."""
 import datetime as dt
 import hashlib
+import hmac
 import unittest
 from unittest.mock import Mock
 import test_community_reports as fixtures
@@ -80,6 +81,60 @@ class BillJourney(unittest.TestCase):
         self.download(b'a,b\nx,y\n');self.bills._download.return_value=b'a,b\nx,z\n'
         with self.assertRaises(PermissionError):self.call('bill_fetch')
         self.assertEqual(self.fx.c.db.execute("SELECT COUNT(*) FROM links WHERE channel='COMMUNITY_PROVIDER_BILL'").fetchone()[0],0)
+    def assert_download_identity_change_denied(self,change):
+        raw=b'unknown,columns\na,b\n'
+        self.download(raw)
+        _,policy=self.fx.actions._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
+        def download(url):
+            change()
+            # The replacement is independently valid through the real Center
+            # session/project and protected-grant checks, with the same policy.
+            self.assertEqual(self.fx.actions._authorize(
+                self.fx.web['token'],self.fx.web['csrf'],'finance')[1],policy)
+            return raw
+        self.bills._download.side_effect=download
+        with self.assertRaisesRegex(PermissionError,'BILL_AUTHORIZATION_CHANGED'):
+            self.call('bill_fetch')
+        self.assertEqual(self.fx.c.db.execute("SELECT COUNT(*) FROM links WHERE channel='COMMUNITY_PROVIDER_BILL'").fetchone()[0],0)
+        self.assertEqual(self.fx.c.db.execute("SELECT COUNT(*) FROM audit WHERE event='PROVIDER_BILL_HASH_VERIFIED'").fetchone()[0],0)
+
+    def change_bill_scope(self,in_place):
+        grant=self.fx.ops.grants['finance'];identity=dict(grant['scope'],store_id='other-store')
+        self.fx.actions.runtime.bindings[grant['principal']]=dict(identity)
+        original=tuple(grant['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
+        self.fx.actions.bindings[tuple(identity[k] for k in ('tenant_id','merchant_id','store_id'))]=self.fx.actions.bindings[original]
+        if in_place:grant['scope'].update(identity)
+        else:self.fx.ops.grants['finance']=dict(grant,scope=identity)
+
+    def test_bill_download_rejects_replaced_scope_with_same_policy(self):
+        self.assert_download_identity_change_denied(lambda:self.change_bill_scope(False))
+
+    def test_bill_download_rejects_in_place_scope_change_with_same_policy(self):
+        self.assert_download_identity_change_denied(lambda:self.change_bill_scope(True))
+
+    def test_bill_download_rejects_project_change_with_same_scope_and_policy(self):
+        from scripts.pr122_customer_core import canonical
+        original=self.fx.c.project(self.fx.fx.uid1,'project1',('OWNER',))[2]
+        payload=dict(revision=2,expires=self.fx.c.now()+10000,
+                     projects=[original,dict(original,id='project2')])
+        key=b'a'*32
+        self.fx.c.import_authority(dict(payload=payload,signature=hmac.new(
+            key,canonical(payload),hashlib.sha256).hexdigest()),key)
+        def change():self.fx.ops.grants['finance']['project']='project2'
+        self.assert_download_identity_change_denied(change)
+
+    def test_bill_download_rejects_user_change_with_same_scope_and_policy(self):
+        # Model unexpected session/principal rebinding using only synthetic
+        # accounts; both actors really have the required Center membership.
+        self.fx.ops.grants['finance']['project_roles']=('OWNER','EDITOR')
+        def change():
+            uid=self.fx.fx.uid2
+            epoch=self.fx.c.db.execute('SELECT epoch FROM accounts WHERE id=?',(uid,)).fetchone()[0]
+            self.fx.c.db.execute('UPDATE sessions SET user_id=?,epoch=? WHERE token=?',
+                (uid,epoch,hashlib.sha256(self.fx.web['token'].encode()).hexdigest()))
+            self.fx.ops.grants['finance']['user_id']=uid
+        self.assert_download_identity_change_denied(change)
+
     def test_auth_and_schema_fail_closed(self):
         with self.assertRaises(PermissionError):self.bills.dispatch(self.fx.web['token'],'','finance','bill_fetch',dict(kind='TRADE',bill_date=self.date))
         self.download(b'unknown,columns\na,b\n');self.call('bill_fetch')

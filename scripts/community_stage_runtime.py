@@ -57,7 +57,7 @@ class StageRuntime:
             'ad_create': {'record'}, 'ad_state': {'campaign_id', 'state', 'expected_version'},
             'ad_review': {'campaign_id', 'approved', 'expected_version'},
         }
-        if name not in fields or set(params) != fields[name]:
+        if name not in fields or (set(params) != fields[name] and not (name == 'merchant_settings' and set(params) == {'after_id'})):
             raise ValueError('INVALID_COMMUNITY_FIELDS')
         public = {'storefront', 'qr', 'checkout', 'receipt'}
         permissions={
@@ -90,7 +90,7 @@ class StageRuntime:
             return (orders_export if name=='orders_export' else orders_page)(self.demo.db,identity,**params)
         if name == 'merchant_settings':
             from scripts.community_workbench import merchant_settings
-            return merchant_settings(self.demo.merchant_db,identity)
+            return merchant_settings(self.demo.merchant_db,identity,**params)
         if name == 'ads_page':
             from scripts.community_ad_store import list_campaigns
             return list_campaigns(self.demo.ad_db,identity,**params)

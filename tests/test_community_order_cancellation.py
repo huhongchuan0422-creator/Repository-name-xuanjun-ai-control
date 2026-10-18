@@ -42,10 +42,10 @@ class CancellationJourney(unittest.TestCase):
         web=self.fx.center.login('one@example.org','FixturePassword123!')
         ops=CenterOperations(self.fx.center,self.fx.stage.api,{'merchant':dict(user_id=self.fx.uid1,project='project1',project_roles=['OWNER'],principal=self.fx.stage.merchant)})
         commerce=Commerce(ops,self.fx.identity);self.p.payments.commerce=commerce
-        with self.fx.center.tx():
-            commerce._save(DEMO_SCOPE,'project1',self.fx.uid1,'PRODUCT','sample_item',dict(item_id='sample_item',revision=1,unit_minor=101,currency='CNY',stock=9,enabled=True))
-            commerce._save(DEMO_SCOPE,'project1',self.fx.uid1,'ORDER','order1',dict(reference='order1',user_id=self.fx.uid1,lines=[dict(item_id='sample_item',quantity=1)],amount_minor=101,currency='CNY'))
-        self.cancel();self.cancel()
+        commerce.dispatch(web['token'],web['csrf'],dict(workspace='merchant',operation='price_set',params=dict(item_id='sample_item',expected_revision=0,unit_minor=101,stock=10,enabled=True)))
+        commerce.consumer(self.p.token,'shop1','purchase',dict(reference='basket',lines=[dict(item_id='sample_item',quantity=1,revision=1)]))
+        self.p.prepay.bindings['basket']=dict(self.p.binding,out_trade_no='provider_basket')
+        for _ in range(2):self.p.payments.dispatch(self.p.token,dict(scene='shop1',operation='cancel',reference='basket'))
         price=commerce._read(DEMO_SCOPE,'project1','PRODUCT','sample_item')
-        self.assertEqual((price['stock'],price['revision']),(10,2))
-        self.assertTrue(commerce._read(DEMO_SCOPE,'project1','ORDER','order1')['stock_released'])
+        self.assertEqual((price['stock'],price['revision']),(10,3))
+        self.assertTrue(commerce._read(DEMO_SCOPE,'project1','ORDER','basket')['stock_released'])
