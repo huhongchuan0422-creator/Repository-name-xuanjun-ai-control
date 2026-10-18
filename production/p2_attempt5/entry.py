@@ -102,7 +102,7 @@ def main():
             # Full private report is durably emitted by PermitCycle. No secrets,
             # raw host receipts or local paths are printed into public logs.
             print(json.dumps({'status': result['status']}))
-            return 0 if result['status'] == 'SUCCESS' else 2
+            return 0 if result['status'] == 'SUCCEEDED' else 2
         signer = OpenSSLSigner(cfg['key'], cfg['public_der_sha256'])
         server = None
         try:

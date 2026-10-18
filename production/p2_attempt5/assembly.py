@@ -232,9 +232,16 @@ class ProductionIssuer(object):
             else:
                 raise RuntimeError('P2_PRODUCTION_SOCKET_EXISTS_HOLD')
             self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self.listener.bind('/proc/self/fd/' + str(self.directory) + '/' + self.leaf)
-            os.chmod(self.leaf, 0o600, dir_fd=self.directory, follow_symlinks=False)
+            # Create at 0600, rather than chmod a pathname afterwards. This also
+            # avoids Python3.6's unsupported dir_fd+follow_symlinks combination.
+            mask = os.umask(0o177)
+            try:
+                self.listener.bind('/proc/self/fd/' + str(self.directory) + '/' + self.leaf)
+            finally:
+                os.umask(mask)
             info = os.stat(self.leaf, dir_fd=self.directory, follow_symlinks=False)
+            require(stat.S_ISSOCK(info.st_mode) and info.st_uid == 0 and
+                    stat.S_IMODE(info.st_mode) == 0o600, 'SOCKET_PROTECTION')
             self.socket_identity = (info.st_dev, info.st_ino)
             self.listener.listen(4)
             self.listener.settimeout(1)
