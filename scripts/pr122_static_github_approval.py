@@ -197,7 +197,9 @@ def _verify(comment, approval_comment, approval, plan, trust, fetch):
               and all(_hash(value) for value in finding['evidence_sha256']), 'FINDINGS_CLOSED')
     _need(plan['static_baseline_sha256'] in findings['R3']['evidence_sha256'], 'BASELINE_EVIDENCE')
     # Always live; no cached approval, successful earlier request or error fallback.
-    _repository(fetch(''), owner=True)
+    # The existing bounded GitHub client appends '/' before a relative path.
+    # Repository-root '' would yield an unsupported trailing-slash endpoint.
+    # The same live CI response authenticates repository ID/name/owner below.
     commit = fetch('git/commits/' + payload['source_commit'])
     _need(commit['sha'] == payload['source_commit'] and commit['tree']['sha'] == payload['source_tree'],
           'IMMUTABLE_GIT_TREE')
@@ -211,7 +213,7 @@ def _verify(comment, approval_comment, approval, plan, trust, fetch):
           and ci['status'] == 'completed' and ci['conclusion'] == 'success'
           and ci['head_sha'] == payload['source_commit'] and ci['path'] == WORKFLOW
           and ci['event'] in ('push', 'workflow_dispatch'), 'EXACT_CI')
-    _repository(ci['repository'])
+    _repository(ci['repository'], owner=True)
     _repository(ci['head_repository'])
     _need(approval['issued_unix'] <= time.time() < approval['expires_unix'], 'EXPIRED')
     return payload

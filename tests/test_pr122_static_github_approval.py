@@ -100,9 +100,8 @@ class _DualFixture:
             4: self.comment(4, OWNER_ID, release.OWNER),
             5: self.comment(5, REVIEWER_ID, 'independent-reviewer'),
         }
-        repo_identity = {'id': REPO_ID, 'full_name': REPO}
+        repo_identity = {'id': REPO_ID, 'full_name': REPO, 'owner': {'id': OWNER_ID}}
         self.responses = {
-            '': dict(repo_identity, owner={'id': OWNER_ID, 'login': release.OWNER}),
             'git/commits/' + self.plan['source_commit']: {
                 'sha': self.plan['source_commit'], 'tree': {'sha': self.plan['source_tree']}},
             'actions/artifacts/7': {
@@ -210,7 +209,7 @@ class _DualFixture:
 class StaticGithubApprovalTests(_DualFixture, unittest.TestCase):
     def test_exact_fixed_numeric_dual_approval_and_fresh_api_objects_pass(self):
         self.assertEqual(self.gate(), self.approval)
-        expected = {'', 'issues/comments/4', 'issues/comments/5',
+        expected = {'issues/comments/4', 'issues/comments/5',
                     'git/commits/' + self.plan['source_commit'],
                     'actions/artifacts/7', 'actions/runs/6'}
         self.assertEqual(set(self.fetched), expected)
@@ -314,12 +313,14 @@ class StaticGithubApprovalTests(_DualFixture, unittest.TestCase):
                                       'review_comment_id', 'review_body_sha256'})
 
     def test_live_repository_id_name_and_owner_are_all_required(self):
-        original = copy.deepcopy(self.responses[''])
+        original = copy.deepcopy(self.responses['actions/runs/6']['repository'])
         for key, value in [('id', True), ('id', REPO_ID + 1),
                            ('full_name', 'attacker/Repository-name-xuanjun-ai-control'),
-                           ('owner', {'id': REVIEWER_ID}), ('owner', {'id': True})]:
+                           ('owner', {'id': REVIEWER_ID}), ('owner', {'id': True}),
+                           ('owner', {'id': str(OWNER_ID)}), ('owner', {}), ('owner', None)]:
             with self.subTest(key=key, value=value):
-                self.responses[''] = dict(original, **{key: value}); self.assert_hold()
+                self.responses['actions/runs/6']['repository'] = dict(original, **{key: value})
+                self.assert_hold()
 
     def test_comment_origin_must_be_exact_fixed_repository_issue_and_numeric_ids(self):
         original = copy.deepcopy(self.comments)
@@ -513,7 +514,7 @@ class StaticGithubApprovalTests(_DualFixture, unittest.TestCase):
     def test_repeated_gate_api_exceptions_are_hold_without_cached_authorization(self):
         original_comments = copy.deepcopy(self.comments)
         original_responses = copy.deepcopy(self.responses)
-        paths = ['', 'issues/comments/4', 'issues/comments/5',
+        paths = ['issues/comments/4', 'issues/comments/5',
                  'git/commits/' + self.plan['source_commit'], 'actions/artifacts/7', 'actions/runs/6']
         for path in paths:
             for error in (OSError('fixture 404'), TimeoutError('fixture timeout'),
@@ -654,7 +655,7 @@ class StaticGithubCoordinatorTests(_DualFixture, unittest.TestCase):
 
     def test_api_failure_between_effects_stops_original_coordinator(self):
         def break_api(stage, lease):
-            if stage == static.STAGES[0]: self.responses[''] = TimeoutError('fixture timeout')
+            if stage == static.STAGES[0]: self.responses['actions/runs/6'] = TimeoutError('fixture timeout')
         self.ops.execute_hook = break_api
         with self.assertRaisesRegex(Denied, '^HOLD:'): self.apply()
         self.assertEqual(self.ops.executed, [(static.STAGES[0], 1)])
@@ -727,6 +728,52 @@ class StaticAuthorityRoutingTests(_DualFixture, unittest.TestCase):
                 self.github.assert_not_called()
                 self.pins_path.write_bytes(pins); self.plan = plan
 
+    def test_original_github_client_uses_five_exact_paths_and_avoids_root_404(self):
+        # The real API rejects the old client's repository-root trailing slash.
+        # Model that observed failure locally, then exercise the original client
+        # and real authority successfully without making that unsupported call.
+        requests = []
+        token = 'FIXTURE-NEVER-A-REAL-TOKEN'
+        root = 'https://api.github.com/repos/' + REPO + '/'
+        paths = ['issues/comments/4', 'issues/comments/5',
+                 'git/commits/' + self.plan['source_commit'],
+                 'actions/artifacts/7', 'actions/runs/6']
+        payloads = {root + path: copy.deepcopy(
+            self.comments[int(path.rsplit('/', 1)[1])]
+            if path.startswith('issues/comments/') else self.responses[path]) for path in paths}
+        testcase = self
+        class Transport(urllib.request.HTTPSHandler):
+            def https_open(self, request):
+                requests.append((request.full_url, dict(request.header_items())))
+                headers = Message(); headers['Content-Type'] = 'application/json'
+                if request.full_url == root:
+                    code, payload = 404, {'message': 'Not Found', 'status': '404'}
+                else:
+                    testcase.assertIn(request.full_url, payloads)
+                    code, payload = 200, payloads[request.full_url]
+                response = urllib.response.addinfourl(io.BytesIO(canonical(payload)), headers,
+                                                       request.full_url, code=code)
+                response.msg = 'Not Found' if code == 404 else 'OK'
+                return response
+        build_opener = urllib.request.build_opener
+        def offline_opener(*handlers):
+            return build_opener(Transport(), *handlers)
+        fake_token = SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0, st_mode=0o600),
+                                     read_text=lambda: token)
+        with patch.object(release, 'private_path', return_value=fake_token), \
+             patch.object(urllib.request, 'build_opener', side_effect=offline_opener), \
+             patch.object(release, 'github', side_effect=REAL_GITHUB):
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                REAL_GITHUB('')
+            self.assertEqual(caught.exception.code, 404)
+            self.assertEqual(requests[0][0], root)
+            requests.clear()
+            self.assertEqual(self.authority.gate(4, self.plan), self.approval)
+        self.assertEqual([url for url, headers in requests], [root + path for path in paths])
+        self.assertNotIn(root, [url for url, headers in requests])
+        self.assertTrue(all(headers['Authorization'] == 'Bearer ' + token for url, headers in requests))
+        self.assertEqual(payloads[root + 'actions/runs/6']['repository']['owner']['id'], OWNER_ID)
+
     def test_real_no_redirect_handler_never_forwards_authorization(self):
         requests = []
         token = 'FIXTURE-NEVER-A-REAL-TOKEN'
@@ -758,7 +805,7 @@ class StaticAuthorityRoutingTests(_DualFixture, unittest.TestCase):
 
     def test_api_exception_with_secret_is_sanitized_by_public_authority(self):
         token = 'FIXTURE-SECRET-IN-API-ERROR'
-        self.responses[''] = RuntimeError('response includes ' + token)
+        self.responses['actions/runs/6'] = RuntimeError('response includes ' + token)
         with self.assertRaisesRegex(Denied, '^HOLD:') as caught:
             self.authority.gate(4, self.plan)
         self.assertNotIn(token, str(caught.exception))
