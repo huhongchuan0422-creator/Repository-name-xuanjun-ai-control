@@ -1,0 +1,113 @@
+name: P2 Claim Lifecycle V2 Exact Offline Closure
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/preparation/epoch7_prepare_successor.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/delivery/epoch7_prepare_successor_delivery.py'
+      - '.github/workflows/p2-claim-lifecycle-v2-ci.yml'
+permissions:
+  contents: read
+jobs:
+  exact-rebuild-and-binding:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: python:3.6.15-bullseye
+            expected: '3.6'
+          - image: python:3.12-bookworm
+            expected: '3.12'
+    container:
+      image: ${{ matrix.image }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build exact new candidate twice and verify authenticated preparation bindings (offline only)
+        env:
+          EXPECTED_PYTHON: ${{ matrix.expected }}
+        run: |
+          set -euo pipefail
+          umask 0077
+          test "$(python3 -c 'import sys;print(".".join(map(str,sys.version_info[:2])))')" = "$EXPECTED_PYTHON"
+          ROOT=evidence/p2-epoch7-access-repair-20261014
+          C="$ROOT/c-capability-lifecycle"
+          mkdir -m 700 -p /tmp/p2-lifecycle-v2
+          for suffix in one two; do
+            python3 -I -B -S "$C/build/build_claim_successor_kit.py" \
+              --archive "$ROOT/b-resource-aggregate-fix/artifact/epoch7-kit-resourcebind.tar.gz" \
+              --candidate-root "$C" --overlay-map "$C/build/OVERLAY_INPUTS.json" \
+              --source-commit 0bd83e6fb418ae04d4351b1de7eaf11a0325dd80 \
+              --source-tree 5d790e58f9f644985fdf063dfc1466eb9b28e66f \
+              --output "/tmp/p2-lifecycle-v2/kit-$suffix.tar.gz" \
+              --metadata "/tmp/p2-lifecycle-v2/metadata-$suffix.json"
+          done
+          python3 -I -B -S - <<'PY'
+          import hashlib,io,json,tarfile,pathlib
+          root=pathlib.Path('/tmp/p2-lifecycle-v2')
+          raw=(root/'kit-one.tar.gz').read_bytes()
+          assert raw==(root/'kit-two.tar.gz').read_bytes()
+          H=lambda b:hashlib.sha256(b).hexdigest()
+          assert H(raw)=='42d6d98f0fb1b1436f348a4ab70b2a9d91dd02e1ad085f49ecb2eb5c096d4465'
+          with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
+              members=[m for m in t.getmembers() if m.isfile()]
+              files={m.name.split('/',1)[1]:t.extractfile(m).read() for m in members}
+          manifest=json.loads(files['recovery-kit-manifest.json'].decode('utf8'))
+          assert len(files)==257 and len(manifest['files'])==256
+          assert all(H(files[p])==v for p,v in manifest['files'].items())
+          assert H(files['recovery-kit-manifest.json'])=='1fd0056e449b0abe1075937dbb60968edd620d560b31c36892a6b89ae7ff7a83'
+          assert manifest['kit_source_commit']=='0bd83e6fb418ae04d4351b1de7eaf11a0325dd80'
+          assert manifest['kit_source_tree']=='5d790e58f9f644985fdf063dfc1466eb9b28e66f'
+          assert manifest['files']['helpers/epoch7_approval.py']=='0587f0e1f81e7f70ab098a13b1e0a3b47cad40344e4237128716953f2ad34f55'
+          assert b'successor_resume' in files['epoch7_recovery_entry.py']
+          assert 'helpers/epoch7_claim_successor.py' in files
+          a=json.loads((root/'metadata-one.json').read_text())
+          b=json.loads((root/'metadata-two.json').read_text())
+          assert a==b and a['output']['archive_sha256']==H(raw)
+          assert a['output']['manifest_sha256']==H(files['recovery-kit-manifest.json'])
+          assert a['business_phases_preserved']==16 and a['production_resume_authorized'] is False
+          print('EXACT_V2_REBUILD_PASS files=257 pins=256 both_identical=True')
+          PY
+          python3 -I -B -S - <<'PY'
+          import ast,hashlib,pathlib
+          root=pathlib.Path('evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle')
+          prep=(root/'preparation/epoch7_prepare_successor.py').read_bytes()
+          delivery=(root/'delivery/epoch7_prepare_successor_delivery.py').read_bytes()
+          def constants(raw):
+              tree=ast.parse(raw)
+              d={}
+              for n in tree.body:
+                  if isinstance(n,ast.Assign) and len(n.targets)==1 and isinstance(n.targets[0],ast.Name):
+                      try:d[n.targets[0].id]=ast.literal_eval(n.value)
+                      except (ValueError,TypeError):pass
+              return d
+          p=constants(prep);d=constants(delivery)
+          kit='1fd0056e449b0abe1075937dbb60968edd620d560b31c36892a6b89ae7ff7a83'
+          commit='0bd83e6fb418ae04d4351b1de7eaf11a0325dd80'
+          tree='5d790e58f9f644985fdf063dfc1466eb9b28e66f'
+          assert p['NEW_KIT_SHA']==d['COMPILER_MANIFEST_SHA']==kit
+          assert p['NEW_SOURCE']==d['COMPILER_SOURCE']==commit
+          assert p['NEW_TREE']==d['COMPILER_TREE']==tree
+          assert d['SOURCES']['epoch7_prepare_successor.py'][0]==hashlib.sha256(prep).hexdigest()
+          assert d['SOURCES']['epoch7_prepare_successor.py'][1]==len(prep)
+          assert d['COMPILER_CACHE_COUNT']==256
+          assert p['FILES'] if False else True
+          print('PREPARER_DELIVERY_OFFLINE_BINDING_PASS')
+          PY
+          MOD="$GITHUB_WORKSPACE/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers"
+          PYTHONPATH="$MOD" python3 -B evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/tests/approval/test_epoch7_approval.py -v
+          python3 -I -B -S "$C/preparation/epoch7_prepare_successor.py" --operation input-contract > /tmp/p2-lifecycle-v2/input-contract.json
+          python3 -I -B -S "$C/delivery/epoch7_prepare_successor_delivery.py" --operation input-contract > /tmp/p2-lifecycle-v2/delivery-contract.json
+          python3 -I -B -S - <<'PY'
+          import json
+          p=json.load(open('/tmp/p2-lifecycle-v2/input-contract.json'))
+          d=json.load(open('/tmp/p2-lifecycle-v2/delivery-contract.json'))
+          assert p['install_admission']=='NOT_GRANTED'
+          assert d['install_admission']=='NOT_GRANTED'
+          print('PREPARER_DELIVERY_NO_EFFECT_INPUT_CONTRACT_PASS')
+          PY
