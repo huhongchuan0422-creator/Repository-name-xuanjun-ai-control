@@ -97,4 +97,10 @@ class StoreTests(unittest.TestCase):
         self.consume(1);self.reconcile(1,'SUCCESS')
         with self.assertRaises(Hold):self.reconcile(1,'NO_WRITE')
 
+    def test_identical_safe_reconciliation_after_lost_ack_idempotent(self):
+        self.consume(1);self.reconcile(1);self.reconcile(1)
+        self.assertEqual(self.consume(2),2)
+    def test_conflicting_reconciliation_replay_denied(self):
+        self.consume(1);self.reconcile(1)
+        with self.assertRaises(Hold):self.store.reconcile(self.g,'attempt-1','NO_WRITE','c'*64,self.token,lambda *args:True)
 if __name__=='__main__':unittest.main()

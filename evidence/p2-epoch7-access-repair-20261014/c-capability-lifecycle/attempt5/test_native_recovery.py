@@ -317,7 +317,7 @@ def native_suite(env):
                 action={'id':'retry-limit','before_sha256':sha(target.read_bytes()),'after_sha256':sha(new),
                         'payload_sha256':sha(new),'checkpoint_sha256':'a'*64}
                 approved=policy();approved['configuration_actions']=[action]
-                config=ApprovedConfiguration(root,{'retry-limit':('settings.json',new)},lambda:self.native.fence(self.ledger.snapshot()['attempts'][-1]['id'],'CONFIG_CAS'))
+                config=ApprovedConfiguration(root,{'retry-limit':('settings.json',new)},lambda:self.native.fence(self.ledger.snapshot()['attempts'][-1]['id'],'CONFIG_CAS'),lambda:'a'*64)
                 failures=[0]
                 def change(request,result):
                     if request['operation']=='authorize_first_admission':
@@ -349,6 +349,15 @@ def native_suite(env):
                     self.assertEqual(target.read_bytes(),new)
                     self.assertEqual(len(list(Path(root).glob('backup-*.json'))),1)
                 finally:config.close()
+        def test_cycle_parallel_controller_refused_without_claim(self):
+            import fcntl
+            path=os.path.join(self.folder.name,'permit-cycle.lock')
+            fd=os.open(path,os.O_CREAT|os.O_RDWR,0o600)
+            try:
+                fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                with self.assertRaises(Hold):self.cycle().run('d'*64)
+                self.assertEqual(self.ledger.snapshot()['attempts'],[])
+            finally:os.close(fd)
         def test_cycle_first_success_stops(self):
             report=self.cycle().run('d'*64)
             self.assertEqual((report['status'],report['used']),('SUCCEEDED',1))

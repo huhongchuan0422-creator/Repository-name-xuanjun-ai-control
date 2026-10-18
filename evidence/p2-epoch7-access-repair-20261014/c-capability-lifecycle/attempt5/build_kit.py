@@ -37,7 +37,8 @@ def build(commit,tree):
     manifest={'schema':1,'kind':'P2_ATTEMPT5_CANDIDATE_V1','source_commit':commit,'source_tree':tree,
               'legacy_kit_sha256':BASE_SHA,'inherited_files':inherited,
               'files':{name:sha(body) for name,body in files.items()},
-              'max_attempts':5,'production_ready':False,'install_permit':'NOT_ISSUED',
+              'max_attempts':5,'permit_mode':'ONE_PERMIT_MAX_5_ATTEMPTS','cycle_entry':'permit_cycle.PermitCycle',
+              'new_approval_per_retry':False,'production_ready':False,'install_permit':'NOT_ISSUED',
               'trusted_provider':'EXTERNAL_PINNED_ISSUER_AND_TRANSPORT_REQUIRED',
               'release':'HOLD'}
     files['attempt5-manifest.json']=canonical(manifest)

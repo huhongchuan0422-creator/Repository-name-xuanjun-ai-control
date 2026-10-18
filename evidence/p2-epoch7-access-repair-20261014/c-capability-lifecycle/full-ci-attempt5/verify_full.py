@@ -251,9 +251,9 @@ def run(output):
         invoke('delivery-e2e',[sys.executable,'-I','-B','-S',str(temp/'current/delivery/run_r14_ci.py')],ROOT,17,b'R14_E2E_TERMINAL=')
         argv=[sys.executable,'-I','-B','-S','-c',"import sys,unittest;sys.path.insert(0,"+repr(str(CANDIDATE/'attempt5/original'))+");r=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover("+repr(str(CANDIDATE/'attempt5/original'))+"));sys.exit(not r.wasSuccessful())"]
         invoke('attempt5-original',argv,ROOT,29)
-        for filename,count in (('test_receipt_provider.py',10),('test_authority_store.py',19),('test_versioned_kit.py',6),('test_issuer_service.py',13),('test_authorization.py',9),('test_approved_config.py',8)):
+        for filename,count in (('test_receipt_provider.py',10),('test_authority_store.py',21),('test_versioned_kit.py',6),('test_issuer_service.py',14),('test_authorization.py',9),('test_approved_config.py',9)):
             invoke('attempt5-'+filename,[sys.executable,'-I','-B','-S',str(CANDIDATE/'attempt5'/filename),'-v'],ROOT,count)
-        invoke('attempt5-native',[sys.executable,'-I','-B','-S',str(CANDIDATE/'attempt5/test_native_recovery.py'),str(temp/'current')],ROOT,34)
+        invoke('attempt5-native',[sys.executable,'-I','-B','-S',str(CANDIDATE/'attempt5/test_native_recovery.py'),str(temp/'current')],ROOT,35)
         builder=load(CANDIDATE/'attempt5/build_kit.py','attempt5_kit_builder')
         kit,kit_manifest=builder.build(head,tree)
         kit2,manifest2=builder.build(head,tree)
@@ -266,7 +266,7 @@ def run(output):
     need(git('rev-parse','HEAD').decode().strip()==head,'HEAD_DRIFT')
     for path,row in manifest['files'].items():file_record(git('show','HEAD:'+path),row)
     need(git('show','HEAD:'+PREFIX+'full-ci-attempt5/INPUTS.json')==(HERE/'INPUTS.json').read_bytes(),'MANIFEST_DRIFT')
-    total=sum(row['tests'] for row in results);need(total==903,'TOTAL_TESTS')
+    total=sum(row['tests'] for row in results);need(total==908,'TOTAL_TESTS')
     report={'schema':2,'state':'PASS','source_commit':head,'source_tree':tree,'python':sys.version,
         'input_manifest_sha256':manifest_sha,'files':manifest['files'],'dependencies':dependencies,
         'tests':total,'errors':0,'failures':0,'skips':0,'suites':results,'logs':logs,
@@ -286,7 +286,7 @@ def run(output):
     raw=compressed.getvalue()
     with open(str(output/'full-evidence.tar.gz'),'xb') as stream:stream.write(raw)
     with open(str(output/'full-evidence.tar.gz.sha256'),'x') as stream:stream.write(sha(raw)+'  full-evidence.tar.gz\n')
-    print('VERSIONED_FULL_CI='+json.dumps({'state':'PASS','tests':903,'errors':0,'failures':0,'skips':0,
+    print('VERSIONED_FULL_CI='+json.dumps({'state':'PASS','tests':908,'errors':0,'failures':0,'skips':0,
           'source_commit':head,'source_tree':tree,'artifact_sha256':sha(raw),'input_manifest_sha256':manifest_sha},sort_keys=True))
 
 def main():

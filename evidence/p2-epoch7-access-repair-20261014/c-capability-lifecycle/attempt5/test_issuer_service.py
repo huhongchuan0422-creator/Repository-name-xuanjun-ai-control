@@ -92,6 +92,12 @@ class ServiceTests(unittest.TestCase):
         self.change=self.cycle_host
         with self.assertRaises(Hold):self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)
         self.assertEqual(self.store.db.execute('SELECT stopped FROM cycles').fetchone()[0],1)
+    def test_source_changed_cycle_cannot_bypass_stop_via_raw_consume(self):
+        self.cycle_payload=self.cycle_registration()
+        self.change=lambda receipt:receipt['result'].update(status='UNCHANGED',binding=self.cycle_payload,source_identity={})
+        with self.assertRaises(Hold):self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)
+        with self.assertRaises(Hold):self.consume()
+        self.assertEqual(self.store.db.execute('SELECT consumed FROM grants').fetchone()[0],0)
     def test_cycle_configuration_not_in_first_scope_denied(self):
         payload=self.cycle_registration();self.consume();payload['action']={'id':'unapproved'}
         with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','apply_approved_configuration',payload)

@@ -75,6 +75,9 @@ class AuthorityStore(object):
         rows = self.db.execute('SELECT binding,body,consumed,terminal,writer,epoch,fence,expiry FROM grants WHERE id=?',
                                (grant['grant_id'],)).fetchall()
         need(len(rows)==1 and rows[0][0]==digest(grant) and self.clock()<grant['expires_utc'], 'GRANT_UNKNOWN_OR_EXPIRED')
+        try:cycle=self.db.execute('SELECT stopped FROM cycles WHERE grant_id=?',(grant['grant_id'],)).fetchone()
+        except sqlite3.OperationalError:cycle=None
+        need(cycle is None or not cycle[0],'CYCLE_SOURCE_CHANGED_NEW_PERMIT')
         return rows[0]
     def lease(self, grant, writer, ttl=30):
         need(type(writer) is str and 0<len(writer)<=128 and type(ttl) is int and 0<ttl<=60,'LEASE_REQUEST')
@@ -122,9 +125,13 @@ class AuthorityStore(object):
         need(verify(grant,attempt,outcome,proof_sha) is True,'RECOVERY_UNVERIFIED')
         def action():
             row=self._fence(grant,token)
-            prior=self.db.execute('SELECT ordinal,state FROM attempts WHERE id=? AND grant_id=?',
+            prior=self.db.execute('SELECT ordinal,state,proof FROM attempts WHERE id=? AND grant_id=?',
                                  (attempt,grant['grant_id'])).fetchone()
-            need(prior is not None and prior[0]==row[2] and prior[1]=='UNKNOWN','RECOVERY_STATE')
+            need(prior is not None and prior[0]==row[2],'RECOVERY_STATE')
+            if prior[1]!='UNKNOWN':
+                need(prior[1]==outcome and prior[2]==proof_sha,'RECOVERY_CONFLICT')
+                return  # Exact lost-ack replay; never changes quota or proof.
+            need(prior[1]=='UNKNOWN','RECOVERY_STATE')
             self.db.execute('UPDATE attempts SET state=?,proof=? WHERE id=?',(outcome,proof_sha,attempt))
             if outcome=='SUCCESS':self.db.execute('UPDATE grants SET terminal=1 WHERE id=?',(grant['grant_id'],))
             self.audit(grant['grant_id'],'RECONCILE',{'attempt':attempt,'outcome':outcome,'proof':proof_sha})

@@ -45,9 +45,10 @@ def imports(root, manifest_sha256):
         need(sha(raw)==manifest_sha256,'MANIFEST_SHA')
         manifest=entry.decode(raw)
         need(set(manifest)=={'schema','kind','source_commit','source_tree','legacy_kit_sha256',
-             'inherited_files','files','max_attempts','production_ready','install_permit','trusted_provider','release'} and
+             'inherited_files','files','max_attempts','permit_mode','cycle_entry','new_approval_per_retry','production_ready','install_permit','trusted_provider','release'} and
              manifest['schema']==1 and manifest['kind']=='P2_ATTEMPT5_CANDIDATE_V1' and
-             manifest['max_attempts']==5 and manifest['production_ready'] is False and
+             manifest['max_attempts']==5 and manifest['permit_mode']=='ONE_PERMIT_MAX_5_ATTEMPTS' and
+             manifest['cycle_entry']=='permit_cycle.PermitCycle' and manifest['new_approval_per_retry'] is False and manifest['production_ready'] is False and
              manifest['install_permit']=='NOT_ISSUED' and manifest['release']=='HOLD', 'VERSION')
         for key in ('source_commit','source_tree'):
             need(type(manifest[key]) is str and re.fullmatch('[0-9a-f]{40}',manifest[key]),'SOURCE_IDENTITY')

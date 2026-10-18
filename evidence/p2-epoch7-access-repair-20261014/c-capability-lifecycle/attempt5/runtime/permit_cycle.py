@@ -37,6 +37,8 @@ class PermitCycle(object):
         need(callable(native_factory),'NATIVE_FACTORY')
         self.factory=native_factory;self.policy=policy(approved_policy)
         self.native=native_factory()
+        from native_recovery import NativeRecovery
+        need(isinstance(self.native,NativeRecovery),'NATIVE_RECOVERY_REQUIRED')
         self.grant=dict(self.native.ledger.grant)
         self.binding=digest(self.grant)
         need(getattr(self.native,'cycle_policy',None)==self.policy,'APPROVED_CYCLE_POLICY_REQUIRED')
@@ -44,6 +46,8 @@ class PermitCycle(object):
 
     def fresh(self):
         native=self.factory()
+        from native_recovery import NativeRecovery
+        need(isinstance(native,NativeRecovery),'NATIVE_RECOVERY_REQUIRED')
         need(digest(native.ledger.grant)==self.binding and native.cycle_policy==self.policy and
              native.approval_review_id==self.review,'PERMIT_CHANGED')
         self.native=native

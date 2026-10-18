@@ -14,8 +14,8 @@ from receipt_provider import need, canonical, digest
 def sha(value):return hashlib.sha256(value).hexdigest()
 
 class ApprovedConfiguration(object):
-    def __init__(self, directory, actions, fence):
-        need(os.path.isabs(directory) and os.path.normpath(directory)==directory and callable(fence),'CONFIG_ROOT')
+    def __init__(self, directory, actions, fence, checkpoint):
+        need(os.path.isabs(directory) and os.path.normpath(directory)==directory and callable(fence) and callable(checkpoint),'CONFIG_ROOT')
         current='/'
         for part in directory.split('/')[1:]:
             current=os.path.join(current,part);info=os.lstat(current)
@@ -23,7 +23,7 @@ class ApprovedConfiguration(object):
         info=os.lstat(directory)
         need(info.st_uid==os.geteuid() and stat.S_IMODE(info.st_mode)==0o700,'CONFIG_OWNER')
         self.fd=os.open(directory,os.O_DIRECTORY|os.O_RDONLY|os.O_NOFOLLOW)
-        self.actions=dict(actions);self.fence=fence
+        self.actions=dict(actions);self.fence=fence;self.checkpoint=checkpoint
     def close(self):os.close(self.fd)
     def read(self,name):
         fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=self.fd)
@@ -54,6 +54,7 @@ class ApprovedConfiguration(object):
         tag=digest(action)
         backup='backup-'+tag+'.json';intent='intent-'+tag+'.json';temp='pending-'+tag+'.json'
         self.fence()
+        need(self.checkpoint()==action['checkpoint_sha256'],'CONFIG_CHECKPOINT_UNKNOWN')
         before,identity=self.read(name)
         if sha(before)==action['after_sha256']:
             original,_=self.read(backup);record,_=self.read(intent)

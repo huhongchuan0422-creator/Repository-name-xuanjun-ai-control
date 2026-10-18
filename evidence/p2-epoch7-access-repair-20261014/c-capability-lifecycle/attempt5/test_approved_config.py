@@ -20,7 +20,7 @@ class ConfigTests(unittest.TestCase):
         def fence():
             self.count+=1
             if self.fail and self.count==2:raise Hold('LEASE_LOST')
-        self.config=ApprovedConfiguration(self.tmp.name,{'limit':('settings.json',self.new)},fence)
+        self.config=ApprovedConfiguration(self.tmp.name,{'limit':('settings.json',self.new)},fence,lambda:'a'*64)
     def tearDown(self):self.config.close();self.tmp.cleanup()
     def test_approved_configuration_real_cas_and_backup(self):
         result=self.config.apply(self.action)
@@ -47,6 +47,10 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):self.config.apply(self.action)
         self.assertEqual(self.path.read_bytes(),self.old)
         self.assertEqual(len(list(Path(self.tmp.name).glob('pending-*.json'))),1)
+    def test_unproven_checkpoint_never_writes(self):
+        self.config.checkpoint=lambda:'f'*64
+        with self.assertRaises(Hold):self.config.apply(self.action)
+        self.assertEqual(self.path.read_bytes(),self.old)
     def test_concurrent_value_refused(self):
         self.path.write_bytes(b'{"limit":3}')
         with self.assertRaises(Hold):self.config.apply(self.action)

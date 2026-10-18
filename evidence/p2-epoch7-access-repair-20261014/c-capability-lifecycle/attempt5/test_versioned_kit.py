@@ -28,8 +28,11 @@ class KitTests(unittest.TestCase):
     def tearDown(self):self.temp.cleanup()
     def test_actual_native_module_import_closure(self):
         with entry.imports(str(self.root),self.pin) as report:
-            import native_recovery,attempt_ledger,authority_store,receipt_provider,issuer_service
+            import native_recovery,attempt_ledger,authority_store,receipt_provider,issuer_service,permit_cycle,approved_config
             self.assertTrue(native_recovery.NativeRecovery)
+            self.assertTrue(permit_cycle.PermitCycle)
+            self.assertTrue(approved_config.ApprovedConfiguration)
+            self.assertFalse(self.manifest['new_approval_per_retry'])
             self.assertEqual(attempt_ledger.MAX_ATTEMPTS,5)
             self.assertFalse(report['production_authorized'])
     def test_manifest_pin_refuses(self):
