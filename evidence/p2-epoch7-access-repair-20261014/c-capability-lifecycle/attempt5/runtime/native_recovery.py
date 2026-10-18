@@ -113,7 +113,7 @@ class NativeRecovery(object):
         self.journal.save(state)
         return state
 
-    def _adopt(self, attempt):
+    def _adopt(self, attempt, record_checkpoints=True):
         """Authenticate exact native records before setting in-memory CAS state.
 
         No old claim is deleted, rewritten as fresh, or re-consumed. An external
@@ -151,7 +151,7 @@ class NativeRecovery(object):
                                  {'phase': phase, 'checkpoint_sha256': fingerprint})
             need(readback.get('status') == 'VERIFIED' and
                  readback.get('checkpoint_sha256') == fingerprint, 'EFFECT_UNVERIFIED')
-            if phase not in pins:
+            if phase not in pins and record_checkpoints:
                 self.ledger.checkpoint(attempt, phase, fingerprint)
         native_state.restore(driver, state.get('component_checkpoint'), done)
         self.journal = s.OuterJournal(driver.journal_io, driver.context, driver.gate.journal_binding())
@@ -186,12 +186,14 @@ class NativeRecovery(object):
         """
         driver, s = self.driver, self.s
         with driver.controls.install_lock():
-            self.fence(attempt, 'RECONCILE')
-            self._guard_native_effects(attempt)
             record = driver.journal_io.read_journal(s.OUTER_NAME)
             state = s.retained.BoundJournal._validate_record(record)['state']
             done = state.get('completed')
             need(type(done) is list and done == list(s.PHASES[:len(done)]), 'NATIVE_PHASE_ORDER')
+            if state.get('stage') in ('ADMITTED',)+tuple(p+'_COMPLETE' for p in s.PHASES):
+                return self._recover_completed(attempt,record,state)
+            self.fence(attempt,'RECONCILE')
+            self._guard_native_effects(attempt)
             need(len(done) < 16 and state.get('stage') == s.PHASES[len(done)] + '_INTENT', 'RECOVERY_INTENT')
             phase = s.PHASES[len(done)]
             binding = {'outer_sha256': s.sha(record['data']), 'phase': phase,
@@ -226,6 +228,63 @@ class NativeRecovery(object):
             need(terminal.get('status') == 'RECONCILED' and
                  terminal.get('proof') == proof['proof'], 'GLOBAL_RECONCILIATION_UNKNOWN')
             return self.ledger.reconcile(attempt, proof['proof'], lambda value: value == terminal['proof'])
+
+    def _record_recovered_checkpoints(self,attempt,state,proof,outer_sha):
+        # Add only independently authenticated receipts. This does not clear
+        # PARTIAL_WRITE, alter quota, or synthesize successful phase execution.
+        # Reuse the original Ledger's atomic locked/fsynced persistence helper;
+        # its frozen source and historical single-use semantics stay unchanged.
+        done=state['completed'];pins=[]
+        for phase in done:
+            observation=self.s.check_observation(state['phase_evidence'][phase],self.driver.context,phase)
+            pins.append({'name':phase,'sha256':digest(observation)})
+        def action(local):
+            need(local['attempts'] and local['attempts'][-1]['id']==attempt and
+                 local['attempts'][-1]['state'] in ('INTENT_RECORDED','UNKNOWN','PARTIAL_WRITE'),'RECOVERY_LEDGER_STATE')
+            existing=local['completed']
+            need(existing==pins[:len(existing)],'RECOVERY_CHECKPOINT_CONFLICT')
+            if existing==pins:return None,False
+            local['completed']=pins
+            local['attempts'][-1]['events'].append({'kind':'native_checkpoint_receipts_recovered',
+                'at':int(self.ledger.clock()),'outer_sha256':outer_sha,'proof_sha256':digest(proof)})
+            return None,True
+        self.ledger._fresh();self.ledger._guard(action)
+
+    def _recover_completed(self,attempt,record,state):
+        """Converge CAS/service/local commits without executing a phase.
+
+        SUCCESS readback never acquires an execution lease. All other safe
+        checkpoint recovery authenticates the original native binding and each
+        completed effect under a fresh canonical fence before local mutation.
+        """
+        outer_sha=self.s.sha(record['data'])
+        readback=self.proof(attempt,'read_committed_outcome',{'outer_sha256':outer_sha})
+        need(readback.get('binding')=={'outer_sha256':outer_sha},'OUTCOME_READ_BINDING')
+        committed=readback.get('committed')
+        if committed is not None and committed.get('outcome')=='SUCCESS':
+            need(readback.get('status')=='COMMITTED_OUTCOME' and len(state['completed'])==16 and
+                 committed.get('operation')=='verify_terminal' and
+                 committed.get('payload')=={'outer_sha256':outer_sha},'TERMINAL_NATIVE_MISMATCH')
+            proof=committed['result']['proof']
+            need(proof.get('outcome')=='SUCCESS','TERMINAL_PROOF')
+            self._record_recovered_checkpoints(attempt,state,proof,outer_sha)
+            return self.ledger.reconcile(attempt,proof,lambda value:value==proof)
+        self.fence(attempt,'RECOVER_COMPLETE')
+        adopted=self._adopt(attempt,record_checkpoints=False)
+        need(self.s.sha(self.journal.last['data'])==outer_sha and adopted==state,'COMPLETED_NATIVE_DRIFT')
+        if committed is not None:
+            need(readback.get('status')=='COMMITTED_OUTCOME' and committed.get('outcome')=='SAFE_CHECKPOINT' and
+                 committed.get('payload',{}).get('outer_sha256')==outer_sha,'COMMITTED_CHECKPOINT_CONFLICT')
+            proof=committed['result']['proof']
+        else:
+            need(readback.get('status')=='UNRESOLVED','COMMITTED_OUTCOME_UNKNOWN')
+            operation='verify_terminal' if len(state['completed'])==16 else 'reconcile_completed_checkpoint'
+            response=self.proof(attempt,operation,{'outer_sha256':outer_sha})
+            proof=response.get('proof')
+            need(type(proof) is dict and proof.get('outcome')==('SUCCESS' if len(state['completed'])==16 else 'SAFE_CHECKPOINT') and
+                 response.get('status')==('SUCCESS' if len(state['completed'])==16 else 'RECONCILED'),'COMPLETED_READBACK_UNPROVEN')
+        self._record_recovered_checkpoints(attempt,state,proof,outer_sha)
+        return self.ledger.reconcile(attempt,proof,lambda value:value==proof)
 
     def run(self, attempt):
         driver, s = self.driver, self.s

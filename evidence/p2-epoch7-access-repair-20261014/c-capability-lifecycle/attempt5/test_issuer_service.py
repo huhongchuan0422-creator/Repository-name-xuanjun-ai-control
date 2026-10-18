@@ -107,4 +107,39 @@ class ServiceTests(unittest.TestCase):
         with self.assertRaises(Hold):self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)
         self.change=self.cycle_host
         self.assertEqual(self.provider.request(self.g,'CANDIDATE','verify_cycle_binding',self.cycle_payload)['status'],'UNCHANGED')
+    def reconciliation_receipt(self,receipt):
+        operation=receipt['operation']
+        outcome='SUCCESS' if operation=='verify_terminal' else 'NO_WRITE'
+        receipt['result'].update(status='SUCCESS' if outcome=='SUCCESS' else 'RECONCILED',
+            proof={'outcome':outcome,'evidence_sha256':'a'*64,'checkpoint_sha256':'b'*64,'log_sha256':'c'*64})
+    def test_reconcile_no_write_lost_ack_retries_same_transaction(self):
+        self.consume();self.change=self.reconciliation_receipt
+        one=self.provider.request(self.g,'attempt1','reconcile_unadmitted',{})
+        two=self.provider.request(self.g,'attempt1','reconcile_unadmitted',{})
+        self.assertEqual(one,two)
+        self.assertEqual(self.store.db.execute('SELECT consumed FROM grants').fetchone()[0],1)
+    def test_terminal_readback_fresh_nonce_no_new_execution_lease(self):
+        self.consume();self.change=self.reconciliation_receipt
+        self.provider.request(self.g,'attempt1','verify_terminal',{'outer_sha256':'d'*64})
+        leases=self.store.db.execute("SELECT count(*) FROM audit WHERE event='LEASE'").fetchone()[0]
+        for unused in range(2):
+            value=self.provider.request(self.g,'attempt1','read_committed_outcome',{'outer_sha256':'d'*64})
+            self.assertEqual(value['committed']['outcome'],'SUCCESS')
+        self.assertEqual(self.store.db.execute("SELECT count(*) FROM audit WHERE event='LEASE'").fetchone()[0],leases)
+        import json
+        bodies=[json.loads(row[0])['signed_body'] for row in self.store.db.execute("SELECT body FROM audit WHERE event='SIGNED_RECEIPT' ORDER BY id DESC LIMIT 2")]
+        self.assertNotEqual(bodies[0]['request_sha256'],bodies[1]['request_sha256'])
+        with self.assertRaises(Hold):self.consume()
+    def test_committed_outcome_unclaimed_or_wrong_identity_refused(self):
+        self.consume()
+        with self.assertRaises(Hold):self.provider.request(self.g,'other','read_committed_outcome',{})
+        self.principal['actor_id']='OTHER'
+        with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','read_committed_outcome',{})
+    def test_conflicting_committed_proof_replay_holds(self):
+        self.consume();self.change=self.reconciliation_receipt
+        self.provider.request(self.g,'attempt1','reconcile_unadmitted',{})
+        def changed(receipt):
+            self.reconciliation_receipt(receipt);receipt['result']['proof']['evidence_sha256']='f'*64
+        self.change=changed
+        with self.assertRaises(Hold):self.provider.request(self.g,'attempt1','reconcile_unadmitted',{})
 if __name__=='__main__':unittest.main()

@@ -120,7 +120,7 @@ class AuthorityStore(object):
             self.db.execute('UPDATE grants SET consumed=? WHERE id=?',(ordinal,grant['grant_id']))
             self.audit(grant['grant_id'],'CONSUME',{'attempt':attempt,'ordinal':ordinal});return ordinal
         return self.transaction(action)
-    def reconcile(self, grant, attempt, outcome, proof_sha, token, verify):
+    def reconcile(self, grant, attempt, outcome, proof_sha, token, verify, committed_receipt=None):
         need(outcome in ('NO_WRITE','SAFE_CHECKPOINT','SUCCESS') and callable(verify), 'RECOVERY_PROOF')
         need(verify(grant,attempt,outcome,proof_sha) is True,'RECOVERY_UNVERIFIED')
         def action():
@@ -132,6 +132,9 @@ class AuthorityStore(object):
                 need(prior[1]==outcome and prior[2]==proof_sha,'RECOVERY_CONFLICT')
                 return  # Exact lost-ack replay; never changes quota or proof.
             need(prior[1]=='UNKNOWN','RECOVERY_STATE')
+            if committed_receipt is not None:
+                self.db.execute('CREATE TABLE IF NOT EXISTS committed_receipts(attempt_id TEXT PRIMARY KEY,grant_id TEXT NOT NULL,body TEXT NOT NULL)')
+                self.db.execute('INSERT INTO committed_receipts VALUES(?,?,?)',(attempt,grant['grant_id'],canonical(committed_receipt).decode()))
             self.db.execute('UPDATE attempts SET state=?,proof=? WHERE id=?',(outcome,proof_sha,attempt))
             if outcome=='SUCCESS':self.db.execute('UPDATE grants SET terminal=1 WHERE id=?',(grant['grant_id'],))
             self.audit(grant['grant_id'],'RECONCILE',{'attempt':attempt,'outcome':outcome,'proof':proof_sha})
@@ -170,3 +173,16 @@ class AuthorityStore(object):
             self.db.execute('UPDATE cycles SET stopped=1 WHERE grant_id=?',(grant['grant_id'],))
             self.audit(grant['grant_id'],'CYCLE_STOP',{'reason':reason})
         return self.transaction(action)
+
+    def committed(self,grant,attempt):
+        self._grant(grant)
+        row=self.db.execute('SELECT state,proof FROM attempts WHERE id=? AND grant_id=?',(attempt,grant['grant_id'])).fetchone()
+        need(row is not None,'UNCLAIMED_ATTEMPT')
+        if row[0]=='UNKNOWN':return None
+        table=self.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='committed_receipts'").fetchone()
+        need(table is not None,'COMMITTED_RECEIPT_MISSING')
+        receipt=self.db.execute('SELECT body FROM committed_receipts WHERE attempt_id=? AND grant_id=?',(attempt,grant['grant_id'])).fetchone()
+        need(receipt is not None,'COMMITTED_RECEIPT_MISSING')
+        value=json.loads(receipt[0])
+        need(value['outcome']==row[0] and digest(value['result']['proof'])==row[1],'COMMITTED_RECEIPT_CONFLICT')
+        return value

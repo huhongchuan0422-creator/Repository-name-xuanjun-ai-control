@@ -178,3 +178,15 @@ external admission dependencies. INSTALL_PERMIT=NOT_ISSUED; P2_RELEASE=HOLD.
 首次批准正文现包含完整permit_cycle策略；AuthorityStore由受信管理员在独立认证后register_cycle，服务按策略SHA、review ID、批准正文SHA核验每个周期请求。IssuerService对代码身份变化持久停止原周期，普通UNKNOWN保持可对账HOLD。`approved_config.py`仅执行管理员预映射的、首次许可逐项批准的专用JSON配置CAS，校验before/after/payload/checkpoint SHA，O_EXCL保留原始备份和意图、fsync、Fence、写后校验；不接收任意路径/命令，不允许源代码调整。部分输出保留，需先可信对账，不能盲重试。
 
 生产集成需原受信通道提供真实Writer身份、Lease/Fence和事务/备份/检查点回执；测试中的TEST_ONLY host facts和签名钥匙仅为隔离测试，绝不作为英国生产验收。未修改英国冻结文件，未运行旧Prepare、安装、激活或回滚。原R1–R4、未变16阶段及257文件旧Kit继承原结果。INSTALL_PERMIT=NOT_ISSUED；P2_RELEASE=HOLD。
+
+
+### Dots恢复缺陷闭环（PR58 #6247637376）
+
+c527原版本已正确复用同一人工Grant；逐次签名服务回执不是新的人工许可。本次修改补齐自动周期及首次批准配置范围，并处理独审A1/A2/B1/B2恢复窗口：
+
+- 原生ADMITTED或COMPLETE已落盘但本地Ledger未收敛时，认证原生绑定、逐阶段可信读回，恢复持久组件检查点，原子补回已验证checkpoint回执，最后以独立证明收敛原Attempt；不清空PARTIAL_WRITE、不重建Claim、不SKIP、不重跑成功阶段。
+- AuthorityStore在同一个SQLite提交中保存完整语义结果/证明/原始host回执与事务结果，再执行签名和签名审计；相同证明可幂等返回，冲突证明拒绝。`read_committed_outcome`仅允许同一已认证主机/身份/Grant读取已提交结果，重新签署当前request digest与新nonce。
+- SUCCESS后取回终态不获取或续租执行Lease，不消费额度，不执行任何阶段。原生16阶段全部完成后的局部Ledger/checkpoint异常，可以同Attempt认证收敛SUCCESS；普通UNKNOWN且未得到可信证明仍HOLD。
+- 隔离故障注入覆盖native COMPLETE提交后中断、本地checkpoint写失败、服务结果提交后签名失败、签名审计失败、丢失响应、服务重启、新nonce取回和冲突证明拒绝；完整测试包含原875项。
+
+这些均是离线实现和Hosted验证；真实英国Writer、共享数据库、Lease/Fence、签名发行方、可信通道以及Run/Job/InvokeId、实际副作用和备份checkpoint仍需原受信只读取证。未实施生产操作，未签发安装许可。

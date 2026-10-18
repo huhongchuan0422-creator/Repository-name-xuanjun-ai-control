@@ -94,6 +94,12 @@ class PermitCycle(object):
 
     def recover(self,attempt):
         native=self.native
+        if native.driver.journal_io.journal_exists(native.s.OUTER_NAME):
+            record=native.driver.journal_io.read_journal(native.s.OUTER_NAME)
+            state=native.s.retained.BoundJournal._validate_record(record)['state']
+            if state.get('completed')==list(native.s.PHASES) and state.get('stage')==native.s.PHASES[-1]+'_COMPLETE':
+                native.reconcile(attempt)
+                return True
         result=self.checked(attempt,'diagnose_attempt',{'ledger_sha256':digest(native.ledger.snapshot())})
         need(result.get('source_identity')=={k:self.grant[k] for k in ('source_commit','source_tree','kit_sha256','manifest_sha256')},'SOURCE_CHANGE_NEW_PERMIT')
         need(result.get('status')=='DIAGNOSED' and result.get('transaction_consistent') is True and

@@ -51,6 +51,8 @@ def native_suite(env):
             elif operation in ('verify_phase_commit','verify_completed_phase'):result.update(status='VERIFIED',checkpoint_sha256=payload['checkpoint_sha256'])
             elif operation=='reconcile_native_intent':
                 result.update(status='COMMITTED',binding=payload,observation=s.observation(self.rig.driver.context,payload['phase'],env['h'](payload['phase'])),proof={'outcome':'SAFE_CHECKPOINT','evidence_sha256':'a'*64,'checkpoint_sha256':'b'*64,'log_sha256':'c'*64})
+            elif operation=='read_committed_outcome':result.update(status='UNRESOLVED',binding=payload,committed=None)
+            elif operation=='reconcile_completed_checkpoint':result.update(status='RECONCILED',proof={'outcome':'SAFE_CHECKPOINT','evidence_sha256':'a'*64,'checkpoint_sha256':'b'*64,'log_sha256':'c'*64})
             elif operation=='reconcile_unadmitted':result.update(status='RECONCILED',binding=payload,proof={'outcome':'NO_WRITE','evidence_sha256':'a'*64,'checkpoint_sha256':'b'*64,'log_sha256':'c'*64})
             elif operation=='commit_safe_reconciliation':result.update(status='RECONCILED',proof=payload['proof'])
             elif operation=='verify_terminal':result.update(status='SUCCESS',proof={'outcome':'SUCCESS','evidence_sha256':'a'*64,'checkpoint_sha256':'b'*64,'log_sha256':'c'*64})
@@ -286,6 +288,136 @@ def native_suite(env):
             self.change=change
             with self.assertRaises(Hold):self.native.run(aid)
             self.assertFalse(any(x.startswith('phase:') for x in self.rig.events))
+        def connect_real_service(self):
+            from authority_store import AuthorityStore
+            from issuer_service import IssuerService
+            store=AuthorityStore(str(Path(self.folder.name)/'recovery-service.db'),initialize=True,clock=lambda:100)
+            store.register(self.ledger.grant)
+            original=self.transport
+            def host(g,aid,operation,payload):
+                request={'schema':1,'grant_sha256':digest(g),'attempt_id':aid,'operation':operation,'nonce':'0'*32,'payload':payload}
+                result=original(request)['body']['result']
+                return {'grant_sha256':digest(g),'attempt_id':aid,'operation':operation,'payload_sha256':digest(payload),
+                        'run_id':'TEST_RUN','job_id':'TEST_JOB','invoke_id':'TEST_INVOKE','backup_sha256':'a'*64,
+                        'checkpoint_sha256':'b'*64,'log_sha256':'c'*64,'result':result}
+            signer=lambda raw:subprocess.check_output(['openssl','dgst','-sha256','-sign',self.key],input=raw)
+            service=IssuerService(store,host,signer,'TEST_ONLY')
+            principal={'actor_id':self.ledger.grant['actor_id'],'host':'TEST_ONLY','writer_id':'fixture-recovery-writer'}
+            self.provider=ReceiptProvider(lambda request:service.handle(request,principal),self.modulus,65537,'TEST_ONLY',clock=lambda:101)
+            self.restart_native()
+            return store,service
+        def test_complete_cas_then_local_checkpoint_failure_converges(self):
+            aid=self.begin()
+            self.ledger.checkpoint=lambda *args:(_ for _ in ()).throw(IOError('fixture checkpoint disk failure'))
+            with self.assertRaises(IOError):self.native.run(aid)
+            self.restart_native();self.assertEqual(self.native.reconcile(aid),'SAFE_RECONCILED')
+            self.restart_native();self.native.run(self.begin())
+            self.assertEqual(self.rig.events.count('phase:'+s.PHASES[0]),1)
+        def test_admitted_checkpoint_can_reconcile_without_reclaim(self):
+            aid=self.begin()
+            def change(request,result):
+                if request['operation']=='verify_fence' and request['payload']['step']=='BEFORE_'+s.PHASES[0]:result['status']='LOST'
+            self.change=change
+            with self.assertRaises(Hold):self.native.run(aid)
+            self.change=lambda request,result:None
+            self.restart_native();self.assertEqual(self.native.reconcile(aid),'SAFE_RECONCILED')
+            self.restart_native();self.native.run(self.begin())
+            self.assertEqual(len([e for e in self.rig.events if e.startswith('phase:')]),16)
+        def test_complete_checkpoint_unknown_host_still_holds(self):
+            aid=self.begin();self.ledger.checkpoint=lambda *args:(_ for _ in ()).throw(IOError('checkpoint'))
+            with self.assertRaises(IOError):self.native.run(aid)
+            self.restart_native()
+            self.change=lambda request,result:result.update(status='UNKNOWN') if request['operation']=='verify_completed_phase' else None
+            with self.assertRaises(Hold):self.native.reconcile(aid)
+            self.assertEqual(self.ledger.snapshot()['attempts'][-1]['state'],'PARTIAL_WRITE')
+        def test_safe_reconcile_commit_then_lost_response_recovers(self):
+            store,service=self.connect_real_service()
+            try:
+                aid=self.fail_after_first_effect();self.restart_native()
+                signer=service.signer
+                def fail(raw):
+                    if json.loads(raw)['result'].get('status')=='RECONCILED':raise IOError('fixture signer failure after commit')
+                    return signer(raw)
+                service.signer=fail
+                with self.assertRaises(Hold):self.native.reconcile(aid)
+                self.assertEqual(store.db.execute('SELECT state FROM attempts').fetchone()[0],'SAFE_CHECKPOINT')
+                service.signer=signer;self.restart_native()
+                self.assertEqual(self.native.reconcile(aid),'SAFE_RECONCILED')
+                self.restart_native();self.native.run(self.begin())
+                self.assertEqual(self.rig.events.count('phase:'+s.PHASES[0]),1)
+            finally:store.close()
+        def test_terminal_success_response_loss_recovers_read_only(self):
+            store,service=self.connect_real_service()
+            try:
+                signer=service.signer
+                def fail(raw):
+                    if json.loads(raw)['result'].get('status')=='SUCCESS':raise IOError('fixture terminal signer failure')
+                    return signer(raw)
+                service.signer=fail;aid=self.begin()
+                with self.assertRaises(Hold):self.native.run(aid)
+                self.assertEqual(store.db.execute('SELECT consumed,terminal FROM grants').fetchone(),(1,1))
+                service.signer=signer;self.restart_native()
+                leases=store.db.execute("SELECT count(*) FROM audit WHERE event='LEASE'").fetchone()[0]
+                self.assertEqual(self.native.reconcile(aid),'SUCCEEDED')
+                self.assertEqual(store.db.execute("SELECT count(*) FROM audit WHERE event='LEASE'").fetchone()[0],leases)
+                self.assertEqual(len([e for e in self.rig.events if e.startswith('phase:')]),16)
+            finally:store.close()
+        def test_terminal_audit_failure_survives_service_restart(self):
+            from authority_store import AuthorityStore
+            store,service=self.connect_real_service()
+            try:
+                audit=store.audit
+                def fail(gid,event,body):
+                    if event=='SIGNED_RECEIPT' and body['operation']=='verify_terminal':raise IOError('fixture audit disk failure')
+                    return audit(gid,event,body)
+                store.audit=fail;aid=self.begin()
+                with self.assertRaises(Hold):self.native.run(aid)
+                store.close()
+                store=AuthorityStore(str(Path(self.folder.name)/'recovery-service.db'),clock=lambda:100)
+                service.store=store;self.restart_native()
+                self.assertEqual(self.native.reconcile(aid),'SUCCEEDED')
+                self.assertEqual(store.db.execute('SELECT consumed,terminal FROM grants').fetchone(),(1,1))
+            finally:store.close()
+        def test_all_sixteen_complete_before_local_checkpoint_failure_recovers_success(self):
+            store,service=self.connect_real_service()
+            try:
+                aid=self.begin();checkpoint=self.ledger.checkpoint
+                def fail(aid,phase,pin):
+                    if phase==s.PHASES[-1]:raise IOError('fixture final checkpoint failure')
+                    return checkpoint(aid,phase,pin)
+                self.ledger.checkpoint=fail
+                with self.assertRaises(IOError):self.native.run(aid)
+                self.restart_native();self.assertEqual(self.native.reconcile(aid),'SUCCEEDED')
+                self.assertEqual(len(self.ledger.snapshot()['completed']),16)
+                self.assertEqual(store.db.execute('SELECT consumed,terminal FROM grants').fetchone(),(1,1))
+                self.assertEqual(len([e for e in self.rig.events if e.startswith('phase:')]),16)
+            finally:store.close()
+        def test_native_complete_cas_post_commit_interrupt_recovery(self):
+            save=s.OuterJournal.save
+            def fail(journal,state):
+                result=save(journal,state)
+                if state.get('stage')==s.PHASES[0]+'_COMPLETE':raise IOError('fixture crash after native CAS')
+                return result
+            aid=self.begin();s.OuterJournal.save=fail
+            try:
+                with self.assertRaises(IOError):self.native.run(aid)
+            finally:s.OuterJournal.save=save
+            self.restart_native();self.assertEqual(self.native.reconcile(aid),'SAFE_RECONCILED')
+            self.restart_native();self.native.run(self.begin())
+            self.assertEqual(self.rig.events.count('phase:'+s.PHASES[0]),1)
+        def test_cycle_terminal_lost_response_converges_without_new_attempt(self):
+            store,service=self.connect_real_service()
+            try:
+                signer=service.signer
+                service.signer=lambda raw:(_ for _ in ()).throw(IOError('fixture lost terminal')) if json.loads(raw)['result'].get('status')=='SUCCESS' else signer(raw)
+                aid=self.begin()
+                with self.assertRaises(Hold):self.native.run(aid)
+                service.signer=signer
+                report=self.cycle().run('d'*64)
+                self.assertEqual((report['status'],report['used']),('SUCCEEDED',1))
+                self.assertEqual(len(report['ledger']['completed']),16)
+                self.assertEqual(len([e for e in self.rig.events if e.startswith('phase:')]),16)
+            finally:store.close()
         def cycle(self):
             def factory():
                 self.restart_native()

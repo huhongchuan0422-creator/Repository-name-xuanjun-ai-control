@@ -13,7 +13,7 @@ from authority_store import AuthorityStore
 HOST_OPERATIONS=frozenset(('authorize_first_admission','authenticate_native_recovery',
     'verify_completed_phase','verify_phase_commit','reconcile_native_intent',
     'commit_safe_reconciliation','reconcile_unadmitted','verify_terminal',
-    'verify_cycle_binding','diagnose_attempt','apply_approved_configuration'))
+    'reconcile_completed_checkpoint','verify_cycle_binding','diagnose_attempt','apply_approved_configuration'))
 
 class IssuerService(object):
     def __init__(self, store, host_readback, signer, issuer):
@@ -49,10 +49,14 @@ class IssuerService(object):
         attempt,operation,payload=request['attempt_id'],request['operation'],request['payload']
         # Revalidate/renew the same canonical writer lease for every request.
         # Actual phase effects still use the original independent install lock.
-        token=self.store.lease(grant,principal['writer_id'])
+        token=(None if operation=='read_committed_outcome' else self.store.lease(grant,principal['writer_id']))
         receipt=None
         result={'grant_id':grant['grant_id'],'attempt_id':attempt}
-        if operation=='verify_fence':
+        if operation=='read_committed_outcome':
+            committed=self.store.committed(grant,attempt)
+            result.update(status='UNRESOLVED' if committed is None else 'COMMITTED_OUTCOME',
+                          binding=payload,committed=committed)
+        elif operation=='verify_fence':
             result.update(status='HELD',exclusive=True,writer=token['writer'],
                           lease_epoch=token['lease_epoch'],fence=token['fence'])
         elif operation=='consume_attempt':
@@ -94,13 +98,14 @@ class IssuerService(object):
                     if observed.get('source_identity')!=identity:
                         self.store.stop_cycle(grant,'SOURCE_CHANGE_NEW_PERMIT',token)
                     need(observed.get('source_identity')==identity,'SOURCE_CHANGE_NEW_PERMIT')
-            if operation in ('commit_safe_reconciliation','reconcile_unadmitted','verify_terminal'):
+            if operation in ('commit_safe_reconciliation','reconcile_completed_checkpoint','reconcile_unadmitted','verify_terminal'):
                 proof=observed.get('proof')
                 need(type(proof) is dict and proof.get('outcome')==
                      ('SUCCESS' if operation=='verify_terminal' else
                       'NO_WRITE' if operation=='reconcile_unadmitted' else 'SAFE_CHECKPOINT'), 'TERMINAL_PROOF')
                 self.store.reconcile(grant,attempt,proof['outcome'],digest(proof),token,
-                                     lambda *unused:True)
+                                     lambda *unused:True,committed_receipt={'operation':operation,'payload':payload,
+                                         'outcome':proof['outcome'],'result':observed,'host_receipt':receipt})
             result.update(observed)
         need(result.get('grant_id')==grant['grant_id'] and result.get('attempt_id')==attempt,'RESULT_SCOPE')
         now=int(self.store.clock())
