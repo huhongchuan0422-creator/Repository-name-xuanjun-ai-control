@@ -1750,5 +1750,271 @@
     "production_services_installed": false,
     "production_cutover": false,
     "remaining_major_nodes": 6
+  },
+  "source_scheduler_inventory_20261018": {
+    "schema": 1,
+    "status": "SCHEDULER_METADATA_ACCEPTED_SOURCE_RECEIPT_STILL_UNKNOWN_NEW_COMPACT_FIX_NOT_DISPATCHED",
+    "scheduler": {
+      "commit": "c9a022848c4cb53e5bfa6cef1017c181476cd857",
+      "tree": "13113dc792a43e1fc28f3d038135e5f5c580502f",
+      "run": 39130337276,
+      "job": 117684049239,
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "enforced_fence": "UNKNOWN",
+        "hosts": [
+          {
+            "authoritative_writer": "UNKNOWN",
+            "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+            "enforced_fence": "UNKNOWN",
+            "host": "tokyo",
+            "host_commands": 1,
+            "instance_id": "68985c531add4e90a131aef703a389e6",
+            "invocation_status": "Success",
+            "invoke_id": "t-jpn70exlhv86xa8",
+            "nonterminal_invocations": [],
+            "receipt": {
+              "authoritative_writer": "UNKNOWN",
+              "business_requests": 0,
+              "business_source_imports": 0,
+              "canonical_data_assigned": false,
+              "database_opened": false,
+              "enforced_fence": "UNKNOWN",
+              "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+              "limitations": [
+                "IMMEDIATE_REGULAR_FRAGMENTS_ONLY_NOT_EFFECTIVE_UNIT_CONFIGURATION",
+                "EXCLUDED_LINKS_DROPINS_OTHER_NAMESPACES_NOT_COVERED",
+                "NO_DRAIN_OR_FENCE_PERFORMED"
+              ],
+              "nonce": "8692dab80bef4135a05ac988e7b4beb8",
+              "observed_at": "2026-10-18T13:10:08.519621Z",
+              "schedulers": {
+                "candidates": [
+                  {
+                    "bytes": 381,
+                    "matching_lines": 1,
+                    "name": "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-tokyo-readonly.service",
+                    "root_slot": 0,
+                    "sha256": "ec373f725aa50c38dc857c4d84e09c47deae4a15aa4509fdbc3fa7c0e31672db"
+                  },
+                  {
+                    "bytes": 546,
+                    "matching_lines": 4,
+                    "name": "billing-operations-payment-scheduler.service",
+                    "root_slot": 0,
+                    "sha256": "fc79a86a83d94bb98ff927e18668730740c0d9be51b893af4ce38adee1d74da0"
+                  },
+                  {
+                    "bytes": 587,
+                    "matching_lines": 4,
+                    "name": "billing-operations-weekly-final-invoice.service",
+                    "root_slot": 0,
+                    "sha256": "131e112d8a52a453c95b9b4dce416cbb22a2d1fdfccb804d9ae163e04927c037"
+                  },
+                  {
+                    "bytes": 581,
+                    "matching_lines": 4,
+                    "name": "billing-operations-weekly-settlement.service",
+                    "root_slot": 0,
+                    "sha256": "9e28965325f4b26bacc000b2aa856ee09afd56b1cf9fe4931ea73c17a629c3dc"
+                  },
+                  {
+                    "bytes": 1248,
+                    "matching_lines": 1,
+                    "name": "domestic-model-rpc-tunnel.service",
+                    "root_slot": 0,
+                    "sha256": "b3b73107f768c6b52b160591ec1e12a28b69c9fbea3b99a41249a9212fc71d0d"
+                  },
+                  {
+                    "bytes": 777,
+                    "matching_lines": 7,
+                    "name": "finance-collection-sync.service",
+                    "root_slot": 0,
+                    "sha256": "5c83e733b2a0ef62bbe64cca86747ec740157d6dc65157429ace2dae911b5f2e"
+                  },
+                  {
+                    "bytes": 338,
+                    "matching_lines": 3,
+                    "name": "finance-collection-sync.timer",
+                    "root_slot": 0,
+                    "sha256": "814f423856f2be44fb967dd6644df9ce85e91c2d99095f32d53c31f81e710a65"
+                  },
+                  {
+                    "bytes": 557,
+                    "matching_lines": 5,
+                    "name": "owner-commercial-ledger-sync.service",
+                    "root_slot": 0,
+                    "sha256": "c52ecc3d565afbf7847dee63abd304e60216e824233198bfc36352fa4994078c"
+                  },
+                  {
+                    "bytes": 230,
+                    "matching_lines": 1,
+                    "name": "owner-commercial-ledger-sync.timer",
+                    "root_slot": 0,
+                    "sha256": "a9764a3a234309e4c0dcd4f40ff140cb30b944b56b5f89c6f562ea86ae2fa2c8"
+                  },
+                  {
+                    "bytes": 1155,
+                    "matching_lines": 1,
+                    "name": "provider-neutral-tokyo-tunnel.service",
+                    "root_slot": 0,
+                    "sha256": "c83f148d878be3b448d22455c01250e91bd903904608a3e919c899758e23125e"
+                  },
+                  {
+                    "bytes": 1289,
+                    "matching_lines": 8,
+                    "name": "restricted-rpc-openai-shim.service",
+                    "root_slot": 0,
+                    "sha256": "1500671e8059d87053f9bedc749d579c357339278fe8cac3e0d3241130841cac"
+                  },
+                  {
+                    "bytes": 579,
+                    "matching_lines": 4,
+                    "name": "secure-secrets-portal.service",
+                    "root_slot": 0,
+                    "sha256": "3023bd5152e1bc26f35cea3ee1cf8196a67c69a736faad7ecf53887882dad0a7"
+                  },
+                  {
+                    "bytes": 1481,
+                    "matching_lines": 6,
+                    "name": "tokyo-restricted-model-executor.service",
+                    "root_slot": 0,
+                    "sha256": "dcd0bb3cb454322dca7385f82fa4152819523b4e08db73e6a9bd26e571a87a81"
+                  },
+                  {
+                    "bytes": 407,
+                    "matching_lines": 1,
+                    "name": "xj-tokyo-vpn.service",
+                    "root_slot": 0,
+                    "sha256": "662323e718b3559a03533c634662b75d3c8a8e1f7619d023a92b6e7c17848ba6"
+                  },
+                  {
+                    "bytes": 592,
+                    "matching_lines": 5,
+                    "name": "xuanjun-wecom-customer-contact.service",
+                    "root_slot": 0,
+                    "sha256": "f855698347cc734112d6abd102773eb1a39444a332a90a503f8a4f746ecec5aa"
+                  },
+                  {
+                    "bytes": 658,
+                    "matching_lines": 5,
+                    "name": "xuanjun-wecom-customer-service.service",
+                    "root_slot": 0,
+                    "sha256": "53669b3e6e5646f22b512df5e9dd14feef0796fcd0ac4cb336161c83aa876791"
+                  },
+                  {
+                    "bytes": 908,
+                    "matching_lines": 8,
+                    "name": "xuanjun-wecom-novel-ingress.service",
+                    "root_slot": 0,
+                    "sha256": "0474dc967087e0ef0eeea2dd7b0b00a51caedec443dd0c6534f8b83aabe68b91"
+                  }
+                ],
+                "excluded_symlinks": 30,
+                "regular_fragments_read": 265
+              },
+              "scope": "PR99_SCHEDULER_DEFINITIONS_ONLY_NOT_AUTHORITY",
+              "service_actions": 0,
+              "source_inventory": "PREVIOUS_FAILED_RESULT_NOT_RETURNED_NOT_REPLAYED"
+            },
+            "run_command_attempted": true,
+            "service_actions": 0,
+            "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+            "sts": "PASS_CURRENT"
+          }
+        ],
+        "migration_started": false,
+        "production_actions": 0,
+        "production_cutover": false,
+        "status": "WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION"
+      }
+    },
+    "preserved_failures": [
+      {
+        "source_commit": "960029b58f6dee751ffd068ca9b460f31e24acdb",
+        "source_tree": "11004770252ddd0dd2eaff5e0f247938a86ce7f5",
+        "run": 39129846790,
+        "job": 117682605331,
+        "invoke": "t-jpn70ewzbz4t62o",
+        "status": "Failed",
+        "code": "SCHEDULER_NAME_BOUND",
+        "error_query_run": 39130046782,
+        "error_query_job": 117683196015,
+        "error_query_receipt": {
+          "database_opened": false,
+          "error_projection": [
+            {
+              "function": "<module>",
+              "line": 1
+            },
+            {
+              "function": "<module>",
+              "line": 171
+            },
+            {
+              "function": "observe",
+              "line": 161
+            },
+            {
+              "function": "scheduler_inventory",
+              "line": 128
+            },
+            {
+              "code": "SCHEDULER_NAME_BOUND",
+              "exception": "RuntimeError"
+            }
+          ],
+          "exit_code": 1,
+          "host_commands": 0,
+          "instance_id": "68985c531add4e90a131aef703a389e6",
+          "invoke_id": "t-jpn70ewzbz4t62o",
+          "observed_at": "2026-10-18T13:05:58.459865+00:00",
+          "production_cutover": false,
+          "retry_allowed": false,
+          "scope": "ORIGINAL_FAILED_INVOKE_QUERY_ONLY",
+          "service_actions": 0,
+          "status": "Failed"
+        }
+      },
+      {
+        "source_commit": "6d642ce56d1673782892e03f9a94b8b325edc189",
+        "source_tree": "7925af3d01cd4c30b67e3e6c75163cefd67995f5",
+        "run": 39130598500,
+        "job": 117684814509,
+        "invoke": "t-jpn70exx16tf280",
+        "host_status": "Success",
+        "receipt_status": "HOLD_INCOMPLETE_OUTPUT_NOT_ACCEPTED",
+        "diagnostic_query_run": 39130868561,
+        "diagnostic_query_job": 117685589430,
+        "diagnostic": {
+          "database_opened": false,
+          "error_projection": [],
+          "exit_code": 0,
+          "host_commands": 0,
+          "instance_id": "68985c531add4e90a131aef703a389e6",
+          "invoke_id": "t-jpn70exx16tf280",
+          "json_complete": false,
+          "observed_at": "2026-10-18T13:17:20.328992+00:00",
+          "output_bytes": 32768,
+          "output_sha256": "041e1e39117627b2496a201b3397480f481d10fe4ccefb0093bb727bda52ef8c",
+          "production_cutover": false,
+          "retry_allowed": false,
+          "scope": "ORIGINAL_SOURCE_RESULT_DIAGNOSTIC_ONLY",
+          "service_actions": 0,
+          "status": "Success"
+        }
+      }
+    ],
+    "readonly_host_commands": 3,
+    "error_query_host_commands": 0,
+    "source_inventory_accepted": false,
+    "source_writer_authority": "UNKNOWN",
+    "enforced_fence": "UNKNOWN",
+    "production_service_actions": 0,
+    "production_migration_started": false,
+    "production_cutover": false,
+    "remaining_major_nodes": 6,
+    "M99_dynamic": "NOT_RUN_NOT_RETRIED",
+    "original_40_file_candidate": "UNCHANGED_NOT_REPUBLISHED"
   }
 }

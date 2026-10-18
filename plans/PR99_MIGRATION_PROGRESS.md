@@ -117,3 +117,22 @@ N2：丢失InvokeId时，限DescribeCommandInvocations按完整命令hash/operat
 - 完整权威数据/全部写入来源、唯一Writer、强制Fence/排空、持久控制器和其余生产接线仍由原执行方负责完成，不归咎Owner RAM授权。正式许可未签发、六个生产大节点未关闭。本轮云/主机调用0；自动Root现场job为SKIPPED，无后台迁移writer；东京、国内桥接、Windows现网未操作。
 
 详细回执：evidence/pr99-service-handoff/wal-memory-vfs/INTEGRATION_DELIVERY_20261018.json。新增代码与测试集中送原独审，未变已通过范围继承，未自签独立PASS。
+
+
+## 2026-10-18 21:17 CST — 原执行任务接续：调度定义取证成功，源码回执缺陷保留
+
+Owner确认另一核验窗口停止后，本原执行窗口继续同一PR99/分支；无新生产Writer、无重复交接。20:51两节点41项CI及未变结论继承，不把源码成果认作生产安装。
+
+新增东京AST/调度只读源码960029b58f6dee751ffd068ca9b460f31e24acdb，Tree11004770252ddd0dd2eaff5e0f247938a86ce7f5。13项输出拒绝/AST不执行及脱敏测试，run39129774407/job117682373135 SUCCESS。
+真实run39129846790/job117682605331/Invoke t-jpn70ewzbz4t62o Failed。只通过DescribeInvocationResult查询同一调用（run39130046782/job117683196015），取得固定原错误RuntimeError:SCHEDULER_NAME_BOUND，exit1。未重发旧批，原结果保留。
+
+仅修复调度模板单元名校验，独立调度阶段c9a022848c4cb53e5bfa6cef1017c181476cd857/Tree13113dc792a43e1fc28f3d038135e5f5c580502f；模板名称及7项拒绝测试CI run39130253188/job117683783955 PASS。
+真实run39130337276/job117684049239/Invoke t-jpn70exlhv86xa8 Success，2026-10-18T21:10:08.519621+08:00：
+265份普通定义读取、30个符号链接跳过、17份相关候选定义。含三应用、财务/账务同步、两个timer、模型/tunnel/现有Runner等，不能据此指定全部为Writer或停掉。只扫描直接普通fragment，未证明effective配置、drop-in/链接/其他命名空间和动态来源。既有服务全未操作。
+
+随后仅取未取得回执的源码阶段6d642ce56d1673782892e03f9a94b8b325edc189；13项输出/AST测试CI run39130563691/job117684685235 PASS。
+真实run39130598500/job117684814509/Invoke t-jpn70exx16tf280主机Success，但回执校验HOLD。只查同一Invoke（run39130868561/job117685589430），保存输出32768字节、JSON不完整；不能恢复成已验收清单，不能按exit0认定成功。
+针对回执传输大小新增有界压缩封装，原AST语义不变、不重扫已接收的调度定义。封装小于23000字节、解压不超过110000字节，校验准确长度/SHA及完整流，再执行原严格输出白名单；错误/截断/秘密字段和虚假fence仍HOLD。本提交仅发布该修复，尚未触发新现场采样。原旧Invoke、错误、输出摘要和标签全部保留，不移除重加或重跑旧job。
+
+本轮3次新只读主机调用：1失败、1调度成功、1源码主机成功但回执UNKNOWN；两次错误/元数据查询均未发主机命令。数据库打开0、服务动作0、生产切换0。完整权威数据/全部Writer/Fence/排空、原候选正常发布、M99动态、正式许可及生产实机验收未关闭，六个生产大节点仍未关闭。受限M99和bwrap入口未重试，东京、国内桥接/Windows服务保留。无后台迁移Writer。
+完整证据：evidence/pr99-service-handoff/aliyun-execution/SOURCE_SCHEDULER_OBSERVATION_20261018.json。
