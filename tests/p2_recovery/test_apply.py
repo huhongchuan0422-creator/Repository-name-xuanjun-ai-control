@@ -85,6 +85,7 @@ class ApplyTests(unittest.TestCase):
         self.g = grant()
         self.g.update(grant_id=self.request['new_grant_id'], source_commit='1'*40,
             source_tree='2'*40, manifest_sha256=m['sha256'], target_host=r.HOST,
+            recovery_entry='p2_recovery.entry',
             actor_id='fixture-actor', expires_utc=int(time.time())+1000)
         signer = assembly.OpenSSLSigner(self.private['owner'], self.refs['owner']['der_sha256'])
         try:

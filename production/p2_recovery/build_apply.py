@@ -24,7 +24,7 @@ def main():
         if name == 'production/p2_attempt5/entry.py':
             assert hashlib.sha1(b'blob '+str(len(previous)).encode()+b'\0'+previous).hexdigest() == '5c6c8da9a5cf82f0a6da285b27dbbf02bab90d07'
             expected=previous.replace(b'def main():\n', b'_RECOVERY_GATE = None  # Bound only by the pinned controlled recovery entry.\n\n\ndef main():\n',1)
-            expected=expected.replace(b'    cfg = configuration(args.config, args.config_sha256)\n',b'    cfg = configuration(args.config, args.config_sha256)\n    require(_RECOVERY_GATE is not None, \'CONTROLLED_RECOVERY_ENTRY_REQUIRED\')\n    unused_record, recovered_cfg, unused_manifest = _RECOVERY_GATE.verify()\n    require(recovered_cfg == cfg, \'RECOVERY_CONFIG_CHANGED\')\n',1)
+            expected=expected.replace(b'    cfg = configuration(args.config, args.config_sha256)\n',b'    cfg = configuration(args.config, args.config_sha256)\n    if cfg[\'grant\'].get(\'recovery_entry\') == \'p2_recovery.entry\':\n        require(_RECOVERY_GATE is not None, \'CONTROLLED_RECOVERY_ENTRY_REQUIRED\')\n        unused_record, recovered_cfg, unused_manifest = _RECOVERY_GATE.verify()\n        require(recovered_cfg == cfg, \'RECOVERY_CONFIG_CHANGED\')\n',1)
             assert (ROOT/name).read_bytes()==expected,'EXACT_ENTRY_DELTA'
         else:
             assert (ROOT/name).read_bytes() == previous, name

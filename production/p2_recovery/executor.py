@@ -133,6 +133,7 @@ def validate_config(request, plan, registry, assembly):
            cfg['grant']['grant_id'] == request['new_grant_id'] and
            cfg['grant']['target_host'] == request['host'] and
            cfg['grant']['max_attempts'] == 5 and
+           cfg['grant']['recovery_entry'] == 'p2_recovery.entry' and
            cfg['grant']['expires_utc'] > int(time.time()), 'RECOVERY_CONFIG_SCOPE')
     entry = plan['assembly_root'] + '/production/p2_attempt5/entry.py'
     # The new assembly Manifest includes this executor and entry wrapper. The

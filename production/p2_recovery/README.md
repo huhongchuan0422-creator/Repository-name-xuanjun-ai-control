@@ -4,7 +4,7 @@
 
 ## 本轮实际执行入口
 
-production/p2_recovery/entry.py提供apply、serve、run正式入口。bootstrap.py只按显式SHA、受保护文件描述符加载代码。executor.py将恢复证据、真实管理Provider、原Registry、AuthorityStore、Issuer及原PermitCycle接线。原production/p2_attempt5/entry.py增加强制恢复Gate；不支持用CLI布尔值或环境变量绕过。原16阶段、Ledger、IssuerService、AuthorityStore、NativeRecovery、授权HTTPS校验与原生锁代码不改。
+production/p2_recovery/entry.py提供apply、serve、run正式入口。bootstrap.py只按显式SHA、受保护文件描述符加载代码。executor.py将恢复证据、真实管理Provider、原Registry、AuthorityStore、Issuer及原PermitCycle接线。原production/p2_attempt5/entry.py对恢复Grant(recovery_entry=p2_recovery.entry)增加强制恢复Gate；历史普通Grant入口保持原边界。新增apply强制要求此恢复Grant标识；不支持用CLI布尔值或环境变量绕过。原16阶段、Ledger、IssuerService、AuthorityStore、NativeRecovery、授权HTTPS校验与原生锁代码不改。
 
 apply不会启动Writer、服务或16阶段。serve/run首先核对已持久提交的恢复回执、数据库inode及新权威来源；随后仍执行原Registry、Grant准确Commit/Tree、Kit和完整Assembly Manifest校验。Issuer构造、每次接收及真正handle前、原生RPC与Driver.check_binding均重新查询隔离和对账状态。保留具体Driver、原生锁及Fence，不跳过阶段。实际副作用入口仍必须在Provider所证明的统一控制面落实Fence；本地检查不能替代跨系统原子排他。
 
