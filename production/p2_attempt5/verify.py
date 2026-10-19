@@ -43,11 +43,13 @@ def main():
              'tests/p2_production_assembly/test_observer_recovery.py',
              'tests/p2_production_assembly/test_owner_authorization.py',
              '.github/workflows/p2-production-assembly.yml']
+    added.append('tests/p2_production_assembly/test_entry_input_regressions.py')
     added += sorted(str(p.relative_to(ROOT)) for p in (ROOT/'production/p2_recovery').glob('*.py'))
     for name in added:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     groups = []
-    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_owner_authorization.py', 25),
+    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_entry_input_regressions.py', 15),
+             (str(ROOT / 'tests/p2_production_assembly'), 'test_owner_authorization.py', 25),
              (str(ROOT / PREFIX), 'test_authorization.py', 9),(str(ROOT / 'tests/p2_production_assembly'), 'test_observer_recovery.py', 20),(str(ROOT / 'tests/p2_production_assembly'), 'test_observer_server.py', 23),
              (str(ROOT / 'tests/p2_production_assembly'), 'test_assembly.py', 27),
              (str(ROOT / 'tests/p2_production_assembly'), 'test_native_adapter.py', 21),
