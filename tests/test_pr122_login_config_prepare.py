@@ -1140,5 +1140,417 @@ class SourceIsolationTests(OfflineOnly):
         self.assertRegex(error.code, r"^[A-Z][A-Z0-9_]*$")
 
 
+INITIAL = "FIRST_LOGIN_ONLY_V1"
+INITIAL_HOST = "iZvt5t8tlrm8oiZ"
+
+
+def first_fixture():
+    value = fixture()
+    value.pop("authority_verify_key")
+    value["initialization_mode"] = INITIAL
+    return value
+
+
+def initial_assessment():
+    # Synthetic statements exercise syntax/binding, never target authenticity.
+    observation = {"target": INITIAL_HOST, "observed_unix": 100000,
+                   "subject": "CANONICAL_IDENTITY_INVENTORY",
+                   "synthetic_source_note": "NOT_TARGET_EVIDENCE"}
+    assessment = {"schema": 1, "target": INITIAL_HOST,
+                  "deployment_profile": PROFILE, "initialization_mode": INITIAL,
+                  "manifest_sha256": "a" * 64, "target_state": "ABSENT",
+                  "identity_decision": "NO_EXISTING_AUTHORITATIVE_IDENTITY",
+                  "observation_ref": "/var/lib/xuanjun-customer-preflight/synthetic-observation.json",
+                  "observation_sha256": prepare.digest(prepare.canonical(observation)),
+                  "observed_unix": 100000}
+    return assessment, observation
+
+
+class FirstLoginSchemaTests(OfflineOnly):
+    def test_explicit_first_pair_omits_authority_and_runtime_marker(self):
+        source = first_fixture()
+        original = copy.deepcopy(source)
+        admin, runtime = prepare.derive_pair(source)
+        self.assertEqual(source, original)
+        self.assertEqual(admin, source)
+        self.assertEqual(set(admin), ADMIN_KEYS - {"authority_verify_key"} | {"initialization_mode"})
+        self.assertEqual(set(runtime), RUNTIME_KEYS)
+        self.assertNotIn("authority_verify_key", admin)
+        self.assertNotIn("initialization_mode", runtime)
+        self.assertIs(prepare.validate_pair(admin, runtime), True)
+
+    def test_first_pair_deep_copies_and_retains_all_original_key_versions(self):
+        source = first_fixture()
+        source["keys"]["synthetic-retired-id"] = encoded(53)
+        original = copy.deepcopy(source)
+        admin, runtime = prepare.derive_pair(source)
+        self.assertEqual(admin["keys"], original["keys"])
+        self.assertEqual(runtime["keys"], original["keys"])
+        self.assertEqual(admin["backup_key_ref"], original["backup_key_ref"])
+        admin["keys"][source["active_key"]] = encoded(91)
+        runtime["providers"]["smtp"]["password"] = "changed-runtime-only"
+        self.assertEqual(source, original)
+        self.assertEqual(runtime["keys"], original["keys"])
+        self.assertEqual(admin["providers"], original["providers"])
+
+    def test_first_rejects_any_present_authority_field(self):
+        for value in (None, "", encoded(41), False, ERROR_SENTINEL):
+            with self.subTest(authority=value):
+                source = first_fixture()
+                source["authority_verify_key"] = value
+                self.assert_config_error(lambda: prepare.derive_pair(source))
+
+    def test_unknown_marker_full_and_unmarked_authority_omission_rejected(self):
+        for value in (None, "", True, {}, "FIRST", INITIAL + " "):
+            with self.subTest(marker=repr(value)):
+                source = first_fixture()
+                source["initialization_mode"] = value
+                self.assert_config_error(lambda: prepare.derive_pair(source))
+        for mode in ("FULL", None, "LOGIN_ONLY"):
+            with self.subTest(profile=mode):
+                source = first_fixture()
+                source["deployment_profile"] = mode
+                self.assert_config_error(lambda: prepare.derive_pair(source))
+        source = first_fixture()
+        source.pop("initialization_mode")
+        self.assert_config_error(lambda: prepare.derive_pair(source))
+
+    def test_first_requires_every_data_backup_and_reference_field(self):
+        for key in ("keys", "active_key", "backup_key", "backup_key_ref"):
+            with self.subTest(missing=key):
+                source = first_fixture()
+                source.pop(key)
+                self.assert_config_error(lambda: prepare.derive_pair(source))
+        for field in ("backup_key", "backup_key_ref"):
+            for value in (None, "", False):
+                with self.subTest(field=field, value=repr(value)):
+                    source = first_fixture()
+                    source[field] = value
+                    self.assert_config_error(lambda: prepare.derive_pair(source))
+
+    def test_first_backup_key_must_differ_from_every_data_key(self):
+        source = first_fixture()
+        for key_id in (source["active_key"], "synthetic-retired-id"):
+            with self.subTest(key_id=key_id):
+                value = copy.deepcopy(source)
+                value["keys"][key_id] = value["backup_key"]
+                error = self.assert_config_error(lambda: prepare.derive_pair(value))
+                self.assertEqual(error.code, "INITIAL_KEY_SEPARATION")
+
+    def test_first_runtime_whitelist_and_exact_binding_remain(self):
+        for key, value in (("initialization_mode", INITIAL), ("authority_verify_key", encoded(41)),
+                           ("backup_key", encoded(29)), ("unknown", "value")):
+            with self.subTest(extra=key):
+                admin, runtime = prepare.derive_pair(first_fixture())
+                runtime[key] = value
+                self.assert_config_error(lambda: prepare.validate_pair(admin, runtime))
+        for key, value in (("deployment_profile", "FULL"), ("active_key", "other"),
+                           ("keys", {"synthetic-key-id-6728": encoded(91)}),
+                           ("providers", {"smtp": {}})):
+            with self.subTest(mismatch=key):
+                admin, runtime = prepare.derive_pair(first_fixture())
+                runtime[key] = value
+                self.assert_config_error(lambda: prepare.validate_pair(admin, runtime))
+
+    def test_first_reuse_has_no_generation_or_claim_of_custody(self):
+        source = first_fixture()
+        with patch.object(prepare, "prepare_initial_pair", side_effect=AssertionError("No regeneration")) as generated:
+            admin, runtime = prepare.derive_pair(source)
+            report = prepare.redacted_report(admin, runtime)
+        generated.assert_not_called()
+        self.assertEqual(admin, source)
+        self.assertEqual(report["production"], "NOT_INSTALLABLE")
+        self.assertEqual(report["key_provenance"], "NOT_VERIFIED")
+        self.assertEqual(report["target_acceptance"], "NOT_VERIFIED")
+        self.assert_redacted(report)
+
+
+class SyntheticInitialMaterialTests(OfflineOnly):
+    def setUp(self):
+        super().setUp()
+        self.assessment, self.observation = initial_assessment()
+        self.options = {"manifest_sha256": "a" * 64, "now": 100001,
+                        "key_id": "synthetic-initial-key", "backup_key_ref": "synthetic-planned-custody",
+                        "smtp": copy.deepcopy(fixture()["providers"]["smtp"])}
+        self.entropy = self.stack.enter_context(patch.object(
+            prepare.os, "urandom", side_effect=AssertionError("Default entropy forbidden")))
+
+    def generate(self, entropy, assessment=None, observation=None, **overrides):
+        source = self.observation if observation is None else observation
+        if type(source) is dict:
+            source = prepare.canonical(source)
+        return prepare.prepare_initial_pair(
+            self.assessment if assessment is None else assessment,
+            source,
+            **{**self.options, **overrides}, entropy_source=entropy)
+
+    def test_lone_surrogate_inputs_are_rejected_before_any_entropy(self):
+        from unittest.mock import Mock
+        valid_raw = prepare.canonical(self.observation)
+        for surrogate in ("\ud800", "\udc00"):
+            for field in ("password", "username", "sender", "backup_key_ref", "key_id"):
+                with self.subTest(field=field, codepoint=hex(ord(surrogate))):
+                    options = copy.deepcopy(self.options)
+                    value = "synthetic-" + surrogate + "-value"
+                    if field in ("password", "username", "sender"):
+                        options["smtp"][field] = value + ("@example.invalid" if field != "password" else "")
+                    else:
+                        options[field] = value
+                    entropy = Mock(side_effect=[b"D" * 32, b"B" * 32])
+                    self.assert_config_error(lambda: prepare.prepare_initial_pair(
+                        self.assessment, valid_raw, **options, entropy_source=entropy))
+                    entropy.assert_not_called()
+            with self.subTest(field="assessment.observation_ref", codepoint=hex(ord(surrogate))):
+                assessment = {**self.assessment, "observation_ref":
+                              "/var/lib/xuanjun-customer-preflight/synthetic-" + surrogate + ".json"}
+                entropy = Mock(side_effect=[b"D" * 32, b"B" * 32])
+                self.assert_config_error(lambda: self.generate(entropy, assessment=assessment, observation=valid_raw))
+                entropy.assert_not_called()
+            for kind in ("top_value", "nested_value", "top_key", "nested_key", "invalid_utf8"):
+                with self.subTest(source=kind, codepoint=hex(ord(surrogate))):
+                    body = copy.deepcopy(self.observation)
+                    if kind in ("top_value", "invalid_utf8"):
+                        body["extra"] = "synthetic-" + surrogate
+                    elif kind == "nested_value":
+                        body["extra"] = {"rows": [1, {"value": "synthetic-" + surrogate}]}
+                    elif kind == "top_key":
+                        body["synthetic-" + surrogate] = "value"
+                    else:
+                        body["extra"] = {"rows": [{"synthetic-" + surrogate: "value"}]}
+                    raw = (json.dumps(body, ensure_ascii=False).encode("utf-8", "surrogatepass")
+                           if kind == "invalid_utf8" else json.dumps(body, ensure_ascii=True).encode("utf-8"))
+                    assessment = {**self.assessment, "observation_sha256": prepare.digest(raw)}
+                    entropy = Mock(side_effect=[b"D" * 32, b"B" * 32])
+                    self.assert_config_error(lambda: self.generate(entropy, assessment=assessment, observation=raw))
+                    entropy.assert_not_called()
+        # Scalar Unicode and valid JSON-escaped surrogate pairs remain valid.
+        body = {**self.observation, "extra": {"rows": [{"测试": "\U0001f680"}]}}
+        for escaped in (False, True):
+            with self.subTest(valid_unicode_escaped=escaped):
+                raw = json.dumps(body, ensure_ascii=escaped).encode("utf-8")
+                assessment = {**self.assessment, "observation_sha256": prepare.digest(raw)}
+                smtp = {**self.options["smtp"], "password": "synthetic-测试-\U0001f680"}
+                entropy = Mock(side_effect=[b"D" * 32, b"B" * 32])
+                admin, runtime = self.generate(entropy, assessment=assessment, observation=raw,
+                                               smtp=smtp, backup_key_ref="synthetic-托管-\U0001f680")
+                self.assertEqual(entropy.call_count, 2)
+                self.assertEqual(admin["providers"]["smtp"], smtp)
+                self.assertEqual(runtime["providers"]["smtp"], smtp)
+
+    def test_entropy_callback_cannot_modify_the_validated_input_snapshot(self):
+        from unittest.mock import Mock, call
+        for mutate_on_call in (1, 2):
+            with self.subTest(mutate_on_call=mutate_on_call):
+                smtp = copy.deepcopy(self.options["smtp"])
+                expected = copy.deepcopy(smtp)
+                calls = []
+                def injected(size):
+                    calls.append(size)
+                    if len(calls) == mutate_on_call:
+                        smtp.update(password="synthetic-invalid-\ud800", host="https://changed.invalid",
+                                    tls_mode="none", port=True, unexpected="synthetic-mutation")
+                    return b"D" * 32 if len(calls) == 1 else b"B" * 32
+                entropy = Mock(side_effect=injected)
+                admin, runtime = self.generate(entropy, smtp=smtp)
+                self.assertEqual(entropy.call_args_list, [call(32), call(32)])
+                self.assertNotEqual(smtp, expected)
+                self.assertEqual(admin["providers"]["smtp"], expected)
+                self.assertEqual(runtime["providers"]["smtp"], expected)
+                self.assertIs(prepare.validate_pair(admin, runtime), True)
+                self.assertEqual(admin["backup_key_ref"], self.options["backup_key_ref"])
+
+    def test_exactly_two_explicit_synthetic_values_and_no_extra_secret(self):
+        from unittest.mock import Mock, call
+        injected = Mock(side_effect=[b"D" * 32, b"B" * 32])
+        before = copy.deepcopy((self.assessment, self.observation, self.options))
+        admin, runtime = self.generate(injected)
+        self.assertEqual(injected.call_args_list, [call(32), call(32)])
+        self.assertEqual(admin["keys"], {self.options["key_id"]: base64.b64encode(b"D" * 32).decode()})
+        self.assertEqual(admin["backup_key"], base64.b64encode(b"B" * 32).decode())
+        self.assertEqual(admin["backup_key_ref"], self.options["backup_key_ref"])
+        self.assertEqual(set(admin), ADMIN_KEYS - {"authority_verify_key"} | {"initialization_mode"})
+        self.assertEqual(admin["initialization_mode"], INITIAL)
+        self.assertEqual(set(runtime), RUNTIME_KEYS)
+        self.assertEqual((self.assessment, self.observation, self.options), before)
+        self.entropy.assert_not_called()
+
+    def test_state_identity_and_profile_rejected_before_entropy(self):
+        from unittest.mock import Mock
+        cases = [("target_state", value) for value in ("UNKNOWN", "EXISTING", "RESTORE", "PARTIAL", "CONFLICT", None)]
+        cases += [("identity_decision", value) for value in ("MAPPED_EXISTING", "UNKNOWN", "EXISTING", True)]
+        cases += [("deployment_profile", "FULL"), ("initialization_mode", None), ("target", "foreign-host")]
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                assessment = copy.deepcopy(self.assessment)
+                assessment[field] = value
+                injected = Mock(side_effect=AssertionError("Entropy before eligibility"))
+                error = self.assert_config_error(lambda: self.generate(injected, assessment=assessment))
+                self.assertEqual(error.code, "INITIAL_ASSESSMENT")
+                injected.assert_not_called()
+
+    def test_exact_assessment_schema_and_source_binding_required_before_entropy(self):
+        from unittest.mock import Mock
+        invalid = []
+        for key in self.assessment:
+            value = copy.deepcopy(self.assessment)
+            value.pop(key)
+            invalid.append(value)
+        invalid.extend((None, [], {}, {**self.assessment, "approved": True},
+                        {**self.assessment, "schema": True},
+                        {**self.assessment, "manifest_sha256": "b" * 64},
+                        {**self.assessment, "observation_sha256": "G" * 64}))
+        for value in invalid:
+            with self.subTest(value=repr(value)):
+                injected = Mock()
+                operation = lambda: prepare.prepare_initial_pair(
+                    value, prepare.canonical(self.observation), **self.options, entropy_source=injected)
+                self.assert_config_error(operation)
+                injected.assert_not_called()
+        for field, value in (("target", "foreign-host"), ("observed_unix", 99999),
+                             ("subject", "UNRELATED_OBSERVATION")):
+            with self.subTest(observation=field):
+                injected = Mock()
+                observation = {**self.observation, field: value}
+                assessment = {**self.assessment, "observation_sha256": prepare.digest(prepare.canonical(observation))}
+                self.assert_config_error(lambda: self.generate(injected, assessment=assessment, observation=observation))
+                injected.assert_not_called()
+
+    def test_freshness_boundaries_and_exact_time_types(self):
+        from unittest.mock import Mock
+        for now in (100000, 118000, 100001.5):
+            with self.subTest(allowed_now=now):
+                injected = Mock(side_effect=[b"D" * 32, b"B" * 32])
+                self.generate(injected, now=now)
+                self.assertEqual(injected.call_count, 2)
+        for now in (99999, 118001, True, "100001", float('nan'), float('inf'), -float('inf'), -1):
+            with self.subTest(denied_now=repr(now)):
+                injected = Mock()
+                self.assert_config_error(lambda: self.generate(injected, now=now))
+                injected.assert_not_called()
+        for observed in (True, "100000", 100000.0, -1):
+            with self.subTest(observed=repr(observed)):
+                injected = Mock()
+                self.assert_config_error(lambda: self.generate(
+                    injected, assessment={**self.assessment, "observed_unix": observed},
+                    observation={**self.observation, "observed_unix": observed}))
+                injected.assert_not_called()
+
+    def test_noncanonical_or_out_of_scope_observation_paths_rejected_before_entropy(self):
+        from unittest.mock import Mock
+        paths = ("relative.json", "/etc/secret", "/var/lib/xuanjun-customer-preflight/../outside",
+                 "/var/lib/xuanjun-customer-preflight//source.json",
+                 "/var/lib/xuanjun-customer-preflight/./source.json",
+                 "/var/lib/xuanjun-customer-preflight", "//var/lib/xuanjun-customer-preflight/source.json")
+        for path in paths:
+            with self.subTest(path=path):
+                injected = Mock()
+                self.assert_config_error(lambda: self.generate(
+                    injected, assessment={**self.assessment, "observation_ref": path}))
+                injected.assert_not_called()
+
+    def test_all_configuration_inputs_validated_before_entropy(self):
+        from unittest.mock import Mock
+        cases = ({"key_id": ""}, {"key_id": "bad/key"}, {"key_id": True},
+                 {"backup_key_ref": ""}, {"backup_key_ref": None},
+                 {"smtp": {}}, {"smtp": {**self.options["smtp"], "port": True}},
+                 {"smtp": {**self.options["smtp"], "tls_mode": "none"}},
+                 {"smtp": {**self.options["smtp"], "password": ""}})
+        for options in cases:
+            with self.subTest(options=repr(options)):
+                injected = Mock()
+                self.assert_config_error(lambda: self.generate(injected, **options))
+                injected.assert_not_called()
+
+    def test_missing_or_noncallable_entropy_has_no_default(self):
+        import inspect
+        signature = inspect.signature(prepare.prepare_initial_pair)
+        self.assertIs(signature.parameters["entropy_source"].default, inspect.Parameter.empty)
+        with self.assertRaises(TypeError):
+            prepare.prepare_initial_pair(self.assessment, prepare.canonical(self.observation), **self.options)
+        for value in (None, b"D" * 32, True, "os.urandom"):
+            with self.subTest(value=repr(value)):
+                error = self.assert_config_error(lambda: self.generate(value))
+                self.assertEqual(error.code, "INITIAL_ENTROPY")
+        self.entropy.assert_not_called()
+
+    def test_bad_entropy_type_length_and_duplicates_are_not_retried(self):
+        from unittest.mock import Mock
+        for value in (None, "D" * 32, bytearray(b"D" * 32), b"", b"D" * 31, b"D" * 33):
+            for position in (0, 1):
+                with self.subTest(value=repr(value), position=position):
+                    injected = Mock(side_effect=[value, b"B" * 32] if position == 0 else [b"D" * 32, value])
+                    error = self.assert_config_error(lambda: self.generate(injected))
+                    self.assertEqual(error.code, "INITIAL_ENTROPY")
+                    self.assertLessEqual(injected.call_count, 2)
+        injected = Mock(side_effect=[b"D" * 32, b"D" * 32])
+        error = self.assert_config_error(lambda: self.generate(injected))
+        self.assertEqual(error.code, "INITIAL_ENTROPY")
+        self.assertEqual(injected.call_count, 2)
+
+    def test_entropy_exceptions_are_sanitized_without_retry(self):
+        from unittest.mock import Mock
+        for error in (OSError(ERROR_SENTINEL), ValueError(ERROR_SENTINEL),
+                      EOFError(ERROR_SENTINEL), KeyboardInterrupt(ERROR_SENTINEL)):
+            for position in (0, 1):
+                with self.subTest(error=type(error).__name__, position=position):
+                    injected = Mock(side_effect=[error] if position == 0 else [b"D" * 32, error])
+                    caught = self.assert_config_error(lambda: self.generate(injected))
+                    self.assertEqual(caught.code, "INITIAL_ENTROPY")
+                    self.assertEqual(injected.call_count, position + 1)
+
+    def test_generation_is_pure_and_report_does_not_certify_real_custody(self):
+        from unittest.mock import Mock
+        injected = Mock(side_effect=[b"D" * 32, b"B" * 32])
+        with patch.object(os, "open", side_effect=AssertionError("Filesystem forbidden")) as opened, \
+             patch("builtins.open", side_effect=AssertionError("Filesystem forbidden")) as builtin_open, \
+             patch.object(prepare, "write_bundle", side_effect=AssertionError("Publication forbidden")) as written:
+            admin, runtime = self.generate(injected)
+            report = prepare.redacted_report(admin, runtime)
+        opened.assert_not_called()
+        builtin_open.assert_not_called()
+        written.assert_not_called()
+        self.assertEqual(report["production"], "NOT_INSTALLABLE")
+        self.assertEqual(report["key_provenance"], "NOT_VERIFIED")
+        self.assertEqual(report["target_acceptance"], "NOT_VERIFIED")
+        serialized = json.dumps(report)
+        for secret in (*admin["keys"].values(), admin["backup_key"], self.options["backup_key_ref"]):
+            self.assertNotIn(secret, serialized)
+
+    def test_cli_cannot_select_initial_generation(self):
+        for args in (("--initialization-mode", INITIAL), ("--first-login-only",),
+                     ("--generate-keys",), ("--entropy-source", "synthetic")):
+            with self.subTest(args=args), patch.object(prepare, "prepare_initial_pair") as generated, \
+                 patch.object(prepare, "collect_interactive") as collect, \
+                 patch.object(prepare.sys, "stdout", io.StringIO()), \
+                 patch.object(prepare.sys, "stderr", io.StringIO()):
+                self.assertNotEqual(prepare.main(list(args)), 0)
+                generated.assert_not_called()
+                collect.assert_not_called()
+
+    def test_source_raw_digest_and_strict_json_precede_entropy(self):
+        from unittest.mock import Mock
+        valid = prepare.canonical(self.observation)
+        duplicate = valid[:-1] + b',"synthetic_extra":1,"synthetic_extra":2}'
+        nonfinite = valid[:-1] + b',"synthetic_extra":NaN}'
+        overflow = valid[:-1] + b',"synthetic_extra":1e999}'
+        nested_overflow = valid[:-1] + b',"synthetic_extra":{"rows":[1,{"value":-1e999}]}}'
+        for source in (valid + b" ", self.observation, None, [], b"{not-json}",
+                       duplicate, nonfinite, overflow, nested_overflow):
+            with self.subTest(source=repr(source)):
+                injected = Mock()
+                assessment = dict(self.assessment)
+                if type(source) is bytes and source != valid + b" ":
+                    assessment["observation_sha256"] = prepare.digest(source)
+                self.assert_config_error(lambda: prepare.prepare_initial_pair(
+                    assessment, source, **self.options, entropy_source=injected))
+                injected.assert_not_called()
+        # A differently serialized but exactly hash-bound source is legitimate.
+        source = json.dumps({**self.observation, "synthetic_extra": {"rows": [1.25, {"value": -2.5}]}}, indent=2).encode()
+        injected = Mock(side_effect=[b"D" * 32, b"B" * 32])
+        self.generate(injected, assessment={**self.assessment, "observation_sha256": prepare.digest(source)},
+                      observation=source)
+        self.assertEqual(injected.call_count, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

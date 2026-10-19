@@ -197,3 +197,9 @@ c69c5841 Hosted 原客户测试在 /bind 输入上被 USE_OAUTH_OR_SECRETREF 拒
 两种模式均使用 ssl.create_default_context() 校验证书链及主机名；只有 TLS 建立成功后才认证并发送。失败后没有应用层重试，不切换SMTP传输协议、不降级明文、不新建连接自动重试，也不自动重投该 outbox 邮件。标准库 smtp.login 的既有行为保持：它可在同一已加密连接内依次尝试服务器声明的多个 AUTH 机制，因此一次 login 调用不保证只发送一次 AUTH。原持久 outbox 在网络动作前标记 UNKNOWN 的机制保持；不确定结果在重新打开数据库后仍不自动重发，ACCEPTED仍只表示SMTP接收，不表示收件箱已送达。
 
 腾讯企业邮箱已确认的465 SSL配置应显式选择 implicit_tls；本说明不写入任何生产配置或凭据，不代表已完成其真实连接或收件验收。config.json 与 runtime.json 的 providers 必须保持完全一致；现有受保护配置、身份、runtime、验收和独立授权门禁不变。新的专用离线SMTP测试另接既有Hosted工作流，保留原150项冻结证据组的成员及断言。候选本地通过不等于Hosted CI、生产部署或邮件投递成功。
+
+## 首次LOGIN_ONLY凭据最小化候选
+
+显式initialization_mode=FIRST_LOGIN_ONLY_V1且deployment_profile=OFFICIAL_LOGIN_ONLY_V1可采用无authority_verify_key的admin形状；FIRST+FULL/未知模式拒绝，旧形状与FULL要求不减。首次计划仍拒绝已有安装对象，并在原canonical_identity_mapping证据中核当前manifest/目标/观察原始hash及NO_EXISTING_AUTHORITATIVE_IDENTITY声明；这是受保护声明的结构/范围/绑定检查，不证明事实。既有Identity需另行真实映射/迁移，UNKNOWN保持HOLD。data及独立backup仍必需，四项真实验收、原独审/Owner签名/预算不变。
+
+离线准备提供仅显式注入合成熵的纯构造接口，无默认随机源、无真实生成CLI；实际首次两类key生成/指定保管仍需单独准入和准确确认。FIRST是创建来源标记，合法原key可复用；不得给未知旧配置重贴标签或覆盖。原restore-isolated的maintenance不解除，本轮不扩大恢复业务。具体边界见PR122_LOGIN_CONFIG_PREPARATION.md。

@@ -82,6 +82,35 @@ def isolated_python_identity():
     need(values.get('include-system-site-packages')=='false' and values.get('version','').startswith('3.11.'),'ISOLATED_RUNTIME_CONFIGURATION')
     return {'path':str(executable),'sha256':digest(executable.read_bytes()),'config_sha256':digest(config.read_bytes())}
 
+def first_identity_evidence(descriptor,manifest_sha256,now):
+    """Consume existing protected evidence; never collect or certify target facts."""
+    from scripts import pr122_customer_workflow_request as request
+    def first_json(raw):
+        # Parse the decoded text: passing bytes lets json.loads autodetect
+        # UTF-16/32, including ASCII encodings that also decode as UTF-8+NUL.
+        need(type(raw) is bytes and len(raw)<=request.MAX_JSON,'REQUEST_JSON_SIZE')
+        def pairs(items):
+            result={}
+            for key,value in items:
+                need(key not in result,'REQUEST_DUPLICATE_KEY');result[key]=value
+            return result
+        try:
+            return json.loads(raw.decode('utf-8',errors='strict'),object_pairs_hook=pairs,
+                              parse_constant=lambda _:(_ for _ in ()).throw(ValueError()))
+        except (ValueError,UnicodeError,RecursionError):
+            raise Denied('HOLD:INITIAL_EVIDENCE_UTF8_JSON') from None
+    need(type(descriptor) is dict and set(descriptor)=={'path','sha256'},'INITIAL_EVIDENCE_DESCRIPTOR')
+    path=deployment.first_evidence_path(descriptor['path'])
+    raw=request.read_bytes(path,protected=True)
+    need(digest(raw)==descriptor['sha256'],'INITIAL_EVIDENCE_HASH')
+    record=first_json(raw)
+    deployment._first_identity_header(record,manifest_sha256,now)
+    observation_raw=request.read_bytes(record['observation_ref'],protected=True)
+    need(digest(observation_raw)==record['observation_sha256'],'INITIAL_OBSERVATION_HASH')
+    deployment.validate_first_identity_record(record,first_json(observation_raw),
+                                             manifest_sha256=manifest_sha256,now=now)
+    return True
+
 def plan(folder):
     need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','HOST_OR_ROOT')
     manifest,raw,files=source(folder)
@@ -97,9 +126,7 @@ def plan(folder):
     from scripts.pr122_customer_ops import validate_runtime_contexts
     validate_runtime_contexts(c,runtime)
     need(c['keys']==runtime['keys'] and c['active_key']==runtime['active_key'] and c['providers']==runtime['providers'],'CONFIG_BINDING')
-    import base64
-    need(len(base64.b64decode(c['backup_key'],validate=True))==32 and len(base64.b64decode(c['authority_verify_key'],validate=True))==32,'PROTECTED_KEYS_REQUIRED')
-    need(c['backup_key_ref'] and c['active_key'] in c['keys'] and all(len(base64.b64decode(v,validate=True))==32 for v in c['keys'].values()),'DATA_KEY_MAPPING')
+    deployment.validate_admin_keys(c)
     selected=deployment.validate_pair(c,runtime)
     login_only=selected==deployment.LOGIN_ONLY
     if not login_only:
@@ -118,6 +145,8 @@ def plan(folder):
     for key in required:
         v=acceptance['evidence'][key];need(type(v) is dict and set(v)=={'sha256','path'} and len(v['sha256'])==64,'TARGET_EVIDENCE_SCHEMA')
         p=private_path(v['path']);need(p.is_absolute() and str(p).startswith('/var/lib/xuanjun-customer-preflight/') and p.stat().st_uid==0 and not p.stat().st_mode&0o077 and digest(p.read_bytes())==v['sha256'],'TARGET_EVIDENCE_HASH')
+    if deployment.initialization_mode(c)==deployment.INITIAL_LOGIN:
+        first_identity_evidence(acceptance['evidence']['canonical_identity_mapping'],digest(raw),time.time())
     import grp
     grp.getgrnam('nginx')
     need(not os.path.lexists('/run/xuanjun-customer-api/http.sock'),'SOCKET_OCCUPIED')

@@ -1,6 +1,6 @@
 """Offline LOGIN_ONLY configuration preparation; never an installer or acceptance.
 
-No application imports, network, processes, key generation, or production paths.
+No application imports, network, processes, default entropy, or production paths.
 Real-secret use is for the Owner's own terminal after separate authorization.
 """
 from __future__ import annotations
@@ -13,6 +13,7 @@ import getpass
 import hashlib
 import ipaddress
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -22,8 +23,12 @@ import uuid
 import warnings
 
 PROFILE = 'OFFICIAL_LOGIN_ONLY_V1'
+INITIAL_LOGIN = 'FIRST_LOGIN_ONLY_V1'
+INITIAL_TARGET = 'iZvt5t8tlrm8oiZ'
+MAX_OBSERVATION_AGE = 18000
 ADMIN_FIELDS = frozenset(('deployment_profile', 'keys', 'active_key', 'providers',
                          'backup_key', 'backup_key_ref', 'authority_verify_key'))
+INITIAL_ADMIN_FIELDS = (ADMIN_FIELDS - {'authority_verify_key'}) | {'initialization_mode'}
 RUNTIME_FIELDS = frozenset(('deployment_profile', 'keys', 'active_key', 'providers'))
 SMTP_FIELDS = frozenset(('host', 'port', 'tls_mode', 'username', 'sender', 'password'))
 BUNDLE_FILES = frozenset(('config.json', 'runtime.json', 'PREPARATION.json'))
@@ -40,7 +45,8 @@ ERROR_CODES = frozenset(('ADMIN_SCHEMA', 'PROFILE', 'DATA_KEYS', 'ACTIVE_KEY',
     'DIRECTORY_POLICY', 'FILE_POLICY', 'BUNDLE_MEMBERS', 'BUNDLE_JSON',
     'BUNDLE_INCOMPLETE', 'BUNDLE_DIGEST', 'OUTPUT_EXISTS', 'ATOMIC_PUBLISH_UNAVAILABLE',
     'OUTPUT_FAILED', 'OUTPUT_INTERRUPTED', 'PUBLISH_DURABILITY_UNKNOWN',
-    'ARGUMENTS_INVALID', 'PREPARATION_FAILED'))
+    'ARGUMENTS_INVALID', 'PREPARATION_FAILED', 'INITIAL_ASSESSMENT',
+    'INITIAL_ENTROPY', 'INITIAL_KEY_SEPARATION'))
 
 
 class ConfigError(ValueError):
@@ -87,27 +93,7 @@ def _host(value):
         require(all(DNS_LABEL.fullmatch(label) for label in value.split('.')), 'SMTP_HOST')
 
 
-def derive_pair(admin):
-    """Validate the bounded minimal schema and derive two separate plain dicts.
-
-    This checks syntax, not key provenance, provider service, backup recovery or
-    authority. No new values or keys are generated. Optional contexts are outside
-    this deliberately minimal preparation interface, not forbidden in production.
-    """
-    require(type(admin) is dict and set(admin) == ADMIN_FIELDS, 'ADMIN_SCHEMA')
-    require(type(admin['deployment_profile']) is str and admin['deployment_profile'] == PROFILE, 'PROFILE')
-    keys = admin['keys']
-    require(type(keys) is dict and bool(keys), 'DATA_KEYS')
-    for key_id, value in keys.items():
-        require(type(key_id) is str and ID.fullmatch(key_id), 'DATA_KEYS')
-        _key(value)
-    require(type(admin['active_key']) is str and admin['active_key'] in keys, 'ACTIVE_KEY')
-    _key(admin['backup_key'])
-    _key(admin['authority_verify_key'])
-    require(_text(admin['backup_key_ref'], 1024), 'BACKUP_REFERENCE')
-    providers = admin['providers']
-    require(type(providers) is dict and set(providers) == {'smtp'}, 'SMTP_SCHEMA')
-    smtp = providers['smtp']
+def _smtp(smtp):
     require(type(smtp) is dict and set(smtp) == SMTP_FIELDS, 'SMTP_SCHEMA')
     _host(smtp['host'])
     require(type(smtp['port']) is int and 1 <= smtp['port'] <= 65535, 'SMTP_PORT')
@@ -115,6 +101,38 @@ def derive_pair(admin):
     for field in ('username', 'sender'):
         require(_text(smtp[field], 293) and EMAIL.fullmatch(smtp[field]), 'SMTP_ADDRESS')
     require(_text(smtp['password'], 4096), 'SMTP_PASSWORD')
+
+
+def derive_pair(admin):
+    """Validate the bounded minimal schema and derive two separate plain dicts.
+
+    This checks syntax, not key provenance, provider service, backup recovery or
+    authority. No new values or keys are generated. Optional contexts are outside
+    this deliberately minimal preparation interface, not forbidden in production.
+    """
+    require(type(admin) is dict, 'ADMIN_SCHEMA')
+    initial = 'initialization_mode' in admin
+    require(set(admin) == (INITIAL_ADMIN_FIELDS if initial else ADMIN_FIELDS), 'ADMIN_SCHEMA')
+    require(type(admin['deployment_profile']) is str and admin['deployment_profile'] == PROFILE, 'PROFILE')
+    if initial:
+        require(type(admin['initialization_mode']) is str and admin['initialization_mode'] == INITIAL_LOGIN,
+                'INITIAL_ASSESSMENT')
+    keys = admin['keys']
+    require(type(keys) is dict and bool(keys), 'DATA_KEYS')
+    for key_id, value in keys.items():
+        require(type(key_id) is str and ID.fullmatch(key_id), 'DATA_KEYS')
+        _key(value)
+    require(type(admin['active_key']) is str and admin['active_key'] in keys, 'ACTIVE_KEY')
+    _key(admin['backup_key'])
+    if initial:
+        require(admin['backup_key'] not in keys.values(), 'INITIAL_KEY_SEPARATION')
+    else:
+        _key(admin['authority_verify_key'])
+    require(_text(admin['backup_key_ref'], 1024), 'BACKUP_REFERENCE')
+    providers = admin['providers']
+    require(type(providers) is dict and set(providers) == {'smtp'}, 'SMTP_SCHEMA')
+    smtp = providers['smtp']
+    _smtp(smtp)
     # JSON cloning follows exact-type checks and never imports production modules.
     try:
         raw = canonical(admin)
@@ -124,6 +142,96 @@ def derive_pair(admin):
     config = json.loads(raw)
     runtime = json.loads(canonical({k: config[k] for k in RUNTIME_FIELDS}))
     return config, runtime
+
+
+def _initial_assessment(assessment, observation, manifest_sha256, now):
+    """Pure fixture/source binding, not certification of an actual observation."""
+    fields = {'schema', 'target', 'deployment_profile', 'initialization_mode',
+              'manifest_sha256', 'target_state', 'identity_decision',
+              'observation_ref', 'observation_sha256', 'observed_unix'}
+    require(type(assessment) is dict and set(assessment) == fields, 'INITIAL_ASSESSMENT')
+    try:
+        canonical(assessment)
+    except (ValueError, TypeError, UnicodeError, RecursionError):
+        raise ConfigError('INITIAL_ASSESSMENT') from None
+    require(all(type(assessment[name]) is str for name in fields - {'schema', 'observed_unix'}),
+            'INITIAL_ASSESSMENT')
+    require(type(assessment['schema']) is int and assessment['schema'] == 1
+            and assessment['target'] == INITIAL_TARGET
+            and assessment['deployment_profile'] == PROFILE
+            and assessment['initialization_mode'] == INITIAL_LOGIN
+            and assessment['target_state'] == 'ABSENT'
+            and assessment['identity_decision'] == 'NO_EXISTING_AUTHORITATIVE_IDENTITY', 'INITIAL_ASSESSMENT')
+    hex64 = lambda value: type(value) is str and re.fullmatch('[0-9a-f]{64}', value) is not None
+    require(hex64(manifest_sha256) and assessment['manifest_sha256'] == manifest_sha256
+            and hex64(assessment['observation_sha256']), 'INITIAL_ASSESSMENT')
+    ref = assessment['observation_ref']
+    require(type(ref) is str and ref.startswith('/var/lib/xuanjun-customer-preflight/')
+            and '\\' not in ref and not any(ord(c) < 32 or ord(c) == 127 for c in ref)
+            and all(part not in ('', '.', '..') for part in ref.split('/')[1:])
+            and str(Path(ref)) == ref, 'INITIAL_ASSESSMENT')
+    observed = assessment['observed_unix']
+    require(type(observed) is int and observed >= 0 and type(now) in (int, float)
+            and (type(now) is int or math.isfinite(now)) and observed <= now
+            and now - observed <= MAX_OBSERVATION_AGE, 'INITIAL_ASSESSMENT')
+    require(type(observation) is bytes and len(observation) <= MAX_FILE_BYTES
+            and digest(observation) == assessment['observation_sha256'], 'INITIAL_ASSESSMENT')
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            require(key not in result, 'INITIAL_ASSESSMENT')
+            result[key] = value
+        return result
+    def finite_float(value):
+        parsed = float(value)
+        require(math.isfinite(parsed), 'INITIAL_ASSESSMENT')
+        return parsed
+    try:
+        source = json.loads(observation.decode('utf-8', errors='strict'), object_pairs_hook=pairs,
+                            parse_float=finite_float,
+                            parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        canonical(source)
+    except (ValueError, UnicodeError, RecursionError):
+        raise ConfigError('INITIAL_ASSESSMENT') from None
+    require(type(source) is dict and source.get('subject') == 'CANONICAL_IDENTITY_INVENTORY'
+            and source.get('target') == assessment['target']
+            and type(source.get('observed_unix')) is int
+            and source['observed_unix'] == observed, 'INITIAL_ASSESSMENT')
+
+
+def prepare_initial_pair(assessment, observation, *, manifest_sha256, now,
+                         key_id, backup_key_ref, smtp, entropy_source):
+    """Pure initial-material interface, tested only with explicit synthetic entropy.
+
+    There is deliberately no default CSPRNG and no CLI route to this function.
+    A future real generation/custody driver requires its own trusted admission
+    and exact Owner confirmation. Shape-valid fixture metadata is not authority.
+    """
+    _initial_assessment(assessment, observation, manifest_sha256, now)
+    require(callable(entropy_source), 'INITIAL_ENTROPY')
+    require(type(key_id) is str and ID.fullmatch(key_id), 'DATA_KEYS')
+    require(_text(backup_key_ref, 1024), 'BACKUP_REFERENCE')
+    _smtp(smtp)
+    # Validate actual non-key input serialization before requesting entropy.
+    # Freeze it so an injected provider cannot mutate a validated SMTP object.
+    try:
+        prepared = json.loads(canonical({'key_id': key_id, 'backup_key_ref': backup_key_ref,
+                                         'smtp': smtp}))
+    except (ValueError, TypeError, UnicodeError, RecursionError):
+        raise ConfigError('ADMIN_SCHEMA') from None
+    try:
+        data_key = entropy_source(32)
+        require(type(data_key) is bytes and len(data_key) == 32, 'INITIAL_ENTROPY')
+        backup_key = entropy_source(32)
+        require(type(backup_key) is bytes and len(backup_key) == 32 and backup_key != data_key,
+                'INITIAL_ENTROPY')
+    except BaseException:
+        raise ConfigError('INITIAL_ENTROPY') from None
+    candidate = {'deployment_profile': PROFILE, 'initialization_mode': INITIAL_LOGIN,
+                 'keys': {prepared['key_id']: base64.b64encode(data_key).decode('ascii')},
+                 'active_key': prepared['key_id'], 'backup_key': base64.b64encode(backup_key).decode('ascii'),
+                 'backup_key_ref': prepared['backup_key_ref'], 'providers': {'smtp': prepared['smtp']}}
+    return derive_pair(candidate)
 
 
 def validate_pair(admin, runtime):
