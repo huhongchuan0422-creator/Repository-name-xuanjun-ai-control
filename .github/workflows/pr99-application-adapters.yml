@@ -53,7 +53,7 @@ jobs:
           receipt={'code_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
            'code_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
            'sources':{n:hashlib.sha256((base/n).read_bytes()).hexdigest() for n in names},
-           'inherited_ingress_gate_sha256':expected_gate,'ordinary_tests':66,
+           'inherited_ingress_gate_sha256':expected_gate,'ordinary_tests':67,
            'business_api_and_source_verification':'FIXTURES_NOT_NATIVE_ACCEPTANCE',
            'production_started':False,'actual_configuration_exported':False,
            'live_application_hook_installed':False,'m99':'NOT_RUN'}
