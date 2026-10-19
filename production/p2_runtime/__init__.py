@@ -277,7 +277,8 @@ def probe_health(entry):
         except (FileNotFoundError, ConnectionRefusedError):
             last = "APP_NOT_READY"
         except OSError:
-            last = "HEALTH_IO_ERROR"
+            if last != "HEALTH_TIMEOUT":
+                last = "HEALTH_IO_ERROR"
         finally:
             sock.close()
         if time.monotonic() < deadline: time.sleep(.02)
