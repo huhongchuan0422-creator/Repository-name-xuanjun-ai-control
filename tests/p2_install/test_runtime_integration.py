@@ -1,5 +1,6 @@
 """Runs with EXACT window-two source staged read-only by CI. No network."""
 import json, os, pathlib, signal, subprocess, sys, tempfile, time, unittest
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from production.p2_install.coordinator import Coordinator
 from production import p2_runtime
 
