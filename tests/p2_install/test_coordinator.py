@@ -111,6 +111,25 @@ class CoordinatorTests(unittest.TestCase):
             c.tick()
             count = c.journal.db.execute("SELECT COUNT(*) FROM coordinator_outbox").fetchone()[0]
             self.assertEqual(count,len(set(x["id"] for x in rows)))
+    def test_subprocess_call_timeout_does_not_repeat_execute(self):
+        import subprocess
+        class BlockingEffects(Effects):
+            def execute(self,request):
+                subprocess.run(["/usr/bin/sleep","2"],check=True)
+                return super().execute(request)
+        blocked = BlockingEffects()
+        request = self.request("blocked")
+        request["deadline_utc"] = 1
+        with Coordinator(self.root,self.plan,{"one":blocked},
+                         now=lambda:1,component_roots={"one":self.component},
+                         grant=Grant()) as c:
+            result = c.execute(request)
+            self.assertEqual(result["status"],"HOLD")
+            self.assertEqual(c.journal.latest("one")[1],"RUNNING")
+            recovery = c.recover(request)
+            self.assertIn(recovery["status"],("HOLD","NO_EFFECT"))
+            self.assertEqual(c.journal.latest("one")[1],"RETRYABLE")
+
     def test_five_attempts_preserved(self):
         self.effect.mode="NO_EFFECT"
         for number in range(5):
