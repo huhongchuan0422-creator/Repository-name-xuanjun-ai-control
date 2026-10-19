@@ -181,8 +181,14 @@ def write_receipt(req, root, kind, status, error=None, entry=None):
     return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 def finish(req, root, status, code=None, reference=None, kind="observe", entry=None):
+    if entry is None:
+        try: entry = load(root / ("batch-" + req["batch_id"] + ".json"))
+        except Exception: entry = None
     err = None if code is None else {"code": code, "log": reference}
     rec = write_receipt(req, root, kind, status, err, entry)
+    if kind == "commit" and status == "COMMITTED" and entry and entry.get("phase") == "RUNNING" and not entry.get("commit_receipt"):
+        entry["commit_receipt"] = rec
+        durable(root / ("batch-" + req["batch_id"] + ".json"), entry)
     return base(req, status, err, rec, entry)
 
 def marker_path(root, batch):
@@ -352,10 +358,12 @@ def _locked(req, root, method):
             return finish(req, root, "HOLD", "STOP_OUTCOME_UNKNOWN", entry.get("log"))
         if entry["phase"] == "RUNNING":
             ws, group = workload_state(entry)
-            if ws != "LIVE": return finish(req, root, "HOLD", "RUNNING_PROCESS_MISSING", entry.get("log"))
-            if collector != "LIVE": return finish(req, root, "HOLD", "LOG_COLLECTOR_FAILED", entry.get("log"))
+            if ws != "LIVE": return finish(req, root, "HOLD", "RUNNING_PROCESS_MISSING", entry.get("log"), entry=entry)
+            if collector != "LIVE": return finish(req, root, "HOLD", "LOG_COLLECTOR_FAILED", entry.get("log"), entry=entry)
+            readiness = probe_health(entry)
+            if readiness: return finish(req, root, "HOLD", readiness, entry.get("log"), entry=entry)
             entry["members"] = [{"pid": p["pid"], "start": p["start"]} for p in group]; durable(journal, entry)
-            return finish(req, root, "COMMITTED")
+            return finish(req, root, "COMMITTED", entry=entry)
         if entry["phase"] == "STOPPED":
             ws, _ = workload_state(entry) if "pid" in entry else ("GONE", [])
             if ws == "GONE" and collector == "LIVE":
@@ -389,7 +397,9 @@ def _locked(req, root, method):
             entry["phase"] = "STOPPED"; durable(journal, entry)
             return finish(req, root, "HOLD", mark, entry.get("log"))
         if entry["phase"] == "RUNNING" and workload_state(entry)[0] == "LIVE" and collector == "LIVE":
-            return finish(req, root, "COMMITTED")
+            readiness = probe_health(entry)
+            if readiness: return finish(req, root, "HOLD", readiness, entry.get("log"), entry=entry)
+            return finish(req, root, "COMMITTED", entry=entry)
         if entry["phase"] == "PREPARED": return finish(req, root, "HOLD", "START_OUTCOME_UNKNOWN", entry.get("log"))
         if entry["phase"] == "STOPPED" and state == "GONE": return finish(req, root, "HOLD", "ATTEMPT_ALREADY_USED", entry.get("log"))
         return finish(req, root, "HOLD", "UNCERTAIN_PRIOR_START", entry.get("log"))
