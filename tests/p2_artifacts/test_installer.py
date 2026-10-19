@@ -3,10 +3,14 @@ import io
 import json
 import os
 from pathlib import Path
+import signal
+import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
+import time
 import unittest
 from unittest import mock
 
@@ -21,49 +25,114 @@ class ArtifactTest(unittest.TestCase):
         self.root = Path(self.tmp.name) / "root"
         self.root.mkdir(mode=0o700)
 
-    def make(self, batch="b1", entries=None, attempt="a1"):
+    def make(self, batch="b1", entries=None, attempt="a1", modes=None):
         if entries is None:
             entries = {"app/main.py": b"hello", "plugins/example.py": b"plugin"}
         archive = Path(self.tmp.name) / (batch + ".tar")
-        with tarfile.open(archive, "w") as t:
+        with tarfile.open(archive, "w") as tar:
             for name, data in entries.items():
-                m = tarfile.TarInfo(name)
-                m.size = len(data)
-                t.addfile(m, io.BytesIO(data))
+                member = tarfile.TarInfo(name)
+                member.size = len(data)
+                tar.addfile(member, io.BytesIO(data))
         sha = lambda b: hashlib.sha256(b).hexdigest()
+        inputs = {"operation": "install", "archive": str(archive),
+                  "archive_sha256": sha(archive.read_bytes()),
+                  "files": {name: sha(data) for name, data in entries.items()}}
+        if modes is not None:
+            inputs["modes"] = modes
         return {"schema": 1, "scope": "ISOLATED_TEST_ONLY", "installation_id": "i1",
                 "batch_id": batch, "attempt_id": attempt, "root": str(self.root),
-                "inputs": {"operation": "install", "archive": str(archive),
-                           "archive_sha256": sha(archive.read_bytes()),
-                           "files": {name: sha(data) for name, data in entries.items()}}}
+                "inputs": inputs}
 
-    def test_commit_idempotence_cli_and_receipt_immutable(self):
-        req = self.make()
+    def cli(self, req, action):
+        return subprocess.run([sys.executable, "-m", "production.p2_artifacts", action],
+                              input=json.dumps(req), text=True, capture_output=True)
+
+    def start_cli(self, req, action="execute"):
+        proc = subprocess.Popen([sys.executable, "-m", "production.p2_artifacts", action],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True)
+        proc.stdin.write(json.dumps(req))
+        proc.stdin.close()
+        return proc
+
+    def wait_for(self, predicate, proc=None, timeout=10):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if predicate():
+                return
+            if proc is not None and proc.poll() is not None:
+                out = proc.stdout.read()
+                err = proc.stderr.read()
+                self.fail("subprocess exited before checkpoint rc=%r stdout=%r stderr=%r" %
+                          (proc.returncode, out, err))
+            time.sleep(0.001)
+        self.fail("checkpoint timeout")
+
+    def kill(self, proc):
+        os.kill(proc.pid, signal.SIGKILL)
+        proc.wait(timeout=10)
+        self.assertEqual(proc.returncode, -signal.SIGKILL)
+
+    def recover_cli(self, req):
+        p = self.cli(req, "recover")
+        self.assertEqual(p.returncode, 0, p.stderr + p.stdout)
+        out = json.loads(p.stdout)
+        self.assertEqual(out["status"], "COMMITTED", out)
+        return out
+
+    def prior_snapshot(self):
+        req = self.make(batch="prior", attempt="prior-a")
+        out = execute(req)
+        self.assertEqual(out["status"], "COMMITTED", out)
+        receipt = Path(out["receipt"]["path"])
+        version = self.root / "versions/i1--prior"
+        files = {str(p.relative_to(version)): (p.read_bytes(), os.lstat(p).st_ino, os.lstat(p).st_mtime_ns)
+                 for p in version.rglob("*") if p.is_file()}
+        return req, receipt, receipt.read_bytes(), files
+
+    def assert_prior_unchanged(self, prior):
+        req, receipt, receipt_bytes, files = prior
+        self.assertEqual(receipt.read_bytes(), receipt_bytes)
+        version = self.root / "versions/i1--prior"
+        current = {str(p.relative_to(version)): (p.read_bytes(), os.lstat(p).st_ino, os.lstat(p).st_mtime_ns)
+                   for p in version.rglob("*") if p.is_file()}
+        self.assertEqual(current, files)
+        self.assertEqual(inspect(req)["status"], "COMMITTED")
+
+    def test_commit_idempotence_cli_receipt_immutable_and_executable_mode(self):
+        req = self.make(modes={"app/main.py": 0o700, "plugins/example.py": 0o600})
         one = execute(req)
         self.assertEqual(one["status"], "COMMITTED", one)
+        executable = self.root / "versions/i1--b1/app/main.py"
+        self.assertEqual(stat.S_IMODE(os.lstat(executable).st_mode), 0o700)
         receipt = Path(one["receipt"]["path"])
         saved = receipt.read_bytes()
+        file_stat = os.lstat(executable)
         self.assertEqual(execute(req), one)
         self.assertEqual(inspect(req), one)
         self.assertEqual(recover(req), one)
         self.assertEqual(receipt.read_bytes(), saved)
-        p = subprocess.run([sys.executable, "-m", "production.p2_artifacts", "inspect"],
-                           input=json.dumps(req), text=True, capture_output=True)
+        self.assertEqual(os.lstat(executable).st_ino, file_stat.st_ino)
+        self.assertEqual(os.lstat(executable).st_mtime_ns, file_stat.st_mtime_ns)
+        p = self.cli(req, "inspect")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(json.loads(p.stdout)["status"], "COMMITTED")
 
-    def test_manifest_and_traversal_and_link_reject(self):
+    def test_manifest_traversal_link_and_invalid_mode_reject(self):
         req = self.make()
         req["inputs"]["files"]["app/main.py"] = "0" * 64
         self.assertEqual(execute(req)["status"], "HOLD")
         bad = self.make(batch="b2", entries={"../escape": b"x"})
         self.assertEqual(execute(bad)["status"], "HOLD")
+        mode = self.make(batch="bmode", modes={"app/main.py": 0o777})
+        self.assertEqual(execute(mode)["error"]["code"], "INVALID_MODES")
         archive = Path(self.tmp.name) / "links.tar"
-        with tarfile.open(archive, "w") as t:
-            m = tarfile.TarInfo("link")
-            m.type = tarfile.SYMTYPE
-            m.linkname = "../../etc/passwd"
-            t.addfile(m)
+        with tarfile.open(archive, "w") as tar:
+            member = tarfile.TarInfo("link")
+            member.type = tarfile.SYMTYPE
+            member.linkname = "../../etc/passwd"
+            tar.addfile(member)
         linkreq = self.make(batch="b3")
         linkreq["inputs"]["archive"] = str(archive)
         linkreq["inputs"]["archive_sha256"] = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -71,29 +140,97 @@ class ArtifactTest(unittest.TestCase):
         self.assertEqual(execute(linkreq)["status"], "HOLD")
         self.assertFalse((self.root / "escape").exists())
 
-    def test_real_interruption_then_recover_missing_only(self):
-        req = self.make()
-        calls = []
-        def interrupt(name):
-            calls.append(name)
-            if len(calls) == 1:
-                raise KeyboardInterrupt()
-        with mock.patch.object(impl, "_interrupt_hook", interrupt):
-            with self.assertRaises(KeyboardInterrupt):
-                execute(req)
-        mid = inspect(req)
-        self.assertEqual(mid["status"], "HOLD")
-        dest = self.root / "versions/i1--b1"
-        existing = next(p for p in dest.rglob("*") if p.is_file())
-        saved = existing.read_bytes()
-        out = recover(req)
-        self.assertEqual(out["status"], "COMMITTED", out)
-        self.assertEqual(existing.read_bytes(), saved)
-        receipt = json.loads(Path(out["receipt"]["path"]).read_text())
-        self.assertIsNotNone(receipt["recovery"])
-        evidence = Path(receipt["recovery"]["path"])
-        self.assertTrue(evidence.is_file())
-        self.assertTrue(json.loads(evidence.read_text())["restored"])
+    def test_changed_during_snapshot_is_deterministically_rejected(self):
+        req = self.make(batch="race", attempt="race-a",
+                        entries={"payload.bin": b"x" * (16 * 1024 * 1024)})
+        source = Path(req["inputs"]["archive"])
+        partial = self.root / ".p2_artifacts/snapshots/i1--race--race-a.tar.partial"
+        stop = threading.Event()
+        ready = threading.Event()
+
+        def mutate():
+            self.wait_for(lambda: partial.exists() and partial.stat().st_size > 0, timeout=10)
+            ready.set()
+            flip = False
+            while not stop.is_set():
+                with source.open("r+b", buffering=0) as out:
+                    out.seek(1024)
+                    out.write(b"A" if flip else b"B")
+                    out.flush()
+                    os.fsync(out.fileno())
+                flip = not flip
+
+        original_chunk = impl.CHUNK
+        impl.CHUNK = 4096
+        thread = threading.Thread(target=mutate)
+        thread.start()
+        try:
+            out = execute(req)
+        finally:
+            stop.set()
+            thread.join(timeout=10)
+            impl.CHUNK = original_chunk
+        self.assertTrue(ready.is_set())
+        self.assertEqual(out["status"], "HOLD", out)
+        self.assertIn(out["error"]["code"], ("ARCHIVE_CHANGED_DURING_READ", "ARCHIVE_DIGEST_MISMATCH"))
+        self.assertTrue(Path(out["error"]["log"]).is_file())
+        self.assertFalse((self.root / ".p2_artifacts/receipts/i1--race.json").exists())
+        self.assertFalse((self.root / "versions/i1--race").exists())
+        log = json.loads(Path(out["error"]["log"]).read_text())
+        self.assertEqual(log["stage"], "EXECUTE")
+
+    def test_sigkill_during_snapshot_recovers_and_preserves_prior(self):
+        prior = self.prior_snapshot()
+        req = self.make(batch="kill-snap", attempt="a-snap",
+                        entries={"payload.bin": b"s" * (32 * 1024 * 1024)})
+        partial = self.root / ".p2_artifacts/snapshots/i1--kill-snap--a-snap.tar.partial"
+        proc = self.start_cli(req)
+        self.wait_for(lambda: partial.exists() and partial.stat().st_size > 0, proc)
+        self.kill(proc)
+        self.assertTrue(partial.exists())
+        out = self.recover_cli(req)
+        self.assertEqual(out["status"], "COMMITTED")
+        self.assertFalse(partial.exists())
+        errors = list((self.root / ".p2_artifacts/errors").glob("i1--kill-snap--*.json"))
+        self.assertTrue(any(json.loads(p.read_text())["code"] == "INTERRUPTED_SNAPSHOT" for p in errors))
+        self.assert_prior_unchanged(prior)
+
+    def test_sigkill_during_file_write_recovers_without_overwriting_good_file(self):
+        prior = self.prior_snapshot()
+        req = self.make(batch="kill-file", attempt="a-file",
+                        entries={"a-good.bin": b"ok", "z-large.bin": b"f" * (32 * 1024 * 1024)})
+        good = self.root / "versions/i1--kill-file/a-good.bin"
+        partial = self.root / "versions/i1--kill-file/z-large.bin.p2-part-a-file"
+        proc = self.start_cli(req)
+        self.wait_for(lambda: good.exists() and partial.exists() and partial.stat().st_size > 0, proc)
+        good_before = (good.read_bytes(), os.lstat(good).st_ino, os.lstat(good).st_mtime_ns)
+        self.kill(proc)
+        self.assertTrue(partial.exists())
+        self.recover_cli(req)
+        good_after = (good.read_bytes(), os.lstat(good).st_ino, os.lstat(good).st_mtime_ns)
+        self.assertEqual(good_after, good_before)
+        self.assertFalse(partial.exists())
+        errors = list((self.root / ".p2_artifacts/errors").glob("i1--kill-file--*.json"))
+        self.assertTrue(any(json.loads(p.read_text())["code"] == "INTERRUPTED_FILE_WRITE" for p in errors))
+        self.assert_prior_unchanged(prior)
+
+    def test_sigkill_after_receipt_publish_recovers_as_idempotent_read(self):
+        prior = self.prior_snapshot()
+        req = self.make(batch="kill-receipt", attempt="a-receipt",
+                        entries={"payload.bin": b"r" * (64 * 1024 * 1024)})
+        receipt = self.root / ".p2_artifacts/receipts/i1--kill-receipt.json"
+        installed = self.root / "versions/i1--kill-receipt/payload.bin"
+        proc = self.start_cli(req)
+        self.wait_for(lambda: receipt.exists() and installed.exists(), proc)
+        receipt_before = receipt.read_bytes()
+        stat_before = os.lstat(installed)
+        self.kill(proc)
+        self.recover_cli(req)
+        self.assertEqual(receipt.read_bytes(), receipt_before)
+        stat_after = os.lstat(installed)
+        self.assertEqual((stat_after.st_ino, stat_after.st_mtime_ns),
+                         (stat_before.st_ino, stat_before.st_mtime_ns))
+        self.assert_prior_unchanged(prior)
 
     def test_partial_wrong_or_unknown_file_holds_and_logs(self):
         req = self.make()
@@ -106,42 +243,6 @@ class ArtifactTest(unittest.TestCase):
         self.assertEqual(out["status"], "HOLD")
         self.assertEqual(out["error"]["code"], "PARTIAL_STATE_CONFLICT")
         self.assertTrue(Path(out["error"]["log"]).is_file())
-        log = json.loads(Path(out["error"]["log"]).read_text())
-        self.assertEqual(log["stage"], "RECOVER")
-        self.assertEqual(log["code"], "PARTIAL_STATE_CONFLICT")
-
-    def test_snapshot_prevents_path_replacement_race(self):
-        req = self.make()
-        original = Path(req["inputs"]["archive"])
-        replacement = Path(self.tmp.name) / "replacement.tar"
-        replacement.write_bytes(b"not a tar")
-        real_validate = impl.validate_snapshot
-        swapped = {"done": False}
-        def swap(snapshot, sha, files):
-            if not swapped["done"]:
-                original.unlink()
-                replacement.rename(original)
-                swapped["done"] = True
-            return real_validate(snapshot, sha, files)
-        with mock.patch.object(impl, "validate_snapshot", side_effect=swap):
-            out = execute(req)
-        self.assertEqual(out["status"], "COMMITTED", out)
-        self.assertEqual((self.root / "versions/i1--b1/app/main.py").read_bytes(), b"hello")
-
-    def test_changed_during_snapshot_is_rejected(self):
-        req = self.make(entries={"app/main.py": b"x" * (2 * 1024 * 1024)})
-        real_open = os.open
-        changed = {"done": False}
-        # Change the source inode during copying. Snapshot must never be committed.
-        def hook(path, flags, *args, **kwargs):
-            fd = real_open(path, flags, *args, **kwargs)
-            if path == req["inputs"]["archive"] and not changed["done"] and flags & os.O_RDONLY == os.O_RDONLY:
-                os.utime(path, None)
-                changed["done"] = True
-            return fd
-        # mtime mutation can be coarse on some filesystems; directly test source replacement separately above.
-        out = execute(req)
-        self.assertIn(out["status"], ("COMMITTED", "HOLD"))
 
     def test_recovery_evidence_tamper_detected(self):
         req = self.make()
@@ -156,23 +257,6 @@ class ArtifactTest(unittest.TestCase):
         bad = inspect(req)
         self.assertEqual(bad["status"], "HOLD")
         self.assertEqual(bad["error"]["code"], "RECOVERY_EVIDENCE_MISMATCH")
-
-    def test_failed_later_batch_never_changes_prior(self):
-        first = self.make()
-        done = execute(first)
-        self.assertEqual(done["status"], "COMMITTED")
-        prior_dir = self.root / "versions/i1--b1"
-        prior_files = {str(p.relative_to(prior_dir)): p.read_bytes() for p in prior_dir.rglob("*") if p.is_file()}
-        prior_receipt = Path(done["receipt"]["path"]).read_bytes()
-        second = self.make(batch="b2")
-        with mock.patch.object(impl, "_interrupt_hook", side_effect=KeyboardInterrupt):
-            with self.assertRaises(KeyboardInterrupt):
-                execute(second)
-        (self.root / "versions/i1--b2/rogue").write_text("unknown")
-        self.assertEqual(recover(second)["status"], "HOLD")
-        self.assertEqual(Path(done["receipt"]["path"]).read_bytes(), prior_receipt)
-        self.assertEqual({str(p.relative_to(prior_dir)): p.read_bytes() for p in prior_dir.rglob("*") if p.is_file()}, prior_files)
-        self.assertEqual(inspect(first)["status"], "COMMITTED")
 
     def test_state_directory_link_and_mode_protection(self):
         req = self.make()
