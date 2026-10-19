@@ -5,6 +5,47 @@ from production.p2_install.coordinator import Coordinator
 from production import p2_runtime
 
 class RuntimeIntegration(unittest.TestCase):
+    def test_cli_execute_inspect_and_recover(self):
+        with tempfile.TemporaryDirectory() as home:
+            root=pathlib.Path(home)
+            coord=root/"coordinator";runtime=root/"runtime"
+            coord.mkdir(mode=0o700);runtime.mkdir(mode=0o700)
+            plan={"schema":1,"release":"a"*64,"batches":["service"]}
+            req={"schema":1,"scope":"ISOLATED_TEST_ONLY","installation_id":"cli",
+                 "batch_id":"service","attempt_id":"cli1","root":str(runtime),
+                 "version":"a"*64,"deadline_utc":int(time.time())+30,
+                 "inputs":{"operation":"start","argv":[sys.executable,"-c","import time;time.sleep(120)"],
+                           "cwd":str(runtime),"env":{},"health":{"type":"process"},"timeout":0.2}}
+            planfile=root/"plan.json";requestfile=root/"request.json"
+            planfile.write_text(json.dumps(plan));requestfile.write_text(json.dumps(req))
+            def run(action):
+                args=[sys.executable,"-m","production.p2_install.coordinator",action,
+                      "--root",str(coord),"--plan",str(planfile),
+                      "--request",str(requestfile),"--runtime",
+                      "--component-root","service="+str(runtime)]
+                call=subprocess.run(args,capture_output=True,text=True,timeout=20,cwd=str(pathlib.Path(__file__).resolve().parents[2]))
+                return json.loads(call.stdout)
+            try:
+                started=run("execute")
+                self.assertEqual(started["status"],"COMMITTED",started)
+                checked=run("inspect")
+                self.assertEqual(checked["status"],"COMMITTED",checked)
+                self.assertNotEqual(started["receipt"],checked["receipt"])
+                entry=json.loads((runtime/"batch-service.json").read_text())
+                os.kill(entry["pid"],signal.SIGKILL)
+                time.sleep(0.2)
+                hold=run("recover")
+                self.assertEqual(hold["status"],"HOLD",hold)
+            finally:
+                try:
+                    entry=json.loads((runtime/"batch-service.json").read_text())
+                    for key in ("pid",):
+                        try: os.kill(entry[key],signal.SIGTERM)
+                        except (ProcessLookupError,KeyError): pass
+                    try: os.kill(entry["collector"]["pid"],signal.SIGTERM)
+                    except (ProcessLookupError,KeyError): pass
+                except (FileNotFoundError,ValueError): pass
+
     def test_real_runtime_receipts_and_sigkill_reconcile(self):
         with tempfile.TemporaryDirectory() as home:
             root=pathlib.Path(home)
