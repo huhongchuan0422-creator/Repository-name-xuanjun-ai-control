@@ -53,7 +53,7 @@ def main():
     request = r.decode(r.read(args.request, args.request_sha256))
     packet = r.decode(r.read(args.evidence, args.evidence_sha256))
     keys = r.load_trust(args.trust, args.trust_sha256)
-    r.decide(request, packet, keys)
+    executor.historical_recipe(request, packet, keys)
     ref = {'path': args.plan, 'sha256': args.plan_sha256}
     plan = executor.signed_plan(request, packet, ref)
     manifest = r.decode(r.read(plan['assembly_manifest']['path'], plan['assembly_manifest']['sha256']))

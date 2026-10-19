@@ -77,7 +77,18 @@ class UnixEvidenceProvider(object):
         # Fresh query must still prove the complete old-authority isolation and
         # historical reconciliation contract. UNKNOWN cannot authorize writes.
         r.need(self.plan_ref in body['packet']['body']['sources'], 'FRESH_PLAN_NOT_SIGNED')
+        r.need(r.canonical(body['packet']['body']['restoration']) ==
+               r.canonical(self.restoration), 'LIVE_RESTORATION_CHANGED')
         return r.decide(request, body['packet'], self.keys, now)
+
+
+def historical_recipe(request, packet, keys):
+    # A stored signed recipe may outlive its initial evidence window. It is
+    # never current permission: the online, nonce-bound three-signature packet
+    # must independently pass decide(now) before any production write/entry.
+    issued = packet['body']['issued_utc']
+    r.need(type(issued) is int and issued <= int(time.time()), 'RECIPE_FUTURE')
+    return r.decide(request, packet, keys, now=issued)
 
 
 def load_plan(ref, request):
@@ -163,9 +174,10 @@ class RecoveryGate(object):
         self.request, self.packet, self.keys, self.ref = request, packet, keys, plan_ref
         self.plan = signed_plan(request, packet, plan_ref)
         self.registry, self.assembly = registry, assembly
-        r.decide(request, packet, keys)
+        historical_recipe(request, packet, keys)
         self.provider = UnixEvidenceProvider(self.plan['provider_socket'], keys)
         self.provider.plan_ref = plan_ref
+        self.provider.restoration = packet['body']['restoration']
 
     def verify(self, operation='execution_gate', require_committed=True):
         # The initial packet is checked when the gate is constructed. Every

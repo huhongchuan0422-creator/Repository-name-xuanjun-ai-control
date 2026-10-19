@@ -14,11 +14,11 @@ A只接受原管理执行器形成并三方签名绑定的一致性备份，绝�
 
 B只在UNRECOVERABLE_WITH_DISPOSITION、旧权威可信隔离及历史副作用处置成立后调用原AuthorityStore(initialize=True)。不存在任何“未找到即首次初始化”的捷径。新Grant独立身份，最多5次持久消费，原独立授权正文及编号不逐次改变；旧Grant不能自动重放。原库、WAL、备份和回执不改。
 
-apply在现存root0700检查点目录取得独占锁。AuthorityStore目标及sidecar、issuer锁任何已存在状态拒绝覆盖。数据库、Grant、cycle及新权威来源落盘后登记原Registry，再写O_EXCL恢复回执、fsync文件/目录，最后通过SQLite FULL独立提交索引发布。serve/run只读核验该提交，不自动补登记。提交成功后进程重启可幂等再入，不重置额度。未提交的数据库或回执保留并HOLD；不能删除后重试或自动采纳。失败恢复需管理Provider先对新恢复副作用作可信对账，当前版本对这种未提交输出不自动续写，属于明确保留的人工恢复边界。
+apply在现存root0700检查点目录取得独占锁。AuthorityStore目标及sidecar、issuer锁任何已存在状态拒绝覆盖。数据库、Grant、cycle及新权威来源落盘后登记原Registry，再写O_EXCL恢复回执、fsync文件/目录，最后通过SQLite FULL独立提交索引发布。serve/run只读核验该提交，不自动补登记。提交成功后进程重启可幂等再入，不重置额度。历史三签包只作为已签名请求/plan/备份配方，不能作为当前许可；即使原5分钟证据窗口已过，正式入口仍可自动向真实Provider取得新鲜nonce/时限/三签隔离及对账证明，Grant仍须有效，审核ID及批准正文不改变。新鲜证明缺失或恢复快照变化时HOLD。未提交的数据库或回执保留并HOLD；不能删除后重试或自动采纳。失败恢复需管理Provider先对新恢复副作用作可信对账，当前版本对这种未提交输出不自动续写，属于明确保留的人工恢复边界。
 
 ## 真实管理Provider接口（客户端已实现，英国部署未证实）
 
-管理执行器通过显式配置的root0600 Unix流式socket提供接口；父链root保护且拒绝符号链接，SO_PEERCRED必须uid0。4字节网络序长度+canonical JSON，最大262144字节、单次5秒。请求严格为schema=1、operation、request_sha256、challenge(随机32hex)。operation=recovery_apply要求原控制面原子保留唯一新权威；operation=execution_gate要求核对/续接同一排他绑定，不能另建Writer。
+管理执行器通过显式配置的root0600 Unix流式socket提供接口；父链root保护且拒绝符号链接，SO_PEERCRED必须uid0。4字节网络序长度+canonical JSON，最大262144字节、单次5秒。请求严格为schema=1、operation、request_sha256、challenge(随机32hex)。operation=recovery_apply要求原控制面持久、原子地按旧权威隔离范围保留唯一新权威，重复同request_sha256/plan_sha256幂等返回原保留记录；冲突必须拒绝，断连UNKNOWN后不得切换新ID；operation=execution_gate要求核对/续接同一排他绑定，不能另建Writer。
 
 响应body/signatures，body严格为schema、probe(完整原请求)、issued_utc、expires_utc(最多30秒)、packet、reservation。owner/isolation/reconciliation三把既定且不同的公钥均验证完整body签名；packet也必须满足原三签恢复证据协议及完整历史对账，sources包含准确plan引用。reservation严格绑定old_authority_id、authority_id、epoch、fence(与新Epoch相同起点)、writer_id、grant_id、database、plan_sha256及exclusive=true。UNKNOWN、失效租约、冲突、断连、旧nonce或签名错误均拒绝，不能缓存旧成功答复。
 

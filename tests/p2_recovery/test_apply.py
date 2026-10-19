@@ -172,6 +172,9 @@ class ApplyTests(unittest.TestCase):
                     request = r.decode(exact(struct.unpack('!I',exact(4))[0]))
                     if self.provider_fault == 'disconnect':continue
                     packet = self.signed()
+                    packet['body']['issued_utc']=int(time.time())-1
+                    packet['body']['expires_utc']=int(time.time())+20
+                    packet['signatures']=self.signatures(packet['body'])
                     response = {'schema':1,'probe':request,'issued_utc':int(time.time())-1,
                                 'expires_utc':int(time.time())+20,'packet':packet,
                                 'reservation':{'old_authority_id':self.request['old_authority_id'],
@@ -233,6 +236,33 @@ class ApplyTests(unittest.TestCase):
         db=sqlite3.connect(self.cfg['database'])
         self.assertEqual(db.execute('SELECT consumed,terminal FROM grants').fetchone(),(5,1));db.close()
 
+    def test_first_success_stops_remaining_attempts(self):
+        self.apply();store=authority_store.AuthorityStore(self.cfg['database'])
+        try:
+            token=store.lease(self.g,self.request['writer_id'])
+            store.consume(self.g,'attempt-1',1,'a'*64,token)
+            store.reconcile(self.g,'attempt-1','SUCCESS','b'*64,token,lambda *args:True)
+            with self.assertRaises(receipt_provider.Hold):
+                store.consume(self.g,'attempt-2',2,'a'*64,token)
+        finally:store.close()
+        self.apply()
+        db=sqlite3.connect(self.cfg['database'])
+        self.assertEqual(db.execute('SELECT consumed,terminal FROM grants').fetchone(),(1,1));db.close()
+
+    def test_five_safe_failures_exhaust_quota(self):
+        self.apply();store=authority_store.AuthorityStore(self.cfg['database'])
+        try:
+            token=store.lease(self.g,self.request['writer_id'])
+            for n in range(1,6):
+                store.consume(self.g,'attempt-'+str(n),n,'a'*64,token)
+                store.reconcile(self.g,'attempt-'+str(n),'NO_WRITE','b'*64,token,lambda *args:True)
+            with self.assertRaises(receipt_provider.Hold):
+                store.consume(self.g,'attempt-6',5,'a'*64,token)
+        finally:store.close()
+        self.apply()
+        db=sqlite3.connect(self.cfg['database'])
+        self.assertEqual(db.execute('SELECT consumed FROM grants').fetchone(),(5,));db.close()
+
     def test_unknown_no_database_created(self):
         self.provider_fault='unknown'
         with self.assertRaises(r.Hold):self.apply()
@@ -245,6 +275,23 @@ class ApplyTests(unittest.TestCase):
 
     def test_provider_fence_conflict_rejected(self):
         self.provider_fault='fence'
+        with self.assertRaises(r.Hold):self.apply()
+        self.assertFalse(os.path.lexists(self.cfg['database']))
+
+    def test_expired_recipe_renews_from_live_provider_without_new_approval(self):
+        self.apply()
+        original_review=self.cfg['review_id'];original_sha=self.g['approval_body_sha256']
+        self.body['issued_utc']=int(time.time())-1000
+        self.body['expires_utc']=self.body['issued_utc']+200
+        self.gate().verify()
+        self.assertEqual(self.apply()['state'],'ALREADY_APPLIED_NOT_ACTIVATED')
+        self.assertEqual(self.cfg['review_id'],original_review)
+        self.assertEqual(self.g['approval_body_sha256'],original_sha)
+
+    def test_expired_recipe_cannot_bypass_unknown_live_provider(self):
+        self.body['issued_utc']=int(time.time())-1000
+        self.body['expires_utc']=self.body['issued_utc']+200
+        self.provider_fault='unknown'
         with self.assertRaises(r.Hold):self.apply()
         self.assertFalse(os.path.lexists(self.cfg['database']))
 
