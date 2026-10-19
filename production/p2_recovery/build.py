@@ -3,7 +3,7 @@ import hashlib,json,os,subprocess,sys,tarfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 FILES=['production/p2_recovery/recovery.py','production/p2_recovery/README.md',
-       'production/p2_recovery/build.py','tests/p2_recovery/test_recovery.py',
+       'production/p2_recovery/build.py','tests/p2_recovery/test_recovery.py','tests/p2_recovery/cli_acceptance.py',
        '.github/workflows/p2-authority-recovery.yml']
 def main():
     out=Path(sys.argv[1]);out.mkdir(parents=True,exist_ok=False)

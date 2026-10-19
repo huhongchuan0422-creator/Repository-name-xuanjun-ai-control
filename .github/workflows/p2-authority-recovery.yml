@@ -30,6 +30,12 @@ jobs:
             python -I -B -S tests/p2_recovery/test_recovery.py > /output/tests.log 2>&1
             cat /output/tests.log
           '
+      - name: Formal CLI with explicit synthetic hostname
+        env:
+          PYTHON_VERSION: ${{ matrix.python }}
+        run: |
+          set -euo pipefail
+          docker run --rm --user 0:0 --hostname iZd7oeikknn1z21sq6ji6zZ -e P2_SYNTHETIC_CLI=1 -v "$PWD:/repo:ro" -w /repo "python:${PYTHON_VERSION}" python -I -B -S tests/p2_recovery/cli_acceptance.py
       - name: Bind source and inherited runtime bytes
         run: python3 -I -B -S production/p2_recovery/build.py recovery-package
       - uses: actions/upload-artifact@v4

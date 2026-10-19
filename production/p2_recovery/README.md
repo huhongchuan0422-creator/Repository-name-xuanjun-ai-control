@@ -45,3 +45,5 @@ Owner/基础设施管理方最小操作：
 本轮可以交付准确、无占位符的源码自检命令，但不能给出可实际通过的生产assess/activate命令：真实信任SHA、证据原件路径、旧权威ID/Epoch尚未提供。调用者不能把测试密钥/合成证据带到英国。没有后台生产任务。
 
 41项新增测试使用真实RSA、root隔离目录、SQLite和子进程，所有管理事实明确SYNTHETIC_TEST_ONLY；不是生产验收。旧底层代码/CI限定结论继承；本模块尚未接入serve/run，所以不得声称已恢复生产安装能力。新建Authority/Grant/激活入口仍待可信现场隔离Provider及恢复执行范围落地。本增量先完成能独立实现的证据准入和持久检查点，避免再次将管理员口头前置当作已实现的生产动作。
+
+另在明确SYNTHETIC_CONTAINER环境中设置固定UK hostname，真实独立-I -B -S CLI执行assess、checkpoint、跨进程幂等确认和过期拒绝；无host验证绕过或生产fixture参数。容器名称不冒充英国真实主机。
