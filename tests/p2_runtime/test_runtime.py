@@ -73,7 +73,7 @@ class Lifecycle(unittest.TestCase):
         req=self.req()
         cfg=p2_runtime.config_payload(req["inputs"])
         prepared={"installation_id":"install","batch_id":"b1","attempt_id":"attempt-b1","phase":"PREPARED",
-                  "config_sha256":p2_runtime.sha(cfg),"log":str(self.root/"run-b1.log"),"members":[]}
+                  "config_sha256":p2_runtime.digest(cfg),"log":str(self.root/"run-b1.log"),"members":[]}
         (self.root/"batch-b1.json").write_text(json.dumps(prepared))
         self.assertEqual(recover(req)["error"]["code"],"START_OUTCOME_UNKNOWN")
         self.assertEqual(execute(req)["error"]["code"],"START_OUTCOME_UNKNOWN")
@@ -96,16 +96,29 @@ class Lifecycle(unittest.TestCase):
             rec=self.record(); self.assertEqual(p2_runtime.validate_identity(rec)[0],"GONE")
         finally: p2_runtime.MAX_LOG=old
 
-    def test_stop_timeout_holds_without_touching_other_batch(self):
-        first=self.req("first"); second=self.req("second")
+    def test_real_stop_timeout_holds_without_touching_other_batch(self):
+        stubborn=[sys.executable,"-c","import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); time.sleep(60)"]
+        first=self.req("first",argv=stubborn); second=self.req("second")
         self.assertEqual(execute(first)["status"],"COMMITTED"); self.assertEqual(execute(second)["status"],"COMMITTED")
         a,b=self.record("first"),self.record("second"); self.pids += [a["pid"],b["pid"]]
-        original=p2_runtime.terminate_owned
-        p2_runtime.terminate_owned=lambda entry,timeout:"STOP_TIMEOUT"
-        try:
-            out=execute(self.req("first","stop")); self.assertEqual(out["error"]["code"],"STOP_TIMEOUT")
-            self.assertEqual(inspect(second)["status"],"COMMITTED")
-        finally: p2_runtime.terminate_owned=original
+        out=execute(self.req("first","stop",argv=stubborn,timeout=.08))
+        self.assertEqual(out["status"],"HOLD",out); self.assertEqual(out["error"]["code"],"STOP_TIMEOUT")
+        self.assertEqual(inspect(second)["status"],"COMMITTED")
+
+    def test_leader_exit_with_child_alive_is_not_no_effect(self):
+        code="import subprocess,sys; subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)'])"
+        req=self.req(argv=[sys.executable,"-c",code],timeout=.08)
+        out=execute(req)
+        self.assertEqual(out["status"],"COMMITTED",out)
+        rec=self.record(); self.pids.append(rec["pid"])
+        time.sleep(.15)
+        state,group=p2_runtime.workload_state(rec)
+        self.assertEqual(state,"LIVE")
+        self.assertGreaterEqual(len(group),1)
+        observed=inspect(req)
+        self.assertEqual(observed["status"],"COMMITTED",observed)
+        stopped=execute(self.req(operation="stop",argv=req["inputs"]["argv"]))
+        self.assertEqual(stopped["status"],"COMMITTED",stopped)
 
     def test_short_process_failure_cleaned_and_no_effect_only_after_group_gone(self):
         out=execute(self.req(argv=[sys.executable,"-c","pass"]))
