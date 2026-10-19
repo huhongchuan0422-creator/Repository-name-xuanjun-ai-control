@@ -13,7 +13,13 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
   const request=(path,data,credential,scene)=>new Promise((resolve,reject)=>{
     wx.request({url:baseUrl+path,method:'POST',data,timeout:5000,
       header:{'content-type':'application/json',...(credential?{'X-Community-Session':credential}:{}),...(scene?{'X-Community-Scene':scene}:{})},
-      success:r=>r.statusCode===200?resolve(r.data):reject(Error('SERVICE_REQUEST_REJECTED')),
+      success:r=>{
+        if(r.statusCode===200){resolve(r.data);return;}
+        const error=Error('SERVICE_REQUEST_REJECTED');
+        // Keep definite access refusal distinct from transport uncertainty. Never expose its body.
+        if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
+        reject(error);
+      },
       fail:()=>reject(Error('SERVICE_RESULT_UNKNOWN'))});
   });
   return {

@@ -243,6 +243,12 @@ Page({
   noticeRequestCurrent(request) {
     return this._noticeRequest===request&&this.noticeContextCurrent(request.context);
   },
+  noticeRequestFailed(request,error) {
+    if(!this.noticeRequestCurrent(request))return;
+    const denied=error&&(error.code==='ACCESS_DENIED'||error.message==='SESSION_EXPIRED');
+    this.setData({...(denied?{notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false}:{}),
+      noticeStatus:denied?'通知访问已被拒绝或会话已过期，请重新确认授权后读取':error.message});
+  },
   async loadNotices(e) {
     if(this._pageUnloaded||!this.session||this.data.pending)return;
     const context=this.prepareNoticeContext();
@@ -263,7 +269,7 @@ Page({
       for(const record of r.records){const prior=records.get(record.id);records.set(record.id,{...record,read:record.read||!!(prior&&prior.read)});}
       this.setData({notices:Array.from(records.values()),noticeCursor:r.next_cursor,
         noticesMore:r.has_more,noticesLoaded:true});
-    } catch(error) {if(this.noticeRequestCurrent(request))this.setData({noticeStatus:error.message});}
+    } catch(error) {this.noticeRequestFailed(request,error);}
     finally {if(this.noticeRequestCurrent(request)){this._noticeRequest=null;this.setData({noticePending:false});}}
   },
   async markNoticeRead(e) {
@@ -279,7 +285,7 @@ Page({
       if(!this.noticeRequestCurrent(request))return;
       if(!r||r.id!==id||r.read!==true)throw Error('通知已读状态未确认，请重试或刷新通知');
       this.setData({notices:this.data.notices.map(notice=>notice.id===id?{...notice,read:true}:notice)});
-    } catch(error) {if(this.noticeRequestCurrent(request))this.setData({noticeStatus:error.message});}
+    } catch(error) {this.noticeRequestFailed(request,error);}
     finally {if(this.noticeRequestCurrent(request)){this._noticeRequest=null;this.setData({noticePending:false});}}
   },
   async profileAction(e) {
