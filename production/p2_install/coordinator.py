@@ -210,6 +210,24 @@ class Coordinator:
                            self._verify_previous)
         return self._reconcile(request, launch=True)
 
+    def _automatic_failure(self, request, cause):
+        # A stable (attempt,cause) key prevents repeated readbacks from
+        # inflating the escalation budget or erasing earlier evidence.
+        stored = self.journal.db.execute(
+            "SELECT evidence FROM coordinator_failures WHERE installation=? AND cause=?",
+            (request["installation_id"],cause)).fetchall()
+        for (raw,) in stored:
+            try:
+                if json.loads(raw).get("attempt_id") == request["attempt_id"]:
+                    return
+            except ValueError:
+                continue
+        self.journal.db.execute(
+            "INSERT INTO coordinator_failures(installation,cause,observed,evidence) VALUES (?,?,?,?)",
+            (request["installation_id"],cause,self.now(),
+             canonical({"attempt_id":request["attempt_id"],
+                        "request_sha256":digest(request)}).decode("ascii")))
+
     def _reconcile(self, request, launch=False):
         adapter = self._adapter(request["batch_id"])
         try:
@@ -246,8 +264,10 @@ class Coordinator:
                     (request["attempt_id"],"FAIL",self.now(),
                      canonical({"result":"VERIFIED_NO_EFFECT"}).decode("ascii")))
                 return _receipt(request, "NO_EFFECT", rec)
+            self._automatic_failure(request,"UNKNOWN_EFFECT")
             return _receipt(request, "HOLD", error={"code":"UNKNOWN_EFFECT"})
         except (OSError, ValueError, KeyError, Hold) as exc:
+            self._automatic_failure(request,"RECONCILE_REQUIRED")
             return _receipt(request, "HOLD",
                             error={"code":"RECONCILE_REQUIRED",
                                    "detail":type(exc).__name__})
