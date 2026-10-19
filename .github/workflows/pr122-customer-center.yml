@@ -32,7 +32,7 @@ jobs:
           sha256sum /tmp/pr122-customer/wheels/* > /tmp/pr122-customer/WHEEL_SHA256SUMS
           python -m pip install --no-index --find-links /tmp/pr122-customer/wheels cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
       - name: SMTP TLS mode and durable unknown offline regression
-        run: python -B -m unittest tests.test_pr122_customer_smtp -v
+        run: python -B -m unittest tests.test_pr122_customer_providers.SMTPTransportTests -v
       - name: Authentication authorization material channels and encrypted restore
         shell: bash
         run: |
