@@ -130,16 +130,12 @@ class CoordinatorTests(unittest.TestCase):
             self.assertIn(recovery["status"],("HOLD","NO_EFFECT"))
             self.assertEqual(c.journal.latest("one")[1],"RETRYABLE")
 
-    def test_five_attempts_preserved(self):
+    def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
-        for number in range(5):
+        for number in range(7):
             with self.open() as c:
                 req=self.request("a"+str(number));req["round_id"]="r"+str(number)
                 self.assertEqual(c.execute(req)["status"],"NO_EFFECT")
-        with self.open() as c:
-            with self.assertRaises(Hold):
-                req=self.request("six");req["round_id"]="six"
-                c.execute(req)
 
 if __name__=="__main__":
     unittest.main()
