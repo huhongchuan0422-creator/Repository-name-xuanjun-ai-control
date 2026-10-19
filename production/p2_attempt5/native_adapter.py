@@ -196,6 +196,37 @@ def public_modulus(cfg):
     return modulus
 
 
+def private_resume_inputs(kit, plan_ref, seed_ref):
+    """Read the published lifecycle pair without renaming immutable inputs.
+
+    Successor inputs retain their original frozen loader validation. Lifecycle
+    publication uses a distinct filename family; SHA-bound binding selects one
+    exact pair, and the frozen hydrator still validates the full seed contract.
+    """
+    reference(plan_ref)
+    reference(seed_ref)
+    parent = ('/var/lib/xuanjun-p2-preparation/'
+              'artifact-11796280855-p2pkg-38372304180-1/'
+              'complete-install-candidate-38503014520')
+    lifecycle = (
+        'epoch7-lifecycle-approved-plan-' + plan_ref['sha256'][:16] + '.private.json',
+        'epoch7-lifecycle-resume-inputs-' + seed_ref['sha256'][:16] + '.private.json')
+    names = (os.path.basename(plan_ref['path']), os.path.basename(seed_ref['path']))
+    if names != lifecycle:
+        return kit._private_resume_inputs(plan_ref['path'], plan_ref['sha256'],
+                                          seed_ref['path'], seed_ref['sha256'])
+    need(os.path.dirname(plan_ref['path']) == parent and
+         os.path.dirname(seed_ref['path']) == parent, 'PRIVATE_INPUT_PATH')
+    plan_raw = read(plan_ref['path'], plan_ref['sha256'], bound=2 * 1024 * 1024)
+    seed_raw = read(seed_ref['path'], seed_ref['sha256'], bound=64 * 1024 * 1024)
+    plan, envelope = decode(plan_raw), decode(seed_raw)
+    need(type(plan) is dict and type(envelope) is dict and
+         set(envelope) == {'schema', 'seed'} and
+         type(envelope['schema']) is int and envelope['schema'] == 2 and
+         type(envelope['seed']) is dict, 'PRIVATE_SEED_SCHEMA')
+    return plan_raw, plan, envelope['seed']
+
+
 def build_driver(cfg):
     """Reuse the reviewed private-seed compiler and concrete 16-phase factory.
 
@@ -212,8 +243,7 @@ def build_driver(cfg):
                                      LEGACY_ENTRY_SHA)
     kit = bootstrap.verify_kit(root + '/legacy', value['legacy_manifest_sha256'])
     plan_ref, seed_ref = value['approved_plan'], value['private_seed']
-    plan_raw, plan, private = kit._private_resume_inputs(
-        plan_ref['path'], plan_ref['sha256'], seed_ref['path'], seed_ref['sha256'])
+    plan_raw, plan, private = private_resume_inputs(kit, plan_ref, seed_ref)
     seed = kit._hydrate_seed(private, factory)
     evidence = kit._authenticate_probe_receipt(seed['observation'])
     prepared = factory.prepare_host_inputs(seed)
@@ -224,8 +254,7 @@ def build_driver(cfg):
     contract = factory.compile_host_contract(inputs)
     need(all(canonical(plan.get(k)) == canonical(v) for k, v in contract.items()),
          'APPROVED_CONTRACT_CHANGED')
-    kit._private_resume_inputs(plan_ref['path'], plan_ref['sha256'],
-                               seed_ref['path'], seed_ref['sha256'])
+    private_resume_inputs(kit, plan_ref, seed_ref)
     need(kit._authenticate_probe_receipt(seed['observation']) == evidence,
          'PROBE_RECEIPT_CHANGED')
     driver = factory.assemble_host_driver(plan_raw, inputs, value['legacy_review_id'],
