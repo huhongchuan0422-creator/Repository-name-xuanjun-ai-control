@@ -1,0 +1,47 @@
+# P2受控权威恢复增量
+
+原任务PR17。运行基线6041c7458dce7c83c49c5a9eafa0e20cef52d1c0 / Tree 8e27d077d22af392108568ac06d284df4dd4b35e。已有英国Kit/Assembly及Registry目录原样复用。不修改原951项、175项已通过源码，不涉及PR99、PR122、东京或资金系统。
+
+## 已实现与明确边界
+
+recovery.py提供正式assess/checkpoint命令，校验独立管理来源签名，形成有期限、准确版本及请求绑定的恢复决策，checkpoint持久发布经过文件fsync、目录fsync及SQLite FULL元数据事务。没有initialize/register/activate命令，不打开生产AuthorityStore、不创建生产密钥、不发Grant、不调16阶段。决策成功只叫RECOVERY_EVIDENCE_VALIDATED_NOT_ACTIVATED，不能替代安装准入或真实隔离动作。
+
+这是原部署管理链丢失后的新增恢复准入模块，不是再次搜索“从未部署”的证明。旧历史无法取得时，B路线允许在隔离和副作用处置证据成立后提出新权威；新权威ID、新Epoch、唯一Writer ID和新Grant ID明确与旧权威分开。原库UNKNOWN不能因为还有额度而绕过。证据程序不签发首次部署资格、不认定历史不存在。
+
+## 旧权威隔离与来源
+
+必须由Owner固定的三类管理公钥分别签署同一证据正文：owner、isolation、reconciliation。三把公钥DER摘要必须不同；公钥原件root0600、逐父链root保护且无ACL。信任JSON自身的准确SHA由原受信Owner执行通道固定；不能从证据包自带公钥推导信任。生产代码没有私钥生成或fixture分支。所有签名用RSA2048–4096/e65537/SHA256，OpenSSL验证。
+
+证据必须覆盖八类潜在通道：ssh、ram_swas、github_runners、systemd、schedulers、issuer_api、storage_clones、other_hosts。每类有实际source_id、隔离/不存在证明回执SHA；UNKNOWN、仅STOPPED、未涵盖的外部Writer和不完整清单拒绝。该枚举是最低分类，不是代码自动发现全世界Writer；完整性由原基础设施管理方的准确范围和原件背书，任何不能归入清单的外部通道应列unknown_writers，不允许默默省略。
+
+管理动作应在原控制面落实：回收旧执行主体的写入资格和旧Grant、使原副作用入口拒绝旧Epoch/Fence、排空原调用并核对InvokeId、阻止旧Runner/定时器恢复领取、隔离可写存储克隆及其他主机。服务inactive或本机flock不证明跨主机失效。本模块只验证这些动作的可信回执，不声称已经执行云权限、SSH身份或原事务的撤销。不借用其他项目身份，不解除已有mask，不启动Runner。
+
+## 证据协议
+
+请求字段严格固定：schema=1、host、source_commit/source_tree(固定原运行版本)、recovery_id、old_authority_id/new_authority_id、old_epoch/new_epoch(严格增加)、writer_id、new_grant_id、route、target_database、nonce(64位小写十六进制)。旧权威未知时不可编造old_authority_id/Epoch；这是仍需现场管理资料或受信隔离体系确定的外部输入。target_database是决策目标，程序不会访问或创建它。
+
+包为body/signatures；正文包含schema、request_sha256、issued_utc/expires_utc(最多300秒)、inventory、isolation、history、sources、restoration。三签名均覆盖canonical ASCII JSON完整body。准确请求含主机/新旧权威/版本/nonce，不能复用旧包批准另一请求。sources是已保管原件path/sha256数组，逐一读取并校验，仅输出摘要。isolation要求all_old_tokens_rejected=true、旧ID/Epoch准确、revoked_grants_sha256和enforcement_sha256；history要求RECONCILED、无pending_transactions/unknown_effects、old_grants_not_reissued=true，并保留数据库及sidecar、备份、执行回执三类来源证据。布尔值必须来自已签名管理证据，不能据服务停止本地产生。
+
+A RESTORE_EXISTING：restoration.status=CONSISTENT_BACKUP_VERIFIED，snapshot为由原管理执行器已创建的一致性备份的path/sha256。此模块不生成快照，不对未知活库使用immutable忽略WAL。先校验受保护备份原件与SHA，再复制到root私有临时目录只读检查，原件逐字保留；SQLite quick_check/schema/Grant及ordinal连续性/最多5次/UNKNOWN检查失败即HOLD。该核验不构成全部业务Audit语义完整性证明，原事务/备份来源及副作用由可信reconciliation签名负责。恢复必须回到原唯一库并保留全部表、Grant/Attempt/Audit与原额度；本模块不导出重建一份库。已有SUCCESS不可重跑，额度不清零。
+
+B NEW_AUTHORITY：restoration.status=UNRECOVERABLE_WITH_DISPOSITION且snapshot=null；此状态由管理方提供明确依据，不由本模块从“未找到”推断。必须先满足相同隔离、无未知副作用及旧历史安全处置条件。后续创建仍需专用受控初始化动作、唯一新权威来源登记和服务端每次调用的实际Fence约束；本模块不能替代它们。旧Grant不得在新库重新注册，新的Grant需真实Owner认证，不能自行伪造准确批准正文。
+
+## 持久检查点及失败恢复
+
+assess不创建持久文件；签名验证及备份核验会创建并清理/root内只含公开签名/公钥或一致性快照的私有临时目录，不能描述为零文件系统副作用。checkpoint只写显式既有root0700 recovery checkpoint目录，不创建根。它的.recovery-commits.sqlite3只存决策摘要和inode，不是生产AuthorityStore，不含Grant余额，也不能作为唯一Writer证明。
+
+准确recovery_id.json以O_EXCL/root0600写入并fsync，目录fsync后才以独立SQLite FULL提交发布。部分写入/目录同步失败无提交行，原输出保留，重启或重试不得补认成功；已提交同内容可幂等读回。冲突/链接/硬链接/目录不受保护/未决metadata journal拒绝。不删除数据库或WAL/sidecar，不自动恢复meta索引，不因进程重启重置任何Attempt。每次正式入口仍重新认证签名和有效期，旧持久决策不是无限期执行许可。
+
+## 英国执行与剩余管理操作
+
+当前英国没有本恢复增量，不重跑FIRST_DEPLOY。源码和CI不等于现场隔离。
+
+Owner/基础设施管理方最小操作：
+1. 指定原受信管理通道中可执行旧权威隔离及副作用对账的实际身份，固定三类公开信任摘要；不公开私钥。
+2. 在原控制面完成八类通道排空/隔离和原InvokeId/副作用对账，保留原数据、WAL及备份。未知通道必须显式保留为阻塞。
+3. 通过该通道交付与本次nonce/新旧Epoch准确绑定的三签名包及来源原件。若原库恢复则供一致性快照；无法恢复需明确disposition依据。
+4. 只有包校验成功，才可制定新Authority初始化/原库继承、真实Signer/Registry binding和最终16阶段执行。现在不生成猜测值的英国activate命令。
+
+本轮可以交付准确、无占位符的源码自检命令，但不能给出可实际通过的生产assess/activate命令：真实信任SHA、证据原件路径、旧权威ID/Epoch尚未提供。调用者不能把测试密钥/合成证据带到英国。没有后台生产任务。
+
+41项新增测试使用真实RSA、root隔离目录、SQLite和子进程，所有管理事实明确SYNTHETIC_TEST_ONLY；不是生产验收。旧底层代码/CI限定结论继承；本模块尚未接入serve/run，所以不得声称已恢复生产安装能力。新建Authority/Grant/激活入口仍待可信现场隔离Provider及恢复执行范围落地。本增量先完成能独立实现的证据准入和持久检查点，避免再次将管理员口头前置当作已实现的生产动作。

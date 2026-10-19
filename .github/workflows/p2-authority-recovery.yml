@@ -1,0 +1,41 @@
+name: P2 authority recovery affected acceptance
+on:
+  push:
+    branches: [repair/p2-chatgpt-clean-review-20261013]
+    paths:
+      - 'production/p2_recovery/**'
+      - 'tests/p2_recovery/**'
+      - '.github/workflows/p2-authority-recovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.6.15', '3.12.15']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Isolated real RSA SQLite and restart acceptance
+        env:
+          PYTHON_VERSION: ${{ matrix.python }}
+        run: |
+          set -euo pipefail
+          mkdir recovery-output
+          docker run --rm --user 0:0 -v "$PWD:/repo:ro" -v "$PWD/recovery-output:/output" -w /repo "python:${PYTHON_VERSION}" sh -ec '
+            python -I -B -S tests/p2_recovery/test_recovery.py > /output/tests.log 2>&1
+            cat /output/tests.log
+          '
+      - name: Bind source and inherited runtime bytes
+        run: python3 -I -B -S production/p2_recovery/build.py recovery-package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-recovery-${{ matrix.python }}
+          path: |
+            recovery-output/tests.log
+            recovery-package/*
+          if-no-files-found: error
