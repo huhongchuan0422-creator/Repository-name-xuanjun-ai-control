@@ -41,18 +41,11 @@ def _receipt(request, status, evidence=None, error=None):
             "batch_id": request["batch_id"], "attempt_id": request["attempt_id"],
             "status": status, "receipt": evidence, "error": error}
 
-def _check_reply(request, reply, expected):
-    require(type(reply) is dict and reply.get("schema") == 1
-            and reply.get("scope") == "ISOLATED_TEST_ONLY", "REPLY_SCHEMA")
-    for key in ("installation_id", "batch_id", "attempt_id"):
-        require(reply.get(key) == request[key], "REPLY_IDENTITY")
-    require(reply.get("status") == expected, "REPLY_STATUS")
-    rec = reply.get("receipt")
+def _check_receipt_reference(request, rec):
     require(type(rec) is dict and
             type(rec.get("path")) is str and os.path.isabs(rec["path"]) and
             type(rec.get("sha256")) is str and HEX.fullmatch(rec["sha256"]),
             "RECEIPT_FORMAT")
-    # Only read receipts in the owned root; never accept an arbitrary path.
     p = Path(rec["path"])
     root = Path(request["root"]).resolve()
     require(root in p.parents and p.resolve() == p and p.is_file() and
@@ -62,6 +55,14 @@ def _check_reply(request, reply, expected):
             hashlib.sha256(content).hexdigest() == rec["sha256"],
             "RECEIPT_DIGEST")
     return rec
+
+def _check_reply(request, reply, expected):
+    require(type(reply) is dict and reply.get("schema") == 1
+            and reply.get("scope") == "ISOLATED_TEST_ONLY", "REPLY_SCHEMA")
+    for key in ("installation_id", "batch_id", "attempt_id"):
+        require(reply.get(key) == request[key], "REPLY_IDENTITY")
+    require(reply.get("status") == expected, "REPLY_STATUS")
+    return _check_receipt_reference(request, reply.get("receipt"))
 
 class Coordinator:
     def __init__(self, root, plan, adapters=None, now=None, component_roots=None, grant=None):
@@ -84,13 +85,14 @@ class Coordinator:
                    "id INTEGER PRIMARY KEY, attempt TEXT NOT NULL,"
                    "kind TEXT NOT NULL, observed INTEGER NOT NULL,"
                    "evidence TEXT NOT NULL)")
-        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS coordinator_once "
-                   "ON coordinator_events(attempt,kind)")
+        # Legacy schema briefly enforced one event per (attempt,kind), but
+        # PROGRESS is intentionally repeatable. Drop the legacy index before
+        # any operation that could validate it against preserved history.
+        db.execute("DROP INDEX IF EXISTS coordinator_once")
         db.execute("CREATE TABLE IF NOT EXISTS coordinator_outbox ("
                    "id TEXT PRIMARY KEY, attempt TEXT NOT NULL, event TEXT NOT NULL,"
                    "state TEXT NOT NULL, detail TEXT NOT NULL)")
         # Historic isolated round rows are preserved, but are not admission or quota.
-        db.execute("DROP INDEX IF EXISTS coordinator_once")
         db.execute("CREATE TABLE IF NOT EXISTS coordinator_failures (seq INTEGER PRIMARY KEY, installation TEXT, cause TEXT, observed INTEGER, evidence TEXT)")
         return self
 
@@ -167,6 +169,21 @@ class Coordinator:
         except (OSError, ValueError, KeyError):
             return False
 
+    def _commit_from_reply(self, request, reply, observed):
+        """Return the immutable original commit receipt for a COMMITTED reply.
+
+        Runtime observations have a new observation receipt on every inspect,
+        while commit_receipt remains the immutable original start receipt.
+        Components that use one immutable receipt for both commit and inspect
+        legitimately omit commit_receipt and therefore fall back to observed.
+        """
+        commit = reply.get("commit_receipt")
+        if commit is None:
+            return observed
+        _check_receipt_reference(request, commit)
+        require(self._matches(request, commit, observed), "COMMIT_LINK_CONFLICT")
+        return commit
+
     def _call(self, adapter, method, request, seconds):
         parent, child = multiprocessing.Pipe(False)
         def worker():
@@ -238,18 +255,27 @@ class Coordinator:
             if not launch and result.get("status") == "HOLD":
                 result = self._call(adapter,"recover",request,10)
             if result.get("status") == "COMMITTED":
-                rec = _check_reply(request, result, "COMMITTED")
-                # Commit requires independent inspect/readback.
+                observed = _check_reply(request, result, "COMMITTED")
+                commit = self._commit_from_reply(request, result, observed)
+                # Commit requires a second independent inspect/readback. A
+                # fresh observation receipt is expected to differ; both reads
+                # must link back to the same immutable original commit receipt.
                 checked = self._call(adapter,"inspect",request,10)
-                _check_reply(request, checked, "COMMITTED")
-                require(self._matches(request,rec,checked["receipt"]), "READBACK_CONFLICT")
-                evidence = {"receipt": rec, "request_sha256": digest(request)}
+                checked_observed = _check_reply(request, checked, "COMMITTED")
+                checked_commit = self._commit_from_reply(
+                    request, checked, checked_observed)
+                require(checked_commit == commit, "COMMIT_RECEIPT_CONFLICT")
+                require(self._matches(request,commit,checked_observed),
+                        "READBACK_CONFLICT")
+                evidence = {"receipt": commit,
+                            "observation": observed,
+                            "request_sha256": digest(request)}
                 self.journal.finish(request["batch_id"], request["attempt_id"],
                                     evidence, lambda *unused: True)
                 self.journal.db.execute(
                     "INSERT OR IGNORE INTO coordinator_events(attempt,kind,observed,evidence) VALUES(?,?,?,?)",
                     (request["attempt_id"],"COMPLETE",self.now(),canonical(evidence).decode("ascii")))
-                return _receipt(request, "COMMITTED", rec)
+                return _receipt(request, "COMMITTED", commit)
             if result.get("status") == "NO_EFFECT":
                 rec = _check_reply(request, result, "NO_EFFECT")
                 checked = self._call(adapter,"inspect",request,10)
