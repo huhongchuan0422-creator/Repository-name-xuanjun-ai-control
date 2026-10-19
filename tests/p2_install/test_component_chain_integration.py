@@ -1,6 +1,7 @@
 """Exact window-one + window-two real-chain acceptance. No mock effect adapter."""
 import hashlib, io, json, os, signal, stat, sys, tarfile, tempfile, time, unittest
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from production.p2_install.coordinator import Coordinator
 from production import p2_artifacts, p2_runtime
 
