@@ -181,7 +181,7 @@ def _locked(req, root, method):
     argv = inputs.get("argv")
     if not isinstance(argv, list) or not argv or len(argv) > 64 or any(not isinstance(x, str) or not x or "\x00" in x for x in argv):
         raise Fault("INVALID_ARGV")
-    if argv[0] in ("/bin/sh", "/bin/bash", "sh", "bash") or any(x in ("-c", "--command") for x in argv[1:]):
+    if argv[0] in ("/bin/sh", "/bin/bash", "sh", "bash"):
         raise Fault("SHELL_FORBIDDEN")
     if not os.path.isabs(argv[0]) or not Path(argv[0]).is_file() or not os.access(argv[0], os.X_OK):
         raise Fault("INVALID_EXECUTABLE")
