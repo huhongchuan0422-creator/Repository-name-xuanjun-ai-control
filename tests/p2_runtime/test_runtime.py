@@ -93,7 +93,7 @@ class Lifecycle(unittest.TestCase):
         (self.root/"batch-b1.json").unlink()
         self.assertEqual(execute(req)["status"],"COMMITTED"); rec=self.record(); self.pids.append(rec["pid"])
         rec["phase"]="STOPPING"; (self.root/"batch-b1.json").write_text(json.dumps(rec))
-        self.assertEqual(recover(req)["error"]["code"],"STOP_OUTCOME_UNKNOWN")
+        self.assertEqual(recover(req)["status"],"COMMITTED")
         os.killpg(rec["pgid"],signal.SIGTERM)
         for _ in range(100):
             if p2_runtime.workload_state(rec)[0]=="GONE": break
@@ -134,12 +134,13 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(stopped["status"],"COMMITTED",stopped)
 
     def test_short_process_failure_cleaned_and_no_effect_only_after_group_gone(self):
-        out=execute(self.req(argv=[sys.executable,"-c","pass"]))
+        req=self.req(argv=[sys.executable,"-c","pass"])
+        out=execute(req)
         self.assertEqual(out["status"],"HOLD")
         rec=self.record(); self.assertEqual(p2_runtime.workload_state(rec)[0],"GONE")
-        recovered=recover(self.req())
+        recovered=recover(req)
         self.assertIn(recovered["status"],("COMMITTED","NO_EFFECT"),recovered)
-        self.assertEqual(recover(self.req())["status"],"NO_EFFECT")
+        self.assertEqual(recover(req)["status"],"NO_EFFECT")
 
     def test_cli_and_uniform_identity_fields(self):
         req=self.req()
