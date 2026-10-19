@@ -126,7 +126,9 @@ Concurrent original application writes are not covered until the actual caller
 uses this connection and the original Fence/drain is established. Do not install
 a second credential Writer beside the running application.
 
-Fourteen new tests use real file-backed SQLite and AES-GCM with a synthetic
+Sixteen new tests use real file-backed SQLite and AES-GCM with a synthetic
 application interface. They cover atomic rollback, CAS, restart query, exact
 idempotency, Writer loss, and commit-acknowledgement loss. They are not Tokyo
 application-source, live-instance, M99, or migration acceptance.
+
+The writer rejects non-durable SQLite settings (synchronous below FULL, or MEMORY/OFF journaling), rechecks them on each operation, and never changes database settings.

@@ -36,6 +36,7 @@ class AtomicCredentialWriter:
             raise CredentialBindingHold('EXISTING_CONNECTION_AND_WRITER_REQUIRED')
         self.db = connection
         self.guard = assert_writer
+        self._durability()
         # Merely opening a coordinator must not start or commit a transaction.
         for table in ('credential_records', 'pr99_credential_key_bindings',
                       'pr99_credential_write_results'):
@@ -43,7 +44,14 @@ class AtomicCredentialWriter:
                                   (table,)).fetchone() is None:
                 raise CredentialBindingHold('EXPLICIT_SCHEMA_INSTALL_REQUIRED')
 
+    def _durability(self):
+        mode = self.db.execute('PRAGMA journal_mode').fetchone()[0].lower()
+        synchronous = self.db.execute('PRAGMA synchronous').fetchone()[0]
+        if mode not in {'delete', 'truncate', 'persist', 'wal'} or synchronous < 2:
+            raise CredentialBindingHold('DURABLE_DATABASE_SETTINGS_REQUIRED')
+
     def _guard(self):
+        self._durability()
         if self.guard() is not True:
             raise CredentialBindingHold('ORIGINAL_WRITER_NOT_HELD')
 

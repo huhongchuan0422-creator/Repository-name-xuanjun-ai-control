@@ -161,6 +161,17 @@ class AtomicTests(unittest.TestCase):
             other.close()
         self.assertEqual(self.writer.query('operation-1', request_digest(self.prepared, None))['status'], 'COMMITTED')
 
+    def test_nondurable_database_rejected_without_changing_settings(self):
+        self.db.execute('PRAGMA synchronous=OFF')
+        with self.assertRaisesRegex(CredentialBindingHold, 'DURABLE_DATABASE_SETTINGS_REQUIRED'):
+            AtomicCredentialWriter(self.db, lambda: True)
+        self.assertEqual(self.db.execute('PRAGMA synchronous').fetchone()[0], 0)
+
+    def test_durability_drift_prevents_write(self):
+        self.db.execute('PRAGMA journal_mode=MEMORY')
+        with self.assertRaises(CredentialBindingHold): self.commit()
+        self.assertIsNone(self.writer.get('id-1'))
+
     def test_missing_schema_not_initialized(self):
         self.db.execute('DROP TABLE pr99_credential_write_results'); self.db.commit()
         with self.assertRaises(CredentialBindingHold):

@@ -335,4 +335,4 @@ Owner终端回执：PRIVATE_COPY_NATIVE_METHODS_PASS，3/3；私有绑定已保�
 
 
 ## 2026-10-19｜凭据及密钥绑定同库事务接线
-新增credential_atomic_write.py：在原有SQLite连接内原子提交加密记录、显式密钥绑定和操作结果；CAS拒绝覆盖不同版本、重复操作不写、丢失commit回执后查询恢复。接入原生加密准备和绑定读取组件。新增14项真实文件SQLite/AES-GCM测试（应用接口为合成fixture），本地全部58项通过。两个辅助表仅给出显式Schema，不自动建库/建表，不替代原迁移控制账本，不领取Writer。仍需原应用实际连接/唯一Writer接线、历史绑定导入和现场验收，未安装运行Hook，生产迁移未开始。
+新增credential_atomic_write.py：在原有SQLite连接内原子提交加密记录、显式密钥绑定和操作结果；CAS拒绝覆盖不同版本、重复操作不写、丢失commit回执后查询恢复。接入原生加密准备和绑定读取组件。新增16项真实文件SQLite/AES-GCM测试（应用接口为合成fixture），本地全部60项通过。两个辅助表仅给出显式Schema，不自动建库/建表，不替代原迁移控制账本，不领取Writer。仍需原应用实际连接/唯一Writer接线、历史绑定导入和现场验收，未安装运行Hook，生产迁移未开始。

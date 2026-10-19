@@ -5800,14 +5800,15 @@
     "migration_started": false
   },
   "atomic_credential_write_20261019": {
-    "local_tests": 58,
-    "new_tests": 14,
+    "local_tests": 60,
+    "new_tests": 16,
     "test_scope": "REAL_SQLITE_AES_GCM_SYNTHETIC_APP_INTERFACE",
     "atomic_record_binding_result": true,
     "auto_schema_install": false,
     "production_hook_installed": false,
     "original_controller_bound": false,
     "production_migration_started": false,
-    "background_task": false
+    "background_task": false,
+    "durable_settings_guard": true
   }
 }
