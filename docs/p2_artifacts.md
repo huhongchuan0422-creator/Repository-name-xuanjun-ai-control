@@ -1,13 +1,27 @@
 # P2 isolated artifacts installer
 
-Scope: `ISOLATED_TEST_ONLY`. This module is not a production installer, signer, Grant consumer, Registry reader, or host service manager.
+Scope: `ISOLATED_TEST_ONLY`. The component does not authorize production installation, read production registries, use signers, or issue/consume Grants.
 
-From repository root, run `python -m production.p2_artifacts execute < request.json`; likewise `inspect` and `recover`. Python API: `from production.p2_artifacts import execute, inspect, recover`.
+Use `python -m production.p2_artifacts execute < request.json`, `inspect`, or `recover`. Python API: `execute(request)`, `inspect(request)`, `recover(request)`.
 
-JSON request fields: `schema:1`, `scope:"ISOLATED_TEST_ONLY"`, `installation_id`, `batch_id`, `attempt_id`, `root` (existing, dedicated, absolute non-symlink directory), `inputs:{"operation":"install","archive":"/absolute/path.tar","archive_sha256":"<sha256>","files":{"app/file.py":"<sha256>"}}`.
+The request uses schema 1 and contains `scope:"ISOLATED_TEST_ONLY"`, installation/batch/attempt IDs, a dedicated absolute `root`, and `inputs` with operation `install`, absolute archive path, exact archive SHA-256, and a filename-to-SHA-256 manifest.
 
-Only regular files listed in the manifest are accepted. Archives must contain exactly those members; directories, links and device members are refused. Version files live under `root/versions/<installation_id>--<batch_id>/`. Journals and receipts are under `root/.p2_artifacts/`. Records are fsynced. `recover` is reconciliation only: incomplete or conflicting state returns HOLD, never repeats installation. Previously committed batches are never deleted.
+## Safety and persistence
 
-Result statuses: COMMITTED is checked against on-disk files and journal/receipt; NO_EFFECT requires an absent journal, receipt and version directory; otherwise HOLD. Errors provide stable code and optional local journal path. No secrets are returned.
+The source archive is opened with `O_NOFOLLOW` and copied through that protected file descriptor into a mode-0400 component-owned snapshot. Device/inode/size/mtime are checked across the copy and the exact snapshot digest is checked before tar parsing. Validation and extraction then use only that snapshot, so replacing the source path after the open cannot change installed bytes.
 
-Limitations: caller must supply a dedicated root with filesystem isolation and trusted process ownership; this module does not defend against another privileged process concurrently changing its root, input archive, or parent directories. Interruption after journaling produces HOLD and requires operator-assisted reconciliation before new attempt. The archive is validated before writing and is expected to be immutable during the call. No production use is authorized.
+Only manifest-listed regular tar members are accepted. Absolute/traversal names, links, devices, duplicate/unlisted members, oversized members, more than 2048 members, more than 512 MiB total extracted content, and archives larger than 768 MiB are rejected. Files are installed with bounded streaming writes and per-file SHA-256 verification.
+
+State is under `root/.p2_artifacts/{journals,receipts,snapshots,recoveries,errors}`; version data is under `root/versions/<installation_id>--<batch_id>`. Component directories must be owned by the effective user, mode 0700 and not links; record files are created with no-follow/exclusive semantics. The caller-owned root must be owned by the effective user and cannot be group/world writable.
+
+Receipts are immutable create-once records. COMMITTED is returned only after rereading and verifying journal, version files, receipt and any recovery evidence. Errors after root validation are persisted with a stable error code, operation stage and local evidence path; logs do not include request secrets.
+
+## Recovery
+
+`recover` is an actual current-batch reconciliation operation, not a retry alias. It verifies or recreates the exact protected snapshot, binds the journal to the request digest, inventories the current batch version directory and refuses unknown files or wrong hashes. Files already present with correct hashes are preserved; only missing manifest-owned files are restored from the exact snapshot. It then writes immutable recovery evidence and, only after full verification, the final receipt. Unknown ownership, conflicting bytes, corrupt/tampered journal, snapshot or recovery evidence returns HOLD. Other committed batch directories and receipts are never removed or replaced.
+
+NO_EFFECT means there is no journal, receipt, current-attempt snapshot, version directory or recovery evidence for this batch. A protected snapshot left by interruption without a journal is treated as a recoverable current-batch effect, not NO_EFFECT.
+
+## Limits
+
+Isolation from another privileged process that can rewrite the component root cannot be guaranteed by this module alone. Tar compression bombs are bounded by extracted/member limits, but resource limits of the containing Docker environment remain the outer protection. This component does not manage processes or host services and never operates the UK production installation.
