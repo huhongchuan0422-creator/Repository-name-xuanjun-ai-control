@@ -80,6 +80,9 @@ class Reservations(object):
             os.close(parent)
 
     def check(self, request, operation):
+        info=os.stat(os.path.basename(self.path),dir_fd=self.parent,follow_symlinks=False)
+        r.need((info.st_dev,info.st_ino)==(self.identity.st_dev,self.identity.st_ino),
+               'RESERVATION_REPLACED')
         row=self.db.execute('SELECT request_sha FROM reservations WHERE old_id=?',
                             (request['old_authority_id'],)).fetchone()
         digest=r.sha(r.canonical(request))

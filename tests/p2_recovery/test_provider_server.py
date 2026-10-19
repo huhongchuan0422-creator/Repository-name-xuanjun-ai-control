@@ -72,6 +72,31 @@ class ProviderTests(unittest.TestCase):
         self.body['request_sha256']=self.probe['request_sha256']
         self.reservation['grant_id']=self.request['new_grant_id']
         with self.assertRaises(r.Hold):self.handle()
+    def test_cross_process_restart_preserves_binding(self):
+        self.handle();self.journal.close()
+        code="""import importlib.util,json,sys
+def load(path):
+ spec=importlib.util.spec_from_file_location('pinned',path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+r=load(sys.argv[1]);s=load(sys.argv[2]);s.r=r
+j=s.Reservations(sys.argv[3])
+try:
+ j.check(json.loads(sys.argv[4]),'execution_gate')
+ print(j.db.execute('SELECT count(*) FROM reservations').fetchone()[0])
+finally:j.close()
+"""
+        import json
+        out=subprocess.check_output([sys.executable,'-I','-B','-S','-c',code,
+            str(ROOT/'production/p2_recovery/recovery.py'),
+            str(ROOT/'production/p2_recovery/provider_server.py'),self.path,json.dumps(self.request)])
+        self.assertEqual(out.strip(),b'1')
+    def test_other_old_authority_cannot_reuse_database(self):
+        self.handle();q=copy.deepcopy(self.request);q['old_authority_id']='other-old'
+        q['new_authority_id']='other-new';q['writer_id']='other-writer'
+        with self.assertRaises(r.Hold):self.journal.check(q,'recovery_apply')
+    def test_replaced_journal_refused(self):
+        os.rename(self.path,self.path+'.retained')
+        self.write('management-reservations.sqlite3',b'')
+        with self.assertRaises(r.Hold):self.handle()
     def test_second_writer_lock(self):
         with self.assertRaises(OSError):s.Reservations(self.path)
     def test_unknown_never_commits(self):
