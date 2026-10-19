@@ -5,6 +5,7 @@ on:
     paths:
       - 'production/p2_recovery/**'
       - 'tests/p2_recovery/test_apply.py'
+      - 'tests/p2_recovery/test_provider_server.py'
       - '.github/workflows/p2-recovery-apply.yml'
 permissions:
   contents: read
@@ -38,6 +39,10 @@ jobs:
           mkdir apply-output
           docker run --rm --user 0:0 --hostname iZd7oeikknn1z21sq6ji6zZ -v "$PWD:/repo:ro" -v "$PWD/apply-output:/output" -w /repo "python:${PYTHON_VERSION}" sh -ec '
             set +e
+            python -I -B -S tests/p2_recovery/test_provider_server.py > /output/provider-tests.log 2>&1
+            provider_result=$?
+            cat /output/provider-tests.log
+            if [ "$provider_result" -ne 0 ]; then exit "$provider_result"; fi
             python -I -B -S tests/p2_recovery/test_apply.py > /output/tests.log 2>&1
             result=$?
             cat /output/tests.log
@@ -50,6 +55,6 @@ jobs:
         with:
           name: p2-recovery-apply-${{ matrix.python }}
           path: |
-            apply-output/tests.log
+            apply-output/*.log
             apply-package/*
           if-no-files-found: error

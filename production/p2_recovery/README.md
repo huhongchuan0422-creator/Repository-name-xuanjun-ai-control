@@ -94,3 +94,54 @@ Owner/基础设施管理方最小操作：
 41项新增测试使用真实RSA、root隔离目录、SQLite和子进程，所有管理事实明确SYNTHETIC_TEST_ONLY；不是生产验收。旧底层代码/CI限定结论继承；本模块尚未接入serve/run，所以不得声称已恢复生产安装能力。新建Authority/Grant/激活入口仍待可信现场隔离Provider及恢复执行范围落地。本增量先完成能独立实现的证据准入和持久检查点，避免再次将管理员口头前置当作已实现的生产动作。
 
 另在明确SYNTHETIC_CONTAINER环境中设置固定UK hostname，真实独立-I -B -S CLI执行assess、checkpoint、跨进程幂等确认和过期拒绝；无host验证绕过或生产fixture参数。容器名称不冒充英国真实主机。
+
+### Management Provider service (production bridge)
+
+`provider_server.py` now implements the root-only framed Unix service used by
+`UnixEvidenceProvider`. Its only operations are `recovery_apply` and
+`execution_gate`. Both client and server use the same exact signature, challenge,
+source, plan, restoration, lifetime and reservation validation. Invalid or
+UNKNOWN evidence cannot create a reservation or reach AuthorityStore apply.
+
+The service uses an explicitly initialized **management reservation journal**,
+separate from AuthorityStore. `serve` never initializes a missing journal. A
+process-lifetime flock prevents a second local service. SQLite FULL transactions,
+unique old/new authority, database and Writer bindings, and an append-only audit
+allow exact request reentry after a lost reply or restart. Conflicts are rejected
+before calling the management adapter. A directory fsync failure suppresses the
+reply even if SQLite already committed; retry must use the identical request.
+An existing socket is never unlinked automatically: after a crash, the manager
+must verify the original process/lock and remove only its stale socket under its
+existing controlled recovery procedure. Database and sidecars remain intact.
+
+The `initialize-reservations` CLI only creates a new marked management journal
+with O_EXCL; it does not create an AuthorityStore, keys, Grant or Writer. No such
+initialization or service deployment has been performed in the UK. CLI requires
+isolated root Python, the fixed UK hostname, and accurate bootstrap/recovery/
+executor pins. `serve` additionally requires exact request, trust, evidence,
+plan and adapter file/SHA bindings. The signed plan supplies the socket path.
+
+The adapter is a protected, SHA-pinned Python management integration, executed
+with isolated Python, no shell, a minimal environment, bounded output and a
+four-second deadline. It receives `P2_MANAGEMENT_REQUEST` containing `probe`,
+`request`, `plan` and `restoration`; it must return the existing signed Provider
+response. It must query the real control plane, including global exclusive
+reservation and real transaction reconciliation. Repeated readback/renewal must
+be idempotent under the exact request identity. A timeout is UNKNOWN, never
+proof that a remote action failed. Raw errors and private configuration are not
+returned to the caller. The service does not generate facts, sign on behalf of
+three roles, revoke unknown credentials, or turn local flock into global fencing.
+
+**External binding remains required:** an actual deployed management adapter,
+three independently pinned public trust identities, and real old-channel
+revocation/global reservation/transaction readback evidence. The new server
+provides the production protocol and durable local coordination, not proof that
+these external controls exist. Test adapter signatures and isolated socket/SQLite
+results must never be submitted as UK isolation evidence.
+
+Affected acceptance adds real signed backend positive/negative cases, journal
+restart/reentry, fsync failure, conflict-before-query, signature/fence/UNKNOWN
+rejection, adapter bounds/timeouts, and a real service process → real adapter
+process → existing recovery apply → committed gate integration. Tests use
+synthetic management facts and keys only; original reviewed business logic is
+inherited. UK activation and sixteen stages remain NOT_EXECUTED.

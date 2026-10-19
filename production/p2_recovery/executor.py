@@ -56,30 +56,36 @@ class UnixEvidenceProvider(object):
                 response = r.decode(exact(size))
         finally:
             os.close(parent)
-        r.fields(response, 'body signatures')
-        body = response['body']
-        r.fields(body, 'schema probe issued_utc expires_utc packet reservation')
-        now = int(time.time())
-        r.need(type(body['schema']) is int and body['schema'] == 1 and r.canonical(body['probe']) == r.canonical(probe) and
-               type(body['issued_utc']) is int and type(body['expires_utc']) is int and
-               body['issued_utc'] <= now < body['expires_utc'] <= body['issued_utc'] + 30,
-               'PROVIDER_REPLAY_OR_EXPIRED')
-        r.need(type(response['signatures']) is dict and set(response['signatures']) == r.ROLES,
-               'PROVIDER_SIGNATURES')
-        for role in sorted(r.ROLES):
-            r.signature(body, response['signatures'][role], self.keys[role])
-        expected = {'old_authority_id': request['old_authority_id'],
-            'authority_id': request['new_authority_id'], 'epoch': request['new_epoch'],
-            'fence': request['new_epoch'], 'writer_id': request['writer_id'],
-            'grant_id': request['new_grant_id'], 'database': request['target_database'],
-            'plan_sha256': self.plan_ref['sha256'], 'exclusive': True}
-        r.need(r.canonical(body['reservation']) == r.canonical(expected), 'GLOBAL_AUTHORITY_RESERVATION_REQUIRED')
-        # Fresh query must still prove the complete old-authority isolation and
-        # historical reconciliation contract. UNKNOWN cannot authorize writes.
-        r.need(self.plan_ref in body['packet']['body']['sources'], 'FRESH_PLAN_NOT_SIGNED')
-        r.need(r.canonical(body['packet']['body']['restoration']) ==
-               r.canonical(self.restoration), 'LIVE_RESTORATION_CHANGED')
-        return r.decide(request, body['packet'], self.keys, now)
+        return validate_response(request, probe, response, self.keys,
+                                 self.plan_ref, self.restoration)
+
+
+def validate_response(request, probe, response, keys, plan_ref, restoration):
+    """Shared client/server validation; signatures never substitute for facts."""
+    r.fields(response, 'body signatures')
+    body = response['body']
+    r.fields(body, 'schema probe issued_utc expires_utc packet reservation')
+    now = int(time.time())
+    r.need(type(body['schema']) is int and body['schema'] == 1 and r.canonical(body['probe']) == r.canonical(probe) and
+           type(body['issued_utc']) is int and type(body['expires_utc']) is int and
+           body['issued_utc'] <= now < body['expires_utc'] <= body['issued_utc'] + 30,
+           'PROVIDER_REPLAY_OR_EXPIRED')
+    r.need(type(response['signatures']) is dict and set(response['signatures']) == r.ROLES,
+           'PROVIDER_SIGNATURES')
+    for role in sorted(r.ROLES):
+        r.signature(body, response['signatures'][role], keys[role])
+    expected = {'old_authority_id': request['old_authority_id'],
+        'authority_id': request['new_authority_id'], 'epoch': request['new_epoch'],
+        'fence': request['new_epoch'], 'writer_id': request['writer_id'],
+        'grant_id': request['new_grant_id'], 'database': request['target_database'],
+        'plan_sha256': plan_ref['sha256'], 'exclusive': True}
+    r.need(r.canonical(body['reservation']) == r.canonical(expected), 'GLOBAL_AUTHORITY_RESERVATION_REQUIRED')
+    # Fresh query must still prove the complete old-authority isolation and
+    # historical reconciliation contract. UNKNOWN cannot authorize writes.
+    r.need(plan_ref in body['packet']['body']['sources'], 'FRESH_PLAN_NOT_SIGNED')
+    r.need(r.canonical(body['packet']['body']['restoration']) ==
+           r.canonical(restoration), 'LIVE_RESTORATION_CHANGED')
+    return r.decide(request, body['packet'], keys, now)
 
 
 def historical_recipe(request, packet, keys):

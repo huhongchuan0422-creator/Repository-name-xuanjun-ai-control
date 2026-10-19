@@ -576,5 +576,50 @@ builtins.__import__=test_import;sys.argv=args;runpy.run_path(args[0],run_name='_
             with self.assertRaises(receipt_provider.Hold):store.consume(oldg,'replay',2,'a'*64,token)
         finally:store.close()
 
+    def test_production_provider_server_real_adapter_and_apply(self):
+        # These are test-generated identities and facts, never production isolation.
+        import multiprocessing
+        backend_module=module(ROOT/'production/p2_recovery/provider_server.py')
+        backend_module.r=r;backend_module.e=e
+        self.finish_server();os.unlink(self.plan['provider_socket'])
+        journal_path=self.root+'/management.sqlite3'
+        backend_module.Reservations.initialize(journal_path)
+        source="""import json,time,subprocess,base64
+v=P2_MANAGEMENT_REQUEST
+body=BODY
+body['issued_utc']=int(time.time())-1
+body['expires_utc']=int(time.time())+20
+def signs(value):
+ raw=json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode('ascii')
+ return {k:base64.b64encode(subprocess.check_output(['/usr/bin/openssl','dgst','-sha256','-sign',p],input=raw,stderr=subprocess.DEVNULL)).decode('ascii') for k,p in PRIVATE.items()}
+q=v['request']
+reservation={'old_authority_id':q['old_authority_id'],'authority_id':q['new_authority_id'],'epoch':q['new_epoch'],'fence':q['new_epoch'],'writer_id':q['writer_id'],'grant_id':q['new_grant_id'],'database':q['target_database'],'plan_sha256':v['plan']['sha256'],'exclusive':True}
+out={'schema':1,'probe':v['probe'],'issued_utc':int(time.time())-1,'expires_utc':int(time.time())+20,'packet':{'body':body,'signatures':signs(body)},'reservation':reservation}
+print(json.dumps({'body':out,'signatures':signs(out)}))
+""".replace('BODY',repr(self.body)).replace('PRIVATE',repr(self.private))
+        adapter=self.write('test-management-adapter.py',source.encode())
+        def start():
+            journal=backend_module.Reservations(journal_path)
+            try:
+                b=backend_module.Backend(self.request,self.public,self.ref,self.body['restoration'],journal,adapter)
+                backend_module.serve(self.plan['provider_socket'],b)
+            finally:journal.close()
+        process=multiprocessing.Process(target=start);process.start()
+        def finish():
+            process.terminate();process.join(5)
+        self.addCleanup(finish)
+        deadline=time.monotonic()+5
+        while not os.path.exists(self.plan['provider_socket']):
+            self.assertTrue(process.is_alive())
+            self.assertLess(time.monotonic(),deadline)
+            time.sleep(.01)
+        self.apply();self.gate().verify()
+        finish()
+        journal=backend_module.Reservations(journal_path)
+        try:
+            self.assertEqual(journal.db.execute('SELECT count(*) FROM reservations').fetchone(),(1,))
+            self.assertGreaterEqual(journal.db.execute('SELECT count(*) FROM audit').fetchone()[0],2)
+        finally:journal.close()
+
 
 if __name__=='__main__':unittest.main(verbosity=2)
