@@ -6,7 +6,7 @@ import p2_runtime
 from p2_runtime import execute, inspect
 
 SERVICE = r"""
-import os,socket,sys,time
+import os,socket,sys,time,threading
 path,mode=sys.argv[1],sys.argv[2]
 try: os.unlink(path)
 except FileNotFoundError: pass
@@ -15,11 +15,10 @@ if mode=="exit":
 if mode=="silent":
     time.sleep(60)
 s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
-s.bind(path); s.listen(5)
-while True:
-    c,_=s.accept()
+s.bind(path); s.listen(16)
+def handle(c):
     try:
-        data=c.recv(128)
+        c.recv(128)
         if mode=="timeout":
             time.sleep(2)
         elif mode=="bad":
@@ -28,6 +27,9 @@ while True:
             c.sendall(b"PONG\n")
     finally:
         c.close()
+while True:
+    c,_=s.accept()
+    threading.Thread(target=handle,args=(c,),daemon=True).start()
 """
 
 class Readiness(unittest.TestCase):
