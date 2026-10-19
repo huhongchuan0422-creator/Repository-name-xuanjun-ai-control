@@ -27,7 +27,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '${{ matrix.python }}'
+      - name: Stage exact window-two runtime source
+        run: |
+          mkdir -p production/p2_runtime
+          git fetch --no-tags --depth=1 origin 499bcc43f4c992b21035c22446ccc4d915873fb1
+          git show 499bcc43f4c992b21035c22446ccc4d915873fb1:production/p2_runtime/__init__.py > production/p2_runtime/__init__.py
+          test "$(git hash-object production/p2_runtime/__init__.py)" = "$(git rev-parse FETCH_HEAD:production/p2_runtime/__init__.py)"
       - name: Recovery and coordinator
         run: |
           python -B tests/p2_install/test_journal.py -v
           python -B tests/p2_install/test_coordinator.py -v
+          python -B tests/p2_install/test_runtime_integration.py -v
