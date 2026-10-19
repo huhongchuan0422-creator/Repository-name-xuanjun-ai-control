@@ -172,11 +172,13 @@ def adapter_query(ref, payload):
 
 
 class Backend(object):
-    def __init__(self, request, keys, plan_ref, restoration, journal, adapter):
+    def __init__(self, request, keys, plan_ref, restoration, journal, adapter, control=None):
         r.validate_request(request)
-        r.reference(plan_ref); r.reference(adapter)
+        r.reference(plan_ref)
+        if control is None:r.reference(adapter)
         self.request,self.keys,self.plan_ref,self.restoration=request,keys,plan_ref,restoration
         self.journal,self.adapter=journal,adapter
+        self.control=control
 
     def handle(self, probe):
         r.fields(probe,'schema operation request_sha256 challenge')
@@ -186,6 +188,8 @@ class Backend(object):
                type(probe['challenge']) is str and len(probe['challenge'])==32 and
                all(x in '0123456789abcdef' for x in probe['challenge']), 'PROVIDER_PROBE')
         self.journal.check(self.request,probe['operation'])
+        if self.control is not None:
+            return self.control.respond(probe)
         response=adapter_query(self.adapter, {'probe':probe,'request':self.request,
             'plan':self.plan_ref,'restoration':self.restoration})
         e.validate_response(self.request,probe,response,self.keys,self.plan_ref,self.restoration)
@@ -238,12 +242,14 @@ def main():
     import types
     global r, e
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('initialize-reservations','serve'))
+    parser.add_argument('operation',choices=('initialize-reservations','register-control','serve'))
     parser.add_argument('--journal',required=True)
     for name in ('bootstrap-sha256','recovery-code-sha256','executor-sha256'):
         parser.add_argument('--'+name,required=True)
     for name in ('request','request-sha256','trust','trust-sha256','plan','plan-sha256',
                  'evidence','evidence-sha256','adapter','adapter-sha256'):
+        parser.add_argument('--'+name)
+    for name in ('control-config','control-config-sha256','control-code-sha256','control-approval','control-approval-sha256'):
         parser.add_argument('--'+name)
     args=parser.parse_args()
     if (os.getuid()!=0 or os.geteuid()!=0 or not sys.flags.isolated or
@@ -286,7 +292,9 @@ def main():
         return
     r.need(all(getattr(args,name) is not None for name in
         ('request','request_sha256','trust','trust_sha256','plan','plan_sha256',
-         'evidence','evidence_sha256','adapter','adapter_sha256')), 'PROVIDER_CONFIG_REQUIRED')
+         'evidence','evidence_sha256')), 'PROVIDER_CONFIG_REQUIRED')
+    r.need(args.control_config is not None or
+           (args.adapter is not None and args.adapter_sha256 is not None),'MANAGEMENT_ADAPTER_REQUIRED')
     request=r.decode(r.read(args.request,args.request_sha256))
     keys=r.load_trust(args.trust,args.trust_sha256)
     packet=r.decode(r.read(args.evidence,args.evidence_sha256))
@@ -295,8 +303,21 @@ def main():
     plan=e.signed_plan(request,packet,ref)
     journal=Reservations(args.journal)
     try:
+        control=None
+        if args.control_config is not None:
+            r.need(args.control_config_sha256 is not None and args.control_code_sha256 is not None,'CONTROL_PINS_REQUIRED')
+            module=bootstrap.load(here+'/control_plane.py',args.control_code_sha256)
+            module.r=r;module.e=e
+            control=module.ControlPlane(journal,request,keys,ref,packet['body']['restoration'],
+                {'path':args.control_config,'sha256':args.control_config_sha256})
+        if args.operation=='register-control':
+            r.need(control is not None and args.control_approval is not None and
+                   args.control_approval_sha256 is not None,'CONTROL_APPROVAL_REQUIRED')
+            control.register({'path':args.control_approval,'sha256':args.control_approval_sha256})
+            print('{"control_config":"REGISTERED_NOT_ACTIVATED","authority_initialized":false}')
+            return
         backend=Backend(request,keys,ref,packet['body']['restoration'],journal,
-                        {'path':args.adapter,'sha256':args.adapter_sha256})
+                        ({'path':args.adapter,'sha256':args.adapter_sha256} if control is None else None),control)
         serve(plan['provider_socket'],backend)
     finally: journal.close()
 

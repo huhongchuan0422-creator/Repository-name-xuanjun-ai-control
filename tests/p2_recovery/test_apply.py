@@ -621,5 +621,50 @@ print(json.dumps({'body':out,'signatures':signs(out)}))
             self.assertGreaterEqual(journal.db.execute('SELECT count(*) FROM audit').fetchone()[0],2)
         finally:journal.close()
 
+    def test_formal_control_registration_and_server_recovery(self):
+        # Exact formal CLI, real service/keys/SQLite; all host facts are test-only.
+        self.finish_server();os.unlink(self.plan['provider_socket'])
+        control_module=module(ROOT/'production/p2_recovery/control_plane.py');control_module.r=r;control_module.e=e
+        backend_module=module(ROOT/'production/p2_recovery/provider_server.py');backend_module.r=r;backend_module.e=e
+        journal=self.root+'/management.sqlite3';backend_module.Reservations.initialize(journal)
+        trust=self.write('trust.json',r.canonical({'schema':1,'host':r.HOST,'keys':self.refs}))
+        inv={'schema':1,'request_sha256':r.sha(r.canonical(self.request)),
+             'channels':{k:{'status':'ISOLATED','principals':['synthetic-p2-old'],
+                           'enforcement':self.source} for k in r.CHANNELS},'invoke_ids':[]}
+        inv['signatures']=self.signatures(inv)
+        invref=self.write('control-inventory.json',r.canonical(inv));self.body['sources'].append(invref)
+        evidence=self.write('control-evidence.json',r.canonical(self.signed()))
+        cfg={'schema':1,'host':r.HOST,'request_sha256':r.sha(r.canonical(self.request)),
+            'trust':trust,'signing_keys':{role:{'path':path,'sha256':r.sha(Path(path).read_bytes())}
+                for role,path in self.private.items()},'evidence':evidence,'inventory':invref,
+            'invoke_receipts':[],'snapshot':None}
+        cfgref=self.write('control-config.json',r.canonical(cfg))
+        approval={'config_sha256':cfgref['sha256']};approval['signature']=self.signatures(approval)['owner']
+        approvalref=self.write('control-approval.json',r.canonical(approval))
+        requestref=self.write('control-request.json',r.canonical(self.request))
+        here=self.root+'/assembly/production/p2_recovery/'
+        argv=[sys.executable,'-I','-B','-S',here+'provider_server.py','register-control','--journal',journal]
+        refs={'request':requestref,'evidence':evidence,'trust':trust,'plan':self.ref,
+              'control-config':cfgref,'control-approval':approvalref}
+        for name,ref in refs.items():argv+=['--'+name,ref['path'],'--'+name+'-sha256',ref['sha256']]
+        for name,filename in [('bootstrap-sha256','bootstrap.py'),('recovery-code-sha256','recovery.py'),
+                              ('executor-sha256','executor.py'),('control-code-sha256','control_plane.py')]:
+            argv+=['--'+name,r.sha(Path(here+filename).read_bytes())]
+        result=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=40)
+        self.assertEqual(result.returncode,0,result.stdout.decode()+result.stderr.decode())
+        self.assertEqual(json.loads(result.stdout.decode())['control_config'],'REGISTERED_NOT_ACTIVATED')
+        argv[5]='serve'
+        process=subprocess.Popen(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        def finish():
+            if process.poll() is None:process.terminate()
+            process.communicate(timeout=5)
+        self.addCleanup(finish)
+        deadline=time.monotonic()+5
+        while not os.path.exists(self.plan['provider_socket']):
+            self.assertIsNone(process.poll())
+            self.assertLess(time.monotonic(),deadline);time.sleep(.01)
+        self.apply();self.gate().verify()
+        self.assertTrue(os.path.exists(self.cfg['database']))
+
 
 if __name__=='__main__':unittest.main(verbosity=2)

@@ -32,7 +32,7 @@ def main():
         else:
             assert (ROOT/name).read_bytes() == previous, name
     files = original + git('ls-tree','-r','--name-only','HEAD','--','production/p2_recovery',
-        'tests/p2_recovery/test_apply.py','tests/p2_recovery/test_provider_server.py','.github/workflows/p2-recovery-apply.yml').decode().splitlines()
+        'tests/p2_recovery/test_apply.py','tests/p2_recovery/test_provider_server.py','tests/p2_recovery/test_control_plane.py','.github/workflows/p2-recovery-apply.yml').decode().splitlines()
     files = sorted(set(files))
     manifest = {'schema':1,'source_commit':head,'source_tree':tree,
         'runtime_source_commit':BASE,'runtime_source_tree':'8e27d077d22af392108568ac06d284df4dd4b35e',

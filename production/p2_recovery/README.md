@@ -145,3 +145,61 @@ rejection, adapter bounds/timeouts, and a real service process → real adapter
 process → existing recovery apply → committed gate integration. Tests use
 synthetic management facts and keys only; original reviewed business logic is
 inherited. UK activation and sixteen stages remain NOT_EXECUTED.
+
+### P2 control-plane functional nodes
+
+`control_plane.py` is the native management adapter, selected by the existing
+Provider CLI using `--control-config`, its SHA and `--control-code-sha256`.
+`register-control` registers an exact Owner-signed configuration and revokes the
+old authority/Epoch in the **existing shared management journal**. It creates no
+AuthorityStore, Grant, private key or Writer. `serve` uses that committed binding;
+there is no need for an arbitrary external adapter program in native mode.
+
+1. **Managed-channel revocation:** eight exact channel categories, principal
+   lists and original enforcement references are bound to a three-role signed
+   inventory and original recovery packet. The journal records the revocation
+   scope; unknown external channels cannot register. This does not revoke RAM
+   credentials or SSH access by declaring a row: those external revocations must
+   be carried out by their actual management authority and independently proved.
+2. **Epoch/Fence denial:** `ControlPlane.enforce` rejects the old authority through
+   its revoked Epoch and admits only the exact new authority/Epoch/Writer/Grant.
+   All participating executors must use the one deployed Provider entry. Old
+   binaries that bypass it remain external Writers and require real isolation.
+3. **History reconciliation:** `transaction_snapshot` reads only an exact,
+   already-consistent manager backup through the inherited snapshot validator;
+   retains Grant consumption, Attempt ordinal/state/proof and audit digest.
+   `invocation_state` reuses the original SWAS RPC interface for
+   DescribeInvocationResult only. InvocationResult/InvokeId/instance/status are
+   checked. Cloud Success is NOT a transaction outcome. The signed invocation
+   inventory must exactly equal the signed terminal/reconciled receipts, each
+   tied to a preserved transaction source. Missing, pending or UNKNOWN is HOLD.
+4. **Shared exclusion:** reuse original Provider Reservations, unique shared
+   authority/database/Writer rows, process lock and exact request reentry. No new
+   parallel authority/quota ledger. All executors must query the single shared
+   deployment; independent copies are NOT global exclusion proof.
+5. **Trust/config:** root-protected SHA-bound config, independently pinned three
+   public keys, Owner-signed config digest and matching existing private Signer
+   descriptors. No generated production keys, secrets or public trust defaults.
+   File/directory fsync precedes the final FULL SQLite registration publication;
+   failure cannot authorize a later serve after restart.
+6. **Provider integration:** shared validation and challenge protocol preserved.
+   Native control signs the fresh challenge with the bound real keys only after
+   checking current original evidence. It never refreshes expired evidence or
+   converts local policy into a new historical isolation assertion. Durable
+   reservation/audit commits precede the returned signed response.
+
+**Production acceptance, one condition per node:** (1) actual eight-category
+inventory and external revoke/readback originals, (2) old-token rejection at
+EVERY actual side-effect entry, (3) preserved original backup plus complete
+Grant/Attempt/InvokeId/side-effect closure, (4) two real executors competing at
+the same service yield exactly one authority and conflicting request rejection,
+(5) original trust provenance/private configuration sealed at exact SHA with no
+secret disclosure, (6) deployed formal register-control/serve/apply gate returns
+real signed receipts. None of these UK production results has been executed by
+Hosted CI. Unknown external Writers keep production HOLD.
+
+Deployment inputs still required from the actual UK executor: protected new
+control-config and Owner-signed digest, existing three trusted key references,
+fresh signed inventory/evidence, completed external revocations and all relevant
+InvokeId/transaction receipts. Do not use synthetic tests as these inputs. No
+FIRST_DEPLOY, Prepare or new RAM authorization is needed for the offline changes.
