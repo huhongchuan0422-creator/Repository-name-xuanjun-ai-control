@@ -43,3 +43,17 @@ The new unit tests exercise real temporary file side effects, receipt digest ver
 - Adapter calls run in bounded child processes. Timeout of the coordinating call terminates the adapter invocation and **does not establish absence of effects or authorize a second launch**. The component may retain an in-flight child or owned process; only its trusted inspect/reconcile can decide a safe next step.
 - An intent saved before `journal.begin` is queried with the original attempt, never re-executed blindly. Evidence insufficient means HOLD. `event(request,kind,evidence)` stores append-only lifecycle observations, including repeated progress events, while `tick()` continues to publish idempotent outbox records marked UNAVAILABLE without a real notification provider.
 - Remaining barriers: original AuthorityStore/Grant adapter implementation and authoritative identity binding; window-two observation provenance bridge; real wake Provider; external PR17 lifecycle event delivery; stronger same-root-cause 30/60 handling and process-kill/response-loss integration tests. These are not production-complete.
+
+## Owner revision — isolated rewrite scope (2026-10-20)
+
+This isolated coordinator has NO five-round or five-Attempt admission limit. An installation may execute every approved functional node and may query/recover an existing attempt without consuming an installation quota. Prior production Grant/AuthorityStore records are untouched; production authorization is out of scope. Any historical coordinator_rounds rows remain preserved but no longer control admission.
+
+A separate development-failure escalation mechanism records root cause per installation, across batches and restarts. At the earlier of ten failures or one hour, tick writes a unique Dots escalation to the durable outbox with evidence and alternative-method request. At thirty minutes for the same root cause, a method-change record is created. These thresholds do not grant install retries and do not reset on reboot. Until a real Dots delivery adapter and verified ACK exist, notification status is UNAVAILABLE (not delivered). The current interface requires explicit failure(request,cause,evidence) calls; live event producers must be connected and authenticated before this can be treated as automated escalation.
+
+CLI can opt into only the fixed local runtime module with --runtime and --component-root batch=/private/runtime/path. Run in isolated Python 3.11 container, never on the Python 3.6 host and never against production state. Example:
+
+```sh
+python -m production.p2_install.coordinator execute --root /tmp/private-coordinator --plan /tmp/plan.json --request /tmp/request.json --runtime --component-root runtime=/tmp/private-runtime
+```
+
+The runtime source must be part of the same checkout/container image. This CLI does not import arbitrary user-specified modules. Its observation protocol still requires a trustworthy commit-linked readback adapter; a raw runtime adapter that lacks this proof will correctly HOLD rather than falsely commit. Subprocess timeout is not proof of process cleanup; real process ownership reconciliation remains necessary.
