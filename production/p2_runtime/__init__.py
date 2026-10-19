@@ -247,7 +247,14 @@ def _locked(req, root, method):
             if collector != "LIVE": return finish(req, root, "HOLD", "LOG_COLLECTOR_FAILED", entry.get("log"))
             entry["members"] = [{"pid": p["pid"], "start": p["start"]} for p in group]; durable(journal, entry)
             return finish(req, root, "COMMITTED")
-        return finish(req, root, "NO_EFFECT") if state == "GONE" else finish(req, root, "HOLD", "UNEXPECTED_LIVE_PROCESS", entry.get("log"))
+        if entry["phase"] == "STOPPED":
+            ws, _ = workload_state(entry) if "pid" in entry else ("GONE", [])
+            if ws == "GONE" and collector == "LIVE":
+                err = terminate_owned(entry, 1.0)
+                if err: return finish(req, root, "HOLD", err, entry.get("log"))
+                state, _, collector = process_set(entry)
+            if state == "GONE": return finish(req, root, "NO_EFFECT")
+        return finish(req, root, "HOLD", "UNEXPECTED_LIVE_PROCESS", entry.get("log"))
 
     if op not in ("start", "stop"): raise Fault("INVALID_OPERATION")
     if op == "stop":
