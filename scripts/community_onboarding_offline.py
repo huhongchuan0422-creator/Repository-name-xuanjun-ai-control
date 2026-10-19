@@ -69,11 +69,12 @@ def transition(db,tenant,application,actor,role,action,expected_revision,note=""
             "BEGIN_REVIEW":({"SUBMITTED"},"IN_REVIEW","REVIEWER"),
             "CORRECTION":({"SUBMITTED","IN_REVIEW","APPROVED"},"CORRECTION_REQUIRED","REVIEWER"),
             "REJECT":({"SUBMITTED","IN_REVIEW"},"REJECTED","REVIEWER"),
+            "REOPEN":({"REJECTED"},"CORRECTION_REQUIRED","REVIEWER"),
             "APPROVE":({"SUBMITTED","IN_REVIEW"},"APPROVED","REVIEWER")}
     if action not in matrix:raise ValueError("ACTION")
     allowed,target,required_role=matrix[action]
     if role!=required_role:raise PermissionError("ROLE_FORBIDDEN")
-    note=_str(note,"NOTE",required=action in ("CORRECTION","REJECT"))
+    note=_str(note,"NOTE",required=action in ("CORRECTION","REJECT","REOPEN"))
     with _transaction(db,manage_transaction):
         rev,state,payload,_=_current(db,tenant,application)
         if rev!=expected_revision:raise ValueError("REVISION_CONFLICT")

@@ -3,6 +3,7 @@
   const $=id=>document.getElementById(id),reviewMode=location.pathname==='/merchant/review';
   const states={DRAFT:'草稿',SUBMITTED:'待审核',IN_REVIEW:'审核中',CORRECTION_REQUIRED:'待补件',REJECTED:'已驳回',APPROVED:'入驻审核通过'};
   let current=null,catalog=null,csrf='',busy=false,generation=0,cursor=null,wechatRecord=null;
+  let historyGeneration=0,historyCursor=null,historyRequest=null;
   const wechatControls=new Map(),sceneControls=new Map();
   const storeScene='SALES_SCENES_STORE',miniScene='SALES_SCENES_MINI_PROGRAM';
   let invalidLoadedScenes=false;
@@ -29,9 +30,9 @@
   // The existing customer host passes its current CSRF value after login. No
   // second login form, password store or reusable browser token is introduced.
   window.configureCommunityOnboarding=context=>{generation++;busy=false;csrf=typeof context?.csrf==='string'?context.csrf:'';
-    clearWechat();current=null;cursor=null;$('detail').hidden=true;$('openingActions').hidden=true;$('moreApplications').hidden=true;
+    clearWechat();resetHistory();current=null;cursor=null;$('detail').hidden=true;$('openingActions').hidden=true;$('moreApplications').hidden=true;
     for(const id of ['mine','applications','summary','materials','reviewNote','opening','openingWorkspace'])$(id).replaceChildren();
-    $('applicationTitle').textContent='入驻申请';$('applicationState').textContent='';
+    $('applicationTitle').textContent='入驻申请';$('applicationState').textContent='';$('applicationVersion').textContent='';
     for(const id of ['legal_name','store_name','address','contact','note'])$(id).value='';setForm(null);$('statusFilter').value='ALL';
     message('正在读取当前账号的入驻信息…');return load();};
   function message(text){$('status').textContent=text;}
@@ -55,14 +56,16 @@
   function setForm(app){for(const [k,v] of Object.entries(app?.fields||{}))if($(k))$(k).value=v;
     $('identity_type').value=app?.identity_type||'IDENTIFICATION_TYPE_IDCARD';$('entity_type').value=app?.entity_type||'ENTERPRISE';$('category').value=app?.category||'GENERAL';$('delegated').checked=app?.delegated||false;}
   function render(app){
+    if(current?.application!==app?.application||current?.revision!==app?.revision)resetHistory();
     if(current?.application!==app?.application)clearWechat();current=app;$('detail').hidden=!app;if(!app)return;
+    $('applicationVersion').textContent='申请编号 '+app.application+' · 版本 '+app.revision;
     $('applicationTitle').textContent=app.fields.store_name||'入驻申请';$('applicationState').textContent=states[app.status]||app.status;
     $('summary').replaceChildren();for(const [label,value] of [['主体名称',app.fields.legal_name],['门店名称',app.fields.store_name],['经营地址',app.fields.address],['联系人',app.fields.contact]]){
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;$('summary').append(dt,dd);}
     $('reviewNote').textContent=app.reviewer_note?'审核说明：'+app.reviewer_note:'';
     const editable=['DRAFT','CORRECTION_REQUIRED'].includes(app.status),reviewable=['SUBMITTED','IN_REVIEW'].includes(app.status);
-    $('submitApplication').hidden=reviewMode||!editable;$('reviewActions').hidden=!reviewMode||!reviewable&&app.status!=='APPROVED';
-    document.querySelectorAll('[data-action]').forEach(b=>{b.hidden=app.status==='APPROVED'&&b.dataset.action!=='CORRECTION';
+    $('submitApplication').hidden=reviewMode||!editable;$('reviewActions').hidden=!reviewMode||!reviewable&&!['APPROVED','REJECTED'].includes(app.status);
+    document.querySelectorAll('[data-action]').forEach(b=>{b.hidden=b.dataset.action==='REOPEN'?app.status!=='REJECTED':app.status==='REJECTED'||app.status==='APPROVED'&&b.dataset.action!=='CORRECTION';
       if(b.dataset.action==='CORRECTION')b.textContent=app.status==='APPROVED'?'要求重新核验':'要求补件';});
     $('profile').querySelectorAll('input,select,button').forEach(e=>e.disabled=!editable);
     $('opening').textContent=app.status!=='APPROVED'?'':app.opening_state==='OPENED'?'商家工作台已开通；微信特约商户进件和收款权限尚未核验。':
@@ -74,6 +77,54 @@
     refreshConditions();
     if(!reviewMode)setForm(app);
   }
+  function resetHistory(){
+    historyGeneration++;historyCursor=null;historyRequest=null;
+    $('historyRows').replaceChildren();$('historyMaterials').replaceChildren();$('moreHistory').hidden=true;$('historyStatus').textContent='';
+  }
+  async function loadHistory(more=false){
+    if(!current)throw Error('请先打开原申请。');
+    if(more&&historyCursor===null)return;
+    if(!more)resetHistory();
+    const token={generation,selection:historyGeneration,application:current.application,revision:current.revision};
+    historyRequest=token;
+    const isCurrent=()=>historyRequest===token&&generation===token.generation&&historyGeneration===token.selection&&
+      current?.application===token.application&&current?.revision===token.revision;
+    const after=more?historyCursor:0;
+    try{
+      const result=await request(reviewMode?'review_history':'history',{application:token.application,after_revision:after});
+      if(!isCurrent())return;
+      if(!result||result.application!==token.application||!Array.isArray(result.records)||result.records.length>50||
+        typeof result.has_more!=='boolean'||!Array.isArray(result.material_versions)||typeof result.material_versions_truncated!=='boolean')throw Error('申请历史返回未确认。');
+      let previous=after;
+      for(const record of result.records){
+        if(!record||!Number.isSafeInteger(record.revision)||record.revision<=previous||typeof record.event!=='string'||typeof record.actor!=='string'||
+          record.occurred_at!==null&&!Number.isSafeInteger(record.occurred_at)||
+          !['CAPTURED_AT_EVENT','LEGACY_EVENT_ONLY'].includes(record.evidence)||record.note!==null&&typeof record.note!=='string'||
+          record.materials!==null&&!Array.isArray(record.materials))throw Error('申请历史返回未确认。');
+        previous=record.revision;
+      }
+      if(result.has_more?(result.records.length!==50||result.next_revision!==previous):result.next_revision!==null)throw Error('申请历史分页返回未确认。');
+      const nodes=[];
+      for(const record of result.records){
+        const row=document.createElement('article'),title=document.createElement('strong'),detail=document.createElement('p'),reason=document.createElement('p');
+        title.textContent='版本 '+record.revision+' · '+record.event+' · '+(states[record.status_after]||record.status_after||'历史状态未知');
+        detail.textContent='操作账号 '+record.actor+' · '+(record.occurred_at===null?'原事件时间未能唯一关联':new Date(record.occurred_at*1000).toISOString());
+        reason.textContent=record.note===null?'旧审核原因未完整留存，不以当前意见补填。':record.note?'当次说明：'+record.note:'本次事件无审核说明。';
+        row.append(title,detail,reason);
+        const materials=document.createElement('p');materials.textContent=record.materials===null?'旧审核与材料版本的关联未留存。':
+          record.materials.map(m=>(catalog.materials.find(item=>item.id===m.kind)?.title||m.kind)+'：第'+m.sequence+'版（'+m.version+'）'+(m.review?' · '+m.review.decision+' '+m.review.note:'')).join('；')||'该版本尚无上传资料';
+        row.append(materials);nodes.push(row);
+      }
+      if(!isCurrent())return;
+      $('historyRows').append(...nodes);historyCursor=result.next_revision;$('moreHistory').hidden=!result.has_more;
+      $('historyMaterials').replaceChildren();
+      for(const material of result.material_versions){const row=document.createElement('p');row.textContent=(catalog.materials.find(item=>item.id===material.kind)?.title||material.kind)+' · 第'+material.sequence+'版 · '+material.version+' · 上传账号 '+material.actor+' · '+new Date(material.created_at*1000).toISOString();$('historyMaterials').append(row);}
+      $('historyStatus').textContent=(result.has_more?'已读取本页，可继续加载历史。':'本申请历史已读取至末页。')+(result.material_versions_truncated?'原资料版本档案超过显示上限，请由原系统核对。':'');
+    }catch(error){if(isCurrent()){resetHistory();$('historyStatus').textContent='历史读取未确认，请重新核对当前权限与申请。';throw Error('历史读取未确认，请重新核对当前权限与申请。');}}
+    finally{if(historyRequest===token)historyRequest=null;}
+  }
+  $('loadHistory').addEventListener('click',()=>run(()=>loadHistory()));
+  $('moreHistory').addEventListener('click',()=>run(()=>loadHistory(true)));
   function renderMaterials(app){
     if(!app)return;
     const editable=['DRAFT','CORRECTION_REQUIRED'].includes(app.status),reviewable=['SUBMITTED','IN_REVIEW'].includes(app.status);
@@ -109,7 +160,7 @@
   async function load(){return run(async()=>{catalog=await request('catalog');await list();});}
   $('profile').addEventListener('submit',event=>{event.preventDefault();run(async()=>{render(await request('save',{application:current?.application||null,revision:current?.revision||0,
     identity_type:$('identity_type').value,fields:draftFields(),entity_type:$('entity_type').value,category:$('category').value,delegated:$('delegated').checked}));message('草稿已保存，请按清单上传资料。');});});
-  $('newApplication').addEventListener('click',()=>{if(busy)return;current=null;for(const key of ['legal_name','store_name','address','contact'])$(key).value='';setForm(null);$('profile').querySelectorAll('input,select,button').forEach(e=>e.disabled=false);render(null);message('请填写新申请。');});
+  $('newApplication').addEventListener('click',()=>{if(busy)return;resetHistory();current=null;for(const key of ['legal_name','store_name','address','contact'])$(key).value='';setForm(null);$('profile').querySelectorAll('input,select,button').forEach(e=>e.disabled=false);render(null);message('请填写新申请。');});
   $('submitApplication').addEventListener('click',()=>run(async()=>{render(await request('submit',{application:current.application,revision:current.revision}));message('申请已提交，请等待平台审核。');}));
   document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>run(async()=>{if(!$('note').value.trim())throw Error('请填写审核说明。');
     render(await request('review',{application:current.application,revision:current.revision,action:b.dataset.action,note:$('note').value.trim()}));message('审核处理已保存。');})));

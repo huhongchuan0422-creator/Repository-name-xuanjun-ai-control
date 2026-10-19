@@ -113,7 +113,8 @@ class MerchantOnboarding:
         schemas={'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
                  'upload':{'application','revision','kind','content_base64','expires_at'},
                  'submit':{'application','revision'},'review_list':set(),
-                 'read':{'application'},'review_read':{'application'},'review':{'application','revision','action','note'},
+                 'read':{'application'},'review_read':{'application'},
+                 'history':{'application','after_revision'},'review_history':{'application','after_revision'},'review':{'application','revision','action','note'},
                  'review_material':{'application','revision','kind','decision','note'},
                  'open_workbench':{'application','revision','workspace'},
                  'download':{'application','kind'}}
@@ -142,6 +143,9 @@ class MerchantOnboarding:
             page=rows[:50]
             return {'applications':[self._view(row[0],*self._load(row[0],uid,op=='review_list')[1:]) for row in page],
                     'next_cursor':page[-1][0] if len(rows)>50 else None}
+        if op in ('history','review_history'):
+            from scripts.community_onboarding_history import read
+            return read(self,session,csrf,params['application'],params['after_revision'],op=='review_history')
         if op in ('read','review_read'):
             _,meta,data=self._load(params['application'],uid,op=='review_read')
             return self._view(params['application'],meta,data)
@@ -223,7 +227,7 @@ class MerchantOnboarding:
                 self._meta(application,owner,meta)
             else:
                 action='SUBMIT' if op=='submit' else params['action']
-                if op=='review' and (action not in ('BEGIN_REVIEW','CORRECTION','REJECT','APPROVE') or owner==uid):raise PermissionError('INDEPENDENT_REVIEW_REQUIRED')
+                if op=='review' and (action not in ('BEGIN_REVIEW','CORRECTION','REJECT','REOPEN','APPROVE') or owner==uid):raise PermissionError('INDEPENDENT_REVIEW_REQUIRED')
                 if action in ('SUBMIT','APPROVE'):self._check_materials(application,meta)
                 if action=='APPROVE':
                     account=c.db.execute('SELECT verified FROM accounts WHERE id=?',(owner,)).fetchone()
@@ -236,7 +240,14 @@ class MerchantOnboarding:
                 encoded_note=self._encode({'note':note},'onboarding-note:'+application) if note else ''
                 revision=workflow.transition(c.db,owner,application,uid,'MERCHANT' if op=='submit' else 'REVIEWER',action,params['revision'],encoded_note,
                     decode=lambda value:self._decode(value,'onboarding-fields:'+application),manage_transaction=False)
+                if action=='REOPEN':
+                    # Reopening a rejection authorizes correction, not approval.
+                    # New material decisions are required; immutable history stays.
+                    meta['reviews']={}
+                    self._meta(application,owner,meta)
             c.audit(application,uid,'MERCHANT_ONBOARDING_'+op.upper(),str(revision))
+            from scripts.community_onboarding_history import append
+            append(self,application,owner,uid,op,params,data,meta,revision)
             c.db.commit()
         except BaseException:
             c.db.rollback();raise
