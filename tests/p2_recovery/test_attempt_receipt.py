@@ -37,12 +37,12 @@ class ReceiptTests(unittest.TestCase):
             fields = list(value)
             fields[stat.ST_UID] = 0
             return os.stat_result(fields)
-        with mock.patch.object(ar.os,'getuid',return_value=0), \\
-             mock.patch.object(ar.os,'geteuid',return_value=0), \\
-             mock.patch.object(ar.os,'uname',return_value=(ar.HOST,)*5), \\
-             mock.patch.object(ar.os,'fstat',side_effect=stat_as_root), \\
-             mock.patch.object(ar.sys,'flags',Flags()), \\
-             mock.patch.object(ar.sys,'argv',args):
+        with mock.patch.object(ar.os,'getuid',return_value=0), (
+             mock.patch.object(ar.os,'geteuid',return_value=0)), (
+             mock.patch.object(ar.os,'uname',return_value=(ar.HOST,)*5)), (
+             mock.patch.object(ar.os,'fstat',side_effect=stat_as_root)), (
+             mock.patch.object(ar.sys,'flags',Flags())), (
+             mock.patch.object(ar.sys,'argv',args)):
             ar.main()
     def test_first_and_next_reconciled(self):
         self.run_slot(1)
