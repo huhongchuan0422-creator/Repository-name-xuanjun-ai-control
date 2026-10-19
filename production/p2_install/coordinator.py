@@ -261,8 +261,13 @@ class Coordinator:
         if row and row[0] == request["attempt_id"] and row[1] == "COMMITTED":
             # Durable commit is not sufficient without live readback.
             reply = self._call(self._adapter(request["batch_id"]),"inspect",request,10)
-            rec = _check_reply(request, reply, "COMMITTED")
-            require(self._matches(request,json.loads(row[2])["receipt"],rec), "READBACK_DRIFT")
+            if reply.get("status") != "COMMITTED":
+                return _receipt(request,"HOLD",error={"code":"COMMITTED_EFFECT_DRIFT"})
+            try:
+                rec = _check_reply(request,reply,"COMMITTED")
+                require(self._matches(request,json.loads(row[2])["receipt"],rec),"READBACK_DRIFT")
+            except (Hold,OSError,ValueError,KeyError):
+                return _receipt(request,"HOLD",error={"code":"READBACK_DRIFT"})
             return _receipt(request, "COMMITTED", rec)
         if row and row[0] == request["attempt_id"] and row[1] == "RETRYABLE":
             reply = self._call(self._adapter(request["batch_id"]),"inspect",request,10)
