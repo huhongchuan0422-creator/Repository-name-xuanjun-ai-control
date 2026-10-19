@@ -58,7 +58,10 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(execute(changed)["error"]["code"],"CONFIG_CONFLICT")
         changed=self.req(); changed["inputs"]["cwd"]="/tmp"
         self.assertEqual(execute(changed)["error"]["code"],"CONFIG_CONFLICT")
-        changed=self.req(); changed["inputs"]["health"]={"type":"process","grace":1}
+        changed=self.req(); changed["inputs"]["health"]={"type":"unix_socket","path":str(self.root/"other.sock"),
+                                                        "request":"PING\n","expect":"PONG\n",
+                                                        "connect_timeout":.1,"read_timeout":.1,
+                                                        "total_timeout":.2,"max_response":64}
         self.assertEqual(execute(changed)["error"]["code"],"CONFIG_CONFLICT")
 
     def test_child_group_cleanup_and_other_batch_survives(self):
