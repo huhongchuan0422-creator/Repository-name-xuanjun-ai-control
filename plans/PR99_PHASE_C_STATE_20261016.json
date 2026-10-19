@@ -5829,5 +5829,15 @@
     "session_recovery_bound": false,
     "original_controller_bound": false,
     "migration_started": false
+  },
+  "durable_session_storage_20261019": {
+    "local_tests": 75,
+    "source_semantics_received": true,
+    "native_verified_copy_batch": "NOT_RUN",
+    "durable_file_and_directory_sync": true,
+    "unknown_query_without_rewrite": true,
+    "original_session_recovery_bound": false,
+    "live_hook_installed": false,
+    "production_migration_started": false
   }
 }

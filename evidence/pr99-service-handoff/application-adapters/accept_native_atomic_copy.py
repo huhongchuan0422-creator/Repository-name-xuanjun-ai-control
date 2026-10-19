@@ -41,10 +41,12 @@ def read_regular(path, limit):
         os.close(fd)
 
 
-def native_factory(raw):
+def native_factory(raw, include_verification=False):
     tree = ast.parse(raw)
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CredentialStore')
     methods = {'_load_master_key', '_encrypt', '_decrypt', 'save_credential', 'load_credential'}
+    if include_verification:
+        methods.add('mark_verified')
     selected = []
     for node in cls.body:
         if isinstance(node, ast.Assign):
@@ -52,9 +54,12 @@ def native_factory(raw):
             selected.append(node)
         elif isinstance(node, ast.FunctionDef) and node.name in methods:
             selected.append(node)
-    if len([n for n in selected if isinstance(n, ast.FunctionDef)]) != 5:
+    if len([n for n in selected if isinstance(n, ast.FunctionDef)]) != len(methods):
         raise RuntimeError('NATIVE_METHODS_MISSING')
     helper = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'fingerprint_api_key')
+    helpers = [helper]
+    if include_verification:
+        helpers.append(next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'safe_record'))
     init = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == '__init__')
     args = init.args.posonlyargs + init.args.args
     defaults = {a.arg: ast.literal_eval(v) for a, v in zip(args[-len(init.args.defaults):], init.args.defaults)}
@@ -64,7 +69,7 @@ def native_factory(raw):
                      AESGCM=AESGCM, CredentialError=CredentialError)
     module = ast.Module(body=[
         ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0),
-        helper, ast.ClassDef(name='CredentialStore', bases=[], keywords=[], body=selected, decorator_list=[])
+        *helpers, ast.ClassDef(name='CredentialStore', bases=[], keywords=[], body=selected, decorator_list=[])
     ], type_ignores=[])
     exec(compile(ast.fix_missing_locations(module), '<hash-pinned-native-pure-methods>', 'exec'), namespace)
     native = namespace['CredentialStore']
