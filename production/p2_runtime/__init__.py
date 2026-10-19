@@ -1,5 +1,5 @@
 """Isolated Linux process runtime with durable ownership, recovery and bounded logs."""
-import argparse, fcntl, hashlib, json, os, re, signal, subprocess, sys, time
+import argparse, fcntl, hashlib, json, os, re, signal, socket, subprocess, sys, time
 from pathlib import Path
 
 MAX_LOG = 1024 * 1024
@@ -104,7 +104,47 @@ def process_set(entry):
     if workload == "GONE" and collector == "GONE": return "GONE", group, collector
     return "LIVE", group, collector
 
-def config_payload(inputs):
+def bounded_number(value, low, high, code):
+    try: value = float(value)
+    except (TypeError, ValueError): raise Fault(code)
+    if value < low or value > high: raise Fault(code)
+    return value
+
+def validate_health(health, root):
+    if not isinstance(health, dict): raise Fault("INVALID_HEALTH")
+    kind = health.get("type")
+    if kind == "process":
+        return {"type": "process"}
+    if kind != "unix_socket": raise Fault("INVALID_HEALTH")
+    path = health.get("path")
+    if not isinstance(path, str) or not os.path.isabs(path) or os.path.normpath(path) != path:
+        raise Fault("INVALID_HEALTH_SOCKET")
+    try:
+        Path(path).relative_to(root)
+    except ValueError:
+        raise Fault("HEALTH_SOCKET_OUTSIDE_ROOT")
+    request = health.get("request", "")
+    expect = health.get("expect")
+    if not isinstance(request, str) or not isinstance(expect, str) or not expect:
+        raise Fault("INVALID_HEALTH_PROTOCOL")
+    try:
+        request_bytes = request.encode("utf-8")
+        expect_bytes = expect.encode("utf-8")
+    except UnicodeError:
+        raise Fault("INVALID_HEALTH_PROTOCOL")
+    if len(request_bytes) > 4096 or len(expect_bytes) > 4096:
+        raise Fault("INVALID_HEALTH_PROTOCOL")
+    connect_timeout = bounded_number(health.get("connect_timeout", .2), .01, 5.0, "INVALID_HEALTH_TIMEOUT")
+    read_timeout = bounded_number(health.get("read_timeout", .2), .01, 5.0, "INVALID_HEALTH_TIMEOUT")
+    total_timeout = bounded_number(health.get("total_timeout", 2.0), .02, 30.0, "INVALID_HEALTH_TIMEOUT")
+    max_response = health.get("max_response", 4096)
+    if not isinstance(max_response, int) or isinstance(max_response, bool) or max_response < len(expect_bytes) or max_response > 65536:
+        raise Fault("INVALID_HEALTH_RESPONSE_LIMIT")
+    return {"type":"unix_socket","path":path,"request":request,"expect":expect,
+            "connect_timeout":connect_timeout,"read_timeout":read_timeout,
+            "total_timeout":total_timeout,"max_response":max_response}
+
+def config_payload(inputs, root):
     argv = inputs.get("argv")
     if not isinstance(argv, list) or not argv or len(argv) > 64 or any(not isinstance(x, str) or not x or "\x00" in x for x in argv):
         raise Fault("INVALID_ARGV")
@@ -118,23 +158,32 @@ def config_payload(inputs):
     for k, v in env.items():
         if not isinstance(k, str) or not ID.fullmatch(k) or not isinstance(v, str) or "\x00" in v: raise Fault("INVALID_ENV")
         if any(mark in k.upper() for mark in SECRET_KEYS): raise Fault("SECRET_ENV_FORBIDDEN")
-    health = inputs.get("health", {"type": "process"})
-    if not isinstance(health, dict) or health.get("type") != "process": raise Fault("INVALID_HEALTH")
-    return {"argv": argv, "cwd": cwd, "env": env, "health": health}
+    health = validate_health(inputs.get("health", {"type": "process"}), root)
+    timeout = bounded_number(inputs.get("timeout", 2), .05, 10.0, "INVALID_TIMEOUT")
+    return {"argv": argv, "cwd": cwd, "env": env, "health": health, "timeout": timeout}
 
-def base(req, status, error=None, receipt=None):
+def stable_identity(req, entry=None):
+    cfg = entry.get("config_sha256") if entry else None
+    op = entry.get("operation_id") if entry else None
+    commit = entry.get("commit_receipt") if entry else None
+    return cfg, op, commit
+
+def base(req, status, error=None, receipt=None, entry=None):
+    cfg, op, commit = stable_identity(req, entry)
     out = {k: req[k] for k in ("schema", "scope", "installation_id", "batch_id", "attempt_id")}
-    out.update({"status": status, "receipt": receipt, "error": error})
+    out.update({"status": status, "receipt": receipt, "error": error,
+                "config_sha256": cfg, "operation_id": op, "commit_receipt": commit})
     return out
 
-def write_receipt(req, root, kind, status, error=None):
+def write_receipt(req, root, kind, status, error=None, entry=None):
     path = root / ("%s-%s-%s-%d.json" % (kind, req["batch_id"], req["attempt_id"], time.time_ns()))
-    durable(path, base(req, status, error, None), replace=False)
+    durable(path, base(req, status, error, None, entry), replace=False)
     return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
-def finish(req, root, status, code=None, reference=None, kind="observe"):
+def finish(req, root, status, code=None, reference=None, kind="observe", entry=None):
     err = None if code is None else {"code": code, "log": reference}
-    return base(req, status, err, write_receipt(req, root, kind, status, err))
+    rec = write_receipt(req, root, kind, status, err, entry)
+    return base(req, status, err, rec, entry)
 
 def marker_path(root, batch):
     return root / ("limit-" + batch + ".json")
@@ -219,7 +268,7 @@ def _locked(req, root, method):
     if entry and entry["installation_id"] != req["installation_id"]: return finish(req, root, "HOLD", "BATCH_CONFLICT", entry.get("log"))
     if entry and entry["attempt_id"] != req["attempt_id"]: return finish(req, root, "HOLD", "ATTEMPT_CONFLICT", entry.get("log"))
     if op == "start":
-        cfg = config_payload(inputs); expected = digest(cfg)
+        cfg = config_payload(inputs, root); expected = digest(cfg)
         if entry and entry.get("config_sha256") != expected: return finish(req, root, "HOLD", "CONFIG_CONFLICT", entry.get("log"))
 
     if method != "execute":
@@ -290,7 +339,7 @@ def _locked(req, root, method):
         if entry["phase"] == "STOPPED" and state == "GONE": return finish(req, root, "HOLD", "ATTEMPT_ALREADY_USED", entry.get("log"))
         return finish(req, root, "HOLD", "UNCERTAIN_PRIOR_START", entry.get("log"))
 
-    cfg = config_payload(inputs)
+    cfg = config_payload(inputs, root)
     logfile = root / ("run-" + req["batch_id"] + ".log")
     limitmark = marker_path(root, req["batch_id"])
     if logfile.exists() or limitmark.exists(): return finish(req, root, "HOLD", "BATCH_FILES_EXIST", str(logfile))
