@@ -1,22 +1,24 @@
-name: P2 resumable installation journal
+name: P2 isolated coordinator
 on:
   push:
-    branches: [repair/p2-resumable-install-20261020]
+    branches: [repair/p2-coordinator-20261020]
     paths:
       - 'production/p2_install/**'
       - 'tests/p2_install/**'
+      - 'docs/p2_install.md'
       - '.github/workflows/p2-resumable-install.yml'
   pull_request:
     paths:
       - 'production/p2_install/**'
       - 'tests/p2_install/**'
+      - 'docs/p2_install.md'
       - '.github/workflows/p2-resumable-install.yml'
 permissions:
   contents: read
 jobs:
-  recovery:
+  isolated:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     strategy:
       matrix:
         python: ['3.11', '3.12']
@@ -25,4 +27,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '${{ matrix.python }}'
-      - run: python -B tests/p2_install/test_journal.py -v
+      - name: Recovery and coordinator
+        run: |
+          python -B tests/p2_install/test_journal.py -v
+          python -B tests/p2_install/test_coordinator.py -v
