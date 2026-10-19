@@ -64,3 +64,28 @@ ingress sealed, queue drained, original material guard instantiated, final data
 captured, canonical Writer assigned, production service started or route changed
 by this package. Restricted original M99/40-file release is not retried. Owner's
 removal of separate reviewer/permit waits remains effective.
+
+## Credential key selection increment, 2026-10-19
+
+Owner terminal results on the Tokyo preparation snapshot showed that the
+project configuration key decrypts records 1 and 2, while the portal key
+decrypts record 3. All carry key version `v1`; selecting solely by that version
+would be incorrect. Both original configuration files were preserved privately
+on Tokyo. No key, credential identifier, ciphertext or configuration-file hash
+is included in this public package.
+
+`credential_key_binding.py` implements an explicitly bound, read-only native
+credential reader. Private per-credential bindings include a fingerprint of
+the identity/AAD and encrypted fields and an opaque key reference. It uses
+exactly one supplied key, delegates to the original supplied store factory,
+rechecks repository data before returning, and holds for unbound/changed
+records, missing inputs or native failures. It does not rotate, guess or fall
+back among keys, write databases, or install a live hook. Eight fixture tests
+cover selection, no fallback, error redaction, binding mutation and concurrent
+record changes; the complete adapter suite is now 33 tests.
+
+Still required: construct private bindings from an exact accepted snapshot,
+verify the supplied native factory and real repository, integrate reads and
+new-credential writes into the original application lifecycle, and perform
+target-host acceptance. This read-only increment is not a complete production
+credential adapter, production migration, or M99 acceptance.
