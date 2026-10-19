@@ -91,6 +91,7 @@ class Coordinator:
                    "state TEXT NOT NULL, detail TEXT NOT NULL)")
         # Historic isolated round rows are preserved, but are not admission or quota.
         db.execute("DROP INDEX IF EXISTS coordinator_once")
+        db.execute("CREATE TABLE IF NOT EXISTS coordinator_failures (seq INTEGER PRIMARY KEY, installation TEXT, cause TEXT, observed INTEGER, evidence TEXT)")
         return self
 
     def __exit__(self, *args):
@@ -283,6 +284,14 @@ class Coordinator:
         self.journal.db.execute("INSERT INTO coordinator_events(attempt,kind,observed,evidence) VALUES(?,?,?,?)",(request["attempt_id"],kind,self.now(),canonical(evidence).decode("ascii")))
         return {"status":"RECORDED","kind":kind}
 
+    def failure(self, request, cause, evidence):
+        _valid(request)
+        require(self._stored(request["attempt_id"]) == request, "FAILURE_IDENTITY")
+        require(type(cause) is str and ID.fullmatch(cause), "FAILURE_CAUSE")
+        require(type(evidence) is dict and len(canonical(evidence)) <= 4096, "FAILURE_EVIDENCE")
+        self.journal.db.execute("INSERT INTO coordinator_failures(installation,cause,observed,evidence) VALUES(?,?,?,?)",
+                                (request["installation_id"],cause,self.now(),canonical(evidence).decode("ascii")))
+
     def tick(self):
         """Deterministic, idempotent timeout events; never claims wake ACK."""
         output = []
@@ -313,6 +322,19 @@ class Coordinator:
                                 "deadline_utc":request["deadline_utc"]}).decode("ascii")))
                 output.append({"attempt_id":attempt,"event":event,
                                "delivery":"UNAVAILABLE","id":key})
+        for installation, cause, count, first in self.journal.db.execute(
+                "SELECT installation,cause,COUNT(*),MIN(observed) FROM coordinator_failures GROUP BY installation,cause"):
+            elapsed = self.now()-first
+            for event, due in (("CHANGE_METHOD_30M",elapsed >= 1800),
+                               ("REPORT_DOTS_10_OR_60",count >= 10 or elapsed >= 3600)):
+                if due:
+                    key = digest([installation,cause,event])
+                    self.journal.db.execute("INSERT OR IGNORE INTO coordinator_outbox VALUES (?,?,?,?,?)",
+                        (key,installation,event,"UNAVAILABLE",
+                         canonical({"cause":cause,"failures":count,"first_utc":first,
+                                    "recipient":"DOTS","next":"propose alternative and evaluate"}).decode("ascii")))
+                    output.append({"installation_id":installation,"event":event,
+                                   "delivery":"UNAVAILABLE","id":key})
         return output
 
 def cli():
