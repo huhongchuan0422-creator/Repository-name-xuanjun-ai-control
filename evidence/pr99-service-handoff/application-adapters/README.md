@@ -109,3 +109,24 @@ proof of a running application instance, target deployment, a live Writer
 Fence or M99 acceptance. The program does not install a service hook or
 integrate new credential writes. It must never be used as a production start
 command. Neither existing production configuration is changed.
+
+
+## Atomic credential write integration
+
+`credential_atomic_write.py` commits an encrypted credential record, explicit
+key binding, and operation result in the SAME existing SQLite database transaction.
+It connects the native encryption preparation and bound read adapters.
+No database path, Writer authority, migration journal, or schema is auto-created.
+The original controller must supply the verified connection and exclusive Writer
+guard, record durable intent before dispatch, and use query only on unknown calls.
+SCHEMA_SQL is an explicit additive schema proposal, NOT an instruction to install
+on production. Historical bindings must be imported from the verified private
+checkpoint before historical reads; opening this component does not seed them.
+Concurrent original application writes are not covered until the actual caller
+uses this connection and the original Fence/drain is established. Do not install
+a second credential Writer beside the running application.
+
+Fourteen new tests use real file-backed SQLite and AES-GCM with a synthetic
+application interface. They cover atomic rollback, CAS, restart query, exact
+idempotency, Writer loss, and commit-acknowledgement loss. They are not Tokyo
+application-source, live-instance, M99, or migration acceptance.
