@@ -83,7 +83,7 @@ class Lifecycle(unittest.TestCase):
 
     def test_prepared_and_stopping_recovery(self):
         req=self.req()
-        cfg=p2_runtime.config_payload(req["inputs"])
+        cfg=p2_runtime.config_payload(req["inputs"], self.root)
         prepared={"installation_id":"install","batch_id":"b1","attempt_id":"attempt-b1","phase":"PREPARED",
                   "config_sha256":p2_runtime.digest(cfg),"log":str(self.root/"run-b1.log"),
                   "limit_marker":str(self.root/"limit-b1.json"),"members":[]}
