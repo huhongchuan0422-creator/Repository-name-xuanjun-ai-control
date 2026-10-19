@@ -11,6 +11,18 @@ class Lifecycle(unittest.TestCase):
         self.root=Path(self.temp.name)/"owned"; self.root.mkdir(mode=0o700)
         self.pids=[]
     def tearDown(self):
+        for journal in self.root.glob("batch-*.json"):
+            try:
+                rec=json.loads(journal.read_text())
+                if rec.get("pgid"):
+                    try: os.killpg(rec["pgid"],signal.SIGKILL)
+                    except ProcessLookupError: pass
+                col=rec.get("collector")
+                if col:
+                    try: os.kill(col["pid"],signal.SIGKILL)
+                    except ProcessLookupError: pass
+            except (OSError,ValueError,KeyError):
+                pass
         for pid in self.pids:
             try: os.kill(pid,signal.SIGKILL)
             except ProcessLookupError: pass
@@ -57,7 +69,7 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(execute(second)["status"],"COMMITTED")
         a,b=self.record("first"),self.record("second"); self.pids += [a["pid"],b["pid"]]
         time.sleep(.1)
-        state,group=p2_runtime.validate_identity(a); self.assertEqual(state,"LIVE"); self.assertGreaterEqual(len(group),2)
+        state,group=p2_runtime.workload_state(a); self.assertEqual(state,"LIVE"); self.assertGreaterEqual(len(group),2)
         self.assertEqual(execute(self.req("first","stop",argv=first["inputs"]["argv"]))["status"],"COMMITTED")
         self.assertEqual(inspect(second)["status"],"COMMITTED")
 
@@ -73,7 +85,8 @@ class Lifecycle(unittest.TestCase):
         req=self.req()
         cfg=p2_runtime.config_payload(req["inputs"])
         prepared={"installation_id":"install","batch_id":"b1","attempt_id":"attempt-b1","phase":"PREPARED",
-                  "config_sha256":p2_runtime.digest(cfg),"log":str(self.root/"run-b1.log"),"members":[]}
+                  "config_sha256":p2_runtime.digest(cfg),"log":str(self.root/"run-b1.log"),
+                  "limit_marker":str(self.root/"limit-b1.json"),"members":[]}
         (self.root/"batch-b1.json").write_text(json.dumps(prepared))
         self.assertEqual(recover(req)["error"]["code"],"START_OUTCOME_UNKNOWN")
         self.assertEqual(execute(req)["error"]["code"],"START_OUTCOME_UNKNOWN")
@@ -83,7 +96,7 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(recover(req)["error"]["code"],"STOP_OUTCOME_UNKNOWN")
         os.killpg(rec["pgid"],signal.SIGTERM)
         for _ in range(100):
-            if p2_runtime.validate_identity(rec)[0]=="GONE": break
+            if p2_runtime.workload_state(rec)[0]=="GONE": break
             time.sleep(.02)
         self.assertEqual(recover(req)["status"],"COMMITTED")
 
@@ -93,7 +106,7 @@ class Lifecycle(unittest.TestCase):
             code="import subprocess,sys,time; subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)']); print('X'*100000,flush=True); time.sleep(60)"
             req=self.req(argv=[sys.executable,"-c",code],timeout=.4)
             out=execute(req); self.assertEqual(out["status"],"HOLD",out); self.assertEqual(out["error"]["code"],"LOG_LIMIT")
-            rec=self.record(); self.assertEqual(p2_runtime.validate_identity(rec)[0],"GONE")
+            rec=self.record(); self.assertEqual(p2_runtime.workload_state(rec)[0],"GONE")
         finally: p2_runtime.MAX_LOG=old
 
     def test_real_stop_timeout_holds_without_touching_other_batch(self):
@@ -123,7 +136,7 @@ class Lifecycle(unittest.TestCase):
     def test_short_process_failure_cleaned_and_no_effect_only_after_group_gone(self):
         out=execute(self.req(argv=[sys.executable,"-c","pass"]))
         self.assertEqual(out["status"],"HOLD")
-        rec=self.record(); self.assertEqual(p2_runtime.validate_identity(rec)[0],"GONE")
+        rec=self.record(); self.assertEqual(p2_runtime.workload_state(rec)[0],"GONE")
         self.assertEqual(recover(self.req())["status"],"NO_EFFECT")
 
     def test_cli_and_uniform_identity_fields(self):
