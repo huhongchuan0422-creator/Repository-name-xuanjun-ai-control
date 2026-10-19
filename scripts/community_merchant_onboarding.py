@@ -25,6 +25,19 @@ MATERIALS={
 BASE=('business_license','identity_front','identity_back','storefront_photo','interior_photo','settlement_proof')
 
 
+def _failure_diagnostic(error,commit_attempted,rollback,object_write):
+    # Internal fixed enums only; never expose paths, applicant/material IDs or errors.
+    diagnostic=dict(database='ROLLED_BACK_BEFORE_COMMIT' if not commit_attempted and rollback=='COMPLETED' else 'UNKNOWN',
+        commit_attempted=commit_attempted,rollback=rollback,object_write=object_write,
+        filesystem_cleanup='NOT_ATTEMPTED')
+    try:
+        error.onboarding_failure=diagnostic
+        error.add_note('MERCHANT_ONBOARDING_FAILURE='+json.dumps(diagnostic,sort_keys=True,separators=(',',':')))
+    except BaseException:
+        # A diagnostic sink must never replace the original business/storage error.
+        pass
+
+
 class MerchantOnboarding:
     def __init__(self,center,reviewers):
         if type(center) is not Center or type(reviewers) is not dict or not reviewers:
@@ -169,6 +182,7 @@ class MerchantOnboarding:
             with c.tx():c.audit(application,uid,'ONBOARDING_DOWNLOAD',material['object_id'])
             return {'content_base64':base64.b64encode(raw).decode(),'mime':row['mime']}
         if type(params['revision']) is not int or params['revision']<0:raise ValueError('INVALID_REVISION')
+        commit_attempted=False;object_write='NOT_STARTED'
         c.db.execute('BEGIN IMMEDIATE')
         try:
             # Reload under the original DB write lock for stale-version safety.
@@ -208,7 +222,10 @@ class MerchantOnboarding:
                 count,size=c.db.execute('SELECT count(*),coalesce(sum(size),0) FROM objects WHERE project=?',(application,)).fetchone()
                 if count>=100 or size+len(raw)>50_000_000 or shutil.disk_usage(c.root).free<max(50_000_000,3*len(raw)):raise RuntimeError('MATERIAL_STORAGE_LIMIT')
                 oid='o_'+secrets.token_hex(16);version='v_'+secrets.token_hex(16)
-                secure_write(c.objects/oid,c.encrypt(raw,'object:'+application+':'+oid))
+                encrypted=c.encrypt(raw,'object:'+application+':'+oid)
+                object_write='ATTEMPTED'
+                secure_write(c.objects/oid,encrypted)
+                object_write='RETURNED'
                 seq=c.db.execute('SELECT coalesce(max(seq),0)+1 FROM versions WHERE project=? AND item=?',(application,kind)).fetchone()[0]
                 c.db.execute('INSERT INTO versions VALUES(?,?,?,?,?,?,?,?,?)',(version,application,kind,seq,uid,'SAVE',c.encrypt(canonical({'object_id':oid,'category':'MATERIAL'}),version),expires,c.now()))
                 sha=hashlib.sha256(raw).hexdigest()
@@ -255,9 +272,18 @@ class MerchantOnboarding:
             if op=='review':
                 from scripts.community_onboarding_notices import append as notify_result
                 notify_result(self,application,owner,revision,params['action'])
+            commit_attempted=True
             c.db.commit()
-        except BaseException:
-            c.db.rollback();raise
+        except BaseException as error:
+            rollback='FAILED'
+            try:
+                was_active=c.db.in_transaction
+                c.db.rollback()
+                rollback='COMPLETED' if was_active and not c.db.in_transaction else 'UNCONFIRMED'
+            except BaseException:
+                pass
+            _failure_diagnostic(error,commit_attempted,rollback,object_write)
+            raise
         _,meta,data=self._load(application,uid,op in ('review','review_material'))
         if op=='review' and params['action']=='APPROVE' and self.operations is not None:
             targets=[name for name,g in self.operations.grants.items() if g['user_id']==owner and g['onboarding_required']]
