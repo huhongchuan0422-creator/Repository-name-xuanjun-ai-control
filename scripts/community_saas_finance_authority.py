@@ -31,6 +31,14 @@ class SignedFinanceAuthority(FinanceAuthority):
                 raise ValueError('SUPPORTED_FINANCE_SIGNING_KEY_REQUIRED')
             self._keys[kid]=(key,frozenset(record['tenants']))
     def __repr__(self):return '<SignedFinanceAuthority protected trust redacted>'
+    def configuration_token(self):
+        # Public trust configuration only; detects in-flight local key/scope
+        # replacement, without treating a digest as an issuer attestation.
+        entries=[]
+        for kid,(key,tenants) in sorted(self._keys.items()):
+            public=key.public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo)
+            entries.append([kid,hashlib.sha256(public).hexdigest(),sorted(tenants)])
+        return hashlib.sha256(canonical([self.audience,self.status,entries])).hexdigest()
     def verify(self,claim,proof,now):
         if (type(now) is not int or not 0<=now<=253402300799 or type(claim) is not dict
                 or type(proof) is not dict or set(proof)!={'key_id','payload','signature'}
