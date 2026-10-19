@@ -296,3 +296,19 @@ CODE_COMMIT=ca609d47a9182436a8d47c59170869cf73002f7f；CODE_TREE=1ea6bb60c2cc829
 仍不标记迁移就绪：完整实际配置/权威数据/全部写入来源、原持久控制器fd/guard与真实入口封闭/排空、实际源查询/完整传输接收及canonical assignment尚未完成；原40文件受限发布/M99路径没有重试或变更环境绕过。Owner取消独审/许可等待继续有效，未重新增加Owner审核流程。本批4个主机命令均终态，无后台生产迁移任务；东京及国内桥接/Windows/Nginx保留，UK P2不在范围。
 
 完整证据：evidence/pr99-service-handoff/aliyun-execution/NATIVE_FENCE_CAPACITY_DELIVERY_20261019.json。
+
+
+## 2026-10-19 08:12 CST｜存储实现实机取得，实际数据库绑定/客服排空适配25项通过
+
+新增真实只读结果：[run39179101395](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39179101395)/job117827887578，Invoke t-jpn70gjz1rzfgu8，08:04:32 CST。取得11份准确存储实现的定义、构造器/存储方法与完整方法调用索引，所有请求类均存在。业务字面量全部脱敏，未导入业务源码、打开数据库、启停服务或领取Writer。实际读取了database/repositories包与credential_repository实现、CredentialStore、SecretRef/会话、两类客服、Telegram、Douyin/TikTok及门户；这是源码证据，不是实际进程配置/完整数据目录/所有Writer通过。
+
+由实际源码确认：CredentialRepository默认沿用已初始化SessionLocal；客服accept_callback在queue.put_nowait之后还写审计，worker_once消费任务但没有task_done。因此新增两个适配组件：effective_database_binding.py从实际仓库实例的已绑定engine提取库位置，不再推断环境/default；wecom_queue_binding.py只在原独占启动期借用原Gate，把回调及后置审计、原队列入队与原worker完成一起计入排空。已接任务/未完成工作不搬移、不丢弃，旁路直接job/legacy get/第二绑定拒绝；UNKNOWN只对账不重发。没有新建Writer、Journal、控制器或seal fd。
+
+CODE_COMMIT=a22e41bf271d7e0377e3931969f70bf6385315d9；CODE_TREE=646b029af3cec2e0c1cbfdc7cd8424d83eb27fc3。
+[CI39179688618](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39179688618)，Python3.11/job117829593879、3.12/job117829593771各25/25 PASS，完整日志及源码/Tree哈希一致。14项真实普通queue/thread/fd测试、11项engine形状/变化拒绝测试；业务与来源验证仍fixture，非原应用/M99验收。Artifacts12155344338/12155747576；外层摘要保存。原113项runtime及21项启动源码未改，沿用原结果。
+
+保留失败并正常修复：run39178583437/job117826348459/t-jpn70gjapyv2j28因错误单文件路径FileNotFoundError退出；query-only run39178694437/job117826678574取得原错误，新增主机命令0。run39178799366/job117827011743是label/PR HEAD异步不一致，凭据前拒绝，主机命令0；未移除重加旧label。run39178927661/job117827399261/t-jpn70gjrmi0248w遇STORAGE_SEMANTICS_WIRE_BOUND，原输出边界保留，后续新代码收敛为构造器/存储方法和完整方法索引后取得上述成功回执。未把失败当成RAM或平台授权拒绝，未盲重发UNKNOWN。
+
+**仍未迁移就绪**：两个新组件没有安装进实际应用启动入口，也未从实际进程导出配置；所有实际数据及写入来源、原controller/guard/fd和现场排空/Fence、最终捕获/传输/接收/canonical assignment及业务切换恢复仍未完成。原受限40文件/M99没有重发或重试，原发布拒绝原文及正常恢复依据仍未取得；不能由本次独立组件通过假定解除。Owner取消独审/正式许可等待继续有效。所有本批主机调用终态，生产服务动作/数据打开/切换0，无本窗口后台生产迁移任务，东京与国内桥接/Windows/Nginx保留。
+
+完整证据：evidence/pr99-service-handoff/aliyun-execution/APPLICATION_ADAPTERS_DELIVERY_20261019.json。

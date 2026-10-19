@@ -4497,7 +4497,7 @@
   },
   "owner_direct_execution_20261019": {
     "schema_version": 1,
-    "observed_through": "2026-10-19T07:39:10+08:00",
+    "observed_through": "2026-10-19T08:12:14+08:00",
     "scope": "PR99_ORIGINAL_DOMESTIC_EXECUTION_NOT_COMPLETED_MIGRATION",
     "owner_instruction": {
       "at": "2026-10-19T00:29:13+08:00",
@@ -5094,6 +5094,51 @@
       "background_migration_task": false,
       "host_command_jobs_terminal": true,
       "tokyo_domestic_bridge_windows_preserved": true
+    },
+    "latest_application_adapters": {
+      "status": "STORAGE_IMPLEMENTATIONS_OBSERVED_AND_APPLICATION_ADAPTERS_CI_PASS_NOT_MIGRATION_READY",
+      "native_source": {
+        "code_commit": "bf223045d961d1ebb1768981162a996a0b79acea",
+        "run_id": 39179101395,
+        "job_id": 117827887578,
+        "invoke_id": "t-jpn70gjz1rzfgu8",
+        "source_files": 11,
+        "all_requested_classes_present": true,
+        "actual_runtime_configuration_proven": false
+      },
+      "adapters": {
+        "code_commit": "a22e41bf271d7e0377e3931969f70bf6385315d9",
+        "code_tree": "646b029af3cec2e0c1cbfdc7cd8424d83eb27fc3",
+        "ci_run": 39179688618,
+        "python_311_job": 117829593879,
+        "python_312_job": 117829593771,
+        "each_tests": 25,
+        "each_passed": 25,
+        "source_sha256": {
+          "README.md": "33713c3d16eebdb71d1ec7cfae8a1460a30eb99d4ee4b4ba6d6063b141c0106b",
+          "effective_database_binding.py": "82275c104ac3a5126ba3f0276c465e9c2758ec886058cf4ccadb0f346ae2d178",
+          "test_effective_database_binding.py": "b6d0c378d774b99d021d919a80515049a44612dac02fab9d9904526912efd62f",
+          "test_wecom_queue_binding.py": "aa2c1df249466c68a62e6b054579f51aa8712cd5c720a61535ae750cfeda9bc8",
+          "wecom_queue_binding.py": "2b1adc7055800cc4f7c14b80206eaef7bc8189a514f72730603a7370b14de7d9"
+        },
+        "inherited_gate_sha256": "14514d40bee4d4bf560b4b32e1cf5df7cf72c0ff3105c55eee969a01b6f1f6c8",
+        "live_application_hook_installed": false,
+        "actual_configuration_exported": false
+      },
+      "remaining": [
+        "Connect the original application startup and real instance/source verifiers to these adapters in the admitted environment",
+        "Complete actual effective configuration, recursive authoritative data membership and every manual/scheduled/shared writer origin",
+        "Bind original persistent controller/material guard/fds, actual intake seal/drain and source-wide Fence; restricted M99 normal release remains unproven",
+        "Complete final capture/transport/receive/reconciliation/canonical Writer assignment and actual start/cutover/business/restore acceptance"
+      ],
+      "owner_review_or_permit_wait": false,
+      "m99": "NOT_RUN_NOT_RETRIED",
+      "production_migration_started": false,
+      "production_cutover": false,
+      "migration_complete": false,
+      "background_migration_task": false,
+      "observed_through": "2026-10-19T08:12:14+08:00",
+      "evidence_path": "evidence/pr99-service-handoff/aliyun-execution/APPLICATION_ADAPTERS_DELIVERY_20261019.json"
     }
   },
   "final_handoff_integration_20261019": {
@@ -5611,5 +5656,50 @@
     "observed_through": "2026-10-19T07:39:10+08:00",
     "background_migration_task": false,
     "native_jobs_terminal": true
+  },
+  "application_adapters_delivery_20261019": {
+    "status": "STORAGE_IMPLEMENTATIONS_OBSERVED_AND_APPLICATION_ADAPTERS_CI_PASS_NOT_MIGRATION_READY",
+    "native_source": {
+      "code_commit": "bf223045d961d1ebb1768981162a996a0b79acea",
+      "run_id": 39179101395,
+      "job_id": 117827887578,
+      "invoke_id": "t-jpn70gjz1rzfgu8",
+      "source_files": 11,
+      "all_requested_classes_present": true,
+      "actual_runtime_configuration_proven": false
+    },
+    "adapters": {
+      "code_commit": "a22e41bf271d7e0377e3931969f70bf6385315d9",
+      "code_tree": "646b029af3cec2e0c1cbfdc7cd8424d83eb27fc3",
+      "ci_run": 39179688618,
+      "python_311_job": 117829593879,
+      "python_312_job": 117829593771,
+      "each_tests": 25,
+      "each_passed": 25,
+      "source_sha256": {
+        "README.md": "33713c3d16eebdb71d1ec7cfae8a1460a30eb99d4ee4b4ba6d6063b141c0106b",
+        "effective_database_binding.py": "82275c104ac3a5126ba3f0276c465e9c2758ec886058cf4ccadb0f346ae2d178",
+        "test_effective_database_binding.py": "b6d0c378d774b99d021d919a80515049a44612dac02fab9d9904526912efd62f",
+        "test_wecom_queue_binding.py": "aa2c1df249466c68a62e6b054579f51aa8712cd5c720a61535ae750cfeda9bc8",
+        "wecom_queue_binding.py": "2b1adc7055800cc4f7c14b80206eaef7bc8189a514f72730603a7370b14de7d9"
+      },
+      "inherited_gate_sha256": "14514d40bee4d4bf560b4b32e1cf5df7cf72c0ff3105c55eee969a01b6f1f6c8",
+      "live_application_hook_installed": false,
+      "actual_configuration_exported": false
+    },
+    "remaining": [
+      "Connect the original application startup and real instance/source verifiers to these adapters in the admitted environment",
+      "Complete actual effective configuration, recursive authoritative data membership and every manual/scheduled/shared writer origin",
+      "Bind original persistent controller/material guard/fds, actual intake seal/drain and source-wide Fence; restricted M99 normal release remains unproven",
+      "Complete final capture/transport/receive/reconciliation/canonical Writer assignment and actual start/cutover/business/restore acceptance"
+    ],
+    "owner_review_or_permit_wait": false,
+    "m99": "NOT_RUN_NOT_RETRIED",
+    "production_migration_started": false,
+    "production_cutover": false,
+    "migration_complete": false,
+    "background_migration_task": false,
+    "observed_through": "2026-10-19T08:12:14+08:00",
+    "evidence_path": "evidence/pr99-service-handoff/aliyun-execution/APPLICATION_ADAPTERS_DELIVERY_20261019.json"
   }
 }
