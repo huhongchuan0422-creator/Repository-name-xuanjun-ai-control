@@ -17,7 +17,7 @@ contract='''def validate_observation(d,expected,nonce):
     for key in ('business_imports','service_actions'):need(type(d[key])is int and d[key]==0)
     need(type(d['sources'])is list and len(d['sources'])==len(n['TARGETS']))
     for row,(path,classes) in zip(d['sources'],n['TARGETS']):
-        fields(row,'path source_state sha256 definitions selected_classes missing_classes redacted_syntax')
+        fields(row,'path source_state sha256 definitions selected_classes missing_classes method_calls redacted_syntax')
         need(row['path']==path and row['source_state']in('PRESENT','MISSING'))
         need(type(row['selected_classes'])is list and type(row['missing_classes'])is list)
         need(len(row['selected_classes'])==len(set(row['selected_classes'])) and
@@ -25,11 +25,20 @@ contract='''def validate_observation(d,expected,nonce):
              not set(row['selected_classes'])&set(row['missing_classes']) and
              set(row['selected_classes'])|set(row['missing_classes'])==set(classes))
         if row['source_state']=='MISSING':
-            need(row['sha256']is None and row['selected_classes']==[] and row['definitions']==[] and row['redacted_syntax']=='')
+            need(row['sha256']is None and row['selected_classes']==[] and row['definitions']==[] and row['method_calls']==[] and row['redacted_syntax']=='')
             continue
         need(type(row['sha256'])is str and re.fullmatch('[0-9a-f]{64}',row['sha256']))
         if path in n['PINS']:need(row['sha256']==n['PINS'][path])
         need(type(row['definitions'])is list and len(row['definitions'])<=160)
+        need(type(row['method_calls'])is list and len(row['method_calls'])<=200)
+        for method in row['method_calls']:
+            fields(method,'class method line calls body_included')
+            need(method['class']in classes and type(method['method'])is str and re.fullmatch('[A-Za-z_][A-Za-z0-9_]{0,100}',method['method']))
+            need(type(method['line'])is int and 0<method['line']<100000 and type(method['body_included'])is bool)
+            need(type(method['calls'])is list and len(method['calls'])<=300)
+            for call in method['calls']:
+                fields(call,'line name')
+                need(type(call['line'])is int and 0<call['line']<100000 and type(call['name'])is str and re.fullmatch('[A-Za-z_][A-Za-z0-9_.]{0,200}',call['name']))
         for f in row['definitions']:
             fields(f,'name line kind')
             need(type(f['name'])is str and re.fullmatch('[A-Za-z_][A-Za-z0-9_]{0,100}',f['name']))
@@ -64,6 +73,8 @@ test='''def self_test():
     for private in ('DO_NOT_DISCLOSE_TOKEN','PRIVATE_DOCSTRING','PRIVATE_TEMPLATE','PRIVATE_BYTES'):
         assert private not in json.dumps(clean)
     assert 'class CredentialStore' in clean['redacted_syntax'] and 'pass' in clean['redacted_syntax']
+    assert {m['method'] for m in clean['method_calls']}=={'empty','put'}
+    assert all(m['body_included']is False for m in clean['method_calls'])
     assert n['excerpt'](raw,('NotPresent',))['missing_classes']==['NotPresent']
     sources=[]
     for path,classes in n['TARGETS']:
@@ -109,7 +120,7 @@ for node in ast.parse(old).body:
 lines=old.splitlines()
 for begin,end,value in reversed(changes):lines[begin-1:end]=value.splitlines()
 program='\n'.join(lines)+'\n'
-program=program.replace('pr99-config-flow-','pr99-repository-semantics-r2-').replace('PR99_CONFIG_FLOW_','PR99_REPOSITORY_SEMANTICS_')
+program=program.replace('pr99-config-flow-','pr99-repository-semantics-r3-').replace('PR99_CONFIG_FLOW_','PR99_REPOSITORY_SEMANTICS_')
 program=program.replace('CONFIG_FLOW_OBSERVED_NOT_EFFECTIVE_ATTESTATION','STORAGE_IMPLEMENTATIONS_OBSERVED_NOT_RUNTIME_ATTESTATION')
 program=program.replace('CONFIG_FLOW_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION','STORAGE_IMPLEMENTATIONS_BATCH_NOT_PRODUCTION_ADMISSION')
 program=program.replace("raise Hold('READONLY_COMMAND_FAILED_NO_RETRY')",'''output=detail.get('Output','')
@@ -128,7 +139,7 @@ workflow=(base/'pr99-config-flow.yml').read_text()
 embedded='\n'.join('          '+line for line in old.rstrip('\n').split('\n'))
 replacement='\n'.join('          '+line for line in program.rstrip('\n').split('\n'))
 assert workflow.count(embedded)==2
-workflow=workflow.replace(embedded,replacement).replace('pr99-config-flow-','pr99-repository-semantics-r2-')
+workflow=workflow.replace(embedded,replacement).replace('pr99-config-flow-','pr99-repository-semantics-r3-')
 workflow=workflow.replace('PR99 redacted startup configuration flow','PR99 exact storage implementation binding')
 workflow=workflow.replace('Read fixed redacted startup source flow once','Read exact storage implementation definitions once')
 (base/'pr99-repository-semantics.yml').write_text(workflow)

@@ -53,13 +53,36 @@ class RemoveLiterals(ast.NodeTransformer):
 
 def excerpt(raw,classes):
     tree=ast.parse(raw)
-    selected=[];definitions=[];found=[]
+    selected=[];definitions=[];found=[];methods=[]
+    def call_name(node):
+        if isinstance(node,ast.Name):return node.id
+        if isinstance(node,ast.Attribute):
+            prefix=call_name(node.value)
+            return prefix+'.'+node.attr if prefix!='DYNAMIC_CALL' else 'DYNAMIC_CALL'
+        return 'DYNAMIC_CALL'
+    detail={'__init__','_load','_save','_persist','_write','_atomic_json','worker_once',
+      'load','save','persist','write','enqueue','submit','close','shutdown'}
     for node in tree.body:
         if isinstance(node,(ast.ClassDef,ast.FunctionDef,ast.AsyncFunctionDef)):
             definitions.append({'name':node.name,'line':node.lineno,'kind':type(node).__name__})
         if isinstance(node,ast.ClassDef):
             if node.name not in classes:continue
             found.append(node.name)
+            node=copy.deepcopy(node)
+            kept=[]
+            for method in node.body:
+                if isinstance(method,(ast.FunctionDef,ast.AsyncFunctionDef)):
+                    calls=[{'line':x.lineno,'name':call_name(x.func)} for x in ast.walk(method) if isinstance(x,ast.Call)]
+                    if len(calls)>300:raise RuntimeError('METHOD_CALL_BOUND')
+                    methods.append({'class':node.name,'method':method.name,'line':method.lineno,'calls':calls,
+                      'body_included':method.name in detail})
+                    if method.name not in detail:continue
+                elif isinstance(method,ast.Expr):continue
+                kept.append(method)
+            node.body=kept or [ast.Pass()]
+        elif isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)):
+            if node.name not in {'create_db_engine','create_session_factory','session_scope','build_service',
+                 'load_local_credential_env','ensure_private_dir','build_telegram_canary','serve'}:continue
         elif not isinstance(node,(ast.Import,ast.ImportFrom,ast.Assign,ast.AnnAssign,ast.FunctionDef,ast.AsyncFunctionDef)):
             continue
         selected.append(node)
@@ -68,9 +91,9 @@ def excerpt(raw,classes):
     # Removing docstrings can empty an otherwise valid class/function body.
     # Parsing here catches such transformations before any evidence is emitted.
     ast.parse(code)
-    if len(code.encode())>170000 or len(definitions)>160:raise RuntimeError('STORAGE_SOURCE_BOUND')
+    if len(code.encode())>170000 or len(definitions)>160 or len(methods)>200:raise RuntimeError('STORAGE_SOURCE_BOUND')
     return {'definitions':definitions,'selected_classes':found,
-      'missing_classes':sorted(set(classes)-set(found)),'redacted_syntax':code}
+      'missing_classes':sorted(set(classes)-set(found)),'method_calls':methods,'redacted_syntax':code}
 
 def read_source(root,path):
     parent=os.dup(root)
@@ -100,7 +123,7 @@ def observe(expected,nonce):
             try:raw=read_source(root,path)
             except FileNotFoundError:
                 rows.append({'path':path,'source_state':'MISSING','sha256':None,'definitions':[],
-                  'selected_classes':[],'missing_classes':sorted(classes),'redacted_syntax':''})
+                  'selected_classes':[],'missing_classes':sorted(classes),'method_calls':[],'redacted_syntax':''})
                 continue
             pin=sha(raw)
             if path in PINS and pin!=PINS[path]:raise RuntimeError('PINNED_SOURCE_DRIFT')
