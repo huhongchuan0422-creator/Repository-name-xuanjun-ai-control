@@ -256,15 +256,23 @@ class Coordinator:
                 result = self._call(adapter,"recover",request,10)
             if result.get("status") == "COMMITTED":
                 observed = _check_reply(request, result, "COMMITTED")
-                commit = self._commit_from_reply(request, result, observed)
+                # A direct execute COMMITTED reply is itself the original
+                # commit receipt. During RUNNING recovery the first reply is
+                # an observation, so use an explicit component commit_receipt
+                # when the component contract provides one.
+                commit = observed if launch else self._commit_from_reply(
+                    request, result, observed)
                 # Commit requires a second independent inspect/readback. A
-                # fresh observation receipt is expected to differ; both reads
-                # must link back to the same immutable original commit receipt.
+                # fresh observation receipt may differ. Legacy trusted
+                # observations can prove linkage by request/commit hashes;
+                # runtime additionally exposes the exact original receipt.
                 checked = self._call(adapter,"inspect",request,10)
                 checked_observed = _check_reply(request, checked, "COMMITTED")
-                checked_commit = self._commit_from_reply(
-                    request, checked, checked_observed)
-                require(checked_commit == commit, "COMMIT_RECEIPT_CONFLICT")
+                if checked.get("commit_receipt") is not None:
+                    checked_commit = _check_receipt_reference(
+                        request, checked.get("commit_receipt"))
+                    require(checked_commit == commit,
+                            "COMMIT_RECEIPT_CONFLICT")
                 require(self._matches(request,commit,checked_observed),
                         "READBACK_CONFLICT")
                 evidence = {"receipt": commit,
