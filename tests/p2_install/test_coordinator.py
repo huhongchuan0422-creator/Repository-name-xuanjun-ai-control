@@ -1,4 +1,5 @@
 import hashlib
+import shutil
 import importlib.util
 import json
 import os
@@ -36,29 +37,35 @@ class Effects:
     def recover(self,r):
         return self.inspect(r)
 
+class Grant:
+    def admit_round(self, request, ordinal):
+        return True
+
 class CoordinatorTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = os.path.realpath(self.tmp.name)
+        self.component = self.root + "/component"
+        os.mkdir(self.component, 0o700)
         self.plan = {"schema":1,"release":"a"*64,"batches":["one","two"]}
         self.effect = Effects()
     def request(self, attempt="a1",batch="one"):
         return {"schema":1,"scope":"ISOLATED_TEST_ONLY","installation_id":"install",
-                "batch_id":batch,"attempt_id":attempt,"root":self.root,
+                "batch_id":batch,"attempt_id":attempt,"root":self.component,"round_id":"round-1",
                 "version":"a"*64,"deadline_utc":4102444800,
                 "inputs":{"operation":"start"}}
     def open(self):
-        return Coordinator(self.root,self.plan,{"one":self.effect,"two":self.effect})
+        return Coordinator(self.root,self.plan,{"one":self.effect,"two":self.effect},component_roots={"one":self.component,"two":self.component},grant=Grant())
     def test_real_effect_and_restart_no_duplicate(self):
         with self.open() as c:
             self.assertEqual(c.execute(self.request())["status"],"COMMITTED")
         with self.open() as c:
             self.assertEqual(c.recover(self.request())["status"],"COMMITTED")
             self.assertEqual(c.execute(self.request("a2"))["status"],"HOLD")
-        self.assertEqual(self.effect.calls,1)
+        self.assertEqual((Path(self.component)/"effect.txt").read_text(),"durable-effect")
     def test_no_provider_never_executes(self):
-        with Coordinator(self.root,self.plan) as c:
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component,"two":self.component}) as c:
             with self.assertRaises(Hold):
                 c.execute(self.request())
     def test_different_payload_same_attempt_rejected(self):
@@ -70,7 +77,7 @@ class CoordinatorTests(unittest.TestCase):
     def test_predecessor_drift_rejected(self):
         with self.open() as c:
             c.execute(self.request())
-            (Path(self.root)/"effect.txt").unlink()
+            (Path(self.component)/"effect.txt").unlink()
             with self.assertRaises(Hold):
                 c.execute(self.request("b1","two"))
     def test_no_effect_then_retry(self):
@@ -85,7 +92,7 @@ class CoordinatorTests(unittest.TestCase):
             # A persisted intent with no durable terminal result.
             c._store(self.request())
         # Deterministic clock, no external service claims.
-        with Coordinator(self.root,self.plan,{"one":self.effect},now=lambda:4102444700) as c:
+        with Coordinator(self.root,self.plan,{"one":self.effect},now=lambda:4102444700,component_roots={"one":self.component},grant=Grant()) as c:
             rows = c.tick()
             self.assertTrue(rows)
             self.assertTrue(all(r["delivery"]=="UNAVAILABLE" for r in rows))
@@ -96,10 +103,12 @@ class CoordinatorTests(unittest.TestCase):
         self.effect.mode="NO_EFFECT"
         for number in range(5):
             with self.open() as c:
-                self.assertEqual(c.execute(self.request("a"+str(number)))["status"],"NO_EFFECT")
+                req=self.request("a"+str(number));req["round_id"]="r"+str(number)
+                self.assertEqual(c.execute(req)["status"],"NO_EFFECT")
         with self.open() as c:
             with self.assertRaises(Hold):
-                c.execute(self.request("six"))
+                req=self.request("six");req["round_id"]="six"
+                c.execute(req)
 
 if __name__=="__main__":
     unittest.main()
