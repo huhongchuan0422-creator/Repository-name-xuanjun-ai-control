@@ -106,8 +106,8 @@ def main():
     loader = pinned_module(args.kit_root + '/attempt5/runtime/versioned_entry.py',
                            args.loader_sha256)
     with loader.imports(args.kit_root, args.manifest_sha256) as inherited:
-        require(inherited['source_commit'] == manifest.get('runtime_source_commit',manifest['reviewed_core_commit']) and
-                inherited['source_tree'] == manifest.get('runtime_source_tree',manifest['reviewed_core_tree']),
+        require(inherited['source_commit'] == manifest.get('runtime_source_commit',manifest.get('reviewed_core_commit')) and
+                inherited['source_tree'] == manifest.get('runtime_source_tree',manifest.get('reviewed_core_tree')),
                 'INHERITED_CORE_SOURCE')
         adapter = pinned_module(cfg['adapter_path'], cfg['adapter_sha256'])
         if callable(getattr(adapter, 'bind_deployment', None)):
