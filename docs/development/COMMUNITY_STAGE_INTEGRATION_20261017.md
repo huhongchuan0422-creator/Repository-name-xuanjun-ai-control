@@ -525,3 +525,57 @@ READY和目录同步成功才撤除；它不计入最终payload清单，不改�
 恢复失败早于HTTP探测、无READY/当前指针。测试中的合成健康返回仅验证持久化
 失败及顺序，不冒充真实HTTP验收。原准确Hosted终态另登记Issue76；本补修不
 提供live controller合同、不变更权限/账单语义、不声明生产安装或真实断电验收。
+
+### 整商户财务只读授权（2026-10-19 Owner 明确批准后的代码增量）
+
+Owner 已明确批准：原平台财务人员经单独授权，可查看、核对指定商户全部门店账单；
+门店人员保持本店范围，不增加支付、退款或分账执行权。本增量提供代码及合成测试，
+没有给真实账号创建授权。前文“整商户授权设计待明确”由本段更新；提供商全集、日期、
+summary、回退及解冻合同缺口不因此关闭。
+
+`MiniApplication.configure_merchant_bills(grants=None)` 仅可在已有原
+`provider_actions` 且尚未启动监听时配置，默认空授权。由受保护宿主明确注入
+`grants[bill_workspace]`，严格字段为 `finance_workspace`、`user_id`、`project`、
+`tenant_id`、`merchant_id`、`sp_mchid`、`sub_mchid`、正整数 `revision` 及唯一
+`permission=SUBMERCHANT_ALL_STORES_BILL_READ_RECONCILE`，不接受任意操作列表。
+此配置不是公开授权 API，不写原 operations.grants/runtime.bindings 或新 IAM 表。
+本地工作台可另配 `merchantBillWorkspace`；浏览器只传 workspace 名称，不能据此
+创建/提升权限。原 `providerWorkspace` 的资金操作仍走原路由和原 scope。
+
+新 `/community/merchant-bills` 入口只接受 `bill_fetch`、`bill_rows`、
+`bill_reconcile`、`bill_audit`，复用原 Center Web session/cookie 与 CSRF 校验，
+不接受 Mini bearer 或混合身份。原 finance_workspace 每请求重新调用原
+ProviderActions 授权，须为原 FINANCE_APPROVER/PLATFORM_OWNER，且账号、项目、
+tenant/merchant、服务商及特约商户绑定全等；项目 OWNER 或 MERCHANT_ADMIN 本身
+不构成平台财务授权。每次请求重新读取显式 grant；删除、改主体/revision、原项目
+撤权/到期、账号 epoch 变化、财务 workspace 撤销均拒绝。提供商 I/O 前后、缓存解密、
+分页返回与审计写入前后重验冻结上下文，变化拒绝响应并回滚本次投影。
+
+下载沿原签名 GET 票据、固定下载域与 SHA1 完整性检查，保存在原 Center 加密 links。
+商户账单 key 明确绑定版本、project/tenant/merchant/sp/sub/kind/date，使用独立
+channel；不会将原 store 缓存原地升级。审计也按 bill_key 派生独立 channel，先按本
+账单索引分页，再验证内容摘要及 scope，不通过游标、空页或 has_more 暴露其他商户
+审计存在性。撤权后旧缓存和审计同样不可读。
+
+已知 TRADE 最小布局及明确特约商户号匹配时才披露白名单财务列；已知 SPLIT 分出
+布局须同时匹配分账发起方 sp_mchid 与分账方 sub_mchid。保存前及每次缓存读出均
+检查，明示外商户行拒绝。未知布局、不能证明商户归属的行，以及尚无权威方向合同的
+回退/解冻行在明细页返回空对象和 `unattributed_rows_redacted` 计数，不泄露其金额、
+交易号或参与方；消费者标识、银行卡及下载 token 始终不在财务白名单内。
+
+本地核对集合只来自原提供商 bindings 中同 tenant/merchant/sub 的精确门店三元组，
+同 sub 的跨主体绑定冲突失败关闭。用原订单和同 project ACTION 标识将全账单行一次
+分配到唯一可证明门店，再复用原核对；重复明细不会跨门店重复累计，未知归属保持
+pending。退款记录读取额外限定原 project，不能借同 key 的其他项目记录。原 Center
+同事务提供 ACTION/RETURN 证据；六业务库独立连接，不声称跨库原子快照。
+
+输出仅声明 `ALL_CONFIGURED_LOCAL_STORES`，提供商全部来源仍
+`NOT_ESTABLISHED`，summary 仍 `NOT_RECONCILED`，Finance 仍 `UNCONFIRMED`，
+完整日请求即使零行或本地全匹配也拒绝。核对只保存原业务审计，不核销、不补单、不
+重试资金动作。工作台新增门店/整商户选择，并隔离选择代次和分页；403/无效 JSON
+清理当前私有结果，迟到旧请求不能擦除新结果或解锁未完成资金操作。
+
+定向测试使用真实原 Center、原订单/加密账本及合成提供商票据；明确禁止 socket
+connect/bind，不代表真实授权、生产启用或支付验收。新增跨商户审计分页反例先复现
+旧初稿的他商户游标泄漏，再验证独立 channel 下 101 条本账单记录准确分三页，160 条
+同项目其他商户记录不影响游标。准确 Hosted 终态另登记 Issue76。

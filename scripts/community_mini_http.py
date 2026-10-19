@@ -12,7 +12,7 @@ from scripts.community_demo_api import _HeaderDeadlineReader
 from scripts.community_mini_login import LoginUnavailable
 
 
-def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None,commerce=None,notifications=None):
+def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,merchant_bills=None,communities=None,commerce=None,notifications=None):
     # Remember admitted dependencies so a lost SaaS backend cannot silently
     # turn a previously full composition into a healthy community-only one.
     saas_required=(getattr(getattr(gateway,'runtime',None),'saas',None) is not None
@@ -29,6 +29,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
         from scripts.community_center_communities import CenterCommunities
         if type(communities) is not CenterCommunities or communities.center is not getattr(gateway.identity,'center',None):
             raise ValueError('SAME_CENTER_COMMUNITIES_REQUIRED')
+    if merchant_bills is not None:
+        from scripts.community_merchant_bills import MerchantBills
+        if type(merchant_bills) is not MerchantBills or merchant_bills.actions is not provider_actions:
+            raise ValueError('SAME_ORIGINAL_MERCHANT_BILLS_REQUIRED')
     if provider_actions is not None:
         from scripts.community_wechat_sp_actions import ProviderActions
         if type(provider_actions) is not ProviderActions or provider_actions.runtime is not gateway.runtime or provider_actions.center is not getattr(gateway.identity,'center',None):
@@ -145,6 +149,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     self.path=='/customer/saas-api' and saas is not None) and not (
                     self.path=='/community/fulfillment' and fulfillment is not None) and not (
                     self.path=='/community/provider-actions' and provider_actions is not None) and not (
+                    self.path=='/community/merchant-bills' and merchant_bills is not None) and not (
                     self.path=='/community/directory' and communities is not None) and not (
                     self.path=='/community/commerce' and commerce is not None) and not (
                     self.path in ('/mini/project-materials','/community/project-materials') and commerce is not None) and not (
@@ -173,7 +178,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     # reading any private file bytes, including small uploads.
                     commerce.project_document_authorize(self.headers.get('X-Community-Session',''),
                                                         self.headers.get('X-Community-Scene',''))
-                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions','/community/directory','/community/commerce','/community/project-materials'):
+                if self.path in ('/merchant/onboarding','/community/operations','/customer/saas-api','/community/fulfillment','/community/provider-actions','/community/merchant-bills','/community/directory','/community/commerce','/community/project-materials'):
                     cookies=[part.strip().partition('=')[2] for part in self.headers.get('Cookie','').split(';')
                              if part.strip().partition('=')[0]=='__Host-xj_customer']
                     if len(cookies)>1 or cookies and session or csrf and self.headers.get('X-CSRF-Token'):
@@ -183,7 +188,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     # Authenticate before accepting a large private upload body.
                     if session:
                         if not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions,'/community/directory':communities,'/community/commerce':commerce,'/community/project-materials':commerce}[self.path].center.session(session,csrf)
+                        {'/merchant/onboarding':onboarding,'/community/operations':operations,'/customer/saas-api':saas,'/community/fulfillment':fulfillment,'/community/provider-actions':provider_actions,'/community/merchant-bills':merchant_bills,'/community/directory':communities,'/community/commerce':commerce,'/community/project-materials':commerce}[self.path].center.session(session,csrf)
                     elif length>16384:raise PermissionError('CENTER_SESSION_REQUIRED')
                 remaining=length;chunks=[];deadline=time.monotonic()+1
                 while remaining:
@@ -236,6 +241,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 elif self.path=='/community/directory':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=communities.dispatch(session,csrf,body)
+                elif self.path=='/community/merchant-bills':
+                    if token:raise PermissionError('CENTER_SESSION_REQUIRED')
+                    result=merchant_bills.dispatch(session,csrf,body)
+                    return self.answer(200,{'result':result,'payment_enabled':False})
                 elif self.path=='/community/provider-actions':
                     if token:raise PermissionError('CENTER_SESSION_REQUIRED')
                     result=provider_actions.dispatch(session,csrf,body)
@@ -268,6 +277,6 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
     return Handler
 
 
-def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,communities=None,commerce=None,notifications=None):
+def serve(gateway,port=0,*,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,merchant_bills=None,communities=None,commerce=None,notifications=None):
     if type(port) is not int or not (port==0 or 1024 <= port <= 65535):raise ValueError('INVALID_PORT')
-    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas,fulfillment=fulfillment,provider_actions=provider_actions,communities=communities,commerce=commerce,notifications=notifications))
+    return HTTPServer(('127.0.0.1',port),make_handler(gateway,operations=operations,onboarding=onboarding,saas=saas,fulfillment=fulfillment,provider_actions=provider_actions,merchant_bills=merchant_bills,communities=communities,commerce=commerce,notifications=notifications))

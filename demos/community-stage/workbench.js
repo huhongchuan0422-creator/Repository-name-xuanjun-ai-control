@@ -5,8 +5,8 @@
  const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult','refundApplicationResult','staffResult','storeList','storeResult','billResult','refundApplications','orderLines','staffRecords'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;clearStaffSelection();staffPage=null;$('moreStaff').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;itemCursor=null;$('moreItems').hidden=true;financialPage=null;$('financialMore').hidden=true;billPage=null;billAuditPage=null;refundPage=null;clearRefundSelection();clearOrderLines();$('refundApplicationDecision').value='APPROVED';detailSelection++;$('moreRefundApplications').hidden=true;$('moreBill').hidden=true;$('moreBillAudit').hidden=true;};
  const status=message=>{$('notice').textContent=message;};
  window.configureCommunityWorkbench=value=>{
-  epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,providerWorkspace:typeof value.providerWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.providerWorkspace)?value.providerWorkspace:null}:null;
-  clear();$('providerActions').hidden=!config?.providerWorkspace;$('billSection').hidden=!config?.providerWorkspace;busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!config;status(config?'工作台已连接当前客户中心身份':'请从客户中心登录并打开授权工作台');
+  epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,providerWorkspace:typeof value.providerWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.providerWorkspace)?value.providerWorkspace:null,merchantBillWorkspace:typeof value.merchantBillWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.merchantBillWorkspace)?value.merchantBillWorkspace:null}:null;
+  clear();$('providerActions').hidden=!config?.providerWorkspace;$('billSection').hidden=!(config?.providerWorkspace||config?.merchantBillWorkspace);$('billScope').value=config?.providerWorkspace?'STORE':'MERCHANT';busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!config;status(config?'工作台已连接当前客户中心身份':'请从客户中心登录并打开授权工作台');
  };
  const call=async(op,params,ticket)=>{
   const auth=config;if(!auth)throw Error('请从客户中心打开工作台');
@@ -128,9 +128,10 @@
  $('completeOrder').onclick=()=>action(async t=>{const reference=$('detailReference').value,selection=detailSelection;if($('completionRevision').value==='')throw Error('先读取原篮子商品快照和履约修订号');const r=await commerce(t,'order_complete',{reference,expected_revision:Number($('completionRevision').value),note:$('completionNote').value});if(t===epoch&&selection===detailSelection&&reference===$('detailReference').value){$('completionRevision').value=r.fulfillment_revision;await orderLines(t,reference,selection);}});
  let billPage=null,billAuditPage=null,billSelection=0;
  function billParams(){return {kind:$('billKind').value,bill_date:$('billDate').value};}
- let billSelectionKey=JSON.stringify(billParams());
+ const billSelectionValue=()=>({...billParams(),scope:$('billScope').value});
+ let billSelectionKey=JSON.stringify(billSelectionValue());
  function billChanged(){
-  const key=JSON.stringify(billParams());if(key===billSelectionKey)return;
+  const key=JSON.stringify(billSelectionValue());if(key===billSelectionKey)return;
   billSelectionKey=key;billSelection++;billPage=null;billAuditPage=null;
   $('billResult').replaceChildren();$('moreBill').hidden=true;$('moreBillAudit').hidden=true;
   // Changing a bill selection may release only its read request, never an
@@ -138,13 +139,24 @@
   if(activeAction?.context==='bill'){activeAction=null;busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!config;}
   if(config&&!activeAction)status('账单选择已变化，请重新读取或核对');
  }
- for(const id of ['billKind','billDate']){$(id).oninput=billChanged;$(id).onchange=billChanged;}
+ for(const id of ['billKind','billDate','billScope']){$(id).oninput=billChanged;$(id).onchange=billChanged;}
  const billCurrent=(t,selection,params)=>t===epoch&&selection===billSelection&&params.kind===$('billKind').value&&params.bill_date===$('billDate').value;
  const billRun=fn=>{billChanged();return action(t=>fn(t,billSelection),'bill');};
  async function billAction(t,operation,params,selection){
-  const current=()=>billCurrent(t,selection,params);
-  const result=await providerAction(t,operation,params,current);
-  if(current())$('billResult').textContent=JSON.stringify(result,null,2);
+  const scope=$('billScope').value,current=()=>billCurrent(t,selection,params)&&scope===$('billScope').value;
+  const context=config,merchant=scope==='MERCHANT';
+  if(scope!=='STORE'&&!merchant)throw Error('账单范围无效');
+  const workspace=merchant?context?.merchantBillWorkspace:context?.providerWorkspace;
+  if(!workspace)throw Error(merchant?'当前账号未获整商户账单只读授权':'当前账号未获门店财务授权');
+  if(!current())throw Error('当前选择已变化');
+  const response=await fetch(merchant?'/community/merchant-bills':'/community/provider-actions',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':context.csrf},body:JSON.stringify({workspace,operation,params})});
+  if(!current())throw Error('当前选择已变化');
+  const clearCurrentBill=()=>{if(current()){$('billResult').replaceChildren();billPage=null;billAuditPage=null;$('moreBill').hidden=true;$('moreBillAudit').hidden=true;}};
+  if(!response.ok){clearCurrentBill();throw Error('账单读取未确认，权限可能已变化，请重新读取');}
+  let data;try{data=await response.json();}catch(e){clearCurrentBill();throw Error('账单响应无法读取，请重新核对');}
+  if(!current())throw Error('当前选择已变化');
+  if(!data||typeof data.result!=='object'||!data.result||Array.isArray(data.result)){clearCurrentBill();throw Error('账单响应无法读取，请重新核对');}
+  const result=data.result;$('billResult').textContent=JSON.stringify(result,null,2);
   return result;
  }
  $('fetchBill').onclick=()=>billRun((t,s)=>billAction(t,'bill_fetch',billParams(),s));

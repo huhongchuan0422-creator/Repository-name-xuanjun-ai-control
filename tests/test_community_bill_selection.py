@@ -8,6 +8,16 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class CommunityBillSelection(unittest.TestCase):
+    def test_merchant_bill_scope_and_request_ownership(self):
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node unavailable')
+        subprocess.run([
+            node, str(ROOT / 'tests/community_merchant_bills_dom.cjs'),
+            str(ROOT / 'demos/community-stage/workbench.js'),
+            str(ROOT / 'demos/community-stage/workbench.html'),
+        ], check=True, timeout=30)
+
     def test_selection_and_request_ownership(self):
         node = shutil.which('node')
         if not node:

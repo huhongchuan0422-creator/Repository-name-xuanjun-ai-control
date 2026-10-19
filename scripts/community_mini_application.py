@@ -22,6 +22,7 @@ class MiniApplication:
         self.saas=None
         self.fulfillment=None
         self.provider_actions=None
+        self.merchant_bills=None
         self.communities=None
         self.commerce=None
         self.notifications=None
@@ -40,7 +41,7 @@ class MiniApplication:
         """Loopback backend for the admitted HTTPS host; never a public bind."""
         if self.server is not None:
             raise ValueError('ALREADY_LISTENING')
-        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,communities=self.communities,commerce=self.commerce,notifications=self.notifications)
+        self.server=serve(self.gateway,port,operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,merchant_bills=self.merchant_bills,communities=self.communities,commerce=self.commerce,notifications=self.notifications)
         return self.server
 
     def configure_payment_notifications(self,api_v3_key,path='/wechat/community/notify'):
@@ -79,6 +80,14 @@ class MiniApplication:
         if self.communities is not None:self.communities.provider_actions=self.provider_actions
         if getattr(self.gateway,'payments',None) is not None:self.gateway.payments.rule_actions=self.provider_actions
         return self.provider_actions
+
+    def configure_merchant_bills(self,grants=None):
+        """Explicit host grants for merchant bill reads; never money authority."""
+        if self.server is not None or self.merchant_bills is not None or self.provider_actions is None:
+            raise ValueError('ORIGINAL_PROVIDER_ACTIONS_REQUIRED_BEFORE_MERCHANT_BILLS')
+        from scripts.community_merchant_bills import MerchantBills
+        self.merchant_bills=MerchantBills(self.provider_actions,grants)
+        return self.merchant_bills
 
     def configure_fulfillment(self,finance,authority_id,price_bindings,*,reversal_finance=None):
         if self.server is not None or self.fulfillment is not None or self.operations is None:
@@ -171,7 +180,7 @@ class MiniApplication:
         if (parent.st_gid!=nginx_gid or
                 (nginx_uid!=os.geteuid() and parent.st_mode & 0o050 != 0o050)):
             raise PermissionError('NGINX_SOCKET_DIRECTORY_TRAVERSAL_REQUIRED')
-        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,communities=self.communities,commerce=self.commerce,notifications=self.notifications)
+        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,merchant_bills=self.merchant_bills,communities=self.communities,commerce=self.commerce,notifications=self.notifications)
         class Server(socketserver.UnixStreamServer):request_queue_size=128
         server=Server(str(path),handler)
         info=path.lstat();self._socket=(path,info.st_dev,info.st_ino)
