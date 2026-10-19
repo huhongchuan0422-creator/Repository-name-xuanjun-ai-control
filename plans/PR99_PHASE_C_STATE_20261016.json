@@ -5819,5 +5819,15 @@
     "production_hook_installed": false,
     "original_controller_bound": false,
     "migration_started": false
+  },
+  "verified_credential_preparation_20261019": {
+    "local_tests": 70,
+    "owner_native_copy_acceptance": "PASS",
+    "receipt_sha256": "f41c16cfe500ba177403098d7a173fb8d2464ebc9e22907954061e342da0e3f6",
+    "save_and_mark_verified_prepared_together": true,
+    "live_hook_installed": false,
+    "session_recovery_bound": false,
+    "original_controller_bound": false,
+    "migration_started": false
   }
 }

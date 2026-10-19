@@ -9,7 +9,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from credential_key_binding import CredentialBindingHold, fingerprint
-from credential_write_preparation import prepare_native_save
+from credential_write_preparation import prepare_native_save, prepare_native_verified_save
 
 # Run only during an explicit schema installation, never implicitly on open.
 SCHEMA_SQL = (
@@ -110,7 +110,7 @@ class AtomicCredentialWriter:
                        'key_ciphertext','key_nonce','secret_ciphertext','secret_nonce',
                        'algorithm','key_version','status','fingerprint','permission_state',
                        'verification_state','trade_permission','withdraw_permission',
-                       'legacy_migration_required','metadata'}
+                       'legacy_migration_required','metadata','last_verified_time'}
             if set(record) - allowed:
                 raise ValueError()
             values = dict(record)
@@ -181,6 +181,10 @@ class BoundCredentialStore:
     def prepare_save(self, **arguments):
         return prepare_native_save(self.factory, self.write_ref,
                                    self.keys[self.write_ref], **arguments)
+
+    def prepare_verified_save(self, verification, **arguments):
+        return prepare_native_verified_save(self.factory, self.write_ref,
+            self.keys[self.write_ref], verification, **arguments)
 
     def load_credential(self, credential_id):
         from credential_key_binding import BoundCredentialReader
