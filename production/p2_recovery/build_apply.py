@@ -25,13 +25,22 @@ def main():
             assert hashlib.sha1(b'blob '+str(len(previous)).encode()+b'\0'+previous).hexdigest() == '5c6c8da9a5cf82f0a6da285b27dbbf02bab90d07'
             expected=previous.replace(b'def main():\n', b'_RECOVERY_GATE = None  # Bound only by the pinned controlled recovery entry.\n\n\ndef main():\n',1)
             expected=expected.replace(b'    cfg = configuration(args.config, args.config_sha256)\n',b'    cfg = configuration(args.config, args.config_sha256)\n    if cfg[\'grant\'].get(\'recovery_entry\') == \'p2_recovery.entry\':\n        require(_RECOVERY_GATE is not None, \'CONTROLLED_RECOVERY_ENTRY_REQUIRED\')\n        unused_record, recovered_cfg, unused_manifest = _RECOVERY_GATE.verify()\n        require(recovered_cfg == cfg, \'RECOVERY_CONFIG_CHANGED\')\n',1)
+            expected=expected.replace(b"manifest.get('runtime_source_commit',manifest['reviewed_core_commit'])", b"manifest.get('runtime_source_commit',manifest.get('reviewed_core_commit'))")
+            expected=expected.replace(b"manifest.get('runtime_source_tree',manifest['reviewed_core_tree'])", b"manifest.get('runtime_source_tree',manifest.get('reviewed_core_tree'))")
             assert (ROOT/name).read_bytes()==expected,'EXACT_ENTRY_DELTA'
         elif name == 'production/p2_attempt5/verify.py':
             expected=previous.replace(b'    for name in added:\n',b"    added += sorted(str(p.relative_to(ROOT)) for p in (ROOT/'production/p2_recovery').glob('*.py'))\n    for name in added:\n",1)
+            expected=expected.replace(b"    added += sorted(str(p.relative_to(ROOT))", b"    added.append('tests/p2_production_assembly/test_entry_input_regressions.py')\n    added += sorted(str(p.relative_to(ROOT))",1)
+            expected=expected.replace(b"    cases = [", b"    cases = [(str(ROOT / 'tests/p2_production_assembly'), 'test_entry_input_regressions.py', 15),\n             ",1)
             assert (ROOT/name).read_bytes()==expected,'EXACT_BUILD_CLOSURE_DELTA'
+        elif name == 'production/p2_attempt5/native_adapter.py':
+            assert hashlib.sha1(b'blob '+str(len(previous)).encode()+b'\0'+previous).hexdigest() == '164b9f31530e9f455b111cd25e1ff1674f643a94', 'BASE_ADAPTER_BLOB'
+            current=(ROOT/name).read_bytes()
+            assert hashlib.sha1(b'blob '+str(len(current)).encode()+b'\0'+current).hexdigest() == '8f6b12db6a7000a5289878b4ba5f4909b2ed14a3', 'EXACT_LIFECYCLE_ADAPTER_DELTA'
         else:
             assert (ROOT/name).read_bytes() == previous, name
     files = original + git('ls-tree','-r','--name-only','HEAD','--','production/p2_recovery',
+        'tests/p2_production_assembly/test_entry_input_regressions.py',
         'tests/p2_recovery/test_apply.py','tests/p2_recovery/test_provider_server.py','tests/p2_recovery/test_control_plane.py','.github/workflows/p2-recovery-apply.yml').decode().splitlines()
     files = sorted(set(files))
     manifest = {'schema':1,'source_commit':head,'source_tree':tree,
