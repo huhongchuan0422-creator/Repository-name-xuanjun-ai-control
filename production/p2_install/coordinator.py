@@ -180,6 +180,9 @@ class Coordinator:
                 evidence = {"receipt": rec, "request_sha256": digest(request)}
                 self.journal.finish(request["batch_id"], request["attempt_id"],
                                     evidence, lambda *unused: True)
+                self.journal.db.execute(
+                    "INSERT OR IGNORE INTO coordinator_events(attempt,kind,observed,evidence) VALUES(?,?,?,?)",
+                    (request["attempt_id"],"COMPLETE",self.now(),canonical(evidence).decode("ascii")))
                 return _receipt(request, "COMMITTED", rec)
             if result.get("status") == "NO_EFFECT":
                 rec = _check_reply(request, result, "NO_EFFECT")
@@ -190,6 +193,10 @@ class Coordinator:
                     request["batch_id"], request["attempt_id"],
                     {"receipt":rec,"request_sha256":digest(request)},
                     lambda *unused: True)
+                self.journal.db.execute(
+                    "INSERT OR IGNORE INTO coordinator_events(attempt,kind,observed,evidence) VALUES(?,?,?,?)",
+                    (request["attempt_id"],"FAIL",self.now(),
+                     canonical({"result":"VERIFIED_NO_EFFECT"}).decode("ascii")))
                 return _receipt(request, "NO_EFFECT", rec)
             return _receipt(request, "HOLD", error={"code":"UNKNOWN_EFFECT"})
         except (OSError, ValueError, KeyError, Hold) as exc:
