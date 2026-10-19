@@ -46,14 +46,14 @@ jobs:
           import hashlib,json,subprocess
           from pathlib import Path
           base=Path('evidence/pr99-service-handoff/application-adapters')
-          names=('wecom_queue_binding.py','effective_database_binding.py','credential_key_binding.py','test_credential_key_binding.py','accept_private_credential_bindings.py','test_private_credential_acceptance.py','test_wecom_queue_binding.py','test_effective_database_binding.py','README.md')
+          names=('wecom_queue_binding.py','effective_database_binding.py','credential_key_binding.py','credential_write_preparation.py','test_credential_write_preparation.py','test_credential_key_binding.py','accept_private_credential_bindings.py','test_private_credential_acceptance.py','test_wecom_queue_binding.py','test_effective_database_binding.py','README.md')
           gate=Path('evidence/pr99-service-handoff/runtime-controller/ingress_gate.py')
           expected_gate='14514d40bee4d4bf560b4b32e1cf5df7cf72c0ff3105c55eee969a01b6f1f6c8'
           assert hashlib.sha256(gate.read_bytes()).hexdigest()==expected_gate
           receipt={'code_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
            'code_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
            'sources':{n:hashlib.sha256((base/n).read_bytes()).hexdigest() for n in names},
-           'inherited_ingress_gate_sha256':expected_gate,'ordinary_tests':39,
+           'inherited_ingress_gate_sha256':expected_gate,'ordinary_tests':44,
            'business_api_and_source_verification':'FIXTURES_NOT_NATIVE_ACCEPTANCE',
            'production_started':False,'actual_configuration_exported':False,
            'live_application_hook_installed':False,'m99':'NOT_RUN'}

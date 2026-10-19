@@ -5790,5 +5790,13 @@
         "digest": "sha256:d9a256b3834107463641f63e5070ca1706a6c450944bcccda40728c7c736b048"
       }
     ]
+  },
+  "credential_write_preparation_20261019": {
+    "owner_private_acceptance": "PASS_3_OF_3",
+    "receipt_sha256": "120d58958228d78ee50dfd195979ec4d5e5a472ded287d60be393e652a511ca0",
+    "local_tests": 44,
+    "host_hook_installed": false,
+    "durable_write_integration": "NOT_COMPLETE",
+    "migration_started": false
   }
 }
