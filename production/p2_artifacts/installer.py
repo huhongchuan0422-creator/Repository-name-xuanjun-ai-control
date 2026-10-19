@@ -474,7 +474,7 @@ def do_execute(req, root):
     prior = inspect_locked(req, root)
     if prior["status"] != "NO_EFFECT":
         return prior
-    ensure_snapshot(req, snapshot, files, recover_mode=True, errors=errors)
+    ensure_snapshot(req, snapshot, files)
     make_journal(req, journal)
     if not dest.exists():
         dest.mkdir(mode=0o700)
@@ -488,8 +488,8 @@ def do_recover(req, root):
     _, journal, receipt, snapshot, recovery, dest, errors = state_paths(root, req)
     if receipt.exists():
         return inspect_locked(req, root)
-    # An owned exact snapshot is sufficient evidence to reconstruct a missing journal.
-    ensure_snapshot(req, snapshot, files)
+    # A partial current-attempt snapshot is retained as evidence, then rebuilt from the exact digest-bound source.
+    ensure_snapshot(req, snapshot, files, recover_mode=True, errors=errors)
     if not journal.exists():
         make_journal(req, journal)
     verify_journal(req, journal)
