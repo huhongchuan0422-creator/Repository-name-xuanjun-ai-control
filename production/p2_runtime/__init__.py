@@ -240,6 +240,11 @@ def _locked(req, root, method):
             if state == "GONE":
                 entry["phase"] = "STOPPED"; entry["members"] = []; durable(journal, entry)
                 return finish(req, root, "COMMITTED", kind="commit")
+            if method == "recover":
+                err = terminate_owned(entry, min(10.0, max(.05, float(inputs.get("timeout", 3)))))
+                if err: return finish(req, root, "HOLD", err, entry.get("log"))
+                entry["phase"] = "STOPPED"; entry["members"] = []; durable(journal, entry)
+                return finish(req, root, "COMMITTED", kind="commit")
             return finish(req, root, "HOLD", "STOP_OUTCOME_UNKNOWN", entry.get("log"))
         if entry["phase"] == "RUNNING":
             ws, group = workload_state(entry)
