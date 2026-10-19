@@ -549,3 +549,7 @@ Owner终端回执：PRIVATE_COPY_NATIVE_METHODS_PASS，3/3；私有绑定已保�
 
 ## 2026-10-19｜凭据及密钥绑定同库事务接线
 新增credential_atomic_write.py：在原有SQLite连接内原子提交加密记录、显式密钥绑定和操作结果；CAS拒绝覆盖不同版本、重复操作不写、丢失commit回执后查询恢复。接入原生加密准备和绑定读取组件。新增16项真实文件SQLite/AES-GCM测试（应用接口为合成fixture），本地全部60项通过。两个辅助表仅给出显式Schema，不自动建库/建表，不替代原迁移控制账本，不领取Writer。仍需原应用实际连接/唯一Writer接线、历史绑定导入和现场验收，未安装运行Hook，生产迁移未开始。
+
+
+## 2026-10-19 16:17 CST｜取得原保存及启动函数，完成启动接线与原生副本验收程序
+Owner固定SHA源码输出已取得_encrypt/save_credential/fingerprint_api_key/build_service/serve。新增portal_startup_wiring.py：只在原独占启动期间将build_service内原CredentialStore构造调用接入显式工厂，保留原Repository和其他构造参数，初始化失败不再静默降级为无凭据功能。原controller及每请求操作身份仍须真实提供；未安装运行Hook。新增accept_native_atomic_copy.py：只在新建私有测试副本上提取固定SHA原生加密/保存/读取方法，使用合成凭据验证真实82表Schema、同库事务和重启查询，保持原3条数据不变，不读取原生产库或实际密钥，不调用币安。该批主机尚未执行，不是M99/生产Writer验收。本地66项通过，新增6项包含Owner原build_service函数、合成依赖及提取边界测试。生产迁移仍未启动。

@@ -5810,5 +5810,14 @@
     "production_migration_started": false,
     "background_task": false,
     "durable_settings_guard": true
+  },
+  "native_portal_wiring_20261019": {
+    "local_tests": 66,
+    "owner_source_received": true,
+    "startup_wiring_code": true,
+    "native_copy_acceptance": "NOT_RUN",
+    "production_hook_installed": false,
+    "original_controller_bound": false,
+    "migration_started": false
   }
 }
