@@ -82,8 +82,8 @@ class CoordinatorTests(unittest.TestCase):
             self.assertEqual(c.execute(self.request("a2"))["status"],"COMMITTED")
     def test_threshold_dedup_and_unavailable(self):
         with self.open() as c:
-            self.effect.mode="NO_EFFECT"
-            c.execute(self.request())
+            # A persisted intent with no durable terminal result.
+            c._store(self.request())
         # Deterministic clock, no external service claims.
         with Coordinator(self.root,self.plan,{"one":self.effect},now=lambda:4102444700) as c:
             rows = c.tick()
