@@ -5,7 +5,7 @@ from task requests. Each adapter must implement execute/inspect/recover.
 """
 import argparse
 import hashlib
-import importlib
+import multiprocessing
 import json
 import os
 import re
@@ -64,10 +64,12 @@ def _check_reply(request, reply, expected):
     return rec
 
 class Coordinator:
-    def __init__(self, root, plan, adapters=None, now=None):
+    def __init__(self, root, plan, adapters=None, now=None, component_roots=None, grant=None):
         self.root = root
         self.plan = plan
         self.adapters = adapters or {}
+        self.component_roots = component_roots or {}
+        self.grant = grant
         self.now = now or (lambda: int(time.time()))
         self.journal = None
 
@@ -87,6 +89,8 @@ class Coordinator:
         db.execute("CREATE TABLE IF NOT EXISTS coordinator_outbox ("
                    "id TEXT PRIMARY KEY, attempt TEXT NOT NULL, event TEXT NOT NULL,"
                    "state TEXT NOT NULL, detail TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS coordinator_rounds (installation TEXT NOT NULL, round_id TEXT NOT NULL, ordinal INTEGER NOT NULL, PRIMARY KEY(installation, round_id))")
+        db.execute("DROP INDEX IF EXISTS coordinator_once")
         return self
 
     def __exit__(self, *args):
@@ -128,14 +132,61 @@ class Coordinator:
         try:
             reply = self._adapter(batch).inspect(request)
             _check_reply(request, reply, "COMMITTED")
-            return evidence.get("receipt") == reply["receipt"]
+            return self._matches(request,evidence["receipt"],reply["receipt"])
         except (OSError, ValueError, Hold):
             return False
 
     def _validate_plan(self, request):
         require(request["batch_id"] in self.plan["batches"], "UNKNOWN_BATCH")
         require(self.plan["release"] == request["version"], "RELEASE_MISMATCH")
-        require(request["root"] == self.root, "ROOT_MISMATCH")
+        require(request["batch_id"] in self.component_roots, "ROOT_UNBOUND")
+        require(request["root"] == self.component_roots[request["batch_id"]], "ROOT_MISMATCH")
+        require(request["root"] != self.root, "ROOT_SHARED")
+
+    def _round(self, request):
+        rid = request.get("round_id")
+        require(type(rid) is str and ID.fullmatch(rid), "ROUND_REQUIRED")
+        row = self.journal.db.execute("SELECT ordinal FROM coordinator_rounds WHERE installation=? AND round_id=?", (request["installation_id"],rid)).fetchone()
+        if row: return row[0]
+        count = self.journal.db.execute("SELECT COUNT(*) FROM coordinator_rounds WHERE installation=?", (request["installation_id"],)).fetchone()[0]
+        require(count < 5, "ROUNDS_EXHAUSTED")
+        require(self.grant is not None, "AUTHORITY_UNAVAILABLE")
+        require(self.grant.admit_round(request,count+1) is True, "AUTHORITY_HOLD")
+        self.journal.db.execute("INSERT INTO coordinator_rounds VALUES (?,?,?)", (request["installation_id"],rid,count+1))
+        return count+1
+
+    def _matches(self, request, commit, observed):
+        if commit == observed: return True
+        try:
+            data = json.loads(Path(observed["path"]).read_text())
+            return (data.get("request_sha256") == digest(request)
+                    and data.get("commit_receipt_sha256") == commit["sha256"]
+                    and data.get("effect_verified") is True)
+        except (OSError, ValueError, KeyError):
+            return False
+
+    def _call(self, adapter, method, request, seconds):
+        parent, child = multiprocessing.Pipe(False)
+        def worker():
+            parent.close()
+            try: child.send(("OK", getattr(adapter,method)(request)))
+            except BaseException as e: child.send(("ERROR",type(e).__name__))
+            finally: child.close()
+        process = multiprocessing.Process(target=worker)
+        process.start()
+        child.close()
+        try:
+            if not parent.poll(max(0,seconds)):
+                process.terminate()
+                process.join(2)
+                raise Hold("TIMEOUT_UNKNOWN")
+            status, value = parent.recv()
+            require(status == "OK", "ADAPTER_ERROR")
+            return value
+        finally:
+            parent.close()
+            if process.is_alive(): process.terminate()
+            process.join(2)
 
     def execute(self, request):
         _valid(request)
@@ -149,11 +200,7 @@ class Coordinator:
         if old:
             return self.recover(request)
         require(self.now() <= request["deadline_utc"], "EXPIRED")
-        # The durable quota is shared by all batches of this installation.
-        count = self.journal.db.execute(
-            "SELECT COUNT(*) FROM coordinator_requests WHERE installation=?",
-            (request["installation_id"],)).fetchone()[0]
-        require(count < 5, "ATTEMPTS_EXHAUSTED")
+        self._round(request)
         self._adapter(request["batch_id"])
         # A crash after storing request but before journal.begin is treated as
         # unknown, never as a new permission to launch another process.
@@ -166,17 +213,17 @@ class Coordinator:
         adapter = self._adapter(request["batch_id"])
         try:
             if launch:
-                result = adapter.execute(request)
+                result = self._call(adapter,"execute",request,request["deadline_utc"]-self.now())
             else:
-                result = adapter.inspect(request)
+                result = self._call(adapter,"inspect",request,10)
             if not launch and result.get("status") == "HOLD":
-                result = adapter.recover(request)
+                result = self._call(adapter,"recover",request,10)
             if result.get("status") == "COMMITTED":
                 rec = _check_reply(request, result, "COMMITTED")
                 # Commit requires independent inspect/readback.
-                checked = adapter.inspect(request)
+                checked = self._call(adapter,"inspect",request,10)
                 _check_reply(request, checked, "COMMITTED")
-                require(checked["receipt"] == rec, "READBACK_CONFLICT")
+                require(self._matches(request,rec,checked["receipt"]), "READBACK_CONFLICT")
                 evidence = {"receipt": rec, "request_sha256": digest(request)}
                 self.journal.finish(request["batch_id"], request["attempt_id"],
                                     evidence, lambda *unused: True)
@@ -188,7 +235,7 @@ class Coordinator:
                 rec = _check_reply(request, result, "NO_EFFECT")
                 checked = adapter.inspect(request)
                 _check_reply(request, checked, "NO_EFFECT")
-                require(checked["receipt"] == rec, "NO_EFFECT_CONFLICT")
+                require(self._matches(request,rec,checked["receipt"]), "NO_EFFECT_CONFLICT")
                 self.journal.reconcile_no_effect(
                     request["batch_id"], request["attempt_id"],
                     {"receipt":rec,"request_sha256":digest(request)},
@@ -214,7 +261,7 @@ class Coordinator:
             # Durable commit is not sufficient without live readback.
             reply = self._adapter(request["batch_id"]).inspect(request)
             rec = _check_reply(request, reply, "COMMITTED")
-            require(json.loads(row[2]).get("receipt") == rec, "READBACK_DRIFT")
+            require(self._matches(request,json.loads(row[2])["receipt"],rec), "READBACK_DRIFT")
             return _receipt(request, "COMMITTED", rec)
         if row and row[0] == request["attempt_id"] and row[1] == "RETRYABLE":
             reply = self._adapter(request["batch_id"]).inspect(request)
@@ -232,7 +279,21 @@ class Coordinator:
             return self.inspect(request)
         if row and row[0] == request["attempt_id"] and row[1] == "RUNNING":
             return self._reconcile(request, launch=False)
+        if row is None:
+            reply = self._call(self._adapter(request["batch_id"]),"inspect",request,10)
+            if reply.get("status") == "NO_EFFECT":
+                rec = _check_reply(request,reply,"NO_EFFECT")
+                return _receipt(request,"HOLD",rec,{"code":"PRE_BEGIN_VERIFIED_NO_EFFECT"})
+            return _receipt(request,"HOLD",error={"code":"PRE_BEGIN_UNKNOWN"})
         return _receipt(request, "HOLD", error={"code":"UNSTARTED_OR_CONFLICT"})
+
+    def event(self, request, kind, evidence):
+        _valid(request)
+        require(self._stored(request["attempt_id"]) == request, "EVENT_IDENTITY")
+        require(kind in ("RECEIVED","STARTED","PROGRESS","HEARTBEAT","HOLD","COMPLETE","FAIL"),"EVENT_KIND")
+        require(type(evidence) is dict and len(canonical(evidence)) <= 4096,"EVENT_EVIDENCE")
+        self.journal.db.execute("INSERT INTO coordinator_events(attempt,kind,observed,evidence) VALUES(?,?,?,?)",(request["attempt_id"],kind,self.now(),canonical(evidence).decode("ascii")))
+        return {"status":"RECORDED","kind":kind}
 
     def tick(self):
         """Deterministic, idempotent timeout events; never claims wake ACK."""
@@ -241,7 +302,7 @@ class Coordinator:
                 "SELECT attempt,request_json,created FROM coordinator_requests"):
             request = json.loads(raw)
             events = self.journal.db.execute(
-                "SELECT kind,observed FROM coordinator_events WHERE attempt=?",
+                "SELECT kind,MAX(observed) FROM coordinator_events WHERE attempt=? GROUP BY kind",
                 (attempt,)).fetchall()
             marks = dict(events)
             if "COMPLETE" in marks or "FAIL" in marks:
@@ -251,7 +312,8 @@ class Coordinator:
             milestones = (("NO_RECEIPT_5M", self.now()-created >= 300 and "RECEIVED" not in marks),
                           ("NO_START_15M", self.now()-created >= 900 and "STARTED" not in marks),
                           ("NO_PROGRESS_15M", self.now()-progress >= 900),
-                          ("BLOCKED_30M", self.now()-created >= 1800))
+                          ("BLOCKED_30M", self.now()-created >= 1800),
+                          ("METHOD_STOP_60M", self.now()-created >= 3600))
             for event, due in milestones:
                 if not due:
                     continue
