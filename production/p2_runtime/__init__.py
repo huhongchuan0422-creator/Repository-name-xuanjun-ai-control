@@ -231,6 +231,52 @@ def terminate_owned(entry, timeout):
     if c == "LIVE": return "COLLECTOR_STOP_TIMEOUT"
     return None
 
+def probe_health(entry):
+    health = entry.get("health", {"type":"process"})
+    if health.get("type") == "process":
+        return None
+    deadline = time.monotonic() + health["total_timeout"]
+    last = "APP_NOT_READY"
+    while time.monotonic() < deadline:
+        ws, _ = workload_state(entry)
+        if ws == "GONE": return "APPLICATION_EXITED"
+        if ws == "MISMATCH": return "PID_IDENTITY_MISMATCH"
+        if ws == "UNKNOWN": return "PROCESS_SET_UNKNOWN"
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            remaining = max(.001, deadline - time.monotonic())
+            sock.settimeout(min(health["connect_timeout"], remaining))
+            sock.connect(health["path"])
+            if health["request"]:
+                sock.sendall(health["request"].encode("utf-8"))
+            remaining = max(.001, deadline - time.monotonic())
+            sock.settimeout(min(health["read_timeout"], remaining))
+            data = bytearray()
+            while len(data) <= health["max_response"]:
+                remaining = max(.001, deadline - time.monotonic())
+                sock.settimeout(min(health["read_timeout"], remaining))
+                chunk = sock.recv(min(4096, health["max_response"] + 1 - len(data)))
+                if not chunk: break
+                data.extend(chunk)
+                expected = health["expect"].encode("utf-8")
+                if data == expected: return None
+                if not expected.startswith(data) and data != expected:
+                    last = "HEALTH_BAD_RESPONSE"; break
+            if len(data) > health["max_response"]:
+                return "HEALTH_RESPONSE_TOO_LARGE"
+            if bytes(data) != health["expect"].encode("utf-8") and last != "HEALTH_BAD_RESPONSE":
+                last = "HEALTH_BAD_RESPONSE"
+        except socket.timeout:
+            last = "HEALTH_TIMEOUT"
+        except (FileNotFoundError, ConnectionRefusedError):
+            last = "APP_NOT_READY"
+        except OSError:
+            last = "HEALTH_IO_ERROR"
+        finally:
+            sock.close()
+        if time.monotonic() < deadline: time.sleep(.02)
+    return last
+
 def monitor(entry, timeout):
     until = time.monotonic() + timeout
     while time.monotonic() < until:
@@ -240,10 +286,19 @@ def monitor(entry, timeout):
         if ws == "GONE": return "HEALTH_FAILED"
         if ws == "MISMATCH": return "PID_IDENTITY_MISMATCH"
         if ws == "UNKNOWN": return "PROCESS_SET_UNKNOWN"
-        c = process_match(entry["collector"])
-        if c != "LIVE": return "LOG_COLLECTOR_FAILED" if c == "GONE" else "COLLECTOR_IDENTITY_MISMATCH"
-        time.sleep(.03)
-    return marker_error(entry)
+        col = process_match(entry["collector"])
+        if col != "LIVE": return "LOG_COLLECTOR_FAILED" if col == "GONE" else "COLLECTOR_IDENTITY_MISMATCH"
+        if entry.get("health", {"type":"process"}).get("type") == "process":
+            time.sleep(.03)
+            continue
+        probe = probe_health(entry)
+        if probe is None: return None
+        if probe in ("APPLICATION_EXITED","PID_IDENTITY_MISMATCH","PROCESS_SET_UNKNOWN","HEALTH_RESPONSE_TOO_LARGE"):
+            return probe
+        time.sleep(.02)
+    if entry.get("health", {"type":"process"}).get("type") == "process":
+        return marker_error(entry)
+    return probe_health(entry)
 
 def execute(request): return _operate(request, "execute")
 def inspect(request): return _operate(request, "inspect")
@@ -345,8 +400,10 @@ def _locked(req, root, method):
     if logfile.exists() or limitmark.exists(): return finish(req, root, "HOLD", "BATCH_FILES_EXIST", str(logfile))
     entry = {"installation_id": req["installation_id"], "batch_id": req["batch_id"], "attempt_id": req["attempt_id"],
              "phase": "PREPARED", "config_sha256": digest(cfg), "argv": cfg["argv"], "cwd": cfg["cwd"],
-             "env_sha256": digest(cfg["env"]), "health_sha256": digest(cfg["health"]), "log": str(logfile),
-             "limit_marker": str(limitmark), "members": []}
+             "env_sha256": digest(cfg["env"]), "health_sha256": digest(cfg["health"]), "health": cfg["health"],
+             "operation_id": digest({"installation_id":req["installation_id"],"batch_id":req["batch_id"],
+                                      "attempt_id":req["attempt_id"],"config_sha256":digest(cfg)}),
+             "commit_receipt": None, "log": str(logfile), "limit_marker": str(limitmark), "members": []}
     durable(journal, entry)
     try:
         workload = subprocess.Popen(cfg["argv"], cwd=cfg["cwd"], env=cfg["env"], stdin=subprocess.DEVNULL,
@@ -366,7 +423,7 @@ def _locked(req, root, method):
             return finish(req, root, "HOLD", "COLLECTOR_IDENTITY_UNKNOWN", str(logfile))
         entry["collector"] = {"pid": ci["pid"], "start": ci["start"], "session": ci["session"]}
         entry["phase"] = "RUNNING"; durable(journal, entry)
-        err = monitor(entry, min(10.0, max(.05, float(inputs.get("timeout", 2)))))
+        err = monitor(entry, cfg["timeout"])
         if err:
             entry["phase"] = "STOPPING"; durable(journal, entry)
             cleanup = terminate_owned(entry, 1.0)
