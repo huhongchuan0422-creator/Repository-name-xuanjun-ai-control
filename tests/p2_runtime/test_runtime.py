@@ -137,6 +137,8 @@ class Lifecycle(unittest.TestCase):
         out=execute(self.req(argv=[sys.executable,"-c","pass"]))
         self.assertEqual(out["status"],"HOLD")
         rec=self.record(); self.assertEqual(p2_runtime.workload_state(rec)[0],"GONE")
+        recovered=recover(self.req())
+        self.assertIn(recovered["status"],("COMMITTED","NO_EFFECT"),recovered)
         self.assertEqual(recover(self.req())["status"],"NO_EFFECT")
 
     def test_cli_and_uniform_identity_fields(self):
