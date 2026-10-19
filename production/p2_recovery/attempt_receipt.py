@@ -58,8 +58,30 @@ def main():
         st = os.fstat(fd)
         require(stat.S_ISDIR(st.st_mode) and stat.S_IMODE(st.st_mode) == 0o700,
                 'RECEIPT_DIR_NOT_PROTECTED')
-        # Exactly one immutable file per numbered slot. Prevent silent retries,
-        # slot reuse, or overwrite of UNKNOWN.
+        # Fail closed on skipped slots, earlier success, or unresolved failure.
+        # This is operator bookkeeping, not a production execution grant.
+        for number in range(1, a.slot):
+            prior_name = 'attempt-%d.json' % number
+            prior_fd = os.open(prior_name, os.O_RDONLY | os.O_NOFOLLOW |
+                               os.O_NONBLOCK, dir_fd=fd)
+            try:
+                prior_st = os.fstat(prior_fd)
+                require(stat.S_ISREG(prior_st.st_mode) and prior_st.st_uid == 0 and
+                        prior_st.st_nlink == 1 and
+                        stat.S_IMODE(prior_st.st_mode) == 0o600 and
+                        prior_st.st_size <= 4096, 'PRIOR_RECEIPT_UNSAFE')
+                data = os.read(prior_fd, 4097)
+                require(len(data) <= 4096, 'PRIOR_RECEIPT_BOUND')
+                prior = json.loads(data.decode('ascii'))
+                require(prior.get('schema') == 1 and prior.get('host') == HOST and
+                        prior.get('slot') == number and
+                        prior.get('authorizes_execution') is False and
+                        prior.get('status') == 'FAILED_RECONCILED' and
+                        HEX64.fullmatch(prior.get('evidence_sha256', '')) is not None,
+                        'PRIOR_ATTEMPT_NOT_RECONCILED')
+            finally:
+                os.close(prior_fd)
+        # Exactly one immutable file per numbered slot.
         name = 'attempt-%d.json' % a.slot
         payload = {'schema': 1, 'host': HOST, 'slot': a.slot,
                    'attempt_id': a.attempt_id, 'status': a.status,
