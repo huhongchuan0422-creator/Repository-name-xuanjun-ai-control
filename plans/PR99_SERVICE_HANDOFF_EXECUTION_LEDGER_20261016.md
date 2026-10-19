@@ -534,3 +534,10 @@ Owner终端验证：准备副本51,855,360字节、82表，SHA256=3ab916e90b9ed1
 新增准确按凭据/身份AAD/密文字段指纹和显式key_ref选择的只读组件，不按v1猜测、不失败后遍历密钥；读前/读后检查记录变化，异常脱敏。CODE_COMMIT=789abc0a1aaade82882eaf3e15b4232318c03c4e，CODE_TREE=cec360b55cc8e8d7c92c3a53da646a952fb7978a；[CI39187809976](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39187809976)，Python3.11/job117853841709、3.12/job117853841500各33项通过，新增8项为原Store fixture下的选择/变化拒绝测试，不是实际应用或M99验收。制品12158218119/12158379178元数据绑定准确版本，未在本轮下载独立复算外层包。
 
 尚未安装原应用读Hook或接通新增凭据写入生命周期；该组件没有写库/密钥轮换能力。实际配置/完整权威数据和全部写入源、原持久控制器/UNKNOWN、现场排空/Fence、最终传输/接收和启动切换验收仍需完成。未重试原受限M99/40文件入口；Owner取消本PR独审/许可等待继续有效。生产迁移和切换未开始，无后台迁移任务。
+
+
+## 2026-10-19｜集中副本验收批次等待Owner东京执行
+
+CODE_COMMIT=f11d38f83fe2297344567dda2b15fc47e7ca6ce9；CODE_TREE=4318406f411c78f6d3305325aca49bec75cdb742。[CI39188344202](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39188344202)，Python3.11/job117855432760、3.12/job117855432886各39项通过（新增6项真实AES-GCM/合成数据及私有文件操作测试）。制品12158444560/12158193823元数据绑定准确版本，本轮未下载复算外层包。
+
+accept_private_credential_bindings.py集中核对固定主机、准确源码/准备副本SHA和已保全两份配置/Manifest，调用原纯加密方法验收显式绑定并保存私有映射/回执；先持久化验证意图，成功检查点复用，失败或半完成结果拒绝自动重跑。只读准备副本，不导入业务模块、不打开原数据库、不改服务、不访问币安。局部验证锁不属于生产Writer/控制账本。现场尚未执行，原应用读Hook/新增凭据写入、完整数据及写入来源/排空Fence/持久控制UNKNOWN/传输接收和真实启动切换仍未完成。未重试受限M99，无后台迁移任务。
