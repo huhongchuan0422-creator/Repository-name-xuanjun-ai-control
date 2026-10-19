@@ -36,6 +36,8 @@ class ReceiptTests(unittest.TestCase):
             value = original_stat(fd)
             fields = list(value)
             fields[stat.ST_UID] = 0
+            if stat.S_ISDIR(fields[stat.ST_MODE]):
+                fields[stat.ST_MODE] &= ~0o022
             return os.stat_result(fields)
         with mock.patch.object(ar.os,'getuid',return_value=0), mock.patch.object(ar.os,'geteuid',return_value=0), mock.patch.object(ar.os,'uname',return_value=(ar.HOST,)*5), mock.patch.object(ar.os,'fstat',side_effect=stat_as_root), mock.patch.object(ar.sys,'flags',Flags()), mock.patch.object(ar.sys,'argv',args):
             ar.main()
