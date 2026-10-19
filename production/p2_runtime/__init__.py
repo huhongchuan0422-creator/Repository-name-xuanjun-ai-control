@@ -243,6 +243,7 @@ def probe_health(entry):
         return None
     deadline = time.monotonic() + health["total_timeout"]
     last = "APP_NOT_READY"
+    saw_timeout = False
     while time.monotonic() < deadline:
         ws, _ = workload_state(entry)
         if ws == "GONE": return "APPLICATION_EXITED"
@@ -273,6 +274,7 @@ def probe_health(entry):
             if bytes(data) != health["expect"].encode("utf-8") and last != "HEALTH_BAD_RESPONSE":
                 last = "HEALTH_BAD_RESPONSE"
         except socket.timeout:
+            saw_timeout = True
             last = "HEALTH_TIMEOUT"
         except (FileNotFoundError, ConnectionRefusedError):
             last = "APP_NOT_READY"
@@ -282,6 +284,8 @@ def probe_health(entry):
         finally:
             sock.close()
         if time.monotonic() < deadline: time.sleep(.02)
+    if saw_timeout and last not in ("HEALTH_BAD_RESPONSE","HEALTH_RESPONSE_TOO_LARGE"):
+        return "HEALTH_TIMEOUT"
     return last
 
 def monitor(entry, timeout):
