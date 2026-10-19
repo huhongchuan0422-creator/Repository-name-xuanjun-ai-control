@@ -176,7 +176,7 @@ class Coordinator:
         process.start()
         child.close()
         try:
-            if not parent.poll(max(0,seconds)):
+            if not parent.poll(min(86400,max(0,seconds))):
                 process.terminate()
                 process.join(2)
                 raise Hold("TIMEOUT_UNKNOWN")
