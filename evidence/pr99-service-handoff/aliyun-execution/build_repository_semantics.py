@@ -112,6 +112,17 @@ program='\n'.join(lines)+'\n'
 program=program.replace('pr99-config-flow-','pr99-repository-semantics-r2-').replace('PR99_CONFIG_FLOW_','PR99_REPOSITORY_SEMANTICS_')
 program=program.replace('CONFIG_FLOW_OBSERVED_NOT_EFFECTIVE_ATTESTATION','STORAGE_IMPLEMENTATIONS_OBSERVED_NOT_RUNTIME_ATTESTATION')
 program=program.replace('CONFIG_FLOW_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION','STORAGE_IMPLEMENTATIONS_BATCH_NOT_PRODUCTION_ADMISSION')
+program=program.replace("raise Hold('READONLY_COMMAND_FAILED_NO_RETRY')",'''output=detail.get('Output','')
+                try:
+                    try:failure=json.loads(output)
+                    except ValueError:failure=json.loads(base64.b64decode(output,validate=True))
+                    if type(failure)is dict and set(failure)=={'status','exception','code','retry_allowed'} and failure['retry_allowed']is False:
+                        row['host_error_type']=safe(failure['exception'])
+                        code=failure['code']
+                        if type(code)is str and re.fullmatch('[A-Z0-9_]{1,100}',code):row['host_error_code']=code
+                except Exception:pass
+                row['exit_code']=detail.get('ExitCode')
+                raise Hold('READONLY_COMMAND_FAILED_NO_RETRY')''')
 (base/'repository_semantics_probe.py').write_text(program)
 workflow=(base/'pr99-config-flow.yml').read_text()
 embedded='\n'.join('          '+line for line in old.rstrip('\n').split('\n'))

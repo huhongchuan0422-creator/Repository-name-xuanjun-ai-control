@@ -285,6 +285,16 @@ jobs:
                       if state in ACTIVE:time.sleep(5);continue
                       row['invocation_status']=safe(state)
                       if state!='Success' or detail.get('ExitCode')!=0:
+                          output=detail.get('Output','')
+                          try:
+                              try:failure=json.loads(output)
+                              except ValueError:failure=json.loads(base64.b64decode(output,validate=True))
+                              if type(failure)is dict and set(failure)=={'status','exception','code','retry_allowed'} and failure['retry_allowed']is False:
+                                  row['host_error_type']=safe(failure['exception'])
+                                  code=failure['code']
+                                  if type(code)is str and re.fullmatch('[A-Z0-9_]{1,100}',code):row['host_error_code']=code
+                          except Exception:pass
+                          row['exit_code']=detail.get('ExitCode')
                           raise Hold('READONLY_COMMAND_FAILED_NO_RETRY')
                       row['receipt']=decode_receipt(detail.get('Output'),expected,nonce)
                       row['host_commands']=1
@@ -647,6 +657,16 @@ jobs:
                       if state in ACTIVE:time.sleep(5);continue
                       row['invocation_status']=safe(state)
                       if state!='Success' or detail.get('ExitCode')!=0:
+                          output=detail.get('Output','')
+                          try:
+                              try:failure=json.loads(output)
+                              except ValueError:failure=json.loads(base64.b64decode(output,validate=True))
+                              if type(failure)is dict and set(failure)=={'status','exception','code','retry_allowed'} and failure['retry_allowed']is False:
+                                  row['host_error_type']=safe(failure['exception'])
+                                  code=failure['code']
+                                  if type(code)is str and re.fullmatch('[A-Z0-9_]{1,100}',code):row['host_error_code']=code
+                          except Exception:pass
+                          row['exit_code']=detail.get('ExitCode')
                           raise Hold('READONLY_COMMAND_FAILED_NO_RETRY')
                       row['receipt']=decode_receipt(detail.get('Output'),expected,nonce)
                       row['host_commands']=1
