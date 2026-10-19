@@ -14,26 +14,38 @@ from production.p2_install.coordinator import Coordinator, Hold
 
 class Effects:
     def __init__(self):
-        self.calls = 0
         self.mode = "COMMITTED"
-    def _report(self, r):
+    def _report(self, r, observation=False):
         p = Path(r["root"]) / "effect.txt"
-        if self.mode == "COMMITTED":
+        if not observation and self.mode == "COMMITTED":
             p.write_text("durable-effect")
-        receipt = Path(r["root"]) / "receipt.json"
-        payload = json.dumps({"effect":p.exists(),"status":self.mode}).encode()
-        receipt.write_bytes(payload)
+        commit = Path(r["root"]) / ("commit-" + r["batch_id"] + "-" + r["attempt_id"] + ".json")
+        observed = Path(r["root"]) / ("observed-" + r["batch_id"] + "-" + r["attempt_id"] + ".json")
+        if observation and commit.exists():
+            from production.p2_install.coordinator import digest
+            content = {
+                "installation_id": r["installation_id"],
+                "batch_id": r["batch_id"], "attempt_id": r["attempt_id"],
+                "request_sha256": digest(r),
+                "commit_receipt_sha256": hashlib.sha256(commit.read_bytes()).hexdigest(),
+                "effect_verified": p.exists() == (self.mode == "COMMITTED")
+            }
+            target = observed
+        else:
+            content = {"effect":p.exists(),"status":self.mode}
+            target = commit if not observation else observed
+        payload = json.dumps(content).encode()
+        target.write_bytes(payload)
         return {"schema":1, "scope":r["scope"],
                 "installation_id":r["installation_id"],"batch_id":r["batch_id"],
                 "attempt_id":r["attempt_id"],"status":self.mode,
-                "receipt":{"path":str(receipt),"sha256":hashlib.sha256(payload).hexdigest()}}
-    def execute(self, r):
-        self.calls += 1
+                "receipt":{"path":str(target),"sha256":hashlib.sha256(payload).hexdigest()}}
+    def execute(self,r):
         return self._report(r)
     def inspect(self,r):
         p = Path(r["root"]) / "effect.txt"
         self.mode = "COMMITTED" if p.exists() else "NO_EFFECT"
-        return self._report(r)
+        return self._report(r,True)
     def recover(self,r):
         return self.inspect(r)
 
