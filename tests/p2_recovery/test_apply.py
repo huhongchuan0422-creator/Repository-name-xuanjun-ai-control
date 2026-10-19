@@ -636,7 +636,7 @@ print(json.dumps({'body':out,'signatures':signs(out)}))
         evidence=self.write('control-evidence.json',r.canonical(self.signed()))
         cfg={'schema':1,'host':r.HOST,'request_sha256':r.sha(r.canonical(self.request)),
             'trust':trust,'signing_keys':{role:{'path':path,'sha256':r.sha(Path(path).read_bytes())}
-                for role,path in self.private.items()},'evidence':evidence,'inventory':invref,
+                for role,path in self.private.items()},'plan_sha256':self.ref['sha256'],'live_evidence_path':evidence['path'],'inventory':invref,
             'invoke_receipts':[],'snapshot':None}
         cfgref=self.write('control-config.json',r.canonical(cfg))
         approval={'config_sha256':cfgref['sha256']};approval['signature']=self.signatures(approval)['owner']
@@ -653,6 +653,11 @@ print(json.dumps({'body':out,'signatures':signs(out)}))
         result=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=40)
         self.assertEqual(result.returncode,0,result.stdout.decode()+result.stderr.decode())
         self.assertEqual(json.loads(result.stdout.decode())['control_config'],'REGISTERED_NOT_ACTIVATED')
+        argv[5]='control-status'
+        status=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30)
+        self.assertEqual(status.returncode,0,status.stdout.decode()+status.stderr.decode())
+        self.assertEqual(json.loads(status.stdout.decode())['production_admission'],'NOT_EVALUATED')
+        self.assertFalse(os.path.exists(self.cfg['database']))
         argv[5]='serve'
         process=subprocess.Popen(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         def finish():

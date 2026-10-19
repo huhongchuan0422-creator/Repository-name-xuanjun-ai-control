@@ -158,7 +158,7 @@ there is no need for an arbitrary external adapter program in native mode.
 1. **Managed-channel revocation:** eight exact channel categories, principal
    lists and original enforcement references are bound to a three-role signed
    inventory and original recovery packet. The journal records the revocation
-   scope; unknown external channels cannot register. This does not revoke RAM
+   scope; unknown external channels cannot pass admission. This does not revoke RAM
    credentials or SSH access by declaring a row: those external revocations must
    be carried out by their actual management authority and independently proved.
 2. **Epoch/Fence denial:** `ControlPlane.enforce` rejects the old authority through
@@ -203,3 +203,30 @@ control-config and Owner-signed digest, existing three trusted key references,
 fresh signed inventory/evidence, completed external revocations and all relevant
 InvokeId/transaction receipts. Do not use synthetic tests as these inputs. No
 FIRST_DEPLOY, Prepare or new RAM authorization is needed for the offline changes.
+
+Within a registered control configuration, `live_evidence_path` is the single
+Owner-approved protected refresh source. Fresh three-role signed evidence can
+replace that file without changing the Grant, config digest or Owner approval.
+Every read revalidates signatures, exact request/plan/restoration, current expiry
+and all signed source hashes. The inventory source path stays approved while its
+current SHA must be present in the fresh signed packet. The installation entry retains its separately pinned historical bootstrap
+recipe; the control configuration binds `plan_sha256` and the live source path. A locally edited
+timestamp or expired original cannot become fresh evidence. This preserves
+ONE_PERMIT_MAX_5_ATTEMPTS without requiring a new configuration approval for
+every safe continuation; no source/scope/Signer change is authorized by refresh.
+
+
+Local control enrollment is deliberately separate from production admission.
+`register-control` may install the Owner-signed P2 deny policy before external
+isolation has been proved; it uses the pinned request/plan/trust and creates no
+reservation, AuthorityStore or Grant. This avoids requiring old-token rejection
+proof before its server-side rejection policy can be enrolled. `serve` still
+requires the original signed recovery recipe, and every `respond` requires fresh
+complete evidence. An enrolled policy is never an isolation or activation PASS.
+
+`control-status` is an authenticated-root, digest-only policy query. It reads the
+committed Owner approval source again and reports only enrolled local denial and
+configuration/trust hashes. It explicitly returns production_admission=
+NOT_EVALUATED and external_isolation=NOT_INFERRED; it never signs or promotes a
+policy query into an external isolation receipt, consumes quota or starts Writer.
+The original Owner signature reference is persisted and rechecked after restart.

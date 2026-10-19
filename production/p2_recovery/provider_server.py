@@ -242,7 +242,7 @@ def main():
     import types
     global r, e
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation',choices=('initialize-reservations','register-control','serve'))
+    parser.add_argument('operation',choices=('initialize-reservations','register-control','control-status','serve'))
     parser.add_argument('--journal',required=True)
     for name in ('bootstrap-sha256','recovery-code-sha256','executor-sha256'):
         parser.add_argument('--'+name,required=True)
@@ -292,15 +292,22 @@ def main():
         return
     r.need(all(getattr(args,name) is not None for name in
         ('request','request_sha256','trust','trust_sha256','plan','plan_sha256',
-         'evidence','evidence_sha256')), 'PROVIDER_CONFIG_REQUIRED')
+         )), 'PROVIDER_CONFIG_REQUIRED')
     r.need(args.control_config is not None or
            (args.adapter is not None and args.adapter_sha256 is not None),'MANAGEMENT_ADAPTER_REQUIRED')
     request=r.decode(r.read(args.request,args.request_sha256))
     keys=r.load_trust(args.trust,args.trust_sha256)
-    packet=r.decode(r.read(args.evidence,args.evidence_sha256))
-    e.historical_recipe(request,packet,keys)
     ref={'path':args.plan,'sha256':args.plan_sha256}
-    plan=e.signed_plan(request,packet,ref)
+    r.validate_request(request)
+    if args.operation in ('register-control','control-status'):
+        r.need(args.control_config is not None,'CONTROL_CONFIG_REQUIRED')
+        packet=None
+        plan=e.load_plan(ref,request)
+    else:
+        r.need(args.evidence is not None and args.evidence_sha256 is not None,'EVIDENCE_REQUIRED')
+        packet=r.decode(r.read(args.evidence,args.evidence_sha256))
+        e.historical_recipe(request,packet,keys)
+        plan=e.signed_plan(request,packet,ref)
     journal=Reservations(args.journal)
     try:
         control=None
@@ -308,8 +315,14 @@ def main():
             r.need(args.control_config_sha256 is not None and args.control_code_sha256 is not None,'CONTROL_PINS_REQUIRED')
             module=bootstrap.load(here+'/control_plane.py',args.control_code_sha256)
             module.r=r;module.e=e
-            control=module.ControlPlane(journal,request,keys,ref,packet['body']['restoration'],
+            control=module.ControlPlane(journal,request,keys,ref,
+                (packet['body']['restoration'] if packet is not None else None),
                 {'path':args.control_config,'sha256':args.control_config_sha256})
+        if args.operation=='control-status':
+            r.need(control is not None,'CONTROL_CONFIG_REQUIRED')
+            import json
+            print(json.dumps(control.status(),sort_keys=True))
+            return
         if args.operation=='register-control':
             r.need(control is not None and args.control_approval is not None and
                    args.control_approval_sha256 is not None,'CONTROL_APPROVAL_REQUIRED')

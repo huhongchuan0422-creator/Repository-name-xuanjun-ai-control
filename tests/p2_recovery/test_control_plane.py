@@ -32,8 +32,9 @@ class ControlTests(unittest.TestCase):
         evidence=self.write('evidence.json',r.canonical(self.signed()))
         self.config={'schema':1,'host':r.HOST,'request_sha256':r.sha(r.canonical(self.request)),
             'trust':self.trust,'signing_keys':{role:{'path':path,'sha256':r.sha(Path(path).read_bytes())}
-                for role,path in self.private.items()},'evidence':evidence,'inventory':self.iref,
+                for role,path in self.private.items()},'plan_sha256':self.ref['sha256'],'live_evidence_path':self.root+'/live-evidence.json','inventory':self.iref,
             'invoke_receipts':[],'snapshot':None}
+        self.write('live-evidence.json',r.canonical(self.signed()))
         self.save_config()
     def save_config(self):
         self.cref=self.write('control.json',r.canonical(self.config))
@@ -43,7 +44,7 @@ class ControlTests(unittest.TestCase):
         self.control=c.ControlPlane(self.journal,self.request,self.public,self.ref,
                                    self.body['restoration'],self.cref)
     def update_evidence(self):
-        self.config['evidence']=self.write('evidence.json',r.canonical(self.signed()))
+        self.write('live-evidence.json',r.canonical(self.signed()))
         self.save_config()
     def register(self):self.control.register(self.approval)
     def test_registration_real_keys_and_protected_source(self):
@@ -79,18 +80,27 @@ class ControlTests(unittest.TestCase):
         self.assertEqual(before,set(Path(self.root).iterdir()))
     def test_external_unknown_refused(self):
         self.body['inventory']['unknown_writers']=['external-unverified']
-        self.update_evidence()
-        with self.assertRaises(r.Hold):self.register()
+        with self.assertRaises(r.Hold):
+            self.update_evidence();self.register();self.control.respond(self.probe)
     def test_missing_channel_refused(self):
         del self.inventory['channels']['ssh'];self.inventory.pop('signatures')
         self.inventory['signatures']=self.sign(self.inventory)
         self.config['inventory']=self.write('inventory.json',r.canonical(self.inventory))
-        self.save_config()
-        with self.assertRaises(r.Hold):self.register()
+        with self.assertRaises(r.Hold):
+            self.save_config();self.register();self.control.respond(self.probe)
+    def test_signed_channel_status_conflict_refused(self):
+        self.inventory.pop('signatures');self.inventory['channels']['ssh']['status']='NOT_PRESENT_PROVEN'
+        self.inventory['signatures']=self.sign(self.inventory)
+        old=self.iref;self.iref=self.write('inventory.json',r.canonical(self.inventory))
+        self.body['sources'].remove(old);self.body['sources'].append(self.iref)
+        self.config['inventory']=self.iref;self.update_evidence()
+        with self.assertRaises(r.Hold):
+            self.register();self.control.respond(self.probe)
     def test_expired_external_evidence_not_refreshed_by_signer(self):
         self.body['issued_utc']=1;self.body['expires_utc']=100
         self.update_evidence()
-        with self.assertRaises(r.Hold):self.register()
+        with self.assertRaises(r.Hold):
+            self.register();self.control.respond(self.probe)
     def test_config_change_refused(self):
         self.register();self.write('control.json',b'{}')
         with self.assertRaises(r.Hold):self.control.respond(self.probe)
@@ -123,7 +133,8 @@ class ControlTests(unittest.TestCase):
         old=self.iref;self.iref=self.write('inventory.json',r.canonical(self.inventory))
         self.body['sources'].remove(old);self.body['sources'].append(self.iref)
         self.config['inventory']=self.iref;self.update_evidence()
-        with self.assertRaisesRegex(r.Hold,'INVOKE_CLOSURE_INCOMPLETE'):self.register()
+        with self.assertRaisesRegex(r.Hold,'INVOKE_CLOSURE_INCOMPLETE'):
+            self.register();self.control.respond(self.probe)
     def test_registration_fsync_failure_not_accepted_after_restart(self):
         with mock.patch.object(c.os,'fsync',side_effect=OSError('failure')):
             with self.assertRaises(OSError):self.register()
@@ -165,13 +176,44 @@ class ControlTests(unittest.TestCase):
         self.assertEqual(Path(ref['path']).read_bytes(),before)
     def test_snapshot_unknown_stops(self):
         with self.assertRaises(r.Hold):c.transaction_snapshot(self.snapshot('UNKNOWN'))
+    def test_fresh_evidence_renewal_needs_no_new_owner_config_approval(self):
+        self.register();self.control.respond(self.probe)
+        original_config=Path(self.cref['path']).read_bytes()
+        now=int(time.time())+600
+        self.body['issued_utc']=now-1;self.body['expires_utc']=now+20
+        self.write('live-evidence.json',r.canonical(self.signed()))
+        self.probe['operation']='execution_gate'
+        with mock.patch.object(c.time,'time',return_value=now):
+            self.control.respond(self.probe)
+        self.assertEqual(Path(self.cref['path']).read_bytes(),original_config)
+    def test_forged_live_refresh_rejected(self):
+        self.register();packet=self.signed();packet['body']['expires_utc']+=100
+        self.write('live-evidence.json',r.canonical(packet))
+        with self.assertRaises(r.Hold):self.control.respond(self.probe)
+    def test_enroll_deny_policy_without_external_evidence_never_admits(self):
+        os.unlink(self.config['live_evidence_path']);self.register()
+        with self.assertRaisesRegex(r.Hold,'OLD_EPOCH_REVOKED'):
+            self.control.enforce('old-1',7,'old','old')
+        with self.assertRaises(OSError):self.control.respond(self.probe)
+        self.assertEqual(self.journal.db.execute('SELECT count(*) FROM reservations').fetchone(),(0,))
+    def test_owner_approval_source_preserved_and_rechecked(self):
+        self.register();self.write('control-approval.json',b'{}')
+        with self.assertRaises(r.Hold):self.control.registered()
+    def test_policy_query_does_not_claim_external_isolation(self):
+        self.register();value=self.control.status()
+        self.assertTrue(value['local_old_epoch_deny_enrolled'])
+        self.assertEqual(value['production_admission'],'NOT_EVALUATED')
+        self.assertEqual(value['external_isolation'],'NOT_INFERRED')
+        self.assertFalse(value['authority_initialized'])
+        self.assertNotIn('signing_keys',value)
     def test_snapshot_hash_refused(self):
         with self.assertRaises(r.Hold):c.transaction_snapshot(self.source)
     def test_source_version_change_refused(self):
         self.request['source_commit']='a'*40
         with self.assertRaises(r.Hold):self.control.facts()
     def test_numeric_true_not_accepted(self):
-        self.body['isolation']['all_old_tokens_rejected']=1;self.update_evidence()
-        with self.assertRaises(r.Hold):self.register()
+        self.body['isolation']['all_old_tokens_rejected']=1
+        with self.assertRaises(r.Hold):
+            self.update_evidence();self.register();self.control.respond(self.probe)
 
 if __name__=='__main__':unittest.main(verbosity=2)

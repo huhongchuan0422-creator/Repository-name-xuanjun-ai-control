@@ -95,36 +95,40 @@ class ControlPlane(object):
         self.ref=r.reference(config_ref)
         self.cfg=r.decode(r.read(config_ref['path'],config_ref['sha256']))
         cfg=self.cfg
-        r.fields(cfg,'schema host request_sha256 trust signing_keys evidence inventory invoke_receipts snapshot')
+        r.fields(cfg,'schema host request_sha256 trust signing_keys plan_sha256 live_evidence_path inventory invoke_receipts snapshot')
         r.need(type(cfg['schema']) is int and cfg['schema']==1 and cfg['host']==r.HOST and
                cfg['request_sha256']==r.sha(r.canonical(request)), 'CONTROL_CONFIG_SCOPE')
+        r.reference(cfg['trust'])
         registered=r.load_trust(cfg['trust']['path'],cfg['trust']['sha256'])
         r.need(registered==keys,'CONTROL_TRUST_BINDING')
         r.need(type(cfg['signing_keys']) is dict and set(cfg['signing_keys'])==r.ROLES,'CONTROL_SIGNERS')
         for role,ref in cfg['signing_keys'].items():r.reference(ref)
-        r.reference(cfg['evidence']);r.reference(cfg['inventory'])
+        r.reference(cfg['inventory']);r.path(cfg['live_evidence_path'])
+        r.need(r.pin(cfg['plan_sha256'])==plan_ref['sha256'],'CONTROL_PLAN_BINDING')
         r.need(type(cfg['invoke_receipts']) is list and len(cfg['invoke_receipts'])<=100,'INVOKE_BOUND')
         for ref in cfg['invoke_receipts']:r.reference(ref)
         if cfg['snapshot'] is not None:r.reference(cfg['snapshot'])
 
     def register(self, approval_ref):
         # Owner-signed exact public/private source references; no secret contents in audit.
+        r.reference(approval_ref)
         approval=r.decode(r.read(approval_ref['path'],approval_ref['sha256']))
         r.fields(approval,'config_sha256 signature')
         r.need(approval['config_sha256']==self.ref['sha256'],'CONTROL_APPROVAL_BINDING')
         r.signature({'config_sha256':approval['config_sha256']},approval['signature'],self.keys['owner'])
-        self.facts()  # No registration on UNKNOWN or unproven external channels.
+        # Enroll only the local deny policy. Admission still requires facts() on
+        # every query; do not require isolation success to install its deny gate.
         db=self.journal.db
         db.execute('BEGIN IMMEDIATE')
         try:
-            db.execute('CREATE TABLE IF NOT EXISTS control_config(request_sha TEXT PRIMARY KEY,config_sha TEXT NOT NULL,trust_sha TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS control_config(request_sha TEXT PRIMARY KEY,config_sha TEXT NOT NULL,trust_sha TEXT NOT NULL,approval TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS revoked_authorities(authority_id TEXT PRIMARY KEY,through_epoch INTEGER NOT NULL,request_sha TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS channel_revocations(request_sha TEXT NOT NULL,channel TEXT NOT NULL,inventory_sha TEXT NOT NULL,PRIMARY KEY(request_sha,channel))')
-            row=db.execute('SELECT config_sha,trust_sha FROM control_config WHERE request_sha=?',
+            row=db.execute('SELECT config_sha,trust_sha,approval FROM control_config WHERE request_sha=?',
                            (self.cfg['request_sha256'],)).fetchone()
-            expected=(self.ref['sha256'],self.cfg['trust']['sha256'])
+            expected=(self.ref['sha256'],self.cfg['trust']['sha256'],r.canonical(approval_ref).decode('ascii'))
             r.need(row is None or row==expected,'CONTROL_CONFIG_ALREADY_BOUND')
-            if row is None:db.execute('INSERT INTO control_config VALUES(?,?,?)',(self.cfg['request_sha256'],)+expected)
+            if row is None:db.execute('INSERT INTO control_config VALUES(?,?,?,?)',(self.cfg['request_sha256'],)+expected)
             old=db.execute('SELECT through_epoch,request_sha FROM revoked_authorities WHERE authority_id=?',
                            (self.request['old_authority_id'],)).fetchone()
             expected_old=(self.request['old_epoch'],self.cfg['request_sha256'])
@@ -147,10 +151,15 @@ class ControlPlane(object):
                'CONTROL_JOURNAL_REPLACED')
         r.need(r.sha(r.read(self.ref['path']))==self.ref['sha256'],'CONTROL_CONFIG_CHANGED')
         try:
-            row=self.journal.db.execute('SELECT config_sha,trust_sha FROM control_config WHERE request_sha=?',
+            row=self.journal.db.execute('SELECT config_sha,trust_sha,approval FROM control_config WHERE request_sha=?',
                                        (self.cfg['request_sha256'],)).fetchone()
         except sqlite3.Error:raise r.Hold('CONTROL_NOT_REGISTERED')
-        r.need(row==(self.ref['sha256'],self.cfg['trust']['sha256']),'CONTROL_NOT_REGISTERED')
+        r.need(row is not None and row[:2]==(self.ref['sha256'],self.cfg['trust']['sha256']),'CONTROL_NOT_REGISTERED')
+        approval_ref=r.decode(row[2].encode('ascii'));r.reference(approval_ref)
+        approval=r.decode(r.read(approval_ref['path'],approval_ref['sha256']))
+        r.fields(approval,'config_sha256 signature')
+        r.need(approval['config_sha256']==self.ref['sha256'],'CONTROL_APPROVAL_BINDING')
+        r.signature({'config_sha256':approval['config_sha256']},approval['signature'],self.keys['owner'])
 
     def enforce(self,authority_id,epoch,writer_id,grant_id):
         self.registered()
@@ -162,12 +171,28 @@ class ControlPlane(object):
         r.need((authority_id,epoch,writer_id,grant_id)==
                (q['new_authority_id'],q['new_epoch'],q['writer_id'],q['new_grant_id']), 'CONTROL_FENCE_CONFLICT')
 
+    def status(self):
+        self.registered()
+        row=self.journal.db.execute('SELECT through_epoch FROM revoked_authorities WHERE authority_id=?',
+                                   (self.request['old_authority_id'],)).fetchone()
+        return {'schema':1,'request_sha256':self.cfg['request_sha256'],
+                'config_sha256':self.ref['sha256'],'trust_sha256':self.cfg['trust']['sha256'],
+                'local_old_epoch_deny_enrolled':row==(self.request['old_epoch'],),
+                'production_admission':'NOT_EVALUATED','external_isolation':'NOT_INFERRED',
+                'authority_initialized':False,'writer_started':False}
+
     def facts(self):
-        packet=r.decode(r.read(self.cfg['evidence']['path'],self.cfg['evidence']['sha256']))
+        # Owner binds the protected live source path once. Each replacement must
+        # authenticate all three signatures and current expiry; no retry approval.
+        packet=r.decode(r.read(self.cfg['live_evidence_path']))
         r.decide(self.request,packet,self.keys)
         r.need(self.plan_ref in packet['body']['sources'],'CONTROL_PLAN_NOT_SIGNED')
-        r.need(r.canonical(packet['body']['restoration'])==r.canonical(self.restoration),'CONTROL_RESTORATION')
-        inventory=r.decode(r.read(self.cfg['inventory']['path'],self.cfg['inventory']['sha256']))
+        if self.restoration is not None:
+            r.need(r.canonical(packet['body']['restoration'])==r.canonical(self.restoration),'CONTROL_RESTORATION')
+        inventory_refs=[ref for ref in packet['body']['sources'] if ref['path']==self.cfg['inventory']['path']]
+        r.need(len(inventory_refs)==1,'CONTROL_INVENTORY_SOURCE')
+        inventory_ref=inventory_refs[0]
+        inventory=r.decode(r.read(inventory_ref['path'],inventory_ref['sha256']))
         r.fields(inventory,'schema request_sha256 channels invoke_ids signatures')
         signed={k:v for k,v in inventory.items() if k!='signatures'}
         r.need(type(inventory['schema']) is int and inventory['schema']==1 and
@@ -175,18 +200,22 @@ class ControlPlane(object):
                type(inventory['channels']) is dict and set(inventory['channels'])==r.CHANNELS and
                type(inventory['signatures']) is dict and set(inventory['signatures'])==r.ROLES,'CONTROL_INVENTORY')
         for role in sorted(r.ROLES):r.signature(signed,inventory['signatures'][role],self.keys[role])
-        r.need(self.cfg['inventory'] in packet['body']['sources'],'CONTROL_INVENTORY_NOT_SIGNED')
+        r.need(inventory_ref in packet['body']['sources'],'CONTROL_INVENTORY_NOT_SIGNED')
         for kind,channel in inventory['channels'].items():
             r.fields(channel,'status principals enforcement')
             r.need(channel['status'] in ('ISOLATED','NOT_PRESENT_PROVEN') and
                    type(channel['principals']) is list and len(channel['principals'])<=100,'EXTERNAL_WRITER_UNKNOWN')
             for principal in channel['principals']:r.ident(principal)
+            r.need(len(set(channel['principals']))==len(channel['principals']) and
+                   (channel['status']!='NOT_PRESENT_PROVEN' or channel['principals']==[]) and
+                   channel['status']==packet['body']['inventory']['channels'][kind]['status'],
+                   'CHANNEL_INVENTORY_CONFLICT')
             r.reference(channel['enforcement'])
             r.read(channel['enforcement']['path'],channel['enforcement']['sha256'])
             r.need(channel['enforcement'] in packet['body']['sources'] and
                    packet['body']['inventory']['channels'][kind]['receipt_sha256']==channel['enforcement']['sha256'],
                    'ENFORCEMENT_NOT_BOUND')
-        r.need(type(inventory['invoke_ids']) is list and len(set(inventory['invoke_ids']))==len(inventory['invoke_ids']), 'INVOKE_INVENTORY')
+        r.need(type(inventory['invoke_ids']) is list and all(type(x) is str for x in inventory['invoke_ids']) and len(set(inventory['invoke_ids']))==len(inventory['invoke_ids']), 'INVOKE_INVENTORY')
         seen=set()
         for ref in self.cfg['invoke_receipts']:
             value=r.decode(r.read(ref['path'],ref['sha256']))
