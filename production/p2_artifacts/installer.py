@@ -136,7 +136,16 @@ def parse_manifest(req):
         valid_member(name)
         if not HEX.fullmatch(sha):
             raise Stop("INVALID_MANIFEST")
-    return files
+    modes = ins.get("modes", {})
+    if not isinstance(modes, dict) or set(modes) - set(files):
+        raise Stop("INVALID_MODES")
+    normalized = {}
+    for name in files:
+        mode = modes.get(name, 0o600)
+        if mode not in (0o600, 0o700):
+            raise Stop("INVALID_MODES")
+        normalized[name] = mode
+    return files, normalized
 
 def state_paths(root, req):
     state = checked_dir(root, ".p2_artifacts")
@@ -150,27 +159,33 @@ def state_paths(root, req):
     snap = snapshots / (key + "--" + req["attempt_id"] + ".tar")
     return state, journals / (key + ".json"), receipts / (key + ".json"), snap, recoveries / (key + ".json"), versions / key, errors
 
-def persist_error(errors, req, code, stage):
+def persist_error(errors, req, code, stage, details=None):
     name = "%s--%s--%s.json" % (req.get("installation_id", "unknown"), req.get("batch_id", "unknown"), uuid.uuid4().hex)
     p = errors / name
     payload = {"schema": 1, "code": code, "stage": stage,
                "installation_id": req.get("installation_id"), "batch_id": req.get("batch_id"),
-               "attempt_id": req.get("attempt_id")}
+               "attempt_id": req.get("attempt_id"), "details": details}
     try:
         durable_write(p, encode(payload))
         return str(p)
     except Exception:
         return None
 
+def snapshot_partial(snapshot):
+    return Path(str(snapshot) + ".partial")
+
 def snapshot_input(req, snapshot):
     source = req["inputs"]["archive"]
+    partial = snapshot_partial(snapshot)
+    if partial.exists():
+        raise Stop("STALE_PARTIAL_SNAPSHOT")
     flags = os.O_RDONLY | os.O_NOFOLLOW
     fd = os.open(source, flags)
     before = os.fstat(fd)
     if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_ARCHIVE_BYTES:
         os.close(fd)
         raise Stop("ARCHIVE_UNAVAILABLE")
-    outfd = os.open(str(snapshot), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o400)
+    outfd = os.open(str(partial), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     h = hashlib.sha256()
     total = 0
     try:
@@ -190,17 +205,18 @@ def snapshot_input(req, snapshot):
             if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
                     after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
                 raise Stop("ARCHIVE_CHANGED_DURING_READ")
+            if h.hexdigest() != req["inputs"]["archive_sha256"]:
+                raise Stop("ARCHIVE_DIGEST_MISMATCH")
+            os.fchmod(out.fileno(), 0o400)
+            os.fsync(out.fileno())
+        os.rename(partial, snapshot)
+        fsync_dir(snapshot.parent)
     except BaseException:
         try:
-            os.unlink(snapshot)
+            os.unlink(partial)
         except OSError:
             pass
         raise
-    fsync_dir(snapshot.parent)
-    if h.hexdigest() != req["inputs"]["archive_sha256"]:
-        os.unlink(snapshot)
-        fsync_dir(snapshot.parent)
-        raise Stop("ARCHIVE_DIGEST_MISMATCH")
     return h.hexdigest()
 
 def validate_snapshot(snapshot, expected_sha, files):
@@ -268,8 +284,12 @@ def secure_parent(dest, rel):
         cur = nxt
     return dest / rel
 
-def write_stream(target, src, expected_size):
-    fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+def part_path(target, attempt_id):
+    return target.with_name(target.name + ".p2-part-" + attempt_id)
+
+def write_stream(target, src, expected_size, mode, attempt_id):
+    partial = part_path(target, attempt_id)
+    fd = os.open(str(partial), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     h = hashlib.sha256()
     count = 0
     try:
@@ -285,15 +305,15 @@ def write_stream(target, src, expected_size):
                 out.write(b)
             if count != expected_size:
                 raise Stop("SIZE_MISMATCH")
+            os.fchmod(out.fileno(), mode)
             out.flush()
             os.fsync(out.fileno())
+        os.link(partial, target, follow_symlinks=False)
+        fsync_dir(target.parent)
+        os.unlink(partial)
+        fsync_dir(target.parent)
     except BaseException:
-        try:
-            os.unlink(target)
-        except OSError:
-            pass
         raise
-    fsync_dir(target.parent)
     return h.hexdigest()
 
 def scan_tree(dest):
@@ -316,10 +336,16 @@ def scan_tree(dest):
             actual[str(p.relative_to(dest))] = stream_hash_file(p)
     return actual
 
-def verify_tree(dest, files):
+def verify_tree(dest, files, modes):
     try:
-        return scan_tree(dest) == files
-    except Stop:
+        if scan_tree(dest) != files:
+            return False
+        for name, mode in modes.items():
+            p = dest / name
+            if stat.S_IMODE(os.lstat(p).st_mode) != mode:
+                return False
+        return True
+    except (Stop, OSError):
         return False
 
 def receipt_of(path):
@@ -329,15 +355,16 @@ def receipt_of(path):
 
 def verify_journal(req, journal):
     j = read_json(journal, "CORRUPT_JOURNAL")
+    files, modes = parse_manifest(req)
     if j.get("schema") != 1 or j.get("request_digest") != digest_bytes(encode(req)) or j.get("attempt_id") != req["attempt_id"]:
         raise Stop("REQUEST_CONFLICT")
-    if j.get("files") != req["inputs"].get("files") or j.get("archive_sha256") != req["inputs"].get("archive_sha256"):
+    if j.get("files") != files or j.get("modes") != modes or j.get("archive_sha256") != req["inputs"].get("archive_sha256"):
         raise Stop("JOURNAL_MISMATCH")
     return j
 
 def verify_receipt(journal, receipt, dest, recovery):
     r = read_json(receipt, "CORRUPT_RECEIPT")
-    if r.get("journal_sha256") != stream_hash_file(journal) or not verify_tree(dest, r.get("files", {})):
+    if r.get("journal_sha256") != stream_hash_file(journal) or not verify_tree(dest, r.get("files", {}), r.get("modes", {})):
         raise Stop("COMMITTED_STATE_MISMATCH")
     rec = r.get("recovery")
     if rec:
@@ -362,27 +389,57 @@ def inspect_locked(req, root):
         except Stop as e:
             return failure(req, e.code, str(journal), "INSPECT")
         return failure(req, "INCOMPLETE_BATCH", str(journal), "INSPECT")
-    if snapshot.exists() or dest.exists() or recovery.exists():
-        return failure(req, "UNJOURNALED_EFFECT", str(snapshot if snapshot.exists() else dest), "INSPECT")
+    partial = snapshot_partial(snapshot)
+    if snapshot.exists() or partial.exists() or dest.exists() or recovery.exists():
+        evidence = snapshot if snapshot.exists() else (partial if partial.exists() else dest)
+        return failure(req, "UNJOURNALED_EFFECT", str(evidence), "INSPECT")
     return result(req, "NO_EFFECT")
 
 def make_journal(req, journal):
+    files, modes = parse_manifest(req)
     payload = {"schema": 1, "request_digest": digest_bytes(encode(req)), "attempt_id": req["attempt_id"],
-               "files": req["inputs"]["files"], "archive_sha256": req["inputs"]["archive_sha256"]}
+               "files": files, "modes": modes, "archive_sha256": req["inputs"]["archive_sha256"]}
     durable_write(journal, encode(payload))
 
-def ensure_snapshot(req, snapshot, files):
+def ensure_snapshot(req, snapshot, files, recover_mode=False, errors=None):
+    partial = snapshot_partial(snapshot)
+    if partial.exists():
+        if not recover_mode:
+            raise Stop("STALE_PARTIAL_SNAPSHOT")
+        st = os.lstat(partial)
+        if not stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode) or st.st_uid != os.geteuid():
+            raise Stop("PARTIAL_SNAPSHOT_OWNERSHIP_UNKNOWN")
+        evidence = {"path": str(partial), "size": st.st_size, "sha256": stream_hash_file(partial)}
+        if errors is not None:
+            persist_error(errors, req, "INTERRUPTED_SNAPSHOT", "RECOVER", evidence)
+        os.unlink(partial)
+        fsync_dir(partial.parent)
     if snapshot.exists():
         validate_snapshot(snapshot, req["inputs"]["archive_sha256"], files)
     else:
         snapshot_input(req, snapshot)
         validate_snapshot(snapshot, req["inputs"]["archive_sha256"], files)
 
-def install_missing(snapshot, dest, files):
+def clean_owned_partials(dest, files, attempt_id, errors=None, req=None):
+    for name in files:
+        target = dest / name
+        partial = part_path(target, attempt_id)
+        if partial.exists():
+            st = os.lstat(partial)
+            if not stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode) or st.st_uid != os.geteuid():
+                raise Stop("PARTIAL_FILE_OWNERSHIP_UNKNOWN")
+            if errors is not None and req is not None:
+                persist_error(errors, req, "INTERRUPTED_FILE_WRITE", "RECOVER",
+                              {"path": str(partial), "size": st.st_size, "sha256": stream_hash_file(partial)})
+            os.unlink(partial)
+            fsync_dir(partial.parent)
+
+def install_missing(snapshot, dest, files, modes, attempt_id):
     actual = scan_tree(dest)
     unknown = set(actual) - set(files)
     wrong = {k for k, v in actual.items() if k in files and files[k] != v}
-    if unknown or wrong:
+    wrong_mode = {k for k in actual if k in modes and stat.S_IMODE(os.lstat(dest / k).st_mode) != modes[k]}
+    if unknown or wrong or wrong_mode:
         raise Stop("PARTIAL_STATE_CONFLICT")
     missing = [name for name in sorted(files) if name not in actual]
     if not missing:
@@ -393,7 +450,7 @@ def install_missing(snapshot, dest, files):
             m = mapping[name]
             target = secure_parent(dest, name)
             src = tar.extractfile(m)
-            if src is None or write_stream(target, src, m.size) != files[name]:
+            if src is None or write_stream(target, src, m.size, modes[name], attempt_id) != files[name]:
                 raise Stop("WRITE_VERIFY_FAILED")
             _interrupt_hook(name)
     return missing
@@ -402,32 +459,33 @@ def _interrupt_hook(_name):
     return None
 
 def commit_receipt(req, journal, receipt, dest, recovery=None):
-    if not verify_tree(dest, req["inputs"]["files"]):
+    files, modes = parse_manifest(req)
+    if not verify_tree(dest, files, modes):
         raise Stop("POST_INSTALL_MISMATCH")
     payload = {"schema": 1, "journal_sha256": stream_hash_file(journal), "version": str(dest),
-               "files": req["inputs"]["files"], "recovery": None}
+               "files": files, "modes": modes, "recovery": None}
     if recovery is not None:
         payload["recovery"] = {"path": str(recovery), "sha256": stream_hash_file(recovery)}
     durable_write(receipt, encode(payload))
 
 def do_execute(req, root):
-    files = parse_manifest(req)
+    files, modes = parse_manifest(req)
     _, journal, receipt, snapshot, recovery, dest, _ = state_paths(root, req)
     prior = inspect_locked(req, root)
     if prior["status"] != "NO_EFFECT":
         return prior
-    ensure_snapshot(req, snapshot, files)
+    ensure_snapshot(req, snapshot, files, recover_mode=True, errors=errors)
     make_journal(req, journal)
     if not dest.exists():
         dest.mkdir(mode=0o700)
         fsync_dir(dest.parent)
-    install_missing(snapshot, dest, files)
+    install_missing(snapshot, dest, files, modes, req["attempt_id"])
     commit_receipt(req, journal, receipt, dest)
     return inspect_locked(req, root)
 
 def do_recover(req, root):
-    files = parse_manifest(req)
-    _, journal, receipt, snapshot, recovery, dest, _ = state_paths(root, req)
+    files, modes = parse_manifest(req)
+    _, journal, receipt, snapshot, recovery, dest, errors = state_paths(root, req)
     if receipt.exists():
         return inspect_locked(req, root)
     # An owned exact snapshot is sufficient evidence to reconstruct a missing journal.
@@ -439,13 +497,14 @@ def do_recover(req, root):
     if not dest.exists():
         dest.mkdir(mode=0o700)
         fsync_dir(dest.parent)
+    clean_owned_partials(dest, files, req["attempt_id"], errors, req)
     before = scan_tree(dest)
     unknown = set(before) - set(files)
     wrong = {k for k, v in before.items() if k in files and files[k] != v}
     if unknown or wrong:
         raise Stop("PARTIAL_STATE_CONFLICT")
-    restored = install_missing(snapshot, dest, files)
-    if not verify_tree(dest, files):
+    restored = install_missing(snapshot, dest, files, modes, req["attempt_id"])
+    if not verify_tree(dest, files, modes):
         raise Stop("RECOVERY_VERIFY_FAILED")
     if not recovery.exists():
         durable_write(recovery, encode({"schema": 1, "journal_sha256": stream_hash_file(journal),
