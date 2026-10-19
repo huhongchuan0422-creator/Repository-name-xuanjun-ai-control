@@ -81,13 +81,15 @@ class ApplyTests(unittest.TestCase):
                 files[relative] = r.sha(p.read_bytes())
         mock.patch.object(e, '__file__', self.root+'/assembly/production/p2_recovery/executor.py').start()
         self.manifest = {'schema':1, 'source_commit':'1'*40,'source_tree':'2'*40,
-            'inherited_manifest_sha256':'3'*64, 'runtime_source_commit':r.SOURCE,
+            'inherited_manifest_sha256':'243bc01b1e9c7d2cb302f800556002abcebcfa9f96c298e4275e15d8b1346e1e',
+            'inherited_kit_sha256':'2fdc934a336414086361764a4a77894a597a51a53c7693420eaed5cefed3e1d3', 'runtime_source_commit':r.SOURCE,
             'runtime_source_tree':r.TREE, 'files':files}
         m = self.write('assembly/MANIFEST.json', r.canonical(self.manifest))
         self.g = grant()
         self.g.update(grant_id=self.request['new_grant_id'], source_commit='1'*40,
             source_tree='2'*40, manifest_sha256=m['sha256'], target_host=r.HOST,
             recovery_entry='p2_recovery.entry',
+            kit_sha256='2fdc934a336414086361764a4a77894a597a51a53c7693420eaed5cefed3e1d3',
             actor_id='fixture-actor', expires_utc=int(time.time())+1000)
         signer = assembly.OpenSSLSigner(self.private['owner'], self.refs['owner']['der_sha256'])
         try:
@@ -125,7 +127,7 @@ class ApplyTests(unittest.TestCase):
         self.plan = {'schema':1,'request_sha256':r.sha(r.canonical(self.request)),
             'config':cfg_ref,'registry_record':record_ref,'registry_root':self.root+'/registry',
             'assembly_manifest':m,'assembly_root':self.root+'/assembly','kit_root':self.root+'/kit',
-            'loader_sha256':'5'*64,'kit_manifest_sha256':'3'*64,
+            'loader_sha256':'5'*64,'kit_manifest_sha256':'243bc01b1e9c7d2cb302f800556002abcebcfa9f96c298e4275e15d8b1346e1e',
             'provider_socket':self.root+'/management.sock','checkpoint_root':self.root+'/checkpoint'}
         self.ref = self.write('plan.json', r.canonical(self.plan))
         self.body['sources'].append(self.ref)
@@ -484,9 +486,11 @@ gate.verify();print('RESTART_COMMITTED_GATE_PASS')
         self.assertFalse(os.path.lexists(self.cfg['database']))
 
     def test_formal_cli_apply_real_inherited_kit_and_owner_validation(self):
-        builder=module(CORE/'build_kit.py')
-        kit,km=builder.build(r.SOURCE,r.TREE)
-        manifest_raw=builder.canonical(km)
+        # Reuse the exact approved Python3.6 artifact bytes. Recompressing on
+        # another zlib/Python version is not the same approved archive.
+        kit=(ROOT/'inherited-artifact/attempt5-kit.tar.gz').read_bytes()
+        with tarfile.open(fileobj=io.BytesIO(kit),mode='r:gz') as archive:
+            manifest_raw=archive.extractfile('epoch7-attempt5-candidate-v1/attempt5-manifest.json').read()
         self.assertEqual(r.sha(kit),'2fdc934a336414086361764a4a77894a597a51a53c7693420eaed5cefed3e1d3')
         self.assertEqual(r.sha(manifest_raw),'243bc01b1e9c7d2cb302f800556002abcebcfa9f96c298e4275e15d8b1346e1e')
         os.mkdir(self.plan['kit_root'],0o700)

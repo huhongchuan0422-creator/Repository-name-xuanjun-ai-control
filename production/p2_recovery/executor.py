@@ -151,6 +151,12 @@ def validate_config(request, plan, registry, assembly):
     # Grant binds its exact Commit/Tree and SHA; old Grants cannot authorize it.
     manifest = r.decode(r.read(plan['assembly_manifest']['path'],
                                plan['assembly_manifest']['sha256']))
+    r.need(manifest['inherited_kit_sha256'] == cfg['grant']['kit_sha256'] ==
+           '2fdc934a336414086361764a4a77894a597a51a53c7693420eaed5cefed3e1d3' and
+           manifest['inherited_manifest_sha256'] == plan['kit_manifest_sha256'] ==
+           '243bc01b1e9c7d2cb302f800556002abcebcfa9f96c298e4275e15d8b1346e1e' and
+           manifest['runtime_source_commit'] == r.SOURCE and manifest['runtime_source_tree'] == r.TREE,
+           'INHERITED_KIT_AND_RUNTIME_BINDING')
     root = plan['assembly_root']
     r.need(os.path.dirname(plan['assembly_manifest']['path']) == root, 'RELEASE_ROOT')
     for name in ('executor.py', 'recovery.py', 'entry.py', 'bootstrap.py'):

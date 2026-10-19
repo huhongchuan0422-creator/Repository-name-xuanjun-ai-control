@@ -8,6 +8,7 @@ on:
       - '.github/workflows/p2-recovery-apply.yml'
 permissions:
   contents: read
+  actions: read
 jobs:
   apply:
     runs-on: ubuntu-22.04
@@ -21,6 +22,14 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Reuse exact approved 6041 runtime Kit artifact
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '12142409951'
+          run-id: '39144492649'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inherited-artifact
+          merge-multiple: true
       - name: Real socket RSA SQLite affected recovery integration
         env:
           PYTHON_VERSION: ${{ matrix.python }}
