@@ -179,6 +179,7 @@ class ApplyTests(unittest.TestCase):
                                     'fence':self.request['new_epoch'],'writer_id':self.request['writer_id'],
                                     'grant_id':self.request['new_grant_id'],'database':self.request['target_database'],
                                     'plan_sha256':self.ref['sha256'],'exclusive':True}}
+                    if self.provider_fault == 'numeric':response['reservation']['exclusive']=1
                     if self.provider_fault == 'fence':response['reservation']['fence']-=1
                     if self.provider_fault == 'replay':response['probe']['challenge']='replayed'
                     if self.provider_fault == 'unknown':
@@ -234,6 +235,11 @@ class ApplyTests(unittest.TestCase):
 
     def test_unknown_no_database_created(self):
         self.provider_fault='unknown'
+        with self.assertRaises(r.Hold):self.apply()
+        self.assertFalse(os.path.lexists(self.cfg['database']))
+
+    def test_reservation_requires_boolean_not_integer(self):
+        self.provider_fault='numeric'
         with self.assertRaises(r.Hold):self.apply()
         self.assertFalse(os.path.lexists(self.cfg['database']))
 

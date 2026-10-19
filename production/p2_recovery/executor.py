@@ -60,7 +60,7 @@ class UnixEvidenceProvider(object):
         body = response['body']
         r.fields(body, 'schema probe issued_utc expires_utc packet reservation')
         now = int(time.time())
-        r.need(type(body['schema']) is int and body['schema'] == 1 and body['probe'] == probe and
+        r.need(type(body['schema']) is int and body['schema'] == 1 and r.canonical(body['probe']) == r.canonical(probe) and
                type(body['issued_utc']) is int and type(body['expires_utc']) is int and
                body['issued_utc'] <= now < body['expires_utc'] <= body['issued_utc'] + 30,
                'PROVIDER_REPLAY_OR_EXPIRED')
@@ -73,7 +73,7 @@ class UnixEvidenceProvider(object):
             'fence': request['new_epoch'], 'writer_id': request['writer_id'],
             'grant_id': request['new_grant_id'], 'database': request['target_database'],
             'plan_sha256': self.plan_ref['sha256'], 'exclusive': True}
-        r.need(body['reservation'] == expected, 'GLOBAL_AUTHORITY_RESERVATION_REQUIRED')
+        r.need(r.canonical(body['reservation']) == r.canonical(expected), 'GLOBAL_AUTHORITY_RESERVATION_REQUIRED')
         # Fresh query must still prove the complete old-authority isolation and
         # historical reconciliation contract. UNKNOWN cannot authorize writes.
         r.need(self.plan_ref in body['packet']['body']['sources'], 'FRESH_PLAN_NOT_SIGNED')

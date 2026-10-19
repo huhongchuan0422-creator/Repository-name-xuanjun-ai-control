@@ -21,6 +21,9 @@ def main():
                 expected=previous.replace(b'def main():\n', b'_RECOVERY_GATE = None  # Bound only by the pinned controlled recovery entry.\n\n\ndef main():\n',1)
                 expected=expected.replace(b'    cfg = configuration(args.config, args.config_sha256)\n',b'    cfg = configuration(args.config, args.config_sha256)\n    if cfg[\'grant\'].get(\'recovery_entry\') == \'p2_recovery.entry\':\n        require(_RECOVERY_GATE is not None, \'CONTROLLED_RECOVERY_ENTRY_REQUIRED\')\n        unused_record, recovered_cfg, unused_manifest = _RECOVERY_GATE.verify()\n        require(recovered_cfg == cfg, \'RECOVERY_CONFIG_CHANGED\')\n',1)
                 assert (ROOT/p).read_bytes()==expected,'EXACT_ENTRY_DELTA'
+            elif p=='production/p2_attempt5/verify.py':
+                expected=previous.replace(b'    for name in added:\n',b"    added += sorted(str(p.relative_to(ROOT)) for p in (ROOT/'production/p2_recovery').glob('*.py'))\n    for name in added:\n",1)
+                assert (ROOT/p).read_bytes()==expected,'EXACT_BUILD_CLOSURE_DELTA'
             else:
                 assert (ROOT/p).read_bytes()==previous,p
     hashes={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in FILES}
