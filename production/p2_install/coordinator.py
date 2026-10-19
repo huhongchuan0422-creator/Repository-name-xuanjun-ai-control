@@ -131,7 +131,7 @@ class Coordinator:
             return False
         request = json.loads(prior[0])
         try:
-            reply = self._adapter(batch).inspect(request)
+            reply = self._call(self._adapter(batch),"inspect",request,10)
             _check_reply(request, reply, "COMMITTED")
             return self._matches(request,evidence["receipt"],reply["receipt"])
         except (OSError, ValueError, Hold):
@@ -148,9 +148,22 @@ class Coordinator:
         if commit == observed: return True
         try:
             data = json.loads(Path(observed["path"]).read_text())
-            return (data.get("request_sha256") == digest(request)
+            if (data.get("request_sha256") == digest(request)
                     and data.get("commit_receipt_sha256") == commit["sha256"]
-                    and data.get("effect_verified") is True)
+                    and data.get("effect_verified") is True):
+                return True
+            original = json.loads(Path(commit["path"]).read_text())
+            operation = original.get("operation_id")
+            config = original.get("config_sha256")
+            return (type(operation) is str and HEX.fullmatch(operation)
+                    and type(config) is str and HEX.fullmatch(config)
+                    and original.get("status") == "COMMITTED"
+                    and data.get("status") == "COMMITTED"
+                    and data.get("operation_id") == operation
+                    and data.get("config_sha256") == config
+                    and data.get("commit_receipt") == commit
+                    and all(data.get(k) == request[k] for k in
+                            ("installation_id","batch_id","attempt_id")))
         except (OSError, ValueError, KeyError):
             return False
 
@@ -252,7 +265,7 @@ class Coordinator:
             require(self._matches(request,json.loads(row[2])["receipt"],rec), "READBACK_DRIFT")
             return _receipt(request, "COMMITTED", rec)
         if row and row[0] == request["attempt_id"] and row[1] == "RETRYABLE":
-            reply = self._adapter(request["batch_id"]).inspect(request)
+            reply = self._call(self._adapter(request["batch_id"]),"inspect",request,10)
             return _receipt(request, "NO_EFFECT",
                             _check_reply(request, reply, "NO_EFFECT"))
         return _receipt(request, "HOLD", error={"code":"IN_FLIGHT_OR_UNKNOWN"})
@@ -361,7 +374,7 @@ def cli():
             roots[key] = value
         adapters = {}
         if args.runtime:
-            from production.p2_runtime import runtime as fixed_runtime
+            from production import p2_runtime as fixed_runtime
             class RuntimeAdapter:
                 execute = staticmethod(fixed_runtime.execute)
                 inspect = staticmethod(fixed_runtime.inspect)
