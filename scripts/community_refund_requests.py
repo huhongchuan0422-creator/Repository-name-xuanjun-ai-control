@@ -28,28 +28,33 @@ class RefundRequests:
         identity = i.runtime.bindings[principal]
         with c.tx():
             c.limit('consumer-refund-application:' + uid, 20, 60)
+            def owned_row(kind, reference):
+                key = self.commerce._key(identity, kind, reference)
+                row = c.db.execute("SELECT user_id,payload FROM links WHERE channel='COMMUNITY_COMMERCE_V1' AND subject_idx=? AND project=? AND active=1", (key, project)).fetchone()
+                if row is None:return False, None
+                if row[0] != uid:raise PermissionError('CURRENT_REFUND_LINK_OWNER_REQUIRED')
+                return True, json.loads(c.decrypt(row[1], 'community-commerce:' + key))
+
+            def application(application_id):
+                exists, record = owned_row('REFUND_APPLICATION', application_id)
+                if not exists:return None
+                if (type(record) is not dict or record.get('application_id') != application_id
+                        or record.get('reference') != p['reference'] or record.get('user_id') != uid
+                        or record.get('scope') != identity or record.get('project') != project):
+                    raise PermissionError('CURRENT_REFUND_BINDING_REQUIRED')
+                return record
+
             if operation == 'refund_current':
-                def owned_row(kind, reference):
-                    key = self.commerce._key(identity, kind, reference)
-                    row = c.db.execute("SELECT user_id,payload FROM links WHERE channel='COMMUNITY_COMMERCE_V1' AND subject_idx=? AND project=? AND active=1", (key, project)).fetchone()
-                    if row is None:return False, None
-                    if row[0] != uid:raise PermissionError('CURRENT_REFUND_LINK_OWNER_REQUIRED')
-                    return True, json.loads(c.decrypt(row[1], 'community-commerce:' + key))
                 exists, pointer = owned_row('REFUND_CURRENT', p['reference'])
                 if not exists:return dict(reference=p['reference'], application=None)
                 if type(pointer) is not dict or not valid_id(pointer.get('application_id')):
                     raise ValueError('INVALID_CURRENT_REFUND_POINTER')
-                _, current = owned_row('REFUND_APPLICATION', pointer['application_id'])
-                if (type(current) is not dict or current.get('application_id') != pointer['application_id']
-                        or current.get('reference') != p['reference'] or current.get('user_id') != uid
-                        or current.get('scope') != identity or current.get('project') != project):
-                    raise PermissionError('CURRENT_REFUND_BINDING_REQUIRED')
+                current = application(pointer['application_id'])
+                if current is None:raise PermissionError('CURRENT_REFUND_BINDING_REQUIRED')
                 c.audit(project, uid, 'CONSUMER_REFUND_CURRENT_READ', p['reference'])
                 return dict(reference=p['reference'], application=current)
-            record = self.commerce._read(identity, project, 'REFUND_APPLICATION', p['application_id'])
+            record = application(p['application_id'])
             if record is not None:
-                if record['user_id'] != uid or record['reference'] != p['reference']:
-                    raise PermissionError('REFUND_APPLICATION_OWNER_REQUIRED')
                 if operation == 'refund_apply' and any(record[k] != p[k] for k in ('amount_minor', 'reason')):
                     raise ValueError('REFUND_APPLICATION_ID_COLLISION')
                 return record
@@ -62,9 +67,11 @@ class RefundRequests:
                     or type(p['reason']) is not str or not 1 <= len(p['reason']) <= 80
                     or any(ord(ch) < 32 for ch in p['reason'])):
                 raise ValueError('INVALID_REFUND_APPLICATION')
-            pointer = self.commerce._read(identity, project, 'REFUND_CURRENT', p['reference'])
-            if pointer:
-                prior = self.commerce._read(identity, project, 'REFUND_APPLICATION', pointer['application_id'])
+            exists, pointer = owned_row('REFUND_CURRENT', p['reference'])
+            if exists:
+                if type(pointer) is not dict or not valid_id(pointer.get('application_id')):
+                    raise ValueError('INVALID_CURRENT_REFUND_POINTER')
+                prior = application(pointer['application_id'])
                 if prior is None or prior['status'] not in ('REJECTED', 'COMPLETED', 'CLOSED'):
                     raise PermissionError('EXISTING_REFUND_APPLICATION_MUST_BE_RESOLVED')
             record = dict(reference=p['reference'], application_id=p['application_id'], scope=identity,
