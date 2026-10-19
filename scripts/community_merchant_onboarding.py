@@ -125,7 +125,7 @@ class MerchantOnboarding:
         uid=c.session(session,csrf)
         schemas={'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
                  'upload':{'application','revision','kind','content_base64','expires_at'},
-                 'submit':{'application','revision'},'review_list':set(),
+                 'submit':{'application','revision'},'withdraw':{'application','revision'},'review_list':set(),
                  'read':{'application'},'review_read':{'application'},
                  'history':{'application','after_revision'},'review_history':{'application','after_revision'},
                  'notices':{'application','after_id'},'notice_read':{'application','notice_id'},'review':{'application','revision','action','note'},
@@ -187,6 +187,7 @@ class MerchantOnboarding:
         try:
             # Reload under the original DB write lock for stale-version safety.
             if data is not None:owner,meta,data=self._load(application,uid,op in ('review','review_material'))
+            if op=='withdraw' and c.session(session,csrf)!=uid:raise PermissionError('CURRENT_APPLICANT_SESSION_REQUIRED')
             c.limit('merchant-onboarding:'+uid,60,3600)
             if op=='save':
                 if params['entity_type'] not in ('ENTERPRISE','SOLE_PROPRIETOR') or params['category'] not in ('GENERAL','FOOD') or type(params['delegated']) is not bool:
@@ -247,7 +248,7 @@ class MerchantOnboarding:
                 workflow._append(c.db,owner,application,revision,uid,'REVIEW_MATERIAL',{'kind':kind,'decision':decision,'note_sha256':hashlib.sha256(note.encode()).hexdigest()})
                 self._meta(application,owner,meta)
             else:
-                action='SUBMIT' if op=='submit' else params['action']
+                action='SUBMIT' if op=='submit' else 'WITHDRAW' if op=='withdraw' else params['action']
                 if op=='review' and (action not in ('BEGIN_REVIEW','CORRECTION','REJECT','REOPEN','APPROVE') or owner==uid):raise PermissionError('INDEPENDENT_REVIEW_REQUIRED')
                 if action in ('SUBMIT','APPROVE'):self._check_materials(application,meta)
                 if action=='APPROVE':
@@ -257,9 +258,9 @@ class MerchantOnboarding:
                         review=meta.get('reviews',{}).get(kind,{})
                         if review.get('decision')!='ACCEPTED' or review.get('sha256')!=meta['materials'][kind]['sha256']:
                             raise ValueError('MATERIAL_REVIEW_REQUIRED:'+kind)
-                note='' if op=='submit' else safe_text(params['note'],80)
+                note='' if op in ('submit','withdraw') else safe_text(params['note'],80)
                 encoded_note=self._encode({'note':note},'onboarding-note:'+application) if note else ''
-                revision=workflow.transition(c.db,owner,application,uid,'MERCHANT' if op=='submit' else 'REVIEWER',action,params['revision'],encoded_note,
+                revision=workflow.transition(c.db,owner,application,uid,'MERCHANT' if op in ('submit','withdraw') else 'REVIEWER',action,params['revision'],encoded_note,
                     decode=lambda value:self._decode(value,'onboarding-fields:'+application),manage_transaction=False)
                 if action=='REOPEN':
                     # Reopening a rejection authorizes correction, not approval.
@@ -272,6 +273,9 @@ class MerchantOnboarding:
             if op=='review':
                 from scripts.community_onboarding_notices import append as notify_result
                 notify_result(self,application,owner,revision,params['action'])
+            if op=='withdraw':
+                if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_APPLICANT_SESSION_REQUIRED')
+                self._load(application,uid)
             commit_attempted=True
             c.db.commit()
         except BaseException as error:

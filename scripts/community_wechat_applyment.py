@@ -219,6 +219,8 @@ class WechatApplyment:
         reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query')
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
         application=p['application']
+        if platform['status']=='WITHDRAWN' and op not in ('wechat_read','wechat_review_read','wechat_query'):
+            raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
         with c.tx():c.limit('wechat-applyment:'+uid,20,60)
         if op=='wechat_media':return self.media(uid,owner,application,meta,p['kind'],lambda:c.session(session,csrf))
         record=self._read(application)
@@ -372,6 +374,9 @@ class WechatApplyment:
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_SUBMITTED',code)
             return current
         with c.tx():
+            if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_APPLYMENT_SESSION_REQUIRED')
+            if self.onboarding._load(application,uid,reviewer)[2]['status']=='WITHDRAWN':
+                raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
             if self._read(application)!=record:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
             if op=='wechat_save':
                 if record and record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_APPLICATION_EDIT_DENIED')
@@ -402,6 +407,10 @@ class WechatApplyment:
         filename='material.'+extensions[row[3]];metadata=canonical(dict(filename=filename,sha256=material['sha256']))
         boundary='xj'+secrets.token_hex(24)
         body=('--'+boundary+'\r\nContent-Disposition: form-data; name="meta"\r\nContent-Type: application/json\r\n\r\n').encode()+metadata+('\r\n--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="'+filename+'"\r\nContent-Type: '+row[3]+'\r\n\r\n').encode()+raw+('\r\n--'+boundary+'--\r\n').encode()
+        if reauthorize()!=uid:raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
+        if self.onboarding._load(application,uid)[2]['status']=='WITHDRAWN':raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
+        # Once sent, retain the original response evidence even if the applicant
+        # later withdraws locally. Withdrawal never cancels a provider operation.
         data,digest=request(self.reader,'POST','/v3/merchant/media/upload',raw=body,content_type='multipart/form-data; boundary='+boundary,signing_body=metadata)
         if type(data.get('media_id')) is not str or not 1<=len(data['media_id'])<=1024:raise ValueError('INVALID_PROVIDER_MEDIA_ID')
         with c.tx():

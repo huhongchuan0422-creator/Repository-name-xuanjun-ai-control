@@ -13,7 +13,7 @@ def _transaction(db,manage_transaction):
     if not db.in_transaction:raise ValueError('OUTER_TRANSACTION_REQUIRED')
     return nullcontext()
 
-_ALLOWED = {"DRAFT", "SUBMITTED", "IN_REVIEW", "CORRECTION_REQUIRED", "REJECTED", "APPROVED"}
+_ALLOWED = {"DRAFT", "SUBMITTED", "IN_REVIEW", "CORRECTION_REQUIRED", "REJECTED", "APPROVED", "WITHDRAWN"}
 _FIELDS = ("legal_name", "store_name", "address", "contact", "license_ref")
 def _str(value, label, required=True):
     if type(value) is not str or len(value)>512 or (required and not value.strip()):
@@ -65,7 +65,8 @@ def save_draft(db, tenant, application, actor, fields, expected_revision=0, *, e
 def transition(db,tenant,application,actor,role,action,expected_revision,note="", *, decode=None,manage_transaction=True):
     tenant,actor=_actor(tenant,actor); application=_str(application,"APPLICATION")
     if type(expected_revision) is not int or expected_revision<1:raise ValueError("REVISION")
-    matrix={"SUBMIT":({"DRAFT"},"SUBMITTED","MERCHANT"),
+    matrix={"WITHDRAW":({"DRAFT","CORRECTION_REQUIRED"},"WITHDRAWN","MERCHANT"),
+            "SUBMIT":({"DRAFT"},"SUBMITTED","MERCHANT"),
             "BEGIN_REVIEW":({"SUBMITTED"},"IN_REVIEW","REVIEWER"),
             "CORRECTION":({"SUBMITTED","IN_REVIEW","APPROVED"},"CORRECTION_REQUIRED","REVIEWER"),
             "REJECT":({"SUBMITTED","IN_REVIEW"},"REJECTED","REVIEWER"),
