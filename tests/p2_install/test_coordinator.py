@@ -130,6 +130,23 @@ class CoordinatorTests(unittest.TestCase):
             self.assertIn(recovery["status"],("HOLD","NO_EFFECT"))
             self.assertEqual(c.journal.latest("one")[1],"RETRYABLE")
 
+    def test_failure_threshold_persists_across_reopen(self):
+        req = self.request("failure-trace")
+        with self.open() as c:
+            c._store(req)
+            for i in range(6):
+                c.failure(req,"same-cause",{"sequence":i})
+        with self.open() as c:
+            for i in range(6,10):
+                c.failure(req,"same-cause",{"sequence":i})
+            records = c.tick()
+            alerts = [x for x in records if x.get("event") == "REPORT_DOTS_10_OR_60"]
+            self.assertEqual(len(alerts),1)
+            self.assertEqual(alerts[0]["delivery"],"UNAVAILABLE")
+            c.tick()
+            saved = c.journal.db.execute("SELECT COUNT(*) FROM coordinator_outbox WHERE event='REPORT_DOTS_10_OR_60'").fetchone()[0]
+            self.assertEqual(saved,1)
+
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
         for number in range(7):
