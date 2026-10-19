@@ -130,6 +130,29 @@ class CoordinatorTests(unittest.TestCase):
             self.assertIn(recovery["status"],("HOLD","NO_EFFECT"))
             self.assertEqual(c.journal.latest("one")[1],"RETRYABLE")
 
+
+    def test_repeated_progress_survives_multiple_reopens(self):
+        req = self.request("progress-reopen")
+        with self.open() as c:
+            c._store(req)
+            c.event(req, "PROGRESS", {"step": 1})
+            c.event(req, "PROGRESS", {"step": 2})
+            self.assertEqual(
+                c.journal.db.execute(
+                    "SELECT COUNT(*) FROM coordinator_events WHERE attempt=? AND kind='PROGRESS'",
+                    (req["attempt_id"],)).fetchone()[0], 2)
+        with self.open() as c:
+            c.event(req, "PROGRESS", {"step": 3})
+            self.assertEqual(
+                c.journal.db.execute(
+                    "SELECT COUNT(*) FROM coordinator_events WHERE attempt=? AND kind='PROGRESS'",
+                    (req["attempt_id"],)).fetchone()[0], 3)
+        with self.open() as c:
+            rows = c.journal.db.execute(
+                "SELECT evidence FROM coordinator_events WHERE attempt=? AND kind='PROGRESS' ORDER BY id",
+                (req["attempt_id"],)).fetchall()
+            self.assertEqual([json.loads(x[0])["step"] for x in rows], [1, 2, 3])
+
     def test_failure_threshold_persists_across_reopen(self):
         req = self.request("failure-trace")
         with self.open() as c:
