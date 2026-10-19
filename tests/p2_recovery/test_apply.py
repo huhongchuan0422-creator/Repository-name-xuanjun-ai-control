@@ -12,6 +12,8 @@ import sqlite3
 import struct
 import subprocess
 import sys
+import tarfile
+import io
 import threading
 import time
 import types
@@ -459,6 +461,85 @@ gate.verify();print('RESTART_COMMITTED_GATE_PASS')
         result=subprocess.check_output([sys.executable,'-I','-B','-S','-c',script,json.dumps(paths)],
                                        timeout=30,stderr=subprocess.STDOUT)
         self.assertIn(b'RESTART_COMMITTED_GATE_PASS',result)
+
+    def command(self):
+        refs={'request':self.write('request.json',r.canonical(self.request)),
+              'evidence':self.write('packet.json',r.canonical(self.signed())),
+              'trust':self.write('trust.json',r.canonical({'schema':1,'host':r.HOST,'keys':self.refs})),
+              'plan':self.ref}
+        path=self.root+'/assembly/production/p2_recovery/entry.py'
+        args=[path,'apply']
+        for name,ref in refs.items():args.extend(['--'+name,ref['path'],'--'+name+'-sha256',ref['sha256']])
+        for name,file in [('bootstrap','bootstrap.py'),('recovery-code','recovery.py'),('executor','executor.py')]:
+            args.extend(['--'+name+'-sha256',r.sha(Path(self.root+'/assembly/production/p2_recovery/'+file).read_bytes())])
+        return args
+
+    def test_formal_cli_unknown_refuses_before_database(self):
+        self.provider_fault='unknown'
+        out=subprocess.run([sys.executable,'-I','-B','-S']+self.command(),
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30)
+        self.assertEqual(out.returncode,2,out.stderr.decode())
+        result=json.loads(out.stdout.decode())
+        self.assertEqual(result['reason'],'HISTORY_UNRECONCILED')
+        self.assertFalse(os.path.lexists(self.cfg['database']))
+
+    def test_formal_cli_apply_real_inherited_kit_and_owner_validation(self):
+        builder=module(CORE/'build_kit.py')
+        kit,km=builder.build(r.SOURCE,r.TREE)
+        manifest_raw=builder.canonical(km)
+        self.assertEqual(r.sha(kit),'2fdc934a336414086361764a4a77894a597a51a53c7693420eaed5cefed3e1d3')
+        self.assertEqual(r.sha(manifest_raw),'243bc01b1e9c7d2cb302f800556002abcebcfa9f96c298e4275e15d8b1346e1e')
+        os.mkdir(self.plan['kit_root'],0o700)
+        with tarfile.open(fileobj=io.BytesIO(kit),mode='r:gz') as archive:
+            for item in archive.getmembers():
+                if not item.isfile():continue
+                relative=item.name.split('/',1)[1]
+                target=Path(self.plan['kit_root'])/relative
+                target.parent.mkdir(parents=True,exist_ok=True)
+                current=target.parent
+                while str(current).startswith(self.plan['kit_root']):
+                    os.chmod(str(current),0o700)
+                    if str(current)==self.plan['kit_root']:break
+                    current=current.parent
+                target.write_bytes(archive.extractfile(item).read());os.chmod(str(target),0o600)
+        self.manifest['inherited_manifest_sha256']=r.sha(manifest_raw)
+        self.plan['assembly_manifest']=self.write('assembly/MANIFEST.json',r.canonical(self.manifest))
+        self.g['manifest_sha256']=self.plan['assembly_manifest']['sha256']
+        self.g['kit_sha256']=r.sha(kit)
+        signer=assembly.OpenSSLSigner(self.cfg['key'],self.cfg['public_der_sha256'])
+        try:p=receipt_provider.ReceiptProvider(lambda unused:None,signer.modulus,65537,self.cfg['issuer'])
+        finally:signer.close()
+        body=authorization.OWNER_MARKER+receipt_provider.canonical(
+            authorization.expected(self.g,p,self.policy,owner=True)).decode('utf-8')
+        self.g['approval_body_sha256']=r.sha(body.encode())
+        self.approval['body']=body
+        self.plan['config']=self.write('config.json',r.canonical(self.cfg))
+        rec=r.decode(Path(self.plan['registry_record']['path']).read_bytes())
+        rec['config']=self.plan['config']
+        self.plan['registry_record']=self.write('record.json',registry.canonical(rec))
+        self.plan['loader_sha256']=r.sha(Path(self.plan['kit_root']+'/attempt5/runtime/versioned_entry.py').read_bytes())
+        self.plan['kit_manifest_sha256']=r.sha(manifest_raw)
+        old=self.ref;self.ref=self.write('plan.json',r.canonical(self.plan))
+        self.body['sources'].remove(old);self.body['sources'].append(self.ref)
+        argv=self.command()
+        # Only the pre-existing HTTPS fetch worker is replaced in this isolated
+        # child. Real Kit inventory/imports and exact Owner/body/key validation
+        # still execute. No production switch or synthetic Grant is shipped.
+        script="""import builtins,base64,json,runpy,sys
+raw=base64.b64decode(sys.argv[1]);args=json.loads(sys.argv[2]);original=builtins.__import__
+def test_import(name,*pos,**kw):
+ m=original(name,*pos,**kw)
+ if name=='epoch7_approval':m._run_worker=lambda unused:raw
+ return m
+builtins.__import__=test_import;sys.argv=args;runpy.run_path(args[0],run_name='__main__')
+"""
+        out=subprocess.run([sys.executable,'-I','-B','-S','-c',script,
+            base64.b64encode(json.dumps(self.approval).encode()).decode(),json.dumps(argv)],
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=45)
+        self.assertEqual(out.returncode,0,out.stdout.decode()+out.stderr.decode())
+        self.assertEqual(json.loads(out.stdout.decode())['state'],'RECOVERY_APPLIED_NOT_ACTIVATED')
+        self.assertFalse(os.path.lexists(self.cfg['socket']))
+        self.gate().verify()
 
     def test_a_preserves_all_history_revokes_old_grant(self):
         old=self.root+'/old-backup.sqlite3'

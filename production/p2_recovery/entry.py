@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import signal
 import stat
 import sys
@@ -108,6 +109,8 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except Exception as exc:
-        print(json.dumps({'state': 'HOLD_RETAIN_OUTPUT', 'reason': type(exc).__name__,
-                          'activation_success': False}))
+        code = str(exc)
+        reason = code if re.fullmatch(r'[A-Z][A-Z0-9_]{0,127}', code) else type(exc).__name__
+        print(json.dumps({'state': 'HOLD_RETAIN_OUTPUT', 'reason': reason,
+                          'activation_state': 'UNKNOWN_RECONCILE_BEFORE_RETRY'}))
         sys.exit(2)

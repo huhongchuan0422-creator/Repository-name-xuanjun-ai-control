@@ -39,7 +39,7 @@ apply-plan必须被原恢复packet.sources准确签名引用；字段schema、re
 
 ## 测试范围
 
-新增受影响测试覆盖真实RSA/socket、三签nonce、A/B、旧历史保留、旧Grant拒绝、5次额度/成功停止、重启、并发/部分输出、审批缺失、Fence/UNKNOWN、源码变化、正式Issuer签名RPC及正式入口强制Gate。原951项不重跑；未变核心逐字校验。Hosted CI不是英国验收。
+新增32项受影响测试覆盖正式apply命令、准确原Kit严格Inventory、原Owner授权验证、真实RSA/socket、三签nonce、A/B、旧历史保留、旧Grant拒绝、5次额度/成功停止、重启、并发/部分输出、审批缺失、Fence/UNKNOWN、源码变化、正式Issuer签名RPC及正式入口强制Gate。原951项不重跑；未变核心逐字校验。Hosted CI不是英国验收。
 
 ---
 
