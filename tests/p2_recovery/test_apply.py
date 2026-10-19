@@ -1,6 +1,7 @@
 """Real RSA/socket/SQLite and original registry/issuer. Synthetic host facts ONLY."""
 import base64
 import copy
+import fcntl
 import hashlib
 import importlib.util
 import json
@@ -270,6 +271,25 @@ class ApplyTests(unittest.TestCase):
 
     def test_sidecar_prevents_initialization(self):
         self.write('db/authority.sqlite3-wal',b'RETAIN_WAL')
+        with self.assertRaises(r.Hold):self.apply()
+        self.assertFalse(os.path.lexists(self.cfg['database']))
+
+    def test_parallel_apply_lock_refused(self):
+        fd=os.open(self.plan['checkpoint_root']+'/.apply.lock',os.O_CREAT|os.O_RDWR,0o600)
+        try:
+            fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            with self.assertRaises(BlockingIOError):self.apply()
+            self.assertFalse(os.path.lexists(self.cfg['database']))
+        finally:os.close(fd)
+
+    def test_symlink_target_never_followed(self):
+        protected=self.write('retained.json',b'RETAIN_ORIGINAL')
+        os.symlink(protected['path'],self.cfg['database'])
+        with self.assertRaises(r.Hold):self.apply()
+        self.assertEqual(Path(protected['path']).read_bytes(),b'RETAIN_ORIGINAL')
+
+    def test_unprotected_target_parent_refused(self):
+        os.chmod(self.root+'/db',0o777)
         with self.assertRaises(r.Hold):self.apply()
         self.assertFalse(os.path.lexists(self.cfg['database']))
 
