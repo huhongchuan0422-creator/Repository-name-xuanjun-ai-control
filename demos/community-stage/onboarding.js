@@ -4,6 +4,7 @@
   const states={DRAFT:'草稿',SUBMITTED:'待审核',IN_REVIEW:'审核中',CORRECTION_REQUIRED:'待补件',REJECTED:'已驳回',APPROVED:'入驻审核通过'};
   let current=null,catalog=null,csrf='',busy=false,generation=0,cursor=null,wechatRecord=null;
   let historyGeneration=0,historyCursor=null,historyRequest=null;
+  let noticeGeneration=0,noticeCursor=null,noticeRequest=null,noticeRecords=new Map();
   const wechatControls=new Map(),sceneControls=new Map();
   const storeScene='SALES_SCENES_STORE',miniScene='SALES_SCENES_MINI_PROGRAM';
   let invalidLoadedScenes=false;
@@ -30,7 +31,7 @@
   // The existing customer host passes its current CSRF value after login. No
   // second login form, password store or reusable browser token is introduced.
   window.configureCommunityOnboarding=context=>{generation++;busy=false;csrf=typeof context?.csrf==='string'?context.csrf:'';
-    clearWechat();resetHistory();current=null;cursor=null;$('detail').hidden=true;$('openingActions').hidden=true;$('moreApplications').hidden=true;
+    clearWechat();resetHistory();resetNotices();current=null;cursor=null;$('detail').hidden=true;$('openingActions').hidden=true;$('moreApplications').hidden=true;
     for(const id of ['mine','applications','summary','materials','reviewNote','opening','openingWorkspace'])$(id).replaceChildren();
     $('applicationTitle').textContent='入驻申请';$('applicationState').textContent='';$('applicationVersion').textContent='';
     for(const id of ['legal_name','store_name','address','contact','note'])$(id).value='';setForm(null);$('statusFilter').value='ALL';
@@ -56,7 +57,7 @@
   function setForm(app){for(const [k,v] of Object.entries(app?.fields||{}))if($(k))$(k).value=v;
     $('identity_type').value=app?.identity_type||'IDENTIFICATION_TYPE_IDCARD';$('entity_type').value=app?.entity_type||'ENTERPRISE';$('category').value=app?.category||'GENERAL';$('delegated').checked=app?.delegated||false;}
   function render(app){
-    if(current?.application!==app?.application||current?.revision!==app?.revision)resetHistory();
+    if(current?.application!==app?.application||current?.revision!==app?.revision){resetHistory();resetNotices();}
     if(current?.application!==app?.application)clearWechat();current=app;$('detail').hidden=!app;if(!app)return;
     $('applicationVersion').textContent='申请编号 '+app.application+' · 版本 '+app.revision;
     $('applicationTitle').textContent=app.fields.store_name||'入驻申请';$('applicationState').textContent=states[app.status]||app.status;
@@ -125,6 +126,73 @@
   }
   $('loadHistory').addEventListener('click',()=>run(()=>loadHistory()));
   $('moreHistory').addEventListener('click',()=>run(()=>loadHistory(true)));
+  function resetNotices(){
+    noticeGeneration++;noticeCursor=null;noticeRequest=null;noticeRecords=new Map();
+    $('admissionNotices').replaceChildren();$('moreAdmissionNotices').hidden=true;$('admissionNoticeStatus').textContent='';
+  }
+  const noticeSelection=()=>({generation,selection:noticeGeneration,application:current?.application,revision:current?.revision});
+  const noticeSelected=token=>generation===token.generation&&noticeGeneration===token.selection&&current?.application===token.application&&current?.revision===token.revision;
+  function validNotice(record,token){
+    const statuses={CORRECTION:'CORRECTION_REQUIRED',REJECT:'REJECTED',APPROVE:'APPROVED',REOPEN:'CORRECTION_REQUIRED'};
+    return record&&record.application===token.application&&typeof record.id==='string'&&/^[0-9a-f]{64}$/.test(record.id)&&
+      Number.isSafeInteger(record.revision)&&record.revision>0&&
+      record.kind==='MERCHANT_ONBOARDING_RESULT_V1'&&record.reference===token.application+':'+record.revision&&
+      Object.hasOwn(statuses,record.event)&&record.status===statuses[record.event]&&typeof record.read==='boolean'&&
+      typeof record.message==='string'&&Number.isSafeInteger(record.created_at)&&record.created_at>=0&&record.created_at<=253402300799;
+  }
+  function renderNotices(){
+    $('admissionNotices').replaceChildren();
+    for(const record of noticeRecords.values()){
+      const row=document.createElement('article'),heading=document.createElement('strong'),text=document.createElement('p');
+      heading.textContent='第'+record.revision+'版 · '+states[record.status]+' · '+(record.read?'已读':'未读');text.textContent=record.message;
+      row.append(heading,text);if(!record.read)row.append(button('标为已读',()=>markAdmissionNotice(record)));
+      row.append(button('查看申请最新状态',async()=>{
+        if(noticeRecords.get(record.id)!==record)return;
+        const selected=noticeSelection();
+        try{
+          const app=await request('read',{application:selected.application});
+          if(!noticeSelected(selected))return;
+          if(app.application!==selected.application)throw Error('申请返回归属未确认。');
+          render(app);message('已读取申请最新状态；审核说明请查看受保护时间线。');
+        }catch(error){if(noticeSelected(selected)){resetNotices();throw Error('申请状态读取未确认，请重新核对当前权限。');}}
+      }));
+      $('admissionNotices').append(row);
+    }
+  }
+  async function loadAdmissionNotices(more=false){
+    if(reviewMode)return;
+    if(!current)throw Error('请先打开本人的申请。');
+    if(more&&noticeCursor===null)return;
+    if(!more)resetNotices();
+    const token=noticeSelection();noticeRequest=token;
+    const valid=()=>noticeRequest===token&&noticeSelected(token),after=more?noticeCursor:'';
+    try{
+      const result=await request('notices',{application:token.application,after_id:after});
+      if(!valid())return;
+      if(!result||result.application!==token.application||!Array.isArray(result.records)||result.records.length>50||typeof result.has_more!=='boolean')throw Error('通知返回未确认。');
+      let previous=after;
+      for(const record of result.records){if(!validNotice(record,token)||record.id<=previous)throw Error('通知归属或顺序未确认。');previous=record.id;}
+      if(result.has_more?(result.records.length!==50||result.next_cursor!==previous):result.next_cursor!==null)throw Error('通知分页未确认。');
+      for(const record of result.records)noticeRecords.set(record.id,record);
+      noticeCursor=result.next_cursor;renderNotices();$('moreAdmissionNotices').hidden=!result.has_more;
+      $('admissionNoticeStatus').textContent=noticeRecords.size?'已读取本申请通知；刷新可查看新结果。':'本申请尚无已留存的结果通知；旧记录请查看审核时间线。';
+    }catch(error){if(valid()){resetNotices();throw Error('通知读取未确认，请重新核对当前账号与申请。');}}
+    finally{if(noticeRequest===token)noticeRequest=null;}
+  }
+  async function markAdmissionNotice(record){
+    if(reviewMode||noticeRecords.get(record.id)!==record||record.read)return;
+    const token=noticeSelection();noticeRequest=token;const valid=()=>noticeRequest===token&&noticeSelected(token);
+    try{
+      const result=await request('notice_read',{application:token.application,notice_id:record.id});
+      if(!valid())return;
+      if(!validNotice(result,token)||result.id!==record.id||result.revision!==record.revision||result.event!==record.event||!result.read)throw Error('已读结果未确认。');
+      noticeRecords.set(record.id,result);renderNotices();$('admissionNoticeStatus').textContent='已标为已读。';
+    }catch(error){if(valid()){resetNotices();throw Error('通知已读结果未确认，请刷新后核对。');}}
+    finally{if(noticeRequest===token)noticeRequest=null;}
+  }
+  $('applicationNotices').hidden=reviewMode;
+  $('loadAdmissionNotices').addEventListener('click',()=>run(()=>loadAdmissionNotices()));
+  $('moreAdmissionNotices').addEventListener('click',()=>run(()=>loadAdmissionNotices(true)));
   function renderMaterials(app){
     if(!app)return;
     const editable=['DRAFT','CORRECTION_REQUIRED'].includes(app.status),reviewable=['SUBMITTED','IN_REVIEW'].includes(app.status);
@@ -160,7 +228,7 @@
   async function load(){return run(async()=>{catalog=await request('catalog');await list();});}
   $('profile').addEventListener('submit',event=>{event.preventDefault();run(async()=>{render(await request('save',{application:current?.application||null,revision:current?.revision||0,
     identity_type:$('identity_type').value,fields:draftFields(),entity_type:$('entity_type').value,category:$('category').value,delegated:$('delegated').checked}));message('草稿已保存，请按清单上传资料。');});});
-  $('newApplication').addEventListener('click',()=>{if(busy)return;resetHistory();current=null;for(const key of ['legal_name','store_name','address','contact'])$(key).value='';setForm(null);$('profile').querySelectorAll('input,select,button').forEach(e=>e.disabled=false);render(null);message('请填写新申请。');});
+  $('newApplication').addEventListener('click',()=>{if(busy)return;resetHistory();resetNotices();current=null;for(const key of ['legal_name','store_name','address','contact'])$(key).value='';setForm(null);$('profile').querySelectorAll('input,select,button').forEach(e=>e.disabled=false);render(null);message('请填写新申请。');});
   $('submitApplication').addEventListener('click',()=>run(async()=>{render(await request('submit',{application:current.application,revision:current.revision}));message('申请已提交，请等待平台审核。');}));
   document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>run(async()=>{if(!$('note').value.trim())throw Error('请填写审核说明。');
     render(await request('review',{application:current.application,revision:current.revision,action:b.dataset.action,note:$('note').value.trim()}));message('审核处理已保存。');})));

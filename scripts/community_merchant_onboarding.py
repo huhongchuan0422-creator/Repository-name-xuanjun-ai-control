@@ -114,7 +114,8 @@ class MerchantOnboarding:
                  'upload':{'application','revision','kind','content_base64','expires_at'},
                  'submit':{'application','revision'},'review_list':set(),
                  'read':{'application'},'review_read':{'application'},
-                 'history':{'application','after_revision'},'review_history':{'application','after_revision'},'review':{'application','revision','action','note'},
+                 'history':{'application','after_revision'},'review_history':{'application','after_revision'},
+                 'notices':{'application','after_id'},'notice_read':{'application','notice_id'},'review':{'application','revision','action','note'},
                  'review_material':{'application','revision','kind','decision','note'},
                  'open_workbench':{'application','revision','workspace'},
                  'download':{'application','kind'}}
@@ -143,6 +144,9 @@ class MerchantOnboarding:
             page=rows[:50]
             return {'applications':[self._view(row[0],*self._load(row[0],uid,op=='review_list')[1:]) for row in page],
                     'next_cursor':page[-1][0] if len(rows)>50 else None}
+        if op in ('notices','notice_read'):
+            from scripts.community_onboarding_notices import dispatch
+            return dispatch(self,session,csrf,op,params)
         if op in ('history','review_history'):
             from scripts.community_onboarding_history import read
             return read(self,session,csrf,params['application'],params['after_revision'],op=='review_history')
@@ -248,6 +252,9 @@ class MerchantOnboarding:
             c.audit(application,uid,'MERCHANT_ONBOARDING_'+op.upper(),str(revision))
             from scripts.community_onboarding_history import append
             append(self,application,owner,uid,op,params,data,meta,revision)
+            if op=='review':
+                from scripts.community_onboarding_notices import append as notify_result
+                notify_result(self,application,owner,revision,params['action'])
             c.db.commit()
         except BaseException:
             c.db.rollback();raise
