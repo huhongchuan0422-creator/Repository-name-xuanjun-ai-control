@@ -1,0 +1,30 @@
+name: P2 isolated runtime
+on:
+  push:
+    branches: [repair/p2-runtime-20261020]
+    paths:
+      - 'production/p2_runtime/**'
+      - 'tests/p2_runtime/**'
+      - 'docs/p2_runtime.md'
+      - '.github/workflows/p2-runtime.yml'
+  pull_request:
+    paths:
+      - 'production/p2_runtime/**'
+      - 'tests/p2_runtime/**'
+      - 'docs/p2_runtime.md'
+      - '.github/workflows/p2-runtime.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python }}'
+      - run: python -B -m unittest discover -s tests/p2_runtime -p 'test_*.py' -v
