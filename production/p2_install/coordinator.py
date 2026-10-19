@@ -89,7 +89,7 @@ class Coordinator:
         db.execute("CREATE TABLE IF NOT EXISTS coordinator_outbox ("
                    "id TEXT PRIMARY KEY, attempt TEXT NOT NULL, event TEXT NOT NULL,"
                    "state TEXT NOT NULL, detail TEXT NOT NULL)")
-        db.execute("CREATE TABLE IF NOT EXISTS coordinator_rounds (installation TEXT NOT NULL, round_id TEXT NOT NULL, ordinal INTEGER NOT NULL, PRIMARY KEY(installation, round_id))")
+        # Historic isolated round rows are preserved, but are not admission or quota.
         db.execute("DROP INDEX IF EXISTS coordinator_once")
         return self
 
@@ -143,18 +143,6 @@ class Coordinator:
         require(request["root"] == self.component_roots[request["batch_id"]], "ROOT_MISMATCH")
         require(request["root"] != self.root, "ROOT_SHARED")
 
-    def _round(self, request):
-        rid = request.get("round_id")
-        require(type(rid) is str and ID.fullmatch(rid), "ROUND_REQUIRED")
-        row = self.journal.db.execute("SELECT ordinal FROM coordinator_rounds WHERE installation=? AND round_id=?", (request["installation_id"],rid)).fetchone()
-        if row: return row[0]
-        count = self.journal.db.execute("SELECT COUNT(*) FROM coordinator_rounds WHERE installation=?", (request["installation_id"],)).fetchone()[0]
-        require(count < 5, "ROUNDS_EXHAUSTED")
-        require(self.grant is not None, "AUTHORITY_UNAVAILABLE")
-        require(self.grant.admit_round(request,count+1) is True, "AUTHORITY_HOLD")
-        self.journal.db.execute("INSERT INTO coordinator_rounds VALUES (?,?,?)", (request["installation_id"],rid,count+1))
-        return count+1
-
     def _matches(self, request, commit, observed):
         if commit == observed: return True
         try:
@@ -200,7 +188,6 @@ class Coordinator:
         if old:
             return self.recover(request)
         require(self.now() <= request["deadline_utc"], "EXPIRED")
-        self._round(request)
         self._adapter(request["batch_id"])
         # A crash after storing request but before journal.begin is treated as
         # unknown, never as a new permission to launch another process.
@@ -233,7 +220,7 @@ class Coordinator:
                 return _receipt(request, "COMMITTED", rec)
             if result.get("status") == "NO_EFFECT":
                 rec = _check_reply(request, result, "NO_EFFECT")
-                checked = adapter.inspect(request)
+                checked = self._call(adapter,"inspect",request,10)
                 _check_reply(request, checked, "NO_EFFECT")
                 require(self._matches(request,rec,checked["receipt"]), "NO_EFFECT_CONFLICT")
                 self.journal.reconcile_no_effect(
@@ -259,7 +246,7 @@ class Coordinator:
         row = self.journal.latest(request["batch_id"])
         if row and row[0] == request["attempt_id"] and row[1] == "COMMITTED":
             # Durable commit is not sufficient without live readback.
-            reply = self._adapter(request["batch_id"]).inspect(request)
+            reply = self._call(self._adapter(request["batch_id"]),"inspect",request,10)
             rec = _check_reply(request, reply, "COMMITTED")
             require(self._matches(request,json.loads(row[2])["receipt"],rec), "READBACK_DRIFT")
             return _receipt(request, "COMMITTED", rec)
@@ -283,7 +270,8 @@ class Coordinator:
             reply = self._call(self._adapter(request["batch_id"]),"inspect",request,10)
             if reply.get("status") == "NO_EFFECT":
                 rec = _check_reply(request,reply,"NO_EFFECT")
-                return _receipt(request,"HOLD",rec,{"code":"PRE_BEGIN_VERIFIED_NO_EFFECT"})
+                # No journal effect was ever started; a fresh attempt may execute after proof.
+                return _receipt(request,"NO_EFFECT",rec)
             return _receipt(request,"HOLD",error={"code":"PRE_BEGIN_UNKNOWN"})
         return _receipt(request, "HOLD", error={"code":"UNSTARTED_OR_CONFLICT"})
 
@@ -333,6 +321,8 @@ def cli():
     parser.add_argument("--root", required=True)
     parser.add_argument("--plan", required=True)
     parser.add_argument("--request")
+    parser.add_argument("--component-root", action="append", default=[], help="fixed batch=/absolute/private/root")
+    parser.add_argument("--runtime", action="store_true", help="use fixed isolated runtime adapter (no plugins)")
     args = parser.parse_args()
     with open(args.plan, encoding="utf-8") as source:
         plan = json.load(source)
@@ -342,7 +332,20 @@ def cli():
         with open(args.request, encoding="utf-8") as source:
             request = json.load(source)
     try:
-        with Coordinator(args.root, plan) as c:
+        roots = {}
+        for mapping in args.component_root:
+            key, sep, value = mapping.partition("=")
+            require(sep and key in plan["batches"] and os.path.isabs(value), "ROOT_MAPPING")
+            roots[key] = value
+        adapters = {}
+        if args.runtime:
+            from production.p2_runtime import runtime as fixed_runtime
+            class RuntimeAdapter:
+                execute = staticmethod(fixed_runtime.execute)
+                inspect = staticmethod(fixed_runtime.inspect)
+                recover = staticmethod(fixed_runtime.recover)
+            adapters = {key:RuntimeAdapter() for key in roots}
+        with Coordinator(args.root, plan, adapters=adapters, component_roots=roots) as c:
             result = c.tick() if args.action == "tick" else getattr(c,args.action)(request)
         print(json.dumps(result,sort_keys=True))
         if args.action != "tick" and result["status"] == "HOLD":
