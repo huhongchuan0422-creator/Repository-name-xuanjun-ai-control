@@ -18,6 +18,17 @@ class NativeFixture:
 
 
 class PreparationTests(unittest.TestCase):
+    def test_native_false_normalized_to_sqlite_integer(self):
+        from credential_write_preparation import _CaptureRepository
+        from credential_key_binding import fingerprint
+        capture = _CaptureRepository()
+        row = {k: 'encrypted-fixture' for k in FIELDS}
+        row['legacy_migration_required'] = False
+        saved = capture.save(row)
+        self.assertIs(type(saved['legacy_migration_required']), int)
+        stored = dict(saved, legacy_migration_required=0)
+        self.assertEqual(fingerprint(saved), fingerprint(stored))
+
     def call(self, factory=NativeFixture, **changes):
         args = dict(credential_id='explicit-id', api_key='fixture-key',
                     api_secret='fixture-secret')

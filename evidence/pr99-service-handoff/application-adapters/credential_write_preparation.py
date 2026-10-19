@@ -17,7 +17,11 @@ class _CaptureRepository:
         if self.calls != 1 or not isinstance(record, dict):
             raise CredentialBindingHold('NATIVE_SAVE_CONTRACT_CHANGED')
         self.record = dict(record)
-        self.record.setdefault('legacy_migration_required', False)
+        self.record.setdefault('legacy_migration_required', 0)
+        # SQLite BOOLEAN columns return integers. Normalize new envelopes only;
+        # historical binding fingerprints remain unchanged.
+        if self.record['legacy_migration_required'] in (False, 0):
+            self.record['legacy_migration_required'] = 0
         # Native save returns the repository's complete record. This staging
         # repository deliberately does not fabricate timestamps or IDs.
         return dict(self.record)
