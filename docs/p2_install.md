@@ -57,3 +57,84 @@ python -m production.p2_install.coordinator execute --root /tmp/private-coordina
 ```
 
 The runtime source must be part of the same checkout/container image. This CLI does not import arbitrary user-specified modules. Its observation protocol still requires a trustworthy commit-linked readback adapter; a raw runtime adapter that lacks this proof will correctly HOLD rather than falsely commit. Subprocess timeout is not proof of process cleanup; real process ownership reconciliation remains necessary.
+
+## Exact component chain acceptance (2026-10-20)
+
+Fixed component versions:
+- artifact component: ea31dbbec2a8710b964efb38fa2975684bbd9739
+- runtime component: 499bcc43f4c992b21035c22446ccc4d915873fb1
+
+The integration test is tests/p2_install/test_component_chain_integration.py. CI stages those exact source revisions into the coordinator checkout and verifies their Git blob hashes before running tests. The test installs a real tar artifact containing an executable Unix Socket service, starts that exact installed file through the runtime component, verifies PING/PONG readiness, performs independent artifact/runtime queries, then deliberately fails a later real artifact node. After closing and reopening the coordinator, recovery is invoked on that failed node and the test verifies the earlier artifact file bytes/inode/mtime/mode, runtime PID/start/PGID/session and both original commit receipts remain unchanged.
+
+CHAIN_VERSION is SHA256 over the ASCII bytes of:
+ea31dbbec2a8710b964efb38fa2975684bbd9739 + newline + 499bcc43f4c992b21035c22446ccc4d915873fb1.
+
+Complete artifact request shape:
+```json
+{
+  "schema": 1,
+  "scope": "ISOLATED_TEST_ONLY",
+  "installation_id": "chain-i1",
+  "batch_id": "artifact",
+  "attempt_id": "artifact-a1",
+  "root": "/ABS/artifacts",
+  "version": "<CHAIN_VERSION>",
+  "deadline_utc": 2000000000,
+  "inputs": {
+    "operation": "install",
+    "archive": "/ABS/inputs/service.tar",
+    "archive_sha256": "<SHA256(service.tar)>",
+    "files": {"bin/service": "<SHA256(service-bytes)>"},
+    "modes": {"bin/service": 448}
+  }
+}
+```
+
+Complete runtime request shape:
+```json
+{
+  "schema": 1,
+  "scope": "ISOLATED_TEST_ONLY",
+  "installation_id": "chain-i1",
+  "batch_id": "service",
+  "attempt_id": "service-a1",
+  "root": "/ABS/runtime",
+  "version": "<CHAIN_VERSION>",
+  "deadline_utc": 2000000000,
+  "inputs": {
+    "operation": "start",
+    "argv": ["/ABS/artifacts/versions/chain-i1--artifact/bin/service", "/ABS/runtime/service.sock"],
+    "cwd": "/ABS/runtime",
+    "env": {},
+    "health": {
+      "type": "unix_socket",
+      "path": "/ABS/runtime/service.sock",
+      "request": "PING\n",
+      "expect": "PONG\n",
+      "connect_timeout": 0.1,
+      "read_timeout": 0.1,
+      "total_timeout": 3.0,
+      "max_response": 64
+    },
+    "timeout": 3.0
+  }
+}
+```
+
+Direct component CLI:
+```bash
+python3.11 -m production.p2_artifacts execute < artifact-request.json
+python3.11 -m production.p2_artifacts inspect < artifact-request.json
+python3.11 production/p2_runtime/__init__.py execute --request runtime-request.json
+python3.11 production/p2_runtime/__init__.py inspect --request runtime-request.json
+python3.11 production/p2_runtime/__init__.py recover --request runtime-request.json
+```
+
+Run the full exact-version integration acceptance from repository root after staging the two pinned component versions:
+```bash
+python3.11 -B tests/p2_install/test_component_chain_integration.py -v
+```
+
+The existing container Python 3.11 is the target; CI also runs Python 3.12. UK host Python 3.6.8 is not upgraded. No systemd, Docker Socket, production Registry, Signer, AuthorityStore or production configuration dependency is introduced.
+
+Dots notification transport: UNAVAILABLE. The coordinator keeps durable UNAVAILABLE outbox records; this does not block artifact/runtime integration testing.
