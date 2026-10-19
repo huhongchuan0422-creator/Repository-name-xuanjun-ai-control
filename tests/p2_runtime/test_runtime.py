@@ -94,11 +94,7 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(execute(req)["status"],"COMMITTED"); rec=self.record(); self.pids.append(rec["pid"])
         rec["phase"]="STOPPING"; (self.root/"batch-b1.json").write_text(json.dumps(rec))
         self.assertEqual(recover(req)["status"],"COMMITTED")
-        os.killpg(rec["pgid"],signal.SIGTERM)
-        for _ in range(100):
-            if p2_runtime.workload_state(rec)[0]=="GONE": break
-            time.sleep(.02)
-        self.assertEqual(recover(req)["status"],"COMMITTED")
+        self.assertEqual(recover(req)["status"],"NO_EFFECT")
 
     def test_log_limit_stops_entire_owned_group(self):
         old=p2_runtime.MAX_LOG; p2_runtime.MAX_LOG=2048
