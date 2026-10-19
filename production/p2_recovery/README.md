@@ -1,3 +1,50 @@
+# P2受控恢复执行接线
+
+原任务PR17，继承d0929def的恢复证据门禁及6041c745运行核心。英国FIRST_DEPLOY不重跑。英国未执行本增量；PRODUCTION_ISOLATION=WAITING_REAL_EVIDENCE，P2_RELEASE=HOLD。
+
+## 本轮实际执行入口
+
+production/p2_recovery/entry.py提供apply、serve、run正式入口。bootstrap.py只按显式SHA、受保护文件描述符加载代码。executor.py将恢复证据、真实管理Provider、原Registry、AuthorityStore、Issuer及原PermitCycle接线。原production/p2_attempt5/entry.py增加强制恢复Gate；不支持用CLI布尔值或环境变量绕过。原16阶段、Ledger、IssuerService、AuthorityStore、NativeRecovery、授权HTTPS校验与原生锁代码不改。
+
+apply不会启动Writer、服务或16阶段。serve/run首先核对已持久提交的恢复回执、数据库inode及新权威来源；随后仍执行原Registry、Grant准确Commit/Tree、Kit和完整Assembly Manifest校验。Issuer构造、每次接收及真正handle前、原生RPC与Driver.check_binding均重新查询隔离和对账状态。保留具体Driver、原生锁及Fence，不跳过阶段。实际副作用入口仍必须在Provider所证明的统一控制面落实Fence；本地检查不能替代跨系统原子排他。
+
+## A/B执行与失败恢复
+
+A只接受原管理执行器形成并三方签名绑定的一致性备份，绝不复制未知活库或忽略其WAL。向O_EXCL新恢复目标复制全部备份字节，原件不变；保留所有表、Grant消费数、Attempt、proof及Audit。旧Grant置terminal、旧租约失效、旧cycle停止，变更前完整状态另记Audit，新Grant必须由原Owner准确HTTPS授权认证，新Epoch/Fence在第一份Lease严格推进。恢复目标有独立新权威来源，不能宣称它就是原库。旧事务处置与安全恢复检查点仍需管理方可信对账，UNKNOWN拒绝。
+
+B只在UNRECOVERABLE_WITH_DISPOSITION、旧权威可信隔离及历史副作用处置成立后调用原AuthorityStore(initialize=True)。不存在任何“未找到即首次初始化”的捷径。新Grant独立身份，最多5次持久消费，原独立授权正文及编号不逐次改变；旧Grant不能自动重放。原库、WAL、备份和回执不改。
+
+apply在现存root0700检查点目录取得独占锁。AuthorityStore目标及sidecar、issuer锁任何已存在状态拒绝覆盖。数据库、Grant、cycle及新权威来源落盘后登记原Registry，再写O_EXCL恢复回执、fsync文件/目录，最后通过SQLite FULL独立提交索引发布。serve/run只读核验该提交，不自动补登记。提交成功后进程重启可幂等再入，不重置额度。未提交的数据库或回执保留并HOLD；不能删除后重试或自动采纳。失败恢复需管理Provider先对新恢复副作用作可信对账，当前版本对这种未提交输出不自动续写，属于明确保留的人工恢复边界。
+
+## 真实管理Provider接口（客户端已实现，英国部署未证实）
+
+管理执行器通过显式配置的root0600 Unix流式socket提供接口；父链root保护且拒绝符号链接，SO_PEERCRED必须uid0。4字节网络序长度+canonical JSON，最大262144字节、单次5秒。请求严格为schema=1、operation、request_sha256、challenge(随机32hex)。operation=recovery_apply要求原控制面原子保留唯一新权威；operation=execution_gate要求核对/续接同一排他绑定，不能另建Writer。
+
+响应body/signatures，body严格为schema、probe(完整原请求)、issued_utc、expires_utc(最多30秒)、packet、reservation。owner/isolation/reconciliation三把既定且不同的公钥均验证完整body签名；packet也必须满足原三签恢复证据协议及完整历史对账，sources包含准确plan引用。reservation严格绑定old_authority_id、authority_id、epoch、fence(与新Epoch相同起点)、writer_id、grant_id、database、plan_sha256及exclusive=true。UNKNOWN、失效租约、冲突、断连、旧nonce或签名错误均拒绝，不能缓存旧成功答复。
+
+本仓库不附带声称已撤销英国凭据的模拟生产Provider。测试socket服务使用真实RSA、真实Unix协议及真实SQLite，但所有主机隔离事实均为SYNTHETIC_TEST_ONLY。Owner/isolation/reconciliation是管理证据签名职责，不是重新引入Dots逐次许可。
+
+## 准确执行配置与现场交付
+
+apply-plan必须被原恢复packet.sources准确签名引用；字段schema、request_sha256、config(path/sha256)、registry_record(path/sha256)、registry_root、assembly_manifest(path/sha256)、assembly_root、kit_root、loader_sha256、kit_manifest_sha256、provider_socket、checkpoint_root。私有配置仍用原格式，Registry来源记录仍绑定Issuer公钥、Adapter、AuthorityStore及Writer/Fence。配置原件、真实NativeAdapter binding、Signer及旧事务plan/seed不从候选路径推断。所有目录须预先受保护；程序不chmod/chown、不创建目录，不生成私钥。
+
+新Assembly版本由build_apply.py绑定准确Commit/Tree及全部依赖，继承英国现存6041版Kit和原Manifest SHA；新增恢复代码及正式entry变化由新Assembly Manifest和新Grant绑定。旧制品及冻结文件保留，不覆盖。build.py只生成原证据模块范围的制品，不作为新执行Assembly使用。
+
+英国尚需一次性落实：
+1. 原SSH/RAM、Runner、systemd、scheduler、Issuer API、storage clone及其他主机全部写入来源的实际撤权/排空/旧Epoch拒绝；inactive不能替代撤权。
+2. 在同一真实控制面保留新authority_id/Epoch/Writer/Fence，接通上述provider_socket协议；必须拒绝另一恢复请求并行建立第二权威。
+3. 完成原Run/Job/InvokeId、16阶段事务副作用、备份检查点及历史Grant/Attempt对账；A交付一致性备份，B交付无法恢复及历史安全处置证据。
+4. 通过原Owner通道固定三把管理公钥及trust摘要、准确apply-plan、真实Signer/Adapter配置和新版本Grant绑定，不公开私钥。
+验收：独立实际撤权反向测试拒绝旧身份/旧Epoch；Provider对冲突及UNKNOWN返回拒绝；apply回执与数据库/Registry/持久索引一致；serve/run只在真实Fence和事务条件成立后执行。以上未实证前，不生成含猜测参数的英国激活命令。
+
+## 测试范围
+
+新增受影响测试覆盖真实RSA/socket、三签nonce、A/B、旧历史保留、旧Grant拒绝、5次额度/成功停止、重启、并发/部分输出、审批缺失、Fence/UNKNOWN、源码变化、正式Issuer签名RPC及正式入口强制Gate。原951项不重跑；未变核心逐字校验。Hosted CI不是英国验收。
+
+---
+
+以下保留d0929def原证据协议和检查点设计记录（其中“本模块”仅指recovery.py，而不是新增executor.py）：
+
 # P2受控权威恢复增量
 
 原任务PR17。运行基线6041c7458dce7c83c49c5a9eafa0e20cef52d1c0 / Tree 8e27d077d22af392108568ac06d284df4dd4b35e。已有英国Kit/Assembly及Registry目录原样复用。不修改原951项、175项已通过源码，不涉及PR99、PR122、东京或资金系统。

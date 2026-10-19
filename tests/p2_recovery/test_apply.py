@@ -60,6 +60,7 @@ class ApplyTests(unittest.TestCase):
             uname.release, uname.version, uname.machine))).start()
         for name in ('checkpoint', 'registry', 'db', 'assembly'):
             os.mkdir(self.root+'/'+name, 0o700)
+        self.request['new_grant_id'] = 'recovery-new-grant-0002'
         self.request['target_database'] = self.root + '/db/authority.sqlite3'
         self.body['issued_utc'] = int(time.time())-1
         self.body['expires_utc'] = int(time.time())+290
@@ -170,7 +171,13 @@ class ApplyTests(unittest.TestCase):
                     if self.provider_fault == 'disconnect':continue
                     packet = self.signed()
                     response = {'schema':1,'probe':request,'issued_utc':int(time.time())-1,
-                                'expires_utc':int(time.time())+20,'packet':packet}
+                                'expires_utc':int(time.time())+20,'packet':packet,
+                                'reservation':{'old_authority_id':self.request['old_authority_id'],
+                                    'authority_id':self.request['new_authority_id'],'epoch':self.request['new_epoch'],
+                                    'fence':self.request['new_epoch'],'writer_id':self.request['writer_id'],
+                                    'grant_id':self.request['new_grant_id'],'database':self.request['target_database'],
+                                    'plan_sha256':self.ref['sha256'],'exclusive':True}}
+                    if self.provider_fault == 'fence':response['reservation']['fence']-=1
                     if self.provider_fault == 'replay':response['probe']['challenge']='replayed'
                     if self.provider_fault == 'unknown':
                         response['packet']['body']['history']['unknown_effects']=['UNKNOWN']
@@ -225,6 +232,11 @@ class ApplyTests(unittest.TestCase):
 
     def test_unknown_no_database_created(self):
         self.provider_fault='unknown'
+        with self.assertRaises(r.Hold):self.apply()
+        self.assertFalse(os.path.lexists(self.cfg['database']))
+
+    def test_provider_fence_conflict_rejected(self):
+        self.provider_fault='fence'
         with self.assertRaises(r.Hold):self.apply()
         self.assertFalse(os.path.lexists(self.cfg['database']))
 
@@ -291,9 +303,92 @@ class ApplyTests(unittest.TestCase):
         self.provider_fault='unknown'
         with self.assertRaises(r.Hold):driver.check_binding()
 
+    def entry(self):
+        entry = types.SimpleNamespace(ProductionIssuer=assembly.ProductionIssuer,
+            _assembly=types.SimpleNamespace(UnixTransport=assembly.UnixTransport),
+            native_cycle=lambda factory: factory())
+        e.install_entry_gates(entry, self.gate())
+        return entry
+
+    def test_formal_serve_issuer_real_signed_rpc(self):
+        self.apply()
+        entry=self.entry()
+        signer=assembly.OpenSSLSigner(self.cfg['key'],self.cfg['public_der_sha256'])
+        server=None
+        try:
+            server=entry.ProductionIssuer(self.cfg['database'],self.cfg['socket'],
+                self.cfg['principal'],signer,self.cfg['issuer'],lambda *args: None,self.g)
+            results=[]
+            def client():
+                try:
+                    p=receipt_provider.ReceiptProvider(entry._assembly.UnixTransport(self.cfg['socket']),
+                        signer.modulus,65537,self.cfg['issuer'])
+                    results.append(p.request(self.g,'CANDIDATE','verify_fence',{}))
+                except Exception as exc:results.append(exc)
+            thread=threading.Thread(target=client);thread.start()
+            server.serve_one();thread.join(10)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(results[0]['status'],'HELD')
+            self.assertEqual(results[0]['lease_epoch'],8)
+            self.provider_fault='unknown'
+            with self.assertRaises(r.Hold):server.service.handle({},self.cfg['principal'])
+        finally:
+            if server is not None:server.close()
+            signer.close()
+
+    def test_formal_run_keeps_native_driver_and_checks_live_gate(self):
+        self.apply();entry=self.entry()
+        native=types.SimpleNamespace(check_binding=mock.Mock())
+        self.assertIs(entry.native_cycle(lambda: native),native)
+        native.check_binding()
+        self.provider_fault='fence'
+        with self.assertRaises(r.Hold):native.check_binding()
+
+    def test_direct_original_entry_rejects_missing_recovery_gate(self):
+        bootstrap=module(ROOT/'production/p2_recovery/bootstrap.py')
+        m=self.manifest
+        values=['serve','--kit-root',self.root+'/kit','--loader-sha256','5'*64,
+            '--manifest-sha256','3'*64,'--config',self.plan['config']['path'],
+            '--config-sha256',self.plan['config']['sha256'],'--assembly-sha256',
+            m['files']['production/p2_attempt5/assembly.py'],'--assembly-manifest',
+            self.plan['assembly_manifest']['path'],'--assembly-manifest-sha256',
+            self.plan['assembly_manifest']['sha256'],'--registry-root',self.plan['registry_root'],
+            '--registry-id','recovery-test-registration','--registry-record-sha256',
+            self.plan['registry_record']['sha256']]
+        with mock.patch.object(sys,'argv',['entry.py']+values):
+            original=bootstrap.load(self.root+'/assembly/production/p2_attempt5/entry.py',
+                m['files']['production/p2_attempt5/entry.py'])
+            with self.assertRaisesRegex(RuntimeError,'CONTROLLED_RECOVERY_ENTRY_REQUIRED'):
+                original.main()
+
+    def test_cross_process_restart_checks_committed_state(self):
+        self.apply()
+        req=self.write('request.json',r.canonical(self.request))
+        packet=self.write('packet.json',r.canonical(self.signed()))
+        trust=self.write('trust.json',r.canonical({'schema':1,'host':r.HOST,'keys':self.refs}))
+        paths={'root':self.root+'/assembly','request':req,'packet':packet,'trust':trust,'plan':self.ref}
+        script="""import importlib.util,json,sys
+v=json.loads(sys.argv[1]);base=v['root']+'/production/p2_recovery/'
+def load(name):
+ s=importlib.util.spec_from_file_location(name,base+name+'.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+b=load('bootstrap');r=load('recovery');e=load('executor');e.r=r
+request=r.decode(r.read(v['request']['path'],v['request']['sha256']))
+packet=r.decode(r.read(v['packet']['path'],v['packet']['sha256']))
+keys=r.load_trust(v['trust']['path'],v['trust']['sha256'])
+plan=e.signed_plan(request,packet,v['plan'])
+manifest=r.decode(r.read(plan['assembly_manifest']['path'],plan['assembly_manifest']['sha256']))
+def original(name):
+ relative='production/p2_attempt5/'+name+'.py';return b.load(v['root']+'/'+relative,manifest['files'][relative])
+gate=e.RecoveryGate(request,packet,keys,v['plan'],original('registry'),original('assembly'))
+gate.verify();print('RESTART_COMMITTED_GATE_PASS')
+"""
+        result=subprocess.check_output([sys.executable,'-I','-B','-S','-c',script,json.dumps(paths)],
+                                       timeout=30,stderr=subprocess.STDOUT)
+        self.assertIn(b'RESTART_COMMITTED_GATE_PASS',result)
+
     def test_a_preserves_all_history_revokes_old_grant(self):
         old=self.root+'/old-backup.sqlite3'
-        oldg=grant();oldg.update(grant_id='old-grant',expires_utc=int(time.time())+1000)
+        oldg=grant();oldg.update(grant_id='recovery-old-grant-0001',expires_utc=int(time.time())+1000)
         store=authority_store.AuthorityStore(old,initialize=True)
         try:
             store.register(oldg);token=store.lease(oldg,'old-writer')
@@ -315,7 +410,7 @@ class ApplyTests(unittest.TestCase):
         store=authority_store.AuthorityStore(self.cfg['database'])
         try:
             self.assertEqual(store.db.execute('SELECT consumed,terminal,expiry FROM grants WHERE id=?',
-                ('old-grant',)).fetchone(),(1,1,0))
+                ('recovery-old-grant-0001',)).fetchone(),(1,1,0))
             self.assertEqual(store.db.execute('SELECT id,ordinal FROM attempts').fetchall(),[('old-attempt',1)])
             self.assertEqual(store.db.execute('SELECT * FROM audit WHERE id<=?',(len(audit),)).fetchall(),audit)
             with self.assertRaises(receipt_provider.Hold):store.lease(oldg,'old-writer')

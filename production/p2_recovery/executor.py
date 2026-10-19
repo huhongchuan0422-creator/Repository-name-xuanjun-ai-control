@@ -58,7 +58,7 @@ class UnixEvidenceProvider(object):
             os.close(parent)
         r.fields(response, 'body signatures')
         body = response['body']
-        r.fields(body, 'schema probe issued_utc expires_utc packet')
+        r.fields(body, 'schema probe issued_utc expires_utc packet reservation')
         now = int(time.time())
         r.need(type(body['schema']) is int and body['schema'] == 1 and body['probe'] == probe and
                type(body['issued_utc']) is int and type(body['expires_utc']) is int and
@@ -68,6 +68,12 @@ class UnixEvidenceProvider(object):
                'PROVIDER_SIGNATURES')
         for role in sorted(r.ROLES):
             r.signature(body, response['signatures'][role], self.keys[role])
+        expected = {'old_authority_id': request['old_authority_id'],
+            'authority_id': request['new_authority_id'], 'epoch': request['new_epoch'],
+            'fence': request['new_epoch'], 'writer_id': request['writer_id'],
+            'grant_id': request['new_grant_id'], 'database': request['target_database'],
+            'plan_sha256': self.plan_ref['sha256'], 'exclusive': True}
+        r.need(body['reservation'] == expected, 'GLOBAL_AUTHORITY_RESERVATION_REQUIRED')
         # Fresh query must still prove the complete old-authority isolation and
         # historical reconciliation contract. UNKNOWN cannot authorize writes.
         r.need(self.plan_ref in body['packet']['body']['sources'], 'FRESH_PLAN_NOT_SIGNED')
@@ -86,6 +92,7 @@ def load_plan(ref, request):
         r.path(plan[key])
     for key in ('loader_sha256', 'kit_manifest_sha256'):
         r.pin(plan[key])
+    r.ident(request['recovery_id'] + '-apply')
     return plan
 
 
@@ -346,3 +353,34 @@ def guarded_driver(driver, gate):
         return original()
     driver.check_binding = check
     return driver
+
+
+def install_entry_gates(original, gate):
+    """Wire the existing formal entry. No alternate Issuer or native engine."""
+    original._RECOVERY_GATE = gate
+    base_issuer = original.ProductionIssuer
+    class GuardedService(object):
+        def __init__(self, service): self.service = service
+        def handle(self, *pos, **kw):
+            gate.verify()
+            return self.service.handle(*pos, **kw)
+    class GuardedIssuer(base_issuer):
+        def __init__(self, *pos, **kw):
+            gate.verify()
+            super(GuardedIssuer, self).__init__(*pos, **kw)
+            self.service = GuardedService(self.service)
+        def serve_one(self):
+            gate.verify()
+            return super(GuardedIssuer, self).serve_one()
+    original.ProductionIssuer = GuardedIssuer
+    transport = original._assembly.UnixTransport
+    class GuardedTransport(transport):
+        def __call__(self, request):
+            gate.verify()
+            return super(GuardedTransport, self).__call__(request)
+    original._assembly.UnixTransport = GuardedTransport
+    native = original.native_cycle
+    def cycle(factory, *pos, **kw):
+        gate.verify()
+        return native(lambda: guarded_driver(factory(), gate), *pos, **kw)
+    original.native_cycle = cycle

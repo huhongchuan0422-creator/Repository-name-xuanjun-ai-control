@@ -68,7 +68,9 @@ def main():
     loader = bootstrap.load(plan['kit_root'] + '/attempt5/runtime/versioned_entry.py',
                             plan['loader_sha256'])
     if args.operation == 'apply':
-        with loader.imports(plan['kit_root'], plan['kit_manifest_sha256']):
+        with loader.imports(plan['kit_root'], plan['kit_manifest_sha256']) as inherited:
+            r.need(inherited['source_commit'] == r.SOURCE and inherited['source_tree'] == r.TREE,
+                   'INHERITED_RUNTIME_IDENTITY')
             import authority_store
             import authorization
             import receipt_provider
@@ -93,38 +95,7 @@ def main():
     try:
         sys.argv = argv
         original = pinned('production/p2_attempt5/entry.py')
-        original_issuer = original.ProductionIssuer
-        class GuardedIssuer(original_issuer):
-            def __init__(self, *pos, **kw):
-                gate.verify()
-                super(GuardedIssuer, self).__init__(*pos, **kw)
-            def serve_one(self):
-                gate.verify()
-                return super(GuardedIssuer, self).serve_one()
-        # Gate at the actual handle boundary too: a client arriving after
-        # accept must not use a stale pre-accept attestation.
-        class GuardedService(object):
-            def __init__(self, service): self.service = service
-            def handle(self, *pos, **kw):
-                gate.verify()
-                return self.service.handle(*pos, **kw)
-        old_init = GuardedIssuer.__init__
-        def init(self, *pos, **kw):
-            old_init(self, *pos, **kw)
-            self.service = GuardedService(self.service)
-        GuardedIssuer.__init__ = init
-        original.ProductionIssuer = GuardedIssuer
-        transport = original._assembly.UnixTransport
-        class GuardedTransport(transport):
-            def __call__(self, request):
-                gate.verify()
-                return super(GuardedTransport, self).__call__(request)
-        original._assembly.UnixTransport = GuardedTransport
-        native = original.native_cycle
-        def cycle(factory, *pos, **kw):
-            gate.verify()
-            return native(lambda: executor.guarded_driver(factory(), gate), *pos, **kw)
-        original.native_cycle = cycle
+        executor.install_entry_gates(original, gate)
         signal.alarm(0)  # Original bounded native controls govern the execution.
         return original.main()
     finally:

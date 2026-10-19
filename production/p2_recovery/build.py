@@ -15,7 +15,14 @@ def main():
         'evidence/p2-epoch7-access-repair-20261014/c-capability-lifecycle/attempt5'):
         paths=subprocess.check_output(['git','ls-tree','-r','--name-only','6041c7458dce7c83c49c5a9eafa0e20cef52d1c0','--',prefix],cwd=str(ROOT)).decode().splitlines()
         for p in paths:
-            assert (ROOT/p).read_bytes()==subprocess.check_output(['git','show','6041c7458dce7c83c49c5a9eafa0e20cef52d1c0:'+p],cwd=str(ROOT)),p
+            previous=subprocess.check_output(['git','show','6041c7458dce7c83c49c5a9eafa0e20cef52d1c0:'+p],cwd=str(ROOT))
+            if p=='production/p2_attempt5/entry.py':
+                assert hashlib.sha1(b'blob '+str(len(previous)).encode()+b'\0'+previous).hexdigest()=='5c6c8da9a5cf82f0a6da285b27dbbf02bab90d07'
+                expected=previous.replace(b'def main():\n', b'_RECOVERY_GATE = None  # Bound only by the pinned controlled recovery entry.\n\n\ndef main():\n',1)
+                expected=expected.replace(b'    cfg = configuration(args.config, args.config_sha256)\n',b'    cfg = configuration(args.config, args.config_sha256)\n    require(_RECOVERY_GATE is not None, \'CONTROLLED_RECOVERY_ENTRY_REQUIRED\')\n    unused_record, recovered_cfg, unused_manifest = _RECOVERY_GATE.verify()\n    require(recovered_cfg == cfg, \'RECOVERY_CONFIG_CHANGED\')\n',1)
+                assert (ROOT/p).read_bytes()==expected,'EXACT_ENTRY_DELTA'
+            else:
+                assert (ROOT/p).read_bytes()==previous,p
     hashes={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in FILES}
     manifest={'schema':1,'source_commit':head,'source_tree':tree,
         'inherited_runtime_commit':'6041c7458dce7c83c49c5a9eafa0e20cef52d1c0',

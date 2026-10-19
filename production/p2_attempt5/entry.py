@@ -82,11 +82,17 @@ def configuration(path, expected):
     return value
 
 
+_RECOVERY_GATE = None  # Bound only by the pinned controlled recovery entry.
+
+
 def main():
     require(sys.flags.isolated and sys.flags.no_site and sys.dont_write_bytecode,
             'ISOLATED_INTERPRETER')
     args = _args
     cfg = configuration(args.config, args.config_sha256)
+    require(_RECOVERY_GATE is not None, 'CONTROLLED_RECOVERY_ENTRY_REQUIRED')
+    unused_record, recovered_cfg, unused_manifest = _RECOVERY_GATE.verify()
+    require(recovered_cfg == cfg, 'RECOVERY_CONFIG_CHANGED')
     identity, manifest = _assembly.release_identity(
         args.assembly_manifest, args.assembly_manifest_sha256, cfg['grant'],
         os.path.abspath(__file__), args.assembly_sha256, args.manifest_sha256)
@@ -177,3 +183,4 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+

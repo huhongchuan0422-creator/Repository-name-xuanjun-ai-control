@@ -43,6 +43,7 @@ def main():
              'tests/p2_production_assembly/test_observer_recovery.py',
              'tests/p2_production_assembly/test_owner_authorization.py',
              '.github/workflows/p2-production-assembly.yml']
+    added += sorted(str(p.relative_to(ROOT)) for p in (ROOT/'production/p2_recovery').glob('*.py'))
     for name in added:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     groups = []
@@ -137,3 +138,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
