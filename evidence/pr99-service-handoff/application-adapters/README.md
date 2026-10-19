@@ -89,3 +89,23 @@ verify the supplied native factory and real repository, integrate reads and
 new-credential writes into the original application lifecycle, and perform
 target-host acceptance. This read-only increment is not a complete production
 credential adapter, production migration, or M99 acceptance.
+
+## Private snapshot acceptance batch
+
+`accept_private_credential_bindings.py` is a Tokyo-only, root-only acceptance
+program for the exact Owner preparation snapshot and preserved configuration
+copies. It pins both the original pure crypto source and the reader adapter.
+It imports no original business modules and opens only the immutable private
+copy. Explicit record/key assignments are verified using the original pure
+methods with the installed cryptography dependency. Bindings stay private and
+contain references and fingerprints, never master-key values or plaintext.
+The batch records intent before verification, never overwrites prior outcomes,
+and reuses exact successful checkpoints. Incomplete/failed attempts require
+reconciliation; no automatic retry or key fallback is provided.
+
+Six additional tests use real AES-GCM and synthetic records/source, and real
+private filesystem operations. The complete suite is 39 tests. These are not
+proof of a running application instance, target deployment, a live Writer
+Fence or M99 acceptance. The program does not install a service hook or
+integrate new credential writes. It must never be used as a production start
+command. Neither existing production configuration is changed.
