@@ -143,11 +143,24 @@ class Providers:
     def mail(self,address,purpose,token,origin):
         c=self.config.get('smtp')
         if not c: raise Unavailable('MAIL_PENDING')
+        # Existing configs retain mandatory STARTTLS. Implicit TLS is an
+        # explicit protected-config choice, never a fallback after failure.
+        mode=c.get('tls_mode','starttls')
+        if type(mode) is not str or mode not in ('starttls','implicit_tls'):
+            raise Unavailable('MAIL_TLS_MODE_INVALID')
         # Tokens are entered in an authenticated-origin form, not URL/query logs.
         msg=EmailMessage();msg['From']=c['sender'];msg['To']=address;msg['Subject']='玄钧云汇：'+('验证邮箱' if purpose=='VERIFY' else '重置密码')
         msg.set_content('请在 '+origin+'/customer/center/ 输入一次性验证码（10分钟有效）：\n'+token+'\n不要转发给他人。')
-        with smtplib.SMTP(c['host'],int(c.get('port',587)),timeout=12) as smtp:
-            smtp.ehlo();smtp.starttls(context=ssl.create_default_context());smtp.ehlo();smtp.login(c['username'],c['password']);smtp.send_message(msg)
+        context=ssl.create_default_context()
+        if mode=='implicit_tls':
+            transport=smtplib.SMTP_SSL(c['host'],int(c.get('port',465)),timeout=12,context=context)
+        else:
+            transport=smtplib.SMTP(c['host'],int(c.get('port',587)),timeout=12)
+        with transport as smtp:
+            smtp.ehlo()
+            if mode=='starttls':
+                smtp.starttls(context=context);smtp.ehlo()
+            smtp.login(c['username'],c['password']);smtp.send_message(msg)
         return 'ACCEPTED' # Not proof of inbox delivery.
 
 def drain_mail(center,providers,origin):

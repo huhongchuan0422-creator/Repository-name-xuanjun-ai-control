@@ -189,3 +189,11 @@ c69c5841 Hosted 原客户测试在 /bind 输入上被 USE_OAUTH_OR_SECRETREF 拒
 新增21项故障测试：19项原协调器边界，2项实际临时CUSTOMER_APPLY子回执连接原OriginalOperations.reconcile/child.reconcile/Journal只读验证，覆盖最后真实成功回执丢失返回及KeyboardInterrupt后重启。确认累计仍5次、服务命令不重放；另覆盖UNKNOWN、SAFE_TO_RETRY但未完成、对账异常、expiry/lock/fence及readonly lease拒写。旧39项协调器回归保留，2项旧预期改为允许耗尽后只读重入和UNKNOWN仅状态转HOLD。新增测试追加原已登记模块，Hosted既有whole-workflow步骤自动发现，无新增包成员或派生生成源码。
 
 本地受影响336个唯一测试通过、0 skip；准确记录与新制品绑定以本增量冻结证据/Hosted为准。旧663983制品不能代替修改后新包；本修复不签发生产许可，不补造真实登录验收或现场证据。
+
+## 2026-10-19：SMTP 显式 TLS 模式兼容候选
+
+原传输固定使用 SMTP + STARTTLS，无法直接连接采用隐式 TLS 的465端口。本候选新增受保护 providers.smtp.tls_mode 字段：implicit_tls 使用 SMTP_SSL 和默认465端口；starttls 使用 SMTP、强制 STARTTLS 和默认587端口。旧配置未填写 tls_mode 时继续采用 starttls，不根据端口猜测模式。未知、空值及明文模式在连接前拒绝。
+
+两种模式均使用 ssl.create_default_context() 校验证书链及主机名；只有 TLS 建立成功后才认证并发送。失败后没有应用层重试，不切换SMTP传输协议、不降级明文、不新建连接自动重试，也不自动重投该 outbox 邮件。标准库 smtp.login 的既有行为保持：它可在同一已加密连接内依次尝试服务器声明的多个 AUTH 机制，因此一次 login 调用不保证只发送一次 AUTH。原持久 outbox 在网络动作前标记 UNKNOWN 的机制保持；不确定结果在重新打开数据库后仍不自动重发，ACCEPTED仍只表示SMTP接收，不表示收件箱已送达。
+
+腾讯企业邮箱已确认的465 SSL配置应显式选择 implicit_tls；本说明不写入任何生产配置或凭据，不代表已完成其真实连接或收件验收。config.json 与 runtime.json 的 providers 必须保持完全一致；现有受保护配置、身份、runtime、验收和独立授权门禁不变。新的专用离线SMTP测试另接既有Hosted工作流，保留原150项冻结证据组的成员及断言。候选本地通过不等于Hosted CI、生产部署或邮件投递成功。
