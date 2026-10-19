@@ -355,6 +355,8 @@ def probe_original_health(app):
 
 def inspect_generation(directory, expected_ready=None):
     root = _path(directory, True)
+    if os.path.lexists(root / 'INSTALLING'):
+        raise ValueError('GENERATION_INSTALLATION_INCOMPLETE')
     ready = _read(root / 'READY', 128).decode()
     if expected_ready is not None and ready != _digest(expected_ready):
         raise ValueError('GENERATION_PAIR_MISMATCH')
@@ -458,6 +460,11 @@ class OfflineReleases:
             root = self.root / 'generations' / generation
             root.mkdir(mode=0o700)
             try:
+                # Invalidation is durable before any ready marker. A later
+                # storage failure must not depend only on creating a new HOLD.
+                _write(root / 'INSTALLING', _json({'purpose': PURPOSE, 'generation': generation}))
+                _sync(root)
+                _sync(root.parent)
                 source = root / 'source'
                 source.mkdir(mode=0o700)
                 for name, blob in blobs.items():
@@ -479,8 +486,15 @@ class OfflineReleases:
                     raise ValueError('CENTER_CHANGED_DURING_REHEARSAL')
                 _write(root / 'sbom.json', _json(sbom))
                 _write(root / 'container.json', _json(deployment))
-                files = {p.relative_to(root).as_posix(): _sha(_read(p))
-                         for p in sorted(root.rglob('*')) if p.is_file()}
+                # Restored stores may be touched by the original composition.
+                # After it closes, attest and sync every final file, including
+                # its runtime.lock. Directory fsync alone cannot persist data.
+                files = {}
+                for path in sorted(root.rglob('*')):
+                    if path.is_file() and path != root / 'INSTALLING':
+                        blob = _read(path)
+                        _sync_file(path, blob)
+                        files[path.relative_to(root).as_posix()] = _sha(blob)
                 record = {'purpose': PURPOSE, 'generation': generation, 'source_commit': source_commit,
                           'package_sha256': expected_sha256, 'center_backup': anchor,
                           'six_store_snapshot_sha256': receipt['manifest_sha256'], 'health': health,
@@ -495,10 +509,24 @@ class OfflineReleases:
                 _write(root / 'READY', _sha(encoded).encode())
                 _sync(root)
                 _sync(root.parent)
+                (root / 'INSTALLING').unlink()
+                _sync(root)
                 return {'generation': generation, 'ready_sha256': _sha(encoded)}
             except BaseException as error:
-                _write(root / 'HOLD', _json({'error_type': type(error).__name__, 'retry_same_generation': False}))
-                _sync(root)
+                # Revoke visible readiness first; a disk failure can also make
+                # HOLD unwritable. Cleanup is best-effort and never replaces
+                # the original error or proves that invalidation is durable.
+                try:
+                    if os.path.lexists(root / 'READY'):
+                        (root / 'READY').unlink()
+                    _sync(root)
+                except BaseException:
+                    pass
+                try:
+                    _write(root / 'HOLD', _json({'error_type': type(error).__name__, 'retry_same_generation': False}))
+                    _sync(root)
+                except BaseException:
+                    pass
                 raise
 
     def select(self, target, expected_current, transaction, center, center_backup, *, rollback_of=None):

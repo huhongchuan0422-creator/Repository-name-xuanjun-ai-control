@@ -43,6 +43,23 @@ def _integrity(path):
             raise ValueError('SNAPSHOT_INTEGRITY_FAILED')
     finally:db.close()
 
+def _sync(path,directory=False):
+    """Persist file data separately from the directory entry that names it."""
+    flags=os.O_RDONLY|os.O_NOFOLLOW
+    if directory:flags|=os.O_DIRECTORY
+    fd=os.open(str(path),flags)
+    try:
+        info=os.fstat(fd)
+        if not directory and (not stat.S_ISREG(info.st_mode) or info.st_nlink!=1):
+            raise ValueError('INVALID_SNAPSHOT_FILE')
+        os.fsync(fd)
+    finally:os.close(fd)
+
+def _write_synced(path,blob):
+    fd=os.open(str(path),os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'wb') as stream:
+        stream.write(blob);stream.flush();os.fsync(stream.fileno())
+
 def snapshot(application,destination):
     from scripts.community_mini_application import MiniApplication
     if type(application) is not MiniApplication or application.stage is None or application.server is not None:
@@ -62,12 +79,14 @@ def snapshot(application,destination):
             try:db.backup(out);out.execute('PRAGMA journal_mode=DELETE');out.commit()
             finally:out.close()
             _integrity(target)
+            _sync(target)
             files[target.name]=hashlib.sha256(target.read_bytes()).hexdigest()
         manifest={'format':1,'purpose':'OFFLINE_RESTORE_CANDIDATE','cross_database_atomic':False,
                   'center_backup':'EXISTING_CENTER_OWNER_REQUIRED','payment_enabled':False,'files':files}
         raw=json.dumps(manifest,sort_keys=True,separators=(',',':')).encode()
-        fd=os.open(str(root/'snapshot.json'),os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
-        with os.fdopen(fd,'wb') as stream:stream.write(raw)
+        _write_synced(root/'snapshot.json',raw)
+        _sync(root,True)
+        _sync(root.parent,True)
         return {'manifest_sha256':hashlib.sha256(raw).hexdigest(),'files':files,
                 'cross_database_atomic':False,'center_backup':'EXISTING_CENTER_OWNER_REQUIRED'}
     except BaseException:
@@ -98,9 +117,10 @@ def restore(source,expected_manifest_sha256,destination):
     target=_create(destination)
     try:
         for name,blob in blobs.items():
-            fd=os.open(str(target/name),os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
-            with os.fdopen(fd,'wb') as stream:stream.write(blob)
+            _write_synced(target/name,blob)
             _integrity(target/name)
+        _sync(target,True)
+        _sync(target.parent,True)
         return {'restored':True,'production_installed':False,'payment_enabled':False,
                 'center_backup':'EXISTING_CENTER_OWNER_REQUIRED'}
     except BaseException:
