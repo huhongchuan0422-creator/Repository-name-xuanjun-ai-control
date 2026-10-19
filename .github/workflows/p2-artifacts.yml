@@ -1,0 +1,28 @@
+name: P2 isolated artifacts tests
+on:
+  push:
+    branches: [repair/p2-artifacts-20261020]
+    paths:
+      - 'production/p2_artifacts/**'
+      - 'tests/p2_artifacts/**'
+      - 'docs/p2_artifacts.md'
+      - '.github/workflows/p2-artifacts.yml'
+  pull_request:
+    paths:
+      - 'production/p2_artifacts/**'
+      - 'tests/p2_artifacts/**'
+      - '.github/workflows/p2-artifacts.yml'
+permissions:
+  contents: read
+jobs:
+  filesystem:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -B -m unittest discover -s tests/p2_artifacts -p 'test_*.py' -v
