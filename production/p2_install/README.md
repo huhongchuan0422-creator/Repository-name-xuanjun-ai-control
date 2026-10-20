@@ -471,3 +471,19 @@ B4–B7/P3、生产切换、真实DB/socket/服务启动不并入本轮B3收口�
 已查真实p2_attempt5/p2_recovery入口、Provider、Observer和原sandbox消费链。它们分别依赖root、历史签名恢复、Grant/Registry/Signer或固定宿主profile，不存在已确定的本次UID1002新隔离应用消费配置。499运行组件是进程管理器，a766协调器为有限CLI，二者均不自动成为应用服务；不拿测试服务补位。实际argv/cwd/env/health仍UNAVAILABLE，实际TLS仍UNKNOWN。
 
 尚未完成：CP04–09消费方集中接线、正式逐阶段完成回执、实际应用消费验证、独立主体拒绝证据与最终英国操作包。没有最终Owner安装命令，剩余次数UNKNOWN，1条仍为未验证目标。本轮无服务器操作、无权限/凭据/DB/socket/服务变更，不恢复旧历史前置。
+
+
+### B3真实ledger消费接线（任务6283494928，替代上一轮入口缺项）
+
+真实被装应用明确为原`runtime/stage1/ledger_service.py`，不再要求Owner选择应用。
+新增显式非启动检查分支及同目录`ledger_prepared.py`；`production/p2_install/b3_ledger.py`集中接通CP04–09，
+复用原只读/发布原语和初始化锁；真实ActivationStore链只读，不prepare/reconcile/transition。
+配置与expected identity独立发布；HOLD观察与成功终态分开、请求intent固定、前置回执摘要强制串联。
+原build业务AST不变，原ACTIVE/callback UID1004/native及Owner身份/fd3守卫保留，准备profile不能用于启动。
+
+[交付索引](../../docs/p2-b3-ledger-20261020/DELIVERY.json)和[完整动作清单](../../docs/p2-b3-ledger-20261020/OPERATIONS.md)
+绑定真实源码、695字节请求、预期配置/profile摘要和Hosted源码制品。
+测试源码d011a67d6994971e148c4e81b4c9e7baef481289；[Hosted39371811001](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39371811001)
+SUCCESS，Python3.11/3.12各14通过、0跳过，包含实际UID1002准备、实际独立UID拒绝、全顺序/中断/响应丢失。
+Hosted证明不替代英国现场：UID1002+cap-drop ALL会在CP08记录UNAVAILABLE/HOLD；独立现场观察及其接入未冻结。
+完整B3仍false，最终Owner命令未冻结，次数UNKNOWN；B1/B2/CP03未重装，本轮无英国动作、无新权限/凭据或服务启动。
