@@ -10,6 +10,15 @@ class RuntimeAdapter:
     inspect=staticmethod(p2_runtime.inspect)
     recover=staticmethod(p2_runtime.recover)
 
+class DelayedFailureRuntimeAdapter:
+    @staticmethod
+    def execute(request):
+        result=p2_runtime.execute(request)
+        time.sleep(1.5)
+        return result
+    inspect=staticmethod(p2_runtime.inspect)
+    recover=staticmethod(p2_runtime.recover)
+
 class ResponseLossRuntimeAdapter:
     @staticmethod
     def execute(request):
@@ -100,6 +109,77 @@ class RuntimeIntegration(unittest.TestCase):
                 direct=p2_runtime.recover(req)
                 self.assertEqual(direct["error"]["code"],"START_OUTCOME_UNKNOWN")
                 self.assertEqual(direct["operation_id"],first_saved["operation_id"])
+
+    def test_timeout_unknown_then_real_operation_identity_merges_once(self):
+        with tempfile.TemporaryDirectory() as home:
+            root=pathlib.Path(home)
+            coord=root/"coordinator"; runtime=root/"runtime"
+            coord.mkdir(mode=0o700); runtime.mkdir(mode=0o700)
+            bad=runtime/"bad-timeout-exec"
+            bad.write_text("#!/definitely/missing/interpreter\n")
+            bad.chmod(0o700)
+            plan={"schema":1,"release":"a"*64,"batches":["service"]}
+            req={"schema":1,"scope":"ISOLATED_TEST_ONLY",
+                 "installation_id":"timeout-identity","batch_id":"service",
+                 "attempt_id":"attempt-one","root":str(runtime),
+                 "version":"a"*64,"round_id":"round-1","deadline_utc":1,
+                 "inputs":{"operation":"start","argv":[str(bad)],
+                           "cwd":str(runtime),"env":{},
+                           "health":{"type":"process"},"timeout":0.2}}
+            with Coordinator(str(coord),plan,{"service":DelayedFailureRuntimeAdapter()},
+                             now=lambda:0,
+                             component_roots={"service":str(runtime)}) as c:
+                first=c.execute(req)
+                self.assertEqual(first["status"],"HOLD",first)
+                rows=c.journal.db.execute(
+                    "SELECT observed,evidence FROM coordinator_failures").fetchall()
+                self.assertEqual(len(rows),1)
+                first_time=rows[0][0]
+                first_saved=json.loads(rows[0][1])
+                self.assertEqual(first_saved["operation_id"],"UNKNOWN")
+                self.assertEqual(first_saved["error"]["code"],"TIMEOUT_UNKNOWN")
+                original=dict(first_saved)
+            with Coordinator(str(coord),plan,{"service":RuntimeAdapter()},
+                             now=lambda:50,
+                             component_roots={"service":str(runtime)}) as c:
+                recovered=c.recover(req)
+                self.assertEqual(recovered["status"],"HOLD",recovered)
+                rows=c.journal.db.execute(
+                    "SELECT observed,evidence FROM coordinator_failures").fetchall()
+                self.assertEqual(len(rows),1)
+                self.assertEqual(rows[0][0],first_time)
+                merged=json.loads(rows[0][1])
+                for key in ("event_id","event_key","cause","root_cause","error",
+                            "references","checkpoint"):
+                    self.assertEqual(merged[key],original[key])
+                resolution=merged["identity_resolution"]
+                self.assertNotEqual(resolution["operation_id"],"UNKNOWN")
+                self.assertEqual(
+                    resolution["observed_error"]["code"],"START_OUTCOME_UNKNOWN")
+                again=c.recover(req)
+                self.assertEqual(again["status"],"HOLD",again)
+                self.assertEqual(c.journal.db.execute(
+                    "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
+
+            # A different attempt remains a distinct failure; UNKNOWN identities
+            # are not globally merged.
+            runtime2=root/"runtime2"; runtime2.mkdir(mode=0o700)
+            bad2=runtime2/"bad-timeout-exec"; bad2.write_text(
+                "#!/definitely/missing/interpreter\n"); bad2.chmod(0o700)
+            req2=dict(req); req2["attempt_id"]="attempt-two"; req2["root"]=str(runtime2)
+            req2["inputs"]=dict(req["inputs"]); req2["inputs"]["argv"]=[str(bad2)]
+            req2["inputs"]["cwd"]=str(runtime2)
+            plan2={"schema":1,"release":"a"*64,"batches":["service","service2"]}
+            req2["batch_id"]="service2"
+            with Coordinator(str(coord),plan2,{"service":RuntimeAdapter(),
+                                              "service2":DelayedFailureRuntimeAdapter()},
+                             now=lambda:0,
+                             component_roots={"service":str(runtime),
+                                              "service2":str(runtime2)}) as c:
+                second=c.execute(req2)
+                self.assertEqual(second["status"],"HOLD",second)
+                self.assertEqual(c.journal.db.execute(
+                    "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],2)
 
     def test_cli_execute_inspect_and_recover(self):
         with tempfile.TemporaryDirectory() as home:
