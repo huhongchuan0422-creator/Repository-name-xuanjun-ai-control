@@ -55,3 +55,14 @@ The two live extension SDK symlinks (openclaw-lark and ws-ckpt) retain their
 original /usr/local/lib/node_modules/openclaw target. This distinct installation
 is included once in static capture and bound read-only in private service
 namespaces; it is not redirected to the Gateway 2026.9.3 package.
+
+Recovery for the observed legacy workspace setup error is implemented in
+`korea_workspace_recovery.py`. It retains the original start UNKNOWN, requires
+source fencing and completed transfer/install evidence, stops only the target
+Gateway, backs up private state/workspace, and runs the existing Node/OpenClaw
+`doctor --fix` in a cloned private namespace. No new global OpenClaw install or
+source service resume occurs. Gateway/RPC/Shim health precedes the original real
+model canary and route handoff. Every recovery mutation has its own intent and
+result; existing recovery attempts are query-only. Four additional local
+recovery tests pass (95 total: 93 passed, 2 skipped); native doctor execution
+and real model acceptance remain server-side gates, not locally claimed PASS.
