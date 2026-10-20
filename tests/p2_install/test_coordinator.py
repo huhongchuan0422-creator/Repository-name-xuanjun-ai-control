@@ -538,6 +538,112 @@ class CoordinatorTests(unittest.TestCase):
                 "WHERE event_key IS NULL").fetchall()
             self.assertEqual(unknown,[(124,unknown_raw,"UNKNOWN")])
 
+    def test_legacy_duplicate_rows_do_not_inflate_failure_threshold(self):
+        req=self.request("legacy-duplicates")
+        with self.open() as c:
+            c._store(req)
+
+        db=sqlite3.connect(os.path.join(self.root,"journal.sqlite3"))
+        try:
+            db.execute("DROP INDEX IF EXISTS coordinator_failure_event_key")
+            db.execute("DROP TABLE coordinator_failures")
+            db.execute("CREATE TABLE coordinator_failures("
+                       "seq INTEGER PRIMARY KEY, installation TEXT, cause TEXT,"
+                       "observed INTEGER, evidence TEXT)")
+            raw=canonical({"attempt_id":req["attempt_id"],
+                           "event_id":"same-old-event",
+                           "request_sha256":digest(req),
+                           "error":{"code":"OLD_DUP"}}).decode("ascii")
+            for seq in range(1,11):
+                db.execute("INSERT INTO coordinator_failures VALUES(?,?,?,?,?)",
+                           (seq,req["installation_id"],"OLD_DUP",100,raw))
+            db.commit()
+        finally:
+            db.close()
+
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:101) as c:
+            rows=c.journal.db.execute(
+                "SELECT seq,observed,evidence,event_key,compatibility "
+                "FROM coordinator_failures ORDER BY seq").fetchall()
+            self.assertEqual(len(rows),10)
+            self.assertEqual(sum(1 for x in rows if x[4]=="MIGRATED_EXPLICIT"),1)
+            self.assertEqual(sum(1 for x in rows if x[4]=="DUPLICATE_KNOWN"),9)
+            self.assertEqual({x[1] for x in rows},{100})
+            self.assertEqual({x[2] for x in rows},{raw})
+            groups=c._counted_failure_groups()
+            self.assertEqual(groups[(req["installation_id"],"round-1")]["count"],1)
+            emitted=c.tick()
+            self.assertFalse(any(
+                x.get("event")=="REPORT_DOTS_10_OR_60" for x in emitted))
+
+    def test_legacy_report_link_persists_across_independent_processes(self):
+        req=self.request("legacy-report")
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:100) as c:
+            c._store(req)
+            for i in range(10):
+                c.failure(req,"ROOT_CAUSE",
+                          {"event_id":"old-real-"+str(i),
+                           "error":{"code":"ROOT_CAUSE"}})
+            old_id="legacy-report-id"
+            c.journal.db.execute(
+                "INSERT INTO coordinator_outbox VALUES(?,?,?,?,?)",
+                (old_id,req["installation_id"],"REPORT_DOTS_10_OR_60",
+                 "UNAVAILABLE",
+                 canonical({"failures":10,"first_utc":100,
+                            "recipient":"DOTS",
+                            "next":"propose alternative and evaluate"}
+                          ).decode("ascii")))
+
+        child = (
+            "import json,sys;"
+            "from production.p2_install.coordinator import Coordinator;"
+            "root,component,now=sys.argv[1],sys.argv[2],int(sys.argv[3]);"
+            "plan={'schema':1,'release':'"+"a"*64+"','batches':['one','two']};"
+            "c=Coordinator(root,plan,component_roots={'one':component},"
+            "now=lambda:now);c.__enter__();"
+            "out=c.tick();c.__exit__(None,None,None);"
+            "print(json.dumps(out,sort_keys=True))"
+        )
+        first=subprocess.run(
+            [sys.executable,"-c",child,self.root,self.component,"100"],
+            cwd=str(ROOT),capture_output=True,text=True,timeout=20)
+        self.assertEqual(first.returncode,0,first.stderr)
+        self.assertFalse(any(
+            x.get("event")=="REPORT_DOTS_10_OR_60"
+            for x in json.loads(first.stdout)))
+
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:200) as c:
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox").fetchone()[0],1)
+            links=c.journal.db.execute(
+                "SELECT stable_id,legacy_id,round_id "
+                "FROM coordinator_outbox_links").fetchall()
+            self.assertEqual(len(links),1)
+            self.assertEqual(links[0][1],"legacy-report-id")
+            self.assertEqual(links[0][2],"round-1")
+            c.failure(req,"OTHER_REAL",
+                      {"event_id":"new-eleventh",
+                       "error":{"code":"OTHER_REAL"}})
+
+        second=subprocess.run(
+            [sys.executable,"-c",child,self.root,self.component,"200"],
+            cwd=str(ROOT),capture_output=True,text=True,timeout=20)
+        self.assertEqual(second.returncode,0,second.stderr)
+        self.assertFalse(any(
+            x.get("event")=="REPORT_DOTS_10_OR_60"
+            for x in json.loads(second.stdout)))
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:200) as c:
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox").fetchone()[0],1)
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox_links").fetchone()[0],1)
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],11)
+
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
         for number in range(7):
