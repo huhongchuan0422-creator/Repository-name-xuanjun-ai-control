@@ -29,6 +29,7 @@ class DockerE2E(unittest.TestCase):
         # Preserve all CI failure state for the evidence artifact.
         d=tempfile.mkdtemp(prefix='p2-b3-test-host-',dir='/tmp')
         if True:
+            os.umask(0o077)  # Same creation policy as the real host main.
             base=Path(d);root=base/'b3-initialize';root.mkdir(mode=0o700)
             activation=root/'activation';activation.mkdir(mode=0o700)
             cfg={'installation_id':'p2-host-test','initial_state':'PREPARED','initial_epoch':1,
