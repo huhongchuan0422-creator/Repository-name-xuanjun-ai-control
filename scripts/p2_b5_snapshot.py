@@ -200,7 +200,7 @@ def collect(output):
         result['capture']='STOPPED_RETAINED';result['error']=str(exc) if isinstance(exc,ValueError) else type(exc).__name__
         if collector:result['holds']=collector.holds
     if collector:
-        manifest={'scope':result['scope'],'files':collector.rows,'files_count':collector.files,'bytes':collector.total}
+        manifest={'scope':result['scope'],'files':collector.rows,'files_count':len(collector.rows),'bytes':sum(r['bytes'] for r in collector.rows),'attempted_files':collector.files,'attempted_bytes':collector.total}
         raw=canon(manifest);write_new('manifest.json',raw,dir_fd=directory);result['manifest_sha256']=sha(raw)
     # Pending tar is never published as a closed runtime or executable test artifact.
     if 'fd' in locals():
