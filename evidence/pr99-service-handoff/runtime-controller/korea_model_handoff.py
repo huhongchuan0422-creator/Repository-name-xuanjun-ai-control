@@ -5,7 +5,7 @@ One attempt, durable intents, no automatic replay of uncertain mutations.
 The current offline-project handoff is separate from production model cutover.
 """
 import ast, fcntl, hashlib, http.client, json, os, pwd, re, shlex, socket, ssl, stat
-import subprocess, sys, tarfile, tempfile, time
+import subprocess, sys, tarfile, tempfile, time, signal
 from pathlib import Path, PurePosixPath
 import korea_project_controller as transport
 from portal_total_controller import Checkpoint
@@ -441,7 +441,47 @@ print(json.dumps(result,sort_keys=True),flush=True)
 '''
 
 
+
+def gateway_tasks(main_pid):
+    result=[]
+    for p in Path('/proc').iterdir():
+        if not p.name.isdigit():continue
+        try:
+            if 'openclaw-gateway.service' not in (p/'cgroup').read_text():continue
+            pid=int(p.name);exe=os.readlink(p/'exe')
+            if pid==main_pid or Path(exe).name=='ssh':continue
+            require(pid not in (os.getpid(),os.getppid()),'OPERATOR_INSIDE_GATEWAY_GROUP')
+            start=(p/'stat').read_text().rsplit(')',1)[1].split()[19]
+            result.append({'pid':pid,'start':start,'exe':exe})
+        except (FileNotFoundError,ProcessLookupError):continue
+    return result
+
+def drain_gateway_tasks(main_pid):
+    require('--owner-drain-gateway-tasks' in sys.argv[1:],'OWNER_TASK_DRAIN_AUTHORIZATION_REQUIRED')
+    deadline=time.monotonic()+45;count=0
+    while True:
+        targets=gateway_tasks(main_pid)
+        if not targets:return {'status':'PASS','signalled_tasks':count}
+        require(time.monotonic()<deadline,'GATEWAY_TASKS_CONTINUOUSLY_RESPAWNING')
+        for signum in (signal.SIGTERM,signal.SIGKILL):
+            current={x['pid']:x for x in gateway_tasks(main_pid)}
+            for item in targets:
+                if current.get(item['pid'])!=item:continue
+                fd=None
+                try:
+                    fd=os.pidfd_open(item['pid'],0)
+                    if item not in gateway_tasks(main_pid):continue
+                    signal.pidfd_send_signal(fd,signum)
+                    if signum==signal.SIGTERM:count+=1
+                except ProcessLookupError:pass
+                finally:
+                    if fd is not None:os.close(fd)
+            time.sleep(1)
+        print('AUTHORIZED_GATEWAY_TASK_DRAIN_RUNNING='+str(count),flush=True)
+
+
 def main():
+    require(sys.argv[1:] in ([],['--owner-drain-gateway-tasks']),'SOURCE_ARGUMENTS')
     require(os.geteuid()==0 and os.uname().nodename.split('.')[0]==SOURCE,'SOURCE_HOST_OR_ROOT');os.umask(0o077)
     if not JOB.exists():
         print('PHASE=REUSE_CURRENT_PROJECT_SYNC',flush=True)
@@ -515,7 +555,9 @@ def main():
             except (FileNotFoundError,ProcessLookupError):continue
         if gateway_group_other:
             save(JOB/'source-gateway-other-tasks.json',{'pids':gateway_group_other})
-            raise RuntimeError('SOURCE_GATEWAY_OTHER_TASKS_REQUIRE_DRAIN')
+            if '--owner-drain-gateway-tasks' in sys.argv[1:]:
+                journal.perform('owner_authorized_task_drain',lambda:drain_gateway_tasks(contracts['gateway']['pid']))
+            else:raise RuntimeError('SOURCE_GATEWAY_OTHER_TASKS_REQUIRE_DRAIN')
         require(len(gateway_ssh)==1,'GATEWAY_FORWARDING_CONTRACT_CHANGED')
         require('127.0.0.1:19150:127.0.0.1:10150' in gateway_ssh[0]['argv'],'GATEWAY_FORWARDING_CHANGED')
         contracts['gateway_tunnel']=gateway_ssh[0]
@@ -586,6 +628,8 @@ def main():
         for p in ssh_files:require(sha(p)==static_manifest[str(p).lstrip('/')]['sha256'],'SSH_IDENTITY_CHANGED_DURING_CAPTURE')
         require(sha(NODE/'lib/node_modules/openclaw/package.json')=='226a35245ba5ba8b36ac707e68439eef62a9abb07a3234a154008d959976be7e','OPENCLAW_CHANGED_DURING_CAPTURE')
         def fence():
+            if '--owner-drain-gateway-tasks' in sys.argv[1:]:
+                journal.perform('owner_task_drain_before_fence',lambda:drain_gateway_tasks(contracts['gateway']['pid']))
             for role in ('gateway','rpc','shim','tunnel','korea_source_tunnel','bridge_tunnel'):
                 cfg=contracts[role];require(show(cfg['unit'],role=='gateway')['MainPID']==str(cfg['pid']),'SOURCE_PROCESS_CHANGED_BEFORE_PAUSE')
             for unit in TUNNELS+SYSTEM_SOURCE:run(['/usr/bin/systemctl','stop',unit],120)
