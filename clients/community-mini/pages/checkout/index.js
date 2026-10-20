@@ -40,6 +40,7 @@ Page({
     } catch(e) {if(current())this.setData({status:e.message});}
   },
   onUnload() {this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
+  openCustomerHome(){if(!this.scene){this.setData({status:'缺少门店场景，无法进入客户中心'});return;}wx.navigateTo({url:'/pages/home/index?scene='+encodeURIComponent(this.scene)});},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
   inputProject(e) {this.setData({projectFeedback:e.detail.value});},
