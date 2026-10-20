@@ -111,36 +111,78 @@ class PreviewHTTPTests(HttpTests):
         status,h,raw=self.request(url,headers=self.auth_headers());self.assertEqual(status,200);self.assertIn(b'data-project-feedback',raw);self.assertIn('no-store',h['Cache-Control']);self.assertIn("frame-ancestors 'none'",h['Content-Security-Policy'])
         self.assertEqual(self.request(url)[0],403);self.assertEqual(self.request(url,headers={**self.auth_headers(),'Range':'bytes=0-2'})[0],403)
         self.assertEqual(self.request('api/previews/project-a',headers=self.auth_headers())[0],200)
-    def test_http_project_revocation_blocks_old_cookie_across_private_routes_without_cross_project_damage(self):
-        # Existing project authority revocation semantics: a full newer snapshot
-        # can remove project-a while the account session itself remains valid.
+    def member_headers(self):
+        user=self.users['member']
+        return {'Cookie':__import__('scripts.pr122_customer_http',fromlist=['COOKIE']).COOKIE+'='+user['token'],
+                'X-CSRF-Token':user['csrf']}
+
+    def test_http_editor_download_revocation_keeps_session_and_other_project_access(self):
+        project_b={**self.p,'id':'project-b','tenant':'tenant-b','customer':'customer-b',
+                   'contract_ref':'contract-b','order_ref':'order-b','title':'Other legal project'}
+        self.imported(2,[self.p,project_b])
+        for pid in ('project-a','project-b'):
+            token=self.c.invite(self.owner,pid,'member@example.com','EDITOR')['invitation']
+            self.c.accept_invite(self.member,token)
+
+        owner_headers=self.auth_headers()
+        save_body={'project':'project-a','item':'license','revision':0,'kind':'DOCUMENT',
+                   'content':base64.b64encode(b'%PDF-revocation-http').decode(),'expires':None}
+        self.assertEqual(self.request('api/save',save_body,owner_headers)[0],200)
+        oid=self.c.db.execute("SELECT id FROM objects WHERE project='project-a'").fetchone()[0]
+        download='api/download/project-a/'+oid
+        member_headers=self.member_headers()
+
+        self.assertEqual(self.request(download,headers=member_headers)[0],200)
+        self.assertEqual(self.request('api/checklist/project-b',headers=member_headers)[0],200)
+
+        self.c.revoke(self.owner,'project-a',self.member)
+        self.assertEqual(self.c.session(self.users['member']['token']),self.member)
+        self.assertEqual(self.request('api/me',headers=member_headers)[0],200)
+        self.assertEqual(self.request(download,headers=member_headers)[0],403)
+        self.assertEqual(self.request('api/checklist/project-b',headers=member_headers)[0],200)
+
+    def test_http_owner_preview_revocation_blocks_html_list_and_registered_asset(self):
         project_b={**self.p,'id':'project-b','tenant':'tenant-b','customer':'customer-b',
                    'contract_ref':'contract-b','order_ref':'order-b','title':'Other legal project'}
         self.imported(2,[self.p,project_b])
 
+        # Bind a fresh preview snapshot to the current legal project revision.
+        # Include a separately versioned CSS member so HTTP authorization is
+        # exercised for a real resource route, not only inline content.
+        page='/preview/consumer/'
+        asset='/preview/app.css'
+        page_body=b'<!doctype html><html><head><link rel="stylesheet" href="/preview/app.css"></head><body>Private preview</body></html>'
+        asset_body=b'body{font-family:sans-serif}'
+        page_sha=digest(page_body);asset_sha=digest(asset_body)
+        e=snapshot(self,revision=2,paths=[page,asset])
+        entry=e['payload']['previews'][0]
+        manifest=entry['manifest']
+        manifest['pages']=[{'path':page,'sha256':page_sha},{'path':asset,'sha256':asset_sha}]
+        manifest['execution_scope']='TRUSTED_CUSTOMER_FRONTEND'
+        entry['manifest_sha256']=digest(canonical(manifest))
+        entry['blobs']={page_sha:base64.b64encode(page_body).decode(),
+                        asset_sha:base64.b64encode(asset_body).decode()}
+        e['signature']=hmac.new(self.auth,canonical(e['payload']),hashlib.sha256).hexdigest()
+        import_snapshot(self.c,e,self.auth)
+
         headers=self.auth_headers()
-        save_body={'project':'project-a','item':'license','revision':0,'kind':'DOCUMENT',
-                   'content':base64.b64encode(b'%PDF-revocation-http').decode(),'expires':None}
-        self.assertEqual(self.request('api/save',save_body,headers)[0],200)
-        oid=self.c.db.execute("SELECT id FROM objects WHERE project='project-a'").fetchone()[0]
-        download='api/download/project-a/'+oid
-        preview=route('project-a',self.path,self.sha).removeprefix('/customer/center/')
+        page_url=route('project-a',page,page_sha).removeprefix('/customer/center/')
+        asset_url=route('project-a',asset,asset_sha).removeprefix('/customer/center/')
         listing_url='api/previews/project-a'
 
-        # The same old cookie can read all three protected project-a surfaces
-        # before the authority snapshot revokes that project.
-        self.assertEqual(self.request(download,headers=headers)[0],200)
-        self.assertEqual(self.request(preview,headers=headers)[0],200)
+        self.assertEqual(self.request(page_url,headers=headers)[0],200)
+        self.assertEqual(self.request(asset_url,headers=headers)[0],200)
         self.assertEqual(self.request(listing_url,headers=headers)[0],200)
         self.assertEqual(self.request('api/checklist/project-b',headers=headers)[0],200)
 
-        # Full snapshot removes project-a but retains project-b. Account session
-        # remains valid; project authorization must be checked again per request.
+        # Full authority snapshot removes project-a but keeps project-b. Owner
+        # account session remains valid; all project-a preview surfaces re-check
+        # project authorization and fail without weakening preview revision rules.
         self.imported(3,[project_b])
         self.assertEqual(self.c.session(self.users['owner']['token']),self.owner)
         self.assertEqual(self.request('api/me',headers=headers)[0],200)
-        self.assertEqual(self.request(download,headers=headers)[0],403)
-        self.assertEqual(self.request(preview,headers=headers)[0],403)
+        self.assertEqual(self.request(page_url,headers=headers)[0],403)
+        self.assertEqual(self.request(asset_url,headers=headers)[0],403)
         self.assertEqual(self.request(listing_url,headers=headers)[0],403)
         self.assertEqual(self.request('api/checklist/project-b',headers=headers)[0],200)
 
