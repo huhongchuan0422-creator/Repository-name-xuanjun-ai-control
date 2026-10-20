@@ -17,7 +17,7 @@ Page({
       if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch)){if(this.session)this.session.clear();return;}
       this.setData({authenticated:true});
       await this.loadProfile(epoch,attempt);
-    }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(this.session)this.session.clear();this.session=null;this.clearPrivate(e.message);}}
+    }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else{if(this.session)this.session.clear();this.session=null;this.clearPrivate(e.message);}}}
     finally{if(!this._dead)this.setData({pending:false});}
   },
   clearPrivate(status){this.setData({authenticated:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:'',status});},
@@ -41,7 +41,7 @@ Page({
       const r=this.validateProfile(await this.session.commerce(this.scene,'profile_update',{nickname:this.data.nickname,contact:this.data.contact,expected_version:this.data.version}));
       if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch))return;
       this.setData({version:r.version,nickname:r.nickname,contact:r.contact,userId:r.user_id,customerId:r.project_customer_id,status:'本人资料已保存'});
-    }catch(e){if(!this._dead){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED'){if(this.session)this.session.clear();this.session=null;this.clearPrivate('登录已失效，请重新登录');}else this.setData({status:e.message});}}
+    }catch(e){if(!this._dead){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else this.setData({status:e.message});}}
     finally{if(!this._dead)this.setData({pending:false});}
   },
   customerSessionRevoked(status='登录已退出，请重新登录'){this._loginAttempt=(this._loginAttempt||0)+1;if(this.session)this.session.clear();this.session=null;if(!this._dead)this.clearPrivate(status);},
