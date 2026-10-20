@@ -186,6 +186,65 @@ class PreviewHTTPTests(HttpTests):
         self.assertEqual(self.request(listing_url,headers=headers)[0],403)
         self.assertEqual(self.request('api/checklist/project-b',headers=headers)[0],200)
 
+    def test_http_password_reset_replaces_cookie_without_changing_private_resource_authority(self):
+        # Keep project authorization stable. Rebind preview only to the current
+        # legal project revision and preserve the exact object/preview bytes
+        # across the password-reset boundary.
+        self.imported(2,[self.p])
+        page='/preview/consumer/'
+        asset='/preview/app.css'
+        page_body=b'<!doctype html><html><head><link rel="stylesheet" href="/preview/app.css"></head><body>Reset fixture</body></html>'
+        asset_body=b'body{font-family:sans-serif}'
+        page_sha=digest(page_body);asset_sha=digest(asset_body)
+        e=snapshot(self,revision=2,paths=[page,asset])
+        entry=e['payload']['previews'][0]
+        manifest=entry['manifest']
+        manifest['pages']=[{'path':page,'sha256':page_sha},{'path':asset,'sha256':asset_sha}]
+        manifest['execution_scope']='TRUSTED_CUSTOMER_FRONTEND'
+        entry['manifest_sha256']=digest(canonical(manifest))
+        entry['blobs']={page_sha:base64.b64encode(page_body).decode(),
+                        asset_sha:base64.b64encode(asset_body).decode()}
+        e['signature']=hmac.new(self.auth,canonical(e['payload']),hashlib.sha256).hexdigest()
+        import_snapshot(self.c,e,self.auth)
+
+        old_headers=self.auth_headers()
+        save_body={'project':'project-a','item':'license','revision':0,'kind':'DOCUMENT',
+                   'content':base64.b64encode(b'%PDF-reset-private-resource').decode(),'expires':None}
+        self.assertEqual(self.request('api/save',save_body,old_headers)[0],200)
+        oid=self.c.db.execute("SELECT id FROM objects WHERE project='project-a'").fetchone()[0]
+        download='api/download/project-a/'+oid
+        page_url=route('project-a',page,page_sha).removeprefix('/customer/center/')
+        asset_url=route('project-a',asset,asset_sha).removeprefix('/customer/center/')
+        listing_url='api/previews/project-a'
+        protected=(download,page_url,asset_url,listing_url)
+
+        for path in protected:
+            self.assertEqual(self.request(path,headers=old_headers)[0],200)
+
+        # Exercise the real HTTP reset routes. Reset must invalidate the old
+        # session cookie but must not change project membership, object bytes,
+        # preview authority revision, or registered resource hashes.
+        self.assertEqual(self.request('api/request_reset',{'email':'owner@example.com'})[0],200)
+        reset_row=self.c.db.execute("SELECT * FROM outbox WHERE kind='RESET' ORDER BY rowid DESC LIMIT 1").fetchone()
+        reset_token=json.loads(self.c.decrypt(reset_row['payload'],'outbox:'+reset_row['id']))['token']
+        self.assertEqual(self.request('api/reset',{'token':reset_token,'password':'replacement-password-123'})[0],200)
+        for path in protected:
+            self.assertEqual(self.request(path,headers=old_headers)[0],403)
+
+        status,login_headers,raw=self.request('api/login',{'email':'owner@example.com','password':'replacement-password-123'})
+        self.assertEqual(status,200)
+        login_body=json.loads(raw)
+        cookie=login_headers['Set-Cookie'].split(';',1)[0]
+        new_headers={'Cookie':cookie,'X-CSRF-Token':login_body['csrf']}
+        self.assertNotEqual(cookie,old_headers['Cookie'])
+
+        # Same exact object and preview URLs become readable again with the new
+        # authenticated session. Nothing is regenerated after reset.
+        for path in protected:
+            self.assertEqual(self.request(path,headers=new_headers)[0],200)
+        self.assertEqual(self.c.db.execute("SELECT revision FROM projects WHERE id='project-a'").fetchone()[0],2)
+        self.assertEqual(load(self.c)['revision'],2)
+
     def test_http_delivery_report_queue_requires_reviewer_not_customer(self):
         body={'project':'project-a','case':'change_fixture','serve_id':'pv_fixture','report':{'payload':{},'key_id':'not-enrolled','signature':'invalid'}}
         self.assertEqual(self.request('api/change_delivery_report',body,self.auth_headers())[0],403)
