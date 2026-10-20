@@ -26,7 +26,9 @@ class DockerE2E(unittest.TestCase):
         measure="import hashlib,json,os,sys;p=os.path.realpath(sys.executable);r=open(p,'rb').read();print(json.dumps({'path':p,'bytes':len(r),'sha256':hashlib.sha256(r).hexdigest()}))"
         binary=json.loads(subprocess.check_output(['/bin/docker','run','--rm','--network=none','--cap-drop=ALL',
                          '--security-opt=no-new-privileges','--read-only',image,'/usr/local/bin/python3.11','-I','-B','-S','-c',measure]))
-        with tempfile.TemporaryDirectory(prefix='p2-b3-test-host-',dir='/tmp') as d:
+        # Preserve all CI failure state for the evidence artifact.
+        d=tempfile.mkdtemp(prefix='p2-b3-test-host-',dir='/tmp')
+        if True:
             base=Path(d);root=base/'b3-initialize';root.mkdir(mode=0o700)
             activation=root/'activation';activation.mkdir(mode=0o700)
             cfg={'installation_id':'p2-host-test','initial_state':'PREPARED','initial_epoch':1,
@@ -53,7 +55,11 @@ class DockerE2E(unittest.TestCase):
             work=base/'work';h.directory(work);logs=work/'logs';h.directory(logs)
             raw=b.build(REPO,request_override=request);stage=work/'sources';h.unpack(raw,h.digest(raw),stage)
             producer=h.digest((REPO/'scripts/p2_b3_owner_finalize_20261020.py').read_bytes())
-            first=h.install(stage,work,logs,root,image,binary['path'],producer,fixture=True)
+            try:first=h.install(stage,work,logs,root,image,binary['path'],producer,fixture=True)
+            except Exception:
+                for p in logs.glob('logs-observe-*.stdout'):
+                    print('RAW_OBSERVER='+p.read_text()[-16384:])
+                raise
             self.assertEqual(first['status'],'PREPARATION_COMMITTED')
             proof=json.loads((work/'proof.json').read_bytes())
             self.assertEqual(proof['probe']['uid'],65534)
