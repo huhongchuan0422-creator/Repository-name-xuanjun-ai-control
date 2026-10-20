@@ -204,6 +204,58 @@ class CoordinatorTests(unittest.TestCase):
             self.assertEqual(c.journal.db.execute(
                 "SELECT COUNT(*) FROM coordinator_outbox WHERE event='REPORT_DOTS_10_OR_60'").fetchone()[0],1)
 
+    def test_root_cause_30m_and_round_60m_exact_boundaries(self):
+        req=self.request("boundary")
+        clock=[1000]
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:clock[0]) as c:
+            c._store(req)
+            c.failure(req,"REAL_CAUSE",{"event_id":"boundary-failure"})
+        clock[0]=2799
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:clock[0]) as c:
+            c.tick()
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox WHERE event='CHANGE_METHOD_30M'").fetchone()[0],0)
+        clock[0]=2800
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:clock[0]) as c:
+            c.tick()
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox WHERE event='CHANGE_METHOD_30M'").fetchone()[0],1)
+        clock[0]=4599
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:clock[0]) as c:
+            c.tick()
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox WHERE event='REPORT_DOTS_10_OR_60'").fetchone()[0],0)
+        clock[0]=4600
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:clock[0]) as c:
+            c.tick()
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox WHERE event='REPORT_DOTS_10_OR_60'").fetchone()[0],1)
+
+    def test_actual_cross_node_round_count_and_distinct_root_causes(self):
+        component2=self.root+"/component2"
+        os.mkdir(component2,0o700)
+        roots={"one":self.component,"two":component2}
+        req1=self.request("node-one","one")
+        req2=dict(self.request("node-two","two")); req2["root"]=component2
+        with Coordinator(self.root,self.plan,component_roots=roots,now=lambda:100) as c:
+            c._store(req1); c._store(req2)
+            for index in range(5):
+                c.failure(req1,"ROOT_A",{"event_id":"one-"+str(index)})
+                c.failure(req2,"ROOT_B",{"event_id":"two-"+str(index)})
+            c.tick()
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],10)
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox WHERE event='REPORT_DOTS_10_OR_60'").fetchone()[0],1)
+            evidence=[json.loads(x[0]) for x in c.journal.db.execute(
+                "SELECT evidence FROM coordinator_failures ORDER BY seq")]
+            self.assertEqual({x["root_cause"] for x in evidence},{"ROOT_A","ROOT_B"})
+
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
         for number in range(7):
