@@ -36,7 +36,7 @@ jobs:
       - name: Build source delivery with original complete runtime
         run: |
           mkdir "$RUNNER_TEMP/p2-b3-ledger-delivery"
-          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf "$RUNNER_TEMP/p2-b3-ledger-delivery/b3-ledger-source.tar.gz" production/p2_install/initialize.py production/p2_install/b3_contracts.py production/p2_install/b3_ledger.py evidence/p2-epoch7-access-repair-20261014/runtime tests/p2_install/test_b3_ledger.py
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf "$RUNNER_TEMP/p2-b3-ledger-delivery/b3-ledger-source.tar.gz" production/p2_install/initialize.py production/p2_install/b3_contracts.py production/p2_install/b3_ledger.py evidence/p2-epoch7-access-repair-20261014/runtime tests/p2_install/test_b3_ledger.py docs/p2-b3-ledger-20261020/request.json
           sha256sum "$RUNNER_TEMP/p2-b3-ledger-delivery/b3-ledger-source.tar.gz" > "$RUNNER_TEMP/p2-b3-ledger-delivery/SHA256SUMS"
       - uses: actions/upload-artifact@v4
         with:
