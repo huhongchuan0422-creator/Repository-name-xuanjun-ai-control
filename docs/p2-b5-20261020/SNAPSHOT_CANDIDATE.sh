@@ -7,8 +7,8 @@ from urllib.request import build_opener,ProxyHandler
 HOST='iZd7oeikknn1z21sq6ji6zZ'
 BASE='/var/lib/xuanjun-p2-isolated-test'
 NAME='b5-source-snapshot-20261020'
-SOURCE_COMMIT='4b394748dc1d1857ad7e5e952e6f0ebf4413a7aa'
-SOURCE_SHA='1735c78307b4516edab328befa3da89b63d64c71a4d13b8c5f5eb70ec93e1ae4'
+SOURCE_COMMIT='7c12b368b3586ba0b2d1f91498d8f9f4ed2d95b5'
+SOURCE_SHA='505fbcaca2edb0ce3d9cfc697008242dd2e270d71dd394beede82679b003bf85'
 def check(ok,reason):
     if not ok:raise RuntimeError(reason)
 def put(directory,name,raw):
