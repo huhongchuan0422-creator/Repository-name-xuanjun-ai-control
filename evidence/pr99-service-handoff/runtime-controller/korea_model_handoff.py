@@ -166,6 +166,9 @@ def states(units):
   result[unit]=dict(x.split('=',1) for x in raw.decode().splitlines() if '=' in x)
  return result
 
+def validate_initial_slice(state,occupied):
+ need(state.get('LoadState') in ('not-found','loaded') and state.get('ActiveState')=='inactive' and not state.get('FragmentPath') and not state.get('DropInPaths') and not occupied,'EXISTING_SLICE_CONFIGURATION_OR_TASKS')
+
 def write(p,body,mode=0o600):
  with p.open('xb') as f: f.write(body);f.flush();os.fchmod(f.fileno(),mode);os.fsync(f.fileno())
 
@@ -251,7 +254,16 @@ if action=='preflight':
   s=socket.socket()
   try:s.bind(('0.0.0.0',port))
   finally:s.close()
- for v in states(list(NAMES.values())+['pr99koreamodel.slice']).values():need(v['LoadState']=='not-found','EXISTING_UNIT')
+ for v in states(list(NAMES.values())).values():need(v['LoadState']=='not-found','EXISTING_UNIT')
+ slice_raw=cmd(['/usr/bin/systemctl','show','pr99koreamodel.slice','--property=LoadState,ActiveState,FragmentPath,DropInPaths']).decode()
+ slice_state=dict(x.split('=',1) for x in slice_raw.splitlines() if '=' in x)
+ occupied=False
+ for proc in Path('/proc').iterdir():
+  if not proc.name.isdigit():continue
+  try:
+   if '/pr99koreamodel.slice' in (proc/'cgroup').read_text():occupied=True
+  except (FileNotFoundError,ProcessLookupError):pass
+ validate_initial_slice(slice_state,occupied)
  mem=dict((x.split(':')[0],int(x.split()[1])) for x in Path('/proc/meminfo').read_text().splitlines() if len(x.split())>=2 and x.split()[1].isdigit())
  need(mem.get('MemAvailable',0)>=700000,'INSUFFICIENT_MEMORY_FOR_GATEWAY_PREFLIGHT')
  need(shutil.disk_usage('/opt').free>payload['required_bytes']*2+1073741824,'DISK_SPACE')
