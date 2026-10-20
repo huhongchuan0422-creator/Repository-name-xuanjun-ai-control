@@ -247,6 +247,23 @@ class Coordinator:
         if self.journal.db.execute(
                 "SELECT 1 FROM coordinator_failures WHERE event_key=?", (key,)).fetchone():
             return False
+
+        # If the first failure was captured before the component identity was
+        # observable, conservatively attach the later real identity to that
+        # exact automatic placeholder. Explicit UNKNOWN events and other
+        # attempts are never merged.
+        merge_row = None
+        known_operation = evidence.get("operation_id")
+        if type(known_operation) is str and known_operation != "UNKNOWN":
+            unknown_event = "auto-" + digest([request["attempt_id"], "UNKNOWN"])[:32]
+            unknown_key = digest([request["installation_id"],
+                                  request.get("round_id", "DEFAULT"),
+                                  request["batch_id"], request["attempt_id"],
+                                  unknown_event])
+            merge_row = self.journal.db.execute(
+                "SELECT seq,evidence FROM coordinator_failures WHERE event_key=?",
+                (unknown_key,)).fetchone()
+
         # Preserve original data and digest only references which are verifiable.
         details = dict(evidence)
         references = {}
@@ -285,6 +302,41 @@ class Coordinator:
                  "config_sha256":evidence.get("config_sha256") or "UNKNOWN",
                  "error":evidence.get("error",{"code":cause}),
                  "references":references, "checkpoint":evidence.get("checkpoint","UNKNOWN")}
+
+        if merge_row is not None:
+            seq, raw = merge_row
+            try:
+                prior = json.loads(raw)
+            except ValueError:
+                prior = {}
+            expected_unknown = "auto-" + digest([request["attempt_id"], "UNKNOWN"])[:32]
+            safe_merge = (
+                prior.get("event_id") == expected_unknown
+                and prior.get("operation_id") == "UNKNOWN"
+                and prior.get("checkpoint") == "RECONCILE_REQUIRED"
+                and prior.get("installation_id") == request["installation_id"]
+                and prior.get("round_id") == request.get("round_id","DEFAULT")
+                and prior.get("batch_id") == request["batch_id"]
+                and prior.get("attempt_id") == request["attempt_id"]
+                and prior.get("request_sha256") == digest(request))
+            if safe_merge:
+                resolution = prior.get("identity_resolution")
+                if resolution is None:
+                    prior["identity_resolution"] = {
+                        "operation_id": saved["operation_id"],
+                        "config_sha256": saved["config_sha256"],
+                        "observed_error": saved["error"],
+                        "observed_references": saved["references"]}
+                    self.journal.db.execute(
+                        "UPDATE coordinator_failures SET evidence=? WHERE seq=?",
+                        (canonical(prior).decode("ascii"), seq))
+                elif resolution.get("operation_id") != saved["operation_id"]:
+                    # Conflicting later identities are distinct/unknown, never
+                    # silently folded into the original event.
+                    merge_row = None
+                if merge_row is not None:
+                    return False
+
         self.journal.db.execute(
             "INSERT OR IGNORE INTO coordinator_failures(installation,cause,observed,evidence,event_key) VALUES(?,?,?,?,?)",
             (request["installation_id"],cause,self.now(),canonical(saved).decode("ascii"),key))
