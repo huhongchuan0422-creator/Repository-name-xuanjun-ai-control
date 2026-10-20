@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const sessionModule=require('./session');
+const auth=require('./customer-auth');
 const event=dataset=>({currentTarget:{dataset}});
 const id=n=>n.toString(16).padStart(64,'0');
 const record=n=>({id:id(n),kind:'FIXTURE',reference:'fixture-'+n,message:'Synthetic notice '+n,read:false,created_at:n});
@@ -16,7 +17,7 @@ function harness(count=63){
   }};
   vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{
     Page:p=>{definition=p;},wx,getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid'}}),
-    require:path=>path==='../../session'?sessionModule:path==='../../client'?{
+    require:path=>path==='../../customer-auth'?auth:path==='../../session'?sessionModule:path==='../../client'?{
       makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})
     }:{createPaymentFlow:()=>({reset(){}})}
   });
