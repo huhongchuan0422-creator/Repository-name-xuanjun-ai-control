@@ -58,15 +58,19 @@ export function prepareInvocation(binding,observed,approvedBindingSha) {
 /** Validates a LIVE upstream PluginRegistry, not JSON supplied as proof of real loading.
  * Contract fixtures may exercise this function but never count as SDK acceptance.
  */
-export function validateRegistry(registry,expectedSource) {
+export const READONLY_PROFILE=Object.freeze({id:PLUGIN,version:'0.1.1-b5-readonly.1',methods:Object.freeze(['xuanjun.capabilities.describe'])});
+export function validateRegistry(registry,expectedSource,profile='original') {
+ if(!['original','readonly'].includes(profile))hold('HOLD_REGISTRY_PROFILE');
+ const version=profile==='readonly'?READONLY_PROFILE.version:'0.1.0';
+ const methods=profile==='readonly'?READONLY_PROFILE.methods:METHODS;
  if(!path.isAbsolute(expectedSource))hold('HOLD_PLUGIN_SOURCE');
  if(!Array.isArray(registry?.plugins)||!Array.isArray(registry?.diagnostics)||!registry.gatewayHandlers)hold('HOLD_REGISTRY_SHAPE');
  if(registry.plugins.length!==1)hold('HOLD_REGISTRY_SCOPE');
  const r=registry.plugins[0];
- if(r.id!==PLUGIN||r.source!==expectedSource||(r.packageVersion??r.version)!=='0.1.0'||r.status!=='loaded'||r.enabled!==true||r.imported!==true||r.activated===true||r.error)hold('HOLD_PLUGIN_RECORD');
+ if(r.id!==PLUGIN||r.source!==expectedSource||(r.packageVersion??r.version)!==version||r.status!=='loaded'||r.enabled!==true||r.imported!==true||r.activated===true||r.error)hold('HOLD_PLUGIN_RECORD');
  if(registry.diagnostics.some(d=>d.level==='error'))hold('HOLD_REGISTRY_DIAGNOSTIC');
  const keys=Object.keys(registry.gatewayHandlers).sort();
- if(JSON.stringify(keys)!==JSON.stringify([...METHODS].sort())||METHODS.some(k=>typeof registry.gatewayHandlers[k]!=='function'))hold('HOLD_GATEWAY_HANDLERS');
+ if(JSON.stringify(keys)!==JSON.stringify([...methods].sort())||methods.some(k=>typeof registry.gatewayHandlers[k]!=='function'))hold('HOLD_GATEWAY_HANDLERS');
  return {state:'REGISTRY_STRUCTURE_VALIDATED',pluginId:r.id,source:r.source,version:r.packageVersion??r.version,
   methods:keys,functionalAcceptance:'NOT_EXECUTED',cp11:'NOT_EXECUTED'};
 }
@@ -111,4 +115,69 @@ export function appendRecord(root,identity,phase,versionReferences) {
  try{writeFileSync(fd,JSON.stringify(event)+'\n');fsyncSync(fd);}finally{closeSync(fd);}
  const d=openSync(root,'r');try{fsyncSync(d);}finally{closeSync(d);}
  return event;
+}
+
+/** Pure options policy; not a config, discovery proof or SDK invocation permission. */
+export function readonlyInspectionOptions() {
+ return Object.freeze({onlyPluginIds:Object.freeze([PLUGIN]),mode:'full',
+  allowProcessHomeSessionCatalogs:false,throwOnLoadError:true,loadModules:true,
+  runtimeSideEffects:false});
+}
+/** Lifecycle over an externally bound acquire callback. No SDK import/alias fallback.
+ * Caller must resolve the exact verified real loader and supply isolated config/discovery.
+ * A fixture callback is only a contract test, never real loading/CP11 evidence.
+ * No Promise.race: timeouts cannot abandon a late acquired handle without disposal.
+ */
+export async function inspectReadonlyLease({acquire,expectedSource,record}) {
+ if(typeof acquire!=='function'||typeof record!=='function'||!path.isAbsolute(expectedSource))hold('HOLD_INSPECTION_INPUT');
+ // INTENT failure is before acquire. record must durably append to the existing journal.
+ await record('INTENT');
+ let lease,primary,releaseError,validated;
+ try {
+  lease=await acquire(readonlyInspectionOptions());
+  if(!lease||typeof lease.release!=='function')hold('HOLD_INSPECTION_HANDLE_UNKNOWN');
+  await record('ACQUIRED');
+  validated=validateRegistry(lease.registry,expectedSource,'readonly');
+  await record('VALIDATED');
+ } catch(error) {primary=error;}
+ finally {
+  // If acquire rejects, upstream owns rollback disposal; no guessed handle/retry.
+  // Once a usable handle exists, release even if ACQUIRED append/validation failed.
+  if(lease&&typeof lease.release==='function') {
+   try {await lease.release();await record('RELEASED');}
+   catch(error) {releaseError=error;}
+  }
+ }
+ if(releaseError) {
+  const retained=new Error('HOLD_INSPECTION_RELEASE_OR_RECORD_UNKNOWN');
+  retained.cause=primary;retained.releaseCause=releaseError;throw retained;
+ }
+ if(primary)throw primary;
+ return {...validated,profile:'readonly',released:true,cp11:'NOT_EXECUTED',authenticatedDispatch:'NOT_EXECUTED'};
+}
+
+/** Fixed compiled mapping candidate. Real positive byte validation is BLOCKED until
+ * the actual three-file input is readable here. No arbitrary alias is accepted.
+ * Caller still must import this exact path from a proven immutable full closure;
+ * supplying a namespace is not evidence of that import or authentication.
+ */
+export const FIXED_COMPILED=Object.freeze({version:'2026.9.9',exportName:'t',files:Object.freeze({
+ 'package.json':'214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95',
+ 'dist/loader-runtime-load-DpgEqnzx.mjs':'3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787',
+ 'dist/context-DyPstb2Q.mjs':'db7fc7539455da0c564d4ded0d04da1c764a46903d1632489b8bd04641098320'
+})});
+export function bindFixedInspectionExport(namespace,files) {
+ if(!files||Object.keys(files).sort().join(',')!==Object.keys(FIXED_COMPILED.files).sort().join(','))hold('HOLD_FIXED_THREE_FILE_SET');
+ for(const [name,pin] of Object.entries(FIXED_COMPILED.files)) {
+  if(!Buffer.isBuffer(files[name])||sha(files[name])!==pin)hold('HOLD_FIXED_SOURCE_BYTES');
+ }
+ if(JSON.parse(files['package.json'].toString('utf8')).version!==FIXED_COMPILED.version)hold('HOLD_VERSION');
+ const loader=files['dist/loader-runtime-load-DpgEqnzx.mjs'].toString('utf8');
+ const exports=[...loader.matchAll(/\bexport\s*\{([^{}]{0,16384})\}/g)];
+ const pairs=exports.at(-1)?.[1].split(',').map(x=>x.trim())??[];
+ const declarations=pairs.filter(x=>/^acquirePluginRegistryForInspection(?:\s|$)/.test(x));
+ if(declarations.length!==1||!/^acquirePluginRegistryForInspection\s+as\s+t$/.test(declarations[0]))hold('HOLD_FIXED_T_EXPORT_MAPPING');
+ const descriptor=namespace&&Object.getOwnPropertyDescriptor(namespace,'t');
+ if(!descriptor||!Object.hasOwn(descriptor,'value')||typeof descriptor.value!=='function')hold('HOLD_FIXED_T_NAMESPACE');
+ return descriptor.value;
 }
