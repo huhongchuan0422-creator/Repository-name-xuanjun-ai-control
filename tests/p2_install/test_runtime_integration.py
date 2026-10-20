@@ -57,6 +57,50 @@ class RuntimeIntegration(unittest.TestCase):
                 self.assertEqual(c.journal.db.execute(
                     "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
 
+    def test_real_runtime_error_code_changes_are_one_failure(self):
+        with tempfile.TemporaryDirectory() as home:
+            root=pathlib.Path(home)
+            coord=root/"coordinator"; runtime=root/"runtime"
+            coord.mkdir(mode=0o700); runtime.mkdir(mode=0o700)
+            bad=runtime/"bad-exec"
+            bad.write_text("#!/definitely/missing/interpreter\n")
+            bad.chmod(0o700)
+            plan={"schema":1,"release":"a"*64,"batches":["service"]}
+            req={"schema":1,"scope":"ISOLATED_TEST_ONLY",
+                 "installation_id":"error-change","batch_id":"service",
+                 "attempt_id":"same-operation","root":str(runtime),
+                 "version":"a"*64,"round_id":"round-1",
+                 "deadline_utc":int(time.time())+20,
+                 "inputs":{"operation":"start","argv":[str(bad)],
+                           "cwd":str(runtime),"env":{},
+                           "health":{"type":"process"},"timeout":0.2}}
+            with Coordinator(str(coord),plan,{"service":RuntimeAdapter()},
+                             component_roots={"service":str(runtime)}) as c:
+                first=c.execute(req)
+                self.assertEqual(first["status"],"HOLD",first)
+                rows=c.journal.db.execute(
+                    "SELECT cause,evidence FROM coordinator_failures").fetchall()
+                self.assertEqual(len(rows),1)
+                first_saved=json.loads(rows[0][1])
+                self.assertEqual(first_saved["root_cause"],"LAUNCH_UNKNOWN")
+                first_time=c.journal.db.execute(
+                    "SELECT observed FROM coordinator_failures").fetchone()[0]
+            with Coordinator(str(coord),plan,{"service":RuntimeAdapter()},
+                             component_roots={"service":str(runtime)}) as c:
+                again=c.recover(req)
+                self.assertEqual(again["status"],"HOLD",again)
+                self.assertEqual(c.journal.db.execute(
+                    "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
+                saved=c.journal.db.execute(
+                    "SELECT observed,evidence FROM coordinator_failures").fetchone()
+                self.assertEqual(saved[0],first_time)
+                self.assertEqual(json.loads(saved[1]),first_saved)
+                # Runtime observation now reports START_OUTCOME_UNKNOWN, but
+                # that is an observation of the same operation, not a new failure.
+                direct=p2_runtime.recover(req)
+                self.assertEqual(direct["error"]["code"],"START_OUTCOME_UNKNOWN")
+                self.assertEqual(direct["operation_id"],first_saved["operation_id"])
+
     def test_cli_execute_inspect_and_recover(self):
         with tempfile.TemporaryDirectory() as home:
             root=pathlib.Path(home)
