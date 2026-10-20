@@ -16,6 +16,7 @@ JOB=Path('/root/pr99-korea-model-handoff-v1')
 ROOT=Path('/opt/xuanjun-migration-s07/releases/korea-model-handoff-v1')
 BASELINE=Path('/opt/xuanjun-migration-s07/releases/korea-project-precopy-f4db2e4e5f20')
 NODE=Path('/opt/node-v24.16.0-linux-x64')
+EXTENSION_SDK=Path('/usr/local/lib/node_modules/openclaw')
 STATE=Path('/home/admin/.openclaw')
 WORKSPACE=Path('/mnt/btrfs-workspace/ws-398ab6')
 PROJECT=Path('/opt/trading-system')
@@ -180,7 +181,7 @@ def install_unit(role,contract):
  # The source project is the verified precopy. Only the declared current model
  # source files are refreshed in a separate private app below.
  app=ROOT/'app'
- bindings=[(app,'/opt/trading-system'),(ROOT/'rootfs/opt/node-v24.16.0-linux-x64','/opt/node-v24.16.0-linux-x64'),
+ bindings=[(ROOT/'rootfs/usr/local/lib/node_modules/openclaw','/usr/local/lib/node_modules/openclaw'),(app,'/opt/trading-system'),(ROOT/'rootfs/opt/node-v24.16.0-linux-x64','/opt/node-v24.16.0-linux-x64'),
  (ROOT/'rootfs/home/admin/.openclaw','/home/admin/.openclaw'),
  (ROOT/'rootfs/mnt/btrfs-workspace/ws-398ab6','/mnt/btrfs-workspace/ws-398ab6')]
  header='[Unit]\nDescription=PR99 Korea '+role+'\nAfter=network-online.target\nWants=network-online.target\n[Service]\nType=simple\nUser=admin\nGroup=admin\nUMask=0077\nWorkingDirectory=/opt/trading-system\nRestart=on-failure\nRestartSec=5\nTimeoutStopSec=90\nKillMode=control-group\nNoNewPrivileges=yes\nPrivateTmp=yes\nProtectSystem=strict\nProtectHome=tmpfs\nMemoryAccounting=yes\nSlice=pr99koreamodel.slice\nOOMScoreAdjust=500\n'
@@ -189,7 +190,7 @@ def install_unit(role,contract):
   related=' '.join(NAMES[x] for x in dependencies[role])
   header=header.replace('[Service]','After='+related+'\nRequires='+related+'\n[Service]',1)
  for source,dest in bindings:
-  kind='BindReadOnlyPaths=' if dest in ('/opt/trading-system','/opt/node-v24.16.0-linux-x64') else 'BindPaths='
+  kind='BindReadOnlyPaths=' if dest in ('/opt/trading-system','/opt/node-v24.16.0-linux-x64','/usr/local/lib/node_modules/openclaw') else 'BindPaths='
   header+=kind+str(source)+':'+dest+'\n'
  header+='BindPaths='+str(app/'runtime')+':/opt/trading-system/runtime\n'
  header+='BindReadOnlyPaths='+str(ROOT/'contract.json')+':/srv/pr99-model-contract.json\n'
@@ -287,10 +288,10 @@ elif action=='receive':
   for m in members:
    parts=m.name.split('/');need(not m.name.startswith('/') and all(p not in ('','.','..') for p in parts) and '\\' not in m.name and m.name not in seen,'UNSAFE_MEMBER');seen.add(m.name)
    need(m.isdir() or m.isfile() or m.issym(),'MEMBER_TYPE')
-   need(m.name in ('contract.json','manifest.json') or m.name.startswith(('rootfs/opt/node-v24.16.0-linux-x64','rootfs/home/admin/.openclaw','rootfs/mnt/btrfs-workspace/ws-398ab6','rootfs/home/admin/.ssh/','rootfs/opt/trading-system/runtime/','source/')),'MEMBER_SCOPE')
+   need(m.name in ('contract.json','manifest.json') or m.name.startswith(('rootfs/opt/node-v24.16.0-linux-x64','rootfs/usr/local/lib/node_modules/openclaw','rootfs/home/admin/.openclaw','rootfs/mnt/btrfs-workspace/ws-398ab6','rootfs/home/admin/.ssh/','rootfs/opt/trading-system/runtime/','source/')),'MEMBER_SCOPE')
    dest=ROOT/('manifest-'+segment+'.json') if m.name=='manifest.json' else ROOT/m.name;need(private(dest.parent),'PARENT_LINK')
-   if segment=='static':need(m.name=='manifest.json' or m.name=='rootfs/opt/node-v24.16.0-linux-x64' or m.name.startswith(('rootfs/opt/node-v24.16.0-linux-x64/','rootfs/home/admin/.ssh/')),'STATIC_SCOPE')
-   else:need(not m.name.startswith(('rootfs/opt/node-v24.16.0-linux-x64','rootfs/home/admin/.ssh/')),'STATE_SCOPE')
+   if segment=='static':need(m.name=='manifest.json' or m.name in ('rootfs/opt/node-v24.16.0-linux-x64','rootfs/usr/local/lib/node_modules/openclaw') or m.name.startswith(('rootfs/opt/node-v24.16.0-linux-x64/','rootfs/usr/local/lib/node_modules/openclaw/','rootfs/home/admin/.ssh/')),'STATIC_SCOPE')
+   else:need(not m.name.startswith(('rootfs/opt/node-v24.16.0-linux-x64','rootfs/usr/local/lib/node_modules/openclaw','rootfs/home/admin/.ssh/')),'STATE_SCOPE')
    if m.issym():links.append(m);continue
    dest.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
    if m.isdir():dest.mkdir(exist_ok=True,mode=0o700)
@@ -303,7 +304,7 @@ elif action=='receive':
    if meta['kind']=='file':need(p.stat().st_size==meta['bytes'] and digest(p)==meta['sha256'],'FILE_READBACK')
   for m in links:
    dest=ROOT/m.name;target=os.path.normpath(m.linkname if m.linkname.startswith('/') else '/'+str(Path(m.name).parent).removeprefix('rootfs/')+'/'+m.linkname)
-   allowed=('/opt/node-v24.16.0-linux-x64/','/home/admin/.openclaw/','/mnt/btrfs-workspace/ws-398ab6/','/opt/trading-system/runtime/')
+   allowed=('/usr/local/lib/node_modules/openclaw/','/opt/node-v24.16.0-linux-x64/','/home/admin/.openclaw/','/mnt/btrfs-workspace/ws-398ab6/','/opt/trading-system/runtime/')
    need(any(target==a.rstrip('/') or target.startswith(a) for a in allowed),'LINK_ESCAPE')
    dest.parent.mkdir(parents=True,exist_ok=True,mode=0o700);dest.symlink_to(m.linkname)
   for name,meta in sorted(manifest.items(),key=lambda x:len(Path(x[0]).parts),reverse=True):
@@ -599,7 +600,8 @@ def main():
         contracts['source_hashes']=current
         cert=PROJECT/'runtime/v8-domestic-operations/model-rpc/tls/model_rpc.crt'
         contracts['pin']=hashlib.sha256(ssl.PEM_cert_to_DER_cert(cert.read_text())).hexdigest()
-        roots=[NODE,STATE,WORKSPACE]+sorted(ssh_files)+RUNTIME
+        require(EXTENSION_SDK.is_dir() and not EXTENSION_SDK.is_symlink(),'EXTENSION_SDK_MISSING_OR_LINK')
+        roots=[NODE,EXTENSION_SDK,STATE,WORKSPACE]+sorted(ssh_files)+RUNTIME
         total=sum(p.lstat().st_size for root in roots for p in ([root]+list(root.rglob('*')) if root.is_dir() and not root.is_symlink() else [root]) if p.is_file() and not p.is_symlink())
         pre=journal.perform('target_preflight',lambda:remote('preflight',{'required_bytes':total+700000000}));protected=pre['protected'];contracts['memory_budget_bytes']=pre['memory_budget_bytes']
         save(JOB/'contract-private.json',contracts)
@@ -618,6 +620,7 @@ def main():
         import io
         with tarfile.open(static,'w:gz') as t:
             archive_tree(t,NODE,static_manifest,[NODE])
+            archive_tree(t,EXTENSION_SDK,static_manifest,[EXTENSION_SDK])
             for p in sorted(ssh_files):archive_tree(t,p,static_manifest,roots)
             body=json.dumps(static_manifest).encode();info=tarfile.TarInfo('manifest.json');info.size=len(body);info.mode=0o600;t.addfile(info,io.BytesIO(body))
         with static.open('rb') as f:os.fsync(f.fileno())
@@ -650,7 +653,7 @@ def main():
         print('PHASE=CAPTURE_EXACT_RUNTIME_AND_PRIVATE_IDENTITY',flush=True)
         with tarfile.open(package,'w:gz') as t:
             for root in roots:
-                if root!=NODE and root not in ssh_files:archive_tree(t,root,manifest,roots)
+                if root not in (NODE,EXTENSION_SDK) and root not in ssh_files:archive_tree(t,root,manifest,roots)
             import io
             for name,body in [('contract.json',json.dumps(contracts).encode()),('manifest.json',json.dumps(manifest).encode())]:
                 info=tarfile.TarInfo(name);info.size=len(body);info.mode=0o600;t.addfile(info,io.BytesIO(body))
