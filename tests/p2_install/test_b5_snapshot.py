@@ -43,7 +43,7 @@ class SnapshotTests(unittest.TestCase):
   out=self.tree();node=self.tree()/'node';node.write_bytes(b'NOTELF');sdk=self.tree();(sdk/'package.json').write_text('{}')
   with patch.object(m,'NODE',str(node)),patch.object(m,'SDK',str(sdk)),patch.object(m,'PINS',{str(sdk/'package.json'):'0'*64}):
    code=m.collect(str(out))
-  self.assertEqual(code,2);result=json.loads((out/'result.json').read_text());self.assertEqual(result['state'],'HOLD');self.assertEqual(result['capture'],'STOPPED_RETAINED');self.assertEqual(result['error'],'HISTORICAL_PIN_CHANGED');self.assertTrue((out/'source-tree.tar.pending').exists());self.assertEqual(result['cp11'],'NOT_EXECUTED')
+  self.assertEqual(code,2);manifest=json.loads((out/'manifest.json').read_text());self.assertEqual(manifest['files_count'],len(manifest['files']));self.assertEqual(manifest['bytes'],sum(r['bytes'] for r in manifest['files']));result=json.loads((out/'result.json').read_text());self.assertEqual(result['state'],'HOLD');self.assertEqual(result['capture'],'STOPPED_RETAINED');self.assertEqual(result['error'],'HISTORICAL_PIN_CHANGED');self.assertTrue((out/'source-tree.tar.pending').exists());self.assertEqual(result['cp11'],'NOT_EXECUTED')
  def test_output_fd_retained_across_process(self):
   out=self.tree();sdk=self.tree();node=sdk/'node';node.write_bytes(b'NOTELF');(sdk/'package.json').write_text('{}')
   fd=os.open(str(out),os.O_RDONLY|os.O_DIRECTORY)
