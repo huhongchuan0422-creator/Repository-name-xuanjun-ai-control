@@ -20,9 +20,8 @@ import stat
 import sys
 import tarfile
 import time
+import threading
 
-# Frozen helper imports must never create bytecode during read-only recovery.
-sys.dont_write_bytecode=True
 HERE=Path(__file__).resolve()
 ROOT=HERE.parents[1]
 PINS=ROOT/'deploy/pr122-site-hub-unified/HOST_PINS.json'
@@ -33,18 +32,37 @@ def digest(raw):return hashlib.sha256(raw).hexdigest()
 def need(ok,reason):
     if not ok:raise RuntimeError(reason)
 
-# Authenticate code before importing its root-capable helpers.
-need(digest(HELPER.read_bytes())==HELPER_SHA,'HELPER_SOURCE_DRIFT')
-spec=importlib.util.spec_from_file_location('pr122_ui_frozen_helper',HELPER)
-c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
+# Importing this module and validating package bytes must not load host helpers.
+# Only production-facing attribute access or an explicit production entry loads
+# the same hash-authenticated helper. This is not execution authorization.
+_production_lock=threading.RLock()
+
+def _load_helper():
+    global c
+    with _production_lock:
+        if 'c' in globals():return c
+        need(digest(HELPER.read_bytes())==HELPER_SHA,'HELPER_SOURCE_DRIFT')
+        spec=importlib.util.spec_from_file_location('pr122_ui_frozen_helper',HELPER)
+        helper=importlib.util.module_from_spec(spec)
+        # Preserve the existing no-bytecode constraint for frozen helper loads.
+        sys.dont_write_bytecode=True
+        spec.loader.exec_module(helper)
+        c=helper
+        return c
+
+def __getattr__(name):
+    if name=='c':return _load_helper()
+    if name=='Transaction':return _load_transaction_type()
+    raise AttributeError(name)
 
 
 def entries(raw,pins):
     need(digest(raw)==pins['static_artifact_sha256'],'STATIC_PACKAGE_HASH')
     schema=pins.get('package_schema','LEGACY_UNIFIED_V1')
-    need(schema in ('LEGACY_UNIFIED_V1','FULL_STATIC_REVIEW_V1'),'PACKAGE_SCHEMA')
-    full=schema=='FULL_STATIC_REVIEW_V1'
-    count=460 if full else 459
+    need(schema in ('LEGACY_UNIFIED_V1','FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1'),'PACKAGE_SCHEMA')
+    brand=schema=='FULL_STATIC_BRAND_REVIEW_V1'
+    full=schema in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1')
+    count=1241 if brand else 460 if full else 459
     with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
         members=archive.getmembers()
         need(len(members)==count and len({m.name for m in members})==count,'ARCHIVE_MEMBERS')
@@ -74,6 +92,24 @@ def entries(raw,pins):
         candidate=json.loads(result['candidate-manifest.json'])['files']
         need(len(candidate)==1288 and len({r['path'] for r in candidate})==1288,'FULL_CANDIDATE_SET')
         need(stage.get('final_files')==1288 and stage.get('files')=={r['path']:r['sha256'] for r in candidate},'FULL_STAGE_FILE_BINDING')
+        if brand:
+            contract={'schema':'FULL_STATIC_BRAND_REVIEW_V1','brand':'玄钧AI新','archive_members':1241,'overlay_files':1197,'new_files':101,'public_files':1288}
+            need(type(provenance.get('brand_contract')) is dict and provenance['brand_contract']==contract and all(type(provenance['brand_contract'][key]) is type(value) for key,value in contract.items()),'BRAND_CONTRACT')
+            need(stage.get('brand_projection',{}).get('brand')==contract['brand'],'BRAND_STAGE_CONTRACT')
+            source=json.loads(result['source-pin.json'])
+            need(type(source.get('schema_version')) is int and source['schema_version']==2 and source.get('source_archive_sha256')==pins['source_archive_sha256'],'BRAND_SOURCE_PIN')
+            fixed_members=set('BUILD_PROVENANCE.json FULL_SOURCE_STAGE_MANIFEST.json PACKAGE_MANIFEST.json PRODUCTION_EXECUTION.lock PUBLISHER_PROVENANCE.json RELEASE_GATE.json RUNTIME_MANIFEST.json bin/pr122_website_release.py candidate-manifest.json runtime-config/RELEASE_AND_ROLLBACK.md runtime-config/http-limit.conf runtime-config/server-location.conf runtime-config/xuanjun-site-hub-preview.service runtime/scripts/community_ad_contract.py runtime/scripts/community_ad_store.py runtime/scripts/community_checkout.py runtime/scripts/community_checkout_read_integration.py runtime/scripts/community_checkout_refund_preview_read.py runtime/scripts/community_demo_api.py runtime/scripts/community_demo_bootstrap.py runtime/scripts/community_finance_preview_extension.py runtime/scripts/community_local_admin.py runtime/scripts/community_merchant_contract.py runtime/scripts/community_merchant_store.py runtime/scripts/community_onboarding_offline.py runtime/scripts/community_order_store.py runtime/scripts/community_refund_preview_store.py runtime/scripts/community_saas_cost_pricing.py runtime/scripts/community_saas_modules.py runtime/scripts/community_saas_offer_catalog.py runtime/scripts/community_saas_offers.py runtime/scripts/community_saas_offline_handoff.py runtime/scripts/community_saas_order_preparation.py runtime/scripts/community_saas_phase2.py runtime/scripts/community_saas_phase2_http.py runtime/scripts/community_saas_phase2_package.py runtime/scripts/community_saas_phase2_recovery.py runtime/scripts/community_saas_schema_guard.py runtime/scripts/community_saas_unit_economics.py runtime/scripts/community_storefront_snapshot.py runtime/scripts/community_ui_contracts.py runtime/scripts/community_visual_feedback_identity.py runtime/scripts/pr122_site_hub_preview.py source-pin.json'.split())
+            need({name for name in result if not name.startswith('overlay/public/')}==fixed_members,'BRAND_FIXED_MEMBERS')
+            baselines=source.get('overlay_baselines')
+            overlay={name.removeprefix('overlay/public/'):value for name,value in result.items() if name.startswith('overlay/public/')}
+            need(type(baselines) is dict and len(overlay)==1197 and set(baselines)==set(overlay),'BRAND_OVERLAY_SET')
+            need(sum(value is None for value in baselines.values())==101,'BRAND_NEW_SET')
+            by_path={r['path']:r for r in candidate}
+            need(set(overlay)<=set(by_path),'BRAND_CANDIDATE_OVERLAY_SET')
+            for name,value in overlay.items():
+                row=by_path[name];old=baselines[name]
+                need(type(row.get('size')) is int and row['size']==len(value) and row['sha256']==digest(value),'BRAND_OVERLAY_BYTES')
+                need(old is None or (type(old) is str and len(old)==64 and all(ch in '0123456789abcdef' for ch in old) and old!=row['sha256']),'BRAND_BASELINE_HASH')
     else:
         need(digest(result['COMPOSITION_MANIFEST.json'])==pins['composition_manifest_sha256'],'COMPOSITION_HASH')
     need(digest(result['bin/pr122_website_release.py'])==pins['publisher_sha256'],'PUBLISHER_HASH')
@@ -88,7 +124,7 @@ def routes(data):
     # Its old fixed 90 count is deliberately not disabled or globally patched.
     route_map={};text='# PR122 exact reviewed public files; original routes remain in place.\n'
     for name in names:
-        need(c.re.fullmatch(r'[A-Za-z0-9_./-]+',name) and '..' not in Path(name).parts,'ROUTE_PATH')
+        need(re.fullmatch(r'[A-Za-z0-9_./-]+',name) and '..' not in Path(name).parts,'ROUTE_PATH')
         route_map['/'+name]=('file','/'+name)
         if name.endswith('/index.html'):
             directory='/'+name[:-10];route_map[directory]=('file','/'+name);route_map[directory.rstrip('/')]=('redirect',directory)
@@ -122,6 +158,7 @@ def smoke_routes(data):
 
 
 def gate(value,pins):
+    c=_load_helper()
     fields={'decision':'RELEASE_APPROVED','operation':'PR122_PUBLIC_MOBILE_UNIFIED','transaction_id':pins['transaction_id'],
             'source_head':pins['source_head'],'wrapper_sha256':digest(c.read(HERE)),'host_pins_sha256':digest(c.read(PINS)),
             'static_artifact_sha256':pins['static_artifact_sha256'],'package_manifest_sha256':pins['package_manifest_sha256'],
@@ -135,136 +172,146 @@ def gate(value,pins):
 
 def baseline_receipt_state(pins,state):
     historical='HTTPS_SMOKE_PASS_AWAIT_BROWSER'
-    if pins.get('package_schema')!='FULL_STATIC_REVIEW_V1':return state==historical
+    if pins.get('package_schema') not in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1'):return state==historical
     expected=pins.get('previous_receipt_state',historical)
     return expected in (historical,'STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER') and state==expected
 
 
-class Transaction(c.Transaction):
-    def __init__(self,inputs,ops=None,pins=None):
-        pins=pins or json.loads(c.read(PINS))
-        super().__init__(inputs,pins['transaction_id'],ops,pins)
-    def bind_inputs(self):
-        c.trusted(self.inputs,True)
-        self.entries=entries(c.read(self.inputs/'PR122_SITE_HUB_REVIEW_ONLY.tar.gz'),self.pins)
-        need(digest(c.read(self.inputs/'PR122_TOKYO_WEBROOT_MIGRATION_SOURCE_0363531ee2f8.tar.gz'))==self.pins['source_archive_sha256'],'SOURCE_ARCHIVE_HASH')
-    def load_publisher(self):
-        super().load_publisher();self.args.release_id=self.pins['release_id']
-    def inventory(self,expected):
-        need(digest(c.read(c.PREFLIGHT_PATH))==c.PREFLIGHT_SHA,'PREFLIGHT_SOURCE_DRIFT')
-        inv=c.load_module(c.PREFLIGHT_PATH,'pr122_ui_inventory').nginx_source()
-        need(inv['status']=='SOURCE_INVENTORY_COMPLETE' and inv['disk_config_trust'],'NGINX_SOURCE_TRUST')
-        need({p:r['sha256'] for p,r in inv['files'].items()}==expected,'NGINX_INCLUDE_OR_HASH_DRIFT')
-    def snapshot(self):
-        public=Path(self.pins['previous_release'])/'public';result={}
-        for path in sorted(public.rglob('*')):
-            need(not path.is_symlink(),'OLD_PUBLIC_SYMLINK')
-            if path.is_file():
-                raw=c.read(path);result[path.relative_to(public).as_posix()]={'size':len(raw),'sha256':digest(raw)}
-        return result
-    def runtime(self):
-        # Existing r2 Runtime is verified, never installed, stopped or replaced.
-        need(self.ops.unit().get('ActiveState')=='active','EXISTING_RUNTIME_NOT_ACTIVE')
-        self.runtime_identity()
-        need(c.read(c.UNIT)==self.entries['runtime-config/'+c.SERVICE],'RUNTIME_UNIT_DRIFT')
-        need(c.RUNTIME.joinpath('current').is_symlink() and os.readlink(c.RUNTIME/'current')==str(c.RUNTIME/c.RELEASE),'RUNTIME_LINK_DRIFT')
-        return self.ops.sandbox()
-    def baseline(self):
-        full=self.pins.get('package_schema')=='FULL_STATIC_REVIEW_V1'
-        previous_id=self.pins.get('previous_transaction_id') if full else 'pr122-hub-experience-20261016-r2'
-        need(type(previous_id) is str and re.fullmatch(r'pr122-[a-z0-9-]{1,90}',previous_id) is not None,'BASELINE_TRANSACTION_ID')
-        previous=c.CONTROL/'transactions'/previous_id/'receipt.json'
-        raw=c.read(previous);need(digest(raw)==self.pins['previous_receipt_sha256'],'R2_RECEIPT_DRIFT')
-        need(baseline_receipt_state(self.pins,json.loads(raw)['state']),'R2_STATE_DRIFT')
-        need(os.readlink(c.BASE/'current')==self.pins['previous_release'],'CURRENT_DRIFT')
-        need(digest(c.read(c.INSTALLED_PUBLISHER))==self.pins['installed_publisher_sha256'],'INSTALLED_PUBLISHER_DRIFT')
-        self.inventory(self.pins['nginx']);self.nginx_identity=self.ops.nginx_identity();self.ops.nginx_test()
-        self.sandbox=self.runtime()
-        old_manifest=c.read(self.inputs/'R2_CANDIDATE_MANIFEST.json')
-        need(digest(old_manifest)==self.pins['previous_manifest_sha256'],'R2_MANIFEST_HASH')
-        expected={r['path']:{'size':r['size'],'sha256':r['sha256']} for r in json.loads(old_manifest)['files']}
-        files=self.snapshot();count=self.pins.get('previous_file_count') if full else 1279
-        need(type(count) is int and 1<=count<=10000 and len(expected)==count and len(files)==count and files==expected,'R2_PUBLIC_DRIFT');return files
-    def backup(self,files):
-        directory=self.folder/'backup';c.mkdir(directory,0o700);configs={}
-        for i,(name,expected) in enumerate(sorted(self.pins['nginx'].items())):
-            raw=c.read(Path(name));need(digest(raw)==expected,'BACKUP_CONFIG_DRIFT')
-            copy='config-'+str(i);c.write(directory/copy,raw,0o600)
-            configs[name]={'copy':copy,'sha256':expected,'mode':stat.S_IMODE(Path(name).stat().st_mode)}
-        data={}
-        for name,row in files.items():
-            raw=c.read(Path(self.pins['previous_release'])/'public'/name);need(digest(raw)==row['sha256'],'BACKUP_BYTES_DRIFT');data['public/'+name]=raw
-        for name in ('inline-csp.conf','inline-csp.json'):data['release-metadata/'+name]=c.read(Path(self.pins['previous_release'])/'release-metadata'/name)
-        stream=io.BytesIO()
-        with gzip.GzipFile(fileobj=stream,mode='wb',mtime=0) as zipped,tarfile.open(fileobj=zipped,mode='w') as archive:
-            for name,raw in sorted(data.items()):
-                member=tarfile.TarInfo(name);member.size=len(raw);member.mode=0o644;archive.addfile(member,io.BytesIO(raw))
-        c.write(directory/'previous-static.tar.gz',stream.getvalue(),0o600)
-        with tarfile.open(fileobj=io.BytesIO(c.read(directory/'previous-static.tar.gz'))) as archive:
-            members=archive.getmembers();need(len(members)==len(files)+2 and {m.name for m in members}==set(data),'BACKUP_MEMBERS')
-            for m in members:need(m.isfile() and archive.extractfile(m).read()==data[m.name],'BACKUP_VERIFY')
-        self.data.update(backup={'nginx':configs,'static_sha256':digest(stream.getvalue()),'static_files':files,'archive_verified':True},previous_link=self.pins['previous_release'])
-    def before_activation(self):
-        gate(self.data['approval'],self.pins)
-        need(os.readlink(c.BASE/'current')==self.pins['previous_release'],'ACTIVATION_CURRENT_DRIFT')
-        need(self.snapshot()==self.data['backup']['static_files'],'ACTIVATION_PUBLIC_DRIFT')
-        self.inventory({**self.pins['nginx'],str(c.LOCATIONS):digest(routes(self.entries)[0])})
-        need(self.ops.nginx_identity()==self.nginx_identity,'NGINX_PROCESS_DRIFT');self.runtime()
-    def apply(self,path):
-        self.deadline=time.monotonic()+600;self.bind_inputs()
-        approval=json.loads(c.read(path));need(stat.S_IMODE(path.stat().st_mode)==0o600,'APPROVAL_MODE');gate(approval,self.pins)
-        need(not c.exists(self.folder) and not c.exists(c.BASE/'transactions'/(self.id+'.json')) and not c.exists(c.BASE/'releases'/self.pins['release_id']),'TRANSACTION_ALREADY_EXISTS')
-        files=self.baseline();c.mkdir(self.folder,0o700)
-        self.data={'schema':1,'transaction_id':self.id,'release_id':self.pins['release_id'],'wrapper_sha256':digest(c.read(HERE)),'pins_sha256':digest(c.read(PINS)),
-                   'state':'APPLYING','completed':[],'intent':None,'approval':approval,'sandbox':self.sandbox,'production_browser':'NOT_RUN'}
-        c.atomic(self.receipt,self.data)
-        try:
-            self.step('BACKUP_VERIFIED',lambda:self.backup(files));self.step('SEALED_BUNDLE',self.seal_bundle)
-            self.step('STATIC_PREPARED',lambda:self.publisher('prepare'))
-            self.step('NGINX_STAGED',lambda:c.write(c.LOCATIONS,routes(self.entries)[0],expected=self.pins['nginx'][str(c.LOCATIONS)]))
-            self.step('NGINX_VALIDATED',self.ops.nginx_test);self.step('ACTIVATION_DRIFT_CHECK',self.before_activation)
-            self.step('STATIC_ACTIVATED',lambda:self.publisher('activate'));self.step('NGINX_RELOADED',self.ops.reload_nginx)
-            self.data['https']=self.step('HTTPS_SMOKE',lambda:self.ops.smoke(self.entries,smoke_routes(self.entries)))
-            self.step('STATIC_CHECK',lambda:self.publisher('check'))
-            self.data.update(state='HTTPS_SMOKE_PASS_AWAIT_BROWSER',production_browser='PENDING');c.atomic(self.receipt,self.data);return self.data
-        except BaseException as error:
-            self.data.update(state='HOLD_PARTIAL',failure=type(error).__name__);c.atomic(self.receipt,self.data);raise
-    def load_receipt(self):
-        self.data=json.loads(c.read(self.receipt))
-        need(self.data.get('transaction_id')==self.id and self.data.get('wrapper_sha256')==digest(c.read(HERE)) and self.data.get('pins_sha256')==digest(c.read(PINS)),'RECEIPT_BINDING')
-        return self.data
-    def rollback(self):
-        self.bind_inputs();self.load_receipt();need(self.data['state']!='ROLLED_BACK','ALREADY_ROLLED_BACK')
-        need(self.data.get('backup',{}).get('archive_verified') is True,'BACKUP_NOT_VERIFIED')
-        backup=self.folder/'backup';need(digest(c.read(backup/'previous-static.tar.gz'))==self.data['backup']['static_sha256'],'BACKUP_HASH')
-        for row in self.data['backup']['nginx'].values():need(digest(c.read(backup/row['copy']))==row['sha256'],'BACKUP_CONFIG_HASH')
-        new=digest(routes(self.entries)[0]);old=self.pins['nginx'][str(c.LOCATIONS)]
-        need(digest(c.read(c.LOCATIONS)) in (old,new),'FOREIGN_NGINX_CONFIG')
-        need(os.readlink(c.BASE/'current') in (self.pins['previous_release'],str(c.BASE/'releases'/self.pins['release_id'])),'FOREIGN_CURRENT')
-        expected={**self.pins['nginx'],str(c.LOCATIONS):digest(c.read(c.LOCATIONS))}
-        # CSP inventory follows current; compare the new file only when active.
-        old_csp=str(Path(self.pins['previous_release'])/'release-metadata/inline-csp.conf')
-        if os.readlink(c.BASE/'current')!=self.pins['previous_release']:
-            expected.pop(old_csp);p=c.BASE/'releases'/self.pins['release_id']/'release-metadata/inline-csp.conf'
-            self.load_publisher()
-            with self.pub.Deadline(120) as deadline:self.pub.receipt_for(self.args,{'ACTIVATED','CHECKED','CHECK_FAILED','UNKNOWN_AFTER_CHECK','ACTIVATION_INTENT','UNKNOWN_AFTER_ACTIVATE','ROLLBACK_INTENT','ROLLBACK_PENDING'},deadline)
-            expected[str(p)]=digest(c.read(p))
-        self.inventory(expected);self.runtime()
-        self.data.update(state='ROLLBACK_IN_PROGRESS',intent='ROLLBACK');c.atomic(self.receipt,self.data)
-        if c.exists(self.folder/'bundle/bin/pr122_website_release.py'):
-            self.load_publisher();pr=c.BASE/'transactions'/(self.id+'.json')
-            if c.exists(pr):
-                state=json.loads(c.read(pr))['state']
-                if state in ('ACTIVATION_INTENT','UNKNOWN_AFTER_ACTIVATE'):state=self.publisher('reconcile')['state']
-                if state in ('ACTIVATED','CHECKED','CHECK_FAILED','UNKNOWN_AFTER_CHECK','ROLLBACK_INTENT','ROLLBACK_PENDING'):self.publisher('rollback')
-                elif state not in ('PREPARED','HOLD_PARTIAL','ROLLED_BACK'):raise RuntimeError('UNKNOWN_PUBLISHER_STATE:'+state)
-        need(os.readlink(c.BASE/'current')==self.pins['previous_release'],'POINTER_NOT_RESTORED')
-        if digest(c.read(c.LOCATIONS))!=old:
-            row=self.data['backup']['nginx'][str(c.LOCATIONS)];c.write(c.LOCATIONS,c.read(backup/row['copy']),expected=new)
-        self.ops.nginx_test();self.ops.reload_nginx();self.inventory(self.pins['nginx'])
-        need(self.snapshot()==self.data['backup']['static_files'],'RESTORED_BYTES_DRIFT');self.runtime()
-        self.data.update(state='ROLLED_BACK',intent=None,rollback_verified={'old_pointer':True,'old_public_bytes':True,'config_hashes':True,'runtime_preserved':True,'real_https_browser':'PENDING'})
-        c.atomic(self.receipt,self.data);return self.data
+def _load_transaction_type():
+    # Keep c/os/Path module-global: the existing adapter replaces these globals
+    # with lease-guarded operations when cloning original transaction methods.
+    global Transaction
+    with _production_lock:
+        if 'Transaction' in globals():return Transaction
+        _load_helper()
+        class Transaction(c.Transaction):
+            def __init__(self,inputs,ops=None,pins=None):
+                pins=pins or json.loads(c.read(PINS))
+                super().__init__(inputs,pins['transaction_id'],ops,pins)
+            def bind_inputs(self):
+                c.trusted(self.inputs,True)
+                self.entries=entries(c.read(self.inputs/'PR122_SITE_HUB_REVIEW_ONLY.tar.gz'),self.pins)
+                need(digest(c.read(self.inputs/'PR122_TOKYO_WEBROOT_MIGRATION_SOURCE_0363531ee2f8.tar.gz'))==self.pins['source_archive_sha256'],'SOURCE_ARCHIVE_HASH')
+            def load_publisher(self):
+                super().load_publisher();self.args.release_id=self.pins['release_id']
+            def inventory(self,expected):
+                need(digest(c.read(c.PREFLIGHT_PATH))==c.PREFLIGHT_SHA,'PREFLIGHT_SOURCE_DRIFT')
+                inv=c.load_module(c.PREFLIGHT_PATH,'pr122_ui_inventory').nginx_source()
+                need(inv['status']=='SOURCE_INVENTORY_COMPLETE' and inv['disk_config_trust'],'NGINX_SOURCE_TRUST')
+                need({p:r['sha256'] for p,r in inv['files'].items()}==expected,'NGINX_INCLUDE_OR_HASH_DRIFT')
+            def snapshot(self):
+                public=Path(self.pins['previous_release'])/'public';result={}
+                for path in sorted(public.rglob('*')):
+                    need(not path.is_symlink(),'OLD_PUBLIC_SYMLINK')
+                    if path.is_file():
+                        raw=c.read(path);result[path.relative_to(public).as_posix()]={'size':len(raw),'sha256':digest(raw)}
+                return result
+            def runtime(self):
+                # Existing r2 Runtime is verified, never installed, stopped or replaced.
+                need(self.ops.unit().get('ActiveState')=='active','EXISTING_RUNTIME_NOT_ACTIVE')
+                self.runtime_identity()
+                need(c.read(c.UNIT)==self.entries['runtime-config/'+c.SERVICE],'RUNTIME_UNIT_DRIFT')
+                need(c.RUNTIME.joinpath('current').is_symlink() and os.readlink(c.RUNTIME/'current')==str(c.RUNTIME/c.RELEASE),'RUNTIME_LINK_DRIFT')
+                return self.ops.sandbox()
+            def baseline(self):
+                full=self.pins.get('package_schema') in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1')
+                previous_id=self.pins.get('previous_transaction_id') if full else 'pr122-hub-experience-20261016-r2'
+                need(type(previous_id) is str and re.fullmatch(r'pr122-[a-z0-9-]{1,90}',previous_id) is not None,'BASELINE_TRANSACTION_ID')
+                previous=c.CONTROL/'transactions'/previous_id/'receipt.json'
+                raw=c.read(previous);need(digest(raw)==self.pins['previous_receipt_sha256'],'R2_RECEIPT_DRIFT')
+                need(baseline_receipt_state(self.pins,json.loads(raw)['state']),'R2_STATE_DRIFT')
+                need(os.readlink(c.BASE/'current')==self.pins['previous_release'],'CURRENT_DRIFT')
+                need(digest(c.read(c.INSTALLED_PUBLISHER))==self.pins['installed_publisher_sha256'],'INSTALLED_PUBLISHER_DRIFT')
+                self.inventory(self.pins['nginx']);self.nginx_identity=self.ops.nginx_identity();self.ops.nginx_test()
+                self.sandbox=self.runtime()
+                old_manifest=c.read(self.inputs/'R2_CANDIDATE_MANIFEST.json')
+                need(digest(old_manifest)==self.pins['previous_manifest_sha256'],'R2_MANIFEST_HASH')
+                expected={r['path']:{'size':r['size'],'sha256':r['sha256']} for r in json.loads(old_manifest)['files']}
+                files=self.snapshot();count=self.pins.get('previous_file_count') if full else 1279
+                need(type(count) is int and 1<=count<=10000 and len(expected)==count and len(files)==count and files==expected,'R2_PUBLIC_DRIFT');return files
+            def backup(self,files):
+                directory=self.folder/'backup';c.mkdir(directory,0o700);configs={}
+                for i,(name,expected) in enumerate(sorted(self.pins['nginx'].items())):
+                    raw=c.read(Path(name));need(digest(raw)==expected,'BACKUP_CONFIG_DRIFT')
+                    copy='config-'+str(i);c.write(directory/copy,raw,0o600)
+                    configs[name]={'copy':copy,'sha256':expected,'mode':stat.S_IMODE(Path(name).stat().st_mode)}
+                data={}
+                for name,row in files.items():
+                    raw=c.read(Path(self.pins['previous_release'])/'public'/name);need(digest(raw)==row['sha256'],'BACKUP_BYTES_DRIFT');data['public/'+name]=raw
+                for name in ('inline-csp.conf','inline-csp.json'):data['release-metadata/'+name]=c.read(Path(self.pins['previous_release'])/'release-metadata'/name)
+                stream=io.BytesIO()
+                with gzip.GzipFile(fileobj=stream,mode='wb',mtime=0) as zipped,tarfile.open(fileobj=zipped,mode='w') as archive:
+                    for name,raw in sorted(data.items()):
+                        member=tarfile.TarInfo(name);member.size=len(raw);member.mode=0o644;archive.addfile(member,io.BytesIO(raw))
+                c.write(directory/'previous-static.tar.gz',stream.getvalue(),0o600)
+                with tarfile.open(fileobj=io.BytesIO(c.read(directory/'previous-static.tar.gz'))) as archive:
+                    members=archive.getmembers();need(len(members)==len(files)+2 and {m.name for m in members}==set(data),'BACKUP_MEMBERS')
+                    for m in members:need(m.isfile() and archive.extractfile(m).read()==data[m.name],'BACKUP_VERIFY')
+                self.data.update(backup={'nginx':configs,'static_sha256':digest(stream.getvalue()),'static_files':files,'archive_verified':True},previous_link=self.pins['previous_release'])
+            def before_activation(self):
+                gate(self.data['approval'],self.pins)
+                need(os.readlink(c.BASE/'current')==self.pins['previous_release'],'ACTIVATION_CURRENT_DRIFT')
+                need(self.snapshot()==self.data['backup']['static_files'],'ACTIVATION_PUBLIC_DRIFT')
+                self.inventory({**self.pins['nginx'],str(c.LOCATIONS):digest(routes(self.entries)[0])})
+                need(self.ops.nginx_identity()==self.nginx_identity,'NGINX_PROCESS_DRIFT');self.runtime()
+            def apply(self,path):
+                self.deadline=time.monotonic()+600;self.bind_inputs()
+                approval=json.loads(c.read(path));need(stat.S_IMODE(path.stat().st_mode)==0o600,'APPROVAL_MODE');gate(approval,self.pins)
+                need(not c.exists(self.folder) and not c.exists(c.BASE/'transactions'/(self.id+'.json')) and not c.exists(c.BASE/'releases'/self.pins['release_id']),'TRANSACTION_ALREADY_EXISTS')
+                files=self.baseline();c.mkdir(self.folder,0o700)
+                self.data={'schema':1,'transaction_id':self.id,'release_id':self.pins['release_id'],'wrapper_sha256':digest(c.read(HERE)),'pins_sha256':digest(c.read(PINS)),
+                           'state':'APPLYING','completed':[],'intent':None,'approval':approval,'sandbox':self.sandbox,'production_browser':'NOT_RUN'}
+                c.atomic(self.receipt,self.data)
+                try:
+                    self.step('BACKUP_VERIFIED',lambda:self.backup(files));self.step('SEALED_BUNDLE',self.seal_bundle)
+                    self.step('STATIC_PREPARED',lambda:self.publisher('prepare'))
+                    self.step('NGINX_STAGED',lambda:c.write(c.LOCATIONS,routes(self.entries)[0],expected=self.pins['nginx'][str(c.LOCATIONS)]))
+                    self.step('NGINX_VALIDATED',self.ops.nginx_test);self.step('ACTIVATION_DRIFT_CHECK',self.before_activation)
+                    self.step('STATIC_ACTIVATED',lambda:self.publisher('activate'));self.step('NGINX_RELOADED',self.ops.reload_nginx)
+                    self.data['https']=self.step('HTTPS_SMOKE',lambda:self.ops.smoke(self.entries,smoke_routes(self.entries)))
+                    self.step('STATIC_CHECK',lambda:self.publisher('check'))
+                    self.data.update(state='HTTPS_SMOKE_PASS_AWAIT_BROWSER',production_browser='PENDING');c.atomic(self.receipt,self.data);return self.data
+                except BaseException as error:
+                    self.data.update(state='HOLD_PARTIAL',failure=type(error).__name__);c.atomic(self.receipt,self.data);raise
+            def load_receipt(self):
+                self.data=json.loads(c.read(self.receipt))
+                need(self.data.get('transaction_id')==self.id and self.data.get('wrapper_sha256')==digest(c.read(HERE)) and self.data.get('pins_sha256')==digest(c.read(PINS)),'RECEIPT_BINDING')
+                return self.data
+            def rollback(self):
+                self.bind_inputs();self.load_receipt();need(self.data['state']!='ROLLED_BACK','ALREADY_ROLLED_BACK')
+                need(self.data.get('backup',{}).get('archive_verified') is True,'BACKUP_NOT_VERIFIED')
+                backup=self.folder/'backup';need(digest(c.read(backup/'previous-static.tar.gz'))==self.data['backup']['static_sha256'],'BACKUP_HASH')
+                for row in self.data['backup']['nginx'].values():need(digest(c.read(backup/row['copy']))==row['sha256'],'BACKUP_CONFIG_HASH')
+                new=digest(routes(self.entries)[0]);old=self.pins['nginx'][str(c.LOCATIONS)]
+                need(digest(c.read(c.LOCATIONS)) in (old,new),'FOREIGN_NGINX_CONFIG')
+                need(os.readlink(c.BASE/'current') in (self.pins['previous_release'],str(c.BASE/'releases'/self.pins['release_id'])),'FOREIGN_CURRENT')
+                expected={**self.pins['nginx'],str(c.LOCATIONS):digest(c.read(c.LOCATIONS))}
+                # CSP inventory follows current; compare the new file only when active.
+                old_csp=str(Path(self.pins['previous_release'])/'release-metadata/inline-csp.conf')
+                if os.readlink(c.BASE/'current')!=self.pins['previous_release']:
+                    expected.pop(old_csp);p=c.BASE/'releases'/self.pins['release_id']/'release-metadata/inline-csp.conf'
+                    self.load_publisher()
+                    with self.pub.Deadline(120) as deadline:self.pub.receipt_for(self.args,{'ACTIVATED','CHECKED','CHECK_FAILED','UNKNOWN_AFTER_CHECK','ACTIVATION_INTENT','UNKNOWN_AFTER_ACTIVATE','ROLLBACK_INTENT','ROLLBACK_PENDING'},deadline)
+                    expected[str(p)]=digest(c.read(p))
+                self.inventory(expected);self.runtime()
+                self.data.update(state='ROLLBACK_IN_PROGRESS',intent='ROLLBACK');c.atomic(self.receipt,self.data)
+                if c.exists(self.folder/'bundle/bin/pr122_website_release.py'):
+                    self.load_publisher();pr=c.BASE/'transactions'/(self.id+'.json')
+                    if c.exists(pr):
+                        state=json.loads(c.read(pr))['state']
+                        if state in ('ACTIVATION_INTENT','UNKNOWN_AFTER_ACTIVATE'):state=self.publisher('reconcile')['state']
+                        if state in ('ACTIVATED','CHECKED','CHECK_FAILED','UNKNOWN_AFTER_CHECK','ROLLBACK_INTENT','ROLLBACK_PENDING'):self.publisher('rollback')
+                        elif state not in ('PREPARED','HOLD_PARTIAL','ROLLED_BACK'):raise RuntimeError('UNKNOWN_PUBLISHER_STATE:'+state)
+                need(os.readlink(c.BASE/'current')==self.pins['previous_release'],'POINTER_NOT_RESTORED')
+                if digest(c.read(c.LOCATIONS))!=old:
+                    row=self.data['backup']['nginx'][str(c.LOCATIONS)];c.write(c.LOCATIONS,c.read(backup/row['copy']),expected=new)
+                self.ops.nginx_test();self.ops.reload_nginx();self.inventory(self.pins['nginx'])
+                need(self.snapshot()==self.data['backup']['static_files'],'RESTORED_BYTES_DRIFT');self.runtime()
+                self.data.update(state='ROLLED_BACK',intent=None,rollback_verified={'old_pointer':True,'old_public_bytes':True,'config_hashes':True,'runtime_preserved':True,'real_https_browser':'PENDING'})
+                c.atomic(self.receipt,self.data);return self.data
+
+        Transaction.__qualname__='Transaction'
+        return Transaction
 
 
 def verify_static_source_before_import(root,pins):
@@ -272,6 +319,7 @@ def verify_static_source_before_import(root,pins):
     The deployment preparer supplies this reviewed manifest; never generated on
     the target. Its hash is part of the separately signed host-pins binding.
     """
+    c=_load_helper()
     need(not os.path.lexists(root/'scripts.py'),'STATIC_SOURCE_ROOT_SHADOW')
     raw=c.read(root/'STATIC_SOURCE_MANIFEST.json')
     need(digest(raw)==pins.get('static_source_manifest_sha256'),'STATIC_SOURCE_MANIFEST_PIN')
@@ -314,6 +362,7 @@ def bind_static_source_package(root):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=('apply','rollback','status','controlled-apply'));parser.add_argument('--inputs',type=Path,required=True);parser.add_argument('--approval',type=Path)
     args=parser.parse_args();need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','FIXED_HOST_ROOT_REQUIRED')
+    _load_transaction_type()
     os.umask(0o022)
     for path in (HERE,PINS,HELPER):c.trusted(path)
     if args.command=='controlled-apply':

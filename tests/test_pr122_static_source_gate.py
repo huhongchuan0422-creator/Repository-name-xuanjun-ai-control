@@ -8,7 +8,8 @@ class SourceGateTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name);(self.root/'scripts').mkdir()
   tree=ast.parse((ROOT/'scripts/pr122_site_hub_unified_release.py').read_text());tree.body=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in ('digest','need','verify_static_source_before_import','bind_static_source_package','baseline_receipt_state')]
-  ns=dict(hashlib=hashlib,json=json,re=re,os=os,sys=sys,c=SimpleNamespace(read=lambda p:p.read_bytes(),trusted=lambda *a:None));exec(compile(tree,'pure-static-source-gate','exec'),ns);self.gate=ns['verify_static_source_before_import'];self.bind_package=ns['bind_static_source_package'];self.baseline_state=ns['baseline_receipt_state']
+  helper=SimpleNamespace(read=lambda p:p.read_bytes(),trusted=lambda *a:None)
+  ns=dict(hashlib=hashlib,json=json,re=re,os=os,sys=sys,c=helper,_load_helper=lambda:helper);exec(compile(tree,'pure-static-source-gate','exec'),ns);self.gate=ns['verify_static_source_before_import'];self.bind_package=ns['bind_static_source_package'];self.baseline_state=ns['baseline_receipt_state']
   self.file=self.root/'scripts/pr122_site_hub_unified_release.py';self.file.write_bytes(b'fixture source only')
   self.manifest={'schema':1,'source_commit':'a'*40,'files':[dict(path='scripts/'+self.file.name,size=self.file.stat().st_size,sha256=hashlib.sha256(self.file.read_bytes()).hexdigest())]};self.bind()
  def bind(self):
@@ -53,6 +54,34 @@ class SourceGateTests(unittest.TestCase):
   pins={'package_schema':'FULL_STATIC_REVIEW_V1'};state='STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER'
   self.assertFalse(self.baseline_state(pins,state));pins['previous_receipt_state']=state
   self.assertTrue(self.baseline_state(pins,state));self.assertFalse(self.baseline_state(pins,'HTTPS_SMOKE_PASS_AWAIT_BROWSER'))
+ def test_brand_baseline_uses_exact_full_receipt_state_pin(self):
+  pins={'package_schema':'FULL_STATIC_BRAND_REVIEW_V1'};state='STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER'
+  self.assertFalse(self.baseline_state(pins,state));pins['previous_receipt_state']=state
+  self.assertTrue(self.baseline_state(pins,state));self.assertFalse(self.baseline_state(pins,'HTTPS_SMOKE_PASS_AWAIT_BROWSER'))
+  pins['previous_receipt_state']='UNKNOWN';self.assertFalse(self.baseline_state(pins,'UNKNOWN'))
+ def test_brand_transaction_uses_pinned_previous_id_manifest_and_count(self):
+  from unittest.mock import Mock
+  tree=ast.parse((ROOT/'scripts/pr122_site_hub_unified_release.py').read_text())
+  cls=next(n for n in ast.walk(tree) if isinstance(n,ast.ClassDef) and n.name=='Transaction')
+  method=next(n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name=='baseline')
+  previous_id='pr122-brand-previous-fixture';previous=Path('/synthetic-control/transactions')/previous_id/'receipt.json'
+  receipt=b'{"state":"STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER"}'
+  manifest=json.dumps({'files':[{'path':'a','size':1,'sha256':'a'*64},{'path':'b','size':2,'sha256':'b'*64}]}).encode()
+  source={previous:receipt,Path('/synthetic-installed-publisher'):b'publisher',Path('/synthetic-inputs/R2_CANDIDATE_MANIFEST.json'):manifest}
+  read=Mock(side_effect=lambda p:source[p]);digest=lambda raw:hashlib.sha256(raw).hexdigest()
+  c=SimpleNamespace(CONTROL=Path('/synthetic-control'),BASE=Path('/synthetic-base'),INSTALLED_PUBLISHER=Path('/synthetic-installed-publisher'),read=read)
+  def need(ok,reason):
+   if not ok:raise RuntimeError(reason)
+  ns=dict(c=c,os=SimpleNamespace(readlink=lambda p:'/synthetic-previous'),json=json,re=re,digest=digest,need=need,baseline_receipt_state=self.baseline_state)
+  exec(compile(ast.Module(body=[method],type_ignores=[]),'baseline-only','exec'),ns)
+  pins=dict(package_schema='FULL_STATIC_BRAND_REVIEW_V1',previous_transaction_id=previous_id,previous_receipt_state='STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER',previous_receipt_sha256=digest(receipt),previous_release='/synthetic-previous',installed_publisher_sha256=digest(b'publisher'),previous_manifest_sha256=digest(manifest),previous_file_count=2,nginx={})
+  files={r['path']:{'size':r['size'],'sha256':r['sha256']} for r in json.loads(manifest)['files']}
+  target=SimpleNamespace(pins=pins,inputs=Path('/synthetic-inputs'),inventory=Mock(),ops=SimpleNamespace(nginx_identity=Mock(return_value='fixture'),nginx_test=Mock()),runtime=Mock(return_value='fixture'),snapshot=Mock(return_value=files))
+  self.assertEqual(ns['baseline'](target),files);self.assertEqual(read.call_args_list[0].args,(previous,))
+  pins['previous_file_count']=3
+  with self.assertRaisesRegex(RuntimeError,'R2_PUBLIC_DRIFT'):ns['baseline'](target)
+  pins['previous_transaction_id']='not-valid'
+  with self.assertRaisesRegex(RuntimeError,'BASELINE_TRANSACTION_ID'):ns['baseline'](target)
  def test_legacy_baseline_state_not_extended(self):
   self.assertFalse(self.baseline_state({'previous_receipt_state':'STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER'},'STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER'))
   self.assertTrue(self.baseline_state({},'HTTPS_SMOKE_PASS_AWAIT_BROWSER'))
