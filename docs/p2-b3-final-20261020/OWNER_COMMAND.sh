@@ -21,8 +21,8 @@ try:
     assert stat.S_ISDIR(info.st_mode) and info.st_uid==0 and stat.S_IMODE(info.st_mode)==0o700
     prefix='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/'
     items=[
-      ('p2_b3_owner_finalize_20261020.py','1efb406948e407313298ec860f75656235f19f08/scripts/p2_b3_owner_finalize_20261020.py','b597a4b662df58709e1c5fd91e7367c6b52f34721b2276eedd3ca6e12d99216a'),
-      ('p2-b3-final-bundle.json','e5399515d3f05ed13ae6affe07ff651818951118/docs/p2-b3-final-20261020/p2-b3-final-bundle.json','ba7216b1b9e2f18c9ac13b6f79ca52f8b50259b9033e40053bb1b58681144d1e')]
+      ('p2_b3_owner_finalize_20261020.py','701113c7c453ef16cfa39b72dcd0f8c80b088f0b/scripts/p2_b3_owner_finalize_20261020.py','91e77a767752f3714cd670e41ae6eebf6c834707b016b59a9fbe81cab344b753'),
+      ('p2-b3-final-bundle.json','5d8eeac0d39e9eb513c3bb0df8abc69fdf074c78/docs/p2-b3-final-20261020/p2-b3-final-bundle.json','acc3befbf0031cdee8bedbf87524c1840d44e8682ba9418f21949963f39c28d5')]
     opener=build_opener(ProxyHandler({}))
     for name,relative,pin in items:
         path=work/name
