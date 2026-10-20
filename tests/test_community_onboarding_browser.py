@@ -120,6 +120,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('入驻审核通过')
                     self.assertEqual(application(page),original_id)
                     page.locator('#loadHistory').click()
+                    expect(page.locator('#historyStatus')).to_contain_text('历史已读取至末页')
                     history=page.locator('#historyRows').inner_text()
                     self.assertIn('REJECT',history);self.assertIn('REOPEN',history)
                     self.assertIn('资料整体不符合当前入驻要求',history)
