@@ -1,8 +1,8 @@
 # B3 CP04–09 preparation delivery — pending Owner confirmation
 
-ISOLATED_TEST_ONLY. Source/test commit `1efb406948e407313298ec860f75656235f19f08`, tree `f4b4623798277c85dc42cff1d3c753ddcc8b4af2`.
+ISOLATED_TEST_ONLY. Source/test commit `701113c7c453ef16cfa39b72dcd0f8c80b088f0b`, tree `358ece80b0baf95e797909523c6fce0aa4d56c86`.
 
-Hosted CI [39374474409](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39374474409): SUCCESS. Exact Python 3.6.8: 18 tests; Python 3.11 host tests: 18; real disposable Docker recovery chain: 1. The real `main()` test replaces only host identity/Docker boundary; the separate Docker test performs real UID1002/65534 execution under umask077. These are Hosted results, not UK execution evidence. Journal CI 39374474391: SUCCESS.
+Hosted CI [39374783185](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39374783185): SUCCESS. Exact Python 3.6.8: 19 tests; Python 3.11 host tests: 19; real disposable Docker recovery chain: 1. The real `main()` test replaces only host identity/Docker boundary; the separate Docker test performs real UID1002/65534 execution under umask077. These are Hosted results, not UK execution evidence. Journal CI 39374783198: SUCCESS.
 
 ## Two corrected host gaps
 
@@ -10,17 +10,19 @@ Hosted CI [39374474409](https://github.com/huhongchuan0422-creator/Repository-na
 * `prior_snapshot`: records ten original regular files plus activation/data/run directory metadata separately. Verifies original pending/final hard-link pairs, fixed activation children, empty reserved data/run directories; unknown objects, links, unexpected DB/socket or source mutations HOLD. Never reads directory contents as ordinary file bytes. Prepared output is the sole excluded mutable subtree and must retain its expected owner/mode.
 * Read stability excludes access-time changes caused by reading, while preserving device/inode/owner/mode/link-count/size/mtime/ctime checks.
 
+* Container adoption rejects Privileged, extra CapAdd/devices and shared PID/IPC/UTS/user namespaces; eight mutation cases are covered. Intermediate bundles are superseded; only the hashes below are frozen.
+
 ## Fixed package
 
-[Hosted artifact 12243350205](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39374474409/artifacts/12243350205), ZIP SHA256 `305241fc9a029d5056b54054237f4091d532a903654021ff07615bde53b1ac11`.
+[Hosted artifact 12243061546](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39374783185/artifacts/12243061546), ZIP SHA256 `4d8542ebb58f65af8577c422e9b3f50cf49bf508aad32e92a60bdc4fea30448a`.
 
 | Object | SHA256 |
 |---|---|
-| p2-b3-final-bundle.json | ba7216b1b9e2f18c9ac13b6f79ca52f8b50259b9033e40053bb1b58681144d1e |
-| p2_b3_owner_finalize_20261020.py | b597a4b662df58709e1c5fd91e7367c6b52f34721b2276eedd3ca6e12d99216a |
-| internal tar (233242 bytes, 118 files) | c7e2fcca6f9d4a26a080f2a6ef587fc7f4659ccce8feba3f8714ed32e917074d |
+| p2-b3-final-bundle.json | acc3befbf0031cdee8bedbf87524c1840d44e8682ba9418f21949963f39c28d5 |
+| p2_b3_owner_finalize_20261020.py | 91e77a767752f3714cd670e41ae6eebf6c834707b016b59a9fbe81cab344b753 |
+| internal tar (233377 bytes, 118 files) | 654db8c34c65c83e87e169c35c1c54da4c48c31d8243badc3a85cbfce4e1ba8f |
 
-Artifact ZIP digest, portable relative SHA256SUMS, all tar entries and wrapper identity were independently read back. The identical bundle is frozen at commit `e5399515d3f05ed13ae6affe07ff651818951118` in this directory. Existing real application files, B1/B2/CP03 and request identity are reused.
+Artifact ZIP digest, portable relative SHA256SUMS, all tar entries and wrapper identity were independently read back. The identical bundle is frozen at commit `5d8eeac0d39e9eb513c3bb0df8abc69fdf074c78` in this directory. Existing real application files, B1/B2/CP03 and request identity are reused.
 
 ## Exact proposed operation
 
