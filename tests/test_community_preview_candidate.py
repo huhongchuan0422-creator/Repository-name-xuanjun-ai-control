@@ -30,7 +30,7 @@ class PreviewCandidateContract(unittest.TestCase):
  def test_scope_discloses_mock_login_and_disabled_money(self):
   for phrase in ('test Mock','payments are disabled','Finance remains UNCONFIRMED','not real wx.login/code2session'):self.assertIn(phrase,README)
  def test_rollback_covers_external_checks_and_old_objects(self):
-  for token in ('current.symlink','backup/unit','backup/nginx','backup/enabled','backup/active'):self.assertIn(token,DEPLOY)
+  for token in ('current.symlink','$BACKUP/unit','$BACKUP/nginx','$BACKUP/enabled','$BACKUP/active'):self.assertIn(token,DEPLOY)
   trap=DEPLOY.index("trap 'rollback; exit 90' ERR")
   public=DEPLOY.index('curl --fail --silent --show-error --max-time 10 "https://$HOST/community/health"')
   clear=DEPLOY.index('trap - ERR')
