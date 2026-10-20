@@ -1,0 +1,47 @@
+name: P2 B5 read-only capability profile
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - production/p2_b5_readonly_plugin/**
+      - tests/p2_b5_readonly/**
+      - .github/workflows/p2-b5-readonly-profile.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  readonly-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Existing Node unit fixtures only - no SDK or Gateway
+        run: |
+          node --version
+          node tests/p2_b5_readonly/test_plugin.mjs
+      - name: Package only the new metadata profile
+        run: |
+          python3 - <<'PY'
+          import gzip,hashlib,io,json,os,tarfile
+          from pathlib import Path
+          source=Path('production/p2_b5_readonly_plugin');out=Path('readonly-artifact');out.mkdir()
+          names=['openclaw.plugin.json','package.json','plugin.mjs']
+          assert sorted(p.name for p in source.iterdir())==names
+          files={name:source.joinpath(name).read_bytes() for name in names}
+          version=json.loads(files['package.json'])['version']
+          assert version=='0.1.1-b5-readonly.1'
+          buffer=io.BytesIO()
+          with gzip.GzipFile(fileobj=buffer,mode='wb',mtime=0,filename='') as gz:
+            with tarfile.open(fileobj=gz,mode='w') as tar:
+              for name,raw in files.items():
+                member=tarfile.TarInfo(name);member.size=len(raw);member.mode=0o444;member.uid=member.gid=0;member.mtime=0
+                tar.addfile(member,io.BytesIO(raw))
+          archive=buffer.getvalue();archive_name='p2-b5-readonly-'+version+'.tar.gz';out.joinpath(archive_name).write_bytes(archive)
+          manifest={'scope':'ISOLATED_TEST_ONLY','profile':'B5_METADATA_ONLY','plugin_id':'xuanjun-p2-native-controller','version':version,'source_commit':os.environ['GITHUB_SHA'],'files':{name:{'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw),'mode':292} for name,raw in files.items()},'archive':{'name':archive_name,'sha256':hashlib.sha256(archive).hexdigest(),'bytes':len(archive)},'original_plugin_archive_sha256':'83eac1fca2bf811e8e0ee276cd40f577dc1d0fe77bd425499420fe9f58a9cd8b','real_loader':'NOT_EXECUTED','real_authenticated_dispatch':'NOT_EXECUTED','uk_b5':'NOT_EXECUTED'}
+          out.joinpath('manifest.json').write_text(json.dumps(manifest,sort_keys=True,separators=(',',':'))+'\n')
+          out.joinpath('SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in sorted(out.iterdir())))
+          print(json.dumps(manifest,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-b5-readonly-0.1.1-b5-readonly.1
+          path: readonly-artifact/
