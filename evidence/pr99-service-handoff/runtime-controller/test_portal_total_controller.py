@@ -26,6 +26,19 @@ class Tests(unittest.TestCase):
         m.create(path,raw)
         return path
 
+    def test_explicit_file_mode_survives_private_umask(self):
+        import os,stat
+        old=os.umask(0o077)
+        try:
+            path=self.root/'sudoers-fixture'
+            m.create(path,b'fixture',0o440)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode),0o440)
+        finally:os.umask(old)
+
+    def test_nginx_empty_quoted_header_is_a_valid_token(self):
+        self.assertEqual(m.nginx_tokens('proxy_set_header Connection "";'),
+            [('word','proxy_set_header'),('word','Connection'),('word',''),('punct',';')])
+
     def test_route_exact_must_use_existing_owned_include(self):
         text='server { location = /'+m.VERIFY_NAME+' { include '+str(m.ROUTE)+'; } }'
         self.assertEqual(m.route_probe_path(text),'/'+m.VERIFY_NAME)
