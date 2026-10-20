@@ -143,5 +143,19 @@ class HostAPI(unittest.TestCase):
             raw=self.bundle(name,link)
             with self.assertRaises(ValueError):h.unpack(raw,h.digest(raw),self.root/('stage-'+str(link)+str(len(name))))
 
+    def test_terminal_chain_rechecked_not_cached_success(self):
+        previous='a'*64
+        for stage in ('CP04','CP05','CP06','CP07','CP08','CP09'):
+            row={'stage':stage,'request_sha256':'b'*64,'previous_receipt_sha256':previous,
+                 'status':'PREPARATION_CHECKPOINT_COMMITTED'}
+            raw=h.canonical(row);(self.root/(stage+'-committed.json')).write_bytes(raw);previous=h.digest(raw)
+        raw=h.canonical({'request_sha256':'b'*64,'last_checkpoint_sha256':previous,
+             'status':'PREPARATION_COMMITTED','full_b3_complete':False,'service_started':False})
+        path=self.root/'preparation-receipt.json';path.write_bytes(raw)
+        reference={'path':str(path),'sha256':h.digest(raw)}
+        h.verify_terminal(self.root,'b'*64,'a'*64,reference)
+        (self.root/'CP09-committed.json').write_bytes(b'{}')
+        with self.assertRaises((ValueError,KeyError)):h.verify_terminal(self.root,'b'*64,'a'*64,reference)
+
 
 if __name__=='__main__':unittest.main()
