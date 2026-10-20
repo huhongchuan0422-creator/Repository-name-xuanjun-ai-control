@@ -11,7 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 import sys
 sys.path.insert(0, str(ROOT))
-from production.p2_install.coordinator import Coordinator, Hold, digest
+from production.p2_install.coordinator import Coordinator, Hold, canonical, digest
 
 class Effects:
     def __init__(self):
