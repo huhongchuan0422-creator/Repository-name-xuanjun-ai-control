@@ -35,7 +35,9 @@ class DockerE2E(unittest.TestCase):
                  'release_manifest_sha256':'a'*64,'instance':'0891a51b-feea-520e-850a-c8fc7c840d94',
                  'ledger_uuid':'093955da-4b7d-5c8d-b85e-3adaa304c675','generation':1,
                  'db_path':str(root/'data/ledger.sqlite3'),'ledger_socket':str(root/'run/ledger.sock')}
-            config=h.canonical(cfg);(root/'binding-config.json').write_bytes(config)
+            config=h.canonical(cfg);h.publish(root/'binding-config.json',config,0o400)
+            h.publish(root/'intent.json',h.canonical({'scope':'ISOLATED_TEST_ONLY'}),0o400)
+            for name in ('data','run'):(root/name).mkdir(mode=0o700)
             store=a.ActivationStore(str(activation/'active.json'),str(activation/'epochs.jsonl'),str(activation/'activation.lock'))
             store.prepare(release_sha256='a'*64,config_sha256=h.digest(config),binary_sha256=binary['sha256'],
                 ledger_uuid=cfg['ledger_uuid'],generation=1,instance=cfg['instance'],db_path=cfg['db_path'],
@@ -44,7 +46,7 @@ class DockerE2E(unittest.TestCase):
                 'installation_id':cfg['installation_id'],'config_sha256':h.digest(config),'binary_sha256':binary['sha256'],
                 'full_b3_complete':False,'descriptor_file_sha256':h.digest((activation/'active.json').read_bytes()),
                 'journal_sha256':h.digest((activation/'epochs.jsonl').read_bytes())}
-            (root/'commit-receipt.json').write_bytes(h.canonical(receipt))
+            h.publish(root/'commit-receipt.json',h.canonical(receipt),0o400)
             (root/'.initialize.lock').write_bytes(b'');(root/'.initialize.lock').chmod(0o600)
             for p in list(root.rglob('*'))+[root]:os.chown(str(p),1002,1002)
             app=REPO/'evidence/p2-epoch7-access-repair-20261014/runtime/stage1'
