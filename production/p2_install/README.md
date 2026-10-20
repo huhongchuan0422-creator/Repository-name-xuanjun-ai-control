@@ -487,3 +487,12 @@ B4–B7/P3、生产切换、真实DB/socket/服务启动不并入本轮B3收口�
 SUCCESS，Python3.11/3.12各14通过、0跳过，包含实际UID1002准备、实际独立UID拒绝、全顺序/中断/响应丢失。
 Hosted证明不替代英国现场：UID1002+cap-drop ALL会在CP08记录UNAVAILABLE/HOLD；独立现场观察及其接入未冻结。
 完整B3仍false，最终Owner命令未冻结，次数UNKNOWN；B1/B2/CP03未重装，本轮无英国动作、无新权限/凭据或服务启动。
+
+
+## B3→B4有限消费接线增量（PR17 #6284216737）
+
+继承英国实际准备回执[#6284188828](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6284188828)，CP03及CP04–09准备子范围已通过，不重装B1/B2/B3。full_b3_complete=false、service_started=false保持；旧历史UNKNOWN不作新前置。
+
+本轮源码0c09b3ae24fcb3e2697a94ef190337a792bca102，Tree5756fee7e7b0e172858af209775637cafcb577c5；[Hosted39377081631](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39377081631) SUCCESS：双Python各11项、精确3.6.8宿主3项、两角色真实Docker及真实宿主main重开验收。复用原111运行文件及499bcc43运行组件原字节。薄适配实际调用原ledger准备CLI与原sandbox policy，不启动正常ledger、不改原guard。有限进程身份为独立role/PID的UID1002，不把未知service_uid或B7启动授权写PASS。
+
+本轮只证明CP10新隔离有限契约；原宿主OpenClaw全sandbox等价NOT_CLAIMED，英国B4运行NOT_EXECUTED。B5/B6/B7/P3未前移。详细固定制品、路径/角色挂载、截止时间、退出/恢复及完整单命令候选见[本批操作清单](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/repair/p2-resumable-install-20261020/docs/p2-b4-20261020/OPERATIONS.md)。新目录/进程动作仍待Owner按完整清单确认，七批总体验收不因本轮Hosted成功自动关闭。
