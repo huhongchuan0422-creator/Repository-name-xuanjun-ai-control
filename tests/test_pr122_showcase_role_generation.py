@@ -1,4 +1,5 @@
 import copy
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -20,6 +21,15 @@ class Links(HTMLParser):
 
 
 class RoleGenerationTests(unittest.TestCase):
+    def test_branded_merchant_bundle_declaration_matches_current_public_bytes(self):
+        root = Path(__file__).resolve().parents[1]
+        public = root / 'showcase/projects/community-payment/views/merchant/v1/public'
+        declaration = json.loads((root / 'showcase/projects/community-payment/merchant-v1.json').read_text())
+        rows, _ = s.scan_public_tree(public)
+        self.assertEqual(rows['index.html']['sha256'], declaration['artifact_sha256'])
+        self.assertEqual(s.sha(s.canonical(rows)), declaration['release_artifact_sha256'])
+        self.assertIn('玄钧AI新', (public / 'index.html').read_text())
+
     def test_six_role_fixture_generates_isolated_bilingual_routes(self):
         items, proof, pages, files = fixture_records()
         catalog = s.compile_catalog(items, proof, published_pages=pages)
