@@ -194,3 +194,23 @@ CP标签是设计中的证据位置名称，**不是已存在的checkpoint文件
 Dots调度和节点验收；Work归集/集成/打包及后续获授权安装。本轮不新增独立人工审签，平台必需检查保留；评论自动唤醒NOT_VERIFIED。
 
 详细环境和调度索引：[总集成记录](../../docs/P2_REWRITE_DISPATCH_20261020.md)。
+
+## B2隔离证据导入准备（PR17 #6281853309）
+
+B1已按[真实回执6281846615](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6281846615)限定通过，继承f314，不重装。本节仅本轮B2准备，不回写上文历史快照为生产成功。
+
+`evidence_import.py`只补B2来源绑定与确定性tar/INDEX适配；正式文件安装、inspect和部分安装recover均复用只读ea31制品组件，不新增安装器或调度账本。固定安装范围仅ISOLATED_TEST_ONLY；INDEX始终production_history=false，未知来源/缺摘要为UNKNOWN，不当作生产历史。测试用SYNTHETIC_TEST_ONLY与真实ISOLATED_B1_EVIDENCE分开记录。
+
+| 来源/目标 | 准确绑定与当前状态 |
+| --- | --- |
+| 原receipt | `/var/lib/xuanjun-p2-isolated-test/artifacts/.p2_artifacts/receipts/p2-uk-isolated-20261020--b1-release.json`；SHA256 `2aa0616f8d9cc57e4dc367198fcb40b1d9cfe88ffa46221273c62cf4ad6e069a` |
+| 原summary | `/var/lib/xuanjun-p2-isolated-test/logs/b1-first-install-20261020/summary.json`；真实文件SHA256仍UNKNOWN，不能用终端附件摘要替代 |
+| 本批唯一容器RW根（待确认） | `/var/lib/xuanjun-p2-isolated-test/b2-evidence`，请求installation=p2-uk-isolated-20261020、batch=b2-preserve、attempt=b2-preserve-a1；目录/属主创建尚未授权或执行 |
+| 独立副本/索引 | RW根下`versions/p2-uk-isolated-20261020--b2-preserve/{b1-receipt.json,b1-summary.json,INDEX.json}`；0600，后续消费者只读挂载 |
+| 本批恢复点 | RW根下`b2-input.tar`、`b2-intent.json`及ea31原journal/snapshot/receipt/recovery；不覆盖旧记录。prepare发布中断残留保留，恢复按原spec摘要收敛；已提交重复导入不增加副本或回执 |
+
+来源映射必须在最终命令冻结：原receipt与summary属主可能不同，不能把RO挂载等同于UID1002有读取权，更不能chmod原件。拟由获准宿主只读取两原件，核准确摘要/前后身份后生成本批来源快照；快照单独映射`/source` RO，ea31工具RO，只有b2-evidence RW。不挂B1整个根或生产历史；快照/工具准确host路径与元数据尚待最终操作绑定，当前不是可执行安装命令。
+
+适配器请求除ea31原身份/root字段和inputs={}外，需source_root、origin_scope及sources两项，各含sha256与origin_ref；三动作使用同一份spec。来源路径仅相对source_root的两个固定文件名，读取逐级O_NOFOLLOW、常规文件/大小/读前后身份校验。原子不覆盖发布意图后，inspect/recover按原spec调用ea31，不依赖源件继续可用、不修改B1原件；归属或摘要冲突UNKNOWN，禁止清空重导。
+
+本轮补定向合成测试：独立进程execute/inspect/recover及重复导入、真实SIGKILL后两窗口恢复（archive发布后/intent前及ea31第一文件落盘后）、未知来源、源摘要改变、身份改变拒绝、源内容/权限/inode/mtime不变。它们不构成英国B2验收。真实summary摘要缺失前，最终安装spec/包摘要/命令保持NOT_READY；仅可交两固定原件的最小只读摘要采集。B2现场操作NOT_EXECUTED，不增加B1/协调器/混合CLI/P3前置。
