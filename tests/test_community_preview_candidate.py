@@ -53,7 +53,7 @@ class PreviewCandidateContract(unittest.TestCase):
    self.assertEqual(p.returncode,0,p.stdout+p.stderr)
    app=(out/'app.js').read_text()
    receipt=json.loads((out/'CONNECTED_PREVIEW_RECEIPT.json').read_text())
-   self.assertRegex(app,r"baseUrl:\\s*'https://community-preview\\.wenwenwenyiyiyi\\.work'")
+   self.assertRegex(app,r"baseUrl:\s*'https://community-preview\.wenwenwenyiyiyi\.work'")
    self.assertIn("payments: false",app)
    self.assertIn("commerce: true",app)
    self.assertEqual(receipt['baseUrl'],'https://community-preview.wenwenwenyiyiyi.work')
