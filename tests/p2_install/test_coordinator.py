@@ -361,6 +361,49 @@ class CoordinatorTests(unittest.TestCase):
                 "SELECT seq,observed,evidence,event_key FROM coordinator_failures ORDER BY seq").fetchall()
             self.assertEqual(before,after)
 
+    def test_failure_log_fifo_and_nul_are_unknown_without_blocking(self):
+        req=self.request("log-special")
+        fifo=Path(self.component)/"blocked.fifo"
+        os.mkfifo(fifo,0o600)
+        valid=Path(self.component)/"normal.log"
+        valid.write_bytes(b"normal")
+        with self.open() as c:
+            c._store(req)
+            start=__import__("time").monotonic()
+            self.assertTrue(c.failure(
+                req,"FIFO_LOG",
+                {"event_id":"fifo-log","log":str(fifo),
+                 "error":{"code":"FIFO_LOG"}}))
+            elapsed=__import__("time").monotonic()-start
+            self.assertLess(elapsed,1.0)
+            self.assertTrue(c.failure(
+                req,"NUL_LOG",
+                {"event_id":"nul-log","log":str(valid)+"\x00suffix",
+                 "error":{"code":"NUL_LOG"}}))
+            rows=[json.loads(x[0]) for x in c.journal.db.execute(
+                "SELECT evidence FROM coordinator_failures ORDER BY seq")]
+            refs={x["event_id"]:x["references"]["log"] for x in rows}
+            self.assertEqual(refs["fifo-log"]["status"],"UNKNOWN")
+            self.assertIn(refs["fifo-log"]["reason"],
+                          ("FAILURE_LOG_NOT_REGULAR","FAILURE_LOG_OSERROR_6"))
+            self.assertEqual(refs["nul-log"],
+                             {"status":"UNKNOWN","reason":"FAILURE_LOG_INVALID_PATH"})
+            self.assertEqual(len(rows),2)
+
+        # Existing normal log hashing behavior is unchanged.
+        req2=self.request("log-normal")
+        with self.open() as c:
+            c._store(req2)
+            self.assertTrue(c.failure(
+                req2,"NORMAL_LOG",
+                {"event_id":"normal-log","log":str(valid),
+                 "error":{"code":"NORMAL_LOG"}}))
+            ref=json.loads(c.journal.db.execute(
+                "SELECT evidence FROM coordinator_failures WHERE cause='NORMAL_LOG'"
+            ).fetchone()[0])["references"]["log"]
+            self.assertEqual(ref["status"],"VERIFIED")
+            self.assertEqual(ref["sha256"],hashlib.sha256(b"normal").hexdigest())
+
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
         for number in range(7):
