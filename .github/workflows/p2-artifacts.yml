@@ -26,3 +26,198 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -B -m unittest discover -s tests/p2_artifacts -p 'test_*.py' -v
+
+  b1-release-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build fixed B1 project release package
+        env:
+          RUNTIME_COMMIT: 499bcc43f4c992b21035c22446ccc4d915873fb1
+          COORDINATOR_COMMIT: a766dcb307ce738dc508ad153f17e593d1fb7bfb
+        run: |
+          set -euo pipefail
+          rm -rf .b1-package
+          mkdir -p .b1-package/release/production/p2_runtime .b1-package/release/production/p2_install .b1-package/out
+          git fetch --no-tags --depth=1 origin "$RUNTIME_COMMIT"
+          git show "$RUNTIME_COMMIT:production/p2_runtime/__init__.py" > .b1-package/release/production/p2_runtime/__init__.py
+          git fetch --no-tags --depth=1 origin "$COORDINATOR_COMMIT"
+          git show "$COORDINATOR_COMMIT:production/p2_install/coordinator.py" > .b1-package/release/production/p2_install/coordinator.py
+          git show "$COORDINATOR_COMMIT:production/p2_install/journal.py" > .b1-package/release/production/p2_install/journal.py
+          python - <<'PY'
+          import hashlib, json, os, stat, tarfile
+          from pathlib import Path
+
+          package_id = "xuanjun-p2-b1-release-20261020"
+          installation_id = "p2-uk-isolated-20261020"
+          batch_id = "b1-release"
+          attempt_id = "b1-release-a1"
+          archive_container_path = "/input/xuanjun-p2-b1-release-20261020.tar"
+          install_root = "/var/lib/xuanjun-p2-isolated-test/artifacts"
+          runtime_commit = "499bcc43f4c992b21035c22446ccc4d915873fb1"
+          coordinator_commit = "a766dcb307ce738dc508ad153f17e593d1fb7bfb"
+
+          root = Path(".b1-package/release")
+          out = Path(".b1-package/out")
+          source_paths = [
+              "production/p2_runtime/__init__.py",
+              "production/p2_install/coordinator.py",
+              "production/p2_install/journal.py",
+          ]
+          def sha256(path):
+              h = hashlib.sha256()
+              with open(path, "rb") as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          source_files = {}
+          for rel in source_paths:
+              p = root / rel
+              source_files[rel] = {
+                  "sha256": sha256(p),
+                  "mode": 384,
+                  "size": p.stat().st_size,
+              }
+
+          manifest = {
+              "schema": 1,
+              "scope": "ISOLATED_TEST_ONLY",
+              "package_id": package_id,
+              "purpose": "P2 B1 exact project release snapshot for isolated artifact installation",
+              "installer_source_commit": "ea31dbbec2a8710b964efb38fa2975684bbd9739",
+              "source_commits": {
+                  "production/p2_runtime": runtime_commit,
+                  "production/p2_install": coordinator_commit,
+              },
+              "files": source_files,
+              "excludes": ["production/p2_artifacts"],
+          }
+          manifest_path = root / "MANIFEST.json"
+          manifest_path.write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+          os.chmod(manifest_path, 0o600)
+
+          all_paths = ["MANIFEST.json"] + source_paths
+          files = {rel: sha256(root / rel) for rel in all_paths}
+          modes = {rel: 384 for rel in all_paths}
+
+          tar_path = out / "xuanjun-p2-b1-release-20261020.tar"
+          with tarfile.open(tar_path, "w", format=tarfile.USTAR_FORMAT) as tar:
+              for rel in sorted(all_paths):
+                  data = (root / rel).read_bytes()
+                  info = tarfile.TarInfo(rel)
+                  info.size = len(data)
+                  info.mode = modes[rel]
+                  info.mtime = 0
+                  info.uid = 0
+                  info.gid = 0
+                  info.uname = ""
+                  info.gname = ""
+                  import io
+                  tar.addfile(info, io.BytesIO(data))
+
+          archive_sha = sha256(tar_path)
+          manifest_sha = sha256(manifest_path)
+          request = {
+              "schema": 1,
+              "scope": "ISOLATED_TEST_ONLY",
+              "installation_id": installation_id,
+              "batch_id": batch_id,
+              "attempt_id": attempt_id,
+              "root": install_root,
+              "inputs": {
+                  "operation": "install",
+                  "archive": archive_container_path,
+                  "archive_sha256": archive_sha,
+                  "files": files,
+                  "modes": modes,
+              },
+          }
+          for action in ("execute", "inspect", "recover"):
+              (out / (action + "-request.json")).write_text(
+                  json.dumps(request, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+          (out / "MANIFEST.json").write_bytes(manifest_path.read_bytes())
+          sums = [
+              archive_sha + "  xuanjun-p2-b1-release-20261020.tar",
+              manifest_sha + "  MANIFEST.json",
+          ]
+          for action in ("execute", "inspect", "recover"):
+              p = out / (action + "-request.json")
+              sums.append(sha256(p) + "  " + p.name)
+          (out / "SHA256SUMS").write_text("\n".join(sums) + "\n", encoding="utf-8")
+          (out / "PACKAGE_INFO.json").write_text(json.dumps({
+              "package_id": package_id,
+              "archive_sha256": archive_sha,
+              "manifest_sha256": manifest_sha,
+              "installation_id": installation_id,
+              "batch_id": batch_id,
+              "attempt_id": attempt_id,
+              "archive_container_path": archive_container_path,
+              "install_root": install_root,
+              "files": files,
+              "modes": modes,
+              "runtime_commit": runtime_commit,
+              "coordinator_commit": coordinator_commit,
+          }, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+          print("B1_ARCHIVE_SHA256=" + archive_sha)
+          print("B1_MANIFEST_SHA256=" + manifest_sha)
+          for rel in sorted(all_paths):
+              print("B1_FILE=%s SHA256=%s MODE=%04o" % (rel, files[rel], modes[rel]))
+          PY
+      - name: B1 package adapter check
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, shutil, subprocess, sys, tempfile
+          from pathlib import Path
+
+          out = Path(".b1-package/out")
+          request = json.loads((out / "execute-request.json").read_text())
+          with tempfile.TemporaryDirectory() as td:
+              base = Path(td)
+              local_root = base / "artifacts"
+              local_root.mkdir(mode=0o700)
+              local_archive = base / "input.tar"
+              shutil.copy2(out / "xuanjun-p2-b1-release-20261020.tar", local_archive)
+              local = json.loads(json.dumps(request))
+              local["root"] = str(local_root)
+              local["inputs"]["archive"] = str(local_archive)
+              encoded = json.dumps(local)
+              results = []
+              for action in ("execute", "inspect", "recover"):
+                  p = subprocess.run(
+                      [sys.executable, "-m", "production.p2_artifacts", action],
+                      input=encoded, text=True, capture_output=True, check=False)
+                  if p.returncode != 0:
+                      raise SystemExit("%s failed rc=%s stdout=%s stderr=%s" %
+                                       (action, p.returncode, p.stdout, p.stderr))
+                  value = json.loads(p.stdout)
+                  if value["status"] != "COMMITTED":
+                      raise SystemExit("%s status=%r" % (action, value))
+                  results.append(value)
+              if not (results[0]["receipt"] == results[1]["receipt"] == results[2]["receipt"]):
+                  raise SystemExit("receipt drift")
+              version = local_root / "versions" / (local["installation_id"] + "--" + local["batch_id"])
+              for rel, expected in local["inputs"]["files"].items():
+                  p = version / rel
+                  import hashlib, stat
+                  got = hashlib.sha256(p.read_bytes()).hexdigest()
+                  if got != expected:
+                      raise SystemExit("digest mismatch " + rel)
+                  if stat.S_IMODE(os.lstat(p).st_mode) != local["inputs"]["modes"][rel]:
+                      raise SystemExit("mode mismatch " + rel)
+              if (version / "production/p2_artifacts").exists():
+                  raise SystemExit("installer self-overwrite content present")
+          print("B1_PACKAGE_ADAPTER_CHECK=PASS")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-b1-release-20261020
+          path: .b1-package/out/*
+          if-no-files-found: error
+          retention-days: 30
