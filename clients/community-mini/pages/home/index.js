@@ -17,7 +17,7 @@ Page({
       if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch)){if(this.session)this.session.clear();return;}
       this.setData({authenticated:true,status:'客户身份已验证'});
     }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(this.session)this.session.clear();this.session=null;this.setData({authenticated:false,status:e.message});}}
-    finally{if(!this._dead)this.setData({pending:false});}
+    finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },
   retryLogin(){return this.login();},
   openProfile(){if(!this.data.authenticated||!this.scene){this.setData({status:'请先完成登录'});return;}wx.navigateTo({url:'/pages/profile/index?scene='+encodeURIComponent(this.scene)});},
@@ -26,8 +26,8 @@ Page({
   async logout(){
     if(this.data.pending)return;this.setData({pending:true});
     const session=this.session;const task=session?session.logout():Promise.resolve();
-    auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'已退出登录');
+    const revokedEpoch=auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'已退出登录');
     try{await task;}
-    catch(e){this.customerSessionRevoked('退出结果未确认，本地会话已清除');}
+    catch(e){if(!this._dead&&auth.active(revokedEpoch)&&!this.session)this.setData({pending:false,status:'退出结果未确认，本地会话已清除'});}
   }
 });
