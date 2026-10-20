@@ -1,5 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const event=operation=>({currentTarget:{dataset:{operation}}});
+const auth=require('./customer-auth');
 function harness(){
  let definition,generation=1;const calls=[],writes=[],money=[];
  const session={getGeneration:()=>generation,clear(){generation++;},commerce(scene,operation,params){return new Promise((resolve,reject)=>calls.push({scene,operation,params,resolve,reject}));}};
