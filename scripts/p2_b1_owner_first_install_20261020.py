@@ -136,7 +136,7 @@ def installed(request):
 
 
 def command(action):
-    return ['/bin/docker', 'run', '--pull=never', '--name=p2-uk-b1-' + action + '-20261020',
+    return ['/bin/docker', 'run', '--interactive', '--pull=never', '--name=p2-uk-b1-' + action + '-20261020',
             '--cidfile=' + str(LOGS / (action + '.cid')),
             '--hostname=' + HOST, '--user=1002:1002', '--network=none', '--cap-drop=ALL',
             '--security-opt=no-new-privileges', '--read-only', '--pids-limit=96',
