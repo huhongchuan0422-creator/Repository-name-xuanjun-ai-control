@@ -16,12 +16,11 @@ jobs:
     strategy:
       matrix:
         python: ['3.11', '3.12']
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - run: python -B tests/p2_install/test_b4_sandbox.py -v
+      - run: docker pull python:${{ matrix.python }}-slim
+      - run: docker run --rm --user=1002:1002 --network=none --cap-drop=ALL --security-opt=no-new-privileges --read-only --tmpfs=/tmp:rw,nosuid,nodev,size=128m,mode=1777 --mount=type=bind,src="$PWD",dst=/source,readonly --workdir=/source --env=P2_CP10_OS_TEST=1 python:${{ matrix.python }}-slim python -B -S tests/p2_install/test_b4_sandbox.py -v
   finite-docker:
     runs-on: ubuntu-latest
     timeout-minutes: 10
