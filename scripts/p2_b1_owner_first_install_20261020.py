@@ -1,7 +1,7 @@
 """Owner-confirmed B1 orchestration only; reuses exact ea31 artifact CLI.
 No new installer, no production services, no background installation.
 """
-import base64, fcntl, hashlib, io, json, os, stat, subprocess, sys, tarfile, time, zipfile, zlib
+import base64, fcntl, hashlib, io, json, os, re, stat, subprocess, sys, tarfile, time, zipfile, zlib
 from pathlib import Path
 
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
@@ -137,6 +137,7 @@ def installed(request):
 
 def command(action):
     return ['/bin/docker', 'run', '--pull=never', '--name=p2-uk-b1-' + action + '-20261020',
+            '--cidfile=' + str(LOGS / (action + '.cid')),
             '--hostname=' + HOST, '--user=1002:1002', '--network=none', '--cap-drop=ALL',
             '--security-opt=no-new-privileges', '--read-only', '--pids-limit=96',
             '--memory=512m', '--memory-swap=1g', '--log-driver=none',
@@ -202,14 +203,22 @@ def main():
                         p = subprocess.run(args, input=files['execute-request.json'], stdout=out, stderr=err, timeout=120)
                         call['exit_code'] = p.returncode
                     except subprocess.TimeoutExpired:
-                        stopped = subprocess.run(['/bin/docker', 'stop', '--time=3', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
                         call['timeout'] = True
-                        call['stop_exit'] = stopped.returncode
+                        if (LOGS / (action + '.cid')).is_file():
+                            cid = (LOGS / (action + '.cid')).read_text().strip()
+                            require(re.fullmatch('[0-9a-f]{64}', cid), 'INVALID_OWN_CONTAINER_ID')
+                            stopped = subprocess.run(['/bin/docker', 'stop', '--time=3', cid], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+                            call['stop_exit'] = stopped.returncode
+                        else:
+                            call['stop_result'] = 'NO_CREATED_CID_NO_UNKNOWN_CONTAINER_STOP'
                     finally:
                         out.flush(); os.fsync(out.fileno())
                         err.flush(); os.fsync(err.fileno())
                 call['ended_utc'] = int(time.time())
-                state = container_state(name)
+                cid = (LOGS / (action + '.cid')).read_text().strip()
+                require(re.fullmatch('[0-9a-f]{64}', cid), 'INVALID_OWN_CONTAINER_ID')
+                call['container_id'] = cid
+                state = container_state(cid)
                 call['container'] = state
                 write(LOGS / (action + '-container.json'), json.dumps(state, sort_keys=True, indent=2).encode())
                 require(state['state']['Running'] is False, 'CONTAINER_STILL_RUNNING_RETAIN_STATE')
