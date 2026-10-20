@@ -15,6 +15,8 @@ from scripts.community_mini_http import serve
 
 
 class CommunityPromotionBrowserJourney(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):fixtures.CommunityReportJourney.setUpClass()
     def test_admin_promotion_consumer_redeem_metrics_and_pause(self):
         ready=queue.Queue()
         def host():
