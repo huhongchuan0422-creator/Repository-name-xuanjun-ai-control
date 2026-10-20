@@ -18,6 +18,116 @@ class OnboardingBrowserJourney(unittest.TestCase):
         self.journey(False)
     def test_bound_crm_mapping_automatically_opens_workbench_after_approval(self):
         self.journey(True)
+    def test_reject_reopen_same_application_resubmit_and_fresh_material_reviews(self):
+        ready=queue.Queue()
+        def host():
+            server=None;fx=None
+            try:
+                fx=fixture.MerchantAdmissionJourney();fx.setUp()
+                server=serve(fx.fx.gateway,onboarding=fx.service);ready.put((server,fx));server.serve_forever(poll_interval=.05)
+            except BaseException as error:ready.put(error)
+            finally:
+                if server:server.server_close()
+                if fx:fx.tearDown()
+        thread=threading.Thread(target=host,daemon=True);thread.start();state=ready.get(timeout=10)
+        if isinstance(state,BaseException):raise state
+        server,fx=state
+        try:
+            with sync_playwright() as playwright:
+                browser=playwright.chromium.launch(headless=True)
+                try:
+                    applicant=browser.new_context(extra_http_headers={'X-Center-Session':fx.applicant['token']})
+                    review=browser.new_context(extra_http_headers={'X-Center-Session':fx.reviewer['token']})
+                    page=applicant.new_page();admin=review.new_page();errors=[]
+                    page.on('pageerror',lambda error:errors.append(str(error)));admin.on('pageerror',lambda error:errors.append(str(error)))
+                    base='http://127.0.0.1:'+str(server.server_port)
+                    def open_page(target,path,csrf):
+                        target.goto(base+path);expect(target.locator('#status')).to_contain_text('请先登录')
+                        target.evaluate('csrf=>window.configureCommunityOnboarding({csrf})',csrf)
+                    def revision(target):
+                        text=target.locator('#applicationVersion').inner_text()
+                        return int(text.rsplit(' ',1)[-1])
+                    def application(target):
+                        text=target.locator('#applicationVersion').inner_text()
+                        return text.split(' · ',1)[0].replace('申请编号 ','')
+                    def upload(kind,content):
+                        row=page.locator('[data-kind="'+kind+'"]')
+                        row.locator('input[type=file]').set_input_files({'name':'fixture.pdf','mimeType':'application/pdf','buffer':content})
+                        with page.expect_response(lambda response:response.url.endswith('/merchant/onboarding')):
+                            row.get_by_role('button',name='上传资料',exact=True).click()
+                        expect(row.locator('p')).to_contain_text('已上传')
+
+                    open_page(page,'/merchant/join',fx.applicant['csrf'])
+                    for key,value in fx.fields.items():page.locator('#'+key).fill(value)
+                    page.locator('#saveDraft').click();expect(page.locator('#status')).to_contain_text('草稿已保存')
+                    for kind in BASE:upload(kind,b'%PDF-synthetic '+kind.encode())
+                    original_id=application(page);submitted_from=revision(page)
+                    page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
+                    submitted_revision=revision(page);self.assertGreater(submitted_revision,submitted_from)
+
+                    open_page(admin,'/merchant/review',fx.reviewer['csrf'])
+                    admin.locator('#applications button').first.click();expect(admin.locator('#applicationState')).to_have_text('待审核')
+                    self.assertEqual(application(admin),original_id)
+                    reject_before=revision(admin)
+                    admin.locator('#note').fill('资料整体不符合当前入驻要求，请补充后重新提交')
+                    admin.locator('[data-action=REJECT]').click();expect(admin.locator('#applicationState')).to_have_text('已驳回')
+                    rejected_revision=revision(admin);self.assertGreater(rejected_revision,reject_before)
+
+                    page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('已驳回')
+                    self.assertEqual(application(page),original_id)
+                    expect(page.locator('#reviewNote')).to_contain_text('资料整体不符合当前入驻要求')
+                    page.locator('#loadHistory').click();expect(page.locator('#historyStatus')).to_contain_text('历史已读取至末页')
+                    expect(page.locator('#historyRows')).to_contain_text('REJECT')
+                    expect(page.locator('#historyRows')).to_contain_text('资料整体不符合当前入驻要求')
+                    page.locator('#loadAdmissionNotices').click();expect(page.locator('#admissionNoticeStatus')).to_contain_text('已读取本申请通知')
+                    expect(page.locator('#admissionNotices')).to_contain_text('申请已驳回')
+
+                    admin.locator('#note').fill('允许原申请号重新开启补件')
+                    admin.locator('[data-action=REOPEN]').click();expect(admin.locator('#applicationState')).to_have_text('待补件')
+                    reopened_revision=revision(admin);self.assertGreater(reopened_revision,rejected_revision)
+                    self.assertEqual(application(admin),original_id)
+
+                    page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('待补件')
+                    self.assertEqual(application(page),original_id)
+                    page.locator('#loadHistory').click();expect(page.locator('#historyRows')).to_contain_text('REOPEN')
+                    expect(page.locator('#historyRows')).to_contain_text('允许原申请号重新开启补件')
+                    page.locator('#loadAdmissionNotices').click();expect(page.locator('#admissionNotices')).to_contain_text('已重新开启补件')
+                    upload('storefront_photo',b'%PDF-reopened replacement storefront')
+                    changed_revision=revision(page);self.assertGreater(changed_revision,reopened_revision)
+                    page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
+                    resubmitted_revision=revision(page);self.assertGreater(resubmitted_revision,changed_revision)
+                    self.assertEqual(application(page),original_id)
+
+                    admin.locator('#reloadQueue').click();admin.locator('#applications button').first.click()
+                    expect(admin.locator('#applicationState')).to_have_text('待审核');self.assertEqual(application(admin),original_id)
+                    before_unreviewed=revision(admin)
+                    admin.locator('#note').fill('不得跳过逐份复审')
+                    admin.locator('[data-action=APPROVE]').click()
+                    expect(admin.locator('#applicationState')).to_have_text('待审核')
+                    self.assertEqual(revision(admin),before_unreviewed)
+                    self.assertNotIn('入驻审核通过',admin.locator('#applicationState').inner_text())
+
+                    for kind in BASE:
+                        row=admin.locator('[data-kind="'+kind+'"]')
+                        admin.locator('#note').fill('重开后逐份复审通过 '+kind)
+                        row.get_by_role('button',name='资料通过',exact=True).click()
+                        expect(row.locator('p')).to_contain_text('资料审核通过')
+                    reviewed_revision=revision(admin);self.assertGreater(reviewed_revision,resubmitted_revision)
+                    admin.locator('#note').fill('重开申请逐份复审完成')
+                    admin.locator('[data-action=APPROVE]').click();expect(admin.locator('#applicationState')).to_have_text('入驻审核通过')
+                    approved_revision=revision(admin);self.assertGreater(approved_revision,reviewed_revision)
+
+                    page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('入驻审核通过')
+                    self.assertEqual(application(page),original_id)
+                    page.locator('#loadHistory').click()
+                    history=page.locator('#historyRows').inner_text()
+                    self.assertIn('REJECT',history);self.assertIn('REOPEN',history)
+                    self.assertIn('资料整体不符合当前入驻要求',history)
+                    self.assertIn('允许原申请号重新开启补件',history)
+                    self.assertEqual(errors,[])
+                finally:browser.close()
+        finally:server.shutdown();thread.join(5)
+
     def journey(self,with_opening):
         ready=queue.Queue()
         def host():
