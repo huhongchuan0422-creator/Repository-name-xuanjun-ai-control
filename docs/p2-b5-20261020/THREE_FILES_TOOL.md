@@ -24,9 +24,9 @@ Selected content total419045 bytes. New tar contains exactly these3 regular memb
 
 ## Complete candidate and all actions
 
-Complete self-contained command: `THREE_FILES_CANDIDATE.sh` in this directory. Source is embedded; it does not download a script or invoke any network tool. SHA256 `cc2b7a66d91e301e0f502069e1a8a61516afe24be5b996cb5e570ad51246f4e0`.
+Complete self-contained command: `THREE_FILES_CANDIDATE.sh` in this directory. Source is embedded; it does not download a script or invoke any network tool. SHA256 `dbe79d81bf38a6f0e835d2e22b9501219af326e382bd99bd13253d99718f9a6c`.
 
-Tool `scripts/p2_b5_three_files.py` SHA256 `41385f49529471ab9144d01faac31d52b097a25e13cefccea06b900f1b0a1a5b`.
+Tool `scripts/p2_b5_three_files.py` SHA256 `90684e11592552336663f1a3c53b70787af79e48ee3819c6e8a655d3f9936980`.
 
 This is a candidate for separate on-site confirmation, not an instruction to execute now. No placeholders, runtime installation, package download or source re-collection are hidden inside it.
 

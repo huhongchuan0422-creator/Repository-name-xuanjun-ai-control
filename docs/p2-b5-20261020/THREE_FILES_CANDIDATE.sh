@@ -136,7 +136,7 @@ def select_files(tar_fd,manifest_fd,pins,checkpoint=None):
         need(gnu or magic==b'ustar\x0000','TAR_FORMAT')
         # Old GNU bytes345:512 are extension fields, never a POSIX prefix.
         if gnu:need(not header[345:512].strip(b'\x00'),'GNU_EXTENSION_NOT_ALLOWED')
-        name=text(header[:100]) if pending is None else None
+        name=text(header[:100]) if pending is None or not gnu else None
         if not gnu:
             prefix=text(header[345:500])
             if name is not None:name=(prefix+'/'+name) if prefix else name
@@ -157,6 +157,7 @@ def select_files(tar_fd,manifest_fd,pins,checkpoint=None):
         need(pending is None or pending_format==magic,'TAR_MIXED_EXTENSION')
         # A GNU fallback name may cut a multibyte UTF8 sequence at byte100;
         # bind its exact bytes to the validated full longname instead of decoding.
+        if name is not None:safe_name(name)
         if pending is not None:
             expected=pending.encode('utf8')[:100]
             if gnu:need(header[:100]==expected+b'\x00'*(100-len(expected)),'TAR_LONGNAME_FALLBACK')

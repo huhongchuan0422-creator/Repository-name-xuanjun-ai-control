@@ -55,7 +55,8 @@ class ThreeTests(unittest.TestCase):
     result=m.prior_failure(fd,os.getuid());self.assertEqual(result['receipt.json']['error'],'TAR_FORMAT')
    self.assertEqual((old/'receipt.json').read_bytes(),receipt);self.assertEqual((old/'host-result.json').read_bytes(),host)
    (old/'receipt.json').unlink();(old/'receipt.json').symlink_to(old/'host-result.json')
-   with self.assertRaises(m.Hold):m.prior_failure(fd,os.getuid())
+   with patch.object(m,'sha',side_effect=lambda raw:'e40abcd5304e4ab0e29c83a4865528272aca2b0ddb97e6d3df8d9941544c3bd6' if raw==host else original(raw)):
+    with self.assertRaises(OSError):m.prior_failure(fd,os.getuid())
   finally:os.close(fd)
  def test_python36_default_gnu_regular_and_long_unicode(self):
   # CPython v3.6.8 Lib/tarfile.py DEFAULT_FORMAT=GNU_FORMAT.
