@@ -39,6 +39,8 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     applicant=browser.new_context(extra_http_headers={'X-Center-Session':fx.applicant['token']})
                     review=browser.new_context(extra_http_headers={'X-Center-Session':fx.reviewer['token']})
                     page=applicant.new_page();admin=review.new_page();errors=[]
+                    page.set_default_timeout(10000);admin.set_default_timeout(10000)
+                    def phase(name): print('ONBOARDING_REOPEN_PHASE='+name,flush=True)
                     page.on('pageerror',lambda error:errors.append(str(error)));admin.on('pageerror',lambda error:errors.append(str(error)))
                     base='http://127.0.0.1:'+str(server.server_port)
                     def open_page(target,path,csrf):
@@ -57,6 +59,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                             row.get_by_role('button',name='上传资料',exact=True).click()
                         expect(row.locator('p')).to_contain_text('已上传')
 
+                    phase('APPLICANT_OPEN')
                     open_page(page,'/merchant/join',fx.applicant['csrf'])
                     for key,value in fx.fields.items():page.locator('#'+key).fill(value)
                     page.locator('#saveDraft').click();expect(page.locator('#status')).to_contain_text('草稿已保存')
@@ -65,12 +68,15 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
                     submitted_revision=revision(page);self.assertGreater(submitted_revision,submitted_from)
 
+                    phase('REVIEWER_OPEN')
                     open_page(admin,'/merchant/review',fx.reviewer['csrf'])
                     admin.locator('#applications button').first.click();expect(admin.locator('#applicationState')).to_have_text('待审核')
                     self.assertEqual(application(admin),original_id)
                     reject_before=revision(admin)
                     admin.locator('#note').fill('资料整体不符合当前入驻要求，请补充后重新提交')
+                    phase('REJECT_CLICK')
                     admin.locator('[data-action=REJECT]').click();expect(admin.locator('#applicationState')).to_have_text('已驳回')
+                    phase('REJECT_DONE')
                     rejected_revision=revision(admin);self.assertGreater(rejected_revision,reject_before)
 
                     page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('已驳回')
@@ -83,7 +89,9 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     expect(page.locator('#admissionNotices')).to_contain_text('申请已驳回')
 
                     admin.locator('#note').fill('允许原申请号重新开启补件')
+                    phase('REOPEN_CLICK')
                     admin.locator('[data-action=REOPEN]').click();expect(admin.locator('#applicationState')).to_have_text('待补件')
+                    phase('REOPEN_DONE')
                     reopened_revision=revision(admin);self.assertGreater(reopened_revision,rejected_revision)
                     self.assertEqual(application(admin),original_id)
 
@@ -109,12 +117,14 @@ class OnboardingBrowserJourney(unittest.TestCase):
                         except BaseException: return False
                         return body.get('operation')=='review' and body.get('params',{}).get('action')=='APPROVE' and \
                             body.get('params',{}).get('application')==original_id and body.get('params',{}).get('revision')==before_unreviewed
-                    with admin.expect_response(is_unreviewed_approve) as rejected:
+                    phase('UNREVIEWED_APPROVE_CLICK')
+                    with admin.expect_response(is_unreviewed_approve,timeout=10000) as rejected:
                         admin.locator('[data-action=APPROVE]').click()
                     response=rejected.value
                     self.assertEqual(response.status,400)
                     reply=response.json()
                     self.assertEqual(reply.get('error'),'INVALID_REQUEST')
+                    phase('UNREVIEWED_APPROVE_REJECTED')
                     expect(admin.locator('#status')).to_contain_text('资料、状态或版本不符合要求')
                     expect(admin.locator('[data-action=APPROVE]')).to_be_enabled()
                     admin.locator('#reloadQueue').click()
@@ -124,14 +134,18 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     self.assertEqual(revision(admin),before_unreviewed)
                     self.assertNotIn('入驻审核通过',admin.locator('#applicationState').inner_text())
 
+                    phase('MATERIAL_REVIEW_BEGIN')
                     for kind in BASE:
+                        phase('MATERIAL_REVIEW_'+kind)
                         row=admin.locator('[data-kind="'+kind+'"]')
                         admin.locator('#note').fill('重开后逐份复审通过 '+kind)
                         row.get_by_role('button',name='资料通过',exact=True).click()
                         expect(row.locator('p')).to_contain_text('资料审核通过')
                     reviewed_revision=revision(admin);self.assertGreater(reviewed_revision,resubmitted_revision)
                     admin.locator('#note').fill('重开申请逐份复审完成')
+                    phase('FINAL_APPROVE_CLICK')
                     admin.locator('[data-action=APPROVE]').click();expect(admin.locator('#applicationState')).to_have_text('入驻审核通过')
+                    phase('FINAL_APPROVE_DONE')
                     approved_revision=revision(admin);self.assertGreater(approved_revision,reviewed_revision)
 
                     page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('入驻审核通过')
@@ -143,8 +157,11 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     self.assertIn('资料整体不符合当前入驻要求',history)
                     self.assertIn('允许原申请号重新开启补件',history)
                     self.assertEqual(errors,[])
+                    phase('ASSERTIONS_DONE')
                 finally:browser.close()
-        finally:server.shutdown();thread.join(5)
+        finally:
+            server.shutdown();thread.join(5)
+            self.assertFalse(thread.is_alive(),'ONBOARDING_REOPEN_SERVER_THREAD_DID_NOT_STOP')
 
     def journey(self,with_opening):
         ready=queue.Queue()
