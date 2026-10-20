@@ -210,7 +210,7 @@ def write_new(directory,name,raw):
     os.fsync(directory)
 def run(tar_fd,manifest_fd,out_fd,pins,checkpoint=None):
     s=os.fstat(out_fd);need(stat.S_ISDIR(s.st_mode) and s.st_uid==os.getuid() and stat.S_IMODE(s.st_mode)==0o700,'OUTPUT_UID_OR_MODE')
-    result={'tool_version':'b5-three-files-v1','scope':'B5_THREE_FILES_OFFLINE_ANALYSIS_ONLY','state':'HOLD','source_tar_bytes':pins['tar_bytes'],'source_manifest_bytes':pins['manifest_bytes'],'source_tar_sha256':pins['tar_sha256'],'source_manifest_sha256':pins['manifest_sha256'],'dependency_closure':'UNKNOWN','b5_installation':'NOT_EXECUTED'}
+    result={'tool_version':'b5-three-files-gnu-v2','scope':'B5_THREE_FILES_OFFLINE_ANALYSIS_ONLY','state':'HOLD','source_tar_bytes':pins['tar_bytes'],'source_manifest_bytes':pins['manifest_bytes'],'source_tar_sha256':pins['tar_sha256'],'source_manifest_sha256':pins['manifest_sha256'],'dependency_closure':'UNKNOWN','b5_installation':'NOT_EXECUTED'}
     try:
         selected,evidence=select_files(tar_fd,manifest_fd,pins,checkpoint)
         raw=small_archive(selected);write_new(out_fd,'three-files.tar',raw)

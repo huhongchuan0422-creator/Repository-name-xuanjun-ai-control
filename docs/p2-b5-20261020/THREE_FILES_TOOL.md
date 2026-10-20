@@ -24,9 +24,9 @@ Selected content total419045 bytes. New tar contains exactly these3 regular memb
 
 ## Complete candidate and all actions
 
-Complete self-contained command: `THREE_FILES_CANDIDATE.sh` in this directory. Source is embedded; it does not download a script or invoke any network tool. SHA256 `fe76d02b094fe420264b330c0b5221c4f72c70b7814889bd1f8ead4e382af291`.
+Complete self-contained command: `THREE_FILES_CANDIDATE.sh` in this directory. Source is embedded; it does not download a script or invoke any network tool. SHA256 `cc2b7a66d91e301e0f502069e1a8a61516afe24be5b996cb5e570ad51246f4e0`.
 
-Tool `scripts/p2_b5_three_files.py` SHA256 `744db9fc787b6181ef3680605317747371510f52b2d40255048858a66306282f`.
+Tool `scripts/p2_b5_three_files.py` SHA256 `41385f49529471ab9144d01faac31d52b097a25e13cefccea06b900f1b0a1a5b`.
 
 This is a candidate for separate on-site confirmation, not an instruction to execute now. No placeholders, runtime installation, package download or source re-collection are hidden inside it.
 
@@ -63,3 +63,5 @@ Local29 passed/1 UID-change skipped because local chown is unavailable. Hosted r
 ## Repair execution boundary
 
 Owner reported old child exit2/HOLD; exact child error is still UNKNOWN until original receipt readback. GNU incompatibility is independently proven from source, not asserted as the onsite root cause. The new candidate performs that fixed readback before its independent output attempt; missing evidence stops without writes. Original archive, manifest, failure directory and permissions are retained. No automatic retry or cleanup. This candidate is NOT_EXECUTED in UK and requires separate onsite confirmation. No B5/closure/loader success is claimed.
+
+Additional local provenance check: the unmodified official CPython v3.6.8 `Lib/tarfile.py` was loaded under Python3.12 and used with original `w|` / no format argument / TarInfo metadata rules. Its default GNU archive with five synthetic members including long UTF8 passed all-content verification. This verifies original writer-library bytes, not an actual Python3.6.8 interpreter run.
