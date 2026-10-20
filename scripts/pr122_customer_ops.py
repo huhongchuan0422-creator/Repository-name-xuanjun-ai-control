@@ -85,6 +85,27 @@ def backup(center,output,backup_key,key_ref):
         secure_write(output,encrypted);center.audit('','operator','BACKUP_CREATED',digest(encrypted))
     return {'sha256':digest(encrypted),'key_ref':key_ref,'files':len(manifest['files']),'contains_keys':False}
 
+def restore_key_material(config):
+    """Decode only the key material already required by Center/backup restore."""
+    keys=config.get('keys')
+    active_key=config.get('active_key')
+    if type(keys) is not dict or not keys or type(active_key) is not str:
+        raise Denied('KMS_KEYS_REQUIRED')
+    decoded={}
+    from scripts.pr122_customer_core import identifier
+    for key,value in keys.items():
+        try: name=identifier(key); raw=base64.b64decode(value,validate=True)
+        except (TypeError,ValueError,base64.binascii.Error):
+            raise Denied('KMS_KEYS_REQUIRED')
+        if len(raw)!=32:raise Denied('KMS_KEYS_REQUIRED')
+        decoded[name]=raw
+    if active_key not in decoded:raise Denied('KMS_KEYS_REQUIRED')
+    try: backup_key=base64.b64decode(config.get('backup_key'),validate=True)
+    except (TypeError,ValueError,base64.binascii.Error):
+        raise Denied('SEPARATE_BACKUP_KEY_REQUIRED')
+    if len(backup_key)!=32:raise Denied('SEPARATE_BACKUP_KEY_REQUIRED')
+    return decoded,active_key,backup_key
+
 def restore(backup_file,target,backup_key,keys,active_key):
     """Restore into NEW isolated directory, never live replacement. Every old
     session/grant/link is invalidated and maintenance remains on until a fresh
@@ -92,6 +113,9 @@ def restore(backup_file,target,backup_key,keys,active_key):
     """
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     target=private_path(target)
+    normalized=Path(os.path.abspath(os.path.normpath(os.fspath(target))))
+    live=Path(os.path.abspath(os.path.normpath(os.fspath(ROOT))))
+    if normalized==live:raise Denied('RESTORE_LIVE_ROOT_FORBIDDEN')
     if target.exists():raise Denied('RESTORE_NEW_DIRECTORY_ONLY')
     raw=private_path(backup_file).read_bytes()
     if len(raw)>200_000_000:raise Denied('BACKUP_SIZE')
@@ -170,9 +194,8 @@ def main():
     if args.action=='restore-isolated':
         # Reuse the original isolated restore path without constructing the live Center.
         # Root/host/profile checks and privilege drop above remain mandatory.
-        keys={k:base64.b64decode(v,validate=True) for k,v in config['keys'].items()}
-        result=restore(args.input,args.output,base64.b64decode(config['backup_key'],validate=True),
-                       keys,config['active_key'])
+        keys,active_key,backup_key=restore_key_material(config)
+        result=restore(args.input,args.output,backup_key,keys,active_key)
         print(json.dumps(result,ensure_ascii=False))
         return
     c=factory(config)
