@@ -231,7 +231,8 @@ class Coordinator:
                            self._verify_previous)
         return self._reconcile(request, launch=True)
 
-    def _record_failure(self, request, cause, evidence, event_id):
+    def _record_failure(self, request, cause, evidence, event_id,
+                        allow_identity_merge=False):
         """Append one genuine failure, preserving legacy rows and first UTC.
 
         Identity comes from an actual failed operation/event, never the changing
@@ -254,7 +255,8 @@ class Coordinator:
         # attempts are never merged.
         merge_row = None
         known_operation = evidence.get("operation_id")
-        if type(known_operation) is str and known_operation != "UNKNOWN":
+        if (allow_identity_merge and type(known_operation) is str
+                and known_operation != "UNKNOWN"):
             unknown_event = "auto-" + digest([request["attempt_id"], "UNKNOWN"])[:32]
             unknown_key = digest([request["installation_id"],
                                   request.get("round_id", "DEFAULT"),
@@ -359,7 +361,8 @@ class Coordinator:
             {"operation_id":operation,"config_sha256":response.get("config_sha256"),
              "error":err,"receipt":response.get("receipt"),
              "commit_receipt":response.get("commit_receipt"),
-             "log":err.get("log"),"checkpoint":"RECONCILE_REQUIRED"},event_id)
+             "log":err.get("log"),"checkpoint":"RECONCILE_REQUIRED"},event_id,
+            allow_identity_merge=True)
 
     def _reconcile(self, request, launch=False):
         adapter = self._adapter(request["batch_id"])
