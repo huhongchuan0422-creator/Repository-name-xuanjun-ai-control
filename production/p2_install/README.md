@@ -315,14 +315,14 @@ DB=/var/lib/xuanjun-p2-isolated-test/b3-initialize/data/ledger.sqlite3，仅预�
 socket同根run/ledger.sock，仅预留、未bind，Unix socket无普通文件内容SHA；路径摘要单列，不替代内容摘要。
 DB建立/打开仍在原B6后续阶段，socket/服务仍按原运行阶段，不提前加入本次初始化。
 
-唯一需要补取的现场值是固定镜像内/usr/bin/python3.11的canonical path/bytes/SHA256；
+Owner实测已补齐固定镜像内/usr/bin/python3.11：canonical path同名、6809944字节、SHA256 9bee109da0dce17a7c9eeaca9f420cc6770a9fe143b9382d73bd22fe59b21a5f（#6282808058）；
 既有3.11.2/UID1002/镜像ID不是ELF摘要。没有填占位SHA冒充冻结完成。
 如需补取，准备命令仅创建一个无挂载/无网络/只读根的临时容器，读取它自身Python文件，
 使用唯一名字+本次label限定异常清理；Docker会有临时元数据/overlay，不能称完全零写。本轮未执行。
 
 ### 准确顺序及待确认实际动作（尚无现场执行）
 
-1. 取得上述单一binary pin后，冻结完整expected descriptor及request摘要；不重复全环境核验。
+1. 实测binary pin已纳入完整expected descriptor及request；不重复取证或全环境核验。
 2. 仅新增host b3-input-20261020只读输入（root:1002，目录0550/文件0440）及logs/b3-initialize-20261020（root0700）；
    工具复用原activation_control.py准确SHA169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4，
    不覆盖B1源码。仅宿主root读B1原回执/manifest并生成本次独立只读证据副本。
@@ -330,7 +330,7 @@ DB建立/打开仍在原B6后续阶段，socket/服务仍按原运行阶段，�
    不创建DB，不生成WAL，不bind socket，不安装systemd或启动业务进程。
 4. 容器只挂本次input只读、本次root读写；固定镜像、UID1002、network none、read-only root、cap-drop ALL、
    no-new-privileges、512MiB/swap1GiB/pids96。Python3.11运行；宿主3.6.8不升级。
-5. 必要薄适配缺口尚未实现：O_EXCL/不覆盖发布本次intent与config、同请求冲突校验、对原Store精确调度及不可变回执。
+5. 必要薄适配已实现于initialize.py：O_EXCL/不覆盖发布本次intent与config、同请求冲突校验、对原Store精确调度及不可变回执。
    不新增安装器/账本/调度系统。fresh只在本次新根和已证实无历史时，以owner_uid=1002构造ActivationStore，再调用原prepare方法并指定expected_epoch=0，
    真正产生一条新epoch1 PREPARED日志及descriptor；保留原Store写前append、fsync、descriptor发布格式。
 6. 独立进程inspect读回全字段/链/原receipt。原Store.read内部锁可能O_CREAT/fchmod已有本次锁0644，
@@ -346,6 +346,31 @@ DB建立/打开仍在原B6后续阶段，socket/服务仍按原运行阶段，�
 06仅新身份声明不发布宿主Owner/Signer；07/08只限新私有目录不改B1/B2/旧generation/ACL；
 09不消费或修改TLS，后续确有需求仍沿原B3内部处理，不新增第八批。
 
-现状：配置/来源/动作方案已准备；完整binary pin、薄适配及其定向中断恢复验收仍未完成。
+现状：真实binary、薄适配、固定request与14项双Python Hosted验收已交付；英国安装仍NOT_EXECUTED。
 原14例/8例及B1/B2未变结果复用，不重复全审；本轮资料新增只做结构、摘要、身份和路径长度检查。
 实际服务器目录/进程/权限变更全部NOT_EXECUTED，现场操作须按本次Owner要求待确认。
+
+## B3薄适配最终交付（PR17 #6282808058/#6282750907）
+
+固定入口为`production/p2_install/initialize.py execute|inspect|recover --request-sha256 <固定摘要>`，stdin同一request。
+[最终固定命令/动作清单](../../docs/p2-b3-initialize-20261020/FINAL_OPERATION.md)；
+[准确request](../../docs/p2-b3-initialize-20261020/request.json)。
+request SHA256=d843a697e17e516aa92cb47a4c507527152f65d25b11ccdcc43d27b7fd878dbb；
+预期原commit receipt SHA256=bede2ebc9f9c5458c92307c974358eb61947e7ec80a9611cc76735891ffae433。
+外部请求不可加载模块；固定源码原Store逐字节验签，binary须匹配实际解释器path/bytes/SHA，缺失或漂移HOLD。
+new epoch1完整历史/同身份核准后才可reconcile；不覆盖异身份descriptor，不追加epoch2。
+DB/socket若意外存在，写前HOLD，不将其收为本批成果。
+
+Hosted [39366424078](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39366424078)
+head5752051795755e4a27ea5863e2a731e24f566f92：Python3.11/3.12各14项PASS，已读实际日志。
+测试SIGKILL对象包含真实原Store.prepare在append之后、descriptor之前运行的子进程；
+测试解释器是Hosted原字节的私有0500副本，未放宽文件权限检查，不冒充英国binary。
+前序Hosted失败39366059105/39366255180/39366332332保留，具体FILE_PROTECTION指向Hosted group-writable interpreter。
+旧14例/8例未重复；本轮新增14例独立于旧R03分类器。
+
+可取得制品为固定Commit1f455da15131ddd885439f8903c85e14251663b7下
+scripts/p2_b3_owner_initialize_20261020.py；78182字节，
+SHA25636399b8c57a4acf116c8074a52acab34fd3ee258e41f31edb1f93ea6e629c4ad。
+内含原Store、薄适配、固定request及预期文件；不是仅scratch路径。
+宿主命令Python3.6语法/三动作stdin/制品内源码SHA核对PASS；本地Docker和英国安装NOT_EXECUTED。
+成功仅标B3_NEW_INITIALIZATION_SUBCHECKPOINT_PASS且full_b3_complete=false，实际动作待Owner确认。
