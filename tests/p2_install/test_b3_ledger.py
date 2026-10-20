@@ -102,6 +102,26 @@ print(json.dumps(m.dispatch(req,sys.argv[2],m.sha(m.encode(req)))))
         finally:
             os.environ.clear();os.environ.update(old)
 
+    def test_original_build_guards_unchanged(self):
+        tree=ast.parse((APP/'ledger_service.py').read_text())
+        build=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='build')
+        start=next(i for i,n in enumerate(build.body) if isinstance(n,ast.Assign))
+        retained=ast.dump(ast.Module(body=build.body[start:],type_ignores=[]),include_attributes=False)
+        self.assertEqual(hashlib.sha256(retained.encode()).hexdigest(),
+                         'c962ba6984475c9fbf99bdd3e1f5062ea3e0bf260fcc064df698ccf71965ab19')
+
+    def test_actual_consumer_rejects_extra_transport_even_with_matching_hash(self):
+        self.call()
+        cfg_path=self.root/'prepared/ledger-config.json';profile_path=self.root/'prepared/profile.json'
+        cfg=json.loads(cfg_path.read_bytes());cfg['tcp_endpoint']='127.0.0.1:443'
+        cfg_path.chmod(0o600);cfg_path.write_bytes(m.encode(cfg));cfg_path.chmod(0o400)
+        profile=json.loads(profile_path.read_bytes());profile['config_sha256']=m.sha(m.encode(cfg))
+        profile_path.chmod(0o600);profile_path.write_bytes(m.encode(profile));profile_path.chmod(0o400)
+        expected=m.cp03_identity(self.root,self.req['cp03_receipt_sha256'])
+        check=m.documents(self.req,expected)[3];check[-1]=m.sha(m.encode(profile))
+        with self.assertRaisesRegex(ValueError,'REAL_LEDGER_PREPARED_CONSUMER_FAILED'):
+            m.consume(self.req,check)
+
     def test_full_sequence_or_accurate_independent_uid_hold(self):
         value=self.call()
         if os.environ.get('P2_REQUIRE_OS_DENIAL')=='1':
