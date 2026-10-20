@@ -238,9 +238,47 @@ jobs:
           test -x "$node_bin"
           "$node_bin" --version
           printf 'COMMUNITY_NODE_BINARY=%s\n' "$node_bin" >> "$GITHUB_ENV"
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          persist-credentials: false
+          name: community-phase-integration-evidence
+          path: ${{ runner.temp }}/community-mini-source-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify exact Hosted source package and unpack without git checkout
+        env:
+          COMMUNITY_EXPECTED_SOURCE_SHA256: ${{ needs.test.outputs.source_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'SOURCE'
+          import hashlib,io,json,os,re,stat,zipfile
+          from pathlib import Path
+          temp=Path(os.environ['RUNNER_TEMP'])
+          suffix=os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          raw=(temp/('community-mini-source-input-'+suffix)/'community-stage-source.zip').read_bytes()
+          expected=os.environ['COMMUNITY_EXPECTED_SOURCE_SHA256']
+          assert re.fullmatch('[0-9a-f]{64}',expected) and hashlib.sha256(raw).hexdigest()==expected
+          archive=zipfile.ZipFile(io.BytesIO(raw));items=archive.infolist()
+          assert len(items)<2000 and len(items)==len({i.filename for i in items})
+          assert sum(i.file_size for i in items)<10000000
+          manifest=json.loads(archive.read('MANIFEST.json'))
+          assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
+          assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
+          assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
+          files={}
+          for item in items:
+              path=Path(item.filename)
+              assert not path.is_absolute() and '..' not in path.parts and chr(92) not in item.filename
+              assert stat.S_ISREG(item.external_attr >> 16)
+              data=archive.read(item)
+              if item.filename!='MANIFEST.json':
+                  assert hashlib.sha256(data).hexdigest()==manifest['files'][item.filename]
+              files[item.filename]=data
+          root=temp/('community-mini-preview-source-'+suffix);root.mkdir(mode=0o700)
+          for name,data in files.items():
+              path=root/name;path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+              with path.open('xb') as out:out.write(data)
+              path.chmod(0o600)
+          print('EXACT_PREVIEW_SOURCE_MANIFEST=PASS; FILES='+str(len(manifest['files'])))
+          SOURCE
       - uses: actions/download-artifact@v4
         with:
           name: community-mini-sdk-runtime
@@ -254,6 +292,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/community-mini-ci"
           tar --no-same-owner -xzf sdk.tar.gz -C "$RUNNER_TEMP/community-mini-ci"
       - name: Preview development code using existing upload secret
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
         env:
           WECHAT_MINIPROGRAM_APPID: ${{ secrets.WECHAT_MINIPROGRAM_APPID }}
           WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
