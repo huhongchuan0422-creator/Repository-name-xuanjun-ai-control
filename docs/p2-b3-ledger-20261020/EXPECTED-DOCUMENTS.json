@@ -1,0 +1,39 @@
+{
+  "status": "EXPECTED_NOT_UK_EXECUTED",
+  "sources": "Owner accepted CP03 identity and fixed request",
+  "documents": [
+    {
+      "path": "EXPECTED-ledger-config.json",
+      "bytes": 1149,
+      "sha256": "6ab16b3877cf112a72585723c1e8e67fc98e11cf69e6361338f871480d2dfa15"
+    },
+    {
+      "path": "EXPECTED-profile.json",
+      "bytes": 956,
+      "sha256": "721c6fef4fe59cce60adb460734b8c4d2fd09943822088637d4898c807218a09"
+    },
+    {
+      "path": "EXPECTED-runtime-invocation.json",
+      "bytes": 416,
+      "sha256": "a1e1b2fb13588b40914388b16d50007262912d3ef878306456118539294a55c0"
+    },
+    {
+      "path": "EXPECTED-identity.json",
+      "bytes": 1229,
+      "sha256": "577bb7e951390bd995f3d87b0e851c0dc4c56e6d4324897026b9a2b9cde54157"
+    }
+  ],
+  "check_argv": [
+    "/usr/bin/python3.11",
+    "-B",
+    "-S",
+    "/application/stage1/ledger_service.py",
+    "--config",
+    "/var/lib/xuanjun-p2-isolated-test/b3-initialize/prepared/ledger-config.json",
+    "--check-isolated-prepared",
+    "--profile",
+    "/var/lib/xuanjun-p2-isolated-test/b3-initialize/prepared/profile.json",
+    "--profile-sha256",
+    "721c6fef4fe59cce60adb460734b8c4d2fd09943822088637d4898c807218a09"
+  ]
+}
