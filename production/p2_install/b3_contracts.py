@@ -8,8 +8,9 @@ import json
 import os
 from pathlib import Path
 import stat
-import subprocess
-import sys
+import errno
+import signal
+import time
 import uuid
 
 
@@ -152,27 +153,34 @@ The UID1002 installation process returns UNAVAILABLE instead of inventing proof.
          denied_uid > 0 and denied_gid > 0 and denied_uid != uid, 'DENIED_SUBJECT')
     if os.geteuid() != 0:
         return {'status': 'UNAVAILABLE', 'reason': 'INDEPENDENT_SUBJECT_REQUIRED'}
-    program = '''import errno,os,sys
-try:
- os.setgroups([])
- os.setgid(int(sys.argv[3]))
- os.setuid(int(sys.argv[2]))
-except PermissionError:
- sys.exit(77)
-try:
- fd=os.open(sys.argv[1],os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
- os.close(fd)
-except OSError as e:
- sys.exit(0 if e.errno in (errno.EACCES,errno.EPERM) else 3)
-sys.exit(4)
-'''
-    result = subprocess.run([sys.executable, '-I', '-B', '-S', '-c', program,
-                             str(path), str(denied_uid), str(denied_gid)],
-                            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, timeout=5)
-    if result.returncode == 77:
+    child = os.fork()
+    if child == 0:
+        code = 3
+        try:
+            try:
+                os.setgroups([]); os.setgid(denied_gid); os.setuid(denied_uid)
+            except PermissionError:
+                os._exit(77)
+            try:
+                fd = os.open(str(path), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                os.close(fd); code = 4
+            except OSError as exc:
+                code = 0 if exc.errno in (errno.EACCES, errno.EPERM) else 3
+        finally:
+            os._exit(code)
+    deadline = time.monotonic() + 5
+    while True:
+        observed, status = os.waitpid(child, os.WNOHANG)
+        if observed:
+            break
+        if time.monotonic() >= deadline:
+            os.kill(child, signal.SIGKILL); os.waitpid(child, 0)
+            raise Hold('DENIAL_PROBE_TIMEOUT')
+        time.sleep(.01)
+    code = os.waitstatus_to_exitcode(status)
+    if code == 77:
         return {'status': 'UNAVAILABLE', 'reason': 'INDEPENDENT_SUBJECT_REQUIRED'}
-    need(result.returncode == 0, 'UNAUTHORIZED_DENIAL_NOT_PROVEN')
+    need(code == 0, 'UNAUTHORIZED_DENIAL_NOT_PROVEN')
     return {'status': 'PASS', 'uid': denied_uid, 'gid': denied_gid,
             'operation': 'OPEN_DIRECTORY', 'scope': 'EXACT_PATH_ONLY'}
 
