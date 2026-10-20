@@ -311,12 +311,50 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
   self.assertEqual(errors,[]);self.assertEqual(len(values),8)
   self.assertTrue(all(cls is values[0][0] and helper is values[0][1] for cls,helper in values))
 
- def test_original_class_and_entries_ast_exactly_preserved(self):
+ def canonical_ast_dump(self,node):
+  # Python 3.12 added empty type_params fields to class/function AST nodes.
+  # Canonicalize 3.11 to that fixed 3.12 representation only; a non-empty
+  # type_params value is semantic and is never discarded.
+  import copy
+  node=copy.deepcopy(node)
+  for item in ast.walk(node):
+   if isinstance(item,(ast.ClassDef,ast.FunctionDef,ast.AsyncFunctionDef)):
+    if 'type_params' not in item._fields:
+     item._fields=tuple(item._fields)+('type_params',)
+     item.type_params=[]
+    elif item.type_params:
+     raise AssertionError('NONEMPTY_TYPE_PARAMS_NOT_NORMALIZED')
+  return ast.dump(node,include_attributes=False)
+
+ def fixed_ast_nodes(self):
   tree=ast.parse((ROOT/'scripts/pr122_site_hub_unified_release.py').read_text())
+  return {name:next(n for n in ast.walk(tree) if isinstance(n,(ast.ClassDef,ast.FunctionDef)) and n.name==name)
+          for name in ('Transaction','entries')}
+
+ def test_original_class_and_entries_ast_exactly_preserved(self):
+  # Fixed expected digests were captured from the reviewed IMPORT_ISOLATION
+  # candidate under Python 3.12. Canonicalization makes Python 3.11 emit that
+  # same shape by adding only absent empty type_params fields.
   expected={'Transaction':'20511fb4466bd12942b2b8fc0187c34e6b2cdc04827fa4b3f67dd25b252e8117','entries':'b63f583e12d4525a11f63c738f1f6b41563f315533818266515415fdfec62d6b'}
-  for name,value in expected.items():
-   node=next(n for n in ast.walk(tree) if isinstance(n,(ast.ClassDef,ast.FunctionDef)) and n.name==name)
-   self.assertEqual(sha(ast.dump(node,include_attributes=False).encode()),value)
+  for name,node in self.fixed_ast_nodes().items():
+   self.assertEqual(sha(self.canonical_ast_dump(node).encode()),expected[name])
+
+ def test_ast_normalization_rejects_semantic_security_check_deletion(self):
+  import copy
+  expected={'Transaction':'20511fb4466bd12942b2b8fc0187c34e6b2cdc04827fa4b3f67dd25b252e8117','entries':'b63f583e12d4525a11f63c738f1f6b41563f315533818266515415fdfec62d6b'}
+  for name,original in self.fixed_ast_nodes().items():
+   node=copy.deepcopy(original);removed=False
+   for owner in ast.walk(node):
+    for field in getattr(owner,'_fields',()):
+     value=getattr(owner,field,None)
+     if not isinstance(value,list):continue
+     for index,item in enumerate(value):
+      if isinstance(item,ast.Expr) and isinstance(item.value,ast.Call) and isinstance(item.value.func,ast.Name) and item.value.func.id=='need':
+       del value[index];removed=True;break
+     if removed:break
+    if removed:break
+   self.assertTrue(removed,name+':NO_SECURITY_CHECK_FIXTURE')
+   self.assertNotEqual(sha(self.canonical_ast_dump(node).encode()),expected[name])
 
  def test_methods_keep_module_globals_and_no_helper_closures(self):
   import types
