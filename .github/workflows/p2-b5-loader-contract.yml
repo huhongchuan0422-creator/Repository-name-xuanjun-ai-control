@@ -32,7 +32,7 @@ jobs:
           cp tests/p2_b5_binding/test_binding.py candidate/tests/p2_b5_binding/
           cp docs/p2-b5-20261020/CONTINUATION.md docs/p2-b5-20261020/LOADER_BINDING.md candidate/docs/p2-b5-20261020/
           cd candidate
-          find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: b5-readonly-continuation-source
