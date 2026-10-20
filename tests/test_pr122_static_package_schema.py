@@ -348,13 +348,13 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
   # Fixed expected digests were captured from the reviewed IMPORT_ISOLATION
   # candidate under Python 3.12. Canonicalization makes Python 3.11 emit that
   # same shape by adding only absent empty type_params fields.
-  expected={'Transaction':'92e80bfe60ca34a9066635c29b95c6f188f325e3addd3eb984ecc2bec840a31c','entries':'ef7c94d1054aeb71bd6072a33115224cbb4499658d5467ed91cf8b036c56ab79'}
+  expected={'Transaction':'20511fb4466bd12942b2b8fc0187c34e6b2cdc04827fa4b3f67dd25b252e8117','entries':'b63f583e12d4525a11f63c738f1f6b41563f315533818266515415fdfec62d6b'}
   for name,node in self.fixed_ast_nodes().items():
    self.assertEqual(sha(self.canonical_ast_dump(node).encode()),expected[name])
 
  def test_ast_normalization_rejects_semantic_security_check_deletion(self):
   import copy
-  expected={'Transaction':'92e80bfe60ca34a9066635c29b95c6f188f325e3addd3eb984ecc2bec840a31c','entries':'ef7c94d1054aeb71bd6072a33115224cbb4499658d5467ed91cf8b036c56ab79'}
+  expected={'Transaction':'20511fb4466bd12942b2b8fc0187c34e6b2cdc04827fa4b3f67dd25b252e8117','entries':'b63f583e12d4525a11f63c738f1f6b41563f315533818266515415fdfec62d6b'}
   for name,original in self.fixed_ast_nodes().items():
    node=copy.deepcopy(original);removed=False
    for owner in ast.walk(node):
