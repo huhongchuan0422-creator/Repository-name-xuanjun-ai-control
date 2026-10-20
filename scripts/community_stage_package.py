@@ -17,6 +17,7 @@ def build(root):
                 'clients/community-mini/pages/checkout/*',
                 'docs/development/COMMUNITY_STAGE_INTEGRATION_20261017.md',
                 'docs/development/COMMUNITY_CENTER_EXACT_INTEGRATION_20261018.md',
+                'docs/development/COMMUNITY_BILL_CONTRACT_EVIDENCE.json',
                 'scripts/pr122_customer_core.py',
                 'scripts/pr122_customer_source.py',
                 'scripts/pr122_customer_evidence.py',
