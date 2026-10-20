@@ -6,6 +6,7 @@ on:
       - scripts/p2_b5_snapshot.py
       - scripts/p2_b5_export_probe.mjs
       - tests/p2_install/test_b5_snapshot.py
+      - docs/p2-b5-20261020/SNAPSHOT_CANDIDATE.sh
       - .github/workflows/p2-b5-snapshot-candidate.yml
   workflow_dispatch:
 permissions:
@@ -22,14 +23,17 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Only new snapshot filesystem tests, private fixtures
-        run: sudo "$(command -v python)" -B -m unittest discover -s tests/p2_install -p test_b5_snapshot.py -v
+        run: sudo env B5_REQUIRE_UID1002=1 "$(command -v python)" -B -m unittest discover -s tests/p2_install -p test_b5_snapshot.py -v
       - name: Probe syntax only, never import actual SDK
         run: node --check scripts/p2_b5_export_probe.mjs
       - name: Package NEW candidate source only, not the original plugin
         run: |
-          mkdir candidate
-          cp scripts/p2_b5_snapshot.py scripts/p2_b5_export_probe.mjs candidate/
-          sha256sum candidate/* > candidate/SHA256SUMS
+          mkdir -p candidate/scripts candidate/production/p2_install candidate/docs/p2-b5-20261020
+          cp scripts/p2_b5_snapshot.py scripts/p2_b5_export_probe.mjs candidate/scripts/
+          cp production/p2_install/b5_loader_contract.mjs candidate/production/p2_install/
+          cp docs/p2-b5-20261020/SNAPSHOT_CANDIDATE.sh docs/p2-b5-20261020/SNAPSHOT_PACKAGE.md candidate/docs/p2-b5-20261020/
+          cd candidate
+          sha256sum scripts/* production/p2_install/* docs/p2-b5-20261020/* > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: b5-snapshot-candidate-${{ matrix.python }}
