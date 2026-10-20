@@ -15,6 +15,8 @@ def build(root):
                 'demos/community-admin/*', 'clients/community-mini/*.js',
                 'clients/community-mini/*.json', 'clients/community-mini/*.cjs',
                 'clients/community-mini/pages/checkout/*',
+                'clients/community-mini/pages/home/*',
+                'clients/community-mini/pages/profile/*',
                 'docs/development/COMMUNITY_STAGE_INTEGRATION_20261017.md',
                 'docs/development/COMMUNITY_CENTER_EXACT_INTEGRATION_20261018.md',
                 'docs/development/COMMUNITY_BILL_CONTRACT_EVIDENCE.json',
@@ -35,7 +37,13 @@ def build(root):
                 'scripts/community_stage_package.py', 'clients/community-mini/app.json',
                 'scripts/pr122_customer_core.py', 'scripts/pr122_customer_source.py',
                 'scripts/pr122_customer_runtime.py', 'scripts/pr122_customer_evidence.py',
-                'scripts/pr122_customer_activity_evidence.py', 'scripts/pr122_customer_privacy.py'}
+                'scripts/pr122_customer_activity_evidence.py', 'scripts/pr122_customer_privacy.py',
+                'clients/community-mini/pages/home/index.js',
+                'clients/community-mini/pages/home/index.json',
+                'clients/community-mini/pages/home/index.wxml',
+                'clients/community-mini/pages/profile/index.js',
+                'clients/community-mini/pages/profile/index.json',
+                'clients/community-mini/pages/profile/index.wxml'}
     if not required.issubset(files):
         raise ValueError('REQUIRED_SOURCE_MISSING')
     manifest = {'format': 1, 'purpose':'OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE',
