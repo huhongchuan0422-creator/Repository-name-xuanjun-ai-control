@@ -1,0 +1,38 @@
+name: P2 B3 CP08 and Python368 host
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - 'production/p2_install/cp08_*.py'
+      - 'production/p2_install/b3_ledger.py'
+      - 'scripts/p2_b3_owner_finalize_20261020.py'
+      - 'scripts/build_p2_b3_final_bundle.py'
+      - 'tests/p2_install/test_cp08_*.py'
+      - '.github/workflows/p2-b3-final.yml'
+permissions:
+  contents: read
+jobs:
+  host368:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker pull python:3.6.8
+      - name: Exact Python3.6.8 syntax and actual host APIs without Docker socket
+        run: docker run --rm --network=none --cap-drop=ALL --security-opt=no-new-privileges --read-only --tmpfs=/tmp:rw,nosuid,nodev,size=64m,mode=1777 --mount=type=bind,src="$PWD",dst=/source,readonly --env=REQUIRE_PYTHON368=1 python:3.6.8 python -I -B -S /source/tests/p2_install/test_cp08_host.py -v
+  docker-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: docker pull python:3.11.2-slim
+      - run: sudo "$(command -v python)" -B tests/p2_install/test_cp08_host.py -v
+      - run: sudo "$(command -v python)" -B tests/p2_install/test_cp08_docker.py -v
+      - run: python -B scripts/build_p2_b3_final_bundle.py --output "$RUNNER_TEMP/p2-b3-final-delivery"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-b3-final-fixed-delivery
+          path: ${{ runner.temp }}/p2-b3-final-delivery/
