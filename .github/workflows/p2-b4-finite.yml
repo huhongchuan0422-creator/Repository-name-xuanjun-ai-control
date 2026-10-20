@@ -41,3 +41,14 @@ jobs:
         with:
           name: p2-b4-finite-evidence
           path: ${{ runner.temp }}/b4-evidence.tar.gz
+      - run: python -B scripts/build_p2_b4_bundle.py --output "$RUNNER_TEMP/b4-fixed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-b4-fixed-delivery
+          path: ${{ runner.temp }}/b4-fixed/
+  host368:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker pull python:3.6.8
+      - run: docker run --rm --network=none --cap-drop=ALL --security-opt=no-new-privileges --read-only --tmpfs=/tmp:rw,nosuid,nodev,size=64m,mode=1777 --mount=type=bind,src="$PWD",dst=/source,readonly --env=REQUIRE_PYTHON368=1 python:3.6.8 python -I -B -S /source/tests/p2_install/test_b4_host.py -v
