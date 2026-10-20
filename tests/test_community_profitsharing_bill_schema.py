@@ -13,7 +13,8 @@ from cryptography.hazmat.primitives.asymmetric import padding
 import test_community_reports as fixtures
 import test_community_wechat_sp_readonly as keys
 from scripts.community_provider_bills import (
-    ProviderBills, SPLIT_COLUMNS, SPLIT_SUMMARY_COLUMNS, SPLIT_SCHEMA, parse, parse_document)
+    ProviderBills, SPLIT_COLUMNS, SPLIT_SUMMARY_COLUMNS, SPLIT_SCHEMA, parse, parse_document,
+    signed_bill_evidence)
 from scripts.pr122_customer_core import canonical
 
 
@@ -283,10 +284,16 @@ class ExactSplitDetailJourney(unittest.TestCase):
         identity=tuple(self.g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
         saved=self.a._load(self.key)
         saved['payload']['receivers']=[dict(type='PERSONAL_SUB_OPENID',account='private-openid',amount=10)]
+        data=dict(self.response,receivers=[dict(type='PERSONAL_SUB_OPENID',account='private-openid',amount=10,
+            result='SUCCESS',detail_id='synthetic-detail',finish_time='2026-10-16T12:00:00+08:00')])
+        # Isolate bill validation with retained legacy terminal evidence. The
+        # original ProviderActions contract correctly refuses creating this
+        # receiver while sub_appid is absent.
+        saved['bill_evidence']=signed_bill_evidence(data,'d'*64,'SPLIT')
+        saved['result']=dict(status='FINISHED',receivers=[
+            dict(receiver_id='legacy-personal-sub',amount_minor=10,result='SUCCESS')],
+            receiver_results_pending=False)
         self.a._save(self.key,saved)
-        self.response['receivers']=[dict(type='PERSONAL_SUB_OPENID',account='private-openid',amount=10,
-            result='SUCCESS',detail_id='synthetic-detail',finish_time='2026-10-16T12:00:00+08:00')]
-        self.accept()
         result=self.bills.reconcile(self.g,self.bill({'分账接收方':'private-openid'}))
         self.assertEqual(result['matched_detail_rows'],0)
         self.assertIn('LOCAL_SIGNED_DETAIL_EVIDENCE_COMPLETENESS',result['pending_evidence'])

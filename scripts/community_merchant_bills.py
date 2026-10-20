@@ -43,6 +43,10 @@ class _ProjectLedger:
     """Narrow read adapter: original storage, with no money/authorization API."""
     def __init__(self, actions, project):
         self.center, self.reader, self.runtime = actions.center, actions.reader, actions.runtime
+        # Read-only snapshot of the original admitted receiver policies. ProviderBills
+        # needs only receiver/sub_appid validation; this adapter still exposes no
+        # authorization or money-operation methods.
+        self.bindings = {identity: _copy(policy) for identity, policy in actions.bindings.items()}
         self.project = project
 
     def _load(self, key):
