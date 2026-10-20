@@ -1,0 +1,45 @@
+name: P2 B5 retained archive three-file tool
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - scripts/p2_b5_three_files.py
+      - tests/p2_b5_three_files/**
+      - docs/p2-b5-20261020/THREE_FILES_CANDIDATE.sh
+      - .github/workflows/p2-b5-three-files.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-tool:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: New archive fixtures only - real UID and SIGKILL required
+        run: sudo env B5_REQUIRE_UID=1 "$(command -v python)" -B -m unittest discover -s tests/p2_b5_three_files -p test_tool.py -v
+      - name: Candidate syntax and embedded source equality
+        run: |
+          sh -n docs/p2-b5-20261020/THREE_FILES_CANDIDATE.sh
+          python - <<'PY'
+          from pathlib import Path
+          wrapper=Path('docs/p2-b5-20261020/THREE_FILES_CANDIDATE.sh').read_text()
+          embedded=wrapper.split("<<'B5_THREE_FILES_TOOL'\n",1)[1].rsplit('B5_THREE_FILES_TOOL\n',1)[0]
+          assert embedded==Path('scripts/p2_b5_three_files.py').read_text()
+          PY
+      - name: Package new tool and complete candidate only - no UK files
+        run: |
+          mkdir -p candidate/scripts candidate/docs/p2-b5-20261020
+          cp scripts/p2_b5_three_files.py candidate/scripts/
+          cp docs/p2-b5-20261020/THREE_FILES_CANDIDATE.sh docs/p2-b5-20261020/THREE_FILES_TOOL.md candidate/docs/p2-b5-20261020/
+          cd candidate
+          sha256sum scripts/* docs/p2-b5-20261020/* > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: b5-three-files-tool-${{ matrix.python }}
+          path: candidate/
