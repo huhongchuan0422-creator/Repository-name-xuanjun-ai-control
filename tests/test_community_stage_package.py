@@ -1,6 +1,9 @@
 import hashlib
 import io
 import json
+import subprocess
+import sys
+import tempfile
 import unittest
 import zipfile
 from pathlib import Path
@@ -32,5 +35,15 @@ class SourcePackage(unittest.TestCase):
             self.assertEqual(manifest['files'][bill],hashlib.sha256(bill_raw).hexdigest())
             self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             self.assertFalse(any(name.endswith(('.pem','.sqlite','.env')) for name in archive.namelist()))
+            with tempfile.TemporaryDirectory() as tmp:
+                archive.extractall(tmp)
+                isolated=subprocess.run(
+                    [sys.executable,'-B','-m','unittest','discover','-s','tests',
+                     '-p','test_community_bill_contract_evidence.py','-v'],
+                    cwd=tmp,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                    text=True,timeout=60,check=False)
+                self.assertEqual(isolated.returncode,0,isolated.stdout)
+                self.assertIn('Ran 5 tests',isolated.stdout)
+                self.assertIn('OK',isolated.stdout)
 
 if __name__=='__main__':unittest.main()
