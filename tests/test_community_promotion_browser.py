@@ -52,7 +52,9 @@ class CommunityPromotionBrowserJourney(unittest.TestCase):
                     admin.locator('#promotionTitle').fill('Synthetic browser promotion')
                     admin.locator('#promotionExpiry').fill(datetime.datetime.fromtimestamp(expires,datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M'))
                     admin.locator('#createPromotion').click()
-                    expect(admin.locator('#promotionCode')).to_have_value(re.compile(r'^cp_[0-9a-f]{32}
+                    expect(admin.locator('#promotionCode')).to_have_value(re.compile(r'^cp_[0-9a-f]{32}$'))
+                    expect(admin.locator('#promotionVersion')).to_have_value('1')
+                    code=admin.locator('#promotionCode').input_value()
 
                     consumer_context=browser.new_context()
                     consumer=consumer_context.new_page();consumer.goto(base+'/community/portal')
