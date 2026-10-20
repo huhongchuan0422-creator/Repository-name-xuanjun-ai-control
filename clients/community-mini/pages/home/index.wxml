@@ -1,5 +1,5 @@
 <view>
-  <text>客户中心</text>
+  <text>客户中心</text><text>开发测试入口；支付保持关闭，未配置后端时不会进入业务。</text>
   <text>{{status}}</text>
   <button wx:if="{{!authenticated}}" bindtap="retryLogin" disabled="{{pending}}">重新登录</button>
   <button wx:if="{{authenticated}}" bindtap="openProfile" disabled="{{pending}}">本人资料</button>
