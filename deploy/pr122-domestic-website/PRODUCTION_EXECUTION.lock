@@ -1,0 +1,3 @@
+NOT_AUTHORIZED
+This candidate intentionally contains no installer or sudo entry.
+Production execution requires a later exact-package independent review and two-host Release Gate.

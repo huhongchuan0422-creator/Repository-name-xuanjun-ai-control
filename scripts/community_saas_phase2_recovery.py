@@ -1,0 +1,118 @@
+"""Stage5 Phase2 verified offline SQLite backup; no production deployment.
+
+Backups are only created from explicitly passed offline stores. Recovery is
+manual: this module never overwrites live storage, processes money or grants.
+"""
+import hashlib
+import os
+import pathlib
+import sqlite3
+import tempfile
+import stat
+import re
+
+def _file(path):
+    candidate=pathlib.Path(path)
+    try:
+        mode=candidate.lstat().st_mode
+    except (OSError,ValueError):
+        raise ValueError("SOURCE_DB_MISSING")
+    if not stat.S_ISREG(mode):raise ValueError("SOURCE_DB_MISSING")
+    return candidate.resolve(strict=True)
+
+def _reject_symlink_ancestors(path, error):
+    cursor=pathlib.Path(path)
+    while True:
+        if cursor.is_symlink():raise ValueError(error)
+        if cursor==cursor.parent:return
+        cursor=cursor.parent
+
+def backup(source_path, output_path):
+    src=_file(source_path)
+    requested=pathlib.Path(output_path)
+    _reject_symlink_ancestors(requested,"BACKUP_PATH_UNSAFE")
+    if requested.exists():raise ValueError("BACKUP_PATH_UNSAFE")
+    dest=requested.resolve()
+    if dest==src or dest.exists():raise ValueError("BACKUP_PATH_UNSAFE")
+    dest.parent.mkdir(parents=True,exist_ok=True)
+    _reject_symlink_ancestors(requested,"BACKUP_PATH_UNSAFE")
+    handle=None
+    db=sqlite3.connect(src.as_uri()+"?mode=ro",uri=True)
+    try:
+        if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
+            raise ValueError("SOURCE_DB_INTEGRITY")
+        tmp=tempfile.NamedTemporaryFile(dir=str(dest.parent),suffix=".sqlite",delete=False)
+        temp=pathlib.Path(tmp.name);tmp.close()
+        try:
+            handle=sqlite3.connect(temp)
+            db.backup(handle)
+            if handle.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
+                raise ValueError("BACKUP_INTEGRITY")
+            handle.close();handle=None
+            raw=temp.read_bytes()
+            if requested.is_symlink() or requested.exists():
+                raise ValueError("BACKUP_DESTINATION_CHANGED")
+            os.link(temp,dest)
+            return {"sha256":hashlib.sha256(raw).hexdigest(),
+                    "size_bytes":len(raw),
+                    "destination":str(dest),
+                    "restored":False}
+        finally:
+            if handle is not None:handle.close()
+            if temp.exists():temp.unlink()
+    finally:db.close()
+
+def verify_backup(path,expected_sha256):
+    if type(expected_sha256) is not str or re.fullmatch(r"[0-9a-f]{64}",expected_sha256) is None:
+        raise ValueError("INVALID_BACKUP_DIGEST")
+    p=_file(path)
+    digest=hashlib.sha256(p.read_bytes()).hexdigest()
+    if digest!=expected_sha256:raise ValueError("BACKUP_DIGEST_MISMATCH")
+    db=sqlite3.connect(p.as_uri()+"?mode=ro",uri=True)
+    try:
+        if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
+            raise ValueError("BACKUP_INTEGRITY")
+    finally:db.close()
+    return {"verified":True,"restored":False,"production_release_authorized":False}
+
+def cross_store_audit(quote_db,order_db,tenant_id):
+    """Read-only, per-tenant integrity audit across separate SQLite files.
+
+    A cross-database sale is NOT atomic. This audit detects inconsistency and
+    returns HOLD rather than inventing a successful payment or restoration.
+    """
+    from scripts.community_merchant_contract import valid_id
+    from scripts.community_saas_order_preparation import quote_provenance,status
+    from scripts.community_saas_offer_catalog import read_quote
+    if type(tenant_id) is not str or not valid_id(tenant_id):
+        raise ValueError("INVALID_TENANT")
+    rows=order_db.execute(
+        "SELECT order_id,quote_id FROM saas_order_preparations "
+        "WHERE tenant_id=? ORDER BY order_id",(tenant_id,)).fetchall()
+    pending=[]
+    for order_id,quote_id in rows:
+        try:
+            quote_provenance(order_db,order_id,tenant_id)
+            read_quote(quote_db,quote_id,tenant_id)
+            status(order_db,order_id,tenant_id)
+        except (ValueError,sqlite3.DatabaseError):
+            pending.append(order_id)
+    return {"tenant_id":tenant_id,"orders_checked":len(rows),
+            "integrity_hold":pending,"approval_for_payment":False,
+            "automatic_repair_executed":False,
+            "cross_database_atomicity_proven":False}
+
+def rollback_preview(backup_path, expected_sha256, target_path):
+    """Read-only plan. Never replace a live database automatically."""
+    verified=verify_backup(backup_path,expected_sha256)
+    requested=pathlib.Path(target_path)
+    _reject_symlink_ancestors(requested,"ROLLBACK_TARGET_SYMLINK")
+    target=requested.resolve()
+    saved=_file(backup_path)
+    if target==saved:
+        raise ValueError("ROLLBACK_SOURCE_EQUALS_TARGET")
+    return {"backup_verified":verified["verified"],
+            "target":str(target),"source":str(saved),
+            "requires_manual_service_stop":True,
+            "requires_authorized_restore":True,
+            "rollback_executed":False,"production_gate":"HOLD"}

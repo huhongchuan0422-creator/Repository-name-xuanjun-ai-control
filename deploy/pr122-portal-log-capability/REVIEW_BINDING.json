@@ -1,0 +1,11 @@
+{
+  "files": {
+    "deploy/pr122-portal-log-capability/README.md": "d3e162e98dd91db96047d1fbef7736084e35ebba5ac4c8b83f87b555e2eb1a88",
+    "deploy/pr122-portal-log-capability/install_grant.py": "e95d2c08c49f7df2058cbf4bfce67c17715d9c09bdbbb6e9aa5cc69064f1b3a0",
+    "deploy/pr122-portal-log-capability/portal_log_capability.py": "0e61a4cab72a18e94ed8b97c81e035ee023dfe0969c871c50651cf75792cbcbe",
+    "tests/test_portal_log_capability.py": "65d59c66c8e7f34ec703b46a369c09f4ae9700b8f5a87842434a898f26eab09d"
+  },
+  "patch_source_commit": "ce211a606e82845bfe4d7a6e3d511f3872d53147",
+  "schema_version": 1,
+  "scope": "NEW_PERSISTENT_FIXED_ACTION_ADAPTER_NOT_PRODUCTION_ACCEPTANCE"
+}

@@ -1,0 +1,56 @@
+{
+  "classification": "EXISTING_SOURCE_BRANCH_NO_EXPLICIT_AUTH_CHECK",
+  "credential_read": false,
+  "finding_id": "PR122_LEGACY_DISCONNECT_AUTH_BOUNDARY",
+  "handler_ast_sha256": "bb8b052ad8cbb050afb5bd3f21c7d8b7d091dd504c8f13582ac5415722dc6c65",
+  "introduced_by_log_patch": false,
+  "isolated_events": [
+    {
+      "event": "construct_fake_store"
+    },
+    {
+      "event": "FAKE_DISCONNECT_CALLED"
+    },
+    {
+      "event": "FAKE_AUDIT_CALLED",
+      "operation": "TIKTOK_DISCONNECT"
+    },
+    {
+      "event": "FAKE_RESPONSE",
+      "status": 200
+    }
+  ],
+  "live_candidate_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+  "live_post_executed": false,
+  "next_gate": "Independent classification and minimum correction decision before DNS release; no live disconnect test authorized",
+  "nginx_evidence": "Prior raw Tokyo receipt run38776953939/job116566967626: no auth_basic/auth_request/allow/deny directives recorded in included nginx configs. Current external/WAF state remains unverified.",
+  "production_imports": false,
+  "production_mutation": false,
+  "real_store_instantiated": false,
+  "request_model": {
+    "authenticated_session": "NOT_PROVIDED",
+    "body": "NOT_READ",
+    "headers": {},
+    "method": "POST",
+    "path": "/integrations/tiktok/disconnect"
+  },
+  "scope_limit": "AST extraction of actual do_POST; injected fake store/audit/response. Does not establish all-layer public exploitability or cloud WAF state. Other production code is not imported.",
+  "source_boundary_reproduced": true,
+  "source_method_line": 1371,
+  "source_branch_lines": [
+    1386,
+    1395
+  ],
+  "source_excerpt": "    def do_POST(self):\n        parsed = urllib.parse.urlsplit(self.path)\n        if parsed.path.startswith(\"/telegram-webhook/\"):\n            length = int(self.headers.get(\"Content-Length\", \"0\") or \"0\")\n            if length > 16384:\n                self._send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, \"REQUEST_TOO_LARGE\\n\")\n                return\n            body = self.rfile.read(length)\n            status, payload = self.server.telegram_canary.handle_webhook(\n                parsed.path,\n                self.headers.get(\"X-Telegram-Bot-Api-Secret-Token\", \"\"),\n                body,\n            )\n            self._send(status, json.dumps(payload, ensure_ascii=True, sort_keys=True) + \"\\n\", content_type=\"application/json; charset=utf-8\")\n            return\n        if parsed.path == TIKTOK_DISCONNECT_PATH:\n            payload = TikTokTokenLifecycleStore(DEFAULT_STATE_ROOT / \"tiktok-token-state\").disconnect()\n            self.server.portal_service.operations_store.record_audit({\n                \"operation\": \"TIKTOK_DISCONNECT\",\n                \"provider\": \"tiktok\",\n                \"result\": \"PASS\",\n                \"secret_value_exposed\": False,\n            })\n            self._send(HTTPStatus.OK, json.dumps(payload, ensure_ascii=True, sort_keys=True) + \"\\n\", content_type=\"application/json; charset=utf-8\")\n            return",
+  "handler_bases": [
+    "BaseHTTPRequestHandler"
+  ],
+  "handler_declared_methods": [
+    "log_message",
+    "_send",
+    "_send_bytes",
+    "_origin",
+    "do_GET",
+    "do_POST"
+  ]
+}

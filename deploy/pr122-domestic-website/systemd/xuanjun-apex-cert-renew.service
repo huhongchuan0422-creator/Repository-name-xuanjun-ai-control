@@ -1,0 +1,8 @@
+[Unit]
+Description=Renew Xuanjun apex certificate without touching winctl certificate selection
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/xuanjun-apex-cert-renew

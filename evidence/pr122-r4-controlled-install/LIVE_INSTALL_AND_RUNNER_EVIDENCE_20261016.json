@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "status": "EXECUTION_REPORTED_SUCCESS_AND_NONROOT_CORROBORATED_PENDING_INDEPENDENT_HOST_REVIEW",
+  "approved_candidate": "b4b8ed3fa7dc9435e4959da11dfc335b04385100",
+  "source_artifact_audit": "PR122#6205924529",
+  "install_action_approval": {
+    "comment_id": 6206046505,
+    "body_sha256": "9d08d0b49af0d40ad228928fca87c6d327b3db77b1bceb26daefbb215efb06bb",
+    "action": "install",
+    "max_attempts": 1,
+    "expiry_beijing": "2026-10-16T21:37:45+08:00"
+  },
+  "owner_execution": {
+    "channel": "OWNER_TOKYO_ADMIN_ROOT_TERMINAL",
+    "workdir": "/var/tmp/pr122-r4-approved-29hspn8q",
+    "wrapper_exit": 0,
+    "status": "LIVE_R4_CONTAINMENT_PASS",
+    "root_pin_registered": true,
+    "offline_rollback_started": false,
+    "real_negative_post_requests": 4,
+    "real_account_disconnect": false
+  },
+  "corroboration": {
+    "commit": "2f644ece195b6001d3dc67cfe135b2b7ee48ea18",
+    "run_id": 38836924350,
+    "tokyo_job": 116768015672,
+    "domestic_job": 116768015892,
+    "conclusions": "BOTH_SUCCESS",
+    "root_collector": false,
+    "new_http_requests": 0,
+    "new_post_requests": 0,
+    "new_service_actions": 0,
+    "tokyo": {
+      "approved_install_candidate": "b4b8ed3fa7dc9435e4959da11dfc335b04385100",
+      "collector_http_requests": 0,
+      "collector_post_requests": 0,
+      "collector_production_writes": false,
+      "collector_service_actions": 0,
+      "collector_used_root": false,
+      "current_service": {
+        "ActiveState": "active",
+        "MainPID": "3082952",
+        "SubState": "running",
+        "User": "admin",
+        "WorkingDirectory": "/opt/trading-system"
+      },
+      "current_source": {
+        "gid": 1000,
+        "mode": "0o755",
+        "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+        "size": 85197,
+        "uid": 1000
+      },
+      "delivery_commit": "2f644ece195b6001d3dc67cfe135b2b7ee48ea18",
+      "dns_change": false,
+      "homepage": {
+        "gid": 0,
+        "mode": "0o644",
+        "sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+        "size": 11461,
+        "uid": 0
+      },
+      "host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "install_action_approval": 6206046505,
+      "private_root_anchor_backup_consumption": "NOT_READ_BY_NONROOT_COLLECTOR",
+      "public_receipt_identity": {
+        "gid": 0,
+        "mode": "0o644",
+        "sha256": "3027b9a01364654aa844f64264cdc0b7506d9c039d45807c3d308d2dfd0fd568",
+        "size": 1689,
+        "uid": 0
+      },
+      "public_root_receipt": {
+        "action": "PR122_R4_CONTAINMENT_V1",
+        "apply_started": true,
+        "authenticated_disconnect": "NOT_IMPLEMENTED",
+        "candidate_sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+        "checks": [
+          {
+            "address": "47.245.53.152",
+            "method": "GET",
+            "status": 200
+          },
+          {
+            "address": "47.245.53.152",
+            "method": "HEAD",
+            "status": 501
+          },
+          {
+            "address": "47.101.152.210",
+            "method": "GET",
+            "status": 200
+          },
+          {
+            "address": "47.101.152.210",
+            "method": "HEAD",
+            "status": 501
+          },
+          {
+            "address": "47.245.53.152",
+            "method": "POST",
+            "status": 403,
+            "synthetic_empty_request": true,
+            "tls_verified": true,
+            "variant": "empty"
+          },
+          {
+            "address": "47.245.53.152",
+            "method": "POST",
+            "status": 403,
+            "synthetic_empty_request": true,
+            "tls_verified": true,
+            "variant": "synthetic_untrusted_headers"
+          },
+          {
+            "address": "47.101.152.210",
+            "method": "POST",
+            "status": 403,
+            "synthetic_empty_request": true,
+            "tls_verified": true,
+            "variant": "empty"
+          },
+          {
+            "address": "47.101.152.210",
+            "method": "POST",
+            "status": 403,
+            "synthetic_empty_request": true,
+            "tls_verified": true,
+            "variant": "synthetic_untrusted_headers"
+          }
+        ],
+        "dns_change": false,
+        "error": null,
+        "host": "iZ6wee8q9z4t03hvqumwfhZ",
+        "offline_rollback_started": false,
+        "schema_version": 1,
+        "service_after": {
+          "ActiveState": "active",
+          "MainPID": "3082952",
+          "SubState": "running",
+          "User": "admin",
+          "WorkingDirectory": "/opt/trading-system"
+        },
+        "service_before": {
+          "ActiveState": "active",
+          "MainPID": "3075458",
+          "SubState": "running",
+          "User": "admin",
+          "WorkingDirectory": "/opt/trading-system"
+        },
+        "source_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+        "status": "LIVE_R4_CONTAINMENT_PASS",
+        "tiktok_http_disconnect": "TEMPORARILY_DISABLED",
+        "website_files_changed": false
+      },
+      "schema_version": 1,
+      "side": "tokyo",
+      "status": "NONROOT_POSTINSTALL_EVIDENCE_PASS",
+      "uid": 1001
+    },
+    "domestic": {
+      "approved_install_candidate": "b4b8ed3fa7dc9435e4959da11dfc335b04385100",
+      "collector_http_requests": 0,
+      "collector_post_requests": 0,
+      "collector_production_writes": false,
+      "collector_service_actions": 0,
+      "collector_used_root": false,
+      "delivery_commit": "2f644ece195b6001d3dc67cfe135b2b7ee48ea18",
+      "dns_change": false,
+      "domestic_current": "/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage",
+      "homepage": {
+        "gid": 0,
+        "mode": "0o644",
+        "sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+        "size": 11461,
+        "uid": 0
+      },
+      "host": "iZvt5t8tlrm8oiZ",
+      "install_action_approval": 6206046505,
+      "schema_version": 1,
+      "side": "domestic",
+      "status": "NONROOT_POSTINSTALL_EVIDENCE_PASS",
+      "uid": 1002
+    }
+  },
+  "scope_limits": [
+    "Nonroot collectors did not read private root pin, source backup or consumption marker",
+    "Four controlled synthetic POST denials are recorded by the approved root installer; collector did not send them again",
+    "Temporary HTTP disable is not full identity/ownership/CSRF authorization implementation",
+    "Remaining 11-route business-write paths, client-IP/peripheral audit, DNS management-plane rollback and release gates are not automatically passed"
+  ],
+  "dns_release": "HOLD",
+  "tokyo_retirement": "HOLD",
+  "website_migration": "NOT_COMPLETE",
+  "server_migration": "NOT_COMPLETE"
+}

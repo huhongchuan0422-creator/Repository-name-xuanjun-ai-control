@@ -1,0 +1,95 @@
+{
+  "files": [
+    {
+      "path": "PRODUCTION_EXECUTION.lock",
+      "sha256": "7c34383653fb68348b811d704a73fd9a23f53b9213a61eec00e11f5ef00fdedc",
+      "size": 179
+    },
+    {
+      "path": "README.md",
+      "sha256": "7c330ff42e3256fb538cfc1209ea1105dbf430c279388b0a4c2bcc3035976ae8",
+      "size": 5331
+    },
+    {
+      "path": "candidate-manifest.json",
+      "sha256": "eb2fcc07825e9da350122d3a110b716a8df1b43341f40312bde7ff95591c52f7",
+      "size": 265212
+    },
+    {
+      "path": "cutover-gate.json",
+      "sha256": "3d15dd6368c54210d1ffcfea847d3dff19b585f9e1d691f8f7747641c355e73f",
+      "size": 958
+    },
+    {
+      "path": "nginx/pr122-dynamic-hold.locations.conf",
+      "sha256": "d9ad7db13abe6ce35fd95c9290dd50fff0c4fb26c70eb9b3fc95845b37c4a673",
+      "size": 1082
+    },
+    {
+      "path": "nginx/tokyo-apex-acme-forward.locations.conf",
+      "sha256": "96d2686b5b679dc2aedbf83b0fd63003f896e63a5084715343495389271e0f58",
+      "size": 565
+    },
+    {
+      "path": "nginx/xuanjun-apex-http-bootstrap.conf",
+      "sha256": "2785edc26a0292a6e68e240f40bdda717caa5697314146070f84fe3eac19d727",
+      "size": 431
+    },
+    {
+      "path": "nginx/xuanjun-apex-http-redirect.conf",
+      "sha256": "520359718375fbf431a48a74124e7ac40e8239793c77533518edf385a42c977b",
+      "size": 386
+    },
+    {
+      "path": "nginx/xuanjun-apex-https.conf",
+      "sha256": "0f4fa26f4eb574b5ec8f4284d03bd3f2e01d07ed0d69b8681734256f17d46b9d",
+      "size": 1284
+    },
+    {
+      "path": "overlay/public/assets/tiktok-integration.js",
+      "sha256": "6fa38b952b70862e5a835ae79e4eedfe4b3d0323a8d819bbfb7ef81bddd8aa67",
+      "size": 2452
+    },
+    {
+      "path": "production-action-contract.json",
+      "sha256": "6b2808b62f8110fa871afd341722a2e8760b3e5783ce7a6f7d946438521e85f8",
+      "size": 3646
+    },
+    {
+      "path": "source-pin.json",
+      "sha256": "b49bc42ec92c9982f8adffd069fc1b9dec3aa6af091146571b5de5770338d599",
+      "size": 590
+    },
+    {
+      "path": "systemd/xuanjun-apex-cert-renew.service",
+      "sha256": "d68bc892873d52f8cf8a9ac95c09938c10564abba6f9bcf82d713a2a76a005b8",
+      "size": 229
+    },
+    {
+      "path": "systemd/xuanjun-apex-cert-renew.timer",
+      "sha256": "4ce36b58ba0e599d37458f3aecb0c3c20a588175ffca66834228d405da73807e",
+      "size": 219
+    },
+    {
+      "path": "tls/issue-apex-certificate.sh",
+      "sha256": "464a564dba4269244f4bcbdad77298b109b891541ec4e29e7c4e92e0ab82f5f7",
+      "size": 1238
+    },
+    {
+      "path": "tls/renew-apex-certificate.sh",
+      "sha256": "cb2a9e645cff03e04c667c1001b3eec627119a0498395b013324de909d9f357e",
+      "size": 494
+    },
+    {
+      "path": "tls/xuanjun-apex-nginx-deploy-hook.sh",
+      "sha256": "adb7d7efd5c4255b7aabefd3a0bc74ae7af0df221e32fcf92bf7044bc13b6be8",
+      "size": 159
+    },
+    {
+      "path": "bin/pr122_website_release.py",
+      "sha256": "7253f3b86a6ad17dadc85c26deda17a5ccaaa8f76c65da21572be39658993895",
+      "size": 44119
+    }
+  ],
+  "schema_version": 1
+}

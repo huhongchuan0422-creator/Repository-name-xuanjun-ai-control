@@ -1,0 +1,596 @@
+{
+  "run_id": 38829320821,
+  "job_ids": [
+    116744154336,
+    116744154573
+  ],
+  "receipts": [
+    {
+      "actual_business_writes": "NOT_TESTED",
+      "auth_contract": "NOT_ESTABLISHED_BY_HEAD",
+      "commit": "f5625637f5f0e8ef78bb67dcdc8c2a9d6bd01a00",
+      "dns_release": "HOLD",
+      "dynamic": [
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/p/"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/submit/douyin"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/submit/tiktok"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/douyin/oauth/callback"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/tiktok/oauth/start"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/tiktok/oauth/callback"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/tiktok/status"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/tiktok/disconnect"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/healthz"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 405,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 405,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/telegram-webhook/"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/telegram-canary/status"
+        }
+      ],
+      "errors": [],
+      "home_sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+      "host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "oauth_get": "NOT_CALLED",
+      "production_mutation": false,
+      "root_capability_status": {
+        "apply_started": true,
+        "authority": "PERSISTENT_FIXED_ACTIONS",
+        "backup": "/var/lib/xuanjun-pr122-portal-logfix-capability/source.before.py",
+        "candidate_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+        "checks": [
+          {
+            "address": "47.245.53.152",
+            "method": "GET",
+            "status": 200
+          },
+          {
+            "address": "47.245.53.152",
+            "method": "HEAD",
+            "status": 501
+          },
+          {
+            "address": "47.101.152.210",
+            "method": "GET",
+            "status": 200
+          },
+          {
+            "address": "47.101.152.210",
+            "method": "HEAD",
+            "status": 501
+          }
+        ],
+        "original_gid": 1000,
+        "original_uid": 1000,
+        "restart_attempted_for": "apply",
+        "rollback_started": false,
+        "scope": "OWNER_LONG_TERM_DOMESTIC_TOKYO_MIGRATION",
+        "source_replaced_for": "apply",
+        "source_sha256": "528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006",
+        "status": "LIVE_HEAD_GET_PASS"
+      },
+      "schema_version": 1,
+      "service": {
+        "ActiveState": "active",
+        "MainPID": "3075458",
+        "SubState": "running",
+        "User": "admin"
+      },
+      "source": {
+        "gid": 1000,
+        "links": 1,
+        "mode": "0o755",
+        "regular": true,
+        "sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+        "uid": 1000
+      },
+      "status": "POST_FIX_METHOD_BOUNDARY_PASS"
+    },
+    {
+      "actual_business_writes": "NOT_TESTED",
+      "auth_contract": "NOT_ESTABLISHED_BY_HEAD",
+      "commit": "f5625637f5f0e8ef78bb67dcdc8c2a9d6bd01a00",
+      "current": "/var/www/wenwenwenyiyiyi.work/releases/pr122-d8b08ed-recovery-stage",
+      "dns_release": "HOLD",
+      "dynamic": [
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/p/"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/submit/douyin"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/submit/tiktok"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/douyin/oauth/callback"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/tiktok/oauth/start"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/tiktok/oauth/callback"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/tiktok/status"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/integrations/tiktok/disconnect"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/healthz"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 405,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 405,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/telegram-webhook/"
+        },
+        {
+          "business_auth": "NOT_TESTED",
+          "checks": [
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "baseline"
+            },
+            {
+              "location_present": false,
+              "matches_method_boundary": true,
+              "set_cookie_present": false,
+              "status": 501,
+              "tls_verified": true,
+              "variant": "spoofed_source"
+            }
+          ],
+          "method": "HEAD",
+          "responsibility": "/telegram-canary/status"
+        }
+      ],
+      "errors": [],
+      "home_sha256": "4cdaa871b46fb8f62a5527a81724a9a955beed76542dba922bb4ac9779e90f20",
+      "host": "iZvt5t8tlrm8oiZ",
+      "oauth_get": "NOT_CALLED",
+      "production_mutation": false,
+      "schema_version": 1,
+      "status": "POST_FIX_METHOD_BOUNDARY_PASS"
+    }
+  ]
+}
