@@ -40,3 +40,21 @@ After the gaps are closed and the final command is separately frozen: only a new
 A real loader run must use a caller-owned non-activating registry, record loaded plugin ID/source digest/actual registrations, and an approved bounded no-effect function via genuine host authority. Missing modules/export/binding/role/auth must HOLD. Preserve per-version load intent/observations/receipts and source bytes; after response loss inspect/recover the same loader-owned instance/version, never clear directories or blindly load another instance. No changes to existing Gateway/config/permissions, no runtime installation/image pull, no credentials/auth profile fabrication, no admit/launch/model/Owner delivery/real ledger mutation. Exact process/mount/time limit/receipt paths remain UNKNOWN until real loader wiring is bound; no estimated count or invented PASS.
 
 Current result: **SOURCE_PACKAGE_PREPARED; CP11 NOT_EXECUTED; real registration/function/recovery UNAVAILABLE**. UK unchanged, model_calls0. Independent source work is saved; only dependent loader/functional operations remain blocked.
+
+
+## Frozen source checks (actual results)
+
+Source/test commit10f8f91ad260a8b954b0704a93229d1847340933, Tree2699c741f43258a0059b14019722dcfb5f079f29. Hosted [39380788469](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39380788469): SUCCESS for **source/guard scope only**. Python3.11/3.12 each9 tests;8 original Node guard negatives. Actual runner Nodev22.23.3 does not satisfy the OpenClaw2026.9.9 engine range; it was used only for original component guard tests, never for SDK loading. No new Node/OpenClaw runtime was installed and no image was pulled.
+
+Both Python artifacts were downloaded and verified; their internal three files are byte-identical. Original plugin package `p2-native-controller-0.1.0-3dd9f8c4b8b0d4ff.tar.gz`,14696 bytes,11 unchanged source files, SHA25683eac1fca2bf811e8e0ee276cd40f577dc1d0fe77bd425499420fe9f58a9cd8b.
+
+- [Python3.11 inputs12245606524](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39380788469/artifacts/12245606524), ZIP SHA8bbd8242169ad4ff57103963391adba82ca5395d8c9ef30e605f587141f90601.
+- [Python3.12 inputs12245402436](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39380788469/artifacts/12245402436), ZIP SHA8e054450aeab07a7b829517fe298b7ae4cf073deb71bf97d91d12b4a3e1bd1c6.
+
+Manifest and honest capability report are committed alongside this status. CI success is not CP11 success.
+
+## Minimal dependency read candidate, not installation
+
+[SDK_READ_ONLY_CANDIDATE.sh](SDK_READ_ONLY_CANDIDATE.sh) is one complete **not-executed** metadata command for separate confirmation. It downloads the pinned Python script into memory, drops to existing xuanjun_dev/UID1002 and reads only the fixed Node binary plus package/loader/context files. It records SHA/owner/mode/size and static export-name hints. No files or directories are created, no runtime/plugin is imported or executed, no Gateway/DB/auth/config is read or changed; reads may change atime. Exact transitive closure and actual Node execution version remain UNKNOWN/NOT_EXECUTED. The static export-name hints are not runtime export verification or authority to load a module. Exit0 means only that metadata reporting completed, not readiness.
+
+Inventory script SHA23fc5facba74ef4db05b0c982c73f36b0c8a498a43e71fc86e5282e5ac336dce; Python3.6 grammar checked, exact UK3.6.8 execution NOT_EXECUTED. No old environment/RAM/Writer/Grant scan is included. This candidate closes only the smallest missing measurements; it cannot solve the absent permitted positive functional entry. Original loader/registration/auth/function/recovery operations remain blocked and are not replaced with the metadata command.
