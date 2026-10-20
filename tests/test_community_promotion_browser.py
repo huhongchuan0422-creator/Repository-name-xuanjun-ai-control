@@ -77,7 +77,14 @@ class CommunityPromotionBrowserJourney(unittest.TestCase):
                     admin.locator('#listPromotions').click();expect(admin.locator('#message')).to_have_text('操作完成')
                     expect(admin.locator('#records')).to_contain_text('Synthetic browser promotion')
                     expect(admin.locator('#records')).to_contain_text('新成员 1')
-                    record=fx.call('promotions',dict(community_id=fx.cid,after_id=''))['records'][0]
+                    record=admin.evaluate("""async arg=>{
+                      const r=await fetch('/community/directory',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
+                        headers:{'Content-Type':'application/json','X-CSRF-Token':arg.csrf},
+                        body:JSON.stringify({workspace:'community',operation:'promotions',params:{community_id:arg.community,after_id:''}})});
+                      return {status:r.status,body:await r.json()};
+                    }""",{'csrf':fx.web['csrf'],'community':fx.cid})
+                    self.assertEqual(record['status'],200)
+                    record=record['body']['result']['records'][0]
                     self.assertEqual((record['authenticated_redemptions'],record['new_members']),(1,1))
                     self.assertEqual(record['metrics'],'DISTINCT_AUTHENTICATED_REDEMPTIONS_ONLY')
 
@@ -89,7 +96,14 @@ class CommunityPromotionBrowserJourney(unittest.TestCase):
                     self.assertEqual(denied['body']['error'],'ACCESS_DENIED')
 
                     admin.locator('#listPromotions').click();expect(admin.locator('#records')).to_contain_text('PAUSED')
-                    final=fx.call('promotions',dict(community_id=fx.cid,after_id=''))['records'][0]
+                    final=admin.evaluate("""async arg=>{
+                      const r=await fetch('/community/directory',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
+                        headers:{'Content-Type':'application/json','X-CSRF-Token':arg.csrf},
+                        body:JSON.stringify({workspace:'community',operation:'promotions',params:{community_id:arg.community,after_id:''}})});
+                      return {status:r.status,body:await r.json()};
+                    }""",{'csrf':fx.web['csrf'],'community':fx.cid})
+                    self.assertEqual(final['status'],200)
+                    final=final['body']['result']['records'][0]
                     self.assertEqual((final['authenticated_redemptions'],final['new_members']),(1,1))
                 finally:
                     browser.close()
