@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -108,6 +109,14 @@ class HostAPI(unittest.TestCase):
 
     def test_exact_python_version_when_required(self):
         if os.environ.get('REQUIRE_PYTHON368')=='1':self.assertEqual(sys.version_info[:3],(3,6,8))
+
+    def test_host_guard_keeps_raw_error_without_server_side_effect(self):
+        if os.uname().nodename.split('.')[0]==h.HOST:self.skipTest('never run negative host guard on UK')
+        result=subprocess.run([sys.executable,'-I','-B','-S',str(REPO/'scripts/p2_b3_owner_finalize_20261020.py'),
+           '--bundle','/not-an-input','--bundle-sha256','a'*64],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        self.assertEqual(result.returncode,2)
+        self.assertEqual(json.loads(result.stdout.decode())['reason'],'UK_ROOT_REQUIRED')
+        self.assertIn(b'Traceback',result.stderr)
 
     def test_real_subprocess_io_and_timeout_36_api(self):
         code,out,err=h.command([sys.executable,'-I','-B','-S','-c','print("api")'],self.root,'python')
