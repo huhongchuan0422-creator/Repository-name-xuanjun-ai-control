@@ -106,7 +106,12 @@
         "b3-ledger-source.tar.gz",
         "SHA256SUMS"
       ],
-      "tar_sha256": "IN_INCLUDED_SHA256SUMS_NOT_READ_BY_CONNECTOR"
+      "tar_sha256": "211a5438cf2bb71a95bc151959e596077e19500f239bcc853a50a3dc8dcf9318",
+      "tar_bytes": 232346,
+      "downloaded_zip_and_internal_tar_verified": true,
+      "archive_regular_files": 116,
+      "runtime_stage1_files": 65,
+      "archive_request_sha256_verified": true
     },
     {
       "id": 12241876410,
