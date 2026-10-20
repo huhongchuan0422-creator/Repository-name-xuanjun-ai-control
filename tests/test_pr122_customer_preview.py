@@ -111,6 +111,39 @@ class PreviewHTTPTests(HttpTests):
         status,h,raw=self.request(url,headers=self.auth_headers());self.assertEqual(status,200);self.assertIn(b'data-project-feedback',raw);self.assertIn('no-store',h['Cache-Control']);self.assertIn("frame-ancestors 'none'",h['Content-Security-Policy'])
         self.assertEqual(self.request(url)[0],403);self.assertEqual(self.request(url,headers={**self.auth_headers(),'Range':'bytes=0-2'})[0],403)
         self.assertEqual(self.request('api/previews/project-a',headers=self.auth_headers())[0],200)
+    def test_http_project_revocation_blocks_old_cookie_across_private_routes_without_cross_project_damage(self):
+        # Existing project authority revocation semantics: a full newer snapshot
+        # can remove project-a while the account session itself remains valid.
+        project_b={**self.p,'id':'project-b','tenant':'tenant-b','customer':'customer-b',
+                   'contract_ref':'contract-b','order_ref':'order-b','title':'Other legal project'}
+        self.imported(2,[self.p,project_b])
+
+        headers=self.auth_headers()
+        save_body={'project':'project-a','item':'license','revision':0,'kind':'DOCUMENT',
+                   'content':base64.b64encode(b'%PDF-revocation-http').decode(),'expires':None}
+        self.assertEqual(self.request('api/save',save_body,headers)[0],200)
+        oid=self.c.db.execute("SELECT id FROM objects WHERE project='project-a'").fetchone()[0]
+        download='api/download/project-a/'+oid
+        preview=route('project-a',self.path,self.sha).removeprefix('/customer/center/')
+        listing_url='api/previews/project-a'
+
+        # The same old cookie can read all three protected project-a surfaces
+        # before the authority snapshot revokes that project.
+        self.assertEqual(self.request(download,headers=headers)[0],200)
+        self.assertEqual(self.request(preview,headers=headers)[0],200)
+        self.assertEqual(self.request(listing_url,headers=headers)[0],200)
+        self.assertEqual(self.request('api/checklist/project-b',headers=headers)[0],200)
+
+        # Full snapshot removes project-a but retains project-b. Account session
+        # remains valid; project authorization must be checked again per request.
+        self.imported(3,[project_b])
+        self.assertEqual(self.c.session(self.users['owner']['token']),self.owner)
+        self.assertEqual(self.request('api/me',headers=headers)[0],200)
+        self.assertEqual(self.request(download,headers=headers)[0],403)
+        self.assertEqual(self.request(preview,headers=headers)[0],403)
+        self.assertEqual(self.request(listing_url,headers=headers)[0],403)
+        self.assertEqual(self.request('api/checklist/project-b',headers=headers)[0],200)
+
     def test_http_delivery_report_queue_requires_reviewer_not_customer(self):
         body={'project':'project-a','case':'change_fixture','serve_id':'pv_fixture','report':{'payload':{},'key_id':'not-enrolled','signature':'invalid'}}
         self.assertEqual(self.request('api/change_delivery_report',body,self.auth_headers())[0],403)
