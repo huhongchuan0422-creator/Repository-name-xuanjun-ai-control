@@ -5,13 +5,27 @@ import os
 from pathlib import Path
 import runpy
 import signal
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 
 REPO=Path(__file__).resolve().parents[2]
+# Emulate the real read-only tool staging. Hosted checkout permissions are not
+# the protected deployment input and must not be mistaken for that input.
 TOOL=REPO/'production/p2_install/initialize.py'
+STAGING=None
+if '--crash' not in sys.argv:
+ STAGING=tempfile.TemporaryDirectory(prefix='p2-b3-tools-')
+ staged=Path(STAGING.name)
+ for relative in ('production/p2_install/initialize.py',
+                  'evidence/p2-epoch7-access-repair-20261014/runtime/stage1/activation_control.py'):
+  dest=staged/relative;dest.parent.mkdir(parents=True,exist_ok=True)
+  dest.write_bytes((REPO/relative).read_bytes());dest.chmod(0o440)
+ TOOL=staged/'production/p2_install/initialize.py'
+else:
+ TOOL=Path(os.environ['P2_TEST_STAGED_TOOL'])
 def load():
  s=importlib.util.spec_from_file_location('init_adapter',str(TOOL));m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
 m=load()
@@ -22,6 +36,7 @@ def snapshot(root):
 class InitializationTests(unittest.TestCase):
  def setUp(self):
   self.temp=tempfile.TemporaryDirectory(prefix='p2-b3-test-',dir='/tmp');self.base=Path(self.temp.name)
+  os.umask(0o077)
   self.root=self.base/'b3-initialize';self.root.mkdir(mode=0o700)
   source=self.base/'sources';source.mkdir(mode=0o700)
   b1=runpy.run_path(str(REPO/'scripts/p2_b1_owner_first_install_20261020.py'),run_name='metadata_only')
@@ -50,7 +65,7 @@ class InitializationTests(unittest.TestCase):
    input=m.encode(req),capture_output=True,timeout=15)
   self.assertEqual(p.stderr,b'');return json.loads(p.stdout)
  def crash(self,point):
-  p=subprocess.run([sys.executable,'-B',__file__,'--crash',point],input=m.encode(self.req),timeout=15)
+  p=subprocess.run([sys.executable,'-B',__file__,'--crash',point],input=m.encode(self.req),timeout=15,env=dict(os.environ,P2_TEST_STAGED_TOOL=str(TOOL)))
   self.assertEqual(p.returncode,-signal.SIGKILL)
  def test_three_processes_and_duplicate_preserve_original(self):
   first=self.call();self.assertEqual(first['status'],'COMMITTED');before=snapshot(self.root)
