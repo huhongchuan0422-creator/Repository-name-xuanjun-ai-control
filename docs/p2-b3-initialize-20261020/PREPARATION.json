@@ -1,0 +1,144 @@
+{
+  "activation_directory": "/var/lib/xuanjun-p2-isolated-test/b3-initialize/activation",
+  "adapter_gap": "thin confined wrapper for initial intent/config publication, exact expected descriptor verification before read/reconcile, and immutable receipt; reuse existing Store, no new ledger or installer",
+  "adapter_status": "NOT_IMPLEMENTED_THIS_PREPARATION; no actual request/descriptor frozen until binary pin is known",
+  "baseline_commit": "2816e74fb05e915023c207ba6e911784875e4233",
+  "binary_probe": {
+    "cleanup": "--rm; exception cleanup only unique name with matching own label",
+    "command_role": "one temporary container reading only its own executable, no mounts/network; NOT an installation",
+    "execution": "NOT_EXECUTED",
+    "host_writes": "Docker temporary metadata/overlay only; no application path writes",
+    "new_directories": false
+  },
+  "config": {
+    "attempt_id": "b3-initialize-a1",
+    "batch_id": "b3-initialize",
+    "bind_socket": false,
+    "create_database": false,
+    "db_path": "/var/lib/xuanjun-p2-isolated-test/b3-initialize/data/ledger.sqlite3",
+    "generation": 1,
+    "image_id": "sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d",
+    "initial_epoch": 1,
+    "initial_state": "PREPARED",
+    "installation_id": "p2-uk-isolated-20261020",
+    "instance": "0891a51b-feea-520e-850a-c8fc7c840d94",
+    "interpreter_path": "/usr/bin/python3.11",
+    "ledger_socket": "/var/lib/xuanjun-p2-isolated-test/b3-initialize/run/ledger.sock",
+    "ledger_uuid": "093955da-4b7d-5c8d-b85e-3adaa304c675",
+    "origin": "ISOLATED_NEW",
+    "purpose": "Bind actual B1 release to one new non-active isolated activation descriptor; reserve later DB/socket paths",
+    "release_manifest_sha256": "591855b35c820c486ae07bbb91e681b983a3a2310feaedb57ae7c87fc9b66592",
+    "runtime_module_sha256": "3993ab9bd0073a91d8110814e694b2c402ef5b53efb544a3bc44a1debd4231a1",
+    "runtime_source_commit": "499bcc43f4c992b21035c22446ccc4d915873fb1",
+    "schema": 1,
+    "scope": "ISOLATED_TEST_ONLY",
+    "start_services": false
+  },
+  "config_bytes": 1056,
+  "config_role": "new isolated bootstrap binding metadata consumed by the proposed thin ActivationStore wrapper; not an application service config and not a process-start command",
+  "config_sha256": "f772644e9a8587cda9e0df4c1e53dc64d647195407d29c69ef52625ebb0160ad",
+  "input_directory": "/var/lib/xuanjun-p2-isolated-test/b3-input-20261020",
+  "isolation": {
+    "cap_drop": "ALL",
+    "container_python": "3.11",
+    "docker_socket_mount": false,
+    "host_python": "3.6.8_UNCHANGED",
+    "memory": 536870912,
+    "memory_swap": 1073741824,
+    "network": "none",
+    "no_new_privileges": true,
+    "pids": 96,
+    "production_mounts": false,
+    "read_only_root": true,
+    "uid_gid": "1002:1002"
+  },
+  "kind": "B3_ISOLATED_NEW_INITIALIZATION_PREPARATION",
+  "logs_directory": "/var/lib/xuanjun-p2-isolated-test/logs/b3-initialize-20261020",
+  "minimal_goal": "R03 new-isolation subcheckpoint: exact config and one epoch1 PREPARED descriptor/journal, reopen and same-identity recovery; not full B3 03-09 COMMITTED",
+  "new_ledger_system": false,
+  "old_history": "UNKNOWN_NOT_A_NEW_INSTALL_GATE",
+  "origin": "ISOLATED_NEW",
+  "owner_decision_comment": 6282590952,
+  "phase_mapping": {
+    "03": "Owner-adopted ISOLATED_NEW initialization; old R03 7->8 UNKNOWN and classifier retained separately",
+    "04": "no old isolated process to quiesce; future readback must prove exact new-instance process state; not production quiescence PASS",
+    "05": "new-only candidate paths; no retained target replacement in this minimum; later original B3 subcheckpoint",
+    "06": "declare new instance identities now; host owner/ledger-server identity publication not performed",
+    "07": "private new directories only; no old generation mode change",
+    "08": "new directory private permissions; old ACL changes not applicable; no chmod B1/B2",
+    "09": "no TLS lifecycle/config consumed or mutated; actual new TLS requirement remains later original B3 subcheckpoint if needed"
+  },
+  "preparation_gate": "binary_sha256 must be measured from the fixed image, then freeze exact expected descriptor/request and bounded Owner operation; no ready-install claim now",
+  "production_permission": false,
+  "root": "/var/lib/xuanjun-p2-isolated-test/b3-initialize",
+  "schema": 1,
+  "scope": "ISOLATED_TEST_ONLY",
+  "server_operations": "NOT_EXECUTED",
+  "sources": {
+    "activation_tool": {
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "path": "evidence/p2-epoch7-access-repair-20261014/runtime/stage1/activation_control.py",
+      "reuse": [
+        "ActivationStore.prepare(expected_epoch=0)",
+        "ActivationStore.read(require_active=False)",
+        "ActivationStore.reconcile()"
+      ],
+      "sha256": "169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4"
+    },
+    "b1_receipt": {
+      "path": "/var/lib/xuanjun-p2-isolated-test/artifacts/.p2_artifacts/receipts/p2-uk-isolated-20261020--b1-release.json",
+      "sha256": "2aa0616f8d9cc57e4dc367198fcb40b1d9cfe88ffa46221273c62cf4ad6e069a"
+    },
+    "b2_evidence": {
+      "acceptance_comment": 6282254897,
+      "reuse": "prior B1 evidence preservation only; no new B2 hash invented"
+    },
+    "binary": {
+      "availability": "ONLY_FRESH_MEASUREMENT_MISSING",
+      "bytes": "UNKNOWN",
+      "canonical_path": "UNKNOWN",
+      "declared_path": "/usr/bin/python3.11",
+      "image_id": "sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d",
+      "not_equivalent_to": [
+        "image_id",
+        "runtime_module_sha256"
+      ],
+      "sha256": "UNKNOWN",
+      "version": "3.11.2_INHERITED"
+    },
+    "db": {
+      "content_sha256": "NOT_APPLICABLE_BEFORE_CREATION",
+      "later_owner": "original B6 phase12; no old production data adopted",
+      "ledger_uuid": "093955da-4b7d-5c8d-b85e-3adaa304c675",
+      "path": "/var/lib/xuanjun-p2-isolated-test/b3-initialize/data/ledger.sqlite3",
+      "reserved_path_utf8_sha256": "2d1779444642c60eb1c314ffabc5419894658aec1e4caa1b316761bd836a10f6",
+      "status": "RESERVED_NOT_CREATED"
+    },
+    "instance": {
+      "declared_uuid_utf8_sha256": "769af3de5de90f2b7aa945df1d7328b6e3440d56b5939f8f1989faafa50cb054",
+      "namespace": "uuid5(URL, explicit new identity + :instance)",
+      "origin": "NEW_DETERMINISTIC_DECLARATION_NOT_OLD_INSTANCE",
+      "uuid": "0891a51b-feea-520e-850a-c8fc7c840d94"
+    },
+    "release": {
+      "availability": "B1_REAL_COMMITTED_INHERITED",
+      "path": "/var/lib/xuanjun-p2-isolated-test/artifacts/versions/p2-uk-isolated-20261020--b1-release/MANIFEST.json",
+      "role": "exact installed project manifest; not original epoch7 runtime",
+      "sha256": "591855b35c820c486ae07bbb91e681b983a3a2310feaedb57ae7c87fc9b66592"
+    },
+    "runtime_module": {
+      "commit": "499bcc43f4c992b21035c22446ccc4d915873fb1",
+      "path": "/var/lib/xuanjun-p2-isolated-test/artifacts/versions/p2-uk-isolated-20261020--b1-release/production/p2_runtime/__init__.py",
+      "sha256": "3993ab9bd0073a91d8110814e694b2c402ef5b53efb544a3bc44a1debd4231a1"
+    },
+    "socket": {
+      "content_sha256": "NOT_APPLICABLE_UNIX_SOCKET",
+      "later_owner": "original later runtime/service phase; no listener this batch",
+      "path": "/var/lib/xuanjun-p2-isolated-test/b3-initialize/run/ledger.sock",
+      "path_utf8_bytes": 63,
+      "path_utf8_sha256": "c3a939d69cd00faf08f695bc5f3aca0098b8d516080abc7a79d735c59367dd27",
+      "status": "RESERVED_NOT_BOUND"
+    }
+  },
+  "status": "PREPARATION_INCOMPLETE_ONE_BINARY_PIN_MISSING"
+}
