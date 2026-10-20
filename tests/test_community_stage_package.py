@@ -22,9 +22,15 @@ class SourcePackage(unittest.TestCase):
             self.assertEqual(manifest['production_payment'],'HOLD')
             for name in ('tests/test_community_portal_pagination.mjs',
                          'tests/community_project_review_dom.cjs',
+                         'docs/development/COMMUNITY_BILL_CONTRACT_EVIDENCE.json',
                          'scripts/community_project_materials.py',
                          'demos/community-stage/project-review.js'):
                 self.assertIn(name, manifest['files'])
+            bill='docs/development/COMMUNITY_BILL_CONTRACT_EVIDENCE.json'
+            bill_raw=archive.read(bill)
+            self.assertEqual(bill_raw,(root/bill).read_bytes())
+            self.assertEqual(manifest['files'][bill],hashlib.sha256(bill_raw).hexdigest())
+            self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             self.assertFalse(any(name.endswith(('.pem','.sqlite','.env')) for name in archive.namelist()))
 
 if __name__=='__main__':unittest.main()
