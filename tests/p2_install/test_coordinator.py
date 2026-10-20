@@ -272,6 +272,44 @@ class CoordinatorTests(unittest.TestCase):
                 {json.loads(x[0])["attempt_id"] for x in rows},
                 {"unknown-a","unknown-b"})
 
+    def test_explicit_failure_with_known_operation_is_not_swallowed(self):
+        req=self.request("explicit-after-auto")
+        with self.open() as c:
+            c._store(req)
+            c._automatic_failure(req,"RECONCILE_REQUIRED",
+                                 {"error":{"code":"TIMEOUT_UNKNOWN"}})
+            first=c.journal.db.execute(
+                "SELECT evidence FROM coordinator_failures").fetchone()
+            self.assertEqual(json.loads(first[0])["operation_id"],"UNKNOWN")
+
+            # Automatic reconciliation discovers the concrete operation and
+            # enriches the original failure without incrementing the count.
+            c._automatic_failure(req,"START_OUTCOME_UNKNOWN",
+                                 {"operation_id":"operation-X",
+                                  "error":{"code":"START_OUTCOME_UNKNOWN"}})
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
+
+            explicit={"event_id":"explicit-new-failure",
+                      "operation_id":"operation-X",
+                      "error":{"code":"EXPLICIT_INDEPENDENT"}}
+            self.assertTrue(c.failure(req,"EXPLICIT_INDEPENDENT",explicit))
+            self.assertFalse(c.failure(req,"EXPLICIT_INDEPENDENT",explicit))
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],2)
+
+        with self.open() as c:
+            self.assertFalse(c.failure(req,"EXPLICIT_INDEPENDENT",explicit))
+            rows=c.journal.db.execute(
+                "SELECT evidence FROM coordinator_failures ORDER BY seq").fetchall()
+            self.assertEqual(len(rows),2)
+            self.assertEqual(
+                {json.loads(x[0])["event_id"] for x in rows},
+                {"auto-"+__import__("production.p2_install.coordinator",
+                                    fromlist=["digest"]).digest(
+                                        [req["attempt_id"],"UNKNOWN"])[:32],
+                 "explicit-new-failure"})
+
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
         for number in range(7):
