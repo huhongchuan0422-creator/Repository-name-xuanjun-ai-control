@@ -1,4 +1,5 @@
 import hashlib
+import subprocess
 import shutil
 import importlib.util
 import json
