@@ -157,38 +157,60 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     # The refreshed application text can settle before run() has re-enabled actions; wait for the actual request owner.
                     expect(admin.locator('[data-action=APPROVE]')).to_be_enabled()
                     phase('UNREVIEWED_APPROVE_READY')
-                    # Capture the one onboarding response first; inspect its request body after the event callback returns.
+                    network_events=[]
+                    admin.on('requestfinished',lambda request:network_events.append(('finished',request.method,request.url)))
+                    admin.on('requestfailed',lambda request:network_events.append(('failed',request.method,request.url)))
+                    admin.evaluate('''expected=>{
+                      const original=window.fetch.bind(window);
+                      window.__xjApproveObservation={calls:0,done:false,error:null,status:null,body:null,url:null,method:null,request:null};
+                      window.fetch=async function(input,init){
+                        const method=(init&&init.method)||((input&&input.method)||'GET');
+                        const url=typeof input==='string'?new URL(input,location.href).href:input.url;
+                        let parsed=null;
+                        try{parsed=init&&typeof init.body==='string'?JSON.parse(init.body):null;}catch(_){}
+                        const params=parsed&&parsed.params||{};
+                        const match=url===new URL('/merchant/onboarding',location.href).href&&method==='POST'&&
+                          parsed&&parsed.operation==='review'&&params.action==='APPROVE'&&
+                          params.application===expected.application&&params.revision===expected.revision;
+                        if(match){
+                          const obs=window.__xjApproveObservation;
+                          obs.calls++;obs.url=url;obs.method=method;obs.request=parsed;
+                        }
+                        const response=await original(input,init);
+                        if(match){
+                          const obs=window.__xjApproveObservation;
+                          obs.status=response.status;
+                          const clone=response.clone();
+                          (async()=>{
+                            try{
+                              const text=await clone.text();
+                              obs.body=JSON.parse(text);obs.done=true;
+                            }catch(error){obs.error=String(error&&error.message||error);obs.done=true;}
+                          })();
+                        }
+                        return response;
+                      };
+                    }''',{'application':original_id,'revision':before_unreviewed})
                     phase('UNREVIEWED_APPROVE_CLICK')
-                    with admin.expect_response(lambda response:response.url.endswith('/merchant/onboarding'),timeout=10000) as rejected:
-                        admin.locator('[data-action=APPROVE]').click()
-                        phase('UNREVIEWED_APPROVE_CLICK_RETURNED')
-                    phase('UNREVIEWED_EXPECT_RESPONSE_EXITED')
-                    response=rejected.value
-                    phase('UNREVIEWED_REJECTED_VALUE_READY')
-                    request=response.request
-                    phase('UNREVIEWED_REQUEST_READY')
-                    self.assertEqual(request.method,'POST')
-                    phase('UNREVIEWED_POST_DATA_BEGIN')
-                    body=request.post_data_json
-                    phase('UNREVIEWED_POST_DATA_DONE')
+                    admin.locator('[data-action=APPROVE]').click()
+                    phase('UNREVIEWED_APPROVE_CLICK_RETURNED')
+                    admin.wait_for_function('window.__xjApproveObservation&&window.__xjApproveObservation.done===true',timeout=10000)
+                    phase('UNREVIEWED_CLONE_DONE')
+                    observation=admin.evaluate('window.__xjApproveObservation')
+                    self.assertEqual(observation['calls'],1)
+                    self.assertIsNone(observation['error'])
+                    self.assertEqual(observation['method'],'POST')
+                    self.assertTrue(observation['url'].endswith('/merchant/onboarding'))
+                    body=observation['request']
                     self.assertEqual(body.get('operation'),'review')
                     self.assertEqual(body.get('params',{}).get('action'),'APPROVE')
                     self.assertEqual(body.get('params',{}).get('application'),original_id)
                     self.assertEqual(body.get('params',{}).get('revision'),before_unreviewed)
-                    phase('UNREVIEWED_STATUS_BEGIN')
-                    self.assertEqual(response.status,400)
-                    phase('UNREVIEWED_STATUS_DONE')
-                    phase('UNREVIEWED_FINISHED_BEGIN')
-                    finished_error=response.finished()
-                    phase('UNREVIEWED_FINISHED_DONE')
-                    self.assertIsNone(finished_error)
-                    phase('UNREVIEWED_BODY_BEGIN')
-                    raw=response.body()
-                    phase('UNREVIEWED_BODY_DONE')
-                    self.assertTrue(raw)
-                    reply=json.loads(raw.decode('utf-8'))
-                    phase('UNREVIEWED_JSON_DONE')
-                    self.assertEqual(reply.get('error'),'INVALID_REQUEST')
+                    self.assertEqual(observation['status'],400)
+                    self.assertEqual(observation['body'].get('error'),'INVALID_REQUEST')
+                    self.assertEqual(sum(1 for event,method,url in network_events if event=='finished' and method=='POST' and url.endswith('/merchant/onboarding')),1)
+                    self.assertEqual(sum(1 for event,method,url in network_events if event=='failed' and method=='POST' and url.endswith('/merchant/onboarding')),0)
+                    phase('UNREVIEWED_APPROVE_REJECTED')
                     phase('UNREVIEWED_APPROVE_REJECTED')
                     expect(admin.locator('#status')).to_contain_text('资料、状态或版本不符合要求')
                     expect(admin.locator('[data-action=APPROVE]')).to_be_enabled()
