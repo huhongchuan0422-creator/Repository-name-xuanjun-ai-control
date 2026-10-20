@@ -3,6 +3,7 @@
 Accounts, reviewer grant, documents and scanner are explicit synthetic fixtures.
 The original Center connection is created and used on the server thread.
 """
+# Hosted bounded diagnostic execution trigger; no behavior change.
 import faulthandler
 import os
 import queue
