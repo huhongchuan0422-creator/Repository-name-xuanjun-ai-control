@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -12,8 +13,46 @@ spec = importlib.util.spec_from_file_location('contracts', SOURCE)
 c = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(c)
 
+def expected_identity():
+    return {'installation_id':'test-isolated','instance':'0891a51b-feea-520e-850a-c8fc7c840d94',
+            'ledger_uuid':'093955da-4b7d-5c8d-b85e-3adaa304c675','generation':1,
+            'release_sha256':'a'*64,'config_sha256':'b'*64,'binary_sha256':'c'*64,
+            'db_path':'/test/data/ledger.sqlite3','ledger_socket':'/test/run/ledger.sock'}
+
 
 class Contracts(unittest.TestCase):
+    def test_cp03_read_only_identity_consumption(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); (root/'activation').mkdir()
+            desc = expected_identity(); install = desc.pop('installation_id')
+            desc.update(state='PREPARED',epoch=1,db_path=str(root/'data/ledger.sqlite3'),
+                        ledger_socket=str(root/'run/ledger.sock'))
+            cfg = {k:desc[k] for k in ('instance','ledger_uuid','generation','db_path','ledger_socket')}
+            cfg.update(initial_state='PREPARED',initial_epoch=1,installation_id=install,
+                       release_manifest_sha256=desc['release_sha256'])
+            def save(path,value):
+                raw = json.dumps(value,sort_keys=True).encode(); path.write_bytes(raw)
+                return hashlib.sha256(raw).hexdigest()
+            cfg_sha = save(root/'binding-config.json',cfg); desc['config_sha256'] = cfg_sha
+            desc_sha = save(root/'activation/active.json',desc)
+            journal_sha = save(root/'activation/epochs.jsonl',{'test_only':True})
+            receipt = {'status':'COMMITTED','scope':'ISOLATED_TEST_ONLY','origin':'ISOLATED_NEW',
+                       'full_b3_complete':False,'installation_id':install,'config_sha256':cfg_sha,
+                       'binary_sha256':desc['binary_sha256'],'descriptor_file_sha256':desc_sha,
+                       'journal_sha256':journal_sha}
+            pin = save(root/'commit-receipt.json',receipt)
+            snapshots = {str(p):(p.read_bytes(),p.stat().st_ino,p.stat().st_mtime_ns)
+                         for p in root.rglob('*') if p.is_file()}
+            observed = c.cp03_identity(root,pin)
+            self.assertEqual(observed['installation_id'],install)
+            self.assertEqual(observed['instance'],desc['instance'])
+            for p,record in snapshots.items():
+                path = Path(p)
+                self.assertEqual(record,(path.read_bytes(),path.stat().st_ino,path.stat().st_mtime_ns))
+            (root/'binding-config.json').write_bytes(b'changed')
+            with self.assertRaisesRegex(c.Hold,'SOURCE_SHA'):
+                c.cp03_identity(root,pin)
+
     def test_read_preserves_source(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / 'receipt'; p.write_bytes(b'original')
@@ -38,18 +77,18 @@ class Contracts(unittest.TestCase):
                 c.pinned_file(p/'alias'/'x', hashlib.sha256(b'x').hexdigest())
 
     def test_identity_without_fake_pid(self):
-        expected = dict.fromkeys(c.IDENTITY, 'fixed')
+        expected = expected_identity()
         result = c.identity(expected, {'identity': expected, 'process':
                             {'state': 'NOT_STARTED', 'pid': None, 'peer_uid': None}})
         self.assertFalse(result['live_process_verified'])
 
     def test_identity_conflict(self):
-        expected = dict.fromkeys(c.IDENTITY, 'fixed')
+        expected = expected_identity()
         with self.assertRaisesRegex(c.Hold, 'IDENTITY_CONFLICT'):
             c.identity(expected, {'identity': {}, 'process': {}})
 
     def test_fake_pid_rejected(self):
-        expected = dict.fromkeys(c.IDENTITY, 'fixed')
+        expected = expected_identity()
         with self.assertRaisesRegex(c.Hold, 'B3_PROCESS_NOT_STARTED'):
             c.identity(expected, {'identity': expected, 'process': {'pid': 123}})
 
