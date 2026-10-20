@@ -36,7 +36,7 @@ OAuth/session state may have changed, so automatic rollback to stale Tokyo state
 is refused; both sides remain available for exact reconciliation. No server is
 shut down and no Binance order writer is enabled by this controller.
 
-Validation: 83 local tests, 81 passed / 2 skipped. Tests cover real fixture tar
+Validation: 89 local tests, 87 passed / 2 skipped. Tests cover real fixture tar
 receive/readback, traversal and duplicate refusal, changed baseline refusal,
 committed/uncommitted WAL, sealed closed-database reads, symlink boundaries,
 unit namespace/dependency/mode generation and preserved uncertain intents.
@@ -44,3 +44,9 @@ Native immutable-kernel and Unix-socket tests are unavailable in this test
 runtime. Target chown and external service/network inventories are replaced in
 receiver fixtures. No Hosted or production execution is claimed. Native host
 checks and actual model acceptance are gates inside the operator command.
+
+Owner authorized termination of other Gateway tasks on 2026-10-20. The explicit
+`--owner-drain-gateway-tasks` option drains only non-main/non-SSH Gateway
+children with pidfd identity checks and a 45-second bound, both at initial
+inspection and immediately before the handoff fence. It never suppresses
+unknown migration results or broadens termination to other service groups.
