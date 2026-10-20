@@ -153,6 +153,17 @@ class HostAPI(unittest.TestCase):
             raw=self.bundle(name,link)
             with self.assertRaises(ValueError):h.unpack(raw,h.digest(raw),self.root/('stage-'+str(link)+str(len(name))))
 
+    def test_reused_container_extra_authority_and_shared_namespaces_rejected(self):
+        config={'Privileged':False,'CapAdd':None,'Devices':[], 'DeviceRequests':None,
+                'PidMode':'','IpcMode':'private','UTSMode':'','UsernsMode':''}
+        h.validate_runtime_isolation(config)
+        for key,value in [('Privileged',True),('CapAdd',['SYS_ADMIN']),('Devices',[{}]),
+                          ('DeviceRequests',[{}]),('PidMode','host'),('IpcMode','host'),
+                          ('UTSMode','host'),('UsernsMode','host')]:
+            changed=dict(config);changed[key]=value
+            with self.assertRaisesRegex(ValueError,'EXTRA_AUTHORITY_OR_NAMESPACE'):
+                h.validate_runtime_isolation(changed)
+
     def test_real_main_umask077_publishes_exact_readable_new_files(self):
         # Exercise main itself, including its umask, lock and unpack path.
         # Only the Docker boundary and host identity are replaced in this unit test.
