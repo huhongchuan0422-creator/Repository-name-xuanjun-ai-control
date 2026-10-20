@@ -44,20 +44,41 @@ export async function withInspectionDispatcherContract({acquire,registryApi,crea
  const ownedAcquire=async options=>{lease=await acquire(options);return lease;};
  const result=await inspectReadonlyLease({acquire:ownedAcquire,expectedSource,record,whileAcquired:async()=>{
   const methodRegistry=inspectionMethodRegistry({registryApi,registry:lease.registry,expectedSource});
-  const dispatcher=createAuthenticatedDispatcher(inspectionDispatcherParams({params,methodRegistry}));
+  const publications=new Map(),wrapped=new WeakSet();
+  const observeSender=sender=>{
+   if(wrapped.has(sender))return sender;
+   const observed=(frame,...args)=>{
+    const result=sender(frame,...args); // Preserve native transport result/policy behavior.
+    const item=frame?.type==='res'?publications.get(frame.id):undefined;
+    if(item) {
+     item.count++;
+     try {
+      if(result?.kind!=='sent'||frame.ok!==true||frame.error!==undefined)hold('HOLD_NATIVE_PUBLICATION_REJECTED');
+      validateMetadata(frame.payload);item.success=true;
+     } catch(error) {item.error=error;item.nativeError=frame.error;}
+    }
+    return result;
+   };
+   wrapped.add(observed);return observed;
+  };
+  const configured=inspectionDispatcherParams({params,methodRegistry});
+  const dispatcher=createAuthenticatedDispatcher({...configured,handler:{...configured.handler,send:observeSender(configured.handler.send)}});
   if(typeof dispatcher?.dispatch!=='function')hold('HOLD_REAL_DISPATCHER_UNBOUND');
   open=true;const pending=new Set(),dispatchErrors=[];let primary;
   try {
    const guarded=Object.freeze({dispatch:(frame,...ownerArgs)=>{
     if(!open)hold('HOLD_INSPECTION_LEASE_CLOSED');
     readonlyRequestFrame(frame);
-    // ownerArgs are opaque existing authenticated WebSocket-owner arguments;
-    // no copying/minting client.connect/scopes/profile or bypassing native auth.
+    if(typeof frame.id!=='string'||!frame.id.length||frame.id.length>256||publications.has(frame.id))hold('HOLD_REQUEST_ID');
+    publications.set(frame.id,{count:0,success:false});
+    // Existing authenticated-owner arguments retain identity. A custom native
+    // response sender, if present, is observed without changing its result.
+    if(ownerArgs[3]!==undefined){if(typeof ownerArgs[3]!=='function')hold('HOLD_NATIVE_RESPONSE_OWNER');ownerArgs[3]=observeSender(ownerArgs[3]);}
     const promise=Promise.resolve(dispatcher.dispatch(frame,...ownerArgs));
     pending.add(promise);promise.then(()=>pending.delete(promise),error=>{dispatchErrors.push(error);pending.delete(promise);});
     return promise;
    }});
-   validateMetadata(await runAuthenticatedOwner(guarded));
+   await runAuthenticatedOwner(guarded); // Return value is NOT response evidence.
   } catch(error) {primary=new Error('HOLD_AUTHENTICATED_OWNER_FAILED');primary.cause=error;}
   finally {
    open=false; // Stop new admission; never abandon a dispatched owner request.
@@ -65,6 +86,9 @@ export async function withInspectionDispatcherContract({acquire,registryApi,crea
   }
   if(primary)throw primary;
   if(dispatchErrors.length){const error=new Error('HOLD_NATIVE_DISPATCH_FAILED');error.cause=dispatchErrors[0];throw error;}
+  if(!publications.size)hold('HOLD_NO_NATIVE_METADATA_PUBLICATION');
+  for(const item of publications.values())if(item.count!==1||!item.success||item.error){const error=new Error('HOLD_NATIVE_METADATA_PUBLICATION');error.cause=item.error;error.nativeError=item.nativeError;throw error;}
+
  }});
  return {...result,scope:'CONTRACT_ONLY',compiledBinding:COMPILED_DISPATCH_BINDING.state,realLoader:'NOT_EXECUTED',authenticatedDispatch:'NOT_EXECUTED',cp11:'NOT_EXECUTED'};
 }

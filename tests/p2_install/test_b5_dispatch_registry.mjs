@@ -8,7 +8,7 @@ import {METHOD} from '../../production/p2_install/b5_combined_contract.mjs';
 const source='/isolated/plugin.mjs',identity='a'.repeat(64),versions={binding:'b'.repeat(64),node:'c'.repeat(64),plugin:'d'.repeat(64),sdk:'e'.repeat(64)};
 const registry=()=>{const handler=()=>{};return {plugins:[{id:PLUGIN,source,version:READONLY_PROFILE.version,status:'loaded',enabled:true,imported:true,activated:false}],diagnostics:[],gatewayHandlers:{[METHOD]:handler},gatewayMethodDescriptors:[{name:METHOD,handler,scope:'operator.admin',owner:{kind:'plugin',pluginId:PLUGIN},profileAccess:'required'}]};};
 const api={createPluginGatewayMethodDescriptors:r=>r.gatewayMethodDescriptors,createGatewayMethodRegistry:(ds,r)=>({pluginRegistry:r,getHandler:n=>ds.find(d=>d.name===n)?.handler,getScope:n=>ds.find(d=>d.name===n)?.scope,listMethods:()=>ds.map(d=>d.name),requiresAuthenticatedProfile:n=>ds.find(d=>d.name===n)?.profileAccess==='required',isControlPlaneWrite:()=>false,descriptors:()=>ds})};
-const params=()=>({isWebchatConnect:()=>false,handler:{buildRequestContext:()=>{},send:()=>{},close:()=>{},isClosed:()=>false,getMethodRegistry:()=>null}});
+const params=()=>({isWebchatConnect:()=>false,handler:{buildRequestContext:()=>{},send:()=>({kind:'sent'}),close:()=>{},isClosed:()=>false,getMethodRegistry:()=>null}});
 const declaration={plugin_id:PLUGIN,plugin_version:READONLY_PROFILE.version,declared_capabilities:[{method:METHOD,operation:'describe',read_only:true,required_scope:'operator.admin'}]};
 const metadata={...declaration,plugin_source_sha256:'848b0b77df2ee65394c810de8aea40402abc0cf46e8d1eb66a014f2890eedba9',declaration_sha256:digest(declaration)};
 const frame=()=>({type:'req',id:'test',method:METHOD,params:{operation:'describe'},expectedProfileId:'owner-bound-profile'});
@@ -28,7 +28,7 @@ for(const failure of ['none','native-denied','owner-throws','descriptor-denied',
  if(failure==='descriptor-denied')r.gatewayMethodDescriptors[0].profileAccess='independent';
  try {
   const run=()=>withInspectionDispatcherContract({acquire:async()=>({registry:r,release:async()=>{released++;if(failure==='release')throw Error('release');}}),registryApi:api,createAuthenticatedDispatcher:wired=>{
-   assert.equal(wired.handler.getMethodRegistry().pluginRegistry,r);return {dispatch:async(f,c)=>{receivedClient=c;receivedFrame=f;if(failure==='native-denied')throw Error('FIXTURE_NATIVE_AUTH_DENIED');}};
+   assert.equal(wired.handler.getMethodRegistry().pluginRegistry,r);return {dispatch:async(f,c)=>{receivedClient=c;receivedFrame=f;wired.handler.send({type:'res',id:f.id,ok:failure!=='native-denied',...(failure==='native-denied'?{error:{code:'FORBIDDEN'}}:{payload:metadata})});}};
   },params:p,expectedSource:source,record:phase=>appendRecord(root,identity,phase,versions),runAuthenticatedOwner:async dispatcher=>{retained=dispatcher;if(failure==='owner-throws')throw Error('owner');const f=frame();await dispatcher.dispatch(f,opaqueClient,100);assert.equal(receivedFrame,f);return metadata;}});
   if(failure==='none'){const out=await run();assert.equal(out.compiledBinding,'UNBOUND');assert.equal(out.authenticatedDispatch,'NOT_EXECUTED');assert.equal(receivedClient,opaqueClient);}
   else await assert.rejects(run);
@@ -38,13 +38,21 @@ for(const failure of ['none','native-denied','owner-throws','descriptor-denied',
 }
 {
  let finish,released=0;const r=registry(),seen=[];
- const result=withInspectionDispatcherContract({acquire:async()=>({registry:r,release:()=>{released++;seen.push('release');}}),registryApi:api,createAuthenticatedDispatcher:()=>({dispatch:()=>new Promise(resolve=>{finish=()=>{seen.push('settled');resolve();};})}),params:params(),expectedSource:source,record:phase=>seen.push(phase),runAuthenticatedOwner:async d=>{d.dispatch(frame(),Object.freeze({fixtureOnly:true}),100);return metadata;}});
+ const result=withInspectionDispatcherContract({acquire:async()=>({registry:r,release:()=>{released++;seen.push('release');}}),registryApi:api,createAuthenticatedDispatcher:wired=>({dispatch:f=>new Promise(resolve=>{finish=()=>{wired.handler.send({type:'res',id:f.id,ok:true,payload:metadata});seen.push('settled');resolve();};})}),params:params(),expectedSource:source,record:phase=>seen.push(phase),runAuthenticatedOwner:async d=>{d.dispatch(frame(),Object.freeze({fixtureOnly:true}),100);return metadata;}});
  await new Promise(resolve=>setImmediate(resolve));assert.equal(released,0);finish();await result;assert.ok(seen.indexOf('settled')<seen.indexOf('release'));count++;
 }
 {
  let reject,released=0;const seen=[];
  const result=withInspectionDispatcherContract({acquire:async()=>({registry:registry(),release:()=>{released++;}}),registryApi:api,createAuthenticatedDispatcher:()=>({dispatch:()=>new Promise((resolve,fail)=>{reject=fail;})}),params:params(),expectedSource:source,record:phase=>seen.push(phase),runAuthenticatedOwner:async d=>{d.dispatch(frame(),Object.freeze({fixtureOnly:true}),100);return metadata;}});
  await new Promise(resolve=>setImmediate(resolve));assert.equal(released,0);reject(Error('LATE_NATIVE_DENIAL'));await assert.rejects(()=>result,/HOLD_NATIVE_DISPATCH_FAILED/);assert.equal(released,1);assert.ok(!seen.includes('OBSERVED'));assert.equal(seen.at(-1),'RELEASED');count++;
+}
+for(const failure of ['no-dispatch','no-response','wrong-id','not-sent','duplicate']) {
+ let released=0;const seen=[],p=params();if(failure==='not-sent')p.handler.send=()=>({kind:'closed'});
+ const run=()=>withInspectionDispatcherContract({acquire:async()=>({registry:registry(),release:()=>{released++;}}),registryApi:api,createAuthenticatedDispatcher:wired=>({dispatch:async f=>{
+  if(failure!=='no-response')wired.handler.send({type:'res',id:failure==='wrong-id'?'other-id':f.id,ok:true,payload:metadata});
+  if(failure==='duplicate')wired.handler.send({type:'res',id:f.id,ok:true,payload:metadata});
+ }}),params:p,expectedSource:source,record:phase=>seen.push(phase),runAuthenticatedOwner:async d=>{if(failure!=='no-dispatch')await d.dispatch(frame(),Object.freeze({fixtureOnly:true}),100);return metadata;}});
+ await assert.rejects(run,/HOLD_(NO_NATIVE_METADATA|NATIVE_METADATA)/);assert.equal(released,1);assert.ok(!seen.includes('OBSERVED'));count++;
 }
 assert.equal(COMPILED_DISPATCH_BINDING.dispatcherSha256,null);
 console.log(JSON.stringify({scope:'CONTRACT_FIXTURES_ONLY',contract_cases:count,real_compiled_registry:'UNBOUND',actual_authentication:'NOT_EXECUTED'}));
