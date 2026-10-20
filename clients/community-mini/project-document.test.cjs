@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const {createSession,parseScene}=require('./session');
+const auth=require('./customer-auth');
 const fixture=Buffer.from('%PDF-1.4\nsynthetic fixture only\n').toString('base64');
 const version='v_'+'a'.repeat(32);
 const boundedFile=size=>{const bytes=Buffer.alloc(size,1);bytes.write('%PDF-1.4');return bytes.toString('base64');};
@@ -19,7 +20,7 @@ function harness(){
   },chooseMessageFile(o){choose=o;},getFileSystemManager(){return {readFile(o){reads.push(o);read=o;}};}};
   vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{
     Page:p=>{definition=p;},wx,getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid'}}),
-    require:path=>path==='../../session'?{createSession,parseScene}:path==='../../client'?{
+    require:path=>path==='../../customer-auth'?auth:path==='../../session'?{createSession,parseScene}:path==='../../client'?{
       makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})
     }:{createPaymentFlow:()=>({reset(){}})}
   });
