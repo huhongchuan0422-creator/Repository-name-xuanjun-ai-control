@@ -1,0 +1,36 @@
+name: P2 B5 bounded snapshot candidate
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - scripts/p2_b5_snapshot.py
+      - scripts/p2_b5_export_probe.mjs
+      - tests/p2_install/test_b5_snapshot.py
+      - .github/workflows/p2-b5-snapshot-candidate.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Only new snapshot filesystem tests, private fixtures
+        run: sudo "$(command -v python)" -B -m unittest discover -s tests/p2_install -p test_b5_snapshot.py -v
+      - name: Probe syntax only, never import actual SDK
+        run: node --check scripts/p2_b5_export_probe.mjs
+      - name: Package NEW candidate source only, not the original plugin
+        run: |
+          mkdir candidate
+          cp scripts/p2_b5_snapshot.py scripts/p2_b5_export_probe.mjs candidate/
+          sha256sum candidate/* > candidate/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: b5-snapshot-candidate-${{ matrix.python }}
+          path: candidate/
