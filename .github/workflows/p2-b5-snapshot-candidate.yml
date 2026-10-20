@@ -5,7 +5,7 @@ on:
     paths:
       - scripts/p2_b5_snapshot.py
       - scripts/p2_b5_export_probe.mjs
-      - tests/p2_install/test_b5_snapshot.py
+      - tests/p2_b5_snapshot/test_candidate.py
       - docs/p2-b5-20261020/SNAPSHOT_CANDIDATE.sh
       - .github/workflows/p2-b5-snapshot-candidate.yml
   workflow_dispatch:
@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Only new snapshot filesystem tests, private fixtures
-        run: sudo env B5_REQUIRE_UID1002=1 "$(command -v python)" -B -m unittest discover -s tests/p2_install -p test_b5_snapshot.py -v
+        run: sudo env B5_REQUIRE_UID1002=1 "$(command -v python)" -B -m unittest discover -s tests/p2_b5_snapshot -p test_candidate.py -v
       - name: Probe syntax only, never import actual SDK
         run: node --check scripts/p2_b5_export_probe.mjs
       - name: Package NEW candidate source only, not the original plugin
