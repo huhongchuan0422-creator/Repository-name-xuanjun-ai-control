@@ -12,6 +12,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 REPO=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(REPO))
@@ -151,6 +152,60 @@ class HostAPI(unittest.TestCase):
         for name,link in [('../outside',False),('/absolute',False),('link',True)]:
             raw=self.bundle(name,link)
             with self.assertRaises(ValueError):h.unpack(raw,h.digest(raw),self.root/('stage-'+str(link)+str(len(name))))
+
+    def test_real_main_umask077_publishes_exact_readable_new_files(self):
+        # Exercise main itself, including its umask, lock and unpack path.
+        # Only the Docker boundary and host identity are replaced in this unit test.
+        base=self.root;state=base/'state';state.mkdir()
+        lock=state/'.formal-cli.lock';lock.write_bytes(b'');lock.chmod(0o600)
+        wrapper=(REPO/'scripts/p2_b3_owner_finalize_20261020.py').read_bytes()
+        buffer=io.BytesIO();name='scripts/p2_b3_owner_finalize_20261020.py'
+        with tarfile.open(fileobj=buffer,mode='w:gz') as archive:
+            info=tarfile.TarInfo(name);info.size=len(wrapper);archive.addfile(info,io.BytesIO(wrapper))
+        import base64
+        archive=buffer.getvalue();raw=h.canonical({'schema':1,'tar_bytes':len(archive),
+            'tar_sha256':h.digest(archive),'files':{name:{'bytes':len(wrapper),'sha256':h.digest(wrapper)}},
+            'tar_b64':base64.b64encode(archive).decode()})
+        bundle=base/'bundle.json';bundle.write_bytes(raw)
+        untouched=base/'existing';untouched.write_bytes(b'old');untouched.chmod(0o400)
+        before=untouched.stat();work=base/'new-work'
+        def installed(stage,*args):
+            target=stage/name
+            self.assertEqual(target.stat().st_mode & 0o777,0o444)
+            self.assertEqual(target.read_bytes(),wrapper)
+            proof=work/'proof.json';h.publish(proof,b'proof')
+            self.assertEqual(proof.stat().st_mode & 0o777,0o444)
+            return {'status':'UNIT_DOCKER_BOUNDARY_NOT_EXECUTED'}
+        old=os.umask(0o022);os.umask(old)
+        try:
+            with mock.patch.object(h,'BASE',str(base)),mock.patch.object(h,'INPUT',str(work)),mock.patch.object(h,'HOST',os.uname().nodename.split('.')[0]),mock.patch.object(h.os,'getuid',return_value=0),mock.patch.object(h.os,'geteuid',return_value=0),mock.patch.object(h,'command',return_value=(0,(h.IMAGE+'\n').encode(),b'')),mock.patch.object(h,'install',side_effect=installed),mock.patch.object(h.sys,'argv',['host','--bundle',str(bundle),'--bundle-sha256',h.digest(raw)]):
+                self.assertEqual(h.main(),0)
+            self.assertEqual(untouched.stat(),before)
+            self.assertEqual(untouched.read_bytes(),b'old')
+        finally:os.umask(old)
+
+    def test_cp03_real_ten_files_and_reserved_directories(self):
+        root=self.root/'cp03';root.mkdir(mode=0o700)
+        for name in ('activation','data','run'):(root/name).mkdir(mode=0o700)
+        for name in ('active.json','epochs.jsonl','activation.lock'):(root/'activation'/name).write_bytes(b'old')
+        (root/'.initialize.lock').write_bytes(b'')
+        for name in ('intent.json','binding-config.json','commit-receipt.json'):h.publish(root/name,b'old',0o400)
+        real_lstat=h.os.lstat
+        def owned(path,*args,**kwargs):
+            value=real_lstat(path,*args,**kwargs)
+            class Info:
+                def __getattr__(self,key):return 1002 if key in ('st_uid','st_gid') else getattr(value,key)
+            return Info()
+        with mock.patch.object(h.os,'lstat',side_effect=owned):
+            first=h.prior_snapshot(root)
+            self.assertEqual(sum(v['kind']=='FILE' for v in first.values()),10)
+            self.assertEqual(sum(v['kind']=='DIRECTORY' for v in first.values()),3)
+            self.assertEqual(first,h.prior_snapshot(root))
+            (root/'data/ledger.sqlite3').write_bytes(b'unexpected')
+            with self.assertRaisesRegex(ValueError,'RESERVED_DIRECTORY_NOT_EMPTY'):h.prior_snapshot(root)
+            (root/'data/ledger.sqlite3').unlink()
+            (root/'unknown').write_bytes(b'unknown')
+            with self.assertRaisesRegex(ValueError,'CP03_UNKNOWN_ITEM'):h.prior_snapshot(root)
 
     def test_terminal_chain_rechecked_not_cached_success(self):
         previous='a'*64
