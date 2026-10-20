@@ -142,12 +142,124 @@ class Coordinator:
         cols = [x[1] for x in db.execute("PRAGMA table_info(coordinator_failures)")]
         if "event_key" not in cols:
             db.execute("ALTER TABLE coordinator_failures ADD COLUMN event_key TEXT")
+        if "compatibility" not in cols:
+            db.execute("ALTER TABLE coordinator_failures ADD COLUMN compatibility TEXT")
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS coordinator_failure_event_key ON coordinator_failures(event_key)")
+        self._migrate_legacy_failures()
         return self
 
     def __exit__(self, *args):
         self.journal.close()
         self.journal = None
+
+    def _failure_key(self, request, event_id):
+        return digest([request["installation_id"],
+                       request.get("round_id", "DEFAULT"),
+                       request["batch_id"], request["attempt_id"], event_id])
+
+    def _migrate_legacy_failures(self):
+        """Annotate legacy rows without rewriting their evidence or first UTC."""
+        db = self.journal.db
+        rows = db.execute(
+            "SELECT seq,installation,cause,evidence,event_key,compatibility "
+            "FROM coordinator_failures ORDER BY seq").fetchall()
+        for seq, installation, cause, raw, event_key, compatibility in rows:
+            if event_key is not None or compatibility is not None:
+                continue
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                db.execute("UPDATE coordinator_failures SET compatibility='UNKNOWN' WHERE seq=?",
+                           (seq,))
+                continue
+            attempt = data.get("attempt_id")
+            event_id = data.get("event_id")
+            request = self._stored(attempt) if type(attempt) is str else None
+            if (request is not None and request.get("installation_id") == installation
+                    and type(event_id) is str and ID.fullmatch(event_id)
+                    and data.get("request_sha256", digest(request)) == digest(request)):
+                key = self._failure_key(request, event_id)
+                existing = db.execute(
+                    "SELECT seq FROM coordinator_failures WHERE event_key=?",
+                    (key,)).fetchone()
+                if existing is None:
+                    db.execute(
+                        "UPDATE coordinator_failures SET event_key=?,compatibility='MIGRATED_EXPLICIT' "
+                        "WHERE seq=?", (key, seq))
+                else:
+                    db.execute(
+                        "UPDATE coordinator_failures SET compatibility='DUPLICATE_KNOWN' WHERE seq=?",
+                        (seq,))
+            elif (request is not None and request.get("installation_id") == installation
+                    and data.get("request_sha256") == digest(request)
+                    and event_id is None):
+                # Old automatic records had only attempt + request digest. They
+                # are matchable only by an automatic redelivery with the same
+                # persisted cause; explicit events must never be folded here.
+                db.execute(
+                    "UPDATE coordinator_failures SET compatibility='LEGACY_AUTO' WHERE seq=?",
+                    (seq,))
+            else:
+                db.execute(
+                    "UPDATE coordinator_failures SET compatibility='UNKNOWN' WHERE seq=?",
+                    (seq,))
+
+    def _match_legacy_failure(self, request, cause, event_id,
+                              allow_identity_merge, key):
+        rows = self.journal.db.execute(
+            "SELECT seq,evidence,compatibility FROM coordinator_failures "
+            "WHERE installation=? AND cause=? AND event_key IS NULL ORDER BY seq",
+            (request["installation_id"], cause)).fetchall()
+        for seq, raw, compatibility in rows:
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                continue
+            if (allow_identity_merge and compatibility == "LEGACY_AUTO"
+                    and data.get("attempt_id") == request["attempt_id"]
+                    and data.get("request_sha256") == digest(request)
+                    and data.get("event_id") is None):
+                self.journal.db.execute(
+                    "UPDATE coordinator_failures SET event_key=?,"
+                    "compatibility='MIGRATED_AUTO_MATCH' WHERE seq=?",
+                    (key, seq))
+                return True
+            if (not allow_identity_merge
+                    and data.get("attempt_id") == request["attempt_id"]
+                    and data.get("event_id") == event_id
+                    and data.get("request_sha256") in (None, digest(request))):
+                self.journal.db.execute(
+                    "UPDATE coordinator_failures SET event_key=?,"
+                    "compatibility='MIGRATED_EXPLICIT' WHERE seq=?",
+                    (key, seq))
+                return True
+        return False
+
+    def _failure_outbox_insert(self, key, installation, event, detail):
+        db = self.journal.db
+        if db.execute("SELECT 1 FROM coordinator_outbox WHERE id=?",
+                      (key,)).fetchone():
+            return False
+        for _old_id, raw in db.execute(
+                "SELECT id,detail FROM coordinator_outbox "
+                "WHERE attempt=? AND event=?", (installation,event)).fetchall():
+            try:
+                old = json.loads(raw)
+            except ValueError:
+                continue
+            same_round = old.get("round_id") in (None, detail.get("round_id"))
+            if event == "CHANGE_METHOD_30M":
+                if (same_round and old.get("cause") == detail.get("cause")
+                        and old.get("first_utc") == detail.get("first_utc")):
+                    return False
+            elif event == "REPORT_DOTS_10_OR_60":
+                if (same_round and old.get("first_utc") == detail.get("first_utc")
+                        and old.get("failures") == detail.get("failures")):
+                    return False
+        db.execute("INSERT INTO coordinator_outbox VALUES (?,?,?,?,?)",
+                   (key,installation,event,"UNAVAILABLE",
+                    canonical(detail).decode("ascii")))
+        return True
 
     def _adapter(self, batch):
         adapter = self.adapters.get(batch)
@@ -288,10 +400,12 @@ class Coordinator:
         require(type(cause) is str and ID.fullmatch(cause), "FAILURE_CAUSE")
         require(type(event_id) is str and ID.fullmatch(event_id), "FAILURE_EVENT_ID")
         require(type(evidence) is dict and len(canonical(evidence)) <= 8192, "FAILURE_EVIDENCE")
-        key = digest([request["installation_id"], request.get("round_id", "DEFAULT"),
-                      request["batch_id"], request["attempt_id"], event_id])
+        key = self._failure_key(request, event_id)
         if self.journal.db.execute(
                 "SELECT 1 FROM coordinator_failures WHERE event_key=?", (key,)).fetchone():
+            return False
+        if self._match_legacy_failure(request,cause,event_id,
+                                      allow_identity_merge,key):
             return False
 
         # If the first failure was captured before the component identity was
@@ -583,22 +697,22 @@ class Coordinator:
                 if self.now()-first >= 1800:
                     event = "CHANGE_METHOD_30M"
                     key = digest([installation,rid,cause,event])
-                    self.journal.db.execute("INSERT OR IGNORE INTO coordinator_outbox VALUES (?,?,?,?,?)",
-                        (key,installation,event,"UNAVAILABLE",
-                         canonical({"round_id":rid,"cause":cause,"first_utc":first,
-                                    "recipient":"DOTS","next":"change method"}).decode("ascii")))
-                    output.append({"installation_id":installation,"round_id":rid,
-                                   "event":event,"delivery":"UNAVAILABLE","id":key})
+                    detail = {"round_id":rid,"cause":cause,"first_utc":first,
+                              "recipient":"DOTS","next":"change method"}
+                    if self._failure_outbox_insert(
+                            key,installation,event,detail):
+                        output.append({"installation_id":installation,"round_id":rid,
+                                       "event":event,"delivery":"UNAVAILABLE","id":key})
             if state["count"] >= 10 or self.now()-state["first"] >= 3600:
                 event = "REPORT_DOTS_10_OR_60"
                 key = digest([installation,rid,event])
-                self.journal.db.execute("INSERT OR IGNORE INTO coordinator_outbox VALUES (?,?,?,?,?)",
-                    (key,installation,event,"UNAVAILABLE",
-                     canonical({"round_id":rid,"failures":state["count"],
-                                "first_utc":state["first"],"recipient":"DOTS",
-                                "next":"evaluate a different method"}).decode("ascii")))
-                output.append({"installation_id":installation,"round_id":rid,
-                               "event":event,"delivery":"UNAVAILABLE","id":key})
+                detail = {"round_id":rid,"failures":state["count"],
+                          "first_utc":state["first"],"recipient":"DOTS",
+                          "next":"evaluate a different method"}
+                if self._failure_outbox_insert(
+                        key,installation,event,detail):
+                    output.append({"installation_id":installation,"round_id":rid,
+                                   "event":event,"delivery":"UNAVAILABLE","id":key})
         return output
 
 def cli():
