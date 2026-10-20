@@ -18,7 +18,7 @@ Page({
       this.setData({authenticated:true});
       await this.loadProfile(epoch,attempt);
     }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else{if(this.session)this.session.clear();this.session=null;this.clearPrivate(e.message);}}}
-    finally{if(!this._dead)this.setData({pending:false});}
+    finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },
   clearPrivate(status){this.setData({authenticated:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:'',status});},
   validateProfile(r){
@@ -44,12 +44,12 @@ Page({
     }catch(e){if(!this._dead){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else this.setData({status:e.message});}}
     finally{if(!this._dead)this.setData({pending:false});}
   },
-  customerSessionRevoked(status='登录已退出，请重新登录'){this._loginAttempt=(this._loginAttempt||0)+1;if(this.session)this.session.clear();this.session=null;if(!this._dead)this.clearPrivate(status);},
+  customerSessionRevoked(status='登录已退出，请重新登录'){this._loginAttempt=(this._loginAttempt||0)+1;if(this.session)this.session.clear();this.session=null;if(!this._dead){this.clearPrivate(status);this.setData({pending:false});}},
   async logout(){
     if(this.data.pending)return;this.setData({pending:true});
     const s=this.session;const task=s?s.logout():Promise.resolve();
-    auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'已退出登录');
+    const revokedEpoch=auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'已退出登录');
     try{await task;}
-    catch(e){this.customerSessionRevoked('退出结果未确认，本地会话已清除');}
+    catch(e){if(!this._dead&&auth.active(revokedEpoch)&&!this.session)this.setData({pending:false,status:'退出结果未确认，本地会话已清除'});}
   }
 });
