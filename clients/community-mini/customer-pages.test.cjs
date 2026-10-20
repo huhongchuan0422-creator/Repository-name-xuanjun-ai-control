@@ -66,7 +66,7 @@ test('profile read and update reuse commerce profile APIs without fabricated fie
   await h.page.save();
   const business=h.calls.filter(x=>x.data&&x.data.operation);
   assert.deepEqual(business.map(x=>x.data.operation),['commerce.profile_read','commerce.profile_update']);
-  assert.deepEqual(business[1].data.params,{nickname:'Alice',contact:'alice@example.org',expected_version:0});
+  assert.equal(JSON.stringify(business[1].data.params),JSON.stringify({nickname:'Alice',contact:'alice@example.org',expected_version:0}));
   assert.equal(h.page.data.version,1);
 });
 
