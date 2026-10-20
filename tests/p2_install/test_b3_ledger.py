@@ -90,6 +90,34 @@ print(json.dumps(m.dispatch(req,sys.argv[2],m.sha(m.encode(req)))))
         self.assertEqual(profile['roles']['service_uid'],'UNKNOWN')
         self.assertNotEqual(profile['roles']['preparer_uid'],1004)
 
+    def test_actual_uid1002_preparation_keeps_other_roles_unavailable(self):
+        if os.geteuid()==1002:
+            value=self.call()
+            self.assertEqual(value['completed'],['CP04','CP05','CP06','CP07'],value)
+            self.assertEqual(value['stage'],'CP08')
+            self.assertEqual(value['observations'][0]['denial']['status'],'UNAVAILABLE')
+            profile=json.loads((self.root/'prepared/profile.json').read_bytes())
+            self.assertEqual(profile['roles']['preparer_uid'],1002)
+            self.assertEqual(profile['roles']['callback_uid'],1004)
+            self.assertEqual(profile['roles']['activation_start_owner_uid'],0)
+            return
+        capability=m.unauthorized_access(self.root,os.geteuid(),os.getegid(),65534,65534)
+        if capability['status']!='PASS':
+            self.skipTest('actual UID1002 child requires existing Hosted setuid capability')
+        with tempfile.TemporaryDirectory(prefix='p2-ledger-shared-python-') as d:
+            Path(d).chmod(0o755)
+            binary=Path(d)/'python';shutil.copyfile(os.path.realpath(sys.executable),binary);binary.chmod(0o555)
+            env=dict(os.environ,P2_LEDGER_PRIVATE_PYTHON='1',PYTHONHOME=sys.prefix,
+                     LD_LIBRARY_PATH=str(Path(sys.prefix)/'lib'))
+            env.pop('P2_REQUIRE_OS_DENIAL',None)
+            def subject():
+                os.setgroups([]);os.setgid(1002);os.setuid(1002)
+            result=subprocess.run([str(binary),'-B',__file__,
+                'LedgerPreparation.test_actual_uid1002_preparation_keeps_other_roles_unavailable','-v'],
+                env=env,preexec_fn=subject,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr.decode())
+            self.assertIn(b'Ran 1 test',result.stderr)
+
     def test_start_refuses_preparation_profile(self):
         with self.assertRaisesRegex(ValueError,'PREPARATION_PROFILE_CANNOT_START'):
             ledger_service.build({'profile':'ISOLATED_NEW_PREPARE_ONLY'})
