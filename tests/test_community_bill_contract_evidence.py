@@ -16,10 +16,9 @@ REQUIRED = {
     "LOCAL_SIGNED_DETAIL_EVIDENCE_COMPLETENESS",
 }
 FIELDS = {
-    "id", "domain", "status", "code_references",
-    "proven_by_current_evidence", "not_proven_by_current_evidence",
-    "required_provider_fields_or_rules", "owner_role",
-    "test_references", "closure_conditions",
+    "id", "category", "status", "source_refs", "existing_evidence",
+    "required_delivery", "responsible_role", "dependencies",
+    "existing_tests", "closure_conditions",
 }
 
 
@@ -37,23 +36,24 @@ class CommunityBillContractEvidenceTests(unittest.TestCase):
         for entry in entries:
             self.assertEqual(set(entry), FIELDS)
             self.assertEqual(entry["status"], "OPEN_UNVERIFIED")
-            self.assertIn(entry["domain"], {"PROVIDER", "LOCAL"})
-            self.assertTrue(entry["proven_by_current_evidence"])
-            self.assertTrue(entry["not_proven_by_current_evidence"])
-            self.assertTrue(entry["owner_role"])
-            for field in ("required_provider_fields_or_rules", "closure_conditions",
-                          "code_references", "test_references"):
+            self.assertIn(entry["category"], {"PROVIDER_CONTRACT", "LOCAL_EVIDENCE"})
+            self.assertTrue(entry["existing_evidence"]["proves"])
+            self.assertTrue(entry["existing_evidence"]["does_not_prove"])
+            self.assertTrue(entry["responsible_role"])
+            for field in ("required_delivery", "closure_conditions",
+                          "source_refs", "existing_tests", "dependencies"):
                 self.assertTrue(entry[field], (entry["id"], field))
                 self.assertTrue(all(bool(value) for value in entry[field]))
 
     def test_referenced_paths_symbols_markers_and_test_names_exist(self):
         trees = {}
         for entry in self.doc["evidence"]:
-            for ref in entry["code_references"]:
-                self.assertEqual(set(ref), {"path", "symbol", "marker"})
+            for ref in entry["source_refs"]:
+                self.assertEqual(set(ref), {"path", "symbol", "marker", "reason_code_or_field"})
                 path = ROOT / ref["path"]
                 self.assertTrue(path.is_file(), ref)
                 source = path.read_text(encoding="utf-8")
+                self.assertEqual(ref["marker"], ref["reason_code_or_field"])
                 self.assertIn(ref["marker"], source, ref)
                 if path not in trees:
                     trees[path] = ast.parse(source, filename=str(path))
@@ -77,20 +77,22 @@ class CommunityBillContractEvidenceTests(unittest.TestCase):
                 known.update(n.name for n in ast.walk(tree)
                              if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
                              and n.name.startswith("test_"))
-            for name in entry["test_references"]:
+            for name in entry["existing_tests"]:
                 self.assertIn(name, known, entry["id"])
 
     def test_provider_and_local_evidence_remain_distinct(self):
         provider = {item["id"] for item in self.doc["evidence"]
-                    if item["domain"] == "PROVIDER"}
+                    if item["category"] == "PROVIDER_CONTRACT"}
         local = {item["id"] for item in self.doc["evidence"]
-                 if item["domain"] == "LOCAL"}
+                 if item["category"] == "LOCAL_EVIDENCE"}
         self.assertEqual(local, {"LOCAL_SIGNED_DETAIL_EVIDENCE_COMPLETENESS"})
         self.assertEqual(provider, REQUIRED - local)
         self.assertFalse(self.doc["enforced_boundaries"]
                          ["local_configured_stores_are_provider_population"])
         self.assertFalse(self.doc["enforced_boundaries"]
                          ["files_or_links_establish_verification"])
+        self.assertFalse(self.doc["enforced_boundaries"]["runtime_order_database_in_local_snapshot"])
+        self.assertFalse(self.doc["enforced_boundaries"]["cross_database_atomic"])
         self.assertIn("cannot prove provider population",
                       self.doc["source_separation"]["local"])
 
