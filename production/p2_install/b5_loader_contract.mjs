@@ -78,7 +78,7 @@ export function validateRegistry(registry,expectedSource,profile='original') {
 export function recovery(records,identity) {
  if(records.some(r=>r.identity!==identity))hold('HOLD_OPERATION_CONFLICT');
  const phases=records.map(r=>r.phase);
- const allowed=[[],['INTENT'],['INTENT','ACQUIRED'],['INTENT','ACQUIRED','VALIDATED'],['INTENT','ACQUIRED','VALIDATED','RELEASED'],['INTENT','ACQUIRED','RELEASED']];
+ const allowed=[[],['INTENT'],['INTENT','ACQUIRED'],['INTENT','ACQUIRED','VALIDATED'],['INTENT','ACQUIRED','VALIDATED','RELEASED'],['INTENT','ACQUIRED','VALIDATED','OBSERVED'],['INTENT','ACQUIRED','VALIDATED','OBSERVED','RELEASED'],['INTENT','ACQUIRED','RELEASED']];
  if(!allowed.some(a=>JSON.stringify(a)===JSON.stringify(phases)))hold('HOLD_RECORD_SEQUENCE');
  if(phases.length===0)return {state:'PROVEN_NOT_INVOKED',mayInvoke:false};
  if(phases.at(-1)==='RELEASED')return {state:'RELEASE_RECORDED_PROCESS_ENDED',mayInvoke:false,cp11:'NOT_EXECUTED'};

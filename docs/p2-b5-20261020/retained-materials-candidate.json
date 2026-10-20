@@ -1,0 +1,34 @@
+{
+  "bootstrap_bytes": 42663,
+  "bootstrap_git_blob": "897a47af10c63d446306aca726f5fbdd303ff7a6",
+  "bootstrap_sha256": "8d76be9bbf136ffec7ad9c98d141b6fd904d24458e4e68219e19dc6aa7220770",
+  "candidate": "B5_RETAINED_MATERIALS_V1",
+  "command_sha256": "7bd227ada706d787f3d2c33ba0e7d64840aa28cc47b625e8f79620acbdb9e875",
+  "execution": "NOT_EXECUTED_REQUIRES_SPECIFIC_OWNER_CONFIRMATION",
+  "frontier_sha256": "0ff682af0549837ffb7399fdd3964b37f6c2d817d518486ea2c591f30aff3977",
+  "limits": {
+    "child_memory_bytes": 805306368,
+    "child_wall_seconds": 240,
+    "cpu_seconds": 180,
+    "materials_tar_bytes": 18874368,
+    "node_analysis_only_bytes": 134217728,
+    "open_files": 128,
+    "output_total_max_bytes": 25165824,
+    "parent_watchdog_seconds": 270,
+    "report_bytes": 2097152,
+    "selected_content_bytes": 16777216,
+    "selected_files": 2000,
+    "single_source_bytes": 2097152,
+    "source_fetch_wall_seconds": 45
+  },
+  "source_manifest": {
+    "bytes": 5635704,
+    "path": "/var/lib/xuanjun-p2-isolated-test/b5-source-snapshot-20261020/uid1002/manifest.json",
+    "sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+  },
+  "source_tar": {
+    "bytes": 559237632,
+    "path": "/var/lib/xuanjun-p2-isolated-test/b5-source-snapshot-20261020/uid1002/source-tree.tar.pending",
+    "sha256": "e6d3a3cef96ee996eb4b130fb0bd9305438489326b85678a263998602413e485"
+  }
+}

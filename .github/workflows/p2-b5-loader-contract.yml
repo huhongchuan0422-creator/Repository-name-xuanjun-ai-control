@@ -3,6 +3,12 @@ on:
   push:
     branches: [repair/p2-resumable-install-20261020]
     paths:
+      - scripts/p2_b5_retained_bootstrap.py
+      - scripts/p2_b5_retained_materials.py
+      - tests/p2_b5_retained/**
+      - tests/p2_install/test_b5_observed_journal.mjs
+      - docs/p2-b5-20261020/retained-materials*
+      - docs/p2-b5-20261020/RETAINED_MATERIALS_CANDIDATE.md
       - scripts/p2_b5_three_file_binding.py
       - tests/p2_b5_binding/**
       - docs/p2-b5-20261020/CONTINUATION.md
@@ -23,20 +29,33 @@ jobs:
         run: |
           node --version
           node tests/p2_install/test_b5_loader_contract.mjs
+          node tests/p2_install/test_b5_observed_journal.mjs
+          python3 -B -m unittest discover -s tests/p2_b5_retained -v
           python3 -B -m unittest discover -s tests/p2_b5_binding -v
 
       - name: Package source preparation only - no SDK or server data
         run: |
-          mkdir -p candidate/production/p2_install candidate/scripts candidate/tests/p2_install candidate/tests/p2_b5_binding candidate/docs/p2-b5-20261020 candidate/evidence/p2-b5-20261020
+          mkdir -p candidate/production/p2_install candidate/scripts candidate/tests/p2_install candidate/tests/p2_b5_binding candidate/docs/p2-b5-20261020 candidate/evidence/p2-b5-20261020 candidate/tests/p2_b5_retained
           cp production/p2_install/b5_combined_contract.mjs production/p2_install/b5_loader_contract.mjs candidate/production/p2_install/
-          cp scripts/p2_b5_three_file_binding.py scripts/p2_b5_three_files.py candidate/scripts/
-          cp tests/p2_install/test_b5_loader_contract.mjs candidate/tests/p2_install/
+          cp scripts/p2_b5_retained_bootstrap.py scripts/p2_b5_retained_materials.py scripts/p2_b5_snapshot.py scripts/p2_b5_three_file_binding.py scripts/p2_b5_three_files.py candidate/scripts/
+          cp tests/p2_install/test_b5_observed_journal.mjs tests/p2_install/test_b5_loader_contract.mjs candidate/tests/p2_install/
           cp tests/p2_b5_binding/*.py candidate/tests/p2_b5_binding/
           cp docs/p2-b5-20261020/CONTINUATION.md docs/p2-b5-20261020/LOADER_BINDING.md candidate/docs/p2-b5-20261020/
           cp evidence/p2-b5-20261020/* candidate/evidence/p2-b5-20261020/
+          cp tests/p2_b5_retained/test_retained.py candidate/tests/p2_b5_retained/
+          cp docs/p2-b5-20261020/retained-materials* docs/p2-b5-20261020/RETAINED_MATERIALS_CANDIDATE.md candidate/docs/p2-b5-20261020/
           cd candidate
           find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: b5-readonly-continuation-source
           path: candidate/
+
+  host-python368:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host-tool regressions on actual Python 3.6.8, synthetic archives only
+        run: |
+          docker pull python:3.6.8
+          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=96 --memory=768m --tmpfs=/tmp:rw,nosuid,nodev,size=64m -v "$PWD:/work:ro" -w /work python:3.6.8 python -I -B -S -m unittest discover -s tests/p2_b5_retained -v

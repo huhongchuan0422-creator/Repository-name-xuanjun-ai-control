@@ -65,3 +65,9 @@ The existing lease gains only an optional whileAcquired callback. Callback/metad
 The upstream real CLI has gateway call --expect-url (preserves configured authentication); this is interface research, not a frozen command. Real foreground Gateway/auth configuration and inspection registry integration must still be proved for the fixed compiled runtime. If that seam cannot preserve the actual active registry/profile authority, HOLD rather than substitute fake Gateway or hand-injected client.
 
 No server operation or SDK/auth dispatch was executed. B5 remains PARTIAL. Next authorized independent work is a bounded retained-archive material-selection candidate covering the above set in one scope, with original tar/manifest pins and no live recollection. It must retain missing-member evidence, originals and failed output, and create only a separately approved private output. No final onsite command is offered until that candidate and actual input bindings are complete. Hosted result/Commit/Tree are recorded on original PR17.
+
+## Retained-material candidate and journal correction (next increment)
+
+The complete bounded candidate, fixed inputs/outputs/limits, exact command and side effects are now in RETAINED_MATERIALS_CANDIDATE.md, retained-materials-candidate.json and retained-materials.command. It is NOT_EXECUTED and requires confirmation of this specific onsite scope. No new tar/three-file upload is requested. Original image ID/Python/UID evidence PR17#6281525690 is inherited; Node compatibility remains UNKNOWN.
+
+OBSERVED is now accepted only after VALIDATED, optionally followed by RELEASED. Real appendRecord/readRecords tests cover5 persistent scenarios,5 invalid sequences and independent process readback, including an EIO inside appendRecord retaining its incomplete immutable file. This fixes the previous events.push-only positive path; actual SDK remains NOT_EXECUTED.
