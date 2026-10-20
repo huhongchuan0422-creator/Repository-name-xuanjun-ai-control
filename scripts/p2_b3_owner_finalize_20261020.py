@@ -12,6 +12,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import traceback
 import uuid
 
 HOST='iZd7oeikknn1z21sq6ji6zZ'
@@ -329,6 +330,9 @@ def main():
 if __name__=='__main__':
     try:sys.exit(main())
     except Exception as exc:
+        # Caller bootstrap retains this raw traceback in its root-private log.
+        # Structured stdout remains bounded and does not substitute UNKNOWN.
+        traceback.print_exc()
         print(json.dumps({'status':'HOLD_RETAINED','error_type':type(exc).__name__,
               'reason':str(exc) if isinstance(exc,ValueError) else type(exc).__name__,
               'full_b3_complete':False,'service_started':False},sort_keys=True));sys.exit(2)
