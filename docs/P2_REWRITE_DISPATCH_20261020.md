@@ -116,6 +116,76 @@ CP标签是设计中的证据位置名称，**不是已存在的checkpoint文件
 
 本小任务结论：候选序列 **ORDER_VALID / ACYCLIC**；独立批次闭合、资源隔离、原阶段等价和英国安装 **NOT_VERIFIED / NOT_EXECUTED**。七批继续 **DRAFT / NOT_INSTALLABLE**。
 
+## B3阶段03–09：真实接口与恢复缺口（PR17 #6280660117）
+
+核对源码固定于 `6532479c5993bfc2e61ef3bcee8978cfa11ef7a3`，只读静态接口证据；不是现场状态证明。旧epoch7宿主实现与新容器组件不是等价替换。本节不删除、放宽原guard，不把旧单次机制扩为新许可。
+
+### 首次入口、状态及共同guard
+
+首次装配为 [epoch7_host_factory.py:599](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_factory.py#L599)，经 [epoch7_host_driver.py:14](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_driver.py#L14) 构造具体对象；装配本身不执行。
+实际整序列调用为 [epoch7_recovery_sequence.py:533](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_recovery_sequence.py#L533)：先校验context/approval、持有安装锁、preflight、gate；要求outer和inner均不存在，再O_EXCL创建两记录并按PHASES执行。没有B3-only首次入口，也没有在09后暂停的公开参数。
+
+`resume_once`同对象重复调用触发`SEQUENCE_OBJECT_ALREADY_USED`；新对象遇任一既有/部分记录触发`EXISTING_ATTEMPT_OR_OUTER_RECEIPT_HOLD`。
+[epoch7_injected_recovery.py:160](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_injected_recovery.py#L160)的create拒绝既有记录，save要求当前对象已有last且未poisoned，并做完整记录CAS；没有从盘加载后采纳在途记录的公开恢复方法。
+[epoch7_host_phases.py:207](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_phases.py#L207)要求准确outer INTENT和completed前缀。
+[epoch7_injected_recovery.py:103](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_injected_recovery.py#L103)读回锁、批准、保留pins、非ACTIVE激活、当前generation/targets、原sandbox、身份和排他证据；current_targets/current_generation等会在执行中更新，但新实例从snapshot重置内存，不能推断可重建原恢复上下文。
+
+共同持久资源：`epoch7-recovery-sequence.json`（outer）、`epoch7-recovery-execution.json`（inner）位于fs.TRANSACTION：
+`/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5`。
+这些是旧宿主代码常量，**不授权容器挂载或访问**。
+安装锁`/run/xuanjun-p2-install.lock`；激活锁`/var/lib/xuanjun-development/activation/activation.lock`。激活描述符/journal由既有ActivationStore拥有，确切后端路径本节未展开核实，标UNKNOWN，不自行造路径。
+
+### 每阶段实际资源和唯一拥有者
+
+“所有者”为同一driver内部唯一效果对象；不是允许第二Writer。outer统一由OuterJournal写，inner统一由BoundJournal受保护CAS写。下表恢复判据是需核对的实际状态，**没有实现就不能执行续接**。
+
+| 阶段 / 首次效果入口 | 真实读取与写入 | 唯一效果所有者及原guard | 已有记录与恢复判据 / 缺口 |
+| --- | --- | --- | --- |
+| 03 rebind_prepared_epoch | 读snapshot/candidate、native当前及epoch5/epoch3证明；ActivationStore先append epoch8 PREPARED再发布descriptor；备份epoch7-prior-native-binding.json，替换/etc/xuanjun-development/p2-native-binding.json；O_EXCL发布epoch8-tls-renewal-candidate.json | CoreHostPhases.rebind_prepared_epoch，_enter一次性；rebind_prepared_epoch7要求7→8、同canonical身份、准确旧head及锁；多资源不是单事务 | outer INTENT/COMPLETE与native备份存在；append完成descriptor未发布、native已换但TLS候选未发布均可能部分成功。需分别读回激活两头/native/候选；没有此阶段公开跨进程恢复入口 |
+| 04 quiesce_exact_epoch | 读取observer.quiescence的identity_verified/coordinator_inactive/parent_unit_inactive/cgroups_empty/restart_inhibited；写ActivationStore PREPARED→QUIESCED | CoreHostPhases.quiesce_exact_epoch。此方法本身不调用systemctl stop；它要求静止证明，不负责凭空制造静止环境 | outer证据摘要及激活状态；进程和抑制状态须独立读回。不能把重复transition当作恢复；静止前提在隔离适配未实现 |
+| 05 replace_retained_targets | 读gate.delta中24目标及准确payload；仅非RETAIN成员写入；逐目标先备份epoch7-target-before-<path SHA256>.private，再exact replace；不写应用DB | InjectedDriver.phase→RetainedTargetDelta.apply→ProtectedFilesystem；要求inner恰ADMITTED、fresh PROVISION、未started；每目标backup和before/after CAS | epoch8-runtime-provisioning.json逐目标PENDING/BACKUP_INTENT/REPLACE_INTENT/DONE，inner TARGET_DELTA_COMPLETE带provision摘要；已替换未写DONE必须查备份、实际目标和原意图。现有apply拒绝重入/既有PROVISION，不具备恢复采纳 |
+| 06 publish_reviewed_identities | 仅gate.additions明确的/etc/xuanjun-development/p2-owner-process-identity.json与p2-ledger-server-identity.json；校验原absence、payload摘要，O_EXCL发布 | InjectedDriver.phase循环IdentityPublication.apply；只能两固定path；current_additive_targets须未发布，journal须不存在 | epoch7-owner-identity-publication.json、epoch7-server-identity-publication.json及inner identity_receipts；第一身份已发第二未发需逐个核验，不能覆盖已发身份。空additions为受批准no-op；实际host compose要求两项，不能拿空列表代替 |
+| 07 change_generation_access | 仅/var/lib/xuanjun-development/generations/1目录，保持inode/owner、按delta改mode至0700，不改state.sqlite | GenerationAccessStep.apply→chmod_generation_exact；inner须指定前阶段、准确before、无既有generation journal；无chown/递归/rollback/retry | epoch7-generation-access.json含before/after/observed_after/receipt，inner GENERATION_ACCESS_COMPLETE引用摘要；chmod成功而日志未完成需实际metadata核验；公开恢复入口未实现 |
+| 08 apply_reviewed_access | 仅/opt/xuanjun-control-releases目录及/etc/xuanjun-development/p2-native-ledger-client.json；读准确owner/inode/ACL/default ACL及文件摘要，写system.posix_acl_access并fsync | ExactAccessApplier.__call__；ACL_ONE_EXACT_ATTEMPT、两固定path、before resolver、两次CAS、live guard和after不变项 | observed与started存在对象内存；outer保存聚合摘要，未见此applier独立持久逐路径意图/结果。第一path改完第二未改需真实ACL分项取证；不能靠重建对象或before模板续跑 |
+| 09 rebind_tls_metadata_only | 读tls-lifecycle.json及新TLS config、保留证书/tree摘要；O_EXCL备份epoch7-prior-tls-lifecycle.json，CAS替换原TLS journal；不签发/续期/dry-run | CoreHostPhases.rebind_tls_metadata_only，_enter、准确phase/live guard，写前后TLS内容保持，返回严格tls_change | outer摘要与原TLS备份；替换完成outer未提交需校验原/新journal及证书tree，不重写已发布结果；公开阶段恢复入口未实现 |
+
+源码依据：
+- 03/04/09：[epoch7_host_phases.py:519](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_phases.py#L519)、[epoch7_host_phases.py:547](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_phases.py#L547)、[epoch7_host_phases.py:557](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_phases.py#L557)。
+- 05/06/07：[epoch7_injected_recovery.py:233](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_injected_recovery.py#L233)、[epoch7_injected_recovery.py:332](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_injected_recovery.py#L332)、[epoch7_injected_recovery.py:295](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_injected_recovery.py#L295)。
+- 05准确24路径全集为epoch7_delta.TARGETS（不能扩大为整个/etc或systemd目录），更改子集来自gate.delta；备份和替换判据见[epoch7_protected_fs.py:299](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_protected_fs.py#L299)与[epoch7_protected_fs.py:319](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_protected_fs.py#L319)。
+- 08：[epoch7_exact_access.py:64](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_exact_access.py#L64)和[epoch7_exact_access.py:117](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/6532479c5993bfc2e61ef3bcee8978cfa11ef7a3/evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_exact_access.py#L117)。
+
+跨B1/B3共享资源已识别：B1阶段01创建release内容并观察父目录；B3/08修改同一父目录ACL。因此“B1整个目录metadata永远不变”不成立。候选所有权必须按字段区分：B1拥有release文件内容；B3独占两指定path的ACL（及07指定generation mode）；B7独占激活转换操作，但激活资源03/04/14共享同一ActivationStore。只允许同一受控Store串行操作，不允许两个适配器独立写后端。目录ACL改变是否影响B1访问、原阶段01回执的适用性及字段级冻结判据，仍NOT_VERIFIED。
+
+### 可直接复用与最小缺口接口（仅设计，不新增代码）
+
+直接复用：准确Phase顺序、原context/guard和受保护IO、备份命名与hash、单目标CAS及写后读回、原失败先containment再发布诊断/HOLD的流程。containment可能停服务/恢复mask或sandbox，恢复核验必须查看containment结果，不能假定只发生失败阶段效果。poisoned journal、UNKNOWN cleanup或锁释放不明必须保留HOLD。
+这些旧单次实现有价值，但不构成B3可分批恢复。
+
+最小待适配契约（**NOT_IMPLEMENTED，本节命名是提议**）：
+1. 只读取证接口：给定同一context/attempt及原outer/inner记录引用，返回受保护metadata、bytes/hash、逐资源before/after/conflict/unknown和containment状态；不执行写入，不接收任意路径。
+2. 恢复判定接口：核验context/Plan、阶段completed前缀、原效果身份、原备份/回执与实际状态；明确ALREADY_APPLIED / PROVEN_NOT_APPLIED / UNKNOWN，不能用不存在本地回执推断无效果。
+3. 同操作收敛接口：仅在原恢复机制允许时，按原CAS补原缺失结果，不重新创建claim、不重新消费Grant、不重放已成功效果；需要后续原阶段执行时须有明确持久状态重建、授权和batch停点支持。
+在所核sequence/Core/retained/access接口内，以上跨进程恢复采纳与阶段09停点未实现。仓库其他Attempt5/原生恢复机制可能提供相关能力，**本轮未证明其覆盖这些具体B3对象与状态**，不能全库断言“没有恢复”，也不能直接拿其名称当作已接通。
+
+### 最小离线恢复用例清单（计划，全部NOT_EXECUTED）
+
+只用明确ISOLATED_TEST_ONLY样本、私有临时文件和可注入后端；不使用真实宿主路径/生产批准或Key。已有未变通过用例继承，不重复全量。
+
+| 用例 | 注入窗口与应验结果 |
+| --- | --- |
+| R0 原入口负例 | 同driver重调、重建driver遇outer-only/inner-only/部分记录；原guard拒绝且不启动效果；不能为制造PASS修改guard |
+| R03 激活及native分步 | activation append后/descriptor发布前、native替换后/TLS候选前中断；新进程只读取证，不重复append/替换；未知保持HOLD |
+| R04 静止证明 | 不全静止、身份漂移或抑制丢失拒绝；QUIESCED提交后响应丢失只能读回，不再transition |
+| R05 单目标替换 | 备份后、replace后/DONE前、若干DONE后中断；旧备份保留，已正确目标不覆盖；无恢复实现先断言HOLD |
+| R06 两身份 | 第一发布成功第二未发、单身份发布后journal未确认；保留已发原件，不重复exclusive publish |
+| R07 chmod | chmod后receipt/inner提交前中断；inode/owner/DB不变；mode正确不代表可绕journal guard重跑 |
+| R08 ACL部分 | 第一path ACL已改第二未改；跨进程发现内存observed丢失，按实际路径判定；覆盖路径替换/ACL冲突；不能据聚合摘要推断全完成 |
+| R09 TLS元数据 | TLS journal已换outer COMPLETE未保存；旧备份/证书tree不变，零TLS生命周期调用；缺/改备份HOLD |
+| RX 共同收敛 | journal CAS漂移、poisoned、containment UNKNOWN、锁释放不明；不产生第二效果；09完成仍不得把无暂停能力的整序列宣称已分批关闭 |
+
+本轮仅文档与源码一致性检查；没有运行上述恢复测试。B3恢复能力 **PARTIAL / NOT_VERIFIED**，七批仍 **DRAFT / NOT_INSTALLABLE**，安装与服务器操作 **NOT_EXECUTED**。
+
 ## 后续执行与政策边界
 
 当前只是文档增量；七批已安装数 **0/7**，原16阶段执行数 **0/16**（沿用已知现场状态，本轮未做英国读取）。原生产AuthorityStore仍UNKNOWN，生产切换不在本任务。
