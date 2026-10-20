@@ -107,12 +107,25 @@ print(json.dumps(m.dispatch(req,sys.argv[2],m.sha(m.encode(req)))))
         with tempfile.TemporaryDirectory(prefix='p2-ledger-shared-python-') as d:
             Path(d).chmod(0o755)
             binary=Path(d)/'python';shutil.copyfile(os.path.realpath(sys.executable),binary);binary.chmod(0o555)
+            # Hosted /home/runner is private to its original user. Stage exact
+            # source bytes in a NEW read-only test tree; never relax that home
+            # or repository's permissions to let the UID1002 test traverse it.
+            staged=Path(d)/'repo'
+            relatives=['production/p2_install/initialize.py','production/p2_install/b3_contracts.py',
+                       'production/p2_install/b3_ledger.py','tests/p2_install/test_b3_ledger.py']
+            relatives += ['evidence/p2-epoch7-access-repair-20261014/runtime/stage1/'+n for n in m.NAMES]
+            for relative in relatives:
+                target=staged/relative;target.parent.mkdir(parents=True,exist_ok=True)
+                shutil.copyfile(REPO/relative,target);target.chmod(0o444)
+            for folder in sorted((p for p in staged.rglob('*') if p.is_dir()),reverse=True):
+                folder.chmod(0o555)
+            staged.chmod(0o555)
             env=dict(os.environ,P2_LEDGER_PRIVATE_PYTHON='1',PYTHONHOME=sys.prefix,
                      LD_LIBRARY_PATH=str(Path(sys.prefix)/'lib'))
             env.pop('P2_REQUIRE_OS_DENIAL',None)
             def subject():
                 os.setgroups([]);os.setgid(1002);os.setuid(1002)
-            result=subprocess.run([str(binary),'-B',__file__,
+            result=subprocess.run([str(binary),'-B',str(staged/'tests/p2_install/test_b3_ledger.py'),
                 'LedgerPreparation.test_actual_uid1002_preparation_keeps_other_roles_unavailable','-v'],
                 env=env,preexec_fn=subject,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
             self.assertEqual(result.returncode,0,result.stderr.decode())
