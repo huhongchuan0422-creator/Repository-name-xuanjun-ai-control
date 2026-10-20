@@ -214,3 +214,52 @@ B1已按[真实回执6281846615](https://github.com/huhongchuan0422-creator/Repo
 适配器请求除ea31原身份/root字段和inputs={}外，需source_root、origin_scope及sources两项，各含sha256与origin_ref；三动作使用同一份spec。来源路径仅相对source_root的两个固定文件名，读取逐级O_NOFOLLOW、常规文件/大小/读前后身份校验。原子不覆盖发布意图后，inspect/recover按原spec调用ea31，不依赖源件继续可用、不修改B1原件；归属或摘要冲突UNKNOWN，禁止清空重导。
 
 本轮补定向合成测试：独立进程execute/inspect/recover及重复导入、真实SIGKILL后两窗口恢复（archive发布后/intent前及ea31第一文件落盘后）、未知来源、源摘要改变、身份改变拒绝、源内容/权限/inode/mtime不变。它们不构成英国B2验收。真实summary摘要缺失前，最终安装spec/包摘要/命令保持NOT_READY；仅可交两固定原件的最小只读摘要采集。B2现场操作NOT_EXECUTED，不增加B1/协调器/混合CLI/P3前置。
+
+## R03只读取证最小增量（PR17 #6282306415）
+
+B1/B2继承真实检查点#6281846615/#6282254897，不重装。B3整体仍DRAFT。
+新增 `production/p2_install/rebind_readback.py`，仅检查显式冻结的
+`ISOLATED_TEST_ONLY` 私有证据镜像；不是03首次入口或同操作补写入口。
+没有调用旧03–09、ActivationStore.reconcile/_locked/_append、native替换、TLS发布或Grant。
+
+镜像根必须为本用户0700、规范绝对路径，叶名以`p2-b3-readback-`开头。
+镜像内只读取原绝对资源路径的相对副本，八资源固定为：
+activation/active.json、epochs.jsonl、既有activation.lock；
+原native binding；原transaction下prior-native备份、TLS候选、outer及inner记录。
+准确原路径由源码RESOURCES固定，调用者不能增加路径。实际生产路径不被直接打开。
+只用O_RDONLY/NOFOLLOW、逐级受保护父目录和既有锁非阻塞flock；
+缺锁不创建、不chmod。读取可更新atime；内容、inode、mtime、ctime、权限及目录结构不写。
+
+输入为stdin JSON及外部固定的`--spec-sha256`（对排序、无空白、无末尾换行JSON计算SHA256）。
+字段：schema=1、scope、root、phase=rebind_prepared_epoch、固定transaction_id、
+context_sha256、原journal binding、before、after、原rebind proof、source_refs。
+before包含原activation、完整旧journal SHA及native SHA；
+after包含候选activation、native SHA及TLS候选SHA。
+source_refs必须明确context/snapshot/candidate/plan/outer/inner的原引用及SHA。
+outer/inner保持原canonical JSON加换行、0600及原记录结构；核同context/binding、03 INTENT或COMPLETE及准确completed前缀。
+原proof与journal最终append关联，旧完整链SHA须匹配，备份必须匹配旧native。
+输入摘要是调用者冻结身份，不是审批签名；引用字段本身不证明历史批准真实性或现场guard已通过。
+
+复用未修改的原activation_control.py（SHA256
+`169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4`）
+validate/head/_journal/_read_descriptor_unlocked校验原schema、单调epoch及hash链。
+不实例化CoreHostPhases、不重建旧写入对象，也不放宽原guard。
+
+| 观测 | 阶段判定 | 后续 |
+| --- | --- | --- |
+| 日志已append8、descriptor仍7；native旧、备份/TLS未发布 | UNKNOWN，窗口ACTIVATION_APPEND_BEFORE_DESCRIPTOR | HOLD；不可重复append |
+| 日志/descriptor均8、native新且原备份准确、TLS未发布 | UNKNOWN，窗口NATIVE_REPLACED_BEFORE_TLS_CANDIDATE | HOLD；不可重复替换 |
+| 日志/descriptor/native/备份/TLS均与冻结after相符 | ALREADY_APPLIED | 仅效果观测；不补outer、不宣称B3 COMMITTED |
+| 完整旧日志正向匹配、descriptor/native旧、03 INTENT、无新备份/TLS | PROVEN_NOT_APPLIED | 仅当前冻结资源判定；不是重试许可 |
+| 缺原件/备份/引用、链损坏、绑定漂移、锁忙、containment或跨读变化 | UNKNOWN | HOLD；保留原现场 |
+
+所有输出decision始终HOLD、write_authority=false。分类不能替代原guard、不能证明无历史未决事务。
+本轮没有现场镜像/已认证context、snapshot、candidate、plan及真实03记录，因此现场R03=NOT_EXECUTED，
+不把合成fixture冒充英国恢复通过；后续现场证据冻结/受控收敛仍未完成。
+
+定向验收：`python -B tests/p2_install/test_rebind_readback.py -v`；
+14项独立进程测试，包括两处SIGKILL fixture生产进程→新CLI读取、完整/未应用状态、
+原件和备份缺失、损坏链、错误proof/请求/context、完成记录冲突、锁竞争、链接及权限。
+每次CLI读前后核文件摘要/metadata和文件集合不变。fixture仅原schema合成证据，
+不运行原rebind方法；不代表真实旧guard执行或生产准入已验收。
+目标保持容器Python3.11（CI3.11/3.12）；宿主3.6.8不升级。
