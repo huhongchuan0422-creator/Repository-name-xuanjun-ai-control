@@ -71,8 +71,19 @@ def publish(path,raw,mode=0o444):
              and stat.S_IMODE(s.st_mode)==mode and read(path)==raw,'IMMUTABLE_CONFLICT');return
     pending=path.parent/('.'+path.name+'.pending-'+uuid.uuid4().hex)
     fd=os.open(str(pending),os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
-    with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+    with os.fdopen(fd,'wb') as f:
+        # Only the O_EXCL-created inode: never repair an existing object's mode.
+        os.fchmod(f.fileno(),mode)
+        info=os.fstat(f.fileno())
+        need(stat.S_ISREG(info.st_mode) and info.st_uid==os.geteuid()
+             and info.st_nlink==1 and stat.S_IMODE(info.st_mode)==mode,'NEW_FILE_PROTECTION')
+        f.write(raw);f.flush();os.fsync(f.fileno())
+        need(stat.S_IMODE(os.fstat(f.fileno()).st_mode)==mode,'NEW_FILE_MODE_READBACK')
+    need(read(pending)==raw,'NEW_FILE_BYTES_READBACK')
     os.link(str(pending),str(path));sync(path.parent)
+    info=os.lstat(str(path))
+    need(info.st_ino==os.lstat(str(pending)).st_ino and info.st_nlink==2
+         and stat.S_IMODE(info.st_mode)==mode and read(path)==raw,'PUBLISHED_FILE_READBACK')
 
 
 def unpack(raw,expected_sha,stage):
@@ -124,14 +135,43 @@ def snapshot(target):
 
 
 def prior_snapshot(root):
-    result={}
-    for p in sorted(Path(root).iterdir()):
-        if p.name=='prepared':continue
-        if p.name=='activation':
-            need(p.is_dir() and not p.is_symlink(),'CP03_ACTIVATION_DIRECTORY')
-            for f in sorted(p.iterdir()):result[str(f)]=(digest(read(f)),meta(f))
-        else:result[str(p)]=(digest(read(p)),meta(p))
-    need(len(result)==(6 if str(root).startswith('/tmp/p2-b3-test-host-') else 10),'CP03_ORIGINAL_FILE_COUNT')
+    root=Path(root);result={};files=0
+    top_files={'.initialize.lock','intent.json','binding-config.json','commit-receipt.json'}
+    pending=re.compile(r'^\.(intent\.json|binding-config\.json|commit-receipt\.json)\.pending-[0-9a-f]{32}$')
+    seen=set()
+    def record(path,kind):
+        info=os.lstat(str(path));metadata=meta(path)
+        metadata.update(size=info.st_size,nlink=info.st_nlink)
+        need(info.st_uid==1002 and info.st_gid==1002,'CP03_SOURCE_OWNER')
+        row={'kind':kind,'metadata':metadata}
+        if kind=='FILE':
+            need(stat.S_ISREG(info.st_mode),'CP03_REGULAR_FILE')
+            row['sha256']=digest(read(path))
+        else:need(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode)==0o700,'CP03_DIRECTORY')
+        result[str(path)]=row
+    for p in sorted(root.iterdir()):
+        if p.name=='prepared':
+            info=os.lstat(str(p))
+            need(stat.S_ISDIR(info.st_mode) and info.st_uid==1002
+                 and stat.S_IMODE(info.st_mode)==0o700,'CP03_PREPARED_DIRECTORY')
+            continue
+        if p.name in ('activation','data','run'):
+            record(p,'DIRECTORY');seen.add(p.name)
+            children=sorted(p.iterdir())
+            if p.name=='activation':
+                need({f.name for f in children}=={'active.json','epochs.jsonl','activation.lock'},'CP03_ACTIVATION_FILES')
+                for f in children:record(f,'FILE');files+=1
+            else:need(not children,'CP03_RESERVED_DIRECTORY_NOT_EMPTY')
+        else:
+            match=pending.fullmatch(p.name)
+            need(p.name in top_files or match is not None,'CP03_UNKNOWN_ITEM')
+            record(p,'FILE');files+=1;seen.add(p.name)
+            if match is not None:
+                final=root/match.group(1);a=os.lstat(str(p));b=os.lstat(str(final))
+                need(stat.S_ISREG(b.st_mode) and (a.st_dev,a.st_ino)==(b.st_dev,b.st_ino)
+                     and a.st_nlink==b.st_nlink==2,'CP03_PENDING_LINK')
+    need(top_files.issubset(seen) and {'activation','data','run'}.issubset(seen)
+         and files==10,'CP03_ORIGINAL_FILE_COUNT')
     return result
 
 
