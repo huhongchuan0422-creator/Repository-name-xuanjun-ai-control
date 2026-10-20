@@ -128,8 +128,8 @@ export function readonlyInspectionOptions() {
  * A fixture callback is only a contract test, never real loading/CP11 evidence.
  * No Promise.race: timeouts cannot abandon a late acquired handle without disposal.
  */
-export async function inspectReadonlyLease({acquire,expectedSource,record}) {
- if(typeof acquire!=='function'||typeof record!=='function'||!path.isAbsolute(expectedSource))hold('HOLD_INSPECTION_INPUT');
+export async function inspectReadonlyLease({acquire,expectedSource,record,whileAcquired}) {
+ if(typeof acquire!=='function'||typeof record!=='function'||!path.isAbsolute(expectedSource)||(whileAcquired!==undefined&&typeof whileAcquired!=='function'))hold('HOLD_INSPECTION_INPUT');
  // INTENT failure is before acquire. record must durably append to the existing journal.
  await record('INTENT');
  let lease,primary,releaseError,validated;
@@ -139,6 +139,7 @@ export async function inspectReadonlyLease({acquire,expectedSource,record}) {
   await record('ACQUIRED');
   validated=validateRegistry(lease.registry,expectedSource,'readonly');
   await record('VALIDATED');
+  if(whileAcquired) {await whileAcquired();await record('OBSERVED');}
  } catch(error) {primary=error;}
  finally {
   // If acquire rejects, upstream owns rollback disposal; no guessed handle/retry.
@@ -156,8 +157,8 @@ export async function inspectReadonlyLease({acquire,expectedSource,record}) {
  return {...validated,profile:'readonly',released:true,cp11:'NOT_EXECUTED',authenticatedDispatch:'NOT_EXECUTED'};
 }
 
-/** Fixed compiled mapping candidate. Real positive byte validation is BLOCKED until
- * the actual three-file input is readable here. No arbitrary alias is accepted.
+/** Fixed compiled mapping candidate. Real positive source-byte validation is now covered by the retained actual input.
+ * Namespace provenance and runtime dependency closure remain separate requirements. No arbitrary alias is accepted.
  * Caller still must import this exact path from a proven immutable full closure;
  * supplying a namespace is not evidence of that import or authentication.
  */

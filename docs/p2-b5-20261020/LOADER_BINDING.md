@@ -42,3 +42,7 @@ Original methods are owner delivery, execution start and execution inspect. They
 ## Checks
 
 17 contract tests include engine boundaries, export/closure/binding/tree rejection, genuine registry field shape vs serialized handlers, activation/source/errors, lost-response no-retry and cross-process immutable reference readback with corruption detection. Fixtures are explicitly CONTRACT_FIXTURES_ONLY, not a real loader test. Local Node24.19.0: PASS. Hosted result recorded in original PR17. No old component regression suite rerun and no unchanged package rebuilt.
+
+## Actual input follow-up (PR17 #6292294383)
+
+The normal attachment is now readable and all original pins pass. The previous403/input-unavailable state is superseded only for these three files. Actual source mapping to t is verified; fixture namespace binding and combined contract are covered by the new real-byte regression. Real SDK namespace import, recursive closure and authenticated transport remain NOT_EXECUTED/UNKNOWN. See CONTINUATION.md and retained evidence; no site command is authorized by this update.

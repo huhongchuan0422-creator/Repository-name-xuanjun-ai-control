@@ -6,6 +6,8 @@ on:
       - scripts/p2_b5_three_file_binding.py
       - tests/p2_b5_binding/**
       - docs/p2-b5-20261020/CONTINUATION.md
+      - production/p2_install/b5_combined_contract.mjs
+      - evidence/p2-b5-20261020/**
       - production/p2_install/b5_loader_contract.mjs
       - tests/p2_install/test_b5_loader_contract.mjs
       - .github/workflows/p2-b5-loader-contract.yml
@@ -25,12 +27,13 @@ jobs:
 
       - name: Package source preparation only - no SDK or server data
         run: |
-          mkdir -p candidate/production/p2_install candidate/scripts candidate/tests/p2_install candidate/tests/p2_b5_binding candidate/docs/p2-b5-20261020
-          cp production/p2_install/b5_loader_contract.mjs candidate/production/p2_install/
+          mkdir -p candidate/production/p2_install candidate/scripts candidate/tests/p2_install candidate/tests/p2_b5_binding candidate/docs/p2-b5-20261020 candidate/evidence/p2-b5-20261020
+          cp production/p2_install/b5_combined_contract.mjs production/p2_install/b5_loader_contract.mjs candidate/production/p2_install/
           cp scripts/p2_b5_three_file_binding.py scripts/p2_b5_three_files.py candidate/scripts/
           cp tests/p2_install/test_b5_loader_contract.mjs candidate/tests/p2_install/
-          cp tests/p2_b5_binding/test_binding.py candidate/tests/p2_b5_binding/
+          cp tests/p2_b5_binding/*.py candidate/tests/p2_b5_binding/
           cp docs/p2-b5-20261020/CONTINUATION.md docs/p2-b5-20261020/LOADER_BINDING.md candidate/docs/p2-b5-20261020/
+          cp evidence/p2-b5-20261020/* candidate/evidence/p2-b5-20261020/
           cd candidate
           find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
       - uses: actions/upload-artifact@v4
