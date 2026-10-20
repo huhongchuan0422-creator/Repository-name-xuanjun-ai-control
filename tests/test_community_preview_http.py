@@ -21,7 +21,8 @@ def request(sock_path,method,path,headers=None,body=b''):
     s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.settimeout(5);s.connect(str(sock_path));s.sendall(raw)
     chunks=[]
     while True:
-        part=s.recv(65536)
+        try:part=s.recv(65536)
+        except ConnectionResetError:break
         if not part:break
         chunks.append(part)
     s.close();data=b''.join(chunks);head,_,payload=data.partition(b'\r\n\r\n')

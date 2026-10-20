@@ -31,7 +31,7 @@ class PreviewCandidateContract(unittest.TestCase):
   for phrase in ('test Mock','payments are disabled','Finance remains UNCONFIRMED','not real wx.login/code2session'):self.assertIn(phrase,README)
  def test_rollback_covers_external_checks_and_old_objects(self):
   for token in ('current.symlink','$BACKUP/unit','$BACKUP/nginx','$BACKUP/enabled','$BACKUP/active'):self.assertIn(token,DEPLOY)
-  trap=DEPLOY.index("trap 'rollback; exit 90' ERR")
+  trap=DEPLOY.index("trap 'rc=$?; if rollback; then exit 90; else exit 91; fi' ERR")
   public=DEPLOY.index('curl --fail --silent --show-error --max-time 10 "https://$HOST/community/health"')
   clear=DEPLOY.index('trap - ERR')
   self.assertLess(trap,public);self.assertLess(public,clear)
@@ -53,7 +53,7 @@ class PreviewCandidateContract(unittest.TestCase):
    self.assertEqual(p.returncode,0,p.stdout+p.stderr)
    app=(out/'app.js').read_text()
    receipt=json.loads((out/'CONNECTED_PREVIEW_RECEIPT.json').read_text())
-   self.assertIn("baseUrl: 'https://community-preview.wenwenyiyiyi.work'",app)
+   self.assertRegex(app,r"baseUrl:\\s*'https://community-preview\\.wenwenwenyiyiyi\\.work'")
    self.assertIn("payments: false",app)
    self.assertIn("commerce: true",app)
    self.assertEqual(receipt['baseUrl'],'https://community-preview.wenwenwenyiyiyi.work')
