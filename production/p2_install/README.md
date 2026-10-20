@@ -263,3 +263,33 @@ validate/head/_journal/_read_descriptor_unlocked校验原schema、单调epoch及
 每次CLI读前后核文件摘要/metadata和文件集合不变。fixture仅原schema合成证据，
 不运行原rebind方法；不代表真实旧guard执行或生产准入已验收。
 目标保持容器Python3.11（CI3.11/3.12）；宿主3.6.8不升级。
+
+## R03输入来源冻结（PR17 #6282452861）
+
+准确清单：[P2_B3_R03_INPUT_SOURCES_20261020.json](../../docs/P2_B3_R03_INPUT_SOURCES_20261020.json)。
+本清单是静态来源索引，不是账本、安装请求或历史批准。
+基线4df742208d8bee3bd7b61c0eb4c226e5133f879d；13项来源逐字节SHA256与Git Blob复算一致。
+复用上轮双Python各14项CI，不重跑B1/B2或未变分类器。
+
+已取得原schema/工厂/阶段源码和保存R7有限probe包；三组既有英国私有plan/seed仅继承定位及SHA。
+保存packet的SHA为45b832dce9577b49e6ee718f1637862eebd775c6c10f87d9150ed0a87476fdf7，
+其snapshot引用9bc4a56f28264698058245f47bce8747d9ee96218076c7bbb25d4f1b7aefd4d8
+不是完整snapshot内容。原packet README明确私有完整observation不可用，plan准备另行处理、install_admission=NOT_GRANTED。
+旧Stage-A交付也写private_plan=NOT_READ；不能据其成功probe或归档补出R03上下文。
+
+同context的原context、完整snapshot、source-derived candidate、准确plan、outer/inner、
+原native证明/完整激活链及03效果内容仍UNKNOWN；不把三组plan任挑一组和packet摘要拼接。
+具体八项读回资源允许清单、三项原native支持证明、准确版本及每组私有定位见清单。
+受限仓库搜索不证明英国私有文件不存在，本轮没有读取服务器。
+
+下一最小操作仅设计为对既有六份private JSON及准确配套kit进行一次有界私有来源关联提取；
+不实例化Driver、不调Grant/append/native替换/整序列，只输出脱敏身份摘要及缺项。
+若需容器读取root0600私有原件，必须在具体操作中列出宿主root读取、新只读副本和权限映射，不能仅挂载就声称UID1002可读；
+此轮未提交或执行服务器命令。缺历史仍UNKNOWN，不初始化空生产历史。
+
+可选新身份仅为DRAFT_NOT_ADOPTED：
+`ISOLATED_NEW:p2-uk-isolated-20261020:b3-r03-source-v1`，
+用途为把B1实际release绑定到新声明的非激活隔离候选，不能标旧epoch恢复。
+现有分类器固定旧TX及7→8，尚不能接受新身份；不得调用fixture()造1..7历史来凑兼容。
+须明确选择历史来源关联，或在原03功能映射内定义新隔离初始化及真实config/binary/instance/DB/socket输入；
+不默许改guard、另建AuthorityStore/账本或增加第八批。B3继续DRAFT，本轮server_operations=NOT_EXECUTED。
