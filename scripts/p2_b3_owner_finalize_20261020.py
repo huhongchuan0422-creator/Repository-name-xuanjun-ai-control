@@ -134,6 +134,36 @@ def prior_snapshot(root):
     return result
 
 
+def validate_proof(stage,proof,target,request_sha,cp03_sha,image):
+    s=os.lstat(str(proof))
+    need(stat.S_ISREG(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o444
+         and s.st_nlink in (1,2),'PROOF_HOST_PROTECTION')
+    packet=json.loads(read(proof).decode())
+    current=snapshot(target)
+    context={'request_sha256':request_sha,'cp03_sha256':cp03_sha,
+             'cp07_sha256':current['files']['CP07-committed.json']['sha256'],'host_path':str(target)}
+    import types
+    verifier=types.ModuleType('cp08_host_verifier')
+    exec(compile(read(Path(stage)/'production/p2_install/cp08_evidence.py'),'<pinned-cp08-verifier>','exec'),verifier.__dict__)
+    return verifier.validate(packet,context,current,image=image)
+
+
+def verify_terminal(target,request_sha,cp03_sha,reference):
+    previous=cp03_sha
+    for stage in ('CP04','CP05','CP06','CP07','CP08','CP09'):
+        raw=read(Path(target)/(stage+'-committed.json'));row=json.loads(raw.decode())
+        need(row['stage']==stage and row['request_sha256']==request_sha and
+             row['previous_receipt_sha256']==previous and row['status']=='PREPARATION_CHECKPOINT_COMMITTED',
+             'TERMINAL_CHECKPOINT_CHAIN')
+        previous=digest(raw)
+    expected=Path(target)/'preparation-receipt.json'
+    need(reference['path']==str(expected),'TERMINAL_RECEIPT_PATH')
+    raw=read(expected);row=json.loads(raw.decode())
+    need(digest(raw)==reference['sha256'] and row['request_sha256']==request_sha and
+         row['last_checkpoint_sha256']==previous and row['status']=='PREPARATION_COMMITTED'
+         and row['full_b3_complete'] is False and row['service_started'] is False,'TERMINAL_RECEIPT_BYTES')
+
+
 def command(argv,logs,label,input_bytes=None,timeout=120):
     token=uuid.uuid4().hex
     out=Path(logs)/(label+'-'+token+'.stdout');err=Path(logs)/(label+'-'+token+'.stderr')
@@ -210,6 +240,7 @@ def install(stage,work,logs,root,image,python,producer_sha,fixture=False):
     request=json.loads(req.decode());request_sha=digest(canonical(request))
     if not fixture:need(request_sha==REQUEST_SHA and digest(read(Path(root)/'commit-receipt.json'))==CP03_SHA,'FIXED_REQUEST_CP03')
     original=prior_snapshot(root);proof=Path(work)/'proof.json';target=Path(root)/'prepared'
+    publish(Path(work)/'cp03-source-snapshot.json',canonical(original))
     shared=[(str(stage),'/tools',True),(str(Path(stage)/RUNTIME),'/application/stage1',True),
             (str(root),str(root),False),(str(Path(root)/'activation'),str(Path(root)/'activation'),True),
             (str(Path(root)/'binding-config.json'),str(Path(root)/'binding-config.json'),True),
@@ -255,10 +286,12 @@ def install(stage,work,logs,root,image,python,producer_sha,fixture=False):
         exec(compile(read(Path(stage)/'production/p2_install/cp08_evidence.py'),'<pinned-cp08-verifier>','exec'),verifier.__dict__)
         verifier.validate(packet,context,after,image=image)
         publish(proof,canonical(packet))
+    validate_proof(stage,proof,target,request_sha,digest(read(Path(root)/'commit-receipt.json')),image)
     first=worker('recover','recover-1');need(first['status']=='PREPARATION_COMMITTED','RECOVER_NOT_COMMITTED')
     inspected=worker('inspect','inspect');again=worker('recover','recover-2')
     need(inspected['status']==again['status']=='PREPARATION_COMMITTED'
          and first['receipt']==inspected['receipt']==again['receipt'],'RESTART_RECEIPT_CONFLICT')
+    verify_terminal(target,request_sha,digest(read(Path(root)/'commit-receipt.json')),first['receipt'])
     summary={'schema':1,'scope':'ISOLATED_TEST_ONLY','status':'PREPARATION_COMMITTED',
              'request_sha256':request_sha,'producer_sha256':producer_sha,'records':records,
              'receipt':first['receipt'],'proof_sha256':digest(read(proof)),
