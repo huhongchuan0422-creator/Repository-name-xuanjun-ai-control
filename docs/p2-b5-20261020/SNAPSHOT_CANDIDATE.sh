@@ -25,6 +25,7 @@ check(len(source)<=1048576 and hashlib.sha256(source).hexdigest()==SOURCE_SHA,'H
 compile(source,'<fixed-b5-snapshot>','exec')
 base=os.open(BASE,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
 s=os.fstat(base);check(s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700 and os.path.realpath(BASE)==BASE,'HOLD_EXISTING_BASE')
+space=os.fstatvfs(base);check(space.f_bavail*space.f_frsize>=1024*1024*1024 and space.f_favail>=64,'HOLD_SNAPSHOT_SPACE_BOUND')
 lock=os.open('.b5-source-snapshot.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=base)
 s=os.fstat(lock);check(stat.S_ISREG(s.st_mode) and s.st_uid==0 and s.st_nlink==1 and stat.S_IMODE(s.st_mode)==0o600,'HOLD_LOCK')
 fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
