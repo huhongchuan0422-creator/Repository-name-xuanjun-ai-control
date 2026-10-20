@@ -170,6 +170,26 @@ print(json.dumps(m.dispatch(req,sys.argv[2],m.sha(m.encode(req)))))
         self.assertEqual(value['status'],'HOLD')
         self.assertIn('CONFLICT',value['error']['code'])
 
+    def test_hold_observation_does_not_conflict_with_real_terminal(self):
+        original=m.unauthorized_access
+        try:
+            # Explicit negative fault injection; the subsequent positive proof
+            # is always the real OS probe, never a supplied VALIDATED packet.
+            m.unauthorized_access=lambda *_:{'status':'UNAVAILABLE','reason':'TEST_OBSERVATION_ONLY'}
+            first=self.call()
+        finally:
+            m.unauthorized_access=original
+        self.assertEqual(first['stage'],'CP08')
+        observations=list((self.root/'prepared').glob('CP08-observation-*.json'))
+        self.assertEqual(len(observations),1)
+        before=snap(self.root/'prepared')
+        second=self.call('recover')
+        for path in observations:
+            self.assertEqual(before[str(path)],snap(self.root/'prepared')[str(path)])
+        if os.environ.get('P2_REQUIRE_OS_DENIAL')=='1':
+            self.assertEqual(second['status'],'PREPARATION_COMMITTED',second)
+            self.assertTrue((self.root/'prepared/CP08-committed.json').exists())
+
     def test_config_tampering_hold_not_tls_exemption(self):
         self.call();path=self.root/'prepared/ledger-config.json'
         path.chmod(0o600);value=json.loads(path.read_bytes());value['tls_required']=False
