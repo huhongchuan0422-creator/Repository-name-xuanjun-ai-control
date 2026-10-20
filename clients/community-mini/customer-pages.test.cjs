@@ -3,15 +3,17 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const sessionModule=require('./session');
+const authModule=require('./customer-auth');
 
-function loadPage(path,{baseUrl='https://fixture.invalid'}={}){
-  let definition;const calls=[],nav=[],config={baseUrl,payments:false};
+function environment(baseUrl='https://fixture.invalid'){
+  const calls=[],nav=[],pages=[],config={baseUrl,payments:false};
+  let tokenNo=0;
   const wx={
     login(o){calls.push({kind:'login'});o.success({code:'fixture-code'});},
     request(o){
       calls.push(o);
-      if(o.url.endsWith('/mini/login'))return o.success({statusCode:200,data:{payment_enabled:false,result:{
-        session_token:'s'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
+      if(o.url.endsWith('/mini/login')){tokenNo++;return o.success({statusCode:200,data:{payment_enabled:false,result:{
+        session_token:String(tokenNo).repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});}
       if(o.url.endsWith('/mini/logout'))return o.success({statusCode:200,data:{payment_enabled:false,result:{logged_out:true}}});
       const op=o.data&&o.data.operation;
       if(op==='commerce.profile_read')return o.success({statusCode:200,data:{payment_enabled:false,result:{
@@ -22,12 +24,19 @@ function loadPage(path,{baseUrl='https://fixture.invalid'}={}){
     },
     navigateTo(o){nav.push(o.url);}
   };
+  return {calls,nav,pages,config,wx};
+}
+function loadPage(path,{baseUrl='https://fixture.invalid',env=null}={}){
+  env=env||environment(baseUrl);let definition;
   vm.runInNewContext(fs.readFileSync(__dirname+'/'+path,'utf8'),{
-    Page:p=>{definition=p;},wx,getApp:()=>({globalData:config}),
-    require:p=>p==='../../session'?sessionModule:require(p),encodeURIComponent
+    Page:p=>{definition=p;},wx:env.wx,getApp:()=>({globalData:env.config}),getCurrentPages:()=>env.pages,
+    require:p=>p==='../../session'?sessionModule:p==='../../customer-auth'?authModule:
+      p==='../../client'?{makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})}:
+      p==='../../payment'?{createPaymentFlow:()=>({reset(){}})}:require(p),encodeURIComponent
   });
   const page={...definition,data:structuredClone(definition.data),setData(patch){Object.assign(this.data,patch);}};
-  return {page,calls,nav,config,wx};
+  env.pages.push(page);
+  return {page,calls:env.calls,nav:env.nav,config:env.config,wx:env.wx,env};
 }
 
 test('app routes customer home/profile while preserving checkout route and checkout links home',()=>{
@@ -98,4 +107,72 @@ test('access denial during update clears private state and requires explicit rel
   assert.equal(h.page.data.loaded,false);
   assert.equal(h.page.data.nickname,'');
   assert.match(h.page.data.status,/重新登录/);
+});
+
+
+test('missing scene cold start and retry stay not-ready without false authentication',async()=>{
+  const h=loadPage('pages/home/index.js');
+  h.page.onLoad({});
+  assert.equal(h.page.data.authenticated,false);
+  assert.match(h.page.data.status,/缺少门店场景/);
+  const before=h.calls.length;
+  await h.page.retryLogin();
+  assert.equal(h.page.data.authenticated,false);
+  assert.match(h.page.data.status,/缺少门店场景/);
+  assert.equal(h.calls.length,before);
+  h.page.openProfile();
+  assert.equal(h.nav.length,0);
+});
+
+test('logout from profile revokes retained home and checkout page sessions and private state',async()=>{
+  const env=environment();
+  const checkout=loadPage('pages/checkout/index.js',{env}).page;
+  checkout.scene='shop1';
+  checkout.session=sessionModule.createSession(env.wx,env.config.baseUrl);
+  await checkout.session.login();
+  const oldCheckoutSession=checkout.session;
+  checkout.setData({nickname:'Private',profileContact:'secret',userId:'user1',projectCustomerId:'customer1',
+    notices:[{id:'a'.repeat(64),message:'private',read:false}],orders:[{reference:'order1'}],commerceEnabled:true});
+
+  const home=loadPage('pages/home/index.js',{env}).page;
+  home.onLoad({scene:'shop1'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(home.data.authenticated,true);
+
+  const profile=loadPage('pages/profile/index.js',{env}).page;
+  profile.onLoad({scene:'shop1'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(profile.data.loaded,true);
+
+  await profile.logout();
+  assert.equal(profile.data.authenticated,false);
+  assert.equal(home.data.authenticated,false);
+  assert.equal(checkout.data.nickname,'');
+  assert.equal(checkout.data.profileContact,'');
+  assert.equal(checkout.data.userId,'');
+  assert.equal(checkout.data.projectCustomerId,'');
+  assert.deepEqual(checkout.data.notices,[]);
+  assert.deepEqual(checkout.data.orders,[]);
+  assert.equal(checkout.session,null);
+  await assert.rejects(oldCheckoutSession.transport('shop1',{operation:'community.storefront',params:{}}),/SESSION_EXPIRED/);
+});
+
+test('stack revocation makes a late login callback unable to restore authenticated UI',async()=>{
+  const env=environment();let loginReply;
+  env.wx.request=o=>{
+    env.calls.push(o);
+    if(o.url.endsWith('/mini/login')){loginReply=o;return;}
+    if(o.url.endsWith('/mini/logout'))return o.success({statusCode:200,data:{payment_enabled:false,result:{logged_out:true}}});
+  };
+  const home=loadPage('pages/home/index.js',{env}).page;
+  home.scene='shop1';
+  const pending=home.login();
+  await Promise.resolve();
+  assert.ok(loginReply);
+  authModule.revokePages(env.pages,'已退出登录');
+  loginReply.success({statusCode:200,data:{payment_enabled:false,result:{
+    session_token:'z'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}});
+  await pending;
+  assert.equal(home.data.authenticated,false);
+  assert.match(home.data.status,/退出/);
 });
