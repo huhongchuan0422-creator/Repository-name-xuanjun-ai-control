@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "scope": "ISOLATED_TEST_ONLY",
+  "status": "PARTIAL",
+  "task": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6283318033",
+  "baseline": "9e12ecd6cdfa4dd9513b1dc420ca2f6b5552ddb3",
+  "tested_source_commit": "4fd1cfc008b81ce6d583e6bc2ca2c30c4c0ec8ed",
+  "hosted": {
+    "run": 39369848274,
+    "conclusion": "SUCCESS",
+    "python": [
+      "3.11",
+      "3.12"
+    ],
+    "per_python": {
+      "passed": 18,
+      "skipped": 1
+    },
+    "unauthorized_uid_probe": "SKIPPED_NOT_PROVEN"
+  },
+  "source_inventory": [
+    {
+      "path": "production/p2_recovery/entry.py",
+      "commit": "9e12ecd6cdfa4dd9513b1dc420ca2f6b5552ddb3",
+      "git_blob": "7028c72c47afb8b776ca994b58312b663c0b614b",
+      "disposition": "ROOT_AND_HISTORICAL_RECIPE_REQUIRED"
+    },
+    {
+      "path": "production/p2_recovery/provider_server.py",
+      "commit": "9e12ecd6cdfa4dd9513b1dc420ca2f6b5552ddb3",
+      "git_blob": "8d1649cb0f0e5776e9fed001eeb400bab7fbe3c7",
+      "disposition": "ROOT_AND_SIGNED_HISTORICAL_RESTORATION_REQUIRED"
+    },
+    {
+      "path": "production/p2_attempt5/entry.py",
+      "commit": "9e12ecd6cdfa4dd9513b1dc420ca2f6b5552ddb3",
+      "git_blob": "4eaf6bdac6a728af11c6756af7c74e2de7cc61a5",
+      "disposition": "ROOT_GRANT_REGISTRY_AND_SIGNER_REQUIRED"
+    },
+    {
+      "path": "production/p2_attempt5/observer_server.py",
+      "commit": "9e12ecd6cdfa4dd9513b1dc420ca2f6b5552ddb3",
+      "git_blob": "8020435d945626f62b691ae192b9d6c154cfc5d2",
+      "disposition": "HOST_DRIVER_AUTHORITY_BINDING_NOT_NEW_ISOLATED_APPLICATION"
+    },
+    {
+      "path": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_factory.py",
+      "commit": "9e12ecd6cdfa4dd9513b1dc420ca2f6b5552ddb3",
+      "git_blob": "f71e8b2da687a93234937673c775c3c310ff8c2a",
+      "disposition": "DERIVES_EXISTING_HOST_TARGETS_FROM_MEASURED_SEED_NOT_NEW_APPLICATION"
+    },
+    {
+      "path": "evidence/p2-epoch7-access-repair-20261014/runtime/stage1/p2_sandbox_profile.py",
+      "commit": "9e12ecd6cdfa4dd9513b1dc420ca2f6b5552ddb3",
+      "git_blob": "5a01b29a0ac46b3c8ea82c517aadaf6b7da9d916",
+      "disposition": "MUTATES_FIXED_EXISTING_HOST_PROFILE_NOT_APPLICATION_ENTRY"
+    },
+    {
+      "path": "evidence/p2-native-wiring-work-20261012/sandbox_install_overlay.py",
+      "commit": "9e12ecd6cdfa4dd9513b1dc420ca2f6b5552ddb3",
+      "git_blob": "bfb9b3ab251976bf98682444d73c35c256dbaeb4",
+      "disposition": "BUILD_TIME_OVERLAY_NOT_APPLICATION_ENTRY"
+    }
+  ],
+  "reused": {
+    "runtime_commit": "499bcc43f4c992b21035c22446ccc4d915873fb1",
+    "runtime_role": "FINITE_PROCESS_MANAGER_NOT_APPLICATION",
+    "coordinator_commit": "a766dcb307ce738dc508ad153f17e593d1fb7bfb",
+    "coordinator_role": "FINITE_COORDINATOR_NOT_APPLICATION_DAEMON",
+    "cp03_receipt_sha256": "bede2ebc9f9c5458c92307c974358eb61947e7ec80a9611cc76735891ffae433"
+  },
+  "runtime_contract": {
+    "status": "UNAVAILABLE",
+    "missing": "A real P2 application consumer for the selected ISOLATED_NEW UID1002 scope, with source version and argv/cwd/env/health, without historical authorization inputs. Existing service fixture is excluded.",
+    "argv": null,
+    "cwd": null,
+    "env": null,
+    "health": null
+  },
+  "checkpoints": {
+    "CP04": "NOT_WIRED_TO_SCOPED_STOP_OBSERVATION",
+    "CP05": "HOLD_RUNTIME_CONTRACT_UNAVAILABLE",
+    "CP06": "READ_ONLY_CP03_IDENTITY_AND_EXPECTED_OBSERVED_VALIDATORS_IMPLEMENTED_PUBLICATION_NOT_WIRED",
+    "CP07": "EXACT_PATH_CONTRACT_IMPLEMENTED_INSTALLATION_NOT_EXECUTED",
+    "CP08": "EFFECTIVE_CALLER_PROBE_IMPLEMENTED_INDEPENDENT_UID_DENIAL_UNAVAILABLE",
+    "CP09": "APPLICABILITY_VALIDATOR_IMPLEMENTED_ACTUAL_TLS_UNKNOWN"
+  },
+  "evidence_retention": {
+    "implemented": true,
+    "stage_commit": false,
+    "shared_lock": ".initialize.lock",
+    "output": "b3-initialize/checkpoints/CPxx-<contract_sha256>.json",
+    "immutable": true,
+    "cp03_replayed": false,
+    "tests": [
+      "duplicate_reference",
+      "immutable_conflict",
+      "inspect_no_directory_creation",
+      "wrong_cp03_pin_no_write",
+      "SIGKILL_after_publication_new_process_recovery"
+    ]
+  },
+  "incomplete": [
+    "Complete CP04-09 validated consumer wiring and stage receipts",
+    "Actual runtime source/config binding and consumer verification",
+    "Independent-subject access denial evidence",
+    "Final UK operation package and one-command normal path"
+  ],
+  "failure_evidence": {
+    "local_initial_denial_probe": "PermissionError: [Errno 1] Operation not permitted at os.setgroups([]); correctly returns UNAVAILABLE after correction",
+    "original_state_deleted": false
+  },
+  "server_operations": "NOT_EXECUTED",
+  "owner_install_command": "NOT_AVAILABLE",
+  "remaining_command_count": "UNKNOWN",
+  "full_b3_complete": false,
+  "actions": {
+    "implemented_library_if_called": [
+      "Read original CP03 receipt/config/descriptor/journal without Store prepare/reconcile",
+      "Hold existing initializer lock",
+      "Create only checkpoints private directory if absent",
+      "Publish immutable pending file and final hard link; retain interruption evidence",
+      "No database, socket, service, credentials or permission changes"
+    ],
+    "authorized_in_this_round": [
+      "Local test filesystem and child processes",
+      "GitHub source/test/workflow/evidence commits"
+    ],
+    "server_actions_executed": []
+  }
+}
