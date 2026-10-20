@@ -1,0 +1,30 @@
+name: PR122 brand source snapshot
+on:
+  push:
+    branches: [ "feature/work-pr122-site-hub-integration-20261016" ]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Archive exact parent source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "270a8159d92cf7bf68b4b25f874ac4c9da385525"
+          git archive --format=tar.gz --prefix=repo/ HEAD^ > /tmp/pr122-source-270a8159.tar.gz
+          sha256sum /tmp/pr122-source-270a8159.tar.gz > /tmp/SHA256SUMS
+          git rev-parse HEAD^ > /tmp/SOURCE_COMMIT
+          git rev-parse HEAD^^{tree} > /tmp/SOURCE_TREE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-source-snapshot-270a8159
+          path: |
+            /tmp/pr122-source-270a8159.tar.gz
+            /tmp/SHA256SUMS
+            /tmp/SOURCE_COMMIT
+            /tmp/SOURCE_TREE
+          if-no-files-found: error
