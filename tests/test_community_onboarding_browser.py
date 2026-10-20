@@ -102,8 +102,25 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     expect(admin.locator('#applicationState')).to_have_text('待审核');self.assertEqual(application(admin),original_id)
                     before_unreviewed=revision(admin)
                     admin.locator('#note').fill('不得跳过逐份复审')
-                    admin.locator('[data-action=APPROVE]').click()
+                    def is_unreviewed_approve(response):
+                        if not response.url.endswith('/merchant/onboarding') or response.request.method!='POST':
+                            return False
+                        try: body=response.request.post_data_json
+                        except BaseException: return False
+                        return body.get('operation')=='review' and body.get('params',{}).get('action')=='APPROVE' and \
+                            body.get('params',{}).get('application')==original_id and body.get('params',{}).get('revision')==before_unreviewed
+                    with admin.expect_response(is_unreviewed_approve) as rejected:
+                        admin.locator('[data-action=APPROVE]').click()
+                    response=rejected.value
+                    self.assertEqual(response.status,400)
+                    reply=response.json()
+                    self.assertEqual(reply.get('error'),'INVALID_REQUEST')
+                    expect(admin.locator('#status')).to_contain_text('资料、状态或版本不符合要求')
+                    expect(admin.locator('[data-action=APPROVE]')).to_be_enabled()
+                    admin.locator('#reloadQueue').click()
+                    admin.locator('#applications button').first.click()
                     expect(admin.locator('#applicationState')).to_have_text('待审核')
+                    self.assertEqual(application(admin),original_id)
                     self.assertEqual(revision(admin),before_unreviewed)
                     self.assertNotIn('入驻审核通过',admin.locator('#applicationState').inner_text())
 
