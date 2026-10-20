@@ -103,3 +103,16 @@ class ShimHealthRouteTests(unittest.TestCase):
   code=compile(ast.Module(body=block[start:start+3],type_ignores=[]),'health-discovery','exec')
   for source,expected in [("HEALTHZ_PATH='/healthz'\nclass Handler:\n def do_GET(self):\n  return self.path == HEALTHZ_PATH",{'/healthz'}),("def do_GET(self):\n return self.path == '/health'",{'/health'}),("DANGEROUS=__import__('os').system('false')\ndef do_GET(self):\n return None",set())]:
    env={'ast':ast,'shim_tree':ast.parse(source)};exec(code,env);self.assertEqual(env['health_paths'],expected)
+
+class GatewayHeapFlagTests(unittest.TestCase):
+ def test_preserve_actual_heap_flag_and_reject_other_entries(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d)/'gateway.service'
+   prefix='/opt/node-v24.16.0-linux-x64/'
+   for flag in ('','--max-old-space-size=1536 '):
+    p.write_text('ExecStart='+prefix+'bin/node '+flag+prefix+'lib/node_modules/openclaw/dist/index.js gateway --port 11505\n')
+    argv=m.gateway_argv(p,{})
+    self.assertEqual('--max-old-space-size=1536' in argv,bool(flag))
+   for flag in ('--require=/tmp/other.js ','--max-old-space-size=abc '):
+    p.write_text('ExecStart='+prefix+'bin/node '+flag+prefix+'lib/node_modules/openclaw/dist/index.js gateway --port 11505\n')
+    with self.assertRaises(RuntimeError):m.gateway_argv(p,{})
