@@ -127,3 +127,18 @@ class AutomaticSliceTests(unittest.TestCase):
   for change in ({'ActiveState':'active'},{'FragmentPath':'/etc/systemd/system/pr99koreamodel.slice'},{'DropInPaths':'/run/systemd/system/pr99koreamodel.slice.d/other.conf'},{'LoadState':'masked'}):
    with self.assertRaises(RuntimeError):env['validate_initial_slice'](dict(base,**change),False)
   with self.assertRaises(RuntimeError):env['validate_initial_slice'](base,True)
+
+class AuthorizedDrainTests(unittest.TestCase):
+ def test_no_authorization_never_signals(self):
+  with patch.object(sys,'argv',['controller']),patch.object(m.signal,'pidfd_send_signal') as send:
+   with self.assertRaisesRegex(RuntimeError,'OWNER_TASK_DRAIN_AUTHORIZATION_REQUIRED'):m.drain_gateway_tasks(123)
+   send.assert_not_called()
+ def test_pid_identity_change_never_signals_replacement(self):
+  item={'pid':999,'start':'old','exe':'/bin/node'}
+  with patch.object(sys,'argv',['controller','--owner-drain-gateway-tasks']),patch.object(m,'gateway_tasks',side_effect=[[item],[],[],[]]),patch.object(m.time,'sleep'),patch.object(m.signal,'pidfd_send_signal') as send:
+   self.assertEqual(m.drain_gateway_tasks(123)['status'],'PASS');send.assert_not_called()
+ def test_repeated_new_tasks_drain_in_same_controller(self):
+  item={'pid':999,'start':'old','exe':'/bin/node'}
+  sequence=[[item],[item],[item],[item],[item],[]]
+  with patch.object(sys,'argv',['controller','--owner-drain-gateway-tasks']),patch.object(m,'gateway_tasks',side_effect=sequence),patch.object(m.os,'pidfd_open',return_value=45),patch.object(m.os,'close'),patch.object(m.time,'sleep'),patch.object(m.signal,'pidfd_send_signal') as send:
+   self.assertEqual(m.drain_gateway_tasks(123)['status'],'PASS');self.assertEqual(send.call_count,2)
