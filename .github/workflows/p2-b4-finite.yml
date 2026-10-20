@@ -1,0 +1,44 @@
+name: P2 B4 finite original consumer
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - 'production/p2_install/b4_*.py'
+      - 'production/p2_runtime/__init__.py'
+      - 'tests/p2_install/test_b4_*.py'
+      - 'scripts/*p2_b4*.py'
+      - '.github/workflows/p2-b4-finite.yml'
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -B tests/p2_install/test_b4_sandbox.py -v
+  finite-docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: docker pull python:3.11.2-slim
+      - run: sudo "$(command -v python)" -B scripts/test_p2_b4_docker.py
+      - name: Preserve all finite-process evidence
+        if: always()
+        run: |
+          sudo tar -czf "$RUNNER_TEMP/b4-evidence.tar.gz" --ignore-failed-read /tmp/p2-b3-test-b4-*
+          sudo chmod 0644 "$RUNNER_TEMP/b4-evidence.tar.gz"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2-b4-finite-evidence
+          path: ${{ runner.temp }}/b4-evidence.tar.gz
