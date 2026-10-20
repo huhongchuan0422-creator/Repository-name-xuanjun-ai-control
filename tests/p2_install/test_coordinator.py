@@ -10,7 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 import sys
 sys.path.insert(0, str(ROOT))
-from production.p2_install.coordinator import Coordinator, Hold
+from production.p2_install.coordinator import Coordinator, Hold, digest
 
 class Effects:
     def __init__(self):
@@ -305,9 +305,7 @@ class CoordinatorTests(unittest.TestCase):
             self.assertEqual(len(rows),2)
             self.assertEqual(
                 {json.loads(x[0])["event_id"] for x in rows},
-                {"auto-"+__import__("production.p2_install.coordinator",
-                                    fromlist=["digest"]).digest(
-                                        [req["attempt_id"],"UNKNOWN"])[:32],
+                {"auto-"+digest([req["attempt_id"],"UNKNOWN"])[:32],
                  "explicit-new-failure"})
 
     def test_more_than_five_isolated_node_attempts_not_quota(self):
