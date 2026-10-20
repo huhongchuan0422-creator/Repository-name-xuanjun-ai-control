@@ -33,7 +33,7 @@ async function main(){
   await ci.preview({project,desc:'Community phase integration '+String(receipt.head).slice(0,12),
     setting:{es6:true,es7:true,minify:true},robot:1,threads:1,
     qrcodeFormat:'image',qrcodeOutputDest:path.join(destination,'preview.png'),
-    pagePath:'pages/checkout/index',searchQuery:'scene=shop1',onProgressUpdate:()=>{}});
+    pagePath:'pages/home/index',searchQuery:'scene=shop1',onProgressUpdate:()=>{}});
   if(!fs.existsSync(path.join(destination,'preview.png')))throw Error('PREVIEW_QR_MISSING');
   receipt.status='DEVELOPMENT_PREVIEW_UPLOADED';
  }catch(e){
