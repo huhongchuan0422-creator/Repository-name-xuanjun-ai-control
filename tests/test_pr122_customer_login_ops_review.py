@@ -97,7 +97,7 @@ class LoginOpsTests(unittest.TestCase):
                     patch.object(ops, 'backup', return_value={'backed_up': True}) as backup, \
                     patch.object(ops, 'restore', return_value={'restored': 'ISOLATED_MAINTENANCE'}) as restore:
                 ops.main()
-                self.factory.assert_called_once()
+                self.assertEqual(self.factory.call_count, int(action != 'restore-isolated'))
                 self.assertEqual(backup.call_count, int(action == 'backup'))
                 self.assertEqual(restore.call_count, int(action == 'restore-isolated'))
         self.publisher.assert_not_called()
@@ -135,6 +135,88 @@ class LoginOpsTests(unittest.TestCase):
             self.assertIs(ops.factory(self.config), self.center)
         for name in ('scanner', 'secretref', 'evidence_context', 'privacy_policy_context', 'privacy_processing_context'):
             self.assertIsNone(center.call_args.kwargs[name])
+
+
+    def test_restore_isolated_recovers_without_constructing_corrupt_live_center(self):
+        import json
+        import tempfile
+        from cryptography.exceptions import InvalidTag
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source_root = root / 'backup-source'
+            target = root / 'isolated-restored'
+            backup_file = root / 'center.backup'
+            live_root = root / 'synthetic-live-root'
+            live_root.mkdir(mode=0o700)
+            live_db = live_root / 'center.sqlite'
+            live_db.write_bytes(b'corrupt synthetic live sqlite bytes')
+            live_before = live_db.read_bytes()
+            keys = {'v1': b'k' * 32}
+            source = ops.Center(source_root, keys, 'v1')
+            try:
+                ops.backup(source, backup_file, b'b' * 32, 'fixture-backup-key')
+            finally:
+                source.db.close()
+
+            config = copy.deepcopy(self.config)
+            stdout = io.StringIO()
+            with ExitStack() as stack:
+                stack.enter_context(patch('sys.argv', ['operator', 'restore-isolated',
+                    '--input', str(backup_file), '--output', str(target)]))
+                stack.enter_context(patch.object(ops, 'ROOT', live_root))
+                stack.enter_context(patch.object(ops.os, 'geteuid', return_value=0))
+                stack.enter_context(patch.object(ops.os, 'uname', return_value=SimpleNamespace(nodename=ops.HOST)))
+                stack.enter_context(patch.object(ops, 'load_config', return_value=config))
+                factory = stack.enter_context(patch.object(ops, 'factory', side_effect=AssertionError('corrupt live DB factory must not run')))
+                stack.enter_context(patch('pwd.getpwnam', return_value=SimpleNamespace(pw_uid=12345, pw_gid=12345)))
+                stack.enter_context(patch.object(ops.os, 'umask'))
+                stack.enter_context(patch.object(ops.os, 'setgroups'))
+                stack.enter_context(patch.object(ops.os, 'setgid'))
+                stack.enter_context(patch.object(ops.os, 'setuid'))
+                stack.enter_context(patch('sys.stdout', stdout))
+                ops.main()
+
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result['restored'], 'ISOLATED_MAINTENANCE')
+            self.assertTrue(result['old_sessions_invalid'])
+            self.assertTrue(target.is_dir())
+            self.assertEqual(live_db.read_bytes(), live_before)
+            factory.assert_not_called()
+            db = __import__('sqlite3').connect(target / 'center.sqlite')
+            try:
+                self.assertEqual(db.execute("SELECT v FROM settings WHERE k='maintenance'").fetchone()[0], '1')
+            finally:
+                db.close()
+
+    def test_restore_rejects_live_root_and_symlink_alias_before_output(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / 'synthetic-live-root'
+            root.mkdir(mode=0o700)
+            backup = Path(td) / 'unused-backup'
+            backup.write_bytes(b'not read for forbidden target')
+            keys = {'v1': b'k' * 32}
+            with patch.object(ops, 'ROOT', root):
+                with self.assertRaisesRegex(Denied, 'RESTORE_NEW_DIRECTORY_ONLY'):
+                    ops.restore(backup, root, b'b' * 32, keys, 'v1')
+                alias = Path(td) / 'root-alias'
+                alias.symlink_to(root, target_is_directory=True)
+                with self.assertRaisesRegex(Denied, 'SYMLINK_PATH'):
+                    ops.restore(backup, alias, b'b' * 32, keys, 'v1')
+                self.assertEqual(list(root.iterdir()), [])
+
+    def test_invalid_encrypted_backup_never_leaves_restore_output(self):
+        import tempfile
+        from cryptography.exceptions import InvalidTag
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            backup = root / 'bad.backup'
+            backup.write_bytes(b'0' * 64)
+            target = root / 'must-not-exist'
+            with self.assertRaises(InvalidTag):
+                ops.restore(backup, target, b'b' * 32, {'v1': b'k' * 32}, 'v1')
+            self.assertFalse(target.exists())
+
 
 
 if __name__ == '__main__':
