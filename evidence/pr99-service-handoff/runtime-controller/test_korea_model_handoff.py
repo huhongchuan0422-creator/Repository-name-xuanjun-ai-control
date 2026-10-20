@@ -116,3 +116,14 @@ class GatewayHeapFlagTests(unittest.TestCase):
    for flag in ('--require=/tmp/other.js ','--max-old-space-size=abc '):
     p.write_text('ExecStart='+prefix+'bin/node '+flag+prefix+'lib/node_modules/openclaw/dist/index.js gateway --port 11505\n')
     with self.assertRaises(RuntimeError):m.gateway_argv(p,{})
+
+class AutomaticSliceTests(unittest.TestCase):
+ def test_only_empty_automatic_inactive_slice_is_reusable(self):
+  stub=Path(m.__file__).read_text().split('\n# TARGET_PROGRAM_BEGIN\n',1)[1].split('\n# TARGET_PROGRAM_END\n',1)[0]
+  fn=next(n for n in ast.parse(stub).body if isinstance(n,ast.FunctionDef) and n.name=='validate_initial_slice')
+  env={'need':m.require};exec(compile(ast.Module(body=[fn],type_ignores=[]),'slice-check','exec'),env)
+  base={'LoadState':'loaded','ActiveState':'inactive','FragmentPath':'','DropInPaths':''}
+  env['validate_initial_slice'](base,False)
+  for change in ({'ActiveState':'active'},{'FragmentPath':'/etc/systemd/system/pr99koreamodel.slice'},{'DropInPaths':'/run/systemd/system/pr99koreamodel.slice.d/other.conf'},{'LoadState':'masked'}):
+   with self.assertRaises(RuntimeError):env['validate_initial_slice'](dict(base,**change),False)
+  with self.assertRaises(RuntimeError):env['validate_initial_slice'](base,True)
