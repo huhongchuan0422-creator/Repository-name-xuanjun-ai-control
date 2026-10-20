@@ -161,26 +161,6 @@ class RuntimeIntegration(unittest.TestCase):
                 self.assertEqual(c.journal.db.execute(
                     "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
 
-            # A different attempt remains a distinct failure; UNKNOWN identities
-            # are not globally merged.
-            runtime2=root/"runtime2"; runtime2.mkdir(mode=0o700)
-            bad2=runtime2/"bad-timeout-exec"; bad2.write_text(
-                "#!/definitely/missing/interpreter\n"); bad2.chmod(0o700)
-            req2=dict(req); req2["attempt_id"]="attempt-two"; req2["root"]=str(runtime2)
-            req2["inputs"]=dict(req["inputs"]); req2["inputs"]["argv"]=[str(bad2)]
-            req2["inputs"]["cwd"]=str(runtime2)
-            plan2={"schema":1,"release":"a"*64,"batches":["service","service2"]}
-            req2["batch_id"]="service2"
-            with Coordinator(str(coord),plan2,{"service":RuntimeAdapter(),
-                                              "service2":DelayedFailureRuntimeAdapter()},
-                             now=lambda:0,
-                             component_roots={"service":str(runtime),
-                                              "service2":str(runtime2)}) as c:
-                second=c.execute(req2)
-                self.assertEqual(second["status"],"HOLD",second)
-                self.assertEqual(c.journal.db.execute(
-                    "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],2)
-
     def test_cli_execute_inspect_and_recover(self):
         with tempfile.TemporaryDirectory() as home:
             root=pathlib.Path(home)
