@@ -1,4 +1,5 @@
 import io,json,sqlite3,subprocess,sys,tarfile,tempfile,unittest
+from unittest.mock import patch
 from pathlib import Path
 import korea_current_sync as m
 
@@ -13,6 +14,13 @@ class CurrentSyncTests(unittest.TestCase):
    m.sqlite_copy(src,out)
    with sqlite3.connect(out) as read:self.assertEqual(read.execute('SELECT x FROM t').fetchall(),[(1,)])
    c.rollback();c.close()
+ def test_sealed_closed_database_reuses_kernel_fence_reader(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);src=p/'closed.db';out=p/'copy.db'
+   with sqlite3.connect(src) as c:c.execute('CREATE TABLE t(x)');c.execute('INSERT INTO t VALUES(7)')
+   with patch('portal_total_controller.flag',return_value=0x10) as flags:m.sqlite_copy(src,out)
+   self.assertEqual(flags.call_count,2)
+   with sqlite3.connect(out) as c:self.assertEqual(c.execute('SELECT x FROM t').fetchall(),[(7,)])
  def test_collect_reuses_unchanged_and_preserves_link_metadata(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d);base=p/'src';work=p/'work';base.mkdir();work.mkdir()
