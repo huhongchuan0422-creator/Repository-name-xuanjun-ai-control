@@ -3,8 +3,8 @@ const event=operation=>({currentTarget:{dataset:{operation}}});
 function harness(){
  let definition,generation=1;const calls=[],writes=[],money=[];
  const session={getGeneration:()=>generation,clear(){generation++;},commerce(scene,operation,params){return new Promise((resolve,reject)=>calls.push({scene,operation,params,resolve,reject}));}};
- vm.runInNewContext(fs.readFileSync(process.env.COMMUNITY_CHECKOUT_SOURCE||__dirname+'/pages/checkout/index.js','utf8'),{Page:p=>definition=p,require:()=>({}),wx:{}});
- const p={...definition,data:structuredClone(definition.data),_pageGeneration:1,scene:'shop1',session,
+ vm.runInNewContext(fs.readFileSync(process.env.COMMUNITY_CHECKOUT_SOURCE||__dirname+'/pages/checkout/index.js','utf8'),{Page:p=>definition=p,require:p=>p==='../../customer-auth'?auth:{},wx:{}});
+ const p={...definition,data:structuredClone(definition.data),_pageGeneration:1,_authEpoch:auth.current(),scene:'shop1',session,
   setData(v){writes.push(v);Object.assign(this.data,v);},paymentFlow:{reset(){},pay(){money.push('pay');return new Promise(()=>{});}}};
  p.setData({reference:'orderA',refundApplication:'refundA',refundAmount:'50',refundReason:'reason A',communityId:'co_A',promotionCode:'cp_A',userId:'user1',projectCustomerId:'customer1',commerceEnabled:true});
  return {p,calls,writes,money,reauth:()=>generation++};
@@ -85,6 +85,7 @@ test('unloaded page cannot start refund, membership or order list calls',async()
 
 test('real mini-session stale replies and errors cannot overwrite another session instance',async()=>{
  const {createSession}=require('./session');
+const auth=require('./customer-auth');
  for(const mode of ['replace','clear','reauth'])for(const outcome of ['success','error']){
   const h=harness(),requests=[];
   const wx={login:options=>options.success({code:'synthetic'}),request:options=>{
