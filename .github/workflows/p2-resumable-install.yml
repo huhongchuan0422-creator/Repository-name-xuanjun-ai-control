@@ -1,22 +1,24 @@
-name: P2 resumable installation journal
+name: P2 isolated coordinator
 on:
   push:
-    branches: [repair/p2-resumable-install-20261020]
+    branches: [repair/p2-coordinator-20261020]
     paths:
       - 'production/p2_install/**'
       - 'tests/p2_install/**'
+      - 'docs/p2_install.md'
       - '.github/workflows/p2-resumable-install.yml'
   pull_request:
     paths:
       - 'production/p2_install/**'
       - 'tests/p2_install/**'
+      - 'docs/p2_install.md'
       - '.github/workflows/p2-resumable-install.yml'
 permissions:
   contents: read
 jobs:
-  recovery:
+  isolated:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     strategy:
       matrix:
         python: ['3.11', '3.12']
@@ -25,4 +27,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '${{ matrix.python }}'
-      - run: python -B tests/p2_install/test_journal.py -v
+      - name: Stage exact window-one artifact source
+        env:
+          ARTIFACTS_COMMIT: ea31dbbec2a8710b964efb38fa2975684bbd9739
+        run: |
+          git fetch --no-tags --depth=1 origin "$ARTIFACTS_COMMIT"
+          mkdir -p production/p2_artifacts
+          for f in __init__.py __main__.py installer.py; do
+            git show "$ARTIFACTS_COMMIT:production/p2_artifacts/$f" > "production/p2_artifacts/$f"
+            test "$(git hash-object "production/p2_artifacts/$f")" = "$(git rev-parse "$ARTIFACTS_COMMIT:production/p2_artifacts/$f")"
+          done
+      - name: Stage exact window-two runtime source
+        env:
+          RUNTIME_COMMIT: 499bcc43f4c992b21035c22446ccc4d915873fb1
+        run: |
+          git fetch --no-tags --depth=1 origin "$RUNTIME_COMMIT"
+          mkdir -p production/p2_runtime
+          git show "$RUNTIME_COMMIT:production/p2_runtime/__init__.py" > production/p2_runtime/__init__.py
+          test "$(git hash-object production/p2_runtime/__init__.py)" = "$(git rev-parse "$RUNTIME_COMMIT:production/p2_runtime/__init__.py")"
+      - name: Recovery and coordinator
+        run: |
+          python -B tests/p2_install/test_journal.py -v
+          python -B tests/p2_install/test_coordinator.py -v
+          python -B tests/p2_install/test_runtime_integration.py -v
+          python -B tests/p2_install/test_component_chain_integration.py -v
