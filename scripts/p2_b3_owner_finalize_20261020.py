@@ -232,6 +232,14 @@ def options(user):
             '--tmpfs=/tmp:rw,nosuid,nodev,size=64m,mode=1777']
 
 
+def validate_runtime_isolation(config):
+    need(config.get('Privileged') is False and config.get('CapAdd') in (None,[])
+         and config.get('Devices') in (None,[]) and config.get('DeviceRequests') in (None,[])
+         and config.get('PidMode')=='' and config.get('IpcMode')=='private'
+         and config.get('UTSMode')=='' and config.get('UsernsMode')=='',
+         'CONTAINER_EXTRA_AUTHORITY_OR_NAMESPACE')
+
+
 def run_container(name,step,argv,mounts,user,image,stdin,logs,producer_sha,request_sha=REQUEST_SHA):
     labels={'xuanjun.b3.request':request_sha,'xuanjun.b3.producer':producer_sha,
             'xuanjun.b3.step':step,'xuanjun.b3.stdin':digest(stdin)}
@@ -250,6 +258,7 @@ def run_container(name,step,argv,mounts,user,image,stdin,logs,producer_sha,reque
     need(current is not None and current['Image']==image and current['Config']['Cmd']==argv
          and current['Config']['User']==user and all(current['Config']['Labels'].get(k)==v for k,v in labels.items()),'CONTAINER_IDENTITY')
     h=current['HostConfig']
+    validate_runtime_isolation(h)
     need(h['NetworkMode']=='none' and h['ReadonlyRootfs'] is True and h['CapDrop']==['ALL']
          and h['SecurityOpt']==['no-new-privileges'] and h['Memory']==536870912
          and h['PidsLimit']==96,'CONTAINER_ISOLATION')
