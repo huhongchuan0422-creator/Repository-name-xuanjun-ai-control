@@ -374,3 +374,89 @@ SHA25636399b8c57a4acf116c8074a52acab34fd3ee258e41f31edb1f93ea6e629c4ad。
 内含原Store、薄适配、固定request及预期文件；不是仅scratch路径。
 宿主命令Python3.6语法/三动作stdin/制品内源码SHA核对PASS；本地Docker和英国安装NOT_EXECUTED。
 成功仅标B3_NEW_INITIALIZATION_SUBCHECKPOINT_PASS且full_b3_complete=false，实际动作待Owner确认。
+
+## B3真实初始化后的完整收口范围（PR17 #6283178324）
+
+基线6a5548963c7f1a504a2f1347f7ca1a63a8f30afb，Owner选择B继续有效。
+继承真实验收#6283178324：北京时间2026-10-20 12:07:24输出；
+原终端源文件29575字节SHA2561a6a66fe2e7a01e206f3ed37af1e9fac185c50a5c854b585b5c34eeb5894914e。
+三独立容器execute/inspect/recover均COMMITTED/exit0/已退出，三次10文件metadata一致；
+seq1/epoch1/generation1/PREPARED，descriptor SHA6d3c95521492ba90640e723081a8d0f21fa2a2bfb3c896c0708ecb86e8ef93f1；
+原receipt SHAbede2ebc9f9c5458c92307c974358eb61947e7ec80a9611cc76735891ffae433、
+inode1844889、mtime_ns1792469243126487097。
+准确summary=/var/lib/xuanjun-p2-isolated-test/logs/b3-initialize-20261020/summary.json。
+终端附件SHA不是summary.json SHA；后者UNKNOWN，不能混用。
+B1未变、无DB/socket、base未变仅继承固定脚本强制断言通过；未另取得独立原件快照。
+实机SIGKILL=NOT_EXECUTED，既有Hosted注入不冒称现场注入。
+
+### 完成、余项及旧动作适用性
+
+| 原阶段 | 已有真实成果 / 新隔离语义 | 剩余必要步骤与验收 | 安装/只读/不适用的界线 |
+| --- | --- | --- | --- |
+| 03 | 新epoch1/PREPARED及固定config/request/原receipt已真实完成 | 仅引用该CP03，不再prepare/reconcile或重跑三CLI | 0次重复安装；旧7→8仍UNKNOWN，不作为前置 |
+| 04 | 本次三个受控容器均已退出；初始化没有启动业务服务 | 将证据范围固定到本批新instance；核后续命令不启动/停用业务，保存CP04适用性记录 | 只读/适用性核验；不要求旧生产Writer静止，不执行systemctl stop。不能由此声明全宿主无Writer |
+| 05 | 新根已发布bootstrap config/intent并绑定真实B1 release | 补齐实际供原B4消费的候选运行配置：固定真实入口/argv/cwd/env/health、版本/摘要及路径映射；发布到独立新配置路径并跨进程读回 | 必要新配置发布。原旧24目标替换不适用于已声明的新私有根，但缺应用配置不能靠N/A略过 |
+| 06 | 新instance/预留ledger_uuid及真实UID1002/Python绑定已有证据 | 冻结并发布新隔离expected identity契约，关联CP03/候选配置与原组件稳定operation/config/receipt引用；实际PID/Socket peer身份保持NOT_STARTED | 必要新身份元数据发布；不伪造已运行进程、不发生产Signer/Owner批准，不写旧/etc身份文件 |
+| 07 | 本次base root0700；B3根/data/run为1002:1002 0700按固定断言通过 | 对候选配置的准确父目录及后续读写主体做最小访问核验；新路径若需新增只在本批根内列清 | 默认只读检查；仅必要新路径创建/权限设置可合并。旧generation chmod不适用于新根，不能修改B1/B2 |
+| 08 | 私有输入/输出挂载及uid/gid已实际核验 | 对B4交接所需精确路径补同UID可读写/非授权主体拒绝的证据，确认B1/B2原内容和权限继承边界 | 定向访问检查及必要新路径发布；不setfacl旧host路径、不以当前元数据直接冒称全部访问有效 |
+| 09 | 初始化未消费/变更TLS；原Store只处理新PREPARED | 对固定候选运行配置判定是否涉及TLS：若明确只用隔离Unix socket且无TLS客户端/证书需求，保存有依据的限定N/A；若实际需要TLS，须先冻结真实配置/证书来源与只读元数据契约，再纳入本批计划 | 当前TLS适用性未闭合，不能先写PASS/N/A；不签发/续期/dry-run，不操作生产TLS |
+
+04/05/07/08中的旧路径不适用结论只针对本次新私有根与本批声明效果，不能删除旧历史保护或改变原生产合同。
+06目前只是逻辑身份声明，尚非旧两份进程身份文件等价验收。
+09不是新增TLS签发步骤；是否需要只读取证由实际候选配置决定。
+
+### 已确定的复用资产
+
+- CP03现场：固定1f455da制品、6a554896交付、原receipt及本批summary；不重装。
+- 制品ea31dbbec2a8710b964efb38fa2975684bbd9739，已有不覆盖发布/恢复/前批保护验收复用。
+- 运行499bcc43f4c992b21035c22446ccc4d915873fb1，真实B1文件SHA3993ab9bd0073a91d8110814e694b2c402ef5b53efb544a3bc44a1debd4231a1；
+  config_payload明确必需argv/cwd并产生env/health/timeout配置；stable_identity提供operation_id/config_sha256/commit_receipt。
+- B1协调快照a766dcb307ce738dc508ad153f17e593d1fb7bfb，coordinator SHA1442301368044a98b606c2a4a9787fc521fb85040df2a736c3a9031102ebf8ab；
+  journal SHAbfeebc4cb92dd70b9fc526460f669f3897023fc8b31658738ab7f451706af712。
+  其既有组件接口/记录格式可复用，不宣称混合CLI/整P2已通，不初始化第二协调账本。
+- 新初始化薄适配/原ActivationStore及CI39366424078双Python各14项，均不重写、不重测未变通过项。
+
+本轮只从已有固定B1 tar读取上述三源码并按原manifest核对来源，没有重新安装或跑组件测试。
+代码缺口直接来自config_payload实际字段和当前bootstrap配置的差异；不能把bootstrap metadata当作可运行服务配置。
+已有服务fixture只能复用其Unix socket探针/恢复测试机制，不能未选定真实入口就把测试fixture伪称最终P2服务。
+
+### 一次集中收口的执行边界与恢复点
+
+拟在同一获准隔离UID/固定镜像/私有根权限内，合成**一条**有界Owner命令，内部严格顺序：
+CP03引用核对 → CP04范围/停止状态判据 → CP05配置发布 → CP06身份关联发布 →
+CP07新目录访问核验 → CP08交接权限核验 → CP09 TLS适用性结论及整批收口回执。
+每步独立记录本次输入摘要、before/after或不适用依据、原证据引用和结果；不重调CP03。
+只在该完整范围、具体文件清单、实际动作及测试固定后交确认，不能执行一半再临时加步骤。
+不为凑一条命令把需新权限/凭据/TLS签发/服务启动的动作混入：出现这类需求先停在对应项、修订完整清单，不默许审批扩大。
+
+| 中断位置 | 恢复点 |
+| --- | --- |
+| CP04前/后 | 原CP03 descriptor/receipt保持；只重新读取未定检查，不重新初始化 |
+| CP05文件部分发布 | 保留临时/已发布文件及逐文件摘要；同请求核对后只发布缺失项，不覆盖已提交配置 |
+| CP06第一身份已发/第二未发 | 分项核对原文件和关联摘要，只补未发布项；未知身份HOLD |
+| CP07/08访问证据不全 | 保留已发布配置/身份；只补原精确路径未完成检查，不回滚B1/B2或CP03 |
+| CP09前/回执响应丢失 | 重读CP04–08原结果及同配置TLS判据；只发布缺失终态回执，返回原已提交回执 |
+
+恢复机制须沿既有组件不覆盖发布/inspect/recover实现；本节是完整计划，不伪称CP04–09适配或恢复代码已完成。
+本次新配置/收口回执新增允许改变的是新文件及其父目录metadata；CP03原十文件内容/inode/mtime/权限继续保留，
+不能机械要求整个B3目录以后永远不能增加文件。确切新路径在最终命令冻结前一次列齐。
+
+### Owner次数、准确缺项及工作责任
+
+- **已实际执行：1次B3初始化命令**，内含3个独立容器动作；不是3次Owner安装，更不代表已跑完03–09。
+- **现有可直接交付的剩余安装命令：0条。剩余Owner实际执行次数：UNKNOWN。**
+- **收口设计目标：正常路径再1条集中Owner命令**，内部CP04–09逐步检查点；当前不是已证明能一次安装完的承诺。
+  失败后所需恢复次数依实际错误UNKNOWN；不回到B1/B2/CP03重装。
+- Work先在源码/制品侧一次闭合下列缺项，Owner无需追加查旧六文件、Writer/Grant/RAM：
+
+1. **实际运行输入未固定**：B4接收的真实P2程序入口及完整argv/cwd/env/health和代码/配置摘要；
+   当前B1快照、Python binary、bootstrap UUID已齐，但bootstrap无argv/cwd，不能当正式启动配置。
+2. **新身份/访问/TLS适用性合同未固定**：06的expected/observed分工与消费方；
+   07/08精确路径+主体；09是否确有TLS需求。先由选定配置和原组件接口确定，不凭空加生产权限。
+3. **CP04–09集中薄接线/定向验收尚未交付**：复用组件，补必要串接与逐步不可变证据；
+   一次覆盖发布中断、响应丢失、身份冲突、前批保护，再冻结最终单命令及权限清单。
+
+这三项是源码/输入消费契约缺口，不是新的英国环境前置。
+若其中任何项仍UNKNOWN，保持对应项HOLD，不能靠“只剩一条命令”或把不适用写PASS强行关闭B3。
+B4–B7/P3、生产切换、真实DB/socket/服务启动不并入本轮B3收口；不新增第八批。
+本轮服务器操作/新Hosted/功能测试均NOT_EXECUTED，只有方案/来源一致性检查。
