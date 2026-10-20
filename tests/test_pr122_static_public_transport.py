@@ -528,7 +528,7 @@ class PublicCoordinatorBudgetTests(_PublicFixture, unittest.TestCase):
         # the same attempt count rather than spending attempts 3..5.
         self.requests.clear()
         with patch.object(dual.os, 'getpid', return_value=process + 2):
-            with self.assertRaises(self.workflow.WorkflowStopped):
+            with self.assertRaises(fixture.workflow.WorkflowStopped):
                 fixture.coordinator.run()
         restarted = json.loads(fixture.coordinator.path.read_bytes())
         child_restarted = json.loads(fixture.ops.t.receipt.read_bytes())
