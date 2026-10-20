@@ -7,15 +7,15 @@ import signal
 import socket
 import sys
 
-from activation_control import ActivationStore
-from development_service import load_config
-from execution_ledger import ExecutionLedger
-from uk_owner_callback_core import LedgerOwnerDecisionServer
-from native_peer_identity import load_native_peer_identity
-from owner_process_identity import load_owner_process_verifier, CALLBACK_UID, CALLBACK_USER
-
-
 def build(config):
+    # The preparation-only format is never a service startup configuration.
+    if config.get('profile') == 'ISOLATED_NEW_PREPARE_ONLY':
+        raise ValueError('PREPARATION_PROFILE_CANNOT_START')
+    from activation_control import ActivationStore
+    from execution_ledger import ExecutionLedger
+    from uk_owner_callback_core import LedgerOwnerDecisionServer
+    from native_peer_identity import load_native_peer_identity
+    from owner_process_identity import load_owner_process_verifier, CALLBACK_UID, CALLBACK_USER
     activation=ActivationStore(config['activation_descriptor'],
                                config['activation_epoch_journal'],
                                config['activation_lock'])
@@ -50,7 +50,18 @@ def listener():
 
 def main(argv=None):
     parser=argparse.ArgumentParser(); parser.add_argument('--config',required=True)
-    args=parser.parse_args(argv); server=build(load_config(args.config)); sock=listener()
+    parser.add_argument('--check-isolated-prepared',action='store_true')
+    parser.add_argument('--profile'); parser.add_argument('--profile-sha256')
+    args=parser.parse_args(argv)
+    if args.check_isolated_prepared:
+        from ledger_prepared import check_prepared
+        import json
+        print(json.dumps(check_prepared(args.config,args.profile,args.profile_sha256),sort_keys=True))
+        return 0
+    if args.profile is not None or args.profile_sha256 is not None:
+        raise ValueError('PROFILE_REQUIRES_PREPARATION_CHECK')
+    from development_service import load_config
+    server=build(load_config(args.config)); sock=listener()
     stopping=[False]
     signal.signal(signal.SIGTERM,lambda *_:stopping.__setitem__(0,True))
     signal.signal(signal.SIGINT,lambda *_:stopping.__setitem__(0,True))
