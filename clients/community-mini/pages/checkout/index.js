@@ -1,17 +1,18 @@
 const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
+const auth=require('../../customer-auth');
 Page({
   data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'本地模拟；未连接微信支付', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
   async onLoad(options) {
-    this._pageUnloaded=false;this._consumerRequest=null;this._productRequest=null;this._projectMessagesContext=null;
+    this._pageUnloaded=false;this._authEpoch=auth.current();this._consumerRequest=null;this._productRequest=null;this._projectMessagesContext=null;
     this.setData({projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:''});
     this.setData({products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:''});
     this.resetOrderDetails();
     this._noticeContext=null;this._noticeRequest=null;
     this.setData({notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:''});
     const lifecycle=this._pageGeneration=(this._pageGeneration||0)+1;
-    const current=()=>!this._pageUnloaded&&this._pageGeneration===lifecycle;
+    const current=()=>!this._pageUnloaded&&this._pageGeneration===lifecycle&&auth.active(this._authEpoch);
     try {
       const config = getApp().globalData;
       if (config.mode !== 'OFFLINE') {
@@ -40,6 +41,17 @@ Page({
     } catch(e) {if(current())this.setData({status:e.message});}
   },
   onUnload() {this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
+  customerSessionRevoked(status='登录已退出，请重新登录'){
+    this._pageGeneration=(this._pageGeneration||0)+1;this._consumerRequest=null;this._productRequest=null;this._projectRequest=null;this._noticeRequest=null;this._profileRequest=null;
+    if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();
+    this.session=null;this.client=null;this.paymentFlow=null;
+    if(!this._pageUnloaded)this.setData({commerceEnabled:false,paymentsEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',
+      notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',
+      orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',
+      refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:'',refundAmount:'',refundReason:'',
+      projectTitle:'',projectRole:'',projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',
+      projectFeedback:'',projectReference:'',projectReferenceItem:'',projectReferenceRevision:0,projectState:'',pending:false,status});
+  },
   openCustomerHome(){if(!this.scene){this.setData({status:'缺少门店场景，无法进入客户中心'});return;}wx.navigateTo({url:'/pages/home/index?scene='+encodeURIComponent(this.scene)});},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
@@ -226,7 +238,7 @@ Page({
     return records;
   },
   noticeContextCurrent(context) {
-    return !!context&&!this._pageUnloaded&&context.generation===this._pageGeneration&&
+    return !!context&&!this._pageUnloaded&&auth.active(this._authEpoch)&&context.generation===this._pageGeneration&&
       context.session===this.session&&context.scene===this.scene&&
       context.user===this.data.userId&&context.customer===this.data.projectCustomerId&&
       (typeof context.session.getGeneration!=='function'||context.session.getGeneration()===context.sessionGeneration);
