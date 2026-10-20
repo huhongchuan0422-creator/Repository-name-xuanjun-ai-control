@@ -4,6 +4,8 @@ Uses synthetic existing Center identities/scenes only. No provider, payment, upl
 production host, or new business rule is introduced.
 """
 import datetime
+import os
+import shutil
 import queue
 import re
 import threading
@@ -37,7 +39,7 @@ class CommunityPromotionBrowserJourney(unittest.TestCase):
         server,fx=state
         try:
             with sync_playwright() as p:
-                browser=p.chromium.launch(headless=True)
+                browser=p.chromium.launch(headless=True,executable_path=(os.environ.get('COMMUNITY_CHROMIUM_EXECUTABLE') or shutil.which('google-chrome') or shutil.which('google-chrome-stable') or shutil.which('chromium')))
                 try:
                     base='http://127.0.0.1:'+str(server.server_port)
                     admin_context=browser.new_context(extra_http_headers={'X-Center-Session':fx.web['token']})
