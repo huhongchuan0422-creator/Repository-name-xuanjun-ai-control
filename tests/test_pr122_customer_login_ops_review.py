@@ -188,22 +188,55 @@ class LoginOpsTests(unittest.TestCase):
             finally:
                 db.close()
 
-    def test_restore_rejects_live_root_and_symlink_alias_before_output(self):
+    def test_restore_rejects_missing_live_root_normalized_alias_and_symlink_before_output(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
-            root = Path(td) / 'synthetic-live-root'
-            root.mkdir(mode=0o700)
-            backup = Path(td) / 'unused-backup'
+            parent = Path(td)
+            root = parent / 'synthetic-live-root'
+            backup = parent / 'unused-backup'
             backup.write_bytes(b'not read for forbidden target')
             keys = {'v1': b'k' * 32}
             with patch.object(ops, 'ROOT', root):
-                with self.assertRaisesRegex(Denied, 'RESTORE_NEW_DIRECTORY_ONLY'):
-                    ops.restore(backup, root, b'b' * 32, keys, 'v1')
-                alias = Path(td) / 'root-alias'
+                self.assertFalse(root.exists())
+                for target in (root, parent / 'nested' / '..' / root.name):
+                    with self.subTest(target=target), self.assertRaisesRegex(Denied, 'RESTORE_LIVE_ROOT_FORBIDDEN'):
+                        ops.restore(backup, target, b'b' * 32, keys, 'v1')
+                    self.assertFalse(root.exists())
+                alias = parent / 'root-alias'
                 alias.symlink_to(root, target_is_directory=True)
                 with self.assertRaisesRegex(Denied, 'SYMLINK_PATH'):
                     ops.restore(backup, alias, b'b' * 32, keys, 'v1')
-                self.assertEqual(list(root.iterdir()), [])
+                self.assertFalse(root.exists())
+
+    def test_restore_key_material_rejects_bad_ids_lengths_and_active_key_before_output(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / 'must-not-exist'
+            cases = []
+            bad_id = copy.deepcopy(self.config); bad_id['keys'] = {'bad key': base64.b64encode(b'k' * 32).decode()}
+            cases.append(bad_id)
+            short = copy.deepcopy(self.config); short['keys'] = {'v1': base64.b64encode(b'k' * 31).decode()}
+            cases.append(short)
+            inactive = copy.deepcopy(self.config); inactive['active_key'] = 'missing'
+            cases.append(inactive)
+            for config in cases:
+                with self.subTest(config=config), self.assertRaises(Denied):
+                    ops.restore_key_material(config)
+                self.assertFalse(output.exists())
+
+    def test_restore_isolated_bad_key_config_never_calls_restore_or_creates_output(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / 'must-not-exist'
+            config = copy.deepcopy(self.config)
+            config['keys'] = {'v1': base64.b64encode(b'k' * 31).decode()}
+            with self.invocation('restore-isolated', config), \
+                    patch('sys.argv', ['operator', 'restore-isolated', '--input', str(Path(td) / 'backup'), '--output', str(output)]), \
+                    patch.object(ops, 'restore', side_effect=AssertionError('restore must not run')) as restore, \
+                    self.assertRaises(Denied):
+                ops.main()
+            restore.assert_not_called()
+            self.assertFalse(output.exists())
 
     def test_invalid_encrypted_backup_never_leaves_restore_output(self):
         import tempfile
