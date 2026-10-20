@@ -54,7 +54,7 @@ class OriginalCenterSameOrderBrowser(unittest.TestCase):
                       const r=await fetch('/community/commerce',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
                         headers:{'Content-Type':'application/json','X-CSRF-Token':arg.csrf},
                         body:JSON.stringify({workspace:'merchant',operation:'price_set',params:{
-                          item_id:'four_role_item',expected_revision:0,unit_minor:101,stock:3,enabled:true}})});
+                          item_id:'sample_item',expected_revision:0,unit_minor:101,stock:3,enabled:true}})});
                       return {status:r.status,body:await r.json()};
                     }""",{'csrf':fx.web['csrf']})
                     self.assertEqual(price['status'],200,price)
@@ -69,7 +69,7 @@ class OriginalCenterSameOrderBrowser(unittest.TestCase):
                         }""",{'token':fx.token,'operation':operation,'params':params})
                     joined=mini('community_join',{'community_id':fx.cid})
                     self.assertEqual(joined['status'],200,joined)
-                    purchased=mini('purchase',{'reference':reference,'lines':[{'item_id':'four_role_item','quantity':1,'revision':1}]})
+                    purchased=mini('purchase',{'reference':reference,'lines':[{'item_id':'sample_item','quantity':1,'revision':1}]})
                     self.assertEqual(purchased['status'],200,purchased)
                     order=purchased['body']['result']
                     self.assertEqual(order['reference'],reference)
