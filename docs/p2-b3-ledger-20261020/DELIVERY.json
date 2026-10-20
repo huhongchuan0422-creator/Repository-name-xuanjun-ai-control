@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "scope": "ISOLATED_TEST_ONLY",
+  "task": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6283494928",
+  "status": "SOURCE_DELIVERED_WITH_ENVIRONMENT_HOLD",
+  "baseline": "6f2cc6b6fbe6150ac9384cd330854808c419385b",
+  "tested_commit": "d011a67d6994971e148c4e81b4c9e7baef481289",
+  "application": "evidence/p2-epoch7-access-repair-20261014/runtime/stage1/ledger_service.py",
+  "application_role": "CANONICAL_LEDGER_REAL_APPLICATION",
+  "preparation_entry": "--check-isolated-prepared --profile PATH --profile-sha256 SHA",
+  "starts_application": false,
+  "opens_database": false,
+  "binds_socket": false,
+  "transitions_activation": false,
+  "source_pins": {
+    "ledger_service": "efad89246b465fa1bb1a166fccd281d2c5edbf2bb0822a22fd0141f22dda2db9",
+    "ledger_prepared": "bed0b0c74dd9346e7bf55cf79338c25774ea110ac36f9619ddd1feca105839a9",
+    "original_activation_control": "169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4",
+    "b3_ledger": "9bf5df8bbcbe01b3f54b53eeaaee45ff8484b4636b259bb3ede78ce1c198bcd0",
+    "b3_contracts": "2b38e9260dbe816186b7561dd73fea4ae866db6bc91299f2b3cb730adfa165a0",
+    "original_build_body_ast": "c962ba6984475c9fbf99bdd3e1f5062ea3e0bf260fcc064df698ccf71965ab19"
+  },
+  "fixed_request": {
+    "path": "request.json",
+    "bytes": 695,
+    "sha256": "199938d73d46f5a841cd56f5f51f814256b28bdc5c7cc88d43e3ff07226ee5b9"
+  },
+  "expected_documents": {
+    "status": "EXPECTED_NOT_UK_EXECUTED",
+    "index": "EXPECTED-DOCUMENTS.json",
+    "config_sha256": "6ab16b3877cf112a72585723c1e8e67fc98e11cf69e6361338f871480d2dfa15",
+    "profile_sha256": "721c6fef4fe59cce60adb460734b8c4d2fd09943822088637d4898c807218a09"
+  },
+  "original_cp03": {
+    "receipt_sha256": "bede2ebc9f9c5458c92307c974358eb61947e7ec80a9611cc76735891ffae433",
+    "replayed": false,
+    "store_prepare_called": false,
+    "store_reconcile_called": false,
+    "store_transition_called": false
+  },
+  "stages": [
+    "CP04",
+    "CP05",
+    "CP06",
+    "CP07",
+    "CP08",
+    "CP09"
+  ],
+  "preparation_receipt_is_full_b3": false,
+  "lifecycle": {
+    "status": "ORDERED_WITH_PINNED_PREDECESSOR",
+    "hold_observations": "IMMUTABLE_SEPARATE_NAMES",
+    "terminal_receipts": "IMMUTABLE_BOUND_REQUEST_AND_PREDECESSOR",
+    "changed_contract_bypass": false
+  },
+  "roles": {
+    "preparer_uid": 1002,
+    "service_user": "xuanjun-dispatcher",
+    "service_uid": "UNKNOWN",
+    "callback_uid": 1004,
+    "callback_user": "xuanjun-callback",
+    "activation_start_owner_uid": 0,
+    "socket_activation": "systemd-fd3",
+    "startup_roles_provisioned": false
+  },
+  "tls": {
+    "decision_source": "EXACT_HASH_BOUND_CONFIGURATION_CONSUMED_BY_REAL_LEDGER_ENTRY",
+    "scope": "CANONICAL_LEDGER_UNIX_ENDPOINT_ONLY",
+    "p2_global_tls": "NOT_CLAIMED"
+  },
+  "hosted": {
+    "run_id": 39371811001,
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39371811001",
+    "conclusion": "SUCCESS",
+    "python": [
+      "3.11",
+      "3.12"
+    ],
+    "tests_per_python": 14,
+    "skipped_per_python": 0,
+    "jobs": [
+      {
+        "id": 118461131299,
+        "name": "ledger (3.11)",
+        "conclusion": "success"
+      },
+      {
+        "id": 118461131450,
+        "name": "ledger (3.12)",
+        "conclusion": "success"
+      }
+    ],
+    "real_uid1002_subprocess": true,
+    "real_uid65534_denial": true,
+    "real_original_activation_store_chain": true,
+    "server_started": false
+  },
+  "artifacts": [
+    {
+      "id": 12242031096,
+      "name": "b3-ledger-source-python-3.11",
+      "zip_digest": "sha256:8821127a18bdd3a70b549360d35fde4f9ee5b648bbd16d6aefebeb5ed6e70442",
+      "size_in_bytes": 232767,
+      "download": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39371811001/artifacts/12242031096",
+      "contents": [
+        "b3-ledger-source.tar.gz",
+        "SHA256SUMS"
+      ],
+      "tar_sha256": "IN_INCLUDED_SHA256SUMS_NOT_READ_BY_CONNECTOR"
+    },
+    {
+      "id": 12241876410,
+      "name": "b3-ledger-source-python-3.12",
+      "zip_digest": "sha256:b81982eba3ae7f89ecfe48bc650241c19aefe2e50d7a97fac956385ed2e199be",
+      "size_in_bytes": 232767,
+      "download": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39371811001/artifacts/12241876410",
+      "contents": [
+        "b3-ledger-source.tar.gz",
+        "SHA256SUMS"
+      ],
+      "tar_sha256": "IN_INCLUDED_SHA256SUMS_NOT_READ_BY_CONNECTOR"
+    }
+  ],
+  "retained_failures": [
+    {
+      "run_id": 39371186648,
+      "error": "mkdir: cannot create directory delivery: File exists",
+      "resolution": "NEW_RUNNER_TEMP_OUTPUT_ONLY"
+    },
+    {
+      "run_id": 39371667900,
+      "error": "actual UID1002 cannot open test source under private /home/runner: Permission denied",
+      "resolution": "NEW_EXACT_BYTE_READ_ONLY_TEMP_SOURCE_TREE_NO_ORIGINAL_PERMISSION_CHANGE"
+    }
+  ],
+  "actual_environment_difference": {
+    "uid1002_cap_drop_all": "CP08_UNAVAILABLE_HOLD",
+    "hosted_root_full_path": "PASSED_NOT_UK_EVIDENCE",
+    "independent_uk_denial_observer": "NOT_EXECUTED",
+    "external_observation_ingest": "NOT_FROZEN_NO_SYNTHETIC_VALIDATED_INPUT"
+  },
+  "future_actions": "OPERATIONS.md",
+  "server_operations": "NOT_EXECUTED",
+  "owner_final_install_command": "NOT_FROZEN",
+  "normal_path_command_count": "UNKNOWN",
+  "single_command_target": "UNPROVEN",
+  "full_b3_complete": false,
+  "not_in_scope": [
+    "B1/B2/CP03 reinstall",
+    "old R03 historical recovery",
+    "new credentials or privileges",
+    "B4-B7 live start",
+    "P3",
+    "production switch"
+  ]
+}
