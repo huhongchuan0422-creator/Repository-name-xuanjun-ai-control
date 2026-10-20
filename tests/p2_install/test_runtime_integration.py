@@ -26,6 +26,37 @@ def run_interrupted_coordinator(coord,plan,runtime,request):
         c.execute(request)
 
 class RuntimeIntegration(unittest.TestCase):
+    def test_real_runtime_failed_operation_is_durable_once(self):
+        with tempfile.TemporaryDirectory() as home:
+            root=pathlib.Path(home)
+            coord=root/"coordinator"; runtime=root/"runtime"
+            coord.mkdir(mode=0o700);runtime.mkdir(mode=0o700)
+            plan={"schema":1,"release":"a"*64,"batches":["service"]}
+            req={"schema":1,"scope":"ISOLATED_TEST_ONLY","installation_id":"failure-real",
+                 "batch_id":"service","attempt_id":"error-one","root":str(runtime),
+                 "version":"a"*64,"deadline_utc":int(time.time())+20,
+                 "round_id":"round-1","inputs":{"operation":"start","argv":["/not-real-binary"],
+                 "cwd":str(runtime),"env":{},"health":{"type":"process"}}}
+            class Adapter:
+                execute=staticmethod(p2_runtime.execute)
+                inspect=staticmethod(p2_runtime.inspect)
+                recover=staticmethod(p2_runtime.recover)
+            with Coordinator(str(coord),plan,{"service":Adapter()},
+                             component_roots={"service":str(runtime)}) as c:
+                failed=c.execute(req)
+                self.assertEqual(failed["status"],"HOLD",failed)
+                rows=c.journal.db.execute("SELECT evidence FROM coordinator_failures").fetchall()
+                self.assertEqual(len(rows),1)
+                payload=json.loads(rows[0][0])
+                self.assertEqual(payload["attempt_id"],"error-one")
+                self.assertEqual(payload["references"]["receipt"]["status"],"VERIFIED")
+            with Coordinator(str(coord),plan,{"service":Adapter()},
+                             component_roots={"service":str(runtime)}) as c:
+                c.recover(req)
+                c.inspect(req)
+                self.assertEqual(c.journal.db.execute(
+                    "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
+
     def test_cli_execute_inspect_and_recover(self):
         with tempfile.TemporaryDirectory() as home:
             root=pathlib.Path(home)
