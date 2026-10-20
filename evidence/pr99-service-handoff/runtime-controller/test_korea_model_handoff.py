@@ -93,3 +93,13 @@ class HandoffTests(unittest.TestCase):
    self.assertEqual(calls,[1]);self.assertTrue((Path(d)/'switch.intent.json').is_file());self.assertFalse((Path(d)/'switch.result.json').exists())
 
 if __name__=='__main__':unittest.main()
+
+class ShimHealthRouteTests(unittest.TestCase):
+ def test_literal_and_constant_routes_bind_without_executing_module(self):
+  tree=ast.parse(Path(m.__file__).read_text())
+  main=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='main')
+  block=main.body[-1].body
+  start=next(i for i,n in enumerate(block) if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='constants' for t in n.targets))
+  code=compile(ast.Module(body=block[start:start+3],type_ignores=[]),'health-discovery','exec')
+  for source,expected in [("HEALTHZ_PATH='/healthz'\nclass Handler:\n def do_GET(self):\n  return self.path == HEALTHZ_PATH",{'/healthz'}),("def do_GET(self):\n return self.path == '/health'",{'/health'}),("DANGEROUS=__import__('os').system('false')\ndef do_GET(self):\n return None",set())]:
+   env={'ast':ast,'shim_tree':ast.parse(source)};exec(code,env);self.assertEqual(env['health_paths'],expected)
