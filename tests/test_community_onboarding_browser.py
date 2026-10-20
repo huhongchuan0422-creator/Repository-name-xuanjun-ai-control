@@ -110,17 +110,17 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     expect(admin.locator('#applicationState')).to_have_text('待审核');self.assertEqual(application(admin),original_id)
                     before_unreviewed=revision(admin)
                     admin.locator('#note').fill('不得跳过逐份复审')
-                    def is_unreviewed_approve(response):
-                        if not response.url.endswith('/merchant/onboarding') or response.request.method!='POST':
-                            return False
-                        try: body=response.request.post_data_json
-                        except BaseException: return False
-                        return body.get('operation')=='review' and body.get('params',{}).get('action')=='APPROVE' and \
-                            body.get('params',{}).get('application')==original_id and body.get('params',{}).get('revision')==before_unreviewed
                     phase('UNREVIEWED_APPROVE_CLICK')
-                    with admin.expect_response(is_unreviewed_approve,timeout=10000) as rejected:
+                    with admin.expect_response(lambda response:response.url.endswith('/merchant/onboarding'),timeout=10000) as rejected:
                         admin.locator('[data-action=APPROVE]').click()
                     response=rejected.value
+                    request=response.request
+                    self.assertEqual(request.method,'POST')
+                    body=request.post_data_json
+                    self.assertEqual(body.get('operation'),'review')
+                    self.assertEqual(body.get('params',{}).get('action'),'APPROVE')
+                    self.assertEqual(body.get('params',{}).get('application'),original_id)
+                    self.assertEqual(body.get('params',{}).get('revision'),before_unreviewed)
                     self.assertEqual(response.status,400)
                     reply=response.json()
                     self.assertEqual(reply.get('error'),'INVALID_REQUEST')
