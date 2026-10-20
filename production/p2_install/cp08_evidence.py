@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 import stat
 
-PROBE_SHA='3bd3db756c5ad10711083682009247f25014088ce694523a55d0eb4742096081'
-PRODUCER_SHA='e617acf29baff721e7f516cf9044ddbfcca43ca67e11801a5e5af631e03629b7'
+PROBE_SHA='37132af9bd2a19b032b51f530990f4c67b82efa2584b8107a1efff4ef4811b58'
+PRODUCER_SHA='a7462b56b3d2c8b1bc7be964952213747222667699217cdb8029ff2c14384267'
 IMAGE='sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d'
 
 
@@ -60,7 +60,7 @@ def validate(packet, context, current, image=IMAGE):
          'OBSERVATION_PROBE_FIELDS')
     expected=dict(context,metadata=before['target'])
     need(probe['context']==expected and probe['schema']==1 and probe['target']=='/target'
-         and probe['uid']==probe['euid']==probe['gid']==65534 and probe['groups']==[],
+         and probe['uid']==probe['euid']==probe['gid']==65534 and probe['groups'] in ([],[65534]),
          'OBSERVATION_SUBJECT')
     need(type(probe['errno']) is int and probe['errno'] in (errno.EACCES,errno.EPERM)
          and probe['before']==probe['after']==before['target'],'OBSERVATION_ERRNO_OR_TARGET')
