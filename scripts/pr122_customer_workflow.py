@@ -368,6 +368,8 @@ class Coordinator:
                 self.data['state']='HOLD'
                 self.save();self.active=None
                 if isinstance(error,(KeyboardInterrupt,SystemExit)):raise
+                if str(error)=='HOLD:STATIC_SAFE_RETRY_PUBLIC_BUDGET':
+                    raise WorkflowStopped(self.summary()) from None
                 state=self.settle_readonly()
                 if state=='SUCCESS':return self.summary()
                 if state in ('HOLD','EXHAUSTED'):raise WorkflowStopped(self.summary()) from None
