@@ -27,13 +27,77 @@ Original customer Core/Source/Runtime pinned bytes have not been changed. Busine
 
 Neither phase is complete. In particular, the following cannot be marked implemented merely because nearby code exists:
 
-1. Official submerchant application transport, private drafts, common domestic identity/bank form, scanned-material media upload, separate internal review, gated submission and signed status synchronization have now been written. Remaining: complete conditional administrator/foreign-identity/beneficial-owner/industry/bank-branch form requirements and final integration. Existing platform merchant onboarding remains separate.
+1. Official submerchant application transport, private drafts, common domestic identity/bank form, scanned-material media upload, separate internal review, gated submission and signed status synchronization have now been written. Conditional administrator/contact identity, foreign identity and UBO document requirements now have source/tests (`community_applyment_conditions.py`, `test_community_applyment_conditions.py`, `test_community_onboarding_conditional_materials.py`). Remaining here is narrower: provider-current dynamic industry/bank-branch catalog integration/validation and production admission evidence. Existing platform merchant onboarding remains separate.
 2. Original CRM-admitted multi-store business profiles, merchant fulfillment completion and platform ACTIVE/PAUSED/DISABLED lifecycle are implemented. New trading is blocked when suspended; existing status/cancellation/refund recovery remains available. Creating new CRM identities still belongs to original admission authority.
-3. Native personal center, immutable referrals, private notices, original-owned order history, signed payment close and exactly-once stock release are implemented. Final four-role frontend coverage remains development work.
+3. Native personal center, immutable referrals, private notices, original-owned order history, signed payment close and exactly-once stock release are implemented. Existing Chromium coverage includes the shared five-view order flow, merchant workbench, platform/community portal paths and the community↔consumer promotion journey. A single original-Center-backed four-role order/attribution journey (consumer → merchant → community → platform on the same synthetic order) is still not present and remains a test/integration gap.
 4. Raw refund callbacks and hash-verified official bill downloading/private ingestion/scoped reconciliation are implemented. Reverse trade reconciliation uses signed payment dates; undated legacy payments are explicit partial coverage. Unsupported receiver-detail split bill schemas remain UNKNOWN and require a verified official format adapter; current aggregate adapter must not be claimed as complete official split-bill support. Finance核销 is separate and requires original admitted authority.
-5. Community attributed order and signed payout/return views, immutable receiver/community rule snapshots, platform admitted-merchant overview and lifecycle are implemented. Broader community/customer operational views and promotion records remain source work.
-6. Final frontend integration and source security review, meaningful tests for remaining newly written paths, complete regressions/E2E, actual current-source CI and concentrated independent phase reviews remain outstanding.
+5. Community attributed order and signed payout/return views, immutable receiver/community rule snapshots, platform admitted-merchant overview/lifecycle and promotion records are implemented. Promotion closure evidence: `6038e526b559e5a7bb7fef3cd649a0c99e1c3069`, Hosted run `39418635252` SUCCESS, Issue76 `#6290428502`; `test_community_promotion_browser.py` proves Portal create/list/pause plus mini redemption dedupe and PAUSED rejection. Do not reopen promotion work unless the source changes. Broader community/customer operational views remain scoped by the unresolved four-role integration item above.
+6. Current-source full regression exists for `6038e526b559e5a7bb7fef3cd649a0c99e1c3069` (Hosted `39418635252`: 1051 community + 342 Stage5 + 332/40/8/7 Node = 1780 executions). This does not replace final frontend integration or concentrated independent phase review. Independent review evidence currently inherited includes Issue76 `#6244004038` (frozen baseline) and `#6244076141` (Center/signed-detail increment); no independent phase sign-off is recorded for the later `6038e526` promotion-browser increment.
 7. Update original issue/PR acceptance records only after real source evidence and final CI exist.
+
+## 2026-10-20 current phase reconciliation after promotion-browser closure
+
+This section supersedes stale “promotion records remain source work” wording above but does not mark either phase complete.
+
+### Current evidence baseline
+
+- Current verified code/test baseline: `6038e526b559e5a7bb7fef3cd649a0c99e1c3069` / tree `7f247eebed9ad2dc929d0fcd569abd8c4036c267`.
+- Hosted `39418635252` SUCCESS: 1051 community Python + 342 Stage5 Python + 332/40/8/7 Node = 1780 executions; optional mini SDK/runtime/preview jobs were SKIPPED.
+- Promotion cross-role browser path is closed for source/testing: formal Portal create/list/pause, original mini-session redemption, deduplicated authenticated redemption metrics and PAUSED denial. This is synthetic/loopback evidence, not public release or live merchant evidence.
+- Earlier independent reviews remain scoped to their exact versions: Issue76 `#6244004038` and `#6244076141`. Later source additions require concentrated final independent review before phase acceptance.
+
+### Original Phase 1 / Phase 2 groups — current verified gap classification
+
+| Group | Current implementation / tests already present | Remaining classification |
+| --- | --- | --- |
+| P1-A Identity/profile | original Center pins; `community_mini_center_identity.py`, `community_customer_profile.py`; mini/profile/referral/notice/revocation tests | External admission evidence still required for production Center/CRM/KMS/HTTPS. No new IAM code should be invented. |
+| P1-B Merchant onboarding/applyment | `community_merchant_onboarding.py`, `community_wechat_applyment.py`, conditional-field/history/reopen tests | Code gap narrowed to provider-current dynamic industry/bank-branch catalogs and final integration; live submerchant submission/approval remains external. |
+| P1-C Platform review/provider status | onboarding reviewer flows, signed applyment query/recovery tests | Real provider authorization/status and current product permission remain external; no missing local transition rule identified in this check. |
+| P1-D Merchant workbench/store/staff/catalog | workbench/store/staff/catalog source plus Chromium tests | Production principal/store mappings external. No specific local source defect identified in this check. |
+| P1-E Platform base management/notification isolation | platform views, merchant lifecycle, customer notices, audit/permission regressions | Final concentrated role/security review remains; no specific new local notification defect identified. |
+| P2-A Consumer transaction/attribution | mini identity, basket/order ownership, native profile, refunds, community membership/promotion | **Local test/integration gap:** no single original-Center-backed browser journey proves one same synthetic order across consumer → merchant → community → platform while preserving attribution and role isolation. |
+| P2-B Pricing/orders/query | commerce, catalog, order detail, SaaS/customer-center, workbench tests | Production Finance/Owner admission for externally authoritative operations remains external; no specific local pricing/order source defect identified here. |
+| P2-C Real WeChat payment/refund/reconciliation | prepay/query/callback/refund/bill code and extensive signed synthetic tests | Live merchant/product permissions and real authorized transaction evidence are external. Full official bill semantic contract remains unresolved (see below). |
+| P2-D Community management | directory/membership/reports, formal Portal, promotion API + `test_community_promotion_browser.py` | Promotion is no longer a gap. Remaining integration gap is covered by the four-role same-order journey under P2-A/P2-G. |
+| P2-E Split rules/execution/recovery | split rules/actions/returns, recovery/idempotency tests | Full bill/return semantic reconciliation still depends on authoritative provider contract; real funds remain external. |
+| P2-F Operations/finance admin | platform views, merchant bills, financial views, bill audit/workbench | Full semantic reconciliation/Finance settlement not accepted; production Finance issuer/tenant grant is external. |
+| P2-G Complete chain/integration | stage browser, release/migration/recovery/package/health tests, exact source package | Local integration still lacks the original-Center four-role same-order browser journey; production install/controller/lease/fence/ACK, device and disaster-recovery evidence are external. |
+
+### Bill semantics: code gap vs external contract
+
+Current source recognizes and safely stores official-shaped split-bill rows and signed detail evidence (`community_provider_bills.py`, `test_community_profitsharing_bill_schema.py`) while keeping unknown semantics fail-closed. Independent review `#6244076141` explicitly leaves CSV timezone/day membership, summary amount semantics, reverse completeness and return/unfreeze detail mapping UNVERIFIED/NOT_RECONCILED.
+
+Therefore this is **not safe to “finish” by guessing code**. The next implementation step requires authoritative provider documentation/sample contract that defines:
+- bill event timezone and `bill_date` membership;
+- summary count/amount formula and signs;
+- split return/manual-unfreeze/expired-unfreeze row mapping and `detail_id` joins;
+- enough complete provider population evidence to test reverse completeness.
+
+Responsibility: payment/provider contract owner supplies authoritative material; Finance owner supplies the matching complete local population/cutoff contract. Until then, UNKNOWN_SCHEMA / NOT_RECONCILED / UNCONFIRMED remain required.
+
+### External-only gates verified in this check
+
+- Official mini compilation/current-device acceptance: current source `6038e526` has no same-version official compile/device receipt; optional mini jobs in run `39418635252` were SKIPPED. Responsibility: mini release/operations owner.
+- Real merchant/submerchant/product permission and authorized real payment/refund/split: NOT_EXECUTED. Responsibility: WeChat service-provider merchant/product owner plus Finance authority.
+- Production Center/CRM/scanner/KMS/HTTPS wiring: source adapters exist; current-host versioned admission/secret IDs/scene-store mappings and revocation evidence must come from existing system owners.
+- Production install/controller/recovery: offline release/migration/recovery code exists, but real host scope/lease/fence/epoch/ACK and disaster-recovery evidence remain external deployment responsibility.
+- Final concentrated independent Phase 1/2 review: NOT_COMPLETE for current `6038e526`; Dots/independent reviewer must review the exact final candidate rather than inheriting old-version approvals.
+
+### Next smallest development item (already in original scope)
+
+**Four-role same-order browser integration** — source basis: item 3 above (“Final four-role frontend coverage remains development work”), P1-13 shared-order frontend integration, P2-A consumer attribution, P2-D community views, and P2-G complete-chain integration.
+
+Proposed test-only path: extend/add a focused `tests/test_community_*browser.py` journey using existing original Center synthetic identities and existing HTTP endpoints; do not add product rules.
+
+Required behavior:
+1. consumer creates/reads one server-priced synthetic order through the existing mini identity/scene path;
+2. merchant workbench sees the same immutable order/reference under its existing store scope;
+3. community Portal sees that same order only after the existing community attribution/membership snapshot;
+4. platform Portal/overview sees the same order through existing admitted scope;
+5. each wrong-role/cross-scope read remains denied;
+6. no simulated payment state is promoted to Finance settlement; `finance_status` remains `UNCONFIRMED` where applicable.
+
+Acceptance: real Hosted Chromium + loopback HTTP, exact original Center sessions/CSRF/mini token/scene, one immutable reference across all four roles, role-denial assertions, no product-code change unless the journey exposes a real defect, then report the minimal defect before repair.
 
 ## Supervision
 
