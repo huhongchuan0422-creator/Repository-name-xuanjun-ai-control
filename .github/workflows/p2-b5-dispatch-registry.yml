@@ -1,0 +1,37 @@
+name: P2 B5 dispatch registry contracts
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - production/p2_install/b5_dispatch_registry_contract.mjs
+      - tests/p2_install/test_b5_dispatch_registry.mjs
+      - tests/p2_install/test_b5_received_dispatch_bytes.mjs
+      - evidence/p2-b5-dispatch-20261020/**
+      - docs/p2-b5-20261020/DISPATCH_REGISTRY.md
+      - .github/workflows/p2-b5-dispatch-registry.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dispatch-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Own adapter contracts and actual bytes only - never SDK execution
+        run: |
+          node --version
+          node tests/p2_install/test_b5_dispatch_registry.mjs
+          node tests/p2_install/test_b5_received_dispatch_bytes.mjs
+      - name: Package fixed source and byte evidence
+        run: |
+          mkdir -p candidate/production/p2_install candidate/tests/p2_install candidate/evidence/p2-b5-dispatch-20261020 candidate/docs/p2-b5-20261020
+          cp production/p2_install/b5_dispatch_registry_contract.mjs production/p2_install/b5_loader_contract.mjs production/p2_install/b5_combined_contract.mjs candidate/production/p2_install/
+          cp tests/p2_install/test_b5_dispatch_registry.mjs tests/p2_install/test_b5_received_dispatch_bytes.mjs candidate/tests/p2_install/
+          cp evidence/p2-b5-dispatch-20261020/* candidate/evidence/p2-b5-dispatch-20261020/
+          cp docs/p2-b5-20261020/DISPATCH_REGISTRY.md candidate/docs/p2-b5-20261020/
+          cd candidate
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: b5-dispatch-registry-source
+          path: candidate/
