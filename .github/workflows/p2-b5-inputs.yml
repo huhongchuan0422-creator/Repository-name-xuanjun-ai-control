@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -B tests/p2_install/test_b5_inputs.py -v
+      - run: python -B -m unittest discover -s tests/p2_install -p 'test_b5_*.py' -v
       - run: python -B production/p2_install/b5_inputs.py prepare --output "$RUNNER_TEMP/b5-inputs"
       - uses: actions/upload-artifact@v4
         with:
