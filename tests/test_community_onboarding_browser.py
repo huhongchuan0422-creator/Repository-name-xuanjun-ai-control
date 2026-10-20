@@ -27,10 +27,19 @@ class OnboardingBrowserJourney(unittest.TestCase):
         self.journey(True)
     def test_reject_reopen_same_application_resubmit_and_fresh_material_reviews(self):
         if os.environ.get('COMMUNITY_REOPEN_BROWSER_CHILD')!='1':
+            repo_root=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            tests_root=os.path.dirname(os.path.abspath(__file__))
             env=dict(os.environ,COMMUNITY_REOPEN_BROWSER_CHILD='1')
+            env['PYTHONPATH']=os.pathsep.join(filter(None,(tests_root,repo_root,env.get('PYTHONPATH',''))))
+            probe=subprocess.run(
+                [sys.executable,'-u','-c',
+                 'import sys,test_community_merchant_onboarding; print("ONBOARDING_FIXTURE_IMPORT=PASS",flush=True); print("ONBOARDING_FIXTURE_PATH="+test_community_merchant_onboarding.__file__,flush=True)'],
+                cwd=repo_root,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,env=env,timeout=15,check=False)
+            print(probe.stdout,flush=True)
+            self.assertEqual(probe.returncode,0,probe.stdout)
             command=[sys.executable,'-u','-m','unittest',
                 'tests.test_community_onboarding_browser.OnboardingBrowserJourney.test_reject_reopen_same_application_resubmit_and_fresh_material_reviews']
-            process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,env=env)
+            process=subprocess.Popen(command,cwd=repo_root,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,env=env)
             try:
                 output,_=process.communicate(timeout=90)
             except subprocess.TimeoutExpired:
