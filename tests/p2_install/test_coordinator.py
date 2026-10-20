@@ -3,6 +3,7 @@ import shutil
 import importlib.util
 import json
 import os
+import sqlite3
 from pathlib import Path
 import tempfile
 import unittest
@@ -403,6 +404,139 @@ class CoordinatorTests(unittest.TestCase):
             ).fetchone()[0])["references"]["log"]
             self.assertEqual(ref["status"],"VERIFIED")
             self.assertEqual(ref["sha256"],hashlib.sha256(b"normal").hexdigest())
+
+    def test_legacy_failure_schema_upgrade_redelivery_and_outbox_dedup(self):
+        req=self.request("legacy-auto")
+        with self.open() as c:
+            c._store(req)
+
+        db_path=os.path.join(self.root,"journal.sqlite3")
+        db=sqlite3.connect(db_path)
+        try:
+            db.execute("DROP INDEX IF EXISTS coordinator_failure_event_key")
+            db.execute("DROP TABLE coordinator_failures")
+            db.execute("CREATE TABLE coordinator_failures("
+                       "seq INTEGER PRIMARY KEY, installation TEXT, cause TEXT,"
+                       "observed INTEGER, evidence TEXT)")
+            original=canonical({"attempt_id":req["attempt_id"],
+                                "request_sha256":digest(req)}).decode("ascii")
+            db.execute("INSERT INTO coordinator_failures VALUES(?,?,?,?,?)",
+                       (1,req["installation_id"],"LEGACY_CAUSE",100,original))
+            old_change=digest([req["installation_id"],"LEGACY_CAUSE",
+                               "CHANGE_METHOD_30M"])
+            old_report=digest([req["installation_id"],"LEGACY_CAUSE",
+                               "REPORT_DOTS_10_OR_60"])
+            db.execute("INSERT INTO coordinator_outbox VALUES(?,?,?,?,?)",
+                       (old_change,req["installation_id"],"CHANGE_METHOD_30M",
+                        "UNAVAILABLE",canonical(
+                            {"cause":"LEGACY_CAUSE","failures":1,"first_utc":100,
+                             "recipient":"DOTS",
+                             "next":"propose alternative and evaluate"}
+                        ).decode("ascii")))
+            db.execute("INSERT INTO coordinator_outbox VALUES(?,?,?,?,?)",
+                       (old_report,req["installation_id"],"REPORT_DOTS_10_OR_60",
+                        "UNAVAILABLE",canonical(
+                            {"cause":"LEGACY_CAUSE","failures":1,"first_utc":100,
+                             "recipient":"DOTS",
+                             "next":"propose alternative and evaluate"}
+                        ).decode("ascii")))
+            db.commit()
+        finally:
+            db.close()
+
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:3700) as c:
+            cols=[x[1] for x in c.journal.db.execute(
+                "PRAGMA table_info(coordinator_failures)")]
+            self.assertIn("event_key",cols)
+            self.assertIn("compatibility",cols)
+            before=c.journal.db.execute(
+                "SELECT observed,evidence FROM coordinator_failures WHERE seq=1"
+            ).fetchone()
+            self.assertEqual(before,(100,original))
+            compatibility=c.journal.db.execute(
+                "SELECT compatibility FROM coordinator_failures WHERE seq=1"
+            ).fetchone()[0]
+            self.assertEqual(compatibility,"LEGACY_AUTO")
+
+            c._automatic_failure(
+                req,"LEGACY_CAUSE",{"error":{"code":"LEGACY_CAUSE"}})
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
+            after=c.journal.db.execute(
+                "SELECT observed,evidence,compatibility,event_key "
+                "FROM coordinator_failures WHERE seq=1").fetchone()
+            self.assertEqual(after[0:2],before)
+            self.assertEqual(after[2],"MIGRATED_AUTO_MATCH")
+            self.assertTrue(after[3])
+
+            emitted=c.tick()
+            self.assertFalse(any(
+                x.get("event") in ("CHANGE_METHOD_30M","REPORT_DOTS_10_OR_60")
+                for x in emitted))
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox").fetchone()[0],2)
+
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:3800) as c:
+            c._automatic_failure(
+                req,"LEGACY_CAUSE",{"error":{"code":"LEGACY_CAUSE"}})
+            c.tick()
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox").fetchone()[0],2)
+            self.assertEqual(c.journal.db.execute(
+                "SELECT observed,evidence FROM coordinator_failures WHERE seq=1"
+            ).fetchone(),(100,original))
+
+    def test_legacy_explicit_migrates_and_unknown_identity_stays_unknown(self):
+        req=self.request("legacy-explicit")
+        with self.open() as c:
+            c._store(req)
+            explicit={"attempt_id":req["attempt_id"],
+                      "event_id":"old-event",
+                      "request_sha256":digest(req),
+                      "error":{"code":"OLD_EXPLICIT"}}
+            c.journal.db.execute(
+                "INSERT INTO coordinator_failures("
+                "installation,cause,observed,evidence,event_key,compatibility) "
+                "VALUES(?,?,?,?,NULL,NULL)",
+                (req["installation_id"],"OLD_EXPLICIT",123,
+                 canonical(explicit).decode("ascii")))
+            unknown_raw=canonical({"unidentified":"legacy"}).decode("ascii")
+            c.journal.db.execute(
+                "INSERT INTO coordinator_failures("
+                "installation,cause,observed,evidence,event_key,compatibility) "
+                "VALUES(?,?,?,?,NULL,NULL)",
+                (req["installation_id"],"MYSTERY",124,unknown_raw))
+
+        with self.open() as c:
+            rows=c.journal.db.execute(
+                "SELECT cause,observed,evidence,event_key,compatibility "
+                "FROM coordinator_failures ORDER BY seq").fetchall()
+            by_cause={x[0]:x for x in rows}
+            self.assertEqual(by_cause["OLD_EXPLICIT"][1],123)
+            self.assertEqual(by_cause["OLD_EXPLICIT"][2],
+                             canonical(explicit).decode("ascii"))
+            self.assertTrue(by_cause["OLD_EXPLICIT"][3])
+            self.assertEqual(by_cause["OLD_EXPLICIT"][4],"MIGRATED_EXPLICIT")
+            self.assertIsNone(by_cause["MYSTERY"][3])
+            self.assertEqual(by_cause["MYSTERY"][4],"UNKNOWN")
+            self.assertEqual(by_cause["MYSTERY"][2],unknown_raw)
+
+            self.assertFalse(c.failure(
+                req,"OLD_EXPLICIT",
+                {"event_id":"old-event","error":{"code":"OLD_EXPLICIT"}}))
+            self.assertTrue(c.failure(
+                req,"MYSTERY",
+                {"event_id":"new-real-event","error":{"code":"MYSTERY"}}))
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],3)
+            unknown=c.journal.db.execute(
+                "SELECT observed,evidence,compatibility FROM coordinator_failures "
+                "WHERE event_key IS NULL").fetchall()
+            self.assertEqual(unknown,[(124,unknown_raw,"UNKNOWN")])
 
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
