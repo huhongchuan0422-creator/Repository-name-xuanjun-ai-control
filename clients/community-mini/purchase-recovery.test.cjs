@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const sessionModule=require('./session');
+const auth=require('./customer-auth');
 const event=dataset=>({currentTarget:{dataset}});
 function basket(reference='original') {return {reference,user_id:'user1',amount_minor:202,currency:'CNY',
   lines:[{item_id:'item1',name:'Frozen title',revision:1,quantity:2,unit_minor:101,subtotal_minor:202}],
@@ -17,7 +18,7 @@ function harness(){
   },requestPayment(){money.push('provider-payment');}};
   vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:p=>{definition=p;},wx,
     getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid'}}),
-    require:path=>path==='../../session'?sessionModule:path==='../../client'?{makeClient:()=>({reset(){},
+    require:path=>path==='../../customer-auth'?auth:path==='../../session'?sessionModule:path==='../../client'?{makeClient:()=>({reset(){},
       storefront:async()=>({merchant:{name:'fixture'},ads:{}})})}:{createPaymentFlow:()=>({reset(){},pay(){money.push('pay');}})}
   });
   const page={...definition,data:structuredClone(definition.data),setData(patch){writes.push(patch);Object.assign(this.data,patch);}};
