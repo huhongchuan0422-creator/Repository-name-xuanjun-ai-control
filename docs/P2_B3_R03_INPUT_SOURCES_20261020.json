@@ -1,0 +1,340 @@
+{
+  "b3_status": "DRAFT",
+  "baseline_commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+  "baseline_tree": "608d53c4bdae18cd0c30af5d59fa6b244b16e899",
+  "delivered_private_pairs": [
+    {
+      "availability": "LOCATOR_AND_PIN_REUSED_PRIVATE_BYTES_NOT_READ_THIS_ROUND",
+      "pair": "lifecycle-2ac961e8",
+      "plan": {
+        "path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/epoch7-lifecycle-approved-plan-2ac961e8765e82e6.private.json",
+        "sha256": "2ac961e8765e82e6b6fca18f2c3be0f299a71898ad5a8f95109c44420c4a1f15"
+      },
+      "prior_result": "Owner supplied prior INPUT_CONTRACT_COMPATIBLE_NOT_INSTALLED; not R03 execution evidence",
+      "same_r03_context": "UNKNOWN",
+      "seed": {
+        "path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/epoch7-lifecycle-resume-inputs-57f46aa89f4af77b.private.json",
+        "sha256": "57f46aa89f4af77b6e66167ae84875b5c54ee3bdf48c4b28c702a1f7855f94b5"
+      }
+    },
+    {
+      "availability": "LOCATOR_AND_PIN_REUSED_PRIVATE_BYTES_NOT_READ_THIS_ROUND",
+      "pair": "lifecycle-5b3a3422",
+      "plan": {
+        "path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/epoch7-lifecycle-approved-plan-5b3a34222dc634d9.private.json",
+        "sha256": "5b3a34222dc634d95b4e070105de9afb3dc24b5c53f7b6497bc61d392887fb01"
+      },
+      "prior_result": "Owner supplied prior INPUT_CONTRACT_COMPATIBLE_NOT_INSTALLED; not R03 execution evidence",
+      "same_r03_context": "UNKNOWN",
+      "seed": {
+        "path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/epoch7-lifecycle-resume-inputs-d7eabd4c0716bd23.private.json",
+        "sha256": "d7eabd4c0716bd23c35a210c0ace8493b8a9f23237d1df1eeef231fdda8d16f0"
+      }
+    },
+    {
+      "availability": "LOCATOR_AND_PIN_REUSED_PRIVATE_BYTES_NOT_READ_THIS_ROUND",
+      "pair": "lifecycle-8adf9461",
+      "plan": {
+        "path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/epoch7-lifecycle-approved-plan-8adf9461da734f4c.private.json",
+        "sha256": "8adf9461da734f4c10a4c9a4c5e70167f5bccd117e8ae06e7774973afff7f349"
+      },
+      "prior_result": "Owner supplied prior INPUT_CONTRACT_COMPATIBLE_NOT_INSTALLED; not R03 execution evidence",
+      "same_r03_context": "UNKNOWN",
+      "seed": {
+        "path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/epoch7-lifecycle-resume-inputs-be033bc4e8e47032.private.json",
+        "sha256": "be033bc4e8e4703220494e15d0d7524b040388f9700f052714c027132b75898c"
+      }
+    }
+  ],
+  "historical_plan_locator": {
+    "availability": "SOURCE_LITERAL_ONLY_PRIVATE_BYTES_NOT_READ",
+    "path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/protected-core-install-plan.json",
+    "provenance": ".github/workflows/uk-p2-complete-install-candidate.yml",
+    "same_r03_context": "UNKNOWN",
+    "sha256": "ec1d617857845c43eff6bed2b70a0c00a5dad8dc52df95785bed3ee3d775335a"
+  },
+  "kind": "R03_INPUT_SOURCE_INVENTORY_NOT_A_LEDGER",
+  "legacy_native_proof_inputs_not_added_to_readback_allowlist": [
+    "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch5-prior-native-binding.json",
+    "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch3-prior-receipts/native-binding-original.json",
+    "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch5-recovery-execution.json"
+  ],
+  "new_isolated_source_option": {
+    "compatibility_gap": "current rebind_readback intentionally fixes old TX and epochs7->8; cannot accept a new identity unchanged",
+    "do_not": "call current fixture() to manufacture historical epochs1..7 or reuse old transaction as new historical success",
+    "effect_policy": "this task creates no activation journal/descriptor/native/TLS and performs no server operation",
+    "identity": "ISOLATED_NEW:p2-uk-isolated-20261020:b3-r03-source-v1",
+    "new_inputs_not_assigned": [
+      "actual config_sha256",
+      "actual binary_sha256",
+      "isolated instance/ledger identities",
+      "isolated DB/socket paths"
+    ],
+    "purpose": "bind actual B1 release identity into a newly declared non-active isolated candidate, not recover an asserted old epoch",
+    "required_decision": "Dots/Owner select continuation with real historical source join OR explicit original03 functional mapping for new isolated initialization; do not silently relabel initialize as rebind",
+    "reuse": "existing artifact/runtime/coordinator and ActivationStore schemas; no new AuthorityStore/ledger/scheduler",
+    "state": "DRAFT_NOT_ADOPTED"
+  },
+  "next_minimal_operation": {
+    "if_missing": "UNKNOWN; stop only historical-source route, never manufacture epochs1..7 or empty production AuthorityStore",
+    "preferred": "one bounded private source extraction from already located three plan/seed pairs and exact paired kit; compare content-derived context/snapshot/candidate/plan plus original record references; report only sanitized pins and existence",
+    "purpose": "join existing exact input sources without effects",
+    "read_only_caveat": "private root0600 inputs are not automatically readable by UID1002; if container hydration is needed, separately list host-root read and new per-batch 0440 source copies; no chmod original",
+    "reuse": "prior per-file pins and compatibility evidence; no repeat B1/B2 or 14 tests, no replacement download",
+    "scope_limit": "no Driver/Grant/append/replace/service; host action requires a separately approved concrete command",
+    "state": "DESIGN_ONLY_NOT_EXECUTED"
+  },
+  "paired_kit_locator": {
+    "availability": "PRIOR_OWNER_REPORTED_PIN_NOT_REREAD_THIS_ROUND",
+    "manifest_sha256": "91252ba75c38b4a6d12f9b64eb06cb8793fabd97f03646bece97224178c28392",
+    "matches_readback_source": "UNKNOWN",
+    "path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/complete-install-candidate-38503014520/epoch7-recovery-candidate-r7-claim-lifecycle",
+    "source_commit": "105996ed06a0bdb5d025914cf08ebd448425f739",
+    "source_tree": "343d315b3ead6266a626b5875dbdd6c2fa0309af"
+  },
+  "production_permission": false,
+  "r03_required_input_join": [
+    {
+      "availability": "UNKNOWN",
+      "content_sha256": "UNKNOWN",
+      "derivation": "epoch7_host_factory.assemble_host_driver: compiled neutral plus exact review_id, then context_from_gate equality",
+      "input": "context"
+    },
+    {
+      "availability": "hash-only saved packet is not full same-context snapshot",
+      "content_sha256": "UNKNOWN",
+      "derivation": "same seed observation.snapshot; canonical SHA must equal context.snapshot_sha256 and proof.snapshot_sha256",
+      "input": "snapshot"
+    },
+    {
+      "availability": "UNKNOWN",
+      "content_sha256": "UNKNOWN",
+      "derivation": "candidate_from_compiled(compiled,snapshot); canonical SHA must equal context.candidate_sha256",
+      "input": "candidate"
+    },
+    {
+      "availability": "three distinct candidate pair pins exist; none selected without content join",
+      "content_sha256": "UNKNOWN",
+      "derivation": "exact raw approved_plan bytes SHA equals proof.recovery_plan_sha256; contract fields match compiled same seed",
+      "input": "plan"
+    },
+    {
+      "availability": "no exact executed R03 records obtained",
+      "content_sha256": "UNKNOWN",
+      "derivation": "original canonical records, same transaction/context/binding; exact 03 prefix; current source refs hashes",
+      "input": "outer_and_inner"
+    },
+    {
+      "availability": "code constants are not original file contents or measured current state",
+      "content_sha256": "UNKNOWN",
+      "derivation": "exact prior native bytes/metadata and epoch5+epoch3 proof records, candidate native_after and TLS bytes, full activation history/descriptor",
+      "input": "native_transition_and_effects"
+    }
+  ],
+  "r03_site_status": "NOT_EXECUTED",
+  "readback_resource_allowlist": [
+    {
+      "availability": "not collected this round",
+      "mirror_path_rule": "<explicit private isolated mirror root>/var/lib/xuanjun-development/activation/active.json",
+      "original_path": "/var/lib/xuanjun-development/activation/active.json",
+      "resource": "descriptor",
+      "sha256": "UNKNOWN"
+    },
+    {
+      "availability": "not collected this round",
+      "mirror_path_rule": "<explicit private isolated mirror root>/var/lib/xuanjun-development/activation/epochs.jsonl",
+      "original_path": "/var/lib/xuanjun-development/activation/epochs.jsonl",
+      "resource": "journal",
+      "sha256": "UNKNOWN"
+    },
+    {
+      "availability": "not collected this round",
+      "mirror_path_rule": "<explicit private isolated mirror root>/var/lib/xuanjun-development/activation/activation.lock",
+      "original_path": "/var/lib/xuanjun-development/activation/activation.lock",
+      "resource": "lock",
+      "sha256": "UNKNOWN"
+    },
+    {
+      "availability": "not collected this round",
+      "mirror_path_rule": "<explicit private isolated mirror root>/etc/xuanjun-development/p2-native-binding.json",
+      "original_path": "/etc/xuanjun-development/p2-native-binding.json",
+      "resource": "native",
+      "sha256": "UNKNOWN"
+    },
+    {
+      "availability": "not collected this round",
+      "mirror_path_rule": "<explicit private isolated mirror root>/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch7-prior-native-binding.json",
+      "original_path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch7-prior-native-binding.json",
+      "resource": "backup",
+      "sha256": "UNKNOWN"
+    },
+    {
+      "availability": "not collected this round",
+      "mirror_path_rule": "<explicit private isolated mirror root>/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch8-tls-renewal-candidate.json",
+      "original_path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch8-tls-renewal-candidate.json",
+      "resource": "tls",
+      "sha256": "UNKNOWN"
+    },
+    {
+      "availability": "not collected this round",
+      "mirror_path_rule": "<explicit private isolated mirror root>/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch7-recovery-sequence.json",
+      "original_path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch7-recovery-sequence.json",
+      "resource": "outer",
+      "sha256": "UNKNOWN"
+    },
+    {
+      "availability": "not collected this round",
+      "mirror_path_rule": "<explicit private isolated mirror root>/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch7-recovery-execution.json",
+      "original_path": "/var/lib/xuanjun-p2-preparation/artifact-11796280855-p2pkg-38372304180-1/legacy-isolation-c529c379-9341-4510-8384-fc6be1e412e5/epoch7-recovery-execution.json",
+      "resource": "inner",
+      "sha256": "UNKNOWN"
+    }
+  ],
+  "repository_search": {
+    "limit": "current baseline plus explicitly listed delivered locators; not host/private archive absence proof",
+    "recursive_tree_entries": 1355,
+    "truncated": false
+  },
+  "reusable_repository_assets": [
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 13941,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "615eda9caaf84bf21b7580ee3362ddcf6bc6a6d0",
+      "path": "production/p2_install/rebind_readback.py",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "193bb1718c6a862f3f12d906ff60bcc49cf5676e9956c85492870c9d957710c7"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 9868,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "6af96cf501ea4958f9f51f91f54775b043869f5f",
+      "path": "tests/p2_install/test_rebind_readback.py",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "a033af361485777952e302854d15445f342d36fff215d3c49de571753f60ee6f"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 31824,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "867221c73043e008f2c982ffc2839bc3ce33cc6b",
+      "path": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_phases.py",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "f0c5e77767ce36d8c9c34c153311b444a29c6226ecf3a73a79ac5bca3c3a29e5"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 34137,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "45984835fb4dfff475d0481cceebb24811380986",
+      "path": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_recovery_sequence.py",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "5be0e0e1c904aecbda7e5afb90485449b38b142040365dcdb68ef18fe32e450d"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 16726,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "343dd1ca0f0d2aa6f583af43e3cf5a82fd315278",
+      "path": "evidence/p2-epoch7-access-repair-20261014/runtime/stage1/activation_control.py",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 294949,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "605f7fb7bc4230d94fe4c5cf3dc367bd3bf87011",
+      "path": "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7-actual-20261015/packet.json",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "45b832dce9577b49e6ee718f1637862eebd775c6c10f87d9150ed0a87476fdf7"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 3220,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "4621967a7b8b788d015c216168fa9b3bbbd0980d",
+      "path": "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7-actual-20261015/README.md",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "40752e3cd1ac13d0975f26139f54d396756a14c281e04358a7c61368e5d2bced"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 4442,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "1be05640a15d4a39177ce36c622c5f7bf517ff6a",
+      "path": "evidence/p2-epoch7-access-repair-20261014/saved-evidence-r7-actual-20261015/verification.json",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "d292ad66b71adbceac0e8c24c456a789827fe0b816c468da6d134a4e5c04dec7"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 46443,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "f71e8b2da687a93234937673c775c3c310ff8c2a",
+      "path": "evidence/p2-epoch7-access-repair-20261014/recovery-kit-source/helpers/epoch7_host_factory.py",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "9b8e5a60f16d41934fc77c655797aba0f42f1de39b8a1def3e31df90745d3450"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 8277,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "ec24cc2188272868b1fc914d7f6e97c5716e2e7e",
+      "path": "production/p2_recovery/check_native_inputs.py",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "936340e6b10665e909cffe33c8da53cb8346923c5aa8dacef5e3a8a2af76a73e"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 1328,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "e43af38720fdb315a02fb1077dc7fc9024424251",
+      "path": ".github/workflows/uk-p2-complete-install-candidate.yml",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "d0adebb1c1d49cde66167bc8d603573182cd616817f1caa0166b7bf6b1be67c5"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 4884,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "ad32ebc572096935f6fe01aa262b18492f2806fc",
+      "path": "evidence/p2-epoch7-access-repair-20261014/stage-a-delivery-review-20261016/delivery-binding.json",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "fc222230967a0d74bfd5e497c24594e891bcfa089b58edce41a94381fda7c8cc"
+    },
+    {
+      "availability": "READ_AND_GIT_BLOB_VERIFIED",
+      "bytes": 10571,
+      "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
+      "git_blob": "1da3cf64706e69786aa585fa43cfe8f07601779a",
+      "path": "evidence/p2-epoch7-access-repair-20261014/stage-a-delivery-review-20261016/MANIFEST.json",
+      "role": "FORMAT_OR_PROVENANCE_NOT_R03_EXECUTION",
+      "sha256": "5bda61fb6108e6f4091160004fdff1a661cfe552909511c8812929ea6de2074e"
+    }
+  ],
+  "same_context_bundle_status": "UNKNOWN",
+  "saved_r7_packet": {
+    "contains_complete_private_observation": false,
+    "contains_exact_r03_context": false,
+    "install_admission": "NOT_GRANTED",
+    "observation_file_sha256": "a3f7042a1b3099c5699aaef547b22c8f744f0bdc514043a2a91a9847639f4f68",
+    "observation_full_canonical_sha256": "f03fed248eaed766cce97eaa691aaf0f2132269d17bcbe8a7969464a2eb82fea",
+    "packet_sha256": "45b832dce9577b49e6ee718f1637862eebd775c6c10f87d9150ed0a87476fdf7",
+    "production_resume": "NOT_EXECUTED",
+    "relationship": "saved finite probe provenance only; cannot combine snapshot hash with arbitrary plan or seed",
+    "snapshot_sha256": "9bc4a56f28264698058245f47bce8747d9ee96218076c7bbb25d4f1b7aefd4d8"
+  },
+  "schema": 1,
+  "scope": "PREPARATION_ONLY",
+  "server_operations": "NOT_EXECUTED",
+  "task_comment": 6282452861,
+  "validation_reuse": {
+    "ci_run": 39362561039,
+    "python_3_11": "14_PASS",
+    "python_3_12": "14_PASS",
+    "rerun": "NOT_EXECUTED_UNCHANGED",
+    "source_commit": "30128d8716174f7f41915bdbcabe870e107a1add"
+  }
+}
