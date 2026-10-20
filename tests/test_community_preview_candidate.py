@@ -36,6 +36,10 @@ class PreviewCandidateContract(unittest.TestCase):
   clear=DEPLOY.index('trap - ERR')
   self.assertLess(trap,public);self.assertLess(public,clear)
   self.assertIn('rm -rf --one-file-system "$RELEASE"',DEPLOY)
+  self.assertIn('ROLLBACK_HOLD',DEPLOY)
+  self.assertIn('$TX/HOLD',DEPLOY)
+  self.assertIn('if rollback; then exit 90; else exit 91; fi',DEPLOY)
+  self.assertNotIn('echo ROLLBACK_COMPLETE\n}',DEPLOY)
  def test_connected_mini_candidate_is_exact_and_non_mutating(self):
   self.assertIn("https://community-preview.wenwenwenyiyiyi.work",MINI)
   self.assertIn("request_domain_change_performed:false",MINI)

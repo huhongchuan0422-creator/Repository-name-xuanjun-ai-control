@@ -26,18 +26,28 @@ if systemctl is-enabled xuanjun-community-preview.service >/dev/null 2>&1;then :
 if systemctl is-active xuanjun-community-preview.service >/dev/null 2>&1;then : >"$BACKUP/active";else : >"$BACKUP/inactive";fi
 rollback(){
  set +e
- systemctl stop xuanjun-community-preview.service >/dev/null 2>&1
- if [ -e "$BACKUP/unit" ];then cp -a "$BACKUP/unit" "$UNIT";else rm -f "$UNIT";fi
- if [ -e "$BACKUP/nginx" ];then cp -a "$BACKUP/nginx" "$NGINX";else rm -f "$NGINX";fi
- if [ -e "$BACKUP/current.symlink" ];then ln -sfn "$(cat "$BACKUP/current.symlink")" "$CURRENT";else rm -f "$CURRENT";fi
- systemctl daemon-reload
- nginx -t && systemctl reload nginx
- if [ -e "$BACKUP/enabled" ];then systemctl enable xuanjun-community-preview.service >/dev/null 2>&1;else systemctl disable xuanjun-community-preview.service >/dev/null 2>&1;fi
- if [ -e "$BACKUP/active" ];then systemctl start xuanjun-community-preview.service;fi
- if [ -d "$RELEASE" ];then rm -rf --one-file-system "$RELEASE";fi
+ failures=""
+ record(){ "$@" || failures="$failures\n$*"; }
+ record systemctl stop xuanjun-community-preview.service
+ if [ -e "$BACKUP/unit" ];then record cp -a "$BACKUP/unit" "$UNIT";else record rm -f "$UNIT";fi
+ if [ -e "$BACKUP/nginx" ];then record cp -a "$BACKUP/nginx" "$NGINX";else record rm -f "$NGINX";fi
+ if [ -e "$BACKUP/current.symlink" ];then record ln -sfn "$(cat "$BACKUP/current.symlink")" "$CURRENT";else record rm -f "$CURRENT";fi
+ record systemctl daemon-reload
+ if nginx -t >/dev/null 2>&1;then record systemctl reload nginx;else failures="$failures\nnginx -t";fi
+ if [ -e "$BACKUP/enabled" ];then record systemctl enable xuanjun-community-preview.service;else record systemctl disable xuanjun-community-preview.service;fi
+ if [ -e "$BACKUP/active" ];then record systemctl start xuanjun-community-preview.service;else record systemctl stop xuanjun-community-preview.service;fi
+ if [ -d "$RELEASE" ];then record rm -rf --one-file-system "$RELEASE";fi
+ if [ -n "$failures" ];then
+   printf 'ROLLBACK_HOLD%s\n' "$failures" >"$TX/HOLD"
+   sync "$TX/HOLD" 2>/dev/null || true
+   echo ROLLBACK_HOLD
+   return 1
+ fi
+ printf '%s\n' ROLLBACK_COMPLETE >"$TX/ROLLED_BACK"
+ sync "$TX/ROLLED_BACK" 2>/dev/null || { printf '%s\n' ROLLBACK_DURABILITY_UNKNOWN >"$TX/HOLD"; echo ROLLBACK_HOLD; return 1; }
  echo ROLLBACK_COMPLETE
-}
-trap 'rollback; exit 90' ERR
+ return 0
+trap 'rc=$?; if rollback; then exit 90; else exit 91; fi' ERR
 test ! -e "$RELEASE";mkdir "$RELEASE"
 tar -xzf "$COMMUNITY_PREVIEW_PACKAGE" -C "$RELEASE"
 chown -R root:root "$RELEASE";find "$RELEASE" -type d -exec chmod 0755 {} +;find "$RELEASE" -type f -exec chmod 0644 {} +

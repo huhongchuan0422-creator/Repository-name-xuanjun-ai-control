@@ -36,19 +36,25 @@ class Handler(Base):
         for k,v in [('Content-Type','text/html; charset=utf-8'),('Content-Length',str(len(raw))),('Cache-Control','no-store'),('Referrer-Policy','no-referrer'),('X-Content-Type-Options','nosniff')]:self.send_header(k,v)
         self.end_headers();self.wfile.write(raw);self.close_connection=True
     def do_GET(self):
-        if self.path in ('/','/index.html'):
+        parsed=urllib.parse.urlsplit(self.path)
+        path=parsed.path
+        if path in ('/','/index.html'):
             if self._trusted() is None:return
             return self._preview_html()
-        if self.path in ROLE_ROUTES:
+        if path in ROLE_ROUTES:
             if self._trusted() is None:return
-            target,workspace=ROLE_ROUTES[self.path]
+            target,workspace=ROLE_ROUTES[path]
             context=urllib.parse.quote(json.dumps({'csrf':fx.web['csrf'],'workspace':workspace},separators=(',',':')))
             self.send_response(302)
             self.send_header('Set-Cookie',COOKIE+'='+fx.web['token']+'; Path=/; Secure; HttpOnly; SameSite=Strict')
             self.send_header('Location',target+'#preview='+context)
             self.send_header('Cache-Control','no-store');self.send_header('Referrer-Policy','no-referrer')
             self.end_headers();self.close_connection=True;return
-        return super().do_GET()
+        # Static product assets must never be keyed by attacker-controlled query text.
+        original=self.path
+        self.path=path
+        try:return super().do_GET()
+        finally:self.path=original
     def do_POST(self):
         cookie=self.headers.get('Cookie','');token='';kept=[]
         for part in cookie.split(';'):
