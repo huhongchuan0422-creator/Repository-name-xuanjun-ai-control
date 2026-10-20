@@ -17,7 +17,7 @@
     "runtime_order_database_in_local_snapshot": false,
     "cross_database_atomic": false
   },
-  "evidence": [
+  "requirements": [
     {
       "id": "BILL_TIMEZONE",
       "category": "PROVIDER_CONTRACT",
@@ -262,6 +262,18 @@
           "symbol": "ProviderBills._reconcile_split_details",
           "marker": "SIGNED_DETAIL_EVIDENCE_REQUIRED",
           "reason_code_or_field": "SIGNED_DETAIL_EVIDENCE_REQUIRED"
+        },
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "signed_bill_evidence",
+          "marker": "elif kind=='RETURN':",
+          "reason_code_or_field": "elif kind=='RETURN':"
+        },
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "signed_bill_evidence",
+          "marker": "if kind=='SPLIT':",
+          "reason_code_or_field": "if kind=='SPLIT':"
         }
       ],
       "existing_evidence": {
@@ -269,15 +281,19 @@
           {
             "path": "scripts/community_provider_bills.py",
             "symbol": "ProviderBills._reconcile_split_details"
+          },
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "signed_bill_evidence"
           }
         ],
         "proves": "signed_bill_evidence retains terminal signed split detail when complete; local inventory flags missing, invalid, inactive or nonterminal.",
         "does_not_prove": "All historic local actions have authenticated, unambiguous and scope-bound detail evidence."
       },
       "required_delivery": [
-        "For each local action: signed response digest, sub_mchid, transaction_id, out_order_no, order_id, receiver detail_id/finish_time/type/account/amount/result",
-        "Inventory manifest/watermark including inactive and invalid records",
-        "Original payment evidence and ambiguity resolution"
+        "SPLIT terminal FINISHED signed query (signed_bill_evidence kind SPLIT): sub_mchid, transaction_id, out_order_no, order_id; receivers each detail_id, finish_time, type, account, amount, result; body_sha256. Match frozen intent and original payment; incomplete receivers remain unknown.",
+        "RETURN terminal SUCCESS signed query (signed_bill_evidence kind RETURN): sub_mchid, out_order_no, order_id, out_return_no, return_id, return_mchid, finish_time, amount; body_sha256. This captures signed local return evidence but does not establish a provider CSV detail-id join.",
+        "Inventory snapshot with captured_at, audit_watermark and scoped records including inactive, missing, invalid and nonterminal actions; runtime order database not included; cross-database atomicity not established."
       ],
       "responsible_role": "Local community payment integration and ledger owner",
       "dependencies": [
