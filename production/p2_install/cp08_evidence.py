@@ -7,7 +7,7 @@ from pathlib import Path
 import stat
 
 PROBE_SHA='37132af9bd2a19b032b51f530990f4c67b82efa2584b8107a1efff4ef4811b58'
-PRODUCER_SHA='c73e6d8dcd60ec7c1092c008a6b42c42537971b9122bb66c01f722cf8d2f5dc9'
+PRODUCER_SHA='b597a4b662df58709e1c5fd91e7367c6b52f34721b2276eedd3ca6e12d99216a'
 IMAGE='sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d'
 
 
@@ -34,7 +34,9 @@ def snapshot(root):
             before=os.fstat(f.fileno())
             need(stat.S_ISREG(before.st_mode) and before.st_size<=65536,'OBSERVED_FILE')
             raw=f.read(65537);after=os.fstat(f.fileno())
-            need(before==after and len(raw)==before.st_size,'OBSERVED_FILE_CHANGED')
+            fields=('st_dev','st_ino','st_uid','st_gid','st_mode','st_nlink','st_size','st_mtime_ns','st_ctime_ns')
+            need(all(getattr(before,k)==getattr(after,k) for k in fields)
+                 and len(raw)==before.st_size,'OBSERVED_FILE_CHANGED')
             out[name]={'sha256':digest(raw),'metadata':metadata(p)}
     return {'target':metadata(root),'files':out}
 
