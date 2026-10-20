@@ -69,6 +69,7 @@ def _read_log_reference(root, candidate):
     """Read a bounded regular file by descriptor traversal inside root only."""
     require(type(candidate) is str and os.path.isabs(candidate),
             "FAILURE_LOG_NOT_ABSOLUTE")
+    require("\x00" not in candidate, "FAILURE_LOG_INVALID_PATH")
     require(os.path.normpath(candidate) == candidate, "FAILURE_LOG_DOTDOT")
     root_path = os.path.normpath(root)
     prefix = root_path.rstrip("/") + "/"
@@ -85,7 +86,10 @@ def _read_log_reference(root, candidate):
                             dir_fd=fd)
             os.close(fd)
             fd = child
-        leaf = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+        # O_NONBLOCK prevents a FIFO/device-like leaf from stalling before
+        # fstat can reject it as non-regular.
+        leaf = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                       dir_fd=fd)
         try:
             info = os.fstat(leaf)
             require(stat.S_ISREG(info.st_mode), "FAILURE_LOG_NOT_REGULAR")
