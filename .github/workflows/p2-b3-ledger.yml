@@ -35,10 +35,10 @@ jobs:
         run: sudo env P2_REQUIRE_OS_DENIAL=1 "$(command -v python)" -B tests/p2_install/test_b3_ledger.py -v
       - name: Build source delivery with original complete runtime
         run: |
-          mkdir delivery
-          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf delivery/b3-ledger-source.tar.gz production/p2_install/initialize.py production/p2_install/b3_contracts.py production/p2_install/b3_ledger.py evidence/p2-epoch7-access-repair-20261014/runtime tests/p2_install/test_b3_ledger.py
-          sha256sum delivery/b3-ledger-source.tar.gz > delivery/SHA256SUMS
+          mkdir "$RUNNER_TEMP/p2-b3-ledger-delivery"
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf "$RUNNER_TEMP/p2-b3-ledger-delivery/b3-ledger-source.tar.gz" production/p2_install/initialize.py production/p2_install/b3_contracts.py production/p2_install/b3_ledger.py evidence/p2-epoch7-access-repair-20261014/runtime tests/p2_install/test_b3_ledger.py
+          sha256sum "$RUNNER_TEMP/p2-b3-ledger-delivery/b3-ledger-source.tar.gz" > "$RUNNER_TEMP/p2-b3-ledger-delivery/SHA256SUMS"
       - uses: actions/upload-artifact@v4
         with:
           name: b3-ledger-source-python-${{ matrix.python }}
-          path: delivery/
+          path: ${{ runner.temp }}/p2-b3-ledger-delivery/
