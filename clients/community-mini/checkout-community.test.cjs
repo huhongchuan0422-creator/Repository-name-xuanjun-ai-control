@@ -47,6 +47,25 @@ test('unverified or unavailable creative never changes paid status',async()=>{
  }
 });
 
+
+test('session exit clears checkout amount and verified creative while retained page instance stays inert',async()=>{
+ const {result}=page(false,()=>({payment_success_verified:true,creative:{title:'verified fixture'}}));
+ await result.onLoad({scene:'shop1'});
+ result.setData({reference:'order1',amount:'101',afterAd:'verified fixture',afterAdVerified:true});
+ const retained=result;
+ retained.customerSessionRevoked();
+ assert.equal(retained,result);
+ assert.equal(result.data.reference,'');
+ assert.equal(result.data.amount,'');
+ assert.equal(result.data.afterAd,'');
+ assert.equal(result.data.afterAdVerified,false);
+ assert.equal(result.data.commerceEnabled,false);
+ assert.equal(result.data.paymentsEnabled,false);
+ assert.equal(result.session,null);
+ assert.equal(result.client,null);
+ assert.equal(result.paymentFlow,null);
+});
+
 test('project feedback archive read uses current mini session and remains archived',async()=>{
  const {result,calls}=page();await result.onLoad({scene:'shop1'});
  await result.projectAction({currentTarget:{dataset:{operation:'project_messages'}}});

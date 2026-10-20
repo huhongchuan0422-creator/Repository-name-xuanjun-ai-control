@@ -258,12 +258,13 @@ class ExactSplitDetailJourney(unittest.TestCase):
     def test_each_receiver_matches_its_detail_amount_never_aggregate(self):
         import copy
         identity=tuple(self.g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
-        self.a.bindings[identity]['receivers']['second']=dict(type='PERSONAL_OPENID',account='private-openid',name=None,label='Synthetic')
+        self.a.bindings[identity]['sub_appid']='wx1234567890abcdef'
+        self.a.bindings[identity]['receivers']['second']=dict(type='PERSONAL_SUB_OPENID',account='private-openid',name=None,label='Synthetic')
         self.g,self.policy=self.a._authorize(self.fx.web['token'],self.fx.web['csrf'],'finance')
         saved=self.a._load(self.key)
-        saved['payload']['receivers'].append(dict(type='PERSONAL_OPENID',account='private-openid',amount=5))
+        saved['payload']['receivers'].append(dict(type='PERSONAL_SUB_OPENID',account='private-openid',amount=5))
         self.a._save(self.key,saved)
-        self.response['receivers'].append(dict(type='PERSONAL_OPENID',account='private-openid',amount=5,
+        self.response['receivers'].append(dict(type='PERSONAL_SUB_OPENID',account='private-openid',amount=5,
             result='SUCCESS',detail_id='synthetic-detail-second',finish_time='2026-10-16T12:00:00Z'))
         self.accept()
         first=self.bill();second=self.bill({'分账明细单号':'synthetic-detail-second','分账接收方':'private-openid','金额':'0.05'})
@@ -276,6 +277,25 @@ class ExactSplitDetailJourney(unittest.TestCase):
         # The naive CSV time is never localized from either signed API offset.
         self.assertEqual(result['time_coverage'],'UNKNOWN_BILL_TIMEZONE')
         self.assertNotIn('private-openid',json.dumps(result))
+
+
+    def test_personal_sub_openid_requires_original_sub_appid_binding(self):
+        identity=tuple(self.g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
+        saved=self.a._load(self.key)
+        saved['payload']['receivers']=[dict(type='PERSONAL_SUB_OPENID',account='private-openid',amount=10)]
+        self.a._save(self.key,saved)
+        self.response['receivers']=[dict(type='PERSONAL_SUB_OPENID',account='private-openid',amount=10,
+            result='SUCCESS',detail_id='synthetic-detail',finish_time='2026-10-16T12:00:00+08:00')]
+        self.accept()
+        result=self.bills.reconcile(self.g,self.bill({'分账接收方':'private-openid'}))
+        self.assertEqual(result['matched_detail_rows'],0)
+        self.assertIn('LOCAL_SIGNED_DETAIL_EVIDENCE_COMPLETENESS',result['pending_evidence'])
+
+        self.a.bindings[identity]['sub_appid']='wx1234567890abcdef'
+        result=self.bills.reconcile(self.g,self.bill({'分账接收方':'private-openid'}))
+        self.assertEqual(result['matched_detail_rows'],1)
+        self.assertEqual(result['status'],'DETAIL_FIELDS_MATCH_RECONCILIATION_PENDING')
+        self.assertEqual(result['finance_status'],'UNCONFIRMED')
 
     def test_duplicate_detail_is_not_double_counted(self):
         self.accept();bill=self.bill();bill['rows']*=2

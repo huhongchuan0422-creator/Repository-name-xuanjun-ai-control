@@ -3278,6 +3278,31 @@ class HistoricalMigration(unittest.TestCase):
                 migration.migrate(self.source, hashes, self.root / 'uncertain')
         self.assertFalse((self.root / 'uncertain').exists()); self.assertEqual(self.hashes(), hashes)
 
+
+    def test_success_syncs_new_target_before_parent_and_parent_failure_cleans_only_target(self):
+        hashes = self.hashes(); target = self.root / 'durable-order'; original = migration._sync; calls = []
+        def record(path, directory=False):
+            calls.append((Path(path), directory))
+            return original(path, directory)
+        with patch.object(migration, '_sync', side_effect=record):
+            result = migration.migrate(self.source, hashes, target)
+        self.assertTrue(result['migration_executed'])
+        self.assertEqual(calls[-2:], [(target, True), (target.parent, True)])
+        self.assertEqual(self.hashes(), hashes)
+
+        failed = self.root / 'parent-sync-failed'; calls = []
+        def fail_parent(path, directory=False):
+            path = Path(path); calls.append((path, directory))
+            if path == failed.parent:
+                raise OSError('parent directory durability unknown')
+            return original(path, directory)
+        with patch.object(migration, '_sync', side_effect=fail_parent):
+            with self.assertRaisesRegex(OSError, 'parent directory durability unknown'):
+                migration.migrate(self.source, hashes, failed)
+        self.assertEqual(calls[-2:], [(failed, True), (failed.parent, True)])
+        self.assertFalse(failed.exists())
+        self.assertEqual(self.hashes(), hashes)
+
     def test_two_concurrent_writers_have_one_new_directory_winner(self):
         from concurrent.futures import ThreadPoolExecutor
         hashes = self.hashes(); target = self.root / 'concurrent'

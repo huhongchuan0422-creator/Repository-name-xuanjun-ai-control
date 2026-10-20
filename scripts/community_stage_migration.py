@@ -15,7 +15,7 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from scripts.community_stage_recovery import NAMES, _private_root, _create, _read
+from scripts.community_stage_recovery import NAMES, _private_root, _create, _read, _sync
 from scripts.community_order_store import DDL as ORDER_SCHEMA
 from scripts.community_merchant_store import SCHEMA as MERCHANT_SCHEMA
 from scripts.community_ad_store import SCHEMA as AD_SCHEMA
@@ -397,11 +397,10 @@ def migrate(source, expected_files, destination):
                     'payment_enabled': False, 'files': files}
         raw = _canonical(manifest)
         _write_private(target, 'snapshot.json', raw)
-        fd = os.open(str(target), os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+        # Durability order: files (in _write_private), completion marker, target
+        # directory entry set, then the parent entry that names this new target.
+        _sync(target, directory=True)
+        _sync(target.parent, directory=True)
         return {'migration_executed': True, 'source_unchanged': True, 'stores': plans,
                 'source_files': dict(expected_files), 'files': files,
                 'manifest_sha256': hashlib.sha256(raw).hexdigest(),

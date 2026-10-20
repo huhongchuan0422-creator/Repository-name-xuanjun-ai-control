@@ -374,6 +374,10 @@ class ProviderBills:
         it cannot cover external initiators, automatic expiry, or bill-date rules.
         """
         c=self.center
+        identity=tuple(g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
+        policy=self.actions.bindings.get(identity)
+        if type(policy) is not dict:
+            raise PermissionError('PROVIDER_SCOPE_NOT_ADMITTED')
         if not c.db.in_transaction:
             with c.tx():return self._split_local_inventory(g,bill)
         captured_at=c.now()
@@ -439,8 +443,11 @@ class ProviderBills:
                 intended=sorted((r['type'],r['account'],r['amount']) for r in payload['receivers'])
                 observed=sorted((r['type'],r['account'],r['amount']) for r in receivers)
                 if (observed!=intended
-                        or any(type(r['amount']) is not int or r['amount']<=0 or r['type'] not in ('MERCHANT_ID','PERSONAL_OPENID')
-                               or type(r['account']) is not str or not r['account'] for r in receivers+payload['receivers'])
+                        or any(type(r['amount']) is not int or r['amount']<=0
+                               or r['type'] not in ('MERCHANT_ID','PERSONAL_OPENID','PERSONAL_SUB_OPENID')
+                               or type(r['account']) is not str or not r['account']
+                               or r['type']=='PERSONAL_SUB_OPENID' and policy.get('sub_appid') is None
+                               for r in receivers+payload['receivers'])
                         or any(r['result'] not in ('SUCCESS','CLOSED') for r in receivers)):raise ValueError()
                 for receiver in receivers:
                     counts['successful_split_details' if receiver['result']=='SUCCESS' else 'closed_split_details']+=1
