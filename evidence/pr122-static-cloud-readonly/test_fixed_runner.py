@@ -519,7 +519,7 @@ class RunnerTests(OfflineCase):
         self.assertEqual(text.count(ge.SOURCE_PLACEHOLDER), 4)
         substituted = text.replace(ge.SOURCE_PLACEHOLDER, SOURCE)
         self.assertEqual(substituted.count("ref: '" + SOURCE + "'"), 3)
-        source_workflow = (Path(__file__).parent / 'pr122-ro-source-tests.yml').read_text()
+        source_workflow = (Path(__file__).parent / 'pr122-staging-readonly-source-tests.yml').read_text()
         self.assertIn('branches: [feature/work-pr122-site-hub-integration-20261016]', source_workflow)
         self.assertNotIn('secrets.', source_workflow)
         self.assertNotIn('RunCommand', source_workflow)
@@ -563,10 +563,8 @@ class LabelBoundaryTests(OfflineCase):
 
     def test_duplicate_label_does_not_allow_second_dispatch(self):
         api = FakeGitHub()
-        api.history = [run(1, 1), run(2, 2), run(3, 3)]
-        api.current = run(3, 3)
-        api.env['GITHUB_RUN_ID'] = '3'
-        api.job_rows[2] = [job(2, 'success')]
+        api.history = [run(1, 1), run(2, 2)]
+        api.job_rows[1] = [job(1, 'success')]
         with self.assertRaisesRegex(ge.Hold, 'HEAD_CLOUD_JOB_ALREADY_STARTED'):
             ge.live_admission(api, api.event, api.env, 'dispatch')
 
