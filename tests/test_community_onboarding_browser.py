@@ -6,6 +6,7 @@ The original Center connection is created and used on the server thread.
 # Hosted bounded diagnostic execution trigger; no behavior change.
 # Execute bounded body-proof fix in applicable Hosted gate.
 import faulthandler
+import json
 import os
 import queue
 import signal
@@ -177,16 +178,17 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     phase('UNREVIEWED_STATUS_BEGIN')
                     self.assertEqual(response.status,400)
                     phase('UNREVIEWED_STATUS_DONE')
-                    phase('UNREVIEWED_BODY_PROBE_BEGIN')
-                    probe=admin.evaluate('''async arg=>{
-                      const r=await fetch('/merchant/onboarding',{method:'POST',credentials:'same-origin',
-                        headers:{'Content-Type':'application/json','X-CSRF-Token':arg.csrf},
-                        body:JSON.stringify({operation:'review',params:{application:arg.application,revision:arg.revision,action:'APPROVE',note:'不得跳过逐份复审'}})});
-                      return {status:r.status,body:await r.json()};
-                    }''',{'csrf':fx.reviewer['csrf'],'application':original_id,'revision':before_unreviewed})
-                    phase('UNREVIEWED_BODY_PROBE_DONE')
-                    self.assertEqual(probe['status'],400)
-                    self.assertEqual(probe['body'].get('error'),'INVALID_REQUEST')
+                    phase('UNREVIEWED_FINISHED_BEGIN')
+                    finished_error=response.finished()
+                    phase('UNREVIEWED_FINISHED_DONE')
+                    self.assertIsNone(finished_error)
+                    phase('UNREVIEWED_BODY_BEGIN')
+                    raw=response.body()
+                    phase('UNREVIEWED_BODY_DONE')
+                    self.assertTrue(raw)
+                    reply=json.loads(raw.decode('utf-8'))
+                    phase('UNREVIEWED_JSON_DONE')
+                    self.assertEqual(reply.get('error'),'INVALID_REQUEST')
                     phase('UNREVIEWED_APPROVE_REJECTED')
                     expect(admin.locator('#status')).to_contain_text('资料、状态或版本不符合要求')
                     expect(admin.locator('[data-action=APPROVE]')).to_be_enabled()
