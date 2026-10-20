@@ -94,6 +94,10 @@ class Coordinator:
                    "state TEXT NOT NULL, detail TEXT NOT NULL)")
         # Historic isolated round rows are preserved, but are not admission or quota.
         db.execute("CREATE TABLE IF NOT EXISTS coordinator_failures (seq INTEGER PRIMARY KEY, installation TEXT, cause TEXT, observed INTEGER, evidence TEXT)")
+        cols = [x[1] for x in db.execute("PRAGMA table_info(coordinator_failures)")]
+        if "event_key" not in cols:
+            db.execute("ALTER TABLE coordinator_failures ADD COLUMN event_key TEXT")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS coordinator_failure_event_key ON coordinator_failures(event_key)")
         return self
 
     def __exit__(self, *args):
@@ -227,23 +231,78 @@ class Coordinator:
                            self._verify_previous)
         return self._reconcile(request, launch=True)
 
-    def _automatic_failure(self, request, cause):
-        # A stable (attempt,cause) key prevents repeated readbacks from
-        # inflating the escalation budget or erasing earlier evidence.
-        stored = self.journal.db.execute(
-            "SELECT evidence FROM coordinator_failures WHERE installation=? AND cause=?",
-            (request["installation_id"],cause)).fetchall()
-        for (raw,) in stored:
+    def _record_failure(self, request, cause, evidence, event_id):
+        """Append one genuine failure, preserving legacy rows and first UTC.
+
+        Identity comes from an actual failed operation/event, never the changing
+        observation receipt or current wall clock. No dedupe based on cause alone.
+        """
+        _valid(request)
+        require(self._stored(request["attempt_id"]) == request, "FAILURE_IDENTITY")
+        require(type(cause) is str and ID.fullmatch(cause), "FAILURE_CAUSE")
+        require(type(event_id) is str and ID.fullmatch(event_id), "FAILURE_EVENT_ID")
+        require(type(evidence) is dict and len(canonical(evidence)) <= 8192, "FAILURE_EVIDENCE")
+        key = digest([request["installation_id"], request.get("round_id", "DEFAULT"),
+                      request["batch_id"], request["attempt_id"], event_id])
+        if self.journal.db.execute(
+                "SELECT 1 FROM coordinator_failures WHERE event_key=?", (key,)).fetchone():
+            return False
+        # Preserve original data and digest only references which are verifiable.
+        details = dict(evidence)
+        references = {}
+        for label in ("receipt", "commit_receipt"):
+            rec = evidence.get(label)
+            if rec is None:
+                references[label] = {"status":"UNKNOWN"}
+            else:
+                try:
+                    _check_receipt_reference(request, rec)
+                    references[label] = {"status":"VERIFIED", "path":rec["path"],
+                                         "sha256":rec["sha256"]}
+                except (Hold, OSError, ValueError, KeyError):
+                    references[label] = {"status":"UNKNOWN"}
+        log = evidence.get("log")
+        if type(log) is str and os.path.isabs(log):
             try:
-                if json.loads(raw).get("attempt_id") == request["attempt_id"]:
-                    return
-            except ValueError:
-                continue
+                path = Path(log)
+                require(Path(request["root"]).resolve() in path.parents and
+                        not path.is_symlink() and path.is_file(), "FAILURE_LOG_UNSAFE")
+                content = path.read_bytes()
+                require(len(content) <= 1048576, "FAILURE_LOG_TOO_LARGE")
+                references["log"] = {"status":"VERIFIED","path":log,
+                                     "sha256":hashlib.sha256(content).hexdigest()}
+            except (Hold, OSError, ValueError):
+                references["log"] = {"status":"UNKNOWN"}
+        else:
+            references["log"] = {"status":"UNKNOWN"}
+        saved = {"event_id":event_id,"event_key":key,"cause":cause,
+                 "installation_id":request["installation_id"],
+                 "round_id":request.get("round_id","DEFAULT"),
+                 "batch_id":request["batch_id"],"attempt_id":request["attempt_id"],
+                 "request_sha256":digest(request),
+                 "operation_id":evidence.get("operation_id") or "UNKNOWN",
+                 "config_sha256":evidence.get("config_sha256") or "UNKNOWN",
+                 "error":evidence.get("error",{"code":cause}),
+                 "references":references, "checkpoint":evidence.get("checkpoint","UNKNOWN")}
         self.journal.db.execute(
-            "INSERT INTO coordinator_failures(installation,cause,observed,evidence) VALUES (?,?,?,?)",
-            (request["installation_id"],cause,self.now(),
-             canonical({"attempt_id":request["attempt_id"],
-                        "request_sha256":digest(request)}).decode("ascii")))
+            "INSERT OR IGNORE INTO coordinator_failures(installation,cause,observed,evidence,event_key) VALUES(?,?,?,?,?)",
+            (request["installation_id"],cause,self.now(),canonical(saved).decode("ascii"),key))
+        return True
+
+    def _automatic_failure(self, request, cause, response=None):
+        response = response if type(response) is dict else {}
+        err = response.get("error")
+        if type(err) is not dict:
+            err = {"code":cause}
+        operation = response.get("operation_id") or "UNKNOWN"
+        # One actual failed operation+error event; observations never add events.
+        event_id = "auto-" + digest([request["attempt_id"], operation,
+                                     err.get("code",cause)])[:32]
+        self._record_failure(request,cause,
+            {"operation_id":operation,"config_sha256":response.get("config_sha256"),
+             "error":err,"receipt":response.get("receipt"),
+             "commit_receipt":response.get("commit_receipt"),
+             "log":err.get("log"),"checkpoint":"RECONCILE_REQUIRED"},event_id)
 
     def _reconcile(self, request, launch=False):
         adapter = self._adapter(request["batch_id"])
@@ -298,10 +357,11 @@ class Coordinator:
                     (request["attempt_id"],"FAIL",self.now(),
                      canonical({"result":"VERIFIED_NO_EFFECT"}).decode("ascii")))
                 return _receipt(request, "NO_EFFECT", rec)
-            self._automatic_failure(request,"UNKNOWN_EFFECT")
+            self._automatic_failure(request,"UNKNOWN_EFFECT",result)
             return _receipt(request, "HOLD", error={"code":"UNKNOWN_EFFECT"})
         except (OSError, ValueError, KeyError, Hold) as exc:
-            self._automatic_failure(request,"RECONCILE_REQUIRED")
+            self._automatic_failure(request,"RECONCILE_REQUIRED",
+                                    {"error":{"code":str(exc),"class":type(exc).__name__}})
             return _receipt(request, "HOLD",
                             error={"code":"RECONCILE_REQUIRED",
                                    "detail":type(exc).__name__})
@@ -357,12 +417,9 @@ class Coordinator:
         return {"status":"RECORDED","kind":kind}
 
     def failure(self, request, cause, evidence):
-        _valid(request)
-        require(self._stored(request["attempt_id"]) == request, "FAILURE_IDENTITY")
-        require(type(cause) is str and ID.fullmatch(cause), "FAILURE_CAUSE")
-        require(type(evidence) is dict and len(canonical(evidence)) <= 4096, "FAILURE_EVIDENCE")
-        self.journal.db.execute("INSERT INTO coordinator_failures(installation,cause,observed,evidence) VALUES(?,?,?,?)",
-                                (request["installation_id"],cause,self.now(),canonical(evidence).decode("ascii")))
+        require(type(evidence) is dict and type(evidence.get("event_id")) is str,
+                "FAILURE_EVENT_ID_REQUIRED")
+        return self._record_failure(request,cause,evidence,evidence["event_id"])
 
     def tick(self):
         """Deterministic, idempotent timeout events; never claims wake ACK."""
@@ -394,19 +451,46 @@ class Coordinator:
                                 "deadline_utc":request["deadline_utc"]}).decode("ascii")))
                 output.append({"attempt_id":attempt,"event":event,
                                "delivery":"UNAVAILABLE","id":key})
-        for installation, cause, count, first in self.journal.db.execute(
-                "SELECT installation,cause,COUNT(*),MIN(observed) FROM coordinator_failures GROUP BY installation,cause"):
-            elapsed = self.now()-first
-            for event, due in (("CHANGE_METHOD_30M",elapsed >= 1800),
-                               ("REPORT_DOTS_10_OR_60",count >= 10 or elapsed >= 3600)):
-                if due:
-                    key = digest([installation,cause,event])
+        # Preserve legacy rows. Aggregate a round across batches/causes;
+        # only the method-change deadline is per identical root cause.
+        groups = {}
+        for installation, cause, observed, raw in self.journal.db.execute(
+                "SELECT installation,cause,observed,evidence FROM coordinator_failures ORDER BY seq"):
+            try:
+                evidence = json.loads(raw)
+            except ValueError:
+                evidence = {}
+            rid = evidence.get("round_id")
+            if not rid:
+                attempt = evidence.get("attempt_id")
+                stored = self._stored(attempt) if attempt else None
+                rid = stored.get("round_id","DEFAULT") if stored else "DEFAULT"
+            round_key = (installation,rid)
+            state = groups.setdefault(round_key,{"count":0,"first":observed,"causes":{}})
+            state["count"] += 1
+            state["first"] = min(state["first"],observed)
+            state["causes"][cause] = min(state["causes"].get(cause,observed),observed)
+        for (installation,rid),state in groups.items():
+            for cause,first in state["causes"].items():
+                if self.now()-first >= 1800:
+                    event = "CHANGE_METHOD_30M"
+                    key = digest([installation,rid,cause,event])
                     self.journal.db.execute("INSERT OR IGNORE INTO coordinator_outbox VALUES (?,?,?,?,?)",
                         (key,installation,event,"UNAVAILABLE",
-                         canonical({"cause":cause,"failures":count,"first_utc":first,
-                                    "recipient":"DOTS","next":"propose alternative and evaluate"}).decode("ascii")))
-                    output.append({"installation_id":installation,"event":event,
-                                   "delivery":"UNAVAILABLE","id":key})
+                         canonical({"round_id":rid,"cause":cause,"first_utc":first,
+                                    "recipient":"DOTS","next":"change method"}).decode("ascii")))
+                    output.append({"installation_id":installation,"round_id":rid,
+                                   "event":event,"delivery":"UNAVAILABLE","id":key})
+            if state["count"] >= 10 or self.now()-state["first"] >= 3600:
+                event = "REPORT_DOTS_10_OR_60"
+                key = digest([installation,rid,event])
+                self.journal.db.execute("INSERT OR IGNORE INTO coordinator_outbox VALUES (?,?,?,?,?)",
+                    (key,installation,event,"UNAVAILABLE",
+                     canonical({"round_id":rid,"failures":state["count"],
+                                "first_utc":state["first"],"recipient":"DOTS",
+                                "next":"evaluate a different method"}).decode("ascii")))
+                output.append({"installation_id":installation,"round_id":rid,
+                               "event":event,"delivery":"UNAVAILABLE","id":key})
         return output
 
 def cli():
