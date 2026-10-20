@@ -51,6 +51,40 @@ class SnapshotTests(unittest.TestCase):
   try:r=subprocess.run([sys.executable,'-I','-B','-S','-c',code],pass_fds=(fd,),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
   finally:os.close(fd)
   self.assertEqual(r.returncode,2,r.stderr);value=json.loads((out/'result.json').read_text());self.assertEqual(value['capture'],'BOUNDED_SOURCE_CAPTURED');self.assertEqual(value['dependency_closure'],'UNKNOWN');self.assertEqual(value['state'],'HOLD');self.assertTrue((out/'manifest.json').exists())
+ def test_wrapper_source_pin_grammar_and_wrong_host(self):
+  wrapper=P.parents[1]/'docs/p2-b5-20261020/SNAPSHOT_CANDIDATE.sh'
+  code=wrapper.read_text().split("<<'PY'\n",1)[1].rsplit('\nPY',1)[0]
+  tree=ast.parse(code,feature_version=(3,6));values={n.targets[0].id:ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and isinstance(n.targets[0],ast.Name) and n.targets[0].id in ('SOURCE_SHA','SOURCE_COMMIT')}
+  self.assertEqual(values['SOURCE_SHA'],hashlib.sha256(P.read_bytes()).hexdigest())
+  r=subprocess.run([sys.executable,'-I','-B','-S','-'],input=code.encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  self.assertNotEqual(r.returncode,0);self.assertIn(b'HOLD_HOST_ROOT',r.stderr)
+ def test_elf_missing_and_ambiguous_candidates_hold(self):
+  first=self.tree();second=self.tree()
+  with tarfile.open(fileobj=io.BytesIO(),mode='w|') as tar:
+   c=m.Collector(tar);c.elf=[{'path':'node','dependencies':{'interpreter':None,'needed':['a.so']}}]
+   with patch.object(m,'SYSROOTS',(str(first),str(second))):m.capture_libraries(c)
+   self.assertEqual(c.holds[0]['reason'],'ELF_LIBRARY_MISSING_OR_AMBIGUOUS')
+   (first/'a.so').write_bytes(b'x');(second/'a.so').write_bytes(b'y');c.holds=[]
+   with patch.object(m,'SYSROOTS',(str(first),str(second))):m.capture_libraries(c)
+   self.assertEqual(c.holds[0]['reason'],'ELF_LIBRARY_MISSING_OR_AMBIGUOUS');self.assertEqual(c.files,0)
+ def test_uid1002_writes_by_fd_without_private_parent_access(self):
+  parent=self.tree();out=parent/'uid1002';out.mkdir(mode=0o700)
+  try:os.chown(str(out),1002,1002)
+  except OSError:
+   if os.environ.get('B5_REQUIRE_UID1002')=='1':raise
+   self.skipTest('local chown unavailable; Hosted sudo test required')
+  fd=os.open(str(out),os.O_RDONLY|os.O_DIRECTORY)
+  code=P.read_text()+"\nNODE='/root/nonexistent-b5-source';SDK='/root/nonexistent-b5-sdk';PINS={};raise SystemExit(collect(%d))\n"%fd
+  # Rename main guard so this fixture exercises collect, not UK identity acceptance.
+  code=code.replace("if __name__=='__main__':", "if False:")
+  def drop():os.setgroups([]);os.setgid(1002);os.setuid(1002)
+  try:
+   try:r=subprocess.run([sys.executable,'-I','-B','-S','-'],input=code.encode(),pass_fds=(fd,),preexec_fn=drop,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+   except subprocess.SubprocessError:
+    if os.environ.get('B5_REQUIRE_UID1002')=='1':raise
+    self.skipTest('local setuid unavailable; Hosted sudo test required')
+  finally:os.close(fd)
+  self.assertEqual(r.returncode,2,r.stderr);result=json.loads((out/'result.json').read_text());self.assertEqual(result['state'],'HOLD');self.assertEqual((out/'result.json').stat().st_uid,1002);self.assertEqual(parent.stat().st_mode&0o777,0o700)
  def test_depth_and_time_fail_closed(self):
   root=self.tree()
   with tarfile.open(fileobj=io.BytesIO(),mode='w|') as tar:
