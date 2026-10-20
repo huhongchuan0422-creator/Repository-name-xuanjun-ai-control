@@ -68,6 +68,16 @@ class DockerE2E(unittest.TestCase):
             self.assertEqual(first,second)
             self.assertEqual(before.st_ino,(work/'proof.json').stat().st_ino)
             self.assertFalse((root/'data/ledger.sqlite3').exists());self.assertFalse((root/'run/ledger.sock').exists())
+            # Identical bytes at a replacement inode must not be accepted by
+            # replaying the old exited containers' success logs.
+            cp07=root/'prepared/CP07-committed.json';old=cp07.read_bytes()
+            cp07.rename(root/'prepared/CP07-held-original.json')
+            cp07.write_bytes(old);cp07.chmod(0o400);os.chown(str(cp07),1002,1002)
+            with self.assertRaisesRegex(ValueError,'OBSERVATION_TARGET_CHANGED'):
+                h.install(stage,work,logs,root,image,binary['path'],producer,fixture=True)
+            config_path=root/'binding-config.json';config_path.write_bytes(config_path.read_bytes()+b' ')
+            with self.assertRaisesRegex(ValueError,'IMMUTABLE_CONFLICT'):
+                h.install(stage,work,logs,root,image,binary['path'],producer,fixture=True)
             # This disposable Hosted-only cleanup is never present in the UK
             # wrapper. Inspect each owned label before deleting TEST containers.
             for name in ('execute','observe','recover-1','inspect','recover-2'):
