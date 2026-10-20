@@ -158,7 +158,7 @@ class CoordinatorTests(unittest.TestCase):
         with self.open() as c:
             c._store(req)
             for i in range(6):
-                c.failure(req,"same-cause",{"sequence":i})
+                c.failure(req,"same-cause",{"event_id":"event-"+str(i),"sequence":i})
         with self.open() as c:
             for i in range(6,10):
                 c.failure(req,"same-cause",{"sequence":i})
@@ -169,6 +169,40 @@ class CoordinatorTests(unittest.TestCase):
             c.tick()
             saved = c.journal.db.execute("SELECT COUNT(*) FROM coordinator_outbox WHERE event='REPORT_DOTS_10_OR_60'").fetchone()[0]
             self.assertEqual(saved,1)
+
+    def test_failure_identity_evidence_and_reopen(self):
+        req=self.request("evidence")
+        original_time=100
+        log=Path(self.component)/"error.log"
+        log.write_text("actual-error")
+        payload={"event_id":"actual-failure-1","error":{"code":"PROCESS_EXITED"},
+                 "operation_id":"operation-1","log":str(log)}
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:original_time) as c:
+            c._store(req)
+            self.assertTrue(c.failure(req,"PROCESS_EXITED",payload))
+            self.assertFalse(c.failure(req,"PROCESS_EXITED",payload))
+            first=c.journal.db.execute("SELECT observed,evidence FROM coordinator_failures").fetchone()
+            details=json.loads(first[1])
+            self.assertEqual(details["references"]["log"]["sha256"],hashlib.sha256(b"actual-error").hexdigest())
+        with Coordinator(self.root,self.plan,component_roots={"one":self.component},
+                         now=lambda:original_time+100) as c:
+            self.assertFalse(c.failure(req,"PROCESS_EXITED",payload))
+            self.assertEqual(c.journal.db.execute("SELECT COUNT(*) FROM coordinator_failures").fetchone()[0],1)
+            self.assertEqual(first,c.journal.db.execute("SELECT observed,evidence FROM coordinator_failures").fetchone())
+
+    def test_round_across_causes_and_nodes(self):
+        req=self.request("failed-base")
+        with self.open() as c:
+            c._store(req)
+            for index in range(10):
+                cause="CAUSE_A" if index%2 else "CAUSE_B"
+                c.failure(req,cause,{"event_id":"distinct-"+str(index)})
+            alerts=c.tick()
+            self.assertEqual(len([x for x in alerts if x.get("event")=="REPORT_DOTS_10_OR_60"]),1)
+            c.tick()
+            self.assertEqual(c.journal.db.execute(
+                "SELECT COUNT(*) FROM coordinator_outbox WHERE event='REPORT_DOTS_10_OR_60'").fetchone()[0],1)
 
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
