@@ -159,6 +159,10 @@ receipt={'host':'iZmj7a5kwr75qc1tul4kf9Z','status':'PASS_WORKSPACE_REPAIR_AND_ST
 save(WORK/'receipt.json',receipt);print(json.dumps(receipt,sort_keys=True),flush=True)
 '''
 
+
+def gateway_is_stopped(state,has_children,masked):
+    return state.get('ActiveState') in ('inactive','failed') and state.get('MainPID')=='0' and not has_children and masked
+
 def main():
     if os.geteuid()!=0 or os.uname().nodename.split('.')[0]!='iZ6wee8q9z4t03hvqumwfhZ':raise RuntimeError('SOURCE_IDENTITY')
     os.umask(0o077)
@@ -181,7 +185,15 @@ def main():
     m['require'](not any((JOB/(x+'.intent.json')).exists() for x in ('real_model_canary','korea_local_route','domestic_reverse_route','persist_target')),'LATER_STAGE_ALREADY_ATTEMPTED')
     for unit in m['TUNNELS']+m['SYSTEM_SOURCE']:
         s=m['show'](unit);m['require'](s['ActiveState']=='inactive' and s['MainPID']=='0','SOURCE_FENCE_LOST')
-    s=m['show']('openclaw-gateway.service',True);m['require'](s['ActiveState']=='inactive' and s['MainPID']=='0','SOURCE_GATEWAY_FENCE_LOST')
+    s=m['show']('openclaw-gateway.service',True)
+    has_children=False
+    for proc in Path('/proc').iterdir():
+        if not proc.name.isdigit():continue
+        try:
+            if 'openclaw-gateway.service' in (proc/'cgroup').read_text():has_children=True
+        except (FileNotFoundError,ProcessLookupError):pass
+    mask=Path('/run/user/1000/systemd/user/openclaw-gateway.service')
+    m['require'](gateway_is_stopped(s,has_children,mask.is_symlink() and os.readlink(mask)=='/dev/null'),'SOURCE_GATEWAY_FENCE_LOST')
     RECOVERY.mkdir(mode=0o700);journal=m['Checkpoint'](RECOVERY)
     print('CHECKPOINT='+str(RECOVERY),flush=True)
     def repair():
