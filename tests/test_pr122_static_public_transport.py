@@ -478,5 +478,49 @@ class PublicCoordinatorBudgetTests(_PublicFixture, unittest.TestCase):
         self.assertIsNone(child['intent'])
 
 
+    def test_restart_low_budget_after_backup_interrupt_does_not_burn_remaining_attempts(self):
+        """Regression: safe recovery must stop when fresh public budget is insufficient."""
+        fixture = self.adapter_fixture()
+        original_execute = fixture.ops.execute
+        interrupted = [False]
+
+        def interrupt_before_seal(stage, lease):
+            # Coordinator intent is durable, but no SEALED_BUNDLE child effect or
+            # child intent has started. This is the exact safe retry boundary.
+            if stage == 'SEALED_BUNDLE' and not interrupted[0]:
+                interrupted[0] = True
+                raise KeyboardInterrupt('offline before seal effect')
+            return original_execute(stage, lease)
+
+        fixture.ops.execute = interrupt_before_seal
+        with self.assertRaises(KeyboardInterrupt):
+            self.run_adapter(fixture)
+        self.assertEqual(fixture.events, ['backup'])
+        first = json.loads(fixture.coordinator.path.read_bytes())
+        self.assertEqual(len(first['attempts']), 1)
+        self.assertIn('BACKUP_VERIFIED', first['checkpoints'])
+        child = json.loads(fixture.ops.t.receipt.read_bytes())
+        self.assertEqual(child['completed'], ['BACKUP_VERIFIED'])
+        self.assertIsNone(child['intent'])
+
+        # New process gets a fresh 54-request local context. Read-only reconcile
+        # proves SAFE_TO_RETRY, but by the next phase admission only 39 remain
+        # while SEALED_BUNDLE requires 42. No seal effect is allowed, and that
+        # no-effect budget failure must not consume attempts 3..5.
+        fixture.ops.execute = original_execute
+        self.requests.clear()
+        process = os.getpid()
+        with patch.object(dual.os, 'getpid', return_value=process + 1):
+            with self.assertRaises(Denied):
+                self.run_adapter(fixture)
+
+        ledger = json.loads(fixture.coordinator.path.read_bytes())
+        self.assertEqual(fixture.events, ['backup'])
+        self.assertEqual(child['completed'], ['BACKUP_VERIFIED'])
+        self.assertEqual(len(ledger['attempts']), 2)
+        self.assertEqual(ledger['state'], 'HOLD')
+        self.assertEqual(len(self.requests), 15)
+
+
 if __name__ == '__main__':
     unittest.main()
