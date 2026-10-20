@@ -1,0 +1,36 @@
+name: P2 B5 source inputs only
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - 'production/p2_install/b5_inputs.py'
+      - 'tests/p2_install/test_b5_*'
+      - '.github/workflows/p2-b5-inputs.yml'
+permissions:
+  contents: read
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -B tests/p2_install/test_b5_inputs.py -v
+      - run: python -B production/p2_install/b5_inputs.py prepare --output "$RUNNER_TEMP/b5-inputs"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2-b5-source-inputs-python${{ matrix.python }}
+          path: ${{ runner.temp }}/b5-inputs/
+  original-guard-negatives:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Existing runner Node, no runtime installation
+        run: node --version
+      - name: Original guard component tests; not OpenClaw registration
+        run: sudo "$(command -v node)" tests/p2_install/test_b5_guards.mjs
