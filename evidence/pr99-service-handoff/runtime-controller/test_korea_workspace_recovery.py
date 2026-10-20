@@ -30,3 +30,11 @@ class WorkspaceRecoveryTests(unittest.TestCase):
   self.assertNotIn('.unlink(',source)
   self.assertNotIn("'unmask'",source)
   self.assertIn("'original_start_unknown_preserved':True",source)
+
+class SourceStoppedStateTests(unittest.TestCase):
+ def test_failed_empty_masked_service_is_stopped(self):
+  self.assertTrue(r.gateway_is_stopped({'ActiveState':'failed','MainPID':'0'},False,True))
+  self.assertTrue(r.gateway_is_stopped({'ActiveState':'inactive','MainPID':'0'},False,True))
+ def test_live_children_or_missing_mask_still_refused(self):
+  for state,children,masked in [({'ActiveState':'active','MainPID':'10'},False,True),({'ActiveState':'failed','MainPID':'0'},True,True),({'ActiveState':'failed','MainPID':'0'},False,False)]:
+   self.assertFalse(r.gateway_is_stopped(state,children,masked))
