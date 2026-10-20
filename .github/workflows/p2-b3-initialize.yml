@@ -1,0 +1,28 @@
+name: P2 B3 new isolated initialization
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - 'production/p2_install/initialize.py'
+      - 'tests/p2_install/test_initialize.py'
+      - '.github/workflows/p2-b3-initialize.yml'
+  pull_request:
+    paths:
+      - 'production/p2_install/initialize.py'
+      - 'tests/p2_install/test_initialize.py'
+      - '.github/workflows/p2-b3-initialize.yml'
+permissions:
+  contents: read
+jobs:
+  initialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python }}'
+      - run: python -B tests/p2_install/test_initialize.py -v
