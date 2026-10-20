@@ -1,0 +1,37 @@
+name: PR122 showcase readonly candidate
+on:
+  push:
+    branches: [feature/work-pr122-site-hub-integration-20261016]
+    paths:
+      - scripts/pr122_showcase_readonly.py
+      - tests/pr122_showcase_readonly/**
+      - docs/development/showcase-readonly/**
+      - .github/workflows/pr122-showcase-readonly.yml
+permissions:
+  contents: read
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Isolated synthetic files only - no server or configuration reads
+        run: sudo "$(command -v python)" -B -m unittest discover -s tests/pr122_showcase_readonly -v
+      - name: Candidate syntax
+        run: sh -n docs/development/showcase-readonly/CANDIDATE.sh
+      - name: Source candidate only - never host data
+        run: |
+          mkdir -p candidate/scripts candidate/docs/development/showcase-readonly
+          cp scripts/pr122_showcase_readonly.py candidate/scripts/
+          cp docs/development/showcase-readonly/* candidate/docs/development/showcase-readonly/
+          cd candidate
+          sha256sum scripts/* docs/development/showcase-readonly/* > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: showcase-readonly-candidate-${{ matrix.python }}
+          path: candidate/
