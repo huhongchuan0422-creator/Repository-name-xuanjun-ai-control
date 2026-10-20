@@ -328,6 +328,22 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
     self.assertTrue(set(value.__code__.co_freevars)<={'__class__'})
 
 
+
+ def test_existing_adapter_clone_still_checks_lease_before_mutation(self):
+  from scripts import pr122_static_operations as adapter
+  from scripts.pr122_customer_core import Denied
+  from types import SimpleNamespace
+  module=self.fresh();self.synthetic_helper(module);cls=module.Transaction
+  transaction=object.__new__(cls);transaction.folder=self.root/'never-created';transaction.ops=SimpleNamespace()
+  target=object.__new__(adapter.OriginalStaticOperations);target.t=transaction;target.u=module;target.c=module.c
+  calls=[]
+  def guard():
+   calls.append('lease')
+   if len(calls)>1:raise Denied('SYNTHETIC_EXPIRED_LEASE')
+  with self.assertRaisesRegex(Denied,'SYNTHETIC_EXPIRED_LEASE'):
+   target._original_action('backup',SimpleNamespace(assert_active=guard),{})
+  self.assertEqual(len(calls),2);self.assertFalse(transaction.folder.exists())
+
  def test_actual_source_gate_uses_authenticated_synthetic_helper(self):
   module=self.fresh();self.synthetic_helper(module)
   root=self.root/'source';(root/'scripts').mkdir(parents=True)
