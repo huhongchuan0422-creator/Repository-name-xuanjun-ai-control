@@ -33,7 +33,7 @@ jobs:
           python3 -B -m unittest discover -s tests/p2_b5_retained -v
           python3 -B -m unittest discover -s tests/p2_b5_binding -v
 
-      - name: Package source preparation only - no SDK or server data
+      - name: Package source and fixed SDK byte evidence - no runtime execution
         run: |
           mkdir -p candidate/production/p2_install candidate/scripts candidate/tests/p2_install candidate/tests/p2_b5_binding candidate/docs/p2-b5-20261020 candidate/evidence/p2-b5-20261020 candidate/tests/p2_b5_retained
           cp production/p2_install/b5_combined_contract.mjs production/p2_install/b5_loader_contract.mjs candidate/production/p2_install/

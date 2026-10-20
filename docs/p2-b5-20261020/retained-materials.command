@@ -18,6 +18,6 @@ try:
         raise RuntimeError('HOLD_SOURCE_SHA')
     signal.alarm(0)
 except Exception as exc:
-    print(json.dumps({'state':'HOLD_SOURCE_NOT_STARTED','error':type(exc).__name__,'sdk':'NOT_EXECUTED'}));raise SystemExit(2)
+    print(json.dumps({'state':'HOLD_SOURCE_NOT_STARTED','error_type':type(exc).__name__,'error':str(exc)[:300],'http_status':getattr(exc,'code',None),'errno':getattr(exc,'errno',None),'sdk':'NOT_EXECUTED'}));raise SystemExit(2)
 exec(compile(raw,'<sha256-verified-b5-retained-bootstrap>','exec'),{'__name__':'__main__'})
 B5_RETAINED_CANDIDATE

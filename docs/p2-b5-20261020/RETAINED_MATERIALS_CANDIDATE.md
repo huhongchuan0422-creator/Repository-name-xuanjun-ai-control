@@ -7,7 +7,7 @@ NOT_EXECUTED; requires Owner confirmation of this exact scope before UK executio
 The exact standalone command is [retained-materials.command](retained-materials.command); the exact byte/operation limits and input SHA are in [retained-materials-candidate.json](retained-materials-candidate.json).
 
 Bootstrap SHA256: `8d76be9bbf136ffec7ad9c98d141b6fd904d24458e4e68219e19dc6aa7220770` (42663 bytes), immutable Git blob `897a47af10c63d446306aca726f5fbdd303ff7a6`.
-Command SHA256: `7bd227ada706d787f3d2c33ba0e7d64840aa28cc47b625e8f79620acbdb9e875`.
+Command SHA256: `7d4c968db3a3a692a97354ac8bca597d7fe08843f2a95581dae8f137a948be8b`.
 
 The command checks fixed UK/root/Python3.6.8, fetches only this public tool blob from GitHub HTTPS (45s total/30s read timeout/128KiB envelope), verifies Git blob identity/size plus full SHA256, then executes the verified Python tool. No credentials or SDK are downloaded. Bootstrap includes lossless copies of the existing pinned archive reader, existing static ELF analyzer and fixed156-frontier; these support bytes are SHA-checked before use, not redeveloped collectors.
 

@@ -3,7 +3,7 @@
   "bootstrap_git_blob": "897a47af10c63d446306aca726f5fbdd303ff7a6",
   "bootstrap_sha256": "8d76be9bbf136ffec7ad9c98d141b6fd904d24458e4e68219e19dc6aa7220770",
   "candidate": "B5_RETAINED_MATERIALS_V1",
-  "command_sha256": "7bd227ada706d787f3d2c33ba0e7d64840aa28cc47b625e8f79620acbdb9e875",
+  "command_sha256": "7d4c968db3a3a692a97354ac8bca597d7fe08843f2a95581dae8f137a948be8b",
   "execution": "NOT_EXECUTED_REQUIRES_SPECIFIC_OWNER_CONFIRMATION",
   "frontier_sha256": "0ff682af0549837ffb7399fdd3964b37f6c2d817d518486ea2c591f30aff3977",
   "limits": {
