@@ -515,11 +515,29 @@ class PublicCoordinatorBudgetTests(_PublicFixture, unittest.TestCase):
                 self.run_adapter(fixture)
 
         ledger = json.loads(fixture.coordinator.path.read_bytes())
+        child_after = json.loads(fixture.ops.t.receipt.read_bytes())
         self.assertEqual(fixture.events, ['backup'])
-        self.assertEqual(child['completed'], ['BACKUP_VERIFIED'])
+        self.assertEqual(child_after['completed'], ['BACKUP_VERIFIED'])
+        self.assertIsNone(child_after['intent'])
         self.assertEqual(len(ledger['attempts']), 2)
         self.assertEqual(ledger['state'], 'HOLD')
+        self.assertEqual(ledger['intent']['stage'], 'SEALED_BUNDLE')
         self.assertEqual(len(self.requests), 15)
+
+        # Another process restart must reconcile the same checkpoint and stop at
+        # the same attempt count rather than spending attempts 3..5.
+        self.requests.clear()
+        with patch.object(dual.os, 'getpid', return_value=process + 2):
+            with self.assertRaises(self.workflow.WorkflowStopped):
+                fixture.coordinator.run()
+        restarted = json.loads(fixture.coordinator.path.read_bytes())
+        child_restarted = json.loads(fixture.ops.t.receipt.read_bytes())
+        self.assertEqual(len(restarted['attempts']), 2)
+        self.assertEqual(restarted['state'], 'HOLD')
+        self.assertEqual(restarted['intent']['stage'], 'SEALED_BUNDLE')
+        self.assertEqual(child_restarted['completed'], ['BACKUP_VERIFIED'])
+        self.assertIsNone(child_restarted['intent'])
+        self.assertEqual(fixture.events, ['backup'])
 
 
 if __name__ == '__main__':
