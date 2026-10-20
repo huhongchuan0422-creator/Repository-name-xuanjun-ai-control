@@ -152,8 +152,8 @@ test('logout from profile revokes retained home and checkout page sessions and p
   assert.equal(checkout.data.userId,'');
   assert.equal(checkout.data.projectCustomerId,'');
   assert.equal(checkout.data.reference,'');
-  assert.deepEqual(checkout.data.notices,[]);
-  assert.deepEqual(checkout.data.orders,[]);
+  assert.equal(checkout.data.notices.length,0);
+  assert.equal(checkout.data.orders.length,0);
   assert.equal(checkout.session,null);
   await assert.rejects(oldCheckoutSession.transport('shop1',{operation:'community.storefront',params:{}}),/SESSION_EXPIRED/);
 });
@@ -230,4 +230,61 @@ test('old login finally cannot unlock a replacement login',async()=>{
   await second;
   assert.equal(home.data.authenticated,true);
   assert.equal(home.data.pending,false);
+});
+
+
+test('late rejected profile save cannot revoke a newer successful login',async()=>{
+  const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
+  await h.page.loginAndLoad();
+  let oldSave;
+  h.wx.request=o=>{
+    h.calls.push(o);
+    if(o.url.endsWith('/mini/login'))return o.success({statusCode:200,data:{payment_enabled:false,result:{
+      session_token:'9'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
+    const op=o.data&&o.data.operation;
+    if(op==='commerce.profile_read')return o.success({statusCode:200,data:{payment_enabled:false,result:{
+      user_id:'user1',project_customer_id:'customer1',nickname:'Fresh',contact:'',version:2}}});
+    if(op==='commerce.profile_update'){oldSave=o;return;}
+  };
+  h.page.setData({nickname:'Old'});
+  const stale=h.page.save();await Promise.resolve();assert.ok(oldSave);
+  authModule.revokePages(h.env.pages,'登录已退出，请重新登录');
+  await h.page.retryLogin();
+  assert.equal(h.page.data.authenticated,true);assert.equal(h.page.data.loaded,true);assert.equal(h.page.data.nickname,'Fresh');
+  oldSave.success({statusCode:403,data:{error:'old denied'}});await stale;
+  assert.equal(h.page.data.authenticated,true);
+  assert.equal(h.page.data.loaded,true);
+  assert.equal(h.page.data.nickname,'Fresh');
+  assert.equal(h.page.data.pending,false);
+  assert.equal(h.page.data.status,'本人资料已读取');
+});
+
+test('late profile save finally cannot release a newer save request lock',async()=>{
+  const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
+  await h.page.loginAndLoad();
+  const updates=[];let freshVersion=1;
+  h.wx.request=o=>{
+    h.calls.push(o);
+    if(o.url.endsWith('/mini/login'))return o.success({statusCode:200,data:{payment_enabled:false,result:{
+      session_token:'8'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
+    const op=o.data&&o.data.operation;
+    if(op==='commerce.profile_read')return o.success({statusCode:200,data:{payment_enabled:false,result:{
+      user_id:'user1',project_customer_id:'customer1',nickname:'Fresh',contact:'',version:freshVersion}}});
+    if(op==='commerce.profile_update'){updates.push(o);return;}
+  };
+  h.page.setData({nickname:'Old'});
+  const stale=h.page.save();await Promise.resolve();assert.equal(updates.length,1);
+  authModule.revokePages(h.env.pages,'登录已退出，请重新登录');
+  await h.page.retryLogin();
+  h.page.setData({nickname:'Newest'});
+  const fresh=h.page.save();await Promise.resolve();assert.equal(updates.length,2);assert.equal(h.page.data.pending,true);
+  updates[0].success({statusCode:500,data:{error:'old failure'}});await stale;
+  assert.equal(h.page.data.pending,true);
+  updates[1].success({statusCode:200,data:{payment_enabled:false,result:{
+    user_id:'user1',project_customer_id:'customer1',nickname:'Newest',contact:'',version:2}}});
+  await fresh;
+  assert.equal(h.page.data.pending,false);
+  assert.equal(h.page.data.nickname,'Newest');
+  assert.equal(h.page.data.version,2);
+  assert.equal(h.page.data.status,'本人资料已保存');
 });
