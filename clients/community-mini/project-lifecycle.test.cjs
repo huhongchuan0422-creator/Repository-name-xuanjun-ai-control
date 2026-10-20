@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const sessionModule=require('./session');
+const auth=require('./customer-auth');
 const event=dataset=>({currentTarget:{dataset}});
 function harness({delayLogin=false}={}) {
   let definition,loginRequest,loginCount=0;
@@ -20,7 +21,7 @@ function harness({delayLogin=false}={}) {
   vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{
     Page:value=>{definition=value;},wx,
     getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid',commerce:false,payments:false}}),
-    require:path=>path==='../../session'?sessionModule:path==='../../client'?{
+    require:path=>path==='../../customer-auth'?auth:path==='../../session'?sessionModule:path==='../../client'?{
       makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})
     }:{createPaymentFlow:()=>({reset(){}})}
   });
