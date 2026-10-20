@@ -35,14 +35,17 @@ Page({
   input(e){const f=e.currentTarget.dataset.field;if(f==='nickname'||f==='contact')this.setData({[f]:e.detail.value});},
   async save(){
     if(this.data.pending||!this.data.authenticated||!this.data.loaded||!this.session)return;
+    const epoch=this._authEpoch,attempt=this._loginAttempt,session=this.session;
+    const saveAttempt=this._saveAttempt=(this._saveAttempt||0)+1;
+    const current=()=>!this._dead&&saveAttempt===this._saveAttempt&&attempt===this._loginAttempt&&
+      auth.active(epoch)&&this.session===session;
     this.setData({pending:true,status:'正在保存'});
     try{
-      const epoch=this._authEpoch,attempt=this._loginAttempt;
-      const r=this.validateProfile(await this.session.commerce(this.scene,'profile_update',{nickname:this.data.nickname,contact:this.data.contact,expected_version:this.data.version}));
-      if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch))return;
+      const r=this.validateProfile(await session.commerce(this.scene,'profile_update',{nickname:this.data.nickname,contact:this.data.contact,expected_version:this.data.version}));
+      if(!current())return;
       this.setData({version:r.version,nickname:r.nickname,contact:r.contact,userId:r.user_id,customerId:r.project_customer_id,status:'本人资料已保存'});
-    }catch(e){if(!this._dead){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else this.setData({status:e.message});}}
-    finally{if(!this._dead)this.setData({pending:false});}
+    }catch(e){if(current()){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else this.setData({status:e.message});}}
+    finally{if(current())this.setData({pending:false});}
   },
   customerSessionRevoked(status='登录已退出，请重新登录'){this._loginAttempt=(this._loginAttempt||0)+1;if(this.session)this.session.clear();this.session=null;if(!this._dead){this.clearPrivate(status);this.setData({pending:false});}},
   async logout(){
