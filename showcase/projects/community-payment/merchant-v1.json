@@ -14,7 +14,7 @@
   },
   "href": "/showcase/projects/community-payment/views/merchant/v1/",
   "role": "merchant",
-  "artifact_sha256": "308f1eeba57874bab286b5d71bc11de691c4425b5e2a27d02282289e9ce99336",
-  "release_artifact_sha256": "8b70880b359b66a5504b75810ad15a49028993efbc3b6462432a0d4f9d4219ca",
+  "artifact_sha256": "c3589fa1d27b6ca8fb904fcab253ee5ce3715a1c08189d57fb03134b7907db8d",
+  "release_artifact_sha256": "afeab5b6676160f5321345de95130319b58b245edd1b3957e6a19b73759257b0",
   "sort_order": 20
 }
