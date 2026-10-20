@@ -151,6 +151,7 @@ test('logout from profile revokes retained home and checkout page sessions and p
   assert.equal(checkout.data.profileContact,'');
   assert.equal(checkout.data.userId,'');
   assert.equal(checkout.data.projectCustomerId,'');
+  assert.equal(checkout.data.reference,'');
   assert.deepEqual(checkout.data.notices,[]);
   assert.deepEqual(checkout.data.orders,[]);
   assert.equal(checkout.session,null);
@@ -171,8 +172,62 @@ test('stack revocation makes a late login callback unable to restore authenticat
   assert.ok(loginReply);
   authModule.revokePages(env.pages,'已退出登录');
   loginReply.success({statusCode:200,data:{payment_enabled:false,result:{
-    session_token:'z'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}});
+    session_token:'z'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
   await pending;
   assert.equal(home.data.authenticated,false);
   assert.match(home.data.status,/退出/);
+});
+
+
+test('profile logout releases pending so explicit relogin is not blocked',async()=>{
+  const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
+  await h.page.loginAndLoad();
+  await h.page.logout();
+  assert.equal(h.page.data.pending,false);
+  await h.page.retryLogin();
+  assert.equal(h.page.data.authenticated,true);
+  assert.equal(h.page.data.loaded,true);
+});
+
+test('late rejected old logout cannot clear a newer successful home login',async()=>{
+  const env=environment();let oldLogout,newLogin;
+  env.wx.request=o=>{
+    env.calls.push(o);
+    if(o.url.endsWith('/mini/login')){
+      if(!newLogin)return o.success({statusCode:200,data:{payment_enabled:false,result:{
+        session_token:'1'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
+      newLogin=o;return;
+    }
+    if(o.url.endsWith('/mini/logout')){oldLogout=o;return;}
+  };
+  const home=loadPage('pages/home/index.js',{env}).page;home.scene='shop1';
+  await home.login();assert.equal(home.data.authenticated,true);
+  const old=home.logout();await Promise.resolve();
+  assert.ok(oldLogout);assert.equal(home.data.pending,false);
+  newLogin=true;
+  const fresh=home.retryLogin();await Promise.resolve();
+  assert.ok(typeof newLogin==='object');
+  newLogin.success({statusCode:200,data:{payment_enabled:false,result:{
+    session_token:'2'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
+  await fresh;assert.equal(home.data.authenticated,true);
+  oldLogout.fail({errMsg:'synthetic old logout failure'});await old;
+  assert.equal(home.data.authenticated,true);
+  assert.equal(home.data.pending,false);
+  assert.equal(home.data.status,'客户身份已验证');
+});
+
+test('old login finally cannot unlock a replacement login',async()=>{
+  const env=environment();const pendingLogins=[];
+  env.wx.request=o=>{env.calls.push(o);if(o.url.endsWith('/mini/login')){pendingLogins.push(o);return;}};
+  const home=loadPage('pages/home/index.js',{env}).page;home.scene='shop1';
+  const first=home.login();await Promise.resolve();assert.equal(home.data.pending,true);
+  authModule.revokePages(env.pages,'登录已退出，请重新登录');
+  const second=home.login();await Promise.resolve();assert.equal(home.data.pending,true);
+  pendingLogins[0].fail({errMsg:'old failure'});await first;
+  assert.equal(home.data.pending,true);
+  pendingLogins[1].success({statusCode:200,data:{payment_enabled:false,result:{
+    session_token:'2'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
+  await second;
+  assert.equal(home.data.authenticated,true);
+  assert.equal(home.data.pending,false);
 });
