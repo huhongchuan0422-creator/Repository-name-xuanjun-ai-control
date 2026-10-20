@@ -13,7 +13,7 @@ permissions:
 # Source is an immutable literal in the actual PR122 branch's only new file.
 # The inert source-branch template is mechanically substituted after source CAS.
 env:
-  READONLY_SOURCE_HEAD: '86afab6e351e1a3d6d90f6e9dd7e4bc7696f023f'
+  READONLY_SOURCE_HEAD: '2e7bdfe773e08c3e4f267069f28e41ddcd04bd76'
 
 # One workflow/action family per exact source HEAD. A later queued label must
 # inspect the earlier finished cloud job, not take a second clean-run path.
@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: '86afab6e351e1a3d6d90f6e9dd7e4bc7696f023f'
+          ref: '2e7bdfe773e08c3e4f267069f28e41ddcd04bd76'
           persist-credentials: false
       - name: Pure mock tests without cloud credentials
         run: python3 -m unittest discover -s evidence/pr122-static-cloud-readonly -p 'test_*.py' -v
@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: '86afab6e351e1a3d6d90f6e9dd7e4bc7696f023f'
+          ref: '2e7bdfe773e08c3e4f267069f28e41ddcd04bd76'
           persist-credentials: false
       - name: Verify current HEAD and complete history; prepare fixed intent
         run: python3 evidence/pr122-static-cloud-readonly/fixed_runner.py prepare-dispatch
@@ -115,7 +115,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: '86afab6e351e1a3d6d90f6e9dd7e4bc7696f023f'
+          ref: '2e7bdfe773e08c3e4f267069f28e41ddcd04bd76'
           persist-credentials: false
       - name: Recover exact prior InvokeId from verified artifacts; query only
         env:
