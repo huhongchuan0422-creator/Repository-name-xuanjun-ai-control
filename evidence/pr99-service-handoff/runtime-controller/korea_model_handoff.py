@@ -448,7 +448,13 @@ def main():
         require(point.get('status')=='PASS_CURRENT_OFFLINE_RECOVERY','CURRENT_PROJECT_NOT_ACCEPTED')
         contracts['project_directory']=point['directory']+'/project';contracts['project_package_sha256']=point['package_sha256']
         shim_tree=ast.parse((PROJECT/'ai_service/restricted_rpc_openai_shim.py').read_text())
-        health_paths={n.value for fn in ast.walk(shim_tree) if isinstance(fn,ast.FunctionDef) and fn.name=='do_GET' for n in ast.walk(fn) if isinstance(n,ast.Constant) and isinstance(n.value,str) and n.value in ('/healthz','/health')}
+        constants={t.id:n.value.value for n in shim_tree.body if isinstance(n,ast.Assign) and isinstance(n.value,ast.Constant) and isinstance(n.value.value,str) for t in n.targets if isinstance(t,ast.Name)}
+        health_paths=set()
+        for fn in ast.walk(shim_tree):
+            if isinstance(fn,ast.FunctionDef) and fn.name=='do_GET':
+                for n in ast.walk(fn):
+                    value=n.value if isinstance(n,ast.Constant) else constants.get(n.id) if isinstance(n,ast.Name) else None
+                    if isinstance(value,str) and value in ('/healthz','/health'):health_paths.add(value)
         require(bool(health_paths),'SHIM_HEALTH_ROUTE_NOT_BOUND')
         contracts['shim_health_path']='/healthz' if '/healthz' in health_paths else '/health'
         connection=http.client.HTTPConnection('127.0.0.1',19445,timeout=10)
