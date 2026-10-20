@@ -47,6 +47,7 @@ rollback(){
  sync "$TX/ROLLED_BACK" 2>/dev/null || { printf '%s\n' ROLLBACK_DURABILITY_UNKNOWN >"$TX/HOLD"; echo ROLLBACK_HOLD; return 1; }
  echo ROLLBACK_COMPLETE
  return 0
+}
 trap 'rc=$?; if rollback; then exit 90; else exit 91; fi' ERR
 test ! -e "$RELEASE";mkdir "$RELEASE"
 tar -xzf "$COMMUNITY_PREVIEW_PACKAGE" -C "$RELEASE"

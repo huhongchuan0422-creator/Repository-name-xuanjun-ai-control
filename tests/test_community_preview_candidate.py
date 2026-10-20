@@ -29,6 +29,9 @@ class PreviewCandidateContract(unittest.TestCase):
   for forbidden in ('systemctl','nginx -t','sudo -n','/etc/nginx'):self.assertNotIn(forbidden,WORKFLOW)
  def test_scope_discloses_mock_login_and_disabled_money(self):
   for phrase in ('test Mock','payments are disabled','Finance remains UNCONFIRMED','not real wx.login/code2session'):self.assertIn(phrase,README)
+ def test_deploy_candidate_is_valid_bash(self):
+  p=subprocess.run(['bash','-n',str(ROOT/'deploy/community-preview/deploy.sh')],cwd=ROOT,text=True,capture_output=True,timeout=10)
+  self.assertEqual(p.returncode,0,p.stdout+p.stderr)
  def test_rollback_covers_external_checks_and_old_objects(self):
   for token in ('current.symlink','$BACKUP/unit','$BACKUP/nginx','$BACKUP/enabled','$BACKUP/active'):self.assertIn(token,DEPLOY)
   trap=DEPLOY.index("trap 'rc=$?; if rollback; then exit 90; else exit 91; fi' ERR")
