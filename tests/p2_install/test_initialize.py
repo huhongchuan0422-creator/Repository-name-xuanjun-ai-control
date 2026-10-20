@@ -29,6 +29,17 @@ else:
 def load():
  s=importlib.util.spec_from_file_location('init_adapter',str(TOOL));m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
 m=load()
+PYTHON_BIN=sys.executable
+CHILD_ENV=dict(os.environ,PYTHONHOME=sys.prefix,
+               LD_LIBRARY_PATH=str(Path(sys.prefix)/'lib')+':'+os.environ.get('LD_LIBRARY_PATH',''))
+if STAGING is not None:
+ # Hosted toolcache permits group writes. Preserve the production protection
+ # check by executing the identical bytes from a private nonwritable copy.
+ executable=Path(STAGING.name)/'python'
+ executable.write_bytes(Path(os.path.realpath(sys.executable)).read_bytes())
+ executable.chmod(0o500)
+ PYTHON_BIN=str(executable)
+CHILD_ENV['P2_TEST_STAGED_TOOL']=str(TOOL)
 
 def snapshot(root):
  return {str(p.relative_to(root)):(m.sha(p.read_bytes()),m.stamp(p.stat())) for p in root.rglob('*') if p.is_file()}
@@ -49,7 +60,7 @@ class InitializationTests(unittest.TestCase):
   (source/'b1-receipt.json').write_bytes(m.encode(receipt))
   cfg=json.loads((REPO/'docs/p2-b3-initialize-20261020/binding-config.json').read_bytes())
   cfg.update(db_path=str(self.root/'data/ledger.sqlite3'),ledger_socket=str(self.root/'run/ledger.sock'))
-  binary=Path(os.path.realpath(sys.executable));raw=binary.read_bytes()
+  binary=Path(os.path.realpath(PYTHON_BIN));raw=binary.read_bytes()
   self.req={'schema':1,'scope':'ISOLATED_TEST_ONLY','origin':'ISOLATED_NEW',
    'installation_id':cfg['installation_id'],'batch_id':cfg['batch_id'],'attempt_id':cfg['attempt_id'],
    'root':str(self.root),'source_root':str(source),'config':cfg,'config_sha256':m.sha(m.encode(cfg)),
@@ -61,11 +72,11 @@ class InitializationTests(unittest.TestCase):
  def tearDown(self):self.temp.cleanup()
  def call(self,action='execute',req=None):
   req=req or self.req
-  p=subprocess.run([sys.executable,'-B','-S',str(TOOL),action,'--request-sha256',m.sha(m.encode(req))],
-   input=m.encode(req),capture_output=True,timeout=15)
+  p=subprocess.run([PYTHON_BIN,'-B','-S',str(TOOL),action,'--request-sha256',m.sha(m.encode(req))],
+   input=m.encode(req),capture_output=True,timeout=15,env=CHILD_ENV)
   self.assertEqual(p.stderr,b'');return json.loads(p.stdout)
  def crash(self,point):
-  p=subprocess.run([sys.executable,'-B',__file__,'--crash',point],input=m.encode(self.req),timeout=15,env=dict(os.environ,P2_TEST_STAGED_TOOL=str(TOOL)))
+  p=subprocess.run([PYTHON_BIN,'-B',__file__,'--crash',point],input=m.encode(self.req),timeout=15,env=CHILD_ENV)
   self.assertEqual(p.returncode,-signal.SIGKILL)
  def test_three_processes_and_duplicate_preserve_original(self):
   first=self.call();self.assertEqual(first['status'],'COMMITTED');before=snapshot(self.root)
