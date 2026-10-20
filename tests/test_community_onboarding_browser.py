@@ -13,6 +13,7 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 import traceback
 import unittest
 from playwright.sync_api import sync_playwright,expect
@@ -194,9 +195,15 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     phase('UNREVIEWED_APPROVE_CLICK')
                     admin.locator('[data-action=APPROVE]').click()
                     phase('UNREVIEWED_APPROVE_CLICK_RETURNED')
-                    admin.wait_for_function('window.__xjApproveObservation&&window.__xjApproveObservation.done===true',timeout=10000)
+                    deadline=time.monotonic()+10
+                    observation=None
+                    while time.monotonic()<deadline:
+                        observation=admin.evaluate('window.__xjApproveObservation')
+                        if observation and observation.get('done'):break
+                        time.sleep(.05)
+                    self.assertIsNotNone(observation)
+                    self.assertTrue(observation.get('done'),'UNREVIEWED_CLONE_TIMEOUT')
                     phase('UNREVIEWED_CLONE_DONE')
-                    observation=admin.evaluate('window.__xjApproveObservation')
                     self.assertEqual(observation['calls'],1)
                     self.assertIsNone(observation['error'])
                     self.assertEqual(observation['method'],'POST')
