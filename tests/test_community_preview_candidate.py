@@ -1,4 +1,4 @@
-import pathlib,re,unittest
+import json,os,pathlib,re,subprocess,tempfile,unittest
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 SERVER=(ROOT/'deploy/community-preview/server.py').read_text()
 NGINX=(ROOT/'deploy/community-preview/nginx.conf').read_text()
@@ -38,10 +38,23 @@ class PreviewCandidateContract(unittest.TestCase):
   self.assertIn('rm -rf --one-file-system "$RELEASE"',DEPLOY)
  def test_connected_mini_candidate_is_exact_and_non_mutating(self):
   self.assertIn("https://community-preview.wenwenwenyiyiyi.work",MINI)
-  self.assertIn("commerce: true",MINI)
-  self.assertIn("payments:false",MINI)
   self.assertIn("request_domain_change_performed:false",MINI)
   self.assertIn("upload_performed:false",MINI)
   self.assertIn('"real_wechat_login_verified": false',CONNECTION)
   self.assertIn('"request_domain_required": "https://community-preview.wenwenwenyiyiyi.work"',CONNECTION)
+  with tempfile.TemporaryDirectory() as tmp:
+   out=pathlib.Path(tmp)/'connected-mini'
+   env=dict(os.environ,COMMUNITY_CONNECTED_MINI_OUTPUT=str(out))
+   p=subprocess.run(['node',str(ROOT/'deploy/community-preview/prepare-mini.cjs')],cwd=ROOT,env=env,text=True,capture_output=True,timeout=30)
+   self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+   app=(out/'app.js').read_text()
+   receipt=json.loads((out/'CONNECTED_PREVIEW_RECEIPT.json').read_text())
+   self.assertIn("baseUrl: 'https://community-preview.wenwenyiyiyi.work'",app)
+   self.assertIn("payments: false",app)
+   self.assertIn("commerce: true",app)
+   self.assertEqual(receipt['baseUrl'],'https://community-preview.wenwenwenyiyiyi.work')
+   self.assertTrue(receipt['commerce']);self.assertFalse(receipt['payments'])
+   self.assertFalse(receipt['request_domain_change_performed'])
+   self.assertFalse(receipt['upload_performed'])
+   self.assertFalse(receipt['real_wechat_login_verified'])
 if __name__=='__main__':unittest.main()
