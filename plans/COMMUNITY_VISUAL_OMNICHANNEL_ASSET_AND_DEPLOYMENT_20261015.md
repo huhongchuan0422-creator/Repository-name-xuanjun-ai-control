@@ -10,11 +10,17 @@
 | 社区分账入口 | `demos/visual/community-payment/index.html` | EXTEND | 本PR加入AI/Telegram/飞书入口；未接后端身份 |
 | 商户入驻/驳回/补正原型 | 现有演示附件与Stage5商户模块；需接入网站归档 | EXTEND | 静态内容非真实入驻 |
 | Telegram客户沟通 | 现有`XuanJunAI_ServiceBot`及 CRM/Adapter | REUSE_CHECK | 需实际Webhook、身份绑定证据 |
-| 飞书 | 既有对话/认证Bridge需按系统登记核验 | REUSE_CHECK | 未验证可用，绝不写CONNECTED |
+| 国内客服飞书 | 既有 `XuanjunAICustomerService`，App ID `cli_aa4dc861c0385cbd`；国内 `iZvt5t8tlrm8oiZ`（`47.101.152.210`） | REUSE_CHECK | Owner 已明确任务身份；生产接线/历史接续状态 UNKNOWN，不写CONNECTED |
 | 公共大脑/模型路由 | 玄钧 Common Brain 与对话路由 | REUSE | 需确认网站受控鉴权及调用链 |
 | 统一客户身份与消息证据 | SaaS Tenant/CRM/项目 + 不可变事件模型 | EXTEND | 安全设计入第8.2.7节；真实跨渠道绑定未实现 |
 | 自有域名 | `wenwenwenyiyiyi.work` | REUSE | DNS/TLS/路由/发布未取得实机可访问证据 |
 | 站点发布/回滚 | 现有国内网站与既有发布控制 | REUSE_CHECK | 当前无主机写入会话，不允许臆造部署 |
+
+## 国内客服飞书复用边界（2026-10-20）
+
+身份定义统一引用开发主文档第8.2.7节，并约束第8.2.3–8.2.8节的相关客户入口。本任务以国内客服飞书替代企业微信承接客户咨询，复用统一 CRM 与网页 AI；先核实已有应用、配置、租户映射、客户绑定及历史，再在原资产上续接，不重建应用或另建 CRM/权威状态。
+
+韩国币安飞书、开发控制飞书、认证通知飞书均非本任务对象，不得把原表中泛称的“对话/认证 Bridge”当成客服接线许可，也不得借用其凭据、回调或历史。Owner 指定身份不等于收发/模型联调成功，未核实生产状态保持 `UNKNOWN`，原上线门禁不变。PR135 的候选接线与历史兼容条件见 `docs/development/PR122_FEISHU_CUSTOMER_INTEGRATION_20261020.md`；不得以清空既有历史绕过准入。
 
 ## 上线诊断（区分已知事实与未验证原因）
 1. 当前开发执行环境测试 `getent ahostsv4 wenwenwenyiyiyi.work` 未解析；`curl -IL https://wenwenwenyiyiyi.work/visual/community-payment/` 返回 `curl: (6) Could not resolve host`。这证明**此执行环境未成功解析目标域名**，不证明域名全球DNS坏、证书过期或生产服务宕机。
