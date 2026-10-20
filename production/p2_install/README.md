@@ -331,7 +331,7 @@ DB建立/打开仍在原B6后续阶段，socket/服务仍按原运行阶段，�
 4. 容器只挂本次input只读、本次root读写；固定镜像、UID1002、network none、read-only root、cap-drop ALL、
    no-new-privileges、512MiB/swap1GiB/pids96。Python3.11运行；宿主3.6.8不升级。
 5. 必要薄适配缺口尚未实现：O_EXCL/不覆盖发布本次intent与config、同请求冲突校验、对原Store精确调度及不可变回执。
-   不新增安装器/账本/调度系统。fresh只在本次新根和已证实无历史时调用ActivationStore.prepare(expected_epoch=0, owner_uid=1002)，
+   不新增安装器/账本/调度系统。fresh只在本次新根和已证实无历史时，以owner_uid=1002构造ActivationStore，再调用原prepare方法并指定expected_epoch=0，
    真正产生一条新epoch1 PREPARED日志及descriptor；保留原Store写前append、fsync、descriptor发布格式。
 6. 独立进程inspect读回全字段/链/原receipt。原Store.read内部锁可能O_CREAT/fchmod已有本次锁0644，
    所以不把该动作称绝对只读；不允许inspect为缺历史创建descriptor。
