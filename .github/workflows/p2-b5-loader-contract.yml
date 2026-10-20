@@ -1,0 +1,20 @@
+name: P2 B5 loader contracts
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - production/p2_install/b5_loader_contract.mjs
+      - tests/p2_install/test_b5_loader_contract.mjs
+      - .github/workflows/p2-b5-loader-contract.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Existing Node contract tests only - not SDK loading
+        run: |
+          node --version
+          node tests/p2_install/test_b5_loader_contract.mjs
