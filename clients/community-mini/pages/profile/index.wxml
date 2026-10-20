@@ -1,0 +1,12 @@
+<view>
+  <text>本人资料</text>
+  <text>{{status}}</text>
+  <button wx:if="{{!authenticated}}" bindtap="retryLogin" disabled="{{pending}}">重新登录</button>
+  <view wx:if="{{authenticated&&loaded}}">
+    <text>客户编号：{{customerId}}</text>
+    <input value="{{nickname}}" placeholder="昵称" data-field="nickname" bindinput="input"/>
+    <input value="{{contact}}" placeholder="联系方式" data-field="contact" bindinput="input"/>
+    <button bindtap="save" disabled="{{pending}}">保存资料</button>
+    <button bindtap="logout" disabled="{{pending}}">退出登录</button>
+  </view>
+</view>
