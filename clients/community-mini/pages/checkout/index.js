@@ -259,8 +259,8 @@ Page({
   noticeRequestFailed(request,error) {
     if(!this.noticeRequestCurrent(request))return;
     const denied=error&&(error.code==='ACCESS_DENIED'||error.message==='SESSION_EXPIRED');
-    this.setData({...(denied?{notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false}:{}),
-      noticeStatus:denied?'通知访问已被拒绝或会话已过期，请重新确认授权后读取':error.message});
+    if(denied){auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');return;}
+    this.setData({noticeStatus:error.message});
   },
   async loadNotices(e) {
     if(this._pageUnloaded||!this.session||this.data.pending)return;
@@ -321,7 +321,7 @@ Page({
       }
       else if(op==='referral_code')this.setData({referralCode:r.code});
       this.setData({status:op==='referral_bind'?'推荐关系已绑定':'个人中心已更新'});
-    }catch(error){if(current())this.setData({status:error.message});}
+    }catch(error){if(current()){if(error&&(error.code==='ACCESS_DENIED'||error.message==='SESSION_EXPIRED'))auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else this.setData({status:error.message});}}
     finally{if(this._profileRequest===context&&!this._pageUnloaded&&this._pageGeneration===context.generation){this._profileRequest=null;this.setData({pending:false});}}
   },
   cancelConsumerRead(kind) {
