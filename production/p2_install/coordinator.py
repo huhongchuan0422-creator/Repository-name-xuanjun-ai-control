@@ -137,6 +137,10 @@ class Coordinator:
         db.execute("CREATE TABLE IF NOT EXISTS coordinator_outbox ("
                    "id TEXT PRIMARY KEY, attempt TEXT NOT NULL, event TEXT NOT NULL,"
                    "state TEXT NOT NULL, detail TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS coordinator_outbox_links ("
+                   "stable_id TEXT PRIMARY KEY, legacy_id TEXT NOT NULL UNIQUE,"
+                   "installation TEXT NOT NULL, event TEXT NOT NULL,"
+                   "round_id TEXT NOT NULL, linked INTEGER NOT NULL)")
         # Historic isolated round rows are preserved, but are not admission or quota.
         db.execute("CREATE TABLE IF NOT EXISTS coordinator_failures (seq INTEGER PRIMARY KEY, installation TEXT, cause TEXT, observed INTEGER, evidence TEXT)")
         cols = [x[1] for x in db.execute("PRAGMA table_info(coordinator_failures)")]
@@ -235,27 +239,93 @@ class Coordinator:
                 return True
         return False
 
+    def _counted_failure_groups(self, installation=None):
+        """Return threshold groups using only failures proven unique."""
+        groups = {}
+        rows = self.journal.db.execute(
+            "SELECT installation,cause,observed,evidence,event_key,compatibility "
+            "FROM coordinator_failures ORDER BY seq").fetchall()
+        for inst, cause, observed, raw, event_key, compatibility in rows:
+            if installation is not None and inst != installation:
+                continue
+            # NULL-key legacy rows are not proven unique. DUPLICATE_KNOWN is
+            # retained as evidence but never contributes to escalation.
+            if event_key is None or compatibility == "DUPLICATE_KNOWN":
+                continue
+            try:
+                evidence = json.loads(raw)
+            except ValueError:
+                evidence = {}
+            rid = evidence.get("round_id")
+            if not rid:
+                attempt = evidence.get("attempt_id")
+                stored = self._stored(attempt) if attempt else None
+                rid = stored.get("round_id","DEFAULT") if stored else "DEFAULT"
+            round_key = (inst,rid)
+            state = groups.setdefault(
+                round_key,{"count":0,"first":observed,"causes":{}})
+            state["count"] += 1
+            state["first"] = min(state["first"],observed)
+            root_cause = evidence.get("root_cause")
+            if type(root_cause) is not str or not ID.fullmatch(root_cause):
+                root_cause = cause
+            state["causes"][root_cause] = min(
+                state["causes"].get(root_cause,observed),observed)
+        return groups
+
+    def _infer_legacy_outbox_round(self, installation, event, old):
+        """Infer a missing legacy round only when exactly one round fits."""
+        first = old.get("first_utc")
+        if type(first) is not int:
+            return None
+        candidates = []
+        for (inst,rid), state in self._counted_failure_groups(
+                installation).items():
+            if state["first"] != first:
+                continue
+            if event == "CHANGE_METHOD_30M":
+                cause = old.get("cause")
+                if type(cause) is not str or state["causes"].get(cause) != first:
+                    continue
+            candidates.append(rid)
+        return candidates[0] if len(candidates) == 1 else None
+
     def _failure_outbox_insert(self, key, installation, event, detail):
         db = self.journal.db
-        if db.execute("SELECT 1 FROM coordinator_outbox WHERE id=?",
-                      (key,)).fetchone():
+        if (db.execute("SELECT 1 FROM coordinator_outbox WHERE id=?",
+                       (key,)).fetchone()
+                or db.execute(
+                    "SELECT 1 FROM coordinator_outbox_links WHERE stable_id=?",
+                    (key,)).fetchone()):
             return False
-        for _old_id, raw in db.execute(
+        for old_id, raw in db.execute(
                 "SELECT id,detail FROM coordinator_outbox "
                 "WHERE attempt=? AND event=?", (installation,event)).fetchall():
             try:
                 old = json.loads(raw)
             except ValueError:
                 continue
-            same_round = old.get("round_id") in (None, detail.get("round_id"))
+            old_round = old.get("round_id")
+            if old_round is None:
+                old_round = self._infer_legacy_outbox_round(
+                    installation,event,old)
+            if old_round != detail.get("round_id"):
+                continue
+            matched = False
             if event == "CHANGE_METHOD_30M":
-                if (same_round and old.get("cause") == detail.get("cause")
-                        and old.get("first_utc") == detail.get("first_utc")):
-                    return False
+                matched = (old.get("cause") == detail.get("cause")
+                           and old.get("first_utc") == detail.get("first_utc"))
             elif event == "REPORT_DOTS_10_OR_60":
-                if (same_round and old.get("first_utc") == detail.get("first_utc")
-                        and old.get("failures") == detail.get("failures")):
-                    return False
+                # Failure count may grow after the legacy report. Once its
+                # exact round/first failure are identified, it remains the same
+                # notification and must not be re-emitted.
+                matched = old.get("first_utc") == detail.get("first_utc")
+            if matched:
+                db.execute(
+                    "INSERT OR IGNORE INTO coordinator_outbox_links "
+                    "VALUES(?,?,?,?,?,?)",
+                    (key,old_id,installation,event,detail["round_id"],self.now()))
+                return False
         db.execute("INSERT INTO coordinator_outbox VALUES (?,?,?,?,?)",
                    (key,installation,event,"UNAVAILABLE",
                     canonical(detail).decode("ascii")))
@@ -669,29 +739,10 @@ class Coordinator:
                                 "deadline_utc":request["deadline_utc"]}).decode("ascii")))
                 output.append({"attempt_id":attempt,"event":event,
                                "delivery":"UNAVAILABLE","id":key})
-        # Preserve legacy rows. Aggregate a round across batches/causes;
-        # only the method-change deadline is per identical root cause.
-        groups = {}
-        for installation, cause, observed, raw in self.journal.db.execute(
-                "SELECT installation,cause,observed,evidence FROM coordinator_failures ORDER BY seq"):
-            try:
-                evidence = json.loads(raw)
-            except ValueError:
-                evidence = {}
-            rid = evidence.get("round_id")
-            if not rid:
-                attempt = evidence.get("attempt_id")
-                stored = self._stored(attempt) if attempt else None
-                rid = stored.get("round_id","DEFAULT") if stored else "DEFAULT"
-            round_key = (installation,rid)
-            state = groups.setdefault(round_key,{"count":0,"first":observed,"causes":{}})
-            state["count"] += 1
-            state["first"] = min(state["first"],observed)
-            root_cause = evidence.get("root_cause")
-            if type(root_cause) is not str or not ID.fullmatch(root_cause):
-                root_cause = cause
-            state["causes"][root_cause] = min(
-                state["causes"].get(root_cause,observed),observed)
+        # Retained duplicate/unknown legacy rows remain queryable evidence
+        # but do not inflate threshold counts until a stable event identity is
+        # known.
+        groups = self._counted_failure_groups()
         for (installation,rid),state in groups.items():
             for cause,first in state["causes"].items():
                 if self.now()-first >= 1800:
