@@ -108,7 +108,7 @@ def fsync_dir(path):
 def create(path, raw, mode=0o600):
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
     with os.fdopen(fd,'wb') as stream:
-        stream.write(raw);stream.flush();os.fsync(stream.fileno())
+        stream.write(raw);stream.flush();os.fchmod(stream.fileno(),mode);os.fsync(stream.fileno())
     fsync_dir(Path(path).parent)
 
 def command(argv, timeout=20):
@@ -210,7 +210,7 @@ def nginx_tokens(text):
         if text[index]=='#':
             end=text.find('\n',index);index=len(text) if end<0 else end+1;continue
         if text[index] in '{};': tokens.append(('punct',text[index]));index+=1;continue
-        value=[]
+        token_start=index;value=[]
         while index<len(text) and not text[index].isspace() and text[index] not in '{};#':
             char=text[index]
             if char in ('"',"'"):
@@ -226,7 +226,7 @@ def nginx_tokens(text):
                 end=text.find('}',index+2);need(end>=0,'NGINX_VARIABLE')
                 value.append(text[index:end+1]);index=end+1
             else: value.append(char);index+=1
-        need(value,'NGINX_TOKEN');tokens.append(('word',''.join(value)))
+        need(index>token_start,'NGINX_TOKEN');tokens.append(('word',''.join(value)))
     return tokens
 
 def route_probe_path(text):
