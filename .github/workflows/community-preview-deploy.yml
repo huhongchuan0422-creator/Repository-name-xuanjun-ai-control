@@ -1,0 +1,170 @@
+name: Community Isolated Preview Deploy
+on:
+  push:
+    branches:
+      - feature/chatgpt-community-wechat-sp-offline-20261017
+    paths:
+      - 'deploy/community-preview/**'
+      - 'demos/community-stage/workbench.js'
+      - 'demos/community-stage/communities.js'
+      - '.github/workflows/community-preview-deploy.yml'
+permissions:
+  contents: read
+jobs:
+  package:
+    if: contains(github.event.head_commit.message, '[community-preview-deploy]')
+    runs-on: ubuntu-latest
+    outputs:
+      sha256: ${{ steps.pkg.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build exact isolated preview package
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner             -czf "$RUNNER_TEMP/community-preview.tar.gz" scripts tests demos deploy/community-preview
+          SHA="$(sha256sum "$RUNNER_TEMP/community-preview.tar.gz" | awk '{print $1}')"
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "PREVIEW_PACKAGE_SHA256=$SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-isolated-preview-source
+          path: ${{ runner.temp }}/community-preview.tar.gz
+          retention-days: 7
+
+  deploy:
+    if: contains(github.event.head_commit.message, '[community-preview-deploy]')
+    needs: package
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 8
+    steps:
+      - name: Verify domestic host and deployment authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -un)" = githubrunner
+          sudo -n true
+          sudo -n /usr/sbin/nginx -t
+          test -f /etc/nginx/pr122-xuanjun-apex/pr122-dynamic-hold.locations.conf
+          sudo -n grep -q 'pr122-dynamic-hold.locations.conf' /etc/nginx/nginx.conf /etc/nginx/conf.d/* 2>/dev/null ||             sudo -n /usr/sbin/nginx -T 2>&1 | grep -q 'pr122-dynamic-hold.locations.conf'
+      - uses: actions/download-artifact@v4
+        with:
+          name: community-isolated-preview-source
+          path: ${{ runner.temp }}/community-preview-input
+      - name: Install isolated preview runtime and HTTPS routes
+        env:
+          EXPECTED_SHA: ${{ needs.package.outputs.sha256 }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="$RUNNER_TEMP/community-preview-input/community-preview.tar.gz"
+          test "$(sha256sum "$PKG" | awk '{print $1}')" = "$EXPECTED_SHA"
+          NGINX_USER="$(sudo -n /usr/sbin/nginx -T 2>&1 | sed -n 's/^user[[:space:]]\+\([^ ;]*\).*/\1/p' | head -1)"
+          test -n "$NGINX_USER"
+          NGINX_UID="$(id -u "$NGINX_USER")"
+          NGINX_GROUP="$(id -gn "$NGINX_USER")"
+          RELEASE="/opt/xuanjun-community-preview/releases/$RELEASE_SHA"
+          sudo -n mkdir -p /opt/xuanjun-community-preview/releases
+          test ! -e "$RELEASE"
+          sudo -n mkdir "$RELEASE"
+          sudo -n tar -xzf "$PKG" -C "$RELEASE"
+          sudo -n chown -R root:root "$RELEASE"
+          sudo -n find "$RELEASE" -type d -exec chmod 0755 {} +
+          sudo -n find "$RELEASE" -type f -exec chmod 0644 {} +
+          sudo -n ln -sfn "$RELEASE" /opt/xuanjun-community-preview/current
+
+          UNIT=/etc/systemd/system/xuanjun-community-preview.service
+          sudo -n tee "$UNIT" >/dev/null <<EOF
+          [Unit]
+          Description=Xuanjun Community Isolated Preview
+          After=network.target
+          [Service]
+          Type=simple
+          User=githubrunner
+          Group=$NGINX_GROUP
+          RuntimeDirectory=xuanjun-community-preview
+          RuntimeDirectoryMode=0750
+          Environment=PYTHONUNBUFFERED=1
+          Environment=COMMUNITY_PREVIEW_ORIGIN=https://wenwenwenyiyiyi.work
+          Environment=COMMUNITY_PREVIEW_SOCKET=/run/xuanjun-community-preview/preview.sock
+          Environment=COMMUNITY_PREVIEW_NGINX_UID=$NGINX_UID
+          WorkingDirectory=/opt/xuanjun-community-preview/current
+          ExecStart=/usr/bin/python3 -I -B /opt/xuanjun-community-preview/current/deploy/community-preview/server.py
+          Restart=on-failure
+          RestartSec=2
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectSystem=strict
+          ProtectHome=true
+          ReadWritePaths=/run/xuanjun-community-preview
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          LOC=/etc/nginx/pr122-xuanjun-apex/community-preview.locations.conf
+          sudo -n tee "$LOC" >/dev/null <<'EOF'
+          # Isolated synthetic community preview. No production payment/Finance.
+          location ^~ /preview/ {
+              proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;
+              proxy_set_header Host $host;
+              proxy_set_header X-Forwarded-Proto https;
+              proxy_http_version 1.1;
+          }
+          location = /preview { return 302 /preview/; }
+          location = /merchant/workbench { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /merchant/workbench.js { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /merchant/workbench.css { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /community/portal { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /community/portal.js { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /community/portal.css { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /community/operations { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /community/directory { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /community/commerce { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /community/health { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /mini/login { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /mini/api { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          location = /mini/logout { proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; }
+          EOF
+
+          HOLD=/etc/nginx/pr122-xuanjun-apex/pr122-dynamic-hold.locations.conf
+          sudo -n cp -a "$HOLD" "$HOLD.community-preview.bak"
+          if ! sudo -n grep -q 'community-preview.locations.conf' "$HOLD"; then
+            echo 'include /etc/nginx/pr122-xuanjun-apex/community-preview.locations.conf;' | sudo -n tee -a "$HOLD" >/dev/null
+          fi
+          rollback(){
+            sudo -n cp -a "$HOLD.community-preview.bak" "$HOLD" || true
+            sudo -n /usr/sbin/nginx -t >/dev/null 2>&1 && sudo -n systemctl reload nginx || true
+            sudo -n systemctl disable --now xuanjun-community-preview.service || true
+          }
+          trap rollback ERR
+          sudo -n systemctl daemon-reload
+          sudo -n systemctl enable --now xuanjun-community-preview.service
+          for i in $(seq 1 30); do test -S /run/xuanjun-community-preview/preview.sock && break; sleep 1; done
+          test -S /run/xuanjun-community-preview/preview.sock
+          sudo -n /usr/sbin/nginx -t
+          sudo -n systemctl reload nginx
+          curl --fail --silent --show-error --resolve wenwenwenyiyiyi.work:443:127.0.0.1             https://wenwenwenyiyiyi.work/community/health | grep -q '"READY"'
+          curl --fail --silent --show-error --resolve wenwenwenyiyiyi.work:443:127.0.0.1             https://wenwenwenyiyiyi.work/preview/ | grep -q 'Community Preview'
+          trap - ERR
+          sudo -n rm -f "$HOLD.community-preview.bak"
+          echo "COMMUNITY_PREVIEW_DEPLOYED=$RELEASE_SHA"
+          echo "PAYMENTS=false"
+          echo "FINANCE=UNCONFIRMED"
+
+  external-check:
+    if: contains(github.event.head_commit.message, '[community-preview-deploy]')
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify public HTTPS preview endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 10 https://wenwenwenyiyiyi.work/community/health | grep -q '"READY"'
+          curl --fail --silent --show-error --max-time 10 https://wenwenwenyiyiyi.work/preview/ | grep -q 'Community Preview'
+          echo "PUBLIC_COMMUNITY_PREVIEW=PASS"

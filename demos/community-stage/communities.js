@@ -58,4 +58,11 @@
  $('readPlatformView').onclick=()=>action(t=>{const op=$('platformView').value;const params=op==='platform_overview'?{}:op==='platform_orders'?{after_id:0,status:$('platformOrderStatus').value}:{after_id:op==='platform_audit'?0:''};return platformView(t,op,params);});
  $('morePlatformView').onclick=()=>action(t=>platformPage&&platformView(t,platformPage.operation,platformPage.params));
  window.configureCommunityPortal(null);
+ try{
+  if(location.hash.startsWith('#preview=')){
+   const context=JSON.parse(decodeURIComponent(location.hash.slice(9)));
+   history.replaceState(null,'',location.pathname);
+   window.configureCommunityPortal(context);
+  }
+ }catch(_){window.configureCommunityPortal(null);}
 })();
