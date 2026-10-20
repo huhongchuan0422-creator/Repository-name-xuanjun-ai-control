@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "issue": 76,
+  "baseline_commit": "98067fd25154c95e2ea3c63dcc26fe086f180709",
+  "purpose": "Machine-checkable index of missing contracts, not provider evidence or Finance approval.",
+  "overall_state": "OPEN_UNVERIFIED",
+  "source_separation": {
+    "provider": "Provider-authored rules, signed tickets and full population proof; cannot be substituted by local records.",
+    "local": "Persisted scoped records and signed query evidence; cannot prove provider population."
+  },
+  "enforced_boundaries": {
+    "complete_reconciliation_available": false,
+    "finance_status": "UNCONFIRMED",
+    "funds_retry_authorized": false,
+    "files_or_links_establish_verification": false,
+    "local_configured_stores_are_provider_population": false,
+    "runtime_order_database_in_local_snapshot": false,
+    "cross_database_atomic": false
+  },
+  "requirements": [
+    {
+      "id": "BILL_TIMEZONE",
+      "category": "PROVIDER_CONTRACT",
+      "status": "OPEN_UNVERIFIED",
+      "source_refs": [
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "_parse_document",
+          "marker": "timezone='UNSPECIFIED'",
+          "reason_code_or_field": "timezone='UNSPECIFIED'"
+        }
+      ],
+      "existing_evidence": {
+        "sources": [
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "_parse_document"
+          }
+        ],
+        "proves": "Split CSV dates are syntactically validated; signed query timestamps include offsets.",
+        "does_not_prove": "CSV timezone and conversion to authoritative business date."
+      },
+      "required_delivery": [
+        "Official timezone for 分账时间 CSV column",
+        "DST/offset and date boundary rule linked to bill_date"
+      ],
+      "responsible_role": "WeChat Pay provider contract owner",
+      "dependencies": [
+        "WECHAT_PAY_OFFICIAL_CONTRACT_OR_SIGNED_FIELD_EVIDENCE",
+        "INDEPENDENT_SCOPE_AND_DATE_VALIDATION"
+      ],
+      "existing_tests": [
+        "test_signed_time_has_timezone_bounds_and_no_clock_substitution"
+      ],
+      "closure_conditions": [
+        "Authenticated official rule bound to exact bill layout",
+        "Boundary-date tests compare signed timestamps without assuming CSV offset"
+      ]
+    },
+    {
+      "id": "BILL_DATE_MEMBERSHIP_RULE",
+      "category": "PROVIDER_CONTRACT",
+      "status": "OPEN_UNVERIFIED",
+      "source_refs": [
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "ProviderBills._split_local_inventory",
+          "marker": "bill_date_membership='NOT_ASSIGNED'",
+          "reason_code_or_field": "bill_date_membership='NOT_ASSIGNED'"
+        }
+      ],
+      "existing_evidence": {
+        "sources": [
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "ProviderBills._split_local_inventory"
+          }
+        ],
+        "proves": "Snapshot records scoped persisted local split/return actions at capture.",
+        "does_not_prove": "Whether any local action belongs to a specific provider bill_date."
+      },
+      "required_delivery": [
+        "Provider business-day membership criterion",
+        "Event status transitions and inclusion/exclusion cutoff",
+        "Delayed settlement and reversal date rules"
+      ],
+      "responsible_role": "WeChat Pay provider contract owner",
+      "dependencies": [
+        "WECHAT_PAY_OFFICIAL_CONTRACT_OR_SIGNED_FIELD_EVIDENCE",
+        "INDEPENDENT_SCOPE_AND_DATE_VALIDATION"
+      ],
+      "existing_tests": [
+        "test_reverse_reconciliation_uses_signed_payment_date_not_observation_date"
+      ],
+      "closure_conditions": [
+        "Provider rule for membership verified against signed bill sample and boundary cases"
+      ]
+    },
+    {
+      "id": "SUMMARY_AMOUNT_SEMANTICS",
+      "category": "PROVIDER_CONTRACT",
+      "status": "OPEN_UNVERIFIED",
+      "source_refs": [
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "sample_summary_diagnostic",
+          "marker": "PINNED_SAMPLE_ARITHMETIC_ONLY",
+          "reason_code_or_field": "PINNED_SAMPLE_ARITHMETIC_ONLY"
+        }
+      ],
+      "existing_evidence": {
+        "sources": [
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "sample_summary_diagnostic"
+          }
+        ],
+        "proves": "Reported 5-column summary retained; pinned sample arithmetic can be compared.",
+        "does_not_prove": "Meaning of failed-return, unfreeze, posting-date, and summary category inclusion for all bills."
+      },
+      "required_delivery": [
+        "Each SPLIT_SUMMARY_COLUMNS definition and treatment of failures/reversals",
+        "Minor-unit/rounding and period rules",
+        "Signed provider classification evidence"
+      ],
+      "responsible_role": "WeChat Pay provider contract owner",
+      "dependencies": [
+        "WECHAT_PAY_OFFICIAL_CONTRACT_OR_SIGNED_FIELD_EVIDENCE",
+        "INDEPENDENT_SCOPE_AND_DATE_VALIDATION"
+      ],
+      "existing_tests": [
+        "test_two_store_signed_detail_ledgers_are_partitioned_without_summary_double_count"
+      ],
+      "closure_conditions": [
+        "Provider definitions independently verified; failure and reversal tests; summary no longer inferred from sample"
+      ]
+    },
+    {
+      "id": "RETURN_DETAIL_JOIN_UNVERIFIED",
+      "category": "PROVIDER_CONTRACT",
+      "status": "OPEN_UNVERIFIED",
+      "source_refs": [
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "ProviderBills._reconcile_split_details",
+          "marker": "RETURN_DETAIL_JOIN_UNVERIFIED",
+          "reason_code_or_field": "RETURN_DETAIL_JOIN_UNVERIFIED"
+        }
+      ],
+      "existing_evidence": {
+        "sources": [
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "ProviderBills._reconcile_split_details"
+          }
+        ],
+        "proves": "Split-return rows are preserved as explicit unknown.",
+        "does_not_prove": "Identity join between return_id and provider CSV 分账明细单号."
+      },
+      "required_delivery": [
+        "Official mapping for return_id/out_return_no to bill detail identifiers",
+        "Merchant and transaction identity scope; partial return cardinality"
+      ],
+      "responsible_role": "WeChat Pay provider contract owner",
+      "dependencies": [
+        "WECHAT_PAY_OFFICIAL_CONTRACT_OR_SIGNED_FIELD_EVIDENCE",
+        "INDEPENDENT_SCOPE_AND_DATE_VALIDATION"
+      ],
+      "existing_tests": [
+        "test_returns_and_unfreeze_remain_unresolved_with_complete_merchant_read_permission"
+      ],
+      "closure_conditions": [
+        "Official join contract verified with signed return response and bill row; ambiguous joins remain unknown"
+      ]
+    },
+    {
+      "id": "UNFREEZE_DETAIL_JOIN_UNVERIFIED",
+      "category": "PROVIDER_CONTRACT",
+      "status": "OPEN_UNVERIFIED",
+      "source_refs": [
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "ProviderBills._reconcile_split_details",
+          "marker": "UNFREEZE_DETAIL_JOIN_UNVERIFIED",
+          "reason_code_or_field": "UNFREEZE_DETAIL_JOIN_UNVERIFIED"
+        }
+      ],
+      "existing_evidence": {
+        "sources": [
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "ProviderBills._reconcile_split_details"
+          }
+        ],
+        "proves": "Unfreeze rows are preserved as explicit unknown.",
+        "does_not_prove": "Unfreeze line to original order/detail/receiver and exact signed action."
+      },
+      "required_delivery": [
+        "Official unfreeze bill detail identifier lineage",
+        "Timeout/expiry unfreeze direction and cardinality",
+        "Applicable signed response fields"
+      ],
+      "responsible_role": "WeChat Pay provider contract owner",
+      "dependencies": [
+        "WECHAT_PAY_OFFICIAL_CONTRACT_OR_SIGNED_FIELD_EVIDENCE",
+        "INDEPENDENT_SCOPE_AND_DATE_VALIDATION"
+      ],
+      "existing_tests": [
+        "test_returns_and_unfreeze_remain_unresolved_with_complete_merchant_read_permission"
+      ],
+      "closure_conditions": [
+        "Documented identifier lineage with signed evidence and positive/negative join tests"
+      ]
+    },
+    {
+      "id": "PROVIDER_POPULATION_COMPLETENESS",
+      "category": "PROVIDER_CONTRACT",
+      "status": "OPEN_UNVERIFIED",
+      "source_refs": [
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "ProviderBills._split_local_inventory",
+          "marker": "provider_population_completeness='NOT_ESTABLISHED'",
+          "reason_code_or_field": "provider_population_completeness='NOT_ESTABLISHED'"
+        }
+      ],
+      "existing_evidence": {
+        "sources": [
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "ProviderBills._split_local_inventory"
+          }
+        ],
+        "proves": "Ticket SHA1 proves downloaded bytes match verified ticket; local snapshot tracks persisted local scope.",
+        "does_not_prove": "All provider-side transactions/receivers or billing-day coverage; configured local stores are not provider population."
+      },
+      "required_delivery": [
+        "Provider bill enumeration and pagination/finality guarantee",
+        "Inclusion rules for all submerchant transactions/returns/unfreezes",
+        "Independent provider population or closing control totals"
+      ],
+      "responsible_role": "WeChat Pay provider contract owner",
+      "dependencies": [
+        "WECHAT_PAY_OFFICIAL_CONTRACT_OR_SIGNED_FIELD_EVIDENCE",
+        "INDEPENDENT_SCOPE_AND_DATE_VALIDATION"
+      ],
+      "existing_tests": [
+        "test_two_stores_match_once_and_never_claim_provider_completeness",
+        "test_full_day_request_always_refused_even_empty_bill"
+      ],
+      "closure_conditions": [
+        "Independently establish provider population and date finality; reconcile complete set without relying on local-store count"
+      ]
+    },
+    {
+      "id": "LOCAL_SIGNED_DETAIL_EVIDENCE_COMPLETENESS",
+      "category": "LOCAL_EVIDENCE",
+      "status": "OPEN_UNVERIFIED",
+      "source_refs": [
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "ProviderBills._reconcile_split_details",
+          "marker": "SIGNED_DETAIL_EVIDENCE_REQUIRED",
+          "reason_code_or_field": "SIGNED_DETAIL_EVIDENCE_REQUIRED"
+        },
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "signed_bill_evidence",
+          "marker": "elif kind=='RETURN':",
+          "reason_code_or_field": "elif kind=='RETURN':"
+        },
+        {
+          "path": "scripts/community_provider_bills.py",
+          "symbol": "signed_bill_evidence",
+          "marker": "if kind=='SPLIT':",
+          "reason_code_or_field": "if kind=='SPLIT':"
+        }
+      ],
+      "existing_evidence": {
+        "sources": [
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "ProviderBills._reconcile_split_details"
+          },
+          {
+            "path": "scripts/community_provider_bills.py",
+            "symbol": "signed_bill_evidence"
+          }
+        ],
+        "proves": "signed_bill_evidence retains terminal signed split detail when complete; local inventory flags missing, invalid, inactive or nonterminal.",
+        "does_not_prove": "All historic local actions have authenticated, unambiguous and scope-bound detail evidence."
+      },
+      "required_delivery": [
+        "SPLIT terminal FINISHED signed query (signed_bill_evidence kind SPLIT): sub_mchid, transaction_id, out_order_no, order_id; receivers each detail_id, finish_time, type, account, amount, result; body_sha256. Match frozen intent and original payment; incomplete receivers remain unknown.",
+        "RETURN terminal SUCCESS signed query (signed_bill_evidence kind RETURN): sub_mchid, out_order_no, order_id, out_return_no, return_id, return_mchid, finish_time, amount; body_sha256. This captures signed local return evidence but does not establish a provider CSV detail-id join.",
+        "Inventory snapshot with captured_at, audit_watermark and scoped records including inactive, missing, invalid and nonterminal actions; runtime order database not included; cross-database atomicity not established."
+      ],
+      "responsible_role": "Local community payment integration and ledger owner",
+      "dependencies": [
+        "ORIGINAL_LOCAL_SIGNED_EVIDENCE_CENSUS",
+        "PERSISTED_SNAPSHOT_WATERMARK",
+        "RUNTIME_ORDER_DATABASE_NOT_IN_SNAPSHOT",
+        "CROSS_DATABASE_ATOMICITY_NOT_ESTABLISHED"
+      ],
+      "existing_tests": [
+        "test_receiver_detail_layout_not_treated_as_aggregate_match",
+        "test_two_store_signed_detail_ledgers_are_partitioned_without_summary_double_count"
+      ],
+      "closure_conditions": [
+        "Independent signed-evidence census against persisted local actions at stable watermark",
+        "Every missing/invalid/ambiguous record resolved without relabeling UNKNOWN or using provider population as local inventory"
+      ]
+    }
+  ]
+}
