@@ -39,8 +39,19 @@ def sqlite_copy(source,dest,seconds=45):
     deadline=time.monotonic()+seconds
     def progress(*unused):
         if time.monotonic()>deadline: raise TimeoutError('SQLITE_BACKUP_DEADLINE')
-    # URI mode=ro includes committed WAL without checkpointing the source.
-    with sqlite3.connect(source.resolve().as_uri()+'?mode=ro',uri=True,timeout=2) as inp:
+    # Reuse the original kernel-fence reader. Immutable URI semantics are safe
+    # only for a kernel-immutable file in an immutable directory, with no WAL,
+    # SHM or rollback journal. Live WAL databases keep the normal backup path.
+    uri=source.resolve().as_uri()+'?mode=ro'
+    try:
+        from portal_total_controller import flag
+        sealed=(flag(source)&0x10 and flag(source.parent)&0x10 and
+                not any(Path(str(source)+suffix).exists()
+                        for suffix in ('-wal','-shm','-journal')))
+    except (OSError,ImportError):
+        sealed=False
+    if sealed:uri+='&immutable=1'
+    with sqlite3.connect(uri,uri=True,timeout=2) as inp:
         with sqlite3.connect(str(dest)) as out:
             inp.backup(out,pages=256,progress=progress,sleep=.05)
             if out.execute('PRAGMA integrity_check').fetchall()!=[('ok',)]:
