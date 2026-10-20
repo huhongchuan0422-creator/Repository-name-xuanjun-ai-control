@@ -36,7 +36,7 @@ OAuth/session state may have changed, so automatic rollback to stale Tokyo state
 is refused; both sides remain available for exact reconciliation. No server is
 shut down and no Binance order writer is enabled by this controller.
 
-Validation: 89 local tests, 87 passed / 2 skipped. Tests cover real fixture tar
+Validation: 91 local tests, 89 passed / 2 skipped. Tests cover real fixture tar
 receive/readback, traversal and duplicate refusal, changed baseline refusal,
 committed/uncommitted WAL, sealed closed-database reads, symlink boundaries,
 unit namespace/dependency/mode generation and preserved uncertain intents.
@@ -50,3 +50,8 @@ Owner authorized termination of other Gateway tasks on 2026-10-20. The explicit
 children with pidfd identity checks and a 45-second bound, both at initial
 inspection and immediately before the handoff fence. It never suppresses
 unknown migration results or broadens termination to other service groups.
+
+The two live extension SDK symlinks (openclaw-lark and ws-ckpt) retain their
+original /usr/local/lib/node_modules/openclaw target. This distinct installation
+is included once in static capture and bound read-only in private service
+namespaces; it is not redirected to the Gateway 2026.9.3 package.
