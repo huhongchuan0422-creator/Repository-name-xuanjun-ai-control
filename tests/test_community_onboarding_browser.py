@@ -3,8 +3,14 @@
 Accounts, reviewer grant, documents and scanner are explicit synthetic fixtures.
 The original Center connection is created and used on the server thread.
 """
+import faulthandler
+import os
 import queue
+import signal
+import subprocess
+import sys
 import threading
+import traceback
 import unittest
 from playwright.sync_api import sync_playwright,expect
 import test_community_merchant_onboarding as fixture
@@ -19,6 +25,32 @@ class OnboardingBrowserJourney(unittest.TestCase):
     def test_bound_crm_mapping_automatically_opens_workbench_after_approval(self):
         self.journey(True)
     def test_reject_reopen_same_application_resubmit_and_fresh_material_reviews(self):
+        if os.environ.get('COMMUNITY_REOPEN_BROWSER_CHILD')!='1':
+            env=dict(os.environ,COMMUNITY_REOPEN_BROWSER_CHILD='1')
+            command=[sys.executable,'-u','-m','unittest',
+                'tests.test_community_onboarding_browser.OnboardingBrowserJourney.test_reject_reopen_same_application_resubmit_and_fresh_material_reviews']
+            process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,env=env)
+            try:
+                output,_=process.communicate(timeout=90)
+            except subprocess.TimeoutExpired:
+                if hasattr(signal,'SIGUSR1'):
+                    process.send_signal(signal.SIGUSR1)
+                    try: output,_=process.communicate(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        process.terminate()
+                        try: output,_=process.communicate(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            process.kill();output,_=process.communicate()
+                else:
+                    process.terminate();output,_=process.communicate(timeout=3)
+                print(output,flush=True)
+                self.fail('ONBOARDING_REOPEN_CHILD_DEADLINE_EXCEEDED')
+            print(output,flush=True)
+            self.assertEqual(process.returncode,0,output)
+            return
+        faulthandler.enable()
+        if hasattr(signal,'SIGUSR1'):faulthandler.register(signal.SIGUSR1,all_threads=True)
+        faulthandler.dump_traceback_later(60,repeat=False)
         ready=queue.Queue()
         def host():
             server=None;fx=None
@@ -117,16 +149,26 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     phase('UNREVIEWED_APPROVE_CLICK')
                     with admin.expect_response(lambda response:response.url.endswith('/merchant/onboarding'),timeout=10000) as rejected:
                         admin.locator('[data-action=APPROVE]').click()
+                        phase('UNREVIEWED_APPROVE_CLICK_RETURNED')
+                    phase('UNREVIEWED_EXPECT_RESPONSE_EXITED')
                     response=rejected.value
+                    phase('UNREVIEWED_REJECTED_VALUE_READY')
                     request=response.request
+                    phase('UNREVIEWED_REQUEST_READY')
                     self.assertEqual(request.method,'POST')
+                    phase('UNREVIEWED_POST_DATA_BEGIN')
                     body=request.post_data_json
+                    phase('UNREVIEWED_POST_DATA_DONE')
                     self.assertEqual(body.get('operation'),'review')
                     self.assertEqual(body.get('params',{}).get('action'),'APPROVE')
                     self.assertEqual(body.get('params',{}).get('application'),original_id)
                     self.assertEqual(body.get('params',{}).get('revision'),before_unreviewed)
+                    phase('UNREVIEWED_STATUS_BEGIN')
                     self.assertEqual(response.status,400)
+                    phase('UNREVIEWED_STATUS_DONE')
+                    phase('UNREVIEWED_JSON_BEGIN')
                     reply=response.json()
+                    phase('UNREVIEWED_JSON_DONE')
                     self.assertEqual(reply.get('error'),'INVALID_REQUEST')
                     phase('UNREVIEWED_APPROVE_REJECTED')
                     expect(admin.locator('#status')).to_contain_text('资料、状态或版本不符合要求')
@@ -162,9 +204,25 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     self.assertIn('允许原申请号重新开启补件',history)
                     self.assertEqual(errors,[])
                     phase('ASSERTIONS_DONE')
-                finally:browser.close()
+                except BaseException:
+                    traceback.print_exc()
+                    sys.stderr.flush();sys.stdout.flush()
+                    raise
+                finally:
+                    phase('BROWSER_CLOSE_BEGIN')
+                    browser.close()
+                    phase('BROWSER_CLOSE_DONE')
+        except BaseException:
+            traceback.print_exc()
+            sys.stderr.flush();sys.stdout.flush()
+            raise
         finally:
-            server.shutdown();thread.join(5)
+            print('ONBOARDING_REOPEN_PHASE=SERVER_SHUTDOWN_BEGIN',flush=True)
+            server.shutdown()
+            print('ONBOARDING_REOPEN_PHASE=SERVER_SHUTDOWN_DONE',flush=True)
+            thread.join(5)
+            print('ONBOARDING_REOPEN_PHASE=SERVER_JOIN_DONE alive='+str(thread.is_alive()),flush=True)
+            faulthandler.cancel_dump_traceback_later()
             self.assertFalse(thread.is_alive(),'ONBOARDING_REOPEN_SERVER_THREAD_DID_NOT_STOP')
 
     def journey(self,with_opening):
