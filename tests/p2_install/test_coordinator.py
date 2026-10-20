@@ -161,7 +161,7 @@ class CoordinatorTests(unittest.TestCase):
                 c.failure(req,"same-cause",{"event_id":"event-"+str(i),"sequence":i})
         with self.open() as c:
             for i in range(6,10):
-                c.failure(req,"same-cause",{"sequence":i})
+                c.failure(req,"same-cause",{"event_id":"event-"+str(i),"sequence":i})
             records = c.tick()
             alerts = [x for x in records if x.get("event") == "REPORT_DOTS_10_OR_60"]
             self.assertEqual(len(alerts),1)
