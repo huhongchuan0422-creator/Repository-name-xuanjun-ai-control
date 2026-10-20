@@ -53,14 +53,16 @@ class HandoffTests(unittest.TestCase):
    rpc=(units/m.NAMES['rpc']).read_text()
    self.assertIn('BindReadOnlyPaths='+str(root/'release/app')+':/opt/trading-system',rpc)
    self.assertIn('BindPaths='+str(root/'release/app/runtime')+':/opt/trading-system/runtime',rpc)
+   self.assertIn('BindReadOnlyPaths='+str(root/'release/rootfs/usr/local/lib/node_modules/openclaw')+':/usr/local/lib/node_modules/openclaw',rpc)
    self.assertIn('ProtectHome=tmpfs',rpc);self.assertIn('Slice=pr99koreamodel.slice',rpc)
    self.assertIn('Requires='+m.NAMES['gateway'],rpc)
    self.assertEqual((units/m.NAMES['rpc']).stat().st_mode&0o777,0o644)
    with self.assertRaisesRegex(RuntimeError,'UNIT_CONFLICT'):namespace['install_unit']('rpc',{'ssh_files':[]})
- def remote_receive(self,malicious=False):
+ def remote_receive(self,malicious=False,extension=False):
   with tempfile.TemporaryDirectory() as d:
    root=Path(d)/'release';lock=Path(d)/'lock';blob=b'data';member='rootfs/opt/node-v24.16.0-linux-x64/file'
-   manifest={'opt/node-v24.16.0-linux-x64/file':{'kind':'file','bytes':4,'sha256':hashlib.sha256(blob).hexdigest(),'mode':0o600}}
+   if extension:member='rootfs/usr/local/lib/node_modules/openclaw/package.json'
+   manifest={member.removeprefix('rootfs/'):{'kind':'file','bytes':4,'sha256':hashlib.sha256(blob).hexdigest(),'mode':0o600}}
    output=io.BytesIO()
    with tarfile.open(fileobj=output,mode='w:gz') as t:
     for name,body in [('manifest.json',json.dumps(manifest).encode()),(member,blob)]:
@@ -82,6 +84,7 @@ class HandoffTests(unittest.TestCase):
     # Same receive is rejected; a completed segment is not overwritten.
     again=subprocess.run([sys.executable,'-I','-B','-S','-c',code,json.dumps(payload)],input=data,capture_output=True)
     self.assertNotEqual(again.returncode,0);self.assertEqual((root/member).read_bytes(),blob)
+ def test_extension_sdk_receive_and_duplicate_preservation(self):self.remote_receive(extension=True)
  def test_actual_receive_and_duplicate_preservation(self):self.remote_receive()
  def test_actual_receiver_rejects_traversal(self):self.remote_receive(malicious=True)
  def test_checkpoint_does_not_repeat_uncertain_mutation(self):
@@ -142,3 +145,11 @@ class AuthorizedDrainTests(unittest.TestCase):
   sequence=[[item],[item],[item],[item],[item],[]]
   with patch.object(sys,'argv',['controller','--owner-drain-gateway-tasks']),patch.object(m,'gateway_tasks',side_effect=sequence),patch.object(m.os,'pidfd_open',return_value=45),patch.object(m.os,'close'),patch.object(m.time,'sleep'),patch.object(m.signal,'pidfd_send_signal') as send:
    self.assertEqual(m.drain_gateway_tasks(123)['status'],'PASS');self.assertEqual(send.call_count,2)
+
+class ExtensionLinkTests(unittest.TestCase):
+ def test_extensions_retain_original_sdk_target_without_redirect(self):
+  roots=[m.NODE,m.STATE,m.WORKSPACE,m.EXTENSION_SDK]
+  for name in ('openclaw-lark','ws-ckpt'):
+   p=m.STATE/'extensions'/name/'node_modules/openclaw'
+   self.assertTrue(m.link_allowed(p,str(m.EXTENSION_SDK),roots))
+   self.assertFalse(m.link_allowed(p,'/etc/shadow',roots))
