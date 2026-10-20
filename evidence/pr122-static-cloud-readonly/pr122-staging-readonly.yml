@@ -18,7 +18,7 @@ env:
 # One workflow/action family per exact source HEAD. A later queued label must
 # inspect the earlier finished cloud job, not take a second clean-run path.
 concurrency:
-  group: pr122-ro-${{ github.event.pull_request.head.sha || github.sha }}
+  group: pr122-staging-readonly-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
