@@ -31,6 +31,16 @@ jobs:
       - run: docker pull python:3.11.2-slim
       - run: sudo "$(command -v python)" -B tests/p2_install/test_cp08_host.py -v
       - run: sudo "$(command -v python)" -B tests/p2_install/test_cp08_docker.py -v
+      - name: Preserve Hosted failure and recovery evidence
+        if: always()
+        run: |
+          sudo tar -czf "$RUNNER_TEMP/p2-b3-cp08-evidence.tar.gz" --ignore-failed-read /tmp/p2-b3-test-host-*
+          sudo chmod 0644 "$RUNNER_TEMP/p2-b3-cp08-evidence.tar.gz"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2-b3-cp08-evidence
+          path: ${{ runner.temp }}/p2-b3-cp08-evidence.tar.gz
       - run: python -B scripts/build_p2_b3_final_bundle.py --output "$RUNNER_TEMP/p2-b3-final-delivery"
       - uses: actions/upload-artifact@v4
         with:
