@@ -45,7 +45,7 @@ def read(path, limit=1048576):
         item=os.open(path.name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=fd)
         with os.fdopen(item,'rb') as stream:
             before=os.fstat(stream.fileno())
-            need(stat.S_ISREG(before.st_mode) and not before.st_mode & 0o022 and before.st_size<=limit,'FILE_PROTECTION')
+            need(stat.S_ISREG(before.st_mode) and not before.st_mode & 0o022 and before.st_size<=limit,'FILE_PROTECTION:'+str(path))
             raw=stream.read(limit+1)
             need(stamp(before)==stamp(os.fstat(stream.fileno())) and len(raw)==before.st_size,'FILE_CHANGED')
             return raw
