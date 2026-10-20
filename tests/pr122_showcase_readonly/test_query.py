@@ -78,6 +78,40 @@ class QueryTests(unittest.TestCase):
   self.assertEqual(r['observation'],'UNKNOWN');self.assertNotIn('SECRET',json.dumps(r))
   with patch.object(m.os,'read',side_effect=m.Unknown('TIME_BOUND')):
    with self.assertRaisesRegex(m.Unknown,'TIME_BOUND'):self.run_query()
+ def test_json_and_selection_timeout_escape_observe(self):
+  for target in ('bounded_json','selected'):
+   with self.subTest(stage=target),patch.object(m,target,side_effect=m.Unknown('TIME_BOUND')):
+    with self.assertRaisesRegex(m.Unknown,'TIME_BOUND'):self.run_query()
+ def test_semantic_unknown_stays_a_field_observation(self):
+  with patch.object(m,'selected',side_effect=m.Unknown('TRUST_SCHEMA')):r=self.run_query()
+  self.assertEqual(r['fields'],'UNKNOWN');self.assertEqual(r['field_reason'],'TRUST_SCHEMA');self.assertEqual(r['observation'],'STABLE_BYTES_OBSERVED')
+ def test_actual_sigalrm_in_json_and_selection_cli_is_global(self):
+  # A separate Python process runs the real main and observe on synthetic files.
+  # Fire the actual installed SIGALRM handler at each affected stage; no sleeps.
+  second=self.root/'policy.json';second.write_text(json.dumps(policy()));second.chmod(0o600)
+  program=r"""
+import importlib.util,os,signal,sys
+spec=importlib.util.spec_from_file_location('fixture_query',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+m.HOST=os.uname().nodename.split('.')[0]
+m.TARGETS=(sys.argv[2],sys.argv[3])
+original_observe=m.observe;calls=[]
+def observe(path,*args,**kwargs):
+ calls.append(path);return original_observe(path,*args,**kwargs)
+m.observe=observe
+original=getattr(m,sys.argv[4])
+def interrupted(*args,**kwargs):
+ os.kill(os.getpid(),signal.SIGALRM)
+ return original(*args,**kwargs)
+setattr(m,sys.argv[4],interrupted)
+code=m.main()
+assert calls==[sys.argv[2]],'SECOND_TARGET_MUST_NOT_BE_READ'
+assert code==2,'GLOBAL_TIMEOUT_MUST_FAIL'
+sys.exit(code)
+"""
+  for stage in ('bounded_json','selected'):
+   with self.subTest(stage=stage):
+    r=subprocess.run([sys.executable,'-I','-B','-S','-c',program,str(SOURCE),str(self.p),str(second),stage],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=5)
+    self.assertEqual(r.returncode,2,r.stderr.decode());self.assertEqual(r.stderr,b'');self.assertEqual(r.stdout,b'{"state":"UNKNOWN","reason":"QUERY_INCOMPLETE"}\n')
  def test_python36_syntax_and_wrong_host_no_access(self):
   ast.parse(SOURCE.read_text(),feature_version=(3,6))
   with patch.object(m.os,'uname',return_value=type('U',(),{'nodename':'wrong'})()),patch.object(m.os,'open',side_effect=AssertionError('no access')):

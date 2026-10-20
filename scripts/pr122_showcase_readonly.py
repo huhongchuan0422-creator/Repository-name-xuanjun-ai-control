@@ -112,7 +112,9 @@ def observe(path,trust,now=None,checkpoint=None):
         require(ident(os.fstat(fd))==before and total==before[6],'FILE_CHANGED');stable()
         result.update(observation='STABLE_BYTES_OBSERVED',sha256=h.hexdigest())
         try:result['selected']=selected(b''.join(chunks),trust,time.time() if now is None else now)
-        except Exception as e:result.update(fields='UNKNOWN',field_reason=str(e) if isinstance(e,Unknown) else 'INVALID_JSON')
+        except Exception as e:
+            if isinstance(e,Unknown) and str(e)=='TIME_BOUND':raise
+            result.update(fields='UNKNOWN',field_reason=str(e) if isinstance(e,Unknown) else 'INVALID_JSON')
         stable();require(ident(os.fstat(fd))==before,'FILE_CHANGED')
     except OSError as e:
         result.pop('sha256',None);result.pop('selected',None)

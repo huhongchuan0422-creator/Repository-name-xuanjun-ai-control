@@ -4,8 +4,8 @@
 
 ## 完整候选
 
-同目录 CANDIDATE.sh 为完整自包含 sudo/Python heredoc，无占位符、下载、临时文件或远程依赖。候选SHA256：96c36a9c71b18bfbd02778c719d7c6381b5c540137ed412305bf658af7471436。
-源码 scripts/pr122_showcase_readonly.py SHA256：8a87035a1f03060b7a8af235a40bb824edee9292c5d9e51bff7eb9cec2fa32b5。
+同目录 CANDIDATE.sh 为完整自包含 sudo/Python heredoc，无占位符、下载、临时文件或远程依赖。候选SHA256：272cf73da87eafb7a34d5d7c4ac96865464d49cf30a58e8112a57ffa14291d03。
+源码 scripts/pr122_showcase_readonly.py SHA256：4798eb5e12165062ae09b5a94fd67e1f35fbc2499d224ed7a37bad38bdfce489。
 现场执行须Owner另确认，本轮 NOT_EXECUTED。
 
 固定主机 iZvt5t8tlrm8oiZ，真实/有效UID0。仅打开 /、/etc、/etc/xuanjun-showcase 及：
@@ -41,3 +41,9 @@ policy仅选择schema、mechanism_manifest_sha256、shell_tar_sha256、legacy_pa
 原既有国内回执 PR122 #6213028183 曾观察/usr/bin/python3=3.11.6；该历史值不是当前实测。候选为stdlib Python>=3.6语法，运行时报告实际版本；不升级解释器。实际国内宿主执行NOT_EXECUTED；实际Python3.6解释器NOT_EXECUTED，语法检查不冒充解释器验收。
 
 21项合成测试：固定main两路径/输出上限、保护属性、缺父/缺叶、权限拒绝、链接/硬链接/FIFO/目录拒绝、文件和祖先替换、原件不变、脱敏未知字段、仅选目标anchor、policy摘要、严格schema/类型、撤销/失效/错误绑定、JSON/字节限额、超时/IO及完整命令嵌入一致。首次本地测试有1项期望PATH_CHANGED但重命名先改变原inode ctime而正确报FILE_CHANGED；修正该测试的精确阶段，并另加真正祖先替换用例，产品安全条件未放宽。最终本地21/21 PASS。Hosted终态由原PR122交付回执记录，未变旧组件不重测。
+
+## TIME_BOUND定向修复（PR122 #6290956248）
+
+沿1577802b，仅使JSON解析/selected异常分支重抛全局TIME_BOUND；外层observe继续传播至main，整体只输出QUERY_INCOMPLETE/exit2，列表求值中断，不读第二目标、不返回局部成功。其他字段schema/语义未知仍仅fields UNKNOWN，不混同全局超时。
+
+新增3项测试（含阶段子用例）：bounded_json及selected注入超时传播；语义UNKNOWN保留；独立Python进程在两阶段实际触发SIGALRM、运行真实main/observe于合成文件，断言第二目标未读、stdout逐字节仅QUERY_INCOMPLETE、退出码2及stderr为空。旧源码先复现4个子用例失败，修复后24/24通过。原21项证据继承，受影响候选测试集合再次验证；不操作服务器，原读取范围/权限/副作用保持一致。
