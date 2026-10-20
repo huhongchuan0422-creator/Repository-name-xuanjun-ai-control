@@ -37,7 +37,12 @@ class CustomerProfile:
             raise ValueError('INVALID_CUSTOMER_PROFILE_FIELDS')
         if self.communities is None:raise PermissionError('WEB_PROFILE_BOUNDARY_REQUIRED')
         g = self.communities.authorize(session, csrf, workspace)
-        return self._run(g,op,p)
+        expected=(g['user_id'],g['project'],g['tenant'])
+        def reauthorize():
+            current=self.communities.authorize(session, csrf, workspace)
+            if (current['user_id'],current['project'],current['tenant'])!=expected:
+                raise PermissionError('COMMUNITY_WORKSPACE_REQUIRED')
+        return self._run(g,op,p,reauthorize)
 
     def consumer(self,token,scene,op,p):
         if self.identity is None:raise PermissionError('MINI_PROFILE_BOUNDARY_REQUIRED')
@@ -45,12 +50,19 @@ class CustomerProfile:
         if type(op) is not str or op not in fields or type(p) is not dict or set(p)!=fields[op]:raise ValueError('INVALID_CUSTOMER_PROFILE_FIELDS')
         self.identity._time(self.center.now())
         uid,project,principal=self.identity._resolve(token,scene)
-        return self._run(dict(user_id=uid,project=project,tenant=principal.tenant_id),op,p)
+        g=dict(user_id=uid,project=project,tenant=principal.tenant_id)
+        expected=(uid,project,principal.tenant_id)
+        def reauthorize():
+            current_uid,current_project,current_principal=self.identity._resolve(token,scene)
+            if (current_uid,current_project,current_principal.tenant_id)!=expected:
+                raise PermissionError('MINI_SESSION_BINDING_REQUIRED')
+        return self._run(g,op,p,reauthorize)
 
-    def _run(self,g,op,p):
+    def _run(self,g,op,p,reauthorize):
         c, uid = self.center, g['user_id']
         user_key = c.idx('community-profile:' + g['project'] + ':' + uid)
         with c.tx():
+            reauthorize()
             c.limit('community-profile:' + uid, 60, 60)
             if op in ('profile_read', 'profile_update'):
                 prior = self._read(g, 'COMMUNITY_CUSTOMER_PROFILE', user_key)
