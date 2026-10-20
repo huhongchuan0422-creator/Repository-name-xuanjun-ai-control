@@ -9,7 +9,7 @@ host command was executed, and no installation or deployment was attempted.
   files, this README, and both YAML files under
   `evidence/pr122-static-cloud-readonly/`. The full
   `pr122-staging-readonly.yml` here is an inert reviewed template.
-- On that source branch only, publish `pr122-staging-readonly-source-tests.yml`
+- On that source branch only, publish `pr122-ro-source-tests.yml`
   as `.github/workflows/pr122-staging-readonly.yml`. It has pure push-triggered
   hosted mock tests only, no cloud step, secret reference or PR label handler.
 - After the source branch CAS, mechanically replace the four occurrences of
@@ -35,7 +35,7 @@ not re-observed by this local work.
 
 The only cloud entry is an Owner 332398908 label event in repository 1413132159,
 PR122, branch `feature/stage5-next25-integration-20261015`, with an exact
-full-40-character label `pr122-staging-readonly-<current HEAD>`. The event head,
+full-40-character label `pr122-ro-<current HEAD>` (49 characters; query uses `pr122-roq-<same HEAD>` at 50 characters). The event head,
 live PR head, current workflow run identity, actor IDs, repository IDs, and
 branch must all agree. No fixed stale HEAD is embedded. Ordinary push/PR events
 run hosted tests only. Reruns cannot dispatch.
@@ -83,7 +83,7 @@ hostname/root binding and suppresses all uncaught exceptions to a fixed message.
    fsynced and uploaded before query. A missing/invalid/lost InvokeId is UNKNOWN,
    never recovered by issuing another command. The consumed run blocks replay
    even if the runner dies before uploading the dispatch record.
-6. `pr122-staging-readonly-query-<same current HEAD>` selects the unique prior
+6. `pr122-roq-<same current HEAD>` selects the unique prior
    consumed run and verifies its original intent + dispatch artifacts. It binds
    InvokeId to the domestic instance, both original heads and command hash. It can only
    DescribeInvocationResult; it never calls RunCommand. No arbitrary InvokeId

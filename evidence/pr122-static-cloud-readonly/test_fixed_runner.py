@@ -44,7 +44,7 @@ def fixture(mode='dispatch'):
           'head': {'sha': HEAD, 'ref': ge.BRANCH, 'repo': {'id': ge.REPOSITORY_ID}},
           'base': {'ref': 'feature/stage5-merchant-platform-storefront-ui-20261014',
                    'repo': {'id': ge.REPOSITORY_ID}}}
-    prefix = 'pr122-staging-readonly-' if mode == 'dispatch' else 'pr122-staging-readonly-query-'
+    prefix = 'pr122-ro-' if mode == 'dispatch' else 'pr122-roq-'
     event = {'action': 'labeled', 'number': 122, 'pull_request': pr,
              'repository': {'id': ge.REPOSITORY_ID, 'full_name': ge.REPOSITORY},
              'sender': {'id': ge.OWNER_ID}, 'label': {'name': prefix + HEAD}}
@@ -209,7 +209,7 @@ class AdmissionTests(OfflineCase):
                      lambda e, v: e['repository'].update(id=1),
                      lambda e, v: e['pull_request']['head'].update(ref='main'),
                      lambda e, v: e['pull_request']['head']['repo'].update(id=1),
-                     lambda e, v: e['label'].update(name='pr122-staging-readonly-' + HEAD[:12]),
+                     lambda e, v: e['label'].update(name='pr122-ro-' + HEAD[:12]),
                      lambda e, v: e.update(number=99)]
         for change in mutations:
             event, env = fixture(); change(event, env)
@@ -519,7 +519,7 @@ class RunnerTests(OfflineCase):
         self.assertEqual(text.count(ge.SOURCE_PLACEHOLDER), 4)
         substituted = text.replace(ge.SOURCE_PLACEHOLDER, SOURCE)
         self.assertEqual(substituted.count("ref: '" + SOURCE + "'"), 3)
-        source_workflow = (Path(__file__).parent / 'pr122-staging-readonly-source-tests.yml').read_text()
+        source_workflow = (Path(__file__).parent / 'pr122-ro-source-tests.yml').read_text()
         self.assertIn('branches: [feature/work-pr122-site-hub-integration-20261016]', source_workflow)
         self.assertNotIn('secrets.', source_workflow)
         self.assertNotIn('RunCommand', source_workflow)
@@ -538,6 +538,55 @@ class RunnerTests(OfflineCase):
                             [good, mock.Mock(returncode=1)]):
                 with self.assertRaises(ge.Hold):
                     fr.verify_source_checkout(env, mock.Mock(side_effect=results))
+
+
+
+class LabelBoundaryTests(OfflineCase):
+    def test_exact_label_lengths_and_event_rejection(self):
+        for mode, prefix, expected in (('dispatch', 'pr122-ro-', 49),
+                                       ('query', 'pr122-roq-', 50)):
+            event, env = fixture(mode)
+            self.assertEqual(event['label']['name'], prefix + HEAD)
+            self.assertEqual(len(event['label']['name']), expected)
+            self.assertLessEqual(len(event['label']['name']), 50)
+            self.assertEqual(ge.validate_event(event, env, mode)[0], HEAD)
+            wrongs = [prefix + '0' * 40, prefix + HEAD[:-1],
+                      ('pr122-roq-' if mode == 'dispatch' else 'pr122-ro-') + HEAD,
+                      ('pr122-staging-readonly-' if mode == 'dispatch' else
+                       'pr122-staging-readonly-query-') + HEAD]
+            for wrong in wrongs:
+                with self.subTest(mode=mode, label=wrong):
+                    altered = copy.deepcopy(event)
+                    altered['label']['name'] = wrong
+                    with self.assertRaisesRegex(ge.Hold, 'EVENT_NOT_EXACT'):
+                        ge.validate_event(altered, env, mode)
+
+    def test_duplicate_label_does_not_allow_second_dispatch(self):
+        api = FakeGitHub()
+        api.history = [run(1, 1), run(2, 2), run(3, 3)]
+        api.current = run(3, 3)
+        api.env['GITHUB_RUN_ID'] = '3'
+        api.job_rows[2] = [job(2, 'success')]
+        with self.assertRaisesRegex(ge.Hold, 'HEAD_CLOUD_JOB_ALREADY_STARTED'):
+            ge.live_admission(api, api.event, api.env, 'dispatch')
+
+    def test_history_missing_page_or_deleted_run_stays_hold(self):
+        api = FakeGitHub()
+        api.history = [run(1, 1), run(2, 3)]
+        with self.assertRaisesRegex(ge.Hold, 'RUN_HISTORY_GAP_HOLD'):
+            ge.live_admission(api, api.event, api.env, 'dispatch')
+        class NoHistory(FakeGitHub):
+            def runs(self, workflow_id):
+                raise ge.Hold('HISTORY_MISSING_PAGE')
+        other = NoHistory()
+        with self.assertRaisesRegex(ge.Hold, 'HISTORY_MISSING_PAGE'):
+            ge.live_admission(other, other.event, other.env, 'dispatch')
+
+    def test_yaml_exact_labels_and_template_identity(self):
+        text = ge.TEMPLATE_PATH.read_text()
+        self.assertIn("format('pr122-ro-{0}'", text)
+        self.assertIn("format('pr122-roq-{0}'", text)
+        self.assertNotIn("format('pr122-staging-readonly-", text)
 
 
 if __name__ == '__main__':

@@ -18,7 +18,7 @@ env:
 # One workflow/action family per exact source HEAD. A later queued label must
 # inspect the earlier finished cloud job, not take a second clean-run path.
 concurrency:
-  group: pr122-staging-readonly-${{ github.event.pull_request.head.sha || github.sha }}
+  group: pr122-ro-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
       github.event.sender.id == 332398908 && github.event.pull_request.number == 122 &&
       github.event.pull_request.head.repo.id == 1413132159 &&
       github.event.pull_request.head.ref == 'feature/stage5-next25-integration-20261015' &&
-      github.event.label.name == format('pr122-staging-readonly-{0}', github.event.pull_request.head.sha)
+      github.event.label.name == format('pr122-ro-{0}', github.event.pull_request.head.sha)
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
@@ -107,7 +107,7 @@ jobs:
       github.event.sender.id == 332398908 && github.event.pull_request.number == 122 &&
       github.event.pull_request.head.repo.id == 1413132159 &&
       github.event.pull_request.head.ref == 'feature/stage5-next25-integration-20261015' &&
-      github.event.label.name == format('pr122-staging-readonly-query-{0}', github.event.pull_request.head.sha)
+      github.event.label.name == format('pr122-roq-{0}', github.event.pull_request.head.sha)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:

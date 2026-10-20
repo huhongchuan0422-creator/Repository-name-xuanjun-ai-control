@@ -192,7 +192,7 @@ def validate_event(event, env, mode):
     pr = event.get('pull_request', {})
     head = pr.get('head', {}).get('sha')
     require(type(head) is str and SHA40.fullmatch(head), 'HEAD_SHA')
-    prefix = 'pr122-staging-readonly-' if mode == 'dispatch' else 'pr122-staging-readonly-query-'
+    prefix = 'pr122-ro-' if mode == 'dispatch' else 'pr122-roq-'
     require(env.get('GITHUB_EVENT_NAME') == 'pull_request' and event.get('action') == 'labeled'
             and env.get('GITHUB_REPOSITORY') == REPOSITORY
             and env.get('GITHUB_REPOSITORY_ID') == str(REPOSITORY_ID)
