@@ -320,6 +320,9 @@ class Coordinator:
     def run(self):
         self.load();self.inherit_or_verify()
         if self.data['attempts']:
+            if (self.data.get('state')=='HOLD' and self.data.get('failures')
+                    and self.data['failures'][-1].get('cause_code')=='STATIC_SAFE_RETRY_PUBLIC_BUDGET'):
+                raise WorkflowStopped(self.summary())
             state=self.settle_readonly()
             if state=='SUCCESS':return self.summary()
             if state in ('HOLD','EXHAUSTED'):raise WorkflowStopped(self.summary())
