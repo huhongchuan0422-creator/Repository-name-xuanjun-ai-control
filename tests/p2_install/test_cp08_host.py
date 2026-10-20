@@ -99,7 +99,12 @@ class Transport(unittest.TestCase):
 
 class HostAPI(unittest.TestCase):
     def setUp(self):self.tmp=tempfile.TemporaryDirectory(prefix='p2-host-api-');self.root=Path(self.tmp.name)
-    def tearDown(self):self.tmp.cleanup()
+    def tearDown(self):
+        # Only new test-owned readonly directories; Python3.6's rmtree does not
+        # repair permissions, and cap-drop ALL correctly removes DAC override.
+        for p in self.root.rglob('*'):
+            if p.is_dir():p.chmod(0o700)
+        self.tmp.cleanup()
 
     def test_exact_python_version_when_required(self):
         if os.environ.get('REQUIRE_PYTHON368')=='1':self.assertEqual(sys.version_info[:3],(3,6,8))
