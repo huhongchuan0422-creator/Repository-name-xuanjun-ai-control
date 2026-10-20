@@ -70,7 +70,12 @@ def proc_contract(unit,user=False):
 def gateway_argv(path,env):
     lines=Path(path).read_text().splitlines();values=[x.split('=',1)[1] for x in lines if x.startswith('ExecStart=') and x.split('=',1)[1]]
     require(len(values)==1 and not any(x.endswith('\\') for x in lines),'UNSUPPORTED_GATEWAY_UNIT_SYNTAX')
-    argv=shlex.split(values[0]);require(argv[:2]==[str(NODE/'bin/node'),str(NODE/'lib/node_modules/openclaw/dist/index.js')],'GATEWAY_ENTRY_CHANGED')
+    argv=shlex.split(values[0])
+    require(bool(argv) and argv[0]==str(NODE/'bin/node'),'GATEWAY_ENTRY_CHANGED')
+    index=1
+    if len(argv)>index and re.fullmatch(r'--max-old-space-size=[1-9][0-9]{0,5}',argv[index]):index+=1
+    require(len(argv)>index and argv[index]==str(NODE/'lib/node_modules/openclaw/dist/index.js'),'GATEWAY_ENTRY_CHANGED')
+    require(argv[index+1:]==['gateway','--port','11505'],'GATEWAY_ARGUMENTS_CHANGED')
     require(not any('$' in x or '%' in x for x in argv),'GATEWAY_SPECIFIERS_REQUIRE_BINDING')
     return argv
 
