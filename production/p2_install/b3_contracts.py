@@ -4,11 +4,13 @@ These validators are not CP04--09 installation receipts. An unavailable runtime
 contract must remain HOLD; passing unit tests does not close that dependency.
 """
 import hashlib
+import json
 import os
 from pathlib import Path
 import stat
 import subprocess
 import sys
+import uuid
 
 
 class Hold(ValueError):
@@ -54,9 +56,47 @@ IDENTITY = ('installation_id', 'instance', 'ledger_uuid', 'generation',
             'db_path', 'ledger_socket')
 
 
+def cp03_identity(root, receipt_sha256):
+    """Read the original CP03 receipt/config/descriptor/journal; never reconcile."""
+    root = Path(root)
+    receipt = json.loads(pinned_file(root/'commit-receipt.json', receipt_sha256))
+    need(receipt['status'] == 'COMMITTED' and receipt['scope'] == 'ISOLATED_TEST_ONLY'
+         and receipt['origin'] == 'ISOLATED_NEW'
+         and receipt['full_b3_complete'] is False, 'CP03_RECEIPT_IDENTITY')
+    cfg = json.loads(pinned_file(root/'binding-config.json', receipt['config_sha256']))
+    desc = json.loads(pinned_file(root/'activation/active.json', receipt['descriptor_file_sha256']))
+    pinned_file(root/'activation/epochs.jsonl', receipt['journal_sha256'])
+    need(desc['state'] == 'PREPARED' and desc['epoch'] == 1 and
+         desc['generation'] == 1 and cfg['initial_state'] == 'PREPARED' and
+         cfg['initial_epoch'] == 1, 'CP03_PREPARED_ONLY')
+    need(receipt['installation_id'] == cfg['installation_id'] and
+         desc['config_sha256'] == receipt['config_sha256'] and
+         desc['binary_sha256'] == receipt['binary_sha256'] and
+         desc['release_sha256'] == cfg['release_manifest_sha256'] and
+         all(desc[k] == cfg[k] for k in ('instance','ledger_uuid','generation',
+                                         'db_path','ledger_socket')), 'CP03_BINDING_CONFLICT')
+    need(cfg['db_path'] == str(root/'data/ledger.sqlite3') and
+         cfg['ledger_socket'] == str(root/'run/ledger.sock'), 'CP03_RESERVED_PATHS')
+    need(not os.path.lexists(cfg['db_path']) and not os.path.lexists(cfg['ledger_socket']),
+         'B3_UNEXPECTED_DATABASE_OR_SOCKET')
+    return {k: (receipt[k] if k == 'installation_id' else desc[k]) for k in IDENTITY}
+
+
 def identity(expected, observed):
     """Compare configuration identity separately from a live process identity."""
     need(set(expected) == set(IDENTITY), 'EXPECTED_IDENTITY_FIELDS')
+    need(isinstance(expected['installation_id'],str) and bool(expected['installation_id'])
+         and type(expected['generation']) is int and expected['generation'] == 1,
+         'EXPECTED_IDENTITY_TYPES')
+    for name in ('instance','ledger_uuid'):
+        need(str(uuid.UUID(expected[name])) == expected[name], 'EXPECTED_UUID')
+    for name in ('release_sha256','config_sha256','binary_sha256'):
+        value = expected[name]
+        need(isinstance(value,str) and len(value) == 64 and
+             all(x in '0123456789abcdef' for x in value), 'EXPECTED_SHA')
+    for name in ('db_path','ledger_socket'):
+        value = Path(expected[name])
+        need(value.is_absolute() and '..' not in value.parts, 'EXPECTED_PATH')
     need(isinstance(observed, dict) and set(observed) == {'identity', 'process'},
          'OBSERVED_FIELDS')
     need(observed['identity'] == expected, 'IDENTITY_CONFLICT')
