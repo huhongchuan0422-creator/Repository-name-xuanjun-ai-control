@@ -1,0 +1,44 @@
+name: P2 B3 canonical ledger preparation
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - 'production/p2_install/b3_ledger.py'
+      - 'production/p2_install/b3_contracts.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/runtime/stage1/ledger_service.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/runtime/stage1/ledger_prepared.py'
+      - 'tests/p2_install/test_b3_ledger.py'
+      - '.github/workflows/p2-b3-ledger.yml'
+  pull_request:
+    paths:
+      - 'production/p2_install/b3_ledger.py'
+      - 'production/p2_install/b3_contracts.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/runtime/stage1/ledger_service.py'
+      - 'evidence/p2-epoch7-access-repair-20261014/runtime/stage1/ledger_prepared.py'
+      - 'tests/p2_install/test_b3_ledger.py'
+      - '.github/workflows/p2-b3-ledger.yml'
+permissions:
+  contents: read
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python }}'
+      - name: Real separate-UID filesystem probes in disposable Hosted runner
+        run: sudo env P2_REQUIRE_OS_DENIAL=1 "$(command -v python)" -B tests/p2_install/test_b3_ledger.py -v
+      - name: Build source delivery with original complete runtime
+        run: |
+          mkdir delivery
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf delivery/b3-ledger-source.tar.gz production/p2_install/initialize.py production/p2_install/b3_contracts.py production/p2_install/b3_ledger.py evidence/p2-epoch7-access-repair-20261014/runtime tests/p2_install/test_b3_ledger.py
+          sha256sum delivery/b3-ledger-source.tar.gz > delivery/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: b3-ledger-source-python-${{ matrix.python }}
+          path: delivery/
