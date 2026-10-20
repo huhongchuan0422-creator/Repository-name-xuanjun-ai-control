@@ -572,7 +572,18 @@ class OriginalStaticOperations:
             'HTTPS_SMOKE': lambda: self._static_https(lease),
             'STATIC_CHECK': lambda: self._publisher_action('check', lease),
         }
-        self._admit(lease)
+        try:
+            self._admit(lease)
+        except Denied as error:
+            # This admission is immediately before the stage effect.  Preserve
+            # the original budget rejection semantics, but expose one exact
+            # machine-readable stop only when the child transaction is still at
+            # the clean next-step boundary and no stage effect has begun.
+            if (public and str(error) == 'HOLD:STATIC_GITHUB_PUBLIC_PHASE_BUDGET'
+                    and data['completed'] == list(STATIC_STAGES[:index])
+                    and data['intent'] is None):
+                raise Denied('HOLD:STATIC_SAFE_RETRY_PUBLIC_BUDGET') from None
+            raise
         # Revalidate the immediate activation conditions again, not just a prior
         # completed pre-activation check, before the actual pointer-switch intent.
         if stage == 'STATIC_ACTIVATED':
