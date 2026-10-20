@@ -256,6 +256,22 @@ class CoordinatorTests(unittest.TestCase):
                 "SELECT evidence FROM coordinator_failures ORDER BY seq")]
             self.assertEqual({x["root_cause"] for x in evidence},{"ROOT_A","ROOT_B"})
 
+    def test_unknown_automatic_failures_do_not_merge_across_attempts(self):
+        first=self.request("unknown-a")
+        second=self.request("unknown-b")
+        with self.open() as c:
+            c._store(first); c._store(second)
+            c._automatic_failure(first,"RECONCILE_REQUIRED",
+                                 {"error":{"code":"TIMEOUT_UNKNOWN"}})
+            c._automatic_failure(second,"RECONCILE_REQUIRED",
+                                 {"error":{"code":"TIMEOUT_UNKNOWN"}})
+            rows=c.journal.db.execute(
+                "SELECT evidence FROM coordinator_failures ORDER BY seq").fetchall()
+            self.assertEqual(len(rows),2)
+            self.assertEqual(
+                {json.loads(x[0])["attempt_id"] for x in rows},
+                {"unknown-a","unknown-b"})
+
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
         for number in range(7):
