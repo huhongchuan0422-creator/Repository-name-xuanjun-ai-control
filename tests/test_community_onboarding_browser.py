@@ -110,6 +110,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     expect(admin.locator('#applicationState')).to_have_text('待审核');self.assertEqual(application(admin),original_id)
                     before_unreviewed=revision(admin)
                     admin.locator('#note').fill('不得跳过逐份复审')
+                    # Capture the one onboarding response first; inspect its request body after the event callback returns.
                     phase('UNREVIEWED_APPROVE_CLICK')
                     with admin.expect_response(lambda response:response.url.endswith('/merchant/onboarding'),timeout=10000) as rejected:
                         admin.locator('[data-action=APPROVE]').click()
