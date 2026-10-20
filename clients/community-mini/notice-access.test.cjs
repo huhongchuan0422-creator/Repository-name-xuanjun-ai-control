@@ -16,7 +16,7 @@ async function ready(){
   }};
   vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:value=>definition=value,require:p=>p==='../../customer-auth'?auth:{},wx});
   const session=createSession(wx,'https://fixture.invalid',()=>clock);await session.login();
-  const page={...definition,data:structuredClone(definition.data),session,scene:'shop1',_pageGeneration:1,
+  const page={...definition,data:structuredClone(definition.data),session,scene:'shop1',_pageGeneration:1,_authEpoch:auth.current(),
     setData(value){writes.push(value);Object.assign(this.data,value);}};
   page.setData({userId:'user1',projectCustomerId:'customer1'});
   const reply=(index,result)=>requests[index].success({statusCode:200,data:{payment_enabled:false,result}});
