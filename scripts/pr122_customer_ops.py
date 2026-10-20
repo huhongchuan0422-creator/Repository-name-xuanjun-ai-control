@@ -167,6 +167,14 @@ def main():
         account=pwd.getpwnam('xuanjun-customer')
         if account.pw_uid<=0:raise SystemExit('HOLD: NON_ROOT_ACCOUNT_REQUIRED')
         os.umask(0o077);os.setgroups([]);os.setgid(account.pw_gid);os.setuid(account.pw_uid)
+    if args.action=='restore-isolated':
+        # Reuse the original isolated restore path without constructing the live Center.
+        # Root/host/profile checks and privilege drop above remain mandatory.
+        keys={k:base64.b64decode(v,validate=True) for k,v in config['keys'].items()}
+        result=restore(args.input,args.output,base64.b64decode(config['backup_key'],validate=True),
+                       keys,config['active_key'])
+        print(json.dumps(result,ensure_ascii=False))
+        return
     c=factory(config)
     selected=profile(config)
     try:
