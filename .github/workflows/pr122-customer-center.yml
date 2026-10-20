@@ -4,10 +4,6 @@ on:
   push:
     branches: [feature/work-pr122-site-hub-integration-20261016]
     paths:
-      - 'tools/pr122_readonly_delta_collect.py'
-      - 'tests/test_pr122_readonly_delta_collect.py'
-      - 'tests/test_pr122_readonly_delta_schema.py'
-      - 'docs/development/PR122_READONLY_DELTA_COLLECTION.md'
       - 'tools/pr122_login_config_prepare.py'
       - 'tests/test_pr122_login_config_prepare.py'
       - 'docs/development/PR122_LOGIN_CONFIG_PREPARATION.md'
@@ -77,51 +73,26 @@ jobs:
           (folder/'OFFLINE_CONFIG_BINDING.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
           print(json.dumps(receipt,sort_keys=True))
           PYOFFLINE
-      - name: Exact 138 fixed read-only collector regressions Python 3.11
+      - name: Removed collector reference and tree consistency
         shell: bash
         run: |
           set -euo pipefail
-          export PR122_SOURCE_TREE="$(git rev-parse HEAD^{tree})"
-          python -I -B tools/pr122_readonly_delta_collect.py --help > /tmp/pr122-customer/READONLY_DELTA_HELP.txt
-          python -B - <<'PYDELTA' 2>&1 | tee /tmp/pr122-customer/READONLY_DELTA_TESTS.log
-          import hashlib,json,os,sys,unittest
+          python - <<'PY'
           from pathlib import Path
-          assert sys.version_info[:2]==(3,11), 'Target Python version changed'
-          assert os.geteuid()!=0, 'Collector synthetic tests must run non-root'
-          blocked=[]
-          def guard(event,args):
-              if event.startswith('socket.') or event in ('subprocess.Popen','os.system','os.posix_spawn','os.fork','os.forkpty','os.exec'):
-                  blocked.append(event)
-                  raise AssertionError('FORBIDDEN_NETWORK_OR_PROCESS')
-              if event=='open' and args and isinstance(args[0],str) and any(args[0]==p or args[0].startswith(p+'/') for p in ('/etc/xuanjun-customer-center','/var/lib/xuanjun-customer-center','/var/lib/xuanjun-customer-channel','/var/lib/xuanjun-customer-release','/var/lib/xuanjun-customer-preflight','/usr/local/lib/xuanjun-customer-center','/root/pr122-customer-channel-upgrade-inputs')):
-                  blocked.append('protected-path')
-                  raise AssertionError('FORBIDDEN_PRODUCTION_PATH')
-          sys.addaudithook(guard)
-          suite=unittest.defaultTestLoader.loadTestsFromNames(['tests.test_pr122_readonly_delta_collect','tests.test_pr122_readonly_delta_schema'])
-          def ids(group):
-              for case in group:
-                  if isinstance(case,unittest.TestSuite):yield from ids(case)
-                  else:yield case.id()
-          test_ids=list(ids(suite))
-          test_id_sha=hashlib.sha256(json.dumps(test_ids,separators=(',',':')).encode()).hexdigest()
-          assert len(test_ids)==len(set(test_ids))==suite.countTestCases()==138
-          assert test_id_sha=='7e6c7b9d3675480e016c9cdad93f8401e6e66707bfced808bc6809847c0bd5da', 'Exact collector test IDs changed'
-          result=unittest.TextTestRunner(verbosity=2).run(suite)
-          assert result.testsRun==138 and result.wasSuccessful() and not result.skipped and not result.expectedFailures and not result.unexpectedSuccesses and not blocked
-          folder=Path('/tmp/pr122-customer/readonly-delta-collector')
-          folder.mkdir()
-          bindings=[]
-          for name in ('tools/pr122_readonly_delta_collect.py','tests/test_pr122_readonly_delta_collect.py','tests/test_pr122_readonly_delta_schema.py','docs/development/PR122_READONLY_DELTA_COLLECTION.md','.github/workflows/pr122-customer-center.yml'):
-              body=Path(name).read_bytes()
-              artifact_path='workflow/pr122-customer-center.yml' if name=='.github/workflows/pr122-customer-center.yml' else name
-              target=folder/artifact_path
-              target.parent.mkdir(parents=True,exist_ok=True)
-              target.write_bytes(body)
-              bindings.append({'path':name,'artifact_path':artifact_path,'size':len(body),'sha256':hashlib.sha256(body).hexdigest()})
-          receipt={'source_commit':os.environ['GITHUB_SHA'],'source_tree':os.environ['PR122_SOURCE_TREE'],'run_id':os.environ['GITHUB_RUN_ID'],'python':sys.version,'total':result.testsRun,'passed':result.testsRun,'skipped':0,'errors':0,'failures':0,'expected_failures':0,'unexpected_successes':0,'blocked_network_process_or_protected_path_attempts':blocked,'test_ids':test_ids,'test_ids_sha256':test_id_sha,'files':bindings,'scope':'FIXED_COLLECTOR_SYNTHETIC_ONLY','production_release':'HOLD','real_credentials':'NOT_USED','target_collection':'NOT_RUN'}
-          (folder/'READONLY_DELTA_BINDING.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
-          print(json.dumps(receipt,sort_keys=True))
-          PYDELTA
+          removed=[
+              'tools/'+'pr122_'+'readonly_'+'delta_'+'collect.py',
+              'tests/'+'test_'+'pr122_'+'readonly_'+'delta_'+'collect.py',
+              'tests/'+'test_'+'pr122_'+'readonly_'+'delta_'+'schema.py',
+              'docs/development/'+'PR122_'+'READONLY_'+'DELTA_'+'COLLECTION.md',
+          ]
+          workflow=Path('.github/workflows/pr122-customer-center.yml').read_text()
+          for item in removed:
+              assert not Path(item).exists(), 'REMOVED_COLLECTOR_PATH_REAPPEARED:'+item
+              assert item not in workflow, 'REMOVED_COLLECTOR_REFERENCE_REAPPEARED:'+item
+          assert ('READONLY_'+'DELTA_'+'BINDING.json') not in workflow
+          assert ('readonly-'+'delta-'+'collector') not in workflow
+          print('REMOVED_COLLECTOR_REFERENCE_CLOSURE=PASS; PATHS=4')
+          PY
       - name: Authentication authorization material channels and encrypted restore
         shell: bash
         run: |
@@ -315,23 +286,6 @@ jobs:
               expected_artifact_path='workflow/pr122-customer-center.yml' if item['path']=='.github/workflows/pr122-customer-center.yml' else item['path']
               assert item['artifact_path']==expected_artifact_path
               body=(offline/item['artifact_path']).read_bytes()
-              assert len(body)==item['size'] and sha(body)==item['sha256'] and body==Path(item['path']).read_bytes()
-          delta=folder/'readonly-delta-collector'
-          delta_binding=json.loads((delta/'READONLY_DELTA_BINDING.json').read_bytes())
-          assert set(delta_binding)=={'source_commit','source_tree','run_id','python','total','passed','skipped','errors','failures','expected_failures','unexpected_successes','blocked_network_process_or_protected_path_attempts','test_ids','test_ids_sha256','files','scope','production_release','real_credentials','target_collection'}
-          assert delta_binding['source_commit']==os.environ['GITHUB_SHA'] and delta_binding['source_tree']==manifest['source_tree'] and str(delta_binding['run_id'])==os.environ['GITHUB_RUN_ID']
-          assert delta_binding['total']==delta_binding['passed']==138 and all(delta_binding[key]==0 for key in ('skipped','errors','failures','expected_failures','unexpected_successes'))
-          assert delta_binding['blocked_network_process_or_protected_path_attempts']==[] and delta_binding['scope']=='FIXED_COLLECTOR_SYNTHETIC_ONLY' and delta_binding['production_release']=='HOLD'
-          assert delta_binding['real_credentials']=='NOT_USED' and delta_binding['target_collection']=='NOT_RUN' and delta_binding['python'].startswith('3.11.')
-          assert len(delta_binding['test_ids'])==len(set(delta_binding['test_ids']))==138
-          assert sha(json.dumps(delta_binding['test_ids'],separators=(',',':')).encode())==delta_binding['test_ids_sha256']=='7e6c7b9d3675480e016c9cdad93f8401e6e66707bfced808bc6809847c0bd5da'
-          assert {item['path'] for item in delta_binding['files']}=={'tools/pr122_readonly_delta_collect.py','tests/test_pr122_readonly_delta_collect.py','tests/test_pr122_readonly_delta_schema.py','docs/development/PR122_READONLY_DELTA_COLLECTION.md','.github/workflows/pr122-customer-center.yml'}
-          assert len(delta_binding['files'])==5
-          for item in delta_binding['files']:
-              assert set(item)=={'path','artifact_path','size','sha256'}
-              expected_artifact_path='workflow/pr122-customer-center.yml' if item['path']=='.github/workflows/pr122-customer-center.yml' else item['path']
-              assert item['artifact_path']==expected_artifact_path
-              body=(delta/item['artifact_path']).read_bytes()
               assert len(body)==item['size'] and sha(body)==item['sha256'] and body==Path(item['path']).read_bytes()
           print(json.dumps({'downloaded_tar_sha256':sha(raw),'manifest_sha256':sha(manifest_raw),'members':len(items),'bound_files':len(files),'source_closure':'PASS','channel_roundtrip':'PASS','raw_zip_recalculation':'INDEPENDENT_REVIEW_PENDING'},sort_keys=True))
           PY
