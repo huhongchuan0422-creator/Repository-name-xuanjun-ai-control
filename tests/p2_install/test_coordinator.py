@@ -308,6 +308,59 @@ class CoordinatorTests(unittest.TestCase):
                 {"auto-"+digest([req["attempt_id"],"UNKNOWN"])[:32],
                  "explicit-new-failure"})
 
+    def test_failure_log_real_path_boundaries(self):
+        req=self.request("log-boundary")
+        inside=Path(self.component)/"inside.log"
+        inside.write_bytes(b"inside-log")
+        outside=Path(self.root)/"outside.log"
+        outside.write_bytes(b"outside-secret")
+        escape_dir=Path(self.root)/"escape"
+        escape_dir.mkdir()
+        (escape_dir/"secret.log").write_bytes(b"symlink-secret")
+        link=Path(self.component)/"linked"
+        link.symlink_to(escape_dir, target_is_directory=True)
+
+        cases=[
+            ("inside",str(inside),"VERIFIED",None),
+            ("outside",str(outside),"UNKNOWN","FAILURE_LOG_OUTSIDE_ROOT"),
+            ("dotdot",str(Path(self.component)/"sub"/".."/"inside.log"),
+             "UNKNOWN","FAILURE_LOG_DOTDOT"),
+            ("symlink",str(link/"secret.log"),"UNKNOWN",None),
+        ]
+        with self.open() as c:
+            c._store(req)
+            for label,path,status,reason in cases:
+                event={"event_id":"log-"+label,"log":path,
+                       "error":{"code":"LOG_CASE_"+label.upper()}}
+                self.assertTrue(c.failure(req,"LOG_CASE_"+label.upper(),event))
+            rows=[json.loads(x[0]) for x in c.journal.db.execute(
+                "SELECT evidence FROM coordinator_failures ORDER BY seq")]
+            self.assertEqual(len(rows),4)
+            refs={x["event_id"]:x["references"]["log"] for x in rows}
+            self.assertEqual(refs["log-inside"]["status"],"VERIFIED")
+            self.assertEqual(
+                refs["log-inside"]["sha256"],
+                hashlib.sha256(b"inside-log").hexdigest())
+            self.assertEqual(refs["log-outside"],
+                             {"status":"UNKNOWN","reason":"FAILURE_LOG_OUTSIDE_ROOT"})
+            self.assertEqual(refs["log-dotdot"],
+                             {"status":"UNKNOWN","reason":"FAILURE_LOG_DOTDOT"})
+            self.assertEqual(refs["log-symlink"]["status"],"UNKNOWN")
+            self.assertTrue(refs["log-symlink"]["reason"].startswith(
+                "FAILURE_LOG_OSERROR_"))
+
+        # Reopen does not change identities, counts, or first timestamps.
+        with self.open() as c:
+            before=c.journal.db.execute(
+                "SELECT seq,observed,evidence,event_key FROM coordinator_failures ORDER BY seq").fetchall()
+            self.assertFalse(c.failure(
+                req,"LOG_CASE_INSIDE",
+                {"event_id":"log-inside","log":str(inside),
+                 "error":{"code":"LOG_CASE_INSIDE"}}))
+            after=c.journal.db.execute(
+                "SELECT seq,observed,evidence,event_key FROM coordinator_failures ORDER BY seq").fetchall()
+            self.assertEqual(before,after)
+
     def test_more_than_five_isolated_node_attempts_not_quota(self):
         self.effect.mode="NO_EFFECT"
         for number in range(7):
