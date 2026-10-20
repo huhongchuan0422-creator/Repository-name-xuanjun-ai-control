@@ -13,7 +13,7 @@ permissions:
 # Source is an immutable literal in the actual PR122 branch's only new file.
 # The inert source-branch template is mechanically substituted after source CAS.
 env:
-  READONLY_SOURCE_HEAD: '2e7bdfe773e08c3e4f267069f28e41ddcd04bd76'
+  READONLY_SOURCE_HEAD: '999cf501dd06259cfd8ebe5cdc137ff596d6af18'
 
 # One workflow/action family per exact source HEAD. A later queued label must
 # inspect the earlier finished cloud job, not take a second clean-run path.
@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: '2e7bdfe773e08c3e4f267069f28e41ddcd04bd76'
+          ref: '999cf501dd06259cfd8ebe5cdc137ff596d6af18'
           persist-credentials: false
       - name: Pure mock tests without cloud credentials
         run: python3 -m unittest discover -s evidence/pr122-static-cloud-readonly -p 'test_*.py' -v
@@ -45,7 +45,7 @@ jobs:
       github.event.sender.id == 332398908 && github.event.pull_request.number == 122 &&
       github.event.pull_request.head.repo.id == 1413132159 &&
       github.event.pull_request.head.ref == 'feature/stage5-next25-integration-20261015' &&
-      github.event.label.name == format('pr122-staging-readonly-{0}', github.event.pull_request.head.sha)
+      github.event.label.name == format('pr122-ro-{0}', github.event.pull_request.head.sha)
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: '2e7bdfe773e08c3e4f267069f28e41ddcd04bd76'
+          ref: '999cf501dd06259cfd8ebe5cdc137ff596d6af18'
           persist-credentials: false
       - name: Verify current HEAD and complete history; prepare fixed intent
         run: python3 evidence/pr122-static-cloud-readonly/fixed_runner.py prepare-dispatch
@@ -107,7 +107,7 @@ jobs:
       github.event.sender.id == 332398908 && github.event.pull_request.number == 122 &&
       github.event.pull_request.head.repo.id == 1413132159 &&
       github.event.pull_request.head.ref == 'feature/stage5-next25-integration-20261015' &&
-      github.event.label.name == format('pr122-staging-readonly-query-{0}', github.event.pull_request.head.sha)
+      github.event.label.name == format('pr122-roq-{0}', github.event.pull_request.head.sha)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -115,7 +115,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: '2e7bdfe773e08c3e4f267069f28e41ddcd04bd76'
+          ref: '999cf501dd06259cfd8ebe5cdc137ff596d6af18'
           persist-credentials: false
       - name: Recover exact prior InvokeId from verified artifacts; query only
         env:
