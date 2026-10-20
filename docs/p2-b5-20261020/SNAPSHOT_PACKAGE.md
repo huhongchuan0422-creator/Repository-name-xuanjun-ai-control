@@ -4,9 +4,9 @@ Baseline db54bd818ade4a9ae51cd833193566c9acb72ae7. Existing B1–B4 and 17 loade
 
 ## Candidate A: one fixed bounded source acquisition
 
-Complete candidate command is [SNAPSHOT_CANDIDATE.sh](SNAPSHOT_CANDIDATE.sh), SHA256 `1c0d8179ac529b54ff31d8572348ce1e91c88fb668cf65d98fbd7690af750431`. This is a SOURCE capture, not plugin installation. Do not execute until the entire action list is confirmed. Do not run the earlier four-file inventory first.
+Complete candidate command is [SNAPSHOT_CANDIDATE.sh](SNAPSHOT_CANDIDATE.sh), SHA256 `1ef3e0660b0eab3b2aafc5261dc62dbe63a8f8981bc3634d89068c6dec7bb346`. This is a SOURCE capture, not plugin installation. Do not execute until the entire action list is confirmed. Do not run the earlier four-file inventory first.
 
-Fixed source collector: commit `4b394748dc1d1857ad7e5e952e6f0ebf4413a7aa`, `scripts/p2_b5_snapshot.py`, SHA256 `1735c78307b4516edab328befa3da89b63d64c71a4d13b8c5f5eb70ec93e1ae4`. Candidate fetches only this exact source over HTTPS without proxy credentials, verifies bytes, compiles syntax, then invokes it through stdin. No runtime package download, Node invocation, SDK import or Docker action in A.
+Fixed source collector: commit `7c12b368b3586ba0b2d1f91498d8f9f4ed2d95b5`, `scripts/p2_b5_snapshot.py`, SHA256 `505fbcaca2edb0ce3d9cfc697008242dd2e270d71dd394beede82679b003bf85`. Candidate fetches only this exact source over HTTPS without proxy credentials, verifies bytes, compiles syntax, then invokes it through stdin. No runtime package download, Node invocation, SDK import or Docker action in A.
 
 | Boundary | Frozen scope |
 |---|---|
