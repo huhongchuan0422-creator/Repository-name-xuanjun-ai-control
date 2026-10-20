@@ -460,3 +460,14 @@ CP07新目录访问核验 → CP08交接权限核验 → CP09 TLS适用性结论
 若其中任何项仍UNKNOWN，保持对应项HOLD，不能靠“只剩一条命令”或把不适用写PASS强行关闭B3。
 B4–B7/P3、生产切换、真实DB/socket/服务启动不并入本轮B3收口；不新增第八批。
 本轮服务器操作/新Hosted/功能测试均NOT_EXECUTED，只有方案/来源一致性检查。
+
+
+### B3剩余源码本轮实际交付（任务6283318033）
+
+状态PARTIAL，B1/B2/CP03不重装。新增`b3_contracts.py`和`b3_checkpoint.py`，实现原CP03四份来源只读摘要消费、expected/observed身份区分、精确路径主体、实际调用者访问检查、TLS未知HOLD，以及复用原发布原语和原初始化锁的不可变证据留存。留存不等于安装阶段提交，所有输出明确`installation_stage_complete=false`。
+
+源码与实际测试绑定在[DELIVERY.json](../../docs/p2-b3-rest-20261020/DELIVERY.json)。测试版本4fd1cfc008b81ce6d583e6bc2ca2c30c4c0ec8ed；[Hosted 39369848274](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39369848274) SUCCESS，Python3.11/3.12各18通过、1跳过。跳过的是独立UID拒绝探测，不能作为拒绝成功证据。SIGKILL后新进程recover、重复返回原引用、冲突不覆盖及CP03原件不变的定向测试通过。
+
+已查真实p2_attempt5/p2_recovery入口、Provider、Observer和原sandbox消费链。它们分别依赖root、历史签名恢复、Grant/Registry/Signer或固定宿主profile，不存在已确定的本次UID1002新隔离应用消费配置。499运行组件是进程管理器，a766协调器为有限CLI，二者均不自动成为应用服务；不拿测试服务补位。实际argv/cwd/env/health仍UNAVAILABLE，实际TLS仍UNKNOWN。
+
+尚未完成：CP04–09消费方集中接线、正式逐阶段完成回执、实际应用消费验证、独立主体拒绝证据与最终英国操作包。没有最终Owner安装命令，剩余次数UNKNOWN，1条仍为未验证目标。本轮无服务器操作、无权限/凭据/DB/socket/服务变更，不恢复旧历史前置。
