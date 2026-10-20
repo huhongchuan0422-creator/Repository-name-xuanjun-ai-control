@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const {createSession}=require('./session');
+const auth=require('./customer-auth');
 const event=dataset=>({currentTarget:{dataset}});
 const key=n=>n.toString(16).padStart(64,'0');
 const rows=Array.from({length:50},(_,i)=>({id:key(i+1),message:'Synthetic private notification '+i,read:false}));
@@ -13,7 +14,7 @@ async function ready(){
       session_token:String(logins).repeat(32),expires_at:200,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
     else requests.push(o);
   }};
-  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:value=>definition=value,require:()=>({}),wx});
+  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:value=>definition=value,require:p=>p==='../../customer-auth'?auth:{},wx});
   const session=createSession(wx,'https://fixture.invalid',()=>clock);await session.login();
   const page={...definition,data:structuredClone(definition.data),session,scene:'shop1',_pageGeneration:1,
     setData(value){writes.push(value);Object.assign(this.data,value);}};
