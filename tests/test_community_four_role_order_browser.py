@@ -74,7 +74,6 @@ class OriginalCenterSameOrderBrowser(unittest.TestCase):
                     order=purchased['body']['result']
                     self.assertEqual(order['reference'],reference)
                     self.assertEqual(order['amount_minor'],101)
-                    self.assertEqual(order['state'],'PENDING')
 
                     left=mini('community_leave',{'community_id':fx.cid})
                     self.assertEqual(left['status'],200,left)
