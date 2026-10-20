@@ -1,0 +1,8 @@
+<view>
+  <text>客户中心</text>
+  <text>{{status}}</text>
+  <button wx:if="{{!authenticated}}" bindtap="retryLogin" disabled="{{pending}}">重新登录</button>
+  <button wx:if="{{authenticated}}" bindtap="openProfile" disabled="{{pending}}">本人资料</button>
+  <button bindtap="openCheckout" disabled="{{pending}}">扫码收款 / 订单</button>
+  <button wx:if="{{authenticated}}" bindtap="logout" disabled="{{pending}}">退出登录</button>
+</view>
