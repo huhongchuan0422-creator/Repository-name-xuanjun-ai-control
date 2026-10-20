@@ -45,7 +45,7 @@ class Handler(Base):
             context=urllib.parse.quote(json.dumps({'csrf':fx.web['csrf'],'workspace':workspace},separators=(',',':')))
             self.send_response(302)
             self.send_header('Set-Cookie',COOKIE+'='+fx.web['token']+'; Path=/; Secure; HttpOnly; SameSite=Strict')
-            self.send_header('Location',target+'?preview_context='+context)
+            self.send_header('Location',target+'#preview='+context)
             self.send_header('Cache-Control','no-store');self.send_header('Referrer-Policy','no-referrer')
             self.end_headers();self.close_connection=True;return
         return super().do_GET()

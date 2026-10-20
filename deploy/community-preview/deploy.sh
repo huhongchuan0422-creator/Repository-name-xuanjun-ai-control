@@ -34,6 +34,7 @@ rollback(){
  nginx -t && systemctl reload nginx
  if [ -e "$BACKUP/enabled" ];then systemctl enable xuanjun-community-preview.service >/dev/null 2>&1;else systemctl disable xuanjun-community-preview.service >/dev/null 2>&1;fi
  if [ -e "$BACKUP/active" ];then systemctl start xuanjun-community-preview.service;fi
+ if [ -d "$RELEASE" ];then rm -rf --one-file-system "$RELEASE";fi
  echo ROLLBACK_COMPLETE
 }
 trap 'rollback; exit 90' ERR

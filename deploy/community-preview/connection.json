@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "status": "CANDIDATE_ONLY_NOT_APPLIED",
+  "hostname": "community-preview.wenwenwenyiyiyi.work",
+  "https_origin": "https://community-preview.wenwenwenyiyiyi.work",
+  "mini_program": {
+    "appid": "wx1d5f8873eaea5392",
+    "baseUrl": "https://community-preview.wenwenwenyiyiyi.work",
+    "request_domain_required": "https://community-preview.wenwenwenyiyiyi.work",
+    "scene": "shop1",
+    "commerce": true,
+    "payments": false,
+    "login_mode": "SYNTHETIC_MOCK_EXCHANGE_ONLY",
+    "real_wechat_login_verified": false
+  },
+  "web_roles": {
+    "merchant": "https://community-preview.wenwenwenyiyiyi.work/merchant",
+    "community": "https://community-preview.wenwenwenyiyiyi.work/community",
+    "platform": "https://community-preview.wenwenwenyiyiyi.work/platform"
+  },
+  "api_routes": [
+    "/mini/login",
+    "/mini/api",
+    "/mini/logout",
+    "/community/operations",
+    "/community/directory",
+    "/community/commerce",
+    "/community/health"
+  ],
+  "isolation": {
+    "production_cookie_rejected": "__Host-xj_customer",
+    "preview_cookie": "__Host-xj_community_preview",
+    "client_ip_header": "X-Xuanjun-Client-IP",
+    "nginx_overwrites_client_ip": true
+  }
+}

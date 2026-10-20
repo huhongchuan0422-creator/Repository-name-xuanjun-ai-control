@@ -16,6 +16,7 @@ Status: CANDIDATE_ONLY / NOT_DEPLOYED.
 - This demonstrates role/UI/authorization only; it is not real WeChat login, real merchant admission, real payment, settlement, or production persistence.
 
 ## Proposed URLs after approval
+- Consumer mini: exact connected-preview source uses baseUrl=https://community-preview.wenwenwenyiyiyi.work and scene=shop1; current login remains synthetic Mock until AppSecret-backed admission is separately completed.
 - https://community-preview.wenwenwenyiyiyi.work/
 - /merchant
 - /community
@@ -29,6 +30,7 @@ Status: CANDIDATE_ONLY / NOT_DEPLOYED.
 - AppID stays wx1d5f8873eaea5392.
 - The exact preview hostname must be in the existing mini-program request-domain allowlist before a connected preview build.
 - This candidate does not modify that allowlist or account permissions.
+- `prepare-mini.cjs` can create a separate connected-preview source copy with this exact baseUrl, `commerce=true`, `payments=false`; it does not upload or modify the AppID account/domain allowlist.
 - Real wx.login acceptance later requires an admitted AppSecret-backed WechatCodeClient, existing account-to-openid binding, and persistent admitted Center. None is claimed here.
 
 ## Required later authorization

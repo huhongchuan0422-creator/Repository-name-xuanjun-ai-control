@@ -178,4 +178,11 @@
  $('billAudit').onclick=()=>billRun((t,s)=>billAudit(t,billParams(),'',s));
  $('moreBillAudit').onclick=()=>billRun((t,s)=>billAuditPage&&billAudit(t,billAuditPage.params,billAuditPage.after_id,s));
  window.configureCommunityWorkbench(null);
+ try{
+  if(location.hostname==='community-preview.wenwenwenyiyiyi.work'&&location.hash.startsWith('#preview=')){
+   const context=JSON.parse(decodeURIComponent(location.hash.slice(9)));
+   history.replaceState(null,'',location.pathname);
+   window.configureCommunityWorkbench(context);
+  }
+ }catch(_){window.configureCommunityWorkbench(null);}
 })();
