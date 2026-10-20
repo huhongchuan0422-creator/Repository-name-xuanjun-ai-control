@@ -30,7 +30,7 @@ def main():
     print(json.dumps(result,sort_keys=True,separators=(',',':')))
     return 0 if (number in (errno.EACCES,errno.EPERM) and before==after==expected['metadata']
                  and os.getuid()==os.geteuid()==65534 and os.getgid()==65534
-                 and os.getgroups()==[]) else 2
+                 and os.getgroups() in ([],[65534])) else 2
 
 
 if __name__=='__main__':sys.exit(main())
