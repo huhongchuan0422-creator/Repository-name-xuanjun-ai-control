@@ -162,7 +162,12 @@ def dispatch(req, action, request_sha256):
                           'service_uid':'UNKNOWN','callback_uid':1004,
                           'runtime_roles_granted_access':False}
             elif stage=='CP08':
-                denied=unauthorized_access(folder,os.geteuid(),os.getegid(),65534,65534)
+                from .cp08_evidence import load as load_observation
+                denied=load_observation(folder,request_sha256,req['cp03_receipt_sha256'])
+                if denied['status']=='UNAVAILABLE' and str(root).startswith('/tmp/p2-b3-test-') and not str(root).startswith('/tmp/p2-b3-test-host-'):
+                    # Retained local regression-only probe; never a production
+                    # fallback and never changes UID inside the UK container.
+                    denied=unauthorized_access(folder,os.geteuid(),os.getegid(),65534,65534)
                 evidence={'status':'VALIDATED' if denied['status']=='PASS' else 'UNAVAILABLE',
                           'denial':denied,'scope':'PREPARATION_HANDOFF_DIRECTORY_ONLY'}
             else:
