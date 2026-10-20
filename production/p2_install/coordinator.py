@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sqlite3
+import stat
 import sys
 import time
 from pathlib import Path
@@ -63,6 +64,46 @@ def _check_reply(request, reply, expected):
         require(reply.get(key) == request[key], "REPLY_IDENTITY")
     require(reply.get("status") == expected, "REPLY_STATUS")
     return _check_receipt_reference(request, reply.get("receipt"))
+
+def _read_log_reference(root, candidate):
+    """Read a bounded regular file by descriptor traversal inside root only."""
+    require(type(candidate) is str and os.path.isabs(candidate),
+            "FAILURE_LOG_NOT_ABSOLUTE")
+    require(os.path.normpath(candidate) == candidate, "FAILURE_LOG_DOTDOT")
+    root_path = os.path.normpath(root)
+    prefix = root_path.rstrip("/") + "/"
+    require(candidate.startswith(prefix), "FAILURE_LOG_OUTSIDE_ROOT")
+    rel = candidate[len(prefix):]
+    require(rel and rel != "." and not rel.startswith("../"), "FAILURE_LOG_OUTSIDE_ROOT")
+    parts = rel.split("/")
+    require(all(part not in ("", ".", "..") for part in parts), "FAILURE_LOG_DOTDOT")
+
+    fd = os.open(root_path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in parts[:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                            dir_fd=fd)
+            os.close(fd)
+            fd = child
+        leaf = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+        try:
+            info = os.fstat(leaf)
+            require(stat.S_ISREG(info.st_mode), "FAILURE_LOG_NOT_REGULAR")
+            require(info.st_size <= 1048576, "FAILURE_LOG_TOO_LARGE")
+            chunks = []
+            remaining = info.st_size
+            while remaining:
+                block = os.read(leaf, min(65536, remaining))
+                require(block, "FAILURE_LOG_SHORT_READ")
+                chunks.append(block)
+                remaining -= len(block)
+            content = b"".join(chunks)
+            require(len(content) == info.st_size, "FAILURE_LOG_SHORT_READ")
+            return content
+        finally:
+            os.close(leaf)
+    finally:
+        os.close(fd)
 
 class Coordinator:
     def __init__(self, root, plan, adapters=None, now=None, component_roots=None, grant=None):
@@ -281,19 +322,18 @@ class Coordinator:
                 except (Hold, OSError, ValueError, KeyError):
                     references[label] = {"status":"UNKNOWN"}
         log = evidence.get("log")
-        if type(log) is str and os.path.isabs(log):
+        if type(log) is str:
             try:
-                path = Path(log)
-                require(Path(request["root"]).resolve() in path.parents and
-                        not path.is_symlink() and path.is_file(), "FAILURE_LOG_UNSAFE")
-                content = path.read_bytes()
-                require(len(content) <= 1048576, "FAILURE_LOG_TOO_LARGE")
+                content = _read_log_reference(request["root"], log)
                 references["log"] = {"status":"VERIFIED","path":log,
                                      "sha256":hashlib.sha256(content).hexdigest()}
-            except (Hold, OSError, ValueError):
-                references["log"] = {"status":"UNKNOWN"}
+            except Hold as exc:
+                references["log"] = {"status":"UNKNOWN","reason":str(exc)}
+            except OSError as exc:
+                references["log"] = {"status":"UNKNOWN",
+                                     "reason":"FAILURE_LOG_OSERROR_" + str(exc.errno)}
         else:
-            references["log"] = {"status":"UNKNOWN"}
+            references["log"] = {"status":"UNKNOWN","reason":"FAILURE_LOG_MISSING"}
         saved = {"event_id":event_id,"event_key":key,"cause":cause,
                  "root_cause":cause,
                  "installation_id":request["installation_id"],
