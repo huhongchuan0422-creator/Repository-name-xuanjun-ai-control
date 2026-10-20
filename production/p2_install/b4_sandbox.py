@@ -187,7 +187,9 @@ def runtime_cli(request,action,folder):
 def dispatch(req,role,action):
     need(role in ROLES and action in ('execute','inspect','recover'),'CP10_ACTION')
     root,prior,app=checked_request(req);folder=root/role
-    need(folder.is_dir() and folder.stat().st_uid==os.geteuid() and stat.S_IMODE(folder.stat().st_mode)==0o700,'CP10_ROLE_DIRECTORY')
+    info=os.lstat(str(folder))
+    need(stat.S_ISDIR(info.st_mode) and str(folder.resolve())==str(folder) and info.st_uid==os.geteuid()
+         and stat.S_IMODE(info.st_mode)==0o700,'CP10_ROLE_DIRECTORY')
     lock=os.open(str(folder/'.cp10.lock'),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     try:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);value=handoff(req)
@@ -195,8 +197,12 @@ def dispatch(req,role,action):
         final=folder/'CP10-committed.json'
         if os.path.lexists(final):
             need(read(folder/'intent.json')==intent,'CP10_INTENT_CONFLICT')
-            row=json.loads(read(final));need(row['request_sha256']==sha(encode(req)) and row['role']==role,'CP10_FINAL_IDENTITY')
-            for name,pin in row['files'].items():need(sha(read(folder/name))==pin,'CP10_FINAL_EVIDENCE_CHANGED')
+            row=json.loads(read(final));need(row['request_sha256']==sha(encode(req)) and row['role']==role
+                 and row['schema']==1 and row['scope']=='ISOLATED_TEST_ONLY' and row['stage']=='CP10'
+                 and row['status']=='CP10_FINITE_COMMITTED' and row['service_started'] is False
+                 and row['b3_receipt_sha256']==req['b3_receipt_sha256'],'CP10_FINAL_IDENTITY')
+            for name,pin in row['files'].items():
+                need(Path(name).name==name and sha(read(folder/name))==pin,'CP10_FINAL_EVIDENCE_CHANGED')
             observation=json.loads(read(folder/'consumer-observation.json'))
             import production.p2_runtime as runtime
             journal=json.loads(read(folder/('batch-CP10-'+role+'.json')))
@@ -211,31 +217,59 @@ def dispatch(req,role,action):
         rt=runtime_request(req,role,value)
         import production.p2_runtime as runtime
         journal=folder/('batch-CP10-'+role+'.json')
-        if journal.exists():
-            started=runtime_cli(rt,'recover',folder)
-            need(started['status']=='COMMITTED' and started['commit_receipt'] is not None,'CP10_INTERRUPTED_START_HOLD')
-        else:
+        stop=copy.deepcopy(rt);stop['inputs']={'operation':'stop','timeout':2}
+        def record(name,operation):
+            path=folder/('step-'+name+'.json')
+            if path.exists():return json.loads(read(path))
+            row=operation();publish(path,encode(row));return row
+        def start_or_reconcile():
+            if journal.exists():
+                row=runtime_cli(rt,'recover',folder)
+                need(row['status']=='COMMITTED' and row['commit_receipt'] is not None,'CP10_INTERRUPTED_START_HOLD')
+                return row
             need(action=='execute','CP10_NO_START_REPLAY')
-            started=runtime_cli(rt,'execute',folder)
+            return runtime_cli(rt,'execute',folder)
+        started=record('start',start_or_reconcile)
         _checkpoint('after_start')
-        try:
-            need(started['status']=='COMMITTED' and started['commit_receipt'] is not None,'CP10_START_NOT_READY')
-            observation=json.loads(read(folder/'consumer-observation.json'));entry=json.loads(read(journal))
-            need(observation['pid']==entry['pid'] and observation['uid']==observation['gid']==os.geteuid()
-                 and runtime.process_match({'pid':entry['pid'],'start':entry['start'],'session':entry['session']})=='LIVE',
-                 'CP10_PROCESS_IDENTITY')
-            need(observation['response']==expected_response(req,role,value),'CP10_READINESS_BINDING')
-            inspected=runtime_cli(rt,'inspect',folder)
-            need(inspected['status']=='COMMITTED' and inspected['commit_receipt']==started['commit_receipt'],'CP10_INSPECT_READY')
-        finally:
-            stop=copy.deepcopy(rt);stop['inputs']={'operation':'stop','timeout':2}
-            stopped=runtime_cli(stop,'execute',folder)
+        need(started['status']=='COMMITTED' and started['commit_receipt'] is not None,'CP10_START_NOT_READY')
+        if not (folder/'step-inspect.json').exists():
+            try:
+                observation=json.loads(read(folder/'consumer-observation.json'));entry=json.loads(read(journal))
+                need(observation['pid']==entry['pid'] and observation['uid']==observation['gid']==os.geteuid()
+                     and runtime.process_match({'pid':entry['pid'],'start':entry['start'],'session':entry['session']})=='LIVE',
+                     'CP10_PROCESS_IDENTITY')
+                need(observation['response']==expected_response(req,role,value),'CP10_READINESS_BINDING')
+                status=Path('/proc/%d/status'%entry['pid']).read_text()
+                uids=next(line.split()[1:] for line in status.splitlines() if line.startswith('Uid:'))
+                need(uids==[str(os.geteuid())]*4,'CP10_ACTUAL_PROCESS_UID')
+                need(Path('/proc/%d/cmdline'%entry['pid']).read_bytes().split(b'\0')[:-1]
+                     ==[arg.encode() for arg in rt['inputs']['argv']],'CP10_ACTUAL_PROCESS_ARGV')
+                inspected=record('inspect',lambda:runtime_cli(rt,'inspect',folder))
+                need(inspected['status']=='COMMITTED' and inspected['commit_receipt']==started['commit_receipt'],'CP10_INSPECT_READY')
+            finally:
+                # Persist stop evidence even when the caller later loses response.
+                if not (folder/'step-stop.json').exists():
+                    stopped=runtime_cli(stop,'execute',folder)
+                    publish(folder/'step-stop.json',encode(stopped))
+        inspected=json.loads(read(folder/'step-inspect.json'))
+        need(inspected['status']=='COMMITTED' and inspected['commit_receipt']==started['commit_receipt'],'CP10_RETAINED_INSPECT')
+        if (folder/'step-stop.json').exists():stopped=json.loads(read(folder/'step-stop.json'))
+        else:
+            entry=json.loads(read(journal))
+            if entry['phase']=='STOPPED' and runtime.process_set(entry)[0]=='GONE':
+                stopped=runtime_cli(stop,'recover',folder)
+                need(stopped['status']=='NO_EFFECT','CP10_STOP_RECONCILIATION')
+            else:stopped=runtime_cli(stop,'execute',folder)
+            publish(folder/'step-stop.json',encode(stopped))
         _checkpoint('after_stop')
-        need(stopped['status']=='COMMITTED','CP10_STOP_NOT_CONFIRMED')
-        recovered=runtime_cli(stop,'recover',folder)
+        need(stopped['status'] in ('COMMITTED','NO_EFFECT'),'CP10_STOP_NOT_CONFIRMED')
+        recovered=record('recover',lambda:runtime_cli(stop,'recover',folder))
         need(recovered['status']=='NO_EFFECT' and recovered['commit_receipt']==started['commit_receipt'],'CP10_EXIT_RECOVERY')
         entry=json.loads(read(journal));need(runtime.process_set(entry)[0]=='GONE','CP10_PROCESS_NOT_GONE')
-        names=['consumer-observation.json','consumer-exit.json','sandbox-policy.json']
+        exited=json.loads(read(folder/'consumer-exit.json'))
+        need(exited['pid']==entry['pid'] and exited['request_sha256']==sha(encode(req)),'CP10_EXIT_IDENTITY')
+        names=['consumer-observation.json','consumer-exit.json','sandbox-policy.json',
+               'step-start.json','step-inspect.json','step-stop.json','step-recover.json']
         files={name:sha(read(folder/name)) for name in names}
         for reference in (started['commit_receipt'],inspected['receipt'],stopped['receipt'],recovered['receipt']):
             path=Path(reference['path']);need(path.parent==folder and sha(read(path))==reference['sha256'],'CP10_RUNTIME_RECEIPT')
