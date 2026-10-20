@@ -29,7 +29,7 @@ Neither phase is complete. In particular, the following cannot be marked impleme
 
 1. Official submerchant application transport, private drafts, common domestic identity/bank form, scanned-material media upload, separate internal review, gated submission and signed status synchronization have now been written. Conditional administrator/contact identity, foreign identity and UBO document requirements now have source/tests (`community_applyment_conditions.py`, `test_community_applyment_conditions.py`, `test_community_onboarding_conditional_materials.py`). Remaining here is narrower: provider-current dynamic industry/bank-branch catalog integration/validation and production admission evidence. Existing platform merchant onboarding remains separate.
 2. Original CRM-admitted multi-store business profiles, merchant fulfillment completion and platform ACTIVE/PAUSED/DISABLED lifecycle are implemented. New trading is blocked when suspended; existing status/cancellation/refund recovery remains available. Creating new CRM identities still belongs to original admission authority.
-3. Native personal center, immutable referrals, private notices, original-owned order history, signed payment close and exactly-once stock release are implemented. Existing Chromium coverage includes the shared five-view order flow, merchant workbench, platform/community portal paths and the community↔consumer promotion journey. A single original-Center-backed four-role order/attribution journey (consumer → merchant → community → platform on the same synthetic order) is still not present and remains a test/integration gap.
+3. Native personal center, immutable referrals, private notices, original-owned order history, signed payment close and exactly-once stock release are implemented. The original-Center-backed four-role same-order/attribution browser journey is now closed by `342a0259f7028f5f8c24d509473588959ca8d0ea` / tree `91ceb56a175d280aaf757819f7755d776cf765bf`, Hosted run `39424538489` SUCCESS. The same server-priced synthetic reference is read through consumer mini, merchant workbench, community Portal and platform Portal; attribution remains frozen after community leave; wrong-role/cross-scope reads are denied; Finance remains `UNCONFIRMED`. No product rule was changed.
 4. Raw refund callbacks and hash-verified official bill downloading/private ingestion/scoped reconciliation are implemented. Reverse trade reconciliation uses signed payment dates; undated legacy payments are explicit partial coverage. Unsupported receiver-detail split bill schemas remain UNKNOWN and require a verified official format adapter; current aggregate adapter must not be claimed as complete official split-bill support. Finance核销 is separate and requires original admitted authority.
 5. Community attributed order and signed payout/return views, immutable receiver/community rule snapshots, platform admitted-merchant overview/lifecycle and promotion records are implemented. Promotion closure evidence: `6038e526b559e5a7bb7fef3cd649a0c99e1c3069`, Hosted run `39418635252` SUCCESS, Issue76 `#6290428502`; `test_community_promotion_browser.py` proves Portal create/list/pause plus mini redemption dedupe and PAUSED rejection. Do not reopen promotion work unless the source changes. Broader community/customer operational views remain scoped by the unresolved four-role integration item above.
 6. Current-source full regression exists for `6038e526b559e5a7bb7fef3cd649a0c99e1c3069` (Hosted `39418635252`: 1051 community + 342 Stage5 + 332/40/8/7 Node = 1780 executions). This does not replace final frontend integration or concentrated independent phase review. Independent review evidence currently inherited includes Issue76 `#6244004038` (frozen baseline) and `#6244076141` (Center/signed-detail increment); no independent phase sign-off is recorded for the later `6038e526` promotion-browser increment.
@@ -41,8 +41,8 @@ This section supersedes stale “promotion records remain source work” wording
 
 ### Current evidence baseline
 
-- Current verified code/test baseline: `6038e526b559e5a7bb7fef3cd649a0c99e1c3069` / tree `7f247eebed9ad2dc929d0fcd569abd8c4036c267`.
-- Hosted `39418635252` SUCCESS: 1051 community Python + 342 Stage5 Python + 332/40/8/7 Node = 1780 executions; optional mini SDK/runtime/preview jobs were SKIPPED.
+- Current verified code/test baseline for the latest completed integration increment: `342a0259f7028f5f8c24d509473588959ca8d0ea` / tree `91ceb56a175d280aaf757819f7755d776cf765bf`.
+- Hosted `39424538489` SUCCESS: the prior 1780-execution baseline plus the focused four-role same-order browser test = 1781 executions under the project counting convention; optional mini SDK/runtime/preview jobs were SKIPPED, not PASS.
 - Promotion cross-role browser path is closed for source/testing: formal Portal create/list/pause, original mini-session redemption, deduplicated authenticated redemption metrics and PAUSED denial. This is synthetic/loopback evidence, not public release or live merchant evidence.
 - Earlier independent reviews remain scoped to their exact versions: Issue76 `#6244004038` and `#6244076141`. Later source additions require concentrated final independent review before phase acceptance.
 
@@ -55,13 +55,13 @@ This section supersedes stale “promotion records remain source work” wording
 | P1-C Platform review/provider status | onboarding reviewer flows, signed applyment query/recovery tests | Real provider authorization/status and current product permission remain external; no missing local transition rule identified in this check. |
 | P1-D Merchant workbench/store/staff/catalog | workbench/store/staff/catalog source plus Chromium tests | Production principal/store mappings external. No specific local source defect identified in this check. |
 | P1-E Platform base management/notification isolation | platform views, merchant lifecycle, customer notices, audit/permission regressions | Final concentrated role/security review remains; no specific new local notification defect identified. |
-| P2-A Consumer transaction/attribution | mini identity, basket/order ownership, native profile, refunds, community membership/promotion | **Local test/integration gap:** no single original-Center-backed browser journey proves one same synthetic order across consumer → merchant → community → platform while preserving attribution and role isolation. |
+| P2-A Consumer transaction/attribution | mini identity, basket/order ownership, native profile, refunds, community membership/promotion; four-role same-order browser evidence at `342a0259` / run `39424538489` | Local four-role gap CLOSED. Remaining acceptance is external/live only: official mini compile/device evidence, real merchant/payment admission, and final independent phase review. |
 | P2-B Pricing/orders/query | commerce, catalog, order detail, SaaS/customer-center, workbench tests | Production Finance/Owner admission for externally authoritative operations remains external; no specific local pricing/order source defect identified here. |
 | P2-C Real WeChat payment/refund/reconciliation | prepay/query/callback/refund/bill code and extensive signed synthetic tests | Live merchant/product permissions and real authorized transaction evidence are external. Full official bill semantic contract remains unresolved (see below). |
-| P2-D Community management | directory/membership/reports, formal Portal, promotion API + `test_community_promotion_browser.py` | Promotion is no longer a gap. Remaining integration gap is covered by the four-role same-order journey under P2-A/P2-G. |
+| P2-D Community management | directory/membership/reports, formal Portal, promotion API + `test_community_promotion_browser.py`; same-order community attribution/read covered by `342a0259` | Promotion and four-role local integration gaps are CLOSED. Remaining gates are external/live admission and final independent phase review. |
 | P2-E Split rules/execution/recovery | split rules/actions/returns, recovery/idempotency tests | Full bill/return semantic reconciliation still depends on authoritative provider contract; real funds remain external. |
 | P2-F Operations/finance admin | platform views, merchant bills, financial views, bill audit/workbench | Full semantic reconciliation/Finance settlement not accepted; production Finance issuer/tenant grant is external. |
-| P2-G Complete chain/integration | stage browser, release/migration/recovery/package/health tests, exact source package | Local integration still lacks the original-Center four-role same-order browser journey; production install/controller/lease/fence/ACK, device and disaster-recovery evidence are external. |
+| P2-G Complete chain/integration | stage browser, release/migration/recovery/package/health tests, exact source package; original-Center four-role same-order browser journey `342a0259` / run `39424538489` | Local four-role journey is CLOSED. Production install/controller/lease/fence/ACK, official device evidence and disaster-recovery evidence remain external. |
 
 ### Bill semantics: code gap vs external contract
 
@@ -311,3 +311,100 @@ merchant admission and live transactions remain external. The community's three
 locked Center pins have not been silently replaced with the website branch's
 15c263e6 changes, so cross-branch production integration is not claimed. Final
 phase acceptance and independent review are not granted by these source checks.
+
+
+## 2026-10-20 official material reconciliation after four-role closure
+
+This section updates evidence classification only. It does not change product/Finance rules and does not mark either phase accepted.
+
+### Local integration status
+
+- Four-role same-order journey: CLOSED by `342a0259f7028f5f8c24d509473588959ca8d0ea` / tree `91ceb56a175d280aaf757819f7755d776cf765bf` / Hosted `39424538489` SUCCESS.
+- Existing unchanged test baseline is reused as 1781 executions under the project counting convention. No unchanged suite was rerun for this documentation update.
+- No second Writer, production payment, server operation, Finance mutation, mini upload, or new product rule is part of this checkpoint update.
+
+### Merchant industry / settlement-rule source
+
+Official WeChat Pay special-merchant applyment documentation currently defines `settlement_info.settlement_id` as the onboarding settlement-rule ID and `settlement_info.qualification_type` as the merchant industry, with values required to follow the official fee/settlement-rule mapping. Public source:
+- https://pay.wechatpay.cn/doc/v3/partner/4012719997 (official special-merchant applyment; page updated 2025-03-26).
+
+The public applyment page establishes the required fields and points to the official fee/settlement-rule table, but this checkpoint did not find a public, version-pinned machine-readable industry catalog API for ordinary service-provider applyment. Therefore:
+- schema/field requirement: VERIFIED from public official documentation;
+- current complete industry/settlement-rule catalog revision: EXTERNAL / VERSION_NOT_PINNED;
+- production selectable catalog/entitlement: requires the WeChat Pay service-provider product owner to supply the current official table/export or authenticated platform view and effective date/version.
+
+Do not hard-code or infer missing industry rows from historical examples.
+
+### Official bank / branch source and version
+
+Official WeChat Pay bank-component documentation defines dynamic bank/branch retrieval:
+- personal-bank list: `GET /v3/capital/capitallhh/banks/personal-banking`; official page updated 2025-02-20;
+- branch list: `GET /v3/capital/capitallhh/banks/{bank_alias_code}/branches` with `city_code`; official page updated 2025-02-20;
+- applyment documentation requires bank values from the official personal/corporate bank-list APIs and branch details from the branch-list API;
+- official bank-component developer guide updated 2026-06-09 states the bank component is in gray testing and not yet generally available.
+
+Official references:
+- https://pay.wechatpay.cn/doc/v3/partner/4012697583
+- https://pay.wechatpay.cn/doc/v3/partner/4012697673
+- https://pay.wechatpay.cn/doc/v3/partner/4012160820
+- https://pay.wechatpay.cn/doc/v3/partner/4012719997
+
+Result:
+- API path/schema: VERIFIED;
+- static bank/branch snapshot must not be treated as authoritative current data because official docs explicitly describe backend cached snapshots and periodic refresh;
+- whether this service-provider account can use the gray bank component in production: EXTERNAL / ACCOUNT_ENTITLEMENT_UNKNOWN.
+Required provider material: current account entitlement/availability evidence plus, if unavailable, the official current bank correspondence table/export used by the service-provider console. Responsibility: WeChat Pay service-provider merchant/product owner.
+
+### Official bill contract — verified vs still missing
+
+Public official evidence now supports only the following:
+- profit-sharing bills are daily files; unsuccessful profit-sharing records are excluded; money fields in the bill are in yuan; the file has separate detail and summary sections; each detail row is one profit-sharing or one return operation; only three months are downloadable. Source: https://pay.wechatpay.cn/doc/v3/partner/4012761140 (updated 2025-09-29).
+- `bill_date` is a required `YYYY-MM-DD` request date and the current-day bill is documented as available after the next day around 10:00 in the official bill API error guidance.
+- profit-sharing/query/unfreeze result objects expose RFC3339 timestamps with timezone offsets, and `detail_id` is the WeChat profit-sharing detail ID that can be reconciled to the funds bill business-voucher number. Source: https://pay.wechatpay.cn/doc/v3/partner/4012466860.
+- transaction-bill detail semantics are separately documented for successful payments and refund initiation, with distinct ALL/SUCCESS/REFUND detail and summary schemas. Source: https://pay.wechatpay.cn/doc/v3/partner/4013080599.
+
+These public pages do **not** by themselves establish all project-required reconciliation semantics. The following remain authoritative-contract gaps and must stay `UNKNOWN_SCHEMA / NOT_RECONCILED / UNCONFIRMED`:
+1. exact timezone/day-membership rule mapping an individual split/return/unfreeze event into `bill_date`;
+2. exact sign convention and summary formulas for every receiver-level split/return/unfreeze row needed by our Finance reconciliation;
+3. exact mapping of manual unfreeze / expiry unfreeze / return variants into bill rows and the complete `detail_id` join contract for those variants;
+4. complete provider population/cutoff evidence proving reverse completeness for the chosen bill date.
+
+Required external material:
+- WeChat Pay payment/provider contract owner: official current sample/header contract or authenticated downloadable bill samples covering split, return and unfreeze variants, with documentation revision/effective date;
+- Finance owner: matching complete local provider-action population and explicit cutoff/timezone contract for the same bill date.
+Until both exist, no code or document may promote Finance to confirmed.
+
+### Official mini compile / real-device evidence
+
+Repository evidence at the current completed baseline does not contain same-version official mini compile/real-device acceptance. Hosted optional mini SDK/runtime/preview jobs remain SKIPPED and are not equivalent to official WeChat Developer Tools compilation or real-device acceptance.
+
+Required evidence from mini release/operations owner:
+- exact source/mini package SHA or commit bound to the build;
+- official WeChat Developer Tools version;
+- successful compile/preview receipt or build log for that exact version;
+- real-device test record (device/OS/WeChat version, mini version/build, tested flows, result);
+- if upload/review is intentionally out of scope, state that explicitly rather than treating compile/device as release approval.
+
+Status: EXTERNAL / NOT_VERIFIED. No mini upload is authorized by this checkpoint.
+
+### Final independent Phase 1 / Phase 2 review
+
+Inherited independent review records remain valid only for their exact older scopes (Issue76 `#6244004038`, `#6244076141`). No final concentrated independent Phase 1/2 sign-off is recorded for the current `342a0259` candidate including later promotion and four-role increments.
+
+Required evidence from Dots/independent reviewer:
+- review target bound to exact final commit/tree and retained CI/Hosted evidence;
+- explicit Phase 1 and Phase 2 scope;
+- findings/disposition with unresolved external gates separated from source defects;
+- signed/traceable review record in the original project record.
+
+Status: EXTERNAL REVIEW REQUIRED / NOT_COMPLETE.
+
+### One-time external material handoff list
+
+1. **WeChat Pay service-provider merchant/product owner** — current official industry/settlement-rule catalog revision/effective date; current bank-component entitlement or current official bank correspondence export; real submerchant/product-permission evidence when production admission is later requested.
+2. **Payment/provider contract owner** — authoritative split-bill sample/header contract covering split, return, manual/expiry unfreeze and `detail_id` joins, including the effective date/revision and the bill-date timezone/cutoff semantics.
+3. **Finance owner** — complete local provider-action population for the same reconciliation period plus explicit cutoff/timezone definition; no settlement approval is inferred.
+4. **Mini release/operations owner** — exact-version official Developer Tools compile/preview and real-device evidence.
+5. **Dots / independent reviewer** — final concentrated Phase 1/2 review bound to the exact final candidate.
+
+No other project-side source defect is newly established by this official-material reconciliation.
