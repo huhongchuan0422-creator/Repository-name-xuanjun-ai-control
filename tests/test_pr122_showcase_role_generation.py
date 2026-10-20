@@ -28,7 +28,9 @@ class RoleGenerationTests(unittest.TestCase):
         rows, _ = s.scan_public_tree(public)
         self.assertEqual(rows['index.html']['sha256'], declaration['artifact_sha256'])
         self.assertEqual(s.sha(s.canonical(rows)), declaration['release_artifact_sha256'])
-        self.assertIn('玄钧AI新', (public / 'index.html').read_text())
+        branded = (public / 'index.html').read_text()
+        self.assertIn('玄钧AI新', branded)
+        self.assertNotIn('玄钧云汇', branded)
 
     def test_six_role_fixture_generates_isolated_bilingual_routes(self):
         items, proof, pages, files = fixture_records()
