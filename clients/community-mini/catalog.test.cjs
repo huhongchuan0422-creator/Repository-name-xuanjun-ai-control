@@ -1,11 +1,12 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const auth=require('./customer-auth');
 const event=more=>({currentTarget:{dataset:{more}}});
 const product=id=>({item_id:id,name:'Product '+id,revision:1,unit_minor:101,currency:'CNY',available:true});
 function harness(){
  let definition,generation=1;const calls=[],writes=[];
- vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:p=>definition=p,require:()=>({}),Set});
+ vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:p=>definition=p,require:p=>p==='../../customer-auth'?auth:{},Set});
  const page={...definition,data:structuredClone(definition.data),setData(patch){writes.push(patch);Object.assign(this.data,patch);}};
- page._pageGeneration=1;page.scene='shop1';page.session={getGeneration:()=>generation,commerce(scene,op,params){return new Promise((resolve,reject)=>calls.push({scene,op,params,resolve,reject}));},clear(){generation++;}};
+ page._pageGeneration=1;page._authEpoch=auth.current();page.scene='shop1';page.session={getGeneration:()=>generation,commerce(scene,op,params){return new Promise((resolve,reject)=>calls.push({scene,op,params,resolve,reject}));},clear(){generation++;}};
  return {page,calls,writes,relogin(){generation++;}};
 }
 test('catalog continues beyond 100, preserves basket selection, refresh resets pagination',async()=>{
