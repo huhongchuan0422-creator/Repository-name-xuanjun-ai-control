@@ -109,6 +109,66 @@ class Contracts(unittest.TestCase):
             self.assertEqual(b4.dispatch(self.req,'developer','inspect')['status'],'NOT_EXECUTED')
 
 
+@unittest.skipUnless(os.environ.get('P2_CP10_OS_TEST')=='1','requires actual cap-drop/no-new-privileges container')
+class FiniteOS(unittest.TestCase):
+    setUp=Contracts.setUp
+    tearDown=Contracts.tearDown
+    def test_actual_deadline_and_no_blind_restart(self):
+        import production.p2_runtime as runtime
+        req=self.req;folder=Path(req['root'])/'developer';b4.publish(folder/'request.json',b4.encode(req))
+        rt=b4.runtime_request(req,'developer',b4.handoff(req))
+        first=runtime.execute(rt);self.assertEqual(first['status'],'COMMITTED',first)
+        journal=folder/'batch-CP10-developer.json';entry=json.loads(journal.read_bytes());pid=entry['pid']
+        until=time.monotonic()+11
+        while runtime.process_set(entry)[0]!='GONE' and time.monotonic()<until:time.sleep(.05)
+        self.assertEqual(runtime.process_set(entry)[0],'GONE')
+        self.assertEqual(json.loads((folder/'consumer-exit.json').read_bytes())['reason'],'DEADLINE')
+        recovered=runtime.recover(rt);self.assertEqual(recovered['status'],'HOLD')
+        self.assertEqual(json.loads(journal.read_bytes())['pid'],pid)
+        self.assertFalse((folder/'CP10-committed.json').exists())
+    def test_bad_domain_readiness_not_committed(self):
+        import production.p2_runtime as runtime
+        req=self.req;folder=Path(req['root'])/'developer';b4.publish(folder/'request.json',b4.encode(req))
+        rt=b4.runtime_request(req,'developer',b4.handoff(req));rt['inputs']['health']['expect']='WRONG_DOMAIN_RESPONSE\n'
+        result=runtime.execute(rt);self.assertEqual(result['status'],'HOLD',result)
+        entry=json.loads((folder/'batch-CP10-developer.json').read_bytes())
+        self.assertEqual(entry['phase'],'STOPPED');self.assertEqual(runtime.process_set(entry)[0],'GONE')
+    def test_platform_engineer_wrong_rw_mount_rejected(self):
+        folder=Path(self.req['root'])/'platform-engineer'
+        # Seed only the developer marker; the actual engineer consumer must reject RW.
+        marker=Path(self.req['root'])/'workspace/developer-probe.json'
+        marker.write_bytes(b4.encode({'scope':'ISOLATED_TEST_ONLY','request_sha256':b4.sha(b4.encode(self.req))}))
+        result=call(self.req,'platform-engineer');self.assertEqual(result['status'],'HOLD_RETAINED',result)
+        self.assertFalse((folder/'CP10-committed.json').exists())
+    def interrupted(self,point):
+        path=Path(self.req['root']).parent/'request.json'
+        code="""import sys,os,signal,json
+from production.p2_install import b4_sandbox as m
+point=sys.argv[1]
+def cut(name):
+ if name==point:os.kill(os.getpid(),signal.SIGKILL)
+m._checkpoint=cut
+m.dispatch(json.load(open(sys.argv[2])),'developer','execute')
+"""
+        child=subprocess.run([sys.executable,'-B','-S','-c',code,point,str(path)],cwd=str(REPO),timeout=20)
+        self.assertEqual(child.returncode,-signal.SIGKILL)
+    def test_sigkill_after_stop_resumes_same_operation(self):
+        before=prior(self.req);self.interrupted('after_stop')
+        first=call(self.req,'developer','recover');self.assertEqual(first['status'],'CP10_FINITE_COMMITTED',first)
+        self.assertEqual(call(self.req,'developer','inspect'),first)
+        self.assertEqual(prior(self.req),before)
+    def test_sigkill_after_start_deadline_holds_without_respawn(self):
+        import production.p2_runtime as runtime
+        before=prior(self.req);self.interrupted('after_start')
+        folder=Path(self.req['root'])/'developer';journal=folder/'batch-CP10-developer.json'
+        entry=json.loads(journal.read_bytes());until=time.monotonic()+11
+        while runtime.process_set(entry)[0]!='GONE' and time.monotonic()<until:time.sleep(.05)
+        self.assertEqual(runtime.process_set(entry)[0],'GONE')
+        result=call(self.req,'developer','recover');self.assertEqual(result['status'],'HOLD_RETAINED',result)
+        self.assertEqual(json.loads(journal.read_bytes())['pid'],entry['pid'])
+        self.assertEqual(prior(self.req),before)
+
+
 def role_driver(req,role):
     before=prior(req);first=call(req,role)
     if first['status']!='CP10_FINITE_COMMITTED':raise AssertionError(first)
