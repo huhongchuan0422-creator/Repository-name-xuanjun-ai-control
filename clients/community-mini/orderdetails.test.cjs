@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const sessionModule=require('./session');
+const auth=require('./customer-auth');
 const event=dataset=>({currentTarget:{dataset}});
 const scope={tenant_id:'tenant1',merchant_id:'merchant1',store_id:'store1'};
 function basket(reference='order1') {return {reference,user_id:'user1',scope,amount_minor:250,currency:'CNY',
@@ -16,7 +17,7 @@ function harness(){
     session_token:String(logins).repeat(32),expires_at:Math.floor(Date.now()/1000)+1000,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});else calls.push(o);}};
   vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:p=>{definition=p;},wx,
     getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid'}}),
-    require:path=>path==='../../session'?sessionModule:path==='../../client'?{makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})}:{createPaymentFlow:()=>({reset(){},pay(){money.push('pay');},query(){money.push('query');}})}
+    require:path=>path==='../../customer-auth'?auth:path==='../../session'?sessionModule:path==='../../client'?{makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})}:{createPaymentFlow:()=>({reset(){},pay(){money.push('pay');},query(){money.push('query');}})}
   });
   const page={...definition,data:structuredClone(definition.data),setData(patch){writes.push(patch);Object.assign(this.data,patch);}};
   return {page,calls,writes,money,logins:()=>logins,reply(index,result){calls[index].success({statusCode:200,data:{payment_enabled:false,result}});},fail(index){calls[index].fail({errMsg:'fixture failure'});}};
