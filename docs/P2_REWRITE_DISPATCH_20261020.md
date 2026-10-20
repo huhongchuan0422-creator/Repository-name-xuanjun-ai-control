@@ -192,3 +192,18 @@ CP标签是设计中的证据位置名称，**不是已存在的checkpoint文件
 新隔离协调器不新增五次额度或强制Grant准入；旧生产Grant/历史消费、数据库/WAL保留，不扩权。
 每轮10次失败或1小时先到上报Dots并提出替代方法；同根因30分钟提前换思路。上报门槛不是安装额度，通知未真实接通标UNAVAILABLE。
 Dots调度和节点验收；Work归集/集成/打包及后续获授权安装。本轮不新增独立人工审签，平台必需检查保留；评论自动唤醒NOT_VERIFIED。
+
+### P2/P3后续边界（Owner决定PR17 #6281242944）
+
+依据[Owner阶段决定](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6281242944)，继承[既有分阶段合同](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/8ccd4d08a1fae7afdf65d5a376a6c3960ba0c8a7/plans/WORK_STAGED_EXECUTION_CONTRACT_20261011.json)的逻辑阶段 `stages.P3`（JSON实际为`stages`数组中`id=P3`项）及`result_transition`，沿用[Issue19三入口接力](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/issues/19)。历史合同SHA256 `055d3ad1f41a3f8b64f8096e1f1e115b9cb07cc9e1669ab1be0963c47f43ee33`及旧Grant保持原样；本节只补当前阶段政策，不改历史合同、生产准入或既有验收项。
+
+| 阶段 | 范围与最小验收边界 |
+| --- | --- |
+| P2七批 | 保持B1–B7及原01–16顺序、安装/运行/持久恢复和原安全验收；外部开发执行器启动接口是P3依赖，不新增P2安装关卡，不以接口不可用阻塞独立可推进的安装工作。七批现有DRAFT/NOT_INSTALLABLE结论不因本政策变为可安装。 |
+| P2期间并行只读准备 | 核启动/续接/查询接口、真实ACK/STARTED/终态证据格式、目标执行器身份及现有权限/额度条件；仅查可行性，不调用模型、不启动执行器、不新建凭据/扩大权限、不启用旧Runner、不操作服务器。接口文档存在不等于实测通过。 |
+| 原P3首个真实任务 | 真实事件→获准目标执行器实际STARTED→非生产代码提交→绑定准确Commit的CI→持久终态回执→验收结果；记录实际入口/run/session/版本/事件与效果证据，不以RECEIVED或评论代替启动。实测前核准准确目标及现有授权/权限/额度，缺项只阻塞对应实测。 |
+| 原P3第二任务及故障验收 | 连续第二个真实开发任务验证后继依赖自动推进；覆盖重复事件、ACK丢失、执行器退出/重启、部分结果/UNKNOWN、超时报告及换方法，并继承原P3其他用例。每项验收需原始事件、执行、提交、CI和恢复证据，不能用设计或Hosted组件测试代替真实闭环。 |
+
+复用已有task/spec/checkpoint、canonical ledger、事件去重、lease/fence及持久outbox，不另建任务体系或第二调度器；复用不等于声称相关接口已全部接通。`result_transition`要求先持久化阶段及不可变结果，再推进获准后继依赖；通知失败不得抹掉完成结果。ACK丢失或结果UNKNOWN先查询、对账并按同操作恢复，不盲重发、不产生第二Writer。超时处理继承同根因30分钟换方法、每轮10次失败或1小时先到上报Dots并评估替代方案，不恢复五次准入。
+
+能力状态按准确目标入口分别登记：尚无真实启动证据为`NOT_VERIFIED`；无受支持可用入口为`UNAVAILABLE / CAPABILITY_UNAVAILABLE`，附具体缺口。当前没有本轮接口实测，真实自动启动仍`NOT_VERIFIED`，不把未知写成已接通。人工转发仅作过渡，不计自动启动；不能暗换执行器冒充普通聊天窗口被唤醒，也不能将Work/Codex路径冒充Issue19要求的普通聊天或Dots原生路径。入口不可用不扩大P2，也不停止其余已授权独立工作。
