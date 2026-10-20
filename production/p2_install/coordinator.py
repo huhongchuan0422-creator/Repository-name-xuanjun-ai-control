@@ -276,6 +276,7 @@ class Coordinator:
         else:
             references["log"] = {"status":"UNKNOWN"}
         saved = {"event_id":event_id,"event_key":key,"cause":cause,
+                 "root_cause":cause,
                  "installation_id":request["installation_id"],
                  "round_id":request.get("round_id","DEFAULT"),
                  "batch_id":request["batch_id"],"attempt_id":request["attempt_id"],
@@ -295,10 +296,14 @@ class Coordinator:
         if type(err) is not dict:
             err = {"code":cause}
         operation = response.get("operation_id") or "UNKNOWN"
-        # One actual failed operation+error event; observations never add events.
-        event_id = "auto-" + digest([request["attempt_id"], operation,
-                                     err.get("code",cause)])[:32]
-        self._record_failure(request,cause,
+        actual = err.get("code")
+        if type(actual) is not str or not ID.fullmatch(actual):
+            actual = cause
+        # Stable failure identity is the actual operation, not a later
+        # observation/status code. Thus LAUNCH_UNKNOWN -> START_OUTCOME_UNKNOWN
+        # during recovery remains one failure event and preserves first evidence.
+        event_id = "auto-" + digest([request["attempt_id"], operation])[:32]
+        self._record_failure(request,actual,
             {"operation_id":operation,"config_sha256":response.get("config_sha256"),
              "error":err,"receipt":response.get("receipt"),
              "commit_receipt":response.get("commit_receipt"),
@@ -469,7 +474,11 @@ class Coordinator:
             state = groups.setdefault(round_key,{"count":0,"first":observed,"causes":{}})
             state["count"] += 1
             state["first"] = min(state["first"],observed)
-            state["causes"][cause] = min(state["causes"].get(cause,observed),observed)
+            root_cause = evidence.get("root_cause")
+            if type(root_cause) is not str or not ID.fullmatch(root_cause):
+                root_cause = cause
+            state["causes"][root_cause] = min(
+                state["causes"].get(root_cause,observed),observed)
         for (installation,rid),state in groups.items():
             for cause,first in state["causes"].items():
                 if self.now()-first >= 1800:
