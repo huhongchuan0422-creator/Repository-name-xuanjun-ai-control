@@ -1,12 +1,12 @@
 {
   "activation_directory": "/var/lib/xuanjun-p2-isolated-test/b3-initialize/activation",
-  "adapter_gap": "thin confined wrapper for initial intent/config publication, exact expected descriptor verification before read/reconcile, and immutable receipt; reuse existing Store, no new ledger or installer",
-  "adapter_status": "NOT_IMPLEMENTED_THIS_PREPARATION; no actual request/descriptor frozen until binary pin is known",
+  "adapter_gap": "CLOSED_IN_SOURCE_AND_TARGETED_HOSTED; UK execution NOT_EXECUTED",
+  "adapter_status": "SOURCE_DELIVERED",
   "baseline_commit": "2816e74fb05e915023c207ba6e911784875e4233",
   "binary_probe": {
     "cleanup": "--rm; exception cleanup only unique name with matching own label",
     "command_role": "one temporary container reading only its own executable, no mounts/network; NOT an installation",
-    "execution": "NOT_EXECUTED",
+    "execution": "OWNER_EXECUTED_SUCCESS_6282808058",
     "host_writes": "Docker temporary metadata/overlay only; no application path writes",
     "new_directories": false
   },
@@ -68,12 +68,12 @@
     "08": "new directory private permissions; old ACL changes not applicable; no chmod B1/B2",
     "09": "no TLS lifecycle/config consumed or mutated; actual new TLS requirement remains later original B3 subcheckpoint if needed"
   },
-  "preparation_gate": "binary_sha256 must be measured from the fixed image, then freeze exact expected descriptor/request and bounded Owner operation; no ready-install claim now",
+  "preparation_gate": "Owner confirmation of fixed operation; not server execution permission",
   "production_permission": false,
   "root": "/var/lib/xuanjun-p2-isolated-test/b3-initialize",
   "schema": 1,
   "scope": "ISOLATED_TEST_ONLY",
-  "server_operations": "NOT_EXECUTED",
+  "server_operations": "B3_INSTALL_NOT_EXECUTED",
   "sources": {
     "activation_tool": {
       "commit": "4df742208d8bee3bd7b61c0eb4c226e5133f879d",
@@ -94,17 +94,18 @@
       "reuse": "prior B1 evidence preservation only; no new B2 hash invented"
     },
     "binary": {
-      "availability": "ONLY_FRESH_MEASUREMENT_MISSING",
-      "bytes": "UNKNOWN",
-      "canonical_path": "UNKNOWN",
-      "declared_path": "/usr/bin/python3.11",
       "image_id": "sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d",
+      "declared_path": "/usr/bin/python3.11",
+      "canonical_path": "/usr/bin/python3.11",
+      "bytes": 6809944,
+      "sha256": "9bee109da0dce17a7c9eeaca9f420cc6770a9fe143b9382d73bd22fe59b21a5f",
+      "uid": 1002,
+      "version": "3.11.2",
+      "availability": "OWNER_MEASURED_6282808058",
       "not_equivalent_to": [
         "image_id",
         "runtime_module_sha256"
-      ],
-      "sha256": "UNKNOWN",
-      "version": "3.11.2_INHERITED"
+      ]
     },
     "db": {
       "content_sha256": "NOT_APPLICABLE_BEFORE_CREATION",
@@ -140,5 +141,24 @@
       "status": "RESERVED_NOT_BOUND"
     }
   },
-  "status": "PREPARATION_INCOMPLETE_ONE_BINARY_PIN_MISSING"
+  "status": "THIN_ADAPTER_DELIVERED_HOSTED_PASS_WAITING_OWNER_CONFIRMATION",
+  "adapter_source_sha256": "26dd90276a2e07b471af55cf2eb9b8b0c371f7080f8e91697a384e351eeaa874",
+  "request_sha256": "d843a697e17e516aa92cb47a4c507527152f65d25b11ccdcc43d27b7fd878dbb",
+  "descriptor_head_sha256": "6d3c95521492ba90640e723081a8d0f21fa2a2bfb3c896c0708ecb86e8ef93f1",
+  "expected_commit_receipt_sha256": "bede2ebc9f9c5458c92307c974358eb61947e7ec80a9611cc76735891ffae433",
+  "owner_artifact": {
+    "commit": "1f455da15131ddd885439f8903c85e14251663b7",
+    "path": "scripts/p2_b3_owner_initialize_20261020.py",
+    "bytes": 78182,
+    "sha256": "36399b8c57a4acf116c8074a52acab34fd3ee258e41f31edb1f93ea6e629c4ad",
+    "blob": "ea73338d6b26bacface10342bfb3fd477f25f900"
+  },
+  "hosted": {
+    "code_and_test_commit": "5752051795755e4a27ea5863e2a731e24f566f92",
+    "run": 39366424078,
+    "conclusion": "SUCCESS",
+    "python_3_11": "14_PASS",
+    "python_3_12": "14_PASS",
+    "fixture_binary": "same-byte private copy of Hosted interpreter; never used as UK binary pin"
+  }
 }
