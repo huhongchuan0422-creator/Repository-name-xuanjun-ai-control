@@ -10,7 +10,7 @@ PINS={'tar_bytes':559237632,'tar_sha256':'e6d3a3cef96ee996eb4b130fb0bd9305438489
  'dist/context-DyPstb2Q.mjs':(176,'db7fc7539455da0c564d4ded0d04da1c764a46903d1632489b8bd04641098320')}}
 MAX_MANIFEST=8*1024*1024;MAX_TAR=600*1024*1024;MAX_PAYLOAD=512*1024*1024
 MAX_MEMBER=128*1024*1024;MAX_MEMBERS=20000;MAX_PAX=65536;MAX_SMALL=1024*1024
-OUTPUT_NAME='p2-b5-three-files-20261020'
+OUTPUT_NAME='p2-b5-three-files-gnu-v2-20261020'
 class Hold(Exception):pass
 
 def need(ok,code):
@@ -91,6 +91,10 @@ def octal(raw):
     raw=raw.strip(b'\x00 ');need(not raw or re.fullmatch(b'[0-7]+',raw) is not None,'TAR_NUMERIC');return int(raw or b'0',8)
 def text(raw):
     value,sep,padding=raw.partition(b'\x00');need(not sep or not padding.strip(b'\x00'),'TAR_TEXT_PADDING');return value.decode('utf8')
+def gnu_path(raw):
+    need(1<len(raw)<=4097 and raw[-1:]==b'\x00' and b'\x00' not in raw[:-1],'GNU_LONGNAME_PAYLOAD')
+    return safe_name(raw[:-1].decode('utf8'))
+
 def pax_path(raw):
     need(0<len(raw)<=MAX_PAX,'PAX_BOUND');offset=0;values={}
     while offset<len(raw):
@@ -116,7 +120,7 @@ def select_files(tar_fd,manifest_fd,pins,checkpoint=None):
     rows=manifest_map(manifest_fd,pins)
     need(hash_fd(tar_fd,pins['tar_bytes'])==pins['tar_sha256'],'TAR_SHA')
     if checkpoint:checkpoint('HASHED')
-    reader=TarReader(tar_fd,pins['tar_bytes']);seen=set();selected={};pending=None;headers=0;total=0;termination='MEMBER_BOUNDARY_EOF'
+    reader=TarReader(tar_fd,pins['tar_bytes']);seen=set();selected={};pending=None;pending_format=None;headers=0;total=0;termination='MEMBER_BOUNDARY_EOF'
     while reader.left:
         header=reader.read(512)
         if header==b'\x00'*512:
@@ -125,15 +129,36 @@ def select_files(tar_fd,manifest_fd,pins,checkpoint=None):
             termination='ZERO_END_MARKERS';break
         headers+=1;need(headers<=2*MAX_MEMBERS,'TAR_HEADER_BOUND')
         need(octal(header[148:156])==sum(header[:148])+8*32+sum(header[156:]),'TAR_CHECKSUM')
-        need(header[257:263]==b'ustar\x00' and header[263:265]==b'00','TAR_FORMAT')
-        name=text(header[:100]);prefix=text(header[345:500]);name=(prefix+'/'+name) if prefix else name
+        magic=header[257:265];gnu=magic==b'ustar  \x00'
+        need(gnu or magic==b'ustar\x0000','TAR_FORMAT')
+        # Old GNU bytes345:512 are extension fields, never a POSIX prefix.
+        if gnu:need(not header[345:512].strip(b'\x00'),'GNU_EXTENSION_NOT_ALLOWED')
+        name=text(header[:100]) if pending is None else None
+        if not gnu:
+            prefix=text(header[345:500])
+            if name is not None:name=(prefix+'/'+name) if prefix else name
         size=octal(header[124:136]);kind=header[156:157]
-        if kind==b'x':
-            need(pending is None and name=='././@PaxHeader' and size<=MAX_PAX,'PAX_HEADER')
-            pending=pax_path(reader.read(size));pad=(-size)%512
+        if kind in (b'x',b'L'):
+            need(pending is None,'TAR_NESTED_EXTENSION')
+            need(not text(header[157:257]) and octal(header[329:337])==octal(header[337:345])==0,'TAR_LINK_OR_DEVICE')
+            if kind==b'L':
+                need(gnu and name=='././@LongLink' and 101<size<=4097,'GNU_LONGNAME_HEADER')
+                need(all(octal(header[a:b])==0 for a,b in ((100,108),(108,116),(116,124),(136,148))) and not header[265:329].strip(b'\x00'),'GNU_LONGNAME_METADATA')
+                pending=gnu_path(reader.read(size))
+            else:
+                need(not gnu and name=='././@PaxHeader' and size<=MAX_PAX,'PAX_HEADER')
+                pending=pax_path(reader.read(size))
+            pending_format=magic;pad=(-size)%512
             need(not reader.read(pad).strip(b'\x00'),'TAR_PADDING');continue
         need(kind in (b'0',b'\x00'),'TAR_MEMBER_TYPE')
-        safe_name(name);name=pending if pending is not None else name;pending=None
+        need(pending is None or pending_format==magic,'TAR_MIXED_EXTENSION')
+        # A GNU fallback name may cut a multibyte UTF8 sequence at byte100;
+        # bind its exact bytes to the validated full longname instead of decoding.
+        if pending is not None:
+            expected=pending.encode('utf8')[:100]
+            if gnu:need(header[:100]==expected+b'\x00'*(100-len(expected)),'TAR_LONGNAME_FALLBACK')
+            name=pending
+        safe_name(name);pending=None;pending_format=None
         need(not text(header[157:257]) and octal(header[329:337])==0 and octal(header[337:345])==0,'TAR_LINK_OR_DEVICE')
         need(name not in seen,'DUPLICATE_TAR_MEMBER');need(name in rows,'TAR_MEMBER_NOT_IN_MANIFEST')
         row=rows[name];need(size==row['bytes'] and size<=MAX_MEMBER,'TAR_MEMBER_SIZE')
@@ -205,6 +230,23 @@ def private_home(path,uid):
         need(os.fstat(fd).st_uid==uid,'ADMIN_HOME_OWNER');return fd
     except BaseException:os.close(fd);raise
 
+def prior_failure(home,uid):
+    old=os.open('p2-b5-three-files-20261020',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=home)
+    try:
+        st=os.fstat(old);need(st.st_uid==uid and stat.S_IMODE(st.st_mode)==0o700,'PRIOR_DIRECTORY_IDENTITY')
+        evidence={}
+        for name in ('host-result.json','receipt.json'):
+            fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=old)
+            try:
+                st=os.fstat(fd);need(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_uid==uid and stat.S_IMODE(st.st_mode)==0o600 and st.st_size<=65536,'PRIOR_RECEIPT_IDENTITY')
+                raw=os.read(fd,65537);need(len(raw)==st.st_size,'PRIOR_RECEIPT_SIZE')
+                value=json.loads(raw.decode('utf8'),object_pairs_hook=unique)
+                if name=='host-result.json':need(sha(raw)=='e40abcd5304e4ab0e29c83a4865528272aca2b0ddb97e6d3df8d9941544c3bd6' and value.get('state')=='HOLD','PRIOR_HOST_RESULT_BINDING')
+                error=value.get('error');evidence[name]={'sha256':sha(raw),'bytes':len(raw),'state':value.get('state'),'error':error if isinstance(error,str) and re.fullmatch('[A-Z][A-Z0-9_]{0,160}',error) else 'UNKNOWN'}
+            finally:os.close(fd)
+        return evidence
+    finally:os.close(old)
+
 def main():
     need(os.getuid()==os.geteuid()==0 and os.uname().nodename.split('.')[0]==HOST,'FIXED_HOST_ROOT_REQUIRED')
     need(sys.version_info[:3]==(3,6,8),'HOST_PYTHON368_REQUIRED')
@@ -217,6 +259,7 @@ def main():
         # Open only pwd's real home; no caller-selected output path or runtime-tree traversal.
         home_path=admin.pw_dir;home=private_home(home_path,admin.pw_uid)
         hs=os.fstat(home);need(hs.st_uid==admin.pw_uid and not hs.st_mode&0o022,'ADMIN_HOME_OWNER')
+        prior=prior_failure(home,admin.pw_uid);print(json.dumps({'prior_failure_readback':prior},sort_keys=True),flush=True)
         os.umask(0o077);os.mkdir(OUTPUT_NAME,0o700,dir_fd=home)
         out=os.open(OUTPUT_NAME,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=home);os.fchown(out,admin.pw_uid,admin.pw_gid);os.fsync(home)
         pid=os.fork()

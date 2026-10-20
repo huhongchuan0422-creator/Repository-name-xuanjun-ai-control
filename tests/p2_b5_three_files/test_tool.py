@@ -8,13 +8,13 @@ def hash_(b):return hashlib.sha256(b).hexdigest()
 class ThreeTests(unittest.TestCase):
  def root(self):
   t=tempfile.TemporaryDirectory(dir='/root',prefix='b5-three-test-');self.addCleanup(t.cleanup);return Path(t.name)
- def fixture(self,extra=None,kind=None,duplicate=False,long=False,finish=True,malicious_pax=None):
+ def fixture(self,extra=None,kind=None,duplicate=False,long=False,finish=True,malicious_pax=None,format_=tarfile.PAX_FORMAT):
   selected={'package.json':b'{"version":"fixture"}', 'dist/loader-runtime-load-DpgEqnzx.mjs':b'export const fixture=1;', 'dist/context-DyPstb2Q.mjs':b'export{}'}
   files={m.ROOT+k:v for k,v in selected.items()};files['usr/lib64/fixture.so']=b'not executed'
   if long:files[m.ROOT+'nested/'+('a'*120)+'/unicode-'+('\u6d4b'*20)+'.mjs']=b'long-name'
   if extra:files.update(extra)
   buf=io.BytesIO();rows=[]
-  with tarfile.open(fileobj=buf,mode='w',format=tarfile.PAX_FORMAT) as tar:
+  with tarfile.open(fileobj=buf,mode='w',format=format_) as tar:
    for i,(name,raw) in enumerate(files.items()):
     info=tarfile.TarInfo(name);info.size=len(raw);info.mode=0o600;info.uid=info.gid=os.getuid();info.mtime=0
     if i==0 and kind:info.type=kind;info.linkname='outside'
@@ -38,6 +38,63 @@ class ThreeTests(unittest.TestCase):
  def test_correct_all_content_and_only_three_payloads(self):
   f=self.fixture();selected,e=self.select(f);self.assertEqual(selected,f[-1]);self.assertEqual(e['members_verified'],4);self.assertTrue(e['all_members_content_sha_verified']);raw=m.small_archive(selected);self.assertLess(len(raw),m.MAX_SMALL)
   with tarfile.open(fileobj=io.BytesIO(raw)) as tar:self.assertEqual(set(tar.getnames()),set(selected));self.assertTrue(all(x.isfile() for x in tar.getmembers()))
+ def replace_tar(self,f,raw):
+  f[1].write_bytes(raw);f[4].update(tar_bytes=len(raw),tar_sha256=hash_(raw));return f
+ def header_change(self,raw,offset,field,value):
+  raw=bytearray(raw);h=raw[offset:offset+512];h[field:field+len(value)]=value;h[148:156]=b' '*8;h[148:156]=('%06o\0 '%sum(h)).encode();raw[offset:offset+512]=h;return bytes(raw)
+ def test_prior_failure_readback_is_bound_and_immutable(self):
+  root=self.root();old=root/'p2-b5-three-files-20261020';old.mkdir(mode=0o700)
+  host=m.encoded({'state':'HOLD','error':'CHILD_FAILED_RETAIN_OUTPUT'});receipt=m.encoded({'state':'HOLD','error':'TAR_FORMAT'})
+  for name,raw in [('host-result.json',host),('receipt.json',receipt)]:
+   (old/name).write_bytes(raw);(old/name).chmod(0o600)
+  fd=os.open(str(root),os.O_RDONLY|os.O_DIRECTORY)
+  try:
+   with self.assertRaisesRegex(m.Hold,'PRIOR_HOST_RESULT_BINDING'):m.prior_failure(fd,os.getuid())
+   original=m.sha
+   with patch.object(m,'sha',side_effect=lambda raw:'e40abcd5304e4ab0e29c83a4865528272aca2b0ddb97e6d3df8d9941544c3bd6' if raw==host else original(raw)):
+    result=m.prior_failure(fd,os.getuid());self.assertEqual(result['receipt.json']['error'],'TAR_FORMAT')
+   self.assertEqual((old/'receipt.json').read_bytes(),receipt);self.assertEqual((old/'host-result.json').read_bytes(),host)
+   (old/'receipt.json').unlink();(old/'receipt.json').symlink_to(old/'host-result.json')
+   with self.assertRaises(m.Hold):m.prior_failure(fd,os.getuid())
+  finally:os.close(fd)
+ def test_python36_default_gnu_regular_and_long_unicode(self):
+  # CPython v3.6.8 Lib/tarfile.py DEFAULT_FORMAT=GNU_FORMAT.
+  # Explicit GNU reproduces its writer without relying on a newer default.
+  for long in (False,True):
+   f=self.fixture(long=long,format_=tarfile.GNU_FORMAT);selected,e=self.select(f)
+   self.assertEqual(selected,f[-1]);self.assertEqual(e['members_verified'],5 if long else 4)
+ def test_gnu_longname_utf8_split_at_byte100(self):
+  f=self.fixture(extra={'x'*99+'测'*4:b'unicode'},format_=tarfile.GNU_FORMAT)
+  self.assertEqual(self.select(f)[1]['members_verified'],5)
+ def test_gnu_special_extensions_and_oldgnu_fields_rejected(self):
+  for kind in (b'K',b'S',b'g',b'X',b'1',b'2',b'3',b'4',b'5',b'6',b'7'):
+   f=self.fixture(format_=tarfile.GNU_FORMAT);raw=self.header_change(f[1].read_bytes(),0,156,kind)
+   with self.assertRaises(m.Hold):self.select(self.replace_tar(f,raw))
+  for field in (345,369,386,482,500):
+   f=self.fixture(format_=tarfile.GNU_FORMAT);raw=self.header_change(f[1].read_bytes(),0,field,b'1')
+   with self.assertRaisesRegex(m.Hold,'GNU_EXTENSION_NOT_ALLOWED'):self.select(self.replace_tar(f,raw))
+ def test_gnu_longname_payload_rejects_unsafe_or_unbounded(self):
+  for raw in (b'a',b'a\0b\0',b'../escape\0',b'/absolute\0',b'a//b\0',b'a\\b\0',b'x'*4097+b'\0'):
+   with self.assertRaises(m.Hold):m.gnu_path(raw)
+ def test_gnu_nested_mixed_dangling_and_fallback_rejected(self):
+  f=self.fixture(long=True,format_=tarfile.GNU_FORMAT);raw=f[1].read_bytes()
+  offset=0
+  while raw[offset+156:offset+157]!=b'L':
+   size=int(raw[offset+124:offset+136].strip(b'\0 '),8);offset+=512+((size+511)//512)*512
+  size=int(raw[offset+124:offset+136].strip(b'\0 '),8);following=offset+512+((size+511)//512)*512
+  cases=[self.header_change(raw,following,257,b'ustar\000'),
+         self.header_change(raw,following,156,b'L'),
+         self.header_change(raw,following,0,b'bad'),raw[:following],
+         self.header_change(raw,offset,124,b'00000010002\0')]
+  # payload's final NUL is mandatory, even with a recomputed outer digest.
+  bad=bytearray(raw);bad[offset+512+size-1]=65;cases.append(bytes(bad))
+  for changed in cases:
+   with self.assertRaises(m.Hold):self.select(self.replace_tar(f,changed))
+ def test_gnu_all_contents_and_boundary_still_checked(self):
+  f=self.fixture(long=True,format_=tarfile.GNU_FORMAT,finish=False)
+  self.assertEqual(self.select(f)[1]['source_tar_termination'],'MEMBER_BOUNDARY_EOF')
+  raw=f[1].read_bytes().replace(b'not executed',b'NOT executed')
+  with self.assertRaisesRegex(m.Hold,'TAR_MEMBER_CONTENT_SHA'):self.select(self.replace_tar(f,raw))
  def test_full_tar_and_manifest_digest_mismatch(self):
   for key in ('tar_sha256','manifest_sha256'):
    f=self.fixture();f[4][key]='0'*64
@@ -105,7 +162,7 @@ class ThreeTests(unittest.TestCase):
   finally:os.close(fd)
   self.assertEqual((f[3]/'three-files.tar').stat().st_size,512);self.assertFalse((f[3]/'receipt.json').exists())
  def test_full_20000_member_scale(self):
-  f=self.fixture(extra={m.ROOT+'fixtures/m%05d.mjs'%i:b'' for i in range(19996)})
+  f=self.fixture(extra={m.ROOT+'fixtures/'+('a'*110)+'/m%05d.mjs'%i:b'' for i in range(19996)},format_=tarfile.GNU_FORMAT)
   _,e=self.select(f);self.assertEqual(e['members_verified'],20000);self.assertTrue(e['all_members_content_sha_verified'])
  def test_parent_small_readback_rejects_tamper(self):
   f=self.fixture();selected,_=self.select(f);p=f[0]/'small.tar';raw=m.small_archive(selected);p.write_bytes(raw)
