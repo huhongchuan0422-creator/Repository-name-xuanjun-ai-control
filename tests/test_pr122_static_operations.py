@@ -259,6 +259,14 @@ class StaticOperationsTests(unittest.TestCase):
         self.assertEqual(effect['archive_sha256'], self.data['backup']['static_sha256'])
         self.assertEqual(effect['manifest_sha256'], digest(canonical(self.data['backup']['static_files'])))
 
+    def test_brand_backup_retains_full_dynamic_count_and_hash_validation(self):
+        self.actual_backup_fixture(count=2, schema='FULL_STATIC_BRAND_REVIEW_V1')
+        self.assertEqual(self.ops._backup(self.data)['archive_sha256'], self.data['backup']['static_sha256'])
+        self.ops.t.pins['previous_file_count'] = 3
+        with self.assertRaisesRegex(Denied, 'STATIC_BACKUP_MANIFEST'): self.ops._backup(self.data)
+        self.ops.t.pins['previous_file_count'] = True
+        with self.assertRaisesRegex(Denied, 'STATIC_PREVIOUS_FILE_COUNT'): self.ops._backup(self.data)
+
     def test_full_backup_requires_strict_bounded_integer_count(self):
         self.actual_backup_fixture(count=2)
         for count in (None, True, False, '2', 2.0, 0, -1, 10001):

@@ -43,11 +43,11 @@ class SmallEditTests(unittest.TestCase):
         self.assertEqual(original(self.c, self.owner, 'project-a', digest(self.path.encode()), self.sha)[1], self.body)
 
     def test_chinese_explicit_request_and_bounded_edit_distance(self):
-        self.body = '<html><body><p data-xj-small-text="TYPO_ONLY_V1">欢迎来到玄均云汇</p></body></html>'.encode()
+        self.body = '<html><body><p data-xj-small-text="TYPO_ONLY_V1">欢迎来到玄均AI新</p></body></html>'.encode()
         self.revision = 2
         self.install()
-        result = self.build(self.request('把「玄均云汇」改成「玄钧云汇」。'))
-        self.assertIn('玄钧云汇'.encode(), result['page_bytes'])
+        result = self.build(self.request('把「玄均AI新」改成「玄钧AI新」。'))
+        self.assertIn('玄钧AI新'.encode(), result['page_bytes'])
 
     def test_owner_cannot_self_execute_or_use_another_project(self):
         case = self.request()

@@ -13,8 +13,8 @@ builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
 
 class StaticAlignment(unittest.TestCase):
-    def test_reviewed_html_bytes_survive_rebuild(self):
-        expected = {'custom-development': '04b3f5d112780bbc3c6d742f235beaaa9947993d97ed89ca4b892955b6cf0462',
+    def test_current_brand_draft_html_bytes_survive_rebuild(self):
+        expected = {'custom-development': 'a781409cdc4b20794b6c58aa556a9ee9e7df3dc822ddc1c4230992a314dbc398',
                     'custom-sow': '752200d5ae7849dbb13870969b814cc7e6ee471584b2e54635e8b5309e15e8aa'}
         with tempfile.TemporaryDirectory() as td:
             r=Path(td);shutil.copytree(ROOT/'docs/legal',r/'docs/legal')

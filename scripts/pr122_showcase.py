@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 import re
 from urllib.parse import urlsplit
 from scripts.community_saas_modules import catalog as module_catalog
+from scripts.pr122_site_hub_public_copy import brand_text
 
 KINDS={'project','page','milestone','acceptance','module','ecology','feature','feature_acceptance'}
 ID=re.compile(r'[a-z][a-z0-9-]{0,63}')
@@ -217,10 +218,10 @@ def render(catalog,output,preview=False,project_files=None,shell=None):
         if global_header:
             global_header=re.sub(r'\saria-current="page"','',global_header)
             global_header=re.sub(r'href="[^"]*" lang="(zh-CN|en)"',lambda m:'href="/showcase/'+('en/' if m[1]=='en' else '')+clean+'" lang="'+m[1]+'"'+(' aria-current="page"' if m[1]==lang else ''),global_header)
-        header=global_header or '<header><a href="/">玄钧云汇</a></header>'
-        footer=global_footer or '<footer><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026024862号</a></footer>'
+        header=brand_text(global_header) if global_header else '<header><a href="/">玄钧AI新</a></header>'
+        footer=brand_text(global_footer) if global_footer else '<footer><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026024862号</a></footer>'
         canonical_url='https://wenwenwenyiyiyi.work/showcase/'+relative.removesuffix('index.html')
-        target.write_text('<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escape(title)+'｜玄钧云汇</title><link rel="canonical" href="'+canonical_url+'">'+head_assets+'<link rel="stylesheet" href="/showcase/assets/showcase.css"></head><body>'+header+'<main class="showcase-main"><nav class="showcase-subnav" aria-label="'+('Explore work' if en else '作品展示')+'">'+nav+'</nav>'+('' if global_header else languages)+banner+'<h1>'+escape(title)+'</h1>'+body+'</main>'+footer+script+'</body></html>')
+        target.write_text('<!doctype html><html lang="'+lang+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escape(title)+'｜玄钧AI新</title><link rel="canonical" href="'+canonical_url+'">'+head_assets+'<link rel="stylesheet" href="/showcase/assets/showcase.css"></head><body>'+header+'<main class="showcase-main"><nav class="showcase-subnav" aria-label="'+('Explore work' if en else '作品展示')+'">'+nav+'</nav>'+('' if global_header else languages)+banner+'<h1>'+escape(title)+'</h1>'+body+'</main>'+footer+script+'</body></html>')
     for en in (False,True):
         language='en' if en else 'zh';prefix='en/' if en else '';escape=html.escape
         states={'PLANNED':('规划中','Planned'),'DEVELOPING':('开发中','In development'),'IN_PROGRESS':('进行中','In progress'),'DONE':('已完成','Completed'),'ACCEPTED':('已验收','Accepted')}
@@ -238,7 +239,7 @@ def render(catalog,output,preview=False,project_files=None,shell=None):
                 for view in generated:
                     target=base/view['relative'];target.parent.mkdir(parents=True,exist_ok=True)
                     notice=('<p>送审预览，尚未公开发布 / Review preview</p>' if preview else '')
-                    target.write_text('<!doctype html><html lang="'+('en' if en else 'zh-CN')+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escape(view['title'])+'｜玄钧云汇</title><link rel="stylesheet" href="/showcase/assets/roles.css"></head><body class="'+view['device']+'">'+notice+view['body']+'<footer><a href="https://beian.miit.gov.cn/" rel="noopener noreferrer">渝ICP备2026024862号</a></footer></body></html>')
+                    target.write_text('<!doctype html><html lang="'+('en' if en else 'zh-CN')+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escape(view['title'])+'｜玄钧AI新</title><link rel="stylesheet" href="/showcase/assets/roles.css"></head><body class="'+view['device']+'">'+notice+view['body']+'<footer><a href="https://beian.miit.gov.cn/" rel="noopener noreferrer">渝ICP备2026024862号</a></footer></body></html>')
             milestones=''.join('<article class="card milestone"><span class="showcase-status">'+escape(states[m['state']][en])+'</span><h3>'+escape(m['title'][language])+'</h3><a href="'+escape(m['evidence_url'],quote=True)+'">'+('View record' if en else '查看记录')+' →</a></article>' for m in project['milestones'])
             progress=project['progress'];scenarios='<div class="showcase-tags">'+''.join('<span>'+escape(v[language])+'</span>' for v in project['scenarios'])+'</div>'
             body='<p class="showcase-lead">'+escape(project['summary'][language])+'</p>'+scenarios+'<p class="showcase-progress">'+('Verified milestones: ' if en else '已核验完成：')+str(progress['done'])+' / '+str(progress['total'])+'</p>'+roles+'<h2>'+labels['roadmap'][en]+'</h2><div class="grid">'+milestones+'</div>'
@@ -260,7 +261,7 @@ def render(catalog,output,preview=False,project_files=None,shell=None):
         ecology='<p>'+('Rules and project contributions are separate from ownership of the platform foundation.' if en else '共创项目贡献与平台自研基础模块归属分开登记。')+'</p><nav><a href="'+ecosystem_root+'">'+('Rules' if en else '共建共享规则')+'</a><a href="'+ecosystem_root+'tiers/">'+('Tiers and discounts' if en else '等级与开发折扣')+'</a><a href="'+ecosystem_root+'ledger/">'+('Service credits' if en else '专项金额说明')+'</a><a href="'+ecosystem_root+'profit-sharing/">'+('Profit sharing' if en else '共创净利润共享')+'</a></nav>'
         ecology+=''.join('<article class="card"><h2>'+escape(e['title'][language])+'</h2><p>'+escape(e['summary'][language])+'</p><small>'+('Initiator: ' if en else '共创发起人：')+escape(e['initiator_nickname'])+'</small></article>' for e in catalog['ecology'])
         page(prefix+'ecosystem/index.html',labels['ecosystem'][en],ecology,en)
-        page(prefix+'index.html','Explore XuanJun' if en else '探索玄钧云汇',cards(catalog['projects']),en)
+        page(prefix+'index.html','Explore XuanJun' if en else '探索玄钧AI新',cards(catalog['projects']),en)
     for name,raw in (project_files or {}).items():
         relative=PurePosixPath(name);need(not relative.is_absolute() and '..' not in relative.parts and relative.parts[0]=='showcase','PROJECT_FILE_PATH')
         target=output/name;need(not target.exists(),'PROJECT_FILE_COLLISION');target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)

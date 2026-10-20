@@ -5,6 +5,27 @@ from html import escape
 NAME = '云汇生态权益'
 EN_NAME = 'Yunhui Ecosystem Rights'
 
+BRAND = '玄钧AI新'
+LEGACY_BRAND = '玄钧云汇'
+LEGACY_EN_BRAND = re.compile(r'Xuanjun Yunhui', re.I)
+PUBLIC_TEXT_SUFFIXES = {'.html', '.htm', '.js', '.mjs', '.json', '.xml', '.txt', '.css', '.svg', '.webmanifest'}
+
+
+def brand_text(text):
+    """Project the exact old public brand; preserve domains, IDs and rights names."""
+    return LEGACY_EN_BRAND.sub(BRAND, text.replace(LEGACY_BRAND, BRAND))
+
+
+def project_public_brand(public):
+    """Only a new isolated public tree, before its CSP and final manifest pass."""
+    changed=[]
+    for path in sorted(public.rglob('*')):
+        if path.is_symlink():raise ValueError('PUBLIC_BRAND_SYMLINK')
+        if not path.is_file() or path.suffix.lower() not in PUBLIC_TEXT_SUFFIXES:continue
+        raw=path.read_bytes();updated=brand_text(raw.decode('utf-8')).encode('utf-8')
+        if updated!=raw:path.write_bytes(updated);changed.append(path.relative_to(public).as_posix())
+    return {'brand':BRAND,'changed_public_files':changed,'scope':'NEW_PUBLIC_OUTPUT_ONLY','production_approved':False}
+
 
 def table(caption, headers, rows):
     return '<div class="xj-table-scroll" tabindex="0" role="region" aria-label="'+escape(caption,quote=True)+'"><table><caption>'+escape(caption)+'</caption><thead><tr>'+''.join('<th scope="col">'+escape(x)+'</th>' for x in headers)+'</tr></thead><tbody>'+''.join('<tr>'+''.join('<td>'+escape(str(x))+'</td>' for x in row)+'</tr>' for row in rows)+'</tbody></table></div>'
@@ -49,7 +70,7 @@ def content(relative, en=False):
         p('正常合格贡献来源：每取得1点权益值，一次性附带500元专项服务抵扣额；购买专项服务包获赠的权益不另附带500元。所购服务额度以订单为准，与赠送抵扣余额分别记账。','Each rights-value point from eligible ordinary contributions includes a one-time CNY 500 service credit. Rights gifted with purchased service packages do not include this additional CNY 500. Purchased service allowances follow the order and are tracked separately from gifted credit.')),
       'ecosystem/activities/index.html':(t('参与共建，了解你的专属优惠。','Discover benefits for contributing.'),
         '<div class="notice" role="status">'+t('活动筹备中 · 当前未开放领取','Activities are being prepared · Claims are not open')+'</div>'+
-        p('关注云汇生态活动，了解云汇生态权益与专项服务金额赠送安排。参与资格、名额和生效时间以正式活动规则为准。','Follow ecosystem activities for information about rights and service-credit gifts. Eligibility, places and opening dates follow the published activity rules.')+caps+
+        p('关注玄钧AI新生态活动，了解云汇生态权益与专项服务金额赠送安排。参与资格、名额和生效时间以正式活动规则为准。','Follow ecosystem activities for information about rights and service-credit gifts. Eligibility, places and opening dates follow the published activity rules.')+caps+
         p('正常合格贡献来源：每取得1点权益值，一次性附带500元专项服务抵扣额；服务包购买赠送权益不额外附带该金额。不是现金红包，也不能兑换现金。','Eligible ordinary contributions include a one-time CNY 500 service credit per rights-value point. Rights gifted with service-package purchases do not include this additional credit. This is not a cash gift and cannot be redeemed for cash.')+caveat),
       'ecosystem/index.html':(t('共建共享，让贡献有回响。','Build together. Share what we create.'),
         p('客户、开发者与合作伙伴，一起打磨真实可用的产品。云汇生态权益记录合格贡献，开发优惠和共创收益资格分别确认。','Customers, developers and partners build useful products together. Yunhui Ecosystem Rights record eligible contributions; discounts and profit-sharing eligibility are assessed separately.')+tiers+caps+
@@ -66,13 +87,13 @@ def public_page(text, relative, en=False):
     if main:
         text=re.sub(r'<main\b.*?</main>',lambda _:main,text,count=1,flags=re.S)
         title=re.search(r'<h1>(.*?)</h1>',main)[1]
-        text=re.sub(r'<title>.*?</title>',lambda _:'<title>'+title+' | '+('Xuanjun Yunhui' if en else '玄钧云汇')+'</title>',text,count=1,flags=re.S)
+        text=re.sub(r'<title>.*?</title>',lambda _:'<title>'+title+' | '+BRAND+'</title>',text,count=1,flags=re.S)
     if relative=='marketplace/index.html':
         # Cost and margin are internal. The public estimate always passes UNKNOWN.
         text=re.sub(r'<label>[^<]*<input id="directCost"[^>]*></label>', '',text)
         text=text.replace('第三方成本不得抵扣，推荐佣金只对实际可确认正毛利依权威规则产生。','第三方成本独立列示，不参与专项抵扣。')
         text=text.replace('Third-party costs cannot be offset. Referral commissions require verified positive gross profit under the authoritative rules.','Third-party costs are shown separately and cannot be offset by service credit.')
-    return wording(text,en)
+    return brand_text(wording(text,en))
 
 
 def home_promotion(locale):
@@ -160,7 +181,7 @@ def _reviewed_page_copy_fragment(text, relative):
         key=route.removeprefix('capabilities/')
         if not en and key in labels:
             old=key.replace('-',' ');new=labels[key]
-            text=text.replace('<title>'+old+' | 玄钧云汇</title>','<title>'+new+' | 玄钧云汇</title>')
+            text=text.replace('<title>'+old+' | 玄钧AI新</title>','<title>'+new+' | 玄钧AI新</title>')
             text=text.replace('<span aria-current="page">'+old+'</span>','<span aria-current="page">'+new+'</span>')
         if not en and key=='content-planning-review':
             old='<dt>费用状态</dt><dd>平台发布权限按实际获批范围另行确认</dd>'
@@ -190,7 +211,7 @@ def _reviewed_page_copy_fragment(text, relative):
 def reviewed_page_copy(text, relative):
     # Script/style bytes are outside public wording scope, even for matching strings.
     parts=re.split(r'(<script\b.*?</script>|<style\b.*?</style>)',text,flags=re.S|re.I)
-    for i in range(0,len(parts),2):parts[i]=_reviewed_page_copy_fragment(parts[i],relative)
+    for i in range(0,len(parts),2):parts[i]=_reviewed_page_copy_fragment(brand_text(parts[i]),relative)
     return ''.join(parts)
 
 

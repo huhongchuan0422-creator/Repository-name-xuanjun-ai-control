@@ -286,7 +286,7 @@ class SMTPTransportTests(unittest.TestCase):
                 message = client.send_message.call_args.args[0]
                 self.assertEqual(message['From'], 'sender@example.invalid')
                 self.assertEqual(message['To'], 'recipient@example.invalid')
-                self.assertEqual(message['Subject'], '玄钧云汇：' + title)
+                self.assertEqual(message['Subject'], '玄钧AI新：' + title)
                 self.assertIn('https://example.invalid/customer/center/', message.get_content())
                 self.assertIn('synthetic-one-time-code', message.get_content())
                 self.assertNotIn('?token=', message.get_content())

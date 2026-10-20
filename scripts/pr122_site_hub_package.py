@@ -55,6 +55,15 @@ def package(root,source,output,derive_navigation=False):
         entries.update({'runtime/scripts/'+p.name:p.read_bytes() for p in runtime})
         entries.update({'runtime-config/'+p.name:p.read_bytes() for p in sorted((root/'deploy/pr122-site-hub-preview').glob('*')) if p.is_file()})
         entries['RUNTIME_MANIFEST.json']=canonical({'scope':'In-memory synthetic preview only','files':[{'path':p,'size':len(raw),'sha256':sha(raw)} for p,raw in sorted(entries.items()) if p.startswith(('runtime/','runtime-config/'))]})
+        package_schema='FULL_STATIC_REVIEW_V1' if derive_navigation else None
+        if derive_navigation and 'brand_projection' in stage_binding:
+            brand_contract={'schema':'FULL_STATIC_BRAND_REVIEW_V1','brand':'玄钧AI新','archive_members':1241,'overlay_files':1197,'new_files':101,'public_files':1288}
+            if (stage_binding['brand_projection'].get('brand')!=brand_contract['brand'] or len(entries)+1!=1241 or len(changed)!=1197 or len(final)!=1288 or sum(v is None for v in baselines.values())!=101):
+                raise ValueError('BRAND_PACKAGE_CONTRACT')
+            provenance=json.loads(entries['BUILD_PROVENANCE.json'])
+            provenance['brand_contract']=brand_contract
+            entries['BUILD_PROVENANCE.json']=canonical(provenance)
+            package_schema=brand_contract['schema']
         package_manifest={'schema_version':2,'files':[{'path':p,'size':len(raw),'sha256':sha(raw)} for p,raw in sorted(entries.items())]}
         entries['PACKAGE_MANIFEST.json']=canonical(package_manifest)
         output.mkdir(parents=True)
@@ -65,7 +74,7 @@ def package(root,source,output,derive_navigation=False):
         with archive_path.open('wb') as stream,gzip.GzipFile(filename='',fileobj=stream,mode='wb',mtime=0) as zipped,tarfile.open(fileobj=zipped,mode='w') as archive:
             for name,raw in sorted(entries.items()):
                 member=tarfile.TarInfo('pr122-site-hub/'+name);member.size=len(raw);member.mode=0o644;member.mtime=0;archive.addfile(member,io.BytesIO(raw))
-        receipt={'state':'REVIEW_ONLY_NOT_APPROVED','source_archive_sha256':SOURCE_HASH,'public_file_count':len(final),'overlay_file_count':len(changed),'new_file_count':sum(v is None for v in baselines.values()),'tar_sha256':sha(archive_path.read_bytes()),'package_manifest_sha256':sha(entries['PACKAGE_MANIFEST.json']),'candidate_manifest_sha256':sha(entries['candidate-manifest.json']),'publisher_source_sha256':sha(new_code),'production_deployed':False}
+        receipt={'state':'REVIEW_ONLY_NOT_APPROVED','package_schema':package_schema,'source_archive_sha256':SOURCE_HASH,'public_file_count':len(final),'overlay_file_count':len(changed),'new_file_count':sum(v is None for v in baselines.values()),'tar_sha256':sha(archive_path.read_bytes()),'package_manifest_sha256':sha(entries['PACKAGE_MANIFEST.json']),'candidate_manifest_sha256':sha(entries['candidate-manifest.json']),'publisher_source_sha256':sha(new_code),'production_deployed':False}
         (output/'PACKAGE_RECEIPT.json').write_bytes(canonical(receipt));print(json.dumps(receipt,sort_keys=True));return receipt
 
 if __name__=='__main__':

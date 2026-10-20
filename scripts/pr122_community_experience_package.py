@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import tarfile
 import gzip
+from scripts.pr122_site_hub_public_copy import brand_text
 
 ROOT=Path(__file__).resolve().parents[1]
 TARGET='visual/community-payment/mobile/'
@@ -36,7 +37,7 @@ def prepare_mobile_page(text, name):
     text=adapt_role_navigation(text)
     if name=='index.html' and '<script src="./role.js" defer></script>' not in text:
         text=text.replace('</body>','<script src="./role.js" defer></script></body>',1)
-    return text
+    return brand_text(text)
 
 def collect_mobile_files(root,derive_navigation=False):
     root=Path(root)

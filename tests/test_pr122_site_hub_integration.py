@@ -79,13 +79,13 @@ class IntegrationTests(unittest.TestCase):
         self.assertNotIn('unsafe-inline',policy)
         self.assertTrue((self.public/'assets/ecv-quote-ui.js').is_file())
         self.assertIn('value="ordinary"',(self.public/'marketplace/index.html').read_text())
-    def test_existing_home_body_title_and_links_preserved(self):
+    def test_existing_home_body_title_and_links_preserved_except_brand(self):
         for locale in ('','en/','zh-cn/'):
             old=(ROOT/'tests/fixtures/pr122-site-shell'/locale/'index.html').read_text()
             new=(self.public/locale/'index.html').read_text()
             a=Page();a.feed(old);b=Page();b.feed(new)
             self.assertLessEqual(set(a.refs),set(b.refs))
-            self.assertEqual(re.search(r'<title>.*?</title>',old)[0],re.search(r'<title>.*?</title>',new)[0])
+            self.assertEqual(re.search(r'<title>.*?</title>',old)[0].replace('玄钧云汇','玄钧AI新').replace('Xuanjun Yunhui','玄钧AI新'),re.search(r'<title>.*?</title>',new)[0])
             # The Owner authorized a new home hierarchy and hero copy. Original
             # business detail sections and links remain available in a disclosure.
             oldmain=re.search(r'<main>.*?</main>',old,re.S)[0]

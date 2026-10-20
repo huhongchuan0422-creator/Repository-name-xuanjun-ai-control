@@ -9,7 +9,7 @@ import tarfile
 from pathlib import Path, PurePosixPath
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.pr122_site_hub_public_copy import public_page, legacy_public_wording, reviewed_page_copy, localize_hub_links
+from scripts.pr122_site_hub_public_copy import public_page, legacy_public_wording, reviewed_page_copy, localize_hub_links, project_public_brand
 from scripts.pr122_site_hub_english import translate_fragment
 from scripts.pr122_site_hub_experience import CSS as EXPERIENCE_CSS, disclosures, home as improve_home
 from scripts.pr122_website_release import write_csp_metadata, Deadline
@@ -251,10 +251,12 @@ def build(root, source, output, fixture=None, derive_navigation=False):
         text=p.read_text();updated=reviewed_page_copy(text,p.relative_to(public).as_posix())
         if updated!=text:p.write_text(updated)
     navigation=integrate_mobile_navigation(root,public) if derive_navigation else None
+    brand_projection=project_public_brand(public)
     # Reuse the already reviewed CSP implementation, never enable unsafe-inline.
     with Deadline(20) as deadline: csp=write_csp_metadata(public,output,deadline)
     manifest={p.relative_to(public).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in public.rglob('*') if p.is_file()}
     result={'status':'HOSTED_BROWSER_FIXTURE_ONLY' if fixture else 'ISOLATED_INTEGRATION_CANDIDATE','production_approved':False,'source_archive_sha256':None if fixture else SOURCE_HASH,'base_files':len(old),'final_files':len(manifest),'changed_existing':[k for k,h in old.items() if manifest[k]!=h],'added':[k for k in manifest if k not in old],'files':manifest,'csp':csp,'release_blockers':['Production simulation service isolation and admission pending','Browser acceptance pending','Live current baseline reconciliation pending','Independent review and controlled installer approval pending']}
+    result['brand_projection']=brand_projection
     if navigation is not None:result['navigation_derivation']=navigation
     (output/'MANIFEST.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({k:v for k,v in result.items() if k!='files'},ensure_ascii=False))

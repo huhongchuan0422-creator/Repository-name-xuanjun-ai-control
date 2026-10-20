@@ -28,7 +28,7 @@ Follow V2.7 nodes in order:
 UK must not receive TRADING_PRODUCTION_WRITE.
 
 ## C. Binance Tokyo -> Korea migration
-Migration is a separate production safety track and does not redefine Yunhui V2.7 architecture.
+Migration is a separate production safety track and does not redefine 玄钧AI新 V2.7 architecture.
 
 Order:
 1. Korea preflight: CPU/RAM/disk/network/time sync/kernel/runtime/users/firewall/monitoring/backup.

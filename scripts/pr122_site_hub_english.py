@@ -1,4 +1,5 @@
 """Reviewed English wording for the static hub handoff; no browser translation."""
+from scripts.pr122_site_hub_public_copy import brand_text
 import html
 import re
 
@@ -8,7 +9,7 @@ PAIRS = '''产品与购买|Products and purchase
 共建共享|Co-build and share
 客户项目|Customer projects
 首页|Home
-玄钧云汇|Xuanjun Yunhui
+玄钧AI新|玄钧AI新
 静态预览候选 · 非正式报价、支付、活动领取或客户登录|Static preview candidate · No official quotation, payment, activity claim or customer sign-in
 离线演示候选 · 不提供真实支付、权益领取、收益结算和客户登录|Offline demo candidate · No real payments, entitlement claims, earnings settlement or customer sign-in
 从独立模块、行业解决方案到定制开发，按实际交付状态查看能力、依赖和报价。|Explore standalone modules, industry solutions and custom development with their actual delivery status, dependencies and quotation requirements.
@@ -163,8 +164,8 @@ ECV持有量|ECV holdings
 客户项目验收|Customer project acceptance
 客户项目应能查看需求、合同、版本、开发测试、反馈、整改及验收记录。公开演示允许匿名，私有项目需要服务端认证、租户和项目权限。|Customer projects should expose requirements, contracts, versions, development tests, feedback, corrections and acceptance records. Public demos allow anonymous access; private projects require server-side authentication, tenant and project permissions.
 网页AI、Telegram、飞书需通过同一客户身份的可信绑定与记录留证接入；当前静态页面不收集任何客户私有资料或伪造消息发送。|Web AI, Telegram and Feishu require trusted binding to one customer identity and durable records. This static page does not collect private customer data or fabricate message delivery.
-玄钧云汇 · 共建、共治、共享 · 所有上线能力以正式验收为准|Xuanjun Yunhui · Co-build, co-govern and share · Availability requires formal acceptance
-玄钧云汇 · 正式权益与订单以审核后的权威系统为准|Xuanjun Yunhui · Official entitlements and orders use the approved authoritative system
+玄钧AI新 · 共建、共治、共享 · 所有上线能力以正式验收为准|玄钧AI新 · Co-build, co-govern and share · Availability requires formal acceptance
+玄钧AI新 · 正式权益与订单以审核后的权威系统为准|玄钧AI新 · Official entitlements and orders use the approved authoritative system
 '''
 
 TRANSLATIONS = dict(line.split('|', 1) for line in PAIRS.splitlines() if line)
@@ -183,6 +184,7 @@ TRANSLATIONS.update({
 
 def translate_fragment(source):
     """Translate text nodes; fail closed when Chinese wording has no mapping."""
+    source=brand_text(source)
     def text(match):
         raw = match[0]
         if not re.search('[\u4e00-\u9fff]', raw):
@@ -190,9 +192,9 @@ def translate_fragment(source):
         decoded = html.unescape(raw)
         if decoded in TRANSLATIONS:
             return html.escape(TRANSLATIONS[decoded], quote=False)
-        if decoded.endswith(' | 玄钧云汇'):
-            title = decoded.removesuffix(' | 玄钧云汇')
+        if decoded.endswith(' | 玄钧AI新'):
+            title = decoded.removesuffix(' | 玄钧AI新')
             if title in TRANSLATIONS:
-                return html.escape(TRANSLATIONS[title]+' | Xuanjun Yunhui', quote=False)
+                return html.escape(TRANSLATIONS[title]+' | 玄钧AI新', quote=False)
         raise ValueError('MISSING_ENGLISH_TRANSLATION: '+repr(decoded))
     return re.sub(r'(?<=>)[^<]+(?=<)', text, source)

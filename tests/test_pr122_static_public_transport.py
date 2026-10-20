@@ -228,6 +228,10 @@ class PublicTransportTests(_PublicFixture, unittest.TestCase):
         context['remaining'] = 10
         with self.assertRaises(Denied): dual.require_public_budget(self.plan, 11)
 
+    def test_brand_contract_retains_real_public_dual_approval_and_exact_source_closure(self):
+        self.package_schema_fixture = 'FULL_STATIC_BRAND_REVIEW_V1'
+        self.test_no_crypto_with_actual_authority_source_and_exact_twenty_three_file_closure()
+
     def test_no_crypto_with_actual_authority_source_and_exact_twenty_three_file_closure(self):
         from scripts import pr122_static_source_package as package
         archive, report = package.build(Path(__file__).resolve().parents[1], self.plan['source_commit'])
@@ -243,7 +247,7 @@ class PublicTransportTests(_PublicFixture, unittest.TestCase):
         manifest = json.loads(manifest_raw)
         self.assertEqual(report['source_bindings'], 23)
         self.assertEqual(len(manifest['files']), 23)
-        pins = {'package_schema': 'FULL_STATIC_REVIEW_V1',
+        pins = {'package_schema': getattr(self, 'package_schema_fixture', 'FULL_STATIC_REVIEW_V1'),
                 'static_artifact_sha256': self.plan['artifact_tar_sha256'],
                 'previous_release': str(root / 'previous'), 'previous_receipt_sha256': '1' * 64,
                 'previous_manifest_sha256': '2' * 64, 'nginx': {},

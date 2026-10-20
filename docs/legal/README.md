@@ -1,4 +1,4 @@
-# 玄钧云汇协议与合同草案库
+# 玄钧AI新协议与合同草案库
 
 状态：CANDIDATE_DRAFT_ONLY；22份草案，未正式签署、未部署。
 
@@ -11,9 +11,9 @@
 | [社区分账商户入驻协议](templates/merchant-onboarding.md) | 商户入驻提交前、商户工作台 |
 | [社区交易多方分账协议](templates/community-split.md) | 分账规则确认/变更、社区后台、分账方后台 |
 | [社区分账技术服务与消费者使用条款](templates/community-service.md) | 付款前、消费者帮助中心 |
-| [玄钧云汇隐私政策](templates/privacy.md) | 站点页脚、注册、入驻、反馈、购买 |
+| [玄钧AI新隐私政策](templates/privacy.md) | 站点页脚、注册、入驻、反馈、购买 |
 | [社区交易退款、分账冲回与责任规则](templates/refund-responsibility.md) | 支付确认前、退款申请、商户/分账方对账 |
-| [玄钧云汇平台服务协议](templates/platform-terms.md) | 注册、平台页脚 |
+| [玄钧AI新平台服务协议](templates/platform-terms.md) | 注册、平台页脚 |
 | [SaaS模块订阅、买断与订单条款](templates/saas-order.md) | 模块购买前、SaaS工作台 |
 | [软件与AI定制开发主合同](templates/custom-development.md) | 客户项目签约、合同中心 |
 | [定制项目需求范围、报价与验收任务书](templates/custom-sow.md) | 定制合同附件A |

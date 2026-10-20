@@ -50,7 +50,8 @@ class CopyTests(unittest.TestCase):
         for route in ('tiers','profit-sharing','ledger','activities'):
             page=self.rendered(route,True);p=TableParser(page)
             self.assertTrue(all(x.startswith('/en/ecosystem/') for x in p.links))
-            self.assertNotRegex(page,r'[\u4e00-\u9fff]')
+            self.assertIn(copy.BRAND,page)
+            self.assertNotRegex(page.replace(copy.BRAND,''),r'[\u4e00-\u9fff]')
         p=TableParser(self.rendered('tiers',True))
         self.assertEqual(p.tables[0][1:],[['≥ '+str(n)+' rights-value points',str(d*10)+'% of quoted fee'] for n,d in ((2,9),(10,8),(20,7),(40,6),(80,5),(150,4))])
     def test_table_layout_scroll_and_accessible_name(self):

@@ -110,7 +110,7 @@ class StaticAuthority:
         from scripts import pr122_site_hub_unified_release as original
         pins_raw=original.c.read(original.PINS)
         need(digest(pins_raw)==plan['host_pins_sha256'] and json.loads(pins_raw)==self.tx.pins,'STATIC_HOST_PINS_DRIFT')
-        need(self.tx.pins.get('package_schema')=='FULL_STATIC_REVIEW_V1' and self.tx.pins['static_artifact_sha256']==plan['artifact_tar_sha256'],'STATIC_ARTIFACT_PLAN_BINDING')
+        need(self.tx.pins.get('package_schema') in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1') and self.tx.pins['static_artifact_sha256']==plan['artifact_tar_sha256'],'STATIC_ARTIFACT_PLAN_BINDING')
         baseline={name:self.tx.pins[name] for name in ('previous_release','previous_receipt_sha256','previous_manifest_sha256','nginx')}
         need(digest(canonical(baseline))==plan['static_baseline_sha256'],'STATIC_BASELINE_PLAN_BINDING')
         if plan.get('authorization_mode')=='STATIC_GITHUB_DUAL_APPROVAL':

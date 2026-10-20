@@ -1,4 +1,4 @@
-# 玄钧云汇合同与政策中心候选设计
+# 玄钧AI新合同与政策中心候选设计
 
 FEATURE_ID=LEGAL_CONTRACT_CENTER
 状态：CANDIDATE_DRAFT_ONLY；没有真实签约、资金或生产部署能力。

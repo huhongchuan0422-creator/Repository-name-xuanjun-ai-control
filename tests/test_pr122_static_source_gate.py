@@ -62,6 +62,19 @@ class SourceGateTests(unittest.TestCase):
  def test_brand_transaction_uses_pinned_previous_id_manifest_and_count(self):
   from unittest.mock import Mock
   tree=ast.parse((ROOT/'scripts/pr122_site_hub_unified_release.py').read_text())
+  cls=next(n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='Transaction')
+  method=next(n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name=='baseline')
+  previous_id='pr122-brand-previous-fixture';previous=Path('/synthetic-control/transactions')/previous_id/'receipt.json'
+  receipt=b'{"state":"STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER"}'
+  manifest=json.dumps({'files':[{'path':'a','size':1,'sha256':'a'*64},{'path':'b','size':2,'sha256':'b'*64}]}).encode()
+ def test_brand_baseline_uses_exact_full_receipt_state_pin(self):
+  pins={'package_schema':'FULL_STATIC_BRAND_REVIEW_V1'};state='STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER'
+  self.assertFalse(self.baseline_state(pins,state));pins['previous_receipt_state']=state
+  self.assertTrue(self.baseline_state(pins,state));self.assertFalse(self.baseline_state(pins,'HTTPS_SMOKE_PASS_AWAIT_BROWSER'))
+  pins['previous_receipt_state']='UNKNOWN';self.assertFalse(self.baseline_state(pins,'UNKNOWN'))
+ def test_brand_transaction_uses_pinned_previous_id_manifest_and_count(self):
+  from unittest.mock import Mock
+  tree=ast.parse((ROOT/'scripts/pr122_site_hub_unified_release.py').read_text())
   cls=next(n for n in ast.walk(tree) if isinstance(n,ast.ClassDef) and n.name=='Transaction')
   method=next(n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name=='baseline')
   previous_id='pr122-brand-previous-fixture';previous=Path('/synthetic-control/transactions')/previous_id/'receipt.json'

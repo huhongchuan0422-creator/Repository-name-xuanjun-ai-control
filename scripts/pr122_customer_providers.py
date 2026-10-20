@@ -149,7 +149,7 @@ class Providers:
         if type(mode) is not str or mode not in ('starttls','implicit_tls'):
             raise Unavailable('MAIL_TLS_MODE_INVALID')
         # Tokens are entered in an authenticated-origin form, not URL/query logs.
-        msg=EmailMessage();msg['From']=c['sender'];msg['To']=address;msg['Subject']='玄钧云汇：'+('验证邮箱' if purpose=='VERIFY' else '重置密码')
+        msg=EmailMessage();msg['From']=c['sender'];msg['To']=address;msg['Subject']='玄钧AI新：'+('验证邮箱' if purpose=='VERIFY' else '重置密码')
         msg.set_content('请在 '+origin+'/customer/center/ 输入一次性验证码（10分钟有效）：\n'+token+'\n不要转发给他人。')
         context=ssl.create_default_context()
         if mode=='implicit_tls':

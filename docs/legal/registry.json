@@ -67,8 +67,8 @@
     },
     {
       "id": "privacy",
-      "title": "玄钧云汇隐私政策",
-      "version": "2026-10-15-draft.1",
+      "title": "玄钧AI新隐私政策",
+      "version": "2026-10-15-draft.1-brand-20261019",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "所有用户"
@@ -81,7 +81,7 @@
         "购买"
       ],
       "source": "docs/legal/templates/privacy.md",
-      "source_sha256": "1c74e3a6f2f64e254066414c64f646d3ba623b7f737a0d0e1ba4a1fff78e064b",
+      "source_sha256": "98f01738a045dafd285c5486ba204091ecca1172f98eb0da1642cf527d0d40db",
       "preview": "demos/legal/privacy.html",
       "planned_route": "/legal/privacy/",
       "signature_enabled": false
@@ -111,8 +111,8 @@
     },
     {
       "id": "platform-terms",
-      "title": "玄钧云汇平台服务协议",
-      "version": "2026-10-15-draft.1",
+      "title": "玄钧AI新平台服务协议",
+      "version": "2026-10-15-draft.1-brand-20261019",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "个人用户",
@@ -123,7 +123,7 @@
         "平台页脚"
       ],
       "source": "docs/legal/templates/platform-terms.md",
-      "source_sha256": "d9fd0186510861ddbcacf21549fd231f0404dd0577ad5a8cf5b7a2100425a7ce",
+      "source_sha256": "6e395cfa72174ba03d39a9a6ece42c463287bc7e5c05df6ac85a95f2012f0fb9",
       "preview": "demos/legal/platform-terms.html",
       "planned_route": "/legal/platform-terms/",
       "signature_enabled": false
@@ -149,7 +149,7 @@
     {
       "id": "custom-development",
       "title": "软件与AI定制开发电子合同（唯一签署文件）",
-      "version": "2026-10-17-draft.5",
+      "version": "2026-10-17-draft.5-brand-20261019",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "定制客户",
@@ -160,7 +160,7 @@
         "合同中心"
       ],
       "source": "docs/legal/templates/custom-development.md",
-      "source_sha256": "e33c3c9f441fe67d4c9da9ffc5426d868f69320c3e6e2bb35dcafe1960efc0e3",
+      "source_sha256": "5d7a5bc9afdf7aad5e46ef91fa35c7e5595b113aaf9932d31d9e1a2e799c2db5",
       "preview": "demos/legal/custom-development.html",
       "planned_route": "/legal/custom-development/",
       "signature_enabled": false
@@ -317,7 +317,7 @@
     {
       "id": "referral",
       "title": "推荐合作与佣金结算协议",
-      "version": "2026-10-15-draft.1",
+      "version": "2026-10-15-draft.1-brand-20261019",
       "status": "DRAFT_NOT_FOR_SIGNATURE",
       "audience": [
         "推荐合作方"
@@ -327,7 +327,7 @@
         "佣金工作台"
       ],
       "source": "docs/legal/templates/referral.md",
-      "source_sha256": "0d9472a99710e33e793184faa65ebf86d5e7c1457d56c2f9c6a7dd683004e1cf",
+      "source_sha256": "611f5e599f61c0cac4d446e67197d23e2800488639d16d6c5587f8286b7f045c",
       "preview": "demos/legal/referral.html",
       "planned_route": "/legal/referral/",
       "signature_enabled": false

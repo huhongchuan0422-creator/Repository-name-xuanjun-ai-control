@@ -8,7 +8,7 @@ Evidence status vocabulary: REUSE / EXTEND / MIGRATE / DEPRECATE / MISSING / NOT
 | Trading execution | Tokyo | MIGRATE | /opt/trading-system/trading_execution | Preserve behavior; migrate by artifact/config evidence, not redesign |
 | Binance integration | Tokyo | MIGRATE | /opt/trading-system/binance_integration | Controlled Korea migration |
 | CRM | Tokyo/Domestic assets | REUSE | /opt/trading-system/crm and Domestic runtime packages | Shared abstraction where V2.7 requires |
-| Finance/Billing | Tokyo/Domestic | REUSE/EXTEND | finance-collection-sync.service; backups and runtime assets | Reuse for Yunhui Finance Core; do not rebuild |
+| Finance/Billing | Tokyo/Domestic | REUSE/EXTEND | finance-collection-sync.service; backups and runtime assets | Reuse for 玄钧AI新 Finance Core; do not rebuild |
 | Customer/Common Brain | Tokyo/Domestic | REUSE | domestic-real-ai-runtime artifacts; Customer Brain r10 evidence | Reuse model/provider-neutral patterns |
 | Model RPC | Tokyo/Domestic | REUSE | tokyo-restricted-model-executor.service; domestic-model-rpc-tunnel.service | Reuse patterns/interfaces |
 | OpenClaw | Tokyo/Domestic | REUSE/MIGRATE | existing OpenClaw binaries and gateways | Reuse for UK standard runtime |

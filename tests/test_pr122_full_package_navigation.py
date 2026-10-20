@@ -40,6 +40,11 @@ class FullPackageNavigation(unittest.TestCase):
             data=(bundle/item['path']).read_bytes();self.assertEqual(hashlib.sha256(data).hexdigest(),item['sha256']);self.assertEqual(len(data),item['size'])
         p=json.loads((bundle/'BUILD_PROVENANCE.json').read_bytes());self.assertFalse(p['production_approved']);self.assertEqual(p['stage_manifest_sha256'],hashlib.sha256((bundle/'FULL_SOURCE_STAGE_MANIFEST.json').read_bytes()).hexdigest())
         self.assertFalse(json.loads((bundle/'RELEASE_GATE.json').read_bytes())['production_approved'])
+    def test_brand_projection_cannot_declare_arbitrary_package_shape(self):
+        self.binding_overrides={'brand_projection':{'brand':'玄钧AI新'}}
+        with self.assertRaisesRegex(ValueError,'BRAND_PACKAGE_CONTRACT'):self.run_package(True)
+        self.assertFalse((self.root/'out').exists())
+
     def test_unpinned_input_rejected_before_stage(self):
         self.source.write_bytes(b'synthetic');
         with self.assertRaisesRegex(ValueError,'SOURCE_HASH_MISMATCH'):self.run_package(True)

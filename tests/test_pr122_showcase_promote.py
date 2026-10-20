@@ -20,7 +20,7 @@ class PromotionTests(unittest.TestCase):
     def candidate(self,preview=False):
         self.counter+=1;folder=self.root/('public-'+str(self.counter));catalog=view.compile_catalog([],{});manifest=view.render(catalog,folder,preview)
         # Change a byte between versions, keeping the full tree manifest honest.
-        page=folder/'showcase/index.html';page.write_text(page.read_text().replace('探索玄钧云汇','探索玄钧云汇 '+str(self.counter)))
+        page=folder/'showcase/index.html';page.write_text(page.read_text().replace('探索玄钧AI新','探索玄钧AI新 '+str(self.counter)))
         for row in manifest['files']:
             p=folder/row['path'];row.update(size=p.stat().st_size,sha256=view.sha(p.read_bytes()))
         (folder/'SHOWCASE_MANIFEST.json').write_text(json.dumps(manifest));target=self.root/('candidate-'+str(self.counter)+'.tar.gz')
