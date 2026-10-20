@@ -293,3 +293,59 @@ validate/head/_journal/_read_descriptor_unlocked校验原schema、单调epoch及
 现有分类器固定旧TX及7→8，尚不能接受新身份；不得调用fixture()造1..7历史来凑兼容。
 须明确选择历史来源关联，或在原03功能映射内定义新隔离初始化及真实config/binary/instance/DB/socket输入；
 不默许改guard、另建AuthorityStore/账本或增加第八批。B3继续DRAFT，本轮server_operations=NOT_EXECUTED。
+
+## Owner选择B：B3新隔离初始化准备（PR17 #6282590952）
+
+继承2816e74fb05e915023c207ba6e911784875e4233、真实B1/B2；停止追旧六文件作为本次前置。
+旧R03历史保持UNKNOWN，原7→8 guard/分类器不改；新目标明确ISOLATED_NEW，不造旧epoch成功记录。
+固定输入见[PREPARATION.json](../../docs/p2-b3-initialize-20261020/PREPARATION.json)，
+准确1056字节bootstrap配置见[binding-config.json](../../docs/p2-b3-initialize-20261020/binding-config.json)，
+SHA256 f772644e9a8587cda9e0df4c1e53dc64d647195407d29c69ef52625ebb0160ad。
+该配置是新隔离身份/路径绑定元数据，非应用进程配置；三个start/create_db/bind_socket开关均false。
+
+### 最小实际用途与输入
+
+本次最小子检查点：将B1真实release映射为一个新epoch1 PREPARED候选，供原后续阶段读回准确身份，
+实现退出新进程inspect、同身份recover。不是旧epoch7恢复、不是整B3 03–09 COMMITTED，也不启动P3。
+release直接继承已安装B1 MANIFEST SHA591855b35c820c486ae07bbb91e681b983a3a2310feaedb57ae7c87fc9b66592；
+runtime模块继承499bcc43的真实B1文件SHA3993ab9bd0073a91d8110814e694b2c402ef5b53efb544a3bc44a1debd4231a1。
+新instance=0891a51b-feea-520e-850a-c8fc7c840d94；新预留ledger_uuid=093955da-4b7d-5c8d-b85e-3adaa304c675。
+二者按显式新identity做UUID5声明，不是观察到的旧实例/数据库，字符串摘要在PREPARATION中固定。
+DB=/var/lib/xuanjun-p2-isolated-test/b3-initialize/data/ledger.sqlite3，仅预留、未创建，内容SHA=NOT_APPLICABLE_BEFORE_CREATION；
+socket同根run/ledger.sock，仅预留、未bind，Unix socket无普通文件内容SHA；路径摘要单列，不替代内容摘要。
+DB建立/打开仍在原B6后续阶段，socket/服务仍按原运行阶段，不提前加入本次初始化。
+
+唯一需要补取的现场值是固定镜像内/usr/bin/python3.11的canonical path/bytes/SHA256；
+既有3.11.2/UID1002/镜像ID不是ELF摘要。没有填占位SHA冒充冻结完成。
+如需补取，准备命令仅创建一个无挂载/无网络/只读根的临时容器，读取它自身Python文件，
+使用唯一名字+本次label限定异常清理；Docker会有临时元数据/overlay，不能称完全零写。本轮未执行。
+
+### 准确顺序及待确认实际动作（尚无现场执行）
+
+1. 取得上述单一binary pin后，冻结完整expected descriptor及request摘要；不重复全环境核验。
+2. 仅新增host b3-input-20261020只读输入（root:1002，目录0550/文件0440）及logs/b3-initialize-20261020（root0700）；
+   工具复用原activation_control.py准确SHA169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4，
+   不覆盖B1源码。仅宿主root读B1原回执/manifest并生成本次独立只读证据副本。
+3. 仅新增b3-initialize及activation/data/run私有目录1002:1002 0700；宿主base仍root:root0700，无递归chmod/chown。
+   不创建DB，不生成WAL，不bind socket，不安装systemd或启动业务进程。
+4. 容器只挂本次input只读、本次root读写；固定镜像、UID1002、network none、read-only root、cap-drop ALL、
+   no-new-privileges、512MiB/swap1GiB/pids96。Python3.11运行；宿主3.6.8不升级。
+5. 必要薄适配缺口尚未实现：O_EXCL/不覆盖发布本次intent与config、同请求冲突校验、对原Store精确调度及不可变回执。
+   不新增安装器/账本/调度系统。fresh只在本次新根和已证实无历史时调用ActivationStore.prepare(expected_epoch=0, owner_uid=1002)，
+   真正产生一条新epoch1 PREPARED日志及descriptor；保留原Store写前append、fsync、descriptor发布格式。
+6. 独立进程inspect读回全字段/链/原receipt。原Store.read内部锁可能O_CREAT/fchmod已有本次锁0644，
+   所以不把该动作称绝对只读；不允许inspect为缺历史创建descriptor。
+7. 同请求recover先校验本次intent、config、所有expected身份、完整新journal且仅一条epoch1记录；
+   append完成descriptor前中断，仅原Store.reconcile补同一descriptor，不重新prepare、不生成epoch2。
+   descriptor及receipt已完成则只返回原回执；未知身份/损坏/冲突HOLD，保留原文件、临时文件及日志，不能清空重来。
+8. 每步宿主保留stdout/stderr、容器状态、字段/摘要和恢复检查点；COMMITTED只指该初始化子检查点。
+   全B3还需按原03–09对照验收，不能将本次子结果标整批通过。
+
+原03–09对照逐项在PREPARATION.phase_mapping固定：03按Owner新初始化映射；
+04旧实例停用不在本子操作且不能冒充生产静止PASS；05旧target替换不在本子操作；
+06仅新身份声明不发布宿主Owner/Signer；07/08只限新私有目录不改B1/B2/旧generation/ACL；
+09不消费或修改TLS，后续确有需求仍沿原B3内部处理，不新增第八批。
+
+现状：配置/来源/动作方案已准备；完整binary pin、薄适配及其定向中断恢复验收仍未完成。
+原14例/8例及B1/B2未变结果复用，不重复全审；本轮资料新增只做结构、摘要、身份和路径长度检查。
+实际服务器目录/进程/权限变更全部NOT_EXECUTED，现场操作须按本次Owner要求待确认。
