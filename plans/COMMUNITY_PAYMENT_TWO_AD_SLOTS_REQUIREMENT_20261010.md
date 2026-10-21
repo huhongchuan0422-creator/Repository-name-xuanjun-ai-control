@@ -57,3 +57,32 @@ E. 全链路安全QA、灰度、独立Release、回滚与真实支付Canary后�
 
 ### 当前证据
 Stage5 两广告位规则PR73已合并，独立SQLite候选PR75待审；这些是离线基础，不是已交付微信端、支付分账或管理后台。独立正式业务仓库和生产服务器环境尚未核实，状态UNKNOWN／NOT_STARTED。
+
+
+## 2026-10-21 微信特约商户支付开通闭环（增量）
+
+本节补充商家入驻到小程序支付启用的自动化边界，不改变既有资金安全规则。
+
+### 当前微信闭环
+
+1. 商家在原 Center / CRM 完成注册、资料提交、平台审核和工作台开通。
+2. 原 `WechatApplyment` 负责微信特约商户资料、媒体、内部审核、正式提交和签名查询。
+3. 微信状态 `APPLYMENT_STATE_TO_BE_CONFIRMED / TO_BE_SIGNED / SIGNING` 仍属于商家/法人需要完成的微信确认或签约阶段；系统自动查询状态，但不得替商家确认。
+4. 仅可信签名查询得到 `APPLYMENT_STATE_FINISHED` 且返回不可冲突的 `sub_mchid` 后，才可进入支付配置投影。
+5. `community_wechat_payment_activation.py` 从既有 `COMMUNITY_MERCHANT_OPENING`、原 scene/project/store 映射和原 `COMMUNITY_WECHAT_APPLYMENT` 记录生成现有 `MiniPayments` 的 `merchants` 配置。客户端不能提交或覆盖 `sub_mchid`。
+6. `FINISHED` 只证明微信进件完成，不证明 JSAPI、分账等产品资格。宿主必须提供受保护的产品准入：`jsapi_admitted`；启用分账时还必须有 `profit_sharing_admitted`。UNKNOWN、缺资格、撤销、错服务商、错门店或冲突全部保持关闭。
+7. `MiniApplication.configure_payments_from_applyments(...)` 是启动期接点。当前不引入热启用协议；进件状态或资格变化后由正常受保护配置/重启流程重新组合，禁止客户端动态开支付。
+8. 真正发起付款仍走既有 `MiniPayments -> PartnerPrepay`，继续核原 mini 身份、订单所有权、scene、商家生命周期、金额、AppID、服务商、回调绑定及分账规则；Finance 始终与支付成功分离，未经 Finance 权威回执继续 `UNCONFIRMED`。
+
+### 状态解释
+
+- 平台资料未通过：支付关闭。
+- 微信审核中：支付关闭。
+- 待商家/法人确认或待签约：支付关闭，前台应提示完成微信操作。
+- 微信 FINISHED 但 JSAPI/分账产品资格未知或未准入：支付关闭。
+- 微信 FINISHED + sub_mchid + 原门店/scene绑定 + 受保护JSAPI资格齐全：可以生成既有支付配置；是否允许实际真钱仍服从环境 Release/生产授权。
+- 商家 PAUSED/DISABLED、项目/成员撤销、门店映射改变、服务商或 sub_mchid 冲突：原支付路径拒绝新交易，查询/恢复按既有规则处理。
+
+### 渠道复用边界
+
+微信是当前唯一实现适配器。未来支付宝或其他渠道复用“渠道进件结果 -> 原商家/门店映射 -> 受保护产品资格 -> 现有订单/支付核心”的接口边界；本轮不实现新渠道、不猜造其他渠道状态、签约规则或资金规则。

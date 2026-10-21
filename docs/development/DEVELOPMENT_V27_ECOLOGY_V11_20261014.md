@@ -3172,3 +3172,21 @@ https://developers.openai.com/api/docs/pricing
 
 GEO阶段执行方向：先自用验证，再客户试点和SaaS选配；总体开发顺序始终遵从第12及21.4节。
 
+
+
+### 18.5.1 2026-10-21 微信进件到支付启用接线（增量）
+
+- 复用原 `MerchantOnboarding / MerchantOpening / WechatApplyment / CenterIdentity / MiniPayments / PartnerPrepay`；禁止建立第二套商户、身份或支付系统。
+- 新增适配边界 `community_wechat_payment_activation.project_wechat_merchants`：只从原已开工作台映射和可信微信进件记录读取 `sub_mchid`，核 scene/project/tenant/merchant/store、服务商 mchid、申请归属、撤销状态；输出的对象仍是 `MiniPayments` 已有 `merchants` 配置。
+- 受保护宿主资格参数只承载渠道产品准入和非秘密配置（当前微信：JSAPI资格、分账资格、description、HTTPS notify_url）。客户端不能声明商户号、支付资格或启用状态。
+- `APPLYMENT_STATE_FINISHED` 不是自动资金许可。缺产品资格、UNKNOWN、撤权、暂停、跨租户/跨店、AppID/服务商/特约商户冲突全部 fail closed。
+- 启动期接点为 `MiniApplication.configure_payments_from_applyments(reader, admissions)`；不暗增热启用协议。启动后资格变化须经既有受保护发布/重启流程重新组合。
+- 合成测试只证明源码绑定和门禁，不证明真实商户、真钱支付、退款、分账或 Finance 核销。真实 Finance 继续 `UNCONFIRMED`。
+- 微信为当前适配实现。支付宝等后续渠道只能实现同一“进件结果/资格投影”边界，不能复制订单、身份、账本或支付核心。
+
+#### 客户开发预览门禁
+
+- 自动上传继续复用现有 AppID、`WECHAT_MINIPROGRAM_PRIVATE_KEY`、固定国内 Runner 和 `miniprogram-ci`。
+- 上传源码必须先由 `deploy/community-preview/prepare-mini.cjs` 生成 connected-preview 副本；`baseUrl=https://community-preview.wenwenwenyiyiyi.work`、`commerce=true`、支付未获真实资格时 `payments=false`。
+- 官方预览固定入口 `pages/home/index`，查询参数 `scene=shop1`。不得把空 baseUrl、旧默认页、仅 SDK 成功或仅上传成功当客户验收。
+- 客户可验收至少还要证明：二维码绑定准确源码SHA、真机能打开实际业务页面、预览域名HTTPS/request-domain有效、后端连通、对应业务路径可操作。缺任一项标 UNKNOWN/NOT_VERIFIED，不得称完整验收。
