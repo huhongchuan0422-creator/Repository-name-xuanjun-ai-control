@@ -8,9 +8,18 @@ async function main(){
  fs.mkdirSync(destination,{recursive:true,mode:0o700});
  const projectPath=path.resolve(process.env.COMMUNITY_MINI_PROJECT_PATH||'clients/community-mini');
  const config=JSON.parse(fs.readFileSync(path.join(projectPath,'project.config.json'),'utf8'));
+ const appSource=fs.readFileSync(path.join(projectPath,'app.js'),'utf8');
+ const connected=process.env.COMMUNITY_MINI_PROJECT_PATH;
+ if(connected){
+  if(!appSource.includes("baseUrl: 'https://community-preview.wenwenwenyiyiyi.work'")||
+     !appSource.includes("payments: false")||!appSource.includes("commerce: true"))
+   throw Error('CONNECTED_PREVIEW_SOURCE_REQUIRED');
+ }
  const appid=process.env.WECHAT_MINIPROGRAM_APPID||config.appid;
  const receipt={head:process.env.GITHUB_SHA||null,appid,operation:'DEVELOPMENT_PREVIEW_ONLY',
-   public_release:false,payment_enabled:false,source_hashes:{},status:'NOT_RUN'};
+   public_release:false,payment_enabled:false,connected_preview:Boolean(connected),
+   backend_origin:connected?'https://community-preview.wenwenwenyiyiyi.work':null,
+   entry_page:'pages/home/index',scene:'shop1',source_hashes:{},status:'NOT_RUN'};
  function source(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   const file=path.join(dir,entry.name);if(entry.isSymbolicLink())throw Error('SYMLINK_SOURCE_DENIED');
   if(entry.isDirectory())source(file);else if(!file.endsWith('.test.cjs'))receipt.source_hashes[path.relative(projectPath,file)]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
