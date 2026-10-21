@@ -84,7 +84,7 @@ exit 73
    'FAKE_PROC':str(self.fake/'proc'),'FAKE_CURRENT':str(self.base()/'current'),
    'FAKE_SOCKET':str(self.sock),'FAKE_WRONG_RELEASE':str(self.root/'wrong-release')})
   e.update({k:str(v) for k,v in extra.items()});return e
- def run(self,**extra):
+ def invoke(self,**extra):
   return subprocess.run(['bash',str(SCRIPT)],cwd=ROOT,env=self.env(**extra),text=True,capture_output=True,timeout=20)
  def seed_old(self):
   old=self.base()/'releases/old-release';old.mkdir(parents=True)
@@ -95,41 +95,41 @@ exit 73
   return old
  def test_preexisting_release_sentinel_is_not_deleted(self):
   rel=self.base()/'releases/new-release';rel.mkdir(parents=True);sent=rel/'KEEP';sent.write_text('sentinel')
-  p=self.run();self.assertEqual(p.returncode,32,p.stdout+p.stderr)
+  p=self.invoke();self.assertEqual(p.returncode,32,p.stdout+p.stderr)
   self.assertEqual(sent.read_text(),'sentinel');self.assertFalse((self.base()/'transactions/new-release').exists())
  def test_release_mkdir_failure_does_not_delete_foreign_directory(self):
   releases=self.base()/'releases';releases.mkdir(parents=True)
   foreign=releases/'foreign';foreign.mkdir();sent=foreign/'KEEP';sent.write_text('foreign')
   releases.chmod(0o500)
-  try:p=self.run()
+  try:p=self.invoke()
   finally:releases.chmod(0o700)
   self.assertNotEqual(p.returncode,0);self.assertEqual(sent.read_text(),'foreign')
   self.assertFalse((releases/'new-release').exists())
  def test_first_start_commits_only_running_new_release(self):
-  p=self.run();self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+  p=self.invoke();self.assertEqual(p.returncode,0,p.stdout+p.stderr)
   rel=self.base()/'releases/new-release';pid=(self.state/'pid').read_text().strip()
   self.assertEqual((self.fake/'proc'/pid/'cwd').resolve(),rel.resolve())
   self.assertEqual((self.base()/'transactions/new-release/COMMITTED').read_text().strip(),'new-release')
  def test_active_upgrade_restarts_and_binds_new_pid(self):
-  old=self.seed_old();p=self.run();self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+  old=self.seed_old();p=self.invoke();self.assertEqual(p.returncode,0,p.stdout+p.stderr)
   self.assertNotEqual((self.state/'pid').read_text().strip(),'100')
   self.assertEqual((self.base()/'current').resolve(),(self.base()/'releases/new-release').resolve())
   self.assertTrue((old/'KEEP').exists())
  def test_old_pid_and_ready_output_cannot_commit(self):
-  old=self.seed_old();p=self.run(KEEP_OLD_PID=1)
+  old=self.seed_old();p=self.invoke(KEEP_OLD_PID=1)
   self.assertNotEqual(p.returncode,0);self.assertFalse((self.base()/'transactions/new-release/COMMITTED').exists())
   self.assertEqual((self.base()/'current').resolve(),old.resolve())
  def test_wrong_running_version_cwd_cannot_commit(self):
-  old=self.seed_old();(self.root/'wrong-release').mkdir();p=self.run(WRONG_CWD_ONCE=1)
+  old=self.seed_old();(self.root/'wrong-release').mkdir();p=self.invoke(WRONG_CWD_ONCE=1)
   self.assertNotEqual(p.returncode,0);self.assertFalse((self.base()/'transactions/new-release/COMMITTED').exists())
   self.assertEqual((self.base()/'current').resolve(),old.resolve())
  def test_start_failure_restores_old_and_removes_only_owned_release(self):
-  old=self.seed_old();p=self.run(FAIL_START_ONCE=1)
+  old=self.seed_old();p=self.invoke(FAIL_START_ONCE=1)
   self.assertEqual(p.returncode,90,p.stdout+p.stderr);self.assertEqual((self.base()/'current').resolve(),old.resolve())
   self.assertFalse((self.base()/'releases/new-release').exists());self.assertTrue((old/'KEEP').exists())
   self.assertTrue((self.state/'active').exists());self.assertTrue((self.base()/'transactions/new-release/ROLLED_BACK').exists())
  def test_rollback_failure_records_hold(self):
-  self.seed_old();p=self.run(FAIL_START=1,FAIL_RELOAD=1)
+  self.seed_old();p=self.invoke(FAIL_START=1,FAIL_RELOAD=1)
   tx=self.base()/'transactions/new-release'
   self.assertEqual(p.returncode,91,p.stdout+p.stderr);self.assertTrue((tx/'HOLD').exists())
   self.assertFalse((tx/'ROLLED_BACK').exists());self.assertFalse((tx/'COMMITTED').exists())
