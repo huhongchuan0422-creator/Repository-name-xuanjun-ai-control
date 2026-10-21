@@ -157,3 +157,55 @@ MiniApplication.from_existing_config_file(center, runtime, principals, config_pa
 新增tests/test_community_mini_config_file.py，复用原合成身份及真实持久SQLite夹具，验证不调用sqlite3.connect/LocalStage、不创建状态、宿主所有权、原登录、未绑定拒绝/不建号、错scene与项目撤权及上述读取负例；另跑受影响原host_config/application测试。真实微信网络仍为明确合成provider，不能当现场真实登录。Hosted使用[host-config-scope]仅验该接点，未变1821项及预览端点55项复用；普通完整回归仍包含新test_community文件。
 
 源码现在可直接消费现有宿主配置文件，但真实客户身份对象、配置路径与历史数据的现场归属仍未证。不能将此入口称已存在的英国bootstrap、已配置原平台身份或可用二维码；既有BACKEND_NOT_READY与支付/资金门禁保持，部署/凭据/权限边界未改变。
+
+
+## 本项目固定动作及公共连接接入契约（2026-10-22）
+
+依据Issue76 #6320849617与Owner“准备并完成本项目接线”，沿5a5e9369的受保护配置读取、原身份/Runtime组合及21项Hosted继续。公共连接契约核到78e339db的action_binding/private_transfer/SOURCE_CONTACTS；不修改其队列、worker、MCP或接收方鉴权，不将本项目参数当成授权。
+
+### 已有材料与历史/首次初始化的准确区分
+
+| 事项 | 已核源码/记录 | 可以证明及不能推定 |
+|---|---|---|
+| 客户平台身份宿主 | community_mini_application.from_existing_config_file → from_existing_runtime → 原CenterIdentity；#6316014038、#6320849617 | 原类、SHA/type、账号/会话/绑定规则和保护配置消费已实现；实际客户实例/所在根/宿主组合入口版本仍无现场引用，不能默认等于我方SaaS或国内客服 |
+| center | pr122_customer_core.Center在传入root下打开center.sqlite并执行原schema | 原初始化机制存在；不能从构造函数或合成库证明客户旧账户历史或已部署，也不能自行调用它补未知 |
+| orders/merchants/ads/refunds | LocalStage.opened对应四个原文件/原opener | 源码可首次创建缺失文件；不是现场已有数据或获准初始化证明。客户首次注册/商家入驻属于原业务需求，真实首次宿主建库仍需明确新实例/空历史事实及原准入 |
+| quotes/modules/saas_orders | LocalStage以q=modules.sqlite、s=saas-orders.sqlite组合OfflineSaas(q,s,q) | 八类store不要求八个独立文件，quotes/modules可复用原同一连接；不拆库、不制造数据迁移 |
+| scene/门店 | 原config.scenes指向原project/Principal，validate核当前项目/租户，Runtime.bindings保留原tenant/merchant/store | shop1目前只在合成材料中已证。真实project/principal/store必须来自既有保护配置；不能按昵称、手机、客户端ID推定 |
+| 现有运行回执 | COMMUNITY_STAGE_HOST_RECEIPT_20261017.json、两机已完成采集、原Issue76 | 只证明隔离测试、元数据和限定扫描；没有客户生产库正文或正式平台运行证明。既不宣称“有旧数据”，也不宣称“全新无数据” |
+
+如果后续权威回执确认从未部署，应明确转为原客户平台首次初始化方案，复用上述原schema/注册/入驻机制；由本项目原Writer冻结准确实例、原密钥引用/备份、首个管理主体和单Writer后走适用准入。不得继续索要不存在的旧实例，也不得把初始化许可从“代码能建库”推导出来。本批没有运行任何初始化。
+
+### 两项实际采集函数与输入
+
+新增scripts/community_connection_collect.py，不含CLI/命令执行/新队列：
+1. health()：固定UK hostname；只调用原readiness.check(profile='uk-path-candidate')，精确GET既有域名候选的/community-preview/community/health，不接受调用方URL，不开端口、不调用微信认证。
+2. runtime_metadata(plan)：固定UK hostname及community-payment；plan仅从原worker受保护登记注入，恰好含schema/project/config_path/config_sha256/scene_sha256/service_uid/stores。一个现有配置文件≤65536B且完整SHA/scene摘要匹配，8类路径必须与配置完全一致；数据库仅open/fstat/close，绝不read、连接、PRAGMA或运行应用。输出路径摘要、文件元数据与scene数量，不输出绝对路径、身份映射正文或数据库记录。
+
+两项是可执行源码函数，正例离线已运行；目前不是已注册的线上工具。原队列和action_binding.OPERATIONS没有这两个operation，不能改名套用website_baseline_collect、probe或fetch_os_release。建议原连接Writer按自身审核/准入为community_preview_health_check与community_runtime_metadata_collect登记受保护绑定→原队列/worker固定注册→私有报告交付；本项目不添加通用Shell、任意路径参数、临时执行器或修改公共代码。
+
+输入清单deploy/community-preview/connection-inputs.json：4源码文件共19262B，逐件bytes/SHA已固定；清单3024B，SHA256=11f0f7dd571491fbc265aeba600483e43c5003ff27a7c0ff797b3cee439e89cd。它是DRAFT_INPUTS_PINNED_NOT_ENROLLED候选，不能作为private_transfer.Catalog或生产许可。真正source_root_ref/private_result_root_ref/authenticated_recipient仍为null，不能自填可信身份。新输入清单随原source ZIP纳入allowlist/必需文件断言。
+
+原正式运行时输入直接复用5a5e9369/Tree3d5b7c4c、Hosted39633589412，source ZIP SHA39fc2e67c7e3ad6044bee9006c883af776ec89b6b2d41c4e3c91ae4f26a0a882；本批不重跑21项，不把新采集代码说成该旧ZIP已经包含。新采集代码准确Commit/Tree与源码包摘要由本批Issue76/Hosted回执绑定，无自引用版本或旧包冒名。
+
+### 限定路径、资源和结果语义
+
+本项目不提供猜测的宿主绝对根。唯一许可输入为原登记config_path及其stores八类准确路径，禁止目录扫描/动态发现、软链/非普通文件、不安全父目录、权限或完整摘要不符；最多读1份配置，其余只做元数据。文件元数据不是数据库历史/一致性或身份授权证据，报告history_verified/identity_verified/runtime_verified/production_acceptance始终false。
+
+只读动作建议进程预算：CPU5秒、wall20秒、RSS64MiB、单进程、FD32、配置/报告各64KiB；原health的10秒超时/4096字节响应限制保留。这是待登记的有界建议，模块不修改运行worker的rlimit，也没有实际应用额度；由原worker在隔离任务中按准入落实，不能冒称已限额。英国应用仍≤总CPU/内存/可分配业务存储各1/5，实际有限正配额还须扣除既有服务、B5/P2及系统预留。原4CPU/15563716kB回执只是已持有容量时点，不是可分配预算。旧采集不重跑。
+
+结果应私下经原已验证接收方/原Queue SUCCESS/fetch_approved_object/Catalog完整SHA通道交付，报告产出后再冻结其bytes/SHA；本批未预造结果摘要或有效期。当前OS-only MCP不能取本项目报告。公开Issue只记摘要/InvokeId和非敏感状态。连接任务SUCCESS仅证明采集动作完成，不代表BACKEND_READY/身份或客户验收。DISPATCHING/UNKNOWN仅查原InvokeId；SUCCESS不重放，不重投封存request。
+
+### 一次性待核事实与代码责任
+
+| 缺口 | 原出处/现有责任归属 | 下一最小动作 |
+|---|---|---|
+| 真实客户身份宿主/组合入口版本与config路径、service UID、8类路径、scene/门店摘要 | #6316014038/#6320849617及本文件；现有材料未登记其他具体维护人，本项目唯一源码Writer为窗口4；现场根由英国原管理/连接责任方保管 | 本窗口消费原管理方既有保护配置引用；公共入口支持并获准该限定动作后自行核，不让Owner搬文件，不扫描猜根 |
+| 历史数据应复用，或明确为首次宿主初始化 | 原host receipt仅合成、LocalStage/Center源码有建库机制；现场历史尚无证明 | 沿准确原实例/版本与数据保管回执分类；未证时两种情况均不捏造。首次启动由本项目冻结原初始化步骤，仍需适用准入 |
+| 两个固定operation进入原队列/worker、结果登记与resource enforcement | 公共连接78e339db SOURCE_CONTACTS明确尚未完成项目动作登记 | 原公共连接Writer按本候选补源码/测试/准入，不能统称外部缺件；本项目不另写公共连接 |
+| 受验证recipient与私有源/收件根引用 | PR17 #6328988789/#6329032582，公共接线原任务 | 原公共连接核真实身份来源并登记，拒绝参数/_meta自证；当前null不是可用root_ref |
+| UK实际配额/B5预算、TLS/路由和同版本运行 | 已有两机回执和原部署决定；英国原管理/项目准入 | 复用时点证据，缺准确预算/配置集中核，不改权限/部署以试探 |
+
+本窗口当前已通过真实只读插件connection_status查询既有conn-uk-20261021T151122Z，返回SUCCESS/t-gbr70pxt9ij2jgg，production_authorization=NOT_GRANTED；没有新任务/重试、没有从OS结果读取客户文件。仅证明本窗口旧状态工具可用，不能代替上述项目动作/私有收件。
+
+后继验收顺序：公共固定动作正常准入→本窗口自行取私有报告并核SHA/原InvokeId→按事实绑定原宿主、持久数据和场景；如首次启动则走原批准初始化→英国同版本服务、精确HTTPS/路由、原平台真实code2session→原官方上传通道→真机非空页面与本人/门店/订单权限。每层分别报告。BACKEND_NOT_READY、payments=false、Finance UNCONFIRMED保留。没有服务器命令、权限修改、微信/资金调用或后台持续运行声明。

@@ -1,0 +1,88 @@
+{
+  "application_resource_ceiling": {
+    "business_storage_fraction": "1/5",
+    "cpu_fraction": "1/5",
+    "existing_service_B5_P2_system_reservations_verified": false,
+    "limits_applied": false,
+    "memory_fraction": "1/5"
+  },
+  "authenticated_recipient": null,
+  "dispatch_authorized": false,
+  "files": [
+    {
+      "bytes": 5851,
+      "path": "scripts/community_connection_collect.py",
+      "sha256": "09545f927ec2debd5c1a2f07e2383992e8511232efb44f1cddf31b37003630f8"
+    },
+    {
+      "bytes": 2990,
+      "path": "scripts/community_preview_readiness.py",
+      "sha256": "53feb04ab095676b19abc6c5a86671bd019762798df030c406677e136861397c"
+    },
+    {
+      "bytes": 10280,
+      "path": "scripts/community_owner_readonly_supplement_20261021.py",
+      "sha256": "0d3b95c6db9e0a798aa8e21dd7fa2d49e9cb7335c04e8288f0b094a52b911940"
+    },
+    {
+      "bytes": 141,
+      "path": "deploy/community-preview/endpoint-profiles.json",
+      "sha256": "b863037b2a13c62aa43d427e87616f449ce0400bfee43b7f004393dd1d0b0d8d"
+    }
+  ],
+  "hostname": "iZd7oeikknn1z21sq6ji6zZ",
+  "initialization_authorized": false,
+  "private_result_root_ref": null,
+  "production_acceptance": false,
+  "project": "community-payment",
+  "proposed_actions": [
+    {
+      "entry": "scripts.community_connection_collect.health",
+      "execution_identity": "admin",
+      "input": "NONE",
+      "network_url": "https://uk.wenwenwenyiyiyi.work/community-preview/community/health",
+      "operation": "community_preview_health_check"
+    },
+    {
+      "database_body_reads": false,
+      "entry": "scripts.community_connection_collect.runtime_metadata",
+      "execution_identity": "root",
+      "input": "HOST_ENROLLED_CONFIG_AND_STORE_METADATA_PLAN",
+      "operation": "community_runtime_metadata_collect"
+    }
+  ],
+  "proposed_readonly_limits": {
+    "config_bytes": 65536,
+    "cpu_seconds": 5,
+    "enforced_in_adapter": false,
+    "enforcement_owner": "ORIGINAL_PUBLIC_WORKER",
+    "open_files": 32,
+    "processes": 1,
+    "report_bytes": 65536,
+    "rss_bytes": 67108864,
+    "wall_seconds": 20
+  },
+  "public_connection_source": {
+    "commit": "78e339dbeead0d8c38944bc46018fd857df75ddd",
+    "operations_currently_supported": false,
+    "registration_performed": false
+  },
+  "required_site_facts": [
+    "CUSTOMER_IDENTITY_HOST_AND_BOOTSTRAP_VERSION",
+    "EXACT_CONFIG_PATH_SHA_AND_SERVICE_UID",
+    "EIGHT_LOGICAL_STORE_PATHS_AND_ORIGINAL_HISTORY_OR_EXPLICIT_FIRST_INITIALIZATION",
+    "EXACT_SCENE_PRINCIPAL_PROJECT_STORE_OWNERSHIP",
+    "PROTECTED_SOURCE_AND_PRIVATE_RECIPIENT_ROOT_REFS",
+    "AUTHENTICATED_RECIPIENT_AND_ORIGINAL_ACTION_ADMISSION"
+  ],
+  "runtime_source": {
+    "commit": "5a5e9369d417b859db288a368417f130c548d1cf",
+    "hosted_run": 39633589412,
+    "source_zip_sha256": "39fc2e67c7e3ad6044bee9006c883af776ec89b6b2d41c4e3c91ae4f26a0a882",
+    "tree": "3d5b7c4cdaa2f555b8e9b22dffb4c1fd93afc747"
+  },
+  "schema": 1,
+  "source_root_ref": null,
+  "state": "DRAFT_INPUTS_PINNED_NOT_ENROLLED",
+  "target": "uk"
+}
