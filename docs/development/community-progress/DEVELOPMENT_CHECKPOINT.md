@@ -460,6 +460,7 @@ Keep these evidence classes separate:
 - `community-preview-package.yml` is intentionally named “package”, not “deploy”: it is a Hosted packaging gate and must not be confused with or replace the source-branch deployment candidate.
 - PACKAGE_ONLY_HOSTED_GATE remains **NOT_EXECUTED**; no package Artifact/receipt exists yet.
 - Local container execution of the exact fixed commit was attempted but the local environment could not resolve GitHub, so an exact local tar/unpack/hash PASS is **ENVIRONMENT_BLOCKED**, not PASS.
+- A separate local algorithm-only reproduction of the PR136 packaging procedure PASSed: tracked-path export preserved `clients/community-mini/**` and `deploy/community-preview/**`, deliberately-created untracked `__pycache__`, `.pytest_cache`, `node_modules`, `.coverage` and `*.pyc` files were excluded, package members equaled the tracked list, and unpacked files passed the generated per-file SHA256 manifest. This proves the packaging algorithm only; it is not fixed-commit package acceptance.
 - Repository tree inspection of fixed tree `01e914b...` finds 404 tracked files in the approved package prefixes, required `clients/community-mini/app.js`, `deploy/community-preview/deploy.sh`, and `deploy/community-preview/server.py` are present, and no tracked cache-like path was found. This is structural evidence only, not a substitute for executing the package gate.
 
 ### Phase 1 / Phase 2 remaining classification after local gap review
