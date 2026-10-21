@@ -114,7 +114,7 @@ class Persistence(unittest.TestCase):
             self.assertEqual(hashlib.sha256(self.wal.read_bytes()).hexdigest(), self.wal_hash)
 
     def test_unknown_reconciles_without_replay(self):
-        v = b6.observe(self.req, 'CP12', 'UNKNOWN')
+        v = b6.observe_database_evidence(self.req, 'CP12', 'UNKNOWN')
         self.assertEqual(v['status'], 'RECONCILED_READBACK', v)
         self.assertFalse(v['replay_performed'])
         self.assertEqual(hashlib.sha256(self.wal.read_bytes()).hexdigest(), self.wal_hash)
@@ -122,7 +122,7 @@ class Persistence(unittest.TestCase):
     def test_missing_does_not_create(self):
         original = Path(self.req['db_path'])
         original.rename(self.root/'fixture-retained-main.sqlite3')
-        v = b6.observe(self.req, 'CP12')
+        v = b6.observe_database_evidence(self.req, 'CP12')
         self.assertEqual(v['status'], 'HOLD', v)
         self.assertEqual(v['error']['type'], 'FileNotFoundError')
         self.assertFalse(original.exists())
@@ -133,7 +133,7 @@ class Persistence(unittest.TestCase):
         conn.execute('ALTER TABLE tasks ADD COLUMN invalid TEXT')
         conn.commit()
         conn.close()
-        v = b6.observe(self.req, 'CP12')
+        v = b6.observe_database_evidence(self.req, 'CP12')
         self.assertEqual(v['status'], 'HOLD', v)
         self.assertEqual(v['error']['type'], 'SchemaMismatch')
 
@@ -143,12 +143,12 @@ class Persistence(unittest.TestCase):
             if change == 'generation':req['expected'][change] += 1
             elif change == 'uid':req[change] += 1
             else:req[change] = '/tmp/outside.sqlite3'
-            self.assertEqual(b6.observe(req,'CP12')['status'], 'HOLD')
+            self.assertEqual(b6.observe_database_evidence(req,'CP12')['status'], 'HOLD')
 
     def test_preparation_profile_not_runtime(self):
         req = copy.deepcopy(self.req)
         req['profile'] = 'ISOLATED_NEW_PREPARE_ONLY'
-        self.assertEqual(b6.observe(req,'CP13')['status'], 'HOLD')
+        self.assertEqual(b6.observe_database_evidence(req,'CP13')['status'], 'HOLD')
 
     def test_original_active_guard_not_bypassed(self):
         store = Activation(**self.req['activation'])
@@ -156,27 +156,74 @@ class Persistence(unittest.TestCase):
         v = store.fence(self.req['expected']['epoch'], self.req['expected']['instance'])
         req = copy.deepcopy(self.req)
         req['expected'] = v
-        self.assertEqual(b6.observe(req,'CP12')['status'], 'OBSERVED')
-        self.assertEqual(b6.observe(req,'CP13')['status'], 'HOLD')
+        self.assertEqual(b6.observe_database_evidence(req,'CP12')['status'], 'OBSERVED')
+        self.assertEqual(b6.observe_database_evidence(req,'CP13')['status'], 'HOLD')
 
     def test_symlink_db_or_wal_rejected(self):
         target = self.root/'alias.sqlite3'
         target.symlink_to(self.req['db_path'])
         req = copy.deepcopy(self.req)
         req['db_path'] = str(target)
-        self.assertEqual(b6.observe(req,'CP12')['status'], 'HOLD')
+        self.assertEqual(b6.observe_database_evidence(req,'CP12')['status'], 'HOLD')
         # Preserve WAL fixture bytes while testing a malicious alternate pathname.
         other = self.root/'other'
         other.write_bytes(b'not a wal')
         self.wal.rename(str(self.wal)+'.retained')
         self.wal.symlink_to(other)
-        self.assertEqual(b6.observe(self.req,'CP12')['status'], 'HOLD')
+        self.assertEqual(b6.observe_database_evidence(self.req,'CP12')['status'], 'HOLD')
+
+
+    def test_b6_prepared_does_not_advance_or_activate(self):
+        store = Activation(**self.req['activation'])
+        state = store.fence(self.req['expected']['epoch'], self.req['expected']['instance'])
+        req = copy.deepcopy(self.req)
+        req['expected'] = state
+        before = Path(req['activation']['descriptor']).read_bytes()
+        for stage in ('CP12','CP13'):
+            value = b6.observe(req, stage)
+            self.assertEqual(value['status'], 'HOLD', value)
+            self.assertFalse(value['phase_complete'])
+            self.assertEqual(value['error']['code'], 'B6_REQUIRES_QUIESCED_NOT_PREPARED_OR_ACTIVE')
+        self.assertEqual(Path(req['activation']['descriptor']).read_bytes(), before)
+        self.assertEqual(store.read()['state'], 'PREPARED')
+
+    def test_b6_quiesced_without_access_contract_holds(self):
+        store = Activation(**self.req['activation'])
+        state = store.fence(self.req['expected']['epoch'], self.req['expected']['instance'])
+        state = store.transition('PREPARED','QUIESCED',state['epoch'],state['instance'],
+                                {k:True for k in ('identity_verified','coordinator_inactive',
+                                 'parent_unit_inactive','cgroups_empty','restart_inhibited')})
+        req = copy.deepcopy(self.req)
+        req['expected'] = state
+        before = Path(req['activation']['descriptor']).read_bytes()
+        for stage in ('CP12','CP13'):
+            value = b6.observe(req, stage, 'UNKNOWN')
+            self.assertEqual(value['status'], 'HOLD', value)
+            self.assertEqual(value['database_evidence']['status'], 'RECONCILED_READBACK')
+            self.assertFalse(value['activation_performed'])
+            self.assertIn('CONTRACT_UNAVAILABLE', value['error']['code'])
+        self.assertEqual(Path(req['activation']['descriptor']).read_bytes(), before)
+        self.assertEqual(hashlib.sha256(self.wal.read_bytes()).hexdigest(), self.wal_hash)
+        self.assertEqual(store.read()['state'], 'QUIESCED')
+
+    def test_active_observation_not_preactivation_cp13(self):
+        self.assertEqual(b6.observe_database_evidence(self.req,'CP13')['status'],'OBSERVED')
+        value = b6.observe(self.req,'CP13')
+        self.assertEqual(value['status'],'HOLD')
+        self.assertFalse(value['phase_complete'])
+
+    def test_hand_filled_access_pass_rejected(self):
+        req = copy.deepcopy(self.req)
+        req['runtime_access'] = {'status':'PASS','database':'REOPENED'}
+        value = b6.observe(req,'CP13')
+        self.assertEqual(value['status'],'HOLD')
+        self.assertEqual(value['error']['code'],'REQUEST_FIELDS')
 
 
 if __name__ == '__main__':
     if len(sys.argv)>1 and sys.argv[1]=='--writer':
         writer(json.loads(sys.argv[2]))
     elif len(sys.argv)>1 and sys.argv[1]=='--observe':
-        print(json.dumps(b6.observe(json.loads(sys.argv[2]),sys.argv[3]),sort_keys=True))
+        print(json.dumps(b6.observe_database_evidence(json.loads(sys.argv[2]),sys.argv[3]),sort_keys=True))
     else:
         unittest.main()

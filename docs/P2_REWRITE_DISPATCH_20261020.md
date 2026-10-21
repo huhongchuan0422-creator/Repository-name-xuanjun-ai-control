@@ -234,54 +234,60 @@ Owner已执行1条初始化命令（内部3容器，不算3次安装）；剩余
 本轮只证明CP10新隔离有限契约；原宿主OpenClaw全sandbox等价NOT_CLAIMED，英国B4运行NOT_EXECUTED。B5/B6/B7/P3未前移。详细固定制品、路径/角色挂载、截止时间、退出/恢复及完整单命令候选见[本批操作清单](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/repair/p2-resumable-install-20261020/docs/p2-b4-20261020/OPERATIONS.md)。新目录/进程动作仍待Owner按完整清单确认，七批总体验收不因本轮Hosted成功自动关闭。
 
 
-### B6 offline application persistence adapter (CP12/13; no field completion)
+### B6 offline application persistence adapter — corrected preactivation mapping
 
-`production/p2_install/b6_persistence.py` binds the existing application contract from
-`evidence/p2-epoch7-access-repair-20261014/runtime/stage1/execution_ledger.py`
-SHA256 `8c607f0e2222d906b8450b302dad014a69dfedcb710a257731454e0d97aaf8c6`
-(Git blob `ca96518cda81be2820d693de5a2659a34bb0e802`), and original `activation_control.py`
-SHA256 `169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4`.
-It reuses original `_validate_schema`, `_validate_side_schema`, ActivationStore journal/descriptor
-reconciliation and `_assert_activation`. No duplicate business schema/DB or coordinator journal
-is introduced. Source hashes are checked before fixed-source loading; no caller-chosen modules.
+Original stage source: `recovery-kit-source/helpers/epoch7_runtime_effects.py`, Git blob
+`d3dbd171ce33d9d48ed31beaa1622ca38819b54f`: CP12 lines424–455 and CP13 lines457–462.
+B6[12,13] precedes B7[14–16]. CP13 requires QUIESCED plus original `ledger-access.json`
+state REOPENED, then `runtime_access_check(context, diagnostics)` validated through
+`check_observation`. It does NOT require or cause ACTIVE.
 
-API: `observe(request, 'CP12'|'CP13', previous_outcome='KNOWN'|'UNKNOWN')`.
-Request fields are exactly scope=ISOLATED_TEST_ONLY, profile=B6_EXISTING_APPLICATION_DATABASE_OBSERVATION,
-root, db_path, uid, gid, activation={descriptor,epoch_journal,lock_path,owner_uid},
-expected=original full activation descriptor, task_ids=bounded explicit fixture/application row IDs.
-The caller must bind these to original frozen identity evidence; a request is not itself production authority.
-Only original isolated root descendants or `/tmp/p2-b6-test-*` offline roots are accepted, with
-canonical private owner paths, regular single-link DB/WAL/SHM and actual current UID/GID.
-No missing directory/DB is created. No migration, DDL/DML, WAL deletion, empty bootstrap,
-service/SDK start, activation transition, or checkpoint/task replay occurs.
+The initial25dc5854 eight passing cases are retained as **database recovery/access observations**,
+including the ACTIVE-only observation, not proof that preactivation CP13 is wired or complete.
+`observe_database_evidence` preserves the original `require_active` and `_assert_activation`
+for its legacy CP13-labelled ACTIVE observation. It never gets promoted to original stage13.
+The public B6 `observe(request, 'CP12'|'CP13', previous_outcome)` maps phase conditions and
+currently returns HOLD. PREPARED and ACTIVE are refused for phase completion. QUIESCED may
+produce useful schema/WAL readback evidence but cannot advance without the missing effect
+and role/path consumer binding. No accepted path to original CP13 PASS is implemented yet.
 
-CP12 reopens the existing DB read-only with a held FD, validates original base+side schema,
-reads original task/fence/checkpoint and bounded existing event rows, checks identity before/after.
-No ExecutionLedger constructor is invoked here because it can create side tables.
-CP13 additionally requires original ACTIVE journal/descriptor identity and the original ledger
-activation fence. B3 `ISOLATED_NEW_PREPARE_ONLY` is rejected and nonACTIVE cannot pass CP13.
-This is read-access evidence only, not socket authentication, business write authorization,
-B7 activation, or original service-start permission. Missing runtime profile/identity/ACTIVE handoff
-only blocks live CP13 integration; offline tests proceed using explicit temporary fixtures.
+| Original predicate | Current isolated object | Binding/result |
+|---|---|---|
+| Exact QUIESCED descriptor | Original ActivationStore journal+descriptor, full expected identity including DB path | Read-only validated; PREPARED/ACTIVE cannot satisfy preactivation phase |
+| CP12 REOPENED and database inode/access effect | Existing DB FD, original Schema, task/event/WAL readback | Readback available; trusted REOPENED effect receipt/transaction identity not supplied, HOLD |
+| Original database consumer1003:1006, generation policy0700 and DB0600 | Request current UID/GID and private root checks | Only actual observing subject; B3 preparer1002 is not mapped service1003/callback role; no assumed equivalence, HOLD |
+| Original runtime_access_check + context/check_observation | No trusted consumer/context/role-path proof in current isolated request | UNAVAILABLE, HOLD; extra hand-filled runtime_access PASS rejected by strict request fields |
+| Legacy CP12 forbids WAL/SHM and performs guarded ownership handoff | New-isolation fixture intentionally preserves nonempty WAL, performs no chown/transfer | Persistence recovery proved separately; access-policy equivalence requires explicit original adapter/evidence, not asserted |
 
-UNKNOWN yields a fresh `RECONCILED_READBACK` observation without replay; journal/descriptor
-mismatch or unreadable/changed identity returns HOLD and must be reconciled by the original
-owner, never automatically repaired. The adapter does not call activation.reconcile or fabricate
-an installation COMMITTED receipt. Caller persists observation through the existing receipt layer;
-DB/WAL and original transaction state remain the recovery checkpoint. SQLite may create/update
-its own SHM coordination file during a read-only WAL open; this is disclosed, not called zero-write.
-No prior batch file is modified. Query busy timeout1s plus5s SQLite progress deadline bounds local reads.
+Existing source binding unchanged: `runtime/stage1/execution_ledger.py` SHA256
+`8c607f0e2222d906b8450b302dad014a69dfedcb710a257731454e0d97aaf8c6`, blob
+`ca96518cda81be2820d693de5a2659a34bb0e802`; original `activation_control.py` SHA256
+`169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4`.
+Original `_validate_schema`, `_validate_side_schema` and journal/descriptor validation reused;
+no duplicated business DB or coordinator journal. The constructor is not called by observation,
+because it may create side tables. Fixed original source bytes are verified before loading.
 
-Targeted test: `python -B tests/p2_install/test_b6_persistence.py -v` (8 cases).
-Fixture uses original schema definitions and real ExecutionLedger writes; an open WAL connection
-is SIGKILLed, preserving a nonempty WAL. Main-only fixture snapshot lacks a marker event while
-independent CP12/CP13 processes read that WAL-only marker. DB/WAL SHA and prior B1–B5 fixture
-remain unchanged. Missing DB, wrong schema/generation/UID/path, symlink DB/WAL, B3 preparation
-profile and original nonACTIVE fence are refused; UNKNOWN reads back without replay.
-Fixture activation proofs/rows are explicitly synthetic test state, not old UK/production history.
+Request fields remain scope=ISOLATED_TEST_ONLY, profile=B6_EXISTING_APPLICATION_DATABASE_OBSERVATION,
+root, db_path, uid/gid, activation={descriptor,epoch_journal,lock_path,owner_uid}, expected=full
+original descriptor, task_ids. Canonical owner-private isolated paths and regular single-link
+DB/WAL/SHM are checked. No missing DB bootstrap, DDL/DML, migration, chown, activation transition,
+WAL deletion, task replay or new permit. UNKNOWN only reads back; it never settles unknown external
+effects or manufactures REOPENED. Existing DB/WAL/transaction and prior batch receipts are retained.
+SQLite may update/create its own SHM on readonly WAL open; no zero-write claim. Query busy timeout1s
+and5s SQLite progress deadline retained. Observations are not durable phase COMMITTED receipts.
 
-Local Python3.12 eight cases PASS. Existing Hosted journal workflow runs only test_journal.py;
-it does NOT automatically execute the new B6 test. This task's four-file scope does not modify
-workflow or imply Hosted B6 PASS. Python3.11 target/real container, actual runtime access,
-CP12/13 installation receipts and UK recovery remain NOT_EXECUTED until independently verified.
-B5 checkpoints/paused extraction remain intact; no Owner material ferry required by this adapter.
+`python -B tests/p2_install/test_b6_persistence.py -v`: local Python3.12 **12 cases PASS**.
+Original8 cases retained: writer SIGKILL leaves nonempty WAL; separate processes read a WAL-only
+marker absent from main-only test copy; DB/WAL SHA and prior batch fixture unchanged; missing
+DB/schema, wrong identity/subject/path, symlink and original ACTIVE-fence negatives, UNKNOWN no replay.
+New4: PREPARED no advance/activation; QUIESCED without trusted effect/access consumer HOLD with
+readback and unchanged activation/WAL; ACTIVE observation not accepted as preactivation CP13;
+hand-filled access PASS refused. Activation transitions only provision temporary test fixtures.
+
+Remaining integration: trusted isolated CP12 REOPENED effect provenance; service/callback role and
+path access mapping; original access checker/context/observation binding; explicit new-isolation
+WAL versus legacy no-sidecar/ownership equivalence. Missing contracts block only preactivation
+acceptance, not existing persistence tests. B6 CP12/13 site completion NOT_EXECUTED, not closed.
+No B7 activation is moved forward; B1–B5/old guard/config remain unchanged. B5 checkpoint waits
+for long-term channel, no Owner ferry task. New12-case Hosted coverage/Python3.11 target remains
+NOT_EXECUTED: existing workflow runs test_journal.py only; this round does not modify workflow.
