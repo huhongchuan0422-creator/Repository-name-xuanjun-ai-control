@@ -121,17 +121,20 @@ def directory(path, owner, private=False):
 def read_object(root, owner, item):
     """Descriptor walk, bounded regular file, full SHA, root/parents rechecked."""
     rootfd = directory(root, owner)
-    fd = os.dup(rootfd)
+    fd = None
     chain = []
     try:
+        fd = os.dup(rootfd)
         parts = item['relative_path'].split('/')
         for part in parts[:-1]:
             nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
-            s = os.fstat(nxt)
+            # Transfer ownership immediately: fstat/check failures are covered
+            # by the outer finally, including BaseException interruptions.
+            previous, fd = fd, nxt
+            os.close(previous)
+            s = os.fstat(fd)
             check(s.st_uid == owner and not s.st_mode & 0o022, 'SOURCE_PARENT')
             chain.append((part, s.st_dev, s.st_ino))
-            os.close(fd)
-            fd = nxt
         filefd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
         try:
             before = os.fstat(filefd)
@@ -164,7 +167,8 @@ def read_object(root, owner, item):
         check(len(data) == item['bytes'] and hashlib.sha256(data).hexdigest() == item['sha256'], 'SOURCE_SHA')
         return data
     finally:
-        os.close(fd)
+        if fd is not None:
+            os.close(fd)
         os.close(rootfd)
 
 
@@ -360,7 +364,28 @@ class Receiver:
             pos = envelope['offset']
             if pos < offset or state == 'SUCCESS':
                 old = self.db.execute('SELECT bytes,sha256 FROM connection_file_events WHERE delivery_id=? AND offset=?', (ident, pos)).fetchone()
-                check(old == (len(block), envelope['chunk_sha256']) and os.pread(fd, len(block), pos) == block, 'REPLAY_MISMATCH')
+                if old is None and state == 'SUCCESS':
+                    # Reconciliation may prove the whole object after a lost
+                    # chunk COMMIT. Do not invent the missing historical event.
+                    proof = self.db.execute('SELECT bytes,sha256 FROM connection_file_events WHERE delivery_id=? AND offset=-1', (ident,)).fetchone()
+                    check(proof == (item['bytes'], item['sha256'])
+                          and offset == item['bytes']
+                          and (len(block) > 0 or item['bytes'] == 0)
+                          and pos + len(block) <= offset
+                          and (len(block) == CHUNK or pos + len(block) == offset), 'REPLAY_MISMATCH')
+                    before = os.fstat(fd)
+                    digest, scanned = hashlib.sha256(), 0
+                    while scanned < offset:
+                        part = os.pread(fd, min(CHUNK, offset - scanned), scanned)
+                        check(part, 'REPLAY_MISMATCH')
+                        digest.update(part)
+                        scanned += len(part)
+                    check(digest.hexdigest() == item['sha256']
+                          and stamp(before) == stamp(os.fstat(fd))
+                          and stamp(before) == stamp(os.stat(ident + '.bin', dir_fd=self.fd, follow_symlinks=False)), 'REPLAY_MISMATCH')
+                else:
+                    check(old == (len(block), envelope['chunk_sha256']), 'REPLAY_MISMATCH')
+                check(os.pread(fd, len(block), pos) == block, 'REPLAY_MISMATCH')
             else:
                 check(pos == offset and (len(block) > 0 or item['bytes'] == 0)
                       and pos + len(block) <= item['bytes'] and (len(block) == CHUNK or pos + len(block) == item['bytes']), 'CHUNK_ORDER')

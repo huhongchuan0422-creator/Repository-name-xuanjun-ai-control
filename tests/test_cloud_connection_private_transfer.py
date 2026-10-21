@@ -72,6 +72,48 @@ class PrivateTransferTests(unittest.TestCase):
             result=self.receiver.accept(self.chunk(offset),NOW)
         return result
 
+    def test_rejected_parent_does_not_leak_descriptors(self):
+        before=len(os.listdir('/proc/self/fd'))
+        os.chmod(str(self.src/'dist'),0o777)
+        try:
+            for _ in range(20):
+                with self.assertRaisesRegex(Hold,'SOURCE_PARENT'): self.chunk()
+            self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+        finally: os.chmod(str(self.src/'dist'),0o700)
+
+    def test_parent_fstat_failure_does_not_leak_descriptors(self):
+        before=len(os.listdir('/proc/self/fd'))
+        original=os.fstat
+        def failing(fd):
+            st=original(fd)
+            if st.st_ino == os.stat(str(self.src/'dist')).st_ino:
+                raise OSError('injected fstat failure')
+            return st
+        with patch('production.cloud_connection.private_transfer.os.fstat',side_effect=failing):
+            for _ in range(20):
+                with self.assertRaisesRegex(OSError,'injected'): self.chunk()
+        self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+
+    def test_source_dup_failure_closes_root_descriptor(self):
+        before=len(os.listdir('/proc/self/fd'))
+        with patch('production.cloud_connection.private_transfer.os.dup',side_effect=OSError('dup failure')):
+            for _ in range(20):
+                with self.assertRaisesRegex(OSError,'dup failure'): self.chunk()
+        self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+
+    def test_parent_fstat_interrupt_closes_descriptors(self):
+        before=len(os.listdir('/proc/self/fd'))
+        original=os.fstat
+        def failing(fd):
+            st=original(fd)
+            if st.st_ino == os.stat(str(self.src/'dist')).st_ino:
+                raise KeyboardInterrupt()
+            return st
+        with patch('production.cloud_connection.private_transfer.os.fstat',side_effect=failing):
+            for _ in range(20):
+                with self.assertRaises(KeyboardInterrupt): self.chunk()
+        self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+
     def test_non_os_project_object_full_sha(self):
         r=self.complete()
         self.assertEqual(r['state'],'SUCCESS')
@@ -267,6 +309,18 @@ class PrivateTransferTests(unittest.TestCase):
         self.assertEqual(r['state'],'SUCCESS')
         proof=self.q.db.execute('SELECT bytes,sha256 FROM connection_file_events WHERE offset=-1').fetchone()
         self.assertEqual(proof,(len(self.data),hashlib.sha256(self.data).hexdigest()))
+        events=self.q.db.execute('SELECT * FROM connection_file_events').fetchall()
+        with patch('production.cloud_connection.private_transfer.os.pwrite',side_effect=AssertionError('must not rewrite')):
+            self.assertEqual(self.receiver.accept(self.chunk(offsets[-1]),NOW),r)
+        self.assertEqual(self.q.db.execute('SELECT * FROM connection_file_events').fetchall(),events)
+        bad=self.chunk(offsets[-1]); block=b'X'+base64.b64decode(bad['data'])[1:]
+        bad['data']=base64.b64encode(block).decode('ascii'); bad['chunk_sha256']=hashlib.sha256(block).hexdigest()
+        with self.assertRaisesRegex(Hold,'REPLAY_MISMATCH'): self.receiver.accept(bad,NOW)
+        final=self.dst/r['private_ref']
+        with final.open('r+b') as f: f.write(b'X')
+        with self.assertRaisesRegex(Hold,'REPLAY_MISMATCH'):
+            self.receiver.accept(self.chunk(offsets[-1]),NOW)
+        self.assertEqual(self.q.db.execute('SELECT * FROM connection_file_events').fetchall(),events)
 
     def test_wal_lock_contention(self):
         self.q.db.execute('PRAGMA journal_mode=WAL')
