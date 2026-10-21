@@ -132,3 +132,15 @@ A new process, including a recovery process, must pass the full 54-request admis
 本次只读取证接线采用两个明确绑定：真实 PR 分支仅安装固定工作流，PR_EVENT_HEAD 用于原 PR122 事件、Owner准确标签及当前 PR 的核验；READONLY_SOURCE_HEAD 是工作流正文固定的完整40位已检源码提交，用于 checkout 只读适配器与 helper。持久意图和后续查询同时绑定两者，不能混用 GitHub run.head_sha 与 checkout 源码 SHA。普通分支 push 仍仅运行本地模拟/Hosted 测试；实际云动作须真实 PR 上的准确事件和全部固定门禁成立。
 
 原官网产品 `73454b6f973e073067de7afb7580c1ac709ede2f` 的技术审核与制品证据按其准确版本继承，不能由这次只读取证接线改称新产品版本或安装许可。不合并整网站工作分支、不修改原PR的base/head关系，不创建第二个产品任务。首次109a只读接线的 Hosted 39147246174 失败记录保留：runner 36项通过；helper fixture把 Hosted 非root UID错误映射到根祖先，已仅修测试投影，生产 helper 的保护不放宽。该工作提交不具备真实PR事件触发条件，禁止以其标签试跑。
+
+### 2026-10-21：完整固定静态基线只读源码候选（未准入/未执行）
+
+依据原PR122 #6320173363、连接方 #6320055601，仅新增 `tools/pr122_static_baseline_readonly.py` 及对应离线测试；不修改旧8文件探针、host_preflight、注册能力、工作流或事件。无参数生产入口只接受固定国内hostname与root身份；这项身份检查不构成执行许可，仍需原连接方按准确候选字节及一次性范围核准。
+
+完整候选观察清单固定为20项：本站current和原preview Runtime current两个链接；原r2 receipt、installed publisher、原preview unit及原HostPins十三条Nginx文件，共16项有界摘要；原transaction.lock和候选pr122-public-mobile-20261016.attempts.json两项仅lstat元数据（不读取账本正文，不获取锁）。两个链接只准在原站releases根或原preview根内的受限pr122名称，验证目标目录及NOFOLLOW祖先，不枚举目录。receipt只投影固定状态枚举及intent空/未知存在标记，其他正文不输出；配置、publisher及unit只报摘要/元数据，不输出内容。
+
+复用原安全读取模式：dir-FD、O_NOFOLLOW、普通单链接文件、固定Owner/权限、读取前后FD/名称身份及最终保留路径复核，拒绝越界/链接逃逸/替换/增长。单文件2MiB，总读取16MiB，路径/持有FD各至多256，20秒monotonic及进程alarm，JSON输出至多32768bytes；不创建文件、不取flock、不运行子进程或网络、不控制服务。普通读取可能更新atime；逐项稳定不等于全局原子快照。HOLD后不继续读余项，不自动重试。
+
+inputs/source准确根未知时固定UNKNOWN_NOT_READ，不接受任意根参数、不扫描猜位置；对应previous manifest/完整public计数也保持UNKNOWN。Runtime活动/沙箱、已加载Nginx、Writer/Fence/锁是否空闲，没有本范围内原只读接口则UNKNOWN；lock/ledger存在不构成Writer空闲证明。本候选只补已获范围内的固定文件观察能力，不假称所有现场绑定齐全。由原保管方补确切roots引用后，如需新增读取范围，仍须准确范围核准，不能临时追加路径。
+
+离线验证入口：`python -B -m unittest tests.test_pr122_static_baseline_readonly -v`，仅临时合成FD根和固定路径fixture，不运行真实collect。Hosted仅沿既有适用覆盖，本轮没有扩展工作流，新模块未被旧工作流显式执行时不得称已过Hosted。已有品牌包、原离线输入候选 #6319390111 与摘要 #6319403826全部复用；本候选不覆盖或启动旧客户中心，不是现场取证、安装或生产许可。
