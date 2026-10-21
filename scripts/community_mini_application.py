@@ -103,6 +103,16 @@ class MiniApplication:
         self.saas=CenterSaas(self.center,self.stage.runtime,grants)
         return self.saas
 
+    def configure_payments_from_applyments(self,reader,admissions):
+        """Startup-only projection from verified applyment to existing MiniPayments."""
+        if self.server is not None or getattr(self.gateway,'payments',None) is not None:
+            raise ValueError('PAYMENTS_ALREADY_CONFIGURED_OR_LISTENING')
+        if self.onboarding is None or self.onboarding.wechat_applyment is None:
+            raise ValueError('ORIGINAL_WECHAT_APPLYMENT_REQUIRED')
+        from scripts.community_wechat_payment_activation import project_wechat_merchants
+        merchants=project_wechat_merchants(self.identity,self.onboarding,reader,admissions)
+        return self.configure_payments(reader,merchants=merchants)
+
     def configure_payments(self,reader,bindings=None,*,merchants=None):
         """Protected opt-in; original customer orders and verified payer required."""
         if self.server is not None or getattr(self.gateway,'payments',None) is not None:
