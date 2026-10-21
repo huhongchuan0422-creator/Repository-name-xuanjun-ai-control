@@ -22,7 +22,7 @@ jobs:
           set -euo pipefail
           test "${{ inputs.package_only }}" = true
           bash -n deploy/community-preview/deploy.sh
-          python -m unittest -v tests.test_community_preview_candidate
+          python -m unittest -v tests.test_community_preview_candidate tests.test_community_preview_deploy_offline
       - name: Build exact candidate package
         run: |
           set -euo pipefail
