@@ -1,0 +1,16 @@
+{
+  "execution": "NOT_EXECUTED_REQUIRES_SPECIFIC_CONFIRMATION",
+  "bootstrap_bytes": 44109,
+  "bootstrap_sha256": "81d18211d061532b23d3e6140ecb346e3c6a162800a8684f50325d6ace6224fc",
+  "bootstrap_git_blob": "4a879573d4cf98cb9de71524f1ef448a07278c95",
+  "command_bytes": 1720,
+  "command_sha256": "c25b86f7f79dfb0f3f640aeda362e369e8bb2bcfa6c8d24635284b0b1f692d68",
+  "selected_member": "dist/server-shutdown-6hlRrMSx.mjs",
+  "selected_bytes": 3884,
+  "selected_sha256": "4fd5792f6c4dbd7dd3e257edd085866578eaf7ee0bafe3d9ab6cd77357a5df36",
+  "owner_binding": "UNBOUND",
+  "output_directories": [
+    "/home/admin/p2-b5-shutdown-candidate-v1-20261021",
+    "/home/admin/p2-b5-shutdown-member-v1-20261021"
+  ]
+}
