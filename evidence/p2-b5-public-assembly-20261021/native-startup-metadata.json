@@ -1,0 +1,103 @@
+{
+  "scope": "WORK_STATIC_CONTINUATION_METADATA_NOT_EXTRACTION_SELECTION",
+  "source_commit": "d1b204104f8f56046ba648f5e8fbeb877268bbdf",
+  "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba",
+  "current_three_implementation_gaps": [
+    {
+      "member": "dist/server-startup-config-helpers-U6xkM_57.mjs",
+      "bytes": 137,
+      "sha256": "05234c987220249a923175b49d20d7edc5f49c091272fbdca2a2f151e9aae765",
+      "manifest_matches": 1,
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_line": 5254,
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    },
+    {
+      "member": "dist/server-startup-early-BLUjqlAE.mjs",
+      "bytes": 4816,
+      "sha256": "1d457bf7c8373bc3f37acaa9039b588efa4e24a46d9d3d15751d88d84fa3b551",
+      "manifest_matches": 1,
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_line": 5481,
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    },
+    {
+      "member": "dist/server-startup-post-attach-CsYAFanV.mjs",
+      "bytes": 53969,
+      "sha256": "b62aa11d48ecedddf1b606f33114cdde8faf7fc193305eafddb918427024de22",
+      "manifest_matches": 1,
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_line": 8571,
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    }
+  ],
+  "current_three_bytes": 58922,
+  "additional_previously_identified_dependencies_not_selected": [
+    {
+      "member": "dist/config-recovery-hints-BpoTGCnY.mjs",
+      "bytes": 898,
+      "sha256": "4bdb27805b7cb7dd7c69c9cc7c5753d8ae54b4a160b3ddc560d24bbf3417db63",
+      "manifest_matches": 1,
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "reference_line": 16,
+      "source_evidence": "implementation-pair-source-analysis.json",
+      "selection_reason": "Metadata binding only, not a decision that this route must execute",
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    },
+    {
+      "member": "dist/issue-location-D9EcrsIq.mjs",
+      "bytes": 7503,
+      "sha256": "f7e6f4577f3c4961163b0a97b7e48be6cab489a497799bda19f961f9c94e123d",
+      "manifest_matches": 1,
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "reference_line": 17,
+      "source_evidence": "implementation-pair-source-analysis.json",
+      "selection_reason": "Metadata binding only, not a decision that this route must execute",
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    },
+    {
+      "member": "dist/plugin-activation-runtime-config-DIBrwFOO.mjs",
+      "bytes": 2958,
+      "sha256": "711dbf3e028e01a3dffe401a5f4205baa26ec868daddefb0f4cac57480bff26b",
+      "manifest_matches": 1,
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "reference_line": 18,
+      "source_evidence": "implementation-pair-source-analysis.json",
+      "selection_reason": "Metadata binding only, not a decision that this route must execute",
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba",
+      "additional_parent_reference": {
+        "parent": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+        "reference_line": 6
+      }
+    },
+    {
+      "member": "dist/recovery-policy-D5E-mA-L.mjs",
+      "bytes": 4762,
+      "sha256": "f518b69e31a66bab70e252abf8bfba1c6bad569695ef811445973043ed996714",
+      "manifest_matches": 1,
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "reference_line": 8,
+      "source_evidence": "implementation-pair-source-analysis.json",
+      "selection_reason": "Metadata binding only, not a decision that this route must execute",
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    }
+  ],
+  "selected_members": [],
+  "sdk": "NOT_EXECUTED",
+  "closure": "UNKNOWN",
+  "limitations": [
+    "Size and SHA are unique original-manifest matches, not implementation bytes.",
+    "Parent references derive from the pinned Work evidence JSON; no SDK execution or fresh server collection.",
+    "Additional dependency metadata is supplied to avoid repeated lookup, not to prescribe an extraction batch."
+  ]
+}

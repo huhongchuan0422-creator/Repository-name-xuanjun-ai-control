@@ -1,0 +1,66 @@
+{
+  "scope": "EXACT_THREE_NATIVE_STARTUP_ANALYSIS_NOT_INSTALLATION",
+  "execution": "NOT_EXECUTED_REQUIRES_SPECIFIC_CONFIRMATION",
+  "metadata_bytes": 4969,
+  "metadata_sha256": "980ea7ff1b6ecacdfec864cf743120a178bd3904833a7fff87b973dbecbb8296",
+  "bootstrap_bytes": 44630,
+  "bootstrap_sha256": "30c6caa8e30dfe91e03dd80eb51b1d4c25931dbcb1374e08f87def3d56dd8b3c",
+  "bootstrap_git_blob": "e44f0e6e34eadfe2ccb2da0ef50af4ae04d9b1a3",
+  "command_bytes": 1730,
+  "command_sha256": "143fc72358b15f311a3a18fa93d2e8fc4af07235ede3ddcb4b82a3569007026f",
+  "selected_bytes": 58922,
+  "selected_members": {
+    "dist/server-startup-config-helpers-U6xkM_57.mjs": {
+      "bytes": 137,
+      "sha256": "05234c987220249a923175b49d20d7edc5f49c091272fbdca2a2f151e9aae765"
+    },
+    "dist/server-startup-early-BLUjqlAE.mjs": {
+      "bytes": 4816,
+      "sha256": "1d457bf7c8373bc3f37acaa9039b588efa4e24a46d9d3d15751d88d84fa3b551"
+    },
+    "dist/server-startup-post-attach-CsYAFanV.mjs": {
+      "bytes": 53969,
+      "sha256": "b62aa11d48ecedddf1b606f33114cdde8faf7fc193305eafddb918427024de22"
+    }
+  },
+  "output_directories": [
+    "/home/admin/p2-b5-native-startup-three-candidate-v1-20261021",
+    "/home/admin/p2-b5-native-startup-three-members-v1-20261021"
+  ],
+  "parent_references": [
+    {
+      "member": "dist/server-startup-config-helpers-U6xkM_57.mjs",
+      "bytes": 137,
+      "sha256": "05234c987220249a923175b49d20d7edc5f49c091272fbdca2a2f151e9aae765",
+      "manifest_matches": 1,
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_line": 5254,
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    },
+    {
+      "member": "dist/server-startup-early-BLUjqlAE.mjs",
+      "bytes": 4816,
+      "sha256": "1d457bf7c8373bc3f37acaa9039b588efa4e24a46d9d3d15751d88d84fa3b551",
+      "manifest_matches": 1,
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_line": 5481,
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    },
+    {
+      "member": "dist/server-startup-post-attach-CsYAFanV.mjs",
+      "bytes": 53969,
+      "sha256": "b62aa11d48ecedddf1b606f33114cdde8faf7fc193305eafddb918427024de22",
+      "manifest_matches": 1,
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_line": 8571,
+      "present_in_verified_1718_archive": false,
+      "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    }
+  ],
+  "additional_dependencies": "METADATA_ONLY_NOT_SELECTED: not required to read these three bodies as inert analysis data; not a claim that imports are optional at runtime"
+}
