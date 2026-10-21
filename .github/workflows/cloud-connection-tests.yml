@@ -6,6 +6,7 @@ on:
       - production/cloud_connection/**
       - tests/test_cloud_connection*.py
       - deployment/cloud-connection/**
+      - docs/development/CLOUD_CONNECTION*.md
       - .github/workflows/cloud-connection-tests.yml
 permissions:
   contents: read
