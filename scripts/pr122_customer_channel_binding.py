@@ -11,13 +11,27 @@ import tarfile
 from scripts.pr122_customer_core import canonical,digest,Denied
 
 ORIGINAL_SHA='0804e33edac6ad07a711456c0c15708266b2ad8a75c4cb3bdc5964a9b79a96bd'
+# Exact 58b1dbbc 99-file baseline path set, plus the three identity additions.
+# This is not a generic increase of the legacy 100-member envelope.
+IDENTITY_ADDITIONS=frozenset({'scripts/pr122_customer_identity.py',
+    'tests/test_pr122_customer_identity.py',
+    'docs/development/PR122_CUSTOMER_CENTER_IDENTITY_CONTRACT_V1.md'})
+IDENTITY_BASE_PATHS_SHA256='88200b5319005bc1e56a20c37f1ba822c8520a81dc2f3c64b4f26b5bfc225a6a'
+
+def validate_member_shape(ms):
+    if not 1<len(ms)<=103 or len({m.name for m in ms})!=len(ms) or any(not m.isfile() or not m.name.startswith('customer-center/') or '..' in Path(m.name).parts or m.size>8000000 for m in ms):raise Denied('CANDIDATE_MEMBERS')
+    paths={m.name[len('customer-center/'):] for m in ms}
+    if paths & IDENTITY_ADDITIONS or len(ms)>100:
+        if len(ms)!=103 or not IDENTITY_ADDITIONS <= paths or 'CUSTOMER_MANIFEST.json' not in paths:raise Denied('IDENTITY_CANDIDATE_SHAPE')
+        baseline=paths-IDENTITY_ADDITIONS-{'CUSTOMER_MANIFEST.json'}
+        if len(baseline)!=99 or digest(canonical(sorted(baseline)))!=IDENTITY_BASE_PATHS_SHA256:raise Denied('IDENTITY_CANDIDATE_BASE_PATHS')
 
 def bind(original,archive,wheel_folder=None):
     if digest(original)!=ORIGINAL_SHA:raise Denied('EXACT_ORIGINAL_CHANNEL_REQUIRED')
     if len(archive)>10000000:raise Denied('CANDIDATE_ARCHIVE_LIMIT')
     with tarfile.open(fileobj=io.BytesIO(archive),mode='r:gz') as t:
         ms=t.getmembers()
-        if not 1<len(ms)<=100 or len({m.name for m in ms})!=len(ms) or any(not m.isfile() or not m.name.startswith('customer-center/') or '..' in Path(m.name).parts or m.size>8000000 for m in ms):raise Denied('CANDIDATE_MEMBERS')
+        validate_member_shape(ms)
         raw=t.extractfile('customer-center/CUSTOMER_MANIFEST.json').read();manifest=json.loads(raw)
         files=manifest['files']
         if len(files)!=len(ms)-1 or {m.name for m in ms}!={'customer-center/CUSTOMER_MANIFEST.json',*['customer-center/'+x['path'] for x in files]}:raise Denied('CANDIDATE_MANIFEST_SET')

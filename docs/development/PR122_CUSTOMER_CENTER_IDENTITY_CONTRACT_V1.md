@@ -169,3 +169,17 @@ All test identities are synthetic. Real mapping data, actual endpoint reachabili
 TLS/service-caller custody and store authorization/consumer integration are not
 accepted by these tests. Brand original byte review remains independently PENDING;
 this work does not issue install or production permission.
+
+## Exact customer candidate closure
+
+The existing customer review package grows from 100 to 103 archive members only
+because it adds the identity module, its test module and this contract. The fixed
+channel build adapter accepts that shape only with those exact three paths plus
+the complete 58b1dbbc baseline 99-file path set (canonical sorted-path SHA256
+88200b5319005bc1e56a20c37f1ba822c8520a81dc2f3c64b4f26b5bfc225a6a)
+and CUSTOMER_MANIFEST.json. Partial identity packages, arbitrary 101/102/103-file
+sets, path substitutions, duplicate/unsafe/nonregular members are rejected.
+Original per-file byte hashes, manifest coverage, archive limit and exact original
+channel source/AST checks remain. This affects build-only customer review closure;
+it does not expand actions, change frozen upgrade permission, or describe the
+separate 1241-member static brand archive.
