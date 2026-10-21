@@ -111,6 +111,8 @@ def import_mapping(c, document, key, confirmers, evidence):
         else:
             need(p['status'] == 'ACTIVE', 'REVOKE_UNKNOWN')
         if p['status'] == 'ACTIVE':
+            need(c.db.execute('SELECT 1 FROM accounts WHERE id=? AND verified=1',
+                              (p['user_id'],)).fetchone() is not None, 'VERIFIED_ACCOUNT_REQUIRED')
             project, _, _ = c.project(p['user_id'], p['project_id'])
             need(project['tenant'] == p['tenant_id'], 'MAPPING_TENANT')
             need(callable(evidence), 'EVIDENCE_REQUIRED')

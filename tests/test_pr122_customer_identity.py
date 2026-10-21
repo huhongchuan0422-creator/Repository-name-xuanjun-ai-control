@@ -96,6 +96,8 @@ class IdentityTests(unittest.TestCase):
         doc = {'payload': self.mapping, 'signature': '0' * 64}
         with self.assertRaises(Denied):import_mapping(self.c, doc, self.auth, ['owner-authority'], self.proofs.__getitem__)
         with self.assertRaises(Denied):self.put({**self.mapping, 'version': 2, 'email': 'same@example.com'})
+        self.c.db.execute('UPDATE accounts SET verified=0 WHERE id=?', (self.owner,))
+        with self.assertRaises(Denied):self.put({**self.mapping, 'version': 2})
 
     def test_mapping_old_version_bool_and_conflicting_id_rejected(self):
         with self.assertRaises(Conflict):self.put(self.mapping)
