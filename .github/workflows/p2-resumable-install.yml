@@ -26,3 +26,5 @@ jobs:
         with:
           python-version: '${{ matrix.python }}'
       - run: python -B tests/p2_install/test_journal.py -v
+      - name: B6 offline persistence and preactivation scope tests
+        run: python -B tests/p2_install/test_b6_persistence.py -v
