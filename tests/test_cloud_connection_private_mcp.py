@@ -107,3 +107,26 @@ class PrivateMcpTests(unittest.TestCase):
         self.assertEqual(r['result']['structuredContent']['state'],'SUCCESS')
         r=self.rpc('tools/call',{'name':'run_shell','arguments':{'request_id':'job-1'},'_meta':{'approved':True}})
         self.assertIn('error',r)
+
+    def test_tunnel_duplicate_initialize_before_notification(self):
+        p={'protocolVersion':'2025-03-26'}
+        a=self.rpc('initialize',p,mid='discovery')
+        b=self.rpc('initialize',p,mid=0)
+        self.assertEqual(a['result'],b['result'])
+        self.assertFalse(self.m.ready)
+        self.assertIn('error',self.rpc('tools/list'))
+
+    def test_tunnel_discovery_then_connector_initialize(self):
+        # Actual tunnel trace: initialize, initialized, initialize, tools/list.
+        self.initialize()
+        self.assertIn('result',self.rpc('initialize',{'protocolVersion':'2025-03-26'},mid=0))
+        self.assertTrue(self.m.ready)
+        self.assertEqual(len(self.rpc('tools/list')['result']['tools']),2)
+        self.assertIn('error',self.rpc('tools/call',{'name':'run_shell','arguments':{'request_id':'job-1'}}))
+        self.assertIn('error',self.rpc('tools/call',{'name':'read_result_file','arguments':{'request_id':'job-1','path':'/etc/shadow'}}))
+
+    def test_invalid_reinitialize_does_not_mutate_ready(self):
+        self.initialize()
+        self.assertIn('error',self.rpc('initialize',{'protocolVersion':'invalid'}))
+        self.assertTrue(self.m.ready)
+        self.assertEqual(self.call('connection_status')['structuredContent']['state'],'SUCCESS')
