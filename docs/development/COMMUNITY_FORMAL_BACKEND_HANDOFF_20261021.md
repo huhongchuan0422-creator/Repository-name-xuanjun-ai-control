@@ -87,3 +87,7 @@ scene必须指向现有CUSTOMER Principal及当前有效、同租户原项目。
 ## 国内服务复用证据增量
 
 公共大脑、客服中心留国内。实际国内源码的受控bridge、身份模型与社区Center的差异、接口缺项、下一最小改动及域名候选见[跨机接口增量](COMMUNITY_DOMESTIC_INTERFACE_DELTA_20261021.md)。已存在的round-trip不能当身份/门店授权接口；不放宽本地Center类型检查、不挂远端活动SQLite、不迁库或新建身份系统。本节与Owner #6313455771覆盖此前位置待定表述；现场操作仍单独确认。
+
+### 国内身份回交后的范围修正
+
+同SHA国内源码复核确认：消息workflow未知身份会get_or_create_customer创建LEAD，round-trip不是只读身份查询。Resolver仅做渠道映射、可选审计，不是会话/微信验证或租户门店授权；实际认证入口全项目状态UNKNOWN，已核桥接内相关端点NOT_IMPLEMENTED。英国调用许可仍UNKNOWN。准确增量见跨机接口文档，不重新列现场清单；未取得原权威读取合同前不写RemoteCenter或消息fallback，不触发建号。

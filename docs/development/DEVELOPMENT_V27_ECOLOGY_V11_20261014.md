@@ -3228,3 +3228,7 @@ CPU/内存/PID/磁盘/日志必须分别冻结有限硬上限；PR133 #628132286
 公共大脑、客服中心留国内，不迁库。已核国内源码存在受控/provider-neutral/bridge/v1/round-trip、独立model/complete及healthz；有HMAC/TTL/防重放，但允许channel不含小程序，未提供社区用户的tenant/project/store授权证明。国内CustomerSource/CustomerRepository与源码PR122 Center映射NOT_VERIFIED，不能把远端服务当本地Center或直接跨机挂活动SQLite。下一最小改动先由原国内责任方提供既有身份/微信绑定和权限投影合同，再按原受控接口确定薄接线；不新建身份系统，不把模型调用作为支付准入。
 
 准确源码hash、接口证据、缺项和验证方案见[跨机接口增量](COMMUNITY_DOMESTIC_INTERFACE_DELTA_20261021.md)。域名优先现有community-preview.wenwenwenyiyiyi.work；视频二级域名仅候选，center现有网站域名不挪用。复用1ac19e4a Hosted39580901541的1821项通过结果，本轮文档不等于跨机联通或现场通过；BACKEND_NOT_READY保持。
+
+#### 国内身份回交修正：消息桥接存在建号副作用
+
+同一customer-brain-source快照的customer_context_core.py约4469—4484行，workflow未知身份会调用get_or_create_customer创建LEAD；round-trip不能用于社区只读身份查询、登录鉴权或未知身份fallback。Resolver仅返回渠道映射，其审计可因audit_repository=None跳过；持久化/原子性/撤权合同UNKNOWN。全项目正式认证/微信绑定实现状态UNKNOWN，已核消息桥接内社区相关端点NOT_IMPLEMENTED；不得混写。下一最小接线先取得原权威且无建号副作用的认证/授权读取合同，英国URL/TLS/调用许可未证不调用。详见COMMUNITY_DOMESTIC_INTERFACE_DELTA_20261021.md；BACKEND_NOT_READY保持，1821项未变结果复用。

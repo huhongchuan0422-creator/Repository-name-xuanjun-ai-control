@@ -9,7 +9,7 @@
 | 来源/摘要 | 已证实的接口或数据关系 | 未证实/不得推定 |
 |---|---|---|
 | scripts/pr122_customer_core.py；原固定SHA cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0 | Center是原SQLite accounts/sessions/projects/members/links/events/audit组件；CenterIdentity/MiniPayments/Commerce等依赖其实际对象和数据库 | 名称Center不证明它就是国内客服中心；其实际部署位置及与国内CustomerRepository的绑定未取得 |
-| 国内ai_service/customer_context_core.py；8181fd7cf76cdb1ec729e4fa94e9160a32fb0f560de54175b0b4c0e55bbcd40f | CustomerIdentityResolver.resolve(channel,channel_identity)经CustomerRepository.hash_private_value及SQLAlchemy CustomerSource映射身份，未知身份返回IDENTITY_UNKNOWN并审计；DomesticRealCustomerWorkflow调用原客户工作流 | 未见对英国社区提供原会话验证、tenant/project/store/role授权投影的受控HTTP接口。此处customer_id不能直接与PR122 user_id等同 |
+| 国内ai_service/customer_context_core.py；8181fd7cf76cdb1ec729e4fa94e9160a32fb0f560de54175b0b4c0e55bbcd40f | CustomerIdentityResolver.resolve(channel,channel_identity)经CustomerRepository.hash_private_value及SQLAlchemy CustomerSource映射身份，未知身份返回IDENTITY_UNKNOWN；仅配置audit_repository时记录审计；DomesticRealCustomerWorkflow调用原客户工作流 | 未见对英国社区提供原会话验证、tenant/project/store/role授权投影的受控HTTP接口。此处customer_id不能直接与PR122 user_id等同 |
 | 国内ai_service/internal_provider_neutral_bridge.py；94745003e7857bce1d6694bee24c6a3377650f37a50db1f29671a96a1b2b19a3 | POST /provider-neutral/bridge/v1/round-trip；GET /healthz；schema provider-neutral-bridge.v1；四个X-Bridge头、HMAC、300秒时限、request_id+nonce重放库、有限并发/请求体、脱敏审计。DomesticRealCustomerCoreAdapter复用workflow.handle_message | 只有源码协议证据；实际base URL/TLS/网络策略/调用身份与既有SecretRef授权未知。服务HMAC不等于最终客户授权；/healthz PASS不等于社区/health READY或真机验收 |
 | 同桥接validate_provider_neutral_message | 允许FEISHU/TELEGRAM/WECOM及两个明确测试渠道；要求UNTRUSTED_USER_CONTENT；不接受秘密字段/文本 | 没有小程序/WEB渠道；不得冒充TG/飞书或用测试渠道接生产。不得把session、AppSecret、SecretRef或Authorization塞进消息metadata绕过规则 |
 | 同桥接POST /provider-neutral/model/v1/complete | 独立模型RPC请求/响应校验及处理路径存在 | 不等于CRM查询、身份鉴权或公共大脑知识检索API；不能为接社区擅自扩大模型RPC权限 |
@@ -31,7 +31,13 @@
 
 下一责任方是原国内身份/客服源码Writer提供已持有的：实际认证/微信绑定路由与校验函数；CustomerSource/CustomerRepository相关定义及PR122关联来源；对应租户/项目/角色投影与原审计调用；原桥接URL/TLS/SecretRef名称与已有UK调用权限的脱敏引用（不提供秘密值）。现有快照引用database.models.CustomerSource、database.repositories.CustomerRepository/AuditRepository，但未包含它们的完整定义或正式HTTP认证入口；这些是准确缺项，不虚构文件名或端口。
 
-此证据到齐后，本窗口在同一原分支交最小英国业务边界增量。没有这些证据时，不先写一个“永远PASS”的适配器、模拟身份网关或新IAM服务。公共大脑、客服中心及其数据继续国内，不以本方案申请迁库。
+**新增阻断证据（国内原窗口回交，已在相同SHA快照复核）：** customer_context_core.py约4469—4484行，workflow在resolve未命中时调用lifecycle.get_or_create_customer，status=LEAD。消息round-trip有建号副作用，绝不能作为社区只读身份探测、登录校验或未知身份fallback。仅Resolver返回UNKNOWN不代表完整workflow不写库。
+
+Resolver约898行只提供status/customer_id/channel/identity_hash；不验证会话、微信code/openid签名或tenant/project/store/role权限。_audit约942行在audit_repository为None时直接返回；有仓储时记录SYSTEM/CustomerIdentityResolver、Customer、IDENTITY_RESOLVED或UNKNOWN对应事件与channel metadata。仓储持久化/事务原子性/唯一约束/撤权审计仍UNKNOWN，不将调用record等同持久化证明。
+
+认证/微信绑定全项目实现状态UNKNOWN；已核消息桥接内社区会话鉴权/微信绑定端点NOT_IMPLEMENTED，两者范围不可混写。原国内窗口补充的loopback/TLS证书/HMAC文件引用仅为已有客服调用记录，保留在Owner回交，不公开复制内部路径，不代表英国可访问或获准使用。客户端证书SHA256固定校验能力与实际英国URL/TLS/调用者/SecretRef/网络许可应分别验收，后者仍UNKNOWN。
+
+下一最小源码动作保持在原国内权威接口证据到齐后：先确定一个明确不建号、不合并身份的原认证/授权读取接点，再由本窗口增量接英国业务边界；不调用round-trip验证身份。没有这些证据时，不先写一个“永远PASS”的适配器、模拟身份网关或新IAM服务。公共大脑、客服中心及其数据继续国内，不以本方案申请迁库。
 
 ## 有界验证方案
 
