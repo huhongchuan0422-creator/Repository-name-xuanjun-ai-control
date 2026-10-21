@@ -6,6 +6,8 @@ on:
     paths:
       - 'tools/pr122_login_config_prepare.py'
       - 'tests/test_pr122_login_config_prepare.py'
+      - 'tools/pr122_login_initial_prepare.py'
+      - 'tests/test_pr122_login_initial_prepare.py'
       - 'docs/development/PR122_LOGIN_CONFIG_PREPARATION.md'
       - 'scripts/pr122_customer_*.py'
       - 'tests/test_pr122_customer_*.py'
@@ -88,6 +90,44 @@ jobs:
           (folder/'OFFLINE_CONFIG_BINDING.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
           print(json.dumps(receipt,sort_keys=True))
           PYOFFLINE
+      - name: Exact 23 initial preparation regressions including 6 nonroot filesystem cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PR122_SOURCE_TREE="$(git rev-parse HEAD^{tree})"
+          python -B - <<'PYINITIAL' 2>&1 | tee /tmp/pr122-customer/INITIAL_PREPARATION_TESTS.log
+          import hashlib,json,os,sys,unittest
+          from pathlib import Path
+          assert sys.version_info[:2]==(3,11), 'Target Python version changed'
+          assert os.geteuid()!=0, 'Initial synthetic tests must run non-root'
+          blocked=[]
+          def guard(event,args):
+              if event.startswith('socket.') or event in ('subprocess.Popen','os.system','os.posix_spawn','os.fork','os.forkpty','os.exec'):
+                  blocked.append(event)
+                  raise AssertionError('FORBIDDEN_NETWORK_OR_PROCESS')
+              if event=='open' and args and isinstance(args[0],str) and any(args[0]==p or args[0].startswith(p+'/') for p in ('/etc/xuanjun-customer-center','/var/lib/xuanjun-customer-center','/usr/local/lib/xuanjun-customer-center')):
+                  blocked.append('protected-path')
+                  raise AssertionError('FORBIDDEN_PRODUCTION_PATH')
+          sys.addaudithook(guard)
+          suite=unittest.defaultTestLoader.loadTestsFromName('tests.test_pr122_login_initial_prepare')
+          def cases(group):
+              for item in group:
+                  if isinstance(item,unittest.TestSuite):yield from cases(item)
+                  else:yield item.id()
+          case_ids=list(cases(suite))
+          filesystem=[name for name in case_ids if '.FilesystemTests.' in name]
+          assert suite.countTestCases()==len(set(case_ids))==23, 'Initial test collection changed'
+          assert len(filesystem)==6, 'Nonroot filesystem collection changed'
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          assert result.testsRun==23 and result.wasSuccessful() and not result.skipped and not result.expectedFailures and not result.unexpectedSuccesses and not blocked
+          bindings=[]
+          for name in ('tools/pr122_login_initial_prepare.py','tests/test_pr122_login_initial_prepare.py','tools/pr122_login_config_prepare.py','.github/workflows/pr122-customer-center.yml'):
+              body=Path(name).read_bytes()
+              bindings.append({'path':name,'size':len(body),'sha256':hashlib.sha256(body).hexdigest()})
+          receipt={'source_commit':os.environ['GITHUB_SHA'],'source_tree':os.environ['PR122_SOURCE_TREE'],'run_id':os.environ['GITHUB_RUN_ID'],'python':sys.version,'euid':os.geteuid(),'total':result.testsRun,'passed':result.testsRun,'filesystem_cases':filesystem,'case_ids':case_ids,'skipped':0,'errors':0,'failures':0,'blocked_network_process_or_protected_path_attempts':blocked,'files':bindings,'scope':'OFFLINE_SYNTHETIC_ONLY','production_release':'HOLD','real_credentials':'NOT_USED','target_install':'NOT_RUN'}
+          Path('/tmp/pr122-customer/INITIAL_PREPARATION_BINDING.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
+          print(json.dumps(receipt,sort_keys=True))
+          PYINITIAL
       - name: Removed collector reference and tree consistency
         shell: bash
         run: |
