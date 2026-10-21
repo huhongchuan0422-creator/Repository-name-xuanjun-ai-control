@@ -14,6 +14,7 @@ def build(root):
                 'demos/community-stage/*', 'demos/community-payment/*',
                 'demos/community-admin/*', 'clients/community-mini/*.js',
                 'clients/community-mini/*.json', 'clients/community-mini/*.cjs',
+                'clients/community-mini/*.wxss',
                 'clients/community-mini/pages/checkout/*',
                 'clients/community-mini/pages/home/*',
                 'clients/community-mini/pages/profile/*',
@@ -35,12 +36,14 @@ def build(root):
             raise ValueError('PACKAGE_SYMLINK_DENIED')
         files[path.relative_to(root).as_posix()] = path.read_bytes()
     required = {'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
+                'scripts/community_preview_readiness.py',
                 'scripts/community_stage_package.py', 'clients/community-mini/app.json',
                 'scripts/pr122_customer_core.py', 'scripts/pr122_customer_source.py',
                 'scripts/pr122_customer_runtime.py', 'scripts/pr122_customer_evidence.py',
                 'scripts/pr122_customer_activity_evidence.py', 'scripts/pr122_customer_privacy.py',
                 'deploy/community-preview/prepare-mini.cjs',
                 'clients/community-mini/pages/home/index.js',
+                'clients/community-mini/app.wxss',
                 'clients/community-mini/pages/home/index.json',
                 'clients/community-mini/pages/home/index.wxml',
                 'clients/community-mini/pages/profile/index.js',

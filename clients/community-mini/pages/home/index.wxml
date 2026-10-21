@@ -1,8 +1,21 @@
-<view>
-  <text>客户中心</text><text>开发测试入口；支付保持关闭，未配置后端时不会进入业务。</text>
-  <text>{{status}}</text>
-  <button wx:if="{{!authenticated}}" bindtap="retryLogin" disabled="{{pending}}">重新登录</button>
-  <button wx:if="{{authenticated}}" bindtap="openProfile" disabled="{{pending}}">本人资料</button>
-  <button bindtap="openCheckout" disabled="{{pending}}">扫码收款 / 订单</button>
-  <button wx:if="{{authenticated}}" bindtap="logout" disabled="{{pending}}">退出登录</button>
+<view class="page">
+  <view class="brand">玄钧AI新 <text class="badge">开发预览</text></view>
+  <view class="hero">
+    <text class="eyebrow">COMMUNITY SERVICE</text>
+    <text class="title">欢迎来到客户中心</text>
+    <text class="subtitle">管理个人资料，查看门店服务与订单</text>
+  </view>
+  <view class="card status-card" aria-live="polite">
+    <view class="status-heading"><view class="status-dot {{authenticated?'is-ready':''}}"></view><text>{{pending?'正在连接':(authenticated?'已登录':'暂未登录')}}</text></view>
+    <text class="description">{{status}}</text>
+    <button class="primary" wx:if="{{!authenticated}}" bindtap="retryLogin" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在登录':'重新登录'}}</button>
+  </view>
+  <view class="card">
+    <text class="section-title">我的服务</text>
+    <button class="service-link" bindtap="openProfile" disabled="{{!authenticated||pending}}"><text>个人资料</text><text class="muted">管理昵称与联系方式 ›</text></button>
+    <button class="service-link" bindtap="openCheckout" disabled="{{!authenticated||pending}}"><text>门店与订单</text><text class="muted">浏览服务与查看订单 ›</text></button>
+    <text wx:if="{{!authenticated}}" class="hint">完成登录后可使用以上服务</text>
+  </view>
+  <button wx:if="{{authenticated}}" class="secondary" bindtap="logout" disabled="{{pending}}">退出登录</button>
+  <text class="footer">开发预览 · 支付尚未开放</text>
 </view>

@@ -53,7 +53,7 @@ test('missing backend is explicit and retry login uses existing session boundary
   const h=loadPage('pages/home/index.js',{baseUrl:''});h.page.scene='shop1';
   await h.page.login();
   assert.equal(h.page.data.authenticated,false);
-  assert.match(h.page.data.status,/未配置业务后端/);
+  assert.match(h.page.data.status,/服务尚未接通/);
   assert.equal(h.calls.length,0);
   h.config.baseUrl='https://fixture.invalid';
   await h.page.retryLogin();
@@ -287,4 +287,15 @@ test('late profile save finally cannot release a newer save request lock',async(
   assert.equal(h.page.data.nickname,'Newest');
   assert.equal(h.page.data.version,2);
   assert.equal(h.page.data.status,'本人资料已保存');
+});
+
+test('unavailable login remains unauthenticated and renders a safe customer message',async()=>{
+  for(const failure of ['network','server']){
+    const h=loadPage('pages/home/index.js');h.page.scene='shop1';
+    h.wx.request=o=>failure==='network'?o.fail({errMsg:'private network diagnostic'}):o.success({statusCode:503,data:'private upstream detail'});
+    await h.page.login();
+    assert.equal(h.page.data.authenticated,false);assert.equal(h.page.data.pending,false);
+    assert.match(h.page.data.status,/重试/);
+    assert.doesNotMatch(h.page.data.status,/SERVICE_|private|503/);
+  }
 });

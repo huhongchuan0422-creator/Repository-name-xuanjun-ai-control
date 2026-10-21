@@ -1,4 +1,4 @@
-const {parseScene,createSession}=require('../../session');
+const {parseScene,createSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
   data:{scene:'',status:'未连接业务后端',authenticated:false,pending:false},
@@ -16,7 +16,7 @@ Page({
       await this.session.login();
       if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch)){if(this.session)this.session.clear();return;}
       this.setData({authenticated:true,status:'客户身份已验证'});
-    }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(this.session)this.session.clear();this.session=null;this.setData({authenticated:false,status:e.message});}}
+    }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(this.session)this.session.clear();this.session=null;this.setData({authenticated:false,status:customerError(e)});}}
     finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },
   retryLogin(){return this.login();},

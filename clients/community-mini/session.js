@@ -1,4 +1,16 @@
 'use strict';
+function customerError(error) {
+  const code=error&&error.message;
+  if(error&&error.code==='ACCESS_DENIED')return '当前账号暂无访问权限，请联系项目负责人确认';
+  if(code==='SERVICE_RESULT_UNKNOWN')return '暂时无法连接服务，请检查网络后重试；若仍失败，请联系项目负责人';
+  if(code==='SERVICE_UNAVAILABLE')return '服务暂不可用，请稍后重试';
+  if(code==='SERVICE_REQUEST_REJECTED')return '请求未能完成，请稍后重试';
+  if(code==='WECHAT_LOGIN_FAILED'||code==='LOGIN_CODE_REQUIRED')return '微信登录未完成，请点击重新登录';
+  if(code==='SESSION_EXPIRED')return '登录已失效，请重新登录';
+  if(code==='UNTRUSTED_SESSION')return '登录结果未通过验证，请联系项目负责人';
+  if(typeof code==='string'&&/^未配置业务后端/.test(code))return '当前服务尚未接通，请联系项目负责人';
+  return '操作未能完成，请稍后重试';
+}
 function parseScene(options) {
   if (!options || typeof options.scene !== 'string') throw Error('SCENE_REQUIRED');
   let scene;
@@ -117,4 +129,4 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     clear() {generation++;token=null;expires=0;}
   };
 }
-module.exports={parseScene,createSession};
+module.exports={parseScene,createSession,customerError};

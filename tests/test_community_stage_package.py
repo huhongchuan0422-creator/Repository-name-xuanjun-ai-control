@@ -36,6 +36,7 @@ class SourcePackage(unittest.TestCase):
             self.assertEqual(manifest['files'][bill],hashlib.sha256(bill_raw).hexdigest())
             self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             required_pages=(
+                'clients/community-mini/app.wxss',
                 'deploy/community-preview/prepare-mini.cjs',
                 'clients/community-mini/pages/home/index.js',
                 'clients/community-mini/pages/home/index.json',

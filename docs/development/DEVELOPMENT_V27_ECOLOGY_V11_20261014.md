@@ -3196,3 +3196,9 @@ GEO阶段执行方向：先自用验证，再客户试点和SaaS选配；总体�
 - `community_stage_package.py` 必须显式纳入并要求 `deploy/community-preview/prepare-mini.cjs`；不得只在完整checkout验证。回归测试将实际生成的ZIP解至空目录，以工作流相同cwd运行准备脚本，核AppID、固定后端、主页文件及commerce=true/payments=false，逐文件manifest校验继续保留。
 - 正式组合测试复用原Center、mini token/scene、已审核商家及原订单SQLite，调用实际 `MiniApplication.configure_payments_from_applyments`，核原支付对象/身份/商户号接线、listen后禁止再次配置、撤权后prepare拒绝且provider零调用。这些均为合成环境测试，不等于生产准入或真实支付。
 - 客户现场验收仍需集中核DNS/TLS、request合法域名、官方真机扫码、真实code2session、商户进件确认/签约及JSAPI资格；真实支付、退款、分账与Finance核销分别留证，未取得证据一律UNKNOWN/UNCONFIRMED。
+
+#### 2026-10-21 真机失败后的预览修正
+
+Owner真机截图显示无样式首页和SERVICE_RESULT_UNKNOWN，客户预览验收明确FAIL。官方上传成功与源码非空不能推定可交客户。首页/本人资料页补统一WXSS和中文状态，网络或服务失败保持未登录，不暴露原始诊断或假造成功。app.wxss纳入实际source ZIP且为必需成员。
+
+官方预览上传前新增community_preview_readiness.py：只读检查固定HTTPS域名/community/health，禁止重定向，限时和响应大小；非200、非JSON、非READY或错误scope均拒绝上传，保留脱敏backend-readiness.json。健康通过只证明连通，login_verified和customer_acceptance仍false。后端503、合法域名、真实code2session与真机业务证据没有解决前，不生成或宣传客户验收二维码。当前范围不包含服务器部署或权限变更；不改用模拟登录绕过故障。

@@ -1,12 +1,12 @@
-<view>
-  <text>本人资料</text>
-  <text>{{status}}</text>
-  <button wx:if="{{!authenticated}}" bindtap="retryLogin" disabled="{{pending}}">重新登录</button>
-  <view wx:if="{{authenticated&&loaded}}">
+<view class="page">
+  <view class="hero"><text class="eyebrow">MY ACCOUNT</text><text class="title">个人资料</text><text class="subtitle">管理你的昵称与联系方式</text></view>
+  <view class="card"><text class="description">{{status}}</text>
+  <button class="primary" wx:if="{{!authenticated}}" bindtap="retryLogin" loading="{{pending}}" disabled="{{pending}}">重新登录</button></view>
+  <view class="card" wx:if="{{authenticated&&loaded}}">
     <text>客户编号：{{customerId}}</text>
-    <input value="{{nickname}}" placeholder="昵称" data-field="nickname" bindinput="input"/>
-    <input value="{{contact}}" placeholder="联系方式" data-field="contact" bindinput="input"/>
-    <button bindtap="save" disabled="{{pending}}">保存资料</button>
+    <text class="hint">昵称</text><input value="{{nickname}}" placeholder="填写昵称" data-field="nickname" bindinput="input"/>
+    <text class="hint">联系方式</text><input value="{{contact}}" placeholder="填写联系方式" data-field="contact" bindinput="input"/>
+    <button class="primary" bindtap="save" loading="{{pending}}" disabled="{{pending}}">保存资料</button>
     <button bindtap="logout" disabled="{{pending}}">退出登录</button>
   </view>
 </view>

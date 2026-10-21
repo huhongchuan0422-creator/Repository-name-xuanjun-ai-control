@@ -291,7 +291,10 @@ jobs:
           sha256sum -c sdk.sha256
           mkdir -p "$RUNNER_TEMP/community-mini-ci"
           tar --no-same-owner -xzf sdk.tar.gz -C "$RUNNER_TEMP/community-mini-ci"
-      - name: Prepare connected customer-acceptance mini source
+      - name: Require live backend health before loading upload credentials
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        run: /usr/bin/python3 -I -B scripts/community_preview_readiness.py --output "$RUNNER_TEMP/community-mini-preview/backend-readiness.json"
+      - name: Prepare connected development mini source
         working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
         env:
           COMMUNITY_CONNECTED_MINI_OUTPUT: ${{ runner.temp }}/community-mini-connected-${{ github.run_id }}-${{ github.run_attempt }}
