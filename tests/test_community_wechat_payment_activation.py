@@ -80,7 +80,20 @@ class WechatPaymentActivation(unittest.TestCase):
   token=self.fx.fx.fx.token('paused_code')
   self.fx.fx.fx.checkout(token,'paused_order')
   client=self.configured_client();self.reader._fetch=Mock()
-  with self.assertRaises(PermissionError):
+  from scripts.community_platform_merchants import CHANNEL,merchant_key,assert_trading
+  from scripts.pr122_customer_core import canonical
+  scope=dict(self.identity.runtime.bindings[self.identity.scenes[self.scene]['principal']])
+  key=merchant_key(scope)
+  # Original platform lifecycle store, not the separate storefront profile status.
+  value=dict(scope=scope,status='PAUSED',version=1,reason='Synthetic pause',
+             updated_at=self.center.now(),actor=self.fx.fx.fx.uid1)
+  with self.center.tx():
+   self.center.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',
+       (CHANNEL,key,self.fx.fx.fx.uid1,'project1',
+        self.center.encrypt(canonical(value),'community-merchant-lifecycle:'+key)))
+  with self.assertRaisesRegex(PermissionError,'PLATFORM_MERCHANT_TRADING_SUSPENDED'):
+   assert_trading(self.center,scope)
+  with self.assertRaisesRegex(PermissionError,'PLATFORM_MERCHANT_TRADING_SUSPENDED'):
    client.dispatch(token,{'scene':self.scene,'operation':'prepare','reference':'paused_order'})
   self.reader._fetch.assert_not_called()
  def test_wrong_applyment_owner_or_missing_signed_query_proof_is_rejected(self):
