@@ -60,3 +60,11 @@ FIRST_LOGIN_ONLY_V1表示配置创建来源/范围，不表示以后每次备份
 实际首次准备需要两阶段：先由原责任窗口取得当前可信身份/目标观察并获Owner对“两类新持久秘密及准确私有保管位置”的动作确认；再用另行准入的受控驱动生成/保存并取得真实保管与恢复证据，之后才形成准确config/runtime和四项验收，走原计划/签名/许可。生成前不能绑定尚不存在的配置摘要，也不能填假恢复PASS。本候选不提供这个实际生成驱动，不声称首装生产准备已闭环。
 
 恢复继续沿原restore-isolated进入maintenance、撤销旧会话/授权且队列UNKNOWN；本轮不增加解除maintenance、导入authority绕过或服务重开路径。真正既有材料只能复用对应keys/ref；未知来源保持HOLD。
+
+## 首次准备编排驱动候选（源码与合成测试）
+
+`tools/pr122_login_initial_prepare.py` 的 `InitialPreparation.run` 复用原 `prepare_initial_pair`、输出预检、`write_bundle` 和 `inspect_bundle`。没有CLI、默认熵源、默认时钟或生产准入适配器；依赖不齐即拒绝。只读观察、manifest、两类材料/保管输入和准确输出位置进入不可变请求摘要。注入的受信准入适配器必须自行认证调用者、真实Owner确认/归属/保管证据，并在 `claim(request_bytes, now)` 中持久消费唯一attempt；返回规范JSON字节，精确绑定request_sha256、authority_ref和最长300秒有效期。`check(request_bytes, grant_bytes, now)` 在生成前及写入前复核同一消费和撤权状态，返回相同准入字节。结构正确的JSON、boolean或测试适配器不是真实授权。本候选不提供该生产适配器，也不允许从用户输入直接构造真实准入。
+
+错目标/已有或未知身份、无效观察、拒绝/取消/过期、非私有或已有输出均在生成和写入前拒绝；仅派生独立data/backup，不创建authority。原NOFOLLOW、0600/0700、atomic NOREPLACE及读回不变。实例一经调用即消费，失败不清理现场、不重试；写入调用后异常一律保守UNKNOWN，跨实例/跨进程的唯一消费必须由未来获准适配器保证，不能靠新建实例恢复额度。成功仅为离线候选，仍NOT_INSTALLABLE、四项真实验收NOT_VERIFIED。
+
+对应合成测试：`python -B -m unittest tests.test_pr122_login_initial_prepare -v`。其中LogicTests明确隔离文件系统边界；FilesystemTests要求真实非root runner，使用临时私有目录、合成熵和测试准入，真实调用原安全写入/读回。root环境不得跳过或削弱原NONROOT_ONLY保护冒充文件系统通过。现有工作流只显式加载旧110项，本轮按限定三路径不改workflow，因此新模块未被该Hosted自动覆盖；应区分新模块执行证据与既有CI回归，不能宣称新增场景已由旧110项验收。
