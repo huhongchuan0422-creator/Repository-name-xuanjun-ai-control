@@ -35,7 +35,7 @@ class PreviewCandidateContract(unittest.TestCase):
  def test_rollback_covers_external_checks_and_old_objects(self):
   for token in ('current.symlink','$BACKUP/unit','$BACKUP/nginx','$BACKUP/enabled','$BACKUP/active'):self.assertIn(token,DEPLOY)
   trap=DEPLOY.index("trap 'rc=$?; if rollback; then exit 90; else exit 91; fi' ERR")
-  public=DEPLOY.index('curl --fail --silent --show-error --max-time 10 "https://$HOST/community/health"')
+  public=DEPLOY.index('curl_cmd --fail --silent --show-error --max-time 10 "https://$HOST/community/health"')
   clear=DEPLOY.index('trap - ERR')
   self.assertLess(trap,public);self.assertLess(public,clear)
   self.assertIn('rm -rf --one-file-system "$RELEASE"',DEPLOY)

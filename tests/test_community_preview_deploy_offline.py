@@ -85,7 +85,7 @@ exit 73
    'FAKE_SOCKET':str(self.sock),'FAKE_WRONG_RELEASE':str(self.root/'wrong-release')})
   e.update({k:str(v) for k,v in extra.items()});return e
  def invoke(self,**extra):
-  return subprocess.run(['bash',str(SCRIPT)],cwd=ROOT,env=self.env(**extra),text=True,capture_output=True,timeout=20)
+  return subprocess.run(['bash',str(SCRIPT)],cwd=ROOT,env=self.env(**extra),text=True,capture_output=True,timeout=12)
  def seed_old(self):
   old=self.base()/'releases/old-release';old.mkdir(parents=True)
   (old/'KEEP').write_text('old')

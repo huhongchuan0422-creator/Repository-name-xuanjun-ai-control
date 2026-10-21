@@ -134,9 +134,15 @@ cp "$RELEASE/deploy/community-preview/nginx.conf" "$NGINX"
 ln -sfn "$RELEASE" "$CURRENT"
 systemctl_cmd daemon-reload
 nginx_cmd -t
-if [ -e "$BACKUP/active" ];then systemctl_cmd restart "$SERVICE";else systemctl_cmd start "$SERVICE";fi
+if [ -e "$BACKUP/active" ];then
+  systemctl_cmd restart "$SERVICE" || false
+else
+  systemctl_cmd start "$SERVICE" || false
+fi
 NEW_PID=0
-for i in $(seq 1 30);do
+WAIT_LOOPS=30
+[ "${COMMUNITY_PREVIEW_TEST_MODE:-0}" != 1 ] || WAIT_LOOPS=2
+for i in $(seq 1 "$WAIT_LOOPS");do
   candidate="$(systemctl_cmd show -p MainPID --value "$SERVICE" 2>/dev/null || true)"
   case "$candidate" in ''|*[!0-9]*) candidate=0;; esac
   if [ "$candidate" -gt 0 ] 2>/dev/null;then
@@ -149,7 +155,7 @@ test "$NEW_PID" -gt 0
 if [ "$OLD_PID" -gt 0 ];then test "$NEW_PID" -ne "$OLD_PID";fi
 test "$(readlink -f "$PROC_ROOT/$NEW_PID/cwd")" = "$(readlink -f "$RELEASE")"
 SOCKET_PATH="${COMMUNITY_PREVIEW_SOCKET_PATH:-/run/xuanjun-community-preview/preview.sock}"
-for i in $(seq 1 30);do test -S "$SOCKET_PATH"&&break;sleep 1;done
+for i in $(seq 1 "$WAIT_LOOPS");do test -S "$SOCKET_PATH"&&break;sleep 1;done
 test -S "$SOCKET_PATH"
 nginx_cmd -t
 systemctl_cmd reload nginx
