@@ -114,8 +114,10 @@ class PrivateStore:
 
 
 class Loop:
-    def __init__(self, queue, github, cloud, store):
+    def __init__(self, queue, github, cloud, store, expiry_watch=None):
         self.q, self.gh, self.cloud, self.store = queue, github, cloud, store
+        # Host-only source contact point; main() does not enroll this candidate.
+        self.expiry_watch = expiry_watch
         queue.db.executescript('''
           CREATE TABLE IF NOT EXISTS connection_cursor (id INTEGER PRIMARY KEY CHECK(id=1), since TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS connection_outbox (
@@ -143,6 +145,13 @@ class Loop:
         return outcomes
 
     def tick(self, now):
+        if self.expiry_watch is not None:
+            from .credential_lifecycle import record_on_existing_queue
+            raw, approved_sha = self.expiry_watch
+            result = record_on_existing_queue(self.q.db, raw, approved_sha, now)
+            if result['state'] == 'STOP_EXPIRED_OR_CONSERVATIVE_BOUND':
+                self.flush()
+                raise Hold('CREDENTIAL_EXPIRY_STOP')
         self.ingest(now)
         rows = self.q.db.execute('SELECT request_id,state,invoke_id FROM connection_jobs ORDER BY rowid').fetchall()
         for rid, state, invoke in rows:
@@ -184,7 +193,7 @@ class Loop:
 
 def code_pin(directory):
     records = []
-    for name in ('queue.py', 'worker.py', 'runtime.py'):
+    for name in ('queue.py', 'worker.py', 'runtime.py', 'private_transfer.py', 'credential_lifecycle.py'):
         raw = (Path(directory) / name).read_bytes()
         records.append([name, hashlib.sha256(raw).hexdigest()])
     return hashlib.sha256(canonical(records).encode()).hexdigest()

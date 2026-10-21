@@ -116,6 +116,9 @@ class Cloud:
 
 
 def fixed_command(request):
+    # Candidate project jobs must never fall through to the old probe builder.
+    if request.get('operation') not in ('probe', 'fetch_os_release'):
+        raise Hold('FIXED_OPERATION_NOT_ENROLLED')
     nonce = hashlib.sha256(canonical(request).encode()).hexdigest()
     read_file = request['operation'] == 'fetch_os_release'
     code = ("import os,json,hashlib,base64,stat\n"
@@ -254,3 +257,39 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+class ExistingProjectFiles:
+    """Source-only bridge to existing SUCCESS jobs, never dispatch/enrollment.
+
+    recipient_provider is a trusted transport dependency, NOT a tool argument.
+    No such authenticated provider exists in the installed stdio transport;
+    leaving it absent always refuses. Tests may supply an offline fixture.
+    """
+    def __init__(self, db, catalogs=None, recipient_provider=None, enabled=False):
+        self.db = db
+        self.catalogs = catalogs
+        self.recipient_provider = recipient_provider
+        self.enabled = enabled
+
+    def read(self, arguments, now):
+        if self.enabled is not True:
+            raise Hold('PROJECT_TRANSFER_DISABLED')
+        if self.recipient_provider is None:
+            raise Hold('AUTHENTICATED_RECIPIENT_SOURCE_MISSING')
+        # Deliberately no request/metadata passed to the provider.
+        recipient = self.recipient_provider()
+        if type(recipient) is not str or not recipient:
+            raise Hold('AUTHENTICATED_RECIPIENT_REQUIRED')
+        if (type(arguments) is not dict or set(arguments) !=
+                {'manifest_sha256', 'request_id', 'object_ref', 'offset'}):
+            raise Hold('FIXED_OBJECT_ARGUMENTS')
+        sha = arguments['manifest_sha256']
+        if type(sha) is not str or self.catalogs is None or sha not in self.catalogs:
+            raise Hold('APPROVED_PROJECT_CATALOG_REQUIRED')
+        catalog, roots = self.catalogs[sha]
+        if catalog.sha != sha:
+            raise Hold('PROJECT_CATALOG_BINDING')
+        from .private_transfer import export_chunk
+        return export_chunk(self.db, catalog, roots, arguments['request_id'],
+                            arguments['object_ref'], recipient, arguments['offset'], now)

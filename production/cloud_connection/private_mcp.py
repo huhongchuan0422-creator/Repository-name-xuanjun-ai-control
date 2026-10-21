@@ -32,8 +32,9 @@ TOOLS = [
 
 
 class PrivateMcp:
-    def __init__(self, state_root):
+    def __init__(self, state_root, project_files=None):
         self.root = str(state_root)
+        self.project_files = project_files
         self.initialized = False
         self.ready = False
         self.guard = PrivateStore(self.root)
@@ -69,6 +70,13 @@ class PrivateMcp:
         if request.get('request_id') != rid:
             raise Hold('STATE_IDENTITY_MISMATCH')
         return rid, row, request
+
+    def read_project_chunk(self, arguments, now):
+        # Internal candidate contact point only. Not a registered MCP tool;
+        # main() supplies no adapter, catalog or authenticated identity source.
+        if self.project_files is None:
+            raise Hold('PROJECT_TRANSFER_NOT_ENROLLED')
+        return self.project_files.read(arguments, now)
 
     def call(self, name, arguments):
         if name not in ('connection_status', 'read_result_file'):

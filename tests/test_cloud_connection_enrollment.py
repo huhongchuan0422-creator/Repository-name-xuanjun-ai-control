@@ -13,6 +13,13 @@ spec = importlib.util.spec_from_file_location('connection_enroll', str(ROOT / 'd
 enroll = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(enroll)
 
+def frozen_source(path):
+    # enroll.py deliberately installs its original frozen source_commit.
+    # New candidate code must not rewrite that old manifest or installer.
+    if path in ('production/cloud_connection/worker.py','production/cloud_connection/runtime.py'):
+        return ROOT/'tests/fixtures/cloud_connection_enrollment'/Path(path).name
+    return ROOT/path
+
 class EnrollmentTests(unittest.TestCase):
     def run_plan(self, bad_sha=False, existing=False, apply=False):
         class Reply:
@@ -26,7 +33,7 @@ class EnrollmentTests(unittest.TestCase):
                 return self.url
             def read(self, limit):
                 path = self.url.split(enroll.SOURCE_COMMIT + '/')[1]
-                raw = (ROOT / path).read_bytes()
+                raw = frozen_source(path).read_bytes()
                 return raw + b'changed' if bad_sha else raw
         opener = SimpleNamespace(open=lambda url, timeout: Reply(url))
         def lstat(path):
@@ -77,9 +84,9 @@ class EnrollmentTests(unittest.TestCase):
             ['systemctl', 'is-active', '--quiet', 'xuanjun-cloud-connection.service']])
         self.assertEqual(self.write.call_count, 5)
 
-    def test_manifest_matches_current_sources(self):
+    def test_manifest_matches_frozen_enrollment_sources(self):
         for path, digest in enroll.FILES.items():
-            self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), digest)
+            self.assertEqual(hashlib.sha256(frozen_source(path).read_bytes()).hexdigest(), digest)
 
     def test_wrong_host_refused(self):
         with patch.object(enroll.sys, 'argv', ['enroll']), patch.object(enroll.os, 'geteuid', return_value=0), patch.object(enroll.os, 'uname', return_value=SimpleNamespace(nodename='wrong')):
