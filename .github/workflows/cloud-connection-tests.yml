@@ -1,0 +1,30 @@
+name: Cloud connection candidate tests
+on:
+  push:
+    branches: [feature/cloud-connection-continuation-20261021]
+    paths:
+      - production/cloud_connection/**
+      - tests/test_cloud_connection*.py
+      - deployment/cloud-connection/**
+      - .github/workflows/cloud-connection-tests.yml
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['python:3.6.15-buster', 'python:3.12.15-bookworm']
+    container:
+      image: ${{ matrix.image }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact source and runtime
+        run: |
+          git log -1 --format='%H %T %P'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python -c 'import sys,sqlite3; print(sys.version); print(sqlite3.sqlite_version)'
+      - name: Offline queue, transport and custody regression
+        run: python -m unittest discover -s tests -p 'test_cloud_connection*.py' -v
