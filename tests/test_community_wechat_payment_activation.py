@@ -1,5 +1,6 @@
 """Verified applyment -> existing MiniPayments startup projection; synthetic only."""
 import json,unittest
+from unittest.mock import Mock
 import test_community_merchant_opening as opening_fixture
 import test_community_wechat_sp_readonly as key_fixture
 from scripts.community_wechat_sp_readonly import PartnerOrderReader
@@ -62,13 +63,25 @@ class WechatPaymentActivation(unittest.TestCase):
  def test_revoked_opening_or_scope_change_rejects_projection(self):
   self.center.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_MERCHANT_OPENING'")
   with self.assertRaises(PermissionError):self.project()
- def test_runtime_guard_rejects_revoked_opening_after_startup_projection(self):
+ def configured_client(self):
   result=self.project()
   client=MiniPayments(self.identity,PartnerPrepay(self.center,self.reader,{}),merchants=result)
   client.activation_guard=lambda scene:project_wechat_scene(
       self.identity,self.fx.fx.service,self.reader,scene,self.admissions[scene])['merchant']
+  return client
+ def test_runtime_guard_rejects_revoked_opening_through_payment_authorize(self):
+  token=self.fx.fx.fx.token('activation_code')
+  self.fx.fx.fx.checkout(token,'activation_order')
+  client=self.configured_client()
   self.center.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_MERCHANT_OPENING'")
-  with self.assertRaises(PermissionError):client.activation_guard(self.scene)
+  with self.assertRaises(PermissionError):client._authorize(token,self.scene,'activation_order')
+ def test_paused_merchant_denies_prepare_before_provider_io(self):
+  token=self.fx.fx.fx.token('paused_code')
+  self.fx.fx.fx.checkout(token,'paused_order')
+  client=self.configured_client();self.reader._fetch=Mock()
+  with self.assertRaises(PermissionError):
+   client.dispatch(token,{'scene':self.scene,'operation':'prepare','reference':'paused_order'})
+  self.reader._fetch.assert_not_called()
  def test_reopen_is_idempotent_and_client_never_supplies_submerchant(self):
   first=self.project()
   self.fx.fx.fx.reopen()
