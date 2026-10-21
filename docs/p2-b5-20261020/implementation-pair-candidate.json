@@ -1,0 +1,39 @@
+{
+  "scope": "EXACT_TWO_IMPLEMENTATIONS_ANALYSIS_NOT_INSTALLATION",
+  "execution": "NOT_EXECUTED_REQUIRES_SPECIFIC_CONFIRMATION",
+  "binding_source": "PR17#6314958023 original manifest attestation; target bytes not received",
+  "bootstrap_bytes": 44413,
+  "bootstrap_sha256": "5fb267b1a5539d61ea3fe43f28815dd82822fc8b6f18a98a1118a31971bfdf5f",
+  "bootstrap_git_blob": "fbc2e1037c5c688bc3d2b1fb9ec96e5c7d39eb3e",
+  "command_bytes": 1728,
+  "command_sha256": "2d80202cbac0bd020b9bc169e30751e527f4d50dfc62ab7b1b7a9824178ae4e9",
+  "selected_bytes": 15004,
+  "selected_members": {
+    "dist/server-plugin-bootstrap-BF-wNIVo.mjs": {
+      "bytes": 3726,
+      "sha256": "d52477f026b0aeb3c2ee9baafc4a081506ac7a08bff645ec9850e19dd8483881"
+    },
+    "dist/server-startup-config-helpers-d2nPJiVj.mjs": {
+      "bytes": 11278,
+      "sha256": "d969dec157ce6a62f7c999d09e5682c9abfa0430b1fa7baeaa4106ceeb90fcde"
+    }
+  },
+  "output_directories": [
+    "/home/admin/p2-b5-implementation-pair-candidate-v1-20261021",
+    "/home/admin/p2-b5-implementation-pair-members-v1-20261021"
+  ],
+  "parent_references": [
+    {
+      "file": "dist/server-startup-plugins-Cajv-q3y.mjs",
+      "line": 182,
+      "kind": "dynamic import",
+      "target": "dist/server-plugin-bootstrap-BF-wNIVo.mjs"
+    },
+    {
+      "file": "dist/server-startup-config-Hx2M1x7s.mjs",
+      "line": 11,
+      "kind": "static named import",
+      "target": "dist/server-startup-config-helpers-d2nPJiVj.mjs"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "scope": "TWO_IMPLEMENTATION_METADATA_JOIN_NOT_SELECTION_OR_PERMISSION",
+  "source_commit": "4fb10937d260d15f03b986599c5a75a90ecca474",
+  "source_evidence": "evidence/p2-b5-public-assembly-20261021/four-member-source-analysis.json",
+  "manifest_bytes": 5635704,
+  "manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba",
+  "rows": [
+    {
+      "member": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "bytes": 3726,
+      "sha256": "d52477f026b0aeb3c2ee9baafc4a081506ac7a08bff645ec9850e19dd8483881",
+      "manifest_matches": 1,
+      "match_status": "UNIQUE",
+      "present_in_verified_1718_archive": false,
+      "parent": "dist/server-startup-plugins-Cajv-q3y.mjs",
+      "reference_line": null,
+      "reference_line_status": "Work evidence identifies call but has no line number; not invented"
+    },
+    {
+      "member": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "bytes": 11278,
+      "sha256": "d969dec157ce6a62f7c999d09e5682c9abfa0430b1fa7baeaa4106ceeb90fcde",
+      "manifest_matches": 1,
+      "match_status": "UNIQUE",
+      "present_in_verified_1718_archive": false,
+      "parent": "dist/server-startup-config-Hx2M1x7s.mjs",
+      "reference_line": null,
+      "reference_line_status": "Work evidence identifies call but has no line number; not invented"
+    }
+  ],
+  "total_bytes": 15004,
+  "selected_members": [],
+  "sdk": "NOT_EXECUTED",
+  "closure": "UNKNOWN"
+}
