@@ -1,0 +1,16 @@
+{
+  "execution": "NOT_EXECUTED_REQUIRES_SPECIFIC_CONFIRMATION",
+  "bootstrap_bytes": 44085,
+  "bootstrap_sha256": "3802a1b5c286026e7e1ff0740cadc2b2a01d8141b3a0a250df376fb9a65b5ae3",
+  "bootstrap_git_blob": "50cfaf4fdf32ccf4750677e422c09fa03b899d4a",
+  "command_bytes": 1728,
+  "command_sha256": "684295f31ae3dd92bc82dcc85ada03ecc2e23ec1da24b539af69f7b2f5342cd6",
+  "selected_member": "dist/server-start-Bz-KV48j.mjs",
+  "selected_bytes": 382422,
+  "selected_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+  "owner_binding": "UNBOUND",
+  "output_directories": [
+    "/home/admin/p2-b5-server-start-candidate-v1-20261021",
+    "/home/admin/p2-b5-server-start-member-v1-20261021"
+  ]
+}
