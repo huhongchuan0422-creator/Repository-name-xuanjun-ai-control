@@ -3,6 +3,8 @@ on:
   push:
     branches: [repair/p2-resumable-install-20261020]
     paths:
+      - production/p2_install/b5_native_work_drain.mjs
+      - tests/p2_install/test_b5_native_work_drain.mjs
       - production/p2_install/b5_server_root_binding.mjs
       - tests/p2_install/test_b5_server_root_binding.mjs
       - production/p2_install/b5_ws_public_contract.mjs
@@ -19,5 +21,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: New affected server-root byte cases; prior lifecycle cases retained
-        run: node tests/p2_install/test_b5_server_root_binding.mjs
+      - name: New affected native drain glue only; prior tests retained
+        run: node tests/p2_install/test_b5_native_work_drain.mjs

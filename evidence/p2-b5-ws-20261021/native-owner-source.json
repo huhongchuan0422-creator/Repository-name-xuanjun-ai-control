@@ -1,0 +1,62 @@
+{
+  "scope": "RECEIVED_STATIC_BYTES_NOT_RUNTIME_BINDING",
+  "materials": {
+    "bytes": 389120,
+    "sha256": "ae5124933e2e318e9fc7cb1fc224705c9706381e914f93f12c2b662c322149ed"
+  },
+  "report": {
+    "bytes": 956,
+    "sha256": "17cd4f4c14819020e07055ca88bbb8673338e5e6c4cef6bc8a58f92233bb1674"
+  },
+  "sources": [
+    {
+      "member": "dist/server-start-Bz-KV48j.mjs",
+      "bytes": 382422,
+      "sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "excerpts": [
+        {
+          "first_line": 3884,
+          "last_line": 3927,
+          "text": "/** Owns received work and connection cleanup until this Gateway generation settles. */\nvar GatewayConnectionWork = class extends AsyncWorkScope {\n\tconstructor(..._args) {\n\t\tsuper(..._args);\n\t\tthis.spawnBroker = getSpawnBroker();\n\t\tthis.runWithReadOnlyWorkers = captureSqliteReadOnlyWorkerScope();\n\t\tthis.connections = /* @__PURE__ */ new Set();\n\t}\n\ttrack(run) {\n\t\treturn runWithSpawnBroker(this.spawnBroker, () => super.track(() => this.runWithReadOnlyWorkers(run)));\n\t}\n\ttrackCleanup(run) {\n\t\treturn this.track(async () => {\n\t\t\ttry {\n\t\t\t\tawait run();\n\t\t\t} catch (error) {\n\t\t\t\tthis.failure ??= { error };\n\t\t\t\tthrow error;\n\t\t\t}\n\t\t});\n\t}\n\tregisterConnection(close) {\n\t\tconst closed = createDeferredCore();\n\t\tthis.connections.add(close);\n\t\tthis.track(() => closed.promise);\n\t\treturn () => {\n\t\t\tthis.connections.delete(close);\n\t\t\tclosed.resolve();\n\t\t};\n\t}\n\tasync drain() {\n\t\tthis.beginClose();\n\t\tfor (const close of this.connections) {\n\t\t\tthis.connections.delete(close);\n\t\t\ttry {\n\t\t\t\tclose();\n\t\t\t} catch (error) {\n\t\t\t\tthis.failure ??= { error };\n\t\t\t}\n\t\t}\n\t\tawait super.drain();\n\t\tif (this.failure) throw new Error(\"Gateway connection work failed to close cleanly\", { cause: this.failure.error });\n\t}\n};"
+        },
+        {
+          "first_line": 4265,
+          "last_line": 4274,
+          "text": "\t\t\t\t}\n\t\t\t};\n\t\t},\n\t\tclients,\n\t\tforgetConnectionAncestors,\n\t\tconnectionWork: new GatewayConnectionWork(),\n\t\tmentionInbox,\n\t\tisConnectionActive,\n\t\t...gatewayBroadcaster,\n\t\tagentRunSeq,"
+        },
+        {
+          "first_line": 8139,
+          "last_line": 8150,
+          "text": "\tconst databaseStartupAdmission = getAgentDatabaseStartupAdmission();\n\tconst getReadiness = runtime.createHttpTransportOptions().getReadiness;\n\tconst { attachGatewayWsConnectionHandler } = await startupTrace.measure(\"gateway.ws-imports\", () => import(\"./ws-connection-CsJ9cE0L.mjs\"));\n\tawait startupTrace.measure(\"gateway.ws-attach\", () => attachGatewayWsConnectionHandler({\n\t\twss,\n\t\tclients,\n\t\tconnectionWork: runtime.connectionWork,\n\t\tbootId,\n\t\tpreauthConnectionBudget,\n\t\tport,\n\t\tgatewayHost: bindHost ?? void 0,\n\t\tpluginSurfaceScheme: gatewayTls.enabled ? \"https\" : \"http\","
+        },
+        {
+          "first_line": 8667,
+          "last_line": 8669,
+          "text": "}\n//#endregion\nexport { startGatewayServerCore };"
+        }
+      ]
+    },
+    {
+      "member": "dist/async-work-scope-BYeX3gh6.mjs",
+      "bytes": 6156,
+      "sha256": "e820957a70b90a0b3d5d3dbb65ea07f88991d696d193c87798df9e33afb3fd3c",
+      "excerpts": [
+        {
+          "first_line": 1,
+          "last_line": 6,
+          "text": "import { t as createDeferredCore } from \"./deferred-D0La5CRk.mjs\";\nimport { a as resolveGlobalSingleton } from \"./global-singleton-0m-JziJW.mjs\";\nimport { AsyncLocalStorage, AsyncResource } from \"node:async_hooks\";\n//#region src/shared/async-work-scope.ts\nconst currentWorkScope = resolveGlobalSingleton(Symbol.for(\"openclaw.asyncWorkScope\"), () => new AsyncLocalStorage());\nconst currentWorkScopeAncestry = resolveGlobalSingleton(Symbol.for(\"openclaw.asyncWorkScopeAncestry\"), () => new AsyncLocalStorage());"
+        },
+        {
+          "first_line": 64,
+          "last_line": 103,
+          "text": "\t}\n\tbeginClose(reason) {\n\t\tif (this.phase !== \"open\") return;\n\t\tthis.phase = \"closing\";\n\t\tthis.controller.abort(reason);\n\t}\n\t/** Starts the next phase in the same continuation that observes settled pending work. */\n\trunWhenIdle(run) {\n\t\treturn AsyncWorkScope.runWhenAllIdle(() => [this], () => this.track(run));\n\t}\n\t/** Reselects owners so work admitted into a later phase is not mistaken for earlier work. */\n\tstatic async runWhenAllIdle(selectScopes, run) {\n\t\tlet scopes = selectScopes();\n\t\twhile (scopes.some((scope) => scope.pending.size > 0)) {\n\t\t\tawait Promise.allSettled(scopes.flatMap((scope) => Array.from(scope.pending)));\n\t\t\tscopes = selectScopes();\n\t\t}\n\t\treturn run();\n\t}\n\tasync drain() {\n\t\tthis.beginClose();\n\t\twhile (this.pending.size > 0) await Promise.allSettled(this.pending);\n\t\tthis.phase = \"closed\";\n\t}\n};\n/** Inspect retained scopes by identity, including instances created by a released runtime. */\nfunction isAsyncWorkScopeActiveHere(scope) {\n\tconst owner = currentWorkScope.getStore();\n\tif (owner === scope) return true;\n\tconst ancestry = currentWorkScopeAncestry.getStore();\n\tif (!owner || ancestry?.scope !== owner) return false;\n\tfor (let frame = ancestry; frame; frame = frame.parent) if (frame.scope === scope) return true;\n\treturn false;\n}\n/** Outside a managed scope, the returned promise remains the caller's responsibility. */\nasync function trackAsyncWork(run) {\n\tconst scope = currentWorkScope.getStore();\n\treturn await (scope ? scope.track(run) : run());\n}\n/** Captures only work ownership, never the caller's authorization or other async context. */"
+        },
+        {
+          "first_line": 166,
+          "last_line": 166,
+          "text": ""
+        }
+      ]
+    }
+  ]
+}
